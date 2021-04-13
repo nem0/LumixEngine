@@ -149,7 +149,7 @@ namespace Lumix
 	}
 
 	DefaultAllocator::~DefaultAllocator() {
-		os::memRelease(m_small_allocations);
+		os::memRelease(m_small_allocations, PAGE_SIZE * MAX_PAGE_COUNT);
 	}
 
 	void* DefaultAllocator::allocate(size_t n)

@@ -118,12 +118,13 @@ void GameView::captureMouse(bool capture)
 	os::showCursor(!capture || m_is_ingame_cursor);
 	
 	if (capture) {
+		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
 		const os::Point cp = os::getMouseScreenPos();
 		m_captured_mouse_x = cp.x;
 		m_captured_mouse_y = cp.y;
 	}
 	else {
-		os::unclipCursor();
+		os::grabMouse(os::INVALID_WINDOW);
 		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 	}
 }
@@ -352,10 +353,6 @@ void GameView::onWindowGUI()
 			if (is_hovered && ImGui::IsMouseClicked(0) && editor.isGameMode()) captureMouse(true);
 			m_pos = ImGui::GetItemRectMin();
 			m_size = ImGui::GetItemRectSize();
-
-			if (m_is_mouse_captured) {
-				os::clipCursor((int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
-			}
 
 			processInputEvents();
 			controlsGUI(editor);

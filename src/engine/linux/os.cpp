@@ -1,14 +1,18 @@
+#include "engine/os.h"
 #include "engine/allocators.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
-#include "engine/os.h"
 #include "engine/path.h"
 #include "engine/queue.h"
 #include "engine/string.h"
-#include <dlfcn.h>
+#include <X11/Xatom.h>
+#include <X11/Xlib.h>
+#include <X11/Xmd.h>
+#include <X11/Xresource.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -22,25 +26,19 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <X11/Xatom.h>
-#include <X11/Xlib.h>
-#include <X11/Xmd.h>
-#include <X11/Xresource.h>
 #define GLX_GLXEXT_LEGACY
 #include <GL/glx.h>
 
-#define _NET_WM_STATE_ADD           1
+#define _NET_WM_STATE_ADD 1
 
-namespace Lumix::os
-{
+namespace Lumix::os {
 
 
 static DefaultAllocator s_allocator;
 static HashMap<KeySym, Keycode> s_from_x11_keysym(s_allocator);
 static const char* s_keycode_names[256];
 
-static struct
-{
+static struct {
 	bool finished = false;
 	Queue<Event, 128> event_queue;
 	Point relative_mode_pos = {};
@@ -49,12 +47,12 @@ static struct
 
 	int argc = 0;
 	char** argv = nullptr;
-	Display* display = nullptr; 
+	Display* display = nullptr;
 	XIC ic;
 	XIM im;
 	IVec2 mouse_screen_pos = {};
 	bool key_states[256] = {};
-    Atom net_wm_state_atom;
+	Atom net_wm_state_atom;
 	Atom net_wm_state_maximized_vert_atom;
 	Atom net_wm_state_maximized_horz_atom;
 	Atom wm_protocols_atom;
@@ -75,7 +73,7 @@ static Keycode getKeycode(KeySym keysym) {
 
 	if ((u8)keysym >= 'a' && (u8)keysym <= 'z') return (Keycode)(keysym - 'a' + 'A');
 	if ((u8)keysym >= 'A' && (u8)keysym <= 'Z' || (u8)keysym >= '0' && (u8)keysym <= '9') return (Keycode)keysym;
-	
+
 	return Keycode::INVALID;
 }
 
@@ -93,14 +91,14 @@ void init() {
 		Keycode lumix;
 		const char* name;
 	} map[] = {
-		{ XK_BackSpace, Keycode::BACKSPACE, "Backspace" },
-		{ XK_Tab, Keycode::TAB, "Tab" },
-		{ XK_Clear, Keycode::CLEAR, "Clear" },
-		{ XK_Return, Keycode::RETURN, "Return" },
-		{ XK_Shift_L, Keycode::SHIFT, "Shift" },
-		{ XK_Control_L, Keycode::CTRL, "Ctrl" },
-		{ XK_Menu, Keycode::MENU, "Menu" },
-		{ XK_Pause, Keycode::PAUSE, "Pause" },
+		{XK_BackSpace, Keycode::BACKSPACE, "Backspace"},
+		{XK_Tab, Keycode::TAB, "Tab"},
+		{XK_Clear, Keycode::CLEAR, "Clear"},
+		{XK_Return, Keycode::RETURN, "Return"},
+		{XK_Shift_L, Keycode::SHIFT, "Shift"},
+		{XK_Control_L, Keycode::CTRL, "Ctrl"},
+		{XK_Menu, Keycode::MENU, "Menu"},
+		{XK_Pause, Keycode::PAUSE, "Pause"},
 		//{ XK_, Keycode::CAPITAL, "" },
 		//{ XK_, Keycode::KANA, "" },
 		//{ XK_, Keycode::HANGEUL, "" },
@@ -109,83 +107,83 @@ void init() {
 		//{ XK_, Keycode::FINAL, "" },
 		//{ XK_, Keycode::HANJA, "" },
 		//{ XK_, Keycode::KANJI, "" },
-		{ XK_Escape, Keycode::ESCAPE, "Escape" },
+		{XK_Escape, Keycode::ESCAPE, "Escape"},
 		//{ XK_, Keycode::CONVERT, "" },
 		//{ XK_, Keycode::NONCONVERT, "" },
 		//{ XK_, Keycode::ACCEPT, "" },
 		//{ XK_m, Keycode::MODECHANGE, "" },
-		{ XK_space, Keycode::SPACE, "Space" },
-		{ XK_Page_Up, Keycode::PAGEUP, "Page Up" },
-		{ XK_Page_Down, Keycode::PAGEDOWN, "Page Down" },
-		{ XK_End, Keycode::END, "End" },
-		{ XK_Home, Keycode::HOME, "Home" },
-		{ XK_Left, Keycode::LEFT, "Left" },
-		{ XK_Up, Keycode::UP, "Up" },
-		{ XK_Right, Keycode::RIGHT, "Right" },
-		{ XK_Down, Keycode::DOWN, "Down" },
-		{ XK_Select, Keycode::SELECT, "Select" },
-		{ XK_Print, Keycode::PRINT, "Print" },
-		{ XK_Execute, Keycode::EXECUTE, "Execute" },
+		{XK_space, Keycode::SPACE, "Space"},
+		{XK_Page_Up, Keycode::PAGEUP, "Page Up"},
+		{XK_Page_Down, Keycode::PAGEDOWN, "Page Down"},
+		{XK_End, Keycode::END, "End"},
+		{XK_Home, Keycode::HOME, "Home"},
+		{XK_Left, Keycode::LEFT, "Left"},
+		{XK_Up, Keycode::UP, "Up"},
+		{XK_Right, Keycode::RIGHT, "Right"},
+		{XK_Down, Keycode::DOWN, "Down"},
+		{XK_Select, Keycode::SELECT, "Select"},
+		{XK_Print, Keycode::PRINT, "Print"},
+		{XK_Execute, Keycode::EXECUTE, "Execute"},
 		//{ XK_, Keycode::SNAPSHOT, "" },
-		{ XK_Insert, Keycode::INSERT, "Insert" },
-		{ XK_Delete, Keycode::DEL, "Delete" },
-		{ XK_Help, Keycode::HELP, "Help" },
+		{XK_Insert, Keycode::INSERT, "Insert"},
+		{XK_Delete, Keycode::DEL, "Delete"},
+		{XK_Help, Keycode::HELP, "Help"},
 		//{ XK_, Keycode::LWIN, "" },
 		//{ XK_, Keycode::RWIN, "" },
 		//{ XK_, Keycode::APPS, "" },
 		//{ XK_, Keycode::SLEEP, "" },
-		{ XK_KP_0, Keycode::NUMPAD0, "Numpad 0" },
-		{ XK_KP_1, Keycode::NUMPAD1, "Numpad 1" },
-		{ XK_KP_2, Keycode::NUMPAD2, "Numpad 2" },
-		{ XK_KP_3, Keycode::NUMPAD3, "Numpad 3" },
-		{ XK_KP_4, Keycode::NUMPAD4, "Numpad 4" },
-		{ XK_KP_5, Keycode::NUMPAD5, "Numpad 5" },
-		{ XK_KP_6, Keycode::NUMPAD6, "Numpad 6" },
-		{ XK_KP_7, Keycode::NUMPAD7, "Numpad 7" },
-		{ XK_KP_8, Keycode::NUMPAD8, "Numpad 8" },
-		{ XK_KP_9, Keycode::NUMPAD9, "Numpad 9" },
-		{ XK_multiply, Keycode::MULTIPLY, "*" },
-		{ XK_KP_Add, Keycode::ADD, "+" },
-		{ XK_KP_Separator, Keycode::SEPARATOR, "N/A" },
-		{ XK_KP_Subtract, Keycode::SUBTRACT, "-" },
-		{ XK_KP_Decimal, Keycode::DECIMAL, "." },
-		{ XK_KP_Divide, Keycode::DIVIDE, "/" },
-		{ XK_F1, Keycode::F1, "F1" },
-		{ XK_F2, Keycode::F2, "F2" },
-		{ XK_F3, Keycode::F3, "F3" },
-		{ XK_F4, Keycode::F4, "F4" },
-		{ XK_F5, Keycode::F5, "F5" },
-		{ XK_F6, Keycode::F6, "F6" },
-		{ XK_F7, Keycode::F7, "F7" },
-		{ XK_F8, Keycode::F8, "F8" },
-		{ XK_F9, Keycode::F9, "F9" },
-		{ XK_F10, Keycode::F10, "F10" },
-		{ XK_F11, Keycode::F11, "F11" },
-		{ XK_F12, Keycode::F12, "F12" },
-		{ XK_F13, Keycode::F13, "F13" },
-		{ XK_F14, Keycode::F14, "F14" },
-		{ XK_F15, Keycode::F15, "F15" },
-		{ XK_F16, Keycode::F16, "F16" },
-		{ XK_F17, Keycode::F17, "F17" },
-		{ XK_F18, Keycode::F18, "F18" },
-		{ XK_F19, Keycode::F19, "F19" },
-		{ XK_F20, Keycode::F20, "F20" },
-		{ XK_F21, Keycode::F21, "F21" },
-		{ XK_F22, Keycode::F22, "F22" },
-		{ XK_F23, Keycode::F23, "F23" },
-		{ XK_F24, Keycode::F24, "F24" },
-		{ XK_Num_Lock, Keycode::NUMLOCK, "Num lock" },
-		{ XK_Scroll_Lock, Keycode::SCROLL, "Scroll lock" },
+		{XK_KP_0, Keycode::NUMPAD0, "Numpad 0"},
+		{XK_KP_1, Keycode::NUMPAD1, "Numpad 1"},
+		{XK_KP_2, Keycode::NUMPAD2, "Numpad 2"},
+		{XK_KP_3, Keycode::NUMPAD3, "Numpad 3"},
+		{XK_KP_4, Keycode::NUMPAD4, "Numpad 4"},
+		{XK_KP_5, Keycode::NUMPAD5, "Numpad 5"},
+		{XK_KP_6, Keycode::NUMPAD6, "Numpad 6"},
+		{XK_KP_7, Keycode::NUMPAD7, "Numpad 7"},
+		{XK_KP_8, Keycode::NUMPAD8, "Numpad 8"},
+		{XK_KP_9, Keycode::NUMPAD9, "Numpad 9"},
+		{XK_multiply, Keycode::MULTIPLY, "*"},
+		{XK_KP_Add, Keycode::ADD, "+"},
+		{XK_KP_Separator, Keycode::SEPARATOR, "N/A"},
+		{XK_KP_Subtract, Keycode::SUBTRACT, "-"},
+		{XK_KP_Decimal, Keycode::DECIMAL, "."},
+		{XK_KP_Divide, Keycode::DIVIDE, "/"},
+		{XK_F1, Keycode::F1, "F1"},
+		{XK_F2, Keycode::F2, "F2"},
+		{XK_F3, Keycode::F3, "F3"},
+		{XK_F4, Keycode::F4, "F4"},
+		{XK_F5, Keycode::F5, "F5"},
+		{XK_F6, Keycode::F6, "F6"},
+		{XK_F7, Keycode::F7, "F7"},
+		{XK_F8, Keycode::F8, "F8"},
+		{XK_F9, Keycode::F9, "F9"},
+		{XK_F10, Keycode::F10, "F10"},
+		{XK_F11, Keycode::F11, "F11"},
+		{XK_F12, Keycode::F12, "F12"},
+		{XK_F13, Keycode::F13, "F13"},
+		{XK_F14, Keycode::F14, "F14"},
+		{XK_F15, Keycode::F15, "F15"},
+		{XK_F16, Keycode::F16, "F16"},
+		{XK_F17, Keycode::F17, "F17"},
+		{XK_F18, Keycode::F18, "F18"},
+		{XK_F19, Keycode::F19, "F19"},
+		{XK_F20, Keycode::F20, "F20"},
+		{XK_F21, Keycode::F21, "F21"},
+		{XK_F22, Keycode::F22, "F22"},
+		{XK_F23, Keycode::F23, "F23"},
+		{XK_F24, Keycode::F24, "F24"},
+		{XK_Num_Lock, Keycode::NUMLOCK, "Num lock"},
+		{XK_Scroll_Lock, Keycode::SCROLL, "Scroll lock"},
 		//{ XK_, Keycode::OEM_NEC_EQUAL, "" },
 		//{ XK_, Keycode::OEM_FJ_JISHO, "" },
 		//{ XK_, Keycode::OEM_FJ_MASSHOU, "" },
 		//{ XK_, Keycode::OEM_FJ_TOUROKU, "" },
 		//{ XK_, Keycode::OEM_FJ_LOYA, "" },
 		//{ XK_, Keycode::OEM_FJ_ROYA, "" },
-		{ XK_Shift_L, Keycode::LSHIFT, "LShift" },
-		{ XK_Shift_R, Keycode::RSHIFT, "RShift" },
-		{ XK_Control_L, Keycode::LCTRL, "LCtrl" },
-		{ XK_Control_R, Keycode::RCTRL, "RCtrl" },
+		{XK_Shift_L, Keycode::LSHIFT, "LShift"},
+		{XK_Shift_R, Keycode::RSHIFT, "RShift"},
+		{XK_Control_L, Keycode::LCTRL, "LCtrl"},
+		{XK_Control_R, Keycode::RCTRL, "RCtrl"},
 		//{ XK_, Keycode::LMENU, "" },
 		//{ XK_, Keycode::RMENU, "" },
 		//{ XK_, Keycode::BROWSER_BACK, "" },
@@ -247,24 +245,24 @@ void init() {
 		//{ XK_, Keycode::NONAME, "" },
 		//{ XK_, Keycode::PA1, "" },
 		//{ XK_, Keycode::OEM_CLEAR, "" },
-		{ XK_A, Keycode::A, "A" },
-		{ XK_C, Keycode::C, "B" },
-		{ XK_D, Keycode::D, "C" },
-		{ XK_K, Keycode::K, "D" },
-		{ XK_S, Keycode::S, "E" },
-		{ XK_V, Keycode::V, "F" },
-		{ XK_X, Keycode::X, "G" },
-		{ XK_Y, Keycode::Y, "H" },
-		{ XK_Z, Keycode::Z, "I" },
-		{ 'a', Keycode::A, "A" },
-		{ 'c', Keycode::C, "C" },
-		{ 'd', Keycode::D, "D" },
-		{ 'k', Keycode::K, "K" },
-		{ 's', Keycode::S, "S" },
-		{ 'v', Keycode::V, "V" },
-		{ 'x', Keycode::X, "X" },
-		{ 'y', Keycode::Y, "Y" },
-		{ 'z', Keycode::Z, "Z" },
+		{XK_A, Keycode::A, "A"},
+		{XK_C, Keycode::C, "B"},
+		{XK_D, Keycode::D, "C"},
+		{XK_K, Keycode::K, "D"},
+		{XK_S, Keycode::S, "E"},
+		{XK_V, Keycode::V, "F"},
+		{XK_X, Keycode::X, "G"},
+		{XK_Y, Keycode::Y, "H"},
+		{XK_Z, Keycode::Z, "I"},
+		{'a', Keycode::A, "A"},
+		{'c', Keycode::C, "C"},
+		{'d', Keycode::D, "D"},
+		{'k', Keycode::K, "K"},
+		{'s', Keycode::S, "S"},
+		{'v', Keycode::V, "V"},
+		{'x', Keycode::X, "X"},
+		{'y', Keycode::Y, "Y"},
+		{'z', Keycode::Z, "Z"},
 	};
 
 	for (const auto& m : map) {
@@ -272,64 +270,56 @@ void init() {
 		s_keycode_names[(u8)m.lumix] = m.name;
 	}
 
-    G.net_wm_state_atom = XInternAtom(G.display, "_NET_WM_STATE", False);
-    G.net_wm_state_maximized_horz_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
-    G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+	G.net_wm_state_atom = XInternAtom(G.display, "_NET_WM_STATE", False);
+	G.net_wm_state_maximized_horz_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+	G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
 	G.wm_protocols_atom = XInternAtom(G.display, "WM_PROTOCOLS", False);
 	G.wm_delete_window_atom = XInternAtom(G.display, "WM_DELETE_WINDOW", False);
 }
 
-InputFile::InputFile()
-{
+InputFile::InputFile() {
 	m_handle = nullptr;
 	static_assert(sizeof(m_handle) >= sizeof(FILE*), "");
 }
 
 
-OutputFile::OutputFile()
-{
-    m_is_error = false;
+OutputFile::OutputFile() {
+	m_is_error = false;
 	m_handle = nullptr;
 	static_assert(sizeof(m_handle) >= sizeof(FILE*), "");
 }
 
 
-InputFile::~InputFile()
-{
+InputFile::~InputFile() {
 	ASSERT(!m_handle);
 }
 
 
-OutputFile::~OutputFile()
-{
+OutputFile::~OutputFile() {
 	ASSERT(!m_handle);
 }
 
 
-bool OutputFile::open(const char* path)
-{
-    m_handle = fopen(path, "wb");
+bool OutputFile::open(const char* path) {
+	m_handle = fopen(path, "wb");
 	m_is_error = !m_handle;
-    return !m_is_error;
+	return !m_is_error;
 }
 
 
-bool InputFile::open(const char* path)
-{
+bool InputFile::open(const char* path) {
 	m_handle = fopen(path, "rb");
 	return m_handle;
 }
 
 
-void OutputFile::flush()
-{
+void OutputFile::flush() {
 	ASSERT(m_handle);
 	fflush((FILE*)m_handle);
 }
 
 
-void OutputFile::close()
-{
+void OutputFile::close() {
 	if (m_handle) {
 		fclose((FILE*)m_handle);
 		m_handle = nullptr;
@@ -337,8 +327,7 @@ void OutputFile::close()
 }
 
 
-void InputFile::close()
-{
+void InputFile::close() {
 	if (m_handle) {
 		fclose((FILE*)m_handle);
 		m_handle = nullptr;
@@ -346,22 +335,19 @@ void InputFile::close()
 }
 
 
-bool OutputFile::write(const void* data, u64 size)
-{
-    ASSERT(m_handle);
-    const size_t written = fwrite(data, size, 1, (FILE*)m_handle);
-    return written == 1;
+bool OutputFile::write(const void* data, u64 size) {
+	ASSERT(m_handle);
+	const size_t written = fwrite(data, size, 1, (FILE*)m_handle);
+	return written == 1;
 }
 
-bool InputFile::read(void* data, u64 size)
-{
+bool InputFile::read(void* data, u64 size) {
 	ASSERT(nullptr != m_handle);
 	size_t read = fread(data, size, 1, (FILE*)m_handle);
 	return read == 1;
 }
 
-u64 InputFile::size() const
-{
+u64 InputFile::size() const {
 	ASSERT(nullptr != m_handle);
 	long pos = ftell((FILE*)m_handle);
 	fseek((FILE*)m_handle, 0, SEEK_END);
@@ -371,75 +357,64 @@ u64 InputFile::size() const
 }
 
 
-u64 InputFile::pos()
-{
+u64 InputFile::pos() {
 	ASSERT(nullptr != m_handle);
 	long pos = ftell((FILE*)m_handle);
 	return (size_t)pos;
 }
 
 
-bool InputFile::seek(u64 pos)
-{
+bool InputFile::seek(u64 pos) {
 	ASSERT(nullptr != m_handle);
 	return fseek((FILE*)m_handle, pos, SEEK_SET) == 0;
 }
 
 
-u32 getCPUsCount() { return sysconf(_SC_NPROCESSORS_ONLN); }
-void sleep(u32 milliseconds) { if (milliseconds) usleep(useconds_t(milliseconds * 1000)); }
-ThreadID getCurrentThreadID() { return pthread_self(); }
+u32 getCPUsCount() {
+	return sysconf(_SC_NPROCESSORS_ONLN);
+}
+void sleep(u32 milliseconds) {
+	if (milliseconds) usleep(useconds_t(milliseconds * 1000));
+}
+ThreadID getCurrentThreadID() {
+	return pthread_self();
+}
 
 void logVersion() {
-    struct utsname tmp;
+	struct utsname tmp;
 	if (uname(&tmp) == 0) {
 		logInfo("sysname: ", tmp.sysname);
 		logInfo("nodename: ", tmp.nodename);
 		logInfo("release: ", tmp.release);
 		logInfo("version: ", tmp.version);
 		logInfo("machine: ", tmp.machine);
-	}
-	else {
+	} else {
 		logWarning("uname failed");
 	}
 }
 
 
-void getDropFile(const Event& event, int idx, Span<char> out)
-{
-    ASSERT(false); // not supported, processEvents does not generate the drop event
+void getDropFile(const Event& event, int idx, Span<char> out) {
+	ASSERT(false); // not supported, processEvents does not generate the drop event
 }
 
 
-int getDropFileCount(const Event& event)
-{
-    ASSERT(false); // not supported, processEvents does not generate the drop event
+int getDropFileCount(const Event& event) {
+	ASSERT(false); // not supported, processEvents does not generate the drop event
 	return 0;
 }
 
 
-void finishDrag(const Event& event)
-{
-    ASSERT(false); // not supported, processEvents does not generate the drop event
+void finishDrag(const Event& event) {
+	ASSERT(false); // not supported, processEvents does not generate the drop event
 }
 
 static unsigned long get_window_property(Window win, Atom property, Atom type, unsigned char** value) {
-    Atom actual_type;
-    int format;
-    unsigned long count, bytes_after;
-    XGetWindowProperty(G.display
-		, win
-		, property
-		, 0
-		, LONG_MAX
-		, False
-		, type
-		, &actual_type
-		, &format
-		, &count
-		, &bytes_after
-		, value);
-    return count;
+	Atom actual_type;
+	int format;
+	unsigned long count, bytes_after;
+	XGetWindowProperty(G.display, win, property, 0, LONG_MAX, False, type, &actual_type, &format, &count, &bytes_after, value);
+	return count;
 }
 
 bool getEvent(Event& e) {
@@ -449,16 +424,15 @@ bool getEvent(Event& e) {
 		return true;
 	}
 
-	next:
+next:
 	if (XPending(G.display) <= 0) return false;
 	XEvent xevent;
 	XNextEvent(G.display, &xevent);
-	
+
 	if (XFilterEvent(&xevent, None)) return false;
 
 	switch (xevent.type) {
-		default:
-			goto next;
+		default: goto next;
 		case KeyPress: {
 			KeySym keysym;
 			Status status = 0;
@@ -479,7 +453,7 @@ bool getEvent(Event& e) {
 						e2.text_input.utf8 = utf8;
 						G.event_queue.push(e2);
 					}
-				break;
+					break;
 				default: break;
 			}
 			return true;
@@ -504,8 +478,7 @@ bool getEvent(Event& e) {
 					default: e.mouse_button.button = MouseButton::EXTENDED; break;
 				}
 				e.mouse_button.down = xevent.type == ButtonPress;
-			}
-			else {
+			} else {
 				e.type = Event::Type::MOUSE_WHEEL;
 				switch (xevent.xbutton.button) {
 					case 4: e.mouse_wheel.amount = 1; break;
@@ -551,15 +524,13 @@ bool getEvent(Event& e) {
 }
 
 
-void destroyWindow(WindowHandle window)
-{
+void destroyWindow(WindowHandle window) {
 	XUnmapWindow(G.display, (Window)window);
 	XDestroyWindow(G.display, (Window)window);
 }
 
 
-Point toScreen(WindowHandle win, int x, int y)
-{
+Point toScreen(WindowHandle win, int x, int y) {
 	XWindowAttributes attrs;
 	Point p;
 	p.x = x;
@@ -574,59 +545,33 @@ Point toScreen(WindowHandle win, int x, int y)
 		XQueryTree(G.display, (Window)win, &root, &parent, &children, &children_count);
 		win = (WindowHandle)parent;
 	}
-    
+
 	return p;
 }
 
-WindowHandle createWindow(const InitWindowArgs& args)
-{
+WindowHandle createWindow(const InitWindowArgs& args) {
 	ASSERT(G.display);
-	
+
 	Display* display = G.display;
 	static i32 screen = DefaultScreen(display);
 	static i32 depth = DefaultDepth(display, screen);
 	static Window root = RootWindow(display, screen);
 	static Visual* visual = DefaultVisual(display, screen);
-	static XSetWindowAttributes attrs = [](){
+	static XSetWindowAttributes attrs = []() {
 		XSetWindowAttributes ret = {};
 		ret.background_pixmap = 0;
 		ret.border_pixel = 0;
-		ret.event_mask = ButtonPressMask
-			| ButtonReleaseMask
-			| ExposureMask
-			| KeyPressMask
-			| KeyReleaseMask
-			| PointerMotionMask
-			| StructureNotifyMask;
+		ret.event_mask = ButtonPressMask | ButtonReleaseMask | ExposureMask | KeyPressMask | KeyReleaseMask | PointerMotionMask | StructureNotifyMask;
 		return ret;
 	}();
-	Window win = XCreateWindow(display
-		, args.parent ? (Window)args.parent : root
-		, 0
-		, 0
-		, 800
-		, 600
-		, 0
-		, depth
-		, InputOutput
-		, visual
-		, CWBorderPixel | CWEventMask
-		, &attrs);
+	Window win = XCreateWindow(display, args.parent ? (Window)args.parent : root, 0, 0, 800, 600, 0, depth, InputOutput, visual, CWBorderPixel | CWEventMask, &attrs);
 	XSetWindowAttributes attr = {};
 	XChangeWindowAttributes(display, win, CWBackPixel, &attr);
 
 	XMapWindow(display, win);
 	XStoreName(display, win, args.name && args.name[0] ? args.name : "Lumix App");
 
-	G.ic = XCreateIC(G.im
-			, XNInputStyle
-			, 0
-			| XIMPreeditNothing
-			| XIMStatusNothing
-			, XNClientWindow
-			, win
-			, NULL
-			);
+	G.ic = XCreateIC(G.im, XNInputStyle, 0 | XIMPreeditNothing | XIMStatusNothing, XNClientWindow, win, NULL);
 
 	Atom protocols = G.wm_delete_window_atom;
 	XSetWMProtocols(G.display, (Window)win, &protocols, 1);
@@ -636,28 +581,25 @@ WindowHandle createWindow(const InitWindowArgs& args)
 		Event e;
 		if (getEvent(e)) {
 			G.event_queue.push(e);
-		} 
+		}
 	}
 
-    WindowHandle res = (WindowHandle)win;
+	WindowHandle res = (WindowHandle)win;
 	return res;
 }
 
 
-void quit()
-{
+void quit() {
 	G.finished = true;
 }
 
 
-bool isKeyDown(Keycode keycode)
-{
+bool isKeyDown(Keycode keycode) {
 	return G.key_states[(u8)keycode];
 }
 
 
-void getKeyName(Keycode keycode, Span<char> out)
-{
+void getKeyName(Keycode keycode, Span<char> out) {
 	ASSERT(out.length() > 1);
 	if ((u8)keycode >= 'a' && (u8)keycode <= 'z' || (u8)keycode >= 'A' && (u8)keycode <= 'Z' || (u8)keycode >= '0' && (u8)keycode <= '9') {
 		out[0] = (char)keycode;
@@ -665,29 +607,26 @@ void getKeyName(Keycode keycode, Span<char> out)
 		return;
 	}
 	const char* name = s_keycode_names[(u8)keycode];
-	copyString(out, name ? name : keycode != Keycode::INVALID ? "N/A" : ""); 
+	copyString(out, name ? name : keycode != Keycode::INVALID ? "N/A" : "");
 }
 
 void setCursor(CursorType type) {
-	//ASSERT(false);
-    // TODO
+	// ASSERT(false);
+	// TODO
 }
 
-void showCursor(bool show)
-{
-	//ASSERT(false);
-    // TODO
+void showCursor(bool show) {
+	// ASSERT(false);
+	// TODO
 }
 
 
-void setWindowTitle(WindowHandle win, const char* title)
-{
+void setWindowTitle(WindowHandle win, const char* title) {
 	XStoreName(G.display, (Window)win, title);
 }
 
 
-Rect getWindowScreenRect(WindowHandle win)
-{
+Rect getWindowScreenRect(WindowHandle win) {
 	XWindowAttributes attrs;
 	XGetWindowAttributes(G.display, (Window)win, &attrs);
 	Rect r;
@@ -695,14 +634,13 @@ Rect getWindowScreenRect(WindowHandle win)
 	r.top = attrs.y;
 	r.width = attrs.width;
 	r.height = attrs.height;
-   
+
 	Window dummy;
 	XTranslateCoordinates(G.display, (Window)win, attrs.root, 0, 0, &r.left, &r.top, &dummy);
 	return r;
 }
 
-Rect getWindowClientRect(WindowHandle win)
-{
+Rect getWindowClientRect(WindowHandle win) {
 	XWindowAttributes attrs;
 	XGetWindowAttributes(G.display, (Window)win, &attrs);
 	Rect r;
@@ -710,16 +648,14 @@ Rect getWindowClientRect(WindowHandle win)
 	r.top = 0;
 	r.width = attrs.width;
 	r.height = attrs.height;
-    return r;
+	return r;
 }
 
-void setWindowScreenRect(WindowHandle win, const Rect& rect)
-{
+void setWindowScreenRect(WindowHandle win, const Rect& rect) {
 	XMoveResizeWindow(G.display, (Window)win, rect.left, rect.top, rect.width, rect.height);
 }
 
-u32 getMonitors(Span<Monitor> monitors)
-{
+u32 getMonitors(Span<Monitor> monitors) {
 	ASSERT(monitors.length() > 0);
 
 	const int count = minimum(ScreenCount(G.display), monitors.length());
@@ -739,24 +675,18 @@ u32 getMonitors(Span<Monitor> monitors)
 	return count;
 }
 
-void setMouseScreenPos(int x, int y)
-{
+void setMouseScreenPos(int x, int y) {
 	Window root = DefaultRootWindow(G.display);
 	XWarpPointer(G.display, None, root, 0, 0, 0, 0, x, y);
 }
 
-Point getMousePos(WindowHandle win)
-{
+Point getMousePos(WindowHandle win) {
 	const Rect r = getWindowScreenRect(win);
 	const Point mp = getMouseScreenPos();
-	return {
-		mp.x - r.left,
-		mp.y - r.top
-	};
+	return {mp.x - r.left, mp.y - r.top};
 }
 
-Point getMouseScreenPos()
-{
+Point getMouseScreenPos() {
 	const int screen_count = ScreenCount(G.display);
 	for (int screen = 0; screen < screen_count; ++screen) {
 		Window root, child;
@@ -773,8 +703,7 @@ Point getMouseScreenPos()
 }
 
 
-WindowHandle getFocused()
-{
+WindowHandle getFocused() {
 	Window win;
 	int dummy;
 	XGetInputFocus(G.display, &win, &dummy);
@@ -783,88 +712,78 @@ WindowHandle getFocused()
 
 
 bool isMaximized(WindowHandle win) {
-    if (!G.net_wm_state_atom) return false;
-    if (!G.net_wm_state_maximized_horz_atom) return false;
-    if (!G.net_wm_state_maximized_vert_atom) return false;
+	if (!G.net_wm_state_atom) return false;
+	if (!G.net_wm_state_maximized_horz_atom) return false;
+	if (!G.net_wm_state_maximized_vert_atom) return false;
 
 	Atom* states;
-    const unsigned long count =
-        get_window_property((Window)win,
-			G.net_wm_state_atom,
-			XA_ATOM,
-			(unsigned char**) &states);
+	const unsigned long count = get_window_property((Window)win, G.net_wm_state_atom, XA_ATOM, (unsigned char**)&states);
 
-    bool maximized = false;
-    for (unsigned long i = 0; i < count; ++i) {
-        if (states[i] == G.net_wm_state_maximized_horz_atom || states[i] == G.net_wm_state_maximized_vert_atom) {
-            maximized = true;
-            break;
-        }
-    }
+	bool maximized = false;
+	for (unsigned long i = 0; i < count; ++i) {
+		if (states[i] == G.net_wm_state_maximized_horz_atom || states[i] == G.net_wm_state_maximized_vert_atom) {
+			maximized = true;
+			break;
+		}
+	}
 
-    XFree(states);
+	XFree(states);
 
-    return maximized;
+	return maximized;
 }
 
 void restore(WindowHandle win, WindowState state) {
 	ASSERT(false);
-    // TODO
+	// TODO
 }
 
 WindowState setFullscreen(WindowHandle win) {
 	ASSERT(false);
-    // TODO
-    return {};
+	// TODO
+	return {};
 }
 
-void maximizeWindow(WindowHandle win)
-{
-	XEvent event = { ClientMessage };
-    event.xclient.window = (Window)win;
-    event.xclient.format = 32;
-    event.xclient.message_type = G.net_wm_state_atom;
+void maximizeWindow(WindowHandle win) {
+	XEvent event = {ClientMessage};
+	event.xclient.window = (Window)win;
+	event.xclient.format = 32;
+	event.xclient.message_type = G.net_wm_state_atom;
 	event.xclient.data.l[0] = _NET_WM_STATE_ADD;
-    event.xclient.data.l[1] = G.net_wm_state_maximized_vert_atom;
-    event.xclient.data.l[2] = G.net_wm_state_maximized_horz_atom;
-    event.xclient.data.l[3] = 1;
-    event.xclient.data.l[4] = 0;
+	event.xclient.data.l[1] = G.net_wm_state_maximized_vert_atom;
+	event.xclient.data.l[2] = G.net_wm_state_maximized_horz_atom;
+	event.xclient.data.l[3] = 1;
+	event.xclient.data.l[4] = 0;
 
 	XWindowAttributes attrs;
 	XGetWindowAttributes(G.display, (Window)win, &attrs);
 	Window root = RootWindowOfScreen(attrs.screen);
-    XSendEvent(G.display
-		, root
-		, False
-		, SubstructureNotifyMask | SubstructureRedirectMask
-		, &event);
+	XSendEvent(G.display, root, False, SubstructureNotifyMask | SubstructureRedirectMask, &event);
 }
 
 
-bool isRelativeMouseMode()
-{
+bool isRelativeMouseMode() {
 	return G.relative_mouse;
 }
 
 
 int getDPI() {
 	float dpi = DisplayWidth(G.display, 0) * 25.4f / DisplayWidthMM(G.display, 0);
-    char* rms = XResourceManagerString(G.display);
-    if (rms) {
-        XrmDatabase db = XrmGetStringDatabase(rms);
-        if (db) {
-            XrmValue value;
-            char* type;
-            if (XrmGetResource(db, "Xft.dpi", "Xft.Dpi", &type, &value)) {
-                if (type && strcmp(type, "String") == 0) {
-                    dpi = atof(value.addr);
-                }
-            }
-            XrmDestroyDatabase(db);
-        }
-    }
+	char* rms = XResourceManagerString(G.display);
+	if (rms) {
+		XrmDatabase db = XrmGetStringDatabase(rms);
+		if (db) {
+			XrmValue value;
+			char* type;
+			if (XrmGetResource(db, "Xft.dpi", "Xft.Dpi", &type, &value)) {
+				if (type && strcmp(type, "String") == 0) {
+					dpi = atof(value.addr);
+				}
+			}
+			XrmDestroyDatabase(db);
+		}
+	}
 
-    return int(dpi + 0.5f);
+	return int(dpi + 0.5f);
 }
 
 u32 getMemPageSize() {
@@ -882,26 +801,23 @@ void memCommit(void* ptr, size_t size) {
 	// noop on linux
 }
 
-void memRelease(void* ptr) {
-	//free(ptr);
+void memRelease(void* ptr, size_t size) {
+	munmap(ptr, size);
 }
 
 struct FileIterator {};
 
-FileIterator* createFileIterator(const char* path, IAllocator& allocator)
-{
+FileIterator* createFileIterator(const char* path, IAllocator& allocator) {
 	return (FileIterator*)opendir(path);
 }
 
 
-void destroyFileIterator(FileIterator* iterator)
-{
+void destroyFileIterator(FileIterator* iterator) {
 	closedir((DIR*)iterator);
 }
 
 
-bool getNextFile(FileIterator* iterator, FileInfo* info)
-{
+bool getNextFile(FileIterator* iterator, FileInfo* info) {
 	if (!iterator) return false;
 
 	auto* dir = (DIR*)iterator;
@@ -914,106 +830,88 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 }
 
 
-void setCurrentDirectory(const char* path)
-{
+void setCurrentDirectory(const char* path) {
 	auto res = chdir(path);
 	(void)res;
 }
 
 
-void getCurrentDirectory(Span<char> output)
-{
+void getCurrentDirectory(Span<char> output) {
 	if (!getcwd(output.m_begin, output.length())) {
 		output[0] = 0;
 	}
 }
 
 
-bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension)
-{
-		ASSERT(false);
-    // TODO
-    return {};
-
+bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension) {
+	ASSERT(false);
+	// TODO
+	return {};
 }
 
 
-bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file)
-{
-		ASSERT(false);
-    // TODO
-    return {};
-
+bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file) {
+	ASSERT(false);
+	// TODO
+	return {};
 }
 
 
-bool getOpenDirectory(Span<char> output, const char* starting_dir)
-{
-		ASSERT(false);
-    // TODO
-    return {};
-
+bool getOpenDirectory(Span<char> output, const char* starting_dir) {
+	ASSERT(false);
+	// TODO
+	return {};
 }
 
 
-void copyToClipboard(const char* text)
-{
-		ASSERT(false);
-    // TODO
+void copyToClipboard(const char* text) {
+	ASSERT(false);
+	// TODO
 }
 
 
-ExecuteOpenResult shellExecuteOpen(const char* path)
-{
+ExecuteOpenResult shellExecuteOpen(const char* path) {
 	return system(path) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
 }
 
 
-ExecuteOpenResult openExplorer(const char* path)
-{
-		ASSERT(false);
-    // TODO
-    return {};
-
+ExecuteOpenResult openExplorer(const char* path) {
+	ASSERT(false);
+	// TODO
+	return {};
 }
 
 
-bool deleteFile(const char* path)
-{
+bool deleteFile(const char* path) {
 	return unlink(path) == 0;
 }
 
 
-bool moveFile(const char* from, const char* to)
-{
+bool moveFile(const char* from, const char* to) {
 	return rename(from, to) == 0;
 }
 
 
-size_t getFileSize(const char* path)
-{
+size_t getFileSize(const char* path) {
 	struct stat tmp;
 	stat(path, &tmp);
 	return tmp.st_size;
 }
 
 
-bool fileExists(const char* path)
-{
+bool fileExists(const char* path) {
 	struct stat tmp;
 	return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) != S_IFDIR));
 }
 
 
-bool dirExists(const char* path)
-{
+bool dirExists(const char* path) {
 	struct stat tmp;
 	return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) == S_IFDIR));
 }
 
 
-u64 getLastModified(const char* path)
-{
+u64 getLastModified(const char* path) {
 	struct stat tmp;
 	Lumix::u64 ret = 0;
 	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::u64(tmp.st_mtim.tv_nsec / 1000000);
@@ -1021,15 +919,14 @@ u64 getLastModified(const char* path)
 }
 
 
-bool makePath(const char* path)
-{
+bool makePath(const char* path) {
 	char tmp[LUMIX_MAX_PATH];
 	const char* cin = path;
 	char* cout = tmp;
 
 	while (*cin) {
 		*cout = *cin;
-		if (*cout == '\\' || *cout == '/' || *cout == '\0'){
+		if (*cout == '\\' || *cout == '/' || *cout == '\0') {
 			if (cout != tmp) {
 				*cout = '\0';
 				mkdir(tmp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
@@ -1043,49 +940,41 @@ bool makePath(const char* path)
 }
 
 
-void clipCursor(int x, int y, int w, int h)
-{
-	//ASSERT(false);
-    // TODO
+void grabMouse(WindowHandle window) {
+	// const u32 mask = ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask;
+	// X11_XGrabPointer(G.display, window, True, mask, GrabModeAsync, GrabModeAsync, window, None, CurrentTime);
+	// ASSERT(false);
+	// TODO
 }
 
 
-void unclipCursor()
-{
-	//ASSERT(false);
-    // TODO
-}
-
-
-bool copyFile(const char* from, const char* to)
-{
-    const int source = open(from, O_RDONLY, 0);
+bool copyFile(const char* from, const char* to) {
+	const int source = open(from, O_RDONLY, 0);
 	if (source < 0) return false;
-    const int dest = open(to, O_WRONLY | O_CREAT, 0644);
+	const int dest = open(to, O_WRONLY | O_CREAT, 0644);
 	if (dest < 1) {
 		close(source);
 		return false;
 	}
 
 	char buf[BUFSIZ];
-    size_t size;
-    while ((size = read(source, buf, BUFSIZ)) > 0) {
-        const ssize_t res = write(dest, buf, size); //-V512
+	size_t size;
+	while ((size = read(source, buf, BUFSIZ)) > 0) {
+		const ssize_t res = write(dest, buf, size); //-V512
 		if (res == -1) {
 			close(source);
 			close(dest);
 			return false;
 		}
-    }
+	}
 
-    close(source);
-    close(dest);
+	close(source);
+	close(dest);
 	return true;
 }
 
 
-void getExecutablePath(Span<char> buffer)
-{
+void getExecutablePath(Span<char> buffer) {
 	char self[PATH_MAX] = {};
 	const int res = readlink("/proc/self/exe", self, sizeof(self));
 
@@ -1097,68 +986,58 @@ void getExecutablePath(Span<char> buffer)
 }
 
 
-void messageBox(const char* text)
-{
+void messageBox(const char* text) {
 	fprintf(stderr, "%s", text);
 }
 
-	
-void setCommandLine(int argc, char** argv)
-{
+
+void setCommandLine(int argc, char** argv) {
 	G.argc = argc;
 	G.argv = argv;
 }
-	
 
-bool getCommandLine(Span<char> output)
-{
+
+bool getCommandLine(Span<char> output) {
 	copyString(output, "");
 	for (int i = 0; i < G.argc; ++i) {
 		catString(output, G.argv[i]);
 		catString(output, " ");
 	}
-    return true;
+	return true;
 }
 
 
-void* loadLibrary(const char* path)
-{
+void* loadLibrary(const char* path) {
 	return dlopen(path, RTLD_LOCAL | RTLD_LAZY);
 }
 
 
-void unloadLibrary(void* handle)
-{
+void unloadLibrary(void* handle) {
 	dlclose(handle);
 }
 
 
-void* getLibrarySymbol(void* handle, const char* name)
-{
+void* getLibrarySymbol(void* handle, const char* name) {
 	return dlsym(handle, name);
 }
 
-Timer::Timer()
-{
+Timer::Timer() {
 	last_tick = getRawTimestamp();
 	first_tick = last_tick;
 }
 
 
-float Timer::getTimeSinceStart()
-{
+float Timer::getTimeSinceStart() {
 	return float(double(getRawTimestamp() - first_tick) / double(getFrequency()));
 }
 
 
-float Timer::getTimeSinceTick()
-{
+float Timer::getTimeSinceTick() {
 	return float(double(getRawTimestamp() - last_tick) / double(getFrequency()));
 }
 
 
-float Timer::tick()
-{
+float Timer::tick() {
 	const u64 now = getRawTimestamp();
 	const float delta = float(double(now - last_tick) / double(getFrequency()));
 	last_tick = now;
@@ -1166,18 +1045,16 @@ float Timer::tick()
 }
 
 
-u64 Timer::getFrequency()
-{
+u64 Timer::getFrequency() {
 	return 1'000'000'000;
 }
 
 
-u64 Timer::getRawTimestamp()
-{
+u64 Timer::getRawTimestamp() {
 	timespec tick;
 	clock_gettime(CLOCK_REALTIME, &tick);
 	return u64(tick.tv_sec) * 1000000000 + u64(tick.tv_nsec);
 }
 
 
-} // namespace Lumix::OS
+} // namespace Lumix::os

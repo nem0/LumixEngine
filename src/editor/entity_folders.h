@@ -5,7 +5,7 @@
 
 namespace Lumix {
 
-struct EntityFolders final {
+struct LUMIX_EDITOR_API EntityFolders final {
 	using FolderID = u16;
 	static constexpr FolderID INVALID_FOLDER = 0xffFF; 
 

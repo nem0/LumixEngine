@@ -336,7 +336,7 @@ struct Matrix3x4 {
 	Vec4 columns[3];
 };
 
-struct Matrix4x3 {
+struct LUMIX_ENGINE_API Matrix4x3 {
 	Matrix4x3() {}
 	explicit Matrix4x3(const Matrix& rhs);
 	Matrix3x4 transposed() const;

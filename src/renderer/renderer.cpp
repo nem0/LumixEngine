@@ -55,6 +55,7 @@ static const char* downscale_src = R"#(
 
 struct TransientBuffer {
 	static constexpr u32 INIT_SIZE = 1024 * 1024;
+	static constexpr u32 OVERFLOW_BUFFER_SIZE = 512 * 1024 * 1024;
 	
 	void init() {
 		m_buffer = gpu::allocBufferHandle();
@@ -78,7 +79,7 @@ struct TransientBuffer {
 		MutexGuard lock(m_mutex);
 		if (!m_overflow.buffer) {
 			m_overflow.buffer = gpu::allocBufferHandle();
-			m_overflow.data = (u8*)os::memReserve(512 * 1024 * 1024);
+			m_overflow.data = (u8*)os::memReserve(OVERFLOW_BUFFER_SIZE);
 			m_overflow.size = 0;
 			m_overflow.commit = 0;
 		}
@@ -105,7 +106,7 @@ struct TransientBuffer {
 				memcpy(mem, m_overflow.data, m_overflow.size);
 				gpu::unmap(m_overflow.buffer);
 			}
-			os::memRelease(m_overflow.data);
+			os::memRelease(m_overflow.data, OVERFLOW_BUFFER_SIZE);
 			m_overflow.data = nullptr;
 			m_overflow.commit = 0;
 		}

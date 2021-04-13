@@ -16,7 +16,7 @@ namespace reflection
 	
 struct Context {
 	Scene* first_scene = nullptr; 
-	RegisteredComponent ComponentBases[ComponentType::MAX_TYPES_COUNT];
+	RegisteredComponent component_bases[ComponentType::MAX_TYPES_COUNT];
 	u32 components_count = 0;
 };
 
@@ -47,7 +47,7 @@ void ComponentBase::visit(IPropertyVisitor& visitor) const {
 }
 
 const ComponentBase* getComponent(ComponentType cmp_type) {
-	return getContext().ComponentBases[cmp_type.index].cmp;
+	return getContext().component_bases[cmp_type.index].cmp;
 }
 
 const PropertyBase* getProperty(ComponentType cmp_type, const char* prop_name) {
@@ -71,16 +71,16 @@ builder::builder(IAllocator& allocator)
 
 void builder::registerCmp(ComponentBase* cmp) {
 	cmp->scene = crc32(scene->name);
-	getContext().ComponentBases[cmp->component_type.index].cmp = cmp;
-	getContext().ComponentBases[cmp->component_type.index].name_hash = crc32(cmp->name);
-	getContext().ComponentBases[cmp->component_type.index].scene = crc32(scene->name);
+	getContext().component_bases[cmp->component_type.index].cmp = cmp;
+	getContext().component_bases[cmp->component_type.index].name_hash = crc32(cmp->name);
+	getContext().component_bases[cmp->component_type.index].scene = crc32(scene->name);
 	scene->cmps.push(cmp);
 }
 
 ComponentType getComponentTypeFromHash(u32 hash)
 {
 	for (u32 i = 0, c = getContext().components_count; i < c; ++i) {
-		if (getContext().ComponentBases[i].name_hash == hash) {
+		if (getContext().component_bases[i].name_hash == hash) {
 			return {(i32)i};
 		}
 	}
@@ -91,7 +91,7 @@ ComponentType getComponentTypeFromHash(u32 hash)
 
 u32 getComponentTypeHash(ComponentType type)
 {
-	return getContext().ComponentBases[type.index].name_hash;
+	return getContext().component_bases[type.index].name_hash;
 }
 
 
@@ -100,7 +100,7 @@ ComponentType getComponentType(const char* name)
 	Context& ctx = getContext();
 	u32 name_hash = crc32(name);
 	for (u32 i = 0, c = ctx.components_count; i < c; ++i) {
-		if (ctx.ComponentBases[i].name_hash == name_hash) {
+		if (ctx.component_bases[i].name_hash == name_hash) {
 			return {(i32)i};
 		}
 	}
@@ -110,7 +110,7 @@ ComponentType getComponentType(const char* name)
 		return INVALID_COMPONENT_TYPE;
 	}
 
-	RegisteredComponent& type = ctx.ComponentBases[getContext().components_count];
+	RegisteredComponent& type = ctx.component_bases[getContext().components_count];
 	type.name_hash = name_hash;
 	++ctx.components_count;
 	return {i32(getContext().components_count - 1)};
@@ -123,7 +123,7 @@ Scene* getFirstScene() {
 void DynamicProperties::visit(IPropertyVisitor& visitor) const { visitor.visit(*this); }
 
 Span<const RegisteredComponent> getComponents() {
-	return Span(getContext().ComponentBases, getContext().components_count);
+	return Span(getContext().component_bases, getContext().components_count);
 }
 
 struct RadiansAttribute : IAttribute

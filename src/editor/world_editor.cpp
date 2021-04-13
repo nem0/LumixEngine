@@ -363,13 +363,9 @@ void addSphere(UniverseView& view, const DVec3& center, float radius, Color colo
 
 template <typename T> void writeToStream(OutputMemoryStream& stream, T value) {	stream.write(value); }
 template <typename T> T readFromStream(InputMemoryStream& stream) { return stream.read<T>(); }
-template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputMemoryStream& stream);
-template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputMemoryStream& stream, Path);
-template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
-template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputMemoryStream& stream);
-template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* path);
+template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
 	
-template <> Path readFromStream<Path>(InputMemoryStream& stream)
+template <> LUMIX_EDITOR_API Path readFromStream<Path>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	Path path(c_str);
@@ -378,21 +374,21 @@ template <> Path readFromStream<Path>(InputMemoryStream& stream)
 }
 
 
-template <> void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path)
+template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path)
 {
 	const char* str = path.c_str();
 	stream.write(str, stringLength(str) + 1);
 }
 
 
-template <> void writeToStream<Path>(OutputMemoryStream& stream, Path path)
+template <> LUMIX_EDITOR_API void writeToStream<Path>(OutputMemoryStream& stream, Path path)
 {
 	const char* str = path.c_str();
 	stream.write(str, stringLength(str) + 1);
 }
 
 
-template <> const char* readFromStream<const char*>(InputMemoryStream& stream)
+template <> LUMIX_EDITOR_API const char* readFromStream<const char*>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	stream.skip(stringLength(c_str) + 1);
@@ -400,7 +396,7 @@ template <> const char* readFromStream<const char*>(InputMemoryStream& stream)
 }
 
 
-template <> void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
+template <> LUMIX_EDITOR_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
 {
 	stream.write(value, stringLength(value) + 1);
 }

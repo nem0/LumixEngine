@@ -16,7 +16,7 @@ PageAllocator::~PageAllocator()
 	while (p) {
 		void* tmp = p;
 		memcpy(&p, p, sizeof(p)); //-V579
-		os::memRelease(tmp);
+		os::memRelease(tmp, PAGE_SIZE);
 	}
 }
 

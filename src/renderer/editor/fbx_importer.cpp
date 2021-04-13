@@ -39,9 +39,18 @@ static bool hasTangents(const ofbx::Geometry& geom) {
 }
 
 
-static void getMaterialName(const ofbx::Material* material, char (&out)[128])
+static void getMaterialName(const ofbx::Mesh* mesh, const ofbx::Material* material, char (&out)[128])
 {
-	copyString(out, material ? material->name : "default");
+	if (material) {
+		copyString(out, material->name);
+	}
+	else if (mesh) {
+		copyString(out, mesh->name);
+		if (out[0] == '\0' && mesh->getParent()) copyString(out, mesh->getParent()->name);
+	}
+	else {
+		copyString(out, "default");
+	}
 	char* iter = out;
 	while (*iter)
 	{
@@ -706,7 +715,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		AABB aabb = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
 		float origin_radius_squared = 0;
 
-		int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
+		int material_idx = import_mesh.fbx_mat ? getMaterialIndex(mesh, *import_mesh.fbx_mat) : 0;
 		ASSERT(material_idx >= 0);
 
 		const int* geom_materials = geom->getMaterials();
@@ -813,6 +822,17 @@ void FBXImporter::gatherGeometries(ofbx::IScene* scene)
 	}
 }
 
+static bool isSkinned(const ofbx::Geometry* geom) {
+	if (geom && geom->getSkin()) {
+		const ofbx::Skin* skin = geom->getSkin();
+		for (int i = 0; i < skin->getClusterCount(); ++i) {
+			if (skin->getCluster(i)->getIndicesCount() > 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 {
@@ -822,19 +842,19 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 		const int mat_count = fbx_mesh->getMaterialCount();
 		for (int j = 0; j < mat_count; ++j) {
 			ImportMesh& mesh = m_meshes.emplace(m_allocator);
-			mesh.is_skinned = false;
-			if (fbx_mesh->getGeometry() && fbx_mesh->getGeometry()->getSkin()) {
-				const ofbx::Skin* skin = fbx_mesh->getGeometry()->getSkin();
-				for (int i = 0; i < skin->getClusterCount(); ++i) {
-					if (skin->getCluster(i)->getIndicesCount() > 0) {
-						mesh.is_skinned = true;
-						break;
-					}
-				}
-			}
+			mesh.is_skinned = isSkinned(fbx_mesh->getGeometry());
 			mesh.fbx = fbx_mesh;
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
+			mesh.lod = detectMeshLOD(mesh);
+		}
+
+		if (mat_count == 0) {
+			ImportMesh& mesh = m_meshes.emplace(m_allocator);
+			mesh.is_skinned = isSkinned(fbx_mesh->getGeometry());
+			mesh.fbx = fbx_mesh;
+			mesh.fbx_mat = nullptr;
+			mesh.submesh = -1;
 			mesh.lod = detectMeshLOD(mesh);
 		}
 	}
@@ -1196,11 +1216,34 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION()
 	const PathInfo src_info(src);
+	for (const ImportMesh& mesh : m_meshes) {
+		if (!mesh.fbx_mat) {
+			char mat_name[128];
+			getMaterialName(mesh.fbx, mesh.fbx_mat, mat_name);
+
+			const StaticString<LUMIX_MAX_PATH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
+			if (m_filesystem.fileExists(mat_src)) continue;
+
+			os::OutputFile f;
+			if (!m_filesystem.open(mat_src, f))
+			{
+				logError("Failed to create ", mat_src);
+				continue;
+			}
+			out_file.clear();
+			writeString("shader \"pipelines/standard.shd\"\n");
+			if (!f.write(out_file.data(), out_file.size())) {
+				logError("Failed to write ", mat_src);
+			}
+			f.close();
+		}
+	}
+
 	for (const ImportMaterial& material : m_materials) {
 		if (!material.import) continue;
 
 		char mat_name[128];
-		getMaterialName(material.fbx, mat_name);
+		getMaterialName(nullptr, material.fbx, mat_name);
 
 		const StaticString<LUMIX_MAX_PATH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
 		if (m_filesystem.fileExists(mat_src)) continue;
@@ -2030,7 +2073,7 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 
 		const ofbx::Material* material = import_mesh.fbx_mat;
 		char mat[128];
-		getMaterialName(material, mat);
+		getMaterialName(import_mesh.fbx, material, mat);
 		StaticString<LUMIX_MAX_PATH + 128> mat_id(src_info.m_dir, mat, ".mat");
 		const i32 len = stringLength(mat_id.data);
 		write(len);

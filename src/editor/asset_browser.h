@@ -10,7 +10,7 @@ template <typename T> struct UniquePtr;
 struct AssetBrowser {
 	static constexpr int TILE_SIZE = 96;
 
-	struct IPlugin {
+	struct LUMIX_EDITOR_API IPlugin {
 		virtual ~IPlugin() {}
 
 		virtual bool canCreateResource() const { return false; }

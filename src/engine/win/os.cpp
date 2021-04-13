@@ -62,6 +62,7 @@ struct EventQueue {
 
 static struct
 {
+	WindowHandle grabbed_window = INVALID_WINDOW;
 	EventQueue event_queue;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
@@ -481,6 +482,17 @@ Point toScreen(WindowHandle win, int x, int y)
 	return res;
 }
 
+void updateGrabbedMouse() {
+	if (G.grabbed_window == INVALID_WINDOW) {
+		ClipCursor(NULL);
+		return;
+	}
+
+	RECT rect;
+	GetWindowRect((HWND)G.grabbed_window, &rect);
+	ClipCursor(&rect);
+}
+
 WindowHandle createWindow(const InitWindowArgs& args) {
 	WCharStr<LUMIX_MAX_PATH> cls_name("lunex_window");
 	static WNDCLASS wc = [&]() -> WNDCLASS {
@@ -495,25 +507,31 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					e.win_move.x = (i16)LOWORD(lParam);
 					e.win_move.y = (i16)HIWORD(lParam);
 					G.event_queue.pushBack(e);
+					updateGrabbedMouse();
 					return 0;
 				case WM_SIZE:
 					e.type = Event::Type::WINDOW_SIZE;
 					e.win_size.w = LOWORD(lParam);
 					e.win_size.h = HIWORD(lParam);
 					G.event_queue.pushBack(e);
+					updateGrabbedMouse();
 					return 0;
 				case WM_CLOSE:
 					e.type = Event::Type::WINDOW_CLOSE;
 					G.event_queue.pushBack(e);
+					if (hWnd == G.grabbed_window) G.grabbed_window = INVALID_WINDOW;
+					updateGrabbedMouse();
 					return 0;
 				case WM_ACTIVATE:
 					if (wParam == WA_INACTIVE) {
 						showCursor(true);
-						unclipCursor();
+						grabMouse(INVALID_WINDOW);
 					}
+
 					e.type = Event::Type::FOCUS;
 					e.focus.gained = wParam != WA_INACTIVE;
 					G.event_queue.pushBack(e);
+					updateGrabbedMouse();
 					break;
 			}
 			return DefWindowProc(hWnd, Msg, wParam, lParam);
@@ -798,7 +816,7 @@ void memCommit(void* ptr, size_t size) {
 	VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
-void memRelease(void* ptr) {
+void memRelease(void* ptr, size_t size) {
 	VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
@@ -1143,21 +1161,9 @@ bool makePath(const char* path)
 	return error_code == ERROR_SUCCESS || error_code == ERROR_ALREADY_EXISTS;
 }
 
-
-void clipCursor(int x, int y, int w, int h)
-{
-	RECT rect;
-	rect.left = x;
-	rect.right = x + w;
-	rect.top = y;
-	rect.bottom = y + h;
-	ClipCursor(&rect);
-}
-
-
-void unclipCursor()
-{
-	ClipCursor(NULL);
+void grabMouse(WindowHandle win) {
+	G.grabbed_window = win;
+	updateGrabbedMouse();
 }
 
 

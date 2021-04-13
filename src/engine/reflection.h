@@ -115,7 +115,7 @@ struct StringEnumAttribute : IAttribute {
 };
 
 
-struct PropertyBase {
+struct LUMIX_ENGINE_API PropertyBase {
 	PropertyBase(IAllocator& allocator) : attributes(allocator) {}
 	Array<IAttribute*> attributes;
 
@@ -124,7 +124,7 @@ struct PropertyBase {
 };
 
 
-struct DynamicProperties : PropertyBase {
+struct LUMIX_ENGINE_API DynamicProperties : PropertyBase {
 	enum Type {
 		I32,
 		FLOAT,
@@ -489,7 +489,7 @@ auto& function(F func, const char* decl_code, const char* name)
 	return ret;
 }
 
-struct ComponentBase {
+struct LUMIX_ENGINE_API ComponentBase {
 	ComponentBase(IAllocator& allocator);
 
 	void visit(IPropertyVisitor& visitor) const;
@@ -541,7 +541,7 @@ struct Scene {
 
 LUMIX_ENGINE_API Scene* getFirstScene();
 
-struct builder {
+struct LUMIX_ENGINE_API builder {
 	builder(IAllocator& allocator);
 
 	template <auto Creator, auto Destroyer>
@@ -729,7 +729,7 @@ struct builder {
 	PropertyBase* last_prop = nullptr;
 };
 
-builder build_scene(const char* scene_name);
+LUMIX_ENGINE_API builder build_scene(const char* scene_name);
 
 } // namespace reflection
 

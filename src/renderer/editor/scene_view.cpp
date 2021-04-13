@@ -1049,13 +1049,14 @@ void SceneView::captureMouse(bool capture)
 	m_is_mouse_captured = capture;
 	os::showCursor(!m_is_mouse_captured);
 	if (capture) {
+		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
 		const os::Point p = os::getMouseScreenPos();
 		m_captured_mouse_x = p.x;
 		m_captured_mouse_y = p.y;
 	}
 	else {
+		os::grabMouse(os::INVALID_WINDOW);
 		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
-		os::unclipCursor();
 	}
 }
 
@@ -1474,12 +1475,6 @@ void SceneView::onWindowGUI()
 				else {
 					ImGui::Image(t, size);
 				}
-			}
-
-			if (m_is_mouse_captured) {
-				const ImVec2 pos = ImGui::GetItemRectMin();
-				const ImVec2 size = ImGui::GetItemRectSize();
-				os::clipCursor((int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
 			}
 
 			if (ImGui::BeginDragDropTarget()) {

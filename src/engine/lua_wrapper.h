@@ -17,7 +17,7 @@ namespace LuaWrapper {
 
 
 #ifdef LUMIX_DEBUG
-	struct DebugGuard {
+	struct LUMIX_ENGINE_API DebugGuard {
 		DebugGuard(lua_State* L);
 		DebugGuard(lua_State* L, int offset);
 		~DebugGuard();
@@ -27,7 +27,7 @@ namespace LuaWrapper {
 		int top;
 	};
 #else
-	struct DebugGuard { 
+	struct LUMIX_ENGINE_API DebugGuard { 
 		DebugGuard(lua_State* L) {} 
 		DebugGuard(lua_State* L, int offset) {} 
 	};

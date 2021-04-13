@@ -8,7 +8,7 @@ namespace Lumix {
 struct AABB;
 struct Matrix;
 
-struct Sphere {
+struct LUMIX_ENGINE_API Sphere {
 	Sphere();
 	Sphere(float x, float y, float z, float _radius);
 	Sphere(const Vec3& point, float _radius);

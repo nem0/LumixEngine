@@ -164,7 +164,7 @@ LUMIX_ENGINE_API ThreadID getCurrentThreadID();
 
 LUMIX_ENGINE_API void* memReserve(size_t size);
 LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);
-LUMIX_ENGINE_API void memRelease(void* ptr);
+LUMIX_ENGINE_API void memRelease(void* ptr, size_t size); // size must be full size used in reserve
 LUMIX_ENGINE_API u32 getMemPageSize();
 
 LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
@@ -189,8 +189,7 @@ LUMIX_ENGINE_API u64 getLastModified(const char* file);
 LUMIX_ENGINE_API [[nodiscard]] bool makePath(const char* path);
 
 LUMIX_ENGINE_API void setCursor(CursorType type);
-LUMIX_ENGINE_API void clipCursor(int screen_x, int screen_y, int w, int h);
-LUMIX_ENGINE_API void unclipCursor();
+LUMIX_ENGINE_API void grabMouse(WindowHandle win);
 
 LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, Span<char> out);
 LUMIX_ENGINE_API int getDropFileCount(const Event& event);
