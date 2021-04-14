@@ -288,7 +288,7 @@ void init() {
 		logError("Missing XInputExtension, mouse input will be broken.");
 	}
 	else {
-		unsigned char mask_bytes[XIMaskLen(XI_RawMotion)];
+		u8 mask_bytes[XIMaskLen(XI_RawMotion)] = {};
 		XISetMask(mask_bytes, XI_RawMotion);
 
 		XIEventMask mask;
