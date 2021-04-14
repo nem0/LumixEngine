@@ -593,7 +593,7 @@ if has_plugin("renderer") then
 		linkLib "freetype"
 		linkOpenGL()
 		configuration { "linux" }
-			links { "GL", "X11" }
+			links { "GL", "X11", "Xi" }
 		configuration {}
 		useLua()
 		
@@ -788,7 +788,7 @@ if build_app then
 			kind "WindowedApp"
 
 		configuration { "linux" }
-			links { "GL", "X11", "dl", "rt" }
+			links { "GL", "X11", "dl", "rt", "Xi" }
 		
 		configuration {}
 		
@@ -913,7 +913,7 @@ if build_studio then
 
 		if not _OPTIONS["dynamic-plugins"] then	
 			configuration { "linux" }
-				links { "dl", "GL", "X11", "rt" }
+				links { "dl", "GL", "X11", "rt", "Xi" }
 				if _ACTION == "gmake" then
 					linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
 				end

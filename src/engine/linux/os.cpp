@@ -28,6 +28,9 @@
 #include <unistd.h>
 #define GLX_GLXEXT_LEGACY
 #include <GL/glx.h>
+#include <X11/extensions/XInput2.h>
+#include <X11/cursorfont.h>
+#include <X11/Xmd.h>
 
 #define _NET_WM_STATE_ADD 1
 
@@ -52,13 +55,15 @@ static struct {
 	Display* display = nullptr;
 	XIC ic;
 	XIM im;
-	IVec2 mouse_screen_pos = {};
+	IVec2 mouse_screen_pos = {}; // only valid if has_raw_inputs == false
 	bool key_states[256] = {};
 	Atom net_wm_state_atom;
 	Atom net_wm_state_maximized_vert_atom;
 	Atom net_wm_state_maximized_horz_atom;
 	Atom wm_protocols_atom;
 	Atom wm_delete_window_atom;
+	int xinput_opcode = 0;
+	bool has_raw_inputs = false;
 } G;
 
 bool getAppDataDir(Span<char> path) {
@@ -277,6 +282,25 @@ void init() {
 	G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
 	G.wm_protocols_atom = XInternAtom(G.display, "WM_PROTOCOLS", False);
 	G.wm_delete_window_atom = XInternAtom(G.display, "WM_DELETE_WINDOW", False);
+
+	int first, error;
+	if (XQueryExtension(G.display, "XInputExtension", &G.xinput_opcode, &first, &error) == False) {
+		logError("Missing XInputExtension, mouse input will be broken.");
+	}
+	else {
+		unsigned char mask_bytes[XIMaskLen(XI_RawMotion)];
+		XISetMask(mask_bytes, XI_RawMotion);
+
+		XIEventMask mask;
+
+		mask.deviceid = XIAllMasterDevices;
+		mask.mask_len = sizeof(mask_bytes);
+		mask.mask     = mask_bytes;
+
+		Window root  = DefaultRootWindow(G.display);
+		XISelectEvents(G.display, root, &mask, 1);
+		G.has_raw_inputs = true;
+	}
 }
 
 InputFile::InputFile() {
@@ -433,6 +457,35 @@ next:
 
 	if (XFilterEvent(&xevent, None)) return false;
 
+	if ((xevent.xcookie.type == GenericEvent) && (xevent.xcookie.extension == G.xinput_opcode)) {
+		XGetEventData(G.display, &xevent.xcookie);
+		bool handled = false;
+
+		if (xevent.xcookie.evtype == XI_RawMotion) {
+			XIRawEvent* re = (XIRawEvent*)xevent.xcookie.data;
+			if (re->valuators.mask_len) {
+				const double* values = re->raw_values;
+
+				e.window = INVALID_WINDOW;
+				e.type = Event::Type::MOUSE_MOVE;
+
+				if (XIMaskIsSet(re->valuators.mask, 0)) {
+					e.mouse_move.xrel = *values;
+					values++;
+				}
+
+				if (XIMaskIsSet(re->valuators.mask, 1)) {
+					e.mouse_move.yrel = *values;
+				}
+
+				handled = true;
+			}
+		}
+
+		XFreeEventData(G.display, &xevent.xcookie);
+		if(handled) return true;
+	}
+
 	switch (xevent.type) {
 		default: goto next;
 		case KeyPress: {
@@ -513,9 +566,12 @@ next:
 			return true;
 		}
 		case MotionNotify:
+			if (G.has_raw_inputs) goto next;
+			
 			const IVec2 mp(xevent.xmotion.x, xevent.xmotion.y);
 			const IVec2 rel = mp - G.mouse_screen_pos;
 			G.mouse_screen_pos = mp;
+
 			e.window = (WindowHandle)xevent.xmotion.window;
 			e.type = Event::Type::MOUSE_MOVE;
 			e.mouse_move.xrel = rel.x;
@@ -962,10 +1018,13 @@ bool makePath(const char* path) {
 
 
 void grabMouse(WindowHandle window) {
-	// const u32 mask = ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask;
-	// X11_XGrabPointer(G.display, window, True, mask, GrabModeAsync, GrabModeAsync, window, None, CurrentTime);
-	// ASSERT(false);
-	// TODO
+	if (window == INVALID_WINDOW) {
+		XUngrabPointer(G.display, CurrentTime);
+	}
+	else {
+		const u32 mask = ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask;
+		XGrabPointer(G.display, (Window)window, True, mask, GrabModeAsync, GrabModeAsync, (Window)window, None, CurrentTime);
+	}
 }
 
 

@@ -92,6 +92,7 @@ jobs:
               sudo apt-get install libasound2-dev
               sudo apt-get install libgl1-mesa-dev
               sudo apt-get install libgl1-mesa-glx
+              sudo apt-get install libxi-dev
           - name: Download 3rdparties
             run: |
               cd projects

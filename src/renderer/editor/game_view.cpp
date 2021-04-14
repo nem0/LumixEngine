@@ -360,10 +360,6 @@ void GameView::onWindowGUI()
 
 	}
 
-	if (m_is_mouse_captured) {
-		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
-	}
-
 	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
 	ImGui::End();
 	ImGui::PopStyleVar();
