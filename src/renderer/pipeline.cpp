@@ -362,7 +362,6 @@ namespace LuaWrapper {
 }
 
 
-
 struct GlobalState
 {
 	struct SMSlice {

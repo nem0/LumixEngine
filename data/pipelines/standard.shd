@@ -33,7 +33,7 @@ uniform("Stiffness", "float", 10)
 
 common [[
 	#ifdef SKINNED
-			layout(std140, binding = 4) uniform ModelState {
+		layout(std140, binding = 4) uniform ModelState {
 			float layer;
 			float fur_scale;
 			float fur_gravity;
