@@ -4034,6 +4034,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		const u32 vehicles_count = serializer.read<u32>();
 		m_vehicles.reserve(vehicles_count + m_vehicles.size());
+		Array<EntityRef> tmp(m_allocator);
 		for (u32 i = 0; i < vehicles_count; ++i) {
 			EntityRef e = serializer.read<EntityRef>();
 			e = entity_map.get(e);
@@ -4050,6 +4051,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				iter.value()->geom = geom_res;
 			}
 			m_universe.onComponentCreated(e, VEHICLE_TYPE, this);
+			if (m_is_game_running) tmp.push(e);
 		}
 
 		const u32 wheels_count = serializer.read<u32>();
@@ -4060,6 +4062,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 			Wheel& w = m_wheels.insert(e);
 			serializer.read(w);
 			m_universe.onComponentCreated(e, WHEEL_TYPE, this);
+		}
+
+		if (m_is_game_running) {
+			for (EntityRef e : tmp) {
+				rebuildVehicle(e, *m_vehicles[e]);
+			}
 		}
 	}
 
@@ -4220,6 +4228,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		deserializeRagdolls(serializer, entity_map);
 		deserializeJoints(serializer, entity_map);
 		deserializeVehicles(serializer, entity_map);
+		updateFilterData();
 	}
 
 
@@ -4669,6 +4678,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
 		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, *scene.m_default_material);
 		(void)shape;
+		scene.updateFilterData(physx_actor, layer);
 	}
 }
 

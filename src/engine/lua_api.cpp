@@ -440,16 +440,39 @@ static void installLuaPackageLoader(lua_State* L)
 	lua_pop(L, 2);
 }
 
+static Engine* getEngineUpvalue(lua_State* L) {
+	const int index = lua_upvalueindex(1);
+	if (!LuaWrapper::isType<Engine>(L, index)) {
+		logError("Invalid Lua closure");
+		ASSERT(false);
+		return 0;
+	}
+	return LuaWrapper::checkArg<Engine*>(L, index);
+}
 
-static bool LUA_hasFilesystemWork(Engine* engine)
+static int LUA_pause(lua_State* L) 
 {
-	return engine->getFileSystem().hasWork();
+	bool pause = LuaWrapper::checkArg<bool>(L, 1);
+	Engine* engine = getEngineUpvalue(L);
+	engine->pause(pause);
+	return 0;
 }
 
 
-static void LUA_processFilesystemWork(Engine* engine)
+static int LUA_hasFilesystemWork(lua_State* L)
 {
+	Engine* engine = getEngineUpvalue(L);
+	bool res = engine->getFileSystem().hasWork();
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+static int LUA_processFilesystemWork(lua_State* L)
+{
+	Engine* engine = getEngineUpvalue(L);
 	engine->getFileSystem().processCallbacks();
+	return 0;
 }
 
 
@@ -628,7 +651,6 @@ static void LUA_destroyEntity(Universe* universe, i32 entity) { universe->destro
 static Universe* LUA_getSceneUniverse(IScene* scene) { return &scene->getUniverse(); }
 static void LUA_logError(const char* text) { logError(text); }
 static void LUA_logInfo(const char* text) { logInfo(text); }
-static void LUA_pause(Engine* engine, bool pause) { engine->pause(pause); }
 static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
 static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
@@ -636,14 +658,7 @@ static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
 
 static int LUA_loadUniverse(lua_State* L)
 {
-	const int index = lua_upvalueindex(1);
-	if (!LuaWrapper::isType<Engine>(L, index)) {
-		logError("Invalid Lua closure");
-		ASSERT(false);
-		return 0;
-	}
-	Engine* engine = LuaWrapper::checkArg<Engine*>(L, index);
-
+	Engine* engine = getEngineUpvalue(L);
 	auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
 	auto* name = LuaWrapper::checkArg<const char*>(L, 2);
 	if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
@@ -704,13 +719,7 @@ static int LUA_loadUniverse(lua_State* L)
 }
 
 static int LUA_instantiatePrefab(lua_State* L) {
-	const int index = lua_upvalueindex(1);
-	if (!LuaWrapper::isType<Engine>(L, index)) {
-		logError("Invalid Lua closure");
-		ASSERT(false);
-		return 0;
-	}
-	Engine* engine = LuaWrapper::checkArg<Engine*>(L, index);
+	Engine* engine = getEngineUpvalue(L);
 	LuaWrapper::checkTableArg(L, 1);
 	if (LuaWrapper::getField(L, 1, "value") != LUA_TLIGHTUSERDATA) {
 		LuaWrapper::argError(L, 1, "universe");
@@ -761,7 +770,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(getLastTimeDelta);
 	REGISTER_FUNCTION(getScene);
 	//REGISTER_FUNCTION(getSceneUniverse);
-	//REGISTER_FUNCTION(hasFilesystemWork);
 	REGISTER_FUNCTION(loadResource);
 	REGISTER_FUNCTION(getResourcePath);
 	REGISTER_FUNCTION(logError);
@@ -769,8 +777,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(multMatrixVec);
 	//REGISTER_FUNCTION(multQuat);
 	//REGISTER_FUNCTION(nextFrame);
-	//REGISTER_FUNCTION(pause);
-	//REGISTER_FUNCTION(processFilesystemWork);
 	//REGISTER_FUNCTION(setEntityLocalPosition);
 	//REGISTER_FUNCTION(setEntityLocalRotation);
 	REGISTER_FUNCTION(setEntityPosition);
@@ -781,6 +787,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(unloadResource);
 
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadUniverse", LUA_loadUniverse);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "hasFilesystemWork", LUA_hasFilesystemWork);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
 
 	#undef REGISTER_FUNCTION
 
@@ -961,7 +970,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			LumixAPI.destroyUniverse(LumixAPI.engine, self.value)
 		end
 		function Lumix.Universe:load(path, callback_fn)
-			LumixAPI.loadUniverse(LumixAPI.engine, self.value, path, callback_fn)
+			LumixAPI.loadUniverse(self.value, path, callback_fn)
 		end
 		function Lumix.Universe:new(_universe)
 			local u = { value = _universe }
