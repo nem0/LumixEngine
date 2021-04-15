@@ -209,8 +209,7 @@ void Resource::doLoad()
 	ASSERT(m_current_state != State::READY);
 
 	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
-	FileSystem::ContentCallback cb;
-	cb.bind<&Resource::fileLoaded>(this);
+	FileSystem::ContentCallback cb = makeDelegate<&Resource::fileLoaded>(this);
 
 	const u32 hash = m_path.getHash();
 	if (startsWith(m_path.c_str(), ".lumix/asset_tiles/")) {

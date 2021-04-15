@@ -655,10 +655,8 @@ struct NavigationSceneImpl final : NavigationScene
 		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
 		StaticString<LUMIX_MAX_PATH> path("universes/navzones/", zone.zone.guid, ".nav");
-		FileSystem::ContentCallback cb;
-		cb.bind<&LoadCallback::fileLoaded>(lcb);
 		FileSystem& fs = m_engine.getFileSystem();
-		return fs.getContent(Path(path), cb).isValid();
+		return fs.getContent(Path(path), makeDelegate<&LoadCallback::fileLoaded>(lcb)).isValid();
 	}
 
 	bool saveZone(EntityRef zone_entity) override {

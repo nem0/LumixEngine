@@ -1104,6 +1104,7 @@ struct StudioAppImpl final : StudioApp
 			ImGui::OpenPopup("Save Universe As");
 			m_save_as_request = false;
 		}
+		ImGui::SetNextWindowSizeConstraints(ImVec2(300, 150), ImVec2(9000, 9000));
 		if (ImGui::BeginPopupModal("Save Universe As"))
 		{
 			static char name[64] = "";

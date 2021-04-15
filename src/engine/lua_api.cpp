@@ -1,5 +1,6 @@
 #include <imgui/imgui.h>
 #include "crc32.h"
+#include "delegate.h"
 #include "engine.h"
 #include "file_system.h"
 #include "input_system.h"
@@ -635,31 +636,27 @@ static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
 
 static int LUA_loadUniverse(lua_State* L)
 {
-	auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
-	auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
-	auto* path = LuaWrapper::checkArg<const char*>(L, 3);
-	if (!lua_isfunction(L, 4)) LuaWrapper::argError(L, 4, "function");
-	FileSystem& fs = engine->getFileSystem();
-	FileSystem::ContentCallback cb;
-	struct Callback
-	{
-		~Callback()
-		{
-			luaL_unref(L, LUA_REGISTRYINDEX, lua_func);
-		}
+	const int index = lua_upvalueindex(1);
+	if (!LuaWrapper::isType<Engine>(L, index)) {
+		logError("Invalid Lua closure");
+		ASSERT(false);
+		return 0;
+	}
+	Engine* engine = LuaWrapper::checkArg<Engine*>(L, index);
 
-		void invoke(u64 size, const u8* mem, bool success)
-		{
-			if (!success)
-			{
+	auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
+	auto* name = LuaWrapper::checkArg<const char*>(L, 2);
+	if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
+	struct Callback {
+		~Callback() { luaL_unref(L, LUA_REGISTRYINDEX, lua_func); }
+
+		void invoke(u64 size, const u8* mem, bool success) {
+			if (!success) {
 				logError("Failed to open universe ", path);
-			}
-			else
-			{
+			} else {
 				InputMemoryStream blob(mem, size);
 				#pragma pack(1)
-					struct Header
-					{
+					struct Header {
 						u32 magic;
 						int version;
 						u32 hash;
@@ -670,20 +667,15 @@ static int LUA_loadUniverse(lua_State* L)
 				blob.read(&header, sizeof(header));
 
 				EntityMap entity_map(engine->getAllocator());
-				if (!engine->deserialize(*universe, blob, entity_map))
-				{
+				if (!engine->deserialize(*universe, blob, entity_map)) {
 					logError("Failed to deserialize universe ", path);
-				}
-				else
-				{
+				} else {
 					lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func);
-					if (lua_type(L, -1) != LUA_TFUNCTION)
-					{
+					if (lua_type(L, -1) != LUA_TFUNCTION) {
 						ASSERT(false);
 					}
 
-					if (lua_pcall(L, 0, 0, 0) != 0)
-					{
+					if (lua_pcall(L, 0, 0, 0) != 0) {
 						logError(lua_tostring(L, -1));
 						lua_pop(L, 1);
 					}
@@ -698,17 +690,18 @@ static int LUA_loadUniverse(lua_State* L)
 		lua_State* L;
 		int lua_func;
 	};
+
+	FileSystem& fs = engine->getFileSystem();
 	Callback* inst = LUMIX_NEW(engine->getAllocator(), Callback);
 	inst->engine = engine;
 	inst->universe = universe;
+	StaticString<LUMIX_MAX_PATH> path("universes/", name, ".unv");
 	inst->path = path;
 	inst->L = L;
 	inst->lua_func = luaL_ref(L, LUA_REGISTRYINDEX);
-	cb.bind<&Callback::invoke>(inst);
-	fs.getContent(inst->path, cb);
+	fs.getContent(inst->path, makeDelegate<&Callback::invoke>(inst));
 	return 0;
 }
-
 
 static int LUA_instantiatePrefab(lua_State* L) {
 	const int index = lua_upvalueindex(1);
@@ -787,7 +780,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
 
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "loadUniverse", LUA_loadUniverse);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadUniverse", LUA_loadUniverse);
 
 	#undef REGISTER_FUNCTION
 

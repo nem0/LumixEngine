@@ -772,8 +772,7 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		
 		probe.load_job = LUMIX_NEW(m_allocator, ReflectionProbe::LoadJob)(*this, entity, m_allocator);
-		FileSystem::ContentCallback cb;
-		cb.bind<&ReflectionProbe::LoadJob::callback>(probe.load_job);
+		FileSystem::ContentCallback cb = makeDelegate<&ReflectionProbe::LoadJob::callback>(probe.load_job);
 		probe.load_job->m_handle = m_engine.getFileSystem().getContent(Path(path_str), cb);
 	}
 

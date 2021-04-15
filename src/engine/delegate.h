@@ -75,4 +75,19 @@ private:
 	Stub m_stub;
 };
 
+template <typename T> struct ToDelegate_T;
+template <typename R, typename C, typename... Args> struct ToDelegate_T<R (C::*)(Args...)> {
+	using Type = Delegate<R (Args...)>;
+};
+
+template <typename T> using ToDelegate = typename ToDelegate_T<T>::Type;
+
+template <auto M, typename C>
+auto makeDelegate(C* inst) {
+	ToDelegate<decltype(M)> res;
+	res.bind<M>(inst);
+	return res;
+};
+
+
 } // namespace Lumix
