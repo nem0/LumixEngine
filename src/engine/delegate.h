@@ -85,7 +85,7 @@ template <typename T> using ToDelegate = typename ToDelegate_T<T>::Type;
 template <auto M, typename C>
 auto makeDelegate(C* inst) {
 	ToDelegate<decltype(M)> res;
-	res.bind<M>(inst);
+	res.template bind<M, C>(inst);
 	return res;
 };
 
