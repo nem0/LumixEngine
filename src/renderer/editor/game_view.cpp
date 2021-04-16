@@ -350,7 +350,7 @@ void GameView::onWindowGUI()
 				ImGuiEx::Rect(size.x, size.y, 0xffFF00FF);
 			}
 			const bool is_hovered = ImGui::IsItemHovered();
-			if (is_hovered && ImGui::IsMouseClicked(0) && editor.isGameMode()) captureMouse(true);
+			if (is_hovered && ImGui::IsMouseReleased(0) && editor.isGameMode()) captureMouse(true);
 			m_pos = ImGui::GetItemRectMin();
 			m_size = ImGui::GetItemRectSize();
 

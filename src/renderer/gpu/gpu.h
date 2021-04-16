@@ -145,14 +145,14 @@ enum class TextureFlags : u32 {
 	CLAMP_U = 1 << 1,
 	CLAMP_V = 1 << 2,
 	CLAMP_W = 1 << 3,
-	NO_MIPS = 1 << 4,
-	SRGB = 1 << 5,
-	READBACK = 1 << 6,
-	IS_3D = 1 << 7,
-	IS_CUBE = 1 << 8,
-	COMPUTE_WRITE = 1 << 9,
-	RENDER_TARGET = 1 << 10,
-	ANISOTROPIC_FILTER = 1 << 11
+	ANISOTROPIC_FILTER = 1 << 4,
+	NO_MIPS = 1 << 5,
+	SRGB = 1 << 6,
+	READBACK = 1 << 7,
+	IS_3D = 1 << 8,
+	IS_CUBE = 1 << 9,
+	COMPUTE_WRITE = 1 << 10,
+	RENDER_TARGET = 1 << 11,
 };
 
 enum class BufferFlags : u32 {
