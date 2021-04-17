@@ -45,8 +45,12 @@ struct StackNode {
 };
 
 
-StackTree::StackTree() {}
+StackTree::StackTree()
+	: m_root(nullptr)
+{}
+
 StackTree::~StackTree() {}
+
 void StackTree::refreshModuleList() {}
 
 
