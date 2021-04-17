@@ -6,8 +6,6 @@
 [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 [![Twitter](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/mikulasflorek)
 
-HEAD of master is not stable, for stable version use [this](https://github.com/nem0/LumixEngine/tree/f77a0b6a899be4736f0ce26133bbe8061a3828f1)
-
 3D Game Engine
 
 * [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started) | [Video](https://www.youtube.com/watch?v=OjQKTA5ia2U)
