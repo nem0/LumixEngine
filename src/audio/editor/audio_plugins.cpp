@@ -123,6 +123,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			AudioDevice::BufferHandle handle = device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
 			if (handle != AudioDevice::INVALID_BUFFER_HANDLE) {
+				device.setVolume(handle, clip->m_volume);
 				device.play(handle, true);
 				m_playing_clip = handle;
 			}

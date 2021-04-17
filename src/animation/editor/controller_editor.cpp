@@ -356,6 +356,26 @@ struct ControllerEditorImpl : ControllerEditor {
 		return *m_event_types[0].get();
 	}
 
+	void removeEvent(OutputMemoryStream& events, u32 idx) const {
+		OutputMemoryStream tmp(m_app.getAllocator());
+		InputMemoryStream blob(events);
+		u32 i = 0;
+		while(blob.getPosition() != blob.size()) {
+			const u32 type = blob.read<u32>();
+			const u16 data_size = blob.read<u16>();
+			u16* rel_time = (u16*)blob.skip(sizeof(u16));
+			u8* data = (u8*)blob.skip(data_size);
+			if (i != idx) {
+				tmp.write(type);
+				tmp.write(data_size);
+				tmp.write(*rel_time);
+				tmp.write(data, data_size);
+			}
+			++i;
+		}
+		events = static_cast<OutputMemoryStream&&>(tmp);
+	}
+
 	bool editEvents(OutputMemoryStream& events) {
 		if (!ImGui::TreeNode("Events")) return false;
 		ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_PLUS_CIRCLE).x);
@@ -373,7 +393,16 @@ struct ControllerEditorImpl : ControllerEditor {
 				ASSERT(data_size == type_obj.size);
 				u16* rel_time = (u16*)blob.skip(sizeof(u16));
 				u8* data = (u8*)blob.skip(type_obj.size);
-				if (ImGui::TreeNode((void*)(uintptr)i, "%d %s", i, type_obj.label.data)) {
+				
+				bool open = ImGui::TreeNodeEx((void*)(uintptr)i, ImGuiTreeNodeFlags_AllowItemOverlap, "%d %s", i, type_obj.label.data);
+				ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_MINUS_CIRCLE).x);
+				if (ImGuiEx::IconButton(ICON_FA_MINUS_CIRCLE, "Delete")) {
+					ImGui::TreePop();
+					removeEvent(events, i - 1);
+					break;
+				}
+				
+				if (open) {
 					ImGuiEx::Label("Time");
 					float t = *rel_time / float(0xffff);
 					if (ImGui::DragFloat("##t", &t, 0.01f, 0.f, 1.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
