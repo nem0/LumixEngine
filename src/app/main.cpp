@@ -1,6 +1,7 @@
 #if 1 // set to 0 to build minimal lunex example
 
 #include "engine/allocators.h"
+#include "engine/atomic.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
@@ -22,6 +23,11 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
+
+#ifdef __linux__
+	#define STB_IMAGE_IMPLEMENTATION
+	#include "stb/stb_image.h"
+#endif
 
 using namespace Lumix;
 
