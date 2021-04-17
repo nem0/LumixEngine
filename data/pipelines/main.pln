@@ -377,8 +377,12 @@ function main_shadowmap()
 end
 
 function render_preview()
+	local shadowmap = createRenderbuffer { width = 1, height = 1, format = "depth32", debug_name = "shadowmap" }
+	setRenderTargetsDS(shadowmap)
+	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
+
 	local view_params = getCameraParams()
-	fillClusters()
+	fillClusters(view_params)
 	local entities = cull(view_params)
 	
 	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16f", debug_name = "preview_rb" }
@@ -388,6 +392,8 @@ function render_preview()
 	clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
 
 	pass(view_params)
+	
+	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 5)
 	local bucket1 = createBucket(entities, "default", "")
 	local bucket2 = createBucket(entities, "transparent", "", "depth")
 	renderBucket(bucket1, default_state)

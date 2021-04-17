@@ -1874,7 +1874,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void createPreviewUniverse()
 	{
-		auto& engine = m_app.getEngine();
+		Engine& engine = m_app.getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
@@ -2601,17 +2601,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(radius * 2);
+		Vec3 dir = normalize(center - eye);
 		mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 		mtx = mtx.inverted();
 
 		Viewport viewport;
-		viewport.near = -4 * radius;
-		viewport.far = 4 * radius;
+		viewport.near = 0.01f;
+		viewport.far = 8 * radius;
 		viewport.is_ortho = true;
 		viewport.ortho_size = radius * 1.1f;
 		viewport.h = AssetBrowser::TILE_SIZE * 4;
 		viewport.w = AssetBrowser::TILE_SIZE * 4;
-		viewport.pos = DVec3(center);
+		viewport.pos = DVec3(center - dir * 4 * radius);
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
