@@ -39,7 +39,7 @@ local transparent_state = {
 
 local water_state = {
 	depth_write = false,
-	blending = "alpha"
+	blending = "dual"
 }
 
 local default_state = {
