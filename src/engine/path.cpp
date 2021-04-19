@@ -39,11 +39,13 @@ void Path::operator =(const char* rhs) {
 }
 
 bool Path::operator==(const Path& rhs) const {
+	ASSERT(equalStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
 	return m_hash == rhs.m_hash;
 }
 
 bool Path::operator!=(const Path& rhs) const {
-	return m_hash != rhs.m_hash;
+	ASSERT(equalStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
+	return m_hash != rhs.m_hash || !equalStrings(m_path, rhs.m_path);
 }
 
 void Path::normalize(const char* path, Span<char> output)

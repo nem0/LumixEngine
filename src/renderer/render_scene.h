@@ -34,8 +34,8 @@ struct Terrain;
 struct Texture;
 struct Universe;
 template <typename T> struct Array;
+template <typename T> struct Delegate;
 template <typename T, typename T2> struct AssociativeArray;
-
 
 struct Camera
 {
@@ -144,13 +144,6 @@ struct EnvironmentProbe
 };
 
 
-struct MeshSortData
-{
-    u32 sort_key;
-    u8 layer;
-};
-
-
 struct ModelInstance
 {
 	enum Flags : u8
@@ -209,7 +202,6 @@ struct DebugLine
 
 
 enum class RenderableTypes : u8 {
-	MESH_GROUP,
 	MESH,
 	SKINNED,
 	DECAL,
@@ -238,6 +230,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	static void registerLuaAPI(lua_State* L);
 	static void reflect();
 
+	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) = 0;
 	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
@@ -249,7 +242,6 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual float getCameraLODMultiplier(EntityRef entity) const = 0;
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity) const = 0;
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
-	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void setGlobalLODMultiplier(float multiplier) = 0;
@@ -298,16 +290,13 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getParticleEmitterPath(EntityRef entity) = 0;
-	virtual void setParticleEmitterRate(EntityRef entity, u32 value) = 0;
-	virtual u32 getParticleEmitterRate(EntityRef entity) = 0;
 	virtual void updateParticleEmitter(EntityRef entity, float dt) = 0;
-	virtual const AssociativeArray<EntityRef, struct ParticleEmitter*>& getParticleEmitters() const = 0;
-	virtual ParticleEmitter* getParticleEmitter(EntityRef e) const = 0;
+	virtual const HashMap<EntityRef, struct ParticleEmitter>& getParticleEmitters() const = 0;
+	virtual ParticleEmitter& getParticleEmitter(EntityRef e) = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
-	virtual const MeshSortData* getMeshSortData() const = 0;
 	virtual Span<const ModelInstance> getModelInstances() const = 0;
 	virtual Span<ModelInstance> getModelInstances() = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;

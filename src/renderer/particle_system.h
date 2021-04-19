@@ -102,13 +102,14 @@ struct LUMIX_RENDERER_API ParticleEmitter
 {
 public:
 	ParticleEmitter(EntityPtr entity, IAllocator& allocator);
+	ParticleEmitter(ParticleEmitter&& rhs);
 	~ParticleEmitter();
 
-	void serialize(OutputMemoryStream& blob);
-	void deserialize(InputMemoryStream& blob, ResourceManagerHub& manager);
-	void update(float dt, struct PageAllocator& allocator);
+	void serialize(OutputMemoryStream& blob) const;
+	void deserialize(InputMemoryStream& blob, bool has_autodestroy, ResourceManagerHub& manager);
+	bool update(float dt, struct PageAllocator& allocator);
 	void emit(const float* args);
-	void fillInstanceData(float* data);
+	void fillInstanceData(float* data) const;
 	u32 getParticlesDataSizeBytes() const;
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);
@@ -119,6 +120,7 @@ public:
 	EntityPtr m_entity;
 	u32 m_emit_rate = 10;
 	u32 m_particles_count = 0;
+	bool m_autodestroy = false;
 	float m_constants[16];
 
 private:

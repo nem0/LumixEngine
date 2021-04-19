@@ -885,12 +885,6 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 
 	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
 	if(meshes) {
-		meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_GROUP));
-	}
-	else {
-		meshes = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);
-	}
-	if(meshes) {
 		meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
 	}
 	else {
@@ -1005,8 +999,6 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 			m_terrain_brush_size);
 		
 		CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
-		if (meshes) meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_GROUP));
-		else meshes = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);
 		if (meshes) meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
 		else meshes = scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
 

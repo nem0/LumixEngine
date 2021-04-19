@@ -475,7 +475,7 @@ void Material::enableBackfaceCulling(bool enable)
 }
 
 bool Material::isAlphaCutout() const {
-	const u8 idx = m_renderer.getShaderDefineIdx("ALPHA_CUTOUT");
+	static const u8 idx = m_renderer.getShaderDefineIdx("ALPHA_CUTOUT");
 	return isDefined(idx);
 }
 

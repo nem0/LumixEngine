@@ -155,7 +155,7 @@ bool Model::isSkinned() const
 }
 
 
-RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose)
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter)
 {
 	RayCastModelHit hit;
 	hit.is_hit = false;
@@ -164,52 +164,44 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 	Matrix matrices[256];
 	ASSERT(!pose || pose->count <= lengthOf(matrices));
 	bool is_skinned = false;
-	for (int mesh_index = m_lod_indices[0].from; mesh_index <= m_lod_indices[0].to; ++mesh_index)
-	{
+	for (int mesh_index = m_lod_indices[0].from; mesh_index <= m_lod_indices[0].to; ++mesh_index) {
 		Mesh& mesh = m_meshes[mesh_index];
 		is_skinned = pose && !mesh.skin.empty() && pose->count <= lengthOf(matrices);
 	}
-	if (is_skinned)
-	{
+	if (is_skinned) {
 		computeSkinMatrices(*pose, *this, matrices);
 	}
 
-	for (int mesh_index = m_lod_indices[0].from; mesh_index <= m_lod_indices[0].to; ++mesh_index)
-	{
-		Mesh& mesh = m_meshes[mesh_index];
-		bool is_mesh_skinned = !mesh.skin.empty() && is_skinned;
-		u16* indices16 = (u16*)mesh.indices.getMutableData();
-		u32* indices32 = (u32*)mesh.indices.getMutableData();
-		bool is16 = mesh.flags.isSet(Mesh::Flags::INDICES_16_BIT);
-		int index_size = is16 ? 2 : 4;
-		for(i32 i = 0, c = (i32)mesh.indices.size() / index_size; i < c; i += 3)
-		{
+	for (int mesh_index = m_lod_indices[0].from; mesh_index <= m_lod_indices[0].to; ++mesh_index) {
+		const Mesh& mesh = m_meshes[mesh_index];
+		const bool is_mesh_skinned = !mesh.skin.empty() && is_skinned;
+		const u16* indices16 = (const u16*)mesh.indices.data();
+		const u32* indices32 = (const u32*)mesh.indices.data();
+		const bool is16 = mesh.flags.isSet(Mesh::Flags::INDICES_16_BIT);
+		const int index_size = is16 ? 2 : 4;
+		const Vec3* vertices = mesh.vertices.begin();
+		
+		for (i32 i = 0, c = (i32)mesh.indices.size() / index_size; i < c; i += 3) {
 			Vec3 p0, p1, p2;
-			if (is16)
-			{
-				p0 = mesh.vertices[indices16[i]];
-				p1 = mesh.vertices[indices16[i + 1]];
-				p2 = mesh.vertices[indices16[i + 2]];
-				if (is_mesh_skinned)
-				{
+			if (is16) {
+				p0 = vertices[indices16[i]];
+				p1 = vertices[indices16[i + 1]];
+				p2 = vertices[indices16[i + 2]];
+				if (is_mesh_skinned) {
 					p0 = evaluateSkin(p0, mesh.skin[indices16[i]], matrices);
 					p1 = evaluateSkin(p1, mesh.skin[indices16[i + 1]], matrices);
 					p2 = evaluateSkin(p2, mesh.skin[indices16[i + 2]], matrices);
 				}
-			}
-			else
-			{
-				p0 = mesh.vertices[indices32[i]];
-				p1 = mesh.vertices[indices32[i + 1]];
-				p2 = mesh.vertices[indices32[i + 2]];
-				if (is_mesh_skinned)
-				{
+			} else {
+				p0 = vertices[indices32[i]];
+				p1 = vertices[indices32[i + 1]];
+				p2 = vertices[indices32[i + 2]];
+				if (is_mesh_skinned) {
 					p0 = evaluateSkin(p0, mesh.skin[indices32[i]], matrices);
 					p1 = evaluateSkin(p1, mesh.skin[indices32[i + 1]], matrices);
 					p2 = evaluateSkin(p2, mesh.skin[indices32[i + 2]], matrices);
 				}
 			}
-
 
 			Vec3 normal = cross(p1 - p0, p2 - p0);
 			float q = dot(normal, dir);
@@ -235,9 +227,12 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 
 			if (!hit.is_hit || hit.t > t)
 			{
+				RayCastModelHit prev = hit;
 				hit.is_hit = true;
 				hit.t = t;
+				hit.entity = entity;
 				hit.mesh = &m_meshes[mesh_index];
+				if (filter && !filter->invoke(hit)) hit = prev;
 			}
 		}
 	}

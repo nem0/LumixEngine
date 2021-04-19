@@ -121,6 +121,28 @@ ParticleEmitter::ParticleEmitter(EntityPtr entity, IAllocator& allocator)
 {
 }
 
+ParticleEmitter::ParticleEmitter(ParticleEmitter&& rhs)
+	: m_allocator(rhs.m_allocator)
+	, m_emit_buffer(static_cast<OutputMemoryStream&&>(rhs.m_emit_buffer))
+	, m_capacity(rhs.m_capacity)
+	, m_emit_timer(rhs.m_emit_timer)
+	, m_resource(rhs.m_resource)
+	, m_entity(rhs.m_entity)
+	, m_emit_rate(rhs.m_emit_rate)
+	, m_particles_count(rhs.m_particles_count)
+	, m_autodestroy(rhs.m_autodestroy)
+{
+	memcpy(m_channels, rhs.m_channels, sizeof(m_channels));
+	memcpy(m_constants, rhs.m_constants, sizeof(m_constants));
+	memset(rhs.m_channels, 0, sizeof(rhs.m_channels));
+	if (rhs.m_resource) {
+		rhs.m_resource->getObserverCb().unbind<&ParticleEmitter::onResourceChanged>(&rhs);
+	}
+	rhs.m_resource = nullptr;
+	if (m_resource) {
+		m_resource->onLoaded<&ParticleEmitter::onResourceChanged>(this);
+	}
+}
 
 ParticleEmitter::~ParticleEmitter()
 {
@@ -143,8 +165,8 @@ void ParticleEmitter::onResourceChanged(Resource::State old_state, Resource::Sta
 void ParticleEmitter::setResource(ParticleEmitterResource* res)
 {
 	if (m_resource) {
-		m_resource->decRefCount();
 		m_resource->getObserverCb().unbind<&ParticleEmitter::onResourceChanged>(this);
+		m_resource->decRefCount();
 	}
 	m_resource = res;
 	if (m_resource) {
@@ -214,18 +236,21 @@ void ParticleEmitter::emit(const float* args)
 }
 
 
-void ParticleEmitter::serialize(OutputMemoryStream& blob)
+void ParticleEmitter::serialize(OutputMemoryStream& blob) const
 {
 	blob.write(m_entity);
 	blob.write(m_emit_rate);
+	blob.write(m_autodestroy);
 	blob.writeString(m_resource ? m_resource->getPath().c_str() : "");
 }
 
 
-void ParticleEmitter::deserialize(InputMemoryStream& blob, ResourceManagerHub& manager)
+void ParticleEmitter::deserialize(InputMemoryStream& blob, bool has_autodestroy, ResourceManagerHub& manager)
 {
 	blob.read(m_entity);
 	blob.read(m_emit_rate);
+	m_autodestroy = false;
+	if (has_autodestroy) blob.read(m_autodestroy);
 	const char* path = blob.readString();
 	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);
@@ -331,7 +356,7 @@ struct BinaryHelper {
 		}
 	}
 
-	ParticleEmitter* emitter;
+	const ParticleEmitter* emitter;
 	i32 fromf4;
 	i32 stepf4;
 	float4* reg_mem;
@@ -390,7 +415,7 @@ struct TernaryHelper {
 		}
 	}
 
-	ParticleEmitter* emitter;
+	const ParticleEmitter* emitter;
 	i32 fromf4;
 	i32 stepf4;
 	float4* reg_mem;
@@ -398,9 +423,9 @@ struct TernaryHelper {
 };
 
 
-void ParticleEmitter::update(float dt, PageAllocator& allocator)
+bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 {
-	if (!m_resource || !m_resource->isReady()) return;
+	if (!m_resource || !m_resource->isReady()) return false;
 	
 	if (m_emit_rate > 0) {
 		m_emit_timer += dt;
@@ -411,7 +436,7 @@ void ParticleEmitter::update(float dt, PageAllocator& allocator)
 		}
 	}
 
-	if (m_particles_count == 0) return;
+	if (m_particles_count == 0) return false;
 
 	profiler::pushInt("particle count", m_particles_count);
 	m_emit_buffer.clear();
@@ -614,6 +639,7 @@ void ParticleEmitter::update(float dt, PageAllocator& allocator)
 	}
 
 	allocator.deallocate(kill_list, true);
+	return kill_counter > 0 && m_particles_count == 0 && m_autodestroy;
 }
 
 
@@ -623,7 +649,7 @@ u32 ParticleEmitter::getParticlesDataSizeBytes() const
 }
 
 
-void ParticleEmitter::fillInstanceData(float* data) {
+void ParticleEmitter::fillInstanceData(float* data) const {
 	if (m_particles_count == 0) return;
 
 	volatile i32 counter = 0;

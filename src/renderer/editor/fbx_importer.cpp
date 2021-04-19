@@ -1929,9 +1929,9 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		writeImpostorVertices(aabb);
 	}
 
-	write(sqrtf(origin_radius_squared) * cfg.radius_scale);
-	write(sqrtf(center_radius_squared) * cfg.radius_scale);
-	write(aabb);
+	write(sqrtf(origin_radius_squared) * cfg.bounding_scale);
+	write(sqrtf(center_radius_squared) * cfg.bounding_scale);
+	write(aabb * cfg.bounding_scale);
 }
 
 

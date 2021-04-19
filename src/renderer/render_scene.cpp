@@ -34,14 +34,6 @@ namespace Lumix
 {
 
 
-enum class RenderSceneVersion : int
-{
-	DECAL_UV_SCALE,
-	CURVE_DECALS,
-	LATEST
-};
-
-
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
 static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
@@ -55,6 +47,14 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
+enum class RenderSceneVersion : i32
+{
+	DECAL_UV_SCALE,
+	CURVE_DECALS,
+	AUTODESTROY_EMITTER,
+
+	LATEST
+};
 
 struct BoneAttachment
 {
@@ -70,7 +70,6 @@ static RenderableTypes getRenderableType(const Model& model, bool custom_materia
 	ASSERT(model.isReady());
 	if (custom_material) return RenderableTypes::MESH_MATERIAL_OVERRIDE;
 	if (model.isSkinned()) return RenderableTypes::SKINNED;
-	if (model.getMeshCount() > 1) return RenderableTypes::MESH_GROUP;
 	return RenderableTypes::MESH;
 }
 
@@ -193,10 +192,6 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		m_terrains.clear();
 
-		for (auto* emitter : m_particle_emitters)
-		{
-			LUMIX_DELETE(m_allocator, emitter);
-		}
 		m_particle_emitters.clear();
 
 		for (ModelInstance& i : m_model_instances)
@@ -512,37 +507,27 @@ struct RenderSceneImpl final : RenderScene {
 		updateRelativeMatrix(ba);
 	}
 
+	void startGame() override { m_is_game_running = true; }
+	void stopGame() override { m_is_game_running = false; }
 
-	void startGame() override
-	{
-		m_is_game_running = true;
-	}
-
-
-	void stopGame() override
-	{
-		m_is_game_running = false;
-	}
-
-
-	void update(float dt, bool paused) override
-	{
+	void update(float dt, bool paused) override {
 		PROFILE_FUNCTION();
 
-		m_time += dt;
+		if (!m_is_game_running) return;
+		if (paused) return;
 
-		if (m_is_game_running && !paused)
-		{
-			for (auto* emitter : m_particle_emitters)
-			{
-				emitter->update(dt, m_engine.getPageAllocator());
+		Array<EntityRef> to_delete(m_allocator);
+		for (ParticleEmitter& emitter : m_particle_emitters) {
+			if (emitter.update(dt, m_engine.getPageAllocator())) {
+				to_delete.push(*emitter.m_entity);
 			}
+		}
+		for (EntityRef e : to_delete) {
+			m_universe.destroyEntity(e);
 		}
 	}
 
-
 	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
-
 
 	void serializeBoneAttachments(OutputMemoryStream& serializer)
 	{
@@ -814,31 +799,26 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	void deserializeParticleEmitters(InputMemoryStream& serializer, const EntityMap& entity_map)
-	{
+	void deserializeParticleEmitters(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
 		const u32 count = serializer.read<u32>();
 		m_particle_emitters.reserve(count + m_particle_emitters.size());
 		for (u32 i = 0; i < count; ++i) {
-			ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(INVALID_ENTITY, m_allocator);
-			emitter->deserialize(serializer, m_engine.getResourceManager());
-			emitter->m_entity = entity_map.get(emitter->m_entity);
-			if(emitter->m_entity.isValid()) {
-				m_particle_emitters.insert((EntityRef)emitter->m_entity, emitter);
-				m_universe.onComponentCreated((EntityRef)emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
-			}
-			else {
-				LUMIX_DELETE(m_allocator, emitter);
+			ParticleEmitter emitter(INVALID_ENTITY, m_allocator);
+			emitter.deserialize(serializer, version > (i32)RenderSceneVersion::AUTODESTROY_EMITTER, m_engine.getResourceManager());
+			emitter.m_entity = entity_map.get(emitter.m_entity);
+			if (emitter.m_entity.isValid()) {
+				EntityRef e = *emitter.m_entity;
+				m_particle_emitters.insert(e, static_cast<ParticleEmitter&&>(emitter));
+				m_universe.onComponentCreated(e, PARTICLE_EMITTER_TYPE, this);
 			}
 		}
 	}
 
 
-	void serializeParticleEmitters(OutputMemoryStream& serializer)
-	{
+	void serializeParticleEmitters(OutputMemoryStream& serializer) {
 		serializer.write(m_particle_emitters.size());
-		for (auto* emitter : m_particle_emitters)
-		{
-			emitter->serialize(serializer);
+		for (const ParticleEmitter& emitter : m_particle_emitters) {
+			emitter.serialize(serializer);
 		}
 	}
 
@@ -881,7 +861,6 @@ struct RenderSceneImpl final : RenderScene {
 		u32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(nextPow2(size + m_model_instances.size()));
-		m_mesh_sort_data.reserve(nextPow2(size + m_mesh_sort_data.size()));
 		for (u32 i = 0; i < size; ++i) {
 			FlagSet<ModelInstance::Flags, u8> flags;
 			serializer.read(flags);
@@ -973,7 +952,7 @@ struct RenderSceneImpl final : RenderScene {
 		deserializeModelInstances(serializer, entity_map);
 		deserializeLights(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map);
-		deserializeParticleEmitters(serializer, entity_map);
+		deserializeParticleEmitters(serializer, entity_map, version);
 		deserializeBoneAttachments(serializer, entity_map);
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
@@ -1080,10 +1059,9 @@ struct RenderSceneImpl final : RenderScene {
 
 	void destroyParticleEmitter(EntityRef entity)
 	{
-		auto* emitter = m_particle_emitters[entity];
-		m_universe.onComponentDestroyed((EntityRef)emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
-		m_particle_emitters.erase((EntityRef)emitter->m_entity);
-		LUMIX_DELETE(m_allocator, emitter);
+		const ParticleEmitter& emitter = m_particle_emitters[entity];
+		m_universe.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
+		m_particle_emitters.erase(*emitter.m_entity);
 	}
 
 
@@ -1121,7 +1099,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	void createParticleEmitter(EntityRef entity)
 	{
-		m_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_allocator));
+		m_particle_emitters.insert(entity, ParticleEmitter(entity, m_allocator));
 		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
@@ -1149,12 +1127,6 @@ struct RenderSceneImpl final : RenderScene {
 		return m_point_lights[entity];
 	}
 	
-	
-	const MeshSortData* getMeshSortData() const override
-	{
-		return m_mesh_sort_data.empty() ? nullptr : m_mesh_sort_data.begin();
-	}
-
 
 	Span<const ModelInstance> getModelInstances() const override
 	{
@@ -2126,8 +2098,13 @@ struct RenderSceneImpl final : RenderScene {
 		return hit;
 	}
 
-	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override
-	{
+	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override {
+		return castRay(origin, dir, [&](const RayCastModelHit& hit) -> bool {
+			return hit.entity != ignored_model_instance;
+		});
+	}
+	
+	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.is_hit = false;
@@ -2135,8 +2112,8 @@ struct RenderSceneImpl final : RenderScene {
 		const Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
-			if (ignored_model_instance.index == i || !r.model) continue;
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
+			if (!r.flags.isSet(ModelInstance::VALID)) continue;
 
 			const EntityRef entity{i};
 			const DVec3& pos = universe.getPosition(entity);
@@ -2154,7 +2131,7 @@ struct RenderSceneImpl final : RenderScene {
 				const AABB& aabb = r.model->getAABB();
 				rel_pos = rot.rotate(rel_pos / scale);
 				if (getRayAABBIntersection(rel_pos, rel_dir, aabb.min, aabb.max - aabb.min, aabb_hit)) {
-					RayCastModelHit new_hit = r.model->castRay(rel_pos, rel_dir, r.pose);
+					RayCastModelHit new_hit = r.model->castRay(rel_pos, rel_dir, r.pose, entity, &filter);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
 						new_hit.entity = entity;
 						new_hit.component_type = MODEL_INSTANCE_TYPE;
@@ -2169,7 +2146,7 @@ struct RenderSceneImpl final : RenderScene {
 
 		for (auto* terrain : m_terrains) {
 			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
-			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t)) {
+			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t) && filter.invoke(terrain_hit)) {
 				terrain_hit.component_type = TERRAIN_TYPE;
 				terrain_hit.entity = terrain->getEntity();
 				terrain_hit.mesh = nullptr;
@@ -2298,9 +2275,6 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	float getTime() const override { return m_time; }
-
-
 	void modelUnloaded(Model*, EntityRef entity)
 	{
 		auto& r = m_model_instances[entity.index];
@@ -2349,12 +2323,6 @@ struct RenderSceneImpl final : RenderScene {
 				break;
 			}
 		}
-
-		while (m_mesh_sort_data.size() < m_model_instances.size()) {
-			m_mesh_sort_data.emplace();
-		}
-		m_mesh_sort_data[entity.index].layer = r.meshes[0].layer;
-		m_mesh_sort_data[entity.index].sort_key = r.meshes[0].sort_key;
 	}
 
 
@@ -2670,48 +2638,27 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void updateParticleEmitter(EntityRef entity, float dt) override {
-		if (!m_particle_emitters[entity]) return;
-		m_particle_emitters[entity]->update(dt, m_engine.getPageAllocator());
-	}
+	void updateParticleEmitter(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
 
-	void setParticleEmitterPath(EntityRef entity, const Path& path) override
-	{
-		if (!m_particle_emitters[entity]) return;
-
+	void setParticleEmitterPath(EntityRef entity, const Path& path) override {
 		ParticleEmitterResource* res = m_engine.getResourceManager().load<ParticleEmitterResource>(path);
-		m_particle_emitters[entity]->setResource(res);
+		m_particle_emitters[entity].setResource(res);
 	}
 
+	Path getParticleEmitterPath(EntityRef entity) override {
+		const ParticleEmitter& emitter = m_particle_emitters[entity];
+		if (!emitter.getResource()) return Path("");
 
-	Path getParticleEmitterPath(EntityRef entity) override
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		if (!emitter) return Path("");
-		if (!emitter->getResource()) return Path("");
-
-		return emitter->getResource()->getPath();
+		return emitter.getResource()->getPath();
 	}
 
-	void setParticleEmitterRate(EntityRef entity, u32 value) override {
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		emitter->m_emit_rate = value;
+	ParticleEmitter& getParticleEmitter(EntityRef e) override {
+		auto iter = m_particle_emitters.find(e);
+		ASSERT(iter.isValid());
+		return iter.value();
 	}
 
-	u32 getParticleEmitterRate(EntityRef entity) override {
-		return m_particle_emitters[entity]->m_emit_rate;
-	}
-	
-	ParticleEmitter* getParticleEmitter(EntityRef e) const override {
-		i32 idx = m_particle_emitters.find(e);
-		if (idx < 0) return nullptr;
-		return m_particle_emitters.at(idx);
-	}
-
-	const AssociativeArray<EntityRef, ParticleEmitter*>& getParticleEmitters() const override
-	{
-		return m_particle_emitters;
-	}
+	const HashMap<EntityRef, ParticleEmitter>& getParticleEmitters() const override { return m_particle_emitters; }
 
 	IAllocator& m_allocator;
 	Universe& m_universe;
@@ -2722,11 +2669,9 @@ struct RenderSceneImpl final : RenderScene {
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
-
 	HashMap<EntityRef, Decal> m_decals;
 	HashMap<EntityRef, CurveDecal> m_curve_decals;
 	Array<ModelInstance> m_model_instances;
-	Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, Environment> m_environments;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera = INVALID_ENTITY;
@@ -2734,14 +2679,13 @@ struct RenderSceneImpl final : RenderScene {
 	AssociativeArray<EntityRef, EnvironmentProbe> m_environment_probes;
 	AssociativeArray<EntityRef, ReflectionProbe> m_reflection_probes;
 	HashMap<EntityRef, Terrain*> m_terrains;
-	AssociativeArray<EntityRef, ParticleEmitter*> m_particle_emitters;
+	HashMap<EntityRef, ParticleEmitter> m_particle_emitters;
 	gpu::TextureHandle m_reflection_probes_texture = gpu::INVALID_TEXTURE;
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
 	HashMap<EntityRef, FurComponent> m_furs;
 
-	float m_time;
 	float m_lod_multiplier;
 	bool m_is_updating_attachments;
 	bool m_is_game_running;
@@ -2878,7 +2822,8 @@ void RenderScene::reflect() {
 			.var_prop<&RenderScene::getReflectionProbe, &ReflectionProbe::size>("size")
 			.var_prop<&RenderScene::getReflectionProbe, &ReflectionProbe::half_extents>("half_extents")
 		.LUMIX_CMP(ParticleEmitter, "particle_emitter", "Render / Particle emitter")
-			.LUMIX_PROP(ParticleEmitterRate, "Emit rate")
+			.var_prop<&RenderScene::getParticleEmitter, &ParticleEmitter::m_emit_rate>("Emit rate")
+			.var_prop<&RenderScene::getParticleEmitter, &ParticleEmitter::m_autodestroy>("Autodestroy")
 			.LUMIX_PROP(ParticleEmitterPath, "Source").resourceAttribute(ParticleEmitterResource::TYPE)
 		.LUMIX_CMP(Camera, "camera", "Render / Camera")
 			.icon(ICON_FA_CAMERA)
@@ -2959,11 +2904,9 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_environment_probes(m_allocator)
 	, m_reflection_probes(m_allocator)
 	, m_lod_multiplier(1.0f)
-	, m_time(0)
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
-	, m_mesh_sort_data(m_allocator)
 	, m_furs(m_allocator)
 {
 
@@ -2971,7 +2914,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	m_universe.entityDestroyed().bind<&RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
-	m_mesh_sort_data.reserve(5000);
 
 	m_render_cmps_mask = 0;
 

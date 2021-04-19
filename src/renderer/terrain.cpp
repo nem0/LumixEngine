@@ -355,6 +355,7 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 {
 	RayCastModelHit hit;
 	hit.is_hit = false;
+	hit.mesh = nullptr;
 	if (!m_heightmap || !m_heightmap->isReady()) return hit;
 
 	const Universe& universe = m_scene.getUniverse();

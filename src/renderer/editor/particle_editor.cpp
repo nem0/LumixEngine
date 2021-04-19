@@ -1299,7 +1299,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		}
 	}
 
-	ParticleEmitter* getSelectedEmitter() {
+	const ParticleEmitter* getSelectedEmitter() {
 		WorldEditor& editor = m_app.getWorldEditor();
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return nullptr;
@@ -1309,11 +1309,11 @@ struct ParticleEditorImpl : ParticleEditor {
 		RenderScene* scene = (RenderScene*)universe->getScene(emitter_type);
 		const bool has = universe->hasComponent(selected[0], emitter_type);
 		EntityRef e = selected[0];
-		return has ? scene->getParticleEmitters()[e] : nullptr;
+		return has ? &scene->getParticleEmitter(e) : nullptr;
 	}
 
 	void apply() {
-		ParticleEmitter* emitter = getSelectedEmitter();
+		const ParticleEmitter* emitter = getSelectedEmitter();
 		if (!emitter) return;
 
 		OutputMemoryStream instructions(m_allocator);
@@ -1376,7 +1376,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
-				ParticleEmitter* emitter = getSelectedEmitter();
+				const ParticleEmitter* emitter = getSelectedEmitter();
 				if (ImGui::MenuItem("New")) newGraph();
 				if (ImGui::MenuItem("Load")) load();
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
@@ -1548,7 +1548,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	}
 
 	void loadFromEntity() {
-		ParticleEmitter* emitter = getSelectedEmitter();
+		const ParticleEmitter* emitter = getSelectedEmitter();
 		ASSERT(emitter);
 
 		const Path& path = emitter->getResource()->getPath();

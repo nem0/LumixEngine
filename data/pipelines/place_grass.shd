@@ -32,7 +32,7 @@ compute_shader [[
 		uint u_step;
 		float u_grass_height;
 		uint u_vertex_count;
-		uint u_type;
+		uint u_type_mask;
 		float u_radius;
 		uint u_rotation_mode;
 		vec2 u_terrain_xz_scale;
@@ -81,7 +81,7 @@ compute_shader [[
 
 		uint mask = (splat.w << 8) | splat.z;
 		
-		if ((mask & (1 << u_type)) != 0) {
+		if ((mask & u_type_mask) != 0) {
 			float r = snoise(ij) * M_PI;
 			inst_pos.x += (fract(r * 2531) * 2 - 1) * 0.99 * u_step * 0.01;
 			inst_pos.z += (fract(r * 2819) * 2 - 1) * 0.99 * u_step * 0.01;

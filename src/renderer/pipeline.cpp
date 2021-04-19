@@ -1859,7 +1859,7 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
-				if(emitters.size() == 0) return;
+				if (emitters.size() == 0) return;
 				
 				Universe& universe = m_pipeline->m_scene->getUniverse();
 
@@ -1873,16 +1873,16 @@ struct PipelineImpl final : Pipeline
 				decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
 				decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
 
-				for (ParticleEmitter* emitter : emitters) {
-					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
+				for (const ParticleEmitter& emitter : emitters) {
+					if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
 					
-					const int size = emitter->getParticlesDataSizeBytes();
+					const int size = emitter.getParticlesDataSizeBytes();
 					if (size == 0) continue;
 
-					const Transform tr = universe.getTransform((EntityRef)emitter->m_entity);
+					const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
 					const Vec3 lpos = Vec3(tr.pos - m_camera_params.pos);
 
-					const Material* material = emitter->getResource()->getMaterial();
+					const Material* material = emitter.getResource()->getMaterial();
 					if (!material) continue;
 
 					Drawcall& dc = m_drawcalls.emplace();
@@ -1891,9 +1891,9 @@ struct PipelineImpl final : Pipeline
 					dc.program = material->getShader()->getProgram(decl, 0);
 					dc.material = material->getRenderData();
 					dc.size = size;
-					dc.particles_count = emitter->getParticlesCount();
-					dc.slice = m_pipeline->m_renderer.allocTransient(emitter->getParticlesDataSizeBytes());
-					emitter->fillInstanceData((float*)dc.slice.ptr);
+					dc.particles_count = emitter.getParticlesCount();
+					dc.slice = m_pipeline->m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
+					emitter.fillInstanceData((float*)dc.slice.ptr);
 				}
 			}
 
@@ -3056,7 +3056,6 @@ struct PipelineImpl final : Pipeline
 					READ(RenderableTypes, type);
 					switch(type) {
 						case RenderableTypes::MESH:
-						case RenderableTypes::MESH_GROUP:
 						case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 							READ(Mesh::RenderData*, mesh);
 							READ(Material::RenderData*, material);
@@ -3356,8 +3355,7 @@ struct PipelineImpl final : Pipeline
 							
 					break;
 				}
-				case RenderableTypes::MESH:
-				case RenderableTypes::MESH_GROUP: {
+				case RenderableTypes::MESH: {
 					if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
 						const u32 group_idx = renderables[i] & 0xffFF;
 						const u32 instancer_idx = (renderables[i] >> 16) & 0xffFF;
@@ -4015,7 +4013,7 @@ struct PipelineImpl final : Pipeline
 					u32 step;
 					float grass_height;
 					u32 indices_count;
-					u32 type;
+					u32 type_mask;
 					float radius;
 					u32 rotation_mode;
 					Vec2 terrain_xz_scale;
@@ -4030,7 +4028,7 @@ struct PipelineImpl final : Pipeline
 				dc.step = grass.step;
 				dc.grass_height = grass.grass_height;
 				dc.indices_count = grass.mesh->indices_count;
-				dc.type = grass.type;
+				dc.type_mask = 1 << grass.type;
 				dc.radius = grass.radius;
 				dc.rotation_mode = grass.rotation_mode;
 				dc.terrain_xz_scale = grass.terrain_xz_scale;
@@ -4275,7 +4273,6 @@ struct PipelineImpl final : Pipeline
 			}
 			RenderScene* scene = m_scene;
 			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
-			const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
 			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
 			const DVec3 camera_pos = view.cp.pos;
 			const DVec3 lod_ref_point = m_viewport.pos;
@@ -4326,25 +4323,6 @@ struct PipelineImpl final : Pipeline
 						}
 						break;
 					}
-					case RenderableTypes::MESH: {
-						for (int i = 0, c = page->header.count; i < c; ++i) {
-							const EntityRef e = renderables[i];
-							const MeshSortData& mesh = mesh_data[e.index];
-							const u32 bucket = bucket_map[mesh.layer];
-							const u64 subrenderable = e.index | type_mask;
-							if (bucket < 0xff) {
-								instancer.add(mesh.sort_key, subrenderable);
-							} else if (bucket < 0xffFF) {
-								const DVec3 pos = entity_data[e.index].pos;
-								const DVec3 rel_pos = pos - lod_ref_point;
-								const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-								const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-								const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | depth_bits;
-								inserter.push(key, subrenderable);
-							}
-						}
-						break;
-					}
 					case RenderableTypes::SKINNED:
 					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
@@ -4359,7 +4337,6 @@ struct PipelineImpl final : Pipeline
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
-									const u64 type_mask = (u64)type << 32;
 									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
 									ASSERT(!mi.custom_material || mesh_idx == 0);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
@@ -4405,7 +4382,7 @@ struct PipelineImpl final : Pipeline
 						}
 						break;
 					}
-					case RenderableTypes::MESH_GROUP: {
+					case RenderableTypes::MESH: {
 						const bool is_shadow = view.cp.is_shadow;
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
@@ -4419,9 +4396,7 @@ struct PipelineImpl final : Pipeline
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
-									const u64 type_mask = (u64)type << 32;
-									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
-									ASSERT(!mi.custom_material || mesh_idx == 0);
+									ASSERT(!mi.custom_material);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
 									if (bucket < 0xff) {
 										instancer.add(mesh.sort_key, subrenderable);

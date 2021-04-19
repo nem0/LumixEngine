@@ -46,6 +46,16 @@ public:
 		m_stub.second = nullptr;
 	}
 
+	template <typename T>
+	Delegate(T& obj)
+	{
+		m_stub.first = (InstancePtr)&obj;
+		m_stub.second = [](InstancePtr inst, Args... args) -> R {
+			T& obj = *(T*)inst;
+			return obj(args...);
+		};
+	}
+
 	bool isValid() { return m_stub.second != nullptr; }
 
 	template <R (*Function)(Args...)> void bind()

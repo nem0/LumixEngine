@@ -331,19 +331,18 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
 		
 		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
+		
 		RenderScene* scene = (RenderScene*)cmp.scene;
-		const i32 emitter_idx = scene->getParticleEmitters().find((EntityRef)cmp.entity);
-		ASSERT(emitter_idx >= 0);
-		ParticleEmitter* emitter = scene->getParticleEmitters().at(emitter_idx);
+		ParticleEmitter& emitter = scene->getParticleEmitter(*cmp.entity);
 
 		if (m_playing && ImGui::Button(ICON_FA_STOP " Stop")) m_playing = false;
 		else if (!m_playing && ImGui::Button(ICON_FA_PLAY " Play")) m_playing = true;
 
 		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) emitter->reset();
+		if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) emitter.reset();
 
 		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_EDIT " Edit")) m_particle_editor->open(emitter->getResource()->getPath().c_str());
+		if (ImGui::Button(ICON_FA_EDIT " Edit")) m_particle_editor->open(emitter.getResource()->getPath().c_str());
 
 		ImGuiEx::Label("Time scale");
 		ImGui::SliderFloat("##ts", &m_time_scale, 0, 1);
@@ -353,7 +352,7 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 		}
 			
 		ImGuiEx::Label("Particle count");
-		ImGui::Text("%d", emitter->m_particles_count);
+		ImGui::Text("%d", emitter.m_particles_count);
 	}
 
 	StudioApp& m_app;
@@ -1813,7 +1812,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.position_error = meta.position_error;
 		cfg.mikktspace_tangents = meta.use_mikktspace;
 		cfg.mesh_scale = meta.scale;
-		cfg.radius_scale = meta.culling_scale;
+		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
 		cfg.bake_vertex_ao = meta.bake_vertex_ao;

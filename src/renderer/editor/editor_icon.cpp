@@ -179,7 +179,7 @@ struct EditorIconsImpl final : EditorIcons
 			
 			const Vec3 rel_origin = icon_tr.rot.conjugated() * Vec3(origin - icon_tr.pos);
 			const Vec3 rel_dir = icon_tr.rot.conjugated() * dir;
-			const RayCastModelHit hit = m_models[(int)icon.type]->castRay(rel_origin / icon_tr.scale, rel_dir, nullptr);
+			const RayCastModelHit hit = m_models[(int)icon.type]->castRay(rel_origin / icon_tr.scale, rel_dir, nullptr, INVALID_ENTITY, nullptr);
 			if (hit.is_hit && hit.t >= 0 && (hit.t < res.t || res.t < 0)) {
 				res.t = hit.t;
 				res.entity = icon.entity;

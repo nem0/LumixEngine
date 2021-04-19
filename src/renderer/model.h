@@ -22,6 +22,7 @@ struct Mesh;
 struct Model;
 struct Pose;
 struct Renderer;
+template <typename T> struct Delegate;
 
 
 struct LUMIX_RENDERER_API RayCastModelHit {
@@ -32,6 +33,7 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 	Mesh* mesh;
 	EntityPtr entity;
 	ComponentType component_type;
+	using Filter = Delegate<bool (const RayCastModelHit&)>;
 };
 
 
@@ -183,7 +185,7 @@ public:
 	void getRelativePose(Pose& pose);
 	float getOriginBoundingRadius() const { return m_origin_bounding_radius; }
 	float getCenterBoundingRadius() const { return m_center_bounding_radius; }
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose);
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter);
 	const AABB& getAABB() const { return m_aabb; }
 	void onBeforeReady() override;
 	bool isSkinned() const;
