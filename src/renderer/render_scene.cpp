@@ -2100,7 +2100,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override {
 		return castRay(origin, dir, [&](const RayCastModelHit& hit) -> bool {
-			return hit.entity != ignored_model_instance;
+			return hit.entity != ignored_model_instance || !ignored_model_instance.isValid();
 		});
 	}
 	

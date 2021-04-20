@@ -47,11 +47,11 @@ public:
 	}
 
 	template <typename T>
-	Delegate(T& obj)
+	Delegate(const T& obj)
 	{
 		m_stub.first = (InstancePtr)&obj;
 		m_stub.second = [](InstancePtr inst, Args... args) -> R {
-			T& obj = *(T*)inst;
+			const T& obj = *(const T*)inst;
 			return obj(args...);
 		};
 	}
