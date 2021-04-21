@@ -398,7 +398,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	};
 	
 	static TileState getState(const FileInfo& info, FileSystem& fs) {
-		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", info.file_path_hash, ".dds");
+		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", info.file_path_hash, ".lbc");
 		if (!fs.fileExists(info.filepath)) return TileState::DELETED;
 		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
 
@@ -434,7 +434,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		{
 			ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
 			StaticString<LUMIX_MAX_PATH> compiled_asset_path(".lumix/assets/", tile.file_path_hash, ".res");
-			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
+			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
 				case TileState::OK:

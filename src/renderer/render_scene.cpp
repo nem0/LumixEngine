@@ -750,7 +750,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 		}
 
-		StaticString<LUMIX_MAX_PATH> path_str("universes/probes/", probe.guid, ".dds");
+		StaticString<LUMIX_MAX_PATH> path_str("universes/probes/", probe.guid, ".lbc");
 		if (probe.texture_id == 0xffFFffFF) {
 			logError("There's not enough space for ", path_str);
 			return;
@@ -2719,7 +2719,7 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 				
 		void execute() override {
 			gpu::TextureDesc desc;
-			const u8* image_data = Texture::getDDSInfo(data.data(), desc);
+			const u8* image_data = Texture::getLBCInfo(data.data(), desc);
 			if (!image_data) return;
 
 			ASSERT(desc.depth == 1);

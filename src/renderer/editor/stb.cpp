@@ -1,5 +1,5 @@
 // stb_image is already implemented in nvtt
-//#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #if defined _MSC_VER && _MSC_VER == 1900 

@@ -111,6 +111,7 @@ enum class AttributeType : u8 {
 };
 
 
+// keep order, this is serialized
 enum class TextureFormat : u32 {
 	R8,
 	RG8,

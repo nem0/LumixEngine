@@ -813,8 +813,7 @@ struct PipelineImpl final : Pipeline
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 		m_place_grass_shader = rm.load<Shader>(Path("pipelines/place_grass.shd"));
-		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
-
+		
 		m_draw2d.clear({1, 1});
 
 		float cube_verts[] = {
@@ -912,7 +911,6 @@ struct PipelineImpl final : Pipeline
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
 		m_place_grass_shader->decRefCount();
-		m_default_cubemap->decRefCount();
 
 		for (const Renderbuffer& rb : m_renderbuffers) {
 			m_renderer.destroy(rb.handle);
@@ -4906,7 +4904,6 @@ struct PipelineImpl final : Pipeline
 	int m_output;
 	Shader* m_debug_shape_shader;
 	Shader* m_place_grass_shader;
-	Texture* m_default_cubemap;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;

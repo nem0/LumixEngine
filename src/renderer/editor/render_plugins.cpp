@@ -42,7 +42,6 @@
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/font.h"
-#include "renderer/gpu/dds.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -56,7 +55,6 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
-#include <nvtt.h>
 
 using namespace Lumix;
 
@@ -72,272 +70,304 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
+namespace TextureCompressor {
 
-struct TextureCompressor {
-	enum Flags : u32 {
-		SRGB = 1 << 0,
-		GENERATE_MIPS = 1 << 1,
-		IS_NORMALMAP = 1 << 2,
-		HAS_ALPHA = 1 << 3,
-		CUBEMAP = 1 << 4
+struct Input {
+	struct Image {
+		Image(IAllocator& allocator) : pixels(allocator) {}
+
+		OutputMemoryStream pixels;
+		u32 mip;
+		u32 face;
+		u32 slice;
 	};
 
+	Input(u32 w, u32 h, u32 slices, u32 mips, IAllocator& allocator) 
+		: allocator(allocator)
+		, images(allocator)
+		, w(w)
+		, h(h)
+		, slices(slices)
+		, mips(mips)
+	{}
 
-	static void compress(const u8* src_data, u32 src_w, u32 src_h, u32 mips, u32 flags, OutputMemoryStream& dst, IAllocator& allocator) {
+	bool has(u32 face, u32 slice, u32 mip) const {
+		for (const Image& i : images) {
+			if (i.face == face && i.mip == mip && i.slice == slice) return true;
+		}
+		return false;
+	}
+
+	const Image& get(u32 face, u32 slice, u32 mip) const {
+		for (const Image& i : images) {
+			if (i.face == face && i.mip == mip && i.slice == slice) return i;
+		}
+		ASSERT(false);
+		return images[0];
+	}
+
+	Image& add(u32 face, u32 slice, u32 mip) {
+		Image img(allocator);
+		img.face = face;
+		img.mip = mip;
+		img.slice = slice;
+		img.pixels.resize(maximum(1, (w >> mip)) * maximum(1, (h >> mip)) * 4);
+		images.push(static_cast<Image&&>(img));
+		return images.back();
+	}
+
+	void add(Span<const u8> data, u32 face, u32 slice, u32 mip) {
+		Image img(allocator);
+		img.face = face;
+		img.mip = mip;
+		img.slice = slice;
+		ASSERT(data.length() == maximum(1, (w >> mip)) * maximum(1, (h >> mip)) * 4);
+		img.pixels.reserve(data.length());
+		img.pixels.write(data.begin(), data.length());
+		images.push(static_cast<Image&&>(img));
+	}
+
+	IAllocator& allocator;
+	Array<Image> images;
+	u32 w;
+	u32 h;
+	u32 slices;
+	u32 mips;
+	bool is_srgb = false;
+	bool is_normalmap = false;
+	bool has_alpha = false;
+	bool is_cubemap = false;
+};
+
+enum Flags : u32 {
+	GENERATE_MIPS = 1 << 1,
+};
+	
+static u32 getCompressedMipSize(u32 w, u32 h, u32 bytes_per_block) {
+	return ((w + 3) >> 2) * ((h + 3) >> 2) * bytes_per_block;
+}
+
+static u32 getCompressedSize(u32 w, u32 h, u32 mips, u32 faces, u32 bytes_per_block) {
+	u32 total = getCompressedMipSize(w, h, bytes_per_block) * faces;
+	for (u32 i = 1; i < mips; ++i) {
+		u32 mip_w = maximum(1, w >> i);
+		u32 mip_h = maximum(1, h >> i);
+		total += getCompressedMipSize(mip_w, mip_h, bytes_per_block) * faces;
+	}
+	return total;
+}
+
+static void computeMip(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w, u32 dst_h, bool is_srgb, IAllocator& allocator) {
+	PROFILE_FUNCTION();
+	if (is_srgb) {
+		i32 res = stbir_resize_uint8_srgb(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4, 3, STBIR_ALPHA_CHANNEL_NONE);
+		ASSERT(res == 1);
+	}
+	else {
+		i32 res = stbir_resize_uint8(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4);
+		ASSERT(res == 1);
+	}
+}
+
+static void compressBC1(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
+	PROFILE_FUNCTION();
+	
+	const u32 dst_block_size = 8;
+	const u32 size = getCompressedMipSize(w, h, dst_block_size);
+	const u64 offset = dst.size();
+	dst.resize(offset + size);
+	u8* out = dst.getMutableData() + offset;
+
+	jobs::forEach(h, 4, [&](i32 j, i32){
 		PROFILE_FUNCTION();
-		static bool once = []() { rgbcx::init(); return false; }();
+		u8 tmp[32 * 4];
+		const u8* src_row_begin = &src[j * w * 4];
 
-		Span<const u8> src(src_data, src_w * src_h * 4);
-		const bool is_srgb = flags & SRGB;
-		const bool is_cubemap = flags & CUBEMAP;
-		if (flags & IS_NORMALMAP) {
-			ASSERT(!is_cubemap);
-			writeDDSHeader(dst, src_w, src_h, 1, mips, gpu::DDS::DxgiFormat::BC5_UNORM, false, is_cubemap);
+		const u32 src_block_h = minimum(h - j, 4);
+		for (u32 i = 0; i < w; i += 4) {
+			const u8* src_block_begin = src_row_begin + i * 4;
 			
-			const u32 total_compressed_size = getCompressedSize(src_w, src_h, mips, 1, 16);
-			dst.reserve(dst.size() + total_compressed_size);
-			u32 w = src_w;
-			u32 h = src_h;
-			compressBC5(src, dst, w, h);
-			if (mips > 1 && flags & GENERATE_MIPS) {
-				Array<u8> mip(allocator);
-				Array<u8> prev_mip(allocator);
-				bool first = true;
-				while (w > 1 || h > 1) {
-					u32 prev_w = w;
-					u32 prev_h = h;
-					w = maximum(1, w >> 1);
-					h = maximum(1, h >> 1);
-					mip.resize(w * h * 4);
-					computeMip(first ? src : prev_mip, mip, prev_w, prev_h, w, h, false, allocator);
-					compressBC5(mip, dst, w, h);
-					prev_mip.swap(mip);
-					first = false;
+			const u32 src_block_w = minimum(w - i, 4);
+			for (u32 jj = 0; jj < src_block_h; ++jj) {
+				for (u32 ii = 0; ii < src_block_w; ++ii) {
+					u32 i0 = (ii + jj * 4) * 4;
+					u32 i1 = (ii + jj * w) * 4;
+					memcpy(&tmp[i0], &src_block_begin[i1], 4);
 				}
 			}
+
+			const u32 bi = i >> 2;
+			const u32 bj = j >> 2;
+			rgbcx::encode_bc1(10, &out[(bi + bj * ((w + 3) >> 2)) * dst_block_size], (const u8*)tmp, true, false);
 		}
-		else if (flags & HAS_ALPHA) {
-			writeDDSHeader(dst, src_w, src_h, 1, mips, is_srgb ? gpu::DDS::DxgiFormat::BC3_UNORM_SRGB : gpu::DDS::DxgiFormat::BC3_UNORM, false, is_cubemap);
+	});
+}
+
+static void compressRGBA(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
+	PROFILE_FUNCTION();
+	dst.write(src.begin(), src.length());
+}
+
+static void compressBC5(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
+	PROFILE_FUNCTION();
+	
+	const u32 size = getCompressedMipSize(w, h, 16);
+	const u64 offset = dst.size();
+	dst.resize(offset + size);
+	u8* out = dst.getMutableData() + offset;
+
+	jobs::forEach(h, 4, [&](i32 j, i32){
+		PROFILE_FUNCTION();
+		u32 tmp[32];
+		const u8* src_row_begin = &src[j * w * 4];
+		const u32 dst_block_size = 16;
+
+		const u32 src_block_h = minimum(h - j, 4);
+		for (u32 i = 0; i < w; i += 4) {
+			const u8* src_block_begin = src_row_begin + i * 4;
 			
-			const u32 faces = is_cubemap ? 6 : 1;
-			const u32 total_compressed_size = getCompressedSize(src_w, src_h, mips, faces, 16);
-			dst.reserve(dst.size() + total_compressed_size);
-			const u8* src_iter = src.begin();
-			for (u32 face = 0; face < faces; ++face) {
-				compressBC3(Span(src_iter, src_w * src_h * 4), dst, src_w, src_h);
-				src_iter += src_w * src_h * 4;
+			const u32 src_block_w = minimum(w - i, 4);
+			for (u32 jj = 0; jj < src_block_h; ++jj) {
+				for (u32 ii = 0; ii < src_block_w; ++ii) {
+					memcpy(&tmp[(ii + jj * 4)], &src_block_begin[ii * 4 + jj * w * 4], 4);
+				}
 			}
-			Array<u8> mip_data(allocator);
-			Array<u8> prev_mip(allocator);
-			bool first = true;
-			for (u32 mip = 1; mip < mips; ++mip) {
-				u32 mip_w = maximum(src_w >> mip, 1);
-				u32 mip_h = maximum(src_h >> mip, 1);
+
+			const u32 bi = i >> 2;
+			const u32 bj = j >> 2;
+			rgbcx::encode_bc5(&out[(bi + bj * ((w + 3) >> 2)) * dst_block_size], (const u8*)tmp, 0, 1, 4);
+		}
+	});
+}
+
+static void compressBC3(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
+	PROFILE_FUNCTION();
+	
+	const u32 size = getCompressedMipSize(w, h, 16);
+	const u64 offset = dst.size();
+	dst.resize(offset + size);
+	u8* out = dst.getMutableData() + offset;
+
+	jobs::forEach(h, 4, [&](i32 j, i32){
+		PROFILE_FUNCTION();
+		u8 tmp[32*4];
+		const u8* src_row_begin = &src[j * w * 4];
+		const u32 dst_block_size = 16;
+
+		const u32 src_block_h = minimum(h - j, 4);
+		for (u32 i = 0; i < w; i += 4) {
+			const u8* src_block_begin = src_row_begin + i * 4;
+			
+			const u32 src_block_w = minimum(w - i, 4);
+			for (u32 jj = 0; jj < src_block_h; ++jj) {
+				for (u32 ii = 0; ii < src_block_w; ++ii) {
+					u32 i0 = (ii + jj * 4) * 4;
+					u32 i1 = (ii + jj * w) * 4;
+					memcpy(&tmp[i0], &src_block_begin[i1], 4);
+				}
+			}
+
+			const u32 bi = i >> 2;
+			const u32 bj = j >> 2;
+			rgbcx::encode_bc3(10, &out[(bi + bj * ((w + 3) >> 2)) * dst_block_size], (const u8*)tmp);
+		}
+	});
+}
+
+static void writeLBCHeader(OutputMemoryStream& out, u32 w, u32 h, u32 slices, u32 mips, gpu::TextureFormat format, bool is_3d, bool is_cubemap) {
+	LBCHeader header;
+	header.w = w;
+	header.h = h;
+	header.slices = slices;
+	header.mips = mips;
+	header.format = format;
+	if (is_3d) header.flags |= LBCHeader::IS_3D;
+	if (is_cubemap) header.flags |= LBCHeader::CUBEMAP;
+	out.write(header);
+}
+
+static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32, u32), const Input& src_data, u32 flags, OutputMemoryStream& dst, IAllocator& allocator) {
+	const u32 mips = flags & GENERATE_MIPS ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
+	const u32 faces = src_data.is_cubemap ? 6 : 1;
+	const u32 block_size = src_data.has_alpha || src_data.is_normalmap ? 16 : 8;
+	const u32 total_compressed_size = getCompressedSize(src_data.w, src_data.h, mips, faces, block_size);
+	dst.reserve(dst.size() + total_compressed_size);
+	Array<u8> mip_data(allocator);
+	Array<u8> prev_mip(allocator);
+
+	for (u32 slice = 0; slice < src_data.slices; ++slice) {
+		for (u32 face = 0; face < faces; ++face) {
+			for (u32 mip = 0; mip < mips; ++mip) {
+				u32 mip_w = maximum(src_data.w >> mip, 1);
+				u32 mip_h = maximum(src_data.h >> mip, 1);
 				if (flags & GENERATE_MIPS) {
-					ASSERT(faces == 1);
-					mip_data.resize(mip_w * mip_h * 4);
-					u32 prev_w = maximum(src_w >> (mip - 1), 1);
-					u32 prev_h = maximum(src_h >> (mip - 1), 1);
-					computeMip(first ? Span(src_iter, mip_w * mip_h * 4) : prev_mip, mip_data, prev_w, prev_h, mip_w, mip_h, is_srgb, allocator);
-					compressBC3(mip_data, dst, mip_w, mip_h);
+					if (mip == 0) {
+						const Input::Image& src_mip = src_data.get(face, slice, mip);
+						compressor(src_mip.pixels, dst, mip_w, mip_h);
+					}
+					else {
+						mip_data.resize(mip_w * mip_h * 4);
+						u32 prev_w = maximum(src_data.w >> (mip - 1), 1);
+						u32 prev_h = maximum(src_data.h >> (mip - 1), 1);
+						computeMip(mip == 1 ? (Span<const u8>)src_data.get(face, slice, 0).pixels : prev_mip, mip_data, prev_w, prev_h, mip_w, mip_h, src_data.is_srgb, allocator);
+						compressor(mip_data, dst, mip_w, mip_h);
+						prev_mip.swap(mip_data);
+					}
 				}
 				else {
-					for (u32 face = 0; face < faces; ++face) {
-						compressBC3(Span(src_iter, mip_w * mip_h * 4), dst, mip_w, mip_h);
-						src_iter += mip_w * mip_h * 4;
-					}
-				}
-				prev_mip.swap(mip_data);
-				first = false;
-			}
-		}
-		else {
-			ASSERT(!is_cubemap);
-			writeDDSHeader(dst, src_w, src_h, 1, mips, is_srgb ? gpu::DDS::DxgiFormat::BC1_UNORM_SRGB : gpu::DDS::DxgiFormat::BC1_UNORM, false, is_cubemap);
-			const u32 total_compressed_size = getCompressedSize(src_w, src_h, mips, 1, 8);
-			dst.reserve(dst.size() + total_compressed_size);
-			u32 w = src_w;
-			u32 h = src_h;
-			compressBC1(src, dst, w, h);
-			if (mips > 1 && flags & GENERATE_MIPS) {
-				Array<u8> mip(allocator);
-				Array<u8> prev_mip(allocator);
-				bool first = true;
-				while (w > 1 || h > 1) {
-					u32 prev_w = w;
-					u32 prev_h = h;
-					w = maximum(1, w >> 1);
-					h = maximum(1, h >> 1);
-					mip.resize(w * h * 4);
-					computeMip(first ? src : prev_mip, mip, prev_w, prev_h, w, h, is_srgb, allocator);
-					compressBC1(mip, dst, w, h);
-					prev_mip.swap(mip);
-					first = false;
+					const Input::Image& src_mip = src_data.get(face, slice, mip);
+					compressor(src_mip.pixels, dst, mip_w, mip_h);
 				}
 			}
 		}
 	}
+}
 
-	static u32 getCompressedMipSize(u32 w, u32 h, u32 bytes_per_block) {
-		return ((w + 3) >> 2) * ((h + 3) >> 2) * bytes_per_block;
-	}
-
-	static u32 getCompressedSize(u32 w, u32 h, u32 mips, u32 faces, u32 bytes_per_block) {
-		u32 total = getCompressedMipSize(w, h, bytes_per_block) * faces;
-		for (u32 i = 1; i < mips; ++i) {
-			u32 mip_w = maximum(1, w >> i);
-			u32 mip_h = maximum(1, h >> i);
-			total += getCompressedMipSize(mip_w, mip_h, bytes_per_block) * faces;
-		}
-		return total;
-	}
-
-	static void computeMip(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w, u32 dst_h, bool is_srgb, IAllocator& allocator) {
-		PROFILE_FUNCTION();
-		if (is_srgb) {
-			i32 res = stbir_resize_uint8_srgb(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4, 3, STBIR_ALPHA_CHANNEL_NONE);
-			ASSERT(res == 1);
-		}
-		else {
-			i32 res = stbir_resize_uint8(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4);
-			ASSERT(res == 1);
-		}
-	}
-
-	static void compressBC1(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
-		PROFILE_FUNCTION();
-	
-		const u32 dst_block_size = 8;
-		const u32 size = getCompressedMipSize(w, h, dst_block_size);
-		const u64 offset = dst.size();
-		dst.resize(offset + size);
-		u8* out = dst.getMutableData() + offset;
-
-		jobs::forEach(h, 4, [&](i32 j, i32){
-			PROFILE_FUNCTION();
-			u8 tmp[32 * 4];
-			const u8* src_row_begin = &src[j * w * 4];
-
-			const u32 src_block_h = minimum(h - j, 4);
-			for (u32 i = 0; i < w; i += 4) {
-				const u8* src_block_begin = src_row_begin + i * 4;
-			
-				const u32 src_block_w = minimum(w - i, 4);
-				for (u32 jj = 0; jj < src_block_h; ++jj) {
-					for (u32 ii = 0; ii < src_block_w; ++ii) {
-						u32 i0 = (ii + jj * 4) * 4;
-						u32 i1 = (ii + jj * w) * 4;
-						tmp[i0 + 0] = src_block_begin[i1 + 2];
-						tmp[i0 + 1] = src_block_begin[i1 + 1];
-						tmp[i0 + 2] = src_block_begin[i1 + 0];
-						tmp[i0 + 3] = src_block_begin[i1 + 3];
-					}
-				}
-
-				const u32 bi = i >> 2;
-				const u32 bj = j >> 2;
-				rgbcx::encode_bc1(10, &out[(bi + bj * (w >> 2)) * dst_block_size], (const u8*)tmp, true, false);
+static bool isValid(const Input& src_data, u32 flags) {
+	if ((flags & GENERATE_MIPS) != 0 && src_data.mips != 1) return false;
+	for (u32 mip = 0; mip < src_data.mips; ++mip) {
+		for (u32 slice = 0; slice < src_data.slices; ++slice) {
+			for (u32 face = 0; face < (src_data.is_cubemap ? 6u : 1u); ++face) {
+				if (!src_data.has(face, slice, mip)) return false;
 			}
-		});
-	}
-
-	static void compressBC5(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
-		PROFILE_FUNCTION();
-	
-		const u32 size = getCompressedMipSize(w, h, 16);
-		const u64 offset = dst.size();
-		dst.resize(offset + size);
-		u8* out = dst.getMutableData() + offset;
-
-		jobs::forEach(h, 4, [&](i32 j, i32){
-			PROFILE_FUNCTION();
-			u32 tmp[32];
-			const u8* src_row_begin = &src[j * w * 4];
-			const u32 dst_block_size = 16;
-
-			const u32 src_block_h = minimum(h - j, 4);
-			for (u32 i = 0; i < w; i += 4) {
-				const u8* src_block_begin = src_row_begin + i * 4;
-			
-				const u32 src_block_w = minimum(w - i, 4);
-				for (u32 jj = 0; jj < src_block_h; ++jj) {
-					for (u32 ii = 0; ii < src_block_w; ++ii) {
-						memcpy(&tmp[(ii + jj * 4)], &src_block_begin[ii * 4 + jj * w * 4], 4);
-					}
-				}
-
-				const u32 bi = i >> 2;
-				const u32 bj = j >> 2;
-				rgbcx::encode_bc5(&out[(bi + bj * (w >> 2)) * dst_block_size], (const u8*)tmp, 2, 1, 4);
-			}
-		});
-	}
-
-	static void compressBC3(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
-		PROFILE_FUNCTION();
-	
-		const u32 size = getCompressedMipSize(w, h, 16);
-		const u64 offset = dst.size();
-		dst.resize(offset + size);
-		u8* out = dst.getMutableData() + offset;
-
-		jobs::forEach(h, 4, [&](i32 j, i32){
-			PROFILE_FUNCTION();
-			u8 tmp[32*4];
-			const u8* src_row_begin = &src[j * w * 4];
-			const u32 dst_block_size = 16;
-
-			const u32 src_block_h = minimum(h - j, 4);
-			for (u32 i = 0; i < w; i += 4) {
-				const u8* src_block_begin = src_row_begin + i * 4;
-			
-				const u32 src_block_w = minimum(w - i, 4);
-				for (u32 jj = 0; jj < src_block_h; ++jj) {
-					for (u32 ii = 0; ii < src_block_w; ++ii) {
-						u32 i0 = (ii + jj * 4) * 4;
-						u32 i1 = (ii + jj * w) * 4;
-						tmp[i0 + 2] = src_block_begin[i1 + 0];
-						tmp[i0 + 1] = src_block_begin[i1 + 1];
-						tmp[i0 + 0] = src_block_begin[i1 + 2];
-						tmp[i0 + 3] = src_block_begin[i1 + 3];
-					}
-				}
-
-				const u32 bi = i >> 2;
-				const u32 bj = j >> 2;
-				rgbcx::encode_bc3(10, &out[(bi + bj * (w >> 2)) * dst_block_size], (const u8*)tmp);
-			}
-		});
-	}
-
-	static void writeDDSHeader(OutputMemoryStream& out, u32 w, u32 h, u32 depth, u32 mips, gpu::DDS::DxgiFormat format, bool is_3d, bool is_cubemap) {
-		gpu::DDS::Header header = {};
-		gpu::DDS::DXT10Header header10 = {};
-		header.dwMagic = gpu::DDS::DDS_MAGIC;
-		header.dwSize = 124;
-		header.dwFlags = gpu::DDS::DDSD_CAPS | gpu::DDS::DDSD_PIXELFORMAT | gpu::DDS::DDSD_WIDTH | gpu::DDS::DDSD_HEIGHT | gpu::DDS::DDSD_MIPMAPCOUNT;
-		header.dwWidth = w;
-		header.dwHeight = h;
-		header.dwMipMapCount = mips;
-		header.dwDepth = is_3d ? depth : 0;
-		header.caps2.dwCaps1 = gpu::DDS::DDSCAPS_TEXTURE;
-		if (is_cubemap) {
-			header.caps2.dwCaps1 |= gpu::DDS::DDSCAPS_COMPLEX;
-			header.caps2.dwCaps2 = gpu::DDS::DDSCAPS2_CUBEMAP | gpu::DDS::DDSCAPS2_CUBEMAP_ALL_FACE;
 		}
-		header.pixelFormat.dwSize = 32;
-		header.pixelFormat.dwFlags = gpu::DDS::DDPF_FOURCC;
-		header.pixelFormat.dwFourCC = gpu::DDS::D3DFMT_DX10;
-		if (is_3d) header.dwFlags = gpu::DDS::DDSD_DEPTH;
-		out.write(header);
-
-		header10.dxgi_format = format;
-		header10.resource_dimension = u32(is_3d ? gpu::DDS::Dimension::TEXTURE3D : gpu::DDS::Dimension::TEXTURE2D);
-		header10.misc_flag = is_cubemap ? gpu::DDS::MISC_TEXTURECUBE : 0;
-		header10.array_size = is_3d ? depth : depth;
-		out.write(header10);
 	}
-};
+	return true;
+}
+
+[[nodiscard]] static bool compress(const Input& src_data, u32 flags, OutputMemoryStream& dst, IAllocator& allocator) {
+	PROFILE_FUNCTION();
+	static bool once = []() { rgbcx::init(); return false; }();
+
+	if (!isValid(src_data, flags)) return false;
+
+	const u32 mips = flags & GENERATE_MIPS ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
+	gpu::TextureFormat format;
+
+	const bool can_compress = (src_data.w % 4) == 0 && (src_data.h % 4) == 0;
+	if (!can_compress) format = gpu::TextureFormat::RGBA8;
+	else if (src_data.is_normalmap) format = gpu::TextureFormat::BC5;
+	else if (src_data.has_alpha) format = gpu::TextureFormat::BC3;
+	else format = gpu::TextureFormat::BC1;
+		
+	writeLBCHeader(dst, src_data.w, src_data.h, src_data.slices, mips, format, false, src_data.is_cubemap);
+
+	if (!can_compress) {
+		compress(compressRGBA, src_data, flags, dst, allocator);
+	}
+	if (src_data.is_normalmap) {
+		compress(compressBC5, src_data, flags, dst, allocator);
+	}
+	else if (src_data.has_alpha) {
+		compress(compressBC3, src_data, flags, dst, allocator);
+	}
+	else {
+		compress(compressBC1, src_data, flags, dst, allocator);
+	}
+	return true;
+}
+
+} // namespace TextureCompressor
 
 // https://www.khronos.org/opengl/wiki/Cubemap_Texture
 static const Vec3 cube_fwd[6] = {
@@ -507,14 +537,18 @@ static void flipX(Vec4* data, int texture_size)
 		}
 	}
 }
-
-static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, IAllocator& allocator) {
+	
+static bool saveAsLBC(const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, IAllocator& allocator) {
 	ASSERT(data);
-	os::OutputFile file;
-	if (!file.open(path)) return false;
 	
 	OutputMemoryStream blob(allocator);
-	TextureCompressor::compress(data, w, h, 1, TextureCompressor::HAS_ALPHA, blob, allocator);
+	TextureCompressor::Input input(w, h, 1, 1, allocator);
+	input.add(Span(data, w * h * 4), 0, 0, 0);
+	if (!TextureCompressor::compress(input, generate_mipmaps ? TextureCompressor::GENERATE_MIPS : 0, blob, allocator)) {
+		return false;
+	}
+	os::OutputFile file;
+	if (!file.open(path)) return false;
 	const bool res = file.write(blob.data(), blob.size());
 	file.close();
 	return res;
@@ -991,12 +1025,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
-		enum class Quality : i32 {
-			FASTEST,
-			NORMAL,
-			PRODUCTION,
-			HIGHEST
-		};
 		enum WrapMode : u32 {
 			REPEAT,
 			CLAMP
@@ -1015,7 +1043,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
 		WrapMode wrap_mode_v = WrapMode::REPEAT;
 		WrapMode wrap_mode_w = WrapMode::REPEAT;
-		Quality quality = Quality::NORMAL;
 		Filter filter = Filter::LINEAR;
 	};
 
@@ -1027,7 +1054,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetCompiler().registerExtension("jpeg", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("jpg", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
-		app.getAssetCompiler().registerExtension("dds", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("raw", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("ltc", Texture::TYPE);
 	}
@@ -1067,55 +1093,49 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			IAllocator& allocator = m_allocator;
 
 			u32 hash = crc32(m_in_path);
-			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".dds");
+			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".lbc");
 			OutputMemoryStream resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-			if (Path::hasExtension(m_in_path, "dds")) {
+			int image_comp;
+			int w, h;
+			os::InputFile file;
+			if (!file.open(m_in_path)) {
+				logError("Failed to load ", m_in_path);
 				m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
+				return;
 			}
-			else
+			Array<u8> tmp(m_allocator);
+			tmp.resize((u32)file.size());
+			if (!file.read(tmp.begin(), tmp.byte_size())) {
+				logError("Failed to load ", m_in_path);
+				m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
+				return;
+			}
+			file.close();
+
+			auto data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &w, &h, &image_comp, 4);
+			if (!data)
 			{
-				int image_comp;
-				int w, h;
-				os::InputFile file;
-				if (!file.open(m_in_path)) {
-					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
-					return;
-				}
-				Array<u8> tmp(m_allocator);
-				tmp.resize((u32)file.size());
-				if (!file.read(tmp.begin(), tmp.byte_size())) {
-					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
-					return;
-				}
-				file.close();
-
-				auto data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &w, &h, &image_comp, 4);
-				if (!data)
-				{
-					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
-					return;
-				}
-
-				stbir_resize_uint8(data,
-					w,
-					h,
-					0,
-					resized_data.getMutableData(),
-					AssetBrowser::TILE_SIZE,
-					AssetBrowser::TILE_SIZE,
-					0,
-					4);
-				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
-					swap(resized_data.getMutableData()[i * 4 + 0], resized_data.getMutableData()[i * 4 + 2]);
-				}
-				stbi_image_free(data);
+				logError("Failed to load ", m_in_path);
+				m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
+				return;
 			}
 
-			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+			stbir_resize_uint8(data,
+				w,
+				h,
+				0,
+				resized_data.getMutableData(),
+				AssetBrowser::TILE_SIZE,
+				AssetBrowser::TILE_SIZE,
+				0,
+				4);
+			for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
+				swap(resized_data.getMutableData()[i * 4 + 0], resized_data.getMutableData()[i * 4 + 2]);
+			}
+			stbi_image_free(data);
+
+			if (!saveAsLBC(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 				logError("Failed to save ", m_out_path);
 			}
 		}
@@ -1166,6 +1186,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream tmp_src(allocator);
 		int w = -1, h = -1;
+		bool has_alpha = false;
 
 		auto prepare_source =[&](const CompositeTexture::ChannelSource& ch){
 			if (ch.path.isEmpty()) return false;
@@ -1201,6 +1222,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		if (sources.size() == 0) return false;
+
 		const Src first_src = sources.begin().value(); 
 		for (auto iter = sources.begin(); iter.isValid(); ++iter) {
 			if (iter.value().w != first_src.w || iter.value().h != first_src.h) {
@@ -1210,15 +1232,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		nvtt::InputOptions input;
-		input.setMipmapGeneration(meta.mips);
-		input.setAlphaCoverageMipScale(meta.scale_coverage, 4);
-		input.setAlphaMode(nvtt::AlphaMode_Transparency);
-		input.setNormalMap(meta.is_normalmap);
-		input.setTextureLayout(nvtt::TextureType_Array, w, h, 1, tc.layers.size());
-		
+		TextureCompressor::Input input(w, h, tc.layers.size(), 1, allocator);
+		input.is_normalmap = meta.is_normalmap;
+		input.is_srgb = meta.srgb;
+
 		OutputMemoryStream out_data(allocator);
 		out_data.resize(w * h * 4);
+		u8* out_data_ptr = out_data.getMutableData();
 		for (CompositeTexture::Layer& layer : tc.layers) {
 			const u32 idx = u32(&layer - tc.layers.begin());
 			for (u32 ch = 0; ch < 4; ++ch) {
@@ -1227,42 +1247,24 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				stbi_uc* from = sources[p.getHash()].data;
 				if (!from) continue;
 				u32 from_ch = layer.getChannel(ch).src_channel;
-				if (from_ch == 0) from_ch = 2;
-				else if (from_ch == 2) from_ch = 0;
 
 				for (u32 j = 0; j < (u32)h; ++j) {
 					for (u32 i = 0; i < (u32)w; ++i) {
-						out_data.getMutableData()[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
+						out_data_ptr[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
 					}
 				}
+
+				input.has_alpha = input.has_alpha || ch == 3;
 			}
 
-			input.setMipmapData(out_data.data(), w, h, 1, idx);
+			input.add(out_data, 0, idx, 0);
 		}
 
 		for (const Src& i : sources) {
 			free(i.data);
 		}
 
-		nvtt::OutputOptions output;
-		output.setSrgbFlag(meta.srgb);
-		output.setContainer(nvtt::Container_DDS10);
-		struct : nvtt::OutputHandler {
-			bool writeData(const void * data, int size) override { return dst->write(data, size); }
-			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
-			void endImage() override {}
-
-			OutputMemoryStream* dst;
-		} output_handler;
-		output_handler.dst = &dst;
-		output.setOutputHandler(&output_handler);
-
-		nvtt::CompressionOptions compression;
-		// TODO format
-		compression.setFormat(nvtt::Format_BC3);
-		compression.setQuality(toNVTT(meta.quality));
-
-		dst.write("dds", 3);
+		dst.write("lbc", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 		flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
 		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
@@ -1271,11 +1273,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
 
-		nvtt::Context context;
-		if (!context.process(input, compression, output)) {
-			return false;
-		}
-		return true;
+		return TextureCompressor::compress(input, TextureCompressor::GENERATE_MIPS, dst, allocator);
 	}
 
 	bool compileImage(const Path& path, const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta)
@@ -1346,11 +1344,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const basisu::uint8_vec& out = c.get_output_basis_file();
 			return dst.write(out.get_ptr(), out.size_in_bytes());
 		#else
-			for (u32 i = 0; i < u32(w * h); ++i) {
-				swap(data[i * 4 + 0], data[i * 4 + 2]);
-			}
-
-			dst.write("dds", 3);
+			dst.write("lbc", 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
 			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
@@ -1359,34 +1353,15 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			dst.write(&flags, sizeof(flags));
 
-			const bool has_alpha = comps == 4;
-			/*nvtt::InputOptions input;
-			if (meta.is_normalmap) input.setGamma(1, 1);
-			input.setMipmapGeneration(meta.mips);
-			input.setAlphaCoverageMipScale(meta.scale_coverage, comps == 4 ? 3 : 0);
-			input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
-			input.setNormalMap(meta.is_normalmap);
-			input.setTextureLayout(nvtt::TextureType_2D, w, h);
-			input.setMipmapData(data, w, h);*/
-			const u32 mips = 1 + log2((u32)maximum(w, h));
-			u32 compressor_flags = TextureCompressor::GENERATE_MIPS; 
-			compressor_flags |= meta.srgb ? TextureCompressor::SRGB : 0;
-			compressor_flags |= meta.is_normalmap ? TextureCompressor::IS_NORMALMAP : 0;
-			compressor_flags |= has_alpha ? TextureCompressor::HAS_ALPHA : 0;
-			TextureCompressor::compress(data, w, h, mips, compressor_flags, dst, m_app.getAllocator());
+			TextureCompressor::Input input(w, h, 1, 1, m_app.getAllocator());
+			input.add(Span(data, w * h * 4), 0, 0, 0);
+			input.is_srgb = meta.srgb;
+			input.is_normalmap = meta.is_normalmap;
+			input.has_alpha = comps == 4;
+			const bool res = TextureCompressor::compress(input, TextureCompressor::GENERATE_MIPS, dst, m_app.getAllocator());
 			stbi_image_free(data);
-			return true;
+			return res;
 		#endif
-	}
-
-	static nvtt::Quality toNVTT(Meta::Quality quality) {
-		switch (quality) {
-			case Meta::Quality::FASTEST: return nvtt::Quality_Fastest;
-			case Meta::Quality::NORMAL: return nvtt::Quality_Normal;
-			case Meta::Quality::PRODUCTION: return nvtt::Quality_Production;
-			case Meta::Quality::HIGHEST: return nvtt::Quality_Highest;
-			default: return nvtt::Quality_Production;
-		}
 	}
 
 	Meta getMeta(const Path& path) const
@@ -1420,13 +1395,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
 				meta.wrap_mode_w = equalIStrings(tmp, "repeat") ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
 			}
-			
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "quality", Span(tmp))) {
-				if (equalIStrings(tmp, "fastest")) meta.quality = Meta::Quality::FASTEST;
-				else if (equalIStrings(tmp, "normal")) meta.quality = Meta::Quality::NORMAL;
-				else if (equalIStrings(tmp, "production")) meta.quality = Meta::Quality::PRODUCTION;
-				else if (equalIStrings(tmp, "highest")) meta.quality = Meta::Quality::HIGHEST;
-			}
 		});
 		return meta;
 	}
@@ -1442,7 +1410,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		OutputMemoryStream out(m_app.getAllocator());
 		Meta meta = getMeta(src);
-		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap && !meta.mips)) {
+		if (equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap && !meta.mips)) {
 			if (meta.scale_coverage >= 0) {
 				logError("Coverage scale on ", src, " ignored, use different format");
 			}
@@ -1494,16 +1462,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case Meta::WrapMode::CLAMP: return "clamp";
 			case Meta::WrapMode::REPEAT: return "repeat";
 			default: ASSERT(false); return "repeat";
-		}
-	}
-
-	const char* toString(Meta::Quality quality) {
-		switch (quality) {
-			case Meta::Quality::FASTEST: return "fastest";
-			case Meta::Quality::NORMAL: return "normal";
-			case Meta::Quality::PRODUCTION: return "production";
-			case Meta::Quality::HIGHEST: return "highest";
-			default: ASSERT(false); return "production";
 		}
 	}
 
@@ -1679,7 +1637,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		}
 
-		bool is_dds = Path::hasExtension(texture->getPath().c_str(), "dds");
 		if (Path::hasExtension(texture->getPath().c_str(), "ltc")) compositeGUI(*texture);
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -1701,9 +1658,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			
 			if ((m_meta.compress || !is_tga) && !m_meta.convert_to_raw) {
-				ImGuiEx::Label("Compression quality");
-				ImGui::Combo("Quality", (i32*)&m_meta.quality, "Fastest\0Normal\0Production\0Highest\0");
-
 				if (texture->width % 4 != 0 || texture->height % 4 != 0) {
 					ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
 				}
@@ -1720,10 +1674,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGuiEx::Label("Coverage alpha ref");
 				ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1);
 			}
-			if (!is_dds) {
-				ImGuiEx::Label("Is normalmap");
-				ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
-			}
+			ImGuiEx::Label("Is normalmap");
+			ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
 
 			ImGuiEx::Label("U Wrap mode");
 			ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
@@ -1741,7 +1693,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nmips = ", m_meta.mips ? "true" : "false"
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
-					, "\nquality = \"", toString(m_meta.quality), "\""
 					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
 					, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""
 					, "\nwrap_mode_w = \"", toString(m_meta.wrap_mode_w), "\""
@@ -2597,14 +2548,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				destroyEntityRecursive(*m_tile.universe, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
-				StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
+				StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".lbc");
 				
-				u8* raw_tile_data = m_tile.data.getMutableData();
-				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
-					swap(raw_tile_data[i * 4 + 0], raw_tile_data[i * 4 + 2]);
-				}
-
-				saveAsDDS(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
+				saveAsLBC(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
@@ -2619,7 +2565,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Resource* resource = m_tile.queue.front();
 		if (resource->isFailure()) {
-			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".dds");
+			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
 			if (resource->getType() == Model::TYPE) {
 				m_app.getEngine().getFileSystem().copyFile("editor/textures/tile_animation.dds", out_path);
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
@@ -2739,7 +2685,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (material->getTextureCount() == 0) return;
 		const char* in_path = material->getTexture(0)->getPath().c_str();
 		Engine& engine = m_app.getEngine();
-		StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".dds");
+		StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
 
 		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
 	}
@@ -3107,8 +3053,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
 	}
 
-	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count)
-	{
+	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count) {
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<LUMIX_MAX_PATH> path(base_path, "universes");
@@ -3119,41 +3064,36 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
-		path << probe_guid << ".dds";
+		path << probe_guid << ".lbc";
+
+		OutputMemoryStream blob(m_app.getAllocator());
+
+		const Vec4* mip_pixels = data;
+		TextureCompressor::Input input(texture_size, texture_size, 1, mips_count, m_app.getAllocator());
+		for (u32 mip = 0; mip < mips_count; ++mip) {
+			const u32 mip_size = texture_size >> mip;
+			for (int face = 0; face < 6; ++face) {
+				TextureCompressor::Input::Image& img = input.add(face, 0, mip);
+				Color* rgbm = (Color*)img.pixels.getMutableData();
+				for (u32 j = 0, c = mip_size * mip_size; j < c; ++j) {
+					const float m = clamp(maximum(mip_pixels[j].x, mip_pixels[j].y, mip_pixels[j].z), 1 / 64.f, 4.f);
+					rgbm[j].r = u8(clamp(mip_pixels[j].x / m * 255 + 0.5f, 0.f, 255.f));
+					rgbm[j].g = u8(clamp(mip_pixels[j].y / m * 255 + 0.5f, 0.f, 255.f));
+					rgbm[j].b = u8(clamp(mip_pixels[j].z / m * 255 + 0.5f, 0.f, 255.f));
+					rgbm[j].a = u8(clamp(255.f * m / 4 + 0.5f, 1.f, 255.f));
+				}
+				mip_pixels += mip_size * mip_size;
+			}
+		}
+		input.has_alpha = true;
+		input.is_cubemap = true;
+		if (!TextureCompressor::compress(input, 0, blob, m_app.getAllocator())) return false;
+
 		os::OutputFile file;
 		if (!file.open(path)) {
 			logError("Failed to create ", path);
 			return false;
 		}
-
-		OutputMemoryStream blob(m_app.getAllocator());
-
-		Array<Color> rgbm(m_app.getAllocator());
-		u32 size = 0;
-		for (u32 mip = 0; mip < mips_count; ++mip) {
-			size += 6 * (texture_size >> mip) * (texture_size >> mip);
-		}
-		rgbm.resize(size);
-		
-		const Vec4* data_ptr = data;
-		u32 offset = 0;
-		for (u32 mip = 0; mip < mips_count; ++mip) {
-			const u32 mip_size = texture_size >> mip;
-			for (int i = 0; i < 6; ++i) {
-				const Vec4* face = data_ptr;
-				for (u32 j = 0, c = mip_size * mip_size; j < c; ++j) {
-					const float m = clamp(maximum(face[j].x, face[j].y, face[j].z), 1 / 64.f, 4.f);
-					rgbm[j + offset].r = u8(clamp(face[j].z / m * 255 + 0.5f, 0.f, 255.f));
-					rgbm[j + offset].g = u8(clamp(face[j].y / m * 255 + 0.5f, 0.f, 255.f));
-					rgbm[j + offset].b = u8(clamp(face[j].x / m * 255 + 0.5f, 0.f, 255.f));
-					rgbm[j + offset].a = u8(clamp(255.f * m / 4 + 0.5f, 1.f, 255.f));
-				}
-				offset += mip_size * mip_size;
-				data_ptr += mip_size * mip_size;
-			}
-		}
-
-		TextureCompressor::compress((const u8*)rgbm.begin(), texture_size, texture_size, mips_count, TextureCompressor::HAS_ALPHA | TextureCompressor::CUBEMAP, blob, m_app.getAllocator());
 		bool res = file.write(blob.data(), blob.size());
 		file.close();
 		return res;
@@ -3299,8 +3239,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const u64 guid = job.reflection_probe.guid;
 
-					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/probes_tmp/", guid, ".dds");
-					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/probes/", guid, ".dds");
+					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/probes_tmp/", guid, ".lbc");
+					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/probes/", guid, ".lbc");
 					if (!os::fileExists(tmp_path)) {
 						if (scene) scene->reloadReflectionProbes();
 						return;
@@ -3467,7 +3407,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			else {
 				const ReflectionProbe& probe = scene->getReflectionProbe(e);
 				if (probe.flags.isSet(ReflectionProbe::ENABLED)) {
-					StaticString<LUMIX_MAX_PATH> path("universes/probes/", probe.guid, ".dds");
+					StaticString<LUMIX_MAX_PATH> path("universes/probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
 					ImGui::TextUnformatted(path);
 					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(Path(path), true, false);
@@ -4166,7 +4106,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* shader_exts[] = {"shd", nullptr};
 		asset_compiler.addPlugin(m_shader_plugin, shader_exts);
 
-		const char* texture_exts[] = { "png", "jpg", "jpeg", "dds", "tga", "raw", "ltc", nullptr};
+		const char* texture_exts[] = { "png", "jpg", "jpeg", "tga", "raw", "ltc", nullptr};
 		asset_compiler.addPlugin(m_texture_plugin, texture_exts);
 
 		const char* pipeline_exts[] = {"pln", nullptr};
