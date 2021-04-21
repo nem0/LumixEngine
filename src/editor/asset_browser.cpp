@@ -1222,6 +1222,24 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool isOpen() const override { return m_is_open; }
 	void setOpen(bool open) override { m_is_open = open; }
 
+	bool copyTile(const char* from, const char* to) override {
+		OutputMemoryStream img(m_app.getAllocator());
+		if (!m_app.getEngine().getFileSystem().getContentSync(Path(from), img)) return false;
+		
+		os::OutputFile file;
+		if (!m_app.getEngine().getFileSystem().open(to, file)) return false;
+		Span<const char> ext = Path::getExtension(Span(from, stringLength(from)));
+		if (ext.length() != 3) {
+			file.close();
+			return false;
+		}
+		(void)file.write(ext.begin(), 3);
+		(void)file.write(u32(0));
+		(void)file.write(img.data(), img.size());
+		file.close();
+		return !file.isError();
+	}
+
 	bool m_is_open;
 	float m_left_column_width = 120;
 	StudioApp& m_app;

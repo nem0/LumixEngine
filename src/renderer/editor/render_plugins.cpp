@@ -549,9 +549,11 @@ static bool saveAsLBC(const char* path, const u8* data, int w, int h, bool gener
 	}
 	os::OutputFile file;
 	if (!file.open(path)) return false;
-	const bool res = file.write(blob.data(), blob.size());
+	(void)file.write("lbc", 3);
+	(void)file.write(u32(0));
+	(void)file.write(blob.data(), blob.size());
 	file.close();
-	return res;
+	return !file.isError();
 }
 
 
@@ -1084,9 +1086,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	struct TextureTileJob
 	{
-		TextureTileJob(FileSystem& filesystem, IAllocator& allocator) 
+		TextureTileJob(StudioApp& app, FileSystem& filesystem, IAllocator& allocator) 
 			: m_allocator(allocator) 
 			, m_filesystem(filesystem)
+			, m_app(app)
 		{}
 
 		void execute() {
@@ -1101,14 +1104,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			os::InputFile file;
 			if (!file.open(m_in_path)) {
 				logError("Failed to load ", m_in_path);
-				m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
+				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 				return;
 			}
 			Array<u8> tmp(m_allocator);
 			tmp.resize((u32)file.size());
 			if (!file.read(tmp.begin(), tmp.byte_size())) {
 				logError("Failed to load ", m_in_path);
-				m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
+				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 				return;
 			}
 			file.close();
@@ -1117,7 +1120,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!data)
 			{
 				logError("Failed to load ", m_in_path);
-				m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
+				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 				return;
 			}
 
@@ -1147,6 +1150,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LUMIX_DELETE(that->m_allocator, that);
 		}
 
+		StudioApp& m_app;
 		IAllocator& m_allocator;
 		FileSystem& m_filesystem;
 		StaticString<LUMIX_MAX_PATH> m_in_path; 
@@ -1159,7 +1163,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (type == Texture::TYPE && !Path::hasExtension(in_path, "ltc") && !Path::hasExtension(in_path, "raw")) {
 			IAllocator& allocator = m_app.getAllocator();
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			auto* job = LUMIX_NEW(allocator, TextureTileJob)(fs, allocator);
+			auto* job = LUMIX_NEW(allocator, TextureTileJob)(m_app, fs, allocator);
 			job->m_in_path = fs.getBasePath();
 			job->m_in_path << in_path;
 			job->m_out_path = fs.getBasePath();
@@ -2565,9 +2569,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Resource* resource = m_tile.queue.front();
 		if (resource->isFailure()) {
-			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
 			if (resource->getType() == Model::TYPE) {
-				m_app.getEngine().getFileSystem().copyFile("editor/textures/tile_animation.dds", out_path);
+				StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
+				m_app.getAssetBrowser().copyTile("editor/textures/tile_animation.tga", out_path);
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
 			popTileQueue();
@@ -2750,7 +2754,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (type == Shader::TYPE) return fs.copyFile("editor/textures/tile_shader.dds", out_path);
+		if (type == Shader::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_shader.tga", out_path);
 
 		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
 

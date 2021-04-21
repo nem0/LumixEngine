@@ -66,7 +66,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (type == Animation::TYPE) return fs.copyFile("editor/textures/tile_animation.dds", out_path);
+		if (type == Animation::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_animation.tga", out_path);
 		return false;
 	}
 
@@ -301,7 +301,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (type == anim::Controller::TYPE) return fs.copyFile("editor/textures/tile_animation_graph.dds", out_path);
+		if (type == anim::Controller::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_animation_graph.tga", out_path);
 		return false;
 	}
 

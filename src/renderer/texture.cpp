@@ -683,9 +683,6 @@ bool Texture::load(u64 size, const u8* mem)
 	PROFILE_FUNCTION();
 	profiler::pushString(getPath().c_str());
 	
-	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
-		return loadLBC(*this, mem, (u32)size);
-	}
 	
 	char ext[4] = {};
 	InputMemoryStream file(mem, size);
