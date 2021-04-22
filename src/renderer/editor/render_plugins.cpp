@@ -72,6 +72,11 @@ static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
 namespace TextureCompressor {
 
+struct Options {
+	bool generate_mipmaps = false;
+	float scale_coverage_ref = -0.5f;
+};
+
 struct Input {
 	struct Image {
 		Image(IAllocator& allocator) : pixels(allocator) {}
@@ -138,10 +143,6 @@ struct Input {
 	bool has_alpha = false;
 	bool is_cubemap = false;
 };
-
-enum Flags : u32 {
-	GENERATE_MIPS = 1 << 1,
-};
 	
 static u32 getCompressedMipSize(u32 w, u32 h, u32 bytes_per_block) {
 	return ((w + 3) >> 2) * ((h + 3) >> 2) * bytes_per_block;
@@ -180,7 +181,7 @@ static void compressBC1(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 
 	jobs::forEach(h, 4, [&](i32 j, i32){
 		PROFILE_FUNCTION();
-		u8 tmp[32 * 4];
+		u32 tmp[32];
 		const u8* src_row_begin = &src[j * w * 4];
 
 		const u32 src_block_h = minimum(h - j, 4);
@@ -189,11 +190,7 @@ static void compressBC1(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 			
 			const u32 src_block_w = minimum(w - i, 4);
 			for (u32 jj = 0; jj < src_block_h; ++jj) {
-				for (u32 ii = 0; ii < src_block_w; ++ii) {
-					u32 i0 = (ii + jj * 4) * 4;
-					u32 i1 = (ii + jj * w) * 4;
-					memcpy(&tmp[i0], &src_block_begin[i1], 4);
-				}
+				memcpy(&tmp[jj * 4], &src_block_begin[jj * w * 4], 4 * src_block_w);
 			}
 
 			const u32 bi = i >> 2;
@@ -211,7 +208,8 @@ static void compressRGBA(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32
 static void compressBC5(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
 	PROFILE_FUNCTION();
 	
-	const u32 size = getCompressedMipSize(w, h, 16);
+	const u32 dst_block_size = 16;
+	const u32 size = getCompressedMipSize(w, h, dst_block_size);
 	const u64 offset = dst.size();
 	dst.resize(offset + size);
 	u8* out = dst.getMutableData() + offset;
@@ -220,7 +218,6 @@ static void compressBC5(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 		PROFILE_FUNCTION();
 		u32 tmp[32];
 		const u8* src_row_begin = &src[j * w * 4];
-		const u32 dst_block_size = 16;
 
 		const u32 src_block_h = minimum(h - j, 4);
 		for (u32 i = 0; i < w; i += 4) {
@@ -228,14 +225,12 @@ static void compressBC5(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 			
 			const u32 src_block_w = minimum(w - i, 4);
 			for (u32 jj = 0; jj < src_block_h; ++jj) {
-				for (u32 ii = 0; ii < src_block_w; ++ii) {
-					memcpy(&tmp[(ii + jj * 4)], &src_block_begin[ii * 4 + jj * w * 4], 4);
-				}
+				memcpy(&tmp[jj * 4], &src_block_begin[jj * w * 4], 4 * src_block_w);
 			}
 
 			const u32 bi = i >> 2;
 			const u32 bj = j >> 2;
-			rgbcx::encode_bc5(&out[(bi + bj * ((w + 3) >> 2)) * dst_block_size], (const u8*)tmp, 0, 1, 4);
+			rgbcx::encode_bc5(&out[(bi + bj * ((w + 3) >> 2)) * dst_block_size], (const u8*)tmp);
 		}
 	});
 }
@@ -243,16 +238,16 @@ static void compressBC5(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 static void compressBC3(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 h) {
 	PROFILE_FUNCTION();
 	
-	const u32 size = getCompressedMipSize(w, h, 16);
+	const u32 dst_block_size = 16;
+	const u32 size = getCompressedMipSize(w, h, dst_block_size);
 	const u64 offset = dst.size();
 	dst.resize(offset + size);
 	u8* out = dst.getMutableData() + offset;
 
 	jobs::forEach(h, 4, [&](i32 j, i32){
 		PROFILE_FUNCTION();
-		u8 tmp[32*4];
+		u32 tmp[32];
 		const u8* src_row_begin = &src[j * w * 4];
-		const u32 dst_block_size = 16;
 
 		const u32 src_block_h = minimum(h - j, 4);
 		for (u32 i = 0; i < w; i += 4) {
@@ -260,11 +255,7 @@ static void compressBC3(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 			
 			const u32 src_block_w = minimum(w - i, 4);
 			for (u32 jj = 0; jj < src_block_h; ++jj) {
-				for (u32 ii = 0; ii < src_block_w; ++ii) {
-					u32 i0 = (ii + jj * 4) * 4;
-					u32 i1 = (ii + jj * w) * 4;
-					memcpy(&tmp[i0], &src_block_begin[i1], 4);
-				}
+				memcpy(&tmp[jj * 4], &src_block_begin[jj * w * 4], 4 * src_block_w);
 			}
 
 			const u32 bi = i >> 2;
@@ -286,8 +277,44 @@ static void writeLBCHeader(OutputMemoryStream& out, u32 w, u32 h, u32 slices, u3
 	out.write(header);
 }
 
-static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32, u32), const Input& src_data, u32 flags, OutputMemoryStream& dst, IAllocator& allocator) {
-	const u32 mips = flags & GENERATE_MIPS ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
+static float computeCoverage(Span<const u8> data, u32 w, u32 h, float ref_norm) {
+	const u8 ref = u8(clamp(255 * ref_norm, 0.f, 255.f));
+
+	u32 count = 0;
+	const Color* pixels = (const Color*)data.begin();
+	for (u32 i = 0; i < w * h; ++i) {
+		if (pixels[i].a > ref) ++count;
+	}
+
+	return float(double(count) / double(w * h));
+}
+
+static void scaleCoverage(Span<u8> data, u32 w, u32 h, float ref_norm, float wanted_coverage) {
+	u32 histogram[256] = {};
+	Color* pixels = (Color*)data.begin();
+	for (u32 i = 0; i < w * h; ++i) {
+		++histogram[pixels[i].a];
+	}
+
+	const u8 ref = u8(clamp(255 * ref_norm, 0.f, 255.f));
+	u32 count = u32(w * h  * (1 - wanted_coverage));
+	float new_ref;
+	for (new_ref = 0; new_ref < 255; ++new_ref) {
+		if (count < histogram[u32(new_ref)]) {
+			new_ref += (float)count / histogram[u32(new_ref)];
+			break;
+		}
+		count -= histogram[u32(new_ref)];
+	}
+	const float scale = ref_norm / (new_ref / 255.f);
+
+	for (u32 i = 0; i < w * h; ++i) {
+		pixels[i].a = u8(clamp(pixels[i].a * scale, 0.f, 255.f));
+	}
+}
+
+static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32, u32), const Input& src_data, const Options& options, OutputMemoryStream& dst, IAllocator& allocator) {
+	const u32 mips = options.generate_mipmaps ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
 	const u32 faces = src_data.is_cubemap ? 6 : 1;
 	const u32 block_size = src_data.has_alpha || src_data.is_normalmap ? 16 : 8;
 	const u32 total_compressed_size = getCompressedSize(src_data.w, src_data.h, mips, faces, block_size);
@@ -295,12 +322,16 @@ static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32
 	Array<u8> mip_data(allocator);
 	Array<u8> prev_mip(allocator);
 
+	const float coverage = options.scale_coverage_ref >= 0 
+		? computeCoverage(src_data.get(0, 0, 0).pixels, src_data.w, src_data.h, options.scale_coverage_ref) 
+		: -1;
+
 	for (u32 slice = 0; slice < src_data.slices; ++slice) {
 		for (u32 face = 0; face < faces; ++face) {
 			for (u32 mip = 0; mip < mips; ++mip) {
 				u32 mip_w = maximum(src_data.w >> mip, 1);
 				u32 mip_h = maximum(src_data.h >> mip, 1);
-				if (flags & GENERATE_MIPS) {
+				if (options.generate_mipmaps) {
 					if (mip == 0) {
 						const Input::Image& src_mip = src_data.get(face, slice, mip);
 						compressor(src_mip.pixels, dst, mip_w, mip_h);
@@ -310,6 +341,9 @@ static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32
 						u32 prev_w = maximum(src_data.w >> (mip - 1), 1);
 						u32 prev_h = maximum(src_data.h >> (mip - 1), 1);
 						computeMip(mip == 1 ? (Span<const u8>)src_data.get(face, slice, 0).pixels : prev_mip, mip_data, prev_w, prev_h, mip_w, mip_h, src_data.is_srgb, allocator);
+						if (options.scale_coverage_ref >= 0) {
+							scaleCoverage(mip_data, mip_w, mip_h, options.scale_coverage_ref, coverage);
+						}
 						compressor(mip_data, dst, mip_w, mip_h);
 						prev_mip.swap(mip_data);
 					}
@@ -323,8 +357,8 @@ static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32
 	}
 }
 
-static bool isValid(const Input& src_data, u32 flags) {
-	if ((flags & GENERATE_MIPS) != 0 && src_data.mips != 1) return false;
+static bool isValid(const Input& src_data, const Options& options) {
+	if (options.generate_mipmaps && src_data.mips != 1) return false;
 	for (u32 mip = 0; mip < src_data.mips; ++mip) {
 		for (u32 slice = 0; slice < src_data.slices; ++slice) {
 			for (u32 face = 0; face < (src_data.is_cubemap ? 6u : 1u); ++face) {
@@ -335,13 +369,13 @@ static bool isValid(const Input& src_data, u32 flags) {
 	return true;
 }
 
-[[nodiscard]] static bool compress(const Input& src_data, u32 flags, OutputMemoryStream& dst, IAllocator& allocator) {
+[[nodiscard]] static bool compress(const Input& src_data, const Options& options, OutputMemoryStream& dst, IAllocator& allocator) {
 	PROFILE_FUNCTION();
 	static bool once = []() { rgbcx::init(); return false; }();
 
-	if (!isValid(src_data, flags)) return false;
+	if (!isValid(src_data, options)) return false;
 
-	const u32 mips = flags & GENERATE_MIPS ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
+	const u32 mips = options.generate_mipmaps ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
 	gpu::TextureFormat format;
 
 	const bool can_compress = (src_data.w % 4) == 0 && (src_data.h % 4) == 0;
@@ -353,16 +387,16 @@ static bool isValid(const Input& src_data, u32 flags) {
 	writeLBCHeader(dst, src_data.w, src_data.h, src_data.slices, mips, format, false, src_data.is_cubemap);
 
 	if (!can_compress) {
-		compress(compressRGBA, src_data, flags, dst, allocator);
+		compress(compressRGBA, src_data, options, dst, allocator);
 	}
 	if (src_data.is_normalmap) {
-		compress(compressBC5, src_data, flags, dst, allocator);
+		compress(compressBC5, src_data, options, dst, allocator);
 	}
 	else if (src_data.has_alpha) {
-		compress(compressBC3, src_data, flags, dst, allocator);
+		compress(compressBC3, src_data, options, dst, allocator);
 	}
 	else {
-		compress(compressBC1, src_data, flags, dst, allocator);
+		compress(compressBC1, src_data, options, dst, allocator);
 	}
 	return true;
 }
@@ -542,9 +576,11 @@ static bool saveAsLBC(const char* path, const u8* data, int w, int h, bool gener
 	ASSERT(data);
 	
 	OutputMemoryStream blob(allocator);
+	TextureCompressor::Options options;
+	options.generate_mipmaps = generate_mipmaps;
 	TextureCompressor::Input input(w, h, 1, 1, allocator);
 	input.add(Span(data, w * h * 4), 0, 0, 0);
-	if (!TextureCompressor::compress(input, generate_mipmaps ? TextureCompressor::GENERATE_MIPS : 0, blob, allocator)) {
+	if (!TextureCompressor::compress(input, options, blob, allocator)) {
 		return false;
 	}
 	os::OutputFile file;
@@ -1276,8 +1312,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
 		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
-
-		return TextureCompressor::compress(input, TextureCompressor::GENERATE_MIPS, dst, allocator);
+		TextureCompressor::Options options;
+		options.generate_mipmaps = meta.mips;
+		options.scale_coverage_ref = meta.scale_coverage;
+		return TextureCompressor::compress(input, options, dst, allocator);
 	}
 
 	bool compileImage(const Path& path, const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta)
@@ -1362,7 +1400,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			input.is_srgb = meta.srgb;
 			input.is_normalmap = meta.is_normalmap;
 			input.has_alpha = comps == 4;
-			const bool res = TextureCompressor::compress(input, TextureCompressor::GENERATE_MIPS, dst, m_app.getAllocator());
+			TextureCompressor::Options options;
+			options.generate_mipmaps = meta.mips;
+			options.scale_coverage_ref = meta.scale_coverage;
+			const bool res = TextureCompressor::compress(input, options, dst, m_app.getAllocator());
 			stbi_image_free(data);
 			return res;
 		#endif
@@ -3091,7 +3132,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		}
 		input.has_alpha = true;
 		input.is_cubemap = true;
-		if (!TextureCompressor::compress(input, 0, blob, m_app.getAllocator())) return false;
+		if (!TextureCompressor::compress(input, TextureCompressor::Options(), blob, m_app.getAllocator())) return false;
 
 		os::OutputFile file;
 		if (!file.open(path)) {
