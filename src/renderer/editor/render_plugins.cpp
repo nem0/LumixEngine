@@ -2,9 +2,6 @@
 	#define LUMIX_NO_CUSTOM_CRT
 	#include <encoder/basisu_comp.h>
 #endif
-#define RGBCX_IMPLEMENTATION
-#include <rgbcx/rgbcx.h>
-#include <stb/stb_image_resize.h>
 
 #include <imgui/imgui_freetype.h>
 #include <imgui/imnodes.h>
@@ -55,6 +52,11 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
+
+#define RGBCX_IMPLEMENTATION
+#include <rgbcx/rgbcx.h>
+#include <stb/stb_image_resize.h>
+
 
 using namespace Lumix;
 

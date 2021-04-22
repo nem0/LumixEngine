@@ -914,7 +914,6 @@ if build_studio then
 				if _ACTION == "gmake" then
 					linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
 				end
-				links { "nvimage", "nvcore", "nvmath", "nvthread", "squish", "bc6h", "bc7" } 
 
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
