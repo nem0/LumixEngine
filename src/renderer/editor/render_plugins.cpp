@@ -1,5 +1,5 @@
+#define LUMIX_NO_CUSTOM_CRT
 #ifdef LUMIX_BASIS_UNIVERSAL
-	#define LUMIX_NO_CUSTOM_CRT
 	#include <encoder/basisu_comp.h>
 #endif
 
@@ -324,7 +324,7 @@ static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32
 	Array<u8> mip_data(allocator);
 	Array<u8> prev_mip(allocator);
 
-	const float coverage = options.scale_coverage_ref >= 0 
+	const float coverage = options.scale_coverage_ref >= 0.f
 		? computeCoverage(src_data.get(0, 0, 0).pixels, src_data.w, src_data.h, options.scale_coverage_ref) 
 		: -1;
 
@@ -343,7 +343,7 @@ static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32
 						u32 prev_w = maximum(src_data.w >> (mip - 1), 1);
 						u32 prev_h = maximum(src_data.h >> (mip - 1), 1);
 						computeMip(mip == 1 ? (Span<const u8>)src_data.get(face, slice, 0).pixels : prev_mip, mip_data, prev_w, prev_h, mip_w, mip_h, src_data.is_srgb, allocator);
-						if (options.scale_coverage_ref >= 0) {
+						if (options.scale_coverage_ref >= 0.f) {
 							scaleCoverage(mip_data, mip_w, mip_h, options.scale_coverage_ref, coverage);
 						}
 						compressor(mip_data, dst, mip_w, mip_h);

@@ -404,6 +404,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			rhs.physx_actor = nullptr;
 		}
 
+		void operator =(RigidActor&& rhs) = delete;
+
 		~RigidActor() {
 			setResource(nullptr);
 			if (physx_actor) physx_actor->release();
