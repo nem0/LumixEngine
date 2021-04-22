@@ -31,6 +31,8 @@
 #include <X11/extensions/XInput2.h>
 #include <X11/cursorfont.h>
 #include <X11/Xmd.h>
+#include <gtk/gtk.h>
+
 
 #define _NET_WM_STATE_ADD 1
 
@@ -927,10 +929,59 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 }
 
 
-bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file) {
-	ASSERT(false);
-	// TODO
-	return {};
+bool getOpenFilename(Span<char> out, const char* filter_str, const char* starting_file) {
+	GtkWidget *dialog;
+    GtkFileFilter *filter;
+    GtkFileChooser *chooser;
+    GtkFileChooserAction action;
+    gint res;
+    char buf[128], *patterns;
+
+    action = GTK_FILE_CHOOSER_ACTION_OPEN;
+    //action = GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
+
+    gtk_init_check(NULL, NULL);
+    dialog = gtk_file_chooser_dialog_new(
+            "Open File",
+            NULL,
+            action,
+            "_Cancel", GTK_RESPONSE_CANCEL,
+            "_Open", GTK_RESPONSE_ACCEPT,
+            NULL );
+    chooser = GTK_FILE_CHOOSER(dialog);
+
+	const char* filters = filter_str;
+    while (filters && *filters) {
+        filter = gtk_file_filter_new();
+        gtk_file_filter_set_name(filter, filters);
+        filters += strlen(filters) + 1;
+
+        strcpy(buf, filters);
+        buf[strlen(buf)] = '\0';
+        for (patterns = buf; *patterns; patterns++)
+            if (*patterns == ';') *patterns = '\0';
+        patterns = buf;
+        while (*patterns) {
+            gtk_file_filter_add_pattern(filter, patterns);
+            patterns += strlen(patterns) + 1;
+        }
+
+        gtk_file_chooser_add_filter(chooser, filter);
+        filters += strlen(filters) + 1;
+    }
+
+    res = gtk_dialog_run(GTK_DIALOG(dialog));
+
+	static char *g_noc_file_dialog_ret = NULL;
+    free(g_noc_file_dialog_ret);
+    g_noc_file_dialog_ret = NULL;
+
+    if (res == GTK_RESPONSE_ACCEPT)
+        g_noc_file_dialog_ret = gtk_file_chooser_get_filename(chooser);
+    gtk_widget_destroy(dialog);
+    while (gtk_events_pending()) gtk_main_iteration();
+	if (g_noc_file_dialog_ret) copyString(out, g_noc_file_dialog_ret);
+    return g_noc_file_dialog_ret;
 }
 
 

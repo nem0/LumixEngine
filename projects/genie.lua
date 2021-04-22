@@ -507,18 +507,20 @@ project "engine"
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/luajit/include", "../external/freetype/include" }
+
+	configuration { "linux" }
+		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
+
+	configuration { "vs20*" }
+		if _OPTIONS["dynamic-plugins"] then
+			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
+		end
 	
 	linkLib "lua51"
 	linkLib "luajit"
 	if _OPTIONS["dynamic-plugins"] then
 		linkLib "freetype"
 	end
-
-	configuration { "vs20*" }
-		if _OPTIONS["dynamic-plugins"] then
-			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
-		end
-
 
 	defaultConfigurations()
 
@@ -942,6 +944,9 @@ if build_studio then
 			callback()
 		end
 		
+		configuration { "linux" }
+			links {"gtk-3", "gobject-2.0"}
+
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
 		configuration {}
