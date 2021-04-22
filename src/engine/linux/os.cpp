@@ -921,46 +921,37 @@ void getCurrentDirectory(Span<char> output) {
 	}
 }
 
-
-bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension) {
-	ASSERT(false);
-	// TODO
-	return {};
-}
-
-
-bool getOpenFilename(Span<char> out, const char* filter_str, const char* starting_file) {
-	GtkWidget *dialog;
-    GtkFileFilter *filter;
-    GtkFileChooser *chooser;
-    GtkFileChooserAction action;
-    gint res;
-    char buf[128], *patterns;
-
-    action = GTK_FILE_CHOOSER_ACTION_OPEN;
-    //action = GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
-
+static bool dialog(Span<char> out, const char* filter_str, const char* starting_file, bool is_dir, bool is_save) {
     gtk_init_check(NULL, NULL);
-    dialog = gtk_file_chooser_dialog_new(
-            "Open File",
+    GtkWidget* dialog = gtk_file_chooser_dialog_new(
+            is_save ? "Save file" : is_dir ? "Select folder" : "Open File",
             NULL,
-            action,
+            is_save ? GTK_FILE_CHOOSER_ACTION_SAVE : is_dir ? GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER : GTK_FILE_CHOOSER_ACTION_OPEN,
             "_Cancel", GTK_RESPONSE_CANCEL,
-            "_Open", GTK_RESPONSE_ACCEPT,
+            is_save ? "_Save" : "_Open", GTK_RESPONSE_ACCEPT,
             NULL );
-    chooser = GTK_FILE_CHOOSER(dialog);
+    GtkFileChooser* chooser = GTK_FILE_CHOOSER(dialog);
+	if (is_save) {
+		gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);		
+	}
 
 	const char* filters = filter_str;
+    GtkFileFilter* filter;
     while (filters && *filters) {
         filter = gtk_file_filter_new();
         gtk_file_filter_set_name(filter, filters);
         filters += strlen(filters) + 1;
 
-        strcpy(buf, filters);
-        buf[strlen(buf)] = '\0';
-        for (patterns = buf; *patterns; patterns++)
-            if (*patterns == ';') *patterns = '\0';
-        patterns = buf;
+	    char buf[128];
+        copyString(buf, filters);
+		char *patterns;
+        for (patterns = buf; *patterns; ++patterns) {
+            if (*patterns == ';') {
+				*patterns = '\0';
+			}
+		}
+        
+		patterns = buf;
         while (*patterns) {
             gtk_file_filter_add_pattern(filter, patterns);
             patterns += strlen(patterns) + 1;
@@ -970,25 +961,35 @@ bool getOpenFilename(Span<char> out, const char* filter_str, const char* startin
         filters += strlen(filters) + 1;
     }
 
-    res = gtk_dialog_run(GTK_DIALOG(dialog));
+	char* name = nullptr;
 
-	static char *g_noc_file_dialog_ret = NULL;
-    free(g_noc_file_dialog_ret);
-    g_noc_file_dialog_ret = NULL;
-
-    if (res == GTK_RESPONSE_ACCEPT)
-        g_noc_file_dialog_ret = gtk_file_chooser_get_filename(chooser);
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        name = gtk_file_chooser_get_filename(chooser);
+	}
     gtk_widget_destroy(dialog);
+
     while (gtk_events_pending()) gtk_main_iteration();
-	if (g_noc_file_dialog_ret) copyString(out, g_noc_file_dialog_ret);
-    return g_noc_file_dialog_ret;
+
+	if (name) {
+		copyString(out, name);
+		free(name);
+		return true;
+	}
+    return false;
+} 
+
+bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension) {
+	return dialog(out, filter, "", false, true);
+}
+
+
+bool getOpenFilename(Span<char> out, const char* filter_str, const char* starting_file) {
+	return dialog(out, filter_str, starting_file, false, false);
 }
 
 
 bool getOpenDirectory(Span<char> output, const char* starting_dir) {
-	ASSERT(false);
-	// TODO
-	return {};
+	return dialog(output, nullptr, starting_dir, true, false);
 }
 
 

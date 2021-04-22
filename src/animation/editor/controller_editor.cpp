@@ -775,7 +775,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		os::OutputFile file;
 		char relative[LUMIX_MAX_PATH];
 		(void)fs.makeRelative(Span(relative), path);
-		if (fs.open(path, file)) {
+		if (fs.open(relative, file)) {
 			if (!file.write(str.data(), str.size())) {
 				logError("Failed to write ", path);
 			}
@@ -818,7 +818,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	void saveAs() {
 		char path[LUMIX_MAX_PATH];
 
-		if (os::getSaveFilename(Span(path), "Animation controller\0*.act", "act")) {
+		if (os::getSaveFilename(Span(path), "Animation controller\0*.act\0", "act")) {
 			save(path);
 		}
 	}

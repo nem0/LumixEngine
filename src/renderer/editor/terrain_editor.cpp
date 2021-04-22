@@ -1511,7 +1511,7 @@ void TerrainEditor::entityGUI() {
 
 void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 	char filename[LUMIX_MAX_PATH];
-	if (!os::getSaveFilename(Span(filename), "Wavefront obj\0*.obj", "obj")) return;
+	if (!os::getSaveFilename(Span(filename), "Wavefront obj\0*.obj\0", "obj")) return;
 
 	os::OutputFile file;
 	if (!file.open(filename)) {

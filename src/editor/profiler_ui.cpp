@@ -313,7 +313,7 @@ struct ProfilerUIImpl final : ProfilerUI
 
 	void save() {
 		char path[LUMIX_MAX_PATH];
-		if (os::getSaveFilename(Span(path), "Profile data\0*.lpd", "lpd")) {
+		if (os::getSaveFilename(Span(path), "Profile data\0*.lpd\0", "lpd")) {
 			os::OutputFile file;
 			if (file.open(path)) {
 				if (!file.write(m_data.getMutableData(), m_data.size())) {
