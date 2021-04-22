@@ -12,7 +12,6 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "renderer/gpu/dds.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
@@ -533,74 +532,18 @@ void Texture::removeDataReference()
 	}
 }
 
-u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
-	const gpu::DDS::Header* hdr = (const gpu::DDS::Header*)data;
-	
-	if (hdr->dwMagic != gpu::DDS::DDS_MAGIC || hdr->dwSize != 124 || !(hdr->dwFlags & gpu::DDS::DDSD_PIXELFORMAT) || !(hdr->dwFlags & gpu::DDS::DDSD_CAPS)) {
-		return nullptr;
-	}
-	
-	desc.width = hdr->dwWidth;
-	desc.height = hdr->dwHeight;
-	desc.is_cubemap = (hdr->caps2.dwCaps2 & gpu::DDS::DDSCAPS2_CUBEMAP) != 0;
-	desc.mips = (hdr->dwFlags & gpu::DDS::DDSD_MIPMAPCOUNT) ? hdr->dwMipMapCount : 1;
-	desc.depth = (hdr->dwFlags & gpu::DDS::DDSD_DEPTH) ? hdr->dwDepth : 1;
-	u8* data_ptr = (u8*)data + sizeof(*hdr);
+u8* Texture::getLBCInfo(const void* data, gpu::TextureDesc& desc) {
+	const LBCHeader* hdr = (const LBCHeader*)data;
+	if (hdr->magic != LBCHeader::MAGIC) return nullptr;
+	if (hdr->version > 0) return nullptr;
 
-	if (isDXT1(hdr->pixelFormat)) {
-		desc.format = gpu::TextureFormat::BC1;
-	}
-	else if (isDXT3(hdr->pixelFormat)) {
-		desc.format = gpu::TextureFormat::BC2;
-	}
-	else if (isDXT5(hdr->pixelFormat)) {
-		desc.format = gpu::TextureFormat::BC3;
-	}
-	else if (isATI1(hdr->pixelFormat)) {
-		desc.format = gpu::TextureFormat::BC4;
-	}
-	else if (isATI2(hdr->pixelFormat)) {
-		desc.format = gpu::TextureFormat::BC5;
-	}
-	else if (isBGRA8(hdr->pixelFormat)) {
-		desc.format = gpu::TextureFormat::BGRA8;
-	}
-	else if (isDXT10(hdr->pixelFormat)) {
-		const gpu::DDS::DXT10Header* hdr_dxt10 = (const gpu::DDS::DXT10Header*)((const u8*)data + sizeof(gpu::DDS::Header));
-		switch (hdr_dxt10->dxgi_format) {
-			case gpu::DDS::DxgiFormat::BC1_UNORM_SRGB:
-			case gpu::DDS::DxgiFormat::BC1_UNORM:
-				desc.format = gpu::TextureFormat::BC1;
-				break;
-			case gpu::DDS::DxgiFormat::BC2_UNORM_SRGB:
-			case gpu::DDS::DxgiFormat::BC2_UNORM:
-				desc.format = gpu::TextureFormat::BC2;
-				break;
-			case gpu::DDS::DxgiFormat::BC3_UNORM_SRGB:
-			case gpu::DDS::DxgiFormat::BC3_UNORM:
-				desc.format = gpu::TextureFormat::BC3;
-				break;
-			case gpu::DDS::DxgiFormat::BC4_SNORM:
-			case gpu::DDS::DxgiFormat::BC4_UNORM:
-				desc.format = gpu::TextureFormat::BC4;
-				break;
-			case gpu::DDS::DxgiFormat::BC5_SNORM:
-			case gpu::DDS::DxgiFormat::BC5_UNORM:
-				desc.format = gpu::TextureFormat::BC5;
-				break;
-			default:
-				ASSERT(false);
-				return nullptr;
-		}
-		desc.depth = hdr_dxt10->array_size;
-		data_ptr = data_ptr + sizeof(*hdr_dxt10);
-	}
-	else {
-		ASSERT(false);
-		return nullptr;
-	}
-
-	return data_ptr;
+	desc.width = hdr->w;
+	desc.height = hdr->h;
+	desc.is_cubemap = hdr->flags & LBCHeader::CUBEMAP;
+	desc.mips = hdr->mips;
+	desc.depth = hdr->slices;
+	desc.format = hdr->format;
+	return (u8*)data + sizeof(*hdr);
 }
 
 #ifdef LUMIX_BASIS_UNIVERSAL
@@ -681,16 +624,16 @@ u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
 	}
 #endif
 
-static bool loadDDS(Texture& texture, const u8* data, u32 size)
+static bool loadLBC(Texture& texture, const u8* data, u32 size)
 {
 	if(texture.data_reference > 0) {
 		logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Use uncompressed TGA without mipmaps or RAW.");
 	}
 
 	gpu::TextureDesc desc;
-	const u8* image_data = Texture::getDDSInfo(data, desc);
+	const u8* image_data = Texture::getLBCInfo(data, desc);
 	if (!image_data) {
-		logError("Corrupted or unsupported dds ", texture.getPath());
+		logError("Corrupted or unsupported texture ", texture.getPath());
 		return false;
 	};
 
@@ -740,9 +683,6 @@ bool Texture::load(u64 size, const u8* mem)
 	PROFILE_FUNCTION();
 	profiler::pushString(getPath().c_str());
 	
-	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
-		return loadDDS(*this, mem, (u32)size);
-	}
 	
 	char ext[4] = {};
 	InputMemoryStream file(mem, size);
@@ -758,7 +698,12 @@ bool Texture::load(u64 size, const u8* mem)
 	#endif
 
 	if (equalIStrings(ext, "dds")) {
-		loaded = loadDDS(*this, (const u8*)file.getBuffer() + file.getPosition(), u32(file.size() - file.getPosition()));
+		logWarning("Outdated baked texture ", getPath(), ". Please delete directory .lumix and try again");
+		return false;
+	}
+	
+	if (equalIStrings(ext, "lbc")) {
+		loaded = loadLBC(*this, (const u8*)file.getBuffer() + file.getPosition(), u32(file.size() - file.getPosition()));
 	}
 	else if (equalIStrings(ext, "raw")) {
 		loaded = loadRaw(*this, file, allocator);

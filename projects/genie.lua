@@ -578,14 +578,13 @@ if has_plugin("renderer") then
 			defines { "LUMIX_BASIS_UNIVERSAL" }
 			includedirs { "../external/basisu/include" }
 		end
-		includedirs { "../src", "../external/nvtt/include", "../external/freetype/include", "../external/" }
+		includedirs { "../src", "../external/freetype/include", "../external/" }
 		
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 
 		if build_studio then
 			links { "editor" }
-			linkLib "nvtt"
 			if use_basisu then
 				linkLib "basisu"
 			end
@@ -761,7 +760,6 @@ if build_app then
 			if use_basisu then
 				linkLib "basisu"
 			end
-			linkLib "nvtt"
 			linkLib "freetype"
 			linkLib "luajit"
 			linkLib "recast"
@@ -777,7 +775,6 @@ if build_app then
 			if use_basisu then
 				linkLib "basisu"
 			end
-			linkLib "nvtt"
 		end
 		
 		linkLib "luajit"
@@ -917,7 +914,6 @@ if build_studio then
 				if _ACTION == "gmake" then
 					linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
 				end
-				links { "nvimage", "nvcore", "nvmath", "nvthread", "squish", "bc6h", "bc7" } 
 
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
@@ -928,7 +924,6 @@ if build_studio then
 			if use_basisu then
 				linkLib "basisu"
 			end
-			linkLib "nvtt"
 			linkLib "freetype"
 			linkLib "luajit"
 			linkLib "recast"

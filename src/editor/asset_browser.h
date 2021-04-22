@@ -49,6 +49,7 @@ struct AssetBrowser {
 	virtual void reloadTile(u32 hash) = 0;
 	virtual bool isOpen() const = 0;
 	virtual void setOpen(bool open) = 0;
+	virtual bool copyTile(const char* from, const char* to) = 0;
 };
 
 

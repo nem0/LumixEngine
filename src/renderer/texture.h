@@ -30,6 +30,21 @@ struct TGAHeader
 };
 #pragma pack()
 
+struct LBCHeader {
+	static constexpr u32 MAGIC = 'LBC_';
+	enum Flags {
+		CUBEMAP = 1 << 0,
+		IS_3D = 1 << 1
+	};
+	u32 magic = MAGIC;
+	u32 version = 0;
+	u32 w = 0;
+	u32 h = 0;
+	u32 slices = 0;
+	u32 mips = 0;
+	u32 flags = 0;
+	gpu::TextureFormat format;
+};
 
 struct RawTextureHeader {
 	enum class ChannelType : u32 {
@@ -83,7 +98,7 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 	u32 getPixel(float x, float y) const;
 	gpu::TextureFlags getGPUFlags() const;
 
-	static u8* getDDSInfo(const void* data, gpu::TextureDesc& desc);
+	static u8* getLBCInfo(const void* data, gpu::TextureDesc& desc);
 	static bool saveTGA(IOutputStream* file,
 		int width,
 		int height,

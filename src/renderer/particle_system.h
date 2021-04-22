@@ -130,6 +130,7 @@ private:
 		u32 name = 0;
 	};
 
+	void operator =(ParticleEmitter&& rhs) = delete;
 	float readSingleValue(InputMemoryStream& blob) const;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
 

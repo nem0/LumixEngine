@@ -398,7 +398,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	};
 	
 	static TileState getState(const FileInfo& info, FileSystem& fs) {
-		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", info.file_path_hash, ".dds");
+		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", info.file_path_hash, ".lbc");
 		if (!fs.fileExists(info.filepath)) return TileState::DELETED;
 		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
 
@@ -434,7 +434,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		{
 			ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
 			StaticString<LUMIX_MAX_PATH> compiled_asset_path(".lumix/assets/", tile.file_path_hash, ".res");
-			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
+			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
 				case TileState::OK:
@@ -1221,6 +1221,24 @@ struct AssetBrowserImpl : AssetBrowser {
 	
 	bool isOpen() const override { return m_is_open; }
 	void setOpen(bool open) override { m_is_open = open; }
+
+	bool copyTile(const char* from, const char* to) override {
+		OutputMemoryStream img(m_app.getAllocator());
+		if (!m_app.getEngine().getFileSystem().getContentSync(Path(from), img)) return false;
+		
+		os::OutputFile file;
+		if (!m_app.getEngine().getFileSystem().open(to, file)) return false;
+		Span<const char> ext = Path::getExtension(Span(from, stringLength(from)));
+		if (ext.length() != 3) {
+			file.close();
+			return false;
+		}
+		(void)file.write(ext.begin(), 3);
+		(void)file.write(u32(0));
+		(void)file.write(img.data(), img.size());
+		file.close();
+		return !file.isError();
+	}
 
 	bool m_is_open;
 	float m_left_column_width = 120;

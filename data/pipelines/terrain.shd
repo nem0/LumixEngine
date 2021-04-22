@@ -158,8 +158,10 @@ fragment_shader [[
 			vec4 cola = textureGrad(u_albedo, vec3(x + v * offa, layer), duvdx, duvdy);
 			vec4 colb = textureGrad(u_albedo, vec3(x + v * offb, layer), duvdx, duvdy);
 
-			vec3 norma = textureGrad(u_normal, vec3(x + v * offa, layer), duvdx, duvdy).xyz * 2 - 1;
-			vec3 normb = textureGrad(u_normal, vec3(x + v * offb, layer), duvdx, duvdy).xyz * 2 - 1;
+			vec3 norma; norma.xy = textureGrad(u_normal, vec3(x + v * offa, layer), duvdx, duvdy).xy * 2 - 1;
+			vec3 normb; normb.xy = textureGrad(u_normal, vec3(x + v * offb, layer), duvdx, duvdy).xy * 2 - 1;
+			norma.z = sqrt(saturate(1 - dot(norma.xy, norma.xy))); 
+			normb.z = sqrt(saturate(1 - dot(normb.xy, normb.xy)));
     
 			Detail detail;
 

@@ -45,6 +45,7 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	bool write(const void* data, u64 size) override;
 
 	Span<u8> releaseOwnership();
+	operator Span<const u8>() const { return Span(m_data, m_data + m_size); }
 	void resize(u64 size);
 	void reserve(u64 size);
 	const u8* data() const { return m_data; }

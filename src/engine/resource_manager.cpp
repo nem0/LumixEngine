@@ -55,6 +55,10 @@ Resource* ResourceManager::load(const Path& path)
 	{
 		if (m_owner->onBeforeLoad(*resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 		{
+			#ifdef LUMIX_DEBUG
+				ASSERT(!resource->m_hooked);
+				resource->m_hooked = true;
+			#endif
 			resource->m_desired_state = Resource::State::READY;
 			resource->incRefCount(); // for hook
 			resource->incRefCount(); // for return value
@@ -87,14 +91,22 @@ void ResourceManager::removeUnreferenced()
 void ResourceManager::reload(const Path& path)
 {
 	Resource* resource = get(path);
-	if(resource) reload(*resource);
+	if (resource) reload(*resource);
 }
 
 void ResourceManager::reload(Resource& resource)
 {
-	resource.doUnload();
+	if (resource.m_current_state != Resource::State::EMPTY) {
+		resource.doUnload();
+	}
+	else if (resource.m_desired_state == Resource::State::READY) return;
+
 	if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 	{
+		#ifdef LUMIX_DEBUG
+			ASSERT(!resource.m_hooked);
+			resource.m_hooked = true;
+		#endif
 		resource.m_desired_state = Resource::State::READY;
 		resource.incRefCount(); // for hook
 		resource.incRefCount(); // for return value
@@ -169,6 +181,9 @@ void ResourceManagerHub::LoadHook::continueLoad(Resource& resource)
 {
 	ASSERT(resource.isEmpty());
 	resource.decRefCount(); // release from hook
+	#ifdef LUMIX_DEBUG
+		resource.m_hooked = false;
+	#endif
 	resource.m_desired_state = Resource::State::EMPTY;
 	resource.doLoad();
 }
