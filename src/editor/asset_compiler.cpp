@@ -192,6 +192,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 		char normalized[LUMIX_MAX_PATH];
 		Path::normalize(locator, Span(normalized));
+		makeLowercase(Span(normalized), normalized);
 		const u32 hash = crc32(normalized);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		StaticString<LUMIX_MAX_PATH> out_path(".lumix/assets/", hash, ".res");
@@ -242,7 +243,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		const Span<const char> subres = getSubresource(path);
 		Span<const char> ext = Path::getExtension(subres);
 
-		auto iter = m_registered_extensions.find(crc32(ext.begin(), ext.length()));
+		char tmp[64];
+		makeLowercase(Span(tmp), ext.begin());
+		auto iter = m_registered_extensions.find(crc32(tmp));
 		if (iter.isValid()) return iter.value();
 
 		return INVALID_RESOURCE_TYPE;
@@ -251,7 +254,9 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		auto iter = m_registered_extensions.find(crc32(ext));
+		char tmp[64];
+		makeLowercase(Span(tmp), ext);
+		auto iter = m_registered_extensions.find(crc32(tmp));
 		if (!iter.isValid()) return false;
 		return iter.value() == type;
 	}
@@ -485,7 +490,10 @@ struct AssetCompilerImpl : AssetCompiler {
 	bool compile(const Path& src) override
 	{
 		Span<const char> ext = Path::getExtension(Span(src.c_str(), src.length()));
-		const u32 hash = crc32(ext.begin(), ext.length());
+		char tmp[64];
+		copyString(Span(tmp), ext);
+		makeLowercase(Span(tmp), tmp);
+		const u32 hash = crc32(tmp);
 		MutexGuard lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) {
@@ -653,7 +661,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			MutexGuard lock(m_compiled_mutex);
 			// reload/continue loading resource and its subresources
 			for (const ResourceItem& ri : m_resources) {
-				if (!endsWith(ri.path.c_str(), p.path.c_str())) continue;;
+				if (!endsWithInsensitive(ri.path.c_str(), p.path.c_str())) continue;;
 				
 				Resource* r = getResource(ri.path);
 				if (r && r->isReady()) r->getResourceManager().reload(*r);
@@ -686,17 +694,19 @@ struct AssetCompilerImpl : AssetCompiler {
 				path_obj = tmp;
 			}
 
-			if (!m_app.getEngine().getFileSystem().fileExists(path_obj.c_str())) {
-				MutexGuard lock(m_resources_mutex);
-				m_resources.eraseIf([&](const ResourceItem& ri){
-					if (!endsWith(ri.path.c_str(), path_obj.c_str())) return false;
-					return true;
-				});
-				m_on_list_changed.invoke(path_obj);
-			}
-			else {
-				addResource(path_obj.c_str());
-				pushToCompileQueue(path_obj);
+			if (getResourceType(path_obj.c_str()) != INVALID_RESOURCE_TYPE) {
+				if (!m_app.getEngine().getFileSystem().fileExists(path_obj.c_str())) {
+					MutexGuard lock(m_resources_mutex);
+					m_resources.eraseIf([&](const ResourceItem& ri){
+						if (!endsWithInsensitive(ri.path.c_str(), path_obj.c_str())) return false;
+						return true;
+					});
+					m_on_list_changed.invoke(path_obj);
+				}
+				else {
+					addResource(path_obj.c_str());
+					pushToCompileQueue(path_obj);
+				}
 			}
 		}
 	}

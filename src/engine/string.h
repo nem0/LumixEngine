@@ -52,6 +52,7 @@ LUMIX_ENGINE_API int compareStringN(const char* lhs, const char* rhs, int length
 LUMIX_ENGINE_API int compareIStringN(const char* lhs, const char* rhs, int length);
 LUMIX_ENGINE_API const char* findSubstring(const char* str, const char* substr);
 LUMIX_ENGINE_API bool endsWith(const char* str, const char* substr);
+LUMIX_ENGINE_API bool endsWithInsensitive(const char* str, const char* substr);
 LUMIX_ENGINE_API bool isLetter(char c);
 LUMIX_ENGINE_API bool isNumeric(char c);
 LUMIX_ENGINE_API bool isUpperCase(char c);

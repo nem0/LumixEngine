@@ -1232,7 +1232,9 @@ struct AssetBrowserImpl : AssetBrowser {
 			file.close();
 			return false;
 		}
-		(void)file.write(ext.begin(), 3);
+		char ext_tmp[4];
+		makeLowercase(Span(ext_tmp), ext.begin());
+		(void)file.write(ext_tmp, 3);
 		(void)file.write(u32(0));
 		(void)file.write(img.data(), img.size());
 		file.close();

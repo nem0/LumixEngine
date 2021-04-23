@@ -360,6 +360,13 @@ int stringLength(const char* str)
 	return (int)strlen(str);
 }
 
+bool endsWithInsensitive(const char* str, const char* substr)
+{
+	int len = stringLength(str);
+	int len2 = stringLength(substr);
+	if (len2 > len) return false;
+	return equalIStrings(str + len - len2, substr);
+}
 bool endsWith(const char* str, const char* substr)
 {
 	int len = stringLength(str);

@@ -215,7 +215,7 @@ static void saveTGA(Texture& texture)
 void Texture::save()
 {
 	char ext[5];
-	copyString(Span(ext), Path::getExtension(Span(getPath().c_str(), getPath().length())));
+	makeLowercase(Span(ext), Path::getExtension(Span(getPath().c_str(), getPath().length())).begin());
 	if (equalStrings(ext, "raw") && format == gpu::TextureFormat::R16)
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();

@@ -21,7 +21,13 @@ Path::Path()
 
 Path::Path(const char* path) {
 	normalize(path, Span(m_path));
-	m_hash = crc32(m_path);
+	#ifdef _WIN32
+		char tmp[LUMIX_MAX_PATH];
+		makeLowercase(Span(tmp), m_path);
+		m_hash = crc32(tmp);
+	#else
+		m_hash = crc32(m_path);
+	#endif
 }
 
 i32 Path::length() const {
@@ -30,7 +36,13 @@ i32 Path::length() const {
 
 void Path::operator =(const char* rhs) {
 	normalize(rhs, Span(m_path));
-	m_hash = crc32(m_path);
+	#ifdef _WIN32
+		char tmp[LUMIX_MAX_PATH];
+		makeLowercase(Span(tmp), m_path);
+		m_hash = crc32(tmp);
+	#else
+		m_hash = crc32(m_path);
+	#endif
 }
 
 bool Path::operator==(const Path& rhs) const {
@@ -40,7 +52,11 @@ bool Path::operator==(const Path& rhs) const {
 
 bool Path::operator!=(const Path& rhs) const {
 	ASSERT(equalStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
-	return m_hash != rhs.m_hash || !equalStrings(m_path, rhs.m_path);
+	#ifdef _WIN32
+		return m_hash != rhs.m_hash || !equalIStrings(m_path, rhs.m_path);
+	#else
+		return m_hash != rhs.m_hash || !equalStrings(m_path, rhs.m_path);
+	#endif
 }
 
 void Path::normalize(const char* path, Span<char> output)

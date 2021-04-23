@@ -3312,7 +3312,7 @@ struct StudioAppImpl final : StudioApp
 			{
 				char ext[5];
 				copyString(Span(ext), Path::getExtension(Span(info.filename, stringLength(info.filename))));
-				if (equalStrings(ext, "lua"))
+				if (equalIStrings(ext, "lua"))
 				{
 					loadLuaPlugin(dir, info.filename);
 				}

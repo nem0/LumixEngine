@@ -1450,6 +1450,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		char ext[5] = {};
 		copyString(Span(ext), Path::getExtension(Span(src.c_str(), src.length())));
+		makeLowercase(Span(ext), ext);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
