@@ -55,10 +55,8 @@ Resource* ResourceManager::load(const Path& path)
 	{
 		if (m_owner->onBeforeLoad(*resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 		{
-			#ifdef LUMIX_DEBUG
-				ASSERT(!resource->m_hooked);
-				resource->m_hooked = true;
-			#endif
+			ASSERT(!resource->m_hooked);
+			resource->m_hooked = true;
 			resource->m_desired_state = Resource::State::READY;
 			resource->incRefCount(); // for hook
 			resource->incRefCount(); // for return value
@@ -103,10 +101,8 @@ void ResourceManager::reload(Resource& resource)
 
 	if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 	{
-		#ifdef LUMIX_DEBUG
-			ASSERT(!resource.m_hooked);
-			resource.m_hooked = true;
-		#endif
+		ASSERT(!resource.m_hooked);
+		resource.m_hooked = true;
 		resource.m_desired_state = Resource::State::READY;
 		resource.incRefCount(); // for hook
 		resource.incRefCount(); // for return value
@@ -181,9 +177,7 @@ void ResourceManagerHub::LoadHook::continueLoad(Resource& resource)
 {
 	ASSERT(resource.isEmpty());
 	resource.decRefCount(); // release from hook
-	#ifdef LUMIX_DEBUG
-		resource.m_hooked = false;
-	#endif
+	resource.m_hooked = false;
 	resource.m_desired_state = Resource::State::EMPTY;
 	resource.doLoad();
 }

@@ -1992,7 +1992,7 @@ struct StudioAppImpl final : StudioApp
 
 	void setFullscreen(bool fullscreen) override
 	{
-		if(fullscreen) {
+		if (fullscreen) {
 			m_fullscreen_restore_state = os::setFullscreen(m_main_window);
 		}
 		else {

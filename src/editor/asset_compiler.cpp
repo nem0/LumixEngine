@@ -64,14 +64,7 @@ void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const char
 }
 
 
-struct AssetCompilerImpl : AssetCompiler
-{
-	struct ResourceUpdate {
-		ResourceUpdate(IAllocator& allocator) : resources(allocator) {}
-		Array<Resource*> resources;
-		u32 generation = 0;
-	};
-
+struct AssetCompilerImpl : AssetCompiler {
 	struct CompileJob {
 		u32 generation;
 		Path path;
@@ -100,7 +93,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_semaphore(0, 0x7fFFffFF)
 		, m_registered_extensions(app.getAllocator())
 		, m_resources(app.getAllocator())
-		, m_updates(app.getAllocator())
+		, m_generations(app.getAllocator())
 		, m_dependencies(app.getAllocator())
 		, m_changed_files(app.getAllocator())
 		, m_on_list_changed(app.getAllocator())
@@ -240,6 +233,7 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 		else {
 			m_resources.insert(hash, {path_obj, type, dirHash(path_obj.c_str())});
+			m_on_list_changed.invoke(path_obj);
 		}
 	}
 
@@ -308,7 +302,6 @@ struct AssetCompilerImpl : AssetCompiler
 				copyString(fullpath, dir);
 				if(dir[0]) catString(fullpath, "/");
 				catString(fullpath, info.filename);
-				makeLowercase(Span(fullpath), fullpath);
 
 				if (fs.getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
 					addResource(fullpath);
@@ -334,7 +327,9 @@ struct AssetCompilerImpl : AssetCompiler
 			m_dependencies.insert(dependency, Array<Path>(allocator));
 			iter = m_dependencies.find(dependency);
 		}
-		iter.value().push(included_from);
+		if (iter.value().indexOf(included_from) < 0) {
+			iter.value().push(included_from);
+		}
 	}
 
 	void fillDB() {
@@ -424,40 +419,11 @@ struct AssetCompilerImpl : AssetCompiler
 		m_init_finished = true;
 		for (Resource* res : m_on_init_load) {
 			const char* filepath = getResourceFilePath(res->getPath().c_str());
-			pushToCompileQueue(*res, filepath);
+			pushToCompileQueue(Path(filepath));
 			res->decRefCount();
 		}
 		m_on_init_load.clear();
 		fillDB();
-	}
-
-
-	Array<Path> removeResource(const char* path)
-	{
-		Array<Path> res(m_app.getAllocator());
-
-		MutexGuard lock(m_resources_mutex);
-		m_resources.eraseIf([&](const ResourceItem& ri){
-			if (!equalStrings(getResourceFilePath(ri.path.c_str()), path)) return false;
-			res.push(ri.path);
-			return true;
-		});
-
-		const Path path_obj(path);
-		for (Array<Path>& deps : m_dependencies) {
-			deps.eraseItems([&](const Path& p){ return p == path_obj; });
-		}
-
-		return res;
-	}
-
-
-	void reloadSubresources(const Array<Path>& subresources)
-	{
-		ResourceManagerHub& rman = m_app.getEngine().getResourceManager();
-		for (const Path& p : subresources) {
-			rman.reload(p);
-		}
 	}
 
 	void onFileChanged(const char* path)
@@ -570,31 +536,26 @@ struct AssetCompilerImpl : AssetCompiler
 				return ResourceManagerHub::LoadHook::Action::DEFERRED;
 			}
 
-			pushToCompileQueue(res, filepath);
+			pushToCompileQueue(Path(filepath));
 			return ResourceManagerHub::LoadHook::Action::DEFERRED;
 		}
 		return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 	}
 
-	void pushToCompileQueue(Resource& res, const char* filepath) {
+	void pushToCompileQueue(const Path& path) {
 		MutexGuard lock(m_to_compile_mutex);
-		const Path path(filepath);
-		auto iter = m_updates.find(path);
+		auto iter = m_generations.find(path);
 		if (!iter.isValid()) {
 			IAllocator& allocator = m_app.getAllocator();
-			m_updates.insert(path, ResourceUpdate(allocator));
-			iter = m_updates.find(path);
+			iter = m_generations.insert(path, 0);
 		}
-
-		ResourceUpdate& update = iter.value();
-		++update.generation;
-		if (update.resources.indexOf(&res) < 0) {
-			update.resources.push(&res);
+		else {
+			++iter.value();
 		}
 
 		CompileJob job;
 		job.path = path;
-		job.generation = update.generation;
+		job.generation = iter.value();
 
 		m_to_compile.push(job);
 		++m_compile_batch_count;
@@ -666,6 +627,15 @@ struct AssetCompilerImpl : AssetCompiler
 		ImGui::PopStyleVar();
 	}
 
+	Resource* getResource(const Path& path) const {
+		ResourceManagerHub& rman = m_app.getEngine().getResourceManager();
+		for (ResourceManager* rm : rman.getAll()) {
+			auto iter = rm->getResourceTable().find(path.getHash());
+			if (iter.isValid()) return iter.value();
+		}
+		return nullptr;
+	}
+
 	void update() override
 	{
 		for(;;) {
@@ -673,13 +643,29 @@ struct AssetCompilerImpl : AssetCompiler
 			if (p.path.isEmpty()) break;
 
 			// this can take some time, mutex is probably not the best option
+
+			const u32 generation = [&](){
+				MutexGuard lock(m_to_compile_mutex);
+				return m_generations[p.path];
+			}();
+			if (p.generation != generation) continue;
+
 			MutexGuard lock(m_compiled_mutex);
+			// reload/continue loading resource and its subresources
+			for (const ResourceItem& ri : m_resources) {
+				if (!endsWith(ri.path.c_str(), p.path.c_str())) continue;;
+				
+				Resource* r = getResource(ri.path);
+				if (r && r->isReady()) r->getResourceManager().reload(*r);
+				else if (r && r->isHooked()) m_load_hook.continueLoad(*r);
+			}
 
-			ResourceUpdate& update = m_updates[p.path];
-			if (p.generation != update.generation) continue;
-
-			for (Resource* r : update.resources) {
-				if (r->wantReady()) m_load_hook.continueLoad(*r);
+			// compile all dependents
+			auto dep_iter = m_dependencies.find(p.path);
+			if (dep_iter.isValid()) {
+				for (const Path& p : dep_iter.value()) {
+					pushToCompileQueue(p);
+				}
 			}
 		}
 
@@ -700,26 +686,19 @@ struct AssetCompilerImpl : AssetCompiler
 				path_obj = tmp;
 			}
 
-			const Array<Path> removed_subresources = removeResource(path_obj.c_str());
-			addResource(path_obj.c_str());
-			reloadSubresources(removed_subresources);
-
-			auto iter = m_dependencies.find(path_obj);
-			if (iter.isValid()) {
-				const Array<Path> tmp(iter.value().makeCopy());
-				m_dependencies.erase(iter);
-				for (Path& p : tmp) {
-					Array<Path> removed_subresources = removeResource(p.c_str());
-					addResource(p.c_str());
-					reloadSubresources(removed_subresources);
-				}
+			if (!m_app.getEngine().getFileSystem().fileExists(path_obj.c_str())) {
+				MutexGuard lock(m_resources_mutex);
+				m_resources.eraseIf([&](const ResourceItem& ri){
+					if (!endsWith(ri.path.c_str(), path_obj.c_str())) return false;
+					return true;
+				});
+				m_on_list_changed.invoke(path_obj);
 			}
-			m_on_list_changed.invoke(path_obj);
+			else {
+				addResource(path_obj.c_str());
+				pushToCompileQueue(path_obj);
+			}
 		}
-	}
-
-	void removeResource(const Path& path) override {
-		m_resources.erase(path.getHash());
 	}
 
 	void removePlugin(IPlugin& plugin) override
@@ -763,8 +742,8 @@ struct AssetCompilerImpl : AssetCompiler
 	Mutex m_compiled_mutex;
 	Mutex m_plugin_mutex;
 	Mutex m_changed_mutex;
-	HashMap<Path, ResourceUpdate> m_updates; 
-	HashMap<Path, Array<Path>> m_dependencies;
+	HashMap<Path, u32> m_generations; 
+	HashMap<Path, Array<Path>> m_dependencies; 
 	Array<Path> m_changed_files;
 	Array<CompileJob> m_to_compile;
 	Array<CompileJob> m_compiled;
@@ -792,8 +771,16 @@ int AssetCompilerTask::task()
 		m_compiler.m_semaphore.wait();
 		const AssetCompilerImpl::CompileJob p = [&]{
 			MutexGuard lock(m_compiler.m_to_compile_mutex);
-			const AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
-			m_compiler.m_res_in_progress = p.path.c_str();
+			AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
+			auto iter = m_compiler.m_generations.find(p.path);
+			const bool is_most_recent = p.generation == iter.value();
+			if (is_most_recent) {
+				m_compiler.m_res_in_progress = p.path.c_str();
+			}
+			else {
+				p.path = Path();
+				--m_compiler.m_batch_remaining_count;
+			}
 			m_compiler.m_to_compile.pop();
 			return p;
 		}();
@@ -801,9 +788,7 @@ int AssetCompilerTask::task()
 			PROFILE_BLOCK("compile asset");
 			profiler::pushString(p.path.c_str());
 			const bool compiled = m_compiler.compile(p.path);
-			if (!compiled) {
-				logError("Failed to compile resource ", p.path);
-			}
+			if (!compiled) logError("Failed to compile resource ", p.path);
 			MutexGuard lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(p);
 		}

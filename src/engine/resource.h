@@ -61,6 +61,7 @@ struct LUMIX_ENGINE_API Resource {
 	u32 decRefCount();
 	u32 incRefCount() { return ++m_ref_count; }
 	bool wantReady() const { return m_desired_state == State::READY; }
+	bool isHooked() const { return m_hooked; }
 
 	template <auto Function, typename C> void onLoaded(C* instance)
 	{
@@ -104,8 +105,8 @@ private:
 	u16 m_failed_dep_count;
 	State m_current_state;
 	FileSystem::AsyncHandle m_async_op;
+	bool m_hooked = false;
 	#ifdef LUMIX_DEBUG
-		bool m_hooked = false;
 		bool m_invoking = false;
 	#endif
 }; // struct Resource

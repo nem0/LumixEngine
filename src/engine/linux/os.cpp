@@ -50,6 +50,11 @@ static struct {
 	bool relative_mouse = false;
 	WindowHandle win = INVALID_WINDOW;
 	Cursor arrow_cursor = None;
+	Cursor size_ns_cursor = None;
+	Cursor size_we_cursor = None;
+	Cursor size_nwse_cursor = None;
+	Cursor load_cursor = None;
+	Cursor text_input_cursor = None;
 	Cursor hidden_cursor = None;
 
 	int argc = 0;
@@ -64,8 +69,10 @@ static struct {
 	Atom net_wm_state_maximized_horz_atom;
 	Atom wm_protocols_atom;
 	Atom wm_delete_window_atom;
+	Atom clipboard_atom;
 	int xinput_opcode = 0;
 	bool has_raw_inputs = false;
+	char* clipboard = nullptr;
 } G;
 
 bool getAppDataDir(Span<char> path) {
@@ -284,7 +291,8 @@ void init() {
 	G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
 	G.wm_protocols_atom = XInternAtom(G.display, "WM_PROTOCOLS", False);
 	G.wm_delete_window_atom = XInternAtom(G.display, "WM_DELETE_WINDOW", False);
-
+	G.clipboard_atom = XInternAtom(G.display, "CLIPBOARD", False);
+	
 	int first, error;
 	if (XQueryExtension(G.display, "XInputExtension", &G.xinput_opcode, &first, &error) == False) {
 		logError("Missing XInputExtension, mouse input will be broken.");
@@ -490,6 +498,10 @@ next:
 
 	switch (xevent.type) {
 		default: goto next;
+		case SelectionClear:
+		case SelectionRequest:
+			ASSERT(false); // TODO
+			goto next;
 		case KeyPress: {
 			KeySym keysym;
 			Status status = 0;
@@ -671,15 +683,14 @@ void getKeyName(Keycode keycode, Span<char> out) {
 	copyString(out, name ? name : keycode != Keycode::INVALID ? "N/A" : "");
 }
 
-void setCursor(CursorType type) {
-	// ASSERT(false);
-	// TODO
-}
-
-void showCursor(bool show) {
-	if (G.arrow_cursor == None) {
-		G.arrow_cursor = XCreateFontCursor(G.display, 2);
-  
+static void initCursors() {
+	if (G.arrow_cursor == None) G.arrow_cursor = XCreateFontCursor(G.display, 68);
+	if (G.size_ns_cursor == None) G.size_ns_cursor = XCreateFontCursor(G.display, 116);
+	if (G.size_we_cursor == None) G.size_we_cursor = XCreateFontCursor(G.display, 108);
+	if (G.size_nwse_cursor == None) G.size_nwse_cursor = XCreateFontCursor(G.display, 52);
+	if (G.load_cursor == None) G.load_cursor = XCreateFontCursor(G.display, 150);
+	if (G.text_input_cursor == None) G.text_input_cursor = XCreateFontCursor(G.display, 152);
+	if (G.hidden_cursor == None) {
 		Pixmap cursorPixmap = XCreatePixmap(G.display, (Window)G.win, 1, 1, 1);
 		GC graphicsContext = XCreateGC(G.display, cursorPixmap, 0, NULL);
 		XDrawPoint(G.display, cursorPixmap, graphicsContext, 0, 0);
@@ -690,6 +701,23 @@ void showCursor(bool show) {
 		G.hidden_cursor = XCreatePixmapCursor(G.display, cursorPixmap, cursorPixmap, &color, &color, 0, 0);
 		XFreePixmap(G.display, cursorPixmap);
 	}
+}
+
+void setCursor(CursorType type) {
+	initCursors();
+	switch (type) {
+		case CursorType::DEFAULT: XDefineCursor(G.display, (Window)G.win, G.arrow_cursor); break;
+		case CursorType::SIZE_NS: XDefineCursor(G.display, (Window)G.win, G.size_ns_cursor); break;
+		case CursorType::SIZE_WE: XDefineCursor(G.display, (Window)G.win, G.size_we_cursor); break;
+		case CursorType::SIZE_NWSE: XDefineCursor(G.display, (Window)G.win, G.size_nwse_cursor); break;
+		case CursorType::LOAD: XDefineCursor(G.display, (Window)G.win, G.load_cursor); break;
+		case CursorType::TEXT_INPUT: XDefineCursor(G.display, (Window)G.win, G.text_input_cursor); break;
+		default: ASSERT(false); break;
+	}
+}
+
+void showCursor(bool show) {
+	initCursors();
 
 	if (show) {
 		XDefineCursor(G.display, (Window)G.win, G.arrow_cursor);
@@ -922,60 +950,63 @@ void getCurrentDirectory(Span<char> output) {
 }
 
 static bool dialog(Span<char> out, const char* filter_str, const char* starting_file, bool is_dir, bool is_save) {
-    gtk_init_check(NULL, NULL);
-    GtkWidget* dialog = gtk_file_chooser_dialog_new(
-            is_save ? "Save file" : is_dir ? "Select folder" : "Open File",
-            NULL,
-            is_save ? GTK_FILE_CHOOSER_ACTION_SAVE : is_dir ? GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER : GTK_FILE_CHOOSER_ACTION_OPEN,
-            "_Cancel", GTK_RESPONSE_CANCEL,
-            is_save ? "_Save" : "_Open", GTK_RESPONSE_ACCEPT,
-            NULL );
-    GtkFileChooser* chooser = GTK_FILE_CHOOSER(dialog);
-	if (is_save) {
-		gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);		
-	}
+	gtk_init_check(NULL, NULL);
+	GtkWidget* dialog = gtk_file_chooser_dialog_new(is_save	 ? "Save file"
+													: is_dir ? "Select folder"
+															 : "Open File",
+		NULL,
+		is_save	 ? GTK_FILE_CHOOSER_ACTION_SAVE
+		: is_dir ? GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER
+				 : GTK_FILE_CHOOSER_ACTION_OPEN,
+		"_Cancel",
+		GTK_RESPONSE_CANCEL,
+		is_save ? "_Save" : "_Open",
+		GTK_RESPONSE_ACCEPT,
+		NULL);
+	GtkFileChooser* chooser = GTK_FILE_CHOOSER(dialog);
+	if (is_save) gtk_file_chooser_set_do_overwrite_confirmation(chooser, TRUE);
 
 	const char* filters = filter_str;
-    GtkFileFilter* filter;
-    while (filters && *filters) {
-        filter = gtk_file_filter_new();
-        gtk_file_filter_set_name(filter, filters);
-        filters += strlen(filters) + 1;
+	GtkFileFilter* filter;
+	while (filters && *filters) {
+		filter = gtk_file_filter_new();
+		gtk_file_filter_set_name(filter, filters);
+		filters += strlen(filters) + 1;
 
-	    char buf[128];
-        copyString(buf, filters);
-		char *patterns;
-        for (patterns = buf; *patterns; ++patterns) {
-            if (*patterns == ';') {
+		char buf[128];
+		copyString(buf, filters);
+		char* patterns;
+		for (patterns = buf; *patterns; ++patterns) {
+			if (*patterns == ';') {
 				*patterns = '\0';
 			}
 		}
-        
-		patterns = buf;
-        while (*patterns) {
-            gtk_file_filter_add_pattern(filter, patterns);
-            patterns += strlen(patterns) + 1;
-        }
 
-        gtk_file_chooser_add_filter(chooser, filter);
-        filters += strlen(filters) + 1;
-    }
+		patterns = buf;
+		while (*patterns) {
+			gtk_file_filter_add_pattern(filter, patterns);
+			patterns += strlen(patterns) + 1;
+		}
+
+		gtk_file_chooser_add_filter(chooser, filter);
+		filters += strlen(filters) + 1;
+	}
 
 	char* name = nullptr;
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
-        name = gtk_file_chooser_get_filename(chooser);
+	if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+		name = gtk_file_chooser_get_filename(chooser);
 	}
-    gtk_widget_destroy(dialog);
+	gtk_widget_destroy(dialog);
 
-    while (gtk_events_pending()) gtk_main_iteration();
+	while (gtk_events_pending()) gtk_main_iteration();
 
 	if (name) {
 		copyString(out, name);
 		free(name);
 		return true;
 	}
-    return false;
+	return false;
 } 
 
 bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension) {
@@ -994,8 +1025,14 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir) {
 
 
 void copyToClipboard(const char* text) {
-	ASSERT(false);
-	// TODO
+	ASSERT(text);
+
+	free(G.clipboard);
+	G.clipboard = (char*)malloc(strlen(text) + 1);
+	strcpy(G.clipboard, text);
+	XSetSelectionOwner(G.display, G.clipboard_atom, (Window)G.win, CurrentTime);
+	ASSERT(XGetSelectionOwner(G.display, G.clipboard_atom) == (Window)G.win);
+	// TODO finish
 }
 
 

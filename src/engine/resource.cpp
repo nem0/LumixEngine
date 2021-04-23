@@ -176,6 +176,7 @@ void Resource::doUnload()
 		m_async_op = FileSystem::AsyncHandle::invalid();
 	}
 
+	m_hooked = false;
 	m_desired_state = State::EMPTY;
 	unload();
 	ASSERT(m_empty_dep_count <= 1);

@@ -463,7 +463,6 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void deleteTile(u32 idx) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		m_app.getAssetCompiler().removeResource(Path(m_file_infos[idx].filepath));
 		StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", m_file_infos[idx].file_path_hash, ".res");
 		fs.deleteFile(res_path);
 		if (!fs.deleteFile(m_file_infos[idx].filepath)) {

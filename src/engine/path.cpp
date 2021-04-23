@@ -18,11 +18,6 @@ Path::Path()
 	, m_path{}
 {}
 
-//Path::Path(const Path& rhs)
-//	: m_hash(rhs.m_hash)
-//{
-//	copyString(m_path, rhs.m_path);
-//}
 
 Path::Path(const char* path) {
 	normalize(path, Span(m_path));
@@ -74,9 +69,6 @@ void Path::normalize(const char* path, Span<char> output)
 		}
 
 		*out = *path == '\\' ? '/' : *path;
-		#ifdef _WIN32
-			*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
-		#endif
 
 		path++;
 		out++;
@@ -170,9 +162,8 @@ bool Path::hasExtension(const char* filename, const char* ext)
 {
 	char tmp[20];
 	copyString(Span(tmp), getExtension(Span(filename, stringLength(filename))));
-	makeLowercase(Span(tmp), tmp);
 
-	return equalStrings(tmp, ext);
+	return equalIStrings(tmp, ext);
 }
 
 PathInfo::PathInfo(const char* path) {
