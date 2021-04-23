@@ -1026,9 +1026,13 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir) {
 
 void copyToClipboard(const char* text) {
 	ASSERT(text);
+	if (!text) return;
 
 	free(G.clipboard);
 	G.clipboard = (char*)malloc(strlen(text) + 1);
+	ASSERT(G.clipboard);
+	if (!G.clipboard) return;
+
 	strcpy(G.clipboard, text);
 	XSetSelectionOwner(G.display, G.clipboard_atom, (Window)G.win, CurrentTime);
 	ASSERT(XGetSelectionOwner(G.display, G.clipboard_atom) == (Window)G.win);
