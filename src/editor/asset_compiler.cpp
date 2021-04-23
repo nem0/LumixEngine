@@ -782,6 +782,8 @@ int AssetCompilerTask::task()
 		const AssetCompilerImpl::CompileJob p = [&]{
 			MutexGuard lock(m_compiler.m_to_compile_mutex);
 			AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
+			if (p.path.isEmpty()) return p;
+
 			auto iter = m_compiler.m_generations.find(p.path);
 			const bool is_most_recent = p.generation == iter.value();
 			if (is_most_recent) {
