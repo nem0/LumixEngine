@@ -330,6 +330,11 @@ template <typename T> struct Array {
 		emplaceAt(index, value);
 	}
 
+	void insert(u32 index, T&& value)
+	{
+		emplaceAt(index, value);
+	}
+
 	bool empty() const { return m_size == 0; }
 
 	void clear()

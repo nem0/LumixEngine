@@ -60,6 +60,27 @@ Terrain::~Terrain()
 	setMaterial(nullptr);
 }
 
+Terrain::GrassType::GrassType(GrassType&& rhs)
+	: m_grass_model(rhs.m_grass_model)
+	, m_terrain(rhs.m_terrain)
+	, m_spacing(rhs.m_spacing)
+	, m_distance(rhs.m_distance)
+	, m_idx(rhs.m_idx)
+	, m_rotation_mode(rhs.m_rotation_mode)
+{
+	rhs.m_grass_model = nullptr;
+}
+
+Terrain::GrassType::GrassType(const GrassType& rhs)
+	: m_grass_model(rhs.m_grass_model)
+	, m_terrain(rhs.m_terrain)
+	, m_spacing(rhs.m_spacing)
+	, m_distance(rhs.m_distance)
+	, m_idx(rhs.m_idx)
+	, m_rotation_mode(rhs.m_rotation_mode)
+{
+	if (m_grass_model) m_grass_model->incRefCount();
+}
 
 Terrain::GrassType::GrassType(Terrain& terrain)
 	: m_terrain(terrain)

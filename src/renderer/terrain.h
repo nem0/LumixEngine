@@ -36,6 +36,8 @@ struct Terrain
 		struct GrassType
 		{
 			explicit GrassType(Terrain& terrain);
+			GrassType(const GrassType& rhs);
+			GrassType(GrassType&& rhs);
 			~GrassType();
 
 			Model* m_grass_model;
