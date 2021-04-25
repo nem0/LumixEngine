@@ -1171,9 +1171,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				AssetBrowser::TILE_SIZE,
 				0,
 				4);
-			for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
-				swap(resized_data.getMutableData()[i * 4 + 0], resized_data.getMutableData()[i * 4 + 2]);
-			}
 			stbi_image_free(data);
 
 			if (!saveAsLBC(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {

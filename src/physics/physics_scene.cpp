@@ -3908,6 +3908,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void deserializeActors(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
+		PROFILE_FUNCTION();
 		u32 count;
 		serializer.read(count);
 		m_actors.reserve(count + m_actors.size());

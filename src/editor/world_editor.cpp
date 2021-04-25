@@ -2529,6 +2529,7 @@ public:
 
 	bool load(IInputStream& file)
 	{
+		PROFILE_FUNCTION();
 		m_is_loading = true;
 		Header header;
 		const u64 file_size = file.size();

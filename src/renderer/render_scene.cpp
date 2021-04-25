@@ -858,6 +858,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	void deserializeModelInstances(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
+		PROFILE_FUNCTION();
 		u32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(nextPow2(size + m_model_instances.size()));
