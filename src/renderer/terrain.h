@@ -37,6 +37,8 @@ struct Terrain
 		{
 			explicit GrassType(Terrain& terrain);
 			GrassType(const GrassType& rhs);
+			void operator =(const GrassType& rhs) = delete;
+			void operator =(GrassType&& rhs) = delete;
 			GrassType(GrassType&& rhs);
 			~GrassType();
 
