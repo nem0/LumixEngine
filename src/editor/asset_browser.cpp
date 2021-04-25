@@ -1147,7 +1147,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		Path selected_path;
 		for (const auto& res : resources) {
 			if(res.type != type) continue;
-			if (filter[0] != '\0' && strstr(res.path.c_str(), filter) == nullptr) continue;
+			if (filter[0] != '\0' && stristr(res.path.c_str(), filter) == nullptr) continue;
 
 			const bool selected = selected_path_hash == res.path.getHash();
 			if(selected) selected_path = res.path;
