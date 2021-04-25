@@ -224,7 +224,7 @@ struct ControllerEditorImpl : ControllerEditor {
 				}
 				if (open) {
 					changed = nodeInput("From", tr.from, node.m_children, true) || changed;
-					changed = nodeInput("To", tr.to, node.m_children, false) || changed;
+					changed = nodeInput("To", tr.to, node.m_children, true) || changed;
 					bool has_exit_time = tr.exit_time >= 0;
 					ImGuiEx::Label("Blend length");
 					float l = tr.blend_length.seconds();
