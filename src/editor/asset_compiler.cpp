@@ -246,9 +246,10 @@ struct AssetCompilerImpl : AssetCompiler {
 		const Span<const char> subres = getSubresource(path);
 		Span<const char> ext = Path::getExtension(subres);
 
-		char tmp[64];
-		makeLowercase(Span(tmp), ext.begin());
-		auto iter = m_registered_extensions.find(crc32(tmp));
+		char tmp[6] = {};
+		makeLowercase(Span(tmp), ext);
+		ASSERT(strlen(tmp) < 5);
+		auto iter = m_registered_extensions.find(*(u32*)tmp);
 		if (iter.isValid()) return iter.value();
 
 		return INVALID_RESOURCE_TYPE;
@@ -257,9 +258,10 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		char tmp[64];
+		char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
-		auto iter = m_registered_extensions.find(crc32(tmp));
+		ASSERT(strlen(tmp) < 5);
+		auto iter = m_registered_extensions.find(*(u32*)tmp);
 		if (!iter.isValid()) return false;
 		return iter.value() == type;
 	}
@@ -267,10 +269,13 @@ struct AssetCompilerImpl : AssetCompiler {
 	
 	void registerExtension(const char* extension, ResourceType type) override
 	{
-		const u32 hash = crc32(extension);
-		ASSERT(!m_registered_extensions.find(hash).isValid());
+		char tmp[6] = {};
+		makeLowercase(Span(tmp), extension);
+		ASSERT(strlen(tmp) < 5);
+		u32 q = *(u32*)tmp;
+		ASSERT(!m_registered_extensions.find(q).isValid());
 
-		m_registered_extensions.insert(hash, type);
+		m_registered_extensions.insert(q, type);
 	}
 
 

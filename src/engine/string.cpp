@@ -407,6 +407,20 @@ const char* stristr(const char* haystack, const char* needle)
 	return nullptr;
 }
 
+bool makeLowercase(Span<char> output, Span<const char> src) {
+	char* destination = output.begin();
+	if (src.length() + 1 > output.length()) return false;
+
+	const char* source = src.begin();
+	while (source != src.end())
+	{
+		*destination = makeLowercase(*source);
+		++destination;
+		++source;
+	}
+	*destination = 0;
+	return true;
+}
 
 bool makeLowercase(Span<char> dst, const char* source)
 {

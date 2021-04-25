@@ -141,10 +141,8 @@ Span<const char> Path::getExtension(Span<const char> src)
 	while(res.m_begin != src.m_begin && *res.m_begin != '.') {
 		--res.m_begin;
 	}
-	if (*res.m_begin == '.') {
-		++res.m_begin;
-	}
-	
+	if (*res.m_begin != '.') return Span<const char>(nullptr, nullptr);
+	++res.m_begin;
 	return res;
 }
 
