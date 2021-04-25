@@ -24,6 +24,13 @@ struct NavmeshZone {
 	Vec3 extents;
 	u64 guid;
 	u32 flags;
+
+	float cell_size = 0.3f;
+	float cell_height = 0.1f;
+	float walkable_slope_angle = 60.f;
+	float agent_height = 1.8f;
+	float max_climb = 0.3f;
+	float agent_radius = 0.3f;
 };
 
 struct NavmeshBuildJob {
@@ -67,13 +74,6 @@ struct NavigationScene : IScene
 	virtual const dtCrowdAgent* getDetourAgent(EntityRef entity) = 0;
 	virtual bool isNavmeshReady(EntityRef zone) const = 0;
 	virtual bool hasDebugDrawData(EntityRef zoneko) const = 0;
-	virtual void setGeneratorParams(float cell_size,
-		float cell_height,
-		float agent_radius,
-		float agent_height,
-		float walkable_angle,
-		float max_climb) = 0;
-
 };
 
 

@@ -33,6 +33,7 @@ namespace Lumix
 enum class NavigationSceneVersion : i32 {
 	ZONE_GUID,
 	DETAILED,
+	GENERATOR_PARAMS,
 	LATEST
 };
 
@@ -53,6 +54,9 @@ struct RecastZone {
 	dtNavMeshQuery* navquery = nullptr;
 	dtNavMesh* navmesh = nullptr;
 	dtCrowd* crowd = nullptr;
+
+	i32 getWalkableRadius() const { return (i32)(zone.agent_radius / zone.cell_size + 0.99f); }
+	float getBorderSize() const { return getWalkableRadius() + 3.f; }
 
 	rcCompactHeightfield* debug_compact_heightfield = nullptr;
 	rcHeightfield* debug_heightfield = nullptr;
@@ -91,7 +95,6 @@ struct NavigationSceneImpl final : NavigationScene
 		, m_script_scene(nullptr)
 		, m_on_update(m_allocator)
 	{
-		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 0.3f);
 		m_universe.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
 	}
 
@@ -891,8 +894,8 @@ struct NavigationSceneImpl final : NavigationScene
 		const Vec3 max = zone.zone.extents;
 		if (pos.x > max.x || pos.x < min.x || pos.z > max.z || pos.z < min.z) return;
 
-		int x = int((pos.x - min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
-		int z = int((pos.z - min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		const dtMeshTile* tile = zone.navmesh->getTileAt(x, z, 0);
 		if (!tile) return;
 
@@ -1043,37 +1046,6 @@ struct NavigationSceneImpl final : NavigationScene
 		return !agent.is_finished;
 	}
 
-
-	void setGeneratorParams(float cell_size,
-		float cell_height,
-		float agent_radius,
-		float agent_height,
-		float walkable_angle,
-		float max_climb) override
-	{
-		static const float DETAIL_SAMPLE_DIST = 6;
-		static const float DETAIL_SAMPLE_MAX_ERROR = 1;
-
-		m_config.cs = cell_size;
-		m_config.ch = cell_height;
-		m_config.walkableSlopeAngle = walkable_angle;
-		m_config.walkableHeight = (int)(agent_height / m_config.ch + 0.99f);
-		m_config.walkableClimb = (int)(max_climb / m_config.ch);
-		m_config.walkableRadius = (int)(agent_radius / m_config.cs + 0.99f);
-		m_config.maxEdgeLen = (int)(12 / m_config.cs);
-		m_config.maxSimplificationError = 1.3f;
-		m_config.minRegionArea = 8 * 8;
-		m_config.mergeRegionArea = 20 * 20;
-		m_config.maxVertsPerPoly = 6;
-		m_config.detailSampleDist = DETAIL_SAMPLE_DIST < 0.9f ? 0 : CELL_SIZE * DETAIL_SAMPLE_DIST;
-		m_config.detailSampleMaxError = m_config.ch * DETAIL_SAMPLE_MAX_ERROR;
-		m_config.borderSize = m_config.walkableRadius + 3;
-		m_config.tileSize = CELLS_PER_TILE_SIDE;
-		m_config.width = m_config.tileSize + m_config.borderSize * 2;
-		m_config.height = m_config.tileSize + m_config.borderSize * 2;
-	}
-
-
 	bool generateTileAt(EntityRef zone_entity, const DVec3& world_pos, bool keep_data) override {
 		RecastZone& zone = m_zones[zone_entity];
 		if (!zone.navmesh) return false;
@@ -1081,8 +1053,8 @@ struct NavigationSceneImpl final : NavigationScene
 		const Transform tr = m_universe.getTransform(zone_entity);
 		const Vec3 pos = Vec3(tr.inverted().transform(world_pos));
 		const Vec3 min = -zone.zone.extents;
-		const int x = int((pos.x - min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
-		const int z = int((pos.z - min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		const int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		const int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		zone.navmesh->removeTile(zone.navmesh->getTileRefAt(x, z, 0), 0, 0);
 
 		Mutex mutex;
@@ -1094,18 +1066,40 @@ struct NavigationSceneImpl final : NavigationScene
 		// TODO some stuff leaks on errors
 		ASSERT(zone.navmesh);
 
+		rcConfig config;
+		static const float DETAIL_SAMPLE_DIST = 6;
+		static const float DETAIL_SAMPLE_MAX_ERROR = 1;
+
+		config.cs = zone.zone.cell_size;
+		config.ch = zone.zone.cell_height;
+		config.walkableSlopeAngle = zone.zone.walkable_slope_angle;
+		config.walkableHeight = (int)(zone.zone.agent_height / config.ch + 0.99f);
+		config.walkableClimb = (int)(zone.zone.max_climb / config.ch);
+		config.walkableRadius = (int)(zone.zone.agent_radius / config.cs + 0.99f);
+		config.maxEdgeLen = (int)(12 / config.cs);
+		config.maxSimplificationError = 1.3f;
+		config.minRegionArea = 8 * 8;
+		config.mergeRegionArea = 20 * 20;
+		config.maxVertsPerPoly = 6;
+		config.detailSampleDist = DETAIL_SAMPLE_DIST < 0.9f ? 0 : CELL_SIZE * DETAIL_SAMPLE_DIST;
+		config.detailSampleMaxError = config.ch * DETAIL_SAMPLE_MAX_ERROR;
+		config.borderSize = config.walkableRadius + 3;
+		config.tileSize = CELLS_PER_TILE_SIDE;
+		config.width = config.tileSize + config.borderSize * 2;
+		config.height = config.tileSize + config.borderSize * 2;
+
 		rcContext ctx;
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
-		Vec3 bmin(min.x + x * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + m_config.borderSize) * m_config.cs,
+		Vec3 bmin(min.x + x * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + config.borderSize) * config.cs,
 			min.y,
-			min.z + z * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + m_config.borderSize) * m_config.cs);
-		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + m_config.borderSize) * m_config.cs,
+			min.z + z * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + config.borderSize) * config.cs);
+		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + config.borderSize) * config.cs,
 			max.y,
-			bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + m_config.borderSize) * m_config.cs);
+			bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + config.borderSize) * config.cs);
 		if (keep_data) m_debug_tile_origin = bmin;
-		rcVcopy(m_config.bmin, &bmin.x);
-		rcVcopy(m_config.bmax, &bmax.x);
+		rcVcopy(config.bmin, &bmin.x);
+		rcVcopy(config.bmax, &bmax.x);
 		rcHeightfield* solid = rcAllocHeightfield();
 		zone.debug_heightfield = keep_data ? solid : nullptr;
 		if (!solid) {
@@ -1114,18 +1108,18 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 
 		if (!rcCreateHeightfield(
-				&ctx, *solid, m_config.width, m_config.height, m_config.bmin, m_config.bmax, m_config.cs, m_config.ch))
+				&ctx, *solid, config.width, config.height, config.bmin, config.bmax, config.cs, config.ch))
 		{
 			logError("Could not generate navmesh: Could not create solid heightfield.");
 			return false;
 		}
 
 		const Transform tr = m_universe.getTransform(zone_entity);
-		rasterizeGeometry(tr, AABB(bmin, bmax), ctx, m_config, *solid);
+		rasterizeGeometry(tr, AABB(bmin, bmax), ctx, config, *solid);
 
-		rcFilterLowHangingWalkableObstacles(&ctx, m_config.walkableClimb, *solid);
-		rcFilterLedgeSpans(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid);
-		rcFilterWalkableLowHeightSpans(&ctx, m_config.walkableHeight, *solid);
+		rcFilterLowHangingWalkableObstacles(&ctx, config.walkableClimb, *solid);
+		rcFilterLedgeSpans(&ctx, config.walkableHeight, config.walkableClimb, *solid);
+		rcFilterWalkableLowHeightSpans(&ctx, config.walkableHeight, *solid);
 
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
 		zone.debug_compact_heightfield = keep_data ? chf : nullptr;
@@ -1134,14 +1128,14 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		if (!rcBuildCompactHeightfield(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid, *chf)) {
+		if (!rcBuildCompactHeightfield(&ctx, config.walkableHeight, config.walkableClimb, *solid, *chf)) {
 			logError("Could not generate navmesh: Could not build compact data.");
 			return false;
 		}
 
 		if (!zone.debug_heightfield) rcFreeHeightField(solid);
 
-		if (!rcErodeWalkableArea(&ctx, m_config.walkableRadius, *chf)) {
+		if (!rcErodeWalkableArea(&ctx, config.walkableRadius, *chf)) {
 			logError("Could not generate navmesh: Could not erode.");
 			return false;
 		}
@@ -1151,7 +1145,7 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		if (!rcBuildRegions(&ctx, *chf, m_config.borderSize, m_config.minRegionArea, m_config.mergeRegionArea)) {
+		if (!rcBuildRegions(&ctx, *chf, config.borderSize, config.minRegionArea, config.mergeRegionArea)) {
 			logError("Could not generate navmesh: Could not build regions.");
 			return false;
 		}
@@ -1163,7 +1157,7 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		if (!rcBuildContours(&ctx, *chf, m_config.maxSimplificationError, m_config.maxEdgeLen, *cset)) {
+		if (!rcBuildContours(&ctx, *chf, config.maxSimplificationError, config.maxEdgeLen, *cset)) {
 			logError("Could not generate navmesh: Could not create contours.");
 			return false;
 		}
@@ -1173,7 +1167,7 @@ struct NavigationSceneImpl final : NavigationScene
 			logError("Could not generate navmesh: Out of memory 'polymesh'.");
 			return false;
 		}
-		if (!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *polymesh)) {
+		if (!rcBuildPolyMesh(&ctx, *cset, config.maxVertsPerPoly, *polymesh)) {
 			logError("Could not generate navmesh: Could not triangulate contours.");
 			return false;
 		}
@@ -1186,7 +1180,7 @@ struct NavigationSceneImpl final : NavigationScene
 				return false;
 			}
 
-			if (!rcBuildPolyMeshDetail(&ctx, *polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *detail_mesh))
+			if (!rcBuildPolyMeshDetail(&ctx, *polymesh, *chf, config.detailSampleDist, config.detailSampleMaxError, *detail_mesh))
 			{
 				logError("Could not generate navmesh: Could not build detail mesh.");
 				return false;
@@ -1218,15 +1212,15 @@ struct NavigationSceneImpl final : NavigationScene
 			params.detailTris = detail_mesh->tris;
 			params.detailTriCount = detail_mesh->ntris;
 		}
-		params.walkableHeight = m_config.walkableHeight * m_config.ch;
-		params.walkableRadius = m_config.walkableRadius * m_config.cs;
-		params.walkableClimb = m_config.walkableClimb * m_config.ch;
+		params.walkableHeight = config.walkableHeight * config.ch;
+		params.walkableRadius = config.walkableRadius * config.cs;
+		params.walkableClimb = config.walkableClimb * config.ch;
 		params.tileX = x;
 		params.tileY = z;
 		rcVcopy(params.bmin, polymesh->bmin);
 		rcVcopy(params.bmax, polymesh->bmax);
-		params.cs = m_config.cs;
-		params.ch = m_config.ch;
+		params.cs = config.cs;
+		params.ch = config.ch;
 		params.buildBvTree = false;
 
 		MutexGuard guard(mutex);
@@ -1475,6 +1469,12 @@ struct NavigationSceneImpl final : NavigationScene
 			serializer.write(zone.extents);
 			serializer.write(zone.guid);
 			serializer.write(zone.flags);
+			serializer.write(zone.cell_size);
+			serializer.write(zone.cell_height);
+			serializer.write(zone.walkable_slope_angle);
+			serializer.write(zone.agent_height);
+			serializer.write(zone.max_climb);
+			serializer.write(zone.agent_radius);
 		}
 
 		count = m_agents.size();
@@ -1511,6 +1511,16 @@ struct NavigationSceneImpl final : NavigationScene
 				zone.zone.guid = randGUID();
 				zone.zone.flags = NavmeshZone::AUTOLOAD | NavmeshZone::DETAILED;
 			}
+
+			if (version > (i32)NavigationSceneVersion::GENERATOR_PARAMS) {
+				serializer.read(zone.zone.cell_size);
+				serializer.read(zone.zone.cell_height);
+				serializer.read(zone.zone.walkable_slope_angle);
+				serializer.read(zone.zone.agent_height);
+				serializer.read(zone.zone.max_climb);
+				serializer.read(zone.zone.agent_radius);
+			}
+
 			m_zones.insert(e, zone);
 			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
 			if (version > (i32)NavigationSceneVersion::ZONE_GUID && (zone.zone.flags & NavmeshZone::AUTOLOAD) != 0) {
@@ -1609,7 +1619,6 @@ struct NavigationSceneImpl final : NavigationScene
 	bool m_is_game_running = false;
 	
 	Vec3 m_debug_tile_origin;
-	rcConfig m_config;
 	LuaScriptScene* m_script_scene;
 	DelegateList<void(float)> m_on_update;
 };
@@ -1623,8 +1632,6 @@ UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& syst
 
 void NavigationScene::reflect() {
 	LUMIX_SCENE(NavigationSceneImpl, "navigation")
-		.LUMIX_FUNC(NavigationSceneImpl::setGeneratorParams)
-
 		.LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone")
 			.icon(ICON_FA_STREET_VIEW)
 			.LUMIX_FUNC_EX(loadZone, "load")
@@ -1634,6 +1641,12 @@ void NavigationScene::reflect() {
 			.LUMIX_FUNC_EX(debugDrawHeightfield, "drawHeightfield")
 			.LUMIX_FUNC(NavigationSceneImpl::generateNavmesh)
 			.var_prop<&NavigationScene::getZone, &NavmeshZone::extents>("Extents")
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::agent_height>("Agent height")
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::agent_radius>("Agent radius")
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::cell_size>("Cell size")
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::cell_height>("Cell height")
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::walkable_slope_angle>("Walkable slope angle")
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::max_climb>("Max climb")
 			.prop<&NavigationScene::isZoneAutoload, &NavigationScene::setZoneAutoload>("Autoload")
 			.prop<&NavigationScene::isZoneDetailed, &NavigationScene::setZoneDetailed>("Detailed")
 		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
