@@ -265,7 +265,9 @@ struct AssetBrowserImpl : AssetBrowser {
 		os::destroyFileIterator(iter);
 
 		AssetCompiler& compiler = m_app.getAssetCompiler();
-		const u32 dir_hash = crc32(m_dir);
+		char tmp[LUMIX_MAX_PATH];
+		makeLowercase(Span(tmp), m_dir.data);
+		const u32 dir_hash = crc32(tmp);
 		auto& resources = compiler.lockResources();
 		for (const AssetCompiler::ResourceItem& res : resources) {
 			if (res.dir_hash != dir_hash) continue;
@@ -556,6 +558,12 @@ struct AssetBrowserImpl : AssetBrowser {
 		static char tmp[LUMIX_MAX_PATH] = "";
 		auto common_popup = [&](){
 			const char* base_path = fs.getBasePath();
+			ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+			if (ImGui::Checkbox("Subresources", &m_show_subresources)) changeDir(m_dir);
+			if (ImGui::SliderFloat("Icon size", &m_thumbnail_size, 0.3f, 3.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+				refreshLabels();
+			}
+			
 			if (ImGui::MenuItem("View in explorer")) {
 				StaticString<LUMIX_MAX_PATH> dir_full_path(base_path, "/", m_dir);
 				os::openExplorer(dir_full_path);
@@ -811,22 +819,6 @@ struct AssetBrowserImpl : AssetBrowser {
 				return;
 			}
 
-			float checkbox_w = ImGui::GetCursorPosX();
-			if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) {
-				ImGui::OpenPopup("ab_settings");
-			}
-			if (ImGui::BeginPopup("ab_settings")) {
-				ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
-				if (ImGui::Checkbox("Subresources", &m_show_subresources)) changeDir(m_dir);
-				ImGui::SetNextItemWidth(100);
-				if (ImGui::SliderFloat("Icon size", &m_thumbnail_size, 0.3f, 3.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
-					refreshLabels();
-				}
-				ImGui::EndPopup();
-			}
-
-			ImGui::SameLine();
-			checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
 			ImGui::PushItemWidth(100);
 			if (ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter))) doFilter();
 			ImGui::PopItemWidth();

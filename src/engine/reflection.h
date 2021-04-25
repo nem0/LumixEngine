@@ -560,6 +560,27 @@ struct LUMIX_ENGINE_API builder {
 		return *this;
 	}
 
+	template <auto Getter, auto PropGetter>
+	builder& var_enum_prop(const char* name) {
+		using T = typename ResultOf<decltype(PropGetter)>::Type;
+		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
+		p->setter = [](IScene* scene, EntityRef e, u32, const i32& value) {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& v = c.*PropGetter;
+			v = static_cast<T>(value);
+		};
+		p->getter = [](IScene* scene, EntityRef e, u32) -> i32 {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& v = c.*PropGetter;
+			return static_cast<i32>(v);
+		};
+		p->name = name;
+		addProp(p);
+		return *this;
+	}
+
 	template <auto Getter, auto Setter = nullptr>
 	builder& enum_prop(const char* name) {
 		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
@@ -665,7 +686,6 @@ struct LUMIX_ENGINE_API builder {
 		addProp(p);
 		return *this;
 	}
-
 
 	template <auto Counter, auto Adder, auto Remover>
 	builder& begin_array(const char* name) {

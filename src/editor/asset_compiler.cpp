@@ -218,7 +218,10 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	static u32 dirHash(const char* path) {
-		Span<const char> dir = Path::getDir(getResourceFilePath(path));
+		char tmp[LUMIX_MAX_PATH];
+		copyString(Span(tmp), Path::getDir(getResourceFilePath(path)));
+		makeLowercase(Span(tmp), tmp);
+		Span<const char> dir(tmp, stringLength(tmp));
 		if (dir.m_end > dir.m_begin && (*(dir.m_end - 1) == '\\' || *(dir.m_end - 1) == '/')) {
 			--dir.m_end;
 		} 

@@ -46,12 +46,12 @@ void Path::operator =(const char* rhs) {
 }
 
 bool Path::operator==(const Path& rhs) const {
-	ASSERT(equalStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
+	ASSERT(equalIStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
 	return m_hash == rhs.m_hash;
 }
 
 bool Path::operator!=(const Path& rhs) const {
-	ASSERT(equalStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
+	ASSERT(equalIStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
 	#ifdef _WIN32
 		return m_hash != rhs.m_hash || !equalIStrings(m_path, rhs.m_path);
 	#else

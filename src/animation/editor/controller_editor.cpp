@@ -208,8 +208,8 @@ struct ControllerEditorImpl : ControllerEditor {
 
 		if (ImGui::TreeNode("Transitions")) {
 			for (GroupNode::Transition& tr : node.m_transitions) {
-				const char* name_from = node.m_children[tr.from].node->m_name.c_str();
-				const char* name_to = node.m_children[tr.to].node->m_name.c_str();
+				const char* name_from = tr.from == 0xFFffFFff ? "*" : node.m_children[tr.from].node->m_name.c_str();
+				const char* name_to = tr.to == 0xFFffFFff ? "*" : node.m_children[tr.to].node->m_name.c_str();
 				const bool open = ImGui::TreeNodeEx(&tr, 0, "%s -> %s", name_from, name_to);
 				if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("context_menu");
 				if (ImGui::BeginPopup("context_menu")) {
@@ -223,8 +223,8 @@ struct ControllerEditorImpl : ControllerEditor {
 					ImGui::EndPopup();
 				}
 				if (open) {
-					changed = nodeInput("From", tr.from, node.m_children) || changed;
-					changed = nodeInput("To", tr.to, node.m_children) || changed;
+					changed = nodeInput("From", tr.from, node.m_children, true) || changed;
+					changed = nodeInput("To", tr.to, node.m_children, false) || changed;
 					bool has_exit_time = tr.exit_time >= 0;
 					ImGuiEx::Label("Blend length");
 					float l = tr.blend_length.seconds();
@@ -533,10 +533,17 @@ struct ControllerEditorImpl : ControllerEditor {
 		return false;
 	}
 
-	static bool nodeInput(const char* label, u32& value, const Array<GroupNode::Child>& children) {
+	static bool nodeInput(const char* label, u32& value, const Array<GroupNode::Child>& children, bool has_any) {
 		ImGuiEx::Label(label);		
 		bool changed = false;
-		if (!ImGui::BeginCombo(StaticString<64>("##_", label), children[value].node->m_name.c_str())) return false;
+		if (!ImGui::BeginCombo(StaticString<64>("##_", label), value == 0xffFFffFF ? "*" : children[value].node->m_name.c_str())) return false;
+
+		if (has_any) {
+			if (ImGui::Selectable("*")) {
+				value = 0xffFFffFF;
+				changed = true;
+			}
+		}
 
 		for (GroupNode::Child& child : children) {
 			if (ImGui::Selectable(child.node->m_name.c_str())) {

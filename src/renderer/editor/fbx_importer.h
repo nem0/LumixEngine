@@ -37,8 +37,8 @@ struct FBXImporter
 		bool bake_vertex_ao = false;
 		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
-		float position_error = 0.02f;
-		float rotation_error = 0.001f;
+		float position_error = 0.0f;
+		float rotation_error = 0.0f;
 		float bounding_scale = 1.f;
 	};
 
