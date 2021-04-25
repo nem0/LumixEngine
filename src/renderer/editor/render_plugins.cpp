@@ -2594,7 +2594,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
 				StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".lbc");
-				
+
+				if (!gpu::isOriginBottomLeft()) {
+					u32* p = (u32*)m_tile.data.getMutableData();
+					for (u32 y = 0; y < AssetBrowser::TILE_SIZE >> 1; ++y) {
+						for (u32 x = 0; x < AssetBrowser::TILE_SIZE; ++x) {
+							swap(p[x + y * AssetBrowser::TILE_SIZE], p[x + (AssetBrowser::TILE_SIZE - y - 1) * AssetBrowser::TILE_SIZE]);
+						}
+					}
+				}
+
 				saveAsLBC(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
