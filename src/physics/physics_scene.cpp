@@ -66,7 +66,6 @@ namespace Lumix
 static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
-static const ComponentType RAGDOLL_TYPE = reflection::getComponentType("ragdoll");
 static const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
 static const ComponentType HEIGHTFIELD_TYPE = reflection::getComponentType("physical_heightfield");
 static const ComponentType DISTANCE_JOINT_TYPE = reflection::getComponentType("distance_joint");
@@ -79,6 +78,8 @@ static const u32 RENDERER_HASH = crc32("renderer");
 
 enum class PhysicsSceneVersion
 {
+	REMOVED_RAGDOLLS,
+
 	LATEST,
 };
 
@@ -113,36 +114,6 @@ static constexpr PxF32 steer_vs_forward_speed_data[] =
 };
 
 static const PxFixedSizeLookupTable<8> steer_vs_forward_speed(steer_vs_forward_speed_data, 4);
-
-struct RagdollBone
-{
-	enum Type : int
-	{
-		BOX,
-		CAPSULE
-	};
-
-	int pose_bone_idx;
-	PxRigidDynamic* actor;
-	PxJoint* parent_joint;
-	RagdollBone* child;
-	RagdollBone* next;
-	RagdollBone* prev;
-	RagdollBone* parent;
-	RigidTransform bind_transform;
-	RigidTransform inv_bind_transform;
-	bool is_kinematic;
-};
-
-
-struct Ragdoll
-{
-	EntityRef entity;
-	RagdollBone* root = nullptr;
-	RigidTransform root_transform;
-	int layer;
-};
-
 
 struct OutputStream final : PxOutputStream
 {
@@ -288,19 +259,17 @@ struct Wheel
 };
 
 
-struct Heightfield
-{
-	Heightfield();
+struct Heightfield {
 	~Heightfield();
 	void heightmapLoaded(Resource::State, Resource::State new_state, Resource&);
 
 	struct PhysicsSceneImpl* m_scene;
 	EntityRef m_entity;
-	PxRigidActor* m_actor;
-	Texture* m_heightmap;
-	float m_xz_scale;
-	float m_y_scale;
-	int m_layer;
+	PxRigidActor* m_actor = nullptr;
+	Texture* m_heightmap = nullptr;
+	float m_xz_scale = 1.f;
+	float m_y_scale = 1.f;
+	i32 m_layer = 0;
 };
 
 
@@ -496,12 +465,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		m_controllers.clear();
 
-		for (auto& ragdoll : m_ragdolls)
-		{
-			destroySkeleton(ragdoll.root);
-		}
-		m_ragdolls.clear();
-
 		for (auto& v : m_vehicles) {
 			if (v->geom) {
 				v->geom->getObserverCb().unbind<&Vehicle::onStateChanged>(v.get());
@@ -653,31 +616,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		controller.controller->invalidateCache();
 	}
-
-
-	void setRagdollLayer(EntityRef entity, u32 layer) override
-	{
-		auto& ragdoll = m_ragdolls[entity];
-		ragdoll.layer = layer;
-		struct Tmp
-		{
-			void operator()(RagdollBone* bone, int layer)
-			{
-				if (!bone) return;
-				if (bone->actor) scene.updateFilterData(bone->actor, layer);
-				(*this)(bone->child, layer);
-				(*this)(bone->next, layer);
-			}
-
-			PhysicsSceneImpl& scene;
-		};
-		Tmp tmp{*this};
-		tmp(ragdoll.root, layer);
-	}
-
-
-	u32 getRagdollLayer(EntityRef entity) override { return m_ragdolls[entity].layer; }
-
 
 	void setActorLayer(EntityRef entity, u32 layer) override
 	{
@@ -1320,15 +1258,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void destroyRagdoll(EntityRef entity)
-	{
-		auto iter = m_ragdolls.find(entity);
-		destroySkeleton(iter.value().root);
-		m_ragdolls.erase(iter);
-		m_universe.onComponentDestroyed(entity, RAGDOLL_TYPE, this);
-	}
-
-
 	void destroyWheel(EntityRef entity)
 	{
 		m_wheels.erase(entity);
@@ -1556,19 +1485,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void createRagdoll(EntityRef entity)
-	{
-		Ragdoll& ragdoll = m_ragdolls.insert(entity);
-		ragdoll.entity = entity;
-		ragdoll.root = nullptr;
-		ragdoll.layer = 0;
-		ragdoll.root_transform.pos = DVec3(0, 0, 0);
-		ragdoll.root_transform.rot.set(0, 0, 0, 1);
-
-		m_universe.onComponentCreated(entity, RAGDOLL_TYPE, this);
-	}
-
-
 	void createRigidActor(EntityRef entity)
 	{
 		if (m_actors.find(entity).isValid()) {
@@ -1633,14 +1549,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void setHeightmapSource(EntityRef entity, const Path& str) override
 	{
-		auto& resource_manager = m_engine.getResourceManager();
-		auto& terrain = m_terrains[entity];
-		auto* old_hm = terrain.m_heightmap;
-		if (old_hm)
-		{
+		ResourceManagerHub& resource_manager = m_engine.getResourceManager();
+		Heightfield& terrain = m_terrains[entity];
+		Texture* old_hm = terrain.m_heightmap;
+		if (old_hm) {
+			old_hm->getObserverCb().unbind<&Heightfield::heightmapLoaded>(&terrain);
 			old_hm->decRefCount();
-			auto& cb = old_hm->getObserverCb();
-			cb.unbind<&Heightfield::heightmapLoaded>(&terrain);
 		}
 
 		if (str.isEmpty()) {
@@ -1797,537 +1711,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
-
-	static RagdollBone* getBone(RagdollBone* bone, int pose_bone_idx)
-	{
-		if (!bone) return nullptr;
-		if (bone->pose_bone_idx == pose_bone_idx) return bone;
-
-		auto* handle = getBone(bone->child, pose_bone_idx);
-		if (handle) return handle;
-
-		handle = getBone(bone->next, pose_bone_idx);
-		if (handle) return handle;
-
-		return nullptr;
-	}
-
-
-	PxCapsuleGeometry getCapsuleGeometry(RagdollBone* bone)
-	{
-		PxShape* shape;
-		int count = bone->actor->getShapes(&shape, 1);
-		ASSERT(count == 1);
-
-		PxCapsuleGeometry geom;
-		bool is_capsule = shape->getCapsuleGeometry(geom);
-		ASSERT(is_capsule);
-
-		return geom;
-	}
-
-
-	PxJoint* getRagdollBoneJoint(RagdollBone* bone) const override { return bone->parent_joint; }
-
-
-	RagdollBone* getRagdollRootBone(EntityRef entity) const override { return m_ragdolls[entity].root; }
-
-
-	RagdollBone* getRagdollBoneChild(RagdollBone* bone) override { return bone->child; }
-
-
-	RagdollBone* getRagdollBoneSibling(RagdollBone* bone) override { return bone->next; }
-
-
-	float getRagdollBoneHeight(RagdollBone* bone) override { return getCapsuleGeometry(bone).halfHeight * 2.0f; }
-
-
-	float getRagdollBoneRadius(RagdollBone* bone) override { return getCapsuleGeometry(bone).radius; }
-
-
-	void setRagdollBoneHeight(RagdollBone* bone, float value) override
-	{
-		if (value < 0) return;
-		auto geom = getCapsuleGeometry(bone);
-		geom.halfHeight = value * 0.5f;
-		PxShape* shape;
-		bone->actor->getShapes(&shape, 1);
-		shape->setGeometry(geom);
-	}
-
-
-	void setRagdollBoneRadius(RagdollBone* bone, float value) override
-	{
-		if (value < 0) return;
-		auto geom = getCapsuleGeometry(bone);
-		geom.radius = value;
-		PxShape* shape;
-		bone->actor->getShapes(&shape, 1);
-		shape->setGeometry(geom);
-	}
-
-
-	RigidTransform getRagdollBoneTransform(RagdollBone* bone) override
-	{
-		auto px_pose = bone->actor->getGlobalPose();
-		return fromPhysx(px_pose);
-	}
-
-
-	void setRagdollBoneTransform(RagdollBone* bone, const RigidTransform& transform) override
-	{
-		EntityRef entity = {(int)(intptr_t)bone->actor->userData};
-
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-		if (!render_scene) return;
-
-		if (!render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
-
-		Model* model = render_scene->getModelInstanceModel(entity);
-		RigidTransform entity_transform = m_universe.getTransform(entity).getRigidPart();
-
-		bone->bind_transform =
-			(entity_transform.inverted() * transform).inverted() * model->getBone(bone->pose_bone_idx).transform;
-		bone->inv_bind_transform = bone->bind_transform.inverted();
-		PxTransform delta = toPhysx(transform).getInverse() * bone->actor->getGlobalPose();
-		bone->actor->setGlobalPose(toPhysx(transform));
-
-		if (bone->parent_joint)
-		{
-			PxTransform local_pose1 = bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR1);
-			bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, delta * local_pose1);
-		}
-		auto* child = bone->child;
-		while (child && child->parent_joint)
-		{
-			PxTransform local_pose0 = child->parent_joint->getLocalPose(PxJointActorIndex::eACTOR0);
-			child->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, delta * local_pose0);
-			child = child->next;
-		}
-	}
-
-
-	const char* getRagdollBoneName(RagdollBone* bone) override
-	{
-		EntityRef entity = {(int)(intptr_t)(void*)bone->actor->userData};
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-		ASSERT(render_scene);
-
-		Model* model = render_scene->getModelInstanceModel(entity);
-		ASSERT(model && model->isReady());
-
-		return model->getBone(bone->pose_bone_idx).name.c_str();
-	}
-
-
-	RagdollBone* getRagdollBoneByName(EntityRef entity, u32 bone_name_hash) override
-	{
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-		ASSERT(render_scene);
-
-		Model* model = render_scene->getModelInstanceModel(entity);
-		ASSERT(model && model->isReady());
-
-		auto iter = model->getBoneIndex(bone_name_hash);
-		ASSERT(iter.isValid());
-
-		return getBone(m_ragdolls[entity].root, iter.value());
-	}
-
-
-	RagdollBone* getPhyParent(EntityRef entity, Model* model, int bone_index)
-	{
-		auto* bone = &model->getBone(bone_index);
-		if (bone->parent_idx < 0) return nullptr;
-		RagdollBone* phy_bone;
-		do
-		{
-			bone = &model->getBone(bone->parent_idx);
-			phy_bone = getRagdollBoneByName(entity, crc32(bone->name.c_str()));
-		} while (!phy_bone && bone->parent_idx >= 0);
-		return phy_bone;
-	}
-
-
-	void destroyRagdollBone(EntityRef entity, RagdollBone* bone) override
-	{
-		disconnect(m_ragdolls[entity], bone);
-		bone->actor->release();
-		LUMIX_DELETE(m_allocator, bone);
-	}
-
-
-	void getRagdollData(EntityRef entity, OutputMemoryStream& blob) override
-	{
-		auto& ragdoll = m_ragdolls[entity];
-		serializeRagdollBone(ragdoll, ragdoll.root, blob);
-	}
-
-
-	void setRagdollRoot(Ragdoll& ragdoll, RagdollBone* bone) const
-	{
-		ragdoll.root = bone;
-		if (!bone) return;
-		RigidTransform root_transform = fromPhysx(ragdoll.root->actor->getGlobalPose());
-		RigidTransform entity_transform = m_universe.getTransform(ragdoll.entity).getRigidPart();
-		ragdoll.root_transform = root_transform.inverted() * entity_transform;
-	}
-
-
-	void setRagdollData(EntityRef entity, InputMemoryStream& blob) override
-	{
-		auto& ragdoll = m_ragdolls[entity];
-		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, blob));
-	}
-
-
-	void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) override
-	{
-		bone->is_kinematic = is_kinematic;
-		bone->actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
-	}
-
-
-	void setRagdollBoneKinematicRecursive(RagdollBone* bone, bool is_kinematic) override
-	{
-		if (!bone) return;
-		bone->is_kinematic = is_kinematic;
-		bone->actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
-		setRagdollBoneKinematicRecursive(bone->child, is_kinematic);
-		setRagdollBoneKinematicRecursive(bone->next, is_kinematic);
-	}
-
-
-	bool isRagdollBoneKinematic(RagdollBone* bone) override { return bone->is_kinematic; }
-
-
-	void changeRagdollBoneJoint(RagdollBone* child, int type) override
-	{
-		if (child->parent_joint) child->parent_joint->release();
-
-		PxJointConcreteType::Enum px_type = (PxJointConcreteType::Enum)type;
-		auto d1 = child->actor->getGlobalPose().q.rotate(PxVec3(1, 0, 0));
-		auto d2 = child->parent->actor->getGlobalPose().q.rotate(PxVec3(1, 0, 0));
-		auto axis = d1.cross(d2).getNormalized();
-		auto pos = child->parent->actor->getGlobalPose().p;
-		auto diff = (pos - child->actor->getGlobalPose().p).getNormalized();
-		if (diff.dot(d2) < 0) d2 = -d2;
-
-		PxShape* shape;
-		if (child->parent->actor->getShapes(&shape, 1) == 1)
-		{
-			PxCapsuleGeometry capsule;
-			if (shape->getCapsuleGeometry(capsule))
-			{
-				pos -= (capsule.halfHeight + capsule.radius) * d2;
-			}
-		}
-
-		PxMat44 mat(d1, axis, d1.cross(axis).getNormalized(), pos);
-		PxTransform tr0 = child->parent->actor->getGlobalPose().getInverse() * PxTransform(mat);
-		PxTransform tr1 = child->actor->getGlobalPose().getInverse() * child->parent->actor->getGlobalPose() * tr0;
-
-		PxJoint* joint = nullptr;
-		switch (px_type)
-		{
-			case PxJointConcreteType::eFIXED:
-				joint = PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-				if (joint)
-				{
-					auto* fixed_joint = static_cast<PxFixedJoint*>(joint);
-					fixed_joint->setProjectionLinearTolerance(0.1f);
-					fixed_joint->setProjectionAngularTolerance(0.01f);
-				}
-				break;
-			case PxJointConcreteType::eREVOLUTE:
-				joint = PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-				if (joint)
-				{
-					auto* hinge = static_cast<PxRevoluteJoint*>(joint);
-					hinge->setProjectionLinearTolerance(0.1f);
-					hinge->setProjectionAngularTolerance(0.01f);
-				}
-				break;
-			case PxJointConcreteType::eSPHERICAL:
-				joint = PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-				if (joint)
-				{
-					auto* spherical = static_cast<PxSphericalJoint*>(joint);
-					spherical->setProjectionLinearTolerance(0.1f);
-				}
-				break;
-			case PxJointConcreteType::eD6:
-				joint = PxD6JointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-				if (joint)
-				{
-					PxD6Joint* d6 = ((PxD6Joint*)joint);
-					d6->setProjectionLinearTolerance(0.1f);
-					d6->setProjectionAngularTolerance(0.01f);
-					PxJointLinearLimit l = d6->getLinearLimit();
-					l.value = 0.01f;
-					d6->setLinearLimit(l);
-					d6->setMotion(PxD6Axis::eSWING1, PxD6Motion::eLIMITED);
-					d6->setMotion(PxD6Axis::eSWING2, PxD6Motion::eLIMITED);
-					d6->setProjectionAngularTolerance(0.01f);
-					d6->setProjectionLinearTolerance(0.1f);
-					d6->setSwingLimit(PxJointLimitCone(degreesToRadians(30), degreesToRadians(30)));
-				}
-				break;
-			default: ASSERT(false); break;
-		}
-
-		if (joint)
-		{
-			joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
-			joint->setConstraintFlag(PxConstraintFlag::eCOLLISION_ENABLED, false);
-			joint->setConstraintFlag(PxConstraintFlag::ePROJECTION, true);
-		}
-		child->parent_joint = joint;
-	}
-
-
-	void disconnect(Ragdoll& ragdoll, RagdollBone* bone)
-	{
-		auto* child = bone->child;
-		auto* parent = bone->parent;
-		if (parent && parent->child == bone) parent->child = bone->next;
-		if (ragdoll.root == bone) setRagdollRoot(ragdoll, bone->next);
-		if (bone->prev) bone->prev->next = bone->next;
-		if (bone->next) bone->next->prev = bone->prev;
-
-		while (child)
-		{
-			auto* next = child->next;
-
-			if (child->parent_joint) child->parent_joint->release();
-			child->parent_joint = nullptr;
-
-			if (parent)
-			{
-				child->next = parent->child;
-				child->prev = nullptr;
-				if (child->next) child->next->prev = child;
-				parent->child = child;
-				child->parent = parent;
-				changeRagdollBoneJoint(child, PxJointConcreteType::eREVOLUTE);
-			}
-			else
-			{
-				child->parent = nullptr;
-				child->next = ragdoll.root;
-				child->prev = nullptr;
-				if (child->next) child->next->prev = child;
-				setRagdollRoot(ragdoll, child);
-			}
-			child = next;
-		}
-		if (bone->parent_joint) bone->parent_joint->release();
-		bone->parent_joint = nullptr;
-
-		bone->parent = nullptr;
-		bone->child = nullptr;
-		bone->prev = nullptr;
-		bone->next = ragdoll.root;
-		if (bone->next) bone->next->prev = bone;
-	}
-
-
-	void connect(Ragdoll& ragdoll, RagdollBone* child, RagdollBone* parent)
-	{
-		ASSERT(!child->parent);
-		ASSERT(!child->child);
-		if (child->next) child->next->prev = child->prev;
-		if (child->prev) child->prev->next = child->next;
-		if (ragdoll.root == child) setRagdollRoot(ragdoll, child->next);
-		child->next = parent->child;
-		if (child->next) child->next->prev = child;
-		parent->child = child;
-		child->parent = parent;
-		changeRagdollBoneJoint(child, PxJointConcreteType::eD6);
-	}
-
-
-	void findCloserChildren(Ragdoll& ragdoll, EntityRef entity, Model* model, RagdollBone* bone)
-	{
-		for (auto* root = ragdoll.root; root; root = root->next)
-		{
-			if (root == bone) continue;
-
-			auto* tmp = getPhyParent(entity, model, root->pose_bone_idx);
-			if (tmp != bone) continue;
-
-			disconnect(ragdoll, root);
-			connect(ragdoll, root, bone);
-			break;
-		}
-		if (!bone->parent) return;
-
-		for (auto* child = bone->parent->child; child; child = child->next)
-		{
-			if (child == bone) continue;
-
-			auto* tmp = getPhyParent(entity, model, bone->pose_bone_idx);
-			if (tmp != bone) continue;
-
-			disconnect(ragdoll, child);
-			connect(ragdoll, child, bone);
-		}
-	}
-
-	RigidTransform getNewBoneTransform(const Model* model, int bone_idx, float& length)
-	{
-		/*const Model::Bone& bone = model->getBone(bone_idx);
-
-		length = 0.1f;
-		for (int i = 0; i < model->getBoneCount(); ++i)
-		{
-			if (model->getBone(i).parent_idx == bone_idx)
-			{
-				length = (bone.transform.pos - model->getBone(i).transform.pos).length();
-				break;
-			}
-		}
-
-		Matrix mtx = bone.transform.toMatrix();
-		if (m_new_bone_orientation == BoneOrientation::X)
-		{
-			Vec3 x = mtx.getXVector();
-			mtx.setXVector(-mtx.getYVector());
-			mtx.setYVector(x);
-			mtx.setTranslation(mtx.getTranslation() - mtx.getXVector() * length * 0.5f);
-			return mtx.toTransform();
-		}
-		mtx.setTranslation(mtx.getTranslation() + mtx.getXVector() * length * 0.5f);
-		return mtx.toTransform();*/
-		// TODO
-		return {};
-	}
-
-
-	BoneOrientation getNewBoneOrientation() const override { return m_new_bone_orientation; }
-	void setNewBoneOrientation(BoneOrientation orientation) override { m_new_bone_orientation = orientation; }
-
-
-	RagdollBone* createRagdollBone(EntityRef entity, u32 bone_name_hash) override
-	{
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-		ASSERT(render_scene);
-
-		Model* model = render_scene->getModelInstanceModel(entity);
-		ASSERT(model && model->isReady());
-		auto iter = model->getBoneIndex(bone_name_hash);
-		ASSERT(iter.isValid());
-
-		auto* new_bone = LUMIX_NEW(m_allocator, RagdollBone);
-		new_bone->child = new_bone->next = new_bone->prev = new_bone->parent = nullptr;
-		new_bone->parent_joint = nullptr;
-		new_bone->is_kinematic = false;
-		new_bone->pose_bone_idx = iter.value();
-
-		float bone_height;
-		RigidTransform transform = getNewBoneTransform(model, iter.value(), bone_height);
-
-		new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
-		new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
-		transform = m_universe.getTransform(entity).getRigidPart() * transform;
-
-		PxCapsuleGeometry geom;
-		geom.halfHeight = bone_height * 0.3f;
-		if (geom.halfHeight < 0.001f) geom.halfHeight = 1.0f;
-		geom.radius = geom.halfHeight * 0.5f;
-
-		PxTransform px_transform = toPhysx(transform);
-		new_bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
-		new_bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
-		new_bone->actor->userData = (void*)(intptr_t)entity.index;
-		new_bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
-		new_bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
-		m_scene->addActor(*new_bone->actor);
-		updateFilterData(new_bone->actor, 0);
-
-		auto& ragdoll = m_ragdolls[entity];
-		new_bone->next = ragdoll.root;
-		if (new_bone->next) new_bone->next->prev = new_bone;
-		setRagdollRoot(ragdoll, new_bone);
-		auto* parent = getPhyParent(entity, model, iter.value());
-		if (parent) connect(ragdoll, new_bone, parent);
-
-		findCloserChildren(ragdoll, entity, model, new_bone);
-
-		return new_bone;
-	}
-
-
-	void setSkeletonPose(const RigidTransform& root_transform, RagdollBone* bone, const Pose* pose)
-	{
-		if (!bone) return;
-
-		RigidTransform bone_transform(
-			DVec3(pose->positions[bone->pose_bone_idx]), pose->rotations[bone->pose_bone_idx]);
-		bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
-
-		setSkeletonPose(root_transform, bone->next, pose);
-		setSkeletonPose(root_transform, bone->child, pose);
-	}
-
-
-	void updateBone(const RigidTransform& root_transform, const RigidTransform& inv_root, RagdollBone* bone, Pose* pose)
-	{
-		/*if (!bone) return;
-
-		if (bone->is_kinematic)
-		{
-			RigidTransform bone_transform(DVec3(pose->positions[bone->pose_bone_idx]),
-		pose->rotations[bone->pose_bone_idx]); bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform *
-		bone->inv_bind_transform));
-		}
-		else
-		{
-			PxTransform bone_pose = bone->actor->getGlobalPose();
-			auto tr = inv_root * RigidTransform(DVec3(fromPhysx(bone_pose.p)), fromPhysx(bone_pose.q)) *
-		bone->bind_transform; pose->rotations[bone->pose_bone_idx] = tr.rot; pose->positions[bone->pose_bone_idx] =
-		tr.pos;
-		}
-
-		updateBone(root_transform, inv_root, bone->next, pose);
-		updateBone(root_transform, inv_root, bone->child, pose);*/
-
-		// TODO
-	}
-
-
-	void updateRagdolls()
-	{
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-		if (!render_scene) return;
-
-		for (auto& ragdoll : m_ragdolls)
-		{
-			EntityRef entity = ragdoll.entity;
-
-			if (!render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE)) continue;
-			Pose* pose = render_scene->lockPose(entity);
-			if (!pose) continue;
-
-			RigidTransform root_transform;
-			root_transform.rot = m_universe.getRotation(ragdoll.entity);
-			root_transform.pos = m_universe.getPosition(ragdoll.entity);
-
-			if (ragdoll.root && !ragdoll.root->is_kinematic)
-			{
-				PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
-				m_is_updating_ragdoll = true;
-
-				RigidTransform rigid_tr = fromPhysx(bone_pose) * ragdoll.root_transform;
-				m_universe.setTransform(ragdoll.entity, {rigid_tr.pos, rigid_tr.rot, 1.0f});
-
-				m_is_updating_ragdoll = false;
-			}
-			updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
-			render_scene->unlockPose(entity, true);
-		}
-	}
-
 	void updateVehicles(float time_delta) {
 		PxVehicleWheels* vehicles[16];
 		const u32 count = (u32)m_vehicles.size();
@@ -2372,7 +1755,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 		updateVehicles(time_delta);
 		simulateScene(time_delta);
 		fetchResults();
-		updateRagdolls();
 		updateDynamicActors();
 		updateControllers(time_delta);
 
@@ -2806,12 +2188,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void setRagdollKinematic(EntityRef entity, bool is_kinematic) override
-	{
-		setRagdollBoneKinematicRecursive(m_ragdolls[entity].root, is_kinematic);
-	}
-
-
 	void moveController(EntityRef entity, const Vec3& v) override { m_controllers[entity].frame_change += v; }
 
 
@@ -2917,21 +2293,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 				DVec3 pos = m_universe.getPosition(entity);
 				PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 				controller.controller->setFootPosition(pvec);
-			}
-		}
-
-		if (m_universe.hasComponent(entity, RAGDOLL_TYPE)) {
-			auto iter = m_ragdolls.find(entity);
-			if (iter.isValid() && !m_is_updating_ragdoll)
-			{
-				auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-				if (!render_scene) return;
-				if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
-
-				const Pose* pose = render_scene->lockPose(entity);
-				if (!pose) return;
-				setSkeletonPose(m_universe.getTransform(entity).getRigidPart(), iter.value().root, pose);
-				render_scene->unlockPose(entity, false);
 			}
 		}
 
@@ -3079,32 +2440,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void updateFilterData()
 	{
-		for (auto& ragdoll : m_ragdolls)
-		{
-			struct Tmp
-			{
-				void operator()(RagdollBone* bone)
-				{
-					if (!bone) return;
-					int shapes_count = bone->actor->getShapes(shapes, lengthOf(shapes));
-					for (int i = 0; i < shapes_count; ++i)
-					{
-						shapes[i]->setSimulationFilterData(data);
-					}
-					(*this)(bone->child);
-					(*this)(bone->next);
-				}
-				PxShape* shapes[8];
-				PxFilterData data;
-			};
-
-			Tmp tmp;
-			int layer = ragdoll.layer;
-			tmp.data.word0 = 1 << layer;
-			tmp.data.word1 = m_layers.filter[layer];
-			tmp(ragdoll.root);
-		}
-
 		for (const RigidActor& actor : m_actors)
 		{
 			if (!actor.physx_actor) continue;
@@ -3553,271 +2888,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(terrain.m_y_scale);
 			serializer.write(terrain.m_layer);
 		}
-		serializeRagdolls(serializer);
 		serializeJoints(serializer);
 		serializeVehicles(serializer);
-	}
-
-
-	void serializeRagdollJoint(RagdollBone* bone, OutputMemoryStream& serializer)
-	{
-		serializer.write(bone->parent_joint != nullptr);
-		if (!bone->parent_joint) return;
-
-		serializer.write((int)bone->parent_joint->getConcreteType());
-		serializer.write(bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR0));
-		serializer.write(bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR1));
-
-		switch ((PxJointConcreteType::Enum)bone->parent_joint->getConcreteType())
-		{
-			case PxJointConcreteType::eFIXED: break;
-			case PxJointConcreteType::eDISTANCE:
-			{
-				auto* joint = bone->parent_joint->is<PxDistanceJoint>();
-				serializer.write(joint->getMinDistance());
-				serializer.write(joint->getMaxDistance());
-				serializer.write(joint->getTolerance());
-				serializer.write(joint->getStiffness());
-				serializer.write(joint->getDamping());
-				u32 flags = (PxU32)joint->getDistanceJointFlags();
-				serializer.write(flags);
-				break;
-			}
-			case PxJointConcreteType::eREVOLUTE:
-			{
-				auto* joint = bone->parent_joint->is<PxRevoluteJoint>();
-				serializer.write(joint->getLimit());
-				u32 flags = (PxU32)joint->getRevoluteJointFlags();
-				serializer.write(flags);
-				break;
-			}
-			case PxJointConcreteType::eD6:
-			{
-				auto* joint = bone->parent_joint->is<PxD6Joint>();
-				serializer.write(joint->getLinearLimit());
-				serializer.write(joint->getSwingLimit());
-				serializer.write(joint->getTwistLimit());
-				serializer.write(joint->getMotion(PxD6Axis::eX));
-				serializer.write(joint->getMotion(PxD6Axis::eY));
-				serializer.write(joint->getMotion(PxD6Axis::eZ));
-				serializer.write(joint->getMotion(PxD6Axis::eSWING1));
-				serializer.write(joint->getMotion(PxD6Axis::eSWING2));
-				serializer.write(joint->getMotion(PxD6Axis::eTWIST));
-				break;
-			}
-			case PxJointConcreteType::eSPHERICAL:
-			{
-				auto* joint = bone->parent_joint->is<PxSphericalJoint>();
-				serializer.write(joint->getLimitCone());
-				u32 flags = (PxU32)joint->getSphericalJointFlags();
-				serializer.write(flags);
-				break;
-			}
-			default: ASSERT(false); break;
-		}
-	}
-
-
-	void serializeRagdollBone(const Ragdoll& ragdoll, RagdollBone* bone, OutputMemoryStream& serializer)
-	{
-		if (!bone)
-		{
-			serializer.write(-1);
-			return;
-		}
-		serializer.write(bone->pose_bone_idx);
-		PxTransform pose = bone->actor->getGlobalPose();
-		pose = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()).getInverse() * pose;
-		serializer.write(fromPhysx(pose));
-		serializer.write(bone->bind_transform);
-
-		PxShape* shape;
-		int shape_count = bone->actor->getShapes(&shape, 1);
-		ASSERT(shape_count == 1);
-		PxBoxGeometry box_geom;
-		if (shape->getBoxGeometry(box_geom))
-		{
-			serializer.write(RagdollBone::BOX);
-			serializer.write(box_geom.halfExtents);
-		}
-		else
-		{
-			PxCapsuleGeometry capsule_geom;
-			bool is_capsule = shape->getCapsuleGeometry(capsule_geom);
-			ASSERT(is_capsule);
-			serializer.write(RagdollBone::CAPSULE);
-			serializer.write(capsule_geom.halfHeight);
-			serializer.write(capsule_geom.radius);
-		}
-		serializer.write(bone->actor->is<PxRigidBody>()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
-
-		serializeRagdollBone(ragdoll, bone->child, serializer);
-		serializeRagdollBone(ragdoll, bone->next, serializer);
-
-		serializeRagdollJoint(bone, serializer);
-	}
-
-
-	void deserializeRagdollJoint(RagdollBone* bone, InputMemoryStream& serializer)
-	{
-		bool has_joint;
-		serializer.read(has_joint);
-		if (!has_joint) return;
-
-		int type;
-		serializer.read(type);
-		changeRagdollBoneJoint(bone, type);
-
-		PxTransform local_poses[2];
-		serializer.read(local_poses);
-		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, local_poses[0]);
-		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, local_poses[1]);
-
-		switch ((PxJointConcreteType::Enum)type)
-		{
-			case PxJointConcreteType::eFIXED: break;
-			case PxJointConcreteType::eDISTANCE:
-			{
-				auto* joint = bone->parent_joint->is<PxDistanceJoint>();
-				PxReal value;
-				serializer.read(value);
-				joint->setMinDistance(value);
-				serializer.read(value);
-				joint->setMaxDistance(value);
-				serializer.read(value);
-				joint->setTolerance(value);
-				serializer.read(value);
-				joint->setStiffness(value);
-				serializer.read(value);
-				joint->setDamping(value);
-				u32 flags;
-				serializer.read(flags);
-				joint->setDistanceJointFlags((PxDistanceJointFlags)flags);
-				break;
-			}
-			case PxJointConcreteType::eREVOLUTE:
-			{
-				auto* joint = bone->parent_joint->is<PxRevoluteJoint>();
-				PxJointAngularLimitPair limit(0, 0);
-				serializer.read(limit);
-				joint->setLimit(limit);
-				u32 flags;
-				serializer.read(flags);
-				joint->setRevoluteJointFlags((PxRevoluteJointFlags)flags);
-				break;
-			}
-			case PxJointConcreteType::eSPHERICAL:
-			{
-				auto* joint = bone->parent_joint->is<PxSphericalJoint>();
-				PxJointLimitCone limit(0, 0);
-				serializer.read(limit);
-				joint->setLimitCone(limit);
-				u32 flags;
-				serializer.read(flags);
-				joint->setSphericalJointFlags((PxSphericalJointFlags)flags);
-				break;
-			}
-			case PxJointConcreteType::eD6:
-			{
-				auto* joint = bone->parent_joint->is<PxD6Joint>();
-
-				PxJointLinearLimit linear_limit(0, PxSpring(0, 0));
-				serializer.read(linear_limit);
-				joint->setLinearLimit(linear_limit);
-
-				PxJointLimitCone swing_limit(0, 0);
-				serializer.read(swing_limit);
-				joint->setSwingLimit(swing_limit);
-
-				PxJointAngularLimitPair twist_limit(0, 0);
-				serializer.read(twist_limit);
-				joint->setTwistLimit(twist_limit);
-
-				PxD6Motion::Enum motions[6];
-				serializer.read(motions);
-				joint->setMotion(PxD6Axis::eX, motions[0]);
-				joint->setMotion(PxD6Axis::eY, motions[1]);
-				joint->setMotion(PxD6Axis::eZ, motions[2]);
-				joint->setMotion(PxD6Axis::eSWING1, motions[3]);
-				joint->setMotion(PxD6Axis::eSWING2, motions[4]);
-				joint->setMotion(PxD6Axis::eTWIST, motions[5]);
-				break;
-			}
-			default: ASSERT(false); break;
-		}
-	}
-
-
-	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputMemoryStream& serializer)
-	{
-		int pose_bone_idx;
-		serializer.read(pose_bone_idx);
-		if (pose_bone_idx < 0) return nullptr;
-		auto* bone = LUMIX_NEW(m_allocator, RagdollBone);
-		bone->pose_bone_idx = pose_bone_idx;
-		bone->parent_joint = nullptr;
-		bone->is_kinematic = false;
-		bone->prev = nullptr;
-		RigidTransform transform;
-		serializer.read(transform);
-		serializer.read(bone->bind_transform);
-		bone->inv_bind_transform = bone->bind_transform.inverted();
-
-		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()) * toPhysx(transform);
-
-		RagdollBone::Type type;
-		serializer.read(type);
-
-		switch (type)
-		{
-			case RagdollBone::CAPSULE:
-			{
-				PxCapsuleGeometry shape;
-				serializer.read(shape.halfHeight);
-				serializer.read(shape.radius);
-				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
-				break;
-			}
-			case RagdollBone::BOX:
-			{
-				PxBoxGeometry shape;
-				serializer.read(shape.halfExtents);
-				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
-				break;
-			}
-			default: ASSERT(false); break;
-		}
-		serializer.read(bone->is_kinematic);
-		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
-		bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
-		bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
-		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
-
-		bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
-		m_scene->addActor(*bone->actor);
-		updateFilterData(bone->actor, ragdoll.layer);
-
-		bone->parent = parent;
-
-		bone->child = deserializeRagdollBone(ragdoll, bone, serializer);
-		bone->next = deserializeRagdollBone(ragdoll, parent, serializer);
-		if (bone->next) bone->next->prev = bone;
-
-		deserializeRagdollJoint(bone, serializer);
-
-		return bone;
-	}
-
-
-	void serializeRagdolls(OutputMemoryStream& serializer)
-	{
-		serializer.write(m_ragdolls.size());
-		for (const Ragdoll& ragdoll : m_ragdolls)
-		{
-			serializer.write(ragdoll.entity);
-			serializer.write(ragdoll.layer);
-			serializeRagdollBone(ragdoll, ragdoll.root, serializer);
-		}
 	}
 
 
@@ -3912,6 +2984,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		u32 count;
 		serializer.read(count);
 		m_actors.reserve(count + m_actors.size());
+
 		for (u32 j = 0; j < count; ++j) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -3932,15 +3005,18 @@ struct PhysicsSceneImpl final : PhysicsScene
 			if (actor.dynamic_type == DynamicType::KINEMATIC) {
 				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 			}
+
+			PxFilterData filter_data;
+			filter_data.word0 = 1 << actor.layer;
+			filter_data.word1 = m_layers.filter[actor.layer];
+
 			int geoms_count = serializer.read<int>();
-			for (int i = 0; i < geoms_count; ++i)
-			{
+			for (int i = 0; i < geoms_count; ++i) {
 				int type = serializer.read<int>();
 				int index = serializer.read<int>();
 				PxTransform tr = toPhysx(serializer.read<RigidTransform>());
 				PxShape* shape = nullptr;
-				switch (type)
-				{
+				switch (type) {
 					case PxGeometryType::eBOX: {
 						PxBoxGeometry box_geom;
 						serializer.read(box_geom.halfExtents.x);
@@ -3959,12 +3035,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 						break;
 					}
 					case PxGeometryType::eCONVEXMESH:
-					case PxGeometryType::eTRIANGLEMESH:
-						break;
+					case PxGeometryType::eTRIANGLEMESH: break;
 					default: ASSERT(false); break;
 				}
 				if (shape) {
 					shape->userData = (void*)(intptr_t)index;
+					shape->setSimulationFilterData(filter_data);
+
 					if (actor.is_trigger) {
 						shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false); // must set false first
 						shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true);
@@ -4011,21 +3088,19 @@ struct PhysicsSceneImpl final : PhysicsScene
 			c.controller->getActor()->userData = (void*)(intptr_t)entity.index;
 			c.entity = entity;
 			c.controller->setFootPosition({position.x, position.y, position.z});
+
+			PxFilterData data;
+			data.word0 = 1 << c.layer;
+			data.word1 = m_layers.filter[c.layer];
+			c.filter_data = data;
+			PxShape* shapes[8];
+			const u32 shapes_count = c.controller->getActor()->getShapes(shapes, lengthOf(shapes));
+			for (u32 i = 0; i < shapes_count; ++i) shapes[i]->setSimulationFilterData(data);
+			c.controller->invalidateCache();
+
 			m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
 		}
 	}
-
-
-	void destroySkeleton(RagdollBone* bone)
-	{
-		if (!bone) return;
-		destroySkeleton(bone->next);
-		destroySkeleton(bone->child);
-		if (bone->parent_joint) bone->parent_joint->release();
-		if (bone->actor) bone->actor->release();
-		LUMIX_DELETE(m_allocator, bone);
-	}
-
 
 	void deserializeVehicles(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
@@ -4068,34 +3143,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
-
-	void deserializeRagdolls(InputMemoryStream& serializer, const EntityMap& entity_map)
-	{
-		u32 count;
-		serializer.read(count);
-		m_ragdolls.reserve(count + m_ragdolls.size());
-		for (u32 i = 0; i < count; ++i) {
-			EntityRef entity;
-			serializer.read(entity);
-			entity = entity_map.get(entity);
-			Ragdoll& ragdoll = m_ragdolls.insert(entity);
-			ragdoll.layer = 0;
-			ragdoll.root_transform.pos = DVec3(0, 0, 0);
-			ragdoll.root_transform.rot.set(0, 0, 0, 1);
-
-			serializer.read(ragdoll.layer);
-			ragdoll.entity = entity;
-			setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
-			m_universe.onComponentCreated(ragdoll.entity, RAGDOLL_TYPE, this);
-		}
-	}
-
-
 	void deserializeJoints(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 count;
 		serializer.read(count);
 		m_joints.reserve(count + m_joints.size());
+
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -4107,13 +3160,11 @@ struct PhysicsSceneImpl final : PhysicsScene
 			joint.connected_body = entity_map.get(joint.connected_body);
 			serializer.read(joint.local_frame0);
 			ComponentType cmp_type;
-			switch (PxJointConcreteType::Enum(type))
-			{
-				case PxJointConcreteType::eSPHERICAL:
-				{
+
+			switch (PxJointConcreteType::Enum(type)) {
+				case PxJointConcreteType::eSPHERICAL: {
 					cmp_type = SPHERICAL_JOINT_TYPE;
-					auto* px_joint = PxSphericalJointCreate(
-						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
+					auto* px_joint = PxSphericalJointCreate(m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4123,11 +3174,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 					px_joint->setLimitCone(limit);
 					break;
 				}
-				case PxJointConcreteType::eREVOLUTE:
-				{
+				case PxJointConcreteType::eREVOLUTE: {
 					cmp_type = HINGE_JOINT_TYPE;
-					auto* px_joint = PxRevoluteJointCreate(
-						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
+					auto* px_joint = PxRevoluteJointCreate(m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4137,11 +3186,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 					px_joint->setLimit(limit);
 					break;
 				}
-				case PxJointConcreteType::eDISTANCE:
-				{
+				case PxJointConcreteType::eDISTANCE: {
 					cmp_type = DISTANCE_JOINT_TYPE;
-					auto* px_joint = PxDistanceJointCreate(
-						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
+					auto* px_joint = PxDistanceJointCreate(m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4159,11 +3206,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 					px_joint->setMaxDistance(tmp);
 					break;
 				}
-				case PxJointConcreteType::eD6:
-				{
+				case PxJointConcreteType::eD6: {
 					cmp_type = D6_JOINT_TYPE;
-					auto* px_joint = PxD6JointCreate(
-						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
+					auto* px_joint = PxD6JointCreate(m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					int motions[6];
 					serializer.read(motions);
@@ -4207,11 +3252,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(terrain.m_layer);
 
 			m_terrains.insert(terrain.m_entity, terrain);
-			EntityRef entity = terrain.m_entity;
-			if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
-			{
-				setHeightmapSource(entity, Path(tmp));
-			}
+			setHeightmapSource(terrain.m_entity, Path(tmp));
 			m_universe.onComponentCreated(terrain.m_entity, HEIGHTFIELD_TYPE, this);
 		}
 	}
@@ -4222,10 +3263,15 @@ struct PhysicsSceneImpl final : PhysicsScene
 		deserializeActors(serializer, entity_map);
 		deserializeControllers(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map);
-		deserializeRagdolls(serializer, entity_map);
+
+		if (version <= (i32)PhysicsSceneVersion::REMOVED_RAGDOLLS) {
+			u32 count;
+			serializer.read(count);
+			LUMIX_FATAL(count == 0); // ragdolls were removed
+		}
+
 		deserializeJoints(serializer, entity_map);
 		deserializeVehicles(serializer, entity_map);
-		updateFilterData();
 	}
 
 
@@ -4414,7 +3460,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	HashMap<EntityRef, RigidActor> m_actors;
 	HashMap<PhysicsGeometry*, EntityRef> m_resource_actor_map;
-	HashMap<EntityRef, Ragdoll> m_ragdolls;
 	AssociativeArray<EntityRef, Joint> m_joints;
 	HashMap<EntityRef, Controller> m_controllers;
 	HashMap<EntityRef, Heightfield> m_terrains;
@@ -4430,7 +3475,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	RigidActor* m_update_in_progress;
 	DelegateList<void(const ContactData&)> m_contact_callbacks;
 	bool m_is_game_running;
-	bool m_is_updating_ragdoll;
 	u32 m_debug_visualization_flags;
 	CPUDispatcher m_cpu_dispatcher;
 	CollisionLayers& m_layers;
@@ -4441,7 +3485,6 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	, m_engine(engine)
 	, m_controllers(m_allocator)
 	, m_actors(m_allocator)
-	, m_ragdolls(m_allocator)
 	, m_vehicles(m_allocator)
 	, m_wheels(m_allocator)
 	, m_terrains(m_allocator)
@@ -4453,7 +3496,6 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	, m_joints(m_allocator)
 	, m_script_scene(nullptr)
 	, m_debug_visualization_flags(0)
-	, m_is_updating_ragdoll(false)
 	, m_update_in_progress(nullptr)
 	, m_vehicle_batch_query(nullptr)
 	, m_system(&system)
@@ -4553,11 +3595,6 @@ void PhysicsScene::reflect() {
 
 	LUMIX_SCENE(PhysicsSceneImpl, "physics")
 		.LUMIX_FUNC(PhysicsSceneImpl::raycast)
-		.LUMIX_CMP(Ragdoll, "ragdoll", "Physics / Ragdoll")
-			.icon(ICON_FA_MALE)
-			.LUMIX_FUNC(PhysicsScene::setRagdollKinematic)
-			.blob_property<&PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData>("data")
-			.LUMIX_ENUM_PROP(RagdollLayer, "Layer").attribute<LayerEnum>()
 		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
 			.LUMIX_PROP(JointConnectedBody, "Connected body")
 			.LUMIX_PROP(JointAxisPosition, "Axis position")
@@ -4774,16 +3811,6 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* new_value)
 			next_with_resource = INVALID_ENTITY;
 		}
 	}
-}
-
-
-Heightfield::Heightfield()
-{
-	m_heightmap = nullptr;
-	m_xz_scale = 1.0f;
-	m_y_scale = 1.0f;
-	m_actor = nullptr;
-	m_layer = 0;
 }
 
 

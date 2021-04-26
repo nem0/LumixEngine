@@ -1336,17 +1336,18 @@ static float evalCurve(i64 time, const ofbx::AnimationCurve& curve) {
 
 // parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
 // it in writeSkeleton() and use `parent_scale` in this function
-static void compressPositions(float error, float parent_scale, Array<FBXImporter::Key>& out)
+static void compressPositions(float parent_scale, Array<FBXImporter::Key>& out)
 {
 	if (out.empty()) return;
 
+	const float ERROR = 0; 
 	Vec3 dir = out[1].pos - out[0].pos;
 	dir *= float(1 / ofbx::fbxTimeToSeconds(out[1].time - out[0].time));
 	u32 prev = 0;
 	for (u32 i = 2; i < (u32)out.size(); ++i) {
 		const Vec3 estimate = out[prev].pos + dir * (float)ofbx::fbxTimeToSeconds(out[i].time - out[prev].time);
 		const Vec3 diff = estimate - out[i].pos;
-		if (fabs(diff.x) > error || fabs(diff.y) > error || fabs(diff.z) > error)  {
+		if (fabs(diff.x) > ERROR || fabs(diff.y) > ERROR || fabs(diff.z) > ERROR)  {
 			prev = i - 1;
 			dir = out[i].pos - out[i - 1].pos;
 			dir *= float(1 / ofbx::fbxTimeToSeconds(out[i].time - out[i - 1].time));
@@ -1360,16 +1361,17 @@ static void compressPositions(float error, float parent_scale, Array<FBXImporter
 	}
 }
 
-static void compressRotations(float error, Array<FBXImporter::Key>& out)
+static void compressRotations(Array<FBXImporter::Key>& out)
 {
 	if (out.empty()) return;
 
+	const float ERROR = 0; 
 	u32 prev = 0;
 	for (u32 i = 2; i < (u32)out.size(); ++i) {
 		const float t = float(ofbx::fbxTimeToSeconds(out[prev + 1].time - out[prev].time) / ofbx::fbxTimeToSeconds(out[i].time - out[prev].time));
 		const Quat estimate = nlerp(out[prev].rot, out[i].rot, t);
-		if (fabs(estimate.x - out[prev + 1].rot.x) > error || fabs(estimate.y - out[prev + 1].rot.y) > error ||
-			fabs(estimate.z - out[prev + 1].rot.z) > error) 
+		if (fabs(estimate.x - out[prev + 1].rot.x) > ERROR || fabs(estimate.y - out[prev + 1].rot.y) > ERROR ||
+			fabs(estimate.z - out[prev + 1].rot.z) > ERROR) 
 		{
 			prev = i - 1;
 		}
@@ -1501,12 +1503,13 @@ static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& ke
 	return true;
 }
 
-static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const Vec3& bind_pos, float error) {
+static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const Vec3& bind_pos) {
 	if (count != 2) return false;
+	const float ERROR = 0;
 	for (const FBXImporter::Key& key : keys) {
 		if (key.flags & 1) continue;
 		const Vec3 d = key.pos - bind_pos;
-		if (d.x > error || d.y > error || d.z > error) return false;
+		if (d.x > ERROR || d.y > ERROR || d.z > ERROR) return false;
 	}
 	return true;
 }
@@ -1564,8 +1567,8 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			ofbx::Object* parent = bone->getParent();
 			const float parent_scale = parent ? (float)getScaleX(parent->getGlobalTransform()) : 1;
 			// TODO skip curves which do not change anything
-			compressRotations(cfg.rotation_error, keys);
-			compressPositions(cfg.position_error, parent_scale, keys);
+			compressRotations(keys);
+			compressPositions(parent_scale, keys);
 		}
 
 		const u64 stream_translations_count_pos = out_file.size();
@@ -1590,6 +1593,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			{
 				const int parent_idx = m_bones.indexOf(parent);
 				if (m_bind_pose.empty()) {
+					// TODO should not we evalLocal here like in rotation ~50lines below?
 					bind_pos = toLumixVec3(bone->getLocalTranslation());
 				}
 				else {
@@ -1597,7 +1601,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				}
 			}
 
-			if (isBindPosePositionTrack(count, keys, bind_pos, cfg.position_error)) continue;
+			if (isBindPosePositionTrack(count, keys, bind_pos)) continue;
 			
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);

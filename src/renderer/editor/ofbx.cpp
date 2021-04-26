@@ -2940,63 +2940,54 @@ static float getFramerateFromTimeMode(FrameRate time_mode, float custom_frame_ra
 
 static void parseGlobalSettings(const Element& root, Scene* scene)
 {
-	for (Element* settings = root.child; settings; settings = settings->sibling)
-	{
-		if (settings->id == "GlobalSettings")
-		{
-			for (Element* props70 = settings->child; props70; props70 = props70->sibling)
-			{
-				if (props70->id == "Properties70")
-				{
-					for (Element* node = props70->child; node; node = node->sibling)
-					{
-						if (!node->first_property)
-							continue;
+	const Element* settings = findChild(root, "GlobalSettings");
+	if (!settings) return;
 
-						#define get_property(name, field, type, getter) if(node->first_property->value == name) \
-						{ \
-							IElementProperty* prop = node->getProperty(4); \
-							if (prop) \
-							{ \
-								DataView value = prop->getValue(); \
-								scene->m_settings.field = (type)value.getter(); \
-							} \
-						}
+	const Element* props70 = findChild(*settings, "Properties70");
+	if (!props70) return;
 
-						#define get_time_property(name, field, type, getter) if(node->first_property->value == name) \
-						{ \
-							IElementProperty* prop = node->getProperty(4); \
-							if (prop) \
-							{ \
-								DataView value = prop->getValue(); \
-								scene->m_settings.field = fbxTimeToSeconds((type)value.getter()); \
-							} \
-						}
+	for (Element* node = props70->child; node; node = node->sibling) {
+		if (!node->first_property) continue;
 
-						get_property("UpAxis", UpAxis, UpVector, toInt);
-						get_property("UpAxisSign", UpAxisSign, int, toInt);
-						get_property("FrontAxis", FrontAxis, FrontVector, toInt);
-						get_property("FrontAxisSign", FrontAxisSign, int, toInt);
-						get_property("CoordAxis", CoordAxis, CoordSystem, toInt);
-						get_property("CoordAxisSign", CoordAxisSign, int, toInt);
-						get_property("OriginalUpAxis", OriginalUpAxis, int, toInt);
-						get_property("OriginalUpAxisSign", OriginalUpAxisSign, int, toInt);
-						get_property("UnitScaleFactor", UnitScaleFactor, float, toDouble);
-						get_property("OriginalUnitScaleFactor", OriginalUnitScaleFactor, float, toDouble);
-						get_time_property("TimeSpanStart", TimeSpanStart, u64, toU64);
-						get_time_property("TimeSpanStop", TimeSpanStop, u64, toU64);
-						get_property("TimeMode", TimeMode, FrameRate, toInt);
-						get_property("CustomFrameRate", CustomFrameRate, float, toDouble);
-
-						#undef get_property
-
-						scene->m_scene_frame_rate = getFramerateFromTimeMode(scene->m_settings.TimeMode, scene->m_settings.CustomFrameRate);
-					}
-					break;
-				}
-			}
-			break;
+		#define get_property(name, field, type, getter) if(node->first_property->value == name) \
+		{ \
+			IElementProperty* prop = node->getProperty(4); \
+			if (prop) \
+			{ \
+				DataView value = prop->getValue(); \
+				scene->m_settings.field = (type)value.getter(); \
+			} \
 		}
+
+		#define get_time_property(name, field, type, getter) if(node->first_property->value == name) \
+		{ \
+			IElementProperty* prop = node->getProperty(4); \
+			if (prop) \
+			{ \
+				DataView value = prop->getValue(); \
+				scene->m_settings.field = fbxTimeToSeconds((type)value.getter()); \
+			} \
+		}
+
+		get_property("UpAxis", UpAxis, UpVector, toInt);
+		get_property("UpAxisSign", UpAxisSign, int, toInt);
+		get_property("FrontAxis", FrontAxis, FrontVector, toInt);
+		get_property("FrontAxisSign", FrontAxisSign, int, toInt);
+		get_property("CoordAxis", CoordAxis, CoordSystem, toInt);
+		get_property("CoordAxisSign", CoordAxisSign, int, toInt);
+		get_property("OriginalUpAxis", OriginalUpAxis, int, toInt);
+		get_property("OriginalUpAxisSign", OriginalUpAxisSign, int, toInt);
+		get_property("UnitScaleFactor", UnitScaleFactor, float, toDouble);
+		get_property("OriginalUnitScaleFactor", OriginalUnitScaleFactor, float, toDouble);
+		get_time_property("TimeSpanStart", TimeSpanStart, u64, toU64);
+		get_time_property("TimeSpanStop", TimeSpanStop, u64, toU64);
+		get_property("TimeMode", TimeMode, FrameRate, toInt);
+		get_property("CustomFrameRate", CustomFrameRate, float, toDouble);
+
+		#undef get_property
+		#undef get_time_property
+
+		scene->m_scene_frame_rate = getFramerateFromTimeMode(scene->m_settings.TimeMode, scene->m_settings.CustomFrameRate);
 	}
 }
 

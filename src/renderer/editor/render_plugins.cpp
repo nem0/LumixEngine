@@ -1838,8 +1838,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool import_vertex_colors = false;
 		bool bake_vertex_ao = false;
 		float lods_distances[4] = { -1, -1, -1, -1 };
-		float position_error = 0.02f;
-		float rotation_error = 0.001f;
 		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 	};
@@ -1881,17 +1879,20 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			LuaWrapper::DebugGuard guard(L);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &meta.use_mikktspace);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &meta.force_skin);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &meta.culling_scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
-			
+
+			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
+			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
+			lua_pop(L, 2);
+
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
 				if (equalIStrings(tmp, "trimesh")) meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
@@ -1968,8 +1969,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const char* filepath = getResourceFilePath(src.c_str());
 		FBXImporter::ImportConfig cfg;
 		const Meta meta = getMeta(Path(filepath));
-		cfg.rotation_error = meta.rotation_error;
-		cfg.position_error = meta.position_error;
 		cfg.mikktspace_tangents = meta.use_mikktspace;
 		cfg.mesh_scale = meta.scale;
 		cfg.bounding_scale = meta.culling_scale;
@@ -2409,10 +2408,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace);
 			ImGuiEx::Label("Force skinned");
 			ImGui::Checkbox("##frcskn", &m_meta.force_skin);
-			ImGuiEx::Label("Max position error");
-			ImGui::InputFloat("##maxposer", &m_meta.position_error);
-			ImGuiEx::Label("Max rotation error");
-			ImGui::InputFloat("##maxroter", &m_meta.rotation_error);
 			ImGuiEx::Label("Scale");
 			ImGui::InputFloat("##scale", &m_meta.scale);
 			ImGuiEx::Label("Culling scale");
@@ -2458,8 +2453,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
 					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace ? "true" : "false")
 					.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")
-					.cat("\nposition_error = ").cat(m_meta.position_error)
-					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
 					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nculling_scale = ").cat(m_meta.culling_scale)

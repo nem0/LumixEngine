@@ -52,6 +52,7 @@ enum class RenderSceneVersion : i32
 	DECAL_UV_SCALE,
 	CURVE_DECALS,
 	AUTODESTROY_EMITTER,
+	SMALLER_MODEL_INSTANCES,
 
 	LATEST
 };
@@ -565,14 +566,24 @@ struct RenderSceneImpl final : RenderScene {
 		serializer.write(m_active_global_light_entity);
 	}
 
-	void serializeModelInstances(OutputMemoryStream& serializer)
-	{
+	void serializeModelInstances(OutputMemoryStream& serializer) {
+		u32 len = 0;
+		HashMap<Model*, u32> offsets(m_allocator);
+		for (auto iter = m_model_entity_map.begin(); iter.isValid(); ++iter) {
+			offsets.insert(iter.key(), len);
+			len += iter.key()->getPath().length() + 1;
+		}
+
+		serializer.write(len);
+		for (auto iter = m_model_entity_map.begin(); iter.isValid(); ++iter) {
+			serializer.writeString(iter.key()->getPath().c_str());
+		}
+
 		serializer.write((i32)m_model_instances.size());
-		for (auto& r : m_model_instances)
-		{
+		for (const ModelInstance& r : m_model_instances) {
 			serializer.write(r.flags.base);
 			if(r.flags.isSet(ModelInstance::VALID)) {
-				serializer.writeString(r.model ? r.model->getPath().c_str() : "");
+				serializer.write(u32(r.model ? offsets[r.model] : 0xffFFffFF));
 				serializer.writeString(r.custom_material ? r.custom_material->getPath().c_str() : "");
 			}
 		}
@@ -644,7 +655,6 @@ struct RenderSceneImpl final : RenderScene {
 			CurveDecal decal;
 			serializer.read(decal.entity);
 			decal.entity = entity_map.get(decal.entity);
-			decal.uv_scale = Vec2(1);
 			serializer.read(decal.uv_scale);
 			serializer.read(decal.half_extents.y);
 			serializer.read(decal.bezier_p0);
@@ -657,12 +667,10 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-
 	void serializeDecals(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_decals.size());
-		for (auto& decal : m_decals)
-		{
+		for (Decal& decal : m_decals) {
 			serializer.write(decal.entity);
 			serializer.write(decal.half_extents);
 			serializer.write(decal.uv_scale);
@@ -673,8 +681,7 @@ struct RenderSceneImpl final : RenderScene {
 	void serializeCurveDecals(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_curve_decals.size());
-		for (auto& decal : m_curve_decals)
-		{
+		for (CurveDecal& decal : m_curve_decals) {
 			serializer.write(decal.entity);
 			serializer.write(decal.uv_scale);
 			serializer.write(decal.half_extents.y);
@@ -856,7 +863,7 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-	void deserializeModelInstances(InputMemoryStream& serializer, const EntityMap& entity_map)
+	void deserializeModelInstancesOld(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		PROFILE_FUNCTION();
 		u32 size = 0;
@@ -887,6 +894,52 @@ struct RenderSceneImpl final : RenderScene {
 				const char* path = serializer.readString();
 				if (path[0] != 0) {
 					Model* model = m_engine.getResourceManager().load<Model>(Path(path));
+					setModel(e, model);
+				}
+
+				const char* mat_path = serializer.readString();
+				if (mat_path[0] != 0) {
+					setModelInstanceMaterialOverride(e, Path(mat_path));
+				}
+
+				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
+			}
+		}
+	}
+	void deserializeModelInstances(InputMemoryStream& serializer, const EntityMap& entity_map)
+	{
+		PROFILE_FUNCTION();
+		u32 size = 0;
+		serializer.read(size);
+		const char* paths = (const char*)serializer.skip(size);
+
+		serializer.read(size);
+		m_model_instances.reserve(nextPow2(size + m_model_instances.size()));
+		for (u32 i = 0; i < size; ++i) {
+			FlagSet<ModelInstance::Flags, u8> flags;
+			serializer.read(flags);
+
+			if(flags.isSet(ModelInstance::VALID)) {
+				const EntityRef e = entity_map.get(EntityRef{(i32)i});
+
+				while (e.index >= m_model_instances.size()) {
+					ModelInstance& r = m_model_instances.emplace();
+					r.flags.clear();
+					r.flags.set(ModelInstance::VALID, false);
+					r.model = nullptr;
+					r.pose = nullptr;
+				}
+
+				ModelInstance& r = m_model_instances[e.index];
+				r.flags = flags;
+				r.model = nullptr;
+				r.pose = nullptr;
+				r.meshes = nullptr;
+				r.mesh_count = 0;
+
+				const u32 path_offset = serializer.read<u32>();
+				if (path_offset != 0xffFFffFF) {
+					Model* model = m_engine.getResourceManager().load<Model>(Path(paths + path_offset));
 					setModel(e, model);
 				}
 
@@ -950,7 +1003,12 @@ struct RenderSceneImpl final : RenderScene {
 	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
 		deserializeCameras(serializer, entity_map);
-		deserializeModelInstances(serializer, entity_map);
+		if (version > (i32)RenderSceneVersion::SMALLER_MODEL_INSTANCES) {
+			deserializeModelInstances(serializer, entity_map);
+		}
+		else {
+			deserializeModelInstancesOld(serializer, entity_map);
+		}
 		deserializeLights(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map);
 		deserializeParticleEmitters(serializer, entity_map, version);

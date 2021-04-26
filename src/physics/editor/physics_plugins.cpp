@@ -37,7 +37,6 @@ namespace
 
 const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
-const ComponentType RAGDOLL_TYPE = reflection::getComponentType("ragdoll");
 const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
 const ComponentType DISTANCE_JOINT_TYPE = reflection::getComponentType("distance_joint");
 const ComponentType HINGE_JOINT_TYPE = reflection::getComponentType("hinge_joint");
