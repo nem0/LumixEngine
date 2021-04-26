@@ -249,7 +249,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
 		ASSERT(strlen(tmp) < 5);
-		auto iter = m_registered_extensions.find(*(u32*)tmp);
+		auto iter = m_registered_extensions.find(*(u32*)tmp); //-V641 
 		if (iter.isValid()) return iter.value();
 
 		return INVALID_RESOURCE_TYPE;
@@ -261,7 +261,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
 		ASSERT(strlen(tmp) < 5);
-		auto iter = m_registered_extensions.find(*(u32*)tmp);
+		auto iter = m_registered_extensions.find(*(u32*)tmp); //-V641 
 		if (!iter.isValid()) return false;
 		return iter.value() == type;
 	}
@@ -272,7 +272,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		char tmp[6] = {};
 		makeLowercase(Span(tmp), extension);
 		ASSERT(strlen(tmp) < 5);
-		u32 q = *(u32*)tmp;
+		u32 q = *(u32*)tmp; //-V641 
 		ASSERT(!m_registered_extensions.find(q).isValid());
 
 		m_registered_extensions.insert(q, type);
