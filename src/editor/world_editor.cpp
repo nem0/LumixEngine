@@ -2454,7 +2454,7 @@ public:
 		os::OutputFile file;
 		if (file.open(path)) {
 			OutputMemoryStream stream(m_allocator);
-			m_engine.serializeProject(stream);
+			m_engine.serializeProject(stream, "main");
 			bool saved = true;
 			if (!file.write(stream.data(), stream.size())) {
 				logError("Failed to save project ", path);
@@ -2472,7 +2472,8 @@ public:
 		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), data)) return false;
 		
 		InputMemoryStream stream(data);
-		return m_engine.deserializeProject(stream);
+		char dummy[1];
+		return m_engine.deserializeProject(stream, Span(dummy));
 	}
 	
 	bool isLoading() const override { return m_is_loading; }

@@ -47,8 +47,8 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void update(Universe& context) = 0;
 	virtual u32 serialize(Universe& ctx, struct OutputMemoryStream& serializer) = 0;
 	virtual bool deserialize(Universe& ctx, struct InputMemoryStream& serializer, struct EntityMap& entity_map) = 0;
-	virtual bool deserializeProject(InputMemoryStream& serializer) = 0;
-	virtual void serializeProject(OutputMemoryStream& serializer) const = 0;
+	virtual bool deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) = 0;
+	virtual void serializeProject(OutputMemoryStream& serializer, const char* startup_universe) const = 0;
 	virtual float getLastTimeDelta() const = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;

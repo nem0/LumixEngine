@@ -109,7 +109,7 @@ struct Runner final
 		lua_scene->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
-	bool loadUniverse(const char* path) {
+	bool loadUniverse(const char* path, const char* universe_name) {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) return false;
@@ -125,7 +125,7 @@ struct Runner final
 
 		tmp.read(header);
 
-		m_universe->setName("main");
+		m_universe->setName(universe_name);
 		if (!m_engine->deserialize(*m_universe, tmp, entity_map)) {
 			logError("Failed to deserialize ", path);
 			return false;
@@ -143,6 +143,15 @@ struct Runner final
 			if (parser.currentEquals("-window")) return true;
 		}
 		return false;
+	}
+
+	void loadProject() {
+		FileSystem& fs = m_engine->getFileSystem();
+		OutputMemoryStream data(m_allocator);
+		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
+
+		InputMemoryStream tmp(data);
+		m_engine->deserializeProject(tmp, Span(m_startup_universe));
 	}
 
 	void onInit() {
@@ -167,7 +176,10 @@ struct Runner final
 		m_gui_interface.pipeline = m_pipeline.get();
 		gui->setInterface(&m_gui_interface);
 
-		if (!loadUniverse("universes/main.unv")) {
+		loadProject();
+
+		const StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_startup_universe, ".unv");
+		if (!loadUniverse(unv_path, m_startup_universe)) {
 			initDemoScene();
 		}
 		os::showCursor(false);
@@ -252,6 +264,7 @@ struct Runner final
 	Renderer* m_renderer = nullptr;
 	Universe* m_universe = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
+	char m_startup_universe[96] = "main";
 
 	Viewport m_viewport;
 	bool m_finished = false;

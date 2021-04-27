@@ -987,9 +987,9 @@ struct StudioAppImpl final : StudioApp
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 								 ImGuiWindowFlags_NoSavedSettings;
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->GetWorkPos());
-        ImGui::SetNextWindowSize(viewport->GetWorkSize());
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImGui::SetNextWindowPos(viewport->GetWorkPos());
+		ImGui::SetNextWindowSize(viewport->GetWorkSize());
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
@@ -3144,6 +3144,15 @@ struct StudioAppImpl final : StudioApp
 				m_settings.setValue(Settings::LOCAL, "export_pack", (i32)m_export.mode);
 			}
 
+			ImGuiEx::Label("Startup universe");
+			if (m_universes.size() > 0 && m_export.startup_universe[0] == '\0') m_export.startup_universe = m_universes[0].data;
+			if (ImGui::BeginCombo("##startunv", m_export.startup_universe)) {
+				for (const auto& unv : m_universes) {
+					if (ImGui::Selectable(unv)) m_export.startup_universe = unv.data;
+				}
+				ImGui::EndCombo();
+			}
+
 			if (ImGui::Button("Export")) exportData();
 		}
 		ImGui::End();
@@ -3161,6 +3170,26 @@ struct StudioAppImpl final : StudioApp
 			case ExportConfig::Mode::CURRENT_UNIVERSE: exportDataScanResources(infos); break;
 			default: ASSERT(false); break;
 		}
+
+		{
+			StaticString<LUMIX_MAX_PATH> project_path(m_export.dest_dir, "lumix.prj");
+			OutputMemoryStream prj_blob(m_allocator);
+			m_engine->serializeProject(prj_blob, m_export.startup_universe);
+			os::OutputFile file;
+			if (!file.open(project_path)) {
+				logError("Could not create ", project_path);
+				return;
+			}
+
+			(void)file.write(prj_blob.data(), prj_blob.size());
+
+			file.close();
+			if (file.isError()) {
+				logError("Could not write ", project_path);
+				return;
+			}
+		}
+
 
 		FileSystem& fs = m_engine->getFileSystem();
 		if (m_export.pack) {
@@ -3442,8 +3471,10 @@ struct StudioAppImpl final : StudioApp
 			CURRENT_UNIVERSE
 		};
 
-		Mode mode;
+		Mode mode = Mode::ALL_FILES;
+
 		bool pack = false;
+		StaticString<96> startup_universe;
 		StaticString<LUMIX_MAX_PATH> dest_dir;
 	};
 

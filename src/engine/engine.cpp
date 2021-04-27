@@ -364,11 +364,21 @@ public:
 		return true;
 	}
 
-	bool deserializeProject(InputMemoryStream& serializer) override {
+	enum class ProjectVersion : u32 {
+		FIRST,
+
+		LAST,
+	};
+
+	bool deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) override {
 		SerializedEngineHeader header;
 		serializer.read(header);
 		if (header.magic != SERIALIZED_PROJECT_MAGIC) return false;
-		if (header.version != 0) return false;
+		if (header.version > (u32)ProjectVersion::LAST) return false;
+		if (header.version > (u32)ProjectVersion::FIRST) {
+			const char* tmp = serializer.readString();
+			copyString(startup_universe, tmp);
+		}
 		i32 count = 0;
 		serializer.read(count);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
@@ -388,11 +398,12 @@ public:
 		return false;
 	}
 
-	void serializeProject(OutputMemoryStream& serializer) const override {
+	void serializeProject(OutputMemoryStream& serializer, const char* startup_universe) const override {
 		SerializedEngineHeader header;
 		header.magic = SERIALIZED_PROJECT_MAGIC;
-		header.version = 0;
+		header.version = (u32)ProjectVersion::LAST;
 		serializer.write(header);
+		serializer.writeString(startup_universe);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		serializer.write((i32)plugins.size());
 		for (IPlugin* plugin : plugins) {
