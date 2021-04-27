@@ -42,7 +42,6 @@ static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_s
 static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
 static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("navmesh_agent");
 static const int CELLS_PER_TILE_SIDE = 256;
-static const float CELL_SIZE = 0.3f;
 
 
 struct RecastZone {
@@ -134,7 +133,7 @@ struct NavigationSceneImpl final : NavigationScene
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 		const Transform zone_tr = m_universe.getTransform((EntityRef)agent.zone);
 		const Vec3 pos = Vec3(zone_tr.inverted().transform(agent_pos));
-		if (squaredLength(pos - *(Vec3*)dt_agent->npos) > 0.1f) {
+		if (squaredLength(pos.xz() - (*(Vec3*)dt_agent->npos).xz()) > 0.1f) {
 			const Transform old_zone_tr = m_universe.getTransform(zone.entity);
 			const DVec3 target_pos = old_zone_tr.transform(*(Vec3*)dt_agent->targetPos);
 			float speed = dt_agent->params.maxSpeed;
@@ -170,7 +169,7 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	void rasterizeTerrains(const Transform& zone_tr, const AABB& zone_aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	void rasterizeTerrains(const Transform& zone_tr, const AABB& tile_aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
@@ -188,7 +187,7 @@ struct NavigationSceneImpl final : NavigationScene
 			const Transform to_terrain = to_zone.inverted();
 			Matrix mtx = to_terrain.rot.toMatrix();
 			mtx.setTranslation(Vec3(to_terrain.pos));
-			AABB aabb = zone_aabb;
+			AABB aabb = tile_aabb;
 			aabb.transform(mtx);
 			const IVec2 from = IVec2(aabb.min.xz() / scaleXZ);
 			const IVec2 to = IVec2(aabb.max.xz() / scaleXZ + Vec2(1));
@@ -703,12 +702,12 @@ struct NavigationSceneImpl final : NavigationScene
 		float cell_height = 0.1f;
 		for(int z = 0; z < zone.debug_heightfield->height; ++z) {
 			for(int x = 0; x < width; ++x) {
-				float fx = orig.x + x * CELL_SIZE;
-				float fz = orig.z + z * CELL_SIZE;
+				float fx = orig.x + x * zone.zone.cell_size;
+				float fz = orig.z + z * zone.zone.cell_size;
 				const rcSpan* span = zone.debug_heightfield->spans[x + z * width];
 				while(span) {
 					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
-					Vec3 maxs(fx + CELL_SIZE, orig.y + span->smax * cell_height, fz + CELL_SIZE);
+					Vec3 maxs(fx + zone.zone.cell_size, orig.y + span->smax * cell_height, fz + zone.zone.cell_size);
 					u32 color = span->area == 0 ? 0xffff0000 : 0xff00aaff;
 					render_scene->addDebugCubeSolid(tr.transform(mins), tr.transform(maxs), color);
 					render_scene->addDebugCube(tr.transform(mins), tr.transform(maxs), 0xffffFFFF);
@@ -894,13 +893,13 @@ struct NavigationSceneImpl final : NavigationScene
 		const Vec3 max = zone.zone.extents;
 		if (pos.x > max.x || pos.x < min.x || pos.z > max.z || pos.z < min.z) return;
 
-		int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
-		int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
-		const dtMeshTile* tile = zone.navmesh->getTileAt(x, z, 0);
-		if (!tile) return;
-
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
+
+		int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
+		int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
+		const dtMeshTile* tile = zone.navmesh->getTileAt(x, z, 0);
+		if (!tile) return;
 
 		for (int i = 0; i < tile->header->polyCount; ++i) {
 			const dtPoly* p = &tile->polys[i];
@@ -1053,8 +1052,8 @@ struct NavigationSceneImpl final : NavigationScene
 		const Transform tr = m_universe.getTransform(zone_entity);
 		const Vec3 pos = Vec3(tr.inverted().transform(world_pos));
 		const Vec3 min = -zone.zone.extents;
-		const int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
-		const int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		const int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
+		const int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
 		zone.navmesh->removeTile(zone.navmesh->getTileRefAt(x, z, 0), 0, 0);
 
 		Mutex mutex;
@@ -1081,7 +1080,7 @@ struct NavigationSceneImpl final : NavigationScene
 		config.minRegionArea = 8 * 8;
 		config.mergeRegionArea = 20 * 20;
 		config.maxVertsPerPoly = 6;
-		config.detailSampleDist = DETAIL_SAMPLE_DIST < 0.9f ? 0 : CELL_SIZE * DETAIL_SAMPLE_DIST;
+		config.detailSampleDist = DETAIL_SAMPLE_DIST < 0.9f ? 0 : zone.zone.cell_size * DETAIL_SAMPLE_DIST;
 		config.detailSampleMaxError = config.ch * DETAIL_SAMPLE_MAX_ERROR;
 		config.borderSize = config.walkableRadius + 3;
 		config.tileSize = CELLS_PER_TILE_SIDE;
@@ -1091,12 +1090,12 @@ struct NavigationSceneImpl final : NavigationScene
 		rcContext ctx;
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
-		Vec3 bmin(min.x + x * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + config.borderSize) * config.cs,
+		Vec3 bmin(min.x + x * CELLS_PER_TILE_SIDE * zone.zone.cell_size - (1 + config.borderSize) * config.cs,
 			min.y,
-			min.z + z * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + config.borderSize) * config.cs);
-		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + config.borderSize) * config.cs,
+			min.z + z * CELLS_PER_TILE_SIDE * zone.zone.cell_size - (1 + config.borderSize) * config.cs);
+		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * zone.zone.cell_size + (1 + config.borderSize) * config.cs * 2,
 			max.y,
-			bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + config.borderSize) * config.cs);
+			bmin.z + CELLS_PER_TILE_SIDE * zone.zone.cell_size + (1 + config.borderSize) * config.cs * 2);
 		if (keep_data) m_debug_tile_origin = bmin;
 		rcVcopy(config.bmin, &bmin.x);
 		rcVcopy(config.bmax, &bmax.x);
@@ -1225,6 +1224,12 @@ struct NavigationSceneImpl final : NavigationScene
 
 		MutexGuard guard(mutex);
 		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size)) {
+			if (polymesh->npolys == 0) {
+				// no geometry in tile
+				rcFreePolyMesh(polymesh);
+				if (detail_mesh) rcFreePolyMeshDetail(detail_mesh);
+				return true;
+			}
 			logError("Could not build Detour navmesh.");
 			return false;
 		}
@@ -1335,10 +1340,10 @@ struct NavigationSceneImpl final : NavigationScene
 		const Vec3 max = zone.zone.extents;
 			
 		rcVcopy(params.orig, &min.x);
-		params.tileWidth = float(CELLS_PER_TILE_SIDE * CELL_SIZE);
-		params.tileHeight = float(CELLS_PER_TILE_SIDE * CELL_SIZE);
+		params.tileWidth = float(CELLS_PER_TILE_SIDE * zone.zone.cell_size);
+		params.tileHeight = float(CELLS_PER_TILE_SIDE * zone.zone.cell_size);
 		int grid_width, grid_height;
-		rcCalcGridSize(&min.x, &max.x, CELL_SIZE, &grid_width, &grid_height);
+		rcCalcGridSize(&min.x, &max.x, zone.zone.cell_size, &grid_width, &grid_height);
 		zone.m_num_tiles_x = (grid_width + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
 		zone.m_num_tiles_z = (grid_height + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
 		params.maxTiles = zone.m_num_tiles_x * zone.m_num_tiles_z;
