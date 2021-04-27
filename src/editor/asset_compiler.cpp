@@ -246,7 +246,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		const Span<const char> subres = getSubresource(path);
 		Span<const char> ext = Path::getExtension(subres);
 
-		char tmp[6] = {};
+		alignas(u32) char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
 		ASSERT(strlen(tmp) < 5);
 		auto iter = m_registered_extensions.find(*(u32*)tmp); //-V641 
@@ -258,7 +258,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		char tmp[6] = {};
+		alignas(u32) char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
 		ASSERT(strlen(tmp) < 5);
 		auto iter = m_registered_extensions.find(*(u32*)tmp); //-V641 
@@ -269,7 +269,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	
 	void registerExtension(const char* extension, ResourceType type) override
 	{
-		char tmp[6] = {};
+		alignas(u32) char tmp[6] = {};
 		makeLowercase(Span(tmp), extension);
 		ASSERT(strlen(tmp) < 5);
 		u32 q = *(u32*)tmp; //-V641 
