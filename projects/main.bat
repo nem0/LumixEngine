@@ -15,41 +15,29 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo ===============================
 	echo   1. Exit
 	echo   2. Create project
-	echo   3. Build release
-	echo   4. Run Studio
-	echo   5. Open in VS
-	echo   6. Create bundle
-	echo   7. Pull latest from Github
-	echo   8. Open live help / discord chat
-	echo   9. 3rd party
-	echo   A. Plugins
-	echo   B. Create project - static physx
-	echo   C. Push to itch.io (GL)
-	echo   D. Push to itch.io (DX11)
-	echo   E. Create project with app 
+	echo   3. Run Studio
+	echo   4. Open in VS
+	echo   5. Create bundle
+	echo   6. Open live help / discord chat
+	echo   7. 3rd party
+	echo   8. Plugins
 	echo ===============================
-	choice /C 123456789ABCDE /N /M "Your choice:"
+	choice /C 12345678 /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
 	if %errorlevel%==2 call :create_project
-	if %errorlevel%==3 call :build
-	if %errorlevel%==4 call :run_studio
-	if %errorlevel%==5 call :open_in_vs
-	if %errorlevel%==6 call :create_bundle
-	if %errorlevel%==7 call :git_pull
-	if %errorlevel%==8 call :open_discord
-	if %errorlevel%==9 call :third_party
-	if %errorlevel%==10 call :plugins
-	if %errorlevel%==11 call :create_project_static_physx
-	if %errorlevel%==12 call :push_to_itch_io
-	if %errorlevel%==13 call :push_to_itch_io_dx
-	if %errorlevel%==14 call :create_project_with_app
+	if %errorlevel%==3 call :run_studio
+	if %errorlevel%==4 call :open_in_vs
+	if %errorlevel%==5 call :create_bundle
+	if %errorlevel%==6 call :open_discord
+	if %errorlevel%==7 call :third_party
+	if %errorlevel%==8 call :plugins
 goto :begin
 
-:plugins 
+:plugins
 	cls
-	echo Wut? - you have to (re)create project if you download/upgrade plugin
+	echo Wut?
 	echo ===============================
 	echo  1. Go back
 	echo  2. Empty plugin template
@@ -62,7 +50,7 @@ goto :begin
 	echo  9. JS
 	echo  A. C#
 	echo ===============================
-	choice /C 123456789 /N /M "Your choice:"
+	choice /C 123456789A /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -74,26 +62,8 @@ goto :begin
 	if %errorlevel%==8 call :network_plugin
 	if %errorlevel%==9 call :js_plugin
 	if %errorlevel%==10 call :cs_plugin
-	pause
+	call :create_project
 goto :plugins
-
-:push_to_itch_io
-	if not exist itch_io mkdir itch_io
-	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
-	git clean -f -x -d ..\data
-	xcopy /E /Y ..\data itch_io
-	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
-	pause
-exit /B 0
-
-:push_to_itch_io_dx
-	if not exist itch_io mkdir itch_io
-	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
-	git clean -f -x -d ..\data
-	xcopy /E /Y ..\data itch_io
-	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx
-	pause
-exit /B 0
 
 :dx_plugin
 	if not exist ..\plugins mkdir ..\plugins
@@ -496,19 +466,7 @@ exit /B 0
 
 :create_project
 	echo Creating project...
-	genie.exe vs2019 
-	pause
-exit /B 0
-
-:create_project_with_app
-	echo Creating project...
 	genie.exe --with-app vs2019 
-	pause
-exit /B 0
-
-:create_project_static_physx
-	echo Creating project with statically linked PhysX...
-	genie.exe --static-physx vs2019 
 	pause
 exit /B 0
 
@@ -599,10 +557,4 @@ exit /B 0
 	start "" "https://discord.gg/RgFybs6"
 	pause
 exit /B 0
-
-:git_pull
-	git.exe pull
-exit /B 0
-
-
 

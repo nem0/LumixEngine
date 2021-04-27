@@ -727,6 +727,13 @@ if has_plugin("lua_script") then
 		defaultConfigurations()
 end
 
+function dbgHelp()
+	configuration { "windows" }
+		files { "../external/dbghelp/**.dll" }	
+		copy { "../external/dbghelp/**.dll" }
+	configuration {}
+end
+
 if build_app then
 	project "app"
 		if working_dir then
@@ -903,6 +910,8 @@ if build_studio then
 		end
 
 		files { "../src/studio/**.cpp" }
+
+		dbgHelp()
 
 		if embed_resources then
 			files { "../src/studio/**.rc" }
