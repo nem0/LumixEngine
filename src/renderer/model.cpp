@@ -280,9 +280,8 @@ static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
 		case Mesh::AttributeSemantic::WEIGHTS: return 5;
 		case Mesh::AttributeSemantic::COLOR0: return 7;
 		case Mesh::AttributeSemantic::AO: return 8;
+		default: ASSERT(false); return 0;
 	}
-	ASSERT(false);
-	return 0;
 }
 
 
@@ -598,7 +597,6 @@ bool Model::load(u64 size, const u8* mem)
 
 void Model::unload()
 {
-	auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
 	for (int i = 0; i < m_meshes.size(); ++i) {
 		removeDependency(*m_meshes[i].material);
 		m_meshes[i].material->decRefCount();

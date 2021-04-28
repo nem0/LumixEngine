@@ -322,7 +322,6 @@ namespace LuaWrapper {
 		lua_createtable(L, 0, 4);
 
 		lua_createtable(L, 32+24, 0);
-		const float* frustum = params.frustum.xs; 
 		auto push_floats = [L](const float* values, int count, int offset){
 			for(int i = 0; i < count; ++i) {
 				LuaWrapper::push(L, values[i]);
@@ -1861,7 +1860,6 @@ struct PipelineImpl final : Pipeline
 				
 				Universe& universe = m_pipeline->m_scene->getUniverse();
 
-				u32 byte_size = 0;
 				m_drawcalls.reserve(emitters.size());
 
 				gpu::VertexDecl decl;
@@ -2168,7 +2166,6 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void dispatch(u32 shader_id, u32 num_groups_x, u32 num_groups_y, u32 num_groups_z, LuaWrapper::Optional<const char*> define) {
-		Engine& engine = m_renderer.getEngine();
 		Shader* shader = nullptr;
 		for (const ShaderRef& s : m_shaders) {
 			if(s.id == shader_id) {
@@ -2184,9 +2181,6 @@ struct PipelineImpl final : Pipeline
 		}
 		gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), defines);
 		if (!program) return;
-
-		gpu::TextureHandle textures[16] = {};
-		u32 textures_count = 0;
 
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
@@ -3360,7 +3354,6 @@ struct PipelineImpl final : Pipeline
 						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
 						const u32 total_count = instances.end->offset + instances.end->count;
 						const Mesh& mesh = *sort_key_to_mesh[group_idx];
-						const float mesh_lod = mesh.lod;
 						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
 							new_page(bucket);
 						}
@@ -3487,7 +3480,6 @@ struct PipelineImpl final : Pipeline
 					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
 						new_page(bucket);
 					}
-					u8* mem = slice.ptr;
 					DecalData* beg = (DecalData*)slice.ptr;
 					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 					for(u32 j = start_i; j < i; ++j) {
@@ -3539,7 +3531,6 @@ struct PipelineImpl final : Pipeline
 					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
 						new_page(bucket);
 					}
-					u8* mem = slice.ptr;
 					DecalData* beg = (DecalData*)slice.ptr;
 					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 					for(u32 j = start_i; j < i; ++j) {
@@ -3776,7 +3767,6 @@ struct PipelineImpl final : Pipeline
 		if (lights) {
 			lights->forEach([&](EntityRef e){
 				PointLight& pl = m_scene->getPointLight(e);
-				i32 idx = job.m_point_lights.size();
 				FillClustersJob::ClusterPointLight& light = job.m_point_lights.emplace();
 				light.radius = pl.range;
 				const DVec3 light_pos = universe.getPosition(e);

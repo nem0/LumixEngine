@@ -337,7 +337,6 @@ void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const V
 	UniverseView::Vertex* vertices = view.render(false, 25*6);
 
 	const float ANGLE_STEP = degreesToRadians(1.0f / 100.0f * 360.0f);
-	Vec3 n = cross(a, b) * 0.05f / length(a);
 	int offset = -1;
 	for (int i = 0; i < 25; ++i) {
 		float angle = i * ANGLE_STEP;
@@ -406,8 +405,6 @@ void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const V
 
 void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& origin, const Vec3& dst, float scale, u32 color) {
 	UniverseView::Vertex* vertices = view.render(false, 25 * 3);
-
-	const Vec3 side = cross(normalize(n), origin);
 
 	int offset = -1;
 	for (int i = 0; i < 25; ++i) {
@@ -545,7 +542,6 @@ void setDragged(u64 id) {
 }
 
 bool translate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
-	const float scale = getScale(view.getViewport(), tr.pos, cfg.scale);
 	TranslationGizmo gizmo = getGizmo<TranslationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -731,12 +727,6 @@ bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Co
 	Vec3 dir;
 	const Vec2 mp = view.getMousePos();
 	vp.getRay(mp, origin, dir);
-	u32 xp_color = X_COLOR;
-	u32 xn_color = X_COLOR;
-	u32 yp_color = X_COLOR;
-	u32 yn_color = X_COLOR;
-	u32 zp_color = X_COLOR;
-	u32 zn_color = X_COLOR;
 	
 	const Vec3 pos = Vec3(origin - tr.pos);
 	const Vec3 center = Vec3(tr.pos - vp.pos);
@@ -785,6 +775,7 @@ bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Co
 			case BoxAxis::ZN:
 				g_gizmo_state.axis = Axis::Z;
 				break;
+			default: ASSERT(false); break;
 		}
 		g_gizmo_state.box.axis = axis;
 		g_gizmo_state.box.start_transform = tr;
@@ -851,6 +842,7 @@ bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Co
 			}
 			return true;
 		}
+		default: ASSERT(false); break;
 	}
 
 	return false;

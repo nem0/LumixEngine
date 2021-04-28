@@ -216,10 +216,9 @@ struct Runner final
 
 	void onEvent(const os::Event& event) {
 		if (m_engine.get()) {
-			if (m_focused 
-				|| event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down 
-				|| event.type == os::Event::Type::KEY && !event.key.down)
-			{
+			const bool is_mouse_up = event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down;
+			const bool is_key_up = event.type == os::Event::Type::KEY && !event.key.down;
+			if (m_focused || is_mouse_up || is_key_up) {
 				InputSystem& input = m_engine->getInputSystem();
 				input.injectEvent(event, 0, 0);
 			}
@@ -238,6 +237,7 @@ struct Runner final
 				onResize();
 				captureMouse(m_focused);
 				break;
+			default: break;
 		}
 	}
 

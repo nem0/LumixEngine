@@ -602,7 +602,6 @@ struct LUMIX_ENGINE_API builder {
 		}
 
 		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> i32 {
-			using T = typename ResultOf<decltype(Getter)>::Type;
 			using C = typename ClassOf<decltype(Getter)>::Type;
 			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
 				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e));

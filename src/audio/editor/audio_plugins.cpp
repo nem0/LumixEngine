@@ -40,7 +40,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	Meta getMeta(const Path& path) const {
 		Meta meta;
-		m_app.getAssetCompiler().getMeta(path, [&path, &meta](lua_State* L){
+		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "looped", &meta.looped);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "volume", &meta.volume);
 		});
@@ -149,7 +149,6 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (type == Clip::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_audio.tga", out_path);
 		return false;
 	}
@@ -174,8 +173,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override 
 	{
-		IAllocator& allocator = m_app.getAllocator();
-
 		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin);
 		const char* extensions[] = { "ogg", nullptr };
 		m_app.getAssetCompiler().addPlugin(m_asset_browser_plugin, extensions);

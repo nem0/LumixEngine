@@ -79,7 +79,6 @@ struct Animation final : Resource
 		Array<RotationCurve> m_rotations;
 		Array<u8> m_mem;
 		u32 m_frame_count = 0;
-		int m_root_motion_bone_idx;
 
 		friend struct AnimationSampler;
 };

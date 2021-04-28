@@ -562,7 +562,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		MutexGuard lock(m_to_compile_mutex);
 		auto iter = m_generations.find(path);
 		if (!iter.isValid()) {
-			IAllocator& allocator = m_app.getAllocator();
 			iter = m_generations.insert(path, 0);
 		}
 		else {

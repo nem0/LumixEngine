@@ -2,7 +2,7 @@
 
 #include "lumix.h"
 
-#if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT)
+#if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT) && !defined __clang__
 	#define LUMIX_CRT_API LUMIX_LIBRARY_IMPORT
 	#ifndef MCW_EM
 		#define _EM_OVERFLOW	0x00000004
@@ -78,11 +78,13 @@
 		double __cdecl tan(double _X);
 		LUMIX_CRT_API float __cdecl tanf(float x);
 	}
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__clang__)
 	#include <float.h>
 	#include <inttypes.h>
 	#include <math.h>
 	#include <stdlib.h>
 	#include <string.h>
-	inline int stricmp(const char* a, const char* b) { return strcasecmp(a, b); }
+	#ifndef __clang__
+		inline int stricmp(const char* a, const char* b) { return strcasecmp(a, b); }
+	#endif
 #endif

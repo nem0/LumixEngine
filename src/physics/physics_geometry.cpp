@@ -36,7 +36,6 @@ const ResourceType PhysicsGeometry::TYPE("physics");
 PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_manager, PhysicsSystem& system, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, system(system)
-	, allocator(allocator)
 	, convex_mesh(nullptr)
 	, tri_mesh(nullptr)
 {

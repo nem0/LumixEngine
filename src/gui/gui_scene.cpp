@@ -827,6 +827,7 @@ struct GUISceneImpl final : GUIScene
 			case os::Keycode::RIGHT:
 				if (rect->input_field->cursor < rect->text->text.length()) ++rect->input_field->cursor;
 				break;
+			default: break;
 		}
 	}
 

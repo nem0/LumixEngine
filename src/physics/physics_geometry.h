@@ -52,7 +52,6 @@ struct PhysicsGeometry final : Resource
 
 	private:
 		PhysicsSystem& system;
-		IAllocator& allocator;
 
 		void unload() override;
 		bool load(u64 size, const u8* mem) override;

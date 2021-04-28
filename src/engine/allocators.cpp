@@ -3,7 +3,7 @@
 #include "engine/crt.h"
 #include "engine/math.h"
 #include "engine/os.h"
-#ifndef _WIN32
+#if !defined _WIN32 || defined __clang__
 	#include <string.h>
 	#include <malloc.h>
 #endif

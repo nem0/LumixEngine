@@ -100,7 +100,6 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		if (type == LuaScript::TYPE)
 		{
-			FileSystem& fs = m_app.getEngine().getFileSystem();
 			return m_app.getAssetBrowser().copyTile("editor/textures/tile_lua_script.tga", out_path);
 		}
 		return false;
@@ -476,8 +475,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		IAllocator& allocator = m_app.getAllocator();
-
 		AddComponentPlugin* add_cmp_plugin = LUMIX_NEW(m_app.getAllocator(), AddComponentPlugin)(m_app);
 		m_app.registerComponent(ICON_FA_MOON, "lua_script", *add_cmp_plugin);
 
@@ -490,8 +487,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		IAllocator& allocator = m_app.getAllocator();
-		
 		m_app.getAssetCompiler().removePlugin(m_asset_plugin);
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
 		m_app.removePlugin(m_console_plugin);

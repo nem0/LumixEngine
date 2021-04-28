@@ -16,7 +16,7 @@
 		#endif
 		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
 	#else
-		#ifdef _WIN32		
+		#if defined _MSC_VER && !defined __clang__
 			#define ASSERT(x) __assume(x)
 		#else
 			#define ASSERT(x) { false ? (void)(x) : (void)0; }

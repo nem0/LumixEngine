@@ -34,7 +34,7 @@ struct NavmeshZone {
 };
 
 struct NavmeshBuildJob {
-	~NavmeshBuildJob() {}
+	virtual ~NavmeshBuildJob() {}
 	virtual bool isFinished() = 0;
 	virtual float getProgress() = 0;
 };

@@ -8,6 +8,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/os.h"
@@ -100,7 +101,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_filtered_file_infos(app.getAllocator())
 		, m_subdirs(app.getAllocator())
 	{
-		IAllocator& allocator = app.getAllocator();
 		m_filter[0] = '\0';
 
 		onBasePathChanged();
@@ -1082,7 +1082,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void tile(const Path& path, bool selected) {
+	void tile(const Path& path, bool selected) override {
 		i32 idx = m_immediate_tiles.find([&path](const FileInfo& fi){
 			return fi.file_path_hash == path.getHash();
 		});

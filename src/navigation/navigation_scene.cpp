@@ -344,7 +344,6 @@ struct NavigationSceneImpl final : NavigationScene
 
 			const Vec3 pos(inv_tr.transform(m_universe.getPosition(agent.entity)));
 			const Quat rot = m_universe.getRotation(agent.entity);
-			const Vec3 diff = *(Vec3*)dt_agent->npos - pos;
 
 			const Vec3 velocity = *(Vec3*)dt_agent->nvel;
 			agent.speed = length(velocity);
@@ -371,7 +370,6 @@ struct NavigationSceneImpl final : NavigationScene
 		if (!zone.crowd) return;
 		
 		const Transform zone_tr = m_universe.getTransform(zone.entity);
-		const Transform inv_zone_tr = zone_tr.inverted();
 
 		zone.crowd->doMove(time_delta);
 
@@ -1606,7 +1604,7 @@ struct NavigationSceneImpl final : NavigationScene
 		return m_zones[entity].zone.flags & NavmeshZone::AUTOLOAD;
 	}
 	
-	void setZoneAutoload(EntityRef entity, bool value) {
+	void setZoneAutoload(EntityRef entity, bool value) override {
 		if (value) m_zones[entity].zone.flags |= NavmeshZone::AUTOLOAD;
 		else m_zones[entity].zone.flags &= ~NavmeshZone::AUTOLOAD;
 	}

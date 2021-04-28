@@ -521,7 +521,6 @@ int roughness(lua_State* L)
 
 int alpha_ref(lua_State* L)
 {
-	const float r = LuaWrapper::checkArg<float>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);

@@ -463,6 +463,11 @@ solution "LumixEngine"
 	configuration { "vs*" }
 		defines { "_HAS_EXCEPTIONS=0" }
 
+	configuration { "vs*", "RelWithDebInfo" }
+		flags { "NoBufferSecurityCheck" }
+		buildoptions { "/GL", "/Oi" }
+		linkoptions { "/LTCG:incremental"}
+
 	configuration "not macosx"
 		removefiles { "../src/**/osx/*"}
 		

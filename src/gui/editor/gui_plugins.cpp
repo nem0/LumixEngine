@@ -231,8 +231,6 @@ public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
 	{
-		IAllocator& allocator = app.getAllocator();
-
 		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "", true);
 		m_toggle_ui.func.bind<&GUIEditor::onAction>(this);
 		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
@@ -434,6 +432,7 @@ private:
 				EntityRef e = editor.getSelectedEntities()[0];
 				switch (m_mouse_mode)
 				{
+					case MouseMode::NONE: break;
 					case MouseMode::RESIZE:
 					{
 						editor.beginCommandGroup("gui_mouse_resize");
@@ -611,7 +610,6 @@ private:
 		const Universe& universe = *editor.getUniverse();
 		const EntityRef e = selected[0];
 
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
 		editor.beginCommandGroup("layout_gui");
 
 		u32 y = 0;
@@ -694,14 +692,7 @@ private:
 	}
 
 	void anchor(EntityRef entity, u8 mask, WorldEditor& editor) {
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
-
 		editor.beginCommandGroup("anchor_gui_rect");
-
-		float br = scene->getRectBottomRelative(entity);
-		float tr = scene->getRectTopRelative(entity);
-		float rr = scene->getRectRightRelative(entity);
-		float lr = scene->getRectLeftRelative(entity);
 
 		if (mask & (u8)EdgeMask::TOP) {
 			setRectProperty(entity, "Bottom Relative", 0, editor);
