@@ -60,8 +60,7 @@ common [[
 vertex_shader [[ 
 	#ifndef DEPTH
 		layout (location = 0) out vec2 v_uv;
-	 	layout (location = 1) out vec2 v_uv_detail;
-	 	layout (location = 2) out float v_dist2;
+	 	layout (location = 1) out float v_dist2;
 	#endif
 
 	void main() {
@@ -84,9 +83,6 @@ vertex_shader [[
 		#ifndef DEPTH
 			v_uv = v.xz / u_hm_size;
 		
-			// because of float precision
-			vec2 detail_uv_offset = floor(u_rel_camera_pos.xz);
- 			v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 			float h = texture(u_hm, hm_uv).x * u_terrain_scale.y;
 		#else
 			float h = texture(u_hm, hm_uv).x * u_terrain_scale.y;
@@ -112,8 +108,7 @@ fragment_shader [[
 
 	#ifndef DEPTH
 		layout (location = 0) in vec2 v_uv;
-		layout (location = 1) in vec2 v_uv_detail;
-		layout (location = 2) in float v_dist2;
+		layout (location = 1) in float v_dist2;
 
 		float rgbSum(vec4 v) { return dot(v, vec4(1, 1, 1, 0)); }
 
@@ -209,10 +204,12 @@ fragment_shader [[
 
 				float noise = texture(u_noise, 0.05 * v_uv * u_hm_size).x;
 
-				Detail c00 = textureNoTile(noise, v_uv_detail, int(splat00.x * 255.0 + 0.5), 1);
-				Detail c01 = textureNoTile(noise, v_uv_detail, int(splat01.x * 255.0 + 0.5), 1);
-				Detail c10 = textureNoTile(noise, v_uv_detail, int(splat10.x * 255.0 + 0.5), 1);
-				Detail c11 = textureNoTile(noise, v_uv_detail, int(splat11.x * 255.0 + 0.5), 1);
+				vec2 uv_detail = u_detail_scale * v_uv * u_hm_size;
+
+				Detail c00 = textureNoTile(noise, uv_detail, int(splat00.x * 255.0 + 0.5), 1);
+				Detail c01 = textureNoTile(noise, uv_detail, int(splat01.x * 255.0 + 0.5), 1);
+				Detail c10 = textureNoTile(noise, uv_detail, int(splat10.x * 255.0 + 0.5), 1);
+				Detail c11 = textureNoTile(noise, uv_detail, int(splat11.x * 255.0 + 0.5), 1);
 			
 				vec4 v4 = c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w;
 				float a = splat00.z * bicoef.x + splat01.z * bicoef.y + splat10.z * bicoef.z + splat11.z * bicoef.w;
@@ -220,10 +217,10 @@ fragment_shader [[
 				vec3 n0 = (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy;
 				
 				#ifdef SECONDARY_TEXTURE
-					Detail s00 = textureNoTile(noise, v_uv_detail, int(splat00.y * 255.0 + 0.5), 1);
-					Detail s01 = textureNoTile(noise, v_uv_detail, int(splat01.y * 255.0 + 0.5), 1);
-					Detail s10 = textureNoTile(noise, v_uv_detail, int(splat10.y * 255.0 + 0.5), 1);
-					Detail s11 = textureNoTile(noise, v_uv_detail, int(splat11.y * 255.0 + 0.5), 1);
+					Detail s00 = textureNoTile(noise, uv_detail, int(splat00.y * 255.0 + 0.5), 1);
+					Detail s01 = textureNoTile(noise, uv_detail, int(splat01.y * 255.0 + 0.5), 1);
+					Detail s10 = textureNoTile(noise, uv_detail, int(splat10.y * 255.0 + 0.5), 1);
+					Detail s11 = textureNoTile(noise, uv_detail, int(splat11.y * 255.0 + 0.5), 1);
 
 					vec4 v4_2 = s00.albedo * bicoef.x + s01.albedo * bicoef.y + s10.albedo * bicoef.z + s11.albedo * bicoef.w;
 					vec3 n0_2 = (s00.normal * bicoef.x + s01.normal * bicoef.y + s10.normal * bicoef.z + s11.normal * bicoef.w).xzy;
