@@ -1292,13 +1292,13 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			default: ASSERT(false); return false;
 		}
 		++src_idx;
+		for (u32 j = 0; j < decl.attributes_count; ++j) {
+			combined_srcs[src_idx] = attr_defines[decl.attributes[j].idx];
+			++src_idx;
+		}
 		const GLuint shd = glCreateShader(shader_type);
 		for (u32 j = 0; j < prefixes_count; ++j) {
 			combined_srcs[src_idx] = prefixes[j];
-			++src_idx;
-		}
-		for (u32 j = 0; j < decl.attributes_count; ++j) {
-			combined_srcs[src_idx] = attr_defines[decl.attributes[j].idx];
 			++src_idx;
 		}
 		combined_srcs[src_idx] = srcs[i];

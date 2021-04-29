@@ -1185,13 +1185,19 @@ float angleDiff(float a, float b) {
 }
 
 // Marsaglia simple rng
-static thread_local u32 u = 521288629;
-static thread_local u32 v = 362436069;
 
-u32 rand() {
+RandomGenerator::RandomGenerator(u32 u, u32 v) : u(u), v(v) {}
+
+u32 RandomGenerator::rand() {
 	u = 36969 * (u & 65535) + (u >> 16);
 	v = 18000 * (v & 65535) + (v >> 16);
 	return (u << 16) + v;
+}
+
+static thread_local RandomGenerator rg;
+
+u32 rand() {
+	return rg.rand();
 }
 
 u64 randGUID() {
@@ -1209,12 +1215,14 @@ float randFloat() {
     return float(i * 2.328306435996595e-10);
 }
 
-
-float randFloat(float from, float to)
+float RandomGenerator::randFloat(float from, float to)
 {
 	return from + float((to - from) * (rand() * 2.328306435996595e-10));
 }
 
+float randFloat(float from, float to) {
+	return rg.randFloat(from, to);
+}
 
 u32 nextPow2(u32 v)
 {

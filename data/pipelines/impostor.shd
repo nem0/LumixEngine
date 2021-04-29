@@ -49,8 +49,8 @@ vertex_shader [[
 	layout (location = 3) out vec4 v_wpos;
 	#if !defined DEPTH && !defined DEFERRED
 		layout (location = 4) out vec4 v_shadow_coefs;
-		layout (location = 5) out float v_lod;
 	#endif
+	layout (location = 5) out float v_lod;
 	
 	vec2 dirToGrid(vec3 vec)
 	{
@@ -74,8 +74,8 @@ vertex_shader [[
 		vec3 vd = vec3(N.x, N.y, N.z);
 		vec4 to_model_space = vec4(-i_rot_quat.xyz, i_rot_quat.w);
 		vd = rotateByQuat(to_model_space, vd);
+		v_lod = i_lod;
 		#if !defined DEPTH && !defined DEFERRED
-			v_lod = i_lod;
 			vec3 ld = rotateByQuat(to_model_space, -Global.light_dir.xyz);
 			v_shadow_coefs = max(vec4(ld.x, -ld.z, -ld.x, ld.z), vec4(0));
 			v_shadow_coefs /= dot(v_shadow_coefs, vec4(1));
@@ -117,8 +117,8 @@ fragment_shader [[
 	#elif !defined DEPTH
 		layout(location = 0) out vec4 o_color;
 		layout (location = 4) in vec4 v_shadow_coefs;
-		layout (location = 5) in float v_lod;
 	#endif
+	layout (location = 5) in float v_lod;
 
 	Surface getSurface()
 	{
@@ -150,6 +150,7 @@ fragment_shader [[
 	#ifdef DEPTH
 		void main()
 		{
+			if (ditherLOD(v_lod)) discard;
 			#ifdef ALPHA_CUTOUT
 				vec4 c = texture(u_albedomap, v_uv);
 				if(c.a < 0.5) discard;

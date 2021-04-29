@@ -257,6 +257,9 @@ fragment_shader [[
 	#ifdef DEPTH
 		void main()
 		{
+			#ifdef HAS_LOD
+				if (ditherLOD(v_lod)) discard;
+			#endif
 			#ifdef ALPHA_CUTOUT
 				vec4 c = texture(u_albedomap, v_uv);
 				if(c.a < 0.5) discard;

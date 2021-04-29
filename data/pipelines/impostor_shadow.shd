@@ -3,7 +3,8 @@ include "pipelines/common.glsl"
 compute_shader [[
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 	layout (rgba8, binding = 0) uniform writeonly image2D u_output;
-	layout (binding = 1) uniform sampler2D u_depth;
+	layout (binding = 1) uniform sampler2D u_normalmap;
+	layout (binding = 2) uniform sampler2D u_depth;
 	layout(std140, binding = 4) uniform Data {
 		mat4 u_projection;
 		mat4 u_proj_to_model;
@@ -64,7 +65,7 @@ compute_shader [[
 		vec4 p = to_sm * vec4(tile_uv * 2 - 1, depth, 1);
 		p.xy = p.xy * 0.5 + 0.5;
 		p.xyz /= p.w;
-		const int SPREAD = 0;
+		const int SPREAD = 2;
 		for(int j = -SPREAD; j <= SPREAD; ++j) {
 			for(int i = -SPREAD; i <= SPREAD; ++i) {
 				vec4 p2 = p;
