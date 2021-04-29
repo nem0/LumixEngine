@@ -441,7 +441,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void onFileChanged(const char* path)
 	{
-		if (startsWith(path, ".lumix")) return;
+		if (startsWith(path, ".")) return;
 		if (equalIStrings(path, "lumix.log")) return;
 		
 		MutexGuard lock(m_changed_mutex);
@@ -713,6 +713,14 @@ struct AssetCompilerImpl : AssetCompiler {
 				else {
 					addResource(path_obj.c_str());
 					pushToCompileQueue(path_obj);
+				}
+			}
+			else {
+				auto dep_iter = m_dependencies.find(path_obj);
+				if (dep_iter.isValid()) {
+					for (const Path& p : dep_iter.value()) {
+						pushToCompileQueue(p);
+					}
 				}
 			}
 		}
