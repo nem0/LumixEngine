@@ -219,6 +219,12 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		m_material_decal_map.clear();
 
+		for(auto iter = m_material_curve_decal_map.begin(), end = m_material_curve_decal_map.end(); iter != end; ++iter) {
+			Material* mat = iter.key();
+			mat->getObserverCb().unbind<&RenderSceneImpl::curveDecalMaterialStateChanged>(this);
+		}
+		m_material_curve_decal_map.clear();
+
 		m_culling_system->clear();
 
 		for (const ReflectionProbe& probe : m_reflection_probes) {
