@@ -89,7 +89,6 @@ compute_shader [[
 			+ 0.125 * getShadow(tile_uv, depth, mid - vec3(0, 0.2, 0))
 			+ 0.125 * getShadow(tile_uv, depth, mid + delta)
 			+ 0.125 * getShadow(tile_uv, depth, mid - delta);
-	
 	}
 
 	void main() {

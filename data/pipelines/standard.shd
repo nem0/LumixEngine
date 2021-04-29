@@ -94,11 +94,11 @@ vertex_shader [[
 	#endif
 	
 	void main() {
-		#ifdef HAS_LOD
-			v_lod = 0;
-		#endif
 		v_uv = a_uv;
 		#if defined INSTANCED || defined GRASS
+			#ifdef HAS_LOD
+				v_lod = 0;
+			#endif
 			v_normal = rotateByQuat(i_rot_quat, a_normal);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
