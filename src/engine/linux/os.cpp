@@ -419,11 +419,11 @@ ThreadID getCurrentThreadID() {
 void logInfo() {
 	struct utsname tmp;
 	if (uname(&tmp) == 0) {
-		logInfo("sysname: ", tmp.sysname);
-		logInfo("nodename: ", tmp.nodename);
-		logInfo("release: ", tmp.release);
-		logInfo("version: ", tmp.version);
-		logInfo("machine: ", tmp.machine);
+		Lumix::logInfo("sysname: ", tmp.sysname);
+		Lumix::logInfo("nodename: ", tmp.nodename);
+		Lumix::logInfo("release: ", tmp.release);
+		Lumix::logInfo("version: ", tmp.version);
+		Lumix::logInfo("machine: ", tmp.machine);
 	} else {
 		logWarning("uname failed");
 	}
