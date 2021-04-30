@@ -76,6 +76,7 @@ namespace TextureCompressor {
 
 struct Options {
 	bool generate_mipmaps = false;
+	bool stochastic_mipmap = false;
 	float scale_coverage_ref = -0.5f;
 };
 
@@ -160,9 +161,49 @@ static u32 getCompressedSize(u32 w, u32 h, u32 mips, u32 faces, u32 bytes_per_bl
 	return total;
 }
 
-static void computeMip(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w, u32 dst_h, bool is_srgb, IAllocator& allocator) {
+static void downsampleNormal(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w, u32 dst_h) {
+	ASSERT(w / dst_w <= 3);
+	ASSERT(h / dst_h <= 3);
+
+	const float rw = w / float(dst_w);
+	const float rh = h / float(dst_h);
+
+	auto fract = [](float f) { return f - u32(f); };
+
+	const u32* sptr = (const u32*)src.begin();
+	u32* dptr = (u32*)dst.begin();
+
+	jobs::forEach(dst_h, 1, [&](i32 j, i32) {
+		RandomGenerator rg(521288629, 362436069 + 1337 * j);
+		for (u32 i = 0; i < dst_w; ++i) {
+			float r = rg.randFloat(0, rh);
+			float s = j * rh;
+			float r0 = 1 - fract(s);
+			const u32 row = (r > r0) + (r > (r0 + 1));
+
+			r = rg.randFloat(0, rw);
+			s = i * rw;
+			r0 = 1 - fract(s);
+			const u32 col = (r > r0) + (r > (r0 + 1));
+
+			const u32 isrc = u32(i * rw) + col;
+			const u32 jsrc = u32(j * rh) + row;
+
+			ASSERT(isrc < w);
+			ASSERT(jsrc < h);
+
+			dptr[i + j * dst_w] = sptr[isrc + jsrc * w];
+		}
+	});
+}
+
+static void computeMip(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w, u32 dst_h, bool is_srgb, bool stochastic, IAllocator& allocator) {
 	PROFILE_FUNCTION();
-	if (is_srgb) {
+	if (stochastic) {
+		ASSERT(!is_srgb);
+		downsampleNormal(src, dst, w, h, dst_w, dst_h);
+	}
+	else if (is_srgb) {
 		i32 res = stbir_resize_uint8_srgb(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4, 3, STBIR_ALPHA_CHANNEL_NONE);
 		ASSERT(res == 1);
 	}
@@ -342,7 +383,7 @@ static void compress(void (*compressor)(Span<const u8>, OutputMemoryStream&, u32
 						mip_data.resize(mip_w * mip_h * 4);
 						u32 prev_w = maximum(src_data.w >> (mip - 1), 1);
 						u32 prev_h = maximum(src_data.h >> (mip - 1), 1);
-						computeMip(mip == 1 ? (Span<const u8>)src_data.get(face, slice, 0).pixels : prev_mip, mip_data, prev_w, prev_h, mip_w, mip_h, src_data.is_srgb, allocator);
+						computeMip(mip == 1 ? (Span<const u8>)src_data.get(face, slice, 0).pixels : prev_mip, mip_data, prev_w, prev_h, mip_w, mip_h, src_data.is_srgb, options.stochastic_mipmap, allocator);
 						if (options.scale_coverage_ref >= 0.f) {
 							scaleCoverage(mip_data, mip_w, mip_h, options.scale_coverage_ref, coverage);
 						}
@@ -1078,6 +1119,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool is_normalmap = false;
 		bool mips = true;
 		float scale_coverage = -0.5f;
+		bool stochastic_mipmap = false;
 		bool convert_to_raw = false;
 		bool compress = false;
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
@@ -1313,6 +1355,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		dst.write(&flags, sizeof(flags));
 		TextureCompressor::Options options;
 		options.generate_mipmaps = meta.mips;
+		options.stochastic_mipmap = meta.stochastic_mipmap;
 		options.scale_coverage_ref = meta.scale_coverage;
 		return TextureCompressor::compress(input, options, dst, allocator);
 	}
@@ -1401,6 +1444,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			input.has_alpha = comps == 4;
 			TextureCompressor::Options options;
 			options.generate_mipmaps = meta.mips;
+			options.stochastic_mipmap = meta.stochastic_mipmap; 
 			options.scale_coverage_ref = meta.scale_coverage;
 			const bool res = TextureCompressor::compress(input, options, dst, m_app.getAllocator());
 			stbi_image_free(data);
@@ -1416,6 +1460,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &meta.compress);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "convert_to_raw", &meta.convert_to_raw);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &meta.stochastic_mipmap);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &meta.mips);
 			char tmp[32];
@@ -1695,7 +1740,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("##srgb", &m_meta.srgb);
 			ImGuiEx::Label("Mipmaps");
 			ImGui::Checkbox("##mip", &m_meta.mips);
-			
+			if (m_meta.mips) {
+				ImGuiEx::Label("Stochastic mipmap");
+				ImGui::Checkbox("##stomip", &m_meta.stochastic_mipmap);
+			}
+
 			const bool is_tga = Path::hasExtension(texture->getPath().c_str(), "tga");
 			if (is_tga) {
 				ImGuiEx::Label("Compress");
@@ -1735,6 +1784,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
 					, "\ncompress = ", m_meta.compress ? "true" : "false"
 					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
+					, "\nstochastic_mip = ", m_meta.stochastic_mipmap ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nmips = ", m_meta.mips ? "true" : "false"
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
