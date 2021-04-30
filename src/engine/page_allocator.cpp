@@ -1,6 +1,7 @@
 #include "engine/allocator.h"
-#include "engine/crt.h"
 #include "engine/atomic.h"
+#include "engine/crt.h"
+#include "engine/log.h"
 #include "engine/page_allocator.h"
 #include "engine/os.h"
 
@@ -8,6 +9,9 @@
 namespace Lumix
 {
 
+PageAllocator::PageAllocator() {
+	LUMIX_FATAL(os::getMemPageAlignment() % PAGE_SIZE == 0);
+}
 
 PageAllocator::~PageAllocator()
 {

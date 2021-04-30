@@ -234,7 +234,7 @@ struct WCharStr
 
 void sleep(u32 milliseconds) { ::Sleep(milliseconds); }
 
-static_assert(sizeof(ThreadID) == sizeof(::GetCurrentThreadId()), "Not matching");
+static_assert(sizeof(ThreadID) == sizeof(::GetCurrentThreadId()));
 ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
 u32 getCPUsCount() {
@@ -247,7 +247,7 @@ u32 getCPUsCount() {
 	return num;
 }
 
-void logVersion() {
+void logInfo() {
 	DWORD dwVersion = 0;
 	DWORD dwMajorVersion = 0;
 	DWORD dwMinorVersion = 0;
@@ -260,7 +260,13 @@ void logVersion() {
 
 	if (dwVersion < 0x80000000) dwBuild = (DWORD)(HIWORD(dwVersion));
 
-	logInfo("OS Version is ", u32(dwMajorVersion), ".", u32(dwMinorVersion), " (", u32(dwBuild), ")");
+	Lumix::logInfo("OS Version: ", u32(dwMajorVersion), ".", u32(dwMinorVersion), " (", u32(dwBuild), ")");
+
+	SYSTEM_INFO sys_info;
+	GetSystemInfo(&sys_info);
+	Lumix::logInfo("Page size: ", u32(sys_info.dwPageSize));
+	Lumix::logInfo("Number of processors: ", u32(sys_info.dwNumberOfProcessors));
+	Lumix::logInfo("Allocation granularity: ", u32(sys_info.dwAllocationGranularity));
 }
 
 
@@ -806,6 +812,12 @@ u32 getMemPageSize() {
 	SYSTEM_INFO info;
 	GetSystemInfo(&info);
 	return info.dwPageSize;
+}
+
+u32 getMemPageAlignment() {
+	SYSTEM_INFO info;
+	GetSystemInfo(&info);
+	return info.dwAllocationGranularity;
 }
 
 void* memReserve(size_t size) {

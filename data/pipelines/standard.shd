@@ -39,7 +39,7 @@ common [[
 			float fur_gravity;
 			float padding;
 			mat4 matrix;
-			mat4 bones[256];
+			mat2x4 bones[255];
 		} Model;
 	#endif
 
@@ -96,9 +96,6 @@ vertex_shader [[
 	void main() {
 		v_uv = a_uv;
 		#if defined INSTANCED || defined GRASS
-			#ifdef HAS_LOD
-				v_lod = 0;
-			#endif
 			v_normal = rotateByQuat(i_rot_quat, a_normal);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
@@ -123,17 +120,26 @@ vertex_shader [[
 				v_ao = a_ao;
 			#endif
 		#elif defined SKINNED
-			mat4 model_mtx = Model.matrix * (a_weights.x * Model.bones[a_indices.x] + 
-			a_weights.y * Model.bones[a_indices.y] +
-			a_weights.z * Model.bones[a_indices.z] +
-			a_weights.w * Model.bones[a_indices.w]);
-			v_normal = mat3(model_mtx) * a_normal;
-			v_tangent = mat3(model_mtx) * a_tangent;
+			mat2x4 dq = a_weights.x * Model.bones[a_indices.x];
+			float w = dot(Model.bones[a_indices.y][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.y : a_weights.y;
+			dq += w * Model.bones[a_indices.y];
+			w = dot(Model.bones[a_indices.z][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.z : a_weights.z;
+			dq += w * Model.bones[a_indices.z];
+			w = dot(Model.bones[a_indices.w][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.w : a_weights.w;
+			dq += w * Model.bones[a_indices.w];
+			
+			dq *= 1 / length(dq[0]);
+
+			mat3 m = mat3(Model.matrix);
+			v_normal = m * rotateByQuat(dq[0], a_normal);
+			v_tangent = m * rotateByQuat(dq[0], a_tangent);
+			vec3 mpos;
 			#ifdef FUR
-				v_wpos = model_mtx * vec4(a_position + (a_normal + vec3(0, -Model.fur_gravity * Model.layer, 0)) * Model.layer * Model.fur_scale,  1);
+				mpos = a_position + (a_normal + vec3(0, -Model.fur_gravity * Model.layer, 0)) * Model.layer * Model.fur_scale;
 			#else
-				v_wpos = model_mtx * vec4(a_position,  1);
+				mpos = a_position;
 			#endif
+			v_wpos = Model.matrix * vec4(transformByDualQuat(dq, mpos), 1);
 		#else 
 			mat4 model_mtx = Model.matrix;
 			v_normal = mat3(model_mtx) * a_normal;

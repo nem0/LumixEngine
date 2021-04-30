@@ -133,6 +133,18 @@ namespace Lumix
 		return _mm_max_ps(a, b);
 	}
 
+	LUMIX_FORCE_INLINE float4 operator +(float4 a, float4 b) {
+		return _mm_add_ps(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 operator -(float4 a, float4 b) {
+		return _mm_sub_ps(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 operator *(float4 a, float4 b) {
+		return _mm_mul_ps(a, b);
+	}
+
 #else 
 	struct float4
 	{
@@ -323,6 +335,18 @@ namespace Lumix
 			a.z > b.z ? a.z : b.z,
 			a.w > b.w ? a.w : b.w
 		};
+	}
+
+	LUMIX_FORCE_INLINE float4 operator +(float4 a, float4 b) {
+		return f4Add(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 operator -(float4 a, float4 b) {
+		return f4Sub(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 operator *(float4 a, float4 b) {
+		return f4Mul(a, b);
 	}
 
 #endif

@@ -114,7 +114,6 @@ struct CullingSystemImpl final : CullingSystem
 
 	void add(EntityRef entity, u8 type, const DVec3& pos, float radius) override
 	{
-		// TODO reuse free space
 		if(m_entity_to_cell.size() <= entity.index) {
 			m_entity_to_cell.reserve(entity.index);
 			while(m_entity_to_cell.size() <= entity.index) {
@@ -261,7 +260,6 @@ struct CullingSystemImpl final : CullingSystem
 		m_entity_to_cell.clear();
 	}
 
-
 	LUMIX_FORCE_INLINE void doCulling(const CellPage& cell
 		, const Frustum& frustum
 		, CullResult* LUMIX_RESTRICT results
@@ -281,26 +279,21 @@ struct CullingSystemImpl final : CullingSystem
 		const float4 pz2 = f4Load(&frustum.zs[4]);
 		const float4 pd2 = f4Load(&frustum.ds[4]);
 		int cursor = results->header.count;
-	
+
 		int i = 0;
+
 		for (const Sphere *sphere = start; sphere < end; ++sphere, ++i) {
 			const float4 cx = f4Splat(sphere->position.x);
 			const float4 cy = f4Splat(sphere->position.y);
 			const float4 cz = f4Splat(sphere->position.z);
 			const float4 r = f4Splat(-sphere->radius);
 
-			float4 t = f4Mul(cx, px);
-			t = f4Add(t, f4Mul(cy, py));
-			t = f4Add(t, f4Mul(cz, pz));
-			t = f4Add(t, pd);
-			t = f4Sub(t, r);
+			float4 t = cx * px + cy * py + cz * pz + pd;
+			t = t - r;
 			if (f4MoveMask(t)) continue;
 
-			t = f4Mul(cx, px2);
-			t = f4Add(t, f4Mul(cy, py2));
-			t = f4Add(t, f4Mul(cz, pz2));
-			t = f4Add(t, pd2);
-			t = f4Sub(t, r);
+			t = cx * px2 + cy * py2 + cz * pz2 + pd2;
+			t = t - r;
 			if (f4MoveMask(t)) continue;
 
 			if(cursor == lengthOf(results->entities)) {

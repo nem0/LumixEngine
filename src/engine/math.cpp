@@ -735,6 +735,18 @@ LocalRigidTransform LocalRigidTransform::inverted() const {
 	return result;
 }
 
+DualQuat LocalRigidTransform::toDualQuat() const {
+	DualQuat res;
+	res.r = rot;
+	res.d = {
+		0.5f * (pos.x * rot.w + pos.y * rot.z - pos.z * rot.y),
+		0.5f * (-pos.x * rot.z + pos.y * rot.w + pos.z * rot.x),
+		0.5f * (pos.x * rot.y - pos.y * rot.x + pos.z * rot.w),
+		-0.5f * (pos.x * rot.x + pos.y * rot.y + pos.z * rot.z)
+	};
+	return res;
+}
+
 Matrix LocalRigidTransform::toMatrix() const {
 	return Matrix(pos, rot);
 }

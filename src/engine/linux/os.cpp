@@ -416,7 +416,7 @@ ThreadID getCurrentThreadID() {
 	return pthread_self();
 }
 
-void logVersion() {
+void logInfo() {
 	struct utsname tmp;
 	if (uname(&tmp) == 0) {
 		logInfo("sysname: ", tmp.sysname);
@@ -896,6 +896,10 @@ int getDPI() {
 u32 getMemPageSize() {
 	const u32 sz = sysconf(_SC_PAGESIZE);
 	return sz;
+}
+
+u32 getMemPageAlignment() {
+	return getMemPageSize();
 }
 
 void* memReserve(size_t size) {

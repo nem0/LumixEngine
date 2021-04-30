@@ -428,6 +428,12 @@ vec3 evalSH(EnvProbe probe, vec3 N) {
 	+ probe.sh_coefs8.rgb * (N.x * N.x - N.y * N.y);
 }
 
+vec3 transformByDualQuat(mat2x4 dq, vec3 pos) {
+	return pos 
+		+ 2 * cross(dq[0].xyz, cross(dq[0].xyz, pos) + dq[0].w * pos) 
+		+ 2 * (dq[0].w * dq[1].xyz - dq[1].w * dq[0].xyz + cross(dq[0].xyz, dq[1].xyz));
+}
+
 vec3 rotateByQuat(vec4 rot, vec3 pos)
 {
 	vec3 uv = cross(rot.xyz, pos);

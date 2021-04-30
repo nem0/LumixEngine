@@ -18,6 +18,7 @@ public:
 		enum { PAGE_SIZE = 16384 };
 	#endif
 
+	PageAllocator();
 	~PageAllocator();
 		
 	void* allocate(bool lock);

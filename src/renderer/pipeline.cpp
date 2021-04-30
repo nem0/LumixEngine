@@ -3091,7 +3091,8 @@ struct PipelineImpl final : Pipeline
 								float fur_scale;
 								float gravity;
 								float padding;
-								Matrix bones[256];
+								Matrix model_mtx;
+								DualQuat bones[255];
 							} dc;
 							ASSERT(bones_count < (i32)lengthOf(dc.bones));
 
@@ -3104,11 +3105,11 @@ struct PipelineImpl final : Pipeline
 								dc.gravity = tmp3;
 							}
 
-							Matrix* bones = (Matrix*)cmd;
+							DualQuat* bones = (DualQuat*)cmd;
 							cmd += sizeof(bones[0]) * bones_count;
 
-							Matrix model_mtx(pos, rot);
-							model_mtx.multiply3x3(scale);
+							dc.model_mtx = Matrix(pos, rot);
+							dc.model_mtx.multiply3x3(scale);
 
 							gpu::bindTextures(material->textures, 0, material->textures_count);
 
@@ -3118,8 +3119,7 @@ struct PipelineImpl final : Pipeline
 								material_ub_idx = material->material_constants;
 							}
 
-							dc.bones[0] = model_mtx;
-							memcpy(&dc.bones[1], bones, sizeof(Matrix) * bones_count);
+							memcpy(&dc.bones[0], bones, sizeof(bones[0]) * bones_count);
 
 							gpu::useProgram(program);
 
@@ -3454,8 +3454,8 @@ struct PipelineImpl final : Pipeline
 					for (int j = 0, c = mi->pose->count; j < c; ++j) {
 						const Model::Bone& bone = model.getBone(j);
 						const LocalRigidTransform tmp = {positions[j], rotations[j]};
-						const Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
-						WRITE(m);
+						const DualQuat dq = (tmp * bone.inv_bind_transform).toDualQuat();
+						WRITE(dq);
 					}
 					break;
 				}
@@ -4244,6 +4244,7 @@ struct PipelineImpl final : Pipeline
 			view.instancers.emplace(m_allocator, m_renderer.getEngine().getPageAllocator());
 		}
 
+		const float time_delta = m_renderer.getEngine().getLastTimeDelta();
 		volatile i32 worker_idx = 0;
 
 		jobs::runOnWorkers([&](){
@@ -4351,12 +4352,12 @@ struct PipelineImpl final : Pipeline
 									const float d = lod_idx - mi.lod;
 									const float ad = fabsf(d);
 									
-									if (ad <= 0.03f) {
+									if (ad <= time_delta) {
 										mi.lod = float(lod_idx);
 										create_key(mi.model->getLODIndices()[lod_idx]);
 									}
 									else {
-										mi.lod += d / ad * 0.03f;
+										mi.lod += d / ad * time_delta;
 										const u32 cur_lod_idx = u32(mi.lod);
 										create_key(mi.model->getLODIndices()[cur_lod_idx]);
 										if (cur_lod_idx < 3) create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
@@ -4403,12 +4404,12 @@ struct PipelineImpl final : Pipeline
 								const float d = lod_idx - mi.lod;
 								const float ad = fabsf(d);
 									
-								if (ad <= 0.03f) {
+								if (ad <= time_delta) {
 									mi.lod = float(lod_idx);
 									create_key(mi.model->getLODIndices()[lod_idx]);
 								}
 								else {
-									if(!is_shadow) mi.lod += d / ad * 0.03f;
+									if (!is_shadow) mi.lod += d / ad * time_delta;
 									const u32 cur_lod_idx = u32(mi.lod);
 									create_key(mi.model->getLODIndices()[cur_lod_idx]);
 									if (cur_lod_idx < 3) create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);

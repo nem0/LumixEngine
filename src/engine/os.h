@@ -157,7 +157,7 @@ struct WindowState {
 };
 
 LUMIX_ENGINE_API void init();
-LUMIX_ENGINE_API void logVersion();
+LUMIX_ENGINE_API void logInfo();
 LUMIX_ENGINE_API u32 getCPUsCount();
 LUMIX_ENGINE_API void sleep(u32 milliseconds);
 LUMIX_ENGINE_API ThreadID getCurrentThreadID();
@@ -166,6 +166,7 @@ LUMIX_ENGINE_API void* memReserve(size_t size);
 LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);
 LUMIX_ENGINE_API void memRelease(void* ptr, size_t size); // size must be full size used in reserve
 LUMIX_ENGINE_API u32 getMemPageSize();
+LUMIX_ENGINE_API u32 getMemPageAlignment();
 
 LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
 LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);

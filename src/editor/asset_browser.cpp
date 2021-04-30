@@ -73,8 +73,7 @@ bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path
 }
 
 struct AssetBrowserImpl : AssetBrowser {
-	struct FileInfo
-	{
+	struct FileInfo {
 		StaticString<LUMIX_MAX_PATH> clamped_filename;
 		StaticString<LUMIX_MAX_PATH> filepath;
 		u32 file_path_hash;
@@ -82,7 +81,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		bool create_called = false;
 	};
 
-	struct ImmediateTile : FileInfo{
+	struct ImmediateTile : FileInfo {
 		u32 gc_counter;
 	};
 

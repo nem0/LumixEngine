@@ -232,12 +232,17 @@ struct LUMIX_ENGINE_API Quat
 	static const Quat IDENTITY;
 };
 
+struct LUMIX_ENGINE_API DualQuat {
+	Quat r;
+	Quat d;
+};
+
 struct LUMIX_ENGINE_API LocalRigidTransform {
 	LocalRigidTransform inverted() const;
 	LocalRigidTransform operator*(const LocalRigidTransform& rhs) const;
 	Matrix toMatrix() const;
+	DualQuat toDualQuat() const;
 	LocalRigidTransform interpolate(const LocalRigidTransform& rhs, float t) const;
-
 	Vec3 pos;
 	Quat rot;
 };

@@ -94,7 +94,7 @@ public:
 		registerLogCallback<&EngineImpl::logToFile>(this);
 		registerLogCallback<logToDebugOutput>();
 
-		os::logVersion();
+		os::logInfo();
 
 		m_state = luaL_newstate();
 		luaL_openlibs(m_state);

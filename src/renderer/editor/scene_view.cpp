@@ -889,11 +889,11 @@ void SceneView::renderSelection()
 					item.mtx = universe.getRelativeMatrix(e, m_cam_pos);
 					if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
 						define_mask |= skinned_define;
-						item.pose.push(item.mtx);
+						item.pose.reserve(pose->count);
 						for (int j = 0, c = pose->count; j < c; ++j) {
 							const Model::Bone& bone = model->getBone(j);
 							const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
-							item.pose.push((tmp * bone.inv_bind_transform).toMatrix());
+							item.pose.push((tmp * bone.inv_bind_transform).toDualQuat());
 						}
 					}
 					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, define_mask);
@@ -920,12 +920,14 @@ void SceneView::renderSelection()
 						float fur_scale;
 						float gravity;
 						float padding;
-						Matrix bones[256];
+						Matrix model_mtx;
+						DualQuat bones[255];
 					} dc;
 					ASSERT(item.pose.size() < (i32)lengthOf(dc.bones));
 					dc.layer = 0;
 					dc.fur_scale = 0;
 					dc.gravity = 0;
+					dc.model_mtx = item.mtx;
 					memcpy(dc.bones, item.pose.begin(), item.pose.byte_size());
 					const u32 size = item.pose.byte_size() + sizeof(Vec4);
 					gpu::update(drawcall_ub, &dc, size);
@@ -945,7 +947,7 @@ void SceneView::renderSelection()
 
 		struct Item {
 			Item(IAllocator& allocator) : pose(allocator) {}
-			Array<Matrix> pose;
+			Array<DualQuat> pose;
 			gpu::ProgramHandle program;
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
