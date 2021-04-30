@@ -1077,7 +1077,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, "impostor_shadow");
 		gpu::useProgram(m_shadow_program);
 		gpu::bindImageTexture(shadow, 0);
-		gpu::bindTextures(&gbs[2], 1, 1);
+		gpu::bindTextures(&gbs[1], 1, 2);
 		struct {
 			Matrix projection;
 			Matrix proj_to_model;

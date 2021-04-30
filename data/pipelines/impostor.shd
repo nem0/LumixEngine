@@ -5,17 +5,7 @@ texture_slot {
 
 texture_slot {
 	name = "Normal",
-	default_texture = "textures/common/default_normal.tga"
-}
-
-texture_slot {
-	name = "Roughness",
-	default_texture = "textures/common/white.tga"
-}
-
-texture_slot {
-	name = "Metallic",
-	default_texture = "textures/common/white.tga"
+	define = "HAS_NORMAL"
 }
 
 texture_slot {
@@ -100,10 +90,10 @@ vertex_shader [[
 
 fragment_shader [[
 	layout (binding=0) uniform sampler2D u_albedomap;
-	layout (binding=1) uniform sampler2D u_normalmap;
-	layout (binding=2) uniform sampler2D u_roughnessmap;
-	layout (binding=3) uniform sampler2D u_metallicmap;
-	layout (binding=4) uniform sampler2D u_selfshadow;
+	#ifdef HAS_NORMAL
+		layout (binding=1) uniform sampler2D u_normalmap;
+	#endif
+	layout (binding=2) uniform sampler2D u_selfshadow;
 	layout (binding=6) uniform samplerCubeArray u_reflection_probes;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 1) in vec3 v_normal;
@@ -137,10 +127,15 @@ fragment_shader [[
 		
 		data.wpos = v_wpos.xyz;
 		data.V = normalize(-data.wpos);
-		data.roughness = texture(u_roughnessmap, v_uv).r * u_roughness;
-		data.metallic  = texture(u_metallicmap, v_uv).r * u_metallic;
-		data.N = texture(u_normalmap, v_uv).xzy * 2 - 1;
-		data.N = tbn * data.N;
+		data.roughness = u_roughness;
+		data.metallic = u_metallic;
+		#ifdef HAS_NORMAL
+			data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
+			data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 		
+			data.N = tbn * data.N;
+		#else
+			data.N = vec3(0, 1, 0);
+		#endif
 		data.emission = u_emission;
 		data.translucency = u_translucency;
 		data.ao = 1;
