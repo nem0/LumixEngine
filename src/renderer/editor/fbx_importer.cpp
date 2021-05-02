@@ -1168,25 +1168,24 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	const PathInfo src_info(model->getPath().c_str());
 	const StaticString<LUMIX_MAX_PATH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
 	os::OutputFile f;
-	if (!m_filesystem.open(mat_src, f)) {
-		logError("Failed to create ", mat_src);
+	if (!m_filesystem.fileExists(mat_src)) {
+		if (!m_filesystem.open(mat_src, f)) {
+			logError("Failed to create ", mat_src);
+		}
+		else {
+			const AABB& aabb = model->getAABB();
+			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+			f << "shader \"/pipelines/impostor.shd\"\n";
+			f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
+			f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
+			f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
+			f << "defines { \"ALPHA_CUTOUT\" }\n";
+			f << "layer \"impostor\"\n";
+			f << "backface_culling(false)\n";
+			f << "uniform(\"Center\", { 0, " << center.y << ", 0 })\n";
+			f.close();
+		}
 	}
-	else {
-		const AABB& aabb = model->getAABB();
-		const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		f << "shader \"/pipelines/impostor.shd\"\n";
-		f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
-		f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
-		f << "texture \"\"\n";
-		f << "texture \"\"\n";
-		f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
-		f << "defines { \"ALPHA_CUTOUT\" }\n";
-		f << "layer \"impostor\"\n";
-		f << "backface_culling(false)\n";
-		f << "uniform(\"Center\", { 0, " << center.y << ", 0 })\n";
-		f.close();
-	}
-
 	
 	return true;
 }
@@ -1257,25 +1256,6 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			logError("Failed to write ", mat_src);
 		}
 		f.close();
-	}
-
-	if (cfg.create_impostor) {
-		const StaticString<LUMIX_MAX_PATH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
-		if (!m_filesystem.fileExists(mat_src)) {
-			os::OutputFile f;
-			if (!m_filesystem.open(mat_src, f)) {
-				logError("Failed to create ", mat_src);
-			}
-			else {
-				f << "shader \"/pipelines/impostor.shd\"\n";
-				f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
-				f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
-				f << "defines { \"ALPHA_CUTOUT\" }\n";
-				f << "layer \"impostor\"\n";
-				f << "backface_culling(false)\n";
-				f.close();
-			}
-		}
 	}
 }
 
