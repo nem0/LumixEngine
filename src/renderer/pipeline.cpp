@@ -3327,7 +3327,7 @@ struct PipelineImpl final : Pipeline
 					const float lod_d = model_instances[e.index].lod - mesh.lod;
 					memcpy(instance_data, &lod_d, sizeof(lod_d));
 					instance_data += sizeof(lod_d);
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
 						new_page(bucket);
 					}
 
@@ -3354,7 +3354,7 @@ struct PipelineImpl final : Pipeline
 						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
 						const u32 total_count = instances.end->offset + instances.end->count;
 						const Mesh& mesh = *sort_key_to_mesh[group_idx];
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
 							new_page(bucket);
 						}
 
@@ -3396,7 +3396,7 @@ struct PipelineImpl final : Pipeline
 							memcpy(instance_data, &lod_d, sizeof(lod_d));
 							instance_data += sizeof(lod_d);
 						}
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
 							new_page(bucket);
 						}
 
