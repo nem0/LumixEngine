@@ -8,6 +8,7 @@ compute_shader [[
 	layout(std140, binding = 4) uniform Data {
 		mat4 u_projection;
 		mat4 u_proj_to_model;
+		mat4 u_inv_view;
 		vec4 u_center;
 		ivec2 u_tile;
 		ivec2 u_tile_size;
@@ -66,7 +67,7 @@ compute_shader [[
 		vec4 p = to_sm * vec4(tile_uv * 2 - 1, depth, 1);
 		p.xy = p.xy * 0.5 + 0.5;
 		p.xyz /= p.w;
-		const int SPREAD = 2;
+		const int SPREAD = 0;
 		for(int j = -SPREAD; j <= SPREAD; ++j) {
 			for(int i = -SPREAD; i <= SPREAD; ++i) {
 				vec4 p2 = p;
@@ -84,12 +85,21 @@ compute_shader [[
 		return res / (2 * SPREAD + 1) /  (2 * SPREAD + 1);
 	}
 
-	float softShadow(vec2 tile_uv, float depth, vec3 mid, vec3 delta) {
-		return 0.5 * getShadow(tile_uv, depth, mid) 
-			+ 0.125 * getShadow(tile_uv, depth, mid + vec3(0, 0.2, 0))
-			+ 0.125 * getShadow(tile_uv, depth, mid - vec3(0, 0.2, 0))
-			+ 0.125 * getShadow(tile_uv, depth, mid + delta)
-			+ 0.125 * getShadow(tile_uv, depth, mid - delta);
+	float softShadow(vec2 tile_uv, vec3 N, float depth, vec3 mid, vec3 delta) {
+		float NdL = saturate(0.1 + 
+			0.5 * saturate(dot(N, -mid)) 
+			+ 0.25 * saturate(dot(N, -mid - delta)) 
+			+ 0.25 * saturate(dot(N, -mid + delta))
+		);
+		NdL *= NdL;
+		float s = 0.5 * getShadow(tile_uv, depth, mid)
+			+ 0.25 * getShadow(tile_uv, depth, mid + delta)
+			+ 0.25 * getShadow(tile_uv, depth, mid - delta);
+		#ifdef BAKE_NORMALS
+			return saturate(min(s, NdL));
+		#else
+			return saturate(s);
+		#endif
 	}
 
 	void main() {
@@ -98,13 +108,17 @@ compute_shader [[
 		vec2 tile_uv = gl_GlobalInvocationID.xy / vec2(u_tile_size);
 		vec2 uv = (u_tile + tile_uv) / float(u_size);
 		float depth = texture(u_depth, uv).r;
+		vec3 N;
+		N.xy = texture(u_normalmap, uv).xy * 2 - 1;
+		N.z = sqrt(1 - dot(N.xy, N.xy));
+		N = mat3(u_inv_view) * N;
 
-		float zenith = -0.5;
+		float zenith = -1;
 		vec4 res = vec4(
-			softShadow(tile_uv, depth, vec3(1, zenith, 0), vec3(0, 0, 0.2)),
-			softShadow(tile_uv, depth, vec3(0, zenith, -1), vec3(0.2, 0, 0)),
-			softShadow(tile_uv, depth, vec3(-1, zenith, 0), vec3(0, 0, 0.2)),
-			softShadow(tile_uv, depth, vec3(0, zenith, 1), vec3(0.2, 0, 0))
+			softShadow(tile_uv, N, depth, vec3(1, zenith, 0), vec3(0, 0, 0.5)),
+			softShadow(tile_uv, N, depth, vec3(0, zenith, -1), vec3(0.5, 0, 0)),
+			softShadow(tile_uv, N, depth, vec3(-1, zenith, 0), vec3(0, 0, 0.5)),
+			softShadow(tile_uv, N, depth, vec3(0, zenith, 1), vec3(0.5, 0, 0))
 		);
 
 		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy + u_tile * u_tile_size), res);

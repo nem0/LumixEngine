@@ -134,7 +134,7 @@ fragment_shader [[
 			data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 		
 			data.N = tbn * data.N;
 		#else
-			data.N = vec3(0, 1, 0);
+			data.N = Global.light_dir.xyz;
 		#endif
 		data.emission = u_emission;
 		data.translucency = u_translucency;
@@ -163,8 +163,8 @@ fragment_shader [[
 			if (ditherLOD(v_lod)) discard;
 
 			Surface surface = getSurface();
-			vec4 self_shadow = textureLod(u_selfshadow, v_uv, 0);
-			float shadow = dot(self_shadow, v_shadow_coefs);
+			vec4 self_shadow = texture(u_selfshadow, v_uv);
+			float shadow = saturate(dot(self_shadow, v_shadow_coefs));
 			
 			vec3 res = computeDirectLight(surface
 				, Global.light_dir.xyz

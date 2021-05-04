@@ -1022,11 +1022,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		m_tile_size.x = (m_tile_size.x + 3) & ~3;
 		m_tile_size.y = (m_tile_size.y + 3) & ~3;
 		const IVec2 texture_size = m_tile_size * IMPOSTOR_COLS;
-		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
+		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::SRGBA, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
 		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb1");
 		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gbd");
 		
-		gpu::setFramebuffer(gbs, 2, gbs[2], gpu::FramebufferFlags::NONE);
+		gpu::setFramebuffer(gbs, 2, gbs[2], gpu::FramebufferFlags::SRGB);
 		const float color[] = {0, 0, 0, 0};
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH | gpu::ClearFlags::STENCIL, color, 0);
 
@@ -1081,6 +1081,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		struct {
 			Matrix projection;
 			Matrix proj_to_model;
+			Matrix inv_view;
 			Vec4 center;
 			IVec2 tile;
 			IVec2 tile_size;
@@ -1097,6 +1098,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 				projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, true);
 				data.proj_to_model = (projection * view).inverted();
 				data.projection = projection;
+				data.inv_view = view.inverted();
 				data.center = Vec4(center, 1);
 				data.tile = IVec2(i, j);
 				data.tile_size = m_tile_size;
@@ -1113,8 +1115,10 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::copy(staging, gbs[0], 0, 0);
 		gpu::readTexture(staging, 0, Span((u8*)m_gb0.begin(), m_gb0.byte_size()));
 		
-		gpu::copy(staging, gbs[1], 0, 0);
-		gpu::readTexture(staging, 0, Span((u8*)m_gb1.begin(), m_gb1.byte_size()));
+		if (!m_bake_normals) {
+			gpu::copy(staging, gbs[1], 0, 0);
+			gpu::readTexture(staging, 0, Span((u8*)m_gb1.begin(), m_gb1.byte_size()));
+		}
 		
 		gpu::copy(staging, shadow, 0, 0);
 		gpu::readTexture(staging, 0, Span((u8*)m_shadow.begin(), m_shadow.byte_size()));
@@ -1138,6 +1142,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	AABB m_aabb;
 	float m_radius;
 	gpu::BufferHandle m_material_ub;
+	bool m_bake_normals;
 	Array<u32>& m_gb0;
 	Array<u32>& m_gb1;
 	Array<u32>& m_shadow;
@@ -1146,7 +1151,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	IVec2& m_tile_size;
 };
 
-bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u32>& shadow, IVec2& size)
+bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u32>& shadow, IVec2& size, bool bake_normals)
 {
 	ASSERT(model->isReady());
 	ASSERT(m_impostor_shadow_shader->isReady());
@@ -1157,10 +1162,12 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 
 	IAllocator& allocator = renderer->getAllocator();
 	CaptureImpostorJob& job = renderer->createJob<CaptureImpostorJob>(gb0_rgba, gb1_rgba, shadow, size, allocator);
-	job.m_shadow_program = m_impostor_shadow_shader->getProgram(gpu::VertexDecl(), 0);
+	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
+	job.m_shadow_program = m_impostor_shadow_shader->getProgram(gpu::VertexDecl(), bake_normals ? bake_normals_define : 0);
 	job.m_model = model;
 	job.m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	job.m_material_ub = renderer->getMaterialUniformBuffer();
+	job.m_bake_normals = bake_normals;
 	renderer->queue(job, 0);
 	renderer->frame();
 	renderer->waitForRender();
@@ -1177,7 +1184,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			f << "shader \"/pipelines/impostor.shd\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
-			f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
+			if (!bake_normals) f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
 			f << "defines { \"ALPHA_CUTOUT\" }\n";
 			f << "layer \"impostor\"\n";
@@ -1187,6 +1194,17 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		}
 	}
 	
+	const StaticString<LUMIX_MAX_PATH> albedo_meta(src_info.m_dir, src_info.m_basename, "_impostor0.tga.meta");
+	if (!m_filesystem.fileExists(albedo_meta)) {
+		if (!m_filesystem.open(albedo_meta, f)) {
+			logError("Failed to create ", albedo_meta);
+		}
+		else {
+			f << "srgb = true";
+			f.close();
+		}
+	}
+
 	return true;
 }
 

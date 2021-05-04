@@ -1883,6 +1883,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		float culling_scale = 1.f;
 		bool split = false;
 		bool create_impostor = false;
+		bool bake_impostor_normals = false;
 		bool use_mikktspace = false;
 		bool force_skin = false;
 		bool import_vertex_colors = false;
@@ -1935,6 +1936,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &meta.culling_scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &meta.bake_impostor_normals);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
@@ -2471,6 +2473,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("##split", &m_meta.split);
 			ImGuiEx::Label("Create impostor mesh");
 			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
+			if (m_meta.create_impostor) {
+				ImGuiEx::Label("Bake impostor normals");
+				ImGui::Checkbox("##impnrm", &m_meta.bake_impostor_normals);
+			}
 			ImGuiEx::Label("Import vertex colors");
 			ImGui::Checkbox("##vercol", &m_meta.import_vertex_colors);
 			ImGuiEx::Label("Bake vertex AO");
@@ -2501,6 +2507,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
 				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
+					.cat("\nbake_impostor_normals = ").cat(m_meta.bake_impostor_normals ? "true" : "false")
 					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace ? "true" : "false")
 					.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
@@ -2527,7 +2534,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Array<u32> gb1(allocator); 
 				Array<u32> shadow(allocator); 
 				IVec2 tile_size;
-				importer.createImpostorTextures(model, gb0, gb1, shadow, tile_size);
+				importer.createImpostorTextures(model, gb0, gb1, shadow, tile_size, m_meta.bake_impostor_normals);
 				postprocessImpostor(gb0, gb1, tile_size, allocator);
 				const PathInfo fi(model->getPath().c_str());
 				StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
