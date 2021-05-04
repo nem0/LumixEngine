@@ -158,6 +158,16 @@ float luminance(vec3 color) {
 	return dot(vec3(0.2126729, 0.7151522, 0.0721750), color);
 }
 
+vec3 ACESFilm(vec3 x)
+{
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+}
+
 #ifdef LUMIX_FRAGMENT_SHADER
 	bool ditherLOD(float lod){
 		// interleaved gradient noise by Jorge Jimenez
