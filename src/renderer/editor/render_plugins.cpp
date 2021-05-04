@@ -2550,14 +2550,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					logError("Failed to open ", img_path);
 				}
 
-				img_path = fi.m_dir;
-				img_path << fi.m_basename << "_impostor1.tga";
-				if (fs.open(img_path, file)) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-					file.close();
-				}
-				else {
-					logError("Failed to open ", img_path);
+				if (!m_meta.bake_impostor_normals) {
+					img_path = fi.m_dir;
+					img_path << fi.m_basename << "_impostor1.tga";
+					if (fs.open(img_path, file)) {
+						Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+						file.close();
+					}
+					else {
+						logError("Failed to open ", img_path);
+					}
 				}
 
 				img_path = fi.m_dir;
