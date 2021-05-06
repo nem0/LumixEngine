@@ -3105,7 +3105,7 @@ struct StudioAppImpl final : StudioApp
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
-				u32 hash = crc32(res->getPath().c_str());
+				u32 hash = res->getPath().getHash();
 				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/assets/", hash, ".res");
 
 				auto& out_info = infos.emplace(hash);
