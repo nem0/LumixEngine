@@ -79,6 +79,7 @@ static const u32 RENDERER_HASH = crc32("renderer");
 enum class PhysicsSceneVersion
 {
 	REMOVED_RAGDOLLS,
+	VEHICLE_PEAK_TORQUE,
 
 	LATEST,
 };
@@ -233,6 +234,8 @@ struct Vehicle
 	u32 chassis_layer = 0;
 	Vec3 center_of_mass = Vec3(0);
 	float moi_multiplier = 1;
+	float peak_torque = 500.f;
+	float max_rpm = 6000.f;
 
 	void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&) {
 
@@ -630,6 +633,23 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	u32 getActorLayer(EntityRef entity) override { return m_actors[entity].layer; }
 
+	const Vehicle* getWheelVehicle(EntityRef wheel) const {
+		EntityPtr parent = m_universe.getParent(wheel);
+		if (!parent.isValid()) return nullptr;
+		auto iter = m_vehicles.find(*parent);
+		if (!iter.isValid()) return nullptr;
+		return iter.value().get();
+	}
+
+	float getWheelRPM(EntityRef entity) override {
+		const Wheel& wheel = m_wheels[entity];
+		const Vehicle* vehicle = getWheelVehicle(entity);
+		if (!vehicle) return 0;
+		if (!vehicle->drive) return 0;
+
+		return vehicle->drive->mWheelsDynData.getWheelRotationSpeed((u32)wheel.slot) * (60 / (2 * PI));
+	}
+
 	float getWheelMOI(EntityRef entity) override { return m_wheels[entity].moi; }
 	void setWheelMOI(EntityRef entity, float moi) override { m_wheels[entity].moi = moi; }
 	WheelSlot getWheelSlot(EntityRef entity) override { return m_wheels[entity].slot; }
@@ -764,10 +784,41 @@ struct PhysicsSceneImpl final : PhysicsScene
 		m_vehicles[entity]->raw_input.setAnalogBrake(value);
 	}
 
+	float getVehicleRPM(EntityRef entity) override {
+		if (!m_vehicles[entity]->drive) return 0.0f;
+
+		return m_vehicles[entity]->drive->mDriveDynData.getEngineRotationSpeed() * (60 / (PI * 2));
+	}
+
+	i32 getVehicleCurrentGear(EntityRef entity) override {
+		const Vehicle* vehicle = m_vehicles[entity].get();
+		return vehicle->drive ? vehicle->drive->mDriveDynData.getCurrentGear() - 1 : 0;
+	}
+
 	float getVehicleSpeed(EntityRef entity) override {
 		if (!m_vehicles[entity]->drive) return 0.0f;
 
 		return m_vehicles[entity]->drive->computeForwardSpeed();
+	}
+
+	float getVehiclePeakTorque(EntityRef entity) override {
+		return m_vehicles[entity]->peak_torque;
+	}
+
+	void setVehiclePeakTorque(EntityRef entity, float value) override {
+		Vehicle* veh = m_vehicles[entity].get();
+		veh->peak_torque = value;
+		if(veh->actor) rebuildVehicle(entity, *veh);
+	}
+
+	float getVehicleMaxRPM(EntityRef entity) override {
+		return m_vehicles[entity]->max_rpm;
+	}
+
+	void setVehicleMaxRPM(EntityRef entity, float value) override {
+		Vehicle* veh = m_vehicles[entity].get();
+		veh->max_rpm = value;
+		if(veh->actor) rebuildVehicle(entity, *veh);
 	}
 
 	void rebuildWheel(EntityRef entity)
@@ -1712,9 +1763,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	void updateVehicles(float time_delta) {
-		PxVehicleWheels* vehicles[16];
 		const u32 count = (u32)m_vehicles.size();
-		ASSERT(count <= lengthOf(vehicles)); // TODO
+		
+		PxVehicleWheels* vehicles[16];
 
 		u32 valid_count = 0;
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
@@ -1723,8 +1774,15 @@ struct PhysicsSceneImpl final : PhysicsScene
 				vehicles[valid_count] = veh->drive;
 				PxVehicleDrive4WSmoothAnalogRawInputsAndSetAnalogInputs(pad_smoothing, steer_vs_forward_speed, veh->raw_input, time_delta, false, *veh->drive);
 				++valid_count;
+
+				if (valid_count == lengthOf(vehicles)) {
+					PxVehicleSuspensionRaycasts(m_vehicle_batch_query, valid_count, vehicles, valid_count * 4, m_vehicle_results);
+					PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, valid_count, vehicles, nullptr);
+					valid_count = 0;
+				}
 			}
 		}
+
 		if (valid_count > 0) {
 			PxVehicleSuspensionRaycasts(m_vehicle_batch_query, valid_count, vehicles, valid_count * 4, m_vehicle_results);
 			PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, valid_count, vehicles, nullptr);
@@ -1876,31 +1934,24 @@ struct PhysicsSceneImpl final : PhysicsScene
 		return wheel_sim_data;
 	}
 
-
-	static void setupDriveSimData(const PxVehicleWheelsSimData& wheel_sim_data, PxVehicleDriveSimData4W& drive_sim_data)
-	{
-		//Diff
+	static void setupDriveSimData(const PxVehicleWheelsSimData& wheel_sim_data, PxVehicleDriveSimData4W& drive_sim_data, const Vehicle& vehicle) {
 		PxVehicleDifferential4WData diff;
 		diff.mType = PxVehicleDifferential4WData::eDIFF_TYPE_LS_4WD;
 		drive_sim_data.setDiffData(diff);
 
-		//Engine
 		PxVehicleEngineData engine;
-		engine.mPeakTorque = 500.0f;
-		engine.mMaxOmega = 600.0f;//approx 6000 rpm
+		engine.mPeakTorque = vehicle.peak_torque;
+		engine.mMaxOmega = vehicle.max_rpm * 2 * PI / 60;
 		drive_sim_data.setEngineData(engine);
 
-		//Gears
 		PxVehicleGearsData gears;
 		gears.mSwitchTime = 0.5f;
 		drive_sim_data.setGearsData(gears);
 
-		//Clutch
 		PxVehicleClutchData clutch;
 		clutch.mStrength = 10.0f;
 		drive_sim_data.setClutchData(clutch);
 
-		//Ackermann steer accuracy
 		PxVehicleAckermannGeometryData ackermann;
 		ackermann.mAccuracy = 1.0f;
 		ackermann.mAxleSeparation =
@@ -1914,9 +1965,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		drive_sim_data.setAckermannGeometryData(ackermann);
 	}
 
-
-	PxRigidDynamic* createVehicleActor(const RigidTransform& transform, Span<const EntityRef> wheels_entities, Vehicle& vehicle)
-	{
+	PxRigidDynamic* createVehicleActor(const RigidTransform& transform, Span<const EntityRef> wheels_entities, Vehicle& vehicle) {
 		PxPhysics& physics = *m_system->getPhysics();
 		PxCooking& cooking = *m_system->getCooking();
 
@@ -1978,7 +2027,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 
 		PxVehicleDriveSimData4W drive_sim_data;
-		setupDriveSimData(*wheel_sim_data, drive_sim_data);
+		setupDriveSimData(*wheel_sim_data, drive_sim_data, vehicle);
 
 		const RigidTransform tr = m_universe.getTransform(entity).getRigidPart();
 
@@ -2904,6 +2953,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(veh->moi_multiplier);
 			serializer.write(veh->chassis_layer);
 			serializer.write(veh->wheels_layer);
+			serializer.write(veh->peak_torque);
 			serializer.writeString(veh->geom ? veh->geom->getPath().c_str() : "");
 		}
 
@@ -3102,7 +3152,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
-	void deserializeVehicles(InputMemoryStream& serializer, const EntityMap& entity_map)
+	void deserializeVehicles(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
 	{
 		const u32 vehicles_count = serializer.read<u32>();
 		m_vehicles.reserve(vehicles_count + m_vehicles.size());
@@ -3116,6 +3166,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(iter.value()->moi_multiplier);
 			serializer.read(iter.value()->chassis_layer);
 			serializer.read(iter.value()->wheels_layer);
+			if (version > (i32)PhysicsSceneVersion::VEHICLE_PEAK_TORQUE) serializer.read(iter.value()->peak_torque);
 			const char* path = serializer.readString();
 			if (path[0]) {
 				ResourceManagerHub& manager = m_engine.getResourceManager();
@@ -3271,7 +3322,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 
 		deserializeJoints(serializer, entity_map);
-		deserializeVehicles(serializer, entity_map);
+		deserializeVehicles(serializer, entity_map, version);
 	}
 
 
@@ -3539,8 +3590,7 @@ UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, Universe& co
 
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
-	impl->m_dummy_actor =
-		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
+	impl->m_dummy_actor = PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
 	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(impl->m_vehicle_query_mem);
 	return UniquePtr<PhysicsSceneImpl>(impl, &allocator);
 }
@@ -3668,7 +3718,11 @@ void PhysicsScene::reflect() {
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer")
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleBrake, "setBrake")
 			.prop<&PhysicsSceneImpl::getVehicleSpeed>("Speed")
+			.prop<&PhysicsSceneImpl::getVehicleCurrentGear>("Current gear")
+			.prop<&PhysicsSceneImpl::getVehicleRPM>("RPM")
 			.LUMIX_PROP(VehicleMass, "Mass").minAttribute(0)
+			.LUMIX_PROP(VehiclePeakTorque, "Peak torque").minAttribute(0)
+			.LUMIX_PROP(VehicleMaxRPM, "Max RPM").minAttribute(0)
 			.LUMIX_PROP(VehicleCenterOfMass, "Center of mass")
 			.LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier")
 			.LUMIX_PROP(VehicleChassis, "Chassis").resourceAttribute(PhysicsGeometry::TYPE)
@@ -3684,6 +3738,7 @@ void PhysicsScene::reflect() {
 			.LUMIX_PROP(WheelSpringStrength, "Spring strength").minAttribute(0)
 			.LUMIX_PROP(WheelSpringDamperRate, "Spring damper rate").minAttribute(0)
 			.LUMIX_ENUM_PROP(WheelSlot, "Slot").attribute<WheelSlotEnum>()
+			.prop<&PhysicsSceneImpl::getWheelRPM>("RPM")
 		.LUMIX_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield")
 			.LUMIX_ENUM_PROP(HeightfieldLayer, "Layer").attribute<LayerEnum>()
 			.LUMIX_PROP(HeightmapSource, "Heightmap").resourceAttribute(Texture::TYPE)

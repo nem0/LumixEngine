@@ -240,7 +240,14 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setWheelMOI(EntityRef entity, float moi) = 0;
 	virtual WheelSlot getWheelSlot(EntityRef entity) = 0;
 	virtual void setWheelSlot(EntityRef entity, WheelSlot s) = 0;
+	virtual float getWheelRPM(EntityRef entity) = 0;
 
+	virtual float getVehiclePeakTorque(EntityRef entity) = 0;
+	virtual void setVehiclePeakTorque(EntityRef entity, float value) = 0;
+	virtual float getVehicleMaxRPM(EntityRef entity) = 0;
+	virtual void setVehicleMaxRPM(EntityRef entity, float value) = 0;
+	virtual float getVehicleRPM(EntityRef entity) = 0;
+	virtual i32 getVehicleCurrentGear(EntityRef entity) = 0;
 	virtual float getVehicleSpeed(EntityRef entity) = 0;
 	virtual void setVehicleAccel(EntityRef entity, float accel) = 0;
 	virtual void setVehicleSteer(EntityRef entity, float value) = 0;
