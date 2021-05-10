@@ -43,6 +43,13 @@ static CompositeTexture::ChannelSource toChannelSource(lua_State* L, int idx) {
 	return res;
 }
 
+static int LUA_cubemap(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L);
+	CompositeTexture& that = getThis(L);
+	that.cubemap = LuaWrapper::checkArg<bool>(L, 1);
+	return 0;
+}
+
 static int LUA_layer(lua_State* L) {
 	LuaWrapper::DebugGuard guard(L);
 	LuaWrapper::checkTableArg(L, 1);
@@ -113,6 +120,7 @@ bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 bool CompositeTexture::save(FileSystem& fs, const Path& path) {
 	os::OutputFile file;
 	if (fs.open(path.c_str(), file)) {
+		file << "cubemap(" << (cubemap ? "true" : "false") << ")\n";
 		for (CompositeTexture::Layer& layer : layers) {
 			file << "layer {\n";
 			file << "\tred = { \"" << layer.red.path.c_str() << "\", " << layer.red.src_channel << " },\n";
@@ -142,6 +150,7 @@ bool CompositeTexture::init(Span<const u8> data, const char* src_path) {
 		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
 
 	DEFINE_LUA_FUNC(layer)
+	DEFINE_LUA_FUNC(cubemap)
 	DEFINE_LUA_FUNC(output)
 		
 	#undef DEFINE_LUA_FUNC

@@ -41,6 +41,7 @@ struct CompositeTexture {
 	IAllocator& allocator;
 	Array<Layer> layers;
 	Output output = Output::BC1;
+	bool cubemap = false;
 };
 
 } // namespace Lumix

@@ -1313,9 +1313,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		TextureCompressor::Input input(w, h, tc.layers.size(), 1, allocator);
+		TextureCompressor::Input input(w, h, tc.cubemap ? 1 : tc.layers.size(), 1, allocator);
 		input.is_normalmap = meta.is_normalmap;
 		input.is_srgb = meta.srgb;
+		input.is_cubemap = tc.cubemap;
 
 		OutputMemoryStream out_data(allocator);
 		out_data.resize(w * h * 4);
@@ -1338,7 +1339,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				input.has_alpha = input.has_alpha || ch == 3;
 			}
 
-			input.add(out_data, 0, idx, 0);
+			input.add(out_data, input.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
 		}
 
 		for (const Src& i : sources) {
@@ -1555,6 +1556,18 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
+	static const char* getCubemapLabel(u32 idx) {
+		switch (idx) {
+			case 0: return "X+";
+			case 1: return "X-";
+			case 2: return "Y+ (top)";
+			case 3: return "Y- (bottom)";
+			case 4: return "Z+";
+			case 5: return "Z+";
+			default: return "Too many layers in cubemap";
+		}
+	}
+
 	void compositeGUI(Texture& texture) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (m_composite_tag != &texture) {
@@ -1596,9 +1609,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			else {
 				show_channels = true;
 			}
+			ImGui::Checkbox("Cubemap", &m_composite.cubemap);
+
 			for (CompositeTexture::Layer& layer : m_composite.layers) {
 				const u32 idx = u32(&layer - m_composite.layers.begin());
-				if (ImGui::TreeNodeEx(&layer, 0, "%d", idx)) {
+				bool open;
+				if (m_composite.cubemap) open = ImGui::TreeNodeEx(&layer, 0, "%s", getCubemapLabel(idx));
+				else open = ImGui::TreeNodeEx(&layer, 0, "%d", idx);
+				if (open) {
 					if (ImGui::Button("Remove")) {
 						m_composite.layers.erase(idx);
 						ImGui::TreePop();
