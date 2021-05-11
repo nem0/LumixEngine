@@ -80,6 +80,7 @@ enum class PhysicsSceneVersion
 {
 	REMOVED_RAGDOLLS,
 	VEHICLE_PEAK_TORQUE,
+	VEHICLE_MAX_RPM,
 
 	LATEST,
 };
@@ -785,14 +786,11 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	float getVehicleRPM(EntityRef entity) override {
-		if (!m_vehicles[entity]->drive) return 0.0f;
-
 		return m_vehicles[entity]->drive->mDriveDynData.getEngineRotationSpeed() * (60 / (PI * 2));
 	}
 
 	i32 getVehicleCurrentGear(EntityRef entity) override {
-		const Vehicle* vehicle = m_vehicles[entity].get();
-		return vehicle->drive ? vehicle->drive->mDriveDynData.getCurrentGear() - 1 : 0;
+		return m_vehicles[entity]->drive->mDriveDynData.getCurrentGear() - 1;
 	}
 
 	float getVehicleSpeed(EntityRef entity) override {
@@ -1998,6 +1996,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			filter.word3 = 4;
 			PxMeshScale pxscale(1.f);
 			PxConvexMeshGeometry convex_geom(vehicle.geom->convex_mesh, pxscale);
+			// TODO what if there's no geom or it's not ready
 			PxShape* chassis_shape = PxRigidActorExt::createExclusiveShape(*actor, convex_geom, *m_default_material);
 			const PxBounds3 bounds = vehicle.geom->convex_mesh->getLocalBounds();
 			extents = bounds.getExtents();
@@ -2954,6 +2953,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(veh->chassis_layer);
 			serializer.write(veh->wheels_layer);
 			serializer.write(veh->peak_torque);
+			serializer.write(veh->max_rpm);
 			serializer.writeString(veh->geom ? veh->geom->getPath().c_str() : "");
 		}
 
@@ -3167,6 +3167,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(iter.value()->chassis_layer);
 			serializer.read(iter.value()->wheels_layer);
 			if (version > (i32)PhysicsSceneVersion::VEHICLE_PEAK_TORQUE) serializer.read(iter.value()->peak_torque);
+			if (version > (i32)PhysicsSceneVersion::VEHICLE_MAX_RPM) serializer.read(iter.value()->max_rpm);
 			const char* path = serializer.readString();
 			if (path[0]) {
 				ResourceManagerHub& manager = m_engine.getResourceManager();
@@ -3721,8 +3722,6 @@ void PhysicsScene::reflect() {
 			.prop<&PhysicsSceneImpl::getVehicleCurrentGear>("Current gear")
 			.prop<&PhysicsSceneImpl::getVehicleRPM>("RPM")
 			.LUMIX_PROP(VehicleMass, "Mass").minAttribute(0)
-			.LUMIX_PROP(VehiclePeakTorque, "Peak torque").minAttribute(0)
-			.LUMIX_PROP(VehicleMaxRPM, "Max RPM").minAttribute(0)
 			.LUMIX_PROP(VehicleCenterOfMass, "Center of mass")
 			.LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier")
 			.LUMIX_PROP(VehicleChassis, "Chassis").resourceAttribute(PhysicsGeometry::TYPE)

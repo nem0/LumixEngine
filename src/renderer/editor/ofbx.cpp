@@ -1,5 +1,8 @@
 #include "ofbx.h"
+
+#define MINIZ_NO_ARCHIVE_APIS
 #include "miniz.h"
+
 #include <cassert>
 #include <math.h>
 #include <ctype.h>
