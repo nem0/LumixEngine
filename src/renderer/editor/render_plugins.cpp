@@ -75,6 +75,7 @@ static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 namespace TextureCompressor {
 
 struct Options {
+	bool compress = true;
 	bool generate_mipmaps = false;
 	bool stochastic_mipmap = false;
 	float scale_coverage_ref = -0.5f;
@@ -421,7 +422,7 @@ static bool isValid(const Input& src_data, const Options& options) {
 	const u32 mips = options.generate_mipmaps ? 1 + log2(maximum(src_data.w, src_data.h)) : src_data.mips;
 	gpu::TextureFormat format;
 
-	const bool can_compress = (src_data.w % 4) == 0 && (src_data.h % 4) == 0;
+	const bool can_compress = options.compress && (src_data.w % 4) == 0 && (src_data.h % 4) == 0;
 	if (!can_compress) format = gpu::TextureFormat::RGBA8;
 	else if (src_data.is_normalmap) format = gpu::TextureFormat::BC5;
 	else if (src_data.has_alpha) format = gpu::TextureFormat::BC3;
@@ -1120,8 +1121,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool mips = true;
 		float scale_coverage = -0.5f;
 		bool stochastic_mipmap = false;
-		bool convert_to_raw = false;
-		bool compress = false;
+		bool compress = true;
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
 		WrapMode wrap_mode_v = WrapMode::REPEAT;
 		WrapMode wrap_mode_w = WrapMode::REPEAT;
@@ -1366,30 +1366,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		PROFILE_FUNCTION();
 		int w, h, comps;
 		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.data(), (i32)src_data.size());
-		if (is_16_bit) {
-			logError(path, ": 16bit images not yet supported.");
-		}
+		if (is_16_bit) logWarning(path, ": 16bit images not yet supported. Converting to 8bit.");
 
 		stbi_uc* data = stbi_load_from_memory(src_data.data(), (i32)src_data.size(), &w, &h, &comps, 4);
 		if (!data) return false;
-
-		if(meta.convert_to_raw) {
-			dst.write("raw", 3);
-			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
-			dst.write(&flags, sizeof(flags));
-			for (int j = 0; j < h; ++j) {
-				for (int i = 0; i < w; ++i) {
-					const u16 tmp = (u16)data[(i + j * w) * 4] * 256;
-					dst.write(tmp);
-				}
-			}
-			return true;
-		}
 
 		#ifdef LUMIX_BASIS_UNIVERSAL
 			dst.write("bsu", 3);
@@ -1447,6 +1427,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			options.generate_mipmaps = meta.mips;
 			options.stochastic_mipmap = meta.stochastic_mipmap; 
 			options.scale_coverage_ref = meta.scale_coverage;
+			options.compress = meta.compress;
 			const bool res = TextureCompressor::compress(input, options, dst, m_app.getAllocator());
 			stbi_image_free(data);
 			return res;
@@ -1456,10 +1437,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	Meta getMeta(const Path& path) const
 	{
 		Meta meta;
+		if (Path::hasExtension(path.c_str(), "raw")) {
+			meta.compress = false;
+			meta.mips = false;
+		}
+
 		m_app.getAssetCompiler().getMeta(path, [&path, &meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &meta.compress);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "convert_to_raw", &meta.convert_to_raw);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &meta.stochastic_mipmap);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
@@ -1501,10 +1486,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		OutputMemoryStream out(m_app.getAllocator());
 		Meta meta = getMeta(src);
-		if (equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap && !meta.mips)) {
-			if (meta.scale_coverage >= 0) {
-				logError("Coverage scale on ", src, " ignored, use different format");
-			}
+		if (equalStrings(ext, "raw")) {
+			if (meta.scale_coverage >= 0) logError(src, ": RAW can not scale coverage");
+			if (meta.compress) logError(src, ": RAW can not be copressed");
+			if (meta.mips) logError(src, ": RAW can not have mipmaps");
+			
 			out.write(ext, 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
@@ -1515,22 +1501,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			out.write(flags);
 			out.write(src_data.data(), src_data.size());
 		}
-		else if(equalStrings(ext, "jpg") || equalStrings(ext, "jpeg") || equalStrings(ext, "png")) {
-			meta.compress = true;
-			compileImage(src, src_data, out, meta);
-		}
-		else if (equalStrings(ext, "tga")) {
-			if (!meta.compress && meta.is_normalmap) {
-				meta.compress = true;
-				logWarning("Forcing compression of ", src, " because it's a normalmap");
-			}
-			compileImage(src, src_data, out, meta);
+		else if(equalStrings(ext, "jpg") || equalStrings(ext, "jpeg") || equalStrings(ext, "png") || equalStrings(ext, "tga")) {
+			if (!compileImage(src, src_data, out, meta)) return false;
 		}
 		else if (equalStrings(ext, "ltc")) {
-			meta.compress = true;
-			if (!createComposite(src_data, out, meta, src.c_str())) {
-				return false;
-			}
+			if (!createComposite(src_data, out, meta, src.c_str())) return false;
 		}
 		else {
 			ASSERT(false);
@@ -1763,20 +1738,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::Checkbox("##stomip", &m_meta.stochastic_mipmap);
 			}
 
-			const bool is_tga = Path::hasExtension(texture->getPath().c_str(), "tga");
-			if (is_tga) {
-				ImGuiEx::Label("Compress");
-				ImGui::Checkbox("##cmprs", &m_meta.compress);
-			}
+			ImGuiEx::Label("Compress");
+			ImGui::Checkbox("##cmprs", &m_meta.compress);
 			
-			if ((m_meta.compress || !is_tga) && !m_meta.convert_to_raw) {
-				if (texture->width % 4 != 0 || texture->height % 4 != 0) {
-					ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
-				}
+			if (m_meta.compress && (texture->width % 4 != 0 || texture->height % 4 != 0)) {
+				ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
 			}
 
-			ImGuiEx::Label("Convert to RAW");
-			ImGui::Checkbox("##cvt2raw", &m_meta.convert_to_raw);
 			bool scale_coverage = m_meta.scale_coverage >= 0;
 			ImGuiEx::Label("Mipmap scale coverage");
 			if (ImGui::Checkbox("##mmapsccov", &scale_coverage)) {
@@ -1801,7 +1769,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
 					, "\ncompress = ", m_meta.compress ? "true" : "false"
-					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
 					, "\nstochastic_mip = ", m_meta.stochastic_mipmap ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nmips = ", m_meta.mips ? "true" : "false"
@@ -4214,9 +4181,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 	}
 
-
 	const char* getName() const override { return "renderer"; }
-
 
 	void init() override
 	{
@@ -4316,7 +4281,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		}
 	}
 
-	
 	void showReflectionProbeGizmo(UniverseView& view, ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const Universe& universe = scene->getUniverse();
@@ -4355,18 +4319,15 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		}
 	}
 
-
 	static Vec3 minCoords(const Vec3& a, const Vec3& b)
 	{
 		return Vec3(minimum(a.x, b.x), minimum(a.y, b.y), minimum(a.z, b.z));
 	}
 
-
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
 	{
 		return Vec3(maximum(a.x, b.x), maximum(a.y, b.y), maximum(a.z, b.z));
 	}
-
 
 	void showGlobalLightGizmo(UniverseView& view, ComponentUID light)
 	{
@@ -4393,7 +4354,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		addSphere(view, pos - dir, 0.1f, Color::BLUE);
 	}
 
-
 	void showDecalGizmo(UniverseView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -4406,7 +4366,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Vec3 z = tr.rot * Vec3(0, 0, 1) * decal.half_extents.z;
 		addCube(view, tr.pos, x, y, z, Color::BLUE);
 	}
-	
+
 	void showCurveDecalGizmo(UniverseView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -4439,14 +4399,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		addLine(view, tr.pos, p2_tr.pos, Color::GREEN);
 	}
 
-
 	void showCameraGizmo(UniverseView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 
 		addFrustum(view, scene->getCameraFrustum((EntityRef)cmp.entity), Color::BLUE);
 	}
-
 
 	bool showGizmo(UniverseView& view, ComponentUID cmp) override
 	{

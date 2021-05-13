@@ -277,7 +277,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	RawTextureHeader header;
 	file.read(&header, sizeof(header));
 	if (header.magic != RawTextureHeader::MAGIC) {
-		logError(texture.getPath(), ": corruptede file or not raw texture format.");
+		logError(texture.getPath(), ": corrupted file or not raw texture format.");
 		return false;
 	}
 	if (header.version > RawTextureHeader::LAST_VERSION) {
@@ -626,10 +626,6 @@ u8* Texture::getLBCInfo(const void* data, gpu::TextureDesc& desc) {
 
 static bool loadLBC(Texture& texture, const u8* data, u32 size)
 {
-	if(texture.data_reference > 0) {
-		logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Use uncompressed TGA without mipmaps or RAW.");
-	}
-
 	gpu::TextureDesc desc;
 	const u8* image_data = Texture::getLBCInfo(data, desc);
 	if (!image_data) {
@@ -639,6 +635,16 @@ static bool loadLBC(Texture& texture, const u8* data, u32 size)
 
 	const u32 offset = u32(image_data - data);
 	if (offset >= size) return false;
+
+	if(texture.data_reference > 0) {
+		if (desc.format != gpu::TextureFormat::RGBA8) {
+			logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Use uncompressed TGA without mipmaps or RAW.");
+		}
+		else {
+			texture.data.resize(size - offset);
+			memcpy(texture.data.getMutableData(), image_data, texture.data.size());
+		}
+	}
 
 	Renderer::MemRef mem = texture.renderer.copy(image_data, size - offset);
 	texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());

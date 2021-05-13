@@ -1,5 +1,4 @@
 #include "navigation_scene.h"
-#include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/atomic.h"
 #include "engine/crc32.h"
@@ -342,7 +341,6 @@ struct NavigationSceneImpl final : NavigationScene
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			//if (dt_agent->paused) continue;
 
-			const Vec3 pos(inv_tr.transform(m_universe.getPosition(agent.entity)));
 			const Quat rot = m_universe.getRotation(agent.entity);
 
 			const Vec3 velocity = *(Vec3*)dt_agent->nvel;

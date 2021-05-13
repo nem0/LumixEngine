@@ -28,7 +28,6 @@ struct TGAHeader
 	u8 bitsPerPixel;
 	u8 imageDescriptor;
 };
-#pragma pack()
 
 struct LBCHeader {
 	static constexpr u32 MAGIC = 'LBC_';
@@ -63,7 +62,12 @@ struct RawTextureHeader {
 	ChannelType channel_type;
 	u32 channels_count;
 	bool is_array = false;
+	u8 padding[3];
 };
+#pragma pack()
+
+static_assert(sizeof(LBCHeader) == 32);
+static_assert(sizeof(RawTextureHeader) == 32);
 
 
 struct LUMIX_RENDERER_API Texture final : Resource {
