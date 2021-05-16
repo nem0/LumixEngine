@@ -57,7 +57,7 @@ bool Clip::load(u64 size, const u8* mem)
 			if (header.bits_per_sample != 16) return false;
 			m_channels = header.channels;
 			m_sample_rate = header.frequency;
-			m_data.resize(u32(blob.size() - blob.getPosition()) / 2);
+			m_data.resize(u32(blob.size() - blob.getPosition()) / (header.bits_per_sample / 8));
 			return blob.read(m_data.begin(), m_data.byte_size());
 		}
 		case Format::OGG: {

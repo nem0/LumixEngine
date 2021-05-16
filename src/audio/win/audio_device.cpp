@@ -23,6 +23,7 @@ struct AudioDeviceImpl final : AudioDevice
 		const void* data;
 		DWORD data_size;
 		DWORD written;
+		DWORD written_total;
 		int sparse_idx;
 		bool looped;
 	};
@@ -223,6 +224,7 @@ struct AudioDeviceImpl final : AudioDevice
 				m_buffers[m_buffer_count].data = data;
 				m_buffers[m_buffer_count].data_size = data_size;
 				m_buffers[m_buffer_count].written = buffer_size;
+				m_buffers[m_buffer_count].written_total = buffer_size;
 				m_buffers[m_buffer_count].sparse_idx = i;
 				m_buffers[m_buffer_count].handle_3d = source;
 				m_buffers[m_buffer_count].handle8 = nullptr;
@@ -386,8 +388,8 @@ struct AudioDeviceImpl final : AudioDevice
 			if ((status & DSBSTATUS_PLAYING) == 0) return true;
 		}
 		buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
-		auto rel_written = DWORD(buffer.written % STREAM_SIZE);
-		DWORD abs_pc = buffer.written - (rel_written - rel_pc);
+		auto rel_written = DWORD(buffer.written_total % STREAM_SIZE);
+		DWORD abs_pc = buffer.written_total - (rel_written - rel_pc);
 		if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
 		return abs_pc >= buffer.data_size;
 	}
@@ -505,6 +507,7 @@ struct AudioDeviceImpl final : AudioDevice
 				memcpy(p, (u8*)buffer.data + buffer.written, size);
 			}
 			buffer.written += size;
+			buffer.written_total += size;
 			buffer.written = buffer.written % buffer.data_size;
 		};
 
