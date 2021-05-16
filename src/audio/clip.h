@@ -11,7 +11,8 @@ namespace Lumix {
 struct Clip final : Resource
 {
 	enum class Format : u8 {
-		OGG
+		OGG,
+		WAV
 	};
 
 	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)

@@ -31,6 +31,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_playing_clip(-1)
 	{
 		app.getAssetCompiler().registerExtension("ogg", Clip::TYPE);
+		app.getAssetCompiler().registerExtension("wav", Clip::TYPE);
 	}
 
 	struct Meta {
@@ -57,7 +58,8 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		OutputMemoryStream compiled(m_app.getAllocator());
 		compiled.reserve(64 + src_data.size());
 		compiled.write((u32)0);
-		compiled.write(Clip::Format::OGG);
+		const bool is_wav = Path::hasExtension(src.c_str(), "wav");
+		compiled.write(is_wav ? Clip::Format::WAV : Clip::Format::OGG);
 		compiled.write(meta.looped);
 		compiled.write(meta.volume);
 		compiled.write(src_data.data(), src_data.size());
@@ -174,7 +176,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override 
 	{
 		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin);
-		const char* extensions[] = { "ogg", nullptr };
+		const char* extensions[] = { "ogg", "wav", nullptr };
 		m_app.getAssetCompiler().addPlugin(m_asset_browser_plugin, extensions);
 	}
 
