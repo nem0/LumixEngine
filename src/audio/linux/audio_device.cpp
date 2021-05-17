@@ -198,7 +198,7 @@ struct AudioDeviceImpl : AudioDevice
 	}
 
 
-	void setFrequency(BufferHandle buffer, float frequency) override 
+	void setFrequency(BufferHandle buffer, u32 frequency_hz) override 
 	{
 		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
@@ -496,7 +496,7 @@ struct NullAudioDevice final : AudioDevice
 	void pause(BufferHandle buffer) override {}
 	void setMasterVolume(float volume) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
-	void setFrequency(BufferHandle buffer, float frequency) override {}
+	void setFrequency(BufferHandle buffer, u32 frequency_hz) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
 	float getCurrentTime(BufferHandle buffer) override { return -1; }
 	void setListenerPosition(const DVec3& pos) override {}
