@@ -459,6 +459,17 @@ struct ControllerEditorImpl : ControllerEditor {
 		return universe->hasComponent(selected[0], reflection::getComponentType("animator"));
 	}
 
+	void updateSelectedEntity() {
+		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
+		if (selected.size() != 1) return;
+		Universe* universe = m_app.getWorldEditor().getUniverse();
+		ComponentType animator_type = reflection::getComponentType("animator");
+		if (!universe->hasComponent(selected[0], animator_type)) return;
+
+		AnimationScene* scene = (AnimationScene*)universe->getScene(animator_type);
+		scene->updateAnimator(selected[0], m_app.getEngine().getLastTimeDelta());
+	}
+
 	Path getPathFromEntity() const {
 		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return Path();
@@ -955,8 +966,12 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 				}
 
+				ImGui::Checkbox("Update", &m_update);
+
 				ImGui::EndMenuBar();
 			}
+
+			if (m_update) updateSelectedEntity();
 
 			if (hierarchy_ui(*m_controller->m_root)) {
 				pushUndo();
@@ -1230,6 +1245,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	Action m_toggle_ui;
 	Action m_undo_action;
 	Action m_redo_action;
+	bool m_update = false;
 	StaticString<LUMIX_MAX_PATH> m_path;
 	Array<UniquePtr<EventType>> m_event_types;
 }; // ControllerEditorImpl

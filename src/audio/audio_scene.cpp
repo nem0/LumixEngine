@@ -132,11 +132,9 @@ struct AudioSceneImpl final : AudioScene
 		for (PlayingSound & sound : m_playing_sounds)
 		{
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
-			if (!sound.entity.isValid()) continue;
-
-			if (sound.is_3d)
+			if (sound.is_3d && sound.entity.isValid())
 			{
-				auto pos = m_universe.getPosition((EntityRef)sound.entity);
+				const DVec3 pos = m_universe.getPosition((EntityRef)sound.entity);
 				m_device.setSourcePosition(sound.buffer_id, pos);
 			}
 

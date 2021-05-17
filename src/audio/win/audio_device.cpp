@@ -455,7 +455,7 @@ struct AudioDeviceImpl final : AudioDevice
 		}
 		return 0;
 	}
-	
+
 
 	void setCurrentTime(BufferHandle handle, float time_seconds) override
 	{

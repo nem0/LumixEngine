@@ -76,6 +76,10 @@ static const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle"
 static const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
 static const u32 RENDERER_HASH = crc32("renderer");
 
+enum class FilterFlags : u32 {
+	VEHICLE = 1 << 0
+};
+
 enum class PhysicsSceneVersion
 {
 	REMOVED_RAGDOLLS,
@@ -419,13 +423,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		m_vehicle_results = desc.queryMemory.userRaycastResultBuffer;
 
-		auto f = [](PxFilterData queryFilterData, PxFilterData objectFilterData, const void* constantBlock, PxU32 constantBlockSize, PxHitFlags& hitFlags)->PxQueryHitType::Enum {
-			if (objectFilterData.word3 == 4) return PxQueryHitType::eNONE;
+		desc.preFilterShader = [](PxFilterData queryFilterData, PxFilterData objectFilterData, const void* constantBlock, PxU32 constantBlockSize, PxHitFlags& hitFlags) -> PxQueryHitType::Enum {
+			if (objectFilterData.word3 == (u32)FilterFlags::VEHICLE) return PxQueryHitType::eNONE;
 			return PxQueryHitType::eBLOCK;
 		};
-
-		desc.preFilterShader = f;
-		//desc.postFilterShader = vehicleSceneQueryData.mPostFilterShader;
 
 		return m_scene->createBatchQuery(desc);
 	}
@@ -1893,12 +1894,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 			wheel_sim_data->setSuspForceAppPointOffset(idx, offsets[idx] + PxVec3(0, 0.1f, 0));
 			wheel_sim_data->setTireForceAppPointOffset(idx, offsets[idx] + PxVec3(0, 0.1f, 0));
 			wheel_sim_data->setWheelShapeMapping(idx, idx);
-			// TODO
+
 			physx::PxFilterData filter;
-			filter.word0 = 5;
-			filter.word1 = 5;
-			filter.word2 = 5;
-			filter.word3 = 4;
+			filter.word0 = 1 << vehicle.wheels_layer;
+			filter.word1 = m_layers.filter[vehicle.wheels_layer];
+			filter.word2 = 0;
+			filter.word3 = (u32)FilterFlags::VEHICLE;
 			wheel_sim_data->setSceneQueryFilterData(idx, filter);
 		}
 
@@ -1981,7 +1982,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			filter.word0 = 1 << vehicle.wheels_layer;
 			filter.word1 = m_layers.filter[vehicle.wheels_layer];
 			filter.word2 = 0;
-			filter.word3 = 4;
+			filter.word3 = (u32)FilterFlags::VEHICLE;
 			wheel_shape->setQueryFilterData(filter);
 			wheel_shape->setSimulationFilterData(filter);
 			wheel_shape->setLocalPose(toPhysx(transform.inverted() * wheel_transforms[i]));
@@ -1993,7 +1994,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			filter.word0 = 1 << vehicle.chassis_layer;
 			filter.word1 = m_layers.filter[vehicle.chassis_layer];
 			filter.word2 = 0;
-			filter.word3 = 4;
+			filter.word3 = (u32)FilterFlags::VEHICLE;
 			PxMeshScale pxscale(1.f);
 			PxConvexMeshGeometry convex_geom(vehicle.geom->convex_mesh, pxscale);
 			// TODO what if there's no geom or it's not ready
