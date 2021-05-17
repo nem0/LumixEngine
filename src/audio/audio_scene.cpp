@@ -439,6 +439,10 @@ struct AudioSceneImpl final : AudioScene
 		return INVALID_SOUND_HANDLE;
 	}
 
+	bool isEnd(SoundHandle sound_id) override {
+		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+		return m_device.isEnd(m_playing_sounds[sound_id].buffer_id);
+	}
 
 	void stop(SoundHandle sound_id) override
 	{
@@ -462,6 +466,11 @@ struct AudioSceneImpl final : AudioScene
 		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
 	}
 
+	void setFrequency(SoundHandle sound_id, u32 frequency) override {
+		ASSERT(sound_id != AudioScene::INVALID_SOUND_HANDLE);
+		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+		m_device.setFrequency(m_playing_sounds[sound_id].buffer_id, frequency);
+	}
 
 	void setEcho(SoundHandle sound_id, float wet_dry_mix, float feedback, float left_delay, float right_delay) override
 	{
@@ -496,6 +505,9 @@ void AudioScene::reflect(Engine& engine) {
 	LUMIX_SCENE(AudioSceneImpl, "audio")
 		.LUMIX_FUNC(AudioScene::setMasterVolume)
 		.function<(SoundHandle (AudioScene::*)(EntityRef, const Path&, bool))&AudioScene::play>("AudioScene::play", "AudioScene::play")
+		.LUMIX_FUNC(AudioScene::stop)
+		.LUMIX_FUNC(AudioScene::isEnd)
+		.LUMIX_FUNC(AudioScene::setFrequency)
 		.LUMIX_FUNC(AudioScene::setVolume)
 		.LUMIX_FUNC(AudioScene::setEcho)
 		.LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound")

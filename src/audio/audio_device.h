@@ -29,7 +29,6 @@ struct LUMIX_AUDIO_API AudioDevice
 {
 	enum class BufferFlags {
 		IS3D = 1,
-		LOOPED = 1 << 1
 	};
 
 	static constexpr int MAX_PLAYING_SOUNDS = 256;
@@ -61,7 +60,7 @@ struct LUMIX_AUDIO_API AudioDevice
 	virtual void pause(BufferHandle buffer) = 0;
 	virtual void setMasterVolume(float volume) = 0;
 	virtual void setVolume(BufferHandle buffer, float volume) = 0;
-	virtual void setFrequency(BufferHandle buffer, float frequency) = 0;
+	virtual void setFrequency(BufferHandle buffer, u32 frequency_hz) = 0;
 	virtual void setCurrentTime(BufferHandle buffer, float time_seconds) = 0;
 	virtual float getCurrentTime(BufferHandle buffer) = 0;
 	virtual void setListenerPosition(const DVec3& pos) = 0;

@@ -80,8 +80,8 @@ struct XInputControllerDevice : ControllerDevice
 			}
 		};
 
-		check2AxisEvent(new_state.Gamepad.sThumbLX, old_state.Gamepad.sThumbLX, new_state.Gamepad.sThumbLY, old_state.Gamepad.sThumbLY, InputSystem::AxisEvent::LTHUMB, 65535.0f);
-		check2AxisEvent(new_state.Gamepad.sThumbRX, old_state.Gamepad.sThumbRX, new_state.Gamepad.sThumbRY, old_state.Gamepad.sThumbRY, InputSystem::AxisEvent::RTHUMB, 65535.0f);
+		check2AxisEvent(new_state.Gamepad.sThumbLX, old_state.Gamepad.sThumbLX, new_state.Gamepad.sThumbLY, old_state.Gamepad.sThumbLY, InputSystem::AxisEvent::LTHUMB, 32768);
+		check2AxisEvent(new_state.Gamepad.sThumbRX, old_state.Gamepad.sThumbRX, new_state.Gamepad.sThumbRY, old_state.Gamepad.sThumbRY, InputSystem::AxisEvent::RTHUMB, 32768.0f);
 
 		g_controllers.states[index] = new_state;
 	}

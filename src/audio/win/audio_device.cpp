@@ -431,10 +431,9 @@ struct AudioDeviceImpl final : AudioDevice
 	}
 
 
-	void setFrequency(BufferHandle handle, float frequency) override
+	void setFrequency(BufferHandle handle, u32 frequency_hz) override
 	{
-		m_buffers[m_buffer_map[handle]].handle->SetFrequency(
-			DSBFREQUENCY_MIN + DWORD(frequency * (DSBFREQUENCY_MAX - DSBFREQUENCY_MIN)));
+		m_buffers[m_buffer_map[handle]].handle->SetFrequency(clamp(frequency_hz, DSBFREQUENCY_MIN, DSBFREQUENCY_MAX));
 	}
 
 
@@ -600,7 +599,7 @@ struct NullAudioDevice final : AudioDevice
 	void pause(BufferHandle buffer) override {}
 	void setMasterVolume(float volume) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
-	void setFrequency(BufferHandle buffer, float frequency) override {}
+	void setFrequency(BufferHandle buffer, u32 frequency_hz) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
 	float getCurrentTime(BufferHandle buffer) override { return -1; }
 	void setListenerPosition(const DVec3& pos) override {}

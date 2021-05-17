@@ -69,8 +69,10 @@ struct AudioScene : IScene
 
 	virtual SoundHandle play(EntityRef entity, Clip* clip, bool is_3d) = 0;
 	virtual SoundHandle play(EntityRef entity, const Path& clip, bool is_3d) = 0;
+	virtual bool isEnd(SoundHandle sound_id) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
 	virtual void setVolume(SoundHandle sound_id, float volume) = 0;
+	virtual void setFrequency(SoundHandle sound_id, u32 frequency_hz) = 0;
 
 	virtual void setEcho(SoundHandle sound_id,
 		float wet_dry_mix,
