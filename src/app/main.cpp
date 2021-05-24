@@ -96,7 +96,7 @@ struct Runner final
 		m_universe->createComponent(ENVIRONMENT_TYPE, env);
 		m_universe->createComponent(LUA_SCRIPT_TYPE, env);
 		
-		RenderScene* render_scene = (RenderScene*)m_universe->getScene(crc32("renderer"));
+		RenderScene* render_scene = (RenderScene*)m_universe->getScene("renderer");
 		Environment& environment = render_scene->getEnvironment(env);
 		environment.direct_intensity = 3;
 		
@@ -104,7 +104,7 @@ struct Runner final
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_universe->setRotation(env, rot);
 		
-		LuaScriptScene* lua_scene = (LuaScriptScene*)m_universe->getScene(crc32("lua_script"));
+		LuaScriptScene* lua_scene = (LuaScriptScene*)m_universe->getScene("lua_script");
 		lua_scene->addScript(env, 0);
 		lua_scene->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
