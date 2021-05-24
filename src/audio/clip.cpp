@@ -34,9 +34,12 @@ struct WAVHeader {
 	u32 bytes_per_sec;
 	u16 align;
 	u16 bits_per_sample;
-	u32 subchunk2_ID;
-	u32 data_size;
 }; 
+
+struct WAVChunk {
+	u32 type;
+	u32 size;
+};
 
 bool Clip::load(u64 size, const u8* mem)
 {
@@ -55,10 +58,19 @@ bool Clip::load(u64 size, const u8* mem)
 			if (header.riff != 'FFIR') return false;
 			if (header.wave != 'EVAW') return false;
 			if (header.bits_per_sample != 16) return false;
+			blob.skip(header.subchunk_size - 16);
 			m_channels = header.channels;
 			m_sample_rate = header.frequency;
-			m_data.resize(u32(blob.size() - blob.getPosition()) / (header.bits_per_sample / 8));
-			return blob.read(m_data.begin(), m_data.byte_size());
+
+			for (;;) {
+				const WAVChunk chunk = blob.read<WAVChunk>();
+				if (chunk.type == 'atad') {
+					m_data.resize(u32(chunk.size / sizeof(m_data[0])));
+					return blob.read(m_data.begin(), m_data.byte_size());
+				}
+				blob.skip(chunk.size);
+				if (blob.getPosition() >= blob.size()) return false;
+			}
 		}
 		case Format::OGG: {
 			short* output = nullptr;
