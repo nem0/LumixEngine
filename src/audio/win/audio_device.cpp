@@ -23,7 +23,6 @@ struct AudioDeviceImpl final : AudioDevice
 		const void* data;
 		DWORD data_size;
 		DWORD written;
-		DWORD written_total;
 		int sparse_idx;
 		bool looped;
 	};
@@ -37,7 +36,7 @@ struct AudioDeviceImpl final : AudioDevice
 	int m_buffer_map[MAX_PLAYING_SOUNDS];
 	int m_buffer_count;
 
-	static const int STREAM_SIZE = 32768;
+	static const int STREAM_SIZE = 32 * 1024;
 
 	AudioDeviceImpl()
 	{
@@ -224,7 +223,6 @@ struct AudioDeviceImpl final : AudioDevice
 				m_buffers[m_buffer_count].data = data;
 				m_buffers[m_buffer_count].data_size = data_size;
 				m_buffers[m_buffer_count].written = buffer_size;
-				m_buffers[m_buffer_count].written_total = buffer_size;
 				m_buffers[m_buffer_count].sparse_idx = i;
 				m_buffers[m_buffer_count].handle_3d = source;
 				m_buffers[m_buffer_count].handle8 = nullptr;
@@ -388,8 +386,8 @@ struct AudioDeviceImpl final : AudioDevice
 			if ((status & DSBSTATUS_PLAYING) == 0) return true;
 		}
 		buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
-		auto rel_written = DWORD(buffer.written_total % STREAM_SIZE);
-		DWORD abs_pc = buffer.written_total - (rel_written - rel_pc);
+		auto rel_written = DWORD(buffer.written % STREAM_SIZE);
+		DWORD abs_pc = buffer.written - (rel_written - rel_pc);
 		if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
 		return abs_pc >= buffer.data_size;
 	}
@@ -450,7 +448,7 @@ struct AudioDeviceImpl final : AudioDevice
 				buffer.handle->GetCurrentPosition(&pc, &wc);
 				return pc / (float)format.nAvgBytesPerSec;
 			}
-			return buffer.written / (float)format.nAvgBytesPerSec;
+			return (buffer.written % buffer.data_size) / (float)format.nAvgBytesPerSec;
 		}
 		return 0;
 	}
@@ -476,70 +474,69 @@ struct AudioDeviceImpl final : AudioDevice
 	}
 
 
-	void updateStreamData(Buffer& buffer, DWORD update_size)
-	{
+	void updateStreamData(Buffer& buffer, DWORD update_size) {
+		ASSERT(update_size <= STREAM_SIZE);
 		DWORD s1, s2;
 		void* p1;
 		void* p2;
-		if (FAILED(buffer.handle->Lock(buffer.written % STREAM_SIZE, update_size, &p1, &s1, &p2, &s2, 0)))
-		{
+		if (FAILED(buffer.handle->Lock(buffer.written % STREAM_SIZE, update_size, &p1, &s1, &p2, &s2, 0))) {
+			logError("Failed to lock buffer.");
+			ASSERT(false);
 			return;
 		}
+
 		auto updateBuffer = [&buffer](void* p, DWORD size) {
 			if (!p) return;
-			if (buffer.written + size > buffer.data_size)
-			{
-				memcpy(p, (u8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
-				void* p_2 = (u8*)p + (buffer.data_size - buffer.written);
-				DWORD size_2 = size - (buffer.data_size - buffer.written);
-				if (buffer.looped)
-				{
+
+			const u32 written = buffer.written % buffer.data_size;
+			if (written + size > buffer.data_size) {
+				memcpy(p, (u8*)buffer.data + written, buffer.data_size - written);
+				void* p_2 = (u8*)p + (buffer.data_size - written);
+				const DWORD size_2 = size - (buffer.data_size - written);
+				if (buffer.looped) {
 					memcpy(p_2, buffer.data, size_2);
+				} else {
+					memset(p_2, 0, size_2);
 				}
-				else
-				{
-					ZeroMemory(p_2, size_2);
-				}
+			} else {
+				memcpy(p, (u8*)buffer.data + written, size);
 			}
-			else
-			{
-				memcpy(p, (u8*)buffer.data + buffer.written, size);
-			}
+
 			buffer.written += size;
-			buffer.written_total += size;
-			buffer.written = buffer.written % buffer.data_size;
 		};
 
 		updateBuffer(p1, s1);
 		updateBuffer(p2, s2);
 
-		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
-		{
+		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2))) {
 			logError("Failed to unlock buffer.");
+			ASSERT(false);
 		}
 	}
 
 
-	void update(float) override 
-	{
-		for (int i = 0; i < m_buffer_count; ++i)
-		{
+	void update(float) override {
+		for (int i = 0; i < m_buffer_count; ++i) {
 			auto& buffer = m_buffers[i];
 			if (buffer.data_size <= STREAM_SIZE) continue;
 
 			DWORD rel_pc, rel_wc;
-			buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
+			HRESULT status = buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
+			ASSERT(SUCCEEDED(status));
 
-			auto rel_written = DWORD(buffer.written % STREAM_SIZE);
-			DWORD abs_pc = buffer.written - (rel_written - rel_pc);
-			if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
-			if (buffer.written - abs_pc < STREAM_SIZE / 2)
-			{
-				DWORD update_size = abs_pc + STREAM_SIZE - buffer.written;
+			DWORD rel_written = DWORD(buffer.written % STREAM_SIZE);
+			DWORD abs_pc = buffer.written - rel_written + rel_pc;
+			if (rel_pc >= rel_written) {
+				ASSERT(abs_pc >= STREAM_SIZE);
+				abs_pc -= STREAM_SIZE;
+			}
+			ASSERT(buffer.written >= abs_pc);
+			if (buffer.written - abs_pc < STREAM_SIZE / 2) {
+				const DWORD update_size = abs_pc + STREAM_SIZE - buffer.written;
 				updateStreamData(buffer, update_size);
 			}
 		}
-		m_listener->CommitDeferredSettings(); 
+		m_listener->CommitDeferredSettings();
 	}
 
 
