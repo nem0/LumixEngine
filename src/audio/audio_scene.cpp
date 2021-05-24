@@ -177,7 +177,7 @@ struct AudioSceneImpl final : AudioScene
 
 	void startGame() override
 	{
-		m_animation_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
+		m_animation_scene = (AnimationScene*)m_universe.getScene("animation");
 		for (AmbientSound& sound : m_ambient_sounds)
 		{
 			if (sound.clip) sound.playing_sound = play(sound.entity, sound.clip, sound.is_3d);

@@ -35,7 +35,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 	void onAgentGUI(EntityRef entity, WorldEditor& editor) {
 		Universe& universe = *editor.getUniverse();
-		auto* scene = static_cast<NavigationScene*>(universe.getScene(crc32("navigation")));
+		auto* scene = static_cast<NavigationScene*>(universe.getScene("navigation"));
 		static bool debug_draw_path = false;
 		const dtCrowdAgent* agent = scene->getDetourAgent(entity);
 		if (agent) {

@@ -545,8 +545,7 @@ static int LUA_setEntityRotation(lua_State* L)
 
 static IScene* LUA_getScene(Universe* universe, const char* name)
 {
-	u32 hash = crc32(name);
-	return universe->getScene(hash);
+	return universe->getScene(name);
 }
 
 

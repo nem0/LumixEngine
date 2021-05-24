@@ -1640,7 +1640,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 
 	void render() override {
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 
 		const PxRenderBuffer& rb = m_scene->getRenderBuffer();
@@ -1791,7 +1791,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void lateUpdate(float time_delta, bool paused) override {
 		if (!m_is_game_running || paused) return;
 
-		AnimationScene* anim_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
+		AnimationScene* anim_scene = (AnimationScene*)m_universe.getScene("animation");
 		if (!anim_scene) return;
 
 		for (Controller& ctrl : m_controllers) {
@@ -2124,7 +2124,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void startGame() override
 	{
-		auto* scene = m_universe.getScene(crc32("lua_script"));
+		auto* scene = m_universe.getScene("lua_script");
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		m_is_game_running = true;
 

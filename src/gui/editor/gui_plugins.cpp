@@ -357,7 +357,7 @@ private:
 
 	void copy(EntityRef e, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
+		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
 		m_copy_position_buffer_count = 0;
 
 		if (mask & (u8)EdgeMask::TOP)
@@ -420,7 +420,7 @@ private:
 
 			m_pipeline->setUniverse(editor.getUniverse());
 
-			GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
+			GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
 			scene->render(*m_pipeline, { size.x, size.y }, false);
 			
 			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *scene, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
@@ -660,7 +660,7 @@ private:
 
 
 	void makeAbsolute(EntityRef entity, const Vec2& canvas_size, u8 mask, WorldEditor& editor) {
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
+		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
 
 		EntityRef parent = (EntityRef)scene->getUniverse().getParent(entity);
 		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
@@ -729,7 +729,7 @@ private:
 
 	void align(EntityRef entity, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
+		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
 
 		editor.beginCommandGroup("align_gui_rect");
 
@@ -828,7 +828,7 @@ private:
 
 	void makeRelative(EntityRef entity, const Vec2& canvas_size, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene(crc32("gui"));
+		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
 		
 		EntityPtr parent = scene->getUniverse().getParent(entity);
 		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);

@@ -1661,7 +1661,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void setUniverse(Universe* universe) override {
-		RenderScene* scene = universe ? (RenderScene*)universe->getScene(crc32("renderer")) : nullptr;
+		RenderScene* scene = universe ? (RenderScene*)universe->getScene("renderer") : nullptr;
 		if (m_scene == scene) return;
 		m_scene = scene;
 		if (m_lua_state && m_scene) callInitScene();

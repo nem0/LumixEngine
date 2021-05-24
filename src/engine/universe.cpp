@@ -70,11 +70,11 @@ IScene* Universe::getScene(ComponentType type) const {
 }
 
 
-IScene* Universe::getScene(u32 hash) const
+IScene* Universe::getScene(const char* name) const
 {
 	for (auto& scene : m_scenes)
 	{
-		if (crc32(scene->getPlugin().getName()) == hash)
+		if (equalStrings(scene->getPlugin().getName(), name))
 		{
 			return scene.get();
 		}

@@ -1545,9 +1545,9 @@ namespace Lumix
 
 		void startGame() override
 		{
-			m_animation_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
+			m_animation_scene = (AnimationScene*)m_universe.getScene("animation");
 			m_is_game_running = true;
-			m_gui_scene = (GUIScene*)m_universe.getScene(crc32("gui"));
+			m_gui_scene = (GUIScene*)m_universe.getScene("gui");
 			if (m_gui_scene)
 			{
 				m_gui_scene->buttonClicked().bind<&LuaScriptSceneImpl::onButtonClicked>(this);

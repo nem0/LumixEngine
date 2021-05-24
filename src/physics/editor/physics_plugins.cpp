@@ -551,7 +551,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onVisualizationGUI(WorldEditor& editor)
 	{
-		auto* scene = static_cast<PhysicsScene*>(editor.getUniverse()->getScene(crc32("physics")));
+		auto* scene = static_cast<PhysicsScene*>(editor.getUniverse()->getScene("physics"));
 		DVec3 camera_pos = editor.getView().getViewport().pos;
 		const Vec3 extents(20, 20, 20);
 		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
@@ -599,7 +599,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		const EntityRef e = editor.getSelectedEntities()[0];
 
 		Universe& universe = *editor.getUniverse();
-		auto* scene = static_cast<PhysicsScene*>(universe.getScene(crc32("physics")));
+		auto* scene = static_cast<PhysicsScene*>(universe.getScene("physics"));
 
 		if(!scene->getUniverse().hasComponent(e, RIGID_ACTOR_TYPE)) {
 			ImGui::Text("Entity does not have rigid actor component.");

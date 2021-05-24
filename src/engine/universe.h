@@ -106,7 +106,7 @@ struct LUMIX_ENGINE_API Universe {
 	void deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map);
 
 	IScene* getScene(ComponentType type) const;
-	IScene* getScene(u32 hash) const;
+	IScene* getScene(const char* name) const;
 	Array<UniquePtr<IScene>>& getScenes();
 	void addScene(UniquePtr<IScene>&& scene);
 

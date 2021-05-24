@@ -102,7 +102,7 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void onUniverseCreated(){
-		m_scene = (RenderScene*)m_editor.getUniverse()->getScene(crc32("renderer"));
+		m_scene = (RenderScene*)m_editor.getUniverse()->getScene("renderer");
 		m_icons = EditorIcons::create(m_editor, *m_scene);
 	}
 

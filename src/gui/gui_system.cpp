@@ -107,7 +107,7 @@ struct GUISystemImpl final : GUISystem
 		if (!m_interface) return;
 
 		Pipeline* pipeline = m_interface->getPipeline();
-		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene(crc32("gui"));
+		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene("gui");
 		Vec2 size = m_interface->getSize();
 		scene->render(*pipeline, size, true);
 	}

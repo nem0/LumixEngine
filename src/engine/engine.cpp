@@ -451,7 +451,7 @@ public:
 		for (int i = 0; i < scene_count; ++i)
 		{
 			const char* tmp = serializer.readString();
-			IScene* scene = ctx.getScene(crc32(tmp));
+			IScene* scene = ctx.getScene(tmp);
 			const i32 version = serializer.read<i32>();
 			scene->deserialize(serializer, entity_map, version);
 		}

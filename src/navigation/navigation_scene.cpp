@@ -173,7 +173,7 @@ struct NavigationSceneImpl final : NavigationScene
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 
 		EntityPtr entity_ptr = render_scene->getFirstTerrain();
@@ -234,7 +234,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 		const Transform inv_zone_tr = zone_tr.inverted();
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 
 		u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
@@ -510,7 +510,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void debugDrawPath(EntityRef entity) override
 	{
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 		
 		auto agent_iter = m_agents.find(entity);
@@ -556,7 +556,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 
 	void debugDrawContours(EntityRef zone_entity) override {
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 
 		const RecastZone& zone = m_zones[zone_entity];
@@ -685,7 +685,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 
 	void debugDrawHeightfield(EntityRef zone_entity) override {
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 		
 		const RecastZone& zone = m_zones[zone_entity];
@@ -717,7 +717,7 @@ struct NavigationSceneImpl final : NavigationScene
 	void debugDrawCompactHeightfield(EntityRef zone_entity) override {
 		static const int MAX_CUBES = 0xffFF;
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 		
 		const RecastZone& zone = m_zones[zone_entity];
@@ -889,7 +889,7 @@ struct NavigationSceneImpl final : NavigationScene
 		const Vec3 max = zone.zone.extents;
 		if (pos.x > max.x || pos.x < min.x || pos.z > max.z || pos.z < min.z) return;
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 
 		int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
@@ -931,7 +931,7 @@ struct NavigationSceneImpl final : NavigationScene
 	void startGame() override
 	{
 		m_is_game_running = true;
-		auto* scene = m_universe.getScene(crc32("lua_script"));
+		auto* scene = m_universe.getScene("lua_script");
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		
 		for (RecastZone& zone : m_zones) {

@@ -482,7 +482,7 @@ private:
 
 		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::REMOVE_GRASS)
 		{
-			IScene* scene = m_world_editor.getUniverse()->getScene(crc32("physics"));
+			IScene* scene = m_world_editor.getUniverse()->getScene("physics");
 			if (!scene) return;
 
 			auto* phy_scene = static_cast<PhysicsScene*>(scene);

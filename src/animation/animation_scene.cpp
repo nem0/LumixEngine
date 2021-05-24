@@ -99,7 +99,7 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 	void init() override {
-		m_render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		m_render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		ASSERT(m_render_scene);
 	}
 
