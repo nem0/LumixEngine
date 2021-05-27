@@ -16,7 +16,7 @@ struct ProfilerUI
 	virtual ~ProfilerUI() {}
 	virtual void onGUI() = 0;
 
-	static UniquePtr<ProfilerUI> create(Engine& engine);
+	static UniquePtr<ProfilerUI> create(struct StudioApp& app);
 
 	bool m_is_open;
 };

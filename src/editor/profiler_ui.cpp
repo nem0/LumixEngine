@@ -1,6 +1,8 @@
 #include <imgui/imgui.h>
 
 #include "profiler_ui.h"
+#include "editor/asset_browser.h"
+#include "editor/studio_app.h"
 #include "engine/allocators.h"
 #include "engine/crt.h"
 #include "engine/debug.h"
@@ -167,8 +169,9 @@ static void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 
 struct ProfilerUIImpl final : ProfilerUI
 {
-	ProfilerUIImpl(debug::Allocator* allocator, Engine& engine)
+	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
 		: m_main_allocator(allocator)
+		, m_app(app)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
 		, m_resource_manager(engine.getResourceManager())
@@ -395,6 +398,7 @@ struct ProfilerUIImpl final : ProfilerUI
 	DefaultAllocator m_allocator;
 	debug::Allocator* m_main_allocator;
 	ResourceManagerHub& m_resource_manager;
+	StudioApp& m_app;
 	AllocationStackNode* m_allocation_root;
 	int m_allocation_size_from;
 	int m_allocation_size_to;
@@ -484,6 +488,12 @@ void ProfilerUIImpl::onGUIResources()
 				if (m_resource_size_filter > iter.value()->size() / 1000) continue;
 				
 				ImGui::TableNextColumn();
+				ImGui::PushID(iter.value());
+				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+					m_app.getAssetBrowser().selectResource(iter.value()->getPath(), true, false);
+				}
+				ImGui::PopID();
+				ImGui::SameLine();
 				ImGui::Text("%s", iter.value()->getPath().c_str());
 				ImGui::TableNextColumn();
 				ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
@@ -1168,10 +1178,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 }
 
 
-UniquePtr<ProfilerUI> ProfilerUI::create(Engine& engine)
+UniquePtr<ProfilerUI> ProfilerUI::create(StudioApp& app)
 {
+	Engine& engine = app.getEngine();
 	debug::Allocator* allocator = engine.getAllocator().isDebug() ? static_cast<debug::Allocator*>(&engine.getAllocator()) : nullptr;
-	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), allocator, engine);
+	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), app, allocator, engine);
 }
 
 

@@ -432,13 +432,13 @@ struct AnimationSceneImpl final : AnimationScene
 
 	bool isPropertyAnimatorEnabled(EntityRef entity) override
 	{
-		return !m_property_animators.get(entity).flags.isSet(PropertyAnimator::DISABLED);
+		return !m_property_animators[entity].flags.isSet(PropertyAnimator::DISABLED);
 	}
 
 
 	void enablePropertyAnimator(EntityRef entity, bool enabled) override
 	{
-		PropertyAnimator& animator = m_property_animators.get(entity);
+		PropertyAnimator& animator = m_property_animators[entity];
 		animator.flags.set(PropertyAnimator::DISABLED, !enabled);
 		animator.time = 0;
 		if (!enabled)
@@ -450,14 +450,14 @@ struct AnimationSceneImpl final : AnimationScene
 
 	Path getPropertyAnimation(EntityRef entity) override
 	{
-		const auto& animator = m_property_animators.get(entity);
+		const auto& animator = m_property_animators[entity];
 		return animator.animation ? animator.animation->getPath() : Path("");
 	}
 	
 	
 	void setPropertyAnimation(EntityRef entity, const Path& path) override
 	{
-		auto& animator = m_property_animators.get(entity);
+		auto& animator = m_property_animators[entity];
 		animator.time = 0;
 		unloadResource(animator.animation);
 		animator.animation = loadPropertyAnimation(path);

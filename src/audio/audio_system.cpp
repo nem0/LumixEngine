@@ -12,13 +12,11 @@ namespace Lumix
 {
 
 
-struct ClipManager final : ResourceManager
-{
+struct ClipManager final : ResourceManager {
 	explicit ClipManager(IAllocator& allocator)
 		: ResourceManager(allocator)
 		, m_allocator(allocator)
-	{
-	}
+	{}
 
 	Resource* createResource(const Path& path) override {
 		return LUMIX_NEW(m_allocator, Clip)(path, *this, m_allocator);
@@ -32,8 +30,7 @@ struct ClipManager final : ResourceManager
 };
 
 
-struct AudioSystemImpl final : AudioSystem
-{
+struct AudioSystemImpl final : AudioSystem {
 	explicit AudioSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_manager(engine.getAllocator())

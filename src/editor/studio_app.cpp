@@ -400,7 +400,7 @@ struct StudioAppImpl final : StudioApp
 
 		m_asset_browser = AssetBrowser::create(*this);
 		m_property_grid.create(*this);
-		m_profiler_ui = ProfilerUI::create(*m_engine);
+		m_profiler_ui = ProfilerUI::create(*this);
 		m_log_ui.create(m_editor->getAllocator());
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);

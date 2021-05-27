@@ -32,7 +32,7 @@ namespace reflection
 
 
 struct IAttribute {
-	enum Type {
+	enum Type : u32 {
 		MIN,
 		CLAMP,
 		RADIANS,
@@ -45,7 +45,7 @@ struct IAttribute {
 	};
 
 	virtual ~IAttribute() {}
-	virtual int getType() const = 0;
+	virtual Type getType() const = 0;
 };
 
 // we don't use method pointers here because VS has sizeof issues if IScene is forward declared
@@ -70,7 +70,7 @@ struct ResourceAttribute : IAttribute
 	ResourceAttribute(ResourceType type) : resource_type(type) {}
 	ResourceAttribute() {}
 
-	int getType() const override { return RESOURCE; }
+	Type getType() const override { return RESOURCE; }
 
 	ResourceType resource_type;
 };
@@ -80,7 +80,7 @@ struct MinAttribute : IAttribute
 	explicit MinAttribute(float min) { this->min = min; }
 	MinAttribute() {}
 
-	int getType() const override { return MIN; }
+	Type getType() const override { return MIN; }
 
 	float min;
 };
@@ -90,28 +90,28 @@ struct ClampAttribute : IAttribute
 	ClampAttribute(float min, float max) { this->min = min; this->max = max; }
 	ClampAttribute() {}
 
-	int getType() const override { return CLAMP; }
+	Type getType() const override { return CLAMP; }
 
 	float min;
 	float max;
 };
 
 struct ColorAttribute : IAttribute {
-	int getType() const override { return COLOR; }
+	Type getType() const override { return COLOR; }
 };
 
 struct EnumAttribute : IAttribute {
 	virtual u32 count(ComponentUID cmp) const = 0;
 	virtual const char* name(ComponentUID cmp, u32 idx) const = 0;
 	
-	int getType() const override { return ENUM; }
+	Type getType() const override { return ENUM; }
 };
 
 struct StringEnumAttribute : IAttribute {
 	virtual u32 count(ComponentUID cmp) const = 0;
 	virtual const char* name(ComponentUID cmp, u32 idx) const = 0;
 	
-	int getType() const override { return STRING_ENUM; }
+	Type getType() const override { return STRING_ENUM; }
 };
 
 

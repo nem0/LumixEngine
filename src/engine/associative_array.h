@@ -10,294 +10,285 @@ namespace Lumix
 	template <typename Key, typename Value>
 	struct AssociativeArray
 	{
-		public:
-			explicit AssociativeArray(IAllocator& allocator)
-				: m_allocator(allocator)
-				, m_size(0)
-				, m_capacity(0)
-				, m_keys(nullptr)
-				, m_values(nullptr)
-			{}
+		explicit AssociativeArray(IAllocator& allocator)
+			: m_allocator(allocator)
+			, m_size(0)
+			, m_capacity(0)
+			, m_keys(nullptr)
+			, m_values(nullptr)
+		{}
 
 
-			~AssociativeArray()
+		~AssociativeArray()
+		{
+			callDestructors(m_keys, m_size);
+			callDestructors(m_values, m_size);
+			m_allocator.deallocate(m_keys);
+		}
+
+
+		Value& insert(const Key& key)
+		{
+			if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+			int i = index(key);
+			ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
+			moveObjects(m_keys + i + 1, m_keys + i, m_size - i);
+			moveObjects(m_values + i + 1, m_values + i, m_size - i);
+
+			new (NewPlaceholder(), &m_values[i]) Value();
+			new (NewPlaceholder(), &m_keys[i]) Key(key);
+			++m_size;
+			return m_values[i];
+		}
+
+
+		template <typename... Params> Value& emplace(const Key& key, Params&&... params)
+		{
+			if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+			int i = index(key);
+			ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
+
+			moveObjects(m_keys + i + 1, m_keys + i, m_size - i);
+			moveObjects(m_values + i + 1, m_values + i, m_size - i);
+
+			new (NewPlaceholder(), &m_values[i]) Value(static_cast<Params&&>(params)...);
+			new (NewPlaceholder(), &m_keys[i]) Key(key);
+			++m_size;
+
+			return m_values[i];
+		}
+
+
+		int insert(const Key& key, Value&& value)
+		{
+			if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+			int i = index(key);
+			if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
 			{
-				callDestructors(m_keys, m_size);
-				callDestructors(m_values, m_size);
-				m_allocator.deallocate(m_keys);
-			}
+				moveObjects(m_keys + i + 1, m_keys + i, m_size - i);
+				moveObjects(m_values + i + 1, m_values + i, m_size - i);
 
-
-			Value& insert(const Key& key)
-			{
-				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
-
-				int i = index(key);
-				ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
-				memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-				memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
-				new (NewPlaceholder(), &m_values[i]) Value();
+				new (NewPlaceholder(), &m_values[i]) Value(static_cast<Value&&>(value));
 				new (NewPlaceholder(), &m_keys[i]) Key(key);
 				++m_size;
-				return m_values[i];
+
+				return i;
 			}
+			return -1;
+		}
 
 
-			template <typename... Params> Value& emplace(const Key& key, Params&&... params)
+		int insert(const Key& key, const Value& value)
+		{
+			if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+			int i = index(key);
+			if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
 			{
-				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+				moveObjects(m_keys + i + 1, m_keys + i, m_size - i);
+				moveObjects(m_values + i + 1, m_values + i, m_size - i);
 
-				int i = index(key);
-				ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
-
-				memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-				memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
-				new (NewPlaceholder(), &m_values[i]) Value(static_cast<Params&&>(params)...);
+				new (NewPlaceholder(), &m_values[i]) Value(value);
 				new (NewPlaceholder(), &m_keys[i]) Key(key);
 				++m_size;
 
-				return m_values[i];
+				return i;
 			}
+			return -1;
+		}
 
 
-			int insert(const Key& key, Value&& value)
+		int find(const Key& key) const
+		{
+			int l = 0;
+			int h = m_size - 1;
+			while (l < h)
 			{
-				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
-
-				int i = index(key);
-				if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
+				int mid = (l + h) >> 1;
+				if (m_keys[mid] < key)
 				{
-					memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-					memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
-					new (NewPlaceholder(), &m_values[i]) Value(static_cast<Value&&>(value));
-					new (NewPlaceholder(), &m_keys[i]) Key(key);
-					++m_size;
-
-					return i;
-				}
-				return -1;
-			}
-
-
-			int insert(const Key& key, const Value& value)
-			{
-				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
-
-				int i = index(key);
-				if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
-				{
-					memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-					memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
-					new (NewPlaceholder(), &m_values[i]) Value(value);
-					new (NewPlaceholder(), &m_keys[i]) Key(key);
-					++m_size;
-
-					return i;
-				}
-				return -1;
-			}
-
-
-			int find(const Key& key) const
-			{
-				int l = 0;
-				int h = m_size - 1;
-				while (l < h)
-				{
-					int mid = (l + h) >> 1;
-					if (m_keys[mid] < key)
-					{
-						l = mid + 1;
-					}
-					else
-					{
-						h = mid;
-					}
-				}
-				if (l == h && m_keys[l] == key)
-				{
-					return l;
-				}
-				return -1;
-			}
-
-
-			const Value& operator [](const Key& key) const
-			{
-				int index = find(key);
-				if (index >= 0)
-				{
-					return m_values[index];
+					l = mid + 1;
 				}
 				else
 				{
-					ASSERT(false);
-					return m_values[0];
+					h = mid;
 				}
 			}
-
-
-			Value& operator [](const Key& key)
+			if (l == h && m_keys[l] == key)
 			{
-				int index = find(key);
-				if (index >= 0)
-				{
-					return m_values[index];
-				}
-				else
-				{
-					ASSERT(false);
-					return m_values[0];
-				}
+				return l;
 			}
+			return -1;
+		}
 
 
-			int size() const
-			{
-				return m_size;
-			}
-
-
-			Value& get(const Key& key)
-			{
-				int index = find(key);
-				ASSERT(index >= 0);
-				return m_values[index];
-			}
-
-			const Value& get(const Key& key) const
-			{
-				int index = find(key);
-				ASSERT(index >= 0);
-				return m_values[index];
-			}
-
-			Value* begin() { return m_values; }
-			Value* end() { return m_values + m_size; }
-			const Value* begin() const { return m_values; }
-			const Value* end() const { return m_values + m_size; }
-
-
-			Value& at(int index)
+		const Value& operator [](const Key& key) const
+		{
+			int index = find(key);
+			if (index >= 0)
 			{
 				return m_values[index];
 			}
+			else
+			{
+				ASSERT(false);
+				return m_values[0];
+			}
+		}
 
 
-			const Value& at(int index) const
+		Value& operator [](const Key& key)
+		{
+			int index = find(key);
+			if (index >= 0)
 			{
 				return m_values[index];
 			}
-
-
-			void clear()
+			else
 			{
-				callDestructors(m_keys, m_size);
-				callDestructors(m_values, m_size);
-				m_size = 0;
+				ASSERT(false);
+				return m_values[0];
 			}
+		}
 
+		int size() const { return m_size; }
+		Value* begin() { return m_values; }
+		Value* end() { return m_values + m_size; }
+		const Value* begin() const { return m_values; }
+		const Value* end() const { return m_values + m_size; }
 
-			void reserve(int new_capacity)
-			{
-				if (m_capacity >= new_capacity) return;
+		Value& at(int index) { ASSERT(index >= 0 && index < m_size); return m_values[index]; }
+		const Value& at(int index) const { ASSERT(index >= 0 && index < m_size); return m_values[index]; }
+
+		void clear()
+		{
+			callDestructors(m_keys, m_size);
+			callDestructors(m_values, m_size);
+			m_size = 0;
+		}
+
+		void reserve(int new_capacity)
+		{
+			if (m_capacity >= new_capacity) return;
 				
-				u8* new_data = (u8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
+			u8* new_data = (u8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
 				
-				memcpy(new_data, m_keys, sizeof(Key) * m_size);
-				memcpy(new_data + sizeof(Key) * new_capacity, m_values, sizeof(Value) * m_size);
+			moveObjects((Key*)new_data, m_keys, m_size);
+			moveObjects((Value*)(new_data + sizeof(Key) * new_capacity), m_values, m_size);
 
-				m_allocator.deallocate(m_keys);
-				m_keys = (Key*)new_data;
-				m_values = (Value*)(new_data + sizeof(Key) * new_capacity);
+			m_allocator.deallocate(m_keys);
+			m_keys = (Key*)new_data;
+			m_values = (Value*)(new_data + sizeof(Key) * new_capacity);
 
-				m_capacity = new_capacity;
-			}
+			m_capacity = new_capacity;
+		}
 
 
-			const Key& getKey(int index) const
+		const Key& getKey(int index) const
+		{
+			return m_keys[index];
+		}
+
+
+		void eraseAt(int index)
+		{
+			if (index >= 0 && index < m_size)
 			{
-				return m_keys[index];
-			}
-
-
-			void eraseAt(int index)
-			{
-				if (index >= 0 && index < m_size)
+				m_values[index].~Value();
+				m_keys[index].~Key();
+				if (index < m_size - 1)
 				{
-					m_values[index].~Value();
-					m_keys[index].~Key();
-					if (index < m_size - 1)
-					{
-						memmove(m_keys + index, m_keys + index + 1, sizeof(Key) * (m_size - index - 1));
-						memmove(m_values + index, m_values + index + 1, sizeof(Value) * (m_size - index - 1));
-					}
-					--m_size;
+					moveObjects(m_keys + index, m_keys + index + 1, m_size - index - 1);
+					moveObjects(m_values + index, m_values + index + 1, m_size - index - 1);
 				}
+				--m_size;
 			}
+		}
 
 
-			void erase(const Key& key)
+		void erase(const Key& key)
+		{
+			int i = find(key);
+			if (i >= 0)
 			{
-				int i = find(key);
-				if (i >= 0)
-				{
-					eraseAt(i);
-				}
+				eraseAt(i);
 			}
-			Span<Value> values() const {
-				Span<Value> res;
-				res.m_begin = m_values;
-				res.m_end = m_values + m_size;
-				return res;
-			}
+		}
 
-			Span<Key> keys() const { 
-				Span<Key> res;
-				res.m_begin = m_keys;
-				res.m_end = m_keys + m_size;
-				return res;
-			}
+		Span<Value> values() const {
+			Span<Value> res;
+			res.m_begin = m_values;
+			res.m_end = m_values + m_size;
+			return res;
+		}
 
-		private:
-			template <typename T> void callDestructors(T* ptr, int count)
-			{
-				for (int i = 0; i < count; ++i)
-				{
+		Span<Key> keys() const { 
+			Span<Key> res;
+			res.m_begin = m_keys;
+			res.m_end = m_keys + m_size;
+			return res;
+		}
+
+	private:
+		template <typename T> void callDestructors(T* ptr, int count) {
+			if constexpr (!__is_trivially_copyable(T)) {
+				for (int i = 0; i < count; ++i) {
 					ptr[i].~T();
 				}
 			}
+		}
 
-
-			int index(const Key& key) const
-			{
-				int l = 0;
-				int h = m_size - 1;
-				while (l < h)
-				{
-					int mid = (l + h) >> 1;
-					if (m_keys[mid] < key)
-					{
-						l = mid + 1;
-					}
-					else
-					{
-						h = mid;
-					}
-				}
-				if (l + 1 == m_size && m_keys[l] < key)
-				{
-					return l + 1;
-				}
-				return l;
+		template <typename O> void moveObjects(O* dst, O* src, u32 count) {
+			if constexpr (__is_trivially_copyable(O)) {
+				memmove(dst, src, sizeof(O) * count);
 			}
+			else {
+				if (dst > src) {
+					for (u32 i = count - 1; i < count; --i) {
+						new (NewPlaceholder(), &dst[i]) O(static_cast<O&&>(src[i]));
+						src[i].~O();
+					}
+				}
+				else {
+					for (u32 i = 0; i < count; ++i) {
+						new (NewPlaceholder(), &dst[i]) O(static_cast<O&&>(src[i]));
+						src[i].~O();
+					}
+				}
+			}
+		}
 
-		private:
-			IAllocator& m_allocator;
-			Key* m_keys;
-			Value* m_values;
-			int m_size;
-			int m_capacity;
+		int index(const Key& key) const
+		{
+			int l = 0;
+			int h = m_size - 1;
+			while (l < h)
+			{
+				int mid = (l + h) >> 1;
+				if (m_keys[mid] < key)
+				{
+					l = mid + 1;
+				}
+				else
+				{
+					h = mid;
+				}
+			}
+			if (l + 1 == m_size && m_keys[l] < key)
+			{
+				return l + 1;
+			}
+			return l;
+		}
+
+		IAllocator& m_allocator;
+		Key* m_keys;
+		Value* m_values;
+		int m_size;
+		int m_capacity;
 	};
 
 

@@ -128,16 +128,16 @@ Span<const RegisteredComponent> getComponents() {
 
 struct RadiansAttribute : IAttribute
 {
-	int getType() const override { return RADIANS; }
+	Type getType() const override { return RADIANS; }
 };
 
 struct MultilineAttribute : IAttribute
 {
-	int getType() const override { return MULTILINE; }
+	Type getType() const override { return MULTILINE; }
 };
 
 struct NoUIAttribute : IAttribute {
-	int getType() const override { return NO_UI; }
+	Type getType() const override { return NO_UI; }
 };
 
 builder build_scene(const char* name) {

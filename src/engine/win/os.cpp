@@ -4,7 +4,6 @@
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/path.h"
-#include "engine/queue.h"
 #include "engine/string.h"
 #define UNICODE
 #pragma warning(push)

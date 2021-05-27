@@ -1539,7 +1539,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case 3: return "Y- (bottom)";
 			case 4: return "Z+";
 			case 5: return "Z+";
-			default: return "Too many layers in cubemap";
+			default: return "Too many faces in cubemap";
 		}
 	}
 
