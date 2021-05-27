@@ -489,7 +489,10 @@ struct AudioDeviceImpl final : AudioDevice
 			if (!p) return;
 
 			const u32 written = buffer.written % buffer.data_size;
-			if (written + size > buffer.data_size) {
+			if (buffer.written > buffer.data_size && !buffer.looped) {
+				memset(p, 0, size);
+			}
+			else if (written + size > buffer.data_size) {
 				memcpy(p, (u8*)buffer.data + written, buffer.data_size - written);
 				void* p_2 = (u8*)p + (buffer.data_size - written);
 				const DWORD size_2 = size - (buffer.data_size - written);
