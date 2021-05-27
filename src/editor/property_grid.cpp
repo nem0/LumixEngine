@@ -101,6 +101,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				case reflection::IAttribute::RESOURCE:
 					attrs.resource_type = ((reflection::ResourceAttribute&)*attr).resource_type;
 					break;
+				default: break;
 			}
 		}
 		return attrs;
