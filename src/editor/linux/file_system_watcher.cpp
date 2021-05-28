@@ -6,6 +6,7 @@
 #include "engine/string.h"
 #include "file_system_watcher.h"
 #include <sys/inotify.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 
@@ -150,19 +151,29 @@ int FileSystemWatcherTask::task()
     char buf[4096];
     while (!finished)
     {
-        int r = read(fd, buf, sizeof(buf));
-        if(r == -1) return 1;
-        if (finished) return 0;
-        auto* event = (inotify_event*)buf;
+		fd_set rfds;
+		FD_ZERO (&rfds);
+		FD_SET (fd, &rfds);
+		timeval timeout;
+		timeout.tv_sec=0;
+		timeout.tv_usec=100000;
 
-        while ((char*)event < buf + r)
-        {
-            char tmp[LUMIX_MAX_PATH];
-            getName(*this, event, tmp, Lumix::lengthOf(tmp));
-            if (event->mask & IN_CREATE) addWatch(*this, tmp, root_length);
-            watcher.callback.invoke(tmp);
+		if(select(FD_SETSIZE, &rfds, NULL, NULL, &timeout) > 0)
+		{
+            int r = read(fd, buf, sizeof(buf));
+            if (finished) return 0;
+            if(r == -1) return 1;
+            auto* event = (inotify_event*)buf;
 
-            event = (inotify_event*)((char*)event + sizeof(*event) + event->len);
+            while ((char*)event < buf + r)
+            {
+                char tmp[LUMIX_MAX_PATH];
+                getName(*this, event, tmp, Lumix::lengthOf(tmp));
+                if (event->mask & IN_CREATE) addWatch(*this, tmp, root_length);
+                watcher.callback.invoke(tmp);
+
+                event = (inotify_event*)((char*)event + sizeof(*event) + event->len);
+            }
         }
     }
 
