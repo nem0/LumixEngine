@@ -768,7 +768,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return false;
 		}
 
-		file << "shader \"/pipelines/standard.shd\"";
+		file << "shader \"pipelines/standard.shd\"";
 		file.close();
 		return true;
 	}
@@ -4079,7 +4079,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 
 		file << R"#(
-			shader "/pipelines/terrain.shd"
+			shader "pipelines/terrain.shd"
 			texture ")#";
 		file << info.m_basename;
 		file << R"#(.raw"
