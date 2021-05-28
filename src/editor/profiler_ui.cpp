@@ -50,7 +50,7 @@ struct ThreadRecord
 	const char* name;
 	bool show;
 	struct {
-		u64 time;
+		u64 time = 0;
 		bool is_enter;
 	} last_context_switch;
 };
@@ -1019,13 +1019,14 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	auto draw_cswitch = [&](float x, const profiler::ContextSwitchRecord& r, ThreadRecord& tr, bool is_enter) {
 		const float y = tr.y + 10;
-		dl->AddLine(ImVec2(x, y - 5), ImVec2(x, y + 5), 0xff00ff00);
+		dl->AddLine(ImVec2(x + (is_enter ? -2.f : 2.f), y - 5), ImVec2(x, y), 0xff00ff00);
 		if (!is_enter) {
 			const u64 prev_switch = tr.last_context_switch.time;
 			if (prev_switch) {
-				float prev_x = get_view_x(prev_switch);
-				dl->AddLine(ImVec2(prev_x, y), ImVec2(x, y), 0xff00ff00);
-				dl->AddLine(ImVec2(prev_x, y - 5), ImVec2(prev_x, y + 5), 0xff00ff00);
+				if (tr.last_context_switch.is_enter) {
+					float prev_x = get_view_x(prev_switch);
+					dl->AddLine(ImVec2(prev_x, y), ImVec2(x, y), 0xff00ff00);
+				}
 			}
 			else {
 				dl->AddLine(ImVec2(x, y), ImVec2(0, y), 0xff00ff00);
@@ -1169,11 +1170,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 	}
 
-	for (const ThreadRecord& tr : m_threads) {
+	for (ThreadRecord& tr : m_threads) {
 		if (tr.last_context_switch.is_enter) {
 			const float x = get_view_x(tr.last_context_switch.time);
-			dl->AddLine(ImVec2(to_x, tr.y + 10), ImVec2(x, tr.y + 10), 0xff00ff00);
+			dl->AddLine(ImVec2(x + 10, tr.y + 10), ImVec2(x, tr.y + 10), 0xffffff00);
 		}
+		tr.last_context_switch.time = 0;
 	}
 }
 
