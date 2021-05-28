@@ -42,7 +42,7 @@ struct FileSystemWatcherTask : Lumix::Thread
 
     Lumix::IAllocator& allocator;
     FileSystemWatcherImpl& watcher;
-	volatile bool finished;
+	volatile bool finished = false;
 	char path[LUMIX_MAX_PATH];
 	Lumix::HashMap<int, Lumix::StaticString<LUMIX_MAX_PATH> > watched;
 	int fd;
