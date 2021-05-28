@@ -972,18 +972,20 @@ static bool dialog(Span<char> out, const char* filter_str, const char* starting_
 
 	const char* filters = filter_str;
 	GtkFileFilter* filter;
+	char default_ext[64] = "";
 	while (filters && *filters) {
 		filter = gtk_file_filter_new();
 		gtk_file_filter_set_name(filter, filters);
 		filters += strlen(filters) + 1;
 
-		char buf[128];
+		char buf[512];
 		copyString(buf, filters);
 		char* patterns;
 		for (patterns = buf; *patterns; ++patterns) {
 			if (*patterns == ';') {
 				*patterns = '\0';
 			}
+			if (!default_ext[0]) copyString(default_ext, patterns[0] == '*' ? patterns + 1 : patterns);
 		}
 
 		patterns = buf;
@@ -1007,6 +1009,12 @@ static bool dialog(Span<char> out, const char* filter_str, const char* starting_
 
 	if (name) {
 		copyString(out, name);
+		if (is_save) {
+			Span<const char> ext = Path::getExtension(Span(name, strlen(name)));
+			if (ext.length() == 0) {
+				catString(out, default_ext);
+			}
+		}
 		free(name);
 		return true;
 	}
