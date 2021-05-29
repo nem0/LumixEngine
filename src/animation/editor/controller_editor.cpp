@@ -80,8 +80,8 @@ struct ControllerEditorImpl : ControllerEditor {
 		m_redo_action.func.bind<&ControllerEditorImpl::redo>(this);
 
 		app.addWindowAction(&m_toggle_ui);
-		app.addWindowAction(&m_undo_action);
-		app.addWindowAction(&m_redo_action);
+		app.addAction(&m_undo_action);
+		app.addAction(&m_redo_action);
 
 		newGraph();
 
