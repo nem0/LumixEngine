@@ -645,6 +645,7 @@ static Vec3 LUA_getEntityDirection(Universe* universe, i32 entity)
 	return rot.rotate(Vec3(0, 0, 1));
 }
 
+static void LUA_setEntityName(Universe* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
 static void LUA_setEntityScale(Universe* univ, i32 entity, float scale) { univ->setScale({entity}, scale); }
 static void LUA_setEntityPosition(Universe* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
 static float LUA_getLastTimeDelta(Engine* engine) { return engine->getLastTimeDelta(); }
@@ -784,6 +785,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(nextFrame);
 	//REGISTER_FUNCTION(setEntityLocalPosition);
 	//REGISTER_FUNCTION(setEntityLocalRotation);
+	REGISTER_FUNCTION(setEntityName);
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
 	REGISTER_FUNCTION(setEntityScale);
@@ -952,6 +954,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		Lumix.Entity.__newindex = function(table, key, value)
 			if key == "position" then
 				LumixAPI.setEntityPosition(table._universe, table._entity, value)
+			elseif key == "name" then
+				LumixAPI.setEntityName(table._universe, table._entity, value)
 			elseif key == "rotation" then
 				LumixAPI.setEntityRotation(table._universe, table._entity, value)
 			elseif key == "scale" then
