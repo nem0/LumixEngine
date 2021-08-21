@@ -628,6 +628,11 @@ static i32 LUA_getParent(Universe* universe, i32 entity)
 	return universe->getParent({entity}).index;
 }
 
+static i32 LUA_findByName(Universe* universe, i32 entity, const char* name)
+{
+	return universe->findByName(EntityPtr{entity}, name).index;
+}
+
 static void LUA_setParent(Universe* universe, i32 parent, i32 child)
 {
 	return universe->setParent(EntityPtr{parent}, EntityRef{child});
@@ -758,6 +763,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(createUniverse);
 	REGISTER_FUNCTION(destroyEntity);
 	REGISTER_FUNCTION(destroyUniverse);
+	REGISTER_FUNCTION(findByName);
 	//REGISTER_FUNCTION(getComponentType);
 	//REGISTER_FUNCTION(getEntityDirection);
 	REGISTER_FUNCTION(getEntityPosition);
@@ -799,7 +805,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		} while(false)
 
 	//REGISTER_FUNCTION(cloneEntity);
-	//REGISTER_FUNCTION(findByName);
 	//REGISTER_FUNCTION(getFirstEntity);
 	//REGISTER_FUNCTION(getNextEntity);
 	//REGISTER_FUNCTION(getNextSibling);
@@ -984,6 +989,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		function Lumix.Universe:getScene(scene_name)
 			local scene = LumixAPI.getScene(self.value, scene_name)	
 			return Lumix[scene_name]:new(scene)
+		end
+		function Lumix.Universe:findEntityByName(parent, name)
+			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)
+			if p < 0 then return nil end
+			return Lumix.Entity:new(self.value, p)			
 		end
 		function Lumix.Universe:createEntityEx(desc)
 			local ent = self:createEntity()
