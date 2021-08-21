@@ -52,7 +52,7 @@ struct Optional {
 LUMIX_ENGINE_API int traceback (lua_State *L);
 LUMIX_ENGINE_API bool pcall(lua_State* L, int nargs, int nres);
 LUMIX_ENGINE_API bool execute(lua_State* L, Span<const char> content, const char* name, int nresults);
-LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k);
+LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k); //-V1071
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {

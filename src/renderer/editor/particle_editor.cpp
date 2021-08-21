@@ -44,7 +44,7 @@ struct ParticleEditorResource {
 	struct NodeInput {
 		Node* node;
 		u8 output_idx;
-		DataStream generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const;
+		DataStream generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const; //-V1071
 	};
 
 	struct Node {
