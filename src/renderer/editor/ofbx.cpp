@@ -1,8 +1,5 @@
 #include "ofbx.h"
-
-#define MINIZ_NO_ARCHIVE_APIS
 #include "miniz.h"
-
 #include <cassert>
 #include <math.h>
 #include <ctype.h>
@@ -2974,7 +2971,7 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 
 		get_property("UpAxis", UpAxis, UpVector, toInt);
 		get_property("UpAxisSign", UpAxisSign, int, toInt);
-		get_property("FrontAxis", FrontAxis, FrontVector, toInt);
+		get_property("FrontAxis", FrontAxis, int, toInt);
 		get_property("FrontAxisSign", FrontAxisSign, int, toInt);
 		get_property("CoordAxis", CoordAxis, CoordSystem, toInt);
 		get_property("CoordAxisSign", CoordAxisSign, int, toInt);
