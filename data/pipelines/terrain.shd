@@ -38,6 +38,7 @@ uniform("Detail power", "float")
 
 common [[
 	//#define SECONDARY_TEXTURE
+	//#define HQ_TILING
 
 	layout(binding=0) uniform sampler2D u_hm;
 	layout(binding=1) uniform sampler2DArray u_albedo;
@@ -136,34 +137,51 @@ fragment_shader [[
 		};
 
 		// http://www.iquilezles.org/www/articles/texturerepetition/texturerepetition.htm
-		Detail textureNoTile(float k, vec2 x, int layer, float v )
+		Detail textureNoTile(float dist2, float k, vec2 x, int layer, float v )
 		{
-			vec2 duvdx = dFdx( x );
-			vec2 duvdy = dFdy( x );
-    
-			float l = k*8;
-			float f = fract(l);
-    
-			float ia = floor(l);
-			float ib = ia + 1.0;
-    
-			vec2 offa = sin(vec2(3.0,7.0)*ia);
-			vec2 offb = sin(vec2(3.0,7.0)*ib);
+			#ifdef HQ_TILING
+				vec2 duvdx = dFdx( x );
+				vec2 duvdy = dFdy( x );
+		
+				float l = k*8;
+				float f = fract(l);
+		
+				float ia = floor(l);
+				float ib = ia + 1.0;
+		
+				vec2 offa = sin(vec2(3.0,7.0)*ia);
+				vec2 offb = sin(vec2(3.0,7.0)*ib);
 
-			vec4 cola = textureGrad(u_albedo, vec3(x + v * offa, layer), duvdx, duvdy);
-			vec4 colb = textureGrad(u_albedo, vec3(x + v * offb, layer), duvdx, duvdy);
+				vec4 cola = textureGrad(u_albedo, vec3(x + v * offa, layer), duvdx, duvdy);
+				vec4 colb = textureGrad(u_albedo, vec3(x + v * offb, layer), duvdx, duvdy);
 
-			vec3 norma; norma.xy = textureGrad(u_normal, vec3(x + v * offa, layer), duvdx, duvdy).xy * 2 - 1;
-			vec3 normb; normb.xy = textureGrad(u_normal, vec3(x + v * offb, layer), duvdx, duvdy).xy * 2 - 1;
-			norma.z = sqrt(saturate(1 - dot(norma.xy, norma.xy))); 
-			normb.z = sqrt(saturate(1 - dot(normb.xy, normb.xy)));
-    
-			Detail detail;
+				vec3 norma; norma.xy = textureGrad(u_normal, vec3(x + v * offa, layer), duvdx, duvdy).xy * 2 - 1;
+				vec3 normb; normb.xy = textureGrad(u_normal, vec3(x + v * offb, layer), duvdx, duvdy).xy * 2 - 1;
+				norma.z = sqrt(saturate(1 - dot(norma.xy, norma.xy))); 
+				normb.z = sqrt(saturate(1 - dot(normb.xy, normb.xy)));
+		
+				Detail detail;
 
-			float t = smoothstep(0.2,0.8,f-0.1*rgbSum(cola-colb));
-			detail.albedo = mix(cola, colb, t);
-			detail.normal = mix(norma, normb, t);
-			return detail;
+				float t = smoothstep(0.2,0.8,f-0.1*rgbSum(cola-colb));
+				detail.albedo = mix(cola, colb, t);
+				detail.normal = mix(norma, normb, t);
+				return detail;
+			#else
+				Detail detail;
+
+				detail.normal.xy = texture(u_normal, vec3(x, layer)).xy * 2 - 1;
+				detail.normal.z = sqrt(saturate(1 - dot(detail.normal.xy, detail.normal.xy))); 
+				detail.albedo = texture(u_albedo, vec3(x, layer));
+
+				vec3 N;
+				vec4 albedo = texture(u_albedo, vec3(x * 0.1, layer));
+				N.xy = texture(u_normal, vec3(x * 0.1, layer)).xy * 2 - 1;
+				N.z = sqrt(saturate(1 - dot(N.xy, N.xy)));
+				detail.normal = normalize(mix(detail.normal, N, saturate(dist2 / 10000)));
+				detail.albedo = mix(detail.albedo, albedo, saturate(dist2 / 10000));
+
+				return detail;
+			#endif
 		}
 
 		vec2 power(vec2 v, vec2 a) {
@@ -206,10 +224,10 @@ fragment_shader [[
 
 				vec2 uv_detail = u_detail_scale * v_uv * u_hm_size;
 
-				Detail c00 = textureNoTile(noise, uv_detail, int(splat00.x * 255.0 + 0.5), 1);
-				Detail c01 = textureNoTile(noise, uv_detail, int(splat01.x * 255.0 + 0.5), 1);
-				Detail c10 = textureNoTile(noise, uv_detail, int(splat10.x * 255.0 + 0.5), 1);
-				Detail c11 = textureNoTile(noise, uv_detail, int(splat11.x * 255.0 + 0.5), 1);
+				Detail c00 = textureNoTile(v_dist2, noise, uv_detail, int(splat00.x * 255.0 + 0.5), 1);
+				Detail c01 = textureNoTile(v_dist2, noise, uv_detail, int(splat01.x * 255.0 + 0.5), 1);
+				Detail c10 = textureNoTile(v_dist2, noise, uv_detail, int(splat10.x * 255.0 + 0.5), 1);
+				Detail c11 = textureNoTile(v_dist2, noise, uv_detail, int(splat11.x * 255.0 + 0.5), 1);
 			
 				vec4 v4 = c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w;
 				float a = splat00.z * bicoef.x + splat01.z * bicoef.y + splat10.z * bicoef.z + splat11.z * bicoef.w;
@@ -217,10 +235,10 @@ fragment_shader [[
 				vec3 n0 = (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy;
 				
 				#ifdef SECONDARY_TEXTURE
-					Detail s00 = textureNoTile(noise, uv_detail, int(splat00.y * 255.0 + 0.5), 1);
-					Detail s01 = textureNoTile(noise, uv_detail, int(splat01.y * 255.0 + 0.5), 1);
-					Detail s10 = textureNoTile(noise, uv_detail, int(splat10.y * 255.0 + 0.5), 1);
-					Detail s11 = textureNoTile(noise, uv_detail, int(splat11.y * 255.0 + 0.5), 1);
+					Detail s00 = textureNoTile(v_dist2, noise, uv_detail, int(splat00.y * 255.0 + 0.5), 1);
+					Detail s01 = textureNoTile(v_dist2, noise, uv_detail, int(splat01.y * 255.0 + 0.5), 1);
+					Detail s10 = textureNoTile(v_dist2, noise, uv_detail, int(splat10.y * 255.0 + 0.5), 1);
+					Detail s11 = textureNoTile(v_dist2, noise, uv_detail, int(splat11.y * 255.0 + 0.5), 1);
 
 					vec4 v4_2 = s00.albedo * bicoef.x + s01.albedo * bicoef.y + s10.albedo * bicoef.z + s11.albedo * bicoef.w;
 					vec3 n0_2 = (s00.normal * bicoef.x + s01.normal * bicoef.y + s10.normal * bicoef.z + s11.normal * bicoef.w).xzy;
