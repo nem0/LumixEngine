@@ -16,6 +16,13 @@ fragment_shader [[
 	layout (location = 0) out vec4 o_color;
 	layout (binding = 0) uniform samplerCube u_sky;
 
+	layout(std140, binding = 4) uniform Data {
+		float u_intensity;
+		float u_padding0;
+		float u_padding1;
+		float u_padding2;
+	};
+
 	float getFogFactorSky(float cam_height, vec3 eye_dir, float fog_density, float fog_bottom, float fog_height) 
 	{
 		if(eye_dir.y == 0) return 1.0;
@@ -31,7 +38,7 @@ fragment_shader [[
 	void main()
 	{
 		vec3 eye_dir = getWorldNormal(v_uv);
-		o_color.rgb = texture(u_sky, eye_dir).rgb;
+		o_color.rgb = texture(u_sky, eye_dir).rgb * u_intensity;
 		o_color.a = 1;
 	}
 ]]

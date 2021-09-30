@@ -1,3 +1,4 @@
+intensity = 1.0
 sky = -1
 Editor.setPropertyType(this, "sky", Editor.RESOURCE_PROPERTY, "texture")
 
@@ -22,6 +23,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		depth_write = false,
 		depth_test = false
 	}
+	env.drawcallUniforms(intensity, 0, 0, 0)
 	env.drawArray(0, 3, env.cubemap_sky_shader, {}, state)
 	env.endBlock()
 	return hdr_buffer
