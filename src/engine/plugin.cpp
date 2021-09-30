@@ -195,5 +195,8 @@ namespace Lumix
 
 	void PluginManager::createAllStatic(Engine& engine) {
 		#include "plugins.inl"
+		for (IPlugin* plugin : engine.getPluginManager().getPlugins()) {
+			logInfo("Plugin ", plugin->getName(), " loaded");
+		}
 	}
 }

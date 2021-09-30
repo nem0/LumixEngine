@@ -2686,6 +2686,10 @@ struct StudioAppImpl final : StudioApp
 #endif
 		addPlugin(*createSplineEditor(*this));
 
+		for (IPlugin* plugin : m_plugins) {
+			logInfo("Studio plugin ", plugin->getName(), " loaded");
+		}
+
 		initPlugins();
 		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}
