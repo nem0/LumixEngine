@@ -1,9 +1,9 @@
 radius = 0.2
 intensity = 1
-debug = false
 
 function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
+
 	if phase ~= "pre_lightpass" then return hdr_buffer end
 	env.beginBlock("ssao")
 	if env.ssao_shader == nil then
@@ -42,10 +42,6 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.dispatch(env.ssao_blit_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
 
 	env.endBlock()
-
-	if debug then
-		env.debugRenderbuffer(ssao_rb, hdr_buffer, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 1})
-	end
 end
 
 function awake()
