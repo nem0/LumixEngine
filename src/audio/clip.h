@@ -28,7 +28,7 @@ struct Clip final : Resource
 	int getChannels() const { return m_channels; }
 	int getSampleRate() const { return m_sample_rate; }
 	int getSize() const { return m_data.size() * sizeof(m_data[0]); }
-	u16* getData() { return &m_data[0]; }
+	u16* getData() { return m_data.begin(); }
 	float getLengthSeconds() const { return m_data.size() / float(m_channels * m_sample_rate); }
 
 	static const ResourceType TYPE;
