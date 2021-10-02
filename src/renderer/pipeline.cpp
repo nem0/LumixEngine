@@ -377,6 +377,7 @@ struct GlobalState
 	Matrix camera_inv_view;
 	Matrix camera_view_projection;
 	Matrix camera_inv_view_projection;
+	Matrix camera_reprojection;
 	Vec4 cam_world_pos;
 	Vec4 light_direction;
 	Vec4 light_color;
@@ -502,6 +503,7 @@ struct PipelineImpl final : Pipeline
 		gpu::TextureHandle handle;
 		int frame_counter;
 		bool persistent;
+		gpu::TextureFlags flags;
 	};
 
 	struct ShaderRef {
@@ -1109,6 +1111,10 @@ struct PipelineImpl final : Pipeline
 	void setViewport(const Viewport& viewport) override 
 	{
 		m_viewport = viewport;
+		if (m_first_set_viewport) {
+			m_prev_viewport = viewport;
+			m_first_set_viewport = false;
+		}
 	}
 
 	void prepareShadowCameras(GlobalState& global_state)
@@ -1301,6 +1307,17 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
+	static Matrix computeReprojection(const Viewport& current, const Viewport& prev) {
+		Matrix translation = Matrix::IDENTITY;
+		translation.setTranslation(Vec3(current.pos - prev.pos));
+		if (gpu::isOriginBottomLeft()) {
+			return prev.getProjection() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjection().inverted();
+		}
+
+		Matrix flip = Matrix::IDENTITY;
+		flip.columns[1].y = -1;
+		return flip * prev.getProjection() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjection().inverted() * flip;
+	}
 
 	bool render(bool only_2d) override
 	{
@@ -1328,10 +1345,12 @@ struct PipelineImpl final : Pipeline
 		global_state.camera_inv_view_projection = global_state.camera_view_projection.inverted();
 		global_state.time = m_timer.getTimeSinceStart();
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
+		global_state.camera_reprojection = computeReprojection(m_viewport, m_prev_viewport);
 		m_timer.tick();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
+		m_prev_viewport = m_viewport;
 
 		if(m_scene) {
 			const EntityPtr global_light = m_scene->getActiveEnvironment();
@@ -1734,6 +1753,14 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
+	void keepRenderbufferAlive(lua_State* L) {
+		const i32 rb = toRenderbufferIdx(L, 1);
+
+		if (rb >= 0 && rb < m_renderbuffers.size()) {
+			--m_renderbuffers[rb].frame_counter;
+		}
+	}
+
 	PipelineTexture createRenderbuffer(lua_State* L) {
 		PROFILE_FUNCTION();
 
@@ -1768,6 +1795,7 @@ struct PipelineImpl final : Pipeline
 				rb.width = rb_w;
 				rb.height = rb_h;
 				rb.format = format;
+				rb.flags = flags;
 			}
 			else {
 				if (rb.frame_counter < 2) continue;
@@ -1775,6 +1803,7 @@ struct PipelineImpl final : Pipeline
 				if (rb.width != rb_w) continue;
 				if (rb.height != rb_h) continue;
 				if (rb.format != format) continue;
+				if (rb.flags != flags) continue;
 			}
 
 			rb.frame_counter = 0;
@@ -1798,6 +1827,7 @@ struct PipelineImpl final : Pipeline
 		rb.height = rb_h;
 		rb.format = format;
 		rb.persistent = persistent;
+		rb.flags = flags;
 		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, Renderer::MemRef(), debug_name);
 
 		PipelineTexture res;
@@ -4800,6 +4830,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(fur);
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
+		REGISTER_FUNCTION(keepRenderbufferAlive);
 		REGISTER_FUNCTION(pass);
 		REGISTER_FUNCTION(preloadShader);
 		REGISTER_FUNCTION(releaseRenderbuffer);
@@ -4892,6 +4923,8 @@ struct PipelineImpl final : Pipeline
 	Array<Bucket> m_buckets;
 	jobs::SignalHandle m_buckets_ready;
 	Viewport m_viewport;
+	Viewport m_prev_viewport;
+	bool m_first_set_viewport = true;
 	int m_output;
 	Shader* m_debug_shape_shader;
 	Shader* m_place_grass_shader;

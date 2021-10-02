@@ -94,6 +94,7 @@ layout (std140, binding = 0) uniform GlobalState {
 	mat4 inv_view;
 	mat4 view_projection;
 	mat4 inv_view_projection;
+	mat4 reprojection;
 	vec4 camera_world_pos;
 	vec4 light_dir;
 	vec4 light_color;

@@ -1,0 +1,39 @@
+include "pipelines/common.glsl"
+
+
+compute_shader [[
+	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+	layout (binding=0) uniform sampler2D u_depthbuf;
+	layout (binding=1, r8) uniform image2D u_current;
+	layout (binding=2, r8) uniform image2D u_history;
+	
+	layout(std140, binding = 4) uniform Data {
+		vec4 u_size;
+	};
+
+	vec2 reproject(vec2 uv, float depth) {
+		vec4 v = (Global.reprojection * vec4(uv * 2 - 1, depth, 1));
+		vec2 res = (v.xy / v.w) * 0.5 + 0.5;
+		return res;
+	}
+
+	void main()
+	{
+		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+		if (any(greaterThan(ij, ivec2(u_size.xy)))) return;
+
+		vec2 uv = vec2(ij) / u_size.xy;
+		float depth = texture(u_depthbuf, uv).x;
+		float current = imageLoad(u_current, ij).x;
+		
+		vec2 uv_prev = reproject(uv, depth);
+		ivec2 ij_prev = ivec2(uv_prev * u_size.xy + 0.5);
+
+		if (all(lessThan(ij_prev, u_size.xy - 1)) && all(greaterThan(ij_prev, ivec2(0)))) {
+			vec4 prev = imageLoad(u_history, ij_prev);
+			vec4 v = vec4(mix(current, prev.x, 0.9));
+			imageStore(u_current, ij, v);
+		}
+	}
+]]

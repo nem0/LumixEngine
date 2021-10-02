@@ -1,25 +1,17 @@
 include "pipelines/common.glsl"
 
-vertex_shader [[
-	
-	layout (location = 0) out vec2 v_uv;
-	
-	void main()
-	{
-		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
-	}
-]]
-
-fragment_shader [[
+compute_shader [[
+	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 	// possible future optimizations https://software.intel.com/content/www/us/en/develop/articles/adaptive-screen-space-ambient-occlusion.html
 	// inspired by https://github.com/tobspr/RenderPipeline/blob/master/rpplugins/ao/shader/ue4ao.kernel.glsl
-	layout (location = 0) in vec2 v_uv;
-	layout (location = 0) out vec4 o_color;
 	layout (binding=0) uniform sampler2D u_depth_buffer;
 	layout (binding=1) uniform sampler2D u_normal_buffer;
+	layout (binding=2, rgba8) uniform image2D u_output;
 	layout(std140, binding = 4) uniform Drawcall {
 		float u_radius;
 		float u_intensity;
+		float u_width;
+		float u_height;
 	};
 
 	vec3 getViewNormal(vec2 tex_coord)
@@ -31,13 +23,16 @@ fragment_shader [[
 	
 	void main()
 	{
-		vec3 view_pos = getViewPosition(u_depth_buffer, Global.inv_projection, v_uv);
-		vec3 view_normal = getViewNormal(v_uv);
+		if (any(greaterThan(gl_GlobalInvocationID.xy, ivec2(u_width, u_height)))) return;
+
+		vec2 uv = gl_GlobalInvocationID.xy / vec2(u_width, u_height);
+		vec3 view_pos = getViewPosition(u_depth_buffer, Global.inv_projection, uv);
+		vec3 view_normal = getViewNormal(uv);
 	
 		float occlusion = 0;
 		float occlusion_count = 0;
 	
-		float rand = rand(view_pos.xyz);
+		float rand = rand(view_pos.xyz + Global.time * 0.1);
 		float random_angle = rand * 6.283285;
 		vec3 rot;
 		float depth_scale = u_radius / view_pos.z * (rand * 2 + 0.1);
@@ -51,8 +46,8 @@ fragment_shader [[
 			vec2 poisson = POISSON_DISK_4[i];
 			vec2 s = vec2(dot(poisson, rot.xy), dot(poisson, rot.zx));
 			
-			vec3 vpos_a = getViewPosition(u_depth_buffer, Global.inv_projection, v_uv + s) - view_pos;
-			vec3 vpos_b = getViewPosition(u_depth_buffer, Global.inv_projection, v_uv - s) - view_pos;
+			vec3 vpos_a = getViewPosition(u_depth_buffer, Global.inv_projection, uv + s) - view_pos;
+			vec3 vpos_b = getViewPosition(u_depth_buffer, Global.inv_projection, uv - s) - view_pos;
 
 			vec3 sample_vec_a = normalize(vpos_a);
 			vec3 sample_vec_b = normalize(vpos_b);
@@ -80,7 +75,6 @@ fragment_shader [[
 		occlusion /= max(1.0, occlusion_count);
 		float value = 1 - occlusion * u_intensity;
 	
-		o_color.rgb = vec3(mix(value, 1, saturate(-view_pos.z * 0.02)));
-		o_color.w = 1;
+		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(value), 1));
 	}
 ]]
