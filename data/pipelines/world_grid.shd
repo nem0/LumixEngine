@@ -30,6 +30,7 @@ vertex_shader [[
 	
 	layout(location = 0) out vec3 v_normal;
 	layout(location = 1) out vec4 v_wpos;
+	layout(location = 2) out vec3 v_pos;
 	
 	void main() {
 		#if defined INSTANCED || defined GRASS
@@ -56,6 +57,7 @@ vertex_shader [[
 			v_wpos = model_mtx * vec4(a_position,  1);
 		#endif
 		
+		v_pos = a_position;
 		gl_Position = Pass.view_projection * v_wpos;		
 	}
 ]]
@@ -71,6 +73,7 @@ fragment_shader [[
 	
 	layout(location = 0) in vec3 v_normal;
 	layout(location = 1) in vec4 v_wpos;
+	layout(location = 2) in vec3 v_pos;
 
 	#if defined DEFERRED || defined GRASS
 		layout(location = 0) out vec4 o_gbuffer0;
@@ -84,7 +87,7 @@ fragment_shader [[
 	{
 		Surface data;
 		vec4 c = u_material_color;
-		float ff = dot(floor(mod(Global.camera_world_pos.xyz + v_wpos.xyz, vec3(2))), vec3(1));
+		float ff = dot(floor(mod(v_pos.xyz + 0.5, vec3(2))), vec3(1));
 		ff = mod(ff, 2);
 		data.albedo = c.rgb * (ff < 1 ? vec3(1) : vec3(0.75));
 		data.alpha = c.a;
