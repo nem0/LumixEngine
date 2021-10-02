@@ -244,6 +244,8 @@ function blur(buffer, format, w, h, tmp_rb_dbg_name)
 		, { depth_test = false, depth_write = false }
 	)
 	endBlock()
+
+	setRenderTargets()
 end
 
 function shadowPass()

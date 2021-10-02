@@ -124,7 +124,6 @@ fragment_shader [[
 		o_color1 = vec4(1);
 		o_color0.a = 1;
 
-
 		if (u_fog_enabled > 0) {
 			const vec3 fog_extinction = u_fog_scattering.rgb;
 			float linear_depth = ndc_depth > 0 ? toLinearDepth(Global.inv_projection, ndc_depth) : 1e5;

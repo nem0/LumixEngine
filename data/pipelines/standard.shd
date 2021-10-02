@@ -67,10 +67,6 @@ vertex_shader [[
 	#elif defined INSTANCED || defined GRASS
 		layout(location = 4) in vec4 i_rot_quat;
 		layout(location = 5) in vec4 i_pos_scale;
-		#ifdef HAS_LOD
-			layout(location = 6) in float i_lod;
-			layout(location = 4) out float v_lod;
-		#endif
 		#ifdef _HAS_ATTR7
 			layout(location = 7) in vec4 a_color;
 			layout(location = 6) out vec4 v_color;
@@ -83,6 +79,10 @@ vertex_shader [[
 		layout(std140, binding = 4) uniform ModelState {
 			mat4 matrix;
 		} Model;
+	#endif
+	#ifdef HAS_LOD
+		layout(location = 6) in float i_lod;
+		layout(location = 4) out float v_lod;
 	#endif
 	
 	layout(location = 0) out vec2 v_uv;
