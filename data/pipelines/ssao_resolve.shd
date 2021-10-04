@@ -5,8 +5,8 @@ compute_shader [[
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 	layout (binding=0) uniform sampler2D u_depthbuf;
-	layout (binding=1, r8) uniform image2D u_current;
-	layout (binding=2, r8) uniform image2D u_history;
+	layout (binding=1) uniform sampler2D u_history;
+	layout (binding=2, r8) uniform image2D u_current;
 	
 	layout(std140, binding = 4) uniform Data {
 		vec4 u_size;
@@ -21,18 +21,17 @@ compute_shader [[
 	void main()
 	{
 		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
-		if (any(greaterThan(ij, ivec2(u_size.xy)))) return;
+		if (any(greaterThan(ij, ivec2(u_size.xy - 1)))) return;
 
-		vec2 uv = vec2(ij) / u_size.xy;
+		vec2 uv = (vec2(ij) + vec2(0.5)) / u_size.xy;
 		float depth = texture(u_depthbuf, uv).x;
-		float current = imageLoad(u_current, ij).x;
 		
 		vec2 uv_prev = reproject(uv, depth);
-		ivec2 ij_prev = ivec2(uv_prev * u_size.xy + 0.5);
 
-		if (all(lessThan(ij_prev, u_size.xy - 1)) && all(greaterThan(ij_prev, ivec2(0)))) {
-			vec4 prev = imageLoad(u_history, ij_prev);
-			vec4 v = vec4(mix(current, prev.x, 0.9));
+		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {
+			float current = imageLoad(u_current, ij).x;
+			float prev = texture(u_history, uv_prev).x;
+			vec4 v = vec4(mix(current, prev, 0.9));
 			imageStore(u_current, ij, v);
 		}
 	}
