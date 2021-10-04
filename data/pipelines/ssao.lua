@@ -12,8 +12,8 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.ssao_blit_shader = env.ssao_blit_shader or env.preloadShader("pipelines/ssao_blit.shd")
 	env.ssao_resolve_shader = env.ssao_resolve_shader or env.preloadShader("pipelines/ssao_resolve.shd")
 
-	local w = env.viewport_w * 0.5
-	local h = env.viewport_h * 0.5
+	local w = math.floor(env.viewport_w * 0.5)
+	local h = math.floor(env.viewport_h * 0.5)
 	local ssao_rb = env.createRenderbuffer { width = w, height = h, format = "r8", debug_name = "ssao", compute_write = true }
 
 	if use_temporal and history_buf == -1 then

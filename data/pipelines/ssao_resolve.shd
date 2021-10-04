@@ -21,9 +21,9 @@ compute_shader [[
 	void main()
 	{
 		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
-		if (any(greaterThan(ij, ivec2(u_size.xy - 1)))) return;
+		if (any(greaterThanEqual(ij, ivec2(u_size.xy)))) return;
 
-		vec2 uv = (vec2(ij) + vec2(0.5)) / u_size.xy;
+		vec2 uv = (vec2(ij) + 0.5) / u_size.xy;
 		float depth = texture(u_depthbuf, uv).x;
 		
 		vec2 uv_prev = reproject(uv, depth);
