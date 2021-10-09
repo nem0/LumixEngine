@@ -1411,7 +1411,7 @@ void TerrainEditor::entityGUI() {
 	}
 
 	static ImVec2 size(-1, 200);
-	if (ImGui::ListBoxHeader("##prefabs", size)) {
+	if (ImGui::BeginListBox("##prefabs", size)) {
 		auto& resources = m_app.getAssetCompiler().lockResources();
 		u32 count = 0;
 		for (const AssetCompiler::ResourceItem& res : resources) {
@@ -1449,7 +1449,7 @@ void TerrainEditor::entityGUI() {
 		}
 		if (count == 0) ImGui::TextUnformatted("No prefabs");
 		m_app.getAssetCompiler().unlockResources();
-		ImGui::ListBoxFooter();
+		ImGui::EndListBox();
 	}
 	ImGuiEx::HSplitter("after_prefab", &size);
 

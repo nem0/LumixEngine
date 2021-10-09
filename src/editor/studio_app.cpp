@@ -988,8 +988,8 @@ struct StudioAppImpl final : StudioApp
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 								 ImGuiWindowFlags_NoSavedSettings;
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		ImGui::SetNextWindowPos(viewport->GetWorkPos());
-		ImGui::SetNextWindowSize(viewport->GetWorkSize());
+		ImGui::SetNextWindowPos(viewport->WorkPos);
+		ImGui::SetNextWindowSize(viewport->WorkSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
@@ -1637,7 +1637,7 @@ struct StudioAppImpl final : StudioApp
 			viewMenu();
 			ImGui::PopStyleVar(2);
 
-			float w = ImGui::GetWindowContentRegionWidth() * 0.5f - 30 - ImGui::GetCursorPosX();
+			float w = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x) * 0.5f - 30 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight()));
 			getAction("toggleGameMode")->toolbarButton(m_big_icon_font);
 			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);

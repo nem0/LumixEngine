@@ -192,7 +192,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 		ImGui::SameLine();
 		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) m_filter[0] = '\0';
 
-		if (ImGui::ListBoxHeader("##prefabs", size)) {
+		if (ImGui::BeginListBox("##prefabs", size)) {
 			auto& resources = m_app.getAssetCompiler().lockResources();
 			u32 count = 0;
 			for (const AssetCompiler::ResourceItem& res : resources) {
@@ -230,7 +230,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			}
 			if (count == 0) ImGui::TextUnformatted("No prefabs");
 			m_app.getAssetCompiler().unlockResources();
-			ImGui::ListBoxFooter();
+			ImGui::EndListBox();
 		}
 		ImGuiEx::HSplitter("after_prefab", &size);
 		ImGuiEx::Label("Spacing");

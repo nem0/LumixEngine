@@ -113,7 +113,6 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		env.bloom_shader = env.preloadShader("pipelines/bloom.shd")
 		env.bloom_tonemap_shader = env.preloadShader("pipelines/bloom_tonemap.shd")
 		env.bloom_blur_shader = env.preloadShader("pipelines/bloom_blur.shd")
-		env.textured_quad_shader = env.preloadShader("pipelines/textured_quad.shd")
 	end
 	if env.blur_shader == nil then
 		env.blur_shader = env.preloadShader("pipelines/blur.shd")

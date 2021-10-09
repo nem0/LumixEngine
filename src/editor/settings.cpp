@@ -103,7 +103,7 @@ static void loadStyle(lua_State* L)
 		LOAD_BOOL(AntiAliasedLines);           
 		LOAD_BOOL(AntiAliasedFill);            
 		LOAD_FLOAT(CurveTessellationTol);
-		LOAD_FLOAT(CircleSegmentMaxError);
+		LOAD_FLOAT(CircleTessellationMaxError);
 
 		#undef LOAD_FLOAT
 		#undef LOAD_BOOL
@@ -176,7 +176,7 @@ static void saveStyle(os::OutputFile& file)
     SAVE_BOOL(AntiAliasedLines);           
     SAVE_BOOL(AntiAliasedFill);            
     SAVE_FLOAT(CurveTessellationTol);
-    SAVE_FLOAT(CircleSegmentMaxError);
+    SAVE_FLOAT(CircleTessellationMaxError);
 
 	#undef SAVE_BOOL
 	#undef SAVE_FLOAT
@@ -1015,7 +1015,7 @@ void Settings::showStyleEditor() const {
             if (style.CurveTessellationTol < 0.10f) style.CurveTessellationTol = 0.10f;
 
             // When editing the "Circle Segment Max Error" value, draw a preview of its effect on auto-tessellated circles.
-            ImGui::DragFloat("Circle Segment Max Error", &style.CircleSegmentMaxError, 0.01f, 0.10f, 10.0f, "%.2f");
+            ImGui::DragFloat("Circle Segment Max Error", &style.CircleTessellationMaxError, 0.01f, 0.10f, 10.0f, "%.2f");
             if (ImGui::IsItemActive())
             {
                 ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
