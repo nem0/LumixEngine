@@ -1,3 +1,5 @@
+grainamount = 0.01
+lumamount = 0.1
 noise = -1
 Editor.setPropertyType(this, "noise", Editor.RESOURCE_PROPERTY, "texture")
 
@@ -11,6 +13,7 @@ function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbu
 		env.film_grain_shader = env.preloadShader("pipelines/film_grain.shd")
 	end
 
+	env.drawcallUniforms(grainamount, lumamount)
 	env.setRenderTargets(res)
 	env.bindTextures({noise}, 1)
 	env.drawArray(0, 3, env.film_grain_shader, 
