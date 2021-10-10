@@ -132,7 +132,8 @@ enum class TextureFormat : u32 {
 	BC2,
 	BC3,
 	BC4,
-	BC5
+	BC5,
+	R11G11B10F
 };
 
 enum class BindShaderBufferFlags : u32 {

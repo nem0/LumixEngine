@@ -123,6 +123,7 @@ struct FormatDesc {
 			case GL_RGBA8 : return get(TextureFormat::RGBA8);
 			case GL_RGBA16 : return get(TextureFormat::RGBA16);
 			case GL_RGBA16F : return get(TextureFormat::RGBA16F);
+			case GL_R11F_G11F_B10F : return get(TextureFormat::R11G11B10F);
 			case GL_RGBA32F : return get(TextureFormat::RGBA32F);
 			case GL_RG32F : return get(TextureFormat::RG32F);
 			
@@ -133,24 +134,25 @@ struct FormatDesc {
 	}
 	static FormatDesc get(TextureFormat format) {
 		switch(format) {
-			case TextureFormat::BC1: return {		true,		false,	8,	GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,	GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT};
-			case TextureFormat::BC2: return {		true,		false,	16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT,	GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT};
-			case TextureFormat::BC3: return {		true,		false,	16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT,	GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT};
-			case TextureFormat::BC4: return {		true,		false,	8,	GL_COMPRESSED_RED_RGTC1,			GL_ZERO};
-			case TextureFormat::BC5: return {		true,		false,	16, GL_COMPRESSED_RG_RGTC2,				GL_ZERO};
-			case TextureFormat::R16: return {		false,		false,	2,	GL_R16,								GL_ZERO, GL_RED, GL_UNSIGNED_SHORT};
-			case TextureFormat::R8: return {		false,		false,	1,	GL_R8,								GL_ZERO, GL_RED, GL_UNSIGNED_BYTE};
-			case TextureFormat::RG8: return {		false,		false,	2,	GL_RG8,								GL_ZERO, GL_RG, GL_UNSIGNED_BYTE};
-			case TextureFormat::BGRA8: return {		false,		false,	4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE};
-			case TextureFormat::SRGBA: return {		false,		false, 4,	GL_SRGB8_ALPHA8,					GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE};
-			case TextureFormat::RGBA8: return {		false,		false, 4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE};
-			case TextureFormat::RGBA16: return {	false,		false, 8,	GL_RGBA16,							GL_ZERO, GL_RGBA, GL_UNSIGNED_SHORT};
-			case TextureFormat::RGBA16F: return {	false,		false, 8,	GL_RGBA16F,							GL_ZERO, GL_RGBA, GL_HALF_FLOAT};
-			case TextureFormat::RGBA32F: return {	false,		false, 16,	GL_RGBA32F,							GL_ZERO, GL_RGBA, GL_FLOAT};
-			case TextureFormat::RG32F: return {		false,		false, 8,	GL_RG32F,							GL_ZERO, GL_RG, GL_FLOAT};
+			case TextureFormat::BC1: return {			true,		false,	8,	GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,	GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT};
+			case TextureFormat::BC2: return {			true,		false,	16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT,	GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT};
+			case TextureFormat::BC3: return {			true,		false,	16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT,	GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT};
+			case TextureFormat::BC4: return {			true,		false,	8,	GL_COMPRESSED_RED_RGTC1,			GL_ZERO};
+			case TextureFormat::BC5: return {			true,		false,	16, GL_COMPRESSED_RG_RGTC2,				GL_ZERO};
+			case TextureFormat::R16: return {			false,		false,	2,	GL_R16,								GL_ZERO, GL_RED, GL_UNSIGNED_SHORT};
+			case TextureFormat::R8: return {			false,		false,	1,	GL_R8,								GL_ZERO, GL_RED, GL_UNSIGNED_BYTE};
+			case TextureFormat::RG8: return {			false,		false,	2,	GL_RG8,								GL_ZERO, GL_RG, GL_UNSIGNED_BYTE};
+			case TextureFormat::BGRA8: return {			false,		false,	4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE};
+			case TextureFormat::SRGBA: return {			false,		false, 4,	GL_SRGB8_ALPHA8,					GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE};
+			case TextureFormat::RGBA8: return {			false,		false, 4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE};
+			case TextureFormat::RGBA16: return {		false,		false, 8,	GL_RGBA16,							GL_ZERO, GL_RGBA, GL_UNSIGNED_SHORT};
+			case TextureFormat::RGBA16F: return {		false,		false, 8,	GL_RGBA16F,							GL_ZERO, GL_RGBA, GL_HALF_FLOAT};
+			case TextureFormat::R11G11B10F: return {	false,		false, 4,	GL_R11F_G11F_B10F,					GL_ZERO, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV};
+			case TextureFormat::RGBA32F: return {		false,		false, 16,	GL_RGBA32F,							GL_ZERO, GL_RGBA, GL_FLOAT};
+			case TextureFormat::RG32F: return {			false,		false, 8,	GL_RG32F,							GL_ZERO, GL_RG, GL_FLOAT};
 			
-			case TextureFormat::D32: return {		false,		false, 4,	GL_DEPTH_COMPONENT32,			    GL_ZERO, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
-			case TextureFormat::D24S8: return {		false,		false, 4,	GL_DEPTH24_STENCIL8,			    GL_ZERO, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT_24_8};
+			case TextureFormat::D32: return {			false,		false, 4,	GL_DEPTH_COMPONENT32,			    GL_ZERO, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
+			case TextureFormat::D24S8: return {			false,		false, 4,	GL_DEPTH24_STENCIL8,			    GL_ZERO, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT_24_8};
 			default: ASSERT(false); return {}; 
 		}
 	}
