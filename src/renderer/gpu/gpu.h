@@ -308,6 +308,7 @@ inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 			return 2;
 		case gpu::TextureFormat::SRGB:
 			return 3;
+		case gpu::TextureFormat::R11G11B10F:
 		case gpu::TextureFormat::R32F:
 		case gpu::TextureFormat::SRGBA:
 		case gpu::TextureFormat::RGBA8:

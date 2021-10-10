@@ -1682,6 +1682,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case gpu::TextureFormat::R8: format = "R8"; break;
 			case gpu::TextureFormat::RGBA8: format = "RGBA8"; break;
 			case gpu::TextureFormat::RGBA16: format = "RGBA16"; break;
+			case gpu::TextureFormat::R11G11B10F: format = "R11G11B10F"; break;
 			case gpu::TextureFormat::RGBA16F: format = "RGBA16F"; break;
 			case gpu::TextureFormat::RGBA32F: format = "RGBA32F"; break;
 			case gpu::TextureFormat::R16F: format = "R16F"; break;
