@@ -4356,7 +4356,8 @@ struct PipelineImpl final : Pipeline
 							auto create_key = [&](const LODMeshIndices& lod){
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
-									const u32 bucket = bucket_map[mesh.layer];
+									const u8 layer = mi.custom_material ? mi.custom_material->getLayer() : mesh.layer;
+									const u32 bucket = bucket_map[layer];
 									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
 									ASSERT(!mi.custom_material || mesh_idx == 0);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
