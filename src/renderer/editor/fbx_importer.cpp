@@ -698,7 +698,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		}
 
 		const int vertex_size = getVertexSize(*geom, import_mesh.is_skinned, cfg);
-		import_mesh.vertex_data.reserve(import_geom.unique_vertex_count);
+		import_mesh.vertex_data.reserve(import_geom.unique_vertex_count * vertex_size);
 
 		Array<Skin> skinning(m_allocator);
 		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
@@ -756,6 +756,24 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			if (intramat_idx[orig_idx] != 0xffFFffFF) {
 				import_mesh.indices.push(intramat_idx[orig_idx]);
 			}
+		}
+
+		for (u32 i = 0; i < 3; ++i) {
+			if ((cfg.autolod_mask & (1 << i)) == 0) continue;
+			if (import_mesh.lod != 0) continue;
+			
+			import_mesh.autolod_indices[i].create(m_allocator);
+			import_mesh.autolod_indices[i]->resize(import_mesh.indices.size());
+			const size_t lod_index_count = meshopt_simplify(import_mesh.autolod_indices[i]->begin()
+				, import_mesh.indices.begin()
+				, import_mesh.indices.size()
+				, (const float*)import_mesh.vertex_data.data()
+				, u32(import_mesh.vertex_data.size() / vertex_size)
+				, vertex_size
+				, size_t(import_mesh.indices.size() * cfg.autolod_coefs[i])
+				, 9001.f // TODO
+				);
+			import_mesh.autolod_indices[i]->resize((u32)lod_index_count);
 		}
 
 		import_mesh.aabb = aabb;
@@ -1877,6 +1895,9 @@ void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 	write(import_mesh.aabb);
 }
 
+static bool hasAutoLOD(const FBXImporter::ImportConfig& cfg, u32 idx) {
+	return cfg.autolod_mask & (1 << idx);
+}
 
 void FBXImporter::writeGeometry(const ImportConfig& cfg)
 {
@@ -1884,32 +1905,60 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 	float origin_radius_squared = 0;
 	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
-	for (const ImportMesh& import_mesh : m_meshes)
-	{
-		if (!import_mesh.import) continue;
-		bool are_indices_16_bit = areIndices16Bit(import_mesh, cfg);
-		if (are_indices_16_bit)
+	for (u32 lod = 0; lod < 4; ++lod) {
+		for (const ImportMesh& import_mesh : m_meshes)
 		{
-			int index_size = sizeof(u16);
-			write(index_size);
-			write(import_mesh.indices.size());
-			for (int i : import_mesh.indices)
-			{
-				ASSERT(i <= (1 << 16));
-				u16 index = (u16)i;
-				write(index);
+			if (!import_mesh.import) continue;
+
+			const bool are_indices_16_bit = areIndices16Bit(import_mesh, cfg);
+			origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
+			center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
+			aabb.merge(import_mesh.aabb);
+			
+			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod - 1)) {
+
+				if (are_indices_16_bit)
+				{
+					const i32 index_size = sizeof(u16);
+					write(index_size);
+					write(import_mesh.indices.size());
+					for (int i : import_mesh.indices)
+					{
+						ASSERT(i <= (1 << 16));
+						u16 index = (u16)i;
+						write(index);
+					}
+				}
+				else
+				{
+					int index_size = sizeof(import_mesh.indices[0]);
+					write(index_size);
+					write(import_mesh.indices.size());
+					write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
+				}
+			}
+			else if (lod > 0 && import_mesh.lod == 0 && hasAutoLOD(cfg, lod - 1)) {
+				const auto& lod_indices = *import_mesh.autolod_indices[lod - 1].get();
+				if (are_indices_16_bit) {
+					const i32 index_size = sizeof(u16);
+					write(index_size);
+					write(lod_indices.size());
+					for (u32 i : lod_indices)
+					{
+						ASSERT(i <= (1 << 16));
+						u16 index = (u16)i;
+						write(index);
+					}
+				}
+				else
+				{
+					i32 index_size = sizeof(lod_indices[0]);
+					write(index_size);
+					write(lod_indices.size());
+					write(lod_indices.begin(), import_mesh.autolod_indices[lod - 1]->byte_size());
+				}
 			}
 		}
-		else
-		{
-			int index_size = sizeof(import_mesh.indices[0]);
-			write(index_size);
-			write(import_mesh.indices.size());
-			write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
-		}
-		aabb.merge(import_mesh.aabb);
-		origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
-		center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
 	}
 
 	if (cfg.create_impostor) {
@@ -1921,11 +1970,15 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		write(indices, sizeof(indices));
 	}
 
-	for (const ImportMesh& import_mesh : m_meshes)
-	{
-		if (!import_mesh.import) continue;
-		write((i32)import_mesh.vertex_data.size());
-		write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
+	for (u32 lod = 0; lod < 4; ++lod) {
+		for (const ImportMesh& import_mesh : m_meshes) {
+			if (!import_mesh.import) continue;
+			
+			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod - 1) || lod > 0 && import_mesh.lod == 0 && hasAutoLOD(cfg, lod - 1)) {
+				write((i32)import_mesh.vertex_data.size());
+				write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
+			}
+		}
 	}
 	if (cfg.create_impostor) {
 		writeImpostorVertices(aabb);
@@ -1978,8 +2031,12 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		mesh_count = 1;
 	}
 	else {
-		for (ImportMesh& mesh : m_meshes)
-			if (mesh.import) ++mesh_count;
+		for (ImportMesh& mesh : m_meshes) {
+			if (mesh.import && (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod - 1))) ++mesh_count;
+			for (u32 i = 0; i < 3; ++i) {
+				if (mesh.lod == 0 && hasAutoLOD(cfg, i) && mesh_idx < 0) ++mesh_count;
+			}
+		}
 		if (cfg.create_impostor) ++mesh_count;
 	}
 	write(mesh_count);
@@ -2009,7 +2066,7 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 			write(gpu::AttributeType::U8);
 			write((u8)4);
 		}
-		if (hasTangents(*mesh.getGeometry())) {
+		if (hasTangents(*geom)) {
 			write(Mesh::AttributeSemantic::TANGENT);
 			write(gpu::AttributeType::I8);
 			write((u8)4);
@@ -2049,8 +2106,11 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		writeMesh(m_meshes[mesh_idx]);
 	}
 	else {
-		for (ImportMesh& import_mesh : m_meshes) {
-			if (import_mesh.import) writeMesh(import_mesh);
+		for (u32 lod = 0; lod < 4; ++lod) {
+			for (ImportMesh& import_mesh : m_meshes) {
+				if (import_mesh.import && import_mesh.lod == lod && !hasAutoLOD(cfg, lod - 1)) writeMesh(import_mesh);
+				else if (lod > 0 && import_mesh.lod == 0 && import_mesh.import && hasAutoLOD(cfg, lod - 1)) writeMesh(import_mesh);
+			}
 		}
 	}
 
@@ -2102,30 +2162,35 @@ void FBXImporter::writeLODs(const ImportConfig& cfg)
 {
 	i32 lod_count = 1;
 	i32 last_mesh_idx = -1;
-	i32 lods[8] = {};
+	i32 lods[4] = {};
 	for (auto& mesh : m_meshes) {
 		if (!mesh.import) continue;
 
-		++last_mesh_idx;
 		if (mesh.lod >= lengthOf(cfg.lods_distances)) continue;
-		lod_count = mesh.lod + 1;
-		lods[mesh.lod] = last_mesh_idx;
-	}
-
-	for (u32 i = 1; i < Lumix::lengthOf(lods); ++i) {
-		if (lods[i] < lods[i - 1]) lods[i] = lods[i - 1];
+		if (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod - 1)) {
+			lod_count = maximum(lod_count, mesh.lod + 1);
+			++lods[mesh.lod];
+		}
+		for (u32 i = 0; i < 3; ++i) {
+			if (mesh.lod == 0 && hasAutoLOD(cfg, i)) {
+				lod_count = maximum(lod_count, i + 2);
+				++lods[i + 1];
+			}
+		}
 	}
 
 	if (cfg.create_impostor) {
-		lods[lod_count] = last_mesh_idx + 1;
+		lods[lod_count] = 1;
 		++lod_count;
 	}
 
 	write((const char*)&lod_count, sizeof(lod_count));
 
+	u32 to_mesh = 0;
 	for (int i = 0; i < lod_count; ++i) {
-		i32 to_mesh = lods[i];
-		write((const char*)&to_mesh, sizeof(to_mesh));
+		to_mesh += lods[i];
+		const i32 tmp = to_mesh - 1;
+		write((const char*)&tmp, sizeof(tmp));
 		float factor = cfg.lods_distances[i] < 0 ? FLT_MAX : cfg.lods_distances[i] * cfg.lods_distances[i];
 		write((const char*)&factor, sizeof(factor));
 	}
@@ -2314,19 +2379,12 @@ void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg, src);
 
-	auto cmpMeshes = [](const void* a, const void* b) -> int {
-		auto a_mesh = static_cast<const ImportMesh*>(a);
-		auto b_mesh = static_cast<const ImportMesh*>(b);
-		return a_mesh->lod - b_mesh->lod;
-	};
-
 	bool import_any_mesh = false;
 	for (const ImportMesh& m : m_meshes) {
 		if (m.import) import_any_mesh = true;
 	}
 	if (!import_any_mesh && m_animations.empty()) return;
 
-	if (!m_meshes.empty()) qsort(&m_meshes[0], m_meshes.size(), sizeof(m_meshes[0]), cmpMeshes);
 	out_file.clear();
 	writeModelHeader();
 	writeMeshes(src, -1, cfg);

@@ -570,7 +570,6 @@ if has_plugin("renderer") then
 			"../external/meshoptimizer/clusterizer.cpp",
 			"../external/meshoptimizer/overdrawanalyzer.cpp",
 			"../external/meshoptimizer/overdrawoptimizer.cpp",
-			"../external/meshoptimizer/simplifier.cpp",
 			"../external/meshoptimizer/spatialorder.cpp",
 			"../external/meshoptimizer/stripifier.cpp",
 			"../external/meshoptimizer/vcacheanalyzer.cpp",

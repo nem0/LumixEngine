@@ -37,6 +37,8 @@ struct FBXImporter
 		bool bake_vertex_ao = false;
 		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
+		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
+		u8 autolod_mask = 0;
 		float bounding_scale = 1.f;
 	};
 
@@ -134,7 +136,8 @@ struct FBXImporter
 		u32 lod = 0;
 		int submesh = -1;
 		OutputMemoryStream vertex_data;
-		Array<int> indices;
+		Array<u32> indices;
+		Local<Array<u32>> autolod_indices[3];
 		AABB aabb;
 		float origin_radius_squared;
 		float center_radius_squared;
@@ -161,6 +164,7 @@ struct FBXImporter
 	ofbx::IScene* getOFBXScene() { return scene; }
 
 private:
+	void createAutoLODs(const ImportConfig& cfg, ImportMesh& import_mesh);
 	bool findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const;
 	const ImportGeometry& getImportGeometry(const ofbx::Geometry* geom) const;
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;

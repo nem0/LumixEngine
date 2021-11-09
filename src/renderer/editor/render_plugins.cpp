@@ -1874,6 +1874,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool force_skin = false;
 		bool import_vertex_colors = false;
 		bool bake_vertex_ao = false;
+		u8 autolod_mask = 0;
+		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
@@ -1926,6 +1928,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
+			
+			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &meta.autolod_coefs[0])) meta.autolod_mask |= 1;
+			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &meta.autolod_coefs[1])) meta.autolod_mask |= 2;
+			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &meta.autolod_coefs[2])) meta.autolod_mask |= 4;
 
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
@@ -2007,6 +2013,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const char* filepath = getResourceFilePath(src.c_str());
 		FBXImporter::ImportConfig cfg;
 		const Meta meta = getMeta(Path(filepath));
+		cfg.autolod_mask = meta.autolod_mask;
+		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
 		cfg.mikktspace_tangents = meta.use_mikktspace;
 		cfg.mesh_scale = meta.scale;
 		cfg.bounding_scale = meta.culling_scale;
@@ -2478,16 +2486,31 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 				bool infinite = m_meta.lods_distances[i] <= 0;
-				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
-					m_meta.lods_distances[i] *= -1;
+				if (ImGui::TreeNode(&m_meta.lods_distances[i], "LOD %d", i)) {
+					if(ImGui::Checkbox(StaticString<32>("Infinite"), &infinite)) {
+						m_meta.lods_distances[i] *= -1;
+					}
+
+					if (!infinite && m_meta.lods_distances[i] > 0) {
+						ImGui::SameLine();
+						ImGui::SetNextItemWidth(-1);
+						ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
+					}
+					if (i > 0) {
+						bool autolod = m_meta.autolod_mask & (1 << (i - 1));
+						ImGuiEx::Label("Auto LOD");
+						if (ImGui::Checkbox("##autolod", &autolod)) {
+							m_meta.autolod_mask &= ~(1 << (i - 1));
+							if (autolod) m_meta.autolod_mask |= 1 << (i - 1);
+						}
+						if (autolod) {
+							ImGuiEx::Label("Auto LOD coef");
+							ImGui::DragFloat("##autolod_coef", &m_meta.autolod_coefs[i - 1]);
+						}
+					}
+					ImGui::TreePop();
 				}
 				if (infinite) break;
-
-				if (m_meta.lods_distances[i] > 0) {
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(-1);
-					ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
-				}
 			}
 			
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
@@ -2499,13 +2522,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
 					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
-					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n")
-					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true\n" : "false\n")
-					.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true\n" : "false\n");
+					.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
+					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
+					.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true" : "false");
+
+				if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
+				if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);
+				if (m_meta.autolod_mask & 4) src.cat("\nautolod2 = ").cat(m_meta.autolod_coefs[2]);
 
 				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 					if (m_meta.lods_distances[i] > 0) {
-						src.cat("lod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]).cat("\n");
+						src.cat("\nlod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]);
 					}
 				}
 

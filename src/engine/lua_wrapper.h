@@ -619,13 +619,16 @@ template <typename T> T checkArg(lua_State* L, int index)
 }
 
 template <typename T>
-void getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
+bool getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
 {
+	bool res = false;
 	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<T>(L, -1))
 	{
 		*out = toType<T>(L, -1);
+		res = true;
 	}
 	lua_pop(L, 1);
+	return res;
 }
 
 template <typename T>
