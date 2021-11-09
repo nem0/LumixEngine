@@ -2032,6 +2032,7 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 	}
 	else {
 		for (ImportMesh& mesh : m_meshes) {
+			if (mesh.lod > 3) continue;
 			if (mesh.import && (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod - 1))) ++mesh_count;
 			for (u32 i = 0; i < 3; ++i) {
 				if (mesh.lod == 0 && hasAutoLOD(cfg, i) && mesh_idx < 0) ++mesh_count;
