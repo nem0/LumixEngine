@@ -44,6 +44,8 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 	void onGUI(ComponentUID cmp, WorldEditor& editor);
 
 private:
+	void fillGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
+	void clearGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	bool onMouseDown(UniverseView& view, int, int) override;
 	void onMouseMove(UniverseView& view, int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	void onMouseUp(UniverseView& view, int, int, os::MouseButton) override {};

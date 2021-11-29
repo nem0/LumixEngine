@@ -43,6 +43,75 @@ static const char* DETAIL_ALBEDO_SLOT_NAME = "Detail albedo";
 static const char* DETAIL_NORMAL_SLOT_NAME = "Detail normal";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
+struct FillClearGrassCommand final : IEditorCommand {
+	FillClearGrassCommand(u32 grass_idx, bool fill, EntityRef terrain, WorldEditor& editor)
+		: m_world_editor(editor)
+		, m_terrain(terrain)
+		, m_grass_idx(grass_idx)
+		, m_fill(fill)
+		, m_old_data(editor.getAllocator())
+	{}
+
+	Texture* getDestinationTexture() const
+	{
+		RenderScene* scene = (RenderScene*)m_world_editor.getUniverse()->getScene(TERRAIN_TYPE);
+		return scene->getTerrainMaterial(m_terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
+	}
+
+	bool merge(IEditorCommand& command) override { return false; }
+	
+	bool execute() override {
+		Texture* texture = getDestinationTexture();
+		if (!texture) return false;
+
+		const u32 Bpp = gpu::getBytesPerPixel(texture->format);
+		if (4 != Bpp) return false;
+
+		u16* data = (u16*)texture->getData();
+		if (!data) return false;
+
+		m_old_data.resize(texture->width * texture->height * 4);
+		if (m_old_data.empty()) return false;
+
+		memcpy(m_old_data.begin(), data, m_old_data.byte_size());
+
+		u16 grass_mask = 1 << m_grass_idx;
+		for (u32 j = 0; j < texture->height; ++j) {
+			for (u32 i = 0; i < texture->width; ++i) {
+				const u32 index = Bpp * (i + j * texture->width) + 2;
+				if (m_fill)
+					data[index / sizeof(data[0])] |= grass_mask;
+				else 
+					data[index / sizeof(data[0])] &= ~grass_mask;
+			}
+		}
+		texture->onDataUpdated(0, 0, texture->width, texture->height);
+		return true;
+	}
+
+	void undo() override {
+		ASSERT(!m_old_data.empty());
+		
+		Texture* texture = getDestinationTexture();
+		ASSERT(texture);
+		ASSERT(gpu::getBytesPerPixel(texture->format) == 4);
+		ASSERT(texture->width * texture->height * 4 == m_old_data.byte_size());
+
+		u8* data = texture->getData();
+		ASSERT(data);
+
+		memcpy(data, m_old_data.begin(), m_old_data.byte_size());
+		texture->onDataUpdated(0, 0, texture->width, texture->height);
+	}
+	const char* getType() override { return "fill_clear_grass"; }
+
+	WorldEditor& m_world_editor;
+	EntityRef m_terrain;
+	u32 m_grass_idx;
+	bool m_fill;
+
+	Array<u8> m_old_data;
+};
 
 struct PaintTerrainCommand final : IEditorCommand
 {
@@ -1155,6 +1224,24 @@ static Array<u8> getFileContent(const char* path, IAllocator& allocator) {
 	return res;
 }
 
+void TerrainEditor::fillGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
+	UniquePtr<FillClearGrassCommand> command = UniquePtr<FillClearGrassCommand>::create(editor.getAllocator(),
+		idx,
+		true,
+		terrain,
+		editor);
+	editor.executeCommand(command.move());
+}
+
+void TerrainEditor::clearGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
+	UniquePtr<FillClearGrassCommand> command = UniquePtr<FillClearGrassCommand>::create(editor.getAllocator(),
+		idx,
+		false,
+		terrain,
+		editor);
+	editor.executeCommand(command.move());
+}
+
 void TerrainEditor::layerGUI(ComponentUID cmp) {
 	m_mode = Mode::LAYER;
 	RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -1228,6 +1315,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	int type_count = scene->getGrassCount((EntityRef)cmp.entity);
 	for (int i = 0; i < type_count; ++i) {
 		ImGui::SameLine();
+		ImGui::PushID(i);
 		if (i == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
 		bool b = (m_grass_mask & (1 << i)) != 0;
 		m_app.getAssetBrowser().tile(scene->getGrassPath((EntityRef)cmp.entity, i), b);
@@ -1240,6 +1328,12 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 				m_grass_mask |= 1 << i;
 			}
 		}
+		if (ImGui::BeginPopupContextItem("grs_ctx")) {
+			if (ImGui::Selectable("Fill")) fillGrass(i, *cmp.entity, m_app.getWorldEditor());
+			if (ImGui::Selectable("Clear")) clearGrass(i, *cmp.entity, m_app.getWorldEditor());
+			ImGui::EndPopup();
+		}
+		ImGui::PopID();
 	}
 
 	Texture* albedo = material->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
