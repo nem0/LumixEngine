@@ -140,6 +140,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		for (u32 i = 0, c = prop.getCount(cmp, m_index); i < c; ++i) {
 			const reflection::DynamicProperties::Type type = prop.getType(cmp, m_index, i);
 			switch(type) {
+				case reflection::DynamicProperties::NONE: break;
 				case reflection::DynamicProperties::FLOAT: dynamicProperty<float>(cmp, prop, i); break;
 				case reflection::DynamicProperties::BOOLEAN: dynamicProperty<bool>(cmp, prop, i); break;
 				case reflection::DynamicProperties::ENTITY: dynamicProperty<EntityPtr>(cmp, prop, i); break;

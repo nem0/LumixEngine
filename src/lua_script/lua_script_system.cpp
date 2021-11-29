@@ -1233,7 +1233,7 @@ namespace Lumix
 		{
 			int idx = m_property_names.find(name_hash);
 			if(idx >= 0) return m_property_names.at(idx).c_str();
-			return nullptr;
+			return "N/A";
 		}
 
 		void applyEntityProperty(ScriptInstance& script, const char* name, Property& prop, const char* value)
@@ -2233,6 +2233,7 @@ namespace Lumix
 				case LuaScriptScene::Property::Type::ENTITY: return ENTITY;
 				case LuaScriptScene::Property::Type::RESOURCE: return RESOURCE;
 				case LuaScriptScene::Property::Type::COLOR: return COLOR;
+				case LuaScriptScene::Property::Type::ANY: return NONE;
 				default: ASSERT(false); return NONE;
 			}
 		}
@@ -2278,6 +2279,7 @@ namespace Lumix
 					}
 					break;
 				}
+				case LuaScriptScene::Property::Type::ANY: reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
 				default: ASSERT(false); break;
 			}
 			return v;
@@ -2294,6 +2296,7 @@ namespace Lumix
 				case ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
 				case RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
 				case COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
+				case NONE: break;
 				default: ASSERT(false); break;
 			}
 		}
