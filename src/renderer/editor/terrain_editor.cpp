@@ -1224,6 +1224,92 @@ static Array<u8> getFileContent(const char* path, IAllocator& allocator) {
 	return res;
 }
 
+void TerrainEditor::exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
+	OutputMemoryStream blob(editor.getAllocator());
+	RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(TERRAIN_TYPE);
+	Texture* texture = scene->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
+	if (!texture) return;
+	
+	ASSERT(texture->format == gpu::TextureFormat::RGBA8);
+	const u8* src = texture->getData();
+	ASSERT(src);
+
+	char filename[LUMIX_MAX_PATH];
+	if (!os::getSaveFilename(Span(filename), "Targa TGA\0*.tga\0", "tga")) return;
+	
+	const Path path(filename);
+	Array<u32> data(editor.getAllocator());
+	data.resize(texture->width * texture->height);
+
+	for (u32 j = 0; j < texture->height; ++j) {
+		for (u32 i = 0; i < texture->width; ++i) {
+			const u16 grass_mask = *(const u16*)(&src[(i + j * texture->width) * 4 + 2]);
+			const bool masked = grass_mask & (1 << idx);
+			data[i + j * texture->width] = masked ? 0xffFFffFF : 0;
+		}
+	}
+
+	bool saved = Texture::saveTGA(&blob, texture->width, texture->height, gpu::TextureFormat::RGBA8, (const u8*)data.begin(), true, path, editor.getAllocator());
+	if (!saved) {
+		logError("Failed to save ", path);
+		return;
+	}
+
+	os::OutputFile file;
+	if (!file.open(filename)) {
+		logError("Failed to open ", filename);
+		return;
+	}
+
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Failed to write ", filename, " properly, it's corrupted.");
+	}
+	file.close();
+}
+
+void TerrainEditor::importGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
+	RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(TERRAIN_TYPE);
+	Texture* texture = scene->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
+	if (!texture) return;
+
+	u8* dst = texture->getData();
+	ASSERT(dst);
+
+	char filename[LUMIX_MAX_PATH];
+	if (!os::getOpenFilename(Span(filename), "Targa TGA\0*.tga\0", nullptr)) return;
+
+	Array<u8> src = getFileContent(filename, editor.getAllocator());
+	TGAHeader header;
+	if (src.size() < sizeof(header)) {
+		logError("Invalid TGA ", filename);
+		return;
+	}
+
+	memcpy(&header, src.begin(), sizeof(header));
+	if (header.dataType != 2 && header.bitsPerPixel != 32) {
+		logError("Unsupported TGA ", filename);
+		return;
+	}
+
+	if (texture->width != header.width || texture->height != header.height) {
+		logError("Size of ", filename, " does not match terrain's size");
+		return;
+	}
+
+	const u32* data = (const u32*)(src.begin() + sizeof(header));
+	for (u32 j = 0; j < texture->height; ++j) {
+		const u32 dst_j = header.imageDescriptor & 32 ? j : texture->height - j - 1; 
+		for (u32 i = 0; i < texture->width; ++i) {
+			u16& grass_mask = *(u16*)(&dst[(i + dst_j * texture->width) * 4 + 2]);
+			const bool masked = data[i + j * texture->width] != 0;
+			if (masked) grass_mask |= 1 << idx;
+			else grass_mask &= ~(1 << idx);
+		}
+	}
+
+	texture->onDataUpdated(0, 0, texture->width, texture->height);
+}
+
 void TerrainEditor::fillGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
 	UniquePtr<FillClearGrassCommand> command = UniquePtr<FillClearGrassCommand>::create(editor.getAllocator(),
 		idx,
@@ -1331,6 +1417,8 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 		if (ImGui::BeginPopupContextItem("grs_ctx")) {
 			if (ImGui::Selectable("Fill")) fillGrass(i, *cmp.entity, m_app.getWorldEditor());
 			if (ImGui::Selectable("Clear")) clearGrass(i, *cmp.entity, m_app.getWorldEditor());
+			if (ImGui::Selectable("Export")) exportGrass(i, *cmp.entity, m_app.getWorldEditor());
+			if (ImGui::Selectable("Import")) importGrass(i, *cmp.entity, m_app.getWorldEditor());
 			ImGui::EndPopup();
 		}
 		ImGui::PopID();

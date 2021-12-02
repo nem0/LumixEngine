@@ -149,6 +149,7 @@ bool Texture::saveTGA(IOutputStream* file,
 {
 	if (format != gpu::TextureFormat::RGBA8) {
 		logError("Texture ", path, " could not be saved, unsupported TGA format");
+		return false;
 	}
 
 	u8* data = (u8*)allocator.allocate(width * height * 4);
