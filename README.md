@@ -20,7 +20,7 @@ Who is using it?
 
 * [On the Hunt](http://www.indiedb.com/games/on-the-hunt)
 
-![4k_1](https://user-images.githubusercontent.com/153526/31843558-f6f077fe-b5f3-11e7-8883-3244e28b2a9c.jpg)
+![4k_1](https://user-images.githubusercontent.com/153526/144655096-dd289dc3-c2a3-4a9d-a02c-0f55e87115aa.jpg)
 
 * [YAP](https://mikulasflorek.itch.io/yap) 
 
