@@ -362,8 +362,9 @@ int include(lua_State* L)
 
 bool Shader::load(u64 size, const u8* mem)
 {
-	lua_State* L = luaL_newstate();
-	luaL_openlibs(L);
+	lua_State* root_state = m_renderer.getEngine().getState();
+	lua_State* L = lua_newthread(root_state);
+	const int state_ref = luaL_ref(root_state, LUA_REGISTRYINDEX);
 
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -390,11 +391,11 @@ bool Shader::load(u64 size, const u8* mem)
 
 	const Span<const char> content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
-		lua_close(L);
+		luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
 		return false;
 	}
 
-	lua_close(L);
+	luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
 	return true;
 }
 

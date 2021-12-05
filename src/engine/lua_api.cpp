@@ -390,7 +390,6 @@ static int LUA_packageLoader(lua_State* L)
 {
 	const char* module = LuaWrapper::toType<const char*>(L, 1);
 	StaticString<LUMIX_MAX_PATH> tmp(module);
-	tmp << ".lua";
 	lua_getglobal(L, "LumixAPI");
 	lua_getfield(L, -1, "engine");
 	lua_remove(L, -2);
@@ -398,13 +397,18 @@ static int LUA_packageLoader(lua_State* L)
 	lua_pop(L, 1);
 	auto& fs = engine->getFileSystem();
 	OutputMemoryStream buf(engine->getAllocator());
+	bool loaded = true;
 	if (!fs.getContentSync(Path(tmp), buf)) {
-		logError("Failed to open file ", tmp);
-		StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
-		msg << tmp;
-		lua_pushstring(L, msg);
+		tmp << ".lua";
+		if (!fs.getContentSync(Path(tmp), buf)) {
+			loaded = false;
+			logError("Failed to open file ", tmp);
+			StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
+			msg << tmp;
+			lua_pushstring(L, msg);
+		}
 	}
-	else if (luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp) != 0) {
+	if (loaded && luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp) != 0) {
 		logError("Failed to load package ", tmp, ": ", lua_tostring(L, -1));
 	}
 	return 1;
