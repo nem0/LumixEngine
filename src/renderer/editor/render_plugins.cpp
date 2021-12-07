@@ -2960,7 +2960,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		lua_pushlightuserdata(L, &ctx);
 		lua_setfield(L, LUA_GLOBALSINDEX, "this");
 
-		auto include = [](lua_State* L) -> int {
+		auto reg_dep = [](lua_State* L) -> int {
 			lua_getfield(L, LUA_GLOBALSINDEX, "this");
 			Context* that = LuaWrapper::toType<Context*>(L, -1);
 			lua_pop(L, 1);
@@ -2969,11 +2969,13 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return 0;
 		};
 
-		lua_pushcclosure(L, include, 0);
+		lua_pushcclosure(L, reg_dep, 0);
 		lua_setfield(L, LUA_GLOBALSINDEX, "include");
+		lua_pushcclosure(L, reg_dep, 0);
+		lua_setfield(L, LUA_GLOBALSINDEX, "import");
 
 		static const char* preface = 
-			"local new_g = setmetatable({include = include}, {__index = function() return function() end end })\n"
+			"local new_g = setmetatable({include = include, import = import}, {__index = function() return function() end end })\n"
 			"setfenv(1, new_g)\n";
 
 		auto reader = [](lua_State* L, void* data, size_t* size) -> const char* {

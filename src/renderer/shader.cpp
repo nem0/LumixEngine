@@ -332,6 +332,24 @@ int geometry_shader(lua_State* L)
 	return 0;
 }
 
+int import(lua_State* L)
+{
+	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+	Shader* shader = getShader(L);
+	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
+
+	OutputMemoryStream content(shader->m_allocator);
+	if (!fs.getContentSync(Path(path), content)) {
+		logError("Failed to open/read import ", path, " imported from ", shader->getPath());
+		return 0;
+	}
+	
+	if (!content.empty()) {
+		LuaWrapper::execute(L, Span((const char*)content.data(), (u32)content.size()), path, 0);
+	}
+
+	return 0;
+}
 
 int include(lua_State* L)
 {
@@ -380,6 +398,8 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
 	lua_pushcfunction(L, LuaAPI::include);
 	lua_setfield(L, LUA_GLOBALSINDEX, "include");
+	lua_pushcfunction(L, LuaAPI::import);
+	lua_setfield(L, LUA_GLOBALSINDEX, "import");
 	lua_pushcfunction(L, LuaAPI::texture_slot);
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
 	lua_pushcfunction(L, LuaAPI::define);

@@ -1,132 +1,15 @@
-include "pipelines/common.glsl"
+import "pipelines/surface_base.inc"
 
-common [[
-	#ifdef SKINNED
-		layout(std140, binding = 4) uniform ModelState {
-			float layer;
-			float fur_scale;
-			float fur_gravity;
-			float padding;
-			mat4 matrix;
-			mat2x4 bones[255];
-		} Model;
-	#endif
-]]
-
-vertex_shader [[
-	layout(location = 0) in vec3 a_position;
-	layout(location = 2) in vec3 a_normal;
-	#if defined SKINNED
-		layout(location = 4) in ivec4 a_indices;
-		layout(location = 5) in vec4 a_weights;
-	#elif defined INSTANCED || defined GRASS
-		layout(location = 4) in vec4 i_rot_quat;
-		layout(location = 5) in vec4 i_pos_scale;
-	#else
-		layout(std140, binding = 4) uniform ModelState {
-			mat4 matrix;
-		} Model;
-	#endif
-	
-	layout(location = 0) out vec3 v_normal;
-	layout(location = 1) out vec4 v_wpos;
-	layout(location = 2) out vec3 v_pos;
-	
-	void main() {
-		#if defined INSTANCED || defined GRASS
-			v_normal = rotateByQuat(i_rot_quat, a_normal);
-			vec3 p = a_position * i_pos_scale.w;
-			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
-		#elif defined SKINNED
-			mat2x4 dq = a_weights.x * Model.bones[a_indices.x];
-			float w = dot(Model.bones[a_indices.y][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.y : a_weights.y;
-			dq += w * Model.bones[a_indices.y];
-			w = dot(Model.bones[a_indices.z][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.z : a_weights.z;
-			dq += w * Model.bones[a_indices.z];
-			w = dot(Model.bones[a_indices.w][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.w : a_weights.w;
-			dq += w * Model.bones[a_indices.w];
-			
-			dq *= 1 / length(dq[0]);
-
-			mat3 m = mat3(Model.matrix);
-			v_normal = m * rotateByQuat(dq[0], a_normal);
-			v_wpos = Model.matrix * vec4(transformByDualQuat(dq, a_position), 1);
-		#else 
-			mat4 model_mtx = Model.matrix;
-			v_normal = mat3(model_mtx) * a_normal;
-			v_wpos = model_mtx * vec4(a_position,  1);
-		#endif
-		
-		v_pos = a_position;
-		gl_Position = Pass.view_projection * v_wpos;		
-	}
-]]
-
----------------------
-
-fragment_shader [[
-	layout (binding=5) uniform sampler2D u_shadowmap;
-	#if !defined DEPTH && !defined DEFERRED && !defined GRASS
-		layout (binding=6) uniform sampler2D u_shadow_atlas;
-		layout (binding=7) uniform samplerCubeArray u_reflection_probes;
-	#endif
-	
-	layout(location = 0) in vec3 v_normal;
-	layout(location = 1) in vec4 v_wpos;
-	layout(location = 2) in vec3 v_pos;
-
-	#if defined DEFERRED || defined GRASS
-		layout(location = 0) out vec4 o_gbuffer0;
-		layout(location = 1) out vec4 o_gbuffer1;
-		layout(location = 2) out vec4 o_gbuffer2;
-	#elif !defined DEPTH
-		layout(location = 0) out vec4 o_color;
-	#endif
-
-	Surface getSurface()
-	{
-		Surface data;
-		vec4 c = u_material_color;
-		float ff = dot(floor(mod(v_pos.xyz + 0.5, vec3(2))), vec3(1));
-		ff = mod(ff, 2);
-		data.albedo = c.rgb * (ff < 1 ? vec3(1) : vec3(0.75));
-		data.alpha = c.a;
-		data.ao = 1;
-
-		// dx shader has internal errors on this
-		#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
-			if(data.alpha < 0.5) discard;
-		#endif
-	
-		data.wpos = v_wpos.xyz;
-		data.V = normalize(-data.wpos);
-		data.roughness = u_roughness;
-		data.metallic  = u_metallic;
-		data.N = v_normal;
-		data.emission = u_emission;
-		data.translucency = u_translucency;
-		return data;
-	}
-	
-	#ifdef DEPTH
-		void main() {}
-	#elif defined DEFERRED || defined GRASS
-		void main()
-		{
-			Surface data = getSurface();
-			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
-		}
-	#else 
-		void main()
-		{
-			Surface data = getSurface();
-			
-			float linear_depth = dot(data.wpos.xyz, Pass.view_dir.xyz);
-			Cluster cluster = getClusterLinearDepth(linear_depth);
-			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes);
-
-			float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
-			o_color.a = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
-		}
-	#endif
+surface_shader [[
+	vec4 c = u_material_color;
+	float ff = dot(floor(mod(v_wpos.xyz + Global.camera_world_pos.xyz + 0.5, vec3(2))), vec3(1));
+	ff = mod(ff, 2);
+	data.albedo = c.rgb * (ff < 1 ? vec3(1) : vec3(0.75));
+	data.alpha = c.a;
+	data.ao = 1;
+	data.roughness = u_roughness;
+	data.metallic  = u_metallic;
+	data.N = v_normal;
+	data.emission = u_emission;
+	data.translucency = u_translucency;
 ]]

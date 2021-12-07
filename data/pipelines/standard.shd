@@ -1,300 +1,54 @@
-texture_slot {
-	name = "Albedo",
-	default_texture = "textures/common/white.tga"
-}
+import "pipelines/surface_base.inc"
 
-texture_slot {
-	name = "Normal",
-	default_texture = "textures/common/default_normal.tga"
-}
-
-texture_slot {
-	name = "Roughness",
-	default_texture = "textures/common/white.tga"
-}
-
-texture_slot {
-	name = "Metallic",
-	default_texture = "textures/common/white.tga"
-}
-
-texture_slot {
-	name = "Ambient occlusion",
-	define = "HAS_AMBIENT_OCCLUSION_TEX"
-}
-
-include "pipelines/common.glsl"
-
-define "ALPHA_CUTOUT"
-define "VEGETATION"
-uniform("Stiffness", "float", 10)
-
-------------------
-
-common [[
-	#ifdef SKINNED
-		layout(std140, binding = 4) uniform ModelState {
-			float layer;
-			float fur_scale;
-			float fur_gravity;
-			float padding;
-			mat4 matrix;
-			mat2x4 bones[255];
-		} Model;
-	#endif
-
-	#if defined _HAS_ATTR6 && !defined GRASS
-		#define HAS_LOD
-	#endif
-]]
-
-vertex_shader [[
-	layout(location = 0) in vec3 a_position;
-	#ifdef _HAS_ATTR1
-		layout(location = 1) in vec2 a_uv;
-	#else
-		const vec2 a_uv = vec2(0);
-	#endif
-	layout(location = 2) in vec3 a_normal;
-	#ifdef _HAS_ATTR3
-		layout(location = 3) in vec3 a_tangent;
-	#else 
-		const vec3 a_tangent = vec3(0, 1, 0);
-	#endif
-	#if defined SKINNED
-		layout(location = 4) in ivec4 a_indices;
-		layout(location = 5) in vec4 a_weights;
-	#elif defined INSTANCED || defined GRASS
-		layout(location = 4) in vec4 i_rot_quat;
-		layout(location = 5) in vec4 i_pos_scale;
-		#ifdef _HAS_ATTR7
-			layout(location = 7) in vec4 a_color;
-			layout(location = 6) out vec4 v_color;
-		#endif
-		#ifdef _HAS_ATTR8
-			layout(location = 8) in float a_ao;
-			layout(location = 7) out float v_ao;
-		#endif
-	#else
-		layout(std140, binding = 4) uniform ModelState {
-			mat4 matrix;
-		} Model;
-	#endif
-	#ifdef HAS_LOD
-		layout(location = 6) in float i_lod;
-		layout(location = 4) out float v_lod;
-	#endif
-	
-	layout(location = 0) out vec2 v_uv;
-	layout(location = 1) out vec3 v_normal;
-	layout(location = 2) out vec3 v_tangent;
-	layout(location = 3) out vec4 v_wpos;
-	#ifdef GRASS
-		layout(location = 5) out float v_darken;
-	#endif
-	
-	void main() {
-		v_uv = a_uv;
-		#if defined INSTANCED || defined GRASS
-			v_normal = rotateByQuat(i_rot_quat, a_normal);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
-			vec3 p = a_position * i_pos_scale.w;
-			#ifdef HAS_LOD
-				v_lod = i_lod;
-			#endif
-			#if defined GRASS && defined VEGETATION
-				p = vegetationAnim(i_pos_scale.xyz, p, 1 / (1.0 + u_stiffness));
-				v_darken = a_position.y > 0.1 ? 1 : 0.0;
-			#elif defined VEGETATION
-				#ifdef DEPTH
-					p = vegetationAnim(i_pos_scale.xyz - Pass.shadow_to_camera.xyz, p, 0.001);
-				#else
-					p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
-				#endif
-			#endif
-			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
-			#ifdef _HAS_ATTR7
-				v_color = a_color;
-			#endif
-			#ifdef _HAS_ATTR8
-				v_ao = a_ao;
-			#endif
-		#elif defined SKINNED
-			mat2x4 dq = a_weights.x * Model.bones[a_indices.x];
-			float w = dot(Model.bones[a_indices.y][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.y : a_weights.y;
-			dq += w * Model.bones[a_indices.y];
-			w = dot(Model.bones[a_indices.z][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.z : a_weights.z;
-			dq += w * Model.bones[a_indices.z];
-			w = dot(Model.bones[a_indices.w][0], Model.bones[a_indices.x][0]) < 0 ? -a_weights.w : a_weights.w;
-			dq += w * Model.bones[a_indices.w];
-			
-			dq *= 1 / length(dq[0]);
-
-			mat3 m = mat3(Model.matrix);
-			v_normal = m * rotateByQuat(dq[0], a_normal);
-			v_tangent = m * rotateByQuat(dq[0], a_tangent);
-			vec3 mpos;
-			#ifdef FUR
-				mpos = a_position + (a_normal + vec3(0, -Model.fur_gravity * Model.layer, 0)) * Model.layer * Model.fur_scale;
-			#else
-				mpos = a_position;
-			#endif
-			v_wpos = Model.matrix * vec4(transformByDualQuat(dq, mpos), 1);
-		#else 
-			mat4 model_mtx = Model.matrix;
-			v_normal = mat3(model_mtx) * a_normal;
-			v_tangent = mat3(model_mtx) * a_tangent;
-
-			vec3 p = a_position;
-			#ifdef VEGETATION
-				p = vegetationAnim(Model.matrix[3].xyz, p, 0.001);
-			#endif
-
-			v_wpos = model_mtx * vec4(p,  1);
-		#endif
-		
-		gl_Position = Pass.view_projection * v_wpos;		
-	}
-]]
-
----------------------
-
-fragment_shader [[
-	layout (binding=0) uniform sampler2D u_albedomap;
-	layout (binding=1) uniform sampler2D u_normalmap;
-	layout (binding=2) uniform sampler2D u_roughnessmap;
-	layout (binding=3) uniform sampler2D u_metallicmap;
-	#ifdef HAS_AMBIENT_OCCLUSION_TEX	
-		layout (binding=4) uniform sampler2D u_aomap;
-	#endif
-	layout (binding=5) uniform sampler2D u_shadowmap;
-	#if !defined DEPTH && !defined DEFERRED && !defined GRASS
-		layout (binding=6) uniform sampler2D u_shadow_atlas;
-		layout (binding=7) uniform samplerCubeArray u_reflection_probes;
-	#endif
-	
-	layout(location = 0) in vec2 v_uv;
-	layout(location = 1) in vec3 v_normal;
-	layout(location = 2) in vec3 v_tangent;
-	layout(location = 3) in vec4 v_wpos;
-	#ifdef HAS_LOD
-		layout(location = 4) in float v_lod;
-	#endif
-	#ifdef GRASS
-		layout(location = 5) in float v_darken;
+surface_shader [[
+	vec4 c = texture(u_albedomap, v_uv) * u_material_color;
+	data.albedo = c.rgb;
+	data.alpha = c.a;
+	#if defined GRASS && defined VEGETATION
+		data.albedo *= v_darken;
 	#endif
 	#ifdef _HAS_ATTR7
-		layout(location = 6) in vec4 v_color;
+		data.albedo.rgb *= v_color.rgb;
 	#endif
 	#ifdef _HAS_ATTR8
-		layout(location = 7) in float v_ao;
+		data.ao = v_ao;
+	#else
+		data.ao = 1;
 	#endif
 
-	#if defined DEFERRED || defined GRASS
-		layout(location = 0) out vec4 o_gbuffer0;
-		layout(location = 1) out vec4 o_gbuffer1;
-		layout(location = 2) out vec4 o_gbuffer2;
-	#elif !defined DEPTH
-		layout(location = 0) out vec4 o_color;
+	#ifdef HAS_AMBIENT_OCCLUSION_TEX
+		data.ao *= texture(u_aomap, v_uv).r;
 	#endif
 
-	Surface getSurface()
-	{
-		#ifdef HAS_LOD
-			if (ditherLOD(v_lod)) discard;
-		#endif
+	#ifdef FUR 
+		data.alpha = saturate(data.alpha - Model.layer);
+	#endif
 
-		Surface data;
-		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
-		data.albedo = c.rgb;
-		data.alpha = c.a;
-		#if defined GRASS && defined VEGETATION
-			data.albedo *= v_darken;
-		#endif
-		#ifdef _HAS_ATTR7
-			data.albedo.rgb *= v_color.rgb;
-		#endif
-		#ifdef _HAS_ATTR8
-			data.ao = v_ao;
-		#else
-			data.ao = 1;
-		#endif
+	// dx shader has internal errors on this
+	#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
+		if(data.alpha < 0.5) discard;
+	#endif
 
-		#ifdef HAS_AMBIENT_OCCLUSION_TEX
-			data.ao *= texture(u_aomap, v_uv).r;
-		#endif
+	vec3 N = v_normal;
+	vec3 tangent = v_tangent;
+	#ifdef VEGETATION
+		if (!gl_FrontFacing) {
+			N = -N;
+			tangent = -tangent;
+		}
+	#endif
 
-		#ifdef FUR 
-			data.alpha = saturate(data.alpha - Model.layer);
-		#endif
-
-		// dx shader has internal errors on this
-		#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
-			if(data.alpha < 0.5) discard;
-		#endif
-
-		vec3 N = v_normal;
-		vec3 tangent = v_tangent;
-		#ifdef VEGETATION
-			if (!gl_FrontFacing) {
-				N = -N;
-				tangent = -tangent;
-			}
-		#endif
-
-		mat3 tbn = mat3(
-			normalize(tangent),
-			normalize(N),
-			normalize(cross(N, tangent))
-			);
+	mat3 tbn = mat3(
+		normalize(tangent),
+		normalize(N),
+		normalize(cross(N, tangent))
+		);
 		
-		data.wpos = v_wpos.xyz;
-		data.V = normalize(-data.wpos);
-		data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
-		data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
-		data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
-		data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
-		data.N = tbn * data.N;
-		data.emission = u_emission;
-		data.translucency = u_translucency;
-		return data;
-	}
-	
-	#ifdef DEPTH
-		void main()
-		{
-			#ifdef HAS_LOD
-				if (ditherLOD(v_lod)) discard;
-			#endif
-			#ifdef ALPHA_CUTOUT
-				vec4 c = texture(u_albedomap, v_uv);
-				if(c.a < 0.5) discard;
-			#endif
-		}
-	#elif defined DEFERRED || defined GRASS
-		void main()
-		{
-			Surface data = getSurface();
-			#if defined ALPHA_CUTOUT && defined LUMIX_DX_SHADER
-				if(data.alpha < 0.5) discard;
-			#endif
-			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
-		}
-	#else 
-		void main()
-		{
-			Surface data = getSurface();
-			
-			float linear_depth = dot(data.wpos.xyz, Pass.view_dir.xyz);
-			Cluster cluster = getClusterLinearDepth(linear_depth);
-			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes);
-
-			#if defined ALPHA_CUTOUT
-				if(data.alpha < 0.5) discard;
-			#endif
-
-			float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
-			o_color.a = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
-		}
-	#endif
+	data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
+	data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
+	data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
+	data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
+	data.N = tbn * data.N;
+	data.emission = u_emission;
+	data.translucency = u_translucency;
 ]]
