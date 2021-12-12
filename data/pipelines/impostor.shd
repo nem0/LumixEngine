@@ -16,7 +16,6 @@ texture_slot {
 include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
-define "VEGETATION"
 uniform("Center", "vec3")
 
 ------------------
@@ -77,9 +76,6 @@ vertex_shader [[
 		p *= i_pos_scale.w;
 		v_tangent = tangent_space[0];
 		v_normal = tangent_space[2];
-		#ifdef VEGETATION
-			p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
-		#endif
 		v_wpos = vec4(i_pos_scale.xyz + p, 1);
 
 		gl_Position = Pass.view_projection * v_wpos;		

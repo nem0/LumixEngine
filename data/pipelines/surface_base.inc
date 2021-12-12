@@ -27,9 +27,7 @@ function surface_shader(code)
 	include "pipelines/common.glsl"
 
 	define "ALPHA_CUTOUT"
-	define "VEGETATION"
-	uniform("Stiffness", "float", 10)
-
+	
 	------------------
 
 	common [[
@@ -90,9 +88,6 @@ function surface_shader(code)
 		layout(location = 1) out vec3 v_normal;
 		layout(location = 2) out vec3 v_tangent;
 		layout(location = 3) out vec4 v_wpos;
-		#ifdef GRASS
-			layout(location = 5) out float v_darken;
-		#endif
 	
 		void main() {
 			v_uv = a_uv;
@@ -102,16 +97,6 @@ function surface_shader(code)
 				vec3 p = a_position * i_pos_scale.w;
 				#ifdef HAS_LOD
 					v_lod = i_lod;
-				#endif
-				#if defined GRASS && defined VEGETATION
-					p = vegetationAnim(i_pos_scale.xyz, p, 1 / (1.0 + u_stiffness));
-					v_darken = a_position.y > 0.1 ? 1 : 0.0;
-				#elif defined VEGETATION
-					#ifdef DEPTH
-						p = vegetationAnim(i_pos_scale.xyz - Pass.shadow_to_camera.xyz, p, 0.001);
-					#else
-						p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
-					#endif
 				#endif
 				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 				#ifdef _HAS_ATTR7
@@ -147,9 +132,6 @@ function surface_shader(code)
 				v_tangent = mat3(model_mtx) * a_tangent;
 
 				vec3 p = a_position;
-				#ifdef VEGETATION
-					p = vegetationAnim(Model.matrix[3].xyz, p, 0.001);
-				#endif
 
 				v_wpos = model_mtx * vec4(p,  1);
 			#endif
@@ -180,9 +162,6 @@ function surface_shader(code)
 		layout(location = 3) in vec4 v_wpos;
 		#ifdef HAS_LOD
 			layout(location = 4) in float v_lod;
-		#endif
-		#ifdef GRASS
-			layout(location = 5) in float v_darken;
 		#endif
 		#ifdef _HAS_ATTR7
 			layout(location = 6) in vec4 v_color;

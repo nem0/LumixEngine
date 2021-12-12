@@ -583,12 +583,6 @@ float rand(vec3 seed)
 	return fract(sin(dot_product) * 43758.5453);
 }
 
-vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos, float strength) {
-	obj_pos += Global.camera_world_pos.xyz;
-	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + Global.time * 2) * vertex_pos.y * vertex_pos.y * strength : 0;
-	return vertex_pos;
-}
-
 void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2) {
 	gbuffer0 = vec4(surface.albedo.rgb, surface.roughness);
 	gbuffer1 = vec4(surface.N * 0.5 + 0.5, surface.metallic);

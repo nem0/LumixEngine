@@ -4,9 +4,6 @@ surface_shader [[
 	vec4 c = texture(u_albedomap, v_uv) * u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
-	#if defined GRASS && defined VEGETATION
-		data.albedo *= v_darken;
-	#endif
 	#ifdef _HAS_ATTR7
 		data.albedo.rgb *= v_color.rgb;
 	#endif
@@ -31,12 +28,6 @@ surface_shader [[
 
 	vec3 N = v_normal;
 	vec3 tangent = v_tangent;
-	#ifdef VEGETATION
-		if (!gl_FrontFacing) {
-			N = -N;
-			tangent = -tangent;
-		}
-	#endif
 
 	mat3 tbn = mat3(
 		normalize(tangent),
