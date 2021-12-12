@@ -220,6 +220,60 @@ struct ProfilerUIImpl final : ProfilerUI
 		});
 	}
 
+	void framesUI() {
+		if (!ImGui::TreeNode("Frames")) return;
+		
+		ThreadContextProxy ctx(m_data.getMutableData() + 2 * sizeof(u32));
+
+		u32 p = ctx.begin;
+		const u32 end = ctx.end;
+		static u32 last_frames_count = 0;
+		static float last_max_t = 1/60.f;
+		float max_t = 0;
+		u64 last_frame = 0;
+		u32 frames_count = 0;
+
+		const float from_x = ImGui::GetCursorScreenPos().x;
+		const float to_y = ImGui::GetCursorScreenPos().y + 100;
+		const float to_x = from_x + ImGui::GetContentRegionAvail().x;
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const float col_width = (to_x - from_x) / maximum(last_frames_count, 1);
+		const u64 freq = profiler::frequency();
+
+		while (p != end) {
+			profiler::EventHeader header;
+			read(ctx, p, header);
+			switch (header.type) {
+				case profiler::EventType::PAUSE:
+					last_frame = 0; // frame time is accumulated during pause, so we ignore it
+					break;
+				case profiler::EventType::FRAME:
+					if (last_frame != 0) {
+						const float t = 1000 * float((header.time - last_frame) / double(freq));
+						max_t = maximum(t, max_t);
+						const float y = to_y - t / last_max_t * 100;
+						const float x = from_x + (to_x - from_x) * frames_count / last_frames_count; 
+						ImVec2 ra(x, y);
+						ImVec2 rb(x + col_width, to_y);
+						dl->AddRectFilled(ra, rb, IM_COL32(0xff, 0, 0, 0xff));
+						if (ImGui::IsMouseHoveringRect(ra, rb)) {
+							dl->AddRect(ra, rb, IM_COL32(0, 0, 0, 0xff));
+							ImGui::SetTooltip("%.3f ms", t);
+						}
+					}
+					last_frame = header.time;
+					++frames_count;
+					break;
+			}
+			p += header.size;
+		}
+		
+		last_max_t = max_t;
+		last_frames_count = frames_count;
+		ImGui::Dummy(ImVec2(-1, 100));
+		ImGui::TreePop();
+	}
+
 	void patchStrings() {
 		InputMemoryStream tmp(m_data);
 		tmp.read<u32>();
@@ -758,6 +812,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	if (m_data.empty()) return;
 	if (!m_is_paused) return;
+
+	framesUI();
+
 	ThreadContextProxy global(m_data.getMutableData() + 2 * sizeof(u32));
 
 	const u64 view_start = m_end - m_range;
@@ -1139,6 +1196,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						if (new_iter.isValid()) draw_cswitch(x, r, new_iter.value(), true);
 						if (old_iter.isValid()) draw_cswitch(x, r, old_iter.value(), false);
 					}
+					break;
+				case profiler::EventType::PAUSE:
 					break;
 				default: ASSERT(false); break;
 			}

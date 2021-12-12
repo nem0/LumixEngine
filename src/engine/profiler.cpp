@@ -589,6 +589,8 @@ void serialize(OutputMemoryStream& blob) {
 
 void pause(bool paused)
 {
+	if (paused) write(g_instance.global_context, EventType::PAUSE, 0);
+
 	g_instance.paused = paused;
 	if (paused) g_instance.paused_time = os::Timer::getRawTimestamp();
 }

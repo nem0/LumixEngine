@@ -115,7 +115,8 @@ enum class EventType : u8
 	END_GPU_BLOCK,
 	GPU_FRAME,
 	GPU_MEM_STATS,
-	LINK
+	LINK,
+	PAUSE
 };
 
 #pragma pack(1)
