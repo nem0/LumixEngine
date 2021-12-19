@@ -2040,7 +2040,7 @@ public:
 		DVec3 origin;
 		Vec3 dir;
 
-		const UniverseView::RayHit hit = m_view->getCameraRaycastHit(camera_x, camera_y);
+		const UniverseView::RayHit hit = m_view->getCameraRaycastHit(camera_x, camera_y, INVALID_ENTITY);
 
 		EntityRef res;
 		UniquePtr<AddEntityCommand> command = UniquePtr<AddEntityCommand>::create(m_allocator, *this, hit.pos, &res);
@@ -2884,7 +2884,7 @@ public:
 		, m_identity(identity)
 	{
 		UniverseView& view = editor.getView();
-		const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+		const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 		m_position = hit.pos;
 	}
 

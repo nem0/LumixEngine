@@ -831,7 +831,7 @@ bool TerrainEditor::onMouseDown(UniverseView& view, int x, int y)
 	DVec3 origin;
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
-	const RayCastModelHit hit = scene->castRayTerrain(selected_entities[0], origin, dir);
+	const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
 	if (!hit.is_hit) return false;
 
 	const DVec3 hit_pos = hit.origin + hit.dir * hit.t;
@@ -1159,7 +1159,7 @@ void TerrainEditor::onMouseMove(UniverseView& view, int x, int y, int, int)
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
 
-	const RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
+	const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
 	if (!hit.is_hit) return;
 	if (hit.entity != entity) return;
 	
@@ -1886,7 +1886,7 @@ void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 		DVec3 origin;
 		Vec3 dir;
 		editor.getView().getViewport().getRay(mp, origin, dir);
-		const RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
+		const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
 
 		if(hit.is_hit) {
 			DVec3 center = hit.origin + hit.dir * hit.t;

@@ -122,7 +122,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
 			UniverseView& view = editor.getView();
-			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 			scene->generateTileAt((EntityRef)cmp.entity, hit.pos, true);
 		}
 
@@ -136,7 +136,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Outer boundaries", &outer_boundaries);
 			ImGui::Checkbox("Portals", &portals);
 			UniverseView& view = editor.getView();
-			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 			scene->debugDrawNavmesh((EntityRef)cmp.entity, hit.pos, inner_boundaries, outer_boundaries, portals);
 		}
 

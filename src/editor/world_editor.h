@@ -59,7 +59,7 @@ struct UniverseView {
 	virtual void setCustomPivot() = 0;
 	virtual void resetPivot() = 0;
 	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
-	virtual RayHit getCameraRaycastHit(int cam_x, int cam_y) = 0;
+	virtual RayHit getCameraRaycastHit(int cam_x, int cam_y, EntityPtr ignore) = 0;
 	virtual Vertex* render(bool lines, u32 vertex_count) = 0;
 	virtual void addText2D(float x, float y, Color color, const char* text) = 0;
 	virtual struct WorldEditor& getEditor() = 0;

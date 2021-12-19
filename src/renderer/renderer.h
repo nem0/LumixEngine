@@ -77,6 +77,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual gpu::TextureHandle loadTexture(const gpu::TextureDesc& desc, const MemRef& image_data, gpu::TextureFlags flags, const char* debug_name) = 0;
 	virtual void copy(gpu::TextureHandle dst, gpu::TextureHandle src) = 0;
 	virtual void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) = 0;
+	virtual void updateBuffer(gpu::BufferHandle buffer, const MemRef& memory) = 0;
 	virtual void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& memory) = 0;
 	virtual void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) = 0;
 	virtual void destroy(gpu::TextureHandle tex) = 0;

@@ -157,6 +157,8 @@ bool Model::isSkinned() const
 
 RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter)
 {
+	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+
 	RayCastModelHit hit;
 	hit.is_hit = false;
 	if (!isReady()) return hit;
@@ -232,6 +234,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 				hit.t = t;
 				hit.entity = entity;
 				hit.mesh = &m_meshes[mesh_index];
+				hit.component_type = MODEL_INSTANCE_TYPE;
 				if (filter && !filter->invoke(hit)) hit = prev;
 			}
 		}

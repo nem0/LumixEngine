@@ -1,0 +1,48 @@
+include "pipelines/common.glsl"
+
+compute_shader [[
+	struct Indirect {
+		uint vertex_count;
+		uint instance_count;
+		uint first_index;
+		uint base_vertex;
+		uint base_instance;
+	};
+	
+	struct OutputData {
+		vec4 rot;
+		vec4 pos_scale;
+		vec4 lod_fade;
+	};
+
+	struct InputData {
+		vec4 rot;
+		vec4 pos_scale;
+	};
+
+	layout(local_size_x = 16, local_size_y = 16) in;
+
+
+	layout(binding = 0, std430) readonly buffer InData {
+		InputData b_input[];
+	};
+
+	layout(binding = 1, std430) writeonly buffer OutData {
+		OutputData b_output[];
+	};
+
+	layout(std140, binding = 4) uniform Drawcall {
+		vec4 u_camera_offset;
+	};
+
+	// TODO culling
+	void main() {
+		uint id = gl_GlobalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
+
+		InputData inp = b_input[id];
+
+		b_output[id].rot = inp.rot;
+		b_output[id].pos_scale = inp.pos_scale + vec4(u_camera_offset.xyz, 0);
+		b_output[id].lod_fade = vec4(0, 0, 0, 0);
+	}
+]]

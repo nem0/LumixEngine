@@ -607,6 +607,32 @@ struct RendererImpl final : Renderer
 		queue(cmd, 0);
 	}
 
+	void updateBuffer(gpu::BufferHandle handle, const MemRef& mem) override {
+		ASSERT(mem.size > 0);
+		ASSERT(handle);
+
+		struct Cmd : RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::update(handle, mem.data, mem.size);
+				if (mem.own) {
+					renderer->free(mem);
+				}
+			}
+
+			gpu::BufferHandle handle;
+			MemRef mem;
+			RendererImpl* renderer;
+		};
+
+		Cmd& cmd = createJob<Cmd>();
+		cmd.handle = handle;
+		cmd.mem = mem;
+		cmd.renderer = this;
+
+		queue(cmd, 0);
+	}
 
 	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override
 	{
