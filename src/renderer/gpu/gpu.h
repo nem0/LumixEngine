@@ -285,7 +285,7 @@ void destroy(QueryHandle query);
 
 void bindIndexBuffer(BufferHandle handle);
 void bindIndirectBuffer(BufferHandle handle);
-void drawIndirect(DataType index_type);
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
 void drawTriangles(u32 byte_offset, u32 indices_count, DataType index_type);
 void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type);
 void drawElements(PrimitiveType primitive_type, u32 byte_offset, u32 count, DataType index_type);

@@ -728,6 +728,24 @@ Transform Transform::inverted() const {
 	return result;
 }
 
+LocalTransform::LocalTransform(const Vec3& pos, const Quat& rot, float scale)
+	: pos(pos)
+	, rot(rot)
+	, scale(scale)
+{}
+
+LocalTransform LocalTransform::inverted() const {
+	LocalTransform result;
+	result.rot = rot.conjugated();
+	result.pos = result.rot.rotate(-pos / scale);
+	result.scale = 1.0f / scale;
+	return result;
+}
+
+LocalTransform LocalTransform::operator*(const LocalTransform& rhs) const {
+	return {pos + rot.rotate(rhs.pos * scale), rot * rhs.rot, scale};
+}
+
 LocalRigidTransform LocalRigidTransform::inverted() const {
 	LocalRigidTransform result;
 	result.rot = rot.conjugated();

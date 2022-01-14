@@ -3034,7 +3034,7 @@ void RenderScene::reflect() {
 			.var_prop<&RenderScene::getCamera, &Camera::is_ortho>("Orthographic")
 			.var_prop<&RenderScene::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
 		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
-			.LUMIX_PROP(InstancedModelPath, "Source").resourceAttribute(Model::TYPE)
+			.LUMIX_PROP(InstancedModelPath, "Model").resourceAttribute(Model::TYPE)
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
 			.LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
 			.prop<&RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance>("Enabled")

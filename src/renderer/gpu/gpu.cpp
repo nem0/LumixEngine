@@ -701,10 +701,10 @@ void drawElements(PrimitiveType primitive_type, u32 offset, u32 count, DataType 
 	glDrawElements(pt, count, t, (void*)(intptr_t)offset);
 }
 
-void drawIndirect(DataType index_type)
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset)
 {
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-	glMultiDrawElementsIndirect(GL_TRIANGLES, type, nullptr, 1, 0);
+	glMultiDrawElementsIndirect(GL_TRIANGLES, type, (const void*)(uintptr)indirect_buffer_offset, 1, 0);
 }
 
 void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type)

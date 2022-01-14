@@ -3636,6 +3636,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		: m_app(app)
 	{
 		m_app.addPlugin(*this);
+		m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
 	}
 
 	~InstancedModelPlugin() {
@@ -3660,23 +3661,27 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	}
 
 
-	static bool isOBBCollision(Span<const InstancedModel::InstanceData> meshes, const InstancedModel::InstanceData& obj, Model* model)
+	static bool isOBBCollision(Span<const InstancedModel::InstanceData> meshes, const InstancedModel::InstanceData& obj, Model* model, float bounding_offset)
 	{
+		ASSERT(bounding_offset <= 0);
+		AABB aabb = model->getAABB();
+		aabb.shrink(-bounding_offset);
 		float radius_a_squared = model->getOriginBoundingRadius() * obj.scale;
 		radius_a_squared = radius_a_squared * radius_a_squared;
+		const LocalTransform tr_a(obj.pos, obj.rot, obj.scale);
 		for (const InstancedModel::InstanceData& inst : meshes) {
-			const float radius_b = model->getOriginBoundingRadius() * inst.scale;
+			const float radius_b = model->getOriginBoundingRadius() * inst.scale + bounding_offset;
 			const float radius_squared = radius_a_squared + radius_b * radius_b;
 			if (squaredLength(inst.pos - obj.pos) < radius_squared) {
-				// TODO
-				/*const Transform rel_tr = model_tr.inverted() * tr_b;
+				const LocalTransform tr_b(inst.pos, inst.rot, inst.scale);
+				const LocalTransform rel_tr = tr_a.inverted() * tr_b;
 				Matrix mtx = rel_tr.rot.toMatrix();
 				mtx.multiply3x3(rel_tr.scale);
 				mtx.setTranslation(Vec3(rel_tr.pos));
 
-				if (testOBBCollision(model->getAABB(), mtx, model_instance.model->getAABB())) {*/
+				if (testOBBCollision(aabb, mtx, aabb)) {
 					return true;
-				//}
+				}
 			}
 		}
 		return false;
@@ -3743,12 +3748,32 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 						DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
 						const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
 						pos.y = cmp.scene->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + terrain_tr.pos.y;
-
+						pos.y += randFloat(m_y_spread.x, m_y_spread.y);
+						
 						InstancedModel::InstanceData id;
-						id.scale = 1;
+						id.scale = randFloat(m_size_spread.x, m_size_spread.y);
 						id.rot = Quat::IDENTITY;
+
+						if (m_is_rotate_x) {
+							float angle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
+							Quat q(Vec3(1, 0, 0), angle);
+							id.rot = q * id.rot;
+						}
+
+						if (m_is_rotate_y) {
+							float angle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+							Quat q(Vec3(0, 1, 0), angle);
+							id.rot = q * id.rot;
+						}
+
+						if (m_is_rotate_z) {
+							float angle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
+							Quat q(id.rot.rotate(Vec3(0, 0, 1)), angle);
+							id.rot = q * id.rot;
+						}
+
 						id.pos = Vec3(pos - origin);
-						if (!isOBBCollision(existing, id, cmp.im->model)) {
+						if (!isOBBCollision(existing, id, cmp.im->model, m_bounding_offset)) {
 							 add_cmd->instances.push(id);
 							 existing.push(id);
 						}
@@ -3823,6 +3848,10 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		ImGuiEx::Label("Instances");
 		ImGui::Text("%d", im.instances.size());
 
+		ImGuiEx::Label("Selected instance");
+		ImGui::InputInt("##sel", &m_selected);
+		m_selected = clamp(m_selected, -1, im.instances.size() - 1);
+
 		if (m_selected >= 0 && m_selected < im.instances.size()) {
 			DVec3 origin = cmp.scene->getUniverse().getPosition(*cmp.entity);
 			Transform tr;
@@ -3832,6 +3861,13 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			const Gizmo::Config& cfg = m_app.getGizmoConfig();
 			bool changed = Gizmo::manipulate(u64(4) << 32 | cmp.entity.index, editor.getView(), tr, cfg);
 
+			// TODO undo/redo, rotation
+			Vec3 p = im.instances[m_selected].pos;
+			ImGuiEx::Label("Position");
+			if (ImGui::DragFloat3("##pos", &p.x, 0.01f)) {
+				changed = true;
+				tr.pos = origin + DVec3(p);
+			}
 			ImGuiEx::Label("Scale");
 			changed = ImGui::DragFloat("##scale", &tr.scale, 0.01f) || changed;
 
@@ -3842,9 +3878,9 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 				render_scene->initInstancedModelGPUData(*cmp.entity);
 			}
-
-			// TODO pos, rot
 		}
+
+		ImGui::Separator();
 		ImGuiEx::Label("Brush");
 		ImGui::Combo("##brush", (i32*)&m_brush, "Single\0Terrain\0");
 
@@ -3856,7 +3892,54 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 				ImGui::DragFloat("##brush_radius", &m_brush_radius, 0.1f, 0.f, FLT_MAX);
 				ImGuiEx::Label("Brush strength");
 				ImGui::SliderFloat("##brush_str", &m_brush_strength, 0.f, 1.f, "%.2f");
+				ImGuiEx::Label("Bounding offset");
+				ImGui::DragFloat("##bounding_offset", &m_bounding_offset, 0.1f, -FLT_MAX, 0);
+				ImGuiEx::Label("Size spread");
+				ImGui::DragFloatRange2("##size_spread", &m_size_spread.x, &m_size_spread.y, 0.01f);
+				m_size_spread.x = minimum(m_size_spread.x, m_size_spread.y);
+				ImGuiEx::Label("Y spread");
+				ImGui::DragFloatRange2("##y_spread", &m_y_spread.x, &m_y_spread.y, 0.01f);
+				m_y_spread.x = minimum(m_y_spread.x, m_y_spread.y);
 				
+				if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x)) {
+					//if (m_is_rotate_x) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_x) {
+					Vec2 tmp = m_rotate_x_spread;
+					tmp.x = radiansToDegrees(tmp.x);
+					tmp.y = radiansToDegrees(tmp.y);
+					if (ImGui::DragFloatRange2("Rotate X spread", &tmp.x, &tmp.y)) {
+						m_rotate_x_spread.x = degreesToRadians(tmp.x);
+						m_rotate_x_spread.y = degreesToRadians(tmp.y);
+					}
+				}
+
+				if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y)) {
+					//if (m_is_rotate_y) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_y) {
+					Vec2 tmp = m_rotate_y_spread;
+					tmp.x = radiansToDegrees(tmp.x);
+					tmp.y = radiansToDegrees(tmp.y);
+					if (ImGui::DragFloatRange2("Rotate Y spread", &tmp.x, &tmp.y)) {
+						m_rotate_y_spread.x = degreesToRadians(tmp.x);
+						m_rotate_y_spread.y = degreesToRadians(tmp.y);
+					}
+				}
+
+				if (ImGui::Checkbox("Rotate around Z", &m_is_rotate_z)) {
+					//if (m_is_rotate_z) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_z) {
+					Vec2 tmp = m_rotate_z_spread;
+					tmp.x = radiansToDegrees(tmp.x);
+					tmp.y = radiansToDegrees(tmp.y);
+					if (ImGui::DragFloatRange2("Rotate Z spread", &tmp.x, &tmp.y)) {
+						m_rotate_z_spread.x = degreesToRadians(tmp.x);
+						m_rotate_z_spread.y = degreesToRadians(tmp.y);
+					}
+				}
+
 				if (ImGui::GetIO().KeyShift) {
 					const Vec2 mp = editor.getView().getMousePos();
 					DVec3 ray_origin;
@@ -3882,7 +3965,17 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	Brush m_brush = Brush::SINGLE;
 	float m_brush_radius = 10.f;
 	float m_brush_strength = 1.f;
+	float m_bounding_offset = 0;
 	i32 m_selected = -1;
+	Vec2 m_size_spread = Vec2(1);
+	Vec2 m_y_spread = Vec2(0);
+
+	bool m_is_rotate_x = false;
+	bool m_is_rotate_y = false;
+	bool m_is_rotate_z = false;
+	Vec2 m_rotate_x_spread;
+	Vec2 m_rotate_y_spread;
+	Vec2 m_rotate_z_spread;
 };
 
 struct TerrainPlugin final : PropertyGrid::IPlugin

@@ -1839,7 +1839,7 @@ struct PipelineImpl final : Pipeline
 		return res;
 	}
 
-	void renderInstancedModels(lua_State* L, CameraParams cp, RenderState state) {
+	void renderInstancedModels(lua_State* L, CameraParams cp, RenderState state, const char* layer) {
 		PROFILE_FUNCTION();
 	
 		if (!m_instancing_shader->isReady()) return;
@@ -1848,13 +1848,17 @@ struct PipelineImpl final : Pipeline
 		RenderInstancedModelsCommand& cmd = m_renderer.createJob<RenderInstancedModelsCommand>(allocator);
 
 		const char* define = "";
-		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
+		LuaWrapper::getOptionalField<const char*>(L, 3, "define", &define);
 
+		cmd.m_layer = m_renderer.getLayerIdx(layer);
 		cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		cmd.m_render_state = state.value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
-		cmd.m_compute = m_instancing_shader->getProgram(gpu::VertexDecl(), 0);
+		cmd.m_gather_shader = m_instancing_shader->getProgram(0);
+		cmd.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
+		cmd.m_cull_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS1"));
+		cmd.m_init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1893,7 +1897,7 @@ struct PipelineImpl final : Pipeline
 		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
-		cmd.m_compute_shader = m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
+		cmd.m_compute_shader = m_place_grass_shader->getProgram(0);
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -2232,7 +2236,7 @@ struct PipelineImpl final : Pipeline
 		if (define.valid) {
 			defines |= 1 << m_renderer.getShaderDefineIdx(define.value);
 		}
-		gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), defines);
+		gpu::ProgramHandle program = shader->getProgram(defines);
 		if (!program) return;
 
 		struct Cmd : Renderer::RenderJob {
@@ -4106,7 +4110,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
 				gpu::bindIndirectBuffer(data);
-				gpu::drawIndirect(grass.mesh->index_type);
+				gpu::drawIndirect(grass.mesh->index_type, 0);
 
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				// TODO
@@ -4150,12 +4154,20 @@ struct PipelineImpl final : Pipeline
 
 	struct RenderInstancedModelsCommand : Renderer::RenderJob {
 		struct Group {
+			Group(IAllocator& allocator) : meshes(allocator) {}
+
+			struct MeshRec {
+				Mesh::RenderData* mesh;
+				Material::RenderData* material;
+				gpu::ProgramHandle program;
+			};
+
 			Transform origin;
 			gpu::BufferHandle instance_data;
 			u32 instance_count;
-			Mesh::RenderData* mesh;
-			Material::RenderData* material;
-			gpu::ProgramHandle program;
+			Vec4 lod_distances;
+			IVec4 lod_indices;
+			Array<MeshRec> meshes;
 			u32 offset;
 		};
 
@@ -4166,39 +4178,94 @@ struct PipelineImpl final : Pipeline
 		}
 		
 		void execute() override {
+			PROFILE_FUNCTION();
+			// TODO
+			gpu::BufferHandle tmp = gpu::allocBufferHandle();
+			gpu::createBuffer(tmp, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER, 16 * 1024, nullptr);
+
 			gpu::pushDebugGroup("instanced_models");
 			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			const gpu::BufferHandle scratch_buffer = m_pipeline->m_renderer.getScratchBuffer();
 			for (const Group& g : m_groups) {
 				ASSERT(g.instance_count < Renderer::SCRATCH_BUFFER_SIZE / 48); // TODO split into multiple drawcalls
-				gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
-				gpu::bindShaderBuffer(scratch_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
-				struct {
-					Vec4 camera_offset; 
-				} ub_values;
-				ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
-				gpu::update(drawcall_ub, &ub_values, sizeof(ub_values));
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(ub_values));
-				gpu::useProgram(m_compute);
-				gpu::dispatch((g.instance_count + 15) / 16, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
+				constexpr u32 MAX_BATCH_SIZE = Renderer::SCRATCH_BUFFER_SIZE / 48;
+				const u32 batch_count = (g.instance_count + MAX_BATCH_SIZE - 1) / MAX_BATCH_SIZE;
+				for (u32 batch = 0; batch < batch_count; ++batch) {
+					const u32 batch_size = minimum(MAX_BATCH_SIZE, g.instance_count - batch * MAX_BATCH_SIZE);
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+					gpu::bindShaderBuffer(scratch_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
+					struct {
+						Vec4 camera_offset;
+						Vec4 lod_distances;
+						IVec4 lod_indices;
+						u32 total_count;
+						u32 instance_offset;
+					} ub_values;
+					ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
+					ub_values.total_count = g.instance_count;
+					ub_values.lod_distances = g.lod_distances;
+					ub_values.lod_indices = g.lod_indices;
+					ub_values.instance_offset = batch * MAX_BATCH_SIZE;
+					gpu::update(drawcall_ub, &ub_values, sizeof(ub_values));
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(ub_values));
+					gpu::useProgram(m_init_shader);
+					gpu::dispatch(1, 1, 1);
 
-				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+					gpu::useProgram(m_cull_shader);
+					gpu::dispatch((batch_size + 255) / 256, 1, 1);
 
-				gpu::bindTextures(g.material->textures, 0, g.material->textures_count);
-				gpu::setState(g.material->render_states | m_render_state);
-				gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, g.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					struct Indirect {
+						u32 vertex_count;
+						u32 instance_count;
+						u32 first_index;
+						u32 base_vertex;
+						u32 base_instance;
+					} indirects[32];
 
-				gpu::useProgram(g.program);
+					ASSERT((u32)g.meshes.size() < lengthOf(indirects)); // TODO
 
-				gpu::bindIndexBuffer(g.mesh->index_buffer_handle);
-				gpu::bindVertexBuffer(0, g.mesh->vertex_buffer_handle, 0, g.mesh->vb_stride);
-				gpu::bindVertexBuffer(1, scratch_buffer, 0, 48);
+					for (const auto& m : g.meshes) {
+						Indirect& i = indirects[&m - g.meshes.begin()];
+						i.base_instance = 0;
+						i.base_vertex = 0;
+						i.first_index = 0;
+						i.instance_count = 0;
+						i.vertex_count = m.mesh->indices_count;
+					}
 
-				gpu::drawTrianglesInstanced(g.mesh->indices_count, g.instance_count, g.mesh->index_type);
+					gpu::update(tmp, indirects, sizeof(indirects[0]) * g.meshes.size());
+					gpu::bindShaderBuffer(tmp, 2, gpu::BindShaderBufferFlags::OUTPUT);
+					gpu::useProgram(m_indirect_shader);
+					gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
+
+					gpu::useProgram(m_gather_shader);
+					gpu::dispatch((batch_size + 255) / 256, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
+
+					gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
+					gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+					gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);
+					
+					for (const auto& m : g.meshes) {
+						gpu::bindTextures(m.material->textures, 0, m.material->textures_count);
+						gpu::setState(m.material->render_states | m_render_state);
+						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+
+						gpu::useProgram(m.program);
+
+						gpu::bindIndexBuffer(m.mesh->index_buffer_handle);
+						gpu::bindVertexBuffer(0, m.mesh->vertex_buffer_handle, 0, m.mesh->vb_stride);
+						gpu::bindVertexBuffer(1, scratch_buffer, 32, 48);
+
+						gpu::bindIndirectBuffer(tmp);
+
+						gpu::drawIndirect(m.mesh->index_type, u32(sizeof(Indirect) * (&m - g.meshes.begin())));
+					}
+				}
 			}
 			gpu::popDebugGroup();
+
+			gpu::destroy(tmp);
 		}
 
 		void setup() override {
@@ -4211,16 +4278,22 @@ struct PipelineImpl final : Pipeline
 				Model* m = iter.value().model;
 				if (!m || !m->isReady()) continue;
 
-				// TODO LODs
+				Group& g = m_groups.emplace(m_allocator);
+				g.origin = universe.getTransform(iter.key());
+				g.lod_distances = *(Vec4*)m->getLODDistances();
+				g.lod_indices = IVec4(0);
+				g.instance_count = iter.value().instances.size();
+				g.instance_data = iter.value().gpu_data;
+				g.meshes.reserve(m->getMeshCount());
 				for (i32 i = 0; i < m->getMeshCount(); ++i) {
-					Group& g = m_groups.emplace();
-					g.origin = universe.getTransform(iter.key());
-					g.instance_count = iter.value().instances.size();
-					g.instance_data = iter.value().gpu_data;
 					const Mesh& mesh = m->getMesh(i);
-					g.mesh = mesh.render_data;
-					g.material = mesh.material->getRenderData();
-					g.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+					if (mesh.layer == m_layer) {
+						++(&g.lod_indices.x)[(u32)mesh.lod];
+						Group::MeshRec& m = g.meshes.emplace();
+						m.mesh = mesh.render_data;
+						m.material = mesh.material->getRenderData();
+						m.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+					}
 				}
 			}
 		}
@@ -4230,8 +4303,12 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		gpu::StateFlags m_render_state;
+		u8 m_layer;
 		u32 m_define_mask = 0;
-		gpu::ProgramHandle m_compute;
+		gpu::ProgramHandle m_gather_shader;
+		gpu::ProgramHandle m_indirect_shader;
+		gpu::ProgramHandle m_cull_shader;
+		gpu::ProgramHandle m_init_shader;
 	};
 
 	struct RenderTerrainsCommand : Renderer::RenderJob

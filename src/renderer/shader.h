@@ -106,6 +106,7 @@ public:
 	void ignoreProperty(Property value) { m_ignored_properties |= 1 << (u32)value; }
 	bool isIgnored(Property value) const { return m_ignored_properties & (1 << (u32)value); }
 	
+	gpu::ProgramHandle getProgram(u32 defines);
 	gpu::ProgramHandle getProgram(const gpu::VertexDecl& decl, u32 defines);
 	static void compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer);
 

@@ -572,6 +572,11 @@ void AABB::getCorners(const Transform& tr, DVec3* points) const
 	points[7] = tr.transform(p);
 }
 
+void AABB::shrink(float x) {
+	min += Vec3(x);
+	max -= Vec3(x);
+}
+
 Vec3 AABB::minCoords(const Vec3& a, const Vec3& b)
 {
 	return Vec3(minimum(a.x, b.x), minimum(a.y, b.y), minimum(a.z, b.z));
@@ -894,6 +899,62 @@ LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
 	if (squaredLength(v2 - center) < squared_radius) return true;
 
 	return false;
+}
+
+static void getProjections(const Vec3& axis,
+	const Vec3 vertices[8],
+	float& min,
+	float& max)
+{
+	max = dot(vertices[0], axis);
+	min = max;
+	for(int i = 1; i < 8; ++i)
+	{
+		float d = dot(vertices[i], axis);
+		min = minimum(d, min);
+		max = maximum(d, max);
+	}
+}
+
+static bool overlaps(float min1, float max1, float min2, float max2)
+{
+	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
+}
+
+bool testOBBCollision(const AABB& a, const Matrix& mtx_b, const AABB& b)
+{
+	Vec3 box_a_points[8];
+	Vec3 box_b_points[8];
+
+	a.getCorners(Matrix::IDENTITY, box_a_points);
+	b.getCorners(mtx_b, box_b_points);
+
+	const Vec3 normals[] = {Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(0, 0, 1)};
+	for(int i = 0; i < 3; i++)
+	{
+		float box_a_min, box_a_max, box_b_min, box_b_max;
+		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
+		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
+		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+		{
+			return false;
+		}
+	}
+
+	Vec3 normals_b[] = {
+		normalize(mtx_b.getXVector()), normalize(mtx_b.getYVector()), normalize(mtx_b.getZVector())};
+	for(int i = 0; i < 3; i++)
+	{
+		float box_a_min, box_a_max, box_b_min, box_b_max;
+		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
+		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
+		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 } // namespace Lumix

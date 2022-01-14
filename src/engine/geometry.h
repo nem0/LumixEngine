@@ -156,6 +156,7 @@ struct LUMIX_ENGINE_API AABB {
 	void getCorners(const Matrix& matrix, Vec3* points) const;
 	static Vec3 minCoords(const Vec3& a, const Vec3& b);
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b);
+	void shrink(float x);
 	AABB operator*(float scale) { return {min * scale, max * scale}; }
 
 	Vec3 min;
@@ -192,5 +193,6 @@ LUMIX_ENGINE_API bool getRayAABBIntersection(const Vec3& origin, const Vec3& dir
 LUMIX_ENGINE_API float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b);
 LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b, const Vec3& c, float* out_t);
 LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center, float radius, const Vec3& v0, const Vec3& v1, const Vec3& v2);
+LUMIX_ENGINE_API bool testOBBCollision(const AABB& a, const Matrix& mtx_b, const AABB& b);
 
 } // namespace Lumix
