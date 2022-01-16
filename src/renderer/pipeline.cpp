@@ -3258,19 +3258,21 @@ struct PipelineImpl final : Pipeline
 		}
 		memset(view.layer_to_bucket, 0xff, sizeof(view.layer_to_bucket));
 
-		CullInstancedMeshesJob& job = m_renderer.createJob<CullInstancedMeshesJob>(m_allocator);
-		jobs::incSignal(&view.instanced_meshes->culled);
-		job.m_pipeline = this;
-		job.m_camera_params = cp;
-		job.m_instanced_meshes = view.instanced_meshes;
-		job.m_gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
-		job.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
-		job.m_finalize_shader = m_instancing_shader->getProgram(0);
-		u32 cull_shader_define_mask = 1 << m_renderer.getShaderDefineIdx("PASS1");
-		if (!cp.is_shadow) cull_shader_define_mask |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
-		job.m_cull_shader = m_instancing_shader->getProgram(cull_shader_define_mask);
-		job.m_init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
-		m_renderer.queue(job, m_profiler_link);
+		if (m_instancing_shader->isReady()) {
+			CullInstancedMeshesJob& job = m_renderer.createJob<CullInstancedMeshesJob>(m_allocator);
+			jobs::incSignal(&view.instanced_meshes->culled);
+			job.m_pipeline = this;
+			job.m_camera_params = cp;
+			job.m_instanced_meshes = view.instanced_meshes;
+			job.m_gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
+			job.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
+			job.m_finalize_shader = m_instancing_shader->getProgram(0);
+			u32 cull_shader_define_mask = 1 << m_renderer.getShaderDefineIdx("PASS1");
+			if (!cp.is_shadow) cull_shader_define_mask |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
+			job.m_cull_shader = m_instancing_shader->getProgram(cull_shader_define_mask);
+			job.m_init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
+			m_renderer.queue(job, m_profiler_link);
+		}
 
 		return m_views.size() - 1;
 	}

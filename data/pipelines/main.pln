@@ -539,6 +539,7 @@ function onGUI()
 		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
+		terrain_state.wireframe = default_state.wireframe
 		ImGui.EndPopup()
 	end
 end
