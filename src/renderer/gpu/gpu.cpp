@@ -1365,6 +1365,14 @@ void preinit(IAllocator& allocator, bool load_renderdoc)
 }
 
 
+void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle) {
+	GLbitfield gl = 0;
+	if (u32(type & gpu::MemoryBarrierType::SSBO)) gl |= GL_SHADER_STORAGE_BARRIER_BIT;
+	if (u32(type & gpu::MemoryBarrierType::COMMAND)) gl |= GL_COMMAND_BARRIER_BIT;
+	glMemoryBarrier(gl);
+}
+
+
 bool getMemoryStats(MemoryStats& stats) {
 	if (!gl->has_gpu_mem_info_ext) return false;
 
@@ -1484,6 +1492,15 @@ void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
 		if (u32(dst->flags & TextureFlags::NO_MIPS)) break;
 	}
 }
+
+void readBuffer(BufferHandle handle, Span<u8> buf) {
+	void* mem = glMapNamedBufferRange(handle->gl_handle, 0, buf.length(), GL_MAP_READ_BIT);
+	if (!mem) return;
+
+	memcpy(buf.m_begin, mem, buf.length());
+	glUnmapNamedBuffer(handle->gl_handle);
+}
+
 
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 {

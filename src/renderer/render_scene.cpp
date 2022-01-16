@@ -1108,7 +1108,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 			else {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
-				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER);
+				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE);
 				im.gpu_capacity = im.instances.capacity();
 			}
 		}
@@ -2264,13 +2264,21 @@ struct RenderSceneImpl final : RenderScene {
 			if (!im.model || !im.model->isReady()) continue;
 			
 			const float model_radius = im.model->getOriginBoundingRadius();
+			auto getInstanceQuat = [](Vec3 q) {
+				Quat res;
+				res.x = q.x;
+				res.y = q.y;
+				res.z = q.z;
+				res.w = sqrtf(1 - q.x * q.x + q.y * q.y + q.z * q.z);
+				return res;
+			};
 			for (const InstancedModel::InstanceData& id : im.instances) {
 				Vec3 rel_pos = Vec3(origin - tr.pos) - id.pos;
 				const float radius = model_radius * id.scale;
 				float intersection_t;
 				if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
-					const Vec3 rel_dir = id.rot.conjugated().rotate(dir);
-					rel_pos = id.rot.rotate(rel_pos / id.scale);
+					const Vec3 rel_dir = getInstanceQuat(id.rot_quat).conjugated().rotate(dir);
+					rel_pos = getInstanceQuat(id.rot_quat).rotate(rel_pos / id.scale);
 					RayCastModelHit new_hit = im.model->castRay(rel_pos, rel_dir, nullptr, e, &filter);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * id.scale < hit.t)) {
 						new_hit.entity = e;
@@ -2803,15 +2811,6 @@ struct RenderSceneImpl final : RenderScene {
 	void createInstancedModel(EntityRef entity) {
 		InstancedModel im(m_allocator);
 		m_instanced_models.insert(entity, static_cast<InstancedModel&&>(im));
-		InstancedModel::InstanceData& tr = m_instanced_models[entity].instances.emplace(); // TODO remove
-		tr.pos = Vec3::ZERO;
-		tr.rot = Quat::IDENTITY;
-		tr.scale = 1;
-
-		InstancedModel::InstanceData& tr2 = m_instanced_models[entity].instances.emplace(); // TODO remove
-		tr2.pos = Vec3(3, 0, 0);
-		tr2.rot = Quat::IDENTITY;
-		tr2.scale = 1;
 
 		initInstancedModelGPUData(entity);
 		m_universe.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);

@@ -171,7 +171,8 @@ struct InstancedModel {
 	{}
 
 	struct InstanceData {
-		Quat rot;
+		Vec3 rot_quat;
+		float lod;
 		Vec3 pos;
 		float scale;
 	};

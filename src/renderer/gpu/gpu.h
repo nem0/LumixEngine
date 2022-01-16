@@ -42,6 +42,10 @@ enum class StateFlags : u64 {
 	/* 40 bits reserver for stencil*/ 
 };
 
+enum class MemoryBarrierType : u32 {
+	SSBO = 1 << 0,
+	COMMAND = 1 << 1
+};
 
 enum class PrimitiveType : u32 {
 	TRIANGLES,
@@ -219,6 +223,7 @@ bool init(void* window_handle, InitFlags flags);
 void launchRenderDoc();
 void setCurrentWindow(void* window_handle);
 bool getMemoryStats(MemoryStats& stats);
+void memoryBarrier(MemoryBarrierType type, BufferHandle buffer);
 u32 swapBuffers();
 void waitFrame(u32 frame);
 bool frameFinished(u32 frame);
@@ -323,6 +328,10 @@ inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 			return 0;
 	}
 }
+
+constexpr MemoryBarrierType operator ~(MemoryBarrierType a) { return MemoryBarrierType(~(u64)a); }
+constexpr MemoryBarrierType operator | (MemoryBarrierType a, MemoryBarrierType b) { return MemoryBarrierType((u64)a | (u64)b); }
+constexpr MemoryBarrierType operator & (MemoryBarrierType a, MemoryBarrierType b) { return MemoryBarrierType((u64)a & (u64)b); }
 
 constexpr StateFlags operator ~(StateFlags a) { return StateFlags(~(u64)a); }
 constexpr StateFlags operator | (StateFlags a, StateFlags b) { return StateFlags((u64)a | (u64)b); }

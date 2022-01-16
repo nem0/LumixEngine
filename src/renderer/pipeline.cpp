@@ -43,7 +43,8 @@ namespace Lumix
 // instancer 31 - 16; if instanced
 // instance group 15 - 0; if instanced
 
-static constexpr u32 DRAWCALL_UB_SIZE = 32*1024;
+static constexpr u32 INSTANCED_MESHES_BUFFER_SIZE = 64 * 1024 * 1024; // TODO dynamic
+static constexpr u32 DRAWCALL_UB_SIZE = 32 * 1024;
 static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
@@ -77,6 +78,16 @@ struct PipelineTexture {
 struct RenderState {
 	gpu::StateFlags value;
 };
+
+namespace {
+	struct Indirect {
+		u32 vertex_count;
+		u32 instance_count;
+		u32 first_index;
+		u32 base_vertex;
+		u32 base_instance;
+	};
+}
 
 using LuaBufferHandle = gpu::BufferHandle;
 
@@ -756,18 +767,51 @@ struct PipelineImpl final : Pipeline
 		PageAllocator& page_allocator;
 		Mutex mutex;
 	};
+	
+	struct InstancedMeshes {
+		InstancedMeshes(IAllocator& allocator) : models(allocator) {}
+
+		struct Model {
+			Model(IAllocator& allocator) : meshes(allocator) {}
+
+			struct MeshRenderData {
+				Mesh::RenderData* mesh_rd;
+				Material::RenderData* material;
+				gpu::ProgramHandle program;
+				const Mesh* mesh;
+				u8 layer;
+			};
+
+			Transform origin;
+			gpu::BufferHandle instance_data;
+			u32 instance_count;
+			u32 indirect_offset;
+			float radius;
+			Vec4 lod_distances;
+			IVec4 lod_indices;
+			Array<MeshRenderData> meshes;
+			u32 offset;
+		};
+
+		Array<Model> models;
+		InstancedMeshes* next = nullptr;
+		jobs::SignalHandle culled = jobs::INVALID_HANDLE;
+	};
 
 	struct View {
 		View(IAllocator& allocator, PageAllocator& page_allocator) 
 			: sorter(allocator, page_allocator)
 			, instancers(allocator)
-		{}
+		{
+			instanced_meshes = LUMIX_NEW(allocator, InstancedMeshes)(allocator);
+		}
 
 		View(View&& rhs)
 			: sorter(static_cast<Sorter&&>(rhs.sorter))
 			, renderables(rhs.renderables)
 			, cp(rhs.cp)
 			, instancers(rhs.instancers.move())
+			, instanced_meshes(rhs.instanced_meshes)
 		{
 			memcpy(layer_to_bucket, rhs.layer_to_bucket, sizeof(layer_to_bucket));
 		}
@@ -775,6 +819,7 @@ struct PipelineImpl final : Pipeline
 		void operator=(View&&) = delete;
 
 		Array<AutoInstancer> instancers;
+		InstancedMeshes* instanced_meshes;
 		Sorter sorter;
 		CullResult* renderables = nullptr;
 		CameraParams cp;
@@ -859,6 +904,12 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
 		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, gpu::BufferFlags::UNIFORM_BUFFER);
 		
+		const Renderer::MemRef im_mem = { INSTANCED_MESHES_BUFFER_SIZE, nullptr, false };
+		m_instanced_meshes_buffer = m_renderer.createBuffer(im_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
+
+		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
+		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
+
 		PassState pass_state;
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
 		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, gpu::BufferFlags::UNIFORM_BUFFER);
@@ -926,6 +977,8 @@ struct PipelineImpl final : Pipeline
 
 		m_renderer.destroy(m_cube_ib);
 		m_renderer.destroy(m_cube_vb);
+		m_renderer.destroy(m_instanced_meshes_buffer);
+		m_renderer.destroy(m_indirect_buffer);
 		m_renderer.destroy(m_global_state_buffer);
 		m_renderer.destroy(m_pass_state_buffer);
 		m_renderer.destroy(m_drawcall_ub);
@@ -1353,6 +1406,7 @@ struct PipelineImpl final : Pipeline
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
 		m_prev_viewport = m_viewport;
+		m_instanced_meshes_indirect_offset = 0;
 
 		if(m_scene) {
 			const EntityPtr global_light = m_scene->getActiveEnvironment();
@@ -1378,6 +1432,8 @@ struct PipelineImpl final : Pipeline
 				gpu::bindUniformBuffer(UniformBuffer::PASS, pass_state_buffer, 0, sizeof(PassState));
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 				pipeline->m_stats = {};
+				IVec4 tmp(0);
+				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
 			}
 			void setup() override {}
 
@@ -1415,6 +1471,7 @@ struct PipelineImpl final : Pipeline
 		}
 		{
 			PROFILE_BLOCK("lua pipeline main");
+			profiler::blockColor(0xff, 0x7f, 0x7f);
 			LuaWrapper::pcall(m_lua_state, 0, 0);
 		}
 		lua_pop(m_lua_state, 1);
@@ -1424,13 +1481,22 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override {
 				pipeline->m_last_frame_stats = pipeline->m_stats;
+				while (instanced_meshes) {
+					InstancedMeshes* i = instanced_meshes;
+					instanced_meshes = instanced_meshes->next;
+					LUMIX_DELETE(*allocator, i);
+				}
 			}
 
 			PipelineImpl* pipeline;
+			IAllocator* allocator;
+			InstancedMeshes* instanced_meshes; 
 		};
 
 		EndPipelineJob& end_job = m_renderer.createJob<EndPipelineJob>();
 		end_job.pipeline = this;
+		end_job.allocator = &m_allocator;
+		end_job.instanced_meshes = m_views.empty() ? nullptr : m_views[0].instanced_meshes;
 		m_renderer.queue(end_job, 0);
 		processBuckets();
 		m_renderer.waitForCommandSetup();
@@ -1839,26 +1905,22 @@ struct PipelineImpl final : Pipeline
 		return res;
 	}
 
-	void renderInstancedModels(lua_State* L, CameraParams cp, RenderState state, const char* layer) {
+	void renderInstancedModels(lua_State* L, u32 view_id, RenderState state, const char* layer) {
 		PROFILE_FUNCTION();
 	
 		if (!m_instancing_shader->isReady()) return;
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderInstancedModelsCommand& cmd = m_renderer.createJob<RenderInstancedModelsCommand>(allocator);
+		RenderInstancedModelsCommand& cmd = m_renderer.createJob<RenderInstancedModelsCommand>();
 
 		const char* define = "";
-		LuaWrapper::getOptionalField<const char*>(L, 3, "define", &define);
+		LuaWrapper::getOptionalField<const char*>(L, 4, "define", &define);
 
 		cmd.m_layer = m_renderer.getLayerIdx(layer);
 		cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		cmd.m_render_state = state.value;
 		cmd.m_pipeline = this;
-		cmd.m_camera_params = cp;
-		cmd.m_gather_shader = m_instancing_shader->getProgram(0);
-		cmd.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
-		cmd.m_cull_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS1"));
-		cmd.m_init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
+		cmd.m_instanced_meshes = m_views[view_id].instanced_meshes;
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -3060,11 +3122,156 @@ struct PipelineImpl final : Pipeline
 		return float(light.radius / length(cam_pos - light_pos));
 	}
 
+	struct CullInstancedMeshesJob : Renderer::RenderJob {
+		CullInstancedMeshesJob(IAllocator& allocator)
+			: m_allocator(allocator)
+		{
+		}
+		
+		void execute() override {
+			PROFILE_FUNCTION();
+			gpu::pushDebugGroup("cull instanced models");
+			m_pipeline->m_renderer.beginProfileBlock("cull instanced models", 0);
+			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
+			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+				struct {
+					Vec4 camera_offset;
+					Vec4 lod_distances;
+					IVec4 lod_indices;
+					u32 batch_size;
+					u32 indirect_offset;
+					float radius;
+					u32 padding;
+					Vec4 camera_planes[6];
+					IVec4 indices_count[32];
+				} ub_values;
+				ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
+				ub_values.batch_size = g.instance_count;
+				ub_values.lod_distances = g.lod_distances;
+				ub_values.lod_indices = g.lod_indices;
+				ub_values.indirect_offset = g.indirect_offset;
+				ub_values.radius = g.radius;
+				toPlanes(m_camera_params, Span(ub_values.camera_planes));
+
+				ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
+				for (const auto& m : g.meshes) {
+					ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
+				}
+
+				gpu::update(drawcall_ub, &ub_values, sizeof(ub_values));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(ub_values));
+
+				gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+				gpu::bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
+				gpu::useProgram(m_init_shader);
+				gpu::dispatch(1, 1, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+
+				if (!m_camera_params.is_shadow) {
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+				}
+				gpu::useProgram(m_cull_shader);
+				gpu::dispatch((g.instance_count + 255) / 256, 1, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, g.instance_data);
+
+				if (!m_camera_params.is_shadow) {
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+				}
+				gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
+				gpu::useProgram(m_indirect_shader);
+				gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
+
+				gpu::useProgram(m_gather_shader);
+				gpu::dispatch((g.instance_count + 255) / 256, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+
+				gpu::useProgram(m_finalize_shader);
+				gpu::dispatch(1, 1, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+
+			}
+			
+			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
+			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);
+			
+			m_pipeline->m_renderer.endProfileBlock();
+			gpu::popDebugGroup();
+		}
+
+		void setup() override {
+			const Universe& universe = m_pipeline->m_scene->getUniverse();
+			const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
+			Renderer& renderer = m_pipeline->m_renderer;
+			const u32 instanced_define_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+			m_instanced_meshes->models.reserve(ims.size());
+			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+				Model* m = iter.value().model;
+				if (!m || !m->isReady()) continue;
+
+				InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
+				g.origin = universe.getTransform(iter.key());
+				g.lod_distances = *(Vec4*)m->getLODDistances();
+				g.lod_indices.x = m->getLODIndices()[0].to;
+				g.lod_indices.y = m->getLODIndices()[1].to;
+				g.lod_indices.z = m->getLODIndices()[2].to;
+				g.lod_indices.w = m->getLODIndices()[3].to;
+				g.radius = m->getOriginBoundingRadius();
+				g.instance_count = iter.value().instances.size();
+				g.instance_data = iter.value().gpu_data;
+				g.indirect_offset = atomicAdd(&m_pipeline->m_instanced_meshes_indirect_offset, m->getMeshCount());
+				g.meshes.reserve(m->getMeshCount());
+				for (i32 i = 0; i < m->getMeshCount(); ++i) {
+					const Mesh& mesh = m->getMesh(i);
+					InstancedMeshes::Model::MeshRenderData& m = g.meshes.emplace();
+					m.mesh_rd = mesh.render_data;
+					m.mesh = &mesh;
+					m.material = mesh.material->getRenderData();
+					m.layer = mesh.layer;
+				}
+			}
+			jobs::decSignal(m_instanced_meshes->culled);
+		}
+
+		IAllocator& m_allocator;
+		PipelineImpl* m_pipeline;
+		CameraParams m_camera_params;
+		u32 m_define_mask = 0;
+		InstancedMeshes* m_instanced_meshes;
+		gpu::ProgramHandle m_gather_shader;
+		gpu::ProgramHandle m_indirect_shader;
+		gpu::ProgramHandle m_cull_shader;
+		gpu::ProgramHandle m_init_shader;
+		gpu::ProgramHandle m_finalize_shader;
+	};
+
 	u32 cull(CameraParams cp) {
 		View& view = m_views.emplace(m_allocator, m_renderer.getEngine().getPageAllocator());
 		view.cp = cp;
 		view.renderables = m_scene->getRenderables(cp.frustum);
+		if (m_views.size() > 1) {
+			m_views[m_views.size() - 2].instanced_meshes->next = view.instanced_meshes;
+		}
 		memset(view.layer_to_bucket, 0xff, sizeof(view.layer_to_bucket));
+
+		CullInstancedMeshesJob& job = m_renderer.createJob<CullInstancedMeshesJob>(m_allocator);
+		jobs::incSignal(&view.instanced_meshes->culled);
+		job.m_pipeline = this;
+		job.m_camera_params = cp;
+		job.m_instanced_meshes = view.instanced_meshes;
+		job.m_gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
+		job.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
+		job.m_finalize_shader = m_instancing_shader->getProgram(0);
+		u32 cull_shader_define_mask = 1 << m_renderer.getShaderDefineIdx("PASS1");
+		if (!cp.is_shadow) cull_shader_define_mask |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
+		job.m_cull_shader = m_instancing_shader->getProgram(cull_shader_define_mask);
+		job.m_init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
+		m_renderer.queue(job, m_profiler_link);
+
 		return m_views.size() - 1;
 	}
 
@@ -4038,13 +4245,6 @@ struct PipelineImpl final : Pipeline
 			gpu::pushDebugGroup("grass");
 			renderer.beginProfileBlock("grass", 0);
 			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
-			struct Indirect {
-				u32 vertex_count;
-				u32 instance_count;
-				u32 first_index;
-				u32 base_vertex;
-				u32 base_instance;
-			};
 
 			for (const Grass& grass : m_grass) {
 				struct {
@@ -4153,162 +4353,60 @@ struct PipelineImpl final : Pipeline
 	};
 
 	struct RenderInstancedModelsCommand : Renderer::RenderJob {
-		struct Group {
-			Group(IAllocator& allocator) : meshes(allocator) {}
-
-			struct MeshRec {
-				Mesh::RenderData* mesh;
-				Material::RenderData* material;
-				gpu::ProgramHandle program;
-			};
-
-			Transform origin;
-			gpu::BufferHandle instance_data;
-			u32 instance_count;
-			Vec4 lod_distances;
-			IVec4 lod_indices;
-			Array<MeshRec> meshes;
-			u32 offset;
-		};
-
-		RenderInstancedModelsCommand(IAllocator& allocator)
-			: m_allocator(allocator)
-			, m_groups(allocator)
-		{
-		}
-		
 		void execute() override {
-			PROFILE_FUNCTION();
-			// TODO
-			gpu::BufferHandle tmp = gpu::allocBufferHandle();
-			gpu::createBuffer(tmp, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER, 16 * 1024, nullptr);
+			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
 
-			gpu::pushDebugGroup("instanced_models");
+			PROFILE_FUNCTION();
+			gpu::pushDebugGroup("draw instanced models");
+			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
 			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-			const gpu::BufferHandle scratch_buffer = m_pipeline->m_renderer.getScratchBuffer();
-			for (const Group& g : m_groups) {
-				ASSERT(g.instance_count < Renderer::SCRATCH_BUFFER_SIZE / 48); // TODO split into multiple drawcalls
-				constexpr u32 MAX_BATCH_SIZE = Renderer::SCRATCH_BUFFER_SIZE / 48;
-				const u32 batch_count = (g.instance_count + MAX_BATCH_SIZE - 1) / MAX_BATCH_SIZE;
-				for (u32 batch = 0; batch < batch_count; ++batch) {
-					const u32 batch_size = minimum(MAX_BATCH_SIZE, g.instance_count - batch * MAX_BATCH_SIZE);
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
-					gpu::bindShaderBuffer(scratch_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
-					struct {
-						Vec4 camera_offset;
-						Vec4 lod_distances;
-						IVec4 lod_indices;
-						u32 total_count;
-						u32 instance_offset;
-					} ub_values;
-					ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
-					ub_values.total_count = g.instance_count;
-					ub_values.lod_distances = g.lod_distances;
-					ub_values.lod_indices = g.lod_indices;
-					ub_values.instance_offset = batch * MAX_BATCH_SIZE;
-					gpu::update(drawcall_ub, &ub_values, sizeof(ub_values));
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(ub_values));
-					gpu::useProgram(m_init_shader);
-					gpu::dispatch(1, 1, 1);
-
-					gpu::useProgram(m_cull_shader);
-					gpu::dispatch((batch_size + 255) / 256, 1, 1);
-
-					struct Indirect {
-						u32 vertex_count;
-						u32 instance_count;
-						u32 first_index;
-						u32 base_vertex;
-						u32 base_instance;
-					} indirects[32];
-
-					ASSERT((u32)g.meshes.size() < lengthOf(indirects)); // TODO
-
-					for (const auto& m : g.meshes) {
-						Indirect& i = indirects[&m - g.meshes.begin()];
-						i.base_instance = 0;
-						i.base_vertex = 0;
-						i.first_index = 0;
-						i.instance_count = 0;
-						i.vertex_count = m.mesh->indices_count;
-					}
-
-					gpu::update(tmp, indirects, sizeof(indirects[0]) * g.meshes.size());
-					gpu::bindShaderBuffer(tmp, 2, gpu::BindShaderBufferFlags::OUTPUT);
-					gpu::useProgram(m_indirect_shader);
-					gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
-
-					gpu::useProgram(m_gather_shader);
-					gpu::dispatch((batch_size + 255) / 256, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
-
-					gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-					gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
-					gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);
-					
-					for (const auto& m : g.meshes) {
+			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+				for (const auto& m : g.meshes) {
+					if (m.layer == m_layer) {
 						gpu::bindTextures(m.material->textures, 0, m.material->textures_count);
 						gpu::setState(m.material->render_states | m_render_state);
 						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 
 						gpu::useProgram(m.program);
 
-						gpu::bindIndexBuffer(m.mesh->index_buffer_handle);
-						gpu::bindVertexBuffer(0, m.mesh->vertex_buffer_handle, 0, m.mesh->vb_stride);
-						gpu::bindVertexBuffer(1, scratch_buffer, 32, 48);
+						gpu::bindIndexBuffer(m.mesh_rd->index_buffer_handle);
+						gpu::bindVertexBuffer(0, m.mesh_rd->vertex_buffer_handle, 0, m.mesh_rd->vb_stride);
+						gpu::bindVertexBuffer(1, m_pipeline->m_instanced_meshes_buffer, 48, 48);
 
-						gpu::bindIndirectBuffer(tmp);
+						gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
 
-						gpu::drawIndirect(m.mesh->index_type, u32(sizeof(Indirect) * (&m - g.meshes.begin())));
+						gpu::drawIndirect(m.mesh_rd->index_type, u32(sizeof(Indirect) * (g.indirect_offset + (&m - g.meshes.begin()))));
 					}
 				}
 			}
-			gpu::popDebugGroup();
+			
+			gpu::bindIndirectBuffer(gpu::INVALID_BUFFER);
+			gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-			gpu::destroy(tmp);
+			m_pipeline->m_renderer.endProfileBlock();
+			gpu::popDebugGroup();
 		}
 
 		void setup() override {
-			const Universe& universe = m_pipeline->m_scene->getUniverse();
-			const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
-			Renderer& renderer = m_pipeline->m_renderer;
-			const u32 instanced_define_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-			m_groups.reserve(ims.size());
-			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-				Model* m = iter.value().model;
-				if (!m || !m->isReady()) continue;
-
-				Group& g = m_groups.emplace(m_allocator);
-				g.origin = universe.getTransform(iter.key());
-				g.lod_distances = *(Vec4*)m->getLODDistances();
-				g.lod_indices = IVec4(0);
-				g.instance_count = iter.value().instances.size();
-				g.instance_data = iter.value().gpu_data;
-				g.meshes.reserve(m->getMeshCount());
-				for (i32 i = 0; i < m->getMeshCount(); ++i) {
-					const Mesh& mesh = m->getMesh(i);
-					if (mesh.layer == m_layer) {
-						++(&g.lod_indices.x)[(u32)mesh.lod];
-						Group::MeshRec& m = g.meshes.emplace();
-						m.mesh = mesh.render_data;
-						m.material = mesh.material->getRenderData();
-						m.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+			jobs::wait(m_instanced_meshes->culled);
+			const u32 instanced_define_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
+			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+				for (auto& m : g.meshes) {
+					if (m.layer == m_layer) {
+						m.program = m.mesh->material->getShader()->getProgram(m.mesh->vertex_decl, instanced_define_mask | m.mesh->material->getDefineMask());
 					}
 				}
 			}
 		}
 
-		IAllocator& m_allocator;
-		Array<Group> m_groups;
+		InstancedMeshes* m_instanced_meshes;
 		PipelineImpl* m_pipeline;
-		CameraParams m_camera_params;
 		gpu::StateFlags m_render_state;
+		u32 m_define_mask;
 		u8 m_layer;
-		u32 m_define_mask = 0;
-		gpu::ProgramHandle m_gather_shader;
-		gpu::ProgramHandle m_indirect_shader;
-		gpu::ProgramHandle m_cull_shader;
-		gpu::ProgramHandle m_init_shader;
 	};
 
 	struct RenderTerrainsCommand : Renderer::RenderJob
@@ -5122,6 +5220,9 @@ struct PipelineImpl final : Pipeline
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
+	volatile i32 m_instanced_meshes_indirect_offset;
+	gpu::BufferHandle m_instanced_meshes_buffer;
+	gpu::BufferHandle m_indirect_buffer;
 	gpu::BufferHandle m_global_state_buffer;
 	gpu::BufferHandle m_pass_state_buffer;
 	gpu::VertexDecl m_base_vertex_decl;

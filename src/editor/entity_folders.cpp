@@ -107,6 +107,7 @@ void EntityFolders::destroyFolder(FolderID folder) {
 		p.next_folder = f.next_folder;
 	}
 	m_folders.free(folder);
+	if (m_selected_folder == folder) m_selected_folder = 0;
 }
 
 EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID parent) {

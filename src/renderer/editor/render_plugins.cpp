@@ -3660,6 +3660,14 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		return { &iter.value(), selected_entities[0], scene };
 	}
 
+	static Quat getInstanceQuat(Vec3 q) {
+		Quat res;
+		res.x = q.x;
+		res.y = q.y;
+		res.z = q.z;
+		res.w = sqrtf(1 - q.x * q.x + q.y * q.y + q.z * q.z);
+		return res;
+	}
 
 	static bool isOBBCollision(Span<const InstancedModel::InstanceData> meshes, const InstancedModel::InstanceData& obj, Model* model, float bounding_offset)
 	{
@@ -3668,12 +3676,12 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		aabb.shrink(-bounding_offset);
 		float radius_a_squared = model->getOriginBoundingRadius() * obj.scale;
 		radius_a_squared = radius_a_squared * radius_a_squared;
-		const LocalTransform tr_a(obj.pos, obj.rot, obj.scale);
+		const LocalTransform tr_a(obj.pos, getInstanceQuat(obj.rot_quat), obj.scale);
 		for (const InstancedModel::InstanceData& inst : meshes) {
 			const float radius_b = model->getOriginBoundingRadius() * inst.scale + bounding_offset;
 			const float radius_squared = radius_a_squared + radius_b * radius_b;
 			if (squaredLength(inst.pos - obj.pos) < radius_squared) {
-				const LocalTransform tr_b(inst.pos, inst.rot, inst.scale);
+				const LocalTransform tr_b(inst.pos, getInstanceQuat(inst.rot_quat), inst.scale);
 				const LocalTransform rel_tr = tr_a.inverted() * tr_b;
 				Matrix mtx = rel_tr.rot.toMatrix();
 				mtx.multiply3x3(rel_tr.scale);
@@ -3706,7 +3714,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			case Brush::SINGLE: {
 				InstancedModel::InstanceData& id = cmp.im->instances.emplace();
 				id.scale = 1;
-				id.rot = Quat::IDENTITY;
+				id.rot_quat = Vec3::ZERO;
+				id.lod = 3;
 				id.pos = Vec3(hit_pos - origin);
 				cmp.scene->initInstancedModelGPUData(cmp.entity);
 				m_selected = cmp.im->instances.size() - 1;
@@ -3718,7 +3727,6 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 				const Transform inv_terrain_tr = terrain_tr.inverted();
 
 				const bool remove = ImGui::GetIO().KeyCtrl; // TODO
-
 
 				Array<InstancedModel::InstanceData> existing(m_app.getAllocator());
 				Vec2 center_xz = Vec3(hit_pos - origin).xz();
@@ -3752,25 +3760,30 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 						
 						InstancedModel::InstanceData id;
 						id.scale = randFloat(m_size_spread.x, m_size_spread.y);
-						id.rot = Quat::IDENTITY;
+						id.rot_quat = Vec3::ZERO;
+						id.lod = 3;
 
+						Quat rot = Quat::IDENTITY;
 						if (m_is_rotate_x) {
 							float angle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
 							Quat q(Vec3(1, 0, 0), angle);
-							id.rot = q * id.rot;
+							rot = q * rot;
 						}
 
 						if (m_is_rotate_y) {
 							float angle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
 							Quat q(Vec3(0, 1, 0), angle);
-							id.rot = q * id.rot;
+							rot = q * rot;
 						}
 
 						if (m_is_rotate_z) {
 							float angle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
-							Quat q(id.rot.rotate(Vec3(0, 0, 1)), angle);
-							id.rot = q * id.rot;
+							Quat q(rot.rotate(Vec3(0, 0, 1)), angle);
+							rot = q * rot;
 						}
+
+						id.rot_quat = Vec3(rot.x, rot.y, rot.z);
+						if (rot.w < 0) id.rot_quat = -id.rot_quat;
 
 						id.pos = Vec3(pos - origin);
 						if (!isOBBCollision(existing, id, cmp.im->model, m_bounding_offset)) {
@@ -3794,7 +3807,9 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	}
 
 	void onMouseMove(UniverseView& view, int x, int y, int, int) override {
-		if (ImGui::GetIO().KeyShift && m_brush == Brush::TERRAIN) paint(x, y);
+		if (ImGui::GetIO().KeyShift && m_brush == Brush::TERRAIN) {
+			paint(x, y);
+		}
 	}
 
 	bool onMouseDown(UniverseView& view, int x, int y) override {
@@ -3855,7 +3870,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (m_selected >= 0 && m_selected < im.instances.size()) {
 			DVec3 origin = cmp.scene->getUniverse().getPosition(*cmp.entity);
 			Transform tr;
-			tr.rot = im.instances[m_selected].rot;
+			tr.rot = getInstanceQuat(im.instances[m_selected].rot_quat);
 			tr.scale = im.instances[m_selected].scale;
 			tr.pos = origin + DVec3(im.instances[m_selected].pos);
 			const Gizmo::Config& cfg = m_app.getGizmoConfig();
@@ -3873,7 +3888,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 			if (changed) {
 				im.instances[m_selected].pos = Vec3(tr.pos - origin);
-				im.instances[m_selected].rot = tr.rot;
+				im.instances[m_selected].rot_quat = Vec3(tr.rot.x, tr.rot.y, tr.rot.z);
+				if (tr.rot.w < 0) im.instances[m_selected].rot_quat *= -1;
 				im.instances[m_selected].scale = tr.scale;
 
 				render_scene->initInstancedModelGPUData(*cmp.entity);

@@ -519,6 +519,14 @@ void Vec3::operator-=(const Vec3& rhs) {
 	this->z = z;
 }
 
+void IVec4::operator += (const IVec4& rhs) {
+	x += rhs.x;
+	y += rhs.y;
+	z += rhs.z;
+	w += rhs.w;
+}
+
+
 const Quat Quat::IDENTITY = { 0, 0, 0, 1 };
 
 

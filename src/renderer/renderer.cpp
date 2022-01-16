@@ -1172,15 +1172,19 @@ struct RendererImpl final : Renderer
 		}
 		frame.material_updates.clear();
 
+		m_profiler.beginQuery("frame", 0);
 		gpu::useProgram(gpu::INVALID_PROGRAM);
 		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-		for (RenderJob* job : frame.jobs) {
-			PROFILE_BLOCK("execute_render_job");
+		{
+			PROFILE_BLOCK("render jobs");
 			profiler::blockColor(0xaa, 0xff, 0xaa);
-			profiler::link(job->profiler_link);
-			job->execute();
-			destroyJob(*job);
+			for (RenderJob* job : frame.jobs) {
+				profiler::link(job->profiler_link);
+				job->execute();
+				destroyJob(*job);
+			}
 		}
+		m_profiler.endQuery();
 		frame.jobs.clear();
 
 		PROFILE_BLOCK("swap buffers");
