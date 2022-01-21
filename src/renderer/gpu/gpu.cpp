@@ -1533,15 +1533,6 @@ void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
 	}
 }
 
-void readBuffer(BufferHandle handle, Span<u8> buf) {
-	GPU_PROFILE();
-	void* mem = glMapNamedBufferRange(handle->gl_handle, 0, buf.length(), GL_MAP_READ_BIT);
-	if (!mem) return;
-
-	memcpy(buf.m_begin, mem, buf.length());
-	glUnmapNamedBuffer(handle->gl_handle);
-}
-
 
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 {
