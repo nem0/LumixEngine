@@ -711,7 +711,13 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 		const float current = m_gpu_mem_stats.current / (1024.f * 1024.f);
 		const float total = m_gpu_mem_stats.total / (1024.f * 1024.f);
 		const float dedicated = m_gpu_mem_stats.dedicated / (1024.f * 1024.f);
+		const float buffer_mem = m_gpu_mem_stats.buffer_mem / (1024.f * 1024.f);
+		const float texture_mem = m_gpu_mem_stats.texture_mem / (1024.f * 1024.f);
+		const float render_target_mem = m_gpu_mem_stats.render_target_mem / (1024.f * 1024.f);
 		ImGui::Text("GPU: %.02fMB/%.02f (%.02fMB dedicated)", current, total, dedicated);
+		ImGui::Text("GPU Buffers: %.02fMB", buffer_mem);
+		ImGui::Text("GPU Textures: %.02fMB", texture_mem);
+		ImGui::Text("GPU Render targets: %.02fMB", render_target_mem);
 	}
 
 	ImGui::Columns(2, "memc");

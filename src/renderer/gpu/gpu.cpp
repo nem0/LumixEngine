@@ -48,6 +48,7 @@ struct Buffer {
 
 	GLuint gl_handle;
 	BufferFlags flags;
+	u64 size;
 };
 
 struct Texture {
@@ -61,6 +62,7 @@ struct Texture {
 	u32 width;
 	u32 height;
 	u32 depth;
+	u32 bytes_size;
 	TextureFlags flags;
 	#ifdef LUMIX_DEBUG
 		StaticString<64> name;
@@ -102,6 +104,9 @@ struct GL {
 	GLuint helper_indirect_buffer = 0;
 	ProgramHandle default_program = INVALID_PROGRAM;
 	bool has_gpu_mem_info_ext = false;
+	u64 buffer_allocated_mem = 0;
+	u64 texture_allocated_mem = 0;
+	u64 render_target_allocated_mem = 0;
 	float max_anisotropy = 0;
 };
 
@@ -1026,6 +1031,8 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 
 	buffer->gl_handle = buf;
 	buffer->flags = flags;
+	buffer->size = size;
+	gl->buffer_allocated_mem += size;
 }
 
 void destroy(ProgramHandle program)
@@ -1200,6 +1207,18 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	#ifdef LUMIX_DEBUG
 		handle->name = debug_name;
 	#endif
+	handle->bytes_size = 0;
+	for (u32 mip = 0; mip < mip_count; ++mip) {
+		const u32 mip_w = maximum(1, w >> mip);
+		const u32 mip_h = maximum(1, h >> mip);
+		handle->bytes_size += getSize(format, mip_w, mip_h) * depth;
+	}
+	if (u32(flags & TextureFlags::RENDER_TARGET)) {
+		gl->render_target_allocated_mem += handle->bytes_size;
+	}
+	else {
+		gl->texture_allocated_mem += handle->bytes_size;
+	}
 	return true;
 }
 
@@ -1213,11 +1232,18 @@ void generateMipmaps(TextureHandle texture)
 void destroy(TextureHandle texture)
 {
 	checkThread();
+	if (u32(texture->flags & TextureFlags::RENDER_TARGET)) {
+		gl->render_target_allocated_mem -= texture->bytes_size;
+	}
+	else {
+		gl->texture_allocated_mem -= texture->bytes_size;
+	}
 	LUMIX_DELETE(gl->allocator, texture);
 }
 
 void destroy(BufferHandle buffer) {
 	checkThread();
+	gl->buffer_allocated_mem -= buffer->size;
 	LUMIX_DELETE(gl->allocator, buffer);
 }
 
@@ -1425,6 +1451,10 @@ bool getMemoryStats(MemoryStats& stats) {
 	glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &tmp);
 	stats.dedicated_vidmem = (u64)tmp * 1024;
 	
+	stats.buffer_mem = gl->buffer_allocated_mem;
+	stats.texture_mem = gl->texture_allocated_mem;
+	stats.render_target_mem = gl->render_target_allocated_mem;
+
 	return true;
 }
 

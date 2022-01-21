@@ -1158,7 +1158,7 @@ struct RendererImpl final : Renderer
 		
 		gpu::MemoryStats mem_stats;
 		if (gpu::getMemoryStats(mem_stats)) {
-			profiler::gpuMemStats(mem_stats.total_available_mem, mem_stats.current_available_mem, mem_stats.dedicated_vidmem);
+			profiler::gpuMemStats(mem_stats.total_available_mem, mem_stats.current_available_mem, mem_stats.dedicated_vidmem, mem_stats.buffer_mem, mem_stats.texture_mem, mem_stats.render_target_mem);
 		}
 
 		for (const auto& i : frame.to_compile_shaders) {

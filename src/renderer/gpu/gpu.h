@@ -215,6 +215,9 @@ struct MemoryStats {
 	u64 total_available_mem;
 	u64 current_available_mem;
 	u64 dedicated_vidmem;
+	u64 render_target_mem;
+	u64 buffer_mem;
+	u64 texture_mem;
 };
 
 
