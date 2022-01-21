@@ -1955,6 +1955,13 @@ struct PipelineImpl final : Pipeline
 			const char* define = "";
 			LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
 			cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+
+			if (LuaWrapper::getField(L, 2, "defines") != LUA_TNIL) {
+				LuaWrapper::forEachArrayItem<const char*>(L, -1, "array of strings expeceted", [&](const char* define){
+					cmd.m_define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
+				});
+			}
+			lua_pop(L, 1);
 		}
 		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
@@ -3163,15 +3170,12 @@ struct PipelineImpl final : Pipeline
 				gpu::update(drawcall_ub, &ub_values, sizeof(ub_values));
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(ub_values));
 
-				gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
 				gpu::bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::useProgram(m_init_shader);
 				gpu::dispatch(1, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 
-				if (!m_camera_params.is_shadow) {
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-				}
+				gpu::bindShaderBuffer(g.instance_data, 0, m_camera_params.is_shadow ? gpu::BindShaderBufferFlags::NONE : gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::useProgram(m_cull_shader);
 				gpu::dispatch((g.instance_count + 255) / 256, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);

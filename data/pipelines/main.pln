@@ -92,6 +92,19 @@ local grass_state = {
 	wireframe = false
 }
 
+local shadow_grass_state = {
+	defines = { "GRASS", "DEPTH" },
+	depth_write = true,
+	stencil_func = STENCIL_ALWAYS,
+	stencil_write_mask = 0xff,
+	stencil_ref = 1,
+	stencil_mask = 0xff, 
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
+	stencil_zpass = STENCIL_REPLACE,
+	wireframe = false
+}
+
 function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
@@ -278,7 +291,7 @@ function shadowPass()
 				renderInstancedModels(entities, default_state, "impostor", { define = "DEPTH" })
 
 				if slice < 2 then
-					renderGrass(view_params, grass_state)
+					renderGrass(view_params, shadow_grass_state)
 				end
 				renderTerrains(view_params, {define = "DEPTH"})
 				endBlock()
