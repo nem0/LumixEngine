@@ -3698,12 +3698,13 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		m_app.removePlugin(*this);
 	}
 
-	struct {
+	struct Component {
 		InstancedModel* im;
 		EntityRef entity;
 		RenderScene* scene;
-	}
-	getComponent() {
+	};
+
+	Component getComponent() {
 		WorldEditor& editor = m_app.getWorldEditor();
 		const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
 		if (selected_entities.size() != 1) return { nullptr };
