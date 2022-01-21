@@ -30,7 +30,7 @@ namespace gpu {
 #define GPU_GL_IMPORT(prototype, name) static prototype name;
 #define GPU_GL_IMPORT_TYPEDEFS
 
-#if 1
+#if 0
 	#define GPU_PROFILE() PROFILE_FUNCTION()
 #else
 	#define GPU_PROFILE() 
