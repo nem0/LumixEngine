@@ -3217,9 +3217,9 @@ struct PipelineImpl final : Pipeline
 				g.origin = universe.getTransform(iter.key());
 				g.lod_distances = *(Vec4*)m->getLODDistances();
 				g.lod_indices.x = m->getLODIndices()[0].to;
-				g.lod_indices.y = m->getLODIndices()[1].to;
-				g.lod_indices.z = m->getLODIndices()[2].to;
-				g.lod_indices.w = m->getLODIndices()[3].to;
+				g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
+				g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
+				g.lod_indices.w = maximum(g.lod_indices.z, m->getLODIndices()[3].to);
 				g.radius = m->getOriginBoundingRadius();
 				g.instance_count = iter.value().instances.size();
 				g.instance_data = iter.value().gpu_data;

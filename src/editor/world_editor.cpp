@@ -600,6 +600,7 @@ struct EndGroupCommand final : IEditorCommand
 	const char* getType() override { return "end_group"; }
 
 	u32 group_type;
+	bool locked = false;
 };
 
 
@@ -2189,7 +2190,8 @@ public:
 			static const u32 end_group_hash = crc32("end_group");
 			if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
 			{
-				if(static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index].get())->group_type == type)
+				auto* end_group = static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index].get());
+				if(end_group->group_type == type && !end_group->locked)
 				{
 					m_undo_stack[m_undo_index].reset();
 					--m_undo_index;
@@ -2205,6 +2207,13 @@ public:
 		++m_undo_index;
 	}
 
+
+	void lockGroupCommand() override {
+		ASSERT(m_undo_index >= 0);
+		ASSERT(m_undo_index < m_undo_stack.size());
+		ASSERT(equalStrings(m_undo_stack.last()->getType(), "end_group"));
+		((EndGroupCommand*)m_undo_stack.last().get())->locked = true;
+	}
 
 	void endCommandGroup() override
 	{

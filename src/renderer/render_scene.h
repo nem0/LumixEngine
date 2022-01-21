@@ -251,6 +251,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(const DVec3& origin, const Vec3& dir) = 0;
+	virtual RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
 	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
 
 	virtual void setActiveCamera(EntityRef camera) = 0;

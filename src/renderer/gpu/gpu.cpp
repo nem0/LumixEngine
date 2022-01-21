@@ -7,6 +7,7 @@
 #include "engine/stream.h"
 #include "engine/sync.h"
 #include "engine/os.h"
+#include "engine/profiler.h"
 #include "engine/stream.h"
 #include "engine/string.h"
 #ifdef _WIN32
@@ -28,6 +29,12 @@ namespace gpu {
 
 #define GPU_GL_IMPORT(prototype, name) static prototype name;
 #define GPU_GL_IMPORT_TYPEDEFS
+
+#if 1
+	#define GPU_PROFILE() PROFILE_FUNCTION()
+#else
+	#define GPU_PROFILE() 
+#endif
 
 #include "gl_ext.h"
 
@@ -452,6 +459,7 @@ void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, Attribu
 
 void viewport(u32 x,u32 y,u32 w,u32 h)
 {
+	GPU_PROFILE();
 	checkThread();
 	glViewport(x, y, w, h);
 }
@@ -459,11 +467,13 @@ void viewport(u32 x,u32 y,u32 w,u32 h)
 
 void scissor(u32 x,u32 y,u32 w,u32 h)
 {
+	GPU_PROFILE();
 	checkThread();
 	glScissor(x, y, w, h);
 }
 
 static void setVAO(const VertexDecl& decl) {
+	GPU_PROFILE();
 	checkThread();
 
 	u32 mask = 0;
@@ -502,11 +512,13 @@ static void setVAO(const VertexDecl& decl) {
 
 void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z)
 {
+	GPU_PROFILE();
 	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
 }
 
 void useProgram(ProgramHandle program)
 {
+	GPU_PROFILE();
 	const Program* prev = gl->last_program;
 	if (prev != program) {
 		gl->last_program = program;
@@ -524,6 +536,7 @@ void useProgram(ProgramHandle program)
 }
 
 void bindImageTexture(TextureHandle texture, u32 unit) {
+	GPU_PROFILE();
 	if (texture) {
 		glBindImageTexture(unit, texture->gl_handle, 0, GL_TRUE, 0, GL_READ_WRITE, texture->format);
 	}
@@ -534,6 +547,7 @@ void bindImageTexture(TextureHandle texture, u32 unit) {
 
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 {
+	GPU_PROFILE();
 	GLuint gl_handles[64];
 	ASSERT(count <= lengthOf(gl_handles));
 	ASSERT(handles);
@@ -552,11 +566,13 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 
 void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags)
 {
+	GPU_PROFILE();
 	checkThread();
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_idx, buffer ? buffer->gl_handle : 0);
 }
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride) {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(binding_idx < 2);
 	glBindVertexBuffer(binding_idx, buffer ? buffer->gl_handle : 0, buffer_offset, stride);
@@ -565,6 +581,7 @@ void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u
 
 void setState(StateFlags state)
 {
+	GPU_PROFILE();
 	checkThread();
 	
 	if(state == gl->last_state) return;
@@ -666,6 +683,7 @@ void setState(StateFlags state)
 
 void bindIndexBuffer(BufferHandle buffer)
 {
+	GPU_PROFILE();
 	checkThread();
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer ? buffer->gl_handle : 0);
 }
@@ -673,6 +691,7 @@ void bindIndexBuffer(BufferHandle buffer)
 
 void bindIndirectBuffer(BufferHandle buffer)
 {
+	GPU_PROFILE();
 	checkThread();
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer ? buffer->gl_handle : 0);
 }
@@ -680,6 +699,7 @@ void bindIndirectBuffer(BufferHandle buffer)
 
 void drawElements(PrimitiveType primitive_type, u32 offset, u32 count, DataType type)
 {
+	GPU_PROFILE();
 	checkThread();
 	
 	GLuint pt;
@@ -703,12 +723,14 @@ void drawElements(PrimitiveType primitive_type, u32 offset, u32 count, DataType 
 
 void drawIndirect(DataType index_type, u32 indirect_buffer_offset)
 {
+	GPU_PROFILE();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 	glMultiDrawElementsIndirect(GL_TRIANGLES, type, (const void*)(uintptr)indirect_buffer_offset, 1, 0);
 }
 
 void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type)
 {
+	GPU_PROFILE();
 	checkThread();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 	if (instances_count * indices_count > 4096) {
@@ -738,6 +760,7 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 
 void drawTriangles(u32 indices_byte_offset, u32 indices_count, DataType index_type)
 {
+	GPU_PROFILE();
 	checkThread();
 
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
@@ -747,6 +770,7 @@ void drawTriangles(u32 indices_byte_offset, u32 indices_count, DataType index_ty
 
 void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count)
 {
+	GPU_PROFILE();
 	GLuint pt;
 	switch (type) {
 		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
@@ -761,6 +785,7 @@ void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_co
 
 void drawArrays(PrimitiveType type, u32 offset, u32 count)
 {
+	GPU_PROFILE();
 	checkThread();
 	
 	GLuint pt;
@@ -783,6 +808,7 @@ void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t siz
 
 void* map(BufferHandle buffer, size_t size)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(buffer);
 	ASSERT(u32(buffer->flags & BufferFlags::IMMUTABLE) == 0);
@@ -793,6 +819,7 @@ void* map(BufferHandle buffer, size_t size)
 
 void unmap(BufferHandle buffer)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(buffer);
 	glUnmapNamedBuffer(buffer->gl_handle);
@@ -801,6 +828,7 @@ void unmap(BufferHandle buffer)
 
 void update(BufferHandle buffer, const void* data, size_t size)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(buffer);
 	ASSERT(u32(buffer->flags & BufferFlags::IMMUTABLE) == 0);
@@ -810,6 +838,7 @@ void update(BufferHandle buffer, const void* data, size_t size)
 
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(src);
 	ASSERT(dst);
@@ -951,6 +980,7 @@ void setCurrentWindow(void* window_handle) {
 
 u32 swapBuffers()
 {
+	GPU_PROFILE();
 	checkThread();
 	#ifdef _WIN32
 		for (WindowContext& ctx : gl->contexts) {
@@ -984,6 +1014,7 @@ void waitFrame(u32 frame) {}
 
 void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(buffer);
 	GLuint buf;
@@ -1004,6 +1035,7 @@ void destroy(ProgramHandle program)
 }
 
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 buf_size) {
+	GPU_PROFILE();
 	checkThread();
 
 	const bool is_2d = u32(texture->flags & TextureFlags::IS_CUBE) == 0 && u32(texture->flags & TextureFlags::IS_3D) == 0 && texture->depth == 1;
@@ -1091,6 +1123,7 @@ TextureHandle allocTextureHandle()
 
 void createTextureView(TextureHandle view, TextureHandle texture)
 {
+	GPU_PROFILE();
 	checkThread();
 	
 	ASSERT(texture);
@@ -1113,6 +1146,7 @@ void createTextureView(TextureHandle view, TextureHandle texture)
 
 bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(handle);
 	const bool is_srgb = u32(flags & TextureFlags::SRGB);
@@ -1171,6 +1205,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 
 void generateMipmaps(TextureHandle texture)
 {
+	GPU_PROFILE();
 	ASSERT(texture);
 	glGenerateTextureMipmap(texture->gl_handle);
 }
@@ -1188,6 +1223,7 @@ void destroy(BufferHandle buffer) {
 
 void clear(ClearFlags flags, const float* color, float depth)
 {
+	GPU_PROFILE();
 	glUseProgram(0);
 	gl->last_program = INVALID_PROGRAM;
 	glDisable(GL_SCISSOR_TEST);
@@ -1226,6 +1262,7 @@ static const char* shaderTypeToString(ShaderType type)
 
 bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name)
 {
+	GPU_PROFILE();
 	checkThread();
 
 	static const char* attr_defines[] = {
@@ -1366,6 +1403,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc)
 
 
 void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle) {
+	GPU_PROFILE();
 	GLbitfield gl = 0;
 	if (u32(type & gpu::MemoryBarrierType::SSBO)) gl |= GL_SHADER_STORAGE_BARRIER_BIT;
 	if (u32(type & gpu::MemoryBarrierType::COMMAND)) gl |= GL_COMMAND_BARRIER_BIT;
@@ -1374,6 +1412,7 @@ void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle) {
 
 
 bool getMemoryStats(MemoryStats& stats) {
+	GPU_PROFILE();
 	if (!gl->has_gpu_mem_info_ext) return false;
 
 	GLint tmp;
@@ -1470,6 +1509,7 @@ bool isOriginBottomLeft() { return true; }
 
 
 void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(dst);
 	ASSERT(src);
@@ -1494,6 +1534,7 @@ void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
 }
 
 void readBuffer(BufferHandle handle, Span<u8> buf) {
+	GPU_PROFILE();
 	void* mem = glMapNamedBufferRange(handle->gl_handle, 0, buf.length(), GL_MAP_READ_BIT);
 	if (!mem) return;
 
@@ -1504,6 +1545,7 @@ void readBuffer(BufferHandle handle, Span<u8> buf) {
 
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 {
+	GPU_PROFILE();
 	checkThread();
 	ASSERT(texture);
 	const GLuint handle = texture->gl_handle;
@@ -1515,6 +1557,7 @@ void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 
 void popDebugGroup()
 {
+	GPU_PROFILE();
 	checkThread();
 	glPopDebugGroup();
 }
@@ -1522,6 +1565,7 @@ void popDebugGroup()
 
 void pushDebugGroup(const char* msg)
 {
+	GPU_PROFILE();
 	checkThread();
 	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg);
 }
@@ -1529,6 +1573,7 @@ void pushDebugGroup(const char* msg)
 
 QueryHandle createQuery()
 {
+	GPU_PROFILE();
 	GLuint q;
 	glGenQueries(1, &q);
 	ASSERT(q != 0);
@@ -1538,6 +1583,7 @@ QueryHandle createQuery()
 
 bool isQueryReady(QueryHandle query)
 {
+	GPU_PROFILE();
 	GLuint done;
 	glGetQueryObjectuiv((GLuint)(uintptr_t)query, GL_QUERY_RESULT_AVAILABLE, &done);
 	return done;
@@ -1547,6 +1593,7 @@ u64 getQueryFrequency() { return 1'000'000'000; }
 
 u64 getQueryResult(QueryHandle query)
 {
+	GPU_PROFILE();
 	u64 time;
 	glGetQueryObjectui64v((GLuint)(uintptr_t)query, GL_QUERY_RESULT, &time);
 	return time;
@@ -1555,6 +1602,7 @@ u64 getQueryResult(QueryHandle query)
 
 void destroy(QueryHandle query)
 {
+	GPU_PROFILE();
 	GLuint q = (GLuint)(uintptr_t)query;
 	glDeleteQueries(1, &q);
 }
@@ -1562,11 +1610,13 @@ void destroy(QueryHandle query)
 
 void queryTimestamp(QueryHandle query)
 {
+	GPU_PROFILE();
 	glQueryCounter((GLuint)(uintptr_t)query, GL_TIMESTAMP);
 }
 
 void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 {
+	GPU_PROFILE();
 	ASSERT(cube);
 	const GLuint t = cube->gl_handle;
 	checkThread();
@@ -1593,6 +1643,7 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 
 void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags)
 {
+	GPU_PROFILE();
 	checkThread();
 
 	if (u32(flags & FramebufferFlags::SRGB)) {
@@ -1655,6 +1706,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, Frame
 
 void shutdown()
 {
+	GPU_PROFILE();
 	checkThread();
 	destroy(gl->default_program);
 	for (WindowContext& ctx : gl->contexts) {

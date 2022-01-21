@@ -28,6 +28,8 @@ template <typename T> struct Array {
 	T* begin() const { return m_data; }
 	T* end() const { return m_data ? m_data + m_size : nullptr; }
 
+	const T& last() const { ASSERT(m_size > 0); return m_data[m_size - 1]; }
+
 	operator Span<T>() const { return Span(begin(), end()); }
 	operator Span<const T>() const { return Span(begin(), end()); }
 

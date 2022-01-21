@@ -3555,8 +3555,63 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	u32 m_probe_counter = 0;
 };
 
-// TODO undo/redo + lock undo group once mouse is released
 struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugin {
+	struct SetTransformCommand : IEditorCommand {
+		SetTransformCommand(EntityRef entity, u32 instance, const Transform& transform, WorldEditor& editor)
+			: editor(editor)
+			, entity(entity)
+			, instance(instance)
+			, transform(transform)
+		{
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+
+			old_transform.pos = DVec3(im.instances[instance].pos);
+			old_transform.rot = getInstanceQuat(im.instances[instance].rot_quat);
+			old_transform.scale = im.instances[instance].scale;
+		}
+
+		bool execute() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+
+			im.instances[instance].pos = Vec3(transform.pos);
+			im.instances[instance].rot_quat = Vec3(transform.rot.x, transform.rot.y, transform.rot.z);
+			if (transform.rot.w < 0) im.instances[instance].rot_quat *= -1;
+			im.instances[instance].scale = transform.scale;
+
+			scene->initInstancedModelGPUData(entity);
+			return true;
+		}
+
+		void undo() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+
+			im.instances[instance].pos = Vec3(old_transform.pos);
+			im.instances[instance].rot_quat = Vec3(old_transform.rot.x, old_transform.rot.y, old_transform.rot.z);
+			if (old_transform.rot.w < 0) im.instances[instance].rot_quat *= -1;
+			im.instances[instance].scale = old_transform.scale;
+
+			scene->initInstancedModelGPUData(entity);
+		}
+
+		const char* getType() override { return "set_intanced_model_transform"; }
+		bool merge(IEditorCommand& command) override {
+			SetTransformCommand& rhs = ((SetTransformCommand&)command);
+			if (rhs.entity != entity) return false;
+			if (rhs.instance != instance) return false;
+			rhs.transform = transform;
+			return true;
+		}
+
+		EntityRef entity;
+		u32 instance;
+		WorldEditor& editor;
+		Transform transform;
+		Transform old_transform;
+	};
+
 	struct RemoveCommand : IEditorCommand {
 		RemoveCommand(EntityRef entity, WorldEditor& editor)
 			: editor(editor)
@@ -3665,7 +3720,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		res.x = q.x;
 		res.y = q.y;
 		res.z = q.z;
-		res.w = sqrtf(1 - q.x * q.x + q.y * q.y + q.z * q.z);
+		res.w = sqrtf(1 - (q.x * q.x + q.y * q.y + q.z * q.z));
 		return res;
 	}
 
@@ -3791,14 +3846,16 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 							 existing.push(id);
 						}
 					}
-					editor.beginCommandGroup("add_instanced_model_instances_group"); // so consecutive adds can be merged // TODO do this in a sane way
+					editor.beginCommandGroup("add_instanced_model_instances_group");
 					editor.executeCommand(add_cmd.move());
 					editor.endCommandGroup();
+					m_can_lock_group = true;
 				}
 				else {
 					editor.beginCommandGroup("remove_instanced_model_instances_group");
 					editor.executeCommand(remove_cmd.move());
 					editor.endCommandGroup();
+					m_can_lock_group = true;
 				}
 				break;
 			}
@@ -3812,6 +3869,13 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 	}
 
+	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {
+		if (m_can_lock_group) {
+			m_app.getWorldEditor().lockGroupCommand();
+			m_can_lock_group = false;
+		}
+	}
+
 	bool onMouseDown(UniverseView& view, int x, int y) override {
 		if (ImGui::GetIO().KeyShift) return paint(x, y);
 
@@ -3819,28 +3883,15 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (!cmp.im) return false;
 		if (!cmp.im->model || !cmp.im->model->isReady()) return false;
 
-		const float radius = cmp.im->model->getOriginBoundingRadius();
-		i32 idx = -1;
-		float min_t = FLT_MAX;
 		DVec3 ray_origin;
 		Vec3 ray_dir;
-		const DVec3 origin = cmp.scene->getUniverse().getPosition(cmp.entity);
 		view.getViewport().getRay(Vec2((float)x, (float)y), ray_origin, ray_dir);
-		bool res = false;
-		for (const InstancedModel::InstanceData& id : cmp.im->instances) {
-			float t;
-			Vec3 local_ray_origin(ray_origin - origin);
-			if (getRaySphereIntersection(local_ray_origin, ray_dir, id.pos, radius, t) && t < min_t) {
-				// TODO
-				// cmp.im->model->castRay(ray_origin - id.)
-				min_t = t;
-				idx = i32(&id - cmp.im->instances.begin());
-				m_selected = idx;
-				res = true;
-			}
+		RayCastModelHit hit = cmp.scene->castRayInstancedModels(ray_origin, ray_dir, [](const RayCastModelHit&){ return true; });
+		if (hit.is_hit && hit.entity == cmp.entity) {
+			m_selected = hit.subindex;
+			return true;
 		}
-	
-		return res;
+		return false;
 	}
 
 	static void drawCircle(RenderScene& scene, const DVec3& center, float radius, u32 color) {
@@ -3876,23 +3927,27 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			const Gizmo::Config& cfg = m_app.getGizmoConfig();
 			bool changed = Gizmo::manipulate(u64(4) << 32 | cmp.entity.index, editor.getView(), tr, cfg);
 
-			// TODO undo/redo, rotation
 			Vec3 p = im.instances[m_selected].pos;
 			ImGuiEx::Label("Position");
 			if (ImGui::DragFloat3("##pos", &p.x, 0.01f)) {
 				changed = true;
 				tr.pos = origin + DVec3(p);
 			}
+
+			ImGuiEx::Label("Rotation");
+			Vec3 euler = tr.rot.toEuler();
+			if (ImGuiEx::InputRotation("##rot", &euler.x)) {
+				tr.rot.fromEuler(euler);
+				changed = true;
+			}
+
 			ImGuiEx::Label("Scale");
 			changed = ImGui::DragFloat("##scale", &tr.scale, 0.01f) || changed;
 
 			if (changed) {
-				im.instances[m_selected].pos = Vec3(tr.pos - origin);
-				im.instances[m_selected].rot_quat = Vec3(tr.rot.x, tr.rot.y, tr.rot.z);
-				if (tr.rot.w < 0) im.instances[m_selected].rot_quat *= -1;
-				im.instances[m_selected].scale = tr.scale;
-
-				render_scene->initInstancedModelGPUData(*cmp.entity);
+				tr.pos = tr.pos - origin;
+				UniquePtr<SetTransformCommand> cmd = UniquePtr<SetTransformCommand>::create(editor.getAllocator(), *cmp.entity, m_selected, tr, editor);
+				editor.executeCommand(cmd.move());
 			}
 		}
 
@@ -3992,6 +4047,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	Vec2 m_rotate_x_spread;
 	Vec2 m_rotate_y_spread;
 	Vec2 m_rotate_z_spread;
+	bool m_can_lock_group = false;
 };
 
 struct TerrainPlugin final : PropertyGrid::IPlugin
@@ -4263,6 +4319,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		{
 			PROFILE_FUNCTION();
 
+			renderer->beginProfileBlock("editor imgui", 0);
 			gpu::pushDebugGroup("imgui");
 
 			vb_offset = 0;
@@ -4324,6 +4381,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			gpu::setCurrentWindow(nullptr);
 
 			gpu::popDebugGroup();
+			renderer->endProfileBlock();
 		}
 		
 		Renderer* renderer;

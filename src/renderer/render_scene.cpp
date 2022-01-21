@@ -2251,12 +2251,10 @@ struct RenderSceneImpl final : RenderScene {
 		});
 	}
 	
-	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
-		PROFILE_FUNCTION();
+	RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
 		RayCastModelHit hit;
-		hit.is_hit = false;
 		double cur_dist = DBL_MAX;
-		const Universe& universe = getUniverse();
+		hit.is_hit = false;
 		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
 			const EntityRef e = iter.key();
 			const Transform tr = m_universe.getTransform(e);
@@ -2269,15 +2267,15 @@ struct RenderSceneImpl final : RenderScene {
 				res.x = q.x;
 				res.y = q.y;
 				res.z = q.z;
-				res.w = sqrtf(1 - q.x * q.x + q.y * q.y + q.z * q.z);
+				res.w = sqrtf(1 - (q.x * q.x + q.y * q.y + q.z * q.z));
 				return res;
 			};
 			for (const InstancedModel::InstanceData& id : im.instances) {
-				Vec3 rel_pos = Vec3(origin - tr.pos) - id.pos;
+				Vec3 rel_pos = Vec3(ray_origin - tr.pos) - id.pos;
 				const float radius = model_radius * id.scale;
 				float intersection_t;
-				if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
-					const Vec3 rel_dir = getInstanceQuat(id.rot_quat).conjugated().rotate(dir);
+				if (getRaySphereIntersection(rel_pos, ray_dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
+					const Vec3 rel_dir = getInstanceQuat(id.rot_quat).conjugated().rotate(ray_dir);
 					rel_pos = getInstanceQuat(id.rot_quat).rotate(rel_pos / id.scale);
 					RayCastModelHit new_hit = im.model->castRay(rel_pos, rel_dir, nullptr, e, &filter);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * id.scale < hit.t)) {
@@ -2286,12 +2284,21 @@ struct RenderSceneImpl final : RenderScene {
 						hit = new_hit;
 						hit.t *= id.scale;
 						hit.is_hit = true;
-						cur_dist = length(dir) * hit.t;
+						cur_dist = length(ray_dir) * hit.t;
+						hit.subindex = u32(&id - im.instances.begin());
 					}
 				}
 			}
 		}
+		return hit;
+	}
 
+	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
+		PROFILE_FUNCTION();
+		RayCastModelHit hit = castRayInstancedModels(origin, dir, filter);
+		double cur_dist = hit.is_hit ? hit.t * length(dir) : DBL_MAX;
+
+		const Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
