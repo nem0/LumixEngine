@@ -831,7 +831,7 @@ bool TerrainEditor::onMouseDown(UniverseView& view, int x, int y)
 	DVec3 origin;
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
-	const RayCastModelHit hit = scene->castRayTerrain(selected_entities[0], origin, dir);
+	const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
 	if (!hit.is_hit) return false;
 
 	const DVec3 hit_pos = hit.origin + hit.dir * hit.t;
@@ -872,64 +872,6 @@ bool TerrainEditor::onMouseDown(UniverseView& view, int x, int y)
 			paint(hit_pos, action, false, selected_entities[0], editor);
 			break;
 	}
-	return true;
-}
-
-static void getProjections(const Vec3& axis,
-	const Vec3 vertices[8],
-	float& min,
-	float& max)
-{
-	max = dot(vertices[0], axis);
-	min = max;
-	for(int i = 1; i < 8; ++i)
-	{
-		float d = dot(vertices[i], axis);
-		min = minimum(d, min);
-		max = maximum(d, max);
-	}
-}
-
-static bool overlaps(float min1, float max1, float min2, float max2)
-{
-	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
-}
-
-static bool testOBBCollision(const AABB& a,
-	const Matrix& mtx_b,
-	const AABB& b)
-{
-	Vec3 box_a_points[8];
-	Vec3 box_b_points[8];
-
-	a.getCorners(Matrix::IDENTITY, box_a_points);
-	b.getCorners(mtx_b, box_b_points);
-
-	const Vec3 normals[] = {Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(0, 0, 1)};
-	for(int i = 0; i < 3; i++)
-	{
-		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
-		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
-		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-		{
-			return false;
-		}
-	}
-
-	Vec3 normals_b[] = {
-		normalize(mtx_b.getXVector()), normalize(mtx_b.getYVector()), normalize(mtx_b.getZVector())};
-	for(int i = 0; i < 3; i++)
-	{
-		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
-		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
-		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-		{
-			return false;
-		}
-	}
-
 	return true;
 }
 
@@ -1159,7 +1101,7 @@ void TerrainEditor::onMouseMove(UniverseView& view, int x, int y, int, int)
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
 
-	const RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
+	const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
 	if (!hit.is_hit) return;
 	if (hit.entity != entity) return;
 	
@@ -1886,7 +1828,7 @@ void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 		DVec3 origin;
 		Vec3 dir;
 		editor.getView().getViewport().getRay(mp, origin, dir);
-		const RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
+		const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
 
 		if(hit.is_hit) {
 			DVec3 center = hit.origin + hit.dir * hit.t;

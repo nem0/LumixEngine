@@ -822,22 +822,14 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 			}
 		}
 
-		Quat rot = universe.getRotation(entities[0]);
-		Vec3 old_euler = rot.toEuler();
-		Vec3 euler = radiansToDegrees(old_euler);
 		ImGuiEx::Label("Rotation");
-		const float rot_change_speed = ImGui::GetIO().KeyAlt ? 10.f : 1.f; // we won't have precision without this
-		if (ImGui::DragFloat3("##rot", &euler.x, rot_change_speed, 0, 0, "%.2f"))
-		{
-			if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
-			euler.x = degreesToRadians(clamp(euler.x, -90.0f, 90.0f));
-			euler.y = degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
-			euler.z = degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
-			rot.fromEuler(euler);
 		
+		Quat rot = universe.getRotation(entities[0]);
+		const Vec3 old_euler = rot.toEuler();
+		Vec3 euler = old_euler;
+		if (ImGuiEx::InputRotation("##rot", &euler.x)) {
 			Array<Quat> rots(editor.getAllocator());
-			for (EntityRef entity : entities)
-			{
+			for (EntityRef entity : entities) {
 				Vec3 tmp = universe.getRotation(entity).toEuler();
 			
 				if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;

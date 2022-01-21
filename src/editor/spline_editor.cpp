@@ -88,7 +88,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			}
 		}
 
-		UniverseView::RayHit hit = view.getCameraRaycastHit(x, y);
+		UniverseView::RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
 		if (hit.is_hit) {
 			CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
 			Spline& spline = scene->getSpline(e);

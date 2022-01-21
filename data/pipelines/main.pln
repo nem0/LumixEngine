@@ -125,6 +125,7 @@ function impostorPass(entities, colorbuffer, dsbuffer)
 	pass(getCameraParams())
 	local bucket = createBucket(entities, "impostor", "")
 	renderBucket(bucket, impostor_state)
+	renderInstancedModels(entities, default_state, "impostor", {})
 	endBlock()
 end
 
@@ -140,6 +141,7 @@ function geomPass(entities)
 		local view_params = getCameraParams()
 		pass(view_params)
 		renderTerrains(view_params, terrain_state)
+		renderInstancedModels(entities, default_state, "default", {define = "DEFERRED"})
 		renderGrass(view_params, grass_state)
 		local bucket = createBucket(entities, "default", "DEFERRED")
 		renderBucket(bucket, default_state)
@@ -272,6 +274,8 @@ function shadowPass()
 				local bucket1 = createBucket(entities, "impostor", "DEPTH")
 				renderBucket(bucket0, {})
 				renderBucket(bucket1, {})
+				renderInstancedModels(entities, default_state, "default", { define = "DEPTH" })
+				renderInstancedModels(entities, default_state, "impostor", { define = "DEPTH" })
 
 				if slice < 2 then
 					renderGrass(view_params, grass_state)
@@ -535,6 +539,7 @@ function onGUI()
 		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
+		terrain_state.wireframe = default_state.wireframe
 		ImGui.EndPopup()
 	end
 end

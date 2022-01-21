@@ -45,7 +45,9 @@ struct LUMIX_ENGINE_API IVec3 {
 
 struct LUMIX_ENGINE_API IVec4 {
 	IVec4() {}
+	IVec4(i32 v) : x(v), y(v), z(v), w(v) {}
 	IVec4(const IVec2& a, const IVec2& b) : x(a.x), y(a.y), z(b.x), w(b.y) {}
+	void operator += (const IVec4& rhs);
 	i32 x, y, z, w;
 };
 
@@ -258,6 +260,21 @@ struct LUMIX_ENGINE_API RigidTransform {
 	Quat rot;
 	DVec3 pos;
 };
+
+
+struct LUMIX_ENGINE_API LocalTransform {
+	LocalTransform() {}
+	LocalTransform(const Vec3& pos, const Quat& rot, float scale);
+
+	LocalTransform inverted() const;
+
+	LocalTransform operator*(const LocalTransform& rhs) const;
+
+	Vec3 pos;
+	Quat rot;
+	float scale;
+};
+
 
 struct LUMIX_ENGINE_API Transform {
 	Transform() {}

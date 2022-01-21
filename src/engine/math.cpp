@@ -519,6 +519,14 @@ void Vec3::operator-=(const Vec3& rhs) {
 	this->z = z;
 }
 
+void IVec4::operator += (const IVec4& rhs) {
+	x += rhs.x;
+	y += rhs.y;
+	z += rhs.z;
+	w += rhs.w;
+}
+
+
 const Quat Quat::IDENTITY = { 0, 0, 0, 1 };
 
 
@@ -726,6 +734,24 @@ Transform Transform::inverted() const {
 	result.pos = result.rot.rotate(-pos / scale);
 	result.scale = 1.0f / scale;
 	return result;
+}
+
+LocalTransform::LocalTransform(const Vec3& pos, const Quat& rot, float scale)
+	: pos(pos)
+	, rot(rot)
+	, scale(scale)
+{}
+
+LocalTransform LocalTransform::inverted() const {
+	LocalTransform result;
+	result.rot = rot.conjugated();
+	result.pos = result.rot.rotate(-pos / scale);
+	result.scale = 1.0f / scale;
+	return result;
+}
+
+LocalTransform LocalTransform::operator*(const LocalTransform& rhs) const {
+	return {pos + rot.rotate(rhs.pos * scale), rot * rhs.rot, scale};
 }
 
 LocalRigidTransform LocalRigidTransform::inverted() const {

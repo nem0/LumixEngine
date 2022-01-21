@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/array.h"
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
 #include "engine/hash_map.h"
@@ -164,6 +165,23 @@ struct ModelInstance
 	u16 mesh_count;
 };
 
+struct InstancedModel {
+	InstancedModel(IAllocator& allocator) 
+		: instances(allocator)
+	{}
+
+	struct InstanceData {
+		Vec3 rot_quat;
+		float lod;
+		Vec3 pos;
+		float scale;
+	};
+
+	Model* model = nullptr;
+	Array<InstanceData> instances;
+	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;
+	u32 gpu_capacity = 0;
+};
 
 struct MeshInstance
 {
@@ -232,7 +250,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
-	virtual RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) = 0;
+	virtual RayCastModelHit castRayTerrain(const DVec3& origin, const Vec3& dir) = 0;
+	virtual RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
 	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
 
 	virtual void setActiveCamera(EntityRef camera) = 0;
@@ -293,6 +312,12 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void updateParticleEmitter(EntityRef entity, float dt) = 0;
 	virtual const HashMap<EntityRef, struct ParticleEmitter>& getParticleEmitters() const = 0;
 	virtual ParticleEmitter& getParticleEmitter(EntityRef e) = 0;
+
+	virtual Path getInstancedModelPath(EntityRef entity) = 0;
+	virtual void setInstancedModelPath(EntityRef entity, const Path& path) = 0;
+	virtual const HashMap<EntityRef, InstancedModel>& getInstancedModels() const = 0;
+	virtual HashMap<EntityRef, InstancedModel>& getInstancedModels() = 0;
+	virtual void initInstancedModelGPUData(EntityRef entity) = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;

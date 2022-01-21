@@ -33,6 +33,7 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 	Mesh* mesh;
 	EntityPtr entity;
 	ComponentType component_type;
+	u32 subindex;
 	using Filter = Delegate<bool (const RayCastModelHit&)>;
 };
 

@@ -34,6 +34,7 @@ namespace Lumix
 {
 
 
+static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
 static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
@@ -53,6 +54,7 @@ enum class RenderSceneVersion : i32
 	CURVE_DECALS,
 	AUTODESTROY_EMITTER,
 	SMALLER_MODEL_INSTANCES,
+	INSTANCED_MODEL,
 
 	LATEST
 };
@@ -64,7 +66,6 @@ struct BoneAttachment
 	int bone_index;
 	LocalRigidTransform relative_transform;
 };
-
 
 static RenderableTypes getRenderableType(const Model& model, bool custom_material)
 {
@@ -605,6 +606,40 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
+	void serializeInstancedModels(OutputMemoryStream& serializer) {
+		serializer.write(m_instanced_models.size());
+		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
+			serializer.write(iter.key());
+			const InstancedModel& im = iter.value();
+			serializer.writeString(im.model ? im.model->getPath().c_str() : "");
+			serializer.write(im.instances.size());
+			serializer.write(im.instances.begin(), im.instances.byte_size());
+		}
+	}
+
+	void deserializeInstancedModels(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
+		if (version <= (i32)RenderSceneVersion::INSTANCED_MODEL) return;
+		u32 count;
+		serializer.read(count);
+		m_instanced_models.reserve(count + m_instanced_models.size());
+		ResourceManagerHub& rm = m_engine.getResourceManager();
+		for (u32 i = 0; i < count; ++i) {
+			EntityRef e;
+			serializer.read(e);
+			e = entity_map.get(e);
+			InstancedModel im(m_allocator);
+			const char* path = serializer.readString();
+			im.model = path[0] ? rm.load<Model>(Path(path)) : nullptr;
+			u32 size;
+			serializer.read(size);
+			im.instances.resize(size);
+			serializer.read(im.instances.begin(), im.instances.byte_size());
+			m_instanced_models.insert(e, static_cast<InstancedModel&&>(im));
+			initInstancedModelGPUData(e);
+			m_universe.onComponentCreated(e, INSTANCED_MODEL_TYPE, this);
+		}
+	}
+
 	void serializeFurs(OutputMemoryStream& serializer) {
 		serializer.write(m_furs.size());
 		for (auto iter = m_furs.begin(); iter.isValid(); ++iter) {
@@ -849,6 +884,7 @@ struct RenderSceneImpl final : RenderScene {
 		serializeDecals(serializer);
 		serializeCurveDecals(serializer);
 		serializeFurs(serializer);
+		serializeInstancedModels(serializer);
 	}
 
 
@@ -1024,6 +1060,7 @@ struct RenderSceneImpl final : RenderScene {
 		deserializeDecals(serializer, entity_map, version);
 		deserializeCurveDecals(serializer, entity_map, version);
 		deserializeFurs(serializer, entity_map);
+		deserializeInstancedModels(serializer, entity_map, version);
 	}
 
 
@@ -1054,6 +1091,36 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
+	void initInstancedModelGPUData(EntityRef entity) override {
+		PROFILE_FUNCTION();
+		InstancedModel& im = m_instanced_models[entity];
+		if (im.gpu_data) {
+			if (im.gpu_capacity < (u32)im.instances.size()) {
+				m_renderer.destroy(im.gpu_data);
+				im.gpu_data = gpu::INVALID_BUFFER;
+				im.gpu_capacity = 0;
+			}
+		}
+		if (!im.instances.empty()) {
+			if (im.gpu_data) {
+				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());
+				m_renderer.updateBuffer(im.gpu_data, mem);
+			}
+			else {
+				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
+				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE);
+				im.gpu_capacity = im.instances.capacity();
+			}
+		}
+	}
+
+	void destroyInstancedModel(EntityRef entity) {
+		Model* m = m_instanced_models[entity].model;
+		if (m) m->decRefCount();
+		if (m_instanced_models[entity].gpu_data) m_renderer.destroy(m_instanced_models[entity].gpu_data);
+		m_instanced_models.erase(entity);
+		m_universe.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
+	}
 
 	void destroyModelInstance(EntityRef entity)
 	{
@@ -1612,6 +1679,22 @@ struct RenderSceneImpl final : RenderScene {
 		return m_model_instances[entity.index].custom_material ? m_model_instances[entity.index].custom_material->getPath() : Path("");
 	}
 
+	Path getInstancedModelPath(EntityRef entity) override {
+		Model* m = m_instanced_models[entity].model;
+		return m ? m->getPath() : Path();
+	}
+
+	void setInstancedModelPath(EntityRef entity, const Path& path) override {
+		InstancedModel& im = m_instanced_models[entity];
+		if (im.model) {
+			im.model->decRefCount();
+			im.model = nullptr;
+		}
+		if (!path.isEmpty()) {
+			im.model = m_engine.getResourceManager().load<Model>(path);
+		}
+	}
+
 	Path getModelInstancePath(EntityRef entity) override
 	{
 		return m_model_instances[entity.index].model ? m_model_instances[entity.index].model->getPath() : Path("");
@@ -2149,17 +2232,16 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) override
+	RayCastModelHit castRayTerrain(const DVec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.is_hit = false;
-		auto iter = m_terrains.find(entity);
-		if (!iter.isValid()) return hit;
-
-		Terrain* terrain = iter.value();
-		hit = terrain->castRay(origin, dir);
-		hit.component_type = TERRAIN_TYPE;
-		hit.entity = terrain->getEntity();
+		for (Terrain* terrain : m_terrains) {
+			hit = terrain->castRay(origin, dir);
+			hit.component_type = TERRAIN_TYPE;
+			hit.entity = terrain->getEntity();
+			if (hit.is_hit) break;
+		}
 		return hit;
 	}
 
@@ -2169,11 +2251,53 @@ struct RenderSceneImpl final : RenderScene {
 		});
 	}
 	
+	RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
+		RayCastModelHit hit;
+		double cur_dist = DBL_MAX;
+		hit.is_hit = false;
+		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
+			const EntityRef e = iter.key();
+			const Transform tr = m_universe.getTransform(e);
+			const InstancedModel& im = iter.value();
+			if (!im.model || !im.model->isReady()) continue;
+			
+			const float model_radius = im.model->getOriginBoundingRadius();
+			auto getInstanceQuat = [](Vec3 q) {
+				Quat res;
+				res.x = q.x;
+				res.y = q.y;
+				res.z = q.z;
+				res.w = sqrtf(1 - (q.x * q.x + q.y * q.y + q.z * q.z));
+				return res;
+			};
+			for (const InstancedModel::InstanceData& id : im.instances) {
+				Vec3 rel_pos = Vec3(ray_origin - tr.pos) - id.pos;
+				const float radius = model_radius * id.scale;
+				float intersection_t;
+				if (getRaySphereIntersection(rel_pos, ray_dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
+					const Vec3 rel_dir = getInstanceQuat(id.rot_quat).conjugated().rotate(ray_dir);
+					rel_pos = getInstanceQuat(id.rot_quat).rotate(rel_pos / id.scale);
+					RayCastModelHit new_hit = im.model->castRay(rel_pos, rel_dir, nullptr, e, &filter);
+					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * id.scale < hit.t)) {
+						new_hit.entity = e;
+						new_hit.component_type = INSTANCED_MODEL_TYPE;
+						hit = new_hit;
+						hit.t *= id.scale;
+						hit.is_hit = true;
+						cur_dist = length(ray_dir) * hit.t;
+						hit.subindex = u32(&id - im.instances.begin());
+					}
+				}
+			}
+		}
+		return hit;
+	}
+
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
 		PROFILE_FUNCTION();
-		RayCastModelHit hit;
-		hit.is_hit = false;
-		double cur_dist = DBL_MAX;
+		RayCastModelHit hit = castRayInstancedModels(origin, dir, filter);
+		double cur_dist = hit.is_hit ? hit.t * length(dir) : DBL_MAX;
+
 		const Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
@@ -2211,11 +2335,13 @@ struct RenderSceneImpl final : RenderScene {
 
 		for (auto* terrain : m_terrains) {
 			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
-			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t) && filter.invoke(terrain_hit)) {
+			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t)) {
 				terrain_hit.component_type = TERRAIN_TYPE;
 				terrain_hit.entity = terrain->getEntity();
 				terrain_hit.mesh = nullptr;
-				hit = terrain_hit;
+				if (filter.invoke(terrain_hit)) {
+					hit = terrain_hit;
+				}
 			}
 		}
 
@@ -2681,6 +2807,21 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 
+	const HashMap<EntityRef, InstancedModel>& getInstancedModels() const override {
+		return m_instanced_models;
+	}
+
+	HashMap<EntityRef, InstancedModel>& getInstancedModels() override {
+		return m_instanced_models;
+	}
+
+	void createInstancedModel(EntityRef entity) {
+		InstancedModel im(m_allocator);
+		m_instanced_models.insert(entity, static_cast<InstancedModel&&>(im));
+
+		initInstancedModelGPUData(entity);
+		m_universe.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);
+	}
 
 	void createModelInstance(EntityRef entity)
 	{
@@ -2737,6 +2878,7 @@ struct RenderSceneImpl final : RenderScene {
 	HashMap<EntityRef, Decal> m_decals;
 	HashMap<EntityRef, CurveDecal> m_curve_decals;
 	Array<ModelInstance> m_model_instances;
+	HashMap<EntityRef, InstancedModel> m_instanced_models;
 	HashMap<EntityRef, Environment> m_environments;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera = INVALID_ENTITY;
@@ -2897,6 +3039,8 @@ void RenderScene::reflect() {
 			.var_prop<&RenderScene::getCamera, &Camera::far>("Far").minAttribute(0)
 			.var_prop<&RenderScene::getCamera, &Camera::is_ortho>("Orthographic")
 			.var_prop<&RenderScene::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
+		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
+			.LUMIX_PROP(InstancedModelPath, "Model").resourceAttribute(Model::TYPE)
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
 			.LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
 			.prop<&RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance>("Enabled")
@@ -2953,6 +3097,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_allocator(allocator)
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
+	, m_instanced_models(m_allocator)
 	, m_cameras(m_allocator)
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)

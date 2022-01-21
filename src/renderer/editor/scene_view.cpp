@@ -521,7 +521,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.rot = rot;
 	}
 
-	RayHit getCameraRaycastHit(int cam_x, int cam_y) override
+	RayHit getCameraRaycastHit(int cam_x, int cam_y, EntityPtr ignore) override
 	{
 		RayHit res;
 		const Vec2 center{float(cam_x), float(cam_y)};
@@ -529,7 +529,7 @@ struct UniverseViewImpl final : UniverseView {
 		DVec3 origin;
 		Vec3 dir;
 		m_viewport.getRay(center, origin, dir);
-		const RayCastModelHit hit = m_scene->castRay(origin, dir, INVALID_ENTITY);
+		const RayCastModelHit hit = m_scene->castRay(origin, dir, ignore);
 		DVec3 pos;
 		if (hit.is_hit) {
 			res.pos = origin + dir * hit.t;

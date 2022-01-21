@@ -67,6 +67,7 @@ static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
 static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
 static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
+static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
@@ -3554,6 +3555,501 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	u32 m_probe_counter = 0;
 };
 
+struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugin {
+	struct SetTransformCommand : IEditorCommand {
+		SetTransformCommand(EntityRef entity, u32 instance, const Transform& transform, WorldEditor& editor)
+			: editor(editor)
+			, entity(entity)
+			, instance(instance)
+			, transform(transform)
+		{
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+
+			old_transform.pos = DVec3(im.instances[instance].pos);
+			old_transform.rot = getInstanceQuat(im.instances[instance].rot_quat);
+			old_transform.scale = im.instances[instance].scale;
+		}
+
+		bool execute() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+
+			im.instances[instance].pos = Vec3(transform.pos);
+			im.instances[instance].rot_quat = Vec3(transform.rot.x, transform.rot.y, transform.rot.z);
+			if (transform.rot.w < 0) im.instances[instance].rot_quat *= -1;
+			im.instances[instance].scale = transform.scale;
+
+			scene->initInstancedModelGPUData(entity);
+			return true;
+		}
+
+		void undo() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+
+			im.instances[instance].pos = Vec3(old_transform.pos);
+			im.instances[instance].rot_quat = Vec3(old_transform.rot.x, old_transform.rot.y, old_transform.rot.z);
+			if (old_transform.rot.w < 0) im.instances[instance].rot_quat *= -1;
+			im.instances[instance].scale = old_transform.scale;
+
+			scene->initInstancedModelGPUData(entity);
+		}
+
+		const char* getType() override { return "set_intanced_model_transform"; }
+		bool merge(IEditorCommand& command) override {
+			SetTransformCommand& rhs = ((SetTransformCommand&)command);
+			if (rhs.entity != entity) return false;
+			if (rhs.instance != instance) return false;
+			rhs.transform = transform;
+			return true;
+		}
+
+		EntityRef entity;
+		u32 instance;
+		WorldEditor& editor;
+		Transform transform;
+		Transform old_transform;
+	};
+
+	struct RemoveCommand : IEditorCommand {
+		RemoveCommand(EntityRef entity, WorldEditor& editor)
+			: editor(editor)
+			, entity(entity)
+			, instances(editor.getAllocator())
+			, indices(editor.getAllocator())
+		{}
+		
+		bool execute() override {
+			instances.clear();
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+			for (i32 i = indices.size() - 1; i >= 0; --i) {
+				ASSERT(i == 0 || indices[i] > indices[i - 1]);
+				instances.push(im.instances[indices[i]]);
+				im.instances.erase(indices[i]);
+			}
+			scene->initInstancedModelGPUData(entity);
+			return true;
+		}
+		
+		void undo() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+			
+			for (i32 i = 0; i < indices.size(); ++i) {
+				im.instances.insert(indices[i], instances[i]);
+			}
+			scene->initInstancedModelGPUData(entity);
+		}
+		
+		bool merge(IEditorCommand& command) override { return false; }
+
+		const char* getType() override { return "remove_instanced_model_instances"; }
+
+		WorldEditor& editor;
+		EntityRef entity;
+		Array<u32> indices;
+		Array<InstancedModel::InstanceData> instances;
+	};
+
+	struct AddCommand : IEditorCommand {
+		AddCommand(EntityRef entity, WorldEditor& editor)
+			: editor(editor)
+			, instances(editor.getAllocator())
+			, entity(entity)
+		{}
+
+		bool execute() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+			for (const InstancedModel::InstanceData& i : instances) {
+				im.instances.push(i);
+			}
+			scene->initInstancedModelGPUData(entity);
+			return true;
+		}
+		
+		void undo() override {
+			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			InstancedModel& im = scene->getInstancedModels()[entity];
+			for (u32 i = 0; i < (u32)instances.size(); ++i) {
+				im.instances.pop();
+			}
+			scene->initInstancedModelGPUData(entity);
+		}
+		
+		bool merge(IEditorCommand& command) override { return false; }
+
+		const char* getType() override { return "add_instanced_model_instances"; }
+		Array<InstancedModel::InstanceData> instances;
+		EntityRef entity;
+		WorldEditor& editor;
+	};
+
+	explicit InstancedModelPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		m_app.addPlugin(*this);
+		m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
+	}
+
+	~InstancedModelPlugin() {
+		m_app.removePlugin(*this);
+	}
+
+	struct Component {
+		InstancedModel* im;
+		EntityRef entity;
+		RenderScene* scene;
+	};
+
+	Component getComponent() {
+		WorldEditor& editor = m_app.getWorldEditor();
+		const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+		if (selected_entities.size() != 1) return { nullptr };
+
+		Universe& universe = *editor.getUniverse();
+		RenderScene* scene = (RenderScene*)universe.getScene(INSTANCED_MODEL_TYPE);
+		auto iter = scene->getInstancedModels().find(selected_entities[0]);
+		if (!iter.isValid()) return { nullptr };
+		return { &iter.value(), selected_entities[0], scene };
+	}
+
+	static Quat getInstanceQuat(Vec3 q) {
+		Quat res;
+		res.x = q.x;
+		res.y = q.y;
+		res.z = q.z;
+		res.w = sqrtf(1 - (q.x * q.x + q.y * q.y + q.z * q.z));
+		return res;
+	}
+
+	static bool isOBBCollision(Span<const InstancedModel::InstanceData> meshes, const InstancedModel::InstanceData& obj, Model* model, float bounding_offset)
+	{
+		ASSERT(bounding_offset <= 0);
+		AABB aabb = model->getAABB();
+		aabb.shrink(-bounding_offset);
+		float radius_a_squared = model->getOriginBoundingRadius() * obj.scale;
+		radius_a_squared = radius_a_squared * radius_a_squared;
+		const LocalTransform tr_a(obj.pos, getInstanceQuat(obj.rot_quat), obj.scale);
+		for (const InstancedModel::InstanceData& inst : meshes) {
+			const float radius_b = model->getOriginBoundingRadius() * inst.scale + bounding_offset;
+			const float radius_squared = radius_a_squared + radius_b * radius_b;
+			if (squaredLength(inst.pos - obj.pos) < radius_squared) {
+				const LocalTransform tr_b(inst.pos, getInstanceQuat(inst.rot_quat), inst.scale);
+				const LocalTransform rel_tr = tr_a.inverted() * tr_b;
+				Matrix mtx = rel_tr.rot.toMatrix();
+				mtx.multiply3x3(rel_tr.scale);
+				mtx.setTranslation(Vec3(rel_tr.pos));
+
+				if (testOBBCollision(aabb, mtx, aabb)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	bool paint(i32 x, i32 y) {
+		PROFILE_FUNCTION();
+		auto cmp = getComponent();
+		if (!cmp.im) return false;
+		if (!cmp.im->model || !cmp.im->model->isReady()) return false;
+
+		WorldEditor& editor = m_app.getWorldEditor();
+		DVec3 ray_origin;
+		Vec3 ray_dir;
+		editor.getView().getViewport().getRay(Vec2((float)x, (float)y), ray_origin, ray_dir);
+		const RayCastModelHit hit = m_brush != Brush::TERRAIN ? cmp.scene->castRay(ray_origin, ray_dir, INVALID_ENTITY) : cmp.scene->castRayTerrain(ray_origin, ray_dir);
+		if (!hit.is_hit) return false;
+
+		const DVec3 hit_pos = hit.origin + hit.t * hit.dir;
+		const DVec3 origin = editor.getUniverse()->getPosition(cmp.entity);
+		switch (m_brush) {
+			case Brush::SINGLE: {
+				InstancedModel::InstanceData& id = cmp.im->instances.emplace();
+				id.scale = 1;
+				id.rot_quat = Vec3::ZERO;
+				id.lod = 3;
+				id.pos = Vec3(hit_pos - origin);
+				cmp.scene->initInstancedModelGPUData(cmp.entity);
+				m_selected = cmp.im->instances.size() - 1;
+				break;
+			}
+			case Brush::TERRAIN: {
+				const EntityRef terrain = *hit.entity;
+				const Transform terrain_tr = editor.getUniverse()->getTransform(terrain);
+				const Transform inv_terrain_tr = terrain_tr.inverted();
+
+				const bool remove = ImGui::GetIO().KeyCtrl; // TODO
+
+				Array<InstancedModel::InstanceData> existing(m_app.getAllocator());
+				Vec2 center_xz = Vec3(hit_pos - origin).xz();
+				const float model_radius = cmp.im->model->getOriginBoundingRadius();
+				const float radius_squared = (m_brush_radius + 2 * model_radius) * (m_brush_radius + 2 * model_radius);
+				UniquePtr<RemoveCommand> remove_cmd = UniquePtr<RemoveCommand>::create(editor.getAllocator(), cmp.entity, editor);
+				{
+					PROFILE_BLOCK("existing");
+					for (u32 i = 0; i < (u32)cmp.im->instances.size(); ++i) {
+						const InstancedModel::InstanceData& id = cmp.im->instances[i];
+						if (squaredLength(id.pos.xz() - center_xz) < radius_squared) {
+							if (remove) {
+								remove_cmd->indices.push(i);
+							}
+							else {
+								existing.push(id);
+							}
+						}
+					}
+				}
+				
+				if (!remove) {
+					UniquePtr<AddCommand> add_cmd = UniquePtr<AddCommand>::create(editor.getAllocator(), cmp.entity, editor);
+					for (int i = 0; i <= m_brush_radius * m_brush_radius / 100.0f * m_brush_strength; ++i) {
+						const float angle = randFloat(0, PI * 2);
+						const float dist = randFloat(0, 1.0f) * m_brush_radius;
+						DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
+						const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
+						pos.y = cmp.scene->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + terrain_tr.pos.y;
+						pos.y += randFloat(m_y_spread.x, m_y_spread.y);
+						
+						InstancedModel::InstanceData id;
+						id.scale = randFloat(m_size_spread.x, m_size_spread.y);
+						id.rot_quat = Vec3::ZERO;
+						id.lod = 3;
+
+						Quat rot = Quat::IDENTITY;
+						if (m_is_rotate_x) {
+							float angle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
+							Quat q(Vec3(1, 0, 0), angle);
+							rot = q * rot;
+						}
+
+						if (m_is_rotate_y) {
+							float angle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+							Quat q(Vec3(0, 1, 0), angle);
+							rot = q * rot;
+						}
+
+						if (m_is_rotate_z) {
+							float angle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
+							Quat q(rot.rotate(Vec3(0, 0, 1)), angle);
+							rot = q * rot;
+						}
+
+						id.rot_quat = Vec3(rot.x, rot.y, rot.z);
+						if (rot.w < 0) id.rot_quat = -id.rot_quat;
+
+						id.pos = Vec3(pos - origin);
+						if (!isOBBCollision(existing, id, cmp.im->model, m_bounding_offset)) {
+							 add_cmd->instances.push(id);
+							 existing.push(id);
+						}
+					}
+					editor.beginCommandGroup("add_instanced_model_instances_group");
+					editor.executeCommand(add_cmd.move());
+					editor.endCommandGroup();
+					m_can_lock_group = true;
+				}
+				else {
+					editor.beginCommandGroup("remove_instanced_model_instances_group");
+					editor.executeCommand(remove_cmd.move());
+					editor.endCommandGroup();
+					m_can_lock_group = true;
+				}
+				break;
+			}
+		}
+		return true;
+	}
+
+	void onMouseMove(UniverseView& view, int x, int y, int, int) override {
+		if (ImGui::GetIO().KeyShift && m_brush == Brush::TERRAIN) {
+			paint(x, y);
+		}
+	}
+
+	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {
+		if (m_can_lock_group) {
+			m_app.getWorldEditor().lockGroupCommand();
+			m_can_lock_group = false;
+		}
+	}
+
+	bool onMouseDown(UniverseView& view, int x, int y) override {
+		if (ImGui::GetIO().KeyShift) return paint(x, y);
+
+		auto cmp = getComponent();
+		if (!cmp.im) return false;
+		if (!cmp.im->model || !cmp.im->model->isReady()) return false;
+
+		DVec3 ray_origin;
+		Vec3 ray_dir;
+		view.getViewport().getRay(Vec2((float)x, (float)y), ray_origin, ray_dir);
+		RayCastModelHit hit = cmp.scene->castRayInstancedModels(ray_origin, ray_dir, [](const RayCastModelHit&){ return true; });
+		if (hit.is_hit && hit.entity == cmp.entity) {
+			m_selected = hit.subindex;
+			return true;
+		}
+		return false;
+	}
+
+	static void drawCircle(RenderScene& scene, const DVec3& center, float radius, u32 color) {
+		constexpr i32 SLICE_COUNT = 30;
+		constexpr float angle_step = PI * 2 / SLICE_COUNT;
+		for (i32 i = 0; i < SLICE_COUNT + 1; ++i) {
+			const float angle = i * angle_step;
+			const float next_angle = i * angle_step + angle_step;
+			const DVec3 from = center + DVec3(cosf(angle), 0, sinf(angle)) * radius;
+			const DVec3 to = center + DVec3(cosf(next_angle), 0, sinf(next_angle)) * radius;
+			scene.addDebugLine(from, to, color);
+		}		
+	}
+
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
+		if (cmp.type != INSTANCED_MODEL_TYPE) return;
+		RenderScene* render_scene = ((RenderScene*)cmp.scene);
+		InstancedModel& im = render_scene->getInstancedModels()[*cmp.entity];
+		
+		ImGuiEx::Label("Instances");
+		ImGui::Text("%d", im.instances.size());
+
+		ImGuiEx::Label("Selected instance");
+		ImGui::InputInt("##sel", &m_selected);
+		m_selected = clamp(m_selected, -1, im.instances.size() - 1);
+
+		if (m_selected >= 0 && m_selected < im.instances.size()) {
+			DVec3 origin = cmp.scene->getUniverse().getPosition(*cmp.entity);
+			Transform tr;
+			tr.rot = getInstanceQuat(im.instances[m_selected].rot_quat);
+			tr.scale = im.instances[m_selected].scale;
+			tr.pos = origin + DVec3(im.instances[m_selected].pos);
+			const Gizmo::Config& cfg = m_app.getGizmoConfig();
+			bool changed = Gizmo::manipulate(u64(4) << 32 | cmp.entity.index, editor.getView(), tr, cfg);
+
+			Vec3 p = im.instances[m_selected].pos;
+			ImGuiEx::Label("Position");
+			if (ImGui::DragFloat3("##pos", &p.x, 0.01f)) {
+				changed = true;
+				tr.pos = origin + DVec3(p);
+			}
+
+			ImGuiEx::Label("Rotation");
+			Vec3 euler = tr.rot.toEuler();
+			if (ImGuiEx::InputRotation("##rot", &euler.x)) {
+				tr.rot.fromEuler(euler);
+				changed = true;
+			}
+
+			ImGuiEx::Label("Scale");
+			changed = ImGui::DragFloat("##scale", &tr.scale, 0.01f) || changed;
+
+			if (changed) {
+				tr.pos = tr.pos - origin;
+				UniquePtr<SetTransformCommand> cmd = UniquePtr<SetTransformCommand>::create(editor.getAllocator(), *cmp.entity, m_selected, tr, editor);
+				editor.executeCommand(cmd.move());
+			}
+		}
+
+		ImGui::Separator();
+		ImGuiEx::Label("Brush");
+		ImGui::Combo("##brush", (i32*)&m_brush, "Single\0Terrain\0");
+
+		switch (m_brush) {
+			case Brush::SINGLE:
+				break;
+			case Brush::TERRAIN: {
+				ImGuiEx::Label("Brush radius");
+				ImGui::DragFloat("##brush_radius", &m_brush_radius, 0.1f, 0.f, FLT_MAX);
+				ImGuiEx::Label("Brush strength");
+				ImGui::SliderFloat("##brush_str", &m_brush_strength, 0.f, 1.f, "%.2f");
+				ImGuiEx::Label("Bounding offset");
+				ImGui::DragFloat("##bounding_offset", &m_bounding_offset, 0.1f, -FLT_MAX, 0);
+				ImGuiEx::Label("Size spread");
+				ImGui::DragFloatRange2("##size_spread", &m_size_spread.x, &m_size_spread.y, 0.01f);
+				m_size_spread.x = minimum(m_size_spread.x, m_size_spread.y);
+				ImGuiEx::Label("Y spread");
+				ImGui::DragFloatRange2("##y_spread", &m_y_spread.x, &m_y_spread.y, 0.01f);
+				m_y_spread.x = minimum(m_y_spread.x, m_y_spread.y);
+				
+				if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x)) {
+					//if (m_is_rotate_x) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_x) {
+					Vec2 tmp = m_rotate_x_spread;
+					tmp.x = radiansToDegrees(tmp.x);
+					tmp.y = radiansToDegrees(tmp.y);
+					if (ImGui::DragFloatRange2("Rotate X spread", &tmp.x, &tmp.y)) {
+						m_rotate_x_spread.x = degreesToRadians(tmp.x);
+						m_rotate_x_spread.y = degreesToRadians(tmp.y);
+					}
+				}
+
+				if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y)) {
+					//if (m_is_rotate_y) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_y) {
+					Vec2 tmp = m_rotate_y_spread;
+					tmp.x = radiansToDegrees(tmp.x);
+					tmp.y = radiansToDegrees(tmp.y);
+					if (ImGui::DragFloatRange2("Rotate Y spread", &tmp.x, &tmp.y)) {
+						m_rotate_y_spread.x = degreesToRadians(tmp.x);
+						m_rotate_y_spread.y = degreesToRadians(tmp.y);
+					}
+				}
+
+				if (ImGui::Checkbox("Rotate around Z", &m_is_rotate_z)) {
+					//if (m_is_rotate_z) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_z) {
+					Vec2 tmp = m_rotate_z_spread;
+					tmp.x = radiansToDegrees(tmp.x);
+					tmp.y = radiansToDegrees(tmp.y);
+					if (ImGui::DragFloatRange2("Rotate Z spread", &tmp.x, &tmp.y)) {
+						m_rotate_z_spread.x = degreesToRadians(tmp.x);
+						m_rotate_z_spread.y = degreesToRadians(tmp.y);
+					}
+				}
+
+				if (ImGui::GetIO().KeyShift) {
+					const Vec2 mp = editor.getView().getMousePos();
+					DVec3 ray_origin;
+					Vec3 ray_dir;
+					editor.getView().getViewport().getRay(mp, ray_origin, ray_dir);
+					const RayCastModelHit hit = render_scene->castRayTerrain(ray_origin, ray_dir);
+					if (hit.is_hit) {
+						drawCircle(*render_scene, hit.origin + hit.t * hit.dir, m_brush_radius, 0xff880000);
+					}
+				}
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+	}
+
+	enum class Brush : i32 {
+		SINGLE,
+		TERRAIN
+	};
+
+	StudioApp& m_app;
+	Brush m_brush = Brush::SINGLE;
+	float m_brush_radius = 10.f;
+	float m_brush_strength = 1.f;
+	float m_bounding_offset = 0;
+	i32 m_selected = -1;
+	Vec2 m_size_spread = Vec2(1);
+	Vec2 m_y_spread = Vec2(0);
+
+	bool m_is_rotate_x = false;
+	bool m_is_rotate_y = false;
+	bool m_is_rotate_z = false;
+	Vec2 m_rotate_x_spread;
+	Vec2 m_rotate_y_spread;
+	Vec2 m_rotate_z_spread;
+	bool m_can_lock_group = false;
+};
 
 struct TerrainPlugin final : PropertyGrid::IPlugin
 {
@@ -3824,6 +4320,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		{
 			PROFILE_FUNCTION();
 
+			renderer->beginProfileBlock("editor imgui", 0);
 			gpu::pushDebugGroup("imgui");
 
 			vb_offset = 0;
@@ -3885,6 +4382,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			gpu::setCurrentWindow(nullptr);
 
 			gpu::popDebugGroup();
+			renderer->endProfileBlock();
 		}
 		
 		Renderer* renderer;
@@ -4207,6 +4705,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_editor_ui_render_plugin(app)
 		, m_env_probe_plugin(app)
 		, m_terrain_plugin(app)
+		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
 	{
 	}
@@ -4260,6 +4759,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.addPlugin(m_model_properties_plugin);
 		property_grid.addPlugin(m_env_probe_plugin);
 		property_grid.addPlugin(m_terrain_plugin);
+		property_grid.addPlugin(m_instanced_model_plugin);
 		property_grid.addPlugin(m_particle_emitter_property_plugin);
 
 		m_scene_view.init();
@@ -4505,6 +5005,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.removePlugin(m_model_properties_plugin);
 		property_grid.removePlugin(m_env_probe_plugin);
 		property_grid.removePlugin(m_terrain_plugin);
+		property_grid.removePlugin(m_instanced_model_plugin);
 		property_grid.removePlugin(m_particle_emitter_property_plugin);
 	}
 
@@ -4523,6 +5024,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	SceneView m_scene_view;
 	EnvironmentProbePlugin m_env_probe_plugin;
 	TerrainPlugin m_terrain_plugin;
+	InstancedModelPlugin m_instanced_model_plugin;
 	ModelPlugin m_model_plugin;
 };
 

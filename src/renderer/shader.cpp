@@ -92,6 +92,14 @@ gpu::ProgramHandle Shader::getProgram(const gpu::VertexDecl& decl, u32 defines) 
 	return m_renderer.queueShaderCompile(*this, decl, defines);
 }
 
+gpu::ProgramHandle Shader::getProgram(u32 defines) {
+	ASSERT(m_sources.stages.empty() || m_sources.stages[0].type == gpu::ShaderType::COMPUTE);
+	const u64 key = defines;
+	auto iter = m_programs.find(key);
+	if (iter.isValid()) return iter.value();
+	return m_renderer.queueShaderCompile(*this, gpu::VertexDecl(), defines);
+}
+
 static Shader* getShader(lua_State* L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
