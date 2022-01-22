@@ -1432,7 +1432,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindUniformBuffer(UniformBuffer::PASS, pass_state_buffer, 0, sizeof(PassState));
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 				pipeline->m_stats = {};
-				IVec4 tmp(0);
+				int tmp[12] = {};
 				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
 			}
 			void setup() override {}
@@ -3142,6 +3142,8 @@ struct PipelineImpl final : Pipeline
 			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
+			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
+			
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
 				struct {
 					Vec4 camera_offset;
@@ -3179,25 +3181,19 @@ struct PipelineImpl final : Pipeline
 				gpu::useProgram(m_cull_shader);
 				gpu::dispatch((g.instance_count + 255) / 256, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, g.instance_data);
 
 				if (!m_camera_params.is_shadow) {
+					gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, g.instance_data);
 					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
 				}
-				gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::useProgram(m_indirect_shader);
 				gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
 
 				gpu::useProgram(m_gather_shader);
 				gpu::dispatch((g.instance_count + 255) / 256, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
-
-				gpu::useProgram(m_finalize_shader);
-				gpu::dispatch(1, 1, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
-
 			}
+			gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
 			
 			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
 			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
@@ -3250,7 +3246,6 @@ struct PipelineImpl final : Pipeline
 		gpu::ProgramHandle m_indirect_shader;
 		gpu::ProgramHandle m_cull_shader;
 		gpu::ProgramHandle m_init_shader;
-		gpu::ProgramHandle m_finalize_shader;
 	};
 
 	u32 cull(CameraParams cp) {
@@ -3270,7 +3265,6 @@ struct PipelineImpl final : Pipeline
 			job.m_instanced_meshes = view.instanced_meshes;
 			job.m_gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
 			job.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
-			job.m_finalize_shader = m_instancing_shader->getProgram(0);
 			u32 cull_shader_define_mask = 1 << m_renderer.getShaderDefineIdx("PASS1");
 			if (!cp.is_shadow) cull_shader_define_mask |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
 			job.m_cull_shader = m_instancing_shader->getProgram(cull_shader_define_mask);

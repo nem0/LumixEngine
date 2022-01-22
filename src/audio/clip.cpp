@@ -73,6 +73,7 @@ bool Clip::load(u64 size, const u8* mem)
 			}
 		}
 		case Format::OGG: {
+			PROFILE_BLOCK("ogg");
 			short* output = nullptr;
 			auto res = stb_vorbis_decode_memory((unsigned char*)blob.skip(0), (int)(size - blob.getPosition()), &m_channels, &m_sample_rate, &output);
 			if (res <= 0) return false;

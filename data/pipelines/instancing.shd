@@ -32,7 +32,7 @@ compute_shader [[
 		};
 	#endif
 
-	layout(binding = 1, std430) coherent buffer OutData {
+	layout(binding = 1, std430) buffer OutData {
 		uvec4 b_batch_offset;
 		uvec4 b_lod_count;
 		uvec4 b_lod_offset;
@@ -82,6 +82,7 @@ compute_shader [[
 		uint id = gl_GlobalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
 		#ifdef PASS0
 			if (id == 0) {
+				b_batch_offset.x += uint(dot(b_lod_count, vec4(1)));
 				b_lod_offset = uvec4(b_batch_offset.x);
 				b_lod_count = uvec4(0);
 			}
@@ -200,11 +201,6 @@ compute_shader [[
 				b_output[idx].rot.w = sqrt(1 - dot(r, r));
 				b_output[idx].pos_scale = inp.pos_scale + vec4(u_camera_offset.xyz, 0);
 				b_output[idx].lod_fade = vec4(t - 1, 0, 0, 0);
-			}
-
-		#else
-			if (id == 0) {
-				b_batch_offset.x += uint(dot(b_lod_count, vec4(1)));
 			}
 		#endif
 	}
