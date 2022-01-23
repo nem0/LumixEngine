@@ -1153,8 +1153,6 @@ struct PipelineImpl final : Pipeline
 		lua_pop(m_lua_state, 1);
 	}
 
-	gpu::BufferHandle getDrawcallUniformBuffer() override { return m_drawcall_ub; }
-
 	Viewport getViewport() override {
 		return m_viewport;
 	}
@@ -1738,6 +1736,8 @@ struct PipelineImpl final : Pipeline
 		m_scene = scene;
 		if (m_lua_state && m_scene) callInitScene();
 	}
+	
+	Renderer& getRenderer() const override { return m_renderer; }
 
 	RenderScene* getScene() const override { return m_scene; }
 
@@ -1993,14 +1993,16 @@ struct PipelineImpl final : Pipeline
 					if (!material) continue;
 
 					Drawcall& dc = m_drawcalls.emplace();
-					dc.pos = lpos;
-					dc.rot = tr.rot;
 					dc.program = material->getShader()->getProgram(decl, 0);
 					dc.material = material->getRenderData();
 					dc.size = size;
 					dc.particles_count = emitter.getParticlesCount();
 					dc.slice = m_pipeline->m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
 					emitter.fillInstanceData((float*)dc.slice.ptr);
+					dc.ub = m_pipeline->m_renderer.allocUniform(sizeof(Matrix));
+					Matrix mtx = tr.rot.toMatrix();
+					mtx.setTranslation(lpos);
+					memcpy(dc.ub.ptr, &mtx, sizeof(mtx));
 				}
 			}
 
@@ -2015,16 +2017,13 @@ struct PipelineImpl final : Pipeline
 				const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
 				for (const Drawcall& dc : m_drawcalls) {
-					Matrix mtx = dc.rot.toMatrix();
-					mtx.setTranslation(dc.pos);
-
 					if (material_ub_idx != dc.material->material_constants) {
 						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 						material_ub_idx = dc.material->material_constants;
 					}
 
 					gpu::bindTextures(dc.material->textures, 0, dc.material->textures_count);
-					gpu::update(m_pipeline->m_drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, dc.ub.buffer, dc.ub.offset, dc.ub.size);
 					gpu::useProgram(dc.program);
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2035,13 +2034,12 @@ struct PipelineImpl final : Pipeline
 			}
 
 			struct Drawcall {
-				Vec3 pos;
-				Quat rot;
 				gpu::ProgramHandle program;
 				Material::RenderData* material;
 				int size;
 				int particles_count;
 				Renderer::TransientSlice slice; 
+				Renderer::TransientSlice ub; 
 			};
 
 			Array<Drawcall> m_drawcalls; 

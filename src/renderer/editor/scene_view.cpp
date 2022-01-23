@@ -809,9 +809,10 @@ void SceneView::renderIcons()
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;
-					item.mtx = rd.mtx;
 					item.material = mesh.material->getRenderData();
 					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, item.material->define_mask);
+					item.ub = m_renderer.allocUniform(sizeof(Matrix));
+					memcpy(item.ub.ptr, &rd.mtx, sizeof(rd.mtx));
 				}
 			}
 		}
@@ -819,13 +820,11 @@ void SceneView::renderIcons()
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const gpu::BufferHandle drawcall_ub = m_ui->m_pipeline->getDrawcallUniformBuffer();
 			m_renderer.beginProfileBlock("icons", 0);
-			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(Matrix));
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				gpu::update(drawcall_ub, &item.mtx.columns[0].x, sizeof(item.mtx));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, item.ub.buffer, item.ub.offset, item.ub.size);
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
 				gpu::useProgram(item.program);
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
@@ -841,7 +840,7 @@ void SceneView::renderIcons()
 			gpu::ProgramHandle program;
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
-			Matrix mtx;
+			Renderer::TransientSlice ub;
 		};
 
 		IAllocator& m_allocator;
@@ -901,6 +900,28 @@ void SceneView::renderSelection()
 						}
 					}
 					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, define_mask);
+					if (item.pose.empty()) {
+						item.ub = m_pipeline->getRenderer().allocUniform(sizeof(item.mtx));
+						memcpy(item.ub.ptr, &item.mtx, sizeof(item.mtx));
+					}
+					else {
+						struct UBPrefix {
+							float layer;
+							float fur_scale;
+							float gravity;
+							float padding;
+							Matrix model_mtx;
+							// DualQuat bones[];
+						};
+
+						item.ub = m_pipeline->getRenderer().allocUniform(sizeof(UBPrefix) + item.pose.byte_size());
+						UBPrefix* dc = (UBPrefix*)item.ub.ptr;
+						dc->layer = 0;
+						dc->fur_scale = 0;
+						dc->gravity = 0;
+						dc->model_mtx = item.mtx;
+						memcpy(item.ub.ptr + sizeof(UBPrefix), item.pose.begin(), item.pose.byte_size());
+					}
 				}
 				scene->unlockPose(e, false);
 			}
@@ -909,36 +930,11 @@ void SceneView::renderSelection()
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
-
 			gpu::pushDebugGroup("selection");
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				if (item.pose.empty()) {
-					gpu::update(drawcall_ub, &item.mtx.columns[0].x, sizeof(item.mtx));
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(item.mtx));
-				}
-				else {
-					struct {
-						float layer;
-						float fur_scale;
-						float gravity;
-						float padding;
-						Matrix model_mtx;
-						DualQuat bones[255];
-					} dc;
-					ASSERT(item.pose.size() < (i32)lengthOf(dc.bones));
-					dc.layer = 0;
-					dc.fur_scale = 0;
-					dc.gravity = 0;
-					dc.model_mtx = item.mtx;
-					memcpy(dc.bones, item.pose.begin(), item.pose.byte_size());
-					const u32 size = item.pose.byte_size() + sizeof(Vec4);
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, size);
-					gpu::update(drawcall_ub, &dc, size);
-				}
-
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, item.ub.buffer, item.ub.offset, item.ub.size);
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
 				gpu::useProgram(item.program);
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
@@ -957,6 +953,7 @@ void SceneView::renderSelection()
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
 			Matrix mtx;
+			Renderer::TransientSlice ub;
 		};
 
 		IAllocator& m_allocator;
@@ -996,6 +993,8 @@ void SceneView::renderGizmos()
 			auto& vertices = view->m_view->m_draw_vertices;
 			vb = renderer->allocTransient(vertices.byte_size());
 			memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
+			ub = renderer->allocUniform(sizeof(Matrix));
+			memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 		}
 
 		void execute() override {
@@ -1005,11 +1004,8 @@ void SceneView::renderGizmos()
 			renderer->beginProfileBlock("gizmos", 0);
 			gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 			u32 offset = 0;
-			const gpu::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
-			const Matrix mtx = Matrix::IDENTITY;
-			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(mtx));
+			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			for (const UniverseViewImpl::DrawCmd& cmd : cmds) {
-				gpu::update(drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
 				gpu::useProgram(program);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
@@ -1027,6 +1023,7 @@ void SceneView::renderGizmos()
 		Renderer* renderer;
 		Renderer::TransientSlice ib;
 		Renderer::TransientSlice vb;
+		Renderer::TransientSlice ub;
 		Viewport viewport;
 		SceneView* view;
 		gpu::ProgramHandle program;

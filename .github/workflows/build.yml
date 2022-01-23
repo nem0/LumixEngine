@@ -111,6 +111,8 @@ jobs:
               cd projects
               ./genie --pvs-studio-build gmake
               cd tmp/gmake
-              pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
-              pvs-studio-analyzer analyze -e ../../../src/renderer/editor/mikktspace.c -e ../../../src/renderer/editor/miniz.c -e ../../../src/engine/lz4.c -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
-              plog-converter -a 'GA:1,2;OP:1' -d V730,V1001,V530,V1048,V763 -t errorfile -w pvs-studio.log
+              make -j
+# disabled for now since license expired
+#              pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
+#              pvs-studio-analyzer analyze -e ../../../src/renderer/editor/mikktspace.c -e ../../../src/renderer/editor/miniz.c -e ../../../src/engine/lz4.c -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
+#              plog-converter -a 'GA:1,2;OP:1' -d V730,V1001,V530,V1048,V763 -t errorfile -w pvs-studio.log
