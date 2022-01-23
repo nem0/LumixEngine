@@ -782,6 +782,7 @@ struct PipelineImpl final : Pipeline
 				u8 layer;
 			};
 
+			Renderer::TransientSlice drawcall_ub;
 			Transform origin;
 			gpu::BufferHandle instance_data;
 			u32 instance_count;
@@ -910,10 +911,6 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
 		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
 
-		PassState pass_state;
-		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
-		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, gpu::BufferFlags::UNIFORM_BUFFER);
-
 		const Renderer::MemRef dc_mem = { DRAWCALL_UB_SIZE, nullptr, false };
 		const gpu::BufferFlags dc_ub_flags = gpu::BufferFlags::UNIFORM_BUFFER;
 		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
@@ -980,7 +977,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.destroy(m_instanced_meshes_buffer);
 		m_renderer.destroy(m_indirect_buffer);
 		m_renderer.destroy(m_global_state_buffer);
-		m_renderer.destroy(m_pass_state_buffer);
 		m_renderer.destroy(m_drawcall_ub);
 		m_renderer.destroy(m_shadow_atlas.uniform_buffer);
 		m_renderer.destroy(m_shadow_atlas.texture);
@@ -1429,8 +1425,6 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
 				gpu::bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer, 0, sizeof(GlobalState));
-				gpu::bindUniformBuffer(UniformBuffer::PASS, pass_state_buffer, 0, sizeof(PassState));
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 				pipeline->m_stats = {};
 				int tmp[12] = {};
 				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
@@ -1438,7 +1432,6 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 
 			gpu::BufferHandle global_state_buffer;
-			gpu::BufferHandle pass_state_buffer;
 			PipelineImpl* pipeline;
 			GlobalState global_state;
 			PassState pass_state;
@@ -1448,7 +1441,6 @@ struct PipelineImpl final : Pipeline
 		start_job.pipeline = this;
 		start_job.global_state = global_state;
 		start_job.global_state_buffer = m_global_state_buffer;
-		start_job.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(start_job, 0);
 		
 		m_buckets_ready = jobs::INVALID_HANDLE;
@@ -1517,11 +1509,11 @@ struct PipelineImpl final : Pipeline
 			void setup() override {
 				PROFILE_FUNCTION();
 				const Array<DebugTriangle>& tris = pipeline->m_scene->getDebugTriangles();
-				vb.size = 0;
-				if (tris.size() == 0) return;
 
 				program = pipeline->m_debug_shape_shader->getProgram(pipeline->m_base_vertex_decl, 0);
 				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
+				ub = pipeline->m_renderer.allocUniform(sizeof(Matrix));
+				memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				for (u32 i = 0, c = tris.size(); i < c; ++i) {
 					vertices[3 * i + 0].color = tris[i].color;
@@ -1537,16 +1529,10 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override {
 				PROFILE_FUNCTION();
-
-				if (vb.size == 0) return;
-
 				gpu::pushDebugGroup("debug triangles");
-
-				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
 				gpu::useProgram(program);
-
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -1558,8 +1544,8 @@ struct PipelineImpl final : Pipeline
 			DVec3 viewport_pos;
 			gpu::ProgramHandle program;
 			Renderer::TransientSlice vb;
+			Renderer::TransientSlice ub;
 		};
-
 
 		const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
 		if (tris.empty() || !m_debug_shape_shader->isReady()) return;
@@ -1582,11 +1568,11 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				const Array<DebugLine>& lines = pipeline->m_scene->getDebugLines();
-				vb.size = 0;
-				if (lines.size() == 0) return;
 
 				program = pipeline->m_debug_shape_shader->getProgram(pipeline->m_base_vertex_decl, 0);
 				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
+				ub = pipeline->m_renderer.allocUniform(sizeof(Matrix));
+				memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				for (u32 i = 0, c = lines.size(); i < c; ++i) {
 					vertices[2 * i + 0].color = lines[i].color;
@@ -1601,18 +1587,13 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 				if (vb.size == 0) return;
-
 				gpu::pushDebugGroup("debug lines");
-
-				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 				gpu::useProgram(program);
-
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
 				gpu::drawArrays(gpu::PrimitiveType::LINES, 0, vb.size / sizeof(BaseVertex));
 				gpu::popDebugGroup();
 			}
@@ -1621,6 +1602,7 @@ struct PipelineImpl final : Pipeline
 			DVec3 viewport_pos;
 			gpu::ProgramHandle program;
 			Renderer::TransientSlice vb;
+			Renderer::TransientSlice ub;
 		};
 
 
@@ -1657,6 +1639,8 @@ struct PipelineImpl final : Pipeline
 			memcpy(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
 
 			program = pipeline->m_draw2d_shader->getProgram(pipeline->m_2D_decl, 0);
+			ub = pipeline->m_renderer.allocUniform(sizeof(matrix));
+			memcpy(ub.ptr, &matrix, sizeof(matrix));
 		}
 
 		void setup() override {}
@@ -1668,7 +1652,7 @@ struct PipelineImpl final : Pipeline
 
 			gpu::pushDebugGroup("draw2d");
 
-			gpu::update(pipeline->m_drawcall_ub, &matrix.columns[0].x, sizeof(matrix));
+			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
 			u32 elem_offset = 0;
 			gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			state = state | gpu::StateFlags::SCISSOR_TEST;
@@ -1715,6 +1699,7 @@ struct PipelineImpl final : Pipeline
 		gpu::TextureHandle atlas_texture;
 		Renderer::TransientSlice idx_buffer_mem;
 		Renderer::TransientSlice vtx_buffer_mem;
+		Renderer::TransientSlice ub;
 		int num_indices;
 		int num_vertices;
 		Array<Draw2D::Cmd> cmd_buffer;
@@ -2263,31 +2248,25 @@ struct PipelineImpl final : Pipeline
 	static int drawcallUniforms(lua_State* L) {
 		PipelineImpl* pipeline = getClosureThis(L);
 		const int len = lua_gettop(L);
-		float values[32];
-		if (len > (int)lengthOf(values)) {
-			return luaL_error(L, "%s", "Too many uniforms in drawcallUniforms");
-		}
-
-		for(int i = 0; i < len; ++i) {
-			values[i] = LuaWrapper::checkArg<float>(L, i + 1);
-		}
 
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(drawcall_ub, values, sizeof(values));
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(values));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
 			}
-			float values[32];
-			gpu::BufferHandle drawcall_ub;
+			Renderer::TransientSlice drawcall_ub;
 		};
 
 		Cmd& cmd = pipeline->m_renderer.createJob<Cmd>();
-		memcpy(cmd.values, values, sizeof(values));
-		cmd.drawcall_ub = pipeline->m_drawcall_ub;
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		cmd.drawcall_ub = pipeline->m_renderer.allocUniform(sizeof(float) * len);
 
+		float* values = (float*)cmd.drawcall_ub.ptr;
+		for(int i = 0; i < len; ++i) {
+			values[i] = LuaWrapper::checkArg<float>(L, i + 1);
+		}
+
+		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
 		return 0;
 	}
 
@@ -2400,30 +2379,36 @@ struct PipelineImpl final : Pipeline
 		struct PushPassStateCmd : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(pass_state_buffer, &pass_state, sizeof(pass_state));
-				gpu::bindUniformBuffer(UniformBuffer::PASS, pass_state_buffer, 0, sizeof(PassState));
+				gpu::bindUniformBuffer(UniformBuffer::PASS, buf.buffer, buf.offset, sizeof(PassState));
 			}
-			void setup() override {}
 
-			gpu::BufferHandle pass_state_buffer;
-			PassState pass_state;
+			void setup() override {
+				PROFILE_FUNCTION();
+				PassState* pass_state = (PassState*)buf.ptr;
+				pass_state->view = cp.view;
+				pass_state->projection = cp.projection;
+				pass_state->inv_projection = cp.projection.inverted();
+				pass_state->inv_view = cp.view.fastInverted();
+				pass_state->view_projection = cp.projection * cp.view;
+				pass_state->inv_view_projection = pass_state->view_projection.inverted();
+				pass_state->view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+				pass_state->camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
+				toPlanes(cp, Span(pass_state->camera_planes));
+				if (cp.is_shadow) {
+					pass_state->shadow_to_camera = Vec4(Vec3(viewport_pos - cp.pos), 1);
+				}
+			}
+
+			Renderer::TransientSlice buf;
+			CameraParams cp;
+			DVec3 viewport_pos;
 		};
 
 		PushPassStateCmd& cmd = m_renderer.createJob<PushPassStateCmd>();
-		cmd.pass_state.view = cp.view;
-		cmd.pass_state.projection = cp.projection;
-		cmd.pass_state.inv_projection = cp.projection.inverted();
-		cmd.pass_state.inv_view = cp.view.fastInverted();
-		cmd.pass_state.view_projection = cp.projection * cp.view;
-		cmd.pass_state.inv_view_projection = cmd.pass_state.view_projection.inverted();
-		cmd.pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-		cmd.pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
-		toPlanes(cp, Span(cmd.pass_state.camera_planes));
-		if (cp.is_shadow) {
-			cmd.pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
-		}
+		cmd.cp = cp;
+		cmd.viewport_pos = m_viewport.pos;
+		cmd.buf = m_renderer.allocUniform(sizeof(PassState));
 		
-		cmd.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -2449,10 +2434,6 @@ struct PipelineImpl final : Pipeline
 
 				gpu::bindTextures(m_textures_handles, 0, m_textures_count);
 
-				if (m_uniforms_count > 0) {
-					gpu::update(m_pipeline->m_drawcall_ub, m_uniforms, sizeof(m_uniforms[0]) * m_uniforms_count);
-				}
-
 				gpu::useProgram(m_program);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2463,8 +2444,6 @@ struct PipelineImpl final : Pipeline
 			PipelineImpl* m_pipeline;
 			gpu::TextureHandle m_textures_handles[16];
 			u32 m_textures_count = 0;
-			float m_uniforms[16][4];
-			int m_uniforms_count = 0;
 			Shader* m_shader;
 			int m_indices_count;
 			int m_indices_offset;
@@ -3135,42 +3114,26 @@ struct PipelineImpl final : Pipeline
 		{
 		}
 		
+		struct UBValues {
+			Vec4 camera_offset;
+			Vec4 lod_distances;
+			IVec4 lod_indices;
+			u32 batch_size;
+			u32 indirect_offset;
+			float radius;
+			u32 padding;
+			Vec4 camera_planes[6];
+			IVec4 indices_count[32];
+		};
+
 		void execute() override {
 			PROFILE_FUNCTION();
-			gpu::pushDebugGroup("cull instanced models");
 			m_pipeline->m_renderer.beginProfileBlock("cull instanced models", 0);
-			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
 			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
 			
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-				struct {
-					Vec4 camera_offset;
-					Vec4 lod_distances;
-					IVec4 lod_indices;
-					u32 batch_size;
-					u32 indirect_offset;
-					float radius;
-					u32 padding;
-					Vec4 camera_planes[6];
-					IVec4 indices_count[32];
-				} ub_values;
-				ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
-				ub_values.batch_size = g.instance_count;
-				ub_values.lod_distances = g.lod_distances;
-				ub_values.lod_indices = g.lod_indices;
-				ub_values.indirect_offset = g.indirect_offset;
-				ub_values.radius = g.radius;
-				toPlanes(m_camera_params, Span(ub_values.camera_planes));
-
-				ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
-				for (const auto& m : g.meshes) {
-					ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
-				}
-
-				gpu::update(drawcall_ub, &ub_values, sizeof(ub_values));
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(ub_values));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, g.drawcall_ub.buffer, g.drawcall_ub.offset, sizeof(UBValues));
 
 				gpu::bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::useProgram(m_init_shader);
@@ -3188,32 +3151,37 @@ struct PipelineImpl final : Pipeline
 				}
 				gpu::useProgram(m_indirect_shader);
 				gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
 
 				gpu::useProgram(m_gather_shader);
 				gpu::dispatch((g.instance_count + 255) / 256, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 			}
-			gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
+			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
 			
 			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
 			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
 			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);
 			
 			m_pipeline->m_renderer.endProfileBlock();
-			gpu::popDebugGroup();
 		}
 
 		void setup() override {
+			PROFILE_FUNCTION();
 			const Universe& universe = m_pipeline->m_scene->getUniverse();
 			const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
 			Renderer& renderer = m_pipeline->m_renderer;
 			const u32 instanced_define_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 			m_instanced_meshes->models.reserve(ims.size());
+			UBValues ub_values;
+			toPlanes(m_camera_params, Span(ub_values.camera_planes));
+
 			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
 				Model* m = iter.value().model;
 				if (!m || !m->isReady()) continue;
 
 				InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
+
 				g.origin = universe.getTransform(iter.key());
 				g.lod_distances = *(Vec4*)m->getLODDistances();
 				g.lod_indices.x = m->getLODIndices()[0].to;
@@ -3233,6 +3201,20 @@ struct PipelineImpl final : Pipeline
 					m.material = mesh.material->getRenderData();
 					m.layer = mesh.layer;
 				}
+
+				ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
+				ub_values.batch_size = g.instance_count;
+				ub_values.lod_distances = g.lod_distances;
+				ub_values.lod_indices = g.lod_indices;
+				ub_values.indirect_offset = g.indirect_offset;
+				ub_values.radius = g.radius;
+				ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
+				for (const auto& m : g.meshes) {
+					ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
+				}
+
+				g.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(ub_values));
+				memcpy(g.drawcall_ub.ptr, &ub_values, sizeof(ub_values));
 			}
 			jobs::decSignal(m_instanced_meshes->culled);
 		}
@@ -4186,6 +4168,45 @@ struct PipelineImpl final : Pipeline
 		{
 		}
 
+		struct UBValues {
+			Vec4 pos;
+			Vec4 lod_ref_point;
+			IVec2 from;
+			IVec2 to;
+			Vec2 terrain_size;
+			float terrain_y_scale;
+			float distance;
+			u32 step;
+			float grass_height;
+			u32 indices_count;
+			u32 type_mask;
+			float radius;
+			u32 rotation_mode;
+			Vec2 terrain_xz_scale;
+		};
+
+		struct Grass {
+			Mesh::RenderData* mesh;
+			Material::RenderData* material;
+			float distance;
+			u32 step;
+			Matrix mtx;
+			Vec3 lod_ref_point;
+			gpu::TextureHandle heightmap;
+			gpu::TextureHandle splatmap;
+			gpu::ProgramHandle program;
+			Vec2 terrain_size;
+			float terrain_y_scale;
+			Vec2 terrain_xz_scale;
+			float grass_height;
+			IVec2 from;
+			IVec2 to;
+			u32 type;
+			float radius;
+			u32 rotation_mode;
+			Renderer::TransientSlice drawcall_ub;
+		};
+
 		void setup() override {
 			PROFILE_FUNCTION();
 			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
@@ -4229,6 +4250,23 @@ struct PipelineImpl final : Pipeline
 						grass.type = u32(&type - terrain->m_grass_types.begin());
 						grass.radius = type.m_grass_model->getOriginBoundingRadius();
 						grass.rotation_mode = (u32)type.m_rotation_mode;
+
+						grass.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(UBValues));
+						UBValues* dc = new (NewPlaceholder(), grass.drawcall_ub.ptr) UBValues;
+						dc->pos = Vec4(grass.mtx.getTranslation(), 1);
+						dc->lod_ref_point = Vec4(grass.lod_ref_point, 1);
+						dc->from = grass.from;
+						dc->to = grass.to;
+						dc->terrain_size = grass.terrain_size;
+						dc->terrain_y_scale = grass.terrain_y_scale;
+						dc->distance = grass.distance;
+						dc->step = grass.step;
+						dc->grass_height = grass.grass_height;
+						dc->indices_count = grass.mesh->indices_count;
+						dc->type_mask = 1 << grass.type;
+						dc->radius = grass.radius;
+						dc->rotation_mode = grass.rotation_mode;
+						dc->terrain_xz_scale = grass.terrain_xz_scale;
 					}
 				}
 			}
@@ -4242,43 +4280,10 @@ struct PipelineImpl final : Pipeline
 			Renderer& renderer = m_pipeline->m_renderer;
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
-			gpu::pushDebugGroup("grass");
 			renderer.beginProfileBlock("grass", 0);
 			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
 
 			for (const Grass& grass : m_grass) {
-				struct {
-					Vec4 pos;
-					Vec4 lod_ref_point;
-					IVec2 from;
-					IVec2 to;
-					Vec2 terrain_size;
-					float terrain_y_scale;
-					float distance;
-					u32 step;
-					float grass_height;
-					u32 indices_count;
-					u32 type_mask;
-					float radius;
-					u32 rotation_mode;
-					Vec2 terrain_xz_scale;
-				} dc;
-				dc.pos = Vec4(grass.mtx.getTranslation(), 1);
-				dc.lod_ref_point = Vec4(grass.lod_ref_point, 1);
-				dc.from = grass.from;
-				dc.to = grass.to;
-				dc.terrain_size = grass.terrain_size;
-				dc.terrain_y_scale = grass.terrain_y_scale;
-				dc.distance = grass.distance;
-				dc.step = grass.step;
-				dc.grass_height = grass.grass_height;
-				dc.indices_count = grass.mesh->indices_count;
-				dc.type_mask = 1 << grass.type;
-				dc.radius = grass.radius;
-				dc.rotation_mode = grass.rotation_mode;
-				dc.terrain_xz_scale = grass.terrain_xz_scale;
-				gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
-
 				Indirect indirect_dc;
 				indirect_dc.base_instance = 0;
 				indirect_dc.base_vertex = 0;
@@ -4290,10 +4295,11 @@ struct PipelineImpl final : Pipeline
 				gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::bindTextures(&grass.heightmap, 2, 1);
 				gpu::bindTextures(&grass.splatmap, 3, 1);
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, m_pipeline->m_drawcall_ub, 0, sizeof(dc));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, sizeof(UBValues));
 				gpu::useProgram(m_compute_shader);
 				const IVec2 size =  (grass.to - grass.from) / grass.step;
 				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, data);
 				
 				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
 				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
@@ -4317,31 +4323,9 @@ struct PipelineImpl final : Pipeline
 				//m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3;
 			}
 			renderer.endProfileBlock();
-			gpu::popDebugGroup();
 			//m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
 			//m_pipeline->m_stats.draw_call_count += m_grass.size();
 		}
-
-		struct Grass {
-			Mesh::RenderData* mesh;
-			Material::RenderData* material;
-			float distance;
-			u32 step;
-			Matrix mtx;
-			Vec3 lod_ref_point;
-			gpu::TextureHandle heightmap;
-			gpu::TextureHandle splatmap;
-			gpu::ProgramHandle program;
-			Vec2 terrain_size;
-			float terrain_y_scale;
-			Vec2 terrain_xz_scale;
-			float grass_height;
-			IVec2 from;
-			IVec2 to;
-			u32 type;
-			float radius;
-			u32 rotation_mode;
-		};
 
 		IAllocator& m_allocator;
 		gpu::ProgramHandle m_compute_shader;
@@ -4357,9 +4341,7 @@ struct PipelineImpl final : Pipeline
 			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
 
 			PROFILE_FUNCTION();
-			gpu::pushDebugGroup("draw instanced models");
 			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
-			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
 				for (const auto& m : g.meshes) {
@@ -4387,7 +4369,6 @@ struct PipelineImpl final : Pipeline
 			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 			m_pipeline->m_renderer.endProfileBlock();
-			gpu::popDebugGroup();
 		}
 
 		void setup() override {
@@ -4429,7 +4410,7 @@ struct PipelineImpl final : Pipeline
 				if (!info.terrain->m_heightmap) continue;
 				if (!info.terrain->m_heightmap->isReady()) continue;
 				
-				Instance& inst = m_instances.emplace();
+				Instance& inst = m_instances.emplace(m_allocator);
 				inst.pos = Vec3(info.position - m_camera_params.pos);
 				inst.ref_pos = Vec3(info.position - m_pipeline->m_viewport.pos);
 				inst.rot = info.rot;
@@ -4437,7 +4418,73 @@ struct PipelineImpl final : Pipeline
 				inst.hm_size = info.terrain->getSize();
 				inst.program = info.shader->getProgram(gpu::VertexDecl(), m_define_mask);
 				inst.material = info.terrain->m_material->getRenderData();
-				if (isinf(inst.pos.x) || isinf(inst.pos.y) || isinf(inst.pos.z)) m_instances.pop();
+				if (isinf(inst.pos.x) || isinf(inst.pos.y) || isinf(inst.pos.z)) {
+					m_instances.pop();
+					continue;
+				}
+
+				struct Quad {
+					IVec4 from_to;
+					IVec4 from_to_sup;
+					Vec4 pos;
+					Vec4 lpos;
+					Vec4 terrain_scale;
+					Vec2 hm_size;
+					float cell_size;
+				};
+
+				Quad quad;
+				quad.pos = Vec4(inst.pos, 0);
+				quad.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
+				quad.hm_size = inst.hm_size;
+
+				const Vec3 ref_pos = inst.rot.conjugated().rotate(-inst.ref_pos);
+				IVec4 prev_from_to;
+				float s = inst.scale.x;
+				bool first = true;
+				for (;;) {
+					// round 
+					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					from.x = from.x & ~1;
+					from.y = from.y & ~1;
+					IVec2 to = from + IVec2(64);
+					// clamp
+					quad.from_to_sup = IVec4(from, to);
+					
+					from.x = clamp(from.x, 0, (int)ceil(inst.hm_size.x / s));
+					from.y = clamp(from.y, 0, (int)ceil(inst.hm_size.y / s));
+					to.x = clamp(to.x, 0, (int)ceil(inst.hm_size.x / s));
+					to.y = clamp(to.y, 0, (int)ceil(inst.hm_size.y / s));
+
+					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
+						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
+						quad.from_to = IVec4(subfrom, subto);
+						quad.terrain_scale = Vec4(inst.scale, 0);
+						quad.cell_size = s;
+						Instance::Quad& tmp = inst.quads.emplace();
+						tmp.from = subfrom;
+						tmp.to = subto;
+						tmp.buf = m_pipeline->m_renderer.allocUniform(sizeof(quad));
+						memcpy(tmp.buf.ptr, &quad, sizeof(quad));
+					};
+
+					if (first) {
+						draw_rect(from, to);
+						first = false;
+					}
+					else {
+						draw_rect(from, IVec2(to.x, prev_from_to.y));
+						draw_rect(IVec2(from.x, prev_from_to.w), to);
+						
+						draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
+						draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
+					}
+					
+					if (from.x <= 0 && from.y <= 0 && to.x * s >= inst.hm_size.x && to.y * s >= inst.hm_size.y) break;
+
+					s *= 2;
+					prev_from_to = IVec4(from / 2, to / 2);
+				}
 			}
 		}
 
@@ -4458,78 +4505,26 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				struct {
-					IVec4 from_to;
-					IVec4 from_to_sup;
-					Vec4 pos;
-					Vec4 lpos;
-					Vec4 terrain_scale;
-					Vec2 hm_size;
-					float cell_size;
-				} dc_data;
-				dc_data.pos = Vec4(inst.pos, 0);
-				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
-				dc_data.hm_size = inst.hm_size;
-
-				const Vec3 ref_pos = inst.rot.conjugated().rotate(-inst.ref_pos);
-
 				gpu::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
 				gpu::setState(state);
-				IVec4 prev_from_to;
 
-				float s = inst.scale.x;
-				bool first = true;
-				for (;;) {
-					// round 
-					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
-					from.x = from.x & ~1;
-					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(64);
-					// clamp
-					dc_data.from_to_sup = IVec4(from, to);
-					
-					from.x = clamp(from.x, 0, (int)ceil(inst.hm_size.x / s));
-					from.y = clamp(from.y, 0, (int)ceil(inst.hm_size.y / s));
-					to.x = clamp(to.x, 0, (int)ceil(inst.hm_size.x / s));
-					to.y = clamp(to.y, 0, (int)ceil(inst.hm_size.y / s));
-
-					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
-						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
-						dc_data.from_to = IVec4(subfrom, subto);
-						dc_data.terrain_scale = Vec4(inst.scale, 0);
-						dc_data.cell_size = s;
-						gpu::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
-						gpu::drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
-						m_pipeline->m_stats.draw_call_count += 1;
-						m_pipeline->m_stats.instance_count += 1;
-						m_pipeline->m_stats.triangle_count += (subto.x - subfrom.x) * (subto.y - subfrom.y) * 2;
-					};
-
-					if (first) {
-						draw_rect(from, to);
-						first = false;
-					}
-					else {
-						draw_rect(from, IVec2(to.x, prev_from_to.y));
-						draw_rect(IVec2(from.x, prev_from_to.w), to);
-						
-						draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
-						draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
-					}
-					
-					if (from.x <= 0 && from.y <= 0 && to.x * s >= inst.hm_size.x && to.y * s >= inst.hm_size.y) break;
-
-					s *= 2;
-					prev_from_to = IVec4(from / 2, to / 2);
+				for (const Instance::Quad& q : inst.quads) {
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, q.buf.buffer, q.buf.offset, q.buf.size);
+					gpu::drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (q.to.x - q.from.x) * 2 + 2, q.to.y - q.from.y);
 				}
-
 			}
 			renderer.endProfileBlock();
 		}
 
-		struct Instance
-		{
+		struct Instance {
+			Instance(IAllocator& allocator) : quads(allocator) {}
+
+			struct Quad {
+				Renderer::TransientSlice buf;
+				IVec2 from;
+				IVec2 to;
+			};
 			Vec2 hm_size;
 			Vec3 pos;
 			Vec3 ref_pos;
@@ -4537,6 +4532,7 @@ struct PipelineImpl final : Pipeline
 			Vec3 scale;
 			gpu::ProgramHandle program;
 			Material::RenderData* material;
+			Array<Quad> quads;
 		};
 
 		IAllocator& m_allocator;
@@ -4944,7 +4940,6 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::pushDebugGroup(name);
 				renderer->beginProfileBlock(name, link);
 			}
 			StaticString<32> name;
@@ -4966,7 +4961,6 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 				renderer->endProfileBlock();
-				gpu::popDebugGroup();
 			}
 			Renderer* renderer;
 		};
@@ -5224,7 +5218,6 @@ struct PipelineImpl final : Pipeline
 	gpu::BufferHandle m_instanced_meshes_buffer;
 	gpu::BufferHandle m_indirect_buffer;
 	gpu::BufferHandle m_global_state_buffer;
-	gpu::BufferHandle m_pass_state_buffer;
 	gpu::VertexDecl m_base_vertex_decl;
 	gpu::VertexDecl m_2D_decl;
 	gpu::VertexDecl m_simple_cube_decl;

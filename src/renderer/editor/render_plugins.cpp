@@ -3398,7 +3398,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		auto lambda = [&](){
 			renderer->beginProfileBlock("radiance_filter", 0);
-			gpu::pushDebugGroup("radiance_filter");
 			gpu::TextureHandle src = gpu::allocTextureHandle();
 			gpu::TextureHandle dst = gpu::allocTextureHandle();
 			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
@@ -3461,7 +3460,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 			saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
 			gpu::destroy(staging);
-			gpu::popDebugGroup();
 			renderer->endProfileBlock();
 
 			gpu::destroy(buf);
@@ -4321,7 +4319,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			renderer->beginProfileBlock("editor imgui", 0);
-			gpu::pushDebugGroup("imgui");
 
 			vb_offset = 0;
 			ib_offset = 0;
@@ -4381,7 +4378,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			}
 			gpu::setCurrentWindow(nullptr);
 
-			gpu::popDebugGroup();
 			renderer->endProfileBlock();
 		}
 		

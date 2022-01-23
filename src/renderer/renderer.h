@@ -69,6 +69,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	
 	virtual gpu::BufferHandle getScratchBuffer() = 0;
 	virtual TransientSlice allocTransient(u32 size) = 0;
+	virtual TransientSlice allocUniform(u32 size) = 0;
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) = 0;
 	virtual void destroy(gpu::BufferHandle buffer) = 0;
 	virtual void destroy(gpu::ProgramHandle program) = 0;

@@ -789,9 +789,10 @@ void SceneView::renderIcons()
 {
 	struct RenderJob : Renderer::RenderJob
 	{
-		RenderJob(IAllocator& allocator) 
+		RenderJob(Renderer& renderer, IAllocator& allocator) 
 			: m_allocator(allocator)
-			, m_items(allocator) 
+			, m_renderer(renderer)
+			, m_items(allocator)
 		{}
 
 		void setup() override
@@ -819,7 +820,8 @@ void SceneView::renderIcons()
 		{
 			PROFILE_FUNCTION();
 			const gpu::BufferHandle drawcall_ub = m_ui->m_pipeline->getDrawcallUniformBuffer();
-
+			m_renderer.beginProfileBlock("icons", 0);
+			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(Matrix));
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
@@ -832,6 +834,7 @@ void SceneView::renderIcons()
 				gpu::setState(item.material->render_states | gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 				gpu::drawTriangles(0, rd->indices_count, rd->index_type);
 			}
+			m_renderer.endProfileBlock();
 		}
 
 		struct Item {
@@ -842,6 +845,7 @@ void SceneView::renderIcons()
 		};
 
 		IAllocator& m_allocator;
+		Renderer& m_renderer;
 		Array<Item> m_items;
 		SceneView* m_ui;
 	};
@@ -850,7 +854,7 @@ void SceneView::renderIcons()
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
-	RenderJob& cmd = renderer->createJob<RenderJob>(allocator);
+	RenderJob& cmd = renderer->createJob<RenderJob>(*renderer, allocator);
 	cmd.m_ui = this;
 	renderer->queue(cmd, 0);
 }
@@ -913,6 +917,7 @@ void SceneView::renderSelection()
 			
 				if (item.pose.empty()) {
 					gpu::update(drawcall_ub, &item.mtx.columns[0].x, sizeof(item.mtx));
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(item.mtx));
 				}
 				else {
 					struct {
@@ -930,8 +935,8 @@ void SceneView::renderSelection()
 					dc.model_mtx = item.mtx;
 					memcpy(dc.bones, item.pose.begin(), item.pose.byte_size());
 					const u32 size = item.pose.byte_size() + sizeof(Vec4);
-					gpu::update(drawcall_ub, &dc, size);
 					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, size);
+					gpu::update(drawcall_ub, &dc, size);
 				}
 
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
@@ -998,11 +1003,11 @@ void SceneView::renderGizmos()
 			if (cmds.empty()) return;
 
 			renderer->beginProfileBlock("gizmos", 0);
-			gpu::pushDebugGroup("gizmos");
 			gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 			u32 offset = 0;
 			const gpu::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			const Matrix mtx = Matrix::IDENTITY;
+			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, sizeof(mtx));
 			for (const UniverseViewImpl::DrawCmd& cmd : cmds) {
 				gpu::update(drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
 				gpu::useProgram(program);
@@ -1014,7 +1019,6 @@ void SceneView::renderGizmos()
 
 				offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
 			}
-			gpu::popDebugGroup();
 			
 			renderer->endProfileBlock();
 		}

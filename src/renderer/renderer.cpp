@@ -53,6 +53,7 @@ static const char* downscale_src = R"#(
 )#";
 
 
+template <u32 ALIGN>
 struct TransientBuffer {
 	static constexpr u32 INIT_SIZE = 1024 * 1024;
 	static constexpr u32 OVERFLOW_BUFFER_SIZE = 512 * 1024 * 1024;
@@ -67,7 +68,7 @@ struct TransientBuffer {
 
 	Renderer::TransientSlice alloc(u32 size) {
 		Renderer::TransientSlice slice;
-		size = (size + 15) & ~15;
+		size = (size + (ALIGN - 1)) & ~(ALIGN - 1);
 		slice.offset = atomicAdd(&m_offset, size);
 		slice.size = size;
 		if (slice.offset + size <= m_size) {
@@ -162,7 +163,8 @@ struct FrameData {
 		MaterialConsts value;
 	};
 
-	TransientBuffer transient_buffer;
+	TransientBuffer<16> transient_buffer;
+	TransientBuffer<256> uniform_buffer;
 	u32 gpu_frame = 0xffFFffFF;
 
 	Array<MaterialUpdates> material_updates;
@@ -400,6 +402,7 @@ struct RendererImpl final : Renderer
 			RendererImpl* renderer = (RendererImpl*)data;
 			for (const Local<FrameData>& frame : renderer->m_frames) {
 				gpu::destroy(frame->transient_buffer.m_buffer);
+				gpu::destroy(frame->uniform_buffer.m_buffer);
 			}
 			gpu::destroy(renderer->m_material_buffer.buffer);
 			gpu::destroy(renderer->m_material_buffer.staging_buffer);
@@ -465,6 +468,7 @@ struct RendererImpl final : Renderer
 
 			for (const Local<FrameData>& frame : renderer.m_frames) {
 				frame->transient_buffer.init();
+				frame->uniform_buffer.init();
 			}
 			renderer.m_cpu_frame = renderer.m_frames[0].get();
 			renderer.m_gpu_frame = renderer.m_frames[0].get();
@@ -564,6 +568,7 @@ struct RendererImpl final : Renderer
 
 	void beginProfileBlock(const char* name, i64 link) override
 	{
+		gpu::pushDebugGroup(name);
 		m_profiler.beginQuery(name, link);
 	}
 
@@ -571,6 +576,7 @@ struct RendererImpl final : Renderer
 	void endProfileBlock() override
 	{
 		m_profiler.endQuery();
+		gpu::popDebugGroup();
 	}
 
 
@@ -730,6 +736,11 @@ struct RendererImpl final : Renderer
 	TransientSlice allocTransient(u32 size) override
 	{
 		return m_cpu_frame->transient_buffer.alloc(size);
+	}
+
+	TransientSlice allocUniform(u32 size) override
+	{
+		return m_cpu_frame->uniform_buffer.alloc(size);
 	}
 	
 	gpu::BufferHandle getMaterialUniformBuffer() override {
@@ -1155,6 +1166,7 @@ struct RendererImpl final : Renderer
 	void render() {
 		FrameData& frame = *m_gpu_frame;
 		frame.transient_buffer.prepareToRender();
+		frame.uniform_buffer.prepareToRender();
 		
 		gpu::MemoryStats mem_stats;
 		if (gpu::getMemoryStats(mem_stats)) {
@@ -1201,6 +1213,7 @@ struct RendererImpl final : Renderer
 		if (check_frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame.gpu_frame)) {
 			check_frame.gpu_frame = 0xffFFffFF;
 			check_frame.transient_buffer.renderDone();
+			check_frame.uniform_buffer.renderDone();
 			jobs::decSignal(check_frame.can_setup);
 		}
 
@@ -1208,6 +1221,7 @@ struct RendererImpl final : Renderer
 			gpu::waitFrame(m_gpu_frame->gpu_frame);
 			m_gpu_frame->gpu_frame = 0xFFffFFff;   
 			m_gpu_frame->transient_buffer.renderDone();
+			m_gpu_frame->uniform_buffer.renderDone();
 			jobs::decSignal(m_gpu_frame->can_setup);
 		}
 	}
