@@ -64,7 +64,7 @@ function surface_shader(code)
 			layout(location = 4) in ivec4 a_indices;
 			layout(location = 5) in vec4 a_weights;
 		#elif defined INSTANCED || defined GRASS
-			layout(location = 4) in vec4 i_rot_quat;
+			layout(location = 4) in vec4 i_rot_lod;
 			layout(location = 5) in vec4 i_pos_scale;
 			#ifdef _HAS_ATTR7
 				layout(location = 7) in vec4 a_color;
@@ -80,7 +80,6 @@ function surface_shader(code)
 			} Model;
 		#endif
 		#ifdef HAS_LOD
-			layout(location = 6) in float i_lod;
 			layout(location = 4) out float v_lod;
 		#endif
 	
@@ -95,13 +94,15 @@ function surface_shader(code)
 		void main() {
 			v_uv = a_uv;
 			#if defined INSTANCED || defined GRASS
-				v_normal = rotateByQuat(i_rot_quat, a_normal);
-				v_tangent = rotateByQuat(i_rot_quat, a_tangent);
+				vec4 rot_quat = vec4(i_rot_lod.xyz, 0);
+				rot_quat.w = sqrt(1 - dot(rot_quat.xyz, rot_quat.xyz));
+				v_normal = rotateByQuat(rot_quat, a_normal);
+				v_tangent = rotateByQuat(rot_quat, a_tangent);
 				vec3 p = a_position * i_pos_scale.w;
 				#ifdef HAS_LOD
-					v_lod = i_lod;
+					v_lod = i_rot_quat.w;
 				#endif
-				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
+				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
 				#ifdef _HAS_ATTR7
 					v_color = a_color;
 				#endif

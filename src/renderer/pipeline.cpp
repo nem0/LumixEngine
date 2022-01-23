@@ -1417,6 +1417,8 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
 				gpu::bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer, 0, sizeof(GlobalState));
+				gpu::bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
 				pipeline->m_stats = {};
 				int tmp[12] = {};
 				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
@@ -3304,7 +3306,7 @@ struct PipelineImpl final : Pipeline
 
 							gpu::bindIndexBuffer(mesh->index_buffer_handle);
 							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-							gpu::bindVertexBuffer(1, buffer, offset, 48);
+							gpu::bindVertexBuffer(1, buffer, offset, 32);
 
 							gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 							++stats.draw_call_count;
@@ -4331,7 +4333,7 @@ struct PipelineImpl final : Pipeline
 
 						gpu::bindIndexBuffer(m.mesh_rd->index_buffer_handle);
 						gpu::bindVertexBuffer(0, m.mesh_rd->vertex_buffer_handle, 0, m.mesh_rd->vb_stride);
-						gpu::bindVertexBuffer(1, m_pipeline->m_instanced_meshes_buffer, 48, 48);
+						gpu::bindVertexBuffer(1, m_pipeline->m_instanced_meshes_buffer, 48, 32);
 
 						gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
 
@@ -4728,7 +4730,7 @@ struct PipelineImpl final : Pipeline
 				if (!group) continue;
 
 				const u32 count = instances.end->offset + instances.end->count;
-				instances.slice = m_renderer.allocTransient(count * (sizeof(Quat) + sizeof(Vec3) + sizeof(float) * 2 + sizeof(float) * 3));
+				instances.slice = m_renderer.allocTransient(count * (2 * sizeof(Vec4)));
 				u8* instance_data = instances.slice.ptr;
 				const u32 sort_key = u32(&instances - instancer.instances.begin());
 				const Mesh* mesh = sort_key_to_mesh[sort_key];
@@ -4745,16 +4747,14 @@ struct PipelineImpl final : Pipeline
 						const EntityRef e = { (i32)group->renderables[i] };
 						const Transform& tr = entity_data[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						const float lod_d = model_instances[e.index].lod - mesh_lod;
+						const Vec4 r = tr.rot.w > 0 ? Vec4(tr.rot.x, tr.rot.y, tr.rot.z, lod_d) : Vec4(-tr.rot.x, -tr.rot.y, -tr.rot.z, lod_d);
+						memcpy(instance_data, &r, sizeof(r));
 						instance_data += sizeof(tr.rot);
 						memcpy(instance_data, &lpos, sizeof(lpos));
 						instance_data += sizeof(lpos);
 						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 						instance_data += sizeof(tr.scale);
-						const float lod_d = model_instances[e.index].lod - mesh_lod;
-						memcpy(instance_data, &lod_d, sizeof(lod_d));
-						instance_data += sizeof(lod_d);
-						instance_data += sizeof(float) * 3; // padding
 					}
 					group = group->next;
 				}

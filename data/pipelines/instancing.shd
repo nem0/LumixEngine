@@ -10,9 +10,8 @@ compute_shader [[
 	};
 	
 	struct OutputData {
-		vec4 rot;
+		vec4 rot_lod;
 		vec4 pos_scale;
-		vec4 lod_fade;
 	};
 
 	struct InputData {
@@ -181,11 +180,9 @@ compute_shader [[
 			}
 			else return;
 
-			vec3 r = inp.rot_lod.xyz;
-			b_output[idx].rot.xyz = r;
-			b_output[idx].rot.w = sqrt(1 - dot(r, r));
+			b_output[idx].rot_lod.xyz = inp.rot_lod.xyz;
+			b_output[idx].rot_lod.w = t;
 			b_output[idx].pos_scale = inp.pos_scale + vec4(u_camera_offset.xyz, 0);
-			b_output[idx].lod_fade = vec4(t, 0, 0, 0);
 
 			if (t > 0.01) {
 				if (ilod == 0) {
@@ -197,10 +194,9 @@ compute_shader [[
 				else if (ilod == 2) {
 					idx = atomicAdd(b_lod_offset.w, 1);
 				}
-				b_output[idx].rot.xyz = r;
-				b_output[idx].rot.w = sqrt(1 - dot(r, r));
+				b_output[idx].rot_lod.xyz = inp.rot_lod.xyz;
+				b_output[idx].rot_lod.w = t - 1;
 				b_output[idx].pos_scale = inp.pos_scale + vec4(u_camera_offset.xyz, 0);
-				b_output[idx].lod_fade = vec4(t - 1, 0, 0, 0);
 			}
 		#endif
 	}

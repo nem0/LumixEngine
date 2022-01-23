@@ -29,9 +29,8 @@ vertex_shader [[
 	#else 
 		const vec3 a_tangent = vec3(0, 1, 0);
 	#endif
-	layout(location = 4) in vec4 i_rot_quat;
+	layout(location = 4) in vec4 i_rot_lod;
 	layout(location = 5) in vec4 i_pos_scale;
-	layout(location = 6) in float i_lod;
 	layout (location = 0) out vec2 v_uv;
 	layout (location = 1) out vec3 v_normal;
 	layout (location = 2) out vec3 v_tangent;
@@ -61,9 +60,9 @@ vertex_shader [[
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
 		vec3 vd = vec3(N.x, N.y, N.z);
-		vec4 to_model_space = vec4(-i_rot_quat.xyz, i_rot_quat.w);
+		vec4 to_model_space = vec4(-i_rot_lod.xyz, sqrt(1 - dot(i_rot_lod.xyz, i_rot_lod.xyz)));
 		vd = rotateByQuat(to_model_space, vd);
-		v_lod = i_lod;
+		v_lod = i_rot_lod.w;
 		#if !defined DEPTH && !defined DEFERRED
 			vec3 ld = rotateByQuat(to_model_space, -Global.light_dir.xyz);
 			v_shadow_coefs = max(vec4(ld.x, -ld.z, -ld.x, ld.z), vec4(0));
