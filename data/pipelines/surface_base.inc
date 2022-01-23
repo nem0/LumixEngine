@@ -33,9 +33,9 @@ function surface_shader(code)
 	common [[
 		#ifdef SKINNED
 			layout(std140, binding = 4) uniform ModelState {
-				float layer;
 				float fur_scale;
 				float fur_gravity;
+				float layers;
 				float padding;
 				mat4 matrix;
 				mat2x4 bones[255];
@@ -88,6 +88,9 @@ function surface_shader(code)
 		layout(location = 1) out vec3 v_normal;
 		layout(location = 2) out vec3 v_tangent;
 		layout(location = 3) out vec4 v_wpos;
+		#ifdef FUR
+			layout(location = 8) out float v_fur_layer;
+		#endif
 	
 		void main() {
 			v_uv = a_uv;
@@ -121,7 +124,8 @@ function surface_shader(code)
 				v_tangent = m * rotateByQuat(dq[0], a_tangent);
 				vec3 mpos;
 				#ifdef FUR
-					mpos = a_position + (a_normal + vec3(0, -Model.fur_gravity * Model.layer, 0)) * Model.layer * Model.fur_scale;
+					v_fur_layer = gl_InstanceID / Model.layers;
+					mpos = a_position + (a_normal + vec3(0, -Model.fur_gravity * v_fur_layer, 0)) * v_fur_layer * Model.fur_scale;
 				#else
 					mpos = a_position;
 				#endif
@@ -168,6 +172,9 @@ function surface_shader(code)
 		#endif
 		#ifdef _HAS_ATTR8
 			layout(location = 7) in float v_ao;
+		#endif
+		#ifdef FUR
+			layout(location = 8) in float v_fur_layer;
 		#endif
 
 		#if defined DEFERRED || defined GRASS

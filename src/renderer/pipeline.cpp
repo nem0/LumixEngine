@@ -44,7 +44,6 @@ namespace Lumix
 // instance group 15 - 0; if instanced
 
 static constexpr u32 INSTANCED_MESHES_BUFFER_SIZE = 64 * 1024 * 1024; // TODO dynamic
-static constexpr u32 DRAWCALL_UB_SIZE = 32 * 1024;
 static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
@@ -911,10 +910,6 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
 		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
 
-		const Renderer::MemRef dc_mem = { DRAWCALL_UB_SIZE, nullptr, false };
-		const gpu::BufferFlags dc_ub_flags = gpu::BufferFlags::UNIFORM_BUFFER;
-		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
-
 		m_base_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 		m_base_vertex_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
@@ -977,7 +972,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.destroy(m_instanced_meshes_buffer);
 		m_renderer.destroy(m_indirect_buffer);
 		m_renderer.destroy(m_global_state_buffer);
-		m_renderer.destroy(m_drawcall_ub);
 		m_renderer.destroy(m_shadow_atlas.uniform_buffer);
 		m_renderer.destroy(m_shadow_atlas.texture);
 		m_renderer.destroy(m_cluster_buffers.clusters.buffer);
@@ -3281,7 +3275,6 @@ struct PipelineImpl final : Pipeline
 			Stats stats = {};
 
 			const gpu::StateFlags render_states = m_render_state;
-			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, m_pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 			const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
 			CmdPage* page = m_cmds;
@@ -3324,36 +3317,11 @@ struct PipelineImpl final : Pipeline
 							READ(Mesh::RenderData*, mesh);
 							READ(Material::RenderData*, material);
 							READ(gpu::ProgramHandle, program);
-							READ(Vec3, pos);
-							READ(Quat, rot);
-							READ(float, scale);
 							READ(i32, bones_count);
-							u32 layers = 1;
-
-							struct {
-								float layer;
-								float fur_scale;
-								float gravity;
-								float padding;
-								Matrix model_mtx;
-								DualQuat bones[255];
-							} dc;
-							ASSERT(bones_count < (i32)lengthOf(dc.bones));
-
-							if (type == RenderableTypes::FUR) {
-								READ(u32, tmp);
-								READ(float, tmp2);
-								READ(float, tmp3);
-								layers = tmp;
-								dc.fur_scale = tmp2;
-								dc.gravity = tmp3;
-							}
-
-							DualQuat* bones = (DualQuat*)cmd;
-							cmd += sizeof(bones[0]) * bones_count;
-
-							dc.model_mtx = Matrix(pos, rot);
-							dc.model_mtx.multiply3x3(scale);
+							READ(u32, layers);
+							READ(gpu::BufferHandle, ub_buffer);
+							READ(u32, ub_offset);
+							READ(u32, ub_size);
 
 							gpu::bindTextures(material->textures, 0, material->textures_count);
 
@@ -3363,20 +3331,14 @@ struct PipelineImpl final : Pipeline
 								material_ub_idx = material->material_constants;
 							}
 
-							memcpy(&dc.bones[0], bones, sizeof(bones[0]) * bones_count);
-
 							gpu::useProgram(program);
 
 							gpu::bindIndexBuffer(mesh->index_buffer_handle);
 							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 							gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 							
-							for (u32 i = 0; i < layers; ++i) {
-								dc.layer = float(i) / layers;
-								// TODO do not update whole buffer each layer
-								gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(Vec4) + sizeof(Matrix) * (bones_count + 1)); 
-								gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
-							}
+							gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub_buffer, ub_offset, ub_size);
+							gpu::drawTrianglesInstanced(mesh->indices_count, layers, mesh->index_type);
 							++stats.draw_call_count;
 							stats.triangle_count += mesh->indices_count / 3;
 							++stats.instance_count;
@@ -3679,28 +3641,45 @@ struct PipelineImpl final : Pipeline
 					WRITE(mesh.render_data);
 					WRITE_FN(mesh.material->getRenderData());
 					WRITE(prog);
-					WRITE(rel_pos);
-					WRITE(tr.rot);
-					WRITE(tr.scale);
 					WRITE(mi->pose->count);
-
-					if (type == RenderableTypes::FUR) {
-						FurComponent& fur = m_scene->getFur(e);
-						WRITE(fur.layers);
-						WRITE(fur.scale);
-						WRITE(fur.gravity);
-					}
 
 					const Quat* rotations = mi->pose->rotations;
 					const Vec3* positions = mi->pose->positions;
 
 					Model& model = *mi->model;
+
+					struct UBPrefix {
+						float fur_scale;
+						float gravity;
+						float layers;
+						float padding;
+						Matrix model_mtx;
+					};
+
+					Renderer::TransientSlice ub = renderer.allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
+					UBPrefix* prefix = (UBPrefix*)ub.ptr;
+					prefix->model_mtx = Matrix(rel_pos, tr.rot);
+					prefix->model_mtx.multiply3x3(tr.scale);
+
+					u32 layers = 1;
+					if (type == RenderableTypes::FUR) {
+						FurComponent& fur = m_scene->getFur(e);
+						layers = fur.layers;
+						prefix->fur_scale = fur.scale;
+						prefix->gravity = fur.gravity;
+					}
+					prefix->layers = float(layers);
+
+					DualQuat* bones_ub_array = (DualQuat*)(ub.ptr + sizeof(UBPrefix));
 					for (int j = 0, c = mi->pose->count; j < c; ++j) {
 						const Model::Bone& bone = model.getBone(j);
 						const LocalRigidTransform tmp = {positions[j], rotations[j]};
-						const DualQuat dq = (tmp * bone.inv_bind_transform).toDualQuat();
-						WRITE(dq);
+						bones_ub_array[j] = (tmp * bone.inv_bind_transform).toDualQuat();
 					}
+					WRITE(layers);
+					WRITE(ub.buffer);
+					WRITE(ub.offset);
+					WRITE(ub.size);
 					break;
 				}
 				case RenderableTypes::DECAL: {
@@ -5225,7 +5204,6 @@ struct PipelineImpl final : Pipeline
 	gpu::VertexDecl m_point_light_decl;
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;
-	gpu::BufferHandle m_drawcall_ub = gpu::INVALID_BUFFER;
 	
 	ShadowAtlas m_shadow_atlas;
 
