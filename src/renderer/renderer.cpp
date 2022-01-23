@@ -58,10 +58,10 @@ struct TransientBuffer {
 	static constexpr u32 INIT_SIZE = 1024 * 1024;
 	static constexpr u32 OVERFLOW_BUFFER_SIZE = 512 * 1024 * 1024;
 	
-	void init(gpu::BufferFlags flags) {
+	void init() {
 		m_buffer = gpu::allocBufferHandle();
 		m_offset = 0;
-		gpu::createBuffer(m_buffer, gpu::BufferFlags::MAPPABLE | flags, INIT_SIZE, nullptr);
+		gpu::createBuffer(m_buffer, gpu::BufferFlags::MAPPABLE, INIT_SIZE, nullptr);
 		m_size = INIT_SIZE;
 		m_ptr = (u8*)gpu::map(m_buffer, INIT_SIZE);
 	}
@@ -467,8 +467,8 @@ struct RendererImpl final : Renderer
 			}
 
 			for (const Local<FrameData>& frame : renderer.m_frames) {
-				frame->transient_buffer.init(gpu::BufferFlags::NONE);
-				frame->uniform_buffer.init(gpu::BufferFlags::UNIFORM_BUFFER);
+				frame->transient_buffer.init();
+				frame->uniform_buffer.init();
 			}
 			renderer.m_cpu_frame = renderer.m_frames[0].get();
 			renderer.m_gpu_frame = renderer.m_frames[0].get();
