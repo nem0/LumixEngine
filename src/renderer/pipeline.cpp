@@ -1415,11 +1415,11 @@ struct PipelineImpl final : Pipeline
 		struct StartPipelineJob : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
+				pipeline->m_renderer.beginProfileBlock(pipeline->m_define, 0, true);
 				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
 				gpu::bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer, 0, sizeof(GlobalState));
 				gpu::bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
-				pipeline->m_stats = {};
 				int tmp[12] = {};
 				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
 			}
@@ -1466,7 +1466,7 @@ struct PipelineImpl final : Pipeline
 		struct EndPipelineJob : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
-				pipeline->m_last_frame_stats = pipeline->m_stats;
+				pipeline->m_renderer.endProfileBlock();
 				while (instanced_meshes) {
 					InstancedMeshes* i = instanced_meshes;
 					instanced_meshes = instanced_meshes->next;
@@ -3274,8 +3274,6 @@ struct PipelineImpl final : Pipeline
 
 			Renderer& renderer = m_pipeline->m_renderer;
 
-			Stats stats = {};
-
 			const gpu::StateFlags render_states = m_render_state;
 			const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
@@ -3309,9 +3307,6 @@ struct PipelineImpl final : Pipeline
 							gpu::bindVertexBuffer(1, buffer, offset, 32);
 
 							gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-							++stats.draw_call_count;
-							stats.triangle_count += instances_count * mesh->indices_count / 3;
-							stats.instance_count += instances_count;
 							break;
 						}
 						case RenderableTypes::FUR:
@@ -3341,9 +3336,6 @@ struct PipelineImpl final : Pipeline
 							
 							gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub_buffer, ub_offset, ub_size);
 							gpu::drawTrianglesInstanced(mesh->indices_count, layers, mesh->index_type);
-							++stats.draw_call_count;
-							stats.triangle_count += mesh->indices_count / 3;
-							++stats.instance_count;
 							break;
 						}
 						case RenderableTypes::CURVE_DECAL: {
@@ -3380,8 +3372,6 @@ struct PipelineImpl final : Pipeline
 								gpu::bindVertexBuffer(1, buffer, offs, 64);
 								gpu::drawTrianglesInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
 							}
-							++stats.draw_call_count;
-							stats.instance_count += count;
 							break;
 						}
 						case RenderableTypes::DECAL: {
@@ -3418,8 +3408,6 @@ struct PipelineImpl final : Pipeline
 								gpu::bindVertexBuffer(1, buffer, offs, 48);
 								gpu::drawTrianglesInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
 							}
-							++stats.draw_call_count;
-							stats.instance_count += count;
 							break;
 						}
 						default: ASSERT(false); break;
@@ -3430,12 +3418,6 @@ struct PipelineImpl final : Pipeline
 				page = next;
 			}
 			#undef READ
-			profiler::pushInt("drawcalls", stats.draw_call_count);
-			profiler::pushInt("instances", stats.instance_count);
-			profiler::pushInt("triangles", stats.triangle_count);
-			m_pipeline->m_stats.draw_call_count += stats.draw_call_count;
-			m_pipeline->m_stats.instance_count += stats.instance_count;
-			m_pipeline->m_stats.triangle_count += stats.triangle_count;		
 		}
 
 		CmdPage* m_cmds;
@@ -4298,12 +4280,8 @@ struct PipelineImpl final : Pipeline
 				gpu::drawIndirect(grass.mesh->index_type, 0);
 
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				// TODO
-				//m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3;
 			}
 			renderer.endProfileBlock();
-			//m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
-			//m_pipeline->m_stats.draw_call_count += m_grass.size();
 		}
 
 		IAllocator& m_allocator;
@@ -5151,7 +5129,6 @@ struct PipelineImpl final : Pipeline
 	}
 
 	bool isReady() const override { return m_resource->isReady(); }
-	const Stats& getStats() const override { return m_last_frame_stats; }
 	const Path& getPath() override { return m_resource->getPath(); }
 
 	void clearDraw2D() override { return m_draw2d.clear(getAtlasSize()); }
@@ -5173,8 +5150,6 @@ struct PipelineImpl final : Pipeline
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
-	Stats m_last_frame_stats;
-	Stats m_stats; // accessed from render thread
 	Array<View> m_views;
 	Array<Bucket> m_buckets;
 	jobs::SignalHandle m_buckets_ready;

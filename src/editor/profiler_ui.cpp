@@ -698,7 +698,7 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 		{
 			m_main_allocator->checkGuards();
 		}
-		ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
+		ImGui::Text("Total tracked size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	}
 	else {
 		ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
@@ -706,6 +706,10 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 	const PageAllocator& page_allocator = m_engine.getPageAllocator();
 	const float reserved_pages_size = (page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
 	ImGui::Text("Page allocator: %.3fMB", reserved_pages_size);
+	#ifdef _WIN32
+		const float process_mem = os::getProcessMemory() / (1024.f * 1024.f);
+		ImGui::Text("Process memory: %.3fMB", process_mem);
+	#endif
 
 	if (m_is_gpu_mem_stats_valid) {
 		const float current = m_gpu_mem_stats.current / (1024.f * 1024.f);
@@ -1121,6 +1125,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		int level = -1;
 		u32 lines = 0;
 
+		bool has_stats = false;
+		u64 primitives_generated;
 		u32 p = ctx.begin;
 		const u32 end = ctx.end;
 		while (p != end) {
@@ -1171,12 +1177,22 @@ void ProfilerUIImpl::onGUICPUProfiler()
 								any_hovered_link = true;
 								hovered_link = data.profiler_link;
 							}
+							if (has_stats) {
+								char tmp[32];
+								toCStringPretty(primitives_generated, Span(tmp));
+								ImGui::Text("Primitives: %s", tmp);
+							}
 							ImGui::EndTooltip();
 						}
 					}
 					if (level >= 0) {
 						--level;
 					}
+					has_stats = false;
+					break;
+				case profiler::EventType::GPU_STATS:
+					read(ctx, p + sizeof(profiler::EventHeader), primitives_generated);
+					has_stats = true;
 					break;
 				case profiler::EventType::GPU_FRAME:
 					break;

@@ -10,6 +10,7 @@
 #pragma warning(disable : 4091)
 #include <Shobjidl_core.h>
 #include <shlobj_core.h>
+#include <Psapi.h>
 #pragma warning(pop)
 #pragma warning(disable : 4996)
 
@@ -812,6 +813,16 @@ u32 getMemPageSize() {
 	GetSystemInfo(&info);
 	return info.dwPageSize;
 }
+
+u64 getProcessMemory() {
+	PROCESS_MEMORY_COUNTERS counters;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)) != 0) {
+		return counters.WorkingSetSize;
+	}
+	ASSERT(false);
+	return 0;
+}
+
 
 u32 getMemPageAlignment() {
 	SYSTEM_INFO info;

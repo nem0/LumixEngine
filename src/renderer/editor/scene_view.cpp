@@ -1309,12 +1309,6 @@ void SceneView::statsUI(float x, float y) {
 			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
 				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 	{
-		const auto& stats = m_pipeline->getStats();
-		ImGui::LabelText("Draw calls (scene view only)", "%d", stats.draw_call_count);
-		ImGui::LabelText("Instances (scene view only)", "%d", stats.instance_count);
-		char buf[30];
-		toCStringPretty(stats.triangle_count, Span(buf));
-		ImGui::LabelText("Triangles (scene view only)", "%s", buf);
 		ImGui::LabelText("Resolution", "%dx%d", m_width, m_height);
 	}
 	ImGui::End();

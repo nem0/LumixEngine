@@ -85,7 +85,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	
 	virtual void queue(RenderJob& cmd, i64 profiler_link) = 0;
 
-	virtual void beginProfileBlock(const char* name, i64 link) = 0;
+	virtual void beginProfileBlock(const char* name, i64 link, bool stats = false) = 0;
 	virtual void endProfileBlock() = 0;
 	virtual void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) = 0;
 

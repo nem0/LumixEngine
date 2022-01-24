@@ -60,13 +60,6 @@ struct LUMIX_RENDERER_API PipelineResource : Resource
 
 struct LUMIX_RENDERER_API Pipeline
 {
-	struct Stats
-	{
-		u32 draw_call_count;
-		u32 instance_count;
-		u32 triangle_count;
-	};
-
 	struct CustomCommandHandler
 	{
 		Delegate<void ()> callback;
@@ -85,7 +78,6 @@ struct LUMIX_RENDERER_API Pipeline
 	virtual Renderer& getRenderer() const = 0;
 	virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 	virtual bool isReady() const = 0;
-	virtual const Stats& getStats() const = 0;
 	virtual const Path& getPath() = 0;
 	virtual void callLuaFunction(const char* func) = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;

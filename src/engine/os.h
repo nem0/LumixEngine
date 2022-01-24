@@ -167,6 +167,7 @@ LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);
 LUMIX_ENGINE_API void memRelease(void* ptr, size_t size); // size must be full size used in reserve
 LUMIX_ENGINE_API u32 getMemPageSize();
 LUMIX_ENGINE_API u32 getMemPageAlignment();
+LUMIX_ENGINE_API u64 getProcessMemory();
 
 LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
 LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);

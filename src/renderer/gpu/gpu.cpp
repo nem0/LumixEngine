@@ -1592,7 +1592,7 @@ void pushDebugGroup(const char* msg)
 }
 
 
-QueryHandle createQuery()
+QueryHandle createQuery(QueryType)
 {
 	GPU_PROFILE();
 	GLuint q;
@@ -1626,6 +1626,16 @@ void destroy(QueryHandle query)
 	GPU_PROFILE();
 	GLuint q = (GLuint)(uintptr_t)query;
 	glDeleteQueries(1, &q);
+}
+
+void beginQuery(QueryHandle query) {
+	GPU_PROFILE();
+	glBeginQuery(GL_PRIMITIVES_GENERATED, (GLuint)(uintptr_t)query);
+}
+
+void endQuery(QueryHandle query) {
+	GPU_PROFILE();
+	glEndQuery(GL_PRIMITIVES_GENERATED);
 }
 
 

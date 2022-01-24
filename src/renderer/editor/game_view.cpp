@@ -216,12 +216,6 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 	if (ImGui::Begin("###stats_overlay", nullptr, flags)) {
-		const auto& stats = m_pipeline->getStats();
-		ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
-		ImGui::LabelText("Instances", "%d", stats.instance_count);
-		char buf[30];
-		toCStringPretty(stats.triangle_count, Span(buf));
-		ImGui::LabelText("Triangles", "%s", buf);
 		ImGui::LabelText("Resolution", "%dx%d", (int)m_size.x, (int)m_size.y);
 	}
 	ImGui::End();

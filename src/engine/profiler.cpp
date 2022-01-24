@@ -369,6 +369,10 @@ void gpuMemStats(u64 total, u64 current, u64 dedicated, u64 buffer_mem, u64 text
 	write(g_instance.global_context, EventType::GPU_MEM_STATS, data);
 }
 
+void gpuStats(u64 primitives_generated) {
+	write(g_instance.global_context, EventType::GPU_STATS, primitives_generated);
+}
+
 void endGPUBlock(u64 timestamp)
 {
 	write(g_instance.global_context, EventType::END_GPU_BLOCK, timestamp);

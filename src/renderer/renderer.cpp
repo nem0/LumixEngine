@@ -207,6 +207,7 @@ struct GPUProfiler
 	{
 		StaticString<32> name;
 		gpu::QueryHandle handle;
+		gpu::QueryHandle stats = gpu::INVALID_QUERY;
 		u64 result;
 		i64 profiler_link;
 		bool is_end;
@@ -217,6 +218,7 @@ struct GPUProfiler
 	GPUProfiler(IAllocator& allocator) 
 		: m_queries(allocator)
 		, m_pool(allocator)
+		, m_stats_pool(allocator)
 		, m_gpu_to_cpu_offset(0)
 	{
 	}
@@ -237,7 +239,7 @@ struct GPUProfiler
 
 	void init()
 	{
-		gpu::QueryHandle q = gpu::createQuery();
+		gpu::QueryHandle q = gpu::createQuery(gpu::QueryType::TIMESTAMP);
 		gpu::queryTimestamp(q);
 		const u64 cpu_timestamp = os::Timer::getRawTimestamp();
 
@@ -276,11 +278,21 @@ struct GPUProfiler
 			m_pool.pop();
 			return res;
 		}
-		return gpu::createQuery();
+		return gpu::createQuery(gpu::QueryType::TIMESTAMP);
+	}
+
+	gpu::QueryHandle allocStatsQuery()
+	{
+		if(!m_stats_pool.empty()) {
+			const gpu::QueryHandle res = m_stats_pool.back();
+			m_stats_pool.pop();
+			return res;
+		}
+		return gpu::createQuery(gpu::QueryType::STATS);
 	}
 
 
-	void beginQuery(const char* name, i64 profiler_link)
+	void beginQuery(const char* name, i64 profiler_link, bool stats)
 	{
 		MutexGuard lock(m_mutex);
 		Query& q = m_queries.emplace();
@@ -290,6 +302,15 @@ struct GPUProfiler
 		q.is_frame = false;
 		q.handle = allocQuery();
 		gpu::queryTimestamp(q.handle);
+		if (stats) {
+			ASSERT(m_stats_counter == 0); // nested counters are not supported
+			m_stats_query = allocStatsQuery();
+			gpu::beginQuery(m_stats_query);
+			m_stats_counter = 1;
+		}
+		else if (m_stats_counter > 0) {
+			++m_stats_counter;
+		}
 	}
 
 
@@ -301,6 +322,14 @@ struct GPUProfiler
 		q.is_frame = false;
 		q.handle = allocQuery();
 		gpu::queryTimestamp(q.handle);
+		if (m_stats_counter > 0) {
+			--m_stats_counter;
+			if (m_stats_counter == 0) {
+				gpu::endQuery(m_stats_query);
+				q.stats = m_stats_query;
+				m_stats_query = gpu::INVALID_QUERY;
+			}
+		}
 	}
 
 
@@ -322,7 +351,13 @@ struct GPUProfiler
 			if (!gpu::isQueryReady(q.handle)) break;
 
 			if (q.is_end) {
+				if (q.stats && !gpu::isQueryReady(q.stats)) break;
+
 				const u64 timestamp = toCPUTimestamp(gpu::getQueryResult(q.handle));
+				if (q.stats) {
+					profiler::gpuStats(gpu::getQueryResult(q.stats));
+					m_stats_pool.push(q.stats);
+				}
 				profiler::endGPUBlock(timestamp);
 			}
 			else {
@@ -337,8 +372,11 @@ struct GPUProfiler
 
 	Array<Query> m_queries;
 	Array<gpu::QueryHandle> m_pool;
+	Array<gpu::QueryHandle> m_stats_pool;
 	Mutex m_mutex;
 	i64 m_gpu_to_cpu_offset;
+	u32 m_stats_counter = 0;
+	gpu::QueryHandle m_stats_query;
 };
 
 
@@ -566,10 +604,10 @@ struct RendererImpl final : Renderer
 		return m_scratch_buffer;
 	}
 
-	void beginProfileBlock(const char* name, i64 link) override
+	void beginProfileBlock(const char* name, i64 link, bool stats) override
 	{
 		gpu::pushDebugGroup(name);
-		m_profiler.beginQuery(name, link);
+		m_profiler.beginQuery(name, link, stats);
 	}
 
 
@@ -1184,7 +1222,7 @@ struct RendererImpl final : Renderer
 		}
 		frame.material_updates.clear();
 
-		m_profiler.beginQuery("frame", 0);
+		m_profiler.beginQuery("frame", 0, false);
 		gpu::useProgram(gpu::INVALID_PROGRAM);
 		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 		{
