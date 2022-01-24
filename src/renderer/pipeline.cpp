@@ -461,7 +461,6 @@ struct ShadowAtlas {
 	}
 
 	gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
-	gpu::BufferHandle uniform_buffer = gpu::INVALID_BUFFER;
 	HashMap<EntityRef, u32> map;
 	EntityPtr inv_map[64];
 };
@@ -876,10 +875,6 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
 		m_cube_vb = m_renderer.createBuffer(vb_mem, gpu::BufferFlags::IMMUTABLE);
 
-		Renderer::MemRef no_mem;
-		no_mem.size = sizeof(Matrix) * 128;
-		m_shadow_atlas.uniform_buffer = m_renderer.createBuffer(no_mem, gpu::BufferFlags::UNIFORM_BUFFER);
-
 		u16 cube_indices[] = {
 			0, 1, 2,
 			0, 2, 3,
@@ -900,10 +895,6 @@ struct PipelineImpl final : Pipeline
 
 		m_resource->onLoaded<&PipelineImpl::onStateChanged>(this);
 
-		GlobalState global_state;
-		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
-		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, gpu::BufferFlags::UNIFORM_BUFFER);
-		
 		const Renderer::MemRef im_mem = { INSTANCED_MESHES_BUFFER_SIZE, nullptr, false };
 		m_instanced_meshes_buffer = m_renderer.createBuffer(im_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
 
@@ -971,8 +962,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.destroy(m_cube_vb);
 		m_renderer.destroy(m_instanced_meshes_buffer);
 		m_renderer.destroy(m_indirect_buffer);
-		m_renderer.destroy(m_global_state_buffer);
-		m_renderer.destroy(m_shadow_atlas.uniform_buffer);
 		m_renderer.destroy(m_shadow_atlas.texture);
 		m_renderer.destroy(m_cluster_buffers.clusters.buffer);
 		m_renderer.destroy(m_cluster_buffers.lights.buffer);
@@ -1416,16 +1405,19 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 				pipeline->m_renderer.beginProfileBlock(pipeline->m_define, 0, true);
-				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
-				gpu::bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer, 0, sizeof(GlobalState));
+				gpu::bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer.buffer, global_state_buffer.offset, sizeof(GlobalState));
 				gpu::bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
+				gpu::bindUniformBuffer(UniformBuffer::SHADOW, gpu::INVALID_BUFFER, 0, 0);
 				int tmp[12] = {};
 				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
 			}
-			void setup() override {}
+			void setup() override {
+				global_state_buffer = pipeline->m_renderer.allocUniform(sizeof(GlobalState));
+				memcpy(global_state_buffer.ptr, &global_state, sizeof(global_state));
+			}
 
-			gpu::BufferHandle global_state_buffer;
+			Renderer::TransientSlice global_state_buffer;
 			PipelineImpl* pipeline;
 			GlobalState global_state;
 			PassState pass_state;
@@ -1434,7 +1426,6 @@ struct PipelineImpl final : Pipeline
 		StartPipelineJob& start_job = m_renderer.createJob<StartPipelineJob>();
 		start_job.pipeline = this;
 		start_job.global_state = global_state;
-		start_job.global_state_buffer = m_global_state_buffer;
 		m_renderer.queue(start_job, 0);
 		
 		m_buckets_ready = jobs::INVALID_HANDLE;
@@ -2967,13 +2958,15 @@ struct PipelineImpl final : Pipeline
 			for (Cluster& cluster : clusters) {
 				cluster.offset -= cluster.point_lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
+
+			m_shadow_matrices_ub = m_pipeline->m_renderer.allocUniform(sizeof(m_shadow_atlas_matrices));
+			memcpy(m_shadow_matrices_ub.ptr, &m_shadow_atlas_matrices, sizeof(m_shadow_atlas_matrices));
 		}
 
 		void execute() override {
 			PROFILE_FUNCTION();
 
-			gpu::update(m_pipeline->m_shadow_atlas.uniform_buffer, m_shadow_atlas_matrices, sizeof(m_shadow_atlas_matrices));
-			gpu::bindUniformBuffer(UniformBuffer::SHADOW, m_pipeline->m_shadow_atlas.uniform_buffer, 0, sizeof(m_shadow_atlas_matrices));
+			gpu::bindUniformBuffer(UniformBuffer::SHADOW, m_shadow_matrices_ub.buffer, m_shadow_matrices_ub.offset, m_shadow_matrices_ub.size);
 
 			auto bind = [](auto& buffer, const auto& data, i32 idx){
 				const u32 capacity = (data.byte_size() + 15) & ~15;
@@ -3044,6 +3037,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams m_camera_params;
 		bool m_is_clear = false;
 		Matrix m_shadow_atlas_matrices[128];
+		Renderer::TransientSlice m_shadow_matrices_ub;
 	};
 	
 	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
@@ -5169,7 +5163,6 @@ struct PipelineImpl final : Pipeline
 	volatile i32 m_instanced_meshes_indirect_offset;
 	gpu::BufferHandle m_instanced_meshes_buffer;
 	gpu::BufferHandle m_indirect_buffer;
-	gpu::BufferHandle m_global_state_buffer;
 	gpu::VertexDecl m_base_vertex_decl;
 	gpu::VertexDecl m_2D_decl;
 	gpu::VertexDecl m_simple_cube_decl;
