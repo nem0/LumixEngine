@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
+#include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
@@ -177,6 +178,18 @@ struct InstancedModel {
 		float scale;
 	};
 
+	struct Grid {
+		struct Cell {
+			AABB aabb;
+			u32 from_instance;
+			u32 instance_count;
+		};
+
+		AABB aabb;
+		Cell cells[4 * 4];
+	};
+
+	Grid grid;
 	Model* model = nullptr;
 	Array<InstanceData> instances;
 	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;

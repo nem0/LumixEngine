@@ -50,6 +50,10 @@ static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
 static constexpr u64 SORT_KEY_DEPTH_MASK = 0xffFFffFF;
 static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
 
+namespace gpu {
+	extern bool xxx;
+}
+
 struct CameraParams
 {
 	ShiftedFrustum frustum;
@@ -780,6 +784,14 @@ struct PipelineImpl final : Pipeline
 				u8 layer;
 			};
 
+			struct Cell {
+				u32 offset;
+				u32 count;
+				Renderer::TransientSlice ub;
+			};
+
+			Cell cells[16];
+			u32 cell_count = 0;
 			Renderer::TransientSlice drawcall_ub;
 			Transform origin;
 			gpu::BufferHandle instance_data;
@@ -3106,20 +3118,35 @@ struct PipelineImpl final : Pipeline
 			Vec4 camera_offset;
 			Vec4 lod_distances;
 			IVec4 lod_indices;
-			u32 batch_size;
 			u32 indirect_offset;
 			float radius;
-			u32 padding;
+			u32 batch_size;
+			float padding;
 			Vec4 camera_planes[6];
 			IVec4 indices_count[32];
 		};
 
 		void execute() override {
 			PROFILE_FUNCTION();
-			m_pipeline->m_renderer.beginProfileBlock("cull instanced models", 0);
 			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
 			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
 			
+			/*if (!m_camera_params.is_shadow) {
+				m_pipeline->m_renderer.beginProfileBlock("update lods", 0);
+				for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+					// TODO this generates barriers on dx12, which slows things down quite a bit
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, g.drawcall_ub.buffer, g.drawcall_ub.offset, sizeof(UBValues));
+					gpu::useProgram(m_update_lods_shader);
+					gpu::dispatch((g.instance_count + 255) / 256, 1, 1);
+				}
+				for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+					gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, g.instance_data);
+				}
+				m_pipeline->m_renderer.endProfileBlock();
+			}*/
+
+			m_pipeline->m_renderer.beginProfileBlock("cull instanced models", 0);
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, g.drawcall_ub.buffer, g.drawcall_ub.offset, sizeof(UBValues));
 
@@ -3128,21 +3155,27 @@ struct PipelineImpl final : Pipeline
 				gpu::dispatch(1, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 
-				gpu::bindShaderBuffer(g.instance_data, 0, m_camera_params.is_shadow ? gpu::BindShaderBufferFlags::NONE : gpu::BindShaderBufferFlags::OUTPUT);
+				gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+				
 				gpu::useProgram(m_cull_shader);
-				gpu::dispatch((g.instance_count + 255) / 256, 1, 1);
+				for (u32 i = 0; i < g.cell_count; ++i) {
+					// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
+					gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+				}
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 
-				if (!m_camera_params.is_shadow) {
-					gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, g.instance_data);
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
-				}
 				gpu::useProgram(m_indirect_shader);
 				gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
 
 				gpu::useProgram(m_gather_shader);
-				gpu::dispatch((g.instance_count + 255) / 256, 1, 1); // TODO GL_MAX_COMPUTE_WORK_GROUP_SIZE min is 1024
+				for (u32 i = 0; i < g.cell_count; ++i) {
+					// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
+					gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+				}
+
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 			}
 			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
@@ -3165,20 +3198,53 @@ struct PipelineImpl final : Pipeline
 			toPlanes(m_camera_params, Span(ub_values.camera_planes));
 
 			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-				Model* m = iter.value().model;
+				const InstancedModel& im = iter.value();
+				Model* m = im.model;
 				if (!m || !m->isReady()) continue;
 
 				InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
 
 				g.origin = universe.getTransform(iter.key());
+				const Frustum frustum = m_camera_params.frustum.getRelative(g.origin.pos);
+				
+				for (u32 i = 0; i < 16; ++i) {
+					const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
+
+					// TODO there's lada's windshield UFO
+					// TODO surface_base.inc now handles lods even in meshes without lods
+					// TODO make undo/redo work (now that we have a grid)
+					// TODO cull by distance
+					// TODO do not cull each instance in cells which are fully in frustum; check if this helps/is faster
+					// TODO update lods in culled cells
+					// TODO add radius of model to cell's size for proper culling
+					if (cell.instance_count > 0 && frustum.intersectAABB(cell.aabb)) {
+						const bool can_merge = g.cell_count > 0 && g.cells[g.cell_count - 1].offset + g.cells[g.cell_count - 1].count == cell.from_instance;
+						if (can_merge) {
+							g.cells[g.cell_count - 1].count += cell.instance_count;
+							u32* tmp =(u32*)g.cells[g.cell_count - 1].ub.ptr;
+							tmp[1] += cell.instance_count;
+						}
+						else {
+							g.cells[g.cell_count].count = cell.instance_count;
+							g.cells[g.cell_count].offset = cell.from_instance;
+							Renderer::TransientSlice ub = m_pipeline->m_renderer.allocUniform(sizeof(u32) * 2);
+							u32* tmp =(u32*)ub.ptr;
+							tmp[0] = cell.from_instance;
+							tmp[1] = cell.instance_count;
+							g.cells[g.cell_count].ub = ub;
+							++g.cell_count;
+						}
+					}
+				}
+				
 				g.lod_distances = *(Vec4*)m->getLODDistances();
 				g.lod_indices.x = m->getLODIndices()[0].to;
 				g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
 				g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
 				g.lod_indices.w = maximum(g.lod_indices.z, m->getLODIndices()[3].to);
 				g.radius = m->getOriginBoundingRadius();
-				g.instance_count = iter.value().instances.size();
-				g.instance_data = iter.value().gpu_data;
+				g.instance_count = im.instances.size();
+				g.instance_data = im.gpu_data;
 				g.indirect_offset = atomicAdd(&m_pipeline->m_instanced_meshes_indirect_offset, m->getMeshCount());
 				g.meshes.reserve(m->getMeshCount());
 				for (i32 i = 0; i < m->getMeshCount(); ++i) {
@@ -3191,11 +3257,11 @@ struct PipelineImpl final : Pipeline
 				}
 
 				ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
-				ub_values.batch_size = g.instance_count;
 				ub_values.lod_distances = g.lod_distances;
 				ub_values.lod_indices = g.lod_indices;
 				ub_values.indirect_offset = g.indirect_offset;
 				ub_values.radius = g.radius;
+				ub_values.batch_size = g.instance_count;
 				ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
 				for (const auto& m : g.meshes) {
 					ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
@@ -3216,6 +3282,7 @@ struct PipelineImpl final : Pipeline
 		gpu::ProgramHandle m_indirect_shader;
 		gpu::ProgramHandle m_cull_shader;
 		gpu::ProgramHandle m_init_shader;
+		gpu::ProgramHandle m_update_lods_shader;
 	};
 
 	u32 cull(CameraParams cp) {
@@ -3235,10 +3302,11 @@ struct PipelineImpl final : Pipeline
 			job.m_instanced_meshes = view.instanced_meshes;
 			job.m_gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
 			job.m_indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
-			u32 cull_shader_define_mask = 1 << m_renderer.getShaderDefineIdx("PASS1");
-			if (!cp.is_shadow) cull_shader_define_mask |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
-			job.m_cull_shader = m_instancing_shader->getProgram(cull_shader_define_mask);
+			u32 cull_shader_defines = 1 << m_renderer.getShaderDefineIdx("PASS1");
+			if (!cp.is_shadow) cull_shader_defines |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
+			job.m_cull_shader = m_instancing_shader->getProgram(cull_shader_defines);
 			job.m_init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
+			job.m_update_lods_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("UPDATE_LODS"));
 			m_renderer.queue(job, m_profiler_link);
 		}
 

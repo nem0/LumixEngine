@@ -492,6 +492,16 @@ void AABB::addPoint(const Vec3& point) {
 	max = maxCoords(point, max);
 }
 
+bool AABB::contains(const Vec3& point) const {
+	if (min.x > point.x) return false;
+	if (min.y > point.y) return false;
+	if (min.z > point.z) return false;
+	if (point.x > max.x) return false;
+	if (point.y > max.y) return false;
+	if (point.z > max.z) return false;
+	return true;
+}
+
 bool AABB::overlaps(const AABB& aabb) const {
 	if (min.x > aabb.max.x) return false;
 	if (min.y > aabb.max.y) return false;

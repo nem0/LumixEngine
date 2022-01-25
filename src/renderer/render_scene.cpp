@@ -1101,6 +1101,61 @@ struct RenderSceneImpl final : RenderScene {
 				im.gpu_capacity = 0;
 			}
 		}
+
+		// grid aabb
+		im.grid.aabb = AABB(Vec3(FLT_MAX), Vec3(-FLT_MAX));
+		for (const InstancedModel::InstanceData& id : im.instances) {
+			im.grid.aabb.addPoint(id.pos);
+		}
+
+		// cells aabb
+		const Vec2 cell_size = (im.grid.aabb.max.xz() - im.grid.aabb.min.xz()) * 0.25f;
+		for (u32 j = 0; j < 4; ++j) {
+			for (u32 i = 0; i < 4; ++i) {
+				InstancedModel::Grid::Cell& cell = im.grid.cells[i + j * 4];
+				cell.from_instance = 0;
+				cell.instance_count = 0;
+				cell.aabb.min.x = im.grid.aabb.min.x + cell_size.x * i;
+				cell.aabb.min.y = im.grid.aabb.min.y;
+				cell.aabb.min.z = im.grid.aabb.min.z + cell_size.y * j;
+				cell.aabb.max.x = cell.aabb.min.x + cell_size.x;
+				cell.aabb.max.y = im.grid.aabb.max.y;
+				cell.aabb.max.z = cell.aabb.min.z + cell_size.y;
+				cell.aabb.shrink(-0.01f);
+			}
+		}
+
+		// count
+		for (const InstancedModel::InstanceData& id : im.instances) {
+			for (u32 i = 0; i < 16; ++i) {
+				if (im.grid.cells[i].aabb.contains(id.pos)) {
+					++im.grid.cells[i].instance_count;
+					break;
+				}
+			}
+		}
+
+		// offsets
+		for (u32 i = 1; i < 16; ++i) {
+			im.grid.cells[i].from_instance = im.grid.cells[i - 1].instance_count + im.grid.cells[i - 1].from_instance;
+		}
+
+		for (u32 i = 0; i < 16; ++i) im.grid.cells[i].instance_count = 0;
+
+		// scatter
+		Array<InstancedModel::InstanceData> tmp(m_allocator);
+		tmp.resize(im.instances.size());
+		for (const InstancedModel::InstanceData& id : im.instances) {
+			for (u32 i = 0; i < 16; ++i) {
+				if (im.grid.cells[i].aabb.contains(id.pos)) {
+					tmp[im.grid.cells[i].instance_count + im.grid.cells[i].from_instance] = id;
+					++im.grid.cells[i].instance_count;
+					break;
+				}
+			}
+		}
+		im.instances.swap(tmp);
+
 		if (!im.instances.empty()) {
 			if (im.gpu_data) {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());

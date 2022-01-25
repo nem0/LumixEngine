@@ -151,6 +151,7 @@ struct LUMIX_ENGINE_API AABB {
 	void merge(const AABB& rhs);
 	void addPoint(const Vec3& point);
 	bool overlaps(const AABB& aabb) const;
+	bool contains(const Vec3& point) const;
 	void transform(const Matrix& matrix);
 	void getCorners(const Transform& tr, DVec3* points) const;
 	void getCorners(const Matrix& matrix, Vec3* points) const;

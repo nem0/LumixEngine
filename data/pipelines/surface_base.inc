@@ -42,7 +42,7 @@ function surface_shader(code)
 			} Model;
 		#endif
 
-		#if defined _HAS_ATTR6 && !defined GRASS
+		#if !defined GRASS
 			#define HAS_LOD
 		#endif
 	]]
@@ -100,7 +100,7 @@ function surface_shader(code)
 				v_tangent = rotateByQuat(rot_quat, a_tangent);
 				vec3 p = a_position * i_pos_scale.w;
 				#ifdef HAS_LOD
-					v_lod = i_rot_quat.w;
+					v_lod = i_rot_lod.w;
 				#endif
 				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
 				#ifdef _HAS_ATTR7
