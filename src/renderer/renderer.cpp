@@ -59,6 +59,7 @@ struct TransientBuffer {
 	static constexpr u32 OVERFLOW_BUFFER_SIZE = 512 * 1024 * 1024;
 	
 	void init(gpu::BufferFlags flags) {
+		m_flags = flags;
 		m_buffer = gpu::allocBufferHandle();
 		m_offset = 0;
 		gpu::createBuffer(m_buffer, gpu::BufferFlags::MAPPABLE | flags, INIT_SIZE, nullptr);
@@ -101,7 +102,7 @@ struct TransientBuffer {
 		m_ptr = nullptr;
 
 		if (m_overflow.buffer) {
-			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE, nextPow2(m_overflow.size + m_size), nullptr);
+			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE | m_flags, nextPow2(m_overflow.size + m_size), nullptr);
 			void* mem = gpu::map(m_overflow.buffer, m_overflow.size + m_size);
 			if (mem) {
 				memcpy(mem, m_overflow.data, m_overflow.size);
@@ -132,6 +133,7 @@ struct TransientBuffer {
 	u32 m_size = 0;
 	u8* m_ptr = nullptr;
 	Mutex m_mutex;
+	gpu::BufferFlags m_flags = gpu::BufferFlags::NONE;
 
 	struct {
 		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
