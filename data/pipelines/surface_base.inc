@@ -66,13 +66,13 @@ function surface_shader(code)
 		#elif defined INSTANCED || defined GRASS
 			layout(location = 4) in vec4 i_rot_lod;
 			layout(location = 5) in vec4 i_pos_scale;
-			#ifdef _HAS_ATTR7
-				layout(location = 7) in vec4 a_color;
-				layout(location = 6) out vec4 v_color;
+			#ifdef _HAS_ATTR6
+				layout(location = 6) in vec4 a_color;
+				layout(location = 5) out vec4 v_color;
 			#endif
-			#ifdef _HAS_ATTR8
-				layout(location = 8) in float a_ao;
-				layout(location = 7) out float v_ao;
+			#ifdef _HAS_ATTR7
+				layout(location = 7) in float a_ao;
+				layout(location = 6) out float v_ao;
 			#endif
 		#else
 			layout(std140, binding = 4) uniform ModelState {
@@ -88,7 +88,7 @@ function surface_shader(code)
 		layout(location = 2) out vec3 v_tangent;
 		layout(location = 3) out vec4 v_wpos;
 		#ifdef FUR
-			layout(location = 8) out float v_fur_layer;
+			layout(location = 7) out float v_fur_layer;
 		#endif
 	
 		void main() {
@@ -103,10 +103,10 @@ function surface_shader(code)
 					v_lod = i_rot_lod.w;
 				#endif
 				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
-				#ifdef _HAS_ATTR7
+				#ifdef _HAS_ATTR6
 					v_color = a_color;
 				#endif
-				#ifdef _HAS_ATTR8
+				#ifdef _HAS_ATTR7
 					v_ao = a_ao;
 				#endif
 			#elif defined SKINNED
@@ -168,14 +168,14 @@ function surface_shader(code)
 		#ifdef HAS_LOD
 			layout(location = 4) in float v_lod;
 		#endif
-		#ifdef _HAS_ATTR7
-			layout(location = 6) in vec4 v_color;
+		#ifdef _HAS_ATTR6
+			layout(location = 5) in vec4 v_color;
 		#endif
-		#ifdef _HAS_ATTR8
-			layout(location = 7) in float v_ao;
+		#ifdef _HAS_ATTR7
+			layout(location = 6) in float v_ao;
 		#endif
 		#ifdef FUR
-			layout(location = 8) in float v_fur_layer;
+			layout(location = 7) in float v_fur_layer;
 		#endif
 
 		#if defined DEFERRED || defined GRASS

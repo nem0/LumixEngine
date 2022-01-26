@@ -787,6 +787,7 @@ struct PipelineImpl final : Pipeline
 			struct Cell {
 				u32 offset;
 				u32 count;
+				bool visible;
 				Renderer::TransientSlice ub;
 			};
 
@@ -3128,24 +3129,11 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override {
 			PROFILE_FUNCTION();
+			if (m_instanced_meshes->models.empty()) return;
+
 			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
 			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
 			
-			/*if (!m_camera_params.is_shadow) {
-				m_pipeline->m_renderer.beginProfileBlock("update lods", 0);
-				for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-					// TODO this generates barriers on dx12, which slows things down quite a bit
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, g.drawcall_ub.buffer, g.drawcall_ub.offset, sizeof(UBValues));
-					gpu::useProgram(m_update_lods_shader);
-					gpu::dispatch((g.instance_count + 255) / 256, 1, 1);
-				}
-				for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-					gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, g.instance_data);
-				}
-				m_pipeline->m_renderer.endProfileBlock();
-			}*/
-
 			m_pipeline->m_renderer.beginProfileBlock("cull instanced models", 0);
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, g.drawcall_ub.buffer, g.drawcall_ub.offset, sizeof(UBValues));
@@ -3155,15 +3143,35 @@ struct PipelineImpl final : Pipeline
 				gpu::dispatch(1, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 
-				gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+				if (m_camera_params.is_shadow) {
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+				}
+				else {
+					m_pipeline->m_renderer.beginProfileBlock("update lods", 0);
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+					gpu::useProgram(m_update_lods_shader);
+					for (u32 i = 0; i < g.cell_count; ++i) {
+						if (!g.cells[i].visible) {
+							gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
+							gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+						}
+					}
+					m_pipeline->m_renderer.endProfileBlock();
+				}
 				
 				gpu::useProgram(m_cull_shader);
 				for (u32 i = 0; i < g.cell_count; ++i) {
 					// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
-					gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+					if (g.cells[i].visible) {
+						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
+						gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+					}
 				}
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+
+				if (!m_camera_params.is_shadow) {
+					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+				}
 
 				gpu::useProgram(m_indirect_shader);
 				gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
@@ -3171,9 +3179,11 @@ struct PipelineImpl final : Pipeline
 
 				gpu::useProgram(m_gather_shader);
 				for (u32 i = 0; i < g.cell_count; ++i) {
-					// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
-					gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+					if (g.cells[i].visible) {
+						// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
+						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
+						gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+					}
 				}
 
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
@@ -3185,6 +3195,17 @@ struct PipelineImpl final : Pipeline
 			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);
 			
 			m_pipeline->m_renderer.endProfileBlock();
+		}
+
+		static float getDrawDistance(const Model& model) {
+			const LODMeshIndices* lod_indices = model.getLODIndices();
+			float dist = 0;
+			for (u32 i = 0; i < 4; ++i) {
+				if (lod_indices[i].to != -1) {
+					dist = model.getLODDistances()[i];
+				}
+			}
+			return sqrtf(dist);
 		}
 
 		void setup() override {
@@ -3202,41 +3223,49 @@ struct PipelineImpl final : Pipeline
 				Model* m = im.model;
 				if (!m || !m->isReady()) continue;
 
+				float draw_distance = getDrawDistance(*m);
 				InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
 
 				g.origin = universe.getTransform(iter.key());
-				const Frustum frustum = m_camera_params.frustum.getRelative(g.origin.pos);
-				
+				Frustum frustum = m_camera_params.frustum.getRelative(g.origin.pos);
+				const float radius = m->getOriginBoundingRadius();
+
 				for (u32 i = 0; i < 16; ++i) {
 					const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
 
-					// TODO there's lada's windshield UFO
-					// TODO surface_base.inc now handles lods even in meshes without lods
 					// TODO make undo/redo work (now that we have a grid)
-					// TODO cull by distance
-					// TODO do not cull each instance in cells which are fully in frustum; check if this helps/is faster
-					// TODO update lods in culled cells
-					// TODO add radius of model to cell's size for proper culling
-					if (cell.instance_count > 0 && frustum.intersectAABB(cell.aabb)) {
-						const bool can_merge = g.cell_count > 0 && g.cells[g.cell_count - 1].offset + g.cells[g.cell_count - 1].count == cell.from_instance;
-						if (can_merge) {
-							g.cells[g.cell_count - 1].count += cell.instance_count;
-							u32* tmp =(u32*)g.cells[g.cell_count - 1].ub.ptr;
-							tmp[1] += cell.instance_count;
-						}
-						else {
-							g.cells[g.cell_count].count = cell.instance_count;
-							g.cells[g.cell_count].offset = cell.from_instance;
-							Renderer::TransientSlice ub = m_pipeline->m_renderer.allocUniform(sizeof(u32) * 2);
-							u32* tmp =(u32*)ub.ptr;
-							tmp[0] = cell.from_instance;
-							tmp[1] = cell.instance_count;
-							g.cells[g.cell_count].ub = ub;
-							++g.cell_count;
+					if (cell.instance_count > 0) {
+						const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
+						const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
+						const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
+						const float cell_radius = length(cell_half_extents);
+						if (length(g.origin.pos - m_camera_params.pos + cell_center) - cell_radius < draw_distance) {
+							const bool can_merge = g.cell_count > 0 && g.cells[g.cell_count - 1].visible == visible  && g.cells[g.cell_count - 1].offset + g.cells[g.cell_count - 1].count == cell.from_instance;
+							if (can_merge) {
+								g.cells[g.cell_count - 1].count += cell.instance_count;
+								u32* tmp =(u32*)g.cells[g.cell_count - 1].ub.ptr;
+								tmp[1] += cell.instance_count;
+							}
+							else {
+								g.cells[g.cell_count].visible = visible;
+								g.cells[g.cell_count].count = cell.instance_count;
+								g.cells[g.cell_count].offset = cell.from_instance;
+								Renderer::TransientSlice ub = m_pipeline->m_renderer.allocUniform(sizeof(u32) * 2);
+								u32* tmp =(u32*)ub.ptr;
+								tmp[0] = cell.from_instance;
+								tmp[1] = cell.instance_count;
+								g.cells[g.cell_count].ub = ub;
+								++g.cell_count;
+							}
 						}
 					}
 				}
 				
+				if (g.cell_count == 0) {
+					m_instanced_meshes->models.pop();
+					continue;
+				}
+
 				g.lod_distances = *(Vec4*)m->getLODDistances();
 				g.lod_indices.x = m->getLODIndices()[0].to;
 				g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
@@ -3488,6 +3517,10 @@ struct PipelineImpl final : Pipeline
 		gpu::StateFlags m_render_state;
 	};
 
+	static Vec4 packRotationLOD(const Quat& rot, float lod) {
+		return rot.w > 0 ? Vec4(rot.x, rot.y, rot.z, lod) : Vec4(-rot.x, -rot.y, -rot.z, lod);
+	}
+
 	void createCommands(View& view
 		, CmdPage* first_page
 		, const u64* LUMIX_RESTRICT renderables
@@ -3565,20 +3598,19 @@ struct PipelineImpl final : Pipeline
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 					const Mesh& mesh = mi->meshes[mesh_idx];
 
-					const Renderer::TransientSlice slice = renderer.allocTransient((sizeof(Vec4) + sizeof(float)) * 2);
+					const Renderer::TransientSlice slice = renderer.allocTransient(sizeof(Vec4) * 2);
 					u8* instance_data = slice.ptr;
 					const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
 					const Transform& tr = entity_data[e.index];
+					const float lod_d = model_instances[e.index].lod - mesh.lod;
+					const Vec4 rot_lod = packRotationLOD(tr.rot, lod_d);
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
-					memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-					instance_data += sizeof(tr.rot);
+					memcpy(instance_data, &rot_lod, sizeof(rot_lod));
+					instance_data += sizeof(rot_lod);
 					memcpy(instance_data, &lpos, sizeof(lpos));
 					instance_data += sizeof(lpos);
 					memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 					instance_data += sizeof(tr.scale);
-					const float lod_d = model_instances[e.index].lod - mesh.lod;
-					memcpy(instance_data, &lod_d, sizeof(lod_d));
-					instance_data += sizeof(lod_d);
 					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
 						new_page(bucket);
 					}
@@ -3632,21 +3664,20 @@ struct PipelineImpl final : Pipeline
 							++i;
 						}
 						const u32 count = u32(i - start_i);
-						const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) + sizeof(Vec4) + sizeof(float)) * 2);
+						const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) * 2));
 						u8* instance_data = slice.ptr;
 						for (int j = start_i; j < start_i + (i32)count; ++j) {
 							const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
-							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-							instance_data += sizeof(tr.rot);
+							const float lod_d = model_instances[e.index].lod - mesh_lod;
+							const Vec4 rot_lod = packRotationLOD(tr.rot, lod_d);
+							memcpy(instance_data, &rot_lod, sizeof(rot_lod));
+							instance_data += sizeof(rot_lod);
 							memcpy(instance_data, &lpos, sizeof(lpos));
 							instance_data += sizeof(lpos);
 							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 							instance_data += sizeof(tr.scale);
-							const float lod_d = model_instances[e.index].lod - mesh_lod;
-							memcpy(instance_data, &lod_d, sizeof(lod_d));
-							instance_data += sizeof(lod_d);
 						}
 						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
 							new_page(bucket);
@@ -4357,9 +4388,10 @@ struct PipelineImpl final : Pipeline
 
 	struct RenderInstancedModelsCommand : Renderer::RenderJob {
 		void execute() override {
-			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
-
 			PROFILE_FUNCTION();
+			if (m_instanced_meshes->models.empty()) return;
+
+			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
 			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
@@ -4788,9 +4820,9 @@ struct PipelineImpl final : Pipeline
 						const Transform& tr = entity_data[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const float lod_d = model_instances[e.index].lod - mesh_lod;
-						const Vec4 r = tr.rot.w > 0 ? Vec4(tr.rot.x, tr.rot.y, tr.rot.z, lod_d) : Vec4(-tr.rot.x, -tr.rot.y, -tr.rot.z, lod_d);
+						const Vec4 r = packRotationLOD(tr.rot, lod_d);
 						memcpy(instance_data, &r, sizeof(r));
-						instance_data += sizeof(tr.rot);
+						instance_data += sizeof(r);
 						memcpy(instance_data, &lpos, sizeof(lpos));
 						instance_data += sizeof(lpos);
 						memcpy(instance_data, &tr.scale, sizeof(tr.scale));

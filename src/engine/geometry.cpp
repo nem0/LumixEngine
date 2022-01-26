@@ -55,6 +55,26 @@ bool Frustum::intersectNearPlane(const Vec3& center, float radius) const {
 	return distance < radius;
 }
 
+bool Frustum::intersectAABBWithOffset(const AABB& aabb, float size_offset) const {
+	Vec3 box[] = { aabb.min, aabb.max };
+
+	for (int i = 0; i < 6; ++i)
+	{
+		int px = (int)(xs[i] > 0.0f);
+		int py = (int)(ys[i] > 0.0f);
+		int pz = (int)(zs[i] > 0.0f);
+
+		float dp =
+			(xs[i] * box[px].x) +
+			(ys[i] * box[py].y) +
+			(zs[i] * box[pz].z);
+
+		if (dp < -ds[i] - size_offset) { return false; }
+	}
+	return true;
+}
+
+
 bool Frustum::intersectAABB(const AABB& aabb) const
 {
 	Vec3 box[] = { aabb.min, aabb.max };
