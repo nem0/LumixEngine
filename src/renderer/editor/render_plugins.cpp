@@ -3555,6 +3555,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugin {
 	struct SetTransformCommand : IEditorCommand {
+		// todo `instance` can become invalid, use position to identify instance
 		SetTransformCommand(EntityRef entity, u32 instance, const Transform& transform, WorldEditor& editor)
 			: editor(editor)
 			, entity(entity)
@@ -3611,22 +3612,27 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	};
 
 	struct RemoveCommand : IEditorCommand {
-		RemoveCommand(EntityRef entity, WorldEditor& editor)
+		RemoveCommand(EntityRef entity, Vec2 center_xz, float radius_squared, WorldEditor& editor)
 			: editor(editor)
 			, entity(entity)
 			, instances(editor.getAllocator())
-			, indices(editor.getAllocator())
+			, center_xz(center_xz)
+			, radius_squared(radius_squared)
 		{}
 		
 		bool execute() override {
 			instances.clear();
+			
 			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->getInstancedModels()[entity];
-			for (i32 i = indices.size() - 1; i >= 0; --i) {
-				ASSERT(i == 0 || indices[i] > indices[i - 1]);
-				instances.push(im.instances[indices[i]]);
-				im.instances.erase(indices[i]);
+			for (i32 i = im.instances.size(); i >= 0; --i) {
+				const InstancedModel::InstanceData& id = im.instances[i];
+				if (squaredLength(id.pos.xz() - center_xz) < radius_squared) {
+					instances.push(im.instances[i]);
+					im.instances.swapAndPop(i);
+				}
 			}
+			
 			scene->initInstancedModelGPUData(entity);
 			return true;
 		}
@@ -3635,8 +3641,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->getInstancedModels()[entity];
 			
-			for (i32 i = 0; i < indices.size(); ++i) {
-				im.instances.insert(indices[i], instances[i]);
+			for (const InstancedModel::InstanceData& id : instances) {
+				im.instances.push(id);
 			}
 			scene->initInstancedModelGPUData(entity);
 		}
@@ -3647,7 +3653,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 		WorldEditor& editor;
 		EntityRef entity;
-		Array<u32> indices;
+		Vec2 center_xz;
+		float radius_squared;
 		Array<InstancedModel::InstanceData> instances;
 	};
 
@@ -3672,6 +3679,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->getInstancedModels()[entity];
 			for (u32 i = 0; i < (u32)instances.size(); ++i) {
+				// TODO initInstancedModelGPUData reorders instances, so we can't use pop
 				im.instances.pop();
 			}
 			scene->initInstancedModelGPUData(entity);
@@ -3786,23 +3794,14 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 				Vec2 center_xz = Vec3(hit_pos - origin).xz();
 				const float model_radius = cmp.im->model->getOriginBoundingRadius();
 				const float radius_squared = (m_brush_radius + 2 * model_radius) * (m_brush_radius + 2 * model_radius);
-				UniquePtr<RemoveCommand> remove_cmd = UniquePtr<RemoveCommand>::create(editor.getAllocator(), cmp.entity, editor);
-				{
-					PROFILE_BLOCK("existing");
+				
+				if (!remove) {
 					for (u32 i = 0; i < (u32)cmp.im->instances.size(); ++i) {
 						const InstancedModel::InstanceData& id = cmp.im->instances[i];
 						if (squaredLength(id.pos.xz() - center_xz) < radius_squared) {
-							if (remove) {
-								remove_cmd->indices.push(i);
-							}
-							else {
-								existing.push(id);
-							}
+							existing.push(id);
 						}
 					}
-				}
-				
-				if (!remove) {
 					UniquePtr<AddCommand> add_cmd = UniquePtr<AddCommand>::create(editor.getAllocator(), cmp.entity, editor);
 					for (int i = 0; i <= m_brush_radius * m_brush_radius / 100.0f * m_brush_strength; ++i) {
 						const float angle = randFloat(0, PI * 2);
@@ -3851,6 +3850,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 					m_can_lock_group = true;
 				}
 				else {
+					UniquePtr<RemoveCommand> remove_cmd = UniquePtr<RemoveCommand>::create(editor.getAllocator(), cmp.entity, center_xz, radius_squared, editor);
 					editor.beginCommandGroup("remove_instanced_model_instances_group");
 					editor.executeCommand(remove_cmd.move());
 					editor.endCommandGroup();

@@ -3147,7 +3147,6 @@ struct PipelineImpl final : Pipeline
 					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
 				}
 				else {
-					m_pipeline->m_renderer.beginProfileBlock("update lods", 0);
 					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
 					gpu::useProgram(m_update_lods_shader);
 					for (u32 i = 0; i < g.cell_count; ++i) {
@@ -3156,12 +3155,10 @@ struct PipelineImpl final : Pipeline
 							gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
 						}
 					}
-					m_pipeline->m_renderer.endProfileBlock();
 				}
 				
 				gpu::useProgram(m_cull_shader);
 				for (u32 i = 0; i < g.cell_count; ++i) {
-					// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
 					if (g.cells[i].visible) {
 						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
 						gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
@@ -3180,7 +3177,6 @@ struct PipelineImpl final : Pipeline
 				gpu::useProgram(m_gather_shader);
 				for (u32 i = 0; i < g.cell_count; ++i) {
 					if (g.cells[i].visible) {
-						// TODO dx12 and dx11 bindUniformBuffer bind to graphics here, which slows things down A LOT
 						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
 						gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
 					}
@@ -4390,9 +4386,9 @@ struct PipelineImpl final : Pipeline
 		void execute() override {
 			PROFILE_FUNCTION();
 			if (m_instanced_meshes->models.empty()) return;
+			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
 
 			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
-			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
 				for (const auto& m : g.meshes) {
