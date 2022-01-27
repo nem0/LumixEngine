@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
+#include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
@@ -177,10 +178,23 @@ struct InstancedModel {
 		float scale;
 	};
 
+	struct Grid {
+		struct Cell {
+			AABB aabb;
+			u32 from_instance;
+			u32 instance_count;
+		};
+
+		AABB aabb;
+		Cell cells[4 * 4];
+	};
+
+	Grid grid;
 	Model* model = nullptr;
 	Array<InstanceData> instances;
 	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;
 	u32 gpu_capacity = 0;
+	bool dirty = false;
 };
 
 struct MeshInstance
@@ -316,7 +330,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual Path getInstancedModelPath(EntityRef entity) = 0;
 	virtual void setInstancedModelPath(EntityRef entity, const Path& path) = 0;
 	virtual const HashMap<EntityRef, InstancedModel>& getInstancedModels() const = 0;
-	virtual HashMap<EntityRef, InstancedModel>& getInstancedModels() = 0;
+	virtual InstancedModel& beginInstancedModelEditing(EntityRef entity) = 0;
+	virtual void endInstancedModelEditing(EntityRef entity) = 0;
 	virtual void initInstancedModelGPUData(EntityRef entity) = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;

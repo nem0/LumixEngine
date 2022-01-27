@@ -46,12 +46,16 @@ compute_shader [[
 		vec4 u_camera_offset;
 		vec4 u_lod_distances;
 		ivec4 u_lod_indices;
-		uint u_batch_size;
 		uint u_indirect_offset;
 		float u_radius;
-		uint padding;
+		vec2 padding;
 		vec4 u_camera_planes[6];
 		uvec4 u_indices_count[32];
+	};
+
+	layout(std140, binding = 5) uniform UniformData2 {
+		uint u_from_instance;
+		uint u_instance_count;
 	};
 
 	shared uint group_count[5];
@@ -96,7 +100,8 @@ compute_shader [[
 			groupMemoryBarrier();
 			barrier();
 
-			if (id < u_batch_size) {
+			if (id < u_instance_count) {
+				id += u_from_instance;
 				#ifdef UPDATE_LODS
 					float dst_lod = getLOD(id);
 					float src_lod = b_input[id].rot_lod.w;
@@ -107,7 +112,7 @@ compute_shader [[
 				#else
 					float lod = b_input[id].rot_lod.w;
 				#endif
-				if (cull(id)) {
+				if (lod <= 3 && cull(id)) {
 					float t = fract(lod);
 					uint ilod = uint(lod);
 					atomicAdd(group_count[ilod], 1);
@@ -154,14 +159,15 @@ compute_shader [[
 			b_indirect[id + u_indirect_offset].first_index = 0;
 			b_indirect[id + u_indirect_offset].vertex_count = u_indices_count[id].x;
 		#elif defined PASS3
-			if (id >= u_batch_size) return;
+			if (id >= u_instance_count) return;
 
+			id += u_from_instance;
 			InputData inp = b_input[id];
 
 			float lod = inp.rot_lod.w;
 
 			uint idx;
-			if (!cull(id)) return;
+			if (lod > 3 || !cull(id)) return;
 
 			float t = fract(lod);
 			uint ilod = uint(lod);
@@ -197,6 +203,16 @@ compute_shader [[
 				b_output[idx].rot_lod.xyz = inp.rot_lod.xyz;
 				b_output[idx].rot_lod.w = t - 1;
 				b_output[idx].pos_scale = inp.pos_scale + vec4(u_camera_offset.xyz, 0);
+			}
+		#elif defined UPDATE_LODS
+			if (id < u_instance_count) {
+				id += u_from_instance;
+				float dst_lod = getLOD(id);
+				float src_lod = b_input[id].rot_lod.w;
+				float d = dst_lod - src_lod;
+				float td = Global.frame_time_delta * 2;
+				float lod = abs(d) < td ? dst_lod : src_lod + td * sign(d);
+				b_input[id].rot_lod.w = lod;
 			}
 		#endif
 	}

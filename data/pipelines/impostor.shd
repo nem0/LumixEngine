@@ -23,12 +23,6 @@ uniform("Center", "vec3")
 vertex_shader [[
 	layout(location = 0) in vec3 a_position;
 	layout(location = 1) in vec2 a_uv;
-	layout(location = 2) in vec3 a_normal;
-	#ifdef _HAS_ATTR3 
-		layout(location = 3) in vec3 a_tangent;
-	#else 
-		const vec3 a_tangent = vec3(0, 1, 0);
-	#endif
 	layout(location = 4) in vec4 i_rot_lod;
 	layout(location = 5) in vec4 i_pos_scale;
 	layout (location = 0) out vec2 v_uv;

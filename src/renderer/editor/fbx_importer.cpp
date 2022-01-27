@@ -1828,8 +1828,6 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 		struct Vertex
 		{
 			Vec3 pos;
-			u8 normal[4];
-			u8 tangent[4];
 			Vec2 uv;
 		};
 	#pragma pack()
@@ -1840,18 +1838,16 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 	getBBProjection(aabb, min, max);
 
 	const Vertex vertices[] = {
-		{{center.x + min.x, center.y + min.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {0, 0}},
-		{{center.x + min.x, center.y + max.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {0, 1}},
-		{{center.x + max.x, center.y + max.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {1, 1}},
-		{{center.x + max.x, center.y + min.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {1, 0}}
+		{{center.x + min.x, center.y + min.y, center.z}, {0, 0}},
+		{{center.x + min.x, center.y + max.y, center.z}, {0, 1}},
+		{{center.x + max.x, center.y + max.y, center.z}, {1, 1}},
+		{{center.x + max.x, center.y + min.y, center.z}, {1, 0}}
 	};
 
 	const u32 vertex_data_size = sizeof(vertices);
 	write(vertex_data_size);
 	for (const Vertex& vertex : vertices) {
 		write(vertex.pos);
-		write(vertex.normal);
-		write(vertex.tangent);
 		write(vertex.uv);
 	}
 }
@@ -1992,20 +1988,12 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 
 void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 {
-	const i32 attribute_count = 4;
+	const i32 attribute_count = 2;
 	write(attribute_count);
 
 	write(Mesh::AttributeSemantic::POSITION);
 	write(gpu::AttributeType::FLOAT);
 	write((u8)3);
-
-	write(Mesh::AttributeSemantic::NORMAL);
-	write(gpu::AttributeType::U8);
-	write((u8)4);
-
-	write(Mesh::AttributeSemantic::TANGENT);
-	write(gpu::AttributeType::U8);
-	write((u8)4);
 
 	write(Mesh::AttributeSemantic::TEXCOORD0);
 	write(gpu::AttributeType::FLOAT);

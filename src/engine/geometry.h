@@ -61,6 +61,7 @@ struct alignas(16) LUMIX_ENGINE_API Frustum {
 
 	bool intersectNearPlane(const Vec3& center, float radius) const;
 	bool intersectAABB(const AABB& aabb) const;
+	bool intersectAABBWithOffset(const AABB& aabb, float size_offset) const;
 	bool isSphereInside(const Vec3& center, float radius) const;
 	Sphere computeBoundingSphere() const;
 	void transform(const Matrix& mtx);
@@ -151,6 +152,7 @@ struct LUMIX_ENGINE_API AABB {
 	void merge(const AABB& rhs);
 	void addPoint(const Vec3& point);
 	bool overlaps(const AABB& aabb) const;
+	bool contains(const Vec3& point) const;
 	void transform(const Matrix& matrix);
 	void getCorners(const Transform& tr, DVec3* points) const;
 	void getCorners(const Matrix& matrix, Vec3* points) const;

@@ -190,6 +190,7 @@ public:
 	const AABB& getAABB() const { return m_aabb; }
 	void onBeforeReady() override;
 	bool isSkinned() const;
+	const float* getLODDistances() const { return m_lod_distances; }
 	float* getLODDistances() { return m_lod_distances; }
 	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }
 
