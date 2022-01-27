@@ -50,10 +50,6 @@ static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
 static constexpr u64 SORT_KEY_DEPTH_MASK = 0xffFFffFF;
 static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
 
-namespace gpu {
-	extern bool xxx;
-}
-
 struct CameraParams
 {
 	ShiftedFrustum frustum;
