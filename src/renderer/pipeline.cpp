@@ -3320,6 +3320,13 @@ struct PipelineImpl final : Pipeline
 		memset(view.layer_to_bucket, 0xff, sizeof(view.layer_to_bucket));
 
 		if (m_instancing_shader->isReady()) {
+			const HashMap<EntityRef, InstancedModel>& ims = m_scene->getInstancedModels();
+			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+				if (iter.value().dirty) {
+					m_scene->initInstancedModelGPUData(iter.key());
+				}
+			}
+
 			CullInstancedMeshesJob& job = m_renderer.createJob<CullInstancedMeshesJob>(m_allocator);
 			jobs::incSignal(&view.instanced_meshes->culled);
 			job.m_pipeline = this;

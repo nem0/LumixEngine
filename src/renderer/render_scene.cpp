@@ -1091,6 +1091,14 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
+	InstancedModel& beginInstancedModelEditing(EntityRef entity) {
+		return m_instanced_models[entity];
+	}
+
+	void endInstancedModelEditing(EntityRef entity) {
+		m_instanced_models[entity].dirty = true;
+	}
+
 	void initInstancedModelGPUData(EntityRef entity) override {
 		PROFILE_FUNCTION();
 		InstancedModel& im = m_instanced_models[entity];
@@ -1167,6 +1175,8 @@ struct RenderSceneImpl final : RenderScene {
 				im.gpu_capacity = im.instances.capacity();
 			}
 		}
+
+		im.dirty = false;
 	}
 
 	void destroyInstancedModel(EntityRef entity) {
@@ -2863,10 +2873,6 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 	const HashMap<EntityRef, InstancedModel>& getInstancedModels() const override {
-		return m_instanced_models;
-	}
-
-	HashMap<EntityRef, InstancedModel>& getInstancedModels() override {
 		return m_instanced_models;
 	}
 
