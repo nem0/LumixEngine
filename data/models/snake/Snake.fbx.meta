@@ -1,0 +1,10 @@
+create_impostor = false
+bake_impostor_normals = false
+use_mikktspace = false
+force_skin = false
+physics = "none"
+scale = 0.5000000000
+culling_scale = 1.0000000000
+split = false
+import_vertex_colors = false
+bake_vertex_ao = false
