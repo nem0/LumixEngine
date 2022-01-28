@@ -896,7 +896,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			const float block_y = y;
 			const float w = ImGui::CalcTextSize(name).x;
 
-			const u32 alpha = m_filter[0] && findSubstring(name, m_filter) == 0 ? 0x2000'0000 : 0xff00'0000;
+			const u32 alpha = m_filter[0] && stristr(name, m_filter) == 0 ? 0x2000'0000 : 0xff00'0000;
 			color = alpha | (color & 0x00ffffff);
 			u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
 			border_color = alpha | (border_color & 0x00ffffff);
