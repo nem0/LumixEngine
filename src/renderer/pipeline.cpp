@@ -3225,7 +3225,6 @@ struct PipelineImpl final : Pipeline
 				for (u32 i = 0; i < 16; ++i) {
 					const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
 
-					// TODO make undo/redo work (now that we have a grid)
 					if (cell.instance_count > 0) {
 						const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
 						const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
