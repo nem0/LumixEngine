@@ -3537,7 +3537,6 @@ struct PipelineImpl final : Pipeline
 			out += sizeof(p); \
 		} while(false)
 
-		PROFILE_BLOCK("create cmds");
 		const Universe& universe = m_scene->getUniverse();
 		Renderer& renderer = m_renderer;
 		RenderScene* scene = m_scene;
@@ -3934,18 +3933,11 @@ struct PipelineImpl final : Pipeline
 		Array<CmdPage*> pages(m_allocator);
 		pages.resize(steps);
 
-		volatile i32 iter = 0;
-
-		jobs::runOnWorkers([&](){
-			for (;;) {
-				const i32 from = atomicAdd(&iter, STEP);
-				if (from >= size) return;
-
-				const u32 step = from / STEP;
-				pages[step] = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
-				const i32 s = minimum(STEP, size - from);
-				createCommands(view, pages[step], renderables + from, sort_keys + from, s);
-			}
+		jobs::forEach(size, STEP, [&](i32 from, i32 to){
+			PROFILE_BLOCK("create cmds");
+			const u32 step = from / STEP;
+			pages[step] = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
+			createCommands(view, pages[step], renderables + from, sort_keys + from, to - from);
 		});
 
 		CmdPage* prev = nullptr;

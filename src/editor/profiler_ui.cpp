@@ -786,7 +786,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 
 	ImGui::SameLine();
-	if (ImGui::BeginMenu("Advanced")) {
+	if (ImGui::Button(ICON_FA_COGS)) {
+		ImGui::OpenPopup("profiler_advanced");
+	}
+	if (ImGui::BeginPopup("profiler_advanced")) {
 		if (ImGui::MenuItem("Load")) load();
 		if (ImGui::MenuItem("Save")) save();
 		ImGui::Checkbox("Show frames", &m_show_frames);
@@ -817,7 +820,14 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			ImGui::Text("Context switch tracing not available.");
 			ImGui::Text("Run the app as an administrator.");
 		}
-		ImGui::EndMenu();
+		ImGui::EndPopup();
+	}
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(150);
+	ImGui::InputTextWithHint("##filter", "filter", m_filter, sizeof(m_filter));
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+		m_filter[0] = '\0';
 	}
 
 	if (m_data.empty()) return;
@@ -886,21 +896,26 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			const float block_y = y;
 			const float w = ImGui::CalcTextSize(name).x;
 
+			const u32 alpha = m_filter[0] && findSubstring(name, m_filter) == 0 ? 0x2000'0000 : 0xff00'0000;
+			color = alpha | (color & 0x00ffffff);
+			u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
+			border_color = alpha | (border_color & 0x00ffffff);
+
 			const ImVec2 ra(x_start, block_y);
 			const ImVec2 rb(x_end, block_y + 19);
 			if (hovered_signal.signal == open_blocks[level].job_info.signal_on_finish
 				&& hovered_signal.signal != jobs::INVALID_HANDLE
 				&& hovered_signal.is_current_pos)
 			{
-				dl->AddLine(ra, ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff0000ff);
+				dl->AddLine(ra, ImVec2(hovered_signal.x, hovered_signal.y - 2), 0x000000ff | alpha);
 			}
 
 			dl->AddRectFilled(ra, rb, color);
 			if (x_end - x_start > 2) {
-				dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
+				dl->AddRect(ra, rb, border_color);
 			}
 			if (w + 2 < x_end - x_start) {
-				dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, name);
+				dl->AddText(ImVec2(x_start + 2, block_y), 0x00000000 | alpha, name);
 			}
 			if (ImGui::IsMouseHoveringRect(ra, rb)) {
 				const u64 freq = profiler::frequency();

@@ -787,10 +787,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	float getVehicleRPM(EntityRef entity) override {
+		if (!m_vehicles[entity]->drive) return 0;
+		
 		return m_vehicles[entity]->drive->mDriveDynData.getEngineRotationSpeed() * (60 / (PI * 2));
 	}
 
 	i32 getVehicleCurrentGear(EntityRef entity) override {
+		if (!m_vehicles[entity]->drive) return 0;
+
 		return m_vehicles[entity]->drive->mDriveDynData.getCurrentGear() - 1;
 	}
 

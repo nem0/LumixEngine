@@ -450,7 +450,7 @@ namespace Lumix
 				ASSERT(lua_type(L, -1) == LUA_TTABLE);
 				lua_pushnil(L); // [env, nil]
 				IAllocator& allocator = m_scene.m_system.m_allocator;
-				u32 valid_properties[256];
+				u8 valid_properties[256];
 				if (inst.m_properties.size() >= sizeof(valid_properties) * 8) {
 					logError("Too many properties in ", inst.m_script->getPath(), ", entity ", m_entity.index
 						, ". Some will be ignored.");
