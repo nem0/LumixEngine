@@ -1228,9 +1228,9 @@ struct RendererImpl final : Renderer
 		gpu::useProgram(gpu::INVALID_PROGRAM);
 		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 		{
-			PROFILE_BLOCK("render jobs");
-			profiler::blockColor(0xaa, 0xff, 0xaa);
 			for (RenderJob* job : frame.jobs) {
+				PROFILE_BLOCK("render job");
+				profiler::blockColor(0xaa, 0xff, 0xaa);
 				profiler::link(job->profiler_link);
 				job->execute();
 				destroyJob(*job);

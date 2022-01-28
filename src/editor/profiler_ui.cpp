@@ -1174,7 +1174,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						const ImVec2 ra(x_start, block_y);
 						const ImVec2 rb(x_end, block_y + 19);
 						u32 color = 0xffDDddDD;
-						if(hovered_link && data.profiler_link == hovered_link) color = 0xffff0000;
+						if(hovered_link && data.profiler_link == hovered_link) {
+							color = 0xffff0000;
+						}
 						dl->AddRectFilled(ra, rb, color);
 						if (x_end - x_start > 2) {
 							dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
