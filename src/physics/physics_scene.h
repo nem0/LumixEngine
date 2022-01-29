@@ -265,6 +265,11 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual u32 getVehicleChassisLayer(EntityRef entity) = 0;
 	virtual void setVehicleChassisLayer(EntityRef entity, u32 layer) = 0;
 
+	virtual Vec3 getInstancedCubeHalfExtents(EntityRef entity) = 0;
+	virtual void setInstancedCubeHalfExtents(EntityRef entity, const Vec3& half_extents) = 0;
+	virtual u32 getInstancedCubeLayer(EntityRef entity) = 0;
+	virtual void setInstancedCubeLayer(EntityRef entity, u32 layer) = 0;
+
 	virtual u32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;
 	virtual void setVisualizationCullingBox(const DVec3& min, const DVec3& max) = 0;

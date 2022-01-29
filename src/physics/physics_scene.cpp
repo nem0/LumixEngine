@@ -64,7 +64,7 @@ namespace Lumix
 
 
 static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
 static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 static const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
 static const ComponentType HEIGHTFIELD_TYPE = reflection::getComponentType("physical_heightfield");
@@ -74,7 +74,7 @@ static const ComponentType SPHERICAL_JOINT_TYPE = reflection::getComponentType("
 static const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_joint");
 static const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle");
 static const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
-static const u32 RENDERER_HASH = crc32("renderer");
+static const ComponentType INSTANCED_CUBE_TYPE = reflection::getComponentType("physical_instanced_cube");
 
 enum class FilterFlags : u32 {
 	VEHICLE = 1 << 0
@@ -85,6 +85,7 @@ enum class PhysicsSceneVersion
 	REMOVED_RAGDOLLS,
 	VEHICLE_PEAK_TORQUE,
 	VEHICLE_MAX_RPM,
+	INSTANCED_CUBE,
 
 	LATEST,
 };
@@ -479,6 +480,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		m_vehicles.clear();
 		m_wheels.clear();
+		
+		for (auto& ic : m_instanced_cubes) {
+			for (PxRigidActor* actor : ic.actors) {
+				actor->release();
+			}
+		}
+		m_instanced_cubes.clear();
 
 		for (auto& joint : m_joints)
 		{
@@ -1303,6 +1311,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 		m_universe.onComponentDestroyed(entity, HEIGHTFIELD_TYPE, this);
 	}
 
+	void destroyInstancedCube(EntityRef entity) {
+		for (PxRigidActor* actor : m_instanced_cubes[entity].actors) {
+			actor->release();
+		}
+		m_instanced_cubes.erase(entity);
+		m_universe.onComponentDestroyed(entity, INSTANCED_CUBE_TYPE, this);
+	}
 
 	void destroyController(EntityRef entity)
 	{
@@ -1490,6 +1505,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 		desc.reportCallback = &m_hit_report;
 	}
 
+	void createInstancedCube(EntityRef entity) {
+		InstancedCube ic(m_allocator);
+		ic.half_extents = Vec3(1);
+		m_instanced_cubes.insert(entity, static_cast<InstancedCube&&>(ic));
+		m_universe.onComponentCreated(entity, INSTANCED_CUBE_TYPE, this);
+	} 
 
 	void createController(EntityRef entity)
 	{
@@ -2107,6 +2128,36 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
+	void initInstancedCubes() {
+		RenderScene* rs = (RenderScene*)m_universe.getScene(INSTANCED_MODEL_TYPE);
+		if (!rs) return;
+
+		for (auto iter = m_instanced_cubes.begin(), end = m_instanced_cubes.end(); iter != end; ++iter) {
+			if (!m_universe.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
+			
+			const InstancedModel& im = rs->getInstancedModels()[iter.key()];
+			InstancedCube& ic = iter.value();
+			
+			const RigidTransform tr = m_universe.getTransform(iter.key()).getRigidPart();
+
+			ic.actors.reserve(im.instances.size());
+			for (const InstancedModel::InstanceData& id : im.instances) {
+				PxBoxGeometry geom;
+				geom.halfExtents = toPhysx(ic.half_extents * id.scale);
+				RigidTransform inst_tr = tr;
+				inst_tr.pos += id.pos;
+				Quat irot(id.rot_quat.x, id.rot_quat.y, id.rot_quat.z, 0);
+				irot.w = sqrtf(1 - dot(id.rot_quat, id.rot_quat));
+				inst_tr.rot = inst_tr.rot * irot;
+				PxTransform transform = toPhysx(inst_tr);
+				PxRigidActor* actor = PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
+				actor->userData = (void*)(intptr_t)iter.key().index;
+				m_scene->addActor(*actor);
+				ic.actors.push(actor);
+			}
+		}
+	}
+
 	void initVehicles()
 	{
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
@@ -2134,6 +2185,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		initJoints();
 		initVehicles();
+		initInstancedCubes();
 
 		updateFilterData();
 	}
@@ -2522,6 +2574,19 @@ struct PhysicsSceneImpl final : PhysicsScene
 				shapes[i]->setSimulationFilterData(data);
 			}
 			controller.controller->invalidateCache();
+		}
+
+		for (auto& instanced_cube : m_instanced_cubes) {
+			PxFilterData data;
+			data.word0 = 1 << instanced_cube.layer;
+			data.word1 = m_layers.filter[instanced_cube.layer];
+			for (PxRigidActor* actor : instanced_cube.actors) {
+				PxShape* shapes[1];
+				int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
+				for (int i = 0; i < shapes_count; ++i) {
+					shapes[i]->setSimulationFilterData(data);
+				}
+			}
 		}
 
 		for (auto& terrain : m_terrains)
@@ -2941,6 +3006,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(terrain.m_y_scale);
 			serializer.write(terrain.m_layer);
 		}
+		
+		serializer.write((i32)m_instanced_cubes.size());
+		for (auto iter = m_instanced_cubes.begin(), end = m_instanced_cubes.end(); iter != end; ++iter) {
+			serializer.write(iter.key());
+			serializer.write(iter.value().half_extents);
+			serializer.write(iter.value().layer);
+		}
+
 		serializeJoints(serializer);
 		serializeVehicles(serializer);
 	}
@@ -3327,6 +3400,21 @@ struct PhysicsSceneImpl final : PhysicsScene
 			LUMIX_FATAL(count == 0); // ragdolls were removed
 		}
 
+		if (version > (i32)PhysicsSceneVersion::INSTANCED_CUBE) {
+			i32 count;
+			serializer.read(count);
+			for (i32 i = 0; i < count; ++i) {
+				EntityRef e;
+				serializer.read(e);
+				e = entity_map.get(e);
+				InstancedCube c(m_allocator);
+				serializer.read(c.half_extents);
+				serializer.read(c.layer);
+				m_instanced_cubes.insert(e, static_cast<InstancedCube&&>(c));
+				m_universe.onComponentCreated(e, INSTANCED_CUBE_TYPE, this);
+			}
+		}
+
 		deserializeJoints(serializer, entity_map);
 		deserializeVehicles(serializer, entity_map, version);
 	}
@@ -3421,6 +3509,22 @@ struct PhysicsSceneImpl final : PhysicsScene
 			actor = &m_actors[*actor->next_with_resource];
 		}
 	}
+	
+	u32 getInstancedCubeLayer(EntityRef entity) override {
+		return m_instanced_cubes[entity].layer;
+	}
+
+	void setInstancedCubeLayer(EntityRef entity, u32 layer) override {
+		m_instanced_cubes[entity].layer = layer;
+	}
+
+	Vec3 getInstancedCubeHalfExtents(EntityRef entity) override {
+		return m_instanced_cubes[entity].half_extents;
+	}
+
+	void setInstancedCubeHalfExtents(EntityRef entity, const Vec3& half_extents) override {
+		m_instanced_cubes[entity].half_extents = half_extents;
+	}
 
 	static PxFilterFlags filterShader(PxFilterObjectAttributes attributes0,
 		PxFilterData filterData0,
@@ -3501,6 +3605,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PhysicsSceneImpl& scene;
 	} ;
 
+	struct InstancedCube {
+		InstancedCube(IAllocator& allocator) : actors(allocator) {}
+		Vec3 half_extents;
+		u32 layer = 0;
+		Array<PxRigidActor*> actors;
+	};
+
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	Universe& m_universe;
@@ -3522,6 +3633,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	HashMap<EntityRef, Heightfield> m_terrains;
 	HashMap<EntityRef, UniquePtr<Vehicle>> m_vehicles;
 	HashMap<EntityRef, Wheel> m_wheels;
+	HashMap<EntityRef, InstancedCube> m_instanced_cubes;
 	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
 	PxBatchQuery* m_vehicle_batch_query;
 	u8 m_vehicle_query_mem[sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64];
@@ -3546,6 +3658,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	, m_wheels(m_allocator)
 	, m_terrains(m_allocator)
 	, m_dynamic_actors(m_allocator)
+	, m_instanced_cubes(m_allocator)
 	, m_universe(context)
 	, m_is_game_running(false)
 	, m_contact_callback(*this)
@@ -3688,6 +3801,9 @@ void PhysicsScene::reflect() {
 			.LUMIX_PROP(HingeJointStiffness, "Stiffness").minAttribute(0)
 			.LUMIX_PROP(HingeJointUseLimit, "Use limit")
 			.LUMIX_PROP(HingeJointLimit, "Limit").radiansAttribute()
+		.LUMIX_CMP(InstancedCube, "physical_instanced_cube", "Physics / Instanced cube")
+			.LUMIX_PROP(InstancedCubeHalfExtents, "Half extents")
+			.LUMIX_ENUM_PROP(InstancedCubeLayer, "Layer").attribute<LayerEnum>()
 		.LUMIX_CMP(Controller, "physical_controller", "Physics / Controller")
 			.LUMIX_FUNC_EX(PhysicsScene::moveController, "move")
 			.LUMIX_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown")

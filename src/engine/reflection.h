@@ -657,10 +657,28 @@ struct LUMIX_ENGINE_API builder {
 		return *this;
 	}
 
-	template <auto Getter, auto PropGetter>
+	template <auto Getter, auto Setter>
 	builder& blob_property(const char* name) {
 		auto* p = LUMIX_NEW(allocator, BlobProperty)(allocator);
 		p->name = name;
+		p->setter = [](IScene* scene, EntityRef e, u32 idx, InputMemoryStream& value) {
+			using C = typename ClassOf<decltype(Setter)>::Type;
+			if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
+				(static_cast<C*>(scene)->*Setter)(e, value);
+			}
+			else {
+				(static_cast<C*>(scene)->*Setter)(e, idx, value);
+			}
+		};
+		p->getter = [](IScene* scene, EntityRef e, u32 idx, OutputMemoryStream& value) {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			if constexpr (ArgsCount<decltype(Getter)>::value == 2) {
+				(static_cast<C*>(scene)->*Getter)(e, value);
+			}
+			else {
+				(static_cast<C*>(scene)->*Getter)(e, idx, value);
+			}
+		};
 		addProp(p);
 		return *this;
 	}

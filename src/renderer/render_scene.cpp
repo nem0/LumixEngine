@@ -106,6 +106,19 @@ struct RenderSceneImpl final : RenderScene {
 		m_culling_system.reset();
 	}
 
+	void getInstancedModelBlob(EntityRef entity, OutputMemoryStream& value) {
+		const Array<InstancedModel::InstanceData>& instances = m_instanced_models[entity].instances;
+		value.write(instances.size());
+		value.write(instances.begin(), instances.byte_size());
+	}
+
+	void setInstancedModelBlob(EntityRef entity, InputMemoryStream& value) {
+		const i32 size = value.read<i32>();
+		InstancedModel& im = beginInstancedModelEditing(entity);
+		im.instances.resize(size);
+		value.read(im.instances.begin(), im.instances.byte_size());
+		endInstancedModelEditing(entity);
+	}
 
 	void decalMaterialStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
 	{
@@ -3102,6 +3115,7 @@ void RenderScene::reflect() {
 			.var_prop<&RenderScene::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
 		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
 			.LUMIX_PROP(InstancedModelPath, "Model").resourceAttribute(Model::TYPE)
+			.blob_property<&RenderSceneImpl::getInstancedModelBlob, &RenderSceneImpl::setInstancedModelBlob>("Blob")
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
 			.LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
 			.prop<&RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance>("Enabled")
