@@ -384,7 +384,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 		if (worker->m_finished) break;
 
 		if (fiber) {
-			profiler::endBlock();
 			worker->m_current_fiber = fiber;
 
 			g_system->m_sync.enter();
@@ -397,7 +396,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			worker->m_current_fiber = this_fiber;
 		}
 		else {
-			profiler::endBlock();
 			profiler::beginBlock("job");
 			if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
 				profiler::pushJobInfo(job.dec_on_finish, job.precondition);
@@ -412,7 +410,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			profiler::endBlock();
 		}
 	}
-	profiler::endBlock();
 	Fiber::switchTo(&this_fiber->fiber, getWorker()->m_primary_fiber);
 }
 
