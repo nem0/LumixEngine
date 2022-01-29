@@ -174,6 +174,7 @@ struct ProfilerUIImpl final : ProfilerUI
 		, m_app(app)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
+		, m_blocks(m_allocator)
 		, m_resource_manager(engine.getResourceManager())
 		, m_engine(engine)
 	{
@@ -204,6 +205,7 @@ struct ProfilerUIImpl final : ProfilerUI
 		profiler::serialize(m_data);
 		patchStrings();
 		findEnd();
+		preprocess();
 	}
 
 	void findEnd() {
@@ -306,10 +308,9 @@ struct ProfilerUIImpl final : ProfilerUI
 				read(ctx, p, header);
 				switch (header.type) {
 					case profiler::EventType::BEGIN_BLOCK: {
-						u64 tmp;
+						profiler::BlockRecord tmp;
 						read(ctx, p + sizeof(profiler::EventHeader), tmp);
-						const char* name = (const char*)(uintptr)tmp;
-						const char* new_val = map[name];
+						const char* new_val = map[tmp.name];
 						overwrite(ctx, u32(p + sizeof(profiler::EventHeader)), new_val);
 						break;
 					}
@@ -349,6 +350,45 @@ struct ProfilerUIImpl final : ProfilerUI
 				logError("Could not open ", path);
 			}
 		}
+		preprocess();
+	}
+
+	void preprocess() {
+		m_blocks.clear();
+		m_blocks.reserve(16 * 1024);
+		forEachThread([&](ThreadContextProxy& ctx){
+			u32 p = ctx.begin;
+			const u32 end = ctx.end;
+			while (p != end) {
+				profiler::EventHeader header;
+				read(ctx, p, header);
+				switch (header.type) {
+					case profiler::EventType::CONTINUE_BLOCK: {
+						i32 id;
+						read(ctx, p + sizeof(profiler::EventHeader), id);
+						if (!m_blocks.find(id).isValid()) {
+							Block& b = m_blocks.insert(id);
+							b.name = "N/A";
+						}
+						break;
+					}
+					case profiler::EventType::BEGIN_BLOCK: {
+						profiler::BlockRecord tmp;
+						read(ctx, p + sizeof(profiler::EventHeader), tmp);
+						auto iter = m_blocks.find(tmp.id);
+						if (iter.isValid()) {
+							iter.value().name = tmp.name;
+						}
+						else {
+							Block& b = m_blocks.insert(tmp.id);
+							b.name = tmp.name;
+						}
+						break;
+					}
+				}
+				p += header.size;
+			}
+		});
 	}
 
 	template <typename F> void forEachThread(const F& f) {
@@ -446,8 +486,19 @@ struct ProfilerUIImpl final : ProfilerUI
 	void addToTree(debug::Allocator::AllocationInfo* info);
 	void refreshAllocations();
 	void showAllocationTree(AllocationStackNode* node, int column) const;
-	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
-		debug::StackNode* external_node, size_t size);
+	AllocationStackNode* getOrCreate(AllocationStackNode* my_node, debug::StackNode* external_node, size_t size);
+
+	struct Block {
+		Block() {
+			job_info.signal_on_finish = jobs::INVALID_HANDLE;
+			job_info.precondition = jobs::INVALID_HANDLE;
+		}
+
+		const char* name;
+		i64 link = 0;
+		u32 color = 0xffdddddd;
+		profiler::JobRecord job_info;
+	};
 
 	DefaultAllocator m_allocator;
 	debug::Allocator* m_main_allocator;
@@ -476,6 +527,7 @@ struct ProfilerUIImpl final : ProfilerUI
 		bool is_current_pos = false;
 	} hovered_signal;
 	i64 hovered_link = 0;
+	HashMap<i32, Block> m_blocks;
 	profiler::GPUMemStatsBlock m_gpu_mem_stats;
 	bool m_is_gpu_mem_stats_valid = false;
 };
@@ -868,11 +920,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		u32 lines = 0;
 
 		struct {
-			u32 offset;
-			i32 switch_id;
-			u32 color;
-			i64 link;
-			profiler::JobRecord job_info;
+			i32 id;
+			u64 start_time;
 		} open_blocks[64];
 		int level = -1;
 		u32 p = ctx.begin;
@@ -903,7 +952,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 			const ImVec2 ra(x_start, block_y);
 			const ImVec2 rb(x_end, block_y + 19);
-			if (hovered_signal.signal == open_blocks[level].job_info.signal_on_finish
+			if (hovered_signal.signal == m_blocks[open_blocks[level].id].job_info.signal_on_finish
 				&& hovered_signal.signal != jobs::INVALID_HANDLE
 				&& hovered_signal.is_current_pos)
 			{
@@ -922,19 +971,20 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				const float t = 1000 * float((to - from) / double(freq));
 				ImGui::BeginTooltip();
 				ImGui::Text("%s (%.3f ms)", name, t);
-				if (open_blocks[level].link) {
-					ImGui::Text("Link: %" PRId64, open_blocks[level].link);
+				const Block& block = m_blocks[open_blocks[level].id];
+				if (block.link) {
+					ImGui::Text("Link: %" PRId64, block.link);
 						
 					any_hovered_link = true;
-					hovered_link = open_blocks[level].link;
+					hovered_link = block.link;
 				}
-				if (open_blocks[level].job_info.signal_on_finish != jobs::INVALID_HANDLE) {
+				if (block.job_info.signal_on_finish != jobs::INVALID_HANDLE) {
 					any_hovered_signal = true;
-					hovered_signal.signal = open_blocks[level].job_info.signal_on_finish;
-					ImGui::Text("Signal on finish: %d", open_blocks[level].job_info.signal_on_finish);
+					hovered_signal.signal = block.job_info.signal_on_finish;
+					ImGui::Text("Signal on finish: %d", block.job_info.signal_on_finish);
 				}
-				if (open_blocks[level].job_info.precondition != jobs::INVALID_HANDLE) {
-					ImGui::Text("Precondition signal: %d", open_blocks[level].job_info.precondition);
+				if (block.job_info.precondition != jobs::INVALID_HANDLE) {
+					ImGui::Text("Precondition signal: %d", block.job_info.precondition);
 				}
 				for (int i = 0; i < properties_count; ++i) {
 					if (properties[i].level != level) continue;
@@ -1007,36 +1057,43 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			case profiler::EventType::LINK:
 				if (level >= 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), open_blocks[level].link);
+					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks[level].id].link);
 				}
 				break;
 			case profiler::EventType::BEGIN_BLOCK:
+				profiler::BlockRecord tmp;
+				read(ctx, p + sizeof(profiler::EventHeader), tmp);
 				++level;
 				ASSERT(level < (int)lengthOf(open_blocks));
-				open_blocks[level].link = 0;
-				open_blocks[level].offset = p;
-				open_blocks[level].color = 0xffDDddDD;
-				open_blocks[level].job_info.signal_on_finish = jobs::INVALID_HANDLE;
-				open_blocks[level].job_info.precondition = jobs::INVALID_HANDLE;
+				open_blocks[level].id = tmp.id;
+				open_blocks[level].start_time = header.time;
 				lines = maximum(lines, level + 1);
 				y += 20.f;
 				break;
+			case profiler::EventType::CONTINUE_BLOCK: {
+				i32 id;
+				read(ctx, p + sizeof(profiler::EventHeader), id);
+				++level;
+				ASSERT(level < (int)lengthOf(open_blocks));
+				open_blocks[level].id = id;
+				open_blocks[level].start_time = header.time;
+				lines = maximum(lines, level + 1);
+				y += 20.f;
+				break;
+			}
 			case profiler::EventType::END_BLOCK:
 				y = maximum(y - 20.f, top);
 				if (level >= 0) {
-					profiler::EventHeader start_header;
-					read(ctx, open_blocks[level].offset, start_header);
-					const char* name;
-					read(ctx, open_blocks[level].offset + sizeof(profiler::EventHeader), name);
-					u32 color = open_blocks[level].color;
-					if (open_blocks[level].job_info.signal_on_finish != jobs::INVALID_HANDLE
-						&& hovered_signal.signal == open_blocks[level].job_info.signal_on_finish
-						|| hovered_link == open_blocks[level].link 
+					const Block& block = m_blocks[open_blocks[level].id];
+					u32 color = block.color;
+					if (block.job_info.signal_on_finish != jobs::INVALID_HANDLE
+						&& hovered_signal.signal == block.job_info.signal_on_finish
+						|| hovered_link == block.link 
 						&& hovered_link != 0)
 					{
 						color = 0xff0000ff;
 					}
-					draw_block(start_header.time, header.time, name, color);
+					draw_block(open_blocks[level].start_time, header.time, block.name, color);
 					while (properties_count > 0 && properties[properties_count - 1].level == level) {
 						--properties_count;
 					}
@@ -1061,12 +1118,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			case profiler::EventType::JOB_INFO:
 				if (level >= 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), open_blocks[level].job_info);
+					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks[level].id].job_info);
 				}
 				break;
 			case profiler::EventType::BLOCK_COLOR:
 				if (level >= 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), open_blocks[level].color);
+					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks[level].id].color);
 				}
 				break;
 			default: ASSERT(false); break;
@@ -1075,11 +1132,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 		while (level >= 0) {
 			y -= 20.f;
-			profiler::EventHeader start_header;
-			read(ctx, open_blocks[level].offset, start_header);
-			const char* name;
-			read(ctx, open_blocks[level].offset + sizeof(profiler::EventHeader), name);
-			draw_block(start_header.time, m_end, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			const Block& b = m_blocks[open_blocks[level].id];
+			draw_block(open_blocks[level].start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
 			--level;
 		}
 

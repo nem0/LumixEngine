@@ -15,6 +15,7 @@ LUMIX_ENGINE_API void setThreadName(const char* name);
 LUMIX_ENGINE_API void showInProfiler(bool show);
 
 LUMIX_ENGINE_API void beginBlock(const char* name_literal);
+LUMIX_ENGINE_API void continueBlock(i32 block_id);
 LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
 LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();
@@ -33,7 +34,7 @@ LUMIX_ENGINE_API void serialize(OutputMemoryStream& blob);
 
 struct FiberSwitchData {
 	i32 id;
-	const char* blocks[16];
+	i32 blocks[16];
 	u32 count;
 };
 
@@ -63,6 +64,10 @@ struct ContextSwitchRecord
 	i8 reason;
 };
 
+struct BlockRecord {
+	const char* name;
+	i32 id;
+};
 
 struct IntRecord
 {
@@ -121,7 +126,8 @@ enum class EventType : u8
 	GPU_MEM_STATS,
 	LINK,
 	PAUSE,
-	GPU_STATS
+	GPU_STATS,
+	CONTINUE_BLOCK
 };
 
 #pragma pack(1)

@@ -36,7 +36,7 @@ struct ThreadContext
 		open_blocks.reserve(64);
 	}
 
-	Array<const char*> open_blocks;
+	Array<i32> open_blocks;
 	OutputMemoryStream buffer;
 	u32 begin = 0;
 	u32 end = 0;
@@ -340,14 +340,23 @@ void blockColor(u8 r, u8 g, u8 b)
 	write(*ctx, EventType::BLOCK_COLOR, color);
 }
 
+static volatile i32 last_block_id = 0;
+
+void continueBlock(i32 block_id) {
+	ThreadContext* ctx = g_instance.getThreadContext();
+	ctx->open_blocks.push(block_id);
+	write(*ctx, EventType::CONTINUE_BLOCK, block_id);
+}
 
 void beginBlock(const char* name)
 {
+	BlockRecord r;
+	r.id = atomicIncrement(&last_block_id);
+	r.name = name;
 	ThreadContext* ctx = g_instance.getThreadContext();
-	ctx->open_blocks.push(name);
-	write(*ctx, EventType::BEGIN_BLOCK, name);
+	ctx->open_blocks.push(r.id);
+	write(*ctx, EventType::BEGIN_BLOCK, r);
 }
-
 
 void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link)
 {
@@ -437,7 +446,7 @@ FiberSwitchData beginFiberWait(u32 job_system_signal)
 	ThreadContext* ctx = g_instance.getThreadContext();
 	res.count = ctx->open_blocks.size();
 	res.id = r.id;
-	memcpy(res.blocks, ctx->open_blocks.begin(), minimum(res.count, lengthOf(res.blocks)) * sizeof(const char*));
+	memcpy(res.blocks, ctx->open_blocks.begin(), minimum(res.count, lengthOf(res.blocks)) * sizeof(res.blocks[0]));
 	write(*ctx, EventType::BEGIN_FIBER_WAIT, r);
 	return res;
 }
@@ -455,9 +464,9 @@ void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data)
 	
 	for (u32 i = 0; i < count; ++i) {
 		if(i < lengthOf(switch_data.blocks)) {
-			beginBlock(switch_data.blocks[i]);
+			continueBlock(switch_data.blocks[i]);
 		} else {
-			beginBlock("N/A");
+			continueBlock(-1);
 		}
 	}
 }
@@ -539,10 +548,10 @@ static void saveStrings(OutputMemoryStream& blob) {
 			read(ctx, p, header);
 			switch (header.type) {
 				case profiler::EventType::BEGIN_BLOCK: {
-					const char* name;
-					read(ctx, p + sizeof(profiler::EventHeader), name);
-					if (!map.find(name).isValid()) {
-						map.insert(name, name);
+					BlockRecord b;
+					read(ctx, p + sizeof(profiler::EventHeader), b);
+					if (!map.find(b.name).isValid()) {
+						map.insert(b.name, b.name);
 					}
 					break;
 				}
