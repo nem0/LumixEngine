@@ -2571,18 +2571,21 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderUI() {
+		PROFILE_FUNCTION();
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderUI(*this);
 		}
 	}
 
 	void renderOpaque() {
+		PROFILE_FUNCTION();
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderOpaque(*this);
 		}
 	}
 
 	void renderTransparent() {
+		PROFILE_FUNCTION();
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderTransparent(*this);
 		}
@@ -2590,6 +2593,7 @@ struct PipelineImpl final : Pipeline
 
 	void renderLocalLights(const char* define, int shader_idx, CmdPage* cmds)
 	{
+		PROFILE_FUNCTION();
 		struct RenderJob : Renderer::RenderJob
 		{
 			void setup() override {}
@@ -3306,9 +3310,9 @@ struct PipelineImpl final : Pipeline
 	};
 
 	u32 cull(CameraParams cp) {
+		PROFILE_FUNCTION();
 		View& view = m_views.emplace(m_allocator, m_renderer.getEngine().getPageAllocator());
 		view.cp = cp;
-		view.renderables = m_scene->getRenderables(cp.frustum);
 		if (m_views.size() > 1) {
 			m_views[m_views.size() - 2].instanced_meshes->next = view.instanced_meshes;
 		}
@@ -3342,6 +3346,7 @@ struct PipelineImpl final : Pipeline
 
 	struct RenderBucketJob : Renderer::RenderJob {
 		void setup() override {
+			PROFILE_FUNCTION();
 			jobs::wait(m_pipeline->m_buckets_ready);
 
 			m_cmds = m_pipeline->m_buckets[m_bucket_id].cmd_page;
@@ -3362,6 +3367,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 			Renderer& renderer = m_pipeline->m_renderer;
+			renderer.beginProfileBlock("render_bucket", 0);
 
 			const gpu::StateFlags render_states = m_render_state;
 			const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
@@ -3506,6 +3512,7 @@ struct PipelineImpl final : Pipeline
 				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
 				page = next;
 			}
+			renderer.endProfileBlock();
 			#undef READ
 		}
 
@@ -3525,6 +3532,7 @@ struct PipelineImpl final : Pipeline
 		, const u64* LUMIX_RESTRICT sort_keys
 		, int count)
 	{
+		PROFILE_BLOCK("create cmds");
 		// because of inlining in debug
 		#define WRITE(x) do { \
 			memcpy(out, &(x), sizeof(x)); \
@@ -3923,6 +3931,7 @@ struct PipelineImpl final : Pipeline
 
 	void createCommands(View& view)
 	{
+		PROFILE_FUNCTION();
 		const u64* renderables = view.sorter.values.begin();
 		const u64* sort_keys = view.sorter.keys.begin();
 		const int size = view.sorter.keys.size();
@@ -3934,7 +3943,6 @@ struct PipelineImpl final : Pipeline
 		pages.resize(steps);
 
 		jobs::forEach(size, STEP, [&](i32 from, i32 to){
-			PROFILE_BLOCK("create cmds");
 			const u32 step = from / STEP;
 			pages[step] = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
 			createCommands(view, pages[step], renderables + from, sort_keys + from, to - from);
@@ -3956,34 +3964,31 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void processBuckets() {
+		PROFILE_FUNCTION();
 		for (i32 i = 0; i < m_buckets.size(); ++i) {
 			Bucket& bucket = m_buckets[i];
 			View& view = m_views[bucket.view_id];
 			view.layer_to_bucket[bucket.layer] = i;
 		}
 
-		for (View& view : m_views) {
-			if (!view.renderables) continue;
+		jobs::forEach(m_views.size(), 1, [&](u32 from, u32 to){
+			View& view = m_views[from];
+			view.renderables = m_scene->getRenderables(view.cp.frustum);
+			
+			if (!view.renderables) return;
 			createSortKeys(view);
 			view.renderables->free(m_renderer.getEngine().getPageAllocator());
-		}
-
-		for (View& view : m_views) {
 			if (!view.sorter.keys.empty()) {
 				radixSort(view.sorter.keys.begin(), view.sorter.values.begin(), view.sorter.keys.size());
+				createCommands(view);
 			}
-		}
-
-		for (View& view : m_views) {
-			if (view.sorter.keys.empty()) continue;
-
-			createCommands(view);
-		}
+		});
 
 		jobs::decSignal(m_buckets_ready);
 	}
 
 	void fur(u32 bucket_id) {
+		PROFILE_FUNCTION();
 		HashMap<EntityRef, FurComponent>& furs = m_scene->getFurs();
 		if (furs.empty()) return;
 
@@ -4019,6 +4024,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	u32 createBucket(u32 view_id, const char* layer_name, const char* define, LuaWrapper::Optional<const char*> sort_str) {
+		PROFILE_FUNCTION();
 		const u8 layer = m_renderer.getLayerIdx(layer_name);
 		const Bucket::Sort sort = equalStrings(sort_str.get(""), "depth") ? Bucket::DEPTH : Bucket::DEFAULT;
 
@@ -4031,6 +4037,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderBucket(u32 bucket_id, RenderState state) {
+		PROFILE_FUNCTION();
 		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>();
 		job.m_render_state = state.value;
 		job.m_pipeline = this;
@@ -4039,6 +4046,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
+		PROFILE_FUNCTION();
 		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(m_allocator);
 		
 		job.m_pipeline = this;
@@ -4938,6 +4946,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth) {
+		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
@@ -4957,6 +4966,8 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void viewport(int x, int y, int w, int h) {
+		PROFILE_FUNCTION();
+
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
