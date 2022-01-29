@@ -39,6 +39,7 @@ struct FiberSwitchData {
 };
 
 LUMIX_ENGINE_API void beforeFiberSwitch();
+LUMIX_ENGINE_API void signalTriggered(u32 job_system_signal);
 LUMIX_ENGINE_API FiberSwitchData beginFiberWait(u32 job_system_signal);
 LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data);
 LUMIX_ENGINE_API float getLastFrameDuration();
@@ -127,7 +128,8 @@ enum class EventType : u8
 	LINK,
 	PAUSE,
 	GPU_STATS,
-	CONTINUE_BLOCK
+	CONTINUE_BLOCK,
+	SIGNAL_TRIGGERED
 };
 
 #pragma pack(1)

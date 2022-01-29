@@ -186,7 +186,7 @@ static void pushJob(const Job& job)
 }
 
 
-void trigger(SignalHandle handle)
+static bool trigger(SignalHandle handle)
 {
 	LUMIX_FATAL((handle & HANDLE_ID_MASK) < 4096);
 
@@ -194,7 +194,7 @@ void trigger(SignalHandle handle)
 	
 	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	--counter.value;
-	if (counter.value > 0) return;
+	if (counter.value > 0) return false;
 
 	SignalHandle iter = handle;
 	while (isValid(iter)) {
@@ -208,6 +208,7 @@ void trigger(SignalHandle handle)
 		signal.next_job.task = nullptr;
 		iter = signal.sibling;
 	}
+	return true;
 }
 
 
@@ -314,7 +315,9 @@ void incSignal(SignalHandle* signal)
 
 void decSignal(SignalHandle signal)
 {
-	trigger(signal);
+	if (trigger(signal)) {
+		profiler::signalTriggered(signal);
+	}
 }
 
 

@@ -4413,6 +4413,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		void setup() override {
+			PROFILE_FUNCTION();
 			jobs::wait(m_instanced_meshes->culled);
 			const u32 instanced_define_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {

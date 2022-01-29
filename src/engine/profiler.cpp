@@ -434,6 +434,11 @@ void pushJobInfo(u32 signal_on_finish, u32 precondition)
 	write(*ctx, EventType::JOB_INFO, r);
 }
 
+void signalTriggered(u32 job_system_signal) {
+	ThreadContext* ctx = g_instance.getThreadContext();
+	write(*ctx, EventType::SIGNAL_TRIGGERED, job_system_signal);
+}
+
 
 FiberSwitchData beginFiberWait(u32 job_system_signal)
 {

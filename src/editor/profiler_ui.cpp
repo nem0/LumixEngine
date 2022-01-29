@@ -934,6 +934,27 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		} properties[64];
 		int properties_count = 0;
 
+		auto draw_triggered_signal = [&](u64 time, u32 signal) {
+			const float t_start = float(int(time - view_start) / double(m_range));
+			const float x = from_x * (1 - t_start) + to_x * t_start;
+			
+			if (hovered_signal.signal == signal && hovered_signal.signal != jobs::INVALID_HANDLE && hovered_signal.is_current_pos) {
+				dl->AddLine(ImVec2(x, y), ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff0000ff);
+			}
+
+			if (time > m_end || time < view_start) return;
+			dl->AddTriangle(ImVec2(x - 2, y), ImVec2(x + 2, y - 2), ImVec2(x + 2, y + 2), 0xffffff00);
+			if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
+				ImGui::BeginTooltip();
+				ImGui::Text("Signal triggered: %d", signal);
+
+				any_hovered_signal = true;
+				hovered_signal.signal = signal;
+
+				ImGui::EndTooltip();
+			}
+		};
+
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
 			if (from > m_end || to < view_start) return;
 
@@ -1079,6 +1100,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				open_blocks[level].start_time = header.time;
 				lines = maximum(lines, level + 1);
 				y += 20.f;
+				break;
+			}
+			case profiler::EventType::SIGNAL_TRIGGERED: {
+				u32 signal;
+				read(ctx, p + sizeof(profiler::EventHeader), signal);
+				draw_triggered_signal(header.time, signal);
 				break;
 			}
 			case profiler::EventType::END_BLOCK:

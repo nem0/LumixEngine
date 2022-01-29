@@ -1204,6 +1204,15 @@ struct RendererImpl final : Renderer
 	}
 
 	void render() {
+		FrameData& check_frame = *m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
+
+		if (check_frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame.gpu_frame)) {
+			check_frame.gpu_frame = 0xffFFffFF;
+			check_frame.transient_buffer.renderDone();
+			check_frame.uniform_buffer.renderDone();
+			jobs::decSignal(check_frame.can_setup);
+		}
+
 		FrameData& frame = *m_gpu_frame;
 		frame.transient_buffer.prepareToRender();
 		frame.uniform_buffer.prepareToRender();
@@ -1248,13 +1257,13 @@ struct RendererImpl final : Renderer
 		m_profiler.frame();
 
 		m_gpu_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
-		FrameData& check_frame = *m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
+		FrameData& check_frame2 = *m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
 
-		if (check_frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame.gpu_frame)) {
-			check_frame.gpu_frame = 0xffFFffFF;
-			check_frame.transient_buffer.renderDone();
-			check_frame.uniform_buffer.renderDone();
-			jobs::decSignal(check_frame.can_setup);
+		if (check_frame2.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame2.gpu_frame)) {
+			check_frame2.gpu_frame = 0xffFFffFF;
+			check_frame2.transient_buffer.renderDone();
+			check_frame2.uniform_buffer.renderDone();
+			jobs::decSignal(check_frame2.can_setup);
 		}
 
 		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
