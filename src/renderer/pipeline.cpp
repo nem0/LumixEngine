@@ -4280,6 +4280,17 @@ struct PipelineImpl final : Pipeline
 				for (Terrain::GrassType& type : terrain->m_grass_types) {
 					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
 
+					Vec3 points[4];
+					AABB frustum_aabb(Vec3(0), Vec3(0));
+					for (Vec3 v : m_camera_params.frustum.points) {
+						frustum_aabb.addPoint(v);
+					}
+					frustum_aabb.translate(Vec3(m_camera_params.frustum.origin - m_pipeline->m_viewport.pos));
+					const AABB grass_aabb(Vec3(-type.m_distance), Vec3(type.m_distance));
+					AABB aabb = frustum_aabb.intersection(grass_aabb);
+					aabb.translate(Vec3(m_pipeline->m_viewport.pos - tr.pos));
+					if (aabb.min.x > aabb.max.x || aabb.min.z > aabb.max.z) continue;
+
 					const i32 mesh_count = type.m_grass_model->getLODIndices()[0].to;
 					for (i32 i = 0; i <= mesh_count; ++i) {
 						const Mesh& mesh = type.m_grass_model->getMesh(i);
@@ -4292,9 +4303,10 @@ struct PipelineImpl final : Pipeline
 						const i32 step_len = maximum(i32(type.m_spacing * 100), 1);
 						const i32 steps = i32(grass.distance * 100) / step_len;
 						grass.lod_ref_point = Vec3(tr.pos - m_pipeline->m_viewport.pos);
-						grass.from = IVec2(-Vec3((tr.pos - m_pipeline->m_viewport.pos) * 100.f).xz() - Vec2(grass.distance * 100.f - 1));
-						grass.from = (grass.from / step_len) * step_len;
-						grass.to = grass.from + IVec2(2 * steps * step_len);
+						grass.from = IVec2(Vec3((aabb.min) * 100.f).xz());
+						grass.to = IVec2(Vec3((aabb.max) * 100.f).xz());
+						grass.from = (grass.from / step_len) * step_len + IVec2(step_len);
+						grass.to = (grass.to / step_len) * step_len + IVec2(step_len);
 						grass.step = step_len;
 						grass.heightmap = terrain->m_heightmap ? terrain->m_heightmap->handle : gpu::INVALID_TEXTURE;
 						grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;

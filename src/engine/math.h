@@ -402,6 +402,14 @@ LUMIX_FORCE_INLINE DVec3 minimum(const DVec3& a, const DVec3& b) {
 	};
 }
 
+LUMIX_FORCE_INLINE Vec3 minimum(const Vec3& a, const Vec3& b) {
+	return {
+		minimum(a.x, b.x),
+		minimum(a.y, b.y),
+		minimum(a.z, b.z)
+	};
+}
+
 template <typename T> LUMIX_FORCE_INLINE T maximum(T a) {
 	return a;
 }
@@ -419,6 +427,14 @@ LUMIX_FORCE_INLINE Vec2 maximum(const Vec2& a, const Vec2& b) {
 }
 
 LUMIX_FORCE_INLINE DVec3 maximum(const DVec3& a, const DVec3& b) {
+	return {
+		maximum(a.x, b.x),
+		maximum(a.y, b.y),
+		maximum(a.z, b.z)
+	};
+}
+
+LUMIX_FORCE_INLINE Vec3 maximum(const Vec3& a, const Vec3& b) {
 	return {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),

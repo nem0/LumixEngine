@@ -532,6 +532,15 @@ bool AABB::overlaps(const AABB& aabb) const {
 	return true;
 }
 
+AABB AABB::intersection(const AABB& rhs) const {
+	return AABB(maximum(rhs.min, min), minimum(rhs.max, max));
+}
+
+void AABB::translate(const Vec3& v) {
+	min += v;
+	max += v;
+}
+
 void AABB::transform(const Matrix& matrix)
 {
 	Vec3 points[8];
