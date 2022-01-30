@@ -1947,8 +1947,7 @@ struct PipelineImpl final : Pipeline
 		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
-		cmd.m_compute_shader = m_place_grass_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
-		cmd.m_compute_shader2 = m_place_grass_shader->getProgram(0);
+		cmd.m_compute_shader = m_place_grass_shader->getProgram();
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -4331,7 +4330,8 @@ struct PipelineImpl final : Pipeline
 
 			m_staging = m_pipeline->m_renderer.allocTransient(sizeof(Indirect) * m_grass.size());
 			Indirect* indirect_dc = (Indirect*)m_staging.ptr;
-			const i32 base_indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m_grass.size()); 
+			// we use 1 indirect structure as a sentinel in shader, so we need m_grass.size() + 1
+			const i32 base_indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m_grass.size() + 1);
 			for (u32 i = 0; i < (u32)m_grass.size(); ++i) {
 				Grass& grass = m_grass[i];
 				indirect_dc[i].base_instance = 0;
@@ -4365,17 +4365,13 @@ struct PipelineImpl final : Pipeline
 
 			gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
 			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
+			gpu::useProgram(m_compute_shader);
 			for (const Grass& grass : m_grass) {
 				gpu::bindTextures(&grass.heightmap, 2, 1);
 				gpu::bindTextures(&grass.splatmap, 3, 1);
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, sizeof(UBValues));
 				const IVec2 size =  (grass.to - grass.from) / grass.step;
-				gpu::useProgram(m_compute_shader);
 				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
-
-				gpu::useProgram(m_compute_shader2);
-				gpu::dispatch(1, 1, 1);
 				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
 			}
 
@@ -4404,7 +4400,6 @@ struct PipelineImpl final : Pipeline
 
 		IAllocator& m_allocator;
 		gpu::ProgramHandle m_compute_shader;
-		gpu::ProgramHandle m_compute_shader2;
 		Array<Grass> m_grass;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
