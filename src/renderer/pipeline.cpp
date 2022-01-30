@@ -1947,7 +1947,7 @@ struct PipelineImpl final : Pipeline
 		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
-		cmd.m_compute_shader = m_place_grass_shader->getProgram();
+		cmd.m_compute_shader = m_place_grass_shader->getProgram(0);
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
