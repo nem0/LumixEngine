@@ -841,7 +841,7 @@ void update(BufferHandle buffer, const void* data, size_t size)
 	glNamedBufferSubData(buf, 0, size, data);
 }
 
-void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size)
+void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size)
 {
 	GPU_PROFILE();
 	checkThread();
@@ -849,7 +849,7 @@ void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size)
 	ASSERT(dst);
 	ASSERT(u32(dst->flags & BufferFlags::IMMUTABLE) == 0);
 
-	glCopyNamedBufferSubData(src->gl_handle, dst->gl_handle, 0, dst_offset, size);
+	glCopyNamedBufferSubData(src->gl_handle, dst->gl_handle, src_offset, dst_offset, size);
 }
 
 void startCapture()

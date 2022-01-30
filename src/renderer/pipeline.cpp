@@ -1392,7 +1392,7 @@ struct PipelineImpl final : Pipeline
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
 		m_prev_viewport = m_viewport;
-		m_instanced_meshes_indirect_offset = 0;
+		m_indirect_buffer_offset = 0;
 
 		if(m_scene) {
 			const EntityPtr global_light = m_scene->getActiveEnvironment();
@@ -1947,7 +1947,8 @@ struct PipelineImpl final : Pipeline
 		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
-		cmd.m_compute_shader = m_place_grass_shader->getProgram(0);
+		cmd.m_compute_shader = m_place_grass_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
+		cmd.m_compute_shader2 = m_place_grass_shader->getProgram(0);
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -3269,7 +3270,7 @@ struct PipelineImpl final : Pipeline
 				g.radius = m->getOriginBoundingRadius();
 				g.instance_count = im.instances.size();
 				g.instance_data = im.gpu_data;
-				g.indirect_offset = atomicAdd(&m_pipeline->m_instanced_meshes_indirect_offset, m->getMeshCount());
+				g.indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m->getMeshCount());
 				g.meshes.reserve(m->getMeshCount());
 				for (i32 i = 0; i < m->getMeshCount(); ++i) {
 					const Mesh& mesh = m->getMesh(i);
@@ -4235,6 +4236,8 @@ struct PipelineImpl final : Pipeline
 			float radius;
 			u32 rotation_mode;
 			Vec2 terrain_xz_scale;
+			u32 indirect_offset;
+			Vec3 padding;
 		};
 
 		struct Grass {
@@ -4256,6 +4259,7 @@ struct PipelineImpl final : Pipeline
 			u32 type;
 			float radius;
 			u32 rotation_mode;
+			u32 indirect_offset;
 			Renderer::TransientSlice drawcall_ub;
 		};
 
@@ -4322,6 +4326,23 @@ struct PipelineImpl final : Pipeline
 					}
 				}
 			}
+			
+			if (m_grass.empty()) return;
+
+			m_staging = m_pipeline->m_renderer.allocTransient(sizeof(Indirect) * m_grass.size());
+			Indirect* indirect_dc = (Indirect*)m_staging.ptr;
+			const i32 base_indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m_grass.size()); 
+			for (u32 i = 0; i < (u32)m_grass.size(); ++i) {
+				Grass& grass = m_grass[i];
+				indirect_dc[i].base_instance = 0;
+				indirect_dc[i].base_vertex = 0;
+				indirect_dc[i].first_index = 0;
+				indirect_dc[i].vertex_count = grass.mesh->indices_count;
+				indirect_dc[i].instance_count = 0;
+				grass.indirect_offset = base_indirect_offset + i;
+				UBValues* dc = (UBValues*)grass.drawcall_ub.ptr;
+				dc->indirect_offset = grass.indirect_offset;
+			}
 		}
 
 		void execute() override {
@@ -4335,53 +4356,61 @@ struct PipelineImpl final : Pipeline
 			renderer.beginProfileBlock("grass", 0);
 			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
 
-			for (const Grass& grass : m_grass) {
-				Indirect indirect_dc;
-				indirect_dc.base_instance = 0;
-				indirect_dc.base_vertex = 0;
-				indirect_dc.first_index = 0;
-				indirect_dc.vertex_count = grass.mesh->indices_count;
-				indirect_dc.instance_count = 0;
-				gpu::update(data, &indirect_dc, sizeof(indirect_dc));
+			gpu::copy(m_pipeline->m_indirect_buffer
+				, m_staging.buffer
+				, m_grass[0].indirect_offset * sizeof(Indirect)
+				, m_staging.offset
+				, sizeof(Indirect) * m_grass.size()
+			);
 
-				gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+			gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
+			for (const Grass& grass : m_grass) {
 				gpu::bindTextures(&grass.heightmap, 2, 1);
 				gpu::bindTextures(&grass.splatmap, 3, 1);
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, sizeof(UBValues));
-				gpu::useProgram(m_compute_shader);
 				const IVec2 size =  (grass.to - grass.from) / grass.step;
+				gpu::useProgram(m_compute_shader);
 				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, data);
-				
-				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
 
+				gpu::useProgram(m_compute_shader2);
+				gpu::dispatch(1, 1, 1);
+				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
+			}
+
+			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
+			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+
+			gpu::bindVertexBuffer(1, data, 0, 32);
+			gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
+			for (const Grass& grass : m_grass) {
 				gpu::useProgram(grass.program);
 				gpu::bindTextures(grass.material->textures, 0, grass.material->textures_count);
 				gpu::bindIndexBuffer(grass.mesh->index_buffer_handle);
 				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
-				gpu::bindVertexBuffer(1, data, (sizeof(Indirect) + 15) & ~15, 32);
 				if (material_ub_idx != grass.material->material_constants) {
 					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, grass.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 					material_ub_idx = grass.material->material_constants;
 				}
 
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
-				gpu::bindIndirectBuffer(data);
-				gpu::drawIndirect(grass.mesh->index_type, 0);
+				gpu::drawIndirect(grass.mesh->index_type, grass.indirect_offset * sizeof(Indirect));
 
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			}
+			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			renderer.endProfileBlock();
 		}
 
 		IAllocator& m_allocator;
 		gpu::ProgramHandle m_compute_shader;
+		gpu::ProgramHandle m_compute_shader2;
 		Array<Grass> m_grass;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		gpu::StateFlags m_render_state;
 		u32 m_define_mask = 0;
+		Renderer::TransientSlice m_staging;
 	};
 
 	struct RenderInstancedModelsCommand : Renderer::RenderJob {
@@ -5262,7 +5291,7 @@ struct PipelineImpl final : Pipeline
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
-	volatile i32 m_instanced_meshes_indirect_offset;
+	volatile i32 m_indirect_buffer_offset;
 	gpu::BufferHandle m_instanced_meshes_buffer;
 	gpu::BufferHandle m_indirect_buffer;
 	gpu::VertexDecl m_base_vertex_decl;

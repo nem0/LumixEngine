@@ -1229,7 +1229,7 @@ struct RendererImpl final : Renderer
 
 		for (const auto& i : frame.material_updates) {
 			gpu::update(m_material_buffer.staging_buffer, &i.value, sizeof(MaterialConsts));
-			gpu::copy(m_material_buffer.buffer, m_material_buffer.staging_buffer, i.idx * sizeof(MaterialConsts), sizeof(MaterialConsts));
+			gpu::copy(m_material_buffer.buffer, m_material_buffer.staging_buffer, i.idx * sizeof(MaterialConsts), 0, sizeof(MaterialConsts));
 		}
 		frame.material_updates.clear();
 
