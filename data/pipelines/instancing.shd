@@ -207,12 +207,7 @@ compute_shader [[
 		#elif defined UPDATE_LODS
 			if (id < u_instance_count) {
 				id += u_from_instance;
-				float dst_lod = getLOD(id);
-				float src_lod = b_input[id].rot_lod.w;
-				float d = dst_lod - src_lod;
-				float td = Global.frame_time_delta * 2;
-				float lod = abs(d) < td ? dst_lod : src_lod + td * sign(d);
-				b_input[id].rot_lod.w = lod;
+				b_input[id].rot_lod.w = getLOD(id);
 			}
 		#endif
 	}
