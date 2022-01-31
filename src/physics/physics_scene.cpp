@@ -1777,12 +1777,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 				controller.gravity_speed = 0;
 			}
 
-			m_filter_callback.m_filter_data = controller.filter_data;
-			PxControllerFilters filters(nullptr, &m_filter_callback);
-			controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
-			PxExtendedVec3 p = controller.controller->getFootPosition();
+			if (squaredLength(dif) > 0.00001f) {
+				m_filter_callback.m_filter_data = controller.filter_data;
+				PxControllerFilters filters(nullptr, &m_filter_callback);
+				controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
+				PxExtendedVec3 p = controller.controller->getFootPosition();
 
-			m_universe.setPosition(controller.entity, {p.x, p.y, p.z});
+				m_universe.setPosition(controller.entity, {p.x, p.y, p.z});
+			}
 		}
 	}
 
