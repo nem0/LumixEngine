@@ -2845,6 +2845,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
+		if (!m_tile.pipeline->getOutput()) {
+			logError("Could not create ", model->getPath(), " thumbnail");
+			model->decRefCount();
+			m_tile.frame_countdown = -1;
+			return;
+		}
 
 		Renderer::MemRef mem;
 		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_final");

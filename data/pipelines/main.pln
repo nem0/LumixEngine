@@ -111,8 +111,7 @@ function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
 	beginBlock("water_pass")
 	pass(getCameraParams())
 	bindTextures({ dsbuffer, shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 4);
-	local bucket = createBucket(entities, "water", "", "depth")
-	renderBucket(bucket, water_state)
+	renderBucket(entities.water, water_state)
 	endBlock()
 end
 
@@ -121,10 +120,9 @@ function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
 
 	beginBlock("transparent_pass")
 	pass(getCameraParams())
-	local bucket = createBucket(entities, "transparent", "", "depth")
-	fur(bucket)
+	fur(entities.transparent)
 	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 5);
-	renderBucket(bucket, transparent_state)
+	renderBucket(entities.transparent, transparent_state)
 	local view_params = getCameraParams()
 	renderParticles(view_params)
 	renderTransparent()
@@ -136,9 +134,8 @@ function impostorPass(entities, colorbuffer, dsbuffer)
 
 	beginBlock("impostor_pass")
 	pass(getCameraParams())
-	local bucket = createBucket(entities, "impostor", "")
-	renderBucket(bucket, impostor_state)
-	renderInstancedModels(entities, default_state, "impostor", {})
+	renderBucket(entities.impostor, impostor_state)
+	renderInstancedModels(entities.view, default_state, "impostor", {})
 	endBlock()
 end
 
@@ -154,10 +151,9 @@ function geomPass(entities)
 		local view_params = getCameraParams()
 		pass(view_params)
 		renderTerrains(view_params, terrain_state)
-		renderInstancedModels(entities, default_state, "default", {define = "DEFERRED"})
+		renderInstancedModels(entities.view, default_state, "default", {define = "DEFERRED"})
 		renderGrass(view_params, grass_state)
-		local bucket = createBucket(entities, "default", "DEFERRED")
-		renderBucket(bucket, default_state)
+		renderBucket(entities.default, default_state)
 		renderOpaque()
 	endBlock()
 
@@ -166,10 +162,8 @@ function geomPass(entities)
 		bindTextures({
 			dsbuffer,
 		}, 1)
-		local bucket = createBucket(entities, "decal", "")
-		renderBucket(bucket, decal_state)
-		bucket = createBucket(entities, "terrain_decal", "")
-		renderBucket(bucket, terrain_decal_state)
+		renderBucket(entities.decal, decal_state)
+		renderBucket(entities.terrain_decal, terrain_decal_state)
 	endBlock()
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
@@ -282,13 +276,13 @@ function shadowPass()
 				beginBlock("slice " .. tostring(slice + 1))
 				pass(view_params)
 
-				local entities = cull(view_params)
-				local bucket0 = createBucket(entities, "default", "DEPTH")
-				local bucket1 = createBucket(entities, "impostor", "DEPTH")
-				renderBucket(bucket0, {})
-				renderBucket(bucket1, {})
-				renderInstancedModels(entities, default_state, "default", { define = "DEPTH" })
-				renderInstancedModels(entities, default_state, "impostor", { define = "DEPTH" })
+				local entities = cull(view_params
+					, { layer = "default", sort = "depth"}
+					, { layer = "impostor", sort = "depth"})
+				renderBucket(entities.default, {})
+				renderBucket(entities.impostor, {})
+				renderInstancedModels(entities.view, default_state, "default", { define = "DEPTH" })
+				renderInstancedModels(entities.view, default_state, "impostor", { define = "DEPTH" })
 
 				if slice < 2 then
 					renderGrass(view_params, shadow_grass_state)
@@ -386,9 +380,8 @@ function main_shadowmap()
 	
 	pass(view_params)
 
-	local entities = cull(view_params)
-	local bucket = createBucket(entities, "default", "DEPTH")
-	renderBucket(bucket, {})
+	local entities = cull(view_params, {layer="default", define="DEPTH"})
+	renderBucket(entities.default, {})
 	renderTerrains(view_params, {define = "DEPTH"})
 	setOutput(depthbuf)
 
@@ -402,7 +395,9 @@ function render_preview()
 
 	local view_params = getCameraParams()
 	fillClusters(view_params)
-	local entities = cull(view_params)
+	local entities = cull(view_params
+		, { layer = "default" }
+		, { layer = "transparent", sort = "depth" })
 	
 	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16f", debug_name = "preview_rb" }
 	local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth32", debug_name = "gbuffer_ds" }
@@ -413,10 +408,8 @@ function render_preview()
 	pass(view_params)
 	
 	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 5)
-	local bucket1 = createBucket(entities, "default", "")
-	local bucket2 = createBucket(entities, "transparent", "", "depth")
-	renderBucket(bucket1, default_state)
-	renderBucket(bucket2, transparent_state)
+	renderBucket(entities.default, default_state)
+	renderBucket(entities.transparent, transparent_state)
 
 	local output = tonemap(rb)
 	setOutput(output)
@@ -429,7 +422,14 @@ function main()
 	end
 
 	local view_params = getCameraParams()
-	local entities = cull(view_params)
+	local entities = cull(view_params
+		, { layer = "default", define = "DEFERRED" }
+		, { layer = "transparent", sort = "depth" }
+		, { layer = "water", sort = "depth" }
+		, { layer = "impostor" }
+		, { layer = "decal" }
+		, { layer = "terrain_decal" }
+	)
 
 	local shadowmap = shadowPass()
 	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(entities)
