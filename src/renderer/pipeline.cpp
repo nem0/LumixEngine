@@ -571,7 +571,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 			~Inserter() {
-				MutexGuard guard(sorter.mutex);
+				jobs::MutexGuard guard(sorter.mutex);
 				if (!sorter.first_page) {
 					sorter.first_page = first_page;
 					sorter.last_page = last_page;
@@ -656,7 +656,7 @@ struct PipelineImpl final : Pipeline
 		PageAllocator& page_allocator;
 		Page* first_page = nullptr;
 		Page* last_page = nullptr;
-		Mutex mutex;
+		jobs::Mutex mutex;
 		Array<u64> keys;
 		Array<u64> values;
 	};
@@ -763,7 +763,6 @@ struct PipelineImpl final : Pipeline
 		Page* last_page = nullptr;
 		Page* first_page = nullptr;
 		PageAllocator& page_allocator;
-		Mutex mutex;
 	};
 	
 	struct InstancedMeshes {
@@ -3175,8 +3174,50 @@ struct PipelineImpl final : Pipeline
 			return sqrtf(dist);
 		}
 
+		void setupFur() {
+			if (m_camera_params.is_shadow) return;
+
+			RenderScene* scene = m_pipeline->m_scene;
+			HashMap<EntityRef, FurComponent>& furs = scene->getFurs();
+			if (furs.empty()) return;
+
+			Span<const ModelInstance> mi = scene->getModelInstances();
+			Sorter::Inserter inserter(m_view->sorter);
+		
+			const u64 type_mask = (u64)RenderableTypes::FUR << 32;
+		
+			// TODO handle sort order
+			// TODO frustum culling
+			// TODO render correct LOD
+			for (auto iter = furs.begin(); iter.isValid(); ++iter) {
+				const EntityRef e = iter.key();
+				if (e.index >= (i32)mi.length()) continue;
+				if (!mi[e.index].flags.isSet(ModelInstance::VALID)) continue;
+				if (!iter.value().enabled) continue;
+
+				const Model* model = mi[e.index].model;
+				if (!model) continue;
+				if (!model->isReady()) continue;
+
+				for (i32 i = 0; i < model->getMeshCount(); ++i) {
+					const Mesh& mesh = model->getMesh(i);
+					if (mesh.type != Mesh::SKINNED) continue;
+
+					const u8 bucket_id = m_view->layer_to_bucket[mesh.material->getLayer()];
+					if (bucket_id != 0xff) {
+						const u64 key = mesh.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
+						const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
+				
+						inserter.push(key, subrenderable);
+					}
+				}
+			}
+		}
+
 		void setup() override {
 			PROFILE_FUNCTION();
+
+			setupFur();
 
 			m_view->renderables = m_pipeline->m_scene->getRenderables(m_view->cp.frustum);
 			
@@ -3457,6 +3498,7 @@ struct PipelineImpl final : Pipeline
 
 			Renderer& renderer = m_pipeline->m_renderer;
 			renderer.beginProfileBlock("render_bucket", 0);
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
 			const gpu::StateFlags render_states = m_render_state;
 			u32 material_ub_idx = 0xffFFffFF;
@@ -4059,44 +4101,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void fur(u32 viewbucket_id) {
-		PROFILE_FUNCTION();
-		HashMap<EntityRef, FurComponent>& furs = m_scene->getFurs();
-		if (furs.empty()) return;
-
-		const u32 view_id = viewbucket_id >> 16;
-		const u32 bucket_id = viewbucket_id & 0xffFF;
-
-		View& view = *m_views[view_id].get();
-		Span<const ModelInstance> mi = m_scene->getModelInstances();
-		Sorter::Inserter inserter(view.sorter);
-		
-		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
-		
-		// TODO handle sort order
-		// TODO frustum culling
-		for (auto iter = furs.begin(); iter.isValid(); ++iter) {
-			const EntityRef e = iter.key();
-			if (e.index >= (i32)mi.length()) continue;
-			if (!mi[e.index].flags.isSet(ModelInstance::VALID)) continue;
-			if (!iter.value().enabled) continue;
-
-			const Model* model = mi[e.index].model;
-			if (!model) continue;
-			if (!model->isReady()) continue;
-
-			for (i32 i = 0; i < model->getMeshCount(); ++i) {
-				const Mesh& mesh = model->getMesh(i);
-				if (mesh.type != Mesh::SKINNED) continue;
-
-				const u64 key = mesh.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
-				const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
-			
-				inserter.push(key, subrenderable);
-			}
-		}
-	}
-
 	void renderBucket(u32 viewbucket_id, RenderState state) {
 		PROFILE_FUNCTION();
 		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>();
@@ -4649,19 +4653,19 @@ struct PipelineImpl final : Pipeline
 		const float time_delta = m_renderer.getEngine().getLastTimeDelta();
 		volatile i32 worker_idx = 0;
 
+		u32 bucket_map[255];
+		for (u32 i = 0; i < 255; ++i) {
+			bucket_map[i] = view.layer_to_bucket[i];
+			if (bucket_map[i] == 0xff) {
+				bucket_map[i] = 0xffFFffFF;
+			}
+			else if (view.buckets[bucket_map[i]].sort == Bucket::DEPTH) {
+				bucket_map[i] |= 0x100;
+			}
+		}
 		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
 			int total = 0;
-			u32 bucket_map[255];
-			for (u32 i = 0; i < 255; ++i) {
-				bucket_map[i] = view.layer_to_bucket[i];
-				if (bucket_map[i] == 0xff) {
-					bucket_map[i] = 0xffFFffFF;
-				}
-				else if (view.buckets[bucket_map[i]].sort == Bucket::DEPTH) {
-					bucket_map[i] |= 0x100;
-				}
-			}
 			RenderScene* scene = m_scene;
 			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
 			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
@@ -4888,7 +4892,7 @@ struct PipelineImpl final : Pipeline
 
 		u32 m_histogram[SIZE];
 		bool m_sorted;
-		Mutex m_cs;
+		jobs::Mutex m_cs;
 
 		void compute(const u64* keys, const u64* values, int size, u16 shift) {
 			memset(m_histogram, 0, sizeof(m_histogram));
@@ -4918,7 +4922,7 @@ struct PipelineImpl final : Pipeline
 					begin = atomicAdd(&counter, STEP);
 				}
 
-				MutexGuard lock(m_cs);
+				jobs::MutexGuard lock(m_cs);
 				m_sorted &= sorted;
 				for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
 					m_histogram[i] += histogram[i]; 
@@ -5198,7 +5202,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(fillClusters);
-		REGISTER_FUNCTION(fur);
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
 		REGISTER_FUNCTION(keepRenderbufferAlive);

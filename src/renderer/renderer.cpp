@@ -78,7 +78,7 @@ struct TransientBuffer {
 			return slice;
 		}
 
-		MutexGuard lock(m_mutex);
+		jobs::MutexGuard lock(m_mutex);
 		if (!m_overflow.buffer) {
 			m_overflow.buffer = gpu::allocBufferHandle();
 			m_overflow.data = (u8*)os::memReserve(OVERFLOW_BUFFER_SIZE);
@@ -132,7 +132,7 @@ struct TransientBuffer {
 	i32 m_offset = 0;
 	u32 m_size = 0;
 	u8* m_ptr = nullptr;
-	Mutex m_mutex;
+	jobs::Mutex m_mutex;
 	gpu::BufferFlags m_flags = gpu::BufferFlags::NONE;
 
 	struct {
@@ -171,7 +171,7 @@ struct FrameData {
 
 	Array<MaterialUpdates> material_updates;
 	Array<Renderer::RenderJob*> jobs;
-	Mutex shader_mutex;
+	jobs::Mutex shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
 	jobs::SignalHandle can_setup = jobs::INVALID_HANDLE;
@@ -296,7 +296,7 @@ struct GPUProfiler
 
 	void beginQuery(const char* name, i64 profiler_link, bool stats)
 	{
-		MutexGuard lock(m_mutex);
+		jobs::MutexGuard lock(m_mutex);
 		Query& q = m_queries.emplace();
 		q.profiler_link = profiler_link;
 		q.name = name;
@@ -318,7 +318,7 @@ struct GPUProfiler
 
 	void endQuery()
 	{
-		MutexGuard lock(m_mutex);
+		jobs::MutexGuard lock(m_mutex);
 		Query& q = m_queries.emplace();
 		q.is_end = true;
 		q.is_frame = false;
@@ -338,7 +338,7 @@ struct GPUProfiler
 	void frame()
 	{
 		PROFILE_FUNCTION();
-		MutexGuard lock(m_mutex);
+		jobs::MutexGuard lock(m_mutex);
 		Query frame_query;
 		frame_query.is_frame = true;
 		m_queries.push(frame_query);
@@ -375,7 +375,7 @@ struct GPUProfiler
 	Array<Query> m_queries;
 	Array<gpu::QueryHandle> m_pool;
 	Array<gpu::QueryHandle> m_stats_pool;
-	Mutex m_mutex;
+	jobs::Mutex m_mutex;
 	i64 m_gpu_to_cpu_offset;
 	u32 m_stats_counter = 0;
 	gpu::QueryHandle m_stats_query;
@@ -1139,7 +1139,7 @@ struct RendererImpl final : Renderer
 
 	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::VertexDecl decl, u32 defines) override {
 		ASSERT(shader.isReady());
-		MutexGuard lock(m_cpu_frame->shader_mutex);
+		jobs::MutexGuard lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
 			if (i.shader == &shader && decl.hash == i.decl.hash && defines == i.defines) {
@@ -1156,7 +1156,7 @@ struct RendererImpl final : Renderer
 
 	u8 getShaderDefineIdx(const char* define) override
 	{
-		MutexGuard lock(m_shader_defines_mutex);
+		jobs::MutexGuard lock(m_shader_defines_mutex);
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
 			if (m_shader_defines[i] == define)
@@ -1318,7 +1318,7 @@ struct RendererImpl final : Renderer
 	Engine& m_engine;
 	IAllocator& m_allocator;
 	Array<StaticString<32>> m_shader_defines;
-	Mutex m_shader_defines_mutex;
+	jobs::Mutex m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;
 	MaterialManager m_material_manager;

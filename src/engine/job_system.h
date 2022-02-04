@@ -11,11 +11,16 @@ using SignalHandle = u32;
 constexpr u8 ANY_WORKER = 0xff;
 constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 
+struct Mutex;
+
 LUMIX_ENGINE_API bool init(u8 workers_count, IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API u8 getWorkersCount();
 
 LUMIX_ENGINE_API void enableBackupWorker(bool enable);
+
+LUMIX_ENGINE_API void enter(Mutex* mutex);
+LUMIX_ENGINE_API void exit(Mutex* mutex);
 
 LUMIX_ENGINE_API void incSignal(SignalHandle* signal);
 LUMIX_ENGINE_API void decSignal(SignalHandle signal);
@@ -60,6 +65,18 @@ void forEach(i32 count, i32 step, const F& f)
 		}
 	});
 }
+
+struct Mutex {
+	volatile i32 lock = 0;
+	SignalHandle signal = jobs::INVALID_HANDLE;
+};
+
+struct MutexGuard {
+	MutexGuard(Mutex& mutex) : mutex(mutex) { enter(&mutex); }
+	~MutexGuard() { exit(&mutex); }
+
+	Mutex& mutex;
+};
 
 } // namespace jobs
 
