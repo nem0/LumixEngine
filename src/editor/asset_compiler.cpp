@@ -445,7 +445,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (startsWith(path, ".")) return;
 		if (equalIStrings(path, "lumix.log")) return;
 		
-		jobs::MutexGuard lock(m_changed_mutex);
+		MutexGuard lock(m_changed_mutex);
 		m_changed_files.push(Path(path));
 	}
 
@@ -503,7 +503,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		copyString(Span(tmp), ext);
 		makeLowercase(Span(tmp), tmp);
 		const u32 hash = crc32(tmp);
-		jobs::MutexGuard lock(m_plugin_mutex);
+		MutexGuard lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) {
 			logError("Unknown resource type ", src);
@@ -560,7 +560,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void pushToCompileQueue(const Path& path) {
-		jobs::MutexGuard lock(m_to_compile_mutex);
+		MutexGuard lock(m_to_compile_mutex);
 		auto iter = m_generations.find(path);
 		if (!iter.isValid()) {
 			iter = m_generations.insert(path, 0);
@@ -581,7 +581,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	CompileJob popCompiledResource()
 	{
-		jobs::MutexGuard lock(m_compiled_mutex);
+		MutexGuard lock(m_compiled_mutex);
 		if (m_compiled.empty()) return {};
 		const CompileJob p = m_compiled.back();
 		m_compiled.pop();
@@ -634,7 +634,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			ImGui::ProgressBar(((float)m_compile_batch_count - m_batch_remaining_count) / m_compile_batch_count);
 			StaticString<LUMIX_MAX_PATH> path;
 			{
-				jobs::MutexGuard lock(m_to_compile_mutex);
+				MutexGuard lock(m_to_compile_mutex);
 				path = m_res_in_progress;
 			}
 			ImGui::TextWrapped("%s", path.data);
@@ -661,12 +661,12 @@ struct AssetCompilerImpl : AssetCompiler {
 			// this can take some time, mutex is probably not the best option
 
 			const u32 generation = [&](){
-				jobs::MutexGuard lock(m_to_compile_mutex);
+				MutexGuard lock(m_to_compile_mutex);
 				return m_generations[p.path];
 			}();
 			if (p.generation != generation) continue;
 
-			jobs::MutexGuard lock(m_compiled_mutex);
+			MutexGuard lock(m_compiled_mutex);
 			// reload/continue loading resource and its subresources
 			for (const ResourceItem& ri : m_resources) {
 				if (!endsWithInsensitive(ri.path.c_str(), p.path.c_str())) continue;;
@@ -688,7 +688,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		for (;;) {
 			Path path_obj;
 			{
-				jobs::MutexGuard lock(m_changed_mutex);
+				MutexGuard lock(m_changed_mutex);
 				if (m_changed_files.empty()) break;
 
 				m_changed_files.removeDuplicates();
@@ -729,7 +729,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void removePlugin(IPlugin& plugin) override
 	{
-		jobs::MutexGuard lock(m_plugin_mutex);
+		MutexGuard lock(m_plugin_mutex);
 		bool removed;
 		do {
 			removed = false;
@@ -748,7 +748,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		const char** i = extensions;
 		while(*i) {
 			const u32 hash = crc32(*i);
-			jobs::MutexGuard lock(m_plugin_mutex);
+			MutexGuard lock(m_plugin_mutex);
 			m_plugins.insert(hash, &plugin);
 			++i;
 		}
@@ -764,10 +764,11 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	Semaphore m_semaphore;
-	jobs::Mutex m_to_compile_mutex;
-	jobs::Mutex m_compiled_mutex;
-	jobs::Mutex m_plugin_mutex;
-	jobs::Mutex m_changed_mutex;
+	Mutex m_to_compile_mutex;
+	Mutex m_compiled_mutex;
+	Mutex m_changed_mutex;
+	Mutex m_plugin_mutex;
+	jobs::Mutex m_resources_mutex;
 	HashMap<Path, u32> m_generations; 
 	HashMap<Path, Array<Path>> m_dependencies; 
 	Array<Path> m_changed_files;
@@ -778,7 +779,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	HashMap<u32, IPlugin*, HashFuncDirect<u32>> m_plugins;
 	AssetCompilerTask m_task;
 	UniquePtr<FileSystemWatcher> m_watcher;
-	jobs::Mutex m_resources_mutex;
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 	DelegateList<void(const Path& path)> m_on_list_changed;
@@ -796,7 +796,7 @@ int AssetCompilerTask::task()
 	while (!m_finished) {
 		m_compiler.m_semaphore.wait();
 		const AssetCompilerImpl::CompileJob p = [&]{
-			jobs::MutexGuard lock(m_compiler.m_to_compile_mutex);
+			MutexGuard lock(m_compiler.m_to_compile_mutex);
 			AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
 			if (p.path.isEmpty()) return p;
 
@@ -817,7 +817,7 @@ int AssetCompilerTask::task()
 			profiler::pushString(p.path.c_str());
 			const bool compiled = m_compiler.compile(p.path);
 			if (!compiled) logError("Failed to compile resource ", p.path);
-			jobs::MutexGuard lock(m_compiler.m_compiled_mutex);
+			MutexGuard lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(p);
 		}
 	}

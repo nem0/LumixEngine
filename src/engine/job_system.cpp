@@ -297,26 +297,6 @@ void enableBackupWorker(bool enable)
 	}
 }
 
-void enter(Mutex* mutex) {
-	ASSERT(getWorker());
-	for (;;) {
-		for (u32 i = 0; i < 400; ++i) {
-			if (compareAndExchange(&mutex->lock, 1, 0)) {
-				incSignal(&mutex->signal);
-				return;
-			}
-		}
-		wait(mutex->signal);
-	}
-}
-
-void exit(Mutex* mutex) {
-	ASSERT(getWorker());
-	bool res = compareAndExchange(&mutex->lock, 0, 1);
-	ASSERT(res);
-	decSignal(mutex->signal);
-}
-
 void incSignal(SignalHandle* signal)
 {
 	ASSERT(signal);
@@ -399,7 +379,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			}
 
 			PROFILE_BLOCK("sleeping");
-			profiler::blockColor(0xff, 0, 0xff);
+			profiler::blockColor(0x30, 0x30, 0x30);
 			worker->sleep(g_system->m_job_queue_sync);
 		}
 		if (worker->m_finished) break;
@@ -418,6 +398,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 		}
 		else {
 			profiler::beginBlock("job");
+			profiler::blockColor(0x60, 0x60, 0x60);
 			if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
 				profiler::pushJobInfo(job.dec_on_finish, job.precondition);
 			}
@@ -514,8 +495,7 @@ void shutdown()
 	g_system.destroy();
 }
 
-
-void wait(SignalHandle handle)
+static void waitEx(SignalHandle handle, bool is_mutex)
 {
 	g_system->m_sync.enter();
 	if (isSignalZero(handle, false)) {
@@ -533,7 +513,6 @@ void wait(SignalHandle handle)
 		return;
 	}
 
-	profiler::blockColor(0xff, 0, 0);
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;
 
 	runInternal(this_fiber, [](void* data){
@@ -552,7 +531,7 @@ void wait(SignalHandle handle)
 		}
 	}, handle, false, nullptr, 0);
 	
-	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(handle);
+	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(handle, is_mutex);
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();
 	if (!Fiber::isValid(new_fiber->fiber)) {
@@ -569,6 +548,30 @@ void wait(SignalHandle handle)
 		ASSERT(isSignalZero(handle, false));
 		g_system->m_sync.exit();
 	#endif
+}
+
+void enter(Mutex* mutex) {
+	ASSERT(getWorker());
+	for (;;) {
+		for (u32 i = 0; i < 400; ++i) {
+			if (compareAndExchange(&mutex->lock, 1, 0)) {
+				incSignal(&mutex->signal);
+				return;
+			}
+		}
+		waitEx(mutex->signal, true);
+	}
+}
+
+void exit(Mutex* mutex) {
+	ASSERT(getWorker());
+	bool res = compareAndExchange(&mutex->lock, 0, 1);
+	ASSERT(res);
+	decSignal(mutex->signal);
+}
+
+void wait(SignalHandle handle) {
+	waitEx(handle, false);
 }
 
 } // namespace Lumix::jobs

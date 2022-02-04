@@ -1055,7 +1055,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						? float((header.time - view_start) / double(m_range))
 						: -float((view_start - header.time) / double(m_range));
 					const float x = from_x * (1 - t) + to_x * t;
-					const u32 color = header.type == profiler::EventType::END_FIBER_WAIT ? 0xffff0000 : 0xff00ff00;
+					const u32 color = r.is_mutex ? 0xff0000ff : header.type == profiler::EventType::END_FIBER_WAIT ? 0xffff0000 : 0xff00ff00;
 					dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
 					const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
 					if (mouse_hovered || (is_begin && hovered_signal.signal == r.job_system_signal)) {

@@ -1100,6 +1100,7 @@ struct RendererImpl final : Renderer
 		jobs::run(&cmd, [](void* data){
 			RenderJob* cmd = (RenderJob*)data;
 			PROFILE_BLOCK("setup_render_job");
+			profiler::blockColor(0x50, 0xff, 0xff);
 			cmd->setup();
 		}, &m_cpu_frame->setup_done);
 	}

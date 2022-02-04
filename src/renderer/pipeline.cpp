@@ -802,7 +802,6 @@ struct PipelineImpl final : Pipeline
 
 		Array<Model> models;
 		InstancedMeshes* next = nullptr;
-		jobs::SignalHandle culled = jobs::INVALID_HANDLE;
 	};
 
 	struct View {
@@ -825,7 +824,7 @@ struct PipelineImpl final : Pipeline
 		CullResult* renderables = nullptr;
 		CameraParams cp;
 		u8 layer_to_bucket[255];
-		jobs::SignalHandle buckets_ready = jobs::INVALID_HANDLE;
+		jobs::SignalHandle ready = jobs::INVALID_HANDLE;
 	};
 
 	// converts float to u32 so it can be used in radix sort
@@ -3229,99 +3228,99 @@ struct PipelineImpl final : Pipeline
 					m_pipeline->createCommands(*m_view);
 				}
 			}
-			jobs::decSignal(m_view->buckets_ready);
 
 			// instanced meshes
-			if (!m_instanced_meshes) return;
-			const Universe& universe = m_pipeline->m_scene->getUniverse();
-			const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
-			Renderer& renderer = m_pipeline->m_renderer;
-			const u32 instanced_define_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-			m_instanced_meshes->models.reserve(ims.size());
-			UBValues ub_values;
-			toPlanes(m_camera_params, Span(ub_values.camera_planes));
+			if (m_instanced_meshes) {
+				const Universe& universe = m_pipeline->m_scene->getUniverse();
+				const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
+				Renderer& renderer = m_pipeline->m_renderer;
+				const u32 instanced_define_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+				m_instanced_meshes->models.reserve(ims.size());
+				UBValues ub_values;
+				toPlanes(m_camera_params, Span(ub_values.camera_planes));
 
-			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-				const InstancedModel& im = iter.value();
-				Model* m = im.model;
-				if (!m || !m->isReady()) continue;
+				for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+					const InstancedModel& im = iter.value();
+					Model* m = im.model;
+					if (!m || !m->isReady()) continue;
 
-				float draw_distance = getDrawDistance(*m);
-				InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
+					float draw_distance = getDrawDistance(*m);
+					InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
 
-				g.origin = universe.getTransform(iter.key());
-				Frustum frustum = m_camera_params.frustum.getRelative(g.origin.pos);
-				const float radius = m->getOriginBoundingRadius();
+					g.origin = universe.getTransform(iter.key());
+					Frustum frustum = m_camera_params.frustum.getRelative(g.origin.pos);
+					const float radius = m->getOriginBoundingRadius();
 
-				for (u32 i = 0; i < 16; ++i) {
-					const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
+					for (u32 i = 0; i < 16; ++i) {
+						const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
 
-					if (cell.instance_count > 0) {
-						const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
-						const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
-						const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
-						const float cell_radius = length(cell_half_extents);
-						if (length(g.origin.pos - m_camera_params.pos + cell_center) - cell_radius < draw_distance) {
-							const bool can_merge = g.cell_count > 0 && g.cells[g.cell_count - 1].visible == visible  && g.cells[g.cell_count - 1].offset + g.cells[g.cell_count - 1].count == cell.from_instance;
-							if (can_merge) {
-								g.cells[g.cell_count - 1].count += cell.instance_count;
-								u32* tmp =(u32*)g.cells[g.cell_count - 1].ub.ptr;
-								tmp[1] += cell.instance_count;
-							}
-							else {
-								g.cells[g.cell_count].visible = visible;
-								g.cells[g.cell_count].count = cell.instance_count;
-								g.cells[g.cell_count].offset = cell.from_instance;
-								Renderer::TransientSlice ub = m_pipeline->m_renderer.allocUniform(sizeof(u32) * 2);
-								u32* tmp =(u32*)ub.ptr;
-								tmp[0] = cell.from_instance;
-								tmp[1] = cell.instance_count;
-								g.cells[g.cell_count].ub = ub;
-								++g.cell_count;
+						if (cell.instance_count > 0) {
+							const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
+							const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
+							const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
+							const float cell_radius = length(cell_half_extents);
+							if (length(g.origin.pos - m_camera_params.pos + cell_center) - cell_radius < draw_distance) {
+								const bool can_merge = g.cell_count > 0 && g.cells[g.cell_count - 1].visible == visible  && g.cells[g.cell_count - 1].offset + g.cells[g.cell_count - 1].count == cell.from_instance;
+								if (can_merge) {
+									g.cells[g.cell_count - 1].count += cell.instance_count;
+									u32* tmp =(u32*)g.cells[g.cell_count - 1].ub.ptr;
+									tmp[1] += cell.instance_count;
+								}
+								else {
+									g.cells[g.cell_count].visible = visible;
+									g.cells[g.cell_count].count = cell.instance_count;
+									g.cells[g.cell_count].offset = cell.from_instance;
+									Renderer::TransientSlice ub = m_pipeline->m_renderer.allocUniform(sizeof(u32) * 2);
+									u32* tmp =(u32*)ub.ptr;
+									tmp[0] = cell.from_instance;
+									tmp[1] = cell.instance_count;
+									g.cells[g.cell_count].ub = ub;
+									++g.cell_count;
+								}
 							}
 						}
 					}
-				}
 				
-				if (g.cell_count == 0) {
-					m_instanced_meshes->models.pop();
-					continue;
-				}
+					if (g.cell_count == 0) {
+						m_instanced_meshes->models.pop();
+						continue;
+					}
 
-				g.lod_distances = *(Vec4*)m->getLODDistances();
-				g.lod_indices.x = m->getLODIndices()[0].to;
-				g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
-				g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
-				g.lod_indices.w = maximum(g.lod_indices.z, m->getLODIndices()[3].to);
-				g.radius = m->getOriginBoundingRadius();
-				g.instance_count = im.instances.size();
-				g.instance_data = im.gpu_data;
-				g.indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m->getMeshCount());
-				g.meshes.reserve(m->getMeshCount());
-				for (i32 i = 0; i < m->getMeshCount(); ++i) {
-					const Mesh& mesh = m->getMesh(i);
-					InstancedMeshes::Model::MeshRenderData& m = g.meshes.emplace();
-					m.mesh_rd = mesh.render_data;
-					m.mesh = &mesh;
-					m.material = mesh.material->getRenderData();
-					m.layer = mesh.layer;
-				}
+					g.lod_distances = *(Vec4*)m->getLODDistances();
+					g.lod_indices.x = m->getLODIndices()[0].to;
+					g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
+					g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
+					g.lod_indices.w = maximum(g.lod_indices.z, m->getLODIndices()[3].to);
+					g.radius = m->getOriginBoundingRadius();
+					g.instance_count = im.instances.size();
+					g.instance_data = im.gpu_data;
+					g.indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m->getMeshCount());
+					g.meshes.reserve(m->getMeshCount());
+					for (i32 i = 0; i < m->getMeshCount(); ++i) {
+						const Mesh& mesh = m->getMesh(i);
+						InstancedMeshes::Model::MeshRenderData& m = g.meshes.emplace();
+						m.mesh_rd = mesh.render_data;
+						m.mesh = &mesh;
+						m.material = mesh.material->getRenderData();
+						m.layer = mesh.layer;
+					}
 
-				ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
-				ub_values.lod_distances = g.lod_distances;
-				ub_values.lod_indices = g.lod_indices;
-				ub_values.indirect_offset = g.indirect_offset;
-				ub_values.radius = g.radius;
-				ub_values.batch_size = g.instance_count;
-				ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
-				for (const auto& m : g.meshes) {
-					ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
-				}
+					ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
+					ub_values.lod_distances = g.lod_distances;
+					ub_values.lod_indices = g.lod_indices;
+					ub_values.indirect_offset = g.indirect_offset;
+					ub_values.radius = g.radius;
+					ub_values.batch_size = g.instance_count;
+					ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
+					for (const auto& m : g.meshes) {
+						ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
+					}
 
-				g.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(ub_values));
-				memcpy(g.drawcall_ub.ptr, &ub_values, sizeof(ub_values));
+					g.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(ub_values));
+					memcpy(g.drawcall_ub.ptr, &ub_values, sizeof(ub_values));
+				}
 			}
-			jobs::decSignal(m_instanced_meshes->culled);
+			jobs::decSignal(m_view->ready);
 		}
 
 		IAllocator& m_allocator;
@@ -3405,7 +3404,6 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 
-			jobs::incSignal(&view->instanced_meshes->culled);
 			job.m_instanced_meshes = view->instanced_meshes;
 			job.m_gather_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS3"));
 			job.m_indirect_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS2"));
@@ -3415,7 +3413,7 @@ struct PipelineImpl final : Pipeline
 			job.m_init_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS0"));
 			job.m_update_lods_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("UPDATE_LODS"));
 		}
-		jobs::incSignal(&view->buckets_ready);
+		jobs::incSignal(&view->ready);
 		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 
 		lua_newtable(L);
@@ -3430,12 +3428,11 @@ struct PipelineImpl final : Pipeline
 	struct RenderBucketJob : Renderer::RenderJob {
 		void setup() override {
 			PROFILE_FUNCTION();
-			jobs::wait(m_view->buckets_ready);
+			jobs::wait(m_view->ready);
 
 			const Bucket& bucket= m_view->buckets[m_bucket_id];
 			m_cmds = bucket.cmd_page;
 
-			jobs::wait(m_instanced_meshes->culled);
 			const u32 instanced_define_mask = bucket.define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
 				for (auto& m : g.meshes) {
@@ -4900,7 +4897,7 @@ struct PipelineImpl final : Pipeline
 
 			volatile i32 counter = 0;
 			auto work = [&](){
-				PROFILE_FUNCTION();
+				PROFILE_BLOCK("compute histogram");
 				u32 histogram[SIZE];
 				bool sorted = true;
 				memset(histogram, 0, sizeof(histogram));

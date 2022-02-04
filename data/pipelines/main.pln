@@ -274,8 +274,8 @@ function shadowPass()
 				pass(view_params)
 
 				local entities = cull(view_params
-					, { layer = "default", sort = "depth"}
-					, { layer = "impostor", sort = "depth"})
+					, { layer = "default", define = "DEPTH" }
+					, { layer = "impostor", define = "DEPTH" })
 				renderBucket(entities.default, {})
 				renderBucket(entities.impostor, {})
 

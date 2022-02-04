@@ -440,11 +440,12 @@ void signalTriggered(u32 job_system_signal) {
 }
 
 
-FiberSwitchData beginFiberWait(u32 job_system_signal)
+FiberSwitchData beginFiberWait(u32 job_system_signal, bool is_mutex)
 {
 	FiberWaitRecord r;
 	r.id = atomicIncrement(&g_instance.fiber_wait_id);
 	r.job_system_signal = job_system_signal;
+	r.is_mutex = is_mutex;
 
 	FiberSwitchData res;
 
@@ -463,6 +464,7 @@ void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data)
 	FiberWaitRecord r;
 	r.id = switch_data.id;
 	r.job_system_signal = job_system_signal;
+	r.is_mutex = false;
 
 	write(*ctx, EventType::END_FIBER_WAIT, r);
 	const u32 count = switch_data.count;
