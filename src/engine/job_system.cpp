@@ -553,4 +553,4 @@ void wait(SignalHandle handle)
 	#endif
 }
 
-} // namespace Lumix::jobs
+} // namespace Lumix::jobs

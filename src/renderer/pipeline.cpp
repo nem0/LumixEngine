@@ -815,17 +815,8 @@ struct PipelineImpl final : Pipeline
 			instanced_meshes = LUMIX_NEW(allocator, InstancedMeshes)(allocator);
 		}
 
-		View(View&& rhs)
-			: sorter(static_cast<Sorter&&>(rhs.sorter))
-			, renderables(rhs.renderables)
-			, cp(rhs.cp)
-			, instancers(rhs.instancers.move())
-			, buckets(rhs.buckets.move())
-			, instanced_meshes(rhs.instanced_meshes)
-		{
-			memcpy(layer_to_bucket, rhs.layer_to_bucket, sizeof(layer_to_bucket));
-		}
-
+		View(View&& rhs) = delete;
+		View(const View& rhs) = delete;
 		void operator=(View&&) = delete;
 
 		Array<Bucket> buckets;
@@ -1482,7 +1473,7 @@ struct PipelineImpl final : Pipeline
 		EndPipelineJob& end_job = m_renderer.createJob<EndPipelineJob>();
 		end_job.pipeline = this;
 		end_job.allocator = &m_allocator;
-		end_job.instanced_meshes = m_views.empty() ? nullptr : m_views[0].instanced_meshes;
+		end_job.instanced_meshes = m_views.empty() ? nullptr : m_views[0]->instanced_meshes;
 		m_renderer.queue(end_job, 0);
 		m_renderer.waitForCommandSetup();
 
@@ -1883,26 +1874,6 @@ struct PipelineImpl final : Pipeline
 		res.type = PipelineTexture::RENDERBUFFER;
 		res.renderbuffer = m_renderbuffers.size() - 1;
 		return res;
-	}
-
-	void renderInstancedModels(lua_State* L, u32 view_id, RenderState state, const char* layer) {
-		PROFILE_FUNCTION();
-	
-		if (!m_instancing_shader->isReady()) return;
-
-		IAllocator& allocator = m_renderer.getAllocator();
-		RenderInstancedModelsCommand& cmd = m_renderer.createJob<RenderInstancedModelsCommand>();
-
-		const char* define = "";
-		LuaWrapper::getOptionalField<const char*>(L, 4, "define", &define);
-
-		cmd.m_layer = m_renderer.getLayerIdx(layer);
-		cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		cmd.m_render_state = state.value;
-		cmd.m_pipeline = this;
-		cmd.m_instanced_meshes = m_views[view_id].instanced_meshes;
-
-		m_renderer.queue(cmd, m_profiler_link);
 	}
 
 	void renderTerrains(lua_State* L, CameraParams cp, RenderState state)
@@ -3108,8 +3079,8 @@ struct PipelineImpl final : Pipeline
 		return float(light.radius / length(cam_pos - light_pos));
 	}
 
-	struct CullInstancedMeshesJob : Renderer::RenderJob {
-		CullInstancedMeshesJob(IAllocator& allocator)
+	struct PrepareViewJob : Renderer::RenderJob {
+		PrepareViewJob(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 		}
@@ -3128,6 +3099,7 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override {
 			PROFILE_FUNCTION();
+			if (!m_instanced_meshes) return;
 			if (m_instanced_meshes->models.empty()) return;
 
 			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
@@ -3205,6 +3177,21 @@ struct PipelineImpl final : Pipeline
 
 		void setup() override {
 			PROFILE_FUNCTION();
+
+			m_view->renderables = m_pipeline->m_scene->getRenderables(m_view->cp.frustum);
+			
+			if (m_view->renderables) {
+				m_pipeline->createSortKeys(*m_view);
+				m_view->renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
+				if (!m_view->sorter.keys.empty()) {
+					m_pipeline->radixSort(m_view->sorter.keys.begin(), m_view->sorter.values.begin(), m_view->sorter.keys.size());
+					m_pipeline->createCommands(*m_view);
+				}
+			}
+			jobs::decSignal(m_view->buckets_ready);
+
+			// instanced meshes
+			if (!m_instanced_meshes) return;
 			const Universe& universe = m_pipeline->m_scene->getUniverse();
 			const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
 			Renderer& renderer = m_pipeline->m_renderer;
@@ -3300,12 +3287,13 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		u32 m_define_mask = 0;
-		InstancedMeshes* m_instanced_meshes;
+		InstancedMeshes* m_instanced_meshes = nullptr;
 		gpu::ProgramHandle m_gather_shader;
 		gpu::ProgramHandle m_indirect_shader;
 		gpu::ProgramHandle m_cull_shader;
 		gpu::ProgramHandle m_init_shader;
 		gpu::ProgramHandle m_update_lods_shader;
+		View* m_view;
 	};
 
 	static int cull(lua_State* L) {
@@ -3315,15 +3303,16 @@ struct PipelineImpl final : Pipeline
 		for (i32 i = 0; i < bucket_count; ++i) LuaWrapper::checkTableArg(L, 2 + i);
 		
 		PROFILE_FUNCTION();
-		Array<View>& views = pipeline->m_views;
-		View& view = views.emplace(pipeline->m_allocator, pipeline->m_renderer.getEngine().getPageAllocator());
-		view.cp = cp;
+		Array<UniquePtr<View>>& views = pipeline->m_views;
+		UniquePtr<View>& view = views.emplace();
+		view = UniquePtr<View>::create(pipeline->m_allocator, pipeline->m_allocator, pipeline->m_renderer.getEngine().getPageAllocator());
+		view->cp = cp;
 		if (views.size() > 1) {
-			views[views.size() - 2].instanced_meshes->next = view.instanced_meshes;
+			views[views.size() - 2]->instanced_meshes->next = view->instanced_meshes;
 		}
-		memset(view.layer_to_bucket, 0xff, sizeof(view.layer_to_bucket));
+		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
 
-		view.buckets.reserve(bucket_count);
+		view->buckets.reserve(bucket_count);
 		for (i32 i = 0; i < bucket_count; ++i) {
 			char layer[32];
 			if (!LuaWrapper::checkStringField(L, 2 + i, "layer", Span(layer))) {
@@ -3332,7 +3321,7 @@ struct PipelineImpl final : Pipeline
 			if (equalStrings(layer, "view")) {
 				LuaWrapper::argError(L, 2 + i, "layer name `view` is reserved");
 			}
-			Bucket& bucket = view.buckets.emplace();
+			Bucket& bucket = view->buckets.emplace();
 			bucket.layer = pipeline->m_renderer.getLayerIdx(layer);
 			copyString(Span(bucket.layer_name), layer); 
 			
@@ -3347,9 +3336,9 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		for (i32 i = 0; i < view.buckets.size(); ++i) {
-			Bucket& bucket = view.buckets[i];
-			view.layer_to_bucket[bucket.layer] = i;
+		for (i32 i = 0; i < view->buckets.size(); ++i) {
+			Bucket& bucket = view->buckets[i];
+			view->layer_to_bucket[bucket.layer] = i;
 		}
 
 		struct JobData {
@@ -3362,23 +3351,10 @@ struct PipelineImpl final : Pipeline
 		job_data->view_id = pipeline->m_views.size() - 1;
 		job_data->allocator = &pipeline->m_allocator;
 
-		// TODO merge this job with CullInstancedMeshesJob and name it PrepareView
-		jobs::run(job_data, [](void* user_ptr){
-			PROFILE_BLOCK("prepare buckets");
-			JobData* job_data = (JobData*)user_ptr;
-			View& view = job_data->pipeline->m_views[job_data->view_id];
-			view.renderables = job_data->pipeline->m_scene->getRenderables(view.cp.frustum);
-			
-			if (!view.renderables) return;
-			job_data->pipeline->createSortKeys(view);
-			view.renderables->free(job_data->pipeline->m_renderer.getEngine().getPageAllocator());
-			if (!view.sorter.keys.empty()) {
-				job_data->pipeline->radixSort(view.sorter.keys.begin(), view.sorter.values.begin(), view.sorter.keys.size());
-				job_data->pipeline->createCommands(view);
-			}
-
-			LUMIX_DELETE(*job_data->allocator, job_data);
-		}, &view.buckets_ready);
+		PrepareViewJob& job = pipeline->m_renderer.createJob<PrepareViewJob>(pipeline->m_allocator);
+		job.m_pipeline = pipeline;
+		job.m_camera_params = cp;
+		job.m_view = view.get();
 
 		if (pipeline->m_instancing_shader->isReady()) {
 			const HashMap<EntityRef, InstancedModel>& ims = pipeline->m_scene->getInstancedModels();
@@ -3388,11 +3364,8 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 
-			CullInstancedMeshesJob& job = pipeline->m_renderer.createJob<CullInstancedMeshesJob>(pipeline->m_allocator);
-			jobs::incSignal(&view.instanced_meshes->culled);
-			job.m_pipeline = pipeline;
-			job.m_camera_params = cp;
-			job.m_instanced_meshes = view.instanced_meshes;
+			jobs::incSignal(&view->instanced_meshes->culled);
+			job.m_instanced_meshes = view->instanced_meshes;
 			job.m_gather_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS3"));
 			job.m_indirect_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS2"));
 			u32 cull_shader_defines = 1 << pipeline->m_renderer.getShaderDefineIdx("PASS1");
@@ -3400,14 +3373,15 @@ struct PipelineImpl final : Pipeline
 			job.m_cull_shader = pipeline->m_instancing_shader->getProgram(cull_shader_defines);
 			job.m_init_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS0"));
 			job.m_update_lods_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("UPDATE_LODS"));
-			pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 		}
+		jobs::incSignal(&view->buckets_ready);
+		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 
 		lua_newtable(L);
 		const u32 view_id = pipeline->m_views.size() - 1;
 		LuaWrapper::setField(L, -1, "view", view_id);
-		for (u32 i = 0; i < (u32)view.buckets.size(); ++i) {
-			LuaWrapper::setField(L, -1, view.buckets[i].layer_name, (view_id << 16) | i);
+		for (u32 i = 0; i < (u32)view->buckets.size(); ++i) {
+			LuaWrapper::setField(L, -1, view->buckets[i].layer_name, (view_id << 16) | i);
 		}
 		return 1;
 	}
@@ -3415,13 +3389,57 @@ struct PipelineImpl final : Pipeline
 	struct RenderBucketJob : Renderer::RenderJob {
 		void setup() override {
 			PROFILE_FUNCTION();
-			// TODO accessing m_view is not threadsafe
-			jobs::wait(m_pipeline->m_views[m_view_id].buckets_ready);
+			jobs::wait(m_view->buckets_ready);
 
-			m_cmds = m_pipeline->m_views[m_view_id].buckets[m_bucket_id].cmd_page;
+			const Bucket& bucket= m_view->buckets[m_bucket_id];
+
+			m_cmds = bucket.cmd_page;
+
+			jobs::wait(m_instanced_meshes->culled);
+			const u32 instanced_define_mask = bucket.define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
+			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+				for (auto& m : g.meshes) {
+					if (m.layer == m_layer) {
+						m.program = m.mesh->material->getShader()->getProgram(m.mesh->vertex_decl, instanced_define_mask | m.mesh->material->getDefineMask());
+					}
+				}
+			}
 		}
 
 		void execute() override {
+			PROFILE_FUNCTION();
+			if (m_instanced_meshes->models.empty()) return;
+			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
+
+			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
+				for (const auto& m : g.meshes) {
+					if (m.layer == m_layer) {
+						gpu::bindTextures(m.material->textures, 0, m.material->textures_count);
+						gpu::setState(m.material->render_states | m_render_state);
+						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+
+						gpu::useProgram(m.program);
+
+						gpu::bindIndexBuffer(m.mesh_rd->index_buffer_handle);
+						gpu::bindVertexBuffer(0, m.mesh_rd->vertex_buffer_handle, 0, m.mesh_rd->vb_stride);
+						gpu::bindVertexBuffer(1, m_pipeline->m_instanced_meshes_buffer, 48, 32);
+
+						gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
+
+						gpu::drawIndirect(m.mesh_rd->index_type, u32(sizeof(Indirect) * (g.indirect_offset + (&m - g.meshes.begin()))));
+					}
+				}
+			}
+			
+			gpu::bindIndirectBuffer(gpu::INVALID_BUFFER);
+			gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+			m_pipeline->m_renderer.endProfileBlock();
+
 			if (!m_cmds) return;
 
 			// inline in debug
@@ -3429,7 +3447,6 @@ struct PipelineImpl final : Pipeline
 				const T N = *(T*)cmd; \
 				cmd += sizeof(T); \
 				do {} while(false)
-			PROFILE_FUNCTION();
 			if(m_cmds->header.size == 0 && !m_cmds->header.next) {
 				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
 				return;
@@ -3439,7 +3456,6 @@ struct PipelineImpl final : Pipeline
 			renderer.beginProfileBlock("render_bucket", 0);
 
 			const gpu::StateFlags render_states = m_render_state;
-			const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
 			CmdPage* page = m_cmds;
 			while (page) {
@@ -3588,7 +3604,9 @@ struct PipelineImpl final : Pipeline
 		CmdPage* m_cmds;
 		PipelineImpl* m_pipeline;
 		u32 m_bucket_id;
-		u32 m_view_id;
+		View* m_view;
+		InstancedMeshes* m_instanced_meshes;
+		u8 m_layer;
 		gpu::StateFlags m_render_state;
 	};
 
@@ -4046,7 +4064,7 @@ struct PipelineImpl final : Pipeline
 		const u32 view_id = viewbucket_id >> 16;
 		const u32 bucket_id = viewbucket_id & 0xffFF;
 
-		View& view = m_views[view_id];
+		View& view = *m_views[view_id].get();
 		Span<const ModelInstance> mi = m_scene->getModelInstances();
 		Sorter::Inserter inserter(view.sorter);
 		
@@ -4082,7 +4100,9 @@ struct PipelineImpl final : Pipeline
 		job.m_render_state = state.value;
 		job.m_pipeline = this;
 		job.m_bucket_id = viewbucket_id & 0xffFF;
-		job.m_view_id = viewbucket_id >> 16;
+		job.m_view = m_views[viewbucket_id >> 16].get();
+		job.m_layer = job.m_view->buckets[job.m_bucket_id].layer;
+		job.m_instanced_meshes = job.m_view->instanced_meshes;
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -4459,62 +4479,6 @@ struct PipelineImpl final : Pipeline
 		gpu::StateFlags m_render_state;
 		u32 m_define_mask = 0;
 		Renderer::TransientSlice m_staging;
-	};
-
-	struct RenderInstancedModelsCommand : Renderer::RenderJob {
-		void execute() override {
-			PROFILE_FUNCTION();
-			if (m_instanced_meshes->models.empty()) return;
-			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
-
-			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-				for (const auto& m : g.meshes) {
-					if (m.layer == m_layer) {
-						gpu::bindTextures(m.material->textures, 0, m.material->textures_count);
-						gpu::setState(m.material->render_states | m_render_state);
-						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-
-						gpu::useProgram(m.program);
-
-						gpu::bindIndexBuffer(m.mesh_rd->index_buffer_handle);
-						gpu::bindVertexBuffer(0, m.mesh_rd->vertex_buffer_handle, 0, m.mesh_rd->vb_stride);
-						gpu::bindVertexBuffer(1, m_pipeline->m_instanced_meshes_buffer, 48, 32);
-
-						gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
-
-						gpu::drawIndirect(m.mesh_rd->index_type, u32(sizeof(Indirect) * (g.indirect_offset + (&m - g.meshes.begin()))));
-					}
-				}
-			}
-			
-			gpu::bindIndirectBuffer(gpu::INVALID_BUFFER);
-			gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-			m_pipeline->m_renderer.endProfileBlock();
-		}
-
-		void setup() override {
-			PROFILE_FUNCTION();
-			jobs::wait(m_instanced_meshes->culled);
-			const u32 instanced_define_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
-			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-				for (auto& m : g.meshes) {
-					if (m.layer == m_layer) {
-						m.program = m.mesh->material->getShader()->getProgram(m.mesh->vertex_decl, instanced_define_mask | m.mesh->material->getDefineMask());
-					}
-				}
-			}
-		}
-
-		InstancedMeshes* m_instanced_meshes;
-		PipelineImpl* m_pipeline;
-		gpu::StateFlags m_render_state;
-		u32 m_define_mask;
-		u8 m_layer;
 	};
 
 	struct RenderTerrainsCommand : Renderer::RenderJob
@@ -5242,7 +5206,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderGrass);
-		REGISTER_FUNCTION(renderInstancedModels);
 		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderParticles);
 		REGISTER_FUNCTION(renderTerrains);
@@ -5322,7 +5285,7 @@ struct PipelineImpl final : Pipeline
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
-	Array<View> m_views;
+	Array<UniquePtr<View>> m_views;
 	jobs::SignalHandle m_buckets_ready;
 	Viewport m_viewport;
 	Viewport m_prev_viewport;
