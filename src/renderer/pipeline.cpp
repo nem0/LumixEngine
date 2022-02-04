@@ -3392,7 +3392,6 @@ struct PipelineImpl final : Pipeline
 			jobs::wait(m_view->buckets_ready);
 
 			const Bucket& bucket= m_view->buckets[m_bucket_id];
-
 			m_cmds = bucket.cmd_page;
 
 			jobs::wait(m_instanced_meshes->culled);
@@ -3406,8 +3405,7 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		void execute() override {
-			PROFILE_FUNCTION();
+		void drawInstancedMeshes() {
 			if (m_instanced_meshes->models.empty()) return;
 			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
 
@@ -3439,7 +3437,12 @@ struct PipelineImpl final : Pipeline
 			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 			m_pipeline->m_renderer.endProfileBlock();
+		}
 
+		void execute() override {
+			PROFILE_FUNCTION();
+
+			drawInstancedMeshes();
 			if (!m_cmds) return;
 
 			// inline in debug
