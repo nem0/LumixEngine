@@ -12,38 +12,18 @@
 #include "engine/profiler.h"
 
 
-namespace Lumix::jobs
-{
+namespace Lumix::jobs {
 
-enum { 
-	HANDLE_ID_MASK = 0xffFF,
-	HANDLE_GENERATION_MASK = 0xffFF0000 
-};
-
-
-struct Job
-{
+struct Job {
 	void (*task)(void*) = nullptr;
 	void* data = nullptr;
-	SignalHandle dec_on_finish;
-	SignalHandle precondition;
+	Signal* dec_on_finish;
 	u8 worker_index;
 };
 
-
-struct Signal {
-	volatile int value;
-	u32 generation;
-	Job next_job;
-	SignalHandle sibling;
-};
-
-
 struct WorkerTask;
 
-
-struct FiberDecl
-{
+struct FiberDecl {
 	int idx;
 	Fiber::Handle fiber = Fiber::INVALID_FIBER;
 	Job current_job;
@@ -62,19 +42,9 @@ struct System
 		, m_workers(allocator)
 		, m_job_queue(allocator)
 		, m_ready_fibers(allocator)
-		, m_signals_pool(allocator)
-		, m_free_queue(allocator)
 		, m_free_fibers(allocator)
 		, m_backup_workers(allocator)
-	{
-		m_signals_pool.resize(4096);
-		m_free_queue.resize(4096);
-		for(int i = 0; i < 4096; ++i) {
-			m_free_queue[i] = i;
-			m_signals_pool[i].sibling = jobs::INVALID_HANDLE;
-			m_signals_pool[i].generation = 0;
-		}
-	}
+	{}
 
 
 	Lumix::Mutex m_sync;
@@ -82,12 +52,10 @@ struct System
 	Array<WorkerTask*> m_workers;
 	Array<WorkerTask*> m_backup_workers;
 	Array<Job> m_job_queue;
-	Array<Signal> m_signals_pool;
 	FiberDecl m_fiber_pool[512];
 	Array<FiberDecl*> m_free_fibers;
 	Array<FiberDecl*> m_ready_fibers;
 	IAllocator& m_allocator;
-	Array<u32> m_free_queue;
 };
 
 
@@ -100,8 +68,6 @@ WorkerTask* getWorker()
 	return g_worker;
 }
 #pragma optimize( "", on )
-
-static bool isValid(SignalHandle waitable) { return waitable != INVALID_HANDLE; }
 
 struct WorkerTask : Thread
 {
@@ -152,22 +118,6 @@ struct WorkerTask : Thread
 	bool m_is_backup = false;
 };
 
-
-static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
-{
-	LUMIX_FATAL(!g_system->m_free_queue.empty());
-
-	const u32 handle = g_system->m_free_queue.back();
-	Signal& w = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
-	w.value = 1;
-	w.sibling = jobs::INVALID_HANDLE;
-	w.next_job.task = nullptr;
-	g_system->m_free_queue.pop();
-
-	return (handle & HANDLE_ID_MASK) | w.generation;
-}
-
-
 static void pushJob(const Job& job)
 {
 	if (job.worker_index != ANY_WORKER) {
@@ -185,88 +135,64 @@ static void pushJob(const Job& job)
 	}
 }
 
+struct Waitor {
+	Waitor* next;
+	FiberDecl* fiber;
+};
 
-static bool trigger(SignalHandle handle)
+template <bool ZERO>
+static bool trigger(Signal* signal)
 {
-	LUMIX_FATAL((handle & HANDLE_ID_MASK) < 4096);
-
 	Lumix::MutexGuard lock(g_system->m_sync);
-	
-	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
-	--counter.value;
-	if (counter.value > 0) return false;
 
-	SignalHandle iter = handle;
-	while (isValid(iter)) {
-		Signal& signal = g_system->m_signals_pool[iter & HANDLE_ID_MASK];
-		if(signal.next_job.task) {
-			Lumix::MutexGuard queue_lock(g_system->m_job_queue_sync);
-			pushJob(signal.next_job);
-		}
-		signal.generation = (((signal.generation >> 16) + 1) & 0xffFF) << 16;
-		g_system->m_free_queue.push((iter & HANDLE_ID_MASK) | signal.generation);
-		signal.next_job.task = nullptr;
-		iter = signal.sibling;
+	if constexpr (ZERO) {
+		signal->counter = 0;
 	}
+	else {
+		--signal->counter;
+		if (signal->counter > 0) return false;
+	}
+
+	Waitor* waitor = signal->waitor;
+	while (waitor) {
+		Waitor* next = waitor->next;
+		const u8 worker = waitor->fiber->current_job.worker_index;
+		Lumix::MutexGuard queue_lock(g_system->m_job_queue_sync);
+		if (worker == ANY_WORKER) {
+			g_system->m_ready_fibers.push(waitor->fiber);
+			for (WorkerTask* worker : g_system->m_workers) {
+				worker->wakeup();
+			}
+		}
+		else {
+			WorkerTask* worker = g_system->m_workers[waitor->fiber->current_job.worker_index % g_system->m_workers.size()];
+			worker->m_ready_fibers.push(waitor->fiber);
+			worker->wakeup();
+		}
+		waitor = next;
+	}
+	signal->waitor = nullptr;
 	return true;
 }
 
-
-static LUMIX_FORCE_INLINE bool isSignalZero(SignalHandle handle, bool lock)
-{
-	if (!isValid(handle)) return true;
-
-	const u32 gen = handle & HANDLE_GENERATION_MASK;
-	const u32 id = handle & HANDLE_ID_MASK;
-	
-	if (lock) g_system->m_sync.enter();
-	Signal& counter = g_system->m_signals_pool[id];
-	bool is_zero = counter.generation != gen || counter.value == 0;
-	if (lock) g_system->m_sync.exit();
-	return is_zero;
-}
-
-
 static LUMIX_FORCE_INLINE void runInternal(void* data
 	, void (*task)(void*)
-	, SignalHandle precondition
 	, bool do_lock
-	, SignalHandle* on_finish
+	, Signal* on_finish
 	, u8 worker_index)
 {
 	Job j;
 	j.data = data;
 	j.task = task;
 	j.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
-	j.precondition = precondition;
 
 	if (do_lock) g_system->m_sync.enter();
-	j.dec_on_finish = [&]() -> SignalHandle {
-		if (!on_finish) return INVALID_HANDLE;
-		if (isValid(*on_finish) && !isSignalZero(*on_finish, false)) {
-			++g_system->m_signals_pool[*on_finish & HANDLE_ID_MASK].value;
-			return *on_finish;
-		}
-		return allocateSignal();
-	}();
-	if (on_finish) *on_finish = j.dec_on_finish;
+	j.dec_on_finish = on_finish;
+	if (on_finish) ++on_finish->counter;
 
-	if (!isValid(precondition) || isSignalZero(precondition, false)) {
+	{
 		Lumix::MutexGuard lock(g_system->m_job_queue_sync);
 		pushJob(j);
-	}
-	else {
-		Signal& counter = g_system->m_signals_pool[precondition & HANDLE_ID_MASK];
-		if(counter.next_job.task) {
-			const SignalHandle ch = allocateSignal();
-			Signal& c = g_system->m_signals_pool[ch & HANDLE_ID_MASK];
-			c.next_job = j;
-			c.sibling = counter.sibling;
-			counter.sibling = ch;
-		}
-		else {
-			counter.next_job = j;
-		}
 	}
 
 	if (do_lock) g_system->m_sync.exit();
@@ -297,37 +223,35 @@ void enableBackupWorker(bool enable)
 	}
 }
 
-void incSignal(SignalHandle* signal)
+void setRed(Signal* signal)
 {
 	ASSERT(signal);
 	Lumix::MutexGuard lock(g_system->m_sync);
 	
-	if (isValid(*signal) && !isSignalZero(*signal, false)) {
-		++g_system->m_signals_pool[*signal & HANDLE_ID_MASK].value;
-	}
-	else {
-		*signal = allocateSignal();
-	}
+	ASSERT(signal->counter <= 1);
+	signal->counter = 1;
 }
 
 
-void decSignal(SignalHandle signal)
+void setGreen(Signal* signal)
 {
-	if (trigger(signal)) {
-		profiler::signalTriggered(signal);
+	ASSERT(signal->counter <= 1);
+	if (trigger<true>(signal)) {
+		//profiler::signalTriggered(signal);
+		// TODO
 	}
 }
 
 
-void run(void* data, void(*task)(void*), SignalHandle* on_finished)
+void run(void* data, void(*task)(void*), Signal* on_finished)
 {
-	runInternal(data, task, INVALID_HANDLE, true, on_finished, ANY_WORKER);
+	runInternal(data, task, true, on_finished, ANY_WORKER);
 }
 
 
-void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHandle precondition, u8 worker_index)
+void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 {
-	runInternal(data, task, precondition, true, on_finished, worker_index);
+	runInternal(data, task, true, on_finished, worker_index);
 }
 
 
@@ -399,14 +323,15 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 		else {
 			profiler::beginBlock("job");
 			profiler::blockColor(0x60, 0x60, 0x60);
-			if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
+			// TODO
+			/*if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
 				profiler::pushJobInfo(job.dec_on_finish, job.precondition);
-			}
+			}*/
 			this_fiber->current_job = job;
 			job.task(job.data);
             this_fiber->current_job.task = nullptr;
-			if (isValid(job.dec_on_finish)) {
-				trigger(job.dec_on_finish);
+			if (job.dec_on_finish) {
+				trigger<false>(job.dec_on_finish);
 			}
 			worker = getWorker();
 			profiler::endBlock();
@@ -495,16 +420,16 @@ void shutdown()
 	g_system.destroy();
 }
 
-static void waitEx(SignalHandle handle, bool is_mutex)
+static void waitEx(Signal* signal, bool is_mutex)
 {
 	g_system->m_sync.enter();
-	if (isSignalZero(handle, false)) {
+	if (signal->counter == 0) {
 		g_system->m_sync.exit();
 		return;
 	}
 	
 	if (!getWorker()) {
-		while (!isSignalZero(handle, false)) {
+		while (signal->counter > 0) {
 			g_system->m_sync.exit();
 			os::sleep(1);
 			g_system->m_sync.enter();
@@ -515,23 +440,12 @@ static void waitEx(SignalHandle handle, bool is_mutex)
 
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;
 
-	runInternal(this_fiber, [](void* data){
-		Lumix::MutexGuard lock(g_system->m_job_queue_sync);
-		FiberDecl* fiber = (FiberDecl*)data;
-		if (fiber->current_job.worker_index == ANY_WORKER) {
-			g_system->m_ready_fibers.push(fiber);
-			for (WorkerTask* worker : g_system->m_workers) {
-				worker->wakeup();
-			}
-		}
-		else {
-			WorkerTask* worker = g_system->m_workers[fiber->current_job.worker_index % g_system->m_workers.size()];
-			worker->m_ready_fibers.push(fiber);
-			worker->wakeup();
-		}
-	}, handle, false, nullptr, 0);
-	
-	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(handle, is_mutex);
+	Waitor waitor;
+	waitor.fiber = this_fiber;
+	waitor.next = signal->waitor;
+	signal->waitor = &waitor;
+
+	//const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(handle, is_mutex);
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();
 	if (!Fiber::isValid(new_fiber->fiber)) {
@@ -541,13 +455,8 @@ static void waitEx(SignalHandle handle, bool is_mutex)
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 	getWorker()->m_current_fiber = this_fiber;
 	g_system->m_sync.exit();
-	profiler::endFiberWait(handle, switch_data);
-	
-	#ifdef LUMIX_DEBUG
-		g_system->m_sync.enter();
-		ASSERT(isSignalZero(handle, false));
-		g_system->m_sync.exit();
-	#endif
+	//profiler::endFiberWait(handle, switch_data);
+	// TODO
 }
 
 void enter(Mutex* mutex) {
@@ -555,22 +464,22 @@ void enter(Mutex* mutex) {
 	for (;;) {
 		for (u32 i = 0; i < 400; ++i) {
 			if (compareAndExchange(&mutex->lock, 1, 0)) {
-				incSignal(&mutex->signal);
+				setRed(&mutex->signal);
 				return;
 			}
 		}
-		waitEx(mutex->signal, true);
+		waitEx(&mutex->signal, true);
 	}
 }
 
 void exit(Mutex* mutex) {
 	ASSERT(getWorker());
+	setGreen(&mutex->signal);
 	bool res = compareAndExchange(&mutex->lock, 0, 1);
 	ASSERT(res);
-	decSignal(mutex->signal);
 }
 
-void wait(SignalHandle handle) {
+void wait(Signal* handle) {
 	waitEx(handle, false);
 }
 

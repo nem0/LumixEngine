@@ -338,7 +338,7 @@ struct StudioAppImpl final : StudioApp
 			}
 
 			data->semaphore->signal();
-		}, nullptr, jobs::INVALID_HANDLE, 0);
+		}, nullptr, 0);
 		PROFILE_BLOCK("sleeping");
 		semaphore.wait();
 	}

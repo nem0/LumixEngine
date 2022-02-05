@@ -824,7 +824,7 @@ struct PipelineImpl final : Pipeline
 		CullResult* renderables = nullptr;
 		CameraParams cp;
 		u8 layer_to_bucket[255];
-		jobs::SignalHandle ready = jobs::INVALID_HANDLE;
+		jobs::Signal ready;
 	};
 
 	// converts float to u32 so it can be used in radix sort
@@ -3320,7 +3320,7 @@ struct PipelineImpl final : Pipeline
 					memcpy(g.drawcall_ub.ptr, &ub_values, sizeof(ub_values));
 				}
 			}
-			jobs::decSignal(m_view->ready);
+			jobs::setGreen(&m_view->ready);
 		}
 
 		IAllocator& m_allocator;
@@ -3413,7 +3413,7 @@ struct PipelineImpl final : Pipeline
 			job.m_init_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS0"));
 			job.m_update_lods_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("UPDATE_LODS"));
 		}
-		jobs::incSignal(&view->ready);
+		jobs::setRed(&view->ready);
 		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 
 		lua_newtable(L);
@@ -3428,7 +3428,7 @@ struct PipelineImpl final : Pipeline
 	struct RenderBucketJob : Renderer::RenderJob {
 		void setup() override {
 			PROFILE_FUNCTION();
-			jobs::wait(m_view->ready);
+			jobs::wait(&m_view->ready);
 
 			const Bucket& bucket= m_view->buckets[m_bucket_id];
 			m_cmds = bucket.cmd_page;
@@ -5289,7 +5289,7 @@ struct PipelineImpl final : Pipeline
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
 	Array<UniquePtr<View>> m_views;
-	jobs::SignalHandle m_buckets_ready;
+	jobs::Signal m_buckets_ready;
 	Viewport m_viewport;
 	Viewport m_prev_viewport;
 	bool m_first_set_viewport = true;

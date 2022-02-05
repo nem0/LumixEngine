@@ -1232,23 +1232,35 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		IAllocator& m_allocator;
 		FileSystem& m_filesystem;
 		StaticString<LUMIX_MAX_PATH> m_in_path; 
-		StaticString<LUMIX_MAX_PATH> m_out_path; 
+		StaticString<LUMIX_MAX_PATH> m_out_path;
+		TextureTileJob* m_next = nullptr;
 	};
 
+	void update() {
+		if (!m_tiles_to_create.tail) return;
+
+		TextureTileJob* job = m_tiles_to_create.tail;
+		m_tiles_to_create.tail = job->m_next;
+		if (!m_tiles_to_create.tail) m_tiles_to_create.head = nullptr;
+
+		// to keep editor responsive, we don't want to create too many tiles per frame 
+		jobs::runEx(job, &TextureTileJob::execute, nullptr, jobs::getWorkersCount() - 1);
+	}
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		if (type == Texture::TYPE && !Path::hasExtension(in_path, "ltc") && !Path::hasExtension(in_path, "raw")) {
-			IAllocator& allocator = m_app.getAllocator();
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			auto* job = LUMIX_NEW(allocator, TextureTileJob)(m_app, fs, allocator);
+			TextureTileJob* job = LUMIX_NEW(m_app.getAllocator(), TextureTileJob)(m_app, fs, m_app.getAllocator());
 			job->m_in_path = fs.getBasePath();
 			job->m_in_path << in_path;
 			job->m_out_path = fs.getBasePath();
 			job->m_out_path << out_path;
-			jobs::SignalHandle signal = jobs::INVALID_HANDLE;
-			jobs::runEx(job, &TextureTileJob::execute, &signal, m_tile_signal, jobs::getWorkersCount() - 1);
-			m_tile_signal = signal;
+			if (m_tiles_to_create.head) m_tiles_to_create.head->m_next = job;
+			else {
+				m_tiles_to_create.tail = job;
+			}
+			m_tiles_to_create.head = job;
 			return true;
 		}
 		return false;
@@ -1790,11 +1802,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getName() const override { return "Texture"; }
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
-
 	StudioApp& m_app;
+	struct {
+		TextureTileJob* head = nullptr;
+		TextureTileJob* tail = nullptr;
+	} m_tiles_to_create;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
-	jobs::SignalHandle m_tile_signal = jobs::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
 	CompositeTexture m_composite;
@@ -1896,7 +1910,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
-		jobs::wait(m_subres_signal);
+		jobs::wait(&m_subres_signal);
 		auto& engine = m_app.getEngine();
 		engine.destroyUniverse(*m_universe);
 		m_pipeline.reset();
@@ -1998,7 +2012,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 
 			LUMIX_DELETE(plugin->m_app.getAllocator(), data);
-		}, &m_subres_signal, jobs::INVALID_HANDLE, 2);			
+		}, &m_subres_signal, 2);			
 	}
 
 	static const char* getResourceFilePath(const char* str)
@@ -2926,7 +2940,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	int m_captured_mouse_y;
 	TexturePlugin* m_texture_plugin;
 	FBXImporter m_fbx_importer;
-	jobs::SignalHandle m_subres_signal = jobs::INVALID_HANDLE;
+	jobs::Signal m_subres_signal;
 };
 
 
@@ -3398,7 +3412,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			logError(m_ibl_filter_shader->getPath(), "is not ready");
 			return;
 		}
-		jobs::SignalHandle finished = jobs::INVALID_HANDLE;
+		jobs::Signal finished;
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
@@ -3477,8 +3491,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		jobs::runEx(&lambda, [](void* data){
 			auto* l = ((decltype(lambda)*)data);
 			(*l)();
-		}, &finished, jobs::INVALID_HANDLE, 1);
-		jobs::wait(finished);
+		}, &finished, 1);
+		jobs::wait(&finished);
 	}
 
 	void processData(ProbeJob& job) {
