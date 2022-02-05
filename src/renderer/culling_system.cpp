@@ -322,14 +322,13 @@ struct CullingSystemImpl final : CullingSystem
 	
 	CullResult* cullInternal(const ShiftedFrustum& frustum, u8 type)
 	{
-		PROFILE_FUNCTION();
 		if (m_cells.empty()) return nullptr;
 
 		volatile i32 cell_idx = 0;
 		PagedList<CullResult> list(m_page_allocator);
 
 		jobs::runOnWorkers([&](){
-			PROFILE_BLOCK("cull_job");
+			PROFILE_BLOCK("culling");
 			const Vec3 v3_cell_size(m_cell_size);
 			const Vec3 v3_2_cell_size(2 * m_cell_size);
 			CullResult* result = nullptr;

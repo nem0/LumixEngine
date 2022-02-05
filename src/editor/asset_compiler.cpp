@@ -6,6 +6,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/atomic.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/job_system.h"
