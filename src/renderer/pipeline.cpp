@@ -2708,11 +2708,7 @@ struct PipelineImpl final : Pipeline
 				(m_pipeline->m_viewport.w + 63) / 64,
 				(m_pipeline->m_viewport.h + 63) / 64,
 				16 };
-			Array<ClusterPointLight>& point_lights = m_point_lights;
-			Array<ClusterEnvProbe>& env_probes = m_env_probes;
-			Array<ClusterReflProbe>& refl_probes = m_refl_probes;
 			Array<Cluster>& clusters = m_clusters;
-			Array<i32>& map = m_map;
 			clusters.resize(size.x * size.y * size.z);
 			for (Cluster& cluster : clusters) {
 				cluster.point_lights_count = 0;
@@ -2720,8 +2716,15 @@ struct PipelineImpl final : Pipeline
 				cluster.refl_probes_count = 0;
 			}
 
+			m_shadow_matrices_ub = m_pipeline->m_renderer.allocUniform(sizeof(m_shadow_atlas_matrices));
+			memcpy(m_shadow_matrices_ub.ptr, &m_shadow_atlas_matrices, sizeof(m_shadow_atlas_matrices));
+
 			if (m_is_clear) return;
 
+			Array<ClusterPointLight>& point_lights = m_point_lights;
+			Array<ClusterEnvProbe>& env_probes = m_env_probes;
+			Array<ClusterReflProbe>& refl_probes = m_refl_probes;
+			Array<i32>& map = m_map;
 			RenderScene* scene = m_pipeline->m_scene;
 			const DVec3 cam_pos = m_camera_params.pos;
 			Universe& universe = scene->getUniverse();
@@ -2939,9 +2942,6 @@ struct PipelineImpl final : Pipeline
 			for (Cluster& cluster : clusters) {
 				cluster.offset -= cluster.point_lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
-
-			m_shadow_matrices_ub = m_pipeline->m_renderer.allocUniform(sizeof(m_shadow_atlas_matrices));
-			memcpy(m_shadow_matrices_ub.ptr, &m_shadow_atlas_matrices, sizeof(m_shadow_atlas_matrices));
 		}
 
 		void execute() override {
