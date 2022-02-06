@@ -746,7 +746,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			if (uvs) writeUV(uvs[i], &import_mesh.vertex_data);
 			if (colors) {
 				if (cfg.vertex_color_is_ao) {
-					const u8 ao = u8(colors[i].x * 255.f + 0.5f);
+					const u8 ao[4] = { u8(colors[i].x * 255.f + 0.5f) };
 					import_mesh.vertex_data.write(ao);
 				} else {
 					writeColor(colors[i], &import_mesh.vertex_data);
@@ -1720,7 +1720,7 @@ int FBXImporter::getVertexSize(const ofbx::Geometry& geom, bool is_skinned, cons
 	static const int TANGENT_SIZE = sizeof(u8) * 4;
 	static const int UV_SIZE = sizeof(float) * 2;
 	static const int COLOR_SIZE = sizeof(u8) * 4;
-	static const int AO_SIZE = sizeof(u8);
+	static const int AO_SIZE = sizeof(u8) * 4;
 	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
 	int size = POSITION_SIZE + NORMAL_SIZE;
 
@@ -2059,7 +2059,7 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 			if (cfg.vertex_color_is_ao) {
 				write(Mesh::AttributeSemantic::AO);
 				write(gpu::AttributeType::U8);
-				write((u8)1);
+				write((u8)4); // 1+3 because of padding
 			}
 			else {
 				write(Mesh::AttributeSemantic::COLOR0);
