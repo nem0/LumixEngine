@@ -226,19 +226,72 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 	}
 
+	LUMIX_FORCE_INLINE void rasterizeModel(Model* model
+		, const Transform& tr
+		, const AABB& zone_aabb
+		, const Transform& inv_zone_tr
+		, u32 no_navigation_flag
+		, u32 nonwalkable_flag
+		, rcContext& ctx
+		, rcHeightfield& solid)
+	{
+		ASSERT(model->isReady());
+
+		AABB model_aabb = model->getAABB();
+		const Transform rel_tr = inv_zone_tr * tr;
+		Matrix mtx = rel_tr.rot.toMatrix();
+		mtx.setTranslation(Vec3(rel_tr.pos));
+		mtx.multiply3x3(rel_tr.scale);
+		model_aabb.transform(mtx);
+		if (!model_aabb.overlaps(zone_aabb)) return;;
+		const float walkable_threshold = cosf(degreesToRadians(45));
+
+		auto lod = model->getLODIndices()[0];
+		for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+			Mesh& mesh = model->getMesh(mesh_idx);
+			bool is16 = mesh.areIndices16();
+
+			if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
+			bool is_walkable = !mesh.material->isCustomFlag(nonwalkable_flag);
+			auto* vertices = &mesh.vertices[0];
+			if (is16) {
+				const u16* indices16 = (const u16*)mesh.indices.data();
+				for (i32 i = 0; i < (i32)mesh.indices.size() / 2; i += 3) {
+					Vec3 a = mtx.transformPoint(vertices[indices16[i]]);
+					Vec3 b = mtx.transformPoint(vertices[indices16[i + 1]]);
+					Vec3 c = mtx.transformPoint(vertices[indices16[i + 2]]);
+
+					Vec3 n = normalize(cross(a - b, a - c));
+					u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
+					rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+				}
+			}
+			else {
+				const u32* indices32 = (const u32*)mesh.indices.data();
+				for (i32 i = 0; i < (i32)mesh.indices.size() / 4; i += 3) {
+					Vec3 a = mtx.transformPoint(vertices[indices32[i]]);
+					Vec3 b = mtx.transformPoint(vertices[indices32[i + 1]]);
+					Vec3 c = mtx.transformPoint(vertices[indices32[i + 2]]);
+
+					Vec3 n = normalize(cross(a - b, a - c));
+					u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
+					rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+				}
+			}
+		}
+	}
 
 	void rasterizeMeshes(const Transform& zone_tr, const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
 		PROFILE_FUNCTION();
-		const float walkable_threshold = cosf(degreesToRadians(45));
 
 		const Transform inv_zone_tr = zone_tr.inverted();
 
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
 		if (!render_scene) return;
 
-		u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
-		u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
+		const u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
+		const u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
 		for (EntityPtr model_instance = render_scene->getFirstModelInstance(); 
 			model_instance.isValid();
 			model_instance = render_scene->getNextModelInstance(model_instance))
@@ -246,49 +299,41 @@ struct NavigationSceneImpl final : NavigationScene
 			const EntityRef entity = (EntityRef)model_instance;
 			auto* model = render_scene->getModelInstanceModel(entity);
 			if (!model) return;
-			ASSERT(model->isReady());
-
+		
 			const Transform tr = m_universe.getTransform(entity);
-			AABB model_aabb = model->getAABB();
-			const Transform rel_tr = inv_zone_tr * tr;
-			Matrix mtx = rel_tr.rot.toMatrix();
-			mtx.setTranslation(Vec3(rel_tr.pos));
-			mtx.multiply3x3(rel_tr.scale);
-			model_aabb.transform(mtx);
-			if (!model_aabb.overlaps(aabb)) continue;
+			rasterizeModel(model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
+		}
 
-			auto lod = model->getLODIndices()[0];
-			for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-				Mesh& mesh = model->getMesh(mesh_idx);
-				bool is16 = mesh.areIndices16();
+		const HashMap<EntityRef, InstancedModel>& ims = render_scene->getInstancedModels();
+		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+			const InstancedModel& im = iter.value();
+			if (!im.model) continue;
+			if (!im.model->isReady()) {
+				logWarning("Skipping ", im.model->getPath(), " because it is not ready.");
+				continue;
+			}
 
-				if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
-				bool is_walkable = !mesh.material->isCustomFlag(nonwalkable_flag);
-				auto* vertices = &mesh.vertices[0];
-				if (is16) {
-					const u16* indices16 = (const u16*)mesh.indices.data();
-					for (i32 i = 0; i < (i32)mesh.indices.size() / 2; i += 3) {
-						Vec3 a = mtx.transformPoint(vertices[indices16[i]]);
-						Vec3 b = mtx.transformPoint(vertices[indices16[i + 1]]);
-						Vec3 c = mtx.transformPoint(vertices[indices16[i + 2]]);
-
-						Vec3 n = normalize(cross(a - b, a - c));
-						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
-						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
-					}
+			bool all_meshes_no_nav = true;
+			for (i32 i = 0; i < im.model->getMeshCount(); ++i) {
+				if (!im.model->getMesh(i).material->isCustomFlag(no_navigation_flag)) {
+					all_meshes_no_nav = false;
+					break;
 				}
-				else {
-					const u32* indices32 = (const u32*)mesh.indices.data();
-					for (i32 i = 0; i < (i32)mesh.indices.size() / 4; i += 3) {
-						Vec3 a = mtx.transformPoint(vertices[indices32[i]]);
-						Vec3 b = mtx.transformPoint(vertices[indices32[i + 1]]);
-						Vec3 c = mtx.transformPoint(vertices[indices32[i + 2]]);
+			}
 
-						Vec3 n = normalize(cross(a - b, a - c));
-						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
-						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
-					}
-				}
+			if (all_meshes_no_nav) continue;
+
+			Transform im_tr = m_universe.getTransform(iter.key());
+			im_tr.rot = Quat::IDENTITY;
+			im_tr.scale = 1;
+			for (const InstancedModel::InstanceData& i : im.instances) {
+				Transform tr;
+				tr.pos = DVec3(i.pos);
+				tr.rot = Quat(i.rot_quat.x, i.rot_quat.y, i.rot_quat.z, 0);
+				tr.rot.w = sqrtf(1 - dot(i.rot_quat, i.rot_quat));
+				tr.scale = i.scale;
+				tr = im_tr * tr;
+				rasterizeModel(im.model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
 			}
 		}
 	}
