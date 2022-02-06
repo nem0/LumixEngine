@@ -135,7 +135,7 @@ namespace ImGuiEx {
 
 	ImVec2 GetOsImePosRequest()
 	{
-		return GetCurrentContext()->PlatformImePos;
+		return GetCurrentContext()->PlatformImeData.InputPos;
 	}
 
 
