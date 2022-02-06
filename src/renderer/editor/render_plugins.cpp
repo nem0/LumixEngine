@@ -1232,23 +1232,35 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		IAllocator& m_allocator;
 		FileSystem& m_filesystem;
 		StaticString<LUMIX_MAX_PATH> m_in_path; 
-		StaticString<LUMIX_MAX_PATH> m_out_path; 
+		StaticString<LUMIX_MAX_PATH> m_out_path;
+		TextureTileJob* m_next = nullptr;
 	};
 
+	void update() {
+		if (!m_tiles_to_create.tail) return;
+
+		TextureTileJob* job = m_tiles_to_create.tail;
+		m_tiles_to_create.tail = job->m_next;
+		if (!m_tiles_to_create.tail) m_tiles_to_create.head = nullptr;
+
+		// to keep editor responsive, we don't want to create too many tiles per frame 
+		jobs::runEx(job, &TextureTileJob::execute, nullptr, jobs::getWorkersCount() - 1);
+	}
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		if (type == Texture::TYPE && !Path::hasExtension(in_path, "ltc") && !Path::hasExtension(in_path, "raw")) {
-			IAllocator& allocator = m_app.getAllocator();
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			auto* job = LUMIX_NEW(allocator, TextureTileJob)(m_app, fs, allocator);
+			TextureTileJob* job = LUMIX_NEW(m_app.getAllocator(), TextureTileJob)(m_app, fs, m_app.getAllocator());
 			job->m_in_path = fs.getBasePath();
 			job->m_in_path << in_path;
 			job->m_out_path = fs.getBasePath();
 			job->m_out_path << out_path;
-			jobs::SignalHandle signal = jobs::INVALID_HANDLE;
-			jobs::runEx(job, &TextureTileJob::execute, &signal, m_tile_signal, jobs::getWorkersCount() - 1);
-			m_tile_signal = signal;
+			if (m_tiles_to_create.head) m_tiles_to_create.head->m_next = job;
+			else {
+				m_tiles_to_create.tail = job;
+			}
+			m_tiles_to_create.head = job;
 			return true;
 		}
 		return false;
@@ -1790,11 +1802,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getName() const override { return "Texture"; }
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
-
 	StudioApp& m_app;
+	struct {
+		TextureTileJob* head = nullptr;
+		TextureTileJob* tail = nullptr;
+	} m_tiles_to_create;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
-	jobs::SignalHandle m_tile_signal = jobs::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
 	CompositeTexture m_composite;
@@ -1874,7 +1888,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool use_mikktspace = false;
 		bool force_skin = false;
 		bool import_vertex_colors = false;
-		bool bake_vertex_ao = false;
+		bool vertex_color_is_ao = false;
 		u8 autolod_mask = 0;
 		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
 		float lods_distances[4] = { -1, -1, -1, -1 };
@@ -1896,7 +1910,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
-		jobs::wait(m_subres_signal);
+		jobs::wait(&m_subres_signal);
 		auto& engine = m_app.getEngine();
 		engine.destroyUniverse(*m_universe);
 		m_pipeline.reset();
@@ -1928,15 +1942,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &meta.bake_impostor_normals);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &meta.vertex_color_is_ao);
 			
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &meta.autolod_coefs[0])) meta.autolod_mask |= 1;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &meta.autolod_coefs[1])) meta.autolod_mask |= 2;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &meta.autolod_coefs[2])) meta.autolod_mask |= 4;
 
+			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "bake_vertex_ao") != LUA_TNIL) logWarning(path, ": `bake_vertex_ao` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
-			lua_pop(L, 2);
+			lua_pop(L, 3);
 
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
@@ -1953,29 +1968,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return meta;
 	}
 
-	void addSubresources(AssetCompiler& compiler, const char* path) override {
-		compiler.addResource(Model::TYPE, path);
+	void addSubresources(AssetCompiler& compiler, const char* _path) override {
+		compiler.addResource(Model::TYPE, _path);
 
-		const Meta meta = getMeta(Path(path));
-		struct JobData {
-			ModelPlugin* plugin;
-			StaticString<LUMIX_MAX_PATH> path;
-			Meta meta;
-		};
-		JobData* data = LUMIX_NEW(m_app.getAllocator(), JobData);
-		data->plugin = this;
-		data->path = path;
-		data->meta = meta;
-		jobs::runEx(data, [](void* ptr) {
-			JobData* data = (JobData*)ptr;
-			ModelPlugin* plugin = data->plugin;
-			FBXImporter importer(plugin->m_app);
-			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
+		const Meta meta = getMeta(Path(_path));
+		StaticString<LUMIX_MAX_PATH> pathstr = _path;
+		jobs::runLambda([this, pathstr, meta]() {
+			FBXImporter importer(m_app);
+			AssetCompiler& compiler = m_app.getAssetCompiler();
 
-			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path.data;
+			const char* path = pathstr[0] == '/' ? pathstr.data + 1 : pathstr.data;
 			importer.setSource(path, true, false);
 
-			if(data->meta.split) {
+			if(meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
 				for (int i = 0; i < meshes.size(); ++i) {
 					char mesh_name[256];
@@ -1985,7 +1990,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 
-			if (data->meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
 				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
 				ResourceType physics_geom("physics");
 				compiler.addResource(physics_geom, tmp);
@@ -1996,9 +2001,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
 				compiler.addResource(ResourceType("animation"), tmp);
 			}
-
-			LUMIX_DELETE(plugin->m_app.getAllocator(), data);
-		}, &m_subres_signal, jobs::INVALID_HANDLE, 2);			
+		}, &m_subres_signal, 2);			
 	}
 
 	static const char* getResourceFilePath(const char* str)
@@ -2021,7 +2024,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
-		cfg.bake_vertex_ao = meta.bake_vertex_ao;
+		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathInfo src_info(filepath);
@@ -2474,8 +2477,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			ImGuiEx::Label("Import vertex colors");
 			ImGui::Checkbox("##vercol", &m_meta.import_vertex_colors);
-			ImGuiEx::Label("Bake vertex AO");
-			ImGui::Checkbox("##verao", &m_meta.bake_vertex_ao);
+			if (m_meta.import_vertex_colors) {
+				ImGuiEx::Label("Vertex color is AO");
+				ImGui::Checkbox("##verao", &m_meta.vertex_color_is_ao);
+			}
 			
 			ImGuiEx::Label("Physics");
 			if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
@@ -2525,7 +2530,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
 					.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
 					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
-					.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true" : "false");
+					.cat("\nvertex_color_is_ao = ").cat(m_meta.vertex_color_is_ao ? "true" : "false");
 
 				if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
 				if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);
@@ -2845,6 +2850,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
+		if (!m_tile.pipeline->getOutput()) {
+			logError("Could not create ", model->getPath(), " thumbnail");
+			model->decRefCount();
+			m_tile.frame_countdown = -1;
+			return;
+		}
 
 		Renderer::MemRef mem;
 		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_final");
@@ -2920,7 +2931,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	int m_captured_mouse_y;
 	TexturePlugin* m_texture_plugin;
 	FBXImporter m_fbx_importer;
-	jobs::SignalHandle m_subres_signal = jobs::INVALID_HANDLE;
+	jobs::Signal m_subres_signal;
 };
 
 
@@ -3285,9 +3296,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
 		captureCubemap(m_app, job.universe, *m_pipeline, texture_size, job.position, job.data, [&job](){
-			jobs::run(&job, [](void* ptr) {
-				ProbeJob* pjob = (ProbeJob*)ptr;
-				pjob->plugin.processData(*pjob);
+			jobs::runLambda([&job]() {
+				job.plugin.processData(job);
 			}, nullptr);
 
 		});
@@ -3392,11 +3402,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			logError(m_ibl_filter_shader->getPath(), "is not ready");
 			return;
 		}
-		jobs::SignalHandle finished = jobs::INVALID_HANDLE;
+		jobs::Signal finished;
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		auto lambda = [&](){
+		// TODO RenderJob
+		jobs::runLambda([&](){
 			renderer->beginProfileBlock("radiance_filter", 0);
 			gpu::TextureHandle src = gpu::allocTextureHandle();
 			gpu::TextureHandle dst = gpu::allocTextureHandle();
@@ -3465,14 +3476,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			gpu::destroy(buf);
 			gpu::destroy(src);
 			gpu::destroy(dst);
-		};
-		
-		// TODO RenderJob
-		jobs::runEx(&lambda, [](void* data){
-			auto* l = ((decltype(lambda)*)data);
-			(*l)();
-		}, &finished, jobs::INVALID_HANDLE, 1);
-		jobs::wait(finished);
+		}, &finished, 1);
+		jobs::wait(&finished);
 	}
 
 	void processData(ProbeJob& job) {

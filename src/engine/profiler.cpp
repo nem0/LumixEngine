@@ -425,44 +425,46 @@ void beforeFiberSwitch()
 }
 
 
-void pushJobInfo(u32 signal_on_finish, u32 precondition)
+void pushJobInfo(i32 signal_on_finish)
 {
 	JobRecord r;
 	r.signal_on_finish = signal_on_finish;
-	r.precondition = precondition;
 	ThreadContext* ctx = g_instance.getThreadContext();
 	write(*ctx, EventType::JOB_INFO, r);
 }
 
-void signalTriggered(u32 job_system_signal) {
+void signalTriggered(i32 job_system_signal) {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	write(*ctx, EventType::SIGNAL_TRIGGERED, job_system_signal);
 }
 
 
-FiberSwitchData beginFiberWait(u32 job_system_signal)
+FiberSwitchData beginFiberWait(i32 job_system_signal, bool is_mutex)
 {
 	FiberWaitRecord r;
 	r.id = atomicIncrement(&g_instance.fiber_wait_id);
 	r.job_system_signal = job_system_signal;
+	r.is_mutex = is_mutex;
 
 	FiberSwitchData res;
 
 	ThreadContext* ctx = g_instance.getThreadContext();
 	res.count = ctx->open_blocks.size();
 	res.id = r.id;
+	res.signal = job_system_signal;
 	memcpy(res.blocks, ctx->open_blocks.begin(), minimum(res.count, lengthOf(res.blocks)) * sizeof(res.blocks[0]));
 	write(*ctx, EventType::BEGIN_FIBER_WAIT, r);
 	return res;
 }
 
 
-void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data)
+void endFiberWait(const FiberSwitchData& switch_data)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	FiberWaitRecord r;
 	r.id = switch_data.id;
-	r.job_system_signal = job_system_signal;
+	r.job_system_signal = switch_data.signal;
+	r.is_mutex = false;
 
 	write(*ctx, EventType::END_FIBER_WAIT, r);
 	const u32 count = switch_data.count;

@@ -34,7 +34,7 @@ struct FBXImporter
 		bool create_impostor = false;
 		bool mikktspace_tangents = false;
 		bool import_vertex_colors = true;
-		bool bake_vertex_ao = false;
+		bool vertex_color_is_ao = false;
 		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
 		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };

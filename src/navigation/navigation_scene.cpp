@@ -1270,7 +1270,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 	struct NavmeshBuildJobImpl : NavmeshBuildJob {
 		~NavmeshBuildJobImpl() {
-			jobs::wait(signal);
+			jobs::wait(&signal);
 		}
 
 		bool isFinished() override {
@@ -1282,31 +1282,25 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 
 		void pushJob() {
-			jobs::run(this, [](void* user_ptr){
-				NavmeshBuildJobImpl* that = (NavmeshBuildJobImpl*)user_ptr;
-				const i32 i = atomicIncrement(&that->counter) - 1;
-				if (i >= that->total) {
-					jobs::decSignal(that->signal);
+			jobs::runLambda([this](){
+				const i32 i = atomicIncrement(&counter) - 1;
+				if (i >= total) {
 					return;
 				}
 
-				if (!that->scene->generateTile(*that->zone, that->zone_entity, i % that->zone->m_num_tiles_x, i / that->zone->m_num_tiles_x, false, that->mutex)) {
-					atomicIncrement(&that->fail_counter);
+				if (!scene->generateTile(*zone, zone_entity, i % zone->m_num_tiles_x, i / zone->m_num_tiles_x, false, mutex)) {
+					atomicIncrement(&fail_counter);
 				}
 				else {
-					atomicIncrement(&that->done_counter);
+					atomicIncrement(&done_counter);
 				}
 
-				that->pushJob();
-			}, nullptr);
+				pushJob();
+			}, &signal);
 		}
 
 		void run() {
 			total = zone->m_num_tiles_x * zone->m_num_tiles_z;
-			signal = jobs::INVALID_HANDLE;
-			for (u8 i = 0; i < jobs::getWorkersCount() - 1; ++i) {
-				jobs::incSignal(&signal);
-			}
 			for (u8 i = 0; i < jobs::getWorkersCount() - 1; ++i) {
 				pushJob();
 			}
@@ -1321,7 +1315,7 @@ struct NavigationSceneImpl final : NavigationScene
 		EntityRef zone_entity;
 		NavigationSceneImpl* scene;
 
-		jobs::SignalHandle signal;
+		jobs::Signal signal;
 	};
 
 	NavmeshBuildJob* generateNavmesh(EntityRef zone_entity) override {

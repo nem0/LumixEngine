@@ -17,6 +17,7 @@
 	#define FLT_MIN			1.175494351e-38F
 	#define NULL			0
 	#define PRId64			"lld"
+	#define PRIx64			"llx"
 
 	extern "C" {
 		typedef char* va_list;

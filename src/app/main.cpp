@@ -296,7 +296,7 @@ int main(int args, char* argv[])
 		data->app.shutdown();
 
 		data->semaphore.signal();
-	}, nullptr, jobs::INVALID_HANDLE, 0);
+	}, nullptr, 0);
 	
 	PROFILE_BLOCK("sleeping");
 	data.semaphore.wait();

@@ -490,8 +490,7 @@ struct ProfilerUIImpl final : ProfilerUI
 
 	struct Block {
 		Block() {
-			job_info.signal_on_finish = jobs::INVALID_HANDLE;
-			job_info.precondition = jobs::INVALID_HANDLE;
+			job_info.signal_on_finish = 0;
 		}
 
 		const char* name;
@@ -521,12 +520,31 @@ struct ProfilerUIImpl final : ProfilerUI
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_show_frames = true;
+	
 	struct {
-		u32 signal;
-		float x, y;
-		bool is_current_pos = false;
-	} hovered_signal;
-	i64 hovered_link = 0;
+		u32 frame = 0;
+		i64 link;
+	} hovered_link;
+
+	struct {
+		u32 frame = 0;
+		i32 id = 0;
+		ImVec2 pos;
+		i32 signal = 0;
+	} hovered_fiber_wait;
+
+	struct {
+		u32 frame = 0;
+		i32 signal = 0;
+		ImVec2 pos;
+	} hovered_signal_trigger;
+
+	struct {
+		u32 frame = 0;
+		i32 signal = 0;
+		ImVec2 pos;
+	} hovered_job;
+
 	HashMap<i32, Block> m_blocks;
 	profiler::GPUMemStatsBlock m_gpu_mem_stats;
 	bool m_is_gpu_mem_stats_valid = false;
@@ -823,6 +841,9 @@ static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 
 void ProfilerUIImpl::onGUICPUProfiler()
 {
+	static u32 frame_id = 0;
+	++frame_id;
+
 	if (!ImGui::CollapsingHeader("CPU/GPU")) return;
 
 	if (m_autopause > 0 && !m_is_paused && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
@@ -895,14 +916,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	const float from_y = ImGui::GetCursorScreenPos().y;
 	const float to_x = from_x + ImGui::GetContentRegionAvail().x;
 	ImDrawList* dl = ImGui::GetWindowDrawList();
+	dl->ChannelsSplit(2);
 
 	auto getThreadName = [&](u32 thread_id){
 		auto iter = m_threads.find(thread_id);
 		return iter.isValid() ? iter.value().name : "Unknown";
 	};
-	bool any_hovered_signal = false;
-	bool any_hovered_link = false;
-	bool hovered_signal_current_pos = false;
 
 	forEachThread([&](const ThreadContextProxy& ctx) {
 		if (ctx.thread_id == 0) return;
@@ -934,28 +953,38 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		} properties[64];
 		int properties_count = 0;
 
-		auto draw_triggered_signal = [&](u64 time, u32 signal) {
+		auto draw_triggered_signal = [&](u64 time, i32 signal) {
 			const float t_start = float(int(time - view_start) / double(m_range));
 			const float x = from_x * (1 - t_start) + to_x * t_start;
 			
-			if (hovered_signal.signal == signal && hovered_signal.signal != jobs::INVALID_HANDLE && hovered_signal.is_current_pos) {
-				dl->AddLine(ImVec2(x, y), ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff0000ff);
+			if (hovered_fiber_wait.signal == signal && hovered_fiber_wait.frame > frame_id - 2) {
+				dl->ChannelsSetCurrent(1);
+				dl->AddLine(hovered_fiber_wait.pos, ImVec2(x, y), 0xff0000ff);
+				dl->ChannelsSetCurrent(0);
 			}
 
 			if (time > m_end || time < view_start) return;
 			dl->AddTriangle(ImVec2(x - 2, y), ImVec2(x + 2, y - 2), ImVec2(x + 2, y + 2), 0xffffff00);
 			if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
 				ImGui::BeginTooltip();
-				ImGui::Text("Signal triggered: %d", signal);
-
-				any_hovered_signal = true;
-				hovered_signal.signal = signal;
-
+				ImGui::Text("Signal triggered: %" PRIx64, (u64)signal);
 				ImGui::EndTooltip();
+
+				hovered_signal_trigger.signal = signal;
+				hovered_signal_trigger.frame = frame_id;
+				hovered_signal_trigger.pos = ImVec2(x, y);
 			}
 		};
 
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
+			const Block& block = m_blocks[open_blocks[level].id];
+			if (hovered_fiber_wait.signal == block.job_info.signal_on_finish && hovered_fiber_wait.frame > frame_id - 2) {
+				const float t_start = float(int(from - view_start) / double(m_range));
+				const float x_start = from_x * (1 - t_start) + to_x * t_start;
+				dl->ChannelsSetCurrent(1);
+				dl->AddLine(hovered_fiber_wait.pos, ImVec2(x_start, y), 0xff0000ff);
+				dl->ChannelsSetCurrent(0);
+			}
 			if (from > m_end || to < view_start) return;
 
 			const float t_start = float(int(from - view_start) / double(m_range));
@@ -967,18 +996,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			const float w = ImGui::CalcTextSize(name).x;
 
 			const u32 alpha = m_filter[0] && stristr(name, m_filter) == 0 ? 0x2000'0000 : 0xff00'0000;
+			if (hovered_link.link == block.link && hovered_link.frame > frame_id - 2) color = 0xff0000ff;
 			color = alpha | (color & 0x00ffffff);
 			u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
 			border_color = alpha | (border_color & 0x00ffffff);
 
 			const ImVec2 ra(x_start, block_y);
 			const ImVec2 rb(x_end, block_y + 19);
-			if (hovered_signal.signal == m_blocks[open_blocks[level].id].job_info.signal_on_finish
-				&& hovered_signal.signal != jobs::INVALID_HANDLE
-				&& hovered_signal.is_current_pos)
-			{
-				dl->AddLine(ra, ImVec2(hovered_signal.x, hovered_signal.y - 2), 0x000000ff | alpha);
-			}
 
 			dl->AddRectFilled(ra, rb, color);
 			if (x_end - x_start > 2) {
@@ -992,20 +1016,16 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				const float t = 1000 * float((to - from) / double(freq));
 				ImGui::BeginTooltip();
 				ImGui::Text("%s (%.3f ms)", name, t);
-				const Block& block = m_blocks[open_blocks[level].id];
 				if (block.link) {
 					ImGui::Text("Link: %" PRId64, block.link);
-						
-					any_hovered_link = true;
-					hovered_link = block.link;
+					hovered_link.frame = frame_id;
+					hovered_link.link = block.link;
 				}
-				if (block.job_info.signal_on_finish != jobs::INVALID_HANDLE) {
-					any_hovered_signal = true;
-					hovered_signal.signal = block.job_info.signal_on_finish;
-					ImGui::Text("Signal on finish: %d", block.job_info.signal_on_finish);
-				}
-				if (block.job_info.precondition != jobs::INVALID_HANDLE) {
-					ImGui::Text("Precondition signal: %d", block.job_info.precondition);
+				if (block.job_info.signal_on_finish) {
+					ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
+					hovered_job.frame = frame_id;
+					hovered_job.pos = ImVec2(x_start, block_y);
+					hovered_job.signal = block.job_info.signal_on_finish;
 				}
 				for (int i = 0; i < properties_count; ++i) {
 					if (properties[i].level != level) continue;
@@ -1040,38 +1060,45 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				const bool is_begin = header.type == profiler::EventType::BEGIN_FIBER_WAIT;
 				profiler::FiberWaitRecord r;
 				read(ctx, p + sizeof(profiler::EventHeader), r);
-				if (r.job_system_signal == hovered_signal.signal) {
-					float t = float((header.time - view_start) / double(m_range));
-					if (header.time < view_start) {
-						t = -float((view_start - header.time) / double(m_range));
-					}
-					const float x = from_x * (1 - t) + to_x * t;
-					if (hovered_signal.is_current_pos && (x != hovered_signal.x || y != hovered_signal.y)) {
-						dl->AddLine(ImVec2(x, y - 2), ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff00ff00);
-					}
+				
+				const float t = view_start <= header.time
+					? float((header.time - view_start) / double(m_range))
+					: -float((view_start - header.time) / double(m_range));
+				const float x = from_x * (1 - t) + to_x * t;
+
+				if (hovered_job.signal == r.job_system_signal && hovered_job.frame > frame_id - 2) {
+					dl->ChannelsSetCurrent(1);
+					dl->AddLine(ImVec2(x, y - 2), hovered_job.pos, 0xff0000ff);
+					dl->ChannelsSetCurrent(0);
 				}
-				if (header.time >= view_start && header.time <= m_end || is_begin && hovered_signal.signal == r.job_system_signal) {
-					const float t = view_start <= header.time
-						? float((header.time - view_start) / double(m_range))
-						: -float((view_start - header.time) / double(m_range));
-					const float x = from_x * (1 - t) + to_x * t;
-					const u32 color = header.type == profiler::EventType::END_FIBER_WAIT ? 0xffff0000 : 0xff00ff00;
+
+				if (hovered_fiber_wait.id == r.id && hovered_fiber_wait.frame > frame_id - 2) {
+					dl->ChannelsSetCurrent(1);
+					dl->AddLine(ImVec2(x, y - 2), hovered_fiber_wait.pos, 0xff00ff00);
+					dl->ChannelsSetCurrent(0);
+				}
+
+				if (hovered_signal_trigger.signal == r.job_system_signal && hovered_signal_trigger.frame > frame_id - 2) {
+					dl->ChannelsSetCurrent(1);
+					dl->AddLine(ImVec2(x, y - 2), hovered_signal_trigger.pos, 0xff0000ff);
+					dl->ChannelsSetCurrent(0);
+				}
+
+				if (header.time >= view_start && header.time <= m_end) {
+					const u32 color = r.is_mutex ? 0xff0000ff : is_begin ? 0xff00ff00 : 0xffff0000;
 					dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
 					const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
-					if (mouse_hovered || (is_begin && hovered_signal.signal == r.job_system_signal)) {
-						hovered_signal.signal = r.job_system_signal;
-						hovered_signal.x = x;
-						hovered_signal.y = y;
-						hovered_signal.is_current_pos = true;
-						hovered_signal_current_pos = true;
-						if (mouse_hovered) {
-							any_hovered_signal = true;
-							ImGui::BeginTooltip();
-							ImGui::Text("Fiber switch");
-							ImGui::Text("  Switch ID: %d", r.id);
-							ImGui::Text("  Waiting for signal: %d", r.job_system_signal);
-							ImGui::EndTooltip();
-						}
+					if (mouse_hovered) {
+						hovered_fiber_wait.frame = frame_id;
+						hovered_fiber_wait.id = r.id;
+						hovered_fiber_wait.pos = ImVec2(x, y);
+						hovered_fiber_wait.signal = r.job_system_signal;
+
+						ImGui::BeginTooltip();
+						ImGui::Text("Fiber wait");
+						ImGui::Text("  Wait ID: %d", r.id);
+						ImGui::Text("  Waiting for signal: %" PRIx64, (u64)r.job_system_signal);
+						ImGui::EndTooltip();
 					}
 				}
 				break;
@@ -1103,7 +1130,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			}
 			case profiler::EventType::SIGNAL_TRIGGERED: {
-				u32 signal;
+				i32 signal;
 				read(ctx, p + sizeof(profiler::EventHeader), signal);
 				draw_triggered_signal(header.time, signal);
 				break;
@@ -1112,14 +1139,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				y = maximum(y - 20.f, top);
 				if (level >= 0) {
 					const Block& block = m_blocks[open_blocks[level].id];
-					u32 color = block.color;
-					if (block.job_info.signal_on_finish != jobs::INVALID_HANDLE
-						&& hovered_signal.signal == block.job_info.signal_on_finish
-						|| hovered_link == block.link 
-						&& hovered_link != 0)
-					{
-						color = 0xff0000ff;
-					}
+					const u32 color = block.color;
 					draw_block(open_blocks[level].start_time, header.time, block.name, color);
 					while (properties_count > 0 && properties[properties_count - 1].level == level) {
 						--properties_count;
@@ -1168,10 +1188,6 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 		ImGui::TreePop();
 	});
-
-	if (!any_hovered_link) hovered_link = 0;
-	if (!any_hovered_signal) hovered_signal.signal = jobs::INVALID_HANDLE;
-	if (!hovered_signal_current_pos) hovered_signal.is_current_pos = false;
 
 	auto get_view_x = [&](u64 time) {
 		const float t = time > view_start
@@ -1255,9 +1271,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						const ImVec2 ra(x_start, block_y);
 						const ImVec2 rb(x_end, block_y + 19);
 						u32 color = 0xffDDddDD;
-						if(hovered_link && data.profiler_link == hovered_link) {
-							color = 0xffff0000;
-						}
+						if (hovered_link.link == data.profiler_link && hovered_link.frame > frame_id - 2) color = 0xff0000ff;
 						dl->AddRectFilled(ra, rb, color);
 						if (x_end - x_start > 2) {
 							dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
@@ -1272,8 +1286,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 							ImGui::Text("%s (%.3f ms)", data.name, t);
 							if (data.profiler_link) {
 								ImGui::Text("Link: %" PRId64, data.profiler_link);
-								any_hovered_link = true;
-								hovered_link = data.profiler_link;
+								hovered_link.frame = frame_id;
+								hovered_link.link = data.profiler_link;
 							}
 							if (has_stats) {
 								char tmp[32];
@@ -1302,7 +1316,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					if (header.time >= view_start && header.time <= m_end && m_show_frames) {
 						const float t = float((header.time - view_start) / double(m_range));
 						const float x = from_x * (1 - t) + to_x * t;
+						dl->ChannelsSetCurrent(1);
 						dl->AddLine(ImVec2(x, from_y), ImVec2(x, before_gpu_y), 0xffff0000);
+						dl->ChannelsSetCurrent(0);
 					}
 					break;
 				case profiler::EventType::CONTEXT_SWITCH:
@@ -1356,6 +1372,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 		tr.last_context_switch.time = 0;
 	}
+
+	dl->ChannelsMerge();
 }
 
 

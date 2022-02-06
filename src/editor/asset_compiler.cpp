@@ -6,8 +6,10 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/atomic.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lz4.h"
@@ -231,7 +233,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
 		const u32 hash = path_obj.getHash();
-		MutexGuard lock(m_resources_mutex);
+		jobs::MutexGuard lock(m_resources_mutex);
 		if(m_resources.find(hash).isValid()) {
 			m_resources[hash] = {path_obj, type, dirHash(path_obj.c_str())};
 		}
@@ -366,7 +368,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				if (lua_type(L, -1) != LUA_TTABLE) return;
 
 				{
-					MutexGuard lock(m_resources_mutex);
+					jobs::MutexGuard lock(m_resources_mutex);
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
 						#ifdef CACHE_MASTER 
@@ -599,7 +601,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		AssetCompilerImpl* compiler = LuaWrapper::toType<AssetCompilerImpl*>(L, index);
 		ASSERT(compiler);
 
-		MutexGuard lock(compiler->m_resources_mutex);
+		jobs::MutexGuard lock(compiler->m_resources_mutex);
 		lua_createtable(L, 0, compiler->m_resources.size());
 		for (ResourceItem& ri : compiler->m_resources) {
 			lua_pushinteger(L, ri.type.type);
@@ -703,7 +705,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (getResourceType(path_obj.c_str()) != INVALID_RESOURCE_TYPE) {
 				if (!m_app.getEngine().getFileSystem().fileExists(path_obj.c_str())) {
-					MutexGuard lock(m_resources_mutex);
+					jobs::MutexGuard lock(m_resources_mutex);
 					m_resources.eraseIf([&](const ResourceItem& ri){
 						if (!endsWithInsensitive(ri.path.c_str(), path_obj.c_str())) return false;
 						return true;
@@ -754,19 +756,20 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void unlockResources() override {
-		m_resources_mutex.exit();
+		jobs::exit(&m_resources_mutex);
 	}
 
 	const HashMap<u32, ResourceItem, HashFuncDirect<u32>>& lockResources() override {
-		m_resources_mutex.enter();
+		jobs::enter(&m_resources_mutex);
 		return m_resources;
 	}
 
 	Semaphore m_semaphore;
 	Mutex m_to_compile_mutex;
 	Mutex m_compiled_mutex;
-	Mutex m_plugin_mutex;
 	Mutex m_changed_mutex;
+	Mutex m_plugin_mutex;
+	jobs::Mutex m_resources_mutex;
 	HashMap<Path, u32> m_generations; 
 	HashMap<Path, Array<Path>> m_dependencies; 
 	Array<Path> m_changed_files;
@@ -777,7 +780,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	HashMap<u32, IPlugin*, HashFuncDirect<u32>> m_plugins;
 	AssetCompilerTask m_task;
 	UniquePtr<FileSystemWatcher> m_watcher;
-	Mutex m_resources_mutex;
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 	DelegateList<void(const Path& path)> m_on_list_changed;
