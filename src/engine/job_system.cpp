@@ -60,6 +60,7 @@ struct System
 
 
 static Local<System> g_system;
+static volatile i32 g_generation = 0;
 static thread_local WorkerTask* g_worker = nullptr;
 
 #pragma optimize( "", off )
@@ -175,30 +176,6 @@ static bool trigger(Signal* signal)
 	return true;
 }
 
-static LUMIX_FORCE_INLINE void runInternal(void* data
-	, void (*task)(void*)
-	, bool do_lock
-	, Signal* on_finish
-	, u8 worker_index)
-{
-	Job j;
-	j.data = data;
-	j.task = task;
-	j.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
-
-	if (do_lock) g_system->m_sync.enter();
-	j.dec_on_finish = on_finish;
-	if (on_finish) ++on_finish->counter;
-
-	{
-		Lumix::MutexGuard lock(g_system->m_job_queue_sync);
-		pushJob(j);
-	}
-
-	if (do_lock) g_system->m_sync.exit();
-}
-
-
 void enableBackupWorker(bool enable)
 {
 	Lumix::MutexGuard lock(g_system->m_sync);
@@ -223,35 +200,51 @@ void enableBackupWorker(bool enable)
 	}
 }
 
-void setRed(Signal* signal)
-{
+void setRed(Signal* signal) {
 	ASSERT(signal);
 	Lumix::MutexGuard lock(g_system->m_sync);
 	
 	ASSERT(signal->counter <= 1);
+	if (signal->counter == 0) {
+		signal->generation = atomicIncrement(&g_generation);
+	}
 	signal->counter = 1;
 }
 
 
-void setGreen(Signal* signal)
-{
+void setGreen(Signal* signal) {
+	ASSERT(signal);
 	ASSERT(signal->counter <= 1);
 	if (trigger<true>(signal)) {
-		//profiler::signalTriggered(signal);
-		// TODO
+		profiler::signalTriggered(signal->generation);
 	}
 }
 
 
 void run(void* data, void(*task)(void*), Signal* on_finished)
 {
-	runInternal(data, task, true, on_finished, ANY_WORKER);
+	runEx(data, task, on_finished, ANY_WORKER);
 }
 
 
 void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 {
-	runInternal(data, task, true, on_finished, worker_index);
+	Job j;
+	j.data = data;
+	j.task = task;
+	j.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
+	j.dec_on_finish = on_finished;
+
+	Lumix::MutexGuard guard(g_system->m_sync);
+	if (on_finished) {
+		++on_finished->counter;
+		if (on_finished->counter == 1) {
+			on_finished->generation = atomicIncrement(&g_generation);
+		}
+	}
+
+	Lumix::MutexGuard lock(g_system->m_job_queue_sync);
+	pushJob(j);
 }
 
 
@@ -323,10 +316,9 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 		else {
 			profiler::beginBlock("job");
 			profiler::blockColor(0x60, 0x60, 0x60);
-			// TODO
-			/*if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
-				profiler::pushJobInfo(job.dec_on_finish, job.precondition);
-			}*/
+			if (job.dec_on_finish) {
+				profiler::pushJobInfo(job.dec_on_finish->generation);
+			}
 			this_fiber->current_job = job;
 			job.task(job.data);
             this_fiber->current_job.task = nullptr;
@@ -381,6 +373,9 @@ u8 getWorkersCount()
 	return (u8)c;
 }
 
+IAllocator& getAllocator() {
+	return g_system->m_allocator;
+}
 
 void shutdown()
 {
@@ -422,6 +417,7 @@ void shutdown()
 
 static void waitEx(Signal* signal, bool is_mutex)
 {
+	ASSERT(signal);
 	g_system->m_sync.enter();
 	if (signal->counter == 0) {
 		g_system->m_sync.exit();
@@ -445,7 +441,7 @@ static void waitEx(Signal* signal, bool is_mutex)
 	waitor.next = signal->waitor;
 	signal->waitor = &waitor;
 
-	//const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(handle, is_mutex);
+	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(signal->generation, is_mutex);
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();
 	if (!Fiber::isValid(new_fiber->fiber)) {
@@ -455,8 +451,7 @@ static void waitEx(Signal* signal, bool is_mutex)
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 	getWorker()->m_current_fiber = this_fiber;
 	g_system->m_sync.exit();
-	//profiler::endFiberWait(handle, switch_data);
-	// TODO
+	profiler::endFiberWait(switch_data);
 }
 
 void enter(Mutex* mutex) {

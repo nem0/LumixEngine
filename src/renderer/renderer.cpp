@@ -438,18 +438,17 @@ struct RendererImpl final : Renderer
 		waitForRender();
 		
 		jobs::Signal signal;
-		jobs::runEx(this, [](void* data) {
-			RendererImpl* renderer = (RendererImpl*)data;
-			for (const Local<FrameData>& frame : renderer->m_frames) {
+		jobs::runLambda([this]() {
+			for (const Local<FrameData>& frame : m_frames) {
 				gpu::destroy(frame->transient_buffer.m_buffer);
 				gpu::destroy(frame->uniform_buffer.m_buffer);
 			}
-			gpu::destroy(renderer->m_material_buffer.buffer);
-			gpu::destroy(renderer->m_material_buffer.staging_buffer);
-			gpu::destroy(renderer->m_tmp_uniform_buffer);
-			gpu::destroy(renderer->m_scratch_buffer);
-			gpu::destroy(renderer->m_downscale_program);
-			renderer->m_profiler.clear();
+			gpu::destroy(m_material_buffer.buffer);
+			gpu::destroy(m_material_buffer.staging_buffer);
+			gpu::destroy(m_tmp_uniform_buffer);
+			gpu::destroy(m_scratch_buffer);
+			gpu::destroy(m_downscale_program);
+			m_profiler.clear();
 			gpu::shutdown();
 		}, &signal, 1);
 		jobs::wait(&signal);
@@ -487,13 +486,12 @@ struct RendererImpl final : Renderer
 		}
 
 		jobs::Signal signal;
-		jobs::runEx(&init_data, [](void* data) {
+		jobs::runLambda([&init_data]() {
 			PROFILE_BLOCK("init_render");
-			InitData* init_data = (InitData*)data;
-			RendererImpl& renderer = *(RendererImpl*)init_data->renderer;
+			RendererImpl& renderer = *(RendererImpl*)init_data.renderer;
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getWindowHandle();
-			if (!gpu::init(window_handle, init_data->flags)) {
+			if (!gpu::init(window_handle, init_data.flags)) {
 				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
 				fatal(false, "gpu::init()");
 			}
@@ -1097,11 +1095,10 @@ struct RendererImpl final : Renderer
 		
 		m_cpu_frame->jobs.push(&cmd);
 
-		jobs::run(&cmd, [](void* data){
-			RenderJob* cmd = (RenderJob*)data;
+		jobs::runLambda([&cmd](){
 			PROFILE_BLOCK("setup_render_job");
 			profiler::blockColor(0x50, 0xff, 0xff);
-			cmd->setup();
+			cmd.setup();
 		}, &m_cpu_frame->setup_done);
 	}
 
@@ -1306,9 +1303,8 @@ struct RendererImpl final : Renderer
 		jobs::setRed(&m_cpu_frame->can_setup);
 		
 		m_cpu_frame = m_frames[(getFrameIndex(m_cpu_frame) + 1) % lengthOf(m_frames)].get();
-		jobs::runEx(this, [](void* ptr){
-			auto* renderer = (RendererImpl*)ptr;
-			renderer->render();
+		jobs::runLambda([this](){
+			render();
 		}, &m_last_render, 1);
 
 		jobs::wait(&m_cpu_frame->can_setup);

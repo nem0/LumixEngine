@@ -326,18 +326,17 @@ struct StudioAppImpl final : StudioApp
 			StudioAppImpl* that;
 			Semaphore* semaphore;
 		} data = {this, &semaphore};
-		jobs::runEx(&data, [](void* ptr) {
-			Data* data = (Data*)ptr;
-			data->that->onInit();
-			while (!data->that->m_finished) {
+		jobs::runLambda([&data]() {
+			data.that->onInit();
+			while (!data.that->m_finished) {
 				os::Event e;
 				while(os::getEvent(e)) {
-					data->that->onEvent(e);
+					data.that->onEvent(e);
 				}
-				data->that->onIdle();
+				data.that->onIdle();
 			}
 
-			data->semaphore->signal();
+			data.semaphore->signal();
 		}, nullptr, 0);
 		PROFILE_BLOCK("sleeping");
 		semaphore.wait();

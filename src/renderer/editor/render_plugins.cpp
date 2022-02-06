@@ -1967,29 +1967,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return meta;
 	}
 
-	void addSubresources(AssetCompiler& compiler, const char* path) override {
-		compiler.addResource(Model::TYPE, path);
+	void addSubresources(AssetCompiler& compiler, const char* _path) override {
+		compiler.addResource(Model::TYPE, _path);
 
-		const Meta meta = getMeta(Path(path));
-		struct JobData {
-			ModelPlugin* plugin;
-			StaticString<LUMIX_MAX_PATH> path;
-			Meta meta;
-		};
-		JobData* data = LUMIX_NEW(m_app.getAllocator(), JobData);
-		data->plugin = this;
-		data->path = path;
-		data->meta = meta;
-		jobs::runEx(data, [](void* ptr) {
-			JobData* data = (JobData*)ptr;
-			ModelPlugin* plugin = data->plugin;
-			FBXImporter importer(plugin->m_app);
-			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
+		const Meta meta = getMeta(Path(_path));
+		StaticString<LUMIX_MAX_PATH> pathstr = _path;
+		jobs::runLambda([this, pathstr, meta]() {
+			FBXImporter importer(m_app);
+			AssetCompiler& compiler = m_app.getAssetCompiler();
 
-			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path.data;
+			const char* path = pathstr[0] == '/' ? pathstr.data + 1 : pathstr.data;
 			importer.setSource(path, true, false);
 
-			if(data->meta.split) {
+			if(meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
 				for (int i = 0; i < meshes.size(); ++i) {
 					char mesh_name[256];
@@ -1999,7 +1989,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 
-			if (data->meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
 				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
 				ResourceType physics_geom("physics");
 				compiler.addResource(physics_geom, tmp);
@@ -2010,8 +2000,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
 				compiler.addResource(ResourceType("animation"), tmp);
 			}
-
-			LUMIX_DELETE(plugin->m_app.getAllocator(), data);
 		}, &m_subres_signal, 2);			
 	}
 
@@ -3305,9 +3293,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
 		captureCubemap(m_app, job.universe, *m_pipeline, texture_size, job.position, job.data, [&job](){
-			jobs::run(&job, [](void* ptr) {
-				ProbeJob* pjob = (ProbeJob*)ptr;
-				pjob->plugin.processData(*pjob);
+			jobs::runLambda([&job]() {
+				job.plugin.processData(job);
 			}, nullptr);
 
 		});
@@ -3416,7 +3403,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		auto lambda = [&](){
+		// TODO RenderJob
+		jobs::runLambda([&](){
 			renderer->beginProfileBlock("radiance_filter", 0);
 			gpu::TextureHandle src = gpu::allocTextureHandle();
 			gpu::TextureHandle dst = gpu::allocTextureHandle();
@@ -3485,12 +3473,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			gpu::destroy(buf);
 			gpu::destroy(src);
 			gpu::destroy(dst);
-		};
-		
-		// TODO RenderJob
-		jobs::runEx(&lambda, [](void* data){
-			auto* l = ((decltype(lambda)*)data);
-			(*l)();
 		}, &finished, 1);
 		jobs::wait(&finished);
 	}

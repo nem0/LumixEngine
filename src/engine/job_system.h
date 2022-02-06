@@ -14,6 +14,7 @@ struct Mutex;
 struct Signal;
 
 LUMIX_ENGINE_API bool init(u8 workers_count, IAllocator& allocator);
+LUMIX_ENGINE_API IAllocator& getAllocator();
 LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API u8 getWorkersCount();
 
@@ -29,6 +30,26 @@ LUMIX_ENGINE_API void run(void* data, void(*task)(void*), Signal* on_finish);
 LUMIX_ENGINE_API void runEx(void* data, void (*task)(void*), Signal* on_finish, u8 worker_index);
 LUMIX_ENGINE_API void wait(Signal* signal);
 
+template <typename F>
+void runLambda(F&& f, Signal* on_finish, u8 worker = ANY_WORKER) {
+	void* arg;
+	if constexpr (sizeof(f) == sizeof(void*) && __is_trivially_copyable(F)) {
+		memcpy(&arg, &f, sizeof(arg));
+		runEx(arg, [](void* arg){
+			F* f = (F*)&arg;
+			(*f)();
+		}, on_finish, worker);
+	}
+	else {
+		F* tmp = LUMIX_NEW(getAllocator(), F)(static_cast<F&&>(f));
+		runEx(tmp, [](void* arg){
+			F* f = (F*)arg;
+			(*f)();
+			LUMIX_DELETE(getAllocator(), f);
+		}, on_finish, worker);
+
+	}
+}
 
 template <typename F>
 void runOnWorkers(const F& f)
@@ -76,6 +97,7 @@ struct MutexGuard {
 struct Signal {
 	volatile i32 counter = 0;
 	struct Waitor* waitor = nullptr;
+	i32 generation; // identify different red-green pairs on the same signal, used by profiler
 };
 
 struct Mutex {

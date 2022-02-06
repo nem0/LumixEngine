@@ -288,12 +288,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		void submitTask(PxBaseTask& task) override
 		{
-			jobs::run(&task,
-				[](void* data) {
-					PxBaseTask* task = (PxBaseTask*)data;
+			jobs::runLambda([&task]() {
 					PROFILE_FUNCTION();
-					task->run();
-					task->release();
+					task.run();
+					task.release();
 				},
 				nullptr);
 		}

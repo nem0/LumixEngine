@@ -19,7 +19,7 @@ LUMIX_ENGINE_API void continueBlock(i32 block_id);
 LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
 LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();
-LUMIX_ENGINE_API void pushJobInfo(u32 signal_on_finish, u32 precondition);
+LUMIX_ENGINE_API void pushJobInfo(i32 signal_on_finish);
 LUMIX_ENGINE_API void pushString(const char* value);
 LUMIX_ENGINE_API void pushInt(const char* key_literal, int value);
 
@@ -36,12 +36,13 @@ struct FiberSwitchData {
 	i32 id;
 	i32 blocks[16];
 	u32 count;
+	i32 signal;
 };
 
 LUMIX_ENGINE_API void beforeFiberSwitch();
-LUMIX_ENGINE_API void signalTriggered(u32 job_system_signal);
-LUMIX_ENGINE_API FiberSwitchData beginFiberWait(u32 job_system_signal, bool is_mutex);
-LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data);
+LUMIX_ENGINE_API void signalTriggered(i32 job_system_signal);
+LUMIX_ENGINE_API FiberSwitchData beginFiberWait(i32 job_system_signal, bool is_mutex);
+LUMIX_ENGINE_API void endFiberWait(const FiberSwitchData& switch_data);
 LUMIX_ENGINE_API float getLastFrameDuration();
 
 struct Scope
@@ -79,15 +80,14 @@ struct IntRecord
 
 struct JobRecord
 {
-	u32 signal_on_finish;
-	u32 precondition;
+	i32 signal_on_finish;
 };
 
 
 struct FiberWaitRecord
 {
 	i32 id;
-	u32 job_system_signal;
+	i32 job_system_signal;
 	bool is_mutex;
 };
 

@@ -1282,21 +1282,20 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 
 		void pushJob() {
-			jobs::run(this, [](void* user_ptr){
-				NavmeshBuildJobImpl* that = (NavmeshBuildJobImpl*)user_ptr;
-				const i32 i = atomicIncrement(&that->counter) - 1;
-				if (i >= that->total) {
+			jobs::runLambda([this](){
+				const i32 i = atomicIncrement(&counter) - 1;
+				if (i >= total) {
 					return;
 				}
 
-				if (!that->scene->generateTile(*that->zone, that->zone_entity, i % that->zone->m_num_tiles_x, i / that->zone->m_num_tiles_x, false, that->mutex)) {
-					atomicIncrement(&that->fail_counter);
+				if (!scene->generateTile(*zone, zone_entity, i % zone->m_num_tiles_x, i / zone->m_num_tiles_x, false, mutex)) {
+					atomicIncrement(&fail_counter);
 				}
 				else {
-					atomicIncrement(&that->done_counter);
+					atomicIncrement(&done_counter);
 				}
 
-				that->pushJob();
+				pushJob();
 			}, &signal);
 		}
 

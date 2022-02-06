@@ -490,8 +490,7 @@ struct ProfilerUIImpl final : ProfilerUI
 
 	struct Block {
 		Block() {
-			job_info.signal_on_finish = jobs::INVALID_HANDLE;
-			job_info.precondition = jobs::INVALID_HANDLE;
+			job_info.signal_on_finish = 0;
 		}
 
 		const char* name;
@@ -531,18 +530,18 @@ struct ProfilerUIImpl final : ProfilerUI
 		u32 frame = 0;
 		i32 id = 0;
 		ImVec2 pos;
-		u32 signal = 0;
+		i32 signal = 0;
 	} hovered_fiber_wait;
 
 	struct {
 		u32 frame = 0;
-		u32 signal;
+		i32 signal = 0;
 		ImVec2 pos;
 	} hovered_signal_trigger;
 
 	struct {
 		u32 frame = 0;
-		u32 signal = 0;
+		i32 signal = 0;
 		ImVec2 pos;
 	} hovered_job;
 
@@ -954,7 +953,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		} properties[64];
 		int properties_count = 0;
 
-		auto draw_triggered_signal = [&](u64 time, u32 signal) {
+		auto draw_triggered_signal = [&](u64 time, i32 signal) {
 			const float t_start = float(int(time - view_start) / double(m_range));
 			const float x = from_x * (1 - t_start) + to_x * t_start;
 			
@@ -968,7 +967,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			dl->AddTriangle(ImVec2(x - 2, y), ImVec2(x + 2, y - 2), ImVec2(x + 2, y + 2), 0xffffff00);
 			if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
 				ImGui::BeginTooltip();
-				ImGui::Text("Signal triggered: %d", signal);
+				ImGui::Text("Signal triggered: %" PRIx64, (u64)signal);
 				ImGui::EndTooltip();
 
 				hovered_signal_trigger.signal = signal;
@@ -1022,14 +1021,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					hovered_link.frame = frame_id;
 					hovered_link.link = block.link;
 				}
-				if (block.job_info.signal_on_finish != jobs::INVALID_HANDLE) {
-					ImGui::Text("Signal on finish: %d", block.job_info.signal_on_finish);
+				if (block.job_info.signal_on_finish) {
+					ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
 					hovered_job.frame = frame_id;
 					hovered_job.pos = ImVec2(x_start, block_y);
 					hovered_job.signal = block.job_info.signal_on_finish;
-				}
-				if (block.job_info.precondition != jobs::INVALID_HANDLE) {
-					ImGui::Text("Precondition signal: %d", block.job_info.precondition);
 				}
 				for (int i = 0; i < properties_count; ++i) {
 					if (properties[i].level != level) continue;
@@ -1101,7 +1097,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						ImGui::BeginTooltip();
 						ImGui::Text("Fiber wait");
 						ImGui::Text("  Wait ID: %d", r.id);
-						ImGui::Text("  Waiting for signal: %d", r.job_system_signal);
+						ImGui::Text("  Waiting for signal: %" PRIx64, (u64)r.job_system_signal);
 						ImGui::EndTooltip();
 					}
 				}
@@ -1134,7 +1130,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			}
 			case profiler::EventType::SIGNAL_TRIGGERED: {
-				u32 signal;
+				i32 signal;
 				read(ctx, p + sizeof(profiler::EventHeader), signal);
 				draw_triggered_signal(header.time, signal);
 				break;
