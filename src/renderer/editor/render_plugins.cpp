@@ -1888,7 +1888,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool use_mikktspace = false;
 		bool force_skin = false;
 		bool import_vertex_colors = false;
-		bool bake_vertex_ao = false;
+		bool vertex_color_is_ao = false;
 		u8 autolod_mask = 0;
 		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
 		float lods_distances[4] = { -1, -1, -1, -1 };
@@ -1942,15 +1942,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &meta.bake_impostor_normals);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &meta.vertex_color_is_ao);
 			
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &meta.autolod_coefs[0])) meta.autolod_mask |= 1;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &meta.autolod_coefs[1])) meta.autolod_mask |= 2;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &meta.autolod_coefs[2])) meta.autolod_mask |= 4;
 
+			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "bake_vertex_ao") != LUA_TNIL) logWarning(path, ": `bake_vertex_ao` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
-			lua_pop(L, 2);
+			lua_pop(L, 3);
 
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
@@ -2023,7 +2024,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
-		cfg.bake_vertex_ao = meta.bake_vertex_ao;
+		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathInfo src_info(filepath);
@@ -2476,8 +2477,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			ImGuiEx::Label("Import vertex colors");
 			ImGui::Checkbox("##vercol", &m_meta.import_vertex_colors);
-			ImGuiEx::Label("Bake vertex AO");
-			ImGui::Checkbox("##verao", &m_meta.bake_vertex_ao);
+			if (m_meta.import_vertex_colors) {
+				ImGuiEx::Label("Vertex color is AO");
+				ImGui::Checkbox("##verao", &m_meta.vertex_color_is_ao);
+			}
 			
 			ImGuiEx::Label("Physics");
 			if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
@@ -2527,7 +2530,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
 					.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
 					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
-					.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true" : "false");
+					.cat("\nvertex_color_is_ao = ").cat(m_meta.vertex_color_is_ao ? "true" : "false");
 
 				if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
 				if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);

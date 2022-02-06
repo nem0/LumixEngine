@@ -744,9 +744,15 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 
 			if (normals) writePackedVec3(normals[i], transform_matrix, &import_mesh.vertex_data);
 			if (uvs) writeUV(uvs[i], &import_mesh.vertex_data);
-			if (colors) writeColor(colors[i], &import_mesh.vertex_data);
+			if (colors) {
+				if (cfg.vertex_color_is_ao) {
+					const u8 ao = u8(colors[i].x * 255.f + 0.5f);
+					import_mesh.vertex_data.write(ao);
+				} else {
+					writeColor(colors[i], &import_mesh.vertex_data);
+				}
+			}
 			if (tangents) writePackedVec3(tangents[i], transform_matrix, &import_mesh.vertex_data);
-			if (cfg.bake_vertex_ao) { /* TODO */ }
 			if (import_mesh.is_skinned) writeSkin(skinning[i], &import_mesh.vertex_data);
 		}
 
@@ -1719,8 +1725,7 @@ int FBXImporter::getVertexSize(const ofbx::Geometry& geom, bool is_skinned, cons
 	int size = POSITION_SIZE + NORMAL_SIZE;
 
 	if (geom.getUVs()) size += UV_SIZE;
-	if (geom.getColors() && cfg.import_vertex_colors) size += COLOR_SIZE;
-	if (cfg.bake_vertex_ao) size += AO_SIZE;
+	if (geom.getColors() && cfg.import_vertex_colors) size += cfg.vertex_color_is_ao ? AO_SIZE : COLOR_SIZE;
 	if (hasTangents(geom)) size += TANGENT_SIZE;
 	if (is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
 
@@ -2051,20 +2056,21 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 			write((u8)2);
 		}
 		if (geom->getColors() && cfg.import_vertex_colors) {
-			write(Mesh::AttributeSemantic::COLOR0);
-			write(gpu::AttributeType::U8);
-			write((u8)4);
+			if (cfg.vertex_color_is_ao) {
+				write(Mesh::AttributeSemantic::AO);
+				write(gpu::AttributeType::U8);
+				write((u8)1);
+			}
+			else {
+				write(Mesh::AttributeSemantic::COLOR0);
+				write(gpu::AttributeType::U8);
+				write((u8)4);
+			}
 		}
 		if (hasTangents(*geom)) {
 			write(Mesh::AttributeSemantic::TANGENT);
 			write(gpu::AttributeType::I8);
 			write((u8)4);
-		}
-
-		if (cfg.bake_vertex_ao) {
-			write(Mesh::AttributeSemantic::AO);
-			write(gpu::AttributeType::U8);
-			write((u8)1);
 		}
 
 		if (import_mesh.is_skinned) {
@@ -2191,7 +2197,6 @@ int FBXImporter::getAttributeCount(const ImportMesh& mesh, const ImportConfig& c
 	int count = 2; // position & normals
 	if (mesh.fbx->getGeometry()->getUVs()) ++count;
 	if (mesh.fbx->getGeometry()->getColors() && cfg.import_vertex_colors) ++count;
-	if (cfg.bake_vertex_ao) ++count;
 	if (hasTangents(*mesh.fbx->getGeometry())) ++count;
 	if (mesh.is_skinned) count += 2;
 	return count;

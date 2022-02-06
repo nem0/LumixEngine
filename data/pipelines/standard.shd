@@ -4,10 +4,11 @@ surface_shader [[
 	vec4 c = texture(u_albedomap, v_uv) * u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
-	#ifdef _HAS_ATTR7
+	#ifdef _HAS_ATTR6
 		data.albedo.rgb *= v_color.rgb;
 	#endif
-	#ifdef _HAS_ATTR8
+
+	#ifdef _HAS_ATTR7
 		data.ao = v_ao;
 	#else
 		data.ao = 1;
