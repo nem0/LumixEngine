@@ -49,8 +49,9 @@ goto :begin
 	echo  8. Network
 	echo  9. JS
 	echo  A. C#
+	echo  B. Visual script
 	echo ===============================
-	choice /C 123456789A /N /M "Your choice:"
+	choice /C 123456789AB /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -62,6 +63,7 @@ goto :begin
 	if %errorlevel%==8 call :network_plugin
 	if %errorlevel%==9 call :js_plugin
 	if %errorlevel%==10 call :cs_plugin
+	if %errorlevel%==11 call :visual_script_plugin
 	call :create_project
 goto :plugins
 
@@ -132,6 +134,18 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_csharp.git csharp
 	) else (
 		cd csharp
+		git pull
+	)
+	popd
+exit /B 0
+
+:visual_script_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist visualscript (
+		git.exe clone https://github.com/nem0/lumixengine_visualscript.git visualscript
+	) else (
+		cd visualscript
 		git pull
 	)
 	popd
