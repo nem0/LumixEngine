@@ -1,5 +1,4 @@
 #include "engine/atomic.h"
-#include "job_system.h"
 #include "engine/array.h"
 #include "engine/engine.h"
 #include "engine/fibers.h"
@@ -10,6 +9,7 @@
 #include "engine/sync.h"
 #include "engine/thread.h"
 #include "engine/profiler.h"
+#include "job_system.h"
 
 
 namespace Lumix::jobs {
