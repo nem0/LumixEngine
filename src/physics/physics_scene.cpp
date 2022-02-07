@@ -75,6 +75,7 @@ static const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_join
 static const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle");
 static const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
 static const ComponentType INSTANCED_CUBE_TYPE = reflection::getComponentType("physical_instanced_cube");
+static const ComponentType INSTANCED_MESH_TYPE = reflection::getComponentType("physical_instanced_mesh");
 
 enum class FilterFlags : u32 {
 	VEHICLE = 1 << 0
@@ -86,6 +87,7 @@ enum class PhysicsSceneVersion
 	VEHICLE_PEAK_TORQUE,
 	VEHICLE_MAX_RPM,
 	INSTANCED_CUBE,
+	INSTANCED_MESH,
 
 	LATEST,
 };
@@ -485,6 +487,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 		m_instanced_cubes.clear();
+		
+		for (auto& ic : m_instanced_meshes) {
+			for (PxRigidActor* actor : ic.actors) {
+				actor->release();
+			}
+		}
+		m_instanced_meshes.clear();
 
 		for (auto& joint : m_joints)
 		{
@@ -1317,6 +1326,16 @@ struct PhysicsSceneImpl final : PhysicsScene
 		m_universe.onComponentDestroyed(entity, INSTANCED_CUBE_TYPE, this);
 	}
 
+	void destroyInstancedMesh(EntityRef entity) {
+		InstancedMesh& im = m_instanced_meshes[entity];
+		for (PxRigidActor* actor : im.actors) {
+			actor->release();
+		}
+		if (im.resource) im.resource->decRefCount();
+		m_instanced_meshes.erase(entity);
+		m_universe.onComponentDestroyed(entity, INSTANCED_MESH_TYPE, this);
+	}
+
 	void destroyController(EntityRef entity)
 	{
 		m_controllers[entity].controller->release();
@@ -1501,6 +1520,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 		desc.stepOffset = 0.02f;
 		desc.behaviorCallback = &behaviour_cb;
 		desc.reportCallback = &m_hit_report;
+	}
+
+	void createInstancedMesh(EntityRef entity) {
+		InstancedMesh im(m_allocator);
+		m_instanced_meshes.insert(entity, static_cast<InstancedMesh&&>(im));
+		m_universe.onComponentCreated(entity, INSTANCED_MESH_TYPE, this);
 	}
 
 	void createInstancedCube(EntityRef entity) {
@@ -2129,6 +2154,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	void initInstancedCubes() {
+		PROFILE_FUNCTION();
 		RenderScene* rs = (RenderScene*)m_universe.getScene(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
@@ -2154,6 +2180,47 @@ struct PhysicsSceneImpl final : PhysicsScene
 				actor->userData = (void*)(intptr_t)iter.key().index;
 				m_scene->addActor(*actor);
 				ic.actors.push(actor);
+			}
+		}
+	}
+
+	void initInstancedMeshes() {
+		PROFILE_FUNCTION();
+		RenderScene* rs = (RenderScene*)m_universe.getScene(INSTANCED_MODEL_TYPE);
+		if (!rs) return;
+
+		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
+			if (!m_universe.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
+			
+			const InstancedModel& im = rs->getInstancedModels()[iter.key()];
+			InstancedMesh& mesh = iter.value();
+			if (!mesh.resource) continue;
+			if (!mesh.resource->isReady()) continue;
+			
+			const RigidTransform tr = m_universe.getTransform(iter.key()).getRigidPart();
+
+			mesh.actors.reserve(im.instances.size());
+			
+			for (const InstancedModel::InstanceData& id : im.instances) {
+				RigidTransform inst_tr = tr;
+				inst_tr.pos += id.pos;
+				Quat irot(id.rot_quat.x, id.rot_quat.y, id.rot_quat.z, 0);
+				irot.w = sqrtf(1 - dot(id.rot_quat, id.rot_quat));
+				inst_tr.rot = inst_tr.rot * irot;
+				const PxTransform px_transform = toPhysx(inst_tr);
+
+				PxRigidStatic* physx_actor = m_system->getPhysics()->createRigidStatic(px_transform);
+				physx_actor->userData = (void*)(uintptr)iter.key().index;
+				
+				PxMeshScale pxscale(id.scale);
+				PxConvexMeshGeometry convex_geom(mesh.resource->convex_mesh, pxscale);
+				PxTriangleMeshGeometry tri_geom(mesh.resource->tri_mesh, pxscale);
+				const PxGeometry* geom = mesh.resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
+				PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, *m_default_material);
+				shape->userData = (void*)(uintptr)iter.key().index;
+
+				m_scene->addActor(*physx_actor);
+				mesh.actors.push(physx_actor);
 			}
 		}
 	}
@@ -2186,6 +2253,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		initJoints();
 		initVehicles();
 		initInstancedCubes();
+		initInstancedMeshes();
 
 		updateFilterData();
 	}
@@ -2582,7 +2650,20 @@ struct PhysicsSceneImpl final : PhysicsScene
 			data.word1 = m_layers.filter[instanced_cube.layer];
 			for (PxRigidActor* actor : instanced_cube.actors) {
 				PxShape* shapes[1];
-				int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
+				const i32 shapes_count = actor->getShapes(shapes, lengthOf(shapes));
+				for (int i = 0; i < shapes_count; ++i) {
+					shapes[i]->setSimulationFilterData(data);
+				}
+			}
+		}
+
+		for (auto& instanced_mesh : m_instanced_meshes) {
+			PxFilterData data;
+			data.word0 = 1 << instanced_mesh.layer;
+			data.word1 = m_layers.filter[instanced_mesh.layer];
+			for (PxRigidActor* actor : instanced_mesh.actors) {
+				PxShape* shapes[1];
+				const i32 shapes_count = actor->getShapes(shapes, lengthOf(shapes));
 				for (int i = 0; i < shapes_count; ++i) {
 					shapes[i]->setSimulationFilterData(data);
 				}
@@ -3014,6 +3095,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(iter.value().layer);
 		}
 
+		serializer.write((i32)m_instanced_meshes.size());
+		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
+			serializer.write(iter.key());
+			serializer.writeString(iter.value().resource ? iter.value().resource->getPath().c_str() : "");
+			serializer.write(iter.value().layer);
+		}
+
 		serializeJoints(serializer);
 		serializeVehicles(serializer);
 	}
@@ -3415,6 +3503,22 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 
+		if (version > (i32)PhysicsSceneVersion::INSTANCED_MESH) {
+			i32 count;
+			serializer.read(count);
+			for (i32 i = 0; i < count; ++i) {
+				EntityRef e;
+				serializer.read(e);
+				e = entity_map.get(e);
+				InstancedMesh m(m_allocator);
+				const char* path = serializer.readString();
+				m.resource = path[0] ? m_engine.getResourceManager().load<PhysicsGeometry>(Path(path)) : nullptr;
+				serializer.read(m.layer);
+				m_instanced_meshes.insert(e, static_cast<InstancedMesh&&>(m));
+				m_universe.onComponentCreated(e, INSTANCED_MESH_TYPE, this);
+			}
+		}
+
 		deserializeJoints(serializer, entity_map);
 		deserializeVehicles(serializer, entity_map, version);
 	}
@@ -3508,6 +3612,31 @@ struct PhysicsSceneImpl final : PhysicsScene
 			
 			actor = &m_actors[*actor->next_with_resource];
 		}
+	}
+	
+	Path getInstancedMeshGeomPath(EntityRef entity) override {
+		const InstancedMesh& im = m_instanced_meshes[entity];
+		return im.resource ? im.resource->getPath() : Path();
+	}
+
+	void setInstancedMeshGeomPath(EntityRef entity, const Path& path) override {
+		InstancedMesh& im = m_instanced_meshes[entity];
+		if (path.isEmpty() && !im.resource) return;
+		if (im.resource && im.resource->getPath() == path) return;
+
+		if (im.resource) im.resource->decRefCount();
+		im.resource = nullptr;
+		if (!path.isEmpty()) {
+			im.resource = m_engine.getResourceManager().load<PhysicsGeometry>(path);
+		}
+	}
+
+	u32 getInstancedMeshLayer(EntityRef entity) override {
+		return m_instanced_meshes[entity].layer;
+	}
+
+	void setInstancedMeshLayer(EntityRef entity, u32 layer) override {
+		m_instanced_meshes[entity].layer = layer;
 	}
 	
 	u32 getInstancedCubeLayer(EntityRef entity) override {
@@ -3612,6 +3741,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 		Array<PxRigidActor*> actors;
 	};
 
+	struct InstancedMesh {
+		InstancedMesh(IAllocator& allocator) : actors(allocator) {}
+		u32 layer = 0;
+		Array<PxRigidActor*> actors;
+		PhysicsGeometry* resource = nullptr;
+	};
+
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	Universe& m_universe;
@@ -3634,6 +3770,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	HashMap<EntityRef, UniquePtr<Vehicle>> m_vehicles;
 	HashMap<EntityRef, Wheel> m_wheels;
 	HashMap<EntityRef, InstancedCube> m_instanced_cubes;
+	HashMap<EntityRef, InstancedMesh> m_instanced_meshes;
 	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
 	PxBatchQuery* m_vehicle_batch_query;
 	u8 m_vehicle_query_mem[sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64];
@@ -3659,6 +3796,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	, m_terrains(m_allocator)
 	, m_dynamic_actors(m_allocator)
 	, m_instanced_cubes(m_allocator)
+	, m_instanced_meshes(m_allocator)
 	, m_universe(context)
 	, m_is_game_running(false)
 	, m_contact_callback(*this)
@@ -3804,6 +3942,9 @@ void PhysicsScene::reflect() {
 		.LUMIX_CMP(InstancedCube, "physical_instanced_cube", "Physics / Instanced cube")
 			.LUMIX_PROP(InstancedCubeHalfExtents, "Half extents")
 			.LUMIX_ENUM_PROP(InstancedCubeLayer, "Layer").attribute<LayerEnum>()
+		.LUMIX_CMP(InstancedMesh, "physical_instanced_mesh", "Physics / Instanced mesh")
+			.LUMIX_PROP(InstancedMeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
+			.LUMIX_ENUM_PROP(InstancedMeshLayer, "Layer").attribute<LayerEnum>()
 		.LUMIX_CMP(Controller, "physical_controller", "Physics / Controller")
 			.LUMIX_FUNC_EX(PhysicsScene::moveController, "move")
 			.LUMIX_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown")

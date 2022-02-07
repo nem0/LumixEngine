@@ -270,6 +270,11 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual u32 getInstancedCubeLayer(EntityRef entity) = 0;
 	virtual void setInstancedCubeLayer(EntityRef entity, u32 layer) = 0;
 
+	virtual u32 getInstancedMeshLayer(EntityRef entity) = 0;
+	virtual void setInstancedMeshLayer(EntityRef entity, u32 layer) = 0;
+	virtual Path getInstancedMeshGeomPath(EntityRef entity) = 0;
+	virtual void setInstancedMeshGeomPath(EntityRef entity, const Path& path) = 0;
+
 	virtual u32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;
 	virtual void setVisualizationCullingBox(const DVec3& min, const DVec3& max) = 0;
