@@ -8,6 +8,7 @@
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/fixed_array.h"
 #include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
@@ -938,11 +939,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		float top = y;
 		u32 lines = 0;
 
-		struct {
+		struct OpenBlock {
 			i32 id;
 			u64 start_time;
-		} open_blocks[64];
-		int level = -1;
+		};
+		FixedArray<OpenBlock, 64> open_blocks;
+		
 		u32 p = ctx.begin;
 		const u32 end = ctx.end;
 
@@ -950,8 +952,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			profiler::EventHeader header;
 			int level;
 			int offset;
-		} properties[64];
-		int properties_count = 0;
+		};
+		FixedArray<Property, 64> properties;
 
 		auto draw_triggered_signal = [&](u64 time, i32 signal) {
 			const float t_start = float(int(time - view_start) / double(m_range));
@@ -977,7 +979,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		};
 
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
-			const Block& block = m_blocks[open_blocks[level].id];
+			const Block& block = m_blocks[open_blocks.last().id];
 			if (hovered_fiber_wait.signal == block.job_info.signal_on_finish && hovered_fiber_wait.frame > frame_id - 2) {
 				const float t_start = float(int(from - view_start) / double(m_range));
 				const float x_start = from_x * (1 - t_start) + to_x * t_start;
@@ -1027,20 +1029,20 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					hovered_job.pos = ImVec2(x_start, block_y);
 					hovered_job.signal = block.job_info.signal_on_finish;
 				}
-				for (int i = 0; i < properties_count; ++i) {
-					if (properties[i].level != level) continue;
+				for (const Property& prop : properties) {
+					if (prop.level != open_blocks.size() - 1) continue;
 
-					switch (properties[i].header.type) {
+					switch (prop.header.type) {
 					case profiler::EventType::INT: {
 						profiler::IntRecord r;
-						read(ctx, properties[i].offset, (u8*)&r, sizeof(r));
+						read(ctx, prop.offset, (u8*)&r, sizeof(r));
 						ImGui::Text("%s: %d", r.key, r.value);
 						break;
 					}
 					case profiler::EventType::STRING: {
 						char tmp[128];
-						const int tmp_size = properties[i].header.size - sizeof(properties[i].header);
-						read(ctx, properties[i].offset, (u8*)tmp, tmp_size);
+						const int tmp_size = prop.header.size - sizeof(prop.header);
+						read(ctx, prop.offset, (u8*)tmp, tmp_size);
 						ImGui::Text("%s", tmp);
 						break;
 					}
@@ -1104,28 +1106,22 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			}
 			case profiler::EventType::LINK:
-				if (level >= 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks[level].id].link);
+				if (open_blocks.size() > 0) {
+					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].link);
 				}
 				break;
 			case profiler::EventType::BEGIN_BLOCK:
 				profiler::BlockRecord tmp;
 				read(ctx, p + sizeof(profiler::EventHeader), tmp);
-				++level;
-				ASSERT(level < (int)lengthOf(open_blocks));
-				open_blocks[level].id = tmp.id;
-				open_blocks[level].start_time = header.time;
-				lines = maximum(lines, level + 1);
+				open_blocks.push({tmp.id, header.time});
+				lines = maximum(lines, open_blocks.size());
 				y += 20.f;
 				break;
 			case profiler::EventType::CONTINUE_BLOCK: {
 				i32 id;
 				read(ctx, p + sizeof(profiler::EventHeader), id);
-				++level;
-				ASSERT(level < (int)lengthOf(open_blocks));
-				open_blocks[level].id = id;
-				open_blocks[level].start_time = header.time;
-				lines = maximum(lines, level + 1);
+				open_blocks.push({id, header.time});
+				lines = maximum(lines, open_blocks.size());
 				y += 20.f;
 				break;
 			}
@@ -1137,14 +1133,14 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			case profiler::EventType::END_BLOCK:
 				y = maximum(y - 20.f, top);
-				if (level >= 0) {
-					const Block& block = m_blocks[open_blocks[level].id];
+				if (open_blocks.size() > 0) {
+					const Block& block = m_blocks[open_blocks.last().id];
 					const u32 color = block.color;
-					draw_block(open_blocks[level].start_time, header.time, block.name, color);
-					while (properties_count > 0 && properties[properties_count - 1].level == level) {
-						--properties_count;
+					draw_block(open_blocks.last().start_time, header.time, block.name, color);
+					while (properties.size() > 0 && properties.last().level == open_blocks.size() - 1) {
+						properties.pop();
 					}
-					--level;
+					open_blocks.pop();
 				}
 				break;
 			case profiler::EventType::FRAME:
@@ -1152,36 +1148,36 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			case profiler::EventType::INT:
 			case profiler::EventType::STRING: {
-				if (properties_count < (int)lengthOf(properties) && level >= 0) {
-					properties[properties_count].header = header;
-					properties[properties_count].level = level;
-					properties[properties_count].offset = sizeof(profiler::EventHeader) + p;
-					++properties_count;
+				if (!properties.is_full() && open_blocks.size() > 0) {
+					Property& prop = properties.emplace();
+					prop.header = header;
+					prop.level = open_blocks.size() - 1;
+					prop.offset = sizeof(profiler::EventHeader) + p;
 				}
 				else {
-					ASSERT(properties_count == 0);
+					ASSERT(properties.size() == 0);
 				}
 				break;
 			}
 			case profiler::EventType::JOB_INFO:
-				if (level >= 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks[level].id].job_info);
+				if (open_blocks.size() > 0) {
+					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].job_info);
 				}
 				break;
 			case profiler::EventType::BLOCK_COLOR:
-				if (level >= 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks[level].id].color);
+				if (open_blocks.size() > 0) {
+					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].color);
 				}
 				break;
 			default: ASSERT(false); break;
 			}
 			p += header.size;
 		}
-		while (level >= 0) {
+		while (open_blocks.size() > 0) {
 			y -= 20.f;
-			const Block& b = m_blocks[open_blocks[level].id];
-			draw_block(open_blocks[level].start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
-			--level;
+			const Block& b = m_blocks[open_blocks.last().id];
+			draw_block(open_blocks.last().start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			open_blocks.pop();
 		}
 
 		ImGui::Dummy(ImVec2(to_x - from_x, lines * 20.f));

@@ -418,6 +418,8 @@ void shutdown()
 static void waitEx(Signal* signal, bool is_mutex)
 {
 	ASSERT(signal);
+	if (signal->counter == 0) return;
+
 	g_system->m_sync.enter();
 	if (signal->counter == 0) {
 		g_system->m_sync.exit();

@@ -8,7 +8,6 @@ struct IAllocator;
 namespace jobs {
 
 constexpr u8 ANY_WORKER = 0xff;
-constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 
 struct Mutex;
 struct Signal;

@@ -4,6 +4,7 @@
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/fixed_array.h"
 #include "engine/geometry.h"
 #include "engine/atomic.h"
 #include "engine/job_system.h"
@@ -2311,25 +2312,23 @@ struct PipelineImpl final : Pipeline
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				gpu::bindTextures(m_textures_handles, m_offset, m_textures_count);
+				gpu::bindTextures(m_textures_handles.begin(), m_offset, m_textures_handles.size());
 			}
 
-			gpu::TextureHandle m_textures_handles[16];
-			int m_offset = 0;
-			u32 m_textures_count = 0;
+			FixedArray<gpu::TextureHandle, 16> m_textures_handles;
+			i32 m_offset = 0;
 		};
 		
 		Cmd& cmd = m_renderer.createJob<Cmd>();
 		cmd.m_offset = offset.get(0);
 		
-		if (textures.size > lengthOf(cmd.m_textures_handles)) {
+		if (textures.size > cmd.m_textures_handles.capacity()) {
 			luaL_argerror(L, 1, "too many textures");
 			return;
 		}
 
 		for (u32 i = 0; i < textures.size; ++i) {
-			cmd.m_textures_handles[cmd.m_textures_count] = toHandle(textures[i]);
-			++cmd.m_textures_count;
+			cmd.m_textures_handles.push(toHandle(textures[i]));
 		}
 
 		m_renderer.queue(cmd, m_profiler_link);
@@ -2394,7 +2393,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::setState(m_render_state);
 
-				gpu::bindTextures(m_textures_handles, 0, m_textures_count);
+				gpu::bindTextures(m_textures_handles.begin(), 0, m_textures_handles.size());
 
 				gpu::useProgram(m_program);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -2404,8 +2403,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 			PipelineImpl* m_pipeline;
-			gpu::TextureHandle m_textures_handles[16];
-			u32 m_textures_count = 0;
+			FixedArray<gpu::TextureHandle, 16> m_textures_handles;
 			Shader* m_shader;
 			int m_indices_count;
 			int m_indices_offset;
@@ -2448,12 +2446,15 @@ struct PipelineImpl final : Pipeline
 		Cmd& cmd = m_renderer.createJob<Cmd>();
 		if(lua_gettop(L) > 3) {
 			const u32 len = (u32)lua_objlen(L, 4);
+			if (len > cmd.m_textures_handles.capacity()) {
+				luaL_error(L, "Too many textures");
+			}
+
 			for(u32 i = 0; i < len; ++i) {
 				lua_rawgeti(L, 4, i + 1);
 				if (!LuaWrapper::isType<PipelineTexture>(L, -1)) luaL_argerror(L, 4, "expected textures");
 				const PipelineTexture tex = LuaWrapper::toType<PipelineTexture>(L, -1);
-				cmd.m_textures_handles[cmd.m_textures_count] = toHandle(tex);
-				++cmd.m_textures_count;
+				cmd.m_textures_handles.push(toHandle(tex));
 				lua_pop(L, 1);
 			}
 		
