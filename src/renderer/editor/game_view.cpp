@@ -181,7 +181,7 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 
 	ImGui::End();
 
-	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !editor.isGameMode()))
+	if (m_is_fullscreen && (ImGui::IsKeyPressed(ImGuiKey_Escape) || !editor.isGameMode()))
 	{
 		setFullscreen(false);
 	}
@@ -274,7 +274,7 @@ void GameView::onWindowGUI()
 	m_was_game_mode = is_game_mode;
 
 	ImGuiIO& io = ImGui::GetIO();
-	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !editor.isGameMode())) {
+	if (m_is_mouse_captured && (ImGui::IsKeyDown(ImGuiKey_Escape) || !editor.isGameMode())) {
 		captureMouse(false);
 	}
 

@@ -199,28 +199,67 @@ struct StudioAppImpl final : StudioApp
 		if (!jobs::init(cpus_count, m_allocator)) {
 			logError("Failed to initialize job system.");
 		}
-	}
 
+		memset(m_imgui_key_map, 0, sizeof(m_imgui_key_map));
+		m_imgui_key_map[(int)os::Keycode::CTRL] = ImGuiKey_ModCtrl;
+		m_imgui_key_map[(int)os::Keycode::MENU] = ImGuiKey_ModAlt;
+		m_imgui_key_map[(int)os::Keycode::SHIFT] = ImGuiKey_ModShift;
+		m_imgui_key_map[(int)os::Keycode::SHIFT] = ImGuiKey_ModShift;
+		m_imgui_key_map[(int)os::Keycode::LSHIFT] = ImGuiKey_LeftShift;
+		m_imgui_key_map[(int)os::Keycode::RSHIFT] = ImGuiKey_RightShift;
+		m_imgui_key_map[(int)os::Keycode::SPACE] = ImGuiKey_Space;
+		m_imgui_key_map[(int)os::Keycode::TAB] = ImGuiKey_Tab;
+		m_imgui_key_map[(int)os::Keycode::LEFT] = ImGuiKey_LeftArrow;
+		m_imgui_key_map[(int)os::Keycode::RIGHT] = ImGuiKey_RightArrow;
+		m_imgui_key_map[(int)os::Keycode::UP] = ImGuiKey_UpArrow;
+		m_imgui_key_map[(int)os::Keycode::DOWN] = ImGuiKey_DownArrow;
+		m_imgui_key_map[(int)os::Keycode::PAGEUP] = ImGuiKey_PageUp;
+		m_imgui_key_map[(int)os::Keycode::PAGEDOWN] = ImGuiKey_PageDown;
+		m_imgui_key_map[(int)os::Keycode::HOME] = ImGuiKey_Home;
+		m_imgui_key_map[(int)os::Keycode::END] = ImGuiKey_End;
+		m_imgui_key_map[(int)os::Keycode::DEL] = ImGuiKey_Delete;
+		m_imgui_key_map[(int)os::Keycode::BACKSPACE] = ImGuiKey_Backspace;
+		m_imgui_key_map[(int)os::Keycode::RETURN] = ImGuiKey_Enter;
+		m_imgui_key_map[(int)os::Keycode::ESCAPE] = ImGuiKey_Escape;
+		m_imgui_key_map[(int)os::Keycode::A] = ImGuiKey_A;
+		m_imgui_key_map[(int)os::Keycode::C] = ImGuiKey_C;
+		m_imgui_key_map[(int)os::Keycode::V] = ImGuiKey_V;
+		m_imgui_key_map[(int)os::Keycode::X] = ImGuiKey_X;
+		m_imgui_key_map[(int)os::Keycode::Y] = ImGuiKey_Y;
+		m_imgui_key_map[(int)os::Keycode::Z] = ImGuiKey_Z;
+	}
 
 	void onEvent(const os::Event& event)
 	{
 		const bool handle_input = isFocused();
 		m_events.push(event);
 		switch (event.type) {
-			case os::Event::Type::MOUSE_MOVE: break;
+			case os::Event::Type::MOUSE_MOVE: 
+				if (!m_cursor_captured) {
+					ImGuiIO& io = ImGui::GetIO();
+					const os::Point cp = os::getMouseScreenPos();
+					if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+						io.AddMousePosEvent((float)cp.x, (float)cp.y);
+					}
+					else {
+						const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
+						io.AddMousePosEvent((float)cp.x - screen_rect.left, (float)cp.y - screen_rect.top);
+					}
+				}
+				break;
 			case os::Event::Type::FOCUS: break;
 			case os::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 				if (handle_input || !event.mouse_button.down) {
-					io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
+					io.AddMouseButtonEvent((int)event.mouse_button.button, event.mouse_button.down);
 				}
 				break;
 			}
 			case os::Event::Type::MOUSE_WHEEL:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
-					io.MouseWheel = event.mouse_wheel.amount;
+					io.AddMouseWheelEvent(0, event.mouse_wheel.amount);
 				}
 				break;
 			case os::Event::Type::WINDOW_SIZE:
@@ -265,10 +304,8 @@ struct StudioAppImpl final : StudioApp
 			case os::Event::Type::KEY:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
-					io.KeysDown[(int)event.key.keycode] = event.key.down;
-					io.KeyShift = os::isKeyDown(os::Keycode::SHIFT);
-					io.KeyCtrl = os::isKeyDown(os::Keycode::CTRL);
-					io.KeyAlt = os::isKeyDown(os::Keycode::MENU);
+					ImGuiKey key = m_imgui_key_map[(int)event.key.keycode];
+					if (key != ImGuiKey_None) io.AddKeyEvent(key, event.key.down);
 
 					if (event.key.down && event.key.keycode == os::Keycode::F2) {
 						m_is_f2_pressed = true;
@@ -721,22 +758,6 @@ struct StudioAppImpl final : StudioApp
 			io.DisplaySize.y = 600;
 		}
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyShift = os::isKeyDown(os::Keycode::SHIFT);
-		io.KeyCtrl = os::isKeyDown(os::Keycode::CTRL);
-		io.KeyAlt = os::isKeyDown(os::Keycode::MENU);
-
-		const os::Point cp = os::getMouseScreenPos();
-		if (!m_cursor_captured) {
-			if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-				io.MousePos.x = (float)cp.x;
-				io.MousePos.y = (float)cp.y;
-			}
-			else {
-				const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
-				io.MousePos.x = (float)cp.x - screen_rect.left;
-				io.MousePos.y = (float)cp.y - screen_rect.top;
-			}
-		}
 
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
@@ -2190,27 +2211,6 @@ struct StudioAppImpl final : StudioApp
 			);
 		}
 
-		io.KeyMap[ImGuiKey_Space] = (int)os::Keycode::SPACE;
-		io.KeyMap[ImGuiKey_Tab] = (int)os::Keycode::TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = (int)os::Keycode::LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = (int)os::Keycode::RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = (int)os::Keycode::UP;
-		io.KeyMap[ImGuiKey_DownArrow] = (int)os::Keycode::DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = (int)os::Keycode::PAGEUP;
-		io.KeyMap[ImGuiKey_PageDown] = (int)os::Keycode::PAGEDOWN;
-		io.KeyMap[ImGuiKey_Home] = (int)os::Keycode::HOME;
-		io.KeyMap[ImGuiKey_End] = (int)os::Keycode::END;
-		io.KeyMap[ImGuiKey_Delete] = (int)os::Keycode::DEL;
-		io.KeyMap[ImGuiKey_Backspace] = (int)os::Keycode::BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter] = (int)os::Keycode::RETURN;
-		io.KeyMap[ImGuiKey_Escape] = (int)os::Keycode::ESCAPE;
-		io.KeyMap[ImGuiKey_A] = (int)os::Keycode::A;
-		io.KeyMap[ImGuiKey_C] = (int)os::Keycode::C;
-		io.KeyMap[ImGuiKey_V] = (int)os::Keycode::V;
-		io.KeyMap[ImGuiKey_X] = (int)os::Keycode::X;
-		io.KeyMap[ImGuiKey_Y] = (int)os::Keycode::Y;
-		io.KeyMap[ImGuiKey_Z] = (int)os::Keycode::Z;
-
 		ImGuiStyle& style = ImGui::GetStyle();
 		style.FramePadding.y = 0;
 		style.ItemSpacing.y = 2;
@@ -3426,6 +3426,7 @@ struct StudioAppImpl final : StudioApp
 		IAllocator& m_allocator;
 	#endif
 	UniquePtr<Engine> m_engine;
+	ImGuiKey m_imgui_key_map[255];
 	Array<os::WindowHandle> m_windows;
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	os::WindowHandle m_main_window;

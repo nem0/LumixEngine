@@ -256,7 +256,7 @@ enum class Keycode : u8 {
 	RETURN = 0x0D,
 	SHIFT = 0x10,
 	CTRL = 0x11,
-	MENU = 0x12,
+	MENU = 0x12, // alt
 	PAUSE = 0x13,
 	CAPITAL = 0x14,
 	KANA = 0x15,

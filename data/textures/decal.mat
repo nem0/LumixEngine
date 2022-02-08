@@ -1,0 +1,11 @@
+shader "pipelines/decal.shd"
+backface_culling(true)
+layer "decal"
+translucency(0.000000)
+emission(0.000000)
+metallic(0.000000)
+roughness(1.000000)
+defines {}
+color { 1.000000, 1.000000, 1.000000, 1.000000 }
+texture "/textures/decal.png"
+layer "decal"

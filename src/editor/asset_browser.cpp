@@ -583,7 +583,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			for (IPlugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
 				if (ImGui::BeginMenu(plugin->getName())) {
-					ImGui::InputTextWithHint("", "Name", tmp, sizeof(tmp));
+					ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp));
 					ImGui::SameLine();
 					if (ImGui::Button("Create")) {
 						StaticString<LUMIX_MAX_PATH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());

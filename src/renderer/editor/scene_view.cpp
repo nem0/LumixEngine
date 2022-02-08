@@ -1319,7 +1319,7 @@ void SceneView::searchUI() {
 	if (m_search_request) ImGui::OpenPopup("Search");
 
 	if (ImGuiEx::BeginResizablePopup("Search", ImVec2(300, 200))) {
-		if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) ImGui::CloseCurrentPopup();
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 		ImGui::AlignTextToFramePadding();
 		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("settings_popup");
@@ -1339,13 +1339,13 @@ void SceneView::searchUI() {
 			m_search_selected = 0;
 		}
 		bool scroll = false;
-		const bool insert_enter= ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter));
+		const bool insert_enter= ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
 		if (ImGui::IsItemFocused()) {
-			if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow)) && m_search_selected > 0) {
+			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_search_selected > 0) {
 				--m_search_selected;
 				scroll =  true;
 			}
-			if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) {
+			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
 				++m_search_selected;
 				scroll =  true;
 			}
