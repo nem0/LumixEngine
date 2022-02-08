@@ -1229,8 +1229,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		
 		float y = ImGui::GetCursorScreenPos().y;
 
-		u32 open_blocks[64];
-		int level = -1;
+		FixedArray<u32, 32> open_blocks;
 		u32 lines = 0;
 
 		bool has_stats = false;
@@ -1242,17 +1241,15 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			read(ctx, p, header);
 			switch (header.type) {
 				case profiler::EventType::BEGIN_GPU_BLOCK:
-					++level;
-					ASSERT(level < (int)lengthOf(open_blocks));
-					open_blocks[level] = p;
-					lines = maximum(lines, level + 1);
+					open_blocks.push(p);
+					lines = maximum(lines, open_blocks.size());
 					break;
 				case profiler::EventType::END_GPU_BLOCK:
-					if (level >= 0 && gpu_open) {
+					if (open_blocks.size() > 0 && gpu_open) {
 						profiler::EventHeader start_header;
-						read(ctx, open_blocks[level], start_header);
+						read(ctx, open_blocks.last(), start_header);
 						profiler::GPUBlock data;
-						read(ctx, open_blocks[level] + sizeof(profiler::EventHeader), data);
+						read(ctx, open_blocks.last() + sizeof(profiler::EventHeader), data);
 						u64 to;
 						read(ctx, p + sizeof(profiler::EventHeader), to);
 						const u64 from = data.timestamp;
@@ -1261,7 +1258,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						const float x_start = from_x * (1 - t_start) + to_x * t_start;
 						float x_end = from_x * (1 - t_end) + to_x * t_end;
 						if (int(x_end) == int(x_start)) ++x_end;
-						const float block_y = level * 20.f + y;
+						const float block_y = (open_blocks.size() - 1) * 20.f + y;
 						const float w = ImGui::CalcTextSize(data.name).x;
 
 						const ImVec2 ra(x_start, block_y);
@@ -1293,9 +1290,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 							ImGui::EndTooltip();
 						}
 					}
-					if (level >= 0) {
-						--level;
-					}
+					if (open_blocks.size() > 0) open_blocks.pop();
 					has_stats = false;
 					break;
 				case profiler::EventType::GPU_STATS:
