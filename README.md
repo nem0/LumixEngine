@@ -18,7 +18,7 @@
 
 Who is using it?
 
-* [On the Hunt](http://www.indiedb.com/games/on-the-hunt)
+* [On the Hunt](https://mikulasflorek.itch.io/on-the-hunt)
 
 ![4k_1](https://user-images.githubusercontent.com/153526/144655096-dd289dc3-c2a3-4a9d-a02c-0f55e87115aa.jpg)
 
