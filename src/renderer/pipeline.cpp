@@ -1322,7 +1322,6 @@ struct PipelineImpl final : Pipeline
 		Draw2DJob& cmd = m_renderer.createJob<Draw2DJob>(allocator);
 		cmd.pipeline = this;
 		cmd.atlas_texture = atlas_texture->handle;
-		cmd.prepare(drawdata);
 		cmd.matrix = m_scene->getUniverse().getRelativeMatrix(e, m_viewport.pos);
 		cmd.is_3d = true;
 		Matrix normalize(
@@ -1338,6 +1337,7 @@ struct PipelineImpl final : Pipeline
 			cmd.matrix.multiply3x3(tr.scale);
 		}
 		cmd.matrix = m_viewport.getProjection() * m_viewport.getViewRotation() * cmd.matrix * normalize;
+		cmd.prepare(drawdata);
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
