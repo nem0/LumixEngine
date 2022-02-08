@@ -95,7 +95,7 @@ function surface_shader(code)
 			v_uv = a_uv;
 			#if defined INSTANCED || defined GRASS
 				vec4 rot_quat = vec4(i_rot_lod.xyz, 0);
-				rot_quat.w = sqrt(1 - dot(rot_quat.xyz, rot_quat.xyz));
+				rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
 				v_normal = rotateByQuat(rot_quat, a_normal);
 				v_tangent = rotateByQuat(rot_quat, a_tangent);
 				vec3 p = a_position * i_pos_scale.w;
