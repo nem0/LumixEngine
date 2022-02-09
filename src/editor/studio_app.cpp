@@ -1701,6 +1701,7 @@ struct StudioAppImpl final : StudioApp
 		bool has_child = universe->getFirstChild(entity).isValid();
 		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
 		if (selected) flags |= ImGuiTreeNodeFlags_Selected;
+		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 		
 		bool node_open;
 		if (m_renaming_entity == entity) {
@@ -1977,7 +1978,7 @@ struct StudioAppImpl final : StudioApp
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
 						bool selected = entities.indexOf(e_ref) >= 0;
-						if (ImGui::Selectable(buffer, &selected)) {
+						if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
 							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
 						}
 						if (ImGui::BeginDragDropSource()) {
