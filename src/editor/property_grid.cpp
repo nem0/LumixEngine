@@ -905,9 +905,10 @@ void PropertyGrid::onGUI()
 			ImGui::OpenPopup("AddComponentPopup");
 		}
 
-		if (ImGuiEx::BeginResizablePopup("AddComponentPopup", ImVec2(300, 300))) {
+		if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
 			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 			ImGui::SetNextItemWidth(-w);
+			ImGui::SetNextItemWidth(200);
 			ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {

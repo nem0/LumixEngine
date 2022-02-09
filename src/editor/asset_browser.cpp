@@ -1139,7 +1139,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			filter[0] = '\0';
 		}
 
-		ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 3), false, ImGuiWindowFlags_HorizontalScrollbar);
+		ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 2), false, ImGuiWindowFlags_HorizontalScrollbar);
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 	
 		const auto& resources = compiler.lockResources();
@@ -1168,7 +1168,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::EndChild();
 		ImGui::Separator();
 		if (!selected_path.isEmpty()) {
-			ImGui::Text("%s", selected_path.c_str());
+			ImGui::TextWrapped("%s", selected_path.c_str());
 		}
 		compiler.unlockResources();
 		return false;
