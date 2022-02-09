@@ -293,5 +293,67 @@ void* BaseProxyAllocator::reallocate(void* ptr, size_t size)
 	return m_source.reallocate(ptr, size);
 }
 
+LinearAllocator::LinearAllocator(u32 reserved) {
+	m_end = 0;
+	m_commited = 0;
+	m_reserved = reserved;
+	m_mem = (u8*)os::memReserve(reserved);
+}
+
+LinearAllocator::~LinearAllocator() {
+	ASSERT(m_end == 0);
+	os::memRelease(m_mem, m_reserved);
+}
+
+void LinearAllocator::reset() {
+	m_end = 0;
+}
+
+static u32 roundUp(u32 val, u32 align) {
+	ASSERT(isPowOfTwo(align));
+	return (val + align - 1) & ~(align - 1);
+}
+
+void* LinearAllocator::allocate_aligned(size_t size, size_t align) {
+	ASSERT(size < 0xffFFffFF);
+	const u32 start = roundUp(m_end, (u32)align);
+	if (start + size > m_commited) {
+		const u32 commited = roundUp(start + (u32)size, 4096);
+		ASSERT(commited < m_reserved);
+		os::memCommit(m_mem + m_commited, commited - m_commited);
+		m_commited = commited;
+	}
+	m_end = start + (u32)size;
+	return m_mem + start;
+}
+
+void LinearAllocator::deallocate_aligned(void* ptr) { /*everything should be "deallocated" with reset()*/ }
+void* LinearAllocator::reallocate_aligned(void* ptr, size_t size, size_t align) { 
+	if (!ptr) return allocate_aligned(size, align);
+	// realloc not supported
+	ASSERT(false); 
+	return nullptr;
+}
+
+void* LinearAllocator::allocate(size_t size) {
+	ASSERT(size < 0xffFFffFF);
+	const u32 start = m_end;
+	if (start + size > m_commited) {
+		const u32 commited = roundUp(start + (u32)size, 4096);
+		ASSERT(commited < m_reserved);
+		os::memCommit(m_mem + m_commited, commited - m_commited);
+		m_commited = commited;
+	}
+	m_end = start + (u32)size;
+	return m_mem + start;
+}
+
+void LinearAllocator::deallocate(void* ptr) { /*everything should be "deallocated" with reset()*/ }
+void* LinearAllocator::reallocate(void* ptr, size_t size) {
+	if (!ptr) return allocate(size);
+	// realloc not supported
+	ASSERT(false); 
+	return nullptr;
+}
 
 } // namespace Lumix

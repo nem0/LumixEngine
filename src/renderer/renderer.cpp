@@ -1,5 +1,6 @@
 #include "renderer.h"
 
+#include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
@@ -150,6 +151,7 @@ struct FrameData {
 		, renderer(renderer)
 		, to_compile_shaders(allocator)
 		, material_updates(allocator)
+		, job_allocator(1024 * 1024 * 64)
 	{}
 
 	struct ShaderToCompile {
@@ -169,6 +171,7 @@ struct FrameData {
 	TransientBuffer<256> uniform_buffer;
 	u32 gpu_frame = 0xffFFffFF;
 
+	LinearAllocator job_allocator;
 	Array<MaterialUpdates> material_updates;
 	Array<Renderer::RenderJob*> jobs;
 	jobs::Mutex shader_mutex;
@@ -1123,11 +1126,11 @@ struct RendererImpl final : Renderer
 	}
 
 	void* allocJob(u32 size, u32 align) override {
-		return m_allocator.allocate_aligned(size, align);
+		return m_cpu_frame->job_allocator.allocate_aligned(size, align);
 	}
 
 	void deallocJob(void* job) override {
-		m_allocator.deallocate_aligned(job);
+		m_cpu_frame->job_allocator.deallocate_aligned(job);
 	}
 
 	const char* getName() const override { return "renderer"; }
@@ -1242,6 +1245,7 @@ struct RendererImpl final : Renderer
 				job->execute();
 				destroyJob(*job);
 			}
+			frame.job_allocator.reset();
 		}
 		m_profiler.endQuery();
 		frame.jobs.clear();

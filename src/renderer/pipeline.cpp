@@ -1,10 +1,10 @@
 #include "gpu/gpu.h"
+#include "engine/allocators.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "engine/fixed_array.h"
 #include "engine/geometry.h"
 #include "engine/atomic.h"
 #include "engine/job_system.h"
@@ -2308,6 +2308,9 @@ struct PipelineImpl final : Pipeline
 
 	void bindTextures(lua_State* L, LuaWrapper::Array<PipelineTexture, 16> textures, LuaWrapper::Optional<u32> offset) 	{
 		struct Cmd : Renderer::RenderJob {
+			Cmd(IAllocator& allocator) 
+				: m_allocator(allocator)
+				, m_textures_handles(m_allocator) {}
 			void setup() override {}
 			void execute() override
 			{
@@ -2315,18 +2318,14 @@ struct PipelineImpl final : Pipeline
 				gpu::bindTextures(m_textures_handles.begin(), m_offset, m_textures_handles.size());
 			}
 
-			FixedArray<gpu::TextureHandle, 16> m_textures_handles;
+			StackAllocator<sizeof(gpu::TextureHandle) * 16, alignof(gpu::TextureHandle)> m_allocator; 
+			Array<gpu::TextureHandle> m_textures_handles;
 			i32 m_offset = 0;
 		};
 		
-		Cmd& cmd = m_renderer.createJob<Cmd>();
+		Cmd& cmd = m_renderer.createJob<Cmd>(m_allocator);
 		cmd.m_offset = offset.get(0);
 		
-		if (textures.size > cmd.m_textures_handles.capacity()) {
-			luaL_argerror(L, 1, "too many textures");
-			return;
-		}
-
 		for (u32 i = 0; i < textures.size; ++i) {
 			cmd.m_textures_handles.push(toHandle(textures[i]));
 		}
@@ -2386,6 +2385,10 @@ struct PipelineImpl final : Pipeline
 	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id)
 	{
 		struct Cmd : Renderer::RenderJob {
+			Cmd(IAllocator& allocator)
+				: m_allocator(allocator)
+				, m_textures_handles(m_allocator)
+			{}
 			void setup() override { m_program = m_shader->getProgram(gpu::VertexDecl(), m_define_mask); }
 			void execute() override 
 			{
@@ -2403,7 +2406,8 @@ struct PipelineImpl final : Pipeline
 			}
 
 			PipelineImpl* m_pipeline;
-			FixedArray<gpu::TextureHandle, 16> m_textures_handles;
+			StackAllocator<sizeof(gpu::TextureHandle) * 16, alignof(gpu::TextureHandle)> m_allocator; 
+			Array<gpu::TextureHandle> m_textures_handles;
 			Shader* m_shader;
 			int m_indices_count;
 			int m_indices_offset;
@@ -2443,12 +2447,9 @@ struct PipelineImpl final : Pipeline
 		}
 		if (!shader->isReady()) return;
 
-		Cmd& cmd = m_renderer.createJob<Cmd>();
+		Cmd& cmd = m_renderer.createJob<Cmd>(m_allocator);
 		if(lua_gettop(L) > 3) {
 			const u32 len = (u32)lua_objlen(L, 4);
-			if (len > cmd.m_textures_handles.capacity()) {
-				luaL_error(L, "Too many textures");
-			}
 
 			for(u32 i = 0; i < len; ++i) {
 				lua_rawgeti(L, 4, i + 1);
