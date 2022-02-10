@@ -209,6 +209,11 @@ struct RenderSceneImpl final : RenderScene {
 
 		m_particle_emitters.clear();
 
+		for (InstancedModel& im : m_instanced_models) {
+			if (im.model) im.model->decRefCount();
+		}
+		m_instanced_models.clear();
+
 		for (ModelInstance& i : m_model_instances)
 		{
 			if (i.flags.isSet(ModelInstance::VALID) && i.model)
