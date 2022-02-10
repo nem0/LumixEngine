@@ -800,7 +800,8 @@ void SceneView::renderIcons()
 			PROFILE_FUNCTION();
 			Array<EditorIcons::RenderData> data(m_allocator);
 			m_ui->m_view->m_icons->getRenderData(&data);
-			
+			m_items.reserve(data.size());
+
 			for (EditorIcons::RenderData& rd : data) {
 				const Model* model = rd.model;
 				if (!model || !model->isReady()) continue;

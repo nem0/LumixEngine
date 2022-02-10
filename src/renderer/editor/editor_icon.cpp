@@ -239,6 +239,7 @@ struct EditorIconsImpl final : EditorIcons
 		const Viewport& vp = m_editor.getView().getViewport();
 		Matrix camera_mtx({0, 0, 0}, vp.rot);
 
+		data->reserve(m_icons.size());
 		for(auto& icon : m_icons) {
 			const DVec3 position = universe.getPosition(icon.entity);
 			const float distance = (float)length(position - vp.pos);

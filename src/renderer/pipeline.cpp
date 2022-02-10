@@ -1878,8 +1878,9 @@ struct PipelineImpl final : Pipeline
 	void renderTerrains(lua_State* L, CameraParams cp, RenderState state)
 	{
 		PROFILE_FUNCTION();
+		LinearAllocator& current_frame_allocator = m_renderer.getCurrentFrameAllocator();
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderTerrainsCommand& cmd = m_renderer.createJob<RenderTerrainsCommand>(allocator);
+		RenderTerrainsCommand& cmd = m_renderer.createJob<RenderTerrainsCommand>(current_frame_allocator, allocator);
 
 		const char* define = "";
 		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
@@ -1926,7 +1927,7 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderJob
 		{
-			Cmd(IAllocator& allocator) : m_drawcalls(allocator) {}
+			Cmd(LinearAllocator& allocator) : m_drawcalls(allocator) {}
 
 			void setup() override
 			{
@@ -2012,7 +2013,7 @@ struct PipelineImpl final : Pipeline
 			CameraParams m_camera_params;
 		};
 
-		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getAllocator());
+		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getCurrentFrameAllocator());
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
 
@@ -4485,9 +4486,9 @@ struct PipelineImpl final : Pipeline
 
 	struct RenderTerrainsCommand : Renderer::RenderJob
 	{
-		RenderTerrainsCommand(IAllocator& allocator)
+		RenderTerrainsCommand(LinearAllocator& current_frame_allocator, IAllocator& allocator)
 			: m_allocator(allocator)
-			, m_instances(allocator)
+			, m_instances(current_frame_allocator)
 		{
 		}
 
@@ -4590,7 +4591,7 @@ struct PipelineImpl final : Pipeline
 			gpu::StateFlags state = m_render_state;
 			Renderer& renderer = m_pipeline->m_renderer;
 			renderer.beginProfileBlock("terrain", 0);
-			for (Instance& inst : m_instances) {
+			for (const Instance& inst : m_instances) {
 				gpu::useProgram(inst.program);
 				gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 				
