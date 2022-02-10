@@ -682,7 +682,7 @@ struct PipelineImpl final : Pipeline
 		
 		static_assert(sizeof(Page) == PageAllocator::PAGE_SIZE);
 
-		AutoInstancer(IAllocator& allocator, PageAllocator& page_allocator)
+		AutoInstancer(LinearAllocator& allocator, PageAllocator& page_allocator)
 			: instances(allocator)
 			, page_allocator(page_allocator)
 		{
@@ -806,7 +806,7 @@ struct PipelineImpl final : Pipeline
 	};
 
 	struct View {
-		View(IAllocator& allocator, PageAllocator& page_allocator) 
+		View(LinearAllocator& allocator, PageAllocator& page_allocator) 
 			: sorter(allocator, page_allocator)
 			, instancers(allocator)
 			, buckets(allocator)
@@ -1459,8 +1459,8 @@ struct PipelineImpl final : Pipeline
 				pipeline->m_renderer.endProfileBlock();
 				while (instanced_meshes) {
 					InstancedMeshes* i = instanced_meshes;
+					i->~InstancedMeshes();
 					instanced_meshes = instanced_meshes->next;
-					LUMIX_DELETE(*allocator, i);
 				}
 			}
 
@@ -2696,12 +2696,12 @@ struct PipelineImpl final : Pipeline
 
 	// TODO optimize
 	struct FillClustersJob : Renderer::RenderJob {
-		FillClustersJob(IAllocator& allocator)
-			: m_clusters(allocator)
-			, m_map(allocator)
+		FillClustersJob(LinearAllocator& current_frame_allocator, IAllocator& allocator)
+			: m_clusters(current_frame_allocator)
+			, m_map(current_frame_allocator)
 			, m_point_lights(allocator)
-			, m_env_probes(allocator)
-			, m_refl_probes(allocator)
+			, m_env_probes(current_frame_allocator)
+			, m_refl_probes(current_frame_allocator)
 		{}
 
 		void setup() override {
@@ -2772,6 +2772,7 @@ struct PipelineImpl final : Pipeline
 
 			const Span<const ReflectionProbe> scene_refl_probes = scene->getReflectionProbes();
 			const Span<EntityRef> refl_probe_entities = scene->getReflectionProbesEntities();
+			refl_probes.reserve(scene_refl_probes.length());
 			for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
 				const ReflectionProbe& refl_probe = scene_refl_probes[i];
 				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
@@ -2795,6 +2796,7 @@ struct PipelineImpl final : Pipeline
 
 			const Span<const EnvironmentProbe> scene_env_probes = scene->getEnvironmentProbes();
 			const Span<EntityRef> env_probe_entities = scene->getEnvironmentProbesEntities();
+			env_probes.reserve(scene_env_probes.length());
 			for (u32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
 					const EnvironmentProbe& env_probe = scene_env_probes[i];
 					if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
@@ -3347,7 +3349,10 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		Array<UniquePtr<View>>& views = pipeline->m_views;
 		UniquePtr<View>& view = views.emplace();
-		view = UniquePtr<View>::create(pipeline->m_allocator, pipeline->m_allocator, pipeline->m_renderer.getEngine().getPageAllocator());
+		LinearAllocator& allocator = pipeline->m_renderer.getCurrentFrameAllocator();
+		view = UniquePtr<View>::create(allocator
+			, allocator
+			, pipeline->m_renderer.getEngine().getPageAllocator());
 		view->cp = cp;
 		if (views.size() > 1) {
 			views[views.size() - 2]->instanced_meshes->next = view->instanced_meshes;
@@ -3383,13 +3388,7 @@ struct PipelineImpl final : Pipeline
 			view->layer_to_bucket[bucket.layer] = i;
 		}
 
-		struct JobData {
-			PipelineImpl* pipeline;
-			u32 view_id;
-			IAllocator* allocator;
-		};
-
-		PrepareViewJob& job = pipeline->m_renderer.createJob<PrepareViewJob>(pipeline->m_allocator);
+		PrepareViewJob& job = pipeline->m_renderer.createJob<PrepareViewJob>(allocator);
 		job.m_pipeline = pipeline;
 		job.m_camera_params = cp;
 		job.m_view = view.get();
@@ -4110,7 +4109,8 @@ struct PipelineImpl final : Pipeline
 
 	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
 		PROFILE_FUNCTION();
-		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(m_allocator);
+		LinearAllocator& current_frame_allocator = m_renderer.getCurrentFrameAllocator();
+		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(current_frame_allocator, m_allocator);
 		
 		job.m_pipeline = this;
 		if (cp.valid) {
@@ -4641,8 +4641,9 @@ struct PipelineImpl final : Pipeline
 		PagedListIterator<const CullResult> iterator(view.renderables);
 
 		view.instancers.reserve(jobs::getWorkersCount());
+		LinearAllocator& allocator = m_renderer.getCurrentFrameAllocator();
 		for (u8 i = 0; i < jobs::getWorkersCount(); ++i) {
-			view.instancers.emplace(m_allocator, m_renderer.getEngine().getPageAllocator());
+			view.instancers.emplace(allocator, m_renderer.getEngine().getPageAllocator());
 		}
 
 		const float time_delta = m_renderer.getEngine().getLastTimeDelta();

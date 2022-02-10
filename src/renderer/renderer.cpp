@@ -1287,6 +1287,8 @@ struct RendererImpl final : Renderer
 			jobs::setGreen(&m_gpu_frame->can_setup);
 		}
 	}
+	
+	LinearAllocator& getCurrentFrameAllocator() { return m_cpu_frame->job_allocator; }
 
 	void waitForCommandSetup() override
 	{

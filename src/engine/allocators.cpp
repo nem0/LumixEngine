@@ -316,14 +316,23 @@ static u32 roundUp(u32 val, u32 align) {
 
 void* LinearAllocator::allocate_aligned(size_t size, size_t align) {
 	ASSERT(size < 0xffFFffFF);
-	const u32 start = roundUp(m_end, (u32)align);
-	if (start + size > m_commited) {
-		const u32 commited = roundUp(start + (u32)size, 4096);
-		ASSERT(commited < m_reserved);
-		os::memCommit(m_mem + m_commited, commited - m_commited);
-		m_commited = commited;
+	u32 start;
+	for (;;) {
+		const u32 end = m_end;
+		start = roundUp(end, (u32)align);
+		if (compareAndExchange(&m_end, u32(start + size), end)) break;
 	}
-	m_end = start + (u32)size;
+
+	if (start + size <= m_commited) return m_mem + start;
+
+	MutexGuard guard(m_mutex);
+	if (start + size <= m_commited) return m_mem + start;
+
+	const u32 commited = roundUp(start + (u32)size, 4096);
+	ASSERT(commited < m_reserved);
+	os::memCommit(m_mem + m_commited, commited - m_commited);
+	m_commited = commited;
+
 	return m_mem + start;
 }
 
@@ -337,14 +346,18 @@ void* LinearAllocator::reallocate_aligned(void* ptr, size_t size, size_t align) 
 
 void* LinearAllocator::allocate(size_t size) {
 	ASSERT(size < 0xffFFffFF);
-	const u32 start = m_end;
-	if (start + size > m_commited) {
-		const u32 commited = roundUp(start + (u32)size, 4096);
-		ASSERT(commited < m_reserved);
-		os::memCommit(m_mem + m_commited, commited - m_commited);
-		m_commited = commited;
-	}
-	m_end = start + (u32)size;
+	const u32 start = atomicAdd(&m_end, (u32)size);
+
+	if (start + size <= m_commited) return m_mem + start;
+
+	MutexGuard guard(m_mutex);
+	if (start + size <= m_commited) return m_mem + start;
+
+	const u32 commited = roundUp(start + (u32)size, 4096);
+	ASSERT(commited < m_reserved);
+	os::memCommit(m_mem + m_commited, commited - m_commited);
+	m_commited = commited;
+
 	return m_mem + start;
 }
 

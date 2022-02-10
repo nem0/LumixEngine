@@ -905,7 +905,7 @@ namespace ImGuiEx {
 	}
 
 	// copy-pasted from imgui with alwaysautoresize flag removed
-	bool ImGuiEx::BeginResizableMenu(const char* label, const char* icon, bool enabled)
+	bool BeginResizableMenu(const char* label, const char* icon, bool enabled)
 	{
 		ImGuiWindow* window = GetCurrentWindow();
 		if (window->SkipItems)

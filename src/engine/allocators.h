@@ -41,7 +41,7 @@ private:
 	volatile i32 m_allocation_count;
 };
 
-struct LinearAllocator : IAllocator {
+struct LUMIX_ENGINE_API LinearAllocator : IAllocator {
 	LinearAllocator(u32 reserved);
 	~LinearAllocator();
 
@@ -56,8 +56,9 @@ struct LinearAllocator : IAllocator {
 private:
 	u32 m_commited;
 	u32 m_reserved;
-	u32 m_end;
+	volatile i32 m_end;
 	u8* m_mem;
+	Mutex m_mutex;
 };
 
 // only single allocation, can be used by Array<T> to allocate on stack

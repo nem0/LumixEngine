@@ -109,6 +109,8 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 		deallocJob(&job);
 	}
 
+	virtual struct LinearAllocator& getCurrentFrameAllocator() = 0;
+
 protected:
 	virtual void* allocJob(u32 size, u32 align) = 0;
 	virtual void deallocJob(void* ptr) = 0;
