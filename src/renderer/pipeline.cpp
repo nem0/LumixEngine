@@ -3388,10 +3388,6 @@ struct PipelineImpl final : Pipeline
 			u32 view_id;
 			IAllocator* allocator;
 		};
-		JobData* job_data = LUMIX_NEW(pipeline->m_allocator, JobData);
-		job_data->pipeline = pipeline;
-		job_data->view_id = pipeline->m_views.size() - 1;
-		job_data->allocator = &pipeline->m_allocator;
 
 		PrepareViewJob& job = pipeline->m_renderer.createJob<PrepareViewJob>(pipeline->m_allocator);
 		job.m_pipeline = pipeline;
