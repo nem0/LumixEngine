@@ -267,12 +267,23 @@ struct GPUProfiler
 
 	void clear()
 	{
+		for(const Query& q : m_queries) {
+			if (!q.is_frame) gpu::destroy(q.handle);
+		}
 		m_queries.clear();
 
 		for(const gpu::QueryHandle h : m_pool) {
 			gpu::destroy(h);
 		}
 		m_pool.clear();
+
+		if (m_stats_query) gpu::destroy(m_stats_query);
+		m_stats_query = gpu::INVALID_QUERY;
+
+		for(const gpu::QueryHandle h : m_stats_pool) {
+			gpu::destroy(h);
+		}
+		m_stats_pool.clear();
 	}
 
 
@@ -381,7 +392,7 @@ struct GPUProfiler
 	jobs::Mutex m_mutex;
 	i64 m_gpu_to_cpu_offset;
 	u32 m_stats_counter = 0;
-	gpu::QueryHandle m_stats_query;
+	gpu::QueryHandle m_stats_query = gpu::INVALID_QUERY;
 };
 
 
