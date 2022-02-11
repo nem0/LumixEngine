@@ -45,7 +45,7 @@ end
 
 function onControllerHit(obj)
     local a = obj.rigid_actor
-    local dir = {math.sin(yaw), 0, math.cos(yaw)}
+    local dir = {math.sin(yaw) * 50, 0, math.cos(yaw) * 50}
     a:applyForce(dir)
 end
 
