@@ -75,16 +75,6 @@ struct CurveDecal {
 	Vec2 bezier_p2;
 };
 
-struct TerrainInfo
-{
-	DVec3 position;
-	Quat rot;
-	Shader* shader;
-	Terrain* terrain;
-	Vec3 min;
-	int index;
-};
-
 struct Environment
 {
 	enum Flags : u32 {
@@ -370,7 +360,6 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual Terrain* getTerrain(EntityRef entity) = 0;
 	virtual const HashMap<EntityRef, Terrain*>& getTerrains() = 0;
-	virtual void getTerrainInfos(Array<TerrainInfo>& infos) = 0;
 	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(EntityRef entity, const Path& path) = 0;

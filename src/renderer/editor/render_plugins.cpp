@@ -17,6 +17,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/allocators.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -4223,11 +4224,11 @@ struct RenderInterfaceImpl final : RenderInterface
 
 struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 {
-	struct RenderCommand : Renderer::RenderJob
+	struct RenderJob : Renderer::RenderJob
 	{
 		struct CmdList
 		{
-			CmdList(IAllocator& allocator) : commands(allocator) {}
+			CmdList(LinearAllocator& allocator) : commands(allocator) {}
 
 			Renderer::TransientSlice idx_buffer;
 			Renderer::TransientSlice vtx_buffer;
@@ -4236,7 +4237,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		};
 
 		struct WindowDrawData {
-			WindowDrawData(IAllocator& allocator) : cmd_lists(allocator) {}
+			WindowDrawData(LinearAllocator& allocator) : cmd_lists(allocator) {}
 
 			gpu::ProgramHandle program;
 			os::WindowHandle window;
@@ -4246,7 +4247,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			Array<CmdList> cmd_lists;
 		};
 
-		RenderCommand(IAllocator& allocator)
+		RenderJob(LinearAllocator& allocator)
 			: allocator(allocator)
 			, window_draw_data(allocator)
 		{
@@ -4417,13 +4418,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			renderer->endProfileBlock();
 		}
 		
+		LinearAllocator& allocator;
 		Renderer* renderer;
 		const gpu::TextureHandle* default_texture;
 		Array<WindowDrawData> window_draw_data;
 		gpu::BufferHandle ub;
 		u32 ib_offset;
 		u32 vb_offset;
-		IAllocator& allocator;
 		EditorUIRenderPlugin* plugin;
 	};
 
@@ -4488,7 +4489,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	void guiEndFrame() override
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		RenderCommand& cmd = renderer->createJob<RenderCommand>(renderer->getAllocator());
+		RenderJob& cmd = renderer->createJob<RenderJob>(renderer->getCurrentFrameAllocator());
 		cmd.plugin = this;
 		cmd.ub = m_ub;
 		

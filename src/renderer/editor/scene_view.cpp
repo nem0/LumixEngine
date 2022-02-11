@@ -10,6 +10,7 @@
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "engine/allocators.h"
 #include "engine/crc32.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
@@ -789,21 +790,26 @@ void SceneView::renderIcons()
 {
 	struct RenderJob : Renderer::RenderJob
 	{
-		RenderJob(Renderer& renderer, IAllocator& allocator) 
-			: m_allocator(allocator)
-			, m_renderer(renderer)
+		RenderJob(Renderer& renderer, LinearAllocator& allocator) 
+			: m_renderer(renderer)
 			, m_items(allocator)
 		{}
 
 		void setup() override
 		{
 			PROFILE_FUNCTION();
-			Array<EditorIcons::RenderData> data(m_allocator);
-			m_ui->m_view->m_icons->getRenderData(&data);
-			m_items.reserve(data.size());
+			
+			EditorIcons* icon_manager = m_ui->m_view->m_icons.get();
+			const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
+			m_items.reserve(icons.size());
 
-			for (EditorIcons::RenderData& rd : data) {
-				const Model* model = rd.model;
+			const Viewport& vp = m_ui->m_view->getViewport();
+			Matrix camera_mtx({0, 0, 0}, vp.rot);
+
+			icon_manager->computeScales();
+
+			for (const EditorIcons::Icon& icon : icons) {
+				const Model* model = icon_manager->getModel(icon.type);
 				if (!model || !model->isReady()) continue;
 
 				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
@@ -813,7 +819,8 @@ void SceneView::renderIcons()
 					item.material = mesh.material->getRenderData();
 					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, item.material->define_mask);
 					item.ub = m_renderer.allocUniform(sizeof(Matrix));
-					memcpy(item.ub.ptr, &rd.mtx, sizeof(rd.mtx));
+					const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
+					memcpy(item.ub.ptr, &mtx, sizeof(mtx));
 				}
 			}
 		}
@@ -844,7 +851,6 @@ void SceneView::renderIcons()
 			Renderer::TransientSlice ub;
 		};
 
-		IAllocator& m_allocator;
 		Renderer& m_renderer;
 		Array<Item> m_items;
 		SceneView* m_ui;
@@ -853,8 +859,7 @@ void SceneView::renderIcons()
 	Engine& engine = m_app.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
-	IAllocator& allocator = renderer->getAllocator();
-	RenderJob& cmd = renderer->createJob<RenderJob>(*renderer, allocator);
+	RenderJob& cmd = renderer->createJob<RenderJob>(*renderer, renderer->getCurrentFrameAllocator());
 	cmd.m_ui = this;
 	renderer->queue(cmd, 0);
 }

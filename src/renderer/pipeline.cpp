@@ -1,8 +1,8 @@
 #include "gpu/gpu.h"
+#include "engine/crt.h"
 #include "engine/allocators.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
-#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
@@ -4072,7 +4072,8 @@ struct PipelineImpl final : Pipeline
 		}
 		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
 
-		Array<CmdPage*> pages(m_allocator);
+		StackAllocator<sizeof(CmdPage*) * 64, alignof(CmdPage*)> pages_allocator(m_allocator);
+		Array<CmdPage*> pages(pages_allocator);
 		pages.resize(steps);
 
 		jobs::forEach(size, STEP, [&](i32 from, i32 to){
@@ -4280,7 +4281,8 @@ struct PipelineImpl final : Pipeline
 	{
 		RenderGrassCommand(IAllocator& allocator)
 			: m_allocator(allocator)
-			, m_grass(allocator)
+			, m_grass_allocator(allocator)
+			, m_grass(m_grass_allocator)
 		{
 		}
 
@@ -4476,6 +4478,7 @@ struct PipelineImpl final : Pipeline
 
 		IAllocator& m_allocator;
 		gpu::ProgramHandle m_compute_shader;
+		StackAllocator<sizeof(Grass) * 32, alignof(Grass)> m_grass_allocator;
 		Array<Grass> m_grass;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
@@ -4495,23 +4498,26 @@ struct PipelineImpl final : Pipeline
 		void setup() override
 		{
 			PROFILE_FUNCTION();
-			Array<TerrainInfo> infos(m_allocator);
-			m_pipeline->m_scene->getTerrainInfos(infos);
-			if(infos.empty()) return;
+			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
+			if(terrains.empty()) return;
 
-			m_instances.reserve(infos.size());
-			for (TerrainInfo& info : infos) {
-				if (!info.terrain->m_heightmap) continue;
-				if (!info.terrain->m_heightmap->isReady()) continue;
-				
+			Universe& universe = m_pipeline->m_scene->getUniverse();
+			m_instances.reserve(terrains.size());
+			for (const Terrain* terrain : terrains) {
+				if (!terrain->m_heightmap) continue;
+				if (!terrain->m_heightmap->isReady()) continue;
+				if (!terrain->m_material || !terrain->m_material->isReady()) continue;
+
+				const Transform& tr = universe.getTransform(terrain->m_entity);
 				Instance& inst = m_instances.emplace(m_allocator);
-				inst.pos = Vec3(info.position - m_camera_params.pos);
-				inst.ref_pos = Vec3(info.position - m_pipeline->m_viewport.pos);
-				inst.rot = info.rot;
-				inst.scale = info.terrain->getScale();
-				inst.hm_size = info.terrain->getSize();
-				inst.program = info.shader->getProgram(gpu::VertexDecl(), m_define_mask);
-				inst.material = info.terrain->m_material->getRenderData();
+				inst.pos = Vec3(tr.pos- m_camera_params.pos);
+				inst.ref_pos = Vec3(tr.pos - m_pipeline->m_viewport.pos);
+				inst.rot = tr.rot;
+				inst.scale = terrain->getScale();
+				inst.hm_size = terrain->getSize();
+				Shader* shader = terrain->m_material->getShader();
+				inst.program = shader->getProgram(gpu::VertexDecl(), m_define_mask);
+				inst.material = terrain->m_material->getRenderData();
 				if (isinf(inst.pos.x) || isinf(inst.pos.y) || isinf(inst.pos.z)) {
 					m_instances.pop();
 					continue;
@@ -4612,7 +4618,10 @@ struct PipelineImpl final : Pipeline
 		}
 
 		struct Instance {
-			Instance(IAllocator& allocator) : quads(allocator) {}
+			Instance(IAllocator& allocator) 
+				: quads_allocator(allocator)
+				, quads(quads_allocator)
+			{}
 
 			struct Quad {
 				Renderer::TransientSlice buf;
@@ -4626,6 +4635,7 @@ struct PipelineImpl final : Pipeline
 			Vec3 scale;
 			gpu::ProgramHandle program;
 			Material::RenderData* material;
+			StackAllocator<sizeof(Quad) * 32, alignof(Quad)> quads_allocator;
 			Array<Quad> quads;
 		};
 

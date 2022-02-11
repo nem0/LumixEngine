@@ -264,20 +264,6 @@ void Terrain::serialize(OutputMemoryStream& serializer)
 	}
 }
 
-
-TerrainInfo Terrain::getInfo()
-{
-	if (!m_material || !m_material->isReady()) return {};
-	
-	TerrainInfo info;
-	info.shader = m_material->getShader();
-	info.position = m_scene.getUniverse().getPosition(m_entity);
-	info.rot = m_scene.getUniverse().getRotation(m_entity);
-	info.terrain = this;
-	return info;
-}
-
-
 Vec3 Terrain::getNormal(float x, float z)
 {
 	int int_x = (int)(x / m_scale.x);

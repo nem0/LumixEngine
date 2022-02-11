@@ -23,19 +23,7 @@ static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("poin
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
 
 
-enum class IconType
-{
-	PHYSICAL_CONTROLLER,
-	CAMERA,
-	LIGHT,
-	TERRAIN,
-	ENTITY,
-
-	COUNT
-};
-
-
-const char* ICONS[(int)IconType::COUNT] =
+const char* ICONS[(int)EditorIcons::IconType::COUNT] =
 {
 	"phy_controller_icon",
 	"camera_icon",
@@ -50,14 +38,6 @@ static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
 struct EditorIconsImpl final : EditorIcons
 {
-	struct Icon
-	{
-		EntityRef entity;
-		IconType type;
-		float scale;
-	};
-
-
 	explicit EditorIconsImpl(WorldEditor& editor, RenderScene& scene)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
@@ -205,8 +185,24 @@ struct EditorIconsImpl final : EditorIcons
 		return ret;
 	}
 
+	void computeScales() override {
 
-	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, const DVec3& vp_pos, bool is_ortho, float ortho_size) const
+		static const float MIN_SCALE_FACTOR = 10;
+		static const float MAX_SCALE_FACTOR = 60;
+
+		const Universe& universe = *m_editor.getUniverse();
+		const Viewport& vp = m_editor.getView().getViewport();
+
+		for(auto& icon : m_icons) {
+			const DVec3 position = universe.getPosition(icon.entity);
+			const float distance = (float)length(position - vp.pos);
+			float scale_factor = MIN_SCALE_FACTOR + distance;
+			scale_factor = clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
+			icon.scale = tanf(vp.fov * 0.5f) * distance / scale_factor;
+		}
+	}
+
+	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, const DVec3& vp_pos, bool is_ortho, float ortho_size) const override
 	{
 		Matrix ret;
 		if (m_is_3d[(int)icon.type])
@@ -228,29 +224,10 @@ struct EditorIconsImpl final : EditorIcons
 		}
 		return ret;
 	}
+	
+	const Model* getModel(IconType type) const override { return m_models[(i32)type]; }
 
-
-	void getRenderData(Array<RenderData>* data) override
-	{
-		static const float MIN_SCALE_FACTOR = 10;
-		static const float MAX_SCALE_FACTOR = 60;
-
-		const Universe& universe = *m_editor.getUniverse();
-		const Viewport& vp = m_editor.getView().getViewport();
-		Matrix camera_mtx({0, 0, 0}, vp.rot);
-
-		data->reserve(m_icons.size());
-		for(auto& icon : m_icons) {
-			const DVec3 position = universe.getPosition(icon.entity);
-			const float distance = (float)length(position - vp.pos);
-			float scale_factor = MIN_SCALE_FACTOR + distance;
-			scale_factor = clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
-			icon.scale = tanf(vp.fov * 0.5f) * distance / scale_factor;
-			
-			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
-			data->push({icon_mtx, m_models[(int)icon.type]});
-		}
-	}
+	const HashMap<EntityRef, Icon>& getIcons() const override { return m_icons; }
 
 	HashMap<EntityRef, Icon> m_icons;
 	Model* m_models[(int)IconType::COUNT];

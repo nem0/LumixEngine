@@ -23,7 +23,6 @@ struct Renderer;
 struct RenderScene;
 struct ShiftedFrustum;
 struct TerrainQuad;
-struct TerrainInfo;
 struct Texture;
 struct Universe;
 
@@ -91,8 +90,6 @@ struct Terrain
 		void setGrassTypeDistance(int index, float value);
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
-
-		TerrainInfo getInfo();
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 		void serialize(OutputMemoryStream& serializer);

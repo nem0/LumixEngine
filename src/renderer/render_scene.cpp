@@ -1799,17 +1799,6 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	void getTerrainInfos(Array<TerrainInfo>& infos) override
-	{
-		PROFILE_FUNCTION();
-		infos.reserve(m_terrains.size());
-		for (auto* terrain : m_terrains) {
-			const TerrainInfo info = terrain->getInfo();
-			if (info.terrain) infos.push(info);
-		}
-	}
-
-
 	static int LUA_castCameraRay(lua_State* L)
 	{
 		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
