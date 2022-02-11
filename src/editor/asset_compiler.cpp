@@ -98,6 +98,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_generations(app.getAllocator())
 		, m_dependencies(app.getAllocator())
 		, m_changed_files(app.getAllocator())
+		, m_changed_dirs(app.getAllocator())
 		, m_on_list_changed(app.getAllocator())
 		, m_on_init_load(app.getAllocator())
 	{
@@ -445,9 +446,18 @@ struct AssetCompilerImpl : AssetCompiler {
 	{
 		if (startsWith(path, ".")) return;
 		if (equalIStrings(path, "lumix.log")) return;
-		
-		MutexGuard lock(m_changed_mutex);
-		m_changed_files.push(Path(path));
+
+		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+		const StaticString<LUMIX_MAX_PATH> full_path(base_path, "/", path);
+
+		if (os::dirExists(full_path)) {
+			MutexGuard lock(m_changed_mutex);
+			m_changed_dirs.push(Path(path));
+		}
+		else {
+			MutexGuard lock(m_changed_mutex);
+			m_changed_files.push(Path(path));
+		}
 	}
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
@@ -690,6 +700,37 @@ struct AssetCompilerImpl : AssetCompiler {
 			Path path_obj;
 			{
 				MutexGuard lock(m_changed_mutex);
+				if (m_changed_dirs.empty()) break;
+
+				m_changed_dirs.removeDuplicates();
+				path_obj = m_changed_dirs.back();
+				m_changed_dirs.pop();
+			}
+
+			if (!path_obj.isEmpty()) {
+				FileSystem& fs = m_app.getEngine().getFileSystem();
+				const StaticString<LUMIX_MAX_PATH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
+				const u64 list_last_modified = os::getLastModified(list_path);
+				StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), path_obj.c_str());
+				if (os::dirExists(fullpath)) {
+					processDir(path_obj.c_str(), list_last_modified);
+					m_on_list_changed.invoke(path_obj);
+				}
+				else {
+					jobs::MutexGuard lock(m_resources_mutex);
+					m_resources.eraseIf([&](const ResourceItem& ri){
+						if (!startsWith(ri.path.c_str(), path_obj.c_str())) return false;
+						return true;
+					});
+					m_on_list_changed.invoke(path_obj);
+				}
+			}
+		}
+
+		for (;;) {
+			Path path_obj;
+			{
+				MutexGuard lock(m_changed_mutex);
 				if (m_changed_files.empty()) break;
 
 				m_changed_files.removeDuplicates();
@@ -773,6 +814,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	HashMap<Path, u32> m_generations; 
 	HashMap<Path, Array<Path>> m_dependencies; 
 	Array<Path> m_changed_files;
+	Array<Path> m_changed_dirs;
 	Array<CompileJob> m_to_compile;
 	Array<CompileJob> m_compiled;
 	StudioApp& m_app;

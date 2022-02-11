@@ -149,14 +149,20 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void onResourceListChanged(const Path& path) {
+		Engine& engine = m_app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+		StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), path.c_str());
+		if (os::dirExists(fullpath)) {
+			changeDir(m_dir);
+			return;
+		}
+
 		Span<const char> dir = Path::getDir(path.c_str());
 		if (dir.length() > 0 && (*(dir.m_end - 1) == '/' || *(dir.m_end - 1) == '\\')) {
 			--dir.m_end;
 		}
 		if (!equalStrings(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
 
-		Engine& engine = m_app.getEngine();
-		FileSystem& fs = engine.getFileSystem();
 		RenderInterface* ri = m_app.getRenderInterface();
 
 		for (i32 i = 0; i < m_file_infos.size(); ++i) {
