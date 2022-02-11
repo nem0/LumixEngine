@@ -9,6 +9,7 @@ struct CompositeTexture {
 	struct ChannelSource {
 		Path path;
 		u32 src_channel = 0;
+		bool invert = false;
 	};
 		
 	struct Layer {

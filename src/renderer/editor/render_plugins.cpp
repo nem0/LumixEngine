@@ -1343,10 +1343,20 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				stbi_uc* from = sources[p.getHash()].data;
 				if (!from) continue;
 				u32 from_ch = layer.getChannel(ch).src_channel;
+				const bool invert = layer.getChannel(ch).invert;
 
-				for (u32 j = 0; j < (u32)h; ++j) {
-					for (u32 i = 0; i < (u32)w; ++i) {
-						out_data_ptr[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
+				if (invert) {
+					for (u32 j = 0; j < (u32)h; ++j) {
+						for (u32 i = 0; i < (u32)w; ++i) {
+							out_data_ptr[(j * w + i) * 4 + ch] = 0xff - from[(i + j * w) * 4 + from_ch];
+						}
+					}
+				}
+				else {
+					for (u32 j = 0; j < (u32)h; ++j) {
+						for (u32 i = 0; i < (u32)w; ++i) {
+							out_data_ptr[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
+						}
 					}
 				}
 
@@ -1622,6 +1632,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						}
 						ImGuiEx::Label("Red source channel");
 						ImGui::Combo("##rsrcch", (int*)&layer.red.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Invert");
+						ImGui::Checkbox("##invr", &layer.red.invert);
 
 						copyString(Span(tmp), layer.green.path.c_str());
 						ImGuiEx::Label("Green");
@@ -1630,6 +1642,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						}
 						ImGuiEx::Label("Green source channel");
 						ImGui::Combo("##gsrcch", (int*)&layer.green.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Invert");
+						ImGui::Checkbox("##invg", &layer.green.invert);
 
 						copyString(Span(tmp), layer.blue.path.c_str());
 						ImGuiEx::Label("Blue");
@@ -1639,6 +1653,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						
 						ImGuiEx::Label("Blue source channel");
 						ImGui::Combo("##bsrcch", (int*)&layer.blue.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Invert");
+						ImGui::Checkbox("##invb", &layer.blue.invert);
 				
 						copyString(Span(tmp), layer.alpha.path.c_str());
 						ImGuiEx::Label("Alpha");
@@ -1647,6 +1663,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						}
 						ImGuiEx::Label("Alpha source channel");
 						ImGui::Combo("##asrch", (int*)&layer.alpha.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Invert");
+						ImGui::Checkbox("##inva", &layer.alpha.invert);
 					}
 					else {
 						copyString(Span(tmp), layer.red.path.c_str());
@@ -4667,16 +4685,16 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 		file << R"#(
 			layer {
-				red = { "/textures/common/red.tga", 0 },
-				green = { "/textures/common/red.tga", 1 },
-				blue = { "/textures/common/red.tga", 2 },
-				alpha = { "/textures/common/red.tga", 3 }
+				red = { path = "/textures/common/red.tga", channel = 0 },
+				green = { path = "/textures/common/red.tga", channel = 1 },
+				blue = { path = "/textures/common/red.tga", channel = 2 },
+				alpha = { path = "/textures/common/red.tga", channel = 3 }
 			}
 			layer {
-				red = { "/textures/common/green.tga", 0 },
-				green = { "/textures/common/green.tga", 1 },
-				blue = { "/textures/common/green.tga", 2 },
-				alpha = { "/textures/common/green.tga", 3 }
+				red = { path = "/textures/common/green.tga", channel = 0 },
+				green = { path = "/textures/common/green.tga", channel = 1 },
+				blue = { path = "/textures/common/green.tga", channel = 2 },
+				alpha = { path = "/textures/common/green.tga", channel = 3 }
 			}
 		)#";
 		file.close();
@@ -4691,16 +4709,16 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 		file << R"#(
 			layer {
-				red = { "/textures/common/default_normal.tga", 0 },
-				green = { "/textures/common/default_normal.tga", 1 },
-				blue = { "/textures/common/default_normal.tga", 2 },
-				alpha = { "/textures/common/default_normal.tga", 3 }
+				red = { path = "/textures/common/default_normal.tga", channel = 0 },
+				green = { path = "/textures/common/default_normal.tga", channel = 1 },
+				blue = { path = "/textures/common/default_normal.tga", channel = 2 },
+				alpha = { path = "/textures/common/default_normal.tga", channel = 3 }
 			}
 			layer {
-				red = { "/textures/common/default_normal.tga", 0 },
-				green = { "/textures/common/default_normal.tga", 1 },
-				blue = { "/textures/common/default_normal.tga", 2 },
-				alpha = { "/textures/common/default_normal.tga", 3 }
+				red = { path = "/textures/common/default_normal.tga", channel = 0 },
+				green = { path = "/textures/common/default_normal.tga", channel = 1 },
+				blue = { path = "/textures/common/default_normal.tga", channel = 2 },
+				alpha = { path = "/textures/common/default_normal.tga", channel = 3 }
 			}
 		)#";
 		file.close();

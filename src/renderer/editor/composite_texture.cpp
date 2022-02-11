@@ -18,27 +18,18 @@ static CompositeTexture& getThis(lua_State* L) {
 static CompositeTexture::ChannelSource toChannelSource(lua_State* L, int idx) {
 	CompositeTexture::ChannelSource res;
 	if (!lua_istable(L, idx)) {
+		luaL_argerror(L, idx, "unexpected form");
+	}
+	char path[LUMIX_MAX_PATH];
+	if (!LuaWrapper::checkStringField(L, idx, "path", Span(path))) {
 		luaL_argerror(L, 1, "unexpected form");
 	}
-	const size_t l = lua_objlen(L, idx);
-	if (l == 0) {
-		luaL_argerror(L, 1, "unexpected form");
-	}
-	lua_rawgeti(L, idx, 1);
-	if (!lua_isstring(L, -1)) {
-		luaL_argerror(L, 1, "unexpected form");
-	}
-	res.path = lua_tostring(L, -1);
-	lua_pop(L, 1);
+	res.path = path;
 
-	if (l > 1) {
-		lua_rawgeti(L, idx, 2);
-		if (!lua_isnumber(L, -1)) {
-			luaL_argerror(L, 1, "unexpected form");
-		}
-		res.src_channel = (u32)lua_tointeger(L, -1);
-		lua_pop(L, 1);
+	if (!LuaWrapper::checkField(L, idx, "channel", &res.src_channel)) {
+		luaL_argerror(L, 1, "unexpected form");
 	}
+	LuaWrapper::getOptionalField(L, idx, "invert", &res.invert);
 
 	return res;
 }
@@ -123,10 +114,10 @@ bool CompositeTexture::save(FileSystem& fs, const Path& path) {
 		file << "cubemap(" << (cubemap ? "true" : "false") << ")\n";
 		for (CompositeTexture::Layer& layer : layers) {
 			file << "layer {\n";
-			file << "\tred = { \"" << layer.red.path.c_str() << "\", " << layer.red.src_channel << " },\n";
-			file << "\tgreen = { \"" << layer.green.path.c_str() << "\", " << layer.green.src_channel << " },\n";
-			file << "\tblue = { \"" << layer.blue.path.c_str() << "\", " << layer.blue.src_channel << " },\n";
-			file << "\talpha = { \"" << layer.alpha.path.c_str() << "\", " << layer.alpha.src_channel << " },\n";
+			file << "\tred = { path = \"" << layer.red.path.c_str() << "\", channel = " << layer.red.src_channel << ", invert = " << (layer.red.invert ? "true" : "false") << " },\n";
+			file << "\tgreen = { path = \"" << layer.green.path.c_str() << "\", channel = " << layer.green.src_channel << ", invert = " << (layer.green.invert ? "true" : "false") << " },\n";
+			file << "\tblue = { path = \"" << layer.blue.path.c_str() << "\", channel = " << layer.blue.src_channel << ", invert = " << (layer.blue.invert ? "true" : "false") << " },\n";
+			file << "\talpha = { path = \"" << layer.alpha.path.c_str() << "\", channel = " << layer.alpha.src_channel << ", invert = " << (layer.alpha.invert ? "true" : "false") << " },\n";
 			file << "}\n";
 		}
 		file.close();
