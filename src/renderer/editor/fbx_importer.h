@@ -18,6 +18,12 @@ struct FBXImporter
 {
 	struct ImportConfig 
 	{
+		struct Clip {
+			StaticString<64> name;
+			u32 from_frame;
+			u32 to_frame;
+		};
+
 		enum class Origin : int
 		{
 			SOURCE,
@@ -40,6 +46,8 @@ struct FBXImporter
 		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
 		u8 autolod_mask = 0;
 		float bounding_scale = 1.f;
+		Span<const Clip> clips;
+
 	};
 
 

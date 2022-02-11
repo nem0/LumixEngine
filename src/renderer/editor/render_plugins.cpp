@@ -1881,6 +1881,8 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta {
+		Meta(IAllocator& allocator) : clips(allocator) {}
+
 		float scale = 1.f;
 		float culling_scale = 1.f;
 		bool split = false;
@@ -1895,6 +1897,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
+		Array<FBXImporter::ImportConfig::Clip> clips;
 	};
 
 	explicit ModelPlugin(StudioApp& app)
@@ -1904,6 +1907,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_is_mouse_captured(false)
 		, m_tile(app.getAllocator())
 		, m_fbx_importer(app)
+		, m_meta(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 	}
@@ -1932,7 +1936,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	Meta getMeta(const Path& path) const
 	{
-		Meta meta;
+		Meta meta(m_app.getAllocator());
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
 			LuaWrapper::DebugGuard guard(L);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &meta.use_mikktspace);
@@ -1952,7 +1956,27 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "bake_vertex_ao") != LUA_TNIL) logWarning(path, ": `bake_vertex_ao` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
-			lua_pop(L, 3);
+			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "clips") == LUA_TTABLE) {
+				const size_t count = lua_objlen(L, -1);
+				for (int i = 0; i < count; ++i) {
+					lua_rawgeti(L, -1, i + 1);
+					if (lua_istable(L, -1)) {
+						FBXImporter::ImportConfig::Clip& clip = meta.clips.emplace();
+						char name[128];
+						if (!LuaWrapper::checkStringField(L, -1, "name", Span(name)) 
+							|| !LuaWrapper::checkField(L, -1, "from_frame", &clip.from_frame)
+							|| !LuaWrapper::checkField(L, -1, "to_frame", &clip.to_frame))
+						{
+							logError(path, ": clip ", i, " is invalid");
+							meta.clips.pop();
+							continue;
+						}
+						clip.name = name;
+					}
+					lua_pop(L, 1);
+				}
+			}
+			lua_pop(L, 4);
 
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
@@ -1960,7 +1984,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				else if (equalIStrings(tmp, "convex")) meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
 				else meta.physics = FBXImporter::ImportConfig::Physics::NONE;
 			}
-
 
 			for (u32 i = 0; i < lengthOf(meta.lods_distances); ++i) {
 				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &meta.lods_distances[i]);
@@ -1972,9 +1995,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void addSubresources(AssetCompiler& compiler, const char* _path) override {
 		compiler.addResource(Model::TYPE, _path);
 
-		const Meta meta = getMeta(Path(_path));
+		Meta meta = getMeta(Path(_path));
 		StaticString<LUMIX_MAX_PATH> pathstr = _path;
-		jobs::runLambda([this, pathstr, meta]() {
+		jobs::runLambda([this, pathstr, meta = static_cast<Meta&&>(meta)]() {
 			FBXImporter importer(m_app);
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 
@@ -1997,11 +2020,20 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				compiler.addResource(physics_geom, tmp);
 			}
 
-			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
-			for (const FBXImporter::ImportAnimation& anim : animations) {
-				StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
-				compiler.addResource(ResourceType("animation"), tmp);
+			if (meta.clips.empty()) {
+				const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
+				for (const FBXImporter::ImportAnimation& anim : animations) {
+					StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
+					compiler.addResource(ResourceType("animation"), tmp);
+				}
 			}
+			else {
+				for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
+					StaticString<LUMIX_MAX_PATH> tmp(clip.name, ".ani:", path);
+					compiler.addResource(ResourceType("animation"), tmp);
+				}
+			}
+
 		}, &m_subres_signal, 2);			
 	}
 
@@ -2028,6 +2060,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
+		cfg.clips = meta.clips;
 		const PathInfo src_info(filepath);
 		m_fbx_importer.setSource(filepath, false, meta.force_skin);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
@@ -2482,7 +2515,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGuiEx::Label("Vertex color is AO");
 				ImGui::Checkbox("##verao", &m_meta.vertex_color_is_ao);
 			}
-			
 			ImGuiEx::Label("Physics");
 			if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
 				if (ImGui::Selectable("none")) m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
@@ -2491,6 +2523,39 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::EndCombo();
 			}
 
+			ImGui::NewLine();
+			if (ImGui::BeginTable("clips", 4)) {
+				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupColumn("Start");
+				ImGui::TableSetupColumn("End");
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableHeadersRow();
+
+				for (FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+					ImGui::TableNextColumn();
+					ImGui::PushID(&clip);
+					ImGui::SetNextItemWidth(-1);
+					ImGui::InputText("##name", clip.name.data, sizeof(clip.name.data));
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					ImGui::InputInt("##from", (i32*)&clip.from_frame);
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					ImGui::InputInt("##to", (i32*)&clip.to_frame);
+					ImGui::TableNextColumn();
+					if (ImGuiEx::IconButton(ICON_FA_TRASH, "Delete")) {
+						m_meta.clips.erase(u32(&clip - m_meta.clips.begin()));
+						ImGui::PopID();
+						break;
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+			if (ImGui::Button(ICON_FA_PLUS " Add clip")) m_meta.clips.emplace();
+
+			ImGui::NewLine();
 			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 				bool infinite = m_meta.lods_distances[i] <= 0;
 				if (ImGui::TreeNode(&m_meta.lods_distances[i], "LOD %d", i)) {
@@ -2532,6 +2597,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
 					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
 					.cat("\nvertex_color_is_ao = ").cat(m_meta.vertex_color_is_ao ? "true" : "false");
+
+				if (!m_meta.clips.empty()) {
+					src.cat("\nclips = {");
+					for (const FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+						src.cat("\n\n{");
+						src.cat("\n\n\nname = \"").cat(clip.name.data).cat("\",");
+						src.cat("\n\n\nfrom_frame = ").cat(clip.from_frame).cat(",");
+						src.cat("\n\n\nto_frame = ").cat(clip.to_frame);
+						src.cat("\n\n},");
+					}
+					src.cat("\n}");
+				}
 
 				if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
 				if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);
