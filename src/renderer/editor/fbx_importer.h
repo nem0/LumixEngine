@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/geometry.h"
+#include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/stream.h"
@@ -214,6 +215,7 @@ private:
 	struct AssetCompiler& m_compiler;
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
+	HashMap<const ofbx::Material*, String> m_material_name_map;
 	Array<ImportGeometry> m_geometries;
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;

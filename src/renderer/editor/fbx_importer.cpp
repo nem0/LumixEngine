@@ -211,6 +211,28 @@ void FBXImporter::gatherMaterials(const char* fbx_filename, const char* src_dir)
 		gatherTexture(ofbx::Texture::NORMAL);
 		gatherTexture(ofbx::Texture::SPECULAR);
 	}
+
+	Array<String> names(m_allocator);
+	for (ImportMaterial& mat : m_materials) {
+		char name[128];
+		getMaterialName(mat.fbx, name);
+		if (m_material_name_map.find(mat.fbx).isValid()) continue;
+
+		u32 collision = 0;
+		if (names.find([&](const String& i){ return i == name; }) != -1) {
+			char orig_name[128];
+			copyString(orig_name, name);
+			do {
+				copyString(name, orig_name);
+				char num[16];
+				toCString(collision, Span(num));
+				catString(name, num);
+				++collision;
+			} while(names.find([&](const String& i){ return i == name; }) != -1);
+		}
+		names.emplace(name, m_allocator);
+		m_material_name_map.insert(mat.fbx, names.last());
+	}
 }
 
 
@@ -885,6 +907,7 @@ FBXImporter::FBXImporter(StudioApp& app)
 	, out_file(m_allocator)
 	, m_filesystem(app.getEngine().getFileSystem())
 	, m_app(app)
+	, m_material_name_map(m_allocator)
 {
 }
 
@@ -910,6 +933,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 		m_meshes.clear();
 		m_geometries.clear();
 		m_materials.clear();
+		m_material_name_map.clear();
 		m_animations.clear();
 		m_bones.clear();
 		m_bind_pose.clear();
@@ -1240,10 +1264,9 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 	for (const ImportMaterial& material : m_materials) {
 		if (!material.import) continue;
 
-		char mat_name[128];
-		getMaterialName(material.fbx, mat_name);
+		const String& mat_name = m_material_name_map[material.fbx];
 
-		const StaticString<LUMIX_MAX_PATH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
+		const StaticString<LUMIX_MAX_PATH + 128> mat_src(src_info.m_dir, mat_name.c_str(), ".mat");
 		if (m_filesystem.fileExists(mat_src)) continue;
 
 		os::OutputFile f;
@@ -2094,9 +2117,8 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		}
 
 		const ofbx::Material* material = import_mesh.fbx_mat;
-		char mat[128];
-		getMaterialName(material, mat);
-		StaticString<LUMIX_MAX_PATH + 128> mat_id(src_info.m_dir, mat, ".mat");
+		const String& mat_name = m_material_name_map[material];
+		StaticString<LUMIX_MAX_PATH + 128> mat_id(src_info.m_dir, mat_name.c_str(), ".mat");
 		const i32 len = stringLength(mat_id.data);
 		write(len);
 		write(mat_id.data, len);
