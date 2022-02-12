@@ -2552,6 +2552,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	void modelLoaded(Model* model, EntityRef entity)
 	{
+		ASSERT(model->isReady());
 		auto& r = m_model_instances[entity.index];
 
 		float bounding_radius = r.model->getOriginBoundingRadius();

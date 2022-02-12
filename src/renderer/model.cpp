@@ -352,6 +352,8 @@ void Model::onBeforeReady()
 	}
 
 	for (u32 i = 0; i < 4; ++i) {
+		if (m_lod_indices[i].from < 0) continue;
+
 		for (i32 j = m_lod_indices[i].from; j <= m_lod_indices[i].to; ++j) {
 			m_meshes[j].lod = float(i);
 		}
@@ -560,7 +562,7 @@ bool Model::parseLODs(InputMemoryStream& file)
 	for (float& d : m_lod_distances) d = -1;
 	for (LODMeshIndices& i : m_lod_indices) {
 		i.from = -1;
-		i.to = -2;
+		i.to = -1;
 	}
 
 	for (u32 i = 0; i < lod_count; ++i) {
