@@ -553,12 +553,17 @@ bool Model::parseLODs(InputMemoryStream& file)
 {
 	u32 lod_count;
 	file.read(lod_count);
-	if (lod_count <= 0 || lod_count > lengthOf(m_lod_indices))
-	{
+	if (lod_count <= 0 || lod_count > lengthOf(m_lod_indices)) {
 		return false;
 	}
-	for (u32 i = 0; i < lod_count; ++i)
-	{
+
+	for (float& d : m_lod_distances) d = -1;
+	for (LODMeshIndices& i : m_lod_indices) {
+		i.from = -1;
+		i.to = -2;
+	}
+
+	for (u32 i = 0; i < lod_count; ++i) {
 		file.read(m_lod_indices[i].to);
 		file.read(m_lod_distances[i]);
 		m_lod_indices[i].from = i > 0 ? m_lod_indices[i - 1].to + 1 : 0;

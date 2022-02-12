@@ -43,8 +43,9 @@ struct FBXImporter
 		bool import_vertex_colors = true;
 		bool vertex_color_is_ao = false;
 		Physics physics = Physics::NONE;
+		u32 lod_count = 1;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
-		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
+		float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
 		u8 autolod_mask = 0;
 		float bounding_scale = 1.f;
 		Span<const Clip> clips;
@@ -146,7 +147,7 @@ struct FBXImporter
 		int submesh = -1;
 		OutputMemoryStream vertex_data;
 		Array<u32> indices;
-		Local<Array<u32>> autolod_indices[3];
+		Local<Array<u32>> autolod_indices[4];
 		AABB aabb;
 		float origin_radius_squared;
 		float center_radius_squared;

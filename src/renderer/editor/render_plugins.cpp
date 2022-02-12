@@ -1911,8 +1911,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool import_vertex_colors = false;
 		bool vertex_color_is_ao = false;
 		u8 autolod_mask = 0;
-		float autolod_coefs[3] = { 0.5f, 0.25f, 0.125f };
-		float lods_distances[4] = { -1, -1, -1, -1 };
+		u32 lod_count = 1;
+		float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
+		float lods_distances[4] = { 10'000, 0, 0, 0 };
 		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 		Array<FBXImporter::ImportConfig::Clip> clips;
@@ -1966,10 +1967,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &meta.vertex_color_is_ao);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &meta.lod_count);
 			
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &meta.autolod_coefs[0])) meta.autolod_mask |= 1;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &meta.autolod_coefs[1])) meta.autolod_mask |= 2;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &meta.autolod_coefs[2])) meta.autolod_mask |= 4;
+			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod3", &meta.autolod_coefs[3])) meta.autolod_mask |= 8;
 
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "bake_vertex_ao") != LUA_TNIL) logWarning(path, ": `bake_vertex_ao` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
@@ -2076,6 +2079,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.physics = meta.physics;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
 		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
+		cfg.lod_count = meta.lod_count;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		cfg.clips = meta.clips;
@@ -2377,9 +2381,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	static const char* toString(FBXImporter::ImportConfig::Physics value) {
 		switch (value) {
-			case FBXImporter::ImportConfig::Physics::TRIMESH: return "trimesh";
-			case FBXImporter::ImportConfig::Physics::CONVEX: return "convex";
-			case FBXImporter::ImportConfig::Physics::NONE: return "none";
+			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
+			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
+			case FBXImporter::ImportConfig::Physics::NONE: return "None";
 			default: ASSERT(false); return "none";
 		}
 	}
@@ -2418,17 +2422,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						ImGui::PushID(i);
 						ImGui::Text("%d", i);
 						ImGui::NextColumn();
-						if (distances[i] == FLT_MAX)
-						{
-							ImGui::Text("Infinite");
-						}
-						else
-						{
-							float dist = sqrtf(distances[i]);
-							if (ImGui::DragFloat("", &dist))
-							{
-								distances[i] = dist * dist;
-							}
+						float dist = sqrtf(distances[i]);
+						if (ImGui::DragFloat("", &dist)) {
+							distances[i] = dist * dist;
 						}
 						ImGui::NextColumn();
 						ImGui::Text("%d", lods[i].to - lods[i].from + 1);
@@ -2527,53 +2523,93 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGuiEx::Label("Bake impostor normals");
 				ImGui::Checkbox("##impnrm", &m_meta.bake_impostor_normals);
 			}
-			ImGuiEx::Label("Import vertex colors");
-			ImGui::Checkbox("##vercol", &m_meta.import_vertex_colors);
-			if (m_meta.import_vertex_colors) {
-				ImGuiEx::Label("Vertex color is AO");
-				ImGui::Checkbox("##verao", &m_meta.vertex_color_is_ao);
+			ImGuiEx::Label("Vertex colors");
+			i32 vertex_colors_mode = m_meta.import_vertex_colors ? (m_meta.vertex_color_is_ao ? 2 : 1) : 0;
+			if (ImGui::Combo("##vercol", &vertex_colors_mode, "Do not import\0Import\0Import as AO")) {
+				switch(vertex_colors_mode) {
+					case 0:
+						m_meta.import_vertex_colors = false;
+						m_meta.vertex_color_is_ao = false;
+						break;
+					case 1:
+						m_meta.import_vertex_colors = true;
+						m_meta.vertex_color_is_ao = false;
+						break;
+					case 2:
+						m_meta.import_vertex_colors = true;
+						m_meta.vertex_color_is_ao = true;
+						break;
+				}
 			}
 			ImGuiEx::Label("Physics");
 			if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
-				if (ImGui::Selectable("none")) m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
-				if (ImGui::Selectable("convex")) m_meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
-				if (ImGui::Selectable("trimesh")) m_meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+				if (ImGui::Selectable("None")) m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
+				if (ImGui::Selectable("Convex")) m_meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
+				if (ImGui::Selectable("Triangle mesh")) m_meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
 				ImGui::EndCombo();
 			}
 
-			ImGui::NewLine();
-			if (ImGui::BeginTable("clips", 4)) {
-				ImGui::TableSetupColumn("Name");
-				ImGui::TableSetupColumn("Start");
-				ImGui::TableSetupColumn("End");
-				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
-				ImGui::TableHeadersRow();
+			ImGuiEx::Label("LOD count");
+			if (ImGui::SliderInt("##lodcount", (i32*)&m_meta.lod_count, 1, 4)) {
+				m_meta.lods_distances[1] = maximum(m_meta.lods_distances[0] + 0.01f, m_meta.lods_distances[1]);
+				m_meta.lods_distances[2] = maximum(m_meta.lods_distances[1] + 0.01f, m_meta.lods_distances[2]);
+				m_meta.lods_distances[3] = maximum(m_meta.lods_distances[2] + 0.01f, m_meta.lods_distances[3]);
+			}
 
-				for (FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+			ImGui::NewLine();
+			if (ImGui::BeginTable("lods", 4, ImGuiTableFlags_BordersOuter)) {
+				ImGui::TableSetupColumn("LOD", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableSetupColumn("Distance");
+				ImGui::TableSetupColumn("Auto LOD", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableSetupColumn("% triangles", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableHeadersRow();
+				
+				for(u32 i = 0; i < m_meta.lod_count; ++i) {
+					ImGui::PushID(i);
+					
 					ImGui::TableNextColumn();
-					ImGui::PushID(&clip);
-					ImGui::SetNextItemWidth(-1);
-					ImGui::InputText("##name", clip.name.data, sizeof(clip.name.data));
-					ImGui::TableNextColumn();
-					ImGui::SetNextItemWidth(-1);
-					ImGui::InputInt("##from", (i32*)&clip.from_frame);
-					ImGui::TableNextColumn();
-					ImGui::SetNextItemWidth(-1);
-					ImGui::InputInt("##to", (i32*)&clip.to_frame);
-					ImGui::TableNextColumn();
-					if (ImGuiEx::IconButton(ICON_FA_TRASH, "Delete")) {
-						m_meta.clips.erase(u32(&clip - m_meta.clips.begin()));
-						ImGui::PopID();
-						break;
+					if (m_meta.create_impostor && i == m_meta.lod_count - 1) {
+						ImGui::TextUnformatted("Impostor");
 					}
+					else {
+						ImGui::Text("%d", i);
+					}
+
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::DragFloat("##lod", &m_meta.lods_distances[i], 1, 0, FLT_MAX, "%.1f")) {
+						m_meta.lods_distances[0] = maximum(0.f, m_meta.lods_distances[0]);
+						m_meta.lods_distances[1] = maximum(m_meta.lods_distances[0] + 0.01f, m_meta.lods_distances[1]);
+						m_meta.lods_distances[2] = maximum(m_meta.lods_distances[1] + 0.01f, m_meta.lods_distances[2]);
+						m_meta.lods_distances[3] = maximum(m_meta.lods_distances[2] + 0.01f, m_meta.lods_distances[3]);
+					}
+
+					ImGui::TableNextColumn();
+					bool autolod = m_meta.autolod_mask & (1 << i);
+					if (!m_meta.create_impostor || i < m_meta.lod_count - 1) {
+						ImGui::SetNextItemWidth(-1);
+						if (ImGui::Checkbox("##auto_lod", &autolod)) {
+							m_meta.autolod_mask &= ~(1 << i);
+							if (autolod) m_meta.autolod_mask |= 1 << i;
+						}
+					}
+
+					ImGui::TableNextColumn();
+					if ((!m_meta.create_impostor || i < m_meta.lod_count - 1) && autolod) {
+						ImGui::SetNextItemWidth(-1);
+						float f = m_meta.autolod_coefs[i] * 100;
+						if (ImGui::DragFloat("##lodcoef", &f, 1, 0, 100, "%.1f", ImGuiSliderFlags_AlwaysClamp)) {
+							m_meta.autolod_coefs[i] = f * 0.01f;
+						}
+					}
+					
 					ImGui::PopID();
 				}
 
 				ImGui::EndTable();
 			}
-			if (ImGui::Button(ICON_FA_PLUS " Add clip")) m_meta.clips.emplace();
 
-			ImGui::NewLine();
+			/*
 			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 				bool infinite = m_meta.lods_distances[i] <= 0;
 				if (ImGui::TreeNode(&m_meta.lods_distances[i], "LOD %d", i)) {
@@ -2601,8 +2637,40 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					ImGui::TreePop();
 				}
 				if (infinite) break;
-			}
+			}*/
 			
+			ImGui::NewLine();
+			if (ImGui::BeginTable("clips", 4, ImGuiTableFlags_BordersOuter)) {
+				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupColumn("Start frame");
+				ImGui::TableSetupColumn("End frame");
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableHeadersRow();
+
+				for (FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+					ImGui::TableNextColumn();
+					ImGui::PushID(&clip);
+					ImGui::SetNextItemWidth(-1);
+					ImGui::InputText("##name", clip.name.data, sizeof(clip.name.data));
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					ImGui::InputInt("##from", (i32*)&clip.from_frame);
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					ImGui::InputInt("##to", (i32*)&clip.to_frame);
+					ImGui::TableNextColumn();
+					if (ImGuiEx::IconButton(ICON_FA_TRASH, "Delete")) {
+						m_meta.clips.erase(u32(&clip - m_meta.clips.begin()));
+						ImGui::PopID();
+						break;
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+			if (ImGui::Button(ICON_FA_PLUS " Add clip")) m_meta.clips.emplace();
+
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
 				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
@@ -2611,6 +2679,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
 					.cat("\nscale = ").cat(m_meta.scale)
+					.cat("\nlod_count = ").cat(m_meta.lod_count)
 					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
 					.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
 					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
@@ -2631,6 +2700,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
 				if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);
 				if (m_meta.autolod_mask & 4) src.cat("\nautolod2 = ").cat(m_meta.autolod_coefs[2]);
+				if (m_meta.autolod_mask & 4) src.cat("\nautolod3 = ").cat(m_meta.autolod_coefs[3]);
 
 				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 					if (m_meta.lods_distances[i] > 0) {
