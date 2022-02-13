@@ -98,6 +98,7 @@ static struct Instance
 	Instance()
 		: contexts(allocator)
 		, trace_task(allocator)
+		, counters(allocator)
 		, global_context(2 * 1024 * 1024, allocator)
 	{
 		startTrace();
@@ -163,8 +164,8 @@ static struct Instance
 		return ctx;
 	}
 
-
 	DefaultAllocator allocator;
+	Array<Counter> counters;
 	Array<ThreadContext*> contexts;
 	Mutex mutex;
 	os::Timer timer;
@@ -316,6 +317,20 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	};
 #endif
 
+u32 createCounter(const char* key_literal, float min) {
+	Counter& c = g_instance.counters.emplace();
+	copyString(Span(c.name), key_literal);
+	c.min = min;
+	return g_instance.counters.size() - 1;
+}
+
+void pushCounter(u32 counter, float value) {
+	CounterRecord r;
+	r.counter = counter;
+	r.value = value;
+	write(g_instance.global_context, EventType::COUNTER, (u8*)&r, sizeof(r));
+}
+
 void pushInt(const char* key, int value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
@@ -405,9 +420,7 @@ void link(i64 link)
 void gpuFrame()
 {
 	write(g_instance.global_context, EventType::GPU_FRAME, (int)0);
-
 }
-
 
 float getLastFrameDuration()
 {
@@ -601,7 +614,12 @@ void serialize(OutputMemoryStream& blob, ThreadContext& ctx) {
 
 void serialize(OutputMemoryStream& blob) {
 	MutexGuard lock(g_instance.mutex);
-	blob.write<u32>(0); // version
+	
+	const u32 version = 0;
+	blob.write(version);
+	blob.write((u32)g_instance.counters.size());
+	blob.write(g_instance.counters.begin(), g_instance.counters.byte_size());
+
 	blob.write((u32)g_instance.contexts.size());
 	serialize(blob, g_instance.global_context);
 	for (ThreadContext* ctx : g_instance.contexts) {

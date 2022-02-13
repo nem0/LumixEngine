@@ -315,17 +315,18 @@ public:
 	}
 
 	void computeSmoothTimeDelta() {
+		float tmp[11];
+		memcpy(tmp, m_last_time_deltas, sizeof(tmp));
+		qsort(tmp, lengthOf(tmp), sizeof(tmp[0]), [](const void* a, const void* b) -> i32 {
+			return *(const float*)a < *(const float*)b ? -1 : *(const float*)a > *(const float*)b ? 1 : 0;
+		});
 		float t = 0;
-		float max = 0;
-		float min = FLT_MAX;
-		for (float dt : m_last_time_deltas) {
-			t += dt;
-			max = maximum(max, dt);
-			min = minimum(min, dt);
+		for (u32 i = 2; i < lengthOf(tmp) - 2; ++i) {
+			t += tmp[i];
 		}
-		t -= min;
-		t -= max;
-		m_smooth_time_delta = t / (lengthOf(m_last_time_deltas) - 2);
+		m_smooth_time_delta = t / (lengthOf(tmp) - 4);
+		static u32 counter = profiler::createCounter("Smooth time delta (ms)", 0);
+		profiler::pushCounter(counter, m_smooth_time_delta * 1000.f);
 	}
 
 	void update(Universe& context) override
@@ -339,6 +340,9 @@ public:
 		}
 		++m_last_time_deltas_frame;
 		m_last_time_deltas[m_last_time_deltas_frame % lengthOf(m_last_time_deltas)] = dt;
+		static u32 counter = profiler::createCounter("Raw time delta (ms)", 0);
+		profiler::pushCounter(counter, dt * 1000.f);
+
 		computeSmoothTimeDelta();
 
 		{
@@ -534,7 +538,7 @@ private:
 	UniquePtr<InputSystem> m_input_system;
 	os::Timer m_timer;
 	float m_time_multiplier;
-	float m_last_time_deltas[10] = {};
+	float m_last_time_deltas[11] = {};
 	u32 m_last_time_deltas_frame = 0;
 	float m_smooth_time_delta;
 	bool m_is_game_running;

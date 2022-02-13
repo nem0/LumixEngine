@@ -175,6 +175,7 @@ struct ProfilerUIImpl final : ProfilerUI
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
 		, m_blocks(m_allocator)
+		, m_counters(m_allocator)
 		, m_resource_manager(engine.getResourceManager())
 		, m_engine(engine)
 	{
@@ -222,63 +223,79 @@ struct ProfilerUIImpl final : ProfilerUI
 		});
 	}
 
-	void framesUI() {
-		if (!ImGui::TreeNode("Frames")) return;
-		
-		ThreadContextProxy ctx(m_data.getMutableData() + 2 * sizeof(u32));
+	ThreadContextProxy getGlobalThreadContextProxy() {
+		InputMemoryStream blob(m_data);
+		blob.skip(sizeof(u32));
+		const u32 count = blob.read<u32>();
+		blob.skip(count * sizeof(profiler::Counter));
+		blob.skip(sizeof(u32));
+		return ThreadContextProxy(m_data.getMutableData() + blob.getPosition());
+	}
 
-		u32 p = ctx.begin;
-		const u32 end = ctx.end;
-		static u32 last_frames_count = 0;
-		static float last_max_t = 1/60.f;
-		float max_t = 0;
-		u64 last_frame = 0;
-		u32 frames_count = 0;
-
-		const float from_x = ImGui::GetCursorScreenPos().x;
-		const float to_y = ImGui::GetCursorScreenPos().y + 100;
-		const float to_x = from_x + ImGui::GetContentRegionAvail().x;
+	void countersUI(float from_x, float to_x) {
+		if (!ImGui::TreeNode("Counters")) return;
 		ImDrawList* dl = ImGui::GetWindowDrawList();
-		const float col_width = (to_x - from_x) / maximum(last_frames_count, 1);
-		const u64 freq = profiler::frequency();
-
-		while (p != end) {
-			profiler::EventHeader header;
-			read(ctx, p, header);
-			switch (header.type) {
-				case profiler::EventType::PAUSE:
-					last_frame = 0; // frame time is accumulated during pause, so we ignore it
-					break;
-				case profiler::EventType::FRAME:
-					if (last_frame != 0) {
-						const float t = 1000 * float((header.time - last_frame) / double(freq));
-						max_t = maximum(t, max_t);
-						const float y = to_y - t / last_max_t * 100;
-						const float x = from_x + (to_x - from_x) * frames_count / last_frames_count; 
-						ImVec2 ra(x, y);
-						ImVec2 rb(x + col_width, to_y);
-						dl->AddRectFilled(ra, rb, IM_COL32(0xff, 0, 0, 0xff));
-						if (ImGui::IsMouseHoveringRect(ra, rb)) {
-							dl->AddRect(ra, rb, IM_COL32(0, 0, 0, 0xff));
-							ImGui::SetTooltip("%.3f ms", t);
-						}
-					}
-					last_frame = header.time;
-					++frames_count;
-					break;
-			}
-			p += header.size;
-		}
 		
-		last_max_t = max_t;
-		last_frames_count = frames_count;
-		ImGui::Dummy(ImVec2(-1, 100));
+		for (Counter& counter : m_counters) {
+			const char* name = counter.name;
+			if (m_filter[0] && stristr(name, m_filter) == nullptr) continue;
+			if (!ImGui::TreeNode(name)) continue;
+
+			const float top = ImGui::GetCursorScreenPos().y;
+			const u64 view_start = m_end - m_range;
+
+			const ImColor border_color(ImGui::GetStyle().Colors[ImGuiCol_FrameBg]);
+			const ImColor text_color(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+			dl->AddLine(ImVec2(from_x, top), ImVec2(to_x, top), border_color);
+			dl->AddLine(ImVec2(from_x, top + 100), ImVec2(to_x, top + 100), border_color);
+			
+			char text_max[32];
+			
+			toCString(counter.max, Span(text_max), 2);
+			char text_min[32];
+			toCString(counter.min, Span(text_min), 2);
+			float text_width = ImGui::CalcTextSize(text_max).x;
+			dl->AddText(ImVec2(to_x - text_width, top), text_color, text_max);
+			
+			text_width = ImGui::CalcTextSize(text_min).x;
+			dl->AddText(ImVec2(to_x - text_width, top + 100), text_color, text_min);
+			ImVec2 prev;
+			bool first = true;
+			const float value_range = maximum(counter.max - counter.min, 0.00001f);
+			for (const Counter::Record& c : counter.records) {
+				const float t_start = float(int(c.time - view_start) / double(m_range));
+				const float x = from_x * (1 - t_start) + to_x * t_start;
+				const float y = top + 100 - 100 * (c.value - counter.min) / value_range;
+				ImVec2 p(x, y);
+				if (!first) {
+					dl->AddLine(prev, p, 0xffFFff00);
+					dl->AddRect(p - ImVec2(2, 2), p + ImVec2(2, 2), 0xffFFff00);
+					if (ImGui::IsMouseHoveringRect(p - ImVec2(2, 2), p + ImVec2(2, 2))) {
+						ImGui::SetTooltip("%f", c.value);
+					}
+				}
+				first = false;
+				prev = p;
+			}
+			ImGui::Dummy(ImVec2(-1, 100));
+			ImGui::TreePop();
+		}
 		ImGui::TreePop();
+		return;
 	}
 
 	void patchStrings() {
 		InputMemoryStream tmp(m_data);
 		tmp.read<u32>();
+		const u32 counters_count = tmp.read<u32>();
+		m_counters.reserve(counters_count);
+		for (u32 i = 0; i < counters_count; ++i) {
+			Counter& c = m_counters.emplace(m_allocator);
+			const profiler::Counter pc = tmp.read<profiler::Counter>();
+			c.name = pc.name;
+			c.min = pc.min;
+		}
+
 		const u32 count = tmp.read<u32>();
 		u8* iter = (u8*)tmp.skip(0);
 		ThreadContextProxy global(iter);
@@ -354,6 +371,43 @@ struct ProfilerUIImpl final : ProfilerUI
 	}
 
 	void preprocess() {
+		m_counters.clear();
+
+		InputMemoryStream blob(m_data);
+		const u32 version = blob.read<u32>();
+		ASSERT(version == 0);
+		const u32 counters_count = blob.read<u32>();
+		for (u32 i = 0; i < counters_count; ++i) {
+			const profiler::Counter pc = blob.read<profiler::Counter>();
+			Counter& c = m_counters.emplace(m_allocator);
+			c.name = pc.name;
+			c.min = pc.min;
+		}
+		blob.skip(sizeof(u32));
+
+		ThreadContextProxy global(m_data.getMutableData() + blob.getPosition());
+		u32 p = global.begin;
+		const u32 end = global.end;
+		while (p != end) {
+			profiler::EventHeader header;
+			read(global, p, header);
+			switch (header.type) {
+				case profiler::EventType::COUNTER:
+					profiler::CounterRecord tmp;
+					read(global, p + sizeof(profiler::EventHeader), tmp);
+					if (tmp.counter < (u32)m_counters.size()) {
+						Counter& c = m_counters[tmp.counter];
+						Counter::Record& r = c.records.emplace();
+						r.time = header.time;
+						r.value = tmp.value;
+						c.min = minimum(c.min, r.value);
+						c.max = maximum(c.max, r.value);
+					}
+					break;
+			}
+			p += header.size;
+		}
+
 		m_blocks.clear();
 		m_blocks.reserve(16 * 1024);
 		forEachThread([&](ThreadContextProxy& ctx){
@@ -396,6 +450,8 @@ struct ProfilerUIImpl final : ProfilerUI
 
 		InputMemoryStream blob(m_data);
 		const u32 version = blob.read<u32>();
+		const u32 counters_count = blob.read<u32>();
+		blob.skip(counters_count * sizeof(profiler::Counter));
 		const u32 count = blob.read<u32>();
 		u8* iter = (u8*)blob.skip(0);
 		ThreadContextProxy global(iter);
@@ -546,6 +602,20 @@ struct ProfilerUIImpl final : ProfilerUI
 	} hovered_job;
 
 	HashMap<i32, Block> m_blocks;
+	
+	struct Counter {
+		struct Record {
+			u64 time;
+			float value;
+		};
+		Counter(IAllocator& allocator) : records(allocator) {}
+		Array<Record> records;
+		StaticString<64> name;
+		float min = FLT_MAX;
+		float max = -FLT_MAX;
+	};
+
+	Array<Counter> m_counters;
 	profiler::GPUMemStatsBlock m_gpu_mem_stats;
 	bool m_is_gpu_mem_stats_valid = false;
 };
@@ -906,15 +976,15 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	if (m_data.empty()) return;
 	if (!m_is_paused) return;
 
-	framesUI();
+	const float from_y = ImGui::GetCursorScreenPos().y;
+	const float from_x = ImGui::GetCursorScreenPos().x;
+	const float to_x = from_x + ImGui::GetContentRegionAvail().x;
+	countersUI(from_x, to_x);
 
-	ThreadContextProxy global(m_data.getMutableData() + 2 * sizeof(u32));
+	ThreadContextProxy global = getGlobalThreadContextProxy();
 
 	const u64 view_start = m_end - m_range;
 
-	const float from_x = ImGui::GetCursorScreenPos().x;
-	const float from_y = ImGui::GetCursorScreenPos().y;
-	const float to_x = from_x + ImGui::GetContentRegionAvail().x;
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 	dl->ChannelsSplit(2);
 
@@ -1326,6 +1396,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						if (old_iter.isValid()) draw_cswitch(x, r, old_iter.value(), false);
 					}
 					break;
+				case profiler::EventType::COUNTER:
 				case profiler::EventType::PAUSE:
 					break;
 				default: ASSERT(false); break;

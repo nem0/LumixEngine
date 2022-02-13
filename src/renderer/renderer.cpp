@@ -1141,6 +1141,7 @@ struct RendererImpl final : Renderer
 	}
 
 	void* allocJob(u32 size, u32 align) override {
+		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->job_allocator.allocate_aligned(size, align);
 	}
 
@@ -1220,6 +1221,8 @@ struct RendererImpl final : Renderer
 	}
 
 	void render() {
+		jobs::MutexGuard guard(m_render_mutex);
+
 		FrameData* next_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
 
 		if (next_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(next_frame->gpu_frame)) {
@@ -1259,7 +1262,8 @@ struct RendererImpl final : Renderer
 				profiler::blockColor(0xaa, 0xff, 0xaa);
 				profiler::link(job->profiler_link);
 				job->execute();
-				destroyJob(*job);
+				job->~RenderJob();
+				frame.job_allocator.deallocate_aligned(job);
 			}
 			frame.job_allocator.reset();
 		}
@@ -1340,6 +1344,7 @@ struct RendererImpl final : Renderer
 	Engine& m_engine;
 	IAllocator& m_allocator;
 	Array<StaticString<32>> m_shader_defines;
+	jobs::Mutex m_render_mutex;
 	jobs::Mutex m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;

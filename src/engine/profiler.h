@@ -23,6 +23,9 @@ LUMIX_ENGINE_API void pushJobInfo(i32 signal_on_finish);
 LUMIX_ENGINE_API void pushString(const char* value);
 LUMIX_ENGINE_API void pushInt(const char* key_literal, int value);
 
+LUMIX_ENGINE_API u32 createCounter(const char* key_literal, float min);
+LUMIX_ENGINE_API void pushCounter(u32 counter, float value);
+
 LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
 LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
 LUMIX_ENGINE_API void gpuStats(u64 primitives_generated);
@@ -69,6 +72,16 @@ struct ContextSwitchRecord
 struct BlockRecord {
 	const char* name;
 	i32 id;
+};
+
+struct Counter {
+	char name[64];
+	float min;
+};
+
+struct CounterRecord {
+	u32 counter;
+	float value;
 };
 
 struct IntRecord
@@ -130,7 +143,8 @@ enum class EventType : u8
 	PAUSE,
 	GPU_STATS,
 	CONTINUE_BLOCK,
-	SIGNAL_TRIGGERED
+	SIGNAL_TRIGGERED,
+	COUNTER
 };
 
 #pragma pack(1)
