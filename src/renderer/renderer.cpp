@@ -787,11 +787,13 @@ struct RendererImpl final : Renderer
 
 	TransientSlice allocTransient(u32 size) override
 	{
+		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->transient_buffer.alloc(size);
 	}
 
 	TransientSlice allocUniform(u32 size) override
 	{
+		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->uniform_buffer.alloc(size);
 	}
 	
@@ -1105,6 +1107,8 @@ struct RendererImpl final : Renderer
 
 	void queue(RenderJob& cmd, i64 profiler_link) override
 	{
+		jobs::wait(&m_cpu_frame->can_setup);
+
 		cmd.profiler_link = profiler_link;
 		
 		m_cpu_frame->jobs.push(&cmd);
@@ -1216,16 +1220,17 @@ struct RendererImpl final : Renderer
 	}
 
 	void render() {
-		FrameData& check_frame = *m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
+		FrameData* next_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
 
-		if (check_frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame.gpu_frame)) {
-			check_frame.gpu_frame = 0xffFFffFF;
-			check_frame.transient_buffer.renderDone();
-			check_frame.uniform_buffer.renderDone();
-			jobs::setGreen(&check_frame.can_setup);
+		if (next_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(next_frame->gpu_frame)) {
+			next_frame->gpu_frame = 0xFFffFFff;   
+			next_frame->transient_buffer.renderDone();
+			next_frame->uniform_buffer.renderDone();
+			jobs::setGreen(&next_frame->can_setup);
 		}
-
+		
 		FrameData& frame = *m_gpu_frame;
+		profiler::pushInt("GPU Frame", getFrameIndex(m_gpu_frame));
 		frame.transient_buffer.prepareToRender();
 		frame.uniform_buffer.prepareToRender();
 		
@@ -1261,23 +1266,25 @@ struct RendererImpl final : Renderer
 		m_profiler.endQuery();
 		frame.jobs.clear();
 
-		PROFILE_BLOCK("swap buffers");
 		jobs::enableBackupWorker(true);
-			
-		frame.gpu_frame = gpu::swapBuffers();
+
+		FrameData* prev_frame = m_frames[(getFrameIndex(m_gpu_frame) + lengthOf(m_frames) - 1) % lengthOf(m_frames)].get();
+		if (prev_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(prev_frame->gpu_frame)) {
+			prev_frame->gpu_frame = 0xFFffFFff;   
+			prev_frame->transient_buffer.renderDone();
+			prev_frame->uniform_buffer.renderDone();
+			jobs::setGreen(&prev_frame->can_setup);
+		}
+		
+		{
+			PROFILE_BLOCK("swap buffers");
+			frame.gpu_frame = gpu::swapBuffers();
+		}
 			
 		jobs::enableBackupWorker(false);
 		m_profiler.frame();
 
 		m_gpu_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
-		FrameData& check_frame2 = *m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
-
-		if (check_frame2.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame2.gpu_frame)) {
-			check_frame2.gpu_frame = 0xffFFffFF;
-			check_frame2.transient_buffer.renderDone();
-			check_frame2.uniform_buffer.renderDone();
-			jobs::setGreen(&check_frame2.can_setup);
-		}
 
 		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
 			gpu::waitFrame(m_gpu_frame->gpu_frame);
@@ -1293,6 +1300,11 @@ struct RendererImpl final : Renderer
 	void waitForCommandSetup() override
 	{
 		jobs::wait(&m_cpu_frame->setup_done);
+	}
+
+	void waitCanSetup() override
+	{
+		jobs::wait(&m_cpu_frame->can_setup);
 	}
 
 	void waitForRender() override {
@@ -1323,8 +1335,6 @@ struct RendererImpl final : Renderer
 		jobs::runLambda([this](){
 			render();
 		}, &m_last_render, 1);
-
-		jobs::wait(&m_cpu_frame->can_setup);
 	}
 
 	Engine& m_engine;

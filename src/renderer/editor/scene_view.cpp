@@ -491,6 +491,7 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void update(float time_delta) {
+		PROFILE_FUNCTION();
 		if (m_mouse_mode == MouseMode::SELECT) {
 			m_rect_selection_timer += time_delta;
 		}
@@ -681,6 +682,7 @@ SceneView::~SceneView()
 }
 
 void SceneView::manipulate() {
+	PROFILE_FUNCTION();
 	const Array<EntityRef>* selected = &m_editor.getSelectedEntities();
 	if (selected->empty()) return;
 

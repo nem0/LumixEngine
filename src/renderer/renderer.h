@@ -47,6 +47,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual void frame() = 0;
 	virtual void waitForRender() = 0;
 	virtual void waitForCommandSetup() = 0;
+	virtual void waitCanSetup() = 0;
 	virtual void makeScreenshot(const struct Path& filename) = 0;
 	virtual u8 getShaderDefineIdx(const char* define) = 0;
 	virtual const char* getShaderDefine(int define_idx) const = 0;

@@ -2609,36 +2609,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::EndTable();
 			}
 
-			/*
-			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
-				bool infinite = m_meta.lods_distances[i] <= 0;
-				if (ImGui::TreeNode(&m_meta.lods_distances[i], "LOD %d", i)) {
-					if(ImGui::Checkbox(StaticString<32>("Infinite"), &infinite)) {
-						m_meta.lods_distances[i] *= -1;
-					}
-
-					if (!infinite && m_meta.lods_distances[i] > 0) {
-						ImGui::SameLine();
-						ImGui::SetNextItemWidth(-1);
-						ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
-					}
-					if (i > 0) {
-						bool autolod = m_meta.autolod_mask & (1 << (i - 1));
-						ImGuiEx::Label("Auto LOD");
-						if (ImGui::Checkbox("##autolod", &autolod)) {
-							m_meta.autolod_mask &= ~(1 << (i - 1));
-							if (autolod) m_meta.autolod_mask |= 1 << (i - 1);
-						}
-						if (autolod) {
-							ImGuiEx::Label("Auto LOD coef");
-							ImGui::DragFloat("##autolod_coef", &m_meta.autolod_coefs[i - 1]);
-						}
-					}
-					ImGui::TreePop();
-				}
-				if (infinite) break;
-			}*/
-			
 			ImGui::NewLine();
 			if (ImGui::BeginTable("clips", 4, ImGuiTableFlags_BordersOuter)) {
 				ImGui::TableSetupColumn("Name");

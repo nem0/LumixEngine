@@ -106,9 +106,6 @@ private:
 	State m_current_state;
 	FileSystem::AsyncHandle m_async_op;
 	bool m_hooked = false;
-	#ifdef LUMIX_DEBUG
-		bool m_invoking = false;
-	#endif
 }; // struct Resource
 
 

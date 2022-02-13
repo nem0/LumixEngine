@@ -54,13 +54,7 @@ void Resource::checkState()
 	if (m_failed_dep_count > 0 && m_current_state != State::FAILURE)
 	{
 		m_current_state = State::FAILURE;
-		#ifdef LUMIX_DEBUG
-			m_invoking = true;
-		#endif
 		m_cb.invoke(old_state, m_current_state, *this);
-		#ifdef LUMIX_DEBUG
-			m_invoking = false;
-		#endif
 	}
 
 	if (m_failed_dep_count == 0)
@@ -83,25 +77,13 @@ void Resource::checkState()
 			}
 
 			m_current_state = State::READY;
-			#ifdef LUMIX_DEBUG
-				m_invoking = true;
-			#endif
 			m_cb.invoke(old_state, m_current_state, *this);
-			#ifdef LUMIX_DEBUG
-				m_invoking = false;
-			#endif
 		}
 
 		if (m_empty_dep_count > 0 && m_current_state != State::EMPTY)
 		{
 			m_current_state = State::EMPTY;
-			#ifdef LUMIX_DEBUG
-				m_invoking = true;
-			#endif
 			m_cb.invoke(old_state, m_current_state, *this);
-			#ifdef LUMIX_DEBUG
-				m_invoking = false;
-			#endif
 		}
 	}
 }
@@ -239,9 +221,6 @@ void Resource::addDependency(Resource& dependent_resource)
 
 void Resource::removeDependency(Resource& dependent_resource)
 {
-	#ifdef LUMIX_DEBUG
-		ASSERT(!m_invoking);
-	#endif
 	dependent_resource.m_cb.unbind<&Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) 
 	{

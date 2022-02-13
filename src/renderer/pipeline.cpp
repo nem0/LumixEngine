@@ -976,6 +976,7 @@ struct PipelineImpl final : Pipeline
 
 	void callInitScene()
 	{
+		PROFILE_FUNCTION();
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_getfield(m_lua_state, -1, "initScene");
 		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION)
@@ -1366,6 +1367,7 @@ struct PipelineImpl final : Pipeline
 			return false;
 		}
 
+		m_renderer.waitCanSetup();
 		clearBuffers();
 
 		const Matrix view = m_viewport.getViewRotation();

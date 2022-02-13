@@ -1,3 +1,4 @@
+#include "engine/allocators.h"
 #include "engine/atomic.h"
 #include "engine/core.h"
 #include "engine/crc32.h"
@@ -71,11 +72,12 @@ public:
 		, m_lua_resources(m_allocator)
 		, m_last_lua_resource_idx(-1)
 		, m_is_game_running(false)
-		, m_last_time_delta(0)
+		, m_smooth_time_delta(1/60.f)
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
 		, m_next_frame(false)
 	{
+		for (float& f : m_last_time_deltas) f = 1/60.f;
 		os::init();
 		os::InitWindowArgs init_win_args;
 		init_win_args.handle_file_drops = init_data.handle_file_drops;
@@ -96,7 +98,7 @@ public:
 
 		os::logInfo();
 
-		m_state = luaL_newstate();
+		m_state = lua_newstate(&luaAlloc, this);
 		luaL_openlibs(m_state);
 
 		registerEngineAPI(m_state, this);
@@ -160,6 +162,17 @@ public:
 		m_log_file.close();
 		m_is_log_file_open = false;
 		os::destroyWindow(m_window_handle);
+	}
+
+	static void* luaAlloc(void* ud, void* ptr, size_t osize, size_t nsize) {
+		EngineImpl* engine = (EngineImpl*)ud;
+		if (nsize == 0) {
+			if (osize > 0) engine->m_lua_allocator.deallocate(ptr);
+			return nullptr;
+		}
+		if (!ptr) return engine->m_lua_allocator.allocate(nsize);
+
+		return engine->m_lua_allocator.reallocate(ptr, nsize);
 	}
 
 	static void logToDebugOutput(LogLevel level, const char* message)
@@ -301,6 +314,19 @@ public:
 		m_time_multiplier = maximum(multiplier, 0.001f);
 	}
 
+	void computeSmoothTimeDelta() {
+		float t = 0;
+		float max = 0;
+		float min = FLT_MAX;
+		for (float dt : m_last_time_deltas) {
+			t += dt;
+			max = maximum(max, dt);
+			min = minimum(min, dt);
+		}
+		t -= min;
+		t -= max;
+		m_smooth_time_delta = t / (lengthOf(m_last_time_deltas) - 2);
+	}
 
 	void update(Universe& context) override
 	{
@@ -311,7 +337,10 @@ public:
 			m_paused = false;
 			dt = 1 / 30.0f;
 		}
-		m_last_time_delta = dt;
+		++m_last_time_deltas_frame;
+		m_last_time_deltas[m_last_time_deltas_frame % lengthOf(m_last_time_deltas)] = dt;
+		computeSmoothTimeDelta();
+
 		{
 			PROFILE_BLOCK("update scenes");
 			for (UniquePtr<IScene>& scene : context.getScenes())
@@ -492,10 +521,11 @@ public:
 	InputSystem& getInputSystem() override { return *m_input_system; }
 	ResourceManagerHub& getResourceManager() override { return m_resource_manager; }
 	lua_State* getState() override { return m_state; }
-	float getLastTimeDelta() const override { return m_last_time_delta / m_time_multiplier; }
+	float getLastTimeDelta() const override { return m_smooth_time_delta / m_time_multiplier; }
 
 private:
 	IAllocator& m_allocator;
+	DefaultAllocator m_lua_allocator;
 	PageAllocator m_page_allocator;
 	UniquePtr<FileSystem> m_file_system;
 	ResourceManagerHub m_resource_manager;
@@ -504,7 +534,9 @@ private:
 	UniquePtr<InputSystem> m_input_system;
 	os::Timer m_timer;
 	float m_time_multiplier;
-	float m_last_time_delta;
+	float m_last_time_deltas[10] = {};
+	u32 m_last_time_deltas_frame = 0;
+	float m_smooth_time_delta;
 	bool m_is_game_running;
 	bool m_paused;
 	bool m_next_frame;

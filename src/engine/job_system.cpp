@@ -298,6 +298,8 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 			PROFILE_BLOCK("sleeping");
 			profiler::blockColor(0x30, 0x30, 0x30);
 			worker->sleep(g_system->m_job_queue_sync);
+			
+			if (worker->m_is_backup) break;
 		}
 		if (worker->m_finished) break;
 
@@ -314,6 +316,8 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 			worker->m_current_fiber = this_fiber;
 		}
 		else {
+			if (!job.task) continue;
+
 			profiler::beginBlock("job");
 			profiler::blockColor(0x60, 0x60, 0x60);
 			if (job.dec_on_finish) {

@@ -28,11 +28,11 @@ namespace profiler
 
 struct ThreadContext
 {
-	ThreadContext(IAllocator& allocator) 
+	ThreadContext(u32 buffer_size, IAllocator& allocator) 
 		: buffer(allocator)
 		, open_blocks(allocator)
 	{
-		buffer.resize(1024 * 512);
+		buffer.resize(buffer_size);
 		open_blocks.reserve(64);
 	}
 
@@ -98,7 +98,7 @@ static struct Instance
 	Instance()
 		: contexts(allocator)
 		, trace_task(allocator)
-		, global_context(allocator)
+		, global_context(2 * 1024 * 1024, allocator)
 	{
 		startTrace();
 	}
@@ -153,7 +153,7 @@ static struct Instance
 	ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
-			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(allocator);
+			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(1024 * 1024, allocator);
 			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
