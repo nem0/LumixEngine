@@ -1,7 +1,6 @@
 #include "engine/atomic.h"
 #include <intrin.h>
 
-
 namespace Lumix
 {
 

@@ -555,7 +555,7 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	GPU_PROFILE();
 	GLuint gl_handles[64];
 	ASSERT(count <= lengthOf(gl_handles));
-	ASSERT(handles);
+	ASSERT(handles || count == 0);
 	
 	for(u32 i = 0; i < count; ++i) {
 		if (handles[i]) {

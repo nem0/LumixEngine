@@ -561,7 +561,7 @@ bool Model::parseLODs(InputMemoryStream& file)
 
 	for (float& d : m_lod_distances) d = -1;
 	for (LODMeshIndices& i : m_lod_indices) {
-		i.from = -1;
+		i.from = 0;
 		i.to = -1;
 	}
 

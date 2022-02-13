@@ -119,60 +119,57 @@ struct WorkerTask : Thread
 	bool m_is_backup = false;
 };
 
-static void pushJob(const Job& job)
-{
-	if (job.worker_index != ANY_WORKER) {
-		WorkerTask* worker = g_system->m_workers[job.worker_index % g_system->m_workers.size()];
-		worker->m_job_queue.push(job);
-		worker->wakeup();
-		return;
-	}
-	g_system->m_job_queue.push(job);
-	for (WorkerTask* worker : g_system->m_workers) {
-		worker->wakeup();
-	}
-	for (WorkerTask* worker : g_system->m_backup_workers) {
-		if (worker->m_is_enabled) worker->wakeup();
-	}
-}
-
 struct Waitor {
 	Waitor* next;
 	FiberDecl* fiber;
 };
 
 template <bool ZERO>
-static bool trigger(Signal* signal)
+LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 {
-	Lumix::MutexGuard lock(g_system->m_sync);
+	Waitor* waitor;
+	{
+		Lumix::MutexGuard lock(g_system->m_sync);
 
-	if constexpr (ZERO) {
-		signal->counter = 0;
-	}
-	else {
-		--signal->counter;
-		if (signal->counter > 0) return false;
-	}
-
-	Waitor* waitor = signal->waitor;
-	while (waitor) {
-		Waitor* next = waitor->next;
-		const u8 worker = waitor->fiber->current_job.worker_index;
-		Lumix::MutexGuard queue_lock(g_system->m_job_queue_sync);
-		if (worker == ANY_WORKER) {
-			g_system->m_ready_fibers.push(waitor->fiber);
-			for (WorkerTask* worker : g_system->m_workers) {
-				worker->wakeup();
-			}
+		if constexpr (ZERO) {
+			waitor = signal->waitor;
+			signal->counter = 0;
 		}
 		else {
-			WorkerTask* worker = g_system->m_workers[waitor->fiber->current_job.worker_index % g_system->m_workers.size()];
-			worker->m_ready_fibers.push(waitor->fiber);
+			--signal->counter;
+			if (signal->counter > 0) return false;
+		}
+
+		waitor = signal->waitor;
+		signal->waitor = nullptr;
+	}
+
+	bool wake_all = false;
+	{
+		Lumix::MutexGuard queue_lock(g_system->m_job_queue_sync);
+		while (waitor) {
+			Waitor* next = waitor->next;
+			const u8 worker = waitor->fiber->current_job.worker_index;
+			if (worker == ANY_WORKER) {
+				g_system->m_ready_fibers.push(waitor->fiber);
+				wake_all = true;
+			}
+			else {
+				WorkerTask* worker = g_system->m_workers[waitor->fiber->current_job.worker_index % g_system->m_workers.size()];
+				worker->m_ready_fibers.push(waitor->fiber);
+				if(!wake_all) worker->wakeup();
+			}
+			waitor = next;
+		}
+	}
+	if (wake_all) {
+		for (WorkerTask* worker : g_system->m_backup_workers) {
+			if (worker->m_is_enabled) worker->wakeup();
+		}
+		for (WorkerTask* worker : g_system->m_workers) {
 			worker->wakeup();
 		}
-		waitor = next;
 	}
-	signal->waitor = nullptr;
 	return true;
 }
 
@@ -200,24 +197,26 @@ void enableBackupWorker(bool enable)
 	}
 }
 
-void setRed(Signal* signal) {
+LUMIX_FORCE_INLINE static bool setRedEx(Signal* signal) {
 	ASSERT(signal);
-	Lumix::MutexGuard lock(g_system->m_sync);
-	
 	ASSERT(signal->counter <= 1);
-	if (signal->counter == 0) {
+	bool res = compareAndExchange(&signal->counter, 1, 0);
+	if (res) {
 		signal->generation = atomicIncrement(&g_generation);
 	}
-	signal->counter = 1;
+	return res;
 }
 
+void setRed(Signal* signal) {
+	setRedEx(signal);
+}
 
 void setGreen(Signal* signal) {
 	ASSERT(signal);
 	ASSERT(signal->counter <= 1);
-	if (trigger<true>(signal)) {
-		profiler::signalTriggered(signal->generation);
-	}
+	const u32 gen = signal->generation;
+	trigger<true>(signal);
+	profiler::signalTriggered(gen);
 }
 
 
@@ -229,22 +228,41 @@ void run(void* data, void(*task)(void*), Signal* on_finished)
 
 void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 {
-	Job j;
-	j.data = data;
-	j.task = task;
-	j.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
-	j.dec_on_finish = on_finished;
+	Job job;
+	job.data = data;
+	job.task = task;
+	job.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
+	job.dec_on_finish = on_finished;
 
-	Lumix::MutexGuard guard(g_system->m_sync);
 	if (on_finished) {
+		Lumix::MutexGuard guard(g_system->m_sync);
 		++on_finished->counter;
 		if (on_finished->counter == 1) {
 			on_finished->generation = atomicIncrement(&g_generation);
 		}
 	}
 
-	Lumix::MutexGuard lock(g_system->m_job_queue_sync);
-	pushJob(j);
+	if (worker_index != ANY_WORKER) {
+		WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
+		{
+			Lumix::MutexGuard lock(g_system->m_job_queue_sync);
+			worker->m_job_queue.push(job);
+		}
+		worker->wakeup();
+		return;
+	}
+
+	{
+		Lumix::MutexGuard lock(g_system->m_job_queue_sync);
+		g_system->m_job_queue.push(job);
+	}
+
+	for (WorkerTask* worker : g_system->m_workers) {
+		worker->wakeup();
+	}
+	for (WorkerTask* worker : g_system->m_backup_workers) {
+		if (worker->m_is_enabled) worker->wakeup();
+	}
 }
 
 
@@ -464,10 +482,7 @@ void enter(Mutex* mutex) {
 	ASSERT(getWorker());
 	for (;;) {
 		for (u32 i = 0; i < 400; ++i) {
-			if (compareAndExchange(&mutex->lock, 1, 0)) {
-				setRed(&mutex->signal);
-				return;
-			}
+			if (setRedEx(&mutex->signal)) return;
 		}
 		waitEx(&mutex->signal, true);
 	}
@@ -476,8 +491,6 @@ void enter(Mutex* mutex) {
 void exit(Mutex* mutex) {
 	ASSERT(getWorker());
 	setGreen(&mutex->signal);
-	bool res = compareAndExchange(&mutex->lock, 0, 1);
-	ASSERT(res);
 }
 
 void wait(Signal* handle) {

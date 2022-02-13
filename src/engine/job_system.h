@@ -94,14 +94,15 @@ struct MutexGuard {
 };
 
 struct Signal {
-	volatile i32 counter = 0;
+	~Signal() { ASSERT(!waitor); ASSERT(!counter); }
+
 	struct Waitor* waitor = nullptr;
+	volatile i32 counter = 0;
 	i32 generation; // identify different red-green pairs on the same signal, used by profiler
 };
 
 struct Mutex {
-	volatile i32 lock = 0;
-	Signal signal;
+	Signal signal; // do not access this outside of job_system.cpp
 };
 
 } // namespace jobs
