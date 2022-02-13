@@ -15,7 +15,6 @@ LUMIX_ENGINE_API void setThreadName(const char* name);
 LUMIX_ENGINE_API void showInProfiler(bool show);
 
 LUMIX_ENGINE_API void beginBlock(const char* name_literal);
-LUMIX_ENGINE_API void continueBlock(i32 block_id);
 LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
 LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();

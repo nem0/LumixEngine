@@ -166,6 +166,7 @@ public:
 
 	static void* luaAlloc(void* ud, void* ptr, size_t osize, size_t nsize) {
 		EngineImpl* engine = (EngineImpl*)ud;
+		engine->m_lua_allocated = engine->m_lua_allocated + nsize - osize;
 		if (nsize == 0) {
 			if (osize > 0) engine->m_lua_allocator.deallocate(ptr);
 			return nullptr;
@@ -332,6 +333,14 @@ public:
 	void update(Universe& context) override
 	{
 		PROFILE_FUNCTION();
+		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
+		profiler::pushCounter(lua_mem_counter, float(double(m_lua_allocated) / 1024.0));
+		#ifdef _WIN32
+			const float process_mem = os::getProcessMemory() / (1024.f * 1024.f);
+			static u32 process_mem_counter = profiler::createCounter("Process Memory (MB)", 0);
+			profiler::pushCounter(process_mem_counter, process_mem);
+		#endif
+
 		float dt = m_timer.tick() * m_time_multiplier;
 		if (m_next_frame)
 		{
@@ -530,6 +539,7 @@ public:
 private:
 	IAllocator& m_allocator;
 	DefaultAllocator m_lua_allocator;
+	size_t m_lua_allocated = 0;
 	PageAllocator m_page_allocator;
 	UniquePtr<FileSystem> m_file_system;
 	ResourceManagerHub m_resource_manager;

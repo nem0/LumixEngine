@@ -250,7 +250,6 @@ struct ProfilerUIImpl final : ProfilerUI
 			dl->AddLine(ImVec2(from_x, top + 100), ImVec2(to_x, top + 100), border_color);
 			
 			char text_max[32];
-			
 			toCString(counter.max, Span(text_max), 2);
 			char text_min[32];
 			toCString(counter.min, Span(text_min), 2);
@@ -258,7 +257,7 @@ struct ProfilerUIImpl final : ProfilerUI
 			dl->AddText(ImVec2(to_x - text_width, top), text_color, text_max);
 			
 			text_width = ImGui::CalcTextSize(text_min).x;
-			dl->AddText(ImVec2(to_x - text_width, top + 100), text_color, text_min);
+			dl->AddText(ImVec2(to_x - text_width, top + 100 - ImGui::GetTextLineHeightWithSpacing()), text_color, text_min);
 			ImVec2 prev;
 			bool first = true;
 			const float value_range = maximum(counter.max - counter.min, 0.00001f);
@@ -911,6 +910,11 @@ static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 
 void ProfilerUIImpl::onGUICPUProfiler()
 {
+	if (m_main_allocator) {
+		static u32 mem_counter = profiler::createCounter("Total tracked memory (MB)", 0);
+		profiler::pushCounter(mem_counter, float(double(m_main_allocator->getTotalSize()) / (1024.0 * 1024.0)));
+	}
+
 	static u32 frame_id = 0;
 	++frame_id;
 

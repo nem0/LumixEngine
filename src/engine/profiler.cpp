@@ -26,6 +26,15 @@ namespace profiler
 {
 
 
+#ifdef LUMIX_DEBUG
+	static constexpr u32 default_context_size = 5 * 1024 * 1024;
+	static constexpr u32 default_global_context_size = 10 * 1024 * 1024;
+#else
+	static constexpr u32 default_context_size = 1024 * 1024;
+	static constexpr u32 default_global_context_size = 2 * 1024 * 1024;
+#endif
+
+
 struct ThreadContext
 {
 	ThreadContext(u32 buffer_size, IAllocator& allocator) 
@@ -99,7 +108,7 @@ static struct Instance
 		: contexts(allocator)
 		, trace_task(allocator)
 		, counters(allocator)
-		, global_context(2 * 1024 * 1024, allocator)
+		, global_context(default_global_context_size, allocator)
 	{
 		startTrace();
 	}
@@ -154,7 +163,7 @@ static struct Instance
 	ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
-			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(1024 * 1024, allocator);
+			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(default_context_size, allocator);
 			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
@@ -357,7 +366,7 @@ void blockColor(u8 r, u8 g, u8 b)
 
 static volatile i32 last_block_id = 0;
 
-void continueBlock(i32 block_id) {
+static void continueBlock(i32 block_id) {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	ctx->open_blocks.push(block_id);
 	write(*ctx, EventType::CONTINUE_BLOCK, block_id);
