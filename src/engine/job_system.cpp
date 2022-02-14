@@ -143,6 +143,7 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 		waitor = signal->waitor;
 		signal->waitor = nullptr;
 	}
+	if (!waitor) return false;
 
 	bool wake_all = false;
 	{
@@ -215,8 +216,9 @@ void setGreen(Signal* signal) {
 	ASSERT(signal);
 	ASSERT(signal->counter <= 1);
 	const u32 gen = signal->generation;
-	trigger<true>(signal);
-	profiler::signalTriggered(gen);
+	if (trigger<true>(signal)){
+		profiler::signalTriggered(gen);
+	}
 }
 
 
