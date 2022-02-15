@@ -1444,6 +1444,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
 		if (ImGui::BeginPopup("context_menu")) {
+			ImVec2 cp = ImGui::GetItemRectMin();
 			if (ImGui::BeginMenu("Add")) {
 				ParticleEditorResource::Node* n = nullptr;
 				if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
@@ -1488,7 +1489,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				}
 				if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
 				if (n) {
-					n->m_pos = ImGui::GetMousePos() - editor_pos - ImGuiEx::GetNodeEditorOffset();
+					n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
 				}
 				ImGui::EndMenu();
 			}
