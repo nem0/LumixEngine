@@ -22,9 +22,7 @@ namespace ImGuiEx {
 	static float node_w = 120;
 	static ImGuiID last_node_id;
 	constexpr float NODE_SLOT_RADIUS = 4.f;
-	static bool is_input_group = true;
 	static ImVec2 node_editor_pos;
-	static bool output_slots;
 	static ImGuiID new_link_from = 0;
 	static ImGuiID new_link_to = 0;
 	static bool new_link_from_input;
@@ -74,7 +72,6 @@ namespace ImGuiEx {
 	}
 
 	void BeginNode(ImGuiID id, ImVec2& pos) {
-		output_slots = false;
 		last_node_id = id;
 		pos += node_editor_pos;
 		node_pos = &pos;
@@ -88,13 +85,13 @@ namespace ImGuiEx {
 		PushItemWidth(80);
 	}
 
-	void Slot(ImGuiID id) {
+	void Slot(ImGuiID id, bool is_input) {
 		PopID();
 		ImDrawList* draw_list = GetWindowDrawList();
 		ImVec2 screen_pos = ImGui::GetCursorScreenPos();
 		
 		const ImVec2 center = [&](){
-			if (is_input_group) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
+			if (is_input) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
 			return ImVec2(node_pos->x + node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
 		}();
 		ItemAdd(ImRect(center - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS), center + ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS)), id);
@@ -112,12 +109,12 @@ namespace ImGuiEx {
 
 		if (hovered && ImGui::IsMouseClicked(0)) {
 			new_link_from = id;
-			new_link_from_input = is_input_group;
+			new_link_from_input = is_input;
 		}
 
 		if (hovered && ImGui::IsMouseReleased(0) && new_link_from != 0) {
 			new_link_to = id;
-			if (!is_input_group) {
+			if (!is_input) {
 				ImSwap(new_link_to, new_link_from);
 			}
 		}
@@ -153,48 +150,19 @@ namespace ImGuiEx {
 		draw_list->AddBezierCubic(p1, p1 + t1, p2 - t2, p2, GetColorU32(link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
 	}
 
-	void BeginOutputSlots() {
-		EndGroup();
-		SameLine();
-		BeginGroup();
-		is_input_group = false;
-		output_slots = true;
-	}
-
-	void EndOutputSlots() {
-		EndGroup();
-	}
-
-	void BeginInputSlots() {
-		BeginGroup();
-		is_input_group = true;
-	}
-
-	void EndInputSlots() {
-		EndGroup();
-		SameLine();
-		BeginGroup();
-	}
 
 	void EndNode()
 	{
-		if (!output_slots) {
-			BeginOutputSlots();
-			EndOutputSlots();
-		}
-
 		PopItemWidth();
 		ImDrawList* draw_list = GetWindowDrawList();
 		EndGroup();
-		const ImRect rect(GetItemRectMin(), GetItemRectMax());
-		ImVec2 size = rect.GetSize();
+		const ImGuiStyle& style = GetStyle();
+		const ImRect rect(GetItemRectMin() - style.WindowPadding, GetItemRectMax() + style.WindowPadding);
+		const ImVec2 size = rect.GetSize();
 		
-		GetStateStorage()->SetFloat(GetID("node-width"), size.x);
-		size = size + GetStyle().WindowPadding * 2;
+		GetStateStorage()->SetFloat(GetID("node-width"), size.x - style.WindowPadding.x * 2);
 
-		ImGuiStyle& style = ImGui::GetStyle();
-		
-		const ImGuiID dragger_id = GetID("X");
+		const ImGuiID dragger_id = GetID("##_node_dragger");
 		ItemAdd(rect, dragger_id);
 		const bool is_hovered = IsItemHovered();
 		if (is_hovered && IsMouseClicked(0)) {

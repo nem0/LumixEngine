@@ -94,12 +94,12 @@ struct ParticleEditorResource {
 		}
 
 		void inputSlot() {
-			ImGuiEx::Slot(m_id | (u32(m_input_counter) << 16));
+			ImGuiEx::Slot(m_id | (u32(m_input_counter) << 16), true);
 			++m_input_counter;
 		}
 
 		void outputSlot() {
-			ImGuiEx::Slot(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG);
+			ImGuiEx::Slot(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG, false);
 			++m_output_counter;
 		}
 
@@ -152,14 +152,11 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
-			ImGuiEx::EndInputSlots();
-
-			ImGuiEx::BeginOutputSlots();
-			outputSlot();
+			inputSlot();
 			ImGui::SetNextItemWidth(60);
 			ImGui::Combo("##fn", (int*)&func, "cos\0sin\0");
-			ImGuiEx::EndOutputSlots();
+			ImGui::SameLine();
+			outputSlot();
 			return false;
 		}
 
@@ -206,15 +203,11 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
 			ImGui::SetNextItemWidth(120);
 			inputSlot();
 			bool changed = ImGuiEx::Gradient4("test", lengthOf(keys), (int*)&count, keys, &values[0].x);
-			ImGuiEx::EndInputSlots();
-
-			ImGuiEx::BeginOutputSlots();
+			ImGui::SameLine();
 			outputSlot();
-			ImGuiEx::EndOutputSlots();
 			return changed;
 		}
 
@@ -256,9 +249,8 @@ struct ParticleEditorResource {
 
 		bool onGUI() override {
 			ImGui::TextUnformatted("Gradient");
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot(); 
-			ImGuiEx::EndInputSlots();
 
 			ImGui::PushItemWidth(60);
 			bool changed = false;
@@ -278,10 +270,10 @@ struct ParticleEditorResource {
 				++count;
 				changed = true;
 			}
+			ImGui::EndGroup();
 
-			ImGuiEx::BeginOutputSlots();
+			ImGui::SameLine();
 			outputSlot();
-			ImGuiEx::EndOutputSlots();
 			return changed ;
 		}
 
@@ -306,12 +298,9 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
-			ImGuiEx::EndInputSlots();
-
-			ImGuiEx::BeginOutputSlots();
+			ImGui::BeginGroup();
 			outputSlot(); ImGui::TextUnformatted(m_resource.m_consts[idx].name);
-			ImGuiEx::EndOutputSlots();
+			ImGui::EndGroup();
 			return false;
 		}
 
@@ -347,17 +336,19 @@ struct ParticleEditorResource {
 			//imnodes::BeginNodeTitleBar();
 			ImGui::Text(ICON_FA_DICE " Random");
 			//imnodes::EndNodeTitleBar();
-			ImGuiEx::BeginInputSlots();
-			ImGuiEx::EndInputSlots();
 
+			ImGui::BeginGroup();
 			ImGui::PushItemWidth(60);
 			ImGui::DragFloat("##from", &from);
 			ImGui::SameLine(); ImGui::DragFloat("##to", &to);
 			ImGui::PopItemWidth();
+			ImGui::EndGroup();
 
-			ImGuiEx::BeginOutputSlots();
+			ImGui::SameLine();
+
+			ImGui::BeginGroup();
 			outputSlot();
-			ImGuiEx::EndOutputSlots();
+			ImGui::EndGroup();
 			return false;
 		}
 
@@ -381,13 +372,9 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
-			ImGuiEx::EndInputSlots();
-			ImGuiEx::BeginOutputSlots();
 			ImGui::SetNextItemWidth(120);
 			outputSlot();
 			bool changed = ImGui::DragFloat("##v", &value);
-			ImGuiEx::EndOutputSlots();
 			return changed;
 		}
 
@@ -419,7 +406,7 @@ struct ParticleEditorResource {
 			ImGui::PushItemWidth(60);
 			
 			bool changed = false;
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot();
 			if (getInput(0).node) {
 				ImGui::TextUnformatted("X");
@@ -443,13 +430,12 @@ struct ParticleEditorResource {
 			else {
 				changed = ImGui::DragFloat("Z", &value.z) || changed;
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
 			
 			ImGui::PopItemWidth();
 			
-			ImGuiEx::BeginOutputSlots();
+			ImGui::SameLine();
 			outputSlot();
-			ImGuiEx::EndOutputSlots();
 			
 			return changed;
 		}
@@ -473,10 +459,10 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
-			ImGuiEx::EndInputSlots();
+			ImGui::BeginGroup();
+			ImGui::EndGroup();
 			
-			ImGuiEx::BeginOutputSlots();
+			ImGui::BeginGroup();
 			outputSlot();
 			if (idx < m_resource.m_streams.size()) {
 				ImGui::TextUnformatted(m_resource.m_streams[idx].name);
@@ -484,7 +470,7 @@ struct ParticleEditorResource {
 			else {
 				ImGui::TextUnformatted(ICON_FA_EXCLAMATION "Deleted input");
 			}
-			ImGuiEx::EndOutputSlots();
+			ImGui::EndGroup();
 			return false;
 		}
 
@@ -500,11 +486,11 @@ struct ParticleEditorResource {
 			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_PLUS " Emit");
 			//imnodes::EndNodeTitleBar();
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
 			return false;
 		}
 
@@ -583,13 +569,13 @@ struct ParticleEditorResource {
 			ImGui::TextUnformatted(ICON_FA_CLOCK " Update");
 			//imnodes::EndNodeTitleBar();
 
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot(); ImGui::TextUnformatted("Kill");
 
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
 			return false;
 		}
 
@@ -633,7 +619,7 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::CMP; }
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot(); ImGui::NewLine();
 
 			ImGui::SetNextItemWidth(45);
@@ -647,11 +633,10 @@ struct ParticleEditorResource {
 				ImGui::SetNextItemWidth(60);
 				changed = ImGui::DragFloat("##b", &value) || changed;
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
 
-			ImGuiEx::BeginOutputSlots();
+			ImGui::SameLine();
 			outputSlot(); 
-			ImGuiEx::EndOutputSlots();
 			return changed;
 		}
 
@@ -703,11 +688,11 @@ struct ParticleEditorResource {
 			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_EYE " Output");
 			//imnodes::EndNodeTitleBar();
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			for (const Output& stream : m_resource.m_outputs) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
 			return false;
 		}
 
@@ -786,16 +771,14 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(color0); blob.read(color1); }
 
 		bool onGUI() override {
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot(); ImGui::TextUnformatted("Weight");
-			ImGuiEx::EndInputSlots();
-
 			bool changed = ImGui::ColorEdit4("Color A", &color0.x, ImGuiColorEditFlags_NoInputs);
 			changed = ImGui::ColorEdit4("Color B", &color1.x, ImGuiColorEditFlags_NoInputs) || changed;
+			ImGui::EndGroup();
 			
-			ImGuiEx::BeginOutputSlots();
-			outputSlot(); ImGui::TextUnformatted("RGBA");
-			ImGuiEx::EndOutputSlots();
+			ImGui::SameLine();
+			outputSlot();
 			
 			return changed;
 		}
@@ -851,9 +834,7 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			ImGui::TextUnformatted("A * B + C");
-
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot(); ImGui::NewLine();
 			
 			ImGui::TextUnformatted("X");
@@ -877,7 +858,10 @@ struct ParticleEditorResource {
 				ImGui::SetNextItemWidth(60);
 				ImGui::DragFloat("C", &value2);
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
+
+			ImGui::SameLine();
+			outputSlot();
 
 			return false;
 		}
@@ -932,7 +916,7 @@ struct ParticleEditorResource {
 
 		bool onGUI() override {
 			
-			ImGuiEx::BeginInputSlots();
+			ImGui::BeginGroup();
 			inputSlot(); ImGui::NewLine();
 
 			inputSlot();
@@ -943,8 +927,9 @@ struct ParticleEditorResource {
 				ImGui::SetNextItemWidth(60);
 				ImGui::DragFloat("##b", &value);
 			}
-			ImGuiEx::EndInputSlots();
+			ImGui::EndGroup();
 
+			ImGui::SameLine();
 			switch(OP_TYPE) {
 				case InstructionType::DIV: ImGui::TextUnformatted(ICON_FA_DIVIDE); break;
 				case InstructionType::MUL: ImGui::TextUnformatted("X"); break;
@@ -952,9 +937,8 @@ struct ParticleEditorResource {
 				default: ASSERT(false); break;
 			}
 
-			ImGuiEx::BeginOutputSlots();
+			ImGui::SameLine();
 			outputSlot();
-			ImGuiEx::EndOutputSlots();
 
 			return false;
 		}
