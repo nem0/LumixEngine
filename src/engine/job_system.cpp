@@ -132,7 +132,6 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 		Lumix::MutexGuard lock(g_system->m_sync);
 
 		if constexpr (ZERO) {
-			waitor = signal->waitor;
 			signal->counter = 0;
 		}
 		else {
