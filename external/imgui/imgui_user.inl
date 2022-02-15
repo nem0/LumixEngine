@@ -16,8 +16,205 @@ ImVec2::operator Lumix::Vec2() const {
 	return {x, y};
 }                                               
 
-
 namespace ImGuiEx {
+
+	static ImVec2* node_pos;
+	static float node_w = 120;
+	static ImGuiID last_node_id;
+	constexpr float NODE_SLOT_RADIUS = 4.f;
+	static bool is_input_group = true;
+	static ImVec2 node_editor_pos;
+	static bool output_slots;
+	static ImGuiID new_link_from = 0;
+	static ImGuiID new_link_to = 0;
+	static bool new_link_from_input;
+	static ImVec2 canvas_offset = ImVec2(0, 0);
+	static bool link_hovered = false;
+
+	void BeginNodeEditor(const char* title) {
+		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+		node_editor_pos = GetCursorScreenPos() + canvas_offset;
+		link_hovered = false;
+	}
+
+	void EndNodeEditor() {
+		if (new_link_from != 0) {
+			ImGuiStorage* storage = GetStateStorage();
+			PushID(new_link_from);
+			const ImVec2 from(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
+			PopID();
+			ImDrawList* dl = GetWindowDrawList();
+			const ImVec2 to = GetMousePos();
+			if (new_link_from_input) {
+				dl->AddBezierCubic(from, from - ImVec2(20, 0), to + ImVec2(20, 0), to, GetColorU32(ImGuiCol_Tab), 3.f);
+			}
+			else {
+				dl->AddBezierCubic(from, from + ImVec2(20, 0), to - ImVec2(20, 0), to, GetColorU32(ImGuiCol_Tab), 3.f);
+			}
+		}
+		EndChild();
+		if (IsMouseReleased(0)) {
+			new_link_from = 0;
+			new_link_to = 0;
+		}
+
+		if (IsMouseDown(ImGuiMouseButton_Middle) && IsMouseDragging(ImGuiMouseButton_Middle)) {
+			const ImVec2 delta = GetIO().MouseDelta;
+			canvas_offset += delta;
+		}
+	}
+
+	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
+		if (new_link_to) {
+			*from = new_link_from;
+			*to = new_link_to;
+			return true;
+		}
+		return false;
+	}
+
+	void BeginNode(ImGuiID id, ImVec2& pos) {
+		output_slots = false;
+		last_node_id = id;
+		pos += node_editor_pos;
+		node_pos = &pos;
+		SetCursorScreenPos(pos + GetStyle().WindowPadding);
+		ImDrawList* draw_list = GetWindowDrawList();
+		draw_list->ChannelsSplit(2);
+		draw_list->ChannelsSetCurrent(1);
+		BeginGroup();
+		PushID(id);
+		node_w = GetStateStorage()->GetFloat(GetID("node-width"), 120);
+		PushItemWidth(80);
+	}
+
+	void Slot(ImGuiID id) {
+		PopID();
+		ImDrawList* draw_list = GetWindowDrawList();
+		ImVec2 screen_pos = ImGui::GetCursorScreenPos();
+		
+		const ImVec2 center = [&](){
+			if (is_input_group) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
+			return ImVec2(node_pos->x + node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
+		}();
+		ItemAdd(ImRect(center - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS), center + ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS)), id);
+		const bool hovered = IsItemHovered();
+		ImGuiStyle& style = ImGui::GetStyle();
+		draw_list->AddCircleFilled(center,
+			NODE_SLOT_RADIUS,
+			GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab));
+
+		ImGuiStorage* storage = GetStateStorage();
+		PushID(id);
+		storage->SetFloat(GetID("pin-x"), center.x);
+		storage->SetFloat(GetID("pin-y"), center.y);
+		PopID();
+
+		if (hovered && ImGui::IsMouseClicked(0)) {
+			new_link_from = id;
+			new_link_from_input = is_input_group;
+		}
+
+		if (hovered && ImGui::IsMouseReleased(0) && new_link_from != 0) {
+			new_link_to = id;
+			if (!is_input_group) {
+				ImSwap(new_link_to, new_link_from);
+			}
+		}
+		PushID(last_node_id);
+	}
+
+	bool IsLinkHovered() {
+		return link_hovered;
+	}
+
+	void NodeLink(ImGuiID from_id, ImGuiID to_id) {
+		ImGuiStorage* storage = GetStateStorage();
+		PushID(from_id);
+		const ImVec2 from(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
+		PopID();
+
+		PushID(to_id);
+		const ImVec2 to(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
+		PopID();
+
+		ImVec2 p1 = from;
+		float d = ImMax(20.f, ImAbs(from.x - to.x)) * 0.75f;
+		ImVec2 t1 = ImVec2(d, 0.0f);
+		ImVec2 p2 = to;
+		ImVec2 t2 = ImVec2(d, 0.0f);
+		const int STEPS = 12;
+		ImDrawList* draw_list = GetWindowDrawList();
+	    const ImGuiStyle& style = ImGui::GetStyle();
+		const ImVec2 closest_point = ImBezierCubicClosestPointCasteljau(p1, p1 + t1, p2 - t2, p2, ImGui::GetMousePos(), style.CurveTessellationTol);
+		const float dist_squared = ImFabs(ImLengthSqr(ImGui::GetMousePos() - closest_point));
+		link_hovered = dist_squared < 3 * 3 + 1;
+		
+		draw_list->AddBezierCubic(p1, p1 + t1, p2 - t2, p2, GetColorU32(link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
+	}
+
+	void BeginOutputSlots() {
+		EndGroup();
+		SameLine();
+		BeginGroup();
+		is_input_group = false;
+		output_slots = true;
+	}
+
+	void EndOutputSlots() {
+		EndGroup();
+	}
+
+	void BeginInputSlots() {
+		BeginGroup();
+		is_input_group = true;
+	}
+
+	void EndInputSlots() {
+		EndGroup();
+		SameLine();
+		BeginGroup();
+	}
+
+	void EndNode()
+	{
+		if (!output_slots) {
+			BeginOutputSlots();
+			EndOutputSlots();
+		}
+
+		PopItemWidth();
+		ImDrawList* draw_list = GetWindowDrawList();
+		EndGroup();
+		const ImRect rect(GetItemRectMin(), GetItemRectMax());
+		ImVec2 size = rect.GetSize();
+		
+		GetStateStorage()->SetFloat(GetID("node-width"), size.x);
+		size = size + GetStyle().WindowPadding * 2;
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		
+		const ImGuiID dragger_id = GetID("X");
+		ItemAdd(rect, dragger_id);
+		const bool is_hovered = IsItemHovered();
+		if (is_hovered && IsMouseClicked(0)) {
+			SetActiveID(dragger_id, GetCurrentWindow());
+		}
+		if (IsItemActive() && IsMouseReleased(0)) {
+			ResetActiveID();
+		}
+		if (IsItemActive() && IsMouseDragging(0)) {
+			*node_pos += GetIO().MouseDelta;
+		}
+
+		draw_list->ChannelsSetCurrent(0);
+		draw_list->AddRectFilled(*node_pos, *node_pos + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
+		draw_list->AddRect(*node_pos, *node_pos + size, GetColorU32(is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
+		draw_list->ChannelsMerge();
+
+		PopID();
+		*node_pos -= node_editor_pos;
+	}
 
 	bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip)
 	{

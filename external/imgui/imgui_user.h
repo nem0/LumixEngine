@@ -37,6 +37,19 @@ IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
 
+IMGUI_API void BeginNodeEditor(const char* title);
+IMGUI_API void EndNodeEditor();
+IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos);
+IMGUI_API void EndNode();
+IMGUI_API void BeginInputSlots();
+IMGUI_API void EndInputSlots();
+IMGUI_API void BeginOutputSlots();
+IMGUI_API void EndOutputSlots();
+IMGUI_API void Slot(ImGuiID id);
+IMGUI_API bool GetNewLink(ImGuiID* from, ImGuiID* to);
+IMGUI_API void NodeLink(ImGuiID from, ImGuiID to);
+IMGUI_API bool IsLinkHovered();
+
 IMGUI_API bool InputRotation(const char* label, float* euler);
 IMGUI_API void Label(const char* label);
 IMGUI_API void TextClipped(const char* text, float size);
