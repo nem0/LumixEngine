@@ -372,8 +372,8 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		bool onGUI() override {
-			ImGui::SetNextItemWidth(120);
 			outputSlot();
+			ImGui::SetNextItemWidth(120);
 			bool changed = ImGui::DragFloat("##v", &value);
 			return changed;
 		}
@@ -1435,6 +1435,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		}
 
 		ImGuiEx::EndNodeEditor();
+		const ImVec2 editor_pos = ImGui::GetItemRectMin();
 
 		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
 			ImGui::OpenPopup("context_menu");
@@ -1444,9 +1445,10 @@ struct ParticleEditorImpl : ParticleEditor {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
 		if (ImGui::BeginPopup("context_menu")) {
 			if (ImGui::BeginMenu("Add")) {
-				if (ImGui::Selectable("Add")) addNode(ParticleEditorResource::Node::ADD);
-				if (ImGui::Selectable("Color mix")) addNode(ParticleEditorResource::Node::COLOR_MIX);
-				if (ImGui::Selectable("Compare")) addNode(ParticleEditorResource::Node::CMP);
+				ParticleEditorResource::Node* n = nullptr;
+				if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
+				if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
+				if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
 				if (ImGui::BeginMenu("Constant")) {
 					for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
 						if (ImGui::Selectable(m_resource->m_consts[i].name)) {
@@ -1459,11 +1461,11 @@ struct ParticleEditorImpl : ParticleEditor {
 					ImGui::EndMenu();
 				}
 				if (ImGui::Selectable("Cos")) {
-					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+					n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
 					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::COS;
 				}
-				if (ImGui::Selectable("Gradient")) addNode(ParticleEditorResource::Node::GRADIENT);
-				if (ImGui::Selectable("Gradient color")) addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
+				if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
+				if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
 				if (ImGui::BeginMenu("Input")) {
 					for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
 						if (ImGui::Selectable(m_resource->m_streams[i].name)) {
@@ -1475,16 +1477,19 @@ struct ParticleEditorImpl : ParticleEditor {
 					}
 					ImGui::EndMenu();
 				}
-				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
-				if (ImGui::Selectable("Divide")) addNode(ParticleEditorResource::Node::DIV);
-				if (ImGui::Selectable("Multiply")) addNode(ParticleEditorResource::Node::MUL);
-				if (ImGui::Selectable("Multiply add")) addNode(ParticleEditorResource::Node::MADD);
-				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);
+				if (ImGui::Selectable("Literal")) n = addNode(ParticleEditorResource::Node::LITERAL);
+				if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
+				if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
+				if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
+				if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
 				if (ImGui::Selectable("Sin")) {
-					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+					n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
 					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::SIN;
 				}
-				if (ImGui::Selectable("Vec3")) addNode(ParticleEditorResource::Node::VEC3);
+				if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
+				if (n) {
+					n->m_pos = ImGui::GetMousePos() - editor_pos - ImGuiEx::GetNodeEditorOffset();
+				}
 				ImGui::EndMenu();
 			}
 

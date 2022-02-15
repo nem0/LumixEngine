@@ -29,6 +29,10 @@ namespace ImGuiEx {
 	static ImVec2 canvas_offset = ImVec2(0, 0);
 	static bool link_hovered = false;
 
+	ImVec2 GetNodeEditorOffset() {
+		return canvas_offset;
+	}
+
 	void BeginNodeEditor(const char* title) {
 		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 		node_editor_pos = GetCursorScreenPos() + canvas_offset;

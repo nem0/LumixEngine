@@ -39,6 +39,7 @@ IMGUI_API void Rect(float w, float h, ImU32 color);
 
 IMGUI_API void BeginNodeEditor(const char* title);
 IMGUI_API void EndNodeEditor();
+IMGUI_API ImVec2 GetNodeEditorOffset();
 IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos);
 IMGUI_API void EndNode();
 IMGUI_API void Slot(ImGuiID id, bool is_input);
