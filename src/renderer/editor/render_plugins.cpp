@@ -4379,6 +4379,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			i32 x, y;
 			bool new_program = false;
 			Array<CmdList> cmd_lists;
+			Renderer::TransientSlice ub;
 		};
 
 		RenderJob(LinearAllocator& allocator)
@@ -4416,6 +4417,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				dd.window = vp->PlatformHandle;
 				dd.program = getProgram(dd.window, dd.new_program);
 				dd.cmd_lists.reserve(draw_data->CmdListsCount);
+				dd.ub = renderer->allocUniform(sizeof(Vec4) * 2);
+
+				const Vec4 canvas_mtx[] = {
+					Vec4(2.f / dd.w, 0, -1 + (float)-dd.x * 2.f / dd.w, 0),
+					Vec4(0, -2.f / dd.h, 1 + (float)dd.y * 2.f / dd.h, 0)
+				};
+				memcpy(dd.ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
 
 				for (int i = 0; i < draw_data->CmdListsCount; ++i) {
 					ImDrawList* cmd_list = draw_data->CmdLists[i];
@@ -4427,9 +4435,14 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 					out_cmd_list.vtx_buffer = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
 					memcpy(out_cmd_list.vtx_buffer.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
 			
-					out_cmd_list.commands.resize(cmd_list->CmdBuffer.size());
-					for (int i = 0, c = out_cmd_list.commands.size(); i < c; ++i) {
-						out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
+					out_cmd_list.commands.reserve(cmd_list->CmdBuffer.size());
+					for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
+						if (cmd_list->CmdBuffer[i].UserCallback) {
+							cmd_list->CmdBuffer[i].UserCallback(cmd_list, &cmd_list->CmdBuffer[i]);
+						}
+						else {
+							out_cmd_list.commands.push(cmd_list->CmdBuffer[i]);
+						}
 					}
 				}
 			}
@@ -4498,12 +4511,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 				gpu::viewport(0, 0, dd.w, dd.h);
 
-				const Vec4 canvas_mtx[] = {
-					Vec4(2.f / dd.w, 0, -1 + (float)-dd.x * 2.f / dd.w, 0),
-					Vec4(0, -2.f / dd.h, 1 + (float)dd.y * 2.f / dd.h, 0)
-				};
-				gpu::update(ub, &canvas_mtx, sizeof(canvas_mtx));
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub, 0, sizeof(canvas_mtx));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, dd.ub.buffer, dd.ub.offset, dd.ub.size);
 
 				const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
 				gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_color, 1.0);
@@ -4556,7 +4564,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		Renderer* renderer;
 		const gpu::TextureHandle* default_texture;
 		Array<WindowDrawData> window_draw_data;
-		gpu::BufferHandle ub;
 		u32 ib_offset;
 		u32 vb_offset;
 		EditorUIRenderPlugin* plugin;
@@ -4584,10 +4591,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = m_texture;
 
-		Renderer::MemRef ub_mem;
-		ub_mem.size = sizeof(Vec4) * 2;
-		m_ub = renderer->createBuffer(ub_mem, gpu::BufferFlags::UNIFORM_BUFFER);
-
 		m_render_interface.create(app, *renderer);
 		app.setRenderInterface(m_render_interface.get());
 	}
@@ -4599,7 +4602,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		shutdownImGui();
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		renderer->destroy(m_ub);
 		for (gpu::ProgramHandle program : m_programs) {
 			renderer->destroy(program);
 		}
@@ -4624,7 +4626,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		RenderJob& cmd = renderer->createJob<RenderJob>(renderer->getCurrentFrameAllocator());
 		cmd.plugin = this;
-		cmd.ub = m_ub;
 		
 		renderer->queue(cmd, 0);
 		renderer->frame();
@@ -4635,7 +4636,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	Engine& m_engine;
 	HashMap<void*, gpu::ProgramHandle> m_programs;
 	gpu::TextureHandle m_texture;
-	gpu::BufferHandle m_ub;
 	Local<RenderInterfaceImpl> m_render_interface;
 };
 
