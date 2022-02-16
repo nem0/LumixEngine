@@ -4383,6 +4383,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 			Renderer::TransientSlice ub;
 			Vec2 scale;
 			gpu::TextureHandle render_target = gpu::INVALID_TEXTURE;
+			Vec4 clear_color = Vec4(0.2f, 0.2f, 0.2f, 1.f);
 		};
 
 		RenderJob(LinearAllocator& allocator)
@@ -4524,8 +4525,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, dd.ub.buffer, dd.ub.offset, dd.ub.size);
 
-				const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
-				gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_color, 1.0);
+				gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &dd.clear_color.x, 1.0);
 				if (dd.new_program) {
 					const char* vs =
 						R"#(
@@ -4637,6 +4637,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 		dd.ub = renderer->allocUniform(sizeof(Vec4) * 2);
 		dd.render_target = rt;
 		dd.scale = scale;
+		dd.clear_color = Vec4(0);
 
 		const Vec2 offset(0);
 		const Vec4 canvas_mtx[] = {

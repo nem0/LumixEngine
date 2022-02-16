@@ -42,7 +42,7 @@ IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
 
-IMGUI_API void BeginNodeEditor(const char* title);
+IMGUI_API void BeginNodeEditor(const char* title, ImVec2* offset);
 IMGUI_API void EndNodeEditor();
 IMGUI_API ImVec2 GetNodeEditorOffset();
 IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos);

@@ -18,36 +18,45 @@ ImVec2::operator Lumix::Vec2() const {
 
 namespace ImGuiEx {
 
-	static ImVec2* node_pos;
-	static float node_w = 120;
-	static ImGuiID last_node_id;
 	constexpr float NODE_PIN_RADIUS = 5.f;
-	static ImVec2 node_editor_pos;
-	static ImGuiID new_link_from = 0;
-	static ImGuiID new_link_to = 0;
-	static bool new_link_from_input;
-	static ImVec2 canvas_offset = ImVec2(0, 0);
-	static bool link_hovered = false;
+	struct NodeEditorState {
+		ImVec2* node_pos;
+		float node_w = 120;
+		ImGuiID last_node_id;
+		ImVec2 node_editor_pos;
+		ImGuiID new_link_from = 0;
+		ImGuiID new_link_to = 0;
+		bool new_link_from_input;
+		bool link_hovered = false;
+		ImDrawList* draw_list = nullptr;
+		bool is_pin_hovered = false;
+		ImVec2* canvas_offset = nullptr;
+	} g_node_editor;
 
 	ImVec2 GetNodeEditorOffset() {
-		return canvas_offset;
+		return *g_node_editor.canvas_offset;
 	}
 
-	void BeginNodeEditor(const char* title) {
+	void BeginNodeEditor(const char* title, ImVec2* offset) {
+		g_node_editor.canvas_offset = offset;
 		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-		node_editor_pos = GetCursorScreenPos() + canvas_offset;
-		link_hovered = false;
+		g_node_editor.node_editor_pos = GetCursorScreenPos() + *g_node_editor.canvas_offset;
+		g_node_editor.link_hovered = false;
+		g_node_editor.draw_list = GetWindowDrawList();
+		g_node_editor.draw_list->ChannelsSplit(2);
 	}
 
 	void EndNodeEditor() {
-		if (new_link_from != 0) {
+		g_node_editor.draw_list->ChannelsMerge();
+
+		if (g_node_editor.new_link_from != 0) {
 			ImGuiStorage* storage = GetStateStorage();
-			PushID(new_link_from);
+			PushID(g_node_editor.new_link_from);
 			const ImVec2 from(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
 			PopID();
-			ImDrawList* dl = GetWindowDrawList();
+			ImDrawList* dl = g_node_editor.draw_list;
 			const ImVec2 to = GetMousePos();
-			if (new_link_from_input) {
+			if (g_node_editor.new_link_from_input) {
 				dl->AddBezierCubic(from, from - ImVec2(20, 0), to + ImVec2(20, 0), to, GetColorU32(ImGuiCol_Tab), 3.f);
 			}
 			else {
@@ -56,37 +65,23 @@ namespace ImGuiEx {
 		}
 		EndChild();
 		if (IsMouseReleased(0)) {
-			new_link_from = 0;
-			new_link_to = 0;
+			g_node_editor.new_link_from = 0;
+			g_node_editor.new_link_to = 0;
 		}
 
-		if (IsMouseDown(ImGuiMouseButton_Middle) && IsMouseDragging(ImGuiMouseButton_Middle)) {
+		if (IsMouseDragging(ImGuiMouseButton_Middle) && IsItemHovered()) {
 			const ImVec2 delta = GetIO().MouseDelta;
-			canvas_offset += delta;
+			*g_node_editor.canvas_offset += delta;
 		}
 	}
 
 	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
-		if (new_link_to) {
-			*from = new_link_from;
-			*to = new_link_to;
+		if (g_node_editor.new_link_to) {
+			*from = g_node_editor.new_link_from;
+			*to = g_node_editor.new_link_to;
 			return true;
 		}
 		return false;
-	}
-
-	void BeginNode(ImGuiID id, ImVec2& pos) {
-		last_node_id = id;
-		pos += node_editor_pos;
-		node_pos = &pos;
-		SetCursorScreenPos(pos + GetStyle().WindowPadding);
-		ImDrawList* draw_list = GetWindowDrawList();
-		draw_list->ChannelsSplit(2);
-		draw_list->ChannelsSetCurrent(1);
-		BeginGroup();
-		PushID(id);
-		node_w = GetStateStorage()->GetFloat(GetID("node-width"), 120);
-		PushItemWidth(80);
 	}
 
 	void Pin(ImGuiID id, bool is_input, PinShape shape) {
@@ -96,7 +91,7 @@ namespace ImGuiEx {
 		
 		const ImVec2 center = [&](){
 			if (is_input) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
-			return ImVec2(node_pos->x + node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
+			return ImVec2(g_node_editor.node_pos->x + g_node_editor.node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
 		}();
 		const ImVec2 half_extents(NODE_PIN_RADIUS, NODE_PIN_RADIUS);
 		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
@@ -112,6 +107,8 @@ namespace ImGuiEx {
 				break;
 		}
 
+		g_node_editor.is_pin_hovered = g_node_editor.is_pin_hovered || hovered;
+
 		ImGuiStorage* storage = GetStateStorage();
 		PushID(id);
 		storage->SetFloat(GetID("pin-x"), center.x);
@@ -119,21 +116,21 @@ namespace ImGuiEx {
 		PopID();
 
 		if (hovered && ImGui::IsMouseClicked(0)) {
-			new_link_from = id;
-			new_link_from_input = is_input;
+			g_node_editor.new_link_from = id;
+			g_node_editor.new_link_from_input = is_input;
 		}
 
-		if (hovered && ImGui::IsMouseReleased(0) && new_link_from != 0) {
-			new_link_to = id;
+		if (hovered && ImGui::IsMouseReleased(0) && g_node_editor.new_link_from != 0) {
+			g_node_editor.new_link_to = id;
 			if (!is_input) {
-				ImSwap(new_link_to, new_link_from);
+				ImSwap(g_node_editor.new_link_to, g_node_editor.new_link_from);
 			}
 		}
-		PushID(last_node_id);
+		PushID(g_node_editor.last_node_id);
 	}
 
 	bool IsLinkHovered() {
-		return link_hovered;
+		return g_node_editor.link_hovered;
 	}
 
 	void NodeLink(ImGuiID from_id, ImGuiID to_id) {
@@ -156,16 +153,27 @@ namespace ImGuiEx {
 	    const ImGuiStyle& style = ImGui::GetStyle();
 		const ImVec2 closest_point = ImBezierCubicClosestPointCasteljau(p1, p1 + t1, p2 - t2, p2, ImGui::GetMousePos(), style.CurveTessellationTol);
 		const float dist_squared = ImFabs(ImLengthSqr(ImGui::GetMousePos() - closest_point));
-		link_hovered = dist_squared < 3 * 3 + 1;
+		g_node_editor.link_hovered = dist_squared < 3 * 3 + 1;
 		
-		draw_list->AddBezierCubic(p1, p1 + t1, p2 - t2, p2, GetColorU32(link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
+		draw_list->AddBezierCubic(p1, p1 + t1, p2 - t2, p2, GetColorU32(g_node_editor.link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
 	}
 
+	void BeginNode(ImGuiID id, ImVec2& pos) {
+		g_node_editor.last_node_id = id;
+		pos += g_node_editor.node_editor_pos;
+		g_node_editor.node_pos = &pos;
+		SetCursorScreenPos(pos + GetStyle().WindowPadding);
+		g_node_editor.draw_list->ChannelsSetCurrent(1);
+		BeginGroup();
+		PushID(id);
+		g_node_editor.node_w = GetStateStorage()->GetFloat(GetID("node-width"), 120);
+		PushItemWidth(80);
+		g_node_editor.is_pin_hovered = false;
+	}
 
 	void EndNode()
 	{
 		PopItemWidth();
-		ImDrawList* draw_list = GetWindowDrawList();
 		EndGroup();
 		const ImGuiStyle& style = GetStyle();
 		const ImRect rect(GetItemRectMin() - style.WindowPadding, GetItemRectMax() + style.WindowPadding);
@@ -176,23 +184,23 @@ namespace ImGuiEx {
 		const ImGuiID dragger_id = GetID("##_node_dragger");
 		ItemAdd(rect, dragger_id);
 		const bool is_hovered = IsItemHovered();
-		if (is_hovered && IsMouseClicked(0)) {
+		if (is_hovered && IsMouseClicked(0) && !g_node_editor.is_pin_hovered) {
 			SetActiveID(dragger_id, GetCurrentWindow());
 		}
 		if (IsItemActive() && IsMouseReleased(0)) {
 			ResetActiveID();
 		}
 		if (IsItemActive() && IsMouseDragging(0)) {
-			*node_pos += GetIO().MouseDelta;
+			*g_node_editor.node_pos += GetIO().MouseDelta;
 		}
 
-		draw_list->ChannelsSetCurrent(0);
-		draw_list->AddRectFilled(*node_pos, *node_pos + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
-		draw_list->AddRect(*node_pos, *node_pos + size, GetColorU32(is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
-		draw_list->ChannelsMerge();
+		g_node_editor.draw_list->ChannelsSetCurrent(0);
+		ImVec2 np = *g_node_editor.node_pos;
+		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
+		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
 
 		PopID();
-		*node_pos -= node_editor_pos;
+		*g_node_editor.node_pos -= g_node_editor.node_editor_pos;
 	}
 
 	bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip)

@@ -1426,7 +1426,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		ImGui::Begin("particle_editor_canvas", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
 		ImGui::PopStyleVar();
-		ImGuiEx::BeginNodeEditor("particle_editor");
+		ImGuiEx::BeginNodeEditor("particle_editor", &m_canvas_offset);
 
 		i32 hovered_node = -1;
 		i32 hovered_link = -1;
@@ -1562,9 +1562,9 @@ struct ParticleEditorImpl : ParticleEditor {
 		else {
 			ImGui::Image(m_canvas_rt, canvas_size);
 		}
-		if (ImGui::IsItemHovered()) {
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel) {
 			m_canvas_scale.x += ImGui::GetIO().MouseWheel / 20;
-			m_canvas_scale.x = maximum(0.01f, m_canvas_scale.x);
+			m_canvas_scale.x = clamp(m_canvas_scale.x, 0.1f, 10.f);
 			m_canvas_scale.y = m_canvas_scale.x;
 		}
 
@@ -1768,6 +1768,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	ImVec2 m_canvas_size = ImVec2(0, 0);
 	gpu::TextureHandle m_canvas_rt = gpu::INVALID_TEXTURE;
 	ImVec2 m_canvas_scale = ImVec2(1, 1);
+	ImVec2 m_canvas_offset = ImVec2(0, 0);
 	ImGuiContext* m_canvas_ctx = nullptr;
 };
 
