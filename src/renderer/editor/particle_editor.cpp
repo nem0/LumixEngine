@@ -298,9 +298,7 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			ImGui::BeginGroup();
 			outputSlot(); ImGui::TextUnformatted(m_resource.m_consts[idx].name);
-			ImGui::EndGroup();
 			return false;
 		}
 
@@ -346,9 +344,7 @@ struct ParticleEditorResource {
 
 			ImGui::SameLine();
 
-			ImGui::BeginGroup();
 			outputSlot();
-			ImGui::EndGroup();
 			return false;
 		}
 
@@ -459,10 +455,6 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 
 		bool onGUI() override {
-			ImGui::BeginGroup();
-			ImGui::EndGroup();
-			
-			ImGui::BeginGroup();
 			outputSlot();
 			if (idx < m_resource.m_streams.size()) {
 				ImGui::TextUnformatted(m_resource.m_streams[idx].name);
@@ -470,7 +462,6 @@ struct ParticleEditorResource {
 			else {
 				ImGui::TextUnformatted(ICON_FA_EXCLAMATION "Deleted input");
 			}
-			ImGui::EndGroup();
 			return false;
 		}
 
@@ -486,11 +477,9 @@ struct ParticleEditorResource {
 			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_PLUS " Emit");
 			//imnodes::EndNodeTitleBar();
-			ImGui::BeginGroup();
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
-			ImGui::EndGroup();
 			return false;
 		}
 
@@ -569,13 +558,11 @@ struct ParticleEditorResource {
 			ImGui::TextUnformatted(ICON_FA_CLOCK " Update");
 			//imnodes::EndNodeTitleBar();
 
-			ImGui::BeginGroup();
 			inputSlot(ImGuiEx::PinShape::TRIANGLE); ImGui::TextUnformatted("Kill");
 
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
-			ImGui::EndGroup();
 			return false;
 		}
 
@@ -688,11 +675,9 @@ struct ParticleEditorResource {
 			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_EYE " Output");
 			//imnodes::EndNodeTitleBar();
-			ImGui::BeginGroup();
 			for (const Output& stream : m_resource.m_outputs) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
-			ImGui::EndGroup();
 			return false;
 		}
 
