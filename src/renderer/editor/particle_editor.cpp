@@ -93,13 +93,13 @@ struct ParticleEditorResource {
 			return {};
 		}
 
-		void inputSlot() {
-			ImGuiEx::Slot(m_id | (u32(m_input_counter) << 16), true);
+		void inputSlot(ImGuiEx::PinShape shape = ImGuiEx::PinShape::CIRCLE) {
+			ImGuiEx::Pin(m_id | (u32(m_input_counter) << 16), true, shape);
 			++m_input_counter;
 		}
 
-		void outputSlot() {
-			ImGuiEx::Slot(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG, false);
+		void outputSlot(ImGuiEx::PinShape shape = ImGuiEx::PinShape::CIRCLE) {
+			ImGuiEx::Pin(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG, false, shape);
 			++m_output_counter;
 		}
 
@@ -570,7 +570,7 @@ struct ParticleEditorResource {
 			//imnodes::EndNodeTitleBar();
 
 			ImGui::BeginGroup();
-			inputSlot(); ImGui::TextUnformatted("Kill");
+			inputSlot(ImGuiEx::PinShape::TRIANGLE); ImGui::TextUnformatted("Kill");
 
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
@@ -636,7 +636,7 @@ struct ParticleEditorResource {
 			ImGui::EndGroup();
 
 			ImGui::SameLine();
-			outputSlot(); 
+			outputSlot(ImGuiEx::PinShape::TRIANGLE); 
 			return changed;
 		}
 

@@ -21,7 +21,7 @@ namespace ImGuiEx {
 	static ImVec2* node_pos;
 	static float node_w = 120;
 	static ImGuiID last_node_id;
-	constexpr float NODE_SLOT_RADIUS = 4.f;
+	constexpr float NODE_PIN_RADIUS = 5.f;
 	static ImVec2 node_editor_pos;
 	static ImGuiID new_link_from = 0;
 	static ImGuiID new_link_to = 0;
@@ -89,8 +89,8 @@ namespace ImGuiEx {
 		PushItemWidth(80);
 	}
 
-	void Slot(ImGuiID id, bool is_input) {
-		PopID();
+	void Pin(ImGuiID id, bool is_input, PinShape shape) {
+		PopID(); // pop node id, we want pin id to not include node id
 		ImDrawList* draw_list = GetWindowDrawList();
 		ImVec2 screen_pos = ImGui::GetCursorScreenPos();
 		
@@ -98,12 +98,19 @@ namespace ImGuiEx {
 			if (is_input) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
 			return ImVec2(node_pos->x + node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
 		}();
-		ItemAdd(ImRect(center - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS), center + ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS)), id);
+		const ImVec2 half_extents(NODE_PIN_RADIUS, NODE_PIN_RADIUS);
+		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
 		const bool hovered = IsItemHovered();
 		ImGuiStyle& style = ImGui::GetStyle();
-		draw_list->AddCircleFilled(center,
-			NODE_SLOT_RADIUS,
-			GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab));
+		const ImU32 color = GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab);
+		switch(shape) {
+			case PinShape::TRIANGLE:
+				draw_list->AddTriangleFilled(center - ImVec2(NODE_PIN_RADIUS, -NODE_PIN_RADIUS), center - half_extents, center + ImVec2(NODE_PIN_RADIUS, 0), GetColorU32(ImGuiCol_Text));
+				break;
+			default:
+				draw_list->AddCircleFilled(center, NODE_PIN_RADIUS, color);
+				break;
+		}
 
 		ImGuiStorage* storage = GetStateStorage();
 		PushID(id);

@@ -24,6 +24,11 @@ enum class CurveEditorFlags
 	RESET = 1 << 2
 };
 
+enum class PinShape {
+	CIRCLE,
+	TRIANGLE
+};
+
 IMGUI_API int CurveEditor(const char* label
 	, float* values
 	, int points_count
@@ -42,7 +47,7 @@ IMGUI_API void EndNodeEditor();
 IMGUI_API ImVec2 GetNodeEditorOffset();
 IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos);
 IMGUI_API void EndNode();
-IMGUI_API void Slot(ImGuiID id, bool is_input);
+IMGUI_API void Pin(ImGuiID id, bool is_input, PinShape shape = PinShape::CIRCLE);
 IMGUI_API bool GetNewLink(ImGuiID* from, ImGuiID* to);
 IMGUI_API void NodeLink(ImGuiID from, ImGuiID to);
 IMGUI_API bool IsLinkHovered();
