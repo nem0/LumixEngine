@@ -1099,7 +1099,9 @@ struct ParticleEditorResource {
 
 		m_nodes.push(UniquePtr<UpdateNode>::create(m_allocator, *this));
 		m_nodes.push(UniquePtr<OutputNode>::create(m_allocator, *this));
+		m_nodes.back()->m_pos = ImVec2(200, 100);
 		m_nodes.push(UniquePtr<EmitNode>::create(m_allocator, *this));
+		m_nodes.back()->m_pos = ImVec2(300, 100);
 	}
 
 	void generate() {
