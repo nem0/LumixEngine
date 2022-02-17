@@ -136,6 +136,7 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 		}
 		else {
 			--signal->counter;
+			ASSERT(signal->counter >= 0);
 			if (signal->counter > 0) return false;
 		}
 

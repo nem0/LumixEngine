@@ -7,7 +7,7 @@ namespace Lumix {
 template <typename T> struct UniquePtr;
 
 struct ParticleEditor : StudioApp::GUIPlugin {
-	static UniquePtr<ParticleEditor> create(StudioApp& app);
+	static UniquePtr<ParticleEditor> create(StudioApp& app, struct IImGuiRenderer& imgui_renderer);
 	virtual void open(const char* path) = 0;
 	virtual bool compile(struct InputMemoryStream& input, struct OutputMemoryStream& output, const char* path) = 0;
 };

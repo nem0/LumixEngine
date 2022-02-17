@@ -12,11 +12,12 @@
 #include "engine/os.h"
 #include "engine/string.h"
 #include "engine/universe.h"
+#include "render_plugins.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include <imgui/imgui.h>
-#include <imgui/imnodes.h>
 
 namespace Lumix {
 
@@ -94,28 +95,24 @@ struct ParticleEditorResource {
 			return {};
 		}
 
-		void beginInput() {
-			imnodes::BeginInputAttribute(m_id | (u32(m_input_counter) << 16));
+		void inputSlot(ImGuiEx::PinShape shape = ImGuiEx::PinShape::CIRCLE) {
+			ImGuiEx::Pin(m_id | (u32(m_input_counter) << 16), true, shape);
 			++m_input_counter;
 		}
 
-		static void endInput() { imnodes::EndInputAttribute(); }
-
-		void beginOutput() {
-			imnodes::BeginOutputAttribute(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG);
+		void outputSlot(ImGuiEx::PinShape shape = ImGuiEx::PinShape::CIRCLE) {
+			ImGuiEx::Pin(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG, false, shape);
 			++m_output_counter;
 		}
-
-		static void endOutput() { imnodes::EndOutputAttribute(); }
 
 		bool onNodeGUI() {
 			m_input_counter = 0;
 			m_output_counter = 0;
-			imnodes::SetNodeEditorSpacePos(m_id, m_pos);
-			imnodes::BeginNode(m_id);
+			const ImVec2 old_pos = m_pos;
+			ImGuiEx::BeginNode(m_id, m_pos);
 			bool res = onGUI();
-			imnodes::EndNode();
-			return res;
+			ImGuiEx::EndNode();
+			return res || old_pos.x != m_pos.x || old_pos.y != m_pos.y;
 		}
 
 		u16 m_id;
@@ -157,12 +154,11 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			beginInput();
-			endInput();
-			beginOutput();
+			inputSlot();
 			ImGui::SetNextItemWidth(60);
 			ImGui::Combo("##fn", (int*)&func, "cos\0sin\0");
-			endOutput();
+			ImGui::SameLine();
+			outputSlot();
 			return false;
 		}
 
@@ -209,13 +205,11 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool onGUI() override {
-			beginOutput();
-			endOutput();
-
-			beginInput();
 			ImGui::SetNextItemWidth(120);
+			inputSlot();
 			bool changed = ImGuiEx::Gradient4("test", lengthOf(keys), (int*)&count, keys, &values[0].x);
-			endInput();
+			ImGui::SameLine();
+			outputSlot();
 			return changed;
 		}
 
@@ -256,11 +250,10 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool onGUI() override {
-			beginOutput();
-			endOutput();
-
-			beginInput();
 			ImGui::TextUnformatted("Gradient");
+			ImGui::BeginGroup();
+			inputSlot(); 
+
 			ImGui::PushItemWidth(60);
 			bool changed = false;
 			for (u32 i = 0; i < count; ++i) {
@@ -272,7 +265,6 @@ struct ParticleEditorResource {
 				keys[i] = clamp(keys[i], 0.f, 1.f);
 			}
 			ImGui::PopItemWidth();
-			endInput();
 			if (ImGui::Button("Add")) {
 				ASSERT(count < lengthOf(values));
 				keys[count] = 0;
@@ -280,6 +272,10 @@ struct ParticleEditorResource {
 				++count;
 				changed = true;
 			}
+			ImGui::EndGroup();
+
+			ImGui::SameLine();
+			outputSlot();
 			return changed ;
 		}
 
@@ -304,9 +300,7 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			beginOutput();
-			ImGui::TextUnformatted(m_resource.m_consts[idx].name);
-			endOutput();
+			outputSlot(); ImGui::TextUnformatted(m_resource.m_consts[idx].name);
 			return false;
 		}
 
@@ -339,15 +333,20 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			imnodes::BeginNodeTitleBar();
-			ImGui::Text("Random");
-			imnodes::EndNodeTitleBar();
-			beginOutput();
+			//imnodes::BeginNodeTitleBar();
+			ImGui::Text(ICON_FA_DICE " Random");
+			//imnodes::EndNodeTitleBar();
+
+			ImGui::BeginGroup();
 			ImGui::PushItemWidth(60);
-			ImGui::DragFloat("From", &from);
-			ImGui::DragFloat("To", &to);
+			ImGui::DragFloat("##from", &from);
+			ImGui::SameLine(); ImGui::DragFloat("##to", &to);
 			ImGui::PopItemWidth();
-			endOutput();
+			ImGui::EndGroup();
+
+			ImGui::SameLine();
+
+			outputSlot();
 			return false;
 		}
 
@@ -371,10 +370,9 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		bool onGUI() override {
-			beginOutput();
+			outputSlot();
 			ImGui::SetNextItemWidth(120);
 			bool changed = ImGui::DragFloat("##v", &value);
-			endOutput();
 			return changed;
 		}
 
@@ -402,39 +400,41 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		bool onGUI() override {
-			beginOutput();
-			endOutput();
+			
 			ImGui::PushItemWidth(60);
 			
 			bool changed = false;
-			beginInput();
+			ImGui::BeginGroup();
+			inputSlot();
 			if (getInput(0).node) {
 				ImGui::TextUnformatted("X");
 			}
 			else {
 				changed = ImGui::DragFloat("X", &value.x);
 			}
-			endInput();
 
-			beginInput();
+			inputSlot();
 			if (getInput(1).node) {
 				ImGui::TextUnformatted("Y");
 			}
 			else {
 				changed = ImGui::DragFloat("Y", &value.y) || changed;
 			}
-			endInput();
-			
-			beginInput();
+
+			inputSlot();
 			if (getInput(2).node) {
 				ImGui::TextUnformatted("Z");
 			}
 			else {
 				changed = ImGui::DragFloat("Z", &value.z) || changed;
 			}
-			endInput();
+			ImGui::EndGroup();
 			
 			ImGui::PopItemWidth();
+			
+			ImGui::SameLine();
+			outputSlot();
+			
 			return changed;
 		}
 
@@ -457,14 +457,13 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 
 		bool onGUI() override {
-			beginOutput();
+			outputSlot();
 			if (idx < m_resource.m_streams.size()) {
 				ImGui::TextUnformatted(m_resource.m_streams[idx].name);
 			}
 			else {
 				ImGui::TextUnformatted(ICON_FA_EXCLAMATION "Deleted input");
 			}
-			endOutput();
 			return false;
 		}
 
@@ -477,13 +476,11 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::EMIT; }
 
 		bool onGUI() override {
-			imnodes::BeginNodeTitleBar();
+			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_PLUS " Emit");
-			imnodes::EndNodeTitleBar();
+			//imnodes::EndNodeTitleBar();
 			for (const Stream& stream : m_resource.m_streams) {
-				beginInput();
-				ImGui::TextUnformatted(stream.name);
-				endInput();
+				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
 			return false;
 		}
@@ -558,18 +555,15 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::UPDATE; }
 
 		bool onGUI() override {
-			imnodes::BeginNodeTitleBar();
+			
+			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_CLOCK " Update");
-			imnodes::EndNodeTitleBar();
+			//imnodes::EndNodeTitleBar();
 
-			beginInput();
-			ImGui::TextUnformatted("Kill");
-			endInput();
+			inputSlot(ImGuiEx::PinShape::TRIANGLE); ImGui::TextUnformatted("Kill");
 
 			for (const Stream& stream : m_resource.m_streams) {
-				beginInput();
-				ImGui::TextUnformatted(stream.name);
-				endInput();
+				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
 			return false;
 		}
@@ -614,25 +608,24 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::CMP; }
 
 		bool onGUI() override {
-			beginInput();
-			ImGui::TextUnformatted("A");
-			endInput();
+			ImGui::BeginGroup();
+			inputSlot(); ImGui::NewLine();
 
-			beginOutput();
-			ImGui::SetNextItemWidth(60);
-			bool changed = ImGui::Combo("##op", (int*)&op, "A < B\0A > B\0");
-			endOutput();
+			ImGui::SetNextItemWidth(45);
+			bool changed = ImGui::Combo("##op", (int*)&op, "<\0>\0");
+			inputSlot();
 
-			beginInput();
 			if (getInput(1).node) {
-				ImGui::TextUnformatted("B");
+				ImGui::NewLine();
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
-				changed = ImGui::DragFloat("B", &value) || changed;
+				changed = ImGui::DragFloat("##b", &value) || changed;
 			}
-			endInput();
+			ImGui::EndGroup();
 
+			ImGui::SameLine();
+			outputSlot(ImGuiEx::PinShape::TRIANGLE); 
 			return changed;
 		}
 
@@ -681,13 +674,11 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::OUTPUT; }
 
 		bool onGUI() override {
-			imnodes::BeginNodeTitleBar();
+			//imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted(ICON_FA_EYE " Output");
-			imnodes::EndNodeTitleBar();
+			//imnodes::EndNodeTitleBar();
 			for (const Output& stream : m_resource.m_outputs) {
-				beginInput();
-				ImGui::TextUnformatted(stream.name);
-				endInput();
+				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
 			return false;
 		}
@@ -767,15 +758,14 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(color0); blob.read(color1); }
 
 		bool onGUI() override {
-			beginInput();
-			ImGui::TextUnformatted("Weight");
-			endInput();
+			ImGui::BeginGroup();
+			inputSlot(); ImGui::TextUnformatted("Weight");
 			bool changed = ImGui::ColorEdit4("Color A", &color0.x, ImGuiColorEditFlags_NoInputs);
 			changed = ImGui::ColorEdit4("Color B", &color1.x, ImGuiColorEditFlags_NoInputs) || changed;
+			ImGui::EndGroup();
 			
-			beginOutput();
-			ImGui::TextUnformatted("RGBA");
-			endOutput();
+			ImGui::SameLine();
+			outputSlot();
 			
 			return changed;
 		}
@@ -831,35 +821,34 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			imnodes::BeginNodeTitleBar();
-			beginOutput();
-			ImGui::TextUnformatted("A * B + C");
-			endOutput();
-			imnodes::EndNodeTitleBar();
-
-			beginInput();
-			ImGui::TextUnformatted("A");
-			endInput();
-
-			beginInput();
+			ImGui::BeginGroup();
+			inputSlot(); ImGui::NewLine();
+			
+			ImGui::TextUnformatted("X");
+			
+			inputSlot();
 			if (getInput(1).node) {
-				ImGui::TextUnformatted("B");
+				ImGui::NewLine();
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
 				ImGui::DragFloat("B", &value1);
 			}
-			endInput();
 
-			beginInput();
+			ImGui::TextUnformatted(ICON_FA_PLUS);
+
+			inputSlot();
 			if (getInput(2).node) {
-				ImGui::TextUnformatted("C");
+				ImGui::NewLine();
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
 				ImGui::DragFloat("C", &value2);
 			}
-			endInput();
+			ImGui::EndGroup();
+
+			ImGui::SameLine();
+			outputSlot();
 
 			return false;
 		}
@@ -913,30 +902,30 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			imnodes::BeginNodeTitleBar();
-			beginOutput();
-			switch(OP_TYPE) {
-				case InstructionType::DIV: ImGui::TextUnformatted("Divide"); break;
-				case InstructionType::MUL: ImGui::TextUnformatted("Multiply"); break;
-				case InstructionType::ADD: ImGui::TextUnformatted("Add"); break;
-				default: ASSERT(false); break;
-			}
-			endOutput();
-			imnodes::EndNodeTitleBar();
+			
+			ImGui::BeginGroup();
+			inputSlot(); ImGui::NewLine();
 
-			beginInput();
-			ImGui::TextUnformatted("A");
-			endInput();
-
-			beginInput();
+			inputSlot();
 			if (getInput(1).node) {
-				ImGui::TextUnformatted("B");
+				ImGui::NewLine();
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
-				ImGui::DragFloat("B", &value);
+				ImGui::DragFloat("##b", &value);
 			}
-			endInput();
+			ImGui::EndGroup();
+
+			ImGui::SameLine();
+			switch(OP_TYPE) {
+				case InstructionType::DIV: ImGui::TextUnformatted(ICON_FA_DIVIDE); break;
+				case InstructionType::MUL: ImGui::TextUnformatted("X"); break;
+				case InstructionType::ADD: ImGui::TextUnformatted(ICON_FA_PLUS); break;
+				default: ASSERT(false); break;
+			}
+
+			ImGui::SameLine();
+			outputSlot();
 
 			return false;
 		}
@@ -1110,7 +1099,9 @@ struct ParticleEditorResource {
 
 		m_nodes.push(UniquePtr<UpdateNode>::create(m_allocator, *this));
 		m_nodes.push(UniquePtr<OutputNode>::create(m_allocator, *this));
+		m_nodes.back()->m_pos = ImVec2(200, 100);
 		m_nodes.push(UniquePtr<EmitNode>::create(m_allocator, *this));
+		m_nodes.back()->m_pos = ImVec2(300, 100);
 	}
 
 	void generate() {
@@ -1169,10 +1160,11 @@ struct ParticleEditorResource {
 };
 
 struct ParticleEditorImpl : ParticleEditor {
-	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
+	ParticleEditorImpl(StudioApp& app, IImGuiRenderer& imgui_renderer, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_app(app)
 		, m_undo_stack(allocator)
+		, m_imgui_renderer(imgui_renderer)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
@@ -1198,6 +1190,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	}
 
 	~ParticleEditorImpl() {
+		if (m_canvas_ctx) ImGui::DestroyContext(m_canvas_ctx);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_undo_action);
 		m_app.removeAction(&m_redo_action);
@@ -1400,22 +1393,86 @@ struct ParticleEditorImpl : ParticleEditor {
 		ImGui::Columns(2);
 
 		leftColumnGUI();
-		
-		ImGui::NextColumn();
-		bool context_open = false;
-		imnodes::BeginNodeEditor();
 
-		if (imnodes::IsEditorHovered() && ImGui::IsMouseClicked(1)) {
+		ImGui::NextColumn();
+
+		ImVec2 canvas_size = ImGui::GetContentRegionAvail();
+		const ImVec2 canvas_origin = ImGui::GetCursorScreenPos();
+		
+		ImGuiContext* mainctx = ImGui::GetCurrentContext();
+		if (!m_canvas_ctx) m_canvas_ctx = ImGui::CreateContext(ImGui::GetIO().Fonts);
+		ImGui::SetCurrentContext(m_canvas_ctx);
+
+		const os::Event* events = m_app.getEvents();
+		ImGuiIO& io = ImGui::GetIO();
+		for (i32 i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+			switch(events[i].type) {
+				case os::Event::Type::MOUSE_BUTTON: {
+					// TODO check if we should handle input, see studioapp how it's done there
+					io.AddMouseButtonEvent((int)events[i].mouse_button.button, events[i].mouse_button.down);
+					break;
+				}
+				case os::Event::Type::MOUSE_MOVE: {
+					const os::Point cp = os::getMouseScreenPos();
+					io.AddMousePosEvent((cp.x - canvas_origin.x) / m_canvas_scale.x, (cp.y - canvas_origin.y) / m_canvas_scale.y);
+					break;
+				}
+			}
+		}
+
+		ImGui::GetIO().DisplaySize = canvas_size / m_canvas_scale;
+		ImGui::NewFrame();
+
+		ImGui::SetNextWindowPos(ImVec2(0, 0));
+		ImGui::SetNextWindowSize(canvas_size / m_canvas_scale);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+		ImGui::Begin("particle_editor_canvas", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
+		ImGui::PopStyleVar();
+		ImGuiEx::BeginNodeEditor("particle_editor", &m_canvas_offset);
+
+		i32 hovered_node = -1;
+		i32 hovered_link = -1;
+		for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
+			if (n->onNodeGUI()) {
+				pushUndo(n->m_id);
+			}
+			if (ImGui::IsItemHovered()) {
+				hovered_node = n->m_id;
+			}
+		}
+
+		for (const ParticleEditorResource::Link& link : m_resource->m_links) {
+			ImGuiEx::NodeLink(link.from, link.to);
+			if (ImGuiEx::IsLinkHovered()) {
+				hovered_link = link.id;
+			}
+		}
+
+		ImGuiID nlf, nlt;
+		if (ImGuiEx::GetNewLink(&nlf, &nlt)) {
+			ParticleEditorResource::Link& link = m_resource->m_links.emplace();
+			link.from = nlf;
+			link.to = nlt;
+			pushUndo(0xffFFffFF);
+		}
+
+		ImGuiEx::EndNodeEditor();
+		const ImVec2 editor_pos = ImGui::GetItemRectMin();
+		bool context_open = false;
+
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
 			ImGui::OpenPopup("context_menu");
 			context_open = true;
 		}
-
+		
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
 		if (ImGui::BeginPopup("context_menu")) {
+			ImVec2 cp = ImGui::GetItemRectMin();
 			if (ImGui::BeginMenu("Add")) {
-				if (ImGui::Selectable("Add")) addNode(ParticleEditorResource::Node::ADD);
-				if (ImGui::Selectable("Color mix")) addNode(ParticleEditorResource::Node::COLOR_MIX);
-				if (ImGui::Selectable("Compare")) addNode(ParticleEditorResource::Node::CMP);
+				ParticleEditorResource::Node* n = nullptr;
+				if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
+				if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
+				if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
 				if (ImGui::BeginMenu("Constant")) {
 					for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
 						if (ImGui::Selectable(m_resource->m_consts[i].name)) {
@@ -1428,11 +1485,11 @@ struct ParticleEditorImpl : ParticleEditor {
 					ImGui::EndMenu();
 				}
 				if (ImGui::Selectable("Cos")) {
-					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+					n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
 					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::COS;
 				}
-				if (ImGui::Selectable("Gradient")) addNode(ParticleEditorResource::Node::GRADIENT);
-				if (ImGui::Selectable("Gradient color")) addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
+				if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
+				if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
 				if (ImGui::BeginMenu("Input")) {
 					for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
 						if (ImGui::Selectable(m_resource->m_streams[i].name)) {
@@ -1444,16 +1501,19 @@ struct ParticleEditorImpl : ParticleEditor {
 					}
 					ImGui::EndMenu();
 				}
-				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
-				if (ImGui::Selectable("Divide")) addNode(ParticleEditorResource::Node::DIV);
-				if (ImGui::Selectable("Multiply")) addNode(ParticleEditorResource::Node::MUL);
-				if (ImGui::Selectable("Multiply add")) addNode(ParticleEditorResource::Node::MADD);
-				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);
+				if (ImGui::Selectable("Literal")) n = addNode(ParticleEditorResource::Node::LITERAL);
+				if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
+				if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
+				if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
+				if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
 				if (ImGui::Selectable("Sin")) {
-					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+					n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
 					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::SIN;
 				}
-				if (ImGui::Selectable("Vec3")) addNode(ParticleEditorResource::Node::VEC3);
+				if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
+				if (n) {
+					n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
+				}
 				ImGui::EndMenu();
 			}
 
@@ -1478,43 +1538,38 @@ struct ParticleEditorImpl : ParticleEditor {
 		}
 		ImGui::PopStyleVar();
 
-		for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
-			if (n->onNodeGUI()) {
-				pushUndo(n->m_id);
-			}
-		}
-
-		for (const ParticleEditorResource::Link& link : m_resource->m_links) {
-			imnodes::Link(link.id, link.from, link.to);
-		}
-
-		imnodes::EndNodeEditor();
-
-		for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
-			ImVec2 p = imnodes::GetNodeEditorSpacePos(n->m_id);
-			if (p.x != n->m_pos.x || p.y != n->m_pos.y) {
-				n->m_pos = p;
-				pushUndo(n->m_id);
-			}
-		}
-
 		if (context_open) {
-			m_context_link = -1;
-			imnodes::IsLinkHovered(&m_context_link);
-			m_context_node = -1;
-			imnodes::IsNodeHovered(&m_context_node);
+			m_context_link = hovered_link;
+			m_context_node = hovered_node;
 		}
 
-		{
-			int from, to;
-			if (imnodes::IsLinkCreated(&from, &to)) {
-				ParticleEditorResource::Link& link = m_resource->m_links.emplace();
-				link.id = m_resource->genID();
-				link.from = from;
-				link.to = to;
-				pushUndo(0xffFFffFF);
-			}
+		ImGui::End();
+		ImGui::Render();
+
+		if (!m_canvas_rt || m_canvas_size.x != canvas_size.x || m_canvas_size.y != canvas_size.y) {
+			Renderer* renderer = (Renderer*)m_app.getEngine().getPluginManager().getPlugin("renderer");
+			Renderer::MemRef mem;
+			if (m_canvas_rt) renderer->destroy(m_canvas_rt);
+			m_canvas_size = canvas_size;
+			m_canvas_rt = renderer->createTexture((u32)canvas_size.x, (u32)canvas_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::SRGB, mem, "particle_editor");
 		}
+
+		m_imgui_renderer.render(m_canvas_rt, Vec2(canvas_size.x, canvas_size.y), ImGui::GetDrawData(), m_canvas_scale);
+
+		ImGui::SetCurrentContext(mainctx);
+		ImGui::SetCursorScreenPos(canvas_origin);
+		if (gpu::isOriginBottomLeft()) {
+			ImGui::Image(m_canvas_rt, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
+		}
+		else {
+			ImGui::Image(m_canvas_rt, canvas_size);
+		}
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel) {
+			m_canvas_scale.x += ImGui::GetIO().MouseWheel / 20;
+			m_canvas_scale.x = clamp(m_canvas_scale.x, 0.1f, 10.f);
+			m_canvas_scale.y = m_canvas_scale.x;
+		}
+
 		ImGui::Columns();
 
 		ImGui::End();
@@ -1711,19 +1766,21 @@ struct ParticleEditorImpl : ParticleEditor {
 	Action m_redo_action;
 	Action m_apply_action;
 	bool m_has_focus = false;
+	IImGuiRenderer& m_imgui_renderer;
+	ImVec2 m_canvas_size = ImVec2(0, 0);
+	gpu::TextureHandle m_canvas_rt = gpu::INVALID_TEXTURE;
+	ImVec2 m_canvas_scale = ImVec2(1, 1);
+	ImVec2 m_canvas_offset = ImVec2(0, 0);
+	ImGuiContext* m_canvas_ctx = nullptr;
 };
 
 DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
 	return node ? node->generate(instructions, output_idx, output, subindex) : DataStream();
 }
 
-UniquePtr<StudioApp::GUIPlugin> createParticleEditor(StudioApp& app) {
-	return UniquePtr<ParticleEditorImpl>::create(app.getAllocator(), app, app.getAllocator());
-}
-
-UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app) {
+UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app, IImGuiRenderer& imgui_renderer) {
 	IAllocator& allocator = app.getAllocator();
-	return UniquePtr<ParticleEditorImpl>::create(allocator, app, allocator);
+	return UniquePtr<ParticleEditorImpl>::create(allocator, app, imgui_renderer, allocator);
 }
 
 

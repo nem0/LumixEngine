@@ -1,6 +1,5 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
-#include <imgui/imnodes.h>
 
 #include "audio/audio_scene.h"
 #include "editor/asset_browser.h"
@@ -441,7 +440,6 @@ struct StudioAppImpl final : StudioApp
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
-		imnodes::CreateContext();
 		loadSettings();
 		initIMGUI();
 

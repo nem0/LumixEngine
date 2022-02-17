@@ -24,6 +24,11 @@ enum class CurveEditorFlags
 	RESET = 1 << 2
 };
 
+enum class PinShape {
+	CIRCLE,
+	TRIANGLE
+};
+
 IMGUI_API int CurveEditor(const char* label
 	, float* values
 	, int points_count
@@ -36,6 +41,16 @@ IMGUI_API bool BeginResizableMenu(const char* label, const char* icon, bool enab
 IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
+
+IMGUI_API void BeginNodeEditor(const char* title, ImVec2* offset);
+IMGUI_API void EndNodeEditor();
+IMGUI_API ImVec2 GetNodeEditorOffset();
+IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos);
+IMGUI_API void EndNode();
+IMGUI_API void Pin(ImGuiID id, bool is_input, PinShape shape = PinShape::CIRCLE);
+IMGUI_API bool GetNewLink(ImGuiID* from, ImGuiID* to);
+IMGUI_API void NodeLink(ImGuiID from, ImGuiID to);
+IMGUI_API bool IsLinkHovered();
 
 IMGUI_API bool InputRotation(const char* label, float* euler);
 IMGUI_API void Label(const char* label);
