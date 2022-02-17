@@ -28,8 +28,6 @@ LUMIX_ENGINE_API void pushCounter(u32 counter, float value);
 LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
 LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
 LUMIX_ENGINE_API void gpuStats(u64 primitives_generated);
-LUMIX_ENGINE_API void gpuMemStats(u64 total, u64 current, u64 dedicated, u64 buffer_mem, u64 texture_mem, u64 render_target_mem);
-LUMIX_ENGINE_API void gpuFrame();
 LUMIX_ENGINE_API void link(i64 link);
 LUMIX_ENGINE_API i64 createNewLinkID();
 LUMIX_ENGINE_API void serialize(OutputMemoryStream& blob);
@@ -111,17 +109,6 @@ struct GPUBlock
 	i64 profiler_link;
 };
 
-struct GPUMemStatsBlock
-{
-	u64 total;
-	u64 current;
-	u64 dedicated;
-	u64 buffer_mem;
-	u64 texture_mem;
-	u64 render_target_mem;
-};
-
-
 enum class EventType : u8
 {
 	BEGIN_BLOCK,
@@ -136,8 +123,6 @@ enum class EventType : u8
 	JOB_INFO,
 	BEGIN_GPU_BLOCK,
 	END_GPU_BLOCK,
-	GPU_FRAME,
-	GPU_MEM_STATS,
 	LINK,
 	PAUSE,
 	GPU_STATS,

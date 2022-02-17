@@ -170,7 +170,7 @@ static void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 struct ProfilerUIImpl final : ProfilerUI
 {
 	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
-		: m_main_allocator(allocator)
+		: m_debug_allocator(allocator)
 		, m_app(app)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
@@ -555,7 +555,7 @@ struct ProfilerUIImpl final : ProfilerUI
 	};
 
 	DefaultAllocator m_allocator;
-	debug::Allocator* m_main_allocator;
+	debug::Allocator* m_debug_allocator;
 	ResourceManagerHub& m_resource_manager;
 	StudioApp& m_app;
 	AllocationStackNode* m_allocation_root;
@@ -615,8 +615,6 @@ struct ProfilerUIImpl final : ProfilerUI
 	};
 
 	Array<Counter> m_counters;
-	profiler::GPUMemStatsBlock m_gpu_mem_stats;
-	bool m_is_gpu_mem_stats_valid = false;
 };
 
 
@@ -747,21 +745,21 @@ void ProfilerUIImpl::addToTree(debug::Allocator::AllocationInfo* info)
 
 void ProfilerUIImpl::refreshAllocations()
 {
-	if (!m_main_allocator) return;
+	if (!m_debug_allocator) return;
 
 	m_allocation_root->clear(m_allocator);
 	LUMIX_DELETE(m_allocator, m_allocation_root);
 	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 
-	m_main_allocator->lock();
-	auto* current_info = m_main_allocator->getFirstAllocationInfo();
+	m_debug_allocator->lock();
+	auto* current_info = m_debug_allocator->getFirstAllocationInfo();
 
 	while (current_info)
 	{
 		addToTree(current_info);
 		current_info = current_info->next;
 	}
-	m_main_allocator->unlock();
+	m_debug_allocator->unlock();
 }
 
 
@@ -826,7 +824,7 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 {
 	if (!ImGui::CollapsingHeader("Memory")) return;
 
-	if (m_main_allocator) {
+	if (m_debug_allocator) {
 		if (ImGui::Button("Refresh"))
 		{
 			refreshAllocations();
@@ -835,32 +833,11 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 		ImGui::SameLine();
 		if (ImGui::Button("Check memory"))
 		{
-			m_main_allocator->checkGuards();
+			m_debug_allocator->checkGuards();
 		}
-		ImGui::Text("Total tracked size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	}
 	else {
 		ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
-	}
-	const PageAllocator& page_allocator = m_engine.getPageAllocator();
-	const float reserved_pages_size = (page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
-	ImGui::Text("Page allocator: %.3fMB", reserved_pages_size);
-	#ifdef _WIN32
-		const float process_mem = os::getProcessMemory() / (1024.f * 1024.f);
-		ImGui::Text("Process memory: %.3fMB", process_mem);
-	#endif
-
-	if (m_is_gpu_mem_stats_valid) {
-		const float current = m_gpu_mem_stats.current / (1024.f * 1024.f);
-		const float total = m_gpu_mem_stats.total / (1024.f * 1024.f);
-		const float dedicated = m_gpu_mem_stats.dedicated / (1024.f * 1024.f);
-		const float buffer_mem = m_gpu_mem_stats.buffer_mem / (1024.f * 1024.f);
-		const float texture_mem = m_gpu_mem_stats.texture_mem / (1024.f * 1024.f);
-		const float render_target_mem = m_gpu_mem_stats.render_target_mem / (1024.f * 1024.f);
-		ImGui::Text("GPU: %.02fMB/%.02f (%.02fMB dedicated)", current, total, dedicated);
-		ImGui::Text("GPU Buffers: %.02fMB", buffer_mem);
-		ImGui::Text("GPU Textures: %.02fMB", texture_mem);
-		ImGui::Text("GPU Render targets: %.02fMB", render_target_mem);
 	}
 
 	ImGui::Columns(2, "memc");
@@ -910,11 +887,6 @@ static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 
 void ProfilerUIImpl::onGUICPUProfiler()
 {
-	if (m_main_allocator) {
-		static u32 mem_counter = profiler::createCounter("Total tracked memory (MB)", 0);
-		profiler::pushCounter(mem_counter, float(double(m_main_allocator->getTotalSize()) / (1024.0 * 1024.0)));
-	}
-
 	static u32 frame_id = 0;
 	++frame_id;
 
@@ -1372,12 +1344,6 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				case profiler::EventType::GPU_STATS:
 					read(ctx, p + sizeof(profiler::EventHeader), primitives_generated);
 					has_stats = true;
-					break;
-				case profiler::EventType::GPU_FRAME:
-					break;
-				case profiler::EventType::GPU_MEM_STATS:
-					read(ctx, p + sizeof(profiler::EventHeader), m_gpu_mem_stats);
-					m_is_gpu_mem_stats_valid = true;
 					break;
 				case profiler::EventType::FRAME:
 					if (header.time >= view_start && header.time <= m_end && m_show_frames) {

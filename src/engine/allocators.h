@@ -53,6 +53,8 @@ struct LUMIX_ENGINE_API LinearAllocator : IAllocator {
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t size) override;
 
+	u32 getCommited() const { return m_commited; }
+
 private:
 	u32 m_commited;
 	u32 m_reserved;

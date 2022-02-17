@@ -391,17 +391,6 @@ void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link)
 	write(g_instance.global_context, EventType::BEGIN_GPU_BLOCK, data);
 }
 
-void gpuMemStats(u64 total, u64 current, u64 dedicated, u64 buffer_mem, u64 texture_mem, u64 render_target_mem) {
-	GPUMemStatsBlock data;
-	data.total = total;
-	data.current = current;
-	data.dedicated = dedicated;
-	data.buffer_mem = buffer_mem;
-	data.texture_mem = texture_mem;
-	data.render_target_mem = render_target_mem;
-	write(g_instance.global_context, EventType::GPU_MEM_STATS, data);
-}
-
 void gpuStats(u64 primitives_generated) {
 	write(g_instance.global_context, EventType::GPU_STATS, primitives_generated);
 }
@@ -425,11 +414,6 @@ void link(i64 link)
 	write(*ctx, EventType::LINK, link);
 }
 
-
-void gpuFrame()
-{
-	write(g_instance.global_context, EventType::GPU_FRAME, (int)0);
-}
 
 float getLastFrameDuration()
 {

@@ -1882,7 +1882,7 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		LinearAllocator& current_frame_allocator = m_renderer.getCurrentFrameAllocator();
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderTerrainsCommand& cmd = m_renderer.createJob<RenderTerrainsCommand>(current_frame_allocator, allocator);
+		RenderTerrainsJob& cmd = m_renderer.createJob<RenderTerrainsJob>(current_frame_allocator, allocator);
 
 		const char* define = "";
 		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
@@ -1901,7 +1901,7 @@ struct PipelineImpl final : Pipeline
 		if (!m_place_grass_shader->isReady()) return;
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderGrassCommand& cmd = m_renderer.createJob<RenderGrassCommand>(allocator);
+		RenderGrassJob& cmd = m_renderer.createJob<RenderGrassJob>(allocator);
 
 		cmd.m_define_mask = 0;
 		if (lua_istable(L, 2)) {
@@ -4279,9 +4279,9 @@ struct PipelineImpl final : Pipeline
 		return setRenderTargets(L, true, false);
 	}
 
-	struct RenderGrassCommand : Renderer::RenderJob
+	struct RenderGrassJob : Renderer::RenderJob
 	{
-		RenderGrassCommand(IAllocator& allocator)
+		RenderGrassJob(IAllocator& allocator)
 			: m_allocator(allocator)
 			, m_grass_allocator(allocator)
 			, m_grass(m_grass_allocator)
@@ -4489,9 +4489,9 @@ struct PipelineImpl final : Pipeline
 		Renderer::TransientSlice m_staging;
 	};
 
-	struct RenderTerrainsCommand : Renderer::RenderJob
+	struct RenderTerrainsJob : Renderer::RenderJob
 	{
-		RenderTerrainsCommand(LinearAllocator& current_frame_allocator, IAllocator& allocator)
+		RenderTerrainsJob(LinearAllocator& current_frame_allocator, IAllocator& allocator)
 			: m_allocator(allocator)
 			, m_instances(current_frame_allocator)
 		{
@@ -4590,10 +4590,10 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		void execute() override
-		{
+		void execute() override {
 			PROFILE_FUNCTION();
 			
+			if (m_instances.empty()) return;
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
 			gpu::StateFlags state = m_render_state;

@@ -353,16 +353,8 @@ struct GPUProfiler
 	{
 		PROFILE_FUNCTION();
 		jobs::MutexGuard lock(m_mutex);
-		Query frame_query;
-		frame_query.is_frame = true;
-		m_queries.push(frame_query);
 		while (!m_queries.empty()) {
 			Query q = m_queries[0];
-			if (q.is_frame) {
-				profiler::gpuFrame();
-				m_queries.erase(0);
-				continue;
-			}
 			
 			if (!gpu::isQueryReady(q.handle)) break;
 
@@ -1239,7 +1231,19 @@ struct RendererImpl final : Renderer
 		
 		gpu::MemoryStats mem_stats;
 		if (gpu::getMemoryStats(mem_stats)) {
-			profiler::gpuMemStats(mem_stats.total_available_mem, mem_stats.current_available_mem, mem_stats.dedicated_vidmem, mem_stats.buffer_mem, mem_stats.texture_mem, mem_stats.render_target_mem);
+			//static u32 total_counter = profiler::createCounter("Total GPU memory (MB)", 0);
+			static u32 available_counter = profiler::createCounter("Available GPU memory (MB)", 0);
+			//static u32 dedicated_counter = profiler::createCounter("Dedicate Vid memory (MB)", 0);
+			static u32 buffer_counter = profiler::createCounter("Buffer memory (MB)", 0);
+			static u32 texture_counter = profiler::createCounter("Texture memory (MB)", 0);
+			auto to_MB = [](u64 B){
+				return float(double(B) / (1024.0 * 1024.0));
+			};
+			//profiler::pushCounter(total_counter, to_MB(mem_stats.total_available_mem));
+			profiler::pushCounter(available_counter, to_MB(mem_stats.current_available_mem));
+			//profiler::pushCounter(dedicated_counter, to_MB(mem_stats.dedicated_vidmem));
+			profiler::pushCounter(buffer_counter, to_MB(mem_stats.buffer_mem));
+			profiler::pushCounter(texture_counter, to_MB(mem_stats.texture_mem));
 		}
 
 		for (const auto& i : frame.to_compile_shaders) {
@@ -1332,6 +1336,13 @@ struct RendererImpl final : Renderer
 			const u64 key = i.defines | ((u64)i.decl.hash << 32);
 			i.shader->m_programs.insert(key, i.program);
 		}
+
+		u32 frame_data_mem = 0;
+		for (const Local<FrameData>& fd : m_frames) {
+			frame_data_mem += fd->job_allocator.getCommited();
+		}
+		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
+		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
 
 		jobs::setRed(&m_cpu_frame->can_setup);
 		

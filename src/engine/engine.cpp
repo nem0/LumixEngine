@@ -335,6 +335,17 @@ public:
 		PROFILE_FUNCTION();
 		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
 		profiler::pushCounter(lua_mem_counter, float(double(m_lua_allocated) / 1024.0));
+
+		if (m_allocator.isDebug()) {
+			debug::Allocator& a = (debug::Allocator&)m_allocator;
+			static u32 mem_counter = profiler::createCounter("Main allocator (MB)", 0);
+			profiler::pushCounter(mem_counter, float(double(a.getTotalSize()) / (1024.0 * 1024.0)));
+		}
+
+		const float reserved_pages_size = (m_page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
+		static u32 page_allocator_counter = profiler::createCounter("Page allocator (MB)", 0);
+		profiler::pushCounter(page_allocator_counter , reserved_pages_size);
+		
 		#ifdef _WIN32
 			const float process_mem = os::getProcessMemory() / (1024.f * 1024.f);
 			static u32 process_mem_counter = profiler::createCounter("Process Memory (MB)", 0);
@@ -538,7 +549,8 @@ public:
 
 private:
 	IAllocator& m_allocator;
-	DefaultAllocator m_lua_allocator;
+	// lua callstacks are incomplete and they polute memory report if using main allocator 
+	DefaultAllocator m_lua_allocator; 
 	size_t m_lua_allocated = 0;
 	PageAllocator m_page_allocator;
 	UniquePtr<FileSystem> m_file_system;

@@ -3419,11 +3419,7 @@ struct StudioAppImpl final : StudioApp
 	};
 
 	DefaultAllocator m_main_allocator;
-	#ifdef LUMIX_DEBUG
-		debug::Allocator m_allocator;
-	#else
-		IAllocator& m_allocator;
-	#endif
+	debug::Allocator m_allocator;
 	UniquePtr<Engine> m_engine;
 	ImGuiKey m_imgui_key_map[255];
 	Array<os::WindowHandle> m_windows;
