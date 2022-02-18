@@ -152,7 +152,7 @@ static struct Instance
 
 			static EVENT_TRACE_LOGFILE trace = {};
 			trace.LoggerName = KERNEL_LOGGER_NAME;
-			trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
+			trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
 			trace.EventRecordCallback = TraceTask::callback;
 			trace_task.open_handle = OpenTrace(&trace);
 			trace_task.create("profiler trace", true);
