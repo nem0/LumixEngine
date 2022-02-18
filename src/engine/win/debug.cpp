@@ -316,7 +316,7 @@ void Allocator::checkLeaks()
 			m_stack_tree.printCallstack(info->stack_leaf);
 			info = info->next;
 		}
-		ASSERT(false);
+		debugBreak();
 	}
 }
 

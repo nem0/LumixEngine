@@ -1190,6 +1190,11 @@ struct ParticleEditorImpl : ParticleEditor {
 	}
 
 	~ParticleEditorImpl() {
+		if (m_canvas_rt) {	
+			Renderer* renderer = (Renderer*)m_app.getEngine().getPluginManager().getPlugin("renderer");
+			renderer->destroy(m_canvas_rt);
+		}
+
 		if (m_canvas_ctx) ImGui::DestroyContext(m_canvas_ctx);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_undo_action);
