@@ -98,7 +98,10 @@ public:
 
 		os::logInfo();
 
-		m_state = lua_newstate(&luaAlloc, this);
+		m_state = luaL_newstate();
+		#ifdef _WIN32
+			lua_setallocf(m_state, luaAlloc, this);
+		#endif
 		luaL_openlibs(m_state);
 
 		registerEngineAPI(m_state, this);
