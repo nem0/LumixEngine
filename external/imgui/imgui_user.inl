@@ -143,19 +143,19 @@ namespace ImGuiEx {
 		const ImVec2 to(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
 		PopID();
 
-		ImVec2 p1 = from;
 		float d = ImMax(20.f, ImAbs(from.x - to.x)) * 0.75f;
-		ImVec2 t1 = ImVec2(d, 0.0f);
-		ImVec2 p2 = to;
-		ImVec2 t2 = ImVec2(d, 0.0f);
-		const int STEPS = 12;
-		ImDrawList* draw_list = GetWindowDrawList();
+		const ImVec2 p1 = from;
+		const ImVec2 p1_b = p1 + ImVec2(d, 0.0f);
+		const ImVec2 p2 = to;
+		const ImVec2 p2_b = p2 - ImVec2(d, 0.0f);
+		
+		const ImVec2 mp = ImGui::GetMousePos();
 	    const ImGuiStyle& style = ImGui::GetStyle();
-		const ImVec2 closest_point = ImBezierCubicClosestPointCasteljau(p1, p1 + t1, p2 - t2, p2, ImGui::GetMousePos(), style.CurveTessellationTol);
+		const ImVec2 closest_point = ImBezierCubicClosestPointCasteljau(p1, p1_b, p2_b, p2, mp, style.CurveTessellationTol);
 		const float dist_squared = ImFabs(ImLengthSqr(ImGui::GetMousePos() - closest_point));
 		g_node_editor.link_hovered = dist_squared < 3 * 3 + 1;
 		
-		draw_list->AddBezierCubic(p1, p1 + t1, p2 - t2, p2, GetColorU32(g_node_editor.link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
+		g_node_editor.draw_list->AddBezierCubic(p1, p1_b, p2_b, p2, GetColorU32(g_node_editor.link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
 	}
 
 	void BeginNode(ImGuiID id, ImVec2& pos) {
