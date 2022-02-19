@@ -23,8 +23,16 @@ struct LUMIX_EDITOR_API ResourceLocator {
 
 struct LUMIX_EDITOR_API Action
 {
+	enum Modifiers : u8 {
+		NONE = 0,
+
+		SHIFT = 1 << 0,
+		ALT = 1 << 1,
+		CTRL = 1 << 2
+	};
+
 	Action();
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, u8 modifiers, bool is_global);
+	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers, bool is_global);
 	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global);
 	bool toolbarButton(struct ImFont* font);
 	bool isActive();
@@ -32,13 +40,7 @@ struct LUMIX_EDITOR_API Action
 
 	static bool falseConst() { return false; }
 
-	enum class Modifiers : u8 {
-		SHIFT = 1 << 0,
-		ALT = 1 << 1,
-		CTRL = 1 << 2
-	};
-
-	u8 modifiers = 0;
+	Modifiers modifiers = Modifiers::NONE;
 	os::Keycode shortcut;
 	StaticString<32> name;
 	StaticString<32> label_short;
@@ -49,6 +51,9 @@ struct LUMIX_EDITOR_API Action
 	Delegate<void ()> func;
 	Delegate<bool ()> is_selected;
 };
+
+inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }
+inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b; }
 
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API void menuItem(Action& a, bool enabled);

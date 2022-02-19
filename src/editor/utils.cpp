@@ -76,7 +76,7 @@ void Action::init(const char* label_short,
 	const char* name,
 	const char* font_icon,
 	os::Keycode shortcut,
-	u8 modifiers,
+	Modifiers modifiers,
 	bool is_global)
 {
 	this->label_long = label_long;

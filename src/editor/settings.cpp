@@ -195,9 +195,9 @@ static bool shortcutInput(Action& action, bool edit)
 	ImGui::SetNextItemWidth(-30);
 	ImGui::InputText("", button_label, sizeof(button_label), ImGuiInputTextFlags_ReadOnly);
 	if (ImGui::IsItemActive()) {
-		if (os::isKeyDown(os::Keycode::SHIFT)) action.modifiers |= (u8)Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::MENU)) action.modifiers |= (u8)Action::Modifiers::ALT;
-		if (os::isKeyDown(os::Keycode::CTRL)) action.modifiers |= (u8)Action::Modifiers::CTRL;
+		if (os::isKeyDown(os::Keycode::SHIFT)) action.modifiers |= Action::Modifiers::SHIFT;
+		if (os::isKeyDown(os::Keycode::MENU)) action.modifiers |= Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::CTRL)) action.modifiers |= Action::Modifiers::CTRL;
 
 		for (int i = 0; i < (int)os::Keycode::MAX; ++i) {
 			const auto kc= (os::Keycode)i;
@@ -219,7 +219,7 @@ static bool shortcutInput(Action& action, bool edit)
 	}
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
-		action.modifiers = 0;
+		action.modifiers = Action::Modifiers::NONE;
 		action.shortcut = os::Keycode::INVALID;
 	}
 	
@@ -416,7 +416,7 @@ bool Settings::load()
 				}
 				lua_pop(L, 1);
 				if (LuaWrapper::getField(L, -1, "modifiers") == LUA_TNUMBER) {
-					actions[i]->modifiers = (u8)lua_tointeger(L, -1);
+					actions[i]->modifiers = (Action::Modifiers)lua_tointeger(L, -1);
 				}
 				lua_pop(L, 1);
 			}

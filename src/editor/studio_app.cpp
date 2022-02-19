@@ -448,7 +448,7 @@ struct StudioAppImpl final : StudioApp
 			"set_custom_pivot",
 			"",
 			os::Keycode::K,
-			0,
+			Action::Modifiers::NONE,
 			false);
 		addAction(&m_set_pivot_action);
 
@@ -457,7 +457,7 @@ struct StudioAppImpl final : StudioApp
 			"reset_pivot",
 			"",
 			os::Keycode::K,
-			(u8)Action::Modifiers::SHIFT,
+			Action::Modifiers::SHIFT,
 			false);
 		addAction(&m_reset_pivot_action);
 
@@ -1387,7 +1387,7 @@ struct StudioAppImpl final : StudioApp
 		const char* name,
 		const char* font_icon,
 		os::Keycode shortcut,
-		u8 modifiers)
+		Action::Modifiers modifiers)
 	{
 		Action* a = LUMIX_NEW(m_editor->getAllocator(), Action);
 		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, true);
@@ -2272,21 +2272,21 @@ struct StudioAppImpl final : StudioApp
 	{
 		addAction<&StudioAppImpl::newUniverse>(ICON_FA_PLUS "New", "New universe", "newUniverse", ICON_FA_PLUS);
 		addAction<&StudioAppImpl::save>(
-			ICON_FA_SAVE "Save", "Save universe", "save", ICON_FA_SAVE, os::Keycode::S, (u8)Action::Modifiers::CTRL);
+			ICON_FA_SAVE "Save", "Save universe", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::saveAs>(
-			NO_ICON "Save As", "Save universe as", "saveAs", "", os::Keycode::S, (u8)Action::Modifiers::CTRL | (u8)Action::Modifiers::SHIFT);
+			NO_ICON "Save As", "Save universe as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::exit>(
-			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, (u8)Action::Modifiers::CTRL);
+			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::redo>(
-			ICON_FA_REDO "Redo", "Redo scene action", "redo", ICON_FA_REDO, os::Keycode::Z, (u8)Action::Modifiers::CTRL | (u8)Action::Modifiers::SHIFT);
+			ICON_FA_REDO "Redo", "Redo scene action", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::undo>(
-			ICON_FA_UNDO "Undo", "Undo scene action", "undo", ICON_FA_UNDO, os::Keycode::Z, (u8)Action::Modifiers::CTRL);
+			ICON_FA_UNDO "Undo", "Undo scene action", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::copy>(
-			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, (u8)Action::Modifiers::CTRL);
+			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::paste>(
-			ICON_FA_PASTE "Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, (u8)Action::Modifiers::CTRL);
+			ICON_FA_PASTE "Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::duplicate>(
-			ICON_FA_CLONE "Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, (u8)Action::Modifiers::CTRL);
+			ICON_FA_CLONE "Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS_ALT "Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
 			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_UNDO "Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
@@ -2308,7 +2308,7 @@ struct StudioAppImpl final : StudioApp
 			"destroyEntity",
 			ICON_FA_MINUS_SQUARE,
 			os::Keycode::DEL,
-			0);
+			Action::Modifiers::NONE);
 		addAction<&StudioAppImpl::savePrefab>(ICON_FA_SAVE "Save prefab", "Save selected entities as prefab", "savePrefab", ICON_FA_SAVE);
 		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
 		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
@@ -3385,9 +3385,9 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::IsAnyItemActive()) return;
 		GUIPlugin* plugin = getFocusedPlugin();
 		u8 pressed_modifiers = 0;
-		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= (u8)Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= (u8)Action::Modifiers::CTRL;
-		if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= (u8)Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
+		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
+		if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Action::Modifiers::ALT;
 
 		for (Action* a : m_actions) {
 			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers ==0)) continue;

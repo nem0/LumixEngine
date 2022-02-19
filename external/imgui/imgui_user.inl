@@ -28,6 +28,7 @@ namespace ImGuiEx {
 		ImGuiID new_link_to = 0;
 		bool new_link_from_input;
 		bool link_hovered = false;
+		bool between_begin_end_editor = false;
 		ImDrawList* draw_list = nullptr;
 		bool is_pin_hovered = false;
 		ImVec2* canvas_offset = nullptr;
@@ -38,6 +39,7 @@ namespace ImGuiEx {
 	}
 
 	void BeginNodeEditor(const char* title, ImVec2* offset) {
+		g_node_editor.between_begin_end_editor = true;
 		g_node_editor.canvas_offset = offset;
 		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 		g_node_editor.node_editor_pos = GetCursorScreenPos() + *g_node_editor.canvas_offset;
@@ -47,6 +49,7 @@ namespace ImGuiEx {
 	}
 
 	void EndNodeEditor() {
+		g_node_editor.between_begin_end_editor = false;
 		g_node_editor.draw_list->ChannelsMerge();
 
 		if (g_node_editor.new_link_from != 0) {
@@ -76,6 +79,7 @@ namespace ImGuiEx {
 	}
 
 	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
+		ASSERT(g_node_editor.between_begin_end_editor);
 		if (g_node_editor.new_link_to) {
 			*from = g_node_editor.new_link_from;
 			*to = g_node_editor.new_link_to;

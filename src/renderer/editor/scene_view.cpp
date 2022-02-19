@@ -621,7 +621,7 @@ SceneView::SceneView(StudioApp& app)
 	m_move_down_action.init("Move down", "Move camera down", "moveDown", "", false);
 	m_camera_speed_action.init(ICON_FA_CAMERA "Camera speed", "Reset camera speed", "cameraSpeed", ICON_FA_CAMERA, false);
 	m_camera_speed_action.func.bind<&SceneView::resetCameraSpeed>(this);
-	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', (u8)Action::Modifiers::CTRL, true);
+	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
 	m_search_action.func.bind<&SceneView::toggleSearch>(this);
 
 	m_app.addAction(&m_copy_move_action);
