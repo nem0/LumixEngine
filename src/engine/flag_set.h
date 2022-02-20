@@ -14,6 +14,7 @@ struct FlagSet
 	void unset(Enum value) { base &= ~(Base)value; }
 	bool isSet(Enum value) const { return base & (Base)value; }
 
+private:
 	Base base = 0;
 };
 

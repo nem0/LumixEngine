@@ -143,32 +143,7 @@ struct Color {
 		WHITE = 0xffFFffFF
 	};
 };
-
 #pragma pack()
-
-struct Time {
-	Time() {}
-	explicit Time(u32 v) : value(v) {}
-	static Time fromSeconds(float time) {
-		ASSERT(time >= 0);
-		return Time{u32(time * ONE_SECOND)};
-	}
-	float seconds() const { return float(value / double(ONE_SECOND)); }
-	Time operator*(float t) const { return Time{u32(value * t)}; }
-	float operator/(const Time& rhs) const { return float(double(value) / double(rhs.value)); }
-	Time operator+(const Time& rhs) const { return Time{value + rhs.value}; }
-	Time operator-(const Time& rhs) const { return Time{value - rhs.value}; }
-	void operator+=(const Time& rhs) { value += rhs.value; }
-	bool operator<(const Time& rhs) const { return value < rhs.value; }
-	bool operator<=(const Time& rhs) const { return value <= rhs.value; }
-	bool operator>=(const Time& rhs) const { return value >= rhs.value; }
-	Time operator%(const Time& rhs) const { return Time{value % rhs.value}; }
-	u32 raw() const { return value; }
-
-private:
-	u32 value;
-	enum { ONE_SECOND = 1 << 15 };
-};
 
 #ifdef _WIN32
 	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)

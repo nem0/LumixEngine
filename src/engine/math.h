@@ -462,7 +462,6 @@ LUMIX_ENGINE_API float dot(const Vec2& op1, const Vec2& op2);
 LUMIX_ENGINE_API Vec3 cross(const Vec3& op1, const Vec3& op2);
 LUMIX_ENGINE_API DVec3 cross(const DVec3& op1, const DVec3& op2);
 
-LUMIX_ENGINE_API Time lerp(Time op1, Time op2, float t);
 LUMIX_ENGINE_API Vec4 lerp(const Vec4& op1, const Vec4& op2, float t);
 LUMIX_ENGINE_API float lerp(float a, float b, float t);
 LUMIX_ENGINE_API Vec3 lerp(const Vec3& op1, const Vec3& op2, float t);

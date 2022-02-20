@@ -1,5 +1,6 @@
 #pragma once
 
+#include "animation/animation.h"
 #include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/plugin.h"

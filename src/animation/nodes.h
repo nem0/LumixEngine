@@ -1,5 +1,6 @@
 #pragma once
 
+#include "animation/animation.h"
 #include "engine/array.h"
 #include "engine/stream.h"
 

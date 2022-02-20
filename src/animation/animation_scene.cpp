@@ -343,7 +343,7 @@ struct AnimationSceneImpl final : AnimationScene
 			EntityRef entity = m_property_animators.getKey(i);
 			serializer.write(entity);
 			serializer.writeString(animator.animation ? animator.animation->getPath().c_str() : "");
-			serializer.write(animator.flags.base);
+			serializer.write(animator.flags);
 		}
 
 		serializer.write((u32)m_animators.size());
@@ -384,7 +384,7 @@ struct AnimationSceneImpl final : AnimationScene
 
 			PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 			const char* path = serializer.readString();
-			serializer.read(animator.flags.base);
+			serializer.read(animator.flags);
 			animator.time = 0;
 			animator.animation = loadPropertyAnimation(Path(path));
 			m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);

@@ -116,7 +116,7 @@ struct GUIImage
 		if (sprite) sprite->decRefCount();
 	}
 
-	enum Flags
+	enum Flags : u32
 	{
 		IS_ENABLED = 1 << 1
 	};
@@ -128,7 +128,7 @@ struct GUIImage
 
 struct GUIRect
 {
-	enum Flags
+	enum Flags : u32
 	{
 		IS_VALID = 1 << 0,
 		IS_ENABLED = 1 << 1,
@@ -1115,7 +1115,7 @@ struct GUISceneImpl final : GUIScene
 			{
 				serializer.writeString(rect->image->sprite ? rect->image->sprite->getPath().c_str() : "");
 				serializer.write(rect->image->color);
-				serializer.write(rect->image->flags.base);
+				serializer.write(rect->image->flags);
 			}
 
 			serializer.write(rect->input_field != nullptr);
@@ -1158,7 +1158,7 @@ struct GUISceneImpl final : GUIScene
 		u32 count = serializer.read<u32>();
 		for (u32 i = 0; i < count; ++i)
 		{
-			u32 flags;
+			GUIRect::Flags flags;
 			EntityRef entity;
 			serializer.read(flags);
 			serializer.read(entity);
@@ -1169,9 +1169,9 @@ struct GUISceneImpl final : GUIScene
 				iter = m_rects.insert(entity, rect);
 			}
 			GUIRect* rect = iter.value();
-			static_assert(sizeof(flags) == sizeof(rect->flags));
 			rect->entity = entity;
-			rect->flags.base = flags;
+			rect->flags.clear();
+			rect->flags.set(flags);
 
 			serializer.read(rect->top);
 			serializer.read(rect->right);
@@ -1196,7 +1196,7 @@ struct GUISceneImpl final : GUIScene
 					rect->image->sprite = manager.load<Sprite>(Path(tmp));
 				}
 				serializer.read(rect->image->color);
-				serializer.read(rect->image->flags.base);
+				serializer.read(rect->image->flags);
 				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
 
 			}

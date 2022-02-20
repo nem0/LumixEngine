@@ -136,11 +136,6 @@ DVec3 IVec3::operator *(double i) const
     return {i * x, i * y, i * z};
 }
 
-Time lerp(Time op1, Time op2, float t) {
-	const double d = double(op1.raw()) * (1 - t) + double(op2.raw()) * t;
-	return Time(u32(d));
-}
-
 Vec4 lerp(const Vec4& op1, const Vec4& op2, float t) {
 	const float invt = 1.0f - t;
 	return {

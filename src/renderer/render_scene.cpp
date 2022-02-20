@@ -606,7 +606,7 @@ struct RenderSceneImpl final : RenderScene {
 
 		serializer.write((i32)m_model_instances.size());
 		for (const ModelInstance& r : m_model_instances) {
-			serializer.write(r.flags.base);
+			serializer.write(r.flags);
 			if(r.flags.isSet(ModelInstance::VALID)) {
 				serializer.write(u32(r.model ? offsets[r.model] : 0xffFFffFF));
 				serializer.writeString(r.custom_material ? r.custom_material->getPath().c_str() : "");
@@ -772,7 +772,7 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.write(entity);
 			const ReflectionProbe& probe = m_reflection_probes.at(i);
 			serializer.write(probe.guid);
-			serializer.write(probe.flags.base);
+			serializer.write(probe.flags);
 			serializer.write(probe.size);
 			serializer.write(probe.half_extents);
 		}
@@ -790,7 +790,7 @@ struct RenderSceneImpl final : RenderScene {
 			entity = entity_map.get(entity);
 			ReflectionProbe& probe = m_reflection_probes.insert(entity);
 			serializer.read(probe.guid);
-			serializer.read(probe.flags.base);
+			serializer.read(probe.flags);
 			serializer.read(probe.size);
 			serializer.read(probe.half_extents);
 			load(probe, entity);
@@ -2791,7 +2791,7 @@ struct RenderSceneImpl final : RenderScene {
 		light.color = Vec3(1, 1, 1);
 		light.intensity = 1;
 		light.fov = degreesToRadians(360);
-		light.flags.base = 0;
+		light.flags.clear();
 		light.attenuation_param = 2;
 		light.range = 10;
 		light.guid = randGUID();
