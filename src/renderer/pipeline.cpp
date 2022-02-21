@@ -497,7 +497,7 @@ struct alignas(4096) CmdPage
 {
 	struct {
 		CmdPage* next = nullptr;
-		int size = 0;
+		u32 size = 0;
 		u8 bucket = 0;
 	} header;
 	u8 data[PageAllocator::PAGE_SIZE - sizeof(header)];
@@ -2564,91 +2564,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void renderLocalLights(const char* define, int shader_idx, CmdPage* cmds)
-	{
-		PROFILE_FUNCTION();
-		struct RenderJob : Renderer::RenderJob
-		{
-			void setup() override {}
-
-			void execute() override
-			{
-				// inline in debug
-				#define READ(T, N) \
-					T N = *(T*)cmd; \
-					cmd += sizeof(T); \
-					do {} while(false)
-
-				PROFILE_FUNCTION();
-				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) {
-					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
-					return;
-				}
-				
-				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-				CmdPage* page = m_cmds;
-				while (page) {
-					const u8* cmd = page->data;
-					const u8* cmd_end = page->data + page->header.size;
-					while (cmd != cmd_end) {
-						READ(const RenderableTypes, type);
-						ASSERT(type == RenderableTypes::LOCAL_LIGHT);
-
-						READ(u32, total_count);
-						READ(u32, nonintersecting_count);
-						READ(const gpu::BufferHandle, buffer);
-						READ(const u32, offset);
-
-						gpu::useProgram(m_program);
-
-						if(total_count - nonintersecting_count) {
-							gpu::setState(blend_state | gpu::StateFlags::CULL_FRONT);
-							const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
-							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-							gpu::bindVertexBuffer(1, buffer, offs, 64);
-							gpu::drawTrianglesInstanced(36, total_count - nonintersecting_count, gpu::DataType::U16);
-						}
-
-						if (nonintersecting_count) {
-							gpu::setState(blend_state | gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::CULL_BACK);
-							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-							gpu::bindVertexBuffer(1, buffer, offset, 64);
-							gpu::drawTrianglesInstanced(36, nonintersecting_count, gpu::DataType::U16);
-						}
-					}
-					CmdPage* next = page->header.next;
-					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
-					page = next;
-				}
-				#undef READ
-			}
-
-			gpu::ProgramHandle m_program;
-			PipelineImpl* m_pipeline;
-			CmdPage* m_cmds;
-		};
-
-		Shader* shader = [&]() -> Shader* {
-			for (const ShaderRef& s : m_shaders) {
-				if(s.id == shader_idx) {
-					return ((Shader*)s.res);
-				}
-			}
-			return nullptr;
-		}();
-
-		if (!shader || !shader->isReady()) return;
-
-		RenderJob& job = m_renderer.createJob<RenderJob>();
-		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		job.m_pipeline = this;
-		job.m_cmds = cmds;
-		job.m_program = shader->getProgram(m_point_light_decl, define_mask);
-		m_renderer.queue(job, m_profiler_link);
-	}
-
 	static gpu::StateFlags getState(lua_State* L, int idx)
 	{
 		gpu::StencilFuncs stencil_func = gpu::StencilFuncs::DISABLE;
@@ -3477,18 +3392,47 @@ struct PipelineImpl final : Pipeline
 			m_pipeline->m_renderer.endProfileBlock();
 		}
 
+		struct CmdInputStream {
+			CmdInputStream(CmdPage* page, PageAllocator& allocator)
+				: allocator(allocator)
+				, page(page)
+			{}
+
+			RenderableTypes readType() {
+				const u8 type = page->data[offset];
+				offset += 8; // must match output stream
+				return RenderableTypes(type);
+			}
+			
+			bool isEnd() {
+				if (offset == page->header.size) {
+					CmdPage* next = page->header.next;
+					allocator.deallocate(page, true);
+					page = next;
+					offset = 0;
+				}
+				return !page;
+			}
+
+			template <typename T>
+			T* readCmd() {
+				T* tmp = (T*)(page->data + offset);
+				offset += sizeof(T);
+				return tmp;
+			}
+
+			PageAllocator& allocator;
+			CmdPage* page = nullptr;
+			u32 offset = 0;
+		};
+
 		void execute() override {
 			PROFILE_FUNCTION();
 
 			drawInstancedMeshes();
 			if (!m_cmds) return;
 
-			// inline in debug
-			#define READ(T, N) \
-				const T N = *(T*)cmd; \
-				cmd += sizeof(T); \
-				do {} while(false)
-			if(m_cmds->header.size == 0 && !m_cmds->header.next) {
+			if (m_cmds->header.size == 0 && !m_cmds->header.next) {
 				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
 				return;
 			}
@@ -3497,150 +3441,122 @@ struct PipelineImpl final : Pipeline
 			renderer.beginProfileBlock("render_bucket", 0);
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
+			CmdInputStream stream(m_cmds, m_pipeline->getRenderer().getEngine().getPageAllocator());
+
 			const gpu::StateFlags render_states = m_render_state;
 			u32 material_ub_idx = 0xffFFffFF;
 			CmdPage* page = m_cmds;
-			while (page) {
-				const u8* cmd = page->data;
-				const u8* cmd_end = page->data + page->header.size;
-				while (cmd != cmd_end) {
-					READ(RenderableTypes, type);
-					switch(type) {
-						case RenderableTypes::MESH:
-						case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-							READ(Mesh::RenderData*, mesh);
-							READ(Material::RenderData*, material);
-							READ(gpu::ProgramHandle, program);
-							READ(u32, instances_count);
-							READ(gpu::BufferHandle, buffer);
-							READ(u32, offset);
+			while (!stream.isEnd()) {
+				const RenderableTypes type = stream.readType();
+				switch(type) {
+					case RenderableTypes::MESH:
+					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
+						MeshCmd* cmd = stream.readCmd<MeshCmd>();
 
-							gpu::bindTextures(material->textures, 0, material->textures_count);
-							gpu::setState(material->render_states | render_states);
-							if (material_ub_idx != material->material_constants) {
-								gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-								material_ub_idx = material->material_constants;
-							}
-
-							gpu::useProgram(program);
-
-							gpu::bindIndexBuffer(mesh->index_buffer_handle);
-							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-							gpu::bindVertexBuffer(1, buffer, offset, 32);
-
-							gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-							break;
+						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
+						gpu::setState(cmd->material->render_states | render_states);
+						if (material_ub_idx != cmd->material->material_constants) {
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							material_ub_idx = cmd->material->material_constants;
 						}
-						case RenderableTypes::FUR:
-						case RenderableTypes::SKINNED: {
-							READ(Mesh::RenderData*, mesh);
-							READ(Material::RenderData*, material);
-							READ(gpu::ProgramHandle, program);
-							READ(i32, bones_count);
-							READ(u32, layers);
-							READ(gpu::BufferHandle, ub_buffer);
-							READ(u32, ub_offset);
-							READ(u32, ub_size);
 
-							gpu::bindTextures(material->textures, 0, material->textures_count);
+						gpu::useProgram(cmd->program);
 
-							gpu::setState(material->render_states | render_states);
-							if (material_ub_idx != material->material_constants) {
-								gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-								material_ub_idx = material->material_constants;
-							}
+						gpu::bindIndexBuffer(cmd->mesh->index_buffer_handle);
+						gpu::bindVertexBuffer(0, cmd->mesh->vertex_buffer_handle, 0, cmd->mesh->vb_stride);
+						gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 32);
 
-							gpu::useProgram(program);
-
-							gpu::bindIndexBuffer(mesh->index_buffer_handle);
-							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-							gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-							
-							gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub_buffer, ub_offset, ub_size);
-							gpu::drawTrianglesInstanced(mesh->indices_count, layers, mesh->index_type);
-							break;
-						}
-						case RenderableTypes::CURVE_DECAL: {
-							READ(Material::RenderData*, material);
-							READ(gpu::ProgramHandle, program);
-							READ(gpu::BufferHandle, buffer);
-							READ(u32, offset);
-							READ(u32, count);
-							READ(u32, nonintersecting_count);
-								
-							gpu::bindTextures(material->textures, 0, material->textures_count);
-							if (material_ub_idx != material->material_constants) {
-								gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-								material_ub_idx = material->material_constants;
-							}
-							gpu::useProgram(program);
-							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-
-							gpu::StateFlags state = material->render_states | render_states;
-							state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
-							if (nonintersecting_count) {
-								gpu::setState(state);
-								gpu::bindVertexBuffer(1, buffer, offset, 64);
-								gpu::drawTrianglesInstanced(36, nonintersecting_count, gpu::DataType::U16);
-							}
-
-							if (count - nonintersecting_count) {
-								state = state & ~gpu::StateFlags::DEPTH_TEST;
-								state = state & ~gpu::StateFlags::CULL_BACK;
-								state = state | gpu::StateFlags::CULL_FRONT;
-								gpu::setState(state);
-								const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
-								gpu::bindVertexBuffer(1, buffer, offs, 64);
-								gpu::drawTrianglesInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
-							}
-							break;
-						}
-						case RenderableTypes::DECAL: {
-							READ(Material::RenderData*, material);
-							READ(gpu::ProgramHandle, program);
-							READ(gpu::BufferHandle, buffer);
-							READ(u32, offset);
-							READ(u32, count);
-							READ(u32, nonintersecting_count);
-								
-							gpu::bindTextures(material->textures, 0, material->textures_count);
-							if (material_ub_idx != material->material_constants) {
-								gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-								material_ub_idx = material->material_constants;
-							}
-							gpu::useProgram(program);
-							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-
-							gpu::StateFlags state = material->render_states | render_states;
-							state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
-							if (nonintersecting_count) {
-								gpu::setState(state);
-								gpu::bindVertexBuffer(1, buffer, offset, 48);
-								gpu::drawTrianglesInstanced(36, nonintersecting_count, gpu::DataType::U16);
-							}
-
-							if (count - nonintersecting_count) {
-								state = state & ~gpu::StateFlags::DEPTH_TEST;
-								state = state & ~gpu::StateFlags::CULL_BACK;
-								state = state | gpu::StateFlags::CULL_FRONT;
-								gpu::setState(state);
-								const u32 offs = offset + sizeof(float) * 12 * nonintersecting_count;
-								gpu::bindVertexBuffer(1, buffer, offs, 48);
-								gpu::drawTrianglesInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
-							}
-							break;
-						}
-						default: ASSERT(false); break;
+						gpu::drawTrianglesInstanced(cmd->mesh->indices_count, cmd->count, cmd->mesh->index_type);
+						break;
 					}
+					case RenderableTypes::FUR:
+					case RenderableTypes::SKINNED: {
+						SkinnedMeshCmd* cmd = stream.readCmd<SkinnedMeshCmd>();
+
+						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
+
+						gpu::setState(cmd->material->render_states | render_states);
+						if (material_ub_idx != cmd->material->material_constants) {
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							material_ub_idx = cmd->material->material_constants;
+						}
+
+						gpu::useProgram(cmd->program);
+
+						gpu::bindIndexBuffer(cmd->mesh->index_buffer_handle);
+						gpu::bindVertexBuffer(0, cmd->mesh->vertex_buffer_handle, 0, cmd->mesh->vb_stride);
+						gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+							
+						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, cmd->ub_buffer, cmd->ub_offset, cmd->ub_size);
+						gpu::drawTrianglesInstanced(cmd->mesh->indices_count, cmd->layers, cmd->mesh->index_type);
+						break;
+					}
+					case RenderableTypes::CURVE_DECAL: {
+						DecalCmd* cmd = stream.readCmd<DecalCmd>();
+								
+						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
+						if (material_ub_idx != cmd->material->material_constants) {
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							material_ub_idx = cmd->material->material_constants;
+						}
+						gpu::useProgram(cmd->program);
+						gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+						gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+
+						gpu::StateFlags state = cmd->material->render_states | render_states;
+						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+						if (cmd->nonintersecting_count) {
+							gpu::setState(state);
+							gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 64);
+							gpu::drawTrianglesInstanced(36, cmd->nonintersecting_count, gpu::DataType::U16);
+						}
+
+						if (cmd->total_count - cmd->nonintersecting_count) {
+							state = state & ~gpu::StateFlags::DEPTH_TEST;
+							state = state & ~gpu::StateFlags::CULL_BACK;
+							state = state | gpu::StateFlags::CULL_FRONT;
+							gpu::setState(state);
+							const u32 offs = cmd->offset + sizeof(float) * 16 * cmd->nonintersecting_count;
+							gpu::bindVertexBuffer(1, cmd->buffer, offs, 64);
+							gpu::drawTrianglesInstanced(36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
+						}
+						break;
+					}
+					case RenderableTypes::DECAL: {
+						DecalCmd* cmd = stream.readCmd<DecalCmd>();
+								
+						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
+						if (material_ub_idx != cmd->material->material_constants) {
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							material_ub_idx = cmd->material->material_constants;
+						}
+						gpu::useProgram(cmd->program);
+						gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+						gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+
+						gpu::StateFlags state = cmd->material->render_states | render_states;
+						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+						if (cmd->nonintersecting_count) {
+							gpu::setState(state);
+							gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 48);
+							gpu::drawTrianglesInstanced(36, cmd->nonintersecting_count, gpu::DataType::U16);
+						}
+
+						if (cmd->total_count - cmd->nonintersecting_count) {
+							state = state & ~gpu::StateFlags::DEPTH_TEST;
+							state = state & ~gpu::StateFlags::CULL_BACK;
+							state = state | gpu::StateFlags::CULL_FRONT;
+							gpu::setState(state);
+							const u32 offs = cmd->offset + sizeof(float) * 12 * cmd->nonintersecting_count;
+							gpu::bindVertexBuffer(1, cmd->buffer, offs, 48);
+							gpu::drawTrianglesInstanced(36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
+						}
+						break;
+					}
+					default: ASSERT(false); break;
 				}
-				CmdPage* next = page->header.next;
-				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
-				page = next;
 			}
 			renderer.endProfileBlock();
-			#undef READ
 		}
 
 		CmdPage* m_cmds;
@@ -3656,24 +3572,92 @@ struct PipelineImpl final : Pipeline
 		return rot.w > 0 ? Vec4(rot.x, rot.y, rot.z, lod) : Vec4(-rot.x, -rot.y, -rot.z, lod);
 	}
 
-	void createCommands(View& view
-		, CmdPage* first_page
+	struct CmdOutputStream {
+		CmdOutputStream(PageAllocator& allocator) : allocator(allocator) {}
+		
+		void newBucket(u8 bucket) {
+			CmdPage* new_page = new (NewPlaceholder(), allocator.allocate(true)) CmdPage;
+			new_page->header.bucket = bucket;
+			if (!last_page) {
+				last_page = first_page = new_page;
+			}
+			else {
+				last_page->header.next = new_page;
+				last_page = new_page;
+			}
+		}
+
+		template <typename T>
+		T* newCmd(RenderableTypes type) {
+			u8* mem = alloc(sizeof(T) + alignof(T), alignof(T));
+			static_assert(sizeof(type) == sizeof(u8));
+			*mem = (u8)type;
+			return new (NewPlaceholder(), mem + alignof(T)) T;
+		}
+
+		u8* alloc(size_t size, size_t align) {
+			ASSERT(align == 8);
+			if (last_page->header.size + size > sizeof(last_page->data)) {
+				CmdPage* new_page = new (NewPlaceholder(), allocator.allocate(true)) CmdPage;
+				last_page->header.next = new_page;
+				last_page = new_page;
+				new_page->header.bucket = last_page->header.bucket;
+			}
+
+			const u32 p = last_page->header.size;
+
+			last_page->header.size += (u32)size;
+			return last_page->data + p;
+		}
+
+		CmdPage* first_page = nullptr;
+		CmdPage* last_page = nullptr;
+		PageAllocator& allocator;
+	};
+
+	struct MeshCmd {
+		Mesh::RenderData* mesh;
+		Material::RenderData* material;
+		gpu::ProgramHandle program;
+		u32 count;
+		gpu::BufferHandle buffer;
+		u32 offset;
+	};
+
+	struct SkinnedMeshCmd {
+		Mesh::RenderData* mesh;
+		Material::RenderData* material;
+		gpu::ProgramHandle program;
+		u32 bone_count;
+		u32 layers;
+		gpu::BufferHandle ub_buffer;
+		u32 ub_offset;
+		u32 ub_size;
+	};
+
+	struct DecalCmd {
+		Material::RenderData* material;
+		gpu::ProgramHandle program;
+		gpu::BufferHandle buffer;
+		u32 offset;
+		u32 total_count;
+		u32 nonintersecting_count;
+	};
+
+	struct LocalLightCmd {
+		u32 total_count;
+		u32 nonintersecting_count;
+		gpu::BufferHandle buffer;
+		u32 offset;
+	};
+
+	CmdPage* createCommands(View& view
 		, const u64* LUMIX_RESTRICT renderables
 		, const u64* LUMIX_RESTRICT sort_keys
-		, int count)
+		, u32 count)
 	{
 		PROFILE_BLOCK("create cmds");
-		// because of inlining in debug
-		#define WRITE(x) do { \
-			memcpy(out, &(x), sizeof(x)); \
-			out += sizeof(x); \
-		} while(false)
-				
-		#define WRITE_FN(x) do { \
-			auto* p = x; \
-			memcpy(out, &p, sizeof(p)); \
-			out += sizeof(p); \
-		} while(false)
+		if (count == 0) return nullptr;
 
 		const Universe& universe = m_scene->getUniverse();
 		Renderer& renderer = m_renderer;
@@ -3683,48 +3667,31 @@ struct PipelineImpl final : Pipeline
 		const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
 		const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
-				
-		CmdPage* cmd_page = first_page;
-		while (cmd_page->header.next) cmd_page = cmd_page->header.next;
-
-		if (cmd_page->header.size > 0 && cmd_page->header.bucket != sort_keys[0] >> 56) {
-			cmd_page->header.next = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
-			cmd_page = cmd_page->header.next;
-		}
-
-		cmd_page->header.bucket = sort_keys[0] >> 56;
-		const bool sort_depth = view.buckets[cmd_page->header.bucket].sort == Bucket::DEPTH;
-		u64 instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
-		u8* out = cmd_page->data;
-		u32 define_mask = view.buckets[cmd_page->header.bucket].define_mask;
-
-		u32 instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-		u32 skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
-		u32 fur_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("FUR"));
-
-		auto new_page = [&](u8 bucket){
-			cmd_page->header.size = int(out - cmd_page->data);
-			CmdPage* new_page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
-			cmd_page->header.next = new_page;
-			cmd_page = new_page;
-			new_page->header.bucket = bucket;
-			out = cmd_page->data;
-			define_mask = view.buckets[bucket].define_mask;
-			instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-			skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
-			fur_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("FUR"));
-			const bool sort_depth = view.buckets[cmd_page->header.bucket].sort == Bucket::DEPTH;
-			instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
-		};
-
+		
+		CmdOutputStream stream(page_allocator);
+		u64 instance_key_mask;
+		u32 define_mask;
+		u32 instanced_define_mask;
+		u32 skinned_define_mask;
+		u32 fur_define_mask;
 		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
+		u8 prev_bucket = 0xff;
 
 		for (u32 i = 0, c = count; i < c; ++i) {
 			const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
 			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
 			const u8 bucket = sort_keys[i] >> 56;
-			if(bucket != cmd_page->header.bucket) {
-				new_page(bucket);
+			ASSERT(bucket != 0xff); // we use 0xff as initial value of prev_bucket
+
+			if (bucket != prev_bucket) {
+				prev_bucket = bucket;
+				stream.newBucket(bucket);
+				define_mask = view.buckets[bucket].define_mask;
+				instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+				skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
+				fur_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("FUR"));
+				const bool sort_depth = view.buckets[bucket].sort == Bucket::DEPTH;
+				instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 			}
 
 			switch(type) {
@@ -3746,47 +3713,36 @@ struct PipelineImpl final : Pipeline
 					instance_data += sizeof(lpos);
 					memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 					instance_data += sizeof(tr.scale);
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
-						new_page(bucket);
-					}
-
 
 					if (mi->custom_material->isReady()) {
 						Shader* shader = mi->custom_material->getShader();
-						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mi->custom_material->getDefineMask());
-						WRITE(type);
-						WRITE(mesh.render_data);
-						WRITE_FN(mi->custom_material->getRenderData());
-						WRITE(prog);
-						u32 count = 1;
-						WRITE(count);
-						WRITE(slice.buffer);
-						WRITE(slice.offset);
+						MeshCmd* cmd = stream.newCmd<MeshCmd>(type);
+						cmd->mesh = mesh.render_data;
+						cmd->material = mi->custom_material->getRenderData();
+						cmd->program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mi->custom_material->getDefineMask());
+						cmd->count = 1;
+						cmd->buffer = slice.buffer;
+						cmd->offset = slice.offset;
 					}
 							
 					break;
 				}
 				case RenderableTypes::MESH: {
+					MeshCmd* cmd = stream.newCmd<MeshCmd>(type);
 					if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
 						const u32 group_idx = renderables[i] & 0xffFF;
 						const u32 instancer_idx = (renderables[i] >> 16) & 0xffFF;
 						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
 						const u32 total_count = instances.end->offset + instances.end->count;
 						const Mesh& mesh = *sort_key_to_mesh[group_idx];
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
-							new_page(bucket);
-						}
 
 						Shader* shader = mesh.material->getShader();
-						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-
-						WRITE(type);
-						WRITE(mesh.render_data);
-						WRITE_FN(mesh.material->getRenderData());
-						WRITE(prog);
-						WRITE(total_count);
-						WRITE(instances.slice.buffer);
-						WRITE(instances.slice.offset);
+						cmd->mesh = mesh.render_data;
+						cmd->material = mesh.material->getRenderData();
+						cmd->program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						cmd->count = total_count;
+						cmd->buffer = instances.slice.buffer;
+						cmd->offset = instances.slice.offset;
 					}
 					else {
 						const u32 mesh_idx = renderables[i] >> 40;
@@ -3814,21 +3770,15 @@ struct PipelineImpl final : Pipeline
 							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 							instance_data += sizeof(tr.scale);
 						}
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 41) {
-							new_page(bucket);
-						}
 
 						Shader* shader = mesh.material->getShader();
-						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-
-						WRITE(type);
-						WRITE(mesh.render_data);
-						WRITE_FN(mesh.material->getRenderData());
-						WRITE(prog);
-						WRITE(count);
-						WRITE(slice.buffer);
-						WRITE(slice.offset);
-							
+						cmd->mesh = mesh.render_data;
+						cmd->material = mesh.material->getRenderData();
+						cmd->program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						cmd->count = count;
+						cmd->buffer = slice.buffer;
+						cmd->offset = slice.offset;
+						
 						--i;
 					}
 					break;
@@ -3843,17 +3793,12 @@ struct PipelineImpl final : Pipeline
 					Shader* shader = mesh.material->getShader();
 					u32 defines = skinned_define_mask | mesh.material->getDefineMask();
 					if (type == RenderableTypes::FUR) defines |= fur_define_mask;
-					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, defines);
 
-					if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 69) {
-						new_page(bucket);
-					}
-
-					WRITE(type);
-					WRITE(mesh.render_data);
-					WRITE_FN(mesh.material->getRenderData());
-					WRITE(prog);
-					WRITE(mi->pose->count);
+					SkinnedMeshCmd* cmd = stream.newCmd<SkinnedMeshCmd>(type);
+					cmd->mesh = mesh.render_data;
+					cmd->material = mesh.material->getRenderData();
+					cmd->program = shader->getProgram(mesh.vertex_decl, defines);
+					cmd->bone_count = mi->pose->count;
 
 					const Quat* rotations = mi->pose->rotations;
 					const Vec3* positions = mi->pose->positions;
@@ -3888,10 +3833,11 @@ struct PipelineImpl final : Pipeline
 						const LocalRigidTransform tmp = {positions[j], rotations[j]};
 						bones_ub_array[j] = (tmp * bone.inv_bind_transform).toDualQuat();
 					}
-					WRITE(layers);
-					WRITE(ub.buffer);
-					WRITE(ub.offset);
-					WRITE(ub.size);
+					
+					cmd->layers = layers;
+					cmd->ub_buffer = ub.buffer;
+					cmd->ub_offset = ub.offset;
+					cmd->ub_size = ub.size;
 					break;
 				}
 				case RenderableTypes::DECAL: {
@@ -3910,11 +3856,7 @@ struct PipelineImpl final : Pipeline
 						Vec2 uv_scale;
 					};
 					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(DecalData)));
-					const gpu::ProgramHandle prog = material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask());
 
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
-						new_page(bucket);
-					}
 					DecalData* beg = (DecalData*)slice.ptr;
 					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 					for(u32 j = start_i; j < i; ++j) {
@@ -3933,14 +3875,13 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					WRITE(type);
-					WRITE_FN(material->getRenderData());
-					WRITE(prog);
-					WRITE(slice.buffer);
-					WRITE(slice.offset);
-					WRITE(count);
-					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
-					WRITE(nonintersecting_count);
+					DecalCmd* cmd = stream.newCmd<DecalCmd>(type);
+					cmd->material = material->getRenderData();
+					cmd->program = material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask());
+					cmd->buffer = slice.buffer;
+					cmd->offset = slice.offset;
+					cmd->total_count = count;
+					cmd->nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 					--i;
 					break;
 				}
@@ -3961,11 +3902,7 @@ struct PipelineImpl final : Pipeline
 						Vec4 bezier;
 					};
 					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(DecalData)));
-					const gpu::ProgramHandle prog = material->getShader()->getProgram(m_curve_decal_decl, define_mask | material->getDefineMask());
 
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
-						new_page(bucket);
-					}
 					DecalData* beg = (DecalData*)slice.ptr;
 					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 					for(u32 j = start_i; j < i; ++j) {
@@ -3985,14 +3922,13 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					WRITE(type);
-					WRITE_FN(material->getRenderData());
-					WRITE(prog);
-					WRITE(slice.buffer);
-					WRITE(slice.offset);
-					WRITE(count);
-					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
-					WRITE(nonintersecting_count);
+					DecalCmd* cmd = stream.newCmd<DecalCmd>(type);
+					cmd->material = material->getRenderData();
+					cmd->program = material->getShader()->getProgram(m_curve_decal_decl, define_mask | material->getDefineMask());
+					cmd->buffer = slice.buffer;
+					cmd->offset = slice.offset;
+					cmd->total_count = count;
+					cmd->nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 					--i;
 					break;
 				}
@@ -4035,27 +3971,19 @@ struct PipelineImpl final : Pipeline
 						iter->fov = pl.fov;
 						intersecting ? --end : ++beg;
 					}
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 9) {
-						new_page(bucket);
-					}
-					WRITE(type);
-					const u32 total_count = i - start_i;
-					const u32 nonintersecting_count = u32(beg - (LightData*)slice.ptr);
-					WRITE(total_count);
-					WRITE(nonintersecting_count);
-					WRITE(slice.buffer);
-					WRITE(slice.offset);
 
+					LocalLightCmd* cmd = stream.newCmd<LocalLightCmd>(type);
+					cmd->total_count = i - start_i;
+					cmd->nonintersecting_count = u32(beg - (LightData*)slice.ptr);
+					cmd->buffer = slice.buffer;
+					cmd->offset = slice.offset;
 					--i;
 					break;
 				}
 				default: ASSERT(false); break;
 			}
 		}
-
-		cmd_page->header.size = int(out - cmd_page->data);
-		#undef WRITE
-		#undef WRITE_FN
+		return stream.first_page;
 	}
 
 
@@ -4080,8 +4008,7 @@ struct PipelineImpl final : Pipeline
 
 		jobs::forEach(size, STEP, [&](i32 from, i32 to){
 			const u32 step = from / STEP;
-			pages[step] = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
-			createCommands(view, pages[step], renderables + from, sort_keys + from, to - from);
+			pages[step] = createCommands(view, renderables + from, sort_keys + from, to - from);
 		});
 
 		CmdPage* prev = nullptr;
@@ -4863,11 +4790,6 @@ struct PipelineImpl final : Pipeline
 				const u32 sort_key = u32(&instances - instancer.instances.begin());
 				const Mesh* mesh = sort_key_to_mesh[sort_key];
 
-				#define WRITE(x) do { \
-					memcpy(out, &(x), sizeof(x)); \
-					out += sizeof(x); \
-				} while(false)
-
 				const float mesh_lod = mesh->lod;
 
 				while (group) {
@@ -4886,7 +4808,6 @@ struct PipelineImpl final : Pipeline
 					}
 					group = group->next;
 				}
-				#undef WRITE
 			}
 		});
 
@@ -5221,7 +5142,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderGrass);
-		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderParticles);
 		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderOpaque);
