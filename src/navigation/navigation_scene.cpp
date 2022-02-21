@@ -587,7 +587,7 @@ struct NavigationSceneImpl final : NavigationScene
 			render_scene->addDebugLine(zone_tr.transform(prev), zone_tr.transform(tmp), 0xffff0000);
 			prev = tmp;
 		}
-		render_scene->addDebugCross(zone_tr.transform(*(Vec3*)dt_agent->targetPos), 1.0f, 0xffffffff);
+		render_scene->addDebugCross(zone_tr.transform(*(Vec3*)dt_agent->targetPos), 1.0f, Color::WHITE);
 		const Vec3 vel = *(Vec3*)dt_agent->vel;
 		const DVec3 pos = m_universe.getPosition(entity);
 		render_scene->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);

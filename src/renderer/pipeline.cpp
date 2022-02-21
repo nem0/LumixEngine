@@ -1501,11 +1501,11 @@ struct PipelineImpl final : Pipeline
 				memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				for (u32 i = 0, c = tris.size(); i < c; ++i) {
-					vertices[3 * i + 0].color = tris[i].color;
+					vertices[3 * i + 0].color = tris[i].color.abgr();
 					vertices[3 * i + 0].pos = Vec3(tris[i].p0 - viewport_pos);
-					vertices[3 * i + 1].color = tris[i].color;
+					vertices[3 * i + 1].color = tris[i].color.abgr();
 					vertices[3 * i + 1].pos = Vec3(tris[i].p1 - viewport_pos);
-					vertices[3 * i + 2].color = tris[i].color;
+					vertices[3 * i + 2].color = tris[i].color.abgr();
 					vertices[3 * i + 2].pos = Vec3(tris[i].p2 - viewport_pos);
 				}
 				pipeline->m_scene->clearDebugTriangles();
@@ -1560,9 +1560,9 @@ struct PipelineImpl final : Pipeline
 				memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				for (u32 i = 0, c = lines.size(); i < c; ++i) {
-					vertices[2 * i + 0].color = lines[i].color;
+					vertices[2 * i + 0].color = lines[i].color.abgr();
 					vertices[2 * i + 0].pos = Vec3(lines[i].from - viewport_pos);
-					vertices[2 * i + 1].color = lines[i].color;
+					vertices[2 * i + 1].color = lines[i].color.abgr();
 					vertices[2 * i + 1].pos = Vec3(lines[i].to - viewport_pos);
 				}
 				pipeline->m_scene->clearDebugLines();

@@ -330,7 +330,8 @@ struct Variant {
 		ENTITY,
 		VEC2,
 		VEC3,
-		DVEC3
+		DVEC3,
+		COLOR
 	} type;
 	union {
 		bool b;
@@ -343,6 +344,7 @@ struct Variant {
 		Vec3 v3;
 		DVec3 dv3;
 		void* ptr;
+		Color color;
 	};
 
 	void operator =(bool v) { b = v; type = BOOL; }
@@ -355,6 +357,7 @@ struct Variant {
 	void operator =(Vec3 v) { v3 = v; type = VEC3; }
 	void operator =(const DVec3& v) { dv3 = v; type = DVEC3; }
 	void operator =(void* v) { ptr = v; type = PTR; }
+	void operator =(Color c) { color = c; type = COLOR; }
 };
 
 struct FunctionBase
@@ -386,6 +389,7 @@ inline Variant::Type _getVariantType(VariantTag<EntityRef>) { return Variant::EN
 inline Variant::Type _getVariantType(VariantTag<Vec2>) { return Variant::VEC2; }
 inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
 inline Variant::Type _getVariantType(VariantTag<Path>) { return Variant::CSTR; }
+inline Variant::Type _getVariantType(VariantTag<Color>) { return Variant::COLOR; }
 inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
 template <typename T> inline Variant::Type getVariantType() { return _getVariantType(VariantTag<RemoveCVR<T>>{}); }
 
@@ -395,6 +399,7 @@ inline const char* fromVariant(int i, Span<Variant> args, VariantTag<const char*
 inline Path fromVariant(int i, Span<Variant> args, VariantTag<Path>) { return Path(args[i].s); }
 inline i32 fromVariant(int i, Span<Variant> args, VariantTag<i32>) { return args[i].i; }
 inline u32 fromVariant(int i, Span<Variant> args, VariantTag<u32>) { return args[i].u; }
+inline Color fromVariant(int i, Span<Variant> args, VariantTag<Color>) { return args[i].color; }
 inline Vec2 fromVariant(int i, Span<Variant> args, VariantTag<Vec2>) { return args[i].v2; }
 inline Vec3 fromVariant(int i, Span<Variant> args, VariantTag<Vec3>) { return args[i].v3; }
 inline DVec3 fromVariant(int i, Span<Variant> args, VariantTag<DVec3>) { return args[i].dv3; }

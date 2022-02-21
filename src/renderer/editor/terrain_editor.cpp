@@ -754,7 +754,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef entity, const DVec3
 
 		const DVec3 from = terrain_transform.transform(local_from);
 		const DVec3 to = terrain_transform.transform(local_to);
-		scene.addDebugLine(from, to, 0xffff0000);
+		scene.addDebugLine(from, to, Color::RED);
 	}
 
 	const Vec3 rel_pos = Vec3(terrain_transform.inverted().transform(center));
@@ -780,11 +780,11 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef entity, const DVec3
 			p01 = terrain_transform.transform(p01);
 			p11 = terrain_transform.transform(p11);
 
-			scene.addDebugLine(p10, p01, 0xff800000);
-			scene.addDebugLine(p10, p11, 0xff800000);
-			scene.addDebugLine(p00, p10, 0xff800000);
-			scene.addDebugLine(p01, p11, 0xff800000);
-			scene.addDebugLine(p00, p01, 0xff800000);
+			scene.addDebugLine(p10, p01, Color(0x80, 0, 0, 0xff));
+			scene.addDebugLine(p10, p11, Color(0x80, 0, 0, 0xff));
+			scene.addDebugLine(p00, p10, Color(0x80, 0, 0, 0xff));
+			scene.addDebugLine(p01, p11, Color(0x80, 0, 0, 0xff));
+			scene.addDebugLine(p00, p01, Color(0x80, 0, 0, 0xff));
 		}
 	}
 }

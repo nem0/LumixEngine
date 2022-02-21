@@ -2113,13 +2113,13 @@ struct RenderSceneImpl final : RenderScene {
 	void addDebugTriangle(const DVec3& p0,
 		const DVec3& p1,
 		const DVec3& p2,
-		u32 color) override
+		Color color) override
 	{
 		DebugTriangle& tri = m_debug_triangles.emplace();
 		tri.p0 = p0;
 		tri.p1 = p1;
 		tri.p2 = p2;
-		tri.color = ARGBToABGR(color);
+		tri.color = color;
 	}
 
 
@@ -2127,7 +2127,7 @@ struct RenderSceneImpl final : RenderScene {
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
-		u32 color) override
+		Color color) override
 	{
 		addDebugLine(pos + dir + up + right, pos + dir + up - right, color);
 		addDebugLine(pos - dir + up + right, pos - dir + up - right, color);
@@ -2149,7 +2149,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	void addDebugCubeSolid(const DVec3& min,
 		const DVec3& max,
-		u32 color) override
+		Color color) override
 	{
 		DVec3 a = min;
 		DVec3 b = min;
@@ -2216,7 +2216,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	void addDebugCube(const DVec3& min,
 		const DVec3& max,
-		u32 color) override
+		Color color) override
 	{
 		DVec3 a = min;
 		DVec3 b = min;
@@ -2257,7 +2257,7 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	void addDebugCross(const DVec3& center, float size, u32 color) override
+	void addDebugCross(const DVec3& center, float size, Color color) override
 	{
 		addDebugLine(center, DVec3(center.x - size, center.y, center.z), color);
 		addDebugLine(center, DVec3(center.x + size, center.y, center.z), color);
@@ -2267,19 +2267,12 @@ struct RenderSceneImpl final : RenderScene {
 		addDebugLine(center, DVec3(center.x, center.y, center.z + size), color);
 	}
 
-
-	static u32 ARGBToABGR(u32 color)
-	{
-		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) | (color & 0xff000000);
-	}
-
-
-	void addDebugLine(const DVec3& from, const DVec3& to, u32 color) override 
+	void addDebugLine(const DVec3& from, const DVec3& to, Color color) override 
 	{
 		DebugLine& line = m_debug_lines.emplace();
 		line.from = from;
 		line.to = to;
-		line.color = ARGBToABGR(color);
+		line.color = color;
 	}
 
 	DebugTriangle* addDebugTriangles(int count) override
