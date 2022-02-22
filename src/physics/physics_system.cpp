@@ -19,7 +19,7 @@
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/universe.h"
-#include "physics/physics_geometry.h"
+#include "physics/physics_resources.h"
 #include "physics/physics_scene.h"
 #include "renderer/texture.h"
 

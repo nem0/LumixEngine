@@ -22,7 +22,7 @@
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/universe.h"
-#include "physics/physics_geometry.h"
+#include "physics/physics_resources.h"
 #include "physics/physics_scene.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
