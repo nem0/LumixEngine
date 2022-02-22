@@ -2037,7 +2037,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
 				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
-				ResourceType physics_geom("physics");
+				ResourceType physics_geom("physics_geometry");
 				compiler.addResource(physics_geom, tmp);
 			}
 

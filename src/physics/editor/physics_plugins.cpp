@@ -4,6 +4,7 @@
 #include <foundation/PxVec3.h>
 #include <imgui/imgui.h>
 #include <PxVisualizationParameter.h>
+#include <PxMaterial.h>
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -735,7 +736,6 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 };
 
 
-
 struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
@@ -744,13 +744,94 @@ struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 		app.getAssetCompiler().registerExtension("phy", PhysicsGeometry::TYPE);
 	}
 
-
 	void onGUI(Span<Resource*> resources) override {}
-
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Physics geometry"; }
 	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
+
+
+	StudioApp& m_app;
+};
+
+struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+{
+	explicit PhysicsMaterialPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		app.getAssetCompiler().registerExtension("pma", PhysicsMaterial::TYPE);
+	}
+
+	bool canCreateResource() const override { return true; }
+	const char* getFileDialogFilter() const override { return "Physics material\0*.pma\0"; }
+	const char* getFileDialogExtensions() const override { return "pma"; }
+	const char* getDefaultExtension() const override { return "pma"; }
+
+	bool createResource(const char* path) override
+	{
+		os::OutputFile file;
+		if (!file.open(path))
+		{
+			logError("Failed to create ", path);
+			return false;
+		}
+
+		file.close();
+		return true;
+	}
+
+	bool compile(const Path& src) override {
+		return m_app.getAssetCompiler().copyCompile(src);
+	}
+
+	bool save(PhysicsMaterial* mat) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+	
+		OutputMemoryStream blob(m_app.getAllocator());
+		blob << "static_friction(" << mat->material->getStaticFriction() << ")\n";
+		blob << "dynamic_friction(" << mat->material->getDynamicFriction() << ")\n";
+		blob << "restitution(" << mat->material->getRestitution() << ")\n";
+
+		os::OutputFile file;
+		if (!fs.open(mat->getPath().c_str(), file)) return false;
+		bool res = file.write(blob.data(), blob.size());
+		file.close();
+		return res;
+	}
+
+	void onGUI(Span<Resource*> resources) override {
+		if (resources.length() != 1) {
+			ImGui::TextUnformatted("Editing multiple materials is not supported.");
+			return;
+		}
+
+		PhysicsMaterial* mat = (PhysicsMaterial*)resources[0];
+		if (mat->isReady() && mat->material) {
+			float static_friction = mat->material->getStaticFriction();
+			float dynamic_friction = mat->material->getDynamicFriction();
+			float restitution = mat->material->getRestitution();
+			ImGuiEx::Label("Static friction");
+			if (ImGui::DragFloat("##s", &static_friction)) mat->material->setStaticFriction(static_friction);
+			ImGuiEx::Label("Dynamic friction");
+			if (ImGui::DragFloat("##d", &dynamic_friction)) mat->material->setDynamicFriction(dynamic_friction);
+			ImGuiEx::Label("Restitution");
+			if (ImGui::DragFloat("##r", &restitution)) mat->material->setRestitution(restitution);
+
+			if (ImGui::Button(ICON_FA_SAVE "Save")) {
+				if (!save(mat)) {
+					logError("Failed to save ", mat->getPath());
+				}
+			}
+			ImGui::SameLine();
+		}
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
+			m_app.getAssetBrowser().openInExternalEditor(resources[0]->getPath().c_str());
+		}
+	}
+
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Physics material"; }
+	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
 
 	StudioApp& m_app;
@@ -761,7 +842,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
-		, m_geom_plugin(app)
+		, m_geometry_plugin(app)
+		, m_material_plugin(app)
 		, m_ui_plugin(app)
 	{
 	}
@@ -769,7 +851,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		m_app.addPlugin(m_ui_plugin);
-		m_app.getAssetBrowser().addPlugin(m_geom_plugin);
+		m_app.getAssetBrowser().addPlugin(m_material_plugin);
+		m_app.getAssetBrowser().addPlugin(m_geometry_plugin);
+		const char* exts[] = { "pma", nullptr };
+		m_app.getAssetCompiler().addPlugin(m_material_plugin, exts);
 	}
 
 
@@ -834,10 +919,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 
-	~StudioAppPlugin()
-	{
+	~StudioAppPlugin() {
 		m_app.removePlugin(m_ui_plugin);
-		m_app.getAssetBrowser().removePlugin(m_geom_plugin);
+		m_app.getAssetCompiler().removePlugin(m_material_plugin);
+		m_app.getAssetBrowser().removePlugin(m_material_plugin);
+		m_app.getAssetBrowser().removePlugin(m_geometry_plugin);
 	}
 
 	const char* getName() const override { return "physics"; }
@@ -845,7 +931,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	StudioApp& m_app;
 	PhysicsUIPlugin m_ui_plugin;
-	PhysicsGeometryPlugin m_geom_plugin;
+	PhysicsMaterialPlugin m_material_plugin;
+	PhysicsGeometryPlugin m_geometry_plugin;
 };
 
 

@@ -3,19 +3,13 @@
 
 #include "engine/plugin.h"
 
-
-namespace physx
-{
-
+namespace physx {
 	class PxControllerManager;
 	class PxCooking;
 	class PxPhysics;
-
 } // namespace physx
 
-
-namespace Lumix
-{
+namespace Lumix {
 
 struct CollisionLayers {
 	u32 filter[32];
@@ -23,8 +17,7 @@ struct CollisionLayers {
 	u32 count = 0;
 };
 
-struct PhysicsSystem : IPlugin
-{
+struct PhysicsSystem : IPlugin {
 	friend struct PhysicsScene;
 	friend struct PhysicsSceneImpl;
 

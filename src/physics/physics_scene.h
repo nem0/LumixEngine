@@ -214,6 +214,9 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual Path getMeshGeomPath(EntityRef entity) = 0;
 	virtual void setMeshGeomPath(EntityRef entity, const Path& path) = 0;
 
+	virtual void setRigidActorMaterial(EntityRef entity, const Path& path) = 0;
+	virtual Path getRigidActorMaterial(EntityRef entity) = 0;
+
 	virtual void addSphereGeometry(EntityRef entity, int index) = 0;
 	virtual void removeSphereGeometry(EntityRef entity, int index) = 0;
 	virtual int getSphereGeometryCount(EntityRef entity) = 0;

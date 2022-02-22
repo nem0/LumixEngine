@@ -1,3 +1,4 @@
+#define LUMIX_NO_CUSTOM_CRT
 #include "physics/physics_system.h"
 
 #include <foundation/PxAllocatorCallback.h>
@@ -6,6 +7,7 @@
 #include <pvd/PxPvd.h>
 #include <pvd/PxPvdTransport.h>
 #include <PxFoundation.h>
+#include <PxMaterial.h>
 #include <PxPhysics.h>
 #include <PxPhysicsVersion.h>
 #include <vehicle/PxVehicleSDK.h>
@@ -111,7 +113,8 @@ namespace Lumix
 		explicit PhysicsSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())
 			, m_engine(engine)
-			, m_manager(*this, engine.getAllocator())
+			, m_geometry_manager(*this, engine.getAllocator())
+			, m_material_manager(*this, engine.getAllocator())
 			, m_physx_allocator(m_allocator)
 		{
 			PhysicsScene::reflect();
@@ -126,7 +129,8 @@ namespace Lumix
 				m_layers.filter[i] = 1 << i;
 			}
 			
-			m_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
+			m_material_manager.create(PhysicsMaterial::TYPE, engine.getResourceManager());
+			m_geometry_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
 			LuaWrapper::createSystemFunction(engine.getState(), "Physics", "raycast", &LUA_raycast);
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
@@ -153,7 +157,8 @@ namespace Lumix
 
 		~PhysicsSystemImpl()
 		{
-			m_manager.destroy();
+			m_material_manager.destroy();
+			m_geometry_manager.destroy();
 			physx::PxCloseVehicleSDK();
 			m_cooking->release();
 			m_physics->release();
@@ -254,13 +259,13 @@ namespace Lumix
 		AssertNullAllocator m_physx_allocator;
 		CustomErrorCallback m_error_callback;
 		physx::PxCooking* m_cooking;
-		PhysicsGeometryManager m_manager;
+		PhysicsGeometryManager m_geometry_manager;
+		PhysicsMaterialManager m_material_manager;
 		Engine& m_engine;
 		CollisionLayers m_layers;
 		physx::PxPvd* m_pvd = nullptr;
 		physx::PxPvdTransport* m_pvd_transport = nullptr;
 	};
-
 
 	LUMIX_PLUGIN_ENTRY(physics)
 	{

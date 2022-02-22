@@ -88,6 +88,7 @@ enum class PhysicsSceneVersion
 	VEHICLE_MAX_RPM,
 	INSTANCED_CUBE,
 	INSTANCED_MESH,
+	MATERIAL,
 
 	LATEST,
 };
@@ -370,27 +371,29 @@ struct PhysicsSceneImpl final : PhysicsScene
 			: scene(rhs.scene)
 			, entity(rhs.entity)
 			, physx_actor(rhs.physx_actor)
-			, resource(rhs.resource)
+			, mesh(rhs.mesh)
+			, material(rhs.material)
 			, scale(rhs.scale)
 			, layer(rhs.layer)
-			, prev_with_resource(rhs.prev_with_resource)
-			, next_with_resource(rhs.next_with_resource)
+			, prev_with_mesh(rhs.prev_with_mesh)
+			, next_with_mesh(rhs.next_with_mesh)
 			, dynamic_type(rhs.dynamic_type)
 			, is_trigger(rhs.is_trigger)
 		{
-			rhs.resource = nullptr;
+			rhs.mesh = nullptr;
+			rhs.material = nullptr;
 			rhs.physx_actor = nullptr;
 		}
 
 		void operator =(RigidActor&& rhs) = delete;
 
 		~RigidActor() {
-			setResource(nullptr);
+			setMesh(nullptr);
 			if (physx_actor) physx_actor->release();
 		}
 
 		void rescale();
-		void setResource(PhysicsGeometry* resource);
+		void setMesh(PhysicsGeometry* resource);
 		void setPhysxActor(PxRigidActor* actor);
 		void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&);
 		void setIsTrigger(bool is);
@@ -398,11 +401,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PhysicsSceneImpl& scene;
 		EntityRef entity;
 		PxRigidActor* physx_actor = nullptr;
-		PhysicsGeometry* resource = nullptr;
+		PhysicsGeometry* mesh  = nullptr;
+		PhysicsMaterial* material = nullptr;
 		float scale = 1;
 		i32 layer = 0;
-		EntityPtr prev_with_resource = INVALID_ENTITY;
-		EntityPtr next_with_resource = INVALID_ENTITY;
+		EntityPtr prev_with_mesh = INVALID_ENTITY;
+		EntityPtr next_with_mesh = INVALID_ENTITY;
 		DynamicType dynamic_type = DynamicType::STATIC;
 		bool is_trigger = false;
 	};
@@ -2485,7 +2489,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 					{
 						actor.physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
 					}
-					if (actor.resource && actor.scale != trans.scale)
+					if (actor.mesh && actor.scale != trans.scale)
 					{
 						actor.rescale();
 					}
@@ -2602,7 +2606,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_layers.filter[layer];
-		PxShape* shapes[8];
+		PxShape* shapes[64];
 		int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
@@ -2620,7 +2624,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			int actor_layer = actor.layer;
 			data.word0 = 1 << actor_layer;
 			data.word1 = m_layers.filter[actor_layer];
-			PxShape* shapes[8];
+			PxShape* shapes[64];
 			int shapes_count = actor.physx_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
@@ -2717,12 +2721,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		if (index == -1) index = getBoxGeometryCount(entity);
 		moveShapeIndices(entity, index, PxGeometryType::eBOX);
+		PhysicsMaterial* mat = m_actors[entity].material;
 		PxRigidActor* actor = m_actors[entity].physx_actor;
 		PxBoxGeometry geom;
 		geom.halfExtents.x = 1;
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
-		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, mat ? *mat->material : *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
 	}
 
@@ -2871,13 +2876,32 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	Path getMeshGeomPath(EntityRef entity) override {
 		RigidActor& actor = m_actors[entity];
-		return actor.resource ? actor.resource->getPath() : Path();
+		return actor.mesh ? actor.mesh->getPath() : Path();
 	}
 	
 	void setMeshGeomPath(EntityRef entity, const Path& path) override {
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(path);
-		m_actors[entity].setResource(geom_res);
+		m_actors[entity].setMesh(geom_res);
+	}
+	
+	void setRigidActorMaterial(EntityRef entity, const Path& path) override {
+		ResourceManagerHub& manager = m_engine.getResourceManager();
+		PhysicsMaterial* mat = manager.load<PhysicsMaterial>(path);
+		m_actors[entity].material = mat;
+		
+		PxShape* shapes[64];
+		int shapes_count = m_actors[entity].physx_actor->getShapes(shapes, lengthOf(shapes));
+		for (int i = 0; i < shapes_count; ++i)
+		{
+			shapes[i]->setMaterials(&mat->material, 1);
+		}
+
+	}
+
+	Path getRigidActorMaterial(EntityRef entity) {
+		RigidActor& actor = m_actors[entity];
+		return actor.material ? actor.material->getPath() : Path();
 	}
 
 	void addSphereGeometry(EntityRef entity, int index) override
@@ -2887,7 +2911,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxRigidActor* actor = m_actors[entity].physx_actor;
 		PxSphereGeometry geom;
 		geom.radius = 1;
-		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+		PhysicsMaterial* mat = m_actors[entity].material;
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, mat ? *mat->material : *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
 	}
 
@@ -2963,7 +2988,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		{
 			PxShape* shape;
 			actor.physx_actor->getShapes(&shape, 1, i);
-			duplicateShape(shape, new_physx_actor);
+			duplicateShape(shape, new_physx_actor, actor.material ? actor.material->material : m_default_material);
 		}
 		PxRigidBody* rigid_body = new_physx_actor->is<PxRigidBody>();
 		if (rigid_body) {
@@ -2973,7 +2998,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void duplicateShape(PxShape* shape, PxRigidActor* actor)
+	void duplicateShape(PxShape* shape, PxRigidActor* actor, physx::PxMaterial* material)
 	{
 		PxShape* new_shape;
 		switch (shape->getGeometryType())
@@ -2982,7 +3007,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			{
 				PxBoxGeometry geom;
 				shape->getBoxGeometry(geom);
-				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
@@ -2990,7 +3015,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			{
 				PxSphereGeometry geom;
 				shape->getSphereGeometry(geom);
-				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
@@ -2998,7 +3023,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			{
 				PxConvexMeshGeometry geom;
 				shape->getConvexMeshGeometry(geom);
-				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
@@ -3006,7 +3031,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			{
 				PxTriangleMeshGeometry geom;
 				shape->getTriangleMeshGeometry(geom);
-				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
@@ -3022,10 +3047,11 @@ struct PhysicsSceneImpl final : PhysicsScene
 		serializer.write(actor.dynamic_type);
 		serializer.write(actor.is_trigger);
 		serializer.write(actor.layer);
+		serializer.writeString(actor.material ? actor.material->getPath().c_str() : "");
 		auto* px_actor = actor.physx_actor;
 		PxShape* shape;
 		int shape_count = px_actor->getNbShapes();
-		serializer.writeString(actor.resource ? actor.resource->getPath().c_str() : "");
+		serializer.writeString(actor.mesh ? actor.mesh->getPath().c_str() : "");
 		serializer.write(shape_count);
 		for (int i = 0; i < shape_count; ++i)
 		{
@@ -3194,7 +3220,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void deserializeActors(InputMemoryStream& serializer, const EntityMap& entity_map)
+	void deserializeActors(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
 	{
 		PROFILE_FUNCTION();
 		u32 count;
@@ -3212,7 +3238,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 			actor.layer = 0;
 			serializer.read(actor.layer);
 			
-			const char* path = serializer.readString();
+			const char* material_path = "";
+			if (version > (i32)PhysicsSceneVersion::MATERIAL) material_path = serializer.readString();
+			const char* mesh_path = serializer.readString();
 
 			PxTransform transform = toPhysx(m_universe.getTransform(actor.entity).getRigidPart());
 			PxRigidActor* physx_actor = actor.dynamic_type == DynamicType::STATIC
@@ -3220,6 +3248,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 				: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
 			if (actor.dynamic_type == DynamicType::KINEMATIC) {
 				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+			}
+
+			PhysicsMaterial* material = nullptr;
+			if (material_path[0]) {
+				ResourceManagerHub& manager = m_engine.getResourceManager();
+				material = manager.load<PhysicsMaterial>(Path(material_path));
+				actor.material = material;
 			}
 
 			PxFilterData filter_data;
@@ -3239,14 +3274,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 						serializer.read(box_geom.halfExtents.y);
 						serializer.read(box_geom.halfExtents.z);
 
-						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, box_geom, *m_default_material);
+						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, box_geom, material ? *material->material : *m_default_material);
 						shape->setLocalPose(tr);
 						break;
 					}
 					case PxGeometryType::eSPHERE: {
 						PxSphereGeometry geom;
 						serializer.read(geom.radius);
-						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
+						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, material ? *material->material : *m_default_material);
 						shape->setLocalPose(tr);
 						break;
 					}
@@ -3266,10 +3301,11 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 			actor.setPhysxActor(physx_actor);
 			m_actors.insert(entity, static_cast<RigidActor&&>(actor));
-			if (path[0]) {
+			
+			if (mesh_path[0]) {
 				ResourceManagerHub& manager = m_engine.getResourceManager();
-				PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(Path(path));
-				m_actors[entity].setResource(geom_res);
+				PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(Path(mesh_path));
+				m_actors[entity].setMesh(geom_res);
 			}
 
 			m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
@@ -3478,7 +3514,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
-		deserializeActors(serializer, entity_map);
+		deserializeActors(serializer, entity_map, version);
 		deserializeControllers(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map);
 
@@ -3608,9 +3644,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 		RigidActor* actor = &m_actors[e];
 		for (;;) {
 			actor->onStateChanged(prev_state, new_state, res);
-			if (!actor->next_with_resource.isValid()) break;
+			if (!actor->next_with_mesh.isValid()) break;
 			
-			actor = &m_actors[*actor->next_with_resource];
+			actor = &m_actors[*actor->next_with_mesh];
 		}
 	}
 	
@@ -3975,6 +4011,7 @@ void PhysicsScene::reflect() {
 				.LUMIX_PROP(SphereGeomOffsetPosition, "Position offset")
 			.end_array()
 			.LUMIX_PROP(MeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
+			.LUMIX_PROP(RigidActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
 		.LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle")
 			.icon(ICON_FA_CAR_ALT)
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel")
@@ -4040,10 +4077,10 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 #endif
 		scale = scene.getUniverse().getScale(entity);
 		PxMeshScale pxscale(scale);
-		PxConvexMeshGeometry convex_geom(resource->convex_mesh, pxscale);
-		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, pxscale);
-		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
-		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, *scene.m_default_material);
+		PxConvexMeshGeometry convex_geom(mesh->convex_mesh, pxscale);
+		PxTriangleMeshGeometry tri_geom(mesh->tri_mesh, pxscale);
+		const PxGeometry* geom = mesh->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, material ? *material->material : *scene.m_default_material);
 		(void)shape;
 		scene.updateFilterData(physx_actor, layer);
 	}
@@ -4052,9 +4089,9 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 
 void PhysicsSceneImpl::RigidActor::rescale()
 {
-	if (!resource || !resource->isReady()) return;
+	if (!mesh || !mesh->isReady()) return;
 
-	onStateChanged(resource->getState(), resource->getState(), *resource);
+	onStateChanged(mesh->getState(), mesh->getState(), *mesh);
 }
 
 
@@ -4076,7 +4113,7 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 }
 
 
-void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* new_value)
+void PhysicsSceneImpl::RigidActor::setMesh(PhysicsGeometry* new_value)
 {
 	if (physx_actor) {
 		const i32 shape_count = physx_actor->getNbShapes();
@@ -4092,39 +4129,39 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* new_value)
 		}
 	}
 
-	if (resource) {
-		if (!next_with_resource.isValid() && !prev_with_resource.isValid()) {
-			resource->getObserverCb().unbind<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
-			scene.m_resource_actor_map.erase(resource);
-			resource->decRefCount();
+	if (mesh) {
+		if (!next_with_mesh.isValid() && !prev_with_mesh.isValid()) {
+			mesh->getObserverCb().unbind<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
+			scene.m_resource_actor_map.erase(mesh);
+			mesh->decRefCount();
 		} else {
-			auto iter = scene.m_resource_actor_map.find(resource);
+			auto iter = scene.m_resource_actor_map.find(mesh);
 			if (iter.value() == entity) {
-				scene.m_resource_actor_map[resource] = *next_with_resource;
+				scene.m_resource_actor_map[mesh] = *next_with_mesh;
 			}
 
-			if (next_with_resource.isValid()) scene.m_actors[*next_with_resource].prev_with_resource = prev_with_resource;
-			if (prev_with_resource.isValid()) scene.m_actors[*prev_with_resource].next_with_resource = next_with_resource;
+			if (next_with_mesh.isValid()) scene.m_actors[*next_with_mesh].prev_with_mesh = prev_with_mesh;
+			if (prev_with_mesh.isValid()) scene.m_actors[*prev_with_mesh].next_with_mesh = next_with_mesh;
 		}
 	}
-	resource = new_value;
-	if (resource) {
-		auto iter = scene.m_resource_actor_map.find(resource);
+	mesh = new_value;
+	if (mesh) {
+		auto iter = scene.m_resource_actor_map.find(mesh);
 		if (iter.isValid()) {
 			EntityRef e = iter.value();
-			next_with_resource = e;
-			scene.m_actors[*next_with_resource].prev_with_resource = entity;
-			prev_with_resource = INVALID_ENTITY;
-			scene.m_resource_actor_map[resource] = entity;
-			if (resource->isReady()) {
+			next_with_mesh = e;
+			scene.m_actors[*next_with_mesh].prev_with_mesh = entity;
+			prev_with_mesh = INVALID_ENTITY;
+			scene.m_resource_actor_map[mesh] = entity;
+			if (mesh->isReady()) {
 				onStateChanged(Resource::State::READY, Resource::State::READY, *new_value);
 			}
-			resource->decRefCount();
+			mesh->decRefCount();
 		} else {
-			scene.m_resource_actor_map.insert(resource, entity);
-			resource->onLoaded<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
-			prev_with_resource = INVALID_ENTITY;
-			next_with_resource = INVALID_ENTITY;
+			scene.m_resource_actor_map.insert(mesh, entity);
+			mesh->onLoaded<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
+			prev_with_mesh = INVALID_ENTITY;
+			next_with_mesh = INVALID_ENTITY;
 		}
 	}
 }

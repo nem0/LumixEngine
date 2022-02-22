@@ -647,14 +647,16 @@ void ProfilerUIImpl::onGUIResources()
 	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
 		ResourceType("material"),
 		ResourceType("model"),
-		ResourceType("physics"),
+		ResourceType("physics_geometry"),
+		ResourceType("physics_material"),
 		ResourceType("shader"),
 		ResourceType("texture") };
 	static const char* MANAGER_NAMES[] = {
 		"Animations",
 		"Materials",
 		"Models",
-		"Physics",
+		"Physics geometries",
+		"Physics materials",
 		"Shaders",
 		"Textures"
 	};

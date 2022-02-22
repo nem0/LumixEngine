@@ -19,7 +19,7 @@
 #include "engine/universe.h"
 #include "meshoptimizer/meshoptimizer.h"
 #include "mikktspace.h"
-#include "physics/physics_geometry.h"
+#include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
