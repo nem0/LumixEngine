@@ -104,11 +104,13 @@ static void loadStyle(lua_State* L)
 		LOAD_BOOL(AntiAliasedFill);            
 		LOAD_FLOAT(CurveTessellationTol);
 		LOAD_FLOAT(CircleTessellationMaxError);
+		i32 dpi = 96;
+		LuaWrapper::getOptionalField(L, -1, "dpi", &dpi);
 
 		#undef LOAD_FLOAT
 		#undef LOAD_BOOL
 		#undef LOAD_VEC2
-		style.ScaleAllSizes(os::getDPI() / 96.f);
+		if (dpi != os::getDPI()) style.ScaleAllSizes(os::getDPI() / float(dpi));
 	}
 	lua_pop(L, 1);
 
@@ -177,6 +179,7 @@ static void saveStyle(os::OutputFile& file)
     SAVE_BOOL(AntiAliasedFill);            
     SAVE_FLOAT(CurveTessellationTol);
     SAVE_FLOAT(CircleTessellationMaxError);
+	file << "\tdpi = " << os::getDPI() << "\n";
 
 	#undef SAVE_BOOL
 	#undef SAVE_FLOAT
