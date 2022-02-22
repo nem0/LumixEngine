@@ -17,6 +17,7 @@
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "engine/stack_array.h"
 #include "engine/universe.h"
 #include "culling_system.h"
 #include "draw2d.h"
@@ -2312,8 +2313,7 @@ struct PipelineImpl final : Pipeline
 	void bindTextures(lua_State* L, LuaWrapper::Array<PipelineTexture, 16> textures, LuaWrapper::Optional<u32> offset) 	{
 		struct Cmd : Renderer::RenderJob {
 			Cmd(IAllocator& allocator) 
-				: m_allocator(allocator)
-				, m_textures_handles(m_allocator) {}
+				: m_textures_handles(allocator) {}
 			void setup() override {}
 			void execute() override
 			{
@@ -2321,8 +2321,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindTextures(m_textures_handles.begin(), m_offset, m_textures_handles.size());
 			}
 
-			StackAllocator<sizeof(gpu::TextureHandle) * 16, alignof(gpu::TextureHandle)> m_allocator; 
-			Array<gpu::TextureHandle> m_textures_handles;
+			StackArray<gpu::TextureHandle, 16> m_textures_handles;
 			i32 m_offset = 0;
 		};
 		
@@ -2389,8 +2388,7 @@ struct PipelineImpl final : Pipeline
 	{
 		struct Cmd : Renderer::RenderJob {
 			Cmd(IAllocator& allocator)
-				: m_allocator(allocator)
-				, m_textures_handles(m_allocator)
+				: m_textures_handles(allocator)
 			{}
 			void setup() override { m_program = m_shader->getProgram(gpu::VertexDecl(), m_define_mask); }
 			void execute() override 
@@ -2409,8 +2407,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 			PipelineImpl* m_pipeline;
-			StackAllocator<sizeof(gpu::TextureHandle) * 16, alignof(gpu::TextureHandle)> m_allocator; 
-			Array<gpu::TextureHandle> m_textures_handles;
+			StackArray<gpu::TextureHandle, 16> m_textures_handles;
 			Shader* m_shader;
 			int m_indices_count;
 			int m_indices_offset;
@@ -3986,7 +3983,6 @@ struct PipelineImpl final : Pipeline
 		return stream.first_page;
 	}
 
-
 	void createCommands(View& view)
 	{
 		PROFILE_FUNCTION();
@@ -4002,8 +3998,7 @@ struct PipelineImpl final : Pipeline
 		}
 		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
 
-		StackAllocator<sizeof(CmdPage*) * 64, alignof(CmdPage*)> pages_allocator(m_allocator);
-		Array<CmdPage*> pages(pages_allocator);
+		StackArray<CmdPage*, 64> pages(m_allocator);
 		pages.resize(steps);
 
 		jobs::forEach(size, STEP, [&](i32 from, i32 to){
@@ -4209,9 +4204,7 @@ struct PipelineImpl final : Pipeline
 	struct RenderGrassJob : Renderer::RenderJob
 	{
 		RenderGrassJob(IAllocator& allocator)
-			: m_allocator(allocator)
-			, m_grass_allocator(allocator)
-			, m_grass(m_grass_allocator)
+			: m_grass(allocator)
 		{
 		}
 
@@ -4405,10 +4398,8 @@ struct PipelineImpl final : Pipeline
 			renderer.endProfileBlock();
 		}
 
-		IAllocator& m_allocator;
 		gpu::ProgramHandle m_compute_shader;
-		StackAllocator<sizeof(Grass) * 32, alignof(Grass)> m_grass_allocator;
-		Array<Grass> m_grass;
+		StackArray<Grass, 32> m_grass;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		gpu::StateFlags m_render_state;
@@ -4548,8 +4539,7 @@ struct PipelineImpl final : Pipeline
 
 		struct Instance {
 			Instance(IAllocator& allocator) 
-				: quads_allocator(allocator)
-				, quads(quads_allocator)
+				: quads(allocator)
 			{}
 
 			struct Quad {
@@ -4564,8 +4554,7 @@ struct PipelineImpl final : Pipeline
 			Vec3 scale;
 			gpu::ProgramHandle program;
 			Material::RenderData* material;
-			StackAllocator<sizeof(Quad) * 32, alignof(Quad)> quads_allocator;
-			Array<Quad> quads;
+			StackArray<Quad, 32> quads;
 		};
 
 		IAllocator& m_allocator;

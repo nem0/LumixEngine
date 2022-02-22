@@ -17,6 +17,7 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "engine/stack_array.h"
 #include "engine/string.h"
 
 
@@ -988,8 +989,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			i32 id;
 			u64 start_time;
 		};
-		StackAllocator<sizeof(OpenBlock) * 64, alignof(OpenBlock)> oballoc(m_allocator);
-		Array<OpenBlock> open_blocks(oballoc);
+		StackArray<OpenBlock, 64> open_blocks(m_allocator);
 		
 		u32 p = ctx.begin;
 		const u32 end = ctx.end;
@@ -999,8 +999,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			int level;
 			int offset;
 		};
-		StackAllocator<sizeof(Property) * 64, alignof(Property)> propalloc(m_allocator);
-		Array<Property> properties(propalloc);
+		StackArray<Property, 64> properties(m_allocator);
 
 		auto draw_triggered_signal = [&](u64 time, i32 signal) {
 			const float t_start = float(int(time - view_start) / double(m_range));
@@ -1276,8 +1275,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		
 		float y = ImGui::GetCursorScreenPos().y;
 
-		StackAllocator<sizeof(u32) * 32, 4> oballoc(m_allocator);
-		Array<u32> open_blocks(oballoc);
+		StackArray<u32, 32> open_blocks(m_allocator);
 		u32 lines = 0;
 
 		bool has_stats = false;
