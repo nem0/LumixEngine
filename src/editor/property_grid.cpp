@@ -341,7 +341,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 		}
 		
-		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -32.f : -1.f, 0))) {
+		const float w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
+		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -w : -1.f, 0))) {
 			ImGui::OpenPopup("popup");
 		}
 		if (!entity.isValid()) {

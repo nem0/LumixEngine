@@ -1869,6 +1869,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 			open = ImGui::TreeNodeEx("Materials", ImGuiTreeNodeFlags_DefaultOpen);
 		}
 		if (open) {
+			const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
 			for (i32 i = 0; i < count; ++i) {
 				Material* material = model->getMesh(i).material;
 				bool duplicate = false;
@@ -1880,7 +1881,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 				if (duplicate) continue;
 				ImGui::PushID(i);
 				
-				const float w = ImGui::GetContentRegionAvail().x - 20;
+				const float w = ImGui::GetContentRegionAvail().x - go_to_w;
 				ImGuiEx::TextClipped(material->getPath().c_str(), w);
 				ImGui::SameLine();
 				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
@@ -2452,6 +2453,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		if (ImGui::CollapsingHeader("Meshes")) {
+			const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
 			for (int i = 0; i < model->getMeshCount(); ++i)
 			{
 				auto& mesh = model->getMesh(i);
@@ -2460,7 +2462,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					ImGuiEx::Label("Triangle count");
 					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
 					ImGuiEx::Label("Material");
-					const float w = ImGui::GetContentRegionAvail().x - 20;
+					const float w = ImGui::GetContentRegionAvail().x - go_to_w;
 					ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
 					ImGui::SameLine();
 					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))

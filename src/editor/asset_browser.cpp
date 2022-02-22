@@ -982,7 +982,8 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 		else {
-			if (ImGui::Button(getImGuiLabelID(rl, false).data, ImVec2(-32.f, 0))) {
+			float w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
+			if (ImGui::Button(getImGuiLabelID(rl, false).data, ImVec2(-w, 0))) {
 				ImGui::OpenPopup("popup");
 			}
 		}

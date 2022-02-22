@@ -1656,7 +1656,7 @@ struct StudioAppImpl final : StudioApp
 			ImGui::PopStyleVar(2);
 
 			float w = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x) * 0.5f - 30 - ImGui::GetCursorPosX();
-			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight()));
+			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeightWithSpacing()));
 			getAction("toggleGameMode")->toolbarButton(m_big_icon_font);
 			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);

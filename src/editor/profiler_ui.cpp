@@ -972,6 +972,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		return iter.isValid() ? iter.value().name : "Unknown";
 	};
 
+	const float line_height = ImGui::GetTextLineHeightWithSpacing();
+
 	forEachThread([&](const ThreadContextProxy& ctx) {
 		if (ctx.thread_id == 0) return;
 		auto thread = m_threads.find(ctx.thread_id);
@@ -1052,7 +1054,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			border_color = alpha | (border_color & 0x00ffffff);
 
 			const ImVec2 ra(x_start, block_y);
-			const ImVec2 rb(x_end, block_y + 19);
+			const ImVec2 rb(x_end, block_y + line_height - 1);
 
 			dl->AddRectFilled(ra, rb, color);
 			if (x_end - x_start > 2) {
@@ -1163,14 +1165,14 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				read(ctx, p + sizeof(profiler::EventHeader), tmp);
 				open_blocks.push({tmp.id, header.time});
 				lines = maximum(lines, open_blocks.size());
-				y += 20.f;
+				y += line_height;
 				break;
 			case profiler::EventType::CONTINUE_BLOCK: {
 				i32 id;
 				read(ctx, p + sizeof(profiler::EventHeader), id);
 				open_blocks.push({id, header.time});
 				lines = maximum(lines, open_blocks.size());
-				y += 20.f;
+				y += line_height;
 				break;
 			}
 			case profiler::EventType::SIGNAL_TRIGGERED: {
@@ -1180,7 +1182,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			}
 			case profiler::EventType::END_BLOCK:
-				y = maximum(y - 20.f, top);
+				y = maximum(y - line_height, top);
 				if (open_blocks.size() > 0) {
 					const Block& block = m_blocks[open_blocks.last().id];
 					const u32 color = block.color;
@@ -1222,13 +1224,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			p += header.size;
 		}
 		while (open_blocks.size() > 0) {
-			y -= 20.f;
+			y -= line_height;
 			const Block& b = m_blocks[open_blocks.last().id];
 			draw_block(open_blocks.last().start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
 			open_blocks.pop();
 		}
 
-		ImGui::Dummy(ImVec2(to_x - from_x, lines * 20.f));
+		ImGui::Dummy(ImVec2(to_x - from_x, lines * line_height));
 
 		ImGui::TreePop();
 	});
@@ -1306,11 +1308,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						const float x_start = from_x * (1 - t_start) + to_x * t_start;
 						float x_end = from_x * (1 - t_end) + to_x * t_end;
 						if (int(x_end) == int(x_start)) ++x_end;
-						const float block_y = (open_blocks.size() - 1) * 20.f + y;
+						const float block_y = (open_blocks.size() - 1) * line_height + y;
 						const float w = ImGui::CalcTextSize(data.name).x;
 
 						const ImVec2 ra(x_start, block_y);
-						const ImVec2 rb(x_end, block_y + 19);
+						const ImVec2 rb(x_end, block_y + line_height - 1);
 						u32 color = 0xffDDddDD;
 						if (hovered_link.link == data.profiler_link && hovered_link.frame > frame_id - 2) color = 0xff0000ff;
 						dl->AddRectFilled(ra, rb, color);
@@ -1375,7 +1377,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 
 		if (gpu_open) {
-			if (lines > 0) ImGui::Dummy(ImVec2(to_x - from_x, lines * 20.f));
+			if (lines > 0) ImGui::Dummy(ImVec2(to_x - from_x, lines * line_height));
 			ImGui::TreePop();
 		}
 

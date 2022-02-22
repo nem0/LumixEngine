@@ -1166,7 +1166,8 @@ void SceneView::onToolbar()
 		"viewSide" };
 
 	auto pos = ImGui::GetCursorScreenPos();
-	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, 24)))
+	const float toolbar_height = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2;
+	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height)))
 	{
 		for (auto* action_name : actions_names)
 		{
@@ -1179,7 +1180,7 @@ void SceneView::onToolbar()
 
 	ImGui::PushItemWidth(50);
 	ImGui::SameLine();
-	float offset = (24 - ImGui::GetTextLineHeightWithSpacing()) / 2;
+	float offset = (toolbar_height - ImGui::GetTextLineHeightWithSpacing()) / 2;
 	pos = ImGui::GetCursorPos();
 	pos.y += offset;
 	ImGui::SetCursorPos(pos);
