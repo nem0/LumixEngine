@@ -333,6 +333,12 @@ struct StudioAppImpl final : StudioApp
 		return idx >= 0;
 	}
 
+	void onShutdown() {
+		while (m_engine->getFileSystem().hasWork()) {
+			m_engine->getFileSystem().processCallbacks();
+		}
+	}
+
 	void onIdle()
 	{
 		update();
@@ -371,7 +377,7 @@ struct StudioAppImpl final : StudioApp
 				}
 				data.that->onIdle();
 			}
-
+			data.that->onShutdown();
 			data.semaphore->signal();
 		}, nullptr, 0);
 		PROFILE_BLOCK("sleeping");

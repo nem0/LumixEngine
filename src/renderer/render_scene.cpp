@@ -211,6 +211,7 @@ struct RenderSceneImpl final : RenderScene {
 
 		for (InstancedModel& im : m_instanced_models) {
 			if (im.model) im.model->decRefCount();
+			if (im.gpu_data) m_renderer.destroy(im.gpu_data);
 		}
 		m_instanced_models.clear();
 

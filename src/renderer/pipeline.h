@@ -41,7 +41,9 @@ namespace UniformBuffer {
 		MATERIAL,
 		SHADOW,
 		DRAWCALL,
-		DRAWCALL2
+		DRAWCALL2,
+
+		COUNT
 	};
 }
 
