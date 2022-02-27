@@ -3338,6 +3338,8 @@ struct PipelineImpl final : Pipeline
 	}
 
 	struct RenderBucketJob : Renderer::RenderJob {
+		RenderBucketJob(IAllocator& allocator) : m_splines(allocator) {}
+
 		void setup() override {
 			PROFILE_FUNCTION();
 			jobs::wait(&m_view->ready);
@@ -3352,6 +3354,29 @@ struct PipelineImpl final : Pipeline
 						m.program = m.mesh->material->getShader()->getProgram(m.mesh->vertex_decl, instanced_define_mask | m.mesh->material->getDefineMask());
 					}
 				}
+			}
+
+			const Universe& universe = m_pipeline->getScene()->getUniverse();
+			RenderScene* render_scene = m_pipeline->m_scene;
+			const HashMap<EntityRef, ProceduralGeometry>& geometries = render_scene->getProceduralGeometries();
+			Renderer& renderer = m_pipeline->m_renderer;
+			const DVec3 camera_pos = m_view->cp.pos;
+			for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
+				const ProceduralGeometry& pg = iter.value();
+				if (!pg.vertex_buffer) continue;
+				if (!pg.material || !pg.material->isReady()) continue;
+				if (pg.material->getLayer() != m_layer) continue;
+				
+				Spline& spline = m_splines.emplace();
+				spline.vertex_buffer = pg.vertex_buffer;
+				spline.material = pg.material->getRenderData();
+
+				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
+				spline.program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
+				spline.stride = pg.vertex_decl.getStride();
+				spline.vertex_count = (u32)pg.vertex_data.size() / spline.stride;
+				spline.ub = renderer.allocUniform(sizeof(Matrix));
+				memcpy(spline.ub.ptr, &mtx, sizeof(mtx));
 			}
 		}
 
@@ -3423,26 +3448,55 @@ struct PipelineImpl final : Pipeline
 			u32 offset = 0;
 		};
 
+		void drawSplineGeometry() {
+			if (m_splines.empty()) return;
+
+			m_pipeline->m_renderer.beginProfileBlock("draw splines", 0);
+
+			Renderer& renderer = m_pipeline->m_renderer;
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			const gpu::StateFlags render_states = m_render_state;
+			u32 material_ub_idx = 0xffFFffFF;
+			for (const Spline& spline : m_splines) {
+				gpu::bindTextures(spline.material->textures, 0, spline.material->textures_count);
+				gpu::setState(spline.material->render_states | render_states);
+				if (material_ub_idx != spline.material->material_constants) {
+					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, spline.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					material_ub_idx = spline.material->material_constants;
+				}
+
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, spline.ub.buffer, spline.ub.offset, spline.ub.size);
+				gpu::useProgram(spline.program);
+
+				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+				gpu::bindVertexBuffer(0, spline.vertex_buffer, 0, spline.stride);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+				gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, 0, spline.vertex_count);
+			}
+			m_pipeline->m_renderer.endProfileBlock();
+		}
+
 		void execute() override {
 			PROFILE_FUNCTION();
 
 			drawInstancedMeshes();
+			drawSplineGeometry();
+
 			if (!m_cmds) return;
 
 			if (m_cmds->header.size == 0 && !m_cmds->header.next) {
 				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
 				return;
 			}
-
-			Renderer& renderer = m_pipeline->m_renderer;
-			renderer.beginProfileBlock("render_bucket", 0);
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-
 			CmdInputStream stream(m_cmds, m_pipeline->getRenderer().getEngine().getPageAllocator());
 
+			Renderer& renderer = m_pipeline->m_renderer;
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			const gpu::StateFlags render_states = m_render_state;
 			u32 material_ub_idx = 0xffFFffFF;
 			CmdPage* page = m_cmds;
+			renderer.beginProfileBlock("render_bucket", 0);
 			while (!stream.isEnd()) {
 				const RenderableTypes type = stream.readType();
 				switch(type) {
@@ -3556,6 +3610,15 @@ struct PipelineImpl final : Pipeline
 			renderer.endProfileBlock();
 		}
 
+		struct Spline {
+			gpu::BufferHandle vertex_buffer;
+			Material::RenderData* material;
+			gpu::ProgramHandle program;
+			u32 stride;
+			u32 vertex_count;
+			Renderer::TransientSlice ub;
+		};
+
 		CmdPage* m_cmds;
 		PipelineImpl* m_pipeline;
 		u32 m_bucket_id;
@@ -3563,6 +3626,7 @@ struct PipelineImpl final : Pipeline
 		InstancedMeshes* m_instanced_meshes;
 		u8 m_layer;
 		gpu::StateFlags m_render_state;
+		StackArray<Spline, 16> m_splines;
 	};
 
 	static Vec4 packRotationLOD(const Quat& rot, float lod) {
@@ -4023,7 +4087,7 @@ struct PipelineImpl final : Pipeline
 
 	void renderBucket(u32 viewbucket_id, RenderState state) {
 		PROFILE_FUNCTION();
-		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>();
+		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>(m_allocator);
 		job.m_render_state = state.value;
 		job.m_pipeline = this;
 		job.m_bucket_id = viewbucket_id & 0xffFF;

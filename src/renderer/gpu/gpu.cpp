@@ -443,6 +443,17 @@ int getSize(AttributeType type)
 	}
 }
 
+u32 VertexDecl::getStride() const {
+	u32 stride = 0;
+	for (u32 i = 0; i < attributes_count; ++i) {
+		stride += attributes[i].components_count * getSize(attributes[i].type);
+	}
+	return stride;
+}
+
+void VertexDecl::computeHash() {
+	hash = crc32(attributes, sizeof(Attribute) * attributes_count);
+}
 
 void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags)
 {

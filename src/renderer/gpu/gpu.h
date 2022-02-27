@@ -199,6 +199,8 @@ struct VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
 	void addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags);
+	u32 getStride() const;
+	void computeHash();
 
 	u8 attributes_count = 0;
 	u32 hash = 0;

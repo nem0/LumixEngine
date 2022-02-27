@@ -185,6 +185,8 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	}
 
 	void prefabsList() {
+		if (!ImGui::CollapsingHeader("Place prefabs")) return;
+
 		static ImVec2 size(-1, 200);
 		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 		ImGui::SetNextItemWidth(-w);

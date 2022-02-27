@@ -8,6 +8,7 @@
 #include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
+#include "engine/stream.h"
 #include "gpu/gpu.h"
 
 
@@ -38,6 +39,24 @@ struct Universe;
 template <typename T> struct Array;
 template <typename T> struct Delegate;
 template <typename T, typename T2> struct AssociativeArray;
+
+struct SplineGeometry {
+	enum Flags : u32 {
+		NONE = 0,
+		HAS_UVS = 1 << 0
+	};
+
+	float width = 1;
+	FlagSet<Flags, u32> flags;
+};
+
+struct ProceduralGeometry {
+	ProceduralGeometry(IAllocator& allocator) : vertex_data(allocator) {}
+	Material* material = nullptr;
+	OutputMemoryStream vertex_data;
+	gpu::VertexDecl vertex_decl;
+	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
+};
 
 struct Camera
 {
@@ -386,6 +405,15 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual int getGrassCount(EntityRef entity) = 0;
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
+
+	virtual bool getSplineGeometryHasUVs(EntityRef entity) = 0;
+	virtual void setSplineGeometryHasUVs(EntityRef entity, bool create_uvs) = 0;
+	virtual Path getSplineGeometryMaterial(EntityRef entity) = 0;
+	virtual void setSplineGeometryMaterial(EntityRef entity, const Path& path) = 0;
+	virtual SplineGeometry& getSplineGeometry(EntityRef entity) = 0;
+	
+	virtual void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl) = 0;
+	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;

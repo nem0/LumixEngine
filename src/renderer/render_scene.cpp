@@ -33,7 +33,6 @@
 namespace Lumix
 {
 
-
 static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
@@ -46,6 +45,7 @@ static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain"
 static const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
+static const ComponentType SPLINE_GEOMETRY_TYPE = reflection::getComponentType("spline_geometry");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
 enum class RenderSceneVersion : i32
@@ -55,6 +55,7 @@ enum class RenderSceneVersion : i32
 	AUTODESTROY_EMITTER,
 	SMALLER_MODEL_INSTANCES,
 	INSTANCED_MODEL,
+	SPLINES,
 
 	LATEST
 };
@@ -200,6 +201,13 @@ struct RenderSceneImpl final : RenderScene {
 		m_decals.clear();
 
 		m_cameras.clear();
+
+		for (ProceduralGeometry& pg : m_procedural_geometries) {
+			if (pg.material) pg.material->decRefCount();
+			if (pg.vertex_buffer) m_renderer.destroy(pg.vertex_buffer);
+		}
+		m_procedural_geometries.clear();
+		m_spline_geometries.clear();
 
 		for (auto* terrain : m_terrains)
 		{
@@ -889,6 +897,26 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
+	void serializeSplines(OutputMemoryStream& blob) {
+		blob.write(m_spline_geometries.size());
+		for (auto iter = m_spline_geometries.begin(), end = m_spline_geometries.end(); iter != end; ++iter) {
+			blob.write(iter.key());
+			blob.write(iter.value());
+		}
+	}
+
+	void serializeProceduralGeometries(OutputMemoryStream& blob) {
+		blob.write(m_procedural_geometries.size());
+		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
+			blob.write(iter.key());
+			const ProceduralGeometry& pg = iter.value();
+			blob.writeString(pg.material ? pg.material->getPath().c_str() : "");
+			blob.write((u32)pg.vertex_data.size());
+			blob.write(pg.vertex_data.data(), pg.vertex_data.size());
+			blob.write(pg.vertex_decl.attributes_count);
+			blob.write(pg.vertex_decl.attributes, sizeof(pg.vertex_decl.attributes[0]) * pg.vertex_decl.attributes_count);
+		}
+	}
 
 	void serialize(OutputMemoryStream& serializer) override
 	{
@@ -904,6 +932,8 @@ struct RenderSceneImpl final : RenderScene {
 		serializeCurveDecals(serializer);
 		serializeFurs(serializer);
 		serializeInstancedModels(serializer);
+		serializeSplines(serializer);
+		serializeProceduralGeometries(serializer);
 	}
 
 
@@ -1045,8 +1075,44 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-	void deserializeTerrains(InputMemoryStream& serializer, const EntityMap& entity_map)
-	{
+	void deserializeSplines(InputMemoryStream& blob, const EntityMap& entity_map, i32 version) {
+		if (version <= (i32)RenderSceneVersion::SPLINES) return;
+		
+		const u32 count = blob.read<u32>();
+		for (u32 i = 0; i < count; ++i) {
+			EntityRef e = blob.read<EntityRef>();
+			e = entity_map.get(e);
+			SplineGeometry& sg = m_spline_geometries.insert(e);
+			blob.read(sg);
+			m_universe.onComponentCreated(e, SPLINE_GEOMETRY_TYPE, this);
+		}
+	}
+
+	void deserializeProceduralGeometries(InputMemoryStream& blob, const EntityMap& entity_map, i32 version) {
+		if (version <= (i32)RenderSceneVersion::SPLINES) return;
+
+		const u32 count = blob.read<u32>();
+		for (u32 i = 0; i < count; ++i) {
+			EntityRef e = blob.read<EntityRef>();
+			e = entity_map.get(e);
+			ProceduralGeometry pg(m_allocator);
+			const char* mat_path = blob.readString();
+			pg.material = mat_path[0] ? m_engine.getResourceManager().load<Material>(Path(mat_path)) : nullptr;
+			const u32 data_size = blob.read<u32>();
+			pg.vertex_data.resize(data_size);
+			blob.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
+			blob.read(pg.vertex_decl.attributes_count);
+			blob.read(pg.vertex_decl.attributes, pg.vertex_decl.attributes_count * sizeof(pg.vertex_decl.attributes[0]));
+			pg.vertex_decl.computeHash();
+			if (!pg.vertex_data.empty()) {
+				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
+				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);			
+			}
+			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
+		}
+	}
+
+	void deserializeTerrains(InputMemoryStream& serializer, const EntityMap& entity_map) {
 		i32 size = 0;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
@@ -1080,6 +1146,8 @@ struct RenderSceneImpl final : RenderScene {
 		deserializeCurveDecals(serializer, entity_map, version);
 		deserializeFurs(serializer, entity_map);
 		deserializeInstancedModels(serializer, entity_map, version);
+		deserializeSplines(serializer, entity_map, version);
+		deserializeProceduralGeometries(serializer, entity_map, version);
 	}
 
 
@@ -1096,6 +1164,12 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 	
+	void destroySplineGeometry(EntityRef entity) {
+		destroyProceduralGeometry(entity);
+		m_spline_geometries.erase(entity);
+		m_universe.onComponentDestroyed(entity, SPLINE_GEOMETRY_TYPE, this);
+	}
+
 	void destroyReflectionProbe(EntityRef entity)
 	{
 		ReflectionProbe& probe = m_reflection_probes[entity];
@@ -1679,6 +1753,64 @@ struct RenderSceneImpl final : RenderScene {
 
 	float getTerrainYScale(EntityRef entity) override { return m_terrains[entity]->getYScale(); }
 
+	void getProceduralGeometryBlob(EntityRef entity, OutputMemoryStream& value) {
+		const ProceduralGeometry& pg = m_procedural_geometries[entity];
+		value.write(pg.vertex_decl);
+		value.write((u32)pg.vertex_data.size());
+		if (!pg.vertex_data.empty()) value.write(pg.vertex_data.data(), pg.vertex_data.size());
+	}
+
+	void setProceduralGeometryBlob(EntityRef entity, InputMemoryStream& value) {
+		ProceduralGeometry& pg = m_procedural_geometries[entity];
+		value.read(pg.vertex_decl);
+		const u32 size = value.read<u32>();
+		if (size > 0) {
+			pg.vertex_data.resize(size);
+			value.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
+			const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
+			pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+		}
+	}
+
+	SplineGeometry& getSplineGeometry(EntityRef entity) override { return m_spline_geometries[entity]; }
+	
+	void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl) override {
+		ProceduralGeometry& pg = m_procedural_geometries[entity];
+		pg.vertex_decl = vertex_decl;
+		pg.vertex_data.clear();
+		pg.vertex_data.write(vertex_data.begin(), vertex_data.length());
+		const Renderer::MemRef mem = m_renderer.copy(vertex_data.begin(), vertex_data.length());
+		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+	}
+	
+	const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() override {
+		return m_procedural_geometries;
+	}
+	
+	bool getSplineGeometryHasUVs(EntityRef entity) override {
+		return m_spline_geometries[entity].flags.isSet(SplineGeometry::HAS_UVS);
+	}
+
+	void setSplineGeometryHasUVs(EntityRef entity, bool create_uvs) override {
+		SplineGeometry& sg = m_spline_geometries[entity];
+		sg.flags.set(SplineGeometry::HAS_UVS, create_uvs);
+	}
+
+	Path getSplineGeometryMaterial(EntityRef entity) override {
+		const Material* m = m_procedural_geometries[entity].material;
+		return m ? m->getPath() : Path();
+	}
+
+	void setSplineGeometryMaterial(EntityRef entity, const Path& path) override {
+		ProceduralGeometry& pg = m_procedural_geometries[entity];
+		if (pg.material) {
+			if (pg.material->getPath() == path) return;
+			pg.material->decRefCount();
+			pg.material = nullptr;
+		}
+
+		pg.material = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Material>(path);
+	}
 
 	Pose* lockPose(EntityRef entity) override { return m_model_instances[entity.index].pose; }
 	void unlockPose(EntityRef entity, bool changed) override
@@ -2852,6 +2984,19 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 	
+	void destroyProceduralGeometry(EntityRef entity) {
+		const ProceduralGeometry& pg = m_procedural_geometries[entity];
+		if (pg.material) pg.material->decRefCount();
+		if (pg.vertex_buffer) m_renderer.destroy(pg.vertex_buffer);
+		m_procedural_geometries.erase(entity);
+	}
+	
+	void createSplineGeometry(EntityRef entity) {
+		SplineGeometry& sg = m_spline_geometries.insert(entity);
+		sg.flags.set(SplineGeometry::HAS_UVS);
+		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
+		m_universe.onComponentCreated(entity, SPLINE_GEOMETRY_TYPE, this);
+	}
 
 	void createReflectionProbe(EntityRef entity)
 	{
@@ -2948,6 +3093,8 @@ struct RenderSceneImpl final : RenderScene {
 	AssociativeArray<EntityRef, BoneAttachment> m_bone_attachments;
 	AssociativeArray<EntityRef, EnvironmentProbe> m_environment_probes;
 	AssociativeArray<EntityRef, ReflectionProbe> m_reflection_probes;
+	HashMap<EntityRef, SplineGeometry> m_spline_geometries;
+	HashMap<EntityRef, ProceduralGeometry> m_procedural_geometries;
 	HashMap<EntityRef, Terrain*> m_terrains;
 	HashMap<EntityRef, ParticleEmitter> m_particle_emitters;
 	gpu::TextureHandle m_reflection_probes_texture = gpu::INVALID_TEXTURE;
@@ -3087,6 +3234,11 @@ void RenderScene::reflect() {
 			.prop<&RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe>("Enabled")
 			.var_prop<&RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range>("Inner range")
 			.var_prop<&RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range>("Outer range")
+		.LUMIX_CMP(SplineGeometry, "spline_geometry", "Render / Spline geometry")
+			.LUMIX_PROP(SplineGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
+			.var_prop<&RenderScene::getSplineGeometry, &SplineGeometry::width>("Width").minAttribute(0)
+			.blob_property<&RenderSceneImpl::getProceduralGeometryBlob, &RenderSceneImpl::setProceduralGeometryBlob>("Vertex data")
+			.LUMIX_PROP(SplineGeometryHasUVs, "Has UVs")
 		.LUMIX_CMP(ReflectionProbe, "reflection_probe", "Render / Reflection probe")
 			.prop<&RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe>("Enabled")
 			.var_prop<&RenderScene::getReflectionProbe, &ReflectionProbe::size>("size")
@@ -3177,6 +3329,8 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_bone_attachments(m_allocator)
 	, m_environment_probes(m_allocator)
 	, m_reflection_probes(m_allocator)
+	, m_spline_geometries(m_allocator)
+	, m_procedural_geometries(m_allocator)
 	, m_lod_multiplier(1.0f)
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
@@ -3210,7 +3364,6 @@ UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
 {
 	return UniquePtr<RenderSceneImpl>::create(allocator, renderer, engine, universe, allocator);
 }
-
 
 void RenderScene::registerLuaAPI(lua_State* L)
 {

@@ -19,6 +19,7 @@
 #include "engine/allocators.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
+#include "engine/core.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
@@ -61,6 +62,8 @@
 
 using namespace Lumix;
 
+static const ComponentType SPLINE_GEOMETRY_TYPE = reflection::getComponentType("spline_geometry");
+static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
@@ -676,6 +679,115 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 	StudioApp& m_app;
 };
 
+struct SplineIterator {
+	SplineIterator(Span<const Vec3> points) : points(points) {}
+
+	void move(float delta) { t += delta; }
+	bool isEnd() { return u32(t) >= points.length() - 2; }
+	Vec3 getDir() {
+		const u32 segment = u32(t);
+		float rel_t = t - segment;
+		Vec3 p0 = points[segment + 0];
+		Vec3 p1 = points[segment + 1];
+		Vec3 p2 = points[segment + 2];
+		return lerp(p1 - p0, p2 - p1, rel_t);
+	}
+
+	Vec3 getPosition() {
+		const u32 segment = u32(t);
+		float rel_t = t - segment;
+		Vec3 p0 = points[segment + 0];
+		Vec3 p1 = points[segment + 1];
+		Vec3 p2 = points[segment + 2];
+		p0 = (p1 + p0) * 0.5f;
+		p2 = (p1 + p2) * 0.5f;
+
+		return lerp(lerp(p0, p1, rel_t), lerp(p1, p2, rel_t), rel_t);
+	}
+
+	float t = 0;
+
+	Span<const Vec3> points;
+};
+
+struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
+	SplineGeometryPlugin(StudioApp& app) : m_app(app) {}
+	
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
+		if (cmp.type != SPLINE_GEOMETRY_TYPE) return;
+
+		const EntityRef e = *cmp.entity;
+		Universe& universe = cmp.scene->getUniverse();
+		if (!universe.hasComponent(*cmp.entity, SPLINE_TYPE)) {
+			ImGui::TextUnformatted("There's no spline component");
+			if (ImGui::Button("Create spline component")) {
+				editor.addComponent(Span(&e, 1), SPLINE_TYPE);
+			}
+		}
+		else {
+			if (ImGui::Button("Generate geometry")) {
+				CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
+				RenderScene* render_scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
+				const Spline& spline = core_scene->getSpline(e);
+				if (!spline.points.empty()) {
+					const SplineGeometry& sg = render_scene->getSplineGeometry(e);
+					const float width = sg.width;
+					SplineIterator iterator(spline.points);
+					gpu::VertexDecl decl;
+					decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+				
+					if (render_scene->getSplineGeometry(e).flags.isSet(SplineGeometry::HAS_UVS)) {
+						decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
+						struct Vertex {
+							Vec3 position;
+							Vec2 uv;
+						};
+						Array<Vertex> vertices(m_app.getAllocator());
+						Vec3 prev_p0 = spline.points[0];
+						Vec3 prev_p1 = spline.points[0];
+						float u0 = 0;
+						float u1 = 0;
+						while (!iterator.isEnd()) {
+							const Vec3 p = iterator.getPosition();
+							const Vec3 dir = iterator.getDir();
+							const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
+							Vertex& v0 = vertices.emplace();
+							Vertex& v1 = vertices.emplace();
+							v0.position = p + side;
+							u0 += length(p - prev_p0);
+							v0.uv.x = u0;
+							v0.uv.y = -width;
+							v1.position = p - side;
+							u1 += length(p - prev_p1);
+							v1.uv.x = u1;
+							v1.uv.y = width;
+							iterator.move(0.1f);
+							prev_p0 = p;
+							prev_p1 = p;
+						}
+						render_scene->setProceduralGeometry(e, Span((const u8*)vertices.begin(), vertices.byte_size()), decl);
+					}
+					else {
+						Array<Vec3> points(m_app.getAllocator());
+				
+						while (!iterator.isEnd()) {
+							const Vec3 p = iterator.getPosition();
+							const Vec3 dir = iterator.getDir();
+							const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
+							points.push(p + side);
+							points.push(p - side);
+							iterator.move(0.1f);
+						}
+						render_scene->setProceduralGeometry(e, Span((const u8*)points.begin(), points.byte_size()), decl);
+					}
+				}
+			}
+		}
+	}
+
+	StudioApp& m_app;
+};
+
 struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 {
 	ParticleEmitterPropertyPlugin(StudioApp& app) : m_app(app) {}
@@ -868,7 +980,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!shader->isIgnored(Shader::ROUGHNESS)) {
 			float roughness = first->getRoughness();
 			multiLabel<&Material::getRoughness>("Roughness", resources);
-			if (ImGui::DragFloat("##rgh", &roughness, 0.01f, 0.0f, 1.0f)) {
+			if (ImGui::DragFloat("##rgh", &roughness, 0.1f, 0.0f, 1.0f)) {
 				set<&Material::setRoughness>(resources, roughness);
 			}
 		}
@@ -876,7 +988,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!shader->isIgnored(Shader::METALLIC)) {
 			float metallic = first->getMetallic();
 			multiLabel<&Material::getMetallic>("Metallic", resources);
-			if (ImGui::DragFloat("##met", &metallic, 0.01f, 0.0f, 1.0f)) {
+			if (ImGui::DragFloat("##met", &metallic, 0.1f, 0.0f, 1.0f)) {
 				set<&Material::setMetallic>(resources, metallic);
 			}
 		}
@@ -884,7 +996,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!shader->isIgnored(Shader::EMISSION)) {
 			float emission = first->getEmission();
 			multiLabel<&Material::getEmission>("Emission", resources);
-			if (ImGui::DragFloat("##emis", &emission, 0.01f, 0.0f)) {
+			if (ImGui::DragFloat("##emis", &emission, 0.1f, 0.0f)) {
 				set<&Material::setEmission>(resources, emission);
 			}
 		}
@@ -892,7 +1004,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!shader->isIgnored(Shader::TRANSLUCENCY)) {
 			float translucency = first->getTranslucency();
 			multiLabel<&Material::getTranslucency>("Translucency", resources);
-			if (ImGui::DragFloat("##trns", &translucency, 0.01f, 0.f, 1.f)) {
+			if (ImGui::DragFloat("##trns", &translucency, 0.1f, 0.f, 1.f)) {
 				set<&Material::setTranslucency>(resources, translucency);
 			}
 		}
@@ -4929,6 +5041,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_material_plugin(app)
 		, m_particle_emitter_plugin(app)
 		, m_particle_emitter_property_plugin(app)
+		, m_spline_geom_plugin(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
 		, m_texture_plugin(app)
@@ -4993,6 +5106,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.addPlugin(m_terrain_plugin);
 		property_grid.addPlugin(m_instanced_model_plugin);
 		property_grid.addPlugin(m_particle_emitter_property_plugin);
+		property_grid.addPlugin(m_spline_geom_plugin);
 
 		m_scene_view.init();
 		m_game_view.init();
@@ -5239,6 +5353,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.removePlugin(m_terrain_plugin);
 		property_grid.removePlugin(m_instanced_model_plugin);
 		property_grid.removePlugin(m_particle_emitter_property_plugin);
+		property_grid.removePlugin(m_spline_geom_plugin);
 	}
 
 	StudioApp& m_app;
@@ -5247,6 +5362,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	MaterialPlugin m_material_plugin;
 	ParticleEmitterPlugin m_particle_emitter_plugin;
 	ParticleEmitterPropertyPlugin m_particle_emitter_property_plugin;
+	SplineGeometryPlugin m_spline_geom_plugin;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
 	ShaderPlugin m_shader_plugin;
