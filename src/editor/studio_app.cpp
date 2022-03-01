@@ -156,7 +156,11 @@ struct StudioAppImpl final : StudioApp
 					}
 				}
 				break;
-			case os::Event::Type::FOCUS: break;
+			case os::Event::Type::FOCUS: {
+				ImGuiIO& io = ImGui::GetIO();
+				io.AddFocusEvent(isFocused());
+				break;
+			}
 			case os::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
