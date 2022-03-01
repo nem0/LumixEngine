@@ -51,7 +51,7 @@ struct AnimationSampler {
 			const float frame_t = (frame_48_16 & 0xffFF) / float(0xffFF);
 		
 			for (const Animation::TranslationCurve& curve : anim.m_translations) {
-				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
 				if constexpr(use_mask) {
 					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
@@ -80,7 +80,7 @@ struct AnimationSampler {
 			}
 
 			for (const Animation::RotationCurve& curve : anim.m_rotations) {
-				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
 				if constexpr(use_mask) {
 					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
@@ -110,7 +110,7 @@ struct AnimationSampler {
 		}
 		else {
 			for (const Animation::TranslationCurve& curve : anim.m_translations) {
-				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
 				if constexpr(use_mask) {
 					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
@@ -126,7 +126,7 @@ struct AnimationSampler {
 			}
 
 			for (const Animation::RotationCurve& curve : anim.m_rotations) {
-				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
 				if constexpr(use_mask) {
 					if (mask->bones.find(curve.name) == mask->bones.end()) continue;

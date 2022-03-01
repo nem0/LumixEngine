@@ -30,7 +30,7 @@ void ResourceManager::destroy()
 
 Resource* ResourceManager::get(const Path& path)
 {
-	ResourceTable::iterator it = m_resources.find(path.getHash());
+	ResourceTable::Iterator it = m_resources.find(path.getHash());
 
 	if(m_resources.end() != it)
 	{

@@ -136,18 +136,18 @@ private:
 	};
 
 	template <typename HM, typename K, typename V>
-	struct iterator_base {
+	struct IteratorBase {
 		HM* hm;
 		u32 idx;
 
 		template <typename HM2, typename K2, typename V2>
-		bool operator !=(const iterator_base<HM2, K2, V2>& rhs) const {
+		bool operator !=(const IteratorBase<HM2, K2, V2>& rhs) const {
 			ASSERT(hm == rhs.hm);
 			return idx != rhs.idx;
 		}
 
 		template <typename HM2, typename K2, typename V2>
-		bool operator ==(const iterator_base<HM2, K2, V2>& rhs) const {
+		bool operator ==(const IteratorBase<HM2, K2, V2>& rhs) const {
 			ASSERT(hm == rhs.hm);
 			return idx == rhs.idx;
 		}
@@ -187,8 +187,8 @@ private:
 	};
 
 public:
-	using iterator = iterator_base<HashMap, Key, Value>;
-	using const_iterator = iterator_base<const HashMap, const Key, const Value>;
+	using Iterator = IteratorBase<HashMap, Key, Value>;
+	using ConstIterator = IteratorBase<const HashMap, const Key, const Value>;
 
 	explicit HashMap(IAllocator& allocator) 
 		: m_allocator(allocator) 
@@ -232,22 +232,22 @@ public:
 
 	void operator =(HashMap&& rhs) = delete;
 
-	iterator begin() {
+	Iterator begin() {
 		for (u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };
 		}
 		return { this, m_capacity };
 	}
 
-	const_iterator begin() const {
+	ConstIterator begin() const {
 		for (u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };
 		}
 		return { this, m_capacity };
 	}
 
-	iterator end() { return iterator { this, m_capacity }; }
-	const_iterator end() const { return const_iterator { this, m_capacity }; }
+	Iterator end() { return Iterator { this, m_capacity }; }
+	ConstIterator end() const { return ConstIterator { this, m_capacity }; }
 
 	void clear() {
 		for(u32 i = 0, c = m_capacity; i < c; ++i) {
@@ -262,11 +262,11 @@ public:
 		init(8, true);
 	}
 
-	const_iterator find(const Key& key) const {
+	ConstIterator find(const Key& key) const {
 		return { this, findPos(key) };
 	}
 
-	iterator find(const Key& key) {
+	Iterator find(const Key& key) {
 		return { this, findPos(key) };
 	}
 	
@@ -287,7 +287,7 @@ public:
 		return iter.value();
 	}
 
-	iterator insert(const Key& key, Value&& value) {
+	Iterator insert(const Key& key, Value&& value) {
 		if (m_size >= m_capacity * 3 / 4) {
 			grow((m_capacity << 1) < 8 ? 8 : m_capacity << 1);
 		}
@@ -307,7 +307,7 @@ public:
 		return { this, pos };
 	}
 
-	iterator insert(const Key& key, const Value& value) {
+	Iterator insert(const Key& key, const Value& value) {
 		if (m_size >= m_capacity * 3 / 4) {
 			grow((m_capacity << 1) < 8 ? 8 : m_capacity << 1);
 		}
@@ -348,7 +348,7 @@ public:
 		}
 	}
 
-	void erase(const iterator& key) {
+	void erase(const Iterator& key) {
 		ASSERT(key.isValid());
 
 		Slot* keys = m_keys;
