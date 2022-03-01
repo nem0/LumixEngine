@@ -211,7 +211,7 @@ struct StudioAppImpl final : StudioApp
 				}
 				break;
 			case os::Event::Type::KEY:
-				if (handle_input) {
+				if (handle_input || !event.key.down) {
 					ImGuiIO& io = ImGui::GetIO();
 					ImGuiKey key = m_imgui_key_map[(int)event.key.keycode];
 					if (key != ImGuiKey_None) io.AddKeyEvent(key, event.key.down);

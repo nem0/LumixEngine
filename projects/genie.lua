@@ -478,10 +478,6 @@ solution "LumixEngine"
 		defines {"STATIC_PLUGINS"}
 	end
 
-	if _OPTIONS["pvs-studio-build"] ~= nil then
-		defines {"LUMIX_PVS_STUDIO_BUILD"}
-	end
-
 project "engine"
 	libType()
 
