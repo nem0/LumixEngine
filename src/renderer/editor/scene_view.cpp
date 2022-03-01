@@ -618,8 +618,6 @@ SceneView::SceneView(StudioApp& app)
 	m_move_right_action.init("Move right", "Move camera right", "moveRight", "", false);
 	m_move_up_action.init("Move up", "Move camera up", "moveUp", "", false);
 	m_move_down_action.init("Move down", "Move camera down", "moveDown", "", false);
-	m_camera_speed_action.init(ICON_FA_CAMERA "Camera speed", "Reset camera speed", "cameraSpeed", ICON_FA_CAMERA, false);
-	m_camera_speed_action.func.bind<&SceneView::resetCameraSpeed>(this);
 	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
 	m_search_action.func.bind<&SceneView::toggleSearch>(this);
 
@@ -632,7 +630,6 @@ SceneView::SceneView(StudioApp& app)
 	m_app.addAction(&m_move_right_action);
 	m_app.addAction(&m_move_up_action);
 	m_app.addAction(&m_move_down_action);
-	m_app.addAction(&m_camera_speed_action);
 	m_app.addAction(&m_search_action);
 
 	const ResourceType pipeline_type("pipeline");
@@ -656,11 +653,6 @@ void SceneView::init() {
 	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 }
 
-void SceneView::resetCameraSpeed()
-{
-	m_camera_speed = 0.1f;
-}
-
 
 SceneView::~SceneView()
 {
@@ -673,7 +665,6 @@ SceneView::~SceneView()
 	m_app.removeAction(&m_move_right_action);
 	m_app.removeAction(&m_move_up_action);
 	m_app.removeAction(&m_move_down_action);
-	m_app.removeAction(&m_camera_speed_action);
 	m_app.removeAction(&m_search_action);
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
@@ -1175,7 +1166,12 @@ void SceneView::onToolbar()
 		}
 	}
 
-	m_app.getAction("cameraSpeed")->toolbarButton(m_app.getBigIconFont());
+	ImGui::SameLine();
+	const ImVec4 bg_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
+	bool open_camera_transform = false;
+	if(ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_CAMERA, bg_color, "Camera transform")) {
+		open_camera_transform = true;
+	}
 
 	ImGui::PushItemWidth(50);
 	ImGui::SameLine();
@@ -1241,8 +1237,23 @@ void SceneView::onToolbar()
 	}
 
 	ImGui::PopItemWidth();
-
 	ImGuiEx::EndToolbar();
+
+	if (open_camera_transform) ImGui::OpenPopup("Camera transform");
+
+	if (ImGui::BeginPopup("Camera transform")) {
+		Viewport vp = m_editor.getView().getViewport();
+		if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
+			m_editor.getView().setViewport(vp);
+		}
+		Vec3 angles = vp.rot.toEuler();
+		if (ImGuiEx::InputRotation("Rotation", &angles.x)) {
+			vp.rot.fromEuler(angles);
+			m_editor.getView().setViewport(vp);
+		}
+		ImGui::Selectable(ICON_FA_TIMES " Close");
+		ImGui::EndPopup();
+	}
 }
 
 void SceneView::handleEvents() {

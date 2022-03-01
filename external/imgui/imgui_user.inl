@@ -857,7 +857,7 @@ namespace ImGuiEx {
 	bool InputRotation(const char* label, float* feuler) {
 		Lumix::Vec3 euler = radiansToDegrees(*(Lumix::Vec3*)feuler);
 		const float rot_change_speed = ImGui::GetIO().KeyAlt ? 10.f : 1.f; // we won't have precision without this
-		if (ImGui::DragFloat3("##rot", &euler.x, rot_change_speed, 0, 0, "%.2f")) {
+		if (ImGui::DragFloat3(label, &euler.x, rot_change_speed, 0, 0, "%.2f")) {
 			if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
 			euler.x = Lumix::degreesToRadians(Lumix::clamp(euler.x, -90.0f, 90.0f));
 			euler.y = Lumix::degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);

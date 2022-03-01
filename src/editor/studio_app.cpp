@@ -718,7 +718,6 @@ struct StudioAppImpl final : StudioApp
 				m_asset_compiler->onGUI();
 				m_property_grid->onGUI();
 				onEntityListGUI();
-				onEditCameraGUI();
 				onSaveAsDialogGUI();
 				for (auto* plugin : m_gui_plugins)
 				{
@@ -1115,7 +1114,6 @@ struct StudioAppImpl final : StudioApp
 	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
 	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
 	void addEntity() { m_editor->addEntity(); }
-	void setEditCamTransform() { m_is_edit_cam_transform_ui_open = !m_is_edit_cam_transform_ui_open; }
 	void lookAtSelected() { m_editor->getView().lookAtSelected(); }
 	void copyViewTransform() { m_editor->getView().copyTransform(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
@@ -1463,7 +1461,6 @@ struct StudioAppImpl final : StudioApp
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		menuItem("setEditCamTransform", true);
 		menuItem("lookAtSelected", is_any_entity_selected);
 		menuItem("copyViewTransform", is_any_entity_selected);
 		menuItem("snapDown", is_any_entity_selected);
@@ -1726,26 +1723,6 @@ struct StudioAppImpl final : StudioApp
 
 			ImGui::TreePop();
 		}
-	}
-
-
-	void onEditCameraGUI()
-	{
-		if (!m_is_edit_cam_transform_ui_open) return;
-		if (ImGui::Begin("Edit camera")) {
-			Viewport vp = m_editor->getView().getViewport();
-			ImGuiEx::Label("Position");
-			if (ImGui::DragScalarN("##pos", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
-				m_editor->getView().setViewport(vp);
-			}
-			Vec3 angles = vp.rot.toEuler();
-			ImGuiEx::Label("Rotation");
-			if (ImGui::DragFloat3("##rot", &angles.x, 0.01f)) {
-				vp.rot.fromEuler(angles);
-				m_editor->getView().setViewport(vp);
-			}
-		}
-		ImGui::End();
 	}
 
 	void folderUI(EntityFolders::FolderID folder_id, EntityFolders& folders, u32 level) {
@@ -2227,7 +2204,6 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
 		addAction<&StudioAppImpl::launchRenderDoc>(NO_ICON "Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc");
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::setEditCamTransform>(NO_ICON "Camera transform", "Set camera transformation", "setEditCamTransform");
 		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
 		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>(ICON_FA_IMAGES "Asset Browser", "Toggle asset browser", "assetBrowser", ICON_FA_IMAGES)
@@ -3350,7 +3326,6 @@ struct StudioAppImpl final : StudioApp
 	bool m_set_rename_focus = false;
 	char m_rename_buf[Universe::ENTITY_NAME_MAX_LENGTH];
 	bool m_is_f2_pressed = false;
-	bool m_is_edit_cam_transform_ui_open = false;
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
 	ImFont* m_bold_font;

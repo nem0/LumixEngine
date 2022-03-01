@@ -48,7 +48,6 @@ struct SceneView : StudioApp::GUIPlugin
 		RayCastModelHit castRay(float x, float y);
 		void handleDrop(const char* path, float x, float y);
 		void onToolbar();
-		void resetCameraSpeed();
 		void handleEvents();
 		void statsUI(float x, float y);
 		void toggleSearch() { m_search_request = true; }
@@ -68,7 +67,6 @@ struct SceneView : StudioApp::GUIPlugin
 		Action m_move_right_action;
 		Action m_move_up_action;
 		Action m_move_down_action;
-		Action m_camera_speed_action;
 		bool m_is_mouse_captured;
 		bool m_copy_moved = false;
 		bool m_show_stats;
