@@ -73,11 +73,6 @@ newoption {
 }
 
 newoption {
-	trigger = "pvs-studio-build",
-	description = "PVS Studio static analysis."
-}
-
-newoption {
 	trigger = "static-physx",
 	description = "Linked physx static lib."
 }

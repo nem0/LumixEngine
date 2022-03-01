@@ -68,7 +68,7 @@ jobs:
               shell: cmd
               run: |
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
-    linux_and_static_analysis:
+    linux:
         runs-on: ubuntu-20.04
         steps:
           - uses: actions/checkout@v1
@@ -76,18 +76,7 @@ jobs:
               fetch-depth: 1
 
           - name: Install Dependencies
-            env:
-              PVS_STUDIO_LICENSE: ${{ secrets.PVS_STUDIO_LICENSE }}
             run: |
-              if [[ "$PVS_STUDIO_LICENSE" != "" ]];
-              then
-                echo "$PVS_STUDIO_LICENSE" > pvs-studio.lic
-                wget -q https://files.viva64.com/etc/pubkey.txt
-                sudo apt-key add pubkey.txt
-                sudo wget -O /etc/apt/sources.list.d/viva64.list https://files.viva64.com/etc/viva64.list
-                sudo apt-get update
-                sudo apt-get install -y pvs-studio
-              fi
               sudo apt-get install mesa-common-dev
               sudo apt-get install libasound2-dev
               sudo apt-get install libgl1-mesa-dev
@@ -106,13 +95,9 @@ jobs:
               cp lumixengine_linux_3rdparty_bin/luajit/* ../external/luajit/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/physx/* ../external/physx/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/recast/* ../external/recast/lib/linux64_gmake/release
-          - name: PVS-Studio static analysis
+          - name: build
             run: |
               cd projects
-              ./genie --pvs-studio-build gmake
+              ./genie gmake
               cd tmp/gmake
               make -j
-# disabled for now since license expired
-#              pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
-#              pvs-studio-analyzer analyze -e ../../../src/renderer/editor/mikktspace.c -e ../../../src/renderer/editor/miniz.c -e ../../../src/engine/lz4.c -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
-#              plog-converter -a 'GA:1,2;OP:1' -d V730,V1001,V530,V1048,V763 -t errorfile -w pvs-studio.log
