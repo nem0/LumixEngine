@@ -142,13 +142,13 @@ namespace Lumix
 			#endif
 
 			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(), false, m_pvd);
-			LUMIX_FATAL(m_physics);
+			ASSERT(m_physics);
 
 			physx::PxTolerancesScale scale;
 			m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
 
 			if (!PxInitVehicleSDK(*m_physics)) {
-				LUMIX_FATAL(false);
+				ASSERT(false);
 			}
 			physx::PxVehicleSetBasisVectors(physx::PxVec3(0, 1, 0), physx::PxVec3(0, 0, -1));
 			physx::PxVehicleSetUpdateMode(physx::PxVehicleUpdateMode::eVELOCITY_CHANGE);

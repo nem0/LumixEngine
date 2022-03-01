@@ -11,13 +11,6 @@
 namespace Lumix
 {
 
-void fatal(bool cond, const char* msg)
-{
-	if (!cond) {
-		logError(msg, " is false.");
-		abort();
-	}
-}
 
 namespace detail {
 	struct Logger {

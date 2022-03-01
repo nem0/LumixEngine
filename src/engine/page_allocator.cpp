@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 PageAllocator::PageAllocator() {
-	LUMIX_FATAL(os::getMemPageAlignment() % PAGE_SIZE == 0);
+	ASSERT(os::getMemPageAlignment() % PAGE_SIZE == 0);
 }
 
 PageAllocator::~PageAllocator()

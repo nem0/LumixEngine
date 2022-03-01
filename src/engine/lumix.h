@@ -150,13 +150,11 @@ struct Color {
 	#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 	#define LUMIX_FORCE_INLINE __forceinline
 	#define LUMIX_RESTRICT __restrict
-	#define LUMIX_ATTRIBUTE_USED
 #else 
 	#define LUMIX_LIBRARY_EXPORT __attribute__((visibility("default")))
 	#define LUMIX_LIBRARY_IMPORT 
 	#define LUMIX_FORCE_INLINE __attribute__((always_inline)) inline
 	#define LUMIX_RESTRICT __restrict__
-	#define LUMIX_ATTRIBUTE_USED __attribute__((used))
 #endif
 
 #ifdef STATIC_PLUGINS

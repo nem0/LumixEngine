@@ -327,7 +327,6 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 			worker->m_current_fiber = fiber;
 
 			g_system->m_sync.enter();
-            LUMIX_FATAL(!this_fiber->current_job.task);
 			g_system->m_free_fibers.push(this_fiber);
 			Fiber::switchTo(&this_fiber->fiber, fiber->fiber);
 			g_system->m_sync.exit();

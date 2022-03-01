@@ -125,41 +125,6 @@ static constexpr PxF32 steer_vs_forward_speed_data[] =
 
 static const PxFixedSizeLookupTable<8> steer_vs_forward_speed(steer_vs_forward_speed_data, 4);
 
-struct OutputStream final : PxOutputStream
-{
-	explicit OutputStream(IAllocator& allocator)
-		: allocator(allocator)
-	{
-		data = (u8*)allocator.allocate(sizeof(u8) * 4096);
-		capacity = 4096;
-		size = 0;
-	}
-
-	~OutputStream() { allocator.deallocate(data); }
-
-
-	PxU32 write(const void* src, PxU32 count) override
-	{
-		if (size + (int)count > capacity)
-		{
-			int new_capacity = maximum(size + (int)count, capacity + 4096);
-			u8* new_data = (u8*)allocator.allocate(sizeof(u8) * new_capacity);
-			memcpy(new_data, data, size);
-			allocator.deallocate(data);
-			data = new_data;
-			capacity = new_capacity;
-		}
-		memcpy(data + size, src, count);
-		size += count;
-		return count;
-	}
-
-	u8* data;
-	IAllocator& allocator;
-	int capacity;
-	int size;
-};
-
 
 struct InputStream final : PxInputStream
 {
@@ -3521,7 +3486,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (version <= (i32)PhysicsSceneVersion::REMOVED_RAGDOLLS) {
 			u32 count;
 			serializer.read(count);
-			LUMIX_FATAL(count == 0); // ragdolls were removed
+			ASSERT(count == 0); // ragdolls were removed
 		}
 
 		if (version > (i32)PhysicsSceneVersion::INSTANCED_CUBE) {

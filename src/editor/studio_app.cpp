@@ -449,16 +449,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	bool makeFile(const char* path, const char* content) override
-	{
-		os::OutputFile file;
-		if (!m_engine->getFileSystem().open(path, file)) return false;
-		file << content;
-		file.close();
-		return file.isError();
-	}
-
-
 	void destroyAddCmpTreeNode(AddCmpTreeNode* node)
 	{
 		if (!node) return;

@@ -187,9 +187,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		auto* scene = static_cast<NavigationScene*>(cmp.scene);
 		Universe& universe = scene->getUniverse();
 		
-		RenderInterface* ri = m_app.getRenderInterface();
-		if (!ri) return false;
-
 		const NavmeshZone& zone = scene->getZone((EntityRef)cmp.entity);
 		const Transform tr = universe.getTransform((EntityRef)cmp.entity);
 

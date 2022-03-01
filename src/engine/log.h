@@ -3,12 +3,6 @@
 #include "engine/lumix.h"
 #include "engine/delegate_list.h"
 
-#ifdef LUMIX_PVS_STUDIO_BUILD
-	#define LUMIX_FATAL(cond) { false ? (void)(cond) : (void)0; }
-#else
-	#define LUMIX_FATAL(cond) Lumix::fatal((cond), #cond);
-#endif
-
 namespace Lumix {
 
 struct Path;
@@ -21,8 +15,6 @@ enum class LogLevel {
 
 	COUNT
 };
-
-LUMIX_ENGINE_API void fatal(bool cond, const char* msg);
 
 namespace detail {
 	using LogCallback = DelegateList<void (LogLevel, const char*)>;

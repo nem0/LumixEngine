@@ -34,11 +34,6 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
 
-static u32 ARGBToABGR(u32 color)
-{
-	return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) | (color & 0xff000000);
-}
-
 void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3& up, const Vec3& dir, Color color) {
 	UniverseView::Vertex* vertices = view.render(true, 24);
 	const DVec3& cam_pos = view.getViewport().pos;
