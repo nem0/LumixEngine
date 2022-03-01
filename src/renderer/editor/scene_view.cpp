@@ -11,7 +11,6 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "engine/allocators.h"
-#include "engine/crc32.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"

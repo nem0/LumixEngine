@@ -1,5 +1,4 @@
 #include <imgui/imgui.h>
-#include "crc32.h"
 #include "delegate.h"
 #include "engine.h"
 #include "file_system.h"

@@ -1,5 +1,4 @@
 #include "particle_system.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/atomic.h"
 #include "engine/debug.h"

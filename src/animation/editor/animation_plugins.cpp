@@ -9,7 +9,6 @@
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"

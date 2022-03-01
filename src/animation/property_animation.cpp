@@ -1,5 +1,4 @@
 #include "animation/property_animation.h"
-#include "engine/crc32.h"
 #include "engine/allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"

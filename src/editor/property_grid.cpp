@@ -5,7 +5,6 @@
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/plugin.h"
 #include "engine/math.h"

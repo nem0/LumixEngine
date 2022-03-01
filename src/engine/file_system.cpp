@@ -2,7 +2,6 @@
 
 #include "engine/allocator.h"
 #include "engine/array.h"
-#include "engine/crc32.h"
 #include "engine/delegate_list.h"
 #include "engine/flag_set.h"
 #include "engine/hash_map.h"

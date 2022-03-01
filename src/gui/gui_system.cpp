@@ -1,5 +1,4 @@
 ﻿#include "gui_system.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/allocator.h"
 #include "engine/input_system.h"

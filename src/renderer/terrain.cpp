@@ -1,5 +1,4 @@
 #include "terrain.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
