@@ -72,96 +72,6 @@ struct TarHeader {
 #define NO_ICON "     "
 
 
-struct LuaPlugin : StudioApp::GUIPlugin
-{
-	LuaPlugin(StudioApp& app, Span<const char> src, const char* filename)
-		: m_app(app)
-	{
-		L = lua_newthread(app.getEngine().getState());						 // [thread]
-		m_thread_ref = luaL_ref(app.getEngine().getState(), LUA_REGISTRYINDEX); // []
-
-		lua_newtable(L);						  // [env]
-												  // reference environment
-		lua_pushvalue(L, -1);					  // [env, env]
-		m_env_ref = luaL_ref(L, LUA_REGISTRYINDEX); // [env]
-
-		// environment's metatable & __index
-		lua_pushvalue(L, -1);	// [env, env]
-		lua_setmetatable(L, -2); // [env]
-		lua_pushvalue(L, LUA_GLOBALSINDEX);
-		lua_setfield(L, -2, "__index"); // [env]
-
-		bool errors = luaL_loadbuffer(L, src.m_begin, src.length(), filename) != 0; // [env, func]
-
-		lua_pushvalue(L, -2); // [env, func, env]
-		lua_setfenv(L, -2);   // function's environment [env, func]
-
-		errors = errors || lua_pcall(L, 0, 0, 0) != 0; // [env]
-		if (errors)
-		{
-			logError(filename, ": ", lua_tostring(L, -1));
-			lua_pop(L, 1);
-		}
-
-		lua_getfield(L, -1, "plugin_name"); // [env, plugin_name]
-		const char* name = "LuaPlugin";
-		if (lua_type(L, -1) == LUA_TSTRING) {
-			name = lua_tostring(L, -1);
-		}
-
-		lua_pop(L, 2); // []
-
-		m_toggle_ui.init(name, name, name, "", true);
-		m_toggle_ui.func.bind<&LuaPlugin::onAction>(this);
-		app.addWindowAction(&m_toggle_ui);
-		m_is_open = false;
-
-		lua_pop(L, 1); // plugin_name
-	}
-
-
-	~LuaPlugin()
-	{
-		m_app.removeAction(&m_toggle_ui);
-		lua_State* L = m_app.getEngine().getState();
-		luaL_unref(L, LUA_REGISTRYINDEX, m_env_ref);
-		luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
-	}
-
-
-	const char* getName() const override { return "lua_script"; }
-
-
-	void onAction() { m_is_open = !m_is_open; }
-
-
-	void onWindowGUI() override
-	{
-		if (!m_is_open) return;
-
-		lua_rawgeti(L, LUA_REGISTRYINDEX, m_env_ref); // [env]
-		lua_getfield(L, -1, "onGUI"); // [env, onGUI]
-		if (lua_type(L, -1) == LUA_TFUNCTION) {
-			if (lua_pcall(L, 0, 0, 0) != 0) {
-				logError("LuaPlugin:", lua_tostring(L, -1));
-				lua_pop(L, 1);
-			}
-			lua_pop(L, 1);
-		}
-		else {
-			lua_pop(L, 2);
-		}
-	}
-
-	StudioApp& m_app;
-	lua_State* L;
-	int m_thread_ref;
-	int m_env_ref;
-	bool m_is_open;
-	Action m_toggle_ui;
-};
-
-
 struct StudioAppImpl final : StudioApp
 {
 	StudioAppImpl()
@@ -470,7 +380,6 @@ struct StudioAppImpl final : StudioApp
 		setStudioApp();
 		loadSettings();
 		loadUniverseFromCommandLine();
-		findLuaPlugins("plugins/lua/");
 
 		m_asset_compiler->onInitFinished();
 		m_asset_browser->onInitFinished();
@@ -3293,21 +3202,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void loadLuaPlugin(const char* dir, const char* filename)
-	{
-		StaticString<LUMIX_MAX_PATH> path(dir, filename);
-
-		OutputMemoryStream src(m_engine->getAllocator());
-		if (m_engine->getFileSystem().getContentSync(Path(path), src)) {
-			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, Span((const char*)src.data(), (u32)src.size()), filename);
-			addPlugin(*plugin);
-		}
-		else {
-			logWarning("Failed to load ", path);
-		}
-	}
-
-
 	void scanUniverses()
 	{
 		m_universes.clear();
@@ -3323,37 +3217,6 @@ struct StudioAppImpl final : StudioApp
 			char basename[LUMIX_MAX_PATH];
 			copyString(Span(basename), Path::getBasename(info.filename));
 			m_universes.emplace(basename);
-		}
-		os::destroyFileIterator(iter);
-	}
-
-
-	void findLuaPlugins(const char* dir)
-	{
-		auto* iter = m_engine->getFileSystem().createFileIterator(dir);
-		os::FileInfo info;
-		while (os::getNextFile(iter, &info))
-		{
-			char normalized_path[LUMIX_MAX_PATH];
-			Path::normalize(info.filename, Span(normalized_path));
-			if (normalized_path[0] == '.') continue;
-			if (info.is_directory)
-			{
-				char dir_path[LUMIX_MAX_PATH] = {0};
-				if (dir[0] != '.') copyString(dir_path, dir);
-				catString(dir_path, info.filename);
-				catString(dir_path, "/");
-				findLuaPlugins(dir_path);
-			}
-			else
-			{
-				char ext[5];
-				copyString(Span(ext), Path::getExtension(Span(info.filename, stringLength(info.filename))));
-				if (equalIStrings(ext, "lua"))
-				{
-					loadLuaPlugin(dir, info.filename);
-				}
-			}
 		}
 		os::destroyFileIterator(iter);
 	}
@@ -3512,26 +3375,6 @@ struct StudioAppImpl final : StudioApp
 		bool reload_request = false;
 	} m_watched_plugin;
 };
-
-
-static size_t alignMask(size_t _value, size_t _mask)
-{
-	return (_value + _mask) & ((~0) & (~_mask));
-}
-
-
-static void* alignPtr(void* _ptr, size_t _align)
-{
-	union {
-		void* ptr;
-		size_t addr;
-	} un;
-	un.ptr = _ptr;
-	size_t mask = _align - 1;
-	size_t aligned = alignMask(un.addr, mask);
-	un.addr = aligned;
-	return un.ptr;
-}
 
 static Local<StudioAppImpl> g_studio;
 
