@@ -232,8 +232,8 @@ static bool load_gl_linux(void* wnd){
 
 	int major, minor;
 	const bool version_res = glXQueryVersion(display, &major, &minor);
-	LUMIX_FATAL(version_res);
-	LUMIX_FATAL((major == 1 && minor >= 2) || major > 1);
+	ASSERT(version_res);
+	ASSERT((major == 1 && minor >= 2) || major > 1);
 
 	const i32 screen = DefaultScreen(display);
 	const int attrs[] = {
@@ -277,10 +277,10 @@ static bool load_gl_linux(void* wnd){
 		visual = NULL;
 	}
 
-	LUMIX_FATAL(visual);
+	ASSERT(visual);
 
 	GLXContext ctx = glXCreateContext(display, visual, 0, GL_TRUE);
-	LUMIX_FATAL(ctx);
+	ASSERT(ctx);
 
 	PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
 	glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress( (const GLubyte*)"glXCreateContextAttribsARB");
@@ -912,7 +912,7 @@ void setCurrentWindow(void* window_handle) {
 					return i;
 				}
 			}
-			LUMIX_FATAL(false);
+			ASSERT(false);
 			return gl->contexts[0];
 		}();
 
