@@ -805,7 +805,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 
 			ImGui::PushItemWidth(150);
-			if (ImGui::InputTextWithHint("##search", "Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue)) changeDir(m_dir);
+			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue)) changeDir(m_dir);
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear search")) {
