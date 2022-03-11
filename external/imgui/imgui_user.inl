@@ -881,8 +881,6 @@ namespace ImGuiEx {
 		textRect.Max.x += fullWidth - itemWidth;
 		textRect.Max.y += textSize.y;
 
-		SetCursorScreenPos(textRect.Min);
-
 		AlignTextToFramePadding();
 		textRect.Min.y += window->DC.CurrLineTextBaseOffset;
 		textRect.Max.y += window->DC.CurrLineTextBaseOffset;
@@ -896,9 +894,8 @@ namespace ImGuiEx {
 			if (textRect.GetWidth() < textSize.x && IsItemHovered())
 				SetTooltip("%s", label);
 		}
-		SetCursorScreenPos(textRect.Max - ImVec2{0, textSize.y + window->DC.CurrLineTextBaseOffset});
 		SameLine();
-		SetNextItemWidth(itemWidth);
+		SetNextItemWidth(-1);
 	}
 
 	bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values) {

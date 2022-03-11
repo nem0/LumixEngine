@@ -70,6 +70,8 @@ struct CoreSceneImpl : CoreScene {
 		return m_splines[e];
 	}
 
+	const HashMap<EntityRef, Spline>& getSplines() override { return m_splines; }
+
 	static void reflect() {
 		LUMIX_SCENE(CoreSceneImpl, "core")
 			.LUMIX_CMP(Spline, "spline", "Core / Spline")

@@ -257,7 +257,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 		void submitTask(PxBaseTask& task) override
 		{
 			jobs::runLambda([&task]() {
-					PROFILE_FUNCTION();
+					PROFILE_BLOCK(task.getName());
+					profiler::blockColor(0x50, 0xff, 0x50);
 					task.run();
 					task.release();
 				},

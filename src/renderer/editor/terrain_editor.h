@@ -20,6 +20,28 @@ struct PrefabResource;
 struct RenderScene;
 struct Texture;
 
+struct DistanceField {
+	DistanceField(IAllocator& allocator);
+	void resize(u32 w, u32 h);
+	void clear();
+
+	struct Header {
+		static constexpr u32 MAGIC = '_LDF';
+		u32 magic = MAGIC;
+		u32 version = 0;
+		u32 width;
+		u32 height;
+	};
+
+	bool load(FileSystem& fs, IAllocator& allocator);
+	bool load(InputMemoryStream& blob);
+	void save(FileSystem& fs, IAllocator& allocator);
+
+	u32 width;
+	u32 height;
+	Array<float> data;
+	String name;
+};
 
 struct TerrainEditor final : StudioApp::MousePlugin {
 	enum class Mode {
@@ -44,6 +66,8 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 	void onGUI(ComponentUID cmp, WorldEditor& editor);
 
 private:
+	void distanceFieldsUI(ComponentUID cmp);
+	void getDistanceField(const struct Terrain& terrain, DistanceField& df, const struct Spline& spline, EntityRef spline_entity) const;
 	void fillGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	void clearGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	void exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
@@ -100,6 +124,7 @@ private:
 	Vec2 m_rotate_z_spread;
 	CompositeTexture m_albedo_composite;
 	Path m_albedo_composite_path;
+	Array<DistanceField> m_distance_fields;
 
 	struct {
 		char albedo[LUMIX_MAX_PATH] = "";

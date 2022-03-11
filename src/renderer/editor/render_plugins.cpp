@@ -50,6 +50,7 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
+#include "renderer/terrain.h"
 #include "scene_view.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
@@ -711,8 +712,10 @@ struct SplineIterator {
 };
 
 struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
-	SplineGeometryPlugin(StudioApp& app) : m_app(app) {}
-	
+	SplineGeometryPlugin(StudioApp& app) 
+		: m_app(app)
+	{}
+
 	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
 		if (cmp.type != SPLINE_GEOMETRY_TYPE) return;
 
@@ -725,12 +728,12 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 			}
 		}
 		else {
+			RenderScene* render_scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
+			CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
+			const Spline& spline = core_scene->getSpline(e);
+			const SplineGeometry& sg = render_scene->getSplineGeometry(e);
 			if (ImGui::Button("Generate geometry")) {
-				CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
-				RenderScene* render_scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
-				const Spline& spline = core_scene->getSpline(e);
 				if (!spline.points.empty()) {
-					const SplineGeometry& sg = render_scene->getSplineGeometry(e);
 					const float width = sg.width;
 					SplineIterator iterator(spline.points);
 					gpu::VertexDecl decl;
@@ -786,6 +789,7 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 	}
 
 	StudioApp& m_app;
+	float m_dig_depth = 1.f;
 };
 
 struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin

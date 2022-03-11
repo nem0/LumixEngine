@@ -7,6 +7,7 @@
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "engine/core.h"
 #include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
@@ -36,6 +37,7 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 static const ComponentType HEIGHTFIELD_TYPE = reflection::getComponentType("physical_heightfield");
 static const char* HEIGHTMAP_SLOT_NAME = "Heightmap";
 static const char* SPLATMAP_SLOT_NAME = "Splatmap";
@@ -679,6 +681,7 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	, m_size_spread(1, 1)
 	, m_y_spread(0, 0)
 	, m_albedo_composite(app.getAllocator())
+	, m_distance_fields(app.getAllocator())
 {
 	m_smooth_terrain_action.init("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "", false);
 	m_lower_terrain_action.init("Lower terrain", "Terrain editor - lower", "lowerTerrain", "", false);
@@ -702,6 +705,401 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	m_is_rotate_y = false;
 	m_is_rotate_z = false;
 	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
+
+	FileSystem& fs = app.getEngine().getFileSystem();
+	StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), "/universes/distance_fields");
+	os::FileIterator* iter = os::createFileIterator(path, app.getAllocator());
+	os::FileInfo info;
+	while (os::getNextFile(iter, &info)) {
+		if (info.is_directory) continue;
+		if (!Path::hasExtension(info.filename, "df")) continue;
+
+		DistanceField df(app.getAllocator());
+		df.name = Path::getBasename(info.filename);
+		if (!df.load(fs, app.getAllocator())) {
+			logError("Failed to load ", info.filename);
+		}
+		m_distance_fields.push(static_cast<DistanceField&&>(df));
+
+	}
+	os::destroyFileIterator(iter);
+}
+
+DistanceField::DistanceField(IAllocator& allocator) 
+	: data(allocator)
+	, name(allocator)
+{}
+
+void DistanceField::resize(u32 w, u32 h) {
+	width = w;
+	height = h;
+	data.resize(w * h);
+	clear();
+}
+
+void DistanceField::clear() {
+	for (float& f : data) f = FLT_MAX;
+}
+
+bool DistanceField::load(FileSystem& fs, IAllocator& allocator) {
+	const StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), "universes/distance_fields/", name.c_str(), ".df");
+	os::InputFile file;
+	if (!file.open(path)) {
+		logError("Failed to open ", path);
+		return false;
+	}
+	OutputMemoryStream blob(allocator);
+	blob.resize(file.size());
+	if (!file.read(blob.getMutableData(), blob.size())) {
+		logError("Failed to read ", path);
+		file.close();
+		return false;
+	}
+	file.close();
+	InputMemoryStream input(blob);
+	return load(input);
+}
+
+bool DistanceField::load(InputMemoryStream& blob) {
+	Header header;
+	blob.read(header);
+	if (header.magic != Header::MAGIC) return false;
+	if (header.version > 0) return false;
+	name = blob.readString();
+	width = header.width;
+	height = header.height;
+	data.resize(width * height);
+	blob.read(data.begin(), data.byte_size());
+	return blob.getPosition() == blob.size();
+}
+
+void DistanceField::save(FileSystem& fs, IAllocator& allocator) {
+	StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), "universes/distance_fields/");
+	if (!os::makePath(path)) {
+		logError("Failed to create ", path);
+	}
+	path.add(name.c_str());
+	path.add(".df");
+
+	OutputMemoryStream blob(allocator);
+	Header header;
+	header.width = width;
+	header.height = height;
+	blob.write(header);
+	blob.writeString(name.c_str());
+	blob.write(data.begin(), data.byte_size());
+
+	os::OutputFile file;
+	if (file.open(path)) {
+		if (!file.write(blob.data(), blob.size())) {
+			logError("Failed to write ", path);
+		}
+		file.close();
+	}
+	else {
+		logError("Failed to create ", path);
+	}
+}
+
+static Vec2 abs(Vec2 v) { return {fabsf(v.x), fabsf(v.y)}; }
+static float cross2(Vec2 a, Vec2 b) { return a.x * b.y - a.y * b.x; }
+static Vec2 pow(Vec2 a, Vec2 b) { return {powf(a.x, b.x), powf(a.y, b.y)}; }
+static Vec2 sign(Vec2 v) { return {signum(v.x), signum(v.y)}; }
+
+// from curve_decal.shd
+static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {    
+	Vec2 a = B - A;
+	Vec2 b = A - B * 2.f + C;
+	Vec2 c = a * 2.f;
+	Vec2 d = A - pos;
+
+	float kk = 1.f / dot(b, b);
+	float kx = kk * dot(a, b);
+	float ky = kk * (2.f * dot(a, a) + dot(d, b)) / 3.f;
+	float kz = kk * dot(d, a);
+
+	float res = 0.f;
+
+	float p = ky - kx * kx;
+	float p3 = p * p * p;
+	float q = kx * (2.f * kx * kx - 3.f * ky) + kz;
+	float h = q * q + 4.f * p3;
+	float res_t;
+
+	if (h >= 0.f) { // 1 root
+		h = sqrtf(h);
+		Vec2 x = (Vec2(h, -h) - q) / 2.f;
+		Vec2 uv = sign(x) * pow(abs(x), Vec2(1.f / 3.f));
+		float t = clamp(uv.x + uv.y - kx, 0.f, 1.f);
+		Vec2 q = d + (c + b * t) * t;
+		res = dot(q, q);
+		res_t = t;
+	}
+	else { // 3 roots
+		float z = sqrtf(-p);
+		float v = acosf(q / (p * z * 2.f)) / 3.f;
+		float m = cosf(v);
+		float n = sinf(v) * 1.732050808f;
+		Vec3 t = clamp(Vec3(m + m, -n - m, n - m) * z - Vec3(kx), Vec3(0), Vec3(1));
+		Vec2 qx = d + (c + b * t.x) * t.x;
+		float dx = dot(qx, qx), sx = cross2(c + b * 2.f * t.x, qx);
+		Vec2 qy = d + (c + b * t.y) * t.y;
+		float dy = dot(qy, qy), sy = cross2(c + b * 2.f * t.y, qy);
+		if (dx < dy) {
+			res = dx;
+			res_t = t.x;
+		} else {
+			res = dy;
+			res_t = t.y;
+		}
+	}
+    
+	return sqrtf(res);
+}
+
+void TerrainEditor::getDistanceField(const Terrain& terrain, DistanceField& df, const Spline& spline, EntityRef spline_entity) const {
+	const Universe& universe = *m_app.getWorldEditor().getUniverse();
+	const Transform spline_tr = universe.getTransform(spline_entity);
+	const Transform terrain_tr = universe.getTransform(terrain.m_entity);
+	const Transform spline_to_terrain = terrain_tr.inverted() * spline_tr;
+	for (u32 i = 0, c = spline.points.size() - 2; i < c; ++i) {
+		Vec3 p0 = spline.points[i];
+		Vec3 p1 = spline.points[i + 1];
+		Vec3 p2 = spline.points[i + 2];
+			
+		p0 = Vec3(spline_to_terrain.transform(p0));
+		p1 = Vec3(spline_to_terrain.transform(p1));
+		p2 = Vec3(spline_to_terrain.transform(p2));
+			
+		p0 = (p0 + p1) * 0.5f;
+		p2 = (p1 + p2) * 0.5f;
+
+		const Vec2 p0xz = p0.xz() / terrain.m_scale.xz();
+		const Vec2 p1xz = p1.xz() / terrain.m_scale.xz();
+		const Vec2 p2xz = p2.xz() / terrain.m_scale.xz();
+
+		Vec2 min = minimum(minimum(p0xz, p1xz), p2xz);
+		Vec2 max = maximum(maximum(p0xz, p1xz), p2xz);
+
+		min = min - Vec2(30);
+		max = max + Vec2(30);
+
+		const Vec2 size((float)df.width, (float)df.height);
+		min = clamp(min, Vec2(0), size);
+		max = clamp(max, Vec2(0), size);
+
+		for (u32 j = (u32)min.y, cj = (u32)max.y; j < cj; ++j) {
+			for (u32 i = (u32)min.x, ci = (u32)max.x; i < ci; ++i) {
+				float& f = df.data[i + j * df.width]; 
+				f = minimum(f, bezierDistance(Vec2((float)i, (float)j), p0xz, p1xz, p2xz));
+			}
+		}
+	}
+}
+
+struct TerrainTextureChangeCommand : IEditorCommand {
+	TerrainTextureChangeCommand(WorldEditor& editor, Terrain& terrain, bool splatmap, IAllocator& allocator)
+		: editor(editor)
+		, before(allocator)
+		, after(allocator)
+		, entity(terrain.m_entity)
+		, splatmap(splatmap)
+	{
+		Texture* texture = splatmap ? terrain.m_splatmap : terrain.m_heightmap;
+		const u8* mask = texture->getData();
+		const u32 size = texture->width * texture->height * (splatmap ? 4 : 2);
+		before.resize(size);
+		after.resize(size);
+		memcpy(before.getMutableData(), mask, size);
+		memcpy(after.getMutableData(), mask, size);
+	}
+
+	bool apply(OutputMemoryStream& blob) {
+		RenderScene* render_scene = (RenderScene*)editor.getUniverse()->getScene(TERRAIN_TYPE);
+		Terrain* terrain = render_scene->getTerrain(entity);
+		if (!terrain) return false;
+		Texture* texture = splatmap ? terrain->m_splatmap : terrain->m_heightmap;
+		
+		if (!texture) return false;
+		if (!texture->isReady()) return false;
+		
+		u8* data = texture->getData();
+		if (!data) return false;
+		
+		const u32 bytes_per_pixel = splatmap ? 4 : 2; 
+		if (texture->width * texture->height * bytes_per_pixel != blob.size()) return false;
+
+		memcpy(data, blob.data(), blob.size());
+		texture->onDataUpdated(0, 0, texture->width, texture->height);
+		return true;
+	}
+
+	bool execute() override { return apply(after); }
+	void undo() override { apply(before); }
+	const char* getType() override { return "terrain_texture_change"; }
+	bool merge(IEditorCommand& command) override { return false; }
+
+	WorldEditor& editor;
+	EntityRef entity;
+	OutputMemoryStream before;
+	OutputMemoryStream after;
+	bool splatmap;
+};
+
+void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
+	for (DistanceField& df : m_distance_fields) {
+		if (ImGui::TreeNode(df.name.c_str(), "%s %d x %d", df.name.c_str(), df.width, df.height)) {
+			RenderScene* render_scene = (RenderScene*)terrain_uid.scene;
+			Terrain* terrain = render_scene->getTerrain(*terrain_uid.entity);
+				
+			static float dig_depth = -1.f;
+			bool can_edit = terrain->m_heightmap;
+			can_edit = can_edit && terrain->m_heightmap->isReady(); 
+			can_edit = can_edit && terrain->m_heightmap->format == gpu::TextureFormat::R16; 
+			can_edit = can_edit && terrain->m_splatmap->isReady(); 
+			can_edit = can_edit && terrain->m_splatmap->format == gpu::TextureFormat::RGBA8; 
+			
+			if (can_edit) {
+				ASSERT(df.width == terrain->m_width);
+				ASSERT(df.height == terrain->m_height);
+				WorldEditor& editor = m_app.getWorldEditor();
+				IAllocator& allocator = editor.getAllocator();
+
+				if (ImGui::Button("Paint surface and grass")) {
+					UniquePtr<TerrainTextureChangeCommand> cmd = UniquePtr<TerrainTextureChangeCommand>::create(allocator, editor, *terrain, true, allocator);
+					u16* after = (u16*)cmd->after.getMutableData();
+
+					u8 tex[64];
+					u32 tex_count = 0;
+					for (u64 i = 0; i < 64; ++i) {
+						if (m_textures_mask & (u64(1) << i)) {
+							tex[tex_count] = u8(i);
+							++tex_count;
+						}
+					}
+
+					for (u32 j = 0; j < (u32)terrain->m_height; ++j) {
+						for (u32 i = 0; i < (u32)terrain->m_width; ++i) {
+							const u32 idx = i + j * terrain->m_width;
+							if (df.data[idx] < m_terrain_brush_size / terrain->m_scale.x) {
+								after[idx * 2 + 1] |= m_grass_mask;
+								if (tex_count > 0) after[idx * 2] = tex[rand() % tex_count];
+							}
+						}
+					}
+
+					editor.executeCommand(cmd.move());
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Clear grass")) {
+					UniquePtr<TerrainTextureChangeCommand> cmd = UniquePtr<TerrainTextureChangeCommand>::create(allocator, editor, *terrain, true, allocator);
+					u16* after = (u16*)(cmd->after.getMutableData() + 2);
+
+					for (u32 j = 0; j < (u32)terrain->m_height; ++j) {
+						for (u32 i = 0; i < (u32)terrain->m_width; ++i) {
+							const u32 idx = i + j * terrain->m_width;
+							if (df.data[idx] < m_terrain_brush_size / terrain->m_scale.x) {
+								after[idx * 2] = 0;
+							}
+						}
+					}
+
+					editor.executeCommand(cmd.move());
+				}
+
+				if (ImGui::Button("Dig")) {
+					UniquePtr<TerrainTextureChangeCommand> cmd = UniquePtr<TerrainTextureChangeCommand>::create(allocator, editor, *terrain, false, allocator);
+					u16* after = (u16*)cmd->after.getMutableData();
+
+					const float dig_amount = 65535.f * dig_depth / terrain->m_scale.y;
+
+					for (u32 j = 0; j < (u32)terrain->m_height; ++j) {
+						for (u32 i = 0; i < (u32)terrain->m_width; ++i) {
+							const u32 idx = i + j * terrain->m_width;
+							if (df.data[idx] < m_terrain_brush_size / terrain->m_scale.x) {
+								const float t = df.data[idx] / m_terrain_brush_size;
+								after[idx] += i32(dig_amount * (1 - t * t) + 0.5f);
+							}
+						}
+					}
+					editor.executeCommand(cmd.move());
+				}
+			}
+			ImGui::SameLine();
+			ImGuiEx::Label("Dig depth");
+			ImGui::DragFloat("##depth", &dig_depth);
+
+			if (ImGuiEx::IconButton(ICON_FA_REDO, "Reload")) df.load(m_app.getEngine().getFileSystem(), m_app.getAllocator());
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) df.save(m_app.getEngine().getFileSystem(), m_app.getAllocator());
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear")) df.clear();
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_PLUS, "Add spline")) {
+				ImGui::OpenPopup("add_spline");
+			}
+
+			if (ImGui::BeginPopup("add_spline")) {
+				CoreScene* core = (CoreScene*)render_scene->getUniverse().getScene(SPLINE_TYPE);
+				
+				const HashMap<EntityRef, Spline>& splines = core->getSplines();
+				static EntityPtr selected = INVALID_ENTITY;
+				char buf[64];
+				getEntityListDisplayName(m_app, *m_app.getWorldEditor().getUniverse(), Span(buf), selected);
+				if (ImGui::BeginCombo("##spline_ent", buf)) {
+					for (auto iter = splines.begin(), end = splines.end(); iter != end; ++iter) {
+						getEntityListDisplayName(m_app, *m_app.getWorldEditor().getUniverse(), Span(buf), iter.key());
+						if (ImGui::Selectable(buf)) selected = iter.key();
+					}
+					ImGui::EndCombo();
+				}
+				
+				if (selected.isValid()) {
+					auto iter = splines.find(*selected);
+					if (iter.isValid() && ImGui::Selectable(ICON_FA_CHECK " Add")) {
+						getDistanceField(*terrain, df, iter.value(), *selected);
+					}
+				}
+				ImGui::EndPopup();
+			}
+
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Delete")) {
+				StaticString<LUMIX_MAX_PATH> path("universes/distance_fields/", df.name.c_str(), ".df");
+				if (!m_app.getEngine().getFileSystem().deleteFile(path)) {
+					logError("Failed to delete ", path);
+				}
+				m_distance_fields.erase(u32(&df - m_distance_fields.begin()));
+				ImGui::TreePop();
+				break;
+			}
+			ImGui::TreePop();
+		}
+	}
+	if (ImGui::Button(ICON_FA_PLUS " Add")) {
+		ImGui::OpenPopup("Add distance field");
+	}
+
+	if (ImGui::BeginPopup("Add distance field")) {
+		static char name[64] = "";
+		static i32 w = 4096, h = 4096;
+		ImGuiEx::Label("Name");
+		ImGui::InputText("##name", name, sizeof(name));
+		ImGuiEx::Label("Width");
+		ImGui::DragInt("##w", &w);
+		ImGuiEx::Label("Height");
+		ImGui::DragInt("##h", &h);
+
+		if (ImGui::Selectable(ICON_FA_CHECK " Add")) {
+			DistanceField& df = m_distance_fields.emplace(m_app.getAllocator());
+			df.name = name;
+			df.resize(w, h);
+		}
+		
+		ImGui::Dummy(ImVec2(150, 1));
+		ImGui::EndPopup();
+	}
 }
 
 
@@ -1407,7 +1805,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 
 	// TODO shader does not handle secondary surfaces now, so pretend they don't exist
 	// uncomment once shader is ready
-	m_layers_mask = 0xb11;
+	// m_layers_mask = 0xb11;
 	/*ImGuiEx::Label("Primary surface");
 	ImGui::Checkbox("##prim", &primary);
 	ImGuiEx::Label("Secondary surface");
@@ -1809,6 +2207,11 @@ void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 
 		if (ImGui::BeginTabItem("Entity")) {
 			entityGUI();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Distance fields")) {
+			distanceFieldsUI(cmp);
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();

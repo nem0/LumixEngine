@@ -78,7 +78,6 @@ struct LUMIX_ENGINE_API Universe {
 	void setLocalPosition(EntityRef entity, const DVec3& pos);
 	void setLocalRotation(EntityRef entity, const Quat& rot);
 	void setLocalTransform(EntityRef entity, const Transform& transform);
-	Transform computeLocalTransform(EntityRef parent, const Transform& global_transform) const;
 
 	Matrix getRelativeMatrix(EntityRef entity, const DVec3& base_pos) const;
 	void setTransform(EntityRef entity, const RigidTransform& transform);

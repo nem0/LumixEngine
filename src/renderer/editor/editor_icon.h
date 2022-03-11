@@ -35,7 +35,6 @@ struct EditorIcons
 	};
 
 	static UniquePtr<EditorIcons> create(struct WorldEditor& editor, struct RenderScene& scene);
-	static void destroy(EditorIcons& icons);
 
 	virtual ~EditorIcons() {}
 

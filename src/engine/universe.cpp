@@ -601,13 +601,6 @@ void Universe::setLocalRotation(EntityRef entity, const Quat& rot)
 }
 
 
-Transform Universe::computeLocalTransform(EntityRef parent, const Transform& global_transform) const
-{
-	Transform parent_tr = getTransform(parent);
-	return parent_tr.inverted() * global_transform;
-}
-
-
 void Universe::setLocalTransform(EntityRef entity, const Transform& transform)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
