@@ -347,12 +347,12 @@ bool getEvent(Event& event) {
 			event.type = Event::Type::KEY;
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
-			return true;
+			break;
 		case WM_SYSKEYUP:
 			event.type = Event::Type::KEY;
 			event.key.down = false;
 			event.key.keycode = (Keycode)msg.wParam;
-			return true;
+			break;
 		case WM_KEYDOWN:
 			event.type = Event::Type::KEY;
 			event.key.down = true;
