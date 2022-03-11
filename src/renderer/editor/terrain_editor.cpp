@@ -970,6 +970,14 @@ Terrain* TerrainEditor::getTerrain() const {
 	return scene->getTerrain(selected_entities[0]);
 }
 
+struct PrefabProbability {
+	PrefabResource* resource;
+	Vec4 distances;
+	Vec2 scale;
+	Vec2 y_offset;
+	float multiplier = 1.f;
+};
+
 struct ModelProbability {
 	Model* resource;
 	Vec4 distances;
@@ -977,6 +985,56 @@ struct ModelProbability {
 	Vec2 y_offset;
 	float multiplier = 1.f;
 };
+
+static void getPrefabs(StudioApp& app, lua_State* L, i32 idx, const char* key, Array<PrefabProbability>& prefabs) {
+	const int type = LuaWrapper::getField(L, idx, key);
+	if (type == LUA_TNIL) luaL_error(L, "missing `%s`", key);
+	if (type != LUA_TTABLE) luaL_error(L, "`%s` is not a table", key);
+		
+	WorldEditor& editor = app.getWorldEditor();
+	ResourceManagerHub& rm = editor.getEngine().getResourceManager();
+	
+	const i32 n = (int)lua_objlen(L, -1);
+	for (i32 i = 0; i < n; ++i) {
+		lua_rawgeti(L, -1, i + 1);
+		if(lua_istable(L, -1)) {
+			if (LuaWrapper::getField(L, -1, "prefab") != LUA_TSTRING) {
+				lua_pop(L, 1);
+				luaL_argerror(L, idx, "'prefab' is not string or is missing");
+			}
+			const char* prefab_path = LuaWrapper::toType<const char*>(L, -1);
+			PrefabResource* res = rm.load<PrefabResource>(Path(prefab_path));
+			lua_pop(L, 1);
+			lua_getfield(L, -1, "distances");
+			if (!LuaWrapper::isType<Vec4>(L, -1)) {
+				lua_pop(L, 1);
+				res->decRefCount();
+				luaL_argerror(L, idx, "'distances' is not vec4 or is missing");
+			}
+			const Vec4 distances = LuaWrapper::toType<Vec4>(L, -1);
+			lua_pop(L, 1);
+
+			Vec2 scale = Vec2(1, 1);
+			LuaWrapper::getOptionalField(L, -1, "scale", &scale);
+			Vec2 y_offset = Vec2(0, 0);
+			LuaWrapper::getOptionalField(L, -1, "y_offset", &y_offset);
+
+			PrefabProbability& prob = prefabs.emplace();
+			LuaWrapper::getOptionalField(L, -1, "multiplier", &prob.multiplier);
+			prob.resource = res;
+			prob.distances = distances;
+			prob.scale = scale;
+			prob.y_offset = y_offset;
+		}
+		else {
+			lua_pop(L, 1);
+			luaL_argerror(L, idx, "table of prefabs expected");
+		}
+		lua_pop(L, 1);
+	}
+
+	lua_pop(L, 1);
+}
 
 static void getModels(StudioApp& app, lua_State* L, i32 idx, const char* key, Array<ModelProbability>& prefabs) {
 	const int type = LuaWrapper::getField(L, idx, key);
@@ -1062,6 +1120,98 @@ static u32 getRandomItem(float distance, const Array<T>& probs) {
 	ASSERT(false);
 	return 0xffFFffFF;
 }
+
+
+int TerrainEditor::placePrefabs(lua_State* L) {
+	const int index = lua_upvalueindex(1);
+	if (!LuaWrapper::isType<TerrainEditor>(L, index)) {
+		ASSERT(false);
+		return luaL_error(L, "Invalid Lua closure");
+	}
+
+	TerrainEditor* that = LuaWrapper::toType<TerrainEditor*>(L, index);
+	
+	float spacing;
+	if (!LuaWrapper::checkField(L, 1, "spacing", &spacing)) {
+		return luaL_error(L, "missing `spacing`");
+	}
+
+	char df_name[128];
+	if (!LuaWrapper::checkStringField(L, 1, "distance_field", Span(df_name))) {
+		return luaL_error(L, "missing `distance_field`");
+	}
+
+	DistanceField* df = that->findDistanceField(df_name);
+	if (!df) return luaL_error(L, "`distance_field` %s not found", df_name);
+
+	Terrain* terrain = that->getTerrain();
+	if (!terrain) return luaL_error(L, "no terrain is selected");
+
+	Array<PrefabProbability> prefabs(that->m_app.getAllocator());
+	getPrefabs(that->m_app, L, 1, "prefabs", prefabs);
+	if (prefabs.empty()) return 0;
+
+	WorldEditor& editor = that->m_app.getWorldEditor();
+	Universe* universe = editor.getUniverse();
+	RenderScene* render_scene = (RenderScene*)universe->getScene(TERRAIN_TYPE);
+	Array<Array<Transform>> transforms(that->m_app.getAllocator());
+	const i32 prefabs_count = prefabs.size();
+	for (const auto& prefab : prefabs) {
+		transforms.emplace(that->m_app.getAllocator());
+	}
+
+	const double y_base = universe->getPosition(terrain->m_entity).y;
+	const Vec2 size = render_scene->getTerrainSize(terrain->m_entity);
+	const Vec2 df_to_terrain = size / Vec2((float)df->width, (float)df->height);
+	const Vec2 terrain_to_df = Vec2((float)df->width, (float)df->height) / size;
+
+	for (float y = 0; y < df->height; y += spacing * terrain_to_df.y) {
+		for (float x = 0; x < df->width; x += spacing * terrain_to_df.x) {
+			const i32 idx = i32(x) + i32(y) * df->width;
+			const float distance = df->data[idx];
+			if (distance > 0.01f) {
+				float fx = (x + spacing * randFloat() * 0.9f - spacing * 0.45f);
+				float fy = (y + spacing * randFloat() * 0.9f - spacing * 0.45f);
+				fx = clamp(fx, 0.f, (float)df->width - 1);
+				fy = clamp(fy, 0.f, (float)df->height - 1);
+
+				DVec3 pos;
+				pos.x = fx * df_to_terrain.x;
+				pos.z = fy * df_to_terrain.y;
+				pos.y = render_scene->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
+
+				pos.x -= size.x * 0.5f;
+				pos.y += y_base;
+				pos.z -= size.y * 0.5f;
+					
+				const u32 r = getRandomItem(distance, prefabs);
+				if (r != 0xffFFffFF) {
+					const Vec2& yoffset_range = prefabs[r].y_offset;
+					pos.y += lerp(yoffset_range.x, yoffset_range.y, randFloat());
+
+					const Vec2& scale_range = prefabs[r].scale;
+					const float scale = lerp(scale_range.x, scale_range.y, randFloat());
+					transforms[r].push({pos, Quat(Vec3(0, 1, 0), randFloat() * 2 * PI), scale});
+				}
+			}
+		}
+	}
+
+	FileSystem& fs = editor.getEngine().getFileSystem();
+	while (fs.hasWork()) {
+		os::sleep(10);
+		fs.processCallbacks();
+	}
+
+	editor.beginCommandGroup("maps_place_prefabs");
+	for (u32 i = 0; i < (u32)prefabs.size(); ++i) {
+		if (!transforms[i].empty()) editor.getPrefabSystem().instantiatePrefabs(*prefabs[i].resource, transforms[i]);
+		prefabs[i].resource->decRefCount();
+	}
+	editor.endCommandGroup();
+	return 0;
+}
+
 
 int TerrainEditor::placeInstances(lua_State* L) {
 	const int index = lua_upvalueindex(1);
@@ -1171,6 +1321,7 @@ int TerrainEditor::placeInstances(lua_State* L) {
 void TerrainEditor::registerLuaAPI() {
 	lua_State* L = m_app.getEngine().getState();
 	LuaWrapper::createSystemClosure(L, "TerrainEditor", this, "placeInstances", placeInstances);
+	LuaWrapper::createSystemClosure(L, "TerrainEditor", this, "placePrefabs", placePrefabs);
 }
 
 void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {

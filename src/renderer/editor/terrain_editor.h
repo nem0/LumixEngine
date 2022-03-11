@@ -67,6 +67,7 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 
 private:
 	static int placeInstances(lua_State* L);
+	static int placePrefabs(lua_State* L);
 	void registerLuaAPI();
 	DistanceField* findDistanceField(const char* name) const;
 	struct Terrain* getTerrain() const;
