@@ -1092,14 +1092,39 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	}
 	else if (Path::hasExtension(path, "fbx"))
 	{
-		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
+		if (stristr(path, ".phy:"))
+		{
+			if (hit.is_hit && hit.entity.isValid())
+			{
+				m_editor.beginCommandGroup("insert_phy_component");
+				const EntityRef e = (EntityRef)hit.entity;
+				m_editor.selectEntities(Span(&e, 1), false);
+				m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
+				m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&e, 1), Path(path));
+				m_editor.endCommandGroup();
+			}
+			else
+			{
+				const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
+				m_editor.beginCommandGroup("insert_phy");
+				EntityRef entity = m_editor.addEntity();
+				m_editor.setEntitiesPositions(&entity, &pos, 1);
+				m_editor.selectEntities(Span(&entity, 1), false);
+				m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
+				m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&entity, 1), Path(path));
+				m_editor.endCommandGroup();
+			}
+		}
+		else {
+			const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 
-		m_editor.beginCommandGroup("insert_mesh");
-		EntityRef entity = m_editor.addEntity();
-		m_editor.setEntitiesPositions(&entity, &pos, 1);
-		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-		m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
-		m_editor.endCommandGroup();
+			m_editor.beginCommandGroup("insert_mesh");
+			EntityRef entity = m_editor.addEntity();
+			m_editor.setEntitiesPositions(&entity, &pos, 1);
+			m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
+			m_editor.endCommandGroup();
+		}
 	}
 	else if (Path::hasExtension(path, "fab"))
 	{
@@ -1116,29 +1141,6 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		else {
 			ASSERT(prefab->isFailure());
 			logError("Failed to load ", prefab->getPath());
-		}
-	}
-	else if (Path::hasExtension(path, "phy"))
-	{
-		if (hit.is_hit && hit.entity.isValid())
-		{
-			m_editor.beginCommandGroup("insert_phy_component");
-			const EntityRef e = (EntityRef)hit.entity;
-			m_editor.selectEntities(Span(&e, 1), false);
-			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
-			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Source", Span(&e, 1), path);
-			m_editor.endCommandGroup();
-		}
-		else
-		{
-			const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
-			m_editor.beginCommandGroup("insert_phy");
-			EntityRef entity = m_editor.addEntity();
-			m_editor.setEntitiesPositions(&entity, &pos, 1);
-			m_editor.selectEntities(Span(&entity, 1), false);
-			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
-			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Source", Span(&entity, 1), path);
-			m_editor.endCommandGroup();
 		}
 	}
 }
