@@ -13,11 +13,13 @@
 #include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "engine/stack_array.h"
 #include "engine/universe.h"
 #include "physics/physics_scene.h"
 #include "renderer/culling_system.h"
@@ -35,6 +37,7 @@ namespace Lumix
 {
 
 
+static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
 static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
@@ -723,6 +726,7 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 
 	}
 	os::destroyFileIterator(iter);
+	registerLuaAPI();
 }
 
 DistanceField::DistanceField(IAllocator& allocator) 
@@ -945,6 +949,229 @@ struct TerrainTextureChangeCommand : IEditorCommand {
 	OutputMemoryStream after;
 	bool splatmap;
 };
+
+DistanceField* TerrainEditor::findDistanceField(const char* name) const {
+	for (DistanceField& df : m_distance_fields) {
+		if (df.name == name) return &df;
+	}
+	return nullptr;
+}
+
+Terrain* TerrainEditor::getTerrain() const {
+	WorldEditor& editor = m_app.getWorldEditor();
+	const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+	if (selected_entities.size() != 1) return nullptr;
+	
+	Universe& universe = *editor.getUniverse();
+	bool is_terrain = universe.hasComponent(selected_entities[0], TERRAIN_TYPE);
+	if (!is_terrain) return nullptr;
+
+	RenderScene* scene = (RenderScene*)universe.getScene(TERRAIN_TYPE);
+	return scene->getTerrain(selected_entities[0]);
+}
+
+struct ModelProbability {
+	Model* resource;
+	Vec4 distances;
+	Vec2 scale;
+	Vec2 y_offset;
+	float multiplier = 1.f;
+};
+
+static void getModels(StudioApp& app, lua_State* L, i32 idx, const char* key, Array<ModelProbability>& prefabs) {
+	const int type = LuaWrapper::getField(L, idx, key);
+	if (type == LUA_TNIL) luaL_error(L, "missing `%s`", key);
+	if (type != LUA_TTABLE) luaL_error(L, "`%s` is not a table", key);
+		
+	WorldEditor& editor = app.getWorldEditor();
+	ResourceManagerHub& rm = editor.getEngine().getResourceManager();
+	
+	const i32 n = (int)lua_objlen(L, -1);
+	for (i32 i = 0; i < n; ++i) {
+		lua_rawgeti(L, -1, i + 1);
+		if(lua_istable(L, -1)) {
+			if (LuaWrapper::getField(L, -1, "model") != LUA_TSTRING) {
+				lua_pop(L, 1);
+				luaL_argerror(L, idx, "'model' is not string or is missing");
+			}
+			const char* prefab_path = LuaWrapper::toType<const char*>(L, -1);
+			Model* res = rm.load<Model>(Path(prefab_path));
+			lua_pop(L, 1);
+			lua_getfield(L, -1, "distances");
+			if (!LuaWrapper::isType<Vec4>(L, -1)) {
+				lua_pop(L, 1);
+				res->decRefCount();
+				luaL_argerror(L, idx, "'distances' is not vec4 or is missing");
+			}
+			const Vec4 distances = LuaWrapper::toType<Vec4>(L, -1);
+			lua_pop(L, 1);
+
+			Vec2 scale = Vec2(1, 1);
+			LuaWrapper::getOptionalField(L, -1, "scale", &scale);
+			Vec2 y_offset = Vec2(0, 0);
+			LuaWrapper::getOptionalField(L, -1, "y_offset", &y_offset);
+
+			ModelProbability& prob = prefabs.emplace();
+			LuaWrapper::getOptionalField(L, -1, "multiplier", &prob.multiplier);
+			prob.resource = res;
+			prob.distances = distances;
+			prob.scale = scale;
+			prob.y_offset = y_offset;
+		}
+		else {
+			lua_pop(L, 1);
+			luaL_argerror(L, idx, "table of models expected");
+		}
+		lua_pop(L, 1);
+	}
+
+	lua_pop(L, 1);
+}
+
+template <typename T>
+static u32 getRandomItem(float distance, const Array<T>& probs) {
+	float sum = 0;
+
+	auto get = [](float distance, const T& prob){
+		if (distance < prob.distances.x) return 0.f;
+		if (distance > prob.distances.w) return 0.f;
+			
+		if (distance < prob.distances.y) {
+			return prob.multiplier * (distance - prob.distances.x) / (prob.distances.y - prob.distances.x);
+		}
+		else if (distance < prob.distances.z) {
+			return prob.multiplier;
+		}
+		return prob.multiplier * (1 - (distance - prob.distances.z) / (prob.distances.w - prob.distances.z));
+	};
+
+	for (const T& prob : probs) {
+		sum += get(distance, prob);
+	}
+	if (sum == 0) return 0xffFFffFF;
+		
+	float r = randFloat() * sum;
+
+	for (i32 i = 0; i < probs.size(); ++i) {
+		const T& prob = probs[i];
+		float p = get(distance, prob);
+		if (r < p) return i;
+		r -= p;
+	}
+		
+	ASSERT(false);
+	return 0xffFFffFF;
+}
+
+int TerrainEditor::placeInstances(lua_State* L) {
+	const int index = lua_upvalueindex(1);
+	if (!LuaWrapper::isType<TerrainEditor>(L, index)) {
+		ASSERT(false);
+		return luaL_error(L, "Invalid Lua closure");
+	}
+
+	TerrainEditor* that = LuaWrapper::toType<TerrainEditor*>(L, index);
+	
+	float spacing;
+	if (!LuaWrapper::checkField(L, 1, "spacing", &spacing)) {
+		return luaL_error(L, "missing `spacing`");
+	}
+
+	char df_name[128];
+	if (!LuaWrapper::checkStringField(L, 1, "distance_field", Span(df_name))) {
+		return luaL_error(L, "missing `distance_field`");
+	}
+
+	DistanceField* df = that->findDistanceField(df_name);
+	if (!df) return luaL_error(L, "`distance_field` %s not found", df_name);
+
+	Terrain* terrain = that->getTerrain();
+	if (!terrain) return luaL_error(L, "no terrain is selected");
+
+	Array<ModelProbability> models(that->m_app.getAllocator());
+	getModels(that->m_app, L, 1, "models", models);
+	if (models.empty()) return 0;
+
+	WorldEditor& editor = that->m_app.getWorldEditor();
+	Universe* universe = editor.getUniverse();
+	RenderScene* render_scene = (RenderScene*)universe->getScene(TERRAIN_TYPE);
+	const DVec3 terrain_pos = universe->getPosition(terrain->m_entity);
+
+	struct Group {
+		EntityRef e;
+		InstancedModel* im;
+	};
+
+	StackArray<Group, 64> groups(that->m_app.getAllocator());
+	editor.beginCommandGroup("maps_place_instances");
+	for (const ModelProbability& m : models) {
+		const EntityRef e = editor.addEntity();
+		groups.emplace().e = e;
+		editor.makeParent(terrain->m_entity, e);
+		editor.addComponent(Span(&e, 1), INSTANCED_MODEL_TYPE);
+		editor.setProperty(INSTANCED_MODEL_TYPE, "", 0, "Model", Span(&e, 1), m.resource->getPath());
+		editor.setEntitiesPositions(&e, &terrain_pos, 1);
+	}
+
+	for (Group& g : groups) {
+		g.im = &render_scene->beginInstancedModelEditing(g.e);
+	}
+
+	const double y_base = terrain_pos.y;
+	const Vec2 size = render_scene->getTerrainSize(terrain->m_entity);
+	const Vec2 df_to_terrain = size / Vec2((float)df->width, (float)df->height);
+	const Vec2 terrain_to_df = Vec2((float)df->width, (float)df->height) / size;
+
+	for (float y = 0; y < df->height; y += spacing * terrain_to_df.y) {
+		for (float x = 0; x < df->width; x += spacing * terrain_to_df.x) {
+			const i32 idx = i32(x) + i32(y) * df->width;
+			const float distance = df->data[idx];
+			if (distance > 0.01f) {
+				float fx = (x + spacing * randFloat() * 0.9f - spacing * 0.45f);
+				float fy = (y + spacing * randFloat() * 0.9f - spacing * 0.45f);
+				fx = clamp(fx, 0.f, (float)df->width - 1);
+				fy = clamp(fy, 0.f, (float)df->height - 1);
+
+				DVec3 pos;
+				pos.x = fx * df_to_terrain.x;
+				pos.z = fy * df_to_terrain.y;
+				pos.y = render_scene->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
+
+				pos.x -= size.x * 0.5f;
+				pos.y += y_base;
+				pos.z -= size.y * 0.5f;
+					
+				const u32 r = getRandomItem(distance, models);
+				if (r != 0xffFFffFF) {
+					const Vec2& yoffset_range = models[r].y_offset;
+					pos.y += lerp(yoffset_range.x, yoffset_range.y, randFloat());
+
+					const Vec2& scale_range = models[r].scale;
+					const float scale = lerp(scale_range.x, scale_range.y, randFloat());
+					
+					InstancedModel::InstanceData& id = groups[r].im->instances.emplace();
+					const Quat rot(Vec3(0, 1, 0), randFloat() * 2 * PI);
+					id.pos = Vec3(pos - terrain_pos);
+					id.scale = scale;
+					id.rot_quat = rot.w < 0 ? -Vec3(rot.x, rot.y, rot.z) : Vec3(rot.x, rot.y, rot.z);
+					id.lod = 3;
+				}
+			}
+		}
+	}
+
+	for (Group& g : groups) {
+		render_scene->endInstancedModelEditing(g.e);
+	}
+
+	editor.endCommandGroup();
+	return 0;
+}
+
+void TerrainEditor::registerLuaAPI() {
+	lua_State* L = m_app.getEngine().getState();
+	LuaWrapper::createSystemClosure(L, "TerrainEditor", this, "placeInstances", placeInstances);
+}
 
 void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 	for (DistanceField& df : m_distance_fields) {
