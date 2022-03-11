@@ -5,9 +5,9 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/array.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/plugin.h"
 #include "engine/log.h"
@@ -547,7 +547,7 @@ public:
 		else {
 			ResourceManagerHub& resource_manager = engine.getResourceManager();
 			prefab_res = resource_manager.load<PrefabResource>(path);
-			const u32 content_hash = crc32(blob.data(), (u32)blob.size());
+			const StableHash content_hash(blob.data(), (u32)blob.size());
 			m_resources.insert(path.getHash(), { content_hash, prefab_res});
 			m_roots.insert(entity, prefab);
 		}
@@ -674,7 +674,7 @@ public:
 		m_resources.reserve(count);
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
-			u32 content_hash;
+			StableHash content_hash;
 			serializer.read(content_hash);
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), {content_hash, res});
@@ -703,7 +703,7 @@ private:
 	};
 
 	struct PrefabVersion {
-		u32 content_hash;
+		StableHash content_hash;
 		PrefabResource* resource;
 		u32 instance_count = 0;
 	};

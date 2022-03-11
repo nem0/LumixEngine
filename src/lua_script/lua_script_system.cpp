@@ -2,7 +2,7 @@
 #include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
-#include "engine/crc32.h"
+#include "engine/hash.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
@@ -431,7 +431,7 @@ namespace Lumix
 			}
 
 
-			static int getProperty(ScriptInstance& inst, u32 hash)
+			static int getProperty(ScriptInstance& inst, StableHash hash)
 			{
 				for(int i = 0, c = inst.m_properties.size(); i < c; ++i)
 				{
@@ -443,8 +443,8 @@ namespace Lumix
 
 			void detectProperties(ScriptInstance& inst)
 			{
-				static const u32 INDEX_HASH = crc32("__index");
-				static const u32 THIS_HASH = crc32("this");
+				static const StableHash INDEX_HASH("__index");
+				static const StableHash THIS_HASH("this");
 				lua_State* L = inst.m_state;
 				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment); // [env]
 				ASSERT(lua_type(L, -1) == LUA_TTABLE);
@@ -465,10 +465,9 @@ namespace Lumix
 						const char* name = lua_tostring(L, -2);
 						if(name[0] != '_' && !equalStrings(name, "enabled"))
 						{
-							u32 hash = crc32(name);
-							if (m_scene.m_property_names.find(hash) < 0)
-							{
-								m_scene.m_property_names.emplace(hash, name, allocator);
+							const StableHash hash(name);
+							if (!m_scene.m_property_names.find(hash).isValid()) {
+								m_scene.m_property_names.insert(hash, String(name, allocator));
 							}
 							if (hash != INDEX_HASH && hash != THIS_HASH)
 							{
@@ -722,7 +721,7 @@ namespace Lumix
 			auto* scene = (LuaScriptSceneImpl*)universe->getScene(LUA_SCRIPT_TYPE);
 
 			lua_pop(L, 2);
-			u32 prop_name_hash = crc32(prop_name);
+			const StableHash prop_name_hash(prop_name);
 			for (auto& prop : scene->m_current_script_instance->m_properties)
 			{
 				if (prop.name_hash == prop_name_hash)
@@ -737,9 +736,9 @@ namespace Lumix
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
 			prop.resource_type = resource_type;
-			if (scene->m_property_names.find(prop_name_hash) < 0)
+			if (!scene->m_property_names.find(prop_name_hash).isValid())
 			{
-				scene->m_property_names.emplace(prop_name_hash, prop_name, scene->m_system.m_allocator);
+				scene->m_property_names.insert(prop_name_hash, String(prop_name, scene->m_system.m_allocator));
 			}
 			return 0;
 		}
@@ -1229,10 +1228,10 @@ namespace Lumix
 		}
 
 
-		const char* getPropertyName(u32 name_hash) const
+		const char* getPropertyName(StableHash name_hash) const
 		{
-			int idx = m_property_names.find(name_hash);
-			if(idx >= 0) return m_property_names.at(idx).c_str();
+			auto iter = m_property_names.find(name_hash);
+			if (iter.isValid()) return iter.value().c_str();
 			return "N/A";
 		}
 
@@ -1593,7 +1592,7 @@ namespace Lumix
 
 		template <typename T>
 		T getPropertyValue(EntityRef entity, int scr_index, const char* property_name) {
-			u32 hash = crc32(property_name);
+			const StableHash hash(property_name);
 			auto& inst = m_scripts[entity]->m_scripts[scr_index];
 			for (auto& prop : inst.m_properties)
 			{
@@ -1613,7 +1612,7 @@ namespace Lumix
 		{
 			ASSERT(out.length() > 0);
 
-			u32 hash = crc32(property_name);
+			const StableHash hash(property_name);
 			auto& inst = m_scripts[entity]->m_scripts[scr_index];
 			for (auto& prop : inst.m_properties)
 			{
@@ -1741,10 +1740,9 @@ namespace Lumix
 					{
 						serializer.write(prop.name_hash);
 						serializer.write(prop.type);
-						int idx = m_property_names.find(prop.name_hash);
-						if (idx >= 0)
-						{
-							const char* name = m_property_names.at(idx).c_str();
+						auto iter = m_property_names.find(prop.name_hash);
+						if (iter.isValid()) {
+							const char* name = iter.value().c_str();
 							char tmp[1024];
 							getProperty(prop, name, scr, Span(tmp));
 							serializer.writeString(tmp);
@@ -1999,7 +1997,7 @@ namespace Lumix
 
 		Property& getScriptProperty(EntityRef entity, int scr_index, const char* name)
 		{
-			u32 name_hash = crc32(name);
+			const StableHash name_hash(name);
 			ScriptComponent* script_cmp = m_scripts[entity];
 			for (auto& prop : script_cmp->m_scripts[scr_index].m_properties)
 			{
@@ -2111,7 +2109,7 @@ namespace Lumix
 
 		LuaScriptSystemImpl& m_system;
 		HashMap<EntityRef, ScriptComponent*> m_scripts;
-		AssociativeArray<u32, String> m_property_names;
+		HashMap<StableHash, String> m_property_names;
 		Array<CallbackData> m_input_handlers;
 		Universe& m_universe;
 		Array<CallbackData> m_updates;

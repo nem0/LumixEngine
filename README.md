@@ -38,6 +38,7 @@ Who is using it?
 * [mikktspace](https://github.com/mmikk/MikkTSpace)
 * [OpenFBX](https://github.com/nem0/OpenFBX/)
 * [LZ4](https://github.com/lz4/lz4)
+* [wyhash](https://github.com/wangyi-fudan/wyhash)
 
 Project generator
 

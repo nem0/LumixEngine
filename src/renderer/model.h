@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/flag_set.h"
 #include "engine/geometry.h"
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/resource.h"
@@ -125,7 +126,7 @@ struct LODMeshIndices
 struct LUMIX_RENDERER_API Model final : Resource
 {
 public:
-	using BoneMap = HashMap<u32, int, HashFuncDirect<u32>>;
+	using BoneMap = HashMap<StableHash, int>;
 	
 #pragma pack(1)
 	struct FileHeader
@@ -181,7 +182,7 @@ public:
 	i32 getBoneParent(u32 idx) { return m_bones[idx].parent_idx; }
 	const Bone& getBone(u32 i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
-	BoneMap::ConstIterator getBoneIndex(u32 hash) const { return m_bone_map.find(hash); }
+	BoneMap::ConstIterator getBoneIndex(StableHash hash) const { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	void getRelativePose(Pose& pose);
 	float getOriginBoundingRadius() const { return m_origin_bounding_radius; }

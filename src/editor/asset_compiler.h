@@ -2,6 +2,7 @@
 
 struct lua_State;
 
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/resource.h"
 
@@ -20,7 +21,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	struct ResourceItem {
 		Path path;
 		ResourceType type;
-		u32 dir_hash;
+		RuntimeHash dir_hash;
 	};
 
 	static UniquePtr<AssetCompiler> create(StudioApp& app);

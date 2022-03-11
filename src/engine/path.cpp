@@ -1,7 +1,7 @@
 #include "engine/lumix.h"
 #include "engine/path.h"
 
-#include "engine/crc32.h"
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/sync.h"
 #include "engine/path.h"

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/hash.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
 
@@ -26,7 +27,7 @@ struct LUMIX_ENGINE_API PrefabResource final : Resource
 	bool load(u64 size, const u8* mem) override;
 
 	OutputMemoryStream data;
-	u32 content_hash;
+	StableHash content_hash;
 	static const ResourceType TYPE;
 };
 

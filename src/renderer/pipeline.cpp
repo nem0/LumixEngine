@@ -2,11 +2,11 @@
 #include "engine/crt.h"
 #include "engine/allocators.h"
 #include "engine/associative_array.h"
-#include "engine/crc32.h"
+#include "engine/atomic.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
-#include "engine/atomic.h"
+#include "engine/hash.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -1030,11 +1030,9 @@ struct PipelineImpl final : Pipeline
 
 	void executeCustomCommand(const char* name)
 	{
-		u32 name_hash = crc32(name);
-		for(CustomCommandHandler& handler : m_custom_commands_handlers)
-		{
-			if(handler.hash == name_hash)
-			{
+		const RuntimeHash name_hash(name);
+		for (CustomCommandHandler& handler : m_custom_commands_handlers) {
+			if (handler.hash == name_hash) {
 				handler.callback.invoke();
 				break;
 			}
@@ -1733,7 +1731,7 @@ struct PipelineImpl final : Pipeline
 	{
 		auto& handler = m_custom_commands_handlers.emplace();
 		copyString(handler.name, name);
-		handler.hash = crc32(name);
+		handler.hash = RuntimeHash(name);
 		exposeCustomCommandToLua(handler);
 		return handler;
 	}

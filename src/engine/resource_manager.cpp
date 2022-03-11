@@ -168,7 +168,7 @@ Resource* ResourceManagerHub::load(ResourceManager& manager, const Path& path)
 
 ResourceManager* ResourceManagerHub::get(ResourceType type)
 {
-	auto iter = m_resource_managers.find(type.type); 
+	auto iter = m_resource_managers.find(type); 
 	if (!iter.isValid()) return nullptr;
 	return iter.value();
 }
@@ -195,12 +195,12 @@ ResourceManagerHub::LoadHook::Action ResourceManagerHub::onBeforeLoad(Resource& 
 
 void ResourceManagerHub::add(ResourceType type, ResourceManager* rm)
 { 
-	m_resource_managers.insert(type.type, rm);
+	m_resource_managers.insert(type, rm);
 }
 
 void ResourceManagerHub::remove(ResourceType type)
 { 
-	m_resource_managers.erase(type.type);
+	m_resource_managers.erase(type);
 }
 
 void ResourceManagerHub::removeUnreferenced()

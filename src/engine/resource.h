@@ -3,6 +3,7 @@
 
 #include "engine/delegate_list.h"
 #include "engine/file_system.h"
+#include "engine/hash.h"
 #include "engine/path.h"
 
 
@@ -10,13 +11,13 @@ namespace Lumix {
 
 
 struct LUMIX_ENGINE_API ResourceType {
-	ResourceType() : type(0) {}
+	ResourceType() {}
 	explicit ResourceType(const char* type_name);
-	u32 type;
 	bool operator !=(const ResourceType& rhs) const { return rhs.type != type; }
 	bool operator ==(const ResourceType& rhs) const { return rhs.type == type; }
-	bool operator <(const ResourceType& rhs) const { return rhs.type < type; }
-	bool isValid() const { return type != 0; }
+	bool operator <(const ResourceType& rhs) const { return rhs.type.getHashValue() < type.getHashValue(); }
+	bool isValid() const { return type.getHashValue() != 0; }
+	RuntimeHash type;
 };
 const ResourceType INVALID_RESOURCE_TYPE("");
 

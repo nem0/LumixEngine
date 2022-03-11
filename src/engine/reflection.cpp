@@ -1,7 +1,7 @@
 #include "engine/reflection.h"
 #include "engine/allocator.h"
 #include "engine/allocators.h"
-#include "engine/crc32.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/stream.h"
 #include "engine/string.h"
@@ -70,14 +70,13 @@ builder::builder(IAllocator& allocator)
 }
 
 void builder::registerCmp(ComponentBase* cmp) {
-	cmp->scene = crc32(scene->name);
 	getContext().component_bases[cmp->component_type.index].cmp = cmp;
-	getContext().component_bases[cmp->component_type.index].name_hash = crc32(cmp->name);
-	getContext().component_bases[cmp->component_type.index].scene = crc32(scene->name);
+	getContext().component_bases[cmp->component_type.index].name_hash = RuntimeHash(cmp->name);
+	getContext().component_bases[cmp->component_type.index].scene = RuntimeHash(scene->name);
 	scene->cmps.push(cmp);
 }
 
-ComponentType getComponentTypeFromHash(u32 hash)
+ComponentType getComponentTypeFromHash(RuntimeHash hash)
 {
 	for (u32 i = 0, c = getContext().components_count; i < c; ++i) {
 		if (getContext().component_bases[i].name_hash == hash) {
@@ -89,16 +88,10 @@ ComponentType getComponentTypeFromHash(u32 hash)
 }
 
 
-u32 getComponentTypeHash(ComponentType type)
-{
-	return getContext().component_bases[type.index].name_hash;
-}
-
-
 ComponentType getComponentType(const char* name)
 {
 	Context& ctx = getContext();
-	u32 name_hash = crc32(name);
+	const RuntimeHash name_hash(name);
 	for (u32 i = 0, c = ctx.components_count; i < c; ++i) {
 		if (ctx.component_bases[i].name_hash == name_hash) {
 			return {(i32)i};

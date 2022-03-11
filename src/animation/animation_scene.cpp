@@ -5,9 +5,9 @@
 #include "animation/events.h"
 #include "animation/property_animation.h"
 #include "engine/associative_array.h"
-#include "engine/crc32.h"
-#include "engine/engine.h"
 #include "engine/atomic.h"
+#include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/profiler.h"
@@ -634,7 +634,7 @@ struct AnimationSceneImpl final : AnimationScene
 
 		animator.ctx->model = model;
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
-		animator.ctx->root_bone_hash = crc32(animator.resource->m_root_motion_bone);
+		animator.ctx->root_bone_hash = StableHash(animator.resource->m_root_motion_bone);
 		animator.resource->update(*animator.ctx, animator.root_motion);
 
 		model->getRelativePose(*pose);

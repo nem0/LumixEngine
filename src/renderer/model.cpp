@@ -1,9 +1,9 @@
 #include "engine/lumix.h"
 
 #include "engine/array.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/file_system.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/path.h"
@@ -383,7 +383,7 @@ bool Model::parseBones(InputMemoryStream& file)
 		file.read(tmp, len);
 		tmp[len] = 0;
 		b.name = tmp;
-		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
+		m_bone_map.insert(StableHash(b.name.c_str()), m_bones.size() - 1);
 		file.read(b.parent_idx);
 		file.read(b.transform.pos);
 		file.read(b.transform.rot);

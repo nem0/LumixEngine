@@ -1,7 +1,7 @@
 #include "animation.h"
 #include "controller.h"
 #include "nodes.h"
-#include "engine/crc32.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "renderer/model.h"

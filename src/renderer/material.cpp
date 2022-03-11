@@ -1,6 +1,6 @@
 #include "renderer/material.h"
-#include "engine/crc32.h"
 #include "engine/file_system.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/path.h"
@@ -114,7 +114,7 @@ void Material::setDefine(u8 define_idx, bool enabled)
 }
 
 
-Material::Uniform* Material::findUniform(u32 name_hash) {
+Material::Uniform* Material::findUniform(RuntimeHash name_hash) {
 	for (Uniform& u : m_uniforms) {
 		if (u.name_hash == name_hash) return &u;
 	}
@@ -244,7 +244,7 @@ int Material::uniform(lua_State* L) {
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	Uniform u;
-	u.name_hash = crc32(name);
+	u.name_hash = RuntimeHash(name);
 	switch (lua_type(L, 2)) {
 		case LUA_TNUMBER: u.float_value = LuaWrapper::toType<float>(L, 2); break;
 		case LUA_TTABLE: {
@@ -271,7 +271,7 @@ int Material::int_uniform(lua_State* L) {
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	Uniform u;
-	u.name_hash = crc32(name);
+	u.name_hash = RuntimeHash(name);
 	switch (lua_type(L, 2)) {
 		case LUA_TNUMBER: u.int_value = LuaWrapper::toType<i32>(L, 2); break;
 		default: luaL_error(L, "Uniform %s has unsupported type", name); break;

@@ -1,10 +1,10 @@
 #include "engine/allocators.h"
 #include "engine/atomic.h"
 #include "engine/core.h"
-#include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/hash.h"
 #include "engine/input_system.h"
 #include "engine/plugin.h"
 #include "engine/job_system.h"
@@ -439,10 +439,10 @@ public:
 		serializer.read(count);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (i32 i = 0; i < count; ++i) {
-			u32 hash;
+			StableHash hash;
 			serializer.read(hash);
 			i32 idx = plugins.find([&](IPlugin* plugin){
-				return crc32(plugin->getName()) == hash;
+				return StableHash(plugin->getName()) == hash;
 			});
 			if (idx < 0) return false;
 			IPlugin* plugin = plugins[idx];
@@ -463,14 +463,14 @@ public:
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		serializer.write((i32)plugins.size());
 		for (IPlugin* plugin : plugins) {
-			const u32 hash = crc32(plugin->getName());
+			const StableHash hash(plugin->getName());
 			serializer.write(hash);
 			serializer.write((u32)plugin->getVersion());
 			plugin->serialize(serializer);
 		}
 	}
 
-	u32 serialize(Universe& ctx, OutputMemoryStream& serializer) override
+	StableHash serialize(Universe& ctx, OutputMemoryStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -485,8 +485,7 @@ public:
 			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
-		u32 crc = crc32((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
-		return crc;
+		return StableHash((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
 	}
 
 

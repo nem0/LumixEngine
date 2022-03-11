@@ -43,7 +43,7 @@ protected:
 
 
 struct LUMIX_ENGINE_API ResourceManagerHub {
-	using ResourceManagerTable = HashMap<u32, ResourceManager*>;
+	using ResourceManagerTable = HashMap<ResourceType, ResourceManager*>;
 
 	struct LUMIX_ENGINE_API LoadHook {
 		enum class Action { IMMEDIATE, DEFERRED };

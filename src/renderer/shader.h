@@ -1,5 +1,6 @@
 #pragma once
 #include "engine/array.h"
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/resource.h"
 #include "engine/string.h"
@@ -65,7 +66,7 @@ public:
 		} default_value;
 
 		char name[32];
-		u32 name_hash;
+		RuntimeHash name_hash;
 		Type type;
 		u32 offset;
 		u32 size() const;

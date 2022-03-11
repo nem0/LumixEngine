@@ -1,6 +1,6 @@
 #include "universe.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
@@ -91,7 +91,7 @@ Array<UniquePtr<IScene>>& Universe::getScenes()
 
 void Universe::addScene(UniquePtr<IScene>&& scene)
 {
-	const u32 hash = crc32(scene->getPlugin().getName());
+	const RuntimeHash hash(scene->getPlugin().getName());
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
 			m_component_type_map[cmp.cmp->component_type.index].scene = scene.get();

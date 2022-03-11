@@ -1,7 +1,7 @@
 #include "renderer/shader.h"
-#include "engine/crc32.h"
 #include "engine/file_system.h"
 #include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/lua_wrapper.h"
 #include "engine/log.h"
 #include "engine/os.h"
@@ -158,7 +158,7 @@ int uniform(lua_State* L)
 
 	Shader::Uniform& u = shader->m_uniforms.emplace();
 	copyString(u.name, name);
-	u.name_hash = crc32(name);
+	u.name_hash = RuntimeHash(name);
 	memset(&u.default_value, 0, sizeof(u.default_value));
 	const struct {
 		const char* str;

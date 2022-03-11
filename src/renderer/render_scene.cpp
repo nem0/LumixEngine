@@ -2,11 +2,11 @@
 
 #include "engine/array.h"
 #include "engine/associative_array.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
@@ -1991,7 +1991,7 @@ struct RenderSceneImpl final : RenderScene {
 	static int LUA_getModelBoneIndex(Model* model, const char* bone)
 	{
 		if (!model) return 0;
-		return model->getBoneIndex(crc32(bone)).value();
+		return model->getBoneIndex(StableHash(bone)).value();
 	}
 
 
@@ -2518,6 +2518,7 @@ struct RenderSceneImpl final : RenderScene {
 			auto& r = m_model_instances[i];
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
 			if (!r.flags.isSet(ModelInstance::VALID)) continue;
+			if (!r.model) continue;
 
 			const EntityRef entity{i};
 			const DVec3& pos = universe.getPosition(entity);
@@ -3396,7 +3397,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	Renderer::MemRef mem;
 	m_reflection_probes_texture = renderer.createTexture(128, 128, 32, gpu::TextureFormat::BC3, gpu::TextureFlags::IS_CUBE, mem, "reflection_probes");
 
-	const u32 hash = crc32("renderer");
+	const RuntimeHash hash("renderer");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
 			m_render_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;

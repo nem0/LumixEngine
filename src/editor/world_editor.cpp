@@ -6,12 +6,12 @@
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/command_line_parser.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
+#include "engine/hash.h"
 #include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -594,7 +594,7 @@ struct EndGroupCommand final : IEditorCommand
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "end_group"; }
 
-	u32 group_type;
+	RuntimeHash group_type;
 	bool locked = false;
 };
 
@@ -1993,7 +1993,7 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
-		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, 0, 0};
+		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, StableHash(), StableHash()};
 		blob.write(header);
 		int hashed_offset = sizeof(header);
 
@@ -2003,7 +2003,7 @@ public:
 		const Viewport& vp = getView().getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
-		header.hash = crc32((const u8*)blob.data() + hashed_offset, (int)blob.size() - hashed_offset);
+		header.hash = StableHash((const u8*)blob.data() + hashed_offset, (int)blob.size() - hashed_offset);
 		memcpy(blob.getMutableData(), &header, sizeof(header));
 		file.write(blob.data(), blob.size());
 
@@ -2170,7 +2170,7 @@ public:
 
 	void beginCommandGroup(const char* type_str) override
 	{
-		const u32 type = crc32(type_str);
+		const RuntimeHash type(type_str);
 		while (m_undo_index < m_undo_stack.size() - 1)
 		{
 			for(int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
@@ -2182,11 +2182,10 @@ public:
 
 		if(m_undo_index >= 0)
 		{
-			static const u32 end_group_hash = crc32("end_group");
-			if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
+			if (equalStrings(m_undo_stack[m_undo_index]->getType(), "end_group"))
 			{
 				auto* end_group = static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index].get());
-				if(end_group->group_type == type && !end_group->locked)
+				if (end_group->group_type == type && !end_group->locked)
 				{
 					m_undo_stack[m_undo_index].reset();
 					--m_undo_index;
@@ -2387,7 +2386,7 @@ public:
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
-				const u32 cmp_type = crc32(reflection::getComponent(cmp.type)->name);
+				const RuntimeHash cmp_type(reflection::getComponent(cmp.type)->name);
 				serializer.write(cmp_type);
 				const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
 				
@@ -2526,8 +2525,8 @@ public:
 		{
 			u32 magic;
 			int version;
-			u32 hash;
-			u32 engine_hash;
+			StableHash hash;
+			StableHash engine_hash;
 		};
 	#pragma pack()
 
@@ -2561,11 +2560,11 @@ public:
 			}
 		}
 		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), (int)file_size);
-		u32 hash = 0;
+		StableHash hash;
 		blob.read(hash);
 		header.version = -1;
 		int hashed_offset = sizeof(hash);
-		if (hash == 0xFFFFffff)
+		if (hash.getHashValue() == 0xFFFFffff)
 		{
 			blob.rewind();
 			blob.read(header);
@@ -2577,7 +2576,7 @@ public:
 			u32 engine_hash = 0;
 			blob.read(engine_hash);
 		}
-		if (crc32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
+		if (StableHash((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
 			logError("Corrupted file.");
 			m_is_loading = false;
@@ -2794,15 +2793,12 @@ public:
 	{
 		if (m_is_game_mode) return;
 
-		static const u32 end_group_hash = crc32("end_group");
-		static const u32 begin_group_hash = crc32("begin_group");
-
 		if (m_undo_index >= m_undo_stack.size() || m_undo_index < 0) return;
 
-		if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
+		if (equalStrings(m_undo_stack[m_undo_index]->getType(), "end_group"))
 		{
 			--m_undo_index;
-			while(crc32(m_undo_stack[m_undo_index]->getType()) != begin_group_hash)
+			while (equalStrings(m_undo_stack[m_undo_index]->getType(), "begin_group"))
 			{
 				m_undo_stack[m_undo_index]->undo();
 				--m_undo_index;
@@ -2821,16 +2817,13 @@ public:
 	{
 		if (m_is_game_mode) return;
 
-		static const u32 end_group_hash = crc32("end_group");
-		static const u32 begin_group_hash = crc32("begin_group");
-
 		if (m_undo_index + 1 >= m_undo_stack.size()) return;
 
 		++m_undo_index;
-		if(crc32(m_undo_stack[m_undo_index]->getType()) == begin_group_hash)
+		if(equalStrings(m_undo_stack[m_undo_index]->getType(), "begin_group"))
 		{
 			++m_undo_index;
-			while(crc32(m_undo_stack[m_undo_index]->getType()) != end_group_hash)
+			while(equalStrings(m_undo_stack[m_undo_index]->getType(), "end_group"))
 			{
 				m_undo_stack[m_undo_index]->execute();
 				++m_undo_index;
@@ -2862,7 +2855,7 @@ private:
 	
 	Array<UniquePtr<IEditorCommand>> m_undo_stack;
 	int m_undo_index;
-	u32 m_current_group_type;
+	RuntimeHash m_current_group_type;
 
 	Array<EntityRef> m_selected_entities;
 	EntityPtr m_selected_entity_on_game_mode;
@@ -2956,9 +2949,9 @@ public:
 			universe.setTransform(new_entity, tr);
 			universe.setParent(parent, new_entity);
 			for (;;) {
-				u32 hash;
+				RuntimeHash hash;
 				blob.read(hash);
-				if (hash == 0) break;
+				if (hash.getHashValue() == 0) break;
 
 				ComponentUID cmp;
 				cmp.entity = new_entity;

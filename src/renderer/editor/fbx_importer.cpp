@@ -4,10 +4,10 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/atomic.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/hash.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -1647,7 +1647,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 				if (isBindPosePositionTrack(count, keys, bind_pos)) continue;
 			
-				const u32 name_hash = crc32(bone->name);
+				const StableHash name_hash(bone->name);
 				write(name_hash);
 				write(Animation::CurveType::KEYFRAMED);
 				write(count);
@@ -1698,7 +1698,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				}
 				//if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
 
-				const u32 name_hash = crc32(bone->name);
+				const StableHash name_hash(bone->name);
 				write(name_hash);
 				if (shouldSample(count, float(anim_len), fps, sizeof(Quat))) {
 					write(Animation::CurveType::SAMPLED);

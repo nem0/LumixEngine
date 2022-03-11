@@ -7,12 +7,12 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/allocator.h"
 #include "engine/array.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "engine/allocator.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/path.h"
@@ -154,7 +154,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 	void onLuaCallEventGUI(u8* data, AnimEditor::Component& component) const
 	{
-		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getUniverse()->getScene(crc32("lua_script"));
+		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getUniverse()->getScene(LUA_SCRIPT_TYPE);
 		ImGui::InputText("Function", (char*)data, LUA_CALL_EVENT_SIZE);
 	}
 	*/

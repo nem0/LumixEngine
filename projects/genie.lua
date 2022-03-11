@@ -490,7 +490,8 @@ project "engine"
 			"../external/imgui/**.cpp",
 			"../external/imgui/**.inl",
 			"../external/lz4/**.c",
-			"../external/lz4/**.h"
+			"../external/lz4/**.h",
+			"../external/wyhash/**.*"
 	}
 	excludes { 
 		"../external/imgui/imgui_demo.cpp",

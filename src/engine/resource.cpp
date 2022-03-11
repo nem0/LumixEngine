@@ -1,5 +1,5 @@
 #include "engine/resource.h"
-#include "engine/crc32.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/path.h"
@@ -16,7 +16,7 @@ namespace Lumix
 ResourceType::ResourceType(const char* type_name)
 {
 	ASSERT(type_name[0] == 0 || (type_name[0] >= 'a' && type_name[0] <= 'z'));
-	type = crc32(type_name);
+	type = RuntimeHash(type_name);
 }
 
 

@@ -2,6 +2,7 @@
 
 #include "condition.h"
 #include "engine/flag_set.h"
+#include "engine/hash.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
 
@@ -60,7 +61,7 @@ public:
 		enum { MAX_BONES_COUNT = 8 };
 		u16 max_iterations = 5;
 		u16 bones_count = 4;
-		u32 bones[MAX_BONES_COUNT];
+		StableHash bones[MAX_BONES_COUNT];
 	} m_ik[4];
 	u32 m_ik_count = 0;
 	StaticString<64> m_root_motion_bone;

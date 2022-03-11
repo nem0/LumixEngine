@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/hash.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/math.h"
@@ -56,7 +57,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 
 	struct Uniform
 	{
-		u32 name_hash;
+		RuntimeHash name_hash;
 		union
 		{
 			i32 int_value;
@@ -108,7 +109,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
-	Uniform* findUniform(u32 name_hash);
+	Uniform* findUniform(RuntimeHash name_hash);
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;

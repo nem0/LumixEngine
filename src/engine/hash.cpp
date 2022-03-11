@@ -1,9 +1,39 @@
-#include "engine/crc32.h"
-
+#include "engine/hash.h"
+#include "wyhash/wyhash.h"
 
 namespace Lumix
 {
 
+
+RuntimeHash::RuntimeHash(const char* string, u32 len) {
+	hash = wyhash(string, len, 0, _wyp);
+}
+
+RuntimeHash::RuntimeHash(const u8* data, u32 len) {
+	hash = wyhash(data, len, 0, _wyp);
+}
+
+RuntimeHash::RuntimeHash(const char* string) {
+	hash = wyhash(string, strlen(string), 0, _wyp);
+}
+
+StableHash StableHash::fromU32(u32 hash) {
+	StableHash res;
+	res.hash = hash;
+	return res;
+}
+
+StableHash::StableHash(const char* string, u32 len) {
+	hash = crc32(string, len);
+}
+
+StableHash::StableHash(const u8* data, u32 len) {
+	hash = crc32(data, len);
+}
+
+StableHash::StableHash(const char* string) {
+	hash = crc32(string);
+}
 
 static u32 crc32Table[256] = {
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,

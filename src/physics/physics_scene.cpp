@@ -33,9 +33,9 @@
 #include "physics/physics_scene.h"
 #include "animation/animation_scene.h"
 #include "engine/associative_array.h"
-#include "engine/crc32.h"
-#include "engine/engine.h"
 #include "engine/atomic.h"
+#include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -3815,7 +3815,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 {
 	m_physics_cmps_mask = 0;
 
-	const u32 hash = crc32("physics");
+	const RuntimeHash hash("physics");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
 			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;

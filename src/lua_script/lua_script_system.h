@@ -1,8 +1,9 @@
 #pragma once
 
 
-#include "engine/plugin.h"
+#include "engine/hash.h"
 #include "engine/path.h"
+#include "engine/plugin.h"
 #include "engine/resource.h"
 #include "engine/string.h"
 
@@ -38,7 +39,7 @@ struct LuaScriptScene : IScene
 		{
 		}
 
-		u32 name_hash;
+		StableHash name_hash;
 		Type type;
 		ResourceType resource_type;
 		String stored_value;

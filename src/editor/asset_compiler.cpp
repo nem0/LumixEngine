@@ -7,8 +7,8 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/atomic.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -220,7 +220,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		return !file.isError();
 	}
 
-	static u32 dirHash(const char* path) {
+	static RuntimeHash dirHash(const char* path) {
 		char tmp[LUMIX_MAX_PATH];
 		copyString(Span(tmp), Path::getDir(getResourceFilePath(path)));
 		makeLowercase(Span(tmp), tmp);
@@ -228,7 +228,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (dir.m_end > dir.m_begin && (*(dir.m_end - 1) == '\\' || *(dir.m_end - 1) == '/')) {
 			--dir.m_end;
 		} 
-		return crc32(dir.begin(), dir.length());
+		return RuntimeHash(dir.begin(), dir.length());
 	}
 
 	void addResource(ResourceType type, const char* path) override {
@@ -427,7 +427,6 @@ struct AssetCompilerImpl : AssetCompiler {
 
 		const u64 list_last_modified = os::getLastModified(list_path);
 		processDir("", list_last_modified);
-		registerLuaAPI(m_app.getEngine().getState());
 	}
 
 	void onInitFinished() override
@@ -599,29 +598,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		--m_batch_remaining_count;
 		if (m_batch_remaining_count == 0) m_compile_batch_count = 0;
 		return p;
-	}
-	
-	static int LUA_getResources(lua_State* L) {
-		const int index = lua_upvalueindex(1);
-		if (!LuaWrapper::isType<AssetCompilerImpl*>(L, index)) {
-			logError("Invalid Lua closure");
-			ASSERT(false);
-			return 0;
-		}
-		AssetCompilerImpl* compiler = LuaWrapper::toType<AssetCompilerImpl*>(L, index);
-		ASSERT(compiler);
-
-		jobs::MutexGuard lock(compiler->m_resources_mutex);
-		lua_createtable(L, 0, compiler->m_resources.size());
-		for (ResourceItem& ri : compiler->m_resources) {
-			lua_pushinteger(L, ri.type.type);
-			lua_setfield(L, -2, ri.path.c_str());
-		}
-		return 1;
-	}
-
-	void registerLuaAPI(lua_State* L) {
-		LuaWrapper::createSystemClosure(L, "Assets", this, "getResources", &LUA_getResources);
 	}
 
 	void onGUI() override {

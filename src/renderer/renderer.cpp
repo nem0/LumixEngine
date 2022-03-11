@@ -3,9 +3,9 @@
 #include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/command_line_parser.h"
-#include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/atomic.h"
 #include "engine/job_system.h"
@@ -521,9 +521,9 @@ struct RendererImpl final : Renderer
 			MaterialBuffer& mb = renderer.m_material_buffer;
 			mb.buffer = gpu::allocBufferHandle();
 			mb.staging_buffer = gpu::allocBufferHandle();
-			mb.map.insert(0, 0);
+			mb.map.insert(RuntimeHash(), 0);
 			mb.data.resize(400);
-			mb.data[0].hash = 0;
+			mb.data[0].hash = RuntimeHash();
 			mb.data[0].ref_count = 1;
 			mb.first_free = 1;
 			for (int i = 1; i < 400; ++i) {
@@ -793,7 +793,7 @@ struct RendererImpl final : Renderer
 	}
 
 	u32 createMaterialConstants(const MaterialConsts& data) override {
-		const u32 hash = crc32(&data, sizeof(data));
+		const RuntimeHash hash((const u8*)&data, sizeof(data));
 		auto iter = m_material_buffer.map.find(hash);
 		u32 idx;
 		if(iter.isValid()) {
@@ -808,7 +808,7 @@ struct RendererImpl final : Renderer
 			idx = m_material_buffer.first_free;
 			m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
 			m_material_buffer.data[idx].ref_count = 0;
-			m_material_buffer.data[idx].hash = crc32(&data, sizeof(data));
+			m_material_buffer.data[idx].hash = RuntimeHash((const u8*)&data, sizeof(data));
 			m_material_buffer.map.insert(hash, idx);
 			m_cpu_frame->material_updates.push({idx, data});
 		}
@@ -820,7 +820,7 @@ struct RendererImpl final : Renderer
 		--m_material_buffer.data[idx].ref_count;
 		if (m_material_buffer.data[idx].ref_count > 0) return;
 			
-		const u32 hash = m_material_buffer.data[idx].hash;
+		const RuntimeHash hash = m_material_buffer.data[idx].hash;
 		m_material_buffer.data[idx].next_free = m_material_buffer.first_free;
 		m_material_buffer.first_free = idx;
 		m_material_buffer.map.erase(hash);
@@ -1390,9 +1390,10 @@ struct RendererImpl final : Renderer
 		{}
 
 		struct Data {
+			Data() {}
 			u32 ref_count;
 			union {
-				u32 hash;
+				RuntimeHash hash;
 				u32 next_free;
 			};
 		};
@@ -1401,7 +1402,7 @@ struct RendererImpl final : Renderer
 		gpu::BufferHandle staging_buffer = gpu::INVALID_BUFFER;
 		Array<Data> data;
 		int first_free;
-		HashMap<u32, u32> map;
+		HashMap<RuntimeHash, u32> map;
 	} m_material_buffer;
 };
 

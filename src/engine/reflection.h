@@ -2,6 +2,7 @@
 
 
 #include "engine/lumix.h"
+#include "engine/hash.h"
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
 #include "engine/string.h"
@@ -53,8 +54,8 @@ using CreateComponent = void (*)(IScene*, EntityRef);
 using DestroyComponent = void (*)(IScene*, EntityRef);
 
 struct RegisteredComponent {
-	u32 name_hash = 0;
-	u32 scene = 0;
+	RuntimeHash name_hash;
+	RuntimeHash scene;
 	struct ComponentBase* cmp = nullptr;
 };
 
@@ -63,7 +64,7 @@ LUMIX_ENGINE_API const struct PropertyBase* getProperty(ComponentType cmp_type, 
 LUMIX_ENGINE_API Span<const RegisteredComponent> getComponents();
 
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
-LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(u32 hash);
+LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
 
 struct ResourceAttribute : IAttribute
 {
@@ -503,7 +504,6 @@ struct LUMIX_ENGINE_API ComponentBase {
 	const char* name;
 	const char* label;
 
-	u32 scene;
 	CreateComponent creator;
 	DestroyComponent destroyer;
 	ComponentType component_type;

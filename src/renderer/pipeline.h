@@ -2,6 +2,7 @@
 
 
 #include "engine/delegate.h"
+#include "engine/hash.h"
 #include "engine/resource.h"
 #include "renderer/gpu/gpu.h"
 
@@ -67,7 +68,7 @@ struct LUMIX_RENDERER_API Pipeline
 	{
 		Delegate<void ()> callback;
 		char name[30];
-		u32 hash;
+		RuntimeHash hash;
 	};
 
 	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);

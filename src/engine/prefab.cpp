@@ -1,5 +1,5 @@
-#include "engine/crc32.h"
 #include "engine/crt.h"
+#include "engine/hash.h"
 #include "prefab.h"
 
 namespace Lumix
@@ -26,7 +26,7 @@ bool PrefabResource::load(u64 size, const u8* mem)
 {
 	data.resize((int)size);
 	memcpy(data.getMutableData(), mem, size);
-	content_hash = crc32(mem, (u32)size);
+	content_hash = StableHash(mem, (u32)size);
 	return true;
 }
 

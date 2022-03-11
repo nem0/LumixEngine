@@ -7,9 +7,9 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
-#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
+#include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/path.h"
@@ -29,7 +29,7 @@ struct HashFunc<ResourceType>
 {
 	static u32 get(const ResourceType& key)
 	{
-		return HashFunc<u32>::get(key.type);
+		return HashFunc<RuntimeHash>::get(key.type);
 	}
 };
 		
@@ -272,7 +272,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 		char tmp[LUMIX_MAX_PATH];
 		makeLowercase(Span(tmp), m_dir.data);
-		const u32 dir_hash = crc32(tmp);
+		const RuntimeHash dir_hash(tmp);
 		auto& resources = compiler.lockResources();
 		if (m_filter[0]) {
 			for (const AssetCompiler::ResourceItem& res : resources) {

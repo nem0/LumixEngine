@@ -15,11 +15,11 @@
 #include "engine/associative_array.h"
 #include "engine/atomic.h"
 #include "engine/command_line_parser.h"
-#include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
+#include "engine/hash.h"
 #include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
@@ -2911,14 +2911,14 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	struct ExportFileInfo {
-		u32 hash;
+		StableHash hash;
 		u64 offset;
 		u64 size;
 
 		char path[LUMIX_MAX_PATH];
 	};
 
-	void scanCompiled(AssociativeArray<u32, ExportFileInfo>& infos) {
+	void scanCompiled(AssociativeArray<StableHash, ExportFileInfo>& infos) {
 		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/assets");
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
@@ -2927,7 +2927,9 @@ struct StudioAppImpl final : StudioApp
 
 			Span<const char> basename = Path::getBasename(info.filename);
 			ExportFileInfo rec;
-			fromCString(Span(basename), rec.hash);
+			u32 tmp_hash;
+			fromCString(Span(basename), tmp_hash);
+			rec.hash = StableHash::fromU32(tmp_hash);
 			rec.offset = 0;
 			rec.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, ".lumix/assets/", info.filename));
 			copyString(rec.path, ".lumix/assets/");
@@ -2939,9 +2941,21 @@ struct StudioAppImpl final : StudioApp
 
 		exportDataScan("pipelines/", infos);
 		exportDataScan("universes/", infos);
+		exportFile("lumix.prj", infos);
 	}
 
-	void exportDataScan(const char* dir_path, AssociativeArray<u32, ExportFileInfo>& infos)
+
+	void exportFile(const char* file_path, AssociativeArray<StableHash, ExportFileInfo>& infos) {
+		const char* base_path = m_engine->getFileSystem().getBasePath();
+		const StableHash hash(file_path);
+		auto& out_info = infos.emplace(hash);
+		copyString(out_info.path, file_path);
+		out_info.hash = hash;
+		out_info.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, file_path));
+		out_info.offset = ~0UL;
+	}
+
+	void exportDataScan(const char* dir_path, AssociativeArray<StableHash, ExportFileInfo>& infos)
 	{
 		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
 		const char* base_path = m_engine->getFileSystem().getBasePath();
@@ -2973,7 +2987,7 @@ struct StudioAppImpl final : StudioApp
 				copyString(out_path.data, dir_path);
 				catString(out_path.data, normalized_path);
 			}
-			u32 hash = crc32(out_path.data);
+			const StableHash hash(out_path.data);
 			if (infos.find(hash) >= 0) continue;
 
 			auto& out_info = infos.emplace(hash);
@@ -2986,7 +3000,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void exportDataScanResources(AssociativeArray<u32, ExportFileInfo>& infos)
+	void exportDataScanResources(AssociativeArray<StableHash, ExportFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
@@ -2995,15 +3009,16 @@ struct StudioAppImpl final : StudioApp
 				u32 hash = res->getPath().getHash();
 				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/assets/", hash, ".res");
 
-				auto& out_info = infos.emplace(hash);
+				auto& out_info = infos.emplace(StableHash::fromU32(hash));
 				copyString(Span(out_info.path), baked_path);
-				out_info.hash = hash;
+				out_info.hash = StableHash::fromU32(hash);
 				out_info.size = os::getFileSize(baked_path);
 				out_info.offset = ~0UL;
 			}
 		}
 		exportDataScan("pipelines/", infos);
 		exportDataScan("universes/", infos);
+		exportFile("lumix.prj", infos);
 	}
 
 
@@ -3049,17 +3064,9 @@ struct StudioAppImpl final : StudioApp
 	void exportData() {
 		if (m_export.dest_dir.empty()) return;
 
-		AssociativeArray<u32, ExportFileInfo> infos(m_allocator);
-		infos.reserve(10000);
-
-		switch (m_export.mode) {
-			case ExportConfig::Mode::ALL_FILES: scanCompiled(infos); break;
-			case ExportConfig::Mode::CURRENT_UNIVERSE: exportDataScanResources(infos); break;
-			default: ASSERT(false); break;
-		}
-
+		FileSystem& fs = m_engine->getFileSystem();
 		{
-			StaticString<LUMIX_MAX_PATH> project_path(m_export.dest_dir, "lumix.prj");
+			StaticString<LUMIX_MAX_PATH> project_path(fs.getBasePath(), "lumix.prj");
 			OutputMemoryStream prj_blob(m_allocator);
 			m_engine->serializeProject(prj_blob, m_export.startup_universe);
 			os::OutputFile file;
@@ -3077,8 +3084,15 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 
+		AssociativeArray<StableHash, ExportFileInfo> infos(m_allocator);
+		infos.reserve(10000);
 
-		FileSystem& fs = m_engine->getFileSystem();
+		switch (m_export.mode) {
+			case ExportConfig::Mode::ALL_FILES: scanCompiled(infos); break;
+			case ExportConfig::Mode::CURRENT_UNIVERSE: exportDataScanResources(infos); break;
+			default: ASSERT(false); break;
+		}
+
 		if (m_export.pack) {
 			static const char* OUT_FILENAME = "main.pak";
 			char dest[LUMIX_MAX_PATH];
