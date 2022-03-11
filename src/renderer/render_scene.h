@@ -56,6 +56,7 @@ struct ProceduralGeometry {
 	OutputMemoryStream vertex_data;
 	gpu::VertexDecl vertex_decl;
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
+	AABB aabb;
 };
 
 struct Camera

@@ -1108,6 +1108,7 @@ struct RenderSceneImpl final : RenderScene {
 				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);			
 			}
+			computeAABB(pg);
 			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
 		}
 	}
@@ -1774,6 +1775,21 @@ struct RenderSceneImpl final : RenderScene {
 
 	SplineGeometry& getSplineGeometry(EntityRef entity) override { return m_spline_geometries[entity]; }
 	
+	static void computeAABB(ProceduralGeometry& pg) {
+		pg.aabb.min = Vec3(FLT_MAX);
+		pg.aabb.max = Vec3(-FLT_MAX);
+
+		const u32 stride = pg.vertex_decl.getStride();
+		const u32 vertex_count = u32(pg.vertex_data.size() / stride);
+		const u8* data = pg.vertex_data.data();
+
+		for (u32 i = 0; i < vertex_count; ++i) {
+			Vec3 p;
+			memcpy(&p, data + stride * i, sizeof(p));
+			pg.aabb.addPoint(p);
+		}
+	}
+
 	void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl) override {
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		pg.vertex_decl = vertex_decl;
@@ -1781,6 +1797,7 @@ struct RenderSceneImpl final : RenderScene {
 		pg.vertex_data.write(vertex_data.begin(), vertex_data.length());
 		const Renderer::MemRef mem = m_renderer.copy(vertex_data.begin(), vertex_data.length());
 		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+		computeAABB(pg);
 	}
 	
 	const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() override {
@@ -2531,15 +2548,46 @@ struct RenderSceneImpl final : RenderScene {
 			}
 		}
 
+		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
+			const ProceduralGeometry& pg = iter.value();
+			if (pg.vertex_data.empty()) continue;
+
+			const u32 stride = pg.vertex_decl.getStride();
+			const u32 vertex_count = u32(pg.vertex_data.size() / stride);
+			const u8* data = pg.vertex_data.data();
+			Vec3 a, b, c;
+			RayCastModelHit pg_hit;
+
+			const DVec3& pos = universe.getPosition(iter.key());
+			const Quat rot = universe.getRotation(iter.key()).conjugated();
+			const Vec3 rd = rot.rotate(dir);
+			Vec3 ro = Vec3(origin - pos);
+
+			Vec3 dummy;
+			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max, dummy)) continue;
+
+			for (u32 i = 0; i < vertex_count - 1; ++i) {
+				float t;
+				memcpy(&a, data + i * stride, sizeof(a));
+				memcpy(&b, data + (i + 1) * stride, sizeof(b));
+				memcpy(&c, data + (i + 2) * stride, sizeof(c));
+				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && t < hit.t) {
+					pg_hit.is_hit = true;
+					pg_hit.mesh = nullptr;
+					pg_hit.entity = iter.key();
+					pg_hit.component_type = SPLINE_GEOMETRY_TYPE;
+					if (filter.invoke(pg_hit)) hit = pg_hit;
+				}
+			}
+		}
+
 		for (auto* terrain : m_terrains) {
 			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
 			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t)) {
 				terrain_hit.component_type = TERRAIN_TYPE;
 				terrain_hit.entity = terrain->getEntity();
 				terrain_hit.mesh = nullptr;
-				if (filter.invoke(terrain_hit)) {
-					hit = terrain_hit;
-				}
+				if (filter.invoke(terrain_hit)) hit = terrain_hit;
 			}
 		}
 
