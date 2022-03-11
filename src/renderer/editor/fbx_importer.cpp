@@ -18,7 +18,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "meshoptimizer/meshoptimizer.h"
-#include "mikktspace.h"
+#include "mikktspace/mikktspace.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/material.h"

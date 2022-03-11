@@ -488,7 +488,9 @@ project "engine"
 			"genie.lua",
 			"../external/imgui/**.h",
 			"../external/imgui/**.cpp",
-			"../external/imgui/**.inl"
+			"../external/imgui/**.inl",
+			"../external/lz4/**.c",
+			"../external/lz4/**.h"
 	}
 	excludes { 
 		"../external/imgui/imgui_demo.cpp",
@@ -497,7 +499,6 @@ project "engine"
 		"../external/imgui/imgui_draw.cpp",
 		"../external/imgui/imgui_widgets.cpp",
 		"../external/imgui/imgui_freetype.cpp",
-		"../external/imgui/imnodes.cpp"
 	}
 
 
@@ -555,7 +556,11 @@ if has_plugin("renderer") then
 	project "renderer"
 		libType()
 
-		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../external/meshoptimizer/**.*" }
+		files {
+			"../src/renderer/**.h",
+			"../src/renderer/**.cpp",
+			"../src/renderer/**.c",
+		}
 		files { "../data/pipelines/**.*" }
 		excludes { 
 			"../external/meshoptimizer/clusterizer.cpp",
@@ -571,6 +576,14 @@ if has_plugin("renderer") then
 			"../external/meshoptimizer/vfetchoptimizer.cpp"
 		}
 		
+		if build_studio then
+			files {
+				"../external/meshoptimizer/**.*",
+				"../external/mikktspace/**.*",
+				"../external/openfbx/**.*",
+			}
+		end
+
 		if use_basisu then
 			defines { "LUMIX_BASIS_UNIVERSAL" }
 			includedirs { "../external/basisu/include" }

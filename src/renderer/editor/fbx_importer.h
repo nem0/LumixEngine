@@ -8,7 +8,7 @@
 #include "engine/os.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "ofbx.h"
+#include "openfbx/ofbx.h"
 
 
 namespace Lumix

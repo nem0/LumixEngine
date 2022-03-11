@@ -12,7 +12,6 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/lz4.h"
 #include "engine/atomic.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
@@ -21,6 +20,7 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "lz4/lz4.h"
 
 // use this if you want to be able to use cached resources without having the original
 // #define CACHE_MASTER

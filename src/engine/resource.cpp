@@ -2,11 +2,11 @@
 #include "engine/crc32.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
-#include "engine/lz4.h"
 #include "engine/path.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
+#include "lz4/lz4.h"
 
 
 namespace Lumix
