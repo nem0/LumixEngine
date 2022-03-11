@@ -33,10 +33,11 @@ Who is using it?
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
-* [lent](https://github.com/nem0/lent/)
-* [lucy](https://github.com/nem0/lucy_job_system)
 * [freetype](https://github.com/aseprite/freetype2)
 * [meshoptimizer](https://github.com/zeux/meshoptimizer)
+* [mikktspace](https://github.com/mmikk/MikkTSpace)
+* [OpenFBX](https://github.com/nem0/OpenFBX/)
+* [LZ4](https://github.com/lz4/lz4)
 
 Project generator
 
