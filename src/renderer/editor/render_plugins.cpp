@@ -4316,6 +4316,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 	}
 
+	const char* getName() const override { return "instanced_model"; }
+
 	enum class Brush : i32 {
 		SINGLE,
 		TERRAIN

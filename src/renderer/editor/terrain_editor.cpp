@@ -1212,7 +1212,6 @@ int TerrainEditor::placePrefabs(lua_State* L) {
 	return 0;
 }
 
-
 int TerrainEditor::placeInstances(lua_State* L) {
 	const int index = lua_upvalueindex(1);
 	if (!LuaWrapper::isType<TerrainEditor>(L, index)) {

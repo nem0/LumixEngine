@@ -64,12 +64,13 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 	~TerrainEditor();
 
 	void onGUI(ComponentUID cmp, WorldEditor& editor);
+	DistanceField* findDistanceField(const char* name) const;
+	const char* getName() const override { return "terrain_editor"; }
 
 private:
 	static int placeInstances(lua_State* L);
 	static int placePrefabs(lua_State* L);
 	void registerLuaAPI();
-	DistanceField* findDistanceField(const char* name) const;
 	struct Terrain* getTerrain() const;
 	void distanceFieldsUI(ComponentUID cmp);
 	void getDistanceField(const struct Terrain& terrain, DistanceField& df, const struct Spline& spline, EntityRef spline_entity) const;
