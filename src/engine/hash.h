@@ -14,7 +14,7 @@ LUMIX_ENGINE_API u32 continueCrc32(u32 original_crc, const void* data, u32 lengt
 
 // use if you want fast hash with low probability of collisions and size (8 bytes) is not an issue
 // can change in future, do not serialize
-struct RuntimeHash {
+struct LUMIX_ENGINE_API RuntimeHash {
 	RuntimeHash() {}
 	explicit RuntimeHash(const char* string);
 	RuntimeHash(const char* string, u32 len);
@@ -29,7 +29,7 @@ private:
 };
 
 // use if you want to serialize it
-struct StableHash {
+struct LUMIX_ENGINE_API StableHash {
 	static StableHash fromU32(u32 hash);
 	StableHash() {}
 	explicit StableHash(const char* string);

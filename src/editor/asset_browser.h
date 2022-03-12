@@ -41,12 +41,12 @@ struct AssetBrowser {
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual void openInExternalEditor(Resource* resource) const = 0;
 	virtual void openInExternalEditor(const char* path) const = 0;
-	virtual bool resourceList(Span<char> buf, u32& selected_idx, ResourceType type, float height, bool can_create_new) const = 0;
+	virtual bool resourceList(Span<char> buf, struct StableHash& selected_idx, ResourceType type, float height, bool can_create_new) const = 0;
 	virtual void tile(const Path& path, bool selected) = 0;
 	virtual struct OutputMemoryStream* beginSaveResource(Resource& resource) = 0;
 	virtual void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success) = 0;
 	virtual void releaseResources() = 0;
-	virtual void reloadTile(u32 hash) = 0;
+	virtual void reloadTile(StableHash hash) = 0;
 	virtual bool isOpen() const = 0;
 	virtual void setOpen(bool open) = 0;
 	virtual bool copyTile(const char* from, const char* to) = 0;

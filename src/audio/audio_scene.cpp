@@ -90,10 +90,10 @@ struct AudioSceneImpl final : AudioScene
 		/*if (!m_animation_scene) return;
 		
 		InputMemoryStream blob(m_animation_scene->getEventStream());
-		u32 sound_type = crc32("sound");
+		const RuntimeHash sound_type("sound");
 		while (blob.getPosition() < blob.size())
 		{
-			u32 type;
+			RuntimeHash type;
 			u8 size;
 			EntityRef entity;
 			blob.read(type);

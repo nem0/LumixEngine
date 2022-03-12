@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/hash.h"
 #include "editor/studio_app.h"
 #include "engine/string.h"
 
@@ -12,7 +13,7 @@ template <typename T> struct UniquePtr;
 namespace anim {
 
 struct EventType {
-	u32 type;
+	RuntimeHash type;
 	StaticString<64> label;
 	u16 size;
 

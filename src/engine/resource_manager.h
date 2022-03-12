@@ -11,7 +11,7 @@ namespace Lumix
 struct LUMIX_ENGINE_API ResourceManager {
 	friend struct Resource;
 	friend struct ResourceManagerHub;
-	using ResourceTable = HashMap<u32, struct Resource*, HashFuncDirect<u32>>;
+	using ResourceTable = HashMap<StableHash, struct Resource*>;
 
 	void create(struct ResourceType type, struct ResourceManagerHub& owner);
 	void destroy();

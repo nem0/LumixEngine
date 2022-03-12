@@ -2,6 +2,7 @@
 
 
 #include "engine/lumix.h"
+#include "engine/hash.h"
 
 
 namespace Lumix
@@ -117,6 +118,11 @@ template <int SIZE> struct StaticString
 	{
 		int len = stringLength(data);
 		toCString(value, Span<char>(data).fromLeft(len), 10);
+	}
+
+	void add(StableHash value)
+	{
+		add(value.getHashValue());
 	}
 
 	template <typename T> void add(T value)

@@ -76,7 +76,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	struct FileInfo {
 		StaticString<LUMIX_MAX_PATH> clamped_filename;
 		StaticString<LUMIX_MAX_PATH> filepath;
-		u32 file_path_hash;
+		StableHash file_path_hash;
 		void* tex = nullptr;
 		bool create_called = false;
 	};
@@ -465,7 +465,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void reloadTile(u32 hash) override {
+	void reloadTile(StableHash hash) override {
 		for (FileInfo& fi : m_file_infos) {
 			if (fi.file_path_hash == hash) {
 				m_app.getRenderInterface()->unloadTexture(fi.tex);
@@ -942,7 +942,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			res << rl.subresource << (rl.subresource.length() > 0 ? ":" : "") << rl.basename << "." << rl.ext;
 		}
 		if (hash_id) {
-			res << "##h" << crc32(rl.full.m_begin, rl.full.length());
+			res << "##h" << RuntimeHash(rl.full.m_begin, rl.full.length()).getHashValue();
 		}
 		return res;
 	}
@@ -1009,7 +1009,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::PopStyleVar();
 
 		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(300, 300))) {
-			static u32 selected_path_hash = 0;
+			static StableHash selected_path_hash;
 			if (resourceList(buf, selected_path_hash, type, 0, true)) {
 				ImGui::EndPopup();
 				ImGui::PopID();
@@ -1097,7 +1097,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
-	bool resourceList(Span<char> buf, u32& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
+	bool resourceList(Span<char> buf, StableHash& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 

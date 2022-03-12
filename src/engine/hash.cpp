@@ -1,20 +1,21 @@
 #include "engine/hash.h"
-#include "wyhash/wyhash.h"
 
-namespace Lumix
-{
+#define XXH_STATIC_LINKING_ONLY
+#define XXH_IMPLEMENTATION
+#include "xxhash/xxhash.h"
 
+namespace Lumix {
 
 RuntimeHash::RuntimeHash(const char* string, u32 len) {
-	hash = wyhash(string, len, 0, _wyp);
+	hash = XXH3_64bits(string, len);
 }
 
 RuntimeHash::RuntimeHash(const u8* data, u32 len) {
-	hash = wyhash(data, len, 0, _wyp);
+	hash = XXH3_64bits(data, len);
 }
 
-RuntimeHash::RuntimeHash(const char* string) {
-	hash = wyhash(string, strlen(string), 0, _wyp);
+RuntimeHash::RuntimeHash(const char* str) {
+	hash = XXH3_64bits(str, strlen(str));
 }
 
 StableHash StableHash::fromU32(u32 hash) {

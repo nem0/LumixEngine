@@ -1682,7 +1682,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 	if (m_selected_prefabs.empty())
 	{
 		meshes->forEach([&](EntityRef entity){
-			if (prefab_system.getPrefab(entity) == 0) return; 
+			if (prefab_system.getPrefab(entity).getHashValue() == 0) return; 
 			
 			const Model* model = scene->getModelInstanceModel(entity);
 			const AABB entity_aabb = model ? model->getAABB() : AABB(Vec3::ZERO, Vec3::ZERO);
@@ -1695,7 +1695,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 		meshes->forEach([&](EntityRef entity){
 			for (auto* res : m_selected_prefabs)
 			{
-				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
+				if (prefab_system.getPrefab(entity) == res->getPath().getHash())
 				{
 					const Model* model = scene->getModelInstanceModel(entity);
 					const AABB entity_aabb = model ? model->getAABB() : AABB(Vec3::ZERO, Vec3::ZERO);

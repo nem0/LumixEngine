@@ -88,10 +88,10 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 void Controller::processEvents(RuntimeContext& ctx) const {
 	if (ctx.events.empty()) return;
 	
-	static const u32 set_input_type = crc32("set_input");
+	static const RuntimeHash set_input_type("set_input");
 	InputMemoryStream blob(ctx.events);
 	while(blob.getPosition() < blob.size()) {
-		const u32 type = blob.read<u32>();
+		const RuntimeHash type = blob.read<RuntimeHash>();
 		const u16 size = blob.read<u16>();
 		const u16 rel_time = blob.read<u16>();
 		const u8* data = (const u8*)blob.skip(size);

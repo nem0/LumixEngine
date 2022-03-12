@@ -8,7 +8,8 @@ namespace Lumix
 {
 
 
-using PrefabHandle = u32;
+struct StableHash;
+using PrefabHandle = StableHash;
 template <typename T> struct UniquePtr;
 
 struct LUMIX_EDITOR_API PrefabSystem

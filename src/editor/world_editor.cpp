@@ -1714,7 +1714,7 @@ private:
 				}
 				PrefabHandle tpl;
 				blob.read(tpl);
-				if (tpl) m_editor.getPrefabSystem().setPrefab(new_entity, tpl);
+				if (tpl.getHashValue()) m_editor.getPrefabSystem().setPrefab(new_entity, tpl);
 			}
 		}
 

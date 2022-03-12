@@ -185,9 +185,9 @@ public:
 		
 		if (entity.index >= m_entity_to_prefab.size()) return;
 		const PrefabHandle prefab = m_entity_to_prefab[entity.index];
-		if (prefab == 0) return;
+		if (prefab.getHashValue() == 0) return;
 
-		m_entity_to_prefab[entity.index] = 0;
+		m_entity_to_prefab[entity.index] = StableHash();
 	}
 
 
@@ -209,7 +209,7 @@ public:
 
 	PrefabHandle getPrefab(EntityRef entity) const override
 	{
-		if (entity.index >= m_entity_to_prefab.size()) return 0;
+		if (entity.index >= m_entity_to_prefab.size()) return StableHash();
 		return m_entity_to_prefab[entity.index];
 	}
 
@@ -218,7 +218,7 @@ public:
 	{
 		while (entity.index >= m_entity_to_prefab.size())
 		{
-			m_entity_to_prefab.push(0);
+			m_entity_to_prefab.push(StableHash());
 		}
 	}
 	
@@ -302,7 +302,7 @@ public:
 	{
 		EntityRef root = entity;
 		EntityPtr parent = m_universe->getParent(root);
-		while (parent.isValid() && getPrefab((EntityRef)parent) != 0)
+		while (parent.isValid() && getPrefab((EntityRef)parent).getHashValue() != 0)
 		{
 			root = (EntityRef)parent;
 			parent = m_universe->getParent(root);
@@ -475,7 +475,7 @@ public:
 	}
 
 	void breakPrefabRecursive(EntityRef e) {
-		m_entity_to_prefab[e.index] = 0;
+		m_entity_to_prefab[e.index] = StableHash();
 		const EntityPtr child = m_universe->getFirstChild(e);
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
@@ -492,13 +492,13 @@ public:
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
 		}
-		m_entity_to_prefab[root.index] = 0;
+		m_entity_to_prefab[root.index] = StableHash();
 		m_roots.erase(root);
 	}
 
 	void savePrefab(EntityRef entity, const Path& path) override
 	{
-		if (getPrefab(entity) != 0) entity = getPrefabRoot(entity);
+		if (getPrefab(entity).getHashValue() != 0) entity = getPrefabRoot(entity);
 
 		Engine& engine = m_editor.getEngine();
 		FileSystem& fs = engine.getFileSystem();
@@ -664,7 +664,7 @@ public:
 
 			if (!e.isValid()) continue;
 			while (e.index >= m_entity_to_prefab.size()) {
-				m_entity_to_prefab.push(0);
+				m_entity_to_prefab.push(StableHash());
 			}
 			m_entity_to_prefab[e.index] = prefab;
 		}
@@ -710,7 +710,7 @@ private:
 
 	Array<PrefabHandle> m_entity_to_prefab;
 	HashMap<EntityRef, PrefabHandle> m_roots;
-	HashMap<PrefabHandle, PrefabVersion, HashFuncDirect<u32>> m_resources;
+	HashMap<PrefabHandle, PrefabVersion> m_resources;
 	Array<DeferredInstance> m_deferred_instances;
 	Universe* m_universe;
 	WorldEditor& m_editor;

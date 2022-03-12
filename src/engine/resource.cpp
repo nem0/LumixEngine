@@ -194,12 +194,12 @@ void Resource::doLoad()
 	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FileSystem::ContentCallback cb = makeDelegate<&Resource::fileLoaded>(this);
 
-	const u32 hash = m_path.getHash();
+	const StableHash hash = m_path.getHash();
 	if (startsWith(m_path.c_str(), ".lumix/asset_tiles/")) {
 		m_async_op = fs.getContent(m_path, cb);
 	}
 	else {	
-		const StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", hash, ".res");
+		const StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", hash.getHashValue(), ".res");
 		m_async_op = fs.getContent(Path(res_path), cb);
 	}
 }

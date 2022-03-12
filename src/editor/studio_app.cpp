@@ -552,7 +552,7 @@ struct StudioAppImpl final : StudioApp
 				if (!ImGuiEx::BeginResizableMenu(last, nullptr, true)) return;
 				char buf[LUMIX_MAX_PATH];
 				bool create_empty = ImGui::MenuItem(ICON_FA_BROOM " Empty");
-				static u32 selected_res_hash = 0;
+				static StableHash selected_res_hash;
 				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, 0, true) || create_empty) {
 					if (create_entity) {
 						EntityRef entity = editor.addEntity();
@@ -3006,12 +3006,12 @@ struct StudioAppImpl final : StudioApp
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
-				u32 hash = res->getPath().getHash();
+				const StableHash hash = res->getPath().getHash();
 				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/assets/", hash, ".res");
 
-				auto& out_info = infos.emplace(StableHash::fromU32(hash));
+				auto& out_info = infos.emplace(hash);
 				copyString(Span(out_info.path), baked_path);
-				out_info.hash = StableHash::fromU32(hash);
+				out_info.hash = hash;
 				out_info.size = os::getFileSize(baked_path);
 				out_info.offset = ~0UL;
 			}

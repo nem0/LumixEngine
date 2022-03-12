@@ -14,8 +14,7 @@ namespace Lumix
 
 
 Path::Path()
-	: m_hash(0)
-	, m_path{}
+	: m_path{}
 {}
 
 
@@ -24,9 +23,9 @@ Path::Path(const char* path) {
 	#ifdef _WIN32
 		char tmp[LUMIX_MAX_PATH];
 		makeLowercase(Span(tmp), m_path);
-		m_hash = crc32(tmp);
+		m_hash = StableHash(tmp);
 	#else
-		m_hash = crc32(m_path);
+		m_hash = StableHash(m_path);
 	#endif
 }
 
@@ -39,9 +38,9 @@ void Path::operator =(const char* rhs) {
 	#ifdef _WIN32
 		char tmp[LUMIX_MAX_PATH];
 		makeLowercase(Span(tmp), m_path);
-		m_hash = crc32(tmp);
+		m_hash = StableHash(tmp);
 	#else
-		m_hash = crc32(m_path);
+		m_hash = StableHash(m_path);
 	#endif
 }
 

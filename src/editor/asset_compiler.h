@@ -36,7 +36,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual bool compile(const Path& path) = 0;
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
-	virtual const HashMap<u32, ResourceItem, HashFuncDirect<u32>>& lockResources() = 0;
+	virtual const HashMap<StableHash, ResourceItem>& lockResources() = 0;
 	virtual void unlockResources() = 0;
 	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
 	virtual void addResource(ResourceType type, const char* path) = 0;

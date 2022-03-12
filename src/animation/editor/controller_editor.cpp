@@ -23,7 +23,7 @@ namespace Lumix::anim {
 struct ControllerEditorImpl : ControllerEditor {
 	struct SetInputEventType : EventType {
 		SetInputEventType() {
-			type = crc32("set_input");
+			type = RuntimeHash("set_input");
 			label = "Set input";
 			size = sizeof(u32) + sizeof(float);
 		}
@@ -348,7 +348,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		memset(events.getMutableData() + ptr, 0, type.size);
 	}
 
-	const EventType& getEventType(u32 type) {
+	const EventType& getEventType(RuntimeHash type) {
 		for (const UniquePtr<EventType>& t : m_event_types) {
 			if (t->type == type) return *t.get();
 		}
@@ -387,7 +387,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			InputMemoryStream blob(events);
 			while(blob.getPosition() != blob.size()) {
 				++i;
-				const u32 type = blob.read<u32>();
+				const RuntimeHash type = blob.read<RuntimeHash>();
 				const u16 data_size = blob.read<u16>();
 				const EventType& type_obj = getEventType(type);
 				ASSERT(data_size == type_obj.size);
