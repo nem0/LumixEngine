@@ -348,6 +348,12 @@ bool getEvent(Event& event) {
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
 			break;
+		case WM_SYSCOMMAND:
+			if (msg.wParam != SC_KEYMENU || (msg.lParam >> 16) > 0) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			goto retry;
 		case WM_SYSKEYUP:
 			event.type = Event::Type::KEY;
 			event.key.down = false;
