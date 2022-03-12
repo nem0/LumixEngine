@@ -15,7 +15,6 @@ struct HashFunc
 	static u32 get(const Key& key);
 };
 
-// https://gist.github.com/badboy/6267743
 template<>
 struct HashFunc<u64>
 {
@@ -115,7 +114,7 @@ struct HashMap
 {
 private:
 	struct Slot {
-		u8 key_mem[sizeof(Key)];
+		alignas(Key) u8 key_mem[sizeof(Key)];
 		bool valid;
 		//u8 padding[3];
 	};
