@@ -55,14 +55,8 @@ template <typename Key> struct HashFunc;
 
 template<> struct HashFunc<RuntimeHash> {
 	static u32 get(const RuntimeHash& k) {
-		const u64 key = k.getHashValue();
-		u64 tmp = (~key) + (key << 18);
-		tmp = tmp ^ (tmp >> 31);
-		tmp = tmp * 21;
-		tmp = tmp ^ (tmp >> 11);
-		tmp = tmp + (tmp << 6);
-		tmp = tmp ^ (tmp >> 22);
-		return (u32)tmp;
+		const u64 hash = k.getHashValue();
+		return u32(hash ^ (hash >> 16));
 	}
 };
 
