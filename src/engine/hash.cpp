@@ -22,24 +22,6 @@ RuntimeHash32::RuntimeHash32(const char* str) {
 	hash = XXH32(str, strlen(str), 0);
 }
 
-StableHash StableHash::fromU32(u32 hash) {
-	StableHash res;
-	res.hash = hash;
-	return res;
-}
-
-StableHash::StableHash(const char* string, u32 len) {
-	hash = crc32(string, len);
-}
-
-StableHash::StableHash(const u8* data, u32 len) {
-	hash = crc32(data, len);
-}
-
-StableHash::StableHash(const char* string) {
-	hash = crc32(string);
-}
-
 static u32 crc32Table[256] = {
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
 	0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -85,8 +67,7 @@ static u32 crc32Table[256] = {
 	0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d};
 
-
-u32 crc32(const void* data, u32 length)
+static u32 crc32(const void* data, u32 length)
 {
 	const u8* c = static_cast<const u8*>(data);
 	u32 crc = 0xffffFFFF;
@@ -100,8 +81,7 @@ u32 crc32(const void* data, u32 length)
 	return ~crc;
 }
 
-
-u32 crc32(const char* str)
+static u32 crc32(const char* str)
 {
 	const u8* c = reinterpret_cast<const u8*>(str);
 	u32 crc = 0xffffFFFF;
@@ -113,32 +93,22 @@ u32 crc32(const char* str)
 	return ~crc;
 }
 
-
-u32 continueCrc32(u32 original_crc, const char* str)
-{
-	const u8* c = reinterpret_cast<const u8*>(str);
-	u32 crc = ~original_crc;
-	while (*c)
-	{
-		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
-		++c;
-	}
-	return ~crc;
+StableHash StableHash::fromU32(u32 hash) {
+	StableHash res;
+	res.hash = hash;
+	return res;
 }
 
-
-u32 continueCrc32(u32 original_crc, const void* data, u32 length)
-{
-	const u8* c = reinterpret_cast<const u8*>(data);
-	u32 crc = ~original_crc;
-	while (length)
-	{
-		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
-		++c;
-		--length;
-	}
-	return ~crc;
+StableHash::StableHash(const char* string, u32 len) {
+	hash = crc32(string, len);
 }
 
+StableHash::StableHash(const u8* data, u32 len) {
+	hash = crc32(data, len);
+}
+
+StableHash::StableHash(const char* string) {
+	hash = crc32(string);
+}
 
 } // namespace Lumix
