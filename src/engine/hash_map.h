@@ -19,27 +19,29 @@ struct HashFunc
 template<>
 struct HashFunc<u64>
 {
-	static u32 get(const u64& key)
-	{
-		u64 tmp = (~key) + (key << 18);
-		tmp = tmp ^ (tmp >> 31);
-		tmp = tmp * 21;
-		tmp = tmp ^ (tmp >> 11);
-		tmp = tmp + (tmp << 6);
-		tmp = tmp ^ (tmp >> 22);
-		return (u32)tmp;
+	static u32 get(u64 key) {
+		// https://xoshiro.di.unimi.it/splitmix64.c
+		u64 x = key;
+		x ^= x >> 30;
+		x *= 0xbf58476d1ce4e5b9U;
+		x ^= x >> 27;
+		x *= 0x94d049bb133111ebU;
+		x ^= x >> 31;
+		return u32((x >> 32) ^ x);
 	}
 };
 
 
 template<>
-struct HashFunc<i32>
-{
-	static u32 get(const i32& key)
-	{
-		u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
-		x = ((x >> 16) ^ x) * 0x45d9f3b;
-		x = ((x >> 16) ^ x);
+struct HashFunc<i32> {
+	static u32 get(i32 key) {
+		// https://nullprogram.com/blog/2018/07/31/
+		u32 x = key;
+		x ^= x >> 16;
+		x *= 0x7feb352dU;
+		x ^= x >> 15;
+		x *= 0x846ca68bU;
+		x ^= x >> 16;
 		return x;
 	}
 };
@@ -75,13 +77,14 @@ struct HashFunc<EntityPtr>
 };
 
 template<>
-struct HashFunc<u32>
-{
-	static u32 get(const u32& key)
-	{
-		u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
-		x = ((x >> 16) ^ x) * 0x45d9f3b;
-		x = ((x >> 16) ^ x);
+struct HashFunc<u32> {
+	static u32 get(const u32& key) {
+		u32 x = key;
+		x ^= x >> 16;
+		x *= 0x7feb352dU;
+		x ^= x >> 15;
+		x *= 0x846ca68bU;
+		x ^= x >> 16;
 		return x;
 	}
 };
@@ -92,31 +95,13 @@ struct HashFunc<T*>
 	static u32 get(const void* key)
 	{
 		static_assert(sizeof(key) == sizeof(u64));
-		u64 tmp = (u64)key;
-		tmp = (~tmp) + (tmp << 18);
-		tmp = tmp ^ (tmp >> 31);
-		tmp = tmp * 21;
-		tmp = tmp ^ (tmp >> 11);
-		tmp = tmp + (tmp << 6);
-		tmp = tmp ^ (tmp >> 22);
-		return (u32)tmp;
-	}
-};
-
-template<>
-struct HashFunc<char*>
-{
-	static u32 get(const char* key)
-	{
-		u32 result = 0x55555555;
-
-		while (*key) 
-		{ 
-			result ^= *key++;
-			result = ((result << 5) | (result >> 27));
-		}
-
-		return result;
+		u64 x = (u64)key;
+		x ^= x >> 30;
+		x *= 0xbf58476d1ce4e5b9U;
+		x ^= x >> 27;
+		x *= 0x94d049bb133111ebU;
+		x ^= x >> 31;
+		return u32((x >> 32) ^ x);
 	}
 };
 
