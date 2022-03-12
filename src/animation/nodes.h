@@ -29,7 +29,7 @@ struct RuntimeContext {
 	OutputMemoryStream data;
 	OutputMemoryStream events;
 	
-	StableHash root_bone_hash;
+	StableHash32 root_bone_hash;
 	Time time_delta;
 	Model* model = nullptr;
 	InputMemoryStream input_runtime;

@@ -319,7 +319,7 @@ struct PackFileSystem : FileSystemImpl {
 		}
 		const u32 count = m_file.read<u32>();
 		for (u32 i = 0; i < count; ++i) {
-			const StableHash hash = m_file.read<StableHash>();
+			const StableHash32 hash = m_file.read<StableHash32>();
 			PackFile& f = m_map.insert(hash);
 			f.offset = m_file.read<u64>();
 			f.size = m_file.read<u64>();
@@ -335,7 +335,7 @@ struct PackFileSystem : FileSystemImpl {
 		Span<const char> basename = Path::getBasename(path.c_str());
 		u32 hashu32;
 		fromCString(basename, hashu32);
-		StableHash hash = StableHash::fromU32(hashu32);
+		StableHash32 hash = StableHash32::fromU32(hashu32);
 		if (basename[0] < '0' || basename[0] > '9' || hashu32 == 0) {
 			hash = path.getHash();
 		}
@@ -362,7 +362,7 @@ struct PackFileSystem : FileSystemImpl {
 	};
 
 	IAllocator& m_allocator;
-	HashMap<StableHash, PackFile> m_map;
+	HashMap<StableHash32, PackFile> m_map;
 	Mutex m_mutex;
 	os::InputFile m_file;
 };

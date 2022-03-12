@@ -31,13 +31,13 @@ struct LUMIX_ENGINE_API Path {
 	bool operator!=(const Path& rhs) const;
 
 	i32 length() const;
-	StableHash getHash() const { return m_hash; }
+	StableHash32 getHash() const { return m_hash; }
 	const char* c_str() const { return m_path; }
 	bool isEmpty() const { return m_path[0] == '\0'; }
 
 private:
 	char m_path[LUMIX_MAX_PATH];
-	StableHash m_hash;
+	StableHash32 m_hash;
 };
 
 

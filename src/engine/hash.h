@@ -37,16 +37,17 @@ private:
 };
 
 // use if you want to serialize it
-struct LUMIX_ENGINE_API StableHash {
-	static StableHash fromU32(u32 hash);
-	StableHash() {}
-	explicit StableHash(const char* string);
-	StableHash(const char* string, u32 len);
-	StableHash(const u8* data, u32 len);
+// 32bits, use if size matters 
+struct LUMIX_ENGINE_API StableHash32 {
+	static StableHash32 fromU32(u32 hash);
+	StableHash32() {}
+	explicit StableHash32(const char* string);
+	StableHash32(const char* string, u32 len);
+	StableHash32(const u8* data, u32 len);
 
-	bool operator != (StableHash rhs) const { return hash != rhs.hash; }
-	bool operator == (StableHash rhs) const { return hash == rhs.hash; }
-	bool operator < (StableHash rhs) const { return hash < rhs.hash; }
+	bool operator != (StableHash32 rhs) const { return hash != rhs.hash; }
+	bool operator == (StableHash32 rhs) const { return hash == rhs.hash; }
+	bool operator < (StableHash32 rhs) const { return hash < rhs.hash; }
 
 	u32 getHashValue() const { return hash; }
 private:
@@ -56,7 +57,7 @@ private:
 struct RollingStableHasher {
 	void begin();
 	void update(const void* data, u32 len);
-	StableHash end();
+	StableHash32 end();
 };
 
 struct RollingHasher {
@@ -74,8 +75,8 @@ template<> struct HashFunc<RuntimeHash> {
 	}
 };
 
-template<> struct HashFunc<StableHash> {
-	static u32 get(const StableHash& k) {
+template<> struct HashFunc<StableHash32> {
+	static u32 get(const StableHash32& k) {
 		return k.getHashValue();
 	}
 };

@@ -26,7 +26,7 @@ bool PrefabResource::load(u64 size, const u8* mem)
 {
 	data.resize((int)size);
 	memcpy(data.getMutableData(), mem, size);
-	content_hash = StableHash(mem, (u32)size);
+	content_hash = StableHash32(mem, (u32)size);
 	return true;
 }
 

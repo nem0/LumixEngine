@@ -439,10 +439,10 @@ public:
 		serializer.read(count);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (i32 i = 0; i < count; ++i) {
-			StableHash hash;
+			StableHash32 hash;
 			serializer.read(hash);
 			i32 idx = plugins.find([&](IPlugin* plugin){
-				return StableHash(plugin->getName()) == hash;
+				return StableHash32(plugin->getName()) == hash;
 			});
 			if (idx < 0) return false;
 			IPlugin* plugin = plugins[idx];
@@ -463,14 +463,14 @@ public:
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		serializer.write((i32)plugins.size());
 		for (IPlugin* plugin : plugins) {
-			const StableHash hash(plugin->getName());
+			const StableHash32 hash(plugin->getName());
 			serializer.write(hash);
 			serializer.write((u32)plugin->getVersion());
 			plugin->serialize(serializer);
 		}
 	}
 
-	StableHash serialize(Universe& ctx, OutputMemoryStream& serializer) override
+	StableHash32 serialize(Universe& ctx, OutputMemoryStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -485,7 +485,7 @@ public:
 			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
-		return StableHash((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
+		return StableHash32((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
 	}
 
 

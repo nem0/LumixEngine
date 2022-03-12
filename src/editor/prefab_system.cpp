@@ -187,7 +187,7 @@ public:
 		const PrefabHandle prefab = m_entity_to_prefab[entity.index];
 		if (prefab.getHashValue() == 0) return;
 
-		m_entity_to_prefab[entity.index] = StableHash();
+		m_entity_to_prefab[entity.index] = StableHash32();
 	}
 
 
@@ -209,7 +209,7 @@ public:
 
 	PrefabHandle getPrefab(EntityRef entity) const override
 	{
-		if (entity.index >= m_entity_to_prefab.size()) return StableHash();
+		if (entity.index >= m_entity_to_prefab.size()) return StableHash32();
 		return m_entity_to_prefab[entity.index];
 	}
 
@@ -218,7 +218,7 @@ public:
 	{
 		while (entity.index >= m_entity_to_prefab.size())
 		{
-			m_entity_to_prefab.push(StableHash());
+			m_entity_to_prefab.push(StableHash32());
 		}
 	}
 	
@@ -475,7 +475,7 @@ public:
 	}
 
 	void breakPrefabRecursive(EntityRef e) {
-		m_entity_to_prefab[e.index] = StableHash();
+		m_entity_to_prefab[e.index] = StableHash32();
 		const EntityPtr child = m_universe->getFirstChild(e);
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
@@ -492,7 +492,7 @@ public:
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
 		}
-		m_entity_to_prefab[root.index] = StableHash();
+		m_entity_to_prefab[root.index] = StableHash32();
 		m_roots.erase(root);
 	}
 
@@ -547,7 +547,7 @@ public:
 		else {
 			ResourceManagerHub& resource_manager = engine.getResourceManager();
 			prefab_res = resource_manager.load<PrefabResource>(path);
-			const StableHash content_hash(blob.data(), (u32)blob.size());
+			const StableHash32 content_hash(blob.data(), (u32)blob.size());
 			m_resources.insert(path.getHash(), { content_hash, prefab_res});
 			m_roots.insert(entity, prefab);
 		}
@@ -664,7 +664,7 @@ public:
 
 			if (!e.isValid()) continue;
 			while (e.index >= m_entity_to_prefab.size()) {
-				m_entity_to_prefab.push(StableHash());
+				m_entity_to_prefab.push(StableHash32());
 			}
 			m_entity_to_prefab[e.index] = prefab;
 		}
@@ -674,7 +674,7 @@ public:
 		m_resources.reserve(count);
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
-			StableHash content_hash;
+			StableHash32 content_hash;
 			serializer.read(content_hash);
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), {content_hash, res});
@@ -703,7 +703,7 @@ private:
 	};
 
 	struct PrefabVersion {
-		StableHash content_hash;
+		StableHash32 content_hash;
 		PrefabResource* resource;
 		u32 instance_count = 0;
 	};

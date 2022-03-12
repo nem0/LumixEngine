@@ -45,7 +45,7 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void stopGame(Universe& context) = 0;
 
 	virtual void update(Universe& context) = 0;
-	virtual struct StableHash serialize(Universe& ctx, struct OutputMemoryStream& serializer) = 0;
+	virtual struct StableHash32 serialize(Universe& ctx, struct OutputMemoryStream& serializer) = 0;
 	virtual bool deserialize(Universe& ctx, struct InputMemoryStream& serializer, struct EntityMap& entity_map) = 0;
 	virtual bool deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) = 0;
 	virtual void serializeProject(OutputMemoryStream& serializer, const char* startup_universe) const = 0;

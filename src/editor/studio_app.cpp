@@ -552,7 +552,7 @@ struct StudioAppImpl final : StudioApp
 				if (!ImGuiEx::BeginResizableMenu(last, nullptr, true)) return;
 				char buf[LUMIX_MAX_PATH];
 				bool create_empty = ImGui::MenuItem(ICON_FA_BROOM " Empty");
-				static StableHash selected_res_hash;
+				static StableHash32 selected_res_hash;
 				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, 0, true) || create_empty) {
 					if (create_entity) {
 						EntityRef entity = editor.addEntity();
@@ -2911,14 +2911,14 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	struct ExportFileInfo {
-		StableHash hash;
+		StableHash32 hash;
 		u64 offset;
 		u64 size;
 
 		char path[LUMIX_MAX_PATH];
 	};
 
-	void scanCompiled(AssociativeArray<StableHash, ExportFileInfo>& infos) {
+	void scanCompiled(AssociativeArray<StableHash32, ExportFileInfo>& infos) {
 		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/assets");
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
@@ -2929,7 +2929,7 @@ struct StudioAppImpl final : StudioApp
 			ExportFileInfo rec;
 			u32 tmp_hash;
 			fromCString(Span(basename), tmp_hash);
-			rec.hash = StableHash::fromU32(tmp_hash);
+			rec.hash = StableHash32::fromU32(tmp_hash);
 			rec.offset = 0;
 			rec.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, ".lumix/assets/", info.filename));
 			copyString(rec.path, ".lumix/assets/");
@@ -2945,9 +2945,9 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void exportFile(const char* file_path, AssociativeArray<StableHash, ExportFileInfo>& infos) {
+	void exportFile(const char* file_path, AssociativeArray<StableHash32, ExportFileInfo>& infos) {
 		const char* base_path = m_engine->getFileSystem().getBasePath();
-		const StableHash hash(file_path);
+		const StableHash32 hash(file_path);
 		auto& out_info = infos.emplace(hash);
 		copyString(out_info.path, file_path);
 		out_info.hash = hash;
@@ -2955,7 +2955,7 @@ struct StudioAppImpl final : StudioApp
 		out_info.offset = ~0UL;
 	}
 
-	void exportDataScan(const char* dir_path, AssociativeArray<StableHash, ExportFileInfo>& infos)
+	void exportDataScan(const char* dir_path, AssociativeArray<StableHash32, ExportFileInfo>& infos)
 	{
 		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
 		const char* base_path = m_engine->getFileSystem().getBasePath();
@@ -2987,7 +2987,7 @@ struct StudioAppImpl final : StudioApp
 				copyString(out_path.data, dir_path);
 				catString(out_path.data, normalized_path);
 			}
-			const StableHash hash(out_path.data);
+			const StableHash32 hash(out_path.data);
 			if (infos.find(hash) >= 0) continue;
 
 			auto& out_info = infos.emplace(hash);
@@ -3000,13 +3000,13 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void exportDataScanResources(AssociativeArray<StableHash, ExportFileInfo>& infos)
+	void exportDataScanResources(AssociativeArray<StableHash32, ExportFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
-				const StableHash hash = res->getPath().getHash();
+				const StableHash32 hash = res->getPath().getHash();
 				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/assets/", hash, ".res");
 
 				auto& out_info = infos.emplace(hash);
@@ -3084,7 +3084,7 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 
-		AssociativeArray<StableHash, ExportFileInfo> infos(m_allocator);
+		AssociativeArray<StableHash32, ExportFileInfo> infos(m_allocator);
 		infos.reserve(10000);
 
 		switch (m_export.mode) {

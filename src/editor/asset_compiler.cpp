@@ -196,7 +196,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		char normalized[LUMIX_MAX_PATH];
 		Path::normalize(locator, Span(normalized));
 		makeLowercase(Span(normalized), normalized);
-		const StableHash hash(normalized);
+		const StableHash32 hash(normalized);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		StaticString<LUMIX_MAX_PATH> out_path(".lumix/assets/", hash, ".res");
 		os::OutputFile file;
@@ -233,7 +233,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
-		const StableHash hash = path_obj.getHash();
+		const StableHash32 hash = path_obj.getHash();
 		jobs::MutexGuard lock(m_resources_mutex);
 		if (m_resources.find(hash).isValid()) {
 			m_resources[hash] = {path_obj, type, dirHash(path_obj.c_str())};
@@ -548,7 +548,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (startsWith(filepath, ".lumix/assets/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 		if (startsWith(filepath, ".lumix/asset_tiles/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
-		const StableHash hash = res.getPath().getHash();
+		const StableHash32 hash = res.getPath().getHash();
 		const StaticString<LUMIX_MAX_PATH> dst_path(".lumix/assets/", hash, ".res");
 		const StaticString<LUMIX_MAX_PATH> meta_path(filepath, ".meta");
 
@@ -776,7 +776,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		jobs::exit(&m_resources_mutex);
 	}
 
-	const HashMap<StableHash, ResourceItem>& lockResources() override {
+	const HashMap<StableHash32, ResourceItem>& lockResources() override {
 		jobs::enter(&m_resources_mutex);
 		return m_resources;
 	}
@@ -798,7 +798,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	HashMap<RuntimeHash, IPlugin*> m_plugins;
 	AssetCompilerTask m_task;
 	UniquePtr<FileSystemWatcher> m_watcher;
-	HashMap<StableHash, ResourceItem> m_resources;
+	HashMap<StableHash32, ResourceItem> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 	DelegateList<void(const Path& path)> m_on_list_changed;
 	bool m_init_finished = false;

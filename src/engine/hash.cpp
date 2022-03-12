@@ -105,21 +105,21 @@ static u32 crc32(const char* str)
 	return ~crc;
 }
 
-StableHash StableHash::fromU32(u32 hash) {
-	StableHash res;
+StableHash32 StableHash32::fromU32(u32 hash) {
+	StableHash32 res;
 	res.hash = hash;
 	return res;
 }
 
-StableHash::StableHash(const char* string, u32 len) {
+StableHash32::StableHash32(const char* string, u32 len) {
 	hash = crc32(string, len);
 }
 
-StableHash::StableHash(const u8* data, u32 len) {
+StableHash32::StableHash32(const u8* data, u32 len) {
 	hash = crc32(data, len);
 }
 
-StableHash::StableHash(const char* string) {
+StableHash32::StableHash32(const char* string) {
 	hash = crc32(string);
 }
 
@@ -143,9 +143,9 @@ void RollingStableHasher::update(const void* data, u32 len) {
 	XXH3_64bits_update(g_rolling_hasher_state.state, data, len);
 }
 
-StableHash RollingStableHasher::end() {
+StableHash32 RollingStableHasher::end() {
 	const XXH64_hash_t result = XXH3_64bits_digest(g_rolling_hasher_state.state);
-	return StableHash::fromU32(u32(result ^ (result >> 32)));
+	return StableHash32::fromU32(u32(result ^ (result >> 32)));
 }
 
 void RollingHasher::begin() {

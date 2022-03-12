@@ -1107,7 +1107,7 @@ struct ControllerEditorImpl : ControllerEditor {
 						ImGui::InputText("##name", mask.name.data, sizeof(mask.name.data));
 						for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
 							const char* bone_name = m_model->getBone(i).name.c_str();
-							const StableHash bone_name_hash(bone_name);
+							const StableHash32 bone_name_hash(bone_name);
 							const bool is_masked = mask.bones.find(bone_name_hash).isValid();
 							bool b = is_masked;
 							ImGuiEx::Label(bone_name);
@@ -1148,7 +1148,7 @@ struct ControllerEditorImpl : ControllerEditor {
 									const char* bone_name = m_model->getBone(j).name.c_str();
 									if (ImGui::Selectable(bone_name)) {
 										ik.bones_count = 1;
-										ik.bones[0] = StableHash(bone_name);
+										ik.bones[0] = StableHash32(bone_name);
 									}
 								}
 								ImGui::EndCombo();
@@ -1172,7 +1172,7 @@ struct ControllerEditorImpl : ControllerEditor {
 										const StaticString<64> add_label("Add ", bone_name);
 										if (ImGui::Button(add_label)) {
 											memmove(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
-											ik.bones[0] = StableHash(bone_name);
+											ik.bones[0] = StableHash32(bone_name);
 											++ik.bones_count;
 										}
 									}
@@ -1195,7 +1195,7 @@ struct ControllerEditorImpl : ControllerEditor {
 
 					if (m_controller->m_ik_count < (u32)lengthOf(m_controller->m_ik[0].bones) && ImGui::Button("Add chain")) {
 						m_controller->m_ik[m_controller->m_ik_count].bones_count = 1;
-						m_controller->m_ik[m_controller->m_ik_count].bones[0] = StableHash();
+						m_controller->m_ik[m_controller->m_ik_count].bones[0] = StableHash32();
 						++m_controller->m_ik_count;
 					}
 				}

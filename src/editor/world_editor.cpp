@@ -1993,7 +1993,7 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
-		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, StableHash(), StableHash()};
+		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, StableHash32(), StableHash32()};
 		blob.write(header);
 		int hashed_offset = sizeof(header);
 
@@ -2003,7 +2003,7 @@ public:
 		const Viewport& vp = getView().getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
-		header.hash = StableHash((const u8*)blob.data() + hashed_offset, (int)blob.size() - hashed_offset);
+		header.hash = StableHash32((const u8*)blob.data() + hashed_offset, (int)blob.size() - hashed_offset);
 		memcpy(blob.getMutableData(), &header, sizeof(header));
 		file.write(blob.data(), blob.size());
 
@@ -2525,8 +2525,8 @@ public:
 		{
 			u32 magic;
 			int version;
-			StableHash hash;
-			StableHash engine_hash;
+			StableHash32 hash;
+			StableHash32 engine_hash;
 		};
 	#pragma pack()
 
@@ -2560,7 +2560,7 @@ public:
 			}
 		}
 		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), (int)file_size);
-		StableHash hash;
+		StableHash32 hash;
 		blob.read(hash);
 		header.version = -1;
 		int hashed_offset = sizeof(hash);
@@ -2576,7 +2576,7 @@ public:
 			u32 engine_hash = 0;
 			blob.read(engine_hash);
 		}
-		if (StableHash((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
+		if (StableHash32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
 			logError("Corrupted file.");
 			m_is_loading = false;

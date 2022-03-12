@@ -1647,7 +1647,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 				if (isBindPosePositionTrack(count, keys, bind_pos)) continue;
 			
-				const StableHash name_hash(bone->name);
+				const StableHash32 name_hash(bone->name);
 				write(name_hash);
 				write(Animation::CurveType::KEYFRAMED);
 				write(count);
@@ -1698,7 +1698,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				}
 				//if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
 
-				const StableHash name_hash(bone->name);
+				const StableHash32 name_hash(bone->name);
 				write(name_hash);
 				if (shouldSample(count, float(anim_len), fps, sizeof(Quat))) {
 					write(Animation::CurveType::SAMPLED);

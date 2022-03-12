@@ -27,7 +27,7 @@ struct LUMIX_ENGINE_API PrefabResource final : Resource
 	bool load(u64 size, const u8* mem) override;
 
 	OutputMemoryStream data;
-	StableHash content_hash;
+	StableHash32 content_hash;
 	static const ResourceType TYPE;
 };
 
