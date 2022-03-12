@@ -14,12 +14,24 @@ RuntimeHash::RuntimeHash(const char* str) {
 	hash = XXH3_64bits(str, strlen(str));
 }
 
+RuntimeHash RuntimeHash::fromU64(u64 hash) { 
+	RuntimeHash res;
+	res.hash = hash;
+	return res;
+}
+
 RuntimeHash32::RuntimeHash32(const void* data, u32 len) {
 	hash = XXH32(data, len, 0);
 }
 
 RuntimeHash32::RuntimeHash32(const char* str) {
 	hash = XXH32(str, strlen(str), 0);
+}
+
+RuntimeHash32 RuntimeHash32::fromU32(u32 hash) {
+	RuntimeHash32 res;
+	res.hash = hash;
+	return res;
 }
 
 static u32 crc32Table[256] = {
@@ -109,6 +121,44 @@ StableHash::StableHash(const u8* data, u32 len) {
 
 StableHash::StableHash(const char* string) {
 	hash = crc32(string);
+}
+
+static struct RollingHasherState {
+	RollingHasherState() {
+		state = XXH3_createState();
+	}
+
+	~RollingHasherState() {
+		XXH3_freeState(state);
+	}
+
+	XXH3_state_t* state = nullptr; 
+} g_rolling_hasher_state;
+
+void RollingStableHasher::begin() {
+	XXH3_64bits_reset(g_rolling_hasher_state.state);
+}
+
+void RollingStableHasher::update(const void* data, u32 len) {
+	XXH3_64bits_update(g_rolling_hasher_state.state, data, len);
+}
+
+StableHash RollingStableHasher::end() {
+	const XXH64_hash_t result = XXH3_64bits_digest(g_rolling_hasher_state.state);
+	return StableHash::fromU32(u32(result ^ (result >> 32)));
+}
+
+void RollingHasher::begin() {
+	XXH3_64bits_reset(g_rolling_hasher_state.state);
+}
+
+void RollingHasher::update(const void* data, u32 len) {
+	XXH3_64bits_update(g_rolling_hasher_state.state, data, len);
+}
+
+RuntimeHash32 RollingHasher::end() {
+	const XXH64_hash_t result = XXH3_64bits_digest(g_rolling_hasher_state.state);
+	return RuntimeHash32::fromU32(u32(result ^ (result >> 32)));
 }
 
 } // namespace Lumix

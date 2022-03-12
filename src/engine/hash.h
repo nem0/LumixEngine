@@ -8,6 +8,7 @@ namespace Lumix
 // use if you want fast hash with low probability of collisions and size (8 bytes) is not an issue
 // can change in future, do not serialize
 struct LUMIX_ENGINE_API RuntimeHash {
+	static RuntimeHash fromU64(u64 hash);
 	RuntimeHash() {}
 	explicit RuntimeHash(const char* string);
 	RuntimeHash(const void* data, u32 len);
@@ -22,6 +23,7 @@ private:
 
 // same as RuntimeHash, but only 32 bits
 struct LUMIX_ENGINE_API RuntimeHash32 {
+	static RuntimeHash32 fromU32(u32 hash);
 	RuntimeHash32() {}
 	explicit RuntimeHash32(const char* string);
 	RuntimeHash32(const void* data, u32 len);
@@ -51,6 +53,18 @@ private:
 	u32 hash = 0;
 };
 
+struct RollingStableHasher {
+	void begin();
+	void update(const void* data, u32 len);
+	StableHash end();
+};
+
+struct RollingHasher {
+	void begin();
+	void update(const void* data, u32 len);
+	RuntimeHash32 end();
+};
+
 template <typename Key> struct HashFunc;
 
 template<> struct HashFunc<RuntimeHash> {
@@ -66,5 +80,10 @@ template<> struct HashFunc<StableHash> {
 	}
 };
 
+template<> struct HashFunc<RuntimeHash32> {
+	static u32 get(const RuntimeHash32& k) {
+		return k.getHashValue();
+	}
+};
 
 } // namespace Lumix
