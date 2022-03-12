@@ -17,8 +17,7 @@ LUMIX_ENGINE_API u32 continueCrc32(u32 original_crc, const void* data, u32 lengt
 struct LUMIX_ENGINE_API RuntimeHash {
 	RuntimeHash() {}
 	explicit RuntimeHash(const char* string);
-	RuntimeHash(const char* string, u32 len);
-	RuntimeHash(const u8* data, u32 len);
+	RuntimeHash(const void* data, u32 len);
 
 	bool operator != (RuntimeHash rhs) const { return hash != rhs.hash; }
 	bool operator == (RuntimeHash rhs) const { return hash == rhs.hash; }
@@ -26,6 +25,20 @@ struct LUMIX_ENGINE_API RuntimeHash {
 	u64 getHashValue() const { return hash; }
 private:
 	u64 hash = 0;
+};
+
+// same as RuntimeHash, but only 32 bits
+struct LUMIX_ENGINE_API RuntimeHash32 {
+	RuntimeHash32() {}
+	explicit RuntimeHash32(const char* string);
+	RuntimeHash32(const void* data, u32 len);
+
+	bool operator != (RuntimeHash32 rhs) const { return hash != rhs.hash; }
+	bool operator == (RuntimeHash32 rhs) const { return hash == rhs.hash; }
+	
+	u32 getHashValue() const { return hash; }
+private:
+	u32 hash = 0;
 };
 
 // use if you want to serialize it

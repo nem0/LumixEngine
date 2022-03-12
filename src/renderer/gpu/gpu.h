@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/hash.h"
 #include "engine/lumix.h"
 
 
@@ -203,7 +204,7 @@ struct VertexDecl {
 	void computeHash();
 
 	u8 attributes_count = 0;
-	u32 hash = 0;
+	RuntimeHash32 hash;
 	Attribute attributes[MAX_ATTRIBUTES];
 };
 

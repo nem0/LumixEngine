@@ -1336,7 +1336,7 @@ struct RendererImpl final : Renderer
 		
 		jobs::wait(&m_cpu_frame->setup_done);
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
-			const u64 key = i.defines | ((u64)i.decl.hash << 32);
+			const u64 key = i.defines | ((u64)i.decl.hash.getHashValue() << 32);
 			i.shader->m_programs.insert(key, i.program);
 		}
 

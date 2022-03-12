@@ -5,17 +5,21 @@
 #include "xxhash/xxhash.h"
 
 namespace Lumix {
-
-RuntimeHash::RuntimeHash(const char* string, u32 len) {
-	hash = XXH3_64bits(string, len);
-}
-
-RuntimeHash::RuntimeHash(const u8* data, u32 len) {
+	
+RuntimeHash::RuntimeHash(const void* data, u32 len) {
 	hash = XXH3_64bits(data, len);
 }
 
 RuntimeHash::RuntimeHash(const char* str) {
 	hash = XXH3_64bits(str, strlen(str));
+}
+
+RuntimeHash32::RuntimeHash32(const void* data, u32 len) {
+	hash = XXH32(data, len, 0);
+}
+
+RuntimeHash32::RuntimeHash32(const char* str) {
+	hash = XXH32(str, strlen(str), 0);
 }
 
 StableHash StableHash::fromU32(u32 hash) {

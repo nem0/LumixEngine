@@ -86,7 +86,7 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 }
 
 gpu::ProgramHandle Shader::getProgram(const gpu::VertexDecl& decl, u32 defines) {
-	const u64 key = defines | ((u64)decl.hash << 32);
+	const u64 key = defines | ((u64)decl.hash.getHashValue() << 32);
 	auto iter = m_programs.find(key);
 	if (iter.isValid()) return iter.value();
 	return m_renderer.queueShaderCompile(*this, decl, defines);
