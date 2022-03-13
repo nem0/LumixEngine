@@ -1991,7 +1991,7 @@ struct RenderSceneImpl final : RenderScene {
 	static int LUA_getModelBoneIndex(Model* model, const char* bone)
 	{
 		if (!model) return 0;
-		return model->getBoneIndex(StableHash32(bone)).value();
+		return model->getBoneIndex(BoneNameHash(bone)).value();
 	}
 
 

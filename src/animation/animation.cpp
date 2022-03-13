@@ -12,14 +12,6 @@ namespace Lumix
 {
 
 
-enum class Version
-{
-	FIRST = 0,
-
-	LAST
-};
-
-
 const ResourceType Animation::TYPE("animation");
 
 
@@ -192,14 +184,14 @@ Vec3 Animation::getTranslation(Time time, u32 curve_idx) const
 	return curve.pos[curve.count - 1];
 }
 
-int Animation::getTranslationCurveIndex(StableHash32 name_hash) const {
+int Animation::getTranslationCurveIndex(BoneNameHash name_hash) const {
 	for (int i = 0, c = m_translations.size(); i < c; ++i) {
 		if (m_translations[i].name == name_hash) return i;
 	}
 	return -1;
 }
 
-int Animation::getRotationCurveIndex(StableHash32 name_hash) const {
+int Animation::getRotationCurveIndex(BoneNameHash name_hash) const {
 	for (int i = 0, c = m_rotations.size(); i < c; ++i) {
 		if (m_rotations[i].name == name_hash) return i;
 	}
@@ -257,6 +249,16 @@ bool Animation::load(u64 mem_size, const u8* mem)
 		return false;
 	}
 
+	if (header.version > Version::LAST) {
+		logError(getPath(), ": version not supported");
+		return false;
+	}
+
+	if (header.version <= Version::FIRST) {
+		logError(getPath(), ": version not supported. Please delete '.lumix' directory and try again");
+		return false;
+	}
+
 	m_length = header.length;
 	m_frame_count = header.frame_count;
 	u32 translations_count;
@@ -270,7 +272,7 @@ bool Animation::load(u64 mem_size, const u8* mem)
 	InputMemoryStream blob(&m_mem[0], size);
 	for (int i = 0; i < m_translations.size(); ++i) {
 		TranslationCurve& curve = m_translations[i];
-		curve.name = blob.read<StableHash32>();
+		curve.name = blob.read<BoneNameHash>();
 		const Animation::CurveType type = blob.read<Animation::CurveType>();
 		curve.count = blob.read<u32>();
 		ASSERT(curve.count > 1 || type != Animation::CurveType::KEYFRAMED);
@@ -283,7 +285,7 @@ bool Animation::load(u64 mem_size, const u8* mem)
 
 	for (int i = 0; i < m_rotations.size(); ++i) {
 		RotationCurve& curve = m_rotations[i];
-		curve.name = blob.read<StableHash32>();
+		curve.name = blob.read<BoneNameHash>();
 		const Animation::CurveType type = blob.read<Animation::CurveType>();
 		curve.count = blob.read<u32>();
 		ASSERT(curve.count > 1 || type != Animation::CurveType::KEYFRAMED);

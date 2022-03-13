@@ -39,7 +39,8 @@ struct LuaScriptScene : IScene
 		{
 		}
 
-		StableHash32 name_hash;
+		StableHash32 name_hash_legacy;
+		StableHash name_hash;
 		Type type;
 		ResourceType resource_type;
 		String stored_value;

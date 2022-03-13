@@ -1293,7 +1293,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		void execute() {
 			IAllocator& allocator = m_allocator;
 
-			StableHash32 hash(m_in_path);
+			const FilePathHash hash(m_in_path);
 			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".lbc");
 			OutputMemoryStream resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
@@ -1393,7 +1393,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			Path path;
 		};
 
-		HashMap<StableHash32, Src> sources(allocator);
+		HashMap<FilePathHash, Src> sources(allocator);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream tmp_src(allocator);
 		int w = -1, h = -1;
@@ -1945,7 +1945,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	Meta m_meta;
-	StableHash32 m_meta_res;
+	FilePathHash m_meta_res;
 	CompositeTexture m_composite;
 	void* m_composite_tag = nullptr;
 };
@@ -2856,7 +2856,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 	Meta m_meta;
-	StableHash32 m_meta_res;
+	FilePathHash m_meta_res;
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
@@ -3165,7 +3165,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		UniquePtr<Pipeline> pipeline;
 		EntityPtr entity = INVALID_ENTITY;
 		int frame_countdown = -1;
-		StableHash32 path_hash;
+		FilePathHash path_hash;
 		OutputMemoryStream data;
 		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
 		Queue<Resource*, 8> queue;
@@ -5004,7 +5004,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
-		static StableHash32 selected_res_hash;
+		static FilePathHash selected_res_hash;
 		if (asset_browser.resourceList(Span(buf), selected_res_hash, Material::TYPE, 0, false) || create_empty || new_created)
 		{
 			if (create_entity)

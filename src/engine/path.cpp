@@ -23,9 +23,9 @@ Path::Path(const char* path) {
 	#ifdef _WIN32
 		char tmp[LUMIX_MAX_PATH];
 		makeLowercase(Span(tmp), m_path);
-		m_hash = StableHash32(tmp);
+		m_hash = FilePathHash(tmp);
 	#else
-		m_hash = StableHash32(m_path);
+		m_hash = FilePathHash(m_path);
 	#endif
 }
 
@@ -38,9 +38,9 @@ void Path::operator =(const char* rhs) {
 	#ifdef _WIN32
 		char tmp[LUMIX_MAX_PATH];
 		makeLowercase(Span(tmp), m_path);
-		m_hash = StableHash32(tmp);
+		m_hash = FilePathHash(tmp);
 	#else
-		m_hash = StableHash32(m_path);
+		m_hash = FilePathHash(m_path);
 	#endif
 }
 

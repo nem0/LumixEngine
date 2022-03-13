@@ -383,7 +383,7 @@ bool Model::parseBones(InputMemoryStream& file)
 		file.read(tmp, len);
 		tmp[len] = 0;
 		b.name = tmp;
-		m_bone_map.insert(StableHash32(b.name.c_str()), m_bones.size() - 1);
+		m_bone_map.insert(BoneNameHash(b.name.c_str()), m_bones.size() - 1);
 		file.read(b.parent_idx);
 		file.read(b.transform.pos);
 		file.read(b.transform.rot);

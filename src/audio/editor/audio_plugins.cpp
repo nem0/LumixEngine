@@ -159,7 +159,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 	AssetBrowser& m_browser;
 	Meta m_meta;
-	StableHash32 m_meta_res;
+	FilePathHash m_meta_res;
 };
 
 

@@ -6,6 +6,14 @@
 
 namespace Lumix {
 	
+StableHash::StableHash(const void* data, u32 len) {
+	hash = XXH3_64bits(data, len);
+}
+
+StableHash::StableHash(const char* str) {
+	hash = XXH3_64bits(str, strlen(str));
+}
+
 RuntimeHash::RuntimeHash(const void* data, u32 len) {
 	hash = XXH3_64bits(data, len);
 }
@@ -30,6 +38,12 @@ RuntimeHash32::RuntimeHash32(const char* str) {
 
 RuntimeHash32 RuntimeHash32::fromU32(u32 hash) {
 	RuntimeHash32 res;
+	res.hash = hash;
+	return res;
+}
+
+StableHash StableHash::fromU64(u64 hash) {
+	StableHash res;
 	res.hash = hash;
 	return res;
 }
@@ -111,11 +125,7 @@ StableHash32 StableHash32::fromU32(u32 hash) {
 	return res;
 }
 
-StableHash32::StableHash32(const char* string, u32 len) {
-	hash = crc32(string, len);
-}
-
-StableHash32::StableHash32(const u8* data, u32 len) {
+StableHash32::StableHash32(const void* data, u32 len) {
 	hash = crc32(data, len);
 }
 

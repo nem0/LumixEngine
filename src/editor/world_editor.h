@@ -86,7 +86,7 @@ struct LUMIX_EDITOR_API WorldEditor
 
 	static UniquePtr<WorldEditor> create(struct Engine& engine, struct IAllocator& allocator);
 
-	virtual bool loadProject() = 0;
+	virtual void loadProject() = 0;
 	virtual void update() = 0;
 	virtual Engine& getEngine() = 0;
 	virtual struct Universe* getUniverse() = 0;

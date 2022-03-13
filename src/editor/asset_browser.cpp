@@ -76,7 +76,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	struct FileInfo {
 		StaticString<LUMIX_MAX_PATH> clamped_filename;
 		StaticString<LUMIX_MAX_PATH> filepath;
-		StableHash32 file_path_hash;
+		FilePathHash file_path_hash;
 		void* tex = nullptr;
 		bool create_called = false;
 	};
@@ -397,7 +397,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (!fs.fileExists(info.filepath)) return TileState::DELETED;
 		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
 
-		StaticString<LUMIX_MAX_PATH> compiled_path(".lumix/assets/", info.file_path_hash, ".res");
+		StaticString<LUMIX_MAX_PATH> compiled_path(".lumix/resources/", info.file_path_hash, ".res");
 		const u64 last_modified = fs.getLastModified(path);
 		if (last_modified < fs.getLastModified(info.filepath) || last_modified < fs.getLastModified(compiled_path)) {
 			return TileState::OUTDATED;
@@ -428,7 +428,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		else
 		{
 			ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
-			StaticString<LUMIX_MAX_PATH> compiled_asset_path(".lumix/assets/", tile.file_path_hash, ".res");
+			StaticString<LUMIX_MAX_PATH> compiled_asset_path(".lumix/resources/", tile.file_path_hash, ".res");
 			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
@@ -458,14 +458,14 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void deleteTile(u32 idx) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", m_file_infos[idx].file_path_hash, ".res");
+		StaticString<LUMIX_MAX_PATH> res_path(".lumix/resources/", m_file_infos[idx].file_path_hash, ".res");
 		fs.deleteFile(res_path);
 		if (!fs.deleteFile(m_file_infos[idx].filepath)) {
 			logError("Failed to delete ", m_file_infos[idx].filepath);
 		}
 	}
 
-	void reloadTile(StableHash32 hash) override {
+	void reloadTile(FilePathHash hash) override {
 		for (FileInfo& fi : m_file_infos) {
 			if (fi.file_path_hash == hash) {
 				m_app.getRenderInterface()->unloadTexture(fi.tex);
@@ -1009,7 +1009,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::PopStyleVar();
 
 		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(300, 300))) {
-			static StableHash32 selected_path_hash;
+			static FilePathHash selected_path_hash;
 			if (resourceList(buf, selected_path_hash, type, 0, true)) {
 				ImGui::EndPopup();
 				ImGui::PopID();
@@ -1097,7 +1097,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
-	bool resourceList(Span<char> buf, StableHash32& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
+	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 

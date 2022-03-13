@@ -113,19 +113,28 @@ struct Runner final
 		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) return false;
 
-		InputMemoryStream tmp(data);
+		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
-		struct Header {
-			u32 magic;
-			i32 version;
-			u32 hash;
-			u32 engine_hash;
-		} header;
 
-		tmp.read(header);
+		UniverseHeader header;
+		blob.read(header);
+		if ((u32)header.version <= (u32)UniverseSerializedVersion::HASH64) {
+			u32 dummy;
+			blob.read(dummy);
+			blob.read(dummy);
+		}
+		else {
+			StableHash hash;
+			blob.read(hash);
+			const StableHash hash2((const u8*)blob.getData() + blob.getPosition(), u32(blob.size() - blob.getPosition()));
+			if (hash != hash2) {
+				logError("Corrupted file '", path, "'");
+				return false;
+			}
+		}
 
 		m_universe->setName(universe_name);
-		if (!m_engine->deserialize(*m_universe, tmp, entity_map)) {
+		if (!m_engine->deserialize(*m_universe, blob, entity_map)) {
 			logError("Failed to deserialize ", path);
 			return false;
 		}

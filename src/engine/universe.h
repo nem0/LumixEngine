@@ -12,6 +12,23 @@ namespace Lumix {
 struct ComponentUID;
 struct IScene;
 
+enum class UniverseSerializedVersion : u32
+{
+	CAMERA,
+	ENTITY_FOLDERS,
+	HASH64,
+
+	LATEST
+};
+
+#pragma pack(1)
+	struct UniverseHeader {
+		static const u32 MAGIC = 'LUNV';
+		u32 magic;
+		UniverseSerializedVersion version;
+	};
+#pragma pack()
+
 struct LUMIX_ENGINE_API EntityMap {
 	EntityMap(IAllocator& allocator);
 	void reserve(u32 count);

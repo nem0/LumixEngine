@@ -53,15 +53,15 @@ namespace Lumix
 
 	static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, reflection::Variant& val) {
 		switch(type) {
-			case reflection::Variant::BOOL: val = LuaWrapper::toType<bool>(L, idx); break;
-			case reflection::Variant::U32: val = LuaWrapper::toType<u32>(L, idx); break;
-			case reflection::Variant::I32: val = LuaWrapper::toType<i32>(L, idx); break;
-			case reflection::Variant::FLOAT: val = LuaWrapper::toType<float>(L, idx); break;
-			case reflection::Variant::ENTITY: val = LuaWrapper::toType<EntityPtr>(L, idx); break;
-			case reflection::Variant::VEC2: val = LuaWrapper::toType<Vec2>(L, idx); break;
-			case reflection::Variant::VEC3: val = LuaWrapper::toType<Vec3>(L, idx); break;
-			case reflection::Variant::DVEC3: val = LuaWrapper::toType<DVec3>(L, idx); break;
-			case reflection::Variant::CSTR: val = LuaWrapper::toType<const char*>(L, idx); break;
+			case reflection::Variant::BOOL: val = LuaWrapper::checkArg<bool>(L, idx); break;
+			case reflection::Variant::U32: val = LuaWrapper::checkArg<u32>(L, idx); break;
+			case reflection::Variant::I32: val = LuaWrapper::checkArg<i32>(L, idx); break;
+			case reflection::Variant::FLOAT: val = LuaWrapper::checkArg<float>(L, idx); break;
+			case reflection::Variant::ENTITY: val = LuaWrapper::checkArg<EntityPtr>(L, idx); break;
+			case reflection::Variant::VEC2: val = LuaWrapper::checkArg<Vec2>(L, idx); break;
+			case reflection::Variant::VEC3: val = LuaWrapper::checkArg<Vec3>(L, idx); break;
+			case reflection::Variant::DVEC3: val = LuaWrapper::checkArg<DVec3>(L, idx); break;
+			case reflection::Variant::CSTR: val = LuaWrapper::checkArg<const char*>(L, idx); break;
 			case reflection::Variant::PTR: {
 				void* ptr;
 				if (!LuaWrapper::checkField(L, idx, "_value", &ptr)) {
@@ -209,6 +209,8 @@ namespace Lumix
 
 	enum class LuaSceneVersion : i32
 	{
+		HASH64,
+
 		LATEST
 	};
 
@@ -431,7 +433,20 @@ namespace Lumix
 			}
 
 
-			static int getProperty(ScriptInstance& inst, StableHash32 hash)
+			static int getPropertyLegacy(ScriptInstance& inst, const char* name) {
+				const StableHash32 hash(name);
+				for(int i = 0, c = inst.m_properties.size(); i < c; ++i)
+				{
+					if (inst.m_properties[i].name_hash_legacy == hash) {
+						inst.m_properties[i].name_hash = StableHash(name);
+						inst.m_properties[i].name_hash_legacy = StableHash32();
+						return i;
+					}
+				}
+				return -1;
+			}
+
+			static int getProperty(ScriptInstance& inst, StableHash hash)
 			{
 				for(int i = 0, c = inst.m_properties.size(); i < c; ++i)
 				{
@@ -443,8 +458,8 @@ namespace Lumix
 
 			void detectProperties(ScriptInstance& inst)
 			{
-				static const StableHash32 INDEX_HASH("__index");
-				static const StableHash32 THIS_HASH("this");
+				static const StableHash INDEX_HASH("__index");
+				static const StableHash THIS_HASH("this");
 				lua_State* L = inst.m_state;
 				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment); // [env]
 				ASSERT(lua_type(L, -1) == LUA_TTABLE);
@@ -465,13 +480,14 @@ namespace Lumix
 						const char* name = lua_tostring(L, -2);
 						if(name[0] != '_' && !equalStrings(name, "enabled"))
 						{
-							const StableHash32 hash(name);
+							const StableHash hash(name);
 							if (!m_scene.m_property_names.find(hash).isValid()) {
 								m_scene.m_property_names.insert(hash, String(name, allocator));
 							}
 							if (hash != INDEX_HASH && hash != THIS_HASH)
 							{
 								int prop_index = getProperty(inst, hash);
+								if (prop_index < 0) prop_index = getPropertyLegacy(inst, name);
 								if (prop_index >= 0) {
 									valid_properties[prop_index / 8] |=  1 << (prop_index % 8);
 									Property& existing_prop = inst.m_properties[prop_index];
@@ -721,10 +737,11 @@ namespace Lumix
 			auto* scene = (LuaScriptSceneImpl*)universe->getScene(LUA_SCRIPT_TYPE);
 
 			lua_pop(L, 2);
-			const StableHash32 prop_name_hash(prop_name);
+			const StableHash prop_name_hash(prop_name);
+			const StableHash32 prop_name_hash32(prop_name);
 			for (auto& prop : scene->m_current_script_instance->m_properties)
 			{
-				if (prop.name_hash == prop_name_hash)
+				if (prop.name_hash == prop_name_hash || prop.name_hash_legacy == prop_name_hash32)
 				{
 					prop.type = (Property::Type)type;
 					prop.resource_type = resource_type;
@@ -1228,7 +1245,7 @@ namespace Lumix
 		}
 
 
-		const char* getPropertyName(StableHash32 name_hash) const
+		const char* getPropertyName(StableHash name_hash) const
 		{
 			auto iter = m_property_names.find(name_hash);
 			if (iter.isValid()) return iter.value().c_str();
@@ -1592,7 +1609,7 @@ namespace Lumix
 
 		template <typename T>
 		T getPropertyValue(EntityRef entity, int scr_index, const char* property_name) {
-			const StableHash32 hash(property_name);
+			const StableHash hash(property_name);
 			auto& inst = m_scripts[entity]->m_scripts[scr_index];
 			for (auto& prop : inst.m_properties)
 			{
@@ -1612,7 +1629,7 @@ namespace Lumix
 		{
 			ASSERT(out.length() > 0);
 
-			const StableHash32 hash(property_name);
+			const StableHash hash(property_name);
 			auto& inst = m_scripts[entity]->m_scripts[scr_index];
 			for (auto& prop : inst.m_properties)
 			{
@@ -1785,7 +1802,12 @@ namespace Lumix
 					{
 						Property& prop = scr.m_properties.emplace(allocator);
 						prop.type = Property::ANY;
-						serializer.read(prop.name_hash);
+						if (version <= (i32)LuaSceneVersion::HASH64) {
+							serializer.read(prop.name_hash_legacy);
+						}
+						else {
+							serializer.read(prop.name_hash);
+						}
 						Property::Type type;
 						serializer.read(type);
 						const char* tmp = serializer.readString();
@@ -1997,7 +2019,7 @@ namespace Lumix
 
 		Property& getScriptProperty(EntityRef entity, int scr_index, const char* name)
 		{
-			const StableHash32 name_hash(name);
+			const StableHash name_hash(name);
 			ScriptComponent* script_cmp = m_scripts[entity];
 			for (auto& prop : script_cmp->m_scripts[scr_index].m_properties)
 			{
@@ -2109,7 +2131,7 @@ namespace Lumix
 
 		LuaScriptSystemImpl& m_system;
 		HashMap<EntityRef, ScriptComponent*> m_scripts;
-		HashMap<StableHash32, String> m_property_names;
+		HashMap<StableHash, String> m_property_names;
 		Array<CallbackData> m_input_handlers;
 		Universe& m_universe;
 		Array<CallbackData> m_updates;

@@ -207,6 +207,16 @@ void Controller::serialize(OutputMemoryStream& stream) {
 bool Controller::deserialize(InputMemoryStream& stream) {
 	Header header;
 	stream.read(header);
+
+	if (header.magic != Header::MAGIC) {
+		logError("Invalid animation controller file ", getPath());
+		return false;
+	}
+	if (header.version > ControllerVersion::LATEST) {
+		logError("Version of animation controller ", getPath(), " is not supported");
+		return false;
+	}
+
 	stream.read(m_flags);
 	stream.read(m_root_motion_bone);
 	InputDecl::Type type;
@@ -218,14 +228,6 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(type);
 	}
 	m_inputs.recalculateOffsets();
-	if (header.magic != Header::MAGIC) {
-		logError("Invalid animation controller file ", getPath());
-		return false;
-	}
-	if (header.version > ControllerVersion::LATEST) {
-		logError("Version of animation controller ", getPath(), " is not supported");
-		return false;
-	}
 	initEmpty();
 	const u32 slots_count = stream.read<u32>();
 	m_animation_slots.reserve(slots_count);
@@ -245,8 +247,18 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
 	}
 
-	stream.read(m_ik);
-	stream.read(m_ik_count);
+	if (header.version <= ControllerVersion::HASH64) {
+		char dummy[36 * 4];
+		stream.read(dummy, sizeof(dummy));
+		stream.read(m_ik_count);
+		if (m_ik_count > 0) {
+			logError(getPath(), " version is not supported, IK data is lost.");
+		}
+	}
+	else {
+		stream.read(m_ik);
+		stream.read(m_ik_count);
+	}
 	m_root->deserialize(stream, *this, (u32)header.version);
 	return true;
 }

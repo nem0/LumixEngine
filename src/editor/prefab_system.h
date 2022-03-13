@@ -1,16 +1,16 @@
 #pragma once
 
 
-#include "engine/lumix.h"
+#include "engine/hash.h"
 
 
 namespace Lumix
 {
 
 
-struct StableHash32;
-using PrefabHandle = StableHash32;
+using PrefabHandle = FilePathHash;
 template <typename T> struct UniquePtr;
+enum class UniverseSerializedVersion : u32;
 
 struct LUMIX_EDITOR_API PrefabSystem
 {
@@ -22,7 +22,7 @@ struct LUMIX_EDITOR_API PrefabSystem
 	virtual void setUniverse(struct Universe*) = 0;
 	virtual void update() = 0;
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
-	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map) = 0;
+	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map, UniverseSerializedVersion version) = 0;
 	virtual EntityPtr instantiatePrefab(struct PrefabResource& prefab, const struct DVec3& pos, const struct Quat& rot, float scale) = 0;
 	virtual void instantiatePrefabs(struct PrefabResource& prefab, Span<struct Transform> transforms) = 0;
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;

@@ -43,7 +43,7 @@ struct BoneMask
 	BoneMask(IAllocator& allocator) : bones(allocator) {}
 	BoneMask(BoneMask&& rhs) = default;
 	StaticString<32> name;
-	HashMap<StableHash32, u8> bones;
+	HashMap<BoneNameHash, u8> bones;
 };
 
 
@@ -59,10 +59,15 @@ struct Animation final : Resource
 			SAMPLED
 		};
 
-		struct Header
-		{
+		enum class Version : u32 {
+			FIRST = 3,
+
+			LAST
+		};
+
+		struct Header {
 			u32 magic;
-			u32 version;
+			Version version;
 			Time length;
 			u32 frame_count;
 		};
@@ -74,8 +79,8 @@ struct Animation final : Resource
 
 		Vec3 getTranslation(Time time, u32 curve_idx) const;
 		Quat getRotation(Time time, u32 curve_idx) const;
-		int getTranslationCurveIndex(StableHash32 name_hash) const;
-		int getRotationCurveIndex(StableHash32 name_hash) const;
+		int getTranslationCurveIndex(BoneNameHash name_hash) const;
+		int getRotationCurveIndex(BoneNameHash name_hash) const;
 		void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
 		void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
 		Time getLength() const { return m_length; }
@@ -88,14 +93,14 @@ struct Animation final : Resource
 		Time m_length;
 		struct TranslationCurve
 		{
-			StableHash32 name;
+			BoneNameHash name;
 			u32 count;
 			const u16* times;
 			const Vec3* pos;
 		};
 		struct RotationCurve
 		{
-			StableHash32 name;
+			BoneNameHash name;
 			u32 count;
 			const u16* times;
 			const Quat* rot;

@@ -120,7 +120,7 @@ template <int SIZE> struct StaticString
 		toCString(value, Span<char>(data).fromLeft(len), 10);
 	}
 
-	void add(StableHash32 value)
+	void add(StableHash value)
 	{
 		add(value.getHashValue());
 	}

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 
 
@@ -11,7 +12,7 @@ namespace Lumix
 struct LUMIX_ENGINE_API ResourceManager {
 	friend struct Resource;
 	friend struct ResourceManagerHub;
-	using ResourceTable = HashMap<StableHash32, struct Resource*>;
+	using ResourceTable = HashMap<FilePathHash, struct Resource*>;
 
 	void create(struct ResourceType type, struct ResourceManagerHub& owner);
 	void destroy();

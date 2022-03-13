@@ -1993,18 +1993,20 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
-		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, StableHash32(), StableHash32()};
+		const UniverseHeader header = { UniverseHeader::MAGIC, UniverseSerializedVersion::LATEST };
 		blob.write(header);
-		int hashed_offset = sizeof(header);
+		StableHash hash;
+		blob.write(hash);
+		const u64 hashed_offset = blob.size();
 
-		header.engine_hash = m_engine.serialize(*m_universe, blob);
+		m_engine.serialize(*m_universe, blob);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
 		const Viewport& vp = getView().getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
-		header.hash = StableHash32((const u8*)blob.data() + hashed_offset, (int)blob.size() - hashed_offset);
-		memcpy(blob.getMutableData(), &header, sizeof(header));
+		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
+		memcpy(blob.getMutableData() + sizeof(UniverseHeader), &hash, sizeof(hash));
 		file.write(blob.data(), blob.size());
 
 		logInfo("Universe saved");
@@ -2312,7 +2314,7 @@ public:
 			m_universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
             InputMemoryStream file(m_game_mode_file);
-			load(file);
+			load(file, "game mode");
 		}
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
@@ -2470,13 +2472,24 @@ public:
 		logError("Failed to save project ", path);
 	}
 
-	bool loadProject() override {
+	void loadProject() override {
 		OutputMemoryStream data(m_allocator);
-		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), data)) return false;
+		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), data)) {
+			logWarning("Project file not found");
+			return;
+		}
 		
 		InputMemoryStream stream(data);
 		char dummy[1];
-		return m_engine.deserializeProject(stream, Span(dummy));
+		
+		
+		const DeserializeProjectResult res = m_engine.deserializeProject(stream, Span(dummy));
+		switch (res) {
+			case DeserializeProjectResult::SUCCESS: break;
+			case DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED: logError("Project file: Plugin deserialization failed"); break;
+			case DeserializeProjectResult::PLUGIN_NOT_FOUND: logError("Project file: Plugin not found"); break;
+			case DeserializeProjectResult::VERSION_NOT_SUPPORTED: logError("Project file: version not supported"); break;
+		}
 	}
 	
 	bool isLoading() const override { return m_is_loading; }
@@ -2491,7 +2504,7 @@ public:
 		os::InputFile file;
 		const StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
 		if (file.open(path)) {
-			if (!load(file)) {
+			if (!load(file, path)) {
 				logError("Failed to parse ", path);
 				newUniverse();
 			}
@@ -2512,30 +2525,11 @@ public:
 	}
 
 
-	enum class SerializedVersion : i32
-	{
-		CAMERA,
-		ENTITY_FOLDERS,
-		LATEST
-	};
-
-
-	#pragma pack(1)
-		struct Header
-		{
-			u32 magic;
-			int version;
-			StableHash32 hash;
-			StableHash32 engine_hash;
-		};
-	#pragma pack()
-
-
-	bool load(IInputStream& file)
+	bool load(IInputStream& file, const char* path)
 	{
 		PROFILE_FUNCTION();
 		m_is_loading = true;
-		Header header;
+		UniverseHeader header;
 		const u64 file_size = file.size();
 		if (file_size < sizeof(header)) {
 			logError("Corrupted file.");
@@ -2559,38 +2553,33 @@ public:
 				return false;
 			}
 		}
-		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), (int)file_size);
-		StableHash32 hash;
-		blob.read(hash);
-		header.version = -1;
-		int hashed_offset = sizeof(hash);
-		if (hash.getHashValue() == 0xFFFFffff)
-		{
-			blob.rewind();
-			blob.read(header);
-			hashed_offset = sizeof(header);
-			hash = header.hash;
+		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), file_size);
+		blob.read(header);
+		if ((u32)header.version <= (u32)UniverseSerializedVersion::HASH64) {
+			u32 tmp;
+			blob.read(tmp);
+			blob.read(tmp);
 		}
-		else
-		{
-			u32 engine_hash = 0;
-			blob.read(engine_hash);
-		}
-		if (StableHash32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
-		{
-			logError("Corrupted file.");
-			m_is_loading = false;
-			return false;
+		else {
+			const StableHash hash = blob.read<StableHash>();
+
+			if (header.magic != UniverseHeader::MAGIC 
+				|| StableHash((const u8*)blob.getData() + blob.getPosition(), u32(blob.size() - blob.getPosition())) != hash)
+			{
+				logError("Corrupted file `", path, "`");
+				m_is_loading = false;
+				return false;
+			}
 		}
 
 		EntityMap entity_map(m_allocator);
 		if (m_engine.deserialize(*m_universe, blob, entity_map))
 		{
-			m_prefab_system->deserialize(blob, entity_map);
-			if (header.version > (i32)SerializedVersion::ENTITY_FOLDERS) {
+			m_prefab_system->deserialize(blob, entity_map, header.version);
+			if ((u32)header.version > (u32)UniverseSerializedVersion::ENTITY_FOLDERS) {
 				m_entity_folders->deserialize(blob, entity_map);
 			}
-			if (header.version > (i32)SerializedVersion::CAMERA) {
+			if ((u32)header.version > (u32)UniverseSerializedVersion::CAMERA) {
 				DVec3 pos;
 				Quat rot;
 				blob.read(pos);

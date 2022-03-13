@@ -187,7 +187,7 @@ public:
 		const PrefabHandle prefab = m_entity_to_prefab[entity.index];
 		if (prefab.getHashValue() == 0) return;
 
-		m_entity_to_prefab[entity.index] = StableHash32();
+		m_entity_to_prefab[entity.index] = FilePathHash();
 	}
 
 
@@ -209,7 +209,7 @@ public:
 
 	PrefabHandle getPrefab(EntityRef entity) const override
 	{
-		if (entity.index >= m_entity_to_prefab.size()) return StableHash32();
+		if (entity.index >= m_entity_to_prefab.size()) return FilePathHash();
 		return m_entity_to_prefab[entity.index];
 	}
 
@@ -218,7 +218,7 @@ public:
 	{
 		while (entity.index >= m_entity_to_prefab.size())
 		{
-			m_entity_to_prefab.push(StableHash32());
+			m_entity_to_prefab.push(FilePathHash());
 		}
 	}
 	
@@ -475,7 +475,7 @@ public:
 	}
 
 	void breakPrefabRecursive(EntityRef e) {
-		m_entity_to_prefab[e.index] = StableHash32();
+		m_entity_to_prefab[e.index] = FilePathHash();
 		const EntityPtr child = m_universe->getFirstChild(e);
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
@@ -492,7 +492,7 @@ public:
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
 		}
-		m_entity_to_prefab[root.index] = StableHash32();
+		m_entity_to_prefab[root.index] = FilePathHash();
 		m_roots.erase(root);
 	}
 
@@ -547,7 +547,7 @@ public:
 		else {
 			ResourceManagerHub& resource_manager = engine.getResourceManager();
 			prefab_res = resource_manager.load<PrefabResource>(path);
-			const StableHash32 content_hash(blob.data(), (u32)blob.size());
+			const StableHash content_hash(blob.data(), (u32)blob.size());
 			m_resources.insert(path.getHash(), { content_hash, prefab_res});
 			m_roots.insert(entity, prefab);
 		}
@@ -595,6 +595,7 @@ public:
 				}
 				else {
 					// TODO what now
+					logError("Failed to load '", prefab.resource->getPath(), "'");
 					ASSERT(prefab.resource->isFailure()); 
 				}
 			}
@@ -652,7 +653,7 @@ public:
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, UniverseSerializedVersion version) override
 	{
 		u32 count;
 		serializer.read(count);
@@ -664,7 +665,7 @@ public:
 
 			if (!e.isValid()) continue;
 			while (e.index >= m_entity_to_prefab.size()) {
-				m_entity_to_prefab.push(StableHash32());
+				m_entity_to_prefab.push(FilePathHash());
 			}
 			m_entity_to_prefab[e.index] = prefab;
 		}
@@ -674,8 +675,14 @@ public:
 		m_resources.reserve(count);
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
-			StableHash32 content_hash;
-			serializer.read(content_hash);
+			StableHash content_hash;
+			if ((u32)version <= (u32)UniverseSerializedVersion::HASH64) {
+				u32 dummy;
+				serializer.read(dummy);
+			}
+			else {
+				serializer.read(content_hash);
+			}
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), {content_hash, res});
 		}
@@ -703,7 +710,7 @@ private:
 	};
 
 	struct PrefabVersion {
-		StableHash32 content_hash;
+		StableHash content_hash;
 		PrefabResource* resource;
 		u32 instance_count = 0;
 	};

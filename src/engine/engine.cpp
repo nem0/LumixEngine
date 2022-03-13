@@ -422,36 +422,36 @@ public:
 
 	enum class ProjectVersion : u32 {
 		FIRST,
+		HASH64,
 
 		LAST,
 	};
 
-	bool deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) override {
+	DeserializeProjectResult deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) override {
 		SerializedEngineHeader header;
 		serializer.read(header);
-		if (header.magic != SERIALIZED_PROJECT_MAGIC) return false;
-		if (header.version > (u32)ProjectVersion::LAST) return false;
-		if (header.version > (u32)ProjectVersion::FIRST) {
-			const char* tmp = serializer.readString();
-			copyString(startup_universe, tmp);
-		}
+		if (header.magic != SERIALIZED_PROJECT_MAGIC) return DeserializeProjectResult::CORRUPTED_FILE;
+		if (header.version > (u32)ProjectVersion::LAST) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
+		if (header.version <= (u32)ProjectVersion::HASH64) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
+		const char* tmp = serializer.readString();
+		copyString(startup_universe, tmp);
 		i32 count = 0;
 		serializer.read(count);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (i32 i = 0; i < count; ++i) {
-			StableHash32 hash;
+			StableHash hash;
 			serializer.read(hash);
 			i32 idx = plugins.find([&](IPlugin* plugin){
-				return StableHash32(plugin->getName()) == hash;
+				return StableHash(plugin->getName()) == hash;
 			});
-			if (idx < 0) return false;
+			if (idx < 0) return DeserializeProjectResult::PLUGIN_NOT_FOUND;
 			IPlugin* plugin = plugins[idx];
-			if (!plugin) return false;
+			if (!plugin) return DeserializeProjectResult::PLUGIN_NOT_FOUND;
 			u32 version;
 			serializer.read(version);
-			if (!plugin->deserialize(version, serializer)) return false;
+			if (!plugin->deserialize(version, serializer)) return DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED;
 		}
-		return false;
+		return DeserializeProjectResult::SUCCESS;
 	}
 
 	void serializeProject(OutputMemoryStream& serializer, const char* startup_universe) const override {
@@ -463,14 +463,14 @@ public:
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		serializer.write((i32)plugins.size());
 		for (IPlugin* plugin : plugins) {
-			const StableHash32 hash(plugin->getName());
+			const StableHash hash(plugin->getName());
 			serializer.write(hash);
 			serializer.write((u32)plugin->getVersion());
 			plugin->serialize(serializer);
 		}
 	}
 
-	StableHash32 serialize(Universe& ctx, OutputMemoryStream& serializer) override
+	void serialize(Universe& ctx, OutputMemoryStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -485,7 +485,6 @@ public:
 			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
-		return StableHash32((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
 	}
 
 
