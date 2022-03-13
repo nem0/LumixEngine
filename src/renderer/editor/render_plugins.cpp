@@ -4588,7 +4588,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 			gpu::bindVertexBuffer(0, cmd_list.vtx_buffer.buffer, cmd_list.vtx_buffer.offset, sizeof(ImDrawVert));
 			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
 
@@ -4616,9 +4615,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y) * wdd.scale.y, 0.f, 65535.f)));
 				}
 
-				gpu::drawElements(gpu::PrimitiveType::TRIANGLES, elem_offset * sizeof(u32) + cmd_list.idx_buffer.offset, pcmd->ElemCount, gpu::DataType::U32);
-
-				elem_offset += pcmd->ElemCount;
+				gpu::drawElements(gpu::PrimitiveType::TRIANGLES, pcmd->IdxOffset * sizeof(u32) + cmd_list.idx_buffer.offset, pcmd->ElemCount, gpu::DataType::U32);
 			}
 			ib_offset += num_indices;
 			vb_offset += num_vertices;
