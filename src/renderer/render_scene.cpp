@@ -56,6 +56,8 @@ enum class RenderSceneVersion : i32
 	SMALLER_MODEL_INSTANCES,
 	INSTANCED_MODEL,
 	SPLINES,
+	SPLINES_VERTEX_COLORS,
+	PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE,
 
 	LATEST
 };
@@ -901,7 +903,10 @@ struct RenderSceneImpl final : RenderScene {
 		blob.write(m_spline_geometries.size());
 		for (auto iter = m_spline_geometries.begin(), end = m_spline_geometries.end(); iter != end; ++iter) {
 			blob.write(iter.key());
-			blob.write(iter.value());
+			SplineGeometry& sg = iter.value();
+			blob.write(sg.width);
+			blob.write(sg.flags);
+			blob.write(sg.num_user_channels);
 		}
 	}
 
@@ -915,6 +920,7 @@ struct RenderSceneImpl final : RenderScene {
 			blob.write(pg.vertex_data.data(), pg.vertex_data.size());
 			blob.write(pg.vertex_decl.attributes_count);
 			blob.write(pg.vertex_decl.attributes, sizeof(pg.vertex_decl.attributes[0]) * pg.vertex_decl.attributes_count);
+			blob.write(pg.primitive_type);
 		}
 	}
 
@@ -1083,7 +1089,11 @@ struct RenderSceneImpl final : RenderScene {
 			EntityRef e = blob.read<EntityRef>();
 			e = entity_map.get(e);
 			SplineGeometry& sg = m_spline_geometries.insert(e);
-			blob.read(sg);
+			blob.read(sg.width);
+			blob.read(sg.flags);
+			if (version > (i32)RenderSceneVersion::SPLINES_VERTEX_COLORS) {
+				blob.read(sg.num_user_channels);
+			}
 			m_universe.onComponentCreated(e, SPLINE_GEOMETRY_TYPE, this);
 		}
 	}
@@ -1103,6 +1113,9 @@ struct RenderSceneImpl final : RenderScene {
 			blob.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
 			blob.read(pg.vertex_decl.attributes_count);
 			blob.read(pg.vertex_decl.attributes, pg.vertex_decl.attributes_count * sizeof(pg.vertex_decl.attributes[0]));
+			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
+				blob.read(pg.primitive_type);
+			}
 			pg.vertex_decl.computeHash();
 			if (!pg.vertex_data.empty()) {
 				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
@@ -1757,6 +1770,7 @@ struct RenderSceneImpl final : RenderScene {
 	void getProceduralGeometryBlob(EntityRef entity, OutputMemoryStream& value) {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		value.write(pg.vertex_decl);
+		value.write(pg.primitive_type);
 		value.write((u32)pg.vertex_data.size());
 		if (!pg.vertex_data.empty()) value.write(pg.vertex_data.data(), pg.vertex_data.size());
 	}
@@ -1764,6 +1778,7 @@ struct RenderSceneImpl final : RenderScene {
 	void setProceduralGeometryBlob(EntityRef entity, InputMemoryStream& value) {
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		value.read(pg.vertex_decl);
+		value.read(pg.primitive_type);
 		const u32 size = value.read<u32>();
 		if (size > 0) {
 			pg.vertex_data.resize(size);
@@ -1790,10 +1805,11 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-	void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl) override {
+	void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl, gpu::PrimitiveType primitive_type) override {
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		pg.vertex_decl = vertex_decl;
 		pg.vertex_data.clear();
+		pg.primitive_type = primitive_type;
 		pg.vertex_data.write(vertex_data.begin(), vertex_data.length());
 		const Renderer::MemRef mem = m_renderer.copy(vertex_data.begin(), vertex_data.length());
 		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
@@ -1811,6 +1827,15 @@ struct RenderSceneImpl final : RenderScene {
 	void setSplineGeometryHasUVs(EntityRef entity, bool create_uvs) override {
 		SplineGeometry& sg = m_spline_geometries[entity];
 		sg.flags.set(SplineGeometry::HAS_UVS, create_uvs);
+	}
+	
+	u32 getSplineGeometryUserChannelsCount(EntityRef entity) override {
+		return m_spline_geometries[entity].num_user_channels;
+	}
+
+	void setSplineGeometryUserChannelsCount(EntityRef entity, u32 num) override {
+		SplineGeometry& sg = m_spline_geometries[entity];
+		sg.num_user_channels = clamp(num, 0, 4);
 	}
 
 	Path getSplineGeometryMaterial(EntityRef entity) override {
@@ -2572,7 +2597,7 @@ struct RenderSceneImpl final : RenderScene {
 				memcpy(&a, data + i * stride, sizeof(a));
 				memcpy(&b, data + (i + 1) * stride, sizeof(b));
 				memcpy(&c, data + (i + 2) * stride, sizeof(c));
-				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && t < hit.t) {
+				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && t < hit.t && t > 0) {
 					pg_hit.is_hit = true;
 					pg_hit.mesh = nullptr;
 					pg_hit.entity = iter.key();
@@ -3043,7 +3068,8 @@ struct RenderSceneImpl final : RenderScene {
 	void createSplineGeometry(EntityRef entity) {
 		SplineGeometry& sg = m_spline_geometries.insert(entity);
 		sg.flags.set(SplineGeometry::HAS_UVS);
-		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
+		auto iter = m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
+		iter.value().primitive_type = gpu::PrimitiveType::TRIANGLE_STRIP;
 		m_universe.onComponentCreated(entity, SPLINE_GEOMETRY_TYPE, this);
 	}
 
@@ -3288,6 +3314,7 @@ void RenderScene::reflect() {
 			.var_prop<&RenderScene::getSplineGeometry, &SplineGeometry::width>("Width").minAttribute(0)
 			.blob_property<&RenderSceneImpl::getProceduralGeometryBlob, &RenderSceneImpl::setProceduralGeometryBlob>("Vertex data")
 			.LUMIX_PROP(SplineGeometryHasUVs, "Has UVs")
+			.LUMIX_PROP(SplineGeometryUserChannelsCount, "User channels")
 		.LUMIX_CMP(ReflectionProbe, "reflection_probe", "Render / Reflection probe")
 			.prop<&RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe>("Enabled")
 			.var_prop<&RenderScene::getReflectionProbe, &ReflectionProbe::size>("size")

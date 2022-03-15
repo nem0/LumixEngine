@@ -739,13 +739,14 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 					gpu::VertexDecl decl;
 					decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 				
+					OutputMemoryStream vertices(m_app.getAllocator());
+					vertices.reserve(16 * 1024);
 					if (render_scene->getSplineGeometry(e).flags.isSet(SplineGeometry::HAS_UVS)) {
 						decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
 						struct Vertex {
 							Vec3 position;
 							Vec2 uv;
 						};
-						Array<Vertex> vertices(m_app.getAllocator());
 						Vec3 prev_p0 = spline.points[0];
 						Vec3 prev_p1 = spline.points[0];
 						float u0 = 0;
@@ -754,8 +755,8 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 							const Vec3 p = iterator.getPosition();
 							const Vec3 dir = iterator.getDir();
 							const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
-							Vertex& v0 = vertices.emplace();
-							Vertex& v1 = vertices.emplace();
+							Vertex v0;
+							Vertex v1;
 							v0.position = p + side;
 							u0 += length(p - prev_p0);
 							v0.uv.x = u0;
@@ -767,22 +768,46 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 							iterator.move(0.1f);
 							prev_p0 = p;
 							prev_p1 = p;
+							vertices.write(v0);
+							if (sg.num_user_channels > 0) {
+								u32 tmp = 0;
+								vertices.write(&tmp, sg.num_user_channels);
+							}
+							vertices.write(v1);
+							if (sg.num_user_channels > 0) {
+								u32 tmp = 0;
+								vertices.write(&tmp, sg.num_user_channels);
+							}
 						}
-						render_scene->setProceduralGeometry(e, Span((const u8*)vertices.begin(), vertices.byte_size()), decl);
+						if (sg.num_user_channels > 0) {
+							decl.addAttribute(2, 20, sg.num_user_channels, gpu::AttributeType::U8, 0);
+						}
 					}
 					else {
-						Array<Vec3> points(m_app.getAllocator());
-				
 						while (!iterator.isEnd()) {
 							const Vec3 p = iterator.getPosition();
 							const Vec3 dir = iterator.getDir();
 							const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
-							points.push(p + side);
-							points.push(p - side);
+							const Vec3 v0 = p + side;
+							const Vec3 v1 = p - side;
+							vertices.write(v0);
+							if (sg.num_user_channels > 0) {
+								u32 tmp = 0;
+								vertices.write(&tmp, sg.num_user_channels);
+							}
+							vertices.write(v1);
+							if (sg.num_user_channels > 0) {
+								u32 tmp = 0;
+								vertices.write(&tmp, sg.num_user_channels);
+							}
 							iterator.move(0.1f);
 						}
-						render_scene->setProceduralGeometry(e, Span((const u8*)points.begin(), points.byte_size()), decl);
+						if (sg.num_user_channels > 0) {
+							decl.addAttribute(1, 12, sg.num_user_channels, gpu::AttributeType::U8, 0);
+						}
 					}
+
+					render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLE_STRIP);
 				}
 			}
 		}

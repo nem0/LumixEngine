@@ -3368,6 +3368,7 @@ struct PipelineImpl final : Pipeline
 				Spline& spline = m_splines.emplace();
 				spline.vertex_buffer = pg.vertex_buffer;
 				spline.material = pg.material->getRenderData();
+				spline.primitive_type = pg.primitive_type;
 
 				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
 				spline.program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
@@ -3470,7 +3471,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(0, spline.vertex_buffer, 0, spline.stride);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, 0, spline.vertex_count);
+				gpu::drawArrays(spline.primitive_type, 0, spline.vertex_count);
 			}
 			m_pipeline->m_renderer.endProfileBlock();
 		}
@@ -3615,6 +3616,7 @@ struct PipelineImpl final : Pipeline
 			u32 stride;
 			u32 vertex_count;
 			Renderer::TransientSlice ub;
+			gpu::PrimitiveType primitive_type;
 		};
 
 		CmdPage* m_cmds;

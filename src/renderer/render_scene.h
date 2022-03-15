@@ -48,6 +48,7 @@ struct SplineGeometry {
 
 	float width = 1;
 	FlagSet<Flags, u32> flags;
+	u32 num_user_channels = 0;
 };
 
 struct ProceduralGeometry {
@@ -55,6 +56,7 @@ struct ProceduralGeometry {
 	Material* material = nullptr;
 	OutputMemoryStream vertex_data;
 	gpu::VertexDecl vertex_decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLE_STRIP;
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
 	AABB aabb;
 };
@@ -409,11 +411,13 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual bool getSplineGeometryHasUVs(EntityRef entity) = 0;
 	virtual void setSplineGeometryHasUVs(EntityRef entity, bool create_uvs) = 0;
+	virtual u32 getSplineGeometryUserChannelsCount(EntityRef entity) = 0;
+	virtual void setSplineGeometryUserChannelsCount(EntityRef entity, u32 count) = 0;
 	virtual Path getSplineGeometryMaterial(EntityRef entity) = 0;
 	virtual void setSplineGeometryMaterial(EntityRef entity, const Path& path) = 0;
 	virtual SplineGeometry& getSplineGeometry(EntityRef entity) = 0;
 	
-	virtual void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl) = 0;
+	virtual void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl, gpu::PrimitiveType primitive_type) = 0;
 	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
