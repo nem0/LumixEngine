@@ -2565,7 +2565,7 @@ struct RenderSceneImpl final : RenderScene {
 			Vec3 ro = Vec3(origin - pos);
 
 			Vec3 dummy;
-			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max, dummy)) continue;
+			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
 
 			for (u32 i = 0; i < vertex_count - 1; ++i) {
 				float t;
