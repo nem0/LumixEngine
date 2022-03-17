@@ -1,9 +1,12 @@
 #define LUMIX_NO_CUSTOM_CRT
 
+#include "../model.h"
+#include "../renderer.h"
 #include "../render_scene.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/core.h"
+#include "engine/engine.h"
 #include "engine/universe.h"
 #include "imgui/imgui.h"
 #include "spline_geometry_plugin.h"
@@ -48,6 +51,113 @@ SplineGeometryPlugin::SplineGeometryPlugin(StudioApp& app)
 	: m_app(app)
 {}
 
+void SplineGeometryPlugin::paint(const DVec3& pos, const Universe& universe, EntityRef entity, ProceduralGeometry& pg, Renderer& renderer) const {
+	if (pg.vertex_data.size() == 0) return;
+	
+	// TODO undo/redo
+
+	const Transform tr = universe.getTransform(entity);
+	const Vec3 center(tr.inverted().transform(pos));
+
+	const float R2 = m_brush_size * m_brush_size;
+
+	const u8* end = pg.vertex_data.data() + pg.vertex_data.size();
+	const u32 stride = pg.vertex_decl.getStride();
+	ASSERT(stride != 0);
+	const u32 offset = 20 + m_brush_channel; // TODO
+	for (u8* iter = pg.vertex_data.getMutableData(); iter < end; iter += stride) {
+		Vec3 p;
+		memcpy(&p, iter, sizeof(p));
+
+		if (squaredLength(p - center) < R2) {
+			*(iter + offset) = m_brush_value;
+		}
+	}
+
+	if (pg.vertex_buffer) renderer.destroy(pg.vertex_buffer);
+	const Renderer::MemRef mem = renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
+	pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);	
+}
+
+bool SplineGeometryPlugin::paint(UniverseView& view, i32 x, i32 y) {
+	WorldEditor& editor = view.getEditor();
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return false;
+
+	const Universe& universe = *editor.getUniverse();
+	const bool is_spline = universe.hasComponent(selected[0], SPLINE_GEOMETRY_TYPE);
+	if (!is_spline) return false;
+
+	RenderScene* scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
+	DVec3 origin;
+	Vec3 dir;
+	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
+	const RayCastModelHit hit = scene->castRayProceduralGeometry(origin, dir);
+	if (!hit.is_hit) return false;
+	if (hit.entity != selected[0]) return false;
+
+	Renderer* renderer = (Renderer*)editor.getEngine().getPluginManager().getPlugin("renderer");
+	ASSERT(renderer);
+
+	ProceduralGeometry& pg = scene->getProceduralGeometry(selected[0]);
+	paint(hit.origin + hit.t * hit.dir, universe, selected[0], pg, *renderer);
+
+	return true;
+}
+
+bool SplineGeometryPlugin::onMouseDown(UniverseView& view, int x, int y) {
+	return paint(view, x, y);
+}
+
+void SplineGeometryPlugin::onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) {
+}
+
+void SplineGeometryPlugin::onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) {
+	paint(view, x, y);
+}
+
+void SplineGeometryPlugin::drawCursor(WorldEditor& editor, EntityRef entity) const {
+	const UniverseView& view = editor.getView();
+	const Vec2 mp = view.getMousePos();
+	Universe& universe = *editor.getUniverse();
+	
+	RenderScene* scene = static_cast<RenderScene*>(universe.getScene(SPLINE_GEOMETRY_TYPE));
+	DVec3 origin;
+	Vec3 dir;
+	editor.getView().getViewport().getRay(mp, origin, dir);
+	const RayCastModelHit hit = scene->castRayProceduralGeometry(origin, dir);
+
+	if (hit.is_hit) {
+		const DVec3 center = hit.origin + hit.dir * hit.t;
+		drawCursor(editor, *scene, entity, center);
+		return;
+	}
+}
+
+void SplineGeometryPlugin::drawCursor(WorldEditor& editor, RenderScene& scene, EntityRef entity, const DVec3& center) const {
+	UniverseView& view = editor.getView();
+	addCircle(view, center, m_brush_size, Vec3(0, 1, 0), Color::GREEN);
+	const ProceduralGeometry& pg = scene.getProceduralGeometry(entity);
+
+	if (pg.vertex_data.size() == 0) return;
+
+	const u8* data = pg.vertex_data.data();
+	const u32 stride = pg.vertex_decl.getStride();
+
+	const float R2 = m_brush_size * m_brush_size;
+
+	const Transform tr = scene.getUniverse().getTransform(entity);
+	const Vec3 center_local = Vec3(tr.inverted().transform(center));
+
+	for (u32 i = 0, c = pg.getIndexCount(); i < c; ++i) {
+		Vec3 p;
+		memcpy(&p, data + stride * i, sizeof(p));
+		if (squaredLength(center_local - p) < R2) {
+			addCircle(view, tr.transform(p), 0.1f, Vec3(0, 1, 0), Color::BLUE);
+		}
+	}
+}
+
 void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) {
 	if (cmp.type != SPLINE_GEOMETRY_TYPE) return;
 
@@ -64,11 +174,23 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 		CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
 		const Spline& spline = core_scene->getSpline(e);
 		const SplineGeometry& sg = render_scene->getSplineGeometry(e);
+		const ProceduralGeometry& pg = render_scene->getProceduralGeometry(e);
 			
-		const ProceduralGeometry& pg = render_scene->getProceduralGeometries()[e];
-			
+		drawCursor(editor, *cmp.entity);
+
 		ImGuiEx::Label("Triangles");
 		ImGui::Text("%d", pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3);
+
+		ImGuiEx::Label("Brush size");
+		ImGui::DragFloat("##bs", &m_brush_size, 0.1f, 0, FLT_MAX);
+
+		if (sg.num_user_channels > 1) {
+			ImGuiEx::Label("Paint channel");
+			ImGui::SliderInt("##pc", (int*)&m_brush_channel, 0, sg.num_user_channels - 1);
+		}
+
+		ImGuiEx::Label("Paint value");
+		ImGui::SliderInt("##pv", (int*)&m_brush_value, 0, 255);
 
 		if (ImGui::Button("Generate geometry")) {
 			if (!spline.points.empty()) {
@@ -134,7 +256,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 					}
 
 					if (sg.num_user_channels > 0) {
-						decl.addAttribute(2, 20, sg.num_user_channels, gpu::AttributeType::U8, 0);
+						decl.addAttribute(2, 20, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 					}
 				}
 				else {
@@ -157,7 +279,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 						iterator.move(0.1f);
 					}
 					if (sg.num_user_channels > 0) {
-						decl.addAttribute(1, 12, sg.num_user_channels, gpu::AttributeType::U8, 0);
+						decl.addAttribute(1, 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 					}
 				}
 

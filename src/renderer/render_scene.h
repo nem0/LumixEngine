@@ -68,6 +68,9 @@ struct ProceduralGeometry {
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle index_buffer = gpu::INVALID_BUFFER;
 	AABB aabb;
+
+	
+	u32 getIndexCount() const;
 };
 
 struct Camera
@@ -285,8 +288,9 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
+	virtual RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir) = 0;
 	virtual RayCastModelHit castRayTerrain(const DVec3& origin, const Vec3& dir) = 0;
-	virtual RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
+	virtual RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)>& filter) = 0;
 	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
 
 	virtual void setActiveCamera(EntityRef camera) = 0;
@@ -433,6 +437,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 		, Span<const u8> index_data
 		, gpu::DataType index_type) = 0;
 	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
+	virtual ProceduralGeometry& getProceduralGeometry(EntityRef e) = 0;
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;

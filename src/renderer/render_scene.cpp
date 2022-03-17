@@ -71,8 +71,8 @@ struct BoneAttachment
 	LocalRigidTransform relative_transform;
 };
 
-static u32 getIndexCount(const ProceduralGeometry& pg) {
-	return u32(pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4));
+u32 ProceduralGeometry::getIndexCount() const {
+	return u32(index_data.size() / (index_type == gpu::DataType::U16 ? 2 : 4));
 }
 
 static RenderableTypes getRenderableType(const Model& model, bool custom_material)
@@ -1864,6 +1864,7 @@ struct RenderSceneImpl final : RenderScene {
 		, Span<const u8> indices
 		, gpu::DataType index_type) override
 	{
+		PROFILE_FUNCTION();
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		pg.vertex_decl = vertex_decl;
 		pg.vertex_data.clear();
@@ -1884,6 +1885,10 @@ struct RenderSceneImpl final : RenderScene {
 		const Renderer::MemRef mem = m_renderer.copy(vertex_data.begin(), vertex_data.length());
 		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
 		computeAABB(pg);
+	}
+	
+	ProceduralGeometry& getProceduralGeometry(EntityRef e) override {
+		return m_procedural_geometries[e];
 	}
 	
 	const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() override {
@@ -2561,7 +2566,7 @@ struct RenderSceneImpl final : RenderScene {
 		});
 	}
 	
-	RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
+	RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const RayCastModelHit::Filter& filter) override {
 		RayCastModelHit hit;
 		double cur_dist = DBL_MAX;
 		hit.is_hit = false;
@@ -2602,6 +2607,76 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		return hit;
 	}
+
+	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir) override {
+		return castRayProceduralGeometry(origin, dir, [](const RayCastModelHit&){ return true; });
+	}
+
+	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir, const RayCastModelHit::Filter& filter) {
+		RayCastModelHit hit;
+		hit.is_hit = false;
+		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
+			const ProceduralGeometry& pg = iter.value();
+			if (pg.vertex_data.empty()) continue;
+			if (pg.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
+
+			const u32 stride = pg.vertex_decl.getStride();
+			const u8* data = pg.vertex_data.data();
+			Vec3 a, b, c;
+			RayCastModelHit pg_hit;
+
+			const DVec3& pos = m_universe.getPosition(iter.key());
+			const Quat rot = m_universe.getRotation(iter.key()).conjugated();
+			const Vec3 rd = rot.rotate(dir);
+			Vec3 ro = Vec3(origin - pos);
+
+			Vec3 dummy;
+			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
+
+			const bool is_indexed = pg.index_data.size() != 0;
+			const u32 triangles = (is_indexed ? pg.getIndexCount() : u32(pg.vertex_data.size() / stride)) / 3;
+			const u16* indices16 = (const u16*)pg.index_data.data();
+			const u32* indices32 = (const u32*)pg.index_data.data();
+			for (u32 i = 0; i < triangles * 3; i += 3) {
+				float t;
+
+				u32 tindices[3];
+				if (is_indexed) {
+					if (pg.index_type == gpu::DataType::U16) {
+						tindices[0] = indices16[i];
+						tindices[1] = indices16[i + 1];
+						tindices[2] = indices16[i + 2];
+					}
+					else {
+						tindices[0] = indices32[i];
+						tindices[1] = indices32[i + 1];
+						tindices[2] = indices32[i + 2];
+					}
+				}
+				else {
+					tindices[0] = i;
+					tindices[1] = i + 1;
+					tindices[2] = i + 2;
+				}
+
+				memcpy(&a, data + tindices[0] * stride, sizeof(a));
+				memcpy(&b, data + tindices[1] * stride, sizeof(b));
+				memcpy(&c, data + tindices[2] * stride, sizeof(c));
+				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && (t < hit.t || !hit.is_hit)) {
+					pg_hit.is_hit = true;
+					pg_hit.mesh = nullptr;
+					pg_hit.entity = iter.key();
+					pg_hit.component_type = SPLINE_GEOMETRY_TYPE;
+					pg_hit.t = t;
+					if (filter.invoke(pg_hit)) hit = pg_hit;
+				}
+			}
+		}
+		hit.origin = origin;
+		hit.dir = dir;
+		return hit;
+	}
+
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
 		PROFILE_FUNCTION();
@@ -2644,61 +2719,9 @@ struct RenderSceneImpl final : RenderScene {
 			}
 		}
 
-		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
-			const ProceduralGeometry& pg = iter.value();
-			if (pg.vertex_data.empty()) continue;
-			if (pg.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
-
-			const u32 stride = pg.vertex_decl.getStride();
-			const u8* data = pg.vertex_data.data();
-			Vec3 a, b, c;
-			RayCastModelHit pg_hit;
-
-			const DVec3& pos = universe.getPosition(iter.key());
-			const Quat rot = universe.getRotation(iter.key()).conjugated();
-			const Vec3 rd = rot.rotate(dir);
-			Vec3 ro = Vec3(origin - pos);
-
-			Vec3 dummy;
-			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
-
-			const bool is_indexed = pg.index_data.size() != 0;
-			const u32 triangles = (is_indexed ? getIndexCount(pg) : u32(pg.vertex_data.size() / stride)) / 3;
-			const u16* indices16 = (const u16*)pg.index_data.data();
-			const u32* indices32 = (const u32*)pg.index_data.data();
-			for (u32 i = 0; i < triangles * 3; i += 3) {
-				float t;
-
-				u32 tindices[3];
-				if (is_indexed) {
-					if (pg.index_type == gpu::DataType::U16) {
-						tindices[0] = indices16[i];
-						tindices[1] = indices16[i + 1];
-						tindices[2] = indices16[i + 2];
-					}
-					else {
-						tindices[0] = indices32[i];
-						tindices[1] = indices32[i + 1];
-						tindices[2] = indices32[i + 2];
-					}
-				}
-				else {
-					tindices[0] = i;
-					tindices[1] = i + 1;
-					tindices[2] = i + 2;
-				}
-
-				memcpy(&a, data + tindices[0] * stride, sizeof(a));
-				memcpy(&b, data + tindices[1] * stride, sizeof(b));
-				memcpy(&c, data + tindices[2] * stride, sizeof(c));
-				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && (t < hit.t || !hit.is_hit)) {
-					pg_hit.is_hit = true;
-					pg_hit.mesh = nullptr;
-					pg_hit.entity = iter.key();
-					pg_hit.component_type = SPLINE_GEOMETRY_TYPE;
-					if (filter.invoke(pg_hit)) hit = pg_hit;
-				}
-			}
+		const RayCastModelHit pg_hit = castRayProceduralGeometry(origin, dir, filter);
+		if (pg_hit.is_hit && (pg_hit.t < hit.t || !hit.is_hit)) {
+			hit = pg_hit;
 		}
 
 		for (auto* terrain : m_terrains) {

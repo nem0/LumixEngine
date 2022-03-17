@@ -4990,6 +4990,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);
 		m_app.addPlugin(m_editor_ui_render_plugin);
+		m_app.addPlugin(m_spline_geom_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(m_model_properties_plugin);
@@ -5236,6 +5237,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.removePlugin(m_scene_view);
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
+		m_app.removePlugin(m_spline_geom_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
