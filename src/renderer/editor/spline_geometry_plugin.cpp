@@ -209,85 +209,66 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 				OutputMemoryStream vertices(m_app.getAllocator());
 				OutputMemoryStream indices(m_app.getAllocator());
 				vertices.reserve(16 * 1024);
-				if (sg.flags.isSet(SplineGeometry::HAS_UVS)) {
-					decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
-					struct Vertex {
-						Vec3 position;
-						Vec2 uv;
-					};
+				const bool has_uvs = sg.flags.isSet(SplineGeometry::HAS_UVS);
+				if (has_uvs) decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
+				struct Vertex {
+					Vec3 position;
+					Vec2 uv;
+				};
 
-					auto write_vertex = [&](const Vertex& v){
+				auto write_vertex = [&](const Vertex& v){
+					if (has_uvs) {
 						vertices.write(v);
-						if (sg.num_user_channels > 0) {
-							u32 tmp = 0;
-							vertices.write(&tmp, sg.num_user_channels);
-						}
-					};
-						
-					float u = 0;
-					u32 rows = 0;
-					Vec3 prev_p = spline.points[0];
-					const u32 u_density = sg.u_density;
-					while (!iterator.isEnd()) {
-						++rows;
-						const Vec3 p = iterator.getPosition();
-						const Vec3 dir = iterator.getDir();
-						const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
-						u += length(p - prev_p);
-
-						const Vec3 p0 = p - side;
-						for (u32 i = 0; i < u_density; ++i) {
-					
-							Vertex v;
-							v.position = p0 + 2 * side * (i / float(u_density - 1));
-							v.uv.x = u;
-							v.uv.y = i / float(u_density - 1) * width;
-								
-							write_vertex(v);
-						}
-
-						iterator.move(sg.v_density);
-						prev_p = p;
 					}
-
-					for (u32 row = 0; row < rows - 1; ++row) {
-						for (u32 i = 0; i < u_density - 1; ++i) {
-							indices.write(u16(u_density * row + i));
-							indices.write(u16(u_density * row + i + 1));
-							indices.write(u16(u_density * (row + 1) + i));
-
-							indices.write(u16(u_density * row + i + 1));
-							indices.write(u16(u_density * (row + 1) + i));
-							indices.write(u16(u_density * (row + 1) + i + 1));
-						}
+					else {
+						vertices.write(v.position);
 					}
-
 					if (sg.num_user_channels > 0) {
-						decl.addAttribute(2, 20, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+						u32 tmp = 0;
+						vertices.write(&tmp, sg.num_user_channels);
+					}
+				};
+						
+				float u = 0;
+				u32 rows = 0;
+				Vec3 prev_p = spline.points[0];
+				const u32 u_density = sg.u_density;
+				while (!iterator.isEnd()) {
+					++rows;
+					const Vec3 p = iterator.getPosition();
+					const Vec3 dir = iterator.getDir();
+					const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
+					u += length(p - prev_p);
+
+					const Vec3 p0 = p - side;
+					for (u32 i = 0; i < u_density; ++i) {
+					
+						Vertex v;
+						v.position = p0 + 2 * side * (i / float(u_density - 1));
+						v.uv.x = u;
+						v.uv.y = i / float(u_density - 1) * width;
+								
+						write_vertex(v);
+					}
+
+					iterator.move(sg.v_density);
+					prev_p = p;
+				}
+
+				for (u32 row = 0; row < rows - 1; ++row) {
+					for (u32 i = 0; i < u_density - 1; ++i) {
+						indices.write(u16(u_density * row + i));
+						indices.write(u16(u_density * row + i + 1));
+						indices.write(u16(u_density * (row + 1) + i));
+
+						indices.write(u16(u_density * row + i + 1));
+						indices.write(u16(u_density * (row + 1) + i));
+						indices.write(u16(u_density * (row + 1) + i + 1));
 					}
 				}
-				else {
-					while (!iterator.isEnd()) {
-						const Vec3 p = iterator.getPosition();
-						const Vec3 dir = iterator.getDir();
-						const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
-						const Vec3 v0 = p + side;
-						const Vec3 v1 = p - side;
-						vertices.write(v0);
-						if (sg.num_user_channels > 0) {
-							u32 tmp = 0;
-							vertices.write(&tmp, sg.num_user_channels);
-						}
-						vertices.write(v1);
-						if (sg.num_user_channels > 0) {
-							u32 tmp = 0;
-							vertices.write(&tmp, sg.num_user_channels);
-						}
-						iterator.move(0.1f);
-					}
-					if (sg.num_user_channels > 0) {
-						decl.addAttribute(1, 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-					}
+
+				if (sg.num_user_channels > 0) {
+					decl.addAttribute(2, has_uvs ? 20 : 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 				}
 
 				render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, gpu::DataType::U16);
