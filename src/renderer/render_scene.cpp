@@ -58,6 +58,7 @@ enum class RenderSceneVersion : i32
 	SPLINES,
 	SPLINES_VERTEX_COLORS,
 	PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE,
+	PROCEDURAL_GEOMETRY_INDEX_BUFFER,
 
 	LATEST
 };
@@ -69,6 +70,10 @@ struct BoneAttachment
 	int bone_index;
 	LocalRigidTransform relative_transform;
 };
+
+static u32 getIndexCount(const ProceduralGeometry& pg) {
+	return u32(pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4));
+}
 
 static RenderableTypes getRenderableType(const Model& model, bool custom_material)
 {
@@ -207,6 +212,7 @@ struct RenderSceneImpl final : RenderScene {
 		for (ProceduralGeometry& pg : m_procedural_geometries) {
 			if (pg.material) pg.material->decRefCount();
 			if (pg.vertex_buffer) m_renderer.destroy(pg.vertex_buffer);
+			if (pg.index_buffer) m_renderer.destroy(pg.index_buffer);
 		}
 		m_procedural_geometries.clear();
 		m_spline_geometries.clear();
@@ -907,6 +913,8 @@ struct RenderSceneImpl final : RenderScene {
 			blob.write(sg.width);
 			blob.write(sg.flags);
 			blob.write(sg.num_user_channels);
+			blob.write(sg.u_density);
+			blob.write(sg.v_density);
 		}
 	}
 
@@ -921,6 +929,10 @@ struct RenderSceneImpl final : RenderScene {
 			blob.write(pg.vertex_decl.attributes_count);
 			blob.write(pg.vertex_decl.attributes, sizeof(pg.vertex_decl.attributes[0]) * pg.vertex_decl.attributes_count);
 			blob.write(pg.primitive_type);
+
+			blob.write((u32)pg.index_data.size());
+			if (pg.index_data.size() > 0) blob.write(pg.index_data.data(), pg.index_data.size());
+			blob.write(pg.index_type);
 		}
 	}
 
@@ -1094,6 +1106,10 @@ struct RenderSceneImpl final : RenderScene {
 			if (version > (i32)RenderSceneVersion::SPLINES_VERTEX_COLORS) {
 				blob.read(sg.num_user_channels);
 			}
+			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
+				blob.read(sg.u_density);
+				blob.read(sg.v_density);
+			}
 			m_universe.onComponentCreated(e, SPLINE_GEOMETRY_TYPE, this);
 		}
 	}
@@ -1116,10 +1132,23 @@ struct RenderSceneImpl final : RenderScene {
 			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
 				blob.read(pg.primitive_type);
 			}
+			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
+				u32 index_buffer_size;
+				blob.read(index_buffer_size);
+				if (index_buffer_size > 0) {
+					pg.index_data.resize(index_buffer_size);
+					blob.read(pg.index_data.getMutableData(), pg.index_data.size());
+				}
+				blob.read(pg.index_type);
+			}
 			pg.vertex_decl.computeHash();
 			if (!pg.vertex_data.empty()) {
 				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);			
+			}
+			if (!pg.index_data.empty()) {
+				const Renderer::MemRef mem = m_renderer.copy(pg.index_data.data(), (u32)pg.index_data.size());
+				pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);			
 			}
 			computeAABB(pg);
 			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
@@ -1771,20 +1800,43 @@ struct RenderSceneImpl final : RenderScene {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		value.write(pg.vertex_decl);
 		value.write(pg.primitive_type);
+		value.write(pg.index_type);
 		value.write((u32)pg.vertex_data.size());
 		if (!pg.vertex_data.empty()) value.write(pg.vertex_data.data(), pg.vertex_data.size());
+		value.write((u32)pg.index_data.size());
+		if (!pg.index_data.empty()) value.write(pg.index_data.data(), pg.index_data.size());
 	}
 
 	void setProceduralGeometryBlob(EntityRef entity, InputMemoryStream& value) {
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
+		pg.index_data.clear();
+		pg.vertex_data.clear();
+		if (pg.vertex_buffer) {
+			m_renderer.destroy(pg.vertex_buffer);
+			pg.vertex_buffer = gpu::INVALID_BUFFER;
+		}
+		if (pg.index_buffer) {
+			m_renderer.destroy(pg.index_buffer);
+			pg.index_buffer = gpu::INVALID_BUFFER;
+		}
+		
 		value.read(pg.vertex_decl);
 		value.read(pg.primitive_type);
-		const u32 size = value.read<u32>();
+		value.read(pg.index_type);
+		u32 size = value.read<u32>();
 		if (size > 0) {
 			pg.vertex_data.resize(size);
 			value.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
 			const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 			pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+		}
+
+		size = value.read<u32>();
+		if (size > 0) {
+			pg.index_data.resize(size);
+			value.read(pg.index_data.getMutableData(), pg.index_data.size());
+			const Renderer::MemRef mem = m_renderer.copy(pg.index_data.data(), (u32)pg.index_data.size());
+			pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
 		}
 	}
 
@@ -1805,12 +1857,30 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-	void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl, gpu::PrimitiveType primitive_type) override {
+	void setProceduralGeometry(EntityRef entity
+		, Span<const u8> vertex_data
+		, const gpu::VertexDecl& vertex_decl
+		, gpu::PrimitiveType primitive_type
+		, Span<const u8> indices
+		, gpu::DataType index_type) override
+	{
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		pg.vertex_decl = vertex_decl;
 		pg.vertex_data.clear();
+		pg.index_data.clear();
+		pg.index_type = index_type;
 		pg.primitive_type = primitive_type;
 		pg.vertex_data.write(vertex_data.begin(), vertex_data.length());
+		
+		if (pg.index_buffer) m_renderer.destroy(pg.index_buffer);
+		if (pg.vertex_buffer) m_renderer.destroy(pg.vertex_buffer);
+		
+		if (indices.length() > 0) {
+			pg.index_data.write(indices.begin(), indices.length());
+			const Renderer::MemRef mem = m_renderer.copy(indices.begin(), indices.length());
+			pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+		}
+		
 		const Renderer::MemRef mem = m_renderer.copy(vertex_data.begin(), vertex_data.length());
 		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
 		computeAABB(pg);
@@ -2577,9 +2647,9 @@ struct RenderSceneImpl final : RenderScene {
 		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
 			const ProceduralGeometry& pg = iter.value();
 			if (pg.vertex_data.empty()) continue;
+			if (pg.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
 
 			const u32 stride = pg.vertex_decl.getStride();
-			const u32 vertex_count = u32(pg.vertex_data.size() / stride);
 			const u8* data = pg.vertex_data.data();
 			Vec3 a, b, c;
 			RayCastModelHit pg_hit;
@@ -2592,11 +2662,35 @@ struct RenderSceneImpl final : RenderScene {
 			Vec3 dummy;
 			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
 
-			for (u32 i = 0; i < vertex_count - 2; ++i) {
+			const bool is_indexed = pg.index_data.size() != 0;
+			const u32 triangles = (is_indexed ? getIndexCount(pg) : u32(pg.vertex_data.size() / stride)) / 3;
+			const u16* indices16 = (const u16*)pg.index_data.data();
+			const u32* indices32 = (const u32*)pg.index_data.data();
+			for (u32 i = 0; i < triangles * 3; i += 3) {
 				float t;
-				memcpy(&a, data + i * stride, sizeof(a));
-				memcpy(&b, data + (i + 1) * stride, sizeof(b));
-				memcpy(&c, data + (i + 2) * stride, sizeof(c));
+
+				u32 tindices[3];
+				if (is_indexed) {
+					if (pg.index_type == gpu::DataType::U16) {
+						tindices[0] = indices16[i];
+						tindices[1] = indices16[i + 1];
+						tindices[2] = indices16[i + 2];
+					}
+					else {
+						tindices[0] = indices32[i];
+						tindices[1] = indices32[i + 1];
+						tindices[2] = indices32[i + 2];
+					}
+				}
+				else {
+					tindices[0] = i;
+					tindices[1] = i + 1;
+					tindices[2] = i + 2;
+				}
+
+				memcpy(&a, data + tindices[0] * stride, sizeof(a));
+				memcpy(&b, data + tindices[1] * stride, sizeof(b));
+				memcpy(&c, data + tindices[2] * stride, sizeof(c));
 				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && (t < hit.t || !hit.is_hit)) {
 					pg_hit.is_hit = true;
 					pg_hit.mesh = nullptr;
@@ -3062,6 +3156,7 @@ struct RenderSceneImpl final : RenderScene {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		if (pg.material) pg.material->decRefCount();
 		if (pg.vertex_buffer) m_renderer.destroy(pg.vertex_buffer);
+		if (pg.index_buffer) m_renderer.destroy(pg.index_buffer);
 		m_procedural_geometries.erase(entity);
 	}
 	
@@ -3312,6 +3407,8 @@ void RenderScene::reflect() {
 		.LUMIX_CMP(SplineGeometry, "spline_geometry", "Render / Spline geometry")
 			.LUMIX_PROP(SplineGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
 			.var_prop<&RenderScene::getSplineGeometry, &SplineGeometry::width>("Width").minAttribute(0)
+			.var_prop<&RenderScene::getSplineGeometry, &SplineGeometry::u_density>("U density").minAttribute(0)
+			.var_prop<&RenderScene::getSplineGeometry, &SplineGeometry::v_density>("V density").minAttribute(0)
 			.blob_property<&RenderSceneImpl::getProceduralGeometryBlob, &RenderSceneImpl::setProceduralGeometryBlob>("Vertex data")
 			.LUMIX_PROP(SplineGeometryHasUVs, "Has UVs")
 			.LUMIX_PROP(SplineGeometryUserChannelsCount, "User channels")

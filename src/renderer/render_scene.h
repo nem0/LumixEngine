@@ -49,15 +49,24 @@ struct SplineGeometry {
 	float width = 1;
 	FlagSet<Flags, u32> flags;
 	u32 num_user_channels = 0;
+	float v_density = 0.1f;
+	u32 u_density = 8;
 };
 
 struct ProceduralGeometry {
-	ProceduralGeometry(IAllocator& allocator) : vertex_data(allocator) {}
+	ProceduralGeometry(IAllocator& allocator) 
+		: vertex_data(allocator)
+		, index_data(allocator)
+	{}
+
 	Material* material = nullptr;
 	OutputMemoryStream vertex_data;
+	OutputMemoryStream index_data;
 	gpu::VertexDecl vertex_decl;
+	gpu::DataType index_type;
 	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLE_STRIP;
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
+	gpu::BufferHandle index_buffer = gpu::INVALID_BUFFER;
 	AABB aabb;
 };
 
@@ -417,7 +426,12 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void setSplineGeometryMaterial(EntityRef entity, const Path& path) = 0;
 	virtual SplineGeometry& getSplineGeometry(EntityRef entity) = 0;
 	
-	virtual void setProceduralGeometry(EntityRef entity, Span<const u8> vertex_data, const gpu::VertexDecl& vertex_decl, gpu::PrimitiveType primitive_type) = 0;
+	virtual void setProceduralGeometry(EntityRef entity
+		, Span<const u8> vertex_data
+		, const gpu::VertexDecl& vertex_decl
+		, gpu::PrimitiveType primitive_type
+		, Span<const u8> index_data
+		, gpu::DataType index_type) = 0;
 	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;

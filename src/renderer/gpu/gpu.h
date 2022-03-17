@@ -176,7 +176,7 @@ enum class BufferFlags : u32 {
 	MAPPABLE = 1 << 4,
 };
 
-enum class DataType {
+enum class DataType : u32 {
 	U16,
 	U32
 };

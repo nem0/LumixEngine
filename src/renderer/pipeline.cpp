@@ -3366,14 +3366,16 @@ struct PipelineImpl final : Pipeline
 				if (pg.material->getLayer() != m_layer) continue;
 				
 				Spline& spline = m_splines.emplace();
+				spline.index_buffer = pg.index_buffer;
 				spline.vertex_buffer = pg.vertex_buffer;
 				spline.material = pg.material->getRenderData();
 				spline.primitive_type = pg.primitive_type;
+				spline.index_type = pg.index_type;
 
 				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
 				spline.program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
 				spline.stride = pg.vertex_decl.getStride();
-				spline.vertex_count = (u32)pg.vertex_data.size() / spline.stride;
+				spline.vertex_count = pg.index_buffer ? (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) :  (u32)pg.vertex_data.size() / spline.stride;
 				spline.ub = renderer.allocUniform(sizeof(Matrix));
 				memcpy(spline.ub.ptr, &mtx, sizeof(mtx));
 			}
@@ -3471,7 +3473,15 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(0, spline.vertex_buffer, 0, spline.stride);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				gpu::drawArrays(spline.primitive_type, 0, spline.vertex_count);
+				if (spline.index_buffer) {
+					gpu::bindIndexBuffer(spline.index_buffer);
+					gpu::drawElements(spline.primitive_type, 0, spline.vertex_count, spline.index_type);
+				}
+				else {
+					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+					gpu::drawArrays(spline.primitive_type, 0, spline.vertex_count);
+				}
+
 			}
 			m_pipeline->m_renderer.endProfileBlock();
 		}
@@ -3611,12 +3621,14 @@ struct PipelineImpl final : Pipeline
 
 		struct Spline {
 			gpu::BufferHandle vertex_buffer;
+			gpu::BufferHandle index_buffer;
 			Material::RenderData* material;
 			gpu::ProgramHandle program;
 			u32 stride;
 			u32 vertex_count;
 			Renderer::TransientSlice ub;
 			gpu::PrimitiveType primitive_type;
+			gpu::DataType index_type;
 		};
 
 		CmdPage* m_cmds;

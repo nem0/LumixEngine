@@ -732,6 +732,12 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 			CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
 			const Spline& spline = core_scene->getSpline(e);
 			const SplineGeometry& sg = render_scene->getSplineGeometry(e);
+			
+			const ProceduralGeometry& pg = render_scene->getProceduralGeometries()[e];
+			
+			ImGuiEx::Label("Triangles");
+			ImGui::Text("%d", pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3);
+
 			if (ImGui::Button("Generate geometry")) {
 				if (!spline.points.empty()) {
 					const float width = sg.width;
@@ -740,45 +746,61 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 					decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 				
 					OutputMemoryStream vertices(m_app.getAllocator());
+					OutputMemoryStream indices(m_app.getAllocator());
 					vertices.reserve(16 * 1024);
-					if (render_scene->getSplineGeometry(e).flags.isSet(SplineGeometry::HAS_UVS)) {
+					if (sg.flags.isSet(SplineGeometry::HAS_UVS)) {
 						decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
 						struct Vertex {
 							Vec3 position;
 							Vec2 uv;
 						};
-						Vec3 prev_p0 = spline.points[0];
-						Vec3 prev_p1 = spline.points[0];
-						float u0 = 0;
-						float u1 = 0;
+
+						auto write_vertex = [&](const Vertex& v){
+							vertices.write(v);
+							if (sg.num_user_channels > 0) {
+								u32 tmp = 0;
+								vertices.write(&tmp, sg.num_user_channels);
+							}
+						};
+						
+						float u = 0;
+						u32 rows = 0;
+						Vec3 prev_p = spline.points[0];
+						const u32 u_density = sg.u_density;
 						while (!iterator.isEnd()) {
+							++rows;
 							const Vec3 p = iterator.getPosition();
 							const Vec3 dir = iterator.getDir();
 							const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
-							Vertex v0;
-							Vertex v1;
-							v0.position = p + side;
-							u0 += length(p - prev_p0);
-							v0.uv.x = u0;
-							v0.uv.y = -width;
-							v1.position = p - side;
-							u1 += length(p - prev_p1);
-							v1.uv.x = u1;
-							v1.uv.y = width;
-							iterator.move(0.1f);
-							prev_p0 = p;
-							prev_p1 = p;
-							vertices.write(v0);
-							if (sg.num_user_channels > 0) {
-								u32 tmp = 0;
-								vertices.write(&tmp, sg.num_user_channels);
+							u += length(p - prev_p);
+
+							const Vec3 p0 = p - side;
+							for (u32 i = 0; i < u_density; ++i) {
+					
+								Vertex v;
+								v.position = p0 + 2 * side * (i / float(u_density - 1));
+								v.uv.x = u;
+								v.uv.y = i / float(u_density - 1) * width;
+								
+								write_vertex(v);
 							}
-							vertices.write(v1);
-							if (sg.num_user_channels > 0) {
-								u32 tmp = 0;
-								vertices.write(&tmp, sg.num_user_channels);
+
+							iterator.move(sg.v_density);
+							prev_p = p;
+						}
+
+						for (u32 row = 0; row < rows - 1; ++row) {
+							for (u32 i = 0; i < u_density - 1; ++i) {
+								indices.write(u16(u_density * row + i));
+								indices.write(u16(u_density * row + i + 1));
+								indices.write(u16(u_density * (row + 1) + i));
+
+								indices.write(u16(u_density * row + i + 1));
+								indices.write(u16(u_density * (row + 1) + i));
+								indices.write(u16(u_density * (row + 1) + i + 1));
 							}
 						}
+
 						if (sg.num_user_channels > 0) {
 							decl.addAttribute(2, 20, sg.num_user_channels, gpu::AttributeType::U8, 0);
 						}
@@ -807,7 +829,7 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin {
 						}
 					}
 
-					render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLE_STRIP);
+					render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, gpu::DataType::U16);
 				}
 			}
 		}
