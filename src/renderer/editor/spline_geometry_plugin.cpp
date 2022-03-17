@@ -90,24 +90,28 @@ bool SplineGeometryPlugin::paint(UniverseView& view, i32 x, i32 y) {
 	const Array<EntityRef>& selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return false;
 
+	const EntityRef entity = selected[0];
+
 	const Universe& universe = *editor.getUniverse();
-	const bool is_spline = universe.hasComponent(selected[0], SPLINE_GEOMETRY_TYPE);
+	const bool is_spline = universe.hasComponent(entity, SPLINE_GEOMETRY_TYPE);
 	if (!is_spline) return false;
 
 	RenderScene* scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
 	DVec3 origin;
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
-	const RayCastModelHit hit = scene->castRayProceduralGeometry(origin, dir);
+	const RayCastModelHit hit = scene->castRayProceduralGeometry(origin, dir, [entity](const RayCastModelHit& hit) {
+		return hit.entity == entity;
+	});
 	if (!hit.is_hit) return false;
-	if (hit.entity != selected[0]) return false;
+	if (hit.entity != entity) return false;
 
 	Renderer* renderer = (Renderer*)editor.getEngine().getPluginManager().getPlugin("renderer");
 	ASSERT(renderer);
 
-	ProceduralGeometry& pg = scene->getProceduralGeometry(selected[0]);
-	const SplineGeometry& sg = scene->getSplineGeometry(selected[0]);
-	paint(hit.origin + hit.t * hit.dir, universe, selected[0], sg, pg, *renderer);
+	ProceduralGeometry& pg = scene->getProceduralGeometry(entity);
+	const SplineGeometry& sg = scene->getSplineGeometry(entity);
+	paint(hit.origin + hit.t * hit.dir, universe, entity, sg, pg, *renderer);
 
 	return true;
 }
@@ -132,7 +136,9 @@ void SplineGeometryPlugin::drawCursor(WorldEditor& editor, EntityRef entity) con
 	DVec3 origin;
 	Vec3 dir;
 	editor.getView().getViewport().getRay(mp, origin, dir);
-	const RayCastModelHit hit = scene->castRayProceduralGeometry(origin, dir);
+	const RayCastModelHit hit = scene->castRayProceduralGeometry(origin, dir, [entity](const RayCastModelHit& hit){
+		return hit.entity == entity;
+	});
 
 	if (hit.is_hit) {
 		const DVec3 center = hit.origin + hit.dir * hit.t;
@@ -188,6 +194,8 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 		ImGuiEx::Label("Triangles");
 		ImGui::Text("%d", u32(pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3));
 
+		ImGui::Separator();
+
 		ImGuiEx::Label("Brush size");
 		ImGui::DragFloat("##bs", &m_brush_size, 0.1f, 0, FLT_MAX);
 
@@ -198,6 +206,8 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 
 		ImGuiEx::Label("Paint value");
 		ImGui::SliderInt("##pv", (int*)&m_brush_value, 0, 255);
+
+		ImGui::Separator();
 
 		if (ImGui::Button("Generate geometry")) {
 			if (!spline.points.empty()) {

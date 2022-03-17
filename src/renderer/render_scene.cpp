@@ -2616,7 +2616,7 @@ struct RenderSceneImpl final : RenderScene {
 		return castRayProceduralGeometry(origin, dir, [](const RayCastModelHit&){ return true; });
 	}
 
-	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir, const RayCastModelHit::Filter& filter) {
+	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir, const RayCastModelHit::Filter& filter) override {
 		RayCastModelHit hit;
 		hit.is_hit = false;
 		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
