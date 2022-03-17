@@ -399,7 +399,6 @@ vec3 computeDirectLight(Surface surface, vec3 L, vec3 light_color)
 
 	// F Schlick 
 	vec3 F = F_Schlick(hdotv, F0);// mix(F0, vec3(1), pow(1.0 - hdotv, 5.0)); 
-	
 	vec3 specular = D * V * F;
 	
 	float kD = 1.0 - surface.metallic;

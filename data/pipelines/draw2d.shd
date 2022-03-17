@@ -5,7 +5,7 @@ vertex_shader [[
 	layout(location = 1) in vec2 a_uv;
 	layout(location = 2) in vec4 a_color;
 	
-	layout(std140, binding = 4) uniform Drawcall {
+	layout(std140, binding = 4) uniform Bones {
 		mat4 u_matrix;
 	};
 

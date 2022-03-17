@@ -54,11 +54,7 @@ function surface_shader(code)
 		#else
 			const vec2 a_uv = vec2(0);
 		#endif
-		#ifdef _HAS_ATTR3
-			layout(location = 2) in vec3 a_normal;
-		#else
-			const vec3 a_normal = vec3(0, 0, -1);
-		#endif
+		layout(location = 2) in vec3 a_normal;
 		#ifdef _HAS_ATTR3
 			layout(location = 3) in vec3 a_tangent;
 		#else 

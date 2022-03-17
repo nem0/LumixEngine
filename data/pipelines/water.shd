@@ -8,6 +8,16 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+texture_slot {
+	name = "Foam",
+	define = "HAS_FOAM"
+}
+
+texture_slot {
+	name = "Clutter",
+	define = "HAS_CLUTTER"
+}
+
 include "pipelines/common.glsl"
 
 ignore_property("roughness")
@@ -23,18 +33,24 @@ uniform("Reflection multiplier", "float")
 uniform("Specular multiplier", "float")
 uniform("Flow dir", "vec2")
 uniform("Water color", "color")
+uniform("Ground tint", "color")
+uniform("Water scattering", "float")
+uniform("Refraction distortion", "float")
 
 ------------------
 
 vertex_shader [[
 	layout(location = 0) in vec3 a_position;
-	layout(location = 1) in vec2 a_uv;
-	layout(location = 2) in vec3 a_normal;
-	#ifdef _HAS_ATTR3 
-		layout(location = 3) in vec3 a_tangent;
-	#else 
-		const vec3 a_tangent = vec3(0, 1, 0);
+	#ifdef _HAS_ATTR1 
+		layout(location = 1) in vec2 a_uv;
+	#else
+		const vec2 a_uv = vec2(0, 0);
 	#endif
+	#ifdef _HAS_ATTR2 
+		layout(location = 2) in vec2 a_masks;
+	#endif
+	const vec3 a_normal = vec3(0, 1, 0);
+	const vec3 a_tangent = vec3(1, 0, 0);
 
 	#if defined INSTANCED
 		layout(location = 4) in vec4 i_rot_quat;
@@ -48,6 +64,9 @@ vertex_shader [[
 	layout (location = 1) out vec3 v_normal;
 	layout (location = 2) out vec3 v_tangent;
 	layout (location = 3) out vec4 v_wpos;
+	#ifdef _HAS_ATTR2 
+		layout (location = 4) out vec2 v_masks;
+	#endif
 	
 	void main() {
 		v_uv = a_uv;
@@ -66,6 +85,9 @@ vertex_shader [[
 			v_wpos = model_mtx * vec4(p,  1);
 		#endif
 		
+		#ifdef _HAS_ATTR2 
+			v_masks = a_masks;
+		#endif
 		gl_Position = Pass.view_projection * v_wpos;		
 	}
 ]]
@@ -75,23 +97,34 @@ vertex_shader [[
 fragment_shader [[
 	layout (binding=0) uniform sampler2D u_normalmap;
 	layout (binding=1) uniform sampler2D u_noise;
+	#ifdef HAS_FOAM
+		layout (binding=2) uniform sampler2D u_foam;
+	#endif
+	#ifdef HAS_CLUTTER
+		layout (binding=3) uniform sampler2D u_clutter;
+	#endif
 
-	layout (binding=3) uniform sampler2D u_shadowmap;
-	layout (binding=4) uniform sampler2D u_depthbuffer;
+	layout (binding=4) uniform sampler2D u_shadowmap;
+	layout (binding=5) uniform sampler2D u_depthbuffer;
 	
-	layout (binding=7) uniform samplerCubeArray u_reflection_probes;
+	layout (binding=8) uniform samplerCubeArray u_reflection_probes;
+	layout (binding=9) uniform sampler2D u_bg;
 	
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 1) in vec3 v_normal;
 	layout (location = 2) in vec3 v_tangent;
 	layout (location = 3) in vec4 v_wpos;
+	#ifdef _HAS_ATTR2 
+		layout (location = 4) in vec2 v_masks;
+	#endif
 
 	layout(location = 0) out vec4 o_color;
 
 	vec3 getReflectionColor(vec3 view, vec3 normal, float dist)
 	{
 		vec3 reflection = reflect(-view, normal);
-		return textureLod(u_reflection_probes, vec4(reflection, 0), dist / 2).rgb;
+		vec4 radiance_rgbm = textureLod(u_reflection_probes, vec4(reflection, 0), min(3, dist * 0.1));
+		return radiance_rgbm.rgb * radiance_rgbm.a * 4;
 	}
 
 	float toLinearDepth(float ndc_depth) {
@@ -102,38 +135,31 @@ fragment_shader [[
 		return -view_pos.z / view_pos.w;
 	}
 
-	float getWaterDepth(vec3 wpos, vec3 view, vec3 normal, float wave)
+	float getWaterDepth(vec3 wpos, vec3 view, vec3 normal)
 	{
-		float fullColorDepth = 1;
-		vec3 water_color = u_material_color.rgb * 0.1;
 		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
 		#ifndef _ORIGIN_BOTTOM_LEFT
 			screen_pos.y *= -1;
 		#endif
 		float depth = texture(u_depthbuffer, screen_pos.xy * 0.5 + 0.5).x;
-		return toLinearDepth(depth) - toLinearDepth(screen_pos.z) + wave;
+		return toLinearDepth(depth) - toLinearDepth(screen_pos.z);
 	}
 	
-	vec3 getRefractionColor(vec3 wpos, vec3 view, vec3 normal, float wave)
+	vec4 getRefraction(vec3 wpos)
 	{
-		float fullColorDepth = 1;
-		vec3 water_color = u_material_color.rgb * 0.1;
 		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
 		#ifndef _ORIGIN_BOTTOM_LEFT
 			screen_pos.y *= -1;
 		#endif
-		float depth = texture(u_depthbuffer, screen_pos.xy * 0.5 + 0.5).x;
-		float depth_diff = toLinearDepth(depth) - toLinearDepth(screen_pos.z) + wave;
-		vec3 refraction = refract(-view, normal, u_r0);
-		vec3 refr_color = texture(u_reflection_probes, vec4(refraction, 0)).rgb;
-		return mix(water_color, refr_color, saturate(1 - depth_diff * depth_diff / (fullColorDepth * fullColorDepth)));
+		return texture(u_bg, screen_pos.xy * 0.5 + 0.5);
 	}
 	
-	vec3 getSurfaceNormal(vec2 uv)
+	// TODO try less texture fetches
+	vec3 getSurfaceNormal(vec2 uv, float normal_strength)
 	{
-		float noise_t = texture(u_noise, 1 - uv * 30).x;
+		float noise_t = texture(u_noise, 1 - uv * 0.1).x;
 		vec2 tc0 = uv * u_uv_scale + u_flow_dir * Global.time;
 		vec2 tc1 = uv * u_uv_scale + u_flow_dir * (Global.time + noise_t * 0.1);
 
@@ -147,11 +173,11 @@ fragment_shader [[
 		wnormal0.y = sqrt(saturate(1 - dot(wnormal0.xz, wnormal0.xz))); 
 		wnormal1.y = sqrt(saturate(1 - dot(wnormal1.xz, wnormal1.xz))); 
 
-		float noise = 0;//texture(u_noise, uv * 30).x;
-		float t = fract(Global.time * 0.6 + noise * 2);
+		float noise = texture(u_noise, uv * 0.05).x;
+		float t = fract(Global.time + noise * 2);
 		vec3 wnormal = mix(wnormal0, wnormal1, abs( 0.5 - t ) / 0.5);
 
-		return normalize(mix(vec3(0, 1, 0), wnormal, u_normal_strength));
+		return normalize(mix(vec3(0, 1, 0), wnormal, normal_strength));
 	}
 
 	void main()
@@ -161,9 +187,6 @@ fragment_shader [[
 		
 		float shadow = 1; //getShadow(u_shadowmap, data.wpos, data.N);
 		
-		o_color.rgb = vec3(1, 0, 0);
-		o_color.w = 1;
-
 		/////////
 		const float WAVE_HEIGHT = 0.0;
 		const float WAVE_FREQUENCY = 3;
@@ -177,49 +200,56 @@ fragment_shader [[
 			normalize(v_normal),
 			normalize(cross(v_normal, v_tangent))
 			);
-		vec3 wnormal = getSurfaceNormal(v_uv.xy);
+
+		float normal_strength = u_normal_strength;
+		#ifdef _HAS_ATTR2 
+			normal_strength *= 1 - v_masks.g;
+		#endif
+
+		vec3 wnormal = getSurfaceNormal(v_uv, normal_strength);
 		wnormal = normalize(tbn * wnormal);
 
-		float noise = texture(u_noise, v_uv*10).x;
-		float wave = cos(Global.time * WAVE_FREQUENCY + length(v_wpos)*10.15) * WAVE_HEIGHT - WAVE_HEIGHT /*- WAVE_HEIGHT * noise*/;
-		//vec3 screen_uv = getScreenCoord(v_wpos);
-		//float depth = texture(u_gbuffer_depth, screen_uv.xy * 0.5 + 0.5).x;
-		//float depth_diff = toLinearDepth(Global.inv_projection, depth) - toLinearDepth(screen_uv.z) + wave;
-
-		//if(depth_diff < FOAM_DEPTH)
-		//{
-		//	wnormal = texture(u_gbuffer1, screen_uv.xy * 0.5 + 0.5).xyz * 2 - 1;	
-		//	wnormal = mix(vec3(0, 1, 0), wnormal, normal_strength);
-		//	wnormal = normalize(wnormal);
-		//}
-	
 		float dist = length(v_wpos.xyz);
 		vec3 view = normalize(vec4(-v_wpos.xyz, 0).xyz);
-		vec3 refl_color = getReflectionColor(view, wnormal, dist * u_normal_strength);
-		vec3 refr_color = getRefractionColor(v_wpos.xyz, view, wnormal, /*wave*/0);
-		float water_depth = getWaterDepth(v_wpos.xyz, view, wnormal, wave);
-		//
-		vec3 halfvec = normalize(mix(Global.light_dir.xyz, view, 0.5));
-		float spec_strength = pow(max(0.0, dot(halfvec, wnormal)), u_specular_power);
-		vec3 spec_color = Global.light_color.rgb * spec_strength * u_specular_multiplier;
+		vec3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength) * u_reflection_multiplier;
+		float water_depth = getWaterDepth(v_wpos.xyz, view, wnormal);
+
+		vec3 halfvec = normalize(view + Global.light_dir.xyz);
+		float spec_strength = pow(saturate(dot(halfvec, wnormal)), u_specular_power);
 		
+		vec3 R = reflect(-normalize(view), normalize(wnormal));
+		spec_strength = pow(saturate(dot(R, normalize(Global.light_dir.xyz))), u_specular_power);
+
+		vec3 spec_color = Global.light_color.rgb * spec_strength * u_specular_multiplier;
 		float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
-		fresnel = saturate(fresnel * saturate(water_depth));
-		//fresnel *= saturate((depth_diff - wave)*10); 
 
+		vec3 water_color = pow(u_water_color.rgb, vec3(2.2));
+		vec3 transmittance = saturate(exp(-water_depth * u_water_scattering * (vec3(1) - water_color)));
 
-		//vec3 color = mix(refr_color, refl_color * u_reflection_multiplier, saturate(fresnel));
-		//color = vec3(dot(normalize(view), wnormal) > 0.5 ? 1 : 0);
-		//color = vec3(fresnel);
-		/*#ifdef FOAM_TEXTURE
-			vec3 foam = texture(u_texFoam, v_texcoord0 * texture_scale * FOAM_TEXTURE_SCALE).rgb;
-			color = color + foam * saturate(FOAM_DEPTH-abs(FOAM_DEPTH - depth_diff * FOAM_WIDTH)) * (1/FOAM_DEPTH);
-		#endif*/
-		//vec4 camera_wpos = mul(u_camInvView, vec4(0, 0, 0, 1));
-		//vec3 wpos = getViewPosition(u_gbuffer_depth, u_camInvViewProj, screen_uv.xy * 0.5 + 0.5);
-		//float fog_factor = getFogFactor(camera_wpos.xyz / camera_wpos.w, u_fogColorDensity.w, wpos.xyz, u_fogParams);
-		//gl_FragColor = vec4(mix(color + spec_color, u_fogColorDensity.rgb, fog_factor), 1);
-		float t = saturate(1 - exp(-water_depth * 2));
-		o_color = vec4(fresnel * refl_color + spec_color + pow(u_water_color.rgb, vec3(2.2)) * t, saturate(t + fresnel));
+		float t = saturate(water_depth * 5); // no hard edge
+
+		float refraction_distortion = u_refraction_distortion;
+
+		vec3 refraction = getRefraction(v_wpos.xyz + vec3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
+		refraction *= mix(vec3(1), u_ground_tint.rgb, t);
+		refraction *= transmittance;
+
+		vec3 reflection = refl_color + spec_color;
+
+		o_color.rgb = mix(refraction, reflection, fresnel);
+		o_color.rgb = mix(refraction, o_color.rgb, t);
+		
+		float noise = texture(u_noise, 1 - v_uv * 0.1 - u_flow_dir * Global.time * 0.3).x;
+		#ifdef HAS_FOAM
+			vec4 foam = texture(u_foam, v_uv + u_flow_dir * Global.time * 3);
+			o_color.rgb = mix(foam.rgb, o_color.rgb, saturate(1 - (v_masks.r - noise)));
+		#endif
+
+		#ifdef HAS_CLUTTER
+			vec4 clutter = texture(u_clutter, v_uv + wnormal.xz * 0.3 + vec2(noise * 0.03, 0));
+			o_color.rgb = mix(o_color.rgb, clutter.rgb, clutter.a * v_masks.g);
+		#endif
+
+		o_color.a = 1;
 	}
 ]]

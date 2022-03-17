@@ -39,7 +39,6 @@ local transparent_state = {
 
 local water_state = {
 	depth_write = false,
-	blending = "alpha"
 }
 
 local default_state = {
@@ -106,11 +105,29 @@ local shadow_grass_state = {
 }
 
 function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
-	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
+	local color_copy = createRenderbuffer { width = viewport_w, height = viewport_h, format = "r11g11b10f", debug_name = "hdr_copy" }
+
+	setRenderTargets(color_copy)
+
+	drawcallUniforms( 
+		0, 0, 1, 1, 
+		1, 0, 0, 0, 
+		0, 1, 0, 0, 
+		0, 0, 1, 0, 
+		0, 0, 0, 1, 
+		0, 0, 0, 1
+	)
+	-- TODO textures instead of drawcall
+	drawArray(0, 3, textured_quad_shader
+		, { colorbuffer }
+		, { depth_test = false }
+	)
+
+	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 	beginBlock("water_pass")
 	pass(getCameraParams())
-	bindTextures({ dsbuffer, shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 4);
+	bindTextures({ dsbuffer, shadowmap, SHADOW_ATLAS, REFLECTION_PROBES, color_copy }, 5);
 	renderBucket(entities.water, water_state)
 	endBlock()
 end
@@ -548,6 +565,9 @@ function onGUI()
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
 		terrain_state.wireframe = default_state.wireframe
+		water_state.wireframe = default_state.wireframe
+		grass_state.wireframe = default_state.wireframe
+		impostor_state.wireframe = default_state.wireframe
 		ImGui.EndPopup()
 	end
 end
