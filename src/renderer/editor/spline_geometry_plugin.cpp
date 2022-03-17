@@ -179,7 +179,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 		drawCursor(editor, *cmp.entity);
 
 		ImGuiEx::Label("Triangles");
-		ImGui::Text("%d", pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3);
+		ImGui::Text("%d", u32(pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3));
 
 		ImGuiEx::Label("Brush size");
 		ImGui::DragFloat("##bs", &m_brush_size, 0.1f, 0, FLT_MAX);
