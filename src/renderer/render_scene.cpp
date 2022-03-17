@@ -2592,12 +2592,12 @@ struct RenderSceneImpl final : RenderScene {
 			Vec3 dummy;
 			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
 
-			for (u32 i = 0; i < vertex_count - 1; ++i) {
+			for (u32 i = 0; i < vertex_count - 2; ++i) {
 				float t;
 				memcpy(&a, data + i * stride, sizeof(a));
 				memcpy(&b, data + (i + 1) * stride, sizeof(b));
 				memcpy(&c, data + (i + 2) * stride, sizeof(c));
-				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && t < hit.t && t > 0) {
+				if (getRayTriangleIntersection(ro, rd, a, b, c, &t) && (t < hit.t || !hit.is_hit)) {
 					pg_hit.is_hit = true;
 					pg_hit.mesh = nullptr;
 					pg_hit.entity = iter.key();
