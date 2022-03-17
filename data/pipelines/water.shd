@@ -223,7 +223,7 @@ fragment_shader [[
 		vec3 spec_color = Global.light_color.rgb * spec_strength * u_specular_multiplier;
 		float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
 
-		vec3 water_color = pow(u_water_color.rgb, vec3(2.2));
+		vec3 water_color = pow(u_water_color.rgb, vec3(2.2)); // TODO do not do this in shader
 		vec3 transmittance = saturate(exp(-water_depth * u_water_scattering * (vec3(1) - water_color)));
 
 		float t = saturate(water_depth * 5); // no hard edge
@@ -239,15 +239,15 @@ fragment_shader [[
 		o_color.rgb = mix(refraction, reflection, fresnel);
 		o_color.rgb = mix(refraction, o_color.rgb, t);
 		
-		float noise = texture(u_noise, 1 - v_uv * 0.1 - u_flow_dir * Global.time * 0.3).x;
+		float noise = texture(u_noise, 1 - v_uv * 0.1 + u_flow_dir * Global.time * 0.3).x;
 		#ifdef HAS_FOAM
 			vec4 foam = texture(u_foam, v_uv + u_flow_dir * Global.time * 3);
-			o_color.rgb = mix(foam.rgb, o_color.rgb, saturate(1 - (v_masks.r - noise)));
+			o_color.rgb = mix(o_color.rgb, foam.rgb, saturate(v_masks.r - noise) * t);
 		#endif
 
 		#ifdef HAS_CLUTTER
 			vec4 clutter = texture(u_clutter, v_uv + wnormal.xz * 0.3 + vec2(noise * 0.03, 0));
-			o_color.rgb = mix(o_color.rgb, clutter.rgb, clutter.a * v_masks.g);
+			o_color.rgb = mix(o_color.rgb, clutter.rgb, saturate(clutter.a * v_masks.g * t));
 		#endif
 
 		o_color.a = 1;

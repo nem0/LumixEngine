@@ -51,7 +51,13 @@ SplineGeometryPlugin::SplineGeometryPlugin(StudioApp& app)
 	: m_app(app)
 {}
 
-void SplineGeometryPlugin::paint(const DVec3& pos, const Universe& universe, EntityRef entity, ProceduralGeometry& pg, Renderer& renderer) const {
+void SplineGeometryPlugin::paint(const DVec3& pos
+	, const Universe& universe
+	, EntityRef entity
+	, const SplineGeometry& sg
+	, ProceduralGeometry& pg
+	, Renderer& renderer) const
+{
 	if (pg.vertex_data.size() == 0) return;
 	
 	// TODO undo/redo
@@ -64,7 +70,7 @@ void SplineGeometryPlugin::paint(const DVec3& pos, const Universe& universe, Ent
 	const u8* end = pg.vertex_data.data() + pg.vertex_data.size();
 	const u32 stride = pg.vertex_decl.getStride();
 	ASSERT(stride != 0);
-	const u32 offset = 20 + m_brush_channel; // TODO
+	const u32 offset = (sg.flags.isSet(SplineGeometry::HAS_UVS) ? 20 : 12) + m_brush_channel;
 	for (u8* iter = pg.vertex_data.getMutableData(); iter < end; iter += stride) {
 		Vec3 p;
 		memcpy(&p, iter, sizeof(p));
@@ -100,7 +106,8 @@ bool SplineGeometryPlugin::paint(UniverseView& view, i32 x, i32 y) {
 	ASSERT(renderer);
 
 	ProceduralGeometry& pg = scene->getProceduralGeometry(selected[0]);
-	paint(hit.origin + hit.t * hit.dir, universe, selected[0], pg, *renderer);
+	const SplineGeometry& sg = scene->getSplineGeometry(selected[0]);
+	paint(hit.origin + hit.t * hit.dir, universe, selected[0], sg, pg, *renderer);
 
 	return true;
 }
