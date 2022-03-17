@@ -156,7 +156,7 @@ void SplineGeometryPlugin::drawCursor(WorldEditor& editor, RenderScene& scene, E
 	const Transform tr = scene.getUniverse().getTransform(entity);
 	const Vec3 center_local = Vec3(tr.inverted().transform(center));
 
-	for (u32 i = 0, c = pg.getIndexCount(); i < c; ++i) {
+	for (u32 i = 0, c = pg.getVertexCount(); i < c; ++i) {
 		Vec3 p;
 		memcpy(&p, data + stride * i, sizeof(p));
 		if (squaredLength(center_local - p) < R2) {
@@ -255,15 +255,32 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 					prev_p = p;
 				}
 
-				for (u32 row = 0; row < rows - 1; ++row) {
-					for (u32 i = 0; i < u_density - 1; ++i) {
-						indices.write(u16(u_density * row + i));
-						indices.write(u16(u_density * row + i + 1));
-						indices.write(u16(u_density * (row + 1) + i));
+				const bool u16indices = u_density * rows < 0xffFF;
 
-						indices.write(u16(u_density * row + i + 1));
-						indices.write(u16(u_density * (row + 1) + i));
-						indices.write(u16(u_density * (row + 1) + i + 1));
+				if (u16indices) {
+					for (u32 row = 0; row < rows - 1; ++row) {
+						for (u32 i = 0; i < u_density - 1; ++i) {
+							indices.write(u16(u_density * row + i));
+							indices.write(u16(u_density * row + i + 1));
+							indices.write(u16(u_density * (row + 1) + i));
+
+							indices.write(u16(u_density * row + i + 1));
+							indices.write(u16(u_density * (row + 1) + i));
+							indices.write(u16(u_density * (row + 1) + i + 1));
+						}
+					}
+				}
+				else {
+					for (u32 row = 0; row < rows - 1; ++row) {
+						for (u32 i = 0; i < u_density - 1; ++i) {
+							indices.write(u32(u_density * row + i));
+							indices.write(u32(u_density * row + i + 1));
+							indices.write(u32(u_density * (row + 1) + i));
+
+							indices.write(u32(u_density * row + i + 1));
+							indices.write(u32(u_density * (row + 1) + i));
+							indices.write(u32(u_density * (row + 1) + i + 1));
+						}
 					}
 				}
 
@@ -271,7 +288,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 					decl.addAttribute(2, has_uvs ? 20 : 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 				}
 
-				render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, gpu::DataType::U16);
+				render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, u16indices ? gpu::DataType::U16 : gpu::DataType::U32);
 			}
 		}
 	}

@@ -20,7 +20,7 @@ namespace Lumix {
 
 static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 
-struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, PropertyGrid::IPlugin {
+struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::IPlugin {
 	SplineEditorPlugin(StudioApp& app)
 		: m_app(app)
 		, m_selected_prefabs(app.getAllocator())
@@ -97,6 +97,21 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 				spline.points.push(Vec3(hit.pos - tr.pos));
 			});
 		}
+	}
+
+	void setSplinePoints(EntityRef entity, Span<const Vec3> points) override {
+		WorldEditor& editor = m_app.getWorldEditor();
+		Universe* universe = editor.getUniverse();
+
+		ASSERT(universe->hasComponent(entity, SPLINE_TYPE));
+
+		CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
+		Spline& spline = scene->getSpline(entity);
+		
+		recordUndo(-1, spline, entity, [&](){
+			spline.points.clear();
+			for (Vec3 p : points) spline.points.push(p);
+		});
 	}
 
 	Spline* getSpline() const {
@@ -402,7 +417,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	float m_spacing = 1.f;
 };
 
-StudioApp::IPlugin* createSplineEditor(StudioApp& app) {
+SplineEditor* createSplineEditor(StudioApp& app) {
 	return LUMIX_NEW(app.getAllocator(), SplineEditorPlugin)(app);
 }
 

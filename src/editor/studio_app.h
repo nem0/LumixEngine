@@ -98,7 +98,9 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual void addPlugin(GUIPlugin& plugin) = 0;
 	virtual void removePlugin(GUIPlugin& plugin) = 0;
 	virtual void removePlugin(MousePlugin& plugin) = 0;
-	virtual GUIPlugin* getPlugin(const char* name) = 0;
+	virtual IPlugin* getIPlugin(const char* name) = 0;
+	virtual GUIPlugin* getGUIPlugin(const char* name) = 0;
+	virtual MousePlugin* getMousePlugin(const char* name) = 0;
 	virtual Span<MousePlugin*> getMousePlugins() = 0;
 	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual const char* getComponentIcon(ComponentType cmp_type) const = 0;

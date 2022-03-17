@@ -861,7 +861,7 @@ static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {
 	return sqrtf(res);
 }
 
-void TerrainEditor::getDistanceField(const Terrain& terrain, DistanceField& df, const Spline& spline, EntityRef spline_entity) const {
+void TerrainEditor::addSpline(const Terrain& terrain, DistanceField& df, const Spline& spline, EntityRef spline_entity) const {
 	const Universe& universe = *m_app.getWorldEditor().getUniverse();
 	const Transform spline_tr = universe.getTransform(spline_entity);
 	const Transform terrain_tr = universe.getTransform(terrain.m_entity);
@@ -1435,7 +1435,7 @@ void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 				if (selected.isValid()) {
 					auto iter = splines.find(*selected);
 					if (iter.isValid() && ImGui::Selectable(ICON_FA_CHECK " Add")) {
-						getDistanceField(*terrain, df, iter.value(), *selected);
+						addSpline(*terrain, df, iter.value(), *selected);
 					}
 				}
 				ImGui::EndPopup();

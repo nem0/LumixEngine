@@ -71,6 +71,10 @@ struct BoneAttachment
 	LocalRigidTransform relative_transform;
 };
 
+u32 ProceduralGeometry::getVertexCount() const {
+	return vertex_decl.getStride() ? u32(vertex_data.size() / vertex_decl.getStride()) : 0;
+}
+
 u32 ProceduralGeometry::getIndexCount() const {
 	return u32(index_data.size() / (index_type == gpu::DataType::U16 ? 2 : 4));
 }

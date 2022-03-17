@@ -68,8 +68,8 @@ struct ProceduralGeometry {
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle index_buffer = gpu::INVALID_BUFFER;
 	AABB aabb;
-
 	
+	u32 getVertexCount() const;
 	u32 getIndexCount() const;
 };
 

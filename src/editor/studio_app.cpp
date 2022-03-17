@@ -2471,10 +2471,22 @@ struct StudioAppImpl final : StudioApp
 	
 	Span<MousePlugin*> getMousePlugins() override { return m_mouse_plugins; }
 
-	GUIPlugin* getPlugin(const char* name) override
-	{
-		for (auto* i : m_gui_plugins)
-		{
+	MousePlugin* getMousePlugin(const char* name) override {
+		for (auto* i : m_mouse_plugins) {
+			if (equalStrings(i->getName(), name)) return i;
+		}
+		return nullptr;
+	}
+
+	IPlugin* getIPlugin(const char* name) override {
+		for (auto* i : m_plugins) {
+			if (equalStrings(i->getName(), name)) return i;
+		}
+		return nullptr;
+	}
+
+	GUIPlugin* getGUIPlugin(const char* name) override {
+		for (auto* i : m_gui_plugins) {
 			if (equalStrings(i->getName(), name)) return i;
 		}
 		return nullptr;
