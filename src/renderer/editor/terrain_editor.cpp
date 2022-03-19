@@ -1589,6 +1589,9 @@ u16 TerrainEditor::getHeight(const DVec3& world_pos, RenderScene* scene, EntityR
 	return data[int(rel_pos.x / scale) + int(rel_pos.z / scale) * heightmap->width];
 }
 
+void TerrainEditor::onMouseWheel(float value) {
+	m_terrain_brush_size = maximum(0.f, m_terrain_brush_size + value);
+}
 
 bool TerrainEditor::onMouseDown(UniverseView& view, int x, int y)
 {

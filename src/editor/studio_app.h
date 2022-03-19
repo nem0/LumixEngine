@@ -48,6 +48,7 @@ struct LUMIX_EDITOR_API StudioApp
 		virtual bool onMouseDown(UniverseView& view, int x, int y) { return false; }
 		virtual void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) {}
 		virtual void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) {}
+		virtual void onMouseWheel(float value) {}
 		virtual const char* getName() const = 0;
 	};
 

@@ -240,12 +240,12 @@ fragment_shader [[
 		o_color.rgb = mix(refraction, o_color.rgb, t);
 		
 		float noise = texture(u_noise, 1 - v_uv * 0.1 + u_flow_dir * Global.time * 0.3).x;
-		#ifdef HAS_FOAM
+		#if defined HAS_FOAM && defined _HAS_ATTR2
 			vec4 foam = texture(u_foam, v_uv + u_flow_dir * Global.time * 3);
 			o_color.rgb = mix(o_color.rgb, foam.rgb, saturate(v_masks.r - noise) * t);
 		#endif
 
-		#ifdef HAS_CLUTTER
+		#if defined HAS_CLUTTER && defined _HAS_ATTR2
 			vec4 clutter = texture(u_clutter, v_uv + wnormal.xz * 0.3 + vec2(noise * 0.03, 0));
 			o_color.rgb = mix(o_color.rgb, clutter.rgb, saturate(clutter.a * v_masks.g * t));
 		#endif

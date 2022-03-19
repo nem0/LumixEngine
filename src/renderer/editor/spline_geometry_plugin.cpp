@@ -71,12 +71,13 @@ void SplineGeometryPlugin::paint(const DVec3& pos
 	const u32 stride = pg.vertex_decl.getStride();
 	ASSERT(stride != 0);
 	const u32 offset = (sg.flags.isSet(SplineGeometry::HAS_UVS) ? 20 : 12) + m_brush_channel;
+	ImGuiIO& io = ImGui::GetIO();
 	for (u8* iter = pg.vertex_data.getMutableData(); iter < end; iter += stride) {
 		Vec3 p;
 		memcpy(&p, iter, sizeof(p));
 
 		if (squaredLength(p - center) < R2) {
-			*(iter + offset) = m_brush_value;
+			*(iter + offset) = io.KeyAlt ? 255 - m_brush_value : m_brush_value;
 		}
 	}
 
@@ -114,6 +115,10 @@ bool SplineGeometryPlugin::paint(UniverseView& view, i32 x, i32 y) {
 	paint(hit.origin + hit.t * hit.dir, universe, entity, sg, pg, *renderer);
 
 	return true;
+}
+
+void SplineGeometryPlugin::onMouseWheel(float value) {
+	m_brush_size = maximum(0.f, m_brush_size + value * 0.2f);
 }
 
 bool SplineGeometryPlugin::onMouseDown(UniverseView& view, int x, int y) {
@@ -171,6 +176,16 @@ void SplineGeometryPlugin::drawCursor(WorldEditor& editor, RenderScene& scene, E
 	}
 }
 
+static const char* toString(SplineGeometryPlugin::GeometryMode mode) {
+	switch (mode) {
+		case SplineGeometryPlugin::GeometryMode::NO_SNAP: return "No snap";
+		case SplineGeometryPlugin::GeometryMode::SNAP_CENTER: return "Snap center";
+		case SplineGeometryPlugin::GeometryMode::SNAP_ALL: return "Snap everything";
+	}
+	ASSERT(false);
+	return "N/A";
+}
+
 void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) {
 	if (cmp.type != SPLINE_GEOMETRY_TYPE) return;
 
@@ -209,6 +224,21 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 
 		ImGui::Separator();
 
+		ImGuiEx::Label("Mode");
+		if (ImGui::BeginCombo("##gm", toString(m_geometry_mode))) {
+			for (u32 i = 0; i < (u32)GeometryMode::COUNT; ++i) {
+				if (ImGui::Selectable(toString(GeometryMode(i)))) m_geometry_mode = GeometryMode(i);
+			}
+			ImGui::EndCombo();
+		}
+
+		const bool snap = m_geometry_mode != GeometryMode::NO_SNAP;
+
+		if (!snap) ImGuiEx::PushReadOnly();
+		ImGuiEx::Label("Snap height");
+		ImGui::DragFloat("##sh", &m_snap_height);
+		if (!snap) ImGuiEx::PopReadOnly();
+
 		if (ImGui::Button("Generate geometry")) {
 			if (!spline.points.empty()) {
 				const float width = sg.width;
@@ -226,12 +256,22 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 					Vec2 uv;
 				};
 
+				const Transform spline_tr = universe.getTransform(e);
+				const Transform spline_tr_inv = spline_tr.inverted();
+
 				auto write_vertex = [&](const Vertex& v){
-					if (has_uvs) {
-						vertices.write(v);
+					Vec3 position = v.position;
+					if (m_geometry_mode == GeometryMode::SNAP_ALL) {
+						const DVec3 p = spline_tr.transform(v.position) + Vec3(0, 1 + m_snap_height, 0);
+						const RayCastModelHit hit = render_scene->castRayTerrain(p, Vec3(0, -1, 0));
+						if (hit.is_hit) {
+							const DVec3 hp = hit.origin + (hit.t - m_snap_height) * hit.dir;
+							position = Vec3(spline_tr_inv.transform(hp));
+						}
 					}
-					else {
-						vertices.write(v.position);
+					vertices.write(position);
+					if (has_uvs) {
+						vertices.write(v.uv);
 					}
 					if (sg.num_user_channels > 0) {
 						u32 tmp = 0;
@@ -245,12 +285,22 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 				const u32 u_density = sg.u_density;
 				while (!iterator.isEnd()) {
 					++rows;
-					const Vec3 p = iterator.getPosition();
+					Vec3 p = iterator.getPosition();
+					if (m_geometry_mode == GeometryMode::SNAP_CENTER) {
+						const DVec3 pglob = spline_tr.transform(p) + Vec3(0, 100 + m_snap_height, 0);
+						const RayCastModelHit hit = render_scene->castRayTerrain(pglob, Vec3(0, -1, 0));
+						if (hit.is_hit) {
+							const DVec3 hp = hit.origin + (hit.t - m_snap_height) * hit.dir;
+							p = Vec3(spline_tr_inv.transform(hp));
+						}
+					}
+
 					const Vec3 dir = iterator.getDir();
 					const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
 					u += length(p - prev_p);
 
 					const Vec3 p0 = p - side;
+
 					for (u32 i = 0; i < u_density; ++i) {
 					
 						Vertex v;

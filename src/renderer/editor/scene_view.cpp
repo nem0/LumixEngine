@@ -161,6 +161,14 @@ struct UniverseViewImpl final : UniverseView {
 		}
 	}
 
+	void onMouseWheel(float value) {
+		if (m_mouse_mode == MouseMode::NONE) {
+			for (StudioApp::MousePlugin* plugin : m_app.getMousePlugins()) {
+				plugin->onMouseWheel(value);
+			}
+		}
+	}
+
 	void onMouseUp(int x, int y, os::MouseButton button)
 	{
 		m_mouse_pos = {(float)x, (float)y};
@@ -1264,6 +1272,12 @@ void SceneView::handleEvents() {
 	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
 		const os::Event& event = events[i];
 		switch (event.type) {
+			case os::Event::Type::MOUSE_WHEEL: {
+				if (handle_input) {
+					m_view->onMouseWheel(event.mouse_wheel.amount);
+				}
+				break;
+			}
 			case os::Event::Type::MOUSE_BUTTON: {
 				const os::Point cp = os::getMouseScreenPos();
 				Vec2 rel_mp = { (float)cp.x, (float)cp.y };
