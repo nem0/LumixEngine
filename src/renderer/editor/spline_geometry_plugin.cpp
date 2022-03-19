@@ -275,7 +275,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 					}
 					if (sg.num_user_channels > 0) {
 						u32 tmp = 0;
-						vertices.write(&tmp, sg.num_user_channels);
+						vertices.write(tmp);
 					}
 				};
 						
@@ -346,6 +346,9 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEdit
 
 				if (sg.num_user_channels > 0) {
 					decl.addAttribute(2, has_uvs ? 20 : 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+					if (sg.num_user_channels < 4) {
+						decl.addAttribute(3, has_uvs ? 20 : 12 + sg.num_user_channels, 4 - sg.num_user_channels, gpu::AttributeType::U8, 0); // padding
+					}
 				}
 
 				render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, u16indices ? gpu::DataType::U16 : gpu::DataType::U32);
