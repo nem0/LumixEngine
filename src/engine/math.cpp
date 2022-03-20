@@ -442,6 +442,10 @@ Vec3 Vec3::operator/(float s) const {
 	return Vec3(x * tmp, y * tmp, z * tmp);
 }
 
+Vec3 Vec3::operator-(float s) const {
+	return Vec3(x - s, y - s, z - s);
+}
+
 void Vec3::operator/=(float rhs) {
 	*this *= 1.0f / rhs;
 }

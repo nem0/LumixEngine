@@ -91,6 +91,10 @@ struct FillClearGrassCommand final : IEditorCommand {
 			}
 		}
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
+
+		RenderScene* scene = (RenderScene*)m_world_editor.getUniverse()->getScene(TERRAIN_TYPE);
+		scene->getTerrain(m_terrain)->setGrassDirty();
+
 		return true;
 	}
 
@@ -107,6 +111,9 @@ struct FillClearGrassCommand final : IEditorCommand {
 
 		memcpy(data, m_old_data.begin(), m_old_data.byte_size());
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
+
+		RenderScene* scene = (RenderScene*)m_world_editor.getUniverse()->getScene(TERRAIN_TYPE);
+		scene->getTerrain(m_terrain)->setGrassDirty();
 	}
 	const char* getType() override { return "fill_clear_grass"; }
 
@@ -563,6 +570,10 @@ private:
 			if (!scene->getUniverse().hasComponent(m_terrain, HEIGHTFIELD_TYPE)) return;
 
 			phy_scene->updateHeighfieldData(m_terrain, m_x, m_y, m_width, m_height, &data[0], bpp);
+		}
+		else {
+			RenderScene* scene = (RenderScene*)m_world_editor.getUniverse()->getScene(TERRAIN_TYPE);
+			return scene->getTerrain(m_terrain)->setGrassDirty();
 		}
 	}
 

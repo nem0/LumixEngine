@@ -10,6 +10,7 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "engine/universe.h"
 
@@ -28,6 +29,143 @@ struct Sample
 	float u, v;
 };
 
+static Vec2 hammersley(u32 i, u32 num_bits) {
+	Vec2 res(0);
+	res.x = 0.f;
+    {
+        u32 n = i;
+        float base = 0.5f;
+        while (n) {
+            if (n & 1)
+                res.x += base;
+            n = n >> 1;
+            base *= 0.5f;
+        }
+    }
+	
+    {
+        u32 n = i;
+        float base = 0.5f;
+		u32 mask = 1 << (num_bits - 1);
+        while (mask) {
+            if (n & mask)
+                res.y += base;
+            mask = mask >> 1;
+            base *= 0.5f;
+        }
+    }
+
+	return res;
+}
+
+void Terrain::createGrass(const Vec2& center, u32 frame) {
+	PROFILE_FUNCTION();
+	if (m_is_grass_dirty) {
+		for (GrassType& type : m_grass_types) {
+			for (const GrassQuad& quad : type.m_quads) {
+				m_renderer.destroy(quad.instances);
+			}
+			type.m_quads.clear();
+		}
+		m_is_grass_dirty = false;
+	}
+
+	if (!m_heightmap) return;
+	if (!m_heightmap->isReady()) return;
+	if (!m_splatmap) return;
+	if (!m_splatmap->isReady()) return;
+
+	for (GrassType& type : m_grass_types) {
+		Array<GrassQuad>& quads = type.m_quads;
+		for (i32 i = quads.size() - 1; i >= 0; --i) {
+			if (quads[i].last_used_frame < frame - 3) {
+				m_renderer.destroy(quads[i].instances);
+				quads.swapAndPop(i);
+			}
+		}
+	}
+
+	for (u32 type_idx = 0; type_idx < (u32)m_grass_types.size(); ++type_idx) {
+		Terrain::GrassType& type = m_grass_types[type_idx];
+		Array<GrassQuad>& quads = type.m_quads;
+		const Vec2 half_extents(type.m_distance);
+		const Vec2 size(type.m_distance * 2);
+		const Vec2 quad_size(type.m_spacing * 32);
+		const IVec2 ij = maximum(IVec2((center - half_extents) / quad_size), IVec2(0));
+		
+		struct Instance {
+			Vec3 position;
+			float scale;
+			Quat rotation;
+		};
+
+		Array<Instance> instances(m_allocator);
+		
+		const u32 cols = 1 + u32(size.x / quad_size.x);
+		const u32 rows = 1 + u32(size.y / quad_size.y);
+
+		for (u32 j = ij.y; j < ij.y + rows; ++j) {
+			for (u32 i = ij.x; i < ij.x + cols; ++i) {
+				
+				const i32 quad_idx = quads.find([&](const GrassQuad& quad){
+					return quad.ij.x == i && quad.ij.y == j;	
+				});
+
+				if (quad_idx >= 0) {
+					quads[quad_idx].last_used_frame = frame;
+					continue;
+				}
+
+				PROFILE_BLOCK("create grass quad")
+				const Vec2 from = Vec2((float)i, (float)j) * quad_size;
+
+				instances.clear();
+				AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
+				for (u32 k = 0; k < 1024; ++k) {
+					const Vec2 pn = Vec2(randFloat(), randFloat());
+					Vec4 p;
+					p.x = from.x + pn.x * quad_size.x;
+					p.z = from.y + pn.y * quad_size.y;
+					const u32 splat = m_splatmap->getPixelNearest(u32(p.x / m_scale.x), u32(p.z / m_scale.x));
+					if ((splat >> 16) & (1 << type_idx)) {
+						p.y = getHeight(p.x, p.z);
+						p.w = randFloat(0.7f, 1.f);
+						Instance& inst = instances.emplace();
+						inst.position = p.xyz();
+						inst.scale = p.w;
+						switch (type.m_rotation_mode) {
+							case GrassType::RotationMode::Y_UP:
+								inst.rotation = Quat(0, sinf(randFloat() * PI), 0, cosf(randFloat() * PI));
+								break;
+							case GrassType::RotationMode::ALL_RANDOM: {
+								const Vec3 axis = normalize(Vec3(randFloat(), randFloat(), randFloat()) * 2.f - 1.f);
+								inst.rotation = Quat(axis, randFloat() * 2 * PI);
+								break;
+							}
+							default: 
+								inst.rotation = Quat::IDENTITY;
+								ASSERT(false);
+								break;
+						}
+						instances.push(inst);
+						aabb.addPoint(p.xyz());
+					}
+				}
+
+				GrassQuad& quad = quads.emplace();
+				quad.aabb = aabb;
+				quad.ij = IVec2(i, j);
+				quad.type = type_idx;
+				quad.last_used_frame = frame;
+				if (!instances.empty()) {
+					const Renderer::MemRef mem = m_renderer.copy(instances.begin(), instances.byte_size());
+					quad.instances = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+					quad.instances_count = instances.size();
+				}
+			}
+		}
+	}
+}
 
 Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator)
 	: m_material(nullptr)
@@ -56,6 +194,11 @@ Terrain::GrassType::~GrassType()
 
 Terrain::~Terrain()
 {
+	for (const GrassType& type : m_grass_types) {
+		for (const GrassQuad& quad : type.m_quads) {
+			m_renderer.destroy(quad.instances);
+		}
+	}
 	setMaterial(nullptr);
 }
 
@@ -66,23 +209,14 @@ Terrain::GrassType::GrassType(GrassType&& rhs)
 	, m_distance(rhs.m_distance)
 	, m_idx(rhs.m_idx)
 	, m_rotation_mode(rhs.m_rotation_mode)
+	, m_quads(rhs.m_quads.move())
 {
 	rhs.m_grass_model = nullptr;
 }
 
-Terrain::GrassType::GrassType(const GrassType& rhs)
-	: m_grass_model(rhs.m_grass_model)
-	, m_terrain(rhs.m_terrain)
-	, m_spacing(rhs.m_spacing)
-	, m_distance(rhs.m_distance)
-	, m_idx(rhs.m_idx)
-	, m_rotation_mode(rhs.m_rotation_mode)
-{
-	if (m_grass_model) m_grass_model->incRefCount();
-}
-
 Terrain::GrassType::GrassType(Terrain& terrain)
 	: m_terrain(terrain)
+	, m_quads(terrain.m_allocator)
 {
 	m_grass_model = nullptr;
 	m_spacing = 1.f;
@@ -101,7 +235,7 @@ void Terrain::addGrassType(int index)
 	{
 		GrassType type(*this);
 		type.m_idx = index;
-		m_grass_types.insert(index, type);
+		m_grass_types.insert(index, static_cast<GrassType&&>(type));
 	}
 }
 

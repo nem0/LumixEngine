@@ -179,6 +179,7 @@ struct FrameData {
 	RendererImpl& renderer;
 	jobs::Signal can_setup;
 	jobs::Signal setup_done;
+	u32 frame_number = 0;
 };
 
 
@@ -1330,6 +1331,8 @@ struct RendererImpl final : Renderer
 		return -1;
 	}
 
+	u32 frameNumber() const override { return m_cpu_frame->frame_number; }
+
 	void frame() override
 	{
 		PROFILE_FUNCTION();
@@ -1350,6 +1353,9 @@ struct RendererImpl final : Renderer
 		jobs::setRed(&m_cpu_frame->can_setup);
 		
 		m_cpu_frame = m_frames[(getFrameIndex(m_cpu_frame) + 1) % lengthOf(m_frames)].get();
+		++m_frame_number;
+		m_cpu_frame->frame_number = m_frame_number;
+		
 		jobs::runLambda([this](){
 			render();
 		}, &m_last_render, 1);
@@ -1374,6 +1380,7 @@ struct RendererImpl final : Renderer
 	Array<u32> m_free_sort_keys;
 	Array<const Mesh*> m_sort_key_to_mesh_map;
 	u32 m_max_sort_key = 0;
+	u32 m_frame_number = 0;
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];

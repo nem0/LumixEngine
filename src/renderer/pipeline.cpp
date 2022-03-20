@@ -860,7 +860,6 @@ struct PipelineImpl final : Pipeline
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
-		m_place_grass_shader = rm.load<Shader>(Path("pipelines/place_grass.shd"));
 		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.shd"));
 		
 		m_draw2d.clear({1, 1});
@@ -949,7 +948,6 @@ struct PipelineImpl final : Pipeline
 
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
-		m_place_grass_shader->decRefCount();
 		m_instancing_shader->decRefCount();
 
 		for (const Renderbuffer& rb : m_renderbuffers) {
@@ -1897,10 +1895,18 @@ struct PipelineImpl final : Pipeline
 	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state)
 	{
 		PROFILE_FUNCTION();
-		if (!m_place_grass_shader->isReady()) return;
 
 		IAllocator& allocator = m_renderer.getAllocator();
 		RenderGrassJob& cmd = m_renderer.createJob<RenderGrassJob>(allocator);
+
+		if (!cp.is_shadow) {
+			for (Terrain* terrain : m_scene->getTerrains()) {
+				const Transform tr = m_scene->getUniverse().getTransform(terrain->m_entity);
+				Transform rel_tr = tr;
+				rel_tr.pos = tr.pos - cp.pos;
+				terrain->createGrass(Vec2(-(float)rel_tr.pos.x, -(float)rel_tr.pos.z), m_renderer.frameNumber());
+			}
+		}
 
 		cmd.m_define_mask = 0;
 		if (lua_istable(L, 2)) {
@@ -1915,10 +1921,10 @@ struct PipelineImpl final : Pipeline
 			}
 			lua_pop(L, 1);
 		}
+		cmd.m_define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
 		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
-		cmd.m_compute_shader = m_place_grass_shader->getProgram(0);
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -2521,21 +2527,6 @@ struct PipelineImpl final : Pipeline
 			}
 			prev_side = side;
 		}
-	}
-
-
-	static Vec3 shadowmapTexelAlign(const Vec3& shadow_cam_pos,
-		float shadowmap_width,
-		float frustum_radius,
-		const Matrix& light_mtx)
-	{
-		Matrix inv = light_mtx.fastInverted();
-		Vec3 out = inv.transformPoint(shadow_cam_pos);
-		float align = 2 * frustum_radius / (shadowmap_width * 0.5f - 2);
-		out.x -= fmodf(out.x, align);
-		out.y -= fmodf(out.y, align);
-		out = light_mtx.transformPoint(out);
-		return out;
 	}
 
 	void renderUI() {
@@ -4284,45 +4275,14 @@ struct PipelineImpl final : Pipeline
 		{
 		}
 
-		struct UBValues {
-			Vec4 pos;
-			Vec4 lod_ref_point;
-			IVec2 from;
-			IVec2 to;
-			Vec2 terrain_size;
-			float terrain_y_scale;
-			float distance;
-			u32 step;
-			float grass_height;
-			u32 indices_count;
-			u32 type_mask;
-			float radius;
-			u32 rotation_mode;
-			Vec2 terrain_xz_scale;
-			u32 indirect_offset;
-			Vec3 padding;
-		};
-
 		struct Grass {
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
-			float distance;
-			u32 step;
-			Matrix mtx;
-			Vec3 lod_ref_point;
+			u32 instance_count;
 			gpu::TextureHandle heightmap;
 			gpu::TextureHandle splatmap;
 			gpu::ProgramHandle program;
-			Vec2 terrain_size;
-			float terrain_y_scale;
-			Vec2 terrain_xz_scale;
-			float grass_height;
-			IVec2 from;
-			IVec2 to;
-			u32 type;
-			float radius;
-			u32 rotation_mode;
-			u32 indirect_offset;
+			gpu::BufferHandle instance_buffer;
 			Renderer::TransientSlice drawcall_ub;
 		};
 
@@ -4336,151 +4296,110 @@ struct PipelineImpl final : Pipeline
 				fov_multiplier = clamp(degreesToRadians(60) / m_pipeline->m_viewport.fov, 1.f, 3.f);
 			}
 
+			u32 culled_count = 0;
+			u32 instance_count = 0;
 			for (Terrain* terrain : terrains) {
 				const Transform tr = universe.getTransform(terrain->m_entity);
 				Transform rel_tr = tr;
 				rel_tr.pos = tr.pos - m_camera_params.pos;
-				
+				const Vec3 rel_pos(rel_tr.pos);
+				const Vec3 ref_lod_pos = Vec3(m_pipeline->m_viewport.pos - tr.pos);
+				const Frustum frustum = m_camera_params.frustum.getRelative(tr.pos);
+
 				for (Terrain::GrassType& type : terrain->m_grass_types) {
 					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
 
-					Vec3 points[4];
-					AABB frustum_aabb(Vec3(0), Vec3(0));
-					for (Vec3 v : m_camera_params.frustum.points) {
-						frustum_aabb.addPoint(v);
-					}
-					frustum_aabb.translate(Vec3(m_camera_params.frustum.origin - m_pipeline->m_viewport.pos));
-					const AABB grass_aabb(Vec3(-type.m_distance), Vec3(type.m_distance));
-					AABB aabb = frustum_aabb.intersection(grass_aabb);
-					aabb.translate(Vec3(m_pipeline->m_viewport.pos - tr.pos));
-					if (aabb.min.x > aabb.max.x || aabb.min.z > aabb.max.z) continue;
-
 					const i32 mesh_count = type.m_grass_model->getLODIndices()[0].to;
+					const Array<Terrain::GrassQuad>& quads = type.m_quads;
 					for (i32 i = 0; i <= mesh_count; ++i) {
 						const Mesh& mesh = type.m_grass_model->getMesh(i);
-						Grass& grass = m_grass.emplace();
-						grass.mesh = mesh.render_data;
-						grass.material = mesh.material->getRenderData();
-						grass.distance = type.m_distance * fov_multiplier;
-						grass.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
-						grass.mtx = Matrix(Vec3(rel_tr.pos), rel_tr.rot);
-						const i32 step_len = maximum(i32(type.m_spacing * 100), 1);
-						const i32 steps = i32(grass.distance * 100) / step_len;
-						grass.lod_ref_point = Vec3(tr.pos - m_pipeline->m_viewport.pos);
-						grass.from = IVec2(Vec3((aabb.min) * 100.f).xz());
-						grass.to = IVec2(Vec3((aabb.max) * 100.f).xz());
-						grass.from = (grass.from / step_len) * step_len + IVec2(step_len);
-						grass.to = (grass.to / step_len) * step_len + IVec2(step_len);
-						grass.step = step_len;
-						grass.heightmap = terrain->m_heightmap ? terrain->m_heightmap->handle : gpu::INVALID_TEXTURE;
-						grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;
-						grass.terrain_size = terrain->getSize();
-						grass.terrain_y_scale = terrain->getYScale();
-						grass.terrain_xz_scale = Vec2(terrain->getXZScale());
-						grass.grass_height = type.m_grass_model->getAABB().max.y;
-						grass.type = u32(&type - terrain->m_grass_types.begin());
-						grass.radius = type.m_grass_model->getOriginBoundingRadius();
-						grass.rotation_mode = (u32)type.m_rotation_mode;
+						Shader* shader = mesh.material->getShader();
+						if (!shader->isReady()) continue;
+						
+						for (const Terrain::GrassQuad& quad : quads) {
+							if (quad.instances_count == 0) continue;
+							if (!frustum.intersectAABB(quad.aabb)) {
+								++culled_count;
+								continue;
+							}
 
-						grass.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(UBValues));
-						UBValues* dc = new (NewPlaceholder(), grass.drawcall_ub.ptr) UBValues;
-						dc->pos = Vec4(grass.mtx.getTranslation(), 1);
-						dc->lod_ref_point = Vec4(grass.lod_ref_point, 1);
-						dc->from = grass.from;
-						dc->to = grass.to;
-						dc->terrain_size = grass.terrain_size;
-						dc->terrain_y_scale = grass.terrain_y_scale;
-						dc->distance = grass.distance;
-						dc->step = grass.step;
-						dc->grass_height = grass.grass_height;
-						dc->indices_count = grass.mesh->indices_count;
-						dc->type_mask = 1 << grass.type;
-						dc->radius = grass.radius;
-						dc->rotation_mode = grass.rotation_mode;
-						dc->terrain_xz_scale = grass.terrain_xz_scale;
+							const Vec2 quad_size(type.m_spacing * 32);
+							const Vec2 quad_center = Vec2(quad.ij) * quad_size + quad_size * 0.5f;
+							const float distance = length(quad_center - ref_lod_pos.xz());
+
+							const float half_range = type.m_distance * 0.5f;
+							float count_scale = 1 - clamp(distance - half_range, 0.f, half_range) / half_range; 
+							count_scale *= count_scale;
+							count_scale *= count_scale;
+
+							if (count_scale < 0.001f) continue;
+
+							Grass& grass = m_grass.emplace();
+							grass.mesh = mesh.render_data;
+							grass.material = mesh.material->getRenderData();
+							grass.program = shader->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
+							grass.heightmap = terrain->m_heightmap ? terrain->m_heightmap->handle : gpu::INVALID_TEXTURE;
+							grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;
+							
+							grass.instance_count = u32(quad.instances_count * count_scale);
+							instance_count += grass.instance_count;
+							grass.instance_buffer = quad.instances;
+
+							// TODO - reuse for every instance in the same terrain
+							struct {
+								Vec3 position;
+								float distance;
+							} drawcall_data;
+							drawcall_data.position = rel_pos;
+							drawcall_data.distance = distance;
+
+							grass.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(drawcall_data));
+							memcpy(grass.drawcall_ub.ptr, &drawcall_data, sizeof(drawcall_data));
+						}
 					}
 				}
 			}
-			
-			if (m_grass.empty()) return;
-
-			m_staging = m_pipeline->m_renderer.allocTransient(sizeof(Indirect) * m_grass.size());
-			Indirect* indirect_dc = (Indirect*)m_staging.ptr;
-			// we use 1 indirect structure as a sentinel in shader, so we need m_grass.size() + 1
-			const i32 base_indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m_grass.size() + 1);
-			for (u32 i = 0; i < (u32)m_grass.size(); ++i) {
-				Grass& grass = m_grass[i];
-				indirect_dc[i].base_instance = 0;
-				indirect_dc[i].base_vertex = 0;
-				indirect_dc[i].first_index = 0;
-				indirect_dc[i].vertex_count = grass.mesh->indices_count;
-				indirect_dc[i].instance_count = 0;
-				grass.indirect_offset = base_indirect_offset + i;
-				UBValues* dc = (UBValues*)grass.drawcall_ub.ptr;
-				dc->indirect_offset = grass.indirect_offset;
-			}
+			profiler::pushInt("Quad count", m_grass.size());
+			profiler::pushInt("Culled", culled_count);
+			profiler::pushInt("Instances", instance_count);
 		}
 
 		void execute() override {
 			PROFILE_FUNCTION();
 			if (m_grass.empty()) return;
-			if (!m_compute_shader) return;
 
 			Renderer& renderer = m_pipeline->m_renderer;
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
 			renderer.beginProfileBlock("grass", 0);
-			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
 
-			gpu::copy(m_pipeline->m_indirect_buffer
-				, m_staging.buffer
-				, m_grass[0].indirect_offset * sizeof(Indirect)
-				, m_staging.offset
-				, sizeof(Indirect) * m_grass.size()
-			);
-
-			gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
-			gpu::useProgram(m_compute_shader);
-			for (const Grass& grass : m_grass) {
-				gpu::bindTextures(&grass.heightmap, 2, 1);
-				gpu::bindTextures(&grass.splatmap, 3, 1);
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, sizeof(UBValues));
-				const IVec2 size =  (grass.to - grass.from) / grass.step;
-				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
-			}
-
-			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
-
-			gpu::bindVertexBuffer(1, data, 0, 32);
-			gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
 			for (const Grass& grass : m_grass) {
 				gpu::useProgram(grass.program);
 				gpu::bindTextures(grass.material->textures, 0, grass.material->textures_count);
 				gpu::bindIndexBuffer(grass.mesh->index_buffer_handle);
 				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
+				gpu::bindVertexBuffer(1, grass.instance_buffer, 0, sizeof(Vec4) * 2);
 				if (material_ub_idx != grass.material->material_constants) {
 					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, grass.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 					material_ub_idx = grass.material->material_constants;
 				}
 
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, grass.drawcall_ub.size);
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
-				gpu::drawIndirect(grass.mesh->index_type, grass.indirect_offset * sizeof(Indirect));
-
+				gpu::drawTrianglesInstanced(grass.mesh->indices_count, grass.instance_count, grass.mesh->index_type);
 			}
+			
+			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+			
 			renderer.endProfileBlock();
 		}
 
-		gpu::ProgramHandle m_compute_shader;
-		StackArray<Grass, 32> m_grass;
+		StackArray<Grass, 64> m_grass;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		gpu::StateFlags m_render_state;
 		u32 m_define_mask = 0;
-		Renderer::TransientSlice m_staging;
 	};
 
 	struct RenderTerrainsJob : Renderer::RenderJob
@@ -5292,7 +5211,6 @@ struct PipelineImpl final : Pipeline
 	bool m_first_set_viewport = true;
 	int m_output;
 	Shader* m_debug_shape_shader;
-	Shader* m_place_grass_shader;
 	Shader* m_instancing_shader;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;

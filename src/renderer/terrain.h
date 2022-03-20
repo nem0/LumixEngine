@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/math.h"
+#include "engine/geometry.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
 #include "gpu/gpu.h"
@@ -28,14 +29,26 @@ struct Universe;
 
 
 struct Terrain {
+	struct GrassQuad {
+		gpu::BufferHandle instances = gpu::INVALID_BUFFER;
+		u32 instances_count = 0;
+		IVec2 ij;
+		u32 type;
+		u32 last_used_frame;
+		AABB aabb;
+	};
+
 	struct GrassType {
 		explicit GrassType(Terrain& terrain);
-		GrassType(const GrassType& rhs);
+		
+		GrassType(const GrassType& rhs) = delete;
 		void operator =(const GrassType& rhs) = delete;
 		void operator =(GrassType&& rhs) = delete;
+		
 		GrassType(GrassType&& rhs);
 		~GrassType();
 
+		Array<GrassQuad> m_quads;
 		Model* m_grass_model;
 		Terrain& m_terrain;
 		float m_spacing;
@@ -91,6 +104,8 @@ struct Terrain {
 
 	void addGrassType(int index);
 	void removeGrassType(int index);
+	void createGrass(const Vec2& center, u32 frame);
+	void setGrassDirty() { m_is_grass_dirty = true; }
 
 	IAllocator& m_allocator;
 	i32 m_width;
@@ -105,6 +120,7 @@ struct Terrain {
 	RenderScene& m_scene;
 	Array<GrassType> m_grass_types;
 	Renderer& m_renderer;
+	bool m_is_grass_dirty = false;
 
 private: 
 	void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);

@@ -2131,7 +2131,9 @@ struct RenderSceneImpl final : RenderScene {
 
 	void setGrassSpacing(EntityRef entity, int index, float spacing) override
 	{
-		m_terrains[entity]->setGrassTypeSpacing(index, spacing);
+		Terrain* terrain = m_terrains[entity];
+		terrain->setGrassTypeSpacing(index, spacing);
+		terrain->setGrassDirty();
 	}
 
 
@@ -2167,7 +2169,9 @@ struct RenderSceneImpl final : RenderScene {
 
 	void removeGrass(EntityRef entity, int index) override
 	{
-		m_terrains[entity]->removeGrassType(index);
+		Terrain* terrain = m_terrains[entity];
+		terrain->removeGrassType(index);
+		terrain->setGrassDirty();
 	}
 
 
@@ -2611,7 +2615,7 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		return hit;
 	}
-
+	
 	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir) override {
 		return castRayProceduralGeometry(origin, dir, [](const RayCastModelHit&){ return true; });
 	}

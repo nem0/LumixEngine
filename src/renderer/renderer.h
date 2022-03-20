@@ -45,6 +45,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual void startCapture() = 0;
 	virtual void stopCapture() = 0;
 	virtual void frame() = 0;
+	virtual u32 frameNumber() const = 0;
 	virtual void waitForRender() = 0;
 	virtual void waitForCommandSetup() = 0;
 	virtual void waitCanSetup() = 0;

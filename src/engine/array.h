@@ -245,7 +245,7 @@ template <typename T> struct Array {
 
 	void insert(u32 index, const T& value) { emplaceAt(index, value); }
 
-	void insert(u32 index, T&& value) { emplaceAt(index, value); }
+	void insert(u32 index, T&& value) { emplaceAt(index, static_cast<T&&>(value)); }
 
 	bool empty() const { return m_size == 0; }
 

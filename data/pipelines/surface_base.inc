@@ -63,9 +63,20 @@ function surface_shader(code)
 		#if defined SKINNED
 			layout(location = 4) in ivec4 a_indices;
 			layout(location = 5) in vec4 a_weights;
-		#elif defined INSTANCED || defined GRASS
+		#elif defined INSTANCED
 			layout(location = 4) in vec4 i_rot_lod;
 			layout(location = 5) in vec4 i_pos_scale;
+			#ifdef _HAS_ATTR6
+				layout(location = 6) in vec4 a_color;
+				layout(location = 5) out vec4 v_color;
+			#endif
+			#ifdef _HAS_ATTR7
+				layout(location = 7) in float a_ao;
+				layout(location = 6) out float v_ao;
+			#endif
+		#elif defined GRASS
+			layout(location = 4) in vec4 i_pos_scale;
+			layout(location = 5) in vec4 i_rot;
 			#ifdef _HAS_ATTR6
 				layout(location = 6) in vec4 a_color;
 				layout(location = 5) out vec4 v_color;
@@ -78,6 +89,11 @@ function surface_shader(code)
 			layout(std140, binding = 4) uniform ModelState {
 				mat4 matrix;
 			} Model;
+		#endif
+		#if defined GRASS
+			layout(std140, binding = 4) uniform ModelState {
+				vec3 u_grass_origin;
+			} Grass;
 		#endif
 		#ifdef HAS_LOD
 			layout(location = 4) out float v_lod;
@@ -93,7 +109,7 @@ function surface_shader(code)
 	
 		void main() {
 			v_uv = a_uv;
-			#if defined INSTANCED || defined GRASS
+			#if defined INSTANCED
 				vec4 rot_quat = vec4(i_rot_lod.xyz, 0);
 				rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
 				v_normal = rotateByQuat(rot_quat, a_normal);
@@ -103,6 +119,20 @@ function surface_shader(code)
 					v_lod = i_rot_lod.w;
 				#endif
 				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
+				#ifdef _HAS_ATTR6
+					v_color = a_color;
+				#endif
+				#ifdef _HAS_ATTR7
+					v_ao = a_ao;
+				#endif
+			#elif defined GRASS
+				v_normal = rotateByQuat(i_rot, a_normal);
+				v_tangent = rotateByQuat(i_rot, a_tangent);
+				vec3 p = a_position;
+				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot, a_position * i_pos_scale.w), 1);
+				#ifdef GRASS
+					v_wpos.xyz += Grass.u_grass_origin;
+				#endif
 				#ifdef _HAS_ATTR6
 					v_color = a_color;
 				#endif

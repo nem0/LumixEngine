@@ -112,6 +112,7 @@ struct LUMIX_ENGINE_API Vec3 {
 	Vec3 operator*(const Vec3& rhs) const;
 	Vec3 operator*(const IVec3& rhs) const;
 	Vec3 operator/(const IVec3& rhs) const;
+	Vec3 operator-(float s) const;
 	Vec3 operator/(float s) const;
 	void operator/=(float rhs);
 	void operator*=(float rhs);
@@ -420,6 +421,13 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 maximum(T1 a, T2...
 }
 
 LUMIX_FORCE_INLINE Vec2 maximum(const Vec2& a, const Vec2& b) {
+	return {
+		maximum(a.x, b.x),
+		maximum(a.y, b.y),
+	};
+}
+
+LUMIX_FORCE_INLINE IVec2 maximum(const IVec2& a, const IVec2& b) {
 	return {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),
