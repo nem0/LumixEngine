@@ -76,18 +76,19 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 	if (!m_splatmap->isReady()) return;
 
 	for (GrassType& type : m_grass_types) {
-		Array<GrassQuad>& quads = type.m_quads;
-		for (i32 i = quads.size() - 1; i >= 0; --i) {
-			if (quads[i].last_used_frame < frame - 3) {
-				m_renderer.destroy(quads[i].instances);
-				quads.swapAndPop(i);
+		HashMap<u64, GrassQuad>& quads = type.m_quads;
+		quads.eraseIf([&](const GrassQuad& q){
+			if (q.last_used_frame < frame - 3) {
+				m_renderer.destroy(q.instances);
+				return true;
 			}
-		}
+			return false;
+		});
 	}
 
 	for (u32 type_idx = 0; type_idx < (u32)m_grass_types.size(); ++type_idx) {
 		Terrain::GrassType& type = m_grass_types[type_idx];
-		Array<GrassQuad>& quads = type.m_quads;
+		HashMap<u64, GrassQuad>& quads = type.m_quads;
 		const Vec2 half_extents(type.m_distance);
 		const Vec2 size(type.m_distance * 2);
 		const Vec2 quad_size(type.m_spacing * 32);
@@ -107,12 +108,11 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 		for (u32 j = ij.y; j < ij.y + rows; ++j) {
 			for (u32 i = ij.x; i < ij.x + cols; ++i) {
 				
-				const i32 quad_idx = quads.find([&](const GrassQuad& quad){
-					return quad.ij.x == i && quad.ij.y == j;	
-				});
+				const u64 key = (u64(i) << 32) | u32(j);
+				auto quad_iter = quads.find(key);
 
-				if (quad_idx >= 0) {
-					quads[quad_idx].last_used_frame = frame;
+				if (quad_iter.isValid()) {
+					quad_iter.value().last_used_frame = frame;
 					continue;
 				}
 
@@ -152,7 +152,7 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 					}
 				}
 
-				GrassQuad& quad = quads.emplace();
+				GrassQuad& quad = quads.insert(key);
 				quad.aabb = aabb;
 				quad.ij = IVec2(i, j);
 				quad.type = type_idx;

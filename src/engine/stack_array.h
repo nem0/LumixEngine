@@ -27,6 +27,7 @@ struct StackArray {
 	T& operator[](u32 idx) { return array[idx]; }
 	const T& last() const { return array.last(); }
 	void pop() { array.pop(); }
+	void clear() { array.clear(); }
 
 private:
 	StackAllocator<sizeof(T) * N, alignof(T)> allocator;

@@ -214,6 +214,10 @@ public:
 		m_allocator.deallocate(m_values);
 	}
 
+	HashMap&& move() {
+		return static_cast<HashMap&&>(*this);
+	}
+
 	void operator =(HashMap&& rhs) = delete;
 
 	Iterator begin() {

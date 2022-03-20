@@ -4310,7 +4310,7 @@ struct PipelineImpl final : Pipeline
 					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
 
 					const i32 mesh_count = type.m_grass_model->getLODIndices()[0].to;
-					const Array<Terrain::GrassQuad>& quads = type.m_quads;
+					const HashMap<u64, Terrain::GrassQuad>& quads = type.m_quads;
 					for (i32 i = 0; i <= mesh_count; ++i) {
 						const Mesh& mesh = type.m_grass_model->getMesh(i);
 						Shader* shader = mesh.material->getShader();

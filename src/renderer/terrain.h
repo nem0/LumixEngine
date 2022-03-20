@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/geometry.h"
 #include "engine/resource.h"
@@ -48,7 +49,7 @@ struct Terrain {
 		GrassType(GrassType&& rhs);
 		~GrassType();
 
-		Array<GrassQuad> m_quads;
+		HashMap<u64, GrassQuad> m_quads;
 		Model* m_grass_model;
 		Terrain& m_terrain;
 		float m_spacing;
