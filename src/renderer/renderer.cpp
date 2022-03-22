@@ -452,8 +452,6 @@ struct RendererImpl final : Renderer
 			}
 			gpu::destroy(m_material_buffer.buffer);
 			gpu::destroy(m_material_buffer.staging_buffer);
-			gpu::destroy(m_tmp_uniform_buffer);
-			gpu::destroy(m_scratch_buffer);
 			gpu::destroy(m_downscale_program);
 			m_profiler.clear();
 			gpu::shutdown();
@@ -548,12 +546,6 @@ struct RendererImpl final : Renderer
 			const char* srcs[] = { downscale_src };
 			gpu::createProgram(renderer.m_downscale_program, {}, srcs, &type, 1, nullptr, 0, "downscale");
 
-			renderer.m_tmp_uniform_buffer = gpu::allocBufferHandle();
-			gpu::createBuffer(renderer.m_tmp_uniform_buffer, gpu::BufferFlags::UNIFORM_BUFFER, 16 * 1024, nullptr);
-
-			renderer.m_scratch_buffer = gpu::allocBufferHandle();
-			gpu::createBuffer(renderer.m_scratch_buffer, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE, SCRATCH_BUFFER_SIZE, nullptr);
-
 			MaterialConsts default_mat;
 			default_mat.color = Vec4(1, 0, 1, 1);
 			gpu::update(mb.buffer, &default_mat, sizeof(MaterialConsts));
@@ -604,10 +596,6 @@ struct RendererImpl final : Renderer
 		ret.own = true;
 		ret.data = m_allocator.allocate(size);
 		return ret;
-	}
-
-	gpu::BufferHandle getScratchBuffer() override {
-		return m_scratch_buffer;
 	}
 
 	void beginProfileBlock(const char* name, i64 link, bool stats) override
@@ -1002,9 +990,7 @@ struct RendererImpl final : Renderer
 			void execute() override {
 				PROFILE_FUNCTION();
 				
-				const IVec2 scale = src_size / dst_size;
-				gpu::update(ub, &scale, sizeof(scale));
-				gpu::bindUniformBuffer(4, ub, 0, sizeof(scale));
+				gpu::bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
 				gpu::bindImageTexture(src, 0);
 				gpu::bindImageTexture(dst, 1);
 				gpu::useProgram(program);
@@ -1014,17 +1000,19 @@ struct RendererImpl final : Renderer
 			gpu::TextureHandle src;
 			gpu::TextureHandle dst;
 			gpu::ProgramHandle program;
-			gpu::BufferHandle ub;
+			TransientSlice ub_slice;
 			IVec2 src_size;
 			IVec2 dst_size;
 		};
 		Cmd& cmd = createJob<Cmd>();
 		cmd.src = src;
 		cmd.dst = dst;
-		cmd.src_size = {(i32)src_w, (i32)src_h};
+		IVec2 src_size((i32)src_w, (i32)src_h);
 		cmd.dst_size = {(i32)dst_w, (i32)dst_h};
 		cmd.program = m_downscale_program;
-		cmd.ub = m_tmp_uniform_buffer;
+		const IVec2 scale = src_size / cmd.dst_size;
+		cmd.ub_slice = allocUniform(sizeof(scale));
+		memcpy(cmd.ub_slice.ptr, &scale, sizeof(scale));
 		queue(cmd, 0);
 	}
 
@@ -1375,8 +1363,6 @@ struct RendererImpl final : Renderer
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 	gpu::ProgramHandle m_downscale_program;
-	gpu::BufferHandle m_tmp_uniform_buffer;
-	gpu::BufferHandle m_scratch_buffer;
 	Array<u32> m_free_sort_keys;
 	Array<const Mesh*> m_sort_key_to_mesh_map;
 	u32 m_max_sort_key = 0;
