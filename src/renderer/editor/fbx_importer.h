@@ -206,8 +206,6 @@ private:
 	int getAttributeCount(const ImportMesh& mesh, const ImportConfig& cfg) const;
 	bool areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cfg) const;
 	void writeModelHeader();
-	void writePhysicsTriMesh(OutputMemoryStream& file, const ImportConfig& cfg);
-
 	
 	IAllocator& m_allocator;
 	struct FileSystem& m_filesystem;

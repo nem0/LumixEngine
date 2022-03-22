@@ -4345,7 +4345,6 @@ struct PipelineImpl final : Pipeline
 							instance_count += grass.instance_count;
 							grass.instance_buffer = quad.instances;
 
-							// TODO - reuse for every instance in the same terrain
 							struct {
 								Vec3 position;
 								float distance;

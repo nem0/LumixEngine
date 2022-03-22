@@ -96,7 +96,6 @@ struct GL {
 	RENDERDOC_API_1_0_2* rdoc_api;
 	WindowContext contexts[64];
 	Lumix::os::ThreadID thread;
-	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
 	StateFlags last_state = StateFlags::NONE;

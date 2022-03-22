@@ -901,7 +901,6 @@ void Matrix::setOrtho(float left, float right, float bottom, float top, float z_
 void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_plane, bool reversed_z) {
 	*this = Matrix::IDENTITY;
 	float f = 1 / tanf(fov * 0.5f);
-	float z_diff = near_plane - far_plane;
 	columns[0].x = f / ratio;
 	columns[1].y = f;
 	columns[3].w = 0;
