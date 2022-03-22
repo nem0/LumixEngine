@@ -1670,7 +1670,7 @@ struct PipelineImpl final : Pipeline
 				if (!texture_id) texture_id = atlas_texture;
 
 				gpu::bindTextures(&texture_id, 0, 1);
-				gpu::drawElements(gpu::PrimitiveType::TRIANGLES, idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::DataType::U32);
+				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::DataType::U32);
 
 				elem_offset += cmd.indices_count;
 			}
@@ -3327,7 +3327,9 @@ struct PipelineImpl final : Pipeline
 	}
 
 	struct RenderBucketJob : Renderer::RenderJob {
-		RenderBucketJob(IAllocator& allocator) : m_splines(allocator) {}
+		RenderBucketJob(IAllocator& allocator)
+			: m_procedurals(allocator)
+		{}
 
 		void setup() override {
 			PROFILE_FUNCTION();
@@ -3356,19 +3358,19 @@ struct PipelineImpl final : Pipeline
 				if (!pg.material || !pg.material->isReady()) continue;
 				if (pg.material->getLayer() != m_layer) continue;
 				
-				Spline& spline = m_splines.emplace();
-				spline.index_buffer = pg.index_buffer;
-				spline.vertex_buffer = pg.vertex_buffer;
-				spline.material = pg.material->getRenderData();
-				spline.primitive_type = pg.primitive_type;
-				spline.index_type = pg.index_type;
+				Procedural& procedural = m_procedurals.emplace();
+				procedural.index_buffer = pg.index_buffer;
+				procedural.vertex_buffer = pg.vertex_buffer;
+				procedural.material = pg.material->getRenderData();
+				procedural.primitive_type = pg.primitive_type;
+				procedural.index_type = pg.index_type;
 
 				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
-				spline.program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
-				spline.stride = pg.vertex_decl.getStride();
-				spline.vertex_count = pg.index_buffer ? (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) :  (u32)pg.vertex_data.size() / spline.stride;
-				spline.ub = renderer.allocUniform(sizeof(Matrix));
-				memcpy(spline.ub.ptr, &mtx, sizeof(mtx));
+				procedural.program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
+				procedural.stride = pg.vertex_decl.getStride();
+				procedural.vertex_count = pg.index_buffer ? (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) :  (u32)pg.vertex_data.size() / procedural.stride;
+				procedural.ub = renderer.allocUniform(sizeof(Matrix));
+				memcpy(procedural.ub.ptr, &mtx, sizeof(mtx));
 			}
 		}
 
@@ -3440,37 +3442,37 @@ struct PipelineImpl final : Pipeline
 			u32 offset = 0;
 		};
 
-		void drawSplineGeometry() {
-			if (m_splines.empty()) return;
+		void drawProceduralGeometry() {
+			if (m_procedurals.empty()) return;
 
-			m_pipeline->m_renderer.beginProfileBlock("draw splines", 0);
+			m_pipeline->m_renderer.beginProfileBlock("draw procedural geom", 0);
 
 			Renderer& renderer = m_pipeline->m_renderer;
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			const gpu::StateFlags render_states = m_render_state;
 			u32 material_ub_idx = 0xffFFffFF;
-			for (const Spline& spline : m_splines) {
-				gpu::bindTextures(spline.material->textures, 0, spline.material->textures_count);
-				gpu::setState(spline.material->render_states | render_states);
-				if (material_ub_idx != spline.material->material_constants) {
-					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, spline.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-					material_ub_idx = spline.material->material_constants;
+			for (const Procedural& procedural : m_procedurals) {
+				gpu::bindTextures(procedural.material->textures, 0, procedural.material->textures_count);
+				gpu::setState(procedural.material->render_states | render_states);
+				if (material_ub_idx != procedural.material->material_constants) {
+					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, procedural.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					material_ub_idx = procedural.material->material_constants;
 				}
 
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, spline.ub.buffer, spline.ub.offset, spline.ub.size);
-				gpu::useProgram(spline.program);
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, procedural.ub.buffer, procedural.ub.offset, procedural.ub.size);
+				gpu::useProgram(procedural.program);
 
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, spline.vertex_buffer, 0, spline.stride);
+				gpu::bindVertexBuffer(0, procedural.vertex_buffer, 0, procedural.stride);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				if (spline.index_buffer) {
-					gpu::bindIndexBuffer(spline.index_buffer);
-					gpu::drawElements(spline.primitive_type, 0, spline.vertex_count, spline.index_type);
+				if (procedural.index_buffer) {
+					gpu::bindIndexBuffer(procedural.index_buffer);
+					gpu::drawIndexed(procedural.primitive_type, 0, procedural.vertex_count, procedural.index_type);
 				}
 				else {
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-					gpu::drawArrays(spline.primitive_type, 0, spline.vertex_count);
+					gpu::drawArrays(procedural.primitive_type, 0, procedural.vertex_count);
 				}
 
 			}
@@ -3481,7 +3483,7 @@ struct PipelineImpl final : Pipeline
 			PROFILE_FUNCTION();
 
 			drawInstancedMeshes();
-			drawSplineGeometry();
+			drawProceduralGeometry();
 
 			if (!m_cmds) return;
 
@@ -3517,7 +3519,7 @@ struct PipelineImpl final : Pipeline
 						gpu::bindVertexBuffer(0, cmd->mesh->vertex_buffer_handle, 0, cmd->mesh->vb_stride);
 						gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 32);
 
-						gpu::drawTrianglesInstanced(cmd->mesh->indices_count, cmd->count, cmd->mesh->index_type);
+						gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, cmd->mesh->indices_count, cmd->count, cmd->mesh->index_type);
 						break;
 					}
 					case RenderableTypes::FUR:
@@ -3539,7 +3541,7 @@ struct PipelineImpl final : Pipeline
 						gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 							
 						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, cmd->ub_buffer, cmd->ub_offset, cmd->ub_size);
-						gpu::drawTrianglesInstanced(cmd->mesh->indices_count, cmd->layers, cmd->mesh->index_type);
+						gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, cmd->mesh->indices_count, cmd->layers, cmd->mesh->index_type);
 						break;
 					}
 					case RenderableTypes::CURVE_DECAL: {
@@ -3559,7 +3561,7 @@ struct PipelineImpl final : Pipeline
 						if (cmd->nonintersecting_count) {
 							gpu::setState(state);
 							gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 64);
-							gpu::drawTrianglesInstanced(36, cmd->nonintersecting_count, gpu::DataType::U16);
+							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->nonintersecting_count, gpu::DataType::U16);
 						}
 
 						if (cmd->total_count - cmd->nonintersecting_count) {
@@ -3569,7 +3571,7 @@ struct PipelineImpl final : Pipeline
 							gpu::setState(state);
 							const u32 offs = cmd->offset + sizeof(float) * 16 * cmd->nonintersecting_count;
 							gpu::bindVertexBuffer(1, cmd->buffer, offs, 64);
-							gpu::drawTrianglesInstanced(36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
+							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
 						}
 						break;
 					}
@@ -3590,7 +3592,7 @@ struct PipelineImpl final : Pipeline
 						if (cmd->nonintersecting_count) {
 							gpu::setState(state);
 							gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 48);
-							gpu::drawTrianglesInstanced(36, cmd->nonintersecting_count, gpu::DataType::U16);
+							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->nonintersecting_count, gpu::DataType::U16);
 						}
 
 						if (cmd->total_count - cmd->nonintersecting_count) {
@@ -3600,7 +3602,7 @@ struct PipelineImpl final : Pipeline
 							gpu::setState(state);
 							const u32 offs = cmd->offset + sizeof(float) * 12 * cmd->nonintersecting_count;
 							gpu::bindVertexBuffer(1, cmd->buffer, offs, 48);
-							gpu::drawTrianglesInstanced(36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
+							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
 						}
 						break;
 					}
@@ -3610,7 +3612,7 @@ struct PipelineImpl final : Pipeline
 			renderer.endProfileBlock();
 		}
 
-		struct Spline {
+		struct Procedural {
 			gpu::BufferHandle vertex_buffer;
 			gpu::BufferHandle index_buffer;
 			Material::RenderData* material;
@@ -3629,7 +3631,7 @@ struct PipelineImpl final : Pipeline
 		InstancedMeshes* m_instanced_meshes;
 		u8 m_layer;
 		gpu::StateFlags m_render_state;
-		StackArray<Spline, 16> m_splines;
+		StackArray<Procedural, 16> m_procedurals;
 	};
 
 	static Vec4 packRotationLOD(const Quat& rot, float lod) {
@@ -4385,7 +4387,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, grass.drawcall_ub.size);
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
-				gpu::drawTrianglesInstanced(grass.mesh->indices_count, grass.instance_count, grass.mesh->index_type);
+				gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, grass.mesh->indices_count, grass.instance_count, grass.mesh->index_type);
 			}
 			
 			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);

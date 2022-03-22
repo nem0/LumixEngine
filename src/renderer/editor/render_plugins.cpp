@@ -4503,7 +4503,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y) * wdd.scale.y, 0.f, 65535.f)));
 				}
 
-				gpu::drawElements(gpu::PrimitiveType::TRIANGLES, pcmd->IdxOffset * sizeof(u32) + cmd_list.idx_buffer.offset, pcmd->ElemCount, gpu::DataType::U32);
+				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, pcmd->IdxOffset * sizeof(u32) + cmd_list.idx_buffer.offset, pcmd->ElemCount, gpu::DataType::U32);
 			}
 			ib_offset += num_indices;
 			vb_offset += num_vertices;
