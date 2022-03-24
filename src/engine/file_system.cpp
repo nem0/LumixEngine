@@ -311,7 +311,6 @@ struct PackFileSystem : FileSystemImpl {
 	PackFileSystem(const char* pak_path, IAllocator& allocator) 
 		: FileSystemImpl("pack://", allocator) 
 		, m_map(allocator)
-		, m_allocator(allocator)
 	{
 		if (!m_file.open(pak_path)) {
 			logError("Failed to open game.pak");
@@ -361,9 +360,7 @@ struct PackFileSystem : FileSystemImpl {
 		u64 size;
 	};
 
-	IAllocator& m_allocator;
 	HashMap<FilePathHash, PackFile> m_map;
-	Mutex m_mutex;
 	os::InputFile m_file;
 };
 
