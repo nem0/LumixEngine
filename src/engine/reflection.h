@@ -280,7 +280,7 @@ inline Icon icon(const char* name) { return {name}; }
 
 namespace detail {
 
-static const unsigned int FRONT_SIZE = sizeof("Lumix::detail::GetTypeNameHelper<") - 1u;
+static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
 static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 
 template <typename T>

@@ -4106,8 +4106,20 @@ void PhysicsSceneImpl::RigidActor::setMesh(PhysicsGeometry* new_value)
 				scene.m_resource_actor_map[mesh] = *next_with_mesh;
 			}
 
-			if (next_with_mesh.isValid()) scene.m_actors[*next_with_mesh].prev_with_mesh = prev_with_mesh;
-			if (prev_with_mesh.isValid()) scene.m_actors[*prev_with_mesh].next_with_mesh = next_with_mesh;
+			if (next_with_mesh.isValid()) {
+				auto actor = scene.m_actors.find(*next_with_mesh);
+				if (actor.isValid()) {
+					actor.value().prev_with_mesh = prev_with_mesh;
+				}
+			}
+			if (prev_with_mesh.isValid()) 
+			{
+				auto actor = scene.m_actors.find(*prev_with_mesh);
+				if (actor.isValid()) {
+					actor.value().next_with_mesh = next_with_mesh;
+				}
+				else ASSERT(0);
+			}
 		}
 	}
 	mesh = new_value;

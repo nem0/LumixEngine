@@ -661,7 +661,13 @@ public:
 		for (u32 i = 0; i < count; ++i) {
 			const EntityPtr e = entity_map.get(EntityPtr{(i32)i});
 			PrefabHandle prefab;
-			serializer.read(prefab);
+			if ((u32)version <= (u32)UniverseSerializedVersion::HASH64) {
+				u32 dummy;
+				serializer.read(dummy);
+			}
+			else {
+				serializer.read(prefab);
+			}
 
 			if (!e.isValid()) continue;
 			while (e.index >= m_entity_to_prefab.size()) {
