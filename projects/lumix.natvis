@@ -27,7 +27,7 @@
 			<Synthetic Name="z">
 				<DisplayString>{z}</DisplayString>
 			</Synthetic>
-			<Synthetic Name="x">
+			<Synthetic Name="w">
 				<DisplayString>{w}</DisplayString>
 			</Synthetic>
 		</Expand>

@@ -12,4 +12,5 @@ surface_shader [[
 	data.N = v_normal;
 	data.emission = u_emission;
 	data.translucency = u_translucency;
+	data.shadow = 1;
 ]]

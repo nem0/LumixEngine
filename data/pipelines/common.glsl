@@ -73,6 +73,7 @@ struct Surface {
 	float emission;
 	float translucency;
 	float ao;
+	float shadow;
 	vec3 N;
 	vec3 V;
 	vec3 wpos;
@@ -603,11 +604,12 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	surface.V = normalize(-surface.wpos);
 	surface.translucency = gb2.y;
 	surface.ao = gb2.z;
+	surface.shadow = gb2.w;
 	return surface;
 }
 
 vec3 computeLighting(Cluster cluster, Surface surface, vec3 light_direction, vec3 light, sampler2D shadowmap, sampler2D shadow_atlas, samplerCubeArray reflection_probes) {
-	float shadow = getShadow(shadowmap, surface.wpos, surface.N);
+	float shadow = min(surface.shadow, getShadow(shadowmap, surface.wpos, surface.N));
 	vec3 res = computeDirectLight(surface
 		, light_direction
 		, light * shadow);
