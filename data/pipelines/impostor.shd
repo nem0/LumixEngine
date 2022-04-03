@@ -29,7 +29,7 @@ vertex_shader [[
 	layout (location = 1) out vec3 v_normal;
 	layout (location = 2) out vec3 v_tangent;
 	layout (location = 3) out vec4 v_wpos;
-	#if !defined DEPTH && !defined DEFERRED
+	#ifndef DEPTH
 		layout (location = 4) out vec4 v_shadow_coefs;
 	#endif
 	layout (location = 5) out float v_lod;
@@ -57,7 +57,7 @@ vertex_shader [[
 		vec4 to_model_space = vec4(-i_rot_lod.xyz, sqrt(1 - dot(i_rot_lod.xyz, i_rot_lod.xyz)));
 		vd = rotateByQuat(to_model_space, vd);
 		v_lod = i_rot_lod.w;
-		#if !defined DEPTH && !defined DEFERRED
+		#ifndef DEPTH
 			vec3 ld = rotateByQuat(to_model_space, -Global.light_dir.xyz);
 			v_shadow_coefs = max(vec4(ld.x, -ld.z, -ld.x, ld.z), vec4(0));
 			v_shadow_coefs /= dot(v_shadow_coefs, vec4(1));
@@ -88,6 +88,9 @@ fragment_shader [[
 	layout (location = 1) in vec3 v_normal;
 	layout (location = 2) in vec3 v_tangent;
 	layout (location = 3) in vec4 v_wpos;
+	#ifndef DEPTH
+		layout(location = 4) in vec4 v_shadow_coefs;
+	#endif
 
 	#ifdef DEFERRED
 		layout(location = 0) out vec4 o_gbuffer0;
@@ -95,7 +98,6 @@ fragment_shader [[
 		layout(location = 2) out vec4 o_gbuffer2;
 	#elif !defined DEPTH
 		layout(location = 0) out vec4 o_color;
-		layout (location = 4) in vec4 v_shadow_coefs;
 	#endif
 	layout (location = 5) in float v_lod;
 
@@ -128,6 +130,14 @@ fragment_shader [[
 		data.emission = u_emission;
 		data.translucency = u_translucency;
 		data.ao = 1;
+		
+		#ifndef DEPTH
+			vec4 self_shadow = texture(u_selfshadow, v_uv);
+			data.shadow = saturate(dot(self_shadow, v_shadow_coefs));
+		#else
+			data.shadow = 1;
+		#endif
+		
 		return data;
 	}
 	
@@ -151,13 +161,9 @@ fragment_shader [[
 		{
 			if (ditherLOD(v_lod)) discard;
 
-			Surface surface = getSurface();
-			vec4 self_shadow = texture(u_selfshadow, v_uv);
-			float shadow = saturate(dot(self_shadow, v_shadow_coefs));
-			
 			vec3 res = computeDirectLight(surface
 				, Global.light_dir.xyz
-				, Global.light_color.rgb * Global.light_intensity * shadow);
+				, Global.light_color.rgb * Global.light_intensity * surface.shadow);
 			res += surface.emission * surface.albedo;
 
 			float linear_depth = dot(surface.wpos.xyz, Pass.view_dir.xyz);

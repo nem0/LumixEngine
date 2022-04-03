@@ -43,4 +43,5 @@ surface_shader [[
 	data.N = tbn * data.N;
 	data.emission = u_emission;
 	data.translucency = u_translucency;
+	data.shadow = 1;
 ]]

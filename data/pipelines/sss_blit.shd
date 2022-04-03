@@ -35,7 +35,7 @@ compute_shader [[
     }
     
     vec4 gb2v = imageLoad(u_gbuffer2, ij);
-    gb2v.w = current;
+    gb2v.w = min(current, gb2v.w);
     imageStore(u_gbuffer2, ij, gb2v);
 	}
 ]]

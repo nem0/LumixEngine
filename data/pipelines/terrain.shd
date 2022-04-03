@@ -271,6 +271,7 @@ fragment_shader [[
 			surface.emission = 0;
 			surface.translucency = 0;
 			surface.ao = 1;
+			surface.shadow = 1;
 			return surface;
 		}
 	#endif

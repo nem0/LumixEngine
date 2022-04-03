@@ -145,15 +145,6 @@ function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
 	endBlock()
 end
 
-function impostorPass(entities, colorbuffer, dsbuffer)
-	setRenderTargetsDS(colorbuffer, dsbuffer)
-
-	beginBlock("impostor_pass")
-	pass(getCameraParams())
-	renderBucket(entities.impostor, impostor_state)
-	endBlock()
-end
-
 function geomPass(entities)
 	beginBlock("geom_pass")
 		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "srgba", debug_name = "gbuffer0" }
@@ -169,6 +160,10 @@ function geomPass(entities)
 		renderGrass(view_params, grass_state)
 		renderBucket(entities.default, default_state)
 		renderOpaque()
+
+		beginBlock("impostors")
+			renderBucket(entities.impostor, impostor_state)
+		endBlock()
 	endBlock()
 
 	beginBlock("decals")
@@ -438,7 +433,7 @@ function main()
 		, { layer = "default", define = "DEFERRED" }
 		, { layer = "transparent", sort = "depth" }
 		, { layer = "water", sort = "depth" }
-		, { layer = "impostor" }
+		, { layer = "impostor", define = "DEFERRED" }
 		, { layer = "decal" }
 		, { layer = "terrain_decal" }
 	)
@@ -455,7 +450,6 @@ function main()
 	end
 
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-	impostorPass(entities, hdr_buffer, gbuffer_depth)
 	
 	custom_tonemap = false
 	local res = hdr_buffer
