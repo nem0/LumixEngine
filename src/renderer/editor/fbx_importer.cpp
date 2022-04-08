@@ -1023,12 +1023,14 @@ static void getBBProjection(const AABB& aabb, Vec2& out_min, Vec2& out_max) {
 
 struct CaptureImpostorJob : Renderer::RenderJob {
 
-	CaptureImpostorJob(Array<u32>& gb0, Array<u32>& gb1, Array<u32>& shadow, IVec2& size, IAllocator& allocator) 
+	CaptureImpostorJob(Array<u32>& gb0, Array<u32>& gb1, Array<u16>& gb_depth, Array<u32>& shadow, IVec2& size, IAllocator& allocator) 
 		: m_gb0(gb0)
 		, m_gb1(gb1)
+		, m_gb_depth(gb_depth)
 		, m_shadow(shadow)
 		, m_tile_size(size)
 		, m_drawcalls(allocator)
+		, m_allocator(allocator)
 	{
 	}
 
@@ -1059,6 +1061,13 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		const Vec3 center = Vec3(0, (m_aabb.min + m_aabb.max).y * 0.5f, 0);
 		Vec2 min, max;
 		getBBProjection(m_aabb, min, max);
+		if (max.x > m_radius && min.y < -m_radius && max.y > m_radius && min.y < m_radius) {
+			max = Vec2(m_radius);
+			min = Vec2(-m_radius);
+		}
+		const Vec2 padding = Vec2(1.f) / Vec2(IMPOSTOR_TILE_SIZE) * (max - min);
+		min += -padding;
+		max += padding;
 		const Vec2 size = max - min;
 
 		m_tile_size = IVec2(int(IMPOSTOR_TILE_SIZE * size.x / size.y), IMPOSTOR_TILE_SIZE);
@@ -1076,12 +1085,12 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				gpu::viewport(i * m_tile_size.x, j * m_tile_size.y, m_tile_size.x, m_tile_size.y);
-				const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
+				const Vec3 v = normalize(impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)}));
 
 				Matrix model_mtx;
 				Vec3 up = Vec3(0, 1, 0);
 				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
-				model_mtx.lookAt(center - v * 2 * m_radius, center, up);
+				model_mtx.lookAt(center - v * 1.01f * m_radius, center, up);
 				gpu::update(ub, &model_mtx.columns[0].x, sizeof(model_mtx));
 
 				for (const Drawcall& dc : m_drawcalls) {
@@ -1090,7 +1099,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 					PassState pass_state;
 					pass_state.view = Matrix::IDENTITY;
-					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, true);
+					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 2.02f * m_radius, true);
 					pass_state.inv_projection = pass_state.projection.inverted();
 					pass_state.inv_view = pass_state.view.fastInverted();
 					pass_state.view_projection = pass_state.projection * pass_state.view;
@@ -1114,6 +1123,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 		m_gb0.resize(texture_size.x * texture_size.y);
 		m_gb1.resize(m_gb0.size());
+		m_gb_depth.resize(m_gb0.size());
 		m_shadow.resize(m_gb0.size());
 
 		gpu::TextureHandle shadow = gpu::allocTextureHandle();
@@ -1134,11 +1144,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				Matrix view, projection;
-				const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
+				const Vec3 v = normalize(impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)}));
 				Vec3 up = Vec3(0, 1, 0);
 				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
-				view.lookAt(center - v * 2 * m_radius, center, up);
-				projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, true);
+				view.lookAt(center - v * 1.01f * m_radius, center, up);
+				projection.setOrtho(min.x, max.x, min.y, max.y, 0, 2.02f * m_radius, true);
 				data.proj_to_model = (projection * view).inverted();
 				data.projection = projection;
 				data.inv_view = view.inverted();
@@ -1167,6 +1177,20 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::readTexture(staging, 0, Span((u8*)m_shadow.begin(), m_shadow.byte_size()));
 		gpu::destroy(staging);
 
+		{
+			gpu::TextureHandle staging_depth = gpu::allocTextureHandle();
+			const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
+			gpu::createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
+			gpu::copy(staging_depth, gbs[2], 0, 0);
+			Array<u32> tmp(m_allocator);
+			tmp.resize(m_gb_depth.size());
+			gpu::readTexture(staging_depth, 0, Span((u8*)tmp.begin(), tmp.byte_size()));
+			for (i32 i = 0; i < tmp.size(); ++i) {
+				m_gb_depth[i] = u16(0xffFF - (tmp[i] >> 16));
+			}
+			gpu::destroy(staging_depth);
+		}
+
 		gpu::destroy(ub);
 		gpu::destroy(shadow);
 		gpu::destroy(gbs[0]);
@@ -1180,6 +1204,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		const Material::RenderData* material;
 	};
 
+	IAllocator& m_allocator;
 	Array<Drawcall> m_drawcalls;
 	gpu::ProgramHandle m_shadow_program;
 	AABB m_aabb;
@@ -1188,13 +1213,14 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	bool m_bake_normals;
 	Array<u32>& m_gb0;
 	Array<u32>& m_gb1;
+	Array<u16>& m_gb_depth;
 	Array<u32>& m_shadow;
 	Model* m_model;
 	u32 m_capture_define;
 	IVec2& m_tile_size;
 };
 
-bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u32>& shadow, IVec2& size, bool bake_normals)
+bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u16>& gb_depth, Array<u32>& shadow, IVec2& size, bool bake_normals)
 {
 	ASSERT(model->isReady());
 	ASSERT(m_impostor_shadow_shader->isReady());
@@ -1204,7 +1230,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	ASSERT(renderer);
 
 	IAllocator& allocator = renderer->getAllocator();
-	CaptureImpostorJob& job = renderer->createJob<CaptureImpostorJob>(gb0_rgba, gb1_rgba, shadow, size, allocator);
+	CaptureImpostorJob& job = renderer->createJob<CaptureImpostorJob>(gb0_rgba, gb1_rgba, gb_depth, shadow, size, allocator);
 	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
 	job.m_shadow_program = m_impostor_shadow_shader->getProgram(gpu::VertexDecl(), bake_normals ? bake_normals_define : 0);
 	job.m_model = model;
@@ -1228,11 +1254,14 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			f << "shader \"/pipelines/impostor.shd\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
 			if (!bake_normals) f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
+			else f << "texture \"\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
+			f << "texture \"" << src_info.m_basename << "_impostor_depth.raw\"\n";
 			f << "defines { \"ALPHA_CUTOUT\" }\n";
 			f << "layer \"impostor\"\n";
 			f << "backface_culling(false)\n";
 			f << "uniform(\"Center\", { 0, " << center.y << ", 0 })\n";
+			f << "uniform(\"Radius\", " << model->getCenterBoundingRadius() << ")\n";
 			f.close();
 		}
 	}

@@ -57,9 +57,9 @@ compute_shader [[
 		if (depth == 0) return 1;
 
 		ivec2 shadow_tile = ivec2(0.5 + worldToImpostor(v_shadow) * (u_size - 1)); 
-		v_shadow = impostorToWorld(shadow_tile / float(u_size - 1));
+		v_shadow = normalize(impostorToWorld(shadow_tile / float(u_size - 1)));
 
-		mat4 view = lookAt(u_center.xyz - v_shadow * 2 * u_radius, u_center.xyz, vec3(0, 1, 0));
+		mat4 view = lookAt(u_center.xyz - v_shadow * u_radius, u_center.xyz, vec3(0, 1, 0));
 		
 		mat4 to_sm = u_projection * view * u_proj_to_model;
 

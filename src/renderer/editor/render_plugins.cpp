@@ -2692,10 +2692,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				importer.init();
 				IAllocator& allocator = m_app.getAllocator();
 				Array<u32> gb0(allocator); 
-				Array<u32> gb1(allocator); 
+				Array<u32> gb1(allocator);
+				Array<u16> gbdepth(allocator);
 				Array<u32> shadow(allocator); 
 				IVec2 tile_size;
-				importer.createImpostorTextures(model, gb0, gb1, shadow, tile_size, m_meta.bake_impostor_normals);
+				importer.createImpostorTextures(model, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
 				postprocessImpostor(gb0, gb1, tile_size, allocator);
 				const PathInfo fi(model->getPath().c_str());
 				StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
@@ -2721,6 +2722,26 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					else {
 						logError("Failed to open ", img_path);
 					}
+				}
+
+				img_path = fi.m_dir;
+				img_path << fi.m_basename << "_impostor_depth.raw";
+				if (fs.open(img_path, file)) {
+					RawTextureHeader header;
+					header.width = tile_size.x * 9;
+					header.height = tile_size.y * 9;
+					header.depth = 1;
+					header.channel_type = RawTextureHeader::ChannelType::U16;
+					header.channels_count = 1;
+					bool res = file.write(header);
+					res = file.write(gbdepth.begin(), gbdepth.byte_size()) && res;
+					if (!res) {
+						logError("Failed to write ", img_path);
+					} 
+					file.close();
+				}
+				else {
+					logError("Failed to open ", img_path);
 				}
 
 				img_path = fi.m_dir;

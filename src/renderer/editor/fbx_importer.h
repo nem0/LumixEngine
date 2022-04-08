@@ -165,7 +165,13 @@ struct FBXImporter
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* src, const ImportConfig& cfg);
 	void writePhysics(const char* src, const ImportConfig& cfg);
-	bool createImpostorTextures(struct Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u32>& shadow, IVec2& size, bool bake_normals);
+	bool createImpostorTextures(struct Model* model
+		, Array<u32>& gb0_rgba
+		, Array<u32>& gb1_rgba
+		, Array<u16>& gb_depth
+		, Array<u32>& shadow
+		, IVec2& size
+		, bool bake_normals);
 
 	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
