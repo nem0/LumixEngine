@@ -394,6 +394,7 @@ struct GlobalState
 	Vec4 light_direction;
 	Vec4 light_color;
 	IVec2 framebuffer_size;
+	Vec2 pixel_jitter;
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
@@ -1351,6 +1352,19 @@ struct PipelineImpl final : Pipeline
 		return flip * prev.getProjection() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjection().inverted() * flip;
 	}
 
+	static float halton(u32 index, i32 base)
+	{
+		float f = 1;
+		float r = 0;
+		i32 current = index;
+		do {
+			f = f / base;
+			r = r + f * (current % base);
+			current = i32(floor(float(current) / base));
+		} while (current > 0);
+		return r;
+	}
+
 	bool render(bool only_2d) override
 	{
 		PROFILE_FUNCTION();
@@ -1367,9 +1381,19 @@ struct PipelineImpl final : Pipeline
 		m_renderer.waitCanSetup();
 		clearBuffers();
 
+		bool pixel_jitter = false;
+		LuaWrapper::getOptionalField(m_lua_state, -1, "PIXEL_JITTER", &pixel_jitter);
+		m_viewport.pixel_offset = Vec2(0);
+
+		if (pixel_jitter) {
+			m_viewport.pixel_offset.x = (halton(m_renderer.frameNumber() % 8 + 1, 2) * 2 - 1) / (2 * m_viewport.w);
+			m_viewport.pixel_offset.y = (halton(m_renderer.frameNumber() % 8 + 1, 3) * 2 - 1) / (2 * m_viewport.h);
+		}
+
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjection();
 		GlobalState global_state;
+		global_state.pixel_jitter = m_viewport.pixel_offset;
 		global_state.camera_projection = projection;
 		global_state.camera_inv_projection = projection.inverted();
 		global_state.camera_view = view;

@@ -1,7 +1,7 @@
 import "pipelines/surface_base.inc"
 
 surface_shader [[
-	vec4 c = texture(u_albedomap, v_uv) * u_material_color;
+	vec4 c = texture(u_albedomap, v_uv, -1) * u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
 	#ifdef _HAS_ATTR6

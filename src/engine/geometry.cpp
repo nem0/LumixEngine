@@ -644,6 +644,8 @@ Matrix Viewport::getProjection() const
 	}
 
 	mtx.setPerspective(fov, ratio, near, far, true);
+	mtx.columns[2].x = pixel_offset.x;
+	mtx.columns[2].y = pixel_offset.y;
 	return mtx;
 }
 

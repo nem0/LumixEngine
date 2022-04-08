@@ -100,6 +100,7 @@ layout (std140, binding = 0) uniform GlobalState {
 	vec4 light_dir;
 	vec4 light_color;
 	ivec2 framebuffer_size;
+	vec2 pixel_jitter;
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;

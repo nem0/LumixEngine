@@ -186,6 +186,7 @@ struct LUMIX_ENGINE_API Viewport {
 	Quat rot;
 	float near;
 	float far;
+	Vec2 pixel_offset = Vec2(0);
 };
 
 LUMIX_ENGINE_API Vec4 makePlane(const Vec3& normal, const Vec3& point);

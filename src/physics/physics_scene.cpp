@@ -2852,17 +2852,24 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 	
 	void setRigidActorMaterial(EntityRef entity, const Path& path) override {
-		ResourceManagerHub& manager = m_engine.getResourceManager();
-		PhysicsMaterial* mat = manager.load<PhysicsMaterial>(path);
-		m_actors[entity].material = mat;
-		
 		PxShape* shapes[64];
-		int shapes_count = m_actors[entity].physx_actor->getShapes(shapes, lengthOf(shapes));
-		for (int i = 0; i < shapes_count; ++i)
-		{
-			shapes[i]->setMaterials(&mat->material, 1);
-		}
+		const u32 shapes_count = m_actors[entity].physx_actor->getShapes(shapes, lengthOf(shapes));
 
+		ResourceManagerHub& manager = m_engine.getResourceManager();
+		if (path.isEmpty()) {
+			m_actors[entity].material = nullptr;
+			for (u32 i = 0; i < shapes_count; ++i) {
+				shapes[i]->setMaterials(&m_default_material, 1);
+			}
+		}
+		else {
+			PhysicsMaterial* mat = manager.load<PhysicsMaterial>(path);
+			m_actors[entity].material = mat;
+		
+			for (u32 i = 0; i < shapes_count; ++i) {
+				shapes[i]->setMaterials(&mat->material, 1);
+			}
+		}
 	}
 
 	Path getRigidActorMaterial(EntityRef entity) {

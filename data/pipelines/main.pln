@@ -4,6 +4,7 @@ local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
+local taa_shader = preloadShader("pipelines/taa.shd")
 local debug_shadowmap = false
 local debug_normal = false
 local debug_roughness = false
@@ -14,6 +15,8 @@ local debug_clusters = false
 local debug_shadow_atlas = false
 local screenshot_request = 0
 local enable_icons = true
+local taa_enabled = true
+local taa_history = -1
 
 local decal_state = {
 	blending = "alpha",
@@ -422,6 +425,45 @@ function render_preview()
 	setOutput(output)
 end
 
+function TAA(res, gbuffer_depth)
+	PIXEL_JITTER = taa_enabled
+	if taa_enabled then
+		beginBlock("taa")
+		if taa_history == -1 then
+			taa_history = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "taa", compute_write = true }
+			setRenderTargets(taa_history)
+			clear(CLEAR_ALL, 1, 1, 1, 1, 0)
+		end
+
+		local taa_tmp = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "taa_tmp", compute_write = true }
+
+		drawcallUniforms(viewport_w, viewport_h, 0, 0) 
+		bindTextures({taa_history, gbuffer_depth, res}, 0)
+		bindImageTexture(taa_tmp, 3)
+		dispatch(taa_shader, (viewport_w + 15) / 16, (viewport_h + 15) / 16, 1)
+
+		setRenderTargets(res)
+		drawcallUniforms( 
+			0, 0, 1, 1, 
+			1, 0, 0, 0, 
+			0, 1, 0, 0, 
+			0, 0, 1, 0, 
+			0, 0, 0, 1, 
+			0, 0, 0, 0
+		)
+
+		-- TODO get rid of this step
+		drawArray(0, 3, textured_quad_shader
+			, { taa_tmp }
+			, { depth_test = false })
+
+		taa_history = taa_tmp
+
+		keepRenderbufferAlive(taa_history)
+		endBlock()
+	end
+end
+
 function main()
 	if PREVIEW then
 		render_preview()
@@ -473,6 +515,7 @@ function main()
 		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 
+
 	if GAME_VIEW or APP then
 		setRenderTargetsReadonlyDS(res, gbuffer_depth)
 		renderUI()
@@ -490,6 +533,7 @@ function main()
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 			renderGizmos()
 	end
+	TAA(res, gbuffer_depth)
 
 	render2D()
 
@@ -558,6 +602,7 @@ function onGUI()
 		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
+		changed, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
 		terrain_state.wireframe = default_state.wireframe
 		water_state.wireframe = default_state.wireframe
 		grass_state.wireframe = default_state.wireframe
