@@ -2598,8 +2598,9 @@ struct RenderSceneImpl final : RenderScene {
 				const float radius = model_radius * id.scale;
 				float intersection_t;
 				if (getRaySphereIntersection(rel_pos, ray_dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
-					const Vec3 rel_dir = getInstanceQuat(id.rot_quat).conjugated().rotate(ray_dir);
-					rel_pos = getInstanceQuat(id.rot_quat).rotate(rel_pos / id.scale);
+					const Quat rot = getInstanceQuat(id.rot_quat);
+					const Vec3 rel_dir = rot.conjugated().rotate(ray_dir);
+					rel_pos = rot.conjugated().rotate(rel_pos / id.scale);
 					RayCastModelHit new_hit = im.model->castRay(rel_pos, rel_dir, nullptr, e, &filter);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * id.scale < hit.t)) {
 						new_hit.entity = e;
