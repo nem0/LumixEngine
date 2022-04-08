@@ -145,12 +145,15 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 	ImVec2 size = io.DisplaySize;
 	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos);
 	ImGui::SetNextWindowSize(size);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (!ImGui::Begin("game view fullscreen",
 		&open,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
 		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 	{
 		ImGui::End();
+		ImGui::PopStyleVar(2);
 		return;
 	}
 
@@ -179,6 +182,7 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 	m_size = ImGui::GetItemRectSize();
 
 	ImGui::End();
+	ImGui::PopStyleVar(2);
 
 	if (m_is_fullscreen && (ImGui::IsKeyPressed(ImGuiKey_Escape) || !editor.isGameMode()))
 	{
