@@ -1006,7 +1006,6 @@ u32 swapBuffers()
 				glDeleteVertexArrays(1, &ctx.vao);
 				SwapBuffers(ctx.device_context);
 				
-				ASSERT(res);
 				res = wglDeleteContext(ctx.hglrc);
 				ctx.window_handle = nullptr;
 				ASSERT(res);

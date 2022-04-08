@@ -134,9 +134,11 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 						inst.position = p.xyz();
 						inst.scale = p.w;
 						switch (type.m_rotation_mode) {
-							case GrassType::RotationMode::Y_UP:
-								inst.rotation = Quat(0, sinf(randFloat() * PI), 0, cosf(randFloat() * PI));
+							case GrassType::RotationMode::Y_UP: {
+								const float angle = randFloat();
+								inst.rotation = Quat(0, sinf(angle * PI), 0, cosf(angle * PI));
 								break;
+							}
 							case GrassType::RotationMode::ALL_RANDOM: {
 								const Vec3 axis = normalize(Vec3(randFloat(), randFloat(), randFloat()) * 2.f - 1.f);
 								inst.rotation = Quat(axis, randFloat() * 2 * PI);
