@@ -1158,7 +1158,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::copy(staging, gbs[0], 0, 0);
 		gpu::readTexture(staging, 0, Span((u8*)m_gb0.begin(), m_gb0.byte_size()));
 		
-		if (!m_bake_normals) {
+		if (m_bake_normals) {
 			gpu::copy(staging, gbs[1], 0, 0);
 			gpu::readTexture(staging, 0, Span((u8*)m_gb1.begin(), m_gb1.byte_size()));
 		}
