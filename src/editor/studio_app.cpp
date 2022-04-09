@@ -1677,26 +1677,10 @@ struct StudioAppImpl final : StudioApp
 				ImGui::EndPopup();
 			}
 			ImGui::PopID();
-			if (ImGui::BeginDragDropSource())
-			{
-				char buffer[1024];
-				getEntityListDisplayName(*this, *universe, Span(buffer), entity);
-				ImGui::Text("%s", buffer);
-				ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
-				ImGui::EndDragDropSource();
-			}
-			else {
-				if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-					m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
-				}
-			}
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
-				{
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 					EntityRef dropped_entity = *(EntityRef*)payload->Data;
-					if (dropped_entity != entity)
-					{
+					if (dropped_entity != entity) {
 						m_editor->makeParent(entity, dropped_entity);
 						ImGui::EndDragDropTarget();
 						if (node_open) ImGui::TreePop();
@@ -1704,7 +1688,40 @@ struct StudioAppImpl final : StudioApp
 					}
 				}
 
+				if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
+					const Array<EntityRef>& selected = m_editor->getSelectedEntities();
+					for (EntityRef e : selected) {
+						if (e != entity) {
+							m_editor->makeParent(entity, e);
+						}
+					}
+					ImGui::EndDragDropTarget();
+					if (node_open) ImGui::TreePop();
+					return;
+				}
+
 				ImGui::EndDragDropTarget();
+			}
+
+			if (ImGui::BeginDragDropSource())
+			{
+				char buffer[1024];
+				getEntityListDisplayName(*this, *universe, Span(buffer), entity);
+				ImGui::Text("%s", buffer);
+				
+				const Array<EntityRef>& selected = m_editor->getSelectedEntities();
+				if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
+					ImGui::SetDragDropPayload("selected_entities", nullptr, 0);
+				}
+				else {	
+					ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
+				}
+				ImGui::EndDragDropSource();
+			}
+			else {
+				if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+					m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+				}
 			}
 		}
 

@@ -946,6 +946,7 @@ struct TerrainTextureChangeCommand : IEditorCommand {
 
 		memcpy(data, blob.data(), blob.size());
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
+		terrain->setGrassDirty();
 		return true;
 	}
 
