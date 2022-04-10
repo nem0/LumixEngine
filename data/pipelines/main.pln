@@ -69,6 +69,7 @@ local terrain_state = {
 	stencil_zpass = STENCIL_REPLACE,
 	wireframe = false
 }
+
 local impostor_state = {
 	depth_write = true,
 	stencil_func = STENCIL_ALWAYS,
@@ -436,6 +437,8 @@ function TAA(res, gbuffer_depth)
 		end
 
 		local taa_tmp = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "taa_tmp", compute_write = true }
+
+		setRenderTargets()
 
 		drawcallUniforms(viewport_w, viewport_h, 0, 0) 
 		bindTextures({taa_history, gbuffer_depth, res}, 0)

@@ -208,12 +208,14 @@ function surface_shader(code)
 			layout(location = 7) in float v_fur_layer;
 		#endif
 
-		#if defined DEFERRED || defined GRASS
-			layout(location = 0) out vec4 o_gbuffer0;
-			layout(location = 1) out vec4 o_gbuffer1;
-			layout(location = 2) out vec4 o_gbuffer2;
-		#elif !defined DEPTH
-			layout(location = 0) out vec4 o_color;
+		#ifndef DEPTH
+			#if defined DEFERRED || defined GRASS
+				layout(location = 0) out vec4 o_gbuffer0;
+				layout(location = 1) out vec4 o_gbuffer1;
+				layout(location = 2) out vec4 o_gbuffer2;
+			#else
+				layout(location = 0) out vec4 o_color;
+			#endif
 		#endif
 
 		Surface getSurface()

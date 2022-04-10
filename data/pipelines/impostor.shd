@@ -146,6 +146,7 @@ fragment_shader [[
 		#if !defined DEPTH && defined HAS_SELFSHADOW
 			vec4 self_shadow = texture(u_selfshadow, v_uv);
 			data.shadow = saturate(dot(self_shadow, v_shadow_coefs));
+			data.ao = dot(self_shadow, vec4(1));
 		#else
 			data.shadow = 1;
 		#endif

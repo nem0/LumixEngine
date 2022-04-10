@@ -7,9 +7,9 @@ compute_shader [[
 
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
     layout (binding = 0) uniform sampler2D u_history;
-	  layout (binding = 1) uniform sampler2D u_depthbuf;
-    layout (r8, binding = 2) uniform image2D u_sss;
-    layout (rgba8, binding = 3) uniform image2D u_gbuffer2;
+	layout (binding = 1) uniform sampler2D u_depthbuf;
+    layout (rgba8, binding = 0) uniform image2D u_gbuffer2;
+    layout (r8, binding = 1) uniform image2D u_sss;
 
   vec2 reproject(vec2 uv, float depth) {
 		vec4 v = (Global.reprojection * vec4(uv * 2 - 1, depth, 1));

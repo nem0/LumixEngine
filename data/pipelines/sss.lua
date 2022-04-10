@@ -17,6 +17,8 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 		env.clear(env.CLEAR_ALL, 1, 1, 1, 1, 0)
 	end
 
+	env.setRenderTargets()
+
 	env.bindTextures({gbuffer_depth}, 0)
 	env.bindImageTexture(sss_rb, 1)
 	env.drawcallUniforms (
@@ -28,8 +30,8 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.dispatch(env.sss_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
 
 	env.bindTextures({sss_history, gbuffer_depth}, 0)
-	env.bindImageTexture(sss_rb, 2)
-	env.bindImageTexture(gbuffer2, 3)
+	env.bindImageTexture(gbuffer2, 0)
+	env.bindImageTexture(sss_rb, 1)
 	env.dispatch(env.sss_blit_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
 
 	sss_history = sss_rb
