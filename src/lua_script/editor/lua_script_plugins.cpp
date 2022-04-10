@@ -448,11 +448,12 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 
 struct PropertyGridPlugin final : PropertyGrid::IPlugin
 {
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
-		if (cmp.type != LUA_SCRIPT_TYPE) return;
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != LUA_SCRIPT_TYPE) return;
+		if (entities.length() != 1) return;
 
-		LuaScriptScene* scene = (LuaScriptScene*)cmp.scene; 
-		const EntityRef e = (EntityRef)cmp.entity;
+		LuaScriptScene* scene = (LuaScriptScene*)editor.getUniverse()->getScene(cmp_type); 
+		const EntityRef e = entities[0];
 		const u32 count = scene->getScriptCount(e);
 		for (u32 i = 0; i < count; ++i) {
 			if (scene->beginFunctionCall(e, i, "onGUI")) {

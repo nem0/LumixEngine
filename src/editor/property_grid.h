@@ -9,8 +9,6 @@ namespace Lumix
 
 
 struct ArrayDescriptorBase;
-struct ComponentUID;
-struct IEnumPropertyDescriptor;
 struct PropertyDescriptorBase;
 struct WorldEditor;
 struct StudioApp;
@@ -24,7 +22,7 @@ public:
 	{
 		virtual ~IPlugin() {}
 		virtual void update() {}
-		virtual void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) = 0;
+		virtual void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) = 0;
 	};
 
 public:

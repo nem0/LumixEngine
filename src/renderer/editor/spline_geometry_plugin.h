@@ -16,7 +16,7 @@ struct SplineGeometryPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	SplineGeometryPlugin(StudioApp& app) ;
 
 private:
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override;
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override;
 	
 	const char* getName() const override { return "spline_geometry"; }
 	bool onMouseDown(UniverseView& view, int x, int y) override;

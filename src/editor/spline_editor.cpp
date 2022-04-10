@@ -127,21 +127,23 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		return &scene->getSpline(selected[0]);
 	}
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
-		if (cmp.type != SPLINE_TYPE) return;
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != SPLINE_TYPE) return;
+		if (entities.length() != 1) return;
 
+		const EntityRef entity = entities[0];
 		Spline* spline = getSpline();
 		ASSERT(spline);
 
 		if (!spline->points.empty() && ImGui::Button("Clear")) {
-			recordUndo(-1, *spline, *cmp.entity, [&](){
+			recordUndo(-1, *spline, entity, [&](){
 				spline->points.clear();
 			});
 		}
 
 		ImGui::SameLine();
 		if (m_selected >= 0 && m_selected < spline->points.size() && ImGui::Button("Delete node")) {
-			recordUndo(-1, *spline, *cmp.entity, [&](){
+			recordUndo(-1, *spline, entity, [&](){
 				spline->points.erase(m_selected);
 			});
 		}

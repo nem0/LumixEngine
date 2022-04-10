@@ -722,15 +722,8 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, editor);
 	if (component) component->visit(visitor);
 
-	if (entities.size() == 1) {
-		ComponentUID cmp;
-		cmp.type = cmp_type;
-		cmp.scene = editor.getUniverse()->getScene(cmp.type);
-		cmp.entity = entities[0];
-		for (IPlugin* i : m_plugins)
-		{
-			i->onGUI(*this, cmp, editor);
-		}
+	for (IPlugin* i : m_plugins) {
+		i->onGUI(*this, entities, cmp_type, editor);
 	}
 	ImGui::TreePop();
 }

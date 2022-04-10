@@ -319,12 +319,13 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override
 	{
-		if (cmp.type != ANIMABLE_TYPE) return;
+		if (cmp_type != ANIMABLE_TYPE) return;
+		if (entities.length() != 1) return;
 
-		const EntityRef entity = (EntityRef)cmp.entity;
-		auto* scene = (AnimationScene*)cmp.scene;
+		const EntityRef entity = entities[0];
+		auto* scene = (AnimationScene*)editor.getUniverse()->getScene(cmp_type);
 		auto* animation = scene->getAnimableAnimation(entity);
 		if (!animation) return;
 		if (!animation->isReady()) return;

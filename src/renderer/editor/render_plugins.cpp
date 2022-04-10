@@ -684,12 +684,12 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 {
 	ParticleEmitterPropertyPlugin(StudioApp& app) : m_app(app) {}
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != PARTICLE_EMITTER_TYPE) return;
+		if (entities.length() != 1) return;
 		
-		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
-		
-		RenderScene* scene = (RenderScene*)cmp.scene;
-		ParticleEmitter& emitter = scene->getParticleEmitter(*cmp.entity);
+		RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(cmp_type);
+		ParticleEmitter& emitter = scene->getParticleEmitter(entities[0]);
 
 		if (m_playing && ImGui::Button(ICON_FA_STOP " Stop")) m_playing = false;
 		else if (!m_playing && ImGui::Button(ICON_FA_PLAY " Play")) m_playing = true;
@@ -704,7 +704,7 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 		ImGui::SliderFloat("##ts", &m_time_scale, 0, 1);
 		if (m_playing) {
 			float dt = m_app.getEngine().getLastTimeDelta() * m_time_scale;
-			scene->updateParticleEmitter((EntityRef)cmp.entity, dt);
+			scene->updateParticleEmitter(entities[0], dt);
 		}
 			
 		ImGuiEx::Label("Particle count");
@@ -1843,11 +1843,12 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	
 	void update() {}
 	
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) {
-		if (cmp.type != MODEL_INSTANCE_TYPE) return;
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != MODEL_INSTANCE_TYPE) return;
+		if (entities.length() != 1) return;
 
-		RenderScene* scene = (RenderScene*)cmp.scene;
-		EntityRef entity = (EntityRef)cmp.entity;
+		RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(cmp_type);
+		EntityRef entity = entities[0];
 		Model* model = scene->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
 
@@ -3672,11 +3673,13 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (entities.length() != 1) return;
+
 		Universe& universe = *editor.getUniverse();
-		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
-			const EntityRef e = (EntityRef)cmp.entity;
-			auto* scene = static_cast<RenderScene*>(cmp.scene);
+		const EntityRef e = entities[0];
+		auto* scene = static_cast<RenderScene*>(universe.getScene(cmp_type));
+		if (cmp_type == ENVIRONMENT_PROBE_TYPE) {
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
 				const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
@@ -3688,9 +3691,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			}
 		}
 
-		if (cmp.type == REFLECTION_PROBE_TYPE) {
-			const EntityRef e = (EntityRef)cmp.entity;
-			auto* scene = static_cast<RenderScene*>(cmp.scene);
+		if (cmp_type == REFLECTION_PROBE_TYPE) {
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
 				const ReflectionProbe& probe = scene->getReflectionProbe(e);
@@ -4090,10 +4091,12 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		return -1;
 	}
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
-		if (cmp.type != INSTANCED_MODEL_TYPE) return;
-		RenderScene* render_scene = ((RenderScene*)cmp.scene);
-		const InstancedModel& im = render_scene->getInstancedModels()[*cmp.entity];
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != INSTANCED_MODEL_TYPE) return;
+		if (entities.length() != 1) return;
+
+		RenderScene* render_scene = (RenderScene*)editor.getUniverse()->getScene(cmp_type);
+		const InstancedModel& im = render_scene->getInstancedModels()[entities[0]];
 		
 		ImGuiEx::Label("Instances");
 		ImGui::Text("%d", im.instances.size());
@@ -4107,13 +4110,13 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 
 		if (selected >= 0 && selected < im.instances.size()) {
-			DVec3 origin = cmp.scene->getUniverse().getPosition(*cmp.entity);
+			DVec3 origin = editor.getUniverse()->getPosition(entities[0]);
 			Transform tr;
 			tr.rot = getInstanceQuat(m_selected.rot_quat);
 			tr.scale = m_selected.scale;
 			tr.pos = origin + DVec3(m_selected.pos);
 			const Gizmo::Config& cfg = m_app.getGizmoConfig();
-			bool changed = Gizmo::manipulate(u64(4) << 32 | cmp.entity.index, editor.getView(), tr, cfg);
+			bool changed = Gizmo::manipulate(u64(4) << 32 | entities[0].index, editor.getView(), tr, cfg);
 
 			Vec3 p = m_selected.pos;
 			ImGuiEx::Label("Position");
@@ -4142,7 +4145,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 				new_value.scale = tr.scale;
 				new_value.lod = 3;
 				
-				UniquePtr<SetTransformCommand> cmd = UniquePtr<SetTransformCommand>::create(editor.getAllocator(), *cmp.entity, m_selected, new_value, editor);
+				UniquePtr<SetTransformCommand> cmd = UniquePtr<SetTransformCommand>::create(editor.getAllocator(), entities[0], m_selected, new_value, editor);
 				editor.executeCommand(cmd.move());
 
 				m_selected = new_value;
@@ -4257,8 +4260,14 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 	{}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
-		if (cmp.type != TERRAIN_TYPE) return;
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != TERRAIN_TYPE) return;
+		if (entities.length() != 1) return;
+
+		ComponentUID cmp;
+		cmp.entity = entities[0];
+		cmp.scene = editor.getUniverse()->getScene(cmp_type);
+		cmp.type = cmp_type;
 		m_terrain_editor.onGUI(cmp, editor);
 	}
 

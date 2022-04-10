@@ -186,173 +186,186 @@ static const char* toString(SplineGeometryPlugin::GeometryMode mode) {
 	return "N/A";
 }
 
-void SplineGeometryPlugin::onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) {
-	if (cmp.type != SPLINE_GEOMETRY_TYPE) return;
+void SplineGeometryPlugin::onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) {
+	if (cmp_type != SPLINE_GEOMETRY_TYPE) return;
 
-	const EntityRef e = *cmp.entity;
-	Universe& universe = cmp.scene->getUniverse();
-	if (!universe.hasComponent(*cmp.entity, SPLINE_TYPE)) {
-		ImGui::TextUnformatted("There's no spline component");
-		if (ImGui::Button("Create spline component")) {
-			editor.addComponent(Span(&e, 1), SPLINE_TYPE);
+	Universe& universe = *editor.getUniverse();
+	for (EntityRef e : entities) {
+		if (!universe.hasComponent(e, SPLINE_GEOMETRY_TYPE)) return;
+	}
+
+	RenderScene* render_scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
+	CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
+	if (entities.length() == 1) {
+		const EntityRef e = entities[0];
+		if (!universe.hasComponent(e, SPLINE_TYPE)) {
+			ImGui::TextUnformatted("There's no spline component");
+			if (ImGui::Button("Create spline component")) {
+				editor.addComponent(Span(&e, 1), SPLINE_TYPE);
+			}
+			return;
+		}
+		else {
+			const Spline& spline = core_scene->getSpline(e);
+			const SplineGeometry& sg = render_scene->getSplineGeometry(e);
+			const ProceduralGeometry& pg = render_scene->getProceduralGeometry(e);
+			
+			drawCursor(editor, e);
+
+			ImGuiEx::Label("Triangles");
+			ImGui::Text("%d", u32(pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3));
+
+			ImGui::Separator();
+
+			ImGuiEx::Label("Brush size");
+			ImGui::DragFloat("##bs", &m_brush_size, 0.1f, 0, FLT_MAX);
+
+			if (sg.num_user_channels > 1) {
+				ImGuiEx::Label("Paint channel");
+				ImGui::SliderInt("##pc", (int*)&m_brush_channel, 0, sg.num_user_channels - 1);
+			}
+
+			ImGuiEx::Label("Paint value");
+			ImGui::SliderInt("##pv", (int*)&m_brush_value, 0, 255);
 		}
 	}
-	else {
-		RenderScene* render_scene = (RenderScene*)universe.getScene(SPLINE_GEOMETRY_TYPE);
-		CoreScene* core_scene = (CoreScene*)universe.getScene(SPLINE_TYPE);
-		const Spline& spline = core_scene->getSpline(e);
-		const SplineGeometry& sg = render_scene->getSplineGeometry(e);
-		const ProceduralGeometry& pg = render_scene->getProceduralGeometry(e);
-			
-		drawCursor(editor, *cmp.entity);
 
-		ImGuiEx::Label("Triangles");
-		ImGui::Text("%d", u32(pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) / 3));
-
-		ImGui::Separator();
-
-		ImGuiEx::Label("Brush size");
-		ImGui::DragFloat("##bs", &m_brush_size, 0.1f, 0, FLT_MAX);
-
-		if (sg.num_user_channels > 1) {
-			ImGuiEx::Label("Paint channel");
-			ImGui::SliderInt("##pc", (int*)&m_brush_channel, 0, sg.num_user_channels - 1);
+	ImGui::Separator();
+	ImGuiEx::Label("Mode");
+	if (ImGui::BeginCombo("##gm", toString(m_geometry_mode))) {
+		for (u32 i = 0; i < (u32)GeometryMode::COUNT; ++i) {
+			if (ImGui::Selectable(toString(GeometryMode(i)))) m_geometry_mode = GeometryMode(i);
 		}
+		ImGui::EndCombo();
+	}
 
-		ImGuiEx::Label("Paint value");
-		ImGui::SliderInt("##pv", (int*)&m_brush_value, 0, 255);
+	const bool snap = m_geometry_mode != GeometryMode::NO_SNAP;
 
-		ImGui::Separator();
+	if (!snap) ImGuiEx::PushReadOnly();
+	ImGuiEx::Label("Snap height");
+	ImGui::DragFloat("##sh", &m_snap_height);
+	if (!snap) ImGuiEx::PopReadOnly();
 
-		ImGuiEx::Label("Mode");
-		if (ImGui::BeginCombo("##gm", toString(m_geometry_mode))) {
-			for (u32 i = 0; i < (u32)GeometryMode::COUNT; ++i) {
-				if (ImGui::Selectable(toString(GeometryMode(i)))) m_geometry_mode = GeometryMode(i);
-			}
-			ImGui::EndCombo();
-		}
+	if (ImGui::Button("Generate geometry")) {
+		for (EntityRef e : entities) {
+			if (!universe.hasComponent(e, SPLINE_TYPE)) continue;
 
-		const bool snap = m_geometry_mode != GeometryMode::NO_SNAP;
+			const Spline& spline = core_scene->getSpline(e);
+			const SplineGeometry& sg = render_scene->getSplineGeometry(e);
+			const ProceduralGeometry& pg = render_scene->getProceduralGeometry(e);
+			if (spline.points.empty()) continue;
 
-		if (!snap) ImGuiEx::PushReadOnly();
-		ImGuiEx::Label("Snap height");
-		ImGui::DragFloat("##sh", &m_snap_height);
-		if (!snap) ImGuiEx::PopReadOnly();
-
-		if (ImGui::Button("Generate geometry")) {
-			if (!spline.points.empty()) {
-				const float width = sg.width;
-				SplineIterator iterator(spline.points);
-				gpu::VertexDecl decl;
-				decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+			const float width = sg.width;
+			SplineIterator iterator(spline.points);
+			gpu::VertexDecl decl;
+			decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 				
-				OutputMemoryStream vertices(m_app.getAllocator());
-				OutputMemoryStream indices(m_app.getAllocator());
-				vertices.reserve(16 * 1024);
-				const bool has_uvs = sg.flags.isSet(SplineGeometry::HAS_UVS);
-				if (has_uvs) decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
-				struct Vertex {
-					Vec3 position;
-					Vec2 uv;
-				};
+			OutputMemoryStream vertices(m_app.getAllocator());
+			OutputMemoryStream indices(m_app.getAllocator());
+			vertices.reserve(16 * 1024);
+			const bool has_uvs = sg.flags.isSet(SplineGeometry::HAS_UVS);
+			if (has_uvs) decl.addAttribute(1, 12, 2, gpu::AttributeType::FLOAT, 0);
+			struct Vertex {
+				Vec3 position;
+				Vec2 uv;
+			};
 
-				const Transform spline_tr = universe.getTransform(e);
-				const Transform spline_tr_inv = spline_tr.inverted();
+			const Transform spline_tr = universe.getTransform(e);
+			const Transform spline_tr_inv = spline_tr.inverted();
 
-				auto write_vertex = [&](const Vertex& v){
-					Vec3 position = v.position;
-					if (m_geometry_mode == GeometryMode::SNAP_ALL) {
-						const DVec3 p = spline_tr.transform(v.position) + Vec3(0, 1 + m_snap_height, 0);
-						const RayCastModelHit hit = render_scene->castRayTerrain(p, Vec3(0, -1, 0));
-						if (hit.is_hit) {
-							const DVec3 hp = hit.origin + (hit.t - m_snap_height) * hit.dir;
-							position = Vec3(spline_tr_inv.transform(hp));
-						}
-					}
-					vertices.write(position);
-					if (has_uvs) {
-						vertices.write(v.uv);
-					}
-					if (sg.num_user_channels > 0) {
-						u32 tmp = 0;
-						vertices.write(tmp);
-					}
-				};
-						
-				float u = 0;
-				u32 rows = 0;
-				Vec3 prev_p = spline.points[0];
-				const u32 u_density = sg.u_density;
-				while (!iterator.isEnd()) {
-					++rows;
-					Vec3 p = iterator.getPosition();
-					if (m_geometry_mode == GeometryMode::SNAP_CENTER) {
-						const DVec3 pglob = spline_tr.transform(p) + Vec3(0, 100 + m_snap_height, 0);
-						const RayCastModelHit hit = render_scene->castRayTerrain(pglob, Vec3(0, -1, 0));
-						if (hit.is_hit) {
-							const DVec3 hp = hit.origin + (hit.t - m_snap_height) * hit.dir;
-							p = Vec3(spline_tr_inv.transform(hp));
-						}
-					}
-
-					const Vec3 dir = iterator.getDir();
-					const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
-					u += length(p - prev_p);
-
-					const Vec3 p0 = p - side;
-
-					for (u32 i = 0; i < u_density; ++i) {
-					
-						Vertex v;
-						v.position = p0 + 2 * side * (i / float(u_density - 1));
-						v.uv.x = u;
-						v.uv.y = i / float(u_density - 1) * width;
-								
-						write_vertex(v);
-					}
-
-					iterator.move(sg.v_density);
-					prev_p = p;
-				}
-
-				const bool u16indices = u_density * rows < 0xffFF;
-
-				if (u16indices) {
-					for (u32 row = 0; row < rows - 1; ++row) {
-						for (u32 i = 0; i < u_density - 1; ++i) {
-							indices.write(u16(u_density * row + i));
-							indices.write(u16(u_density * row + i + 1));
-							indices.write(u16(u_density * (row + 1) + i));
-
-							indices.write(u16(u_density * row + i + 1));
-							indices.write(u16(u_density * (row + 1) + i));
-							indices.write(u16(u_density * (row + 1) + i + 1));
-						}
+			auto write_vertex = [&](const Vertex& v){
+				Vec3 position = v.position;
+				if (m_geometry_mode == GeometryMode::SNAP_ALL) {
+					const DVec3 p = spline_tr.transform(v.position) + Vec3(0, 1 + m_snap_height, 0);
+					const RayCastModelHit hit = render_scene->castRayTerrain(p, Vec3(0, -1, 0));
+					if (hit.is_hit) {
+						const DVec3 hp = hit.origin + (hit.t - m_snap_height) * hit.dir;
+						position = Vec3(spline_tr_inv.transform(hp));
 					}
 				}
-				else {
-					for (u32 row = 0; row < rows - 1; ++row) {
-						for (u32 i = 0; i < u_density - 1; ++i) {
-							indices.write(u32(u_density * row + i));
-							indices.write(u32(u_density * row + i + 1));
-							indices.write(u32(u_density * (row + 1) + i));
-
-							indices.write(u32(u_density * row + i + 1));
-							indices.write(u32(u_density * (row + 1) + i));
-							indices.write(u32(u_density * (row + 1) + i + 1));
-						}
-					}
+				vertices.write(position);
+				if (has_uvs) {
+					vertices.write(v.uv);
 				}
-
 				if (sg.num_user_channels > 0) {
-					decl.addAttribute(2, has_uvs ? 20 : 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-					if (sg.num_user_channels < 4) {
-						decl.addAttribute(3, has_uvs ? 20 : 12 + sg.num_user_channels, 4 - sg.num_user_channels, gpu::AttributeType::U8, 0); // padding
+					u32 tmp = 0;
+					vertices.write(tmp);
+				}
+			};
+						
+			float u = 0;
+			u32 rows = 0;
+			Vec3 prev_p = spline.points[0];
+			const u32 u_density = sg.u_density;
+			while (!iterator.isEnd()) {
+				++rows;
+				Vec3 p = iterator.getPosition();
+				if (m_geometry_mode == GeometryMode::SNAP_CENTER) {
+					const DVec3 pglob = spline_tr.transform(p) + Vec3(0, 100 + m_snap_height, 0);
+					const RayCastModelHit hit = render_scene->castRayTerrain(pglob, Vec3(0, -1, 0));
+					if (hit.is_hit) {
+						const DVec3 hp = hit.origin + (hit.t - m_snap_height) * hit.dir;
+						p = Vec3(spline_tr_inv.transform(hp));
 					}
 				}
 
-				render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, u16indices ? gpu::DataType::U16 : gpu::DataType::U32);
+				const Vec3 dir = iterator.getDir();
+				const Vec3 side = normalize(cross(Vec3(0, 1, 0), dir)) * width;
+				u += length(p - prev_p);
+
+				const Vec3 p0 = p - side;
+
+				for (u32 i = 0; i < u_density; ++i) {
+					
+					Vertex v;
+					v.position = p0 + 2 * side * (i / float(u_density - 1));
+					v.uv.x = u;
+					v.uv.y = i / float(u_density - 1) * width;
+								
+					write_vertex(v);
+				}
+
+				iterator.move(sg.v_density);
+				prev_p = p;
 			}
+
+			const bool u16indices = u_density * rows < 0xffFF;
+
+			if (u16indices) {
+				for (u32 row = 0; row < rows - 1; ++row) {
+					for (u32 i = 0; i < u_density - 1; ++i) {
+						indices.write(u16(u_density * row + i));
+						indices.write(u16(u_density * row + i + 1));
+						indices.write(u16(u_density * (row + 1) + i));
+
+						indices.write(u16(u_density * row + i + 1));
+						indices.write(u16(u_density * (row + 1) + i));
+						indices.write(u16(u_density * (row + 1) + i + 1));
+					}
+				}
+			}
+			else {
+				for (u32 row = 0; row < rows - 1; ++row) {
+					for (u32 i = 0; i < u_density - 1; ++i) {
+						indices.write(u32(u_density * row + i));
+						indices.write(u32(u_density * row + i + 1));
+						indices.write(u32(u_density * (row + 1) + i));
+
+						indices.write(u32(u_density * row + i + 1));
+						indices.write(u32(u_density * (row + 1) + i));
+						indices.write(u32(u_density * (row + 1) + i + 1));
+					}
+				}
+			}
+
+			if (sg.num_user_channels > 0) {
+				decl.addAttribute(2, has_uvs ? 20 : 12, sg.num_user_channels, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				if (sg.num_user_channels < 4) {
+					decl.addAttribute(3, has_uvs ? 20 : 12 + sg.num_user_channels, 4 - sg.num_user_channels, gpu::AttributeType::U8, 0); // padding
+				}
+			}
+
+			render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, u16indices ? gpu::DataType::U16 : gpu::DataType::U32);
 		}
 	}
 }

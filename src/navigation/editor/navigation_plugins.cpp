@@ -86,43 +86,45 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		ImGui::PopStyleVar();
 	}
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
-		if(cmp.type == NAVMESH_AGENT_TYPE) { 
-			onAgentGUI((EntityRef)cmp.entity, editor);
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (entities.length() != 1) return;
+
+		if(cmp_type == NAVMESH_AGENT_TYPE) { 
+			onAgentGUI(entities[0], editor);
 			return;
 		}
 
-		if (cmp.type != NAVMESH_ZONE_TYPE) return;
+		if (cmp_type != NAVMESH_ZONE_TYPE) return;
 		
-		auto* scene = static_cast<NavigationScene*>(cmp.scene);
+		auto* scene = static_cast<NavigationScene*>(editor.getUniverse()->getScene(cmp_type));
 		if (m_job) {
 			ImGui::TextUnformatted("Generating...");
 		}
 		else if (ImGui::Button("Generate")) {
-			m_job = scene->generateNavmesh((EntityRef)cmp.entity);
+			m_job = scene->generateNavmesh(entities[0]);
 		}
 
 		ImGui::SameLine();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
-			scene->loadZone((EntityRef)cmp.entity);
+			scene->loadZone(entities[0]);
 		}
 
-		if(scene->isNavmeshReady((EntityRef)cmp.entity)) {
+		if(scene->isNavmeshReady(entities[0])) {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
 				StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
 				if (!os::makePath(dir) && !os::dirExists(dir)) {
 					logError("Could not create ", dir);
 				}
-				scene->saveZone((EntityRef)cmp.entity);
+				scene->saveZone(entities[0]);
 			}
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
 			UniverseView& view = editor.getView();
 			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
-			scene->generateTileAt((EntityRef)cmp.entity, hit.pos, true);
+			scene->generateTileAt(entities[0], hit.pos, true);
 		}
 
 		static bool debug_draw_navmesh = false;
@@ -136,21 +138,21 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Portals", &portals);
 			UniverseView& view = editor.getView();
 			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
-			scene->debugDrawNavmesh((EntityRef)cmp.entity, hit.pos, inner_boundaries, outer_boundaries, portals);
+			scene->debugDrawNavmesh(entities[0], hit.pos, inner_boundaries, outer_boundaries, portals);
 		}
 
-		if (scene->hasDebugDrawData((EntityRef)cmp.entity)) {
+		if (scene->hasDebugDrawData(entities[0])) {
 			static bool debug_draw_compact_heightfield = false;
 			ImGui::Checkbox("Draw compact heightfield", &debug_draw_compact_heightfield);
-			if (debug_draw_compact_heightfield) scene->debugDrawCompactHeightfield((EntityRef)cmp.entity);
+			if (debug_draw_compact_heightfield) scene->debugDrawCompactHeightfield(entities[0]);
 
 			static bool debug_draw_heightfield = false;
 			ImGui::Checkbox("Draw heightfield", &debug_draw_heightfield);
-			if (debug_draw_heightfield) scene->debugDrawHeightfield((EntityRef)cmp.entity);
+			if (debug_draw_heightfield) scene->debugDrawHeightfield(entities[0]);
 
 			static bool debug_draw_contours = false;
 			ImGui::Checkbox("Draw contours", &debug_draw_contours);
-			if (debug_draw_contours) scene->debugDrawContours((EntityRef)cmp.entity);
+			if (debug_draw_contours) scene->debugDrawContours(entities[0]);
 		}
 		else {
 			ImGui::Text("For more info press \"Debug tile\"");

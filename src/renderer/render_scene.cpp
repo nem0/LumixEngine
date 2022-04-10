@@ -1850,6 +1850,8 @@ struct RenderSceneImpl final : RenderScene {
 		pg.aabb.min = Vec3(FLT_MAX);
 		pg.aabb.max = Vec3(-FLT_MAX);
 
+		if (pg.vertex_decl.attributes_count == 0) return;
+
 		const u32 stride = pg.vertex_decl.getStride();
 		const u32 vertex_count = u32(pg.vertex_data.size() / stride);
 		const u8* data = pg.vertex_data.data();
