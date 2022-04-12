@@ -295,7 +295,7 @@ static void compressBC3(Span<const u8> src, OutputMemoryStream& dst, u32 w, u32 
 
 	jobs::forEach(h, 4, [&](i32 j, i32){
 		PROFILE_FUNCTION();
-		u32 tmp[32];
+		u32 tmp[32] = {};
 		const u8* src_row_begin = &src[j * w * 4];
 
 		const u32 src_block_h = minimum(h - j, 4);

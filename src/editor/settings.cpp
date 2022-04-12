@@ -446,7 +446,7 @@ bool Settings::loadAppData() {
 	}
 	file.close();
 	Span<const char> content((const char*)buf.data(), (u32)buf.size());
-	return LuaWrapper::execute(m_local_state, content, "app data", 0);
+	return LuaWrapper::execute(m_local_state, content, m_app_data_path, 0);
 }
 
 void Settings::setValue(Storage storage, const char* name, bool value) const

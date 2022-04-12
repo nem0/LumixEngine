@@ -88,6 +88,8 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 
 	for (u32 type_idx = 0; type_idx < (u32)m_grass_types.size(); ++type_idx) {
 		Terrain::GrassType& type = m_grass_types[type_idx];
+		if (type.m_spacing <= 0) continue;
+
 		HashMap<u64, GrassQuad>& quads = type.m_quads;
 		const Vec2 half_extents(type.m_distance);
 		const Vec2 size(type.m_distance * 2);
