@@ -711,7 +711,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				if (!endsWithInsensitive(ri.path.c_str(), p.path.c_str())) continue;;
 				
 				Resource* r = getResource(ri.path);
-				if (r && r->isReady()) r->getResourceManager().reload(*r);
+				if (r && (r->isReady() || r->isFailure())) r->getResourceManager().reload(*r);
 				else if (r && r->isHooked()) m_load_hook.continueLoad(*r);
 			}
 
