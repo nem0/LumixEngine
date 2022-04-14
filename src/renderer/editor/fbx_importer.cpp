@@ -1253,7 +1253,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			f << "shader \"/pipelines/impostor.shd\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
-			if (!bake_normals) f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
+			if (bake_normals) f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
 			else f << "texture \"\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor_depth.raw\"\n";
