@@ -9,25 +9,6 @@ vertex_shader [[
 
 
 fragment_shader [[
-	float Uncharted2Tonemap(float x)
-	{
-		const float A = 0.15;
-		const float B = 0.50;
-		const float C = 0.10;
-		const float D = 0.20;
-		const float E = 0.02;
-		const float F = 0.30;
-		return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
-	}
-
-	vec3 tonemap(vec3 in_color, float avglum) {
-		float midgray = 0.18;
-		float lum = luminance(in_color);
-		float map_middle = (midgray / (avglum  + 0.001)) * lum;
-		float ld = Uncharted2Tonemap(map_middle) / Uncharted2Tonemap(11.0);
-		return (in_color / max(0.00001, lum)) * ld;
-	}
-
 	layout (binding=0) uniform sampler2D u_hdrbuffer;
 	layout (binding=5, std430) readonly buffer LuminanceData {
 		uint b_histogram[256];
@@ -37,9 +18,9 @@ fragment_shader [[
 	layout (location = 0) out vec4 o_color;
 	void main() {
 		float avglum = b_accum;
-		const float exposure = 3;
+		const float exposure = 1;
 
-		o_color.rgb = tonemap(texture(u_hdrbuffer, v_uv, 0).rgb * exposure, avglum);
+		o_color.rgb = ACESFilm(texture(u_hdrbuffer, v_uv, 0).rgb * exposure);
 		o_color.w = 1;
 	}
 ]]
