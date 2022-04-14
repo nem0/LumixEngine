@@ -1991,7 +1991,7 @@ struct StudioAppImpl final : StudioApp
 		};
 		pio.Platform_DestroyWindow = [](ImGuiViewport* vp){
 			os::WindowHandle w = (os::WindowHandle)vp->PlatformHandle;
-			that->m_deferred_destroy_windows.push({w, 3});
+			that->m_deferred_destroy_windows.push({w, 4});
 			vp->PlatformHandle = nullptr;
 			vp->PlatformUserData = nullptr;
 			that->m_windows.eraseItem(w);
