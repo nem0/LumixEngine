@@ -399,7 +399,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 					}
 				}
 				else {
-					logError("Can not create ", full_path, " because it's not in root directory.");
+					logError("Can not create ", full_path, " because it's not in root directory (", fs.getBasePath(), ").");
 				}
 			}
 		}

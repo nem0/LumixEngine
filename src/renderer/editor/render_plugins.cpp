@@ -4912,7 +4912,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 						new_created = createHeightmap(buf, size);
 					}
 					else {
-						logError("Can not create ", save_filename, " because it's not in root directory.");
+						logError("Can not create ", save_filename, " because it's not in root directory (", fs.getBasePath(), ").");
 					}
 				}
 			}
