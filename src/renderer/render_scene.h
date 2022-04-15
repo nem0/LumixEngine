@@ -283,7 +283,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 		Engine& engine,
 		Universe& universe,
 		IAllocator& allocator);
-	static void registerLuaAPI(lua_State* L);
+	static void registerLuaAPI(lua_State* L, Renderer& renderer);
 	static void reflect();
 
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
@@ -303,8 +303,6 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual void setGlobalLODMultiplier(float multiplier) = 0;
-	virtual float getGlobalLODMultiplier() const = 0;
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;

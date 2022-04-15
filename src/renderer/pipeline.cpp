@@ -3109,6 +3109,7 @@ struct PipelineImpl final : Pipeline
 			setupFur();
 
 			m_view->renderables = m_pipeline->m_scene->getRenderables(m_view->cp.frustum);
+			const float global_lod_multiplier = m_pipeline->m_renderer.getLODMultiplier();
 			
 			if (m_view->renderables) {
 				m_pipeline->createSortKeys(*m_view);
@@ -3176,7 +3177,7 @@ struct PipelineImpl final : Pipeline
 						continue;
 					}
 
-					g.lod_distances = *(Vec4*)m->getLODDistances();
+					g.lod_distances = *(Vec4*)m->getLODDistances() * global_lod_multiplier;
 					g.lod_indices.x = m->getLODIndices()[0].to;
 					g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
 					g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
@@ -4274,6 +4275,7 @@ struct PipelineImpl final : Pipeline
 			PROFILE_FUNCTION();
 			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
 			const Universe& universe = m_pipeline->m_scene->getUniverse();
+			const float global_lod_multiplier = m_pipeline->m_renderer.getLODMultiplier();
 
 			float fov_multiplier = 1;
 			if (!m_pipeline->m_viewport.is_ortho) {
@@ -4311,7 +4313,7 @@ struct PipelineImpl final : Pipeline
 							const Vec2 quad_center = Vec2(quad.ij) * quad_size + quad_size * 0.5f;
 							const float distance = length(quad_center - ref_lod_pos.xz());
 
-							const float half_range = type.m_distance * 0.5f;
+							const float half_range = type.m_distance * 0.5f * global_lod_multiplier;
 							float count_scale = 1 - clamp(distance - half_range, 0.f, half_range) / half_range; 
 							count_scale *= count_scale;
 							count_scale *= count_scale;
@@ -4553,6 +4555,8 @@ struct PipelineImpl final : Pipeline
 			view.instancers.emplace(allocator, m_renderer.getEngine().getPageAllocator());
 		}
 
+		const float global_lod_multiplier = m_renderer.getLODMultiplier();
+		const float global_lod_multiplier_rcp = 1 / global_lod_multiplier;
 		const float time_delta = m_renderer.getEngine().getLastTimeDelta();
 		volatile i32 worker_idx = 0;
 
@@ -4629,7 +4633,7 @@ struct PipelineImpl final : Pipeline
 							ModelInstance& mi = model_instances[e.index];
 							const float squared_length = float(squaredLength(pos - lod_ref_point));
 								
-							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
+							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length * global_lod_multiplier_rcp);
 
 							auto create_key = [&](const LODMeshIndices& lod){
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
@@ -4689,7 +4693,7 @@ struct PipelineImpl final : Pipeline
 							ModelInstance& mi = model_instances[e.index];
 							const float squared_length = float(squaredLength(pos - lod_ref_point));
 								
-							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
+							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length * global_lod_multiplier_rcp);
 
 							auto create_key = [&](const LODMeshIndices& lod){
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {

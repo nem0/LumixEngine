@@ -423,6 +423,9 @@ struct RendererImpl final : Renderer
 		m_frames[2].create(*this, m_allocator);
 	}
 
+	float getLODMultiplier() const override { return m_lod_multiplier; }
+	void setLODMultiplier(float value) override { m_lod_multiplier = value; }
+
 	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
@@ -562,7 +565,7 @@ struct RendererImpl final : Renderer
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 
-		RenderScene::registerLuaAPI(m_engine.getState());
+		RenderScene::registerLuaAPI(m_engine.getState(), *this);
 
 		m_layers.emplace("default");
 	}
@@ -1367,6 +1370,7 @@ struct RendererImpl final : Renderer
 	Array<const Mesh*> m_sort_key_to_mesh_map;
 	u32 m_max_sort_key = 0;
 	u32 m_frame_number = 0;
+	float m_lod_multiplier = 1;
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];

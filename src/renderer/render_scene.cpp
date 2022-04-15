@@ -2224,10 +2224,6 @@ struct RenderSceneImpl final : RenderScene {
 	float getCameraScreenWidth(EntityRef camera) override { return m_cameras[camera].screen_width; }
 	float getCameraScreenHeight(EntityRef camera) override { return m_cameras[camera].screen_height; }
 
-
-	void setGlobalLODMultiplier(float multiplier) override { m_lod_multiplier = multiplier; }
-	float getGlobalLODMultiplier() const override { return m_lod_multiplier; }
-
 	Camera& getCamera(EntityRef entity) override { return m_cameras[entity]; }
 
 	Matrix getCameraProjection(EntityRef entity) override
@@ -3307,7 +3303,6 @@ struct RenderSceneImpl final : RenderScene {
 	Array<DebugLine> m_debug_lines;
 	HashMap<EntityRef, FurComponent> m_furs;
 
-	float m_lod_multiplier;
 	bool m_is_updating_attachments;
 	bool m_is_game_running;
 
@@ -3417,8 +3412,6 @@ void RenderScene::reflect() {
 	};
 
 	LUMIX_SCENE(RenderSceneImpl, "renderer")
-		.LUMIX_FUNC(RenderSceneImpl::setGlobalLODMultiplier)
-		.LUMIX_FUNC(RenderSceneImpl::getGlobalLODMultiplier)
 		.LUMIX_FUNC(RenderSceneImpl::addDebugCross)
 		.LUMIX_FUNC(RenderSceneImpl::addDebugLine)
 		.LUMIX_FUNC(RenderSceneImpl::addDebugTriangle)
@@ -3538,7 +3531,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_reflection_probes(m_allocator)
 	, m_spline_geometries(m_allocator)
 	, m_procedural_geometries(m_allocator)
-	, m_lod_multiplier(1.0f)
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
@@ -3572,7 +3564,7 @@ UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
 	return UniquePtr<RenderSceneImpl>::create(allocator, renderer, engine, universe, allocator);
 }
 
-void RenderScene::registerLuaAPI(lua_State* L)
+void RenderScene::registerLuaAPI(lua_State* L, Renderer& renderer)
 {
 	#define REGISTER_FUNCTION(F)\
 		do { \
@@ -3595,6 +3587,9 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(makeScreenshot);
 
 	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
+
+	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
+	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
 
 	#undef REGISTER_FUNCTION
 }
