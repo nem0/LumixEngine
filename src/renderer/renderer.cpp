@@ -424,7 +424,7 @@ struct RendererImpl final : Renderer
 	}
 
 	float getLODMultiplier() const override { return m_lod_multiplier; }
-	void setLODMultiplier(float value) override { m_lod_multiplier = value; }
+	void setLODMultiplier(float value) override { m_lod_multiplier = maximum(0.f, value); }
 
 	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}

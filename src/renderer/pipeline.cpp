@@ -3404,7 +3404,7 @@ struct PipelineImpl final : Pipeline
 			}
 			
 			bool isEnd() {
-				if (offset == page->header.size) {
+				while (page && offset == page->header.size) {
 					CmdPage* next = page->header.next;
 					allocator.deallocate(page, true);
 					page = next;
