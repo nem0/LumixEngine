@@ -30,7 +30,7 @@ compute_shader [[
 		float current = imageLoad(u_sss, ij).x;
 		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {
 			float prev = texture(u_history, uv_prev).x;
-				current = mix(current, prev, 0.9);
+				current = mix(current, prev, 0.5);
 				imageStore(u_sss, ij, vec4(current));
 		}
 		

@@ -480,10 +480,10 @@ vec3 reflProbesLighting(Cluster cluster, Surface surface, samplerCubeArray refle
 		float w = 1 - max(rpos.x, max(rpos.y, rpos.z));
 		w = min(remaining_w, w);
 		remaining_w -= w;
-		res += radiance * brdf * w;
+		res += radiance * w;
 	}
 
-	return (remaining_w > 0.999 ? vec3(0) : res / (1 - remaining_w)) * surface.ao * Global.light_indirect_intensity;
+	return (remaining_w > 0.999 ? vec3(0) : res * brdf / (1 - remaining_w)) * surface.ao * Global.light_indirect_intensity;
 }
 
 vec3 envProbesLighting(Cluster cluster, Surface surface) {
@@ -512,10 +512,10 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 		vec3 irradiance = evalSH(b_env_probes[probe_idx], surface.N);
 		irradiance = max(vec3(0), irradiance);
 		vec3 indirect = computeIndirectDiffuse(irradiance, surface);
-		probe_light += (indirect * Global.light_indirect_intensity) * w / M_PI;
+		probe_light += indirect * w;
 		if (remaining_w <= 0) break;
 	}
-	return (remaining_w < 1 ? probe_light / (1 - remaining_w) : vec3(0)) * surface.ao;
+	return (remaining_w < 1 ? probe_light / (1 - remaining_w) / M_PI : vec3(0)) * surface.ao * Global.light_indirect_intensity;
 }
 
 // must match ShadowAtlas::getUV

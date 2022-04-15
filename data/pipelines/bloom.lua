@@ -1,8 +1,9 @@
 enabled = false
 debug = false
 only_autoexposure = false
-luma_limit = 1
+luma_limit = 64
 accomodation_speed = 1
+exposure = 1
 local state = {
 	depth_write = false,
 	depth_test = false
@@ -94,6 +95,7 @@ function tonemap(env, hdr_buffer)
 	local rb = env.createRenderbuffer { width = env.viewport_w, height = env.viewport_h, format = format, debug_name = "tonemap_bloom" }
 	env.setRenderTargets(rb)
 	env.bindShaderBuffer(env.lum_buf, 5, false)
+	env.drawcallUniforms(exposure) 
 	env.drawArray(0, 3, env.bloom_tonemap_shader
 		, { hdr_buffer }
 		, { depth_test = false }

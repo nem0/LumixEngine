@@ -34,11 +34,14 @@ enum class FramebufferFlags : u32 {
 enum class StateFlags : u64 {
 	NONE = 0,
 	WIREFRAME = 1 << 0,
-	DEPTH_TEST = 1 << 1,
-	CULL_FRONT = 1 << 2,
-	CULL_BACK = 1 << 3,
-	SCISSOR_TEST = 1 << 4,
-	DEPTH_WRITE = 1 << 5,
+	DEPTH_FN_GREATER = 1 << 1,
+	DEPTH_FN_EQUAL = 1 << 2,
+	DEPTH_FUNCTION = DEPTH_FN_GREATER | DEPTH_FN_EQUAL,
+	CULL_FRONT = 1 << 3,
+	CULL_BACK = 1 << 4,
+	SCISSOR_TEST = 1 << 5,
+	DEPTH_WRITE = 1 << 6,
+
 	/* 16 bits reserved for blending*/
 	/* 40 bits reserver for stencil*/ 
 };
@@ -254,12 +257,12 @@ void viewport(u32 x, u32 y, u32 w, u32 h);
 
 inline StateFlags getBlendStateBits(BlendFactors src_rgb, BlendFactors dst_rgb, BlendFactors src_a, BlendFactors dst_a)
 {
-	return StateFlags((((u64)src_rgb & 15) << 6) | (((u64)dst_rgb & 15) << 10) | (((u64)src_a & 15) << 14) | (((u64)dst_a & 15) << 18));
+	return StateFlags((((u64)src_rgb & 15) << 7) | (((u64)dst_rgb & 15) << 11) | (((u64)src_a & 15) << 15) | (((u64)dst_a & 15) << 19));
 }
 
 inline StateFlags getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask, StencilOps sfail, StencilOps dpfail, StencilOps dppass)
 {
-	return StateFlags(((u64)write_mask << 22) | ((u64)func << 30) | ((u64)ref << 34) | ((u64)mask << 42) | ((u64)sfail << 50) | ((u64)dpfail << 54) | ((u64)dppass << 58));
+	return StateFlags(((u64)write_mask << 23) | ((u64)func << 31) | ((u64)ref << 35) | ((u64)mask << 43) | ((u64)sfail << 51) | ((u64)dpfail << 55) | ((u64)dppass << 59));
 }
 
 TextureHandle allocTextureHandle();

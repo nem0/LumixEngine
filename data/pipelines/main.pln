@@ -59,7 +59,8 @@ local default_state = {
 
 local terrain_state = {
 	define = "DEFERRED",
-	depth_write = true,
+	depth_func = DEPTH_FN_EQUAL,
+	depth_write = false,
 	stencil_func = STENCIL_ALWAYS,
 	stencil_write_mask = 0xff,
 	stencil_ref = 2,
@@ -160,14 +161,14 @@ function geomPass(entities)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
 		local view_params = getCameraParams()
 		pass(view_params)
-		renderTerrains(view_params, terrain_state)
+		renderTerrains(view_params, {define = "DEPTH"})
 		renderGrass(view_params, grass_state)
 		renderBucket(entities.default, default_state)
 		renderOpaque()
-
 		beginBlock("impostors")
 			renderBucket(entities.impostor, impostor_state)
 		endBlock()
+		renderTerrains(view_params, terrain_state)
 	endBlock()
 
 	beginBlock("decals")
@@ -295,7 +296,7 @@ function shadowPass()
 				renderBucket(entities.default, {})
 				renderBucket(entities.impostor, {})
 
-				if slice < 2 then
+				if slice < 1 then
 					renderGrass(view_params, shadow_grass_state)
 				end
 				renderTerrains(view_params, {define = "DEPTH"})

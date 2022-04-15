@@ -266,12 +266,12 @@ fragment_shader [[
 				surface.alpha = 1;
 			}
 			surface.wpos = vec3(0);
-			surface.roughness = 0.9;
-			surface.metallic  = 0;
-			surface.emission = 0;
-			surface.translucency = 0;
-			surface.ao = 1;
-			surface.shadow = 1;
+			surface.roughness = u_roughness;
+			surface.metallic  = u_metallic;
+			surface.emission = u_emission;
+			surface.translucency = u_translucency;
+			surface.ao = 0.9;
+			surface.shadow = saturate(Global.light_dir.y * 3) * 0.9;
 			return surface;
 		}
 	#endif

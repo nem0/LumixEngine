@@ -141,7 +141,7 @@ namespace LuaWrapper {
 		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
 
 		char tmp[64];
-		gpu::StateFlags rs = gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE;
+		gpu::StateFlags rs = gpu::StateFlags::DEPTH_WRITE;
 		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
 			if(equalIStrings(tmp, "add")) {
 				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
@@ -162,9 +162,15 @@ namespace LuaWrapper {
 			}
 		}
 
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, gpu::StateFlags::DEPTH_TEST, true);
+		u32 depth_func = 0;
 		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, gpu::StateFlags::WIREFRAME, false);
 		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, gpu::StateFlags::DEPTH_WRITE, true);
+		if (LuaWrapper::getOptionalField(L, idx, "depth_func", &depth_func)) {
+			rs = rs | gpu::StateFlags(depth_func);
+		}
+		else {
+			LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, gpu::StateFlags::DEPTH_FN_GREATER, true);
+		}
 		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
 		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
 		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
@@ -1537,7 +1543,7 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				gpu::pushDebugGroup("debug triangles");
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
+				gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
 				gpu::useProgram(program);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
@@ -1595,7 +1601,7 @@ struct PipelineImpl final : Pipeline
 				if (vb.size == 0) return;
 				gpu::pushDebugGroup("debug lines");
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
+				gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
 				gpu::useProgram(program);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
@@ -1662,7 +1668,7 @@ struct PipelineImpl final : Pipeline
 			u32 elem_offset = 0;
 			gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			state = state | gpu::StateFlags::SCISSOR_TEST;
-			if (is_3d) state = state | gpu::StateFlags::DEPTH_TEST; 
+			if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
 			gpu::setState(state);
 			gpu::useProgram(program);
 			gpu::bindIndexBuffer(idx_buffer_mem.buffer);
@@ -2010,7 +2016,7 @@ struct PipelineImpl final : Pipeline
 				gpu::pushDebugGroup("particles");
 				
 				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState(blend_state | gpu::StateFlags::DEPTH_TEST);
+				gpu::setState(blend_state | gpu::StateFlags::DEPTH_FN_GREATER);
 				const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
 				for (const Drawcall& dc : m_drawcalls) {
@@ -2452,9 +2458,9 @@ struct PipelineImpl final : Pipeline
 		const gpu::StateFlags rs = [&](){
 			if(lua_gettop(L) > 4) {
 				LuaWrapper::checkTableArg(L, 5);
-				return getState(L, 5);
+				return LuaWrapper::toType<RenderState>(L, 5).value;
 			}
-			return gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_TEST;
+			return gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
 		}();
 
 		Shader* shader = nullptr;
@@ -2572,54 +2578,6 @@ struct PipelineImpl final : Pipeline
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderTransparent(*this);
 		}
-	}
-
-	static gpu::StateFlags getState(lua_State* L, int idx)
-	{
-		gpu::StencilFuncs stencil_func = gpu::StencilFuncs::DISABLE;
-		u8 stencil_write_mask = 0xff;
-		u8 stencil_ref = 0;
-		u8 stencil_mask = 0;
-		gpu::StencilOps stencil_sfail = gpu::StencilOps::KEEP;
-		gpu::StencilOps stencil_zfail = gpu::StencilOps::KEEP;
-		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
-
-		char tmp[64];
-		gpu::StateFlags rs = gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE;
-		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
-			if(equalIStrings(tmp, "add")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-			}
-			else if(equalIStrings(tmp, "alpha")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			}
-			else if(equalIStrings(tmp, "multiply")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
-			}
-			else if(equalIStrings(tmp, "dual")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-			}
-			else if(equalIStrings(tmp, "")) {
-			}
-			else {
-				luaL_error(L, "Unknown blending mode");
-			}
-		}
-
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, gpu::StateFlags::DEPTH_TEST, true);
-		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, gpu::StateFlags::WIREFRAME, false);
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, gpu::StateFlags::DEPTH_WRITE, true);
-		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
-		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
-		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
-		LuaWrapper::getOptionalField(L, idx, "stencil_mask", &stencil_mask);
-		LuaWrapper::getOptionalField(L, idx, "stencil_sfail", reinterpret_cast<u8*>(&stencil_sfail));
-		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
-		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
-
-		rs = rs | gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
-
-		return rs;
 	}
 
 	// TODO optimize
@@ -3589,7 +3547,7 @@ struct PipelineImpl final : Pipeline
 						}
 
 						if (cmd->total_count - cmd->nonintersecting_count) {
-							state = state & ~gpu::StateFlags::DEPTH_TEST;
+							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
 							gpu::setState(state);
@@ -3620,7 +3578,7 @@ struct PipelineImpl final : Pipeline
 						}
 
 						if (cmd->total_count - cmd->nonintersecting_count) {
-							state = state & ~gpu::StateFlags::DEPTH_TEST;
+							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
 							gpu::setState(state);
@@ -4410,7 +4368,7 @@ struct PipelineImpl final : Pipeline
 				}
 
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, grass.drawcall_ub.size);
-				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
+				gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
 				gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, grass.mesh->indices_count, grass.instance_count, grass.mesh->index_type);
 			}
 			
@@ -5166,6 +5124,9 @@ struct PipelineImpl final : Pipeline
 		registerConst("CLEAR_DEPTH", (u32)gpu::ClearFlags::DEPTH);
 		registerConst("CLEAR_COLOR", (u32)gpu::ClearFlags::COLOR);
 		registerConst("CLEAR_ALL", (u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL);
+
+		registerConst("DEPTH_FN_GREATER", (u32)gpu::StateFlags::DEPTH_FN_GREATER);
+		registerConst("DEPTH_FN_EQUAL", (u32)gpu::StateFlags::DEPTH_FN_EQUAL);
 
 		registerConst("STENCIL_ALWAYS", (u32)gpu::StencilFuncs::ALWAYS);
 		registerConst("STENCIL_EQUAL", (u32)gpu::StencilFuncs::EQUAL);

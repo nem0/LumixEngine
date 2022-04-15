@@ -16,9 +16,12 @@ fragment_shader [[
 	};
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
+	layout(std140, binding = 4) uniform Data {
+		float u_exposure;
+	};
 	void main() {
 		float avglum = b_accum;
-		const float exposure = 1;
+		const float exposure = u_exposure;
 
 		o_color.rgb = ACESFilm(texture(u_hdrbuffer, v_uv, 0).rgb * exposure);
 		o_color.w = 1;

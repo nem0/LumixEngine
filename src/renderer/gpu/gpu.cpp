@@ -602,7 +602,14 @@ void setState(StateFlags state)
 	if(state == gl->last_state) return;
 	gl->last_state = state;
 
-	if (u64(state & StateFlags::DEPTH_TEST)) glEnable(GL_DEPTH_TEST);
+	if (u64(state & StateFlags::DEPTH_FN_GREATER)) {
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_GREATER);
+	}
+	else if (u64(state & StateFlags::DEPTH_FN_EQUAL)) {
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_EQUAL);
+	}
 	else glDisable(GL_DEPTH_TEST);
 	
 	glDepthMask(u64(state & StateFlags::DEPTH_WRITE) != 0);
@@ -644,7 +651,7 @@ void setState(StateFlags state)
 		return table[(int)factor];
 	};
 
-	u16 blend_bits = u16(u64(state) >> 6);
+	u16 blend_bits = u16(u64(state) >> 7);
 
 	if (blend_bits) {
 		const BlendFactors src_rgb = (BlendFactors)(blend_bits & 0xf);
@@ -658,14 +665,14 @@ void setState(StateFlags state)
 		glDisable(GL_BLEND);
 	}
 	
-	glStencilMask(u8(u64(state) >> 22));
-	const StencilFuncs func = (StencilFuncs)((u64(state) >> 30) & 0xf);
+	glStencilMask(u8(u64(state) >> 23));
+	const StencilFuncs func = (StencilFuncs)((u64(state) >> 31) & 0xf);
 	if (func == StencilFuncs::DISABLE) {
 		glDisable(GL_STENCIL_TEST);
 	}
 	else {
-		const u8 ref = u8(u64(state) >> 34);
-		const u8 mask = u8(u64(state) >> 42);
+		const u8 ref = u8(u64(state) >> 35);
+		const u8 mask = u8(u64(state) >> 43);
 		glEnable(GL_STENCIL_TEST);
 		GLenum gl_func;
 		switch(func) {
@@ -688,9 +695,9 @@ void setState(StateFlags state)
 			};
 			return table[(int)op];
 		};
-		const StencilOps sfail = StencilOps((u64(state) >> 50) & 0xf);
-		const StencilOps zfail = StencilOps((u64(state) >> 54) & 0xf);
-		const StencilOps zpass = StencilOps((u64(state) >> 58) & 0xf);
+		const StencilOps sfail = StencilOps((u64(state) >> 51) & 0xf);
+		const StencilOps zfail = StencilOps((u64(state) >> 55) & 0xf);
+		const StencilOps zpass = StencilOps((u64(state) >> 59) & 0xf);
 		glStencilOp(toGLOp(sfail), toGLOp(zfail), toGLOp(zpass));
 	}
 }

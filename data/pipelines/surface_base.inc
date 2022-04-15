@@ -1,4 +1,8 @@
-function surface_shader(code)
+function surface_shader_ex(args)
+	args.vertex_preface = args.vertex_preface or ""
+	args.fragment_preface = args.fragment_preface or ""
+	args.vertex = args.vertex or ""
+
 	texture_slot {
 		name = "Albedo",
 		default_texture = "textures/common/white.tga"
@@ -24,6 +28,12 @@ function surface_shader(code)
 		define = "HAS_AMBIENT_OCCLUSION_TEX"
 	}
 
+	if args.texture_slots ~= nil then
+		for _, slot in ipairs(args.texture_slots) do
+			texture_slot(slot)
+		end
+	end
+
 	include "pipelines/common.glsl"
 
 	define "ALPHA_CUTOUT"
@@ -47,7 +57,7 @@ function surface_shader(code)
 		#endif
 	]]
 
-	vertex_shader [[
+	vertex_shader([[
 		layout(location = 0) in vec3 a_position;
 		#ifdef _HAS_ATTR1
 			layout(location = 1) in vec2 a_uv;
@@ -85,6 +95,7 @@ function surface_shader(code)
 				layout(location = 7) in float a_ao;
 				layout(location = 6) out float v_ao;
 			#endif
+			layout(location = 7) out float v_pos_y;
 		#else
 			layout(std140, binding = 4) uniform ModelState {
 				mat4 matrix;
@@ -106,7 +117,7 @@ function surface_shader(code)
 		#ifdef FUR
 			layout(location = 7) out float v_fur_layer;
 		#endif
-	
+	]] .. args.vertex_preface .. [[	
 		void main() {
 			v_uv = a_uv;
 			#if defined INSTANCED
@@ -129,6 +140,7 @@ function surface_shader(code)
 				v_normal = rotateByQuat(i_rot, a_normal);
 				v_tangent = rotateByQuat(i_rot, a_tangent);
 				vec3 p = a_position;
+				v_pos_y = p.y;
 				v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot, a_position * i_pos_scale.w), 1);
 				#ifdef GRASS
 					v_wpos.xyz += Grass.u_grass_origin;
@@ -170,10 +182,10 @@ function surface_shader(code)
 
 				v_wpos = model_mtx * vec4(p,  1);
 			#endif
-		
+	]] .. args.vertex .. [[
 			gl_Position = Pass.view_projection * v_wpos;		
 		}
-	]]
+	]])
 
 	---------------------
 
@@ -207,6 +219,9 @@ function surface_shader(code)
 		#ifdef FUR
 			layout(location = 7) in float v_fur_layer;
 		#endif
+		#ifdef GRASS
+			layout(location = 7) in float v_pos_y;
+		#endif
 
 		#ifndef DEPTH
 			#if defined DEFERRED || defined GRASS
@@ -218,6 +233,8 @@ function surface_shader(code)
 			#endif
 		#endif
 
+	]] .. args.fragment_preface .. [[	
+
 		Surface getSurface()
 		{
 			#ifdef HAS_LOD
@@ -226,7 +243,10 @@ function surface_shader(code)
 			Surface data;
 			data.wpos = v_wpos.xyz;
 			data.V = normalize(-data.wpos);
-]] .. code .. [[
+]] .. args.fragment .. [[
+			#ifdef GRASS
+				data.ao *= saturate(0.3 + v_pos_y * 5);
+			#endif
 			return data;
 		}
 	
@@ -268,4 +288,8 @@ function surface_shader(code)
 			}
 		#endif
 	]])
+end
+
+function surface_shader(code)
+	surface_shader_ex({fragment = code})
 end

@@ -838,7 +838,7 @@ void SceneView::renderIcons()
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
 				gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::setState(item.material->render_states | gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
+				gpu::setState(item.material->render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
 				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
 			}
 			m_renderer.endProfileBlock();
@@ -1008,7 +1008,7 @@ void SceneView::renderGizmos()
 			if (cmds.empty()) return;
 
 			renderer->beginProfileBlock("gizmos", 0);
-			gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
+			gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
 			u32 offset = 0;
 			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			for (const UniverseViewImpl::DrawCmd& cmd : cmds) {
