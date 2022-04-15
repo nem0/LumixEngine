@@ -1,4 +1,6 @@
 enabled = false
+max_steps = 20
+stride = 4
 local sss_history = -1
 
 function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
@@ -24,8 +26,8 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.drawcallUniforms (
 		env.viewport_w,
 		env.viewport_h,
-		0, 
-		0
+		max_steps, 
+		stride
 	)
 	env.dispatch(env.sss_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
 

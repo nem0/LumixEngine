@@ -113,7 +113,7 @@ compute_shader [[
 			float lum1 = luminance(prev.rgb);
 
 			float d = 1 - abs(lum0 - lum1) / max(lum0, max(lum1, 0.2));
-			float k_feedback = mix(0.7, 0.99, d * d);
+			float k_feedback = mix(0.9, 0.99, d * d);
 
 			current = mix(current, prev, k_feedback);
     	}
