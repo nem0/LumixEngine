@@ -625,6 +625,11 @@ function onGUI()
 		changed, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
 		changed, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
+		local lod_mul = Renderer.getLODMultiplier()
+		changed, lod_mul = ImGui.DragFloat("LOD multiplier", lod_mul)
+		if changed then
+			Renderer.setLODMultiplier(lod_mul)
+		end
 		terrain_state.wireframe = default_state.wireframe
 		water_state.wireframe = default_state.wireframe
 		grass_state.wireframe = default_state.wireframe
