@@ -7,7 +7,6 @@ vertex_shader [[
 	}
 ]]
 
-
 fragment_shader [[
 	layout (binding=0) uniform sampler2D u_hdrbuffer;
 	layout (binding=5, std430) readonly buffer LuminanceData {

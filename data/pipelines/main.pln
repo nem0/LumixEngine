@@ -17,6 +17,9 @@ local screenshot_request = 0
 local enable_icons = true
 local taa_enabled = true
 local taa_history = -1
+local render_grass = true
+local render_impostors = true
+local render_terrain = true
 
 local decal_state = {
 	blending = "alpha",
@@ -161,14 +164,22 @@ function geomPass(entities)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
 		local view_params = getCameraParams()
 		pass(view_params)
-		renderTerrains(view_params, {define = "DEPTH"})
-		renderGrass(view_params, grass_state)
+		if render_terrain then
+			renderTerrains(view_params, {define = "DEPTH"})
+		end
+		if render_grass then
+			renderGrass(view_params, grass_state)
+		end
 		renderBucket(entities.default, default_state)
 		renderOpaque()
-		beginBlock("impostors")
+		if render_impostors then
+			beginBlock("impostors")
 			renderBucket(entities.impostor, impostor_state)
-		endBlock()
-		renderTerrains(view_params, terrain_state)
+			endBlock()
+		end
+		if render_terrain then
+			renderTerrains(view_params, terrain_state)
+		end
 	endBlock()
 
 	beginBlock("decals")
@@ -294,12 +305,16 @@ function shadowPass()
 					, { layer = "default", define = "DEPTH" }
 					, { layer = "impostor", define = "DEPTH" })
 				renderBucket(entities.default, {})
-				renderBucket(entities.impostor, {})
+				if render_impostors then
+					renderBucket(entities.impostor, {})
+				end
 
-				if slice < 1 then
+				if slice < 1 and render_grass then
 					renderGrass(view_params, shadow_grass_state)
 				end
-				renderTerrains(view_params, {define = "DEPTH"})
+				if render_terrain then
+					renderTerrains(view_params, {define = "DEPTH"})
+				end
 				endBlock()
 			end
 		endBlock()
@@ -604,9 +619,12 @@ function onGUI()
 		changed, debug_metallic = ImGui.Checkbox("Metallic", debug_metallic)
 		changed, debug_ao = ImGui.Checkbox("AO", debug_ao)
 		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
-		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
-		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
+		changed, default_state.wireframe = ImGui.Checkbox("Wireframe", default_state.wireframe)
 		changed, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
+		changed, render_grass = ImGui.Checkbox("Grass", render_grass)
+		changed, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
+		changed, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
+		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		terrain_state.wireframe = default_state.wireframe
 		water_state.wireframe = default_state.wireframe
 		grass_state.wireframe = default_state.wireframe
