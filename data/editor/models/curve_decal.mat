@@ -1,0 +1,11 @@
+shader "pipelines/editor_icon.shd"
+backface_culling(true)
+layer "default"
+translucency(0.000000)
+emission(0.000000)
+metallic(0.000000)
+roughness(1.000000)
+defines {}
+color { 1.000000, 1.000000, 1.000000, 1.000000 }
+texture "/editor/models/curve_decal.tga"
+layer "default"

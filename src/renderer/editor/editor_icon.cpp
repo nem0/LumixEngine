@@ -21,6 +21,7 @@ static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
 
 
 const char* ICONS[(int)EditorIcons::IconType::COUNT] =
@@ -29,7 +30,8 @@ const char* ICONS[(int)EditorIcons::IconType::COUNT] =
 	"camera_icon",
 	"directional_light_icon",
 	"terrain_icon",
-	"icon"
+	"icon",
+	"curve_decal"
 };
 
 
@@ -139,6 +141,11 @@ struct EditorIconsImpl final : EditorIcons
 			if(cmp.type == TERRAIN_TYPE)
 			{
 				icon.type = IconType::TERRAIN;
+				break;
+			}
+			if(cmp.type == CURVE_DECAL_TYPE)
+			{
+				icon.type = IconType::CURVE_DECAL;
 				break;
 			}
 		}
