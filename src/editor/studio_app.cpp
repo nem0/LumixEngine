@@ -2028,9 +2028,7 @@ struct StudioAppImpl final : StudioApp
 		pio.Platform_GetWindowFocus = [](ImGuiViewport* vp){
 			return os::getFocused() == vp->PlatformHandle;
 		};
-		pio.Platform_SetWindowFocus = [](ImGuiViewport* vp){
-			ASSERT(false);
-		};
+		pio.Platform_SetWindowFocus = nullptr;
 
 		ImGuiViewport* mvp = ImGui::GetMainViewport();
 		mvp->PlatformHandle = m_main_window;
