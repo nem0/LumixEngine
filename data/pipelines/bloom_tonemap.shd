@@ -20,10 +20,9 @@ fragment_shader [[
 		float u_exposure;
 	};
 	void main() {
-		float avglum = b_accum;
 		const float exposure = u_exposure;
 
-		o_color.rgb = ACESFilm(texture(u_hdrbuffer, v_uv, 0).rgb * exposure);
+		o_color.rgb = ACESFilm(texture(u_hdrbuffer, v_uv, 0).rgb * exposure / (10 * b_accum));
 		o_color.w = 1;
 	}
 ]]
