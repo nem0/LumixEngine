@@ -90,6 +90,7 @@ struct SMSlice {
 layout (std140, binding = 0) uniform GlobalState {
 	SMSlice sm_slices[4];
 	mat4 projection;
+	mat4 projection_no_jitter;
 	mat4 inv_projection;
 	mat4 view;
 	mat4 inv_view;

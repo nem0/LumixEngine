@@ -31,7 +31,7 @@ vertex_shader [[
 		vec4 p = Global.view * u_model * vec4(a_position,  1);
 		v_wpos = p.xyz;
 		v_normal = a_normal;
-		gl_Position = Global.projection * p;
+		gl_Position = Global.projection_no_jitter * p;
 	}
 ]]
 

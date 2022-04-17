@@ -390,6 +390,7 @@ struct GlobalState
 	};
 	SMSlice sm_slices[4];
 	Matrix camera_projection;
+	Matrix camera_projection_no_jitter;
 	Matrix camera_inv_projection;
 	Matrix camera_view;
 	Matrix camera_inv_view;
@@ -1236,7 +1237,7 @@ struct PipelineImpl final : Pipeline
 
 			view_matrix = vp.getView(m_viewport.pos);
 
-			const Matrix projection_matrix = vp.getProjection();
+			const Matrix projection_matrix = vp.getProjectionNoJitter();
 			const Matrix m = bias_matrix * projection_matrix * view_matrix;
 
 			global_state.sm_slices[slice].world_to_slice = Matrix4x3(m).transposed();
@@ -1341,7 +1342,7 @@ struct PipelineImpl final : Pipeline
 			cmd.matrix.setTranslation(Vec3(tr.pos - m_viewport.pos));
 			cmd.matrix.multiply3x3(tr.scale);
 		}
-		cmd.matrix = m_viewport.getProjection() * m_viewport.getViewRotation() * cmd.matrix * normalize;
+		cmd.matrix = m_viewport.getProjectionWithJitter() * m_viewport.getViewRotation() * cmd.matrix * normalize;
 		cmd.prepare(drawdata);
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1350,12 +1351,12 @@ struct PipelineImpl final : Pipeline
 		Matrix translation = Matrix::IDENTITY;
 		translation.setTranslation(Vec3(current.pos - prev.pos));
 		if (gpu::isOriginBottomLeft()) {
-			return prev.getProjection() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjection().inverted();
+			return prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted();
 		}
 
 		Matrix flip = Matrix::IDENTITY;
 		flip.columns[1].y = -1;
-		return flip * prev.getProjection() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjection().inverted() * flip;
+		return flip * prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted() * flip;
 	}
 
 	static float halton(u32 index, i32 base)
@@ -1392,15 +1393,16 @@ struct PipelineImpl final : Pipeline
 		m_viewport.pixel_offset = Vec2(0);
 
 		if (pixel_jitter) {
-			m_viewport.pixel_offset.x = (halton(m_renderer.frameNumber() % 8 + 1, 2) * 2 - 1) / (2 * m_viewport.w);
-			m_viewport.pixel_offset.y = (halton(m_renderer.frameNumber() % 8 + 1, 3) * 2 - 1) / (2 * m_viewport.h);
+			m_viewport.pixel_offset.x = (halton(m_renderer.frameNumber() % 8 + 1, 2) * 2 - 1) / m_viewport.w;
+			m_viewport.pixel_offset.y = (halton(m_renderer.frameNumber() % 8 + 1, 3) * 2 - 1) / m_viewport.h;
 		}
 
 		const Matrix view = m_viewport.getViewRotation();
-		const Matrix projection = m_viewport.getProjection();
+		const Matrix projection = m_viewport.getProjectionWithJitter();
 		GlobalState global_state;
 		global_state.pixel_jitter = m_viewport.pixel_offset;
 		global_state.camera_projection = projection;
+		global_state.camera_projection_no_jitter = m_viewport.getProjectionNoJitter();
 		global_state.camera_inv_projection = projection.inverted();
 		global_state.camera_view = view;
 		global_state.camera_inv_view = view.fastInverted();
@@ -2528,7 +2530,7 @@ struct PipelineImpl final : Pipeline
 		cp.lod_multiplier = m_scene->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
 		cp.is_shadow = false;
 		cp.view = m_viewport.getView(cp.pos);
-		cp.projection = m_viewport.getProjection();
+		cp.projection = m_viewport.getProjectionWithJitter();
 		return cp;
 	}
 
@@ -4170,7 +4172,7 @@ struct PipelineImpl final : Pipeline
 		cp.lod_multiplier = m_scene->getCameraLODMultiplier(vp.fov, vp.is_ortho);
 		cp.is_shadow = true;
 		cp.view = vp.getView(cp.pos);
-		cp.projection = vp.getProjection();
+		cp.projection = vp.getProjectionNoJitter();
 		return cp;
 	}
 	
