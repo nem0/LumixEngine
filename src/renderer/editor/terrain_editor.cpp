@@ -1288,14 +1288,14 @@ int TerrainEditor::placeInstances(lua_State* L) {
 			const i32 idx = i32(x) + i32(y) * df->width;
 			const float distance = df->data[idx];
 			if (distance > 0.01f) {
-				float fx = (x + spacing * randFloat() * 0.9f - spacing * 0.45f);
-				float fy = (y + spacing * randFloat() * 0.9f - spacing * 0.45f);
+				float fx = x;
+				float fy = y;
 				fx = clamp(fx, 0.f, (float)df->width - 1);
 				fy = clamp(fy, 0.f, (float)df->height - 1);
 
 				DVec3 pos;
-				pos.x = fx * df_to_terrain.x;
-				pos.z = fy * df_to_terrain.y;
+				pos.x = fx * df_to_terrain.x + spacing * randFloat() * 0.9f - spacing * 0.45f;
+				pos.z = fy * df_to_terrain.y + spacing * randFloat() * 0.9f - spacing * 0.45f;
 				pos.y = render_scene->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
 
 				pos.x -= size.x * 0.5f;
