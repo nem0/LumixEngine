@@ -16,6 +16,8 @@ surface_shader_ex({
 		float selfshadow(vec2 uv, vec3 light_dir) {
 			if (light_dir.y <= 0.0) return 0;
 
+			vec2 dPdx = dFdx(uv);
+			vec2 dPdy = dFdy(uv);
 			float layers = mix(16, 8, abs(light_dir.y));
 
 			float depth_step = 1.0 / layers;
@@ -27,7 +29,7 @@ surface_shader_ex({
 
 			while (layer_depth <= depth && layer_depth > 0.0) {
 				uv += uv_step;
-				depth = texture(u_displacement, uv).r;
+				depth = textureGrad(u_displacement, uv, dPdx, dPdy).r;
 				layer_depth -= depth_step;
 			}
 
@@ -35,6 +37,9 @@ surface_shader_ex({
 		}
 
 		vec2 parallax(vec2 uv, vec3 view_dir) { 
+			vec2 dPdx = dFdx(uv);
+			vec2 dPdy = dFdy(uv);
+			
 			float layers = mix(16, 8, abs(view_dir.y));
 			float depth_step = 1.0 / layers;
 			float layer_depth = 0.0;
@@ -44,7 +49,7 @@ surface_shader_ex({
 			
 			while (layer_depth < depth) {
 				uv -= uv_step;
-				depth = texture(u_displacement, uv).r;  
+				depth = textureGrad(u_displacement, uv, dPdx, dPdy).r;  
 				layer_depth += depth_step;
 			}
 
