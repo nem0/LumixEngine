@@ -37,9 +37,6 @@ uniform("Detail diffusion", "float")
 uniform("Detail power", "float")
 
 common [[
-	//#define SECONDARY_TEXTURE
-	//#define HQ_TILING
-
 	layout(binding=0) uniform sampler2D u_hm;
 	layout(binding=1) uniform sampler2DArray u_albedo;
 	layout(binding=2) uniform sampler2DArray u_normal;
@@ -136,52 +133,27 @@ fragment_shader [[
 			vec3 normal;
 		};
 
-		// http://www.iquilezles.org/www/articles/texturerepetition/texturerepetition.htm
-		Detail textureNoTile(float dist2, float k, vec2 x, int layer, float v )
-		{
-			#ifdef HQ_TILING
-				vec2 duvdx = dFdx( x );
-				vec2 duvdy = dFdy( x );
-		
-				float l = k*8;
-				float f = fract(l);
-		
-				float ia = floor(l);
-				float ib = ia + 1.0;
-		
-				vec2 offa = sin(vec2(3.0,7.0)*ia);
-				vec2 offb = sin(vec2(3.0,7.0)*ib);
+		Detail textureNoTile(float dist2, vec2 x, int layer, vec2 dPdx, vec2 dPdy) {
+			Detail detail;
 
-				vec4 cola = textureGrad(u_albedo, vec3(x + v * offa, layer), duvdx, duvdy);
-				vec4 colb = textureGrad(u_albedo, vec3(x + v * offb, layer), duvdx, duvdy);
+			detail.normal.xy = textureGrad(u_normal, vec3(x, layer), dPdx, dPdy).xy * 2 - 1;
+			detail.albedo = textureGrad(u_albedo, vec3(x, layer), dPdx, dPdy);
 
-				vec3 norma; norma.xy = textureGrad(u_normal, vec3(x + v * offa, layer), duvdx, duvdy).xy * 2 - 1;
-				vec3 normb; normb.xy = textureGrad(u_normal, vec3(x + v * offb, layer), duvdx, duvdy).xy * 2 - 1;
-				norma.z = sqrt(saturate(1 - dot(norma.xy, norma.xy))); 
-				normb.z = sqrt(saturate(1 - dot(normb.xy, normb.xy)));
-		
-				Detail detail;
+			const float blend_start_sqr = 10 * 10;
+			if (dist2 > blend_start_sqr) {
+				vec2 N;
+				vec3 uv = vec3(x * 0.1, layer);
+				dPdx *= 0.1; 
+				dPdy *= 0.1; 
+				vec4 albedo = textureGrad(u_albedo, uv, dPdx, dPdy);
+				N = textureGrad(u_normal, uv, dPdx, dPdy).xy * 2 - 1;
+				float t = saturate((dist2 - blend_start_sqr) / 10000);
+				detail.normal.xy = mix(detail.normal.xy, N, t);
+				detail.albedo = mix(detail.albedo, albedo, t);
+			}
+			detail.normal.z = sqrt(saturate(1 - dot(detail.normal.xy, detail.normal.xy))); 
 
-				float t = smoothstep(0.2,0.8,f-0.1*rgbSum(cola-colb));
-				detail.albedo = mix(cola, colb, t);
-				detail.normal = mix(norma, normb, t);
-				return detail;
-			#else
-				Detail detail;
-
-				detail.normal.xy = texture(u_normal, vec3(x, layer)).xy * 2 - 1;
-				detail.normal.z = sqrt(saturate(1 - dot(detail.normal.xy, detail.normal.xy))); 
-				detail.albedo = texture(u_albedo, vec3(x, layer));
-
-				vec3 N;
-				vec4 albedo = texture(u_albedo, vec3(x * 0.1, layer));
-				N.xy = texture(u_normal, vec3(x * 0.1, layer)).xy * 2 - 1;
-				N.z = sqrt(saturate(1 - dot(N.xy, N.xy)));
-				detail.normal = normalize(mix(detail.normal, N, saturate(dist2 / 10000)));
-				detail.albedo = mix(detail.albedo, albedo, saturate(dist2 / 10000));
-
-				return detail;
-			#endif
+			return detail;
 		}
 
 		vec2 power(vec2 v, vec2 a) {
@@ -215,49 +187,39 @@ fragment_shader [[
 				);
 
 				vec2 uv_grid = uv / resolution;
+				// todo textureGather
 				vec4 splat00 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(0, 0));
 				vec4 splat10 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(1, 0));
 				vec4 splat01 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(0, 1));
 				vec4 splat11 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(1, 1));
 
-				float noise = texture(u_noise, 0.05 * v_uv * u_hm_size).x;
-
 				vec2 uv_detail = u_detail_scale * v_uv * u_hm_size;
 
-				Detail c00 = textureNoTile(v_dist2, noise, uv_detail, int(splat00.x * 255.0 + 0.5), 1);
-				Detail c01 = textureNoTile(v_dist2, noise, uv_detail, int(splat01.x * 255.0 + 0.5), 1);
-				Detail c10 = textureNoTile(v_dist2, noise, uv_detail, int(splat10.x * 255.0 + 0.5), 1);
-				Detail c11 = textureNoTile(v_dist2, noise, uv_detail, int(splat11.x * 255.0 + 0.5), 1);
-			
-				vec4 v4 = c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w;
-				float a = splat00.z * bicoef.x + splat01.z * bicoef.y + splat10.z * bicoef.z + splat11.z * bicoef.w;
-				a = a * 2 - 1;
-				vec3 n0 = (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy;
-				
-				#ifdef SECONDARY_TEXTURE
-					Detail s00 = textureNoTile(v_dist2, noise, uv_detail, int(splat00.y * 255.0 + 0.5), 1);
-					Detail s01 = textureNoTile(v_dist2, noise, uv_detail, int(splat01.y * 255.0 + 0.5), 1);
-					Detail s10 = textureNoTile(v_dist2, noise, uv_detail, int(splat10.y * 255.0 + 0.5), 1);
-					Detail s11 = textureNoTile(v_dist2, noise, uv_detail, int(splat11.y * 255.0 + 0.5), 1);
+				ivec4 indices = ivec4(vec4(splat00.x, splat01.x, splat10.x, splat11.x) * 255.0 + 0.5);
 
-					vec4 v4_2 = s00.albedo * bicoef.x + s01.albedo * bicoef.y + s10.albedo * bicoef.z + s11.albedo * bicoef.w;
-					vec3 n0_2 = (s00.normal * bicoef.x + s01.normal * bicoef.y + s10.normal * bicoef.z + s11.normal * bicoef.w).xzy;
-					vec3 n = v4.w > v4_2.w + a ? n0.xyz : n0_2.xyz;
-					surface.albedo.rgb = v4.w > v4_2.w + a ? v4.rgb : v4_2.rgb;
-				#else
-					vec3 n = n0.xyz;
-					surface.albedo.rgb = v4.rgb;
-				#endif
+				vec2 dPdx = dFdx(uv_detail);
+				vec2 dPdy = dFdy(uv_detail);
+				Detail c00 = textureNoTile(v_dist2, uv_detail, indices.x, dPdx, dPdy);
+				Detail c01 = indices.x == indices.y ? c00 : textureNoTile(v_dist2, uv_detail, indices.y, dPdx, dPdy);
+				Detail c10 = indices.x == indices.z ? c00 : indices.y == indices.z ? c01 : textureNoTile(v_dist2, uv_detail, indices.z, dPdx, dPdy);
+				Detail c11 = indices.x == indices.w ? c00 : indices.y == indices.w ? c01 : indices.z == indices.w ? c10 : textureNoTile(v_dist2, uv_detail, indices.w, dPdx, dPdy);
+			
+				surface.albedo = (c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w).rgb;
+				vec3 n = (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy;
 
 				surface.N = normalize(getTBN(v_uv) * n);
 				surface.alpha = 1;
 
 				// blend between detail and satellite
-				float m = v_dist2 / (u_detail_distance * u_detail_distance);
-				m = saturate((m - 0.8) * 5);
-				vec3 sat_color = texture(u_satellite, vec3(v_uv, 0).xy).rgb;
-				sat_color *= saturate(0.5 + texture(u_noise, v_uv * 10, -2).r * texture(u_noise, v_uv*29, -2).r * 0.5);
-				surface.albedo = mix(surface.albedo, sat_color, m);
+				float sat_blend_start = u_detail_distance * 0.05;
+				float sat_blend_start_sqr = sat_blend_start * sat_blend_start;
+				if (v_dist2 > sat_blend_start_sqr) {
+					float m = (v_dist2 - sat_blend_start_sqr) / (u_detail_distance * u_detail_distance);
+					m = saturate((m - 0.8) * 5);
+					vec3 sat_color = texture(u_satellite, vec3(v_uv, 0).xy).rgb;
+					sat_color *= saturate(0.5 + texture(u_noise, v_uv * 10, -2).r * texture(u_noise, v_uv*29, -2).r * 0.5);
+					surface.albedo = mix(surface.albedo, sat_color, m);
+				}
 			}
 			else {
 				surface.N = getTBN(v_uv)[1];

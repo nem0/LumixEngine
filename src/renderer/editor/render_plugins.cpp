@@ -1124,6 +1124,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 		bool srgb = false;
 		bool is_normalmap = false;
+		bool invert_normal_y = false;
 		bool mips = true;
 		float scale_coverage = -0.5f;
 		bool stochastic_mipmap = false;
@@ -1396,8 +1397,26 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.data(), (i32)src_data.size());
 		if (is_16_bit) logWarning(path, ": 16bit images not yet supported. Converting to 8bit.");
 
-		stbi_uc* data = stbi_load_from_memory(src_data.data(), (i32)src_data.size(), &w, &h, &comps, 4);
-		if (!data) return false;
+		stbi_uc* stb_data = stbi_load_from_memory(src_data.data(), (i32)src_data.size(), &w, &h, &comps, 4);
+		if (!stb_data) return false;
+
+		const u8* data;
+		Array<u8> inverted_y_data(m_app.getAllocator());
+		if (meta.is_normalmap && meta.invert_normal_y) {
+			inverted_y_data.resize(w * h * 4);
+			for (i32 y = 0; y < h; ++y) {
+				for (i32 x = 0; x < w; ++x) {
+					const u32 idx = (x + y * w) * 4;
+					inverted_y_data[idx] = stb_data[idx];
+					inverted_y_data[idx + 1] = 0xff - stb_data[idx + 1];
+					inverted_y_data[idx + 2] = stb_data[idx + 2];
+					inverted_y_data[idx + 3] = stb_data[idx + 3];
+				}
+			}
+			data = inverted_y_data.begin();
+		} else {
+			data = stb_data;
+		}
 
 		#ifdef LUMIX_BASIS_UNIVERSAL
 			dst.write("bsu", 3);
@@ -1430,8 +1449,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				params.m_swizzle[2] = 0;
 				params.m_swizzle[3] = 1;
 			}
-			if (!c.init(params)) return false;
+			if (!c.init(params)) {
+				stbi_image_free(stb_data);
+				return false;
+			}
 			basisu::basis_compressor::error_code err = c.process();
+			stbi_image_free(stb_data);
 			if (err != basisu::basis_compressor::cECSuccess) return false;
 
 			const basisu::uint8_vec& out = c.get_output_basis_file();
@@ -1457,7 +1480,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			options.scale_coverage_ref = meta.scale_coverage;
 			options.compress = meta.compress;
 			const bool res = TextureCompressor::compress(input, options, dst, m_app.getAllocator());
-			stbi_image_free(data);
+			stbi_image_free(stb_data);
 			return res;
 		#endif
 	}
@@ -1476,6 +1499,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &meta.stochastic_mipmap);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "invert_green", &meta.invert_normal_y);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &meta.mips);
 			char tmp[32];
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
@@ -1794,6 +1818,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("Is normalmap");
 			ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
 
+			if (m_meta.is_normalmap) {
+				ImGuiEx::Label("Invert normalmap Y");
+				ImGui::Checkbox("##nrmmapinvy", &m_meta.invert_normal_y);
+			}
+
 			ImGuiEx::Label("U Wrap mode");
 			ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
 			ImGuiEx::Label("V Wrap mode");
@@ -1801,7 +1830,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("W Wrap mode");
 			ImGui::Combo("##wwrp", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0");
 			ImGuiEx::Label("Filter");
-			ImGui::Combo("Filter", (int*)&m_meta.filter, "Linear\0Point\0Anisotropic\0");
+			ImGui::Combo("##Filter", (int*)&m_meta.filter, "Linear\0Point\0Anisotropic\0");
 
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
@@ -1810,6 +1839,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nmips = ", m_meta.mips ? "true" : "false"
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
+					, "\ninvert_green = ", m_meta.invert_normal_y ? "true" : "false"
 					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
 					, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""
 					, "\nwrap_mode_w = \"", toString(m_meta.wrap_mode_w), "\""
