@@ -2308,7 +2308,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, const IVec2& tile_size, IAllocator& allocator) {
+	static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, Array<u32>& shadow, const IVec2& tile_size, IAllocator& allocator) {
 		struct Cell {
 			i16 x, y;
 		};
@@ -2407,6 +2407,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 			memcpy(gb1.begin(), tmp.begin(), tmp.byte_size());
+
+			const u32* shadow_data = shadow.begin();
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					tmp[idx] = shadow_data[cells[idx].x + cells[idx].y * size.x];
+				}
+			}
+			memcpy(shadow.begin(), tmp.begin(), tmp.byte_size());
 		}
 		else {
 			// nothing was rendered
@@ -2728,7 +2737,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Array<u32> shadow(allocator); 
 				IVec2 tile_size;
 				importer.createImpostorTextures(model, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
-				postprocessImpostor(gb0, gb1, tile_size, allocator);
+				postprocessImpostor(gb0, gb1, shadow, tile_size, allocator);
 				const PathInfo fi(model->getPath().c_str());
 				StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);

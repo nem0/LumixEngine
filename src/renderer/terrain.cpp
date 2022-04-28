@@ -29,35 +29,6 @@ struct Sample
 	float u, v;
 };
 
-static Vec2 hammersley(u32 i, u32 num_bits) {
-	Vec2 res(0);
-	res.x = 0.f;
-    {
-        u32 n = i;
-        float base = 0.5f;
-        while (n) {
-            if (n & 1)
-                res.x += base;
-            n = n >> 1;
-            base *= 0.5f;
-        }
-    }
-	
-    {
-        u32 n = i;
-        float base = 0.5f;
-		u32 mask = 1 << (num_bits - 1);
-        while (mask) {
-            if (n & mask)
-                res.y += base;
-            mask = mask >> 1;
-            base *= 0.5f;
-        }
-    }
-
-	return res;
-}
-
 void Terrain::createGrass(const Vec2& center, u32 frame) {
 	PROFILE_FUNCTION();
 	if (m_is_grass_dirty) {

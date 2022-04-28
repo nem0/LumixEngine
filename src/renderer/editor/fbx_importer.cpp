@@ -1168,10 +1168,8 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::copy(staging, gbs[0], 0, 0);
 		gpu::readTexture(staging, 0, Span((u8*)m_gb0.begin(), m_gb0.byte_size()));
 		
-		if (m_bake_normals) {
-			gpu::copy(staging, gbs[1], 0, 0);
-			gpu::readTexture(staging, 0, Span((u8*)m_gb1.begin(), m_gb1.byte_size()));
-		}
+		gpu::copy(staging, gbs[1], 0, 0);
+		gpu::readTexture(staging, 0, Span((u8*)m_gb1.begin(), m_gb1.byte_size()));
 		
 		gpu::copy(staging, shadow, 0, 0);
 		gpu::readTexture(staging, 0, Span((u8*)m_shadow.begin(), m_shadow.byte_size()));
@@ -1210,7 +1208,6 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	AABB m_aabb;
 	float m_radius;
 	gpu::BufferHandle m_material_ub;
-	bool m_bake_normals;
 	Array<u32>& m_gb0;
 	Array<u32>& m_gb1;
 	Array<u16>& m_gb_depth;
@@ -1236,7 +1233,6 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	job.m_model = model;
 	job.m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	job.m_material_ub = renderer->getMaterialUniformBuffer();
-	job.m_bake_normals = bake_normals;
 	renderer->queue(job, 0);
 	renderer->frame();
 	renderer->waitForRender();
@@ -1253,8 +1249,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			f << "shader \"/pipelines/impostor.shd\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
-			if (bake_normals) f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
-			else f << "texture \"\"\n";
+			f << "texture \"\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
 			f << "texture \"" << src_info.m_basename << "_impostor_depth.raw\"\n";
 			f << "defines { \"ALPHA_CUTOUT\" }\n";
