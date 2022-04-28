@@ -4418,7 +4418,7 @@ struct PipelineImpl final : Pipeline
 				inst.scale = terrain->getScale();
 				inst.hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				inst.program = shader->getProgram(gpu::VertexDecl(), m_define_mask);
+				inst.program = shader->getProgram(gpu::VertexDecl(), m_define_mask | terrain->m_material->getDefineMask());
 				inst.material = terrain->m_material->getRenderData();
 				if (isinf(inst.pos.x) || isinf(inst.pos.y) || isinf(inst.pos.z)) {
 					m_instances.pop();

@@ -69,6 +69,7 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 	void addSpline(const struct Terrain& terrain, DistanceField& df, const struct Spline& spline, EntityRef spline_entity) const;
 
 private:
+	void exportDistanceField(const DistanceField& df) const;
 	static int placeInstances(lua_State* L);
 	static int placePrefabs(lua_State* L);
 	void registerLuaAPI();

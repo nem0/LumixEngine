@@ -1335,6 +1335,42 @@ void TerrainEditor::registerLuaAPI() {
 	LuaWrapper::createSystemClosure(L, "TerrainEditor", this, "placePrefabs", placePrefabs);
 }
 
+void TerrainEditor::exportDistanceField(const DistanceField& df) const {
+	OutputMemoryStream blob(m_app.getAllocator());
+	
+	char filename[LUMIX_MAX_PATH];
+	if (!os::getSaveFilename(Span(filename), "Targa TGA\0*.tga\0", "tga")) return;
+
+	const Path path(filename);
+	Array<u32> data(m_app.getAllocator());
+	data.resize(df.width * df.height);
+
+	for (u32 j = 0; j < df.height; ++j) {
+		for (u32 i = 0; i < df.width; ++i) {
+			const float dist = df.data[i + j * df.width];
+			u8 d8 = u8(clamp(dist, 0.f, 255.f) + 0.5f);
+			data[i + j * df.width] = d8 | (d8 << 8) | (d8 << 16) | (d8 << 24);
+		}
+	}
+
+	bool saved = Texture::saveTGA(&blob, df.width, df.height, gpu::TextureFormat::RGBA8, (const u8*)data.begin(), true, path, m_app.getAllocator());
+	if (!saved) {
+		logError("Failed to save ", path);
+		return;
+	}
+
+	os::OutputFile file;
+	if (!file.open(filename)) {
+		logError("Failed to open ", filename);
+		return;
+	}
+
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Failed to write ", filename, " properly, it's corrupted.");
+	}
+	file.close();
+}
+
 void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 	for (DistanceField& df : m_distance_fields) {
 		if (ImGui::TreeNode(df.name.c_str(), "%s %d x %d", df.name.c_str(), df.width, df.height)) {
@@ -1428,6 +1464,8 @@ void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 			if (ImGuiEx::IconButton(ICON_FA_PLUS, "Add spline")) {
 				ImGui::OpenPopup("add_spline");
 			}
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_FILE_EXPORT, "Export as texture")) exportDistanceField(df);
 
 			if (ImGui::BeginPopup("add_spline")) {
 				CoreScene* core = (CoreScene*)render_scene->getUniverse().getScene(SPLINE_TYPE);
