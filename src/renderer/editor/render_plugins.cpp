@@ -3636,7 +3636,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 			const u32 roughness_levels = 5;
 			
-			gpu::startCapture();
 			gpu::useProgram(m_ibl_filter_program);
 			gpu::bindTextures(&src, 0, 1);
 			for (u32 mip = 0; mip < roughness_levels; ++mip) {
@@ -3679,7 +3678,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				gpu::readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
 				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
 			}
-			gpu::stopCapture();
 
 			saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
 			gpu::destroy(staging);
