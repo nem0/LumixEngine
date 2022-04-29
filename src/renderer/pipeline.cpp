@@ -4372,7 +4372,7 @@ struct PipelineImpl final : Pipeline
 				}
 
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, grass.drawcall_ub.size);
-				gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
+				gpu::setState(m_render_state | grass.material->render_states);
 				gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, grass.mesh->indices_count, grass.instance_count, grass.mesh->index_type);
 			}
 			
