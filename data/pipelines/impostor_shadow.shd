@@ -52,11 +52,19 @@ compute_shader [[
 		return res;
 	}
 
+	vec2 dxuv(vec2 uv) {
+		#ifdef ORIGIN_BOTTOM_LEFT
+			return uv;
+		#else
+			return vec2(uv.x, 1 - uv.y);
+		#endif
+	}
+
 	float getShadow(vec2 tile_uv, float depth, vec3 v_shadow) {
 		v_shadow = normalize(v_shadow);
 		if (depth == 0) return 1;
 
-		ivec2 shadow_tile = ivec2(0.5 + worldToImpostor(v_shadow) * (u_size - 1)); 
+		ivec2 shadow_tile = ivec2(0.5 + worldToImpostor(v_shadow) * (u_size - 1));
 		v_shadow = normalize(impostorToWorld(shadow_tile / float(u_size - 1)));
 
 		mat4 view = lookAt(u_center.xyz - v_shadow * u_radius, u_center.xyz, vec3(0, 1, 0));
@@ -65,24 +73,12 @@ compute_shader [[
 
 		float res = 0;
 		vec4 p = to_sm * vec4(tile_uv * 2 - 1, depth, 1);
-		p.xy = p.xy * 0.5 + 0.5;
 		p.xyz /= p.w;
-		const int SPREAD = 0;
-		for(int j = -SPREAD; j <= SPREAD; ++j) {
-			for(int i = -SPREAD; i <= SPREAD; ++i) {
-				vec4 p2 = p;
-				p2.xy += vec2(i, j) / u_tile_size / 2;
-				if (any(lessThan(p2.xy, vec2(0))) || any(greaterThan(p2.xy, vec2(1)))) {
-					res += 1;
-				}
-				else {
-					float shadow_depth = texture(u_depth, (p2.xy + shadow_tile.xy) / float(u_size)).r;
-					res += shadow_depth * 0.99 < p.z ? 1 : 0;
-				}
-			}
-		}
+		p.xy = p.xy * 0.5 + 0.5;
+		float shadow_depth = texture(u_depth, dxuv((p.xy + shadow_tile.xy) / float(u_size))).r;
+		res += shadow_depth * 0.99 < p.z ? 1 : 0;
 
-		return res / (2 * SPREAD + 1) /  (2 * SPREAD + 1);
+		return res;
 	}
 
 	float softShadow(vec2 tile_uv, vec3 N, float depth, vec3 mid, vec3 delta) {
@@ -107,7 +103,8 @@ compute_shader [[
 
 		vec2 tile_uv = gl_GlobalInvocationID.xy / vec2(u_tile_size);
 		vec2 uv = (u_tile + tile_uv) / float(u_size);
-		float depth = texture(u_depth, uv).r;
+
+		float depth = texture(u_depth, dxuv(uv)).r;
 		vec3 N;
 		N.xy = texture(u_normalmap, uv).xy * 2 - 1;
 		N.z = sqrt(1 - dot(N.xy, N.xy));
@@ -121,6 +118,11 @@ compute_shader [[
 			softShadow(tile_uv, N, depth, vec3(0, zenith, 1), vec3(0.5, 0, 0))
 		);
 
-		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy + u_tile * u_tile_size), res);
+		ivec2 uv_out = ivec2(gl_GlobalInvocationID.xy + u_tile * u_tile_size);
+		#ifndef ORIGIN_BOTTOM_LEFT
+			uv_out.y = u_tile_size.y * u_size - uv_out.y - 1;
+		#endif
+
+		imageStore(u_output, uv_out, res);
 	}
 ]]

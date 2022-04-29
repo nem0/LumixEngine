@@ -2774,10 +2774,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					header.channel_type = RawTextureHeader::ChannelType::U16;
 					header.channels_count = 1;
 					bool res = file.write(header);
-					res = file.write(gbdepth.begin(), gbdepth.byte_size()) && res;
-					if (!res) {
-						logError("Failed to write ", img_path);
-					} 
+					if (gpu::isOriginBottomLeft()) {
+						res = file.write(gbdepth.begin(), gbdepth.byte_size()) && res;
+					} else {
+						Array<u16> flipped_depth(m_app.getAllocator());
+						flipped_depth.resize(gbdepth.size());
+						for (u32 j = 0; j < header.height; ++j) {
+							for (u32 i = 0; i < header.width; ++i) {
+								flipped_depth[i + j * header.width] = gbdepth[i + (header.height - j - 1) * header.width];
+							}
+						}
+						res = file.write(flipped_depth.begin(), flipped_depth.byte_size()) && res;
+					}
+					if (!res) logError("Failed to write ", img_path);
 					file.close();
 				}
 				else {

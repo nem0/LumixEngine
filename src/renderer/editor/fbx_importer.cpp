@@ -1084,7 +1084,12 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
-				gpu::viewport(i * m_tile_size.x, j * m_tile_size.y, m_tile_size.x, m_tile_size.y);
+				if (gpu::isOriginBottomLeft()) {
+					gpu::viewport(i * m_tile_size.x, j * m_tile_size.y, m_tile_size.x, m_tile_size.y);
+				} else {
+					gpu::viewport(i * m_tile_size.x, (IMPOSTOR_COLS - j - 1) * m_tile_size.y, m_tile_size.x, m_tile_size.y);
+				
+				}
 				const Vec3 v = normalize(impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)}));
 
 				Matrix model_mtx;

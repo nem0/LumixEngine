@@ -180,6 +180,7 @@ fragment_shader [[
 		{
 			if (ditherLOD(v_lod)) discard;
 
+			Surface surface = getSurface();
 			vec3 res = computeDirectLight(surface
 				, Global.light_dir.xyz
 				, Global.light_color.rgb * Global.light_intensity * surface.shadow);
