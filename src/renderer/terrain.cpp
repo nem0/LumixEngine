@@ -94,27 +94,29 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 
 				instances.clear();
 				AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
+				RandomGenerator rg(i, j);
+
 				for (u32 k = 0; k < 1024; ++k) {
-					const Vec2 pn = Vec2(randFloat(), randFloat());
+					const Vec2 pn = Vec2(rg.randFloat(), rg.randFloat());
 					Vec4 p;
 					p.x = from.x + pn.x * quad_size.x;
 					p.z = from.y + pn.y * quad_size.y;
 					const u32 splat = m_splatmap->getPixelNearest(u32(p.x / m_scale.x), u32(p.z / m_scale.x));
 					if ((splat >> 16) & (1 << type_idx)) {
 						p.y = getHeight(p.x, p.z);
-						p.w = randFloat(0.7f, 1.f);
+						p.w = rg.randFloat(0.7f, 1.f);
 						Instance& inst = instances.emplace();
 						inst.position = p.xyz();
 						inst.scale = p.w;
 						switch (type.m_rotation_mode) {
 							case GrassType::RotationMode::Y_UP: {
-								const float angle = randFloat();
+								const float angle = rg.randFloat();
 								inst.rotation = Quat(0, sinf(angle * PI), 0, cosf(angle * PI));
 								break;
 							}
 							case GrassType::RotationMode::ALL_RANDOM: {
-								const Vec3 axis = normalize(Vec3(randFloat(), randFloat(), randFloat()) * 2.f - 1.f);
-								inst.rotation = Quat(axis, randFloat() * 2 * PI);
+								const Vec3 axis = normalize(Vec3(rg.randFloat(), rg.randFloat(), rg.randFloat()) * 2.f - 1.f);
+								inst.rotation = Quat(axis, rg.randFloat() * 2 * PI);
 								break;
 							}
 							default: 

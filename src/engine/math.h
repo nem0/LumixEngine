@@ -511,6 +511,7 @@ LUMIX_ENGINE_API struct RandomGenerator {
 	RandomGenerator(u32 u = 521288629, u32 v = 362436069);
 	u32 rand();
 	float randFloat(float from, float to);
+	float randFloat();
 private:
 	u32 u;
 	u32 v;

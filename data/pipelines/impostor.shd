@@ -172,7 +172,7 @@ fragment_shader [[
 			#ifdef HAS_DEPTHMAP
 				float depth = texture(u_depth, v_uv).x;
 				float linear_z = toLinearDepth(Pass.inv_projection, gl_FragCoord.z);
-				gl_FragDepth = 0.1 / (linear_z + (depth - 0.5) * u_radius);
+				gl_FragDepth = 0.1 / (linear_z + (depth - 0.5) * u_radius); // TODO remove hardcoded near plane 0.1
 			#endif
 		}
 	#else

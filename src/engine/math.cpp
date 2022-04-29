@@ -1251,9 +1251,12 @@ float randFloat() {
     return float(i * 2.328306435996595e-10);
 }
 
-float RandomGenerator::randFloat(float from, float to)
-{
+float RandomGenerator::randFloat(float from, float to) {
 	return from + float((to - from) * (rand() * 2.328306435996595e-10));
+}
+
+float RandomGenerator::randFloat() {
+	return float(rand() * 2.328306435996595e-10);
 }
 
 float randFloat(float from, float to) {

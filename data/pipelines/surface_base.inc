@@ -36,6 +36,10 @@ function surface_shader_ex(args)
 
 	include "pipelines/common.glsl"
 
+	for _, v in ipairs(args.includes or {}) do
+		include(v)
+	end
+
 	define "ALPHA_CUTOUT"
 	
 	------------------
@@ -244,9 +248,6 @@ function surface_shader_ex(args)
 			data.wpos = v_wpos.xyz;
 			data.V = normalize(-data.wpos);
 ]] .. args.fragment .. [[
-			#ifdef GRASS
-				data.ao *= saturate(0.3 + v_pos_y * 5);
-			#endif
 			return data;
 		}
 	
