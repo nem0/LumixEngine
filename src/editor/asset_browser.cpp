@@ -276,7 +276,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto& resources = compiler.lockResources();
 		if (m_filter[0]) {
 			for (const AssetCompiler::ResourceItem& res : resources) {
-				if (tmp[0] != '.' && tmp[1] != '\'' && !startsWith(res.path.c_str(), tmp)) continue;
+				if (tmp[0] != '.' && tmp[1] != '\'' && !startsWithInsensitive(res.path.c_str(), tmp)) continue;
 				addTile(res.path);
 			}
 		}
@@ -711,9 +711,12 @@ struct AssetBrowserImpl : AssetBrowser {
 
 				ImGuiEx::Label("Status");
 				ImGui::TextUnformatted(res->isFailure() ? "failure" : (res->isReady() ? "Ready" : "Not ready"));
+				ImGuiEx::Label("Compiled size");
 				if (res->isReady()) {
-					ImGuiEx::Label("Compiled size");
 					ImGui::Text("%.2f KB", res->size() / 1024.f);
+				}
+				else {
+					ImGui::TextUnformatted("N/A");
 				}
 				const Span<const char> subres = getSubresource(m_selected_resources[0]->getPath().c_str());
 				if (*subres.end()) {

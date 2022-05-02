@@ -557,21 +557,25 @@ struct AssetCompilerImpl : AssetCompiler {
 		file.close();
 	}
 
-
-	bool compile(const Path& src) override
-	{
-		Span<const char> ext = Path::getExtension(Span(src.c_str(), src.length()));
+	IPlugin* getPlugin(const Path& path) {
+		Span<const char> ext = Path::getExtension(Span(path.c_str(), path.length()));
 		char tmp[64];
 		copyString(Span(tmp), ext);
 		makeLowercase(Span(tmp), tmp);
 		const RuntimeHash hash(tmp);
 		MutexGuard lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
-		if (!iter.isValid()) {
+		return iter.isValid() ? iter.value() : nullptr;
+	}
+
+	bool compile(const Path& src) override
+	{
+		IPlugin* plugin = getPlugin(src);
+		if (!plugin) {
 			logError("Unknown resource type ", src);
 			return false;
 		}
-		return iter.value()->compile(src);
+		return plugin->compile(src);
 	}
 	
 
@@ -609,6 +613,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
+			if (!getPlugin(res.getPath())) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 			if (!m_init_finished) {
 				res.incRefCount();
 				m_on_init_load.push(&res);

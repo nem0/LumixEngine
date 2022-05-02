@@ -1097,12 +1097,26 @@ bool toCString(double value, Span<char> out, int after_point)
 }
 
 
-bool startsWith(const char* str, const char* prefix)
-{
+bool startsWith(const char* str, const char* prefix) {
 	const char* lhs = str;
 	const char* rhs = prefix;
-	while (*rhs && *lhs && *lhs == *rhs)
-	{
+	while (*rhs && *lhs && *lhs == *rhs) {
+		++lhs;
+		++rhs;
+	}
+
+	return *rhs == 0;
+}
+
+static char toLower(char c) {
+	if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
+	return c;
+}
+
+bool startsWithInsensitive(const char* str, const char* prefix) {
+	const char* lhs = str;
+	const char* rhs = prefix;
+	while (*rhs && *lhs && toLower(*lhs) == toLower(*rhs)) {
 		++lhs;
 		++rhs;
 	}
