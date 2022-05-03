@@ -139,16 +139,6 @@ int ignore_property(lua_State* L) {
 	return 0;
 }
 
-static int countLines(const char* str) {
-	int count = 0;
-	const char* c = str;
-	while(*c) {
-		if(*c == '\n') ++count;
-		++c;
-	}
-	return count;
-};
-
 int uniform(lua_State* L)
 {
 	const char* name = LuaWrapper::checkArg<const char*>(L, 1); 
@@ -270,7 +260,8 @@ static void source(lua_State* L, gpu::ShaderType shader_type)
 	lua_Debug ar;
 	lua_getstack(L, 1, &ar);
 	lua_getinfo(L, "nSl", &ar);
-	const int line = ar.currentline - countLines(src);
+	const int line = ar.currentline;
+	ASSERT(line >= 0);
 
 	const StaticString<32> line_str("#line ", line, "\n");
 	const int line_str_len = stringLength(line_str);
@@ -285,16 +276,6 @@ static void source(lua_State* L, gpu::ShaderType shader_type)
 
 static int common(lua_State* L)
 {
-	auto countLines = [](const char* str) {
-		int count = 0;
-		const char* c = str;
-		while(*c) {
-			if(*c == '\n') ++count;
-			++c;
-		}
-		return count;
-	};
-
 	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
 	
 	Shader* shader = getShader(L);
@@ -302,7 +283,8 @@ static int common(lua_State* L)
 	lua_Debug ar;
 	lua_getstack(L, 1, &ar);
 	lua_getinfo(L, "nSl", &ar);
-	const int line = ar.currentline - countLines(src);
+	const int line = ar.currentline;
+	ASSERT(line >= 0);
 
 	const StaticString<32> line_str("#line ", line, "\n");
 
