@@ -3180,6 +3180,10 @@ struct PipelineImpl final : Pipeline
 					}
 
 					g.lod_distances = *(Vec4*)m->getLODDistances() * global_lod_multiplier;
+					if (g.lod_distances.w < 0) g.lod_distances.w = FLT_MAX;
+					if (g.lod_distances.z < 0) g.lod_distances.z = FLT_MAX;
+					if (g.lod_distances.y < 0) g.lod_distances.y = FLT_MAX;
+					if (g.lod_distances.x < 0) g.lod_distances.x = FLT_MAX;
 					g.lod_indices.x = m->getLODIndices()[0].to;
 					g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
 					g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
