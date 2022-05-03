@@ -430,6 +430,7 @@ float Terrain::getHeight(int x, int z) const
 	const float DIV64K = 1.0f / 65535.0f;
 	const float DIV255 = 1.0f / 255.0f;
 	if (!m_heightmap) return 0;
+	if (!m_heightmap->getData()) return 0;
 
 	Texture* t = m_heightmap;
 	int idx = clamp(x, 0, m_width - 1) + clamp(z, 0, m_height - 1) * m_width;
