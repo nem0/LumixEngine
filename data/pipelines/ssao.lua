@@ -45,7 +45,7 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.beginBlock("ssao_blit " .. tostring(env.viewport_w) .. "x" .. tostring(env.viewport_h))
 	env.drawcallUniforms( env.viewport_w, env.viewport_h, 0, 0 )
 	env.bindTextures({ssao_rb}, 0)
-	env.bindImageTexture(gbuffer2, 1)
+	env.bindImageTexture(gbuffer1, 1)
 	env.dispatch(env.ssao_blit_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
 	env.endBlock()
 	env.endBlock()

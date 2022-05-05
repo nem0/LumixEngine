@@ -5,7 +5,7 @@ compute_shader [[
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 	layout (binding=0) uniform sampler2D u_ssao_buf;
-	layout (binding=1, rgba8) uniform image2D u_gbuffer2;
+	layout (binding=1, rgba8) uniform image2D u_gbuffer1;
 	
 	layout(std140, binding = 4) uniform Data {
 		vec4 u_size;
@@ -15,8 +15,8 @@ compute_shader [[
 	{
 		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
 		float ssao = texture(u_ssao_buf, vec2(ij) / u_size.xy).x;
-		vec4 v = imageLoad(u_gbuffer2, ij);
-		v.z *= ssao;
-		imageStore(u_gbuffer2, ij, v);
+		vec4 v = imageLoad(u_gbuffer1, ij);
+		v.w *= ssao;
+		imageStore(u_gbuffer1, ij, v);
 	}
 ]]
