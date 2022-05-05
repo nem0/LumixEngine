@@ -44,7 +44,7 @@ compute_shader [[
 		for (int i = 0; i < 4; ++i)
 		{
 			vec2 poisson = POISSON_DISK_4[i];
-			vec2 s = vec2(dot(poisson, rot.xy), dot(poisson, rot.zx));
+			vec2 s = vec2(dot(poisson, rot.yx), dot(poisson, rot.zy));
 			
 			vec3 vpos_a = getViewPosition(u_depth_buffer, Global.inv_projection, uv + s) - view_pos;
 			vec3 vpos_b = getViewPosition(u_depth_buffer, Global.inv_projection, uv - s) - view_pos;
