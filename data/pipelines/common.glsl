@@ -587,8 +587,8 @@ float rand(vec3 seed)
 
 void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2) {
 	gbuffer0 = vec4(surface.albedo.rgb, surface.roughness);
-	gbuffer1 = vec4(surface.N * 0.5 + 0.5, surface.metallic);
-	gbuffer2 = vec4(packEmission(surface.emission), surface.translucency, surface.ao, surface.shadow);
+	gbuffer1 = vec4(surface.N * 0.5 + 0.5, surface.ao);
+	gbuffer2 = vec4(packEmission(surface.emission), surface.translucency, surface.metallic, surface.shadow);
 }
 
 Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D gbuffer2, sampler2D gbuffer_depth, out float ndc_depth) {
@@ -600,12 +600,12 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	surface.albedo = gb0.rgb;
 	surface.N = gb1.rgb * 2 - 1;
 	surface.roughness = gb0.a;
-	surface.metallic = gb1.a;
+	surface.metallic = gb2.z;
 	surface.emission = unpackEmission(gb2.x);
 	surface.wpos = getViewPosition(gbuffer_depth, Global.inv_view_projection, uv, ndc_depth);
 	surface.V = normalize(-surface.wpos);
 	surface.translucency = gb2.y;
-	surface.ao = gb2.z;
+	surface.ao = gb1.w;
 	surface.shadow = gb2.w;
 	return surface;
 }

@@ -33,11 +33,15 @@ surface_shader [[
 	mat3 tbn = mat3(
 		normalize(tangent),
 		normalize(N),
-		normalize(cross(N, tangent))
-		);
+		normalize(cross(tangent, N))
+	);
 		
 	data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
-	data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
+	#ifdef HAS_METALLICMAP
+		data.metallic = texture(u_metallicmap, v_uv).b * u_metallic;
+	#else
+		data.metallic = u_metallic;
+	#endif
 	data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
 	data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 	data.N = tbn * data.N;

@@ -3555,7 +3555,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	}
 }
 
-
 UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
 	Engine& engine,
 	Universe& universe,

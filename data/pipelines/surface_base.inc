@@ -20,7 +20,7 @@ function surface_shader_ex(args)
 
 	texture_slot {
 		name = "Metallic",
-		default_texture = "textures/common/white.tga"
+		define = "HAS_METALLICMAP"
 	}
 
 	texture_slot {
@@ -44,7 +44,7 @@ function surface_shader_ex(args)
 	
 	------------------
 
-	common [[
+	common([[
 		#ifdef SKINNED
 			layout(std140, binding = 4) uniform ModelState {
 				float fur_scale;
@@ -59,7 +59,7 @@ function surface_shader_ex(args)
 		#if !defined GRASS
 			#define HAS_LOD
 		#endif
-	]]
+	]])
 
 	vertex_shader([[
 		layout(location = 0) in vec3 a_position;
@@ -84,20 +84,12 @@ function surface_shader_ex(args)
 				layout(location = 6) in vec4 a_color;
 				layout(location = 5) out vec4 v_color;
 			#endif
-			#ifdef _HAS_ATTR7
-				layout(location = 7) in float a_ao;
-				layout(location = 6) out float v_ao;
-			#endif
 		#elif defined GRASS
 			layout(location = 4) in vec4 i_pos_scale;
 			layout(location = 5) in vec4 i_rot;
 			#ifdef _HAS_ATTR6
 				layout(location = 6) in vec4 a_color;
 				layout(location = 5) out vec4 v_color;
-			#endif
-			#ifdef _HAS_ATTR7
-				layout(location = 7) in float a_ao;
-				layout(location = 6) out float v_ao;
 			#endif
 			layout(location = 7) out float v_pos_y;
 		#else
@@ -113,6 +105,10 @@ function surface_shader_ex(args)
 		#ifdef HAS_LOD
 			layout(location = 4) out float v_lod;
 		#endif
+		#ifdef _HAS_ATTR7
+			layout(location = 7) in float a_ao;
+			layout(location = 6) out float v_ao;
+		#endif
 	
 		layout(location = 0) out vec2 v_uv;
 		layout(location = 1) out vec3 v_normal;
@@ -124,6 +120,10 @@ function surface_shader_ex(args)
 	]] .. args.vertex_preface .. [[	
 		void main() {
 			v_uv = a_uv;
+			#ifdef _HAS_ATTR7
+				v_ao = a_ao;
+			#endif
+
 			#if defined INSTANCED
 				vec4 rot_quat = vec4(i_rot_lod.xyz, 0);
 				rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
@@ -137,9 +137,6 @@ function surface_shader_ex(args)
 				#ifdef _HAS_ATTR6
 					v_color = a_color;
 				#endif
-				#ifdef _HAS_ATTR7
-					v_ao = a_ao;
-				#endif
 			#elif defined GRASS
 				v_normal = rotateByQuat(i_rot, a_normal);
 				v_tangent = rotateByQuat(i_rot, a_tangent);
@@ -151,9 +148,6 @@ function surface_shader_ex(args)
 				#endif
 				#ifdef _HAS_ATTR6
 					v_color = a_color;
-				#endif
-				#ifdef _HAS_ATTR7
-					v_ao = a_ao;
 				#endif
 			#elif defined SKINNED
 				mat2x4 dq = a_weights.x * Model.bones[a_indices.x];
@@ -197,7 +191,9 @@ function surface_shader_ex(args)
 		layout (binding=0) uniform sampler2D u_albedomap;
 		layout (binding=1) uniform sampler2D u_normalmap;
 		layout (binding=2) uniform sampler2D u_roughnessmap;
-		layout (binding=3) uniform sampler2D u_metallicmap;
+		#ifdef HAS_METALLICMAP
+			layout (binding=3) uniform sampler2D u_metallicmap;
+		#endif
 		#ifdef HAS_AMBIENT_OCCLUSION_TEX	
 			layout (binding=4) uniform sampler2D u_aomap;
 		#endif

@@ -371,10 +371,10 @@ function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 		debugRenderbuffer(gb0, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
 	if debug_metallic then
-		debugRenderbuffer(gb1, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
+		debugRenderbuffer(gb2, output, {0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
 	if debug_ao then
-		debugRenderbuffer(gb2, output, {0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
+		debugRenderbuffer(gb1, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
 	if debug_shadow_buf then
 		debugRenderbuffer(gb2, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})

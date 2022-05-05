@@ -45,29 +45,33 @@ compute_shader [[
 
         vec2 P = P0;
         float k = k0;
-        P += dP * jitter / stride;
-        k += dk * jitter / stride;
         
 
-        uint max_steps = uint(min(abs(P1.x - P0.x), u_max_steps));
-        for (uint i = 0; i < max_steps; ++i) {
-            float rayZFar = 1 / k;
+        uint max_steps = uint(min(abs(P1.x - P0.x), u_max_steps)) >> 2;
+        for (uint j = 0; j < 4; ++j) {
+            P += dP * jitter / stride;
+            k += dk * jitter / stride;
+            for (uint i = 0; i < max_steps; ++i) {
+                float rayZFar = 1 / k;
 
-            vec2 p = permute ? P.yx : P;
-            if (any(lessThan(p, vec2(0)))) break;
-            if (any(greaterThan(p, vec2(u_size)))) break;
+                vec2 p = permute ? P.yx : P;
+                if (any(lessThan(p, vec2(0)))) break;
+                if (any(greaterThan(p, vec2(u_size)))) break;
 
-            float depth = texture(u_depth, p / u_size).x;
-            depth = toLinearDepth(Global.inv_projection, depth);
-            
-            float dif = rayZFar - depth;
-            if (dif < depth * 0.02 && dif > 1e-3) {
-                imageStore(u_sss_buffer, ip0, vec4(0));
-                return;
+                float depth = texture(u_depth, p / u_size).x;
+                depth = toLinearDepth(Global.inv_projection, depth);
+                
+                float dif = rayZFar - depth;
+                if (dif < depth * 0.02 && dif > 1e-3) {
+                    imageStore(u_sss_buffer, ip0, vec4(0));
+                    return;
+                }
+
+                P += dP;
+                k += dk;
             }
-
-            P += dP;
-            k += dk;
+            dP *= 2;
+            dk *= 2;
         }
         imageStore(u_sss_buffer, ip0, vec4(1));
     }
