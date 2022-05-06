@@ -1404,175 +1404,178 @@ struct ParticleEditorImpl : ParticleEditor {
 		ImVec2 canvas_size = ImGui::GetContentRegionAvail();
 		const ImVec2 canvas_origin = ImGui::GetCursorScreenPos();
 		
-		ImGuiContext* mainctx = ImGui::GetCurrentContext();
-		if (!m_canvas_ctx) m_canvas_ctx = ImGui::CreateContext(ImGui::GetIO().Fonts);
-		ImGui::SetCurrentContext(m_canvas_ctx);
+		if (canvas_size.x > 0 && canvas_size.y > 0) {
 
-		const os::Event* events = m_app.getEvents();
-		ImGuiIO& io = ImGui::GetIO();
-		for (i32 i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-			switch(events[i].type) {
-				case os::Event::Type::MOUSE_BUTTON: {
-					// TODO check if we should handle input, see studioapp how it's done there
-					io.AddMouseButtonEvent((int)events[i].mouse_button.button, events[i].mouse_button.down);
-					break;
+			ImGuiContext* mainctx = ImGui::GetCurrentContext();
+			if (!m_canvas_ctx) m_canvas_ctx = ImGui::CreateContext(ImGui::GetIO().Fonts);
+			ImGui::SetCurrentContext(m_canvas_ctx);
+
+			const os::Event* events = m_app.getEvents();
+			ImGuiIO& io = ImGui::GetIO();
+			for (i32 i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+				switch(events[i].type) {
+					case os::Event::Type::MOUSE_BUTTON: {
+						// TODO check if we should handle input, see studioapp how it's done there
+						io.AddMouseButtonEvent((int)events[i].mouse_button.button, events[i].mouse_button.down);
+						break;
+					}
+					case os::Event::Type::MOUSE_MOVE: {
+						const os::Point cp = os::getMouseScreenPos();
+						io.AddMousePosEvent((cp.x - canvas_origin.x) / m_canvas_scale.x, (cp.y - canvas_origin.y) / m_canvas_scale.y);
+						break;
+					}
 				}
-				case os::Event::Type::MOUSE_MOVE: {
-					const os::Point cp = os::getMouseScreenPos();
-					io.AddMousePosEvent((cp.x - canvas_origin.x) / m_canvas_scale.x, (cp.y - canvas_origin.y) / m_canvas_scale.y);
-					break;
+			}
+
+			ImGui::GetIO().DisplaySize = canvas_size / m_canvas_scale;
+			ImGui::NewFrame();
+
+			ImGui::SetNextWindowPos(ImVec2(0, 0));
+			ImGui::SetNextWindowSize(canvas_size / m_canvas_scale);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+			ImGui::Begin("particle_editor_canvas", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
+			ImGui::PopStyleVar();
+			ImGuiEx::BeginNodeEditor("particle_editor", &m_canvas_offset);
+
+			i32 hovered_node = -1;
+			i32 hovered_link = -1;
+			for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
+				if (n->onNodeGUI()) {
+					pushUndo(n->m_id);
+				}
+				if (ImGui::IsItemHovered()) {
+					hovered_node = n->m_id;
 				}
 			}
-		}
 
-		ImGui::GetIO().DisplaySize = canvas_size / m_canvas_scale;
-		ImGui::NewFrame();
-
-		ImGui::SetNextWindowPos(ImVec2(0, 0));
-		ImGui::SetNextWindowSize(canvas_size / m_canvas_scale);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-		ImGui::Begin("particle_editor_canvas", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
-		ImGui::PopStyleVar();
-		ImGuiEx::BeginNodeEditor("particle_editor", &m_canvas_offset);
-
-		i32 hovered_node = -1;
-		i32 hovered_link = -1;
-		for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
-			if (n->onNodeGUI()) {
-				pushUndo(n->m_id);
+			for (const ParticleEditorResource::Link& link : m_resource->m_links) {
+				ImGuiEx::NodeLink(link.from, link.to);
+				if (ImGuiEx::IsLinkHovered()) {
+					hovered_link = link.id;
+				}
 			}
-			if (ImGui::IsItemHovered()) {
-				hovered_node = n->m_id;
+
+			ImGuiID nlf, nlt;
+			if (ImGuiEx::GetNewLink(&nlf, &nlt)) {
+				ParticleEditorResource::Link& link = m_resource->m_links.emplace();
+				link.from = nlf;
+				link.to = nlt;
+				pushUndo(0xffFFffFF);
 			}
-		}
 
-		for (const ParticleEditorResource::Link& link : m_resource->m_links) {
-			ImGuiEx::NodeLink(link.from, link.to);
-			if (ImGuiEx::IsLinkHovered()) {
-				hovered_link = link.id;
+			ImGuiEx::EndNodeEditor();
+			const ImVec2 editor_pos = ImGui::GetItemRectMin();
+			bool context_open = false;
+
+			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+				ImGui::OpenPopup("context_menu");
+				context_open = true;
 			}
-		}
-
-		ImGuiID nlf, nlt;
-		if (ImGuiEx::GetNewLink(&nlf, &nlt)) {
-			ParticleEditorResource::Link& link = m_resource->m_links.emplace();
-			link.from = nlf;
-			link.to = nlt;
-			pushUndo(0xffFFffFF);
-		}
-
-		ImGuiEx::EndNodeEditor();
-		const ImVec2 editor_pos = ImGui::GetItemRectMin();
-		bool context_open = false;
-
-		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
-			ImGui::OpenPopup("context_menu");
-			context_open = true;
-		}
 		
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
-		if (ImGui::BeginPopup("context_menu")) {
-			ImVec2 cp = ImGui::GetItemRectMin();
-			if (ImGui::BeginMenu("Add")) {
-				ParticleEditorResource::Node* n = nullptr;
-				if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
-				if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
-				if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
-				if (ImGui::BeginMenu("Constant")) {
-					for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
-						if (ImGui::Selectable(m_resource->m_consts[i].name)) {
-							UniquePtr<ParticleEditorResource::ConstNode> n = UniquePtr<ParticleEditorResource::ConstNode>::create(m_allocator, *m_resource.get());
-							n->idx = i;
-							m_resource->m_nodes.push(n.move());
-							pushUndo(0xffFFffFF);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
+			if (ImGui::BeginPopup("context_menu")) {
+				ImVec2 cp = ImGui::GetItemRectMin();
+				if (ImGui::BeginMenu("Add")) {
+					ParticleEditorResource::Node* n = nullptr;
+					if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
+					if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
+					if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
+					if (ImGui::BeginMenu("Constant")) {
+						for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
+							if (ImGui::Selectable(m_resource->m_consts[i].name)) {
+								UniquePtr<ParticleEditorResource::ConstNode> n = UniquePtr<ParticleEditorResource::ConstNode>::create(m_allocator, *m_resource.get());
+								n->idx = i;
+								m_resource->m_nodes.push(n.move());
+								pushUndo(0xffFFffFF);
+							}
 						}
+						ImGui::EndMenu();
+					}
+					if (ImGui::Selectable("Cos")) {
+						n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+						((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::COS;
+					}
+					if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
+					if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
+					if (ImGui::BeginMenu("Input")) {
+						for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
+							if (ImGui::Selectable(m_resource->m_streams[i].name)) {
+								UniquePtr<ParticleEditorResource::InputNode> n = UniquePtr<ParticleEditorResource::InputNode>::create(m_allocator, *m_resource.get());
+								n->idx = i;
+								m_resource->m_nodes.push(n.move());
+								pushUndo(0xffFFffFF);
+							}
+						}
+						ImGui::EndMenu();
+					}
+					if (ImGui::Selectable("Literal")) n = addNode(ParticleEditorResource::Node::LITERAL);
+					if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
+					if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
+					if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
+					if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
+					if (ImGui::Selectable("Sin")) {
+						n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+						((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::SIN;
+					}
+					if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
+					if (n) {
+						n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
 					}
 					ImGui::EndMenu();
 				}
-				if (ImGui::Selectable("Cos")) {
-					n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
-					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::COS;
+
+				if (m_context_node != -1 && ImGui::Selectable("Remove node")) {
+					m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
+						return link.fromNode() == m_context_node || link.toNode() == m_context_node;
+					});
+
+					m_resource->m_nodes.eraseItems([&](const UniquePtr<ParticleEditorResource::Node>& node){
+						return node->m_id == m_context_node;
+					});
+					pushUndo(0xffFFffFF);
 				}
-				if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
-				if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
-				if (ImGui::BeginMenu("Input")) {
-					for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
-						if (ImGui::Selectable(m_resource->m_streams[i].name)) {
-							UniquePtr<ParticleEditorResource::InputNode> n = UniquePtr<ParticleEditorResource::InputNode>::create(m_allocator, *m_resource.get());
-							n->idx = i;
-							m_resource->m_nodes.push(n.move());
-							pushUndo(0xffFFffFF);
-						}
-					}
-					ImGui::EndMenu();
+
+				if (m_context_link != -1 && ImGui::Selectable("Remove link")) {
+					m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
+						return link.id == m_context_link;
+					});
+					pushUndo(0xffFFffFF);
 				}
-				if (ImGui::Selectable("Literal")) n = addNode(ParticleEditorResource::Node::LITERAL);
-				if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
-				if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
-				if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
-				if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
-				if (ImGui::Selectable("Sin")) {
-					n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
-					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::SIN;
-				}
-				if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
-				if (n) {
-					n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
-				}
-				ImGui::EndMenu();
+				ImGui::EndPopup();
+			}
+			ImGui::PopStyleVar();
+
+			if (context_open) {
+				m_context_link = hovered_link;
+				m_context_node = hovered_node;
 			}
 
-			if (m_context_node != -1 && ImGui::Selectable("Remove node")) {
-				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
-					return link.fromNode() == m_context_node || link.toNode() == m_context_node;
-				});
+			ImGui::End();
+			ImGui::Render();
 
-				m_resource->m_nodes.eraseItems([&](const UniquePtr<ParticleEditorResource::Node>& node){
-					return node->m_id == m_context_node;
-				});
-				pushUndo(0xffFFffFF);
+			if (!m_canvas_rt || m_canvas_size.x != canvas_size.x || m_canvas_size.y != canvas_size.y) {
+				Renderer* renderer = (Renderer*)m_app.getEngine().getPluginManager().getPlugin("renderer");
+				Renderer::MemRef mem;
+				if (m_canvas_rt) renderer->destroy(m_canvas_rt);
+				m_canvas_size = canvas_size;
+				m_canvas_rt = renderer->createTexture((u32)canvas_size.x, (u32)canvas_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::SRGB, mem, "particle_editor");
 			}
 
-			if (m_context_link != -1 && ImGui::Selectable("Remove link")) {
-				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
-					return link.id == m_context_link;
-				});
-				pushUndo(0xffFFffFF);
+			m_imgui_renderer.render(m_canvas_rt, Vec2(canvas_size.x, canvas_size.y), ImGui::GetDrawData(), m_canvas_scale);
+
+			ImGui::SetCurrentContext(mainctx);
+			ImGui::SetCursorScreenPos(canvas_origin);
+			if (gpu::isOriginBottomLeft()) {
+				ImGui::Image(m_canvas_rt, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
 			}
-			ImGui::EndPopup();
-		}
-		ImGui::PopStyleVar();
-
-		if (context_open) {
-			m_context_link = hovered_link;
-			m_context_node = hovered_node;
-		}
-
-		ImGui::End();
-		ImGui::Render();
-
-		if (!m_canvas_rt || m_canvas_size.x != canvas_size.x || m_canvas_size.y != canvas_size.y) {
-			Renderer* renderer = (Renderer*)m_app.getEngine().getPluginManager().getPlugin("renderer");
-			Renderer::MemRef mem;
-			if (m_canvas_rt) renderer->destroy(m_canvas_rt);
-			m_canvas_size = canvas_size;
-			m_canvas_rt = renderer->createTexture((u32)canvas_size.x, (u32)canvas_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::SRGB, mem, "particle_editor");
-		}
-
-		m_imgui_renderer.render(m_canvas_rt, Vec2(canvas_size.x, canvas_size.y), ImGui::GetDrawData(), m_canvas_scale);
-
-		ImGui::SetCurrentContext(mainctx);
-		ImGui::SetCursorScreenPos(canvas_origin);
-		if (gpu::isOriginBottomLeft()) {
-			ImGui::Image(m_canvas_rt, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
-		}
-		else {
-			ImGui::Image(m_canvas_rt, canvas_size);
-		}
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel) {
-			m_canvas_scale.x += ImGui::GetIO().MouseWheel / 20;
-			m_canvas_scale.x = clamp(m_canvas_scale.x, 0.1f, 10.f);
-			m_canvas_scale.y = m_canvas_scale.x;
+			else {
+				ImGui::Image(m_canvas_rt, canvas_size);
+			}
+			if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel) {
+				m_canvas_scale.x += ImGui::GetIO().MouseWheel / 20;
+				m_canvas_scale.x = clamp(m_canvas_scale.x, 0.1f, 10.f);
+				m_canvas_scale.y = m_canvas_scale.x;
+			}
 		}
 
 		ImGui::Columns();
