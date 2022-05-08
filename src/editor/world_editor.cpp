@@ -1848,7 +1848,6 @@ private:
 				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			const EntityRef e = (EntityRef)m_entity;
-			m_editor.selectEntities(Span(&e, 1), false);
 			if (m_output) {
 				*m_output = e;
 			}

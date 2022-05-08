@@ -206,7 +206,6 @@ static void downsampleNormal(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32
 static void computeMip(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w, u32 dst_h, bool is_srgb, bool stochastic, IAllocator& allocator) {
 	PROFILE_FUNCTION();
 	if (stochastic) {
-		ASSERT(!is_srgb);
 		downsampleNormal(src, dst, w, h, dst_w, dst_h);
 	}
 	else if (is_srgb) {

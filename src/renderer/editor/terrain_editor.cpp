@@ -1075,6 +1075,10 @@ static void getModels(StudioApp& app, lua_State* L, i32 idx, const char* key, Ar
 			}
 			const Vec4 distances = LuaWrapper::toType<Vec4>(L, -1);
 			lua_pop(L, 1);
+			if (distances.x > distances.w) {
+				res->decRefCount();
+				luaL_argerror(L, idx, "'distances' are not sorted");
+			}
 
 			Vec2 scale = Vec2(1, 1);
 			LuaWrapper::getOptionalField(L, -1, "scale", &scale);
@@ -1283,6 +1287,14 @@ int TerrainEditor::placeInstances(lua_State* L) {
 	const Vec2 df_to_terrain = size / Vec2((float)df->width, (float)df->height);
 	const Vec2 terrain_to_df = Vec2((float)df->width, (float)df->height) / size;
 
+	float min_dist = FLT_MAX;
+	float max_dist = -FLT_MAX;
+
+	for (const ModelProbability& prob : models) {
+		min_dist = minimum(min_dist, prob.distances.x);
+		max_dist = maximum(max_dist, prob.distances.w);
+	}
+
 	for (float y = 0; y < df->height; y += spacing * terrain_to_df.y) {
 		for (float x = 0; x < df->width; x += spacing * terrain_to_df.x) {
 			float fx = x;
@@ -1296,7 +1308,7 @@ int TerrainEditor::placeInstances(lua_State* L) {
 
 			const i32 idx = i32(fx) + i32(fy) * df->width;
 			const float distance = df->data[idx];
-			if (distance > 0.01f) {
+			if (distance >= min_dist && distance <= max_dist) {
 				pos.y = render_scene->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
 
 				pos.x -= size.x * 0.5f;
