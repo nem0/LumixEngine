@@ -1,6 +1,7 @@
 enabled = false
 max_steps = 20
 stride = 4
+current_frame_weight = 0.1
 local sss_history = -1
 
 function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
@@ -27,7 +28,9 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 		env.viewport_w,
 		env.viewport_h,
 		max_steps, 
-		stride
+		stride,
+		current_frame_weight,
+		0, 0, 0
 	)
 	env.dispatch(env.sss_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
 

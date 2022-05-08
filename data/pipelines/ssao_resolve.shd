@@ -10,6 +10,7 @@ compute_shader [[
 	
 	layout(std140, binding = 4) uniform Data {
 		vec4 u_size;
+		float u_current_frame_weight;
 	};
 
 	vec2 reproject(vec2 uv, float depth) {
@@ -31,7 +32,7 @@ compute_shader [[
 		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {
 			float current = imageLoad(u_current, ij).x;
 			float prev = texture(u_history, uv_prev).x;
-			vec4 v = vec4(mix(current, prev, 0.9));
+			vec4 v = vec4(mix(prev, current, u_current_frame_weight));
 			imageStore(u_current, ij, v);
 		}
 	}

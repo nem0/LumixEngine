@@ -166,7 +166,7 @@ function geomPass(entities)
 		local view_params = getCameraParams()
 		pass(view_params)
 		if render_terrain then
-			renderTerrains(view_params, {define = "DEPTH"})
+			renderTerrains(view_params, {define = "DEPTH", wireframe = terrain_state.wireframe})
 		end
 		if render_grass then
 			renderGrass(view_params, grass_state)
