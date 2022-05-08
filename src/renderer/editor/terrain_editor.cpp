@@ -1438,12 +1438,13 @@ void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 					u16* after = (u16*)cmd->after.getMutableData();
 
 					const float dig_amount = 65535.f * dig_depth / terrain->m_scale.y;
+					const float R = m_terrain_brush_size / terrain->m_scale.x;
 
 					for (u32 j = 0; j < (u32)terrain->m_height; ++j) {
 						for (u32 i = 0; i < (u32)terrain->m_width; ++i) {
 							const u32 idx = i + j * terrain->m_width;
-							if (df.data[idx] < m_terrain_brush_size / terrain->m_scale.x) {
-								const float t = df.data[idx] / m_terrain_brush_size;
+							if (df.data[idx] < R) {
+								const float t = df.data[idx] / R;
 								after[idx] += i32(dig_amount * (1 - t * t) + 0.5f);
 							}
 						}

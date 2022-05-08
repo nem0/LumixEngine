@@ -1,6 +1,8 @@
 radius = 0.2
 intensity = 1
 use_temporal = false
+blur = false
+current_frame_weight = 0.05
 local history_buf = -1
 
 function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
@@ -32,14 +34,18 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 
 	if use_temporal then
 		env.beginBlock("ssao_resolve " .. tostring(w) .. "x" .. tostring(h))
-		env.drawcallUniforms( w, h, 0, 0 )
+		env.drawcallUniforms( w, h, 0, 0, current_frame_weight, 0, 0, 0 )
 		env.bindTextures({gbuffer_depth, history_buf}, 0)
 		env.bindImageTexture(ssao_rb, 2)
 		env.dispatch(env.ssao_resolve_shader, (w + 15) / 16, (h + 15) / 16, 1)
 		env.endBlock()
-		env.blur(ssao_rb, "r8", w, h, "ssao_blur")
+		if blur then
+			env.blur(ssao_rb, "r8", w, h, "ssao_blur")
+		end
 	else
-		env.blur(ssao_rb, "r8", w, h, "ssao_blur")
+		if blur then
+			env.blur(ssao_rb, "r8", w, h, "ssao_blur")
+		end
 	end
 
 	env.beginBlock("ssao_blit " .. tostring(env.viewport_w) .. "x" .. tostring(env.viewport_h))
