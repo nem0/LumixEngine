@@ -277,6 +277,21 @@ struct FurComponent {
 	bool enabled = true;
 };
 
+enum class RenderSceneVersion : i32 {
+	DECAL_UV_SCALE,
+	CURVE_DECALS,
+	AUTODESTROY_EMITTER,
+	SMALLER_MODEL_INSTANCES,
+	INSTANCED_MODEL,
+	SPLINES,
+	SPLINES_VERTEX_COLORS,
+	PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE,
+	PROCEDURAL_GEOMETRY_INDEX_BUFFER,
+	TESSELATED_TERRAIN,
+
+	LATEST
+};
+
 struct LUMIX_RENDERER_API RenderScene : IScene
 {
 	static UniquePtr<RenderScene> createInstance(Renderer& renderer,
@@ -401,6 +416,10 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual Material* getTerrainMaterial(EntityRef entity) = 0;
 	virtual void setTerrainXZScale(EntityRef entity, float scale) = 0;
 	virtual float getTerrainXZScale(EntityRef entity) = 0;
+	virtual void setTerrainTesselation(EntityRef entity, u32 value) = 0;
+	virtual u32 getTerrainTesselation(EntityRef entity) = 0;
+	virtual void setTerrainBaseGridResolution(EntityRef entity, u32 value) = 0;
+	virtual u32 getTerrainBaseGridResolution(EntityRef entity) = 0;
 	virtual void setTerrainYScale(EntityRef entity, float scale) = 0;
 	virtual float getTerrainYScale(EntityRef entity) = 0;
 	virtual Vec2 getTerrainSize(EntityRef entity) = 0;

@@ -48,20 +48,6 @@ static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType(
 static const ComponentType SPLINE_GEOMETRY_TYPE = reflection::getComponentType("spline_geometry");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
-enum class RenderSceneVersion : i32
-{
-	DECAL_UV_SCALE,
-	CURVE_DECALS,
-	AUTODESTROY_EMITTER,
-	SMALLER_MODEL_INSTANCES,
-	INSTANCED_MODEL,
-	SPLINES,
-	SPLINES_VERTEX_COLORS,
-	PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE,
-	PROCEDURAL_GEOMETRY_INDEX_BUFFER,
-
-	LATEST
-};
 
 struct BoneAttachment
 {
@@ -1159,7 +1145,7 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-	void deserializeTerrains(InputMemoryStream& serializer, const EntityMap& entity_map) {
+	void deserializeTerrains(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
 		i32 size = 0;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
@@ -1168,7 +1154,7 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.read(entity);
 			entity = entity_map.get(entity);
 			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
-			terrain->deserialize(entity, serializer, m_universe, *this);
+			terrain->deserialize(entity, serializer, m_universe, *this, version);
 			m_terrains.insert(entity, terrain);
 		}
 	}
@@ -1184,7 +1170,7 @@ struct RenderSceneImpl final : RenderScene {
 			deserializeModelInstancesOld(serializer, entity_map);
 		}
 		deserializeLights(serializer, entity_map);
-		deserializeTerrains(serializer, entity_map);
+		deserializeTerrains(serializer, entity_map, version);
 		deserializeParticleEmitters(serializer, entity_map, version);
 		deserializeBoneAttachments(serializer, entity_map);
 		deserializeEnvironmentProbes(serializer, entity_map);
@@ -1791,6 +1777,21 @@ struct RenderSceneImpl final : RenderScene {
 
 	float getTerrainXZScale(EntityRef entity) override { return m_terrains[entity]->getXZScale(); }
 
+	void setTerrainBaseGridResolution(EntityRef entity, u32 value) override { 
+		m_terrains[entity]->m_base_grid_res = (maximum(8, value) + 1) & ~1;
+	}
+
+	u32 getTerrainBaseGridResolution(EntityRef entity) override { 
+		return m_terrains[entity]->m_base_grid_res; 
+	}
+
+	void setTerrainTesselation(EntityRef entity, u32 value) override {
+		m_terrains[entity]->m_tesselation = maximum(1, value);
+	}
+
+	u32 getTerrainTesselation(EntityRef entity) override {
+		return m_terrains[entity]->m_tesselation;
+	}
 
 	void setTerrainYScale(EntityRef entity, float scale) override
 	{
@@ -3494,6 +3495,8 @@ void RenderScene::reflect() {
 			.LUMIX_PROP(TerrainMaterialPath, "Material").resourceAttribute(Material::TYPE)
 			.LUMIX_PROP(TerrainXZScale, "XZ scale").minAttribute(0)
 			.LUMIX_PROP(TerrainYScale, "Height scale").minAttribute(0)
+			.LUMIX_PROP(TerrainTesselation, "Tesselation").minAttribute(1)
+			.LUMIX_PROP(TerrainBaseGridResolution, "Grid resolution").minAttribute(8)
 			.begin_array<&RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass>("grass")
 				.LUMIX_PROP(GrassPath, "Mesh").resourceAttribute(Model::TYPE)
 				.LUMIX_PROP(GrassDistance, "Distance").minAttribute(1)

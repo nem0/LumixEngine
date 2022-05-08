@@ -101,7 +101,7 @@ struct Terrain {
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 	void serialize(OutputMemoryStream& serializer);
-	void deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene);
+	void deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene, i32 version);
 
 	void addGrassType(int index);
 	void removeGrassType(int index);
@@ -112,6 +112,8 @@ struct Terrain {
 	i32 m_width;
 	i32 m_height;
 	i64 m_layer_mask;
+	u32 m_tesselation;
+	u32 m_base_grid_res;
 	Vec3 m_scale;
 	EntityRef m_entity;
 	Material* m_material;

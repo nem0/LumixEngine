@@ -158,6 +158,8 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	, m_allocator(allocator)
 	, m_grass_types(m_allocator)
 	, m_renderer(renderer)
+	, m_tesselation(1)
+	, m_base_grid_res(64)
 {
 }
 
@@ -324,13 +326,17 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene)
+void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene, i32 version)
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
 	const char* path = serializer.readString();
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
+	if (version > (i32)RenderSceneVersion::TESSELATED_TERRAIN) {
+		serializer.read(m_tesselation);
+		serializer.read(m_base_grid_res);
+	}
 	m_scale.z = m_scale.x;
 	setMaterial(scene.getEngine().getResourceManager().load<Material>(Path(path)));
 	i32 count;
@@ -363,6 +369,8 @@ void Terrain::serialize(OutputMemoryStream& serializer)
 	serializer.writeString(m_material ? m_material->getPath().c_str() : "");
 	serializer.write(m_scale.x);
 	serializer.write(m_scale.y);
+	serializer.write(m_tesselation);
+	serializer.write(m_base_grid_res);
 	serializer.write((i32)m_grass_types.size());
 	for(int i = 0; i < m_grass_types.size(); ++i)
 	{

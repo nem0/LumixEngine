@@ -2787,7 +2787,7 @@ public:
 		if (equalStrings(m_undo_stack[m_undo_index]->getType(), "end_group"))
 		{
 			--m_undo_index;
-			while (equalStrings(m_undo_stack[m_undo_index]->getType(), "begin_group"))
+			while (!equalStrings(m_undo_stack[m_undo_index]->getType(), "begin_group"))
 			{
 				m_undo_stack[m_undo_index]->undo();
 				--m_undo_index;

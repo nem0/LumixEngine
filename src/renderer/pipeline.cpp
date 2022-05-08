@@ -4446,14 +4446,15 @@ struct PipelineImpl final : Pipeline
 
 				const Vec3 ref_pos = inst.rot.conjugated().rotate(-inst.ref_pos);
 				IVec4 prev_from_to;
-				float s = inst.scale.x;
+				float s = inst.scale.x / terrain->m_tesselation;
 				bool first = true;
 				for (;;) {
 					// round 
-					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(64);
+					IVec2 to = from + IVec2(terrain->m_base_grid_res);
+
 					// clamp
 					quad.from_to_sup = IVec4(from, to);
 					
