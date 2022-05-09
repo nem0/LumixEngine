@@ -1106,6 +1106,11 @@ struct StudioAppImpl final : StudioApp
 		m_editor->getView().setViewport(vp); 
 	}
 
+	void addEntity() {
+		const EntityRef e = m_editor->addEntity();
+		m_editor->selectEntities(Span(&e, 1), false);
+	}
+
 	void undo() { m_editor->undo(); }
 	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
@@ -1116,7 +1121,6 @@ struct StudioAppImpl final : StudioApp
 	void setSideView() { m_editor->getView().setSideView(); }
 	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
 	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
-	void addEntity() { m_editor->addEntity(); }
 	void lookAtSelected() { m_editor->getView().lookAtSelected(); }
 	void copyViewTransform() { m_editor->getView().copyTransform(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
