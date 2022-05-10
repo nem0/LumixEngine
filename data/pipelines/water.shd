@@ -37,6 +37,8 @@ uniform("Ground tint", "color")
 uniform("Water scattering", "float")
 uniform("Refraction distortion", "float")
 
+define "SSR"
+
 ------------------
 
 vertex_shader [[
@@ -120,8 +122,78 @@ fragment_shader [[
 
 	layout(location = 0) out vec4 o_color;
 
-	vec3 getReflectionColor(vec3 view, vec3 normal, float dist)
+	vec2 raycast(vec3 csOrig, vec3 csDir, float stride, float jitter) {
+        vec3 csEndPoint = csOrig + abs(csOrig.z * 0.1) * csDir;
+
+        vec4 H0 = Global.projection * vec4(csOrig, 1);
+        vec4 H1 = Global.projection * vec4(csEndPoint, 1);
+
+        float k0 = 1 / H0.w, k1 = 1 / H1.w;
+
+        vec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * Global.framebuffer_size;
+        vec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * Global.framebuffer_size;
+
+        #ifndef _ORIGIN_BOTTOM_LEFT
+            P0.y = Global.framebuffer_size.y - P0.y;
+            P1.y = Global.framebuffer_size.y - P1.y;
+        #endif
+
+        vec2 delta = P1 - P0;
+        bool permute = abs(delta.x) < abs(delta.y);
+        if (permute) {
+            P0 = P0.yx;
+            P1 = P1.yx;
+            delta = delta.yx;
+        }
+
+        float stepDir = sign(delta.x);
+        float invdx = stepDir / delta.x;
+
+        float dk = ((k1 - k0) * invdx) * stride;
+        vec2  dP = (vec2(stepDir, delta.y * invdx)) * stride;
+
+        vec2 P = P0;
+        float k = k0;
+        
+        uint max_steps = 64 >> 2;
+        for (uint j = 0; j < 4; ++j) {
+            P += dP * jitter / stride;
+            k += dk * jitter / stride;
+            for (uint i = 0; i < max_steps; ++i) {
+                float rayZFar = 1 / k;
+
+                vec2 p = permute ? P.yx : P;
+                if (any(lessThan(p, vec2(0)))) break;
+                if (any(greaterThan(p, vec2(Global.framebuffer_size)))) break;
+
+                float depth = texture(u_depthbuffer, p / Global.framebuffer_size).x;
+                depth = toLinearDepth(Global.inv_projection, depth);
+                
+                float dif = rayZFar - depth;
+                if (dif > 1e-3) {
+                    return p;
+                }
+
+                P += dP;
+                k += dk;
+            }
+            dP *= 2;
+            dk *= 2;
+        }
+        return vec2(-1);
+    }
+
+	vec3 getReflectionColor(vec3 view, vec3 normal, float dist, vec3 wpos)
 	{
+		#ifdef SSR
+        	vec4 o = Global.view * vec4(wpos, 1);
+        	vec3 d = mat3(Global.view) * reflect(-view, normal);
+			vec2 hit = raycast(o.xyz, d, 4, random(wpos.xy + Global.time));
+			if (hit.x >= 0) {
+				return texture(u_bg, hit.xy / Global.framebuffer_size.xy).rgb;
+			}
+		#endif
+
 		vec3 reflection = reflect(-view, normal);
 		vec4 radiance_rgbm = textureLod(u_reflection_probes, vec4(reflection, 0), min(3, dist * 0.1));
 		return radiance_rgbm.rgb * radiance_rgbm.a * 4;
@@ -203,15 +275,15 @@ fragment_shader [[
 
 		float normal_strength = u_normal_strength;
 		#ifdef _HAS_ATTR2 
-			normal_strength *= 1 - v_masks.g;
+			//normal_strength *= 1 - v_masks.g;
 		#endif
 
 		vec3 wnormal = getSurfaceNormal(v_uv, normal_strength);
 		wnormal = normalize(tbn * wnormal);
 
 		float dist = length(v_wpos.xyz);
-		vec3 view = normalize(vec4(-v_wpos.xyz, 0).xyz);
-		vec3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength) * u_reflection_multiplier;
+		vec3 view = normalize(-v_wpos.xyz);
+		vec3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, v_wpos.xyz) * u_reflection_multiplier;
 		float water_depth = getWaterDepth(v_wpos.xyz, view, wnormal);
 
 		vec3 halfvec = normalize(view + Global.light_dir.xyz);
