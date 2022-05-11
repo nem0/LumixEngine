@@ -344,6 +344,7 @@ bool getEvent(Event& event) {
 			event.type = Event::Type::WINDOW_CLOSE; 
 			break;
 		case WM_SYSKEYDOWN:
+			if (msg.wParam == VK_MENU) goto retry;
 			event.type = Event::Type::KEY;
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
