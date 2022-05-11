@@ -1457,7 +1457,7 @@ void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 						for (u32 i = 0; i < (u32)terrain->m_width; ++i) {
 							const u32 idx = i + j * terrain->m_width;
 							if (df.data[idx] < R) {
-								const float t = df.data[idx] / R;
+								const float t = clamp(df.data[idx] / R, 0.f, 1.f);
 								after[idx] += i32(dig_amount * (1 - t * t) + 0.5f);
 							}
 						}
