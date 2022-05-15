@@ -968,7 +968,7 @@ bool toCString(float value, Span<char> out, int after_point)
 	}
 	// int part
 	int exponent = value == 0 ? 0 : (int)log10(value);
-	float num = value;
+	double num = value;
 	char* c = output;
 	if (num  < 1 && num > -1 && length > 1)
 	{
@@ -980,7 +980,7 @@ bool toCString(float value, Span<char> out, int after_point)
 	{
 		while ((num >= 1 || exponent >= 0) && length > 1)
 		{
-			float power = powf(10, (float)exponent);
+			const double power = pow(10.0, (double)exponent);
 			char digit = (char)floor(num / power);
 			num -= digit * power;
 			*c = digit + '0';
@@ -990,7 +990,7 @@ bool toCString(float value, Span<char> out, int after_point)
 		}
 	}
 	// decimal part
-	float dec_part = num;
+	double dec_part = num;
 	if (length > 1 && after_point > 0)
 	{
 		*c = '.';
