@@ -1645,7 +1645,7 @@ struct StudioAppImpl final : StudioApp
 			else {
 				const char* dummy = "";
 				const ImGuiID id = ImGui::GetCurrentWindow()->GetID((void*)(intptr_t)entity.index);
-				if (ImGui::TreeNodeBehaviorIsOpen(id, flags)) {
+				if (ImGui::TreeNodeUpdateNextOpen(id, flags)) {
 					ImGui::SetCursorPos(cp);
 					node_open = ImGui::TreeNodeBehavior(id, flags, dummy, dummy);
 				}
