@@ -136,6 +136,7 @@ struct alignas(16) LUMIX_ENGINE_API ShiftedFrustum {
 	void setPlanesFromPoints();
 	void setPlane(Frustum::Planes side, const Vec3& normal, const Vec3& point);
 	bool intersectNearPlane(const DVec3& center, float radius) const;
+	Vec3 getNormal(Frustum::Planes plane) const;
 	
 	float xs[(int)Frustum::Planes::COUNT];
 	float ys[(int)Frustum::Planes::COUNT];

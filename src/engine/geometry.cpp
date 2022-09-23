@@ -123,13 +123,38 @@ Frustum ShiftedFrustum::getRelative(const DVec3& origin) const
 	Frustum res;
 	const Vec3 offset = Vec3(this->origin - origin);
 	memcpy(res.points, points, sizeof(points));
+
+	const Vec3 n_near = getNormal(Frustum::Planes::NEAR);
+	const Vec3 n_far = getNormal(Frustum::Planes::FAR);
+	const Vec3 n_left = getNormal(Frustum::Planes::LEFT);
+	const Vec3 n_right = getNormal(Frustum::Planes::RIGHT);
+	const Vec3 n_top = getNormal(Frustum::Planes::TOP);
+	const Vec3 n_bottom = getNormal(Frustum::Planes::BOTTOM);
+
+	res.setPlane(Frustum::Planes::EXTRA0, n_near, points[0] + offset);
+	res.setPlane(Frustum::Planes::EXTRA1, n_near, points[0] + offset);
+	res.setPlane(Frustum::Planes::NEAR, n_near, points[0] + offset);
+	res.setPlane(Frustum::Planes::FAR, n_far, points[4] + offset);
+
+	res.setPlane(Frustum::Planes::LEFT, n_left, points[1] + offset);
+	res.setPlane(Frustum::Planes::RIGHT, n_right, points[0] + offset);
+	res.setPlane(Frustum::Planes::TOP, n_top, points[0] + offset);
+	res.setPlane(Frustum::Planes::BOTTOM, n_bottom, points[2] + offset);
+
 	for(Vec3& p : res.points) {
 		p += offset;
 	}
-	res.setPlanesFromPoints();
+
 	return res;
 }
 
+Vec3 ShiftedFrustum::getNormal(Frustum::Planes plane) const {
+	return {
+		xs[(int)plane],
+		ys[(int)plane],
+		zs[(int)plane]
+	};
+}
 
 bool ShiftedFrustum::intersectsAABB(const DVec3& pos, const Vec3& size) const
 {
