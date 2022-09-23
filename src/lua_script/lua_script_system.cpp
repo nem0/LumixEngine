@@ -630,8 +630,10 @@ namespace Lumix
 		IFunctionCall* beginFunctionCall(EntityRef entity, int scr_index, const char* function) override
 		{
 			ASSERT(!m_function_call.is_in_progress);
+			auto iter = m_scripts.find(entity);
+			if (!iter.isValid()) return nullptr;
 
-			auto* script_cmp = m_scripts[entity];
+			ScriptComponent* script_cmp = iter.value();
 			auto& script = script_cmp->m_scripts[scr_index];
 			if (!script.m_state) return nullptr;
 
