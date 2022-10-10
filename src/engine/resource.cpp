@@ -30,7 +30,7 @@ Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_size()
 	, m_cb(allocator)
 	, m_resource_manager(resource_manager)
-	, m_async_op(FileSystem::AsyncHandle::invalid())
+	, m_async_op(FileSystem::AsyncHandle::INVALID)
 {
 }
 
@@ -91,19 +91,30 @@ void Resource::checkState()
 
 void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	ASSERT(m_async_op.isValid());
-	m_async_op = FileSystem::AsyncHandle::invalid();
+	m_async_op = FileSystem::AsyncHandle::INVALID;
 	if (m_desired_state != State::READY) return;
 	
 	ASSERT(m_current_state != State::READY);
 	ASSERT(m_empty_dep_count == 1);
 
 	if (!success) {
+		ResourceManagerHub& hub = m_resource_manager.getOwner();
+		if (!m_hooked && hub.isHooked()) {
+			if (hub.onBeforeLoad(*this) == ResourceManagerHub::LoadHook::Action::DEFERRED) {
+				m_hooked = true;
+				m_desired_state = Resource::State::READY;
+				incRefCount(); // for hook
+				logInfo("Trying to reload ", getPath(), " because resource manager has been hooked");
+				return;
+			}
+		}
+
 		logError("Could not open ", getPath().c_str());
 		ASSERT(m_empty_dep_count > 0);
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();
-		m_async_op = FileSystem::AsyncHandle::invalid();
+		m_async_op = FileSystem::AsyncHandle::INVALID;
 		return;
 	}
 
@@ -145,7 +156,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
-	m_async_op = FileSystem::AsyncHandle::invalid();
+	m_async_op = FileSystem::AsyncHandle::INVALID;
 }
 
 
@@ -155,7 +166,7 @@ void Resource::doUnload()
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		fs.cancel(m_async_op);
-		m_async_op = FileSystem::AsyncHandle::invalid();
+		m_async_op = FileSystem::AsyncHandle::INVALID;
 	}
 
 	m_hooked = false;

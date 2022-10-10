@@ -87,7 +87,7 @@ struct ReflectionProbe::LoadJob {
 	IAllocator& m_allocator;
 	RenderSceneImpl& m_scene;
 	EntityRef m_entity;
-	FileSystem::AsyncHandle m_handle = FileSystem::AsyncHandle::invalid();
+	FileSystem::AsyncHandle m_handle = FileSystem::AsyncHandle::INVALID;
 };
 
 struct RenderSceneImpl final : RenderScene {
@@ -3321,7 +3321,7 @@ ReflectionProbe::LoadJob::~LoadJob() {
 void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) {
 	ReflectionProbe& probe = m_scene.m_reflection_probes[m_entity];
 	probe.load_job = nullptr;
-	m_handle = FileSystem::AsyncHandle::invalid();
+	m_handle = FileSystem::AsyncHandle::INVALID;
 
 	if (!success) {
 		logError("Failed to load probe ", probe.guid);

@@ -72,6 +72,7 @@ struct LUMIX_ENGINE_API ResourceManagerHub {
 	Resource* load(ResourceType type, const Path& path);
 
 	void setLoadHook(LoadHook* hook);
+	bool isHooked() const { return m_load_hook; }
 	LoadHook::Action onBeforeLoad(Resource& resource) const;
 	void add(ResourceType type, ResourceManager* rm);
 	void remove(ResourceType type);

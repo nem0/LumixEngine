@@ -186,6 +186,16 @@ void ResourceManagerHub::setLoadHook(LoadHook* hook)
 {
 	ASSERT(!m_load_hook || !hook);
 	m_load_hook = hook;
+
+	if (m_load_hook) {
+		for (ResourceManager* rm : m_resource_managers) {
+			for (Resource* res : rm->getResourceTable()) {
+				if (res->isFailure()) {
+					rm->reload(*res);
+				}
+			}
+		}
+	}
 }
 
 ResourceManagerHub::LoadHook::Action ResourceManagerHub::onBeforeLoad(Resource& resource) const

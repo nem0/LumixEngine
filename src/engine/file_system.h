@@ -17,7 +17,7 @@ struct LUMIX_ENGINE_API FileSystem {
 	using ContentCallback = Delegate<void(u64, const u8*, bool)>;
 
 	struct LUMIX_ENGINE_API AsyncHandle {
-		static AsyncHandle invalid() { return AsyncHandle(0xffFFffFF); }
+		static const AsyncHandle INVALID;
 		explicit AsyncHandle(u32 value) : value(value) {}
 		u32 value;
 		bool isValid() const { return value != 0xffFFffFF; }
@@ -48,5 +48,7 @@ struct LUMIX_ENGINE_API FileSystem {
 	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
 	virtual void cancel(AsyncHandle handle) = 0;
 };
+
+inline const FileSystem::AsyncHandle FileSystem::AsyncHandle::INVALID = AsyncHandle(0xffFFffFF);
 
 } // namespace Lumix
