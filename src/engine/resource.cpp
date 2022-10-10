@@ -30,7 +30,7 @@ Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_size()
 	, m_cb(allocator)
 	, m_resource_manager(resource_manager)
-	, m_async_op(FileSystem::AsyncHandle::INVALID)
+	, m_async_op(FileSystem::AsyncHandle::invalid())
 {
 }
 
@@ -91,7 +91,7 @@ void Resource::checkState()
 
 void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	ASSERT(m_async_op.isValid());
-	m_async_op = FileSystem::AsyncHandle::INVALID;
+	m_async_op = FileSystem::AsyncHandle::invalid();
 	if (m_desired_state != State::READY) return;
 	
 	ASSERT(m_current_state != State::READY);
@@ -114,7 +114,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();
-		m_async_op = FileSystem::AsyncHandle::INVALID;
+		m_async_op = FileSystem::AsyncHandle::invalid();
 		return;
 	}
 
@@ -156,7 +156,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
-	m_async_op = FileSystem::AsyncHandle::INVALID;
+	m_async_op = FileSystem::AsyncHandle::invalid();
 }
 
 
@@ -166,7 +166,7 @@ void Resource::doUnload()
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		fs.cancel(m_async_op);
-		m_async_op = FileSystem::AsyncHandle::INVALID;
+		m_async_op = FileSystem::AsyncHandle::invalid();
 	}
 
 	m_hooked = false;

@@ -12,7 +12,7 @@ struct ImFont;
 		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app)
 #else
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" LUMIX_LIBRARY_EXPORT StudioApp::IPlugin* setStudioApp(StudioApp& app)
+		extern "C" LUMIX_LIBRARY_EXPORT Lumix::StudioApp::IPlugin* setStudioApp(Lumix::StudioApp& app)
 #endif
 
 

@@ -65,7 +65,7 @@ private:
 
 // only single allocation, can be used by Array<T> to allocate on stack
 template <u32 CAPACITY, u32 ALIGN = 8>
-struct LUMIX_ENGINE_API StackAllocator final : IAllocator {
+struct StackAllocator final : IAllocator {
 	explicit StackAllocator(IAllocator& fallback) : m_fallback(fallback) {}
 	~StackAllocator() { ASSERT(!m_allocated); }
 

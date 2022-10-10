@@ -24,14 +24,6 @@
 
 namespace Lumix {
 
-template<>
-struct HashFunc<ResourceType>
-{
-	static u32 get(const ResourceType& key)
-	{
-		return HashFunc<RuntimeHash>::get(key.type);
-	}
-};
 		
 static void clampText(char* text, int width)
 {

@@ -9,7 +9,6 @@
 
 namespace Lumix {
 
-
 struct LUMIX_ENGINE_API ResourceType {
 	ResourceType() {}
 	explicit ResourceType(const char* type_name);
@@ -20,6 +19,10 @@ struct LUMIX_ENGINE_API ResourceType {
 	RuntimeHash type;
 };
 const ResourceType INVALID_RESOURCE_TYPE("");
+
+template <> struct HashFunc<ResourceType> {
+	static u32 get(const ResourceType& key) { return HashFunc<RuntimeHash>::get(key.type); }
+};
 
 #pragma pack(1)
 struct CompiledResourceHeader {

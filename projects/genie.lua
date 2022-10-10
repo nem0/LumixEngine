@@ -260,7 +260,10 @@ function defaultConfigurations()
 		buildoptions { "/wd4503"}
 		
 	configuration {}
-		files { "lumix.natvis", "../.editorconfig" }
+		files {
+			path.join(ROOT_DIR, "projects/lumix.natvis"),
+			path.join(ROOT_DIR, ".editorconfig")
+		}
 		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
 		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
 end
@@ -271,19 +274,18 @@ function linkLib(lib)
 	for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", conf, target_platform }
-				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir}
-				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir}
+				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
+				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
 		end
 	end
 	configuration {}
 end
 
 function useLua()
-	configuration {"windows"}
-	links {"lua51"}
 	configuration {}
+	linkLib "lua51"
 	linkLib "luajit"
-	includedirs { path.join(ROOT_DIR, "external/luajit/include") }
+	includedirs { path.join(ROOT_DIR, "./external/luajit/include") }
 end
 
 function libType()
@@ -503,16 +505,13 @@ project "engine"
 	}
 
 
-	defines { "BUILDING_ENGINE" }
+	defines { "BUILDING_ENGINE", "LZ4_DLL_EXPORT" }
 	includedirs { "../external/luajit/include", "../external/freetype/include" }
 
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
-
-	configuration { "vs20*" }
-		if _OPTIONS["dynamic-plugins"] then
-			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
-		end
+	
+	configuration {}
 	
 	linkLib "lua51"
 	linkLib "luajit"

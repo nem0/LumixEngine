@@ -8,7 +8,7 @@ namespace Lumix {
 template <typename T> struct Span;
 template <typename T> struct UniquePtr;
 
-struct AssetBrowser {
+struct LUMIX_EDITOR_API AssetBrowser {
 	static constexpr int TILE_SIZE = 96;
 
 	struct LUMIX_EDITOR_API IPlugin {

@@ -7,7 +7,6 @@
 namespace Lumix
 {
 
-
 void ResourceManager::create(ResourceType type, ResourceManagerHub& owner)
 {
 	owner.add(type, this);
