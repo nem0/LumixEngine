@@ -72,13 +72,13 @@ private:
 using FilePathHash = StableHash;
 using BoneNameHash = StableHash;
 
-struct RollingStableHasher {
+struct LUMIX_ENGINE_API RollingStableHasher {
 	void begin();
 	void update(const void* data, u32 len);
 	StableHash32 end();
 };
 
-struct RollingHasher {
+struct LUMIX_ENGINE_API RollingHasher {
 	void begin();
 	void update(const void* data, u32 len);
 	RuntimeHash32 end();

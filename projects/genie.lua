@@ -505,7 +505,12 @@ project "engine"
 	}
 
 
-	defines { "BUILDING_ENGINE", "LZ4_DLL_EXPORT" }
+	defines { "BUILDING_ENGINE" }
+	
+	if _OPTIONS["dynamic-plugins"] then
+		defines { "LZ4_DLL_EXPORT" }
+	end
+	
 	includedirs { "../external/luajit/include", "../external/freetype/include" }
 
 	configuration { "linux" }
