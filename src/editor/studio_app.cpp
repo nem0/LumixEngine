@@ -2357,9 +2357,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void tryReloadPlugin()
-	{
-		/*
+	void tryReloadPlugin() {
 		m_watched_plugin.reload_request = false;
 
 		StaticString<LUMIX_MAX_PATH> src(m_watched_plugin.dir, m_watched_plugin.basename, ".", getPluginExtension());
@@ -2368,44 +2366,46 @@ struct StudioAppImpl final : StudioApp
 
 		if (!copyPlugin(src, m_watched_plugin.iteration, copy_path)) return;
 
-		logInfo("Editor") << "Trying to reload plugin " << m_watched_plugin.basename;
+		logInfo("Trying to reload plugin ", m_watched_plugin.basename);
 
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(16 * 1024);
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 
 		Universe* universe = m_editor->getUniverse();
-		for (IScene* scene : universe->getScenes())
-		{
+		i32 scene_version;
+		auto& scenes = universe->getScenes();
+		for (i32 i = 0, c = scenes.size(); i < c; ++i) {
+			UniquePtr<IScene>& scene = scenes[i];
 			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
 			if (m_editor->isGameMode()) scene->stopGame();
+			
 			scene->serialize(blob);
-			universe->removeScene(scene);
-			scene->getPlugin().destroyScene(scene);
+			scene_version = scene->getVersion();
+
+			scene->clear();
+			scenes.erase(i);
+			break;
 		}
 		plugin_manager.unload(m_watched_plugin.plugin);
 
 		// TODO try to delete the old version
 
 		m_watched_plugin.plugin = plugin_manager.load(copy_path);
-		if (!m_watched_plugin.plugin)
-		{
-			logError("Failed to load plugin " << copy_path << ". Reload failed.");
+		if (!m_watched_plugin.plugin) {
+			logError("Failed to load plugin ", copy_path, ". Reload failed.");
 			return;
 		}
 
 		InputMemoryStream input_blob(blob);
 		m_watched_plugin.plugin->createScenes(*universe);
-		for (IScene* scene : universe->getScenes())
-		{
+		for (const UniquePtr<IScene>& scene : universe->getScenes()) {
 			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-			scene->deserialize(input_blob);
+			EntityMap map(m_allocator);
+			scene->deserialize(input_blob, map, scene_version);
 			if (m_editor->isGameMode()) scene->startGame();
 		}
-		logInfo("Editor") << "Finished reloading plugin.";
-		*/
-		// TODO
-		ASSERT(false);
+		logInfo("Finished reloading plugin.");
 	}
 
 	bool workersCountOption(u32& workers_count) {

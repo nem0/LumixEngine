@@ -145,8 +145,7 @@ namespace Lumix
 						}
 						else
 						{
-							addPlugin(plugin);
-							m_libraries.push(lib);
+							addPlugin(plugin, lib);
 							m_library_loaded.invoke(lib);
 							logInfo("Plugin loaded.");
 							debug::StackTree::refreshModuleList();
@@ -169,9 +168,10 @@ namespace Lumix
 			IAllocator& getAllocator() { return m_allocator; }
 
 
-			void addPlugin(IPlugin* plugin) override
+			void addPlugin(IPlugin* plugin, void* library) override
 			{
 				m_plugins.push(plugin);
+				m_libraries.push(library);
 				for (auto* i : m_plugins)
 				{
 					i->pluginAdded(*plugin);

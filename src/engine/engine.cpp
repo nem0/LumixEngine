@@ -128,7 +128,7 @@ public:
 
 		PluginManager::createAllStatic(*this);
 
-		m_plugin_manager->addPlugin(createCorePlugin(*this));
+		m_plugin_manager->addPlugin(createCorePlugin(*this), nullptr);
 
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };

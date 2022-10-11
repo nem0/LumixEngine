@@ -21,7 +21,7 @@ struct LUMIX_ENGINE_API PluginManager
 	virtual void initPlugins() = 0;
 	virtual void unload(struct IPlugin* plugin) = 0;
 	virtual IPlugin* load(const char* path) = 0;
-	virtual void addPlugin(IPlugin* plugin) = 0;
+	virtual void addPlugin(IPlugin* plugin, void* library) = 0;
 	virtual void update(float dt, bool paused) = 0;
 	virtual IPlugin* getPlugin(const char* name) = 0;
 	virtual const Array<IPlugin*>& getPlugins() const = 0;
