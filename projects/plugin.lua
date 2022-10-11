@@ -135,7 +135,6 @@ end
 
 function linkLib(lib)
 	links {lib}
-
 	for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", conf, target_platform }

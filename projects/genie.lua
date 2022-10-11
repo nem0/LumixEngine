@@ -855,15 +855,11 @@ io.write "#elif defined LUMIX_EDITOR_PLUGINS\n"
 	end
 io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
 	if _OPTIONS["dynamic-plugins"] then
-		local first = true
 		for _, plugin in ipairs(plugin_creators) do
-			if not first then
-				io.write(", ")
-			end
-			io.write("\"" .. plugin .. "\"")
+			io.write("\"" .. plugin .. "\", ")
 			first = false
 		end
-		io.write("\n")
+		io.write("nullptr\n")
 	end
 io.write "#else\n"
 	if not _OPTIONS["dynamic-plugins"] then
