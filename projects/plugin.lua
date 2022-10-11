@@ -147,15 +147,9 @@ function linkLib(lib)
 end
 
 function useLua()
-	if not _OPTIONS["dynamic-plugins"] then
-		linkLib("lua51")
-		linkLib("luajit")
-	else
-		configuration { "windows" }
-			defines { "LUA_BUILD_AS_DLL" }
-		configuration {}
-	end
-	includedirs { "../external/luajit/include" }
+	linkLib("lua51")
+	linkLib("luajit")
+	includedirs { path.join(ENGINE_ROOT, "./external/luajit/include") }
 end
 
 

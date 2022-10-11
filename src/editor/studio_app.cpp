@@ -2599,7 +2599,7 @@ struct StudioAppImpl final : StudioApp
 			if (f)
 			{
 				StudioApp::IPlugin* plugin = f(*this);
-				addPlugin(*plugin);
+				if (plugin) addPlugin(*plugin);
 			}
 		}
 #endif
