@@ -339,6 +339,12 @@ struct StudioAppImpl final : StudioApp
 		init_data.handle_file_drops = true;
 		init_data.window_title = "Lumix Studio";
 		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
+		const char* plugins[] = { 
+			#define LUMIX_PLUGINS_STRINGS
+				#include "engine/plugins.inl"
+			#undef LUMIX_PLUGINS_STRINGS
+		};
+		init_data.plugins = Span(plugins, plugins + lengthOf(plugins));
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		m_main_window = m_engine->getWindowHandle();
 		m_windows.push(m_main_window);

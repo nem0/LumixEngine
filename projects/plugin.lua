@@ -1,4 +1,6 @@
-local ide_dir = iif(_ACTION == nil, "vs2019", _ACTION)
+local binary_api_dir = iif(_ACTION == "vs2022" or _ACTION == "vs2019" or _ACTION == "vs2017", "vs2017", "gmake")
+
+local ide_dir = iif(_ACTION == nil, "vs2022", _ACTION)
 if "linux-gcc" == _OPTIONS["gcc"] then
 	ide_dir = "gcc"
 elseif "linux-gcc-5" == _OPTIONS["gcc"] then
@@ -9,161 +11,160 @@ end
 
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
-
+local ENGINE_ROOT = path.getabsolute("../")
 
 newoption {
 		trigger = "gcc",
 		value = "GCC",
 		description = "Choose GCC flavor",
 		allowed = {
-			{ "android-x86",    	"Android - x86"            	 		},
 			{ "linux-gcc", 			"Linux (GCC compiler)" 				},
 			{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
 			{ "linux-clang", 		"Linux (Clang compiler)"			}
 		}
 	}
 
-		
-function defaultConfigurations(dir)
-	dir = dir or BINARY_DIR
-	configuration "Debug"
-		targetdir(dir .. "Debug")
-		defines { "DEBUG", "_DEBUG" }
-		flags { "Symbols", "WinMain" }
+function linkPhysX()
+	if _OPTIONS["static-physx"] then
+		configuration { "x64", "vs20*" }
+			links { 
+				"PhysXCharacterKinematic_static_64",
+				"PhysXCommon_static_64",
+				"PhysXCooking_static_64",
+				"PhysXExtensions_static_64",
+				"PhysXFoundation_static_64",
+				"PhysXPvdSDK_static_64",
+				"PhysXVehicle_static_64",
+				"PhysX_static_64"
+			}
+		configuration { "linux" }
+			libdirs {"../external/physx/lib/linux64_gmake/release"}
+			links { 
+				"PhysX_static_64",
+				"PhysXCharacterKinematic_static_64",
+				"PhysXCommon_static_64",
+				"PhysXCooking_static_64",
+				"PhysXExtensions_static_64",
+				"PhysXFoundation_static_64",
+				"PhysXPvdSDK_static_64",
+				--"PhysXTask_static_64",
+				"PhysXVehicle_static_64",
+				--"SceneQuery_static_64",
+				--"SimulationController_static_64"
+			}
 
-	configuration "Release"
-		targetdir(dir .. "Release")
-		defines { "NDEBUG" }
-		flags { "Optimize", "WinMain" }
+		configuration {}
+			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release_static"}
+			defines {
+				"PX_PHYSX_CHARACTER_STATIC_LIB",
+				"PX_PHYSX_STATIC_LIB"
+			}
+	else 
+		configuration { "x64", "vs20*" }
+			links { 
+				"FastXml_static_64",
+				"LowLevel_static_64",
+				"LowLevelAABB_static_64",
+				"LowLevelDynamics_static_64",
+				"PhysX_64",
+				"PhysXCommon_64",
+				"PhysXCooking_64",
+				"PhysXExtensions_static_64",
+				"PhysXFoundation_64",
+				"PhysXCharacterKinematic_static_64",
+				"PhysXPvdSDK_static_64",
+				"PhysXTask_static_64",
+				"PhysXVehicle_static_64",
+				"SceneQuery_static_64",
+				"SimulationController_static_64"
+			}
+		configuration { "linux" }
+			libdirs {"../external/physx/lib/linux64_gmake/release"}	
+			links { 
+				"PhysX_static_64",
+				"PhysXCharacterKinematic_static_64",
+				"PhysXCommon_static_64",
+				"PhysXCooking_static_64",
+				"PhysXExtensions_static_64",
+				"PhysXFoundation_static_64",
+				"PhysXPvdSDK_static_64",
+				--"PhysXTask_static_64",
+				"PhysXVehicle_static_64",
+				--"SceneQuery_static_64",
+				--"SimulationController_static_64"
+			}
+
+		configuration { "Debug" }
+			libdirs { path.join(ENGINE_ROOT, "./external/physx/lib/" .. binary_api_dir .. "/win64/release") }
+
+		configuration { "RelWithDebInfo" }
+			libdirs { path.join(ENGINE_ROOT, "./external/physx/lib/" .. binary_api_dir .. "/win64/release") }
+
+		configuration {}
+			defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
+	end
+end
+
+function defaultConfigurations()
+	configuration "Debug"
+		targetdir(BINARY_DIR .. "Debug")
+		defines { "NDEBUG", "LUMIX_DEBUG" }
+		flags { "Symbols", "ReleaseRuntime" }
 
 	configuration "RelWithDebInfo"
-		targetdir(dir .. "RelWithDebInfo")
+		targetdir(BINARY_DIR .. "RelWithDebInfo")
 		defines { "NDEBUG" }
-		flags { "Symbols", "Optimize", "WinMain" }
+		flags { "Symbols", "Optimize" }
 
 	configuration "linux"
-		buildoptions { "-std=c++14" }
 		defines { "_GLIBCXX_USE_CXX11_ABI=0" }
 		links { "pthread" }
 
 	configuration { "vs20*"}
 		buildoptions { "/wd4503"}
 		
+	configuration {}
+		files {
+			path.join(ENGINE_ROOT, "./projects/lumix.natvis"),
+			path.join(ENGINE_ROOT, ".editorconfig")
+		}
+		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
+		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
 end
+
 
 function linkLib(lib)
 	links {lib}
 
-	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
+	for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", conf, target_platform }
-				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
-				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
+				libdirs { path.join(ENGINE_ROOT, "./external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
+				libdirs { path.join(ENGINE_ROOT, "./external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
 		end
-	end
-	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
-		configuration { "android-x86", conf }
-			libdirs {"../external/" .. lib .. "/lib/android-x86_gmake/" .. conf_dir}
 	end
 	configuration {}
 end
 
 function useLua()
-	if _OPTIONS["static-plugins"] then
-		linkLib("lua")
+	if not _OPTIONS["dynamic-plugins"] then
+		linkLib("lua51")
+		linkLib("luajit")
 	else
 		configuration { "windows" }
 			defines { "LUA_BUILD_AS_DLL" }
 		configuration {}
 	end
-	includedirs { "../external/lua/include" }
+	includedirs { "../external/luajit/include" }
 end
 
 
 function makeSolution(name)
 	solution(name)
-		if _ACTION == "gmake" then
-			configuration { "android-*" }
-				flags {
-					"NoImportLib",
-				}
-				includedirs {
-					"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/include",
-					"$(ANDROID_NDK_ROOT)/sources/android/native_app_glue",
-				}
-				linkoptions {
-					"-nostdlib",
-					"-static-libgcc",
-				}
-				links {
-					"c",
-					"dl",
-					"m",
-					"android",
-					"log",
-					"gnustl_static",
-					"gcc",
-				}
-				buildoptions {
-					"-fPIC",
-					"-no-canonical-prefixes",
-					"-Wa,--noexecstack",
-					"-fstack-protector",
-					"-ffunction-sections",
-					"-Wno-psabi",
-					"-Wunused-value",
-					"-Wundef",
-				}
-				buildoptions_cpp {
-					"-std=c++14",
-				}
-				linkoptions {
-					"-no-canonical-prefixes",
-					"-Wl,--no-undefined",
-					"-Wl,-z,noexecstack",
-					"-Wl,-z,relro",
-					"-Wl,-z,now",
-				}
-			
-			configuration { "android-x86" }
-				androidPlatform = "android-24"
-				libdirs {
-					path.join(_libDir, "lib/android-x86"),
-					"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/x86",
-				}
-				includedirs {
-					"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/x86/include",
-				}
-				buildoptions {
-					"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
-					"-march=i686",
-					"-mtune=atom",
-					"-mstackrealign",
-					"-msse3",
-					"-mfpmath=sse",
-					"-Wunused-value",
-					"-Wundef",
-				}
-				linkoptions {
-					"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
-					path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtbegin_so.o"),
-					path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtend_so.o"),
-				}
-		
-			configuration {}	
-		
-			
-			if "android-x86" == _OPTIONS["gcc"] then
-				if not os.getenv("ANDROID_NDK_X86") or not os.getenv("ANDROID_NDK_ROOT") then
-					print("Set ANDROID_NDK_X86 and ANDROID_NDK_ROOT envrionment variables.")
-				end
+	flags { "Cpp17" }
 
-				premake.gcc.cc  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-gcc\""
-				premake.gcc.cxx = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-g++\""
-				premake.gcc.ar  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-ar\""
-				LOCATION = "tmp/android-x86_gmake"
-			
-			elseif "linux-gcc" == _OPTIONS["gcc"] then
+		if _ACTION == "gmake" then
+			if "linux-gcc" == _OPTIONS["gcc"] then
 				LOCATION = "tmp/gcc"
 
 			elseif "linux-gcc-5" == _OPTIONS["gcc"] then
@@ -217,13 +218,16 @@ function makeSolution(name)
 		configurations { "Debug", "Release", "RelWithDebInfo" }
 		platforms { "x64" }
 		flags { 
+			"UseObjectResponseFile",
+			"UseLDResponseFile",
+			"LinkSupportCircularDependencies",
 			"FatalWarnings", 
 			"NoPCH", 
 			"NoExceptions", 
 			"NoRTTI", 
 			"NoEditAndContinue"
 		}
-		includedirs {"../src", "../external", "../external/SDL/include" }
+		includedirs {"../src", "../external" }
 		location(LOCATION)
 		language "C++"
 		startproject "studio"
@@ -231,24 +235,11 @@ function makeSolution(name)
 		configuration { "vs*" }
 			defines { "_HAS_EXCEPTIONS=0" }
 
-		configuration "not macosx"
-			removefiles { "../src/**/osx/*"}
-			
 		configuration "not linux"
 			removefiles { "../src/**/linux/*"}
 			
 		configuration "not windows"
 			removefiles { "../src/**/win/*"}
-
-		configuration "android-*"
-			removefiles { "../src/**/win/*"}
-			
-		configuration "not asmjs" 
-			removefiles { "../src/**/asmjs/*"}
-		
-		if _OPTIONS["static-plugins"] then
-			defines {"STATIC_PLUGINS"}
-		end
 end
 
 function bootstrapPlugin(name)
@@ -264,13 +255,13 @@ function bootstrapPlugin(name)
 		links { "engine" }
 		
 		configuration  "Debug" 
-			libdirs { "../lumixengine/projects/tmp/vs2019/bin/Debug" }
+			libdirs { "../lumixengine/projects/tmp/" .. ide_dir .. "/bin/Debug" }
 
 		configuration  "Release" 
-			libdirs { "../lumixengine/projects/tmp/vs2019/bin/Release" }
+			libdirs { "../lumixengine/projects/tmp/" .. ide_dir .. "/bin/Release" }
 
 		configuration  "RelWithDebInfo" 
-			libdirs { "../lumixengine/projects/tmp/vs2019/bin/RelWithDebInfo" }
+			libdirs { "../lumixengine/projects/tmp/" .. ide_dir .. "/bin/RelWithDebInfo" }
 
 		configuration {}
 end

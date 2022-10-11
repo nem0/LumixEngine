@@ -29,8 +29,9 @@ enum class UniverseSerializedVersion : u32
 	};
 #pragma pack()
 
-struct LUMIX_ENGINE_API EntityMap {
+struct LUMIX_ENGINE_API EntityMap final {
 	EntityMap(IAllocator& allocator);
+	~EntityMap() = default;
 	void reserve(u32 count);
 	EntityPtr get(EntityPtr e) const;
 	EntityRef get(EntityRef e) const;

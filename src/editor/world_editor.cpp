@@ -31,9 +31,6 @@
 namespace Lumix
 {
 
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
-
 void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3& up, const Vec3& dir, Color color) {
 	UniverseView::Vertex* vertices = view.render(true, 24);
 	const DVec3& cam_pos = view.getViewport().pos;

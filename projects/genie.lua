@@ -282,8 +282,10 @@ function linkLib(lib)
 end
 
 function useLua()
+	configuration { "vs20*" }
+		linkLib "lua51"
+	
 	configuration {}
-	linkLib "lua51"
 	linkLib "luajit"
 	includedirs { path.join(ROOT_DIR, "./external/luajit/include") }
 end
@@ -516,9 +518,11 @@ project "engine"
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 	
+	configuration { "vs20*" }
+		linkLib "lua51"
+	
 	configuration {}
 	
-	linkLib "lua51"
 	linkLib "luajit"
 	if _OPTIONS["dynamic-plugins"] then
 		linkLib "freetype"
@@ -848,6 +852,18 @@ io.write "#elif defined LUMIX_EDITOR_PLUGINS\n"
 			io.write("\tif (plugin) this->addPlugin(*plugin);\n")
 			io.write "}\n"
 		end
+	end
+io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
+	if _OPTIONS["dynamic-plugins"] then
+		local first = true
+		for _, plugin in ipairs(plugin_creators) do
+			if not first then
+				io.write(", ")
+			end
+			io.write("\"" .. plugin .. "\"")
+			first = false
+		end
+		io.write("\n")
 	end
 io.write "#else\n"
 	if not _OPTIONS["dynamic-plugins"] then
