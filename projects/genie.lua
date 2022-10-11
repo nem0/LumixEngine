@@ -857,16 +857,15 @@ io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
 	if _OPTIONS["dynamic-plugins"] then
 		for _, plugin in ipairs(plugin_creators) do
 			io.write("\"" .. plugin .. "\", ")
-			first = false
 		end
-		io.write("nullptr\n")
 	end
+	io.write("nullptr\n")
 io.write "#else\n"
 	if not _OPTIONS["dynamic-plugins"] then
 		for _, plugin in ipairs(plugin_creators) do
 			io.write "{\n"
 			io.write("\tIPlugin* p = createPlugin_" .. plugin .. "(engine);\n")
-			io.write "\tif (p) engine.getPluginManager().addPlugin(p);\n"
+			io.write "\tif (p) engine.getPluginManager().addPlugin(p, nullptr);\n"
 			io.write "}\n"
 		end
 	end
