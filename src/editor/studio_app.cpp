@@ -2373,15 +2373,12 @@ struct StudioAppImpl final : StudioApp
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 
 		Universe* universe = m_editor->getUniverse();
-		i32 scene_version;
 		auto& scenes = universe->getScenes();
 		for (i32 i = 0, c = scenes.size(); i < c; ++i) {
 			UniquePtr<IScene>& scene = scenes[i];
 			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-			if (m_editor->isGameMode()) scene->stopGame();
 			
-			scene->serialize(blob);
-			scene_version = scene->getVersion();
+			scene->beforeReload(blob);
 
 			scene->clear();
 			scenes.erase(i);
@@ -2401,9 +2398,7 @@ struct StudioAppImpl final : StudioApp
 		m_watched_plugin.plugin->createScenes(*universe);
 		for (const UniquePtr<IScene>& scene : universe->getScenes()) {
 			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-			EntityMap map(m_allocator);
-			scene->deserialize(input_blob, map, scene_version);
-			if (m_editor->isGameMode()) scene->startGame();
+			scene->afterReload(input_blob);
 		}
 		logInfo("Finished reloading plugin.");
 	}
