@@ -376,7 +376,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 	void onGUI(bool create_entity, bool, WorldEditor& editor) override
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
-		if (!ImGui::BeginMenu(getLabel())) return;
+		if (!ImGui::BeginMenu("File")) return;
 		char buf[LUMIX_MAX_PATH];
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
@@ -439,7 +439,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 
 	const char* getLabel() const override 
 	{
-		return "Lua Script";
+		return "Lua Script / File";
 	}
 
 

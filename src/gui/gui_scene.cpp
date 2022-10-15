@@ -722,7 +722,7 @@ struct GUISceneImpl final : GUIScene
 		bool handled = false;
 		
 		if (contains(r, pos)) {
-			m_rect_mouse_down.invoke(rect.entity, event.data.button.x, event.data.button.y);
+			if (!is_up) m_rect_mouse_down.invoke(rect.entity, event.data.button.x, event.data.button.y);
 			if (contains(r, m_mouse_down_pos)) {
 				auto button_iter = m_buttons.find(rect.entity);
 				if (button_iter.isValid())

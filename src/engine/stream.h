@@ -1,5 +1,6 @@
 #pragma once
 
+#include "array.h"
 #include "lumix.h"
 
 
@@ -18,6 +19,7 @@ struct LUMIX_ENGINE_API IOutputStream {
 	IOutputStream& operator << (float value);
 	IOutputStream& operator << (double value);
 	template <typename T> bool write(const T& value);
+	template <typename T> bool writeArray(const Array<T>& value);
 };
 
 
@@ -28,6 +30,7 @@ struct LUMIX_ENGINE_API IInputStream {
 	
 	template <typename T> void read(T& value) { read(&value, sizeof(T)); }
 	template <typename T> T read();
+	template <typename T> void readArray(Array<T>* array);
 };
 
 
@@ -109,6 +112,12 @@ private:
 	u64 m_pos;
 };
 
+template <typename T> void IInputStream::readArray(Array<T>* array) {
+	const i32 size = read<i32>();
+	array->resize(size);
+	read(array->begin(), array->byte_size());
+}
+
 template <typename T> T IInputStream::read()
 {
 	T v;
@@ -123,6 +132,9 @@ template <> inline bool IInputStream::read<bool>()
 	return v != 0;
 }
 
+template <typename T> bool IOutputStream::writeArray(const Array<T>& value) {
+	return write(value.size()) && write(value.begin(), value.byte_size());
+}
 
 template <typename T> bool IOutputStream::write(const T& value)
 {

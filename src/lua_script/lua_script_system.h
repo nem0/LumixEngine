@@ -65,6 +65,7 @@ struct LuaScriptScene : IScene
 	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
 	virtual int getEnvironment(EntityRef entity, int scr_index) = 0;
 	virtual IFunctionCall* beginFunctionCall(EntityRef entity, int scr_index, const char* function) = 0;
+	virtual IFunctionCall* beginFunctionCallInlineScript(EntityRef entity, const char* function) = 0;
 	virtual void endFunctionCall() = 0;
 	virtual int getScriptCount(EntityRef entity) = 0;
 	virtual lua_State* getState(EntityRef entity, int scr_index) = 0;
@@ -80,6 +81,8 @@ struct LuaScriptScene : IScene
 	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) = 0;
+	virtual const char* getInlineScriptCode(EntityRef entity) = 0;
+	virtual void setInlineScriptCode(EntityRef entity, const char* value) = 0;
 };
 
 
