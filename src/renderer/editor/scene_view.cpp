@@ -198,19 +198,19 @@ struct UniverseViewImpl final : UniverseView {
 				else
 				{
 					auto icon_hit = m_icons->raycast(origin, dir);
-					if (icon_hit.entity != INVALID_ENTITY)
-					{
+					if (icon_hit.entity != INVALID_ENTITY) {
 						if(icon_hit.entity.isValid()) {
 							EntityRef e = (EntityRef)icon_hit.entity;
 							m_editor.selectEntities(Span(&e, 1), ImGui::GetIO().KeyCtrl);
 						}
 					}
-					else if (hit.is_hit)
-					{
-						if(hit.entity.isValid()) {
+					else if (hit.is_hit) {
+						if (hit.entity.isValid()) {
 							EntityRef entity = (EntityRef)hit.entity;
 							m_editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
 						}
+					} else {
+						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u32)0), false);
 					}
 				}
 			}
@@ -1272,6 +1272,14 @@ void SceneView::handleEvents() {
 	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
 		const os::Event& event = events[i];
 		switch (event.type) {
+			case os::Event::Type::KEY: {
+				if (handle_input) {
+					if (event.key.down && event.key.keycode == os::Keycode::ESCAPE) {
+						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u32)0), false);
+					}
+				}
+				break;
+			}
 			case os::Event::Type::MOUSE_WHEEL: {
 				if (handle_input) {
 					m_view->onMouseWheel(event.mouse_wheel.amount);

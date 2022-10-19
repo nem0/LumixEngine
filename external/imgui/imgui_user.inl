@@ -129,6 +129,10 @@ namespace ImGuiEx {
 			if (!is_input) {
 				ImSwap(g_node_editor.new_link_to, g_node_editor.new_link_from);
 			}
+			if (g_node_editor.new_link_from_input == is_input) {
+				g_node_editor.new_link_from = 0;
+				g_node_editor.new_link_to = 0;
+			}
 		}
 		PushID(g_node_editor.last_node_id);
 	}
