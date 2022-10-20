@@ -2392,7 +2392,7 @@ public:
 				visitor.idx = -1;
 				cmp_desc->visit(visitor);
 			}
-			serializer.write((u32)0);
+			serializer.write(RuntimeHash::fromU64(0));
 		}
 	}
 
