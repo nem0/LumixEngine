@@ -25,10 +25,10 @@ if not %errorlevel%==0 pause
 
 REM build static physx
 cd PhysX\physx
-call generate_projects.bat lumix_vc16win64_static
+call generate_projects.bat lumix_vc17win64_static
 if not %errorlevel%==0 pause
 
-%msbuild_cmd% "compiler\vc16win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
+%msbuild_cmd% "compiler\vc17win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
 if not %errorlevel%==0 pause
 
 REM deploy physx
@@ -51,17 +51,17 @@ if not %errorlevel%==0 pause
 popd
 
 REM create engine project
-genie.exe --static-physx --with-app --nodx vs2019
+genie.exe --static-physx --with-app --nodx vs2022
 if not %errorlevel%==0 pause
 
 REM build studio.exe
-%msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
 if not %errorlevel%==0 pause
 
 REM push gl version
 mkdir itch_io
-copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
-copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+copy tmp\vs2022\bin\RelWithDebInfo\studio.exe itch_io\
+copy tmp\vs2022\bin\RelWithDebInfo\app.exe itch_io\
 copy .itch.toml itch_io\
 git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
@@ -69,17 +69,17 @@ butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
 if not %errorlevel%==0 pause
 
 REM create engine project
-genie.exe --static-physx --with-app vs2019
+genie.exe --static-physx --with-app vs2022
 if not %errorlevel%==0 pause
 
 REM build studio.exe
-%msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
 if not %errorlevel%==0 pause
 
 REM push gl version
 mkdir itch_io
-copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
-copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+copy tmp\vs2022\bin\RelWithDebInfo\studio.exe itch_io\
+copy tmp\vs2022\bin\RelWithDebInfo\app.exe itch_io\
 copy .itch.toml itch_io\
 git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
