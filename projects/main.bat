@@ -303,7 +303,7 @@ exit /B 0
 	if %errorlevel%==2 call :download_basisu
 	if %errorlevel%==3 call :build_basisu
 	if %errorlevel%==4 call :deploy_basisu
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\basisu\lumix\vs2019\basis_lumix.sln"
+	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\basisu\lumix\vs2022\basis_lumix.sln"
 	pause
 goto :basisu
 
@@ -335,9 +335,9 @@ exit /B 0
 
 :build_basisu
 	pushd 3rdparty\basisu\lumix\
-		..\..\..\genie.exe vs2019
+		..\..\..\genie.exe vs2022
 	popd
-	%msbuild_cmd% 3rdparty\basisu\lumix\vs2019\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
+	%msbuild_cmd% 3rdparty\basisu\lumix\vs2022\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
 exit /B 0
 
 :deploy_freetype
@@ -352,7 +352,7 @@ exit /B 0
 :deploy_basisu
 	echo %CD%
 	del /Q ..\external\basisu\lib\win64_vs2017\release\*
-	xcopy /E /Y "3rdparty\basisu\lumix\vs2019\bin\*.*" ..\external\basisu\lib\win64_vs2017\release\
+	xcopy /E /Y "3rdparty\basisu\lumix\vs2022\bin\*.*" ..\external\basisu\lib\win64_vs2017\release\
 	del /Q ..\external\basisu\include\*
 	xcopy /E /Y "3rdparty\basisu\transcoder\*.h" ..\external\basisu\include\transcoder
 	xcopy /E /Y "3rdparty\basisu\encoder\*.h" ..\external\basisu\include\encoder
@@ -474,43 +474,43 @@ goto :recast
 exit /B 0
 
 :build_recast
-	genie.exe --file=recastnavigation.lua vs2019
+	genie.exe --file=recastnavigation.lua vs2022
 	%msbuild_cmd% 3rdparty\recast\_project\RecastDetour.sln /p:Configuration=Release /p:Platform=x64
 exit /B 0
 
 :create_project
 	echo Creating project...
-	genie.exe --with-app vs2019 
+	genie.exe --with-app vs2022 
 	pause
 exit /B 0
 
 :build
-	if not exist "tmp/vs2019/LumixEngine.sln" call :create_project
+	if not exist "tmp/vs2022/LumixEngine.sln" call :create_project
 	echo Building...
-	%msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+	%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
 	pause
 exit /B 0
 
 :run_studio
-	if not exist "tmp/vs2019/bin/RelWithDebInfo/studio.exe" call :build
+	if not exist "tmp/vs2022/bin/RelWithDebInfo/studio.exe" call :build
 	cd ..\data
-	start "" "../projects/tmp/vs2019/bin/RelWithDebInfo/studio.exe"
+	start "" "../projects/tmp/vs2022/bin/RelWithDebInfo/studio.exe"
 	cd ..\projects
 	pause
 exit /B 0
 
 :open_in_vs
-	start "" %devenv_cmd% "tmp/vs2019/LumixEngine.sln"
+	start "" %devenv_cmd% "tmp/vs2022/LumixEngine.sln"
 exit /B 0
 
 :create_bundle
 	echo Creating bundle...
-	genie.exe --embed-resources --static-physx vs2019
+	genie.exe --embed-resources --static-physx vs2022
 	cd ..\data
 	tar -cvf data.tar .
 	move data.tar ../src/studio
 	cd ..\projects\
-	%msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+	%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
 	del ..\src\studio\data.tar
 	pause
 exit /B 0
