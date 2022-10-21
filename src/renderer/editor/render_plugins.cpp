@@ -37,7 +37,6 @@
 #include "engine/universe.h"
 #include "fbx_importer.h"
 #include "game_view.h"
-#include "render_plugins.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/editor/spline_geometry_plugin.h"
@@ -4317,13 +4316,15 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 	TerrainEditor m_terrain_editor;
 };
 
+struct EditorUIRenderPlugin;
 
 struct RenderInterfaceImpl final : RenderInterface
 {
-	RenderInterfaceImpl(StudioApp& app, Renderer& renderer)
+	RenderInterfaceImpl(StudioApp& app, Renderer& renderer, EditorUIRenderPlugin& plugin)
 		: m_app(app)
 		, m_textures(app.getAllocator())
 		, m_renderer(renderer)
+		, m_plugin(plugin)
 	{}
 
 	void launchRenderDoc() override {
@@ -4431,14 +4432,16 @@ struct RenderInterfaceImpl final : RenderInterface
 		return scene->getModelInstancePath(entity); 
 	}
 
+	void renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* dd, Vec2 scale) override;
 
 	StudioApp& m_app;
 	Renderer& m_renderer;
+	EditorUIRenderPlugin& m_plugin;
 	HashMap<void*, Texture*> m_textures;
 };
 
 
-struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
+struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 {
 	struct RenderJob : Renderer::RenderJob
 	{
@@ -4681,7 +4684,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = m_texture;
 
-		m_render_interface.create(app, *renderer);
+		m_render_interface.create(app, *renderer, *this);
 		app.setRenderInterface(m_render_interface.get());
 	}
 
@@ -4698,7 +4701,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 		if (m_texture) renderer->destroy(m_texture);
 	}
 	
-	void render(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* draw_data, Vec2 scale) override {
+	void renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* draw_data, Vec2 scale) {
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		RenderJob& cmd = renderer->createJob<RenderJob>(renderer->getCurrentFrameAllocator());
 		cmd.plugin = this;
@@ -4781,6 +4784,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin, IImGuiRenderer
 	Local<RenderInterfaceImpl> m_render_interface;
 };
 
+void RenderInterfaceImpl::renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* dd, Vec2 scale) {
+	m_plugin.renderImGuiCanvas(rt, rt_size, dd, scale);
+}
 
 struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 {
@@ -5016,8 +5022,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_terrain_plugin(app)
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
-	{
-	}
+	{}
 
 	const char* getName() const override { return "renderer"; }
 
@@ -5078,7 +5083,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_env_probe_plugin.init();
 		m_model_plugin.init();
 
-		m_particle_editor = ParticleEditor::create(m_app, m_editor_ui_render_plugin);
+		m_particle_editor = ParticleEditor::create(m_app);
 		m_app.addPlugin(*m_particle_editor.get());
 
 		m_particle_emitter_plugin.m_particle_editor = m_particle_editor.get();
@@ -5341,7 +5346,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	InstancedModelPlugin m_instanced_model_plugin;
 	ModelPlugin m_model_plugin;
 };
-
 
 LUMIX_STUDIO_ENTRY(renderer)
 {

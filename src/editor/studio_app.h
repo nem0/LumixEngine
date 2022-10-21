@@ -124,6 +124,7 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual Gizmo::Config& getGizmoConfig() = 0;
 	virtual void setCursorCaptured(bool captured) = 0;
 	virtual void saveSettings() = 0;
+	virtual int getImGuiKey(int keycode) const = 0;
 
 	virtual const os::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;

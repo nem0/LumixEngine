@@ -3293,6 +3293,9 @@ struct StudioAppImpl final : StudioApp
 		return *m_editor;
 	}
 
+	int getImGuiKey(int keycode) const override{
+		return m_imgui_key_map[keycode];
+	}
 	
 	ImFont* getBigIconFont() override { return m_big_icon_font; }
 	ImFont* getBoldFont() override { return m_bold_font; }

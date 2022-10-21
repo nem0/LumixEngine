@@ -1,6 +1,7 @@
 #define LUMIX_NO_CUSTOM_CRT
 #include "particle_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/imguicanvas.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -12,7 +13,6 @@
 #include "engine/os.h"
 #include "engine/string.h"
 #include "engine/universe.h"
-#include "render_plugins.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_scene.h"
@@ -1160,11 +1160,11 @@ struct ParticleEditorResource {
 };
 
 struct ParticleEditorImpl : ParticleEditor {
-	ParticleEditorImpl(StudioApp& app, IImGuiRenderer& imgui_renderer, IAllocator& allocator)
+	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_app(app)
 		, m_undo_stack(allocator)
-		, m_imgui_renderer(imgui_renderer)
+		, m_canvas(app)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
@@ -1190,12 +1190,6 @@ struct ParticleEditorImpl : ParticleEditor {
 	}
 
 	~ParticleEditorImpl() {
-		if (m_canvas_rt) {	
-			Renderer* renderer = (Renderer*)m_app.getEngine().getPluginManager().getPlugin("renderer");
-			renderer->destroy(m_canvas_rt);
-		}
-
-		if (m_canvas_ctx) ImGui::DestroyContext(m_canvas_ctx);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_undo_action);
 		m_app.removeAction(&m_redo_action);
@@ -1402,40 +1396,12 @@ struct ParticleEditorImpl : ParticleEditor {
 		ImGui::NextColumn();
 
 		ImVec2 canvas_size = ImGui::GetContentRegionAvail();
-		const ImVec2 canvas_origin = ImGui::GetCursorScreenPos();
 		
 		if (canvas_size.x > 0 && canvas_size.y > 0) {
 
-			ImGuiContext* mainctx = ImGui::GetCurrentContext();
-			if (!m_canvas_ctx) m_canvas_ctx = ImGui::CreateContext(ImGui::GetIO().Fonts);
-			ImGui::SetCurrentContext(m_canvas_ctx);
+			m_canvas.begin();
 
-			const os::Event* events = m_app.getEvents();
-			ImGuiIO& io = ImGui::GetIO();
-			for (i32 i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-				switch(events[i].type) {
-					case os::Event::Type::MOUSE_BUTTON: {
-						// TODO check if we should handle input, see studioapp how it's done there
-						io.AddMouseButtonEvent((int)events[i].mouse_button.button, events[i].mouse_button.down);
-						break;
-					}
-					case os::Event::Type::MOUSE_MOVE: {
-						const os::Point cp = os::getMouseScreenPos();
-						io.AddMousePosEvent((cp.x - canvas_origin.x) / m_canvas_scale.x, (cp.y - canvas_origin.y) / m_canvas_scale.y);
-						break;
-					}
-				}
-			}
-
-			ImGui::GetIO().DisplaySize = canvas_size / m_canvas_scale;
-			ImGui::NewFrame();
-
-			ImGui::SetNextWindowPos(ImVec2(0, 0));
-			ImGui::SetNextWindowSize(canvas_size / m_canvas_scale);
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::Begin("particle_editor_canvas", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
-			ImGui::PopStyleVar();
-			ImGuiEx::BeginNodeEditor("particle_editor", &m_canvas_offset);
+			ImGuiEx::BeginNodeEditor("particle_editor", &m_offset);
 
 			i32 hovered_node = -1;
 			i32 hovered_link = -1;
@@ -1550,32 +1516,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				m_context_node = hovered_node;
 			}
 
-			ImGui::End();
-			ImGui::Render();
-
-			if (!m_canvas_rt || m_canvas_size.x != canvas_size.x || m_canvas_size.y != canvas_size.y) {
-				Renderer* renderer = (Renderer*)m_app.getEngine().getPluginManager().getPlugin("renderer");
-				Renderer::MemRef mem;
-				if (m_canvas_rt) renderer->destroy(m_canvas_rt);
-				m_canvas_size = canvas_size;
-				m_canvas_rt = renderer->createTexture((u32)canvas_size.x, (u32)canvas_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::SRGB, mem, "particle_editor");
-			}
-
-			m_imgui_renderer.render(m_canvas_rt, Vec2(canvas_size.x, canvas_size.y), ImGui::GetDrawData(), m_canvas_scale);
-
-			ImGui::SetCurrentContext(mainctx);
-			ImGui::SetCursorScreenPos(canvas_origin);
-			if (gpu::isOriginBottomLeft()) {
-				ImGui::Image(m_canvas_rt, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
-			}
-			else {
-				ImGui::Image(m_canvas_rt, canvas_size);
-			}
-			if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel) {
-				m_canvas_scale.x += ImGui::GetIO().MouseWheel / 20;
-				m_canvas_scale.x = clamp(m_canvas_scale.x, 0.1f, 10.f);
-				m_canvas_scale.y = m_canvas_scale.x;
-			}
+			m_canvas.end();
 		}
 
 		ImGui::Columns();
@@ -1774,21 +1715,18 @@ struct ParticleEditorImpl : ParticleEditor {
 	Action m_redo_action;
 	Action m_apply_action;
 	bool m_has_focus = false;
-	IImGuiRenderer& m_imgui_renderer;
-	ImVec2 m_canvas_size = ImVec2(0, 0);
-	gpu::TextureHandle m_canvas_rt = gpu::INVALID_TEXTURE;
-	ImVec2 m_canvas_scale = ImVec2(1, 1);
-	ImVec2 m_canvas_offset = ImVec2(0, 0);
-	ImGuiContext* m_canvas_ctx = nullptr;
+	ImGuiCanvas m_canvas;
+	ImVec2 m_offset = ImVec2(0, 0);
 };
+
 
 DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
 	return node ? node->generate(instructions, output_idx, output, subindex) : DataStream();
 }
 
-UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app, IImGuiRenderer& imgui_renderer) {
+UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app) {
 	IAllocator& allocator = app.getAllocator();
-	return UniquePtr<ParticleEditorImpl>::create(allocator, app, imgui_renderer, allocator);
+	return UniquePtr<ParticleEditorImpl>::create(allocator, app, allocator);
 }
 
 
