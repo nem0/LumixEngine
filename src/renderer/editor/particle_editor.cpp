@@ -109,7 +109,7 @@ struct ParticleEditorResource {
 			m_input_counter = 0;
 			m_output_counter = 0;
 			const ImVec2 old_pos = m_pos;
-			ImGuiEx::BeginNode(m_id, m_pos);
+			ImGuiEx::BeginNode(m_id, m_pos, nullptr);
 			bool res = onGUI();
 			ImGuiEx::EndNode();
 			return res || old_pos.x != m_pos.x || old_pos.y != m_pos.y;

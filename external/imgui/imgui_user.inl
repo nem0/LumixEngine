@@ -31,6 +31,8 @@ namespace ImGuiEx {
 		bool between_begin_end_editor = false;
 		ImDrawList* draw_list = nullptr;
 		bool is_pin_hovered = false;
+		bool* is_node_selected = nullptr;
+		ImGuiID selected_node = 0;
 		ImVec2* canvas_offset = nullptr;
 	} g_node_editor;
 
@@ -166,7 +168,7 @@ namespace ImGuiEx {
 		g_node_editor.draw_list->AddBezierCubic(p1, p1_b, p2_b, p2, GetColorU32(g_node_editor.link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
 	}
 
-	void BeginNode(ImGuiID id, ImVec2& pos) {
+	void BeginNode(ImGuiID id, ImVec2& pos, bool* selected) {
 		g_node_editor.last_node_id = id;
 		pos += g_node_editor.node_editor_pos;
 		g_node_editor.node_pos = &pos;
@@ -177,6 +179,7 @@ namespace ImGuiEx {
 		g_node_editor.node_w = GetStateStorage()->GetFloat(GetID("node-width"), 120);
 		PushItemWidth(80);
 		g_node_editor.is_pin_hovered = false;
+		g_node_editor.is_node_selected = selected;
 	}
 
 	void EndNode()
@@ -192,9 +195,20 @@ namespace ImGuiEx {
 		const ImGuiID dragger_id = GetID("##_node_dragger");
 		ItemAdd(rect, dragger_id);
 		const bool is_hovered = IsItemHovered();
+		const bool is_selected = g_node_editor.is_node_selected ? *g_node_editor.is_node_selected : false;
+		
 		if (is_hovered && IsMouseClicked(0) && !g_node_editor.is_pin_hovered) {
 			SetActiveID(dragger_id, GetCurrentWindow());
+			if (g_node_editor.is_node_selected) {
+				*g_node_editor.is_node_selected = true;
+				g_node_editor.selected_node = g_node_editor.last_node_id;
+			}
 		}
+
+		if (g_node_editor.is_node_selected && g_node_editor.last_node_id != g_node_editor.selected_node) {
+			*g_node_editor.is_node_selected = false;
+		}
+
 		if (IsItemActive() && IsMouseReleased(0)) {
 			ResetActiveID();
 		}
@@ -205,7 +219,7 @@ namespace ImGuiEx {
 		g_node_editor.draw_list->ChannelsSetCurrent(0);
 		ImVec2 np = *g_node_editor.node_pos;
 		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
-		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
+		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(is_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
 
 		PopID();
 		*g_node_editor.node_pos -= g_node_editor.node_editor_pos;
