@@ -235,8 +235,7 @@ void showVehicleGizmo(UniverseView& view, ComponentUID cmp) {
 	PhysicsScene* scene = (PhysicsScene*)cmp.scene;
 	Universe& universe = cmp.scene->getUniverse();
 	const Transform vehicle_tr = universe.getTransform(e);
-	for (EntityPtr ch_ptr = universe.getFirstChild(e); ch_ptr.isValid(); ch_ptr = universe.getNextSibling((EntityRef)ch_ptr)) {
-		const EntityRef ch = (EntityRef)ch_ptr;
+	for (EntityRef ch : universe.childrenOf(e)) {
 		if (!universe.hasComponent(ch, WHEEL_TYPE)) continue;
 			
 		ComponentUID wheel_cmp;

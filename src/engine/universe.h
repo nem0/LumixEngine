@@ -40,6 +40,22 @@ struct LUMIX_ENGINE_API EntityMap final {
 	Array<EntityPtr> m_map;
 };
 
+struct LUMIX_ENGINE_API ChildrenRange {
+	struct LUMIX_ENGINE_API Iterator {
+		void operator ++();
+		bool operator !=(const Iterator& rhs);
+		EntityRef operator*();
+
+		const struct Universe* universe;
+		EntityPtr entity;
+	};
+	ChildrenRange(const Universe& universe, EntityRef parent);
+	Iterator begin() const;
+	Iterator end() const;
+
+	const Universe& universe;
+	EntityRef parent;
+};
 
 struct LUMIX_ENGINE_API Universe {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
@@ -90,6 +106,8 @@ struct LUMIX_ENGINE_API Universe {
 	EntityPtr getParent(EntityRef entity) const;
 	EntityPtr getFirstChild(EntityRef entity) const;
 	EntityPtr getNextSibling(EntityRef entity) const;
+	ChildrenRange childrenOf(EntityRef entity) const;
+
 	Transform getLocalTransform(EntityRef entity) const;
 	float getLocalScale(EntityRef entity) const;
 	void setParent(EntityPtr parent, EntityRef child);

@@ -307,15 +307,11 @@ struct GUISceneImpl final : GUIScene
 			}
 		}
 
-		EntityPtr child = m_universe.getFirstChild(rect.entity);
-		while (child.isValid())
-		{
-			auto iter = m_rects.find((EntityRef)child);
-			if (iter.isValid())
-			{
+		for (EntityRef child : m_universe.childrenOf(rect.entity)) {
+			auto iter = m_rects.find(child);
+			if (iter.isValid()) {
 				renderRect(*iter.value(), draw, { l, t, r - l, b - t }, is_main);
 			}
-			child = m_universe.getNextSibling((EntityRef)child);
 		}
 		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.popClipRect();
 	}
@@ -325,15 +321,11 @@ struct GUISceneImpl final : GUIScene
 	void draw3D(GUICanvas& canvas, Pipeline& pipeline) {
 		m_draw_2d.clear({2, 2});
 
-		EntityPtr child = m_universe.getFirstChild(canvas.entity);
-		while (child.isValid())
-		{
-			auto iter = m_rects.find((EntityRef)child);
-			if (iter.isValid())
-			{
+		for (EntityRef child : m_universe.childrenOf(canvas.entity)) {
+			auto iter = m_rects.find(child);
+			if (iter.isValid()) {
 				renderRect(*iter.value(), m_draw_2d, { 0, 0, canvas.virtual_size.x, canvas.virtual_size.y }, false);
 			}
-			child = m_universe.getNextSibling((EntityRef)child);
 		}
 
 		pipeline.render3DUI(canvas.entity, m_draw_2d, canvas.virtual_size, canvas.orient_to_camera);
@@ -469,9 +461,9 @@ struct GUISceneImpl final : GUIScene
 
 		bool intersect = pos.x >= r.x && pos.y >= r.y && pos.x <= r.x + r.w && pos.y <= r.y + r.h;
 
-		for (EntityPtr child = m_universe.getFirstChild(rect.entity); child.isValid(); child = m_universe.getNextSibling((EntityRef)child))
+		for (EntityRef child : m_universe.childrenOf(rect.entity))
 		{
-			auto iter = m_rects.find((EntityRef)child);
+			auto iter = m_rects.find(child);
 			if (!iter.isValid()) continue;
 
 			GUIRect* child_rect = iter.value();
@@ -685,16 +677,12 @@ struct GUISceneImpl final : GUIScene
 			is  ? hover(rect) : hoverOut(rect);
 		}
 
-
-
-		for (EntityPtr e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e))
-		{
-			auto iter = m_rects.find((EntityRef)e);
+		for (EntityRef e : m_universe.childrenOf(rect.entity)) {
+			auto iter = m_rects.find(e);
 			if (!iter.isValid()) continue;
 			handleMouseAxisEvent(r, *iter.value(), mouse_pos, prev_mouse_pos);
 		}
 	}
-
 
 	static bool contains(const Rect& rect, const Vec2& pos)
 	{
@@ -759,8 +747,7 @@ struct GUISceneImpl final : GUIScene
 			}
 		}
 
-		for (EntityPtr e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e))
-		{
+		for (EntityRef e : m_universe.childrenOf(rect.entity)) {
 			auto iter = m_rects.find((EntityRef)e);
 			if (!iter.isValid()) continue;
 			handled = handleMouseButtonEvent(r, *iter.value(), event) || handled;

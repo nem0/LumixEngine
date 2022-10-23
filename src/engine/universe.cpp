@@ -379,12 +379,10 @@ void Universe::destroyEntity(EntityRef entity)
 {
 	EntityData& entity_data = m_entities[entity.index];
 	ASSERT(entity_data.valid);
-	for (EntityPtr first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity))
-	{
+	for (EntityPtr first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity)) {
 		setParent(INVALID_ENTITY, (EntityRef)first_child);
 	}
 	setParent(INVALID_ENTITY, entity);
-	
 
 	u64 mask = entity_data.components;
 	for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
@@ -468,10 +466,9 @@ EntityPtr Universe::getNextSibling(EntityRef entity) const
 
 bool Universe::isDescendant(EntityRef ancestor, EntityRef descendant) const
 {
-	for(EntityPtr e = getFirstChild(ancestor); e.isValid(); e = getNextSibling((EntityRef)e))
-	{
+	for(EntityRef e : childrenOf(ancestor)) {
 		if (e == descendant) return true;
-		if (isDescendant((EntityRef)e, descendant)) return true;
+		if (isDescendant(e, descendant)) return true;
 	}
 
 	return false;
@@ -805,5 +802,39 @@ void Universe::onComponentCreated(EntityRef entity, ComponentType component_type
 	m_component_added.invoke(cmp);
 }
 
+ChildrenRange Universe::childrenOf(EntityRef entity) const {
+	return ChildrenRange(*this, entity);
+}
+
+void ChildrenRange::Iterator::operator ++() {
+	if (entity) entity = universe->getNextSibling(*entity);
+}
+
+bool ChildrenRange::Iterator::operator !=(const Iterator& rhs) {
+	return rhs.entity != entity;
+}
+
+EntityRef ChildrenRange::Iterator::operator*() {
+	return *entity;
+}
+
+ChildrenRange::ChildrenRange(const Universe& universe, EntityRef parent)
+	: universe(universe)
+	, parent(parent)
+{}
+
+ChildrenRange::Iterator ChildrenRange::begin() const {
+	Iterator iter;
+	iter.universe = &universe;
+	iter.entity = universe.getFirstChild(parent);
+	return iter;
+}
+
+ChildrenRange::Iterator ChildrenRange::end() const {
+	Iterator iter;
+	iter.universe = &universe;
+	iter.entity = INVALID_ENTITY;
+	return iter;
+}
 
 } // namespace Lumix

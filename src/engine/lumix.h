@@ -62,6 +62,7 @@ struct EntityPtr
 	bool operator<(const EntityPtr& rhs) const { return rhs.index < index; }
 	bool operator>(const EntityPtr& rhs) const { return rhs.index > index; }
 	bool operator!=(const EntityPtr& rhs) const { return rhs.index != index; }
+	operator bool() const { return index >= 0; }
 	bool isValid() const { return index >= 0; }
 	inline explicit operator EntityRef() const;
 	inline EntityRef operator *() const;

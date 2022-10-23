@@ -629,8 +629,7 @@ private:
 
 		u32 y = 0;
 		u32 col = 0;
-		for (EntityPtr child = universe.getFirstChild(e); child.isValid(); child = universe.getNextSibling((EntityRef)child)) {
-			const EntityRef ch = (EntityRef)child;
+		for (EntityRef ch : universe.childrenOf(e)) {
 			if (!universe.hasComponent(ch, GUI_RECT_TYPE)) continue;
 
 			setRectProperty(ch, "Top Points", (float)y, editor);

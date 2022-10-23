@@ -1884,10 +1884,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 		wheels[PxVehicleDrive4WWheelOrder::eFRONT_LEFT].mMaxSteer = PxPi * 0.3333f;
 		wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
 
-		for (EntityPtr e = m_universe.getFirstChild(entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e)) {
-			if (!m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) continue;
+		for (EntityRef e : m_universe.childrenOf(entity)) {
+			if (!m_universe.hasComponent(e, WHEEL_TYPE)) continue;
 
-			const Wheel& w = m_wheels[(EntityRef)e];
+			const Wheel& w = m_wheels[e];
 			const u32 idx = (u32)w.slot;
 			mask |= 1 << idx;
 
@@ -2108,8 +2108,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	void getWheels(EntityRef car, Span<EntityPtr> wheels) {
-		for (EntityPtr& e : wheels) e= INVALID_ENTITY;
-		for (EntityPtr e = m_universe.getFirstChild(car); e.isValid(); e = m_universe.getNextSibling((EntityRef)e)) {
+		for (EntityPtr& e : wheels) e = INVALID_ENTITY;
+		for (EntityPtr e : m_universe.childrenOf(car)) {
 			if (m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) {
 				const Wheel& w = m_wheels[(EntityRef)e];
 				wheels[(i32)w.slot] = e;

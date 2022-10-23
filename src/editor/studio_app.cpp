@@ -1702,8 +1702,8 @@ struct StudioAppImpl final : StudioApp
 				{
 					Array<EntityRef> tmp(m_allocator);
 					Universe* universe = m_editor->getUniverse();
-					for (EntityPtr e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(*e)) {
-						tmp.push(*e);
+					for (EntityRef e : universe->childrenOf(entity)) {
+						tmp.push(e);
 					}
 					m_editor->selectEntities(tmp, false);
 				}
@@ -1760,10 +1760,9 @@ struct StudioAppImpl final : StudioApp
 
 		if (node_open)
 		{
-			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid();
-				 e_ptr = universe->getNextSibling((EntityRef)e_ptr))
+			for (EntityRef e : universe->childrenOf(entity))
 			{
-				showHierarchy((EntityRef)e_ptr, selected_entities, selection_chain);
+				showHierarchy(e, selected_entities, selection_chain);
 			}
 			if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_is_f2_pressed) {
 				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];

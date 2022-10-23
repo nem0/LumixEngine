@@ -1585,10 +1585,10 @@ private:
 		void pushChildren(EntityRef entity)
 		{
 			Universe* universe = m_editor.getUniverse();
-			for (EntityPtr e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling((EntityRef)e))
+			for (EntityRef e : universe->childrenOf(entity))
 			{
-				m_entities.push((EntityRef)e);
-				pushChildren((EntityRef)e);
+				m_entities.push(e);
+				pushChildren(e);
 			}
 		}
 
@@ -1619,10 +1619,10 @@ private:
 					Transform local_tr = universe->getLocalTransform(m_entities[i]);
 					m_old_values.write(local_tr);
 				}
-				for (EntityPtr child = universe->getFirstChild(m_entities[i]); child.isValid(); child = universe->getNextSibling((EntityRef)child))
+				for (EntityRef child : universe->childrenOf(m_entities[i]))
 				{
 					m_old_values.write(child);
-					Transform local_tr = universe->getLocalTransform((EntityRef)child);
+					Transform local_tr = universe->getLocalTransform(child);
 					m_old_values.write(local_tr);
 				}
 				m_old_values.write(INVALID_ENTITY);
@@ -2398,13 +2398,9 @@ public:
 
 	void gatherHierarchy(EntityRef e, Array<EntityRef>& entities) {
 		entities.push(e);
-		for (EntityPtr child = m_universe->getFirstChild(e); 
-			child.isValid(); 
-			child = m_universe->getNextSibling((EntityRef)child)) 
-		{
-			const EntityRef ch = (EntityRef)child;
-			if (entities.indexOf(ch) < 0) {
-				gatherHierarchy(ch, entities);
+		for (EntityRef child : m_universe->childrenOf(e)) {
+			if (entities.indexOf(child) < 0) {
+				gatherHierarchy(child, entities);
 			}
 		}
 	}
