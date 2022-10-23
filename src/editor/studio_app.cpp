@@ -309,6 +309,9 @@ struct StudioAppImpl final : StudioApp
 		return app->m_allocator.deallocate(ptr);
 	}
 
+	void onEntitySelectionChanged() {
+		m_entity_selection_changed = true;
+	}
 
 	void onInit()
 	{
@@ -354,6 +357,7 @@ struct StudioAppImpl final : StudioApp
 
 		m_asset_compiler = AssetCompiler::create(*this);
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
+		m_editor->entitySelectionChanged().bind<&StudioAppImpl::onEntitySelectionChanged>(this);
 		scanUniverses();
 		loadUserPlugins();
 		addActions();
@@ -1605,8 +1609,20 @@ struct StudioAppImpl final : StudioApp
 		ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2));
 	}
 
+	void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
+		if (!e.isValid()) return;
+		
+		e = m_editor->getUniverse()->getParent(*e);
+		while (e.isValid()) {
+			chain.push(*e);
+			e = m_editor->getUniverse()->getParent(*e);
+		}
+		for (i32 i = 0; i < chain.size() / 2; ++i) {
+			swap(chain[i], chain[chain.size() - 1 - i]); 
+		}
+	}
 
-	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities)
+	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain)
 	{
 		Universe* universe = m_editor->getUniverse();
 		bool selected = selected_entities.indexOf(entity) >= 0;
@@ -1642,6 +1658,13 @@ struct StudioAppImpl final : StudioApp
 		else {
 			const ImVec2 cp = ImGui::GetCursorPos();
 			ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
+			if (selection_chain.length() > 0 && selection_chain[0] == entity) {
+				ImGui::SetNextItemOpen(true);
+				selection_chain = selection_chain.fromLeft(1);
+				if (selection_chain.length() == 0) {
+					ImGui::SetScrollHereY();
+				}
+			}
 			if (ImGui::IsItemVisible()) {
 				ImGui::SetCursorPos(cp);
 				char buffer[1024];
@@ -1740,7 +1763,7 @@ struct StudioAppImpl final : StudioApp
 			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid();
 				 e_ptr = universe->getNextSibling((EntityRef)e_ptr))
 			{
-				showHierarchy((EntityRef)e_ptr, selected_entities);
+				showHierarchy((EntityRef)e_ptr, selected_entities, selection_chain);
 			}
 			if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_is_f2_pressed) {
 				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
@@ -1755,7 +1778,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void folderUI(EntityFolders::FolderID folder_id, EntityFolders& folders, u32 level) {
+	void folderUI(EntityFolders::FolderID folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain) {
 		const EntityFolders::Folder& folder = folders.getFolder(folder_id);
 		ImGui::PushID(&folder);
 		bool node_open;
@@ -1841,14 +1864,14 @@ struct StudioAppImpl final : StudioApp
 		u16 child_id = folder.child_folder;
 		while (child_id != EntityFolders::INVALID_FOLDER) {
 			const EntityFolders::Folder& child = folders.getFolder(child_id);
-			folderUI(child_id, folders, level + 1);
+			folderUI(child_id, folders, level + 1, selection_chain);
 			child_id = child.next_folder;
 		}
 
 		EntityPtr child_e = folder.first_entity;
 		while (child_e.isValid()) {
 			if (!m_editor->getUniverse()->getParent((EntityRef)child_e).isValid()) {
-				showHierarchy((EntityRef)child_e, m_editor->getSelectedEntities());
+				showHierarchy((EntityRef)child_e, m_editor->getSelectedEntities(), selection_chain);
 			}
 			child_e = folders.getNextEntity((EntityRef)child_e);
 		}
@@ -1879,7 +1902,12 @@ struct StudioAppImpl final : StudioApp
 				
 				if (filter[0] == '\0') {
 					EntityFolders& folders = m_editor->getEntityFolders();
-					folderUI(folders.getRoot(), folders, 0);
+					Array<EntityRef> selection_chain(m_allocator);
+					if (m_entity_selection_changed && !m_editor->getSelectedEntities().empty()) {
+						getSelectionChain(selection_chain, m_editor->getSelectedEntities()[0]);
+						m_entity_selection_changed = false;
+					}
+					folderUI(folders.getRoot(), folders, 0, selection_chain);
 				} else {
 					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e)) {
 						char buffer[1024];
@@ -3365,6 +3393,7 @@ struct StudioAppImpl final : StudioApp
 	};
 
 	ExportConfig m_export;
+	bool m_entity_selection_changed = false;
 	bool m_finished;
 	bool m_deferred_game_mode_exit;
 	int m_exit_code;

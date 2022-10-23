@@ -2605,6 +2605,7 @@ public:
 		, m_universe_destroyed(m_allocator)
 		, m_universe_created(m_allocator)
 		, m_selected_entities(m_allocator)
+		, m_entity_selection_changed(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
 		, m_is_loading(false)
@@ -2701,6 +2702,7 @@ public:
 			}
 		}
 		fastRemoveDuplicates(m_selected_entities);
+		m_entity_selection_changed.invoke();
 	}
 
 
@@ -2736,6 +2738,9 @@ public:
 		return m_universe_destroyed;
 	}
 
+	DelegateList<void()>& entitySelectionChanged() override {
+		return m_entity_selection_changed;
+	}
 
 	void destroyUndoStack()
 	{
@@ -2850,6 +2855,7 @@ private:
 	OutputMemoryStream m_game_mode_file;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
+	DelegateList<void()> m_entity_selection_changed;
 
 	OutputMemoryStream m_copy_buffer;
 };

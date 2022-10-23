@@ -153,6 +153,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
+	virtual DelegateList<void()>& entitySelectionChanged() = 0;
 
 	virtual u16 createEntityFolder(u16 parent) = 0;
 	virtual void destroyEntityFolder(u16 folder) = 0;
