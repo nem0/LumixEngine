@@ -481,13 +481,29 @@ private:
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
 				const Array<EntityRef>& selected = editor.getSelectedEntities();
-				EntityPtr e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), selected.empty() ? INVALID_ENTITY : selected[0]);
-				if (!e.isValid()) {
-					e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), INVALID_ENTITY);
+				bool parent_selected = false;
+				if (!selected.empty()) {
+					const EntityPtr parent = editor.getUniverse()->getParent(selected[0]);
+					if (parent.isValid()) {
+						const GUIScene::Rect rect = scene->getRect(*parent);
+						if (mouse_canvas_pos.x >= rect.x 
+							&& mouse_canvas_pos.y >= rect.y 
+							&& mouse_canvas_pos.x <= rect.x + rect.w
+							&& mouse_canvas_pos.y <= rect.y + rect.h)
+						{
+							EntityRef e = *parent;
+							editor.selectEntities(Span(&e, 1), false);
+							parent_selected =  true;
+						}
+					}
 				}
-				if (e.isValid()) {
-					EntityRef r = (EntityRef)e;
-					editor.selectEntities(Span(&r, 1), false);
+
+				if (!parent_selected) {
+					EntityPtr e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), INVALID_ENTITY);
+					if (e.isValid()) {
+						EntityRef r = (EntityRef)e;
+						editor.selectEntities(Span(&r, 1), false);
+					}
 				}
 			}
 
