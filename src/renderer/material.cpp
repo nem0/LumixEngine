@@ -34,11 +34,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_texture_count(0)
 	, m_renderer(renderer)
 	, m_render_states(gpu::StateFlags::CULL_BACK)
-	, m_color(1, 1, 1, 1)
-	, m_metallic(0.f)
-	, m_roughness(1.f)
-	, m_emission(0.0f)
-	, m_translucency(0.0f)
 	, m_define_mask(0)
 	, m_custom_flags(0)
 	, m_render_data(nullptr)
@@ -142,13 +137,8 @@ void Material::unload()
 
 	setShader(nullptr);
 
-	m_color = Vec4(1, 1, 1, 1);
 	m_custom_flags = 0;
 	m_define_mask = 0;
-	m_metallic = 0.0f;
-	m_roughness = 1.0f;
-	m_emission = 0.0f;
-	m_translucency = 0.0f;
 	m_render_states = gpu::StateFlags::CULL_BACK;
 }
 
@@ -162,11 +152,6 @@ bool Material::save(IOutputStream& file)
 	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
-	file << "translucency(" <<  m_translucency << ")\n";
-	file << "emission(" <<  m_emission << ")\n";
-	file << "metallic(" <<  m_metallic << ")\n";
-	file << "roughness(" <<  m_roughness << ")\n";
-
 	file << "defines {";
 	bool first_define = true;
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
@@ -177,8 +162,6 @@ bool Material::save(IOutputStream& file)
 		file << "\"" << def << "\"";
 	}
 	file << "}\n";
-
-	file << "color { " << m_color.x << ", " << m_color.y << ", " << m_color.z << ", " << m_color.w << " }\n";
 
 	for (u32 i = 0; i < m_texture_count; ++i) {
 		char path[LUMIX_MAX_PATH];
@@ -390,30 +373,23 @@ void Material::updateRenderData(bool on_before_ready)
 	m_render_data->define_mask = m_define_mask;
 	m_render_data->render_states = m_render_states;
 	m_render_data->textures_count = m_texture_count;
-	MaterialConsts cs = {};
-	static_assert(sizeof(cs) == 256, "Renderer::MaterialConstants must have 256B");
-	cs.color = m_color;
-	cs.emission = m_emission;
-	cs.translucency = m_translucency;
-	cs.metallic = m_metallic;
-	cs.roughness = m_roughness;
-	memset(cs.custom, 0, sizeof(cs.custom));
+	float cs[Material::MAX_UNIFORMS_FLOATS] = {};
 	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
 		bool found = false;
 		const u32 size = shader_uniform.size();
-		for (Uniform& mat_uniform : m_uniforms) {
-			if (shader_uniform.name_hash == mat_uniform.name_hash) {
-				memcpy((u8*)cs.custom + shader_uniform.offset, mat_uniform.matrix, size);
+		for (Uniform& uniform : m_uniforms) {
+			if (shader_uniform.name_hash == uniform.name_hash) {
+				memcpy((u8*)cs + shader_uniform.offset, uniform.matrix, size);
 				found = true;
 				break;
 			}
 		}
 		if (!found) {
-			memcpy((u8*)cs.custom + shader_uniform.offset, shader_uniform.default_value.matrix, size);
+			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.matrix, size);
 		}
 	}
 
-	m_render_data->material_constants = m_renderer.createMaterialConstants(cs);
+	m_render_data->material_constants = m_renderer.createMaterialConstants(Span(cs));
 
 	for(u32 i = 0; i < m_texture_count; ++i) {
 		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
@@ -514,7 +490,7 @@ int roughness(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	material->setRoughness(r);
+	logWarning(material->getPath().c_str(), ": roughness deprecated");
 	return 0;
 }
 
@@ -550,7 +526,8 @@ int color(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	material->setColor(c);
+	logWarning(material->getPath().c_str(), ": color deprecated");
+
 	return 0;
 }
 
@@ -577,7 +554,7 @@ int metallic(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	material->setMetallic(m);
+	logWarning(material->getPath().c_str(), ": metallic deprecated");
 	return 0;
 }
 
@@ -589,7 +566,7 @@ int emission(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	material->setEmission(m);
+	logWarning(material->getPath().c_str(), ": emission deprecated");
 	return 0;
 }
 
@@ -601,7 +578,7 @@ int translucency(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	material->setTranslucency(m);
+	logWarning(material->getPath().c_str(), ": translucency deprecated");
 	return 0;
 }
 

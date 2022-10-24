@@ -2023,7 +2023,7 @@ struct PipelineImpl final : Pipeline
 				u32 material_ub_idx = 0xffFFffFF;
 				for (const Drawcall& dc : m_drawcalls) {
 					if (material_ub_idx != dc.material->material_constants) {
-						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, dc.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 						material_ub_idx = dc.material->material_constants;
 					}
 
@@ -3374,7 +3374,7 @@ struct PipelineImpl final : Pipeline
 					if (m.layer == m_layer) {
 						gpu::bindTextures(m.material->textures, 0, m.material->textures_count);
 						gpu::setState(m.material->render_states | m_render_state);
-						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 
 						gpu::useProgram(m.program);
 
@@ -3444,7 +3444,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindTextures(procedural.material->textures, 0, procedural.material->textures_count);
 				gpu::setState(procedural.material->render_states | render_states);
 				if (material_ub_idx != procedural.material->material_constants) {
-					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, procedural.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, procedural.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 					material_ub_idx = procedural.material->material_constants;
 				}
 
@@ -3498,7 +3498,7 @@ struct PipelineImpl final : Pipeline
 						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
 						gpu::setState(cmd->material->render_states | render_states);
 						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 							material_ub_idx = cmd->material->material_constants;
 						}
 
@@ -3519,7 +3519,7 @@ struct PipelineImpl final : Pipeline
 
 						gpu::setState(cmd->material->render_states | render_states);
 						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 							material_ub_idx = cmd->material->material_constants;
 						}
 
@@ -3538,7 +3538,7 @@ struct PipelineImpl final : Pipeline
 								
 						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
 						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 							material_ub_idx = cmd->material->material_constants;
 						}
 						gpu::useProgram(cmd->program);
@@ -3569,7 +3569,7 @@ struct PipelineImpl final : Pipeline
 								
 						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
 						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 							material_ub_idx = cmd->material->material_constants;
 						}
 						gpu::useProgram(cmd->program);
@@ -4371,7 +4371,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
 				gpu::bindVertexBuffer(1, grass.instance_buffer, 0, sizeof(Vec4) * 2);
 				if (material_ub_idx != grass.material->material_constants) {
-					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, grass.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, grass.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 					material_ub_idx = grass.material->material_constants;
 				}
 
@@ -4506,7 +4506,7 @@ struct PipelineImpl final : Pipeline
 			renderer.beginProfileBlock("terrain", 0);
 			for (const Instance& inst : m_instances) {
 				gpu::useProgram(inst.program);
-				gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+				gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, inst.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 				
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);

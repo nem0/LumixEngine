@@ -1,9 +1,34 @@
 import "pipelines/surface_base.inc"
 
+uniform("Material color", "color", {1, 1, 1})
+uniform("Roughness", "float", 1)
+uniform("Metallic", "float", 0)
+uniform("Emission", "float", 0)
+uniform("Translucency", "float", 0)
 uniform("Height scale", "float")
 
 surface_shader_ex({
 	texture_slots = {
+		{
+			name = "Albedo",
+			default_texture = "textures/common/white.tga"
+		},
+		{
+			name = "Normal",
+			default_texture = "textures/common/default_normal.tga"
+		},
+		{
+			name = "Roughness",
+			default_texture = "textures/common/white.tga"
+		},
+		{
+			name = "Metallic",
+			define = "HAS_METALLICMAP"
+		},
+		{
+			name = "Ambient occlusion",
+			define = "HAS_AMBIENT_OCCLUSION_TEX"
+		},
 		{
 			name = "Displacement",
 			default_texture = "textures/common/white.tga"
@@ -11,8 +36,6 @@ surface_shader_ex({
 	},
 
 	fragment_preface = [[
-		layout (binding = 5) uniform sampler2D u_displacement;
-
 		float selfshadow(vec2 uv, vec3 light_dir) {
 			if (light_dir.y <= 0.0) return 0;
 
@@ -24,7 +47,7 @@ surface_shader_ex({
 			vec2 P = light_dir.xz / abs(light_dir.y) * u_height_scale;
 			vec2 uv_step = P / layers;
 
-			float depth = texture(u_displacement, uv).r;
+			float depth = texture(t_displacement, uv).r;
 			float layer_depth = depth;
 
 			while (layer_depth <= depth && layer_depth > 0.0) {
@@ -72,7 +95,7 @@ surface_shader_ex({
 
 		vec2 uv = parallax(v_uv, normalize(-v_wpos.xyz) * tbn);
 
-		vec4 c = texture(u_albedomap, uv, -1) * u_material_color;
+		vec4 c = texture(t_albedo, uv, -1) * u_material_color;
 		data.albedo = c.rgb;
 		data.alpha = c.a;
 		#ifdef _HAS_ATTR6
@@ -86,7 +109,7 @@ surface_shader_ex({
 		#endif
 
 		#ifdef HAS_AMBIENT_OCCLUSION_TEX
-			data.ao *= texture(u_aomap, uv).r;
+			data.ao *= texture(t_ambient_occlusion, uv).r;
 		#endif
 
 		#ifdef FUR 
@@ -98,9 +121,9 @@ surface_shader_ex({
 			if(data.alpha < 0.5) discard;
 		#endif
 			
-		data.roughness = saturate(texture(u_roughnessmap, uv).g * u_roughness);
-		data.metallic  = texture(u_metallicmap, uv).b * u_metallic;
-		data.N.xz = texture(u_normalmap, uv).xy * 2 - 1;
+		data.roughness = saturate(texture(t_roughness, uv).g * u_roughness);
+		data.metallic  = texture(t_metallic, uv).b * u_metallic;
+		data.N.xz = texture(t_normal, uv).xy * 2 - 1;
 		data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 		data.N = tbn * data.N;
 		data.emission = u_emission;

@@ -164,7 +164,7 @@ struct FrameData {
 
 	struct MaterialUpdates {
 		u32 idx;
-		MaterialConsts value;
+		float values[Material::MAX_UNIFORMS_FLOATS];
 	};
 
 	TransientBuffer<16> transient_buffer;
@@ -535,12 +535,12 @@ struct RendererImpl final : Renderer
 			mb.data.back().next_free = -1;
 			gpu::createBuffer(mb.buffer
 				, gpu::BufferFlags::UNIFORM_BUFFER
-				, sizeof(MaterialConsts) * 400
+				, Material::MAX_UNIFORMS_BYTES * 400
 				, nullptr
 			);
 			gpu::createBuffer(mb.staging_buffer
 				, gpu::BufferFlags::UNIFORM_BUFFER
-				, sizeof(MaterialConsts)
+				, Material::MAX_UNIFORMS_BYTES
 				, nullptr
 			);
 
@@ -549,9 +549,8 @@ struct RendererImpl final : Renderer
 			const char* srcs[] = { downscale_src };
 			gpu::createProgram(renderer.m_downscale_program, {}, srcs, &type, 1, nullptr, 0, "downscale");
 
-			MaterialConsts default_mat;
-			default_mat.color = Vec4(1, 0, 1, 1);
-			gpu::update(mb.buffer, &default_mat, sizeof(MaterialConsts));
+			float default_mat[Material::MAX_UNIFORMS_FLOATS] = {};
+			gpu::update(mb.buffer, &default_mat, sizeof(default_mat));
 		}, &signal, 1);
 		jobs::wait(&signal);
 
@@ -784,8 +783,8 @@ struct RendererImpl final : Renderer
 		return m_material_buffer.buffer;
 	}
 
-	u32 createMaterialConstants(const MaterialConsts& data) override {
-		const RuntimeHash hash((const u8*)&data, sizeof(data));
+	u32 createMaterialConstants(Span<const float> data) override {
+		const RuntimeHash hash((const u8*)&data, data.length() * sizeof(float));
 		auto iter = m_material_buffer.map.find(hash);
 		u32 idx;
 		if(iter.isValid()) {
@@ -802,7 +801,11 @@ struct RendererImpl final : Renderer
 			m_material_buffer.data[idx].ref_count = 0;
 			m_material_buffer.data[idx].hash = RuntimeHash((const u8*)&data, sizeof(data));
 			m_material_buffer.map.insert(hash, idx);
-			m_cpu_frame->material_updates.push({idx, data});
+			
+			FrameData::MaterialUpdates& mu = m_cpu_frame->material_updates.emplace();
+			mu.idx = idx;
+			ASSERT(data.length() * sizeof(float) <= sizeof(mu.values));
+			memcpy(mu.values, data.begin(), data.length() * sizeof(float));
 		}
 		++m_material_buffer.data[idx].ref_count;
 		return idx;
@@ -1243,8 +1246,8 @@ struct RendererImpl final : Renderer
 		frame.to_compile_shaders.clear();
 
 		for (const auto& i : frame.material_updates) {
-			gpu::update(m_material_buffer.staging_buffer, &i.value, sizeof(MaterialConsts));
-			gpu::copy(m_material_buffer.buffer, m_material_buffer.staging_buffer, i.idx * sizeof(MaterialConsts), 0, sizeof(MaterialConsts));
+			gpu::update(m_material_buffer.staging_buffer, i.values, sizeof(i.values));
+			gpu::copy(m_material_buffer.buffer, m_material_buffer.staging_buffer, i.idx * sizeof(i.values), 0, sizeof(i.values));
 		}
 		frame.material_updates.clear();
 

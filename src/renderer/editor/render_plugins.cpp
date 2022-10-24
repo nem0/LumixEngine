@@ -859,46 +859,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		if (!shader->isIgnored(Shader::COLOR)) {
-			Vec4 color = first->getColor();
-			multiLabel<&Material::getColor>("Color", resources);
-			if (ImGui::ColorEdit4("##col", &color.x)) {
-				set<&Material::setColor>(resources, color);
-			}
-		}
-
-		if (!shader->isIgnored(Shader::ROUGHNESS)) {
-			float roughness = first->getRoughness();
-			multiLabel<&Material::getRoughness>("Roughness", resources);
-			if (ImGui::DragFloat("##rgh", &roughness, 0.1f, 0.0f, 1.0f)) {
-				set<&Material::setRoughness>(resources, roughness);
-			}
-		}
-
-		if (!shader->isIgnored(Shader::METALLIC)) {
-			float metallic = first->getMetallic();
-			multiLabel<&Material::getMetallic>("Metallic", resources);
-			if (ImGui::DragFloat("##met", &metallic, 0.1f, 0.0f, 1.0f)) {
-				set<&Material::setMetallic>(resources, metallic);
-			}
-		}
-			
-		if (!shader->isIgnored(Shader::EMISSION)) {
-			float emission = first->getEmission();
-			multiLabel<&Material::getEmission>("Emission", resources);
-			if (ImGui::DragFloat("##emis", &emission, 0.1f, 0.0f)) {
-				set<&Material::setEmission>(resources, emission);
-			}
-		}
-
-		if (!shader->isIgnored(Shader::TRANSLUCENCY)) {
-			float translucency = first->getTranslucency();
-			multiLabel<&Material::getTranslucency>("Translucency", resources);
-			if (ImGui::DragFloat("##trns", &translucency, 0.1f, 0.f, 1.f)) {
-				set<&Material::setTranslucency>(resources, translucency);
-			}
-		}
-
 		const char* current_layer_name = renderer.getLayerName(first->getLayer());
 		multiLabel<&Material::getLayer>("Layer", resources);
 		if (ImGui::BeginCombo("##layer", current_layer_name)) {

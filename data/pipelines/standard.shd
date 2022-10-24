@@ -1,7 +1,13 @@
 import "pipelines/surface_base.inc"
 
+uniform("Material color", "color", {1, 1, 1})
+uniform("Roughness", "float", 1)
+uniform("Metallic", "float", 0)
+uniform("Emission", "float", 0)
+uniform("Translucency", "float", 0)
+
 surface_shader [[
-	vec4 c = texture(u_albedomap, v_uv, -1) * u_material_color;
+	vec4 c = texture(t_albedo, v_uv, -1) * u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
 	#ifdef _HAS_ATTR6
@@ -15,7 +21,7 @@ surface_shader [[
 	#endif
 
 	#ifdef HAS_AMBIENT_OCCLUSION_TEX
-		data.ao *= texture(u_aomap, v_uv).r;
+		data.ao *= texture(u_ambient_occlusion, v_uv).r;
 	#endif
 
 	#ifdef FUR 
@@ -36,13 +42,13 @@ surface_shader [[
 		normalize(cross(tangent, N))
 	);
 		
-	data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
+	data.roughness = texture(t_roughness, v_uv).g * u_roughness;
 	#ifdef HAS_METALLICMAP
-		data.metallic = texture(u_metallicmap, v_uv).b * u_metallic;
+		data.metallic = texture(t_metallic, v_uv).b * u_metallic;
 	#else
 		data.metallic = u_metallic;
 	#endif
-	data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
+	data.N.xz = texture(t_normal, v_uv).xy * 2 - 1;
 	data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 	data.N = tbn * data.N;
 	data.emission = u_emission;

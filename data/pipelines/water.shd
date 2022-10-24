@@ -20,11 +20,6 @@ texture_slot {
 
 include "pipelines/common.glsl"
 
-ignore_property("roughness")
-ignore_property("metallic")
-ignore_property("emission")
-ignore_property("translucency")
-
 uniform("UV scale", "float")
 uniform("Specular power", "float")
 uniform("R0", "float")

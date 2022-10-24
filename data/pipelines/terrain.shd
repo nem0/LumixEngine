@@ -38,11 +38,11 @@ uniform("Detail power", "float")
 
 common [[
 	layout(binding=0) uniform sampler2D u_hm;
-	layout(binding=1) uniform sampler2DArray u_albedo;
-	layout(binding=2) uniform sampler2DArray u_normal;
-	layout(binding=3) uniform sampler2D u_splatmap;
-	layout(binding=4) uniform sampler2D u_satellite;
-	layout(binding=5) uniform sampler2D u_noise;
+	layout(binding=1) uniform sampler2DArray t_albedo;
+	layout(binding=2) uniform sampler2DArray t_normal;
+	layout(binding=3) uniform sampler2D t_splatmap;
+	layout(binding=4) uniform sampler2D t_satellite;
+	layout(binding=5) uniform sampler2D t_noise;
 
 	layout(std140, binding = 4) uniform Drawcall {
 		ivec4 u_from_to;
@@ -136,8 +136,8 @@ fragment_shader [[
 		Detail textureNoTile(float dist2, vec2 x, int layer, vec2 dPdx, vec2 dPdy) {
 			Detail detail;
 
-			detail.normal.xy = textureGrad(u_normal, vec3(x, layer), dPdx, dPdy).xy * 2 - 1;
-			detail.albedo = textureGrad(u_albedo, vec3(x, layer), dPdx, dPdy);
+			detail.normal.xy = textureGrad(t_normal, vec3(x, layer), dPdx, dPdy).xy * 2 - 1;
+			detail.albedo = textureGrad(t_albedo, vec3(x, layer), dPdx, dPdy);
 
 			const float blend_start_sqr = 10 * 10;
 			if (dist2 > blend_start_sqr) {
@@ -145,8 +145,8 @@ fragment_shader [[
 				vec3 uv = vec3(x * 0.1, layer);
 				dPdx *= 0.1; 
 				dPdy *= 0.1; 
-				vec4 albedo = textureGrad(u_albedo, uv, dPdx, dPdy);
-				N = textureGrad(u_normal, uv, dPdx, dPdy).xy * 2 - 1;
+				vec4 albedo = textureGrad(t_albedo, uv, dPdx, dPdy);
+				N = textureGrad(t_normal, uv, dPdx, dPdy).xy * 2 - 1;
 				float t = saturate((dist2 - blend_start_sqr) / 10000);
 				detail.normal.xy = mix(detail.normal.xy, N, t);
 				detail.albedo = mix(detail.albedo, albedo, t);
@@ -170,8 +170,8 @@ fragment_shader [[
 				vec2 grid_size = u_hm_size / u_terrain_scale.xz;
 				vec2 resolution = grid_size + 1;
 
-				vec2 r = vec2(texture(u_noise, uv_norm * u_noise_uv_scale * grid_size).x,
-							  texture(u_noise, uv_norm.yx * u_noise_uv_scale * grid_size).x);
+				vec2 r = vec2(texture(t_noise, uv_norm * t_noise_uv_scale * grid_size).x,
+							  texture(t_noise, uv_norm.yx * t_noise_uv_scale * grid_size).x);
 				r = r * u_detail_diffusion * 2 - u_detail_diffusion;
 				uv_norm += r / u_hm_size;
 
@@ -188,10 +188,10 @@ fragment_shader [[
 
 				vec2 uv_grid = uv / resolution;
 				// todo textureGather
-				vec4 splat00 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(0, 0));
-				vec4 splat10 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(1, 0));
-				vec4 splat01 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(0, 1));
-				vec4 splat11 = textureLodOffset(u_splatmap, uv_grid, 0, ivec2(1, 1));
+				vec4 splat00 = textureLodOffset(t_splatmap, uv_grid, 0, ivec2(0, 0));
+				vec4 splat10 = textureLodOffset(t_splatmap, uv_grid, 0, ivec2(1, 0));
+				vec4 splat01 = textureLodOffset(t_splatmap, uv_grid, 0, ivec2(0, 1));
+				vec4 splat11 = textureLodOffset(t_splatmap, uv_grid, 0, ivec2(1, 1));
 
 				vec2 uv_detail = u_detail_scale * v_uv * u_hm_size;
 
@@ -216,15 +216,15 @@ fragment_shader [[
 				if (v_dist2 > sat_blend_start_sqr) {
 					float m = (v_dist2 - sat_blend_start_sqr) / (u_detail_distance * u_detail_distance);
 					m = saturate((m - 0.8) * 5);
-					vec3 sat_color = texture(u_satellite, vec3(v_uv, 0).xy).rgb;
-					sat_color *= saturate(0.5 + texture(u_noise, v_uv * 10, -2).r * texture(u_noise, v_uv*29, -2).r * 0.5);
+					vec3 sat_color = texture(t_satellite, vec3(v_uv, 0).xy).rgb;
+					sat_color *= saturate(0.5 + texture(t_noise, v_uv * 10, -2).r * texture(t_noise, v_uv*29, -2).r * 0.5);
 					surface.albedo = mix(surface.albedo, sat_color, m);
 				}
 			}
 			else {
 				surface.N = getTBN(v_uv)[1];
-				surface.albedo = texture(u_satellite, vec3(v_uv, 0).xy).rgb;
-				surface.albedo *= saturate(0.5 + texture(u_noise, v_uv * 10, -2).r * texture(u_noise, v_uv*29, -2).r * 0.5);
+				surface.albedo = texture(t_satellite, vec3(v_uv, 0).xy).rgb;
+				surface.albedo *= saturate(0.5 + texture(t_noise, v_uv * 10, -2).r * texture(t_noise, v_uv*29, -2).r * 0.5);
 				surface.alpha = 1;
 			}
 			surface.wpos = vec3(0);

@@ -21,6 +21,11 @@ texture_slot {
 include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
+uniform("Material color", "color", {1, 1, 1})
+uniform("Roughness", "float", 1)
+uniform("Metallic", "float", 0)
+uniform("Emission", "float", 0)
+uniform("Translucency", "float", 0)
 uniform("Center", "vec3")
 uniform("Radius", "float")
 
@@ -89,12 +94,12 @@ vertex_shader [[
 ---------------------
 
 fragment_shader [[
-	layout (binding=0) uniform sampler2D u_albedomap;
+	layout (binding=0) uniform sampler2D t_albedo;
 	#ifdef HAS_NORMAL
-		layout (binding=1) uniform sampler2D u_normalmap;
+		layout (binding=1) uniform sampler2D t_normal;
 	#endif
-	layout (binding=2) uniform sampler2D u_selfshadow;
-	layout (binding=3) uniform sampler2D u_depth;
+	layout (binding=2) uniform sampler2D t_selfshadow;
+	layout (binding=3) uniform sampler2D t_depth;
 	layout (binding=7) uniform samplerCubeArray u_reflection_probes;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 1) in vec3 v_normal;
@@ -116,7 +121,7 @@ fragment_shader [[
 	Surface getSurface()
 	{
 		Surface data;
-		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
+		vec4 c = texture(t_albedo, v_uv) * u_material_color;
 		data.albedo = c.rgb;
 		data.alpha = c.a;
 		#ifdef ALPHA_CUTOUT
@@ -133,7 +138,7 @@ fragment_shader [[
 		data.roughness = u_roughness;
 		data.metallic = u_metallic;
 		#ifdef HAS_NORMAL
-			data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
+			data.N.xz = texture(t_normal, v_uv).xy * 2 - 1;
 			data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 		
 			data.N = tbn * data.N;
 		#else
@@ -144,7 +149,7 @@ fragment_shader [[
 		data.ao = 1;
 		
 		#if !defined DEPTH && defined HAS_SELFSHADOW
-			vec4 self_shadow = texture(u_selfshadow, v_uv);
+			vec4 self_shadow = texture(t_selfshadow, v_uv);
 			data.shadow = saturate(dot(self_shadow, v_shadow_coefs));
 			data.shadow *= data.shadow;
 			data.ao = dot(self_shadow, vec4(1)) * 0.25;
@@ -160,7 +165,7 @@ fragment_shader [[
 		{
 			if (ditherLOD(v_lod)) discard;
 			#ifdef ALPHA_CUTOUT
-				vec4 c = texture(u_albedomap, v_uv);
+				vec4 c = texture(t_albedo, v_uv);
 				if(c.a < 0.5) discard;
 			#endif
 		}
@@ -170,7 +175,7 @@ fragment_shader [[
 			Surface data = getSurface();
 			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
 			#ifdef HAS_DEPTHMAP
-				float depth = texture(u_depth, v_uv).x;
+				float depth = texture(t_depth, v_uv).x;
 				float linear_z = toLinearDepth(Pass.inv_projection, gl_FragCoord.z);
 				gl_FragDepth = 0.1 / (linear_z + (depth - 0.5) * u_radius); // TODO remove hardcoded near plane 0.1
 			#endif

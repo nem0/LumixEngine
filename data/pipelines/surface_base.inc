@@ -3,35 +3,32 @@ function surface_shader_ex(args)
 	args.fragment_preface = args.fragment_preface or ""
 	args.vertex = args.vertex or ""
 
-	texture_slot {
-		name = "Albedo",
-		default_texture = "textures/common/white.tga"
-	}
-
-	texture_slot {
-		name = "Normal",
-		default_texture = "textures/common/default_normal.tga"
-	}
-
-	texture_slot {
-		name = "Roughness",
-		default_texture = "textures/common/white.tga"
-	}
-
-	texture_slot {
-		name = "Metallic",
-		define = "HAS_METALLICMAP"
-	}
-
-	texture_slot {
-		name = "Ambient occlusion",
-		define = "HAS_AMBIENT_OCCLUSION_TEX"
-	}
-
-	if args.texture_slots ~= nil then
-		for _, slot in ipairs(args.texture_slots) do
-			texture_slot(slot)
-		end
+	if args.texture_slots == nil then
+		args.texture_slots = {
+			{
+				name = "Albedo",
+				default_texture = "textures/common/white.tga"
+			},
+			{
+				name = "Normal",
+				default_texture = "textures/common/default_normal.tga"
+			},
+			{
+				name = "Roughness",
+				default_texture = "textures/common/white.tga"
+			},
+			{
+				name = "Metallic",
+				define = "HAS_METALLICMAP"
+			},
+			{
+				name = "Ambient occlusion",
+				define = "HAS_AMBIENT_OCCLUSION_TEX"
+			}
+		}
+	end
+	for _, slot in ipairs(args.texture_slots) do
+		texture_slot(slot)
 	end
 
 	include "pipelines/common.glsl"
@@ -43,6 +40,21 @@ function surface_shader_ex(args)
 	define "ALPHA_CUTOUT"
 	
 	------------------
+
+	function toVarName(prefix, name) 
+		local res = prefix .. "_"
+		
+		for idx = 1, #name do
+			local c = name:byte(idx)
+			if (c >= string.byte("A") and c <= string.byte("Z")) or (c >= string.byte("a") and c <= string.byte("z")) or (c >= string.byte("0") and c <= string.byte("9")) then
+				res = res .. string.char(c)
+			else 
+				res = res .. "_"
+			end
+		end
+
+		return string.lower(res)
+	end
 
 	common([[
 		#ifdef SKINNED
@@ -60,6 +72,17 @@ function surface_shader_ex(args)
 			#define HAS_LOD
 		#endif
 	]])
+
+	for idx, slot in ipairs(args.texture_slots) do
+		if slot.define ~= nil then
+			common("#ifdef " .. slot.define .. "\n")
+		end
+		common("layout (binding=" .. tostring(idx - 1) .. ") uniform sampler2D " .. toVarName("t", slot.name) .. ";\n")
+		if slot.define ~= nil then
+			common("#endif\n")
+		end
+	end
+
 
 	vertex_shader([[
 		layout(location = 0) in vec3 a_position;
@@ -187,16 +210,7 @@ function surface_shader_ex(args)
 
 	---------------------
 
-	fragment_shader ([[
-		layout (binding=0) uniform sampler2D u_albedomap;
-		layout (binding=1) uniform sampler2D u_normalmap;
-		layout (binding=2) uniform sampler2D u_roughnessmap;
-		#ifdef HAS_METALLICMAP
-			layout (binding=3) uniform sampler2D u_metallicmap;
-		#endif
-		#ifdef HAS_AMBIENT_OCCLUSION_TEX	
-			layout (binding=4) uniform sampler2D u_aomap;
-		#endif
+	fragment_shader([[
 		layout (binding=5) uniform sampler2D u_shadowmap;
 		#if !defined DEPTH && !defined DEFERRED && !defined GRASS
 			layout (binding=6) uniform sampler2D u_shadow_atlas;
@@ -254,8 +268,8 @@ function surface_shader_ex(args)
 					if (ditherLOD(v_lod)) discard;
 				#endif
 				#ifdef ALPHA_CUTOUT
-					vec4 c = texture(u_albedomap, v_uv);
-					if(c.a < 0.5) discard;
+					Surface data = getSurface();
+					if(data.alpha < 0.5) discard;
 				#endif
 			}
 		#elif defined DEFERRED || defined GRASS

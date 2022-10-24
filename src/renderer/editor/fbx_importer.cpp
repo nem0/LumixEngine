@@ -1114,7 +1114,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
 
 					gpu::useProgram(dc.program);
-					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, m_material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, m_material_ub, dc.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 					gpu::bindIndexBuffer(rd->index_buffer_handle);
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);

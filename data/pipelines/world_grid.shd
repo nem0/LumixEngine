@@ -1,5 +1,11 @@
 import "pipelines/surface_base.inc"
 
+uniform("Material color", "color", {1, 1, 1})
+uniform("Roughness", "float", 1)
+uniform("Metallic", "float", 0)
+uniform("Emission", "float", 0)
+uniform("Translucency", "float", 0)
+
 surface_shader [[
 	vec4 c = u_material_color;
 	float ff = dot(floor(mod(v_wpos.xyz + Global.camera_world_pos.xyz + 0.5, vec3(2))), vec3(1));

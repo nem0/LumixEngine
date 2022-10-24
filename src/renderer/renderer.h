@@ -62,7 +62,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual float getLODMultiplier() const = 0;
 	virtual void setLODMultiplier(float value) = 0;
 
-	virtual u32 createMaterialConstants(const struct MaterialConsts& data) = 0;
+	virtual u32 createMaterialConstants(Span<const float> data) = 0;
 	virtual void destroyMaterialConstants(u32 id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 

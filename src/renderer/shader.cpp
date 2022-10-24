@@ -44,7 +44,6 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_defines(m_allocator)
 	, m_programs(m_allocator)
 	, m_sources(m_allocator)
-	, m_ignored_properties(0)
 {
 	m_sources.path = path;
 }
@@ -112,32 +111,6 @@ static Shader* getShader(lua_State* L)
 
 namespace LuaAPI
 {
-	
-int ignore_property(lua_State* L) {
-	const char* name = LuaWrapper::checkArg<const char*>(L, 1); 
-	Shader* shader = getShader(L);
-	ASSERT(shader);
-
-	if (equalIStrings(name, "roughness")) {
-		shader->ignoreProperty(Shader::ROUGHNESS);
-	}
-	else if (equalIStrings(name, "metallic")) {
-		shader->ignoreProperty(Shader::METALLIC);
-	}
-	else if (equalIStrings(name, "emission")) {
-		shader->ignoreProperty(Shader::EMISSION);
-	}
-	else if (equalIStrings(name, "translucency")) {
-		shader->ignoreProperty(Shader::TRANSLUCENCY);
-	}
-	else if (equalIStrings(name, "color")) {
-		shader->ignoreProperty(Shader::COLOR);
-	}
-	else {
-		luaL_argerror(L, 1, "unknown value");
-	}
-	return 0;
-}
 
 int uniform(lua_State* L)
 {
@@ -182,7 +155,7 @@ int uniform(lua_State* L)
 		switch (lua_type(L, 3)) {
 			case LUA_TNUMBER: u.default_value.float_value = LuaWrapper::toType<float>(L, 3); break;
 			case LUA_TTABLE: {
-				const size_t len = lua_objlen(L, 2);
+				const size_t len = lua_objlen(L, 3);
 				switch (len) {
 					case 2:	*(Vec2*)u.default_value.vec2 = LuaWrapper::toType<Vec2>(L, 3); break;
 					case 3: *(Vec3*)u.default_value.vec3 = LuaWrapper::toType<Vec3>(L, 3); break;
@@ -396,8 +369,6 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "define");
 	lua_pushcfunction(L, LuaAPI::uniform);
 	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
-	lua_pushcfunction(L, LuaAPI::ignore_property);
-	lua_setfield(L, LUA_GLOBALSINDEX, "ignore_property");
 
 	const Span<const char> content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
@@ -417,7 +388,6 @@ void Shader::unload()
 	}
 	m_sources.common = "";
 	m_sources.stages.clear();
-	m_ignored_properties = 0;
 	m_programs.clear();
 	m_uniforms.clear();
 	for (u32 i = 0; i < m_texture_slot_count; ++i) {
@@ -444,11 +414,11 @@ static const char* toString(Shader::Uniform::Type type) {
 	}
 }
 
-static void toVarName(Span<char> out, const char* in) {
+static void toName(char prefix, Span<char> out, const char* in) {
 	ASSERT(out.length() > 3);
 	const char* c = in;
 	char* o = out.begin();
-	*o = 'u';
+	*o = prefix;
 	++o;
 	*o = '_';
 	++o;
@@ -468,21 +438,24 @@ static void toVarName(Span<char> out, const char* in) {
 	*o = 0;
 }
 
+void Shader::toUniformVarName(Span<char> out, const char* in) {
+	toName('u', out, in);
+}
+
+void Shader::toTextureVarName(Span<char> out, const char* in) {
+	toName('t', out, in);
+}
+
 void Shader::onBeforeReady() {
-	m_sources.common.cat(R"#(
-		layout (std140, binding = 2) uniform MaterialState {
-			vec4 u_material_color;
-			float u_roughness;
-			float u_metallic;
-			float u_emission;
-			float u_translucency;
-		)#");
+	if (m_uniforms.empty()) return;
+
+	m_sources.common.cat("layout (std140, binding = 2) uniform MaterialState {");
 
 	for (const Uniform& u : m_uniforms) {
 		m_sources.common.cat(toString(u.type));
 		m_sources.common.cat(" ");
 		char var_name[64];
-		toVarName(Span(var_name), u.name);
+		toUniformVarName(Span(var_name), u.name);
 		m_sources.common.cat(var_name);
 		m_sources.common.cat(";\n");
 	}

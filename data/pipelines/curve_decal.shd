@@ -6,8 +6,7 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
-ignore_property "emission"
-ignore_property "translucency"
+uniform("Material color", "color", {1, 1, 1})
 
 ------------------
 

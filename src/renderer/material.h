@@ -20,15 +20,6 @@ struct ResourceManagerHub;
 struct Shader;
 struct Texture;
 
-struct  MaterialConsts {
-	Vec4 color;
-	float roughness;
-	float metallic;
-	float emission;
-	float translucency;
-	float custom[56];
-};
-
 struct MaterialManager : ResourceManager {
 public:
 	MaterialManager(Renderer& renderer, IAllocator& allocator);
@@ -46,6 +37,9 @@ private:
 struct LUMIX_RENDERER_API Material final : Resource {
 	friend struct MaterialManager;
 	static const int MAX_TEXTURE_COUNT = 16;
+
+	static constexpr u32 MAX_UNIFORMS_FLOATS = 64; 
+	static constexpr u32 MAX_UNIFORMS_BYTES = MAX_UNIFORMS_FLOATS * sizeof(float); 
 
 	struct RenderData {
 		gpu::TextureHandle textures[MAX_TEXTURE_COUNT];
@@ -79,16 +73,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	Renderer& getRenderer() { return m_renderer; }
 	RenderData* getRenderData() const { return m_render_data; }
 
-	float getMetallic() const { return m_metallic; }
-	void setMetallic(float value) { m_metallic = value; updateRenderData(false); }
-	float getRoughness() const { return m_roughness; }
-	void setRoughness(float value) { m_roughness = value; updateRenderData(false); }
-	float getEmission() const { return m_emission; }
-	void setEmission(float value) { m_emission = value; updateRenderData(false); }
-	float getTranslucency() const { return m_translucency; }
-	void setTranslucency(float value) { m_translucency = value; updateRenderData(false); }
-	Vec4 getColor() const { return m_color; }
-	void setColor(const Vec4& color) { m_color = color; updateRenderData(false); }
 	gpu::StateFlags getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
@@ -140,11 +124,6 @@ private:
 private:
 	Renderer& m_renderer;
 	Shader* m_shader;
-	float m_metallic;
-	float m_roughness;
-	float m_emission;
-	float m_translucency;
-	Vec4 m_color;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	u32 m_texture_count;
 	u32 m_define_mask;

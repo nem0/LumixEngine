@@ -6,6 +6,8 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+uniform("Material color", "color", {1, 1, 1})
+
 ------------------
 
 vertex_shader [[
