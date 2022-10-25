@@ -22,7 +22,6 @@ struct RenderInterface {
 	virtual Path getModelInstancePath(Universe& universe, EntityRef entity) = 0;
 	virtual bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) = 0;
 	virtual void launchRenderDoc() = 0;
-	virtual void renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* dd, Vec2 scale) = 0;
 };
 
 }

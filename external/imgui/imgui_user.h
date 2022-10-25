@@ -45,11 +45,14 @@ IMGUI_API void Rect(float w, float h, ImU32 color);
 IMGUI_API void BeginNodeEditor(const char* title, ImVec2* offset);
 IMGUI_API void EndNodeEditor();
 IMGUI_API ImVec2 GetNodeEditorOffset();
+IMGUI_API void BeginNodeTitleBar();
+IMGUI_API void EndNodeTitleBar();
 IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos, bool* selected);
 IMGUI_API void EndNode();
 IMGUI_API void Pin(ImGuiID id, bool is_input, PinShape shape = PinShape::CIRCLE);
 IMGUI_API bool GetNewLink(ImGuiID* from, ImGuiID* to);
 IMGUI_API void NodeLink(ImGuiID from, ImGuiID to);
+IMGUI_API void NodeLinkEx(ImGuiID from, ImGuiID to, ImU32 color, ImU32 active_color);
 IMGUI_API bool IsLinkHovered();
 
 IMGUI_API bool InputRotation(const char* label, float* euler);
@@ -59,5 +62,18 @@ IMGUI_API bool IconButton(const char* icon, const char* tooltip);
 IMGUI_API bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values);
 IMGUI_API void PushReadOnly();
 IMGUI_API void PopReadOnly();
+
+struct IMGUI_API Canvas {
+	~Canvas();
+	void begin();
+	void end();
+
+	ImVec2 m_origin;
+	ImVec2 m_size = ImVec2(0, 0);
+	ImVec2 m_scale = ImVec2(1, 1);
+	ImGuiContext* m_ctx = nullptr;
+	ImGuiContext* m_original_ctx = nullptr;
+};
+
 
 } // namespace ImGuiEx

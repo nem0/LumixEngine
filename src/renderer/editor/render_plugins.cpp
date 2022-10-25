@@ -4392,8 +4392,6 @@ struct RenderInterfaceImpl final : RenderInterface
 		return scene->getModelInstancePath(entity); 
 	}
 
-	void renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* dd, Vec2 scale) override;
-
 	StudioApp& m_app;
 	Renderer& m_renderer;
 	EditorUIRenderPlugin& m_plugin;
@@ -4660,65 +4658,10 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		}
 		if (m_texture) renderer->destroy(m_texture);
 	}
-	
-	void renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* draw_data, Vec2 scale) {
-		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		RenderJob& cmd = renderer->createJob<RenderJob>(renderer->getCurrentFrameAllocator());
-		cmd.plugin = this;
-		
-		LinearAllocator& allocator = renderer->getCurrentFrameAllocator();
-		RenderJob::WindowDrawData& dd = cmd.window_draw_data.emplace(allocator);
-		dd.w = u32(rt_size.x);
-		dd.h = u32(rt_size.y);
-		dd.x = i32(0);
-		dd.y = i32(0);
-		dd.window = nullptr;
-		dd.program = cmd.getProgram(dd.window, dd.new_program);
-		dd.cmd_lists.reserve(draw_data->CmdListsCount);
-		dd.ub = renderer->allocUniform(sizeof(Vec4) * 2);
-		dd.render_target = rt;
-		dd.scale = scale;
-		dd.clear_color = Vec4(0);
-
-		const Vec2 offset(0);
-		const Vec4 canvas_mtx[] = {
-			Vec4(2.f / dd.w * scale.x, 0, -1 + (float)-offset.x * 2.f / dd.w * scale.x, 0),
-			Vec4(0, -2.f / dd.h * scale.y, 1 + (float)offset.y * 2.f / dd.h * scale.y, 0)
-		};
-		memcpy(dd.ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
-
-		for (int i = 0; i < draw_data->CmdListsCount; ++i) {
-			ImDrawList* cmd_list = draw_data->CmdLists[i];
-			RenderJob::CmdList& out_cmd_list = dd.cmd_lists.emplace(allocator);
-
-			out_cmd_list.idx_buffer = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
-			memcpy(out_cmd_list.idx_buffer.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
-
-			out_cmd_list.vtx_buffer = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
-			memcpy(out_cmd_list.vtx_buffer.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
-			
-			out_cmd_list.commands.reserve(cmd_list->CmdBuffer.size());
-			for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
-				if (cmd_list->CmdBuffer[i].UserCallback) {
-					cmd_list->CmdBuffer[i].UserCallback(cmd_list, &cmd_list->CmdBuffer[i]);
-				}
-				else {
-					out_cmd_list.commands.push(cmd_list->CmdBuffer[i]);
-				}
-			}
-		}
-			
-		cmd.default_texture = &m_texture;
-		cmd.should_setup = false;
-
-		renderer->queue(cmd, 0);
-	}
 
 	void onWindowGUI() override {}
 
-
 	const char* getName() const override { return "editor_ui_render"; }
-
 
 	void shutdownImGui()
 	{
@@ -4743,10 +4686,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	gpu::TextureHandle m_texture;
 	Local<RenderInterfaceImpl> m_render_interface;
 };
-
-void RenderInterfaceImpl::renderImGuiCanvas(gpu::TextureHandle rt, Vec2 rt_size, ImDrawData* dd, Vec2 scale) {
-	m_plugin.renderImGuiCanvas(rt, rt_size, dd, scale);
-}
 
 struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 {

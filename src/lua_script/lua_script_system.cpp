@@ -1587,8 +1587,7 @@ namespace Lumix
 			startScriptInternal(entity, instance, is_reload);
 		}
 
-		template <typename T>
-		void startScriptInternal(EntityRef entity, T& instance, bool is_reload)
+		void startScriptInternal(EntityRef entity, ScriptEnvironment& instance, bool is_reload)
 		{
 			if (!instance.m_state) return;
 			

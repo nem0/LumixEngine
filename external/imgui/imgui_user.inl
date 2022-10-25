@@ -33,6 +33,7 @@ namespace ImGuiEx {
 		bool is_pin_hovered = false;
 		bool* is_node_selected = nullptr;
 		ImGuiID selected_node = 0;
+		float titlebar_height = 0;
 		ImVec2* canvas_offset = nullptr;
 	} g_node_editor;
 
@@ -93,7 +94,7 @@ namespace ImGuiEx {
 	void Pin(ImGuiID id, bool is_input, PinShape shape) {
 		PopID(); // pop node id, we want pin id to not include node id
 		ImDrawList* draw_list = GetWindowDrawList();
-		ImVec2 screen_pos = ImGui::GetCursorScreenPos();
+		ImVec2 screen_pos = GetCursorScreenPos();
 		
 		const ImVec2 center = [&](){
 			if (is_input) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
@@ -102,7 +103,7 @@ namespace ImGuiEx {
 		const ImVec2 half_extents(NODE_PIN_RADIUS, NODE_PIN_RADIUS);
 		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
 		const bool hovered = IsItemHovered();
-		ImGuiStyle& style = ImGui::GetStyle();
+		ImGuiStyle& style = GetStyle();
 		const ImU32 color = GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab);
 		switch(shape) {
 			case PinShape::TRIANGLE:
@@ -121,12 +122,12 @@ namespace ImGuiEx {
 		storage->SetFloat(GetID("pin-y"), center.y);
 		PopID();
 
-		if (hovered && ImGui::IsMouseClicked(0)) {
+		if (hovered && IsMouseClicked(0)) {
 			g_node_editor.new_link_from = id;
 			g_node_editor.new_link_from_input = is_input;
 		}
 
-		if (hovered && ImGui::IsMouseReleased(0) && g_node_editor.new_link_from != 0) {
+		if (hovered && IsMouseReleased(0) && g_node_editor.new_link_from != 0) {
 			g_node_editor.new_link_to = id;
 			if (!is_input) {
 				ImSwap(g_node_editor.new_link_to, g_node_editor.new_link_from);
@@ -142,8 +143,12 @@ namespace ImGuiEx {
 	bool IsLinkHovered() {
 		return g_node_editor.link_hovered;
 	}
-
+	
 	void NodeLink(ImGuiID from_id, ImGuiID to_id) {
+		NodeLinkEx(from_id, to_id, GetColorU32(ImGuiCol_Tab), GetColorU32(ImGuiCol_TabActive));
+	}
+
+	void NodeLinkEx(ImGuiID from_id, ImGuiID to_id, ImU32 color, ImU32 active_color) {
 		ImGuiStorage* storage = GetStateStorage();
 		PushID(from_id);
 		const ImVec2 from(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
@@ -159,13 +164,23 @@ namespace ImGuiEx {
 		const ImVec2 p2 = to;
 		const ImVec2 p2_b = p2 - ImVec2(d, 0.0f);
 		
-		const ImVec2 mp = ImGui::GetMousePos();
-	    const ImGuiStyle& style = ImGui::GetStyle();
+		const ImVec2 mp = GetMousePos();
+	    const ImGuiStyle& style = GetStyle();
 		const ImVec2 closest_point = ImBezierCubicClosestPointCasteljau(p1, p1_b, p2_b, p2, mp, style.CurveTessellationTol);
-		const float dist_squared = ImFabs(ImLengthSqr(ImGui::GetMousePos() - closest_point));
+		const float dist_squared = ImFabs(ImLengthSqr(GetMousePos() - closest_point));
 		g_node_editor.link_hovered = dist_squared < 3 * 3 + 1;
 		
-		g_node_editor.draw_list->AddBezierCubic(p1, p1_b, p2_b, p2, GetColorU32(g_node_editor.link_hovered ? ImGuiCol_TabActive : ImGuiCol_Tab), 3.f);
+		g_node_editor.draw_list->AddBezierCubic(p1, p1_b, p2_b, p2, g_node_editor.link_hovered ? active_color : color, 3.f);
+	}
+
+	void BeginNodeTitleBar() {
+		BeginGroup();
+	}
+
+	void EndNodeTitleBar() {
+		EndGroup();
+		g_node_editor.titlebar_height = GetCursorScreenPos().y - g_node_editor.node_pos->y;
+		Dummy(ImVec2(1, GetStyle().FramePadding.y));
 	}
 
 	void BeginNode(ImGuiID id, ImVec2& pos, bool* selected) {
@@ -180,6 +195,7 @@ namespace ImGuiEx {
 		PushItemWidth(80);
 		g_node_editor.is_pin_hovered = false;
 		g_node_editor.is_node_selected = selected;
+		g_node_editor.titlebar_height = 0;
 	}
 
 	void EndNode()
@@ -220,6 +236,12 @@ namespace ImGuiEx {
 		ImVec2 np = *g_node_editor.node_pos;
 		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
 		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(is_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
+
+		if (g_node_editor.titlebar_height > 0) {
+			ImVec2 titlebar_size = size;
+			titlebar_size.y = g_node_editor.titlebar_height;
+			g_node_editor.draw_list->AddRectFilled(np, np + titlebar_size, ImColor(style.Colors[ImGuiCol_Tab]), 4.0f, ImDrawFlags_RoundCornersTop);
+		}
 
 		PopID();
 		*g_node_editor.node_pos -= g_node_editor.node_editor_pos;
@@ -320,6 +342,52 @@ namespace ImGuiEx {
 		return true;
 	}
 
+	static void AppendDrawData(ImDrawList* src, ImVec2 origin, ImVec2 scale) {
+		// TODO optimize if vtx_start == 0 || if idx_start == 0
+		ImDrawList* dl = GetWindowDrawList();
+		const int vtx_start = dl->VtxBuffer.size();
+		const int idx_start = dl->IdxBuffer.size();
+		dl->VtxBuffer.resize(dl->VtxBuffer.size() + src->VtxBuffer.size());
+		dl->IdxBuffer.resize(dl->IdxBuffer.size() + src->IdxBuffer.size());
+		dl->CmdBuffer.reserve(dl->CmdBuffer.size() + src->CmdBuffer.size());
+		dl->_VtxWritePtr = dl->VtxBuffer.Data + vtx_start;
+		dl->_IdxWritePtr = dl->IdxBuffer.Data + idx_start;
+		const ImDrawVert* vtx_read = src->VtxBuffer.Data;
+		const ImDrawIdx* idx_read = src->IdxBuffer.Data;
+		for (int i = 0, c = src->VtxBuffer.size(); i < c; ++i) {
+			dl->_VtxWritePtr[i].uv = vtx_read[i].uv;
+			dl->_VtxWritePtr[i].col = vtx_read[i].col;
+			dl->_VtxWritePtr[i].pos = vtx_read[i].pos * scale + origin;
+		}
+		for (int i = 0, c = src->IdxBuffer.size(); i < c; ++i) {
+			dl->_IdxWritePtr[i] = idx_read[i] + vtx_start;
+		}
+		for (int i = 0, c = src->CmdBuffer.size(); i < c; ++i) {
+			ImDrawCmd cmd = src->CmdBuffer[i];
+			cmd.IdxOffset += idx_start;
+			ASSERT(cmd.VtxOffset == 0);
+			cmd.ClipRect.x = cmd.ClipRect.x * scale.x + origin.x;
+			cmd.ClipRect.y = cmd.ClipRect.y * scale.y + origin.y;
+			cmd.ClipRect.z = cmd.ClipRect.z * scale.x + origin.x;
+			cmd.ClipRect.w = cmd.ClipRect.w * scale.y + origin.y;
+			dl->CmdBuffer.push_back(cmd);
+		}
+
+		dl->_VtxCurrentIdx += src->VtxBuffer.size();
+		dl->_VtxWritePtr = dl->VtxBuffer.Data + dl->VtxBuffer.size();
+		dl->_IdxWritePtr = dl->IdxBuffer.Data + dl->IdxBuffer.size();
+	}
+
+	static void CopyIOEvents(ImGuiContext* src, ImGuiContext* dst, ImVec2 origin, ImVec2 scale) {
+		dst->InputEventsQueue = src->InputEventsTrail;
+		for (ImGuiInputEvent& e : dst->InputEventsQueue) {
+			if (e.Type == ImGuiInputEventType_MousePos) {
+				e.MousePos.PosX = (e.MousePos.PosX - origin.x) / scale.x;
+				e.MousePos.PosY = (e.MousePos.PosY - origin.y) / scale.y;
+			}
+		}
+
+	}
 
 	void BringToFront()
 	{
@@ -874,8 +942,8 @@ namespace ImGuiEx {
 
 	bool InputRotation(const char* label, float* feuler) {
 		Lumix::Vec3 euler = radiansToDegrees(*(Lumix::Vec3*)feuler);
-		const float rot_change_speed = ImGui::GetIO().KeyAlt ? 10.f : 1.f; // we won't have precision without this
-		if (ImGui::DragFloat3(label, &euler.x, rot_change_speed, 0, 0, "%.2f")) {
+		const float rot_change_speed = GetIO().KeyAlt ? 10.f : 1.f; // we won't have precision without this
+		if (DragFloat3(label, &euler.x, rot_change_speed, 0, 0, "%.2f")) {
 			if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
 			euler.x = Lumix::degreesToRadians(Lumix::clamp(euler.x, -90.0f, 90.0f));
 			euler.y = Lumix::degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
@@ -1036,7 +1104,7 @@ namespace ImGuiEx {
 
 	void PushReadOnly() {
 		PushItemFlag(ImGuiItemFlags_ReadOnly, true);
-		PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+		PushStyleColor(ImGuiCol_Text, GetStyle().Colors[ImGuiCol_TextDisabled]);
 	}
 
 	void PopReadOnly() {
@@ -1238,6 +1306,53 @@ namespace ImGuiEx {
 		}
 
 		return menu_is_open;
+	}
+
+	Canvas::~Canvas() {
+		if (m_ctx) DestroyContext(m_ctx);
+	}
+
+	void Canvas::begin() {
+		m_size = GetContentRegionAvail();
+		m_origin = GetCursorScreenPos();
+		m_original_ctx = GetCurrentContext();
+		const ImGuiStyle& orig_style = GetStyle();
+		if (!m_ctx) m_ctx = CreateContext(GetIO().Fonts);
+		SetCurrentContext(m_ctx);
+		ImGuiStyle& new_style = GetStyle();
+		new_style = orig_style;
+
+		CopyIOEvents(m_original_ctx, m_ctx, m_origin, m_scale);
+
+		GetIO().DisplaySize = m_size / m_scale;
+		NewFrame();
+
+		SetNextWindowPos(ImVec2(0, 0));
+		SetNextWindowSize(m_size / m_scale);
+		PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+		Begin("imgui_canvas", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
+		PopStyleVar();
+	}
+
+	void Canvas::end() {
+		End();
+		Render();
+		
+		ImDrawData* draw_data = GetDrawData();
+		
+		SetCurrentContext(m_original_ctx);
+		m_original_ctx = nullptr;
+		for (int i = 0; i < draw_data->CmdListsCount; ++i) {
+			AppendDrawData(draw_data->CmdLists[i], m_origin, m_scale);
+		}
+
+		InvisibleButton("canvas", m_size);
+		if (IsItemHovered() && GetIO().MouseWheel) {
+			m_scale.x += GetIO().MouseWheel / 20;
+			m_scale.x = m_scale.x < 0.1f ? 0.1f : m_scale.x;
+			m_scale.x = m_scale.x > 10.f ? 10.f : m_scale.x;
+			m_scale.y = m_scale.x;
+		}
 	}
 
 } // namespace ImGuiEx

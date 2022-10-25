@@ -1,7 +1,6 @@
 #define LUMIX_NO_CUSTOM_CRT
 #include "particle_editor.h"
 #include "editor/asset_browser.h"
-#include "editor/imguicanvas.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -1160,11 +1159,11 @@ struct ParticleEditorResource {
 };
 
 struct ParticleEditorImpl : ParticleEditor {
+	using Node = ParticleEditorResource::Node;
 	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_app(app)
 		, m_undo_stack(allocator)
-		, m_canvas(app)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
@@ -1430,6 +1429,30 @@ struct ParticleEditorImpl : ParticleEditor {
 			}
 
 			ImGuiEx::EndNodeEditor();
+			
+			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
+				if (ImGui::GetIO().KeyAlt && hovered_link != -1) {
+					m_resource->m_links.erase(hovered_link);
+					pushUndo(0xffFF);
+				}
+				else {
+					static const struct {
+						char key;
+						Node::Type type;
+					} types[] = {
+						{ 'A', Node::Type::ADD },
+						{ 'M', Node::Type::MUL },
+						{ '3', Node::Type::VEC3 }
+					};
+					for (const auto& t : types) {
+						if (os::isKeyDown((os::Keycode)t.key)) {
+							addNode(t.type);
+							break;
+						}
+					}
+				}
+			}
+
 			const ImVec2 editor_pos = ImGui::GetItemRectMin();
 			bool context_open = false;
 
@@ -1501,18 +1524,11 @@ struct ParticleEditorImpl : ParticleEditor {
 					pushUndo(0xffFFffFF);
 				}
 
-				if (m_context_link != -1 && ImGui::Selectable("Remove link")) {
-					m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
-						return link.id == m_context_link;
-					});
-					pushUndo(0xffFFffFF);
-				}
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar();
 
 			if (context_open) {
-				m_context_link = hovered_link;
 				m_context_node = hovered_node;
 			}
 
@@ -1707,7 +1723,6 @@ struct ParticleEditorImpl : ParticleEditor {
 	UniquePtr<ParticleEditorResource> m_resource;
 	bool m_open = false;
 	bool m_autoapply = false;
-	int m_context_link;
 	int m_context_node;
 	bool m_is_focus_requested = false; 
 	Action m_toggle_ui;
@@ -1715,7 +1730,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	Action m_redo_action;
 	Action m_apply_action;
 	bool m_has_focus = false;
-	ImGuiCanvas m_canvas;
+	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
 };
 
