@@ -20,21 +20,25 @@ namespace ImGuiEx {
 
 	constexpr float NODE_PIN_RADIUS = 5.f;
 	struct NodeEditorState {
-		ImVec2* node_pos;
-		float node_w = 120;
+		ImVec2* node_pos = nullptr;
 		ImGuiID last_node_id;
 		ImVec2 node_editor_pos;
-		ImGuiID new_link_from = 0;
 		ImGuiID new_link_to = 0;
-		bool new_link_from_input;
 		bool link_hovered = false;
 		bool between_begin_end_editor = false;
 		ImDrawList* draw_list = nullptr;
 		bool is_pin_hovered = false;
 		bool* is_node_selected = nullptr;
-		ImGuiID selected_node = 0;
 		float titlebar_height = 0;
 		ImVec2* canvas_offset = nullptr;
+
+		// persistent in ImGuiStorage
+		float node_w = 120;
+		ImGuiID new_link_from = 0;
+		bool new_link_from_input;
+		ImRect rect_selection = ImRect(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX); // only Min is persistent
+		bool clicked_node_selected = false;
+		ImGuiID clicked_node = 0;
 	} g_node_editor;
 
 	ImVec2 GetNodeEditorOffset() {
@@ -42,9 +46,25 @@ namespace ImGuiEx {
 	}
 
 	void BeginNodeEditor(const char* title, ImVec2* offset) {
+		g_node_editor = NodeEditorState();
+
 		g_node_editor.between_begin_end_editor = true;
 		g_node_editor.canvas_offset = offset;
 		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+		
+		ImGuiStorage* storage = GetStateStorage();
+		g_node_editor.new_link_from = storage->GetInt(GetID("node-new-link_from"), 0);
+		g_node_editor.new_link_from_input = storage->GetBool(GetID("node-new-link_from-input"), false);
+		g_node_editor.rect_selection.Min.x = storage->GetFloat(GetID("node-rect-selection-x"), -FLT_MAX);
+		g_node_editor.rect_selection.Min.y = storage->GetFloat(GetID("node-rect-selection-y"), -FLT_MAX);
+		g_node_editor.clicked_node_selected = storage->GetBool(GetID("clicked-node-selected"), false);
+		g_node_editor.clicked_node = storage->GetInt(GetID("clicked-node"), 0);
+		if (ImGui::IsMouseReleased(0)) g_node_editor.clicked_node_selected = false;
+		g_node_editor.rect_selection.Max = ImGui::GetMousePos();
+		const ImVec2 max = ImMax(g_node_editor.rect_selection.Max, g_node_editor.rect_selection.Min);
+		const ImVec2 min = ImMin(g_node_editor.rect_selection.Max, g_node_editor.rect_selection.Min);
+		g_node_editor.rect_selection = ImRect(min, max);
+
 		g_node_editor.node_editor_pos = GetCursorScreenPos() + *g_node_editor.canvas_offset;
 		g_node_editor.link_hovered = false;
 		g_node_editor.draw_list = GetWindowDrawList();
@@ -55,30 +75,49 @@ namespace ImGuiEx {
 		g_node_editor.between_begin_end_editor = false;
 		g_node_editor.draw_list->ChannelsMerge();
 
+		const ImVec2 mp = GetMousePos();
+		ImGuiStorage* storage = GetStateStorage();
 		if (g_node_editor.new_link_from != 0) {
-			ImGuiStorage* storage = GetStateStorage();
 			PushID(g_node_editor.new_link_from);
 			const ImVec2 from(storage->GetFloat(GetID("pin-x"), 0), storage->GetFloat(GetID("pin-y"), 0));
 			PopID();
 			ImDrawList* dl = g_node_editor.draw_list;
-			const ImVec2 to = GetMousePos();
 			if (g_node_editor.new_link_from_input) {
-				dl->AddBezierCubic(from, from - ImVec2(20, 0), to + ImVec2(20, 0), to, GetColorU32(ImGuiCol_Tab), 3.f);
+				dl->AddBezierCubic(from, from - ImVec2(20, 0), mp + ImVec2(20, 0), mp, GetColorU32(ImGuiCol_Tab), 3.f);
 			}
 			else {
-				dl->AddBezierCubic(from, from + ImVec2(20, 0), to - ImVec2(20, 0), to, GetColorU32(ImGuiCol_Tab), 3.f);
+				dl->AddBezierCubic(from, from + ImVec2(20, 0), mp - ImVec2(20, 0), mp, GetColorU32(ImGuiCol_Tab), 3.f);
 			}
 		}
-		EndChild();
+		
+		if (IsMouseClicked(0) && !g_node_editor.new_link_from && !IsAnyItemActive()) {
+			storage->SetFloat(GetID("node-rect-selection-x"), mp.x);
+			storage->SetFloat(GetID("node-rect-selection-y"), mp.y);
+		}
+
 		if (IsMouseReleased(0)) {
 			g_node_editor.new_link_from = 0;
 			g_node_editor.new_link_to = 0;
+			storage->SetFloat(GetID("node-rect-selection-x"), -FLT_MAX);
+			storage->SetFloat(GetID("node-rect-selection-y"), -FLT_MAX);
 		}
+
+		storage->SetInt(GetID("node-new-link_from"), g_node_editor.new_link_from);
+		storage->SetBool(GetID("node-new-link_from-input"), g_node_editor.new_link_from_input);
+		storage->SetBool(GetID("clicked-node-selected"), g_node_editor.clicked_node_selected);
+		storage->SetInt(GetID("clicked-node"), g_node_editor.clicked_node);
+
+		if (g_node_editor.rect_selection.Min.x != -FLT_MAX) {
+			g_node_editor.draw_list->AddRect(g_node_editor.rect_selection.Min, g_node_editor.rect_selection.Max, GetColorU32(ImGuiCol_Border));
+		}
+		
+		EndChild();
 
 		if (IsMouseDragging(ImGuiMouseButton_Middle) && IsItemHovered()) {
 			const ImVec2 delta = GetIO().MouseDelta;
 			*g_node_editor.canvas_offset += delta;
 		}
+
 	}
 
 	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
@@ -205,37 +244,78 @@ namespace ImGuiEx {
 		const ImGuiStyle& style = GetStyle();
 		const ImRect rect(GetItemRectMin() - style.WindowPadding, GetItemRectMax() + style.WindowPadding);
 		const ImVec2 size = rect.GetSize();
+		bool draw_selected = g_node_editor.is_node_selected ? *g_node_editor.is_node_selected : false;
 		
+		if (g_node_editor.rect_selection.Min.x != -FLT_MAX && g_node_editor.is_node_selected) {
+			if (GetIO().KeyShift) { // add to selection
+				if (IsMouseReleased(0)) *g_node_editor.is_node_selected = *g_node_editor.is_node_selected || rect.Overlaps(g_node_editor.rect_selection);
+				else draw_selected = rect.Overlaps(g_node_editor.rect_selection) || *g_node_editor.is_node_selected;
+			}
+			else if (GetIO().KeyAlt) { // remove from selection
+				if (IsMouseReleased(0)) *g_node_editor.is_node_selected = *g_node_editor.is_node_selected && !rect.Overlaps(g_node_editor.rect_selection);
+				else draw_selected = *g_node_editor.is_node_selected && !rect.Overlaps(g_node_editor.rect_selection);
+			}
+			else if (GetIO().KeyCtrl) { // toggle selection
+				if (rect.Overlaps(g_node_editor.rect_selection)) {
+					if (IsMouseReleased(0)) *g_node_editor.is_node_selected = !*g_node_editor.is_node_selected;
+					else draw_selected = !*g_node_editor.is_node_selected;
+				}
+			}
+			else {
+				*g_node_editor.is_node_selected = rect.Overlaps(g_node_editor.rect_selection);
+			}
+		}
+
 		GetStateStorage()->SetFloat(GetID("node-width"), size.x - style.WindowPadding.x * 2);
 
 		const ImGuiID dragger_id = GetID("##_node_dragger");
 		ItemAdd(rect, dragger_id);
 		const bool is_hovered = IsItemHovered();
-		const bool is_selected = g_node_editor.is_node_selected ? *g_node_editor.is_node_selected : false;
 		
-		if (is_hovered && IsMouseClicked(0) && !g_node_editor.is_pin_hovered) {
+		if (is_hovered && IsMouseClicked(0)) {
 			SetActiveID(dragger_id, GetCurrentWindow());
+			g_node_editor.clicked_node_selected = g_node_editor.is_node_selected && *g_node_editor.is_node_selected;
+			g_node_editor.clicked_node = g_node_editor.last_node_id;
+		}
+
+		if (is_hovered && IsMouseReleased(0) && !g_node_editor.new_link_from && !g_node_editor.is_pin_hovered) {
 			if (g_node_editor.is_node_selected) {
-				*g_node_editor.is_node_selected = true;
-				g_node_editor.selected_node = g_node_editor.last_node_id;
+				if (GetIO().KeyShift) {
+					*g_node_editor.is_node_selected = !*g_node_editor.is_node_selected;
+				}
+				else {
+					*g_node_editor.is_node_selected = true;
+				}
 			}
 		}
 
-		if (g_node_editor.is_node_selected && g_node_editor.last_node_id != g_node_editor.selected_node) {
-			*g_node_editor.is_node_selected = false;
+		if (!is_hovered && IsMouseReleased(0) && !g_node_editor.is_pin_hovered && !GetIO().KeyShift && GetMouseDragDelta().x == 0 && GetMouseDragDelta().y == 0) {
+			if (g_node_editor.is_node_selected) {
+				*g_node_editor.is_node_selected = false;
+			}
 		}
 
-		if (IsItemActive() && IsMouseReleased(0)) {
-			ResetActiveID();
-		}
-		if (IsItemActive() && IsMouseDragging(0)) {
-			*g_node_editor.node_pos += GetIO().MouseDelta;
+		if (IsItemActive() && IsMouseReleased(0)) ResetActiveID();
+		
+		if ((IsItemActive() || g_node_editor.is_node_selected && *g_node_editor.is_node_selected) 
+			&& IsMouseDragging(0) 
+			&& !g_node_editor.new_link_from 
+			&& g_node_editor.rect_selection.Min.x == -FLT_MAX)
+		{
+			if (!g_node_editor.clicked_node_selected) {
+				if (g_node_editor.is_node_selected) {
+					*g_node_editor.is_node_selected = g_node_editor.last_node_id == g_node_editor.clicked_node;
+				}
+			}
+			if (!g_node_editor.is_node_selected || *g_node_editor.is_node_selected) {
+				*g_node_editor.node_pos += GetIO().MouseDelta;
+			}
 		}
 
 		g_node_editor.draw_list->ChannelsSetCurrent(0);
 		ImVec2 np = *g_node_editor.node_pos;
 		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
-		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(is_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
+		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(draw_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f);
 
 		if (g_node_editor.titlebar_height > 0) {
 			ImVec2 titlebar_size = size;
@@ -1325,6 +1405,7 @@ namespace ImGuiEx {
 		CopyIOEvents(m_original_ctx, m_ctx, m_origin, m_scale);
 
 		GetIO().DisplaySize = m_size / m_scale;
+		GetIO().ConfigInputTrickleEventQueue = false;
 		NewFrame();
 
 		SetNextWindowPos(ImVec2(0, 0));

@@ -108,7 +108,7 @@ struct ParticleEditorResource {
 			m_input_counter = 0;
 			m_output_counter = 0;
 			const ImVec2 old_pos = m_pos;
-			ImGuiEx::BeginNode(m_id, m_pos, nullptr);
+			ImGuiEx::BeginNode(m_id, m_pos, &m_selected);
 			bool res = onGUI();
 			ImGuiEx::EndNode();
 			return res || old_pos.x != m_pos.x || old_pos.y != m_pos.y;
@@ -116,6 +116,7 @@ struct ParticleEditorResource {
 
 		u16 m_id;
 		ImVec2 m_pos = ImVec2(100, 100);
+		bool m_selected = false;
 	
 	protected:
 		virtual bool onGUI() = 0;
@@ -1190,10 +1191,15 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_apply_action.func.bind<&ParticleEditorImpl::apply>(this);
 		m_apply_action.plugin = this;
 
+		m_delete_action.init(ICON_FA_TRASH "Delete", "Particle editor delete", "particle_editor_delete", ICON_FA_TRASH, os::Keycode::DEL, Action::Modifiers::NONE, true);
+		m_delete_action.func.bind<&ParticleEditorImpl::deleteSelectedNodes>(this);
+		m_delete_action.plugin = this;
+
 		app.addWindowAction(&m_toggle_ui);
 		app.addAction(&m_undo_action);
 		app.addAction(&m_redo_action);
 		app.addAction(&m_apply_action);
+		app.addAction(&m_delete_action);
 		newGraph();
 	}
 
@@ -1201,7 +1207,22 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_undo_action);
 		m_app.removeAction(&m_redo_action);
+		m_app.removeAction(&m_delete_action);
 		m_app.removeAction(&m_apply_action);
+	}
+
+	void deleteSelectedNodes() {
+
+		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
+			Node* n = m_resource->m_nodes[i].get();
+			if (n->m_selected) {
+				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
+					return link.fromNode() == n->m_id || link.toNode() == n->m_id;
+				});
+				m_resource->m_nodes.swapAndPop(i);
+			}
+		}
+		pushUndo(0xffFFffFF);
 	}
 
 	bool hasFocus() override { return m_has_focus; }
@@ -1482,11 +1503,9 @@ struct ParticleEditorImpl : ParticleEditor {
 			}
 
 			const ImVec2 editor_pos = ImGui::GetItemRectMin();
-			bool context_open = false;
 
 			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
 				ImGui::OpenPopup("context_menu");
-				context_open = true;
 			}
 		
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
@@ -1541,24 +1560,9 @@ struct ParticleEditorImpl : ParticleEditor {
 					ImGui::EndMenu();
 				}
 
-				if (m_context_node != -1 && ImGui::Selectable("Remove node")) {
-					m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
-						return link.fromNode() == m_context_node || link.toNode() == m_context_node;
-					});
-
-					m_resource->m_nodes.eraseItems([&](const UniquePtr<ParticleEditorResource::Node>& node){
-						return node->m_id == m_context_node;
-					});
-					pushUndo(0xffFFffFF);
-				}
-
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar();
-
-			if (context_open) {
-				m_context_node = hovered_node;
-			}
 
 			m_canvas.end();
 		}
@@ -1751,12 +1755,12 @@ struct ParticleEditorImpl : ParticleEditor {
 	UniquePtr<ParticleEditorResource> m_resource;
 	bool m_open = false;
 	bool m_autoapply = false;
-	int m_context_node;
 	bool m_is_focus_requested = false; 
 	Action m_toggle_ui;
 	Action m_undo_action;
 	Action m_redo_action;
 	Action m_apply_action;
+	Action m_delete_action;
 	bool m_has_focus = false;
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
