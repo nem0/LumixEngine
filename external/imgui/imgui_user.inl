@@ -1431,7 +1431,7 @@ namespace ImGuiEx {
 		if (IsItemHovered() && GetIO().MouseWheel) {
 			m_scale.x += GetIO().MouseWheel / 20;
 			m_scale.x = m_scale.x < 0.1f ? 0.1f : m_scale.x;
-			m_scale.x = m_scale.x > 10.f ? 10.f : m_scale.x;
+			m_scale.x = m_scale.x > 1.f ? 1.f : m_scale.x;
 			m_scale.y = m_scale.x;
 		}
 	}
