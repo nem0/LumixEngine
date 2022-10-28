@@ -293,9 +293,7 @@ function surface_shader_ex(args)
 				#if defined ALPHA_CUTOUT
 					if(data.alpha < 0.5) discard;
 				#endif
-
-				float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
-				o_color.a = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
+				o_color.a = data.alpha;
 			}
 		#endif
 	]])
