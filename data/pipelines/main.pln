@@ -146,7 +146,7 @@ function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
 
 	beginBlock("transparent_pass")
 	pass(getCameraParams())
-	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 5);
+	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES, dsbuffer }, 5);
 	renderBucket(entities.transparent, transparent_state)
 	local view_params = getCameraParams()
 	renderParticles(view_params)

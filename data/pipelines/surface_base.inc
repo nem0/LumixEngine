@@ -215,6 +215,7 @@ function surface_shader_ex(args)
 		#if !defined DEPTH && !defined DEFERRED && !defined GRASS
 			layout (binding=6) uniform sampler2D u_shadow_atlas;
 			layout (binding=7) uniform samplerCubeArray u_reflection_probes;
+			layout (binding=8) uniform sampler2D u_depthbuffer;
 		#endif
 	
 		layout(location = 0) in vec2 v_uv;
