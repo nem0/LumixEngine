@@ -141,7 +141,7 @@ namespace ImGuiEx {
 		}();
 		const ImVec2 half_extents(NODE_PIN_RADIUS, NODE_PIN_RADIUS);
 		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
-		const bool hovered = IsItemHovered();
+		const bool hovered = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 		ImGuiStyle& style = GetStyle();
 		const ImU32 color = GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab);
 		switch(shape) {
