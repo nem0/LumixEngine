@@ -31,6 +31,7 @@ namespace ImGuiEx {
 		bool is_node_hovered = false;
 		bool* is_node_selected = nullptr;
 		float titlebar_height = 0;
+		ImU32 titlebar_color = 0;
 		ImVec2* canvas_offset = nullptr;
 
 		// persistent in ImGuiStorage
@@ -225,8 +226,23 @@ namespace ImGuiEx {
 		g_node_editor.draw_list->AddBezierCubic(p1, p1_b, p2_b, p2, g_node_editor.link_hovered ? active_color : color, 3.f);
 	}
 
+	void NodeTitle(const char* text, ImU32 color) {
+		BeginNodeTitleBar(color);
+		ImGui::TextUnformatted(text);
+		EndNodeTitleBar();
+	}
+
+	void NodeTitle(const char* text) {
+		NodeTitle(text, ImColor(GetStyle().Colors[ImGuiCol_Tab]));
+	}
+
 	void BeginNodeTitleBar() {
+		BeginNodeTitleBar(ImColor(GetStyle().Colors[ImGuiCol_Tab]));
+	}
+
+	void BeginNodeTitleBar(ImU32 color) {
 		BeginGroup();
+		g_node_editor.titlebar_color = color;
 	}
 
 	void EndNodeTitleBar() {
@@ -335,7 +351,7 @@ namespace ImGuiEx {
 		if (g_node_editor.titlebar_height > 0) {
 			ImVec2 titlebar_size = size;
 			titlebar_size.y = g_node_editor.titlebar_height;
-			g_node_editor.draw_list->AddRectFilled(np, np + titlebar_size, ImColor(style.Colors[ImGuiCol_Tab]), 4.0f, ImDrawFlags_RoundCornersTop);
+			g_node_editor.draw_list->AddRectFilled(np, np + titlebar_size, g_node_editor.titlebar_color, 4.0f, ImDrawFlags_RoundCornersTop);
 		}
 
 		PopID();
