@@ -156,10 +156,10 @@ struct ParticleEditorResource {
 		bool onGUI() override {
 			inputSlot();
 			ImGui::SetNextItemWidth(60);
-			ImGui::Combo("##fn", (int*)&func, "cos\0sin\0");
+			bool changed = ImGui::Combo("##fn", (int*)&func, "cos\0sin\0");
 			ImGui::SameLine();
 			outputSlot();
-			return false;
+			return changed;
 		}
 
 		enum Function : int {
@@ -252,9 +252,7 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool onGUI() override {
-			ImGuiEx::BeginNodeTitleBar();
-			ImGui::TextUnformatted("Gradient");
-			ImGuiEx::EndNodeTitleBar();
+			ImGuiEx::NodeTitle("Gradient");
 
 			ImGui::BeginGroup();
 			inputSlot(); 
@@ -338,21 +336,20 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			ImGuiEx::BeginNodeTitleBar();
-			ImGui::Text(ICON_FA_DICE " Random");
-			ImGuiEx::EndNodeTitleBar();
+			ImGuiEx::NodeTitle(ICON_FA_DICE " Random");
 
 			ImGui::BeginGroup();
 			ImGui::PushItemWidth(60);
-			ImGui::DragFloat("##from", &from);
-			ImGui::SameLine(); ImGui::DragFloat("##to", &to);
+			bool res = ImGui::DragFloat("##from", &from);
+			ImGui::SameLine(); 
+			res = ImGui::DragFloat("##to", &to) || res;
 			ImGui::PopItemWidth();
 			ImGui::EndGroup();
 
 			ImGui::SameLine();
 
 			outputSlot();
-			return false;
+			return res;
 		}
 
 		float from = 0;
@@ -481,9 +478,7 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::EMIT; }
 
 		bool onGUI() override {
-			ImGuiEx::BeginNodeTitleBar();
-			ImGui::TextUnformatted(ICON_FA_PLUS " Emit");
-			ImGuiEx::EndNodeTitleBar();
+			ImGuiEx::NodeTitle(ICON_FA_PLUS " Emit", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
@@ -560,10 +555,7 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::UPDATE; }
 
 		bool onGUI() override {
-			
-			ImGuiEx::BeginNodeTitleBar();
-			ImGui::TextUnformatted(ICON_FA_CLOCK " Update");
-			ImGuiEx::EndNodeTitleBar();
+			ImGuiEx::NodeTitle(ICON_FA_CLOCK " Update", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
 
 			inputSlot(ImGuiEx::PinShape::TRIANGLE); ImGui::TextUnformatted("Kill");
 
@@ -679,9 +671,7 @@ struct ParticleEditorResource {
 		Type getType() const override { return Type::OUTPUT; }
 
 		bool onGUI() override {
-			ImGuiEx::BeginNodeTitleBar();
-			ImGui::TextUnformatted(ICON_FA_EYE " Output");
-			ImGuiEx::EndNodeTitleBar();
+			ImGuiEx::NodeTitle(ICON_FA_EYE " Output", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
 			for (const Output& stream : m_resource.m_outputs) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
@@ -826,6 +816,7 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
+			bool changed = false;
 			ImGui::BeginGroup();
 			inputSlot(); ImGui::TextUnformatted("A");
 			
@@ -837,7 +828,7 @@ struct ParticleEditorResource {
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
-				ImGui::DragFloat("B", &value1);
+				changed = ImGui::DragFloat("B", &value1) || changed;
 			}
 
 			ImGui::TextUnformatted(ICON_FA_PLUS);
@@ -848,14 +839,14 @@ struct ParticleEditorResource {
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
-				ImGui::DragFloat("C", &value2);
+				changed = ImGui::DragFloat("C", &value2) || changed;
 			}
 			ImGui::EndGroup();
 
 			ImGui::SameLine();
 			outputSlot();
 
-			return false;
+			return changed;
 		}
 
 		float value1 = 0;
@@ -916,27 +907,26 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			ImGuiEx::BeginNodeTitleBar();
-			ImGui::TextUnformatted(getName());
-			ImGuiEx::EndNodeTitleBar();
+			ImGuiEx::NodeTitle(getName());
 
 			ImGui::BeginGroup();
 			inputSlot(); ImGui::TextUnformatted("A");
 
+			bool changed = false;
 			inputSlot();
 			if (getInput(1).node) {
 				ImGui::TextUnformatted("B");
 			}
 			else {
 				ImGui::SetNextItemWidth(60);
-				ImGui::DragFloat("##b", &value);
+				changed = ImGui::DragFloat("##b", &value);
 			}
 			ImGui::EndGroup();
 
 			ImGui::SameLine();
 			outputSlot();
 
-			return false;
+			return changed;
 		}
 
 		float value = 0;
@@ -1179,6 +1169,10 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&ParticleEditorImpl::isOpen>(this);
 
+		m_save_action.init(ICON_FA_SAVE "Save", "Particle editor save", "particle_editor_save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
+		m_save_action.func.bind<&ParticleEditorImpl::save>(this);
+		m_save_action.plugin = this;
+
 		m_undo_action.init(ICON_FA_UNDO "Undo", "Particle editor undo", "particle_editor_undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
 		m_undo_action.func.bind<&ParticleEditorImpl::undo>(this);
 		m_undo_action.plugin = this;
@@ -1196,6 +1190,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_delete_action.plugin = this;
 
 		app.addWindowAction(&m_toggle_ui);
+		app.addAction(&m_save_action);
 		app.addAction(&m_undo_action);
 		app.addAction(&m_redo_action);
 		app.addAction(&m_apply_action);
@@ -1205,6 +1200,7 @@ struct ParticleEditorImpl : ParticleEditor {
 
 	~ParticleEditorImpl() {
 		m_app.removeAction(&m_toggle_ui);
+		m_app.removeAction(&m_save_action);
 		m_app.removeAction(&m_undo_action);
 		m_app.removeAction(&m_redo_action);
 		m_app.removeAction(&m_delete_action);
@@ -1401,7 +1397,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				if (ImGui::MenuItem("New")) newGraph();
 				if (ImGui::MenuItem("Load")) load();
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
-				if (ImGui::MenuItem("Save", nullptr, false, !m_path.empty())) save(m_path);
+				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save as")) saveAs();
 				ImGui::Separator();
 			
@@ -1651,14 +1647,24 @@ struct ParticleEditorImpl : ParticleEditor {
 		load(path);
 	}
 
+	void save() {
+		if (!m_path.isEmpty()) {
+			saveAs(m_path.c_str());
+			return;
+		}
+		char path[LUMIX_MAX_PATH];
+		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
+		saveAs(m_path.c_str());
+	}
+
 	void saveAs() {
 		char path[LUMIX_MAX_PATH];
 		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
 
-		save(path);
+		saveAs(path);
 	}
 
-	void save(const char* path) {
+	void saveAs(const char* path) {
 		OutputMemoryStream blob(m_allocator);
 		m_resource->serialize(blob);
 
@@ -1745,7 +1751,7 @@ struct ParticleEditorImpl : ParticleEditor {
 
 	IAllocator& m_allocator;
 	StudioApp& m_app;
-	StaticString<LUMIX_MAX_PATH> m_path;
+	Path m_path;
 	Array<UndoRecord> m_undo_stack;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
@@ -1757,6 +1763,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	bool m_autoapply = false;
 	bool m_is_focus_requested = false; 
 	Action m_toggle_ui;
+	Action m_save_action;
 	Action m_undo_action;
 	Action m_redo_action;
 	Action m_apply_action;
