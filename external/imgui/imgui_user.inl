@@ -28,6 +28,7 @@ namespace ImGuiEx {
 		bool between_begin_end_editor = false;
 		ImDrawList* draw_list = nullptr;
 		bool is_pin_hovered = false;
+		bool is_node_hovered = false;
 		bool* is_node_selected = nullptr;
 		float titlebar_height = 0;
 		ImVec2* canvas_offset = nullptr;
@@ -90,7 +91,7 @@ namespace ImGuiEx {
 			}
 		}
 		
-		if (IsMouseClicked(0) && !g_node_editor.new_link_from && !IsAnyItemActive()) {
+		if (IsMouseClicked(0) && !g_node_editor.new_link_from && !g_node_editor.is_node_hovered && !IsAnyItemActive()) {
 			storage->SetFloat(GetID("node-rect-selection-x"), mp.x);
 			storage->SetFloat(GetID("node-rect-selection-y"), mp.y);
 		}
@@ -271,9 +272,10 @@ namespace ImGuiEx {
 		const ImGuiID dragger_id = GetID("##_node_dragger");
 		ItemAdd(rect, dragger_id);
 		const bool is_hovered = IsItemHovered();
+		g_node_editor.is_node_hovered = is_hovered || g_node_editor.is_node_hovered;
 		
 		if (is_hovered && IsMouseClicked(0)) {
-			SetActiveID(dragger_id, GetCurrentWindow());
+			//SetActiveID(dragger_id, GetCurrentWindow());
 			g_node_editor.clicked_node_selected = g_node_editor.is_node_selected && *g_node_editor.is_node_selected;
 			g_node_editor.clicked_node = g_node_editor.last_node_id;
 		}
@@ -297,8 +299,9 @@ namespace ImGuiEx {
 
 		if (IsItemActive() && IsMouseReleased(0)) ResetActiveID();
 		
-		if ((IsItemActive() || g_node_editor.is_node_selected && *g_node_editor.is_node_selected) 
+		if ((is_hovered || g_node_editor.is_node_selected && *g_node_editor.is_node_selected) 
 			&& IsMouseDragging(0) 
+			&& !IsAnyItemHovered() // TODO this can become true while we drag dragfloat
 			&& !g_node_editor.new_link_from 
 			&& g_node_editor.rect_selection.Min.x == -FLT_MAX)
 		{
