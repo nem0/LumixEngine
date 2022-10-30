@@ -34,6 +34,7 @@ namespace ImGuiEx {
 		ImVec2* canvas_offset = nullptr;
 
 		// persistent in ImGuiStorage
+		ImGuiID dragged_node = 0;
 		float node_w = 120;
 		ImGuiID new_link_from = 0;
 		bool new_link_from_input;
@@ -51,7 +52,7 @@ namespace ImGuiEx {
 
 		g_node_editor.between_begin_end_editor = true;
 		g_node_editor.canvas_offset = offset;
-		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
 		
 		ImGuiStorage* storage = GetStateStorage();
 		g_node_editor.new_link_from = storage->GetInt(GetID("node-new-link_from"), 0);
@@ -60,6 +61,8 @@ namespace ImGuiEx {
 		g_node_editor.rect_selection.Min.y = storage->GetFloat(GetID("node-rect-selection-y"), -FLT_MAX);
 		g_node_editor.clicked_node_selected = storage->GetBool(GetID("clicked-node-selected"), false);
 		g_node_editor.clicked_node = storage->GetInt(GetID("clicked-node"), 0);
+		g_node_editor.dragged_node = storage->GetInt(GetID("dragged-node"), 0);
+		if (IsMouseReleased(0)) g_node_editor.dragged_node = 0;
 		if (ImGui::IsMouseReleased(0)) g_node_editor.clicked_node_selected = false;
 		g_node_editor.rect_selection.Max = ImGui::GetMousePos();
 		const ImVec2 max = ImMax(g_node_editor.rect_selection.Max, g_node_editor.rect_selection.Min);
@@ -106,6 +109,7 @@ namespace ImGuiEx {
 		storage->SetInt(GetID("node-new-link_from"), g_node_editor.new_link_from);
 		storage->SetBool(GetID("node-new-link_from-input"), g_node_editor.new_link_from_input);
 		storage->SetBool(GetID("clicked-node-selected"), g_node_editor.clicked_node_selected);
+		storage->SetInt(GetID("dragged-node"), g_node_editor.dragged_node);
 		storage->SetInt(GetID("clicked-node"), g_node_editor.clicked_node);
 
 		if (g_node_editor.rect_selection.Min.x != -FLT_MAX) {
@@ -118,7 +122,6 @@ namespace ImGuiEx {
 			const ImVec2 delta = GetIO().MouseDelta;
 			*g_node_editor.canvas_offset += delta;
 		}
-
 	}
 
 	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
@@ -275,7 +278,7 @@ namespace ImGuiEx {
 		g_node_editor.is_node_hovered = is_hovered || g_node_editor.is_node_hovered;
 		
 		if (is_hovered && IsMouseClicked(0)) {
-			//SetActiveID(dragger_id, GetCurrentWindow());
+			g_node_editor.dragged_node = g_node_editor.last_node_id;
 			g_node_editor.clicked_node_selected = g_node_editor.is_node_selected && *g_node_editor.is_node_selected;
 			g_node_editor.clicked_node = g_node_editor.last_node_id;
 		}
@@ -299,9 +302,9 @@ namespace ImGuiEx {
 
 		if (IsItemActive() && IsMouseReleased(0)) ResetActiveID();
 		
-		if ((is_hovered || g_node_editor.is_node_selected && *g_node_editor.is_node_selected) 
+		if ((g_node_editor.dragged_node == g_node_editor.last_node_id || g_node_editor.is_node_selected && *g_node_editor.is_node_selected) 
 			&& IsMouseDragging(0) 
-			&& !IsAnyItemHovered() // TODO this can become true while we drag dragfloat
+			&& g_node_editor.dragged_node != 0
 			&& !g_node_editor.new_link_from 
 			&& g_node_editor.rect_selection.Min.x == -FLT_MAX)
 		{
