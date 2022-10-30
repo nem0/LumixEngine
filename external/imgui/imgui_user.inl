@@ -124,6 +124,15 @@ namespace ImGuiEx {
 		}
 	}
 
+	bool GetHalfLink(ImGuiID* from) {
+		ASSERT(g_node_editor.between_begin_end_editor);
+		if (g_node_editor.new_link_from && IsMouseReleased(0) && !g_node_editor.new_link_to) {
+			*from = g_node_editor.new_link_from;
+			return true;
+		}
+		return false;
+	}
+
 	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
 		ASSERT(g_node_editor.between_begin_end_editor);
 		if (g_node_editor.new_link_to) {
