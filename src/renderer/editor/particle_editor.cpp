@@ -1933,7 +1933,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		}
 		char path[LUMIX_MAX_PATH];
 		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
-		saveAs(m_path.c_str());
+		saveAs(path);
 	}
 
 	void saveAs() {
