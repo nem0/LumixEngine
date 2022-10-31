@@ -219,9 +219,9 @@ struct ParticleEditorResource {
 		bool hasOutputPins() const override { return true; }
 
 		bool onGUI() override {
-			ImGui::SetNextItemWidth(120);
 			ImGui::BeginGroup();
 			inputSlot();
+			ImGui::SetNextItemWidth(200);
 			bool changed = ImGuiEx::Gradient4("test", lengthOf(keys), (int*)&count, keys, &values[0].x);
 			ImGui::EndGroup();
 			ImGui::SameLine();
