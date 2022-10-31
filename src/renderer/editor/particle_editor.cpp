@@ -1231,6 +1231,7 @@ struct ParticleEditorResource {
 		m_streams.emplace().name = "life";
 
 		m_outputs.emplace().name = "pos";
+		m_outputs.back().type = ValueType::VEC3;
 		m_outputs.emplace().name = "scale";
 		m_outputs.emplace().name = "color";
 		m_outputs.back().type = ValueType::VEC4;
