@@ -79,6 +79,9 @@ public:
 	{
 		for (float& f : m_last_time_deltas) f = 1/60.f;
 		os::init();
+		registerLogCallback<&EngineImpl::logToFile>(this);
+		registerLogCallback<logToDebugOutput>();
+
 		os::InitWindowArgs init_win_args;
 		init_win_args.handle_file_drops = init_data.handle_file_drops;
 		init_win_args.name = init_data.window_title;
@@ -89,12 +92,14 @@ public:
 
 		m_is_log_file_open = m_log_file.open("lumix.log");
 		
-		logInfo("Creating engine...");
 		profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
-		registerLogCallback<&EngineImpl::logToFile>(this);
-		registerLogCallback<logToDebugOutput>();
+		logInfo("Creating engine...");
+		logInfo("Working directory: ", init_data.working_dir);
+		char cmd_line[2048] = "";
+		os::getCommandLine(Span(cmd_line));
+		logInfo("Command line: ", cmd_line);
 
 		os::logInfo();
 

@@ -29,10 +29,15 @@ struct ParticleEditorImpl;
 struct ParticleEditorResource {
 	struct Node;
 
+	enum class Version {
+		LINK_ID_REMOVED,
+		LAST
+	};
+
 	struct Header {
 		static constexpr u32 MAGIC = '_LPE';
 		const u32 magic = MAGIC;
-		u32 version = 0;
+		Version version = Version::LAST;
 	};
 	
 	enum class ValueType : i32 {
@@ -59,14 +64,18 @@ struct ParticleEditorResource {
 			EMIT,
 			UPDATE,
 			RANDOM,
-			UNARY_FUNCTION,
+			SIN,
 			MADD,
 			CMP,
 			COLOR_MIX,
 			GRADIENT,
 			GRADIENT_COLOR,
 			VEC3,
-			DIV
+			DIV,
+			PIN,
+			COS,
+			SWITCH,
+			VEC4
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -79,6 +88,9 @@ struct ParticleEditorResource {
 		virtual DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) = 0;
 		virtual void serialize(OutputMemoryStream& blob) {}
 		virtual void deserialize(InputMemoryStream& blob) {}
+
+		virtual bool hasInputPins() const = 0;
+		virtual bool hasOutputPins() const = 0;
 
 		NodeInput getInput(u8 input_idx) {
 			for (const Link& link : m_resource.m_links) {
@@ -126,13 +138,16 @@ struct ParticleEditorResource {
 		u8 m_output_counter;
 	};
 	
+	template <Node::Type T>
 	struct UnaryFunctionNode : Node {
 		UnaryFunctionNode(ParticleEditorResource& res) : Node(res) {}
 
-		Type getType() const override { return Type::UNARY_FUNCTION; }
+		Type getType() const override { return T; }
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(func); }
-		void deserialize(InputMemoryStream& blob) override { blob.read(func); }
+		void serialize(OutputMemoryStream& blob) override {}
+		void deserialize(InputMemoryStream& blob) override {}
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 		
 		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
 			NodeInput input = getInput(0);
@@ -140,7 +155,7 @@ struct ParticleEditorResource {
 			
 			DataStream dst = m_resource.streamOrRegister(output);
 			DataStream op0 = input.generate(instructions, {}, subindex);
-			switch (func) {
+			switch (T) {
 				case COS: instructions.write(InstructionType::COS); break;
 				case SIN: instructions.write(InstructionType::SIN); break;
 				default: ASSERT(false); break;
@@ -155,19 +170,15 @@ struct ParticleEditorResource {
 
 		bool onGUI() override {
 			inputSlot();
-			ImGui::SetNextItemWidth(60);
-			bool changed = ImGui::Combo("##fn", (int*)&func, "cos\0sin\0");
+			switch (T) {
+				case COS: ImGui::TextUnformatted("cos"); break;
+				case SIN: ImGui::TextUnformatted("sin"); break;
+				default: ASSERT(false); break;
+			}
 			ImGui::SameLine();
 			outputSlot();
-			return changed;
+			return false;
 		}
-
-		enum Function : int {
-			COS,
-			SIN
-		};
-
-		Function func = COS;
 	};
 	
 	struct GradientColorNode : Node {
@@ -204,6 +215,9 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(count); blob.write(keys); blob.write(values); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+
 		bool onGUI() override {
 			ImGui::SetNextItemWidth(120);
 			ImGui::BeginGroup();
@@ -212,12 +226,15 @@ struct ParticleEditorResource {
 			ImGui::EndGroup();
 			ImGui::SameLine();
 			outputSlot();
+			ASSERT(sentinel == 0xDEADBEAF);
 			return changed;
 		}
 
 		u32 count = 2;
 		float keys[8] = { 0, 1 };
 		Vec4 values[8] = { Vec4(0, 0, 0, 1), Vec4(1, 1, 1, 1) };
+
+		u32 sentinel = 0xDEADBEAF;
 	};
 
 	struct GradientNode : Node {
@@ -250,6 +267,9 @@ struct ParticleEditorResource {
 
 		void serialize(OutputMemoryStream& blob) override { blob.write(count); blob.write(keys); blob.write(values); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
+
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 
 		bool onGUI() override {
 			ImGuiEx::NodeTitle("Gradient");
@@ -295,6 +315,9 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(idx); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 		
+		bool hasInputPins() const override { return false; }
+		bool hasOutputPins() const override { return true; }
+
 		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::CONST;
@@ -303,7 +326,13 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			outputSlot(); ImGui::TextUnformatted(m_resource.m_consts[idx].name);
+			outputSlot(); 
+			if (m_resource.m_consts.size() <= idx) {
+				ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " INVALID CONSTANT");
+			}
+			else {
+				ImGui::TextUnformatted(m_resource.m_consts[idx].name);
+			}
 			return false;
 		}
 
@@ -335,6 +364,9 @@ struct ParticleEditorResource {
 			blob.read(to);
 		}
 
+		bool hasInputPins() const override { return false; }
+		bool hasOutputPins() const override { return true; }
+
 		bool onGUI() override {
 			ImGuiEx::NodeTitle(ICON_FA_DICE " Random");
 
@@ -360,6 +392,8 @@ struct ParticleEditorResource {
 		LiteralNode(ParticleEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::NUMBER; }
+		bool hasInputPins() const override { return false; }
+		bool hasOutputPins() const override { return true; }
 
 		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
@@ -373,7 +407,7 @@ struct ParticleEditorResource {
 
 		bool onGUI() override {
 			outputSlot();
-			ImGui::SetNextItemWidth(120);
+			ImGui::SetNextItemWidth(60);
 			bool changed = ImGui::DragFloat("##v", &value);
 			return changed;
 		}
@@ -381,10 +415,11 @@ struct ParticleEditorResource {
 		float value = 0;
 	};
 
-	struct Vec3Node : Node {
-		Vec3Node(ParticleEditorResource& res) : Node(res) {}
+	template <Node::Type T>
+	struct VectorNode : Node {
+		VectorNode(ParticleEditorResource& res) : Node(res) {}
 		
-		Type getType() const override { return Type::VEC3; }
+		Type getType() const override { return T; }
 
 		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(subindex);
@@ -398,8 +433,19 @@ struct ParticleEditorResource {
 			return r;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
-		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
+		void serialize(OutputMemoryStream& blob) override { 
+			if (T == Node::VEC3) blob.write(value.xyz());
+			else blob.write(value);
+		}
+		void deserialize(InputMemoryStream& blob) override { 
+			if (T == Node::VEC3) {
+				Vec3 v = blob.read<Vec3>();
+				value = Vec4(v, 0);
+			}
+			else blob.read(value);
+		}
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 
 		bool onGUI() override {
 			
@@ -430,6 +476,22 @@ struct ParticleEditorResource {
 			else {
 				changed = ImGui::DragFloat("Z", &value.z) || changed;
 			}
+
+			if (T == Node::Type::VEC4) {
+				inputSlot();
+				if (getInput(3).node) {
+					ImGui::TextUnformatted("W");
+				}
+				else {
+					changed = ImGui::DragFloat("W", &value.w) || changed;
+				}
+
+				changed = ImGui::ColorEdit4("##color", &value.x, ImGuiColorEditFlags_NoInputs) || changed;
+			}
+			else {
+				changed = ImGui::ColorEdit3("##color", &value.x, ImGuiColorEditFlags_NoInputs) || changed;
+			}
+
 			ImGui::EndGroup();
 			
 			ImGui::PopItemWidth();
@@ -440,13 +502,15 @@ struct ParticleEditorResource {
 			return changed;
 		}
 
-		Vec3 value = Vec3(0);
+		Vec4 value = Vec4(0);
 	};
 
 	struct InputNode : Node {
 		InputNode(ParticleEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::INPUT; }
+		bool hasInputPins() const override { return false; }
+		bool hasOutputPins() const override { return true; }
 
 		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
@@ -476,6 +540,8 @@ struct ParticleEditorResource {
 		EmitNode(ParticleEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::EMIT; }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return false; }
 
 		bool onGUI() override {
 			ImGuiEx::NodeTitle(ICON_FA_PLUS " Emit", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
@@ -553,6 +619,8 @@ struct ParticleEditorResource {
 		UpdateNode(ParticleEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::UPDATE; }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return false; }
 
 		bool onGUI() override {
 			ImGuiEx::NodeTitle(ICON_FA_CLOCK " Update", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
@@ -603,6 +671,9 @@ struct ParticleEditorResource {
 		CompareNode(ParticleEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::CMP; }
+
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 
 		bool onGUI() override {
 			ImGui::BeginGroup();
@@ -665,10 +736,61 @@ struct ParticleEditorResource {
 		float value = 0;
 	};
 
+	struct SwitchNode : Node {
+		SwitchNode(ParticleEditorResource& res) : Node(res) {}
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+		Type getType() const override { return Type::SWITCH; }
+
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+			const NodeInput input = getInput(m_is_on ? 0 : 1);
+			if (!input.node) return {};
+			return input.generate(instructions, output, subindex);
+		}
+
+		bool onGUI() override {
+			ImGui::BeginGroup();
+			inputSlot(); ImGui::TextUnformatted("True");
+			inputSlot(); ImGui::TextUnformatted("False");
+			ImGui::EndGroup();
+			ImGui::SameLine();
+			bool res = ImGui::Checkbox("##on", &m_is_on);
+			ImGui::SameLine();
+			outputSlot();
+			return res;
+		}
+
+		bool m_is_on = true;
+	};
+
+	struct PinNode : Node {
+		PinNode(ParticleEditorResource& res) : Node(res) {}
+		
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+			const NodeInput input = getInput(0);
+			if (!input.node) return {};
+			return input.generate(instructions, output, subindex);
+		}
+		
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+		Type getType() const override { return Type::PIN; }
+		
+		bool onGUI() override {
+			inputSlot();
+			ImGui::TextUnformatted(" ");
+			ImGui::SameLine();
+			outputSlot();
+			return false;
+		}
+	};
+
 	struct OutputNode : Node {
 		OutputNode(ParticleEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::OUTPUT; }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return false; }
 
 		bool onGUI() override {
 			ImGuiEx::NodeTitle(ICON_FA_EYE " Output", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
@@ -751,12 +873,14 @@ struct ParticleEditorResource {
 
 		void serialize(OutputMemoryStream& blob) override { blob.write(color0); blob.write(color1); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(color0); blob.read(color1); }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 
 		bool onGUI() override {
 			ImGui::BeginGroup();
 			inputSlot(); ImGui::TextUnformatted("Weight");
-			bool changed = ImGui::ColorEdit4("Color A", &color0.x, ImGuiColorEditFlags_NoInputs);
-			changed = ImGui::ColorEdit4("Color B", &color1.x, ImGuiColorEditFlags_NoInputs) || changed;
+			bool changed = ImGui::ColorEdit4("A", &color0.x, ImGuiColorEditFlags_NoInputs);
+			changed = ImGui::ColorEdit4("B", &color1.x, ImGuiColorEditFlags_NoInputs) || changed;
 			ImGui::EndGroup();
 			
 			ImGui::SameLine();
@@ -776,6 +900,8 @@ struct ParticleEditorResource {
 
 		void serialize(OutputMemoryStream& blob) override { blob.write(value1); blob.write(value2); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value1); blob.read(value2); }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 
 		DataStream generate(OutputMemoryStream& instructions, u8, DataStream output, u8 subindex) override {
 			const NodeInput input0 = getInput(0);
@@ -868,6 +994,8 @@ struct ParticleEditorResource {
 
 		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
 
 		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
 			ASSERT(output_idx == 0);
@@ -948,9 +1076,9 @@ struct ParticleEditorResource {
 	};
 	
 	struct Link {
-		int id;
 		int from;
 		int to;
+		ImU32 color;
 
 		u16 toNode() const { return to & 0xffFF; }
 		u16 fromNode() const { return from & 0xffFF; }
@@ -986,26 +1114,30 @@ struct ParticleEditorResource {
 			case Node::CMP: node = UniquePtr<CompareNode>::create(m_allocator, *this); break;
 			case Node::GRADIENT_COLOR: node = UniquePtr<GradientColorNode>::create(m_allocator, *this); break;
 			case Node::GRADIENT: node = UniquePtr<GradientNode>::create(m_allocator, *this); break;
-			case Node::VEC3: node = UniquePtr<Vec3Node>::create(m_allocator, *this); break;
+			case Node::VEC3: node = UniquePtr<VectorNode<Node::VEC3>>::create(m_allocator, *this); break;
+			case Node::VEC4: node = UniquePtr<VectorNode<Node::VEC4>>::create(m_allocator, *this); break;
 			case Node::COLOR_MIX: node = UniquePtr<ColorMixNode>::create(m_allocator, *this); break;
 			case Node::MADD: node = UniquePtr<MaddNode>::create(m_allocator, *this); break;
+			case Node::SWITCH: node = UniquePtr<SwitchNode>::create(m_allocator, *this); break;
 			case Node::RANDOM: node = UniquePtr<RandomNode>::create(m_allocator, *this); break;
 			case Node::EMIT: node = UniquePtr<EmitNode>::create(m_allocator, *this); break;
 			case Node::UPDATE: node = UniquePtr<UpdateNode>::create(m_allocator, *this); break;
 			case Node::INPUT: node = UniquePtr<InputNode>::create(m_allocator, *this); break;
 			case Node::OUTPUT: node = UniquePtr<OutputNode>::create(m_allocator, *this); break;
+			case Node::PIN: node = UniquePtr<PinNode>::create(m_allocator, *this); break;
 			case Node::DIV: node = UniquePtr<BinaryOpNode<InstructionType::DIV>>::create(m_allocator, *this); break;
 			case Node::MUL: node = UniquePtr<BinaryOpNode<InstructionType::MUL>>::create(m_allocator, *this); break;
 			case Node::ADD: node = UniquePtr<BinaryOpNode<InstructionType::ADD>>::create(m_allocator, *this); break;
 			case Node::CONST: node = UniquePtr<ConstNode>::create(m_allocator, *this); break;
-			case Node::UNARY_FUNCTION: node = UniquePtr<UnaryFunctionNode>::create(m_allocator, *this); break;
+			case Node::COS: node = UniquePtr<UnaryFunctionNode<Node::COS>>::create(m_allocator, *this); break;
+			case Node::SIN: node = UniquePtr<UnaryFunctionNode<Node::SIN>>::create(m_allocator, *this); break;
 			case Node::NUMBER: node = UniquePtr<LiteralNode>::create(m_allocator, *this); break;
 			default: ASSERT(false);
 		}
 		m_nodes.push(node.move());
 		return m_nodes.back().get();
 	}
-
+	
 	bool deserialize(InputMemoryStream& blob, const char* path) {
 		Header header;
 		blob.read(header);
@@ -1013,8 +1145,8 @@ struct ParticleEditorResource {
 			logError("Invalid file ", path);
 			return false;
 		}
-		if (header.version != 0) {
-			logError("Invalid file version ", path);
+		if (header.version > Version::LAST) {
+			logError("Unsupported file version ", path);
 			return false;
 		}
 
@@ -1037,7 +1169,19 @@ struct ParticleEditorResource {
 
 		blob.read(count);
 		m_links.resize(count);
-		blob.read(m_links.begin(), m_links.byte_size());
+		if (header.version > Version::LINK_ID_REMOVED) {
+			for (i32 i = 0; i < count; ++i) {
+				blob.read(m_links[i].from);
+				blob.read(m_links[i].to);
+			}
+		}
+		else {
+			for (i32 i = 0; i < count; ++i) {
+				blob.read<i32>();
+				blob.read(m_links[i].from);
+				blob.read(m_links[i].to);
+			}
+		}
 
 		blob.read(count);
 		for (i32 i = 0; i < count; ++i) {
@@ -1067,7 +1211,10 @@ struct ParticleEditorResource {
 		blob.write(m_consts.begin(), m_consts.byte_size());
 
 		blob.write((i32)m_links.size());
-		blob.write(m_links.begin(), m_links.byte_size());
+		for (const Link& link : m_links) {
+			blob.write(link.from);
+			blob.write(link.to);
+		}
 
 		blob.write((i32)m_nodes.size());
 		for (const UniquePtr<Node>& n : m_nodes) {
@@ -1079,18 +1226,14 @@ struct ParticleEditorResource {
 	}
 
 	void initDefault() {
-		m_streams.emplace().name = "pos_x";
-		m_streams.emplace().name = "pos_y";
-		m_streams.emplace().name = "pos_z";
+		m_streams.emplace().name = "pos";
+		m_streams.back().type = ValueType::VEC3;
 		m_streams.emplace().name = "life";
-		m_outputs.emplace().name = "pos_x";
-		m_outputs.emplace().name = "pos_y";
-		m_outputs.emplace().name = "pos_z";
+
+		m_outputs.emplace().name = "pos";
 		m_outputs.emplace().name = "scale";
-		m_outputs.emplace().name = "color_r";
-		m_outputs.emplace().name = "color_g";
-		m_outputs.emplace().name = "color_b";
-		m_outputs.emplace().name = "color_a";
+		m_outputs.emplace().name = "color";
+		m_outputs.back().type = ValueType::VEC4;
 		m_outputs.emplace().name = "rotation";
 		m_outputs.emplace().name = "frame";
 
@@ -1098,9 +1241,9 @@ struct ParticleEditorResource {
 
 		m_nodes.push(UniquePtr<UpdateNode>::create(m_allocator, *this));
 		m_nodes.push(UniquePtr<OutputNode>::create(m_allocator, *this));
-		m_nodes.back()->m_pos = ImVec2(200, 100);
+		m_nodes.back()->m_pos = ImVec2(100, 300);
 		m_nodes.push(UniquePtr<EmitNode>::create(m_allocator, *this));
-		m_nodes.back()->m_pos = ImVec2(300, 100);
+		m_nodes.back()->m_pos = ImVec2(100, 200);
 	}
 
 	void generate() {
@@ -1207,6 +1350,50 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_app.removeAction(&m_apply_action);
 	}
 
+	const ParticleEditorResource::Node* getNode(u16 id) const {
+		for(const auto& n : m_resource->m_nodes) {
+			if (n->m_id == id) return n.get();
+		}
+		return nullptr;
+	}
+
+	void colorLinks(ImU32 color, u32 link_idx) {
+		m_resource->m_links[link_idx].color = color;
+		const u16 from_node_id = m_resource->m_links[link_idx].fromNode();
+		for (u32 i = 0, c = m_resource->m_links.size(); i < c; ++i) {
+			if (m_resource->m_links[i].toNode() == from_node_id) colorLinks(color, i);
+		}
+	}
+
+	void colorLinks() {
+		const ImU32 colors[] = {
+			IM_COL32(0x20, 0x20, 0xA0, 255),
+			IM_COL32(0x20, 0xA0, 0x20, 255),
+			IM_COL32(0x20, 0xA0, 0xA0, 255),
+			IM_COL32(0xA0, 0x20, 0x20, 255),
+			IM_COL32(0xA0, 0x20, 0xA0, 255),
+			IM_COL32(0xA0, 0xA0, 0x20, 255),
+			IM_COL32(0xA0, 0xA0, 0xA0, 255),
+		};
+	
+		for (ParticleEditorResource::Link& l : m_resource->m_links) {
+			l.color = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
+		}
+
+		for (u32 i = 0, c = m_resource->m_links.size(); i < c; ++i) {
+			const ParticleEditorResource::Link& link = m_resource->m_links[i];
+			const ParticleEditorResource::Node* node = getNode(link.toNode());
+			switch(node->getType()) {
+				case ParticleEditorResource::Node::UPDATE:
+				case ParticleEditorResource::Node::EMIT:
+				case ParticleEditorResource::Node::OUTPUT:
+					colorLinks(colors[link.toPin() % lengthOf(colors)], i);
+					break;
+			}
+
+		}		
+	}
+
 	void deleteSelectedNodes() {
 
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
@@ -1249,6 +1436,81 @@ struct ParticleEditorImpl : ParticleEditor {
 		--m_undo_idx;
 		InputMemoryStream tmp(m_undo_stack[m_undo_idx].data);
 		m_resource->deserialize(tmp, "undo");
+		colorLinks();
+	}
+
+	void deleteOutput(u32 output_idx) {
+		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
+			UniquePtr<Node>& n = m_resource->m_nodes[i];
+			switch (n->getType()) {
+				case Node::OUTPUT: {
+					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
+						ParticleEditorResource::Link& link = m_resource->m_links[j];
+						if (link.toNode() == n->m_id) {
+							if (link.toPin() == output_idx) {
+								m_resource->m_links.swapAndPop(j);
+							}
+							else if (link.toPin() > output_idx) {
+								link.to = link.toNode() | (u32(link.toPin() - 1) << 16);
+							}
+						}
+					}
+				}
+			}
+		}
+		m_resource->m_outputs.erase(output_idx);
+		pushUndo(0xffFFffFF);
+	}
+
+	void deleteStream(u32 stream_idx) {
+		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
+			UniquePtr<Node>& n = m_resource->m_nodes[i];
+			switch (n->getType()) {
+				case Node::UPDATE: {
+					auto* node = (ParticleEditorResource::UpdateNode*)n.get();
+					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
+						ParticleEditorResource::Link& link = m_resource->m_links[j];
+						if (link.toNode() == node->m_id) {
+							// `stream_idx + 1` because of the "kill" input pin
+							if (link.toPin() == stream_idx + 1) {
+								m_resource->m_links.swapAndPop(j);
+							}
+							else if (link.toPin() > stream_idx + 1) {
+								link.to = link.toNode() | (u32(link.toPin() - 1) << 16);
+							}
+						}
+					}
+					break;
+				}
+				case Node::EMIT: {
+					auto* node = (ParticleEditorResource::EmitNode*)n.get();
+					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
+						ParticleEditorResource::Link& link = m_resource->m_links[j];
+						if (link.toNode() == node->m_id) {
+							if (link.toPin() == stream_idx) {
+								m_resource->m_links.swapAndPop(j);
+							}
+							else if (link.toPin() > stream_idx) {
+								link.to = link.toNode() | (u32(link.toPin() - 1) << 16);
+							}
+						}
+					}
+					break;
+				}
+				case Node::INPUT: {
+					auto* node = (ParticleEditorResource::InputNode*)n.get();
+					if (node->idx == stream_idx) {
+						m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
+							return link.fromNode() == n->m_id || link.toNode() == n->m_id;
+						});
+						m_resource->m_nodes.swapAndPop(i);
+					}
+					break;
+				}
+			}
+		}
+		m_resource->m_streams.erase(stream_idx);
+		pushUndo(0xffFFffFF);
 	}
 
 	void leftColumnGUI() {
@@ -1258,9 +1520,8 @@ struct ParticleEditorImpl : ParticleEditor {
 			for (ParticleEditorResource::Stream& s : m_resource->m_streams) {
 				ImGui::PushID(&s);
 				if (ImGui::Button(ICON_FA_TRASH)) {
-					m_resource->m_streams.erase(u32(&s - m_resource->m_streams.begin()));
+					deleteStream(u32(&s - m_resource->m_streams.begin()));
 					ImGui::PopID();
-					pushUndo(0xffFFffFF);
 					break;
 				}
 				ImGui::SameLine();
@@ -1279,9 +1540,8 @@ struct ParticleEditorImpl : ParticleEditor {
 			for (ParticleEditorResource::Output& s : m_resource->m_outputs) {
 				ImGui::PushID(&s);
 				if (ImGui::Button(ICON_FA_TRASH)) {
-					m_resource->m_outputs.erase(u32(&s - m_resource->m_outputs.begin()));
+					deleteOutput(u32(&s - m_resource->m_outputs.begin()));
 					ImGui::PopID();
-					pushUndo(0xffFFffFF);
 					break;
 				}
 				ImGui::SameLine();
@@ -1427,6 +1687,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			m_canvas.begin();
 
 			ImGuiEx::BeginNodeEditor("particle_editor", &m_offset);
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
 
 			i32 hovered_node = -1;
 			i32 hovered_link = -1;
@@ -1439,26 +1700,43 @@ struct ParticleEditorImpl : ParticleEditor {
 				}
 			}
 
-			constexpr ImU32 colors[] = {
-				IM_COL32(0x20, 0x20, 0xA0, 255),
-				IM_COL32(0x20, 0xA0, 0x20, 255),
-				IM_COL32(0x20, 0xA0, 0xA0, 255),
-				IM_COL32(0xA0, 0x20, 0x20, 255),
-				IM_COL32(0xA0, 0x20, 0xA0, 255),
-				IM_COL32(0xA0, 0xA0, 0x20, 255),
-				IM_COL32(0xA0, 0xA0, 0xA0, 255),
-			};
-			for (const ParticleEditorResource::Link& link : m_resource->m_links) {
-				const u64 hash = RuntimeHash(&link, sizeof(link)).getHashValue();
-				const u64 color_idx = hash % lengthOf(colors);
-				ImGuiEx::NodeLinkEx(link.from, link.to, colors[color_idx], ImGui::GetColorU32(ImGuiCol_TabActive));
+			for (i32 i = 0, c = m_resource->m_links.size(); i < c; ++i) {
+				ParticleEditorResource::Link& link = m_resource->m_links[i];
+				ImGuiEx::NodeLinkEx(link.from, link.to, link.color, ImGui::GetColorU32(ImGuiCol_TabActive));
 				if (ImGuiEx::IsLinkHovered()) {
-					hovered_link = link.id;
+					if (ImGui::IsMouseClicked(0) && ImGui::GetIO().KeyCtrl) {
+						if (ImGuiEx::IsLinkStartHovered()) {
+							ImGuiEx::StartNewLink(link.to, true);
+						}
+						else {
+							ImGuiEx::StartNewLink(link.from | OUTPUT_FLAG, false);
+						}
+						m_resource->m_links.erase(i);
+						--c;
+					}
+					const ImVec2 mp = ImGui::GetMousePos() - origin - m_offset;
+					if (ImGui::IsMouseDoubleClicked(0)) {
+						Node* n = addNode(ParticleEditorResource::Node::Type::PIN);
+						ParticleEditorResource::Link new_link;
+						new_link.from = n->m_id | OUTPUT_FLAG; 
+						new_link.to = link.to;
+						link.to = n->m_id;
+						m_resource->m_links.push(new_link);
+						n->m_pos = mp;
+						pushUndo(0xffFF);
+					}
+					hovered_link = i32(&link - m_resource->m_links.begin());
 				}
 			}
 
+			bool open_context = false;
 			ImGuiID nlf, nlt;
-			if (ImGuiEx::GetNewLink(&nlf, &nlt)) {
+			if (ImGuiEx::GetHalfLink(&nlf)) {
+				open_context = true;
+				m_half_link_start = nlf;
+			}
+			else if (ImGuiEx::GetNewLink(&nlf, &nlt)) {
+				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){ return link.to == nlt; });
 				ParticleEditorResource::Link& link = m_resource->m_links.emplace();
 				link.from = nlf;
 				link.to = nlt;
@@ -1483,7 +1761,8 @@ struct ParticleEditorImpl : ParticleEditor {
 						{ 'M', Node::Type::MUL },
 						{ 'R', Node::Type::RANDOM },
 						{ '1', Node::Type::NUMBER},
-						{ '3', Node::Type::VEC3 }
+						{ '3', Node::Type::VEC3 },
+						{ '4', Node::Type::VEC4 }
 					};
 					Node* n = nullptr;
 					for (const auto& t : types) {
@@ -1494,6 +1773,7 @@ struct ParticleEditorImpl : ParticleEditor {
 					}
 					if (n) {
 						n->m_pos = ImGui::GetMousePos() - ImGui::GetItemRectMin() - ImGuiEx::GetNodeEditorOffset();
+						pushUndo(0xffFFffFF);
 					}
 				}
 			}
@@ -1501,65 +1781,65 @@ struct ParticleEditorImpl : ParticleEditor {
 			const ImVec2 editor_pos = ImGui::GetItemRectMin();
 
 			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
-				ImGui::OpenPopup("context_menu");
+				open_context = true;
+				m_half_link_start = 0;
 			}
+			if (open_context) ImGui::OpenPopup("context_menu");
 		
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
 			if (ImGui::BeginPopup("context_menu")) {
 				ImVec2 cp = ImGui::GetItemRectMin();
-				if (ImGui::BeginMenu("Add")) {
-					ParticleEditorResource::Node* n = nullptr;
-					if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
-					if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
-					if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
-					if (ImGui::BeginMenu("Constant")) {
-						for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
-							if (ImGui::Selectable(m_resource->m_consts[i].name)) {
-								UniquePtr<ParticleEditorResource::ConstNode> n = UniquePtr<ParticleEditorResource::ConstNode>::create(m_allocator, *m_resource.get());
-								n->idx = i;
-								m_resource->m_nodes.push(n.move());
-								pushUndo(0xffFFffFF);
-							}
+				ParticleEditorResource::Node* n = nullptr;
+				if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
+				if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
+				if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
+				if (ImGui::BeginMenu("Constant")) {
+					for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
+						if (ImGui::Selectable(m_resource->m_consts[i].name)) {
+							n = addNode(ParticleEditorResource::Node::CONST);
+							((ParticleEditorResource::ConstNode*)n)->idx = i;
 						}
-						ImGui::EndMenu();
-					}
-					if (ImGui::Selectable("Cos")) {
-						n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
-						((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::COS;
-					}
-					if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
-					if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
-					if (ImGui::BeginMenu("Input")) {
-						for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
-							if (ImGui::Selectable(m_resource->m_streams[i].name)) {
-								UniquePtr<ParticleEditorResource::InputNode> n = UniquePtr<ParticleEditorResource::InputNode>::create(m_allocator, *m_resource.get());
-								n->idx = i;
-								m_resource->m_nodes.push(n.move());
-								pushUndo(0xffFFffFF);
-							}
-						}
-						ImGui::EndMenu();
-					}
-					if (ImGui::Selectable("Number")) n = addNode(ParticleEditorResource::Node::NUMBER);
-					if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
-					if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
-					if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
-					if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
-					if (ImGui::Selectable("Sin")) {
-						n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
-						((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::SIN;
-					}
-					if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
-					if (n) {
-						n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
 					}
 					ImGui::EndMenu();
+				}
+				if (ImGui::Selectable("Cos")) n = addNode(ParticleEditorResource::Node::COS);
+				if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
+				if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
+				if (ImGui::BeginMenu("Input")) {
+					for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
+						if (ImGui::Selectable(m_resource->m_streams[i].name)) {
+							n = addNode(ParticleEditorResource::Node::INPUT);
+							((ParticleEditorResource::InputNode*)n)->idx = i;
+						}
+					}
+					ImGui::EndMenu();
+				}
+				if (ImGui::Selectable("Number")) n = addNode(ParticleEditorResource::Node::NUMBER);
+				if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
+				if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
+				if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
+				if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
+				if (ImGui::Selectable("Sin")) n = addNode(ParticleEditorResource::Node::SIN);
+				if (ImGui::Selectable("Switch")) n = addNode(ParticleEditorResource::Node::SWITCH);
+				if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
+				if (ImGui::Selectable("Vec4")) n = addNode(ParticleEditorResource::Node::VEC4);
+				if (n) {
+					n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
+						
+					if (m_half_link_start) {
+						if (m_half_link_start & OUTPUT_FLAG) {
+							if (n->hasInputPins()) m_resource->m_links.push({i32(m_half_link_start), i32(n->m_id)});
+						}
+						else {
+							if (n->hasOutputPins()) m_resource->m_links.push({i32(n->m_id | OUTPUT_FLAG) , i32(m_half_link_start)});
+						}
+						m_half_link_start = 0;
+					}
+					pushUndo(0xffFFffFF);
 				}
 
 				ImGui::EndPopup();
 			}
-			ImGui::PopStyleVar();
-
+		
 			m_canvas.end();
 		}
 
@@ -1569,12 +1849,11 @@ struct ParticleEditorImpl : ParticleEditor {
 	}
 
 	ParticleEditorResource::Node* addNode(ParticleEditorResource::Node::Type type) {
-		ParticleEditorResource::Node* n = m_resource->addNode(type);
-		pushUndo(0xffFFffFF);
-		return n;
+		return m_resource->addNode(type);
 	}
 
 	void pushUndo(u32 tag) {
+		colorLinks();
 		m_resource->generate();
 		if (m_autoapply) apply();
 		m_dirty = true;
@@ -1771,6 +2050,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	bool m_has_focus = false;
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
+	ImGuiID m_half_link_start = 0;
 };
 
 

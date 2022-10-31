@@ -25,6 +25,8 @@ namespace ImGuiEx {
 		ImVec2 node_editor_pos;
 		ImGuiID new_link_to = 0;
 		bool link_hovered = false;
+		ImVec2 link_p1;
+		ImVec2 link_p2;
 		bool between_begin_end_editor = false;
 		ImDrawList* draw_list = nullptr;
 		bool is_pin_hovered = false;
@@ -95,7 +97,7 @@ namespace ImGuiEx {
 			}
 		}
 		
-		if (IsMouseClicked(0) && !g_node_editor.new_link_from && !g_node_editor.is_node_hovered && !IsAnyItemActive()) {
+		if (IsMouseClicked(0) && !g_node_editor.new_link_from && !g_node_editor.is_node_hovered && !IsAnyItemActive() && IsWindowHovered()) {
 			storage->SetFloat(GetID("node-rect-selection-x"), mp.x);
 			storage->SetFloat(GetID("node-rect-selection-y"), mp.y);
 		}
@@ -134,6 +136,12 @@ namespace ImGuiEx {
 		return false;
 	}
 
+	void StartNewLink(ImGuiID from, bool is_input) {
+		ASSERT(!g_node_editor.new_link_to);
+		g_node_editor.new_link_from = from;
+		g_node_editor.new_link_from_input = is_input;
+	}
+
 	bool GetNewLink(ImGuiID* from, ImGuiID* to) {
 		ASSERT(g_node_editor.between_begin_end_editor);
 		if (g_node_editor.new_link_to) {
@@ -146,24 +154,26 @@ namespace ImGuiEx {
 
 	void Pin(ImGuiID id, bool is_input, PinShape shape) {
 		PopID(); // pop node id, we want pin id to not include node id
-		ImDrawList* draw_list = GetWindowDrawList();
 		ImVec2 screen_pos = GetCursorScreenPos();
 		
 		const ImVec2 center = [&](){
 			if (is_input) return screen_pos + ImVec2(-GetStyle().WindowPadding.x, GetTextLineHeightWithSpacing() * 0.5f);
 			return ImVec2(g_node_editor.node_pos->x + g_node_editor.node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
 		}();
-		const ImVec2 half_extents(NODE_PIN_RADIUS, NODE_PIN_RADIUS);
+		const ImVec2 half_extents(NODE_PIN_RADIUS + 4, NODE_PIN_RADIUS + 4);
 		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
 		const bool hovered = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 		ImGuiStyle& style = GetStyle();
 		const ImU32 color = GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab);
 		switch(shape) {
 			case PinShape::TRIANGLE:
-				draw_list->AddTriangleFilled(center - ImVec2(NODE_PIN_RADIUS, -NODE_PIN_RADIUS), center - half_extents, center + ImVec2(NODE_PIN_RADIUS, 0), GetColorU32(ImGuiCol_Text));
+				g_node_editor.draw_list->AddTriangleFilled(center - ImVec2(NODE_PIN_RADIUS, -NODE_PIN_RADIUS)
+					, center - ImVec2(NODE_PIN_RADIUS, NODE_PIN_RADIUS)
+					, center + ImVec2(NODE_PIN_RADIUS, 0)
+					, GetColorU32(ImGuiCol_Text));
 				break;
 			default:
-				draw_list->AddCircleFilled(center, NODE_PIN_RADIUS, color);
+				g_node_editor.draw_list->AddCircleFilled(center, NODE_PIN_RADIUS, color);
 				break;
 		}
 
@@ -191,6 +201,11 @@ namespace ImGuiEx {
 			}
 		}
 		PushID(g_node_editor.last_node_id);
+	}
+
+	bool IsLinkStartHovered() {
+		const ImVec2 mp = GetMousePos();
+		return ImLengthSqr(mp - g_node_editor.link_p1) < ImLengthSqr(mp - g_node_editor.link_p2);
 	}
 
 	bool IsLinkHovered() {
@@ -224,6 +239,9 @@ namespace ImGuiEx {
 		g_node_editor.link_hovered = dist_squared < 3 * 3 + 1;
 		
 		g_node_editor.draw_list->AddBezierCubic(p1, p1_b, p2_b, p2, g_node_editor.link_hovered ? active_color : color, 3.f);
+
+		g_node_editor.link_p1 = p1;
+		g_node_editor.link_p2 = p2;
 	}
 
 	void NodeTitle(const char* text, ImU32 color) {
@@ -1145,7 +1163,7 @@ namespace ImGuiEx {
 			bool found = false;
 			for (int i = 0; i < *count; ++i) {
 				if (key < keys[i]) {
-					for (int j = *count; j >= i; --j) {
+					for (int j = *count - 1; j >= i; --j) {
 						keys[j + 1] = keys[j];
 						values[j * 4 + 4] = values[j * 4 + 0];
 						values[j * 4 + 5] = values[j * 4 + 1];
@@ -1448,6 +1466,7 @@ namespace ImGuiEx {
 
 	void Canvas::end() {
 		End();
+		const bool is_any_item_hovered = IsAnyItemHovered();
 		Render();
 		
 		ImDrawData* draw_data = GetDrawData();
@@ -1459,7 +1478,7 @@ namespace ImGuiEx {
 		}
 
 		InvisibleButton("canvas", m_size);
-		if (IsItemHovered() && GetIO().MouseWheel) {
+		if (IsItemHovered() && GetIO().MouseWheel && !is_any_item_hovered) {
 			m_scale.x += GetIO().MouseWheel / 20;
 			m_scale.x = m_scale.x < 0.1f ? 0.1f : m_scale.x;
 			m_scale.x = m_scale.x > 1.f ? 1.f : m_scale.x;

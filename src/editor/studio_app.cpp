@@ -256,7 +256,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		update();
 
-		if (m_sleep_when_inactive && !isFocused()) {
+		if (m_settings.m_sleep_when_inactive && !isFocused()) {
 			const float frame_time = m_inactive_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
@@ -332,10 +332,10 @@ struct StudioAppImpl final : StudioApp
 			cfg_file.close();
 		}
 
-		char current_dir[LUMIX_MAX_PATH];
+		char current_dir[LUMIX_MAX_PATH] = "";
 		os::getCurrentDirectory(Span(current_dir));
 
-		char data_dir[LUMIX_MAX_PATH] = {};
+		char data_dir[LUMIX_MAX_PATH] = "";
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
 		Engine::InitArgs init_data = {};
@@ -351,6 +351,7 @@ struct StudioAppImpl final : StudioApp
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		m_main_window = m_engine->getWindowHandle();
 		m_windows.push(m_main_window);
+		logInfo("Current directory: ", current_dir);
 
 		createLua();
 		extractBundled();
@@ -396,8 +397,7 @@ struct StudioAppImpl final : StudioApp
 
 		m_asset_compiler->onInitFinished();
 		m_asset_browser->onInitFinished();
-		m_sleep_when_inactive = shouldSleepWhenInactive();
-
+		
 		checkScriptCommandLine();
 
 		logInfo("Startup took ", init_timer.getTimeSinceStart(), " s"); 
@@ -2465,20 +2465,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	bool shouldSleepWhenInactive()
-	{
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-no_sleep_inactive")) return false;
-		}
-		return true;
-	}
-
-
 	void loadUniverseFromCommandLine()
 	{
 		char cmd_line[2048];
@@ -3397,7 +3383,6 @@ struct StudioAppImpl final : StudioApp
 	bool m_deferred_game_mode_exit;
 	int m_exit_code;
 
-	bool m_sleep_when_inactive;
 	bool m_is_welcome_screen_open;
 	bool m_is_export_game_dialog_open;
 	bool m_is_entity_list_open;

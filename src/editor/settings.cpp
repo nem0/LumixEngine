@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "settings.h"
+#include "engine/command_line_parser.h"
 #include "engine/debug.h"
 #include "engine/file_system.h"
 #include "engine/engine.h"
@@ -281,6 +282,17 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 	return value;
 }
 
+static bool shouldSleepWhenInactive()
+{
+	char cmd_line[2048];
+	os::getCommandLine(Span(cmd_line));
+
+	CommandLineParser parser(cmd_line);
+	while (parser.next()) {
+		if (parser.currentEquals("-no_sleep_inactive")) return false;
+	}
+	return true;
+}
 
 Settings::Settings(StudioApp& app)
 	: m_app(app)
@@ -293,6 +305,7 @@ Settings::Settings(StudioApp& app)
 	, m_is_profiler_open(false)
 	, m_is_properties_open(false)
 	, m_is_crash_reporting_enabled(true)
+	, m_sleep_when_inactive(true)
 	, m_force_no_crash_report(false)
 	, m_mouse_sensitivity(80.0f, 80.0f)
 	, m_font_size(13)
@@ -323,6 +336,8 @@ Settings::Settings(StudioApp& app)
 	luaL_openlibs(m_local_state);
 	lua_newtable(m_local_state);
 	lua_setglobal(m_local_state, "custom");
+
+	m_sleep_when_inactive = shouldSleepWhenInactive();
 }
 
 
@@ -398,6 +413,8 @@ bool Settings::load()
 	m_is_profiler_open = getBoolean(L, "profiler_opened", false);
 	m_is_properties_open = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
+	m_sleep_when_inactive = getBoolean(L, "sleep_when_inactive", true);
+	if (!shouldSleepWhenInactive()) m_sleep_when_inactive = false;
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_app.getGizmoConfig().scale = getFloat(L, "gizmo_scale", 1.f);
 	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.f);
@@ -581,6 +598,7 @@ bool Settings::save()
 	writeBool("profiler_opened", m_is_profiler_open);
 	writeBool("properties_opened", m_is_properties_open);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
+	writeBool("sleep_when_inactive", m_sleep_when_inactive);
 	file << "gizmo_scale = " << m_app.getGizmoConfig().scale << "\n";
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
@@ -1051,7 +1069,6 @@ void Settings::showStyleEditor() const {
     ImGui::PopItemWidth();
 }
 
-
 void Settings::onGUI()
 {
 	if (!m_is_open) return;
@@ -1080,6 +1097,7 @@ void Settings::onGUI()
 						enableCrashReporting(m_is_crash_reporting_enabled);
 					}
 				}
+				ImGui::Checkbox("Sleep when inactive", &m_sleep_when_inactive);
 				ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 1.f, 0.1f, 500.0f);
 				float fov = radiansToDegrees(m_app.getFOV());
 				if (ImGui::SliderFloat("FOV", &fov, 0.1f, 180)) {

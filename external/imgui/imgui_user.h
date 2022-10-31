@@ -54,10 +54,12 @@ IMGUI_API void BeginNode(ImGuiID id, ImVec2& screen_pos, bool* selected);
 IMGUI_API void EndNode();
 IMGUI_API void Pin(ImGuiID id, bool is_input, PinShape shape = PinShape::CIRCLE);
 IMGUI_API bool GetHalfLink(ImGuiID* from);
+IMGUI_API void StartNewLink(ImGuiID from, bool is_input);
 IMGUI_API bool GetNewLink(ImGuiID* from, ImGuiID* to);
 IMGUI_API void NodeLink(ImGuiID from, ImGuiID to);
 IMGUI_API void NodeLinkEx(ImGuiID from, ImGuiID to, ImU32 color, ImU32 active_color);
 IMGUI_API bool IsLinkHovered();
+IMGUI_API bool IsLinkStartHovered();
 
 IMGUI_API bool InputRotation(const char* label, float* euler);
 IMGUI_API void Label(const char* label);
