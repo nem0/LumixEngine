@@ -784,7 +784,7 @@ struct RendererImpl final : Renderer
 	}
 
 	u32 createMaterialConstants(Span<const float> data) override {
-		const RuntimeHash hash((const u8*)&data, data.length() * sizeof(float));
+		const RuntimeHash hash(data.begin(), data.length() * sizeof(float));
 		auto iter = m_material_buffer.map.find(hash);
 		u32 idx;
 		if(iter.isValid()) {
@@ -799,7 +799,7 @@ struct RendererImpl final : Renderer
 			idx = m_material_buffer.first_free;
 			m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
 			m_material_buffer.data[idx].ref_count = 0;
-			m_material_buffer.data[idx].hash = RuntimeHash((const u8*)&data, sizeof(data));
+			m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
 			m_material_buffer.map.insert(hash, idx);
 			
 			FrameData::MaterialUpdates& mu = m_cpu_frame->material_updates.emplace();
