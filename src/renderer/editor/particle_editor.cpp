@@ -1428,6 +1428,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		++m_undo_idx;
 		InputMemoryStream tmp(m_undo_stack[m_undo_idx].data);
 		m_resource->deserialize(tmp, "undo");
+		colorLinks();
 	}
 
 	void undo() {

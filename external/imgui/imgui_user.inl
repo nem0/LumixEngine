@@ -1222,6 +1222,18 @@ namespace ImGuiEx {
 				EndPopup();
 			}
 
+			if (hovered && IsMouseClicked(0) && ImGui::GetIO().KeyAlt) {
+				for (int j = i; j < *count - 1; ++j) {
+					keys[j] = keys[j + 1];
+					values[j * 4 + 0] = values[j * 4 + 4];
+					values[j * 4 + 1] = values[j * 4 + 5];
+					values[j * 4 + 2] = values[j * 4 + 6];
+					values[j * 4 + 3] = values[j * 4 + 7];
+				}
+				--*count;
+				changed = true;
+			}
+
 			PopID();
 		}
 
