@@ -7,6 +7,7 @@
 namespace Lumix {
 
 struct IAllocator;
+struct PageAllocator;
 
 namespace gpu {
 
@@ -231,6 +232,56 @@ struct MemoryStats {
 	u64 texture_mem;
 };
 
+enum class Instruction : u8;
+
+struct Encoder {
+	Encoder(PageAllocator& allocator);
+	Encoder(Encoder&& rhs);
+	~Encoder();
+
+	Encoder(const Encoder& rhs) = delete;
+	void operator =(const Encoder&) = delete;
+	void operator =(Encoder&&) = delete;
+
+	void merge(Encoder& rhs);
+
+	void setState(StateFlags state);
+	void bindIndexBuffer(BufferHandle buffer);
+	void useProgram(ProgramHandle program);
+	void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
+	void scissor(u32 x,u32 y,u32 w,u32 h);
+	void drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType type);
+	void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
+	void clear(ClearFlags flags, const float* color, float depth);
+	void viewport(u32 x, u32 y, u32 w, u32 h);
+	void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
+	void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
+	void setCurrentWindow(void* window_handle);
+	void createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
+	void drawArrays(PrimitiveType type, u32 offset, u32 count);
+	void pushDebugGroup(const char* msg);
+	void popDebugGroup();
+	void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count);
+	void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type);
+
+	template <typename T>
+	void write(Instruction instruction, const T& val) {
+		u8* ptr = alloc(sizeof(val) + sizeof(Instruction));
+		memcpy(ptr, &instruction, sizeof(instruction));
+		memcpy(ptr + sizeof(instruction), &val, sizeof(val));
+	}
+
+	void run();
+
+	struct Page;
+	PageAllocator& allocator;
+	Page* first = nullptr;
+	Page* current = nullptr;
+	bool run_called = false;
+
+private:
+	u8* alloc(u32 size);
+};
 
 void preinit(IAllocator& allocator, bool load_renderdoc);
 bool init(void* window_handle, InitFlags flags);
@@ -316,7 +367,7 @@ void pushDebugGroup(const char* msg);
 void popDebugGroup();
 
 void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
-void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle depth_stencil, FramebufferFlags flags);
+void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle depth_stencil, FramebufferFlags flags);
 
 inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 	switch (format) {

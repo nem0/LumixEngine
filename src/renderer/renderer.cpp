@@ -1126,6 +1126,19 @@ struct RendererImpl final : Renderer
 		ctx.addScene(scene.move());
 	}
 
+
+	gpu::Encoder* createEncoderJob() override {
+		struct EncoderJob : RenderJob {
+			EncoderJob(PageAllocator& allocator) : encoder(allocator) {}
+			void setup() override {}
+			void execute() override { encoder.run(); }
+			gpu::Encoder encoder;
+		};
+		EncoderJob& job = createJob<EncoderJob>(m_engine.getPageAllocator());
+		queue(job, 0);
+		return &job.encoder;
+	}
+
 	void* allocJob(u32 size, u32 align) override {
 		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->job_allocator.allocate_aligned(size, align);

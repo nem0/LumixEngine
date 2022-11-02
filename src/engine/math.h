@@ -45,6 +45,7 @@ struct LUMIX_ENGINE_API IVec3 {
 
 struct LUMIX_ENGINE_API IVec4 {
 	IVec4() {}
+	IVec4(i32 x, i32 y, i32 z, i32 w) : x(x), y(y), z(z), w(w) {}
 	IVec4(i32 v) : x(v), y(v), z(v), w(v) {}
 	IVec4(const IVec2& a, const IVec2& b) : x(a.x), y(a.y), z(b.x), w(b.y) {}
 	void operator += (const IVec4& rhs);

@@ -786,82 +786,40 @@ void SceneView::update(float time_delta)
 }
 
 
-void SceneView::renderIcons()
-{
-	struct RenderJob : Renderer::RenderJob
-	{
-		RenderJob(Renderer& renderer, LinearAllocator& allocator) 
-			: m_renderer(renderer)
-			, m_items(allocator)
-		{}
-
-		void setup() override
-		{
-			PROFILE_FUNCTION();
-			
-			EditorIcons* icon_manager = m_ui->m_view->m_icons.get();
-			const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
-			m_items.reserve(icons.size());
-
-			const Viewport& vp = m_ui->m_view->getViewport();
-			Matrix camera_mtx({0, 0, 0}, vp.rot);
-
-			icon_manager->computeScales();
-
-			for (const EditorIcons::Icon& icon : icons) {
-				const Model* model = icon_manager->getModel(icon.type);
-				if (!model || !model->isReady()) continue;
-
-				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-					const Mesh& mesh = model->getMesh(i);
-					Item& item = m_items.emplace();
-					item.mesh = mesh.render_data;
-					item.material = mesh.material->getRenderData();
-					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, item.material->define_mask);
-					item.ub = m_renderer.allocUniform(sizeof(Matrix));
-					const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
-					memcpy(item.ub.ptr, &mtx, sizeof(mtx));
-				}
-			}
-		}
-
-		void execute() override
-		{
-			PROFILE_FUNCTION();
-			m_renderer.beginProfileBlock("icons", 0);
-			for (const Item& item : m_items) {
-				const Mesh::RenderData* rd = item.mesh;
-			
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, item.ub.buffer, item.ub.offset, item.ub.size);
-				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
-				gpu::useProgram(item.program);
-				gpu::bindIndexBuffer(rd->index_buffer_handle);
-				gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::setState(item.material->render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
-			}
-			m_renderer.endProfileBlock();
-		}
-
-		struct Item {
-			gpu::ProgramHandle program;
-			Mesh::RenderData* mesh;
-			Material::RenderData* material;
-			Renderer::TransientSlice ub;
-		};
-
-		Renderer& m_renderer;
-		Array<Item> m_items;
-		SceneView* m_ui;
-	};
-
+void SceneView::renderIcons() {
 	Engine& engine = m_app.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	
+	const Viewport& vp = m_view->getViewport();
+	const Matrix camera_mtx({0, 0, 0}, vp.rot);
 
-	RenderJob& cmd = renderer->createJob<RenderJob>(*renderer, renderer->getCurrentFrameAllocator());
-	cmd.m_ui = this;
-	renderer->queue(cmd, 0);
+	EditorIcons* icon_manager = m_view->m_icons.get();
+	icon_manager->computeScales();
+	const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
+	gpu::Encoder* encoder = renderer->createEncoderJob();
+	for (const EditorIcons::Icon& icon : icons) {
+		const Model* model = icon_manager->getModel(icon.type);
+		if (!model || !model->isReady()) continue;
+
+		Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Matrix));
+		const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
+		memcpy(ub.ptr, &mtx, sizeof(mtx));
+		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+		
+		for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
+			const Mesh& mesh = model->getMesh(i);
+			const Mesh::RenderData* rd = mesh.render_data;
+			const Material::RenderData* material = mesh.material->getRenderData();
+			encoder->bindTextures(material->textures, 0, material->textures_count);
+			gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, material->define_mask);
+			encoder->useProgram(program);
+			encoder->bindIndexBuffer(rd->index_buffer_handle);
+			encoder->bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+			encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+			encoder->setState(material->render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+			encoder->drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
+		}
+	}
 }
 
 
@@ -984,71 +942,39 @@ void SceneView::renderSelection()
 
 void SceneView::renderGizmos()
 {
-	struct Cmd : Renderer::RenderJob
-	{
-		Cmd(Engine& engine, IAllocator& allocator)
-			: cmds(allocator)
-			, engine(engine)
-		{}
-
-		void setup() override {
-			PROFILE_FUNCTION();
-			viewport = view->m_view->getViewport();
-			cmds.swap(view->m_view->m_draw_cmds);
-			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-			auto& vertices = view->m_view->m_draw_vertices;
-			vb = renderer->allocTransient(vertices.byte_size());
-			memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-			ub = renderer->allocUniform(sizeof(Matrix));
-			memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-		}
-
-		void execute() override {
-			PROFILE_FUNCTION();
-			if (cmds.empty()) return;
-
-			renderer->beginProfileBlock("gizmos", 0);
-			gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-			u32 offset = 0;
-			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-			for (const UniverseViewImpl::DrawCmd& cmd : cmds) {
-				gpu::useProgram(program);
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
-				gpu::drawArrays(primitive_type, 0, cmd.vertex_count);
-
-				offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
-			}
-			
-			renderer->endProfileBlock();
-		}
-
-		Engine& engine;
-		Renderer* renderer;
-		Renderer::TransientSlice ib;
-		Renderer::TransientSlice vb;
-		Renderer::TransientSlice ub;
-		Viewport viewport;
-		SceneView* view;
-		gpu::ProgramHandle program;
-		Array<UniverseViewImpl::DrawCmd> cmds;
-	};
-
 	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;
+	auto& vertices = m_view->m_draw_vertices;
+	if (vertices.empty()) return;
 
 	Engine& engine = m_app.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	gpu::Encoder* encoder = renderer->createEncoderJob();
 
-	IAllocator& allocator = renderer->getAllocator();
-	Cmd& cmd = renderer->createJob<Cmd>(engine, allocator);
+	Renderer::TransientSlice vb = renderer->allocTransient(vertices.byte_size());
+	memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
+	Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Matrix));
+	memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+
 	gpu::VertexDecl decl;
 	decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 	decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-	cmd.program = m_debug_shape_shader->getProgram(decl, 0);
-	cmd.view = this;
-	renderer->queue(cmd, 0);
+	gpu::ProgramHandle program = m_debug_shape_shader->getProgram(decl, 0);
+	
+	encoder->setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+	u32 offset = 0;
+	encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+	for (const UniverseViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
+		encoder->useProgram(program);
+		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
+		encoder->bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
+		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
+		encoder->drawArrays(primitive_type, 0, cmd.vertex_count);
+
+		offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
+	}
+
+	m_view->m_draw_cmds.clear();
 }
 
 

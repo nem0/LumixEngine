@@ -1,4 +1,5 @@
 #include "gpu.h"
+#include "engine/page_allocator.h"
 #include "engine/array.h"
 #include "engine/hash.h"
 #include "engine/hash_map.h"
@@ -1685,7 +1686,7 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 	glDrawBuffers(1, &db);
 }
 
-void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags)
+void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags)
 {
 	GPU_PROFILE();
 	checkThread();
@@ -1747,6 +1748,391 @@ void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, Frame
 	glDrawBuffers(num, db);
 }
 
+enum class Instruction : u8 {
+	END,
+	SET_STATE,
+	BIND_INDEX_BUFFER,
+	USE_PROGRAM,
+	BIND_VERTEX_BUFFER,
+	SCISSOR,
+	DRAW_INDEXED,
+	BIND_TEXTURES,
+	CLEAR,
+	VIEWPORT,
+	BIND_UNIFORM_BUFFER,
+	SET_FRAMEBUFFER,
+	SET_CURRENT_WINDOW,
+	CREATE_PROGRAM,
+	DRAW_ARRAYS,
+	PUSH_DEBUG_GROUP,
+	POP_DEBUG_GROUP,
+	DRAW_ARRAYS_INSTANCED,
+	DRAW_INDEXED_INSTANCED
+};
+
+struct Encoder::Page {
+	struct Header {
+		Page* next = nullptr;
+		u32 size = 0;
+	};
+	u8 data[4096 - sizeof(Header)];
+	Header header;
+};
+
+static_assert(sizeof(Encoder::Page) == 4096);
+
+Encoder::~Encoder() {
+	allocator.lock();
+	while (first) {
+		Page* next = first->header.next;
+		allocator.deallocate(first, false);
+		first = next;
+	}
+	allocator.unlock();
+}
+
+Encoder::Encoder(Encoder&& rhs)
+	: allocator(rhs.allocator)
+{
+	first = rhs.first;
+	current = rhs.current;
+	rhs.first = rhs.current = nullptr;
+}
+
+Encoder::Encoder(PageAllocator& allocator)
+	: allocator(allocator)
+{
+	first = new (NewPlaceholder(), allocator.allocate(true)) Page;
+	current = first;
+}
+
+u8* Encoder::alloc(u32 size) {
+	u32 start = current->header.size;
+	if (start + size > sizeof(current->data) - sizeof(Instruction)) {
+		const Instruction end_instr = Instruction::END;
+		memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
+		
+		Page* new_page = new (NewPlaceholder(), allocator.allocate(true)) Page;
+		current->header.next = new_page;
+		current = new_page;
+		start = 0;
+		ASSERT(size < sizeof(current->data));
+	}
+	current->header.size += size;
+	return current->data + start;
+}
+
+struct ClearData {
+	ClearFlags flags;
+	Vec4 color;
+	float depth;
+};
+
+#define WRITE(val) memcpy(data, &val, sizeof(val)); data += sizeof(val);
+#define WRITE_CONST(v) do { auto val = v; memcpy(data, &val, sizeof(val)); data += sizeof(val); } while(false)
+#define WRITE_ARRAY(val, count) memcpy(data, val, sizeof(val[0]) * count); data += sizeof(val[0]) * count;
+
+struct CreateProgramData {
+	CreateProgramData(IAllocator& allocator) 
+		: sources(allocator)
+		, prefixes(allocator)
+		, srcs(allocator)
+		, prfxs(allocator)
+		, types(allocator)
+		, name(allocator)
+	{}
+
+	ProgramHandle program;
+	VertexDecl decl;
+	Array<String> sources;
+	Array<const char*> srcs;
+	Array<String> prefixes;
+	Array<const char*> prfxs;
+	Array<ShaderType> types;
+	String name;
+};
+
+void Encoder::createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name) {
+	CreateProgramData* data = LUMIX_NEW(gl->allocator, CreateProgramData)(gl->allocator);
+	data->program = prog;
+	data->decl = decl;
+	data->sources.reserve(num);
+	data->srcs.resize(num);
+	data->types.resize(num);
+	for (u32 i = 0; i < num; ++i) {
+		data->sources.emplace(srcs[i], gl->allocator);
+		data->srcs[i] = data->sources[i].c_str();
+		data->types[i] = types[i];
+	}
+
+	data->prefixes.reserve(prefixes_count);
+	data->prfxs.resize(prefixes_count);
+	for (u32 i = 0; i < prefixes_count; ++i) {
+		data->prefixes.emplace(prefixes[i], gl->allocator);
+		data->prfxs[i] = data->prefixes[i].c_str();
+	}
+	data->name = name;
+	write(Instruction::CREATE_PROGRAM, data);
+}
+
+void Encoder::pushDebugGroup(const char* msg) {
+	write(Instruction::PUSH_DEBUG_GROUP, msg);
+}
+
+void Encoder::popDebugGroup() {
+	u8* ptr = alloc(sizeof(Instruction));
+	const Instruction instruction = Instruction::POP_DEBUG_GROUP;
+	memcpy(ptr, &instruction, sizeof(instruction));
+}
+
+void Encoder::clear(ClearFlags flags, const float* color, float depth) {
+	const ClearData data = { flags, Vec4(color[0], color[1], color[2], color[3]), depth };
+	write(Instruction::CLEAR, data);
+}
+
+void Encoder::setState(StateFlags state) {
+	write(Instruction::SET_STATE, state);
+}
+
+void Encoder::bindIndexBuffer(BufferHandle buffer) {
+	write(Instruction::BIND_INDEX_BUFFER, buffer);
+}
+
+void Encoder::useProgram(ProgramHandle program) {
+	write(Instruction::USE_PROGRAM, program);
+}
+
+void Encoder::setCurrentWindow(void* window_handle) {
+	write(Instruction::SET_CURRENT_WINDOW, window_handle);
+}
+
+struct BindVertexBufferData {
+	u8 binding_idx;
+	BufferHandle buffer;
+	u32 offset;
+	u32 stride;
+};
+
+void Encoder::bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride) {
+	const BindVertexBufferData data = {
+		(u8)binding_idx, buffer, buffer_offset, stride
+	};
+
+	write(Instruction::BIND_VERTEX_BUFFER, data);
+}
+
+void Encoder::scissor(u32 x,u32 y,u32 w,u32 h) {
+	IVec4 vec(x, y, w, h);
+	write(Instruction::SCISSOR, vec);
+}
+
+struct DrawIndexedData {
+	PrimitiveType primitive_type;
+	u32 offset;
+	u32 count;
+	DataType type;
+};
+
+void Encoder::drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType type) {
+	const DrawIndexedData data = { primitive_type, offset, count, type };
+	write(Instruction::DRAW_INDEXED, data);
+}
+
+struct DrawIndexedInstancedDat {
+	PrimitiveType primitive_type;
+	u32 indices_count;
+	u32 instances_count;
+	DataType index_type;
+};
+
+void Encoder::drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type) {
+	const DrawIndexedInstancedDat data = { primitive_type, indices_count, instances_count, index_type };
+	write(Instruction::DRAW_INDEXED_INSTANCED, data);
+}
+
+struct DrawArraysInstancedData {
+	PrimitiveType primitive_type;
+	u32 indices_count;
+	u32 instances_count;
+};
+
+void Encoder::drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count) {
+	const DrawArraysInstancedData data = { type, indices_count, instances_count };
+	write(Instruction::DRAW_ARRAYS_INSTANCED, data);
+}
+
+struct BindUniformBufferData {
+	u32 ub_index;
+	BufferHandle buffer;
+	size_t offset;
+	size_t size;
+};
+
+void Encoder::bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size) {
+	const BindUniformBufferData data = { ub_index, buffer, offset, size };
+	write(Instruction::BIND_UNIFORM_BUFFER, data);
+}
+
+void Encoder::setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags) {
+	u8* data = alloc(sizeof(Instruction) + sizeof(TextureHandle) * (num + 1) + sizeof(u32) + sizeof(FramebufferFlags));
+
+	WRITE_CONST(Instruction::SET_FRAMEBUFFER);
+	WRITE(num);
+	WRITE(ds);
+	WRITE(flags);
+	WRITE_ARRAY(attachments, num);
+}
+
+void Encoder::bindTextures(const TextureHandle* handles, u32 offset, u32 count) {
+	u8* data = alloc(sizeof(Instruction) + sizeof(u32) * 2 + sizeof(TextureHandle) * count);
+	
+	WRITE_CONST(Instruction::BIND_TEXTURES);
+	WRITE(offset);
+	WRITE(count);
+	WRITE_ARRAY(handles, count);
+}
+
+#undef WRITE
+#undef WRITE_CONST
+#undef WRITE_ARRAY
+
+void Encoder::viewport(u32 x, u32 y, u32 w, u32 h) {
+	const IVec4 data(x, y, w, h);
+	write(Instruction::VIEWPORT, data);
+}
+
+struct DrawArraysData {
+	PrimitiveType type;
+	u32 offset;
+	u32 count;
+};
+
+void Encoder::drawArrays(PrimitiveType type, u32 offset, u32 count) {
+	DrawArraysData data = { type, offset, count };
+	write(Instruction::DRAW_ARRAYS, data);
+}
+
+void Encoder::run() {
+	PROFILE_FUNCTION();
+
+	if (!run_called) {
+		const Instruction end_instr = Instruction::END;
+		memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
+		run_called = true;
+	}
+	
+	Page* page = first;
+	#define READ(T, N) T N; memcpy(&N, ptr, sizeof(T)); ptr += sizeof(T);
+	while (page) {
+		const u8* ptr = page->data;
+		for (;;) {
+			READ(Instruction, instr);
+			switch(instr) {
+				case Instruction::END: goto next_page;
+				case Instruction::SET_STATE: {
+					READ(StateFlags, state);
+					gpu::setState(state);
+					break;
+				}
+				case Instruction::POP_DEBUG_GROUP:
+					gpu::popDebugGroup();
+					break;
+				case Instruction::PUSH_DEBUG_GROUP: {
+					READ(const char*, msg);
+					gpu::pushDebugGroup(msg);
+					break;
+				}
+				case Instruction::CREATE_PROGRAM: {
+					READ(CreateProgramData*, data);
+					gpu::createProgram(data->program, data->decl, data->srcs.begin(), data->types.begin(), data->sources.size(), data->prfxs.begin(), data->prfxs.size(), data->name.c_str());
+					LUMIX_DELETE(gl->allocator, data);
+					break;
+				}
+				case Instruction::SET_FRAMEBUFFER: {
+					READ(u32, num);
+					READ(TextureHandle, ds);
+					READ(FramebufferFlags, flags);
+					gpu::setFramebuffer((const TextureHandle*)ptr, num, ds, flags);
+					ptr += sizeof(TextureHandle) * num;
+					break;
+				}
+				case Instruction::BIND_TEXTURES: {
+					READ(u32, offset);
+					READ(u32, count);
+					gpu::bindTextures((const TextureHandle*)ptr, offset, count);
+					ptr += sizeof(TextureHandle) * count;
+					break;
+				}
+				case Instruction::CLEAR: {
+					READ(ClearData, data);
+					gpu::clear(data.flags, &data.color.x, data.depth);
+					break;
+				}
+				case Instruction::BIND_UNIFORM_BUFFER: {
+					READ(BindUniformBufferData, data);
+					gpu::bindUniformBuffer(data.ub_index, data.buffer, data.offset, data.size);
+					break;
+				}
+				case Instruction::BIND_VERTEX_BUFFER: {
+					READ(BindVertexBufferData, data);
+					gpu::bindVertexBuffer(data.binding_idx, data.buffer, data.offset, data.stride);
+					break;
+				}
+				case Instruction::DRAW_ARRAYS: {
+					READ(DrawArraysData, data);
+					gpu::drawArrays(data.type, data.offset, data.count);
+					break;
+				}
+				case Instruction::DRAW_INDEXED_INSTANCED: {
+					READ(DrawIndexedInstancedDat, data);
+					gpu::drawIndexedInstanced(data.primitive_type, data.indices_count, data.instances_count, data.index_type);
+					break;
+				}
+				case Instruction::DRAW_ARRAYS_INSTANCED: {
+					READ(DrawArraysInstancedData, data);
+					gpu::drawArraysInstanced(data.primitive_type, data.indices_count, data.instances_count);
+					break;
+				}
+				case Instruction::DRAW_INDEXED: {
+					READ(DrawIndexedData, data);
+					gpu::drawIndexed(data.primitive_type, data.offset, data.count, data.type);
+					break;
+				}
+				case Instruction::BIND_INDEX_BUFFER: {
+					READ(BufferHandle, buffer);
+					gpu::bindIndexBuffer(buffer);
+					break;
+				}
+				case Instruction::USE_PROGRAM: {
+					READ(ProgramHandle, program);
+					gpu::useProgram(program);
+					break;
+				}
+				case Instruction::SET_CURRENT_WINDOW: {
+					READ(void*, window_handle);
+					gpu::setCurrentWindow(window_handle);
+					break;
+				}
+				case Instruction::SCISSOR: {
+					READ(IVec4, vec);
+					gpu::scissor(vec.x, vec.y, vec.z, vec.w);
+					break;
+				}
+				case Instruction::VIEWPORT: {
+					READ(IVec4, vec);
+					gpu::viewport(vec.x, vec.y, vec.z, vec.w);
+					break;
+				}
+				default:
+					ASSERT(false);
+					goto next_page;
+			}
+		}
+		next_page:
+
+		page = page->header.next;
+	}
+}
 
 void shutdown()
 {

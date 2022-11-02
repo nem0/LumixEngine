@@ -531,6 +531,7 @@ struct PipelineImpl final : Pipeline
 	};
 
 	struct Bucket {
+		Bucket(PageAllocator& allocator) : encoder(allocator) {}
 		enum Sort {
 			DEFAULT,
 			DEPTH
@@ -540,6 +541,8 @@ struct PipelineImpl final : Pipeline
 		Sort sort = DEFAULT;
 		u32 define_mask = 0;
 		CmdPage* cmd_page = nullptr; 
+		gpu::StateFlags state = gpu::StateFlags::NONE;
+		gpu::Encoder encoder;
 	};
 
 	struct Sorter {
@@ -1319,17 +1322,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void render3DUI(EntityRef e, const Draw2D& drawdata, Vec2 canvas_size, bool orient_to_cam) override {
-		if (!m_draw2d_shader->isReady()) return;
-		if (drawdata.getIndices().empty()) return;
-
-		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
-
-		IAllocator& allocator = m_renderer.getAllocator();
-		Draw2DJob& cmd = m_renderer.createJob<Draw2DJob>(allocator);
-		cmd.pipeline = this;
-		cmd.atlas_texture = atlas_texture->handle;
-		cmd.matrix = m_scene->getUniverse().getRelativeMatrix(e, m_viewport.pos);
-		cmd.is_3d = true;
+		Matrix matrix = m_scene->getUniverse().getRelativeMatrix(e, m_viewport.pos);
 		Matrix normalize(
 			Vec4(1 / canvas_size.x, 0, 0, 0),
 			Vec4(0, -1 / canvas_size.x, 0, 0),
@@ -1338,13 +1331,12 @@ struct PipelineImpl final : Pipeline
 		);
 		if (orient_to_cam) {
 			const Transform tr = m_scene->getUniverse().getTransform(e);
-			cmd.matrix = m_viewport.rot.toMatrix();
-			cmd.matrix.setTranslation(Vec3(tr.pos - m_viewport.pos));
-			cmd.matrix.multiply3x3(tr.scale);
+			matrix = m_viewport.rot.toMatrix();
+			matrix.setTranslation(Vec3(tr.pos - m_viewport.pos));
+			matrix.multiply3x3(tr.scale);
 		}
-		cmd.matrix = m_viewport.getProjectionWithJitter() * m_viewport.getViewRotation() * cmd.matrix * normalize;
-		cmd.prepare(drawdata);
-		m_renderer.queue(cmd, m_profiler_link);
+		matrix = m_viewport.getProjectionWithJitter() * m_viewport.getViewRotation() * matrix * normalize;
+		renderUIHelper(drawdata, true, matrix);
 	}
 
 	static Matrix computeReprojection(const Viewport& current, const Viewport& prev) {
@@ -1461,7 +1453,7 @@ struct PipelineImpl final : Pipeline
 		start_job.global_state = global_state;
 		m_renderer.queue(start_job, 0);
 		
-		m_views.clear();
+		ASSERT(m_views.empty());
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -1513,120 +1505,77 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderDebugTriangles() {
-		struct Cmd : Renderer::RenderJob
-		{
-			struct BaseVertex {
-				Vec3 pos;
-				u32 color;
-			};
-
-			void setup() override {
-				PROFILE_FUNCTION();
-				const Array<DebugTriangle>& tris = pipeline->m_scene->getDebugTriangles();
-
-				program = pipeline->m_debug_shape_shader->getProgram(pipeline->m_base_vertex_decl, 0);
-				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
-				ub = pipeline->m_renderer.allocUniform(sizeof(Matrix));
-				memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-				BaseVertex* vertices = (BaseVertex*)vb.ptr;
-				for (u32 i = 0, c = tris.size(); i < c; ++i) {
-					vertices[3 * i + 0].color = tris[i].color.abgr();
-					vertices[3 * i + 0].pos = Vec3(tris[i].p0 - viewport_pos);
-					vertices[3 * i + 1].color = tris[i].color.abgr();
-					vertices[3 * i + 1].pos = Vec3(tris[i].p1 - viewport_pos);
-					vertices[3 * i + 2].color = tris[i].color.abgr();
-					vertices[3 * i + 2].pos = Vec3(tris[i].p2 - viewport_pos);
-				}
-				pipeline->m_scene->clearDebugTriangles();
-			}
-
-
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::pushDebugGroup("debug triangles");
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-				gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
-				gpu::useProgram(program);
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::drawArrays(gpu::PrimitiveType::TRIANGLES, 0, vb.size / sizeof(BaseVertex));
-				gpu::popDebugGroup();
-			}
-
-			PipelineImpl* pipeline;
-			DVec3 viewport_pos;
-			gpu::ProgramHandle program;
-			Renderer::TransientSlice vb;
-			Renderer::TransientSlice ub;
+		PROFILE_FUNCTION();
+		struct BaseVertex {
+			Vec3 pos;
+			u32 color;
 		};
 
 		const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
 		if (tris.empty() || !m_debug_shape_shader->isReady()) return;
 
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.pipeline = this;
-		cmd.viewport_pos = m_viewport.pos;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+
+		const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(m_base_vertex_decl, 0);
+		const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
+		const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+		memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+		BaseVertex* vertices = (BaseVertex*)vb.ptr;
+		for (u32 i = 0, c = tris.size(); i < c; ++i) {
+			vertices[3 * i + 0].color = tris[i].color.abgr();
+			vertices[3 * i + 0].pos = Vec3(tris[i].p0 - m_viewport.pos);
+			vertices[3 * i + 1].color = tris[i].color.abgr();
+			vertices[3 * i + 1].pos = Vec3(tris[i].p1 - m_viewport.pos);
+			vertices[3 * i + 2].color = tris[i].color.abgr();
+			vertices[3 * i + 2].pos = Vec3(tris[i].p2 - m_viewport.pos);
+		}
+		m_scene->clearDebugTriangles();
+
+		encoder->pushDebugGroup("debug triangles");
+		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+		encoder->setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
+		encoder->useProgram(program);
+		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
+		encoder->bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		encoder->drawArrays(gpu::PrimitiveType::TRIANGLES, 0, vb.size / sizeof(BaseVertex));
+		encoder->popDebugGroup();
 	}
 
 	void renderDebugLines()	{
-		struct Cmd : Renderer::RenderJob
-		{
-			struct BaseVertex {
-				Vec3 pos;
-				u32 color;
-			};
-
-			void setup() override
-			{
-				PROFILE_FUNCTION();
-				const Array<DebugLine>& lines = pipeline->m_scene->getDebugLines();
-
-				program = pipeline->m_debug_shape_shader->getProgram(pipeline->m_base_vertex_decl, 0);
-				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
-				ub = pipeline->m_renderer.allocUniform(sizeof(Matrix));
-				memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-				BaseVertex* vertices = (BaseVertex*)vb.ptr;
-				for (u32 i = 0, c = lines.size(); i < c; ++i) {
-					vertices[2 * i + 0].color = lines[i].color.abgr();
-					vertices[2 * i + 0].pos = Vec3(lines[i].from - viewport_pos);
-					vertices[2 * i + 1].color = lines[i].color.abgr();
-					vertices[2 * i + 1].pos = Vec3(lines[i].to - viewport_pos);
-				}
-				pipeline->m_scene->clearDebugLines();
-			}
-
-
-			void execute() override {
-				PROFILE_FUNCTION();
-				if (vb.size == 0) return;
-				gpu::pushDebugGroup("debug lines");
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-				gpu::setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-				gpu::useProgram(program);
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::drawArrays(gpu::PrimitiveType::LINES, 0, vb.size / sizeof(BaseVertex));
-				gpu::popDebugGroup();
-			}
-
-			PipelineImpl* pipeline;
-			DVec3 viewport_pos;
-			gpu::ProgramHandle program;
-			Renderer::TransientSlice vb;
-			Renderer::TransientSlice ub;
+		PROFILE_FUNCTION();
+		struct BaseVertex {
+			Vec3 pos;
+			u32 color;
 		};
-
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
 
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.pipeline = this;
-		cmd.viewport_pos = m_viewport.pos;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+
+		const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(m_base_vertex_decl, 0);
+		const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
+		const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+		memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+		BaseVertex* vertices = (BaseVertex*)vb.ptr;
+		for (u32 i = 0, c = lines.size(); i < c; ++i) {
+			vertices[2 * i + 0].color = lines[i].color.abgr();
+			vertices[2 * i + 0].pos = Vec3(lines[i].from - m_viewport.pos);
+			vertices[2 * i + 1].color = lines[i].color.abgr();
+			vertices[2 * i + 1].pos = Vec3(lines[i].to - m_viewport.pos);
+		}
+		m_scene->clearDebugLines();
+
+		encoder->pushDebugGroup("debug lines");
+		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+		encoder->setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+		encoder->useProgram(program);
+		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
+		encoder->bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		encoder->drawArrays(gpu::PrimitiveType::LINES, 0, vb.size / sizeof(BaseVertex));
+		encoder->popDebugGroup();
 	}
 
 	void renderDebugShapes()
@@ -1636,114 +1585,78 @@ struct PipelineImpl final : Pipeline
 		//renderDebugPoints();
 	}
 
-	struct Draw2DJob : Renderer::RenderJob {
-		Draw2DJob(IAllocator& allocator) : cmd_buffer(allocator) {}
-
-		void prepare(const Draw2D& draw2d) {
-			PROFILE_FUNCTION();
-
-			num_indices = draw2d.getIndices().size();
-			num_vertices = draw2d.getVertices().size();
-
-			idx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getIndices().byte_size());
-			vtx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getVertices().byte_size());
-			memcpy(idx_buffer_mem.ptr, draw2d.getIndices().begin(), draw2d.getIndices().byte_size());
-			memcpy(vtx_buffer_mem.ptr, draw2d.getVertices().begin(), draw2d.getVertices().byte_size());
-			cmd_buffer.resize(draw2d.getCmds().size());
-			memcpy(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
-
-			program = pipeline->m_draw2d_shader->getProgram(pipeline->m_2D_decl, 0);
-			ub = pipeline->m_renderer.allocUniform(sizeof(matrix));
-			memcpy(ub.ptr, &matrix, sizeof(matrix));
-		}
-
-		void setup() override {}
-
-		void execute() override {
-			PROFILE_FUNCTION();
-
-			if (cmd_buffer.empty()) return;
-
-			gpu::pushDebugGroup("draw2d");
-
-			gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-			u32 elem_offset = 0;
-			gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-			state = state | gpu::StateFlags::SCISSOR_TEST;
-			if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
-			gpu::setState(state);
-			gpu::useProgram(program);
-			gpu::bindIndexBuffer(idx_buffer_mem.buffer);
-			gpu::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
-			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-			for (Draw2D::Cmd& cmd : cmd_buffer) {
-				if(cmd.clip_size.x < 0) {
-					gpu::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
-				}
-				else {
-					const u32 h = u32(clamp(cmd.clip_size.y, 0.f, 65535.f));
-					if (gpu::isOriginBottomLeft()) {
-						gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
-							pipeline->m_viewport.h - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
-							u32(minimum(cmd.clip_size.x, 65535.0f)),
-							u32(minimum(cmd.clip_size.y, 65535.0f)));
-					}
-					else {
-						gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
-							u32(maximum(cmd.clip_pos.y, 0.0f)),
-							u32(minimum(cmd.clip_size.x, 65535.0f)),
-							u32(minimum(cmd.clip_size.y, 65535.0f)));
-					}
-				}
-			
-				gpu::TextureHandle texture_id = atlas_texture;
-				if (cmd.texture) texture_id = *cmd.texture;
-				if (!texture_id) texture_id = atlas_texture;
-
-				gpu::bindTextures(&texture_id, 0, 1);
-				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::DataType::U32);
-
-				elem_offset += cmd.indices_count;
-			}
-
-			gpu::popDebugGroup();
-		}
-
-		gpu::TextureHandle atlas_texture;
-		Renderer::TransientSlice idx_buffer_mem;
-		Renderer::TransientSlice vtx_buffer_mem;
-		Renderer::TransientSlice ub;
-		int num_indices;
-		int num_vertices;
-		Array<Draw2D::Cmd> cmd_buffer;
-		PipelineImpl* pipeline;
-		gpu::ProgramHandle program;
-		Matrix matrix;
-		bool is_3d = false;
-	};
-
 	void render2D() {
-		if (!m_draw2d_shader->isReady()) {
-			m_draw2d.clear(getAtlasSize());
-			return;
-		}
+		Matrix matrix;
+		matrix.setOrtho(0, (float)m_viewport.w, (float)m_viewport.h, 0, 0, 1, false);
+		renderUIHelper(m_draw2d, false, matrix);
+		m_draw2d.clear(getAtlasSize());
+	}
 
-		if (m_draw2d.getIndices().empty()) {
-			m_draw2d.clear(getAtlasSize());
-			return;
-		}
+	void renderUIHelper(const Draw2D& data, bool is_3d, const Matrix& matrix) {
+		if (!m_draw2d_shader->isReady()) return;
+		if (data.getIndices().empty()) return;
 
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		Draw2DJob& cmd = m_renderer.createJob<Draw2DJob>(allocator);
-		cmd.pipeline = this;
-		cmd.atlas_texture = atlas_texture->handle;
-		cmd.matrix.setOrtho(0, (float)m_viewport.w, (float)m_viewport.h, 0, 0, 1, false);
-		cmd.prepare(m_draw2d);
-		m_draw2d.clear(getAtlasSize());
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		
+		const i32 num_indices = data.getIndices().size();
+		const i32 num_vertices = data.getVertices().size();
+
+		const Renderer::TransientSlice idx_buffer_mem = m_renderer.allocTransient(data.getIndices().byte_size());
+		const Renderer::TransientSlice vtx_buffer_mem = m_renderer.allocTransient(data.getVertices().byte_size());
+		memcpy(idx_buffer_mem.ptr, data.getIndices().begin(), data.getIndices().byte_size());
+		memcpy(vtx_buffer_mem.ptr, data.getVertices().begin(), data.getVertices().byte_size());
+
+		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(m_2D_decl, 0);
+		const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(matrix));
+		memcpy(ub.ptr, &matrix, sizeof(matrix));
+
+		encoder->pushDebugGroup("draw2d");
+
+		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+		u32 elem_offset = 0;
+		gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+		state = state | gpu::StateFlags::SCISSOR_TEST;
+		if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
+		encoder->setState(state);
+		encoder->useProgram(program);
+		encoder->bindIndexBuffer(idx_buffer_mem.buffer);
+		encoder->bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
+		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+		for (Draw2D::Cmd& cmd : data.getCmds()) {
+			if(cmd.clip_size.x < 0) {
+				encoder->scissor(0, 0, m_viewport.w, m_viewport.h);
+			}
+			else {
+				const u32 h = u32(clamp(cmd.clip_size.y, 0.f, 65535.f));
+				if (gpu::isOriginBottomLeft()) {
+					encoder->scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+						m_viewport.h - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
+						u32(minimum(cmd.clip_size.x, 65535.0f)),
+						u32(minimum(cmd.clip_size.y, 65535.0f)));
+				}
+				else {
+					encoder->scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+						u32(maximum(cmd.clip_pos.y, 0.0f)),
+						u32(minimum(cmd.clip_size.x, 65535.0f)),
+						u32(minimum(cmd.clip_size.y, 65535.0f)));
+				}
+			}
+			
+			gpu::TextureHandle texture_id = atlas_texture->handle;
+			if (cmd.texture) texture_id = *cmd.texture;
+			if (!texture_id) texture_id = atlas_texture->handle;
+
+			encoder->bindTextures(&texture_id, 0, 1);
+			encoder->drawIndexed(gpu::PrimitiveType::TRIANGLES, idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::DataType::U32);
+
+			elem_offset += cmd.indices_count;
+		}
+		encoder->popDebugGroup();
+
 	}
 
 	void setUniverse(Universe* universe) override {
@@ -1906,22 +1819,113 @@ struct PipelineImpl final : Pipeline
 		return res;
 	}
 
-	void renderTerrains(lua_State* L, CameraParams cp, RenderState state)
-	{
+	void renderTerrains(lua_State* L, CameraParams cp, RenderState render_state) {
 		PROFILE_FUNCTION();
-		LinearAllocator& current_frame_allocator = m_renderer.getCurrentFrameAllocator();
-		IAllocator& allocator = m_renderer.getAllocator();
-		RenderTerrainsJob& cmd = m_renderer.createJob<RenderTerrainsJob>(current_frame_allocator, allocator);
-
 		const char* define = "";
 		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
+		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
 
-		cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		cmd.m_render_state = state.value;
-		cmd.m_pipeline = this;
-		cmd.m_camera_params = cp;
+		const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
+		if(terrains.empty()) return;
 
-		m_renderer.queue(cmd, m_profiler_link);
+		Universe& universe = m_scene->getUniverse();
+		for (const Terrain* terrain : terrains) {
+			if (!terrain->m_heightmap) continue;
+			if (!terrain->m_heightmap->isReady()) continue;
+			if (!terrain->m_material || !terrain->m_material->isReady()) continue;
+
+			const Transform& tr = universe.getTransform(terrain->m_entity);
+			const Vec3 pos = Vec3(tr.pos- cp.pos);
+			Vec3 ref_pos = Vec3(tr.pos - m_viewport.pos);
+			const Quat rot = tr.rot;
+			const Vec3 scale = terrain->getScale();
+			const Vec2 hm_size = terrain->getSize();
+			Shader* shader = terrain->m_material->getShader();
+			const gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), define_mask | terrain->m_material->getDefineMask());
+			const Material::RenderData* material = terrain->m_material->getRenderData();
+			if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
+
+			struct Quad {
+				IVec4 from_to;
+				IVec4 from_to_sup;
+				Vec4 pos;
+				Vec4 lpos;
+				Vec4 terrain_scale;
+				Vec2 hm_size;
+				float cell_size;
+			};
+
+			Quad quad;
+			quad.pos = Vec4(pos, 0);
+			quad.lpos = Vec4(rot.conjugated().rotate(-pos), 0);
+			quad.hm_size = hm_size;
+
+			ref_pos = rot.conjugated().rotate(-ref_pos);
+			IVec4 prev_from_to;
+			float s = scale.x / terrain->m_tesselation;
+			bool first = true;
+			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+			const gpu::StateFlags state = render_state.value;
+			// TODO
+			//m_renderer.beginProfileBlock("terrain", 0);
+			encoder->useProgram(program);
+			encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+			encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
+			encoder->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+			encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+			encoder->bindTextures(material->textures, 0, material->textures_count);
+			encoder->setState(state);
+			for (;;) {
+				// round 
+				IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
+				from.x = from.x & ~1;
+				from.y = from.y & ~1;
+				IVec2 to = from + IVec2(terrain->m_base_grid_res);
+
+				// clamp
+				quad.from_to_sup = IVec4(from, to);
+					
+				from.x = clamp(from.x, 0, (int)ceil(hm_size.x / s));
+				from.y = clamp(from.y, 0, (int)ceil(hm_size.y / s));
+				to.x = clamp(to.x, 0, (int)ceil(hm_size.x / s));
+				to.y = clamp(to.y, 0, (int)ceil(hm_size.y / s));
+
+				auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
+					if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
+					quad.from_to = IVec4(subfrom, subto);
+					quad.terrain_scale = Vec4(scale, 0);
+					quad.cell_size = s;
+					
+					const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(quad));
+					memcpy(ub.ptr, &quad, sizeof(quad));
+
+					encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+					encoder->drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
+				};
+
+				if (first) {
+					draw_rect(from, to);
+					first = false;
+				}
+				else {
+					draw_rect(from, IVec2(to.x, prev_from_to.y));
+					draw_rect(IVec2(from.x, prev_from_to.w), to);
+						
+					draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
+					draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
+				}
+					
+				if (from.x <= 0 && from.y <= 0 && to.x * s >= hm_size.x && to.y * s >= hm_size.y) break;
+
+				s *= 2;
+				prev_from_to = IVec4(from / 2, to / 2);
+			}
+		}
+		
+		// TODO
+		// m_renderer.endProfileBlock();
 	}
 	
 	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state)
@@ -1963,100 +1967,74 @@ struct PipelineImpl final : Pipeline
 
 	void renderParticles(CameraParams cp)
 	{
-		PROFILE_FUNCTION();
-		struct Cmd : Renderer::RenderJob
-		{
-			Cmd(LinearAllocator& allocator) : m_drawcalls(allocator) {}
 
-			void setup() override
-			{
-				PROFILE_FUNCTION();
-				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
-				if (emitters.size() == 0) return;
-				
-				Universe& universe = m_pipeline->m_scene->getUniverse();
-
-				m_drawcalls.reserve(emitters.size());
-
-				gpu::VertexDecl decl;
-				decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
-				decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
-				decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
-				decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
-				decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
-
-				for (const ParticleEmitter& emitter : emitters) {
-					if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
-					
-					const int size = emitter.getParticlesDataSizeBytes();
-					if (size == 0) continue;
-
-					const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
-					const Vec3 lpos = Vec3(tr.pos - m_camera_params.pos);
-
-					const Material* material = emitter.getResource()->getMaterial();
-					if (!material) continue;
-
-					Drawcall& dc = m_drawcalls.emplace();
-					dc.program = material->getShader()->getProgram(decl, 0);
-					dc.material = material->getRenderData();
-					dc.size = size;
-					dc.particles_count = emitter.getParticlesCount();
-					dc.slice = m_pipeline->m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
-					emitter.fillInstanceData((float*)dc.slice.ptr);
-					dc.ub = m_pipeline->m_renderer.allocUniform(sizeof(Matrix));
-					Matrix mtx = tr.rot.toMatrix();
-					mtx.setTranslation(lpos);
-					memcpy(dc.ub.ptr, &mtx, sizeof(mtx));
-				}
-			}
-
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				
-				gpu::pushDebugGroup("particles");
-				
-				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState(blend_state | gpu::StateFlags::DEPTH_FN_GREATER);
-				const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-				u32 material_ub_idx = 0xffFFffFF;
-				for (const Drawcall& dc : m_drawcalls) {
-					if (material_ub_idx != dc.material->material_constants) {
-						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, dc.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-						material_ub_idx = dc.material->material_constants;
-					}
-
-					gpu::bindTextures(dc.material->textures, 0, dc.material->textures_count);
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, dc.ub.buffer, dc.ub.offset, dc.ub.size);
-					gpu::useProgram(dc.program);
-					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-					gpu::bindVertexBuffer(1, dc.slice.buffer, dc.slice.offset, 40);
-					gpu::drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, 4, dc.particles_count);
-				}
-				gpu::popDebugGroup();
-			}
-
-			struct Drawcall {
-				gpu::ProgramHandle program;
-				Material::RenderData* material;
-				int size;
-				int particles_count;
-				Renderer::TransientSlice slice; 
-				Renderer::TransientSlice ub; 
-			};
-
-			Array<Drawcall> m_drawcalls; 
-			PipelineImpl* m_pipeline;
-			CameraParams m_camera_params;
+		struct Drawcall {
+			gpu::ProgramHandle program;
+			Material::RenderData* material;
+			int size;
+			int particles_count;
+			Renderer::TransientSlice slice; 
+			Renderer::TransientSlice ub; 
 		};
 
-		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getCurrentFrameAllocator());
-		cmd.m_pipeline = this;
-		cmd.m_camera_params = cp;
+		PROFILE_FUNCTION();
 
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		const auto& emitters = m_scene->getParticleEmitters();
+		if (emitters.size() == 0) return;
+				
+		Universe& universe = m_scene->getUniverse();
+
+		gpu::VertexDecl decl;
+		decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
+		decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
+		decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
+		decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
+		decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
+
+		encoder->pushDebugGroup("particles");
+		
+		const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+		encoder->setState(blend_state | gpu::StateFlags::DEPTH_FN_GREATER);
+		const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+		u32 material_ub_idx = 0xffFFffFF;
+
+		for (const ParticleEmitter& emitter : emitters) {
+			if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
+					
+			const u32 size = emitter.getParticlesDataSizeBytes();
+			if (size == 0) continue;
+
+			const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
+			const Vec3 lpos = Vec3(tr.pos - cp.pos);
+
+			const Material* material = emitter.getResource()->getMaterial();
+			if (!material) continue;
+
+			gpu::ProgramHandle program = material->getShader()->getProgram(decl, 0);
+			Material::RenderData* material_rd = material->getRenderData();
+			const u32 particles_count = emitter.getParticlesCount();
+			const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
+			emitter.fillInstanceData((float*)slice.ptr);
+			const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+			Matrix mtx = tr.rot.toMatrix();
+			mtx.setTranslation(lpos);
+			memcpy(ub.ptr, &mtx, sizeof(mtx));
+
+			if (material_ub_idx != material_rd->material_constants) {
+				encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material_rd->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+				material_ub_idx = material_rd->material_constants;
+			}
+
+			encoder->bindTextures(material_rd->textures, 0, material_rd->textures_count);
+			encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+			encoder->useProgram(program);
+			encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
+			encoder->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+			encoder->bindVertexBuffer(1, slice.buffer, slice.offset, 40);
+			encoder->drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, 4, particles_count);
+		}
+		encoder->popDebugGroup();
 	}
 
 	static CameraParams checkCameraParams(lua_State* L, int idx)
@@ -2422,37 +2400,6 @@ struct PipelineImpl final : Pipeline
 
 	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id)
 	{
-		struct Cmd : Renderer::RenderJob {
-			Cmd(IAllocator& allocator)
-				: m_textures_handles(allocator)
-			{}
-			void setup() override { m_program = m_shader->getProgram(gpu::VertexDecl(), m_define_mask); }
-			void execute() override 
-			{
-				PROFILE_FUNCTION();
-
-				gpu::setState(m_render_state);
-
-				gpu::bindTextures(m_textures_handles.begin(), 0, m_textures_handles.size());
-
-				gpu::useProgram(m_program);
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, m_indices_offset, m_indices_count);
-			}
-
-			PipelineImpl* m_pipeline;
-			StackArray<gpu::TextureHandle, 16> m_textures_handles;
-			Shader* m_shader;
-			int m_indices_count;
-			int m_indices_offset;
-			u32 m_define_mask = 0;
-			gpu::StateFlags m_render_state;
-			gpu::ProgramHandle m_program;
-
-		};
-
 		LuaWrapper::DebugGuard guard(L);
 
 		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
@@ -2483,7 +2430,9 @@ struct PipelineImpl final : Pipeline
 		}
 		if (!shader->isReady()) return;
 
-		Cmd& cmd = m_renderer.createJob<Cmd>(m_allocator);
+		
+		StackArray<gpu::TextureHandle, 16> textures_handles(m_allocator);
+		u32 define_mask = 0;
 		if(lua_gettop(L) > 3) {
 			const u32 len = (u32)lua_objlen(L, 4);
 
@@ -2491,35 +2440,37 @@ struct PipelineImpl final : Pipeline
 				lua_rawgeti(L, 4, i + 1);
 				if (!LuaWrapper::isType<PipelineTexture>(L, -1)) luaL_argerror(L, 4, "expected textures");
 				const PipelineTexture tex = LuaWrapper::toType<PipelineTexture>(L, -1);
-				cmd.m_textures_handles.push(toHandle(tex));
+				textures_handles.push(toHandle(tex));
 				lua_pop(L, 1);
 			}
 		
 			if (lua_isstring(L, 6)) {
 				const char* define = lua_tostring(L, 6);
-				cmd.m_define_mask = 1 << m_renderer.getShaderDefineIdx(define);
+				define_mask = 1 << m_renderer.getShaderDefineIdx(define);
 			}
 			else if (lua_istable(L, 6)) {
 				lua_pushnil(L);
 				while (lua_next(L, 6) != 0) {
 					if(lua_type(L, -1) != LUA_TSTRING) {
-						m_renderer.destroyJob(cmd);
 						luaL_error(L, "%s", "Incorrect define arguments of drawArrays");
 					}
 					const char* define = lua_tostring(L, -1);
-					cmd.m_define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
+					define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
 					lua_pop(L, 1);
 				}
 			}
 
 		}
 	
-		cmd.m_pipeline = this;
-		cmd.m_render_state = rs;
-		cmd.m_shader = shader;
-		cmd.m_indices_count = indices_count;
-		cmd.m_indices_offset = indices_offset;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->setState(rs);
+		encoder->bindTextures(textures_handles.begin(), 0, textures_handles.size());
+		const gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), define_mask);
+		encoder->useProgram(program);
+		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
+		encoder->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		encoder->drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, indices_offset, indices_count);
 	}
 
 	CameraParams getCameraParams()
@@ -3234,12 +3185,13 @@ struct PipelineImpl final : Pipeline
 	};
 
 	static int cull(lua_State* L) {
+		PROFILE_FUNCTION();
+		
 		const CameraParams cp = LuaWrapper::checkArg<CameraParams>(L, 1);
 		PipelineImpl* pipeline = getClosureThis(L);
 		const i32 bucket_count = lua_gettop(L) - 1;
 		for (i32 i = 0; i < bucket_count; ++i) LuaWrapper::checkTableArg(L, 2 + i);
 		
-		PROFILE_FUNCTION();
 		Array<UniquePtr<View>>& views = pipeline->m_views;
 		UniquePtr<View>& view = views.emplace();
 		LinearAllocator& allocator = pipeline->m_renderer.getCurrentFrameAllocator();
@@ -3253,6 +3205,7 @@ struct PipelineImpl final : Pipeline
 		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
 
 		view->buckets.reserve(bucket_count);
+		PageAllocator& page_allocator = pipeline->m_renderer.getEngine().getPageAllocator();
 		for (i32 i = 0; i < bucket_count; ++i) {
 			char layer[32];
 			if (!LuaWrapper::checkStringField(L, 2 + i, "layer", Span(layer))) {
@@ -3261,7 +3214,7 @@ struct PipelineImpl final : Pipeline
 			if (equalStrings(layer, "view")) {
 				LuaWrapper::argError(L, 2 + i, "layer name `view` is reserved");
 			}
-			Bucket& bucket = view->buckets.emplace();
+			Bucket& bucket = view->buckets.emplace(page_allocator);
 			bucket.layer = pipeline->m_renderer.getLayerIdx(layer);
 			copyString(Span(bucket.layer_name), layer); 
 			
@@ -3273,6 +3226,11 @@ struct PipelineImpl final : Pipeline
 			char define[32];
 			if (LuaWrapper::getOptionalStringField(L, 2 + i, "define", Span(define))) {
 				bucket.define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+			}
+
+			RenderState state;
+			if (LuaWrapper::getOptionalField<RenderState>(L, 2 + i, "state", &state)) {
+				bucket.state = state.value;
 			}
 		}
 
@@ -3316,16 +3274,18 @@ struct PipelineImpl final : Pipeline
 	}
 
 	struct RenderBucketJob : Renderer::RenderJob {
-		RenderBucketJob(IAllocator& allocator)
-			: m_procedurals(allocator)
+		RenderBucketJob(IAllocator& allocator, PageAllocator& page_allocator)
+			: m_procedural_encoder(page_allocator)
 		{}
 
 		void setup() override {
 			PROFILE_FUNCTION();
 			jobs::wait(&m_view->ready);
 
-			const Bucket& bucket= m_view->buckets[m_bucket_id];
+			Bucket& bucket= m_view->buckets[m_bucket_id];
+			m_encoder.create(static_cast<gpu::Encoder&&>(bucket.encoder));
 			m_cmds = bucket.cmd_page;
+			m_render_state = bucket.state;
 
 			const u32 instanced_define_mask = bucket.define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
@@ -3341,26 +3301,53 @@ struct PipelineImpl final : Pipeline
 			const HashMap<EntityRef, ProceduralGeometry>& geometries = render_scene->getProceduralGeometries();
 			Renderer& renderer = m_pipeline->m_renderer;
 			const DVec3 camera_pos = m_view->cp.pos;
+			// TODO
+			// m_renderer.beginProfileBlock("draw procedural geom", 0);
 			for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
 				const ProceduralGeometry& pg = iter.value();
 				if (!pg.vertex_buffer) continue;
 				if (!pg.material || !pg.material->isReady()) continue;
 				if (pg.material->getLayer() != m_layer) continue;
-				
-				Procedural& procedural = m_procedurals.emplace();
-				procedural.index_buffer = pg.index_buffer;
-				procedural.vertex_buffer = pg.vertex_buffer;
-				procedural.material = pg.material->getRenderData();
-				procedural.primitive_type = pg.primitive_type;
-				procedural.index_type = pg.index_type;
+
+				Material::RenderData* material = pg.material->getRenderData();
+
+				Renderer& renderer = m_pipeline->m_renderer;
+				const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+				const gpu::StateFlags render_states = m_render_state;
+				u32 material_ub_idx = 0xffFFffFF;
+				m_procedural_encoder.bindTextures(material->textures, 0, material->textures_count);
+				m_procedural_encoder.setState(material->render_states | render_states);
+				if (material_ub_idx != material->material_constants) {
+					m_procedural_encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+					material_ub_idx = material->material_constants;
+				}
 
 				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
-				procedural.program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
-				procedural.stride = pg.vertex_decl.getStride();
-				procedural.vertex_count = pg.index_buffer ? (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4) :  (u32)pg.vertex_data.size() / procedural.stride;
-				procedural.ub = renderer.allocUniform(sizeof(Matrix));
-				memcpy(procedural.ub.ptr, &mtx, sizeof(mtx));
+				const Renderer::TransientSlice ub = renderer.allocUniform(sizeof(Matrix));
+				memcpy(ub.ptr, &mtx, sizeof(mtx));
+
+				m_procedural_encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				const gpu::ProgramHandle program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
+				m_procedural_encoder.useProgram(program);
+
+				m_procedural_encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+				const u32 stride = pg.vertex_decl.getStride();
+				m_procedural_encoder.bindVertexBuffer(0, pg.vertex_buffer, 0, stride);
+				m_procedural_encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+				if (pg.index_buffer) {
+					m_procedural_encoder.bindIndexBuffer(pg.index_buffer);
+					const u32 vertex_count = (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4);
+					m_procedural_encoder.drawIndexed(pg.primitive_type, 0, vertex_count, pg.index_type);
+				}
+				else {
+					m_procedural_encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+					const u32 vertex_count = (u32)pg.vertex_data.size() / stride;
+					m_procedural_encoder.drawArrays(pg.primitive_type, 0, vertex_count);
+				}
 			}
+			// TODO
+			// m_renderer.endProfileBlock();
 		}
 
 		void drawInstancedMeshes() {
@@ -3397,221 +3384,16 @@ struct PipelineImpl final : Pipeline
 			m_pipeline->m_renderer.endProfileBlock();
 		}
 
-		struct CmdInputStream {
-			CmdInputStream(CmdPage* page, PageAllocator& allocator)
-				: allocator(allocator)
-				, page(page)
-			{}
-
-			RenderableTypes readType() {
-				const u8 type = page->data[offset];
-				offset += 8; // must match output stream
-				return RenderableTypes(type);
-			}
-			
-			bool isEnd() {
-				while (page && offset == page->header.size) {
-					CmdPage* next = page->header.next;
-					allocator.deallocate(page, true);
-					page = next;
-					offset = 0;
-				}
-				return !page;
-			}
-
-			template <typename T>
-			T* readCmd() {
-				T* tmp = (T*)(page->data + offset);
-				offset += sizeof(T);
-				return tmp;
-			}
-
-			PageAllocator& allocator;
-			CmdPage* page = nullptr;
-			u32 offset = 0;
-		};
-
-		void drawProceduralGeometry() {
-			if (m_procedurals.empty()) return;
-
-			m_pipeline->m_renderer.beginProfileBlock("draw procedural geom", 0);
-
-			Renderer& renderer = m_pipeline->m_renderer;
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-			const gpu::StateFlags render_states = m_render_state;
-			u32 material_ub_idx = 0xffFFffFF;
-			for (const Procedural& procedural : m_procedurals) {
-				gpu::bindTextures(procedural.material->textures, 0, procedural.material->textures_count);
-				gpu::setState(procedural.material->render_states | render_states);
-				if (material_ub_idx != procedural.material->material_constants) {
-					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, procedural.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-					material_ub_idx = procedural.material->material_constants;
-				}
-
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, procedural.ub.buffer, procedural.ub.offset, procedural.ub.size);
-				gpu::useProgram(procedural.program);
-
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, procedural.vertex_buffer, 0, procedural.stride);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-				if (procedural.index_buffer) {
-					gpu::bindIndexBuffer(procedural.index_buffer);
-					gpu::drawIndexed(procedural.primitive_type, 0, procedural.vertex_count, procedural.index_type);
-				}
-				else {
-					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-					gpu::drawArrays(procedural.primitive_type, 0, procedural.vertex_count);
-				}
-
-			}
-			m_pipeline->m_renderer.endProfileBlock();
-		}
 
 		void execute() override {
 			PROFILE_FUNCTION();
 
 			drawInstancedMeshes();
-			drawProceduralGeometry();
-
-			if (!m_cmds) return;
-
-			if (m_cmds->header.size == 0 && !m_cmds->header.next) {
-				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
-				return;
-			}
-			CmdInputStream stream(m_cmds, m_pipeline->getRenderer().getEngine().getPageAllocator());
-
-			Renderer& renderer = m_pipeline->m_renderer;
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-			const gpu::StateFlags render_states = m_render_state;
-			u32 material_ub_idx = 0xffFFffFF;
-			CmdPage* page = m_cmds;
-			renderer.beginProfileBlock("render_bucket", 0);
-			while (!stream.isEnd()) {
-				const RenderableTypes type = stream.readType();
-				switch(type) {
-					case RenderableTypes::MESH:
-					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-						MeshCmd* cmd = stream.readCmd<MeshCmd>();
-
-						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
-						gpu::setState(cmd->material->render_states | render_states);
-						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = cmd->material->material_constants;
-						}
-
-						gpu::useProgram(cmd->program);
-
-						gpu::bindIndexBuffer(cmd->mesh->index_buffer_handle);
-						gpu::bindVertexBuffer(0, cmd->mesh->vertex_buffer_handle, 0, cmd->mesh->vb_stride);
-						gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 32);
-
-						gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, cmd->mesh->indices_count, cmd->count, cmd->mesh->index_type);
-						break;
-					}
-					case RenderableTypes::FUR:
-					case RenderableTypes::SKINNED: {
-						SkinnedMeshCmd* cmd = stream.readCmd<SkinnedMeshCmd>();
-
-						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
-
-						gpu::setState(cmd->material->render_states | render_states);
-						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = cmd->material->material_constants;
-						}
-
-						gpu::useProgram(cmd->program);
-
-						gpu::bindIndexBuffer(cmd->mesh->index_buffer_handle);
-						gpu::bindVertexBuffer(0, cmd->mesh->vertex_buffer_handle, 0, cmd->mesh->vb_stride);
-						gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-							
-						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, cmd->ub_buffer, cmd->ub_offset, cmd->ub_size);
-						gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, cmd->mesh->indices_count, cmd->layers, cmd->mesh->index_type);
-						break;
-					}
-					case RenderableTypes::CURVE_DECAL: {
-						DecalCmd* cmd = stream.readCmd<DecalCmd>();
-								
-						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
-						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = cmd->material->material_constants;
-						}
-						gpu::useProgram(cmd->program);
-						gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-						gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-
-						gpu::StateFlags state = cmd->material->render_states | render_states;
-						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
-						if (cmd->nonintersecting_count) {
-							gpu::setState(state);
-							gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 64);
-							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->nonintersecting_count, gpu::DataType::U16);
-						}
-
-						if (cmd->total_count - cmd->nonintersecting_count) {
-							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
-							state = state & ~gpu::StateFlags::CULL_BACK;
-							state = state | gpu::StateFlags::CULL_FRONT;
-							gpu::setState(state);
-							const u32 offs = cmd->offset + sizeof(float) * 16 * cmd->nonintersecting_count;
-							gpu::bindVertexBuffer(1, cmd->buffer, offs, 64);
-							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
-						}
-						break;
-					}
-					case RenderableTypes::DECAL: {
-						DecalCmd* cmd = stream.readCmd<DecalCmd>();
-								
-						gpu::bindTextures(cmd->material->textures, 0, cmd->material->textures_count);
-						if (material_ub_idx != cmd->material->material_constants) {
-							gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, cmd->material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = cmd->material->material_constants;
-						}
-						gpu::useProgram(cmd->program);
-						gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-						gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-
-						gpu::StateFlags state = cmd->material->render_states | render_states;
-						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
-						if (cmd->nonintersecting_count) {
-							gpu::setState(state);
-							gpu::bindVertexBuffer(1, cmd->buffer, cmd->offset, 48);
-							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->nonintersecting_count, gpu::DataType::U16);
-						}
-
-						if (cmd->total_count - cmd->nonintersecting_count) {
-							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
-							state = state & ~gpu::StateFlags::CULL_BACK;
-							state = state | gpu::StateFlags::CULL_FRONT;
-							gpu::setState(state);
-							const u32 offs = cmd->offset + sizeof(float) * 12 * cmd->nonintersecting_count;
-							gpu::bindVertexBuffer(1, cmd->buffer, offs, 48);
-							gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, cmd->total_count - cmd->nonintersecting_count, gpu::DataType::U16);
-						}
-						break;
-					}
-					default: ASSERT(false); break;
-				}
-			}
-			renderer.endProfileBlock();
+			m_procedural_encoder.run();
+			m_pipeline->m_renderer.beginProfileBlock("render_bucket", 0);
+			m_encoder->run();
+			m_pipeline->m_renderer.endProfileBlock();
 		}
-
-		struct Procedural {
-			gpu::BufferHandle vertex_buffer;
-			gpu::BufferHandle index_buffer;
-			Material::RenderData* material;
-			gpu::ProgramHandle program;
-			u32 stride;
-			u32 vertex_count;
-			Renderer::TransientSlice ub;
-			gpu::PrimitiveType primitive_type;
-			gpu::DataType index_type;
-		};
 
 		CmdPage* m_cmds;
 		PipelineImpl* m_pipeline;
@@ -3620,55 +3402,13 @@ struct PipelineImpl final : Pipeline
 		InstancedMeshes* m_instanced_meshes;
 		u8 m_layer;
 		gpu::StateFlags m_render_state;
-		StackArray<Procedural, 16> m_procedurals;
+		gpu::Encoder m_procedural_encoder;
+		Local<gpu::Encoder> m_encoder;
 	};
 
 	static Vec4 packRotationLOD(const Quat& rot, float lod) {
 		return rot.w > 0 ? Vec4(rot.x, rot.y, rot.z, lod) : Vec4(-rot.x, -rot.y, -rot.z, lod);
 	}
-
-	struct CmdOutputStream {
-		CmdOutputStream(PageAllocator& allocator) : allocator(allocator) {}
-		
-		void newBucket(u8 bucket) {
-			CmdPage* new_page = new (NewPlaceholder(), allocator.allocate(true)) CmdPage;
-			new_page->header.bucket = bucket;
-			if (!last_page) {
-				last_page = first_page = new_page;
-			}
-			else {
-				last_page->header.next = new_page;
-				last_page = new_page;
-			}
-		}
-
-		template <typename T>
-		T* newCmd(RenderableTypes type) {
-			u8* mem = alloc(sizeof(T) + alignof(T), alignof(T));
-			static_assert(sizeof(type) == sizeof(u8));
-			*mem = (u8)type;
-			return new (NewPlaceholder(), mem + alignof(T)) T;
-		}
-
-		u8* alloc(size_t size, size_t align) {
-			ASSERT(align == 8);
-			if (last_page->header.size + size > sizeof(last_page->data)) {
-				CmdPage* new_page = new (NewPlaceholder(), allocator.allocate(true)) CmdPage;
-				last_page->header.next = new_page;
-				last_page = new_page;
-				new_page->header.bucket = last_page->header.bucket;
-			}
-
-			const u32 p = last_page->header.size;
-
-			last_page->header.size += (u32)size;
-			return last_page->data + p;
-		}
-
-		CmdPage* first_page = nullptr;
-		CmdPage* last_page = nullptr;
-		PageAllocator& allocator;
-	};
 
 	struct MeshCmd {
 		Mesh::RenderData* mesh;
@@ -3706,13 +3446,13 @@ struct PipelineImpl final : Pipeline
 		u32 offset;
 	};
 
-	CmdPage* createCommands(View& view
+	void createCommands(View& view
 		, const u64* LUMIX_RESTRICT renderables
 		, const u64* LUMIX_RESTRICT sort_keys
 		, u32 count)
 	{
 		PROFILE_BLOCK("create cmds");
-		if (count == 0) return nullptr;
+		if (count == 0) return;
 
 		const Universe& universe = m_scene->getUniverse();
 		Renderer& renderer = m_renderer;
@@ -3723,7 +3463,6 @@ struct PipelineImpl final : Pipeline
 		const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
-		CmdOutputStream stream(page_allocator);
 		u64 instance_key_mask;
 		u32 define_mask;
 		u32 instanced_define_mask;
@@ -3731,6 +3470,10 @@ struct PipelineImpl final : Pipeline
 		u32 fur_define_mask;
 		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
 		u8 prev_bucket = 0xff;
+		gpu::Encoder* encoder = nullptr;
+		u32 material_ub_idx = 0xffFFffFF;
+		const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+		gpu::StateFlags render_state;
 
 		for (u32 i = 0, c = count; i < c; ++i) {
 			const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
@@ -3740,13 +3483,14 @@ struct PipelineImpl final : Pipeline
 
 			if (bucket != prev_bucket) {
 				prev_bucket = bucket;
-				stream.newBucket(bucket);
+				encoder = &view.buckets[bucket].encoder;
 				define_mask = view.buckets[bucket].define_mask;
 				instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 				skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
 				fur_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("FUR"));
 				const bool sort_depth = view.buckets[bucket].sort == Bucket::DEPTH;
 				instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
+				render_state = view.buckets[bucket].state;
 			}
 
 			switch(type) {
@@ -3771,19 +3515,24 @@ struct PipelineImpl final : Pipeline
 
 					if (mi->custom_material->isReady()) {
 						Shader* shader = mi->custom_material->getShader();
-						MeshCmd* cmd = stream.newCmd<MeshCmd>(type);
-						cmd->mesh = mesh.render_data;
-						cmd->material = mi->custom_material->getRenderData();
-						cmd->program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mi->custom_material->getDefineMask());
-						cmd->count = 1;
-						cmd->buffer = slice.buffer;
-						cmd->offset = slice.offset;
+						Material::RenderData* material =  mi->custom_material->getRenderData();
+						encoder->bindTextures(material->textures, 0, material->textures_count);
+						encoder->setState(material->render_states | render_state);
+						if (material_ub_idx != material->material_constants) {
+							encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+							material_ub_idx = material->material_constants;
+						}
+						const gpu::ProgramHandle program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						encoder->useProgram(program);
+						encoder->bindIndexBuffer(mesh.render_data->index_buffer_handle);
+						encoder->bindVertexBuffer(0, mesh.render_data->vertex_buffer_handle, 0, mesh.render_data->vb_stride);
+						encoder->bindVertexBuffer(1, slice.buffer, slice.offset, 32);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, mesh.render_data->indices_count, 1, mesh.render_data->index_type);
+
 					}
-							
 					break;
 				}
 				case RenderableTypes::MESH: {
-					MeshCmd* cmd = stream.newCmd<MeshCmd>(type);
 					if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
 						const u32 group_idx = renderables[i] & 0xffFF;
 						const u32 instancer_idx = (renderables[i] >> 16) & 0xffFF;
@@ -3791,13 +3540,21 @@ struct PipelineImpl final : Pipeline
 						const u32 total_count = instances.end->offset + instances.end->count;
 						const Mesh& mesh = *sort_key_to_mesh[group_idx];
 
+						Material::RenderData* material = mesh.material->getRenderData();
+						encoder->bindTextures(material->textures, 0, material->textures_count);
+						encoder->setState(material->render_states | render_state);
+						if (material_ub_idx != material->material_constants) {
+							encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+							material_ub_idx = material->material_constants;
+						}
+
 						Shader* shader = mesh.material->getShader();
-						cmd->mesh = mesh.render_data;
-						cmd->material = mesh.material->getRenderData();
-						cmd->program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-						cmd->count = total_count;
-						cmd->buffer = instances.slice.buffer;
-						cmd->offset = instances.slice.offset;
+						const gpu::ProgramHandle program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						encoder->useProgram(program);
+						encoder->bindIndexBuffer(mesh.render_data->index_buffer_handle);
+						encoder->bindVertexBuffer(0, mesh.render_data->vertex_buffer_handle, 0, mesh.render_data->vb_stride);
+						encoder->bindVertexBuffer(1, instances.slice.buffer, instances.slice.offset, 32);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, mesh.render_data->indices_count, total_count, mesh.render_data->index_type);
 					}
 					else {
 						const u32 mesh_idx = renderables[i] >> 40;
@@ -3826,14 +3583,21 @@ struct PipelineImpl final : Pipeline
 							instance_data += sizeof(tr.scale);
 						}
 
+						Material::RenderData* material = mesh.material->getRenderData();
+						encoder->bindTextures(material->textures, 0, material->textures_count);
+						encoder->setState(material->render_states | render_state);
+						if (material_ub_idx != material->material_constants) {
+							encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+							material_ub_idx = material->material_constants;
+						}
+
 						Shader* shader = mesh.material->getShader();
-						cmd->mesh = mesh.render_data;
-						cmd->material = mesh.material->getRenderData();
-						cmd->program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-						cmd->count = count;
-						cmd->buffer = slice.buffer;
-						cmd->offset = slice.offset;
-						
+						const gpu::ProgramHandle program = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						encoder->useProgram(program);
+						encoder->bindIndexBuffer(mesh.render_data->index_buffer_handle);
+						encoder->bindVertexBuffer(0, mesh.render_data->vertex_buffer_handle, 0, mesh.render_data->vb_stride);
+						encoder->bindVertexBuffer(1, slice.buffer, slice.offset, 32);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, mesh.render_data->indices_count, count, mesh.render_data->index_type);
 						--i;
 					}
 					break;
@@ -3849,11 +3613,6 @@ struct PipelineImpl final : Pipeline
 					u32 defines = skinned_define_mask | mesh.material->getDefineMask();
 					if (type == RenderableTypes::FUR) defines |= fur_define_mask;
 
-					SkinnedMeshCmd* cmd = stream.newCmd<SkinnedMeshCmd>(type);
-					cmd->mesh = mesh.render_data;
-					cmd->material = mesh.material->getRenderData();
-					cmd->program = shader->getProgram(mesh.vertex_decl, defines);
-					cmd->bone_count = mi->pose->count;
 
 					const Quat* rotations = mi->pose->rotations;
 					const Vec3* positions = mi->pose->positions;
@@ -3889,10 +3648,21 @@ struct PipelineImpl final : Pipeline
 						bones_ub_array[j] = (tmp * bone.inv_bind_transform).toDualQuat();
 					}
 					
-					cmd->layers = layers;
-					cmd->ub_buffer = ub.buffer;
-					cmd->ub_offset = ub.offset;
-					cmd->ub_size = ub.size;
+					Material::RenderData* material = mesh.material->getRenderData();
+					encoder->bindTextures(material->textures, 0, material->textures_count);
+
+					encoder->setState(material->render_states | render_state);
+					if (material_ub_idx != material->material_constants) {
+						encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+						material_ub_idx = material->material_constants;
+					}
+
+					encoder->useProgram(shader->getProgram(mesh.vertex_decl, defines));
+					encoder->bindIndexBuffer(mesh.render_data->index_buffer_handle);
+					encoder->bindVertexBuffer(0, mesh.render_data->vertex_buffer_handle, 0, mesh.render_data->vb_stride);
+					encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+					encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+					encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, mesh.render_data->indices_count, layers, mesh.render_data->index_type);
 					break;
 				}
 				case RenderableTypes::DECAL: {
@@ -3930,13 +3700,34 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					DecalCmd* cmd = stream.newCmd<DecalCmd>(type);
-					cmd->material = material->getRenderData();
-					cmd->program = material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask());
-					cmd->buffer = slice.buffer;
-					cmd->offset = slice.offset;
-					cmd->total_count = count;
-					cmd->nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+					const Material::RenderData* material_rd = material->getRenderData();
+					encoder->bindTextures(material_rd->textures, 0, material_rd->textures_count);
+					if (material_ub_idx != material_rd->material_constants) {
+						encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material_rd->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+						material_ub_idx = material_rd->material_constants;
+					}
+					encoder->useProgram(material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask()));
+					encoder->bindIndexBuffer(m_cube_ib);
+					encoder->bindVertexBuffer(0, m_cube_vb, 0, 12);
+
+					gpu::StateFlags state = material_rd->render_states | render_state;
+					state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+					if (nonintersecting_count) {
+						encoder->setState(state);
+						encoder->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, nonintersecting_count, gpu::DataType::U16);
+					}
+
+					if (count - nonintersecting_count) {
+						state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
+						state = state & ~gpu::StateFlags::CULL_BACK;
+						state = state | gpu::StateFlags::CULL_FRONT;
+						encoder->setState(state);
+						const u32 offs = slice.offset + sizeof(float) * 12 * nonintersecting_count;
+						encoder->bindVertexBuffer(1, slice.buffer, offs, 48);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, count - nonintersecting_count, gpu::DataType::U16);
+					}
 					--i;
 					break;
 				}
@@ -3977,16 +3768,39 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					DecalCmd* cmd = stream.newCmd<DecalCmd>(type);
-					cmd->material = material->getRenderData();
-					cmd->program = material->getShader()->getProgram(m_curve_decal_decl, define_mask | material->getDefineMask());
-					cmd->buffer = slice.buffer;
-					cmd->offset = slice.offset;
-					cmd->total_count = count;
-					cmd->nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+					const Material::RenderData* material_rd = material->getRenderData();
+					encoder->bindTextures(material_rd->textures, 0, material_rd->textures_count);
+					if (material_ub_idx != material_rd->material_constants) {
+						encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material_rd->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+						material_ub_idx = material_rd->material_constants;
+					}
+					encoder->useProgram(material->getShader()->getProgram(m_curve_decal_decl, define_mask | material->getDefineMask()));
+					encoder->bindIndexBuffer(m_cube_ib);
+					encoder->bindVertexBuffer(0, m_cube_vb, 0, 12);
+
+					gpu::StateFlags state = material_rd->render_states | render_state;
+					state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+					if (nonintersecting_count) {
+						encoder->setState(state);
+						encoder->bindVertexBuffer(1, slice.buffer, slice.offset, 64);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, nonintersecting_count, gpu::DataType::U16);
+					}
+
+					if (count - nonintersecting_count) {
+						state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
+						state = state & ~gpu::StateFlags::CULL_BACK;
+						state = state | gpu::StateFlags::CULL_FRONT;
+						encoder->setState(state);
+						const u32 offs = slice.offset + sizeof(float) * 16 * nonintersecting_count;
+						encoder->bindVertexBuffer(1, slice.buffer, offs, 64);
+						encoder->drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, 36, count - nonintersecting_count, gpu::DataType::U16);
+					}
 					--i;
 					break;
 				}
+#if 0
+// TODO this is not used anywhere
 				case RenderableTypes::LOCAL_LIGHT: {
 					const u64 type_bits = (u64)RenderableTypes::LOCAL_LIGHT << 32;
 					const u64 type_mask = (u64)0xff << 32;
@@ -4035,10 +3849,10 @@ struct PipelineImpl final : Pipeline
 					--i;
 					break;
 				}
+#endif
 				default: ASSERT(false); break;
 			}
 		}
-		return stream.first_page;
 	}
 
 	void createCommands(View& view)
@@ -4048,20 +3862,24 @@ struct PipelineImpl final : Pipeline
 		const u64* sort_keys = view.sorter.keys.begin();
 		const int size = view.sorter.keys.size();
 		profiler::pushInt("Count", size);
+
+		// TODO multithread
+		createCommands(view, renderables, sort_keys, size);
+
+#if 0
 		i32 STEP = 4096;
 		i32 steps = (size + STEP - 1) / STEP;
 		if (steps < jobs::getWorkersCount()) {
 			STEP = (size + jobs::getWorkersCount() - 1) / jobs::getWorkersCount();
 			steps = (size + STEP - 1) / STEP;
 		}
-		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
 
 		StackArray<CmdPage*, 64> pages(m_allocator);
 		pages.resize(steps);
-
 		jobs::forEach(size, STEP, [&](i32 from, i32 to){
 			const u32 step = from / STEP;
-			pages[step] = createCommands(view, renderables + from, sort_keys + from, to - from);
+			createCommands(bucket_encoders, view, renderables + from, sort_keys + from, to - from);
+			//pages[step] = createCommands(view, renderables + from, sort_keys + from, to - from);
 		});
 
 		CmdPage* prev = nullptr;
@@ -4077,12 +3895,13 @@ struct PipelineImpl final : Pipeline
 				page = page->header.next;
 			}
 		}
+#endif
 	}
 
-	void renderBucket(u32 viewbucket_id, RenderState state) {
+	void renderBucket(u32 viewbucket_id) {
 		PROFILE_FUNCTION();
-		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>(m_allocator);
-		job.m_render_state = state.value;
+		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
+		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>(m_allocator, page_allocator);
 		job.m_pipeline = this;
 		job.m_bucket_id = viewbucket_id & 0xffFF;
 		job.m_view = m_views[viewbucket_id >> 16].get();
@@ -4390,165 +4209,6 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		gpu::StateFlags m_render_state;
-		u32 m_define_mask = 0;
-	};
-
-	struct RenderTerrainsJob : Renderer::RenderJob
-	{
-		RenderTerrainsJob(LinearAllocator& current_frame_allocator, IAllocator& allocator)
-			: m_allocator(allocator)
-			, m_instances(current_frame_allocator)
-		{
-		}
-
-		void setup() override
-		{
-			PROFILE_FUNCTION();
-			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
-			if(terrains.empty()) return;
-
-			Universe& universe = m_pipeline->m_scene->getUniverse();
-			m_instances.reserve(terrains.size());
-			for (const Terrain* terrain : terrains) {
-				if (!terrain->m_heightmap) continue;
-				if (!terrain->m_heightmap->isReady()) continue;
-				if (!terrain->m_material || !terrain->m_material->isReady()) continue;
-
-				const Transform& tr = universe.getTransform(terrain->m_entity);
-				Instance& inst = m_instances.emplace(m_allocator);
-				inst.pos = Vec3(tr.pos- m_camera_params.pos);
-				inst.ref_pos = Vec3(tr.pos - m_pipeline->m_viewport.pos);
-				inst.rot = tr.rot;
-				inst.scale = terrain->getScale();
-				inst.hm_size = terrain->getSize();
-				Shader* shader = terrain->m_material->getShader();
-				inst.program = shader->getProgram(gpu::VertexDecl(), m_define_mask | terrain->m_material->getDefineMask());
-				inst.material = terrain->m_material->getRenderData();
-				if (isinf(inst.pos.x) || isinf(inst.pos.y) || isinf(inst.pos.z)) {
-					m_instances.pop();
-					continue;
-				}
-
-				struct Quad {
-					IVec4 from_to;
-					IVec4 from_to_sup;
-					Vec4 pos;
-					Vec4 lpos;
-					Vec4 terrain_scale;
-					Vec2 hm_size;
-					float cell_size;
-				};
-
-				Quad quad;
-				quad.pos = Vec4(inst.pos, 0);
-				quad.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
-				quad.hm_size = inst.hm_size;
-
-				const Vec3 ref_pos = inst.rot.conjugated().rotate(-inst.ref_pos);
-				IVec4 prev_from_to;
-				float s = inst.scale.x / terrain->m_tesselation;
-				bool first = true;
-				for (;;) {
-					// round 
-					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
-					from.x = from.x & ~1;
-					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(terrain->m_base_grid_res);
-
-					// clamp
-					quad.from_to_sup = IVec4(from, to);
-					
-					from.x = clamp(from.x, 0, (int)ceil(inst.hm_size.x / s));
-					from.y = clamp(from.y, 0, (int)ceil(inst.hm_size.y / s));
-					to.x = clamp(to.x, 0, (int)ceil(inst.hm_size.x / s));
-					to.y = clamp(to.y, 0, (int)ceil(inst.hm_size.y / s));
-
-					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
-						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
-						quad.from_to = IVec4(subfrom, subto);
-						quad.terrain_scale = Vec4(inst.scale, 0);
-						quad.cell_size = s;
-						Instance::Quad& tmp = inst.quads.emplace();
-						tmp.from = subfrom;
-						tmp.to = subto;
-						tmp.buf = m_pipeline->m_renderer.allocUniform(sizeof(quad));
-						memcpy(tmp.buf.ptr, &quad, sizeof(quad));
-					};
-
-					if (first) {
-						draw_rect(from, to);
-						first = false;
-					}
-					else {
-						draw_rect(from, IVec2(to.x, prev_from_to.y));
-						draw_rect(IVec2(from.x, prev_from_to.w), to);
-						
-						draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
-						draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
-					}
-					
-					if (from.x <= 0 && from.y <= 0 && to.x * s >= inst.hm_size.x && to.y * s >= inst.hm_size.y) break;
-
-					s *= 2;
-					prev_from_to = IVec4(from / 2, to / 2);
-				}
-			}
-		}
-
-		void execute() override {
-			PROFILE_FUNCTION();
-			
-			if (m_instances.empty()) return;
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-
-			gpu::StateFlags state = m_render_state;
-			Renderer& renderer = m_pipeline->m_renderer;
-			renderer.beginProfileBlock("terrain", 0);
-			for (const Instance& inst : m_instances) {
-				gpu::useProgram(inst.program);
-				gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, inst.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-				
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-				gpu::bindTextures(inst.material->textures, 0, inst.material->textures_count);
-
-				gpu::setState(state);
-
-				for (const Instance::Quad& q : inst.quads) {
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, q.buf.buffer, q.buf.offset, q.buf.size);
-					gpu::drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (q.to.x - q.from.x) * 2 + 2, q.to.y - q.from.y);
-				}
-			}
-			renderer.endProfileBlock();
-		}
-
-		struct Instance {
-			Instance(IAllocator& allocator) 
-				: quads(allocator)
-			{}
-
-			struct Quad {
-				Renderer::TransientSlice buf;
-				IVec2 from;
-				IVec2 to;
-			};
-			Vec2 hm_size;
-			Vec3 pos;
-			Vec3 ref_pos;
-			Quat rot;
-			Vec3 scale;
-			gpu::ProgramHandle program;
-			Material::RenderData* material;
-			StackArray<Quad, 32> quads;
-		};
-
-		IAllocator& m_allocator;
-		PipelineImpl* m_pipeline;
-		CameraParams m_camera_params;
-		gpu::StateFlags m_render_state;
-		Array<Instance> m_instances;
 		u32 m_define_mask = 0;
 	};
 
