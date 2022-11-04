@@ -991,35 +991,19 @@ struct RendererImpl final : Renderer
 	void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) override {
 		ASSERT(src_w % dst_w == 0);
 		ASSERT(src_h % dst_h == 0);
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				
-				gpu::bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
-				gpu::bindImageTexture(src, 0);
-				gpu::bindImageTexture(dst, 1);
-				gpu::useProgram(program);
-				gpu::dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
-			}
-
-			gpu::TextureHandle src;
-			gpu::TextureHandle dst;
-			gpu::ProgramHandle program;
-			TransientSlice ub_slice;
-			IVec2 src_size;
-			IVec2 dst_size;
-		};
-		Cmd& cmd = createJob<Cmd>();
-		cmd.src = src;
-		cmd.dst = dst;
+		
 		IVec2 src_size((i32)src_w, (i32)src_h);
-		cmd.dst_size = {(i32)dst_w, (i32)dst_h};
-		cmd.program = m_downscale_program;
-		const IVec2 scale = src_size / cmd.dst_size;
-		cmd.ub_slice = allocUniform(sizeof(scale));
-		memcpy(cmd.ub_slice.ptr, &scale, sizeof(scale));
-		queue(cmd, 0);
+		IVec2 dst_size = {(i32)dst_w, (i32)dst_h};
+		pushJob([src_size, dst_size, this, src, dst](gpu::Encoder& encoder){
+			const IVec2 scale = src_size / dst_size;
+			Renderer::TransientSlice ub_slice = allocUniform(sizeof(scale));
+			memcpy(ub_slice.ptr, &scale, sizeof(scale));
+			encoder.bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
+			encoder.bindImageTexture(src, 0);
+			encoder.bindImageTexture(dst, 1);
+			encoder.useProgram(m_downscale_program);
+			encoder.dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
+		});
 	}
 
 

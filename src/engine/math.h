@@ -21,9 +21,9 @@ struct LUMIX_ENGINE_API IVec2 {
 	IVec2 operator +(const IVec2& v) const { return IVec2(x + v.x, y + v.y); }
 	IVec2 operator -(const IVec2& v) const { return IVec2(x - v.x, y - v.y); }
 	IVec2 operator *(i32 i) const { return IVec2(x * i, y * i); }
-	IVec2 operator / (i32 rhs) { return IVec2(x / rhs, y / rhs); }
-	IVec2 operator / (const IVec2& rhs) { return IVec2(x / rhs.x, y / rhs.y); }
-	inline Vec2 operator / (const Vec2& rhs);
+	IVec2 operator / (i32 rhs) const { return IVec2(x / rhs, y / rhs); }
+	IVec2 operator / (const IVec2& rhs) const { return IVec2(x / rhs.x, y / rhs.y); }
+	inline Vec2 operator / (const Vec2& rhs) const;
 	bool operator !=(const IVec2& rhs) const { return rhs.x != x || rhs.y != y; }
 
 	i32 x;

@@ -788,155 +788,120 @@ void SceneView::update(float time_delta)
 
 void SceneView::renderIcons() {
 	Engine& engine = m_app.getEngine();
-	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	Renderer& renderer = m_pipeline->getRenderer();
 	
-	const Viewport& vp = m_view->getViewport();
-	const Matrix camera_mtx({0, 0, 0}, vp.rot);
+	renderer.pushJob("icons", [this, &renderer](gpu::Encoder& encoder) {
+		const Viewport& vp = m_view->getViewport();
+		const Matrix camera_mtx({0, 0, 0}, vp.rot);
 
-	EditorIcons* icon_manager = m_view->m_icons.get();
-	icon_manager->computeScales();
-	const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
-	gpu::Encoder* encoder = renderer->createEncoderJob();
-	for (const EditorIcons::Icon& icon : icons) {
-		const Model* model = icon_manager->getModel(icon.type);
-		if (!model || !model->isReady()) continue;
+		EditorIcons* icon_manager = m_view->m_icons.get();
+		icon_manager->computeScales();
+		const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
+		for (const EditorIcons::Icon& icon : icons) {
+			const Model* model = icon_manager->getModel(icon.type);
+			if (!model || !model->isReady()) continue;
 
-		Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Matrix));
-		const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
-		memcpy(ub.ptr, &mtx, sizeof(mtx));
-		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+			Renderer::TransientSlice ub = renderer.allocUniform(sizeof(Matrix));
+			const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
+			memcpy(ub.ptr, &mtx, sizeof(mtx));
+			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		
-		for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-			const Mesh& mesh = model->getMesh(i);
-			const Mesh::RenderData* rd = mesh.render_data;
-			const Material::RenderData* material = mesh.material->getRenderData();
-			encoder->bindTextures(material->textures, 0, material->textures_count);
-			gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, material->define_mask);
-			encoder->useProgram(program);
-			encoder->bindIndexBuffer(rd->index_buffer_handle);
-			encoder->bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-			encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			encoder->setState(material->render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-			encoder->drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
+			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
+				const Mesh& mesh = model->getMesh(i);
+				const Mesh::RenderData* rd = mesh.render_data;
+				const Material::RenderData* material = mesh.material->getRenderData();
+				encoder.bindTextures(material->textures, 0, material->textures_count);
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, material->define_mask);
+				encoder.useProgram(program);
+				encoder.bindIndexBuffer(rd->index_buffer_handle);
+				encoder.bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				encoder.setState(material->render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
+			}
 		}
-	}
+	});
 }
 
 
 void SceneView::renderSelection()
 {
-	struct RenderJob : Renderer::RenderJob
-	{
-		RenderJob(IAllocator& allocator) 
-			: m_allocator(allocator)
-			, m_items(allocator) {}
+	PROFILE_FUNCTION();
+	Engine& engine = m_app.getEngine();
+	Renderer& renderer = m_pipeline->getRenderer();
+	const Array<EntityRef>& entities = m_editor.getSelectedEntities();
+	if (entities.size() > 5000) return;
+	
+	renderer.pushJob("selection", [&renderer, this, &engine, &entities](gpu::Encoder& encoder) {
+		RenderScene* scene = m_pipeline->getScene();
+		const Universe& universe = scene->getUniverse();
+		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
+		const DVec3 view_pos = m_view->getViewport().pos;
+		Array<DualQuat> dq_pose(engine.getAllocator());
+		encoder.pushDebugGroup("selection");
+		for (EntityRef e : entities) {
+			if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 
-		void setup() override
-		{
-			PROFILE_FUNCTION();
-			const Array<EntityRef>& entities = m_editor->getSelectedEntities();
-			RenderScene* scene = m_pipeline->getScene();
-			const Universe& universe = scene->getUniverse();
-			
-			if (entities.size() > 5000) return;
-			for (EntityRef e : entities) {
-				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+			const Model* model = scene->getModelInstanceModel(e);
+			if (!model || !model->isReady()) continue;
 
-				const Model* model = scene->getModelInstanceModel(e);
-				if (!model || !model->isReady()) continue;
-
-				const Pose* pose = scene->lockPose(e);
-				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-					const Mesh& mesh = model->getMesh(i);
+			const Pose* pose = scene->lockPose(e);
+			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
+				const Mesh& mesh = model->getMesh(i);
 					
-					Item& item = m_items.emplace(m_allocator);
-					item.material = mesh.material->getRenderData();
-					u32 define_mask = item.material->define_mask;
-					item.mesh = mesh.render_data;
-					item.mtx = universe.getRelativeMatrix(e, m_cam_pos);
-					if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
-						define_mask |= skinned_define;
-						item.pose.reserve(pose->count);
-						for (int j = 0, c = pose->count; j < c; ++j) {
-							const Model::Bone& bone = model->getBone(j);
-							const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
-							item.pose.push((tmp * bone.inv_bind_transform).toDualQuat());
-						}
-					}
-					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, define_mask);
-					if (item.pose.empty()) {
-						item.ub = m_pipeline->getRenderer().allocUniform(sizeof(item.mtx));
-						memcpy(item.ub.ptr, &item.mtx, sizeof(item.mtx));
-					}
-					else {
-						struct UBPrefix {
-							float layer;
-							float fur_scale;
-							float gravity;
-							float padding;
-							Matrix model_mtx;
-							// DualQuat bones[];
-						};
-
-						item.ub = m_pipeline->getRenderer().allocUniform(sizeof(UBPrefix) + item.pose.byte_size());
-						UBPrefix* dc = (UBPrefix*)item.ub.ptr;
-						dc->layer = 0;
-						dc->fur_scale = 0;
-						dc->gravity = 0;
-						dc->model_mtx = item.mtx;
-						memcpy(item.ub.ptr + sizeof(UBPrefix), item.pose.begin(), item.pose.byte_size());
+				Material::RenderData* material = mesh.material->getRenderData();
+				u32 define_mask = material->define_mask;
+				Mesh::RenderData* mesh_rd = mesh.render_data;
+				const Matrix mtx = universe.getRelativeMatrix(e, view_pos);
+				dq_pose.clear();
+				if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
+					define_mask |= skinned_define;
+					dq_pose.reserve(pose->count);
+					for (int j = 0, c = pose->count; j < c; ++j) {
+						const Model::Bone& bone = model->getBone(j);
+						const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
+						dq_pose.push((tmp * bone.inv_bind_transform).toDualQuat());
 					}
 				}
-				scene->unlockPose(e, false);
-			}
-		}
-
-		void execute() override
-		{
-			PROFILE_FUNCTION();
-			gpu::pushDebugGroup("selection");
-			for (const Item& item : m_items) {
-				const Mesh::RenderData* rd = item.mesh;
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, define_mask);
 			
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, item.ub.buffer, item.ub.offset, item.ub.size);
-				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
-				gpu::useProgram(item.program);
-				gpu::bindIndexBuffer(rd->index_buffer_handle);
-				gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::setState(item.material->render_states);
-				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
+				Renderer::TransientSlice ub;
+				if (dq_pose.empty()) {
+					ub = renderer.allocUniform(sizeof(mtx));
+					memcpy(ub.ptr, &mtx, sizeof(mtx));
+				}
+				else {
+					struct UBPrefix {
+						float layer;
+						float fur_scale;
+						float gravity;
+						float padding;
+						Matrix model_mtx;
+						// DualQuat bones[];
+					};
+
+					ub = renderer.allocUniform(sizeof(UBPrefix) + dq_pose.byte_size());
+					UBPrefix* dc = (UBPrefix*)ub.ptr;
+					dc->layer = 0;
+					dc->fur_scale = 0;
+					dc->gravity = 0;
+					dc->model_mtx = mtx;
+					memcpy(ub.ptr + sizeof(UBPrefix), dq_pose.begin(), dq_pose.byte_size());
+				}
+		
+				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				encoder.bindTextures(material->textures, 0, material->textures_count);
+				encoder.useProgram(program);
+				encoder.bindIndexBuffer(mesh_rd->index_buffer_handle);
+				encoder.bindVertexBuffer(0, mesh_rd->vertex_buffer_handle, 0, mesh_rd->vb_stride);
+				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				encoder.setState(material->render_states);
+				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh_rd->indices_count, mesh_rd->index_type);
 			}
-			gpu::popDebugGroup();
+			scene->unlockPose(e, false);
 		}
-
-		struct Item {
-			Item(IAllocator& allocator) : pose(allocator) {}
-			Array<DualQuat> pose;
-			gpu::ProgramHandle program;
-			Mesh::RenderData* mesh;
-			Material::RenderData* material;
-			Matrix mtx;
-			Renderer::TransientSlice ub;
-		};
-
-		IAllocator& m_allocator;
-		u32 skinned_define;
-		Array<Item> m_items;
-		Pipeline* m_pipeline;
-		WorldEditor* m_editor;
-		DVec3 m_cam_pos;
-	};
-
-	Engine& engine = m_app.getEngine();
-	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	IAllocator& allocator = renderer->getAllocator();
-	RenderJob& job = renderer->createJob<RenderJob>(allocator);
-	job.skinned_define = 1 << renderer->getShaderDefineIdx("SKINNED");
-	job.m_pipeline = m_pipeline.get();
-	job.m_editor = &m_editor;
-	job.m_cam_pos = m_view->getViewport().pos;
-	renderer->queue(job, 0);
+		encoder.popDebugGroup();
+	});
 }
 
 
@@ -946,35 +911,34 @@ void SceneView::renderGizmos()
 	auto& vertices = m_view->m_draw_vertices;
 	if (vertices.empty()) return;
 
-	Engine& engine = m_app.getEngine();
-	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	gpu::Encoder* encoder = renderer->createEncoderJob();
+	Renderer& renderer = m_pipeline->getRenderer();
+	renderer.pushJob("gizmoes", [&renderer, &vertices, this](gpu::Encoder& encoder){
+		Renderer::TransientSlice vb = renderer.allocTransient(vertices.byte_size());
+		memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
+		Renderer::TransientSlice ub = renderer.allocUniform(sizeof(Matrix));
+		memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
-	Renderer::TransientSlice vb = renderer->allocTransient(vertices.byte_size());
-	memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-	Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Matrix));
-	memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-
-	gpu::VertexDecl decl;
-	decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-	gpu::ProgramHandle program = m_debug_shape_shader->getProgram(decl, 0);
+		gpu::VertexDecl decl;
+		decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		gpu::ProgramHandle program = m_debug_shape_shader->getProgram(decl, 0);
 	
-	encoder->setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-	u32 offset = 0;
-	encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-	for (const UniverseViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
-		encoder->useProgram(program);
-		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
-		encoder->bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
-		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-		const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
-		encoder->drawArrays(primitive_type, 0, cmd.vertex_count);
+		encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+		u32 offset = 0;
+		encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+		for (const UniverseViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
+			encoder.useProgram(program);
+			encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+			encoder.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
+			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+			const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
+			encoder.drawArrays(primitive_type, 0, cmd.vertex_count);
 
-		offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
-	}
+			offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
+		}
 
-	m_view->m_draw_cmds.clear();
+		m_view->m_draw_cmds.clear();
+	});
 }
 
 

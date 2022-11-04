@@ -502,17 +502,6 @@ PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, Ren
 {}
 
 
-struct alignas(4096) CmdPage
-{
-	struct {
-		CmdPage* next = nullptr;
-		u32 size = 0;
-		u8 bucket = 0;
-	} header;
-	u8 data[PageAllocator::PAGE_SIZE - sizeof(header)];
-};
-
-
 struct PipelineImpl final : Pipeline
 {
 	struct Renderbuffer {
@@ -540,8 +529,7 @@ struct PipelineImpl final : Pipeline
 		char layer_name[32];
 		Sort sort = DEFAULT;
 		u32 define_mask = 0;
-		CmdPage* cmd_page = nullptr; 
-		gpu::StateFlags state = gpu::StateFlags::NONE;
+		gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
 		gpu::Encoder encoder;
 	};
 
@@ -787,30 +775,12 @@ struct PipelineImpl final : Pipeline
 			struct MeshRenderData {
 				Mesh::RenderData* mesh_rd;
 				Material::RenderData* material;
-				gpu::ProgramHandle program;
 				const Mesh* mesh;
 				u8 layer;
 			};
 
-			struct Cell {
-				u32 offset;
-				u32 count;
-				bool visible;
-				Renderer::TransientSlice ub;
-			};
-
-			Cell cells[16];
-			u32 cell_count = 0;
-			Renderer::TransientSlice drawcall_ub;
-			Transform origin;
-			gpu::BufferHandle instance_data;
-			u32 instance_count;
 			u32 indirect_offset;
-			float radius;
-			Vec4 lod_distances;
-			IVec4 lod_indices;
 			Array<MeshRenderData> meshes;
-			u32 offset;
 		};
 
 		Array<Model> models;
@@ -1290,15 +1260,6 @@ struct PipelineImpl final : Pipeline
 		LuaWrapper::pcall(m_lua_state, 0, 0);
 		lua_pop(m_lua_state, 1);
 
-		struct BlitJob : Renderer::RenderJob {
-			void execute() override { gpu::copy(dst, src, x, y); }
-			void setup() override {}
-
-			gpu::TextureHandle src;
-			gpu::TextureHandle dst;
-			u32 x, y;
-		};
-
 		const gpu::TextureHandle src = getOutput();
 		m_renderbuffers[m_output].frame_counter = 1;
 		if (!src) {
@@ -1306,13 +1267,13 @@ struct PipelineImpl final : Pipeline
 			return false;
 		}
 
-		BlitJob& job = m_renderer.createJob<BlitJob>();
-		job.dst = m_shadow_atlas.texture;
-		job.src = src;
-		job.x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
-		job.y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
+		const gpu::TextureHandle dst = m_shadow_atlas.texture;
+		m_renderer.pushJob([uv, src, dst](gpu::Encoder& encoder){
+			const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
+			const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
+			encoder.copy(dst, src, x, y);
+		});
 
-		m_renderer.queue(job, m_profiler_link);
 		m_viewport = backup_viewport;
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
@@ -1426,33 +1387,20 @@ struct PipelineImpl final : Pipeline
 			prepareShadowCameras(global_state);
 		}
 
-		struct StartPipelineJob : Renderer::RenderJob {
-			void execute() override {
-				PROFILE_FUNCTION();
-				pipeline->m_renderer.beginProfileBlock(pipeline->m_define, 0, true);
-				gpu::bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer.buffer, global_state_buffer.offset, sizeof(GlobalState));
-				gpu::bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
-				gpu::bindUniformBuffer(UniformBuffer::SHADOW, gpu::INVALID_BUFFER, 0, 0);
-				int tmp[12] = {};
-				gpu::update(pipeline->m_instanced_meshes_buffer, &tmp, sizeof(tmp));
-			}
-			void setup() override {
-				global_state_buffer = pipeline->m_renderer.allocUniform(sizeof(GlobalState));
-				memcpy(global_state_buffer.ptr, &global_state, sizeof(global_state));
-			}
+		beginBlock(m_define);
 
-			Renderer::TransientSlice global_state_buffer;
-			PipelineImpl* pipeline;
-			GlobalState global_state;
-			PassState pass_state;
-		};
+		m_renderer.pushJob([this, global_state](gpu::Encoder& encoder){
+			Renderer::TransientSlice global_state_buffer = m_renderer.allocUniform(sizeof(GlobalState));
+			memcpy(global_state_buffer.ptr, &global_state, sizeof(global_state));
 
-		StartPipelineJob& start_job = m_renderer.createJob<StartPipelineJob>();
-		start_job.pipeline = this;
-		start_job.global_state = global_state;
-		m_renderer.queue(start_job, 0);
-		
+			encoder.bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer.buffer, global_state_buffer.offset, sizeof(GlobalState));
+			encoder.bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
+			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
+			encoder.bindUniformBuffer(UniformBuffer::SHADOW, gpu::INVALID_BUFFER, 0, 0);
+			static int tmp[12] = {};
+			encoder.update(m_instanced_meshes_buffer, &tmp, sizeof(tmp));
+		});
+
 		ASSERT(m_views.empty());
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
@@ -1476,10 +1424,11 @@ struct PipelineImpl final : Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 
+		endBlock();
+
 		struct EndPipelineJob : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
-				pipeline->m_renderer.endProfileBlock();
 				while (instanced_meshes) {
 					InstancedMeshes* i = instanced_meshes;
 					i->~InstancedMeshes();
@@ -1488,13 +1437,11 @@ struct PipelineImpl final : Pipeline
 			}
 
 			PipelineImpl* pipeline;
-			IAllocator* allocator;
 			InstancedMeshes* instanced_meshes; 
 		};
 
 		EndPipelineJob& end_job = m_renderer.createJob<EndPipelineJob>();
 		end_job.pipeline = this;
-		end_job.allocator = &m_allocator;
 		end_job.instanced_meshes = m_views.empty() ? nullptr : m_views[0]->instanced_meshes;
 		m_renderer.queue(end_job, 0);
 		m_renderer.waitForCommandSetup();
@@ -1505,77 +1452,71 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderDebugTriangles() {
-		PROFILE_FUNCTION();
-		struct BaseVertex {
-			Vec3 pos;
-			u32 color;
-		};
-
 		const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
 		if (tris.empty() || !m_debug_shape_shader->isReady()) return;
 
-		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		m_renderer.pushJob("debug triangles", [this](gpu::Encoder& encoder){
+			struct BaseVertex {
+				Vec3 pos;
+				u32 color;
+			};
+			const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(m_base_vertex_decl, 0);
+			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
+			const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+			memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			BaseVertex* vertices = (BaseVertex*)vb.ptr;
+			for (u32 i = 0, c = tris.size(); i < c; ++i) {
+				vertices[3 * i + 0].color = tris[i].color.abgr();
+				vertices[3 * i + 0].pos = Vec3(tris[i].p0 - m_viewport.pos);
+				vertices[3 * i + 1].color = tris[i].color.abgr();
+				vertices[3 * i + 1].pos = Vec3(tris[i].p1 - m_viewport.pos);
+				vertices[3 * i + 2].color = tris[i].color.abgr();
+				vertices[3 * i + 2].pos = Vec3(tris[i].p2 - m_viewport.pos);
+			}
+			m_scene->clearDebugTriangles();
 
-		const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(m_base_vertex_decl, 0);
-		const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
-		const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
-		memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-		BaseVertex* vertices = (BaseVertex*)vb.ptr;
-		for (u32 i = 0, c = tris.size(); i < c; ++i) {
-			vertices[3 * i + 0].color = tris[i].color.abgr();
-			vertices[3 * i + 0].pos = Vec3(tris[i].p0 - m_viewport.pos);
-			vertices[3 * i + 1].color = tris[i].color.abgr();
-			vertices[3 * i + 1].pos = Vec3(tris[i].p1 - m_viewport.pos);
-			vertices[3 * i + 2].color = tris[i].color.abgr();
-			vertices[3 * i + 2].pos = Vec3(tris[i].p2 - m_viewport.pos);
-		}
-		m_scene->clearDebugTriangles();
-
-		encoder->pushDebugGroup("debug triangles");
-		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-		encoder->setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
-		encoder->useProgram(program);
-		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
-		encoder->bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-		encoder->drawArrays(gpu::PrimitiveType::TRIANGLES, 0, vb.size / sizeof(BaseVertex));
-		encoder->popDebugGroup();
+			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+			encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
+			encoder.useProgram(program);
+			encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+			encoder.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+			encoder.drawArrays(gpu::PrimitiveType::TRIANGLES, 0, vb.size / sizeof(BaseVertex));
+		});
 	}
 
 	void renderDebugLines()	{
-		PROFILE_FUNCTION();
-		struct BaseVertex {
-			Vec3 pos;
-			u32 color;
-		};
-
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
 
-		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		m_renderer.pushJob("debug lines", [this](gpu::Encoder& encoder){
+			struct BaseVertex {
+				Vec3 pos;
+				u32 color;
+			};
+			const Array<DebugLine>& lines = m_scene->getDebugLines();
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(m_base_vertex_decl, 0);
+			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
+			const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+			memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			BaseVertex* vertices = (BaseVertex*)vb.ptr;
+			for (u32 i = 0, c = lines.size(); i < c; ++i) {
+				vertices[2 * i + 0].color = lines[i].color.abgr();
+				vertices[2 * i + 0].pos = Vec3(lines[i].from - m_viewport.pos);
+				vertices[2 * i + 1].color = lines[i].color.abgr();
+				vertices[2 * i + 1].pos = Vec3(lines[i].to - m_viewport.pos);
+			}
+			m_scene->clearDebugLines();
 
-		const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(m_base_vertex_decl, 0);
-		const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
-		const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
-		memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-		BaseVertex* vertices = (BaseVertex*)vb.ptr;
-		for (u32 i = 0, c = lines.size(); i < c; ++i) {
-			vertices[2 * i + 0].color = lines[i].color.abgr();
-			vertices[2 * i + 0].pos = Vec3(lines[i].from - m_viewport.pos);
-			vertices[2 * i + 1].color = lines[i].color.abgr();
-			vertices[2 * i + 1].pos = Vec3(lines[i].to - m_viewport.pos);
-		}
-		m_scene->clearDebugLines();
-
-		encoder->pushDebugGroup("debug lines");
-		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
-		encoder->setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-		encoder->useProgram(program);
-		encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
-		encoder->bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-		encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-		encoder->drawArrays(gpu::PrimitiveType::LINES, 0, vb.size / sizeof(BaseVertex));
-		encoder->popDebugGroup();
+			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+			encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+			encoder.useProgram(program);
+			encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+			encoder.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+			encoder.drawArrays(gpu::PrimitiveType::LINES, 0, vb.size / sizeof(BaseVertex));
+		});
 	}
 
 	void renderDebugShapes()
@@ -1820,120 +1761,110 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderTerrains(lua_State* L, CameraParams cp, RenderState render_state) {
-		PROFILE_FUNCTION();
-		const char* define = "";
-		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
+		char define[64] = "";
+		LuaWrapper::getOptionalStringField(L, 2, "define", Span(define));
 		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		
-		gpu::Encoder* encoder = m_renderer.createEncoderJob();
 
-		const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
-		if(terrains.empty()) return;
+		m_renderer.pushJob("terrain", [this, cp, render_state, define_mask](gpu::Encoder& encoder){
+			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
+			if(terrains.empty()) return;
 
-		Universe& universe = m_scene->getUniverse();
-		for (const Terrain* terrain : terrains) {
-			if (!terrain->m_heightmap) continue;
-			if (!terrain->m_heightmap->isReady()) continue;
-			if (!terrain->m_material || !terrain->m_material->isReady()) continue;
+			Universe& universe = m_scene->getUniverse();
+			for (const Terrain* terrain : terrains) {
+				if (!terrain->m_heightmap) continue;
+				if (!terrain->m_heightmap->isReady()) continue;
+				if (!terrain->m_material || !terrain->m_material->isReady()) continue;
 
-			const Transform& tr = universe.getTransform(terrain->m_entity);
-			const Vec3 pos = Vec3(tr.pos- cp.pos);
-			Vec3 ref_pos = Vec3(tr.pos - m_viewport.pos);
-			const Quat rot = tr.rot;
-			const Vec3 scale = terrain->getScale();
-			const Vec2 hm_size = terrain->getSize();
-			Shader* shader = terrain->m_material->getShader();
-			const gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), define_mask | terrain->m_material->getDefineMask());
-			const Material::RenderData* material = terrain->m_material->getRenderData();
-			if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
+				const Transform& tr = universe.getTransform(terrain->m_entity);
+				const Vec3 pos = Vec3(tr.pos- cp.pos);
+				Vec3 ref_pos = Vec3(tr.pos - m_viewport.pos);
+				const Quat rot = tr.rot;
+				const Vec3 scale = terrain->getScale();
+				const Vec2 hm_size = terrain->getSize();
+				Shader* shader = terrain->m_material->getShader();
+				const gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), define_mask | terrain->m_material->getDefineMask());
+				const Material::RenderData* material = terrain->m_material->getRenderData();
+				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
-			struct Quad {
-				IVec4 from_to;
-				IVec4 from_to_sup;
-				Vec4 pos;
-				Vec4 lpos;
-				Vec4 terrain_scale;
-				Vec2 hm_size;
-				float cell_size;
-			};
-
-			Quad quad;
-			quad.pos = Vec4(pos, 0);
-			quad.lpos = Vec4(rot.conjugated().rotate(-pos), 0);
-			quad.hm_size = hm_size;
-
-			ref_pos = rot.conjugated().rotate(-ref_pos);
-			IVec4 prev_from_to;
-			float s = scale.x / terrain->m_tesselation;
-			bool first = true;
-			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
-			const gpu::StateFlags state = render_state.value;
-			// TODO
-			//m_renderer.beginProfileBlock("terrain", 0);
-			encoder->useProgram(program);
-			encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-			encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
-			encoder->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			encoder->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			encoder->bindTextures(material->textures, 0, material->textures_count);
-			encoder->setState(state);
-			for (;;) {
-				// round 
-				IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
-				from.x = from.x & ~1;
-				from.y = from.y & ~1;
-				IVec2 to = from + IVec2(terrain->m_base_grid_res);
-
-				// clamp
-				quad.from_to_sup = IVec4(from, to);
-					
-				from.x = clamp(from.x, 0, (int)ceil(hm_size.x / s));
-				from.y = clamp(from.y, 0, (int)ceil(hm_size.y / s));
-				to.x = clamp(to.x, 0, (int)ceil(hm_size.x / s));
-				to.y = clamp(to.y, 0, (int)ceil(hm_size.y / s));
-
-				auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
-					if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
-					quad.from_to = IVec4(subfrom, subto);
-					quad.terrain_scale = Vec4(scale, 0);
-					quad.cell_size = s;
-					
-					const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(quad));
-					memcpy(ub.ptr, &quad, sizeof(quad));
-
-					encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-					encoder->drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
+				struct Quad {
+					IVec4 from_to;
+					IVec4 from_to_sup;
+					Vec4 pos;
+					Vec4 lpos;
+					Vec4 terrain_scale;
+					Vec2 hm_size;
+					float cell_size;
 				};
 
-				if (first) {
-					draw_rect(from, to);
-					first = false;
-				}
-				else {
-					draw_rect(from, IVec2(to.x, prev_from_to.y));
-					draw_rect(IVec2(from.x, prev_from_to.w), to);
-						
-					draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
-					draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
-				}
-					
-				if (from.x <= 0 && from.y <= 0 && to.x * s >= hm_size.x && to.y * s >= hm_size.y) break;
+				Quad quad;
+				quad.pos = Vec4(pos, 0);
+				quad.lpos = Vec4(rot.conjugated().rotate(-pos), 0);
+				quad.hm_size = hm_size;
 
-				s *= 2;
-				prev_from_to = IVec4(from / 2, to / 2);
+				ref_pos = rot.conjugated().rotate(-ref_pos);
+				IVec4 prev_from_to;
+				float s = scale.x / terrain->m_tesselation;
+				bool first = true;
+				const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+				const gpu::StateFlags state = render_state.value;
+				encoder.useProgram(program);
+				encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+				encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+				encoder.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				encoder.bindTextures(material->textures, 0, material->textures_count);
+				encoder.setState(state);
+				for (;;) {
+					// round 
+					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
+					from.x = from.x & ~1;
+					from.y = from.y & ~1;
+					IVec2 to = from + IVec2(terrain->m_base_grid_res);
+
+					// clamp
+					quad.from_to_sup = IVec4(from, to);
+					
+					from.x = clamp(from.x, 0, (int)ceil(hm_size.x / s));
+					from.y = clamp(from.y, 0, (int)ceil(hm_size.y / s));
+					to.x = clamp(to.x, 0, (int)ceil(hm_size.x / s));
+					to.y = clamp(to.y, 0, (int)ceil(hm_size.y / s));
+
+					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
+						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
+						quad.from_to = IVec4(subfrom, subto);
+						quad.terrain_scale = Vec4(scale, 0);
+						quad.cell_size = s;
+					
+						const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(quad));
+						memcpy(ub.ptr, &quad, sizeof(quad));
+
+						encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						encoder.drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
+					};
+
+					if (first) {
+						draw_rect(from, to);
+						first = false;
+					}
+					else {
+						draw_rect(from, IVec2(to.x, prev_from_to.y));
+						draw_rect(IVec2(from.x, prev_from_to.w), to);
+						
+						draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
+						draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
+					}
+					
+					if (from.x <= 0 && from.y <= 0 && to.x * s >= hm_size.x && to.y * s >= hm_size.y) break;
+
+					s *= 2;
+					prev_from_to = IVec4(from / 2, to / 2);
+				}
 			}
-		}
-		
-		// TODO
-		// m_renderer.endProfileBlock();
+		});
 	}
 	
-	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state)
-	{
+	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state) {
 		PROFILE_FUNCTION();
-
-		IAllocator& allocator = m_renderer.getAllocator();
-		RenderGrassJob& cmd = m_renderer.createJob<RenderGrassJob>(allocator);
 
 		if (!cp.is_shadow) {
 			for (Terrain* terrain : m_scene->getTerrains()) {
@@ -1944,97 +1875,170 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		cmd.m_define_mask = 0;
+		u32 define_mask = 0;
 		if (lua_istable(L, 2)) {
 			const char* define = "";
 			LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
-			cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+			define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 
 			if (LuaWrapper::getField(L, 2, "defines") != LUA_TNIL) {
 				LuaWrapper::forEachArrayItem<const char*>(L, -1, "array of strings expeceted", [&](const char* define){
-					cmd.m_define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
+					define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
 				});
 			}
 			lua_pop(L, 1);
 		}
-		cmd.m_define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
-		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
-		cmd.m_pipeline = this;
-		cmd.m_camera_params = cp;
+		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
+		const gpu::StateFlags render_state = state.get({gpu::StateFlags::NONE}).value;
 
-		m_renderer.queue(cmd, m_profiler_link);
-	}
+		m_renderer.pushJob("grass", [this, cp, define_mask, render_state](gpu::Encoder& encoder){
+			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
+			const Universe& universe = m_scene->getUniverse();
+			const float global_lod_multiplier = m_renderer.getLODMultiplier();
 
-	void renderParticles(CameraParams cp)
-	{
-
-		struct Drawcall {
-			gpu::ProgramHandle program;
-			Material::RenderData* material;
-			int size;
-			int particles_count;
-			Renderer::TransientSlice slice; 
-			Renderer::TransientSlice ub; 
-		};
-
-		PROFILE_FUNCTION();
-
-		gpu::Encoder* encoder = m_renderer.createEncoderJob();
-		const auto& emitters = m_scene->getParticleEmitters();
-		if (emitters.size() == 0) return;
-				
-		Universe& universe = m_scene->getUniverse();
-
-		gpu::VertexDecl decl;
-		decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
-		decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
-		decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
-		decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
-		decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
-
-		encoder->pushDebugGroup("particles");
-		
-		const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-		encoder->setState(blend_state | gpu::StateFlags::DEPTH_FN_GREATER);
-		const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
-		u32 material_ub_idx = 0xffFFffFF;
-
-		for (const ParticleEmitter& emitter : emitters) {
-			if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
-					
-			const u32 size = emitter.getParticlesDataSizeBytes();
-			if (size == 0) continue;
-
-			const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
-			const Vec3 lpos = Vec3(tr.pos - cp.pos);
-
-			const Material* material = emitter.getResource()->getMaterial();
-			if (!material) continue;
-
-			gpu::ProgramHandle program = material->getShader()->getProgram(decl, 0);
-			Material::RenderData* material_rd = material->getRenderData();
-			const u32 particles_count = emitter.getParticlesCount();
-			const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
-			emitter.fillInstanceData((float*)slice.ptr);
-			const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
-			Matrix mtx = tr.rot.toMatrix();
-			mtx.setTranslation(lpos);
-			memcpy(ub.ptr, &mtx, sizeof(mtx));
-
-			if (material_ub_idx != material_rd->material_constants) {
-				encoder->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material_rd->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-				material_ub_idx = material_rd->material_constants;
+			float fov_multiplier = 1;
+			if (!m_viewport.is_ortho) {
+				fov_multiplier = clamp(degreesToRadians(60) / m_viewport.fov, 1.f, 3.f);
 			}
 
-			encoder->bindTextures(material_rd->textures, 0, material_rd->textures_count);
-			encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-			encoder->useProgram(program);
-			encoder->bindIndexBuffer(gpu::INVALID_BUFFER);
-			encoder->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			encoder->bindVertexBuffer(1, slice.buffer, slice.offset, 40);
-			encoder->drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, 4, particles_count);
-		}
-		encoder->popDebugGroup();
+			u32 quad_count = 0;
+			u32 culled_count = 0;
+			u32 total_instance_count = 0;
+			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+			u32 material_ub_idx = 0xffFFffFF;
+
+			for (const Terrain* terrain : terrains) {
+				const Transform tr = universe.getTransform(terrain->m_entity);
+				Transform rel_tr = tr;
+				rel_tr.pos = tr.pos - cp.pos;
+				const Vec3 rel_pos(rel_tr.pos);
+				const Vec3 ref_lod_pos = Vec3(m_viewport.pos - tr.pos);
+				const Frustum frustum = cp.frustum.getRelative(tr.pos);
+
+				for (const Terrain::GrassType& type : terrain->m_grass_types) {
+					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
+
+					const i32 to_mesh = type.m_grass_model->getLODIndices()[0].to;
+					const HashMap<u64, Terrain::GrassQuad>& quads = type.m_quads;
+					for (i32 i = 0; i <= to_mesh; ++i) {
+						const Mesh& mesh = type.m_grass_model->getMesh(i);
+
+						Shader* shader = mesh.material->getShader();
+						ASSERT(shader->isReady());
+
+						const Material::RenderData* material = mesh.material->getRenderData();
+						encoder.setState(render_state | material->render_states);
+						encoder.bindTextures(material->textures, 0, material->textures_count);
+						if (material_ub_idx != material->material_constants) {
+							encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+							material_ub_idx = material->material_constants;
+						}
+
+						encoder.useProgram(shader->getProgram(mesh.vertex_decl, define_mask | material->define_mask));
+
+						const Mesh::RenderData* mesh_rd = mesh.render_data;
+						encoder.bindIndexBuffer(mesh_rd->index_buffer_handle);
+						encoder.bindVertexBuffer(0, mesh_rd->vertex_buffer_handle, 0, mesh_rd->vb_stride);
+						
+						for (const Terrain::GrassQuad& quad : quads) {
+							if (quad.instances_count == 0) continue;
+							if (!frustum.intersectAABB(quad.aabb)) {
+								++culled_count;
+								continue;
+							}
+
+							const Vec2 quad_size(type.m_spacing * 32);
+							const Vec2 quad_center = Vec2(quad.ij) * quad_size + quad_size * 0.5f;
+							const float distance = length(quad_center - ref_lod_pos.xz());
+
+							const float half_range = type.m_distance * 0.5f * global_lod_multiplier;
+							float count_scale = 1 - clamp(distance - half_range, 0.f, half_range) / half_range; 
+							count_scale *= count_scale;
+							count_scale *= count_scale;
+
+							const u32 instance_count = u32(quad.instances_count * count_scale);
+							if (instance_count  == 0) {
+								++culled_count;
+								continue;
+							}
+
+							const Vec4 drawcall_data(rel_pos, distance);
+							const Renderer::TransientSlice drawcall_ub = m_renderer.allocUniform(sizeof(drawcall_data));
+							memcpy(drawcall_ub.ptr, &drawcall_data, sizeof(drawcall_data));
+							encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
+
+							encoder.bindVertexBuffer(1, quad.instances, 0, sizeof(Vec4) * 2);
+							encoder.drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, mesh_rd->indices_count, instance_count, mesh_rd->index_type);
+							++quad_count;
+							total_instance_count += instance_count;
+						}
+					}
+				}
+			}
+			profiler::pushInt("Quad count", quad_count);
+			profiler::pushInt("Culled", culled_count);
+			profiler::pushInt("Instances", total_instance_count);
+
+			encoder.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		});
+	}
+
+	void renderParticles(CameraParams cp) {
+		m_renderer.pushJob("particles", [this, cp](gpu::Encoder& encoder){
+			const auto& emitters = m_scene->getParticleEmitters();
+			if (emitters.size() == 0) return;
+				
+			Universe& universe = m_scene->getUniverse();
+
+			gpu::VertexDecl decl;
+			decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
+			decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
+			decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
+			decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
+			decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
+
+			const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			encoder.setState(blend_state | gpu::StateFlags::DEPTH_FN_GREATER);
+			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+			u32 material_ub_idx = 0xffFFffFF;
+
+			for (const ParticleEmitter& emitter : emitters) {
+				if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
+					
+				const u32 size = emitter.getParticlesDataSizeBytes();
+				if (size == 0) continue;
+
+				const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
+				const Vec3 lpos = Vec3(tr.pos - cp.pos);
+
+				const Material* material = emitter.getResource()->getMaterial();
+				if (!material) continue;
+
+				gpu::ProgramHandle program = material->getShader()->getProgram(decl, 0);
+				Material::RenderData* material_rd = material->getRenderData();
+				const u32 particles_count = emitter.getParticlesCount();
+				const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
+				emitter.fillInstanceData((float*)slice.ptr);
+				const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+				Matrix mtx = tr.rot.toMatrix();
+				mtx.setTranslation(lpos);
+				memcpy(ub.ptr, &mtx, sizeof(mtx));
+
+				if (material_ub_idx != material_rd->material_constants) {
+					encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material_rd->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+					material_ub_idx = material_rd->material_constants;
+				}
+
+				encoder.bindTextures(material_rd->textures, 0, material_rd->textures_count);
+				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				encoder.useProgram(program);
+				encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+				encoder.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+				encoder.bindVertexBuffer(1, slice.buffer, slice.offset, 40);
+				encoder.drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, 4, particles_count);
+			}
+		});
 	}
 
 	static CameraParams checkCameraParams(lua_State* L, int idx)
@@ -2120,43 +2124,10 @@ struct PipelineImpl final : Pipeline
 	}
 	
 	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point, bool writable) {
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::bindShaderBuffer(buffer, binding_point, writable ? gpu::BindShaderBufferFlags::OUTPUT : gpu::BindShaderBufferFlags::NONE);
-			}
-			u32 binding_point;
-			bool writable;
-			gpu::BufferHandle buffer;
-		};
-		
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.binding_point = binding_point;
-		cmd.buffer = buffer_handle;
-		cmd.writable = writable;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->bindShaderBuffer(buffer_handle, binding_point, writable ? gpu::BindShaderBufferFlags::OUTPUT : gpu::BindShaderBufferFlags::NONE);
 	}
 	
-	void bindUniformBuffer(LuaBufferHandle buffer_handle, u32 binding_point, u32 size) {
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::bindUniformBuffer(binding_point, buffer, 0, size);
-			}
-			u32 binding_point;
-			u32 size;
-			gpu::BufferHandle buffer;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.binding_point = binding_point;
-		cmd.buffer = (gpu::BufferHandle)(uintptr)buffer_handle;
-		cmd.size = size;
-		m_renderer.queue(cmd, m_profiler_link);
-	}
-
 	LuaBufferHandle createBuffer(u32 size) {
 		Renderer::MemRef mem;
 		mem.own = false;
@@ -2230,24 +2201,15 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = getClosureThis(L);
 		const int len = lua_gettop(L);
 
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
-			}
-			Renderer::TransientSlice drawcall_ub;
-		};
+		Renderer::TransientSlice ub = pipeline->m_renderer.allocUniform(sizeof(float) * len);
 
-		Cmd& cmd = pipeline->m_renderer.createJob<Cmd>();
-		cmd.drawcall_ub = pipeline->m_renderer.allocUniform(sizeof(float) * len);
-
-		float* values = (float*)cmd.drawcall_ub.ptr;
+		float* values = (float*)ub.ptr;
 		for(int i = 0; i < len; ++i) {
 			values[i] = LuaWrapper::checkArg<float>(L, i + 1);
 		}
 
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		gpu::Encoder* encoder = pipeline->m_renderer.createEncoderJob();
+		encoder->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		return 0;
 	}
 
@@ -2268,25 +2230,9 @@ struct PipelineImpl final : Pipeline
 		gpu::ProgramHandle program = shader->getProgram(defines);
 		if (!program) return;
 
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::useProgram(program);
-				gpu::dispatch(num_groups_x, num_groups_y, num_groups_z);
-			}
-			gpu::ProgramHandle program;
-			u32 num_groups_x;
-			u32 num_groups_y;
-			u32 num_groups_z;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.num_groups_x = num_groups_x;
-		cmd.num_groups_y = num_groups_y;
-		cmd.num_groups_z = num_groups_z;
-		cmd.program = program;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->useProgram(program);
+		encoder->dispatch(num_groups_x, num_groups_y, num_groups_z);
 	}
 
 	gpu::TextureHandle toHandle(PipelineTexture tex) const {
@@ -2308,84 +2254,39 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void bindImageTexture(PipelineTexture texture, u32 unit) {
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::bindImageTexture(texture, unit);
-			}
-			gpu::TextureHandle texture;
-			u32 unit;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.texture = toHandle(texture);
-		cmd.unit = unit;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->bindImageTexture(toHandle(texture), unit);
 	}
 
 	void bindTextures(lua_State* L, LuaWrapper::Array<PipelineTexture, 16> textures, LuaWrapper::Optional<u32> offset) 	{
-		struct Cmd : Renderer::RenderJob {
-			Cmd(IAllocator& allocator) 
-				: m_textures_handles(allocator) {}
-			void setup() override {}
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				gpu::bindTextures(m_textures_handles.begin(), m_offset, m_textures_handles.size());
-			}
-
-			StackArray<gpu::TextureHandle, 16> m_textures_handles;
-			i32 m_offset = 0;
-		};
-		
-		Cmd& cmd = m_renderer.createJob<Cmd>(m_allocator);
-		cmd.m_offset = offset.get(0);
-		
+		StackArray<gpu::TextureHandle, 16> textures_handles(m_allocator);
 		for (u32 i = 0; i < textures.size; ++i) {
-			cmd.m_textures_handles.push(toHandle(textures[i]));
+			textures_handles.push(toHandle(textures[i]));
 		}
 
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->bindTextures(textures_handles.begin(), offset.get(0), textures_handles.size());
 	};
 	
-	void pass(CameraParams cp)
-	{
-		PROFILE_FUNCTION();
-		struct PushPassStateCmd : Renderer::RenderJob {
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::bindUniformBuffer(UniformBuffer::PASS, buf.buffer, buf.offset, sizeof(PassState));
-			}
+	void pass(CameraParams cp) {
+		const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(PassState));
+		PassState pass_state;
+		pass_state.view = cp.view;
+		pass_state.projection = cp.projection;
+		pass_state.inv_projection = cp.projection.inverted();
+		pass_state.inv_view = cp.view.fastInverted();
+		pass_state.view_projection = cp.projection * cp.view;
+		pass_state.inv_view_projection = pass_state.view_projection.inverted();
+		pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+		pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
+		toPlanes(cp, Span(pass_state.camera_planes));
+		if (cp.is_shadow) {
+			pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
+		}
 
-			void setup() override {
-				PROFILE_FUNCTION();
-				PassState* pass_state = (PassState*)buf.ptr;
-				pass_state->view = cp.view;
-				pass_state->projection = cp.projection;
-				pass_state->inv_projection = cp.projection.inverted();
-				pass_state->inv_view = cp.view.fastInverted();
-				pass_state->view_projection = cp.projection * cp.view;
-				pass_state->inv_view_projection = pass_state->view_projection.inverted();
-				pass_state->view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-				pass_state->camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
-				toPlanes(cp, Span(pass_state->camera_planes));
-				if (cp.is_shadow) {
-					pass_state->shadow_to_camera = Vec4(Vec3(viewport_pos - cp.pos), 1);
-				}
-			}
-
-			Renderer::TransientSlice buf;
-			CameraParams cp;
-			DVec3 viewport_pos;
-		};
-
-		PushPassStateCmd& cmd = m_renderer.createJob<PushPassStateCmd>();
-		cmd.cp = cp;
-		cmd.viewport_pos = m_viewport.pos;
-		cmd.buf = m_renderer.allocUniform(sizeof(PassState));
-		
-		m_renderer.queue(cmd, m_profiler_link);
+		memcpy(ub.ptr, &pass_state, sizeof(pass_state));
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
 	}
 
 	static void toPlanes(const CameraParams& cp, Span<Vec4> planes) {
@@ -2459,7 +2360,6 @@ struct PipelineImpl final : Pipeline
 					lua_pop(L, 1);
 				}
 			}
-
 		}
 	
 		gpu::Encoder* encoder = m_renderer.createEncoderJob();
@@ -2535,12 +2435,13 @@ struct PipelineImpl final : Pipeline
 
 	// TODO optimize
 	struct FillClustersJob : Renderer::RenderJob {
-		FillClustersJob(LinearAllocator& current_frame_allocator, IAllocator& allocator)
+		FillClustersJob(LinearAllocator& current_frame_allocator, IAllocator& allocator, PageAllocator& page_allocator)
 			: m_clusters(current_frame_allocator)
 			, m_map(current_frame_allocator)
 			, m_point_lights(allocator)
 			, m_env_probes(current_frame_allocator)
 			, m_refl_probes(current_frame_allocator)
+			, m_encoder(page_allocator)
 		{}
 
 		void setup() override {
@@ -2785,24 +2686,20 @@ struct PipelineImpl final : Pipeline
 			for (Cluster& cluster : clusters) {
 				cluster.offset -= cluster.point_lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
-		}
 
-		void execute() override {
-			PROFILE_FUNCTION();
+			m_encoder.bindUniformBuffer(UniformBuffer::SHADOW, m_shadow_matrices_ub.buffer, m_shadow_matrices_ub.offset, m_shadow_matrices_ub.size);
 
-			gpu::bindUniformBuffer(UniformBuffer::SHADOW, m_shadow_matrices_ub.buffer, m_shadow_matrices_ub.offset, m_shadow_matrices_ub.size);
-
-			auto bind = [](auto& buffer, const auto& data, i32 idx){
+			auto bind = [this](auto& buffer, const auto& data, i32 idx){
 				const u32 capacity = (data.byte_size() + 15) & ~15;
 				if (buffer.capacity < capacity) {
-					if (buffer.buffer) gpu::destroy(buffer.buffer);
+					if (buffer.buffer) m_encoder.destroy(buffer.buffer);
 					buffer.buffer = gpu::allocBufferHandle();
-					gpu::createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
+					m_encoder.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity);
 					buffer.capacity = capacity;
 				}
 				if (!data.empty()) {
-					gpu::update(buffer.buffer, data.begin(), data.byte_size());
-					gpu::bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
+					m_encoder.update(buffer.buffer, data.begin(), data.byte_size());
+					m_encoder.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
 				}
 			};
 
@@ -2811,8 +2708,12 @@ struct PipelineImpl final : Pipeline
 			bind(m_pipeline->m_cluster_buffers.maps, m_map, 13);
 			bind(m_pipeline->m_cluster_buffers.env_probes, m_env_probes, 14);
 			bind(m_pipeline->m_cluster_buffers.refl_probes, m_refl_probes, 15);
+
 		}
 
+		void execute() override {
+			m_encoder.run();
+		}
 
 		struct Cluster {
 			u32 offset;
@@ -2858,6 +2759,7 @@ struct PipelineImpl final : Pipeline
 		Array<ClusterReflProbe> m_refl_probes;
 
 		PipelineImpl* m_pipeline;
+		gpu::Encoder m_encoder;
 		CameraParams m_camera_params;
 		bool m_is_clear = false;
 		Matrix m_shadow_atlas_matrices[128];
@@ -2920,11 +2822,57 @@ struct PipelineImpl final : Pipeline
 		return float(light.radius / length(cam_pos - light_pos));
 	}
 
-	struct PrepareViewJob : Renderer::RenderJob {
-		PrepareViewJob(IAllocator& allocator)
-			: m_allocator(allocator)
-		{
+	void setupFur(View& view, const CameraParams& cp) {
+		if (cp.is_shadow) return;
+
+		HashMap<EntityRef, FurComponent>& furs = m_scene->getFurs();
+		if (furs.empty()) return;
+
+		Span<const ModelInstance> mi = m_scene->getModelInstances();
+		Sorter::Inserter inserter(view.sorter);
+		
+		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
+		
+		// TODO handle sort order
+		// TODO frustum culling
+		// TODO render correct LOD
+		for (auto iter = furs.begin(); iter.isValid(); ++iter) {
+			const EntityRef e = iter.key();
+			if (e.index >= (i32)mi.length()) continue;
+			if (!mi[e.index].flags.isSet(ModelInstance::VALID)) continue;
+			if (!iter.value().enabled) continue;
+
+			const Model* model = mi[e.index].model;
+			if (!model) continue;
+			if (!model->isReady()) continue;
+
+			for (i32 i = 0; i < model->getMeshCount(); ++i) {
+				const Mesh& mesh = model->getMesh(i);
+				if (mesh.type != Mesh::SKINNED) continue;
+
+				const u8 bucket_id = view.layer_to_bucket[mesh.material->getLayer()];
+				if (bucket_id != 0xff) {
+					const u64 key = mesh.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
+					const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
+				
+					inserter.push(key, subrenderable);
+				}
+			}
 		}
+	}
+
+	void setupInstancedModels(gpu::Encoder& encoder, View& view, const CameraParams& cp) {
+		PROFILE_FUNCTION();
+		if (!view.instanced_meshes) return;
+		if (!m_instancing_shader->isReady()) return;
+
+		const float global_lod_multiplier = m_renderer.getLODMultiplier();
+		const Universe& universe = m_scene->getUniverse();
+		const HashMap<EntityRef, InstancedModel>& ims = m_scene->getInstancedModels();
+		Renderer& renderer = m_renderer;
+		u32 define_mask = 0; 
+		const u32 instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+		view.instanced_meshes->models.reserve(ims.size());
 		
 		struct UBValues {
 			Vec4 camera_offset;
@@ -2938,251 +2886,176 @@ struct PipelineImpl final : Pipeline
 			IVec4 indices_count[32];
 		};
 
-		void execute() override {
-			PROFILE_FUNCTION();
-			if (!m_instanced_meshes) return;
-			if (m_instanced_meshes->models.empty()) return;
+		UBValues ub_values;
+		toPlanes(cp, Span(ub_values.camera_planes));
 
-			const gpu::BufferHandle culled_buffer = m_pipeline->m_instanced_meshes_buffer;
-			gpu::bindShaderBuffer(m_pipeline->m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
-			
-			m_pipeline->m_renderer.beginProfileBlock("cull instanced models", 0);
-			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, g.drawcall_ub.buffer, g.drawcall_ub.offset, sizeof(UBValues));
+		const gpu::BufferHandle culled_buffer = m_instanced_meshes_buffer;
+		encoder.bindShaderBuffer(m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
+		const gpu::ProgramHandle gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
+		const gpu::ProgramHandle indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
+		u32 cull_shader_defines = 1 << m_renderer.getShaderDefineIdx("PASS1");
+		if (!cp.is_shadow) cull_shader_defines |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
+		const gpu::ProgramHandle cull_shader = m_instancing_shader->getProgram(cull_shader_defines);
+		const gpu::ProgramHandle init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
+		const gpu::ProgramHandle update_lods_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("UPDATE_LODS"));
 
-				gpu::bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
-				gpu::useProgram(m_init_shader);
-				gpu::dispatch(1, 1, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+			const InstancedModel& im = iter.value();
+			Model* m = im.model;
+			if (!m || !m->isReady()) continue;
 
-				if (m_camera_params.is_shadow) {
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
+			auto getDrawDistance = [](const Model& model) {
+				const LODMeshIndices* lod_indices = model.getLODIndices();
+				float dist = 0;
+				for (u32 i = 0; i < 4; ++i) {
+					if (lod_indices[i].to != -1) {
+						dist = model.getLODDistances()[i];
+					}
 				}
-				else {
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-					gpu::useProgram(m_update_lods_shader);
-					for (u32 i = 0; i < g.cell_count; ++i) {
-						if (!g.cells[i].visible) {
-							gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
-							gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+				return sqrtf(dist);
+			};
+
+			const float draw_distance = getDrawDistance(*m);
+			InstancedMeshes::Model& g = view.instanced_meshes->models.emplace(m_allocator);
+
+			const Transform origin = universe.getTransform(iter.key());
+			const Frustum frustum = cp.frustum.getRelative(origin.pos);
+			const float radius = m->getOriginBoundingRadius();
+
+			struct {
+				u32 offset;
+				u32 count;
+				bool visible;
+				Renderer::TransientSlice ub;
+			} cells[16];
+			u32 cell_count = 0;
+
+			for (u32 i = 0; i < 16; ++i) {
+				const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
+
+				if (cell.instance_count > 0) {
+					const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
+					const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
+					const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
+					const float cell_radius = length(cell_half_extents);
+					if (length(origin.pos - cp.pos + cell_center) - cell_radius < draw_distance) {
+						const bool can_merge = cell_count > 0 && cells[cell_count - 1].visible == visible  && cells[cell_count - 1].offset + cells[cell_count - 1].count == cell.from_instance;
+						if (can_merge) {
+							cells[cell_count - 1].count += cell.instance_count;
+							u32* tmp =(u32*)cells[cell_count - 1].ub.ptr;
+							tmp[1] += cell.instance_count;
+						}
+						else {
+							cells[cell_count].visible = visible;
+							cells[cell_count].count = cell.instance_count;
+							cells[cell_count].offset = cell.from_instance;
+							Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(u32) * 2);
+							u32* tmp =(u32*)ub.ptr;
+							tmp[0] = cell.from_instance;
+							tmp[1] = cell.instance_count;
+							cells[cell_count].ub = ub;
+							++cell_count;
 						}
 					}
 				}
+			}
 				
-				gpu::useProgram(m_cull_shader);
-				for (u32 i = 0; i < g.cell_count; ++i) {
-					if (g.cells[i].visible) {
-						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
-						gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
+			if (cell_count == 0) {
+				view.instanced_meshes->models.pop();
+				continue;
+			}
+
+			Vec4 lod_distances = *(Vec4*)m->getLODDistances() * global_lod_multiplier;
+			if (lod_distances.w < 0) lod_distances.w = FLT_MAX;
+			if (lod_distances.z < 0) lod_distances.z = FLT_MAX;
+			if (lod_distances.y < 0) lod_distances.y = FLT_MAX;
+			if (lod_distances.x < 0) lod_distances.x = FLT_MAX;
+			IVec4 lod_indices;
+			lod_indices.x = m->getLODIndices()[0].to;
+			lod_indices.y = maximum(lod_indices.x, m->getLODIndices()[1].to);
+			lod_indices.z = maximum(lod_indices.y, m->getLODIndices()[2].to);
+			lod_indices.w = maximum(lod_indices.z, m->getLODIndices()[3].to);
+			const u32 instance_count = im.instances.size();
+			
+			g.indirect_offset = atomicAdd(&m_indirect_buffer_offset, m->getMeshCount());
+			g.meshes.reserve(m->getMeshCount());
+			for (i32 i = 0; i < m->getMeshCount(); ++i) {
+				const Mesh& mesh = m->getMesh(i);
+				InstancedMeshes::Model::MeshRenderData& m = g.meshes.emplace();
+				m.mesh_rd = mesh.render_data;
+				m.mesh = &mesh;
+				m.material = mesh.material->getRenderData();
+				m.layer = mesh.layer;
+			}
+
+			ub_values.camera_offset = Vec4(Vec3(origin.pos - cp.pos), 1);
+			ub_values.lod_distances = lod_distances;
+			ub_values.lod_indices = lod_indices;
+			ub_values.indirect_offset = g.indirect_offset;
+			ub_values.radius = m->getOriginBoundingRadius();
+			ub_values.batch_size = instance_count;
+			ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
+			for (const auto& m : g.meshes) {
+				ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
+			}
+
+			const Renderer::TransientSlice drawcall_ub = m_renderer.allocUniform(sizeof(ub_values));
+			memcpy(drawcall_ub.ptr, &ub_values, sizeof(ub_values));
+
+			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
+
+			encoder.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
+			encoder.useProgram(init_shader);
+			encoder.dispatch(1, 1, 1);
+			encoder.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+
+			if (cp.is_shadow) {
+				encoder.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
+			}
+			else {
+				encoder.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+				encoder.useProgram(update_lods_shader);
+				for (u32 i = 0; i < cell_count; ++i) {
+					if (!cells[i].visible) {
+						encoder.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
+						encoder.dispatch((cells[i].count + 255) / 256, 1, 1);
 					}
 				}
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
-
-				if (!m_camera_params.is_shadow) {
-					gpu::bindShaderBuffer(g.instance_data, 0, gpu::BindShaderBufferFlags::NONE);
-				}
-
-				gpu::useProgram(m_indirect_shader);
-				gpu::dispatch((g.meshes.size() + 255) / 256, 1, 1);
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, m_pipeline->m_indirect_buffer);
-
-				gpu::useProgram(m_gather_shader);
-				for (u32 i = 0; i < g.cell_count; ++i) {
-					if (g.cells[i].visible) {
-						gpu::bindUniformBuffer(UniformBuffer::DRAWCALL2, g.cells[i].ub.buffer, g.cells[i].ub.offset, g.cells[i].ub.size);
-						gpu::dispatch((g.cells[i].count + 255) / 256, 1, 1);
-					}
-				}
-
-				gpu::memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 			}
-			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
-			
-			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
-			gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);
-			
-			m_pipeline->m_renderer.endProfileBlock();
-		}
-
-		static float getDrawDistance(const Model& model) {
-			const LODMeshIndices* lod_indices = model.getLODIndices();
-			float dist = 0;
-			for (u32 i = 0; i < 4; ++i) {
-				if (lod_indices[i].to != -1) {
-					dist = model.getLODDistances()[i];
-				}
-			}
-			return sqrtf(dist);
-		}
-
-		void setupFur() {
-			if (m_camera_params.is_shadow) return;
-
-			RenderScene* scene = m_pipeline->m_scene;
-			HashMap<EntityRef, FurComponent>& furs = scene->getFurs();
-			if (furs.empty()) return;
-
-			Span<const ModelInstance> mi = scene->getModelInstances();
-			Sorter::Inserter inserter(m_view->sorter);
-		
-			const u64 type_mask = (u64)RenderableTypes::FUR << 32;
-		
-			// TODO handle sort order
-			// TODO frustum culling
-			// TODO render correct LOD
-			for (auto iter = furs.begin(); iter.isValid(); ++iter) {
-				const EntityRef e = iter.key();
-				if (e.index >= (i32)mi.length()) continue;
-				if (!mi[e.index].flags.isSet(ModelInstance::VALID)) continue;
-				if (!iter.value().enabled) continue;
-
-				const Model* model = mi[e.index].model;
-				if (!model) continue;
-				if (!model->isReady()) continue;
-
-				for (i32 i = 0; i < model->getMeshCount(); ++i) {
-					const Mesh& mesh = model->getMesh(i);
-					if (mesh.type != Mesh::SKINNED) continue;
-
-					const u8 bucket_id = m_view->layer_to_bucket[mesh.material->getLayer()];
-					if (bucket_id != 0xff) {
-						const u64 key = mesh.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
-						const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
 				
-						inserter.push(key, subrenderable);
-					}
+			encoder.useProgram(cull_shader);
+			for (u32 i = 0; i < cell_count; ++i) {
+				if (cells[i].visible) {
+					encoder.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
+					encoder.dispatch((cells[i].count + 255) / 256, 1, 1);
 				}
 			}
+			encoder.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+
+			if (!cp.is_shadow) {
+				encoder.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
+			}
+
+			encoder.useProgram(indirect_shader);
+			encoder.dispatch((g.meshes.size() + 255) / 256, 1, 1);
+			encoder.memoryBarrier(gpu::MemoryBarrierType::SSBO, m_indirect_buffer);
+
+			encoder.useProgram(gather_shader);
+			for (u32 i = 0; i < cell_count; ++i) {
+				if (cells[i].visible) {
+					encoder.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
+					encoder.dispatch((cells[i].count + 255) / 256, 1, 1);
+				}
+			}
+
+			encoder.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 		}
-
-		void setup() override {
-			PROFILE_FUNCTION();
-
-			setupFur();
-
-			m_view->renderables = m_pipeline->m_scene->getRenderables(m_view->cp.frustum);
-			const float global_lod_multiplier = m_pipeline->m_renderer.getLODMultiplier();
+		encoder.memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_indirect_buffer);
 			
-			if (m_view->renderables) {
-				m_pipeline->createSortKeys(*m_view);
-				m_view->renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
-				if (!m_view->sorter.keys.empty()) {
-					m_pipeline->radixSort(m_view->sorter.keys.begin(), m_view->sorter.values.begin(), m_view->sorter.keys.size());
-					m_pipeline->createCommands(*m_view);
-				}
-			}
-
-			// instanced meshes
-			if (m_instanced_meshes) {
-				const Universe& universe = m_pipeline->m_scene->getUniverse();
-				const HashMap<EntityRef, InstancedModel>& ims = m_pipeline->m_scene->getInstancedModels();
-				Renderer& renderer = m_pipeline->m_renderer;
-				const u32 instanced_define_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-				m_instanced_meshes->models.reserve(ims.size());
-				UBValues ub_values;
-				toPlanes(m_camera_params, Span(ub_values.camera_planes));
-
-				for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-					const InstancedModel& im = iter.value();
-					Model* m = im.model;
-					if (!m || !m->isReady()) continue;
-
-					float draw_distance = getDrawDistance(*m);
-					InstancedMeshes::Model& g = m_instanced_meshes->models.emplace(m_allocator);
-
-					g.origin = universe.getTransform(iter.key());
-					Frustum frustum = m_camera_params.frustum.getRelative(g.origin.pos);
-					const float radius = m->getOriginBoundingRadius();
-
-					for (u32 i = 0; i < 16; ++i) {
-						const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
-
-						if (cell.instance_count > 0) {
-							const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
-							const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
-							const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
-							const float cell_radius = length(cell_half_extents);
-							if (length(g.origin.pos - m_camera_params.pos + cell_center) - cell_radius < draw_distance) {
-								const bool can_merge = g.cell_count > 0 && g.cells[g.cell_count - 1].visible == visible  && g.cells[g.cell_count - 1].offset + g.cells[g.cell_count - 1].count == cell.from_instance;
-								if (can_merge) {
-									g.cells[g.cell_count - 1].count += cell.instance_count;
-									u32* tmp =(u32*)g.cells[g.cell_count - 1].ub.ptr;
-									tmp[1] += cell.instance_count;
-								}
-								else {
-									g.cells[g.cell_count].visible = visible;
-									g.cells[g.cell_count].count = cell.instance_count;
-									g.cells[g.cell_count].offset = cell.from_instance;
-									Renderer::TransientSlice ub = m_pipeline->m_renderer.allocUniform(sizeof(u32) * 2);
-									u32* tmp =(u32*)ub.ptr;
-									tmp[0] = cell.from_instance;
-									tmp[1] = cell.instance_count;
-									g.cells[g.cell_count].ub = ub;
-									++g.cell_count;
-								}
-							}
-						}
-					}
-				
-					if (g.cell_count == 0) {
-						m_instanced_meshes->models.pop();
-						continue;
-					}
-
-					g.lod_distances = *(Vec4*)m->getLODDistances() * global_lod_multiplier;
-					if (g.lod_distances.w < 0) g.lod_distances.w = FLT_MAX;
-					if (g.lod_distances.z < 0) g.lod_distances.z = FLT_MAX;
-					if (g.lod_distances.y < 0) g.lod_distances.y = FLT_MAX;
-					if (g.lod_distances.x < 0) g.lod_distances.x = FLT_MAX;
-					g.lod_indices.x = m->getLODIndices()[0].to;
-					g.lod_indices.y = maximum(g.lod_indices.x, m->getLODIndices()[1].to);
-					g.lod_indices.z = maximum(g.lod_indices.y, m->getLODIndices()[2].to);
-					g.lod_indices.w = maximum(g.lod_indices.z, m->getLODIndices()[3].to);
-					g.radius = m->getOriginBoundingRadius();
-					g.instance_count = im.instances.size();
-					g.instance_data = im.gpu_data;
-					g.indirect_offset = atomicAdd(&m_pipeline->m_indirect_buffer_offset, m->getMeshCount());
-					g.meshes.reserve(m->getMeshCount());
-					for (i32 i = 0; i < m->getMeshCount(); ++i) {
-						const Mesh& mesh = m->getMesh(i);
-						InstancedMeshes::Model::MeshRenderData& m = g.meshes.emplace();
-						m.mesh_rd = mesh.render_data;
-						m.mesh = &mesh;
-						m.material = mesh.material->getRenderData();
-						m.layer = mesh.layer;
-					}
-
-					ub_values.camera_offset = Vec4(Vec3(g.origin.pos - m_camera_params.pos), 1);
-					ub_values.lod_distances = g.lod_distances;
-					ub_values.lod_indices = g.lod_indices;
-					ub_values.indirect_offset = g.indirect_offset;
-					ub_values.radius = g.radius;
-					ub_values.batch_size = g.instance_count;
-					ASSERT((u32)g.meshes.size() < lengthOf(ub_values.indices_count)); // TODO
-					for (const auto& m : g.meshes) {
-						ub_values.indices_count[&m - g.meshes.begin()].x = m.mesh_rd->indices_count;
-					}
-
-					g.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(ub_values));
-					memcpy(g.drawcall_ub.ptr, &ub_values, sizeof(ub_values));
-				}
-			}
-			jobs::setGreen(&m_view->ready);
-		}
-
-		IAllocator& m_allocator;
-		PipelineImpl* m_pipeline;
-		CameraParams m_camera_params;
-		u32 m_define_mask = 0;
-		InstancedMeshes* m_instanced_meshes = nullptr;
-		gpu::ProgramHandle m_gather_shader;
-		gpu::ProgramHandle m_indirect_shader;
-		gpu::ProgramHandle m_cull_shader;
-		gpu::ProgramHandle m_init_shader;
-		gpu::ProgramHandle m_update_lods_shader;
-		View* m_view;
-	};
+		encoder.bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
+		encoder.bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+		encoder.bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);	
+	}
 
 	static int cull(lua_State* L) {
 		PROFILE_FUNCTION();
@@ -3239,11 +3112,6 @@ struct PipelineImpl final : Pipeline
 			view->layer_to_bucket[bucket.layer] = i;
 		}
 
-		PrepareViewJob& job = pipeline->m_renderer.createJob<PrepareViewJob>(allocator);
-		job.m_pipeline = pipeline;
-		job.m_camera_params = cp;
-		job.m_view = view.get();
-
 		if (pipeline->m_instancing_shader->isReady()) {
 			const HashMap<EntityRef, InstancedModel>& ims = pipeline->m_scene->getInstancedModels();
 			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
@@ -3251,18 +3119,27 @@ struct PipelineImpl final : Pipeline
 					pipeline->m_scene->initInstancedModelGPUData(iter.key());
 				}
 			}
-
-			job.m_instanced_meshes = view->instanced_meshes;
-			job.m_gather_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS3"));
-			job.m_indirect_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS2"));
-			u32 cull_shader_defines = 1 << pipeline->m_renderer.getShaderDefineIdx("PASS1");
-			if (!cp.is_shadow) cull_shader_defines |= 1 << pipeline->m_renderer.getShaderDefineIdx("UPDATE_LODS");
-			job.m_cull_shader = pipeline->m_instancing_shader->getProgram(cull_shader_defines);
-			job.m_init_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("PASS0"));
-			job.m_update_lods_shader = pipeline->m_instancing_shader->getProgram(1 << pipeline->m_renderer.getShaderDefineIdx("UPDATE_LODS"));
 		}
+
+		View* view_ptr = view.get();
 		jobs::setRed(&view->ready);
-		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
+		pipeline->m_renderer.pushJob("prepare view", [pipeline, view_ptr, cp](gpu::Encoder& encoder){
+			pipeline->setupFur(*view_ptr, cp);
+			pipeline->setupInstancedModels(encoder, *view_ptr, cp);
+
+			view_ptr->renderables = pipeline->m_scene->getRenderables(view_ptr->cp.frustum);
+			
+			if (view_ptr->renderables) {
+				pipeline->createSortKeys(*view_ptr);
+				view_ptr->renderables->free(pipeline->m_renderer.getEngine().getPageAllocator());
+				if (!view_ptr->sorter.keys.empty()) {
+					pipeline->radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
+					pipeline->createCommands(*view_ptr);
+				}
+			}
+
+			jobs::setGreen(&view_ptr->ready);
+		});
 
 		lua_newtable(L);
 		const u32 view_id = pipeline->m_views.size() - 1;
@@ -3273,186 +3150,19 @@ struct PipelineImpl final : Pipeline
 		return 1;
 	}
 
-	struct RenderBucketJob : Renderer::RenderJob {
-		RenderBucketJob(IAllocator& allocator, PageAllocator& page_allocator)
-			: m_procedural_encoder(page_allocator)
-		{}
-
-		void setup() override {
-			PROFILE_FUNCTION();
-			jobs::wait(&m_view->ready);
-
-			Bucket& bucket= m_view->buckets[m_bucket_id];
-			m_encoder.create(static_cast<gpu::Encoder&&>(bucket.encoder));
-			m_cmds = bucket.cmd_page;
-			m_render_state = bucket.state;
-
-			const u32 instanced_define_mask = bucket.define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
-			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-				for (auto& m : g.meshes) {
-					if (m.layer == m_layer) {
-						m.program = m.mesh->material->getShader()->getProgram(m.mesh->vertex_decl, instanced_define_mask | m.mesh->material->getDefineMask());
-					}
-				}
-			}
-
-			const Universe& universe = m_pipeline->getScene()->getUniverse();
-			RenderScene* render_scene = m_pipeline->m_scene;
-			const HashMap<EntityRef, ProceduralGeometry>& geometries = render_scene->getProceduralGeometries();
-			Renderer& renderer = m_pipeline->m_renderer;
-			const DVec3 camera_pos = m_view->cp.pos;
-			// TODO
-			// m_renderer.beginProfileBlock("draw procedural geom", 0);
-			for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
-				const ProceduralGeometry& pg = iter.value();
-				if (!pg.vertex_buffer) continue;
-				if (!pg.material || !pg.material->isReady()) continue;
-				if (pg.material->getLayer() != m_layer) continue;
-
-				Material::RenderData* material = pg.material->getRenderData();
-
-				Renderer& renderer = m_pipeline->m_renderer;
-				const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-				const gpu::StateFlags render_states = m_render_state;
-				u32 material_ub_idx = 0xffFFffFF;
-				m_procedural_encoder.bindTextures(material->textures, 0, material->textures_count);
-				m_procedural_encoder.setState(material->render_states | render_states);
-				if (material_ub_idx != material->material_constants) {
-					m_procedural_encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-					material_ub_idx = material->material_constants;
-				}
-
-				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
-				const Renderer::TransientSlice ub = renderer.allocUniform(sizeof(Matrix));
-				memcpy(ub.ptr, &mtx, sizeof(mtx));
-
-				m_procedural_encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				const gpu::ProgramHandle program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
-				m_procedural_encoder.useProgram(program);
-
-				m_procedural_encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
-				const u32 stride = pg.vertex_decl.getStride();
-				m_procedural_encoder.bindVertexBuffer(0, pg.vertex_buffer, 0, stride);
-				m_procedural_encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-				if (pg.index_buffer) {
-					m_procedural_encoder.bindIndexBuffer(pg.index_buffer);
-					const u32 vertex_count = (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4);
-					m_procedural_encoder.drawIndexed(pg.primitive_type, 0, vertex_count, pg.index_type);
-				}
-				else {
-					m_procedural_encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
-					const u32 vertex_count = (u32)pg.vertex_data.size() / stride;
-					m_procedural_encoder.drawArrays(pg.primitive_type, 0, vertex_count);
-				}
-			}
-			// TODO
-			// m_renderer.endProfileBlock();
-		}
-
-		void drawInstancedMeshes() {
-			if (m_instanced_meshes->models.empty()) return;
-			m_pipeline->m_renderer.beginProfileBlock("draw instanced models", 0);
-
-			gpu::memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_pipeline->m_indirect_buffer);
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-			for (const InstancedMeshes::Model& g : m_instanced_meshes->models) {
-				for (const auto& m : g.meshes) {
-					if (m.layer == m_layer) {
-						gpu::bindTextures(m.material->textures, 0, m.material->textures_count);
-						gpu::setState(m.material->render_states | m_render_state);
-						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-
-						gpu::useProgram(m.program);
-
-						gpu::bindIndexBuffer(m.mesh_rd->index_buffer_handle);
-						gpu::bindVertexBuffer(0, m.mesh_rd->vertex_buffer_handle, 0, m.mesh_rd->vb_stride);
-						gpu::bindVertexBuffer(1, m_pipeline->m_instanced_meshes_buffer, 48, 32);
-
-						gpu::bindIndirectBuffer(m_pipeline->m_indirect_buffer);
-
-						gpu::drawIndirect(m.mesh_rd->index_type, u32(sizeof(Indirect) * (g.indirect_offset + (&m - g.meshes.begin()))));
-					}
-				}
-			}
-			
-			gpu::bindIndirectBuffer(gpu::INVALID_BUFFER);
-			gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-			m_pipeline->m_renderer.endProfileBlock();
-		}
-
-
-		void execute() override {
-			PROFILE_FUNCTION();
-
-			drawInstancedMeshes();
-			m_procedural_encoder.run();
-			m_pipeline->m_renderer.beginProfileBlock("render_bucket", 0);
-			m_encoder->run();
-			m_pipeline->m_renderer.endProfileBlock();
-		}
-
-		CmdPage* m_cmds;
-		PipelineImpl* m_pipeline;
-		u32 m_bucket_id;
-		View* m_view;
-		InstancedMeshes* m_instanced_meshes;
-		u8 m_layer;
-		gpu::StateFlags m_render_state;
-		gpu::Encoder m_procedural_encoder;
-		Local<gpu::Encoder> m_encoder;
-	};
-
 	static Vec4 packRotationLOD(const Quat& rot, float lod) {
 		return rot.w > 0 ? Vec4(rot.x, rot.y, rot.z, lod) : Vec4(-rot.x, -rot.y, -rot.z, lod);
 	}
 
-	struct MeshCmd {
-		Mesh::RenderData* mesh;
-		Material::RenderData* material;
-		gpu::ProgramHandle program;
-		u32 count;
-		gpu::BufferHandle buffer;
-		u32 offset;
-	};
-
-	struct SkinnedMeshCmd {
-		Mesh::RenderData* mesh;
-		Material::RenderData* material;
-		gpu::ProgramHandle program;
-		u32 bone_count;
-		u32 layers;
-		gpu::BufferHandle ub_buffer;
-		u32 ub_offset;
-		u32 ub_size;
-	};
-
-	struct DecalCmd {
-		Material::RenderData* material;
-		gpu::ProgramHandle program;
-		gpu::BufferHandle buffer;
-		u32 offset;
-		u32 total_count;
-		u32 nonintersecting_count;
-	};
-
-	struct LocalLightCmd {
-		u32 total_count;
-		u32 nonintersecting_count;
-		gpu::BufferHandle buffer;
-		u32 offset;
-	};
-
-	void createCommands(View& view
-		, const u64* LUMIX_RESTRICT renderables
-		, const u64* LUMIX_RESTRICT sort_keys
-		, u32 count)
+	void createCommands(View& view)
 	{
-		PROFILE_BLOCK("create cmds");
+		PROFILE_FUNCTION();
+		const int count = view.sorter.keys.size();
+		profiler::pushInt("Count", count);
 		if (count == 0) return;
+		
+		const u64* LUMIX_RESTRICT renderables = view.sorter.values.begin();
+		const u64* LUMIX_RESTRICT sort_keys = view.sorter.keys.begin();
 
 		const Universe& universe = m_scene->getUniverse();
 		Renderer& renderer = m_renderer;
@@ -3799,121 +3509,105 @@ struct PipelineImpl final : Pipeline
 					--i;
 					break;
 				}
-#if 0
-// TODO this is not used anywhere
-				case RenderableTypes::LOCAL_LIGHT: {
-					const u64 type_bits = (u64)RenderableTypes::LOCAL_LIGHT << 32;
-					const u64 type_mask = (u64)0xff << 32;
-					int start_i = i;
-					while (i < c && (renderables[i] & type_mask) == type_bits) {
-						++i;
-					}
-
-					struct LightData {
-						Quat rot;
-						Vec3 pos;
-						float range;
-						float attenuation;
-						Vec3 color;
-						Vec3 dir;
-						float fov;
-					};
-					const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(LightData));
-
-					LightData* beg = (LightData*)slice.ptr;
-					LightData* end = (LightData*)(slice.ptr + (i - start_i - 1) - sizeof(LightData));
-
-					for (u32 j = start_i; j < i; ++j) {
-						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const PointLight& pl = scene->getPointLight(e);
-						const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
-							
-						LightData* iter = intersecting ? end : beg;
-						iter->pos = lpos;
-						iter->rot = tr.rot;
-						iter->range = pl.range;
-						iter->attenuation = pl.attenuation_param;
-						iter->color = pl.color * pl.intensity;
-						iter->dir = tr.rot * Vec3(0, 0, 1);
-						iter->fov = pl.fov;
-						intersecting ? --end : ++beg;
-					}
-
-					LocalLightCmd* cmd = stream.newCmd<LocalLightCmd>(type);
-					cmd->total_count = i - start_i;
-					cmd->nonintersecting_count = u32(beg - (LightData*)slice.ptr);
-					cmd->buffer = slice.buffer;
-					cmd->offset = slice.offset;
-					--i;
-					break;
-				}
-#endif
 				default: ASSERT(false); break;
 			}
 		}
 	}
 
-	void createCommands(View& view)
-	{
-		PROFILE_FUNCTION();
-		const u64* renderables = view.sorter.values.begin();
-		const u64* sort_keys = view.sorter.keys.begin();
-		const int size = view.sorter.keys.size();
-		profiler::pushInt("Count", size);
-
-		// TODO multithread
-		createCommands(view, renderables, sort_keys, size);
-
-#if 0
-		i32 STEP = 4096;
-		i32 steps = (size + STEP - 1) / STEP;
-		if (steps < jobs::getWorkersCount()) {
-			STEP = (size + jobs::getWorkersCount() - 1) / jobs::getWorkersCount();
-			steps = (size + STEP - 1) / STEP;
-		}
-
-		StackArray<CmdPage*, 64> pages(m_allocator);
-		pages.resize(steps);
-		jobs::forEach(size, STEP, [&](i32 from, i32 to){
-			const u32 step = from / STEP;
-			createCommands(bucket_encoders, view, renderables + from, sort_keys + from, to - from);
-			//pages[step] = createCommands(view, renderables + from, sort_keys + from, to - from);
-		});
-
-		CmdPage* prev = nullptr;
-		for (CmdPage* page : pages) {
-			while (page) {
-				if (prev) {
-					prev->header.next = prev->header.bucket != page->header.bucket ? nullptr : page;
-				}
-				Bucket& bucket = view.buckets[page->header.bucket];
-				if (!bucket.cmd_page) bucket.cmd_page = page;
-				
-				prev = page;
-				page = page->header.next;
-			}
-		}
-#endif
-	}
 
 	void renderBucket(u32 viewbucket_id) {
-		PROFILE_FUNCTION();
-		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
-		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>(m_allocator, page_allocator);
-		job.m_pipeline = this;
-		job.m_bucket_id = viewbucket_id & 0xffFF;
-		job.m_view = m_views[viewbucket_id >> 16].get();
-		job.m_layer = job.m_view->buckets[job.m_bucket_id].layer;
-		job.m_instanced_meshes = job.m_view->instanced_meshes;
-		m_renderer.queue(job, m_profiler_link);
+		m_renderer.pushJob("render bucket", [this, viewbucket_id](gpu::Encoder& encoder){
+			View* view = m_views[viewbucket_id >> 16].get();
+			jobs::wait(&view->ready);
+
+			const u16 bucket_id = viewbucket_id & 0xffFF;
+			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+			Bucket& bucket= view->buckets[bucket_id];
+			encoder.merge(bucket.encoder);
+			const gpu::StateFlags render_state = bucket.state;
+
+			// instanced meshes
+			encoder.memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_indirect_buffer);
+			const u32 instanced_define_mask = bucket.define_mask | (1 << m_renderer.getShaderDefineIdx("INSTANCED"));
+			for (const InstancedMeshes::Model& g : view->instanced_meshes->models) {
+				for (auto& m : g.meshes) {
+					if (m.layer == bucket.layer) {
+						Shader* shader = m.mesh->material->getShader();
+						const gpu::ProgramHandle program = shader->getProgram(m.mesh->vertex_decl, instanced_define_mask | m.mesh->material->getDefineMask());
+
+						encoder.bindTextures(m.material->textures, 0, m.material->textures_count);
+						encoder.setState(m.material->render_states | render_state);
+						encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, m.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+
+						encoder.useProgram(program);
+
+						encoder.bindIndexBuffer(m.mesh_rd->index_buffer_handle);
+						encoder.bindVertexBuffer(0, m.mesh_rd->vertex_buffer_handle, 0, m.mesh_rd->vb_stride);
+						encoder.bindVertexBuffer(1, m_instanced_meshes_buffer, 48, 32);
+
+						encoder.bindIndirectBuffer(m_indirect_buffer);
+
+						encoder.drawIndirect(m.mesh_rd->index_type, u32(sizeof(Indirect) * (g.indirect_offset + (&m - g.meshes.begin()))));
+					}
+				}
+			}
+			encoder.bindIndirectBuffer(gpu::INVALID_BUFFER);
+			encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+			encoder.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+			// procedural geometries
+			const Universe& universe = m_scene->getUniverse();
+			const HashMap<EntityRef, ProceduralGeometry>& geometries = m_scene->getProceduralGeometries();
+			const DVec3 camera_pos = view->cp.pos;
+			for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
+				const ProceduralGeometry& pg = iter.value();
+				if (!pg.vertex_buffer) continue;
+				if (!pg.material || !pg.material->isReady()) continue;
+				if (pg.material->getLayer() != bucket.layer) continue;
+
+				Material::RenderData* material = pg.material->getRenderData();
+
+				u32 material_ub_idx = 0xffFFffFF;
+				encoder.bindTextures(material->textures, 0, material->textures_count);
+				encoder.setState(material->render_states | render_state);
+				if (material_ub_idx != material->material_constants) {
+					encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+					material_ub_idx = material->material_constants;
+				}
+
+				const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
+				const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(Matrix));
+				memcpy(ub.ptr, &mtx, sizeof(mtx));
+
+				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				const gpu::ProgramHandle program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
+				encoder.useProgram(program);
+
+				encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+				const u32 stride = pg.vertex_decl.getStride();
+				encoder.bindVertexBuffer(0, pg.vertex_buffer, 0, stride);
+				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+				if (pg.index_buffer) {
+					encoder.bindIndexBuffer(pg.index_buffer);
+					const u32 vertex_count = (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4);
+					encoder.drawIndexed(pg.primitive_type, 0, vertex_count, pg.index_type);
+				}
+				else {
+					encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+					const u32 vertex_count = (u32)pg.vertex_data.size() / stride;
+					encoder.drawArrays(pg.primitive_type, 0, vertex_count);
+				}
+			}
+		});
 	}
 
 	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
 		PROFILE_FUNCTION();
 		LinearAllocator& current_frame_allocator = m_renderer.getCurrentFrameAllocator();
-		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(current_frame_allocator, m_allocator);
+		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
+		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(current_frame_allocator, m_allocator, page_allocator);
 		
 		job.m_pipeline = this;
 		if (cp.valid) {
@@ -4000,44 +3694,13 @@ struct PipelineImpl final : Pipeline
 	}
 	
 	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb) {
-		struct Cmd : Renderer::RenderJob
-		{
-			void setup() override { }
-
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-			
-				gpu::setFramebuffer(rbs, count, ds, flags);
-				gpu::viewport(0, 0, w, h);
-			}
-
-			PipelineImpl* pipeline;
-			gpu::TextureHandle rbs[8];
-			gpu::TextureHandle ds;
-			gpu::FramebufferFlags flags;
-			u32 count;
-			u32 w;
-			u32 h;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		ASSERT(renderbuffers.length() < lengthOf(cmd.rbs));
-
-		for (u32 i = 0; i < renderbuffers.length(); ++i) {
-			cmd.rbs[i] = renderbuffers[i];
-		}
-
-		cmd.pipeline = this;
-		cmd.ds = ds;
-		cmd.count = renderbuffers.length();
-		cmd.flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;
+		gpu::FramebufferFlags flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;
 		if (readonly_ds) {
-			cmd.flags = cmd.flags | gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
+			flags = flags | gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
-		cmd.w = m_viewport.w;
-		cmd.h = m_viewport.h;
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->setFramebuffer(renderbuffers.begin(), renderbuffers.length(), ds, flags);
+		encoder->viewport(0, 0, m_viewport.w, m_viewport.h);
 	}
 
 	static int setRenderTargets(lua_State* L, bool has_ds, bool readonly_ds) {
@@ -4077,140 +3740,6 @@ struct PipelineImpl final : Pipeline
 	static int setRenderTargetsDS(lua_State* L) { 
 		return setRenderTargets(L, true, false);
 	}
-
-	struct RenderGrassJob : Renderer::RenderJob
-	{
-		RenderGrassJob(IAllocator& allocator)
-			: m_grass(allocator)
-		{
-		}
-
-		struct Grass {
-			Mesh::RenderData* mesh;
-			Material::RenderData* material;
-			u32 instance_count;
-			gpu::TextureHandle heightmap;
-			gpu::TextureHandle splatmap;
-			gpu::ProgramHandle program;
-			gpu::BufferHandle instance_buffer;
-			Renderer::TransientSlice drawcall_ub;
-		};
-
-		void setup() override {
-			PROFILE_FUNCTION();
-			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
-			const Universe& universe = m_pipeline->m_scene->getUniverse();
-			const float global_lod_multiplier = m_pipeline->m_renderer.getLODMultiplier();
-
-			float fov_multiplier = 1;
-			if (!m_pipeline->m_viewport.is_ortho) {
-				fov_multiplier = clamp(degreesToRadians(60) / m_pipeline->m_viewport.fov, 1.f, 3.f);
-			}
-
-			u32 culled_count = 0;
-			u32 instance_count = 0;
-			for (Terrain* terrain : terrains) {
-				const Transform tr = universe.getTransform(terrain->m_entity);
-				Transform rel_tr = tr;
-				rel_tr.pos = tr.pos - m_camera_params.pos;
-				const Vec3 rel_pos(rel_tr.pos);
-				const Vec3 ref_lod_pos = Vec3(m_pipeline->m_viewport.pos - tr.pos);
-				const Frustum frustum = m_camera_params.frustum.getRelative(tr.pos);
-
-				for (Terrain::GrassType& type : terrain->m_grass_types) {
-					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
-
-					const i32 mesh_count = type.m_grass_model->getLODIndices()[0].to;
-					const HashMap<u64, Terrain::GrassQuad>& quads = type.m_quads;
-					for (i32 i = 0; i <= mesh_count; ++i) {
-						const Mesh& mesh = type.m_grass_model->getMesh(i);
-						Shader* shader = mesh.material->getShader();
-						if (!shader->isReady()) continue;
-						
-						for (const Terrain::GrassQuad& quad : quads) {
-							if (quad.instances_count == 0) continue;
-							if (!frustum.intersectAABB(quad.aabb)) {
-								++culled_count;
-								continue;
-							}
-
-							const Vec2 quad_size(type.m_spacing * 32);
-							const Vec2 quad_center = Vec2(quad.ij) * quad_size + quad_size * 0.5f;
-							const float distance = length(quad_center - ref_lod_pos.xz());
-
-							const float half_range = type.m_distance * 0.5f * global_lod_multiplier;
-							float count_scale = 1 - clamp(distance - half_range, 0.f, half_range) / half_range; 
-							count_scale *= count_scale;
-							count_scale *= count_scale;
-
-							if (count_scale < 0.001f) continue;
-
-							Grass& grass = m_grass.emplace();
-							grass.mesh = mesh.render_data;
-							grass.material = mesh.material->getRenderData();
-							grass.program = shader->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
-							grass.heightmap = terrain->m_heightmap ? terrain->m_heightmap->handle : gpu::INVALID_TEXTURE;
-							grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;
-							
-							grass.instance_count = u32(quad.instances_count * count_scale);
-							instance_count += grass.instance_count;
-							grass.instance_buffer = quad.instances;
-
-							struct {
-								Vec3 position;
-								float distance;
-							} drawcall_data;
-							drawcall_data.position = rel_pos;
-							drawcall_data.distance = distance;
-
-							grass.drawcall_ub = m_pipeline->m_renderer.allocUniform(sizeof(drawcall_data));
-							memcpy(grass.drawcall_ub.ptr, &drawcall_data, sizeof(drawcall_data));
-						}
-					}
-				}
-			}
-			profiler::pushInt("Quad count", m_grass.size());
-			profiler::pushInt("Culled", culled_count);
-			profiler::pushInt("Instances", instance_count);
-		}
-
-		void execute() override {
-			PROFILE_FUNCTION();
-			if (m_grass.empty()) return;
-
-			Renderer& renderer = m_pipeline->m_renderer;
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
-			u32 material_ub_idx = 0xffFFffFF;
-			renderer.beginProfileBlock("grass", 0);
-
-			for (const Grass& grass : m_grass) {
-				gpu::useProgram(grass.program);
-				gpu::bindTextures(grass.material->textures, 0, grass.material->textures_count);
-				gpu::bindIndexBuffer(grass.mesh->index_buffer_handle);
-				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
-				gpu::bindVertexBuffer(1, grass.instance_buffer, 0, sizeof(Vec4) * 2);
-				if (material_ub_idx != grass.material->material_constants) {
-					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, grass.material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-					material_ub_idx = grass.material->material_constants;
-				}
-
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, grass.drawcall_ub.buffer, grass.drawcall_ub.offset, grass.drawcall_ub.size);
-				gpu::setState(m_render_state | grass.material->render_states);
-				gpu::drawIndexedInstanced(gpu::PrimitiveType::TRIANGLES, grass.mesh->indices_count, grass.instance_count, grass.mesh->index_type);
-			}
-			
-			gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			
-			renderer.endProfileBlock();
-		}
-
-		StackArray<Grass, 64> m_grass;
-		PipelineImpl* m_pipeline;
-		CameraParams m_camera_params;
-		gpu::StateFlags m_render_state;
-		u32 m_define_mask = 0;
-	};
 
 	void createSortKeys(PipelineImpl::View& view) {
 		if (view.renderables->header.count == 0 && !view.renderables->header.next) return;
@@ -4562,44 +4091,14 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth) {
-		PROFILE_FUNCTION();
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::clear(flags, &color.x, depth);
-			}
-			Vec4 color;
-			float depth;
-			gpu::ClearFlags flags;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.color = Vec4(r, g, b, a);
-		cmd.flags = (gpu::ClearFlags)flags;
-		cmd.depth = depth;
-		m_renderer.queue(cmd, m_profiler_link);
+		const Vec4 color = Vec4(r, g, b, a);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->clear((gpu::ClearFlags)flags, &color.x, depth);
 	}
 
 	void viewport(int x, int y, int w, int h) {
-		PROFILE_FUNCTION();
-
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::viewport(x, y, w, h);
-			}
-			int x, y, w, h;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.x = x;
-		cmd.y = y;
-		cmd.w = w;
-		cmd.h = h;
-
-		m_renderer.queue(cmd, m_profiler_link);
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		encoder->viewport(x, y, w, h);
 	}
 
 	void beginBlock(const char* name) {
@@ -4689,19 +4188,24 @@ struct PipelineImpl final : Pipeline
 	void saveRenderbuffer(lua_State* L)
 	{
 		struct Cmd : Renderer::RenderJob {
-			Cmd(IAllocator& allocator) : allocator(allocator) {}
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				Array<u32> pixels(allocator);
+			Cmd(IAllocator& allocator, PageAllocator& page_allocator) 
+				: pixels(allocator)
+				, allocator(allocator)
+				, encoder(page_allocator)
+			{}
+
+			void setup() override {
 				pixels.resize(w * h);
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
 				const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
-				gpu::copy(staging, handle, 0, 0);
-				gpu::readTexture(staging, 0, Span((u8*)pixels.begin(), pixels.byte_size()));
-				gpu::destroy(staging);
+				encoder.createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
+				encoder.copy(staging, handle, 0, 0);
+				encoder.readTexture(staging, 0, Span((u8*)pixels.begin(), pixels.byte_size()));
+				encoder.destroy(staging);
+			}
 
+			void execute() override {
+				encoder.run();
 				os::OutputFile file;
 				if (fs->open(path, file)) {
 					Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)pixels.begin(), false, Path(path), allocator);
@@ -4712,17 +4216,19 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 
+			Array<u32> pixels;
 			IAllocator& allocator;
 			u32 w, h;
 			gpu::TextureHandle handle;
 			FileSystem* fs;
 			StaticString<LUMIX_MAX_PATH> path;
+			gpu::Encoder encoder;
 		};
 
 		const i32 render_buffer = toRenderbufferIdx(L, 1);
 		const char* out_path = LuaWrapper::checkArg<const char*>(L, 2);
 
-		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getAllocator());
+		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getAllocator(), m_renderer.getEngine().getPageAllocator());
 		cmd.handle = m_renderbuffers[render_buffer].handle;
 		cmd.w = m_viewport.w;
 		cmd.h = m_viewport.h;
@@ -4757,7 +4263,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(bindImageTexture);
 		REGISTER_FUNCTION(bindShaderBuffer);
 		REGISTER_FUNCTION(bindTextures);
-		REGISTER_FUNCTION(bindUniformBuffer);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createBuffer);
 		REGISTER_FUNCTION(createRenderbuffer);

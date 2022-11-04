@@ -3570,80 +3570,105 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			logError(m_ibl_filter_shader->getPath(), "is not ready");
 			return;
 		}
-		jobs::Signal finished;
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		// TODO RenderJob
-		jobs::runLambda([&](){
-			renderer->beginProfileBlock("radiance_filter", 0);
-			gpu::TextureHandle src = gpu::allocTextureHandle();
-			gpu::TextureHandle dst = gpu::allocTextureHandle();
-			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
-			ASSERT(created);
-			for (u32 face = 0; face < 6; ++face) {
-				gpu::update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
-			}
-			gpu::generateMipmaps(src);
-			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
-			ASSERT(created);
-			gpu::BufferHandle buf = gpu::allocBufferHandle();
-			gpu::createBuffer(buf, gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+		
+		struct Job : Renderer::RenderJob {
+			Job(IAllocator& allocator, PageAllocator& page_allocator) 
+				: encoder(page_allocator)
+				, tmp(allocator)
+			{}
 
-			const u32 roughness_levels = 5;
-			
-			gpu::useProgram(m_ibl_filter_program);
-			gpu::bindTextures(&src, 0, 1);
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				const float roughness = float(mip) / (roughness_levels - 1);
+			void setup() override {
+				gpu::TextureHandle src = gpu::allocTextureHandle();
+				gpu::TextureHandle dst = gpu::allocTextureHandle();
+				encoder.createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
 				for (u32 face = 0; face < 6; ++face) {
-					gpu::setFramebufferCube(dst, face, mip);
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, buf, 0, 256);
-					struct {
-						float roughness;
-						u32 face;
-						u32 mip;
-					} drawcall = {roughness, face, mip};
-					gpu::setState(gpu::StateFlags::NONE);
-					gpu::viewport(0, 0, size >> mip, size >> mip);
-					gpu::update(buf, &drawcall, sizeof(drawcall));
-					gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, 0, 4);
+					encoder.update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
 				}
-			}
+				encoder.generateMipmaps(src);
+				encoder.createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
+				gpu::BufferHandle buf = gpu::allocBufferHandle();
 
-			gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+				encoder.useProgram(plugin->m_ibl_filter_program);
+				encoder.bindTextures(&src, 0, 1);
+				for (u32 mip = 0; mip < roughness_levels; ++mip) {
+					const float roughness = float(mip) / (roughness_levels - 1);
+					for (u32 face = 0; face < 6; ++face) {
+						encoder.setFramebufferCube(dst, face, mip);
+						struct {
+							float roughness;
+							u32 face;
+							u32 mip;
+						} drawcall = {roughness, face, mip};
+						const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(drawcall));
+						encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						encoder.setState(gpu::StateFlags::NONE);
+						encoder.viewport(0, 0, size >> mip, size >> mip);
+						memcpy(ub.ptr, &drawcall, sizeof(drawcall));
+						encoder.drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, 0, 4);
+					}
+				}
 
-			gpu::TextureHandle staging = gpu::allocTextureHandle();
-			const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
-			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
+				encoder.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+
+				gpu::TextureHandle staging = gpu::allocTextureHandle();
+				const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
+				encoder.createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
 			
-			u32 data_size = 0;
-			u32 mip_size = size;
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				data_size += mip_size * mip_size * sizeof(Vec4) * 6;
-				mip_size >>= 1;
+				u32 data_size = 0;
+				u32 mip_size = size;
+				for (u32 mip = 0; mip < roughness_levels; ++mip) {
+					data_size += mip_size * mip_size * sizeof(Vec4) * 6;
+					mip_size >>= 1;
+				}
+
+				tmp.resize(data_size);
+
+				encoder.copy(staging, dst, 0, 0);
+				u8* tmp_ptr = tmp.begin();
+				for (u32 mip = 0; mip < roughness_levels; ++mip) {
+					const u32 mip_size = size >> mip;
+					encoder.readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
+					tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
+				}
+
+				encoder.destroy(staging);
+
+				encoder.destroy(buf);
+				encoder.destroy(src);
+				encoder.destroy(dst);			
 			}
 
-			Array<u8> tmp(m_app.getAllocator());
-			tmp.resize(data_size);
-
-			gpu::copy(staging, dst, 0, 0);
-			u8* tmp_ptr = tmp.begin();
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				const u32 mip_size = size >> mip;
-				gpu::readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
-				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
+			void execute() override {
+				encoder.run();
+				plugin->saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
+				jobs::setGreen(signal);
 			}
 
-			saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
-			gpu::destroy(staging);
-			renderer->endProfileBlock();
+			gpu::Encoder encoder;
+			Array<u8> tmp;
+			Renderer* renderer;
+			EnvironmentProbePlugin* plugin;
+			const Vec4* data;
+			u32 size;
+			u64 guid;
+			jobs::Signal* signal;
+			const u32 roughness_levels = 5;
+		};
 
-			gpu::destroy(buf);
-			gpu::destroy(src);
-			gpu::destroy(dst);
-		}, &finished, 1);
-		jobs::wait(&finished);
+		jobs::Signal signal;
+		jobs::setRed(&signal);
+		Job& job = renderer->createJob<Job>(renderer->getAllocator(), renderer->getEngine().getPageAllocator());
+		job.data = data;
+		job.size = size;
+		job.guid = guid;
+		job.plugin = this;
+		job.renderer = renderer;
+		job.signal = &signal;
+		renderer->queue(job, 0);
+		jobs::wait(&signal);
 	}
 
 	void processData(ProbeJob& job) {

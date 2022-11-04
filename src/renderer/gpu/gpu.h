@@ -256,6 +256,7 @@ struct Encoder {
 	void viewport(u32 x, u32 y, u32 w, u32 h);
 	void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
 	void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
+	void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
 	void setCurrentWindow(void* window_handle);
 	void createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
 	void drawArrays(PrimitiveType type, u32 offset, u32 count);
@@ -263,6 +264,21 @@ struct Encoder {
 	void popDebugGroup();
 	void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count);
 	void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type);
+	void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle);
+	void bindIndirectBuffer(BufferHandle buffer);
+	void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
+	void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags);
+	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
+	void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size);
+	void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
+	void bindImageTexture(TextureHandle texture, u32 unit);
+	void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
+	void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
+	void destroy(TextureHandle texture);
+	void destroy(BufferHandle buffer);
+	void generateMipmaps(TextureHandle texture);
+	void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
+	void update(BufferHandle buffer, const void* data, size_t size);
 
 	template <typename T>
 	void write(Instruction instruction, const T& val) {
@@ -284,6 +300,7 @@ private:
 };
 
 void preinit(IAllocator& allocator, bool load_renderdoc);
+IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
 void launchRenderDoc();
 void setCurrentWindow(void* window_handle);

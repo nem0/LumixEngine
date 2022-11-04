@@ -105,14 +105,10 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 	virtual gpu::Encoder* createEncoderJob() = 0;
 
-	template <typename T, typename... Args> T& createJob(Args&&... args) {
-		return *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
-	}
-
-	template <typename T> void destroyJob(T& job) {
-		job.~T();
-		deallocJob(&job);
-	}
+	template <typename T> void pushJob(const char* name, const T& func);
+	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
+	template <typename T, typename... Args> T& createJob(Args&&... args);
+	template <typename T> void destroyJob(T& job);
 
 	virtual struct LinearAllocator& getCurrentFrameAllocator() = 0;
 
@@ -121,6 +117,49 @@ protected:
 	virtual void deallocJob(void* ptr) = 0;
 }; 
 
+
+template <typename T, typename... Args> T& Renderer::createJob(Args&&... args) {
+	return *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
+}
+
+template <typename T> void Renderer::destroyJob(T& job) {
+	job.~T();
+	deallocJob(&job);
+}
+
+template <typename T>
+void Renderer::pushJob(const char* name, const T& func) {
+	struct Job : RenderJob {
+		Job(const char* name, const T& func, Renderer& renderer, PageAllocator& allocator)
+			: func(func)
+			, encoder(allocator)
+			, renderer(renderer)
+			, name(name)
+		{}
+		
+		void setup() override { 
+			if (name) {
+				profiler::beginBlock(name);
+				profiler::blockColor(0x7f, 0, 0x7f);
+			}
+			func(encoder);
+			if (name) profiler::endBlock();
+		}
+		
+		void execute() override {
+			if (name) renderer.beginProfileBlock(name, 0);
+			encoder.run();
+			if (name) renderer.endProfileBlock();
+		}
+		
+		gpu::Encoder encoder;
+		T func;
+		Renderer& renderer;
+		const char* name;
+	};
+	Job& job = createJob<Job>(name, func, *this, getEngine().getPageAllocator());
+	queue(job, 0);
+}
 
 } // namespace Lumix
 
