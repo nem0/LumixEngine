@@ -130,9 +130,7 @@ void Material::unload()
 		tex = nullptr;
 	}
 	
-	m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
-		LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
-	});
+	m_renderer.createEncoderJob()->freeAlignedMemory(m_render_data, m_renderer.getAllocator());
 	m_render_data = nullptr;
 
 	setShader(nullptr);
@@ -364,9 +362,7 @@ void Material::updateRenderData(bool on_before_ready)
 
 	if(m_render_data) {
 		m_renderer.destroyMaterialConstants(m_render_data->material_constants);
-		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
-			LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
-		});
+		m_renderer.createEncoderJob()->freeAlignedMemory(m_render_data, m_renderer.getAllocator());
 	}
 
 	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);

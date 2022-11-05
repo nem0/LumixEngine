@@ -85,13 +85,20 @@ enum class Instruction : u8 {
 	CREATE_BUFFER,
 	CREATE_TEXTURE,
 	BIND_IMAGE_TEXTURE,
-	COPY,
+	COPY_TEXTURE,
+	COPY_BUFFER,
 	READ_TEXTURE,
 	DESTROY_TEXTURE,
 	DESTROY_BUFFER,
+	DESTROY_PROGRAM,
 	GENERATE_MIPMAPS,
 	UPDATE_TEXTURE,
-	UPDATE_BUFFER
+	UPDATE_BUFFER,
+	FREE_MEMORY,
+	FREE_ALIGNED_MEMORY,
+	START_CAPTURE,
+	STOP_CAPTURE,
+	CREATE_TEXTURE_VIEW
 };
 
 struct Encoder::Page {
@@ -145,6 +152,10 @@ void Encoder::destroy(TextureHandle texture) {
 	write(Instruction::DESTROY_TEXTURE, texture);
 }
 
+void Encoder::destroy(ProgramHandle program) {
+	write(Instruction::DESTROY_PROGRAM, program);
+}
+
 void Encoder::destroy(BufferHandle buffer) {
 	write(Instruction::DESTROY_BUFFER, buffer);
 }
@@ -169,17 +180,31 @@ struct CopyTextureData {
 
 void Encoder::copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
 	CopyTextureData data = {dst, src, dst_x, dst_y};
-	write(Instruction::COPY, data);
+	write(Instruction::COPY_TEXTURE, data);
 };
+
+struct CopyBufferData {
+	BufferHandle dst;
+	BufferHandle src;
+	u32 dst_offset;
+	u32 src_offset;
+	u32 size;
+};
+
+void Encoder::copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size) {
+	CopyBufferData data = {dst, src, dst_offset, src_offset, size};
+	write(Instruction::COPY_BUFFER, data);
+}
 
 struct CreateBufferData {
 	BufferHandle buffer;
 	BufferFlags flags;
 	size_t size;
+	const void* data;
 };
 
-void Encoder::createBuffer(BufferHandle buffer, BufferFlags flags, size_t size) {
-	CreateBufferData data = {buffer, flags, size};
+void Encoder::createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* ptr) {
+	CreateBufferData data = {buffer, flags, size, ptr};
 	write(Instruction::CREATE_BUFFER, data);
 }
 
@@ -296,6 +321,28 @@ void Encoder::createProgram(ProgramHandle prog, const VertexDecl& decl, const ch
 
 void Encoder::pushDebugGroup(const char* msg) {
 	write(Instruction::PUSH_DEBUG_GROUP, msg);
+}
+
+struct CreateTextureViewData {
+	TextureHandle view;
+	TextureHandle texture;
+};
+
+void Encoder::createTextureView(TextureHandle view, TextureHandle texture) {
+	CreateTextureViewData data = {view, texture};
+	write(Instruction::CREATE_TEXTURE_VIEW, data);
+}
+
+void Encoder::startCapture() {
+	u8* ptr = alloc(sizeof(Instruction));
+	const Instruction instruction = Instruction::START_CAPTURE;
+	memcpy(ptr, &instruction, sizeof(instruction));
+}
+
+void Encoder::stopCapture() {
+	u8* ptr = alloc(sizeof(Instruction));
+	const Instruction instruction = Instruction::STOP_CAPTURE;
+	memcpy(ptr, &instruction, sizeof(instruction));
 }
 
 void Encoder::popDebugGroup() {
@@ -499,6 +546,37 @@ void Encoder::drawArrays(PrimitiveType type, u32 offset, u32 count) {
 	write(Instruction::DRAW_ARRAYS, data);
 }
 
+struct DeleteMemoryData {
+	void* ptr;
+	IAllocator* allocator;
+};
+
+void Encoder::freeMemory(void* ptr, IAllocator& allocator) {
+	DeleteMemoryData data = { ptr, &allocator };
+	write(Instruction::FREE_MEMORY, data);
+}
+
+
+
+void Encoder::freeAlignedMemory(void* ptr, IAllocator& allocator) {
+	DeleteMemoryData data = { ptr, &allocator };
+	write(Instruction::FREE_ALIGNED_MEMORY, data);
+}
+
+void Encoder::reset() {
+	allocator.lock();
+	while (first) {
+		Page* next = first->header.next;
+		allocator.deallocate(first, false);
+		first = next;
+	}
+	first = new (NewPlaceholder(), allocator.allocate(false)) Page;
+	allocator.unlock();
+	
+	current = first;
+	run_called = false;
+}
+
 void Encoder::run() {
 	PROFILE_FUNCTION();
 
@@ -652,7 +730,7 @@ void Encoder::run() {
 				}
 				case Instruction::CREATE_BUFFER: {
 					READ(CreateBufferData, data);
-					gpu::createBuffer(data.buffer, data.flags, data.size, nullptr);
+					gpu::createBuffer(data.buffer, data.flags, data.size, data.data);
 					break;
 				}
 				case Instruction::BIND_IMAGE_TEXTURE: {
@@ -660,9 +738,14 @@ void Encoder::run() {
 					gpu::bindImageTexture(data.texture, data.unit);
 					break;
 				}
-				case Instruction::COPY: {
+				case Instruction::COPY_TEXTURE: {
 					READ(CopyTextureData, data);
 					gpu::copy(data.dst, data.src, data.dst_x, data.dst_y);
+					break;
+				}
+				case Instruction::COPY_BUFFER: {
+					READ(CopyBufferData, data);
+					gpu::copy(data.dst, data.src, data.dst_offset, data.src_offset, data.size);
 					break;
 				}
 				case Instruction::READ_TEXTURE: {
@@ -675,14 +758,42 @@ void Encoder::run() {
 					gpu::destroy(texture);
 					break;
 				}
+				case Instruction::DESTROY_PROGRAM: {
+					READ(ProgramHandle, program);
+					gpu::destroy(program);
+					break;
+				}
 				case Instruction::DESTROY_BUFFER: {
 					READ(BufferHandle, buffer);
 					gpu::destroy(buffer);
 					break;
 				}
+				case Instruction::FREE_MEMORY: {
+					READ(DeleteMemoryData, data);
+					data.allocator->deallocate(data.ptr);
+					break;
+				}
+				case Instruction::FREE_ALIGNED_MEMORY: {
+					READ(DeleteMemoryData, data);
+					data.allocator->deallocate_aligned(data.ptr);
+					break;
+				}
 				case Instruction::DISPATCH: {
 					READ(IVec3, size);
 					gpu::dispatch(size.x, size.y, size.z);
+					break;
+				}
+				case Instruction::START_CAPTURE: {
+					gpu::startCapture();
+					break;
+				}
+				case Instruction::STOP_CAPTURE: {
+					gpu::stopCapture();
+					break;
+				}
+				case Instruction::CREATE_TEXTURE_VIEW: {
+					READ(CreateTextureViewData, data);
+					gpu::createTextureView(data.view, data.texture);
 					break;
 				}
 				case Instruction::VIEWPORT: {

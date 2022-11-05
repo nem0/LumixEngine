@@ -3329,41 +3329,27 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 		return;
 	}
 
-	struct Job : Renderer::RenderJob {
-		Job(IAllocator& allocator) : data(allocator) {}
+	gpu::TextureDesc desc;
+	const u8* image_data = Texture::getLBCInfo(data, desc);
+	if (!image_data) return;
 
-		void setup() override {}
-				
-		void execute() override {
-			gpu::TextureDesc desc;
-			const u8* image_data = Texture::getLBCInfo(data.data(), desc);
-			if (!image_data) return;
+	ASSERT(desc.depth == 1);
+	ASSERT(desc.is_cubemap);
 
-			ASSERT(desc.depth == 1);
-			ASSERT(desc.is_cubemap);
-
-			const u32 offset = u32(image_data - data.data());
-			InputMemoryStream blob(image_data, (u32)data.size() - offset);
-			for (u32 side = 0; side < 6; ++side) {
-				for (u32 mip = 0; mip < desc.mips; ++mip) {
-					u32 w = maximum(desc.width >> mip, 1);
-					u32 h = maximum(desc.height >> mip, 1);
-					const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-					gpu::update(tex, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
-				}
-			}
+	u32 layer = probe.texture_id;
+	gpu::Encoder* encoder = m_scene.m_renderer.createEncoderJob();
+	const u32 offset = u32(image_data - data);
+	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
+	InputMemoryStream blob(mem.data, (u32)size - offset);
+	for (u32 side = 0; side < 6; ++side) {
+		for (u32 mip = 0; mip < desc.mips; ++mip) {
+			u32 w = maximum(desc.width >> mip, 1);
+			u32 h = maximum(desc.height >> mip, 1);
+			const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
+			encoder->update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
 		}
-
-		u32 layer;
-		OutputMemoryStream data;
-		gpu::TextureHandle tex;
-	};
-			
-	Job& job = m_scene.m_renderer.createJob<Job>(m_allocator);
-	job.layer = probe.texture_id;
-	job.tex = m_scene.m_reflection_probes_texture;
-	job.data.write(data, size);
-	m_scene.m_renderer.queue(job, 0);	
+	}
+	encoder->freeMemory(mem.data, m_scene.m_renderer.getAllocator());
 	LUMIX_DELETE(m_allocator, this);
 }
 

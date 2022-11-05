@@ -146,12 +146,13 @@ struct TransientBuffer {
 
 
 struct FrameData {
-	FrameData(struct RendererImpl& renderer, IAllocator& allocator) 
+	FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 
 		: jobs(allocator)
 		, renderer(renderer)
 		, to_compile_shaders(allocator)
-		, material_updates(allocator)
 		, job_allocator(1024 * 1024 * 64)
+		, begin_encoder(page_allocator)
+		, end_encoder(page_allocator)
 	{}
 
 	struct ShaderToCompile {
@@ -162,17 +163,11 @@ struct FrameData {
 		Shader::Sources sources;
 	};
 
-	struct MaterialUpdates {
-		u32 idx;
-		float values[Material::MAX_UNIFORMS_FLOATS];
-	};
-
 	TransientBuffer<16> transient_buffer;
 	TransientBuffer<256> uniform_buffer;
 	u32 gpu_frame = 0xffFFffFF;
 
 	LinearAllocator job_allocator;
-	Array<MaterialUpdates> material_updates;
 	Array<Renderer::RenderJob*> jobs;
 	jobs::Mutex shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
@@ -180,6 +175,8 @@ struct FrameData {
 	jobs::Signal can_setup;
 	jobs::Signal setup_done;
 	u32 frame_number = 0;
+	gpu::Encoder begin_encoder;
+	gpu::Encoder end_encoder;
 };
 
 
@@ -418,9 +415,9 @@ struct RendererImpl final : Renderer
 		m_shader_defines.reserve(32);
 
 		gpu::preinit(m_allocator, shouldLoadRenderdoc());
-		m_frames[0].create(*this, m_allocator);
-		m_frames[1].create(*this, m_allocator);
-		m_frames[2].create(*this, m_allocator);
+		m_frames[0].create(*this, m_allocator, m_engine.getPageAllocator());
+		m_frames[1].create(*this, m_allocator, m_engine.getPageAllocator());
+		m_frames[2].create(*this, m_allocator, m_engine.getPageAllocator());
 	}
 
 	float getLODMultiplier() const override { return m_lod_multiplier; }
@@ -454,7 +451,6 @@ struct RendererImpl final : Renderer
 				gpu::destroy(frame->uniform_buffer.m_buffer);
 			}
 			gpu::destroy(m_material_buffer.buffer);
-			gpu::destroy(m_material_buffer.staging_buffer);
 			gpu::destroy(m_downscale_program);
 			m_profiler.clear();
 			gpu::shutdown();
@@ -522,7 +518,6 @@ struct RendererImpl final : Renderer
 
 			MaterialBuffer& mb = renderer.m_material_buffer;
 			mb.buffer = gpu::allocBufferHandle();
-			mb.staging_buffer = gpu::allocBufferHandle();
 			mb.map.insert(RuntimeHash(), 0);
 			mb.data.resize(400);
 			mb.data[0].hash = RuntimeHash();
@@ -536,11 +531,6 @@ struct RendererImpl final : Renderer
 			gpu::createBuffer(mb.buffer
 				, gpu::BufferFlags::UNIFORM_BUFFER
 				, Material::MAX_UNIFORMS_BYTES * 400
-				, nullptr
-			);
-			gpu::createBuffer(mb.staging_buffer
-				, gpu::BufferFlags::UNIFORM_BUFFER
-				, Material::MAX_UNIFORMS_BYTES
 				, nullptr
 			);
 
@@ -614,100 +604,36 @@ struct RendererImpl final : Renderer
 	}
 
 
-	void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) override
-	{
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::pushDebugGroup("get image data");
-				gpu::TextureHandle staging = gpu::allocTextureHandle();
-				const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-				gpu::createTexture(staging, w, h, 1, out_format, flags, "staging_buffer");
-				gpu::copy(staging, handle, 0, 0);
-				gpu::readTexture(staging, 0, buf);
-				gpu::destroy(staging);
-				gpu::popDebugGroup();
-			}
-
-			gpu::TextureHandle handle;
-			gpu::TextureFormat out_format;
-			u32 w;
-			u32 h;
-			Span<u8> buf;
-		};
-
-		
-		Cmd& cmd = createJob<Cmd>();
-		cmd.handle = texture;
-		cmd.w = w;
-		cmd.h = h;
-		cmd.buf = data;
-		cmd.out_format = out_format;
-		queue(cmd, 0);
+	void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) override {
+		pushJob("get image data", [w, h, out_format, texture, data](gpu::Encoder& encoder){
+			encoder.pushDebugGroup("get image data");
+			gpu::TextureHandle staging = gpu::allocTextureHandle();
+			const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
+			encoder.createTexture(staging, w, h, 1, out_format, flags, "staging_buffer");
+			encoder.copy(staging, texture, 0, 0);
+			encoder.readTexture(staging, 0, data);
+			encoder.destroy(staging);
+			encoder.popDebugGroup();
+			
+		});
 	}
 
 	void updateBuffer(gpu::BufferHandle handle, const MemRef& mem) override {
 		ASSERT(mem.size > 0);
 		ASSERT(handle);
 
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::update(handle, mem.data, mem.size);
-				if (mem.own) {
-					renderer->free(mem);
-				}
-			}
-
-			gpu::BufferHandle handle;
-			MemRef mem;
-			RendererImpl* renderer;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.handle = handle;
-		cmd.mem = mem;
-		cmd.renderer = this;
-
-		queue(cmd, 0);
+		gpu::Encoder* encoder = createEncoderJob();
+		encoder->update(handle, mem.data, mem.size);
+		if (mem.own) encoder->freeMemory(mem.data, m_allocator);
 	}
 
-	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override
-	{
+	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override {
 		ASSERT(mem.size > 0);
 		ASSERT(handle);
 
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::update(handle, 0, x, y, slice, w, h, format, mem.data, mem.size);
-				if (mem.own) {
-					renderer->free(mem);
-				}
-			}
-
-			gpu::TextureHandle handle;
-			u32 x, y, w, h, slice;
-			gpu::TextureFormat format;
-			MemRef mem;
-			RendererImpl* renderer;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.handle = handle;
-		cmd.x = x;
-		cmd.y = y;
-		cmd.w = w;
-		cmd.h = h;
-		cmd.slice = slice;
-		cmd.format = format;
-		cmd.mem = mem;
-		cmd.renderer = this;
-
-		queue(cmd, 0);
+		gpu::Encoder* encoder = createEncoderJob();
+		encoder->update(handle, 0, x, y, slice, w, h, format, mem.data, mem.size);
+		if (mem.own) encoder->freeMemory(mem.data, m_allocator);
 	}
 
 
@@ -718,51 +644,25 @@ struct RendererImpl final : Renderer
 		const gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if (!handle) return handle;
 
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				if (!gpu::createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name)) {
-					if(memory.own) renderer->free(memory);
-					logError("Failed to create texture ", debug_name);
-					return;
-				}
+		gpu::Encoder* encoder = createEncoderJob();
+		if (desc.is_cubemap) flags = flags | gpu::TextureFlags::IS_CUBE;
+		if (desc.mips < 2) flags = flags | gpu::TextureFlags::NO_MIPS;
+		encoder->createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name);
 				
-				const u8* ptr = (const u8*)memory.data;
-				for (u32 layer = 0; layer < desc.depth; ++layer) {
-					for(int side = 0; side < (desc.is_cubemap ? 6 : 1); ++side) {
-						const u32 z = layer * (desc.is_cubemap ? 6 : 1) + side;
-						for (u32 mip = 0; mip < desc.mips; ++mip) {
-							const u32 w = maximum(desc.width >> mip, 1);
-							const u32 h = maximum(desc.height >> mip, 1);
-							const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-							gpu::update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
-							ptr += mip_size_bytes;
-						}
-					}
+		const u8* ptr = (const u8*)memory.data;
+		for (u32 layer = 0; layer < desc.depth; ++layer) {
+			for(int side = 0; side < (desc.is_cubemap ? 6 : 1); ++side) {
+				const u32 z = layer * (desc.is_cubemap ? 6 : 1) + side;
+				for (u32 mip = 0; mip < desc.mips; ++mip) {
+					const u32 w = maximum(desc.width >> mip, 1);
+					const u32 h = maximum(desc.height >> mip, 1);
+					const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
+					encoder->update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
+					ptr += mip_size_bytes;
 				}
-				if(memory.own) renderer->free(memory);
 			}
-
-			StaticString<LUMIX_MAX_PATH> debug_name;
-			gpu::TextureHandle handle;
-			MemRef memory;
-			gpu::TextureFlags flags;
-			gpu::TextureDesc desc;
-			RendererImpl* renderer; 
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.debug_name = debug_name;
-		cmd.handle = handle;
-		cmd.memory = memory;
-		cmd.flags = flags;
-		if (desc.is_cubemap) cmd.flags = cmd.flags | gpu::TextureFlags::IS_CUBE;
-		if (desc.mips < 2) cmd.flags = cmd.flags | gpu::TextureFlags::NO_MIPS;
-		cmd.renderer = this;
-		cmd.desc = desc;
-		queue(cmd, 0);
-
+		}
+		if (memory.own) encoder->freeMemory(memory.data, m_allocator);
 		return handle;
 	}
 
@@ -802,10 +702,10 @@ struct RendererImpl final : Renderer
 			m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
 			m_material_buffer.map.insert(hash, idx);
 			
-			FrameData::MaterialUpdates& mu = m_cpu_frame->material_updates.emplace();
-			mu.idx = idx;
-			ASSERT(data.length() * sizeof(float) <= sizeof(mu.values));
-			memcpy(mu.values, data.begin(), data.length() * sizeof(float));
+			const u32 size = u32(data.length() * sizeof(float));
+			const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+			memcpy(slice.ptr, data.begin(), size);
+			m_cpu_frame->begin_encoder.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 		}
 		++m_material_buffer.data[idx].ref_count;
 		return idx;
@@ -827,30 +727,9 @@ struct RendererImpl final : Renderer
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle) return handle;
 
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::createBuffer(handle, flags, memory.size, memory.data);
-				if (memory.own) {
-					renderer->free(memory);
-				}
-			}
-
-			gpu::BufferHandle handle;
-			MemRef memory;
-			gpu::BufferFlags flags;
-			gpu::TextureFormat format;
-			Renderer* renderer;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.handle = handle;
-		cmd.memory = memory;
-		cmd.renderer = this;
-		cmd.flags = flags;
-		queue(cmd, 0);
-
+		gpu::Encoder* encoder = createEncoderJob();
+		encoder->createBuffer(handle, flags, memory.size, memory.data);
+		if (memory.own) encoder->freeMemory(memory.data, m_allocator);
 		return handle;
 	}
 
@@ -875,29 +754,6 @@ struct RendererImpl final : Renderer
 		ASSERT(m_layers.size() < 0xff);
 		m_layers.emplace(name);
 		return m_layers.size() - 1;
-	}
-
-
-	void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) override
-	{
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				fnc(*renderer, ptr); 
-			}
-
-			void* ptr;
-			void (*fnc)(Renderer&, void*);
-			Renderer* renderer;
-
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.fnc = fnc;
-		cmd.ptr = user_ptr;
-		cmd.renderer = this;
-		queue(cmd, 0);
 	}
 
 	const Mesh** getSortKeyToMeshMap() const override {
@@ -933,59 +789,18 @@ struct RendererImpl final : Renderer
 		return m_max_sort_key;
 	}
 
-	void destroy(gpu::ProgramHandle program) override
-	{
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				gpu::destroy(program); 
-			}
-
-			gpu::ProgramHandle program;
-			RendererImpl* renderer;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.program = program;
-		cmd.renderer = this;
-		queue(cmd, 0);
+	void destroy(gpu::ProgramHandle program) override {
+		m_cpu_frame->end_encoder.destroy(program);
 	}
 
-	void destroy(gpu::BufferHandle buffer) override
-	{
+	void destroy(gpu::BufferHandle buffer) override {
 		if (!buffer) return;
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				gpu::destroy(buffer);
-			}
-
-			gpu::BufferHandle buffer;
-			RendererImpl* renderer;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.buffer = buffer;
-		cmd.renderer = this;
-		queue(cmd, 0);
+		m_cpu_frame->end_encoder.destroy(buffer);
 	}
 
 	void copy(gpu::TextureHandle dst, gpu::TextureHandle src) override {
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::copy(dst, src, 0, 0);
-			}
-			gpu::TextureHandle src;
-			gpu::TextureHandle dst;
-		};
-		Cmd& cmd = createJob<Cmd>();
-		cmd.src = src;
-		cmd.dst = dst;
-		queue(cmd, 0);
+		gpu::Encoder* encoder = createEncoderJob();
+		encoder->copy(dst, src, 0, 0);
 	}
 
 	void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) override {
@@ -994,7 +809,7 @@ struct RendererImpl final : Renderer
 		
 		IVec2 src_size((i32)src_w, (i32)src_h);
 		IVec2 dst_size = {(i32)dst_w, (i32)dst_h};
-		pushJob([src_size, dst_size, this, src, dst](gpu::Encoder& encoder){
+		pushJob("downscale", [src_size, dst_size, this, src, dst](gpu::Encoder& encoder){
 			const IVec2 scale = src_size / dst_size;
 			Renderer::TransientSlice ub_slice = allocUniform(sizeof(scale));
 			memcpy(ub_slice.ptr, &scale, sizeof(scale));
@@ -1012,66 +827,21 @@ struct RendererImpl final : Renderer
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if(!handle) return handle;
 
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				bool res = gpu::createTexture(handle, w, h, depth, format, flags, debug_name);
-				ASSERT(res);
-				if (memory.data && memory.size) {
-					ASSERT(depth == 1);
-					gpu::update(handle, 0, 0, 0, 0, w, h, format, memory.data, memory.size);
-					if (u32(flags & gpu::TextureFlags::NO_MIPS) == 0) gpu::generateMipmaps(handle);
-				}
-				if (memory.own) renderer->free(memory);
-			}
-
-			StaticString<LUMIX_MAX_PATH> debug_name;
-			gpu::TextureHandle handle;
-			MemRef memory;
-			u32 w;
-			u32 h;
-			u32 depth;
-			gpu::TextureFormat format;
-			Renderer* renderer;
-			gpu::TextureFlags flags;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.debug_name = debug_name;
-		cmd.handle = handle;
-		cmd.memory = memory;
-		cmd.format = format;
-		cmd.flags = flags;
-		cmd.w = w;
-		cmd.h = h;
-		cmd.depth = depth;
-		cmd.renderer = this;
-		queue(cmd, 0);
-
+		gpu::Encoder* encoder = createEncoderJob();
+		encoder->createTexture(handle, w, h, depth, format, flags, debug_name);
+		if (memory.data && memory.size) {
+			ASSERT(depth == 1);
+			encoder->update(handle, 0, 0, 0, 0, w, h, format, memory.data, memory.size);
+			if (u32(flags & gpu::TextureFlags::NO_MIPS) == 0) encoder->generateMipmaps(handle);
+		}
+		if (memory.own) encoder->freeMemory(memory.data, m_allocator);
 		return handle;
 	}
 
 
-	void destroy(gpu::TextureHandle tex) override
-	{
+	void destroy(gpu::TextureHandle tex) override {
 		if (!tex) return;
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				gpu::destroy(texture); 
-			}
-
-			gpu::TextureHandle texture;
-			RendererImpl* renderer;
-		};
-
-		Cmd& cmd = createJob<Cmd>();
-		cmd.texture = tex;
-		cmd.renderer = this;
-		queue(cmd, 0);
+		m_cpu_frame->end_encoder.destroy(tex);
 	}
 
 
@@ -1176,32 +946,8 @@ struct RendererImpl final : Renderer
 	}
 
 
-	void startCapture() override
-	{
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				gpu::startCapture();
-			}
-		};
-		Cmd& cmd = createJob<Cmd>();
-		queue(cmd, 0);
-	}
-
-
-	void stopCapture() override
-	{
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				PROFILE_FUNCTION();
-				gpu::stopCapture();
-			}
-		};
-		Cmd& cmd = createJob<Cmd>();
-		queue(cmd, 0);
-	}
+	void startCapture() override { createEncoderJob()->startCapture(); }
+	void stopCapture() override { createEncoderJob()->stopCapture(); }
 
 	void render() {
 		jobs::MutexGuard guard(m_render_mutex);
@@ -1242,19 +988,8 @@ struct RendererImpl final : Renderer
 		}
 		frame.to_compile_shaders.clear();
 
-		for (const auto& i : frame.material_updates) {
-			gpu::update(m_material_buffer.staging_buffer, i.values, sizeof(i.values));
-			gpu::copy(m_material_buffer.buffer, m_material_buffer.staging_buffer, i.idx * sizeof(i.values), 0, sizeof(i.values));
-		}
-		frame.material_updates.clear();
-
-		gpu::useProgram(gpu::INVALID_PROGRAM);
-		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-		gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-		for (u32 i = 0; i < (u32)UniformBuffer::COUNT; ++i) {
-			gpu::bindUniformBuffer(i, gpu::INVALID_BUFFER, 0, 0);
-		}
+		frame.begin_encoder.run();
+		frame.begin_encoder.reset();
 
 		m_profiler.beginQuery("frame", 0, false);
 		for (RenderJob* job : frame.jobs) {
@@ -1265,6 +1000,10 @@ struct RendererImpl final : Renderer
 			job->~RenderJob();
 			frame.job_allocator.deallocate_aligned(job);
 		}
+		
+		frame.end_encoder.run();
+		frame.end_encoder.reset();
+		
 		frame.job_allocator.reset();
 		m_profiler.endQuery();
 		frame.jobs.clear();
@@ -1329,6 +1068,15 @@ struct RendererImpl final : Renderer
 		PROFILE_FUNCTION();
 		
 		jobs::wait(&m_cpu_frame->setup_done);
+
+		m_cpu_frame->begin_encoder.useProgram(gpu::INVALID_PROGRAM);
+		m_cpu_frame->begin_encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
+		m_cpu_frame->begin_encoder.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+		m_cpu_frame->begin_encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		for (u32 i = 0; i < (u32)UniformBuffer::COUNT; ++i) {
+			m_cpu_frame->begin_encoder.bindUniformBuffer(i, gpu::INVALID_BUFFER, 0, 0);
+		}
+
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
 			const u64 key = i.defines | ((u64)i.decl.hash.getHashValue() << 32);
 			i.shader->m_programs.insert(key, i.program);
@@ -1396,7 +1144,6 @@ struct RendererImpl final : Renderer
 		};
 
 		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
-		gpu::BufferHandle staging_buffer = gpu::INVALID_BUFFER;
 		Array<Data> data;
 		int first_free;
 		HashMap<RuntimeHash, u32> map;

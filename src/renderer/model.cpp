@@ -10,6 +10,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -612,12 +613,10 @@ void Model::unload()
 	}
 
 	for (Mesh& mesh : m_meshes) {
-		m_renderer.runInRenderThread(mesh.render_data, [](Renderer& renderer, void* ptr){
-			Mesh::RenderData* rd = (Mesh::RenderData*)ptr;
-			if (rd->index_buffer_handle) gpu::destroy(rd->index_buffer_handle);
-			if (rd->vertex_buffer_handle) gpu::destroy(rd->vertex_buffer_handle);
-			LUMIX_DELETE(renderer.getAllocator(), rd); 
-		});
+		gpu::Encoder* encoder = m_renderer.createEncoderJob();
+		if (mesh.render_data->index_buffer_handle) encoder->destroy(mesh.render_data->index_buffer_handle);
+		if (mesh.render_data->vertex_buffer_handle) encoder->destroy(mesh.render_data->vertex_buffer_handle);
+		encoder->freeAlignedMemory(mesh.render_data, m_renderer.getAllocator());
 	}
 	m_meshes.clear();
 	m_bones.clear();

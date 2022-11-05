@@ -1268,7 +1268,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		const gpu::TextureHandle dst = m_shadow_atlas.texture;
-		m_renderer.pushJob([uv, src, dst](gpu::Encoder& encoder){
+		m_renderer.pushJob("bake_shadow_copy", [uv, src, dst](gpu::Encoder& encoder){
 			const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
 			const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
 			encoder.copy(dst, src, x, y);
@@ -1389,7 +1389,7 @@ struct PipelineImpl final : Pipeline
 
 		beginBlock(m_define);
 
-		m_renderer.pushJob([this, global_state](gpu::Encoder& encoder){
+		m_renderer.pushJob("pipeline start", [this, global_state](gpu::Encoder& encoder){
 			Renderer::TransientSlice global_state_buffer = m_renderer.allocUniform(sizeof(GlobalState));
 			memcpy(global_state_buffer.ptr, &global_state, sizeof(global_state));
 
@@ -2694,7 +2694,7 @@ struct PipelineImpl final : Pipeline
 				if (buffer.capacity < capacity) {
 					if (buffer.buffer) m_encoder.destroy(buffer.buffer);
 					buffer.buffer = gpu::allocBufferHandle();
-					m_encoder.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity);
+					m_encoder.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
 					buffer.capacity = capacity;
 				}
 				if (!data.empty()) {

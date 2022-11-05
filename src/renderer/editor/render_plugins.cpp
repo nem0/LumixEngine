@@ -1725,13 +1725,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_texture = texture;
 				PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-				renderer->runInRenderThread(this, [](Renderer& r, void* ptr){
-					TexturePlugin* p = (TexturePlugin*)ptr;
-					if (!p->m_texture_view) {
-						p->m_texture_view = gpu::allocTextureHandle();
-					}
-					gpu::createTextureView(p->m_texture_view, p->m_texture->handle);
-				});
+
+				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
+				gpu::Encoder* encoder = renderer->createEncoderJob();
+				encoder->createTextureView(m_texture_view, m_texture->handle);
 			}
 
 			ImGui::Image(m_texture_view, texture_size);
