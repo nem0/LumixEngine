@@ -3337,7 +3337,7 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 	ASSERT(desc.is_cubemap);
 
 	u32 layer = probe.texture_id;
-	gpu::Encoder& encoder = m_scene.m_renderer.createEncoderJob();
+	gpu::Encoder& encoder = m_scene.m_renderer.getEndFrameEncoder();
 	const u32 offset = u32(image_data - data);
 	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
 	InputMemoryStream blob(mem.data, (u32)size - offset);

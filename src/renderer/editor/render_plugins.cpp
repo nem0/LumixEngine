@@ -4527,7 +4527,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 
-		gpu::Encoder& encoder = renderer->createEncoderJob();
+		gpu::Encoder& encoder = renderer->getEndFrameEncoder();
 
 		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
 		for (const ImGuiViewport* vp : platform_io.Viewports) {

@@ -239,53 +239,68 @@ struct Encoder {
 	Encoder(Encoder&& rhs);
 	~Encoder();
 
-	Encoder(const Encoder& rhs) = delete;
-	void operator =(const Encoder&) = delete;
-	void operator =(Encoder&&) = delete;
-
-	void merge(Encoder& rhs);
-
-	void setState(StateFlags state);
-	void bindIndexBuffer(BufferHandle buffer);
-	void useProgram(ProgramHandle program);
-	void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
-	void scissor(u32 x,u32 y,u32 w,u32 h);
-	void drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType type);
-	void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
-	void clear(ClearFlags flags, const float* color, float depth);
-	void viewport(u32 x, u32 y, u32 w, u32 h);
-	void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
-	void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
-	void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
-	void setCurrentWindow(void* window_handle);
 	void createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-	void drawArrays(PrimitiveType type, u32 offset, u32 count);
-	void pushDebugGroup(const char* msg);
-	void popDebugGroup();
-	void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count);
-	void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type);
-	void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle);
-	void bindIndirectBuffer(BufferHandle buffer);
-	void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
-	void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags);
-	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 	void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data);
 	void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
-	void bindImageTexture(TextureHandle texture, u32 unit);
-	void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
-	void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
-	void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
+	void createTextureView(TextureHandle view, TextureHandle texture);
+
 	void destroy(TextureHandle texture);
 	void destroy(BufferHandle buffer);
 	void destroy(ProgramHandle program);
-	void generateMipmaps(TextureHandle texture);
-	void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
-	void update(BufferHandle buffer, const void* data, size_t size);
-	void freeMemory(void* data, IAllocator& allocator);
-	void freeAlignedMemory(void* data, IAllocator& allocator);
+	
+	void setCurrentWindow(void* window_handle);
+	void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
+	void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
+	void viewport(u32 x, u32 y, u32 w, u32 h);
+	void scissor(u32 x,u32 y,u32 w,u32 h);
+	void clear(ClearFlags flags, const float* color, float depth);
+	
 	void startCapture();
 	void stopCapture();
-	void createTextureView(TextureHandle view, TextureHandle texture);
+	void pushDebugGroup(const char* msg);
+	void popDebugGroup();
+
+	void setState(StateFlags state);
+	void useProgram(ProgramHandle program);
+	
+	void bindIndexBuffer(BufferHandle buffer);
+	void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
+	void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
+	void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
+	void bindIndirectBuffer(BufferHandle buffer);
+	void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags);
+	void bindImageTexture(TextureHandle texture, u32 unit);
+
+	void drawArrays(PrimitiveType type, u32 offset, u32 count);
+	void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
+	void drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType type);
+	void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count);
+	void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type);
+	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
+	
+	void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle);
+	
+	void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
+	void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
+	
+	void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
+	void generateMipmaps(TextureHandle texture);
+	
+	void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
+	void update(BufferHandle buffer, const void* data, size_t size);
+	
+	void freeMemory(void* data, IAllocator& allocator);
+	void freeAlignedMemory(void* data, IAllocator& allocator);
+
+	void run();
+	void reset();
+	void merge(Encoder& rhs);
+
+	struct Page;
+private:
+	Encoder(const Encoder& rhs) = delete;
+	void operator =(const Encoder&) = delete;
+	void operator =(Encoder&&) = delete;
 
 	template <typename T>
 	void write(Instruction instruction, const T& val) {
@@ -294,16 +309,10 @@ struct Encoder {
 		memcpy(ptr + sizeof(instruction), &val, sizeof(val));
 	}
 
-	void run();
-	void reset();
-
-	struct Page;
 	PageAllocator& allocator;
 	Page* first = nullptr;
 	Page* current = nullptr;
 	bool run_called = false;
-
-private:
 	u8* alloc(u32 size);
 };
 
@@ -320,16 +329,6 @@ void checkThread();
 void shutdown();
 int getSize(AttributeType type);
 u32 getSize(TextureFormat format, u32 w, u32 h);
-
-inline StateFlags getBlendStateBits(BlendFactors src_rgb, BlendFactors dst_rgb, BlendFactors src_a, BlendFactors dst_a)
-{
-	return StateFlags((((u64)src_rgb & 15) << 7) | (((u64)dst_rgb & 15) << 11) | (((u64)src_a & 15) << 15) | (((u64)dst_a & 15) << 19));
-}
-
-inline StateFlags getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask, StencilOps sfail, StencilOps dpfail, StencilOps dppass)
-{
-	return StateFlags(((u64)write_mask << 23) | ((u64)func << 31) | ((u64)ref << 35) | ((u64)mask << 43) | ((u64)sfail << 51) | ((u64)dpfail << 55) | ((u64)dppass << 59));
-}
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
@@ -353,6 +352,16 @@ void destroy(QueryHandle query);
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
+
+inline StateFlags getBlendStateBits(BlendFactors src_rgb, BlendFactors dst_rgb, BlendFactors src_a, BlendFactors dst_a)
+{
+	return StateFlags((((u64)src_rgb & 15) << 7) | (((u64)dst_rgb & 15) << 11) | (((u64)src_a & 15) << 15) | (((u64)dst_a & 15) << 19));
+}
+
+inline StateFlags getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask, StencilOps sfail, StencilOps dpfail, StencilOps dppass)
+{
+	return StateFlags(((u64)write_mask << 23) | ((u64)func << 31) | ((u64)ref << 35) | ((u64)mask << 43) | ((u64)sfail << 51) | ((u64)dpfail << 55) | ((u64)dppass << 59));
+}
 
 inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 	switch (format) {

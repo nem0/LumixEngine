@@ -108,23 +108,16 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	template <typename T> void pushJob(const char* name, const T& func);
 	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
 	template <typename T, typename... Args> T& createJob(Args&&... args);
-	template <typename T> void destroyJob(T& job);
 
 	virtual struct LinearAllocator& getCurrentFrameAllocator() = 0;
 
 protected:
 	virtual void* allocJob(u32 size, u32 align) = 0;
-	virtual void deallocJob(void* ptr) = 0;
 }; 
 
 
 template <typename T, typename... Args> T& Renderer::createJob(Args&&... args) {
 	return *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
-}
-
-template <typename T> void Renderer::destroyJob(T& job) {
-	job.~T();
-	deallocJob(&job);
 }
 
 template <typename T>

@@ -900,10 +900,6 @@ struct RendererImpl final : Renderer
 		return m_cpu_frame->job_allocator.allocate_aligned(size, align);
 	}
 
-	void deallocJob(void* job) override {
-		m_cpu_frame->job_allocator.deallocate_aligned(job);
-	}
-
 	const char* getName() const override { return "renderer"; }
 	Engine& getEngine() override { return m_engine; }
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
