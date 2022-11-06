@@ -302,8 +302,10 @@ private:
 	void operator =(const Encoder&) = delete;
 	void operator =(Encoder&&) = delete;
 
+	LUMIX_FORCE_INLINE u8* alloc(u32 size);
+	
 	template <typename T>
-	void write(Instruction instruction, const T& val) {
+	LUMIX_FORCE_INLINE void write(Instruction instruction, const T& val) {
 		u8* ptr = alloc(sizeof(val) + sizeof(Instruction));
 		memcpy(ptr, &instruction, sizeof(instruction));
 		memcpy(ptr + sizeof(instruction), &val, sizeof(val));
@@ -313,7 +315,6 @@ private:
 	Page* first = nullptr;
 	Page* current = nullptr;
 	bool run_called = false;
-	u8* alloc(u32 size);
 };
 
 void preinit(IAllocator& allocator, bool load_renderdoc);
