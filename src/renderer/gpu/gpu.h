@@ -311,25 +311,15 @@ void preinit(IAllocator& allocator, bool load_renderdoc);
 IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
 void launchRenderDoc();
-void setCurrentWindow(void* window_handle);
 bool getMemoryStats(MemoryStats& stats);
-void memoryBarrier(MemoryBarrierType type, BufferHandle buffer);
 u32 swapBuffers();
 void waitFrame(u32 frame);
 bool frameFinished(u32 frame);
 LUMIX_RENDERER_API bool isOriginBottomLeft();
 void checkThread();
 void shutdown();
-void startCapture();
-void stopCapture();
 int getSize(AttributeType type);
 u32 getSize(TextureFormat format, u32 w, u32 h);
-
-
-void clear(ClearFlags flags, const float* color, float depth);
-
-void scissor(u32 x, u32 y, u32 w, u32 h);
-void viewport(u32 x, u32 y, u32 w, u32 h);
 
 inline StateFlags getBlendStateBits(BlendFactors src_rgb, BlendFactors dst_rgb, BlendFactors src_a, BlendFactors dst_a)
 {
@@ -345,54 +335,24 @@ TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
 
-void setState(StateFlags state);
-bool createProgram(ProgramHandle program, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-void useProgram(ProgramHandle prg);
-void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
-
 void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
-bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
-void createTextureView(TextureHandle view, TextureHandle texture);
-void generateMipmaps(TextureHandle handle);
-void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
 QueryHandle createQuery(QueryType type);
 
-void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
-void bindImageTexture(TextureHandle texture, u32 unit);
-void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
-void bindShaderBuffer(BufferHandle buffer, u32 binding_point, BindShaderBufferFlags flags);
-void update(BufferHandle buffer, const void* data, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
-void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
-void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
-void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
-void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
 void queryTimestamp(QueryHandle query);
+
 void beginQuery(QueryHandle query);
 void endQuery(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
 u64 getQueryFrequency();
 bool isQueryReady(QueryHandle query);
 
-void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
-void destroy(TextureHandle texture);
 void destroy(QueryHandle query);
-
-void bindIndexBuffer(BufferHandle handle);
-void bindIndirectBuffer(BufferHandle handle);
-void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
-void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type);
-void drawIndexed(PrimitiveType primitive_type, u32 byte_offset, u32 count, DataType index_type);
-void drawArrays(PrimitiveType type, u32 offset, u32 count);
-void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count);
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
-
-void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
-void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle depth_stencil, FramebufferFlags flags);
 
 inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 	switch (format) {

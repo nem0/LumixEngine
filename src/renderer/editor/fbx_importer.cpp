@@ -1101,17 +1101,16 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 					const Mesh& mesh = model->getMesh(i);
 					Shader* shader = mesh.material->getShader();
 					const gpu::ProgramHandle program = shader->getProgram(mesh.vertex_decl, capture_define | mesh.material->getDefineMask());
-					const Mesh::RenderData* rd = mesh.render_data;
-					const Material::RenderData* material = mesh.material->getRenderData();
+					const Material* material = mesh.material;
 
-					encoder.bindTextures(material->textures, 0, material->textures_count);
+					encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
 					encoder.useProgram(program);
-					encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-					encoder.bindIndexBuffer(rd->index_buffer_handle);
-					encoder.bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+					encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+					encoder.bindIndexBuffer(mesh.index_buffer_handle);
+					encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 					encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-					encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->render_states);
-					encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
+					encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states);
+					encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh.indices_count, mesh.index_type);
 				}
 			}
 		}

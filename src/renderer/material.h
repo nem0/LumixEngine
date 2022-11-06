@@ -41,14 +41,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	static constexpr u32 MAX_UNIFORMS_FLOATS = 64; 
 	static constexpr u32 MAX_UNIFORMS_BYTES = MAX_UNIFORMS_FLOATS * sizeof(float); 
 
-	struct RenderData {
-		gpu::TextureHandle textures[MAX_TEXTURE_COUNT];
-		int textures_count;
-		gpu::StateFlags render_states;
-		u32 material_constants;
-		u32 define_mask;
-	};
-
 	struct Uniform
 	{
 		RuntimeHash name_hash;
@@ -71,7 +63,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	ResourceType getType() const override { return TYPE; }
 
 	Renderer& getRenderer() { return m_renderer; }
-	RenderData* getRenderData() const { return m_render_data; }
 
 	gpu::StateFlags getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
@@ -113,6 +104,12 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void updateRenderData(bool on_before_ready);
 	Array<Uniform>& getUniforms() { return m_uniforms; }
 
+	gpu::TextureHandle m_texture_handles[MAX_TEXTURE_COUNT];
+	u32 m_texture_count;
+	u32 m_material_constants = 0;
+	u32 m_define_mask;
+	gpu::StateFlags m_render_states;
+
 private:
 	void onBeforeReady() override;
 	void unload() override;
@@ -125,10 +122,6 @@ private:
 	Renderer& m_renderer;
 	Shader* m_shader;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
-	u32 m_texture_count;
-	u32 m_define_mask;
-	gpu::StateFlags m_render_states;
-	RenderData* m_render_data;
 	u8 m_layer;
 	u32 m_sort_key;
 

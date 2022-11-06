@@ -44,12 +44,11 @@ Mesh::Mesh(Material* mat,
 	, skin(allocator)
 	, vertex_decl(vertex_decl)
 	, renderer(renderer)
+	, vb_stride(vb_stride)
+	, vertex_buffer_handle(gpu::INVALID_BUFFER)
+	, index_buffer_handle(gpu::INVALID_BUFFER)
+	, index_type(gpu::DataType::U32)
 {
-	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
-	render_data->vb_stride = vb_stride;
-	render_data->vertex_buffer_handle = gpu::INVALID_BUFFER;
-	render_data->index_buffer_handle = gpu::INVALID_BUFFER;
-	render_data->index_type = gpu::DataType::U32;
 	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
@@ -73,12 +72,9 @@ Mesh::Mesh(Mesh&& rhs)
 	, name(rhs.name)
 	, material(rhs.material)
 	, vertex_decl(rhs.vertex_decl)
-	, render_data(rhs.render_data)
 	, lod(rhs.lod)
 	, renderer(rhs.renderer)
 {
-	memmove(attributes_semantic, rhs.attributes_semantic, sizeof(attributes_semantic));
-	rhs.sort_key = 0;
 	ASSERT(false); // renderer keeps Mesh* pointer, so we should not move
 }
 
@@ -501,14 +497,14 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		file.read(indices_count);
 		if (indices_count <= 0) return false;
 		mesh.indices.resize(index_size * indices_count);
-		mesh.render_data->indices_count = indices_count;
+		mesh.indices_count = indices_count;
 		file.read(mesh.indices.getMutableData(), mesh.indices.size());
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
 		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
-		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
-		mesh.render_data->index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
-		if (!mesh.render_data->index_buffer_handle) return false;
+		mesh.index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+		mesh.index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
+		if (!mesh.index_buffer_handle) return false;
 	}
 
 	for (int i = 0; i < object_count; ++i)
@@ -524,7 +520,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		int bone_indices_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::INDICES);
 		bool keep_skin = hasAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS) && hasAttribute(mesh, Mesh::AttributeSemantic::INDICES);
 
-		int vertex_size = mesh.render_data->vb_stride;
+		int vertex_size = mesh.vb_stride;
 		int mesh_vertex_count = data_size / vertex_size;
 		mesh.vertices.resize(mesh_vertex_count);
 		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
@@ -541,8 +537,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			}
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 		}
-		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, gpu::BufferFlags::IMMUTABLE);
-		if (!mesh.render_data->vertex_buffer_handle) return false;
+		mesh.vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, gpu::BufferFlags::IMMUTABLE);
+		if (!mesh.vertex_buffer_handle) return false;
 	}
 	file.read(m_origin_bounding_radius);
 	file.read(m_center_bounding_radius);
@@ -613,10 +609,11 @@ void Model::unload()
 	}
 
 	for (Mesh& mesh : m_meshes) {
-		gpu::Encoder* encoder = m_renderer.createEncoderJob();
-		if (mesh.render_data->index_buffer_handle) encoder->destroy(mesh.render_data->index_buffer_handle);
-		if (mesh.render_data->vertex_buffer_handle) encoder->destroy(mesh.render_data->vertex_buffer_handle);
-		encoder->freeAlignedMemory(mesh.render_data, m_renderer.getAllocator());
+		gpu::Encoder& encoder = m_renderer.getEndFrameEncoder();
+		if (mesh.index_buffer_handle) encoder.destroy(mesh.index_buffer_handle);
+		if (mesh.vertex_buffer_handle) encoder.destroy(mesh.vertex_buffer_handle);
+		mesh.index_buffer_handle = gpu::INVALID_BUFFER;
+		mesh.vertex_buffer_handle = gpu::INVALID_BUFFER;
 	}
 	m_meshes.clear();
 	m_bones.clear();

@@ -3337,7 +3337,7 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 	ASSERT(desc.is_cubemap);
 
 	u32 layer = probe.texture_id;
-	gpu::Encoder* encoder = m_scene.m_renderer.createEncoderJob();
+	gpu::Encoder& encoder = m_scene.m_renderer.createEncoderJob();
 	const u32 offset = u32(image_data - data);
 	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
 	InputMemoryStream blob(mem.data, (u32)size - offset);
@@ -3346,10 +3346,10 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 			u32 w = maximum(desc.width >> mip, 1);
 			u32 h = maximum(desc.height >> mip, 1);
 			const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-			encoder->update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
+			encoder.update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
 		}
 	}
-	encoder->freeMemory(mem.data, m_scene.m_renderer.getAllocator());
+	encoder.freeMemory(mem.data, m_scene.m_renderer.getAllocator());
 	LUMIX_DELETE(m_allocator, this);
 }
 

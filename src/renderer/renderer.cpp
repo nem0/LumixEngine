@@ -160,7 +160,6 @@ struct FrameData {
 		gpu::VertexDecl decl;
 		u32 defines;
 		gpu::ProgramHandle program;
-		Shader::Sources sources;
 	};
 
 	TransientBuffer<16> transient_buffer;
@@ -446,12 +445,14 @@ struct RendererImpl final : Renderer
 		
 		jobs::Signal signal;
 		jobs::runLambda([this]() {
+			gpu::Encoder encoder(m_engine.getPageAllocator());
 			for (const Local<FrameData>& frame : m_frames) {
-				gpu::destroy(frame->transient_buffer.m_buffer);
-				gpu::destroy(frame->uniform_buffer.m_buffer);
+				encoder.destroy(frame->transient_buffer.m_buffer);
+				encoder.destroy(frame->uniform_buffer.m_buffer);
 			}
-			gpu::destroy(m_material_buffer.buffer);
-			gpu::destroy(m_downscale_program);
+			encoder.destroy(m_material_buffer.buffer);
+			encoder.destroy(m_downscale_program);
+			encoder.run();
 			m_profiler.clear();
 			gpu::shutdown();
 		}, &signal, 1);
@@ -471,31 +472,25 @@ struct RendererImpl final : Renderer
 	}
 
 	void init() override {
-		struct InitData {
-			gpu::InitFlags flags = gpu::InitFlags::VSYNC;
-			RendererImpl* renderer;
-		} init_data;
-		init_data.renderer = this;
+		gpu::InitFlags flags = gpu::InitFlags::VSYNC;
 		
 		char cmd_line[4096];
 		os::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
 			if (cmd_line_parser.currentEquals("-no_vsync")) {
-				init_data.flags = init_data.flags & ~gpu::InitFlags::VSYNC;
+				flags = flags & ~gpu::InitFlags::VSYNC;
 			}
 			else if (cmd_line_parser.currentEquals("-debug_opengl")) {
-				init_data.flags = init_data.flags | gpu::InitFlags::DEBUG_OUTPUT;
+				flags = flags | gpu::InitFlags::DEBUG_OUTPUT;
 			}
 		}
 
 		jobs::Signal signal;
-		jobs::runLambda([&init_data]() {
+		jobs::runLambda([this, flags]() {
 			PROFILE_BLOCK("init_render");
-			RendererImpl& renderer = *(RendererImpl*)init_data.renderer;
-			Engine& engine = renderer.getEngine();
-			void* window_handle = engine.getWindowHandle();
-			if (!gpu::init(window_handle, init_data.flags)) {
+			void* window_handle = m_engine.getWindowHandle();
+			if (!gpu::init(window_handle, flags)) {
 				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
 			}
 
@@ -507,42 +502,45 @@ struct RendererImpl final : Renderer
 					"dedicated: ", (mem_stats.dedicated_vidmem/ (1024.f * 1024.f)), "MB\n");
 			}
 
-			for (const Local<FrameData>& frame : renderer.m_frames) {
+			for (const Local<FrameData>& frame : m_frames) {
 				frame->transient_buffer.init(gpu::BufferFlags::NONE);
 				frame->uniform_buffer.init(gpu::BufferFlags::UNIFORM_BUFFER);
 			}
-			renderer.m_cpu_frame = renderer.m_frames[0].get();
-			renderer.m_gpu_frame = renderer.m_frames[0].get();
-
-			renderer.m_profiler.init();
-
-			MaterialBuffer& mb = renderer.m_material_buffer;
-			mb.buffer = gpu::allocBufferHandle();
-			mb.map.insert(RuntimeHash(), 0);
-			mb.data.resize(400);
-			mb.data[0].hash = RuntimeHash();
-			mb.data[0].ref_count = 1;
-			mb.first_free = 1;
-			for (int i = 1; i < 400; ++i) {
-				mb.data[i].ref_count = 0;
-				mb.data[i].next_free = i + 1;
-			}
-			mb.data.back().next_free = -1;
-			gpu::createBuffer(mb.buffer
-				, gpu::BufferFlags::UNIFORM_BUFFER
-				, Material::MAX_UNIFORMS_BYTES * 400
-				, nullptr
-			);
-
-			renderer.m_downscale_program = gpu::allocProgramHandle();
-			const gpu::ShaderType type = gpu::ShaderType::COMPUTE;
-			const char* srcs[] = { downscale_src };
-			gpu::createProgram(renderer.m_downscale_program, {}, srcs, &type, 1, nullptr, 0, "downscale");
-
-			float default_mat[Material::MAX_UNIFORMS_FLOATS] = {};
-			gpu::update(mb.buffer, &default_mat, sizeof(default_mat));
+			m_profiler.init();
 		}, &signal, 1);
 		jobs::wait(&signal);
+
+		m_cpu_frame = m_frames[0].get();
+		m_gpu_frame = m_frames[0].get();
+
+		MaterialBuffer& mb = m_material_buffer;
+		const u32 MAX_MATERIAL_CONSTS_COUNT = 400;
+		mb.buffer = gpu::allocBufferHandle();
+		mb.map.insert(RuntimeHash(), 0);
+		mb.data.resize(MAX_MATERIAL_CONSTS_COUNT);
+		mb.data[0].hash = RuntimeHash();
+		mb.data[0].ref_count = 1;
+		mb.first_free = 1;
+		for (int i = 1; i < MAX_MATERIAL_CONSTS_COUNT; ++i) {
+			mb.data[i].ref_count = 0;
+			mb.data[i].next_free = i + 1;
+		}
+		mb.data.back().next_free = -1;
+			
+		gpu::Encoder& encoder = m_cpu_frame->begin_encoder;
+		encoder.createBuffer(mb.buffer
+			, gpu::BufferFlags::UNIFORM_BUFFER
+			, Material::MAX_UNIFORMS_BYTES * MAX_MATERIAL_CONSTS_COUNT
+			, nullptr
+		);
+
+		m_downscale_program = gpu::allocProgramHandle();
+		const gpu::ShaderType type = gpu::ShaderType::COMPUTE;
+		const char* srcs[] = { downscale_src };
+		encoder.createProgram(m_downscale_program, {}, srcs, &type, 1, nullptr, 0, "downscale");
+
+		float default_mat[Material::MAX_UNIFORMS_FLOATS] = {};
+		encoder.update(mb.buffer, &default_mat, sizeof(default_mat));
 
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		m_pipeline_manager.create(PipelineResource::TYPE, manager);
@@ -622,18 +620,18 @@ struct RendererImpl final : Renderer
 		ASSERT(mem.size > 0);
 		ASSERT(handle);
 
-		gpu::Encoder* encoder = createEncoderJob();
-		encoder->update(handle, mem.data, mem.size);
-		if (mem.own) encoder->freeMemory(mem.data, m_allocator);
+		gpu::Encoder& encoder = createEncoderJob();
+		encoder.update(handle, mem.data, mem.size);
+		if (mem.own) encoder.freeMemory(mem.data, m_allocator);
 	}
 
 	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override {
 		ASSERT(mem.size > 0);
 		ASSERT(handle);
 
-		gpu::Encoder* encoder = createEncoderJob();
-		encoder->update(handle, 0, x, y, slice, w, h, format, mem.data, mem.size);
-		if (mem.own) encoder->freeMemory(mem.data, m_allocator);
+		gpu::Encoder& encoder = createEncoderJob();
+		encoder.update(handle, 0, x, y, slice, w, h, format, mem.data, mem.size);
+		if (mem.own) encoder.freeMemory(mem.data, m_allocator);
 	}
 
 
@@ -644,10 +642,10 @@ struct RendererImpl final : Renderer
 		const gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if (!handle) return handle;
 
-		gpu::Encoder* encoder = createEncoderJob();
+		gpu::Encoder& encoder = createEncoderJob();
 		if (desc.is_cubemap) flags = flags | gpu::TextureFlags::IS_CUBE;
 		if (desc.mips < 2) flags = flags | gpu::TextureFlags::NO_MIPS;
-		encoder->createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name);
+		encoder.createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name);
 				
 		const u8* ptr = (const u8*)memory.data;
 		for (u32 layer = 0; layer < desc.depth; ++layer) {
@@ -657,12 +655,12 @@ struct RendererImpl final : Renderer
 					const u32 w = maximum(desc.width >> mip, 1);
 					const u32 h = maximum(desc.height >> mip, 1);
 					const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-					encoder->update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
+					encoder.update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
 					ptr += mip_size_bytes;
 				}
 			}
 		}
-		if (memory.own) encoder->freeMemory(memory.data, m_allocator);
+		if (memory.own) encoder.freeMemory(memory.data, m_allocator);
 		return handle;
 	}
 
@@ -702,6 +700,7 @@ struct RendererImpl final : Renderer
 			m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
 			m_material_buffer.map.insert(hash, idx);
 			
+			jobs::wait(&m_cpu_frame->can_setup);
 			const u32 size = u32(data.length() * sizeof(float));
 			const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
 			memcpy(slice.ptr, data.begin(), size);
@@ -727,9 +726,9 @@ struct RendererImpl final : Renderer
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle) return handle;
 
-		gpu::Encoder* encoder = createEncoderJob();
-		encoder->createBuffer(handle, flags, memory.size, memory.data);
-		if (memory.own) encoder->freeMemory(memory.data, m_allocator);
+		gpu::Encoder& encoder = createEncoderJob();
+		encoder.createBuffer(handle, flags, memory.size, memory.data);
+		if (memory.own) encoder.freeMemory(memory.data, m_allocator);
 		return handle;
 	}
 
@@ -799,8 +798,8 @@ struct RendererImpl final : Renderer
 	}
 
 	void copy(gpu::TextureHandle dst, gpu::TextureHandle src) override {
-		gpu::Encoder* encoder = createEncoderJob();
-		encoder->copy(dst, src, 0, 0);
+		gpu::Encoder& encoder = createEncoderJob();
+		encoder.copy(dst, src, 0, 0);
 	}
 
 	void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) override {
@@ -827,14 +826,14 @@ struct RendererImpl final : Renderer
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if(!handle) return handle;
 
-		gpu::Encoder* encoder = createEncoderJob();
-		encoder->createTexture(handle, w, h, depth, format, flags, debug_name);
+		gpu::Encoder& encoder = createEncoderJob();
+		encoder.createTexture(handle, w, h, depth, format, flags, debug_name);
 		if (memory.data && memory.size) {
 			ASSERT(depth == 1);
-			encoder->update(handle, 0, 0, 0, 0, w, h, format, memory.data, memory.size);
-			if (u32(flags & gpu::TextureFlags::NO_MIPS) == 0) encoder->generateMipmaps(handle);
+			encoder.update(handle, 0, 0, 0, 0, w, h, format, memory.data, memory.size);
+			if (u32(flags & gpu::TextureFlags::NO_MIPS) == 0) encoder.generateMipmaps(handle);
 		}
-		if (memory.own) encoder->freeMemory(memory.data, m_allocator);
+		if (memory.own) encoder.freeMemory(memory.data, m_allocator);
 		return handle;
 	}
 
@@ -880,8 +879,11 @@ struct RendererImpl final : Renderer
 		ctx.addScene(scene.move());
 	}
 
+	gpu::Encoder& getEndFrameEncoder() override {
+		return m_cpu_frame->end_encoder;
+	}
 
-	gpu::Encoder* createEncoderJob() override {
+	gpu::Encoder& createEncoderJob() override {
 		struct EncoderJob : RenderJob {
 			EncoderJob(PageAllocator& allocator) : encoder(allocator) {}
 			void setup() override {}
@@ -890,7 +892,7 @@ struct RendererImpl final : Renderer
 		};
 		EncoderJob& job = createJob<EncoderJob>(m_engine.getPageAllocator());
 		queue(job, 0);
-		return &job.encoder;
+		return job.encoder;
 	}
 
 	void* allocJob(u32 size, u32 align) override {
@@ -917,7 +919,8 @@ struct RendererImpl final : Renderer
 			}
 		}
 		gpu::ProgramHandle program = gpu::allocProgramHandle();
-		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, shader.m_sources});
+		shader.compile(program, decl, defines, m_cpu_frame->begin_encoder);
+		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program});
 		return program;
 	}
 
@@ -946,8 +949,8 @@ struct RendererImpl final : Renderer
 	}
 
 
-	void startCapture() override { createEncoderJob()->startCapture(); }
-	void stopCapture() override { createEncoderJob()->stopCapture(); }
+	void startCapture() override { createEncoderJob().startCapture(); }
+	void stopCapture() override { createEncoderJob().stopCapture(); }
 
 	void render() {
 		jobs::MutexGuard guard(m_render_mutex);
@@ -982,11 +985,6 @@ struct RendererImpl final : Renderer
 			profiler::pushCounter(buffer_counter, to_MB(mem_stats.buffer_mem));
 			profiler::pushCounter(texture_counter, to_MB(mem_stats.texture_mem));
 		}
-
-		for (const auto& i : frame.to_compile_shaders) {
-			Shader::compile(i.program, i.decl, i.defines, i.sources, *this);
-		}
-		frame.to_compile_shaders.clear();
 
 		frame.begin_encoder.run();
 		frame.begin_encoder.reset();
@@ -1081,6 +1079,7 @@ struct RendererImpl final : Renderer
 			const u64 key = i.defines | ((u64)i.decl.hash.getHashValue() << 32);
 			i.shader->m_programs.insert(key, i.program);
 		}
+		m_cpu_frame->to_compile_shaders.clear();
 
 		u32 frame_data_mem = 0;
 		for (const Local<FrameData>& fd : m_frames) {

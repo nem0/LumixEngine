@@ -58,15 +58,15 @@ bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }
 
-void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer) {
+void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, gpu::Encoder& encoder) {
 	PROFILE_BLOCK("compile_shader");
 
 	const char* codes[64];
 	gpu::ShaderType types[64];
-	ASSERT((int)lengthOf(types) >= sources.stages.size());
-	for (int i = 0; i < sources.stages.size(); ++i) {
-		codes[i] = &sources.stages[i].code[0];
-		types[i] = sources.stages[i].type;
+	ASSERT((int)lengthOf(types) >= m_sources.stages.size());
+	for (int i = 0; i < m_sources.stages.size(); ++i) {
+		codes[i] = &m_sources.stages[i].code[0];
+		types[i] = m_sources.stages[i].type;
 	}
 	const char* prefixes[35];
 	StaticString<128> defines_code[32];
@@ -74,14 +74,14 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 	if (defines != 0) {
 		for(int i = 0; i < sizeof(defines) * 8; ++i) {
 			if((defines & (1 << i)) == 0) continue;
-			defines_code[defines_count] << "#define " << renderer.getShaderDefine(i) << "\n";
+			defines_code[defines_count] << "#define " << m_renderer.getShaderDefine(i) << "\n";
 			prefixes[defines_count] = defines_code[defines_count];
 			++defines_count;
 		}
 	}
-	prefixes[defines_count] = sources.common.length() == 0 ? "" : sources.common.c_str();
+	prefixes[defines_count] = m_sources.common.length() == 0 ? "" : m_sources.common.c_str();
 
-	gpu::createProgram(program, decl, codes, types, sources.stages.size(), prefixes, 1 + defines_count, sources.path.c_str());
+	encoder.createProgram(program, decl, codes, types, m_sources.stages.size(), prefixes, 1 + defines_count, m_sources.path.c_str());
 }
 
 gpu::ProgramHandle Shader::getProgram(const gpu::VertexDecl& decl, u32 defines) {

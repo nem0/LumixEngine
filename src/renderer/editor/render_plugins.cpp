@@ -1727,8 +1727,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
-				gpu::Encoder* encoder = renderer->createEncoderJob();
-				encoder->createTextureView(m_texture_view, m_texture->handle);
+				renderer->createEncoderJob().createTextureView(m_texture_view, m_texture->handle);
 			}
 
 			ImGui::Image(m_texture_view, texture_size);
@@ -3586,7 +3585,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				}
 				encoder.generateMipmaps(src);
 				encoder.createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
-				gpu::BufferHandle buf = gpu::allocBufferHandle();
 
 				encoder.useProgram(plugin->m_ibl_filter_program);
 				encoder.bindTextures(&src, 0, 1);
@@ -3633,7 +3631,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 				encoder.destroy(staging);
 
-				encoder.destroy(buf);
 				encoder.destroy(src);
 				encoder.destroy(dst);			
 			}
@@ -4423,164 +4420,6 @@ struct RenderInterfaceImpl final : RenderInterface
 
 struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 {
-	struct RenderJob : Renderer::RenderJob
-	{
-		RenderJob(PageAllocator& allocator) : encoder(allocator) {}
-
-		gpu::ProgramHandle getProgram(void* window_handle, bool& new_program) {
-			auto iter = plugin->m_programs.find(window_handle);
-			if (!iter.isValid()) {
-				plugin->m_programs.insert(window_handle, gpu::allocProgramHandle());
-				iter = plugin->m_programs.find(window_handle);
-				new_program = true;
-			}
-
-			return iter.value();
-		}
-
-		void setup() override
-		{
-			PROFILE_FUNCTION();
-			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
-			renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-
-			if (!should_setup) return;
-
-			ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-			for (const ImGuiViewport* vp : platform_io.Viewports) {
-				ImDrawData* draw_data = vp->DrawData;
-				bool new_program = false;
-				gpu::ProgramHandle program = getProgram(vp->PlatformHandle, new_program);
-				const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Vec4) * 2);
-
-				const u32 w = u32(vp->Size.x);
-				const u32 h = u32(vp->Size.y);
-				const Vec4 canvas_mtx[] = {
-					Vec4(2.f / w, 0, -1 + (float)-draw_data->DisplayPos.x * 2.f / w, 0),
-					Vec4(0, -2.f / h, 1 + (float)draw_data->DisplayPos.y * 2.f / h, 0)
-				};
-				memcpy(ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
-
-				if (new_program) {
-					const char* vs =
-						R"#(
-						layout(location = 0) in vec2 a_pos;
-						layout(location = 1) in vec2 a_uv;
-						layout(location = 2) in vec4 a_color;
-						layout(location = 0) out vec4 v_color;
-						layout(location = 1) out vec2 v_uv;
-						layout (std140, binding = 4) uniform IMGUIState {
-							mat2x4 u_canvas_mtx;
-						};
-						void main() {
-							v_color = a_color;
-							v_uv = a_uv;
-							vec2 p = vec3(a_pos, 1) * mat2x3(u_canvas_mtx);
-							gl_Position = vec4(p.xy, 0, 1);
-						})#";
-					const char* fs = 
-						R"#(
-						layout(location = 0) in vec4 v_color;
-						layout(location = 1) in vec2 v_uv;
-						layout(location = 0) out vec4 o_color;
-						layout(binding = 0) uniform sampler2D u_texture;
-						void main() {
-							vec4 tc = textureLod(u_texture, v_uv, 0);
-							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
-							o_color.a = v_color.a * tc.a;
-						})#";
-					const char* srcs[] = {vs, fs};
-					gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
-					gpu::VertexDecl decl;
-					decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
-					decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
-					decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-					encoder.createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
-				}
-
-				encoder.setCurrentWindow(vp->PlatformHandle);
-				encoder.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
-				encoder.viewport(0, 0, w, h);
-				const Vec4 clear_color = Vec4(0.2f, 0.2f, 0.2f, 1.f);
-				encoder.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &clear_color.x, 1.0);
-				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				
-				encoder.useProgram(program);
-
-				for (int i = 0; i < draw_data->CmdListsCount; ++i) {
-					encode(draw_data->CmdLists[i], vp);
-				}
-			}
-			encoder.setCurrentWindow(nullptr);
-			
-			default_texture = &plugin->m_texture;
-		}
-
-
-		void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp) {
-			const u32 num_indices = cmd_list->IdxBuffer.size() / sizeof(ImDrawIdx);
-			const u32 num_vertices = cmd_list->VtxBuffer.size() / sizeof(ImDrawVert);
-
-			const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
-			memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
-
-			const Renderer::TransientSlice vb  = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
-			memcpy(vb.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
-
-			encoder.bindIndexBuffer(ib.buffer);
-			encoder.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
-			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-			const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			encoder.setState(gpu::StateFlags::SCISSOR_TEST | blend_state);
-			for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
-				const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[i];
-				ASSERT(!pcmd->UserCallback);
-				if (0 == pcmd->ElemCount) continue;
-
-				gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
-				if (!tex) tex = *default_texture;
-				encoder.bindTextures(&tex, 0, 1);
-
-				const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
-
-				const ImVec2 pos = vp->DrawData->DisplayPos;
-				const u32 vp_height = u32(vp->Size.y);
-				if (gpu::isOriginBottomLeft()) {
-					encoder.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
-						vp_height - u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)) - h,
-						u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
-						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
-				} else {
-					encoder.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
-						u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)),
-						u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
-						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
-				}
-
-				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, pcmd->IdxOffset * sizeof(u32) + ib.offset, pcmd->ElemCount, gpu::DataType::U32);
-			}
-		}
-
-
-		void execute() override
-		{
-			PROFILE_FUNCTION();
-			renderer->beginProfileBlock("editor imgui", 0);
-
-			encoder.run();
-
-			renderer->endProfileBlock();
-		}
-		
-		Renderer* renderer;
-		const gpu::TextureHandle* default_texture;
-		EditorUIRenderPlugin* plugin;
-		bool should_setup = true;
-		gpu::Encoder encoder;
-	};
-
-
 	EditorUIRenderPlugin(StudioApp& app)
 		: m_app(app)
 		, m_engine(app.getEngine())
@@ -4628,14 +4467,134 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		ImGui::DestroyContext();
 	}
 
+	gpu::ProgramHandle getProgram(void* window_handle, bool& new_program) {
+		auto iter = m_programs.find(window_handle);
+		if (!iter.isValid()) {
+			m_programs.insert(window_handle, gpu::allocProgramHandle());
+			iter = m_programs.find(window_handle);
+			new_program = true;
+		}
+
+		return iter.value();
+	}
+
+	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, gpu::Encoder& encoder) {
+		const u32 num_indices = cmd_list->IdxBuffer.size() / sizeof(ImDrawIdx);
+		const u32 num_vertices = cmd_list->VtxBuffer.size() / sizeof(ImDrawVert);
+
+		const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
+		memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
+
+		const Renderer::TransientSlice vb  = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
+		memcpy(vb.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
+
+		encoder.bindIndexBuffer(ib.buffer);
+		encoder.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
+		encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+		const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+		encoder.setState(gpu::StateFlags::SCISSOR_TEST | blend_state);
+		for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
+			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[i];
+			ASSERT(!pcmd->UserCallback);
+			if (0 == pcmd->ElemCount) continue;
+
+			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
+			if (!tex) tex = m_texture;
+			encoder.bindTextures(&tex, 0, 1);
+
+			const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
+
+			const ImVec2 pos = vp->DrawData->DisplayPos;
+			const u32 vp_height = u32(vp->Size.y);
+			if (gpu::isOriginBottomLeft()) {
+				encoder.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
+					vp_height - u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)) - h,
+					u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
+					u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+			} else {
+				encoder.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
+					u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)),
+					u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
+					u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+			}
+
+			encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, pcmd->IdxOffset * sizeof(u32) + ib.offset, pcmd->ElemCount, gpu::DataType::U32);
+		}
+	}
 
 	void guiEndFrame() override
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		RenderJob& cmd = renderer->createJob<RenderJob>(renderer->getEngine().getPageAllocator());
-		cmd.plugin = this;
-		
-		renderer->queue(cmd, 0);
+
+		gpu::Encoder& encoder = renderer->createEncoderJob();
+
+		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+		for (const ImGuiViewport* vp : platform_io.Viewports) {
+			ImDrawData* draw_data = vp->DrawData;
+			bool new_program = false;
+			gpu::ProgramHandle program = getProgram(vp->PlatformHandle, new_program);
+			const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Vec4) * 2);
+
+			const u32 w = u32(vp->Size.x);
+			const u32 h = u32(vp->Size.y);
+			const Vec4 canvas_mtx[] = {
+				Vec4(2.f / w, 0, -1 + (float)-draw_data->DisplayPos.x * 2.f / w, 0),
+				Vec4(0, -2.f / h, 1 + (float)draw_data->DisplayPos.y * 2.f / h, 0)
+			};
+			memcpy(ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
+
+			if (new_program) {
+				const char* vs =
+					R"#(
+					layout(location = 0) in vec2 a_pos;
+					layout(location = 1) in vec2 a_uv;
+					layout(location = 2) in vec4 a_color;
+					layout(location = 0) out vec4 v_color;
+					layout(location = 1) out vec2 v_uv;
+					layout (std140, binding = 4) uniform IMGUIState {
+						mat2x4 u_canvas_mtx;
+					};
+					void main() {
+						v_color = a_color;
+						v_uv = a_uv;
+						vec2 p = vec3(a_pos, 1) * mat2x3(u_canvas_mtx);
+						gl_Position = vec4(p.xy, 0, 1);
+					})#";
+				const char* fs = 
+					R"#(
+					layout(location = 0) in vec4 v_color;
+					layout(location = 1) in vec2 v_uv;
+					layout(location = 0) out vec4 o_color;
+					layout(binding = 0) uniform sampler2D u_texture;
+					void main() {
+						vec4 tc = textureLod(u_texture, v_uv, 0);
+						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
+						o_color.a = v_color.a * tc.a;
+					})#";
+				const char* srcs[] = {vs, fs};
+				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
+				gpu::VertexDecl decl;
+				decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				encoder.createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+			}
+
+			encoder.setCurrentWindow(vp->PlatformHandle);
+			encoder.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+			encoder.viewport(0, 0, w, h);
+			const Vec4 clear_color = Vec4(0.2f, 0.2f, 0.2f, 1.f);
+			encoder.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &clear_color.x, 1.0);
+			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				
+			encoder.useProgram(program);
+
+			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
+				encode(draw_data->CmdLists[i], vp, renderer, encoder);
+			}
+		}
+		encoder.setCurrentWindow(nullptr);
 		renderer->frame();
 	}
 

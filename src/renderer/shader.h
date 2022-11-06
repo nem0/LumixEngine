@@ -99,7 +99,7 @@ public:
 	
 	gpu::ProgramHandle getProgram(u32 defines);
 	gpu::ProgramHandle getProgram(const gpu::VertexDecl& decl, u32 defines);
-	static void compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer);
+	void compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, gpu::Encoder& encoder);
 	static void toUniformVarName(Span<char> out, const char* in);
 	static void toTextureVarName(Span<char> out, const char* in);
 

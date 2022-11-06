@@ -808,16 +808,15 @@ void SceneView::renderIcons() {
 		
 			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 				const Mesh& mesh = model->getMesh(i);
-				const Mesh::RenderData* rd = mesh.render_data;
-				const Material::RenderData* material = mesh.material->getRenderData();
-				encoder.bindTextures(material->textures, 0, material->textures_count);
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, material->define_mask);
+				const Material* material = mesh.material;
+				encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, material->m_define_mask);
 				encoder.useProgram(program);
-				encoder.bindIndexBuffer(rd->index_buffer_handle);
-				encoder.bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+				encoder.bindIndexBuffer(mesh.index_buffer_handle);
+				encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				encoder.setState(material->render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, rd->indices_count, rd->index_type);
+				encoder.setState(material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
+				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh.indices_count, mesh.index_type);
 			}
 		}
 	});
@@ -849,9 +848,8 @@ void SceneView::renderSelection()
 			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 				const Mesh& mesh = model->getMesh(i);
 					
-				Material::RenderData* material = mesh.material->getRenderData();
-				u32 define_mask = material->define_mask;
-				Mesh::RenderData* mesh_rd = mesh.render_data;
+				Material* material = mesh.material;
+				u32 define_mask = material->m_define_mask;
 				const Matrix mtx = universe.getRelativeMatrix(e, view_pos);
 				dq_pose.clear();
 				if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
@@ -890,13 +888,13 @@ void SceneView::renderSelection()
 				}
 		
 				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				encoder.bindTextures(material->textures, 0, material->textures_count);
+				encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
 				encoder.useProgram(program);
-				encoder.bindIndexBuffer(mesh_rd->index_buffer_handle);
-				encoder.bindVertexBuffer(0, mesh_rd->vertex_buffer_handle, 0, mesh_rd->vb_stride);
+				encoder.bindIndexBuffer(mesh.index_buffer_handle);
+				encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				encoder.setState(material->render_states);
-				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh_rd->indices_count, mesh_rd->index_type);
+				encoder.setState(material->m_render_states);
+				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh.indices_count, mesh.index_type);
 			}
 			scene->unlockPose(e, false);
 		}

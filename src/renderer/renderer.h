@@ -102,7 +102,8 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 	virtual struct Engine& getEngine() = 0;
 
-	virtual gpu::Encoder* createEncoderJob() = 0;
+	virtual gpu::Encoder& createEncoderJob() = 0;
+	virtual gpu::Encoder& getEndFrameEncoder() = 0;
 
 	template <typename T> void pushJob(const char* name, const T& func);
 	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
