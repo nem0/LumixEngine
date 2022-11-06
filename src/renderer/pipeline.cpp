@@ -3566,7 +3566,7 @@ struct PipelineImpl final : Pipeline
 				memcpy(ub.ptr, &mtx, sizeof(mtx));
 
 				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				const gpu::ProgramHandle program = pg.material->getShader()->getProgram(pg.vertex_decl, pg.material->getDefineMask());
+				const gpu::ProgramHandle program = pg.material->getShader()->getProgram(pg.vertex_decl, bucket.define_mask | pg.material->getDefineMask());
 				encoder.useProgram(program);
 
 				encoder.bindIndexBuffer(gpu::INVALID_BUFFER);

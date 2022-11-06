@@ -454,8 +454,11 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 		, gpu::PrimitiveType primitive_type
 		, Span<const u8> index_data
 		, gpu::DataType index_type) = 0;
+	virtual void setProceduralGeometryMaterial(EntityRef entity, const Path& path) = 0;
 	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
 	virtual ProceduralGeometry& getProceduralGeometry(EntityRef e) = 0;
+	virtual bool hasProceduralGeometry(EntityRef e) = 0;
+	virtual void createProceduralGeometry(EntityRef entity) = 0;
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;

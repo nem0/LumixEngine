@@ -1894,6 +1894,10 @@ struct RenderSceneImpl final : RenderScene {
 		computeAABB(pg);
 	}
 	
+	bool hasProceduralGeometry(EntityRef e) override {
+		return m_procedural_geometries.find(e).isValid();
+	}
+
 	ProceduralGeometry& getProceduralGeometry(EntityRef e) override {
 		return m_procedural_geometries[e];
 	}
@@ -1925,7 +1929,7 @@ struct RenderSceneImpl final : RenderScene {
 		return m ? m->getPath() : Path();
 	}
 
-	void setSplineGeometryMaterial(EntityRef entity, const Path& path) override {
+	void setProceduralGeometryMaterial(EntityRef entity, const Path& path) override {
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		if (pg.material) {
 			if (pg.material->getPath() == path) return;
@@ -1934,6 +1938,10 @@ struct RenderSceneImpl final : RenderScene {
 		}
 
 		pg.material = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Material>(path);
+	}
+
+	void setSplineGeometryMaterial(EntityRef entity, const Path& path) override {
+		setProceduralGeometryMaterial(entity, path);
 	}
 
 	Pose* lockPose(EntityRef entity) override { return m_model_instances[entity.index].pose; }
@@ -3191,6 +3199,11 @@ struct RenderSceneImpl final : RenderScene {
 		m_procedural_geometries.erase(entity);
 	}
 	
+	void createProceduralGeometry(EntityRef entity) override {
+		ASSERT(!m_procedural_geometries.find(entity).isValid());
+		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
+	}
+
 	void createSplineGeometry(EntityRef entity) {
 		SplineGeometry& sg = m_spline_geometries.insert(entity);
 		sg.flags.set(SplineGeometry::HAS_UVS);
