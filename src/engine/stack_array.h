@@ -16,10 +16,10 @@ struct StackArray : Array<T> {
 	}
 	
 	~StackArray() {
-		clear();
-		if (m_data) m_allocator.deallocate_aligned(m_data);
-		m_data = nullptr;
-		m_capacity = 0;
+		this->clear();
+		if (this->m_data) this->m_allocator.deallocate_aligned(this->m_data);
+		this->m_data = nullptr;
+		this->m_capacity = 0;
 	}
 
 private:

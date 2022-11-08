@@ -5,6 +5,12 @@
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
 
+#ifndef _WIN32
+	#include "draw_stream.h"
+	#include "engine/engine.h"
+	#include "engine/profiler.h"
+#endif
+
 namespace Lumix {
 
 struct RenderPlugin {

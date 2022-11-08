@@ -1,6 +1,9 @@
 #pragma once
 
 #include "gpu/gpu.h"
+#ifndef _WIN32
+	#include <string.h>
+#endif
 
 namespace Lumix {
 

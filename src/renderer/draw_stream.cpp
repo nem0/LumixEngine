@@ -3,7 +3,9 @@
 #include "engine/math.h"
 #include "engine/page_allocator.h"
 #include "engine/string.h"
-#include <intrin.h>
+#ifdef _WIN32
+	#include <intrin.h>
+#endif
 
 namespace Lumix {
 
@@ -561,7 +563,11 @@ void DrawStream::submitCached() {
 		return;
 	}
 
-	const u32 count = __popcnt(dirty);
+	#ifdef _WIN32
+		const u32 count = __popcnt(dirty);
+	#else
+		const u32 count = __builtin_popcount (dirty);
+	#endif
 	u8* ptr = alloc(sizeof(Instruction) + sizeof(dirty) + count * sizeof(u32));
 	Instruction instr = Instruction::DIRTY_CACHE;
 	#define WRITE(V) do { memcpy(ptr, &V, sizeof(V)); ptr += sizeof(V); } while(false)
