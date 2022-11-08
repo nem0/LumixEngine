@@ -14,7 +14,7 @@ namespace Lumix
 {
 
 
-struct Encoder;
+struct DrawStream;
 struct Renderer;
 struct Texture;
 
@@ -100,7 +100,7 @@ public:
 	
 	gpu::ProgramHandle getProgram(u32 defines);
 	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines);
-	void compile(gpu::ProgramHandle program, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines, Encoder& encoder);
+	void compile(gpu::ProgramHandle program, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines, DrawStream& stream);
 	static void toUniformVarName(Span<char> out, const char* in);
 	static void toTextureVarName(Span<char> out, const char* in);
 

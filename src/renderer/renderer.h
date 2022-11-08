@@ -13,7 +13,7 @@ struct RenderPlugin {
 	virtual void renderTransparent(Pipeline& pipeline) {}
 };
 
-struct Encoder;
+struct DrawStream;
 
 struct LUMIX_RENDERER_API Renderer : IPlugin {
 	struct MemRef {
@@ -96,8 +96,8 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 	virtual struct Engine& getEngine() = 0;
 
-	virtual Encoder& createEncoderJob() = 0;
-	virtual Encoder& getEndFrameEncoder() = 0;
+	virtual DrawStream& createDrawStreamJob() = 0;
+	virtual DrawStream& getEndFrameDrawStream() = 0;
 
 	template <typename T> void pushJob(const char* name, const T& func);
 	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
@@ -121,14 +121,14 @@ void Renderer::pushJob(const char* name, const T& func) {
 	struct Job : RenderJob {
 		Job(const char* name, const T& func, Renderer& renderer, PageAllocator& allocator)
 			: func(func)
-			, encoder(allocator)
+			, stream(allocator)
 			, renderer(renderer)
 			, name(name)
 		{}
 		
 		void execute() override {
 			if (name) renderer.beginProfileBlock(name, 0);
-			encoder.run();
+			stream.run();
 			if (name) renderer.endProfileBlock();
 		}
 		
@@ -138,11 +138,11 @@ void Renderer::pushJob(const char* name, const T& func) {
 				profiler::beginBlock(that->name);
 				profiler::blockColor(0x7f, 0, 0x7f);
 			}
-			that->func(that->encoder);
+			that->func(that->stream);
 			if (that->name) profiler::endBlock();
 		}
 
-		Encoder encoder;
+		DrawStream stream;
 		T func;
 		Renderer& renderer;
 		const char* name;

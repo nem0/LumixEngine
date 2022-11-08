@@ -8,7 +8,7 @@
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "renderer/encoder.h"
+#include "renderer/draw_stream.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 
@@ -66,7 +66,8 @@ bool Shader::ShaderKey::operator==(const ShaderKey& rhs) const {
 void Shader::compile(gpu::ProgramHandle program
 	, gpu::StateFlags state
 	, gpu::VertexDecl decl
-	, u32 defines, Encoder& encoder
+	, u32 defines
+	, DrawStream& stream
 ) {
 	PROFILE_BLOCK("compile_shader");
 
@@ -90,7 +91,7 @@ void Shader::compile(gpu::ProgramHandle program
 	}
 	prefixes[defines_count] = m_sources.common.length() == 0 ? "" : m_sources.common.c_str();
 
-	encoder.createProgram(program, state, decl, codes, types, m_sources.stages.size(), prefixes, 1 + defines_count, m_sources.path.c_str());
+	stream.createProgram(program, state, decl, codes, types, m_sources.stages.size(), prefixes, 1 + defines_count, m_sources.path.c_str());
 }
 
 gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines) {

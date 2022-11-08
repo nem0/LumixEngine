@@ -1,4 +1,4 @@
-#include "encoder.h"
+#include "draw_stream.h"
 #include "engine/array.h"
 #include "engine/math.h"
 #include "engine/page_allocator.h"
@@ -8,7 +8,7 @@
 namespace Lumix {
 
 
-struct Encoder::Page {
+struct DrawStream::Page {
 	struct Header {
 		Page* next = nullptr;
 		u32 size = 0;
@@ -17,7 +17,7 @@ struct Encoder::Page {
 	Header header;
 };
 
-enum class Encoder::Instruction : u8 {
+enum class DrawStream::Instruction : u8 {
 	END,
 	SCISSOR,
 	DRAW_INDEXED,
@@ -221,11 +221,11 @@ struct DrawArraysData {
 	u32 count;
 };
 
-static_assert(sizeof(Encoder::Page) == PageAllocator::PAGE_SIZE);
+static_assert(sizeof(DrawStream::Page) == PageAllocator::PAGE_SIZE);
 
 } // anonymous namespace
 
-Encoder::~Encoder() {
+DrawStream::~DrawStream() {
 	allocator.lock();
 	while (first) {
 		Page* next = first->header.next;
@@ -235,7 +235,7 @@ Encoder::~Encoder() {
 	allocator.unlock();
 }
 
-Encoder::Encoder(Encoder&& rhs)
+DrawStream::DrawStream(DrawStream&& rhs)
 	: allocator(rhs.allocator)
 {
 	first = rhs.first;
@@ -243,51 +243,51 @@ Encoder::Encoder(Encoder&& rhs)
 	rhs.first = rhs.current = nullptr;
 }
 
-Encoder::Encoder(PageAllocator& allocator)
+DrawStream::DrawStream(PageAllocator& allocator)
 	: allocator(allocator)
 {
 	first = new (NewPlaceholder(), allocator.allocate(true)) Page;
 	current = first;
 }
 
-void Encoder::bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu::BindShaderBufferFlags flags) {
+void DrawStream::bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu::BindShaderBufferFlags flags) {
 	BinderShaderBufferData data = {buffer, binding_idx, flags};
 	write(Instruction::BIND_SHADER_BUFFER, data);
 }
 
-void Encoder::destroy(gpu::TextureHandle texture) {
+void DrawStream::destroy(gpu::TextureHandle texture) {
 	write(Instruction::DESTROY_TEXTURE, texture);
 }
 
-void Encoder::destroy(gpu::ProgramHandle program) {
+void DrawStream::destroy(gpu::ProgramHandle program) {
 	write(Instruction::DESTROY_PROGRAM, program);
 }
 
-void Encoder::destroy(gpu::BufferHandle buffer) {
+void DrawStream::destroy(gpu::BufferHandle buffer) {
 	write(Instruction::DESTROY_BUFFER, buffer);
 }
 
-void Encoder::readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf) {
+void DrawStream::readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf) {
 	ReadTextureData data = {texture, mip, buf};
 	write(Instruction::READ_TEXTURE, data);
 }
 
-void Encoder::copy(gpu::TextureHandle dst, gpu::TextureHandle src, u32 dst_x, u32 dst_y) {
+void DrawStream::copy(gpu::TextureHandle dst, gpu::TextureHandle src, u32 dst_x, u32 dst_y) {
 	CopyTextureData data = {dst, src, dst_x, dst_y};
 	write(Instruction::COPY_TEXTURE, data);
 };
 
-void Encoder::copy(gpu::BufferHandle dst, gpu::BufferHandle src, u32 dst_offset, u32 src_offset, u32 size) {
+void DrawStream::copy(gpu::BufferHandle dst, gpu::BufferHandle src, u32 dst_offset, u32 src_offset, u32 size) {
 	CopyBufferData data = {dst, src, dst_offset, src_offset, size};
 	write(Instruction::COPY_BUFFER, data);
 }
 
-void Encoder::createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* ptr) {
+void DrawStream::createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* ptr) {
 	CreateBufferData data = {buffer, flags, size, ptr};
 	write(Instruction::CREATE_BUFFER, data);
 }
 
-void Encoder::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name) {
+void DrawStream::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name) {
 	ASSERT(debug_name);
 	CreateTextureData data = {handle, w, h, depth, format, flags};
 	write(Instruction::CREATE_TEXTURE, data);
@@ -297,18 +297,18 @@ void Encoder::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, 
 	memcpy(ptr + sizeof(len), debug_name, len);
 }
 
-void Encoder::bindImageTexture(gpu::TextureHandle texture, u32 unit) {
+void DrawStream::bindImageTexture(gpu::TextureHandle texture, u32 unit) {
 	BindImageTextureData data = { texture, unit };
 	write(Instruction::BIND_IMAGE_TEXTURE, data);
 }
 
-void Encoder::dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
+void DrawStream::dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
 	submitCached();
 	const IVec3 v(num_groups_x, num_groups_y, num_groups_z);
 	write(Instruction::DISPATCH, v);
 }
 
-void Encoder::merge(Encoder& rhs) {
+void DrawStream::merge(DrawStream& rhs) {
 	ASSERT(&allocator == &rhs.allocator);
 	
 	const Instruction end_instr = Instruction::END;
@@ -319,7 +319,7 @@ void Encoder::merge(Encoder& rhs) {
 	rhs.first = rhs.current = nullptr;
 }
 
-u8* Encoder::alloc(u32 size) {
+u8* DrawStream::alloc(u32 size) {
 	u32 start = current->header.size;
 	if (start + size > sizeof(current->data) - sizeof(Instruction)) {
 		const Instruction end_instr = Instruction::END;
@@ -339,7 +339,7 @@ u8* Encoder::alloc(u32 size) {
 #define WRITE_CONST(v) do { auto val = v; memcpy(data, &val, sizeof(val)); data += sizeof(val); } while(false)
 #define WRITE_ARRAY(val, count) memcpy(data, val, sizeof(val[0]) * count); data += sizeof(val[0]) * count;
 
-void Encoder::createProgram(gpu::ProgramHandle prog
+void DrawStream::createProgram(gpu::ProgramHandle prog
 	, gpu::StateFlags state
 	, const gpu::VertexDecl& decl
 	, const char** srcs
@@ -372,114 +372,114 @@ void Encoder::createProgram(gpu::ProgramHandle prog
 	write(Instruction::CREATE_PROGRAM, data);
 }
 
-void Encoder::pushDebugGroup(const char* msg) {
+void DrawStream::pushDebugGroup(const char* msg) {
 	write(Instruction::PUSH_DEBUG_GROUP, msg);
 }
 
-void Encoder::createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture) {
+void DrawStream::createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture) {
 	CreateTextureViewData data = {view, texture};
 	write(Instruction::CREATE_TEXTURE_VIEW, data);
 }
 
-void Encoder::startCapture() {
+void DrawStream::startCapture() {
 	u8* ptr = alloc(sizeof(Instruction));
 	const Instruction instruction = Instruction::START_CAPTURE;
 	memcpy(ptr, &instruction, sizeof(instruction));
 }
 
-void Encoder::stopCapture() {
+void DrawStream::stopCapture() {
 	u8* ptr = alloc(sizeof(Instruction));
 	const Instruction instruction = Instruction::STOP_CAPTURE;
 	memcpy(ptr, &instruction, sizeof(instruction));
 }
 
-void Encoder::popDebugGroup() {
+void DrawStream::popDebugGroup() {
 	u8* ptr = alloc(sizeof(Instruction));
 	const Instruction instruction = Instruction::POP_DEBUG_GROUP;
 	memcpy(ptr, &instruction, sizeof(instruction));
 }
 
-void Encoder::generateMipmaps(gpu::TextureHandle texture) {
+void DrawStream::generateMipmaps(gpu::TextureHandle texture) {
 	write(Instruction::GENERATE_MIPMAPS, texture);
 }
 
-void Encoder::clear(gpu::ClearFlags flags, const float* color, float depth) {
+void DrawStream::clear(gpu::ClearFlags flags, const float* color, float depth) {
 	const ClearData data = { flags, Vec4(color[0], color[1], color[2], color[3]), depth };
 	write(Instruction::CLEAR, data);
 }
 
-void Encoder::bindIndexBuffer(gpu::BufferHandle buffer) {
+void DrawStream::bindIndexBuffer(gpu::BufferHandle buffer) {
 	m_cache.index_buffer = buffer;
 	m_cache.dirty |= Dirty::INDEX_BUFFER;
 }
 
-void Encoder::useProgram(gpu::ProgramHandle program) {
+void DrawStream::useProgram(gpu::ProgramHandle program) {
 	m_cache.program = program;
 	m_cache.dirty |= Dirty::PROGRAM;
 }
 
-void Encoder::setCurrentWindow(void* window_handle) {
+void DrawStream::setCurrentWindow(void* window_handle) {
 	write(Instruction::SET_CURRENT_WINDOW, window_handle);
 }
 
-void Encoder::bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride) {
+void DrawStream::bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride) {
 	ASSERT(binding_idx < lengthOf(m_cache.vertex_buffers));
 	m_cache.vertex_buffers[binding_idx] = { buffer, buffer_offset, stride};
 	m_cache.dirty |= binding_idx == 0 ? Dirty::VERTEX_BUFFER0 : Dirty::VERTEX_BUFFER1;
 }
 
-void Encoder::scissor(u32 x,u32 y,u32 w,u32 h) {
+void DrawStream::scissor(u32 x,u32 y,u32 w,u32 h) {
 	IVec4 vec(x, y, w, h);
 	write(Instruction::SCISSOR, vec);
 }
 
-void Encoder::drawIndexed(u32 offset, u32 count, gpu::DataType type) {
+void DrawStream::drawIndexed(u32 offset, u32 count, gpu::DataType type) {
 	submitCached();
 	const DrawIndexedData data = { offset, count, type };
 	write(Instruction::DRAW_INDEXED, data);
 }
 
-void Encoder::drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type) {
+void DrawStream::drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type) {
 	submitCached();
 	const DrawIndexedInstancedDat data = { indices_count, instances_count, index_type };
 	write(Instruction::DRAW_INDEXED_INSTANCED, data);
 }
 
-void Encoder::bindIndirectBuffer(gpu::BufferHandle buffer) {
+void DrawStream::bindIndirectBuffer(gpu::BufferHandle buffer) {
 	m_cache.indirect_buffer = buffer;
 	m_cache.dirty |= Dirty::INDIRECT_BUFFER;
 }
 
 
-void Encoder::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset) {
+void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset) {
 	submitCached();
 	DrawIndirectData data = { index_type, indirect_buffer_offset };
 	write(Instruction::DRAW_INDIRECT, data);
 }
 
 
-void Encoder::memoryBarrier(gpu::MemoryBarrierType type, gpu::BufferHandle buffer) {
+void DrawStream::memoryBarrier(gpu::MemoryBarrierType type, gpu::BufferHandle buffer) {
 	MemoryBarrierData data = {type, buffer};
 	write(Instruction::MEMORY_BARRIER, data);
 }
 
-void Encoder::drawArraysInstanced(u32 indices_count, u32 instances_count) {
+void DrawStream::drawArraysInstanced(u32 indices_count, u32 instances_count) {
 	submitCached();
 	const DrawArraysInstancedData data = { indices_count, instances_count };
 	write(Instruction::DRAW_ARRAYS_INSTANCED, data);
 }
 
-void Encoder::bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, u32 offset, u32 size) {
+void DrawStream::bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, u32 offset, u32 size) {
 	const BindUniformBufferData data = { ub_index, buffer, offset, size };
 	write(Instruction::BIND_UNIFORM_BUFFER, data);
 }
 
-void Encoder::setFramebufferCube(gpu::TextureHandle cube, u32 face, u32 mip) {
+void DrawStream::setFramebufferCube(gpu::TextureHandle cube, u32 face, u32 mip) {
 	SetFramebufferCubeData data = {cube, face, mip};
 	write(Instruction::SET_FRAMEBUFFER_CUBE, data);
 }
 
-void Encoder::setFramebuffer(const gpu::TextureHandle* attachments, u32 num, gpu::TextureHandle ds, gpu::FramebufferFlags flags) {
+void DrawStream::setFramebuffer(const gpu::TextureHandle* attachments, u32 num, gpu::TextureHandle ds, gpu::FramebufferFlags flags) {
 	u8* data = alloc(sizeof(Instruction) + sizeof(gpu::TextureHandle) * (num + 1) + sizeof(u32) + sizeof(gpu::FramebufferFlags));
 
 	WRITE_CONST(Instruction::SET_FRAMEBUFFER);
@@ -489,7 +489,7 @@ void Encoder::setFramebuffer(const gpu::TextureHandle* attachments, u32 num, gpu
 	WRITE_ARRAY(attachments, num);
 }
 
-void Encoder::bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count) {
+void DrawStream::bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count) {
 	u8* data = alloc(sizeof(Instruction) + sizeof(u32) * 2 + sizeof(gpu::TextureHandle) * count);
 	
 	WRITE_CONST(Instruction::BIND_TEXTURES);
@@ -502,38 +502,38 @@ void Encoder::bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 co
 #undef WRITE_CONST
 #undef WRITE_ARRAY
 
-void Encoder::viewport(u32 x, u32 y, u32 w, u32 h) {
+void DrawStream::viewport(u32 x, u32 y, u32 w, u32 h) {
 	const IVec4 data(x, y, w, h);
 	write(Instruction::VIEWPORT, data);
 }
 
-void Encoder::update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size) {
+void DrawStream::update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size) {
 	UpdateTextureData data = {texture, mip, x, y, z, w, h, format, buf, size};
 	write(Instruction::UPDATE_TEXTURE, data);
 }
 
-void Encoder::update(gpu::BufferHandle buffer, const void* data, size_t size) {
+void DrawStream::update(gpu::BufferHandle buffer, const void* data, size_t size) {
 	UpdateBufferData tmp = {buffer, data, size};
 	write(Instruction::UPDATE_BUFFER, tmp);
 }
 
-void Encoder::drawArrays(u32 offset, u32 count) {
+void DrawStream::drawArrays(u32 offset, u32 count) {
 	submitCached();
 	DrawArraysData data = { offset, count };
 	write(Instruction::DRAW_ARRAYS, data);
 }
 
-void Encoder::freeMemory(void* ptr, IAllocator& allocator) {
+void DrawStream::freeMemory(void* ptr, IAllocator& allocator) {
 	DeleteMemoryData data = { ptr, &allocator };
 	write(Instruction::FREE_MEMORY, data);
 }
 
-void Encoder::freeAlignedMemory(void* ptr, IAllocator& allocator) {
+void DrawStream::freeAlignedMemory(void* ptr, IAllocator& allocator) {
 	DeleteMemoryData data = { ptr, &allocator };
 	write(Instruction::FREE_ALIGNED_MEMORY, data);
 }
 
-void Encoder::reset() {
+void DrawStream::reset() {
 	allocator.lock();
 	while (first) {
 		Page* next = first->header.next;
@@ -547,7 +547,7 @@ void Encoder::reset() {
 	run_called = false;
 }
 
-void Encoder::submitCached() {
+void DrawStream::submitCached() {
 	const u32 dirty = m_cache.dirty;
 	if (dirty == 0) return;
 	
@@ -575,7 +575,7 @@ void Encoder::submitCached() {
 	#undef WRITE
 }
 
-void Encoder::run() {
+void DrawStream::run() {
 	if (!run_called) {
 		const Instruction end_instr = Instruction::END;
 		memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
@@ -827,4 +827,4 @@ void Encoder::run() {
 	}
 }
 
-} // namespace Lumix
+} // namespace Lumix

@@ -4,10 +4,10 @@
 
 namespace Lumix {
 
-struct Encoder {
-	Encoder(PageAllocator& allocator);
-	Encoder(Encoder&& rhs);
-	~Encoder();
+struct DrawStream {
+	DrawStream(PageAllocator& allocator);
+	DrawStream(DrawStream&& rhs);
+	~DrawStream();
 
 	void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char** srcs, const gpu::ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
 	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data);
@@ -63,15 +63,15 @@ struct Encoder {
 
 	void run();
 	void reset();
-	void merge(Encoder& rhs);
+	void merge(DrawStream& rhs);
 
 	struct Page;
 private:
 	enum class Instruction : u8;
 
-	Encoder(const Encoder& rhs) = delete;
-	void operator =(const Encoder&) = delete;
-	void operator =(Encoder&&) = delete;
+	DrawStream(const DrawStream& rhs) = delete;
+	void operator =(const DrawStream&) = delete;
+	void operator =(DrawStream&&) = delete;
 
 	LUMIX_FORCE_INLINE u8* alloc(u32 size);
 	LUMIX_FORCE_INLINE void submitCached();

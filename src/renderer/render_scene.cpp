@@ -19,7 +19,7 @@
 #include "engine/universe.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "renderer/culling_system.h"
-#include "renderer/encoder.h"
+#include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -1294,9 +1294,9 @@ struct RenderSceneImpl final : RenderScene {
 		if (!im.instances.empty()) {
 			if (im.gpu_data) {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());
-				Encoder& encoder = m_renderer.createEncoderJob();
-				encoder.update(im.gpu_data, mem.data, mem.size);
-				encoder.freeMemory(mem.data, m_renderer.getAllocator());
+				DrawStream& stream = m_renderer.createDrawStreamJob();
+				stream.update(im.gpu_data, mem.data, mem.size);
+				stream.freeMemory(mem.data, m_renderer.getAllocator());
 			}
 			else {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
@@ -3348,7 +3348,7 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 	ASSERT(desc.is_cubemap);
 
 	u32 layer = probe.texture_id;
-	Encoder& encoder = m_scene.m_renderer.getEndFrameEncoder();
+	DrawStream& stream = m_scene.m_renderer.getEndFrameDrawStream();
 	const u32 offset = u32(image_data - data);
 	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
 	InputMemoryStream blob(mem.data, (u32)size - offset);
@@ -3357,10 +3357,10 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 			u32 w = maximum(desc.width >> mip, 1);
 			u32 h = maximum(desc.height >> mip, 1);
 			const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-			encoder.update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
+			stream.update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
 		}
 	}
-	encoder.freeMemory(mem.data, m_scene.m_renderer.getAllocator());
+	stream.freeMemory(mem.data, m_scene.m_renderer.getAllocator());
 	LUMIX_DELETE(m_allocator, this);
 }
 

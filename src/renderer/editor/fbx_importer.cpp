@@ -21,7 +21,7 @@
 #include "mikktspace/mikktspace.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
-#include "renderer/encoder.h"
+#include "renderer/draw_stream.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -1036,7 +1036,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	const u32 capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
 
-	renderer->pushJob("create impostor textures", [&](Encoder& encoder) {
+	renderer->pushJob("create impostor textures", [&](DrawStream& stream) {
 		const AABB aabb = model->getAABB();
 		const float radius = model->getCenterBoundingRadius();
 		gpu::BufferHandle material_ub = renderer->getMaterialUniformBuffer();
@@ -1059,13 +1059,13 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		tile_size.x = (tile_size.x + 3) & ~3;
 		tile_size.y = (tile_size.y + 3) & ~3;
 		const IVec2 texture_size = tile_size * IMPOSTOR_COLS;
-		encoder.createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::SRGBA, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
-		encoder.createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb1");
-		encoder.createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gbd");
+		stream.createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::SRGBA, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
+		stream.createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb1");
+		stream.createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gbd");
 
-		encoder.setFramebuffer(gbs, 2, gbs[2], gpu::FramebufferFlags::SRGB);
+		stream.setFramebuffer(gbs, 2, gbs[2], gpu::FramebufferFlags::SRGB);
 		const float color[] = {0, 0, 0, 0};
-		encoder.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH | gpu::ClearFlags::STENCIL, color, 0);
+		stream.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH | gpu::ClearFlags::STENCIL, color, 0);
 
 		PassState pass_state;
 		pass_state.view = Matrix::IDENTITY;
@@ -1077,14 +1077,14 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 		pass_state.camera_up = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
 		const Renderer::TransientSlice pass_buf = renderer->allocUniform(&pass_state, sizeof(pass_state));
-		encoder.bindUniformBuffer(UniformBuffer::PASS, pass_buf.buffer, pass_buf.offset, pass_buf.size);
+		stream.bindUniformBuffer(UniformBuffer::PASS, pass_buf.buffer, pass_buf.offset, pass_buf.size);
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				if (gpu::isOriginBottomLeft()) {
-					encoder.viewport(i * tile_size.x, j * tile_size.y, tile_size.x, tile_size.y);
+					stream.viewport(i * tile_size.x, j * tile_size.y, tile_size.x, tile_size.y);
 				} else {
-					encoder.viewport(i * tile_size.x, (IMPOSTOR_COLS - j - 1) * tile_size.y, tile_size.x, tile_size.y);
+					stream.viewport(i * tile_size.x, (IMPOSTOR_COLS - j - 1) * tile_size.y, tile_size.x, tile_size.y);
 				}
 				const Vec3 v = normalize(impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)}));
 
@@ -1093,7 +1093,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
 				model_mtx.lookAt(center - v * 1.01f * radius, center, up);
 				const Renderer::TransientSlice ub = renderer->allocUniform(&model_mtx, sizeof(model_mtx));
-				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 				for (u32 i = 0; i <= (u32)model->getLODIndices()[0].to; ++i) {
 					const Mesh& mesh = model->getMesh(i);
@@ -1102,19 +1102,19 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask());
 
-					encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-					encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+					stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
+					stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 
-					encoder.useProgram(program);
-					encoder.bindIndexBuffer(mesh.index_buffer_handle);
-					encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-					encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-					encoder.drawIndexed(0, mesh.indices_count, mesh.index_type);
+					stream.useProgram(program);
+					stream.bindIndexBuffer(mesh.index_buffer_handle);
+					stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+					stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+					stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
 				}
 			}
 		}
 
-		encoder.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+		stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 
 		gb0_rgba.resize(texture_size.x * texture_size.y);
 		gb1_rgba.resize(gb0_rgba.size());
@@ -1122,11 +1122,11 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		shadow_data.resize(gb0_rgba.size());
 
 		gpu::TextureHandle shadow = gpu::allocTextureHandle();
-		encoder.createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, "impostor_shadow");
+		stream.createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, "impostor_shadow");
 		gpu::ProgramHandle shadow_program = m_impostor_shadow_shader->getProgram(bake_normals ? bake_normals_define : 0);
-		encoder.useProgram(shadow_program);
-		encoder.bindImageTexture(shadow, 0);
-		encoder.bindTextures(&gbs[1], 1, 2);
+		stream.useProgram(shadow_program);
+		stream.bindImageTexture(shadow, 0);
+		stream.bindTextures(&gbs[1], 1, 2);
 		struct {
 			Matrix projection;
 			Matrix proj_to_model;
@@ -1154,42 +1154,42 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 				data.size = IMPOSTOR_COLS;
 				data.radius = radius;
 				const Renderer::TransientSlice ub = renderer->allocUniform(&data, sizeof(data));
-				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				encoder.dispatch((tile_size.x + 15) / 16, (tile_size.y + 15) / 16, 1);
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				stream.dispatch((tile_size.x + 15) / 16, (tile_size.y + 15) / 16, 1);
 			}
 		}
 
 		gpu::TextureHandle staging = gpu::allocTextureHandle();
 		const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-		encoder.createTexture(staging, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
-		encoder.copy(staging, gbs[0], 0, 0);
-		encoder.readTexture(staging, 0, Span((u8*)gb0_rgba.begin(), gb0_rgba.byte_size()));
+		stream.createTexture(staging, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
+		stream.copy(staging, gbs[0], 0, 0);
+		stream.readTexture(staging, 0, Span((u8*)gb0_rgba.begin(), gb0_rgba.byte_size()));
 
-		encoder.copy(staging, gbs[1], 0, 0);
-		encoder.readTexture(staging, 0, Span((u8*)gb1_rgba.begin(), gb1_rgba.byte_size()));
+		stream.copy(staging, gbs[1], 0, 0);
+		stream.readTexture(staging, 0, Span((u8*)gb1_rgba.begin(), gb1_rgba.byte_size()));
 
-		encoder.copy(staging, shadow, 0, 0);
-		encoder.readTexture(staging, 0, Span((u8*)shadow_data.begin(), shadow_data.byte_size()));
-		encoder.destroy(staging);
+		stream.copy(staging, shadow, 0, 0);
+		stream.readTexture(staging, 0, Span((u8*)shadow_data.begin(), shadow_data.byte_size()));
+		stream.destroy(staging);
 
 		{
 			gpu::TextureHandle staging_depth = gpu::allocTextureHandle();
 			const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-			encoder.createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
-			encoder.copy(staging_depth, gbs[2], 0, 0);
+			stream.createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
+			stream.copy(staging_depth, gbs[2], 0, 0);
 			Array<u32> tmp(m_allocator);
 			tmp.resize(gb_depth.size());
-			encoder.readTexture(staging_depth, 0, Span((u8*)tmp.begin(), tmp.byte_size()));
+			stream.readTexture(staging_depth, 0, Span((u8*)tmp.begin(), tmp.byte_size()));
 			for (i32 i = 0; i < tmp.size(); ++i) {
 				gb_depth[i] = u16(0xffFF - (tmp[i] >> 16));
 			}
-			encoder.destroy(staging_depth);
+			stream.destroy(staging_depth);
 		}
 
-		encoder.destroy(shadow);
-		encoder.destroy(gbs[0]);
-		encoder.destroy(gbs[1]);
-		encoder.destroy(gbs[2]);
+		stream.destroy(shadow);
+		stream.destroy(gbs[0]);
+		stream.destroy(gbs[1]);
+		stream.destroy(gbs[2]);
 	});
 
 	renderer->frame();
