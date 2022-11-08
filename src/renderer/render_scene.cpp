@@ -19,6 +19,7 @@
 #include "engine/universe.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "renderer/culling_system.h"
+#include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -918,7 +919,7 @@ struct RenderSceneImpl final : RenderScene {
 			blob.write(pg.vertex_data.data(), pg.vertex_data.size());
 			blob.write(pg.vertex_decl.attributes_count);
 			blob.write(pg.vertex_decl.attributes, sizeof(pg.vertex_decl.attributes[0]) * pg.vertex_decl.attributes_count);
-			blob.write(pg.primitive_type);
+			blob.write(pg.vertex_decl.primitive_type);
 
 			blob.write((u32)pg.index_data.size());
 			if (pg.index_data.size() > 0) blob.write(pg.index_data.data(), pg.index_data.size());
@@ -1120,7 +1121,7 @@ struct RenderSceneImpl final : RenderScene {
 			blob.read(pg.vertex_decl.attributes_count);
 			blob.read(pg.vertex_decl.attributes, pg.vertex_decl.attributes_count * sizeof(pg.vertex_decl.attributes[0]));
 			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
-				blob.read(pg.primitive_type);
+				blob.read(pg.vertex_decl.primitive_type);
 			}
 			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
 				u32 index_buffer_size;
@@ -1293,7 +1294,9 @@ struct RenderSceneImpl final : RenderScene {
 		if (!im.instances.empty()) {
 			if (im.gpu_data) {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());
-				m_renderer.updateBuffer(im.gpu_data, mem);
+				DrawStream& stream = m_renderer.createDrawStreamJob();
+				stream.update(im.gpu_data, mem.data, mem.size);
+				stream.freeMemory(mem.data, m_renderer.getAllocator());
 			}
 			else {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
@@ -1804,7 +1807,6 @@ struct RenderSceneImpl final : RenderScene {
 	void getProceduralGeometryBlob(EntityRef entity, OutputMemoryStream& value) {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		value.write(pg.vertex_decl);
-		value.write(pg.primitive_type);
 		value.write(pg.index_type);
 		value.write((u32)pg.vertex_data.size());
 		if (!pg.vertex_data.empty()) value.write(pg.vertex_data.data(), pg.vertex_data.size());
@@ -1826,7 +1828,6 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		
 		value.read(pg.vertex_decl);
-		value.read(pg.primitive_type);
 		value.read(pg.index_type);
 		u32 size = value.read<u32>();
 		if (size > 0) {
@@ -1867,7 +1868,6 @@ struct RenderSceneImpl final : RenderScene {
 	void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
 		, const gpu::VertexDecl& vertex_decl
-		, gpu::PrimitiveType primitive_type
 		, Span<const u8> indices
 		, gpu::DataType index_type) override
 	{
@@ -1877,7 +1877,6 @@ struct RenderSceneImpl final : RenderScene {
 		pg.vertex_data.clear();
 		pg.index_data.clear();
 		pg.index_type = index_type;
-		pg.primitive_type = primitive_type;
 		pg.vertex_data.write(vertex_data.begin(), vertex_data.length());
 		
 		if (pg.index_buffer) m_renderer.destroy(pg.index_buffer);
@@ -1894,6 +1893,10 @@ struct RenderSceneImpl final : RenderScene {
 		computeAABB(pg);
 	}
 	
+	bool hasProceduralGeometry(EntityRef e) override {
+		return m_procedural_geometries.find(e).isValid();
+	}
+
 	ProceduralGeometry& getProceduralGeometry(EntityRef e) override {
 		return m_procedural_geometries[e];
 	}
@@ -1925,7 +1928,7 @@ struct RenderSceneImpl final : RenderScene {
 		return m ? m->getPath() : Path();
 	}
 
-	void setSplineGeometryMaterial(EntityRef entity, const Path& path) override {
+	void setProceduralGeometryMaterial(EntityRef entity, const Path& path) override {
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		if (pg.material) {
 			if (pg.material->getPath() == path) return;
@@ -1934,6 +1937,10 @@ struct RenderSceneImpl final : RenderScene {
 		}
 
 		pg.material = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Material>(path);
+	}
+
+	void setSplineGeometryMaterial(EntityRef entity, const Path& path) override {
+		setProceduralGeometryMaterial(entity, path);
 	}
 
 	Pose* lockPose(EntityRef entity) override { return m_model_instances[entity.index].pose; }
@@ -2626,7 +2633,7 @@ struct RenderSceneImpl final : RenderScene {
 		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
 			const ProceduralGeometry& pg = iter.value();
 			if (pg.vertex_data.empty()) continue;
-			if (pg.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
+			if (pg.vertex_decl.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
 
 			const u32 stride = pg.vertex_decl.getStride();
 			const u8* data = pg.vertex_data.data();
@@ -3191,11 +3198,15 @@ struct RenderSceneImpl final : RenderScene {
 		m_procedural_geometries.erase(entity);
 	}
 	
+	void createProceduralGeometry(EntityRef entity) override {
+		ASSERT(!m_procedural_geometries.find(entity).isValid());
+		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
+	}
+
 	void createSplineGeometry(EntityRef entity) {
 		SplineGeometry& sg = m_spline_geometries.insert(entity);
 		sg.flags.set(SplineGeometry::HAS_UVS);
 		auto iter = m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
-		iter.value().primitive_type = gpu::PrimitiveType::TRIANGLE_STRIP;
 		m_universe.onComponentCreated(entity, SPLINE_GEOMETRY_TYPE, this);
 	}
 
@@ -3329,41 +3340,27 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 		return;
 	}
 
-	struct Job : Renderer::RenderJob {
-		Job(IAllocator& allocator) : data(allocator) {}
+	gpu::TextureDesc desc;
+	const u8* image_data = Texture::getLBCInfo(data, desc);
+	if (!image_data) return;
 
-		void setup() override {}
-				
-		void execute() override {
-			gpu::TextureDesc desc;
-			const u8* image_data = Texture::getLBCInfo(data.data(), desc);
-			if (!image_data) return;
+	ASSERT(desc.depth == 1);
+	ASSERT(desc.is_cubemap);
 
-			ASSERT(desc.depth == 1);
-			ASSERT(desc.is_cubemap);
-
-			const u32 offset = u32(image_data - data.data());
-			InputMemoryStream blob(image_data, (u32)data.size() - offset);
-			for (u32 side = 0; side < 6; ++side) {
-				for (u32 mip = 0; mip < desc.mips; ++mip) {
-					u32 w = maximum(desc.width >> mip, 1);
-					u32 h = maximum(desc.height >> mip, 1);
-					const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-					gpu::update(tex, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
-				}
-			}
+	u32 layer = probe.texture_id;
+	DrawStream& stream = m_scene.m_renderer.getEndFrameDrawStream();
+	const u32 offset = u32(image_data - data);
+	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
+	InputMemoryStream blob(mem.data, (u32)size - offset);
+	for (u32 side = 0; side < 6; ++side) {
+		for (u32 mip = 0; mip < desc.mips; ++mip) {
+			u32 w = maximum(desc.width >> mip, 1);
+			u32 h = maximum(desc.height >> mip, 1);
+			const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
+			stream.update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
 		}
-
-		u32 layer;
-		OutputMemoryStream data;
-		gpu::TextureHandle tex;
-	};
-			
-	Job& job = m_scene.m_renderer.createJob<Job>(m_allocator);
-	job.layer = probe.texture_id;
-	job.tex = m_scene.m_reflection_probes_texture;
-	job.data.write(data, size);
-	m_scene.m_renderer.queue(job, 0);	
+	}
+	stream.freeMemory(mem.data, m_scene.m_renderer.getAllocator());
 	LUMIX_DELETE(m_allocator, this);
 }
 

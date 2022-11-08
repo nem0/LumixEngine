@@ -12,11 +12,7 @@ namespace Lumix
 struct LUMIX_ENGINE_API PageAllocator final
 {
 public:
-	#ifdef __linux__
-		enum { PAGE_SIZE = 4096 };
-	#else
-		enum { PAGE_SIZE = 16384 };
-	#endif
+	enum { PAGE_SIZE = 4096 };
 
 	PageAllocator();
 	~PageAllocator();

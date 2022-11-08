@@ -62,14 +62,6 @@ struct LUMIX_RENDERER_API Mesh {
 		NONE = 0xff
 	};
 
-	struct RenderData {
-		gpu::BufferHandle vertex_buffer_handle;
-		u32 vb_stride;
-		gpu::BufferHandle index_buffer_handle;
-		gpu::DataType index_type;
-		int indices_count;
-	};
-
 	struct Skin {
 		Vec4 weights;
 		i16 indices[4];
@@ -110,9 +102,14 @@ struct LUMIX_RENDERER_API Mesh {
 	Material* material;
 	gpu::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
-	RenderData* render_data;
 	Renderer& renderer;
 	float lod = 0;
+
+	gpu::BufferHandle vertex_buffer_handle;
+	u32 vb_stride;
+	gpu::BufferHandle index_buffer_handle;
+	gpu::DataType index_type;
+	int indices_count;
 };
 
 

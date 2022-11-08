@@ -112,7 +112,7 @@ IVec2::IVec2(const Vec2& rhs)
 }
 
 
-Vec2 IVec2::operator/(const Vec2& rhs) { return {x / rhs.x, y / rhs.y}; }
+Vec2 IVec2::operator/(const Vec2& rhs) const { return {x / rhs.x, y / rhs.y}; }
 
 
 IVec3::IVec3(const DVec3& rhs)

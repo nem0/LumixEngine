@@ -5,33 +5,25 @@
 
 namespace Lumix {
 
+// Array with built-in storage
 template <typename T, u32 N>
-struct StackArray {
+struct StackArray : Array<T> {
 	StackArray(IAllocator& fallback)
-		: allocator(fallback)
-		, array(allocator)
+		: Array(m_stack_allocator)
+		, m_stack_allocator(fallback)
 	{
-		array.reserve(N);
+		reserve(N);
+	}
+	
+	~StackArray() {
+		clear();
+		if (m_data) m_allocator.deallocate_aligned(m_data);
+		m_data = nullptr;
+		m_capacity = 0;
 	}
 
-	bool empty() const { return array.empty(); }
-	u32 size() const { return array.size(); }
-	T& emplace() { return array.emplace(); }
-	T* begin() { return array.begin(); }
-	T* end() { return array.end(); }
-	const T* begin() const { return array.begin(); }
-	const T* end() const { return array.end(); }
-	void push(T&& val) { array.push(static_cast<T&&>(val)); }
-	void push(const T& val) { array.push(val); }
-	void resize(u32 size) { array.resize(size); }
-	T& operator[](u32 idx) { return array[idx]; }
-	const T& last() const { return array.last(); }
-	void pop() { array.pop(); }
-	void clear() { array.clear(); }
-
 private:
-	StackAllocator<sizeof(T) * N, alignof(T)> allocator;
-	Array<T> array;
+	StackAllocator<sizeof(T) * N, alignof(T)> m_stack_allocator;
 };
 
 

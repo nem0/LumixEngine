@@ -36,7 +36,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_render_states(gpu::StateFlags::CULL_BACK)
 	, m_define_mask(0)
 	, m_custom_flags(0)
-	, m_render_data(nullptr)
 {
 	static u32 last_sort_key = 0;
 	m_sort_key = ++last_sort_key;
@@ -126,15 +125,9 @@ void Material::unload()
 		}
 	}
 	m_texture_count = 0;
-	for(Texture*& tex : m_textures ) {
-		tex = nullptr;
-	}
+	for (gpu::TextureHandle& tex : m_texture_handles) tex = gpu::INVALID_TEXTURE;
+	for (Texture*& tex : m_textures) tex = nullptr;
 	
-	m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
-		LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
-	});
-	m_render_data = nullptr;
-
 	setShader(nullptr);
 
 	m_custom_flags = 0;
@@ -362,17 +355,8 @@ void Material::updateRenderData(bool on_before_ready)
 	if (!m_shader) return;
 	if (!on_before_ready && !isReady()) return;
 
-	if(m_render_data) {
-		m_renderer.destroyMaterialConstants(m_render_data->material_constants);
-		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
-			LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
-		});
-	}
+	if (m_material_constants) m_renderer.destroyMaterialConstants(m_material_constants);
 
-	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
-	m_render_data->define_mask = m_define_mask;
-	m_render_data->render_states = m_render_states;
-	m_render_data->textures_count = m_texture_count;
 	float cs[Material::MAX_UNIFORMS_FLOATS] = {};
 	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
 		bool found = false;
@@ -389,10 +373,10 @@ void Material::updateRenderData(bool on_before_ready)
 		}
 	}
 
-	m_render_data->material_constants = m_renderer.createMaterialConstants(Span(cs));
+	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
 
 	for(u32 i = 0; i < m_texture_count; ++i) {
-		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
+		m_texture_handles[i] = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
 	}
 }
 

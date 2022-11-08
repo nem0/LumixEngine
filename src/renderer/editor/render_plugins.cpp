@@ -40,6 +40,7 @@
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/editor/spline_geometry_plugin.h"
+#include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
@@ -1725,13 +1726,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_texture = texture;
 				PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-				renderer->runInRenderThread(this, [](Renderer& r, void* ptr){
-					TexturePlugin* p = (TexturePlugin*)ptr;
-					if (!p->m_texture_view) {
-						p->m_texture_view = gpu::allocTextureHandle();
-					}
-					gpu::createTextureView(p->m_texture_view, p->m_texture->handle);
-				});
+
+				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
+				renderer->createDrawStreamJob().createTextureView(m_texture_view, m_texture->handle);
 			}
 
 			ImGui::Image(m_texture_view, texture_size);
@@ -1890,6 +1887,15 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	StudioApp& m_app;
 };
 
+static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) {
+	gpu::TextureHandle staging = gpu::allocTextureHandle();
+	const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
+	stream.createTexture(staging, w, h, 1, out_format, flags, "staging_buffer");
+	stream.copy(staging, texture, 0, 0);
+	stream.readTexture(staging, 0, data);
+	stream.destroy(staging);
+}
+
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta {
@@ -1928,6 +1934,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
+		if (m_downscale_program) m_pipeline->getRenderer().destroy(m_downscale_program);
 		jobs::wait(&m_subres_signal);
 		auto& engine = m_app.getEngine();
 		engine.destroyUniverse(*m_universe);
@@ -1938,6 +1945,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	void init() {
+		Engine& engine = m_app.getEngine();
+		m_renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		createPreviewUniverse();
 		createTileUniverse();
 		m_viewport.is_ortho = true;
@@ -2109,9 +2118,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		Engine& engine = m_app.getEngine();
 		m_tile.universe = &engine.createUniverse(false);
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_tile.pipeline = Pipeline::create(*renderer, pres, "PREVIEW", engine.getAllocator());
+		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW", engine.getAllocator());
 
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);
@@ -2134,9 +2142,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		Engine& engine = m_app.getEngine();
 		m_universe = &engine.createUniverse(false);
-		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*renderer, pres, "PREVIEW",  engine.getAllocator());
+		m_pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW",  engine.getAllocator());
 
 		const EntityRef mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
@@ -2769,9 +2776,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		showPreview(*model);
 	}
 
-	Meta m_meta;
-	FilePathHash m_meta_res;
-
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
 	ResourceType getResourceType() const override { return Model::TYPE; }
@@ -2845,8 +2849,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				saveAsLBC(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
-				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-				renderer->destroy(m_tile.texture);
+				m_renderer->destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
@@ -2888,11 +2891,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void renderTile(PrefabResource* prefab)
 	{
 		Engine& engine = m_app.getEngine();
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!render_scene) return;
-
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		if (!renderer) return;
 
 		EntityMap entity_map(m_app.getAllocator());
 		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, entity_map)) return;
@@ -2907,16 +2905,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void renderPrefabSecondStage()
 	{
-		Engine& engine = m_app.getEngine();
-
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!render_scene) return;
-
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		if (!renderer) return;
-
 		AABB aabb({0, 0, 0}, {0, 0, 0});
-
 		float radius = 1;
 		Universe& universe = *m_tile.universe;
 		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
@@ -2958,19 +2947,66 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 
 		Renderer::MemRef mem;
-		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_final");
-		gpu::TextureHandle tile_tmp = renderer->createTexture(AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_tmp");
-		renderer->copy(tile_tmp, m_tile.pipeline->getOutput());
-		renderer->downscale(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		DrawStream& stream = m_renderer->createDrawStreamJob();
+		
+		m_tile.texture = gpu::allocTextureHandle();
+		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
+		gpu::TextureHandle tile_tmp = gpu::allocTextureHandle();
+		stream.createTexture(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_tmp");
+		stream.copy(tile_tmp, m_tile.pipeline->getOutput(), 0, 0);
+		downscale(stream, tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
-		renderer->getTextureImage(m_tile.texture
+		getTextureImage(stream
+			, m_tile.texture
 			, AssetBrowser::TILE_SIZE
 			, AssetBrowser::TILE_SIZE
 			, gpu::TextureFormat::RGBA8
 			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
-		renderer->destroy(tile_tmp);
+		stream.destroy(tile_tmp);
 
 		m_tile.frame_countdown = 2;
+	}
+
+	void downscale(DrawStream& stream, gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) {
+		if (!m_downscale_program) {
+			static const char* downscale_src = R"#(
+				layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+				layout (rgba8, binding = 0) uniform readonly image2D u_src;
+				layout (rgba8, binding = 1) uniform writeonly image2D u_dst;
+				layout(std140, binding = 4) uniform Data {
+					ivec2 u_scale;
+				};
+				void main() {
+					vec4 accum = vec4(0);
+					for (int j = 0; j < u_scale.y; ++j) {
+						for (int i = 0; i < u_scale.x; ++i) {
+							vec4 v = imageLoad(u_src, ivec2(gl_GlobalInvocationID.xy) * u_scale + ivec2(i, j));
+							accum += v;
+						}
+					}
+					accum *= 1.0 / (u_scale.x * u_scale.y);
+					imageStore(u_dst, ivec2(gl_GlobalInvocationID.xy), accum);
+				}
+			)#";
+
+			m_downscale_program = gpu::allocProgramHandle();
+			const gpu::ShaderType type = gpu::ShaderType::COMPUTE;
+			const char* srcs[] = { downscale_src };
+			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::NONE), srcs, &type, 1, nullptr, 0, "downscale");
+		}
+
+		ASSERT(src_w % dst_w == 0);
+		ASSERT(src_h % dst_h == 0);
+		
+		IVec2 src_size((i32)src_w, (i32)src_h);
+		IVec2 dst_size = {(i32)dst_w, (i32)dst_h};
+		const IVec2 scale = src_size / dst_size;
+		const Renderer::TransientSlice ub_slice = m_renderer->allocUniform(&scale, sizeof(scale));
+		stream.bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
+		stream.bindImageTexture(src, 0);
+		stream.bindImageTexture(dst, 1);
+		stream.useProgram(m_downscale_program);
+		stream.dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
 	}
 
 
@@ -2988,9 +3024,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Engine& engine = m_app.getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
-
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		if (!renderer) return;
 
 		EntityRef mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
@@ -3025,20 +3058,23 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return;
 		}
 
-		Renderer::MemRef mem;
-		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_final");
-		gpu::TextureHandle tile_tmp = renderer->createTexture(AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_tmp");
-		renderer->copy(tile_tmp, m_tile.pipeline->getOutput());
-		renderer->downscale(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		DrawStream& stream = m_renderer->createDrawStreamJob();
+		m_tile.texture = gpu::allocTextureHandle();
+		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
+		gpu::TextureHandle tile_tmp = gpu::allocTextureHandle();
+		stream.createTexture(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_tmp");
+		stream.copy(tile_tmp, m_tile.pipeline->getOutput(), 0, 0);
+		downscale(stream, tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		renderer->getTextureImage(m_tile.texture 
+		getTextureImage(stream
+			, m_tile.texture 
 			, AssetBrowser::TILE_SIZE
 			, AssetBrowser::TILE_SIZE
 			, gpu::TextureFormat::RGBA8
 			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
 		
-		renderer->destroy(tile_tmp);
+		stream.destroy(tile_tmp);
 		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
@@ -3089,6 +3125,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	
 
 	StudioApp& m_app;
+	Renderer* m_renderer = nullptr;
 	gpu::TextureHandle m_preview;
 	Universe* m_universe;
 	Viewport m_viewport;
@@ -3100,6 +3137,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	TexturePlugin* m_texture_plugin;
 	FBXImporter m_fbx_importer;
 	jobs::Signal m_subres_signal;
+	Meta m_meta;
+	FilePathHash m_meta_res;
+	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
 };
 
 
@@ -3307,7 +3347,9 @@ void captureCubemap(StudioApp& app
 
 		const gpu::TextureHandle res = pipeline.getOutput();
 		ASSERT(res);
-		renderer->getTextureImage(res
+		DrawStream& stream = renderer->createDrawStreamJob();
+		getTextureImage(stream
+			, res
 			, texture_size
 			, texture_size
 			, gpu::TextureFormat::RGBA32F
@@ -3318,15 +3360,13 @@ void captureCubemap(StudioApp& app
 	struct RenderJob : Renderer::RenderJob {
 		RenderJob(F&& f) : f(f) {}
 
-		void setup() override {}
 		void execute() override {
 			f();
 		}
 		F f;
 	};
 
-	RenderJob& rjob = renderer->createJob<RenderJob>(static_cast<F&&>(f));
-	renderer->queue(rjob, 0);
+	renderer->createJob<RenderJob>(static_cast<F&&>(f));
 }
 
 struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
@@ -3474,7 +3514,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void update() override
 	{
 		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
-			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::VertexDecl(), 0);
+			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0);
 		}
 
 		if (m_done_counter != m_probe_counter) {
@@ -3570,80 +3610,94 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			logError(m_ibl_filter_shader->getPath(), "is not ready");
 			return;
 		}
-		jobs::Signal finished;
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+		const u32 roughness_levels = 5;
+		
+		struct Job : Renderer::RenderJob {
+			Job(IAllocator& allocator, PageAllocator& page_allocator) 
+				: stream(page_allocator)
+				, tmp(allocator)
+			{}
 
-		// TODO RenderJob
-		jobs::runLambda([&](){
-			renderer->beginProfileBlock("radiance_filter", 0);
-			gpu::TextureHandle src = gpu::allocTextureHandle();
-			gpu::TextureHandle dst = gpu::allocTextureHandle();
-			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
-			ASSERT(created);
+			void execute() override {
+				stream.run();
+				plugin->saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
+				jobs::setGreen(signal);
+			}
+
+			DrawStream stream;
+			Array<u8> tmp;
+			EnvironmentProbePlugin* plugin;
+			u32 size;
+			u64 guid;
+			jobs::Signal* signal;
+		};
+
+		jobs::Signal signal;
+		jobs::setRed(&signal);
+		Job& job = renderer->createJob<Job>(renderer->getAllocator(), renderer->getEngine().getPageAllocator());
+		job.size = size;
+		job.guid = guid;
+		job.plugin = this;
+		job.signal = &signal;
+		
+		gpu::TextureHandle src = gpu::allocTextureHandle();
+		gpu::TextureHandle dst = gpu::allocTextureHandle();
+		job.stream.createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
+		for (u32 face = 0; face < 6; ++face) {
+			job.stream.update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
+		}
+		job.stream.generateMipmaps(src);
+		job.stream.createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
+
+		job.stream.useProgram(m_ibl_filter_program);
+		job.stream.bindTextures(&src, 0, 1);
+		for (u32 mip = 0; mip < roughness_levels; ++mip) {
+			const float roughness = float(mip) / (roughness_levels - 1);
 			for (u32 face = 0; face < 6; ++face) {
-				gpu::update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
+				job.stream.setFramebufferCube(dst, face, mip);
+				struct {
+					float roughness;
+					u32 face;
+					u32 mip;
+				} drawcall = {roughness, face, mip};
+				const Renderer::TransientSlice ub = renderer->allocUniform(&drawcall, sizeof(drawcall));
+				job.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				job.stream.viewport(0, 0, size >> mip, size >> mip);
+				job.stream.drawArrays(0, 4);
 			}
-			gpu::generateMipmaps(src);
-			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
-			ASSERT(created);
-			gpu::BufferHandle buf = gpu::allocBufferHandle();
-			gpu::createBuffer(buf, gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+		}
 
-			const u32 roughness_levels = 5;
+		job.stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+
+		gpu::TextureHandle staging = gpu::allocTextureHandle();
+		const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
+		job.stream.createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
 			
-			gpu::useProgram(m_ibl_filter_program);
-			gpu::bindTextures(&src, 0, 1);
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				const float roughness = float(mip) / (roughness_levels - 1);
-				for (u32 face = 0; face < 6; ++face) {
-					gpu::setFramebufferCube(dst, face, mip);
-					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, buf, 0, 256);
-					struct {
-						float roughness;
-						u32 face;
-						u32 mip;
-					} drawcall = {roughness, face, mip};
-					gpu::setState(gpu::StateFlags::NONE);
-					gpu::viewport(0, 0, size >> mip, size >> mip);
-					gpu::update(buf, &drawcall, sizeof(drawcall));
-					gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, 0, 4);
-				}
-			}
+		u32 data_size = 0;
+		u32 mip_size = size;
+		for (u32 mip = 0; mip < roughness_levels; ++mip) {
+			data_size += mip_size * mip_size * sizeof(Vec4) * 6;
+			mip_size >>= 1;
+		}
 
-			gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+		job.tmp.resize(data_size);
 
-			gpu::TextureHandle staging = gpu::allocTextureHandle();
-			const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
-			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
-			
-			u32 data_size = 0;
-			u32 mip_size = size;
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				data_size += mip_size * mip_size * sizeof(Vec4) * 6;
-				mip_size >>= 1;
-			}
+		job.stream.copy(staging, dst, 0, 0);
+		u8* tmp_ptr = job.tmp.begin();
+		for (u32 mip = 0; mip < roughness_levels; ++mip) {
+			const u32 mip_size = size >> mip;
+			job.stream.readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
+			tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
+		}
 
-			Array<u8> tmp(m_app.getAllocator());
-			tmp.resize(data_size);
+		job.stream.destroy(staging);
 
-			gpu::copy(staging, dst, 0, 0);
-			u8* tmp_ptr = tmp.begin();
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				const u32 mip_size = size >> mip;
-				gpu::readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
-				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
-			}
-
-			saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
-			gpu::destroy(staging);
-			renderer->endProfileBlock();
-
-			gpu::destroy(buf);
-			gpu::destroy(src);
-			gpu::destroy(dst);
-		}, &finished, 1);
-		jobs::wait(&finished);
+		job.stream.destroy(src);
+		job.stream.destroy(dst);	
+		
+		jobs::wait(&signal);
 	}
 
 	void processData(ProbeJob& job) {
@@ -4401,226 +4455,6 @@ struct RenderInterfaceImpl final : RenderInterface
 
 struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 {
-	struct RenderJob : Renderer::RenderJob
-	{
-		struct CmdList
-		{
-			CmdList(LinearAllocator& allocator) : commands(allocator) {}
-
-			Renderer::TransientSlice idx_buffer;
-			Renderer::TransientSlice vtx_buffer;
-
-			Array<ImDrawCmd> commands;
-		};
-
-		struct WindowDrawData {
-			WindowDrawData(LinearAllocator& allocator) : cmd_lists(allocator) {}
-
-			gpu::ProgramHandle program;
-			os::WindowHandle window;
-			u32 w, h;
-			i32 x, y;
-			bool new_program = false;
-			Array<CmdList> cmd_lists;
-			Renderer::TransientSlice ub;
-			Vec2 scale;
-			gpu::TextureHandle render_target = gpu::INVALID_TEXTURE;
-			Vec4 clear_color = Vec4(0.2f, 0.2f, 0.2f, 1.f);
-		};
-
-		RenderJob(LinearAllocator& allocator)
-			: allocator(allocator)
-			, window_draw_data(allocator)
-		{
-		}
-
-		gpu::ProgramHandle getProgram(void* window_handle, bool& new_program) {
-			auto iter = plugin->m_programs.find(window_handle);
-			if (!iter.isValid()) {
-				plugin->m_programs.insert(window_handle, gpu::allocProgramHandle());
-				iter = plugin->m_programs.find(window_handle);
-				new_program = true;
-			}
-
-			return iter.value();
-		}
-
-		void setup() override
-		{
-			PROFILE_FUNCTION();
-			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
-			renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-
-			if (!should_setup) return;
-
-			ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-			window_draw_data.reserve(platform_io.Viewports.size());
-			for (ImGuiViewport* vp : platform_io.Viewports) {
-				ImDrawData* draw_data = vp->DrawData;
-				WindowDrawData& dd = window_draw_data.emplace(allocator);
-				dd.w = u32(vp->Size.x);
-				dd.h = u32(vp->Size.y);
-				dd.x = i32(draw_data->DisplayPos.x);
-				dd.y = i32(draw_data->DisplayPos.y);
-				dd.scale = Vec2(1);
-				dd.window = vp->PlatformHandle;
-				dd.program = getProgram(dd.window, dd.new_program);
-				dd.cmd_lists.reserve(draw_data->CmdListsCount);
-				dd.ub = renderer->allocUniform(sizeof(Vec4) * 2);
-
-				const Vec4 canvas_mtx[] = {
-					Vec4(2.f / dd.w, 0, -1 + (float)-dd.x * 2.f / dd.w, 0),
-					Vec4(0, -2.f / dd.h, 1 + (float)dd.y * 2.f / dd.h, 0)
-				};
-				memcpy(dd.ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
-
-				for (int i = 0; i < draw_data->CmdListsCount; ++i) {
-					ImDrawList* cmd_list = draw_data->CmdLists[i];
-					CmdList& out_cmd_list = dd.cmd_lists.emplace(allocator);
-
-					out_cmd_list.idx_buffer = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
-					memcpy(out_cmd_list.idx_buffer.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
-
-					out_cmd_list.vtx_buffer = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
-					memcpy(out_cmd_list.vtx_buffer.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
-			
-					out_cmd_list.commands.reserve(cmd_list->CmdBuffer.size());
-					for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
-						if (cmd_list->CmdBuffer[i].UserCallback) {
-							cmd_list->CmdBuffer[i].UserCallback(cmd_list, &cmd_list->CmdBuffer[i]);
-						}
-						else {
-							out_cmd_list.commands.push(cmd_list->CmdBuffer[i]);
-						}
-					}
-				}
-			}
-			
-			default_texture = &plugin->m_texture;
-		}
-
-
-		void draw(const CmdList& cmd_list, const WindowDrawData& wdd) {
-			const u32 num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
-			const u32 num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
-
-			gpu::useProgram(wdd.program);
-
-			gpu::bindIndexBuffer(cmd_list.idx_buffer.buffer);
-			gpu::bindVertexBuffer(0, cmd_list.vtx_buffer.buffer, cmd_list.vtx_buffer.offset, sizeof(ImDrawVert));
-			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
-			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
-
-			const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			gpu::setState(gpu::StateFlags::SCISSOR_TEST | blend_state);
-			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
-				ASSERT(!pcmd->UserCallback);
-				if (0 == pcmd->ElemCount) continue;
-
-				gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
-				if (!tex) tex = *default_texture;
-				gpu::bindTextures(&tex, 0, 1);
-
-				const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y) * wdd.scale.y, 0.f, 65535.f));
-
-				if (gpu::isOriginBottomLeft()) {
-					gpu::scissor(u32(maximum((pcmd->ClipRect.x - wdd.x) * wdd.scale.x, 0.0f)),
-						wdd.h - u32(maximum((pcmd->ClipRect.y - wdd.y) * wdd.scale.y, 0.0f)) - h,
-						u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x) * wdd.scale.x, 0.f, 65535.f)),
-						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y) * wdd.scale.y, 0.f, 65535.f)));
-				} else {
-					gpu::scissor(u32(maximum((pcmd->ClipRect.x - wdd.x) * wdd.scale.x, 0.0f)),
-						u32(maximum((pcmd->ClipRect.y - wdd.y) * wdd.scale.y, 0.0f)),
-						u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x) * wdd.scale.x, 0.f, 65535.f)),
-						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y) * wdd.scale.y, 0.f, 65535.f)));
-				}
-
-				gpu::drawIndexed(gpu::PrimitiveType::TRIANGLES, pcmd->IdxOffset * sizeof(u32) + cmd_list.idx_buffer.offset, pcmd->ElemCount, gpu::DataType::U32);
-			}
-			ib_offset += num_indices;
-			vb_offset += num_vertices;
-		}
-
-
-		void execute() override
-		{
-			PROFILE_FUNCTION();
-
-			renderer->beginProfileBlock("editor imgui", 0);
-
-			vb_offset = 0;
-			ib_offset = 0;
-			for (WindowDrawData& dd : window_draw_data) {
-				if (dd.render_target) {
-					gpu::setFramebuffer(&dd.render_target, 1, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
-				}
-				else {
-					gpu::setCurrentWindow(dd.window);
-					gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
-				}
-				gpu::viewport(0, 0, dd.w, dd.h);
-
-				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, dd.ub.buffer, dd.ub.offset, dd.ub.size);
-
-				gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &dd.clear_color.x, 1.0);
-				if (dd.new_program) {
-					const char* vs =
-						R"#(
-						layout(location = 0) in vec2 a_pos;
-						layout(location = 1) in vec2 a_uv;
-						layout(location = 2) in vec4 a_color;
-						layout(location = 0) out vec4 v_color;
-						layout(location = 1) out vec2 v_uv;
-						layout (std140, binding = 4) uniform IMGUIState {
-							mat2x4 u_canvas_mtx;
-						};
-						void main() {
-							v_color = a_color;
-							v_uv = a_uv;
-							vec2 p = vec3(a_pos, 1) * mat2x3(u_canvas_mtx);
-							gl_Position = vec4(p.xy, 0, 1);
-						})#";
-					const char* fs = 
-						R"#(
-						layout(location = 0) in vec4 v_color;
-						layout(location = 1) in vec2 v_uv;
-						layout(location = 0) out vec4 o_color;
-						layout(binding = 0) uniform sampler2D u_texture;
-						void main() {
-							vec4 tc = textureLod(u_texture, v_uv, 0);
-							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
-							o_color.a = v_color.a * tc.a;
-						})#";
-					const char* srcs[] = {vs, fs};
-					gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
-					gpu::VertexDecl decl;
-					decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
-					decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
-					decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-					gpu::createProgram(dd.program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
-				}
-				for(const CmdList& cmd_list : dd.cmd_lists) {
-					draw(cmd_list, dd);
-				}
-			}
-			gpu::setCurrentWindow(nullptr);
-
-			renderer->endProfileBlock();
-		}
-		
-		LinearAllocator& allocator;
-		Renderer* renderer;
-		const gpu::TextureHandle* default_texture;
-		Array<WindowDrawData> window_draw_data;
-		u32 ib_offset;
-		u32 vb_offset;
-		EditorUIRenderPlugin* plugin;
-		bool should_setup = true;
-	};
-
-
 	EditorUIRenderPlugin(StudioApp& app)
 		: m_app(app)
 		, m_engine(app.getEngine())
@@ -4668,14 +4502,133 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		ImGui::DestroyContext();
 	}
 
+	gpu::ProgramHandle getProgram(void* window_handle, bool& new_program) {
+		auto iter = m_programs.find(window_handle);
+		if (!iter.isValid()) {
+			m_programs.insert(window_handle, gpu::allocProgramHandle());
+			iter = m_programs.find(window_handle);
+			new_program = true;
+		}
+
+		return iter.value();
+	}
+
+	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program) {
+		const u32 num_indices = cmd_list->IdxBuffer.size() / sizeof(ImDrawIdx);
+		const u32 num_vertices = cmd_list->VtxBuffer.size() / sizeof(ImDrawVert);
+
+		const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
+		memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
+
+		const Renderer::TransientSlice vb  = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
+		memcpy(vb.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
+
+		stream.useProgram(program);
+		stream.bindIndexBuffer(ib.buffer);
+		stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
+		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+		for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
+			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[i];
+			ASSERT(!pcmd->UserCallback);
+			if (0 == pcmd->ElemCount) continue;
+
+			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
+			if (!tex) tex = m_texture;
+			stream.bindTextures(&tex, 0, 1);
+
+			const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
+
+			const ImVec2 pos = vp->DrawData->DisplayPos;
+			const u32 vp_height = u32(vp->Size.y);
+			if (gpu::isOriginBottomLeft()) {
+				stream.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
+					vp_height - u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)) - h,
+					u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
+					u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+			} else {
+				stream.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
+					u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)),
+					u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
+					u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+			}
+
+			stream.drawIndexed(pcmd->IdxOffset * sizeof(u32) + ib.offset, pcmd->ElemCount, gpu::DataType::U32);
+		}
+	}
 
 	void guiEndFrame() override
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		RenderJob& cmd = renderer->createJob<RenderJob>(renderer->getCurrentFrameAllocator());
-		cmd.plugin = this;
-		
-		renderer->queue(cmd, 0);
+
+		DrawStream& stream = renderer->getEndFrameDrawStream();
+
+		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+		for (const ImGuiViewport* vp : platform_io.Viewports) {
+			ImDrawData* draw_data = vp->DrawData;
+			bool new_program = false;
+			gpu::ProgramHandle program = getProgram(vp->PlatformHandle, new_program);
+			const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Vec4) * 2);
+
+			const u32 w = u32(vp->Size.x);
+			const u32 h = u32(vp->Size.y);
+			const Vec4 canvas_mtx[] = {
+				Vec4(2.f / w, 0, -1 + (float)-draw_data->DisplayPos.x * 2.f / w, 0),
+				Vec4(0, -2.f / h, 1 + (float)draw_data->DisplayPos.y * 2.f / h, 0)
+			};
+			memcpy(ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
+
+			if (new_program) {
+				const char* vs =
+					R"#(
+					layout(location = 0) in vec2 a_pos;
+					layout(location = 1) in vec2 a_uv;
+					layout(location = 2) in vec4 a_color;
+					layout(location = 0) out vec4 v_color;
+					layout(location = 1) out vec2 v_uv;
+					layout (std140, binding = 4) uniform IMGUIState {
+						mat2x4 u_canvas_mtx;
+					};
+					void main() {
+						v_color = a_color;
+						v_uv = a_uv;
+						vec2 p = vec3(a_pos, 1) * mat2x3(u_canvas_mtx);
+						gl_Position = vec4(p.xy, 0, 1);
+					})#";
+				const char* fs = 
+					R"#(
+					layout(location = 0) in vec4 v_color;
+					layout(location = 1) in vec2 v_uv;
+					layout(location = 0) out vec4 o_color;
+					layout(binding = 0) uniform sampler2D u_texture;
+					void main() {
+						vec4 tc = textureLod(u_texture, v_uv, 0);
+						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
+						o_color.a = v_color.a * tc.a;
+					})#";
+				const char* srcs[] = {vs, fs};
+				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
+				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
+				decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				const gpu::StateFlags state = gpu::StateFlags::SCISSOR_TEST | blend_state;
+				stream.createProgram(program, state, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+			}
+
+			stream.setCurrentWindow(vp->PlatformHandle);
+			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+			stream.viewport(0, 0, w, h);
+			const Vec4 clear_color = Vec4(0.2f, 0.2f, 0.2f, 1.f);
+			stream.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &clear_color.x, 1.0);
+			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				
+			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
+				encode(draw_data->CmdLists[i], vp, renderer, stream, program);
+			}
+		}
+		stream.setCurrentWindow(nullptr);
 		renderer->frame();
 	}
 

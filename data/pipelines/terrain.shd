@@ -30,6 +30,9 @@ texture_slot {
 	default_texture = "textures/common/blue_noise.tga"
 }
 
+uniform("Roughness", "float", 1)
+uniform("Metallic", "float", 0)
+uniform("Emission", "float", 0)
 uniform("Detail distance", "float")
 uniform("Detail scale", "float")
 uniform("Noise UV scale", "float")
@@ -170,8 +173,8 @@ fragment_shader [[
 				vec2 grid_size = u_hm_size / u_terrain_scale.xz;
 				vec2 resolution = grid_size + 1;
 
-				vec2 r = vec2(texture(t_noise, uv_norm * t_noise_uv_scale * grid_size).x,
-							  texture(t_noise, uv_norm.yx * t_noise_uv_scale * grid_size).x);
+				vec2 r = vec2(texture(t_noise, uv_norm * u_noise_uv_scale * grid_size).x,
+							  texture(t_noise, uv_norm.yx * u_noise_uv_scale * grid_size).x);
 				r = r * u_detail_diffusion * 2 - u_detail_diffusion;
 				uv_norm += r / u_hm_size;
 
@@ -231,7 +234,7 @@ fragment_shader [[
 			surface.roughness = u_roughness;
 			surface.metallic  = u_metallic;
 			surface.emission = u_emission;
-			surface.translucency = u_translucency;
+			surface.translucency = 0;
 			surface.ao = 0.9;
 			surface.shadow = saturate(Global.light_dir.y * 3) * 0.9;
 			return surface;

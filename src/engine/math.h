@@ -21,9 +21,9 @@ struct LUMIX_ENGINE_API IVec2 {
 	IVec2 operator +(const IVec2& v) const { return IVec2(x + v.x, y + v.y); }
 	IVec2 operator -(const IVec2& v) const { return IVec2(x - v.x, y - v.y); }
 	IVec2 operator *(i32 i) const { return IVec2(x * i, y * i); }
-	IVec2 operator / (i32 rhs) { return IVec2(x / rhs, y / rhs); }
-	IVec2 operator / (const IVec2& rhs) { return IVec2(x / rhs.x, y / rhs.y); }
-	inline Vec2 operator / (const Vec2& rhs);
+	IVec2 operator / (i32 rhs) const { return IVec2(x / rhs, y / rhs); }
+	IVec2 operator / (const IVec2& rhs) const { return IVec2(x / rhs.x, y / rhs.y); }
+	inline Vec2 operator / (const Vec2& rhs) const;
 	bool operator !=(const IVec2& rhs) const { return rhs.x != x || rhs.y != y; }
 
 	i32 x;
@@ -33,6 +33,7 @@ struct LUMIX_ENGINE_API IVec2 {
 struct LUMIX_ENGINE_API IVec3 {
 	IVec3() {}
 	IVec3(i32 x, i32 y, i32 z) : x(x), y(y), z(z) {}
+	IVec3 operator +(const IVec3& v) const { return IVec3(x + v.x, y + v.y, z + v.z); }
 	explicit IVec3(const DVec3& rhs);
 	explicit IVec3(const Vec3& rhs);
 	bool operator==(const IVec3& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
@@ -45,6 +46,7 @@ struct LUMIX_ENGINE_API IVec3 {
 
 struct LUMIX_ENGINE_API IVec4 {
 	IVec4() {}
+	IVec4(i32 x, i32 y, i32 z, i32 w) : x(x), y(y), z(z), w(w) {}
 	IVec4(i32 v) : x(v), y(v), z(v), w(v) {}
 	IVec4(const IVec2& a, const IVec2& b) : x(a.x), y(a.y), z(b.x), w(b.y) {}
 	void operator += (const IVec4& rhs);

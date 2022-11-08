@@ -57,6 +57,7 @@ struct ProceduralGeometry {
 	ProceduralGeometry(IAllocator& allocator) 
 		: vertex_data(allocator)
 		, index_data(allocator)
+		, vertex_decl(gpu::PrimitiveType::TRIANGLES)
 	{}
 
 	Material* material = nullptr;
@@ -64,7 +65,6 @@ struct ProceduralGeometry {
 	OutputMemoryStream index_data;
 	gpu::VertexDecl vertex_decl;
 	gpu::DataType index_type;
-	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLE_STRIP;
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle index_buffer = gpu::INVALID_BUFFER;
 	AABB aabb;
@@ -451,11 +451,13 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
 		, const gpu::VertexDecl& vertex_decl
-		, gpu::PrimitiveType primitive_type
 		, Span<const u8> index_data
 		, gpu::DataType index_type) = 0;
+	virtual void setProceduralGeometryMaterial(EntityRef entity, const Path& path) = 0;
 	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
 	virtual ProceduralGeometry& getProceduralGeometry(EntityRef e) = 0;
+	virtual bool hasProceduralGeometry(EntityRef e) = 0;
+	virtual void createProceduralGeometry(EntityRef entity) = 0;
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;

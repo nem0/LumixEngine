@@ -50,8 +50,9 @@ goto :begin
 	echo  9. JS
 	echo  A. C#
 	echo  B. Visual script
+	echo  C. Procedural geometry
 	echo ===============================
-	choice /C 123456789AB /N /M "Your choice:"
+	choice /C 123456789ABC /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -64,6 +65,7 @@ goto :begin
 	if %errorlevel%==9 call :js_plugin
 	if %errorlevel%==10 call :cs_plugin
 	if %errorlevel%==11 call :visual_script_plugin
+	if %errorlevel%==12 call :procedural_geom_plugin
 	call :create_project
 goto :plugins
 
@@ -170,6 +172,18 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_maps.git maps
 	) else (
 		cd maps
+		git pull
+	)
+	popd
+exit /B 0
+
+:procedural_geom_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist procedural_geom (
+		git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+	) else (
+		cd procedural_geom
 		git pull
 	)
 	popd
