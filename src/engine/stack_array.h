@@ -9,7 +9,7 @@ namespace Lumix {
 template <typename T, u32 N>
 struct StackArray : Array<T> {
 	StackArray(IAllocator& fallback)
-		: Array(m_stack_allocator)
+		: Array<T>(m_stack_allocator)
 		, m_stack_allocator(fallback)
 	{
 		reserve(N);
