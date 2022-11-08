@@ -2,13 +2,14 @@
 
 #include "engine/allocators.h"
 #include "engine/array.h"
+#include "engine/atomic.h"
 #include "engine/command_line_parser.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/hash.h"
 #include "engine/log.h"
-#include "engine/atomic.h"
 #include "engine/job_system.h"
+#include "engine/page_allocator.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
 #include "engine/os.h"
@@ -17,6 +18,7 @@
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/universe.h"
+#include "renderer/encoder.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -28,30 +30,10 @@
 #include "renderer/texture.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const char* downscale_src = R"#(
-	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-	layout (rgba8, binding = 0) uniform readonly image2D u_src;
-	layout (rgba8, binding = 1) uniform writeonly image2D u_dst;
-	layout(std140, binding = 4) uniform Data {
-		ivec2 u_scale;
-	};
-	void main() {
-		vec4 accum = vec4(0);
-		for (int j = 0; j < u_scale.y; ++j) {
-			for (int i = 0; i < u_scale.x; ++i) {
-				vec4 v = imageLoad(u_src, ivec2(gl_GlobalInvocationID.xy) * u_scale + ivec2(i, j));
-				accum += v;
-			}
-		}
-		accum *= 1.0 / (u_scale.x * u_scale.y);
-		imageStore(u_dst, ivec2(gl_GlobalInvocationID.xy), accum);
-	}
-)#";
 
 
 template <u32 ALIGN>
@@ -160,6 +142,7 @@ struct FrameData {
 		gpu::VertexDecl decl;
 		u32 defines;
 		gpu::ProgramHandle program;
+		gpu::StateFlags state;
 	};
 
 	TransientBuffer<16> transient_buffer;
@@ -174,8 +157,8 @@ struct FrameData {
 	jobs::Signal can_setup;
 	jobs::Signal setup_done;
 	u32 frame_number = 0;
-	gpu::Encoder begin_encoder;
-	gpu::Encoder end_encoder;
+	Encoder begin_encoder;
+	Encoder end_encoder;
 };
 
 
@@ -445,14 +428,11 @@ struct RendererImpl final : Renderer
 		
 		jobs::Signal signal;
 		jobs::runLambda([this]() {
-			gpu::Encoder encoder(m_engine.getPageAllocator());
 			for (const Local<FrameData>& frame : m_frames) {
-				encoder.destroy(frame->transient_buffer.m_buffer);
-				encoder.destroy(frame->uniform_buffer.m_buffer);
+				gpu::destroy(frame->transient_buffer.m_buffer);
+				gpu::destroy(frame->uniform_buffer.m_buffer);
 			}
-			encoder.destroy(m_material_buffer.buffer);
-			encoder.destroy(m_downscale_program);
-			encoder.run();
+			gpu::destroy(m_material_buffer.buffer);
 			m_profiler.clear();
 			gpu::shutdown();
 		}, &signal, 1);
@@ -527,17 +507,12 @@ struct RendererImpl final : Renderer
 		}
 		mb.data.back().next_free = -1;
 			
-		gpu::Encoder& encoder = m_cpu_frame->begin_encoder;
+		Encoder& encoder = m_cpu_frame->begin_encoder;
 		encoder.createBuffer(mb.buffer
 			, gpu::BufferFlags::UNIFORM_BUFFER
 			, Material::MAX_UNIFORMS_BYTES * MAX_MATERIAL_CONSTS_COUNT
 			, nullptr
 		);
-
-		m_downscale_program = gpu::allocProgramHandle();
-		const gpu::ShaderType type = gpu::ShaderType::COMPUTE;
-		const char* srcs[] = { downscale_src };
-		encoder.createProgram(m_downscale_program, {}, srcs, &type, 1, nullptr, 0, "downscale");
 
 		float default_mat[Material::MAX_UNIFORMS_FLOATS] = {};
 		encoder.update(mb.buffer, &default_mat, sizeof(default_mat));
@@ -601,74 +576,17 @@ struct RendererImpl final : Renderer
 		gpu::popDebugGroup();
 	}
 
-
-	void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) override {
-		pushJob("get image data", [w, h, out_format, texture, data](gpu::Encoder& encoder){
-			encoder.pushDebugGroup("get image data");
-			gpu::TextureHandle staging = gpu::allocTextureHandle();
-			const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-			encoder.createTexture(staging, w, h, 1, out_format, flags, "staging_buffer");
-			encoder.copy(staging, texture, 0, 0);
-			encoder.readTexture(staging, 0, data);
-			encoder.destroy(staging);
-			encoder.popDebugGroup();
-			
-		});
-	}
-
-	void updateBuffer(gpu::BufferHandle handle, const MemRef& mem) override {
-		ASSERT(mem.size > 0);
-		ASSERT(handle);
-
-		gpu::Encoder& encoder = createEncoderJob();
-		encoder.update(handle, mem.data, mem.size);
-		if (mem.own) encoder.freeMemory(mem.data, m_allocator);
-	}
-
-	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override {
-		ASSERT(mem.size > 0);
-		ASSERT(handle);
-
-		gpu::Encoder& encoder = createEncoderJob();
-		encoder.update(handle, 0, x, y, slice, w, h, format, mem.data, mem.size);
-		if (mem.own) encoder.freeMemory(mem.data, m_allocator);
-	}
-
-
-	gpu::TextureHandle loadTexture(const gpu::TextureDesc& desc, const MemRef& memory, gpu::TextureFlags flags, const char* debug_name) override
-	{
-		ASSERT(memory.size > 0);
-
-		const gpu::TextureHandle handle = gpu::allocTextureHandle();
-		if (!handle) return handle;
-
-		gpu::Encoder& encoder = createEncoderJob();
-		if (desc.is_cubemap) flags = flags | gpu::TextureFlags::IS_CUBE;
-		if (desc.mips < 2) flags = flags | gpu::TextureFlags::NO_MIPS;
-		encoder.createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name);
-				
-		const u8* ptr = (const u8*)memory.data;
-		for (u32 layer = 0; layer < desc.depth; ++layer) {
-			for(int side = 0; side < (desc.is_cubemap ? 6 : 1); ++side) {
-				const u32 z = layer * (desc.is_cubemap ? 6 : 1) + side;
-				for (u32 mip = 0; mip < desc.mips; ++mip) {
-					const u32 w = maximum(desc.width >> mip, 1);
-					const u32 h = maximum(desc.height >> mip, 1);
-					const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-					encoder.update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
-					ptr += mip_size_bytes;
-				}
-			}
-		}
-		if (memory.own) encoder.freeMemory(memory.data, m_allocator);
-		return handle;
-	}
-
-
 	TransientSlice allocTransient(u32 size) override
 	{
 		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->transient_buffer.alloc(size);
+	}
+
+	TransientSlice allocUniform(const void* data, u32 size) override {
+		jobs::wait(&m_cpu_frame->can_setup);
+		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		memcpy(slice.ptr, data, size);
+		return slice;
 	}
 
 	TransientSlice allocUniform(u32 size) override
@@ -726,7 +644,7 @@ struct RendererImpl final : Renderer
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle) return handle;
 
-		gpu::Encoder& encoder = createEncoderJob();
+		Encoder& encoder = createEncoderJob();
 		encoder.createBuffer(handle, flags, memory.size, memory.data);
 		if (memory.own) encoder.freeMemory(memory.data, m_allocator);
 		return handle;
@@ -797,36 +715,12 @@ struct RendererImpl final : Renderer
 		m_cpu_frame->end_encoder.destroy(buffer);
 	}
 
-	void copy(gpu::TextureHandle dst, gpu::TextureHandle src) override {
-		gpu::Encoder& encoder = createEncoderJob();
-		encoder.copy(dst, src, 0, 0);
-	}
-
-	void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) override {
-		ASSERT(src_w % dst_w == 0);
-		ASSERT(src_h % dst_h == 0);
-		
-		IVec2 src_size((i32)src_w, (i32)src_h);
-		IVec2 dst_size = {(i32)dst_w, (i32)dst_h};
-		pushJob("downscale", [src_size, dst_size, this, src, dst](gpu::Encoder& encoder){
-			const IVec2 scale = src_size / dst_size;
-			Renderer::TransientSlice ub_slice = allocUniform(sizeof(scale));
-			memcpy(ub_slice.ptr, &scale, sizeof(scale));
-			encoder.bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
-			encoder.bindImageTexture(src, 0);
-			encoder.bindImageTexture(dst, 1);
-			encoder.useProgram(m_downscale_program);
-			encoder.dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
-		});
-	}
-
-
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
 	{
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if(!handle) return handle;
 
-		gpu::Encoder& encoder = createEncoderJob();
+		Encoder& encoder = createEncoderJob();
 		encoder.createTexture(handle, w, h, depth, format, flags, debug_name);
 		if (memory.data && memory.size) {
 			ASSERT(depth == 1);
@@ -843,20 +737,8 @@ struct RendererImpl final : Renderer
 		m_cpu_frame->end_encoder.destroy(tex);
 	}
 
-
-	void queue(RenderJob& cmd, i64 profiler_link) override
-	{
-		jobs::wait(&m_cpu_frame->can_setup);
-
-		cmd.profiler_link = profiler_link;
-		
-		m_cpu_frame->jobs.push(&cmd);
-
-		jobs::runLambda([&cmd](){
-			PROFILE_BLOCK("setup_render_job");
-			profiler::blockColor(0x50, 0xff, 0xff);
-			cmd.setup();
-		}, &m_cpu_frame->setup_done);
+	void setupJob(RenderJob& job, void(*task)(void*)) override {
+		jobs::run(&job, task, &m_cpu_frame->setup_done);
 	}
 
 	void addPlugin(RenderPlugin& plugin) override {
@@ -879,25 +761,25 @@ struct RendererImpl final : Renderer
 		ctx.addScene(scene.move());
 	}
 
-	gpu::Encoder& getEndFrameEncoder() override {
+	Encoder& getEndFrameEncoder() override {
 		return m_cpu_frame->end_encoder;
 	}
 
-	gpu::Encoder& createEncoderJob() override {
+	Encoder& createEncoderJob() override {
 		struct EncoderJob : RenderJob {
 			EncoderJob(PageAllocator& allocator) : encoder(allocator) {}
-			void setup() override {}
 			void execute() override { encoder.run(); }
-			gpu::Encoder encoder;
+			Encoder encoder;
 		};
 		EncoderJob& job = createJob<EncoderJob>(m_engine.getPageAllocator());
-		queue(job, 0);
 		return job.encoder;
 	}
 
 	void* allocJob(u32 size, u32 align) override {
 		jobs::wait(&m_cpu_frame->can_setup);
-		return m_cpu_frame->job_allocator.allocate_aligned(size, align);
+		void* job = m_cpu_frame->job_allocator.allocate_aligned(size, align);
+		m_cpu_frame->jobs.push((RenderJob*)job);
+		return job;
 	}
 
 	const char* getName() const override { return "renderer"; }
@@ -905,18 +787,18 @@ struct RendererImpl final : Renderer
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 
-	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::VertexDecl decl, u32 defines) override {
+	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines) override {
 		ASSERT(shader.isReady());
 		jobs::MutexGuard lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
-			if (i.shader == &shader && decl.hash == i.decl.hash && defines == i.defines) {
+			if (i.shader == &shader && decl.hash == i.decl.hash && defines == i.defines && i.state == state) {
 				return i.program;
 			}
 		}
 		gpu::ProgramHandle program = gpu::allocProgramHandle();
-		shader.compile(program, decl, defines, m_cpu_frame->begin_encoder);
-		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program});
+		shader.compile(program, state, decl, defines, m_cpu_frame->begin_encoder);
+		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, state});
 		return program;
 	}
 
@@ -989,7 +871,6 @@ struct RendererImpl final : Renderer
 		for (RenderJob* job : frame.jobs) {
 			PROFILE_BLOCK("render job");
 			profiler::blockColor(0xaa, 0xff, 0xaa);
-			profiler::link(job->profiler_link);
 			job->execute();
 			job->~RenderJob();
 			frame.job_allocator.deallocate_aligned(job);
@@ -1072,7 +953,10 @@ struct RendererImpl final : Renderer
 		}
 
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
-			const u64 key = i.defines | ((u64)i.decl.hash.getHashValue() << 32);
+			Shader::ShaderKey key;
+			key.defines = i.defines;
+			key.decl_hash = i.decl.hash;
+			key.state = i.state;
 			i.shader->m_programs.insert(key, i.program);
 		}
 		m_cpu_frame->to_compile_shaders.clear();
@@ -1108,7 +992,6 @@ struct RendererImpl final : Renderer
 	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
-	gpu::ProgramHandle m_downscale_program;
 	Array<u32> m_free_sort_keys;
 	Array<const Mesh*> m_sort_key_to_mesh_map;
 	u32 m_max_sort_key = 0;

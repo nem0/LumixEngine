@@ -181,7 +181,7 @@ exit /B 0
 	if not exist ..\plugins mkdir ..\plugins
 	pushd ..\plugins
 	if not exist procedural_geom (
-		git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git maps
+		git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
 	) else (
 		cd procedural_geom
 		git pull

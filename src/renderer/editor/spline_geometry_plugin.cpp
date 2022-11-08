@@ -257,7 +257,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, Span<const EntityRef> entit
 
 			const float width = sg.width;
 			SplineIterator iterator(spline.points);
-			gpu::VertexDecl decl;
+			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 			decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 				
 			OutputMemoryStream vertices(m_app.getAllocator());
@@ -365,7 +365,7 @@ void SplineGeometryPlugin::onGUI(PropertyGrid& grid, Span<const EntityRef> entit
 				}
 			}
 
-			render_scene->setProceduralGeometry(e, vertices, decl, gpu::PrimitiveType::TRIANGLES, indices, u16indices ? gpu::DataType::U16 : gpu::DataType::U32);
+			render_scene->setProceduralGeometry(e, vertices, decl, indices, u16indices ? gpu::DataType::U16 : gpu::DataType::U32);
 		}
 	}
 }

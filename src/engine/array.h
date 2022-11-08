@@ -102,6 +102,7 @@ template <typename T> struct Array {
 	}
 
 	~Array() {
+		if (!m_data) return;
 		callDestructors(m_data, m_data + m_size);
 		m_allocator.deallocate_aligned(m_data);
 	}
@@ -318,7 +319,7 @@ template <typename T> struct Array {
 
 	u32 capacity() const { return m_capacity; }
 
-private:
+protected:
 	void grow() { reserve(m_capacity == 0 ? 4 : m_capacity * 2); }
 
 	void callDestructors(T* begin, T* end) {

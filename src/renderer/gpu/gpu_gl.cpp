@@ -1,5 +1,4 @@
 #include "gpu.h"
-#include "gpu_internal.h"
 #include "engine/page_allocator.h"
 #include "engine/array.h"
 #include "engine/hash.h"
@@ -72,12 +71,15 @@ struct Texture {
 };
 
 struct Program {
+	Program() : decl(PrimitiveType::NONE) {}
 	~Program() {
 		if(gl_handle) glDeleteProgram(gl_handle);
 	}
 
 	GLuint gl_handle = 0;
 	VertexDecl decl;
+	GLuint primitive_type;
+	gpu::StateFlags state;
 };
 
 struct WindowContext {
@@ -499,6 +501,7 @@ void useProgram(ProgramHandle program)
 	if (prev != program) {
 		gl->last_program = program;
 		if (program) {
+			setState(program->state);
 			glUseProgram(program->gl_handle);
 
 			if (!prev || program->decl.hash != prev->decl.hash) {
@@ -679,20 +682,11 @@ void bindIndirectBuffer(BufferHandle buffer)
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer ? buffer->gl_handle : 0);
 }
 
-void drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType type)
+void drawIndexed(u32 offset, u32 count, DataType type)
 {
 	GPU_PROFILE();
 	checkThread();
 	
-	GLuint pt;
-	switch (primitive_type) {
-		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
-		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
-		case PrimitiveType::LINES: pt = GL_LINES; break;
-		case PrimitiveType::POINTS: pt = GL_POINTS; break;
-		default: ASSERT(0); break;
-	} 
-
 	GLenum t;
 	switch(type) {
 		case DataType::U16: t = GL_UNSIGNED_SHORT; break;
@@ -700,28 +694,20 @@ void drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType t
 		default: ASSERT(0); break;
 	}
 
-	glDrawElements(pt, count, t, (void*)(intptr_t)offset);
+	glDrawElements(gl->last_program->primitive_type, count, t, (void*)(intptr_t)offset);
 }
 
 void drawIndirect(DataType index_type, u32 indirect_buffer_offset)
 {
 	GPU_PROFILE();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-	glMultiDrawElementsIndirect(GL_TRIANGLES, type, (const void*)(uintptr)indirect_buffer_offset, 1, 0);
+	glMultiDrawElementsIndirect(gl->last_program->primitive_type, type, (const void*)(uintptr)indirect_buffer_offset, 1, 0);
 }
 
-void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type)
+void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type)
 {
 	GPU_PROFILE();
 	checkThread();
-	GLuint pt;
-	switch (primitive_type) {
-		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
-		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
-		case PrimitiveType::LINES: pt = GL_LINES; break;
-		case PrimitiveType::POINTS: pt = GL_POINTS; break;
-		default: ASSERT(0); break;
-	}
 
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 	if (instances_count * indices_count > 4096) {
@@ -741,43 +727,25 @@ void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 i
 		// https://devtalk.nvidia.com/default/topic/1052728/opengl/extremely-slow-gldrawelementsinstanced-compared-to-gldrawarraysinstanced-/
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, gl->helper_indirect_buffer);
 		glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(mdi), &mdi);
-		glMultiDrawElementsIndirect(pt, type, nullptr, 1, 0);
+		glMultiDrawElementsIndirect(gl->last_program->primitive_type, type, nullptr, 1, 0);
 	}
 	else {
-		glDrawElementsInstanced(pt, indices_count, type, 0, instances_count);
+		glDrawElementsInstanced(gl->last_program->primitive_type, indices_count, type, 0, instances_count);
 	}
 }
 
-void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count)
+void drawArraysInstanced(u32 indices_count, u32 instances_count)
 {
 	GPU_PROFILE();
-	GLuint pt;
-	switch (type) {
-		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
-		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
-		case PrimitiveType::LINES: pt = GL_LINES; break;
-		case PrimitiveType::POINTS: pt = GL_POINTS; break;
-		default: ASSERT(0); break;
-	}
-	glDrawArraysInstanced(pt, 0, indices_count, instances_count);
+	glDrawArraysInstanced(gl->last_program->primitive_type, 0, indices_count, instances_count);
 }
 
 
-void drawArrays(PrimitiveType type, u32 offset, u32 count)
+void drawArrays(u32 offset, u32 count)
 {
 	GPU_PROFILE();
 	checkThread();
-	
-	GLuint pt;
-	switch (type) {
-		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
-		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
-		case PrimitiveType::LINES: pt = GL_LINES; break;
-		case PrimitiveType::POINTS: pt = GL_POINTS; break;
-		default: ASSERT(0); break;
-	}
-
-	glDrawArrays(pt, offset, count);
+	glDrawArrays(gl->last_program->primitive_type, offset, count);
 }
 
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
@@ -1125,7 +1093,7 @@ void createTextureView(TextureHandle view, TextureHandle texture)
 	view->height = texture->height;
 }
 
-bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name)
+void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name)
 {
 	GPU_PROFILE();
 	checkThread();
@@ -1193,7 +1161,6 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	else {
 		gl->texture_allocated_mem += handle->bytes_size;
 	}
-	return true;
 }
 
 void generateMipmaps(TextureHandle texture)
@@ -1260,7 +1227,7 @@ static const char* shaderTypeToString(ShaderType type)
 }
 
 
-bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name)
+void createProgram(ProgramHandle prog, gpu::StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name)
 {
 	GPU_PROFILE();
 	checkThread();
@@ -1287,7 +1254,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 
 	if (num > MAX_SHADERS_PER_PROGRAM) {
 		logError("Too many shaders per program in ", name);
-		return false;
+		return;
 	}
 
 	const GLuint prg = glCreateProgram();
@@ -1328,7 +1295,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 				shader_type = GL_VERTEX_SHADER;
 				break;
 			}
-			default: ASSERT(false); return false;
+			default: ASSERT(false); return;
 		}
 		++src_idx;
 		for (u32 j = 0; j < decl.attributes_count; ++j) {
@@ -1361,7 +1328,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 				logError("Failed to compile shader ", name, " - ", shaderTypeToString(types[i]));
 			}
 			glDeleteShader(shd);
-			return false;
+			return;
 		}
 
 		glAttachShader(prg, shd);
@@ -1385,13 +1352,22 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			logError("Failed to link program ", name);
 		}
 		glDeleteProgram(prg);
-		return false;
+		return;
 	}
 
 	ASSERT(prog);
+	switch (decl.primitive_type) {
+		case PrimitiveType::TRIANGLES: prog->primitive_type = GL_TRIANGLES; break;
+		case PrimitiveType::TRIANGLE_STRIP: prog->primitive_type = GL_TRIANGLE_STRIP; break;
+		case PrimitiveType::LINES: prog->primitive_type = GL_LINES; break;
+		case PrimitiveType::POINTS: prog->primitive_type = GL_POINTS; break;
+		case PrimitiveType::NONE: prog->primitive_type = 0; break;
+		default: ASSERT(0); break;
+	}
 	prog->gl_handle = prg;
 	prog->decl = decl;
-	return true;
+	prog->state = state;
+	return;
 }
 
 
@@ -1724,242 +1700,6 @@ void shutdown()
 		#endif
 	}
 	gl.destroy();
-}
-
-void Encoder::run() {
-	if (!run_called) {
-		const Instruction end_instr = Instruction::END;
-		memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
-		run_called = true;
-	}
-	
-	Page* page = first;
-	#define READ(T, N) T N; memcpy(&N, ptr, sizeof(T)); ptr += sizeof(T);
-	while (page) {
-		const u8* ptr = page->data;
-		for (;;) {
-			READ(Instruction, instr);
-			switch(instr) {
-				case Instruction::END: goto next_page;
-				case Instruction::SET_STATE: {
-					READ(StateFlags, state);
-					gpu::setState(state);
-					break;
-				}
-				case Instruction::BIND_IDIRECT_BUFFER: {
-					READ(BufferHandle, buffer);
-					gpu::bindIndirectBuffer(buffer);
-					break;
-				}
-				case Instruction::DRAW_INDIRECT: {
-					READ(DrawIndirectData, data);
-					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset);
-					break;
-				}
-				case Instruction::MEMORY_BARRIER: {
-					READ(MemoryBarrierData, data);
-					gpu::memoryBarrier(data.type, data.buffer);
-					break;
-				}
-				case Instruction::POP_DEBUG_GROUP:
-					gpu::popDebugGroup();
-					break;
-				case Instruction::PUSH_DEBUG_GROUP: {
-					READ(const char*, msg);
-					gpu::pushDebugGroup(msg);
-					break;
-				}
-				case Instruction::UPDATE_BUFFER: {
-					READ(UpdateBufferData, data);
-					gpu::update(data.buffer, data.data, data.size);
-					break;
-				}
-				case Instruction::UPDATE_TEXTURE: {
-					READ(UpdateTextureData, data);
-					gpu::update(data.texture, data.mip, data.x, data.y, data.z, data.w, data.h, data.format, data.buf, data.size);
-					break;
-				}
-				case Instruction::BIND_SHADER_BUFFER: {
-					READ(BinderShaderBufferData, data);
-					gpu::bindShaderBuffer(data.buffer, data.binding_idx, data.flags);
-					break;
-				}
-				case Instruction::GENERATE_MIPMAPS: {
-					READ(TextureHandle, tex);
-					gpu::generateMipmaps(tex);
-					break;
-				}
-				case Instruction::CREATE_PROGRAM: {
-					READ(CreateProgramData*, data);
-					gpu::createProgram(data->program, data->decl, data->srcs.begin(), data->types.begin(), data->sources.size(), data->prfxs.begin(), data->prfxs.size(), data->name.c_str());
-					LUMIX_DELETE(getAllocator(), data);
-					break;
-				}
-				case Instruction::SET_FRAMEBUFFER_CUBE: {
-					READ(SetFramebufferCubeData, data);
-					gpu::setFramebufferCube(data.cube, data.face, data.mip);
-					break;
-				}
-				case Instruction::SET_FRAMEBUFFER: {
-					READ(u32, num);
-					READ(TextureHandle, ds);
-					READ(FramebufferFlags, flags);
-					gpu::setFramebuffer((const TextureHandle*)ptr, num, ds, flags);
-					ptr += sizeof(TextureHandle) * num;
-					break;
-				}
-				case Instruction::BIND_TEXTURES: {
-					READ(u32, offset);
-					READ(u32, count);
-					gpu::bindTextures((const TextureHandle*)ptr, offset, count);
-					ptr += sizeof(TextureHandle) * count;
-					break;
-				}
-				case Instruction::CLEAR: {
-					READ(ClearData, data);
-					gpu::clear(data.flags, &data.color.x, data.depth);
-					break;
-				}
-				case Instruction::BIND_UNIFORM_BUFFER: {
-					READ(BindUniformBufferData, data);
-					gpu::bindUniformBuffer(data.ub_index, data.buffer, data.offset, data.size);
-					break;
-				}
-				case Instruction::BIND_VERTEX_BUFFER: {
-					READ(BindVertexBufferData, data);
-					gpu::bindVertexBuffer(data.binding_idx, data.buffer, data.offset, data.stride);
-					break;
-				}
-				case Instruction::DRAW_ARRAYS: {
-					READ(DrawArraysData, data);
-					gpu::drawArrays(data.type, data.offset, data.count);
-					break;
-				}
-				case Instruction::DRAW_INDEXED_INSTANCED: {
-					READ(DrawIndexedInstancedDat, data);
-					gpu::drawIndexedInstanced(data.primitive_type, data.indices_count, data.instances_count, data.index_type);
-					break;
-				}
-				case Instruction::DRAW_ARRAYS_INSTANCED: {
-					READ(DrawArraysInstancedData, data);
-					gpu::drawArraysInstanced(data.primitive_type, data.indices_count, data.instances_count);
-					break;
-				}
-				case Instruction::DRAW_INDEXED: {
-					READ(DrawIndexedData, data);
-					gpu::drawIndexed(data.primitive_type, data.offset, data.count, data.type);
-					break;
-				}
-				case Instruction::BIND_INDEX_BUFFER: {
-					READ(BufferHandle, buffer);
-					gpu::bindIndexBuffer(buffer);
-					break;
-				}
-				case Instruction::USE_PROGRAM: {
-					READ(ProgramHandle, program);
-					gpu::useProgram(program);
-					break;
-				}
-				case Instruction::SET_CURRENT_WINDOW: {
-					READ(void*, window_handle);
-					gpu::setCurrentWindow(window_handle);
-					break;
-				}
-				case Instruction::SCISSOR: {
-					READ(IVec4, vec);
-					gpu::scissor(vec.x, vec.y, vec.z, vec.w);
-					break;
-				}
-				case Instruction::CREATE_TEXTURE: {
-					READ(CreateTextureData, data);
-					READ(u32, len);
-					const char* debug_name = (const char*)ptr;
-					ptr += len;
-					gpu::createTexture(data.handle, data.w, data.h, data.depth, data.format, data.flags, debug_name);
-					break;
-				}
-				case Instruction::CREATE_BUFFER: {
-					READ(CreateBufferData, data);
-					gpu::createBuffer(data.buffer, data.flags, data.size, data.data);
-					break;
-				}
-				case Instruction::BIND_IMAGE_TEXTURE: {
-					READ(BindImageTextureData, data);
-					gpu::bindImageTexture(data.texture, data.unit);
-					break;
-				}
-				case Instruction::COPY_TEXTURE: {
-					READ(CopyTextureData, data);
-					gpu::copy(data.dst, data.src, data.dst_x, data.dst_y);
-					break;
-				}
-				case Instruction::COPY_BUFFER: {
-					READ(CopyBufferData, data);
-					gpu::copy(data.dst, data.src, data.dst_offset, data.src_offset, data.size);
-					break;
-				}
-				case Instruction::READ_TEXTURE: {
-					READ(ReadTextureData, data);
-					gpu::readTexture(data.texture, data.mip, data.buf);
-					break;
-				}
-				case Instruction::DESTROY_TEXTURE: {
-					READ(TextureHandle, texture);
-					gpu::destroy(texture);
-					break;
-				}
-				case Instruction::DESTROY_PROGRAM: {
-					READ(ProgramHandle, program);
-					gpu::destroy(program);
-					break;
-				}
-				case Instruction::DESTROY_BUFFER: {
-					READ(BufferHandle, buffer);
-					gpu::destroy(buffer);
-					break;
-				}
-				case Instruction::FREE_MEMORY: {
-					READ(DeleteMemoryData, data);
-					data.allocator->deallocate(data.ptr);
-					break;
-				}
-				case Instruction::FREE_ALIGNED_MEMORY: {
-					READ(DeleteMemoryData, data);
-					data.allocator->deallocate_aligned(data.ptr);
-					break;
-				}
-				case Instruction::DISPATCH: {
-					READ(IVec3, size);
-					gpu::dispatch(size.x, size.y, size.z);
-					break;
-				}
-				case Instruction::START_CAPTURE: {
-					gpu::startCapture();
-					break;
-				}
-				case Instruction::STOP_CAPTURE: {
-					gpu::stopCapture();
-					break;
-				}
-				case Instruction::CREATE_TEXTURE_VIEW: {
-					READ(CreateTextureViewData, data);
-					gpu::createTextureView(data.view, data.texture);
-					break;
-				}
-				case Instruction::VIEWPORT: {
-					READ(IVec4, vec);
-					gpu::viewport(vec.x, vec.y, vec.z, vec.w);
-					break;
-				}
-				default:
-					ASSERT(false);
-					goto next_page;
-			}
-		}
-		next_page:
-
-		page = page->header.next;
-	}
 }
 
 } // namespace gpu

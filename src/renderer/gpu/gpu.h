@@ -57,13 +57,14 @@ enum class MemoryBarrierType : u32 {
 	COMMAND = 1 << 1
 };
 
-enum class PrimitiveType : u32 {
+enum class PrimitiveType : u8 {
 	TRIANGLES,
 	TRIANGLE_STRIP,
 	LINES,
-	POINTS
-};
+	POINTS,
 
+	NONE
+};
 
 enum class ShaderType : u32 {
 	VERTEX,
@@ -203,13 +204,16 @@ struct Attribute {
 struct VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
+	VertexDecl(PrimitiveType pt);
 	void addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags);
 	u32 getStride() const;
 	void computeHash();
+	void setPrimitiveType(PrimitiveType type);
 
 	u8 attributes_count = 0;
-	RuntimeHash32 hash;
+	u32 hash;
 	Attribute attributes[MAX_ATTRIBUTES];
+	PrimitiveType primitive_type = PrimitiveType::NONE;
 };
 
 
@@ -232,91 +236,6 @@ struct MemoryStats {
 	u64 texture_mem;
 };
 
-enum class Instruction : u8;
-
-struct Encoder {
-	Encoder(PageAllocator& allocator);
-	Encoder(Encoder&& rhs);
-	~Encoder();
-
-	void createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-	void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data);
-	void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
-	void createTextureView(TextureHandle view, TextureHandle texture);
-
-	void destroy(TextureHandle texture);
-	void destroy(BufferHandle buffer);
-	void destroy(ProgramHandle program);
-	
-	void setCurrentWindow(void* window_handle);
-	void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
-	void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
-	void viewport(u32 x, u32 y, u32 w, u32 h);
-	void scissor(u32 x,u32 y,u32 w,u32 h);
-	void clear(ClearFlags flags, const float* color, float depth);
-	
-	void startCapture();
-	void stopCapture();
-	void pushDebugGroup(const char* msg);
-	void popDebugGroup();
-
-	void setState(StateFlags state);
-	void useProgram(ProgramHandle program);
-	
-	void bindIndexBuffer(BufferHandle buffer);
-	void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
-	void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
-	void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
-	void bindIndirectBuffer(BufferHandle buffer);
-	void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags);
-	void bindImageTexture(TextureHandle texture, u32 unit);
-
-	void drawArrays(PrimitiveType type, u32 offset, u32 count);
-	void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
-	void drawIndexed(PrimitiveType primitive_type, u32 offset, u32 count, DataType type);
-	void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count);
-	void drawIndexedInstanced(PrimitiveType primitive_type, u32 indices_count, u32 instances_count, DataType index_type);
-	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
-	
-	void memoryBarrier(gpu::MemoryBarrierType type, BufferHandle);
-	
-	void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
-	void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
-	
-	void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
-	void generateMipmaps(TextureHandle texture);
-	
-	void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
-	void update(BufferHandle buffer, const void* data, size_t size);
-	
-	void freeMemory(void* data, IAllocator& allocator);
-	void freeAlignedMemory(void* data, IAllocator& allocator);
-
-	void run();
-	void reset();
-	void merge(Encoder& rhs);
-
-	struct Page;
-private:
-	Encoder(const Encoder& rhs) = delete;
-	void operator =(const Encoder&) = delete;
-	void operator =(Encoder&&) = delete;
-
-	LUMIX_FORCE_INLINE u8* alloc(u32 size);
-	
-	template <typename T>
-	LUMIX_FORCE_INLINE void write(Instruction instruction, const T& val) {
-		u8* ptr = alloc(sizeof(val) + sizeof(Instruction));
-		memcpy(ptr, &instruction, sizeof(instruction));
-		memcpy(ptr + sizeof(instruction), &val, sizeof(val));
-	}
-
-	PageAllocator& allocator;
-	Page* first = nullptr;
-	Page* current = nullptr;
-	bool run_called = false;
-};
-
 void preinit(IAllocator& allocator, bool load_renderdoc);
 IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
@@ -330,6 +249,7 @@ void checkThread();
 void shutdown();
 int getSize(AttributeType type);
 u32 getSize(TextureFormat format, u32 w, u32 h);
+u32 getBytesPerPixel(gpu::TextureFormat format);
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
@@ -338,6 +258,56 @@ ProgramHandle allocProgramHandle();
 void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
 QueryHandle createQuery(QueryType type);
 
+void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char** srcs, const gpu::ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
+void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data);
+void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
+void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture);
+
+void destroy(gpu::TextureHandle texture);
+void destroy(gpu::BufferHandle buffer);
+void destroy(gpu::ProgramHandle program);
+	
+void setCurrentWindow(void* window_handle);
+void setFramebuffer(const gpu::TextureHandle* attachments, u32 num, gpu::TextureHandle ds, gpu::FramebufferFlags flags);
+void setFramebufferCube(gpu::TextureHandle cube, u32 face, u32 mip);
+void viewport(u32 x, u32 y, u32 w, u32 h);
+void scissor(u32 x,u32 y,u32 w,u32 h);
+void clear(gpu::ClearFlags flags, const float* color, float depth);
+	
+void startCapture();
+void stopCapture();
+void pushDebugGroup(const char* msg);
+void popDebugGroup();
+
+void setState(gpu::StateFlags state);
+void useProgram(gpu::ProgramHandle program);
+	
+void bindIndexBuffer(gpu::BufferHandle buffer);
+void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
+void bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count);
+void bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, size_t offset, size_t size);
+void bindIndirectBuffer(gpu::BufferHandle buffer);
+void bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu::BindShaderBufferFlags flags);
+void bindImageTexture(gpu::TextureHandle texture, u32 unit);
+
+void drawArrays(u32 offset, u32 count);
+void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
+void drawIndexed(u32 offset, u32 count, gpu::DataType type);
+void drawArraysInstanced(u32 indices_count, u32 instances_count);
+void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
+void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
+	
+void memoryBarrier(gpu::MemoryBarrierType type, gpu::BufferHandle);
+	
+void copy(gpu::TextureHandle dst, gpu::TextureHandle src, u32 dst_x, u32 dst_y);
+void copy(gpu::BufferHandle dst, gpu::BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
+	
+void readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf);
+void generateMipmaps(gpu::TextureHandle texture);
+	
+void update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size);
+void update(gpu::BufferHandle buffer, const void* data, size_t size);
+	
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void queryTimestamp(QueryHandle query);
@@ -363,33 +333,7 @@ inline StateFlags getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, 
 {
 	return StateFlags(((u64)write_mask << 23) | ((u64)func << 31) | ((u64)ref << 35) | ((u64)mask << 43) | ((u64)sfail << 51) | ((u64)dpfail << 55) | ((u64)dppass << 59));
 }
-
-inline u32 getBytesPerPixel(gpu::TextureFormat format) {
-	switch (format) {
-		case gpu::TextureFormat::R8:
-			return 1;
-
-		case gpu::TextureFormat::R16F:
-		case gpu::TextureFormat::R16:
-			return 2;
-		case gpu::TextureFormat::SRGB:
-			return 3;
-		case gpu::TextureFormat::R11G11B10F:
-		case gpu::TextureFormat::R32F:
-		case gpu::TextureFormat::SRGBA:
-		case gpu::TextureFormat::RGBA8:
-			return 4;
-		case gpu::TextureFormat::RGBA16:
-		case gpu::TextureFormat::RGBA16F:
-			return 8;
-		case gpu::TextureFormat::RGBA32F:
-			return 16;
-		default:
-			ASSERT(false);
-			return 0;
-	}
-}
-
+	
 constexpr MemoryBarrierType operator ~(MemoryBarrierType a) { return MemoryBarrierType(~(u64)a); }
 constexpr MemoryBarrierType operator | (MemoryBarrierType a, MemoryBarrierType b) { return MemoryBarrierType((u64)a | (u64)b); }
 constexpr MemoryBarrierType operator & (MemoryBarrierType a, MemoryBarrierType b) { return MemoryBarrierType((u64)a & (u64)b); }

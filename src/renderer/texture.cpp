@@ -12,6 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
+#include "renderer/encoder.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
@@ -268,7 +269,10 @@ void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 			&src_mem[(x + (y + j) * width) * bytes_per_pixel],
 			bytes_per_pixel * w);
 	}
-	renderer.updateTexture(handle, 0, x, y, w, h, format, mem);
+
+	Encoder& encoder = renderer.createEncoderJob();
+	encoder.update(handle, 0, x, y, 0, w, h, format, mem.data, mem.size);
+	encoder.freeMemory(mem.data, renderer.getAllocator());
 }
 
 
@@ -547,6 +551,36 @@ u8* Texture::getLBCInfo(const void* data, gpu::TextureDesc& desc) {
 	return (u8*)data + sizeof(*hdr);
 }
 
+static gpu::TextureHandle loadTexture(Renderer& renderer, const gpu::TextureDesc& desc, const Renderer::MemRef& memory, gpu::TextureFlags flags, const char* debug_name)
+{
+	ASSERT(memory.size > 0);
+
+	const gpu::TextureHandle handle = gpu::allocTextureHandle();
+	if (!handle) return handle;
+
+	Encoder& encoder = renderer.createEncoderJob();
+	if (desc.is_cubemap) flags = flags | gpu::TextureFlags::IS_CUBE;
+	if (desc.mips < 2) flags = flags | gpu::TextureFlags::NO_MIPS;
+	encoder.createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name);
+				
+	const u8* ptr = (const u8*)memory.data;
+	for (u32 layer = 0; layer < desc.depth; ++layer) {
+		for(int side = 0; side < (desc.is_cubemap ? 6 : 1); ++side) {
+			const u32 z = layer * (desc.is_cubemap ? 6 : 1) + side;
+			for (u32 mip = 0; mip < desc.mips; ++mip) {
+				const u32 w = maximum(desc.width >> mip, 1);
+				const u32 h = maximum(desc.height >> mip, 1);
+				const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
+				encoder.update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
+				ptr += mip_size_bytes;
+			}
+		}
+	}
+	ASSERT(memory.own);
+	encoder.freeMemory(memory.data, renderer.getAllocator());
+	return handle;
+}
+
 #ifdef LUMIX_BASIS_UNIVERSAL
 	static bool loadBasisU(Texture& texture, IInputStream& file)
 	{
@@ -607,7 +641,7 @@ u8* Texture::getLBCInfo(const void* data, gpu::TextureDesc& desc) {
 					}
 					
 					Renderer::MemRef mem = texture.renderer.copy(tmp.data(), (u32)tmp.size());
-					texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
+					texture.handle = loadTexture(texture.renderer, desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
 					if (texture.handle) {
 						texture.mips = info.m_total_levels;
 						texture.width = desc.width;
@@ -624,6 +658,7 @@ u8* Texture::getLBCInfo(const void* data, gpu::TextureDesc& desc) {
 		return false;
 	}
 #endif
+
 
 static bool loadLBC(Texture& texture, const u8* data, u32 size)
 {
@@ -648,7 +683,7 @@ static bool loadLBC(Texture& texture, const u8* data, u32 size)
 	}
 
 	Renderer::MemRef mem = texture.renderer.copy(image_data, size - offset);
-	texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
+	texture.handle = loadTexture(texture.renderer, desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
 	if (texture.handle) {
 		texture.width = desc.width;
 		texture.height = desc.height;

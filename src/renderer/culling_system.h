@@ -25,7 +25,18 @@ struct CullResult {
 		*last = other;
 	}
 	
+	u32 count() const {
+		u32 res = 0;
+		const CullResult* j = this;
+		while (j) {
+			res += j->header.count;
+			j = j->header.next;
+		}
+		return res;
+	}
+
 	void free(PageAllocator& allocator);
+
 	template <typename F>
 	void forEach(F&& f) const {
 		const CullResult* j = this;
@@ -42,6 +53,7 @@ struct CullResult {
 		u32 count = 0;
 		u8 type;
 	} header;
+
 	EntityRef entities[(16384 - sizeof(header)) / sizeof(EntityRef)];
 };
 

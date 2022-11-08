@@ -21,6 +21,7 @@
 #include "mikktspace/mikktspace.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
+#include "renderer/encoder.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -1035,7 +1036,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	const u32 capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
 
-	renderer->pushJob("create impostor textures", [&](gpu::Encoder& encoder) {
+	renderer->pushJob("create impostor textures", [&](Encoder& encoder) {
 		const AABB aabb = model->getAABB();
 		const float radius = model->getCenterBoundingRadius();
 		gpu::BufferHandle material_ub = renderer->getMaterialUniformBuffer();
@@ -1075,9 +1076,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		pass_state.inv_view_projection = pass_state.view_projection.inverted();
 		pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 		pass_state.camera_up = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
-		Renderer::TransientSlice pass_buf = renderer->allocUniform(sizeof(pass_state));
-
-		memcpy(pass_buf.ptr, &pass_state, sizeof(pass_state));
+		const Renderer::TransientSlice pass_buf = renderer->allocUniform(&pass_state, sizeof(pass_state));
 		encoder.bindUniformBuffer(UniformBuffer::PASS, pass_buf.buffer, pass_buf.offset, pass_buf.size);
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
@@ -1093,24 +1092,24 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 				Vec3 up = Vec3(0, 1, 0);
 				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
 				model_mtx.lookAt(center - v * 1.01f * radius, center, up);
-				Renderer::TransientSlice ub = renderer->allocUniform(sizeof(model_mtx));
-				memcpy(ub.ptr, &model_mtx, sizeof(model_mtx));
+				const Renderer::TransientSlice ub = renderer->allocUniform(&model_mtx, sizeof(model_mtx));
 				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 				for (u32 i = 0; i <= (u32)model->getLODIndices()[0].to; ++i) {
 					const Mesh& mesh = model->getMesh(i);
 					Shader* shader = mesh.material->getShader();
-					const gpu::ProgramHandle program = shader->getProgram(mesh.vertex_decl, capture_define | mesh.material->getDefineMask());
 					const Material* material = mesh.material;
+					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
+					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask());
 
 					encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-					encoder.useProgram(program);
 					encoder.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
+
+					encoder.useProgram(program);
 					encoder.bindIndexBuffer(mesh.index_buffer_handle);
 					encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 					encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-					encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states);
-					encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh.indices_count, mesh.index_type);
+					encoder.drawIndexed(0, mesh.indices_count, mesh.index_type);
 				}
 			}
 		}
@@ -1124,7 +1123,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 
 		gpu::TextureHandle shadow = gpu::allocTextureHandle();
 		encoder.createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, "impostor_shadow");
-		gpu::ProgramHandle shadow_program = m_impostor_shadow_shader->getProgram(gpu::VertexDecl(), bake_normals ? bake_normals_define : 0);
+		gpu::ProgramHandle shadow_program = m_impostor_shadow_shader->getProgram(bake_normals ? bake_normals_define : 0);
 		encoder.useProgram(shadow_program);
 		encoder.bindImageTexture(shadow, 0);
 		encoder.bindTextures(&gbs[1], 1, 2);
@@ -1154,8 +1153,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 				data.tile_size = tile_size;
 				data.size = IMPOSTOR_COLS;
 				data.radius = radius;
-				Renderer::TransientSlice ub = renderer->allocUniform(sizeof(data));
-				memcpy(ub.ptr, &data, sizeof(data));
+				const Renderer::TransientSlice ub = renderer->allocUniform(&data, sizeof(data));
 				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				encoder.dispatch((tile_size.x + 15) / 16, (tile_size.y + 15) / 16, 1);
 			}

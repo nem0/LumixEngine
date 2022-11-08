@@ -8,6 +8,7 @@
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "renderer/encoder.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 
@@ -58,7 +59,15 @@ bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }
 
-void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, gpu::Encoder& encoder) {
+bool Shader::ShaderKey::operator==(const ShaderKey& rhs) const {
+	return memcmp(this, &rhs, sizeof(rhs)) == 0;
+}
+
+void Shader::compile(gpu::ProgramHandle program
+	, gpu::StateFlags state
+	, gpu::VertexDecl decl
+	, u32 defines, Encoder& encoder
+) {
 	PROFILE_BLOCK("compile_shader");
 
 	const char* codes[64];
@@ -81,22 +90,29 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 	}
 	prefixes[defines_count] = m_sources.common.length() == 0 ? "" : m_sources.common.c_str();
 
-	encoder.createProgram(program, decl, codes, types, m_sources.stages.size(), prefixes, 1 + defines_count, m_sources.path.c_str());
+	encoder.createProgram(program, state, decl, codes, types, m_sources.stages.size(), prefixes, 1 + defines_count, m_sources.path.c_str());
 }
 
-gpu::ProgramHandle Shader::getProgram(const gpu::VertexDecl& decl, u32 defines) {
-	const u64 key = defines | ((u64)decl.hash.getHashValue() << 32);
+gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines) {
+	ShaderKey key;
+	key.decl_hash = decl.hash;
+	key.defines = defines;
+	key.state = state;
 	auto iter = m_programs.find(key);
 	if (iter.isValid()) return iter.value();
-	return m_renderer.queueShaderCompile(*this, decl, defines);
+	return m_renderer.queueShaderCompile(*this, state, decl, defines);
 }
 
 gpu::ProgramHandle Shader::getProgram(u32 defines) {
 	ASSERT(m_sources.stages.empty() || m_sources.stages[0].type == gpu::ShaderType::COMPUTE);
-	const u64 key = defines;
+	const gpu::VertexDecl dummy_decl(gpu::PrimitiveType::NONE);
+	ShaderKey key;
+	key.decl_hash = dummy_decl.hash;
+	key.defines = defines;
+	key.state = gpu::StateFlags::NONE;
 	auto iter = m_programs.find(key);
 	if (iter.isValid()) return iter.value();
-	return m_renderer.queueShaderCompile(*this, gpu::VertexDecl(), defines);
+	return m_renderer.queueShaderCompile(*this, gpu::StateFlags::NONE, dummy_decl, defines);
 }
 
 static Shader* getShader(lua_State* L)

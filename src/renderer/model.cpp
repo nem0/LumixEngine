@@ -10,7 +10,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "renderer/gpu/gpu.h"
+#include "renderer/encoder.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -462,7 +462,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	m_meshes.reserve(object_count);
 	for (int i = 0; i < object_count; ++i)
 	{
-		gpu::VertexDecl vertex_decl;
+		gpu::VertexDecl vertex_decl(gpu::PrimitiveType::TRIANGLES);
 		Mesh::AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
 		for(auto& i : semantics) i = Mesh::AttributeSemantic::NONE;
 		u32 vb_stride;
@@ -609,7 +609,7 @@ void Model::unload()
 	}
 
 	for (Mesh& mesh : m_meshes) {
-		gpu::Encoder& encoder = m_renderer.getEndFrameEncoder();
+		Encoder& encoder = m_renderer.getEndFrameEncoder();
 		if (mesh.index_buffer_handle) encoder.destroy(mesh.index_buffer_handle);
 		if (mesh.vertex_buffer_handle) encoder.destroy(mesh.vertex_buffer_handle);
 		mesh.index_buffer_handle = gpu::INVALID_BUFFER;

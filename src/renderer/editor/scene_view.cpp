@@ -26,6 +26,7 @@
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/encoder.h"
 #include "renderer/editor/editor_icon.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -790,7 +791,7 @@ void SceneView::renderIcons() {
 	Engine& engine = m_app.getEngine();
 	Renderer& renderer = m_pipeline->getRenderer();
 	
-	renderer.pushJob("icons", [this, &renderer](gpu::Encoder& encoder) {
+	renderer.pushJob("icons", [this, &renderer](Encoder& encoder) {
 		const Viewport& vp = m_view->getViewport();
 		const Matrix camera_mtx({0, 0, 0}, vp.rot);
 
@@ -801,22 +802,22 @@ void SceneView::renderIcons() {
 			const Model* model = icon_manager->getModel(icon.type);
 			if (!model || !model->isReady()) continue;
 
-			Renderer::TransientSlice ub = renderer.allocUniform(sizeof(Matrix));
 			const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
-			memcpy(ub.ptr, &mtx, sizeof(mtx));
+			const Renderer::TransientSlice ub = renderer.allocUniform(&mtx, sizeof(Matrix));
 			encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		
 			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 				const Mesh& mesh = model->getMesh(i);
 				const Material* material = mesh.material;
 				encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, material->m_define_mask);
+				const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->m_define_mask);
+				
 				encoder.useProgram(program);
 				encoder.bindIndexBuffer(mesh.index_buffer_handle);
 				encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				encoder.setState(material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
-				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh.indices_count, mesh.index_type);
+				encoder.drawIndexed(0, mesh.indices_count, mesh.index_type);
 			}
 		}
 	});
@@ -831,7 +832,7 @@ void SceneView::renderSelection()
 	const Array<EntityRef>& entities = m_editor.getSelectedEntities();
 	if (entities.size() > 5000) return;
 	
-	renderer.pushJob("selection", [&renderer, this, &engine, &entities](gpu::Encoder& encoder) {
+	renderer.pushJob("selection", [&renderer, this, &engine, &entities](Encoder& encoder) {
 		RenderScene* scene = m_pipeline->getScene();
 		const Universe& universe = scene->getUniverse();
 		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
@@ -861,12 +862,10 @@ void SceneView::renderSelection()
 						dq_pose.push((tmp * bone.inv_bind_transform).toDualQuat());
 					}
 				}
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(mesh.vertex_decl, define_mask);
 			
 				Renderer::TransientSlice ub;
 				if (dq_pose.empty()) {
-					ub = renderer.allocUniform(sizeof(mtx));
-					memcpy(ub.ptr, &mtx, sizeof(mtx));
+					ub = renderer.allocUniform(&mtx, sizeof(mtx));
 				}
 				else {
 					struct UBPrefix {
@@ -887,14 +886,14 @@ void SceneView::renderSelection()
 					memcpy(ub.ptr + sizeof(UBPrefix), dq_pose.begin(), dq_pose.byte_size());
 				}
 		
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states, mesh.vertex_decl, define_mask);
 				encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				encoder.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
 				encoder.useProgram(program);
 				encoder.bindIndexBuffer(mesh.index_buffer_handle);
 				encoder.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 				encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				encoder.setState(material->m_render_states);
-				encoder.drawIndexed(gpu::PrimitiveType::TRIANGLES, 0, mesh.indices_count, mesh.index_type);
+				encoder.drawIndexed(0, mesh.indices_count, mesh.index_type);
 			}
 			scene->unlockPose(e, false);
 		}
@@ -910,27 +909,32 @@ void SceneView::renderGizmos()
 	if (vertices.empty()) return;
 
 	Renderer& renderer = m_pipeline->getRenderer();
-	renderer.pushJob("gizmoes", [&renderer, &vertices, this](gpu::Encoder& encoder){
+	renderer.pushJob("gizmos", [&renderer, &vertices, this](Encoder& encoder){
 		Renderer::TransientSlice vb = renderer.allocTransient(vertices.byte_size());
 		memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-		Renderer::TransientSlice ub = renderer.allocUniform(sizeof(Matrix));
-		memcpy(ub.ptr, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+		const Renderer::TransientSlice ub = renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
-		gpu::VertexDecl decl;
-		decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-		gpu::ProgramHandle program = m_debug_shape_shader->getProgram(decl, 0);
+		gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
+		lines_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		lines_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+
+		gpu::VertexDecl tris_decl(gpu::PrimitiveType::TRIANGLES);
+		tris_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		tris_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+
+		const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
+		gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0);
+		gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0);
 	
-		encoder.setState(gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE);
 		u32 offset = 0;
 		encoder.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		for (const UniverseViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
+			const gpu::ProgramHandle program = cmd.lines ? lines_program : triangles_program;
 			encoder.useProgram(program);
 			encoder.bindIndexBuffer(gpu::INVALID_BUFFER);
 			encoder.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
 			encoder.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
-			encoder.drawArrays(primitive_type, 0, cmd.vertex_count);
+			encoder.drawArrays(0, cmd.vertex_count);
 
 			offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
 		}

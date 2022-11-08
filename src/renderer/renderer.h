@@ -13,6 +13,8 @@ struct RenderPlugin {
 	virtual void renderTransparent(Pipeline& pipeline) {}
 };
 
+struct Encoder;
+
 struct LUMIX_RENDERER_API Renderer : IPlugin {
 	struct MemRef {
 		u32 size = 0;
@@ -25,9 +27,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 		RenderJob(const RenderJob& rhs) = delete;
 
 		virtual ~RenderJob() {}
-		virtual void setup() = 0;
 		virtual void execute() = 0;
-		i64 profiler_link = 0;
 	};
 
 	struct TransientSlice {
@@ -52,7 +52,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual u8 getShaderDefineIdx(const char* define) = 0;
 	virtual const char* getShaderDefine(int define_idx) const = 0;
 	virtual int getShaderDefinesCount() const = 0;
-	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, gpu::VertexDecl decl, u32 defines) = 0;
+	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines) = 0;
 	virtual struct FontManager& getFontManager() = 0;
 	virtual struct ResourceManager& getTextureManager() = 0;
 	virtual void addPlugin(RenderPlugin& plugin) = 0;
@@ -73,21 +73,15 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	
 	virtual TransientSlice allocTransient(u32 size) = 0;
 	virtual TransientSlice allocUniform(u32 size) = 0;
+	virtual TransientSlice allocUniform(const void* data, u32 size) = 0;
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) = 0;
+	
 	virtual void destroy(gpu::BufferHandle buffer) = 0;
 	virtual void destroy(gpu::ProgramHandle program) = 0;
-	
-	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
-	virtual gpu::TextureHandle loadTexture(const gpu::TextureDesc& desc, const MemRef& image_data, gpu::TextureFlags flags, const char* debug_name) = 0;
-	virtual void copy(gpu::TextureHandle dst, gpu::TextureHandle src) = 0;
-	virtual void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) = 0;
-	virtual void updateBuffer(gpu::BufferHandle buffer, const MemRef& memory) = 0;
-	virtual void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& memory) = 0;
-	virtual void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) = 0;
 	virtual void destroy(gpu::TextureHandle tex) = 0;
 	
-	virtual void queue(RenderJob& cmd, i64 profiler_link) = 0;
-
+	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
+	
 	virtual void beginProfileBlock(const char* name, i64 link, bool stats = false) = 0;
 	virtual void endProfileBlock() = 0;
 
@@ -102,8 +96,8 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 	virtual struct Engine& getEngine() = 0;
 
-	virtual gpu::Encoder& createEncoderJob() = 0;
-	virtual gpu::Encoder& getEndFrameEncoder() = 0;
+	virtual Encoder& createEncoderJob() = 0;
+	virtual Encoder& getEndFrameEncoder() = 0;
 
 	template <typename T> void pushJob(const char* name, const T& func);
 	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
@@ -113,11 +107,13 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 protected:
 	virtual void* allocJob(u32 size, u32 align) = 0;
+	virtual void setupJob(RenderJob& job, void(*task)(void*)) = 0;
 }; 
 
 
 template <typename T, typename... Args> T& Renderer::createJob(Args&&... args) {
-	return *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
+	T& job = *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
+	return job;
 }
 
 template <typename T>
@@ -130,28 +126,29 @@ void Renderer::pushJob(const char* name, const T& func) {
 			, name(name)
 		{}
 		
-		void setup() override { 
-			if (name) {
-				profiler::beginBlock(name);
-				profiler::blockColor(0x7f, 0, 0x7f);
-			}
-			func(encoder);
-			if (name) profiler::endBlock();
-		}
-		
 		void execute() override {
 			if (name) renderer.beginProfileBlock(name, 0);
 			encoder.run();
 			if (name) renderer.endProfileBlock();
 		}
 		
-		gpu::Encoder encoder;
+		static void setup(void* ptr) {
+			Job* that = (Job*)ptr;
+			if (that->name) {
+				profiler::beginBlock(that->name);
+				profiler::blockColor(0x7f, 0, 0x7f);
+			}
+			that->func(that->encoder);
+			if (that->name) profiler::endBlock();
+		}
+
+		Encoder encoder;
 		T func;
 		Renderer& renderer;
 		const char* name;
 	};
 	Job& job = createJob<Job>(name, func, *this, getEngine().getPageAllocator());
-	queue(job, 0);
+	setupJob(job, &Job::setup);
 }
 
 } // namespace Lumix

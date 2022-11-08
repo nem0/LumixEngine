@@ -5,6 +5,9 @@
 
 namespace Lumix {
 
+// use buckets for small allocations - relatively fast
+// fallback to system allocator for big allocations
+// use case: use this unless you really require something special
 struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 	struct Page;
 
@@ -24,6 +27,7 @@ struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 	Mutex m_mutex;
 };
 
+// detects memory leaks, just by counting number of allocations - very fast
 struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 	explicit BaseProxyAllocator(IAllocator& source);
 	~BaseProxyAllocator();
@@ -41,6 +45,8 @@ private:
 	volatile i32 m_allocation_count;
 };
 
+// allocations in a row one after another, deallocate everything at once
+// use case: data for one frame
 struct LUMIX_ENGINE_API LinearAllocator : IAllocator {
 	LinearAllocator(u32 reserved);
 	~LinearAllocator();
@@ -63,38 +69,40 @@ private:
 	Mutex m_mutex;
 };
 
-// only single allocation, can be used by Array<T> to allocate on stack
+// one allocation from local memory backing (m_mem), use fallback allocator otherwise
+// use case: StackArray<T, N> to allocate on stack
 template <u32 CAPACITY, u32 ALIGN = 8>
 struct StackAllocator final : IAllocator {
 	explicit StackAllocator(IAllocator& fallback) : m_fallback(fallback) {}
 	~StackAllocator() { ASSERT(!m_allocated); }
 
 	void* allocate_aligned(size_t size, size_t align) override {
-		ASSERT(!m_allocated);
 		ASSERT(align <= ALIGN);
-		m_allocated = true;
-		if (size <= CAPACITY) return m_mem;
+		if (!m_allocated && size <= CAPACITY) {
+			m_allocated = true;
+			return m_mem;
+		}
 		return m_fallback.allocate_aligned(size, align);
 	}
 
 	void deallocate_aligned(void* ptr) override {
 		if (!ptr) return;
-		ASSERT(m_allocated);
-		m_allocated = false;
-		if (ptr == m_mem) return;
+		if (ptr == m_mem) {
+			m_allocated = false;
+			return;
+		}
 		ASSERT(ptr < m_mem || ptr > m_mem + CAPACITY);
 		m_fallback.deallocate_aligned(ptr);
 	}
 
 	void* reallocate_aligned(void* ptr, size_t size, size_t align) override {
-		if (!ptr) {
-			ASSERT(!m_allocated);
-			return allocate_aligned(size, align);
-		}
-		ASSERT(m_allocated);
 		ASSERT(align <= ALIGN);
+		if (!ptr) return allocate_aligned(size, align);
 		if (ptr == m_mem) {
+			ASSERT(m_allocated);
 			if (size <= CAPACITY) return m_mem;
+			
+			m_allocated = false;
 			void* n = m_fallback.allocate_aligned(size, align);
 			memcpy(n, m_mem, CAPACITY);
 			return n;
@@ -103,6 +111,7 @@ struct StackAllocator final : IAllocator {
 		ASSERT(ptr < m_mem || ptr > m_mem + CAPACITY);
 		if (size > CAPACITY) return m_fallback.reallocate_aligned(ptr, size, align);
 		memcpy(m_mem, ptr, size);
+		m_allocated = true;
 		m_fallback.deallocate_aligned(ptr);
 		return m_mem;
 	}

@@ -33,6 +33,7 @@ struct LUMIX_ENGINE_API IVec2 {
 struct LUMIX_ENGINE_API IVec3 {
 	IVec3() {}
 	IVec3(i32 x, i32 y, i32 z) : x(x), y(y), z(z) {}
+	IVec3 operator +(const IVec3& v) const { return IVec3(x + v.x, y + v.y, z + v.z); }
 	explicit IVec3(const DVec3& rhs);
 	explicit IVec3(const Vec3& rhs);
 	bool operator==(const IVec3& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }

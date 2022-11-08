@@ -14,6 +14,7 @@ namespace Lumix
 {
 
 
+struct Encoder;
 struct Renderer;
 struct Texture;
 
@@ -98,10 +99,17 @@ public:
 	bool hasDefine(u8 define) const;
 	
 	gpu::ProgramHandle getProgram(u32 defines);
-	gpu::ProgramHandle getProgram(const gpu::VertexDecl& decl, u32 defines);
-	void compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, gpu::Encoder& encoder);
+	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines);
+	void compile(gpu::ProgramHandle program, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines, Encoder& encoder);
 	static void toUniformVarName(Span<char> out, const char* in);
 	static void toTextureVarName(Span<char> out, const char* in);
+
+	struct ShaderKey {
+		bool operator==(const ShaderKey& rhs) const;
+		gpu::StateFlags state;
+		u32 defines;
+		u32 decl_hash;
+	};
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -110,7 +118,7 @@ public:
 	u32 m_texture_slot_count;
 	Array<Uniform> m_uniforms;
 	Array<u8> m_defines;
-	HashMap<u64, gpu::ProgramHandle> m_programs;
+	HashMap<ShaderKey, gpu::ProgramHandle> m_programs;
 	Sources m_sources;
 
 
@@ -122,5 +130,18 @@ private:
 	void onBeforeReady() override;
 };
 
+template<>
+struct HashFunc<Shader::ShaderKey> {
+	static u32 mix(u32 a, u32 b) {
+		b *= 0x5bd1e995;
+		b ^= b >> 24;
+		a *= 0x5bd1e995;
+		return a * 0x5bd1e995;
+	}
+
+	static u32 get(const Shader::ShaderKey& key) {
+		return mix(HashFunc<u64>::get(((u64*)&key)[0]), HashFunc<u64>::get(((u64*)&key)[1]));
+	}
+};
 
 } // namespace Lumix
