@@ -494,71 +494,7 @@ void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z)
 	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
 }
 
-void useProgram(ProgramHandle program)
-{
-	GPU_PROFILE();
-	const Program* prev = gl->last_program;
-	if (prev != program) {
-		gl->last_program = program;
-		if (program) {
-			setState(program->state);
-			glUseProgram(program->gl_handle);
-
-			if (!prev || program->decl.hash != prev->decl.hash) {
-				setVAO(program->decl);
-			}
-		}
-		else {
-			glUseProgram(0);
-		}
-	}
-}
-
-void bindImageTexture(TextureHandle texture, u32 unit) {
-	GPU_PROFILE();
-	if (texture) {
-		glBindImageTexture(unit, texture->gl_handle, 0, GL_TRUE, 0, GL_READ_WRITE, texture->format);
-	}
-	else {
-		glBindImageTexture(unit, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8);
-	}
-}
-
-void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
-{
-	GPU_PROFILE();
-	GLuint gl_handles[64];
-	ASSERT(count <= lengthOf(gl_handles));
-	ASSERT(handles || count == 0);
-	
-	for(u32 i = 0; i < count; ++i) {
-		if (handles[i]) {
-			gl_handles[i] = handles[i]->gl_handle;
-		}
-		else {
-			gl_handles[i] = 0;
-		}
-	}
-
-	glBindTextures(offset, count, gl_handles);
-}
-
-void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags)
-{
-	GPU_PROFILE();
-	checkThread();
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_idx, buffer ? buffer->gl_handle : 0);
-}
-
-void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride) {
-	GPU_PROFILE();
-	checkThread();
-	ASSERT(binding_idx < 2);
-	glBindVertexBuffer(binding_idx, buffer ? buffer->gl_handle : 0, buffer_offset, stride);
-}
-
-
-void setState(StateFlags state)
+static void setState(StateFlags state)
 {
 	GPU_PROFILE();
 	checkThread();
@@ -664,6 +600,70 @@ void setState(StateFlags state)
 		const StencilOps zpass = StencilOps((u64(state) >> 59) & 0xf);
 		glStencilOp(toGLOp(sfail), toGLOp(zfail), toGLOp(zpass));
 	}
+}
+
+
+void useProgram(ProgramHandle program)
+{
+	GPU_PROFILE();
+	const Program* prev = gl->last_program;
+	if (prev != program) {
+		gl->last_program = program;
+		if (program) {
+			setState(program->state);
+			glUseProgram(program->gl_handle);
+
+			if (!prev || program->decl.hash != prev->decl.hash) {
+				setVAO(program->decl);
+			}
+		}
+		else {
+			glUseProgram(0);
+		}
+	}
+}
+
+void bindImageTexture(TextureHandle texture, u32 unit) {
+	GPU_PROFILE();
+	if (texture) {
+		glBindImageTexture(unit, texture->gl_handle, 0, GL_TRUE, 0, GL_READ_WRITE, texture->format);
+	}
+	else {
+		glBindImageTexture(unit, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8);
+	}
+}
+
+void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
+{
+	GPU_PROFILE();
+	GLuint gl_handles[64];
+	ASSERT(count <= lengthOf(gl_handles));
+	ASSERT(handles || count == 0);
+	
+	for(u32 i = 0; i < count; ++i) {
+		if (handles[i]) {
+			gl_handles[i] = handles[i]->gl_handle;
+		}
+		else {
+			gl_handles[i] = 0;
+		}
+	}
+
+	glBindTextures(offset, count, gl_handles);
+}
+
+void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags)
+{
+	GPU_PROFILE();
+	checkThread();
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_idx, buffer ? buffer->gl_handle : 0);
+}
+
+void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride) {
+	GPU_PROFILE();
+	checkThread();
+	ASSERT(binding_idx < 2);
+	glBindVertexBuffer(binding_idx, buffer ? buffer->gl_handle : 0, buffer_offset, stride);
 }
 
 

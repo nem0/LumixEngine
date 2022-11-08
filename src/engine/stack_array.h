@@ -12,7 +12,7 @@ struct StackArray : Array<T> {
 		: Array<T>(m_stack_allocator)
 		, m_stack_allocator(fallback)
 	{
-		reserve(N);
+		Array<T>::reserve(N);
 	}
 	
 	~StackArray() {
