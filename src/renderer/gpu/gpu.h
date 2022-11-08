@@ -249,7 +249,7 @@ void checkThread();
 void shutdown();
 int getSize(AttributeType type);
 u32 getSize(TextureFormat format, u32 w, u32 h);
-u32 getBytesPerPixel(gpu::TextureFormat format);
+u32 getBytesPerPixel(TextureFormat format);
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
@@ -258,55 +258,54 @@ ProgramHandle allocProgramHandle();
 void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
 QueryHandle createQuery(QueryType type);
 
-void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char** srcs, const gpu::ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data);
-void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
-void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture);
+void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
+void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data);
+void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
+void createTextureView(TextureHandle view, TextureHandle texture);
 
-void destroy(gpu::TextureHandle texture);
-void destroy(gpu::BufferHandle buffer);
-void destroy(gpu::ProgramHandle program);
+void destroy(TextureHandle texture);
+void destroy(BufferHandle buffer);
+void destroy(ProgramHandle program);
 	
 void setCurrentWindow(void* window_handle);
-void setFramebuffer(const gpu::TextureHandle* attachments, u32 num, gpu::TextureHandle ds, gpu::FramebufferFlags flags);
-void setFramebufferCube(gpu::TextureHandle cube, u32 face, u32 mip);
+void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
+void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
 void viewport(u32 x, u32 y, u32 w, u32 h);
 void scissor(u32 x,u32 y,u32 w,u32 h);
-void clear(gpu::ClearFlags flags, const float* color, float depth);
+void clear(ClearFlags flags, const float* color, float depth);
 	
 void startCapture();
 void stopCapture();
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
 
-void setState(gpu::StateFlags state);
-void useProgram(gpu::ProgramHandle program);
+void useProgram(ProgramHandle program);
 	
-void bindIndexBuffer(gpu::BufferHandle buffer);
-void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
-void bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count);
-void bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, size_t offset, size_t size);
-void bindIndirectBuffer(gpu::BufferHandle buffer);
-void bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu::BindShaderBufferFlags flags);
-void bindImageTexture(gpu::TextureHandle texture, u32 unit);
+void bindIndexBuffer(BufferHandle buffer);
+void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
+void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
+void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
+void bindIndirectBuffer(BufferHandle buffer);
+void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags);
+void bindImageTexture(TextureHandle texture, u32 unit);
 
 void drawArrays(u32 offset, u32 count);
-void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
-void drawIndexed(u32 offset, u32 count, gpu::DataType type);
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
+void drawIndexed(u32 offset, u32 count, DataType type);
 void drawArraysInstanced(u32 indices_count, u32 instances_count);
-void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
+void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);
 void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 	
-void memoryBarrier(gpu::MemoryBarrierType type, gpu::BufferHandle);
+void memoryBarrier(MemoryBarrierType type, BufferHandle);
 	
-void copy(gpu::TextureHandle dst, gpu::TextureHandle src, u32 dst_x, u32 dst_y);
-void copy(gpu::BufferHandle dst, gpu::BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
+void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
+void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
 	
-void readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf);
-void generateMipmaps(gpu::TextureHandle texture);
+void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
+void generateMipmaps(TextureHandle texture);
 	
-void update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size);
-void update(gpu::BufferHandle buffer, const void* data, size_t size);
+void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
+void update(BufferHandle buffer, const void* data, size_t size);
 	
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
