@@ -2155,6 +2155,7 @@ template <> const char* fromString<Matrix>(const char* str, const char* end, Mat
 
 template <typename T> static void parseTextArray(const Property& property, std::vector<T>* out)
 {
+	out->clear();
 	const u8* iter = property.value.begin;
 	while (iter < property.value.end)
 	{
@@ -2778,7 +2779,7 @@ bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator)
 		while (n)
 		{
 			vertices[n->index] = vertices[n->index] + vr[i];
-			normals[n->index] = vertices[n->index] + nr[i];
+			normals[n->index] = normals[n->index] + nr[i];
 			n = n->next;
 		}
 	}
