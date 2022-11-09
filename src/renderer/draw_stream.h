@@ -16,7 +16,9 @@ struct DrawStream {
 	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data);
 	void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
 	void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture);
+	void createBindGroup(gpu::BindGroupHandle group, Span<const gpu::BindGroupEntryDesc> descriptors);
 
+	void destroy(gpu::BindGroupHandle group);
 	void destroy(gpu::TextureHandle texture);
 	void destroy(gpu::BufferHandle buffer);
 	void destroy(gpu::ProgramHandle program);
@@ -35,6 +37,7 @@ struct DrawStream {
 
 	void useProgram(gpu::ProgramHandle program);
 	
+	void bind(u32 idx, gpu::BindGroupHandle group);
 	void bindIndexBuffer(gpu::BufferHandle buffer);
 	void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
 	void bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count);
@@ -63,6 +66,8 @@ struct DrawStream {
 	
 	void freeMemory(void* data, IAllocator& allocator);
 	void freeAlignedMemory(void* data, IAllocator& allocator);
+	u8* pushFunction(void (*func)(void*), u32 payload_size);
+	template <typename F>void pushLambda(const F& f);
 
 	void run();
 	void reset();
@@ -91,6 +96,7 @@ private:
 	Page* current = nullptr;
 	bool run_called = false;
 	struct Cache {
+		gpu::BindGroupHandle group0;
 		gpu::ProgramHandle program;
 		gpu::BufferHandle index_buffer;
 		struct VertexBuffer {
@@ -101,10 +107,21 @@ private:
 	};
 
 	struct CacheEx : Cache {
+		gpu::BindGroupHandle group1;
 		gpu::BufferHandle indirect_buffer;
 		u32 dirty = 0;
 	};
 	CacheEx m_cache;
 };
+
+template <typename F>
+void DrawStream::pushLambda(const F& f) {
+	u8* payload = pushFunction([](void* user_ptr){
+		F* f = (F*)user_ptr;
+		(*f)();
+		f->~F();
+	}, sizeof(F));
+	new (NewPlaceholder(), payload) F(f);
+}
 
 } // namespace Lumix

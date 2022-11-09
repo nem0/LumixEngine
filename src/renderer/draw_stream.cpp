@@ -46,6 +46,7 @@ enum class DrawStream::Instruction : u8 {
 	COPY_TEXTURE,
 	COPY_BUFFER,
 	READ_TEXTURE,
+	DESTROY_BIND_GROUP,
 	DESTROY_TEXTURE,
 	DESTROY_BUFFER,
 	DESTROY_PROGRAM,
@@ -58,7 +59,9 @@ enum class DrawStream::Instruction : u8 {
 	STOP_CAPTURE,
 	CREATE_TEXTURE_VIEW,
 	BIND,
-	DIRTY_CACHE
+	DIRTY_CACHE,
+	CREATE_BIND_GROUP,
+	FUNCTION
 };
 
 namespace {
@@ -70,8 +73,10 @@ namespace Dirty {
 		INDIRECT_BUFFER = 0b11 << 6,
 		VERTEX_BUFFER0 = 0b1111 << 8,
 		VERTEX_BUFFER1 = 0b1111 << 12,
+		BIND_GROUP0 = 0b11 << 16,
+		BIND_GROUP1 = 0b11 << 18,
 
-		BIND = PROGRAM | INDEX_BUFFER | VERTEX_BUFFER0 | VERTEX_BUFFER1
+		BIND = PROGRAM | INDEX_BUFFER | VERTEX_BUFFER0 | VERTEX_BUFFER1 | BIND_GROUP0
 	};
 }
 
@@ -257,6 +262,10 @@ void DrawStream::bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu
 	write(Instruction::BIND_SHADER_BUFFER, data);
 }
 
+void DrawStream::destroy(gpu::BindGroupHandle group) {
+	write(Instruction::DESTROY_BIND_GROUP, group);
+}
+
 void DrawStream::destroy(gpu::TextureHandle texture) {
 	write(Instruction::DESTROY_TEXTURE, texture);
 }
@@ -321,6 +330,7 @@ void DrawStream::merge(DrawStream& rhs) {
 	rhs.first = rhs.current = nullptr;
 }
 
+
 u8* DrawStream::alloc(u32 size) {
 	u32 start = current->header.size;
 	if (start + size > sizeof(current->data) - sizeof(Instruction)) {
@@ -376,6 +386,19 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 
 void DrawStream::pushDebugGroup(const char* msg) {
 	write(Instruction::PUSH_DEBUG_GROUP, msg);
+}
+
+void DrawStream::createBindGroup(gpu::BindGroupHandle group, Span<const gpu::BindGroupEntryDesc> descriptors) {
+	const u32 size = descriptors.length() * sizeof(gpu::BindGroupEntryDesc);
+	u8* ptr = alloc(sizeof(Instruction) +sizeof(group) + sizeof(u32) + size);
+	const Instruction instr = Instruction::CREATE_BIND_GROUP;
+	memcpy(ptr, &instr, sizeof(instr));
+	ptr += sizeof(instr);
+	memcpy(ptr, &group, sizeof(group));
+	ptr += sizeof(group);
+	memcpy(ptr, &size, sizeof(size));
+	ptr += sizeof(size);
+	memcpy(ptr, descriptors.begin(), size);
 }
 
 void DrawStream::createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture) {
@@ -491,6 +514,25 @@ void DrawStream::setFramebuffer(const gpu::TextureHandle* attachments, u32 num, 
 	WRITE_ARRAY(attachments, num);
 }
 
+u8* DrawStream::pushFunction(void (*func)(void*), u32 payload_size) {
+	u8* data = alloc(sizeof(Instruction) + sizeof(payload_size) + sizeof(func) + payload_size);
+	WRITE_CONST(Instruction::FUNCTION);
+	WRITE(payload_size);
+	WRITE(func);
+	return data;
+}
+
+void DrawStream::bind(u32 idx, gpu::BindGroupHandle group) {
+	if (idx == 0) {
+		m_cache.group0 = group;
+		m_cache.dirty |= Dirty::BIND_GROUP0;
+	}
+	else {
+		m_cache.group0 = group;
+		m_cache.dirty |= Dirty::BIND_GROUP0;
+	}
+}
+
 void DrawStream::bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count) {
 	u8* data = alloc(sizeof(Instruction) + sizeof(u32) * 2 + sizeof(gpu::TextureHandle) * count);
 	
@@ -578,6 +620,8 @@ void DrawStream::submitCached() {
 	if (dirty & Dirty::INDIRECT_BUFFER) WRITE(m_cache.indirect_buffer);
 	if (dirty & Dirty::VERTEX_BUFFER0) WRITE(m_cache.vertex_buffers[0]);
 	if (dirty & Dirty::VERTEX_BUFFER1) WRITE(m_cache.vertex_buffers[1]);
+	if (dirty & Dirty::BIND_GROUP0) WRITE(m_cache.group0);
+	if (dirty & Dirty::BIND_GROUP1) WRITE(m_cache.group1);
 	#undef WRITE
 }
 
@@ -598,6 +642,7 @@ void DrawStream::run() {
 				case Instruction::END: goto next_page;
 				case Instruction::BIND: {
 					READ(Cache, cache);
+					gpu::bind(cache.group0);
 					gpu::useProgram(cache.program);
 					gpu::bindIndexBuffer(cache.index_buffer);
 					gpu::bindVertexBuffer(0, cache.vertex_buffers[0].buffer, cache.vertex_buffers[0].offset, cache.vertex_buffers[0].stride);
@@ -625,6 +670,14 @@ void DrawStream::run() {
 					if (dirty & Dirty::VERTEX_BUFFER1) {
 						READ(Cache::VertexBuffer, buf);
 						gpu::bindVertexBuffer(1, buf.buffer, buf.offset, buf.stride);
+					}
+					if (dirty & (Dirty::BIND_GROUP0)) {
+						READ(gpu::BindGroupHandle, group);
+						gpu::bind(group);
+					}
+					if (dirty & (Dirty::BIND_GROUP1)) {
+						READ(gpu::BindGroupHandle, group);
+						gpu::bind(group);
 					}
 					break;
 				}
@@ -779,6 +832,11 @@ void DrawStream::run() {
 					gpu::destroy(texture);
 					break;
 				}
+				case Instruction::DESTROY_BIND_GROUP: {
+					READ(gpu::BindGroupHandle, group);
+					gpu::destroy(group);
+					break;
+				}
 				case Instruction::DESTROY_PROGRAM: {
 					READ(gpu::ProgramHandle, program);
 					gpu::destroy(program);
@@ -799,9 +857,26 @@ void DrawStream::run() {
 					data.allocator->deallocate_aligned(data.ptr);
 					break;
 				}
+				case Instruction::CREATE_BIND_GROUP: {
+					READ(gpu::BindGroupHandle, group);
+					READ(u32, size);
+					gpu::BindGroupEntryDesc* descs = (gpu::BindGroupEntryDesc*)ptr;
+					gpu::createBindGroup(group, Span(descs, size / sizeof(descs[0])));
+					ptr += size;
+					break;
+				}
 				case Instruction::DISPATCH: {
 					READ(IVec3, size);
 					gpu::dispatch(size.x, size.y, size.z);
+					break;
+				}
+				case Instruction::FUNCTION: {
+					READ(u32, payload_size);
+					using F = void (*)(void*);
+					READ(F, func);
+					void* payload = (void*)ptr;
+					ptr += payload_size;
+					func(payload);
 					break;
 				}
 				case Instruction::START_CAPTURE: {

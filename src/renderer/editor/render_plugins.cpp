@@ -3357,16 +3357,8 @@ void captureCubemap(StudioApp& app
 		);
 	}
 
-	struct RenderJob : Renderer::RenderJob {
-		RenderJob(F&& f) : f(f) {}
-
-		void execute() override {
-			f();
-		}
-		F f;
-	};
-
-	renderer->createJob<RenderJob>(static_cast<F&&>(f));
+	DrawStream& stream = renderer->createDrawStreamJob();
+	stream.pushLambda(f);
 }
 
 struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
@@ -3612,92 +3604,80 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		}
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		const u32 roughness_levels = 5;
+		enum { roughness_levels = 5 };
 		
-		struct Job : Renderer::RenderJob {
-			Job(IAllocator& allocator, PageAllocator& page_allocator) 
-				: stream(page_allocator)
-				, tmp(allocator)
-			{}
-
-			void execute() override {
-				stream.run();
-				plugin->saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
-				jobs::setGreen(signal);
-			}
-
-			DrawStream stream;
-			Array<u8> tmp;
-			EnvironmentProbePlugin* plugin;
-			u32 size;
-			u64 guid;
-			jobs::Signal* signal;
-		};
-
 		jobs::Signal signal;
 		jobs::setRed(&signal);
-		Job& job = renderer->createJob<Job>(renderer->getAllocator(), renderer->getEngine().getPageAllocator());
-		job.size = size;
-		job.guid = guid;
-		job.plugin = this;
-		job.signal = &signal;
-		
-		gpu::TextureHandle src = gpu::allocTextureHandle();
-		gpu::TextureHandle dst = gpu::allocTextureHandle();
-		job.stream.createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
-		for (u32 face = 0; face < 6; ++face) {
-			job.stream.update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
-		}
-		job.stream.generateMipmaps(src);
-		job.stream.createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
-
-		job.stream.useProgram(m_ibl_filter_program);
-		job.stream.bindTextures(&src, 0, 1);
-		for (u32 mip = 0; mip < roughness_levels; ++mip) {
-			const float roughness = float(mip) / (roughness_levels - 1);
+		Array<u8> tmp(m_app.getAllocator());
+		renderer->pushJob([&](DrawStream& stream){
+			gpu::TextureHandle src = gpu::allocTextureHandle();
+			gpu::TextureHandle dst = gpu::allocTextureHandle();
+			stream.createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
 			for (u32 face = 0; face < 6; ++face) {
-				job.stream.setFramebufferCube(dst, face, mip);
-				struct {
-					float roughness;
-					u32 face;
-					u32 mip;
-				} drawcall = {roughness, face, mip};
-				const Renderer::TransientSlice ub = renderer->allocUniform(&drawcall, sizeof(drawcall));
-				job.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				job.stream.viewport(0, 0, size >> mip, size >> mip);
-				job.stream.drawArrays(0, 4);
+				stream.update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
 			}
-		}
+			stream.generateMipmaps(src);
+			stream.createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
 
-		job.stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+			stream.useProgram(m_ibl_filter_program);
+			stream.bindTextures(&src, 0, 1);
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				const float roughness = float(mip) / (roughness_levels - 1);
+				for (u32 face = 0; face < 6; ++face) {
+					stream.setFramebufferCube(dst, face, mip);
+					struct {
+						float roughness;
+						u32 face;
+						u32 mip;
+					} drawcall = {roughness, face, mip};
+					const Renderer::TransientSlice ub = renderer->allocUniform(&drawcall, sizeof(drawcall));
+					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+					stream.viewport(0, 0, size >> mip, size >> mip);
+					stream.drawArrays(0, 4);
+				}
+			}
 
-		gpu::TextureHandle staging = gpu::allocTextureHandle();
-		const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
-		job.stream.createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
+			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+
+			gpu::TextureHandle staging = gpu::allocTextureHandle();
+			const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
+			stream.createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
 			
-		u32 data_size = 0;
-		u32 mip_size = size;
-		for (u32 mip = 0; mip < roughness_levels; ++mip) {
-			data_size += mip_size * mip_size * sizeof(Vec4) * 6;
-			mip_size >>= 1;
-		}
+			u32 data_size = 0;
+			u32 mip_size = size;
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				data_size += mip_size * mip_size * sizeof(Vec4) * 6;
+				mip_size >>= 1;
+			}
 
-		job.tmp.resize(data_size);
+			tmp.resize(data_size);
 
-		job.stream.copy(staging, dst, 0, 0);
-		u8* tmp_ptr = job.tmp.begin();
-		for (u32 mip = 0; mip < roughness_levels; ++mip) {
-			const u32 mip_size = size >> mip;
-			job.stream.readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
-			tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
-		}
+			stream.copy(staging, dst, 0, 0);
+			u8* tmp_ptr = tmp.begin();
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				const u32 mip_size = size >> mip;
+				stream.readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
+				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
+			}
 
-		job.stream.destroy(staging);
+			stream.destroy(staging);
+			stream.destroy(src);
+			stream.destroy(dst);	
 
-		job.stream.destroy(src);
-		job.stream.destroy(dst);	
-		
-		jobs::wait(&signal);
+			struct Payload {
+				EnvironmentProbePlugin* plugin;
+				u64 guid;
+				jobs::Signal* signal;
+				Array<u8>* data;
+				u32 texture_size;
+			};
+
+			stream.pushLambda([&](){
+				saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
+				jobs::setGreen(&signal);		
+			});
+		});
+		jobs::wait(&signal); // wait to keep `data` alive until renderer is done with it
 	}
 
 	void processData(ProbeJob& job) {

@@ -52,6 +52,23 @@ struct Buffer {
 	u64 size;
 };
 
+struct BindGroup {
+	struct TextureEntry {
+		TextureHandle handle;
+		u32 bind_point;
+	};
+	struct UniformBufferEntry {
+		BufferHandle handle;
+		u32 bind_point;
+		u32 offset;
+		u32 size;
+	};
+	TextureEntry textures[16];
+	u32 textures_count = 0;
+	UniformBufferEntry uniform_buffers[8];
+	u32 uniform_buffers_count = 0;
+};
+
 struct Texture {
 	~Texture() {
 		if (gl_handle) glDeleteTextures(1, &gl_handle);
@@ -79,7 +96,7 @@ struct Program {
 	GLuint gl_handle = 0;
 	VertexDecl decl;
 	GLuint primitive_type;
-	gpu::StateFlags state;
+	StateFlags state;
 };
 
 struct WindowContext {
@@ -1046,29 +1063,59 @@ static void setSampler(GLuint texture, TextureFlags flags) {
 	}
 }
 
-
-ProgramHandle allocProgramHandle()
-{
+ProgramHandle allocProgramHandle() {
 	Program* p = LUMIX_NEW(gl->allocator, Program)();
-
 	p->gl_handle = gl->default_program ? gl->default_program->gl_handle : 0;
 	return p;
 }
 
-
-BufferHandle allocBufferHandle()
-{
+BufferHandle allocBufferHandle() {
 	Buffer* b = LUMIX_NEW(gl->allocator, Buffer);
 	b->gl_handle = 0;
 	return b;
 }
 
-TextureHandle allocTextureHandle()
-{
+BindGroupHandle allocBindGroupHandle() {
+	return LUMIX_NEW(gl->allocator, BindGroup);
+}
+
+TextureHandle allocTextureHandle() {
 	Texture* t = LUMIX_NEW(gl->allocator, Texture);
 	t->gl_handle = 0;
 	return t;
 }
+
+void createBindGroup(BindGroupHandle group, Span<const BindGroupEntryDesc> descriptors) {
+	for (const BindGroupEntryDesc& desc : descriptors) {
+		switch(desc.type) {
+			case BindGroupEntryDesc::TEXTURE:
+				group->textures[group->textures_count].handle = desc.texture;
+				group->textures[group->textures_count].bind_point = desc.bind_point;
+				++group->textures_count;
+				break;
+			case BindGroupEntryDesc::UNIFORM_BUFFER:
+				group->uniform_buffers[group->uniform_buffers_count].handle = desc.buffer;
+				group->uniform_buffers[group->uniform_buffers_count].bind_point = desc.bind_point;
+				group->uniform_buffers[group->uniform_buffers_count].offset = desc.offset;
+				group->uniform_buffers[group->uniform_buffers_count].size = desc.size;
+				++group->uniform_buffers_count;
+				break;
+			default: ASSERT(false); break;
+		}
+	}
+}
+
+void bind(BindGroupHandle group) {
+	for (u32 i = 0; i < group->textures_count; ++i) {
+		const BindGroup::TextureEntry& t = group->textures[i];
+		glBindTextures(t.bind_point, 1, &t.handle->gl_handle);
+	}
+	for (u32 i = 0; i < group->uniform_buffers_count; ++i) {
+		const BindGroup::UniformBufferEntry& ub = group->uniform_buffers[i];
+		glBindBufferRange(GL_UNIFORM_BUFFER, ub.bind_point, ub.handle->gl_handle, ub.offset, ub.size);
+	}
+}
+
 
 void createTextureView(TextureHandle view, TextureHandle texture)
 {
@@ -1170,6 +1217,11 @@ void generateMipmaps(TextureHandle texture)
 	glGenerateTextureMipmap(texture->gl_handle);
 }
 
+void destroy(BindGroupHandle group) {
+	checkThread();
+	LUMIX_DELETE(gl->allocator, group);
+}
+
 void destroy(TextureHandle texture)
 {
 	checkThread();
@@ -1227,7 +1279,7 @@ static const char* shaderTypeToString(ShaderType type)
 }
 
 
-void createProgram(ProgramHandle prog, gpu::StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name)
+void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name)
 {
 	GPU_PROFILE();
 	checkThread();

@@ -7,6 +7,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "renderer/draw_stream.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -125,7 +126,9 @@ void Material::unload()
 		}
 	}
 	m_texture_count = 0;
-	for (gpu::TextureHandle& tex : m_texture_handles) tex = gpu::INVALID_TEXTURE;
+
+	m_renderer.getEndFrameDrawStream().destroy(m_bind_group);
+	m_bind_group = gpu::INVALID_BIND_GROUP;
 	for (Texture*& tex : m_textures) tex = nullptr;
 	
 	setShader(nullptr);
@@ -375,9 +378,22 @@ void Material::updateRenderData(bool on_before_ready)
 
 	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
 
+	DrawStream& stream = m_renderer.createDrawStreamJob();
+	if (m_bind_group) stream.destroy(m_bind_group);
+	m_bind_group = gpu::allocBindGroupHandle();
+	
+	gpu::BindGroupEntryDesc descs[MAX_TEXTURE_COUNT + 1];
 	for(u32 i = 0; i < m_texture_count; ++i) {
-		m_texture_handles[i] = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
+		descs[i].texture = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
+		descs[i].type = gpu::BindGroupEntryDesc::TEXTURE;
+		descs[i].bind_point = i;
 	}
+	descs[m_texture_count].type = gpu::BindGroupEntryDesc::UNIFORM_BUFFER;
+	descs[m_texture_count].buffer = m_renderer.getMaterialUniformBuffer();
+	descs[m_texture_count].size = MAX_UNIFORMS_BYTES;
+	descs[m_texture_count].offset = m_material_constants * MAX_UNIFORMS_BYTES;
+	descs[m_texture_count].bind_point = UniformBuffer::MATERIAL;
+	stream.createBindGroup(m_bind_group, Span(descs, m_texture_count + 1));
 }
 
 

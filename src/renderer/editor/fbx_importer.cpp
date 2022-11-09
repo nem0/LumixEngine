@@ -1039,7 +1039,6 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	renderer->pushJob("create impostor textures", [&](DrawStream& stream) {
 		const AABB aabb = model->getAABB();
 		const float radius = model->getCenterBoundingRadius();
-		gpu::BufferHandle material_ub = renderer->getMaterialUniformBuffer();
 
 		gpu::TextureHandle gbs[] = {gpu::allocTextureHandle(), gpu::allocTextureHandle(), gpu::allocTextureHandle()};
 
@@ -1102,9 +1101,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask());
 
-					stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-					stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-
+					stream.bind(0, material->m_bind_group);
 					stream.useProgram(program);
 					stream.bindIndexBuffer(mesh.index_buffer_handle);
 					stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);

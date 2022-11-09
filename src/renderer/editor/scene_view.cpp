@@ -809,9 +809,9 @@ void SceneView::renderIcons() {
 			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 				const Mesh& mesh = model->getMesh(i);
 				const Material* material = mesh.material;
-				stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
+				stream.bind(0, material->m_bind_group);
 				const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->m_define_mask);
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask());
 				
 				stream.useProgram(program);
 				stream.bindIndexBuffer(mesh.index_buffer_handle);
@@ -850,7 +850,7 @@ void SceneView::renderSelection()
 				const Mesh& mesh = model->getMesh(i);
 					
 				Material* material = mesh.material;
-				u32 define_mask = material->m_define_mask;
+				u32 define_mask = material->getDefineMask();
 				const Matrix mtx = universe.getRelativeMatrix(e, view_pos);
 				dq_pose.clear();
 				if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
@@ -888,7 +888,7 @@ void SceneView::renderSelection()
 		
 				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states, mesh.vertex_decl, define_mask);
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
+				stream.bind(0, material->m_bind_group);
 				stream.useProgram(program);
 				stream.bindIndexBuffer(mesh.index_buffer_handle);
 				stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);

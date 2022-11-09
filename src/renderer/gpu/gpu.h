@@ -15,10 +15,12 @@ using BufferHandle = struct Buffer*;
 using ProgramHandle = struct Program*;
 using TextureHandle = struct Texture*;
 using QueryHandle = struct Query*;
+using BindGroupHandle = struct BindGroup*;
 const BufferHandle INVALID_BUFFER = nullptr;
 const ProgramHandle INVALID_PROGRAM = nullptr;
 const TextureHandle INVALID_TEXTURE = nullptr;
 const QueryHandle INVALID_QUERY = nullptr;
+const BindGroupHandle INVALID_BIND_GROUP = nullptr;
 
 enum class InitFlags : u32 {
 	NONE = 0,
@@ -236,6 +238,21 @@ struct MemoryStats {
 	u64 texture_mem;
 };
 
+struct BindGroupEntryDesc {
+	enum Type { 
+		UNIFORM_BUFFER,
+		TEXTURE
+	};
+	Type type;
+	union {
+		BufferHandle buffer;
+		TextureHandle texture;
+	};
+	u32 bind_point;
+	u32 offset;
+	u32 size;
+};
+
 void preinit(IAllocator& allocator, bool load_renderdoc);
 IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
@@ -254,6 +271,7 @@ u32 getBytesPerPixel(TextureFormat format);
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
+BindGroupHandle allocBindGroupHandle();
 
 void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
 QueryHandle createQuery(QueryType type);
@@ -262,10 +280,12 @@ void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl,
 void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data);
 void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture);
+void createBindGroup(BindGroupHandle group, Span<const BindGroupEntryDesc> descs);
 
 void destroy(TextureHandle texture);
 void destroy(BufferHandle buffer);
 void destroy(ProgramHandle program);
+void destroy(BindGroupHandle group);
 	
 void setCurrentWindow(void* window_handle);
 void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
@@ -281,6 +301,7 @@ void popDebugGroup();
 
 void useProgram(ProgramHandle program);
 	
+void bind(BindGroupHandle group);
 void bindIndexBuffer(BufferHandle buffer);
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);

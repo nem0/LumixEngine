@@ -52,6 +52,7 @@ static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
 static constexpr u64 SORT_KEY_DEPTH_MASK = 0xffFFffFF;
 static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
+static constexpr u64 SORT_KEY_MESH_IDX_SHIFT = 40;
 
 struct CameraParams
 {
@@ -1753,15 +1754,13 @@ struct PipelineImpl final : Pipeline
 				IVec4 prev_from_to;
 				float s = scale.x / terrain->m_tesselation;
 				bool first = true;
-				const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
 				
-				stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
 				stream.useProgram(program);
 				stream.bindIndexBuffer(gpu::INVALID_BUFFER);
 				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
+				stream.bind(0, material->m_bind_group);
 				for (;;) {
 					// round 
 					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
@@ -1851,8 +1850,6 @@ struct PipelineImpl final : Pipeline
 			u32 quad_count = 0;
 			u32 culled_count = 0;
 			u32 total_instance_count = 0;
-			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
-			u32 material_ub_idx = 0xffFFffFF;
 
 			for (const Terrain* terrain : terrains) {
 				const Transform tr = universe.getTransform(terrain->m_entity);
@@ -1875,14 +1872,9 @@ struct PipelineImpl final : Pipeline
 
 						const Material* material = mesh.material;
 						gpu::StateFlags state = render_state | material->m_render_states;
-						stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-						if (material_ub_idx != material->m_material_constants) {
-							stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = material->m_material_constants;
-						}
 
-						stream.useProgram(shader->getProgram(state, mesh.vertex_decl, define_mask | material->m_define_mask));
-
+						stream.useProgram(shader->getProgram(state, mesh.vertex_decl, define_mask | material->getDefineMask()));
+						stream.bind(0, material->m_bind_group);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
 						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						
@@ -1911,7 +1903,6 @@ struct PipelineImpl final : Pipeline
 							const Vec4 drawcall_data(rel_pos, distance);
 							const Renderer::TransientSlice drawcall_ub = m_renderer.allocUniform(&drawcall_data, sizeof(drawcall_data));
 							stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
-
 							stream.bindVertexBuffer(1, quad.instances, 0, sizeof(Vec4) * 2);
 							stream.drawIndexedInstanced(mesh.indices_count, instance_count, mesh.index_type);
 							++quad_count;
@@ -1944,8 +1935,6 @@ struct PipelineImpl final : Pipeline
 			decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
 
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
-			u32 material_ub_idx = 0xffFFffFF;
 
 			for (const ParticleEmitter& emitter : emitters) {
 				if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
@@ -1965,16 +1954,10 @@ struct PipelineImpl final : Pipeline
 				emitter.fillInstanceData((float*)slice.ptr);
 				Matrix mtx = tr.rot.toMatrix();
 				mtx.setTranslation(lpos);
+
 				const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
-
-				if (material_ub_idx != material->m_material_constants) {
-					stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-					material_ub_idx = material->m_material_constants;
-				}
-
-				stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-
+				stream.bind(0, material->m_bind_group);
 				stream.useProgram(program);
 				stream.bindIndexBuffer(gpu::INVALID_BUFFER);
 				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2457,7 +2440,7 @@ struct PipelineImpl final : Pipeline
 				const u8 bucket_id = view.layer_to_bucket[mesh.material->getLayer()];
 				if (bucket_id != 0xff) {
 					const u64 key = mesh.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
-					const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
+					const u64 subrenderable = e.index | type_mask | ((u64)i << SORT_KEY_MESH_IDX_SHIFT);
 				
 					inserter.push(key, subrenderable);
 				}
@@ -2479,26 +2462,17 @@ struct PipelineImpl final : Pipeline
 
 			Bucket& bucket = view.buckets[bucket_idx];
 			const gpu::StateFlags render_state = bucket.state;
-			const Material* material = pg.material;
-
-			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
-			u32 material_ub_idx = 0xffFFffFF;
-			bucket.stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-			if (material_ub_idx != material->m_material_constants) {
-				bucket.stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-				material_ub_idx = material->m_material_constants;
-			}
-
 			const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
 			const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-			const gpu::StateFlags state = material->m_render_states | render_state;
+			const gpu::StateFlags state = pg.material->m_render_states | render_state;
 			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, pg.vertex_decl, bucket.define_mask | pg.material->getDefineMask());
 
 			const u32 stride = pg.vertex_decl.getStride();
 			
 			bucket.stream.useProgram(program);
+			bucket.stream.bind(0, pg.material->m_bind_group);
 			bucket.stream.bindIndexBuffer(pg.index_buffer);
 			bucket.stream.bindVertexBuffer(0, pg.vertex_buffer, 0, stride);
 			bucket.stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -2686,24 +2660,21 @@ struct PipelineImpl final : Pipeline
 
 			stream.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
 
-			u32 material_ub_idx = 0xffFFffFF;
-			const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
+			const u32 instanced_define = 1 << m_renderer.getShaderDefineIdx("INSTANCED");
 			for (i32 i = 0; i < m->getMeshCount(); ++i) {
 				const Mesh& mesh = m->getMesh(i);
 				const u8 bucket_idx = view.layer_to_bucket[mesh.layer];
 				if (bucket_idx == 0xff) continue;
 				
 				Bucket& bucket = view.buckets[bucket_idx];
-				const u32 instanced_define_mask = bucket.define_mask | (1 << m_renderer.getShaderDefineIdx("INSTANCED"));
+				const u32 instanced_define_mask = bucket.define_mask | instanced_define;
 				Shader* shader = mesh.material->getShader();
 				const Material* material = mesh.material;
 				const gpu::StateFlags state = material->m_render_states | bucket.state;
 				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 
-				bucket.stream.bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-				bucket.stream.bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-				
 				bucket.stream.useProgram(program);
+				bucket.stream.bind(0, material->m_bind_group);
 				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
 				bucket.stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 				bucket.stream.bindVertexBuffer(1, m_instanced_meshes_buffer, 48, 32);
@@ -2844,17 +2815,14 @@ struct PipelineImpl final : Pipeline
 		u32 skinned_define_mask;
 		u32 fur_define_mask;
 		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
-		u8 prev_bucket = 0xff;
+		u8 prev_bucket = (sort_keys[0] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
 		DrawStream* stream = nullptr;
-		u32 material_ub_idx = 0xffFFffFF;
-		const gpu::BufferHandle material_ub = m_renderer.getMaterialUniformBuffer();
 		gpu::StateFlags render_state;
 
 		for (u32 i = 0, c = count; i < c; ++i) {
 			const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
 			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
-			const u8 bucket = sort_keys[i] >> 56;
-			ASSERT(bucket != 0xff); // we use 0xff as initial value of prev_bucket
+			const u8 bucket = sort_keys[i] >> SORT_KEY_BUCKET_SHIFT;
 
 			if (bucket != prev_bucket) {
 				prev_bucket = bucket;
@@ -2870,13 +2838,12 @@ struct PipelineImpl final : Pipeline
 
 			switch(type) {
 				case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-					const u32 mesh_idx = renderables[i] >> 40;
+					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 					const Mesh& mesh = mi->meshes[mesh_idx];
 
 					const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 2);
 					u8* instance_data = slice.ptr;
-					const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
 					const Transform& tr = entity_data[e.index];
 					const float lod_d = model_instances[e.index].lod - mesh.lod;
 					const Vec4 rot_lod = packRotationLOD(tr.rot, lod_d);
@@ -2891,49 +2858,41 @@ struct PipelineImpl final : Pipeline
 					if (mi->custom_material->isReady()) {
 						Shader* shader = mi->custom_material->getShader();
 						const Material* material =  mi->custom_material;
-						stream->bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-						if (material_ub_idx != material->m_material_constants) {
-							stream->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = material->m_material_constants;
-						}
+
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 						stream->useProgram(program);
+						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 32);
 						stream->drawIndexedInstanced(mesh.indices_count, 1, mesh.index_type);
-
 					}
 					break;
 				}
 				case RenderableTypes::MESH: {
 					if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
 						const u32 group_idx = renderables[i] & 0xffFF;
-						const u32 instancer_idx = (renderables[i] >> 16) & 0xffFF;
+						const u32 instancer_idx = (renderables[i] >> SORT_KEY_INSTANCER_SHIFT) & 0xffFF;
 						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
 						const u32 total_count = instances.end->offset + instances.end->count;
 						const Mesh& mesh = *sort_key_to_mesh[group_idx];
 
 						const Material* material = mesh.material;
-						stream->bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-						if (material_ub_idx != material->m_material_constants) {
-							stream->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = material->m_material_constants;
-						}
-
-						Shader* shader = mesh.material->getShader();
+						Shader* shader = material->getShader();
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = instanced_define_mask | mesh.material->getDefineMask();
+						const u32 defines = instanced_define_mask | material->getDefineMask();
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
+						
 						stream->useProgram(program);
+						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						stream->bindVertexBuffer(1, instances.slice.buffer, instances.slice.offset, 32);
 						stream->drawIndexedInstanced(mesh.indices_count, total_count, mesh.index_type);
 					}
 					else {
-						const u32 mesh_idx = renderables[i] >> 40;
+						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 						const Mesh& mesh = mi->meshes[mesh_idx];
 						const float mesh_lod = mesh.lod;
@@ -2946,7 +2905,7 @@ struct PipelineImpl final : Pipeline
 						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 2));
 						u8* instance_data = slice.ptr;
 						for (int j = start_i; j < start_i + (i32)count; ++j) {
-							const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
+							const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							const float lod_d = model_instances[e.index].lod - mesh_lod;
@@ -2960,18 +2919,13 @@ struct PipelineImpl final : Pipeline
 						}
 
 						const Material* material = mesh.material;
-						stream->bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-						if (material_ub_idx != material->m_material_constants) {
-							stream->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-							material_ub_idx = material->m_material_constants;
-						}
-
-						Shader* shader = mesh.material->getShader();
+						Shader* shader = material->getShader();
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = instanced_define_mask | mesh.material->getDefineMask();
+						const u32 defines = instanced_define_mask | material->getDefineMask();
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
 						
 						stream->useProgram(program);
+						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 32);
@@ -2982,7 +2936,7 @@ struct PipelineImpl final : Pipeline
 				}
 				case RenderableTypes::FUR:
 				case RenderableTypes::SKINNED: {
-					const u32 mesh_idx = renderables[i] >> 40;
+					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 					const Transform& tr = entity_data[e.index];
 					const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
@@ -3027,18 +2981,11 @@ struct PipelineImpl final : Pipeline
 					}
 					
 					const Material* material = mesh.material;
-					stream->bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-
-					if (material_ub_idx != material->m_material_constants) {
-						stream->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-						material_ub_idx = material->m_material_constants;
-					}
-
 					stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-					
 					const gpu::StateFlags state = material->m_render_states | render_state;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
 					stream->useProgram(program);
+					stream->bind(0, material->m_bind_group);
 					stream->bindIndexBuffer(mesh.index_buffer_handle);
 					stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 					stream->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -3080,11 +3027,7 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					stream->bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-					if (material_ub_idx != material->m_material_constants) {
-						stream->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-						material_ub_idx = material->m_material_constants;
-					}
+					stream->bind(0, material->m_bind_group);
 					stream->bindIndexBuffer(m_cube_ib);
 					stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
@@ -3146,11 +3089,7 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					stream->bindTextures(material->m_texture_handles, 0, material->m_texture_count);
-					if (material_ub_idx != material->m_material_constants) {
-						stream->bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->m_material_constants * Material::MAX_UNIFORMS_BYTES, Material::MAX_UNIFORMS_BYTES);
-						material_ub_idx = material->m_material_constants;
-					}
+					stream->bind(0, material->m_bind_group);
 					stream->bindIndexBuffer(m_cube_ib);
 					stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
@@ -3545,8 +3484,8 @@ struct PipelineImpl final : Pipeline
 			
 				bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
 				bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
-				bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(scene_env_probes[0]), 14, stream);
-				bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(scene_refl_probes[0]), 15, stream);
+				bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(env_probes[0]), 14, stream);
+				bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
 			}
 
 			bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
@@ -3711,7 +3650,7 @@ struct PipelineImpl final : Pipeline
 									const u32 bucket = bucket_map[layer];
 									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
 									ASSERT(!mi.custom_material || mesh_idx == 0);
-									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
+									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
 									if (bucket < 0xff) {
 										const u64 key = mesh_sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
 										inserter.push(key, subrenderable);
@@ -3769,7 +3708,7 @@ struct PipelineImpl final : Pipeline
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
 									ASSERT(!mi.custom_material);
-									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
+									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
 									if (bucket < 0xff) {
 										instancer.add(mesh.sort_key, subrenderable);
 									} else if (bucket < 0xffFF) {
@@ -4050,53 +3989,33 @@ struct PipelineImpl final : Pipeline
 		lua_pop(m_lua_state, 1);
 	}
 
-	void saveRenderbuffer(lua_State* L)
-	{
-		struct Job : Renderer::RenderJob {
-			Job(IAllocator& allocator, PageAllocator& page_allocator) 
-				: pixels(allocator)
-				, allocator(allocator)
-				, stream(page_allocator)
-			{}
-
-			void execute() override {
-				stream.run();
-				os::OutputFile file;
-				if (fs->open(path, file)) {
-					Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)pixels.begin(), false, Path(path), allocator);
-					file.close();
-				}
-				else {
-					logError("Failed to save ", path);
-				}
-			}
-
-			Array<u32> pixels;
-			IAllocator& allocator;
-			u32 w, h;
-			gpu::TextureHandle handle;
-			FileSystem* fs;
-			StaticString<LUMIX_MAX_PATH> path;
-			DrawStream stream;
-		};
-
+	void saveRenderbuffer(lua_State* L) { 
 		const i32 render_buffer = toRenderbufferIdx(L, 1);
-		const char* out_path = LuaWrapper::checkArg<const char*>(L, 2);
+		StaticString<LUMIX_MAX_PATH> path = LuaWrapper::checkArg<const char*>(L, 2);
+		DrawStream& stream = m_renderer.createDrawStreamJob();
 
-		Job& job = m_renderer.createJob<Job>(m_renderer.getAllocator(), m_renderer.getEngine().getPageAllocator());
-		job.handle = m_renderbuffers[render_buffer].handle;
-		job.w = m_viewport.w;
-		job.h = m_viewport.h;
-		job.path = out_path;
-		job.fs = &m_renderer.getEngine().getFileSystem();
-
-		job.pixels.resize(m_viewport.w * m_viewport.h);
-		gpu::TextureHandle staging = gpu::allocTextureHandle();
+		FileSystem* fs = &m_renderer.getEngine().getFileSystem();
+		const gpu::TextureHandle handle = m_renderbuffers[render_buffer].handle;
+		const Renderer::MemRef mem = m_renderer.allocate(sizeof(u32) * m_viewport.w * m_viewport.h);
+		const gpu::TextureHandle staging = gpu::allocTextureHandle();
 		const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-		job.stream.createTexture(staging, m_viewport.w, m_viewport.h, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
-		job.stream.copy(staging, m_renderbuffers[render_buffer].handle, 0, 0);
-		job.stream.readTexture(staging, 0, Span((u8*)job.pixels.begin(), job.pixels.byte_size()));
-		job.stream.destroy(staging);
+		stream.createTexture(staging, m_viewport.w, m_viewport.h, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
+		stream.copy(staging, m_renderbuffers[render_buffer].handle, 0, 0);
+		stream.readTexture(staging, 0, Span((u8*)mem.data, mem.size));
+		stream.destroy(staging);
+		const u32 w = m_viewport.w;
+		const u32 h = m_viewport.h;
+		stream.pushLambda([fs, path, w, h, mem, this](){
+			os::OutputFile file;
+			if (fs->open(path, file)) {
+				Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)mem.data, false, Path(path), m_renderer.getAllocator());
+				file.close();
+			}
+			else {
+				logError("Failed to save ", path);
+			}
+		});
+		stream.freeMemory(mem.data, m_renderer.getAllocator());
 	}
 
 	void registerLuaAPI(lua_State* L)

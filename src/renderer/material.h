@@ -61,10 +61,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	~Material();
 
 	ResourceType getType() const override { return TYPE; }
-
 	Renderer& getRenderer() { return m_renderer; }
-
-	gpu::StateFlags getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
 	bool isAlphaCutout() const;
@@ -104,10 +101,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void updateRenderData(bool on_before_ready);
 	Array<Uniform>& getUniforms() { return m_uniforms; }
 
-	gpu::TextureHandle m_texture_handles[MAX_TEXTURE_COUNT];
-	u32 m_texture_count;
-	u32 m_material_constants = 0;
-	u32 m_define_mask;
+	gpu::BindGroupHandle m_bind_group = gpu::INVALID_BIND_GROUP;
 	gpu::StateFlags m_render_states;
 
 private:
@@ -118,12 +112,14 @@ private:
 	static int uniform(lua_State* L);
 	static int int_uniform(lua_State* L);
 
-private:
 	Renderer& m_renderer;
 	Shader* m_shader;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	u8 m_layer;
 	u32 m_sort_key;
+	u32 m_define_mask;
+	u32 m_material_constants = 0;
+	u32 m_texture_count;
 
 	Array<Uniform> m_uniforms;
 	u32 m_custom_flags;
