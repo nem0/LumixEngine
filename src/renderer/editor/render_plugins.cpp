@@ -1728,7 +1728,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
-				renderer->createDrawStreamJob().createTextureView(m_texture_view, m_texture->handle);
+				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle);
 			}
 
 			ImGui::Image(m_texture_view, texture_size);
@@ -2947,7 +2947,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 
 		Renderer::MemRef mem;
-		DrawStream& stream = m_renderer->createDrawStreamJob();
+		DrawStream& stream = m_renderer->getDrawStream();
 		
 		m_tile.texture = gpu::allocTextureHandle();
 		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
@@ -3058,7 +3058,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return;
 		}
 
-		DrawStream& stream = m_renderer->createDrawStreamJob();
+		DrawStream& stream = m_renderer->getDrawStream();
 		m_tile.texture = gpu::allocTextureHandle();
 		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
 		gpu::TextureHandle tile_tmp = gpu::allocTextureHandle();
@@ -3347,7 +3347,7 @@ void captureCubemap(StudioApp& app
 
 		const gpu::TextureHandle res = pipeline.getOutput();
 		ASSERT(res);
-		DrawStream& stream = renderer->createDrawStreamJob();
+		DrawStream& stream = renderer->getDrawStream();
 		getTextureImage(stream
 			, res
 			, texture_size
@@ -3357,7 +3357,7 @@ void captureCubemap(StudioApp& app
 		);
 	}
 
-	DrawStream& stream = renderer->createDrawStreamJob();
+	DrawStream& stream = renderer->getDrawStream();
 	stream.pushLambda(f);
 }
 
@@ -4541,7 +4541,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 
-		DrawStream& stream = renderer->getEndFrameDrawStream();
+		DrawStream& stream = renderer->getDrawStream();
 
 		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
 		for (const ImGuiViewport* vp : platform_io.Viewports) {

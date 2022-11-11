@@ -97,6 +97,9 @@ struct Program {
 	VertexDecl decl;
 	GLuint primitive_type;
 	StateFlags state;
+	#ifdef LUMIX_DEBUG
+		StaticString<64> name;
+	#endif
 };
 
 struct WindowContext {
@@ -1419,6 +1422,9 @@ void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl,
 	prog->gl_handle = prg;
 	prog->decl = decl;
 	prog->state = state;
+	#ifdef LUMIX_DEBUG
+		prog->name = name;
+	#endif
 	return;
 }
 
@@ -1515,6 +1521,7 @@ bool init(void* window_handle, InitFlags init_flags)
 	gl->default_program = allocProgramHandle();
 	ASSERT(gl->default_program);
 	Program& p = *gl->default_program;
+	p.state = StateFlags::NONE;
 	p.gl_handle = glCreateProgram();
 	glGenVertexArrays(1, &gl->contexts[0].vao);
 	glBindVertexArray(gl->contexts[0].vao);

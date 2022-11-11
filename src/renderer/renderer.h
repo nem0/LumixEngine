@@ -28,14 +28,6 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 		bool own = false;
 	};
 
-	struct RenderJob {
-		RenderJob() {}
-		RenderJob(const RenderJob& rhs) = delete;
-
-		virtual ~RenderJob() {}
-		virtual void execute() = 0;
-	};
-
 	struct TransientSlice {
 		gpu::BufferHandle buffer;
 		u32 offset;
@@ -47,8 +39,6 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 		MAX_SHADER_DEFINES = 32,
 	};
 
-	virtual void startCapture() = 0;
-	virtual void stopCapture() = 0;
 	virtual void frame() = 0;
 	virtual u32 frameNumber() const = 0;
 	virtual void waitForRender() = 0;
@@ -102,8 +92,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 	virtual struct Engine& getEngine() = 0;
 
-	virtual DrawStream& createDrawStreamJob() = 0;
-	virtual DrawStream& getEndFrameDrawStream() = 0;
+	virtual DrawStream& getDrawStream() = 0;
 
 	template <typename T> void pushJob(const char* name, const T& func);
 	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
@@ -112,49 +101,42 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual struct LinearAllocator& getCurrentFrameAllocator() = 0;
 
 protected:
-	virtual void* allocJob(u32 size, u32 align) = 0;
-	virtual void setupJob(RenderJob& job, void(*task)(void*)) = 0;
+	virtual void setupJob(void* user_ptr, void(*task)(void*)) = 0;
 }; 
 
 
-template <typename T, typename... Args> T& Renderer::createJob(Args&&... args) {
-	T& job = *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
-	return job;
-}
-
 template <typename T>
 void Renderer::pushJob(const char* name, const T& func) {
-	struct Job : RenderJob {
-		Job(const char* name, const T& func, Renderer& renderer, PageAllocator& allocator)
-			: func(func)
-			, stream(allocator)
-			, renderer(renderer)
+	struct Context {
+		Context(DrawStream& stream, T func, const char* name) 
+			: stream(stream)
+			, func(func)
 			, name(name)
 		{}
-		
-		void execute() override {
-			if (name) renderer.beginProfileBlock(name, 0);
-			stream.run();
-			if (name) renderer.endProfileBlock();
-		}
-		
-		static void setup(void* ptr) {
-			Job* that = (Job*)ptr;
+
+		static void run(void* ptr) {
+			Context* that = (Context*)ptr;
 			if (that->name) {
 				profiler::beginBlock(that->name);
 				profiler::blockColor(0x7f, 0, 0x7f);
+				that->stream.beginProfileBlock(that->name);
 			}
 			that->func(that->stream);
-			if (that->name) profiler::endBlock();
+			if (that->name) {
+				that->stream.endProfileBlock();
+				profiler::endBlock();
+			}
+			that->~Context();
 		}
 
-		DrawStream stream;
+		DrawStream& stream;
 		T func;
-		Renderer& renderer;
 		const char* name;
 	};
-	Job& job = createJob<Job>(name, func, *this, getEngine().getPageAllocator());
-	setupJob(job, &Job::setup);
+	
+	DrawStream& stream = getDrawStream().createSubstream();
+	Context* ctx = new (NewPlaceholder(), stream.userAlloc(sizeof(Context))) Context(stream, func, name);
+	setupJob(ctx, &Context::run);
 }
 
 } // namespace Lumix

@@ -8,7 +8,7 @@
 namespace Lumix {
 
 struct DrawStream {
-	DrawStream(PageAllocator& allocator);
+	DrawStream(struct Renderer& renderer);
 	DrawStream(DrawStream&& rhs);
 	~DrawStream();
 
@@ -34,6 +34,8 @@ struct DrawStream {
 	void stopCapture();
 	void pushDebugGroup(const char* msg);
 	void popDebugGroup();
+	void beginProfileBlock(const char* name);
+	void endProfileBlock();
 
 	void useProgram(gpu::ProgramHandle program);
 	
@@ -63,7 +65,9 @@ struct DrawStream {
 	
 	void update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size);
 	void update(gpu::BufferHandle buffer, const void* data, size_t size);
-	
+	DrawStream& createSubstream();
+
+	u8* userAlloc(u32 size);
 	void freeMemory(void* data, IAllocator& allocator);
 	void freeAlignedMemory(void* data, IAllocator& allocator);
 	u8* pushFunction(void (*func)(void*), u32 payload_size);
@@ -91,6 +95,7 @@ private:
 		memcpy(ptr + sizeof(instruction), &val, sizeof(val));
 	}
 
+	Renderer& renderer;
 	PageAllocator& allocator;
 	Page* first = nullptr;
 	Page* current = nullptr;

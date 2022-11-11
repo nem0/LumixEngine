@@ -1294,7 +1294,7 @@ struct RenderSceneImpl final : RenderScene {
 		if (!im.instances.empty()) {
 			if (im.gpu_data) {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());
-				DrawStream& stream = m_renderer.createDrawStreamJob();
+				DrawStream& stream = m_renderer.getDrawStream();
 				stream.update(im.gpu_data, mem.data, mem.size);
 				stream.freeMemory(mem.data, m_renderer.getAllocator());
 			}
@@ -3348,7 +3348,7 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 	ASSERT(desc.is_cubemap);
 
 	u32 layer = probe.texture_id;
-	DrawStream& stream = m_scene.m_renderer.getEndFrameDrawStream();
+	DrawStream& stream = m_scene.m_renderer.getDrawStream();
 	const u32 offset = u32(image_data - data);
 	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
 	InputMemoryStream blob(mem.data, (u32)size - offset);

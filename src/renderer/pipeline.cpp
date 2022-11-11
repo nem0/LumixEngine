@@ -522,7 +522,7 @@ struct PipelineImpl final : Pipeline
 	};
 
 	struct Bucket {
-		Bucket(PageAllocator& allocator) : stream(allocator) {}
+		Bucket(Renderer& renderer) : stream(renderer) {}
 		enum Sort {
 			DEFAULT,
 			DEPTH
@@ -1362,7 +1362,7 @@ struct PipelineImpl final : Pipeline
 
 		beginBlock(m_define);
 
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		const Renderer::TransientSlice global_state_buffer = m_renderer.allocUniform(&global_state, sizeof(GlobalState));
 
 		stream.bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer.buffer, global_state_buffer.offset, sizeof(GlobalState));
@@ -1491,7 +1491,7 @@ struct PipelineImpl final : Pipeline
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		
 		const i32 num_indices = data.getIndices().size();
 		const i32 num_vertices = data.getVertices().size();
@@ -2050,7 +2050,7 @@ struct PipelineImpl final : Pipeline
 	}
 	
 	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point, bool writable) {
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindShaderBuffer(buffer_handle, binding_point, writable ? gpu::BindShaderBufferFlags::OUTPUT : gpu::BindShaderBufferFlags::NONE);
 	}
 	
@@ -2134,7 +2134,7 @@ struct PipelineImpl final : Pipeline
 			values[i] = LuaWrapper::checkArg<float>(L, i + 1);
 		}
 
-		DrawStream& stream = pipeline->m_renderer.createDrawStreamJob();
+		DrawStream& stream = pipeline->m_renderer.getDrawStream();
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		return 0;
 	}
@@ -2156,7 +2156,7 @@ struct PipelineImpl final : Pipeline
 		gpu::ProgramHandle program = shader->getProgram(defines);
 		if (!program) return;
 
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.useProgram(program);
 		stream.dispatch(num_groups_x, num_groups_y, num_groups_z);
 	}
@@ -2180,7 +2180,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void bindImageTexture(PipelineTexture texture, u32 unit) {
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindImageTexture(toHandle(texture), unit);
 	}
 
@@ -2190,7 +2190,7 @@ struct PipelineImpl final : Pipeline
 			textures_handles.push(toHandle(textures[i]));
 		}
 
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindTextures(textures_handles.begin(), offset.get(0), textures_handles.size());
 	};
 	
@@ -2210,7 +2210,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		const Renderer::TransientSlice ub = m_renderer.allocUniform(&pass_state, sizeof(PassState));
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
 	}
 
@@ -2287,7 +2287,7 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 	
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindTextures(textures_handles.begin(), 0, textures_handles.size());
 		const gpu::ProgramHandle program = shader->getProgram(rs, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask);
 		stream.useProgram(program);
@@ -2716,7 +2716,6 @@ struct PipelineImpl final : Pipeline
 		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
 
 		view->buckets.reserve(bucket_count);
-		PageAllocator& page_allocator = pipeline->m_renderer.getEngine().getPageAllocator();
 		for (i32 i = 0; i < bucket_count; ++i) {
 			char layer[32];
 			if (!LuaWrapper::checkStringField(L, 2 + i, "layer", Span(layer))) {
@@ -2725,7 +2724,7 @@ struct PipelineImpl final : Pipeline
 			if (equalStrings(layer, "view")) {
 				LuaWrapper::argError(L, 2 + i, "layer name `view` is reserved");
 			}
-			Bucket& bucket = view->buckets.emplace(page_allocator);
+			Bucket& bucket = view->buckets.emplace(pipeline->m_renderer);
 			bucket.layer = pipeline->m_renderer.getLayerIdx(layer);
 			copyString(Span(bucket.layer_name), layer); 
 			
@@ -3248,6 +3247,7 @@ struct PipelineImpl final : Pipeline
 					ClusterLight& light = lights[atlas_sorter.lights[i].idx];
 					EntityRef e = atlas_sorter.lights[i].entity;
 					PointLight& pl = m_scene->getPointLight(e);
+					// TODO bakeShadow reenters m_lua_state, this is not safe since it's inside another job
 					if (light.atlas_idx == -1) {
 						light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
 						bakeShadow(pl, light.atlas_idx);
@@ -3510,7 +3510,7 @@ struct PipelineImpl final : Pipeline
 		if (readonly_ds) {
 			flags = flags | gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.setFramebuffer(renderbuffers.begin(), renderbuffers.length(), ds, flags);
 		stream.viewport(0, 0, m_viewport.w, m_viewport.h);
 	}
@@ -3904,41 +3904,23 @@ struct PipelineImpl final : Pipeline
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth) {
 		const Vec4 color = Vec4(r, g, b, a);
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.clear((gpu::ClearFlags)flags, &color.x, depth);
 	}
 
 	void viewport(int x, int y, int w, int h) {
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 		stream.viewport(x, y, w, h);
 	}
 
 	void beginBlock(const char* name) {
-		struct Cmd : Renderer::RenderJob {
-			void execute() override {
-				PROFILE_FUNCTION();
-				renderer->beginProfileBlock(name, 0);
-			}
-			StaticString<32> name;
-			Renderer* renderer;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.name = name;
-		cmd.renderer = &m_renderer;
+		DrawStream& stream = m_renderer.getDrawStream();
+		stream.beginProfileBlock(name);
 	}
 
 	void endBlock() {
-		struct Cmd : Renderer::RenderJob {
-			void execute() override {
-				PROFILE_FUNCTION();
-				renderer->endProfileBlock();
-			}
-			Renderer* renderer;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.renderer = &m_renderer;
+		DrawStream& stream = m_renderer.getDrawStream();
+		stream.endProfileBlock();
 	}
 	
 	void setOutput(lua_State* L, PipelineTexture tex) {
@@ -3992,7 +3974,7 @@ struct PipelineImpl final : Pipeline
 	void saveRenderbuffer(lua_State* L) { 
 		const i32 render_buffer = toRenderbufferIdx(L, 1);
 		StaticString<LUMIX_MAX_PATH> path = LuaWrapper::checkArg<const char*>(L, 2);
-		DrawStream& stream = m_renderer.createDrawStreamJob();
+		DrawStream& stream = m_renderer.getDrawStream();
 
 		FileSystem* fs = &m_renderer.getEngine().getFileSystem();
 		const gpu::TextureHandle handle = m_renderbuffers[render_buffer].handle;

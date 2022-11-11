@@ -270,7 +270,7 @@ void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 			bytes_per_pixel * w);
 	}
 
-	DrawStream& stream = renderer.createDrawStreamJob();
+	DrawStream& stream = renderer.getDrawStream();
 	stream.update(handle, 0, x, y, 0, w, h, format, mem.data, mem.size);
 	stream.freeMemory(mem.data, renderer.getAllocator());
 }
@@ -558,7 +558,7 @@ static gpu::TextureHandle loadTexture(Renderer& renderer, const gpu::TextureDesc
 	const gpu::TextureHandle handle = gpu::allocTextureHandle();
 	if (!handle) return handle;
 
-	DrawStream& stream = renderer.createDrawStreamJob();
+	DrawStream& stream = renderer.getDrawStream();
 	if (desc.is_cubemap) flags = flags | gpu::TextureFlags::IS_CUBE;
 	if (desc.mips < 2) flags = flags | gpu::TextureFlags::NO_MIPS;
 	stream.createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name);

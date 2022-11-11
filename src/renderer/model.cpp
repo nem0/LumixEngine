@@ -609,7 +609,7 @@ void Model::unload()
 	}
 
 	for (Mesh& mesh : m_meshes) {
-		DrawStream& stream = m_renderer.getEndFrameDrawStream();
+		DrawStream& stream = m_renderer.getDrawStream();
 		if (mesh.index_buffer_handle) stream.destroy(mesh.index_buffer_handle);
 		if (mesh.vertex_buffer_handle) stream.destroy(mesh.vertex_buffer_handle);
 		mesh.index_buffer_handle = gpu::INVALID_BUFFER;

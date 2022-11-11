@@ -1,8 +1,10 @@
 #include "draw_stream.h"
 #include "engine/array.h"
+#include "engine/engine.h"
 #include "engine/math.h"
 #include "engine/page_allocator.h"
 #include "engine/string.h"
+#include "renderer/renderer.h"
 #ifdef _WIN32
 	#include <intrin.h>
 #endif
@@ -61,7 +63,11 @@ enum class DrawStream::Instruction : u8 {
 	BIND,
 	DIRTY_CACHE,
 	CREATE_BIND_GROUP,
-	FUNCTION
+	FUNCTION,
+	SUBSTREAM,
+	BEGIN_PROFILE_BLOCK,
+	END_PROFILE_BLOCK,
+	USER_ALLOC
 };
 
 namespace {
@@ -244,14 +250,16 @@ DrawStream::~DrawStream() {
 
 DrawStream::DrawStream(DrawStream&& rhs)
 	: allocator(rhs.allocator)
+	, renderer(rhs.renderer)
 {
 	first = rhs.first;
 	current = rhs.current;
 	rhs.first = rhs.current = nullptr;
 }
 
-DrawStream::DrawStream(PageAllocator& allocator)
-	: allocator(allocator)
+DrawStream::DrawStream(Renderer& renderer)
+	: renderer(renderer)
+	, allocator(renderer.getEngine().getPageAllocator())
 {
 	first = new (NewPlaceholder(), allocator.allocate(true)) Page;
 	current = first;
@@ -298,16 +306,6 @@ void DrawStream::createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, 
 	write(Instruction::CREATE_BUFFER, data);
 }
 
-void DrawStream::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name) {
-	ASSERT(debug_name);
-	CreateTextureData data = {handle, w, h, depth, format, flags};
-	write(Instruction::CREATE_TEXTURE, data);
-	const u32 len = stringLength(debug_name) + 1;
-	u8* ptr = alloc(sizeof(len) + len);
-	memcpy(ptr, &len, sizeof(len));
-	memcpy(ptr + sizeof(len), debug_name, len);
-}
-
 void DrawStream::bindImageTexture(gpu::TextureHandle texture, u32 unit) {
 	BindImageTextureData data = { texture, unit };
 	write(Instruction::BIND_IMAGE_TEXTURE, data);
@@ -321,9 +319,11 @@ void DrawStream::dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) 
 
 void DrawStream::merge(DrawStream& rhs) {
 	ASSERT(&allocator == &rhs.allocator);
-	
+	ASSERT(!run_called);
+	ASSERT(!rhs.run_called);
+
 	const Instruction end_instr = Instruction::END;
-	if (!run_called) memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
+	memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
 	run_called = rhs.run_called;
 	current->header.next = rhs.first;
 	current = rhs.current;
@@ -350,6 +350,23 @@ u8* DrawStream::alloc(u32 size) {
 #define WRITE(val) memcpy(data, &val, sizeof(val)); data += sizeof(val);
 #define WRITE_CONST(v) do { auto val = v; memcpy(data, &val, sizeof(val)); data += sizeof(val); } while(false)
 #define WRITE_ARRAY(val, count) memcpy(data, val, sizeof(val[0]) * count); data += sizeof(val[0]) * count;
+
+void DrawStream::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name) {
+	ASSERT(debug_name);
+	CreateTextureData desc = {handle, w, h, depth, format, flags};
+	const u32 len = stringLength(debug_name) + 1;
+	u8* data = alloc(sizeof(Instruction) + sizeof(desc) + len + sizeof(len));
+	WRITE_CONST(Instruction::CREATE_TEXTURE);
+	WRITE(desc);
+	WRITE(len);
+	WRITE_ARRAY(debug_name, len);
+}
+
+DrawStream& DrawStream::createSubstream() {
+	u8* data = alloc(sizeof(Instruction) + sizeof(DrawStream));
+	WRITE_CONST(Instruction::SUBSTREAM);
+	return *new (NewPlaceholder(), data) DrawStream(renderer);
+}
 
 void DrawStream::createProgram(gpu::ProgramHandle prog
 	, gpu::StateFlags state
@@ -382,6 +399,15 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	}
 	data->name = name;
 	write(Instruction::CREATE_PROGRAM, data);
+}
+
+void DrawStream::beginProfileBlock(const char* name) {
+	write(Instruction::BEGIN_PROFILE_BLOCK, name);
+}
+
+void DrawStream::endProfileBlock() {
+	u8* data = alloc(sizeof(Instruction));
+	WRITE_CONST(Instruction::END_PROFILE_BLOCK);
 }
 
 void DrawStream::pushDebugGroup(const char* msg) {
@@ -514,6 +540,13 @@ void DrawStream::setFramebuffer(const gpu::TextureHandle* attachments, u32 num, 
 	WRITE_ARRAY(attachments, num);
 }
 
+u8* DrawStream::userAlloc(u32 size) {
+	u8* data = alloc(size + sizeof(Instruction) + sizeof(size));
+	WRITE_CONST(Instruction::USER_ALLOC);
+	WRITE(size);
+	return data;
+}
+
 u8* DrawStream::pushFunction(void (*func)(void*), u32 payload_size) {
 	u8* data = alloc(sizeof(Instruction) + sizeof(payload_size) + sizeof(func) + payload_size);
 	WRITE_CONST(Instruction::FUNCTION);
@@ -626,11 +659,10 @@ void DrawStream::submitCached() {
 }
 
 void DrawStream::run() {
-	if (!run_called) {
-		const Instruction end_instr = Instruction::END;
-		memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
-		run_called = true;
-	}
+	ASSERT(!run_called);
+	const Instruction end_instr = Instruction::END;
+	memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
+	run_called = true;
 	
 	Page* page = first;
 	#define READ(T, N) T N; memcpy(&N, ptr, sizeof(T)); ptr += sizeof(T);
@@ -879,8 +911,23 @@ void DrawStream::run() {
 					func(payload);
 					break;
 				}
+				case Instruction::SUBSTREAM: {
+					DrawStream* stream = (DrawStream*)ptr;
+					stream->run();
+					stream->~DrawStream();
+					ptr += sizeof(DrawStream);
+				}
 				case Instruction::START_CAPTURE: {
 					gpu::startCapture();
+					break;
+				}
+				case Instruction::END_PROFILE_BLOCK: {
+					renderer.endProfileBlock();
+					break;
+				}
+				case Instruction::BEGIN_PROFILE_BLOCK: {
+					READ(const char*, name)
+					renderer.beginProfileBlock(name, 0);
 					break;
 				}
 				case Instruction::STOP_CAPTURE: {
@@ -890,6 +937,11 @@ void DrawStream::run() {
 				case Instruction::CREATE_TEXTURE_VIEW: {
 					READ(CreateTextureViewData, data);
 					gpu::createTextureView(data.view, data.texture);
+					break;
+				}
+				case Instruction::USER_ALLOC: {
+					READ(u32, size);
+					ptr += size;
 					break;
 				}
 				case Instruction::VIEWPORT: {

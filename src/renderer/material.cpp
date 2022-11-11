@@ -127,7 +127,7 @@ void Material::unload()
 	}
 	m_texture_count = 0;
 
-	m_renderer.getEndFrameDrawStream().destroy(m_bind_group);
+	m_renderer.getDrawStream().destroy(m_bind_group);
 	m_bind_group = gpu::INVALID_BIND_GROUP;
 	for (Texture*& tex : m_textures) tex = nullptr;
 	
@@ -378,7 +378,7 @@ void Material::updateRenderData(bool on_before_ready)
 
 	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
 
-	DrawStream& stream = m_renderer.createDrawStreamJob();
+	DrawStream& stream = m_renderer.getDrawStream();
 	if (m_bind_group) stream.destroy(m_bind_group);
 	m_bind_group = gpu::allocBindGroupHandle();
 	

@@ -128,14 +128,7 @@ struct TransientBuffer {
 
 
 struct FrameData {
-	FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 
-		: jobs(allocator)
-		, renderer(renderer)
-		, to_compile_shaders(allocator)
-		, job_allocator(1024 * 1024 * 64)
-		, begin_draw_stream(page_allocator)
-		, end_draw_stream(page_allocator)
-	{}
+	FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator);
 
 	struct ShaderToCompile {
 		Shader* shader;
@@ -149,16 +142,15 @@ struct FrameData {
 	TransientBuffer<256> uniform_buffer;
 	u32 gpu_frame = 0xffFFffFF;
 
-	LinearAllocator job_allocator;
-	Array<Renderer::RenderJob*> jobs;
+	LinearAllocator linear_allocator;
 	jobs::Mutex shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
 	jobs::Signal can_setup;
 	jobs::Signal setup_done;
 	u32 frame_number = 0;
-	DrawStream begin_draw_stream;
-	DrawStream end_draw_stream;
+	DrawStream begin_frame_draw_stream;
+	DrawStream draw_stream;
 };
 
 
@@ -507,7 +499,7 @@ struct RendererImpl final : Renderer
 		}
 		mb.data.back().next_free = -1;
 			
-		DrawStream& stream = m_cpu_frame->begin_draw_stream;
+		DrawStream& stream = m_cpu_frame->draw_stream;
 		stream.createBuffer(mb.buffer
 			, gpu::BufferFlags::UNIFORM_BUFFER
 			, Material::MAX_UNIFORMS_BYTES * MAX_MATERIAL_CONSTS_COUNT
@@ -622,7 +614,7 @@ struct RendererImpl final : Renderer
 			const u32 size = u32(data.length() * sizeof(float));
 			const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
 			memcpy(slice.ptr, data.begin(), size);
-			m_cpu_frame->begin_draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+			m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 		}
 		++m_material_buffer.data[idx].ref_count;
 		return idx;
@@ -644,7 +636,7 @@ struct RendererImpl final : Renderer
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle) return handle;
 
-		DrawStream& stream = createDrawStreamJob();
+		DrawStream& stream = getDrawStream();
 		stream.createBuffer(handle, flags, memory.size, memory.data);
 		if (memory.own) stream.freeMemory(memory.data, m_allocator);
 		return handle;
@@ -707,12 +699,12 @@ struct RendererImpl final : Renderer
 	}
 
 	void destroy(gpu::ProgramHandle program) override {
-		m_cpu_frame->end_draw_stream.destroy(program);
+		m_cpu_frame->draw_stream.destroy(program);
 	}
 
 	void destroy(gpu::BufferHandle buffer) override {
 		if (!buffer) return;
-		m_cpu_frame->end_draw_stream.destroy(buffer);
+		m_cpu_frame->draw_stream.destroy(buffer);
 	}
 
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
@@ -720,7 +712,7 @@ struct RendererImpl final : Renderer
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if(!handle) return handle;
 
-		DrawStream& stream = createDrawStreamJob();
+		DrawStream& stream = getDrawStream();
 		stream.createTexture(handle, w, h, depth, format, flags, debug_name);
 		if (memory.data && memory.size) {
 			ASSERT(depth == 1);
@@ -734,11 +726,11 @@ struct RendererImpl final : Renderer
 
 	void destroy(gpu::TextureHandle tex) override {
 		if (!tex) return;
-		m_cpu_frame->end_draw_stream.destroy(tex);
+		m_cpu_frame->draw_stream.destroy(tex);
 	}
 
-	void setupJob(RenderJob& job, void(*task)(void*)) override {
-		jobs::run(&job, task, &m_cpu_frame->setup_done);
+	void setupJob(void* user_ptr, void(*task)(void*)) override {
+		jobs::run(user_ptr, task, &m_cpu_frame->setup_done);
 	}
 
 	void addPlugin(RenderPlugin& plugin) override {
@@ -761,25 +753,8 @@ struct RendererImpl final : Renderer
 		ctx.addScene(scene.move());
 	}
 
-	DrawStream& getEndFrameDrawStream() override {
-		return m_cpu_frame->end_draw_stream;
-	}
-
-	DrawStream& createDrawStreamJob() override {
-		struct EncoderJob : RenderJob {
-			EncoderJob(PageAllocator& allocator) : stream(allocator) {}
-			void execute() override { stream.run(); }
-			DrawStream stream;
-		};
-		EncoderJob& job = createJob<EncoderJob>(m_engine.getPageAllocator());
-		return job.stream;
-	}
-
-	void* allocJob(u32 size, u32 align) override {
-		jobs::wait(&m_cpu_frame->can_setup);
-		void* job = m_cpu_frame->job_allocator.allocate_aligned(size, align);
-		m_cpu_frame->jobs.push((RenderJob*)job);
-		return job;
+	DrawStream& getDrawStream() override {
+		return m_cpu_frame->draw_stream;
 	}
 
 	const char* getName() const override { return "renderer"; }
@@ -797,7 +772,7 @@ struct RendererImpl final : Renderer
 			}
 		}
 		gpu::ProgramHandle program = gpu::allocProgramHandle();
-		shader.compile(program, state, decl, defines, m_cpu_frame->begin_draw_stream);
+		shader.compile(program, state, decl, defines, m_cpu_frame->begin_frame_draw_stream);
 		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, state});
 		return program;
 	}
@@ -825,10 +800,6 @@ struct RendererImpl final : Renderer
 		ASSERT(m_shader_defines.size() <= 32); // m_shader_defines are reserved in renderer constructor, so getShaderDefine() is MT safe
 		return u8(m_shader_defines.size() - 1);
 	}
-
-
-	void startCapture() override { createDrawStreamJob().startCapture(); }
-	void stopCapture() override { createDrawStreamJob().stopCapture(); }
 
 	void render() {
 		jobs::MutexGuard guard(m_render_mutex);
@@ -864,24 +835,15 @@ struct RendererImpl final : Renderer
 			profiler::pushCounter(texture_counter, to_MB(mem_stats.texture_mem));
 		}
 
-		frame.begin_draw_stream.run();
-		frame.begin_draw_stream.reset();
-
 		m_profiler.beginQuery("frame", 0, false);
-		for (RenderJob* job : frame.jobs) {
-			PROFILE_BLOCK("render job");
-			profiler::blockColor(0xaa, 0xff, 0xaa);
-			job->execute();
-			job->~RenderJob();
-			frame.job_allocator.deallocate_aligned(job);
-		}
-		
-		frame.end_draw_stream.run();
-		frame.end_draw_stream.reset();
-		
-		frame.job_allocator.reset();
+		frame.begin_frame_draw_stream.run();
+		frame.begin_frame_draw_stream.reset();
+
+		frame.draw_stream.run();
+		frame.draw_stream.reset();
+
+		frame.linear_allocator.reset();
 		m_profiler.endQuery();
-		frame.jobs.clear();
 
 		jobs::enableBackupWorker(true);
 
@@ -912,7 +874,7 @@ struct RendererImpl final : Renderer
 		}
 	}
 	
-	LinearAllocator& getCurrentFrameAllocator() { return m_cpu_frame->job_allocator; }
+	LinearAllocator& getCurrentFrameAllocator() { return m_cpu_frame->linear_allocator; }
 
 	void waitForCommandSetup() override
 	{
@@ -944,12 +906,12 @@ struct RendererImpl final : Renderer
 		
 		jobs::wait(&m_cpu_frame->setup_done);
 
-		m_cpu_frame->begin_draw_stream.useProgram(gpu::INVALID_PROGRAM);
-		m_cpu_frame->begin_draw_stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-		m_cpu_frame->begin_draw_stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		m_cpu_frame->begin_draw_stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		m_cpu_frame->draw_stream.useProgram(gpu::INVALID_PROGRAM);
+		m_cpu_frame->draw_stream.bindIndexBuffer(gpu::INVALID_BUFFER);
+		m_cpu_frame->draw_stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+		m_cpu_frame->draw_stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		for (u32 i = 0; i < (u32)UniformBuffer::COUNT; ++i) {
-			m_cpu_frame->begin_draw_stream.bindUniformBuffer(i, gpu::INVALID_BUFFER, 0, 0);
+			m_cpu_frame->draw_stream.bindUniformBuffer(i, gpu::INVALID_BUFFER, 0, 0);
 		}
 
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
@@ -963,7 +925,7 @@ struct RendererImpl final : Renderer
 
 		u32 frame_data_mem = 0;
 		for (const Local<FrameData>& fd : m_frames) {
-			frame_data_mem += fd->job_allocator.getCommited();
+			frame_data_mem += fd->linear_allocator.getCommited();
 		}
 		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
@@ -1028,6 +990,13 @@ struct RendererImpl final : Renderer
 	} m_material_buffer;
 };
 
+FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 
+	: renderer(renderer)
+	, to_compile_shaders(allocator)
+	, linear_allocator(1024 * 1024 * 64)
+	, draw_stream(renderer)
+	, begin_frame_draw_stream(renderer)
+{}
 
 extern "C"
 {
