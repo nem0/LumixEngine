@@ -1,5 +1,6 @@
 #define LUMIX_NO_CUSTOM_CRT
 
+#include "../draw_stream.h"
 #include "../model.h"
 #include "../renderer.h"
 #include "../render_scene.h"
@@ -81,7 +82,7 @@ void SplineGeometryPlugin::paint(const DVec3& pos
 		}
 	}
 
-	if (pg.vertex_buffer) renderer.destroy(pg.vertex_buffer);
+	if (pg.vertex_buffer) renderer.getDrawStream().destroy(pg.vertex_buffer);
 	const Renderer::MemRef mem = renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 	pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);	
 }

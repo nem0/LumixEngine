@@ -271,19 +271,19 @@ void DrawStream::bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu
 }
 
 void DrawStream::destroy(gpu::BindGroupHandle group) {
-	write(Instruction::DESTROY_BIND_GROUP, group);
+	if(group) write(Instruction::DESTROY_BIND_GROUP, group);
 }
 
 void DrawStream::destroy(gpu::TextureHandle texture) {
-	write(Instruction::DESTROY_TEXTURE, texture);
+	if (texture) write(Instruction::DESTROY_TEXTURE, texture);
 }
 
 void DrawStream::destroy(gpu::ProgramHandle program) {
-	write(Instruction::DESTROY_PROGRAM, program);
+	if(program) write(Instruction::DESTROY_PROGRAM, program);
 }
 
 void DrawStream::destroy(gpu::BufferHandle buffer) {
-	write(Instruction::DESTROY_BUFFER, buffer);
+	if (buffer) write(Instruction::DESTROY_BUFFER, buffer);
 }
 
 void DrawStream::readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf) {
@@ -402,7 +402,11 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 }
 
 void DrawStream::beginProfileBlock(const char* name) {
-	write(Instruction::BEGIN_PROFILE_BLOCK, name);
+	u32 len = stringLength(name) + 1;
+	u8* data = alloc(sizeof(Instruction) + sizeof(len) + len);
+	WRITE_CONST(Instruction::BEGIN_PROFILE_BLOCK);
+	WRITE(len);
+	WRITE_ARRAY(name, len);
 }
 
 void DrawStream::endProfileBlock() {
@@ -665,7 +669,7 @@ void DrawStream::run() {
 	run_called = true;
 	
 	Page* page = first;
-	#define READ(T, N) T N; memcpy(&N, ptr, sizeof(T)); ptr += sizeof(T);
+	#define READ(T, N) T N; memcpy(&N, ptr, sizeof(T)); ptr += sizeof(T)
 	while (page) {
 		const u8* ptr = page->data;
 		for (;;) {
@@ -926,8 +930,9 @@ void DrawStream::run() {
 					break;
 				}
 				case Instruction::BEGIN_PROFILE_BLOCK: {
-					READ(const char*, name)
-					renderer.beginProfileBlock(name, 0);
+					READ(u32, len);
+					renderer.beginProfileBlock((const char*)ptr, 0);
+					ptr += len;
 					break;
 				}
 				case Instruction::STOP_CAPTURE: {

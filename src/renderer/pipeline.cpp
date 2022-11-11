@@ -893,8 +893,9 @@ struct PipelineImpl final : Pipeline
 
 	~PipelineImpl()
 	{
-		for (gpu::TextureHandle t : m_textures) m_renderer.destroy(t);
-		for (gpu::BufferHandle b : m_buffers) m_renderer.destroy(b);
+		DrawStream& stream = m_renderer.getDrawStream();
+		for (gpu::TextureHandle t : m_textures) stream.destroy(t);
+		for (gpu::BufferHandle b : m_buffers) stream.destroy(b);
 
 		m_renderer.frame();
 		m_renderer.frame();
@@ -905,7 +906,7 @@ struct PipelineImpl final : Pipeline
 		m_instancing_shader->decRefCount();
 
 		for (const Renderbuffer& rb : m_renderbuffers) {
-			m_renderer.destroy(rb.handle);
+			stream.destroy(rb.handle);
 		}
 
 		for(ShaderRef& shader : m_shaders) {
@@ -913,16 +914,16 @@ struct PipelineImpl final : Pipeline
 		}
 		if (m_resource) m_resource->decRefCount();
 
-		m_renderer.destroy(m_cube_ib);
-		m_renderer.destroy(m_cube_vb);
-		m_renderer.destroy(m_instanced_meshes_buffer);
-		m_renderer.destroy(m_indirect_buffer);
-		m_renderer.destroy(m_shadow_atlas.texture);
-		m_renderer.destroy(m_cluster_buffers.clusters.buffer);
-		m_renderer.destroy(m_cluster_buffers.lights.buffer);
-		m_renderer.destroy(m_cluster_buffers.maps.buffer);
-		m_renderer.destroy(m_cluster_buffers.env_probes.buffer);
-		m_renderer.destroy(m_cluster_buffers.refl_probes.buffer);
+		stream.destroy(m_cube_ib);
+		stream.destroy(m_cube_vb);
+		stream.destroy(m_instanced_meshes_buffer);
+		stream.destroy(m_indirect_buffer);
+		stream.destroy(m_shadow_atlas.texture);
+		stream.destroy(m_cluster_buffers.clusters.buffer);
+		stream.destroy(m_cluster_buffers.lights.buffer);
+		stream.destroy(m_cluster_buffers.maps.buffer);
+		stream.destroy(m_cluster_buffers.env_probes.buffer);
+		stream.destroy(m_cluster_buffers.refl_probes.buffer);
 
 		clearBuffers();
 	}
@@ -1077,7 +1078,7 @@ struct PipelineImpl final : Pipeline
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
 			if (rb.frame_counter > 2 && !rb.persistent && rb.handle) {
-				m_renderer.destroy(rb.handle);
+				m_renderer.getDrawStream().destroy(rb.handle);
 				rb.handle = gpu::INVALID_TEXTURE;
 			}
 		}

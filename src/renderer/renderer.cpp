@@ -698,15 +698,6 @@ struct RendererImpl final : Renderer
 		return m_max_sort_key;
 	}
 
-	void destroy(gpu::ProgramHandle program) override {
-		m_cpu_frame->draw_stream.destroy(program);
-	}
-
-	void destroy(gpu::BufferHandle buffer) override {
-		if (!buffer) return;
-		m_cpu_frame->draw_stream.destroy(buffer);
-	}
-
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
 	{
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
@@ -723,11 +714,6 @@ struct RendererImpl final : Renderer
 		return handle;
 	}
 
-
-	void destroy(gpu::TextureHandle tex) override {
-		if (!tex) return;
-		m_cpu_frame->draw_stream.destroy(tex);
-	}
 
 	void setupJob(void* user_ptr, void(*task)(void*)) override {
 		jobs::run(user_ptr, task, &m_cpu_frame->setup_done);
@@ -776,8 +762,6 @@ struct RendererImpl final : Renderer
 		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, state});
 		return program;
 	}
-
-	void makeScreenshot(const Path& filename) override {  }
 
 
 	u8 getShaderDefineIdx(const char* define) override

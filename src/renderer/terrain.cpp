@@ -7,6 +7,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "renderer/draw_stream.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
@@ -34,7 +35,7 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 	if (m_is_grass_dirty) {
 		for (GrassType& type : m_grass_types) {
 			for (const GrassQuad& quad : type.m_quads) {
-				m_renderer.destroy(quad.instances);
+				m_renderer.getDrawStream().destroy(quad.instances);
 			}
 			type.m_quads.clear();
 		}
@@ -50,7 +51,7 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 		HashMap<u64, GrassQuad>& quads = type.m_quads;
 		quads.eraseIf([&](const GrassQuad& q){
 			if (q.last_used_frame < frame - 3) {
-				m_renderer.destroy(q.instances);
+				m_renderer.getDrawStream().destroy(q.instances);
 				return true;
 			}
 			return false;
@@ -175,7 +176,7 @@ Terrain::~Terrain()
 {
 	for (const GrassType& type : m_grass_types) {
 		for (const GrassQuad& quad : type.m_quads) {
-			m_renderer.destroy(quad.instances);
+			m_renderer.getDrawStream().destroy(quad.instances);
 		}
 	}
 	setMaterial(nullptr);

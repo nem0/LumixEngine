@@ -401,7 +401,7 @@ bool Shader::load(u64 size, const u8* mem)
 void Shader::unload()
 {
 	for (gpu::ProgramHandle prg : m_programs) {
-		m_renderer.destroy(prg);
+		m_renderer.getDrawStream().destroy(prg);
 	}
 	m_sources.common = "";
 	m_sources.stages.clear();
