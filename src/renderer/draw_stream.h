@@ -2,6 +2,7 @@
 
 #include "gpu/gpu.h"
 #ifndef _WIN32
+	#include "engine/allocator.h"
 	#include <string.h>
 #endif
 
