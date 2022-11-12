@@ -758,7 +758,44 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		m_wireframe_action.init("     Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL, true);
+		m_wireframe_action.func.bind<&MaterialPlugin::toggleWireframe>(this);
+
 		app.getAssetCompiler().registerExtension("mat", Material::TYPE);
+		app.addToolAction(&m_wireframe_action);
+	}
+
+	~MaterialPlugin() {
+		m_app.removeAction(&m_wireframe_action);
+	}
+
+	void toggleWireframe() {
+		WorldEditor& editor = m_app.getWorldEditor();
+		const Array<EntityRef>& selected = editor.getSelectedEntities();
+		if (selected.empty()) return;
+
+		Universe& universe = *editor.getUniverse();
+		RenderScene& scene = *(RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+
+		Array<Material*> materials(m_app.getAllocator());
+		for (EntityRef e : selected) {
+			if (universe.hasComponent(e, MODEL_INSTANCE_TYPE)) {
+				Model* model = scene.getModelInstanceModel(e);
+				if (!model->isReady()) continue;
+				
+				for (u32 i = 0; i < (u32)model->getMeshCount(); ++i) {
+					Mesh& mesh = model->getMesh(i);
+					materials.push(mesh.material);
+				}
+			}
+			if (scene.hasProceduralGeometry(e)) {
+				materials.push(scene.getProceduralGeometry(e).material);
+			}
+		}
+		materials.removeDuplicates();
+		for (Material* m : materials) {
+			m->setWireframe(!m->wireframe());
+		}
 	}
 
 	bool canCreateResource() const override { return true; }
@@ -1065,6 +1102,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	StudioApp& m_app;
+	Action m_wireframe_action;
 };
 
 

@@ -127,10 +127,12 @@ void String::operator=(const String& rhs)
 void String::operator=(Span<const char> rhs)
 {
 	if (!isSmall()) {
+		ASSERT(rhs.begin() > m_big + m_size || rhs.end() < m_big);
 		m_allocator.deallocate(m_big);
 	}
 		
 	if (rhs.length() < sizeof(m_small)) {
+		ASSERT(rhs.begin() > m_small + m_size || rhs.end() < m_small);
 		memcpy(m_small, rhs.m_begin, rhs.length());
 		m_small[rhs.length()] = '\0';
 	}

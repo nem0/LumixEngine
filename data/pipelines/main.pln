@@ -58,7 +58,6 @@ local default_state = {
 	stencil_sfail = STENCIL_KEEP,
 	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
-	wireframe = false
 }
 
 local terrain_state = {
@@ -72,7 +71,6 @@ local terrain_state = {
 	stencil_sfail = STENCIL_KEEP,
 	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
-	wireframe = false
 }
 
 local impostor_state = {
@@ -84,7 +82,6 @@ local impostor_state = {
 	stencil_sfail = STENCIL_KEEP,
 	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
-	wireframe = false
 }
 
 local grass_state = {
@@ -97,7 +94,6 @@ local grass_state = {
 	stencil_sfail = STENCIL_KEEP,
 	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
-	wireframe = false
 }
 
 local shadow_grass_state = {
@@ -110,7 +106,6 @@ local shadow_grass_state = {
 	stencil_sfail = STENCIL_KEEP,
 	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
-	wireframe = false
 }
 
 function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
@@ -166,7 +161,7 @@ function geomPass(entities)
 		local view_params = getCameraParams()
 		pass(view_params)
 		if render_terrain then
-			renderTerrains(view_params, {define = "DEPTH", wireframe = terrain_state.wireframe})
+			renderTerrains(view_params, {define = "DEPTH" })
 		end
 		if render_grass then
 			renderGrass(view_params, grass_state)
@@ -624,7 +619,6 @@ function onGUI()
 		changed, debug_ao = ImGui.Checkbox("AO", debug_ao)
 		changed, debug_shadow_buf = ImGui.Checkbox("GBuffer shadow", debug_shadow_buf)
 		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
-		changed, default_state.wireframe = ImGui.Checkbox("Wireframe", default_state.wireframe)
 		changed, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
 		changed, render_grass = ImGui.Checkbox("Grass", render_grass)
 		changed, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
@@ -635,10 +629,6 @@ function onGUI()
 		if changed then
 			Renderer.setLODMultiplier(lod_mul)
 		end
-		terrain_state.wireframe = default_state.wireframe
-		water_state.wireframe = default_state.wireframe
-		grass_state.wireframe = default_state.wireframe
-		impostor_state.wireframe = default_state.wireframe
 		ImGui.EndPopup()
 	end
 end

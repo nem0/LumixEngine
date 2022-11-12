@@ -81,6 +81,7 @@ struct StudioAppImpl final : StudioApp
 		, m_actions(m_allocator)
 		, m_owned_actions(m_allocator)
 		, m_window_actions(m_allocator)
+		, m_tools_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
 		, m_is_export_game_dialog_open(false)
 		, m_settings(*this)
@@ -1257,8 +1258,13 @@ struct StudioAppImpl final : StudioApp
 	{
 		m_actions.eraseItem(action);
 		m_window_actions.eraseItem(action);
+		m_tools_actions.eraseItem(action);
 	}
 
+	void addToolAction(Action* action) override {
+		addAction(action);
+		m_tools_actions.push(action);
+	}
 
 	void addWindowAction(Action* action) override
 	{
@@ -1484,6 +1490,9 @@ struct StudioAppImpl final : StudioApp
 		menuItem("autosnapDown", true);
 		menuItem("export_game", true);
 		if (renderDocOption()) menuItem("launch_renderdoc", true);
+		for (Action* action : m_tools_actions) {
+			Lumix::menuItem(*action, true);
+		}
 		ImGui::EndMenu();
 	}
 
@@ -3327,6 +3336,7 @@ struct StudioAppImpl final : StudioApp
 	os::WindowHandle m_main_window;
 	os::WindowState m_fullscreen_restore_state;
 	Array<Action*> m_owned_actions;
+	Array<Action*> m_tools_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
 	Array<GUIPlugin*> m_gui_plugins;

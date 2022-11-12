@@ -91,6 +91,9 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void unsetCustomFlag(u32 flag) { m_custom_flags &= ~flag; }
 	bool isCustomFlag(u32 flag) const { return (m_custom_flags & flag) == flag; }
 
+	bool wireframe() const;
+	void setWireframe(bool enable);
+
 	u8 getLayer() const { return m_layer; }
 	void setLayer(u8 layer);
 	u32 getSortKey() const { return m_sort_key; }

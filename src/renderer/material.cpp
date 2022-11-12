@@ -671,6 +671,14 @@ int texture(lua_State* L)
 
 } // namespace LuaAPI
 
+bool Material::wireframe() const {
+	return u32(m_render_states & gpu::StateFlags::WIREFRAME);
+}
+
+void Material::setWireframe(bool enable) {
+	if (enable) m_render_states = m_render_states | gpu::StateFlags::WIREFRAME;
+	else m_render_states = m_render_states & ~gpu::StateFlags::WIREFRAME;
+}
 
 bool Material::load(u64 size, const u8* mem)
 {
