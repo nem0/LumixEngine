@@ -95,8 +95,8 @@ struct Program {
 
 	GLuint gl_handle = 0;
 	VertexDecl decl;
-	GLuint primitive_type;
-	StateFlags state;
+	GLuint primitive_type = 0;
+	StateFlags state = StateFlags::NONE;
 	#ifdef LUMIX_DEBUG
 		StaticString<64> name;
 	#endif
@@ -1520,21 +1520,15 @@ bool init(void* window_handle, InitFlags init_flags)
 	
 	gl->default_program = allocProgramHandle();
 	ASSERT(gl->default_program);
-	Program& p = *gl->default_program;
-	p.state = StateFlags::NONE;
-	p.gl_handle = glCreateProgram();
+	
+	const char* default_srcs[] = { "void main() {}", "void main() { gl_Position = vec4(0); }" };
+	const ShaderType default_types[] = { ShaderType::FRAGMENT, ShaderType::VERTEX };
+	createProgram(gl->default_program, StateFlags::NONE, VertexDecl(PrimitiveType::NONE), default_srcs, default_types, 2, nullptr, 0, "default shader");
+	
 	glGenVertexArrays(1, &gl->contexts[0].vao);
 	glBindVertexArray(gl->contexts[0].vao);
 	glVertexBindingDivisor(0, 0);
 	glVertexBindingDivisor(1, 1);
-
-	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
-	glShaderSource(vs, 1, &vs_src, nullptr);
-	glCompileShader(vs);
-	glAttachShader(p.gl_handle, vs);
-	glLinkProgram(p.gl_handle);
-	glDeleteShader(vs);
 
 	glCreateBuffers(1, &gl->helper_indirect_buffer);
 	glNamedBufferStorage(gl->helper_indirect_buffer, 256, nullptr, GL_DYNAMIC_STORAGE_BIT);

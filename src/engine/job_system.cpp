@@ -127,7 +127,7 @@ struct Waitor {
 template <bool ZERO>
 LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 {
-	Waitor* waitor;
+	Waitor* waitor = nullptr;
 	{
 		Lumix::MutexGuard lock(g_system->m_sync);
 
