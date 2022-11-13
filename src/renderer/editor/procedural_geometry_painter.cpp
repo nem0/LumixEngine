@@ -4,6 +4,7 @@
 #include "../model.h"
 #include "../renderer.h"
 #include "../render_scene.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/core.h"
@@ -16,7 +17,16 @@ namespace Lumix {
 
 ProceduralGeometryPainter::ProceduralGeometryPainter(StudioApp& app) 
 	: m_app(app)
-{}
+{
+	m_toggle_ui.init("Procedural painter", "Toggle procedural painter UI", "procedural_geom_painter", "", false);
+	m_toggle_ui.func.bind<&ProceduralGeometryPainter::toggleUI>(this);
+	m_toggle_ui.is_selected.bind<&ProceduralGeometryPainter::isOpen>(this);
+	app.addWindowAction(&m_toggle_ui);
+}
+
+ProceduralGeometryPainter::~ProceduralGeometryPainter() {
+	m_app.removeAction(&m_toggle_ui);
+}
 
 void ProceduralGeometryPainter::paint(const DVec3& pos
 	, const Universe& universe
@@ -139,8 +149,18 @@ void ProceduralGeometryPainter::drawCursor(WorldEditor& editor, RenderScene& sce
 	}
 }
 
+void ProceduralGeometryPainter::onSettingsLoaded() {
+	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_proc_geom_painter_open", false);
+}
+
+void ProceduralGeometryPainter::onBeforeSettingsSaved() {
+	m_app.getSettings().setValue(Settings::GLOBAL, "is_proc_geom_painter_open", m_is_open);
+}
+
 void ProceduralGeometryPainter::onWindowGUI() {
-	if (!ImGui::Begin("Procedural geometry painter")) {
+	if (!m_is_open) return;
+	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Procedural geometry painter", &m_is_open)) {
 		ImGui::End();
 		return;
 	}
