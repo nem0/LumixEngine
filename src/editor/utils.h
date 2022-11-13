@@ -81,14 +81,16 @@ struct SimpleUndoRedo {
 	void undo() {
 		if (m_stack_idx <= 0) return;
 	
-		deserialize(InputMemoryStream(m_stack[m_stack_idx - 1].blob));
+		InputMemoryStream blob(m_stack[m_stack_idx - 1].blob);
+		deserialize(blob);
 		--m_stack_idx;
 	}
 
 	void redo() {
 		if (m_stack_idx + 1 >= m_stack.size()) return;
 	
-		deserialize(InputMemoryStream(m_stack[m_stack_idx + 1].blob));
+		InputMemoryStream blob(m_stack[m_stack_idx + 1].blob);
+		deserialize(blob);
 		++m_stack_idx;
 	}
 
@@ -140,7 +142,9 @@ struct NodeEditor : SimpleUndoRedo {
 		const ImVec2 origin = ImGui::GetCursorScreenPos();
 
 		ImGuiID moved = 0;
+		ImGuiID unlink_moved = 0;
 		u32 moved_count = 0;
+		u32 unlink_moved_count = 0;
 		for (NodeType& node : resource.m_nodes) {
 			const ImVec2 old_pos = node->m_pos;
 			if (node->nodeGUI()) {
@@ -149,11 +153,31 @@ struct NodeEditor : SimpleUndoRedo {
 			if (old_pos.x != node->m_pos.x || old_pos.y != node->m_pos.y) {
 				moved = node->m_id;
 				++moved_count;
+				if (ImGui::GetIO().KeyAlt) {
+					u32 old_count = resource.m_links.size();
+					
+					for (i32 i = resource.m_links.size() - 1; i >= 0; --i) {
+						const LinkType& link = resource.m_links[i];
+						if (link.getToNode() == node->m_id) {
+							for (LinkType& rlink : resource.m_links) {
+								if (rlink.getFromNode() == node->m_id && rlink.getFromPin() == link.getToPin()) {
+									rlink.from = link.from;
+									resource.m_links.erase(i);
+								}
+							}
+						}
+					}
+					
+					unlink_moved_count += old_count != resource.m_links.size() ? 1 : 0;
+					unlink_moved = node->m_id;
+				}
 			}
 		}
 
 		if (moved_count > 0) {
-			if (moved_count > 1) pushUndo(0xffFE);
+			if (unlink_moved_count > 1) pushUndo(NO_MERGE_UNDO);
+			else if (unlink_moved_count == 1) pushUndo(unlink_moved);
+			else if (moved_count > 1) pushUndo(NO_MERGE_UNDO - 1);
 			else pushUndo(moved);
 		}
 		

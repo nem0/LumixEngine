@@ -94,12 +94,12 @@ struct ParticleEditorResource {
 
 		NodeInput getInput(u8 input_idx) {
 			for (const Link& link : m_resource.m_links) {
-				if (link.toNode() != m_id) continue;
-				if (link.toPin() != input_idx) continue;
+				if (link.getToNode() != m_id) continue;
+				if (link.getToPin() != input_idx) continue;
 
 				NodeInput res;
-				res.output_idx = link.fromPin();
-				res.node = m_resource.getNodeByID(link.fromNode());
+				res.output_idx = link.getFromPin();
+				res.node = m_resource.getNodeByID(link.getFromNode());
 				return res;
 			}
 
@@ -1080,11 +1080,11 @@ struct ParticleEditorResource {
 		u32 to;
 		ImU32 color;
 
-		u16 toNode() const { return to & 0xffFF; }
-		u16 fromNode() const { return from & 0xffFF; }
+		u16 getToNode() const { return to & 0xffFF; }
+		u16 getFromNode() const { return from & 0xffFF; }
 		
-		u8 toPin() const { return (to >> 16) & 0xff; }
-		u8 fromPin() const { return (from >> 16) & 0xff; }
+		u8 getToPin() const { return (to >> 16) & 0xff; }
+		u8 getFromPin() const { return (from >> 16) & 0xff; }
 	};
 
 	ParticleEditorResource(IAllocator& allocator)
@@ -1101,9 +1101,9 @@ struct ParticleEditorResource {
 	
 	void colorLinks(ImU32 color, u32 link_idx) {
 		m_links[link_idx].color = color;
-		const u16 from_node_id = m_links[link_idx].fromNode();
+		const u16 from_node_id = m_links[link_idx].getFromNode();
 		for (u32 i = 0, c = m_links.size(); i < c; ++i) {
-			if (m_links[i].toNode() == from_node_id) colorLinks(color, i);
+			if (m_links[i].getToNode() == from_node_id) colorLinks(color, i);
 		}
 	}
 	
@@ -1131,12 +1131,12 @@ struct ParticleEditorResource {
 
 		for (u32 i = 0, c = m_links.size(); i < c; ++i) {
 			const ParticleEditorResource::Link& link = m_links[i];
-			const ParticleEditorResource::Node* node = getNode(link.toNode());
+			const ParticleEditorResource::Node* node = getNode(link.getToNode());
 			switch(node->getType()) {
 				case ParticleEditorResource::Node::UPDATE:
 				case ParticleEditorResource::Node::EMIT:
 				case ParticleEditorResource::Node::OUTPUT:
-					colorLinks(colors[link.toPin() % lengthOf(colors)], i);
+					colorLinks(colors[link.getToPin() % lengthOf(colors)], i);
 					break;
 			}
 
@@ -1492,7 +1492,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 			Node* n = m_resource->m_nodes[i].get();
 			if (n->m_selected) {
 				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
-					return link.fromNode() == n->m_id || link.toNode() == n->m_id;
+					return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 				});
 				m_resource->m_nodes.swapAndPop(i);
 			}
@@ -1519,12 +1519,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 				case Node::OUTPUT: {
 					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
 						ParticleEditorResource::Link& link = m_resource->m_links[j];
-						if (link.toNode() == n->m_id) {
-							if (link.toPin() == output_idx) {
+						if (link.getToNode() == n->m_id) {
+							if (link.getToPin() == output_idx) {
 								m_resource->m_links.swapAndPop(j);
 							}
-							else if (link.toPin() > output_idx) {
-								link.to = link.toNode() | (u32(link.toPin() - 1) << 16);
+							else if (link.getToPin() > output_idx) {
+								link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
 							}
 						}
 					}
@@ -1543,13 +1543,13 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 					auto* node = (ParticleEditorResource::UpdateNode*)n.get();
 					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
 						ParticleEditorResource::Link& link = m_resource->m_links[j];
-						if (link.toNode() == node->m_id) {
+						if (link.getToNode() == node->m_id) {
 							// `stream_idx + 1` because of the "kill" input pin
-							if (link.toPin() == stream_idx + 1) {
+							if (link.getToPin() == stream_idx + 1) {
 								m_resource->m_links.swapAndPop(j);
 							}
-							else if (link.toPin() > stream_idx + 1) {
-								link.to = link.toNode() | (u32(link.toPin() - 1) << 16);
+							else if (link.getToPin() > stream_idx + 1) {
+								link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
 							}
 						}
 					}
@@ -1559,12 +1559,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 					auto* node = (ParticleEditorResource::EmitNode*)n.get();
 					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
 						ParticleEditorResource::Link& link = m_resource->m_links[j];
-						if (link.toNode() == node->m_id) {
-							if (link.toPin() == stream_idx) {
+						if (link.getToNode() == node->m_id) {
+							if (link.getToPin() == stream_idx) {
 								m_resource->m_links.swapAndPop(j);
 							}
-							else if (link.toPin() > stream_idx) {
-								link.to = link.toNode() | (u32(link.toPin() - 1) << 16);
+							else if (link.getToPin() > stream_idx) {
+								link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
 							}
 						}
 					}
@@ -1574,7 +1574,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 					auto* node = (ParticleEditorResource::InputNode*)n.get();
 					if (node->idx == stream_idx) {
 						m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
-							return link.fromNode() == n->m_id || link.toNode() == n->m_id;
+							return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 						});
 						m_resource->m_nodes.swapAndPop(i);
 					}
