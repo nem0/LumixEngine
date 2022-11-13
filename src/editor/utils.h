@@ -4,6 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/string.h"
 #include "engine/stream.h"
+#include <imgui/imgui.h>
 
 namespace Lumix {
 
@@ -91,7 +92,7 @@ struct SimpleUndoRedo {
 		++m_stack_idx;
 	}
 
-	void pushUndo(u32 tag) {
+	virtual void pushUndo(u32 tag) {
 		while (m_stack.size() > m_stack_idx + 1) m_stack.pop();
 
 		Undo u(m_allocator);
@@ -118,6 +119,119 @@ private:
 	IAllocator& m_allocator;
 	Array<Undo> m_stack;
 	i32 m_stack_idx = -1;
+};
+
+template<typename ResourceType, typename NodeType, typename LinkType>
+struct NodeEditor : SimpleUndoRedo {
+	enum { OUTPUT_FLAG = 1 << 31 };
+
+	NodeEditor(IAllocator& allocator)
+		: SimpleUndoRedo(allocator)
+	{}
+
+	virtual void onCanvasClicked(ImVec2 pos) = 0;
+	virtual void onLinkDoubleClicked(LinkType& link, ImVec2 pos) = 0;
+	virtual void onContextMenu(bool recently_opened, ImVec2 pos) = 0;
+
+	void nodeEditorGUI(ResourceType& resource) {
+		m_canvas.begin();
+
+		ImGuiEx::BeginNodeEditor("node_editor", &m_offset);
+		const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+		ImGuiID moved = 0;
+		u32 moved_count = 0;
+		for (NodeType& node : resource.m_nodes) {
+			const ImVec2 old_pos = node->m_pos;
+			if (node->nodeGUI()) {
+				pushUndo(node->m_id);
+			}
+			if (old_pos.x != node->m_pos.x || old_pos.y != node->m_pos.y) {
+				moved = node->m_id;
+				++moved_count;
+			}
+		}
+
+		if (moved_count > 0) {
+			if (moved_count > 1) pushUndo(0xffFE);
+			else pushUndo(moved);
+		}
+		
+		bool open_context = false;
+		i32 hovered_link = -1;
+		for (i32 i = 0, c = resource.m_links.size(); i < c; ++i) {
+			LinkType& link = resource.m_links[i];
+			ImGuiEx::NodeLinkEx(link.from | OUTPUT_FLAG, link.to, link.color, ImGui::GetColorU32(ImGuiCol_TabActive));
+			if (ImGuiEx::IsLinkHovered()) {
+				if (ImGui::IsMouseClicked(0) && ImGui::GetIO().KeyCtrl) {
+					if (ImGuiEx::IsLinkStartHovered()) {
+						ImGuiEx::StartNewLink(link.to, true);
+					}
+					else {
+						ImGuiEx::StartNewLink(link.from | OUTPUT_FLAG, false);
+					}
+					resource.m_links.erase(i);
+					--c;
+				}
+				if (ImGui::IsMouseDoubleClicked(0)) {
+					onLinkDoubleClicked(link, ImGui::GetMousePos() - m_offset);
+				}
+				else {
+					hovered_link = i;
+				}
+			}
+		}
+
+		{
+			ImGuiID start_attr, end_attr;
+			if (ImGuiEx::GetHalfLink(&start_attr)) {
+				open_context = true;
+				m_half_link_start = start_attr;
+			}
+
+			if (ImGuiEx::GetNewLink(&start_attr, &end_attr)) {
+				ASSERT(start_attr & OUTPUT_FLAG);
+				resource.m_links.eraseItems([&](const LinkType& link) { return link.to == end_attr; });
+				resource.m_links.push({u32(start_attr) & ~OUTPUT_FLAG, u32(end_attr)});
+			
+				pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+			}
+		}
+
+		ImGuiEx::EndNodeEditor();
+		
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
+			if (ImGui::GetIO().KeyAlt && hovered_link != -1) {
+				resource.m_links.erase(hovered_link);
+				pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+			}
+			else {
+				onCanvasClicked(ImGui::GetMousePos() - m_offset);
+			}
+		}
+
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+			open_context = true;
+			m_half_link_start = 0;
+		}
+
+		if (open_context) ImGui::OpenPopup("context_menu");
+
+		if (ImGui::BeginPopup("context_menu")) {
+			const ImVec2 pos = ImGui::GetMousePosOnOpeningCurrentPopup() - m_offset;
+			onContextMenu(open_context, pos);
+			ImGui::EndPopup();
+		}		
+
+		m_is_any_item_active = ImGui::IsAnyItemActive();
+
+		m_canvas.end();
+	}
+
+	ImGuiEx::Canvas m_canvas;
+	ImVec2 m_offset = ImVec2(0, 0);
+	ImGuiID m_half_link_start = 0;
+	bool m_is_any_item_active = false;
 };
 
 } // namespace Lumix

@@ -116,7 +116,7 @@ struct ParticleEditorResource {
 			++m_output_counter;
 		}
 
-		bool onNodeGUI() {
+		bool nodeGUI() {
 			m_input_counter = 0;
 			m_output_counter = 0;
 			const ImVec2 old_pos = m_pos;
@@ -1076,8 +1076,8 @@ struct ParticleEditorResource {
 	};
 	
 	struct Link {
-		int from;
-		int to;
+		u32 from;
+		u32 to;
 		ImU32 color;
 
 		u16 toNode() const { return to & 0xffFF; }
@@ -1348,12 +1348,12 @@ struct ParticleEditorResource {
 	u8 m_registers_count = 0;
 };
 
-struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
+struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, UniquePtr<ParticleEditorResource::Node>, ParticleEditorResource::Link> {
 	using Node = ParticleEditorResource::Node;
 	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_app(app)
-		, SimpleUndoRedo(allocator)
+		, NodeEditor(allocator)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
@@ -1397,8 +1397,97 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 		m_app.removeAction(&m_apply_action);
 	}
 
-	void deleteSelectedNodes() {
+	void onCanvasClicked(ImVec2 pos) override {
+		static const struct {
+			char key;
+			Node::Type type;
+		} types[] = {
+			{ 'A', Node::Type::ADD },
+			{ 'D', Node::Type::DIV },
+			{ 'G', Node::Type::GRADIENT },
+			{ 'M', Node::Type::MUL },
+			{ 'R', Node::Type::RANDOM },
+			{ '1', Node::Type::NUMBER},
+			{ '3', Node::Type::VEC3 },
+			{ '4', Node::Type::VEC4 }
+		};
+		Node* n = nullptr;
+		for (const auto& t : types) {
+			if (os::isKeyDown((os::Keycode)t.key)) {
+				n = addNode(t.type);
+				break;
+			}
+		}
+		if (n) {
+			n->m_pos = pos;
+			pushUndo(NO_MERGE_UNDO);
+		}	
+	}
+	
+	void onLinkDoubleClicked(ParticleEditorResource::Link& link, ImVec2 pos) override {
+		Node* n = addNode(ParticleEditorResource::Node::Type::PIN);
+		ParticleEditorResource::Link new_link;
+		new_link.from = n->m_id | OUTPUT_FLAG; 
+		new_link.to = link.to;
+		link.to = n->m_id;
+		m_resource->m_links.push(new_link);
+		n->m_pos = pos;
+		pushUndo(0xffFF);
+	}
+	
+	void onContextMenu(bool recently_opened, ImVec2 pos) override {
+		ImVec2 cp = ImGui::GetItemRectMin();
+		ParticleEditorResource::Node* n = nullptr;
+		if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
+		if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
+		if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
+		if (ImGui::BeginMenu("Constant")) {
+			for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
+				if (ImGui::Selectable(m_resource->m_consts[i].name)) {
+					n = addNode(ParticleEditorResource::Node::CONST);
+					((ParticleEditorResource::ConstNode*)n)->idx = i;
+				}
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::Selectable("Cos")) n = addNode(ParticleEditorResource::Node::COS);
+		if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
+		if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
+		if (ImGui::BeginMenu("Input")) {
+			for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
+				if (ImGui::Selectable(m_resource->m_streams[i].name)) {
+					n = addNode(ParticleEditorResource::Node::INPUT);
+					((ParticleEditorResource::InputNode*)n)->idx = i;
+				}
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::Selectable("Number")) n = addNode(ParticleEditorResource::Node::NUMBER);
+		if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
+		if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
+		if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
+		if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
+		if (ImGui::Selectable("Sin")) n = addNode(ParticleEditorResource::Node::SIN);
+		if (ImGui::Selectable("Switch")) n = addNode(ParticleEditorResource::Node::SWITCH);
+		if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
+		if (ImGui::Selectable("Vec4")) n = addNode(ParticleEditorResource::Node::VEC4);
+		if (n) {
+			n->m_pos = pos;
+				
+			if (m_half_link_start) {
+				if (m_half_link_start & OUTPUT_FLAG) {
+					if (n->hasInputPins()) m_resource->m_links.push({u32(m_half_link_start), u32(n->m_id)});
+				}
+				else {
+					if (n->hasOutputPins()) m_resource->m_links.push({u32(n->m_id | OUTPUT_FLAG) , u32(m_half_link_start)});
+				}
+				m_half_link_start = 0;
+			}
+			pushUndo(NO_MERGE_UNDO);
+		}	
+	}
 
+	void deleteSelectedNodes() {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
 			Node* n = m_resource->m_nodes[i].get();
 			if (n->m_selected) {
@@ -1408,7 +1497,7 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 				m_resource->m_nodes.swapAndPop(i);
 			}
 		}
-		saveUndo(NO_MERGE_UNDO);
+		pushUndo(NO_MERGE_UNDO);
 	}
 
 	bool hasFocus() override { return m_has_focus; }
@@ -1443,7 +1532,7 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 			}
 		}
 		m_resource->m_outputs.erase(output_idx);
-		saveUndo(NO_MERGE_UNDO);
+		pushUndo(NO_MERGE_UNDO);
 	}
 
 	void deleteStream(u32 stream_idx) {
@@ -1494,7 +1583,7 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 			}
 		}
 		m_resource->m_streams.erase(stream_idx);
-		saveUndo(NO_MERGE_UNDO);
+		pushUndo(NO_MERGE_UNDO);
 	}
 
 	void leftColumnGUI() {
@@ -1546,7 +1635,7 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 				if (ImGui::Button(ICON_FA_TRASH)) {
 					m_resource->m_consts.erase(u32(&s - m_resource->m_consts.begin()));
 					ImGui::PopID();
-					saveUndo(NO_MERGE_UNDO);
+					pushUndo(NO_MERGE_UNDO);
 					break;
 				}
 				ImGui::SameLine();
@@ -1659,174 +1748,9 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 		}
 
 		ImGui::Columns(2);
-
 		leftColumnGUI();
-
 		ImGui::NextColumn();
-
-		ImVec2 canvas_size = ImGui::GetContentRegionAvail();
-		
-		if (canvas_size.x > 0 && canvas_size.y > 0) {
-
-			m_canvas.begin();
-
-			ImGuiEx::BeginNodeEditor("particle_editor", &m_offset);
-			const ImVec2 origin = ImGui::GetCursorScreenPos();
-
-			i32 hovered_node = -1;
-			i32 hovered_link = -1;
-			for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
-				if (n->onNodeGUI()) {
-					saveUndo(n->m_id);
-				}
-				if (ImGui::IsItemHovered()) {
-					hovered_node = n->m_id;
-				}
-			}
-
-			for (i32 i = 0, c = m_resource->m_links.size(); i < c; ++i) {
-				ParticleEditorResource::Link& link = m_resource->m_links[i];
-				ImGuiEx::NodeLinkEx(link.from, link.to, link.color, ImGui::GetColorU32(ImGuiCol_TabActive));
-				if (ImGuiEx::IsLinkHovered()) {
-					if (ImGui::IsMouseClicked(0) && ImGui::GetIO().KeyCtrl) {
-						if (ImGuiEx::IsLinkStartHovered()) {
-							ImGuiEx::StartNewLink(link.to, true);
-						}
-						else {
-							ImGuiEx::StartNewLink(link.from | OUTPUT_FLAG, false);
-						}
-						m_resource->m_links.erase(i);
-						--c;
-					}
-					const ImVec2 mp = ImGui::GetMousePos() - origin - m_offset;
-					if (ImGui::IsMouseDoubleClicked(0)) {
-						Node* n = addNode(ParticleEditorResource::Node::Type::PIN);
-						ParticleEditorResource::Link new_link;
-						new_link.from = n->m_id | OUTPUT_FLAG; 
-						new_link.to = link.to;
-						link.to = n->m_id;
-						m_resource->m_links.push(new_link);
-						n->m_pos = mp;
-						saveUndo(0xffFF);
-					}
-					hovered_link = i32(&link - m_resource->m_links.begin());
-				}
-			}
-
-			bool open_context = false;
-			ImGuiID nlf, nlt;
-			if (ImGuiEx::GetHalfLink(&nlf)) {
-				open_context = true;
-				m_half_link_start = nlf;
-			}
-			else if (ImGuiEx::GetNewLink(&nlf, &nlt)) {
-				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){ return link.to == nlt; });
-				ParticleEditorResource::Link& link = m_resource->m_links.emplace();
-				link.from = nlf;
-				link.to = nlt;
-				saveUndo(NO_MERGE_UNDO);
-			}
-
-			ImGuiEx::EndNodeEditor();
-			
-			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
-				if (ImGui::GetIO().KeyAlt && hovered_link != -1) {
-					m_resource->m_links.erase(hovered_link);
-					saveUndo(0xffFF);
-				}
-				else {
-					static const struct {
-						char key;
-						Node::Type type;
-					} types[] = {
-						{ 'A', Node::Type::ADD },
-						{ 'D', Node::Type::DIV },
-						{ 'G', Node::Type::GRADIENT },
-						{ 'M', Node::Type::MUL },
-						{ 'R', Node::Type::RANDOM },
-						{ '1', Node::Type::NUMBER},
-						{ '3', Node::Type::VEC3 },
-						{ '4', Node::Type::VEC4 }
-					};
-					Node* n = nullptr;
-					for (const auto& t : types) {
-						if (os::isKeyDown((os::Keycode)t.key)) {
-							n = addNode(t.type);
-							break;
-						}
-					}
-					if (n) {
-						n->m_pos = ImGui::GetMousePos() - ImGui::GetItemRectMin() - ImGuiEx::GetNodeEditorOffset();
-						saveUndo(NO_MERGE_UNDO);
-					}
-				}
-			}
-
-			const ImVec2 editor_pos = ImGui::GetItemRectMin();
-
-			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
-				open_context = true;
-				m_half_link_start = 0;
-			}
-			if (open_context) ImGui::OpenPopup("context_menu");
-		
-			if (ImGui::BeginPopup("context_menu")) {
-				ImVec2 cp = ImGui::GetItemRectMin();
-				ParticleEditorResource::Node* n = nullptr;
-				if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
-				if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
-				if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
-				if (ImGui::BeginMenu("Constant")) {
-					for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
-						if (ImGui::Selectable(m_resource->m_consts[i].name)) {
-							n = addNode(ParticleEditorResource::Node::CONST);
-							((ParticleEditorResource::ConstNode*)n)->idx = i;
-						}
-					}
-					ImGui::EndMenu();
-				}
-				if (ImGui::Selectable("Cos")) n = addNode(ParticleEditorResource::Node::COS);
-				if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
-				if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
-				if (ImGui::BeginMenu("Input")) {
-					for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
-						if (ImGui::Selectable(m_resource->m_streams[i].name)) {
-							n = addNode(ParticleEditorResource::Node::INPUT);
-							((ParticleEditorResource::InputNode*)n)->idx = i;
-						}
-					}
-					ImGui::EndMenu();
-				}
-				if (ImGui::Selectable("Number")) n = addNode(ParticleEditorResource::Node::NUMBER);
-				if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
-				if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
-				if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
-				if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
-				if (ImGui::Selectable("Sin")) n = addNode(ParticleEditorResource::Node::SIN);
-				if (ImGui::Selectable("Switch")) n = addNode(ParticleEditorResource::Node::SWITCH);
-				if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
-				if (ImGui::Selectable("Vec4")) n = addNode(ParticleEditorResource::Node::VEC4);
-				if (n) {
-					n->m_pos = cp - editor_pos - ImGuiEx::GetNodeEditorOffset();
-						
-					if (m_half_link_start) {
-						if (m_half_link_start & OUTPUT_FLAG) {
-							if (n->hasInputPins()) m_resource->m_links.push({i32(m_half_link_start), i32(n->m_id)});
-						}
-						else {
-							if (n->hasOutputPins()) m_resource->m_links.push({i32(n->m_id | OUTPUT_FLAG) , i32(m_half_link_start)});
-						}
-						m_half_link_start = 0;
-					}
-					saveUndo(NO_MERGE_UNDO);
-				}
-
-				ImGui::EndPopup();
-			}
-		
-			m_canvas.end();
-		}
-
+		nodeEditorGUI(*m_resource);
 		ImGui::Columns();
 
 		ImGui::End();
@@ -1836,13 +1760,13 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 		return m_resource->addNode(type);
 	}
 
-	void saveUndo(u32 tag) {
+	void pushUndo(u32 tag) override {
 		m_resource->colorLinks();
 		m_resource->generate();
 		if (m_autoapply) apply();
 		m_dirty = true;
 		
-		pushUndo(tag);
+		SimpleUndoRedo::pushUndo(tag);
 	}
 
 	void loadFromEntity() {
@@ -1883,7 +1807,7 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 			m_resource->deserialize(iblob, path);
 			m_path = path;
 			clearUndoStack();
-			saveUndo(NO_MERGE_UNDO);
+			pushUndo(NO_MERGE_UNDO);
 			m_dirty = false;
 		}
 		else {
@@ -1949,7 +1873,7 @@ struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
 		m_resource->initDefault();
 		m_path = "";
-		saveUndo(NO_MERGE_UNDO);
+		pushUndo(NO_MERGE_UNDO);
 		m_dirty = false;
 	}
 
