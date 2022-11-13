@@ -3,6 +3,7 @@
 #include "engine/delegate.h"
 #include "engine/lumix.h"
 #include "engine/string.h"
+#include "engine/stream.h"
 
 namespace Lumix {
 
@@ -59,5 +60,64 @@ LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API void menuItem(Action& a, bool enabled);
 LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct Universe& editor, Span<char> buf, EntityPtr entity);
 
+
+struct SimpleUndoRedo {
+	enum { NO_MERGE_UNDO = 0xffFFffFF };
+	struct Undo {
+		Undo(IAllocator& allocator) : blob(allocator) {}
+		u32 tag;
+		OutputMemoryStream blob;
+	};
+
+	SimpleUndoRedo(IAllocator& allocator)
+		: m_stack(allocator)
+		, m_allocator(allocator)
+	{}
+
+	bool canUndo() const { return m_stack_idx > 0; }
+	bool canRedo() const { return m_stack_idx < m_stack.size() - 1; }
+
+	void undo() {
+		if (m_stack_idx <= 0) return;
+	
+		deserialize(InputMemoryStream(m_stack[m_stack_idx - 1].blob));
+		--m_stack_idx;
+	}
+
+	void redo() {
+		if (m_stack_idx + 1 >= m_stack.size()) return;
+	
+		deserialize(InputMemoryStream(m_stack[m_stack_idx + 1].blob));
+		++m_stack_idx;
+	}
+
+	void pushUndo(u32 tag) {
+		while (m_stack.size() > m_stack_idx + 1) m_stack.pop();
+
+		Undo u(m_allocator);
+		u.tag = tag;
+		serialize(u.blob);
+		if (tag == NO_MERGE_UNDO || m_stack.back().tag != tag) {
+			m_stack.push(static_cast<Undo&&>(u));
+			++m_stack_idx;
+		}
+		else {
+			m_stack.back() = static_cast<Undo&&>(u);
+		}
+	}
+
+	void clearUndoStack() {
+		m_stack.clear();
+		m_stack_idx = -1;
+	}
+
+	virtual void deserialize(InputMemoryStream& blob) = 0;
+	virtual void serialize(OutputMemoryStream& blob) = 0;
+
+private:
+	IAllocator& m_allocator;
+	Array<Undo> m_stack;
+	i32 m_stack_idx = -1;
+};
 
 } // namespace Lumix

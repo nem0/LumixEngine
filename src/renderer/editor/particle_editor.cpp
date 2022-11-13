@@ -1099,6 +1099,50 @@ struct ParticleEditorResource {
 		, m_output(allocator)
 	{}
 	
+	void colorLinks(ImU32 color, u32 link_idx) {
+		m_links[link_idx].color = color;
+		const u16 from_node_id = m_links[link_idx].fromNode();
+		for (u32 i = 0, c = m_links.size(); i < c; ++i) {
+			if (m_links[i].toNode() == from_node_id) colorLinks(color, i);
+		}
+	}
+	
+	const ParticleEditorResource::Node* getNode(u16 id) const {
+		for(const auto& n : m_nodes) {
+			if (n->m_id == id) return n.get();
+		}
+		return nullptr;
+	}
+
+	void colorLinks() {
+		const ImU32 colors[] = {
+			IM_COL32(0x20, 0x20, 0xA0, 255),
+			IM_COL32(0x20, 0xA0, 0x20, 255),
+			IM_COL32(0x20, 0xA0, 0xA0, 255),
+			IM_COL32(0xA0, 0x20, 0x20, 255),
+			IM_COL32(0xA0, 0x20, 0xA0, 255),
+			IM_COL32(0xA0, 0xA0, 0x20, 255),
+			IM_COL32(0xA0, 0xA0, 0xA0, 255),
+		};
+	
+		for (ParticleEditorResource::Link& l : m_links) {
+			l.color = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
+		}
+
+		for (u32 i = 0, c = m_links.size(); i < c; ++i) {
+			const ParticleEditorResource::Link& link = m_links[i];
+			const ParticleEditorResource::Node* node = getNode(link.toNode());
+			switch(node->getType()) {
+				case ParticleEditorResource::Node::UPDATE:
+				case ParticleEditorResource::Node::EMIT:
+				case ParticleEditorResource::Node::OUTPUT:
+					colorLinks(colors[link.toPin() % lengthOf(colors)], i);
+					break;
+			}
+
+		}		
+	}
+
 	u16 genID() { return ++m_last_id; }
 
 	Node* getNodeByID(u16 id) const {
@@ -1192,6 +1236,8 @@ struct ParticleEditorResource {
 			blob.read(n->m_pos);
 			n->deserialize(blob);
 		}
+		generate();
+		colorLinks();
 		return true;
 	}
 
@@ -1302,12 +1348,12 @@ struct ParticleEditorResource {
 	u8 m_registers_count = 0;
 };
 
-struct ParticleEditorImpl : ParticleEditor {
+struct ParticleEditorImpl : ParticleEditor, SimpleUndoRedo {
 	using Node = ParticleEditorResource::Node;
 	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_app(app)
-		, m_undo_stack(allocator)
+		, SimpleUndoRedo(allocator)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
@@ -1318,11 +1364,11 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_save_action.plugin = this;
 
 		m_undo_action.init(ICON_FA_UNDO "Undo", "Particle editor undo", "particle_editor_undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
-		m_undo_action.func.bind<&ParticleEditorImpl::undo>(this);
+		m_undo_action.func.bind<&ParticleEditorImpl::undo>((SimpleUndoRedo*)this);
 		m_undo_action.plugin = this;
 
 		m_redo_action.init(ICON_FA_REDO "Redo", "Particle editor redo", "particle_editor_redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
-		m_redo_action.func.bind<&ParticleEditorImpl::redo>(this);
+		m_redo_action.func.bind<&ParticleEditorImpl::redo>((SimpleUndoRedo*)this);
 		m_redo_action.plugin = this;
 
 		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, true);
@@ -1351,50 +1397,6 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_app.removeAction(&m_apply_action);
 	}
 
-	const ParticleEditorResource::Node* getNode(u16 id) const {
-		for(const auto& n : m_resource->m_nodes) {
-			if (n->m_id == id) return n.get();
-		}
-		return nullptr;
-	}
-
-	void colorLinks(ImU32 color, u32 link_idx) {
-		m_resource->m_links[link_idx].color = color;
-		const u16 from_node_id = m_resource->m_links[link_idx].fromNode();
-		for (u32 i = 0, c = m_resource->m_links.size(); i < c; ++i) {
-			if (m_resource->m_links[i].toNode() == from_node_id) colorLinks(color, i);
-		}
-	}
-
-	void colorLinks() {
-		const ImU32 colors[] = {
-			IM_COL32(0x20, 0x20, 0xA0, 255),
-			IM_COL32(0x20, 0xA0, 0x20, 255),
-			IM_COL32(0x20, 0xA0, 0xA0, 255),
-			IM_COL32(0xA0, 0x20, 0x20, 255),
-			IM_COL32(0xA0, 0x20, 0xA0, 255),
-			IM_COL32(0xA0, 0xA0, 0x20, 255),
-			IM_COL32(0xA0, 0xA0, 0xA0, 255),
-		};
-	
-		for (ParticleEditorResource::Link& l : m_resource->m_links) {
-			l.color = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
-		}
-
-		for (u32 i = 0, c = m_resource->m_links.size(); i < c; ++i) {
-			const ParticleEditorResource::Link& link = m_resource->m_links[i];
-			const ParticleEditorResource::Node* node = getNode(link.toNode());
-			switch(node->getType()) {
-				case ParticleEditorResource::Node::UPDATE:
-				case ParticleEditorResource::Node::EMIT:
-				case ParticleEditorResource::Node::OUTPUT:
-					colorLinks(colors[link.toPin() % lengthOf(colors)], i);
-					break;
-			}
-
-		}		
-	}
-
 	void deleteSelectedNodes() {
 
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
@@ -1406,7 +1408,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				m_resource->m_nodes.swapAndPop(i);
 			}
 		}
-		pushUndo(0xffFFffFF);
+		saveUndo(NO_MERGE_UNDO);
 	}
 
 	bool hasFocus() override { return m_has_focus; }
@@ -1420,26 +1422,6 @@ struct ParticleEditorImpl : ParticleEditor {
 
 	bool isOpen() const { return m_open; }
 	void toggleOpen() { m_open = !m_open; }
-
-	void redo() {
-		if (m_undo_idx >= m_undo_stack.size() - 1) return;
-
-		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
-		++m_undo_idx;
-		InputMemoryStream tmp(m_undo_stack[m_undo_idx].data);
-		m_resource->deserialize(tmp, "undo");
-		colorLinks();
-	}
-
-	void undo() {
-		if (m_undo_idx <= 0) return;
-
-		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
-		--m_undo_idx;
-		InputMemoryStream tmp(m_undo_stack[m_undo_idx].data);
-		m_resource->deserialize(tmp, "undo");
-		colorLinks();
-	}
 
 	void deleteOutput(u32 output_idx) {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
@@ -1461,7 +1443,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			}
 		}
 		m_resource->m_outputs.erase(output_idx);
-		pushUndo(0xffFFffFF);
+		saveUndo(NO_MERGE_UNDO);
 	}
 
 	void deleteStream(u32 stream_idx) {
@@ -1512,7 +1494,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			}
 		}
 		m_resource->m_streams.erase(stream_idx);
-		pushUndo(0xffFFffFF);
+		saveUndo(NO_MERGE_UNDO);
 	}
 
 	void leftColumnGUI() {
@@ -1564,7 +1546,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				if (ImGui::Button(ICON_FA_TRASH)) {
 					m_resource->m_consts.erase(u32(&s - m_resource->m_consts.begin()));
 					ImGui::PopID();
-					pushUndo(0xffFFffFF);
+					saveUndo(NO_MERGE_UNDO);
 					break;
 				}
 				ImGui::SameLine();
@@ -1669,8 +1651,8 @@ struct ParticleEditorImpl : ParticleEditor {
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {
-				menuItem(m_undo_action, m_undo_idx > 0);
-				menuItem(m_redo_action, m_undo_idx < m_undo_stack.size() - 1);
+				menuItem(m_undo_action, canUndo());
+				menuItem(m_redo_action, canRedo());
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
@@ -1695,7 +1677,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			i32 hovered_link = -1;
 			for (UniquePtr<ParticleEditorResource::Node>& n : m_resource->m_nodes) {
 				if (n->onNodeGUI()) {
-					pushUndo(n->m_id);
+					saveUndo(n->m_id);
 				}
 				if (ImGui::IsItemHovered()) {
 					hovered_node = n->m_id;
@@ -1725,7 +1707,7 @@ struct ParticleEditorImpl : ParticleEditor {
 						link.to = n->m_id;
 						m_resource->m_links.push(new_link);
 						n->m_pos = mp;
-						pushUndo(0xffFF);
+						saveUndo(0xffFF);
 					}
 					hovered_link = i32(&link - m_resource->m_links.begin());
 				}
@@ -1742,7 +1724,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				ParticleEditorResource::Link& link = m_resource->m_links.emplace();
 				link.from = nlf;
 				link.to = nlt;
-				pushUndo(0xffFFffFF);
+				saveUndo(NO_MERGE_UNDO);
 			}
 
 			ImGuiEx::EndNodeEditor();
@@ -1750,7 +1732,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
 				if (ImGui::GetIO().KeyAlt && hovered_link != -1) {
 					m_resource->m_links.erase(hovered_link);
-					pushUndo(0xffFF);
+					saveUndo(0xffFF);
 				}
 				else {
 					static const struct {
@@ -1775,7 +1757,7 @@ struct ParticleEditorImpl : ParticleEditor {
 					}
 					if (n) {
 						n->m_pos = ImGui::GetMousePos() - ImGui::GetItemRectMin() - ImGuiEx::GetNodeEditorOffset();
-						pushUndo(0xffFFffFF);
+						saveUndo(NO_MERGE_UNDO);
 					}
 				}
 			}
@@ -1836,7 +1818,7 @@ struct ParticleEditorImpl : ParticleEditor {
 						}
 						m_half_link_start = 0;
 					}
-					pushUndo(0xffFFffFF);
+					saveUndo(NO_MERGE_UNDO);
 				}
 
 				ImGui::EndPopup();
@@ -1854,26 +1836,13 @@ struct ParticleEditorImpl : ParticleEditor {
 		return m_resource->addNode(type);
 	}
 
-	void pushUndo(u32 tag) {
-		colorLinks();
+	void saveUndo(u32 tag) {
+		m_resource->colorLinks();
 		m_resource->generate();
 		if (m_autoapply) apply();
 		m_dirty = true;
 		
-		while (m_undo_stack.size() > (i32)m_undo_idx + 1) {
-			m_undo_stack.pop();
-		}
-
-		if (tag == 0xffFFffFF || tag != m_undo_stack.back().tag) {
-			UndoRecord& rec = m_undo_stack.emplace(m_allocator);
-			m_resource->serialize(rec.data);
-			rec.tag = tag;
-		}
-		else {
-			m_undo_stack.back().data.clear();
-			m_resource->serialize(m_undo_stack.back().data);
-		}
-		m_undo_idx = m_undo_stack.size() - 1;
+		pushUndo(tag);
 	}
 
 	void loadFromEntity() {
@@ -1883,6 +1852,13 @@ struct ParticleEditorImpl : ParticleEditor {
 		const Path& path = emitter->getResource()->getPath();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		load(StaticString<LUMIX_MAX_PATH>(fs.getBasePath(), path.c_str()));
+	}
+
+	void serialize(OutputMemoryStream& blob) override { m_resource->serialize(blob); }
+	
+	void deserialize(InputMemoryStream& blob) override { 
+		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
+		m_resource->deserialize(blob, "");
 	}
 
 	void load(const char* path) {
@@ -1906,10 +1882,8 @@ struct ParticleEditorImpl : ParticleEditor {
 			InputMemoryStream iblob(blob);
 			m_resource->deserialize(iblob, path);
 			m_path = path;
-			m_resource->generate();
-			m_undo_stack.clear();
-			m_undo_idx = m_undo_stack.size() - 1;
-			pushUndo(0xffFFffFF);
+			clearUndoStack();
+			saveUndo(NO_MERGE_UNDO);
 			m_dirty = false;
 		}
 		else {
@@ -1971,12 +1945,11 @@ struct ParticleEditorImpl : ParticleEditor {
 			return;
 		}
 
-		m_undo_stack.clear();
-		m_undo_idx = -1;
+		clearUndoStack();
 		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
 		m_resource->initDefault();
 		m_path = "";
-		pushUndo(0xffFFffFF);
+		saveUndo(NO_MERGE_UNDO);
 		m_dirty = false;
 	}
 
@@ -2024,21 +1997,13 @@ struct ParticleEditorImpl : ParticleEditor {
 		return true;
 	}
 
-	struct UndoRecord {
-		UndoRecord(IAllocator& allocator) : data(allocator) {}
-		OutputMemoryStream data;
-		u32 tag;
-	};
-
 	IAllocator& m_allocator;
 	StudioApp& m_app;
 	Path m_path;
-	Array<UndoRecord> m_undo_stack;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
 	bool m_confirm_load = false;
 	StaticString<LUMIX_MAX_PATH> m_confirm_load_path;
-	i32 m_undo_idx = 0;
 	UniquePtr<ParticleEditorResource> m_resource;
 	bool m_open = false;
 	bool m_autoapply = false;
