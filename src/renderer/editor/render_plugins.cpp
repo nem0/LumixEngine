@@ -39,7 +39,7 @@
 #include "game_view.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
-#include "renderer/editor/spline_geometry_plugin.h"
+#include "renderer/editor/procedural_geometry_painter.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
@@ -4883,7 +4883,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_material_plugin(app)
 		, m_particle_emitter_plugin(app)
 		, m_particle_emitter_property_plugin(app)
-		, m_spline_geom_plugin(app)
+		, m_procedural_geom_painter(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
 		, m_texture_plugin(app)
@@ -4940,7 +4940,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);
 		m_app.addPlugin(m_editor_ui_render_plugin);
-		m_app.addPlugin(m_spline_geom_plugin);
+		m_app.addPlugin((StudioApp::GUIPlugin&)m_procedural_geom_painter);
+		m_app.addPlugin((StudioApp::MousePlugin&)m_procedural_geom_painter);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(m_model_properties_plugin);
@@ -4948,7 +4949,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.addPlugin(m_terrain_plugin);
 		property_grid.addPlugin(m_instanced_model_plugin);
 		property_grid.addPlugin(m_particle_emitter_property_plugin);
-		property_grid.addPlugin(m_spline_geom_plugin);
 
 		m_scene_view.init();
 		m_game_view.init();
@@ -5187,7 +5187,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.removePlugin(m_scene_view);
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
-		m_app.removePlugin(m_spline_geom_plugin);
+		m_app.removePlugin((StudioApp::MousePlugin&)m_procedural_geom_painter);
+		m_app.removePlugin((StudioApp::GUIPlugin&)m_procedural_geom_painter);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
@@ -5196,7 +5197,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.removePlugin(m_terrain_plugin);
 		property_grid.removePlugin(m_instanced_model_plugin);
 		property_grid.removePlugin(m_particle_emitter_property_plugin);
-		property_grid.removePlugin(m_spline_geom_plugin);
 	}
 
 	StudioApp& m_app;
@@ -5205,7 +5205,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	MaterialPlugin m_material_plugin;
 	ParticleEmitterPlugin m_particle_emitter_plugin;
 	ParticleEmitterPropertyPlugin m_particle_emitter_property_plugin;
-	SplineGeometryPlugin m_spline_geom_plugin;
+	ProceduralGeometryPainter m_procedural_geom_painter;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
 	ShaderPlugin m_shader_plugin;
