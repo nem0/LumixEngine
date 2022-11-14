@@ -115,6 +115,7 @@ struct NodeEditor : SimpleUndoRedo {
 			if (node->nodeGUI()) {
 				pushUndo(node->m_id);
 			}
+			if (ImGui::IsMouseDragging(0) && ImGui::IsItemHovered()) m_dragged_node = node->m_id;
 			if (old_pos.x != node->m_pos.x || old_pos.y != node->m_pos.y) {
 				moved = node->m_id;
 				++moved_count;
@@ -171,6 +172,24 @@ struct NodeEditor : SimpleUndoRedo {
 			}
 		}
 
+		if (hovered_link >= 0 && ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyAlt) {
+			i32 node_idx = resource.m_nodes.find([this](const NodeType& node){ return node->m_id == m_dragged_node; });
+			if (node_idx >= 0) {
+				NodeType& node = resource.m_nodes[node_idx];
+				if (node->hasInputPins() && node->hasOutputPins()) {
+					LinkType& new_link = resource.m_links.emplace();
+					LinkType& link = resource.m_links[hovered_link];
+					new_link.color = link.color;
+					new_link.to = link.to;
+					new_link.from = node->m_id;
+					link.to = node->m_id;
+					pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+				}
+			}
+		}
+
+		if (ImGui::IsMouseReleased(0)) m_dragged_node = 0xffFFffFF;
+
 		{
 			ImGuiID start_attr, end_attr;
 			if (ImGuiEx::GetHalfLink(&start_attr)) {
@@ -221,6 +240,7 @@ struct NodeEditor : SimpleUndoRedo {
 	ImVec2 m_offset = ImVec2(0, 0);
 	ImGuiID m_half_link_start = 0;
 	bool m_is_any_item_active = false;
+	u32 m_dragged_node = 0xFFffFFff;
 };
 
 } // namespace Lumix
