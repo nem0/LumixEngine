@@ -37,7 +37,7 @@ struct LUMIX_EDITOR_API AssetBrowser {
 	virtual void update() = 0;
 	virtual bool onDropFile(const char* path) = 0;
 	virtual void selectResource(const struct Path& resource, bool record_history, bool additive) = 0;
-	virtual bool resourceInput(const char* str_id, Span<char> buf, ResourceType type) = 0;
+	virtual bool resourceInput(const char* str_id, Span<char> buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual void openInExternalEditor(Resource* resource) const = 0;

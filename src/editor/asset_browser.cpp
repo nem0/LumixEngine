@@ -942,7 +942,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		return res;
 	}
 
-	bool resourceInput(const char* str_id, Span<char> buf, ResourceType type)  override
+	bool resourceInput(const char* str_id, Span<char> buf, ResourceType type, float width)  override
 	{
 		ImGui::PushID(str_id);
 
@@ -952,13 +952,13 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ImGui::GetStyle().ItemSpacing.y));
 		if (span.length() == 0) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-			if (ImGui::Button("No resource (click to set)", ImVec2(-1.f, 0))) {
+			if (ImGui::Button("No resource (click to set)", ImVec2(width, 0))) {
 				ImGui::OpenPopup("popup");
 			}
 		}
 		else {
 			float w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
-			if (ImGui::Button(getImGuiLabelID(rl, false).data, ImVec2(-w, 0))) {
+			if (ImGui::Button(getImGuiLabelID(rl, false).data, ImVec2(width < 0 ? -w : width - w, 0))) {
 				ImGui::OpenPopup("popup");
 			}
 		}
