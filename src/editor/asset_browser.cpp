@@ -949,17 +949,20 @@ struct AssetBrowserImpl : AssetBrowser {
 		const Span span(buf.m_begin, stringLength(buf.m_begin));
 		const ResourceLocator rl(span);
 	
+		bool popup_opened = false;
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ImGui::GetStyle().ItemSpacing.y));
 		if (span.length() == 0) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 			if (ImGui::Button("No resource (click to set)", ImVec2(width, 0))) {
 				ImGui::OpenPopup("popup");
+				popup_opened = true;
 			}
 		}
 		else {
 			float w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
 			if (ImGui::Button(getImGuiLabelID(rl, false).data, ImVec2(width < 0 ? -w : width - w, 0))) {
 				ImGui::OpenPopup("popup");
+				popup_opened = true;
 			}
 		}
 		if (span.length() == 0) {
@@ -1005,7 +1008,8 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(300, 300))) {
 			static FilePathHash selected_path_hash;
-			if (resourceList(buf, selected_path_hash, type, 0, true)) {
+			if (popup_opened) ImGui::SetKeyboardFocusHere();
+			if (resourceList(buf, selected_path_hash, type, 0, true, true)) {
 				ImGui::EndPopup();
 				ImGui::PopID();
 				return true;
@@ -1092,7 +1096,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
-	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
+	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, float height, bool can_create_new, bool enter_submit) const override {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 
@@ -1135,10 +1139,11 @@ struct AssetBrowserImpl : AssetBrowser {
 			const Span span(res.path.c_str(), res.path.length());
 			const ResourceLocator rl(span);
 			StaticString<LUMIX_MAX_PATH> label = getImGuiLabelID(rl, true);
-			if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
+			const bool is_enter_submit = (enter_submit && ImGui::IsKeyPressed(ImGuiKey_Enter));
+			if (is_enter_submit || ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 				selected_path_hash = res.path.getHash();
 			
-				if (selected || ImGui::IsMouseDoubleClicked(0)) { //-V1051
+				if (selected || ImGui::IsMouseDoubleClicked(0) || is_enter_submit) { //-V1051
 					copyString(buf, res.path.c_str());
 					ImGui::CloseCurrentPopup();
 					ImGui::EndChild();
