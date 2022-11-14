@@ -10,19 +10,14 @@
 struct lua_State;
 
 
-namespace Lumix
-{
+namespace Lumix {
 
-struct Draw2D;
-struct IAllocator;
-struct Mesh;
 struct Path;
 struct Renderer;
 struct RenderScene;
 struct Viewport;
 
-struct PassState
-{
+struct PassState {
 	Matrix projection;
 	Matrix inv_projection;
 	Matrix view;
@@ -48,8 +43,7 @@ namespace UniformBuffer {
 	};
 }
 
-struct LUMIX_RENDERER_API PipelineResource : Resource
-{
+struct LUMIX_RENDERER_API PipelineResource : Resource {
 	static ResourceType TYPE;
 
 	PipelineResource(const Path& path, ResourceManager& owner, Renderer& renderer, IAllocator& allocator);
@@ -62,10 +56,8 @@ struct LUMIX_RENDERER_API PipelineResource : Resource
 };
 
 
-struct LUMIX_RENDERER_API Pipeline
-{
-	struct CustomCommandHandler
-	{
+struct LUMIX_RENDERER_API Pipeline {
+	struct CustomCommandHandler {
 		Delegate<void ()> callback;
 		char name[30];
 		RuntimeHash hash;

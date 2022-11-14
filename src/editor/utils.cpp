@@ -212,5 +212,48 @@ void getEntityListDisplayName(StudioApp& app, Universe& universe, Span<char> buf
 	}
 }
 
+SimpleUndoRedo::SimpleUndoRedo(IAllocator& allocator)
+: m_stack(allocator)
+	, m_allocator(allocator)
+{}
+
+bool SimpleUndoRedo::canUndo() const { return m_stack_idx > 0; }
+bool SimpleUndoRedo::canRedo() const { return m_stack_idx < m_stack.size() - 1; }
+
+void SimpleUndoRedo::undo() {
+	if (m_stack_idx <= 0) return;
+
+	InputMemoryStream blob(m_stack[m_stack_idx - 1].blob);
+	deserialize(blob);
+	--m_stack_idx;
+}
+
+void SimpleUndoRedo::redo() {
+	if (m_stack_idx + 1 >= m_stack.size()) return;
+
+	InputMemoryStream blob(m_stack[m_stack_idx + 1].blob);
+	deserialize(blob);
+	++m_stack_idx;
+}
+
+void SimpleUndoRedo::pushUndo(u32 tag) {
+	while (m_stack.size() > m_stack_idx + 1) m_stack.pop();
+
+	Undo u(m_allocator);
+	u.tag = tag;
+	serialize(u.blob);
+	if (tag == NO_MERGE_UNDO || m_stack.back().tag != tag) {
+		m_stack.push(static_cast<Undo&&>(u));
+		++m_stack_idx;
+	}
+	else {
+		m_stack.back() = static_cast<Undo&&>(u);
+	}
+}
+
+void SimpleUndoRedo::clearUndoStack() {
+	m_stack.clear();
+	m_stack_idx = -1;
+}
 
 } // namespace Lumix

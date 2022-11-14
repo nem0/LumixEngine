@@ -1143,7 +1143,7 @@ struct RenderSceneImpl final : RenderScene {
 		deserializeCurveDecals(serializer, entity_map, version);
 		deserializeFurs(serializer, entity_map);
 		deserializeInstancedModels(serializer, entity_map, version);
-		if (version <= (i32)RenderSceneVersion::REMOVED_SPLINE_GEOMETRY) {
+		if (version <= (i32)RenderSceneVersion::REMOVED_SPLINE_GEOMETRY && version > (i32)RenderSceneVersion::SPLINES) {
 			u32 count;
 			serializer.read(count);
 			ASSERT(count == 0);
