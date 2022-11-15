@@ -378,6 +378,17 @@ float squaredLength(const Vec3& value) { return value.x * value.x + value.y * va
 double squaredLength(const DVec2& value) { return value.x * value.x + value.y * value.y; }
 double squaredLength(const DVec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
 
+float halton(u32 index, i32 base) {
+	float f = 1;
+	float r = 0;
+	i32 current = index;
+	do {
+		f = f / base;
+		r = r + f * (current % base);
+		current = i32(floor(float(current) / base));
+	} while (current > 0);
+	return r;
+}
 
 Vec3::Vec3(const Vec2& v, float c)
 	: x(v.x)

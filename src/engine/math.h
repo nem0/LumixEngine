@@ -511,6 +511,7 @@ LUMIX_ENGINE_API float squaredLength(const Vec2& value);
 LUMIX_ENGINE_API float squaredLength(const Vec3& value);
 LUMIX_ENGINE_API double squaredLength(const DVec2& value);
 LUMIX_ENGINE_API double squaredLength(const DVec3& value);
+LUMIX_ENGINE_API float halton(u32 index, i32 base);
 
 struct LUMIX_ENGINE_API RandomGenerator {
 	RandomGenerator(u32 u = 521288629, u32 v = 362436069);

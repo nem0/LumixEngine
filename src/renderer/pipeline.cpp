@@ -1286,19 +1286,6 @@ struct PipelineImpl final : Pipeline
 		return flip * prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted() * flip;
 	}
 
-	static float halton(u32 index, i32 base)
-	{
-		float f = 1;
-		float r = 0;
-		i32 current = index;
-		do {
-			f = f / base;
-			r = r + f * (current % base);
-			current = i32(floor(float(current) / base));
-		} while (current > 0);
-		return r;
-	}
-
 	bool render(bool only_2d) override
 	{
 		PROFILE_FUNCTION();
