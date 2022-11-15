@@ -140,21 +140,22 @@ struct MergeNode final : CompositeTexture::Node {
 		const Input inputs[] = { getInput(0), getInput(1), getInput(2), getInput(3) };
 		for (const Input& i : inputs) if (!i) return false;
 		
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!inputs[0].getPixelData(&tmp)) return false;
-		if (tmp.channels != 1) return false;
+		CompositeTexture::PixelData first_pd(m_resource->m_app.getAllocator());
+		if (!inputs[0].getPixelData(&first_pd)) return false;
+		if (first_pd.channels != 1) return false;
 
-		data->w = tmp.w;
-		data->h = tmp.h;
+		data->w = first_pd.w;
+		data->h = first_pd.h;
 		data->channels = 4;
-		data->pixels.resize(4 * tmp.w * tmp.h);
+		data->pixels.resize(4 * first_pd.w * first_pd.h);
 		u8* dst = data->pixels.getMutableData();
-		const u8* src = tmp.pixels.data();
-		for (u32 i = 0; i < tmp.w * tmp.h; ++i) {
-			dst[i * 4] = src[i];
+		const u8* first_src = first_pd.pixels.data();
+		for (u32 i = 0; i < first_pd.w * first_pd.h; ++i) {
+			dst[i * 4] = first_src[i];
 		}
 
 		for (u32 i = 1; i < 4; ++i) {
+			CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
 			if (!inputs[i].getPixelData(&tmp)) return false;
 			if (tmp.channels != 1) return false;
 			if (tmp.w != data->w || tmp.h != data->h) return false;

@@ -2796,9 +2796,9 @@ struct PipelineImpl final : Pipeline
 	void createCommands(View& view)
 	{
 		PROFILE_FUNCTION();
-		const int count = view.sorter.keys.size();
-		profiler::pushInt("Count", count);
-		if (count == 0) return;
+		const u32 keys_count = (u32)view.sorter.keys.size();
+		profiler::pushInt("Count", keys_count);
+		if (keys_count == 0) return;
 		
 		const u64* LUMIX_RESTRICT renderables = view.sorter.values.begin();
 		const u64* LUMIX_RESTRICT sort_keys = view.sorter.keys.begin();
@@ -2819,8 +2819,8 @@ struct PipelineImpl final : Pipeline
 		DrawStream* stream = nullptr;
 		gpu::StateFlags render_state;
 
-		for (u32 i = 0, c = count; i < c; ++i) {
-			const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
+		for (u32 i = 0; i < keys_count; ++i) {
+			const EntityRef entity = {int(renderables[i] & 0xFFffFFff)};
 			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
 			const u8 bucket = sort_keys[i] >> SORT_KEY_BUCKET_SHIFT;
 
@@ -2839,13 +2839,13 @@ struct PipelineImpl final : Pipeline
 			switch(type) {
 				case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
 					const Mesh& mesh = mi->meshes[mesh_idx];
 
 					const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 2);
 					u8* instance_data = slice.ptr;
-					const Transform& tr = entity_data[e.index];
-					const float lod_d = model_instances[e.index].lod - mesh.lod;
+					const Transform& tr = entity_data[entity.index];
+					const float lod_d = model_instances[entity.index].lod - mesh.lod;
 					const Vec4 rot_lod = packRotationLOD(tr.rot, lod_d);
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
 					memcpy(instance_data, &rot_lod, sizeof(rot_lod));
@@ -2893,12 +2893,12 @@ struct PipelineImpl final : Pipeline
 					}
 					else {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
 						const Mesh& mesh = mi->meshes[mesh_idx];
 						const float mesh_lod = mesh.lod;
 						int start_i = i;
 						const u64 key = sort_keys[i] & instance_key_mask;
-						while (i < c && (sort_keys[i] & instance_key_mask) == key) {
+						while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
 							++i;
 						}
 						const u32 count = u32(i - start_i);
@@ -2937,8 +2937,8 @@ struct PipelineImpl final : Pipeline
 				case RenderableTypes::FUR:
 				case RenderableTypes::SKINNED: {
 					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-					const Transform& tr = entity_data[e.index];
+					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+					const Transform& tr = entity_data[entity.index];
 					const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
 					const Mesh& mesh = mi->meshes[mesh_idx];
 					Shader* shader = mesh.material->getShader();
@@ -2966,7 +2966,7 @@ struct PipelineImpl final : Pipeline
 
 					u32 layers = 1;
 					if (type == RenderableTypes::FUR) {
-						FurComponent& fur = m_scene->getFur(e);
+						FurComponent& fur = m_scene->getFur(entity);
 						layers = fur.layers;
 						prefix->fur_scale = fur.scale;
 						prefix->gravity = fur.gravity;
@@ -2993,11 +2993,11 @@ struct PipelineImpl final : Pipeline
 					break;
 				}
 				case RenderableTypes::DECAL: {
-					const Material* material = m_scene->getDecal(e).material;
+					const Material* material = m_scene->getDecal(entity).material;
 
 					int start_i = i;
 					const u64 key = sort_keys[i];
-					while (i < c && sort_keys[i] == key) {
+					while (i < keys_count && sort_keys[i] == key) {
 						++i;
 					}
 					const u32 count = i - start_i;
@@ -3053,11 +3053,11 @@ struct PipelineImpl final : Pipeline
 					break;
 				}
 				case RenderableTypes::CURVE_DECAL: {
-					const Material* material = m_scene->getCurveDecal(e).material;
+					const Material* material = m_scene->getCurveDecal(entity).material;
 
 					int start_i = i;
 					const u64 key = sort_keys[i];
-					while (i < c && sort_keys[i] == key) {
+					while (i < keys_count && sort_keys[i] == key) {
 						++i;
 					}
 					const u32 count = i - start_i;
@@ -3330,12 +3330,12 @@ struct PipelineImpl final : Pipeline
 
 
 				const Span<EntityRef> env_probe_entities = m_scene->getEnvironmentProbesEntities();
-				for (u32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
-					const EnvironmentProbe& env_probe = scene_env_probes[i];
+				for (u32 probe_idx = 0, c = scene_env_probes.length(); probe_idx < c; ++probe_idx) {
+					const EnvironmentProbe& env_probe = scene_env_probes[probe_idx];
 					if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
 
-					const EntityRef e = env_probe_entities[i];
-					ClusterEnvProbe& probe =  env_probes[i];
+					const EntityRef e = env_probe_entities[probe_idx];
+					ClusterEnvProbe& probe =  env_probes[probe_idx];
 					probe.pos = Vec3(universe.getPosition(e) - cam_pos);
 					probe.rot = universe.getRotation(e).conjugated();
 					probe.inner_range = env_probe.inner_range;
@@ -3359,8 +3359,8 @@ struct PipelineImpl final : Pipeline
 					if (planeDist(planes[0], p) < -r) return range;
 					
 					for (i32 i = 0; i < size; ++i) {
-						const float d = planeDist(planes[i + 1], p);
-						if (d > r) continue;
+						const float dist = planeDist(planes[i + 1], p);
+						if (dist > r) continue;
 
 						range.x = i;
 						

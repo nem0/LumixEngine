@@ -464,7 +464,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	{
 		gpu::VertexDecl vertex_decl(gpu::PrimitiveType::TRIANGLES);
 		Mesh::AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
-		for(auto& i : semantics) i = Mesh::AttributeSemantic::NONE;
+		for(auto& sem : semantics) sem = Mesh::AttributeSemantic::NONE;
 		u32 vb_stride;
 		if (!parseVertexDecl(file, &vertex_decl, semantics, vb_stride)) return false;
 

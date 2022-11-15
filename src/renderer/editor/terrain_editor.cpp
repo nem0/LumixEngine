@@ -626,11 +626,11 @@ private:
 	void getBoundingRectangle(Texture* texture, Rectangle& rect)
 	{
 		int s = texture->width;
-		Item& item = m_items[0];
-		rect.from_x = maximum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), 0);
-		rect.from_y = maximum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), 0);
-		rect.to_x = minimum(1 + int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), texture->width);
-		rect.to_y = minimum(1 + int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), texture->height);
+		Item& first_item = m_items[0];
+		rect.from_x = maximum(int(s * (first_item.m_local_pos.x - first_item.m_radius) - 0.5f), 0);
+		rect.from_y = maximum(int(s * (first_item.m_local_pos.z - first_item.m_radius) - 0.5f), 0);
+		rect.to_x = minimum(1 + int(s * (first_item.m_local_pos.x + first_item.m_radius) + 0.5f), texture->width);
+		rect.to_y = minimum(1 + int(s * (first_item.m_local_pos.z + first_item.m_radius) + 0.5f), texture->height);
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
@@ -846,8 +846,8 @@ static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {
 		Vec2 x = (Vec2(h, -h) - q) / 2.f;
 		Vec2 uv = sign(x) * pow(abs(x), Vec2(1.f / 3.f));
 		float t = clamp(uv.x + uv.y - kx, 0.f, 1.f);
-		Vec2 q = d + (c + b * t) * t;
-		res = dot(q, q);
+		Vec2 qv2 = d + (c + b * t) * t;
+		res = dot(qv2, qv2);
 		res_t = t;
 	}
 	else { // 3 roots
@@ -877,10 +877,10 @@ void TerrainEditor::addSpline(const Terrain& terrain, DistanceField& df, const S
 	const Transform spline_tr = universe.getTransform(spline_entity);
 	const Transform terrain_tr = universe.getTransform(terrain.m_entity);
 	const Transform spline_to_terrain = terrain_tr.inverted() * spline_tr;
-	for (u32 i = 0, c = spline.points.size() - 2; i < c; ++i) {
-		Vec3 p0 = spline.points[i];
-		Vec3 p1 = spline.points[i + 1];
-		Vec3 p2 = spline.points[i + 2];
+	for (u32 pt_idx = 0, c = spline.points.size() - 2; pt_idx < c; ++pt_idx) {
+		Vec3 p0 = spline.points[pt_idx];
+		Vec3 p1 = spline.points[pt_idx + 1];
+		Vec3 p2 = spline.points[pt_idx + 2];
 			
 		p0 = Vec3(spline_to_terrain.transform(p0));
 		p1 = Vec3(spline_to_terrain.transform(p1));
@@ -1858,7 +1858,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 		const EntityFolders& folders = editor.getEntityFolders();
 		const EntityFolders::FolderID folder = folders.getSelectedFolder();
 
-		Vec2 size = scene->getTerrainSize(terrain);
+		Vec2 terrain_size = scene->getTerrainSize(terrain);
 		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 100.0f * m_terrain_brush_strength; ++i)
 		{
@@ -1867,7 +1867,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 			const float y = randFloat(m_y_spread.x, m_y_spread.y);
 			DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
 			const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
-			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
+			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= terrain_size.x && terrain_pos.z <= terrain_size.y)
 			{
 				pos.y = scene->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_tr.pos.y;
@@ -1886,22 +1886,22 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 				{
 					if (m_is_rotate_x)
 					{
-						float angle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
-						Quat q(Vec3(1, 0, 0), angle);
+						float xangle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
+						Quat q(Vec3(1, 0, 0), xangle);
 						rot = q * rot;
 					}
 
 					if (m_is_rotate_y)
 					{
-						float angle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
-						Quat q(Vec3(0, 1, 0), angle);
+						float yangle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+						Quat q(Vec3(0, 1, 0), yangle);
 						rot = q * rot;
 					}
 
 					if (m_is_rotate_z)
 					{
-						float angle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
-						Quat q(rot.rotate(Vec3(0, 0, 1)), angle);
+						float zangle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
+						Quat q(rot.rotate(Vec3(0, 0, 1)), zangle);
 						rot = q * rot;
 					}
 				}
@@ -2389,7 +2389,7 @@ void TerrainEditor::entityGUI() {
 					ResourceManagerHub& manager = m_app.getEngine().getResourceManager();
 					PrefabResource* prefab = manager.load<PrefabResource>(res.path);
 					if (!ImGui::GetIO().KeyShift) {
-						for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+						for (PrefabResource* p : m_selected_prefabs) p->decRefCount();
 						m_selected_prefabs.clear();
 					}
 					m_selected_prefabs.push(prefab);
@@ -2397,7 +2397,7 @@ void TerrainEditor::entityGUI() {
 				else {
 					PrefabResource* prefab = m_selected_prefabs[selected_idx];
 					if (!ImGui::GetIO().KeyShift) {
-						for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+						for (PrefabResource* p : m_selected_prefabs) p->decRefCount();
 						m_selected_prefabs.clear();
 					}
 					else {
@@ -2564,7 +2564,7 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 	ASSERT(cmp.type == TERRAIN_TYPE);
 	
-	auto* scene = static_cast<RenderScene*>(cmp.scene);
+	RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 	ImGui::Unindent();
 	if (!ImGui::CollapsingHeader("Terrain editor")) {
 		ImGui::Indent();
@@ -2665,7 +2665,6 @@ void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 	for(auto entity : editor.getSelectedEntities()) {
 		if (!universe.hasComponent(entity, TERRAIN_TYPE)) continue;
 		
-		RenderScene* scene = static_cast<RenderScene*>(universe.getScene(TERRAIN_TYPE));
 		DVec3 origin;
 		Vec3 dir;
 		editor.getView().getViewport().getRay(mp, origin, dir);

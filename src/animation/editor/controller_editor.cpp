@@ -102,8 +102,8 @@ struct ControllerEditorImpl : ControllerEditor {
 			ImGui::Text("No inputs");
 			return false;
 		}
-		const InputDecl::Input& input = m_controller->m_inputs.inputs[*input_index];
-		if (ImGui::BeginCombo("##input", input.name)) {
+		const InputDecl::Input& current_input = m_controller->m_inputs.inputs[*input_index];
+		if (ImGui::BeginCombo("##input", current_input.name)) {
 			for (const InputDecl::Input& input : m_controller->m_inputs.inputs) {
 				if (input.type == InputDecl::EMPTY) continue;
 				if (ImGui::Selectable(input.name)) {
@@ -198,11 +198,11 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	bool properties_ui(GroupNode& node) {
-		float l = node.m_blend_length.seconds();
+		float node_blend_length = node.m_blend_length.seconds();
 		ImGuiEx::Label("Blend length");
 		bool changed = false;
-		if (ImGui::DragFloat("##bl", &l)) {
-			node.m_blend_length = Time::fromSeconds(l);
+		if (ImGui::DragFloat("##bl", &node_blend_length)) {
+			node.m_blend_length = Time::fromSeconds(node_blend_length);
 			changed = true;
 		}
 
@@ -259,10 +259,10 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	bool properties_ui(Blend1DNode& node) {
-		const InputDecl::Input& input = m_controller->m_inputs.inputs[node.m_input_index];
+		const InputDecl::Input& current_input = m_controller->m_inputs.inputs[node.m_input_index];
 		bool changed = false;
 		ImGuiEx::Label("Input");
-		if (ImGui::BeginCombo("##input", input.name)) {
+		if (ImGui::BeginCombo("##input", current_input.name)) {
 			for (const InputDecl::Input& input : m_controller->m_inputs.inputs) {
 				if (ImGui::Selectable(input.name)) {
 					changed = true;
@@ -1048,9 +1048,9 @@ struct ControllerEditorImpl : ControllerEditor {
 				ImGui::Text("Animation");
 				ImGui::NextColumn();
 				ImGui::Separator();
-				for (u32 i = 0; i < (u32)m_controller->m_animation_entries.size(); ++i) {
-					ImGui::PushID(i);
-					Controller::AnimationEntry& entry = m_controller->m_animation_entries[i];
+				for (u32 entry_idx = 0; entry_idx < (u32)m_controller->m_animation_entries.size(); ++entry_idx) {
+					ImGui::PushID(entry_idx);
+					Controller::AnimationEntry& entry = m_controller->m_animation_entries[entry_idx];
 					ImGui::PushItemWidth(-1);
 					ImGui::InputInt("##set", (int*)&entry.set);
 					ImGui::PopItemWidth();

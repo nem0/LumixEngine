@@ -272,9 +272,9 @@ struct UniverseViewImpl final : UniverseView {
 			}
 		};
 
-		for (int i = 0, c = model->getMeshCount(); i < c; ++i)
+		for (int mesh_idx = 0, cm = model->getMeshCount(); mesh_idx < cm; ++mesh_idx)
 		{
-			Mesh& mesh = model->getMesh(i);
+			Mesh& mesh = model->getMesh(mesh_idx);
 
 			if (mesh.areIndices16())
 			{
@@ -1144,7 +1144,6 @@ void SceneView::onToolbar()
 	if (open_camera_transform) ImGui::OpenPopup("Camera transform");
 
 	if (ImGui::BeginPopup("Camera transform")) {
-		Viewport vp = m_editor.getView().getViewport();
 		if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
 			m_editor.getView().setViewport(vp);
 		}

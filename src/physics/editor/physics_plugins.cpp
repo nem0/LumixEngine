@@ -68,8 +68,8 @@ void showD6JointGizmo(UniverseView& view, const RigidTransform& global_frame, ph
 	RigidTransform global_frame1 = global_frame0;
 	if (actors[1]) {
 		const physx::PxTransform local_frame1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-		const RigidTransform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
-		const Quat rot1 = global_frame1.rot;
+		const RigidTransform f = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
+		const Quat rot1 = f.rot;
 
 		addLine(view, joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), Color::RED);
 		addLine(view, joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), Color::GREEN);

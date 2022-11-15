@@ -518,7 +518,7 @@ void updateGrabbedMouse() {
 
 WindowHandle createWindow(const InitWindowArgs& args) {
 	WCharStr<LUMIX_MAX_PATH> cls_name("lunex_window");
-	static WNDCLASS wc = [&]() -> WNDCLASS {
+	static WNDCLASS wndcls = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
 		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
 			Event e;
@@ -593,7 +593,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		CW_USEDEFAULT,
 		parent_window,
 		NULL,
-		wc.hInstance,
+		wndcls.hInstance,
 		NULL);
 	ASSERT(hwnd);
 

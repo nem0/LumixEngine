@@ -150,13 +150,13 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 		Lumix::MutexGuard queue_lock(g_system->m_job_queue_sync);
 		while (waitor) {
 			Waitor* next = waitor->next;
-			const u8 worker = waitor->fiber->current_job.worker_index;
-			if (worker == ANY_WORKER) {
+			const u8 worker_idx = waitor->fiber->current_job.worker_index;
+			if (worker_idx == ANY_WORKER) {
 				g_system->m_ready_fibers.push(waitor->fiber);
 				wake_all = true;
 			}
 			else {
-				WorkerTask* worker = g_system->m_workers[waitor->fiber->current_job.worker_index % g_system->m_workers.size()];
+				WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
 				worker->m_ready_fibers.push(waitor->fiber);
 				if(!wake_all) worker->wakeup();
 			}
@@ -441,9 +441,8 @@ void shutdown()
 static void waitEx(Signal* signal, bool is_mutex)
 {
 	ASSERT(signal);
-	if (signal->counter == 0) return;
-
 	g_system->m_sync.enter();
+
 	if (signal->counter == 0) {
 		g_system->m_sync.exit();
 		return;

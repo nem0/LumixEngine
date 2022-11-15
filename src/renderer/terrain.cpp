@@ -331,7 +331,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Unive
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
-	const char* path = serializer.readString();
+	const char* material_path = serializer.readString();
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	if (version > (i32)RenderSceneVersion::TESSELATED_TERRAIN) {
@@ -339,7 +339,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Unive
 		serializer.read(m_base_grid_res);
 	}
 	m_scale.z = m_scale.x;
-	setMaterial(scene.getEngine().getResourceManager().load<Material>(Path(path)));
+	setMaterial(scene.getEngine().getResourceManager().load<Material>(Path(material_path)));
 	i32 count;
 	serializer.read(count);
 	while(m_grass_types.size() > count)

@@ -379,8 +379,8 @@ bool Settings::load()
 			return false;
 		}
 
-		Span<const char> content((const char*)buf.data(), (u32)buf.size());
-		if (!LuaWrapper::execute(L, content, "settings", 0)) {
+		Span<const char> default_content((const char*)buf.data(), (u32)buf.size());
+		if (!LuaWrapper::execute(L, default_content, "settings", 0)) {
 			return false;
 		}
 	}

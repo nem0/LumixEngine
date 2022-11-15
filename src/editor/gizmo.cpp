@@ -334,52 +334,54 @@ void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr
 }
 
 void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const Vec3& b, u32 color) {
-	UniverseView::Vertex* vertices = view.render(false, 25*6);
-
-	const float ANGLE_STEP = degreesToRadians(1.0f / 100.0f * 360.0f);
-	int offset = -1;
-	for (int i = 0; i < 25; ++i) {
-		float angle = i * ANGLE_STEP;
-		float s = sinf(angle);
-		float c = cosf(angle);
-		float sn = sinf(angle + ANGLE_STEP);
-		float cn = cosf(angle + ANGLE_STEP);
-
-		const Vec3 p0 = p + a * s + b * c;
-		const Vec3 p1 = p + (a * 1.1f) * s + (b * 1.1f) * c;
-		const Vec3 p2 = p + (a * 1.1f) * sn + (b * 1.1f) * cn;
-		const Vec3 p3 = p + a * sn + b * cn;
-
-		++offset;
-		vertices[offset].pos = p0;
-		vertices[offset].abgr = color;
-
-		++offset;
-		vertices[offset].pos = p1;
-		vertices[offset].abgr = color;
-
-		++offset;
-		vertices[offset].pos = p2;
-		vertices[offset].abgr = color;
-
-		++offset;
-		vertices[offset].pos = p0;
-		vertices[offset].abgr = color;
-
-		++offset;
-		vertices[offset].pos = p2;
-		vertices[offset].abgr = color;
-
-		++offset;
-		vertices[offset].pos = p3;
-		vertices[offset].abgr = color;
+	{
+		UniverseView::Vertex* vertices = view.render(false, 25*6);
+	
+		const float ANGLE_STEP = degreesToRadians(1.0f / 100.0f * 360.0f);
+		i32 offset = -1;
+		for (int i = 0; i < 25; ++i) {
+			float angle = i * ANGLE_STEP;
+			float s = sinf(angle);
+			float c = cosf(angle);
+			float sn = sinf(angle + ANGLE_STEP);
+			float cn = cosf(angle + ANGLE_STEP);
+	
+			const Vec3 p0 = p + a * s + b * c;
+			const Vec3 p1 = p + (a * 1.1f) * s + (b * 1.1f) * c;
+			const Vec3 p2 = p + (a * 1.1f) * sn + (b * 1.1f) * cn;
+			const Vec3 p3 = p + a * sn + b * cn;
+	
+			++offset;
+			vertices[offset].pos = p0;
+			vertices[offset].abgr = color;
+	
+			++offset;
+			vertices[offset].pos = p1;
+			vertices[offset].abgr = color;
+	
+			++offset;
+			vertices[offset].pos = p2;
+			vertices[offset].abgr = color;
+	
+			++offset;
+			vertices[offset].pos = p0;
+			vertices[offset].abgr = color;
+	
+			++offset;
+			vertices[offset].pos = p2;
+			vertices[offset].abgr = color;
+	
+			++offset;
+			vertices[offset].pos = p3;
+			vertices[offset].abgr = color;
+		}
 	}
 
 	{
 		const int GRID_SIZE = 5;
 		UniverseView::Vertex* vertices = view.render(true, (GRID_SIZE + 1) * 4);
 
-		offset = -1;
+		i32 offset = -1;
 		for (int i = 0; i <= GRID_SIZE; ++i) {
 			float t = 1.0f / GRID_SIZE * i;
 			float ratio = sinf(acosf(t));

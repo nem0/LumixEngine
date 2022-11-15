@@ -577,7 +577,7 @@ namespace Lumix
 							}
 							if (hash != INDEX_HASH && hash != THIS_HASH)
 							{
-								int prop_index = getProperty(inst, hash);
+								i32 prop_index = getProperty(inst, hash);
 								if (prop_index < 0) prop_index = getPropertyLegacy(inst, name);
 								if (prop_index >= 0) {
 									valid_properties[prop_index / 8] |=  1 << (prop_index % 8);
@@ -592,10 +592,10 @@ namespace Lumix
 									m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 								}
 								else {
-									const int prop_index = inst.m_properties.size();
+									const int size = inst.m_properties.size();
 									if (inst.m_properties.size() < sizeof(valid_properties) * 8) {
 										auto& prop = inst.m_properties.emplace(allocator);
-										valid_properties[prop_index / 8] |= 1 << (prop_index % 8);
+										valid_properties[size / 8] |= 1 << (size % 8);
 										switch (lua_type(inst.m_state, -1)) {
 											case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
 											case LUA_TSTRING: prop.type = Property::STRING; break;
@@ -1639,10 +1639,10 @@ namespace Lumix
 		void onRectHoveredOut(EntityRef e) { onGUIEvent(e, "onRectHoveredOut"); }
 		
 		void onRectMouseDown(EntityRef e, float x, float y) { 
-			auto* call = beginFunctionCallInlineScript(e, "onRectMouseDown");
-			if (call) {
-				call->add(x);
-				call->add(y);
+			auto* inline_call = beginFunctionCallInlineScript(e, "onRectMouseDown");
+			if (inline_call) {
+				inline_call->add(x);
+				inline_call->add(y);
 				endFunctionCall();
 			}
 
@@ -1661,8 +1661,8 @@ namespace Lumix
 
 		LUMIX_FORCE_INLINE void onGUIEvent(EntityRef e, const char* event)
 		{
-			auto* call = beginFunctionCallInlineScript(e, event);
-			if (call) {
+			auto* inline_call = beginFunctionCallInlineScript(e, event);
+			if (inline_call) {
 				endFunctionCall();
 			}
 
@@ -1874,9 +1874,8 @@ namespace Lumix
 			}
 			
 			serializer.write(m_scripts.size());
-			for (auto iter = m_scripts.begin(), end = m_scripts.end(); iter != end; ++iter)
+			for (ScriptComponent* script_cmp : m_scripts)
 			{
-				ScriptComponent* script_cmp = iter.value();
 				serializer.write(script_cmp->m_entity);
 				serializer.write(script_cmp->m_scripts.size());
 				for (auto& scr : script_cmp->m_scripts)
@@ -1933,11 +1932,11 @@ namespace Lumix
 				m_scripts.insert(script->m_entity, script);
 				int scr_count;
 				serializer.read(scr_count);
-				for (int j = 0; j < scr_count; ++j)
+				for (int scr_idx = 0; scr_idx < scr_count; ++scr_idx)
 				{
 					auto& scr = script->m_scripts.emplace(*script, allocator);
 
-					const char* tmp = serializer.readString();
+					const char* path = serializer.readString();
 					serializer.read(scr.m_flags);
 					int prop_count;
 					serializer.read(prop_count);
@@ -1956,17 +1955,17 @@ namespace Lumix
 						serializer.read(type);
 						const char* tmp = serializer.readString();
 						if (type == Property::ENTITY) {
-							EntityPtr entity;
-							fromCString(Span(tmp, stringLength(tmp)), entity.index);
-							entity = entity_map.get(entity);
-							StaticString<64> buf(entity.index);
+							EntityPtr prop_value;
+							fromCString(Span(tmp, stringLength(tmp)), prop_value.index);
+							prop_value = entity_map.get(prop_value);
+							StaticString<64> buf(prop_value.index);
 							prop.stored_value = buf;
 						}
 						else {
 							prop.stored_value = tmp;
 						}
 					}
-					setPath(*script, scr, Path(tmp));
+					setPath(*script, scr, Path(path));
 				}
 				m_universe.onComponentCreated(script->m_entity, LUA_SCRIPT_TYPE, this);
 			}

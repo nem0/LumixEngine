@@ -859,8 +859,8 @@ void FBXImporter::gatherGeometries(ofbx::IScene* scene)
 void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 {
 	int c = scene->getMeshCount();
-	for (int i = 0; i < c; ++i) {
-		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
+	for (int mesh_idx = 0; mesh_idx < c; ++mesh_idx) {
+		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(mesh_idx);
 		const int mat_count = fbx_mesh->getMaterialCount();
 		for (int j = 0; j < mat_count; ++j) {
 			ImportMesh& mesh = m_meshes.emplace(m_allocator);
@@ -1079,17 +1079,17 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		stream.bindUniformBuffer(UniformBuffer::PASS, pass_buf.buffer, pass_buf.offset, pass_buf.size);
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
-			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
+			for (u32 col = 0; col < IMPOSTOR_COLS; ++col) {
 				if (gpu::isOriginBottomLeft()) {
-					stream.viewport(i * tile_size.x, j * tile_size.y, tile_size.x, tile_size.y);
+					stream.viewport(col * tile_size.x, j * tile_size.y, tile_size.x, tile_size.y);
 				} else {
-					stream.viewport(i * tile_size.x, (IMPOSTOR_COLS - j - 1) * tile_size.y, tile_size.x, tile_size.y);
+					stream.viewport(col * tile_size.x, (IMPOSTOR_COLS - j - 1) * tile_size.y, tile_size.x, tile_size.y);
 				}
-				const Vec3 v = normalize(impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)}));
+				const Vec3 v = normalize(impostorToWorld({col / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)}));
 
 				Matrix model_mtx;
 				Vec3 up = Vec3(0, 1, 0);
-				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
+				if (col == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
 				model_mtx.lookAt(center - v * 1.01f * radius, center, up);
 				const Renderer::TransientSlice ub = renderer->allocUniform(&model_mtx, sizeof(model_mtx));
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
@@ -1171,7 +1171,6 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 
 		{
 			gpu::TextureHandle staging_depth = gpu::allocTextureHandle();
-			const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
 			stream.createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
 			stream.copy(staging_depth, gbs[2], 0, 0);
 			Array<u32> tmp(m_allocator);
@@ -1748,8 +1747,8 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 	skinning.resize(geom->getVertexCount());
 	memset(&skinning[0], 0, skinning.size() * sizeof(skinning[0]));
 
-	auto* skin = mesh->getGeometry()->getSkin();
-	if(!skin) {
+	const ofbx::Skin* fbx_skin = mesh->getGeometry()->getSkin();
+	if(!fbx_skin) {
 		ASSERT(import_mesh.bone_idx >= 0);
 		skinning.resize(mesh->getGeometry()->getIndexCount());
 		for (Skin& skin : skinning) {
@@ -1761,9 +1760,9 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 		return;
 	}
 
-	for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
+	for (int i = 0, c = fbx_skin->getClusterCount(); i < c; ++i)
 	{
-		const ofbx::Cluster* cluster = skin->getCluster(i);
+		const ofbx::Cluster* cluster = fbx_skin->getCluster(i);
 		if (cluster->getIndicesCount() == 0) continue;
 		int joint = m_bones.indexOf(cluster->getLink());
 		ASSERT(joint >= 0);
@@ -2156,8 +2155,8 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 		}
 		else
 		{
-			const int idx = m_bones.indexOf(parent);
-			write(idx);
+			const int tmp = m_bones.indexOf(parent);
+			write(tmp);
 		}
 
 		const ImportMesh* mesh = getAnyMeshFromBone(node, int(&node - m_bones.begin()));
@@ -2258,12 +2257,12 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 	}
 	Array<Vec3> verts(m_allocator);
 
-	i32 count = 0;
+	i32 total_vertex_count = 0;
 	for (auto& mesh : m_meshes)	{
-		count += (i32)(mesh.vertex_data.size() / getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg));
+		total_vertex_count += (i32)(mesh.vertex_data.size() / getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg));
 	}
+	verts.reserve(total_vertex_count);
 
-	verts.reserve(count);
 	for (auto& mesh : m_meshes) {
 		int vertex_size = getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg);
 		int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);

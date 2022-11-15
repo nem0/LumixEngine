@@ -856,8 +856,8 @@ struct StudioAppImpl final : StudioApp
 			if (!hrsrc) return;
 			HGLOBAL hglobal = LoadResource(GetModuleHandle(NULL), hrsrc);
 			if (!hglobal) return;
-			const DWORD size = SizeofResource(GetModuleHandle(NULL), hrsrc);
-			if (size == 0) return;
+			const DWORD res_size = SizeofResource(GetModuleHandle(NULL), hrsrc);
+			if (res_size == 0) return;
 			const void* res_mem = LockResource(hglobal);
 			if (!res_mem) return;
 	
@@ -866,7 +866,7 @@ struct StudioAppImpl final : StudioApp
 
 			// TODO extract only nonexistent files
 			u64 bundled_last_modified = os::getLastModified(exe_path);
-			InputMemoryStream str(res_mem, size);
+			InputMemoryStream str(res_mem, res_size);
 
 			TarHeader header;
 			while (str.getPosition() < str.size()) {
@@ -1634,11 +1634,11 @@ struct StudioAppImpl final : StudioApp
 	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain)
 	{
 		Universe* universe = m_editor->getUniverse();
-		bool selected = selected_entities.indexOf(entity) >= 0;
+		bool is_selected = selected_entities.indexOf(entity) >= 0;
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
 		bool has_child = universe->getFirstChild(entity).isValid();
 		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
-		if (selected) flags |= ImGuiTreeNodeFlags_Selected;
+		if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
 		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 		
 		bool node_open;
@@ -1703,14 +1703,13 @@ struct StudioAppImpl final : StudioApp
 					m_editor->beginCommandGroup("create_child_entity");
 					EntityRef child = m_editor->addEntity();
 					m_editor->makeParent(entity, child);
-					const DVec3 pos = m_editor->getUniverse()->getPosition(entity);
+					const DVec3 pos = universe->getPosition(entity);
 					m_editor->setEntitiesPositions(&child, &pos, 1);
 					m_editor->endCommandGroup();
 				}
 				if (ImGui::MenuItem("Select all children"))
 				{
 					Array<EntityRef> tmp(m_allocator);
-					Universe* universe = m_editor->getUniverse();
 					for (EntityRef e : universe->childrenOf(entity)) {
 						tmp.push(e);
 					}

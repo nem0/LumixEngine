@@ -91,10 +91,10 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		UniverseView::RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
 		if (hit.is_hit) {
 			CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
-			Spline& spline = scene->getSpline(e);
-			m_selected = (i32)spline.points.size();
-			recordUndo(-1, spline, e, [&](){
-				spline.points.push(Vec3(hit.pos - tr.pos));
+			Spline& hit_spline = scene->getSpline(e);
+			m_selected = (i32)hit_spline.points.size();
+			recordUndo(-1, hit_spline, e, [&](){
+				hit_spline.points.push(Vec3(hit.pos - tr.pos));
 			});
 		}
 	}
@@ -229,7 +229,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 						ResourceManagerHub& manager = m_app.getEngine().getResourceManager();
 						PrefabResource* prefab = manager.load<PrefabResource>(res.path);
 						if (!ImGui::GetIO().KeyShift) {
-							for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+							for (PrefabResource* iter : m_selected_prefabs) iter->decRefCount();
 							m_selected_prefabs.clear();
 						}
 						m_selected_prefabs.push(prefab);
@@ -237,7 +237,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 					else {
 						PrefabResource* prefab = m_selected_prefabs[selected_idx];
 						if (!ImGui::GetIO().KeyShift) {
-							for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+							for (PrefabResource* iter : m_selected_prefabs) iter->decRefCount();
 							m_selected_prefabs.clear();
 						}
 						else {

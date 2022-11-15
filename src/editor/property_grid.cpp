@@ -340,8 +340,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 		}
 		
-		const float w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
-		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -w : -1.f, 0))) {
+		const float icons_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
+		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -icons_w : -1.f, 0))) {
 			ImGui::OpenPopup("popup");
 		}
 		if (!entity.isValid()) {
@@ -596,11 +596,11 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	void visit(const reflection::ArrayProperty& prop) override
 	{
 		ImGui::Unindent();
-		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap);
+		bool is_root_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");
-			if (is_open) ImGui::TreePop();
+			if (is_root_open) ImGui::TreePop();
 			ImGui::Indent();
 			return;
 		}
@@ -615,7 +615,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.addArrayPropertyItem(cmp, prop.name);
 			count = prop.getCount(cmp);
 		}
-		if (!is_open)
+		if (!is_root_open)
 		{
 			ImGui::PopID();
 			ImGui::Indent();
@@ -733,8 +733,8 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 {
 	char name[Universe::ENTITY_NAME_MAX_LENGTH];
 	Universe& universe = *editor.getUniverse();
-	const char* tmp = universe.getEntityName(entities[0]);
-	copyString(name, tmp);
+	const char* entity_name = universe.getEntityName(entities[0]);
+	copyString(name, entity_name);
 	ImGui::SetNextItemWidth(-1);
 	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name))) editor.setEntityName(entities[0], name);
 	ImGui::PushFont(m_app.getBoldFont());

@@ -917,25 +917,27 @@ bool toCString(u32 value, Span<char> output)
 static bool increment(const char* output, char* end, bool is_space_after)
 {
 	char carry = 1;
-	char* c = end;
-	while (c >= output)
 	{
-		if (*c == '.')
+		char* c = end;
+		while (c >= output)
 		{
+			if (*c == '.')
+			{
+				--c;
+			}
+			*c += carry;
+			if (*c > '9')
+			{
+				*c = '0';
+				carry = 1;
+			}
+			else
+			{
+				carry = 0;
+				break;
+			}
 			--c;
 		}
-		*c += carry;
-		if (*c > '9')
-		{
-			*c = '0';
-			carry = 1;
-		}
-		else
-		{
-			carry = 0;
-			break;
-		}
-		--c;
 	}
 	if (carry && is_space_after)
 	{

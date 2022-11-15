@@ -1140,13 +1140,13 @@ namespace ImGuiEx {
 			
 			ImVec2 from = min * (1 - t0) + max * t0;
 			from.y = min.y;
-			ImVec2 to;
-			to.x = min.x * (1 - t1) + max.x * t1;
-			to.y = max.y;
+			ImVec2 subto;
+			subto.x = min.x * (1 - t1) + max.x * t1;
+			subto.y = max.y;
 
 			const int i1 = i + 1;
 			const ImColor c1(values[i1 * 4 + 0], values[i1 * 4 + 1], values[i1 * 4 + 2], values[i1 * 4 + 3]);
-			dl->AddRectFilledMultiColor(from, to, c0, c1, c1, c0);
+			dl->AddRectFilledMultiColor(from, subto, c0, c1, c1, c0);
 			c0 = c1;
 		}
 

@@ -139,8 +139,8 @@ struct AssetCompilerImpl : AssetCompiler {
 				bool all_deleted = true;
 				while (os::getNextFile(iter, &info)) {
 					if (!info.is_directory) {
-						StaticString<LUMIX_MAX_PATH> path(".lumix/resources/", info.filename);
-						if (!os::deleteFile(path)) {
+						StaticString<LUMIX_MAX_PATH> filepath(".lumix/resources/", info.filename);
+						if (!os::deleteFile(filepath)) {
 							all_deleted = false;
 						}
 					}
@@ -151,13 +151,13 @@ struct AssetCompilerImpl : AssetCompiler {
 					logError("Could not delete all files in .lumix/resources, please delete the directory and restart the editor.");
 				}
 
-				os::OutputFile file;
-				if (!file.open(".lumix/resources/_version.bin")) {
+				os::OutputFile out_file;
+				if (!out_file.open(".lumix/resources/_version.bin")) {
 					logError("Could not open .lumix/resources/_version.bin");
 				}
 				else {
-					file.write(0);
-					file.close();
+					out_file.write(0);
+					out_file.close();
 				}
 			}
 		}
@@ -699,21 +699,21 @@ struct AssetCompilerImpl : AssetCompiler {
 	void update() override
 	{
 		for(;;) {
-			CompileJob p = popCompiledResource();
-			if (p.path.isEmpty()) break;
+			CompileJob job = popCompiledResource();
+			if (job.path.isEmpty()) break;
 
 			// this can take some time, mutex is probably not the best option
 
 			const u32 generation = [&](){
 				MutexGuard lock(m_to_compile_mutex);
-				return m_generations[p.path];
+				return m_generations[job.path];
 			}();
-			if (p.generation != generation) continue;
+			if (job.generation != generation) continue;
 
 			MutexGuard lock(m_compiled_mutex);
 			// reload/continue loading resource and its subresources
 			for (const ResourceItem& ri : m_resources) {
-				if (!endsWithInsensitive(ri.path.c_str(), p.path.c_str())) continue;;
+				if (!endsWithInsensitive(ri.path.c_str(), job.path.c_str())) continue;;
 				
 				Resource* r = getResource(ri.path);
 				if (r && (r->isReady() || r->isFailure())) r->getResourceManager().reload(*r);
@@ -721,7 +721,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 
 			// compile all dependents
-			auto dep_iter = m_dependencies.find(p.path);
+			auto dep_iter = m_dependencies.find(job.path);
 			if (dep_iter.isValid()) {
 				for (const Path& p : dep_iter.value()) {
 					pushToCompileQueue(p);

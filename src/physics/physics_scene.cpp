@@ -2702,13 +2702,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		PxRigidActor* actor = m_actors[entity].physx_actor;
 		int count = getGeometryCount(actor, type);
+		
 		PxShape* shape = getShape(entity, index, type);
 		actor->detachShape(*shape);
 
 		for (int i = index + 1; i < count; ++i)
 		{
-			PxShape* shape = getShape(entity, i, type);
-			shape->userData = (void*)(intptr_t)(i - 1);
+			PxShape* s = getShape(entity, i, type);
+			s->userData = (void*)(intptr_t)(i - 1);
 		}
 	}
 
@@ -3290,7 +3291,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		u32 count;
 		serializer.read(count);
-		for (u32 i = 0; i < count; ++i) {
+		for (u32 ctrl_idx = 0; ctrl_idx < count; ++ctrl_idx) {
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);

@@ -877,9 +877,9 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		multiLabel<&Material::isBackfaceCulling>("Backface culling", resources);
-		bool b = first->isBackfaceCulling();
-		if (ImGui::Checkbox("##bfcul", &b)) {
-			set<&Material::enableBackfaceCulling>(resources, b);
+		bool is_backface_culling = first->isBackfaceCulling();
+		if (ImGui::Checkbox("##bfcul", &is_backface_culling)) {
+			set<&Material::enableBackfaceCulling>(resources, is_backface_culling);
 		}
 
 		if (!same_shader) return;
@@ -891,9 +891,9 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const u8 alpha_cutout_idx = renderer.getShaderDefineIdx("ALPHA_CUTOUT");
 		if (shader->hasDefine(alpha_cutout_idx)) {
 			multiLabel<&Material::isAlphaCutout>("Alpha cutout", resources);
-			b = first->isAlphaCutout();
-			if (ImGui::Checkbox("##acutout", &b)) {
-				set<&Material::setAlphaCutout>(resources, b);
+			bool is_alpha_cutout = first->isAlphaCutout();
+			if (ImGui::Checkbox("##acutout", &is_alpha_cutout)) {
+				set<&Material::setAlphaCutout>(resources, is_alpha_cutout);
 			}
 		}
 
@@ -1273,6 +1273,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		CompositeTexture::Result img(allocator);
 		if (!tc.generate(&img)) return false;
+		if (img.layers.empty()) return false;
 		const u32 w = img.layers[0].w;
 		const u32 h = img.layers[0].h;
 
@@ -1282,9 +1283,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		input.is_cubemap = img.is_cubemap;
 		input.has_alpha = img.layers[0].channels == 4;
 
-		OutputMemoryStream out_data(allocator);
-		out_data.resize(w * h * 4);
-		u8* out_data_ptr = out_data.getMutableData();
 		for (CompositeTexture::PixelData& layer : img.layers) {
 			const u32 idx = u32(&layer - img.layers.begin());
 			if (layer.channels != 4) {
@@ -3396,13 +3394,13 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-			StaticString<LUMIX_MAX_PATH> path(base_path, "universes/");
-			if (!os::dirExists(path) && !os::makePath(path)) {
-				logError("Failed to create ", path);
+			StaticString<LUMIX_MAX_PATH> dir_path(base_path, "universes/");
+			if (!os::dirExists(dir_path) && !os::makePath(dir_path)) {
+				logError("Failed to create ", dir_path);
 			}
-			path << "/probes/";
-			if (!os::dirExists(path) && !os::makePath(path)) {
-				logError("Failed to create ", path);
+			dir_path << "/probes/";
+			if (!os::dirExists(dir_path) && !os::makePath(dir_path)) {
+				logError("Failed to create ", dir_path);
 			}
 			RenderScene* scene = nullptr;
 			while (!m_probes.empty()) {
@@ -3488,10 +3486,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			stream.createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
 			
 			u32 data_size = 0;
-			u32 mip_size = size;
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				data_size += mip_size * mip_size * sizeof(Vec4) * 6;
-				mip_size >>= 1;
+			{
+				u32 mip_size = size;
+				for (u32 mip = 0; mip < roughness_levels; ++mip) {
+					data_size += mip_size * mip_size * sizeof(Vec4) * 6;
+					mip_size >>= 1;
+				}
 			}
 
 			tmp.resize(data_size);
@@ -3873,20 +3873,20 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 						Quat rot = Quat::IDENTITY;
 						if (m_is_rotate_x) {
-							float angle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
-							Quat q(Vec3(1, 0, 0), angle);
+							float xangle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
+							Quat q(Vec3(1, 0, 0), xangle);
 							rot = q * rot;
 						}
 
 						if (m_is_rotate_y) {
-							float angle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
-							Quat q(Vec3(0, 1, 0), angle);
+							float yangle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+							Quat q(Vec3(0, 1, 0), yangle);
 							rot = q * rot;
 						}
 
 						if (m_is_rotate_z) {
-							float angle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
-							Quat q(rot.rotate(Vec3(0, 0, 1)), angle);
+							float zangle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
+							Quat q(rot.rotate(Vec3(0, 0, 1)), zangle);
 							rot = q * rot;
 						}
 
@@ -5069,16 +5069,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		addCube(view, tr.pos, x, y, z, Color::BLUE);
 
 		Gizmo::Config cfg;
-		const DVec3 p0 = tr.transform(DVec3(decal.bezier_p0.x, 0, decal.bezier_p0.y));
-		Transform p0_tr = { p0, Quat::IDENTITY, 1 };
+		const DVec3 pos0 = tr.transform(DVec3(decal.bezier_p0.x, 0, decal.bezier_p0.y));
+		Transform p0_tr = { pos0, Quat::IDENTITY, 1 };
 		WorldEditor& editor = view.getEditor();
 		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, p0_tr, cfg)) {
 			const Vec2 p0 = Vec2(tr.inverted().transform(p0_tr.pos).xz());
 			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
 		}
 
-		const DVec3 p2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
-		Transform p2_tr = { p2, Quat::IDENTITY, 1 };
+		const DVec3 pos2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
+		Transform p2_tr = { pos2, Quat::IDENTITY, 1 };
 		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, p2_tr, cfg)) {
 			const Vec2 p2 = Vec2(tr.inverted().transform(p2_tr.pos).xz());
 			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);

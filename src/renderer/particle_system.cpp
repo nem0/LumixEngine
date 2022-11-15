@@ -669,12 +669,12 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 			while (itype != InstructionType::END) {
 				switch (itype) {
 					case InstructionType::SIN: {
-						DataStream dst = ip.read<DataStream>();
+						DataStream dst_stream = ip.read<DataStream>();
 						DataStream op0 = ip.read<DataStream>();
 						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
 						
-						if (dst.type == DataStream::OUT) {
-							u8 output_idx = dst.index;
+						if (dst_stream.type == DataStream::OUT) {
+							u8 output_idx = dst_stream.index;
 							const u32 stride = m_resource->getOutputsCount();
 							float* dst = data + output_idx + fromf4 * 4 * stride;
 							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
@@ -682,7 +682,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 							}
 						}
 						else {
-							float* result = (float*)getStream(*this, dst, fromf4, reg_mem.begin());
+							float* result = (float*)getStream(*this, dst_stream, fromf4, reg_mem.begin());
 							const float* const end = result + stepf4 * 4;
 
 							for (; result != end; ++result, ++arg) {
@@ -692,11 +692,11 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 						break;
 					}
 					case InstructionType::COS: {
-						DataStream dst = ip.read<DataStream>();
+						DataStream dst_stream = ip.read<DataStream>();
 						DataStream op0 = ip.read<DataStream>();
 						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
-						if (dst.type == DataStream::OUT) {
-							i32 output_idx = dst.index;
+						if (dst_stream.type == DataStream::OUT) {
+							i32 output_idx = dst_stream.index;
 							const u32 stride = m_resource->getOutputsCount();
 							float* dst = data + output_idx + fromf4 * 4 * stride;
 							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
@@ -704,7 +704,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 							}
 						}
 						else {
-							float* result = (float*)getStream(*this, dst, fromf4, reg_mem.begin());
+							float* result = (float*)getStream(*this, dst_stream, fromf4, reg_mem.begin());
 							const float* const end = result + stepf4 * 4;
 
 							for (; result != end; ++result, ++arg) {
