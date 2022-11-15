@@ -1397,7 +1397,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 		m_app.removeAction(&m_apply_action);
 	}
 
-	void onCanvasClicked(ImVec2 pos) override {
+	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
 		static const struct {
 			char key;
 			Node::Type type;
@@ -1420,6 +1420,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 		}
 		if (n) {
 			n->m_pos = pos;
+			if (hovered_link >= 0) splitLink(*m_resource, hovered_link, m_resource->m_nodes.size() - 1);
 			pushUndo(NO_MERGE_UNDO);
 		}	
 	}
@@ -1717,6 +1718,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 			ImGui::EndPopup();
 		}
 
+		ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 		if (!ImGui::Begin("Particle editor", &m_open, ImGuiWindowFlags_MenuBar)) {
 			ImGui::End();
 			return;

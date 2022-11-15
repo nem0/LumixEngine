@@ -47,6 +47,7 @@ static const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
+static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 
 struct BoneAttachment
@@ -1106,6 +1107,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 			computeAABB(pg);
 			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
+			m_universe.onComponentCreated(e, PROCEDURAL_GEOM_TYPE, this);
 		}
 	}
 
@@ -1852,16 +1854,17 @@ struct RenderSceneImpl final : RenderScene {
 		computeAABB(pg);
 	}
 	
-	bool hasProceduralGeometry(EntityRef e) override {
-		return m_procedural_geometries.find(e).isValid();
-	}
-
 	ProceduralGeometry& getProceduralGeometry(EntityRef e) override {
 		return m_procedural_geometries[e];
 	}
 	
 	const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() override {
 		return m_procedural_geometries;
+	}
+
+	Path getProceduralGeometryMaterial(EntityRef entity) override {
+		Material* mat = m_procedural_geometries[entity].material;
+		return mat ? mat->getPath() : Path();
 	}
 
 	void setProceduralGeometryMaterial(EntityRef entity, const Path& path) override {
@@ -2549,11 +2552,7 @@ struct RenderSceneImpl final : RenderScene {
 		return hit;
 	}
 	
-	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir) override {
-		return castRayProceduralGeometry(origin, dir, [](const RayCastModelHit&){ return true; });
-	}
-
-	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir, const RayCastModelHit::Filter& filter) override {
+	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir, const RayCastModelHit::Filter& filter) {
 		RayCastModelHit hit;
 		hit.is_hit = false;
 		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
@@ -2662,6 +2661,7 @@ struct RenderSceneImpl final : RenderScene {
 		const RayCastModelHit pg_hit = castRayProceduralGeometry(origin, dir, filter);
 		if (pg_hit.is_hit && (pg_hit.t < hit.t || !hit.is_hit)) {
 			hit = pg_hit;
+			hit.component_type = PROCEDURAL_GEOM_TYPE;
 		}
 
 		for (auto* terrain : m_terrains) {
@@ -3123,9 +3123,10 @@ struct RenderSceneImpl final : RenderScene {
 		m_procedural_geometries.erase(entity);
 	}
 	
-	void createProceduralGeometry(EntityRef entity) override {
+	void createProceduralGeometry(EntityRef entity) {
 		ASSERT(!m_procedural_geometries.find(entity).isValid());
 		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
+		m_universe.onComponentCreated(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
 
 	void createReflectionProbe(EntityRef entity)
@@ -3331,6 +3332,8 @@ void RenderScene::reflect() {
 		.LUMIX_FUNC(RenderSceneImpl::addDebugLine)
 		.LUMIX_FUNC(RenderSceneImpl::addDebugTriangle)
 		.LUMIX_FUNC(RenderSceneImpl::setActiveCamera)
+		.LUMIX_CMP(ProceduralGeometry, "procedural_geom", "Render / Procedural geometry")
+			.LUMIX_PROP(ProceduralGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
 		.LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment")
 			.icon(ICON_FA_BONE)
 			.LUMIX_PROP(BoneAttachmentParent, "Parent")

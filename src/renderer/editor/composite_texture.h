@@ -1,48 +1,135 @@
 #pragma once
 
+#define LUMIX_NO_CUSTOM_CRT
 #include "engine/array.h"
 #include "engine/path.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 
 namespace Lumix {
 
 struct CompositeTexture {
-	struct ChannelSource {
-		Path path;
-		u32 src_channel = 0;
-		bool invert = false;
+	enum class NodeType : u32;
+	
+	struct PixelData {
+		PixelData(IAllocator& allocator) : pixels(allocator) {}
+		OutputMemoryStream pixels;
+		u32 channels = 4;
+		u32 w;
+		u32 h;
 	};
+
+	struct Result {
+		Result(IAllocator& allocator) : layers(allocator) {}
+		Array<PixelData> layers;
+		bool is_cubemap;
+	};
+	
+	struct Node {
+		virtual NodeType getType() const = 0;
+		virtual bool gui() = 0;
+		virtual bool hasInputPins() const = 0;
+		virtual bool hasOutputPins() const = 0;
+		virtual bool getPixelData(PixelData* data, u32 output_idx) = 0;
+		virtual void serialize(OutputMemoryStream& blob) const {}
+		virtual void deserialize(InputMemoryStream& blob) {}
 		
-	struct Layer {
-		ChannelSource red = {{}, 0};
-		ChannelSource green = {{}, 1};
-		ChannelSource blue = {{}, 2};
-		ChannelSource alpha = {{}, 3};
-
-		ChannelSource& getChannel(u32 i) {
-			switch(i) {
-				case 0: return red;
-				case 1: return green;
-				case 2: return blue;
-				case 3: return alpha;
-				default: ASSERT(false); return red;
-			}
-		}
+		bool nodeGUI();
+		void inputSlot();
+		void outputSlot();
+		struct Input;
+		Input getInput(u32 pin_idx) const;
+		
+		u16 m_id;
+		ImVec2 m_pos = ImVec2(0, 0);
+		bool m_selected = false;
+		u32 m_input_counter;
+		u32 m_output_counter;
+		CompositeTexture* m_resource;
 	};
 
+	struct Link {
+		u32 from;
+		u32 to;
+		u32 color = 0xffFFffFF;
+
+		u16 getToNode() const { return to & 0xffFF; }
+		u16 getFromNode() const { return from & 0xffFF; }
+
+		u16 getToPin() const { return (to >> 16) & 0xffFF; }
+		u16 getFromPin() const { return (from >> 16) & 0xffFF; }
+	};
+	
 	enum class Output {
 		BC1,
 		BC3
 	};
 
-	CompositeTexture(IAllocator& allocator);
-	bool init(Span<const u8> data, const char* src_path);
+	CompositeTexture(StudioApp& app, IAllocator& allocator);
+	~CompositeTexture();
 	bool loadSync(struct FileSystem& fs, const Path& path);
 	bool save(struct FileSystem& fs, const Path& path);
+	Node* addNode(CompositeTexture::NodeType type);
+	Node* getNodeByID(u16 id) const;
+	void deleteSelectedNodes();
+	u32 getLayersCount() const;
+	void clear();
+
+	void serialize(OutputMemoryStream& blob);
+	bool deserialize(InputMemoryStream& blob);
+	bool generate(Result* result);
+	
+	Path getTerrainLayerPath(u32 layer) const;
+	void addTerrainLayer(const char* path);
+	void removeTerrainLayer(u32 idx);
+	void initTerrainAlbedo();
+	void initTerrainNormal();
+	void link(Node* from, u32 from_pin, Node* to, u32 to_pin);
 
 	IAllocator& allocator;
-	Array<Layer> layers;
 	Output output = Output::BC1;
-	bool cubemap = false;
+	
+	StudioApp& m_app;
+	Array<Node*> m_nodes;
+	Array<Link> m_links;
+	u32 m_node_id_generator = 1;
+};
+
+struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor<CompositeTexture, CompositeTexture::Node*, CompositeTexture::Link> {
+	CompositeTextureEditor(StudioApp& app);
+	~CompositeTextureEditor();
+
+	void open(const Path& path);
+	void newGraph();
+	bool saveAs(const Path& path);
+
+private:
+	void onWindowGUI() override;
+	const char* getName() const override { return "composite_texture_editor"; }
+
+	bool getSavePath();
+	bool hasFocus() override { return m_has_focus; }
+	void deserialize(InputMemoryStream& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override;
+	void onLinkDoubleClicked(CompositeTexture::Link& link, ImVec2 pos) override;
+	void onContextMenu(bool recently_opened, ImVec2 pos) override;
+	void toggleOpen() { m_is_open = !m_is_open; }
+	bool isOpen() const { return m_is_open; }
+	void save();
+	void deleteSelectedNodes();
+
+	StudioApp& m_app;
+	IAllocator& m_allocator;
+	bool m_is_open = false;
+	Action m_toggle_ui;
+	Action m_save_action;
+	Action m_delete_action;
+	Action m_undo_action;
+	Action m_redo_action;
+	Path m_path;
+	CompositeTexture* m_resource = nullptr;
+	bool m_has_focus = false;
 };
 
 } // namespace Lumix

@@ -694,7 +694,7 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	, m_is_enabled(false)
 	, m_size_spread(1, 1)
 	, m_y_spread(0, 0)
-	, m_albedo_composite(app.getAllocator())
+	, m_albedo_composite(app, app.getAllocator())
 	, m_distance_fields(app.getAllocator())
 {
 	m_smooth_terrain_action.init("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "", false);
@@ -2273,11 +2273,13 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	}
 
 	m_layers_mask = (primary ? 1 : 0) | (secondary ? 0b10 : 0);
-	for (i32 i = 0; i < m_albedo_composite.layers.size(); ++i) {
+
+	for (u32 i = 0; i < m_albedo_composite.getLayersCount(); ++i) {
 		ImGui::SameLine();
 		if (i == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
 		bool b = m_textures_mask & ((u64)1 << i);
-		m_app.getAssetBrowser().tile(m_albedo_composite.layers[i].red.path, b);
+		const Path layer_path = m_albedo_composite.getTerrainLayerPath(i);
+		m_app.getAssetBrowser().tile(layer_path, b);
 		if (ImGui::IsItemClicked()) {
 			if (!ImGui::GetIO().KeyCtrl) m_textures_mask = 0;
 			if (b) m_textures_mask &= ~((u64)1 << i);
@@ -2296,6 +2298,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 			ImGui::EndPopup();
 		}
 	}
+
 	if (albedo->depth < 255) {
 		if (ImGui::Button(ICON_FA_PLUS "Add surface")) ImGui::OpenPopup("Add surface");
 	}
@@ -2319,13 +2322,13 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 }
 
 void TerrainEditor::compositeTextureRemoveLayer(const Path& path, i32 layer) const {
-	CompositeTexture texture(m_app.getAllocator());
+	CompositeTexture texture(m_app, m_app.getAllocator());
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!texture.loadSync(fs, path)) {
 		logError("Failed to load ", path);
 	}
 	else {
-		texture.layers.erase(layer);
+		texture.removeTerrainLayer(layer);
 		if (!texture.save(fs, path)) {
 			logError("Failed to save ", path);
 		}
@@ -2334,22 +2337,13 @@ void TerrainEditor::compositeTextureRemoveLayer(const Path& path, i32 layer) con
 
 void TerrainEditor::saveCompositeTexture(const Path& path, const char* channel) const
 {
-	CompositeTexture texture(m_app.getAllocator());
+	CompositeTexture texture(m_app, m_app.getAllocator());
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!texture.loadSync(fs, path)) {
 		logError("Failed to load ", path);
 	}
 	else {
-		CompositeTexture::Layer new_layer;
-		new_layer.red.path = channel;
-		new_layer.red.src_channel = 0;
-		new_layer.green.path = channel;
-		new_layer.green.src_channel = 1;
-		new_layer.blue.path = channel;
-		new_layer.blue.src_channel = 2;
-		new_layer.alpha.path = channel;
-		new_layer.alpha.src_channel = 3;
-		texture.layers.push(new_layer);
+		texture.addTerrainLayer(channel);
 		if (!texture.save(fs, path)) {
 			logError("Failed to save ", path);
 		}

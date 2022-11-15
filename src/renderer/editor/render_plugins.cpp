@@ -39,7 +39,6 @@
 #include "game_view.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
-#include "renderer/editor/procedural_geometry_painter.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
@@ -76,6 +75,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("m
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
+static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 namespace TextureCompressor {
 
@@ -788,7 +788,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					materials.push(mesh.material);
 				}
 			}
-			if (scene.hasProceduralGeometry(e)) {
+			if (universe.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
 				materials.push(scene.getProceduralGeometry(e).material);
 			}
 		}
@@ -1105,7 +1105,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	Action m_wireframe_action;
 };
 
-
 struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
@@ -1132,9 +1131,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Filter filter = Filter::LINEAR;
 	};
 
-	explicit TexturePlugin(StudioApp& app)
+	explicit TexturePlugin(CompositeTextureEditor& composite_editor, StudioApp& app)
 		: m_app(app)
-		, m_composite(app.getAllocator())
+		, m_composite_texture_editor(composite_editor)
 	{
 		app.getAssetCompiler().registerExtension("png", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("jpeg", Texture::TYPE);
@@ -1158,14 +1157,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getFileDialogExtensions() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
 	bool createResource(const char* path) override { 
-		os::OutputFile file;
-		if (!file.open(path)) {
-			logError("Failed to create ", path);
-			return false;
-		}
-
-		file.close();
-		return true;
+		char tmp[LUMIX_MAX_PATH];
+		bool res = m_app.getEngine().getFileSystem().makeRelative(Span(tmp), path);
+		(void)res;
+		m_composite_texture_editor.newGraph();
+		return m_composite_texture_editor.saveAs(Path(tmp));
 	}
 
 	struct TextureTileJob
@@ -1271,105 +1267,43 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
 		IAllocator& allocator = m_app.getAllocator();
-		CompositeTexture tc(allocator);
-		if (!tc.init(Span(src_data.data(), (u32)src_data.size()), src_path)) return false;
-		struct Src {
-			stbi_uc* data;
-			int w, h;
-			Path path;
-		};
+		CompositeTexture tc(m_app, allocator);
+		InputMemoryStream blob(src_data);
+		if (!tc.deserialize(blob)) return false;
 
-		HashMap<FilePathHash, Src> sources(allocator);
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream tmp_src(allocator);
-		int w = -1, h = -1;
-		bool has_alpha = false;
+		CompositeTexture::Result img(allocator);
+		if (!tc.generate(&img)) return false;
+		const u32 w = img.layers[0].w;
+		const u32 h = img.layers[0].h;
 
-		auto prepare_source =[&](const CompositeTexture::ChannelSource& ch){
-			if (ch.path.isEmpty()) return false;
-			if (sources.find(ch.path.getHash()).isValid()) return true;
-
-			tmp_src.clear();
-			if (!fs.getContentSync(ch.path, tmp_src)) {
-				return false;
-			}
-
-			int cmp;
-			stbi_uc* data = stbi_load_from_memory(tmp_src.data(), (i32)tmp_src.size(), &w, &h, &cmp, 4);
-			if (!data) {
-				return false;
-			}
-
-			sources.insert(ch.path.getHash(), {data, w, h, ch.path});
-			return true;
-		};
-
-		bool success = true;
-		for (CompositeTexture::Layer& layer : tc.layers) {
-			success = success && prepare_source(layer.red);
-			success = success && prepare_source(layer.green);
-			success = success && prepare_source(layer.blue);
-			success = success && prepare_source(layer.alpha);
-		}
-
-		if (!success) return false;
-
-		if (tc.layers.empty()) {
-			return true;
-		}
-
-		if (sources.size() == 0) return false;
-
-		const Src first_src = sources.begin().value(); 
-		for (auto iter = sources.begin(); iter.isValid(); ++iter) {
-			if (iter.value().w != first_src.w || iter.value().h != first_src.h) {
-				logError(src_path, ": ", first_src.path, "(", first_src.w, "x", first_src.h, ") does not match "
-					, iter.value().path, "(", iter.value().w, "x", iter.value().h, ")");
-				return false;
-			}
-		}
-
-		TextureCompressor::Input input(w, h, tc.cubemap ? 1 : tc.layers.size(), 1, allocator);
+		TextureCompressor::Input input(w, h, img.is_cubemap ? 1 : img.layers.size(), 1, allocator);
 		input.is_normalmap = meta.is_normalmap;
 		input.is_srgb = meta.srgb;
-		input.is_cubemap = tc.cubemap;
+		input.is_cubemap = img.is_cubemap;
+		input.has_alpha = img.layers[0].channels == 4;
 
 		OutputMemoryStream out_data(allocator);
 		out_data.resize(w * h * 4);
 		u8* out_data_ptr = out_data.getMutableData();
-		for (CompositeTexture::Layer& layer : tc.layers) {
-			const u32 idx = u32(&layer - tc.layers.begin());
-			for (u32 ch = 0; ch < 4; ++ch) {
-				const Path& p = layer.getChannel(ch).path;
-				if (p.isEmpty()) continue;
-				stbi_uc* from = sources[p.getHash()].data;
-				if (!from) continue;
-				u32 from_ch = layer.getChannel(ch).src_channel;
-				const bool invert = layer.getChannel(ch).invert;
-
-				if (invert) {
-					for (u32 j = 0; j < (u32)h; ++j) {
-						for (u32 i = 0; i < (u32)w; ++i) {
-							out_data_ptr[(j * w + i) * 4 + ch] = 0xff - from[(i + j * w) * 4 + from_ch];
-						}
+		for (CompositeTexture::PixelData& layer : img.layers) {
+			const u32 idx = u32(&layer - img.layers.begin());
+			if (layer.channels != 4) {
+				TextureCompressor::Input::Image& tmp = input.add(img.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
+				tmp.pixels.resize(layer.w * layer.h * 4);
+				const u8* src = layer.pixels.data();
+				u8* dst = tmp.pixels.getMutableData();
+	
+				for(u32 i = 0; i < layer.w * layer.h; ++i) {
+					memcpy(dst + i * 4, src + i * layer.channels, layer.channels);
+					for (u32 j = layer.channels; j < 4; ++j) {
+						dst[i * 4 + j] = 1;
 					}
 				}
-				else {
-					for (u32 j = 0; j < (u32)h; ++j) {
-						for (u32 i = 0; i < (u32)w; ++i) {
-							out_data_ptr[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
-						}
-					}
-				}
-
-				input.has_alpha = input.has_alpha || ch == 3;
 			}
-
-			input.add(out_data, input.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
-		}
-
-		for (const Src& i : sources) {
-			free(i.data);
+			else {
+				Span<const u8> span(layer.pixels.data(), (u32)layer.pixels.size());
+				input.add(span, img.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
+			}
 		}
 
 		dst.write("lbc", 3);
@@ -1593,135 +1527,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 	void compositeGUI(Texture& texture) {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (m_composite_tag != &texture) {
-			m_composite_tag = &texture;
-			IAllocator& allocator = m_app.getAllocator();
-			OutputMemoryStream content(allocator);
-			if (fs.getContentSync(texture.getPath(), content)) {
-				m_composite.init(Span(content.data(), (u32)content.size()), texture.getPath().c_str());
-			}
-			else {
-				logError("Could not load", texture.getPath());
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Edit")) {
-			static bool show_channels = false;
-			bool same_channels = true;
-			for (CompositeTexture::Layer& layer : m_composite.layers) {
-				if (layer.red.path != layer.green.path
-					|| layer.red.path != layer.blue.path
-					|| layer.red.path != layer.alpha.path) 
-				{
-					same_channels = false;
-					break;
-				}
-				if (layer.red.src_channel != 0
-					|| layer.green.src_channel != 1
-					|| layer.blue.src_channel != 2
-					|| layer.alpha.src_channel != 3)
-				{
-					same_channels = false;
-					break;
-				}
-			}
-
-			if (same_channels) {
-				ImGui::Checkbox("Show single channels", &show_channels);
-			}
-			else {
-				show_channels = true;
-			}
-			ImGui::Checkbox("Cubemap", &m_composite.cubemap);
-
-			for (CompositeTexture::Layer& layer : m_composite.layers) {
-				const u32 idx = u32(&layer - m_composite.layers.begin());
-				bool open;
-				if (m_composite.cubemap) open = ImGui::TreeNodeEx(&layer, 0, "%s", getCubemapLabel(idx));
-				else open = ImGui::TreeNodeEx(&layer, 0, "%d", idx);
-				if (open) {
-					if (ImGui::Button("Remove")) {
-						m_composite.layers.erase(idx);
-						ImGui::TreePop();
-						break;
-					}
-
-					char tmp[LUMIX_MAX_PATH];
-					
-					if (show_channels) {
-						copyString(Span(tmp), layer.red.path.c_str());
-						ImGuiEx::Label("Red");
-						if (m_app.getAssetBrowser().resourceInput("r", Span(tmp), Texture::TYPE)) {
-							layer.red.path = tmp;
-						}
-						ImGuiEx::Label("Red source channel");
-						ImGui::Combo("##rsrcch", (int*)&layer.red.src_channel, "Red\0Green\0Blue\0Alpha\0");
-						ImGuiEx::Label("Invert");
-						ImGui::Checkbox("##invr", &layer.red.invert);
-
-						copyString(Span(tmp), layer.green.path.c_str());
-						ImGuiEx::Label("Green");
-						if (m_app.getAssetBrowser().resourceInput("g", Span(tmp), Texture::TYPE)) {
-							layer.green.path = tmp;
-						}
-						ImGuiEx::Label("Green source channel");
-						ImGui::Combo("##gsrcch", (int*)&layer.green.src_channel, "Red\0Green\0Blue\0Alpha\0");
-						ImGuiEx::Label("Invert");
-						ImGui::Checkbox("##invg", &layer.green.invert);
-
-						copyString(Span(tmp), layer.blue.path.c_str());
-						ImGuiEx::Label("Blue");
-						if (m_app.getAssetBrowser().resourceInput("b", Span(tmp), Texture::TYPE)) {
-							layer.blue.path = tmp;
-						}
-						
-						ImGuiEx::Label("Blue source channel");
-						ImGui::Combo("##bsrcch", (int*)&layer.blue.src_channel, "Red\0Green\0Blue\0Alpha\0");
-						ImGuiEx::Label("Invert");
-						ImGui::Checkbox("##invb", &layer.blue.invert);
-				
-						copyString(Span(tmp), layer.alpha.path.c_str());
-						ImGuiEx::Label("Alpha");
-						if (m_app.getAssetBrowser().resourceInput("a", Span(tmp), Texture::TYPE)) {
-							layer.alpha.path = tmp;
-						}
-						ImGuiEx::Label("Alpha source channel");
-						ImGui::Combo("##asrch", (int*)&layer.alpha.src_channel, "Red\0Green\0Blue\0Alpha\0");
-						ImGuiEx::Label("Invert");
-						ImGui::Checkbox("##inva", &layer.alpha.invert);
-					}
-					else {
-						copyString(Span(tmp), layer.red.path.c_str());
-						ImGuiEx::Label("Source");
-						if (m_app.getAssetBrowser().resourceInput("rgba", Span(tmp), Texture::TYPE)) {
-							layer.red.path = tmp;
-							layer.green.path = tmp;
-							layer.blue.path = tmp;
-							layer.alpha.path = tmp;
-							layer.red.src_channel = 0;
-							layer.green.src_channel = 1;
-							layer.blue.src_channel = 2;
-							layer.alpha.src_channel = 3;
-						}
-					}
-
-					ImGui::TreePop();
-				}
-			}
-			if (ImGui::Button("Add layer")) {
-				m_composite.layers.emplace();
-			}
-			if (ImGui::Button(ICON_FA_SAVE "Save")) {
-				if (!m_composite.save(fs, texture.getPath())) {
-					logError("Failed to save ", texture.getPath());
-				}
-			}
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
-				m_app.getAssetBrowser().openInExternalEditor(texture.getPath().c_str());
-			}
-		}
+		if (ImGui::Button("Edit")) m_composite_texture_editor.open(texture.getPath());
 	}
 
 	void onGUI(Span<Resource*> resources) override
@@ -1849,6 +1655,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
 	StudioApp& m_app;
+	CompositeTextureEditor& m_composite_texture_editor;
+
 	struct {
 		TextureTileJob* head = nullptr;
 		TextureTileJob* tail = nullptr;
@@ -1857,8 +1665,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	Meta m_meta;
 	FilePathHash m_meta_res;
-	CompositeTexture m_composite;
-	void* m_composite_tag = nullptr;
 };
 
 struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
@@ -4327,6 +4133,194 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	bool m_can_lock_group = false;
 };
 
+struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugin {
+	const char* getName() const override { return "procedural_geom"; }
+
+	void paint(const DVec3& pos
+		, const Universe& universe
+		, EntityRef entity
+		, ProceduralGeometry& pg
+		, Renderer& renderer) const
+	{
+		if (!m_is_open) return;
+		if (pg.vertex_data.size() == 0) return;
+	
+		// TODO undo/redo
+
+		const Transform tr = universe.getTransform(entity);
+		const Vec3 center(tr.inverted().transform(pos));
+
+		const float R2 = m_brush_size * m_brush_size;
+
+		const u8* end = pg.vertex_data.data() + pg.vertex_data.size();
+		const u32 stride = pg.vertex_decl.getStride();
+		ASSERT(stride != 0);
+		const u32 offset = pg.vertex_decl.attributes[4].byte_offset + (m_paint_as_color ? 0 : m_brush_channel);
+		ImGuiIO& io = ImGui::GetIO();
+		const u8 color[4] = { u8(m_brush_color.x * 0xff), u8(m_brush_color.y * 0xff), u8(m_brush_color.z * 0xff), u8(m_brush_color.w * 0xff) };
+		for (u8* iter = pg.vertex_data.getMutableData(); iter < end; iter += stride) {
+			Vec3 p;
+			memcpy(&p, iter, sizeof(p));
+
+			if (squaredLength(p - center) < R2) {
+				if (m_paint_as_color) {
+					memcpy(iter + offset, color, pg.vertex_decl.attributes[4].components_count);
+				}
+				else {
+					*(iter + offset) = io.KeyAlt ? 255 - m_brush_value : m_brush_value;
+				}
+			}
+		}
+
+		if (pg.vertex_buffer) renderer.getDrawStream().destroy(pg.vertex_buffer);
+		const Renderer::MemRef mem = renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
+		pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);	
+	}
+
+	bool paint(UniverseView& view, i32 x, i32 y) {
+		if (!m_is_open) return false;
+
+		WorldEditor& editor = view.getEditor();
+		const Array<EntityRef>& selected = editor.getSelectedEntities();
+		if (selected.size() != 1) return false;
+
+		const EntityRef entity = selected[0];
+		const Universe& universe = *editor.getUniverse();
+		RenderScene* scene = (RenderScene*)universe.getScene("renderer");
+		if (!universe.hasComponent(entity, PROCEDURAL_GEOM_TYPE)) return false;
+
+		DVec3 origin;
+		Vec3 dir;
+		view.getViewport().getRay({(float)x, (float)y}, origin, dir);
+		const RayCastModelHit hit = scene->castRay(origin, dir, [entity](const RayCastModelHit& hit) {
+			return hit.entity == entity;
+		});
+		if (!hit.is_hit) return false;
+		if (hit.entity != entity) return false;
+
+		Renderer* renderer = (Renderer*)editor.getEngine().getPluginManager().getPlugin("renderer");
+		ASSERT(renderer);
+
+		ProceduralGeometry& pg = scene->getProceduralGeometry(entity);
+		paint(hit.origin + hit.t * hit.dir, universe, entity, pg, *renderer);
+
+		return true;
+	}
+
+	void drawCursor(WorldEditor& editor, EntityRef entity) const {
+		if (!m_is_open) return;
+		const UniverseView& view = editor.getView();
+		const Vec2 mp = view.getMousePos();
+		Universe& universe = *editor.getUniverse();
+	
+		RenderScene* scene = static_cast<RenderScene*>(universe.getScene("renderer"));
+		DVec3 origin;
+		Vec3 dir;
+		editor.getView().getViewport().getRay(mp, origin, dir);
+		const RayCastModelHit hit = scene->castRay(origin, dir, [entity](const RayCastModelHit& hit){
+			return hit.entity == entity;
+		});
+
+		if (hit.is_hit) {
+			const DVec3 center = hit.origin + hit.dir * hit.t;
+			drawCursor(editor, *scene, entity, center);
+			return;
+		}
+	}
+
+	void drawCursor(WorldEditor& editor, RenderScene& scene, EntityRef entity, const DVec3& center) const {
+		if (!m_is_open) return;
+		UniverseView& view = editor.getView();
+		addCircle(view, center, m_brush_size, Vec3(0, 1, 0), Color::GREEN);
+		const ProceduralGeometry& pg = scene.getProceduralGeometry(entity);
+
+		if (pg.vertex_data.size() == 0) return;
+
+		const u8* data = pg.vertex_data.data();
+		const u32 stride = pg.vertex_decl.getStride();
+
+		const float R2 = m_brush_size * m_brush_size;
+
+		const Transform tr = scene.getUniverse().getTransform(entity);
+		const Vec3 center_local = Vec3(tr.inverted().transform(center));
+
+		for (u32 i = 0, c = pg.getVertexCount(); i < c; ++i) {
+			Vec3 p;
+			memcpy(&p, data + stride * i, sizeof(p));
+			if (squaredLength(center_local - p) < R2) {
+				addCircle(view, tr.transform(p), 0.1f, Vec3(0, 1, 0), Color::BLUE);
+			}
+		}
+	}
+
+	void onMouseWheel(float value) override { m_brush_size = maximum(0.f, m_brush_size + value * 0.2f); }
+	bool onMouseDown(UniverseView& view, int x, int y) override { return paint(view, x, y); }
+	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {}
+	void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) override { paint(view, x, y); }
+	
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+		if (cmp_type != PROCEDURAL_GEOM_TYPE) return;
+		if (entities.length() != 1) return;
+
+		RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(PROCEDURAL_GEOM_TYPE);
+		ProceduralGeometry& pg = scene->getProceduralGeometry(entities[0]);
+		ImGuiEx::Label("Vertex count");
+		const u32 stride = pg.vertex_decl.getStride();
+		const u32 vertex_count = stride ? u32(pg.vertex_data.size() / stride) : 0;
+		ImGui::Text("%d", vertex_count);
+		ImGuiEx::Label("Index count");
+		
+		u32 index_count = 0;
+		if (!pg.index_data.empty()) {
+			switch (pg.index_type) {
+				case gpu::DataType::U16: index_count = u32(pg.index_data.size() / sizeof(u16)); break;
+				case gpu::DataType::U32: index_count = u32(pg.index_data.size() / sizeof(u32)); break;
+				default: ASSERT(false); break;
+			}
+		}
+		ImGui::Text("%d", index_count);
+
+		m_is_open = false;
+		if (ImGui::CollapsingHeader("Edit")) {
+			m_is_open = true;
+			drawCursor(editor, entities[0]);
+			ImGuiEx::Label("Brush size");
+			ImGui::DragFloat("##bs", &m_brush_size, 0.1f, 0, FLT_MAX);
+
+			if (pg.vertex_decl.attributes_count > 4) {
+				if (pg.vertex_decl.attributes[4].components_count > 2) {
+					ImGui::Checkbox("As color", &m_paint_as_color);
+				}
+				else {
+					m_paint_as_color = false;
+				}
+				if (pg.vertex_decl.attributes[4].components_count == 4 && m_paint_as_color) {
+					ImGui::ColorEdit4("Color", &m_brush_color.x);
+				}
+				if (pg.vertex_decl.attributes[4].components_count == 3 && m_paint_as_color) {
+					ImGui::ColorEdit3("Color", &m_brush_color.x);
+				}
+				if (pg.vertex_decl.attributes[4].components_count > 1 && !m_paint_as_color) {
+					ImGuiEx::Label("Paint channel");
+					ImGui::SliderInt("##pc", (int*)&m_brush_channel, 0, pg.vertex_decl.attributes[4].components_count - 1);
+				}
+
+				if (!m_paint_as_color) {
+					ImGuiEx::Label("Paint value");
+					ImGui::SliderInt("##pv", (int*)&m_brush_value, 0, 255);
+				}
+			}
+		}
+	}
+
+	float m_brush_size = 1.f;
+	u32 m_brush_channel = 0;
+	u8 m_brush_value = 0xff;
+	Vec4 m_brush_color = Vec4(1);
+	bool m_is_open = false;
+	bool m_paint_as_color = false;
+};
+
 struct TerrainPlugin final : PropertyGrid::IPlugin
 {
 	explicit TerrainPlugin(StudioApp& app)
@@ -4662,8 +4656,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 {
-	explicit AddTerrainComponentPlugin(StudioApp& _app)
-		: app(_app)
+	explicit AddTerrainComponentPlugin(CompositeTextureEditor& comp_tex_editor, StudioApp& app)
+		: app(app)
+		, m_composite_texture_editor(comp_tex_editor)
 	{
 	}
 
@@ -4734,30 +4729,19 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 		file.close();
 
-		if (!fs.open(albedo_path, file)) {
+		CompositeTexture albedo(app, app.getAllocator());
+		albedo.initTerrainAlbedo();
+		if (!albedo.save(fs, Path(albedo_path))) {
 			logError("Failed to create texture ", albedo_path);
 			os::deleteFile(hm_path);
 			os::deleteFile(splatmap_path);
 			os::deleteFile(splatmap_meta_path);
 			return false;
 		}
-		file << R"#(
-			layer {
-				red = { path = "/textures/common/red.tga", channel = 0 },
-				green = { path = "/textures/common/red.tga", channel = 1 },
-				blue = { path = "/textures/common/red.tga", channel = 2 },
-				alpha = { path = "/textures/common/red.tga", channel = 3 }
-			}
-			layer {
-				red = { path = "/textures/common/green.tga", channel = 0 },
-				green = { path = "/textures/common/green.tga", channel = 1 },
-				blue = { path = "/textures/common/green.tga", channel = 2 },
-				alpha = { path = "/textures/common/green.tga", channel = 3 }
-			}
-		)#";
-		file.close();
 
-		if (!fs.open(normal_path, file)) {
+		CompositeTexture normal(app, app.getAllocator());
+		normal.initTerrainNormal();
+		if (!normal.save(fs, Path(normal_path))) {
 			logError("Failed to create texture ", normal_path);
 			os::deleteFile(albedo_path);
 			os::deleteFile(hm_path);
@@ -4765,21 +4749,6 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			os::deleteFile(splatmap_meta_path);
 			return false;
 		}
-		file << R"#(
-			layer {
-				red = { path = "/textures/common/default_normal.tga", channel = 0 },
-				green = { path = "/textures/common/default_normal.tga", channel = 1 },
-				blue = { path = "/textures/common/default_normal.tga", channel = 2 },
-				alpha = { path = "/textures/common/default_normal.tga", channel = 3 }
-			}
-			layer {
-				red = { path = "/textures/common/default_normal.tga", channel = 0 },
-				green = { path = "/textures/common/default_normal.tga", channel = 1 },
-				blue = { path = "/textures/common/default_normal.tga", channel = 2 },
-				alpha = { path = "/textures/common/default_normal.tga", channel = 3 }
-			}
-		)#";
-		file.close();
 
 		if (!fs.open(normalized_material_path, file))
 		{
@@ -4871,6 +4840,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 
 	StudioApp& app;
+	CompositeTextureEditor& m_composite_texture_editor;
 };
 
 
@@ -4883,10 +4853,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_material_plugin(app)
 		, m_particle_emitter_plugin(app)
 		, m_particle_emitter_property_plugin(app)
-		, m_procedural_geom_painter(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
-		, m_texture_plugin(app)
+		, m_texture_plugin(m_composite_texture_editor, app)
 		, m_game_view(app)
 		, m_scene_view(app)
 		, m_editor_ui_render_plugin(app)
@@ -4894,6 +4863,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_terrain_plugin(app)
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
+		, m_composite_texture_editor(app)
 	{}
 
 	const char* getName() const override { return "renderer"; }
@@ -4902,7 +4872,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = m_app.getAllocator();
 
-		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
+		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_composite_texture_editor, m_app);
 		m_app.registerComponent(ICON_FA_MAP, "terrain", *add_terrain_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
@@ -4937,16 +4907,17 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(m_shader_plugin);
 		asset_browser.addPlugin(m_texture_plugin);
 
+		m_app.addPlugin(m_composite_texture_editor);
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);
 		m_app.addPlugin(m_editor_ui_render_plugin);
-		m_app.addPlugin((StudioApp::GUIPlugin&)m_procedural_geom_painter);
-		m_app.addPlugin((StudioApp::MousePlugin&)m_procedural_geom_painter);
+		m_app.addPlugin(m_procedural_geom_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(m_model_properties_plugin);
 		property_grid.addPlugin(m_env_probe_plugin);
 		property_grid.addPlugin(m_terrain_plugin);
+		property_grid.addPlugin(m_procedural_geom_plugin);
 		property_grid.addPlugin(m_instanced_model_plugin);
 		property_grid.addPlugin(m_particle_emitter_property_plugin);
 
@@ -5185,27 +5156,28 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.removePlugin(*m_particle_editor.get());
 		m_app.removePlugin(m_scene_view);
+		m_app.removePlugin(m_composite_texture_editor);
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
-		m_app.removePlugin((StudioApp::MousePlugin&)m_procedural_geom_painter);
-		m_app.removePlugin((StudioApp::GUIPlugin&)m_procedural_geom_painter);
+		m_app.removePlugin(m_procedural_geom_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
 		property_grid.removePlugin(m_model_properties_plugin);
 		property_grid.removePlugin(m_env_probe_plugin);
+		property_grid.removePlugin(m_procedural_geom_plugin);
 		property_grid.removePlugin(m_terrain_plugin);
 		property_grid.removePlugin(m_instanced_model_plugin);
 		property_grid.removePlugin(m_particle_emitter_property_plugin);
 	}
 
 	StudioApp& m_app;
+	CompositeTextureEditor m_composite_texture_editor;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
 	ParticleEmitterPlugin m_particle_emitter_plugin;
 	ParticleEmitterPropertyPlugin m_particle_emitter_property_plugin;
-	ProceduralGeometryPainter m_procedural_geom_painter;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
 	ShaderPlugin m_shader_plugin;
@@ -5215,6 +5187,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	SceneView m_scene_view;
 	EnvironmentProbePlugin m_env_probe_plugin;
 	TerrainPlugin m_terrain_plugin;
+	ProceduralGeomPlugin m_procedural_geom_plugin;
 	InstancedModelPlugin m_instanced_model_plugin;
 	ModelPlugin m_model_plugin;
 };

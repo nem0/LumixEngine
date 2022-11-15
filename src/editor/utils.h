@@ -96,9 +96,22 @@ struct NodeEditor : SimpleUndoRedo {
 		: SimpleUndoRedo(allocator)
 	{}
 
-	virtual void onCanvasClicked(ImVec2 pos) = 0;
+	virtual void onCanvasClicked(ImVec2 pos, i32 hovered_link) = 0;
 	virtual void onLinkDoubleClicked(LinkType& link, ImVec2 pos) = 0;
 	virtual void onContextMenu(bool recently_opened, ImVec2 pos) = 0;
+
+	void splitLink(ResourceType& resource, u32 link_idx, u32 node_idx) {
+		NodeType& node = resource.m_nodes[node_idx];
+		if (node->hasInputPins() && node->hasOutputPins()) {
+			LinkType& new_link = resource.m_links.emplace();
+			LinkType& link = resource.m_links[link_idx];
+			new_link.color = link.color;
+			new_link.to = link.to;
+			new_link.from = node->m_id;
+			link.to = node->m_id;
+			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+		}
+	}
 
 	void nodeEditorGUI(ResourceType& resource) {
 		m_canvas.begin();
@@ -175,16 +188,7 @@ struct NodeEditor : SimpleUndoRedo {
 		if (hovered_link >= 0 && ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyAlt) {
 			i32 node_idx = resource.m_nodes.find([this](const NodeType& node){ return node->m_id == m_dragged_node; });
 			if (node_idx >= 0) {
-				NodeType& node = resource.m_nodes[node_idx];
-				if (node->hasInputPins() && node->hasOutputPins()) {
-					LinkType& new_link = resource.m_links.emplace();
-					LinkType& link = resource.m_links[hovered_link];
-					new_link.color = link.color;
-					new_link.to = link.to;
-					new_link.from = node->m_id;
-					link.to = node->m_id;
-					pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
-				}
+				splitLink(resource, hovered_link, node_idx);
 			}
 		}
 
@@ -214,7 +218,7 @@ struct NodeEditor : SimpleUndoRedo {
 				pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
 			}
 			else {
-				onCanvasClicked(ImGui::GetMousePos() - m_offset);
+				onCanvasClicked(ImGui::GetMousePos() - m_offset, hovered_link);
 			}
 		}
 
