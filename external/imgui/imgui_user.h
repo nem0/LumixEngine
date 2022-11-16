@@ -76,7 +76,7 @@ struct IMGUI_API Canvas {
 
 	ImVec2 m_origin;
 	ImVec2 m_size = ImVec2(0, 0);
-	ImVec2 m_scale = ImVec2(1, 1);
+	float m_scale = 1.f;
 	ImGuiContext* m_ctx = nullptr;
 	ImGuiContext* m_original_ctx = nullptr;
 };

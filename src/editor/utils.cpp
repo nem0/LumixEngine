@@ -338,7 +338,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 				--c;
 			}
 			if (ImGui::IsMouseDoubleClicked(0)) {
-				onLinkDoubleClicked(link, ImGui::GetMousePos() - m_offset);
+				onLinkDoubleClicked(link, ImGui::GetMousePos() - origin - m_offset);
 			}
 			else {
 				hovered_link = i;
@@ -379,7 +379,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
 		}
 		else {
-			onCanvasClicked(ImGui::GetMousePos() - m_offset, hovered_link);
+			onCanvasClicked(ImGui::GetMousePos() - origin - m_offset, hovered_link);
 		}
 	}
 
@@ -391,7 +391,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	if (open_context) ImGui::OpenPopup("context_menu");
 
 	if (ImGui::BeginPopup("context_menu")) {
-		const ImVec2 pos = ImGui::GetMousePosOnOpeningCurrentPopup() - m_offset;
+		const ImVec2 pos = ImGui::GetMousePosOnOpeningCurrentPopup() - origin - m_offset;
 		onContextMenu(open_context, pos);
 		ImGui::EndPopup();
 	}		

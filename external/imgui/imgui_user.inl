@@ -471,7 +471,7 @@ namespace ImGuiEx {
 		return true;
 	}
 
-	static void AppendDrawData(ImDrawList* src, ImVec2 origin, ImVec2 scale) {
+	static void AppendDrawData(ImDrawList* src, ImVec2 origin, float scale) {
 		// TODO optimize if vtx_start == 0 || if idx_start == 0
 		ImDrawList* dl = GetWindowDrawList();
 		const int vtx_start = dl->VtxBuffer.size();
@@ -495,10 +495,10 @@ namespace ImGuiEx {
 			ImDrawCmd cmd = src->CmdBuffer[i];
 			cmd.IdxOffset += idx_start;
 			ASSERT(cmd.VtxOffset == 0);
-			cmd.ClipRect.x = cmd.ClipRect.x * scale.x + origin.x;
-			cmd.ClipRect.y = cmd.ClipRect.y * scale.y + origin.y;
-			cmd.ClipRect.z = cmd.ClipRect.z * scale.x + origin.x;
-			cmd.ClipRect.w = cmd.ClipRect.w * scale.y + origin.y;
+			cmd.ClipRect.x = cmd.ClipRect.x * scale + origin.x;
+			cmd.ClipRect.y = cmd.ClipRect.y * scale + origin.y;
+			cmd.ClipRect.z = cmd.ClipRect.z * scale + origin.x;
+			cmd.ClipRect.w = cmd.ClipRect.w * scale + origin.y;
 			dl->CmdBuffer.push_back(cmd);
 		}
 
@@ -507,12 +507,12 @@ namespace ImGuiEx {
 		dl->_IdxWritePtr = dl->IdxBuffer.Data + dl->IdxBuffer.size();
 	}
 
-	static void CopyIOEvents(ImGuiContext* src, ImGuiContext* dst, ImVec2 origin, ImVec2 scale) {
+	static void CopyIOEvents(ImGuiContext* src, ImGuiContext* dst, ImVec2 origin, float scale) {
 		dst->InputEventsQueue = src->InputEventsTrail;
 		for (ImGuiInputEvent& e : dst->InputEventsQueue) {
 			if (e.Type == ImGuiInputEventType_MousePos) {
-				e.MousePos.PosX = (e.MousePos.PosX - origin.x) / scale.x;
-				e.MousePos.PosY = (e.MousePos.PosY - origin.y) / scale.y;
+				e.MousePos.PosX = (e.MousePos.PosX - origin.x) / scale;
+				e.MousePos.PosY = (e.MousePos.PosY - origin.y) / scale;
 			}
 		}
 
@@ -1454,6 +1454,8 @@ namespace ImGuiEx {
 	}
 
 	void Canvas::begin() {
+		if (m_scale == 1) return;
+
 		m_size = GetContentRegionAvail();
 		m_origin = GetCursorScreenPos();
 		m_original_ctx = GetCurrentContext();
@@ -1477,6 +1479,16 @@ namespace ImGuiEx {
 	}
 
 	void Canvas::end() {
+		if (m_scale == 1) {
+			const bool is_any_item_hovered = IsAnyItemHovered();
+			if (IsItemHovered() && GetIO().MouseWheel && !is_any_item_hovered) {
+				m_scale += GetIO().MouseWheel / 20;
+				m_scale = m_scale < 0.1f ? 0.1f : m_scale;
+				m_scale = m_scale > 1.f ? 1.f : m_scale;
+			}
+			return;
+		}
+		
 		End();
 		const bool is_any_item_hovered = IsAnyItemHovered();
 		Render();
@@ -1491,10 +1503,9 @@ namespace ImGuiEx {
 
 		InvisibleButton("canvas", m_size);
 		if (IsItemHovered() && GetIO().MouseWheel && !is_any_item_hovered) {
-			m_scale.x += GetIO().MouseWheel / 20;
-			m_scale.x = m_scale.x < 0.1f ? 0.1f : m_scale.x;
-			m_scale.x = m_scale.x > 1.f ? 1.f : m_scale.x;
-			m_scale.y = m_scale.x;
+			m_scale += GetIO().MouseWheel / 20;
+			m_scale = m_scale < 0.1f ? 0.1f : m_scale;
+			m_scale = m_scale > 1.f ? 1.f : m_scale;
 		}
 	}
 
