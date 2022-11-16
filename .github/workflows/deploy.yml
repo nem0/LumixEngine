@@ -9,30 +9,47 @@ jobs:
             - uses: actions/checkout@v1
               with:
                 fetch-depth: 1
-            - name: make plugins dir
-              run: mkdir plugins
+            
+            - name: make dirs
+              run: |
+                mkdir plugins
+                mkdir projects\3rdparty
+                mkdir external\physx\lib\vs2017\win64\release_static
+                
             - name: fetch procedural geometry plugin
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+            
             - name: fetch shader_editor plugin
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+            
             - name: fetch maps plugin
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
-            - name: download physx
+            
+            - name: fetch dx plugin
+              working-directory: plugins
               run: |
-                mkdir 3rdparty
-                cd 3rdparty
+                git.exe clone https://github.com/nem0/lumixengine_dx.git dx
+            
+            - name: download physx
+              working-directory: projects\3rdparty
+              run: |
                 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
-                cd PhysX\physx
+            
+            - name: build physx
+              working-directory: projects\3rdparty\PhysX\physx
+              run: |
                 call generate_projects.bat lumix_vc17win64_static
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" "compiler\vc17win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
-                cd ..\..\..\
-                mkdir ..\external\physx\lib\vs2017\win64\release_static\
+                
+            - name: deploy physx
+              working-directory: projects
+              run: |
                 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCharacterKinematic_static_64.lib ..\external\physx\lib\vs2017\win64\release_static\
                 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
                 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
@@ -41,13 +58,10 @@ jobs:
                 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
                 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
                 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
+            
             - name: make dx11 project
               working-directory: projects
               run: |
-                mkdir ..\plugins
-                pushd ..\plugins
-                git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
-                popd
                 ./genie.exe --static-physx vs2019
             - name: build dx11 engine
               working-directory: projects
