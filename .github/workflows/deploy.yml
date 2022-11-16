@@ -1,0 +1,89 @@
+name: Deploy
+on:
+  workflow_dispatch:
+
+jobs:
+    windows:
+        runs-on: windows-2019
+        steps:
+            - uses: actions/checkout@v1
+              with:
+                fetch-depth: 1
+            - name: fetch procedural geometry plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+            - name: fetch shader_editor plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+            - name: fetch maps plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+            - name: download physx
+              run: |
+                mkdir 3rdparty
+                cd 3rdparty
+                git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
+                cd PhysX\physx
+                call generate_projects.bat lumix_vc17win64_static
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" "compiler\vc17win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
+                cd ..\..\..\
+                mkdir ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCharacterKinematic_static_64.lib ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXExtensions_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXFoundation_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
+            - name: make dx11 project
+              working-directory: projects
+              run: |
+                mkdir ..\plugins
+                pushd ..\plugins
+                git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
+                popd
+                ./genie.exe --static-physx vs2019
+            - name: build dx11 engine
+              working-directory: projects
+              shell: cmd
+              run: |
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+                mkdir itch_io
+                copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+                copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+                xcopy /E /Y ..\data itch_io
+
+            - name: Publish DX11 version
+              uses: KikimoraGames/itch-publish@v0.0.3
+              with:
+                butlerAPIKey: ${{ secrets.BUTLER_API_KEY }}
+                gameData: ${{ github.workspace }}/projects/itch_io/
+                itchUsername: mikulasflorek
+                itchGameId: lumix-engine
+                buildChannel: win-64-dx
+
+            - name: make gl project with plugins
+              working-directory: projects
+              run: |
+                ./genie.exe --static-physx --nodx --with-app vs2019
+                
+            - name: build gl engine
+              working-directory: projects
+              shell: cmd
+              run: |
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+                copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+                copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+
+            - name: Publish GL version
+              uses: KikimoraGames/itch-publish@v0.0.3
+              with:
+                butlerAPIKey: ${{ secrets.BUTLER_API_KEY }}
+                gameData: ${{ github.workspace }}/projects/itch_io/
+                itchUsername: mikulasflorek
+                itchGameId: lumix-engine
+                buildChannel: win-64-gl
