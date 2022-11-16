@@ -46,7 +46,6 @@ jobs:
         # queries: security-extended,security-and-quality
 
     - name: Create solution
-    - name: make dx11 project
       working-directory: projects
       run: ./genie.exe vs2022     
 
