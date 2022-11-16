@@ -31,6 +31,7 @@ template <typename T> struct Array {
 	const T& last() const { ASSERT(m_size > 0); return m_data[m_size - 1]; }
 	T& last() { ASSERT(m_size > 0); return m_data[m_size - 1]; }
 
+	template <typename T2> operator Span<T2*>() const { return Span(reinterpret_cast<T2**>(begin()), reinterpret_cast<T2**>(end())); }
 	operator Span<T>() const { return Span(begin(), end()); }
 	operator Span<const T>() const { return Span(begin(), end()); }
 

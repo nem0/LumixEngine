@@ -1,4 +1,5 @@
 #include "composite_texture.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
@@ -7,9 +8,11 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "editor/asset_browser.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
+#include <math.h>
 
 namespace Lumix {
 
@@ -20,7 +23,14 @@ enum class CompositeTexture::NodeType : u32 {
 	CONSTANT,
 	SPLIT,
 	MERGE,
-	VERTICAL_FLIP
+	FLIP,
+	GAMMA,
+	CONTRAST,
+	BRIGHTNESS,
+	GREYSCALE,
+	MULTIPLY,
+	MIX,
+	GRADIENT,
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -77,6 +87,11 @@ CompositeTexture::Node* CompositeTexture::getNodeByID(u16 id) const {
 	return nullptr;
 }
 
+bool CompositeTexture::Node::getInputPixelData(u32 pin_idx, PixelData* pd) const {
+	const Input input = getInput(pin_idx);
+	if (!input) return false;
+	return input.getPixelData(pd);
+}
 
 CompositeTexture::Node::Input CompositeTexture::Node::getInput(u32 pin_idx) const {
 	for (const Link& link : m_resource->m_links) {
@@ -101,10 +116,8 @@ struct SplitNode final : CompositeTexture::Node {
 	bool hasOutputPins() const override { return true; }
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		const Input input = getInput(0);
-		if (!input) return false;
 		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!input.getPixelData(&tmp)) return false;
+		if (!getInputPixelData(0, &tmp)) return false;
 		if (output_idx >= tmp.channels) return false;
 
 		data->channels = 1;
@@ -215,18 +228,39 @@ struct ConstantNode final : CompositeTexture::Node {
 	Vec4 color = Vec4(1);
 };
 
-struct VerticalFlipNode final : CompositeTexture::Node {
-	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::VERTICAL_FLIP; }
+struct FlipNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::FLIP; }
 
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
+	
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(horizontal);
+	}
 
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(horizontal);
+	}
+	
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		const Input input = getInput(0);
-		if (!input) return false;
-		if (!input.getPixelData(data)) return false;
+		if (!getInputPixelData(0, data)) return false;
 
 		u8* ptr = data->pixels.getMutableData();
+		if (horizontal) {
+			for (u32 j = 0; j < data->h; ++j) {
+				for (u32 i = 0; i < data->w / 2; ++i) {
+					u32 tmp;
+					u8* p0 = ptr + (i + j * data->w) * data->channels;
+					u8* p1 = ptr + (data->w - i - 1 + j * data->w) * data->channels;
+				
+					memcpy(&tmp, p0, data->channels);
+					memcpy(p0, p1, data->channels);
+					memcpy(p1, &tmp, data->channels);
+				}
+			}
+			return true;
+		}
+
 		for (u32 j = 0; j < data->h / 2; ++j) {
 			for (u32 i = 0; i < data->w; ++i) {
 				u32 tmp;
@@ -242,13 +276,288 @@ struct VerticalFlipNode final : CompositeTexture::Node {
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Vertical flip");
+		ImGuiEx::NodeTitle("Flip");
+		inputSlot();
+		bool res = ImGui::Checkbox("Horizontal", &horizontal);
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	bool horizontal = false;
+};
+
+struct GradientNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GRADIENT; }
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(size);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(size);
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		data->pixels.resize(size);
+		for (u32 i = 0; i < size; ++i) {
+			data->pixels[i] = 255 * i / (size - 1);
+		}
+		data->channels = 1;
+		data->w = size;
+		data->h = 1;
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Gradient");
+		bool res = ImGui::DragInt("Size (px)", (i32*)&size, 1, 2, 1024);
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 size = 256;
+};
+
+struct GammaNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GAMMA; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(gamma);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(gamma);
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
+			const bool is_alpha = data->channels == 4 && i % 4 == 3;
+			if (is_alpha) continue;
+
+			float v = data->pixels[i] / 255.f;
+			v = powf(v, 1 / gamma);
+			v = clamp(v * 255.f, 0.f, 255.f);
+			data->pixels[i] = u8(v + 0.5f);
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Gamma");
+		inputSlot();
+		ImGui::SetNextItemWidth(150);
+		bool res = ImGui::DragFloat("##v", &gamma);
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	float gamma = 2.2f;
+};
+
+struct MultiplyNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::MULTIPLY; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(0, data)) return false;
+		if (!getInputPixelData(1, &tmp)) return false;
+		if (tmp.w != data->w) return false;
+		if (tmp.h != data->h) return false;
+		if (tmp.channels != data->channels) return false;
+
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
+			const float a = tmp.pixels[i];
+			const float b = data->pixels[i];
+			float v = (a * b) / 255.f;
+			v = clamp(v, 0.f, 255.f);
+			data->pixels[i] = u8(v + 0.5f);
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Multiply");
+		ImGui::BeginGroup();
+		inputSlot(); ImGui::TextUnformatted("A");
+		inputSlot(); ImGui::TextUnformatted("B");
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return false;
+	}
+};
+
+struct GreyscaleNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GREYSCALE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+		if (data->channels < 3) return false;
+
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; i += data->channels) {
+			Vec3 v(data->pixels[i], data->pixels[i + 1], data->pixels[i + 2]);
+			v *= 1/255.f;
+
+			float greyscale = v.x * 0.299f + v.y * 0.587f + v.z * 0.114f;
+			greyscale = clamp(greyscale * 255.f, 0.f, 255.f);
+			data->pixels[i] = data->pixels[i + 1] = data->pixels[i + 2] = u8(greyscale + 0.5f);
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Greyscale");
 		inputSlot();
 		ImGui::TextUnformatted(" ");
 		ImGui::SameLine();
 		outputSlot();
 		return false;
 	}
+};
+
+struct MixNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::MIX; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(alpha);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(alpha);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+		CompositeTexture::PixelData tmp(m_resource->allocator);
+		if (!getInputPixelData(1, &tmp)) return false;
+		if (tmp.w != data->w) return false;
+		if (tmp.h != data->h) return false;
+		if (tmp.channels != data->channels) return false;
+
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
+			float a = data->pixels[i] / 255.f;
+			const float b = tmp.pixels[i] / 255.f;
+			a = a * (1 - alpha) + b * alpha;
+			a = clamp(a * 255.f, 0.f, 255.f);
+			data->pixels[i] = u8(a + 0.5f);
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Mix");
+		ImGui::BeginGroup();
+		inputSlot(); ImGui::TextUnformatted("A");
+		inputSlot(); ImGui::TextUnformatted("B");
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(150);
+		ImGui::SliderFloat("##alpha", &alpha, 0.f, 1.f);
+		ImGui::SameLine();
+		outputSlot();
+		return false;
+	}
+
+	float alpha = 0.5f;
+};
+
+struct BrightnessNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::BRIGHTNESS; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(brightness);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(brightness);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
+			const bool is_alpha = data->channels == 4 && i % 4 == 3;
+			if (is_alpha) continue;
+
+			float v = data->pixels[i] / 255.f;
+			v += brightness;
+			v = clamp(v * 255.f, 0.f, 255.f);
+			data->pixels[i] = u8(v + 0.5f);
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Brightness");
+		inputSlot();
+		ImGui::SetNextItemWidth(150);
+		bool res = ImGui::SliderFloat("##v", &brightness, -1.f, 1.f);
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	float brightness = 0;
+};
+
+struct ContrastNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CONTRAST; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(contrast);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(contrast);
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+
+		const float factor = 259 * (contrast + 255) / (255 * (259 - contrast));
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
+			const bool is_alpha = data->channels == 4 && i % 4 == 3;
+			if (is_alpha) continue;
+
+			float v = data->pixels[i] / 255.f;
+			v = factor * (v - 0.5f) + 0.5f;
+			v = clamp(v * 255.f, 0.f, 255.f);
+			data->pixels[i] = u8(v + 0.5f);
+		}
+		return true;
+	}
+	
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Contrast");
+		inputSlot();
+		ImGui::SetNextItemWidth(150);
+		bool res = ImGui::SliderFloat("##v", &contrast, -255.f, 255.f);
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	float contrast = 0;
 };
 
 struct InvertNode final : CompositeTexture::Node {
@@ -258,9 +567,8 @@ struct InvertNode final : CompositeTexture::Node {
 	bool hasOutputPins() const override { return true; }
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		const Input input = getInput(0);
-		if (!input) return false;
-		input.getPixelData(data);
+		if (!getInputPixelData(0, data)) return false;
+
 		u8* p = data->pixels.getMutableData();
 		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
 			p[i] = 0xff - p[i];
@@ -409,11 +717,18 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 	switch (type) {
 		case CompositeTexture::NodeType::OUTPUT: node = LUMIX_NEW(allocator, OutputNode); break; 
 		case CompositeTexture::NodeType::INPUT: node = LUMIX_NEW(allocator, InputNode); break; 
-		case CompositeTexture::NodeType::VERTICAL_FLIP: node = LUMIX_NEW(allocator, VerticalFlipNode); break; 
+		case CompositeTexture::NodeType::FLIP: node = LUMIX_NEW(allocator, FlipNode); break; 
 		case CompositeTexture::NodeType::INVERT: node = LUMIX_NEW(allocator, InvertNode); break; 
 		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
 		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode); break; 
 		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode); break; 
+		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode); break; 
+		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
+		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
+		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
+		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
+		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode); break; 
+		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode); break; 
 		default: ASSERT(false); return nullptr;
 	}
 	node->m_resource = &resource;
@@ -696,6 +1011,8 @@ void CompositeTextureEditor::newGraph() {
 	CompositeTexture::Node* output_node = m_resource->addNode(CompositeTexture::NodeType::OUTPUT);
 	CompositeTexture::Node* const_node =m_resource->addNode(CompositeTexture::NodeType::CONSTANT);
 	CompositeTexture::Link& link = m_resource->m_links.emplace();
+	const_node->m_pos = ImVec2(100, 100);
+	output_node->m_pos = ImVec2(300, 100);
 	link.from = const_node->m_id;
 	link.to = output_node->m_id;
 	pushUndo(NO_MERGE_UNDO);
@@ -716,10 +1033,17 @@ static const struct {
 	const char* label;
 	CompositeTexture::NodeType type;
 } TYPES[] = {
+	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
+	{ 'B', "Brightness", CompositeTexture::NodeType::BRIGHTNESS },
 	{ 'C', "Constant", CompositeTexture::NodeType::CONSTANT },
-	{ 'F', "Vertical flip", CompositeTexture::NodeType::VERTICAL_FLIP },
+	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
+	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
+	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
+	{ 'G', "Greyscale", CompositeTexture::NodeType::GREYSCALE },
 	{ 'I', "Invert", CompositeTexture::NodeType::INVERT },
+	{ 'X', "Mix", CompositeTexture::NodeType::MIX },
 	{ 'M', "Merge", CompositeTexture::NodeType::MERGE },
+	{ 0, "Multiply", CompositeTexture::NodeType::MULTIPLY },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
 };
@@ -727,19 +1051,20 @@ static const struct {
 void CompositeTextureEditor::onCanvasClicked(ImVec2 pos, i32 hovered_link) {
 	CompositeTexture::Node* n = nullptr;
 	for (const auto& t : TYPES) {
-		if (os::isKeyDown((os::Keycode)t.key)) {
+		if (t.key && os::isKeyDown((os::Keycode)t.key)) {
 			n = m_resource->addNode(t.type);
 			break;
 		}
 	}
 	if (n) {
 		n->m_pos = pos;
-		if (hovered_link >= 0) splitLink(*m_resource, hovered_link, m_resource->m_nodes.size() - 1);
+		if (hovered_link >= 0) splitLink(m_resource->m_nodes.back(), m_resource->m_links, hovered_link);
 		pushUndo(NO_MERGE_UNDO);
 	}	
 }
 
 void CompositeTextureEditor::open(const Path& path) {
+	m_is_focus_request = true;
 	m_is_open = true;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	IAllocator& allocator = m_app.getAllocator();
@@ -768,10 +1093,20 @@ void CompositeTextureEditor::save() {
 	if (!m_path.isEmpty() || getSavePath()) saveAs(m_path);
 }
 
+void CompositeTextureEditor::onSettingsLoaded() {
+	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_composite_texture_editor_open", false);
+}
+
+void CompositeTextureEditor::onBeforeSettingsSaved() {
+	m_app.getSettings().setValue(Settings::GLOBAL, "is_composite_texture_editor_open", m_is_open);
+}
+
 void CompositeTextureEditor::onWindowGUI() {
 	if (!m_is_open) return;
 
 	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	if (m_is_focus_request) ImGui::SetNextWindowFocus();
+	m_is_focus_request = false;
 	if (ImGui::Begin("Composite texture", &m_is_open, ImGuiWindowFlags_MenuBar)) {
 		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		if (ImGui::BeginMenuBar()) {
@@ -786,7 +1121,7 @@ void CompositeTextureEditor::onWindowGUI() {
 			}
 			ImGui::EndMenuBar();
 		}
-		nodeEditorGUI(*m_resource);
+		nodeEditorGUI(m_resource->m_nodes, m_resource->m_links);
 	}
 	ImGui::End();
 }

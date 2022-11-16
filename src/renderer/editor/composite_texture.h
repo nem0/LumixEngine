@@ -25,45 +25,28 @@ struct CompositeTexture {
 		bool is_cubemap;
 	};
 	
-	struct Node {
+	struct Node : NodeEditorNode {
 		virtual NodeType getType() const = 0;
 		virtual bool gui() = 0;
-		virtual bool hasInputPins() const = 0;
-		virtual bool hasOutputPins() const = 0;
 		virtual bool getPixelData(PixelData* data, u32 output_idx) = 0;
 		virtual void serialize(OutputMemoryStream& blob) const {}
 		virtual void deserialize(InputMemoryStream& blob) {}
 		
-		bool nodeGUI();
+		bool nodeGUI() override;
+
 		void inputSlot();
 		void outputSlot();
 		struct Input;
 		Input getInput(u32 pin_idx) const;
+		bool getInputPixelData(u32 pin_idx, PixelData* pd) const;
 		
-		u16 m_id;
-		ImVec2 m_pos = ImVec2(0, 0);
 		bool m_selected = false;
 		u32 m_input_counter;
 		u32 m_output_counter;
 		CompositeTexture* m_resource;
 	};
 
-	struct Link {
-		u32 from;
-		u32 to;
-		u32 color = 0xffFFffFF;
-
-		u16 getToNode() const { return to & 0xffFF; }
-		u16 getFromNode() const { return from & 0xffFF; }
-
-		u16 getToPin() const { return (to >> 16) & 0xffFF; }
-		u16 getFromPin() const { return (from >> 16) & 0xffFF; }
-	};
-	
-	enum class Output {
-		BC1,
-		BC3
-	};
+	using Link = NodeEditorLink;
 
 	CompositeTexture(StudioApp& app, IAllocator& allocator);
 	~CompositeTexture();
@@ -87,15 +70,13 @@ struct CompositeTexture {
 	void link(Node* from, u32 from_pin, Node* to, u32 to_pin);
 
 	IAllocator& allocator;
-	Output output = Output::BC1;
-	
 	StudioApp& m_app;
 	Array<Node*> m_nodes;
 	Array<Link> m_links;
 	u32 m_node_id_generator = 1;
 };
 
-struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor<CompositeTexture, CompositeTexture::Node*, CompositeTexture::Link> {
+struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {
 	CompositeTextureEditor(StudioApp& app);
 	~CompositeTextureEditor();
 
@@ -106,6 +87,8 @@ struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor<Composite
 private:
 	void onWindowGUI() override;
 	const char* getName() const override { return "composite_texture_editor"; }
+	void onSettingsLoaded() override;
+	void onBeforeSettingsSaved() override;
 
 	bool getSavePath();
 	bool hasFocus() override { return m_has_focus; }
@@ -122,6 +105,7 @@ private:
 	StudioApp& m_app;
 	IAllocator& m_allocator;
 	bool m_is_open = false;
+	bool m_is_focus_request = false;
 	Action m_toggle_ui;
 	Action m_save_action;
 	Action m_delete_action;

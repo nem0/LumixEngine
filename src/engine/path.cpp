@@ -143,6 +143,11 @@ Span<const char> Path::getExtension(Span<const char> src)
 	return res;
 }
 
+bool Path::isSame(Span<const char> a, Span<const char> b) {
+	if (a.length() > 0 && (a.back() == '\\' || a.back() == '/')) --a.m_end;
+	if (b.length() > 0 && (b.back() == '\\' || b.back() == '/')) --b.m_end;
+	return equalStrings(a, b);
+}
 
 bool Path::replaceExtension(char* path, const char* ext)
 {

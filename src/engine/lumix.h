@@ -106,7 +106,17 @@ struct Span
 	T& operator[](u32 idx) const { ASSERT(m_begin + idx < m_end); return m_begin[idx]; }
 	operator Span<const T>() const { return Span<const T>(m_begin, m_end); }
 	Span fromLeft(u32 count) const { return Span(m_begin + count, m_end); }
-	
+	T& back() { ASSERT(length() > 0); return *(m_end - 1); }
+	const T& back() const { ASSERT(length() > 0); return *(m_end - 1); }
+
+	template <typename F>
+	i32 find(const F& f) const { 
+		for (u32 i = 0, c = length(); i < c; ++i) {
+			if (f(m_begin[i])) return i;
+		}
+		return -1;
+	}
+
 	u32 length() const { return u32(m_end - m_begin); }
 
 	T* begin() const { return m_begin; }

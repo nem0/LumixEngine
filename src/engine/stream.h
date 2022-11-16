@@ -44,6 +44,8 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	~OutputMemoryStream();
 	void operator =(const OutputMemoryStream& rhs);
 	void operator =(OutputMemoryStream&& rhs);
+	u8 operator[](u32 idx) const; 
+	u8& operator[](u32 idx); 
 
 	bool write(const void* data, u64 size) override;
 

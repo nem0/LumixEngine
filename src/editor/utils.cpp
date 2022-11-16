@@ -256,4 +256,149 @@ void SimpleUndoRedo::clearUndoStack() {
 	m_stack_idx = -1;
 }
 
+enum { OUTPUT_FLAG = 1 << 31 };
+
+NodeEditor::NodeEditor(IAllocator& allocator)
+: SimpleUndoRedo(allocator)
+{}
+
+void NodeEditor::splitLink(const NodeEditorNode* node, Array<NodeEditorLink>& links, u32 link_idx) {
+	if (node->hasInputPins() && node->hasOutputPins()) {
+		NodeEditorLink& new_link = links.emplace();
+		NodeEditorLink& link = links[link_idx];
+		new_link.color = link.color;
+		new_link.to = link.to;
+		new_link.from = node->m_id;
+		link.to = node->m_id;
+		pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+	}
+}
+
+void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink>& links) {
+	m_canvas.begin();
+
+	ImGuiEx::BeginNodeEditor("node_editor", &m_offset);
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	ImGuiID moved = 0;
+	ImGuiID unlink_moved = 0;
+	u32 moved_count = 0;
+	u32 unlink_moved_count = 0;
+	for (NodeEditorNode* node : nodes) {
+		const ImVec2 old_pos = node->m_pos;
+		if (node->nodeGUI()) {
+			pushUndo(node->m_id);
+		}
+		if (ImGui::IsMouseDragging(0) && ImGui::IsItemHovered()) m_dragged_node = node->m_id;
+		if (old_pos.x != node->m_pos.x || old_pos.y != node->m_pos.y) {
+			moved = node->m_id;
+			++moved_count;
+			if (ImGui::GetIO().KeyAlt) {
+				u32 old_count = links.size();
+					
+				for (i32 i = links.size() - 1; i >= 0; --i) {
+					const NodeEditorLink& link = links[i];
+					if (link.getToNode() == node->m_id) {
+						for (NodeEditorLink& rlink : links) {
+							if (rlink.getFromNode() == node->m_id && rlink.getFromPin() == link.getToPin()) {
+								rlink.from = link.from;
+								links.erase(i);
+							}
+						}
+					}
+				}
+					
+				unlink_moved_count += old_count != links.size() ? 1 : 0;
+				unlink_moved = node->m_id;
+			}
+		}
+	}
+
+	if (moved_count > 0) {
+		if (unlink_moved_count > 1) pushUndo(NO_MERGE_UNDO);
+		else if (unlink_moved_count == 1) pushUndo(unlink_moved);
+		else if (moved_count > 1) pushUndo(NO_MERGE_UNDO - 1);
+		else pushUndo(moved);
+	}
+		
+	bool open_context = false;
+	i32 hovered_link = -1;
+	for (i32 i = 0, c = links.size(); i < c; ++i) {
+		NodeEditorLink& link = links[i];
+		ImGuiEx::NodeLinkEx(link.from | OUTPUT_FLAG, link.to, link.color, ImGui::GetColorU32(ImGuiCol_TabActive));
+		if (ImGuiEx::IsLinkHovered()) {
+			if (ImGui::IsMouseClicked(0) && ImGui::GetIO().KeyCtrl) {
+				if (ImGuiEx::IsLinkStartHovered()) {
+					ImGuiEx::StartNewLink(link.to, true);
+				}
+				else {
+					ImGuiEx::StartNewLink(link.from | OUTPUT_FLAG, false);
+				}
+				links.erase(i);
+				--c;
+			}
+			if (ImGui::IsMouseDoubleClicked(0)) {
+				onLinkDoubleClicked(link, ImGui::GetMousePos() - m_offset);
+			}
+			else {
+				hovered_link = i;
+			}
+		}
+	}
+
+	if (hovered_link >= 0 && ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyAlt) {
+		i32 node_idx = nodes.find([this](const NodeEditorNode* node){ return node->m_id == m_dragged_node; });
+		if (node_idx >= 0) {
+			splitLink(nodes[node_idx], links, hovered_link);
+		}
+	}
+
+	if (ImGui::IsMouseReleased(0)) m_dragged_node = 0xffFFffFF;
+
+	{
+		ImGuiID start_attr, end_attr;
+		if (ImGuiEx::GetHalfLink(&start_attr)) {
+			open_context = true;
+			m_half_link_start = start_attr;
+		}
+
+		if (ImGuiEx::GetNewLink(&start_attr, &end_attr)) {
+			ASSERT(start_attr & OUTPUT_FLAG);
+			links.eraseItems([&](const NodeEditorLink& link) { return link.to == end_attr; });
+			links.push({u32(start_attr) & ~OUTPUT_FLAG, u32(end_attr)});
+			
+			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+		}
+	}
+
+	ImGuiEx::EndNodeEditor();
+		
+	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
+		if (ImGui::GetIO().KeyAlt && hovered_link != -1) {
+			links.erase(hovered_link);
+			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+		}
+		else {
+			onCanvasClicked(ImGui::GetMousePos() - m_offset, hovered_link);
+		}
+	}
+
+	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+		open_context = true;
+		m_half_link_start = 0;
+	}
+
+	if (open_context) ImGui::OpenPopup("context_menu");
+
+	if (ImGui::BeginPopup("context_menu")) {
+		const ImVec2 pos = ImGui::GetMousePosOnOpeningCurrentPopup() - m_offset;
+		onContextMenu(open_context, pos);
+		ImGui::EndPopup();
+	}		
+
+	m_is_any_item_active = ImGui::IsAnyItemActive();
+
+	m_canvas.end();
+}
+
 } // namespace Lumix

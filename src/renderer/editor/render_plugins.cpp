@@ -1174,7 +1174,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		void execute() {
 			IAllocator& allocator = m_allocator;
-
 			const FilePathHash hash(m_in_path);
 			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".lbc");
 			OutputMemoryStream resized_data(allocator);
@@ -1248,7 +1247,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Texture::TYPE && !Path::hasExtension(in_path, "ltc") && !Path::hasExtension(in_path, "raw")) {
+		if (type == Texture::TYPE && !Path::hasExtension(in_path, "raw") && !Path::hasExtension(in_path, "ltc")) {
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			TextureTileJob* job = LUMIX_NEW(m_app.getAllocator(), TextureTileJob)(m_app, fs, m_app.getAllocator());
 			job->m_in_path = fs.getBasePath();
@@ -1524,10 +1523,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
-	void compositeGUI(Texture& texture) {
-		if (ImGui::Button("Edit")) m_composite_texture_editor.open(texture.getPath());
-	}
-
 	void onGUI(Span<Resource*> resources) override
 	{
 		if(resources.length() > 1) return;
@@ -1555,6 +1550,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 		ImGuiEx::Label("Format");
 		ImGui::TextUnformatted(format);
+		const bool is_ltc = Path::hasExtension(texture->getPath().c_str(), "ltc");
 		if (texture->handle) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height) {
@@ -1564,7 +1560,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
 
-			if (texture != m_texture) {
+			if (!texture->isReady()) m_texture = nullptr;
+
+			if (texture != m_texture && texture->isReady()) {
 				m_texture = texture;
 				PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
@@ -1573,12 +1571,16 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle);
 			}
 
-			ImGui::Image(m_texture_view, texture_size);
+			if (m_texture_view) ImGui::Image(m_texture_view, texture_size);
 
-			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
+		}
+		else {
+			m_texture = nullptr;
 		}
 
-		if (Path::hasExtension(texture->getPath().c_str(), "ltc")) compositeGUI(*texture);
+		if (!is_ltc && ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
+		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath());
+
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			

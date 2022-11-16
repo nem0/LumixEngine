@@ -131,12 +131,46 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
 		m_app.getAssetCompiler().listChanged().unbind<&AssetBrowserImpl::onResourceListChanged>(this);
+		m_app.getAssetCompiler().resourceCompiled().unbind<&AssetBrowserImpl::onResourceCompiled>(this);
 
 		ASSERT(m_plugins.size() == 0);
 	}
 
 	void onInitFinished() override {
 		m_app.getAssetCompiler().listChanged().bind<&AssetBrowserImpl::onResourceListChanged>(this);
+		m_app.getAssetCompiler().resourceCompiled().bind<&AssetBrowserImpl::onResourceCompiled>(this);
+	}
+
+	void onResourceCompiled(Resource& resource) {
+		Span<const char> dir = Path::getDir(resource.getPath().c_str());
+		if (!Path::isSame(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
+		
+		RenderInterface* ri = m_app.getRenderInterface();
+		Engine& engine = m_app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+
+		for (i32 i = 0; i < m_file_infos.size(); ++i) {
+			FileInfo& info = m_file_infos[i];
+			if (info.filepath != resource.getPath().c_str()) continue;
+			
+			switch (getState(info, fs)) {
+				case TileState::DELETED:
+					ri->unloadTexture(info.tex);
+					info.create_called = false;
+					m_file_infos.erase(i);
+					return;
+				case TileState::NOT_CREATED:
+				case TileState::OUTDATED:
+					ri->unloadTexture(info.tex);
+					info.create_called = false;
+					info.tex = nullptr;
+					return;
+				case TileState::OK: return;
+			}
+		}
+
+		addTile(resource.getPath());
+		sortTiles();
 	}
 
 	void onResourceListChanged(const Path& path) {
@@ -149,10 +183,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		Span<const char> dir = Path::getDir(path.c_str());
-		if (dir.length() > 0 && (*(dir.m_end - 1) == '/' || *(dir.m_end - 1) == '\\')) {
-			--dir.m_end;
-		}
-		if (!equalStrings(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
+		if (!Path::isSame(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
 
 		RenderInterface* ri = m_app.getRenderInterface();
 

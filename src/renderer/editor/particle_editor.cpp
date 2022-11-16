@@ -48,11 +48,11 @@ struct ParticleEditorResource {
 
 	struct NodeInput {
 		Node* node;
-		u8 output_idx;
+		u16 output_idx;
 		DataStream generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const; //-V1071
 	};
 
-	struct Node {
+	struct Node : NodeEditorNode {
 		// this is serialized, do not change order
 		enum Type {
 			OUTPUT,
@@ -80,17 +80,15 @@ struct ParticleEditorResource {
 
 		Node(ParticleEditorResource& res) 
 			: m_resource(res)
-			, m_id(res.genID())
-		{}
+		{
+			m_id = res.genID();
+		}
 		virtual ~Node() {}
 
 		virtual Type getType() const = 0;
-		virtual DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) = 0;
-		virtual void serialize(OutputMemoryStream& blob) {}
+		virtual DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) = 0;
+		virtual void serialize(OutputMemoryStream& blob) const {}
 		virtual void deserialize(InputMemoryStream& blob) {}
-
-		virtual bool hasInputPins() const = 0;
-		virtual bool hasOutputPins() const = 0;
 
 		NodeInput getInput(u8 input_idx) {
 			for (const Link& link : m_resource.m_links) {
@@ -116,7 +114,7 @@ struct ParticleEditorResource {
 			++m_output_counter;
 		}
 
-		bool nodeGUI() {
+		bool nodeGUI() override {
 			m_input_counter = 0;
 			m_output_counter = 0;
 			const ImVec2 old_pos = m_pos;
@@ -126,8 +124,6 @@ struct ParticleEditorResource {
 			return res || old_pos.x != m_pos.x || old_pos.y != m_pos.y;
 		}
 
-		u16 m_id;
-		ImVec2 m_pos = ImVec2(100, 100);
 		bool m_selected = false;
 	
 	protected:
@@ -144,12 +140,12 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return T; }
 
-		void serialize(OutputMemoryStream& blob) override {}
+		void serialize(OutputMemoryStream& blob) const override {}
 		void deserialize(InputMemoryStream& blob) override {}
 		bool hasInputPins() const override { return true; }
 		bool hasOutputPins() const override { return true; }
 		
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			NodeInput input = getInput(0);
 			if (!input.node) return output;
 			
@@ -186,7 +182,7 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return Type::GRADIENT_COLOR; }
 	
-		DataStream generate(OutputMemoryStream& ip, u8 output_idx, DataStream dst, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) {
 				DataStream res;
@@ -212,7 +208,7 @@ struct ParticleEditorResource {
 			return dst;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(count); blob.write(keys); blob.write(values); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(count); blob.write(keys); blob.write(values); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool hasInputPins() const override { return true; }
@@ -241,7 +237,7 @@ struct ParticleEditorResource {
 		GradientNode(ParticleEditorResource& res) : Node(res) {}
 		Type getType() const override { return Type::GRADIENT; }
 	
-		DataStream generate(OutputMemoryStream& ip, u8 output_idx, DataStream dst, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) {
 				DataStream res;
@@ -265,7 +261,7 @@ struct ParticleEditorResource {
 			return dst;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(count); blob.write(keys); blob.write(values); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(count); blob.write(keys); blob.write(values); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool hasInputPins() const override { return true; }
@@ -312,13 +308,13 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return Type::CONST; }
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(idx); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(idx); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 		
 		bool hasInputPins() const override { return false; }
 		bool hasOutputPins() const override { return true; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::CONST;
 			r.index = idx;
@@ -344,7 +340,7 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { return Type::RANDOM; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			instructions.write(InstructionType::RAND);
 			DataStream op0, op1, dst;
 			dst = m_resource.streamOrRegister(output);
@@ -354,7 +350,7 @@ struct ParticleEditorResource {
 			return dst;
 		}
 
-		void serialize(OutputMemoryStream& blob) override {
+		void serialize(OutputMemoryStream& blob) const override {
 			blob.write(from);
 			blob.write(to);
 		}
@@ -395,14 +391,14 @@ struct ParticleEditorResource {
 		bool hasInputPins() const override { return false; }
 		bool hasOutputPins() const override { return true; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::LITERAL;
 			r.value = value;
 			return r;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(value); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		bool onGUI() override {
@@ -421,7 +417,7 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { return T; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(subindex);
 			if (input.node) {
 				return input.generate(instructions, output, subindex);
@@ -433,7 +429,7 @@ struct ParticleEditorResource {
 			return r;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { 
+		void serialize(OutputMemoryStream& blob) const override { 
 			if (T == Node::VEC3) blob.write(value.xyz());
 			else blob.write(value);
 		}
@@ -512,14 +508,14 @@ struct ParticleEditorResource {
 		bool hasInputPins() const override { return false; }
 		bool hasOutputPins() const override { return true; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::CHANNEL;
 			r.index = m_resource.getChannelIndex(idx, subindex);
 			return r;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(idx); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(idx); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 
 		bool onGUI() override {
@@ -551,7 +547,7 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		DataStream generate(OutputMemoryStream& instructions, u8, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16, DataStream, u8 subindex) override {
 			m_resource.m_register_mask = 0;
 			i32 output_idx = 0;
 			for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
@@ -633,7 +629,7 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream, u8 subindex) override {
 			m_resource.m_register_mask = 0;
 			const NodeInput kill_input = getInput(0);
 			if (kill_input.node) {
@@ -697,10 +693,10 @@ struct ParticleEditorResource {
 			return changed;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(op); blob.write(value); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(op); blob.write(value); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(op); blob.read(value); }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream, u8 subindex) override {
 			const NodeInput input0 = getInput(0);
 			const NodeInput input1 = getInput(1);
 			if (!input0.node) return {};
@@ -742,7 +738,7 @@ struct ParticleEditorResource {
 		bool hasOutputPins() const override { return true; }
 		Type getType() const override { return Type::SWITCH; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(m_is_on ? 0 : 1);
 			if (!input.node) return {};
 			return input.generate(instructions, output, subindex);
@@ -766,7 +762,7 @@ struct ParticleEditorResource {
 	struct PinNode : Node {
 		PinNode(ParticleEditorResource& res) : Node(res) {}
 		
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) return {};
 			return input.generate(instructions, output, subindex);
@@ -800,7 +796,7 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		DataStream generate(OutputMemoryStream& instructions, u8, DataStream, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16, DataStream, u8 subindex) override {
 			m_resource.m_register_mask = 0;
 			u32 output_idx = 0;
 			for (i32 i = 0; i < m_resource.m_outputs.size(); ++i) {
@@ -851,7 +847,7 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return Type::COLOR_MIX; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) return {};
 
@@ -871,7 +867,7 @@ struct ParticleEditorResource {
 			return dst;
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(color0); blob.write(color1); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(color0); blob.write(color1); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(color0); blob.read(color1); }
 		bool hasInputPins() const override { return true; }
 		bool hasOutputPins() const override { return true; }
@@ -898,12 +894,12 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { return Type::MADD; }
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(value1); blob.write(value2); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(value1); blob.write(value2); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value1); blob.read(value2); }
 		bool hasInputPins() const override { return true; }
 		bool hasOutputPins() const override { return true; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16, DataStream output, u8 subindex) override {
 			const NodeInput input0 = getInput(0);
 			if (!input0.node) return output;
 			const NodeInput input1 = getInput(1);
@@ -992,12 +988,12 @@ struct ParticleEditorResource {
 			}
 		}
 
-		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
+		void serialize(OutputMemoryStream& blob) const override { blob.write(value); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 		bool hasInputPins() const override { return true; }
 		bool hasOutputPins() const override { return true; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			ASSERT(output_idx == 0);
 			const NodeInput input0 = getInput(0);
 			if (!input0.node) return output;
@@ -1074,18 +1070,8 @@ struct ParticleEditorResource {
 		StaticString<32> name;
 		ValueType type = ValueType::FLOAT;
 	};
-	
-	struct Link {
-		u32 from;
-		u32 to;
-		ImU32 color;
 
-		u16 getToNode() const { return to & 0xffFF; }
-		u16 getFromNode() const { return from & 0xffFF; }
-		
-		u8 getToPin() const { return (to >> 16) & 0xff; }
-		u8 getFromPin() const { return (from >> 16) & 0xff; }
-	};
+	using Link = NodeEditorLink;
 
 	ParticleEditorResource(IAllocator& allocator)
 		: m_allocator(allocator)
@@ -1099,6 +1085,10 @@ struct ParticleEditorResource {
 		, m_output(allocator)
 	{}
 	
+	~ParticleEditorResource() {
+		for (Node* node : m_nodes) LUMIX_DELETE(m_allocator, node);
+	}
+	
 	void colorLinks(ImU32 color, u32 link_idx) {
 		m_links[link_idx].color = color;
 		const u16 from_node_id = m_links[link_idx].getFromNode();
@@ -1109,7 +1099,7 @@ struct ParticleEditorResource {
 	
 	const ParticleEditorResource::Node* getNode(u16 id) const {
 		for(const auto& n : m_nodes) {
-			if (n->m_id == id) return n.get();
+			if (n->m_id == id) return n;
 		}
 		return nullptr;
 	}
@@ -1146,40 +1136,40 @@ struct ParticleEditorResource {
 	u16 genID() { return ++m_last_id; }
 
 	Node* getNodeByID(u16 id) const {
-		for (UniquePtr<Node>& node : m_nodes) {
-			if (node->m_id == id) return node.get();
+		for (Node* node : m_nodes) {
+			if (node->m_id == id) return node;
 		}
 		return nullptr;
 	}
 
 	Node* addNode(Node::Type type) {
-		UniquePtr<Node> node;
+		Node* node;
 		switch(type) {
-			case Node::CMP: node = UniquePtr<CompareNode>::create(m_allocator, *this); break;
-			case Node::GRADIENT_COLOR: node = UniquePtr<GradientColorNode>::create(m_allocator, *this); break;
-			case Node::GRADIENT: node = UniquePtr<GradientNode>::create(m_allocator, *this); break;
-			case Node::VEC3: node = UniquePtr<VectorNode<Node::VEC3>>::create(m_allocator, *this); break;
-			case Node::VEC4: node = UniquePtr<VectorNode<Node::VEC4>>::create(m_allocator, *this); break;
-			case Node::COLOR_MIX: node = UniquePtr<ColorMixNode>::create(m_allocator, *this); break;
-			case Node::MADD: node = UniquePtr<MaddNode>::create(m_allocator, *this); break;
-			case Node::SWITCH: node = UniquePtr<SwitchNode>::create(m_allocator, *this); break;
-			case Node::RANDOM: node = UniquePtr<RandomNode>::create(m_allocator, *this); break;
-			case Node::EMIT: node = UniquePtr<EmitNode>::create(m_allocator, *this); break;
-			case Node::UPDATE: node = UniquePtr<UpdateNode>::create(m_allocator, *this); break;
-			case Node::INPUT: node = UniquePtr<InputNode>::create(m_allocator, *this); break;
-			case Node::OUTPUT: node = UniquePtr<OutputNode>::create(m_allocator, *this); break;
-			case Node::PIN: node = UniquePtr<PinNode>::create(m_allocator, *this); break;
-			case Node::DIV: node = UniquePtr<BinaryOpNode<InstructionType::DIV>>::create(m_allocator, *this); break;
-			case Node::MUL: node = UniquePtr<BinaryOpNode<InstructionType::MUL>>::create(m_allocator, *this); break;
-			case Node::ADD: node = UniquePtr<BinaryOpNode<InstructionType::ADD>>::create(m_allocator, *this); break;
-			case Node::CONST: node = UniquePtr<ConstNode>::create(m_allocator, *this); break;
-			case Node::COS: node = UniquePtr<UnaryFunctionNode<Node::COS>>::create(m_allocator, *this); break;
-			case Node::SIN: node = UniquePtr<UnaryFunctionNode<Node::SIN>>::create(m_allocator, *this); break;
-			case Node::NUMBER: node = UniquePtr<LiteralNode>::create(m_allocator, *this); break;
-			default: ASSERT(false);
+			case Node::CMP: node = LUMIX_NEW(m_allocator, CompareNode)(*this); break;
+			case Node::GRADIENT_COLOR: node = LUMIX_NEW(m_allocator, GradientColorNode)(*this); break;
+			case Node::GRADIENT: node = LUMIX_NEW(m_allocator, GradientNode)(*this); break;
+			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
+			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
+			case Node::COLOR_MIX: node = LUMIX_NEW(m_allocator, ColorMixNode)(*this); break;
+			case Node::MADD: node = LUMIX_NEW(m_allocator, MaddNode)(*this); break;
+			case Node::SWITCH: node = LUMIX_NEW(m_allocator, SwitchNode)(*this); break;
+			case Node::RANDOM: node = LUMIX_NEW(m_allocator, RandomNode)(*this); break;
+			case Node::EMIT: node = LUMIX_NEW(m_allocator, EmitNode)(*this); break;
+			case Node::UPDATE: node = LUMIX_NEW(m_allocator, UpdateNode)(*this); break;
+			case Node::INPUT: node = LUMIX_NEW(m_allocator, InputNode)(*this); break;
+			case Node::OUTPUT: node = LUMIX_NEW(m_allocator, OutputNode)(*this); break;
+			case Node::PIN: node = LUMIX_NEW(m_allocator, PinNode)(*this); break;
+			case Node::DIV: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::DIV>)(*this); break;
+			case Node::MUL: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MUL>)(*this); break;
+			case Node::ADD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::ADD>)(*this); break;
+			case Node::CONST: node = LUMIX_NEW(m_allocator, ConstNode)(*this); break;
+			case Node::COS: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::COS>)(*this); break;
+			case Node::SIN: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::SIN>)(*this); break;
+			case Node::NUMBER: node = LUMIX_NEW(m_allocator, LiteralNode)(*this); break;
+			default: ASSERT(false); return nullptr;
 		}
-		m_nodes.push(node.move());
-		return m_nodes.back().get();
+		m_nodes.push(node);
+		return node;
 	}
 	
 	bool deserialize(InputMemoryStream& blob, const char* path) {
@@ -1263,7 +1253,7 @@ struct ParticleEditorResource {
 		}
 
 		blob.write((i32)m_nodes.size());
-		for (const UniquePtr<Node>& n : m_nodes) {
+		for (const Node* n : m_nodes) {
 			blob.write(n->getType());
 			blob.write(n->m_id);
 			blob.write(n->m_pos);
@@ -1286,10 +1276,10 @@ struct ParticleEditorResource {
 
 		m_consts.emplace().name = "delta time";
 
-		m_nodes.push(UniquePtr<UpdateNode>::create(m_allocator, *this));
-		m_nodes.push(UniquePtr<OutputNode>::create(m_allocator, *this));
+		m_nodes.push(LUMIX_NEW(m_allocator, UpdateNode)(*this));
+		m_nodes.push(LUMIX_NEW(m_allocator, OutputNode)(*this));
 		m_nodes.back()->m_pos = ImVec2(100, 300);
-		m_nodes.push(UniquePtr<EmitNode>::create(m_allocator, *this));
+		m_nodes.push(LUMIX_NEW(m_allocator, EmitNode)(*this));
 		m_nodes.back()->m_pos = ImVec2(100, 200);
 	}
 
@@ -1338,7 +1328,7 @@ struct ParticleEditorResource {
 	Array<Stream> m_streams;
 	Array<Output> m_outputs;
 	Array<Constant> m_consts;
-	Array<UniquePtr<Node>> m_nodes;
+	Array<Node*> m_nodes;
 	Array<Link> m_links;
 	OutputMemoryStream m_update;
 	OutputMemoryStream m_emit;
@@ -1348,7 +1338,7 @@ struct ParticleEditorResource {
 	u8 m_registers_count = 0;
 };
 
-struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, UniquePtr<ParticleEditorResource::Node>, ParticleEditorResource::Link> {
+struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	using Node = ParticleEditorResource::Node;
 	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -1420,7 +1410,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 		}
 		if (n) {
 			n->m_pos = pos;
-			if (hovered_link >= 0) splitLink(*m_resource, hovered_link, m_resource->m_nodes.size() - 1);
+			if (hovered_link >= 0) splitLink(m_resource->m_nodes.back(), m_resource->m_links, hovered_link);
 			pushUndo(NO_MERGE_UNDO);
 		}	
 	}
@@ -1490,11 +1480,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 
 	void deleteSelectedNodes() {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
-			Node* n = m_resource->m_nodes[i].get();
+			Node* n = m_resource->m_nodes[i];
 			if (n->m_selected) {
 				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
 					return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 				});
+				LUMIX_DELETE(m_allocator, n);
 				m_resource->m_nodes.swapAndPop(i);
 			}
 		}
@@ -1515,7 +1506,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 
 	void deleteOutput(u32 output_idx) {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
-			UniquePtr<Node>& n = m_resource->m_nodes[i];
+			Node* n = m_resource->m_nodes[i];
 			switch (n->getType()) {
 				case Node::OUTPUT: {
 					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
@@ -1538,10 +1529,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 
 	void deleteStream(u32 stream_idx) {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
-			UniquePtr<Node>& n = m_resource->m_nodes[i];
+			Node* n = m_resource->m_nodes[i];
 			switch (n->getType()) {
 				case Node::UPDATE: {
-					auto* node = (ParticleEditorResource::UpdateNode*)n.get();
+					auto* node = (ParticleEditorResource::UpdateNode*)n;
 					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
 						ParticleEditorResource::Link& link = m_resource->m_links[j];
 						if (link.getToNode() == node->m_id) {
@@ -1557,7 +1548,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 					break;
 				}
 				case Node::EMIT: {
-					auto* node = (ParticleEditorResource::EmitNode*)n.get();
+					auto* node = (ParticleEditorResource::EmitNode*)n;
 					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
 						ParticleEditorResource::Link& link = m_resource->m_links[j];
 						if (link.getToNode() == node->m_id) {
@@ -1572,11 +1563,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 					break;
 				}
 				case Node::INPUT: {
-					auto* node = (ParticleEditorResource::InputNode*)n.get();
+					auto* node = (ParticleEditorResource::InputNode*)n;
 					if (node->idx == stream_idx) {
 						m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
 							return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 						});
+						LUMIX_DELETE(m_allocator, n)
 						m_resource->m_nodes.swapAndPop(i);
 					}
 					break;
@@ -1752,7 +1744,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor<ParticleEditorResource, U
 		ImGui::Columns(2);
 		leftColumnGUI();
 		ImGui::NextColumn();
-		nodeEditorGUI(*m_resource);
+		nodeEditorGUI(m_resource->m_nodes, m_resource->m_links);
 		ImGui::Columns();
 
 		ImGui::End();

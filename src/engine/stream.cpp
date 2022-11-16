@@ -215,6 +215,15 @@ void* OutputMemoryStream::skip(u64 size)
 	return ret;
 }
 
+u8 OutputMemoryStream::operator[](u32 idx) const {
+	ASSERT(idx < m_size);
+	return m_data[idx];
+}
+
+u8& OutputMemoryStream::operator[](u32 idx) {
+	ASSERT(idx < m_size);
+	return m_data[idx];
+}
 
 bool OutputMemoryStream::write(const void* data, u64 size)
 {

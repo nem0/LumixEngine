@@ -101,6 +101,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_changed_files(app.getAllocator())
 		, m_changed_dirs(app.getAllocator())
 		, m_on_list_changed(app.getAllocator())
+		, m_resource_compiled(app.getAllocator())
 		, m_on_init_load(app.getAllocator())
 	{
 		Engine& engine = app.getEngine();
@@ -216,6 +217,10 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	DelegateList<void(const Path&)>& listChanged() override {
 		return m_on_list_changed;
+	}
+
+	DelegateList<void(Resource&)>& resourceCompiled() override {
+		return m_resource_compiled;
 	}
 
 	bool copyCompile(const Path& src) override {
@@ -718,6 +723,8 @@ struct AssetCompilerImpl : AssetCompiler {
 				Resource* r = getResource(ri.path);
 				if (r && (r->isReady() || r->isFailure())) r->getResourceManager().reload(*r);
 				else if (r && r->isHooked()) m_load_hook.continueLoad(*r);
+
+				m_resource_compiled.invoke(*r);
 			}
 
 			// compile all dependents
@@ -857,7 +864,8 @@ struct AssetCompilerImpl : AssetCompiler {
 	UniquePtr<FileSystemWatcher> m_watcher;
 	HashMap<FilePathHash, ResourceItem> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
-	DelegateList<void(const Path& path)> m_on_list_changed;
+	DelegateList<void(const Path&)> m_on_list_changed;
+	DelegateList<void(Resource&)> m_resource_compiled;
 	bool m_init_finished = false;
 	Array<Resource*> m_on_init_load;
 
