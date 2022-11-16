@@ -10,7 +10,7 @@ jobs:
               with:
                 fetch-depth: 1
             - name: make plugins dir
-              run: mkdir ..\plugins
+              run: mkdir plugins
             - name: fetch procedural geometry plugin
               working-directory: plugins
               run: |
