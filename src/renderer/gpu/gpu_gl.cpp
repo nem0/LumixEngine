@@ -1120,7 +1120,7 @@ void bind(BindGroupHandle group) {
 }
 
 
-void createTextureView(TextureHandle view, TextureHandle texture)
+void createTextureView(TextureHandle view, TextureHandle texture, u32 layer)
 {
 	GPU_PROFILE();
 	checkThread();
@@ -1136,7 +1136,7 @@ void createTextureView(TextureHandle view, TextureHandle texture)
 	view->format = texture->format;
 
 	glGenTextures(1, &view->gl_handle);
-	glTextureView(view->gl_handle, GL_TEXTURE_2D, texture->gl_handle, texture->format, 0, 1, 0, 1);
+	glTextureView(view->gl_handle, GL_TEXTURE_2D, texture->gl_handle, texture->format, 0, 1, layer, 1);
 	setSampler(view->gl_handle, texture->flags);
 
 	view->width = texture->width;

@@ -279,7 +279,7 @@ QueryHandle createQuery(QueryType type);
 void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
 void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data);
 void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
-void createTextureView(TextureHandle view, TextureHandle texture);
+void createTextureView(TextureHandle view, TextureHandle texture, u32 layer);
 void createBindGroup(BindGroupHandle group, Span<const BindGroupEntryDesc> descs);
 
 void destroy(TextureHandle texture);

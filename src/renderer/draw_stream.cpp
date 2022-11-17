@@ -121,6 +121,7 @@ struct BindUniformBufferData {
 struct CreateTextureViewData {
 	gpu::TextureHandle view;
 	gpu::TextureHandle texture;
+	u32 layer;
 };
 
 struct DrawIndexedData {
@@ -431,8 +432,8 @@ void DrawStream::createBindGroup(gpu::BindGroupHandle group, Span<const gpu::Bin
 	memcpy(ptr, descriptors.begin(), size);
 }
 
-void DrawStream::createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture) {
-	CreateTextureViewData data = {view, texture};
+void DrawStream::createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture, u32 layer) {
+	CreateTextureViewData data = {view, texture, layer};
 	write(Instruction::CREATE_TEXTURE_VIEW, data);
 }
 
@@ -941,7 +942,7 @@ void DrawStream::run() {
 				}
 				case Instruction::CREATE_TEXTURE_VIEW: {
 					READ(CreateTextureViewData, data);
-					gpu::createTextureView(data.view, data.texture);
+					gpu::createTextureView(data.view, data.texture, data.layer);
 					break;
 				}
 				case Instruction::USER_ALLOC: {

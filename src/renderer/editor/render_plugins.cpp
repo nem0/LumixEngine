@@ -1578,7 +1578,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
-				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle);
+				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle, 0);
 			}
 
 			if (m_texture_view) ImGui::Image(m_texture_view, texture_size);
