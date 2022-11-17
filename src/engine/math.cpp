@@ -91,6 +91,9 @@ Vec2 Vec2::operator/(float f) const {
 Vec2 Vec2::operator+(const Vec2& v) const {
 	return Vec2(x + v.x, y + v.y);
 }
+Vec2 Vec2::operator+(float v) const {
+	return Vec2(x + v, y + v);
+}
 void Vec2::operator+=(const Vec2& v) {
 	x += v.x;
 	y += v.y;

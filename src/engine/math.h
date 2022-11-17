@@ -85,6 +85,7 @@ struct LUMIX_ENGINE_API Vec2 {
 	Vec2 operator *(float f) const;
 	Vec2 operator /(float f) const;
 	Vec2 operator +(const Vec2& v) const;
+	Vec2 operator +(float v) const;
 	void operator +=(const Vec2& v);
 	Vec2 operator -(const Vec2& v) const;
 	Vec2 operator -(float f) const;

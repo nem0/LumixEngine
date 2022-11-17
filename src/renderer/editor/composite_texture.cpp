@@ -35,7 +35,11 @@ enum class CompositeTexture::NodeType : u32 {
 	RANDOM_PIXELS,
 	CONSTANT,
 	RESIZE,
-	CIRCLE
+	CIRCLE,
+	CELLULAR_NOISE,
+	SPLAT,
+	SIMPLEX,
+	WAVE_NOISE
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -571,6 +575,231 @@ struct ResizeNode final : CompositeTexture::Node {
 	Vec2 scale = Vec2(50.f);
 };
 
+static Vec2 floor(Vec2 p) { return { floorf(p.x), floorf(p.y) }; }
+static Vec2 sin(Vec2 p) { return { sinf(p.x), sinf(p.y) }; }
+static Vec2 fract(Vec2 p) { return p - floor(p); }
+static Vec2 hash(Vec2 p) {
+	p = Vec2(dot(p, Vec2(127.1f, 311.7f)), dot(p, Vec2(269.5f, 183.3f)));
+	return fract(sin(p) * 18.5453f);
+}
+
+struct WaveNoiseNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::WAVE_NOISE; }
+
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+	
+	static float mix(float a, float b, float t) {
+		return a * (1 - t) + b * t;
+	}
+
+	// https://www.shadertoy.com/view/tldSRj
+	float noise(Vec2 p) const {
+		const float kF = magic;
+
+		Vec2 i = floor(p);
+		Vec2 f = fract(p);
+		f = f * f * (f * -2.f + 3.f);
+		return mix(mix(sinf(kF * dot(p, hash(i + Vec2(0.f, 0.f)))),
+		               sinf(kF * dot(p, hash(i + Vec2(1.f, 0.f)))), f.x),
+		               mix(sinf(kF * dot(p, hash(i + Vec2(0.f, 1.f)))),
+		                   sinf(kF * dot(p, hash(i + Vec2(1.f, 1.f)))), f.x), f.y);
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Wave noise");
+		outputSlot();
+		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
+		res = ImGui::DragFloat("Magic", &magic, 0.01f, 1, 12) || res;
+		res = ImGui::DragFloat("Offset", &offset, 0.01f, FLT_MIN, FLT_MAX) || res;
+		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		return res;
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		data->w = w;
+		data->h = h;
+		data->channels = 1;
+		data->pixels.resize(w * h);
+		for (u32 j = 0; j < h; ++j) {
+			const float v = j / float(h - 1);
+			for (u32 i = 0; i < w; ++i) {
+				float u = i / float(w - 1);
+				float d = noise(Vec2(u, v) * scale + offset) * 0.5f + 0.5f;
+				d = clamp(d * 255.f, 0.f, 255.f);
+				data->pixels[i + j * w] = u8(d + 0.5f);
+			}
+		}
+		return true;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(scale);
+		blob.write(magic);
+		blob.write(offset);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(scale);
+		blob.read(magic);
+		blob.read(offset);
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	float scale = 4;
+	float magic = 6.f;
+	float offset = 0;
+};
+
+struct SimplexNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SIMPLEX; }
+
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	static Vec2 hash2(Vec2 p) { return hash(p) * 2 - Vec2(1); }
+
+	static float step(float edge, float x) {
+		return x < edge ? 0.f : 1.f;
+	}
+
+	// https://www.shadertoy.com/view/Msf3WH
+	float noise(Vec2 p) {
+		static const float K1 = (sqrtf(3) - 1) / 2;
+		static const float K2 = (3 - sqrtf(3)) / 6;
+	
+		Vec2 i = floor(p + (p.x + p.y) * K1);
+		Vec2 a = p - i + (i.x + i.y) * K2;
+		float m = step(a.y, a.x);
+		Vec2 o = Vec2(m, 1.f - m);
+		Vec2 b = a - o + K2;
+		Vec2 c = a - 1.f + 2.f * K2;
+		Vec3 h = maximum(Vec3(0.5f) - Vec3(dot(a, a), dot(b, b), dot(c, c)), Vec3(0.f));
+		Vec3 n = h * h * h * h * Vec3(dot(a, hash2(i)), dot(b, hash2(i + o)), dot(c, hash2(i + 1.f)));
+		return dot(n, Vec3(70.f)) * 0.5f + 0.5f;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Simplex");
+		outputSlot();
+		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
+		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		return res;
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		data->w = w;
+		data->h = h;
+		data->channels = 1;
+		data->pixels.resize(w * h);
+		for (u32 j = 0; j < h; ++j) {
+			const float v = j / float(h - 1);
+			for (u32 i = 0; i < w; ++i) {
+				float u = i / float(w - 1);
+				float d = noise(Vec2(u, v) * scale);
+				d = clamp(d * 255.f, 0.f, 255.f);
+				data->pixels[i + j * w] = u8(d + 0.5f);
+			}
+		}
+		return true;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(scale);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(scale);
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	float scale = 4;
+};
+
+struct CellularNoiseNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CELLULAR_NOISE; }
+
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+	
+	// https://www.shadertoy.com/view/MslGD8
+	Vec2 voronoi(Vec2 x) const {
+		Vec2 n = floor(x);
+		Vec2 f = fract(x);
+	
+		Vec3 m = Vec3(8.0);
+		for (i32 j = -1; j <= 1; j++) {
+			for (i32 i = -1; i <= 1; i++) {
+				Vec2 g = Vec2(float(i), float(j));
+				Vec2 o = hash(n + g);
+				Vec2 r = g - f + (sin(o * 2 * PI + Vec2(offset)) * 0.5f + Vec2(0.5f));
+				float d = dot(r, r);
+				if (d < m.x) m = Vec3(d, o.x, o.y);
+			}
+		}
+	
+		return Vec2(sqrtf(m.x), m.y + m.z);
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Cellular noise");
+		outputSlot();
+		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
+		res = ImGui::DragFloat("Offset", &offset, 0.01f, FLT_MIN, FLT_MAX) || res;
+		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		return res;
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		data->w = w;
+		data->h = h;
+		data->channels = 1;
+		data->pixels.resize(w * h);
+		for (u32 j = 0; j < h; ++j) {
+			const float v = j / float(h - 1);
+			for (u32 i = 0; i < w; ++i) {
+				float u = i / float(w - 1);
+				float d = voronoi(Vec2(u, v) * scale).x;
+				d = clamp(d * 255.f, 0.f, 255.f);
+				data->pixels[i + j * w] = u8(d + 0.5f);
+			}
+		}
+		return true;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(scale);
+		blob.write(offset);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(scale);
+		blob.read(offset);
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	float scale = 4;
+	float offset = 0;
+};
+
 struct CircleNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CIRCLE; }
 	bool hasInputPins() const override { return true; }
@@ -810,6 +1039,39 @@ struct InvertNode final : CompositeTexture::Node {
 	}
 };
 
+struct SplatNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SPLAT; }
+
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(0, &tmp)) return false;
+		data->w = tmp.w;
+		data->h = tmp.h;
+		data->channels = 4;
+		data->pixels.resize(data->w * data->h * data->channels); 
+
+		u8* p = data->pixels.getMutableData();
+		for (u32 i = 0, c = tmp.w * tmp.h; i < c; ++i) {
+			for (u32 channel = 0; channel < 4; ++channel) {
+				data->pixels[i * 4 + channel] = tmp.pixels[i * tmp.channels + channel % tmp.channels];
+			}
+		}
+		return true;
+	};
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Splat");
+		inputSlot();
+		ImGui::TextUnformatted(" ");
+		ImGui::SameLine();
+		outputSlot();
+		return false;
+	}
+};
+
 struct InputNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::INPUT; }
 
@@ -950,6 +1212,10 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
 		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
 		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode); break; 
+		case CompositeTexture::NodeType::SPLAT: node = LUMIX_NEW(allocator, SplatNode); break; 
+		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode); break; 
+		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode); break; 
+		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode); break; 
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode); break; 
 		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
 		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
@@ -1268,23 +1534,27 @@ static const struct {
 	const char* label;
 	CompositeTexture::NodeType type;
 } TYPES[] = {
-	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
 	{ 'B', "Brightness", CompositeTexture::NodeType::BRIGHTNESS },
 	{ 'O', "Circle", CompositeTexture::NodeType::CIRCLE },
 	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
 	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
+	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
 	{ 'G', "Greyscale", CompositeTexture::NodeType::GREYSCALE },
+	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
 	{ 'I', "Invert", CompositeTexture::NodeType::INVERT },
-	{ 'X', "Mix", CompositeTexture::NodeType::MIX },
 	{ 'M', "Merge", CompositeTexture::NodeType::MERGE },
+	{ 'X', "Mix", CompositeTexture::NodeType::MIX },
 	{ 0, "Multiply", CompositeTexture::NodeType::MULTIPLY },
 	{ 0, "Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS },
 	{ 'R', "Resize", CompositeTexture::NodeType::RESIZE },
+	{ 0, "Simplex", CompositeTexture::NodeType::SIMPLEX },
+	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
-	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
+	{ 'V', "Voronoi", CompositeTexture::NodeType::CELLULAR_NOISE },
+	{ 'W', "Wave noise", CompositeTexture::NodeType::WAVE_NOISE }
 };
 
 void CompositeTextureEditor::onCanvasClicked(ImVec2 pos, i32 hovered_link) {
@@ -1319,6 +1589,7 @@ void CompositeTextureEditor::open(const Path& path) {
 		logError("Could not load", path);
 	}
 }
+
 
 bool CompositeTextureEditor::getSavePath() {
 	char path[LUMIX_MAX_PATH];
