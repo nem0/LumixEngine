@@ -48,6 +48,7 @@ jobs:
             
             - name: build physx
               working-directory: projects\3rdparty\PhysX\physx
+              shell: cmd
               run: |
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" compiler\vc17win64\PhysXSDK.sln /p:Configuration=Release /p:Platform=x64
                 
