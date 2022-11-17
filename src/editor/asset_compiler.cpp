@@ -724,7 +724,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				if (r && (r->isReady() || r->isFailure())) r->getResourceManager().reload(*r);
 				else if (r && r->isHooked()) m_load_hook.continueLoad(*r);
 
-				m_resource_compiled.invoke(*r);
+				if (r) m_resource_compiled.invoke(*r);
 			}
 
 			// compile all dependents

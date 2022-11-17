@@ -97,8 +97,8 @@ struct NodeEditorLink {
 	u16 getToNode() const { return to & 0xffFF; }
 	u16 getFromNode() const { return from & 0xffFF; }
 
-	u16 getToPin() const { return (to >> 16) & 0xffFF; }
-	u16 getFromPin() const { return (from >> 16) & 0xffFF; }
+	u16 getToPin() const { return (to >> 16) & 0x7fFF; }
+	u16 getFromPin() const { return (from >> 16) & 0x7fFF; }
 };
 
 struct NodeEditorNode {
