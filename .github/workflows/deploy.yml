@@ -68,7 +68,7 @@ jobs:
             - name: make dx11 project
               working-directory: projects
               run: |
-                ./genie.exe --static-physx vs2019
+                ./genie.exe --with-app --static-physx vs2019
                 
             - name: get butler
               working-directory: projects
