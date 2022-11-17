@@ -4,10 +4,12 @@
 #include "engine/array.h"
 #include "engine/math.h"
 #include "editor/studio_app.h"
+#include "engine/file_system.h"
+#include "engine/path.h"
 #include "engine/universe.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
-#include "renderer/editor/composite_texture.h"
+#include "renderer/gpu/gpu.h"
 
 
 namespace Lumix
@@ -19,6 +21,7 @@ struct Model;
 struct PrefabResource;
 struct RenderScene;
 struct Texture;
+struct Renderer;
 
 struct DistanceField {
 	DistanceField(IAllocator& allocator);
@@ -98,6 +101,7 @@ private:
 	u16 getHeight(const DVec3& world_pos, RenderScene* scene, EntityRef terrain) const;
 	DVec3 getRelativePosition(const DVec3& world_pos, EntityRef terrain, Universe& universe) const;
 	void exportToOBJ(ComponentUID cmp) const;
+	Renderer& getRenderer();
 
 private:
 	StudioApp& m_app;
@@ -130,7 +134,7 @@ private:
 	Vec2 m_rotate_x_spread;
 	Vec2 m_rotate_y_spread;
 	Vec2 m_rotate_z_spread;
-	CompositeTexture m_albedo_composite;
+	Array<gpu::TextureHandle> m_layer_views;
 	Path m_albedo_composite_path;
 	Array<DistanceField> m_distance_fields;
 

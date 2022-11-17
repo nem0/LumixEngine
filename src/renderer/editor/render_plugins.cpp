@@ -1543,6 +1543,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::Text("%dx%d", texture->width, texture->height);
 		ImGuiEx::Label("Mips");
 		ImGui::Text("%d", texture->mips);
+		ImGuiEx::Label("Depth");
+		ImGui::Text("%d", texture->depth);
 		const char* format = "unknown";
 		switch(texture->format) {
 			case gpu::TextureFormat::R8: format = "R8"; break;

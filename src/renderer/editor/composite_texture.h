@@ -63,9 +63,8 @@ struct CompositeTexture {
 	bool deserialize(InputMemoryStream& blob);
 	bool generate(Result* result);
 	
-	Path getTerrainLayerPath(u32 layer) const;
-	void addTerrainLayer(const char* path);
-	void removeTerrainLayer(u32 idx);
+	void addArrayLayer(const char* path);
+	void removeArrayLayer(u32 idx);
 	void initTerrainAlbedo();
 	void initTerrainNormal();
 	void link(Node* from, u32 from_pin, Node* to, u32 to_pin);

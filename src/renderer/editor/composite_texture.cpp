@@ -1402,7 +1402,7 @@ void CompositeTexture::initTerrainNormal() {
 	link(inode1, 0, onode, 1);
 }
 
-void CompositeTexture::removeTerrainLayer(u32 idx) {
+void CompositeTexture::removeArrayLayer(u32 idx) {
 	OutputNode* node = (OutputNode*)m_nodes[0];
 	const Node::Input input = node->getInput(idx);
 	if (!input) return;
@@ -1418,7 +1418,7 @@ void CompositeTexture::removeTerrainLayer(u32 idx) {
 
 }
 
-void CompositeTexture::addTerrainLayer(const char* path) {
+void CompositeTexture::addArrayLayer(const char* path) {
 	OutputNode* node = (OutputNode*)m_nodes[0];
 	if (node->m_output_type != OutputNode::OutputType::ARRAY) return;
 	InputNode* inode = (InputNode*)addNode(NodeType::INPUT);
@@ -1427,19 +1427,6 @@ void CompositeTexture::addTerrainLayer(const char* path) {
 	link.from = inode->m_id;
 	link.to = node->m_id | (node->m_layers_count << 16);
 	++node->m_layers_count;
-}
-
-Path CompositeTexture::getTerrainLayerPath(u32 layer) const {
-	const OutputNode* node = (OutputNode*)m_nodes[0];
-	if (node->m_output_type != OutputNode::OutputType::ARRAY) return Path();
-	if (layer >= node->m_layers_count) return Path();
-
-	const Node::Input input = node->getInput(layer);
-	if (!input) return Path();
-
-	if (input.node->getType() != NodeType::INPUT) return Path();
-	InputNode* inode = (InputNode*)input.node;
-	return Path(inode->m_texture);
 }
 
 bool CompositeTexture::generate(Result* result) {

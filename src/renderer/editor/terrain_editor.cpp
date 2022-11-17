@@ -23,6 +23,7 @@
 #include "engine/universe.h"
 #include "physics/physics_scene.h"
 #include "renderer/culling_system.h"
+#include "renderer/draw_stream.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -680,6 +681,12 @@ TerrainEditor::~TerrainEditor()
 		LUMIX_DELETE(m_app.getAllocator(), m_brush_texture);
 	}
 	m_app.removePlugin(*this);
+	
+	Engine& engine = m_app.getEngine();
+	Lumix::IPlugin* plugin = engine.getPluginManager().getPlugin("renderer");
+	Renderer& renderer = *static_cast<Renderer*>(plugin);
+	DrawStream& stream = renderer.getDrawStream();
+	for (gpu::TextureHandle t : m_layer_views) stream.destroy(t);
 }
 
 
@@ -694,7 +701,7 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	, m_is_enabled(false)
 	, m_size_spread(1, 1)
 	, m_y_spread(0, 0)
-	, m_albedo_composite(app, app.getAllocator())
+	, m_layer_views(app.getAllocator())
 	, m_distance_fields(app.getAllocator())
 {
 	m_smooth_terrain_action.init("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "", false);
@@ -2112,6 +2119,23 @@ void TerrainEditor::clearGrass(u32 idx, EntityRef terrain, WorldEditor& editor) 
 	editor.executeCommand(command.move());
 }
 
+static void thumbnail(gpu::TextureHandle texture, float size, bool selected) {
+	ImVec2 img_size(size, size);
+	ImGui::Image(texture, img_size);
+	if (selected) {
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const u32 color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+		dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), color, 0, 0, 3.f);
+	}
+}
+
+Renderer& TerrainEditor::getRenderer() {
+	Engine& engine = m_app.getEngine();
+	Lumix::IPlugin* plugin = engine.getPluginManager().getPlugin("renderer");
+	return *static_cast<Renderer*>(plugin);
+}
+
+
 void TerrainEditor::layerGUI(ComponentUID cmp) {
 	m_mode = Mode::LAYER;
 	RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -2166,10 +2190,8 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 					LUMIX_DELETE(m_app.getAllocator(), m_brush_texture);
 				}
 
-				Lumix::IPlugin* plugin = engine.getPluginManager().getPlugin("renderer");
-				Renderer& renderer = *static_cast<Renderer*>(plugin);
 				m_brush_texture = LUMIX_NEW(m_app.getAllocator(), Texture)(
-					Path("brush_texture"), *rm.get(Texture::TYPE), renderer, m_app.getAllocator());
+					Path("brush_texture"), *rm.get(Texture::TYPE), getRenderer(), m_app.getAllocator());
 				m_brush_texture->create(image_width, image_height, gpu::TextureFormat::RGBA8, data, image_width * image_height * 4);
 
 				stbi_image_free(data);
@@ -2267,19 +2289,32 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	}*/
 
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	if (albedo->getPath() != m_albedo_composite_path) {
-		m_albedo_composite.loadSync(fs, albedo->getPath());
+	if ((albedo->getPath() != m_albedo_composite_path || albedo->depth != m_layer_views.size()) && albedo->isReady()) {
 		m_albedo_composite_path = albedo->getPath();
+
+		DrawStream& stream = getRenderer().getDrawStream();
+		
+		for (gpu::TextureHandle t : m_layer_views) {
+			stream.destroy(t);
+		}
+		m_layer_views.clear();
+
+		for (u32 layer = 0; layer < albedo->depth; ++layer) {
+			gpu::TextureHandle view = gpu::allocTextureHandle();
+			m_layer_views.push(view);
+			stream.createTextureView(view, albedo->handle, layer);
+		}
 	}
 
 	m_layers_mask = (primary ? 1 : 0) | (secondary ? 0b10 : 0);
 
-	for (u32 i = 0; i < m_albedo_composite.getLayersCount(); ++i) {
+	for (u32 i = 0; i < albedo->depth; ++i) {
 		ImGui::SameLine();
 		if (i == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
 		bool b = m_textures_mask & ((u64)1 << i);
-		const Path layer_path = m_albedo_composite.getTerrainLayerPath(i);
-		m_app.getAssetBrowser().tile(layer_path, b);
+		if (i < (u32)m_layer_views.size()) {
+			thumbnail(m_layer_views[i], 75, m_textures_mask & ((u64)1 << i));
+		}
 		if (ImGui::IsItemClicked()) {
 			if (!ImGui::GetIO().KeyCtrl) m_textures_mask = 0;
 			if (b) m_textures_mask &= ~((u64)1 << i);
@@ -2328,7 +2363,7 @@ void TerrainEditor::compositeTextureRemoveLayer(const Path& path, i32 layer) con
 		logError("Failed to load ", path);
 	}
 	else {
-		texture.removeTerrainLayer(layer);
+		texture.removeArrayLayer(layer);
 		if (!texture.save(fs, path)) {
 			logError("Failed to save ", path);
 		}
@@ -2343,7 +2378,7 @@ void TerrainEditor::saveCompositeTexture(const Path& path, const char* channel) 
 		logError("Failed to load ", path);
 	}
 	else {
-		texture.addTerrainLayer(channel);
+		texture.addArrayLayer(channel);
 		if (!texture.save(fs, path)) {
 			logError("Failed to save ", path);
 		}
