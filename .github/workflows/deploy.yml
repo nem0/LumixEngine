@@ -44,7 +44,7 @@ jobs:
             - name: create physx solution
               working-directory: projects\3rdparty\PhysX\physx
               run: |
-                generate_projects.bat lumix_vc17win64_static
+                ./generate_projects.bat lumix_vc17win64_static
             
             - name: build physx
               working-directory: projects\3rdparty\PhysX\physx
