@@ -33,7 +33,8 @@ enum class CompositeTexture::NodeType : u32 {
 	MIX,
 	GRADIENT,
 	RANDOM_PIXELS,
-	CONSTANT
+	CONSTANT,
+	RESIZE
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -239,7 +240,7 @@ struct ConstantNode final : CompositeTexture::Node {
 		data->channels = 1;
 		data->pixels.reserve(4 * 4);
 		for (u32 i = 0; i < 16; ++i) {
-			data->pixels.write(value);
+			data->pixels.write(u8(value));
 		}
 		return true;
 	}
@@ -247,10 +248,10 @@ struct ConstantNode final : CompositeTexture::Node {
 	bool gui() override {
 		ImGuiEx::NodeTitle("Constant");
 		outputSlot();
-		return ImGui::SliderInt("Value", (i32*)&value, 0, 255);
+		return ImGui::SliderInt("Value", &value, 0, 255);
 	}
 
-	u8 value = 0xff;
+	i32 value = 0xff;
 };
 
 struct ColorNode final : CompositeTexture::Node {
@@ -498,6 +499,75 @@ struct MultiplyNode final : CompositeTexture::Node {
 		outputSlot();
 		return false;
 	}
+};
+
+struct ResizeNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::RESIZE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(type);
+		blob.write(size);
+		blob.write(scale);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(type);
+		blob.read(size);
+		blob.read(scale);
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+		
+		const u32 w = type == Type::PIXELS ? size.x : u32(data->w * scale.x * 0.01f + 0.5f);
+		const u32 h = type == Type::PIXELS ? size.y : u32(data->h * scale.y * 0.01f + 0.5f);
+		if (data->w == w && data->h != h) return true;
+
+		OutputMemoryStream tmp(m_resource->m_app.getAllocator());
+		tmp.resize(w * h * data->channels);
+
+		const i32 res = stbir_resize_uint8(data->pixels.data(), data->w, data->h, 0, tmp.getMutableData(), w, h, 0, data->channels);
+
+		data->w = w;
+		data->h = h;
+		data->pixels = tmp;
+		return res == 1;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Resize");
+		inputSlot();
+		ImGui::BeginGroup();
+		bool res = ImGui::Combo("##type", (int*)&type, "Pixels\0Percent\0");
+		switch (type) {
+			case Type::PERCENT:
+				res = ImGui::DragFloat("Width", &scale.x, 1, 0, FLT_MAX) || res;
+				res = ImGui::DragFloat("Height", &scale.y, 1, 0, FLT_MAX) || res;
+				break;
+			case Type::PIXELS:
+				res = ImGui::DragInt("Width", (i32*)&size.x, 1, 0, 999999) || res;
+				res = ImGui::DragInt("Height", (i32*)&size.y, 1, 0, 999999) || res;
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	enum class Type : int {
+		PIXELS,
+		PERCENT
+	};
+
+	Type type = Type::PIXELS;
+	IVec2 size = IVec2(100, 100);
+	Vec2 scale = Vec2(50.f);
 };
 
 struct GreyscaleNode final : CompositeTexture::Node {
@@ -826,6 +896,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode); break; 
 		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
 		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
+		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode); break; 
 		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
 		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
@@ -1149,6 +1220,7 @@ static const struct {
 	{ 'M', "Merge", CompositeTexture::NodeType::MERGE },
 	{ 0, "Multiply", CompositeTexture::NodeType::MULTIPLY },
 	{ 0, "Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS },
+	{ 'R', "Resize", CompositeTexture::NodeType::RESIZE },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
 };
