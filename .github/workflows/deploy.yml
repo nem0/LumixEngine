@@ -14,6 +14,7 @@ jobs:
               run: |
                 mkdir plugins
                 mkdir projects\3rdparty
+                mkdir projects\itch_io
                 mkdir external\physx\lib\vs2017\win64\release_static
                 
             - name: fetch procedural geometry plugin
@@ -68,25 +69,30 @@ jobs:
               working-directory: projects
               run: |
                 ./genie.exe --static-physx vs2019
+                
+            - name: get butler
+              working-directory: projects
+              run: |
+                curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
+                7z x butler.zip
+
             - name: build dx11 engine
               working-directory: projects
               shell: cmd
               run: |
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
-                mkdir itch_io
-                copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
-                copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
-                xcopy /E /Y ..\data itch_io
 
             - name: Publish DX11 version
-              uses: KikimoraGames/itch-publish@v0.0.3
-              with:
-                butlerAPIKey: ${{ secrets.BUTLER_API_KEY }}
-                gameData: ${{ github.workspace }}/projects/itch_io/
-                itchUsername: mikulasflorek
-                itchGameId: lumix-engine
-                buildChannel: win-64-dx
-
+              working-directory: projects
+              run: |
+                copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+                copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+                copy .itch.toml itch_io\
+                xcopy /E /Y ..\data itch_io
+                butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx                
+              env:
+                BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+                
             - name: make gl project with plugins
               working-directory: projects
               run: |
@@ -97,14 +103,12 @@ jobs:
               shell: cmd
               run: |
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+            
+            - name: Publish GL version
+              working-directory: projects
+              run: |
                 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
                 copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
-
-            - name: Publish GL version
-              uses: KikimoraGames/itch-publish@v0.0.3
-              with:
-                butlerAPIKey: ${{ secrets.BUTLER_API_KEY }}
-                gameData: ${{ github.workspace }}/projects/itch_io/
-                itchUsername: mikulasflorek
-                itchGameId: lumix-engine
-                buildChannel: win-64-gl
+                butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl                
+              env:
+                BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
