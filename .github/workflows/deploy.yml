@@ -89,7 +89,7 @@ jobs:
                 copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
                 copy .itch.toml itch_io\
                 xcopy /E /Y ..\data itch_io
-                butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx                
+                ./butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx                
               env:
                 BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
                 
@@ -109,6 +109,6 @@ jobs:
               run: |
                 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
                 copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
-                butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl                
+                ./butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl                
               env:
                 BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
