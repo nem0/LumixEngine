@@ -1164,10 +1164,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool canCreateResource() const override { return true; }
 	bool createResource(const char* path) override { 
 		char tmp[LUMIX_MAX_PATH];
-		bool res = m_app.getEngine().getFileSystem().makeRelative(Span(tmp), path);
-		(void)res;
-		m_composite_texture_editor.newGraph();
-		return m_composite_texture_editor.saveAs(Path(tmp));
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!m_app.getEngine().getFileSystem().makeRelative(Span(tmp), path)) {
+			logError("Can not open ", path, " because it's not in root directory (", fs.getBasePath(), ").");		
+			return false;
+		}
+		CompositeTexture ltc(m_app, m_app.getAllocator());
+		ltc.initDefault();
+		return ltc.save(fs, Path(tmp));
 	}
 
 	struct TextureTileJob

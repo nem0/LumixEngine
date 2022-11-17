@@ -1722,7 +1722,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			if (ImGui::BeginMenu("File")) {
 				const ParticleEmitter* emitter = getSelectedEmitter();
 				if (ImGui::MenuItem("New")) newGraph();
-				if (ImGui::MenuItem("Load")) load();
+				if (ImGui::MenuItem("Open")) load();
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save as")) saveAs();

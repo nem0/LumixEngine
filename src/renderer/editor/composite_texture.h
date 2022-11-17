@@ -57,6 +57,7 @@ struct CompositeTexture {
 	void deleteSelectedNodes();
 	u32 getLayersCount() const;
 	void clear();
+	void initDefault();
 
 	void serialize(OutputMemoryStream& blob);
 	bool deserialize(InputMemoryStream& blob);
@@ -81,15 +82,16 @@ struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {
 	~CompositeTextureEditor();
 
 	void open(const Path& path);
-	void newGraph();
-	bool saveAs(const Path& path);
 
 private:
+	bool saveAs(const Path& path);
+	void newGraph();
 	void onWindowGUI() override;
 	const char* getName() const override { return "composite_texture_editor"; }
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
 
+	void open();
 	bool getSavePath();
 	bool hasFocus() override { return m_has_focus; }
 	void deserialize(InputMemoryStream& blob) override;

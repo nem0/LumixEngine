@@ -922,6 +922,16 @@ CompositeTexture::~CompositeTexture() {
 	clear();
 }
 
+void CompositeTexture::initDefault() {
+	CompositeTexture::Node* output_node = addNode(CompositeTexture::NodeType::OUTPUT);
+	CompositeTexture::Node* const_node = addNode(CompositeTexture::NodeType::COLOR);
+	CompositeTexture::Link& link = m_links.emplace();
+	const_node->m_pos = ImVec2(100, 100);
+	output_node->m_pos = ImVec2(300, 100);
+	link.from = const_node->m_id;
+	link.to = output_node->m_id;
+}
+
 void CompositeTexture::clear() {
 	m_links.clear();
 	for (Node* n : m_nodes) {
@@ -1182,13 +1192,8 @@ void CompositeTextureEditor::newGraph() {
 	m_resource = LUMIX_NEW(m_allocator, CompositeTexture)(m_app, m_allocator);
 	clearUndoStack();
 
-	CompositeTexture::Node* output_node = m_resource->addNode(CompositeTexture::NodeType::OUTPUT);
-	CompositeTexture::Node* const_node =m_resource->addNode(CompositeTexture::NodeType::COLOR);
-	CompositeTexture::Link& link = m_resource->m_links.emplace();
-	const_node->m_pos = ImVec2(100, 100);
-	output_node->m_pos = ImVec2(300, 100);
-	link.from = const_node->m_id;
-	link.to = output_node->m_id;
+	m_resource->initDefault();
+	m_path = "";
 	pushUndo(NO_MERGE_UNDO);
 }
 
@@ -1278,6 +1283,18 @@ void CompositeTextureEditor::onBeforeSettingsSaved() {
 	m_app.getSettings().setValue(Settings::GLOBAL, "is_composite_texture_editor_open", m_is_open);
 }
 
+void CompositeTextureEditor::open() {
+	char path[LUMIX_MAX_PATH];
+	if (!os::getOpenFilename(Span(path), "Composite texture\0*.ltc\0", "ltc")) return;
+	char rel_path[LUMIX_MAX_PATH];
+	if (!m_app.getEngine().getFileSystem().makeRelative(Span(rel_path), path)) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		logError("Can not open ", path, " because it's not in root directory (", fs.getBasePath(), ").");		
+		return;
+	}
+	open(Path(rel_path));
+}
+
 void CompositeTextureEditor::onWindowGUI() {
 	m_has_focus = false;
 	if (!m_is_open) return;
@@ -1289,7 +1306,10 @@ void CompositeTextureEditor::onWindowGUI() {
 		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
+				if (ImGui::MenuItem("New")) newGraph();
+				if (ImGui::MenuItem("Open")) open();
 				menuItem(m_save_action, true);
+				if (ImGui::MenuItem("Save As") && getSavePath()) saveAs(m_path);
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {
