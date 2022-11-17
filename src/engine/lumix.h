@@ -207,6 +207,7 @@ namespace reflection { LUMIX_ENGINE_API ComponentType getComponentType(const cha
 
 #ifdef _MSC_VER
 	#pragma warning(error : 4456)
+	#pragma warning(error : 4062)
 	#pragma warning(disable : 4251)
 	// this is disabled because VS19 16.5.0 has false positives :(
 	#pragma warning(disable : 4724)

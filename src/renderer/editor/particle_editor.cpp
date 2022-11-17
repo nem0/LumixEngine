@@ -1128,6 +1128,7 @@ struct ParticleEditorResource {
 				case ParticleEditorResource::Node::OUTPUT:
 					colorLinks(colors[link.getToPin() % lengthOf(colors)], i);
 					break;
+				default: break;
 			}
 
 		}		
@@ -1507,17 +1508,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void deleteOutput(u32 output_idx) {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
 			Node* n = m_resource->m_nodes[i];
-			switch (n->getType()) {
-				case Node::OUTPUT: {
-					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
-						ParticleEditorResource::Link& link = m_resource->m_links[j];
-						if (link.getToNode() == n->m_id) {
-							if (link.getToPin() == output_idx) {
-								m_resource->m_links.swapAndPop(j);
-							}
-							else if (link.getToPin() > output_idx) {
-								link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
-							}
+			if (n->getType() == Node::OUTPUT) {
+				for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
+					ParticleEditorResource::Link& link = m_resource->m_links[j];
+					if (link.getToNode() == n->m_id) {
+						if (link.getToPin() == output_idx) {
+							m_resource->m_links.swapAndPop(j);
+						}
+						else if (link.getToPin() > output_idx) {
+							link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
 						}
 					}
 				}
@@ -1573,6 +1572,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					}
 					break;
 				}
+				default: break;
 			}
 		}
 		m_resource->m_streams.erase(stream_idx);

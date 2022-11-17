@@ -716,6 +716,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 					break;
 				}
+				default: break;
 			}
 			ImGui::TreePop();
 		}

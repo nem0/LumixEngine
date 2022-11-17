@@ -2481,6 +2481,7 @@ public:
 			case DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED: logError("Project file: Plugin deserialization failed"); break;
 			case DeserializeProjectResult::PLUGIN_NOT_FOUND: logError("Project file: Plugin not found"); break;
 			case DeserializeProjectResult::VERSION_NOT_SUPPORTED: logError("Project file: version not supported"); break;
+			case DeserializeProjectResult::CORRUPTED_FILE: logError("Project file: corrupted"); break;
 		}
 	}
 	

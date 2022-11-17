@@ -1209,6 +1209,7 @@ void SceneView::handleEvents() {
 					m_view->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
 				}
 				break;
+			default: break;
 		}
 	}
 }

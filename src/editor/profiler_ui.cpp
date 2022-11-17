@@ -391,19 +391,17 @@ struct ProfilerUIImpl final : ProfilerUI
 		while (p != end) {
 			profiler::EventHeader header;
 			read(global, p, header);
-			switch (header.type) {
-				case profiler::EventType::COUNTER:
-					profiler::CounterRecord tmp;
-					read(global, p + sizeof(profiler::EventHeader), tmp);
-					if (tmp.counter < (u32)m_counters.size()) {
-						Counter& c = m_counters[tmp.counter];
-						Counter::Record& r = c.records.emplace();
-						r.time = header.time;
-						r.value = tmp.value;
-						c.min = minimum(c.min, r.value);
-						c.max = maximum(c.max, r.value);
-					}
-					break;
+			if (header.type == profiler::EventType::COUNTER) {
+				profiler::CounterRecord tmp;
+				read(global, p + sizeof(profiler::EventHeader), tmp);
+				if (tmp.counter < (u32)m_counters.size()) {
+					Counter& c = m_counters[tmp.counter];
+					Counter::Record& r = c.records.emplace();
+					r.time = header.time;
+					r.value = tmp.value;
+					c.min = minimum(c.min, r.value);
+					c.max = maximum(c.max, r.value);
+				}
 			}
 			p += header.size;
 		}
@@ -439,6 +437,7 @@ struct ProfilerUIImpl final : ProfilerUI
 						}
 						break;
 					}
+					default: break;
 				}
 				p += header.size;
 			}
