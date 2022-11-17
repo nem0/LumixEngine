@@ -13,6 +13,7 @@
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
 #include <math.h>
+#include <stb/stb_image_resize.h>
 
 namespace Lumix {
 
@@ -20,7 +21,7 @@ enum class CompositeTexture::NodeType : u32 {
 	OUTPUT,
 	INPUT,
 	INVERT,
-	CONSTANT,
+	COLOR,
 	SPLIT,
 	MERGE,
 	FLIP,
@@ -31,7 +32,8 @@ enum class CompositeTexture::NodeType : u32 {
 	MULTIPLY,
 	MIX,
 	GRADIENT,
-	RANDOM_PIXELS
+	RANDOM_PIXELS,
+	CONSTANT
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -110,6 +112,29 @@ CompositeTexture::Node::Input CompositeTexture::Node::getInput(u32 pin_idx) cons
 
 namespace {
 
+bool resize(CompositeTexture::PixelData* pd, u32 w, u32 h) {
+	if (pd->w == w && pd->h == h) return true;
+
+	OutputMemoryStream tmp(pd->pixels.getAllocator());
+	tmp.resize(w * h * pd->channels);
+	const i32 res = stbir_resize_uint8(pd->pixels.data(), pd->w, pd->h, 0, tmp.getMutableData(), w, h, 0, pd->channels);
+	pd->pixels = tmp;
+	pd->w = w;
+	pd->h = h;
+	return res == 1;
+}
+
+void makeSameSize(CompositeTexture::PixelData* a, CompositeTexture::PixelData* b) {
+	if (a->w == b->w && a->h == b->h) return;
+
+	if (a->w * a->h > b->w * b->h) {
+		resize(b, a->w, a->h);
+	}
+	else {
+		resize(a, b->w, b->h);
+	}
+}
+
 struct SplitNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SPLIT; }
 	
@@ -172,7 +197,7 @@ struct MergeNode final : CompositeTexture::Node {
 			CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
 			if (!inputs[i].getPixelData(&tmp)) return false;
 			if (tmp.channels != 1) return false;
-			if (tmp.w != data->w || tmp.h != data->h) return false;
+			resize(&tmp, first_pd.w, first_pd.h);
 			
 			const u8* src = tmp.pixels.data();
 			for (u32 j = 0; j < tmp.w * tmp.h; ++j) {
@@ -201,6 +226,40 @@ struct ConstantNode final : CompositeTexture::Node {
 	bool hasOutputPins() const override { return true; }
 
 	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(value);
+	}
+	
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(value);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		data->w = 4;
+		data->h = 4;
+		data->channels = 1;
+		data->pixels.reserve(4 * 4);
+		for (u32 i = 0; i < 16; ++i) {
+			data->pixels.write(value);
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Constant");
+		outputSlot();
+		return ImGui::SliderInt("Value", (i32*)&value, 0, 255);
+	}
+
+	u8 value = 0xff;
+};
+
+struct ColorNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::COLOR; }
+
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
 		blob.write(color);
 	}
 	
@@ -221,9 +280,9 @@ struct ConstantNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Constant");
+		ImGuiEx::NodeTitle("Color");
 		outputSlot();
-		return ImGui::ColorPicker4("Color", &color.x);
+		return ImGui::ColorPicker4("##color", &color.x);
 	}
 
 	Vec4 color = Vec4(1);
@@ -416,9 +475,8 @@ struct MultiplyNode final : CompositeTexture::Node {
 		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
 		if (!getInputPixelData(0, data)) return false;
 		if (!getInputPixelData(1, &tmp)) return false;
-		if (tmp.w != data->w) return false;
-		if (tmp.h != data->h) return false;
 		if (tmp.channels != data->channels) return false;
+		makeSameSize(&tmp, data);
 
 		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
 			const float a = tmp.pixels[i];
@@ -489,9 +547,8 @@ struct MixNode final : CompositeTexture::Node {
 		if (!getInputPixelData(0, data)) return false;
 		CompositeTexture::PixelData tmp(m_resource->allocator);
 		if (!getInputPixelData(1, &tmp)) return false;
-		if (tmp.w != data->w) return false;
-		if (tmp.h != data->h) return false;
 		if (tmp.channels != data->channels) return false;
+		makeSameSize(data, &tmp);
 
 		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
 			float a = data->pixels[i] / 255.f;
@@ -763,13 +820,14 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::INPUT: node = LUMIX_NEW(allocator, InputNode); break; 
 		case CompositeTexture::NodeType::FLIP: node = LUMIX_NEW(allocator, FlipNode); break; 
 		case CompositeTexture::NodeType::INVERT: node = LUMIX_NEW(allocator, InvertNode); break; 
-		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
+		case CompositeTexture::NodeType::COLOR: node = LUMIX_NEW(allocator, ColorNode); break; 
 		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode); break; 
 		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode); break; 
 		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode); break; 
 		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
 		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
 		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
+		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
 		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode); break; 
 		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode); break; 
@@ -1054,7 +1112,7 @@ void CompositeTextureEditor::newGraph() {
 	clearUndoStack();
 
 	CompositeTexture::Node* output_node = m_resource->addNode(CompositeTexture::NodeType::OUTPUT);
-	CompositeTexture::Node* const_node =m_resource->addNode(CompositeTexture::NodeType::CONSTANT);
+	CompositeTexture::Node* const_node =m_resource->addNode(CompositeTexture::NodeType::COLOR);
 	CompositeTexture::Link& link = m_resource->m_links.emplace();
 	const_node->m_pos = ImVec2(100, 100);
 	output_node->m_pos = ImVec2(300, 100);
@@ -1080,7 +1138,8 @@ static const struct {
 } TYPES[] = {
 	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
 	{ 'B', "Brightness", CompositeTexture::NodeType::BRIGHTNESS },
-	{ 'C', "Constant", CompositeTexture::NodeType::CONSTANT },
+	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
+	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },

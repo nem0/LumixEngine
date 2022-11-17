@@ -63,6 +63,7 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	void* skip(u64 size);
 	bool empty() const { return m_size == 0; }
 	void free();
+	IAllocator& getAllocator() { return *m_allocator; }
 
 private:
 	u8* m_data;
