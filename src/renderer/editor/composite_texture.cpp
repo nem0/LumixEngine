@@ -34,7 +34,8 @@ enum class CompositeTexture::NodeType : u32 {
 	GRADIENT,
 	RANDOM_PIXELS,
 	CONSTANT,
-	RESIZE
+	RESIZE,
+	CIRCLE
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -570,6 +571,58 @@ struct ResizeNode final : CompositeTexture::Node {
 	Vec2 scale = Vec2(50.f);
 };
 
+struct CircleNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CIRCLE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(power);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(power);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		data->pixels.resize(w * h);
+		data->channels = 1;
+		data->w = w;
+		data->h = h;
+
+		for (u32 j = 0; j < h; ++j) {
+			for (u32 i = 0; i < w; ++i) {
+				Vec2 v(i / float(w - 1) - 0.5f
+					, j / float(h - 1) - 0.5f);
+				float d = powf(length(v) * 2, power);
+				d = clamp(d * 255.f, 0.f, 255.f);
+				data->pixels[i + j * w] = u8(d + 0.5f);
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Circle");
+		ImGui::BeginGroup();
+		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999);
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		res = ImGui::DragFloat("Power", &power, 0.1f, FLT_MIN, FLT_MAX) || res;
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	float power = 1.f;
+};
+
 struct GreyscaleNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GREYSCALE; }
 	bool hasInputPins() const override { return true; }
@@ -897,6 +950,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
 		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
 		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode); break; 
+		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode); break; 
 		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
 		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
@@ -969,6 +1023,7 @@ CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
 	: NodeEditor(app.getAllocator())
 	, m_allocator(app.getAllocator())
 	, m_app(app)
+	, m_recent_paths(app.getAllocator())
 {
 	newGraph();
 
@@ -1023,6 +1078,7 @@ bool CompositeTextureEditor::saveAs(const Path& path) {
 	serialize(blob);
 	bool res = file.write(blob.data(), blob.size());
 	file.close();
+	pushRecent(path.c_str());
 	return res;
 }
 
@@ -1214,6 +1270,7 @@ static const struct {
 } TYPES[] = {
 	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
 	{ 'B', "Brightness", CompositeTexture::NodeType::BRIGHTNESS },
+	{ 'O', "Circle", CompositeTexture::NodeType::CIRCLE },
 	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
 	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
@@ -1256,6 +1313,7 @@ void CompositeTextureEditor::open(const Path& path) {
 		InputMemoryStream blob(content);
 		deserialize(blob);
 		pushUndo(NO_MERGE_UNDO);
+		pushRecent(path.c_str());
 	}
 	else {
 		logError("Could not load", path);
@@ -1265,6 +1323,12 @@ void CompositeTextureEditor::open(const Path& path) {
 bool CompositeTextureEditor::getSavePath() {
 	char path[LUMIX_MAX_PATH];
 	if (os::getSaveFilename(Span(path), "Composite texture\0*.ltc\0", "ltc")) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		char rel_path[LUMIX_MAX_PATH];
+		if (!fs.makeRelative(Span(rel_path), path)) {
+			logError("Can not save ", path, " because it's not in root directory (", fs.getBasePath(), ").");		
+			return false;
+		}
 		m_path = path;
 		return true;
 	}
@@ -1276,11 +1340,34 @@ void CompositeTextureEditor::save() {
 }
 
 void CompositeTextureEditor::onSettingsLoaded() {
-	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_composite_texture_editor_open", false);
+	Settings& settings = m_app.getSettings();
+	m_is_open = settings.getValue(Settings::GLOBAL, "is_composite_texture_editor_open", false);
+
+	m_recent_paths.clear();
+	char tmp[LUMIX_MAX_PATH];
+	for (u32 i = 0; ; ++i) {
+		const StaticString<32> key("proc_geom_editor_recent_", i);
+		const u32 len = settings.getValue(Settings::LOCAL, key, Span(tmp));
+		if (len == 0) break;
+		m_recent_paths.emplace(tmp, m_app.getAllocator());
+	}
 }
 
 void CompositeTextureEditor::onBeforeSettingsSaved() {
-	m_app.getSettings().setValue(Settings::GLOBAL, "is_composite_texture_editor_open", m_is_open);
+	Settings& settings = m_app.getSettings();
+	settings.setValue(Settings::GLOBAL, "is_composite_texture_editor_open", m_is_open);
+	
+	for (const String& p : m_recent_paths) {
+		const u32 i = u32(&p - m_recent_paths.begin());
+		const StaticString<32> key("proc_geom_editor_recent_", i);
+		settings.setValue(Settings::LOCAL, key, p.c_str());
+	}
+}
+
+void CompositeTextureEditor::pushRecent(const char* path) {
+	String p(path, m_app.getAllocator());
+	m_recent_paths.eraseItems([&](const String& s) { return s == path; });
+	m_recent_paths.push(static_cast<String&&>(p));
 }
 
 void CompositeTextureEditor::open() {
@@ -1310,6 +1397,12 @@ void CompositeTextureEditor::onWindowGUI() {
 				if (ImGui::MenuItem("Open")) open();
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save As") && getSavePath()) saveAs(m_path);
+				if (ImGui::BeginMenu("Recent", !m_recent_paths.empty())) {
+					for (const String& s : m_recent_paths) {
+						if (ImGui::MenuItem(s.c_str())) open(Path(s.c_str()));
+					}
+					ImGui::EndMenu();
+				}
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {
