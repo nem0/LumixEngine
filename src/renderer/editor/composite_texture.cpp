@@ -1279,6 +1279,7 @@ void CompositeTextureEditor::onBeforeSettingsSaved() {
 }
 
 void CompositeTextureEditor::onWindowGUI() {
+	m_has_focus = false;
 	if (!m_is_open) return;
 
 	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
