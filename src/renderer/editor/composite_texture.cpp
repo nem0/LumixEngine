@@ -31,6 +31,7 @@ enum class CompositeTexture::NodeType : u32 {
 	MULTIPLY,
 	MIX,
 	GRADIENT,
+	RANDOM_PIXELS
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -285,6 +286,49 @@ struct FlipNode final : CompositeTexture::Node {
 	}
 
 	bool horizontal = false;
+};
+
+struct RandomPixelsNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::RANDOM_PIXELS; }
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(seed);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(seed);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		RandomGenerator rng(seed);
+		data->w = w;
+		data->h = h;
+		data->channels = 1;
+		data->pixels.resize(w * h);
+		for (u32 i = 0; i < w * h; ++i) {
+			data->pixels[i] = u8(rng.rand() % 256);
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Random pixels");
+		outputSlot();
+		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 9000);
+		ImGui::DragInt("Height", (i32*)&h, 1, 1, 9000) || res;
+		ImGui::DragInt("Seed", (i32*)&seed) || res;
+		return res;
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	u32 seed = 521288629;
 };
 
 struct GradientNode final : CompositeTexture::Node {
@@ -729,6 +773,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
 		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode); break; 
 		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode); break; 
+		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode); break; 
 		default: ASSERT(false); return nullptr;
 	}
 	node->m_resource = &resource;
@@ -1044,6 +1089,7 @@ static const struct {
 	{ 'X', "Mix", CompositeTexture::NodeType::MIX },
 	{ 'M', "Merge", CompositeTexture::NodeType::MERGE },
 	{ 0, "Multiply", CompositeTexture::NodeType::MULTIPLY },
+	{ 0, "Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
 };

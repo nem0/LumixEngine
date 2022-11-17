@@ -1141,15 +1141,21 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("raw", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("ltc", Texture::TYPE);
+		app.getAssetCompiler().resourceCompiled().bind<&TexturePlugin::onResourceCompiled>(this);
 	}
 
 
 	~TexturePlugin() {
+		m_app.getAssetCompiler().resourceCompiled().unbind<&TexturePlugin::onResourceCompiled>(this);
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		if(m_texture_view) {
 			renderer->getDrawStream().destroy(m_texture_view);
 		}
+	}
+
+	void onResourceCompiled(Resource& res) {
+		if (m_texture == &res) m_texture = nullptr;
 	}
 
 	const char* getDefaultExtension() const override { return "ltc"; }
