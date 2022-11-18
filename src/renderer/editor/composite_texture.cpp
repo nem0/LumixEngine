@@ -41,7 +41,8 @@ enum class CompositeTexture::NodeType : u32 {
 	SIMPLEX,
 	WAVE_NOISE,
 	CURVE,
-	SET_ALPHA
+	SET_ALPHA,
+	CUT
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -840,6 +841,63 @@ struct SetAlphaNode final : CompositeTexture::Node {
 	}
 };
 
+struct CutNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CUT; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(x);
+		blob.write(y);
+		blob.write(w);
+		blob.write(h);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(x);
+		blob.read(y);
+		blob.read(w);
+		blob.read(h);
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+		if (x + w > data->w) return false;
+		if (y + h > data->h) return false;
+
+		OutputMemoryStream tmp(m_resource->m_app.getAllocator());
+		tmp.resize(w * h * data->channels);
+		for (u32 j = 0; j < h; ++j) {
+			for (u32 i = 0; i < w; ++i) {
+				memcpy(&tmp[(i + j * w) * data->channels]
+				, &data->pixels[((x + i) + (y + j) * data->w) * data->channels]
+				, data->channels);
+			}
+		}
+		data->pixels = static_cast<OutputMemoryStream&&>(tmp);
+		data->w = w;
+		data->h = h;
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Cut");
+		inputSlot();
+		ImGui::BeginGroup();
+		bool res = ImGui::DragInt("X", (i32*)&x, 1, 0, 999999);
+		res = ImGui::DragInt("Y", (i32*)&y, 1, 0, 999999) || res;
+		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 x = 0, y = 0;
+	u32 w = 256, h = 256;
+};
+
 struct CurveNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CURVE; }
 	bool hasInputPins() const override { return true; }
@@ -1419,6 +1477,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode); break; 
 		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode); break; 
 		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode); break; 
+		case CompositeTexture::NodeType::CUT: node = LUMIX_NEW(allocator, CutNode); break; 
 		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
 		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
 		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode); break; 
@@ -1763,7 +1822,8 @@ static const struct {
 	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
 	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
 	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
-	{ 'U', "Curve", CompositeTexture::NodeType::CURVE},
+	{ 'U', "Curve", CompositeTexture::NodeType::CURVE },
+	{ 0, "Cut", CompositeTexture::NodeType::CUT },
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
