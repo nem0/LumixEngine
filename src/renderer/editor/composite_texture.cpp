@@ -1329,11 +1329,13 @@ struct OutputNode final : CompositeTexture::Node {
 	void serialize(OutputMemoryStream& blob) const override {
 		blob.write(m_output_type);
 		blob.write(m_layers_count);
+		blob.write(m_channels_count);
 	}
 	
 	void deserialize(InputMemoryStream& blob) override {
 		blob.read(m_output_type);
 		blob.read(m_layers_count);
+		blob.read(m_channels_count);
 	}
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override { return false; };
@@ -1342,7 +1344,7 @@ struct OutputNode final : CompositeTexture::Node {
 		ImGuiEx::NodeTitle("Output");
 		switch(m_output_type) {
 			case OutputType::SIMPLE:
-				inputSlot(); ImGui::TextUnformatted("RGBA");
+				inputSlot(); ImGui::TextUnformatted("Color");
 				break;
 			case OutputType::ARRAY:
 				for (u32 i = 0; i < m_layers_count; ++i) {
@@ -1387,6 +1389,11 @@ struct OutputNode final : CompositeTexture::Node {
 				}
 			}
 		}
+		i32 c = m_channels_count - 1;
+		if (ImGui::Combo("##t", &c, "R\0RG\0RGB\0RGBA\0")) {
+			m_channels_count = c + 1;
+			return true;
+		}
 		return res;
 	}
 
@@ -1398,6 +1405,7 @@ struct OutputNode final : CompositeTexture::Node {
 
 	OutputType m_output_type = OutputType::SIMPLE;
 	u32 m_layers_count = 1;
+	u32 m_channels_count = 4;
 };
 
 CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTexture& resource, IAllocator& allocator) {
@@ -1639,9 +1647,8 @@ bool CompositeTexture::generate(Result* result) {
 		case OutputNode::OutputType::SIMPLE: {
 			result->is_cubemap = false;
 			PixelData& pd = result->layers.emplace(m_app.getAllocator());
-			const Node::Input input = node->getInput(0);
-			if (!input) return false;
-			return input.getPixelData(&pd);
+			if (!node->getInputPixelData(0, &pd)) return false;
+			break;
 		}
 		case OutputNode::OutputType::CUBEMAP: {
 			result->is_cubemap = true;
@@ -1651,7 +1658,7 @@ bool CompositeTexture::generate(Result* result) {
 				if (!input) return false;
 				if (!input.getPixelData(&pd)) return false;
 			}
-			return true;
+			break;
 		}
 		case OutputNode::OutputType::ARRAY: {
 			result->is_cubemap = false;
@@ -1661,10 +1668,26 @@ bool CompositeTexture::generate(Result* result) {
 				if (!input) return false;
 				if (!input.getPixelData(&pd)) return false;
 			}
-			return true;
+			break;
 		}
 	}
-	return false;
+
+	for (PixelData& pd : result->layers) {
+		if (pd.channels != node->m_channels_count) {
+			OutputMemoryStream tmp(m_app.getAllocator());
+			const u32 n = node->m_channels_count;
+			tmp.resize(pd.w * pd.h * n);
+			for (u32 i = 0; i < pd.w * pd.h; ++i) {
+				for (u32 ch = 0; ch < n; ++ch) {
+					tmp[i * n + ch] = ch < pd.channels ? pd.pixels[i * pd.channels + ch] : 0xff;
+				}
+			}
+			pd.pixels = static_cast<OutputMemoryStream&&>(tmp);
+			pd.channels = n;
+		}
+	}
+
+	return true;
 }
 
 bool CompositeTexture::deserialize(InputMemoryStream& blob) {
