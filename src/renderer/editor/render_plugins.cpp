@@ -1537,7 +1537,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		if(resources.length() > 1) return;
 
-		auto* texture = static_cast<Texture*>(resources[0]);
+		Texture* texture = static_cast<Texture*>(resources[0]);
 
 		ImGuiEx::Label("Size");
 		ImGui::Text("%dx%d", texture->width, texture->height);
@@ -1562,6 +1562,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 		ImGuiEx::Label("Format");
 		ImGui::TextUnformatted(format);
+
 		const bool is_ltc = Path::hasExtension(texture->getPath().c_str(), "ltc");
 		if (texture->handle) {
 			ImVec2 texture_size(200, 200);
@@ -1571,20 +1572,36 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			else {
 				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
+			texture_size = texture_size * m_zoom;
 
 			if (!texture->isReady()) m_texture = nullptr;
 
 			if (texture != m_texture && texture->isReady()) {
 				m_texture = texture;
+				m_zoom = 1.f;
+				m_view_layer = 0;
 				PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
-				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle, 0);
+				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle, m_view_layer % m_texture->depth);
 			}
 
-			if (m_texture_view) ImGui::Image(m_texture_view, texture_size);
-
+			if (m_texture_view) {
+				const float w = ImGui::GetContentRegionAvail().x;
+				ImGui::BeginChild("imgpreview", ImVec2(w, minimum(w, texture_size.y + 5)), false, ImGuiWindowFlags_HorizontalScrollbar);
+				ImGui::Image(m_texture_view, texture_size);
+				ImGui::EndChild();
+				if (texture->isReady() && texture->depth > 1) {
+					ImGuiEx::Label("View layer");
+					if (ImGui::InputInt("##layer", (i32*)&m_view_layer)) {
+						m_view_layer = m_view_layer % m_texture->depth;
+						m_texture = nullptr;
+					}
+				}
+				ImGuiEx::Label("Zoom");
+				ImGui::DragFloat("##zoom", &m_zoom, 0.01f, 0.01f, 100.f);
+			}
 		}
 		else {
 			m_texture = nullptr;
@@ -1675,6 +1692,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	} m_tiles_to_create;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
+	u32 m_view_layer = 0;
+	float m_zoom = 1.f;
 	Meta m_meta;
 	FilePathHash m_meta_res;
 };
