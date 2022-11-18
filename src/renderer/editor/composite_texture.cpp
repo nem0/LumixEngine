@@ -958,7 +958,7 @@ struct CurveNode final : CompositeTexture::Node {
 			}
 		}
 
-		if (ImGui::IsMouseDoubleClicked(0)) {
+		if (is_hovered && ImGui::IsMouseDoubleClicked(0)) {
 			if (hovered_point >= 0) {
 				if (point_count > 2) {
 					memmove(points + hovered_point, points + hovered_point + 1, (point_count - hovered_point - 1) * sizeof(points[0]));
