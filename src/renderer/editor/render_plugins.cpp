@@ -1582,7 +1582,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
-				renderer->getDrawStream().createTextureView(m_texture_view, m_texture->handle, m_view_layer % m_texture->depth);
+				DrawStream& stream = renderer->getDrawStream();
+				stream.createTextureView(m_texture_view
+					, m_texture->handle
+					, m_texture->is_cubemap ? m_view_layer : m_view_layer % m_texture->depth);
 			}
 
 			if (m_texture_view) {
@@ -1597,6 +1600,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					if (texture->isReady() && texture->depth > 1) {
 						if (ImGui::InputInt("View layer", (i32*)&m_view_layer)) {
 							m_view_layer = m_view_layer % m_texture->depth;
+							m_texture = nullptr;
+						}
+					}
+					if (texture->isReady() && texture->is_cubemap) {
+						if (ImGui::Combo("Side", (i32*)&m_view_layer, "X+\0X-\0Y+\0Y-\0Z+\0Z-\0")) {
 							m_texture = nullptr;
 						}
 					}

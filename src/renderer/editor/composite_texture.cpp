@@ -1439,6 +1439,16 @@ bool CompositeTexture::generate(Result* result) {
 			if (!input) return false;
 			return input.getPixelData(&pd);
 		}
+		case OutputNode::OutputType::CUBEMAP: {
+			result->is_cubemap = true;
+			for (u32 i = 0; i < 6; ++i) {
+				PixelData& pd = result->layers.emplace(m_app.getAllocator());
+				const Node::Input input = node->getInput(i);
+				if (!input) return false;
+				if (!input.getPixelData(&pd)) return false;
+			}
+			return true;
+		}
 		case OutputNode::OutputType::ARRAY: {
 			result->is_cubemap = false;
 			for (u32 i = 0; i < node->m_layers_count; ++i) {
@@ -1449,8 +1459,8 @@ bool CompositeTexture::generate(Result* result) {
 			}
 			return true;
 		}
-		default: ASSERT(false); return false;
 	}
+	return false;
 }
 
 bool CompositeTexture::deserialize(InputMemoryStream& blob) {
