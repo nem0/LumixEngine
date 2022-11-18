@@ -549,6 +549,7 @@ namespace ImGuiEx {
 	int CurveEditor(const char* label
 		, float* values
 		, int points_count
+		, int capacity
 		, const ImVec2& editor_size
 		, ImU32 flags
 		, int* new_count
@@ -666,7 +667,7 @@ namespace ImGuiEx {
 				}
 				else
 				{
-					ImFormatString(buf, sizeof(buf), " %f", x + i * step_x);
+					ImFormatString(buf, sizeof(buf), " %.2f", x + i * step_x);
 				}
 				window->DrawList->AddText(b, 0x55000000, buf);
 			}
@@ -688,7 +689,7 @@ namespace ImGuiEx {
 				}
 				else
 				{
-					ImFormatString(buf, sizeof(buf), " %f", y + i * step_y);
+					ImFormatString(buf, sizeof(buf), " %.2f", y + i * step_y);
 				}
 				window->DrawList->AddText(a, 0x55000000, buf);
 			}
@@ -911,7 +912,7 @@ namespace ImGuiEx {
 
 		InvisibleButton("bg", inner_bb.Max - inner_bb.Min);
 
-		if (IsItemActive() && IsMouseDoubleClicked(0) && new_count)
+		if (IsItemActive() && IsMouseDoubleClicked(0) && new_count && points_count < capacity)
 		{
 			ImVec2 mp = GetMousePos();
 			ImVec2 new_p = invTransform(mp);

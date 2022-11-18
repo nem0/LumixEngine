@@ -39,7 +39,9 @@ enum class CompositeTexture::NodeType : u32 {
 	CELLULAR_NOISE,
 	SPLAT,
 	SIMPLEX,
-	WAVE_NOISE
+	WAVE_NOISE,
+	CURVE,
+	SET_ALPHA
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -800,9 +802,209 @@ struct CellularNoiseNode final : CompositeTexture::Node {
 	float offset = 0;
 };
 
+
+struct SetAlphaNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SET_ALPHA; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData rgb(m_resource->m_app.getAllocator());
+		CompositeTexture::PixelData a(m_resource->m_app.getAllocator());
+		
+		if (!getInputPixelData(0, &rgb)) return false;
+		if (!getInputPixelData(1, &a)) return false;
+		if (rgb.channels < 3) return false;
+		makeSameSize(&rgb, &a);
+		data->w = rgb.w;
+		data->h = rgb.h;
+		data->channels = 4;
+		data->pixels.resize(data->w * data->h * 4);
+		
+		for (u32 i = 0; i < data->w * data->h; ++i) {
+			memcpy(&data->pixels[i * 4], &rgb.pixels[i * rgb.channels], rgb.channels);
+			data->pixels[i * 4 + 3] = a.pixels[i * a.channels + a.channels - 1];
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Set alpha");
+		ImGui::BeginGroup();
+		inputSlot(); ImGui::TextUnformatted("RGB");
+		inputSlot(); ImGui::TextUnformatted("A");
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return false;
+	}
+};
+
+struct CurveNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CURVE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(point_count);
+		blob.write(points, sizeof(points));
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(point_count);
+		blob.read(points, sizeof(points));
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return false;
+		for (u32 i = 0; i < data->pixels.size(); ++i) {
+			float v = data->pixels[i] / 255.f;
+			v = eval(v);
+			v = clamp(v * 255.f, 0.f, 255.f);
+			data->pixels[i] = u8(v + 0.5f);
+		}
+		return true;
+	}
+	
+	static float cubicInterpolate(float y0, float y1, float y2, float y3, float t) {
+		#if 0 // cubic
+			float a0 = y3 - y2 - y0 + y1;
+			float a1 = y0 - y1 - a0;
+			float a2 = y2 - y0;
+			float a3 = y1;
+		#else // catmull rom
+			float a0 = -0.5f * y0 + 1.5f * y1 - 1.5f * y2 + 0.5f * y3;
+			float a1 = y0 - 2.5f * y1 + 2.f * y2 - 0.5f * y3;
+			float a2 = -0.5f * y0 + 0.5f * y2;
+			float a3 = y1;
+		#endif
+
+		float t2 = t * t;
+		return a0 * t * t2 + a1 * t2 + a2 * t + a3;
+	}
+
+	float eval(float x) {
+		auto p = [&](i32 idx){
+			if (idx < 0) return points[0].y - (points[1].y - points[0].y);
+			if (idx >= (i32)point_count) return points[point_count - 1].y - (points[point_count - 2].y - points[point_count - 1].y);
+			return points[idx].y;
+		};
+		for (i32 j = 1; j < (i32)point_count; ++j) {
+			if (points[j].x >= x) {
+				const float t = (x - points[j - 1].x) / (points[j].x - points[j - 1].x);
+				return cubicInterpolate(p(j - 2), p(j - 1), p(j), p(j + 1), t);
+			}
+		}
+		return points[0].y;
+	}
+
+	static float len(ImVec2 p) {
+		return sqrtf(p.x * p.x + p.y * p.y);
+	}
+
+	static ImVec2 mix(ImVec2 a, ImVec2 b, ImVec2 t) {
+		return {
+			a.x * (1 - t.x) + b.x * t.x,
+			a.y * (1 - t.y) + b.y * t.y
+		};
+	}
+
+	bool curve() {
+		const ImU32 color_border = ImGui::GetColorU32(ImGuiCol_Border);
+		const ImU32 color = ImGui::GetColorU32(ImGuiCol_PlotLines);
+		const ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_PlotLinesHovered);
+		ImGui::InvisibleButton("curve", ImVec2(210, 210));
+		const bool is_hovered = ImGui::IsItemHovered();
+		ImVec2 mp = ImGui::GetMousePos();
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		
+		ImVec2 from = ImGui::GetItemRectMin() + ImVec2(5, 5);
+		ImVec2 to = from + ImGui::GetItemRectSize() - ImVec2(10, 10);
+		swap(to.y, from.y);
+
+		ImVec2 prev_p = points[0];
+		for (u32 i = 1; i < 51; ++i) {
+			float x = i / float(50);
+			float y = clamp(eval(x), 0.f, 1.f);
+			ImVec2 p(x, y);
+			ImVec2 a = mix(from, to, prev_p);
+			ImVec2 b = mix(from, to, p);
+			dl->AddLine(a, b, color);
+			prev_p = p;
+		}
+		dl->AddRect(from - ImVec2(5, -5), to + ImVec2(5, -5), color_border);
+
+		i32 hovered_point = -1;
+		bool changed = false;
+		if (ImGui::IsMouseReleased(0)) dragged_point = -1;
+		for (u32 i = 0; i < point_count; ++i) {
+			ImVec2 center = mix(from, to, points[i]);
+			const bool is_point_hovered = is_hovered && len(mp - center) < 5;
+			if (is_point_hovered) hovered_point = i;
+			dl->AddCircle(center, 5, is_point_hovered ? color_hovered : color);
+			if (is_point_hovered && ImGui::IsMouseClicked(0)) dragged_point = i;
+			if (ImGui::IsMouseDragging(0) && dragged_point == i) {
+				points[i] = points[i] + ImGui::GetMouseDragDelta() / (to - from);
+				changed = true;
+				if (i > 0 && points[i].x < points[i - 1].x) {
+					swap(points[i], points[i - 1]);
+					--dragged_point;
+				}
+				if (i < point_count - 1 && points[i].x > points[i + 1].x) {
+					++dragged_point;
+					swap(points[i], points[i + 1]);
+				}
+				ImGui::ResetMouseDragDelta();
+			}
+		}
+
+		if (ImGui::IsMouseDoubleClicked(0)) {
+			if (hovered_point >= 0) {
+				if (point_count > 2) {
+					memmove(points + hovered_point, points + hovered_point + 1, (point_count - hovered_point - 1) * sizeof(points[0]));
+					--point_count;
+					changed = true;
+				}
+			}
+			else if (point_count < lengthOf(points)) {
+				ImVec2 t = (mp - from) / (to - from);
+				for (u32 i = 0; i < point_count; ++i) {
+					if (t.x < points[i].x) {
+						memmove(points + i + 1, points + i, (point_count - i) * sizeof(points[0]));
+						points[i] = t;
+						++point_count;
+						changed = true;
+						break;
+					}
+				}
+			}
+		}
+
+		points[0].x = 0;
+		points[point_count - 1].x = 1;
+		for (u32 i = 0; i < point_count; ++i) {
+			points[i].y = clamp(points[i].y, 0.f, 1.f);
+		}
+		return changed;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Curve");
+		inputSlot();
+		bool res = curve();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	ImVec2 points[16] = { ImVec2(0, 0), ImVec2(1, 1) };
+	u32 point_count = 2;
+	i32 dragged_point = -1;
+};
+
 struct CircleNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CIRCLE; }
-	bool hasInputPins() const override { return true; }
+	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
 	void serialize(OutputMemoryStream& blob) const override {
@@ -1217,6 +1419,8 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode); break; 
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode); break; 
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode); break; 
+		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode); break; 
+		case CompositeTexture::NodeType::CURVE: node = LUMIX_NEW(allocator, CurveNode); break; 
 		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
 		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
@@ -1536,6 +1740,7 @@ static const struct {
 	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
 	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
 	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
+	{ 'U', "Curve", CompositeTexture::NodeType::CURVE},
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
@@ -1547,7 +1752,8 @@ static const struct {
 	{ 0, "Multiply", CompositeTexture::NodeType::MULTIPLY },
 	{ 0, "Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS },
 	{ 'R', "Resize", CompositeTexture::NodeType::RESIZE },
-	{ 0, "Simplex", CompositeTexture::NodeType::SIMPLEX },
+	{ 'A', "Set alpha", CompositeTexture::NodeType::SET_ALPHA },
+	{ 'N', "Simplex", CompositeTexture::NodeType::SIMPLEX },
 	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 'V', "Voronoi", CompositeTexture::NodeType::CELLULAR_NOISE },

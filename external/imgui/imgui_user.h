@@ -32,6 +32,7 @@ enum class PinShape {
 IMGUI_API int CurveEditor(const char* label
 	, float* values
 	, int points_count
+	, int capacity
 	, const ImVec2& size = ImVec2(-1, -1)
 	, ImU32 flags = 0
 	, int* new_count = nullptr

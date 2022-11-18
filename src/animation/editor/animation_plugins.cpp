@@ -221,7 +221,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			flags |= (int)ImGuiEx::CurveEditorFlags::RESET;
 			m_fit_curve_in_editor = false;
 		}
-		int changed = ImGuiEx::CurveEditor("curve", (float*)points, curve.frames.size(), size, flags, &new_count, &m_selected_point);
+		int changed = ImGuiEx::CurveEditor("curve", (float*)points, curve.frames.size(), lengthOf(points), size, flags, &new_count, &m_selected_point);
 		if (changed >= 0)
 		{
 			curve.frames[changed] = int(points[changed].x + 0.5f);
