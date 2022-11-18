@@ -83,6 +83,7 @@ struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {
 	void open(const Path& path);
 
 private:
+	void exportAs();
 	void pushRecent(const char* path);
 	bool saveAs(const Path& path);
 	void newGraph();

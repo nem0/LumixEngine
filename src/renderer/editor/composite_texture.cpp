@@ -1640,6 +1640,45 @@ void CompositeTextureEditor::open() {
 	open(Path(rel_path));
 }
 
+void CompositeTextureEditor::exportAs() {
+	char path[LUMIX_MAX_PATH];
+	if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
+
+	CompositeTexture::Result img(m_allocator);
+	if (!m_resource->generate(&img)) {
+		logError("Could not generate ", path);
+		return;
+	}
+	
+	if (img.is_cubemap) {
+		logError("Could not export ", path, " because it's a cubemap");
+		return;
+	}
+	
+	if (img.layers.size() != 1) {
+		logError("Could not export ", path, " because it's an array");
+		return;
+	}
+
+	if (img.layers[0].channels != 4) {
+		logError("Could not export ", path, " because it's does not have 4 channels");
+		return;
+	}
+
+	os::OutputFile file;
+	if (!file.open(path)) {
+		logError("Could not save ", path);
+		return;
+	}
+
+	bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, img.layers[0].pixels.data(), true, Path(path), m_allocator);
+	file.close();
+
+	if (!res) {
+		logError("Could not save ", path);
+	}
+}
+
 void CompositeTextureEditor::onWindowGUI() {
 	m_has_focus = false;
 	if (!m_is_open) return;
@@ -1655,6 +1694,7 @@ void CompositeTextureEditor::onWindowGUI() {
 				if (ImGui::MenuItem("Open")) open();
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save As") && getSavePath()) saveAs(m_path);
+				if (ImGui::MenuItem("Export")) exportAs();
 				if (ImGui::BeginMenu("Recent", !m_recent_paths.empty())) {
 					for (const String& s : m_recent_paths) {
 						if (ImGui::MenuItem(s.c_str())) open(Path(s.c_str()));
