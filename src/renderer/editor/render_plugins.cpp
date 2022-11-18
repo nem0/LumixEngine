@@ -1543,8 +1543,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::Text("%dx%d", texture->width, texture->height);
 		ImGuiEx::Label("Mips");
 		ImGui::Text("%d", texture->mips);
-		ImGuiEx::Label("Depth");
-		ImGui::Text("%d", texture->depth);
+		if (texture->depth > 1) {
+			ImGuiEx::Label("Depth");
+			ImGui::Text("%d", texture->depth);
+		}
 		const char* format = "unknown";
 		switch(texture->format) {
 			case gpu::TextureFormat::R8: format = "R8"; break;
@@ -1558,6 +1560,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case gpu::TextureFormat::R32F: format = "R32F"; break;
 			case gpu::TextureFormat::SRGB: format = "SRGB"; break;
 			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
+			case gpu::TextureFormat::BC1: format = "BC1"; break;
+			case gpu::TextureFormat::BC2: format = "BC2"; break;
+			case gpu::TextureFormat::BC3: format = "BC3"; break;
+			case gpu::TextureFormat::BC4: format = "BC4"; break;
+			case gpu::TextureFormat::BC5: format = "BC5"; break;
 			default: ASSERT(false); break;
 		}
 		ImGuiEx::Label("Format");

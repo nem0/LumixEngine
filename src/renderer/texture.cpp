@@ -690,6 +690,7 @@ static bool loadLBC(Texture& texture, const u8* data, u32 size)
 		texture.mips = desc.mips;
 		texture.depth = desc.depth;
 		texture.is_cubemap = desc.is_cubemap;
+		texture.format = desc.format;
 	}
 
 	return texture.handle;
