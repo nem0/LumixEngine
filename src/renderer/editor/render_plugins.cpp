@@ -1578,8 +1578,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (texture != m_texture && texture->isReady()) {
 				m_texture = texture;
-				m_zoom = 1.f;
-				m_view_layer = 0;
 				PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
@@ -1590,17 +1588,25 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (m_texture_view) {
 				const float w = ImGui::GetContentRegionAvail().x;
 				ImGui::BeginChild("imgpreview", ImVec2(w, minimum(w, texture_size.y + 5)), false, ImGuiWindowFlags_HorizontalScrollbar);
-				ImGui::Image(m_texture_view, texture_size);
-				ImGui::EndChild();
-				if (texture->isReady() && texture->depth > 1) {
-					ImGuiEx::Label("View layer");
-					if (ImGui::InputInt("##layer", (i32*)&m_view_layer)) {
-						m_view_layer = m_view_layer % m_texture->depth;
-						m_texture = nullptr;
+				const ImVec4 tint(float(m_channel_view_mask & 1)
+					, float((m_channel_view_mask >> 1) & 1)
+					, float((m_channel_view_mask >> 2) & 1)
+					, 1.f);
+				ImGui::Image(m_texture_view, texture_size, ImVec2(0, 0), ImVec2(1, 1), tint);
+				if (ImGui::BeginPopupContextItem("img_ctx")) {
+					if (texture->isReady() && texture->depth > 1) {
+						if (ImGui::InputInt("View layer", (i32*)&m_view_layer)) {
+							m_view_layer = m_view_layer % m_texture->depth;
+							m_texture = nullptr;
+						}
 					}
+					ImGui::DragFloat("Zoom", &m_zoom, 0.01f, 0.01f, 100.f);
+					ImGui::CheckboxFlags("Red", &m_channel_view_mask, 1);
+					ImGui::CheckboxFlags("Green", &m_channel_view_mask, 2);
+					ImGui::CheckboxFlags("Blue", &m_channel_view_mask, 4);
+					ImGui::EndPopup();
 				}
-				ImGuiEx::Label("Zoom");
-				ImGui::DragFloat("##zoom", &m_zoom, 0.01f, 0.01f, 100.f);
+				ImGui::EndChild();
 			}
 		}
 		else {
@@ -1694,6 +1700,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	u32 m_view_layer = 0;
 	float m_zoom = 1.f;
+	u32 m_channel_view_mask = 0b1111;
 	Meta m_meta;
 	FilePathHash m_meta_res;
 };
