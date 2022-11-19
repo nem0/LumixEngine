@@ -64,6 +64,8 @@ struct CameraParams
 	Matrix projection;
 };
 
+using CameraParamsHandle = u32;
+
 struct PipelineTexture {
 	enum Type {
 		RENDERBUFFER,
@@ -185,90 +187,7 @@ namespace LuaWrapper {
 
 		return {rs};
 	}
-
-	template <>
-	CameraParams toType(lua_State* L, int idx)
-	{
-		CameraParams cp;
-
-		lua_getfield(L, idx, "view");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "View matrix is not a table");
-		}
-
-		for (int i = 0; i < 16; ++i) {
-			lua_rawgeti(L, -1, i + 1);
-			if (!LuaWrapper::isType<float>(L, -1)) {
-				lua_pop(L, 2);
-				luaL_error(L, "View matrix must contain exactly 16 floats");
-			}
-			cp.view[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		lua_getfield(L, idx, "projection");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "Projection matrix is not a table");
-		}
-
-		for (int i = 0; i < 16; ++i) {
-			lua_rawgeti(L, -1, i + 1);
-			if (!LuaWrapper::isType<float>(L, -1)) {
-				lua_pop(L, 2);
-				luaL_error(L, "Projection matrix must contain exactly 16 floats");
-			}
-			cp.projection[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		lua_getfield(L, idx, "frustum");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "Frustum is not a table");
-		}
-		if(!LuaWrapper::checkField(L, -1, "origin", &cp.frustum.origin)) {
-				lua_pop(L, 1);
-				luaL_error(L, "Frustum without origin");
-		}
-		auto load_floats = [L](float* data, int count, int offset) {
-			for (int i = 0; i < count; ++i) {
-				lua_rawgeti(L, -1, offset + i + 1);
-				if(!LuaWrapper::isType<float>(L, -1)) {
-					lua_pop(L, 2);
-					luaL_error(L, "Invalid frustum");
-				}
-				data[i] = LuaWrapper::toType<float>(L, -1);
-				lua_pop(L, 1);
-			}
-		};
-		load_floats(cp.frustum.xs, (int)Frustum::Planes::COUNT, 0);
-		load_floats(cp.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
-		load_floats(cp.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
-		load_floats(cp.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
-		load_floats(&cp.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
-		
-		lua_pop(L, 1);
-		cp.frustum.setPlanesFromPoints();
-		
-		if(!LuaWrapper::checkField(L, idx, "lod_multiplier", &cp.lod_multiplier)) {
-			luaL_error(L, "Missing lod_multiplier in camera params");
-		}
-
-		if (!LuaWrapper::checkField(L, idx, "is_shadow", &cp.is_shadow)) {
-			luaL_error(L, "Missing is_shadow in camera params");
-		}
-
-		if(!LuaWrapper::checkField(L, idx, "position", &cp.pos)) {
-			luaL_error(L, "Missing position in camera params");
-		}
-
-		return cp;
-	}
-
+	
 	template <> inline bool isType<RenderState>(lua_State* L, int index)
 	{
 		return lua_istable(L, index);
@@ -277,11 +196,6 @@ namespace LuaWrapper {
 	template <> inline bool isType<PipelineTexture>(lua_State* L, int index)
 	{
 		return lua_istable(L, index) || lua_isnumber(L, index);
-	}
-
-	template <> inline bool isType<CameraParams>(lua_State* L, int index)
-	{
-		return lua_istable(L, index);
 	}
 
 	template <> inline bool isType<Color>(lua_State* L, int index)
@@ -336,48 +250,6 @@ namespace LuaWrapper {
 			default: ASSERT(false); return;
 		}
 	}
-
-	void push(lua_State* L, const CameraParams& params)
-	{
-		lua_createtable(L, 0, 4);
-
-		lua_createtable(L, 32+24, 0);
-		auto push_floats = [L](const float* values, int count, int offset){
-			for(int i = 0; i < count; ++i) {
-				LuaWrapper::push(L, values[i]);
-				lua_rawseti(L, -2, offset + i + 1);
-			}
-		};
-
-		push_floats(params.frustum.xs, (int)Frustum::Planes::COUNT, 0);
-		push_floats(params.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
-		push_floats(params.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
-		push_floats(params.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
-		push_floats(&params.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
-
-		LuaWrapper::push(L, params.frustum.origin);
-		lua_setfield(L, -2, "origin");
-		lua_setfield(L, -2, "frustum");
-
-		LuaWrapper::setField(L, -1, "is_shadow", params.is_shadow);
-		LuaWrapper::setField(L, -1, "position", params.pos);
-		LuaWrapper::setField(L, -1, "lod_multiplier", params.lod_multiplier);
-
-		lua_createtable(L, 16, 0);
-		for (int i = 0; i < 16; ++i) {
-			LuaWrapper::push(L, params.view[i]);
-			lua_rawseti(L, -2, i + 1);
-		}
-		lua_setfield(L, -2, "view");
-
-		lua_createtable(L, 16, 0);
-		for (int i = 0; i < 16; ++i) {
-			LuaWrapper::push(L, params.projection[i]);
-			lua_rawseti(L, -2, i + 1);
-		}
-		lua_setfield(L, -2, "projection");
-	}
-
 }
 
 
@@ -1696,7 +1568,46 @@ struct PipelineImpl final : Pipeline
 		return res;
 	}
 
-	void renderTerrains(lua_State* L, CameraParams cp, RenderState render_state) {
+	enum class CameraParamsEnum : CameraParamsHandle {
+		MAIN,
+		SHADOW0,
+		SHADOW1,
+		SHADOW2,
+		SHADOW3
+	};
+
+	CameraParams resolveCameraParams(CameraParamsHandle handle) {
+		switch ((CameraParamsEnum)handle) {
+			case CameraParamsEnum::MAIN: {
+				CameraParams cp;
+				cp.pos = m_viewport.pos;
+				cp.frustum = m_viewport.getFrustum();
+				cp.lod_multiplier = m_scene->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
+				cp.is_shadow = false;
+				cp.view = m_viewport.getView(cp.pos);
+				cp.projection = m_viewport.getProjectionWithJitter();
+				return cp;
+			}
+			case CameraParamsEnum::SHADOW0:
+			case CameraParamsEnum::SHADOW1:
+			case CameraParamsEnum::SHADOW2:
+			case CameraParamsEnum::SHADOW3: {
+				const Viewport& vp = m_shadow_camera_viewports[(u32)handle - (u32)CameraParamsEnum::SHADOW0];
+				CameraParams cp;
+				cp.pos = vp.pos;
+				cp.frustum = vp.getFrustum();
+				cp.lod_multiplier = m_scene->getCameraLODMultiplier(vp.fov, vp.is_ortho);
+				cp.is_shadow = true;
+				cp.view = vp.getView(cp.pos);
+				cp.projection = vp.getProjectionNoJitter();
+				return cp;
+			}
+		}
+		return {};
+	}
+
+	void renderTerrains(lua_State* L, CameraParamsHandle cp_handle, RenderState render_state) {
+		const CameraParams cp = resolveCameraParams(cp_handle);
 		char define[64] = "";
 		LuaWrapper::getOptionalStringField(L, 2, "define", Span(define));
 		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
@@ -1797,9 +1708,9 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 	
-	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state) {
+	void renderGrass(lua_State* L, CameraParamsHandle cp_handle, LuaWrapper::Optional<RenderState> state) {
 		PROFILE_FUNCTION();
-
+		const CameraParams cp = resolveCameraParams(cp_handle);
 		if (!cp.is_shadow) {
 			for (Terrain* terrain : m_scene->getTerrains()) {
 				const Transform tr = m_scene->getUniverse().getTransform(terrain->m_entity);
@@ -1908,7 +1819,8 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 
-	void renderParticles(CameraParams cp) {
+	void renderParticles(CameraParamsHandle cp_handle) {
+		const CameraParams cp = resolveCameraParams(cp_handle);
 		m_renderer.pushJob("particles", [this, cp](DrawStream& stream){
 			const auto& emitters = m_scene->getParticleEmitters();
 			if (emitters.size() == 0) return;
@@ -1955,88 +1867,6 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 
-	static CameraParams checkCameraParams(lua_State* L, int idx)
-	{
-		CameraParams cp;
-
-		lua_getfield(L, idx, "view");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "View matrix is not a table");
-		}
-
-		for (int i = 0; i < 16; ++i) {
-			lua_rawgeti(L, -1, i + 1);
-			if (!LuaWrapper::isType<float>(L, -1)) {
-				lua_pop(L, 2);
-				luaL_error(L, "View matrix must contain exactly 16 floats");
-			}
-			cp.view[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		lua_getfield(L, idx, "projection");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "Projection matrix is not a table");
-		}
-
-		for (int i = 0; i < 16; ++i) {
-			lua_rawgeti(L, -1, i + 1);
-			if (!LuaWrapper::isType<float>(L, -1)) {
-				lua_pop(L, 2);
-				luaL_error(L, "Projection matrix must contain exactly 16 floats");
-			}
-			cp.projection[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		lua_getfield(L, idx, "frustum");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "Frustum is not a table");
-		}
-		if(!LuaWrapper::checkField(L, -1, "origin", &cp.frustum.origin)) {
-				lua_pop(L, 1);
-				luaL_error(L, "Frustum without origin");
-		}
-		auto load_floats = [L](float* data, int count, int offset) {
-			for (int i = 0; i < count; ++i) {
-				lua_rawgeti(L, -1, offset + i + 1);
-				if(!LuaWrapper::isType<float>(L, -1)) {
-					lua_pop(L, 2);
-					luaL_error(L, "Invalid frustum");
-				}
-				data[i] = LuaWrapper::toType<float>(L, -1);
-				lua_pop(L, 1);
-			}
-		};
-		load_floats(cp.frustum.xs, (int)Frustum::Planes::COUNT, 0);
-		load_floats(cp.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
-		load_floats(cp.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
-		load_floats(cp.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
-		load_floats(&cp.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
-		
-		lua_pop(L, 1);
-		cp.frustum.setPlanesFromPoints();
-		
-		if(!LuaWrapper::checkField(L, idx, "lod_multiplier", &cp.lod_multiplier)) {
-			luaL_error(L, "Missing lod_multiplier in camera params");
-		}
-
-		if (!LuaWrapper::checkField(L, idx, "is_shadow", &cp.is_shadow)) {
-			luaL_error(L, "Missing is_shadow in camera params");
-		}
-
-		if(!LuaWrapper::checkField(L, idx, "position", &cp.pos)) {
-			luaL_error(L, "Missing position in camera params");
-		}
-
-		return cp;
-	}
-	
 	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point, bool writable) {
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindShaderBuffer(buffer_handle, binding_point, writable ? gpu::BindShaderBufferFlags::OUTPUT : gpu::BindShaderBufferFlags::NONE);
@@ -2182,7 +2012,8 @@ struct PipelineImpl final : Pipeline
 		stream.bindTextures(textures_handles.begin(), offset.get(0), textures_handles.size());
 	};
 	
-	void pass(CameraParams cp) {
+	void pass(CameraParamsHandle cp_handle) {
+		const CameraParams cp = resolveCameraParams(cp_handle);
 		PassState pass_state;
 		pass_state.view = cp.view;
 		pass_state.projection = cp.projection;
@@ -2285,17 +2116,7 @@ struct PipelineImpl final : Pipeline
 		stream.drawArrays(indices_offset, indices_count);
 	}
 
-	CameraParams getCameraParams()
-	{
-		CameraParams cp;
-		cp.pos = m_viewport.pos;
-		cp.frustum = m_viewport.getFrustum();
-		cp.lod_multiplier = m_scene->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
-		cp.is_shadow = false;
-		cp.view = m_viewport.getView(cp.pos);
-		cp.projection = m_viewport.getProjectionWithJitter();
-		return cp;
-	}
+	CameraParamsHandle getCameraParams() { return (CameraParamsHandle)CameraParamsEnum::MAIN; }
 
 	static void findExtraShadowcasterPlanes(const Vec3& light_forward
 		, const Frustum& camera_frustum
@@ -2689,8 +2510,9 @@ struct PipelineImpl final : Pipeline
 	static int cull(lua_State* L) {
 		PROFILE_FUNCTION();
 		
-		const CameraParams cp = LuaWrapper::checkArg<CameraParams>(L, 1);
 		PipelineImpl* pipeline = getClosureThis(L);
+		const CameraParamsHandle cp_handle = LuaWrapper::checkArg<CameraParamsHandle>(L, 1);
+		const CameraParams cp = pipeline->resolveCameraParams(cp_handle);
 		const i32 bucket_count = lua_gettop(L) - 1;
 		for (i32 i = 0; i < bucket_count; ++i) LuaWrapper::checkTableArg(L, 2 + i);
 		
@@ -3120,8 +2942,8 @@ struct PipelineImpl final : Pipeline
 		return float(light_radius / length(cam_pos - light_pos));
 	};
 
-	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
-		m_renderer.pushJob("fill clusters", [cp, this](DrawStream& stream){
+	void fillClusters(LuaWrapper::Optional<CameraParamsHandle> cp_handle) {
+		m_renderer.pushJob("fill clusters", [cp_handle, this](DrawStream& stream){
 			struct ClusterLight {
 				Vec3 pos;
 				float radius;
@@ -3181,10 +3003,11 @@ struct PipelineImpl final : Pipeline
 				stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
 			};
 
-			if (cp.valid) {
-				const DVec3 cam_pos = cp.value.pos;
+			if (cp_handle.valid) {
+				const CameraParams cp = resolveCameraParams(cp_handle.value);
+				const DVec3 cam_pos = cp.pos;
 				const Universe& universe = m_scene->getUniverse();
-				CullResult* light_entities = m_scene->getRenderables(cp.value.frustum, RenderableTypes::LOCAL_LIGHT);
+				CullResult* light_entities = m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
 				const u32 lights_count = light_entities ? light_entities->count() : 0;
 				ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count);
 
@@ -3254,7 +3077,7 @@ struct PipelineImpl final : Pipeline
 				ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * scene_env_probes.length());
 				ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * scene_refl_probes.length());
 
-				const ShiftedFrustum& frustum = cp.value.frustum;
+				const ShiftedFrustum& frustum = cp.frustum;
 				Vec4 xplanes[65];
 				Vec4 yplanes[65];
 				Vec4 zplanes[17];
@@ -3480,18 +3303,7 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 
-	CameraParams getShadowCameraParams(i32 slice)
-	{
-		const Viewport& vp = m_shadow_camera_viewports[slice];
-		CameraParams cp;
-		cp.pos = vp.pos;
-		cp.frustum = vp.getFrustum();
-		cp.lod_multiplier = m_scene->getCameraLODMultiplier(vp.fov, vp.is_ortho);
-		cp.is_shadow = true;
-		cp.view = vp.getView(cp.pos);
-		cp.projection = vp.getProjectionNoJitter();
-		return cp;
-	}
+	CameraParamsHandle getShadowCameraParams(i32 slice) { return (CameraParamsHandle)CameraParamsEnum::SHADOW0 + slice; }
 	
 	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb) {
 		gpu::FramebufferFlags flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;

@@ -96,7 +96,7 @@ local shadow_grass_state = {
 	stencil_zpass = STENCIL_REPLACE,
 }
 
-function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
+function waterPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 
 	local color_copy = createRenderbuffer { width = viewport_w, height = viewport_h, format = "r11g11b10f", debug_name = "hdr_copy" }
 
@@ -118,26 +118,25 @@ function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
 
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 	beginBlock("water_pass")
-	pass(getCameraParams())
+	pass(view_params)
 	bindTextures({ dsbuffer, shadowmap, SHADOW_ATLAS, REFLECTION_PROBES, color_copy }, 5);
 	renderBucket(entities.water)
 	endBlock()
 end
 
-function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
+function transparentPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("transparent_pass")
-	pass(getCameraParams())
+	pass(view_params)
 	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES, dsbuffer }, 5);
 	renderBucket(entities.transparent)
-	local view_params = getCameraParams()
 	renderParticles(view_params)
 	renderTransparent()
 	endBlock()
 end
 
-function geomPass(entities)
+function geomPass(view_params, entities)
 	beginBlock("geom_pass")
 		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "srgba", debug_name = "gbuffer0" }
 		local gbuffer1 = createRenderbuffer { width = viewport_w, height = viewport_h, compute_write = true, format = "rgba16", debug_name = "gbuffer1" }
@@ -146,7 +145,6 @@ function geomPass(entities)
 	
 		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
-		local view_params = getCameraParams()
 		pass(view_params)
 		if render_terrain then
 			renderTerrains(view_params, {define = "DEPTH" })
@@ -178,7 +176,7 @@ function geomPass(entities)
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
 end
 
-function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local format = "rgba16f"
 	if PROBE ~= nil then
 		format = "rgba32f"
@@ -186,8 +184,6 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local hdr_rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = format, debug_name = "hdr" }
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
-	
-	local view_params = getCameraParams()
 	
 	setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
 
@@ -279,7 +275,7 @@ function shadowPass()
 			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
 			for slice = 0, 3 do 
-				local view_params = getShadowCameraParams(slice, 4096)
+				local view_params = getShadowCameraParams(slice)
 				
 				viewport(slice * 1024, 0, 1024, 1024)
 				beginBlock("slice " .. tostring(slice + 1))
@@ -487,7 +483,7 @@ function main()
 	)
 
 	local shadowmap = shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(entities)
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(view_params, entities)
 
 	postprocess("pre_lightpass", nil, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 
@@ -497,14 +493,14 @@ function main()
 		fillClusters()
 	end
 
-	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	local hdr_buffer = lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
 	custom_tonemap = false
 	local res = hdr_buffer
 	res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
-	waterPass(entities, res, gbuffer_depth, shadowmap)
-	transparentPass(entities, res, gbuffer_depth, shadowmap)
+	waterPass(view_params, entities, res, gbuffer_depth, shadowmap)
+	transparentPass(view_params, entities, res, gbuffer_depth, shadowmap)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 
 	res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
@@ -534,7 +530,7 @@ function main()
 	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
 		icon_ds = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "icon_ds" }
-		pass(getCameraParams())
+		pass(view_params)
 			setRenderTargetsDS(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 			renderGizmos()
