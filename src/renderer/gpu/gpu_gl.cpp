@@ -204,9 +204,12 @@ void checkThread()
 	ASSERT(gl->thread == os::getCurrentThreadID());
 }
 
-void launchRenderDoc() {
+void captureRenderDocFrame() {
 	if (gl->rdoc_api) {
-		gl->rdoc_api->LaunchReplayUI(1, "");
+		if (!gl->rdoc_api->IsRemoteAccessConnected()) {
+			gl->rdoc_api->LaunchReplayUI(1, "");
+		}
+		gl->rdoc_api->TriggerCapture();
 	}
 }
 

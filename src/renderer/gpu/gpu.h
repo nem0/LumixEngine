@@ -258,7 +258,7 @@ struct BindGroupEntryDesc {
 void preinit(IAllocator& allocator, bool load_renderdoc);
 IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
-void launchRenderDoc();
+void captureRenderDocFrame();
 bool getMemoryStats(MemoryStats& stats);
 u32 swapBuffers();
 void waitFrame(u32 frame);

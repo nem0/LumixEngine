@@ -921,6 +921,7 @@ void DrawStream::run() {
 					stream->run();
 					stream->~DrawStream();
 					ptr += sizeof(DrawStream);
+					break;
 				}
 				case Instruction::START_CAPTURE: {
 					gpu::startCapture();
