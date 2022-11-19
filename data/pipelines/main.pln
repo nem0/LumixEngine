@@ -49,7 +49,6 @@ local water_state = {
 }
 
 local default_state = {
-	define = "DEFERRED",
 	depth_write = true,
 	stencil_func = STENCIL_ALWAYS,
 	stencil_write_mask = 0xff,
@@ -67,17 +66,6 @@ local terrain_state = {
 	stencil_func = STENCIL_ALWAYS,
 	stencil_write_mask = 0xff,
 	stencil_ref = 2,
-	stencil_mask = 0xff, 
-	stencil_sfail = STENCIL_KEEP,
-	stencil_zfail = STENCIL_KEEP,
-	stencil_zpass = STENCIL_REPLACE,
-}
-
-local impostor_state = {
-	depth_write = true,
-	stencil_func = STENCIL_ALWAYS,
-	stencil_write_mask = 0xff,
-	stencil_ref = 1,
 	stencil_mask = 0xff, 
 	stencil_sfail = STENCIL_KEEP,
 	stencil_zfail = STENCIL_KEEP,
@@ -493,7 +481,7 @@ function main()
 		, { layer = "default", define = "DEFERRED", state = default_state }
 		, { layer = "transparent", sort = "depth", state = transparent_state }
 		, { layer = "water", sort = "depth", state = water_state }
-		, { layer = "impostor", define = "DEFERRED", state = impostor_state }
+		, { layer = "impostor", define = "DEFERRED", state = default_state }
 		, { layer = "decal", state = decal_state }
 		, { layer = "terrain_decal", state = terrain_decal_state }
 	)
