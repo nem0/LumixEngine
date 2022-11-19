@@ -1157,6 +1157,10 @@ void SceneView::onToolbar()
 	}
 }
 
+void SceneView::captureFrameRenderDoc() {
+	m_renderdoc_capture_request = true;
+}
+
 void SceneView::handleEvents() {
 	const bool handle_input = m_is_mouse_captured || (ImGui::IsItemHovered() && os::getFocused() == ImGui::GetWindowViewport()->PlatformHandle);
 	const os::Event* events = m_app.getEvents();
@@ -1386,7 +1390,14 @@ void SceneView::onWindowGUI()
 		vp.h = (int)size.y;
 		m_view->setViewport(vp);
 		m_pipeline->setViewport(vp);
+		if (m_renderdoc_capture_request) {
+			m_pipeline->getRenderer().getDrawStream().startCapture();
+		}
 		m_pipeline->render(false);
+		if (m_renderdoc_capture_request) {
+			m_pipeline->getRenderer().getDrawStream().stopCapture();
+			m_renderdoc_capture_request = false;
+		}
 		m_view->m_draw_vertices.clear();
 		m_view->m_draw_cmds.clear();
 		m_view->inputFrame();

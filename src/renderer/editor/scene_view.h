@@ -27,6 +27,7 @@ struct SceneView : StudioApp::GUIPlugin
 	explicit SceneView(StudioApp& app);
 	~SceneView();
 
+	void captureFrameRenderDoc();
 	void update(float time_delta) override;
 	void setUniverse(Universe* universe);
 	void onWindowGUI() override;
@@ -84,6 +85,7 @@ private:
 	Shader* m_debug_shape_shader;
 	struct UniverseViewImpl* m_view;
 
+	bool m_renderdoc_capture_request = false;
 	bool m_is_measure_active = false;
 	bool m_is_measure_from_set = false;
 	DVec3 m_measure_to = {0, 0, 0};

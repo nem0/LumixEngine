@@ -4934,10 +4934,15 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_renderdoc_action.init("     Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc", "", false);
-		m_renderdoc_action.func.bind<&StudioAppPlugin::launchRenderDoc>(this);
+		m_renderdoc_launch_action.init("     Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc", "", false);
+		m_renderdoc_launch_action.func.bind<&StudioAppPlugin::launchRenderDoc>(this);
+	
+		m_renderdoc_capture_action.init("     Capture with RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", false);
+		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
+
 		if (renderDocOption()) {
-			m_app.addToolAction(&m_renderdoc_action);
+			m_app.addToolAction(&m_renderdoc_launch_action);
+			m_app.addToolAction(&m_renderdoc_capture_action);
 		}
 
 		IAllocator& allocator = m_app.getAllocator();
@@ -5003,6 +5008,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_particle_emitter_property_plugin.m_particle_editor = m_particle_editor.get();
 	}
 
+	void captureRenderDoc() { m_scene_view.captureFrameRenderDoc(); }
 	void launchRenderDoc() { gpu::launchRenderDoc(); }
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
@@ -5207,7 +5213,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		m_app.removeAction(&m_renderdoc_action);
+		m_app.removeAction(&m_renderdoc_launch_action);
+		m_app.removeAction(&m_renderdoc_capture_action);
 
 		IAllocator& allocator = m_app.getAllocator();
 
@@ -5246,7 +5253,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
-	Action m_renderdoc_action;
+	Action m_renderdoc_launch_action;
+	Action m_renderdoc_capture_action;
 	CompositeTextureEditor m_composite_texture_editor;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
