@@ -566,6 +566,7 @@ struct ProfilerUIImpl final : ProfilerUI
 	u64 m_end;
 	u64 m_range = DEFAULT_RANGE;
 	char m_filter[100];
+	double m_filtered_time = 0;
 	char m_resource_filter[100];
 	u64 m_resource_size_filter = 0;
 	Engine& m_engine;
@@ -950,6 +951,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 		m_filter[0] = '\0';
 	}
+	if (m_filter[0]) {
+		ImGui::SameLine();
+		ImGui::Text("%f ms", (float)m_filtered_time);
+	}
 
 	if (m_data.empty()) return;
 	if (!m_is_paused) return;
@@ -972,6 +977,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	};
 
 	const float line_height = ImGui::GetTextLineHeightWithSpacing();
+
+	m_filtered_time = 0;
+	const u64 freq = profiler::frequency();
 
 	forEachThread([&](const ThreadContextProxy& ctx) {
 		if (ctx.thread_id == 0) return;
@@ -1046,7 +1054,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			const float block_y = y;
 			const float w = ImGui::CalcTextSize(name).x;
 
-			const u32 alpha = m_filter[0] && stristr(name, m_filter) == 0 ? 0x2000'0000 : 0xff00'0000;
+			const bool is_filtered = m_filter[0] && stristr(name, m_filter) == 0;
+			const u32 alpha = is_filtered ? 0x2000'0000 : 0xff00'0000;
 			if (hovered_link.link == block.link && hovered_link.frame > frame_id - 2) color = 0xff0000ff;
 			color = alpha | (color & 0x00ffffff);
 			u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
@@ -1062,9 +1071,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			if (w + 2 < x_end - x_start) {
 				dl->AddText(ImVec2(x_start + 2, block_y), 0x00000000 | alpha, name);
 			}
+			const float t = 1000 * float((to - from) / double(freq));
+			if (!is_filtered && m_filter[0]) m_filtered_time += t;
 			if (ImGui::IsMouseHoveringRect(ra, rb)) {
-				const u64 freq = profiler::frequency();
-				const float t = 1000 * float((to - from) / double(freq));
 				ImGui::BeginTooltip();
 				ImGui::Text("%s (%.3f ms)", name, t);
 				if (block.link) {
@@ -1322,7 +1331,6 @@ void ProfilerUIImpl::onGUICPUProfiler()
 							dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, data.name);
 						}
 						if (ImGui::IsMouseHoveringRect(ra, rb)) {
-							const u64 freq = profiler::frequency();
 							const float t = 1000 * float((to - from) / double(freq));
 							ImGui::BeginTooltip();
 							ImGui::Text("%s (%.3f ms)", data.name, t);
