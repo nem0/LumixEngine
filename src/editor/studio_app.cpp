@@ -1235,10 +1235,6 @@ struct StudioAppImpl final : StudioApp
 		m_editor->setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
 	}
 
-	void launchRenderDoc() {
-		m_render_interface->launchRenderDoc();
-	}
-
 	void autosnapDown()
 	{
 		Gizmo::Config& cfg = getGizmoConfig();
@@ -1489,7 +1485,6 @@ struct StudioAppImpl final : StudioApp
 		menuItem("snapDown", is_any_entity_selected);
 		menuItem("autosnapDown", true);
 		menuItem("export_game", true);
-		if (renderDocOption()) menuItem("launch_renderdoc", true);
 		for (Action* action : m_tools_actions) {
 			Lumix::menuItem(*action, true);
 		}
@@ -2265,7 +2260,6 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&WorldEditor::isGameMode>(m_editor.get());
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
-		addAction<&StudioAppImpl::launchRenderDoc>(NO_ICON "Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc");
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
 		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
 		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
@@ -2459,19 +2453,6 @@ struct StudioAppImpl final : StudioApp
 		return false;
 
 	}
-
-	bool renderDocOption() {
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-renderdoc")) return true;
-		}
-		return false;
-	}
-
 
 	void loadUniverseFromCommandLine()
 	{

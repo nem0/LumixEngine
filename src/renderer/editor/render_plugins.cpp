@@ -19,6 +19,7 @@
 #include "engine/allocators.h"
 #include "engine/associative_array.h"
 #include "engine/atomic.h"
+#include "engine/command_line_parser.h"
 #include "engine/core.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -4408,10 +4409,6 @@ struct RenderInterfaceImpl final : RenderInterface
 		, m_plugin(plugin)
 	{}
 
-	void launchRenderDoc() override {
-		gpu::launchRenderDoc();
-	}
-
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
 	{
 		Path path(path_cstr);
@@ -4923,8 +4920,26 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	const char* getName() const override { return "renderer"; }
 
+	static bool renderDocOption() {
+		char cmd_line[2048];
+		os::getCommandLine(Span(cmd_line));
+
+		CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-renderdoc")) return true;
+		}
+		return false;
+	}
+
 	void init() override
 	{
+		m_renderdoc_action.init("     Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc", "", false);
+		m_renderdoc_action.func.bind<&StudioAppPlugin::launchRenderDoc>(this);
+		if (renderDocOption()) {
+			m_app.addToolAction(&m_renderdoc_action);
+		}
+
 		IAllocator& allocator = m_app.getAllocator();
 
 		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_composite_texture_editor, m_app);
@@ -4987,6 +5002,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_particle_emitter_plugin.m_particle_editor = m_particle_editor.get();
 		m_particle_emitter_property_plugin.m_particle_editor = m_particle_editor.get();
 	}
+
+	void launchRenderDoc() { gpu::launchRenderDoc(); }
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -5190,6 +5207,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
+		m_app.removeAction(&m_renderdoc_action);
+
 		IAllocator& allocator = m_app.getAllocator();
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
@@ -5227,6 +5246,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
+	Action m_renderdoc_action;
 	CompositeTextureEditor m_composite_texture_editor;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;

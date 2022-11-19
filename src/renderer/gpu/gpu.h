@@ -79,7 +79,9 @@ enum class ShaderType : u32 {
 enum class ClearFlags : u32 {
 	COLOR = 1 << 0,
 	DEPTH = 1 << 1,
-	STENCIL = 1 << 2
+	STENCIL = 1 << 2,
+
+	ALL = COLOR | DEPTH | STENCIL,
 };
 
 

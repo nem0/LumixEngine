@@ -21,7 +21,6 @@ struct RenderInterface {
 	virtual UniverseView::RayHit castRay(Universe& universe, const DVec3& origin, const Vec3& dir, EntityPtr ignored) = 0;
 	virtual Path getModelInstancePath(Universe& universe, EntityRef entity) = 0;
 	virtual bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) = 0;
-	virtual void launchRenderDoc() = 0;
 };
 
 }
