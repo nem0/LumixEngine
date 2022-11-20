@@ -3334,9 +3334,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void generateCubemaps(bool bounce, Universe& universe) {
 		ASSERT(m_probes.empty());
 
-		m_pipeline->define("PROBE_BOUNCE", bounce);
+		m_pipeline->setIndirectLightMultiplier(bounce ? 1.f : 0.f);
 
-		auto* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+		RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
 		const Span<EntityRef> env_probes = scene->getEnvironmentProbesEntities();
 		const Span<EntityRef> reflection_probes = scene->getReflectionProbesEntities();
 		m_probes.reserve(env_probes.length() + reflection_probes.length());
@@ -3344,7 +3344,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		for (EntityRef p : env_probes) {
 			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, universe, p, allocator);
 			
-			const EntityPtr env_entity = scene->getActiveEnvironment();
 			job->env_probe = scene->getEnvironmentProbe(p);
 			job->is_reflection = false;
 			job->position = universe.getPosition(p);

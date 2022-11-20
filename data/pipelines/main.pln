@@ -415,7 +415,6 @@ function render_preview()
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 
 	local view_params = getCameraParams()
-	fillClusters(view_params)
 	local entities = cull(view_params
 		, { layer = "default", state = default_state }
 		, { layer = "transparent", sort = "depth", state = transparent_state })
@@ -497,12 +496,6 @@ function main()
 	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(view_params, entities)
 
 	postprocess("pre_lightpass", nil, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-
-	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
-		fillClusters(view_params)
-	else
-		fillClusters()
-	end
 
 	local hdr_buffer = lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	

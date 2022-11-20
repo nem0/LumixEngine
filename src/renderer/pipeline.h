@@ -79,6 +79,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void setViewport(const Viewport& viewport) = 0;
 	virtual Viewport getViewport() = 0;
 	virtual void define(const char* define, bool enable) = 0;
+	virtual void setIndirectLightMultiplier(float value) = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
 	virtual void clearDraw2D() = 0;

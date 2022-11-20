@@ -1227,7 +1227,7 @@ struct PipelineImpl final : Pipeline
 				global_state.light_direction = Vec4(normalize(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
 				global_state.light_color = Vec4(env.light_color, 456);
 				global_state.light_intensity = env.direct_intensity;
-				global_state.light_indirect_intensity = env.indirect_intensity;
+				global_state.light_indirect_intensity = env.indirect_intensity * m_indirect_light_multiplier;
 			}
 		}
 
@@ -1249,6 +1249,8 @@ struct PipelineImpl final : Pipeline
 
 		ASSERT(m_views.empty());
 		
+		if (!only_2d) fillClusters(stream, resolveCameraParams((CameraParamsHandle)CameraParamsEnum::MAIN));
+
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
@@ -2956,365 +2958,360 @@ struct PipelineImpl final : Pipeline
 		return float(light_radius / length(cam_pos - light_pos));
 	};
 
-	void fillClusters(LuaWrapper::Optional<CameraParamsHandle> cp_handle) {
-		m_renderer.pushJob("fill clusters", [cp_handle, this](DrawStream& stream){
-			struct ClusterLight {
-				Vec3 pos;
-				float radius;
-				Quat rot;
-				Vec3 color;
-				float attenuation_param;
-				u32 atlas_idx;
-				float fov;
-				Vec2 padding;
-			};
+	void fillClusters(DrawStream& stream, const CameraParams& cp) {
+		PROFILE_FUNCTION();
+		struct ClusterLight {
+			Vec3 pos;
+			float radius;
+			Quat rot;
+			Vec3 color;
+			float attenuation_param;
+			u32 atlas_idx;
+			float fov;
+			Vec2 padding;
+		};
 
-			struct Cluster {
-				u32 offset;
-				u32 lights_count;
-				u32 env_probes_count;
-				u32 refl_probes_count;
-			};
+		struct Cluster {
+			u32 offset;
+			u32 lights_count;
+			u32 env_probes_count;
+			u32 refl_probes_count;
+		};
 
-			struct ClusterEnvProbe {
-				Vec3 pos;
-				float pad0;
-				Quat rot;
-				Vec3 inner_range;
-				float pad1;
-				Vec3 outer_range;
-				float pad2;
-				Vec4 sh_coefs[9];
-			};
+		struct ClusterEnvProbe {
+			Vec3 pos;
+			float pad0;
+			Quat rot;
+			Vec3 inner_range;
+			float pad1;
+			Vec3 outer_range;
+			float pad2;
+			Vec4 sh_coefs[9];
+		};
 
-			struct ClusterReflProbe {
-				Vec3 pos;
-				u32 layer;
-				Quat rot;
-				Vec3 half_extents;
-				float pad1;
-			};
+		struct ClusterReflProbe {
+			Vec3 pos;
+			u32 layer;
+			Quat rot;
+			Vec3 half_extents;
+			float pad1;
+		};
 
-			LinearAllocator& frame_allocator = m_renderer.getCurrentFrameAllocator();
-			const IVec3 size(
-				(m_viewport.w + 63) / 64,
-				(m_viewport.h + 63) / 64,
-				16);
-			const u32 clusters_count = size.x * size.y * size.z;
-			Cluster* clusters = (Cluster*)frame_allocator.allocate(sizeof(Cluster) * clusters_count);
-			memset(clusters, 0, sizeof(Cluster) * clusters_count);
-		
-			auto bind = [](auto& buffer, const void* data, u32 size, i32 idx, DrawStream& stream){
-				if (!size) return;
-				const u32 capacity = (size + 15) & ~15;
-				if (buffer.capacity < capacity) {
-					if (buffer.buffer) stream.destroy(buffer.buffer);
-					buffer.buffer = gpu::allocBufferHandle();
-					stream.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
-					buffer.capacity = capacity;
+		LinearAllocator& frame_allocator = m_renderer.getCurrentFrameAllocator();
+		const IVec3 size(
+			(m_viewport.w + 63) / 64,
+			(m_viewport.h + 63) / 64,
+			16);
+		const u32 clusters_count = size.x * size.y * size.z;
+		Cluster* clusters = (Cluster*)frame_allocator.allocate(sizeof(Cluster) * clusters_count);
+		memset(clusters, 0, sizeof(Cluster) * clusters_count);
+	
+		auto bind = [](auto& buffer, const void* data, u32 size, i32 idx, DrawStream& stream){
+			if (!size) return;
+			const u32 capacity = (size + 15) & ~15;
+			if (buffer.capacity < capacity) {
+				if (buffer.buffer) stream.destroy(buffer.buffer);
+				buffer.buffer = gpu::allocBufferHandle();
+				stream.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
+				buffer.capacity = capacity;
+			}
+			stream.update(buffer.buffer, data, size);
+			stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
+		};
+
+		const DVec3 cam_pos = cp.pos;
+		const Universe& universe = m_scene->getUniverse();
+		CullResult* light_entities = m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
+		const u32 lights_count = light_entities ? light_entities->count() : 0;
+		ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count);
+
+		AtlasSorter atlas_sorter;
+		if (light_entities) {
+			u32 i = 0;
+			light_entities->forEach([&](EntityRef e){
+				PointLight& pl = m_scene->getPointLight(e);
+				ClusterLight& light = lights[i];
+				light.radius = pl.range;
+				const DVec3 light_pos = universe.getPosition(e);
+				light.pos = Vec3(light_pos - cam_pos);
+				light.rot = universe.getRotation(e);
+				light.fov = pl.fov;
+				light.color = pl.color * pl.intensity;
+				light.attenuation_param = pl.attenuation_param;
+
+				auto iter = m_shadow_atlas.map.find(e);
+				if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
+					light.atlas_idx = iter.isValid() ? iter.value() : -1;
+					atlas_sorter.push(i, computeShadowPriority(light.radius, light_pos, cam_pos), e);
 				}
-				stream.update(buffer.buffer, data, size);
-				stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
-			};
-
-			if (cp_handle.valid) {
-				const CameraParams cp = resolveCameraParams(cp_handle.value);
-				const DVec3 cam_pos = cp.pos;
-				const Universe& universe = m_scene->getUniverse();
-				CullResult* light_entities = m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
-				const u32 lights_count = light_entities ? light_entities->count() : 0;
-				ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count);
-
-				AtlasSorter atlas_sorter;
-				if (light_entities) {
-					u32 i = 0;
-					light_entities->forEach([&](EntityRef e){
-						PointLight& pl = m_scene->getPointLight(e);
-						ClusterLight& light = lights[i];
-						light.radius = pl.range;
-						const DVec3 light_pos = universe.getPosition(e);
-						light.pos = Vec3(light_pos - cam_pos);
-						light.rot = universe.getRotation(e);
-						light.fov = pl.fov;
-						light.color = pl.color * pl.intensity;
-						light.attenuation_param = pl.attenuation_param;
-
-						auto iter = m_shadow_atlas.map.find(e);
-						if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
-							light.atlas_idx = iter.isValid() ? iter.value() : -1;
-							atlas_sorter.push(i, computeShadowPriority(light.radius, light_pos, cam_pos), e);
-						}
-						else {
-							light.atlas_idx = -1;
-							if(iter.isValid()) {
-								m_shadow_atlas.remove(e);
-							}
-						}
-						++i;
-					});
-					light_entities->free(m_renderer.getEngine().getPageAllocator());
-				}
-
-				for (u32 i = 0; i < atlas_sorter.count; ++i) {
-					ClusterLight& light = lights[atlas_sorter.lights[i].idx];
-					if (light.atlas_idx != -1 && ShadowAtlas::getGroup(i) != ShadowAtlas::getGroup(light.atlas_idx)) {
-						m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
-						light.atlas_idx = -1;
+				else {
+					light.atlas_idx = -1;
+					if(iter.isValid()) {
+						m_shadow_atlas.remove(e);
 					}
 				}
-		
-				if (!m_shadow_atlas.texture) {
-					m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
-				}
+				++i;
+			});
+			light_entities->free(m_renderer.getEngine().getPageAllocator());
+		}
 
-				Matrix shadow_atlas_matrices[128];
-				for (u32 i = 0; i < atlas_sorter.count; ++i) {
-					ClusterLight& light = lights[atlas_sorter.lights[i].idx];
-					EntityRef e = atlas_sorter.lights[i].entity;
-					PointLight& pl = m_scene->getPointLight(e);
-					// TODO bakeShadow reenters m_lua_state, this is not safe since it's inside another job
-					if (light.atlas_idx == -1) {
-						light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
-						bakeShadow(pl, light.atlas_idx);
-					}
-					else if (pl.flags.isSet(PointLight::DYNAMIC)) {
-						bakeShadow(pl, light.atlas_idx);
-					}
-					shadow_atlas_matrices[light.atlas_idx] = getShadowMatrix(pl, light.atlas_idx);
-				}
-				const Renderer::TransientSlice shadow_matrices_ub = m_renderer.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
-				stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
+		for (u32 i = 0; i < atlas_sorter.count; ++i) {
+			ClusterLight& light = lights[atlas_sorter.lights[i].idx];
+			if (light.atlas_idx != -1 && ShadowAtlas::getGroup(i) != ShadowAtlas::getGroup(light.atlas_idx)) {
+				m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
+				light.atlas_idx = -1;
+			}
+		}
 
-				const Span<const ReflectionProbe> scene_refl_probes = m_scene->getReflectionProbes();
-				const Span<const EnvironmentProbe> scene_env_probes = m_scene->getEnvironmentProbes();
+		if (!m_shadow_atlas.texture) {
+			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
+		}
 
-				ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * scene_env_probes.length());
-				ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * scene_refl_probes.length());
+		Matrix shadow_atlas_matrices[128];
+		for (u32 i = 0; i < atlas_sorter.count; ++i) {
+			ClusterLight& light = lights[atlas_sorter.lights[i].idx];
+			EntityRef e = atlas_sorter.lights[i].entity;
+			PointLight& pl = m_scene->getPointLight(e);
+			// TODO bakeShadow reenters m_lua_state, this is not safe since it's inside another job
+			if (light.atlas_idx == -1) {
+				light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
+				bakeShadow(pl, light.atlas_idx);
+			}
+			else if (pl.flags.isSet(PointLight::DYNAMIC)) {
+				bakeShadow(pl, light.atlas_idx);
+			}
+			shadow_atlas_matrices[light.atlas_idx] = getShadowMatrix(pl, light.atlas_idx);
+		}
+		const Renderer::TransientSlice shadow_matrices_ub = m_renderer.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
+		stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
 
-				const ShiftedFrustum& frustum = cp.frustum;
-				Vec4 xplanes[65];
-				Vec4 yplanes[65];
-				Vec4 zplanes[17];
+		const Span<const ReflectionProbe> scene_refl_probes = m_scene->getReflectionProbes();
+		const Span<const EnvironmentProbe> scene_env_probes = m_scene->getEnvironmentProbes();
 
-				const Vec3 cam_dir = normalize(cross(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]));
+		ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * scene_env_probes.length());
+		ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * scene_refl_probes.length());
+
+		const ShiftedFrustum& frustum = cp.frustum;
+		Vec4 xplanes[65];
+		Vec4 yplanes[65];
+		Vec4 zplanes[17];
+
+		const Vec3 cam_dir = normalize(cross(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]));
+	
+		Vec3 near = (frustum.points[0] + frustum.points[2]) * 0.5f;
+		Vec3 far = (frustum.points[4] + frustum.points[6]) * 0.5f;
+	
+		for (i32 i = 0; i < size.z + 1; ++i) {
+			// TODO do not hardcode constants
+			float znear = 0.1f;
+			float zfar = 10000.0f;
+			const float z = znear * powf(zfar / znear, i / (float)size.z);
+			const Vec3 p = cam_dir * z;
+			zplanes[i] = makePlane(cam_dir, p);
+		}
+
+		for (i32 i = 0; i < size.y + 1; ++i) {
+			const float t = i / (float)size.y;
+			const Vec3 a = lerp(frustum.points[0], frustum.points[3], t);
+			const Vec3 b = lerp(frustum.points[1], frustum.points[2], t);
+			const Vec3 c = lerp(frustum.points[4], frustum.points[7], t);
+			const Vec3 n = normalize(cross(b - a, c - a));
+			yplanes[i] = makePlane(n, a);
+		}
+
+		for (i32 i = 0; i < size.x + 1; ++i) {
+			const float t = i / (float)size.x;
+			const Vec3 a = lerp(frustum.points[1], frustum.points[0], t);
+			const Vec3 b = lerp(frustum.points[2], frustum.points[3], t);
+			const Vec3 c = lerp(frustum.points[5], frustum.points[4], t);
+			const Vec3 n = normalize(cross(b - a, c - a));
+			xplanes[i] = makePlane(n, a);
+		}
+
+		ASSERT(lengthOf(xplanes) >= (u32)size.x);
+		ASSERT(lengthOf(yplanes) >= (u32)size.y);
+
+		const Span<EntityRef> refl_probe_entities = m_scene->getReflectionProbesEntities();
+		for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
+			const ReflectionProbe& refl_probe = scene_refl_probes[i];
+			if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
+			const EntityRef e = refl_probe_entities[i];
+			ClusterReflProbe& probe =  refl_probes[i];
+			probe.pos = Vec3(universe.getPosition(e) - cam_pos);
+			probe.rot = universe.getRotation(e).conjugated();
+			probe.half_extents = refl_probe.half_extents;
+			probe.layer = refl_probe.texture_id;
+		}
+
+		qsort(refl_probes, scene_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
+			const ClusterReflProbe* m = (const ClusterReflProbe*)a;
+			const ClusterReflProbe* n = (const ClusterReflProbe*)b;
+			const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
+			const float n3 = n->half_extents.x * n->half_extents.y * n->half_extents.z;
+			if (m3 < n3) return -1;
+			return m3 > n3 ? 1 : 0;
+		});
+
+
+		const Span<EntityRef> env_probe_entities = m_scene->getEnvironmentProbesEntities();
+		for (u32 probe_idx = 0, c = scene_env_probes.length(); probe_idx < c; ++probe_idx) {
+			const EnvironmentProbe& env_probe = scene_env_probes[probe_idx];
+			if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
+
+			const EntityRef e = env_probe_entities[probe_idx];
+			ClusterEnvProbe& probe =  env_probes[probe_idx];
+			probe.pos = Vec3(universe.getPosition(e) - cam_pos);
+			probe.rot = universe.getRotation(e).conjugated();
+			probe.inner_range = env_probe.inner_range;
+			probe.outer_range = env_probe.outer_range;
+			for (u32 i = 0; i < 9; ++i) {
+				probe.sh_coefs[i] = Vec4(env_probe.sh_coefs[i], 0);
+			}
+		}
+
+		qsort(env_probes, scene_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
+			const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
+			const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
+			const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
+			const float n3 = n->outer_range.x * n->outer_range.y * n->outer_range.z;
+			if (m3 < n3) return -1;
+			return m3 > n3 ? 1 : 0;
+		});
+
+		auto range = [](const Vec3& p, float r, i32 size, const Vec4* planes){
+			IVec2 range = { -1, -1 };
+			if (planeDist(planes[0], p) < -r) return range;
 			
-				Vec3 near = (frustum.points[0] + frustum.points[2]) * 0.5f;
-				Vec3 far = (frustum.points[4] + frustum.points[6]) * 0.5f;
-			
-				for (i32 i = 0; i < size.z + 1; ++i) {
-					// TODO do not hardcode constants
-					float znear = 0.1f;
-					float zfar = 10000.0f;
-					const float z = znear * powf(zfar / znear, i / (float)size.z);
-					const Vec3 p = cam_dir * z;
-					zplanes[i] = makePlane(cam_dir, p);
-				}
+			for (i32 i = 0; i < size; ++i) {
+				const float dist = planeDist(planes[i + 1], p);
+				if (dist > r) continue;
 
-				for (i32 i = 0; i < size.y + 1; ++i) {
-					const float t = i / (float)size.y;
-					const Vec3 a = lerp(frustum.points[0], frustum.points[3], t);
-					const Vec3 b = lerp(frustum.points[1], frustum.points[2], t);
-					const Vec3 c = lerp(frustum.points[4], frustum.points[7], t);
-					const Vec3 n = normalize(cross(b - a, c - a));
-					yplanes[i] = makePlane(n, a);
-				}
-
-				for (i32 i = 0; i < size.x + 1; ++i) {
-					const float t = i / (float)size.x;
-					const Vec3 a = lerp(frustum.points[1], frustum.points[0], t);
-					const Vec3 b = lerp(frustum.points[2], frustum.points[3], t);
-					const Vec3 c = lerp(frustum.points[5], frustum.points[4], t);
-					const Vec3 n = normalize(cross(b - a, c - a));
-					xplanes[i] = makePlane(n, a);
-				}
-
-				ASSERT(lengthOf(xplanes) >= (u32)size.x);
-				ASSERT(lengthOf(yplanes) >= (u32)size.y);
-
-				const Span<EntityRef> refl_probe_entities = m_scene->getReflectionProbesEntities();
-				for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
-					const ReflectionProbe& refl_probe = scene_refl_probes[i];
-					if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
-					const EntityRef e = refl_probe_entities[i];
-					ClusterReflProbe& probe =  refl_probes[i];
-					probe.pos = Vec3(universe.getPosition(e) - cam_pos);
-					probe.rot = universe.getRotation(e).conjugated();
-					probe.half_extents = refl_probe.half_extents;
-					probe.layer = refl_probe.texture_id;
-				}
-
-				qsort(refl_probes, scene_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
-					const ClusterReflProbe* m = (const ClusterReflProbe*)a;
-					const ClusterReflProbe* n = (const ClusterReflProbe*)b;
-					const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
-					const float n3 = n->half_extents.x * n->half_extents.y * n->half_extents.z;
-					if (m3 < n3) return -1;
-					return m3 > n3 ? 1 : 0;
-				});
-
-
-				const Span<EntityRef> env_probe_entities = m_scene->getEnvironmentProbesEntities();
-				for (u32 probe_idx = 0, c = scene_env_probes.length(); probe_idx < c; ++probe_idx) {
-					const EnvironmentProbe& env_probe = scene_env_probes[probe_idx];
-					if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
-
-					const EntityRef e = env_probe_entities[probe_idx];
-					ClusterEnvProbe& probe =  env_probes[probe_idx];
-					probe.pos = Vec3(universe.getPosition(e) - cam_pos);
-					probe.rot = universe.getRotation(e).conjugated();
-					probe.inner_range = env_probe.inner_range;
-					probe.outer_range = env_probe.outer_range;
-					for (u32 i = 0; i < 9; ++i) {
-						probe.sh_coefs[i] = Vec4(env_probe.sh_coefs[i], 0);
-					}
-				}
-
-				qsort(env_probes, scene_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
-					const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
-					const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
-					const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
-					const float n3 = n->outer_range.x * n->outer_range.y * n->outer_range.z;
-					if (m3 < n3) return -1;
-					return m3 > n3 ? 1 : 0;
-				});
-
-				auto range = [](const Vec3& p, float r, i32 size, const Vec4* planes){
-					IVec2 range = { -1, -1 };
-					if (planeDist(planes[0], p) < -r) return range;
-					
-					for (i32 i = 0; i < size; ++i) {
-						const float dist = planeDist(planes[i + 1], p);
-						if (dist > r) continue;
-
-						range.x = i;
-						
-						for (i32 i2 = i + 1; i2 < size + 1; ++i2) {
-							const float d = planeDist(planes[i2], p);
-							if (d < -r) {
-								range.y = i2;
-								return range;
-							}
-						}
-						range.y = size;
+				range.x = i;
+				
+				for (i32 i2 = i + 1; i2 < size + 1; ++i2) {
+					const float d = planeDist(planes[i2], p);
+					if (d < -r) {
+						range.y = i2;
 						return range;
 					}
-					return range;
-				};
-
-				// TODO tighter fit
-				auto for_each_light_pair = [&](auto f){
-					for (i32 i = 0, c = lights_count; i < c; ++i) {
-						ClusterLight& light = lights[i];
-						const float r = light.radius;
-						const Vec3 p = light.pos;
-
-						const IVec2 xrange = range(p, r, size.x, xplanes);
-						const IVec2 yrange = range(p, r, size.y, yplanes);
-						const IVec2 zrange = range(p, r, size.z, zplanes);
-
-						for (i32 z = zrange.x; z < zrange.y; ++z) {
-							for (i32 y = yrange.x; y < yrange.y; ++y) {
-								for (i32 x = xrange.x; x < xrange.y; ++x) {
-									const u32 idx = x + y * size.x + z * size.x * size.y;
-									Cluster& cluster = clusters[idx];
-									f(cluster, i);
-								}
-							}
-						}
-					}
-				};
-			
-				auto for_each_env_probe_pair = [&](auto f){
-					for (i32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
-						const Vec3 p = env_probes[i].pos;
-						const float r = length(env_probes[i].outer_range);
-				
-						const IVec2 xrange = range(p, r, size.x, xplanes);
-						const IVec2 yrange = range(p, r, size.y, yplanes);
-						const IVec2 zrange = range(p, r, size.z, zplanes);
-
-						for (i32 z = zrange.x; z < zrange.y; ++z) {
-							for (i32 y = yrange.x; y < yrange.y; ++y) {
-								for (i32 x = xrange.x; x < xrange.y; ++x) {
-									const u32 idx = x + y * size.x + z * size.x * size.y;
-									Cluster& cluster = clusters[idx];
-									f(cluster, i);
-								}
-							}
-						}
-					}
-				};
-
-				auto for_each_refl_probe_pair = [&](auto f){
-					for (i32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
-						const Vec3 p = refl_probes[i].pos;
-						const float r = length(refl_probes[i].half_extents);
-				
-						const IVec2 xrange = range(p, r, size.x, xplanes);
-						const IVec2 yrange = range(p, r, size.y, yplanes);
-						const IVec2 zrange = range(p, r, size.z, zplanes);
-
-						for (i32 z = zrange.x; z < zrange.y; ++z) {
-							for (i32 y = yrange.x; y < yrange.y; ++y) {
-								for (i32 x = xrange.x; x < xrange.y; ++x) {
-									const u32 idx = x + y * size.x + z * size.x * size.y;
-									Cluster& cluster = clusters[idx];
-									f(cluster, i);
-								}
-							}
-						}
-					}
-				};
-
-				for_each_light_pair([](Cluster& cluster, i32 light_idx){
-					++cluster.lights_count;
-				});
-
-				for_each_env_probe_pair([](Cluster& cluster, i32){
-					++cluster.env_probes_count;
-				});
-
-				for_each_refl_probe_pair([](Cluster& cluster, i32){
-					++cluster.refl_probes_count;
-				});
-
-				u32 offset = 0;
-				for (u32 i = 0; i < clusters_count; ++i) {
-					Cluster& cluster = clusters[i];
-					cluster.offset = offset;
-					offset += cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 				}
-			
-				i32* map = (i32*)frame_allocator.allocate(offset * sizeof(i32));
-		
-				for_each_light_pair([&](Cluster& cluster, i32 light_idx){
-					map[cluster.offset] = light_idx;
-					++cluster.offset;
-				});
-
-				for_each_env_probe_pair([&](Cluster& cluster, i32 probe_idx){
-					map[cluster.offset] = probe_idx;
-					++cluster.offset;
-				});
-
-				for_each_refl_probe_pair([&](Cluster& cluster, i32 probe_idx){
-					map[cluster.offset] = probe_idx;
-					++cluster.offset;
-				});
-
-				for (u32 i = 0; i < clusters_count; ++i) {
-					Cluster& cluster = clusters[i];
-					cluster.offset -= cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
-				}
-			
-				bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
-				bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
-				bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(env_probes[0]), 14, stream);
-				bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
+				range.y = size;
+				return range;
 			}
+			return range;
+		};
 
-			bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
+		// TODO tighter fit
+		auto for_each_light_pair = [&](auto f){
+			for (i32 i = 0, c = lights_count; i < c; ++i) {
+				ClusterLight& light = lights[i];
+				const float r = light.radius;
+				const Vec3 p = light.pos;
+
+				const IVec2 xrange = range(p, r, size.x, xplanes);
+				const IVec2 yrange = range(p, r, size.y, yplanes);
+				const IVec2 zrange = range(p, r, size.z, zplanes);
+
+				for (i32 z = zrange.x; z < zrange.y; ++z) {
+					for (i32 y = yrange.x; y < yrange.y; ++y) {
+						for (i32 x = xrange.x; x < xrange.y; ++x) {
+							const u32 idx = x + y * size.x + z * size.x * size.y;
+							Cluster& cluster = clusters[idx];
+							f(cluster, i);
+						}
+					}
+				}
+			}
+		};
+	
+		auto for_each_env_probe_pair = [&](auto f){
+			for (i32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
+				const Vec3 p = env_probes[i].pos;
+				const float r = length(env_probes[i].outer_range);
+		
+				const IVec2 xrange = range(p, r, size.x, xplanes);
+				const IVec2 yrange = range(p, r, size.y, yplanes);
+				const IVec2 zrange = range(p, r, size.z, zplanes);
+
+				for (i32 z = zrange.x; z < zrange.y; ++z) {
+					for (i32 y = yrange.x; y < yrange.y; ++y) {
+						for (i32 x = xrange.x; x < xrange.y; ++x) {
+							const u32 idx = x + y * size.x + z * size.x * size.y;
+							Cluster& cluster = clusters[idx];
+							f(cluster, i);
+						}
+					}
+				}
+			}
+		};
+
+		auto for_each_refl_probe_pair = [&](auto f){
+			for (i32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
+				const Vec3 p = refl_probes[i].pos;
+				const float r = length(refl_probes[i].half_extents);
+		
+				const IVec2 xrange = range(p, r, size.x, xplanes);
+				const IVec2 yrange = range(p, r, size.y, yplanes);
+				const IVec2 zrange = range(p, r, size.z, zplanes);
+
+				for (i32 z = zrange.x; z < zrange.y; ++z) {
+					for (i32 y = yrange.x; y < yrange.y; ++y) {
+						for (i32 x = xrange.x; x < xrange.y; ++x) {
+							const u32 idx = x + y * size.x + z * size.x * size.y;
+							Cluster& cluster = clusters[idx];
+							f(cluster, i);
+						}
+					}
+				}
+			}
+		};
+
+		for_each_light_pair([](Cluster& cluster, i32 light_idx){
+			++cluster.lights_count;
 		});
+
+		for_each_env_probe_pair([](Cluster& cluster, i32){
+			++cluster.env_probes_count;
+		});
+
+		for_each_refl_probe_pair([](Cluster& cluster, i32){
+			++cluster.refl_probes_count;
+		});
+
+		u32 offset = 0;
+		for (u32 i = 0; i < clusters_count; ++i) {
+			Cluster& cluster = clusters[i];
+			cluster.offset = offset;
+			offset += cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
+		}
+	
+		i32* map = (i32*)frame_allocator.allocate(offset * sizeof(i32));
+
+		for_each_light_pair([&](Cluster& cluster, i32 light_idx){
+			map[cluster.offset] = light_idx;
+			++cluster.offset;
+		});
+
+		for_each_env_probe_pair([&](Cluster& cluster, i32 probe_idx){
+			map[cluster.offset] = probe_idx;
+			++cluster.offset;
+		});
+
+		for_each_refl_probe_pair([&](Cluster& cluster, i32 probe_idx){
+			map[cluster.offset] = probe_idx;
+			++cluster.offset;
+		});
+
+		for (u32 i = 0; i < clusters_count; ++i) {
+			Cluster& cluster = clusters[i];
+			cluster.offset -= cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
+		}
+	
+		bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
+		bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
+		bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(env_probes[0]), 14, stream);
+		bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
+		bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
 	}
 
 	CameraParamsHandle getShadowCameraParams(i32 slice) { return (CameraParamsHandle)CameraParamsEnum::SHADOW0 + slice; }
@@ -3416,7 +3413,6 @@ struct PipelineImpl final : Pipeline
 				
 				switch(type) {
 					case RenderableTypes::LOCAL_LIGHT: {
-						// TODO use this for fillClusters
 						break;
 					}
 					case RenderableTypes::DECAL: {
@@ -3861,7 +3857,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
-		REGISTER_FUNCTION(fillClusters);
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
 		REGISTER_FUNCTION(keepRenderbufferAlive);
@@ -3941,6 +3936,8 @@ struct PipelineImpl final : Pipeline
 		if (m_output < 0 || m_output >= m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
 		return m_renderbuffers[m_output].handle;
 	}
+	
+	void setIndirectLightMultiplier(float value) { m_indirect_light_multiplier = value; }
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -3957,6 +3954,7 @@ struct PipelineImpl final : Pipeline
 	jobs::Signal m_buckets_ready;
 	Viewport m_viewport;
 	Viewport m_prev_viewport;
+	float m_indirect_light_multiplier = 1;
 	bool m_first_set_viewport = true;
 	int m_output;
 	Shader* m_debug_shape_shader;
