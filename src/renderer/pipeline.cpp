@@ -2063,8 +2063,8 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id)
-	{
+	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id) {
+		PROFILE_FUNCTION();
 		LuaWrapper::DebugGuard guard(L);
 		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
 		

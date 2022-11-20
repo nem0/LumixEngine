@@ -953,8 +953,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 	if (m_filter[0]) {
 		ImGui::SameLine();
-		ImGui::Text("%f ms", (float)m_filtered_time);
+		ImGui::Text("%f ms / ", (float)m_filtered_time);
 	}
+	const u64 freq = profiler::frequency();
+	ImGui::SameLine();
+	ImGui::Text("%f ms", (float)1000 * float(m_range / double(freq)));
 
 	if (m_data.empty()) return;
 	if (!m_is_paused) return;
@@ -979,7 +982,6 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	const float line_height = ImGui::GetTextLineHeightWithSpacing();
 
 	m_filtered_time = 0;
-	const u64 freq = profiler::frequency();
 
 	forEachThread([&](const ThreadContextProxy& ctx) {
 		if (ctx.thread_id == 0) return;
