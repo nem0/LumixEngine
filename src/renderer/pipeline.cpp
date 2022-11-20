@@ -3005,19 +3005,6 @@ struct PipelineImpl final : Pipeline
 		const u32 clusters_count = size.x * size.y * size.z;
 		Cluster* clusters = (Cluster*)frame_allocator.allocate(sizeof(Cluster) * clusters_count);
 		memset(clusters, 0, sizeof(Cluster) * clusters_count);
-	
-		auto bind = [](auto& buffer, const void* data, u32 size, i32 idx, DrawStream& stream){
-			if (!size) return;
-			const u32 capacity = (size + 15) & ~15;
-			if (buffer.capacity < capacity) {
-				if (buffer.buffer) stream.destroy(buffer.buffer);
-				buffer.buffer = gpu::allocBufferHandle();
-				stream.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
-				buffer.capacity = capacity;
-			}
-			stream.update(buffer.buffer, data, size);
-			stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
-		};
 
 		const DVec3 cam_pos = cp.pos;
 		const Universe& universe = m_scene->getUniverse();
@@ -3085,233 +3072,247 @@ struct PipelineImpl final : Pipeline
 		const Renderer::TransientSlice shadow_matrices_ub = m_renderer.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
 
-		const Span<const ReflectionProbe> scene_refl_probes = m_scene->getReflectionProbes();
-		const Span<const EnvironmentProbe> scene_env_probes = m_scene->getEnvironmentProbes();
-
-		ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * scene_env_probes.length());
-		ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * scene_refl_probes.length());
-
-		const ShiftedFrustum& frustum = cp.frustum;
-		Vec4 xplanes[65];
-		Vec4 yplanes[65];
-		Vec4 zplanes[17];
-
-		const Vec3 cam_dir = normalize(cross(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]));
+		m_renderer.pushJob([clusters_count, clusters, lights, lights_count, cam_pos, &universe, size, cp, this, &frame_allocator](DrawStream& stream){
+			auto bind = [](auto& buffer, const void* data, u32 size, i32 idx, DrawStream& stream){
+				if (!size) return;
+				const u32 capacity = (size + 15) & ~15;
+				if (buffer.capacity < capacity) {
+					if (buffer.buffer) stream.destroy(buffer.buffer);
+					buffer.buffer = gpu::allocBufferHandle();
+					stream.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
+					buffer.capacity = capacity;
+				}
+				stream.update(buffer.buffer, data, size);
+				stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
+			};
+			const Span<const ReflectionProbe> scene_refl_probes = m_scene->getReflectionProbes();
+			const Span<const EnvironmentProbe> scene_env_probes = m_scene->getEnvironmentProbes();
 	
-		Vec3 near = (frustum.points[0] + frustum.points[2]) * 0.5f;
-		Vec3 far = (frustum.points[4] + frustum.points[6]) * 0.5f;
+			ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * scene_env_probes.length());
+			ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * scene_refl_probes.length());
 	
-		for (i32 i = 0; i < size.z + 1; ++i) {
-			// TODO do not hardcode constants
-			float znear = 0.1f;
-			float zfar = 10000.0f;
-			const float z = znear * powf(zfar / znear, i / (float)size.z);
-			const Vec3 p = cam_dir * z;
-			zplanes[i] = makePlane(cam_dir, p);
-		}
-
-		for (i32 i = 0; i < size.y + 1; ++i) {
-			const float t = i / (float)size.y;
-			const Vec3 a = lerp(frustum.points[0], frustum.points[3], t);
-			const Vec3 b = lerp(frustum.points[1], frustum.points[2], t);
-			const Vec3 c = lerp(frustum.points[4], frustum.points[7], t);
-			const Vec3 n = normalize(cross(b - a, c - a));
-			yplanes[i] = makePlane(n, a);
-		}
-
-		for (i32 i = 0; i < size.x + 1; ++i) {
-			const float t = i / (float)size.x;
-			const Vec3 a = lerp(frustum.points[1], frustum.points[0], t);
-			const Vec3 b = lerp(frustum.points[2], frustum.points[3], t);
-			const Vec3 c = lerp(frustum.points[5], frustum.points[4], t);
-			const Vec3 n = normalize(cross(b - a, c - a));
-			xplanes[i] = makePlane(n, a);
-		}
-
-		ASSERT(lengthOf(xplanes) >= (u32)size.x);
-		ASSERT(lengthOf(yplanes) >= (u32)size.y);
-
-		const Span<EntityRef> refl_probe_entities = m_scene->getReflectionProbesEntities();
-		for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
-			const ReflectionProbe& refl_probe = scene_refl_probes[i];
-			if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
-			const EntityRef e = refl_probe_entities[i];
-			ClusterReflProbe& probe =  refl_probes[i];
-			probe.pos = Vec3(universe.getPosition(e) - cam_pos);
-			probe.rot = universe.getRotation(e).conjugated();
-			probe.half_extents = refl_probe.half_extents;
-			probe.layer = refl_probe.texture_id;
-		}
-
-		qsort(refl_probes, scene_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
-			const ClusterReflProbe* m = (const ClusterReflProbe*)a;
-			const ClusterReflProbe* n = (const ClusterReflProbe*)b;
-			const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
-			const float n3 = n->half_extents.x * n->half_extents.y * n->half_extents.z;
-			if (m3 < n3) return -1;
-			return m3 > n3 ? 1 : 0;
-		});
-
-
-		const Span<EntityRef> env_probe_entities = m_scene->getEnvironmentProbesEntities();
-		for (u32 probe_idx = 0, c = scene_env_probes.length(); probe_idx < c; ++probe_idx) {
-			const EnvironmentProbe& env_probe = scene_env_probes[probe_idx];
-			if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
-
-			const EntityRef e = env_probe_entities[probe_idx];
-			ClusterEnvProbe& probe =  env_probes[probe_idx];
-			probe.pos = Vec3(universe.getPosition(e) - cam_pos);
-			probe.rot = universe.getRotation(e).conjugated();
-			probe.inner_range = env_probe.inner_range;
-			probe.outer_range = env_probe.outer_range;
-			for (u32 i = 0; i < 9; ++i) {
-				probe.sh_coefs[i] = Vec4(env_probe.sh_coefs[i], 0);
+			const ShiftedFrustum& frustum = cp.frustum;
+			Vec4 xplanes[65];
+			Vec4 yplanes[65];
+			Vec4 zplanes[17];
+	
+			const Vec3 cam_dir = normalize(cross(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]));
+		
+			Vec3 near = (frustum.points[0] + frustum.points[2]) * 0.5f;
+			Vec3 far = (frustum.points[4] + frustum.points[6]) * 0.5f;
+		
+			for (i32 i = 0; i < size.z + 1; ++i) {
+				// TODO do not hardcode constants
+				float znear = 0.1f;
+				float zfar = 10000.0f;
+				const float z = znear * powf(zfar / znear, i / (float)size.z);
+				const Vec3 p = cam_dir * z;
+				zplanes[i] = makePlane(cam_dir, p);
 			}
-		}
-
-		qsort(env_probes, scene_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
-			const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
-			const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
-			const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
-			const float n3 = n->outer_range.x * n->outer_range.y * n->outer_range.z;
-			if (m3 < n3) return -1;
-			return m3 > n3 ? 1 : 0;
-		});
-
-		auto range = [](const Vec3& p, float r, i32 size, const Vec4* planes){
-			IVec2 range = { -1, -1 };
-			if (planeDist(planes[0], p) < -r) return range;
-			
-			for (i32 i = 0; i < size; ++i) {
-				const float dist = planeDist(planes[i + 1], p);
-				if (dist > r) continue;
-
-				range.x = i;
+	
+			for (i32 i = 0; i < size.y + 1; ++i) {
+				const float t = i / (float)size.y;
+				const Vec3 a = lerp(frustum.points[0], frustum.points[3], t);
+				const Vec3 b = lerp(frustum.points[1], frustum.points[2], t);
+				const Vec3 c = lerp(frustum.points[4], frustum.points[7], t);
+				const Vec3 n = normalize(cross(b - a, c - a));
+				yplanes[i] = makePlane(n, a);
+			}
+	
+			for (i32 i = 0; i < size.x + 1; ++i) {
+				const float t = i / (float)size.x;
+				const Vec3 a = lerp(frustum.points[1], frustum.points[0], t);
+				const Vec3 b = lerp(frustum.points[2], frustum.points[3], t);
+				const Vec3 c = lerp(frustum.points[5], frustum.points[4], t);
+				const Vec3 n = normalize(cross(b - a, c - a));
+				xplanes[i] = makePlane(n, a);
+			}
+	
+			ASSERT(lengthOf(xplanes) >= (u32)size.x);
+			ASSERT(lengthOf(yplanes) >= (u32)size.y);
+	
+			const Span<EntityRef> refl_probe_entities = m_scene->getReflectionProbesEntities();
+			for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
+				const ReflectionProbe& refl_probe = scene_refl_probes[i];
+				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
+				const EntityRef e = refl_probe_entities[i];
+				ClusterReflProbe& probe =  refl_probes[i];
+				probe.pos = Vec3(universe.getPosition(e) - cam_pos);
+				probe.rot = universe.getRotation(e).conjugated();
+				probe.half_extents = refl_probe.half_extents;
+				probe.layer = refl_probe.texture_id;
+			}
+	
+			qsort(refl_probes, scene_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
+				const ClusterReflProbe* m = (const ClusterReflProbe*)a;
+				const ClusterReflProbe* n = (const ClusterReflProbe*)b;
+				const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
+				const float n3 = n->half_extents.x * n->half_extents.y * n->half_extents.z;
+				if (m3 < n3) return -1;
+				return m3 > n3 ? 1 : 0;
+			});
+	
+	
+			const Span<EntityRef> env_probe_entities = m_scene->getEnvironmentProbesEntities();
+			for (u32 probe_idx = 0, c = scene_env_probes.length(); probe_idx < c; ++probe_idx) {
+				const EnvironmentProbe& env_probe = scene_env_probes[probe_idx];
+				if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
+	
+				const EntityRef e = env_probe_entities[probe_idx];
+				ClusterEnvProbe& probe =  env_probes[probe_idx];
+				probe.pos = Vec3(universe.getPosition(e) - cam_pos);
+				probe.rot = universe.getRotation(e).conjugated();
+				probe.inner_range = env_probe.inner_range;
+				probe.outer_range = env_probe.outer_range;
+				for (u32 i = 0; i < 9; ++i) {
+					probe.sh_coefs[i] = Vec4(env_probe.sh_coefs[i], 0);
+				}
+			}
+	
+			qsort(env_probes, scene_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
+				const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
+				const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
+				const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
+				const float n3 = n->outer_range.x * n->outer_range.y * n->outer_range.z;
+				if (m3 < n3) return -1;
+				return m3 > n3 ? 1 : 0;
+			});
+	
+			auto range = [](const Vec3& p, float r, i32 size, const Vec4* planes){
+				IVec2 range = { -1, -1 };
+				if (planeDist(planes[0], p) < -r) return range;
 				
-				for (i32 i2 = i + 1; i2 < size + 1; ++i2) {
-					const float d = planeDist(planes[i2], p);
-					if (d < -r) {
-						range.y = i2;
-						return range;
+				for (i32 i = 0; i < size; ++i) {
+					const float dist = planeDist(planes[i + 1], p);
+					if (dist > r) continue;
+	
+					range.x = i;
+					
+					for (i32 i2 = i + 1; i2 < size + 1; ++i2) {
+						const float d = planeDist(planes[i2], p);
+						if (d < -r) {
+							range.y = i2;
+							return range;
+						}
 					}
+					range.y = size;
+					return range;
 				}
-				range.y = size;
 				return range;
-			}
-			return range;
-		};
-
-		// TODO tighter fit
-		auto for_each_light_pair = [&](auto f){
-			for (i32 i = 0, c = lights_count; i < c; ++i) {
-				ClusterLight& light = lights[i];
-				const float r = light.radius;
-				const Vec3 p = light.pos;
-
-				const IVec2 xrange = range(p, r, size.x, xplanes);
-				const IVec2 yrange = range(p, r, size.y, yplanes);
-				const IVec2 zrange = range(p, r, size.z, zplanes);
-
-				for (i32 z = zrange.x; z < zrange.y; ++z) {
-					for (i32 y = yrange.x; y < yrange.y; ++y) {
-						for (i32 x = xrange.x; x < xrange.y; ++x) {
-							const u32 idx = x + y * size.x + z * size.x * size.y;
-							Cluster& cluster = clusters[idx];
-							f(cluster, i);
+			};
+	
+			// TODO tighter fit
+			auto for_each_light_pair = [&](auto f){
+				for (i32 i = 0, c = lights_count; i < c; ++i) {
+					ClusterLight& light = lights[i];
+					const float r = light.radius;
+					const Vec3 p = light.pos;
+	
+					const IVec2 xrange = range(p, r, size.x, xplanes);
+					const IVec2 yrange = range(p, r, size.y, yplanes);
+					const IVec2 zrange = range(p, r, size.z, zplanes);
+	
+					for (i32 z = zrange.x; z < zrange.y; ++z) {
+						for (i32 y = yrange.x; y < yrange.y; ++y) {
+							for (i32 x = xrange.x; x < xrange.y; ++x) {
+								const u32 idx = x + y * size.x + z * size.x * size.y;
+								Cluster& cluster = clusters[idx];
+								f(cluster, i);
+							}
 						}
 					}
 				}
-			}
-		};
-	
-		auto for_each_env_probe_pair = [&](auto f){
-			for (i32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
-				const Vec3 p = env_probes[i].pos;
-				const float r = length(env_probes[i].outer_range);
+			};
 		
-				const IVec2 xrange = range(p, r, size.x, xplanes);
-				const IVec2 yrange = range(p, r, size.y, yplanes);
-				const IVec2 zrange = range(p, r, size.z, zplanes);
-
-				for (i32 z = zrange.x; z < zrange.y; ++z) {
-					for (i32 y = yrange.x; y < yrange.y; ++y) {
-						for (i32 x = xrange.x; x < xrange.y; ++x) {
-							const u32 idx = x + y * size.x + z * size.x * size.y;
-							Cluster& cluster = clusters[idx];
-							f(cluster, i);
+			auto for_each_env_probe_pair = [&](auto f){
+				for (i32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
+					const Vec3 p = env_probes[i].pos;
+					const float r = length(env_probes[i].outer_range);
+			
+					const IVec2 xrange = range(p, r, size.x, xplanes);
+					const IVec2 yrange = range(p, r, size.y, yplanes);
+					const IVec2 zrange = range(p, r, size.z, zplanes);
+	
+					for (i32 z = zrange.x; z < zrange.y; ++z) {
+						for (i32 y = yrange.x; y < yrange.y; ++y) {
+							for (i32 x = xrange.x; x < xrange.y; ++x) {
+								const u32 idx = x + y * size.x + z * size.x * size.y;
+								Cluster& cluster = clusters[idx];
+								f(cluster, i);
+							}
 						}
 					}
 				}
+			};
+	
+			auto for_each_refl_probe_pair = [&](auto f){
+				for (i32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
+					const Vec3 p = refl_probes[i].pos;
+					const float r = length(refl_probes[i].half_extents);
+			
+					const IVec2 xrange = range(p, r, size.x, xplanes);
+					const IVec2 yrange = range(p, r, size.y, yplanes);
+					const IVec2 zrange = range(p, r, size.z, zplanes);
+	
+					for (i32 z = zrange.x; z < zrange.y; ++z) {
+						for (i32 y = yrange.x; y < yrange.y; ++y) {
+							for (i32 x = xrange.x; x < xrange.y; ++x) {
+								const u32 idx = x + y * size.x + z * size.x * size.y;
+								Cluster& cluster = clusters[idx];
+								f(cluster, i);
+							}
+						}
+					}
+				}
+			};
+	
+			for_each_light_pair([](Cluster& cluster, i32 light_idx){
+				++cluster.lights_count;
+			});
+	
+			for_each_env_probe_pair([](Cluster& cluster, i32){
+				++cluster.env_probes_count;
+			});
+	
+			for_each_refl_probe_pair([](Cluster& cluster, i32){
+				++cluster.refl_probes_count;
+			});
+	
+			u32 offset = 0;
+			for (u32 i = 0; i < clusters_count; ++i) {
+				Cluster& cluster = clusters[i];
+				cluster.offset = offset;
+				offset += cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
-		};
-
-		auto for_each_refl_probe_pair = [&](auto f){
-			for (i32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
-				const Vec3 p = refl_probes[i].pos;
-				const float r = length(refl_probes[i].half_extents);
 		
-				const IVec2 xrange = range(p, r, size.x, xplanes);
-				const IVec2 yrange = range(p, r, size.y, yplanes);
-				const IVec2 zrange = range(p, r, size.z, zplanes);
-
-				for (i32 z = zrange.x; z < zrange.y; ++z) {
-					for (i32 y = yrange.x; y < yrange.y; ++y) {
-						for (i32 x = xrange.x; x < xrange.y; ++x) {
-							const u32 idx = x + y * size.x + z * size.x * size.y;
-							Cluster& cluster = clusters[idx];
-							f(cluster, i);
-						}
-					}
-				}
+			i32* map = (i32*)frame_allocator.allocate(offset * sizeof(i32));
+	
+			for_each_light_pair([&](Cluster& cluster, i32 light_idx){
+				map[cluster.offset] = light_idx;
+				++cluster.offset;
+			});
+	
+			for_each_env_probe_pair([&](Cluster& cluster, i32 probe_idx){
+				map[cluster.offset] = probe_idx;
+				++cluster.offset;
+			});
+	
+			for_each_refl_probe_pair([&](Cluster& cluster, i32 probe_idx){
+				map[cluster.offset] = probe_idx;
+				++cluster.offset;
+			});
+	
+			for (u32 i = 0; i < clusters_count; ++i) {
+				Cluster& cluster = clusters[i];
+				cluster.offset -= cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
-		};
-
-		for_each_light_pair([](Cluster& cluster, i32 light_idx){
-			++cluster.lights_count;
+		
+			bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
+			bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
+			bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(env_probes[0]), 14, stream);
+			bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
+			bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
 		});
-
-		for_each_env_probe_pair([](Cluster& cluster, i32){
-			++cluster.env_probes_count;
-		});
-
-		for_each_refl_probe_pair([](Cluster& cluster, i32){
-			++cluster.refl_probes_count;
-		});
-
-		u32 offset = 0;
-		for (u32 i = 0; i < clusters_count; ++i) {
-			Cluster& cluster = clusters[i];
-			cluster.offset = offset;
-			offset += cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
-		}
-	
-		i32* map = (i32*)frame_allocator.allocate(offset * sizeof(i32));
-
-		for_each_light_pair([&](Cluster& cluster, i32 light_idx){
-			map[cluster.offset] = light_idx;
-			++cluster.offset;
-		});
-
-		for_each_env_probe_pair([&](Cluster& cluster, i32 probe_idx){
-			map[cluster.offset] = probe_idx;
-			++cluster.offset;
-		});
-
-		for_each_refl_probe_pair([&](Cluster& cluster, i32 probe_idx){
-			map[cluster.offset] = probe_idx;
-			++cluster.offset;
-		});
-
-		for (u32 i = 0; i < clusters_count; ++i) {
-			Cluster& cluster = clusters[i];
-			cluster.offset -= cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
-		}
-	
-		bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
-		bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
-		bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(env_probes[0]), 14, stream);
-		bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
-		bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
 	}
 
 	CameraParamsHandle getShadowCameraParams(i32 slice) { return (CameraParamsHandle)CameraParamsEnum::SHADOW0 + slice; }
