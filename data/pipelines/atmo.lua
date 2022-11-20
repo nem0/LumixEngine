@@ -78,6 +78,54 @@ function setDrawcallUniforms(env, x, y, z)
 	)
 end
 
+function createStates(env)
+	env.clouds_state = env.clouds_state or env.createRenderState({
+		blending = "alpha",
+		depth_write = false,
+		depth_test = false,
+		stencil_write_mask = 0,
+		stencil_func = env.STENCIL_EQUAL,
+		stencil_ref = 0,
+		stencil_mask = 0xff,
+		stencil_sfail = env.STENCIL_KEEP,
+		stencil_zfail = env.STENCIL_KEEP,
+		stencil_zpass = env.STENCIL_KEEP,
+	})
+
+	env.atmo_no_sky_state = env.atmo_no_sky_state or env.createRenderState({
+		blending = "dual",
+		depth_write = false,
+		depth_test = false,
+		stencil_write_mask = 0,
+		stencil_func = env.STENCIL_NOT_EQUAL,
+		stencil_ref = 0,
+		stencil_mask = 0xff,
+		stencil_sfail = env.STENCIL_KEEP,
+		stencil_zfail = env.STENCIL_KEEP,
+		stencil_zpass = env.STENCIL_KEEP
+	})
+
+	env.atmo_no_object_state = env.atmo_no_object_state or env.createRenderState({
+		blending = "dual",
+		depth_write = false,
+		depth_test = false,
+		stencil_write_mask = 0,
+		stencil_func = env.STENCIL_EQUAL,
+		stencil_ref = 0,
+		stencil_mask = 0xff,
+		stencil_sfail = env.STENCIL_KEEP,
+		stencil_zfail = env.STENCIL_KEEP,
+		stencil_zpass = env.STENCIL_KEEP
+	})
+	
+	env.atmo_state = env.atmo_state or env.createRenderState({
+		blending = "dual",
+		depth_write = false,
+		depth_test = false
+	})
+
+end
+
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
@@ -93,41 +141,19 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		env.clouds_noise_precomputed = env.createTexture3D(128, 128, 128, "rgba32f", "cloud_noise")
 	end
 	env.setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
-	local state = {
-		blending = "dual",
-		depth_write = false,
-		depth_test = false
-	}
-	local clouds_state = {
-		blending = "alpha",
-		depth_write = false,
-		depth_test = false,
-		stencil_write_mask = 0,
-		stencil_func = env.STENCIL_EQUAL,
-		stencil_ref = 0,
-		stencil_mask = 0xff,
-		stencil_sfail = env.STENCIL_KEEP,
-		stencil_zfail = env.STENCIL_KEEP,
-		stencil_zpass = env.STENCIL_KEEP,
-	}
-	if object_atmo == false then
-		state.stencil_write_mask = 0
-		state.stencil_func = env.STENCIL_EQUAL
-		state.stencil_ref = 0
-		state.stencil_mask = 0xff
-		state.stencil_sfail = env.STENCIL_KEEP
-		state.stencil_zfail = env.STENCIL_KEEP
-		state.stencil_zpass = env.STENCIL_KEEP
-	elseif not sky then
-		state.stencil_write_mask = 0
-		state.stencil_func = env.STENCIL_NOT_EQUAL
-		state.stencil_ref = 0
-		state.stencil_mask = 0xff
-		state.stencil_sfail = env.STENCIL_KEEP
-		state.stencil_zfail = env.STENCIL_KEEP
-		state.stencil_zpass = env.STENCIL_KEEP
+
+	if env.atmo_state == nil then
+		createStates(env)
 	end
-	
+
+	local state = env.atmo_state
+	if object_atmo == false then
+		state = env.atmo_no_object_state
+	elseif not sky then
+		state = env.atmo_no_sky_state
+	end
+
+
 	env.beginBlock("precompute_transmittance")
 	env.bindImageTexture(env.opt_depth_precomputed, 0)
 	setDrawcallUniforms(env, 128, 128, 1)
@@ -158,7 +184,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 			cloud_param0, cloud_param1, cloud_param2, cloud_param3
 		)
 		env.bindTextures({env.inscatter_precomputed, env.clouds_noise_precomputed}, 1);
-		env.drawArray(0, 3, env.clouds_shader, { gbuffer_depth }, clouds_state)
+		env.drawArray(0, 3, env.clouds_shader, { gbuffer_depth }, env.clouds_state)
 		env.endBlock()
 	end
 	

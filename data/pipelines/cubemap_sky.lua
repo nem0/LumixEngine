@@ -12,7 +12,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	end
 	env.setRenderTargetsDS(hdr_buffer, gbuffer_depth)
 	env.bindTextures({sky}, 0)
-	local state = {
+	env.cubemap_sky_state = env.cubemap_sky_state or env.createRenderState({
 		stencil_write_mask = 0,
 		stencil_func = env.STENCIL_EQUAL,
 		stencil_ref = 0,
@@ -22,9 +22,9 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		stencil_zpass = env.STENCIL_REPLACE,
 		depth_write = false,
 		depth_test = false
-	}
+	})
 	env.drawcallUniforms(intensity, 0, 0, 0)
-	env.drawArray(0, 3, env.cubemap_sky_shader, {}, state)
+	env.drawArray(0, 3, env.cubemap_sky_shader, {}, env.cubemap_sky_state)
 	env.endBlock()
 	return hdr_buffer
 end

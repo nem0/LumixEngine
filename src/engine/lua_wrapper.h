@@ -580,8 +580,13 @@ template <typename T> T checkArg(lua_State* L, int index, Tag<T>)
 template <typename T> Optional<T> checkArg(lua_State* L, int index, Tag<Optional<T>>)
 {
 	Optional<T> res;
-	if (!isType<T>(L, index)) {
+	int type = lua_type(L, index);
+	if (type == LUA_TNONE || type == LUA_TNIL) {
 		res.valid = false;
+		return res;
+	}
+	if (!isType<T>(L, index)) {
+		luaL_argerror(L, index, "unexpected type");
 	}
 	else {
 		res.value = toType<T>(L, index);

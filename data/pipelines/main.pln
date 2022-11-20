@@ -22,12 +22,26 @@ local render_grass = true
 local render_impostors = true
 local render_terrain = true
 
-local decal_state = {
+local empty_state = createRenderState {}
+
+local decal_state = createRenderState {
 	blending = "alpha",
 	depth_write = false
 }
 
-local terrain_decal_state = {
+local light_pass_state = createRenderState { 
+	depth_test = false,
+	blending = "add",
+	stencil_write_mask = 0,
+	stencil_func = STENCIL_NOT_EQUAL,
+	stencil_ref = 0,
+	stencil_mask = 0xff,
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
+	stencil_zpass = STENCIL_KEEP,
+}
+
+local terrain_decal_state = createRenderState {
 	blending = "alpha",
 	depth_write = false,
 	stencil_write_mask = 0,
@@ -39,16 +53,16 @@ local terrain_decal_state = {
 	stencil_zpass = STENCIL_KEEP,
 }
 
-local transparent_state = {
+local transparent_state = createRenderState {
 	blending = "alpha",
 	depth_write = false
 }
 
-local water_state = {
+local water_state = createRenderState {
 	depth_write = false,
 }
 
-local default_state = {
+local default_state = createRenderState {
 	depth_write = true,
 	stencil_func = STENCIL_ALWAYS,
 	stencil_write_mask = 0xff,
@@ -59,8 +73,7 @@ local default_state = {
 	stencil_zpass = STENCIL_REPLACE,
 }
 
-local terrain_state = {
-	define = "DEFERRED",
+local terrain_state = createRenderState {
 	depth_func = DEPTH_FN_EQUAL,
 	depth_write = false,
 	stencil_func = STENCIL_ALWAYS,
@@ -72,7 +85,7 @@ local terrain_state = {
 	stencil_zpass = STENCIL_REPLACE,
 }
 
-local grass_state = {
+local grass_state = createRenderState {
 	define = "GRASS",
 	depth_write = true,
 	stencil_func = STENCIL_ALWAYS,
@@ -84,7 +97,7 @@ local grass_state = {
 	stencil_zpass = STENCIL_REPLACE,
 }
 
-local shadow_grass_state = {
+local shadow_grass_state = createRenderState {
 	defines = { "GRASS", "DEPTH" },
 	depth_write = true,
 	stencil_func = STENCIL_ALWAYS,
@@ -113,7 +126,7 @@ function waterPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 	-- TODO textures instead of drawcall
 	drawArray(0, 3, textured_quad_shader
 		, { colorbuffer }
-		, { depth_test = false }
+		, empty_state
 	)
 
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
@@ -147,7 +160,7 @@ function geomPass(view_params, entities)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
 		pass(view_params)
 		if render_terrain then
-			renderTerrains(view_params, {define = "DEPTH" })
+			renderTerrains(view_params, empty_state, "DEPTH")
 		end
 		if render_grass then
 			renderGrass(view_params, grass_state)
@@ -160,7 +173,7 @@ function geomPass(view_params, entities)
 			endBlock()
 		end
 		if render_terrain then
-			renderTerrains(view_params, terrain_state)
+			renderTerrains(view_params, terrain_state, "DEFERRED")
 		end
 	endBlock()
 
@@ -198,17 +211,7 @@ function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, sha
 			SHADOW_ATLAS,
 			REFLECTION_PROBES
 		}, 
-		{ 
-			depth_test = false,
-			blending = "add",
-			stencil_write_mask = 0,
-			stencil_func = STENCIL_NOT_EQUAL,
-			stencil_ref = 0,
-			stencil_mask = 0xff,
-			stencil_sfail = STENCIL_KEEP,
-			stencil_zfail = STENCIL_KEEP,
-			stencil_zpass = STENCIL_KEEP,
-		}
+		light_pass_state
 	)
 	endBlock()
 	
@@ -293,7 +296,7 @@ function shadowPass()
 					renderGrass(view_params, shadow_grass_state)
 				end
 				if render_terrain then
-					renderTerrains(view_params, {define = "DEPTH"})
+					renderTerrains(view_params, empty_state, "DEPTH")
 				end
 				endBlock()
 			end
@@ -330,7 +333,7 @@ function tonemap(hdr_buffer)
 	setRenderTargets(rb)
 	drawArray(0, 3, tonemap_shader
 		, { hdr_buffer }
-		, { depth_test = false }
+		, empty_state
 	)
 	endBlock()
 	return rb
@@ -376,7 +379,7 @@ local selection_mask = createRenderbuffer { width = viewport_w, height = viewpor
 	setRenderTargets(output)
 	drawArray(0, 3, selection_outline_shader
 		, { selection_mask }
-		, { depth_test = false }
+		, empty_state
 	)
 end
 
@@ -392,7 +395,7 @@ function main_shadowmap()
 
 	local entities = cull(view_params, {layer="default", define="DEPTH"})
 	renderBucket(entities.default)
-	renderTerrains(view_params, {define = "DEPTH"})
+	renderTerrains(view_params, empty_state, "DEPTH")
 	setOutput(depthbuf)
 
 	endBlock()
@@ -457,7 +460,7 @@ function TAA(res, gbuffer_depth)
 		-- TODO get rid of this step
 		drawArray(0, 3, textured_quad_shader
 			, { taa_tmp }
-			, { depth_test = false })
+			, empty_state)
 
 		taa_history = taa_tmp
 

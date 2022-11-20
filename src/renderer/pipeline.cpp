@@ -80,6 +80,7 @@ struct PipelineTexture {
 	};
 };
 
+using RenderStateHandle = u32;
 struct RenderState {
 	gpu::StateFlags value;
 };
@@ -685,6 +686,7 @@ struct PipelineImpl final : Pipeline
 		, m_textures(allocator)
 		, m_buffers(allocator)
 		, m_views(allocator)
+		, m_render_states(allocator)
 		, m_base_vertex_decl(gpu::PrimitiveType::TRIANGLES)
 		, m_base_line_vertex_decl(gpu::PrimitiveType::LINES)
 		, m_decal_decl(gpu::PrimitiveType::TRIANGLES)
@@ -1599,11 +1601,10 @@ struct PipelineImpl final : Pipeline
 		return {};
 	}
 
-	void renderTerrains(lua_State* L, CameraParamsHandle cp_handle, RenderState render_state) {
+	void renderTerrains(CameraParamsHandle cp_handle, RenderStateHandle render_state_handle, LuaWrapper::Optional<const char*> define) {
 		const CameraParams cp = resolveCameraParams(cp_handle);
-		char define[64] = "";
-		LuaWrapper::getOptionalStringField(L, 2, "define", Span(define));
-		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		const u32 define_mask = define.valid && define.value[0] ? 1 << m_renderer.getShaderDefineIdx(define.value) : 0;
+		const gpu::StateFlags render_state = m_render_states[render_state_handle];
 
 		m_renderer.pushJob("terrain", [this, cp, render_state, define_mask](DrawStream& stream){
 			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
@@ -1623,7 +1624,7 @@ struct PipelineImpl final : Pipeline
 				const Vec3 scale = terrain->getScale();
 				const Vec2 hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				const gpu::ProgramHandle program = shader->getProgram(render_state.value, decl, define_mask | terrain->m_material->getDefineMask());
+				const gpu::ProgramHandle program = shader->getProgram(render_state, decl, define_mask | terrain->m_material->getDefineMask());
 				const Material* material = terrain->m_material;
 				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
@@ -1701,7 +1702,7 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 	
-	void renderGrass(lua_State* L, CameraParamsHandle cp_handle, LuaWrapper::Optional<RenderState> state) {
+	void renderGrass(lua_State* L, CameraParamsHandle cp_handle, LuaWrapper::Optional<RenderStateHandle> state_handle) {
 		PROFILE_FUNCTION();
 		const CameraParams cp = resolveCameraParams(cp_handle);
 		if (!cp.is_shadow) {
@@ -1727,7 +1728,7 @@ struct PipelineImpl final : Pipeline
 			lua_pop(L, 1);
 		}
 		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
-		const gpu::StateFlags render_state = state.get({gpu::StateFlags::NONE}).value;
+		gpu::StateFlags render_state = state_handle.valid ? m_render_states[state_handle.value] : gpu::StateFlags::NONE;
 
 		m_renderer.pushJob("grass", [this, cp, define_mask, render_state](DrawStream& stream){
 			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
@@ -2039,16 +2040,10 @@ struct PipelineImpl final : Pipeline
 	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id)
 	{
 		LuaWrapper::DebugGuard guard(L);
-
 		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
 		
-		const gpu::StateFlags rs = [&](){
-			if(lua_gettop(L) > 4) {
-				LuaWrapper::checkTableArg(L, 5);
-				return LuaWrapper::toType<RenderState>(L, 5).value;
-			}
-			return gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
-		}();
+		LuaWrapper::Optional<RenderStateHandle> state_handle = LuaWrapper::checkArg<LuaWrapper::Optional<RenderStateHandle>>(L, 5);
+		const gpu::StateFlags rs = state_handle.valid ? m_render_states[state_handle.value] : gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
 
 		Shader* shader = nullptr;
 		for (const ShaderRef& s : m_shaders) {
@@ -2541,9 +2536,9 @@ struct PipelineImpl final : Pipeline
 				bucket.define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
 			}
 
-			RenderState state;
-			if (LuaWrapper::getOptionalField<RenderState>(L, 2 + i, "state", &state)) {
-				bucket.state = state.value;
+			RenderStateHandle state_handle;
+			if (LuaWrapper::getOptionalField<RenderStateHandle>(L, 2 + i, "state", &state_handle)) {
+				bucket.state = pipeline->m_render_states[state_handle];
 			}
 		}
 
@@ -3729,6 +3724,14 @@ struct PipelineImpl final : Pipeline
 		return m_scene->getEnvironmentCastShadows((EntityRef)env);
 	}
 
+	RenderStateHandle createRenderState(RenderState state) {
+		for (const gpu::StateFlags& s : m_render_states) {
+			if (s == state.value) return RenderStateHandle(&s - m_render_states.begin());
+		}
+		m_render_states.push(state.value);
+		return m_render_states.size() - 1;
+	}
+
 	int preloadShader(const char* path)
 	{
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
@@ -3822,6 +3825,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createBuffer);
 		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(createRenderState);
 		REGISTER_FUNCTION(createTextureArray);
 		REGISTER_FUNCTION(createTexture2D);
 		REGISTER_FUNCTION(createTexture3D);
@@ -3918,6 +3922,7 @@ struct PipelineImpl final : Pipeline
 	int m_lua_thread_ref;
 	int m_lua_env;
 	StaticString<32> m_define;
+	Array<gpu::StateFlags> m_render_states;
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;

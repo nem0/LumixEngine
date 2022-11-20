@@ -14,6 +14,8 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 
 	local tmp_rb = env.createRenderbuffer { width = env.viewport_w, height = env.viewport_h, format = "rgba16f", debug_name = "dof_tmp" }
 	
+	env.dof_state = env.dof_state or env.createRenderState({ depth_test = false, blending = "alpha"})
+
 	env.setRenderTargets(tmp_rb)
 	env.drawcallUniforms(near_blur, near_sharp, far_sharp, far_blur)
 
@@ -22,7 +24,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 			input,
 			gbuffer_depth
 		},
-		{ depth_test = false, blending = "alpha"},
+		env.dof_state,
 		{ "HBLUR", "NEAR" }
 	)
 
@@ -32,7 +34,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 			tmp_rb,
 			gbuffer_depth
 		},
-		{ depth_test = false, blending = "alpha"},
+		env.dof_state,
 		{ "NEAR" }
 	)
 
@@ -42,7 +44,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 			input,
 			gbuffer_depth
 		},
-		{ depth_test = false, blending = "alpha"},
+		env.dof_state,
 		{ "HBLUR", "FAR" }
 	)
 
@@ -52,7 +54,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 			tmp_rb,
 			gbuffer_depth
 		},
-		{ depth_test = false, blending = "alpha"},
+		env.dof_state,
 		{ "FAR" }
 	)
 
