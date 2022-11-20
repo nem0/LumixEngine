@@ -838,7 +838,6 @@ void SceneView::renderSelection()
 		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
 		const DVec3 view_pos = m_view->getViewport().pos;
 		Array<DualQuat> dq_pose(engine.getAllocator());
-		stream.pushDebugGroup("selection");
 		for (EntityRef e : entities) {
 			if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 
@@ -897,7 +896,6 @@ void SceneView::renderSelection()
 			}
 			scene->unlockPose(e, false);
 		}
-		stream.popDebugGroup();
 	});
 }
 
