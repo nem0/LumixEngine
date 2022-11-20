@@ -201,5 +201,6 @@ LUMIX_ENGINE_API float getLineSegmentDistance(const Vec3& origin, const Vec3& di
 LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b, const Vec3& c, float* out_t);
 LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center, float radius, const Vec3& v0, const Vec3& v1, const Vec3& v2);
 LUMIX_ENGINE_API bool testOBBCollision(const AABB& a, const Matrix& mtx_b, const AABB& b);
+LUMIX_ENGINE_API bool testAABBTriangleCollision(const AABB& aabb, const Vec3& a, const Vec3& b, const Vec3& c);
 
 } // namespace Lumix

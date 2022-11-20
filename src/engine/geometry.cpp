@@ -1006,6 +1006,26 @@ static bool overlaps(float min1, float max1, float min2, float max2)
 	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
 }
 
+bool testAABBTriangleCollision(const AABB& aabb, const Vec3& a, const Vec3& b, const Vec3& c) {
+	AABB triaabb;
+	triaabb.min = triaabb.max = a;
+	triaabb.addPoint(b);
+	triaabb.addPoint(c);
+	if (!triaabb.overlaps(aabb)) return false;
+
+	const Vec3 N = cross(b - a, c - a);
+	
+	// p0, p1 oposite aabb vertices, with "normals" closest to triangle's normal
+	Vec3 p0 = aabb.min, p1 = aabb.max;
+	if (N.x < 0) swap(p0.x, p1.x);
+	if (N.y < 0) swap(p0.y, p1.y);
+	if (N.z < 0) swap(p0.z, p1.z);
+
+	// both are on the same side of triangle
+	if (dot(N, p0 - a) * dot(N, p1 - a) > 0) return false;
+	return true;
+}
+
 bool testOBBCollision(const AABB& a, const Matrix& mtx_b, const AABB& b)
 {
 	Vec3 box_a_points[8];

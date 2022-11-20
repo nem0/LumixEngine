@@ -450,7 +450,9 @@ Vec3 Vec3::operator*(const IVec3& rhs) const {
 Vec3 Vec3::operator/(const IVec3& rhs) const {
 	return Vec3(x / rhs.x, y / rhs.y, z / rhs.z);
 }
-
+Vec3 Vec3::operator/(const Vec3& rhs) const {
+	return Vec3(x / rhs.x, y / rhs.y, z / rhs.z);
+}
 Vec3 Vec3::operator/(float s) const {
 	float tmp = 1 / s;
 	return Vec3(x * tmp, y * tmp, z * tmp);
@@ -503,6 +505,12 @@ void DVec3::operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
 DVec2 DVec3::xz() const { return DVec2(x, z); }
 
 Vec3::Vec3(const DVec3& rhs)
+	: x((float)rhs.x)
+	, y((float)rhs.y)
+	, z((float)rhs.z)
+{}
+
+Vec3::Vec3(const IVec3& rhs)
 	: x((float)rhs.x)
 	, y((float)rhs.y)
 	, z((float)rhs.z)

@@ -31,6 +31,7 @@
 namespace Lumix
 {
 
+
 void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3& up, const Vec3& dir, Color color) {
 	UniverseView::Vertex* vertices = view.render(true, 24);
 	const DVec3& cam_pos = view.getViewport().pos;

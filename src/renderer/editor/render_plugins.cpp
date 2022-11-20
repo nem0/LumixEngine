@@ -56,6 +56,7 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
+#include "voxelizer_ui.h"
 
 #define RGBCX_IMPLEMENTATION
 #include <rgbcx/rgbcx.h>
@@ -4903,6 +4904,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_font_plugin(app)
 		, m_material_plugin(app)
 		, m_particle_emitter_plugin(app)
+		, m_voxelizer_plugin(app)
 		, m_particle_emitter_property_plugin(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
@@ -4982,6 +4984,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(m_game_view);
 		m_app.addPlugin(m_editor_ui_render_plugin);
 		m_app.addPlugin(m_procedural_geom_plugin);
+		m_app.addPlugin(m_voxelizer_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(m_model_properties_plugin);
@@ -5234,6 +5237,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
 		m_app.removePlugin(m_procedural_geom_plugin);
+		m_app.removePlugin(m_voxelizer_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
@@ -5265,6 +5269,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	ProceduralGeomPlugin m_procedural_geom_plugin;
 	InstancedModelPlugin m_instanced_model_plugin;
 	ModelPlugin m_model_plugin;
+	VoxelizerUI m_voxelizer_plugin;
 };
 
 LUMIX_STUDIO_ENTRY(renderer)
