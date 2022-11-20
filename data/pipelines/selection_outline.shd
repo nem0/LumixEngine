@@ -20,7 +20,7 @@ fragment_shader [[
 	layout(location = 0) out vec4 o_color;
 	
 	void main() {
-		if(texture(u_mask, v_uv).a > 0) discard;
+		if(texture(u_mask, v_uv).r > 0) discard;
 		
 		vec2 view_texel = 1.0 / Global.framebuffer_size;
 		
@@ -28,14 +28,13 @@ fragment_shader [[
 		int c = 0;
 		for(int i = 0; i < 3; ++i)
 		{
-			if(texture(u_mask, v_uv + vec2(view_texel.x * i, 0)).a == 0) ++c;
-			if(texture(u_mask, v_uv + vec2(-view_texel.x * i, 0)).a == 0) ++c;
-			if(texture(u_mask, v_uv + vec2(0, view_texel.y * i)).a == 0) ++c;
-			if(texture(u_mask, v_uv + vec2(0, -view_texel.y * i)).a == 0) ++c;
+			if(texture(u_mask, v_uv + vec2(view_texel.x * i, 0)).r == 0) ++c;
+			if(texture(u_mask, v_uv + vec2(-view_texel.x * i, 0)).r == 0) ++c;
+			if(texture(u_mask, v_uv + vec2(0, view_texel.y * i)).r == 0) ++c;
+			if(texture(u_mask, v_uv + vec2(0, -view_texel.y * i)).r == 0) ++c;
 		}
 
 		if(c == 12) discard;
-		vec4 x = vec4(1, 0.5, 0, 1.0f);
-		o_color.rgba = x;
+		o_color.rgba = vec4(1, 0.5, 0, 1.0f);
 	}
 ]]

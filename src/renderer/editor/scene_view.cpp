@@ -836,6 +836,7 @@ void SceneView::renderSelection()
 		RenderScene* scene = m_pipeline->getScene();
 		const Universe& universe = scene->getUniverse();
 		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
+		const u32 depth_define = 1 << renderer.getShaderDefineIdx("DEPTH");
 		const DVec3 view_pos = m_view->getViewport().pos;
 		Array<DualQuat> dq_pose(engine.getAllocator());
 		for (EntityRef e : entities) {
@@ -849,7 +850,7 @@ void SceneView::renderSelection()
 				const Mesh& mesh = model->getMesh(i);
 					
 				Material* material = mesh.material;
-				u32 define_mask = material->getDefineMask();
+				u32 define_mask = material->getDefineMask() | depth_define;
 				const Matrix mtx = universe.getRelativeMatrix(e, view_pos);
 				dq_pose.clear();
 				if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
@@ -885,7 +886,8 @@ void SceneView::renderSelection()
 					memcpy(ub.ptr + sizeof(UBPrefix), dq_pose.begin(), dq_pose.byte_size());
 				}
 		
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states, mesh.vertex_decl, define_mask);
+				const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask);
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				stream.bind(0, material->m_bind_group);
 				stream.useProgram(program);

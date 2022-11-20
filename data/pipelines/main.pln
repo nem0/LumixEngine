@@ -27,7 +27,7 @@ end
 
 local shadowmap_1x1 = createRenderbufferDesc { size = {1, 1}, format = "depth32", debug_name = "shadowmap" }
 local shadowmap_desc = createRenderbufferDesc { size = { 4096, 1024 }, format = "depth32", debug_name = "shadowmap" }
-local selection_mask_desc = createRenderbufferDesc { format = "rgba8", debug_name = "selection outline" }
+local selection_mask_desc = createRenderbufferDesc { format = "depth32", debug_name = "selection_depthbuffer" }
 local gbuffer0_desc = createRenderbufferDesc { format = "srgba", debug_name = "gbuffer0" }
 local gbuffer1_desc = createRenderbufferDesc { compute_write = true, format = "rgba16", debug_name = "gbuffer1" }
 local gbuffer2_desc = createRenderbufferDesc { compute_write = true, format = "rgba8", debug_name = "gbuffer2" }
@@ -43,6 +43,7 @@ local preview_rb_desc = createRenderbufferDesc { format = "rgba16f", debug_name 
 local preview_ds_desc = createRenderbufferDesc { format = "depth32", debug_name = "gbuffer_ds" }
 
 local empty_state = createRenderState {}
+local no_depth_state = createRenderState { depth_write = false, depth_test = false}
 
 local decal_state = createRenderState {
 	blending = "alpha",
@@ -380,14 +381,14 @@ end
 
 function renderSelectionOutline(output)
 	local selection_mask = createRenderbuffer(selection_mask_desc)
-	setRenderTargets(selection_mask)
-	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
+	setRenderTargetsDS(selection_mask)
+	clear(CLEAR_DEPTH, 0, 0, 0, 0, 0)
 	renderSelection()
 	
 	setRenderTargets(output)
 	drawArray(0, 3, selection_outline_shader
 		, { selection_mask }
-		, empty_state
+		, no_depth_state
 	)
 end
 
@@ -539,9 +540,6 @@ function main()
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 			renderGizmos()
 	end
-	TAA(res, gbuffer_depth)
-
-	render2D()
 
 	if SCENE_VIEW ~= nil then
 		renderDebugShapes()
@@ -554,6 +552,10 @@ function main()
 			renderIcons()
 		end
 	end
+
+	TAA(res, gbuffer_depth)
+
+	render2D()
 
 	if APP ~= nil then
 		setRenderTargets()
