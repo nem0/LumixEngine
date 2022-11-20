@@ -384,7 +384,6 @@ struct PipelineImpl final : Pipeline
 		gpu::TextureFormat format;
 		gpu::TextureHandle handle;
 		int frame_counter;
-		bool persistent;
 		gpu::TextureFlags flags;
 	};
 
@@ -949,7 +948,7 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
-			if (rb.frame_counter > 2 && !rb.persistent && rb.handle) {
+			if (rb.frame_counter > 2 && rb.handle) {
 				m_renderer.getDrawStream().destroy(rb.handle);
 				rb.handle = gpu::INVALID_TEXTURE;
 			}
@@ -1481,7 +1480,6 @@ struct PipelineImpl final : Pipeline
 
 		if (rb >= 0 && rb < m_renderbuffers.size()) {
 			m_renderbuffers[rb].frame_counter = 2;
-			m_renderbuffers[rb].persistent = false;
 		}
 	}
 
@@ -1500,14 +1498,12 @@ struct PipelineImpl final : Pipeline
 		u32 rb_w, rb_h;
 		char format_str[64];
 		char debug_name[64] = "";
-		bool persistent = false;
 		bool point_filter = false;
 		bool compute_write = false;
 		if (!LuaWrapper::checkField(L, 1, "width", &rb_w)) luaL_argerror(L, 1, "missing width");
 		if (!LuaWrapper::checkField(L, 1, "height", &rb_h)) luaL_argerror(L, 1, "missing height");
 		if (!LuaWrapper::checkStringField(L, 1, "format", Span(format_str))) luaL_argerror(L, 1, "missing format");
 		LuaWrapper::getOptionalStringField(L, 1, "debug_name", Span(debug_name));
-		LuaWrapper::getOptionalField(L, 1, "persistent", &persistent);
 		LuaWrapper::getOptionalField(L, 1, "point_filter", &point_filter);
 		LuaWrapper::getOptionalField(L, 1, "compute_write", &compute_write);
 		gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET 
@@ -1531,7 +1527,6 @@ struct PipelineImpl final : Pipeline
 			}
 			else {
 				if (rb.frame_counter < 2) continue;
-				if (rb.persistent) continue;
 				if (rb.width != rb_w) continue;
 				if (rb.height != rb_h) continue;
 				if (rb.format != format) continue;
@@ -1539,7 +1534,6 @@ struct PipelineImpl final : Pipeline
 			}
 
 			rb.frame_counter = 0;
-			rb.persistent = persistent;
 			PipelineTexture res;
 			res.type = PipelineTexture::RENDERBUFFER;
 			res.renderbuffer = i;
@@ -1558,7 +1552,6 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.persistent = persistent;
 		rb.flags = flags;
 		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, Renderer::MemRef(), debug_name);
 
