@@ -109,6 +109,10 @@ template <> inline bool isType<Vec2>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 2;
 }
+template <> inline bool isType<IVec2>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 2;
+}
 template <> inline bool isType<Matrix>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 16;

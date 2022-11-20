@@ -14,13 +14,33 @@ local debug_shadow_buf = false
 local debug_albedo = false
 local debug_clusters = false
 local debug_shadow_atlas = false
-local screenshot_request = 0
 local enable_icons = true
 local taa_enabled = true
 local taa_history = -1
 local render_grass = true
 local render_impostors = true
 local render_terrain = true
+
+function iff(cond, a, b) 
+	if cond then return a else return b end
+end
+
+local shadowmap_1x1 = createRenderbufferDesc { size = {1, 1}, format = "depth32", debug_name = "shadowmap" }
+local shadowmap_desc = createRenderbufferDesc { size = { 4096, 1024 }, format = "depth32", debug_name = "shadowmap" }
+local selection_mask_desc = createRenderbufferDesc { format = "rgba8", debug_name = "selection outline" }
+local gbuffer0_desc = createRenderbufferDesc { format = "srgba", debug_name = "gbuffer0" }
+local gbuffer1_desc = createRenderbufferDesc { compute_write = true, format = "rgba16", debug_name = "gbuffer1" }
+local gbuffer2_desc = createRenderbufferDesc { compute_write = true, format = "rgba8", debug_name = "gbuffer2" }
+local dsbuffer_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "gbuffer_ds" }
+local baked_shadowmap_desc = createRenderbufferDesc { format = "depth32", debug_name = "shadowmap_depth" }
+local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true }
+local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true }
+local icon_ds_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "icon_ds" }
+local water_color_copy_desc = createRenderbufferDesc { format = "r11g11b10f", debug_name = "hdr_copy" }
+local hdr_rb_desc = createRenderbufferDesc { format = iff(PROBE ~= nil, "rgba32f", "rgba16f"), debug_name = "hdr" }
+local tonemap_rb_desc = createRenderbufferDesc { format = iff(PREVIEW ~= nil, "rgba8", "srgba"), debug_name = "tonemap" }
+local preview_rb_desc = createRenderbufferDesc { format = "rgba16f", debug_name = "preview_rb" }
+local preview_ds_desc = createRenderbufferDesc { format = "depth32", debug_name = "gbuffer_ds" }
 
 local empty_state = createRenderState {}
 
@@ -111,7 +131,7 @@ local shadow_grass_state = createRenderState {
 
 function waterPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 
-	local color_copy = createRenderbuffer { width = viewport_w, height = viewport_h, format = "r11g11b10f", debug_name = "hdr_copy" }
+	local color_copy = createRenderbuffer(water_color_copy_desc)
 
 	setRenderTargets(color_copy)
 
@@ -151,10 +171,10 @@ end
 
 function geomPass(view_params, entities)
 	beginBlock("geom_pass")
-		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "srgba", debug_name = "gbuffer0" }
-		local gbuffer1 = createRenderbuffer { width = viewport_w, height = viewport_h, compute_write = true, format = "rgba16", debug_name = "gbuffer1" }
-		local gbuffer2 = createRenderbuffer { width = viewport_w, height = viewport_h, compute_write = true, format = "rgba8", debug_name = "gbuffer2" }
-		local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "gbuffer_ds" }
+		local gbuffer0 = createRenderbuffer(gbuffer0_desc)
+		local gbuffer1 = createRenderbuffer(gbuffer1_desc)
+		local gbuffer2 = createRenderbuffer(gbuffer2_desc)
+		local dsbuffer = createRenderbuffer(dsbuffer_desc)
 	
 		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
@@ -190,11 +210,7 @@ function geomPass(view_params, entities)
 end
 
 function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-	local format = "rgba16f"
-	if PROBE ~= nil then
-		format = "rgba32f"
-	end
-	local hdr_rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = format, debug_name = "hdr" }
+	local hdr_rb = createRenderbuffer(hdr_rb_desc)
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
@@ -239,41 +255,40 @@ function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 	)
 	drawArray(0, 3, textured_quad_shader
 		, { rb }
-		, { depth_test = false }
+		, empty_state
 	)
 end
 
-function blur(buffer, format, w, h, tmp_rb_dbg_name) 
+function blur(buffer, w, h, rb_desc) 
 	beginBlock("blur")
-	local blur_buf = createRenderbuffer { width = w, height = h, format = format, debug_name = tmp_rb_dbg_name }
+	local blur_buf = createRenderbuffer(rb_desc)
 	setRenderTargets(blur_buf)
 	viewport(0, 0, w, h)
 	drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
 	drawArray(0, 3, blur_shader
 		, { buffer }
-		, { depth_test = false, depth_write = false }
+		, empty_state
 		, "BLUR_H"
 	)
 	setRenderTargets(buffer)
 	viewport(0, 0, w, h)
 	drawArray(0, 3, blur_shader
 		, { blur_buf }
-		, { depth_test = false, depth_write = false }
+		, empty_state
 	)
 	endBlock()
-
 	setRenderTargets()
 end
 
 function shadowPass()
 	if not environmentCastShadows() then
-		local rb = createRenderbuffer { width = 1, height = 1, format = "depth32", debug_name = "shadowmap" }
+		local rb = createRenderbuffer(shadowmap_1x1)
 		setRenderTargetsDS(rb)
 		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 		return rb
 	else 
 		beginBlock("shadows")
-			local depthbuf = createRenderbuffer { width = 4096, height = 1024, format = "depth32", debug_name = "shadowmap_depth" }
+			local depthbuf = createRenderbuffer(shadowmap_desc)
 			setRenderTargetsDS(depthbuf)
 			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
@@ -322,14 +337,7 @@ function tonemap(hdr_buffer)
 	end
 
 	beginBlock("tonemap")
-	local format = "srgba"
-	if PREVIEW ~= nil then
-		format = "rgba8"
-	end
-	if screenshot_request == 1 then
-		format = "rgba16f"
-	end
-	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = format, debug_name = "tonemap" }
+	local rb = createRenderbuffer(tonemap_rb_desc)
 	setRenderTargets(rb)
 	drawArray(0, 3, tonemap_shader
 		, { hdr_buffer }
@@ -371,7 +379,7 @@ end
 
 
 function renderSelectionOutline(output)
-local selection_mask = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "selection outline" }
+	local selection_mask = createRenderbuffer(selection_mask_desc)
 	setRenderTargets(selection_mask)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	renderSelection()
@@ -386,7 +394,7 @@ end
 function main_shadowmap()
 	beginBlock("bake_shadow")
 
-	local depthbuf = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth32", debug_name = "shadowmap_depth" }
+	local depthbuf = createRenderbuffer(baked_shadowmap_desc)
 	setRenderTargetsDS(depthbuf)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
@@ -402,7 +410,7 @@ function main_shadowmap()
 end
 
 function render_preview()
-	local shadowmap = createRenderbuffer { width = 1, height = 1, format = "depth32", debug_name = "shadowmap" }
+	local shadowmap = createRenderbuffer(shadowmap_1x1)
 	setRenderTargetsDS(shadowmap)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 
@@ -412,8 +420,8 @@ function render_preview()
 		, { layer = "default", state = default_state }
 		, { layer = "transparent", sort = "depth", state = transparent_state })
 	
-	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16f", debug_name = "preview_rb" }
-	local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth32", debug_name = "gbuffer_ds" }
+	local rb = createRenderbuffer(preview_rb_desc)
+	local dsbuffer = createRenderbuffer(preview_ds_desc)
 	
 	setRenderTargetsDS(rb, dsbuffer)
 	clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
@@ -433,12 +441,12 @@ function TAA(res, gbuffer_depth)
 	if taa_enabled then
 		beginBlock("taa")
 		if taa_history == -1 then
-			taa_history = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "taa", compute_write = true }
+			taa_history = createRenderbuffer(taa_history_desc)
 			setRenderTargets(taa_history)
 			clear(CLEAR_ALL, 1, 1, 1, 1, 0)
 		end
 
-		local taa_tmp = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "taa_tmp", compute_write = true }
+		local taa_tmp = createRenderbuffer(taa_desc)
 
 		setRenderTargets()
 
@@ -532,7 +540,7 @@ function main()
 	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
-		icon_ds = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "icon_ds" }
+		icon_ds = createRenderbuffer(icon_ds_desc)
 		pass(view_params)
 			setRenderTargetsDS(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
@@ -570,25 +578,10 @@ function main()
 			, { depth_test = false })
 	end
 	setOutput(res)
-
-	if screenshot_request > 1 then
-		-- we have to wait for a few frames to propagate changed resolution
-		-- only then we can take a screeshot
-		screenshot_request = screenshot_request - 1
-		GameView.forceViewport(true, 4096, 2160)
-	elseif screenshot_request == 1 then
-		saveRenderbuffer(res, "screenshot.tga")
-		GameView.forceViewport(false, 0, 0)
-		screenshot_request = 0
-	end		
 end
 
 function onGUI()
 	if GAME_VIEW then
-		ImGui.SameLine()
-		if ImGui.Button("Screenshot") then
-			screenshot_request = 2
-		end
 		return
 	end
 

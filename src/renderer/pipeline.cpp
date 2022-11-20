@@ -379,12 +379,25 @@ PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, Ren
 
 struct PipelineImpl final : Pipeline
 {
-	struct Renderbuffer {
-		u32 width;
-		u32 height;
+	using RenderbufferDescHandle = u32;
+	struct RenderbufferDesc {
+		enum Type {
+			FIXED,
+			RELATIVE
+		};
+		Type type = FIXED;
+		IVec2 fixed_size;
+		Vec2 rel_size;
 		gpu::TextureFormat format;
+		gpu::TextureFlags flags;
+		StaticString<32> debug_name;
+	};
+
+	struct Renderbuffer {
 		gpu::TextureHandle handle;
 		int frame_counter;
+		IVec2 size;
+		gpu::TextureFormat format;
 		gpu::TextureFlags flags;
 	};
 
@@ -680,6 +693,7 @@ struct PipelineImpl final : Pipeline
 		, m_scene(nullptr)
 		, m_draw2d(allocator)
 		, m_output(-1)
+		, m_renderbuffer_descs(allocator)
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
 		, m_shadow_atlas(allocator)
@@ -1493,17 +1507,64 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	PipelineTexture createRenderbuffer(lua_State* L) {
+	PipelineTexture createRenderbuffer(RenderbufferDescHandle desc_handle) {
+		PipelineTexture res;
+		res.type = PipelineTexture::RENDERBUFFER;
+
+		const RenderbufferDesc& desc = m_renderbuffer_descs[desc_handle];
+		const IVec2 size = desc.type == RenderbufferDesc::FIXED ? desc.fixed_size : IVec2(i32(desc.rel_size.x * m_viewport.w), i32(desc.rel_size.y * m_viewport.h));
+		for (Renderbuffer& rb : m_renderbuffers) {
+			if (!rb.handle) {
+				rb.frame_counter = 0;
+				rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+				rb.flags = desc.flags;
+				rb.format = desc.format;
+				rb.size = size;
+				res.renderbuffer = u32(&rb - m_renderbuffers.begin());
+				return res;
+			}
+			else {
+				if (rb.frame_counter < 2) continue;
+				if (rb.size != size) continue;
+				if (rb.format != desc.format) continue;
+				if (rb.flags != desc.flags) continue;
+			}
+			rb.frame_counter = 0;
+			res.renderbuffer = u32(&rb - m_renderbuffers.begin());
+			return res;
+		}
+
+		Renderbuffer& rb = m_renderbuffers.emplace();
+		rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+		rb.frame_counter = 0;
+		rb.flags = desc.flags;
+		rb.format = desc.format;
+		rb.size = size;
+		res.renderbuffer = m_renderbuffers.size() - 1;
+		return res;
+	}
+
+	RenderbufferDescHandle createRenderbufferDesc(lua_State* L) {
 		PROFILE_FUNCTION();
 
 		LuaWrapper::checkTableArg(L, 1);
-		u32 rb_w, rb_h;
+		IVec2 fixed_size;
+		Vec2 rel_size;
 		char format_str[64];
 		char debug_name[64] = "";
 		bool point_filter = false;
 		bool compute_write = false;
-		if (!LuaWrapper::checkField(L, 1, "width", &rb_w)) luaL_argerror(L, 1, "missing width");
-		if (!LuaWrapper::checkField(L, 1, "height", &rb_h)) luaL_argerror(L, 1, "missing height");
+		RenderbufferDesc::Type type = RenderbufferDesc::FIXED;
+		if (!LuaWrapper::getOptionalField(L, 1, "size", &fixed_size)) {
+			if (!LuaWrapper::getOptionalField(L, 1, "rel_size", &rel_size)) {
+				rel_size = Vec2(1, 1);
+			}
+			type = RenderbufferDesc::RELATIVE;
+		}
+		else {
+			type = RenderbufferDesc::FIXED;
+		}
+
 		if (!LuaWrapper::checkStringField(L, 1, "format", Span(format_str))) luaL_argerror(L, 1, "missing format");
 		LuaWrapper::getOptionalStringField(L, 1, "debug_name", Span(debug_name));
 		LuaWrapper::getOptionalField(L, 1, "point_filter", &point_filter);
@@ -1517,50 +1578,15 @@ struct PipelineImpl final : Pipeline
 
 		const gpu::TextureFormat format = getFormat(format_str);
 
-		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
-		{
-			Renderbuffer& rb = m_renderbuffers[i];
-			if (!rb.handle) {
-				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, Renderer::MemRef(), debug_name);
-				rb.width = rb_w;
-				rb.height = rb_h;
-				rb.format = format;
-				rb.flags = flags;
-			}
-			else {
-				if (rb.frame_counter < 2) continue;
-				if (rb.width != rb_w) continue;
-				if (rb.height != rb_h) continue;
-				if (rb.format != format) continue;
-				if (rb.flags != flags) continue;
-			}
-
-			rb.frame_counter = 0;
-			PipelineTexture res;
-			res.type = PipelineTexture::RENDERBUFFER;
-			res.renderbuffer = i;
-			return res;
-		}
-
-		Renderbuffer& rb = [&]() -> Renderbuffer& {
-			for (int i = 0, n = m_renderbuffers.size(); i < n; ++i) {
-				if (!m_renderbuffers[i].handle) {
-					return m_renderbuffers[i];
-				}
-			}	
-			return m_renderbuffers.emplace();
-		}();
-		rb.frame_counter = 0;
-		rb.width = rb_w;
-		rb.height = rb_h;
+		RenderbufferDesc& rb = m_renderbuffer_descs.emplace();
+		rb.fixed_size = fixed_size;
+		rb.rel_size = rel_size;
 		rb.format = format;
 		rb.flags = flags;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, Renderer::MemRef(), debug_name);
+		rb.type = type;
+		rb.debug_name = debug_name;
 
-		PipelineTexture res;
-		res.type = PipelineTexture::RENDERBUFFER;
-		res.renderbuffer = m_renderbuffers.size() - 1;
-		return res;
+		return m_renderbuffer_descs.size() - 1;
 	}
 
 	enum class CameraParamsEnum : CameraParamsHandle {
@@ -3824,6 +3850,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(bindTextures);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createBuffer);
+		REGISTER_FUNCTION(createRenderbufferDesc);
 		REGISTER_FUNCTION(createRenderbuffer);
 		REGISTER_FUNCTION(createRenderState);
 		REGISTER_FUNCTION(createTextureArray);
@@ -3935,6 +3962,7 @@ struct PipelineImpl final : Pipeline
 	Shader* m_debug_shape_shader;
 	Shader* m_instancing_shader;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
+	Array<RenderbufferDesc> m_renderbuffer_descs;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
 	Array<gpu::TextureHandle> m_textures;

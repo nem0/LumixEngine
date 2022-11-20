@@ -12,7 +12,8 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 		env.dof_blur_shader = env.preloadShader("pipelines/dof_blur.shd")
 	end
 
-	local tmp_rb = env.createRenderbuffer { width = env.viewport_w, height = env.viewport_h, format = "rgba16f", debug_name = "dof_tmp" }
+	env.dof_rb_desc = env.dof_rb_desc or env.createRenderbufferDesc { format = "rgba16f", debug_name = "dof_tmp" }
+	local tmp_rb = env.createRenderbuffer(env.dof_rb_desc)
 	
 	env.dof_state = env.dof_state or env.createRenderState({ depth_test = false, blending = "alpha"})
 

@@ -5,9 +5,11 @@ luma_limit = 64
 accomodation_speed = 1
 exposure = 1
 
-function blurUpscale(env, buffer, smaller_buffer, format, w, h, tmp_rb_dbg_name, state) 
-	local blur_buf = env.createRenderbuffer { width = w, height = h, format = format, debug_name = tmp_rb_dbg_name }
+function blurUpscale(env, buffer, smaller_buffer, rel_size, rb_desc, state) 
+	local blur_buf = env.createRenderbuffer(rb_desc)
 	env.setRenderTargets(blur_buf)
+	local w = rel_size[1] * env.viewport_w
+	local h = rel_size[2] * env.viewport_h
 	env.drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
 	env.viewport(0, 0, w, h)
 	env.drawArray(0, 3, env.bloom_blur_shader
@@ -23,9 +25,11 @@ function blurUpscale(env, buffer, smaller_buffer, format, w, h, tmp_rb_dbg_name,
 	)
 end
 
-function blur(env, buffer, format, w, h, tmp_rb_dbg_name, state) 
-	local blur_buf = env.createRenderbuffer { width = w, height = h, format = format, debug_name = tmp_rb_dbg_name }
+function blur(env, buffer, rel_size, rb_desc, state) 
+	local blur_buf = env.createRenderbuffer(rb_desc)
 	env.setRenderTargets(blur_buf)
+	local w = rel_size[1] * env.viewport_w
+	local h = rel_size[2] * env.viewport_h
 	env.drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
 	env.viewport(0, 0, w, h)
 	env.drawArray(0, 3, env.blur_shader
@@ -41,10 +45,10 @@ function blur(env, buffer, format, w, h, tmp_rb_dbg_name, state)
 	)
 end
 
-function downscale(env, big, w, h, state)
-	local small = env.createRenderbuffer { width = w, height = h, format = "rgba16f", debug_name = "bloom_downscaled" }
+function downscale(env, big, rel_size, rb_desc, state)
+	local small = env.createRenderbuffer(rb_desc)
 	env.setRenderTargets(small)
-	env.viewport(0, 0, w, h)
+	env.viewport(0, 0, env.viewport_w * rel_size[1], env.viewport_h * rel_size[2])
 	env.drawArray(0
 		, 3
 		, env.bloom_shader
@@ -85,10 +89,11 @@ end
 function tonemap(env, hdr_buffer, state)
 	env.beginBlock("tonemap")
 	local format = "rgba16f"
-	if env.APP ~= nil or env.PREVIEW ~= nil or env.screenshot_request == 1 then
+	if env.APP ~= nil or env.PREVIEW ~= nil then
 		format = "rgba8"
 	end
-	local rb = env.createRenderbuffer { width = env.viewport_w, height = env.viewport_h, format = format, debug_name = "tonemap_bloom" }
+	env.bloom_tonemap_rb_desc = env.bloom_tonemap_rb_desc or env.createRenderbufferDesc { format = format, debug_name = "tonemap_bloom" }
+	local rb = env.createRenderbuffer(env.bloom_tonemap_rb_desc)
 	env.setRenderTargets(rb)
 	env.bindShaderBuffer(env.lum_buf, 5, false)
 	env.drawcallUniforms(exposure) 
@@ -131,7 +136,8 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 
 	if not only_autoexposure then
 		env.beginBlock("bloom")
-		local bloom_rb = env.createRenderbuffer { width = 0.5 * env.viewport_w, height = 0.5 * env.viewport_h, format = "rgba16f", debug_name = "bloom" }
+		env.bloom_rb_desc = env.bloom_rb_desc or env.createRenderbufferDesc { rel_size = {0.5, 0.5}, format = "rgba16f", debug_name = "bloom" }
+		local bloom_rb = env.createRenderbuffer(env.bloom_rb_desc)
 	
 		env.setRenderTargets(bloom_rb)
 		env.viewport(0, 0, 0.5 * env.viewport_w, 0.5 * env.viewport_h)
@@ -148,16 +154,33 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		if debug then
 			env.debugRenderbuffer(bloom_rb, hdr_buffer, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 1})
 		else 
-			local bloom2_rb = downscale(env, bloom_rb, env.viewport_w * 0.25, env.viewport_h * 0.25, env.bloom_state)
-			local bloom4_rb = downscale(env, bloom2_rb, env.viewport_w * 0.125, env.viewport_h * 0.125, env.bloom_state)
-			local bloom8_rb = downscale(env, bloom4_rb, env.viewport_w * 0.0625, env.viewport_h * 0.0625, env.bloom_state)
-			local bloom16_rb = downscale(env, bloom8_rb, env.viewport_w * 0.03125, env.viewport_h * 0.03125, env.bloom_state)
+			env.bloom_ds_rbs = env.bloom_ds_rbs or {
+				env.createRenderbufferDesc { rel_size = {0.25, 0.25}, format = "rgba16f", debug_name = "bloom_downscaled" },
+				env.createRenderbufferDesc { rel_size = {0.125, 0.125}, format = "rgba16f", debug_name = "bloom_downscaled" },
+				env.createRenderbufferDesc { rel_size = {0.0625, 0.0625}, format = "rgba16f", debug_name = "bloom_downscaled" },
+				env.createRenderbufferDesc { rel_size = {0.03125, 0.03125}, format = "rgba16f", debug_name = "bloom_downscaled" }
+			}
 
-			blur(env, bloom16_rb, "rgba16f", env.viewport_w * 0.03125, env.viewport_h * 0.03125, "bloom_blur", env.bloom_state)
-			blurUpscale(env, bloom8_rb, bloom16_rb, "rgba16f", env.viewport_w * 0.0625, env.viewport_h * 0.0625, "bloom_blur", env.bloom_state)
-			blurUpscale(env, bloom4_rb, bloom8_rb, "rgba16f", env.viewport_w * 0.125, env.viewport_h * 0.125, "bloom_blur", env.bloom_state)
-			blurUpscale(env, bloom2_rb, bloom4_rb, "rgba16f", env.viewport_w * 0.25, env.viewport_h * 0.25, "bloom_blur", env.bloom_state)
-			blurUpscale(env, bloom_rb, bloom2_rb, "rgba16f", env.viewport_w * 0.5, env.viewport_h * 0.5, "bloom_blur", env.bloom_state)
+			local bloom2_rb = downscale(env, bloom_rb, {0.25, 0.25}, env.bloom_ds_rbs[1], env.bloom_state)
+			local bloom4_rb = downscale(env, bloom2_rb, {0.125, 0.125}, env.bloom_ds_rbs[2], env.bloom_state)
+			local bloom8_rb = downscale(env, bloom4_rb, {0.0625, 0.0625}, env.bloom_ds_rbs[3], env.bloom_state)
+			local bloom16_rb = downscale(env, bloom8_rb, {0.03125, 0.03125}, env.bloom_ds_rbs[4], env.bloom_state)
+
+			env.bloom_blur_rb_desc = env.bloom_blur_rb_desc or env.createRenderbufferDesc { rel_size = { 0.03125, 0.03125 }, debug_name = "bloom_blur", format = "rgba16f" }
+
+			blur(env, bloom16_rb, { 0.03125, 0.03125 }, env.bloom_blur_rb_desc, env.bloom_state)
+			
+			env.bloom_rbs = env.bloom_rbs or {
+				env.createRenderbufferDesc { rel_size = { 0.0625, 0.0625 }, debug_name = "bloom_blur", format = "rgba16f" },
+				env.createRenderbufferDesc { rel_size = { 0.125, 0.125 }, debug_name = "bloom_blur", format = "rgba16f" },
+				env.createRenderbufferDesc { rel_size = { 0.25, 0.25 }, debug_name = "bloom_blur", format = "rgba16f" },
+				env.createRenderbufferDesc { rel_size = { 0.5, 0.5 }, debug_name = "bloom_blur", format = "rgba16f" },
+			}
+			
+			blurUpscale(env, bloom8_rb, bloom16_rb, { 0.0625, 0.0625}, env.bloom_rbs[1], env.bloom_state)
+			blurUpscale(env, bloom4_rb, bloom8_rb, { 0.125, 0.125}, env.bloom_rbs[2], env.bloom_state)
+			blurUpscale(env, bloom2_rb, bloom4_rb, { 0.25, 0.25}, env.bloom_rbs[3], env.bloom_state)
+			blurUpscale(env, bloom_rb, bloom2_rb, { 0.5, 0.5}, env.bloom_rbs[4], env.bloom_state)
 
 			env.setRenderTargets(hdr_buffer)
 			env.drawArray(0, 3, env.bloom_shader

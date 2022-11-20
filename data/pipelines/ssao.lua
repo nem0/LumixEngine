@@ -13,13 +13,14 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.blur_shader = env.blur_shader or env.preloadShader("pipelines/blur.shd")
 	env.ssao_blit_shader = env.ssao_blit_shader or env.preloadShader("pipelines/ssao_blit.shd")
 	env.ssao_resolve_shader = env.ssao_resolve_shader or env.preloadShader("pipelines/ssao_resolve.shd")
+	env.ssao_rb_desc = env.ssao_rb_desc or env.createRenderbufferDesc { rel_size = {0.5, 0.5}, format = "r8", debug_name = "ssao", compute_write = true }
 
 	local w = math.floor(env.viewport_w * 0.5)
 	local h = math.floor(env.viewport_h * 0.5)
-	local ssao_rb = env.createRenderbuffer { width = w, height = h, format = "r8", debug_name = "ssao", compute_write = true }
+	local ssao_rb = env.createRenderbuffer(env.ssao_rb_desc)
 
 	if use_temporal and history_buf == -1 then
-		history_buf = env.createRenderbuffer { width = w, height = h, format = "r8", debug_name = "ssao", compute_write = true }
+		history_buf = env.createRenderbuffer(env.ssao_rb_desc)
 		env.setRenderTargets(history_buf)
 		env.clear(env.CLEAR_ALL, 1, 1, 1, 1, 0)
 	end
@@ -32,6 +33,7 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 	env.bindImageTexture(ssao_rb, 2)
 	env.dispatch(env.ssao_shader, (w + 15) / 16, (h + 15) / 16, 1)
 
+	env.ssao_blur_rb_desc = env.ssao_blur_rb_desc or env.createRenderbufferDesc { format = "r8", rel_size = {0.5, 0.5}, debug_name = "ssao_blur" }
 	if use_temporal then
 		env.beginBlock("ssao_resolve " .. tostring(w) .. "x" .. tostring(h))
 		env.drawcallUniforms( w, h, 0, 0, current_frame_weight, 0, 0, 0 )
@@ -40,11 +42,11 @@ function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuff
 		env.dispatch(env.ssao_resolve_shader, (w + 15) / 16, (h + 15) / 16, 1)
 		env.endBlock()
 		if blur then
-			env.blur(ssao_rb, "r8", w, h, "ssao_blur")
+			env.blur(ssao_rb, w, h, env.ssao_blur_rb_desc)
 		end
 	else
 		if blur then
-			env.blur(ssao_rb, "r8", w, h, "ssao_blur")
+			env.blur(ssao_rb, w, h, env.ssao_blur_rb_desc)
 		end
 	end
 

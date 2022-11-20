@@ -357,6 +357,8 @@ void DrawStream::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 dept
 	CreateTextureData desc = {handle, w, h, depth, format, flags};
 	const u32 len = stringLength(debug_name) + 1;
 	u8* data = alloc(sizeof(Instruction) + sizeof(desc) + len + sizeof(len));
+	ASSERT(w < 64*1024);
+	ASSERT(h < 64*1024);
 	WRITE_CONST(Instruction::CREATE_TEXTURE);
 	WRITE(desc);
 	WRITE(len);
