@@ -193,6 +193,7 @@ void VoxelizerUI::onWindowGUI() {
 
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
+			ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 			if (ImGuiEx::BeginResizableMenu("Open", nullptr, true)) {
 				char buf[LUMIX_MAX_PATH];
 				static FilePathHash selected_res_hash;
