@@ -487,9 +487,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			return;
 		}
 
-		char path[LUMIX_MAX_PATH];
-		if (!os::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) return;
-		load(path);
+		m_show_open = true;
 	}
 
 	void load(const char* path) {
@@ -507,16 +505,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		IAllocator& allocator = m_app.getAllocator();
 		OutputMemoryStream data(allocator);
-		char relative[LUMIX_MAX_PATH];
-		(void)fs.makeRelative(Span(relative), path);
-		if (fs.getContentSync(Path(relative), data)) {
+		if (fs.getContentSync(Path(path), data)) {
 			ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
 			InputMemoryStream str(data);
 			UniquePtr<Controller> new_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
 			if (new_controller->deserialize(str)) {
 				m_controller = new_controller.move();
 				m_current_node = m_controller->m_root;
-				m_path = relative;
+				m_path = path;
 				m_undo_stack.clear();
 				m_undo_idx = -1;
 			}
@@ -524,7 +520,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			m_dirty = false;
 		}
 		else {
-			logError("Failed to read ", relative);
+			logError("Failed to read ", path);
 		}
 	}
 
@@ -792,9 +788,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		m_controller->serialize(str);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		os::OutputFile file;
-		char relative[LUMIX_MAX_PATH];
-		(void)fs.makeRelative(Span(relative), path);
-		if (fs.open(relative, file)) {
+		if (fs.open(path, file)) {
 			if (!file.write(str.data(), str.size())) {
 				logError("Failed to write ", path);
 			}
@@ -826,20 +820,8 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	void save() {
-		if (!m_path.empty()) {
-			save(m_path);
-		}
-		else {
-			saveAs();
-		}
-	}
-
-	void saveAs() {
-		char path[LUMIX_MAX_PATH];
-
-		if (os::getSaveFilename(Span(path), "Animation controller\0*.act\0", "act")) {
-			save(path);
-		}
+		if (m_path.empty()) m_show_save_as = true;
+		else save(m_path);
 	}
 
 	void pushUndo(u64 tag = ~u64(0)) {
@@ -941,7 +923,7 @@ struct ControllerEditorImpl : ControllerEditor {
 				if (ImGui::BeginMenu("File")) {
 					if (ImGui::MenuItem("New")) newGraph();
 					if (ImGui::MenuItem("Save")) save();
-					if (ImGui::MenuItem("Save As")) saveAs();
+					if (ImGui::MenuItem("Save As")) m_show_save_as = true;
 					if (ImGui::MenuItem("Load")) load();
 				
 					if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity())) {
@@ -971,6 +953,10 @@ struct ControllerEditorImpl : ControllerEditor {
 
 				ImGui::EndMenuBar();
 			}
+
+			FileSelector& fs = m_app.getFileSelector();
+			if (fs.gui("Open", &m_show_open, "act", false)) load(fs.getPath());
+			if (fs.gui("Save As", &m_show_save_as, "act", true)) save(fs.getPath());
 
 			if (m_update) updateSelectedEntity();
 
@@ -1248,6 +1234,8 @@ struct ControllerEditorImpl : ControllerEditor {
 	Action m_redo_action;
 	bool m_update = false;
 	StaticString<LUMIX_MAX_PATH> m_path;
+	bool m_show_save_as = false;
+	bool m_show_open = false;
 	Array<UniquePtr<EventType>> m_event_types;
 }; // ControllerEditorImpl
 

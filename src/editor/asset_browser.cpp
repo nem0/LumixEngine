@@ -602,10 +602,9 @@ struct AssetBrowserImpl : AssetBrowser {
 					ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp));
 					ImGui::SameLine();
 					if (ImGui::Button("Create")) {
-						StaticString<LUMIX_MAX_PATH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
-						StaticString<LUMIX_MAX_PATH> full_path(base_path, rel_path);
-						plugin->createResource(full_path);
-						m_wanted_resource = rel_path;
+						StaticString<LUMIX_MAX_PATH> path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
+						plugin->createResource(path);
+						m_wanted_resource = path;
 						ImGui::CloseCurrentPopup();
 					}
 					ImGui::EndMenu();

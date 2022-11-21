@@ -1,12 +1,14 @@
 #include <imgui/imgui.h>
 
 #include "utils.h"
-#include "engine/math.h"
-#include "engine/os.h"
-#include "engine/path.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
+#include "engine/math.h"
+#include "engine/os.h"
+#include "engine/path.h"
 #include "engine/universe.h"
 
 
@@ -212,6 +214,21 @@ void getEntityListDisplayName(StudioApp& app, Universe& universe, Span<char> buf
 	}
 }
 
+static int inputTextCallback(ImGuiInputTextCallbackData* data) {
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+		String* str = (String*)data->UserData;
+		ASSERT(data->Buf == str->c_str());
+		str->resize(data->BufTextLen);
+		data->Buf = (char*)str->c_str();
+	}
+	return 0;
+}
+
+bool InputString(const char* label, String* value) {
+	ImGuiInputTextFlags flags = ImGuiInputTextFlags_CallbackResize;
+	return ImGui::InputText(label, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);
+}
+
 SimpleUndoRedo::SimpleUndoRedo(IAllocator& allocator)
 : m_stack(allocator)
 	, m_allocator(allocator)
@@ -254,6 +271,164 @@ void SimpleUndoRedo::pushUndo(u32 tag) {
 void SimpleUndoRedo::clearUndoStack() {
 	m_stack.clear();
 	m_stack_idx = -1;
+}
+
+void FileSelector::fillSubitems() {
+	m_subdirs.clear();
+	m_subfiles.clear();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
+	const char* base_path = fs.getBasePath();
+	
+	StaticString<LUMIX_MAX_PATH> path(base_path, "/", m_current_dir.c_str());
+	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
+	os::FileInfo info;
+	const char* ext = m_accepted_extension.c_str();
+	while (os::getNextFile(iter, &info)) {
+		if (equalStrings(info.filename, ".")) continue;
+		if (equalStrings(info.filename, "..")) continue;
+		if (equalStrings(info.filename, ".lumix") && m_current_dir.length() == 0) continue;
+
+		if (info.is_directory) {
+			m_subdirs.emplace(info.filename, m_app.getAllocator());
+		}
+		else {
+			if (!ext[0] || Path::hasExtension(info.filename, ext)) {
+				m_subfiles.emplace(info.filename, m_app.getAllocator());
+			}
+		}
+	}
+	os::destroyFileIterator(iter);
+}
+
+
+bool FileSelector::breadcrumb(Span<const char> path) {
+	if (path.length() == 0) {
+		if (ImGui::Button(".")) {
+			m_current_dir = "";
+			fillSubitems();
+			return true;
+		}
+		return false;
+	}
+	if (path.back() == '/') path = path.fromRight(1);
+	
+	Span<const char> dir = Path::getDir(path);
+	Span<const char> basename = Path::getBasename(path);
+	if (breadcrumb(dir)) return true;
+	ImGui::SameLine();
+	ImGui::TextUnformatted("/");
+	ImGui::SameLine();
+	
+	char tmp[LUMIX_MAX_PATH];
+	copyString(Span(tmp), basename);
+	if (ImGui::Button(tmp)) {
+		m_current_dir = String(path, m_app.getAllocator());
+		fillSubitems();
+		return true;
+	}
+	return false;
+}
+
+
+FileSelector::FileSelector(StudioApp& app)
+	: m_app(app)
+	, m_filename(app.getAllocator())
+	, m_full_path(app.getAllocator())
+	, m_current_dir(app.getAllocator())
+	, m_subdirs(app.getAllocator())
+	, m_subfiles(app.getAllocator())
+	, m_accepted_extension(app.getAllocator())
+{}
+
+bool FileSelector::gui(const char* label, bool* open, const char* extension, bool save) {
+	if (*open && !ImGui::IsPopupOpen(label)) {
+		ImGui::OpenPopup(label);
+		m_save = save;
+		m_accepted_extension = extension;
+		m_filename = "";
+		m_full_path = "";
+		fillSubitems();
+	}
+
+	bool res = false;
+	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::TextUnformatted("Filename"); ImGui::SameLine(); ImGui::SetNextItemWidth(-1);
+		bool changed = InputString("##fn", &m_filename);
+		
+		changed = breadcrumb(Span(m_current_dir.c_str(), m_current_dir.length())) || changed;
+		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
+			if (m_current_dir.length() > 0) {
+				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
+					Span<const char> dir = Path::getDir(m_current_dir.c_str());
+					if (dir.length() > 0) dir = dir.fromRight(1);
+					m_current_dir = String(dir, m_app.getAllocator());
+					fillSubitems();
+					changed = true;
+				}
+			}
+		
+			for (const String& subdir : m_subdirs) {
+				ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
+				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
+					m_current_dir.cat("/");
+					m_current_dir.cat(subdir.c_str());
+					fillSubitems();
+					changed = true;
+				}
+			}
+		
+			for (const String& subfile : m_subfiles) {
+				if (ImGui::Selectable(subfile.c_str(), false, ImGuiSelectableFlags_DontClosePopups | ImGuiSelectableFlags_AllowDoubleClick)) {
+					m_filename = subfile;
+					changed = true;
+					if (ImGui::IsMouseDoubleClicked(0)) {
+						res = true;
+					}
+				}
+			}
+		}
+		ImGui::EndChild();
+	
+		if (m_save) {
+			if (ImGui::Button(ICON_FA_SAVE " Save")) {
+				if (!Path::hasExtension(m_full_path.c_str(), m_accepted_extension.c_str())) {
+					m_full_path.cat(".").cat(m_accepted_extension.c_str());
+				}
+				if (m_app.getEngine().getFileSystem().fileExists(m_full_path.c_str())) {
+					ImGui::OpenPopup("warn_overwrite");
+				}
+				else {
+					res = true;
+				}
+			}
+		}
+		else {
+			if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open")) {
+				if (m_app.getEngine().getFileSystem().fileExists(m_full_path.c_str())) {
+					res = true;
+				}
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
+	
+		if (changed) {
+			m_full_path = m_current_dir;
+			m_full_path.cat("/").cat(m_filename.c_str());
+		}
+	
+		if (ImGui::BeginPopup("warn_overwrite")) {
+			ImGui::TextUnformatted("File already exists, are you sure you want to overwrite it?");
+			if (ImGui::Selectable("Yes")) res = true;
+			ImGui::Selectable("No");
+			ImGui::EndPopup();
+		}
+		if (res) ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+		if (!ImGui::IsPopupOpen(label)) *open = false;
+		return res;
+	}
+	return false;
 }
 
 enum { OUTPUT_FLAG = 1 << 31 };

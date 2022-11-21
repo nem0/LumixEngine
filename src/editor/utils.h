@@ -60,7 +60,7 @@ inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b;
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API void menuItem(Action& a, bool enabled);
 LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct Universe& editor, Span<char> buf, EntityPtr entity);
-
+LUMIX_EDITOR_API bool InputString(const char* label, String* value);
 
 struct SimpleUndoRedo {
 	enum { NO_MERGE_UNDO = 0xffFFffFF };
@@ -108,6 +108,24 @@ struct NodeEditorNode {
 	virtual bool hasInputPins() const = 0;
 	virtual bool hasOutputPins() const = 0;
 	virtual bool nodeGUI() = 0;
+};
+
+struct FileSelector {
+	FileSelector(StudioApp& app);
+	bool gui(const char* label, bool* open, const char* extension, bool save);
+	const char* getPath() const { return m_full_path.c_str(); }
+
+private:
+	bool breadcrumb(Span<const char> path);
+	void fillSubitems();
+	StudioApp& m_app;
+	bool m_save;
+	String m_current_dir;
+	String m_filename;
+	String m_accepted_extension;
+	Array<String> m_subdirs;
+	Array<String> m_subfiles;
+	String m_full_path;
 };
 
 struct NodeEditor : SimpleUndoRedo {

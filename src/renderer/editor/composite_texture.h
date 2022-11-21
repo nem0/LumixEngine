@@ -80,19 +80,18 @@ struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {
 	CompositeTextureEditor(StudioApp& app);
 	~CompositeTextureEditor();
 
-	void open(const Path& path);
+	void open(const char* path);
 
 private:
 	void exportAs();
 	void pushRecent(const char* path);
-	bool saveAs(const Path& path);
+	bool saveAs(const char* path);
 	void newGraph();
 	void onWindowGUI() override;
 	const char* getName() const override { return "composite_texture_editor"; }
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
 
-	void open();
 	bool getSavePath();
 	bool hasFocus() override { return m_has_focus; }
 	void deserialize(InputMemoryStream& blob) override;
@@ -117,6 +116,8 @@ private:
 	Path m_path;
 	CompositeTexture* m_resource = nullptr;
 	bool m_has_focus = false;
+	bool m_show_save_as = false;
+	bool m_show_open = false;
 	Array<String> m_recent_paths;
 };
 
