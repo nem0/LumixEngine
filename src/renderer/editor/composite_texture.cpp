@@ -1606,16 +1606,17 @@ void CompositeTextureEditor::deleteSelectedNodes() {
 	pushUndo(NO_MERGE_UNDO);
 }
 
-bool CompositeTextureEditor::saveAs(const Path& path) {
+bool CompositeTextureEditor::saveAs(const char* path) {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	os::OutputFile file;
-	if (!fs.open(path.c_str(), file)) return false;
+	if (!fs.open(path, file)) return false;
 	
 	OutputMemoryStream blob(m_app.getAllocator());
 	serialize(blob);
 	bool res = file.write(blob.data(), blob.size());
 	file.close();
-	pushRecent(path.c_str());
+	m_path = path;
+	pushRecent(path);
 	return res;
 }
 
@@ -1858,42 +1859,27 @@ void CompositeTextureEditor::onCanvasClicked(ImVec2 pos, i32 hovered_link) {
 	}	
 }
 
-void CompositeTextureEditor::open(const Path& path) {
+void CompositeTextureEditor::open(const char* path) {
 	m_is_focus_request = true;
 	m_is_open = true;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	IAllocator& allocator = m_app.getAllocator();
 	OutputMemoryStream content(allocator);
-	if (fs.getContentSync(path, content)) {
+	if (fs.getContentSync(Path(path), content)) {
 		m_path = path;
 		InputMemoryStream blob(content);
 		deserialize(blob);
 		pushUndo(NO_MERGE_UNDO);
-		pushRecent(path.c_str());
+		pushRecent(path);
 	}
 	else {
 		logError("Could not load", path);
 	}
 }
 
-
-bool CompositeTextureEditor::getSavePath() {
-	char path[LUMIX_MAX_PATH];
-	if (os::getSaveFilename(Span(path), "Composite texture\0*.ltc\0", "ltc")) {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		char rel_path[LUMIX_MAX_PATH];
-		if (!fs.makeRelative(Span(rel_path), path)) {
-			logError("Can not save ", path, " because it's not in root directory (", fs.getBasePath(), ").");		
-			return false;
-		}
-		m_path = path;
-		return true;
-	}
-	return false;
-}
-
 void CompositeTextureEditor::save() {
-	if (!m_path.isEmpty() || getSavePath()) saveAs(m_path);
+	if (m_path.isEmpty()) m_show_save_as = true;
+	else saveAs(m_path.c_str());
 }
 
 void CompositeTextureEditor::onSettingsLoaded() {
@@ -1925,18 +1911,6 @@ void CompositeTextureEditor::pushRecent(const char* path) {
 	String p(path, m_app.getAllocator());
 	m_recent_paths.eraseItems([&](const String& s) { return s == path; });
 	m_recent_paths.push(static_cast<String&&>(p));
-}
-
-void CompositeTextureEditor::open() {
-	char path[LUMIX_MAX_PATH];
-	if (!os::getOpenFilename(Span(path), "Composite texture\0*.ltc\0", "ltc")) return;
-	char rel_path[LUMIX_MAX_PATH];
-	if (!m_app.getEngine().getFileSystem().makeRelative(Span(rel_path), path)) {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		logError("Can not open ", path, " because it's not in root directory (", fs.getBasePath(), ").");		
-		return;
-	}
-	open(Path(rel_path));
 }
 
 void CompositeTextureEditor::exportAs() {
@@ -1990,13 +1964,13 @@ void CompositeTextureEditor::onWindowGUI() {
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
 				if (ImGui::MenuItem("New")) newGraph();
-				if (ImGui::MenuItem("Open")) open();
+				if (ImGui::MenuItem("Open")) m_show_open = true;
 				menuItem(m_save_action, true);
-				if (ImGui::MenuItem("Save As") && getSavePath()) saveAs(m_path);
+				if (ImGui::MenuItem("Save As")) m_show_save_as = true;
 				if (ImGui::MenuItem("Export")) exportAs();
 				if (ImGui::BeginMenu("Recent", !m_recent_paths.empty())) {
 					for (const String& s : m_recent_paths) {
-						if (ImGui::MenuItem(s.c_str())) open(Path(s.c_str()));
+						if (ImGui::MenuItem(s.c_str())) open(s.c_str());
 					}
 					ImGui::EndMenu();
 				}
@@ -2009,6 +1983,11 @@ void CompositeTextureEditor::onWindowGUI() {
 			}
 			ImGui::EndMenuBar();
 		}
+
+		FileSelector& fs = m_app.getFileSelector();
+		if (fs.gui("Open", &m_show_open, "ltc", false)) open(fs.getPath());
+		if (fs.gui("Save As", &m_show_save_as, "ltc", true)) saveAs(fs.getPath());
+
 		nodeEditorGUI(m_resource->m_nodes, m_resource->m_links);
 	}
 	ImGui::End();

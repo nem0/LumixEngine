@@ -1725,7 +1725,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				if (ImGui::MenuItem("Open")) load();
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
 				menuItem(m_save_action, true);
-				if (ImGui::MenuItem("Save as")) saveAs();
+				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
 				ImGui::Separator();
 			
 				menuItem(m_apply_action, emitter && emitter->getResource());
@@ -1740,6 +1740,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			}
 			ImGui::EndMenuBar();
 		}
+
+		FileSelector& fs = m_app.getFileSelector();
+		if (fs.gui("Open", &m_show_open, "par", false)) open(fs.getPath());
+		if (fs.gui("Save As", &m_show_save_as, "par", true)) saveAs(fs.getPath());
 
 		ImGui::Columns(2);
 		leftColumnGUI();
@@ -1768,8 +1772,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		ASSERT(emitter);
 
 		const Path& path = emitter->getResource()->getPath();
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		load(StaticString<LUMIX_MAX_PATH>(fs.getBasePath(), path.c_str()));
+		load(path.c_str());
 	}
 
 	void serialize(OutputMemoryStream& blob) override { m_resource->serialize(blob); }
@@ -1785,7 +1788,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			return;
 		}
 		os::InputFile file;
-		if (file.open(path)) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (fs.open(path, file)) {
 			const u64 size = file.size();
 			OutputMemoryStream blob(m_allocator);
 			blob.resize(size);
@@ -1815,9 +1819,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			m_confirm_load_path = "";
 			return;
 		}
-		char path[LUMIX_MAX_PATH];
-		if (!os::getOpenFilename(Span(path), "Particles\0*.par\0", nullptr)) return;
-		load(path);
+		m_show_open = true;
 	}
 
 	void save() {
@@ -1825,24 +1827,16 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			saveAs(m_path.c_str());
 			return;
 		}
-		char path[LUMIX_MAX_PATH];
-		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
-		saveAs(path);
-	}
-
-	void saveAs() {
-		char path[LUMIX_MAX_PATH];
-		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
-
-		saveAs(path);
+		m_show_save_as = true;
 	}
 
 	void saveAs(const char* path) {
 		OutputMemoryStream blob(m_allocator);
 		m_resource->serialize(blob);
 
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		os::OutputFile file;
-		if (file.open(path)) {
+		if (fs.open(path, file)) {
 			if (!file.write(blob.data(), blob.size())) {
 				logError("Failed to write ", path);
 			}
@@ -1882,8 +1876,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			return;
 		}
 		
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		load(StaticString<LUMIX_MAX_PATH>(fs.getBasePath(), path));
+		load(path);
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
@@ -1918,6 +1911,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	IAllocator& m_allocator;
 	StudioApp& m_app;
 	Path m_path;
+	bool m_show_save_as = false;
+	bool m_show_open = false;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
 	bool m_confirm_load = false;

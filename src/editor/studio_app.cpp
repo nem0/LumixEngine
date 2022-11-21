@@ -100,6 +100,7 @@ struct StudioAppImpl final : StudioApp
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
+		, m_file_selector(*this)
 	{
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
 		u32 workers;
@@ -1141,6 +1142,11 @@ struct StudioAppImpl final : StudioApp
 	void toggleAssetBrowser() { m_asset_browser->setOpen(!m_asset_browser->isOpen()); }
 	bool isAssetBrowserOpen() const { return m_asset_browser->isOpen(); }
 	int getExitCode() const override { return m_exit_code; }
+	
+	FileSelector& getFileSelector() override {
+		return m_file_selector;
+	}
+	
 	AssetBrowser& getAssetBrowser() override
 	{
 		ASSERT(m_asset_browser.get());
@@ -1335,10 +1341,8 @@ struct StudioAppImpl final : StudioApp
 
 		if (filter[0])
 		{
-			if (!node->plugin)
-				showAddComponentNode(node->child, filter, editor);
-			else if (stristr(node->plugin->getLabel(), filter))
-				node->plugin->onGUI(false, true, editor);
+			if (!node->plugin) showAddComponentNode(node->child, filter, editor);
+			else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, editor);
 			showAddComponentNode(node->next, filter, editor);
 			return;
 		}
@@ -1946,10 +1950,6 @@ struct StudioAppImpl final : StudioApp
 		}
 		ImGui::End();
 	}
-
-
-	void dummy() {}
-
 
 	void setFullscreen(bool fullscreen) override
 	{
@@ -3338,6 +3338,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_new;
 	char m_universe_to_load[LUMIX_MAX_PATH];
 	UniquePtr<AssetBrowser> m_asset_browser;
+	FileSelector m_file_selector;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
 	Local<LogUI> m_log_ui;

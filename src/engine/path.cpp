@@ -92,6 +92,17 @@ void Path::normalize(const char* path, Span<char> output)
 	(i < max_size ? *out : *(out - 1)) = '\0';
 }
 
+Span<const char> Path::getDir(Span<const char> src) {
+	if (src.length() == 0) return {nullptr, nullptr};
+	
+	Span<const char> dir = src.fromRight(1);
+	while (dir.m_end != dir.m_begin && *dir.m_end != '\\' && *dir.m_end != '/') {
+		--dir.m_end;
+	}
+	if (dir.m_end != dir.m_begin) ++dir.m_end;
+	return dir;
+}
+
 Span<const char> Path::getDir(const char* src)
 {
 	if (!src[0]) return {nullptr, nullptr};
@@ -106,6 +117,26 @@ Span<const char> Path::getDir(const char* src)
 	return dir;
 }
 
+Span<const char> Path::getBasename(Span<const char> src)
+{
+	if (src.length() == 0) return src;
+	if (src.back() == '/' || src.back() == '\\') src = src.fromRight(1);
+
+	Span<const char> res;
+	const char* end = src.end();
+	res.m_end = end;
+	res.m_begin = end - 1;
+	while (res.m_begin != src.begin() && *res.m_begin != '\\' && *res.m_begin != '/') {
+		--res.m_begin;
+	}
+
+	if (*res.m_begin == '\\' || *res.m_begin == '/') ++res.m_begin;
+	res.m_end = res.m_begin;
+
+	while (res.m_end != end && *res.m_end != '.') ++res.m_end;
+
+	return res;
+}
 Span<const char> Path::getBasename(const char* src)
 {
 	if (!src[0]) return Span<const char>(src, src);

@@ -92,6 +92,7 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual struct LogUI& getLogUI() = 0;
 	virtual struct AssetBrowser& getAssetBrowser() = 0;
 	virtual struct AssetCompiler& getAssetCompiler() = 0;
+	virtual struct FileSelector& getFileSelector() = 0;
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void initPlugins() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;

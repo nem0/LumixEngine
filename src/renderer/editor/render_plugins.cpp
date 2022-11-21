@@ -1164,15 +1164,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getFileDialogExtensions() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
 	bool createResource(const char* path) override { 
-		char tmp[LUMIX_MAX_PATH];
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!m_app.getEngine().getFileSystem().makeRelative(Span(tmp), path)) {
-			logError("Can not open ", path, " because it's not in root directory (", fs.getBasePath(), ").");		
-			return false;
-		}
 		CompositeTexture ltc(m_app, m_app.getAllocator());
 		ltc.initDefault();
-		return ltc.save(fs, Path(tmp));
+		return ltc.save(fs, Path(path));
 	}
 
 	struct TextureTileJob
@@ -1630,7 +1625,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		if (!is_ltc && ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
-		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath());
+		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath().c_str());
 
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -4891,6 +4886,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 
 	StudioApp& app;
+	bool m_show_save_as = false;
 	CompositeTextureEditor& m_composite_texture_editor;
 };
 

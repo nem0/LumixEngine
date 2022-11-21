@@ -105,7 +105,8 @@ struct Span
 	template <int N> explicit Span(T (&value)[N]) : m_begin(value), m_end(value + N) {}
 	T& operator[](u32 idx) const { ASSERT(m_begin + idx < m_end); return m_begin[idx]; }
 	operator Span<const T>() const { return Span<const T>(m_begin, m_end); }
-	Span fromLeft(u32 count) const { return Span(m_begin + count, m_end); }
+	[[nodiscard]] Span fromLeft(u32 count) const { ASSERT(count <= length()); return Span(m_begin + count, m_end); }
+	[[nodiscard]] Span fromRight(u32 count) const { ASSERT(count <= length()); return Span(m_begin, m_end - count); }
 	T& back() { ASSERT(length() > 0); return *(m_end - 1); }
 	const T& back() const { ASSERT(length() > 0); return *(m_end - 1); }
 
