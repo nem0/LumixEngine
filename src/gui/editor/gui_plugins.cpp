@@ -57,7 +57,8 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createResource(const char* path) override {
 		os::OutputFile file;
-		if (!file.open(path)) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.open(path, file)) {
 			logError("Failed to create ", path);
 			return false;
 		}

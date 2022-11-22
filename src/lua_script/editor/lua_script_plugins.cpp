@@ -367,8 +367,9 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 {
-	explicit AddComponentPlugin(StudioApp& _app)
-		: app(_app)
+	explicit AddComponentPlugin(StudioApp& app)
+		: app(app)
+		, file_selector("lua", app)
 	{
 	}
 
@@ -380,28 +381,21 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		char buf[LUMIX_MAX_PATH];
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
-		if (ImGui::Selectable("New"))
-		{
-			char full_path[LUMIX_MAX_PATH];
-			if (os::getSaveFilename(Span(full_path), "Lua script\0*.lua\0", "lua"))
-			{
+		if (ImGui::BeginMenu("New")) {
+			file_selector.gui(false);
+			if (ImGui::Button("Create")) {
+				copyString(Span(buf), file_selector.getPath());
 				os::OutputFile file;
 				FileSystem& fs = app.getEngine().getFileSystem();
-				if(fs.makeRelative(Span(buf), full_path)) {
-					if (file.open(full_path))
-					{
-						new_created = true;
-						file.close();
-					}
-					else
-					{
-						logError("Failed to create ", buf);
-					}
+				if (fs.open(file_selector.getPath(), file)) {
+					new_created = true;
+					file.close();
 				}
 				else {
-					logError("Can not create ", full_path, " because it's not in root directory (", fs.getBasePath(), ").");
+					logError("Failed to create ", buf);
 				}
 			}
+			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 
@@ -444,6 +438,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 
 
 	StudioApp& app;
+	FileSelector file_selector;
 };
 
 struct PropertyGridPlugin final : PropertyGrid::IPlugin

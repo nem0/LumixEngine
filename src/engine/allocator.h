@@ -124,6 +124,7 @@ struct UniquePtr {
 	IAllocator* getAllocator() const { return m_allocator; }
 	T& operator *() const { ASSERT(m_ptr); return *m_ptr; }
 	T* operator ->() const { ASSERT(m_ptr); return m_ptr; }
+	operator bool() const { return m_ptr; }
 
 private:
 	T* m_ptr = nullptr;
