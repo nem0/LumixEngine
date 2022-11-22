@@ -1132,18 +1132,20 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		IPlugin* plugin = iter.value();
-		if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
-			char full_path[LUMIX_MAX_PATH];
-			if (os::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
-				if (fs.makeRelative(buf, full_path)) {
-					if (plugin->createResource(full_path)) {
-						return true;
-					}
-				}
-				else {
-					logError("Can not create ", full_path, " because it's outside of root directory.");
-				}
+
+		static bool show_new_fs = false;
+		if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New", false, ImGuiSelectableFlags_DontClosePopups)) {
+			show_new_fs = true;
+		}
+
+		FileSelector& file_selector = m_app.getFileSelector();
+		if (file_selector.gui("Save As", &show_new_fs, plugin->getFileDialogExtensions(), true)) {
+			if (!plugin->createResource(file_selector.getPath())) {
+				logError("Failed to create ", file_selector.getPath());
+				return false;
 			}
+			copyString(buf, file_selector.getPath());
+			return true;
 		}
 
 		static char filter[128] = "";

@@ -806,7 +806,8 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createResource(const char* path) override {
 		os::OutputFile file;
-		if (!file.open(path)) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.open(path, file)) {
 			logError("Failed to create ", path);
 			return false;
 		}
@@ -4703,7 +4704,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 {
 	explicit AddTerrainComponentPlugin(CompositeTextureEditor& comp_tex_editor, StudioApp& app)
-		: app(app)
+		: m_app(app)
+		, m_file_selector("mat", app)
 		, m_composite_texture_editor(comp_tex_editor)
 	{
 	}
@@ -4721,7 +4723,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		StaticString<LUMIX_MAX_PATH> splatmap_path(info.m_dir, "splatmap.tga");
 		StaticString<LUMIX_MAX_PATH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
 		os::OutputFile file;
-		FileSystem& fs = app.getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(hm_path, file))
 		{
 			logError("Failed to create heightmap ", hm_path);
@@ -4765,17 +4767,17 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			return false;
 		}
 
-		OutputMemoryStream splatmap(app.getAllocator());
+		OutputMemoryStream splatmap(m_app.getAllocator());
 		splatmap.resize(size * size * 4);
 		memset(splatmap.getMutableData(), 0, size * size * 4);
-		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, Path(splatmap_path), app.getAllocator())) {
+		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, Path(splatmap_path), m_app.getAllocator())) {
 			logError("Failed to create texture ", splatmap_path);
 			os::deleteFile(hm_path);
 			return false;
 		}
 		file.close();
 
-		CompositeTexture albedo(app, app.getAllocator());
+		CompositeTexture albedo(m_app, m_app.getAllocator());
 		albedo.initTerrainAlbedo();
 		if (!albedo.save(fs, Path(albedo_path))) {
 			logError("Failed to create texture ", albedo_path);
@@ -4785,7 +4787,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			return false;
 		}
 
-		CompositeTexture normal(app, app.getAllocator());
+		CompositeTexture normal(m_app, m_app.getAllocator());
 		normal.initTerrainNormal();
 		if (!normal.save(fs, Path(normal_path))) {
 			logError("Failed to create texture ", normal_path);
@@ -4829,28 +4831,23 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 	void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override
 	{
-		FileSystem& fs = app.getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu("Terrain")) return;
 		char buf[LUMIX_MAX_PATH];
-		AssetBrowser& asset_browser = app.getAssetBrowser();
+		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::BeginMenu("New"))
 		{
 			static int size = 1024;
-			ImGui::InputInt("Size", &size);
-			if (ImGui::Button("Create"))
+			ImGuiEx::Label("Size");
+			ImGui::InputInt("##size", &size);
+			m_file_selector.gui(false);
+			if (m_file_selector.getPath()[0] &&  ImGui::Button("Create"))
 			{
-				char save_filename[LUMIX_MAX_PATH];
-				if (os::getSaveFilename(Span(save_filename), "Material\0*.mat\0", "mat")) {
-					if (fs.makeRelative(Span(buf), save_filename)) {
-						new_created = createHeightmap(buf, size);
-					}
-					else {
-						logError("Can not create ", save_filename, " because it's not in root directory (", fs.getBasePath(), ").");
-					}
-				}
+				new_created = createHeightmap(m_file_selector.getPath(), size);
+				copyString(Span(buf), m_file_selector.getPath());
 			}
 			ImGui::EndMenu();
 		}
@@ -4885,7 +4882,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 	const char* getLabel() const override { return "Render / Terrain"; }
 
 
-	StudioApp& app;
+	StudioApp& m_app;
+	FileSelector m_file_selector;
 	bool m_show_save_as = false;
 	CompositeTextureEditor& m_composite_texture_editor;
 };

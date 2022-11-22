@@ -201,28 +201,6 @@ struct FileSystemImpl : FileSystem {
 		return os::createFileIterator(path, m_allocator);
 	}
 
-	void makeAbsolute(Span<char> absolute, const char* relative) const override {
-		bool is_absolute = relative[0] == '\\' || relative[0] == '/';
-		is_absolute = is_absolute || (relative[0] != 0 && relative[1] == ':');
-
-		if (is_absolute) {
-			copyString(absolute, relative);
-			return;
-		}
-
-		copyString(absolute, m_base_path);
-		catString(absolute, relative);
-	}
-
-	bool makeRelative(Span<char> relative, const char* absolute) const override {
-		if (startsWith(absolute, m_base_path)) {
-			copyString(relative, absolute + stringLength(m_base_path));
-			return true;
-		}
-		copyString(relative, absolute);
-		return false;
-	}
-
 	void processCallbacks() override
 	{
 		PROFILE_FUNCTION();

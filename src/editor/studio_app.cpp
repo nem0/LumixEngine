@@ -1974,6 +1974,7 @@ struct StudioAppImpl final : StudioApp
 		m_settings.m_is_log_open = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
 		m_settings.m_is_properties_open = m_property_grid->m_is_open;
+		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
 
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
@@ -2205,6 +2206,7 @@ struct StudioAppImpl final : StudioApp
 		m_export.dest_dir = "";
 		m_settings.getValue(Settings::LOCAL, "export_dir", Span(m_export.dest_dir.data));
 		m_settings.getValue(Settings::LOCAL, "export_pack", m_export.pack);
+		m_file_selector.m_current_dir = m_settings.getStringValue(Settings::LOCAL, "fileselector_dir", "");
 	}
 
 

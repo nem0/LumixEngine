@@ -112,15 +112,19 @@ struct NodeEditorNode {
 
 struct FileSelector {
 	FileSelector(StudioApp& app);
+	FileSelector(const char* ext, StudioApp& app);
+	// popup
 	bool gui(const char* label, bool* open, const char* extension, bool save);
-	const char* getPath() const { return m_full_path.c_str(); }
+	// inplace
+	bool gui(bool show_breadcrumbs);
+	const char* getPath();
+	String m_current_dir;
 
 private:
 	bool breadcrumb(Span<const char> path);
 	void fillSubitems();
 	StudioApp& m_app;
 	bool m_save;
-	String m_current_dir;
 	String m_filename;
 	String m_accepted_extension;
 	Array<String> m_subdirs;
