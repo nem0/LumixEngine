@@ -70,7 +70,7 @@ struct LUMIX_EDITOR_API StudioApp
 	struct IAddComponentPlugin
 	{
 		virtual ~IAddComponentPlugin() {}
-		virtual void onGUI(bool create_entity, bool from_filter, struct WorldEditor& editor) = 0;
+		virtual void onGUI(bool create_entity, bool from_filter, EntityPtr parent, struct WorldEditor& editor) = 0;
 		virtual const char* getLabel() const = 0;
 	};
 

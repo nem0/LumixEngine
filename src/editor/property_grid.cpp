@@ -844,32 +844,32 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 }
 
 
-static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, WorldEditor& editor)
+static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, EntityPtr parent, WorldEditor& editor)
 {
 	if (!node) return;
 
 	if (filter[0])
 	{
-		if (!node->plugin) showAddComponentNode(node->child, filter, editor);
-		else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, editor);
-		showAddComponentNode(node->next, filter, editor);
+		if (!node->plugin) showAddComponentNode(node->child, filter, parent, editor);
+		else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, parent, editor);
+		showAddComponentNode(node->next, filter, parent, editor);
 		return;
 	}
 
 	if (node->plugin)
 	{
-		node->plugin->onGUI(false, false, editor);
-		showAddComponentNode(node->next, filter, editor);
+		node->plugin->onGUI(false, false, parent, editor);
+		showAddComponentNode(node->next, filter, parent, editor);
 		return;
 	}
 
 	const char* last = reverseFind(node->label, nullptr, '/');
 	if (ImGui::BeginMenu(last ? last + 1 : node->label))
 	{
-		showAddComponentNode(node->child, filter, editor);
+		showAddComponentNode(node->child, filter, parent, editor);
 		ImGui::EndMenu();
 	}
-	showAddComponentNode(node->next, filter, editor);
+	showAddComponentNode(node->next, filter, parent, editor);
 }
 
 
@@ -908,7 +908,7 @@ void PropertyGrid::onGUI()
 				m_component_filter[0] = '\0';
 			}
 
-			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, editor);
+			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
 			ImGui::EndPopup();
 		}
 	}
