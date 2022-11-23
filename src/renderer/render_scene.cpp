@@ -3121,6 +3121,7 @@ struct RenderSceneImpl final : RenderScene {
 		if (pg.vertex_buffer) m_renderer.getDrawStream().destroy(pg.vertex_buffer);
 		if (pg.index_buffer) m_renderer.getDrawStream().destroy(pg.index_buffer);
 		m_procedural_geometries.erase(entity);
+		m_universe.onComponentDestroyed(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
 	
 	void createProceduralGeometry(EntityRef entity) {
