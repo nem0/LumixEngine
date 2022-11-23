@@ -295,7 +295,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 		char tmp[LUMIX_MAX_PATH];
 		makeLowercase(Span(tmp), m_dir.data);
-		const RuntimeHash dir_hash(tmp);
+		const RuntimeHash dir_hash(equalStrings(".", tmp) ? "" : tmp);
 		auto& resources = compiler.lockResources();
 		if (m_filter[0]) {
 			for (const AssetCompiler::ResourceItem& res : resources) {
