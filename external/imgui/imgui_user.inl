@@ -1460,10 +1460,15 @@ namespace ImGuiEx {
 	}
 
 	void Canvas::begin() {
-		if (m_scale == 1) return;
-
 		m_size = GetContentRegionAvail();
 		m_origin = GetCursorScreenPos();
+		
+		if (m_scale == 1) {
+			PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+			BeginChild("imgui_canvas", ImVec2(0, 0), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove);
+			PopStyleVar();
+			return;
+		}
 		m_original_ctx = GetCurrentContext();
 		const ImGuiStyle& orig_style = GetStyle();
 		if (!m_ctx) m_ctx = CreateContext(GetIO().Fonts);
@@ -1492,6 +1497,7 @@ namespace ImGuiEx {
 				m_scale = m_scale < 0.1f ? 0.1f : m_scale;
 				m_scale = m_scale > 1.f ? 1.f : m_scale;
 			}
+			EndChild();
 			return;
 		}
 		
