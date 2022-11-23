@@ -599,14 +599,15 @@ struct AssetBrowserImpl : AssetBrowser {
 			for (IPlugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
 				if (ImGui::BeginMenu(plugin->getName())) {
-					ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp));
+					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue);
 					ImGui::SameLine();
-					if (ImGui::Button("Create")) {
+					if (ImGui::Button("Create") || input_entered) {
 						StaticString<LUMIX_MAX_PATH> path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
 						plugin->createResource(path);
 						m_wanted_resource = path;
 						ImGui::CloseCurrentPopup();
 					}
+
 					ImGui::EndMenu();
 				}
 			}
