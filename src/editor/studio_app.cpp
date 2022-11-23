@@ -3099,22 +3099,14 @@ struct StudioAppImpl final : StudioApp
 	void exportData() {
 		if (m_export.dest_dir.empty()) return;
 
-		FileSystem& fs = m_engine->getFileSystem();
+		FileSystem& fs = m_engine->getFileSystem(); 
 		{
-			StaticString<LUMIX_MAX_PATH> project_path(fs.getBasePath(), "lumix.prj");
 			OutputMemoryStream prj_blob(m_allocator);
 			m_engine->serializeProject(prj_blob, m_export.startup_universe);
-			os::OutputFile file;
-			if (!file.open(project_path)) {
-				logError("Could not create ", project_path);
-				return;
-			}
 
-			(void)file.write(prj_blob.data(), prj_blob.size());
-
-			file.close();
-			if (file.isError()) {
-				logError("Could not write ", project_path);
+			StaticString<LUMIX_MAX_PATH> project_path(fs.getBasePath(), "lumix.prj");
+			if (!fs.saveContentSync(Path(project_path), prj_blob)) {
+				logError("Could not save ", project_path);
 				return;
 			}
 		}

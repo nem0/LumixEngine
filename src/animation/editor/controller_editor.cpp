@@ -784,22 +784,15 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	void save(const char* path) {
-		OutputMemoryStream str(m_controller->m_allocator);
-		m_controller->serialize(str);
+		OutputMemoryStream blob(m_controller->m_allocator);
+		m_controller->serialize(blob);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		os::OutputFile file;
-		if (fs.open(path, file)) {
-			if (!file.write(str.data(), str.size())) {
-				logError("Failed to write ", path);
-			}
-			file.close();
-			m_path = path;
-			m_dirty = false;
-			file.close();
+		if (!fs.saveContentSync(Path(path), blob)) {
+			logError("Failed to save ", path);
+			return;
 		}
-		else {
-			logError("Failed to create ", path);
-		}
+		m_path = path;
+		m_dirty = false;
 	}
 
 	void newGraph() {

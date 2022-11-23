@@ -545,21 +545,13 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 
-	void updateMeta(const Path& res, const char* src) const override
-	{
-		os::OutputFile file;
+	void updateMeta(const Path& res, const char* src) const override {
 		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(meta_path, file)) {
-			logError("Could not create ", meta_path);
-			return;
+		if (!fs.saveContentSync(Path(meta_path), Span((const u8*)src, stringLength(src)))) {
+			logError("Could not save ", meta_path);
 		}
-
-		if (!file.write(src, stringLength(src))) {
-			logError("Could not write ", meta_path);
-		}
-		file.close();
 	}
 
 	IPlugin* getPlugin(const Path& path) {

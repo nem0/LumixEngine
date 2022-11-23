@@ -1065,20 +1065,12 @@ struct AssetBrowserImpl : AssetBrowser {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		// use temporary because otherwise the resource is reloaded during saving
 		StaticString<LUMIX_MAX_PATH> tmp_path(resource.getPath().c_str(), ".tmp");
-		os::OutputFile f;
-		if (!fs.open(tmp_path, f))
-		{
+
+		if (!fs.saveContentSync(Path(tmp_path), stream)) {
 			LUMIX_DELETE(m_app.getAllocator(), &stream);
 			logError("Could not save file ", resource.getPath());
 			return;
 		}
-		if (!f.write(stream.data(), stream.size())) {
-			f.close();
-			LUMIX_DELETE(m_app.getAllocator(), &stream);
-			logError("Could not write file ", resource.getPath());
-			return;
-		}
-		f.close();
 		LUMIX_DELETE(m_app.getAllocator(), &stream);
 
 		auto& engine = m_app.getEngine();

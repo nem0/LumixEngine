@@ -153,7 +153,6 @@ bool Texture::saveTGA(IOutputStream* file,
 		return false;
 	}
 
-	u8* data = (u8*)allocator.allocate(width * height * 4);
 
 	TGAHeader header;
 	memset(&header, 0, sizeof(header));
@@ -163,8 +162,9 @@ bool Texture::saveTGA(IOutputStream* file,
 	header.dataType = 2;
 	header.imageDescriptor = upper_left_origin ? 32 : 0;
 
-	file->write(&header, sizeof(header));
+	if (!file->write(&header, sizeof(header))) return false;
 
+	u8* data = (u8*)allocator.allocate(width * height * 4);
 	for (long y = 0; y < header.height; y++)
 	{
 		long write_index = y * header.width * 4;
@@ -178,11 +178,9 @@ bool Texture::saveTGA(IOutputStream* file,
 		}
 	}
 
-	file->write(data, width * height * 4);
-
+	bool res = file->write(data, width * height * 4);
 	allocator.deallocate(data);
-
-	return true;
+	return res;
 }
 
 

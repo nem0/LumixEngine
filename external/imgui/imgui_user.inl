@@ -172,7 +172,12 @@ namespace ImGuiEx {
 					, center + ImVec2(NODE_PIN_RADIUS, 0)
 					, GetColorU32(ImGuiCol_Text));
 				break;
-			default:
+			case PinShape::SQUARE: {
+				const ImVec2 h(NODE_PIN_RADIUS, NODE_PIN_RADIUS);
+				g_node_editor.draw_list->AddRectFilled(center - h, center + h, color);
+				break;
+			}
+			case PinShape::CIRCLE:
 				g_node_editor.draw_list->AddCircleFilled(center, NODE_PIN_RADIUS, color);
 				break;
 		}

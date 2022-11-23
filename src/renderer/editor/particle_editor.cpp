@@ -1787,30 +1787,19 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			load();
 			return;
 		}
-		os::InputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (fs.open(path, file)) {
-			const u64 size = file.size();
-			OutputMemoryStream blob(m_allocator);
-			blob.resize(size);
-			if (!file.read(blob.getMutableData(), blob.size())) {
-				logError("Failed to read ", path);
-				file.close();
-				return;
-			}
-			file.close();
-
-			m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
-			InputMemoryStream iblob(blob);
-			m_resource->deserialize(iblob, path);
-			m_path = path;
-			clearUndoStack();
-			pushUndo(NO_MERGE_UNDO);
-			m_dirty = false;
+		OutputMemoryStream blob(m_allocator);
+		if (!fs.getContentSync(Path(path), blob)) {
+			logError("Failed to read ", path);
+			return;
 		}
-		else {
-			logError("Failed to open ", path);
-		}
+		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
+		InputMemoryStream iblob(blob);
+		m_resource->deserialize(iblob, path);
+		m_path = path;
+		clearUndoStack();
+		pushUndo(NO_MERGE_UNDO);
+		m_dirty = false;
 	}
 
 	void load() {
@@ -1835,20 +1824,13 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_resource->serialize(blob);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		os::OutputFile file;
-		if (fs.open(path, file)) {
-			if (!file.write(blob.data(), blob.size())) {
-				logError("Failed to write ", path);
-			}
-			else {
-				m_path = path;
-				m_dirty = false;
-			}
-			file.close();
+		if (!fs.saveContentSync(Path(path), blob)) {
+			logError("Failed to save ", path);
+			return;
 		}
-		else {
-			logError("Failed to open ", path);
-		}
+		
+		m_path = path;
+		m_dirty = false;
 	}
 
 	void newGraph() {

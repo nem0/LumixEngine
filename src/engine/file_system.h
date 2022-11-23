@@ -42,6 +42,7 @@ struct LUMIX_ENGINE_API FileSystem {
 	virtual void processCallbacks() = 0;
 	virtual bool hasWork() = 0;
 
+	[[nodiscard]] virtual bool saveContentSync(const struct Path& file, Span<const u8> content) =  0;
 	[[nodiscard]] virtual bool getContentSync(const struct Path& file, struct OutputMemoryStream& content) =  0;
 	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
 	virtual void cancel(AsyncHandle handle) = 0;

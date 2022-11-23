@@ -91,6 +91,17 @@ struct FileSystemImpl : FileSystem {
 		}
 	}
 
+	bool saveContentSync(const Path& path, Span<const u8> content) override {
+		os::OutputFile file;
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path.c_str());
+		if (!file.open(full_path)) return false;
+
+		bool res = file.write(content.begin(), content.length());
+		file.close();
+
+		return res;
+	}
+
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		os::InputFile file;
 		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path.c_str());
