@@ -555,7 +555,7 @@ struct StudioAppImpl final : StudioApp
 
 	void registerComponent(const char* icon, ComponentType cmp_type, const char* label, ResourceType resource_type, const char* property) {
 		struct Plugin final : IAddComponentPlugin {
-			void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override {
+			void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override {
 				ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 				const char* last = reverseFind(label, nullptr, '/');
 				last = last && !from_filter ? last + 1 : label;
@@ -565,6 +565,7 @@ struct StudioAppImpl final : StudioApp
 				bool create_empty = ImGui::MenuItem(ICON_FA_BROOM " Empty");
 				static FilePathHash selected_res_hash;
 				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, 0, true) || create_empty) {
+					editor.beginCommandGroup("createEntityWithComponent");
 					if (create_entity) {
 						EntityRef entity = editor.addEntity();
 						editor.selectEntities(Span(&entity, 1), false);
@@ -575,6 +576,9 @@ struct StudioAppImpl final : StudioApp
 					if (!create_empty) {
 						editor.setProperty(type, "", -1, property, editor.getSelectedEntities(), Path(buf));
 					}
+					if (parent.isValid()) editor.makeParent(parent, selected_entites[0]);
+					editor.endCommandGroup();
+					editor.lockGroupCommand();
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndMenu();
@@ -619,20 +623,25 @@ struct StudioAppImpl final : StudioApp
 	{
 		struct Plugin final : IAddComponentPlugin
 		{
-			void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override
+			void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override
 			{
 				const char* last = reverseFind(label, nullptr, '/');
 				last = last && !from_filter ? last + 1 : label;
 				if (last[0] == ' ') ++last;
 				if (ImGui::MenuItem(last))
 				{
+					editor.beginCommandGroup("createEntityWithComponent");
 					if (create_entity)
 					{
 						EntityRef entity = editor.addEntity();
 						editor.selectEntities(Span(&entity, 1), false);
 					}
 
-					editor.addComponent(editor.getSelectedEntities(), type);
+					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					editor.addComponent(selected, type);
+					if (parent.isValid()) editor.makeParent(parent, selected[0]);
+					editor.endCommandGroup();
+					editor.lockGroupCommand();
 				}
 			}
 
@@ -904,6 +913,7 @@ struct StudioAppImpl final : StudioApp
 
 
 	void initDefaultUniverse() {
+		m_editor->beginCommandGroup("initUniverse");
 		EntityRef env = m_editor->addEntity();
 		m_editor->setEntityName(env, "environment");
 		ComponentType env_cmp_type = reflection::getComponentType("environment");
@@ -917,6 +927,7 @@ struct StudioAppImpl final : StudioApp
 		const ComponentUID cmp = m_editor->getUniverse()->getComponent(env, lua_script_cmp_type);
 		m_editor->addArrayPropertyItem(cmp, "scripts");
 		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/atmo.lua"));
+		m_editor->endCommandGroup();
 	}
 
 
@@ -1335,22 +1346,22 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, WorldEditor& editor)
+	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, EntityPtr parent, WorldEditor& editor)
 	{
 		if (!node) return;
 
 		if (filter[0])
 		{
-			if (!node->plugin) showAddComponentNode(node->child, filter, editor);
-			else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, editor);
-			showAddComponentNode(node->next, filter, editor);
+			if (!node->plugin) showAddComponentNode(node->child, filter, parent, editor);
+			else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(true, true, parent, editor);
+			showAddComponentNode(node->next, filter, parent, editor);
 			return;
 		}
 
 		if (node->plugin)
 		{
-			node->plugin->onGUI(true, false, editor);
-			showAddComponentNode(node->next, filter, editor);
+			node->plugin->onGUI(true, false, parent, editor);
+			showAddComponentNode(node->next, filter, parent, editor);
 			return;
 		}
 
@@ -1359,16 +1370,25 @@ struct StudioAppImpl final : StudioApp
 		if (last[0] == ' ') ++last;
 		if (ImGui::BeginMenu(last))
 		{
-			showAddComponentNode(node->child, filter, editor);
+			showAddComponentNode(node->child, filter, parent, editor);
 			ImGui::EndMenu();
 		}
-		showAddComponentNode(node->next, filter, editor);
+		showAddComponentNode(node->next, filter, parent, editor);
 	}
 
 
-	void onCreateEntityWithComponentGUI()
+	void onCreateEntityWithComponentGUI(EntityPtr parent)
 	{
-		menuItem("createEntity", true);
+		char shortcut[64] = "";
+		const Action* create_entity_action = getAction("createEntity");
+		if (create_entity_action) getShortcut(*create_entity_action, Span(shortcut));
+		
+		if (ImGui::MenuItem("Create empty", shortcut)) {
+			const EntityRef e = m_editor->addEntity();
+			m_editor->selectEntities(Span(&e, 1), false);
+			if (parent.isValid()) m_editor->makeParent(parent, e);
+		}
+
 		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 		ImGui::SetNextItemWidth(-w);
 		ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
@@ -1376,7 +1396,7 @@ struct StudioAppImpl final : StudioApp
 		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 			m_component_filter[0] = '\0';
 		}
-		showAddComponentNode(m_add_cmp_root.child, m_component_filter, *m_editor);
+		showAddComponentNode(m_add_cmp_root.child, m_component_filter, parent, *m_editor);
 	}
 
 
@@ -1388,7 +1408,7 @@ struct StudioAppImpl final : StudioApp
 		bool is_any_entity_selected = !selected_entities.empty();
 		if (ImGui::BeginMenu(ICON_FA_PLUS_SQUARE "Create"))
 		{
-			onCreateEntityWithComponentGUI();
+			onCreateEntityWithComponentGUI(INVALID_ENTITY);
 			ImGui::EndMenu();
 		}
 		menuItem("destroyEntity", is_any_entity_selected);
@@ -1697,17 +1717,12 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
 			if (ImGui::BeginPopup("entity_context_menu"))
 			{
-				if (ImGui::MenuItem("Create child"))
-				{
-					m_editor->beginCommandGroup("create_child_entity");
-					EntityRef child = m_editor->addEntity();
-					m_editor->makeParent(entity, child);
-					const DVec3 pos = universe->getPosition(entity);
-					m_editor->setEntitiesPositions(&child, &pos, 1);
-					m_editor->endCommandGroup();
+				if (ImGui::BeginMenu("Create child")) {
+					onCreateEntityWithComponentGUI(entity);
+					ImGui::EndMenu();
 				}
-				if (ImGui::MenuItem("Select all children"))
-				{
+
+				if (ImGui::MenuItem("Select all children")) {
 					Array<EntityRef> tmp(m_allocator);
 					for (EntityRef e : universe->childrenOf(entity)) {
 						tmp.push(e);

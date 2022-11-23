@@ -367,7 +367,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 	}
 
 
-	void onGUI(bool create_entity, bool, WorldEditor& editor) override
+	void onGUI(bool create_entity, bool, EntityPtr parent, WorldEditor& editor) override
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu("File")) return;
@@ -395,6 +395,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		static FilePathHash selected_res_hash;
 		if (asset_browser.resourceList(Span(buf), selected_res_hash, LuaScript::TYPE, 0, false) || create_empty || new_created)
 		{
+			editor.beginCommandGroup("createEntityWithComponent");
 			if (create_entity)
 			{
 				EntityRef entity = editor.addEntity();
@@ -418,6 +419,9 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
 			}
 			editor.endCommandGroup();
+			if (parent.isValid()) editor.makeParent(parent, entity);
+			editor.endCommandGroup();
+			editor.lockGroupCommand();
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndMenu();

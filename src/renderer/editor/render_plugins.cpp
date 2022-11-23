@@ -4830,7 +4830,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 	}
 
 
-	void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override
+	void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 
@@ -4873,7 +4873,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			{
 				editor.setProperty(TERRAIN_TYPE, "", -1, "Material", Span(&entity, 1), Path(buf));
 			}
-
+			if (parent.isValid()) editor.makeParent(parent, entity);
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndMenu();
