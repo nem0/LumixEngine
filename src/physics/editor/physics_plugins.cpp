@@ -790,11 +790,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 		blob << "dynamic_friction(" << mat->material->getDynamicFriction() << ")\n";
 		blob << "restitution(" << mat->material->getRestitution() << ")\n";
 
-		os::OutputFile file;
-		if (!fs.open(mat->getPath().c_str(), file)) return false;
-		bool res = file.write(blob.data(), blob.size());
-		file.close();
-		return res;
+		return fs.saveContentSync(mat->getPath(), blob);
 	}
 
 	void onGUI(Span<Resource*> resources) override {

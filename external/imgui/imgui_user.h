@@ -26,7 +26,8 @@ enum class CurveEditorFlags
 
 enum class PinShape {
 	CIRCLE,
-	TRIANGLE
+	TRIANGLE,
+	SQUARE
 };
 
 IMGUI_API int CurveEditor(const char* label

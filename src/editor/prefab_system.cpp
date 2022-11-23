@@ -501,14 +501,6 @@ public:
 		if (getPrefab(entity).getHashValue() != 0) entity = getPrefabRoot(entity);
 
 		Engine& engine = m_editor.getEngine();
-		FileSystem& fs = engine.getFileSystem();
-		os::OutputFile file;
-		if (!fs.open(path.c_str(), file))
-		{
-			logError("Failed to create ", path);
-			return;
-		}
-
 		OutputMemoryStream blob(m_editor.getAllocator());
 		blob.reserve(4096);
 		Array<EntityRef> src_entities(m_editor.getAllocator());
@@ -517,13 +509,12 @@ public:
 		engine.serialize(prefab_universe, blob);
 		engine.destroyUniverse(prefab_universe);
 
-		if (!file.write(blob.data(), blob.size())) {
-			logError("Failed to write ", path.c_str());
-			file.close();
+		FileSystem& fs = engine.getFileSystem();
+		
+		if (!fs.saveContentSync(path, blob)) {
+			logError("Failed to save ", path);
 			return;
 		}
-
-		file.close();
 
 		const PrefabHandle prefab = path.getHash();
 		PrefabResource* prefab_res;

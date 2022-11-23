@@ -2446,22 +2446,13 @@ public:
 	}
 
 	void saveProject() {
-		const char* base_path = m_engine.getFileSystem().getBasePath();
-		const StaticString<LUMIX_MAX_PATH> path(base_path, "lumix.prj");
-		os::OutputFile file;
-		if (file.open(path)) {
-			OutputMemoryStream stream(m_allocator);
-			m_engine.serializeProject(stream, "main");
-			bool saved = true;
-			if (!file.write(stream.data(), stream.size())) {
-				logError("Failed to save project ", path);
-				saved = false;
-			}
-			file.close();
-			if (!saved) os::deleteFile(path);
-			return;
+		FileSystem& fs = m_engine.getFileSystem();
+		OutputMemoryStream blob(m_allocator);
+		m_engine.serializeProject(blob, "main");
+
+		if (!fs.saveContentSync(Path("lumix.prj"), blob)) {
+			logError("Failed to save lumix.prj");
 		}
-		logError("Failed to save project ", path);
 	}
 
 	void loadProject() override {

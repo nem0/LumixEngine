@@ -1546,15 +1546,8 @@ bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 bool CompositeTexture::save(FileSystem& fs, const Path& path) {
 	OutputMemoryStream blob(m_app.getAllocator());
 	serialize(blob);
-	os::OutputFile file;
-	if (fs.open(path.c_str(), file)) {
-		bool res = file.write(blob.data(), blob.size());
-		file.close();
-		return res;
-	}
-	return false;
+	return fs.saveContentSync(path, blob);
 }
-
 
 CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
 	: NodeEditor(app.getAllocator())
@@ -1608,16 +1601,12 @@ void CompositeTextureEditor::deleteSelectedNodes() {
 
 bool CompositeTextureEditor::saveAs(const char* path) {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	os::OutputFile file;
-	if (!fs.open(path, file)) return false;
-	
 	OutputMemoryStream blob(m_app.getAllocator());
 	serialize(blob);
-	bool res = file.write(blob.data(), blob.size());
-	file.close();
-	m_path = path;
+	if (!fs.saveContentSync(Path(path), blob)) return false;
 	pushRecent(path);
-	return res;
+	m_path = path;
+	return true;
 }
 
 struct CompositeTextureHeader {

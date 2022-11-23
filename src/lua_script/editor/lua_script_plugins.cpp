@@ -65,17 +65,10 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_SAVE "Save"))
 			{
 				FileSystem& fs = m_app.getEngine().getFileSystem();
-				os::OutputFile file;
-				if (!fs.open(script->getPath().c_str(), file))
-				{
+				if (!fs.saveContentSync(script->getPath(), Span((const u8*)m_text_buffer, stringLength(m_text_buffer)))) {
 					logWarning("Could not save ", script->getPath());
 					return;
 				}
-
-				if (!file.write(m_text_buffer, stringLength(m_text_buffer))) {
-					logError("Could not write ", script->getPath());
-				}
-				file.close();
 			}
 			ImGui::SameLine();
 		}
