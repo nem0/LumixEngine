@@ -124,11 +124,45 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	}
 
 	void onSettingsLoaded() override {
-		open = app.getSettings().getValue(Settings::GLOBAL, "is_script_console_open", false);
+		Settings& settings = app.getSettings();
+		open = settings.getValue(Settings::GLOBAL, "is_script_console_open", false);
+		if (!buf[0]) {
+			Span<const char> dir = Path::getDir(settings.getAppDataPath());
+			const StaticString<LUMIX_MAX_PATH> path(dir, "/lua_console_content.lua");
+			os::InputFile file;
+			if (file.open(path)) {
+				const u64 size = file.size();
+				if (size + 1 <= sizeof(buf)) {
+					if (!file.read(buf, size)) {
+						logError("Failed to read ", path);
+						buf[0] = '\0';
+					}
+					else {
+						buf[size] = '\0';
+					}
+				}
+				file.close();
+			}
+		}
 	}
 
 	void onBeforeSettingsSaved() override {
-		app.getSettings().setValue(Settings::GLOBAL, "is_script_console_open", open);
+		Settings& settings = app.getSettings();
+		settings.setValue(Settings::GLOBAL, "is_script_console_open", open);
+		if (buf[0]) {
+			Span<const char> dir = Path::getDir(settings.getAppDataPath());
+			const StaticString<LUMIX_MAX_PATH> path(dir, "/lua_console_content.lua");
+			os::OutputFile file;
+			if (!file.open(path)) {
+				logError("Failed to save ", path);
+			}
+			else {
+				if (!file.write(buf, stringLength(buf))) {
+					logError("Failed to write ", path);
+				}
+				file.close();
+			}
+		}
 	}
 
 	/*static const int LUA_CALL_EVENT_SIZE = 32;

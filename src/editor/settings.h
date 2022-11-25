@@ -61,6 +61,7 @@ struct LUMIX_EDITOR_API Settings {
 	bool getValue(Storage storage, const char* name, bool default_value) const;
 	u32 getValue(Storage storage, const char* name, Span<char> out) const;
 	const char* getStringValue(Storage storage, const char* name, const char* default_value) const;
+	const char* getAppDataPath() const { return m_app_data_path; }
 
 private:
 	static void writeCustom(lua_State* L, struct IOutputStream& file);
