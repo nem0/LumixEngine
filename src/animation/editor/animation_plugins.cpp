@@ -73,9 +73,9 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
-struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
+struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-	explicit PropertyAnimationAssetBrowserPlugin(StudioApp& app)
+	explicit PropertyAnimationPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		app.getAssetCompiler().registerExtension("anp", PropertyAnimation::TYPE);
@@ -86,6 +86,10 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getFileDialogExtensions() const override { return "anp"; }
 	const char* getDefaultExtension() const override { return "anp"; }
 
+	bool compile(const Path& src) override {
+		return m_app.getAssetCompiler().copyCompile(src);
+	}
+
 	bool createResource(const char* path) override
 	{
 		os::OutputFile file;
@@ -95,7 +99,6 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			return false;
 		}
 
-		file << "[]";
 		file.close();
 		return true;
 	}
@@ -388,10 +391,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	const char* getName() const override { return "animation"; }
 
-	void init() override
-	{
+	void init() override {
+		AssetCompiler& compiler = m_app.getAssetCompiler();
 		const char* act_exts[] = { "act", nullptr };
-		m_app.getAssetCompiler().addPlugin(m_anim_ctrl_plugin, act_exts);
+		const char* anp_exts[] = { "anp", nullptr };
+		compiler.addPlugin(m_anim_ctrl_plugin, act_exts);
+		compiler.addPlugin(m_prop_anim_plugin, anp_exts);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(m_animation_plugin);
@@ -408,9 +413,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
 	
-	~StudioAppPlugin()
-	{
-		m_app.getAssetCompiler().removePlugin(m_anim_ctrl_plugin);
+	~StudioAppPlugin() {
+		AssetCompiler& compiler = m_app.getAssetCompiler();
+		compiler.removePlugin(m_anim_ctrl_plugin);
+		compiler.removePlugin(m_prop_anim_plugin);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_animation_plugin);
@@ -424,7 +430,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioApp& m_app;
 	AnimablePropertyGridPlugin m_animable_plugin;
 	AnimationAssetBrowserPlugin m_animation_plugin;
-	PropertyAnimationAssetBrowserPlugin m_prop_anim_plugin;
+	PropertyAnimationPlugin m_prop_anim_plugin;
 	AnimControllerAssetBrowserPlugin m_anim_ctrl_plugin;
 	UniquePtr<anim::ControllerEditor> m_anim_editor;
 };
