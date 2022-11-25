@@ -54,7 +54,7 @@ struct CullResult {
 		u8 type;
 	} header;
 
-	EntityRef entities[(16384 - sizeof(header)) / sizeof(EntityRef)];
+	EntityRef entities[(4096 - sizeof(header)) / sizeof(EntityRef)];
 };
 
 struct LUMIX_RENDERER_API CullingSystem

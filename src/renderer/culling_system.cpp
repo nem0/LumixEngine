@@ -16,6 +16,7 @@
 namespace Lumix
 {
 
+static_assert(sizeof(CullResult) == PageAllocator::PAGE_SIZE);
 
 struct CellIndices
 {
