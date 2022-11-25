@@ -4622,7 +4622,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 
 		DrawStream& stream = renderer->getDrawStream();
-		stream.beginProfileBlock("imgui");
+		stream.beginProfileBlock("imgui", 0);
 
 		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
 		for (const ImGuiViewport* vp : platform_io.Viewports) {

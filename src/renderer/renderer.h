@@ -108,8 +108,10 @@ void Renderer::pushJob(const char* name, const T& func) {
 			Context* that = (Context*)ptr;
 			if (that->name) {
 				profiler::beginBlock(that->name);
+				const i64 link = profiler::createNewLinkID();
+				profiler::link(link);
 				profiler::blockColor(0x7f, 0, 0x7f);
-				that->stream.beginProfileBlock(that->name);
+				that->stream.beginProfileBlock(that->name, link);
 			}
 			that->func(that->stream);
 			if (that->name) {

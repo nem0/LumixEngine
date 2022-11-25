@@ -3726,7 +3726,7 @@ struct PipelineImpl final : Pipeline
 
 	void beginBlock(const char* name) {
 		DrawStream& stream = m_renderer.getDrawStream();
-		stream.beginProfileBlock(name);
+		stream.beginProfileBlock(name, 0);
 	}
 
 	void endBlock() {
