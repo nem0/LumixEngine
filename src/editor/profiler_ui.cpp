@@ -567,6 +567,7 @@ struct ProfilerUIImpl final : ProfilerUI
 	u64 m_range = DEFAULT_RANGE;
 	char m_filter[100];
 	double m_filtered_time = 0;
+	u32 m_filtered_count = 0;
 	char m_resource_filter[100];
 	u64 m_resource_size_filter = 0;
 	Engine& m_engine;
@@ -953,7 +954,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 	if (m_filter[0]) {
 		ImGui::SameLine();
-		ImGui::Text("%f ms / ", (float)m_filtered_time);
+		ImGui::Text("%f ms (%d calls) / ", (float)m_filtered_time, m_filtered_count);
 	}
 	const u64 freq = profiler::frequency();
 	ImGui::SameLine();
@@ -982,6 +983,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	const float line_height = ImGui::GetTextLineHeightWithSpacing();
 
 	m_filtered_time = 0;
+	m_filtered_count = 0;
 
 	forEachThread([&](const ThreadContextProxy& ctx) {
 		if (ctx.thread_id == 0) return;
@@ -1074,7 +1076,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				dl->AddText(ImVec2(x_start + 2, block_y), 0x00000000 | alpha, name);
 			}
 			const float t = 1000 * float((to - from) / double(freq));
-			if (!is_filtered && m_filter[0]) m_filtered_time += t;
+			if (!is_filtered && m_filter[0]) {
+				m_filtered_time += t;
+				++m_filtered_count;
+			}
 			if (ImGui::IsMouseHoveringRect(ra, rb)) {
 				ImGui::BeginTooltip();
 				ImGui::Text("%s (%.3f ms)", name, t);
