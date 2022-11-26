@@ -1181,31 +1181,23 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{}
 
 		void execute() {
-			IAllocator& allocator = m_allocator;
-			const FilePathHash hash(m_in_path);
+			const FilePathHash hash(m_in_path.c_str());
 			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".lbc");
-			OutputMemoryStream resized_data(allocator);
+			OutputMemoryStream resized_data(m_allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			OutputMemoryStream tmp(m_allocator);
+			if (!fs.getContentSync(m_in_path, tmp)) {
+				logError("Failed to load ", m_in_path);
+				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
+				return;
+			}
+
 			int image_comp;
 			int w, h;
-			os::InputFile file;
-			if (!file.open(m_in_path)) {
-				logError("Failed to load ", m_in_path);
-				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
-				return;
-			}
-			Array<u8> tmp(m_allocator);
-			tmp.resize((u32)file.size());
-			if (!file.read(tmp.begin(), tmp.byte_size())) {
-				logError("Failed to load ", m_in_path);
-				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
-				return;
-			}
-			file.close();
-
-			if (Path::hasExtension(m_in_path, "ltc")) {
+			if (Path::hasExtension(m_in_path.c_str(), "ltc")) {
 				CompositeTexture ct(m_app, m_app.getAllocator());
-				InputMemoryStream blob(tmp.begin(), tmp.byte_size());
+				InputMemoryStream blob(tmp);
 				if (!ct.deserialize(blob)) {
 					logError("Failed to deserialize ", m_in_path);
 					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
@@ -1234,13 +1226,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					0,
 					4);
 
-				if (!saveAsLBC(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+				if (!saveAsLBC(m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
 			}
 			else {
 
-				auto data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &w, &h, &image_comp, 4);
+				auto data = stbi_load_from_memory(tmp.data(), (int)tmp.size(), &w, &h, &image_comp, 4);
 				if (!data)
 				{
 					logError("Failed to load ", m_in_path);
@@ -1259,7 +1251,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					4);
 				stbi_image_free(data);
 
-				if (!saveAsLBC(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+				if (!saveAsLBC(m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
 			}
@@ -1275,8 +1267,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		StudioApp& m_app;
 		IAllocator& m_allocator;
 		FileSystem& m_filesystem;
-		StaticString<LUMIX_MAX_PATH> m_in_path; 
-		StaticString<LUMIX_MAX_PATH> m_out_path;
+		Path m_in_path; 
+		Path m_out_path;
 		TextureTileJob* m_next = nullptr;
 	};
 
@@ -1297,10 +1289,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!Path::hasExtension(in_path, "raw")) {
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			TextureTileJob* job = LUMIX_NEW(m_app.getAllocator(), TextureTileJob)(m_app, fs, m_app.getAllocator());
-			job->m_in_path = fs.getBasePath();
-			job->m_in_path << in_path;
-			job->m_out_path = fs.getBasePath();
-			job->m_out_path << out_path;
+			job->m_in_path = in_path;
+			job->m_out_path = out_path;
 			if (m_tiles_to_create.head) m_tiles_to_create.head->m_next = job;
 			else {
 				m_tiles_to_create.tail = job;
