@@ -103,34 +103,35 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return true;
 	}
 
+	static bool hasFloatProperty(const reflection::ComponentBase* cmp) {
+		struct : reflection::IEmptyPropertyVisitor {
+			void visit(const reflection::Property<float>& prop) override { result = true; }
+			bool result = false;
+		} visitor;
+		cmp->visit(visitor);
+		return visitor.result;
+	}
 
-	void ShowAddCurveMenu(PropertyAnimation* animation)
-	{
-		WorldEditor& editor = m_app.getWorldEditor();
-		auto& selected_entities = editor.getSelectedEntities();
-		if (selected_entities.empty()) return;
-			
+	void ShowAddCurveMenu(PropertyAnimation* animation) {
 		if (!ImGui::BeginMenu("Add curve")) return;
-
-		Universe* universe = editor.getUniverse();
 		
-		for (ComponentUID cmp = universe->getFirstComponent(selected_entities[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp))
-		{
-			const char* cmp_type_name = m_app.getComponentTypeName(cmp.type);
+		for (const reflection::RegisteredComponent& cmp_type : reflection::getComponents()) {
+			const char* cmp_type_name = cmp_type.cmp->name;
+			if (!hasFloatProperty(cmp_type.cmp)) continue;
 			if (!ImGui::BeginMenu(cmp_type_name)) continue;
 
-			const reflection::ComponentBase* component = reflection::getComponent(cmp.type);
+			const reflection::ComponentBase* component = cmp_type.cmp;
 			struct : reflection::IEmptyPropertyVisitor
 			{
 				void visit(const reflection::Property<float>& prop) override
 				{
 					int idx = animation->curves.find([&](PropertyAnimation::Curve& rhs) {
-						return rhs.cmp_type == cmp.type && rhs.property == &prop;
+						return rhs.cmp_type == cmp_type && rhs.property == &prop;
 					});
 					if (idx < 0 &&ImGui::MenuItem(prop.name))
 					{
 						PropertyAnimation::Curve& curve = animation->addCurve();
-						curve.cmp_type = cmp.type;
+						curve.cmp_type = cmp_type;
 						curve.property = &prop;
 						curve.frames.push(0);
 						curve.frames.push(animation->curves.size() > 1 ? animation->curves[0].frames.back() : 1);
@@ -139,11 +140,11 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					}
 				}
 				PropertyAnimation* animation;
-				ComponentUID cmp;
+				ComponentType cmp_type;
 			} visitor;
 
 			visitor.animation = animation;
-			visitor.cmp = cmp;
+			visitor.cmp_type = cmp_type.cmp->component_type;
 			component->visit(visitor);
 
 			ImGui::EndMenu();
