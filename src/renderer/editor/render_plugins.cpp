@@ -2859,7 +2859,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
 		stream.destroy(tile_tmp);
 
-		m_tile.frame_countdown = 2;
+		m_tile.frame_countdown = 3;
 	}
 
 	void downscale(DrawStream& stream, gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) {
