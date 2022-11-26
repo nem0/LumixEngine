@@ -204,7 +204,6 @@ StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, v
 	return node;
 }
 
-
 StackNode* StackTree::record()
 {
 	static const int frames_to_capture = 256;
@@ -834,6 +833,51 @@ void enableCrashReporting(bool enable)
 void installUnhandledExceptionHandler()
 {
 	SetUnhandledExceptionFilter(unhandledExceptionHandler);
+}
+
+
+void clearHardwareBreakpoint(u32 breakpoint_idx) {
+	HANDLE thread = GetCurrentThread();
+	CONTEXT ctx = {};
+	ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+ 
+	if (GetThreadContext(thread, &ctx)) {
+		switch(breakpoint_idx) {
+			case 0: ctx.Dr0 = 0; break;
+			case 1: ctx.Dr1 = 0; break;
+			case 2: ctx.Dr2 = 0; break;
+			case 3: ctx.Dr3 = 0; break;
+			default: ASSERT(false); break;
+		}
+	}
+	ctx.Dr7 = ctx.Dr7 & ~(0b11 << (breakpoint_idx * 2));
+	ctx.Dr7 = ctx.Dr7 & ~(0b1111 << (breakpoint_idx * 2 + 16));
+	BOOL res = SetThreadContext(thread, &ctx);
+	ASSERT(res);
+}
+
+void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size) {
+	ASSERT(breakpoint_idx < 4);
+
+	HANDLE thread = GetCurrentThread();
+	CONTEXT ctx = {};
+	ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+ 
+	if (GetThreadContext(thread, &ctx)) {
+		switch(breakpoint_idx) {
+			case 0: ctx.Dr0 = DWORD64(mem); break;
+			case 1: ctx.Dr1 = DWORD64(mem); break;
+			case 2: ctx.Dr2 = DWORD64(mem); break;
+			case 3: ctx.Dr3 = DWORD64(mem); break;
+			default: ASSERT(false); break;
+		}
+	}
+	
+	ctx.Dr7 = (1 << (breakpoint_idx * 2)) 
+		| (0b01 << (breakpoint_idx * 4 + 16)) 
+		| (0b11 << (breakpoint_idx * 4 + 18));
+	BOOL res = SetThreadContext(thread, &ctx);
+	ASSERT(res);
 }
 
 

@@ -740,6 +740,7 @@ struct RendererImpl final : Renderer
 	}
 
 	DrawStream& getDrawStream() override {
+		wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->draw_stream;
 	}
 
