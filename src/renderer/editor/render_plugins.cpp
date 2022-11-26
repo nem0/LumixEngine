@@ -4404,6 +4404,14 @@ struct RenderInterfaceImpl final : RenderInterface
 		, m_plugin(plugin)
 	{}
 
+	~RenderInterfaceImpl() {
+		for (auto iter = m_textures.begin(), end = m_textures.end(); iter != end; ++iter) {
+			if (iter.value().loaded) {
+				iter.value().texture->decRefCount();
+			}
+		} 
+	}
+
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
 	{
 		Path path(path_cstr);
@@ -4427,7 +4435,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
 		texture->create(w, h, gpu::TextureFormat::RGBA8, pixels, w * h * 4);
-		m_textures.insert(&texture->handle, texture);
+		m_textures.insert(&texture->handle, {texture, false});
 		return (ImTextureID)(uintptr_t)texture->handle;
 	}
 
@@ -4437,7 +4445,8 @@ struct RenderInterfaceImpl final : RenderInterface
 		auto& allocator = m_app.getAllocator();
 		auto iter = m_textures.find(handle);
 		if (iter == m_textures.end()) return;
-		auto* texture = iter.value();
+		ASSERT(!iter.value().loaded);
+		auto* texture = iter.value().texture;
 		m_textures.erase(iter);
 		texture->destroy();
 		LUMIX_DELETE(allocator, texture);
@@ -4454,7 +4463,7 @@ struct RenderInterfaceImpl final : RenderInterface
 	{
 		auto& rm = m_app.getEngine().getResourceManager();
 		auto* texture = rm.load<Texture>(path);
-		m_textures.insert(&texture->handle, texture);
+		m_textures.insert(&texture->handle, {texture, true});
 		return &texture->handle;
 	}
 
@@ -4463,7 +4472,8 @@ struct RenderInterfaceImpl final : RenderInterface
 	{
 		auto iter = m_textures.find(handle);
 		if (iter == m_textures.end()) return;
-		auto* texture = iter.value();
+		ASSERT(iter.value().loaded);
+		auto* texture = iter.value().texture;
 		texture->decRefCount();
 		m_textures.erase(iter);
 	}
@@ -4508,7 +4518,11 @@ struct RenderInterfaceImpl final : RenderInterface
 	StudioApp& m_app;
 	Renderer& m_renderer;
 	EditorUIRenderPlugin& m_plugin;
-	HashMap<void*, Texture*> m_textures;
+	struct TextureItem {
+		Texture* texture;
+		bool loaded;
+	};
+	HashMap<void*, TextureItem> m_textures;
 };
 
 
