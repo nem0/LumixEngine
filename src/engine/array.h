@@ -321,7 +321,7 @@ template <typename T> struct Array {
 	u32 capacity() const { return m_capacity; }
 
 protected:
-	void grow() { reserve(m_capacity == 0 ? 4 : m_capacity * 2); }
+	void grow() { reserve(m_capacity < 4 ? 4 : m_capacity + m_capacity / 2); }
 
 	void callDestructors(T* begin, T* end) {
 		for (; begin < end; ++begin) {
