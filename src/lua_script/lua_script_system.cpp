@@ -989,14 +989,84 @@ namespace Lumix
 			*dest = 0;
 		}
 
+		static bool isSameProperty(const char* name, const char* lua_name) {
+			char tmp[50];
+			convertPropertyToLuaName(name, Span(tmp));
+			return equalStrings(tmp, lua_name);
+		}
+
+		static void pushArrayPropertyProxy(lua_State* L, const ComponentUID& cmp, const reflection::ArrayProperty& prop) {
+			auto getter = [](lua_State* L) -> int {
+				auto setter = [](lua_State* L) -> int {
+					LuaPropSetterVisitor visitor;
+					LuaWrapper::checkTableArg(L, 1);
+					visitor.L = L;
+					visitor.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+					auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
+					visitor.cmp.scene = LuaWrapper::toType<IScene*>(L, lua_upvalueindex(2));
+					visitor.cmp.entity.index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
+					visitor.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
+					visitor.idx = LuaWrapper::toType<int>(L, lua_upvalueindex(5));
+					prop->visitChildren(visitor);
+					return 0;
+				};
+
+				auto getter = [](lua_State* L) -> int {
+					LuaPropGetterVisitor visitor;
+					LuaWrapper::checkTableArg(L, 1);
+					visitor.L = L;
+					visitor.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+					auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
+					visitor.cmp.scene = LuaWrapper::toType<IScene*>(L, lua_upvalueindex(2));
+					visitor.cmp.entity.index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
+					visitor.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
+					visitor.idx = LuaWrapper::toType<int>(L, lua_upvalueindex(5));
+					prop->visitChildren(visitor);
+					return visitor.found ? 1 : 0;
+				};
+				
+				LuaWrapper::DebugGuard guard(L, 1);
+				auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
+				auto* scene = LuaWrapper::toType<IScene*>(L, lua_upvalueindex(2));
+				int entity_index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
+				ComponentType cmp_type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
+				LuaWrapper::checkTableArg(L, 1); // self
+				const int idx = LuaWrapper::checkArg<int>(L, 2);
+				lua_newtable(L); // {}
+				lua_newtable(L); // {}, mt
+
+				lua_pushlightuserdata(L, (void*)prop);
+				lua_pushlightuserdata(L, (void*)scene);
+				LuaWrapper::push(L, entity_index);
+				LuaWrapper::push(L, cmp_type);
+				LuaWrapper::push(L, idx);
+				lua_pushcclosure(L, getter, 5); // {}, mt, getter
+				lua_setfield(L, -2, "__index"); // {}, mt
+
+				lua_pushlightuserdata(L, (void*)prop);
+				lua_pushlightuserdata(L, (void*)scene);
+				LuaWrapper::push(L, entity_index);
+				LuaWrapper::push(L, cmp_type);
+				LuaWrapper::push(L, idx);
+				lua_pushcclosure(L, setter, 5); // {}, mt, getter
+				lua_setfield(L, -2, "__newindex"); // {}, mt
+
+				lua_setmetatable(L, -2); // {}
+				return 1;
+			};
+			lua_newtable(L); // {}
+			lua_newtable(L); // {}, metatable
+			lua_pushlightuserdata(L, (void*)&prop); // {}, mt, &prop
+			lua_pushlightuserdata(L, (void*)cmp.scene); // {}, mt, &prop, scene
+			LuaWrapper::push(L, cmp.entity.index); // {}, mt, &prop, scene, entity.index
+			LuaWrapper::push(L, cmp.type); // {}, mt, &prop, scene, entity.index, cmp_type
+			lua_pushcclosure(L, getter, 4); // {}, mt, getter
+			lua_setfield(L, -2, "__index"); // {}, mt
+			lua_setmetatable(L, -2); // {}
+		}
+
 		struct LuaPropGetterVisitor  : reflection::IPropertyVisitor
 		{
-			static bool isSameProperty(const char* name, const char* lua_name) {
-				char tmp[50];
-				convertPropertyToLuaName(name, Span(tmp));
-				return equalStrings(tmp, lua_name);
-			}
-
 			template <typename T>
 			void get(const reflection::Property<T>& prop)
 			{
@@ -1040,7 +1110,12 @@ namespace Lumix
 				LuaWrapper::push(L, tmp);
 			}
 
-			void visit(const reflection::ArrayProperty& prop) override {}
+			void visit(const reflection::ArrayProperty& prop) override {
+				if (!isSameProperty(prop.name, prop_name)) return;
+
+				found = true;
+				pushArrayPropertyProxy(L, cmp, prop);
+			}
 			void visit(const reflection::BlobProperty& prop) override {}
 
 			ComponentUID cmp;
