@@ -42,7 +42,8 @@ enum class CompositeTexture::NodeType : u32 {
 	WAVE_NOISE,
 	CURVE,
 	SET_ALPHA,
-	CUT
+	CUT,
+	SHARPEN
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -898,6 +899,55 @@ struct CutNode final : CompositeTexture::Node {
 	u32 w = 256, h = 256;
 };
 
+struct SharpenNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SHARPEN; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(0, &tmp)) return false;
+
+		data->w = tmp.w;
+		data->h = tmp.h;
+		data->channels = tmp.channels;
+		data->pixels.resize(data->w * data->h * data->channels);
+
+		float inv = 1/9.f;
+		const float conv_mtx[] = {
+			-inv, -inv, -inv,
+			-inv, 17 * inv, -inv,
+			-inv, -inv, -inv
+		};
+
+		for (i32 j = 0; j < (i32)data->h; ++j) {
+			for (i32 i = 0; i < (i32)data->w; ++i) {
+				for (u32 ch = 0; ch < data->channels; ++ch) {
+					float v = 0;
+					for (i32 cj = -1; cj <= 1; ++cj) {
+						for (i32 ci = -1; ci <= 1; ++ci) {
+							const u32 x = clamp(i + ci, 0, tmp.w - 1);
+							const u32 y = clamp(j + cj, 0, tmp.h - 1);
+							v += tmp.pixels[(x + y * tmp.w) * tmp.channels + ch] * conv_mtx[(ci + 1) + (cj + 1) * 3];
+						}
+					}
+					v = clamp(v, 0.f, 255.f);
+					data->pixels[(i + j * data->w) * data->channels + ch] = u8(v + 0.5f);
+				}
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Sharpen");
+		inputSlot();
+		outputSlot();
+		ImGui::TextUnformatted(" ");
+		return false;
+	}
+};
+
 struct CurveNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CURVE; }
 	bool hasInputPins() const override { return true; }
@@ -1494,8 +1544,9 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode); break; 
 		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode); break; 
 		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode); break; 
-		default: ASSERT(false); return nullptr;
+		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode); break; 
 	}
+	if (!node) return nullptr;
 	node->m_resource = &resource;
 	return node;
 }
@@ -1826,6 +1877,7 @@ static const struct {
 	{ 0, "Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS },
 	{ 'R', "Resize", CompositeTexture::NodeType::RESIZE },
 	{ 'A', "Set alpha", CompositeTexture::NodeType::SET_ALPHA },
+	{ 0, "Sharpen", CompositeTexture::NodeType::SHARPEN },
 	{ 'N', "Simplex", CompositeTexture::NodeType::SIMPLEX },
 	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
