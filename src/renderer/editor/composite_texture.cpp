@@ -43,7 +43,8 @@ enum class CompositeTexture::NodeType : u32 {
 	CURVE,
 	SET_ALPHA,
 	CUT,
-	SHARPEN
+	SHARPEN,
+	STATIC_SWITCH
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -899,6 +900,42 @@ struct CutNode final : CompositeTexture::Node {
 	u32 w = 256, h = 256;
 };
 
+struct StaticSwitchNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::STATIC_SWITCH; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(m_is_on);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(m_is_on);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (m_is_on) {
+			return getInputPixelData(0, data);
+		}
+		return getInputPixelData(1, data);
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Sharpen");
+		ImGui::BeginGroup();
+		inputSlot(); ImGui::TextUnformatted("On");
+		inputSlot(); ImGui::TextUnformatted("Off");
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		bool res = ImGui::Checkbox("##cb", &m_is_on);
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	bool m_is_on = true;
+};
+
 struct SharpenNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SHARPEN; }
 	bool hasInputPins() const override { return true; }
@@ -1545,6 +1582,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode); break; 
 		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode); break; 
 		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode); break; 
+		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode); break; 
 	}
 	if (!node) return nullptr;
 	node->m_resource = &resource;
@@ -1859,6 +1897,7 @@ static const struct {
 	CompositeTexture::NodeType type;
 } TYPES[] = {
 	{ 'B', "Brightness", CompositeTexture::NodeType::BRIGHTNESS },
+	{ 'V', "Cell noise", CompositeTexture::NodeType::CELLULAR_NOISE },
 	{ 'O', "Circle", CompositeTexture::NodeType::CIRCLE },
 	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
 	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
@@ -1881,7 +1920,7 @@ static const struct {
 	{ 'N', "Simplex", CompositeTexture::NodeType::SIMPLEX },
 	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
-	{ 'V', "Voronoi", CompositeTexture::NodeType::CELLULAR_NOISE },
+	{ 0, "Static switch", CompositeTexture::NodeType::STATIC_SWITCH },
 	{ 'W', "Wave noise", CompositeTexture::NodeType::WAVE_NOISE }
 };
 
@@ -2038,8 +2077,17 @@ void CompositeTextureEditor::onLinkDoubleClicked(CompositeTexture::Link& link, I
 
 void CompositeTextureEditor::onContextMenu(bool recently_opened, ImVec2 pos) {
 	CompositeTexture::Node* node = nullptr;
+	static char filter[64] = "";
+	if (recently_opened) ImGui::SetKeyboardFocusHere();
+	ImGui::SetNextItemWidth(150);
+	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 	for (const auto& t : TYPES) {
-		if (ImGui::MenuItem(t.label)) node = m_resource->addNode(t.type);
+		if ((!filter[0] || stristr(t.label, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(t.label))) {
+			node = m_resource->addNode(t.type);
+			filter[0] = '\0';
+			ImGui::CloseCurrentPopup();
+			break;
+		}
 	}
 	if (node) {
 		node->m_pos = pos;
