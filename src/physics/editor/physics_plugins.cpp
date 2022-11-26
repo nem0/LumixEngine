@@ -352,15 +352,102 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 {
 	explicit PhysicsUIPlugin(StudioApp& app)
 		: m_app(app)
+		, m_simulated_entities(app.getAllocator())
+		, m_reset_dynamic_entities(app.getAllocator())
 	{
 		m_toggle_ui.init("Physics", "Toggle physics UI", "physics", "", false);
-		m_toggle_ui.func.bind<&PhysicsUIPlugin::onAction>(this);
+		m_toggle_ui.func.bind<&PhysicsUIPlugin::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&PhysicsUIPlugin::isOpen>(this);
+		
+		m_simulate_selected.init("     Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "", (os::Keycode)'L', Action::Modifiers::CTRL, true);
+		m_simulate_selected.func.bind<&PhysicsUIPlugin::toggleSimulateSelected>(this);
+		m_simulate_selected.is_selected.bind<&PhysicsUIPlugin::isSimulatingSelected>(this);
+		
 		app.addWindowAction(&m_toggle_ui);
+		app.addToolAction(&m_simulate_selected);
+		app.getWorldEditor().universeDestroyed().bind<&PhysicsUIPlugin::onUniverseDestroyed>(this);
 	}
 
 	~PhysicsUIPlugin() {
 		m_app.removeAction(&m_toggle_ui);
+		m_app.removeAction(&m_simulate_selected);
+		m_app.getWorldEditor().universeDestroyed().unbind<&PhysicsUIPlugin::onUniverseDestroyed>(this);
+	}
+
+	void onUniverseDestroyed() {
+		m_is_simulating_selected = false;
+		m_simulated_entities.clear();
+		m_reset_dynamic_entities.clear();
+	}
+
+	bool isSimulatingSelected() { return m_is_simulating_selected; }
+
+	void resetSimulation() {
+		WorldEditor& editor = m_app.getWorldEditor();
+		Universe* universe = editor.getUniverse();
+		PhysicsScene* scene = (PhysicsScene*)universe->getScene(RIGID_ACTOR_TYPE);
+
+		if (!m_is_simulating_selected) return;
+		for (EntityRef e : m_reset_dynamic_entities) {
+			scene->setDynamicType(e, PhysicsScene::DynamicType::DYNAMIC);
+		}
+
+		m_reset_dynamic_entities.clear();
+		m_simulated_entities.clear();
+		m_is_simulating_selected = false;
+	}
+
+	void toggleSimulateSelected() {
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (editor.isGameMode()) return;
+
+		Universe* universe = editor.getUniverse();
+		PhysicsScene* scene = (PhysicsScene*)universe->getScene(RIGID_ACTOR_TYPE);
+		if (m_is_simulating_selected) {
+			editor.beginCommandGroup("phys_sim_end");
+			for (SimulatedEntity e : m_simulated_entities) {
+				const Transform tr = universe->getTransform(e.entity);
+				universe->setTransform(e.entity, e.start_transform);
+				editor.setEntitiesPositionsAndRotations(&e.entity, &tr.pos, &tr.rot, 1);
+			}
+			editor.endCommandGroup();
+			editor.lockGroupCommand();
+			for (EntityRef e : m_reset_dynamic_entities) {
+				scene->setDynamicType(e, PhysicsScene::DynamicType::DYNAMIC);
+			}
+
+			m_reset_dynamic_entities.clear();
+			m_simulated_entities.clear();
+		}
+		else {
+			ASSERT(m_simulated_entities.empty());
+			const Array<EntityRef>& selected =  editor.getSelectedEntities();
+			for (EntityRef e : selected) {
+				if (!universe->hasComponent(e, RIGID_ACTOR_TYPE)) continue;
+				SimulatedEntity& se = m_simulated_entities.emplace();
+				se.entity = e;
+				se.start_transform = universe->getTransform(e);
+			}
+			for (EntityRef e : scene->getDynamicActors()) {
+				if (selected.indexOf(e) < 0) {
+					scene->setDynamicType(e, PhysicsScene::DynamicType::STATIC);
+					m_reset_dynamic_entities.push(e);
+				}
+			}
+			if (m_simulated_entities.empty()) return;
+		}
+		m_is_simulating_selected = !m_is_simulating_selected;
+	}
+
+	void update(float time_delta) {
+		if (!m_is_simulating_selected) return;
+		if (m_app.getWorldEditor().isGameMode()) {
+			resetSimulation();
+			return;
+		}
+
+		PhysicsScene* scene = (PhysicsScene*)m_app.getWorldEditor().getUniverse()->getScene(RIGID_ACTOR_TYPE);
+		scene->forceUpdateDynamicActors(time_delta);
 	}
 
 	bool exportData(const char* dest_dir) override
@@ -396,7 +483,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	const char* getName() const override { return "physics"; }
 	bool isOpen() const { return m_is_window_open; }
-	void onAction() { m_is_window_open = !m_is_window_open; }
+	void toggleUI() { m_is_window_open = !m_is_window_open; }
 
 
 	void onLayersGUI()
@@ -727,10 +814,18 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		ImGui::End();
 	}
 
+	struct SimulatedEntity {
+		EntityRef entity;
+		Transform start_transform;
+	};
 
 	StudioApp& m_app;
 	bool m_is_window_open = false;
 	Action m_toggle_ui;
+	Action m_simulate_selected;
+	bool m_is_simulating_selected = false;
+	Array<SimulatedEntity> m_simulated_entities;
+	Array<EntityRef> m_reset_dynamic_entities;
 };
 
 
