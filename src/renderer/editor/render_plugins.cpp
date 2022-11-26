@@ -4409,6 +4409,11 @@ struct RenderInterfaceImpl final : RenderInterface
 			if (iter.value().loaded) {
 				iter.value().texture->decRefCount();
 			}
+			else {
+				iter.value().texture->destroy();
+				IAllocator& allocator = m_app.getAllocator();
+				LUMIX_DELETE(allocator, iter.value().texture);
+			}
 		} 
 	}
 
