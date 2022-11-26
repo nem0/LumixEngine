@@ -2945,10 +2945,10 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderBucket(u32 viewbucket_id) {
-		m_renderer.pushJob("render bucket", [this, viewbucket_id](DrawStream& stream){
-			View* view = m_views[viewbucket_id >> 16].get();
+		View* view = m_views[viewbucket_id >> 16].get();
+		const u16 bucket_id = viewbucket_id & 0xffFF;
+		m_renderer.pushJob("render bucket", [this, view, bucket_id](DrawStream& stream){
 			jobs::wait(&view->ready);
-			const u16 bucket_id = viewbucket_id & 0xffFF;
 			Bucket& bucket= view->buckets[bucket_id];
 			stream.merge(bucket.stream);
 		});
