@@ -2845,7 +2845,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		DrawStream& stream = m_renderer->getDrawStream();
 		
 		m_tile.texture = gpu::allocTextureHandle();
-		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
+		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
 		gpu::TextureHandle tile_tmp = gpu::allocTextureHandle();
 		stream.createTexture(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_tmp");
 		stream.copy(tile_tmp, m_tile.pipeline->getOutput(), 0, 0);
