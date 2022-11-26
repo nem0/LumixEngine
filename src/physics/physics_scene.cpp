@@ -1690,7 +1690,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void updateDynamicActors()
+	void updateDynamicActors(bool vehicles)
 	{
 		PROFILE_FUNCTION();
 		for (EntityRef e : m_dynamic_actors)
@@ -1701,6 +1701,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			m_universe.setTransform(actor.entity, fromPhysx(trans));
 		}
 		m_update_in_progress = nullptr;
+
+		if (!vehicles) return;
 
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
 			Vehicle* veh = iter.value().get();
@@ -1823,6 +1825,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 	}
+	
+	const Array<EntityRef>& getDynamicActors() override { return m_dynamic_actors; }
+
+	void forceUpdateDynamicActors(float time_delta) override {
+		simulateScene(time_delta);
+		fetchResults();
+		updateDynamicActors(false);
+	}
 
 	void update(float time_delta, bool paused) override
 	{
@@ -1832,7 +1842,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		updateVehicles(time_delta);
 		simulateScene(time_delta);
 		fetchResults();
-		updateDynamicActors();
+		updateDynamicActors(true);
 		updateControllers(time_delta);
 
 		render();

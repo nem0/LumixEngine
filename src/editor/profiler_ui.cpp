@@ -1082,7 +1082,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			if (ImGui::IsMouseHoveringRect(ra, rb)) {
 				ImGui::BeginTooltip();
-				ImGui::Text("%s (%.3f ms)", name, t);
+				ImGui::Text("%s (%.4f ms)", name, t);
 				if (block.link) {
 					ImGui::Text("Link: %" PRId64, block.link);
 					hovered_link.frame = frame_id;
@@ -1340,7 +1340,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						if (ImGui::IsMouseHoveringRect(ra, rb)) {
 							const float t = 1000 * float((to - from) / double(freq));
 							ImGui::BeginTooltip();
-							ImGui::Text("%s (%.3f ms)", data.name, t);
+							ImGui::Text("%s (%.4f ms)", data.name, t);
 							if (data.profiler_link) {
 								ImGui::Text("Link: %" PRId64, data.profiler_link);
 								hovered_link.frame = frame_id;

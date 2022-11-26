@@ -1190,8 +1190,9 @@ struct StudioAppImpl final : StudioApp
 	void makeParent()
 	{
 		const auto& entities = m_editor->getSelectedEntities();
-		ASSERT(entities.size() == 2);
-		m_editor->makeParent(entities[0], entities[1]);
+		if (entities.size() == 2) {
+			m_editor->makeParent(entities[0], entities[1]);
+		}
 	}
 
 

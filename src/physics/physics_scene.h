@@ -88,6 +88,8 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	static void reflect();
 
 	virtual ~PhysicsScene() {}
+	virtual void forceUpdateDynamicActors(float time_delta) = 0;
+	virtual const Array<EntityRef>& getDynamicActors() = 0;
 	virtual void render() = 0;
 	virtual EntityPtr raycast(const Vec3& origin, const Vec3& dir, EntityPtr ignore_entity) = 0;
 	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, int layer) = 0;
