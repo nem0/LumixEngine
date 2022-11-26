@@ -471,4 +471,7 @@ void enableCrashReporting(bool enable) {
 void installUnhandledExceptionHandler() {}
 
 
+void clearHardwareBreakpoint(u32 breakpoint_idx) { ASSERT(false); /* not implemented */ }
+void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size) { ASSERT(false); /* not implemented */ }
+
 } // namespace Lumix

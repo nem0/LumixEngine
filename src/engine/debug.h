@@ -114,8 +114,10 @@ private:
 } // namespace Debug
 
 
-void LUMIX_ENGINE_API enableCrashReporting(bool enable);
-void LUMIX_ENGINE_API installUnhandledExceptionHandler();
+LUMIX_ENGINE_API void enableCrashReporting(bool enable);
+LUMIX_ENGINE_API void installUnhandledExceptionHandler();
+LUMIX_ENGINE_API void clearHardwareBreakpoint(u32 breakpoint_idx);
+LUMIX_ENGINE_API void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size);
 
 
 } // namespace Lumix
