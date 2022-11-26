@@ -92,7 +92,12 @@ jobs:
                 ./butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx                
               env:
                 BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-                
+
+            - uses: actions/upload-artifact@v3
+              with:
+                name: itch-io-dx
+                path: projects/itch_io
+
             - name: make gl project with plugins
               working-directory: projects
               run: |
