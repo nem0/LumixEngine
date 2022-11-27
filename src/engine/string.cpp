@@ -195,9 +195,6 @@ String String::substr(u32 start, u32 length) const
 
 void String::resize(u32 size)
 {
-	ASSERT(size > 0);
-	if (size == 0) return;
-	
 	if (isSmall()) {
 		if (size < sizeof(m_small)) {
 			m_size = size;

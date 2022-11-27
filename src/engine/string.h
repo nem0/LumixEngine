@@ -100,6 +100,7 @@ template <int SIZE> struct StaticString
 	void add(const char* value) { catString(data, value); }
 	void add(char* value) { catString(data, value); }
 	void add(const Span<const char>& value) { catNString(Span(data), value.begin(), value.length()); }
+	void add(const Span<char>& value) { catNString(Span(data), value.begin(), value.length()); }
 
 	void operator=(const char* str) { copyString(data, str); }
 
