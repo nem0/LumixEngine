@@ -1,12 +1,7 @@
 shader "pipelines/particles.shd"
 backface_culling(true)
 layer "default"
-translucency(0.000000)
-emission(0.000000)
-metallic(0.000000)
-roughness(1.000000)
 defines {}
-color { 1.000000, 1.000000, 1.000000, 1.000000 }
 texture "/particles/demo/demo.png"
 layer "default"
 int_uniform("Frames cols", 2)
