@@ -79,7 +79,7 @@ bool execute(lua_State* L
 		lua_pop(L, 2);
 		return false;
 	}
-	lua_pop(L, 1);
+	lua_remove(L, -nresults - 1);
 	return true;
 }
 
