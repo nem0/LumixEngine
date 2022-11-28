@@ -1175,7 +1175,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	glCreateTextures(target, 1, &texture);
 	const FormatDesc& fd = FormatDesc::get(format);
 
-	internal_format = is_srgb ? fd.internal_srgb : fd.internal;
+	internal_format = is_srgb && fd.internal_srgb != GL_ZERO ? fd.internal_srgb : fd.internal;
 	bool is_2d = depth <= 1;
 	if(is_2d) {
 		glTextureStorage2D(texture, mip_count, internal_format, w, h);
