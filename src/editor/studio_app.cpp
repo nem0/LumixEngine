@@ -101,6 +101,7 @@ struct StudioAppImpl final : StudioApp
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
 		, m_file_selector(*this)
+		, m_dir_selector(*this)
 	{
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
 		u32 workers;
@@ -1154,6 +1155,10 @@ struct StudioAppImpl final : StudioApp
 	bool isAssetBrowserOpen() const { return m_asset_browser->isOpen(); }
 	int getExitCode() const override { return m_exit_code; }
 	
+	DirSelector& getDirSelector() override {
+		return m_dir_selector;
+	}
+
 	FileSelector& getFileSelector() override {
 		return m_file_selector;
 	}
@@ -3349,6 +3354,7 @@ struct StudioAppImpl final : StudioApp
 	char m_universe_to_load[LUMIX_MAX_PATH];
 	UniquePtr<AssetBrowser> m_asset_browser;
 	FileSelector m_file_selector;
+	DirSelector m_dir_selector;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
 	Local<LogUI> m_log_ui;
