@@ -110,6 +110,19 @@ struct NodeEditorNode {
 	virtual bool nodeGUI() = 0;
 };
 
+struct DirSelector {
+	DirSelector(StudioApp& app);
+	bool gui(const char* label, bool* open);
+	const char* getDir() const { return m_current_dir.c_str(); }
+
+private:
+	void fillSubitems();
+
+	StudioApp& m_app;
+	String m_current_dir;
+	Array<String> m_subdirs;
+};
+
 struct FileSelector {
 	FileSelector(StudioApp& app);
 	FileSelector(const char* ext, StudioApp& app);
@@ -123,6 +136,7 @@ struct FileSelector {
 private:
 	bool breadcrumb(Span<const char> path);
 	void fillSubitems();
+
 	StudioApp& m_app;
 	bool m_save;
 	String m_filename;

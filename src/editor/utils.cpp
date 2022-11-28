@@ -341,6 +341,73 @@ FileSelector::FileSelector(const char* ext, StudioApp& app)
 	fillSubitems();
 }
 
+DirSelector::DirSelector(StudioApp& app)
+	: m_app(app)
+	, m_current_dir(app.getAllocator())
+	, m_subdirs(app.getAllocator())
+{}
+
+
+void DirSelector::fillSubitems() {
+	m_subdirs.clear();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
+	const char* base_path = fs.getBasePath();
+	
+	StaticString<LUMIX_MAX_PATH> path(base_path, "/", m_current_dir.c_str());
+	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
+	os::FileInfo info;
+	while (os::getNextFile(iter, &info)) {
+		if (equalStrings(info.filename, ".")) continue;
+		if (equalStrings(info.filename, "..")) continue;
+		if (equalStrings(info.filename, ".lumix") && m_current_dir.length() == 0) continue;
+
+		if (info.is_directory) {
+			m_subdirs.emplace(info.filename, m_app.getAllocator());
+		}
+	}
+	os::destroyFileIterator(iter);
+}
+
+bool DirSelector::gui(const char* label, bool* open) {
+	if (*open && !ImGui::IsPopupOpen(label)) {
+		ImGui::OpenPopup(label);
+		fillSubitems();
+	}
+
+	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
+			if (m_current_dir.length() > 0) {
+				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
+					Span<const char> dir = Path::getDir(m_current_dir.c_str());
+					if (dir.length() > 0) dir = dir.fromRight(1);
+					m_current_dir = String(dir, m_app.getAllocator());
+					fillSubitems();
+				}
+			}
+			
+			for (const String& subdir : m_subdirs) {
+				ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
+				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
+					m_current_dir.cat("/");
+					m_current_dir.cat(subdir.c_str());
+					fillSubitems();
+				}
+			}
+		}
+		ImGui::EndChild();
+	
+		bool res = ImGui::Button(ICON_FA_CHECK " Select");
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
+	
+		if (res) ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+		if (!ImGui::IsPopupOpen(label)) *open = false;
+		return res;
+	}
+	return false;
+}
+
 FileSelector::FileSelector(StudioApp& app)
 	: m_app(app)
 	, m_filename(app.getAllocator())
