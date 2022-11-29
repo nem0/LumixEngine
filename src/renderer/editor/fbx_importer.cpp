@@ -1284,9 +1284,9 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		
 		if (!material.textures[0].fbx) {
 			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
-			out_file << "uniform(\"Material color\", {" << diffuse_color.r 
-				<< "," << diffuse_color.g
-				<< "," << diffuse_color.b
+			out_file << "uniform(\"Material color\", {" << powf(diffuse_color.r, 2.2f) 
+				<< "," << powf(diffuse_color.g, 2.2f)
+				<< "," << powf(diffuse_color.b, 2.2f)
 				<< ",1})\n";
 		}
 
