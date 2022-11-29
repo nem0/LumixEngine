@@ -40,10 +40,12 @@ enum class ExecuteOpenResult : i32 {
 };
 
 enum class MouseButton : i32 {
-    LEFT = 0,
-    RIGHT = 1,
-    MIDDLE = 2,
-    EXTENDED = 3, // 3 and higher
+	LEFT = 0,
+	RIGHT = 1,
+	MIDDLE = 2,
+	EXTENDED = 3, // 3 and higher
+	EXTENDED1 = EXTENDED,
+	EXTENDED2 = EXTENDED + 1,
 
 	MAX = 16
 };

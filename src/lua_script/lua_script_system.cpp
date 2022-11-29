@@ -2486,8 +2486,9 @@ namespace Lumix
 				case LuaScriptScene::Property::Type::RESOURCE: return RESOURCE;
 				case LuaScriptScene::Property::Type::COLOR: return COLOR;
 				case LuaScriptScene::Property::Type::ANY: return NONE;
-				default: ASSERT(false); return NONE;
 			}
+			ASSERT(false);
+			return NONE;
 		}
 
 		const char* getName(ComponentUID cmp, int array_idx, u32 idx) const override {
@@ -2532,7 +2533,6 @@ namespace Lumix
 					break;
 				}
 				case LuaScriptScene::Property::Type::ANY: reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
-				default: ASSERT(false); break;
 			}
 			return v;
 		}
@@ -2549,7 +2549,6 @@ namespace Lumix
 				case RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
 				case COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
 				case NONE: break;
-				default: ASSERT(false); break;
 			}
 		}
 

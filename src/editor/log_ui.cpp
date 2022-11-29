@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "log_ui.h"
+#include "editor/settings.h"
 #include "engine/delegate_list.h"
 #include "engine/log.h"
 #include "engine/os.h"
@@ -10,8 +11,9 @@ namespace Lumix
 {
 
 
-LogUI::LogUI(IAllocator& allocator)
+LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	: m_allocator(allocator)
+	, m_app(app)
 	, m_messages(allocator)
 	, m_level_filter(2 | 4)
 	, m_notifications(allocator)
@@ -26,11 +28,18 @@ LogUI::LogUI(IAllocator& allocator)
 	{
 		m_new_message_count[i] = 0;
 	}
+
+	m_toggle_ui.init("Log", "Toggle Log UI", "log", "", false);
+	m_toggle_ui.func.bind<&LogUI::toggleUI>(this);
+	m_toggle_ui.is_selected.bind<&LogUI::isOpen>(this);
+
+	m_app.addWindowAction(&m_toggle_ui);
 }
 
 
 LogUI::~LogUI()
 {
+	m_app.removeAction(&m_toggle_ui);
 	unregisterLogCallback<&LogUI::onLog>(this);
 }
 
@@ -130,8 +139,10 @@ int LogUI::getUnreadErrorCount() const
 	return m_new_message_count[(int)LogLevel::ERROR];
 }
 
+void LogUI::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_log_open; }
+void LogUI::onBeforeSettingsSaved() { m_app.getSettings().m_is_log_open  = m_is_open; }
 
-void LogUI::onGUI()
+void LogUI::onWindowGUI()
 {
 	MutexGuard lock(m_guard);
 	showNotifications();

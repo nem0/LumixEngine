@@ -62,8 +62,9 @@ int getSize(AttributeType type)
 		case AttributeType::I8: return 1;
 		case AttributeType::U8: return 1;
 		case AttributeType::I16: return 2;
-		default: ASSERT(false); return 0;
 	}
+	ASSERT(false);
+	return 0;
 }
 
 u32 getBytesPerPixel(gpu::TextureFormat format) {

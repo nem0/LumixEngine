@@ -3890,8 +3890,9 @@ void PhysicsScene::reflect() {
 				case PhysicsScene::DynamicType::DYNAMIC: return "Dynamic";
 				case PhysicsScene::DynamicType::STATIC: return "Static";
 				case PhysicsScene::DynamicType::KINEMATIC: return "Kinematic";
-				default: ASSERT(false); return "N/A";
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 
@@ -3902,8 +3903,9 @@ void PhysicsScene::reflect() {
 				case PhysicsScene::D6Motion::LOCKED: return "Locked";
 				case PhysicsScene::D6Motion::LIMITED: return "Limited";
 				case PhysicsScene::D6Motion::FREE: return "Free";
-				default: ASSERT(false); return "N/A";
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 
@@ -3915,8 +3917,9 @@ void PhysicsScene::reflect() {
 				case PhysicsScene::WheelSlot::FRONT_RIGHT: return "Front right";
 				case PhysicsScene::WheelSlot::REAR_LEFT: return "Rear left";
 				case PhysicsScene::WheelSlot::REAR_RIGHT: return "Rear right";
-				default: ASSERT(false); return "N/A";
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 

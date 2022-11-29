@@ -1514,7 +1514,6 @@ struct OutputNode final : CompositeTexture::Node {
 			case OutputType::SIMPLE: old_pin_count = 1; break;
 			case OutputType::CUBEMAP: old_pin_count = 6; break;
 			case OutputType::ARRAY: old_pin_count = m_layers_count; break;
-			default: ASSERT(false); old_pin_count = 1; break;
 		}
 		bool res = ImGui::Combo("Type", (i32*)&m_output_type, "Simple\0Array\0Cubemap\0");
 		if (res) {
@@ -1523,7 +1522,6 @@ struct OutputNode final : CompositeTexture::Node {
 				case OutputType::SIMPLE: new_pin_count = 1; break;
 				case OutputType::CUBEMAP: new_pin_count = 6; break;
 				case OutputType::ARRAY: new_pin_count = m_layers_count; break;
-				default: ASSERT(false); new_pin_count = 1; break;
 			}
 			if (new_pin_count < old_pin_count) {
 				for (i32 i = m_resource->m_links.size() - 1; i >= 0; --i) {
@@ -1867,8 +1865,9 @@ u32 CompositeTexture::getLayersCount() const {
 		case OutputNode::OutputType::SIMPLE: return 1;
 		case OutputNode::OutputType::CUBEMAP: return 6;
 		case OutputNode::OutputType::ARRAY: return node->m_layers_count;
-		default: ASSERT(false); return 1;
 	}
+	ASSERT(false);
+	return 1;
 }
 
 void CompositeTextureEditor::newGraph() {

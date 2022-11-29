@@ -425,10 +425,11 @@ static const char* toString(Shader::Uniform::Type type) {
 		case Shader::Uniform::INT: return "int";
 		case Shader::Uniform::MATRIX4: return "mat4";
 		case Shader::Uniform::VEC2: return "vec2";
-		case Shader::Uniform::VEC3: return "vec4"; // vec4 because of padding padding
+		case Shader::Uniform::VEC3: return "vec4"; // vec4 because of padding
 		case Shader::Uniform::VEC4: return "vec4";
-		default: ASSERT(false); return "unknown_type";
 	}
+	ASSERT(false);
+	return "unknown_type";
 }
 
 static void toName(char prefix, Span<char> out, const char* in) {

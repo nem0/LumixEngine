@@ -16,8 +16,7 @@ struct ImFont;
 #endif
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
 template <typename T> struct Array;
@@ -31,8 +30,7 @@ namespace os {
 	struct Event;
 }
 
-struct LUMIX_EDITOR_API StudioApp
-{
+struct LUMIX_EDITOR_API StudioApp {
 	struct IPlugin {
 		virtual ~IPlugin() {}
 		virtual void init() = 0;
@@ -67,15 +65,13 @@ struct LUMIX_EDITOR_API StudioApp
 		virtual void onBeforeSettingsSaved() {}
 	};
 
-	struct IAddComponentPlugin
-	{
+	struct IAddComponentPlugin {
 		virtual ~IAddComponentPlugin() {}
 		virtual void onGUI(bool create_entity, bool from_filter, EntityPtr parent, struct WorldEditor& editor) = 0;
 		virtual const char* getLabel() const = 0;
 	};
 
-	struct AddCmpTreeNode
-	{
+	struct AddCmpTreeNode {
 		IAddComponentPlugin* plugin = nullptr;
 		AddCmpTreeNode* child = nullptr;
 		AddCmpTreeNode* next = nullptr;
@@ -95,7 +91,6 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual struct FileSelector& getFileSelector() = 0;
 	virtual struct DirSelector& getDirSelector() = 0;
 	virtual WorldEditor& getWorldEditor() = 0;
-	virtual void initPlugins() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void addPlugin(MousePlugin& plugin) = 0;
 	virtual void addPlugin(GUIPlugin& plugin) = 0;
@@ -131,9 +126,10 @@ struct LUMIX_EDITOR_API StudioApp
 
 	virtual const os::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;
-	virtual ~StudioApp() {}
 	virtual ImFont* getBoldFont() = 0;
 	virtual ImFont* getBigIconFont() = 0;
+	
+	virtual ~StudioApp() {}
 };
 
 

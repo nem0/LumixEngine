@@ -97,8 +97,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Selectable("Simple")) sprite->type = Sprite::Type::SIMPLE;
 			ImGui::EndCombo();
 		}
-		switch (sprite->type)
-		{
+		switch (sprite->type) {
 			case Sprite::Type::PATCH9:
 				ImGuiEx::Label("Top");
 				ImGui::InputInt("##top", &sprite->top);
@@ -111,7 +110,6 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				patch9edit(sprite);
 				break;
 			case Sprite::Type::SIMPLE: break;
-			default: ASSERT(false); break;
 		}
 	}
 

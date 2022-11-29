@@ -857,8 +857,9 @@ bool manipulate(u64 id, UniverseView& view, Transform& tr, const Config& cfg) {
 		case Gizmo::Config::TRANSLATE: return translate(id, view, tr, cfg);
 		case Gizmo::Config::ROTATE: return rotate(id, view, tr, cfg);
 		case Gizmo::Config::SCALE: return scale(id, view, tr, cfg);
-		default: ASSERT(false); return false;
 	}
+	ASSERT(false);
+	return false;
 }
 
 } // namespace Gizmo

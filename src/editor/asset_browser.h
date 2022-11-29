@@ -2,13 +2,14 @@
 
 #include "engine/hash.h"
 #include "engine/lumix.h"
+#include "editor/studio_app.h"
 
 namespace Lumix {
 
 template <typename T> struct Span;
 template <typename T> struct UniquePtr;
 
-struct LUMIX_EDITOR_API AssetBrowser {
+struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	static constexpr int TILE_SIZE = 96;
 
 	struct LUMIX_EDITOR_API IPlugin {
@@ -33,9 +34,6 @@ struct LUMIX_EDITOR_API AssetBrowser {
 
 	virtual ~AssetBrowser() {}
 	virtual void onInitFinished() = 0;
-	virtual void onGUI() = 0;
-	virtual void update() = 0;
-	virtual bool onDropFile(const char* path) = 0;
 	virtual void selectResource(const struct Path& resource, bool record_history, bool additive) = 0;
 	virtual bool resourceInput(const char* str_id, Span<char> buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
@@ -48,8 +46,6 @@ struct LUMIX_EDITOR_API AssetBrowser {
 	virtual void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success) = 0;
 	virtual void releaseResources() = 0;
 	virtual void reloadTile(FilePathHash hash) = 0; 
-	virtual bool isOpen() const = 0;
-	virtual void setOpen(bool open) = 0;
 	virtual bool copyTile(const char* from, const char* to) = 0;
 };
 

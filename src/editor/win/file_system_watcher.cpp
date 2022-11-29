@@ -117,7 +117,6 @@ static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over) {
 				wcharToCharArray(info->FileName, tmp, info->FileNameLength);
 				task->m_watcher.m_callback.invoke(tmp);
 				break;
-			default: ASSERT(false); break;
 		}
 		info = info->NextEntryOffset == 0 ? nullptr : (FILE_NOTIFY_INFORMATION*)(((u8*)info) + info->NextEntryOffset);
 	}

@@ -121,6 +121,8 @@ private:
 	StudioApp& m_app;
 	String m_current_dir;
 	Array<String> m_subdirs;
+	bool m_creating_folder = false;
+	char m_new_folder_name[LUMIX_MAX_PATH] = "";
 };
 
 struct FileSelector {

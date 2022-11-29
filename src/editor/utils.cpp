@@ -6,6 +6,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
@@ -375,6 +376,10 @@ bool DirSelector::gui(const char* label, bool* open) {
 	}
 
 	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
+			m_creating_folder = true;
+			m_new_folder_name[0] = '\0';
+		}
 		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
 			if (m_current_dir.length() > 0) {
 				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
@@ -385,6 +390,24 @@ bool DirSelector::gui(const char* label, bool* open) {
 				}
 			}
 			
+			if (m_creating_folder) {
+				ImGui::SetNextItemWidth(-1);
+				ImGui::InputTextWithHint("##nf", "New folder name", m_new_folder_name, sizeof(m_new_folder_name));
+				if (ImGui::IsItemDeactivated()) {
+					m_creating_folder = false;
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						if (m_new_folder_name[0]) {
+							FileSystem& fs = m_app.getEngine().getFileSystem();
+							StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), m_current_dir.c_str(), m_new_folder_name);
+							if (!os::makePath(fullpath)) {
+								logError("Failed to create ", fullpath);
+							}
+							fillSubitems();
+						}
+					}
+				}
+			}
+
 			for (const String& subdir : m_subdirs) {
 				ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
 				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
