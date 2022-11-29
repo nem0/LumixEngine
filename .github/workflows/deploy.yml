@@ -37,6 +37,11 @@ jobs:
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_dx.git dx
             
+            - name: fetch marketplace plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_market.git market
+            
             - name: download physx
               working-directory: projects\3rdparty
               run: |
