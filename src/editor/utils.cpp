@@ -369,6 +369,34 @@ void DirSelector::fillSubitems() {
 	os::destroyFileIterator(iter);
 }
 
+bool DirSelector::breadcrumb(Span<const char> path) {
+	if (path.length() == 0) {
+		if (ImGui::Button(".")) {
+			m_current_dir = "";
+			fillSubitems();
+			return true;
+		}
+		return false;
+	}
+	if (path.back() == '/') path = path.fromRight(1);
+	
+	Span<const char> dir = Path::getDir(path);
+	Span<const char> basename = Path::getBasename(path);
+	if (breadcrumb(dir)) return true;
+	ImGui::SameLine();
+	ImGui::TextUnformatted("/");
+	ImGui::SameLine();
+	
+	char tmp[LUMIX_MAX_PATH];
+	copyString(Span(tmp), basename);
+	if (ImGui::Button(tmp)) {
+		m_current_dir = String(path, m_app.getAllocator());
+		fillSubitems();
+		return true;
+	}
+	return false;
+}
+
 bool DirSelector::gui(const char* label, bool* open) {
 	if (*open && !ImGui::IsPopupOpen(label)) {
 		ImGui::OpenPopup(label);
@@ -376,10 +404,13 @@ bool DirSelector::gui(const char* label, bool* open) {
 	}
 
 	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		bool recently_open_create_folder = false;
 		if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
 			m_creating_folder = true;
 			m_new_folder_name[0] = '\0';
+			recently_open_create_folder = true;
 		}
+		breadcrumb(Span(m_current_dir.c_str(), m_current_dir.length()));
 		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
 			if (m_current_dir.length() > 0) {
 				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
@@ -392,6 +423,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 			
 			if (m_creating_folder) {
 				ImGui::SetNextItemWidth(-1);
+				if (recently_open_create_folder) ImGui::SetKeyboardFocusHere();
 				ImGui::InputTextWithHint("##nf", "New folder name", m_new_folder_name, sizeof(m_new_folder_name));
 				if (ImGui::IsItemDeactivated()) {
 					m_creating_folder = false;
@@ -401,6 +433,10 @@ bool DirSelector::gui(const char* label, bool* open) {
 							StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), m_current_dir.c_str(), "/", m_new_folder_name);
 							if (!os::makePath(fullpath)) {
 								logError("Failed to create ", fullpath);
+							}
+							else {
+								m_current_dir.cat("/").cat(m_new_folder_name); 
+								m_new_folder_name[0] = '\0';
 							}
 							fillSubitems();
 						}

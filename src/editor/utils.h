@@ -117,6 +117,7 @@ struct DirSelector {
 
 private:
 	void fillSubitems();
+	bool breadcrumb(Span<const char> path);
 
 	StudioApp& m_app;
 	String m_current_dir;
