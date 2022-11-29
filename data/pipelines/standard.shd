@@ -58,7 +58,5 @@ surface_shader [[
 	#ifndef ALPHA_CUTOUT
 		float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
 		data.alpha = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
-	#else
-		data.alpha = 1;
 	#endif
 ]]
