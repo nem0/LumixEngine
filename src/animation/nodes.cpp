@@ -632,8 +632,9 @@ Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {
 		case Node::GROUP: return LUMIX_NEW(allocator, GroupNode)(parent, allocator);
 		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, allocator);
 		case Node::LAYERS: return LUMIX_NEW(allocator, LayersNode)(parent, allocator);
-		default: ASSERT(false); return nullptr;
 	}
+	ASSERT(false);
+	return nullptr;
 }
 
 

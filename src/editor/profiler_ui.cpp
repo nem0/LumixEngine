@@ -2,7 +2,9 @@
 
 #include "profiler_ui.h"
 #include "editor/asset_browser.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "engine/allocators.h"
 #include "engine/crt.h"
 #include "engine/debug.h"
@@ -188,10 +190,17 @@ struct ProfilerUIImpl final : ProfilerUI
 		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 		m_filter[0] = 0;
 		m_resource_filter[0] = 0;
+
+		m_toggle_ui.init("Profiler", "Toggle profiler UI", "profiler", "", false);
+		m_toggle_ui.func.bind<&ProfilerUIImpl::toggleUI>(this);
+		m_toggle_ui.is_selected.bind<&ProfilerUIImpl::isOpen>(this);
+
+		m_app.addWindowAction(&m_toggle_ui);
 	}
 
 	~ProfilerUIImpl()
 	{
+		m_app.removeAction(&m_toggle_ui);
 		while (m_engine.getFileSystem().hasWork())
 		{
 			m_engine.getFileSystem().processCallbacks();
@@ -200,6 +209,12 @@ struct ProfilerUIImpl final : ProfilerUI
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 	}
+	
+	void toggleUI() { m_is_open = !m_is_open; }
+	bool isOpen() { return m_is_open; }
+
+	void onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_profiler_open; }
+	void onBeforeSettingsSaved() { m_app.getSettings().m_is_profiler_open  = m_is_open; }
 
 	void onPause() {
 		ASSERT(m_is_paused);
@@ -480,7 +495,9 @@ struct ProfilerUIImpl final : ProfilerUI
 		}	
 	}
 
-	void onGUI() override
+	const char* getName() const override { return "profiler"; }
+
+	void onWindowGUI() override
 	{
 		PROFILE_FUNCTION();
 
@@ -617,6 +634,8 @@ struct ProfilerUIImpl final : ProfilerUI
 	};
 
 	Array<Counter> m_counters;
+	bool m_is_open = false;
+	Action m_toggle_ui;
 };
 
 
@@ -1098,20 +1117,20 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					if (prop.level != open_blocks.size() - 1) continue;
 
 					switch (prop.header.type) {
-					case profiler::EventType::INT: {
-						profiler::IntRecord r;
-						read(ctx, prop.offset, (u8*)&r, sizeof(r));
-						ImGui::Text("%s: %d", r.key, r.value);
-						break;
-					}
-					case profiler::EventType::STRING: {
-						char tmp[128];
-						const int tmp_size = prop.header.size - sizeof(prop.header);
-						read(ctx, prop.offset, (u8*)tmp, tmp_size);
-						ImGui::Text("%s", tmp);
-						break;
-					}
-					default: ASSERT(false); break;
+						case profiler::EventType::INT: {
+							profiler::IntRecord r;
+							read(ctx, prop.offset, (u8*)&r, sizeof(r));
+							ImGui::Text("%s: %d", r.key, r.value);
+							break;
+						}
+						case profiler::EventType::STRING: {
+							char tmp[128];
+							const int tmp_size = prop.header.size - sizeof(prop.header);
+							read(ctx, prop.offset, (u8*)tmp, tmp_size);
+							ImGui::Text("%s", tmp);
+							break;
+						}
+						default: ASSERT(false); break;
 					}
 				}
 				ImGui::EndTooltip();

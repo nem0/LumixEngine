@@ -313,7 +313,6 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 				default: ASSERT(false); return false;
 			}
 			break;
-		default: ASSERT(false); return false;
 	}
 
 	const u64 size = file.size() - file.getPosition();

@@ -232,14 +232,11 @@ struct StudioAppImpl final : StudioApp
 				for(int i = 0, c = os::getDropFileCount(event); i < c; ++i) {
 					char tmp[LUMIX_MAX_PATH];
 					os::getDropFile(event, i, Span(tmp));
-					if (!m_asset_browser->onDropFile(tmp)) {
-						for (GUIPlugin* plugin : m_gui_plugins) {
-							if (plugin->onDropFile(tmp)) break;
-						}
+					for (GUIPlugin* plugin : m_gui_plugins) {
+						if (plugin->onDropFile(tmp)) break;
 					}
 				}
 				break;
-			default: ASSERT(false); break;
 		}
 	}
 
@@ -321,7 +318,6 @@ struct StudioAppImpl final : StudioApp
 		os::Timer init_timer;
 
 		m_add_cmp_root.label[0] = '\0';
-		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 
 		checkWorkingDirectory();
@@ -369,7 +365,7 @@ struct StudioAppImpl final : StudioApp
 		m_asset_browser = AssetBrowser::create(*this);
 		m_property_grid.create(*this);
 		m_profiler_ui = ProfilerUI::create(*this);
-		m_log_ui.create(m_editor->getAllocator());
+		m_log_ui.create(*this, m_editor->getAllocator());
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
@@ -409,6 +405,11 @@ struct StudioAppImpl final : StudioApp
 
 	~StudioAppImpl()
 	{
+		removePlugin(*m_asset_browser.get());
+		removePlugin(*m_log_ui.get());
+		removePlugin(*m_property_grid.get());
+		removePlugin(*m_profiler_ui.get());
+
 		m_asset_browser->releaseResources();
 		removeAction(&m_set_pivot_action);
 		removeAction(&m_reset_pivot_action);
@@ -737,11 +738,7 @@ struct StudioAppImpl final : StudioApp
 				ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
 				ImGui::End();
 			
-				m_profiler_ui->onGUI();
-				m_asset_browser->onGUI();
-				m_log_ui->onGUI();
 				m_asset_compiler->onGUI();
-				m_property_grid->onGUI();
 				onEntityListGUI();
 				onSaveAsDialogGUI();
 				for (auto* plugin : m_gui_plugins)
@@ -853,9 +850,6 @@ struct StudioAppImpl final : StudioApp
 		for (auto* plugin : m_gui_plugins) {
 			plugin->update(time_delta);
 		}
-
-		m_asset_browser->update();
-		m_log_ui->update(time_delta);
 
 		guiEndFrame();
 	}
@@ -1151,8 +1145,6 @@ struct StudioAppImpl final : StudioApp
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
 	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
 	bool isEntityListOpen() const { return m_is_entity_list_open; }
-	void toggleAssetBrowser() { m_asset_browser->setOpen(!m_asset_browser->isOpen()); }
-	bool isAssetBrowserOpen() const { return m_asset_browser->isOpen(); }
 	int getExitCode() const override { return m_exit_code; }
 	
 	DirSelector& getDirSelector() override {
@@ -1290,7 +1282,7 @@ struct StudioAppImpl final : StudioApp
 		addAction(action);
 		for (int i = 0; i < m_window_actions.size(); ++i)
 		{
-			if (compareString(m_window_actions[i]->label_long, action->label_long) > 0)
+			if (compareString(m_window_actions[i]->label_short, action->label_short) > 0)
 			{
 				m_window_actions.insert(i, action);
 				return;
@@ -1524,14 +1516,7 @@ struct StudioAppImpl final : StudioApp
 	void viewMenu() {
 		if (!ImGui::BeginMenu("View")) return;
 
-		bool is_open = m_asset_browser->isOpen();
-		if (ImGui::MenuItem(ICON_FA_IMAGES "Asset browser", nullptr, &is_open)) {
-			m_asset_browser->setOpen(is_open);		
-		}
 		menuItem("entityList", true);
-		ImGui::MenuItem(ICON_FA_COMMENT_ALT "Log", nullptr, &m_log_ui->m_is_open);
-		ImGui::MenuItem(ICON_FA_CHART_AREA "Profiler", nullptr, &m_profiler_ui->m_is_open);
-		ImGui::MenuItem(ICON_FA_INFO_CIRCLE "Inspector", nullptr, &m_property_grid->m_is_open);
 		menuItem("settings", true);
 		ImGui::Separator();
 		for (Action* action : m_window_actions) {
@@ -1990,11 +1975,7 @@ struct StudioAppImpl final : StudioApp
 			const char* data = ImGui::SaveIniSettingsToMemory();
 			m_settings.m_imgui_state = data;
 		}
-		m_settings.m_is_asset_browser_open = m_asset_browser->isOpen();
 		m_settings.m_is_entity_list_open = m_is_entity_list_open;
-		m_settings.m_is_log_open = m_log_ui->m_is_open;
-		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
-		m_settings.m_is_properties_open = m_property_grid->m_is_open;
 		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
 
 		for (auto* i : m_gui_plugins) {
@@ -2205,11 +2186,7 @@ struct StudioAppImpl final : StudioApp
 			i->onSettingsLoaded();
 		}
 
-		m_asset_browser->setOpen(m_settings.m_is_asset_browser_open);
 		m_is_entity_list_open = m_settings.m_is_entity_list_open;
-		m_log_ui->m_is_open = m_settings.m_is_log_open;
-		m_profiler_ui->m_is_open = m_settings.m_is_profiler_open;
-		m_property_grid->m_is_open = m_settings.m_is_properties_open;
 
 		if (m_settings.m_is_maximized)
 		{
@@ -2286,8 +2263,6 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
 		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
 		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
-		addAction<&StudioAppImpl::toggleAssetBrowser>(ICON_FA_IMAGES "Asset Browser", "Toggle asset browser", "assetBrowser", ICON_FA_IMAGES)
-			.is_selected.bind<&StudioAppImpl::isAssetBrowserOpen>(this);
 		addAction<&StudioAppImpl::toggleEntityList>(ICON_FA_STREAM "Hierarchy", "Toggle hierarchy", "entityList", ICON_FA_STREAM)
 			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>(ICON_FA_COG "Settings", "Toggle settings UI", "settings", ICON_FA_COG)
@@ -2537,7 +2512,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void initPlugins() override
+	void initPlugins()
 	{
 		for (int i = 1, c = m_plugins.size(); i < c; ++i) {
 			for (int j = 0; j < i; ++j) {
@@ -2624,6 +2599,10 @@ struct StudioAppImpl final : StudioApp
 		}
 #endif
 		addPlugin(*createSplineEditor(*this));
+		addPlugin(*m_property_grid.get());
+		addPlugin(*m_log_ui.get());
+		addPlugin(*m_asset_browser.get());
+		addPlugin(*m_profiler_ui.get());
 
 		for (IPlugin* plugin : m_plugins) {
 			logInfo("Studio plugin ", plugin->getName(), " loaded");
@@ -3138,7 +3117,6 @@ struct StudioAppImpl final : StudioApp
 		switch (m_export.mode) {
 			case ExportConfig::Mode::ALL_FILES: scanCompiled(infos); break;
 			case ExportConfig::Mode::CURRENT_UNIVERSE: exportDataScanResources(infos); break;
-			default: ASSERT(false); break;
 		}
 
 		if (m_export.pack) {
@@ -3325,47 +3303,56 @@ struct StudioAppImpl final : StudioApp
 	DefaultAllocator m_main_allocator;
 	debug::Allocator m_allocator;
 	UniquePtr<Engine> m_engine;
+	UniquePtr<WorldEditor> m_editor;
 	ImGuiKey m_imgui_key_map[255];
 	Array<os::WindowHandle> m_windows;
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	os::WindowHandle m_main_window;
 	os::WindowState m_fullscreen_restore_state;
+
 	Array<Action*> m_owned_actions;
 	Array<Action*> m_tools_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
+
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
+
 	Array<StaticString<LUMIX_MAX_PATH>> m_universes;
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, StaticString<5>> m_component_icons;
-	UniquePtr<WorldEditor> m_editor;
+
 	Action m_set_pivot_action;
 	Action m_reset_pivot_action;
 	Gizmo::Config m_gizmo_config;
+
 	bool m_save_as_request = false;
 	bool m_cursor_captured = false;
 	bool m_confirm_exit;
 	bool m_confirm_load;
 	bool m_confirm_new;
+	
 	char m_universe_to_load[LUMIX_MAX_PATH];
+	
 	UniquePtr<AssetBrowser> m_asset_browser;
-	FileSelector m_file_selector;
-	DirSelector m_dir_selector;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
-	Local<LogUI> m_log_ui;
 	UniquePtr<ProfilerUI> m_profiler_ui;
+	Local<LogUI> m_log_ui;
 	Settings m_settings;
+	
+	FileSelector m_file_selector;
+	DirSelector m_dir_selector;
+	
 	float m_fov = degreesToRadians(60);
 	RenderInterface* m_render_interface = nullptr;
 	Array<os::Event> m_events;
-	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];
+	
 	float m_fps = 0;
 	os::Timer m_fps_timer;
 	os::Timer m_inactive_fps_timer;
@@ -3393,17 +3380,18 @@ struct StudioAppImpl final : StudioApp
 	bool m_is_welcome_screen_open;
 	bool m_is_export_game_dialog_open;
 	bool m_is_entity_list_open;
+	
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
 	EntityFolders::FolderID m_renaming_folder = EntityFolders::INVALID_FOLDER;
 	bool m_set_rename_focus = false;
 	char m_rename_buf[Universe::ENTITY_NAME_MAX_LENGTH];
 	bool m_is_f2_pressed = false;
+	
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
 	ImFont* m_bold_font;
 
-	struct WatchedPlugin
-	{
+	struct WatchedPlugin {
 		UniquePtr<FileSystemWatcher> watcher;
 		StaticString<LUMIX_MAX_PATH> dir;
 		StaticString<LUMIX_MAX_PATH> basename;

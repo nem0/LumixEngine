@@ -323,7 +323,6 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, const RuntimeCo
 			}
 			break;
 			case Instruction::NOT: push<bool>(!pop<bool>()); break;
-			default: ASSERT(false); break;
 		}
 	}
 }
@@ -895,8 +894,9 @@ const char* Condition::errorToString(Error error)
 		case Error::INCORRECT_TYPE_ARGS: return "Incorrect type args";
 		case Error::NO_RETURN_VALUE: return "No return value";
 		case Error::UNKNOWN_ERROR: return "Unknown error";
-		default: ASSERT(false); return "Undefined error";
 	}
+	ASSERT(false);
+	return "Undefined error";
 }
 
 

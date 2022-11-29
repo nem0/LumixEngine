@@ -455,6 +455,34 @@ bool getEvent(Event& event) {
 				G.event_queue.pushBack(e);
 			}
 
+			if(flags & RI_MOUSE_BUTTON_4_DOWN) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::EXTENDED1;
+				e.mouse_button.down = true;
+				G.event_queue.pushBack(e);
+			}
+
+			if(flags & RI_MOUSE_BUTTON_4_UP) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::EXTENDED1;
+				e.mouse_button.down = false;
+				G.event_queue.pushBack(e);
+			}
+			
+			if(flags & RI_MOUSE_BUTTON_5_DOWN) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::EXTENDED2;
+				e.mouse_button.down = true;
+				G.event_queue.pushBack(e);
+			}
+
+			if(flags & RI_MOUSE_BUTTON_5_UP) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::EXTENDED2;
+				e.mouse_button.down = false;
+				G.event_queue.pushBack(e);
+			}
+
 			if (x != 0 || y != 0) {
 				e.type = Event::Type::MOUSE_MOVE;
 				e.mouse_move.xrel = x;
@@ -689,7 +717,7 @@ void setCursor(CursorType type) {
 		case CursorType::SIZE_WE: SetCursor(G.cursors.size_we); break;
 		case CursorType::SIZE_NWSE: SetCursor(G.cursors.size_nwse); break;
 		case CursorType::TEXT_INPUT: SetCursor(G.cursors.text_input); break;
-		default: ASSERT(false); break;
+		case CursorType::UNDEFINED: break;
 	}
 }
 

@@ -1295,8 +1295,9 @@ void GUIScene::reflect() {
 				case GUIScene::TextHAlign::LEFT: return "Left";
 				case GUIScene::TextHAlign::RIGHT: return "Right";
 				case GUIScene::TextHAlign::CENTER: return "Center";
-				default: ASSERT(false); return "N/A";
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 
@@ -1307,8 +1308,9 @@ void GUIScene::reflect() {
 				case GUIScene::TextVAlign::TOP: return "Top";
 				case GUIScene::TextVAlign::MIDDLE: return "Middle";
 				case GUIScene::TextVAlign::BOTTOM: return "Bottom";
-				default: ASSERT(false); return "N/A";
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 		
@@ -1323,8 +1325,9 @@ void GUIScene::reflect() {
 				case os::CursorType::SIZE_NWSE: return "Size NWSE";
 				case os::CursorType::SIZE_WE: return "Size WE";
 				case os::CursorType::TEXT_INPUT: return "Text input";
-				default: ASSERT(false); return "N/A";
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 

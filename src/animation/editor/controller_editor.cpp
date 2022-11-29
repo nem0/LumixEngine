@@ -137,7 +137,6 @@ struct ControllerEditorImpl : ControllerEditor {
 				}
 				break;
 			}
-			default: ASSERT(false); break;
 		}
 	}
 
@@ -565,12 +564,13 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	static const char* toString(Node::Type type) {
 		switch (type) {
-			case Node::Type::ANIMATION: return "Animation"; break;
-			case Node::Type::BLEND1D: return "Blend 1D"; break;
-			case Node::Type::GROUP: return "Group"; break;
-			case Node::Type::LAYERS: return "Layers"; break;
-			default: ASSERT(false); return "N/A"; break;
+			case Node::Type::ANIMATION: return "Animation";
+			case Node::Type::BLEND1D: return "Blend 1D";
+			case Node::Type::GROUP: return "Group";
+			case Node::Type::LAYERS: return "Layers";
 		}
+		ASSERT(false);
+		return "N/A";
 	}
 
 	static bool isContainer(const Node& node) {
@@ -579,8 +579,9 @@ struct ControllerEditorImpl : ControllerEditor {
 			case Node::Type::BLEND1D: return false;
 			case Node::Type::GROUP:
 			case Node::Type::LAYERS: return true;
-			default: ASSERT(false); return false;
 		}
+		ASSERT(false);
+		return false;
 	}
 
 	bool isSelectable(Node& node) {
@@ -776,7 +777,6 @@ struct ControllerEditorImpl : ControllerEditor {
 						}
 						break;
 					}
-					default: ASSERT(false); break;
 				}
 			}
 		}

@@ -248,7 +248,6 @@ namespace LuaWrapper {
 				LuaWrapper::setField(L, -1, "lumix_resource", "renderbuffer");
 				LuaWrapper::setField(L, -1, "value", tex.renderbuffer);
 				break;
-			default: ASSERT(false); return;
 		}
 	}
 }

@@ -4,6 +4,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -99,8 +100,14 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_back_action.func.bind<&AssetBrowserImpl::goBack>(this);
 		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, false);
 		m_forward_action.func.bind<&AssetBrowserImpl::goForward>(this);
+
+		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", false);
+		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
+		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
+
 		m_app.addAction(&m_back_action);
 		m_app.addAction(&m_forward_action);
+		m_app.addWindowAction(&m_toggle_ui);
 	}
 
 	void onBasePathChanged() {
@@ -128,6 +135,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	~AssetBrowserImpl() override
 	{
+		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
 		m_app.getAssetCompiler().listChanged().unbind<&AssetBrowserImpl::onResourceListChanged>(this);
@@ -224,9 +232,10 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		m_selected_resources.clear();
 	}
+	
+	bool hasFocus() { return m_has_focus; }
 
-
-	void update() override
+	void update(float) override
 	{
 		PROFILE_FUNCTION();
 
@@ -709,6 +718,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		
 		if (ImGui::Begin(ICON_FA_IMAGE  "Asset inspector##asset_inspector", &m_is_open, ImGuiWindowFlags_AlwaysVerticalScrollbar))
 		{
+			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
+
 			ImVec2 pos = ImGui::GetCursorScreenPos();
 			if (m_history.size() > 1) {
 				if (ImGuiEx::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
@@ -811,8 +822,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
+	const char* getName() const override { return "asset_browser"; }
 
-	void onGUI() override {
+	void onWindowGUI() override {
+		m_has_focus = false;
 		if (m_dir.data[0] == '\0') changeDir(".");
 
 		if (!m_wanted_resource.isEmpty()) {
@@ -829,6 +842,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				detailsGUI();
 				return;
 			}
+			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
 
 			ImGui::PushItemWidth(150);
 			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue)) changeDir(m_dir);
@@ -1221,8 +1235,11 @@ struct AssetBrowserImpl : AssetBrowser {
 		selectResource(m_history[m_history_index], false, false);
 	}
 	
-	bool isOpen() const override { return m_is_open; }
-	void setOpen(bool open) override { m_is_open = open; }
+	bool isOpen() const { return m_is_open; }
+	void toggleUI() { m_is_open = !m_is_open; }
+	
+	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_asset_browser_open; }
+	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_asset_browser_open  = m_is_open; }
 
 	bool copyTile(const char* from, const char* to) override {
 		OutputMemoryStream img(m_app.getAllocator());
@@ -1263,7 +1280,9 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_is_focus_requested;
 	bool m_show_thumbnails;
 	bool m_show_subresources;
+	bool m_has_focus = false;
 	float m_thumbnail_size = 1.f;
+	Action m_toggle_ui;
 	Action m_back_action;
 	Action m_forward_action;
 };

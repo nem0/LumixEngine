@@ -586,8 +586,9 @@ struct ParticleEditorResource {
 			case ValueType::VEC3: return 3;
 			case ValueType::VEC4: return 4;
 			case ValueType::FLOAT: return 1;
-			default: ASSERT(false); return 1;
 		}
+		ASSERT(false);
+		return 1;
 	}
 
 	i32 findChannel(const char* name) {
@@ -606,9 +607,9 @@ struct ParticleEditorResource {
 			case ValueType::FLOAT: return c;
 			case ValueType::VEC3: return c + clamp(subindex, 0, 3);
 			case ValueType::VEC4: return c + clamp(subindex, 0, 4);
-			default: ASSERT(false); return c;
 		}
-		
+		ASSERT(false);
+		return c;
 	}
 
 	struct UpdateNode : Node {
@@ -1167,7 +1168,6 @@ struct ParticleEditorResource {
 			case Node::COS: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::COS>)(*this); break;
 			case Node::SIN: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::SIN>)(*this); break;
 			case Node::NUMBER: node = LUMIX_NEW(m_allocator, LiteralNode)(*this); break;
-			default: ASSERT(false); return nullptr;
 		}
 		m_nodes.push(node);
 		return node;

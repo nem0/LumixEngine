@@ -15,6 +15,7 @@ namespace Lumix
 Semaphore::Semaphore(int init_count, int max_count)
 {
 	m_id = ::CreateSemaphore(nullptr, init_count, max_count, nullptr);
+	ASSERT(m_id);
 }
 
 Semaphore::~Semaphore()
@@ -24,7 +25,8 @@ Semaphore::~Semaphore()
 
 void Semaphore::signal()
 {
-	::ReleaseSemaphore(m_id, 1, nullptr);
+	BOOL res = ::ReleaseSemaphore(m_id, 1, nullptr);
+	ASSERT(res);
 }
 
 void Semaphore::wait()

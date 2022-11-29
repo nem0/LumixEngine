@@ -162,8 +162,15 @@ bool Material::save(IOutputStream& file)
 	for (u32 i = 0; i < m_texture_count; ++i) {
 		char path[LUMIX_MAX_PATH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
-			copyString(Span(path), m_textures[i]->getPath().c_str());
-			file << "texture \"/" << path << "\"\n";
+			Span<const char> texture_path(m_textures[i]->getPath().c_str(), m_textures[i]->getPath().length());
+			Span<const char> mat_dir = Path::getDir(getPath().c_str());
+			if (startsWith(texture_path, mat_dir)) {
+				copyString(Span(path), Span(texture_path).fromLeft(mat_dir.length()));
+			}
+			else {
+				copyString(Span(path), texture_path);
+			}
+			file << "texture \"" << path << "\"\n";
 		}
 		else {
 			file << "texture \"\"\n";
@@ -198,13 +205,13 @@ bool Material::save(IOutputStream& file)
 				else {
 					file << "uniform(\"" << su.name << "\", ";
 					switch(su.type) {
+						case Shader::Uniform::INT: file << mu.int_value; break;
 						case Shader::Uniform::FLOAT: file << mu.float_value; break;
 						case Shader::Uniform::COLOR: 
 						case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
 						case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
 						case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
 						case Shader::Uniform::MATRIX4: writeArray(mu.matrix, 16); break;
-						default: ASSERT(false); break;
 					}
 					file << ")\n";
 				}

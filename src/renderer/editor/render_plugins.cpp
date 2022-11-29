@@ -1536,16 +1536,18 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case Meta::Filter::POINT: return "point";
 			case Meta::Filter::LINEAR: return "linear";
 			case Meta::Filter::ANISOTROPIC: return "anisotropic";
-			default: ASSERT(false); return "linear";
 		}
+		ASSERT(false);
+		return "linear";
 	}
 
 	const char* toString(Meta::WrapMode wrap) {
 		switch (wrap) {
 			case Meta::WrapMode::CLAMP: return "clamp";
 			case Meta::WrapMode::REPEAT: return "repeat";
-			default: ASSERT(false); return "repeat";
 		}
+		ASSERT(false);
+		return "repeat";
 	}
 
 	static const char* getCubemapLabel(u32 idx) {
@@ -2318,8 +2320,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
 			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
 			case FBXImporter::ImportConfig::Physics::NONE: return "None";
-			default: ASSERT(false); return "none";
 		}
+		ASSERT(false);
+		return "none";
 	}
 
 	void onGUI(Span<Resource*> resources) override
@@ -3209,7 +3212,6 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					case Shader::Uniform::VEC4: ImGui::Text("Vector4"); break;
 					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
 					case Shader::Uniform::VEC2: ImGui::Text("Vector2"); break;
-					default: ASSERT(false); break;
 				}
 				ImGui::NextColumn();
 			}
@@ -4185,7 +4187,6 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 				}
 				break;
 			}
-			default: ASSERT(false); break;
 		}
 	}
 
@@ -4356,7 +4357,6 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			switch (pg.index_type) {
 				case gpu::DataType::U16: index_count = u32(pg.index_data.size() / sizeof(u16)); break;
 				case gpu::DataType::U32: index_count = u32(pg.index_data.size() / sizeof(u32)); break;
-				default: ASSERT(false); break;
 			}
 		}
 		ImGui::Text("%d", index_count);

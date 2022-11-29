@@ -578,8 +578,9 @@ lua_State* Settings::getState(Storage storage) const {
 	switch(storage) {
 		case GLOBAL: return m_global_state;
 		case LOCAL: return m_local_state;
-		default: ASSERT(false); return m_local_state;
 	}
+	ASSERT(false);
+	return m_local_state;
 }
 
 bool Settings::save()

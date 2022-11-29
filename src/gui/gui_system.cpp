@@ -53,8 +53,9 @@ struct GUISystemImpl final : GUISystem
 			case GUIScene::TextHAlign::LEFT: return "left";
 			case GUIScene::TextHAlign::RIGHT: return "right";
 			case GUIScene::TextHAlign::CENTER: return "center";
-			default: ASSERT(false); return "Unknown";
 		}
+		ASSERT(false);
+		return "Unknown";
 	}
 
 

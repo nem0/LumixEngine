@@ -52,7 +52,6 @@ bool Clip::load(u64 size, const u8* mem)
 	m_looped = blob.read<bool>();
 	m_volume = blob.read<float>();
 	switch(format) {
-		default: ASSERT(false); return false;
 		case Format::WAV: {
 			WAVHeader header = blob.read<WAVHeader>();
 			if (header.riff != 'FFIR') return false;
@@ -84,6 +83,8 @@ bool Clip::load(u64 size, const u8* mem)
 			return true;
 		}
 	}
+	ASSERT(false);
+	return false;
 }
 
 

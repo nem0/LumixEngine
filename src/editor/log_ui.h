@@ -1,6 +1,8 @@
 #pragma once
 
 
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "engine/array.h"
 #include "engine/log.h"
 #include "engine/sync.h"
@@ -11,19 +13,14 @@ namespace Lumix
 {
 
 
-struct LUMIX_EDITOR_API LogUI
+struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 {
 	public:
-		explicit LogUI(IAllocator& allocator);
+		explicit LogUI(StudioApp& app, IAllocator& allocator);
 		~LogUI();
 
-		void onGUI();
-		void update(float time_delta);
 		int addNotification(const char* text);
 		int getUnreadErrorCount() const;
-
-	public:
-		bool m_is_open;
 
 	private:
 		struct Notification
@@ -37,23 +34,29 @@ struct LUMIX_EDITOR_API LogUI
 			String message;
 		};
 
-	private:
-		void onLog(LogLevel level, const char* message);
-		void push(LogLevel level, const char* message);
-		void showNotifications();
-
-	private:
 		struct Message
 		{
 			Message(IAllocator& allocator)
-				: text(allocator)
+			: text(allocator)
 			{}
 
 			String text;
 			LogLevel level;
 		};
 
+		void onLog(LogLevel level, const char* message);
+		void push(LogLevel level, const char* message);
+		void showNotifications();
+		void onSettingsLoaded() override;
+		void onBeforeSettingsSaved() override;
+		const char* getName() const override { return "log"; }
+		void onWindowGUI() override;
+		void update(float time_delta) override;
+		bool isOpen() const { return m_is_open; }
+		void toggleUI() { m_is_open = !m_is_open; }
+
 		IAllocator& m_allocator;
+		StudioApp& m_app;
 		Array<Message> m_messages;
 		Array<Notification> m_notifications;
 		int m_new_message_count[(int)LogLevel::COUNT];
@@ -64,6 +67,8 @@ struct LUMIX_EDITOR_API LogUI
 		bool m_scroll_to_bottom = false;
 		bool m_autoscroll = true;
 		Mutex m_guard;
+		bool m_is_open = false;
+		Action m_toggle_ui;
 };
 
 

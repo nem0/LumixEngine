@@ -732,7 +732,6 @@ void SceneView::manipulate() {
 				rots[i] = normalize(t.rot);
 			}
 			m_editor.setEntitiesPositionsAndRotations(selected->begin(), poss.begin(), rots.begin(), rots.size());
-
 			break;
 		}
 		case Gizmo::Config::SCALE: {
@@ -743,10 +742,8 @@ void SceneView::manipulate() {
 				scales[i] = universe.getScale((*selected)[i]) * diff;
 			}
 			m_editor.setEntitiesScales(selected->begin(), scales.begin(), scales.size());
-
 			break;
 		}
-		default: ASSERT(false); break;
 	}
 	if (cfg.isAutosnapDown()) m_app.snapDown();
 }

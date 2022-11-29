@@ -1098,6 +1098,17 @@ bool toCString(double value, Span<char> out, int after_point)
 }
 
 
+bool startsWith(Span<const char> str, Span<const char> prefix) {
+	const char* lhs = str.begin();
+	const char* rhs = prefix.begin();
+	while (rhs != prefix.end() && lhs != str.end() && *lhs == *rhs) {
+		++lhs;
+		++rhs;
+	}
+
+	return rhs == prefix.end();
+}
+
 bool startsWith(const char* str, const char* prefix) {
 	const char* lhs = str;
 	const char* rhs = prefix;

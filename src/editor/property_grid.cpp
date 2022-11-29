@@ -3,6 +3,7 @@
 #include "property_grid.h"
 #include "asset_browser.h"
 #include "editor/prefab_system.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/crt.h"
@@ -31,11 +32,18 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_deferred_select(INVALID_ENTITY)
 {
 	m_component_filter[0] = '\0';
+
+	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "", false);
+	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
+	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
+	
+	m_app.addWindowAction(&m_toggle_ui);
 }
 
 
 PropertyGrid::~PropertyGrid()
 {
+	m_app.removeAction(&m_toggle_ui);
 	ASSERT(m_plugins.empty());
 }
 
@@ -203,7 +211,6 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 					visit(p);
 					break;
 				}
-				default: ASSERT(false); break;
 			}
 		}
 	}
@@ -872,8 +879,10 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 	showAddComponentNode(node->next, filter, parent, editor);
 }
 
+void PropertyGrid::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_properties_open; }
+void PropertyGrid::onBeforeSettingsSaved() { m_app.getSettings().m_is_properties_open  = m_is_open; }
 
-void PropertyGrid::onGUI()
+void PropertyGrid::onWindowGUI()
 {
 	for (IPlugin* i : m_plugins) {
 		i->update();

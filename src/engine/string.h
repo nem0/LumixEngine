@@ -43,6 +43,7 @@ LUMIX_ENGINE_API bool catString(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool catNString(Span<char> output, const char* source, int N);
 LUMIX_ENGINE_API bool makeLowercase(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool makeLowercase(Span<char> output, Span<const char> source);
+LUMIX_ENGINE_API bool startsWith(Span<const char> str, Span<const char> prefix);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
 LUMIX_ENGINE_API bool startsWithInsensitive(const char* str, const char* prefix);
 LUMIX_ENGINE_API int stringLength(const char* str);

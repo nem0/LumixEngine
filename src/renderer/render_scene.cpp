@@ -3292,8 +3292,10 @@ void RenderScene::reflect() {
 			switch((Terrain::GrassType::RotationMode)idx) {
 				case Terrain::GrassType::RotationMode::ALL_RANDOM: return "All random";
 				case Terrain::GrassType::RotationMode::Y_UP: return "Y up";
-				default: ASSERT(false); return "N/A";
+				case Terrain::GrassType::RotationMode::COUNT: break;
 			}
+			ASSERT(false);
+			return "N/A";
 		}
 	};
 
