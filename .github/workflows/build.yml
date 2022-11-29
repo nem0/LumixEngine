@@ -55,6 +55,10 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_js.git js
+            - name: fetch marketplace plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_market.git market
             - name: fetch procedural geometry plugin
               working-directory: plugins
               run: |
