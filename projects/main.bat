@@ -51,8 +51,9 @@ goto :begin
 	echo  A. C#
 	echo  B. Visual script
 	echo  C. Procedural geometry
+	echo  D. Marketplace
 	echo ===============================
-	choice /C 123456789ABC /N /M "Your choice:"
+	choice /C 123456789ABCD /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -66,6 +67,7 @@ goto :begin
 	if %errorlevel%==10 call :cs_plugin
 	if %errorlevel%==11 call :visual_script_plugin
 	if %errorlevel%==12 call :procedural_geom_plugin
+	if %errorlevel%==13 call :marketplace_plugin
 	call :create_project
 goto :plugins
 
@@ -184,6 +186,18 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
 	) else (
 		cd procedural_geom
+		git pull
+	)
+	popd
+exit /B 0
+
+:marketplace_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist market (
+		git.exe clone https://github.com/nem0/lumixengine_market.git market
+	) else (
+		cd market
 		git pull
 	)
 	popd
