@@ -398,7 +398,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 					if (ImGui::IsItemDeactivatedAfterEdit()) {
 						if (m_new_folder_name[0]) {
 							FileSystem& fs = m_app.getEngine().getFileSystem();
-							StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), m_current_dir.c_str(), m_new_folder_name);
+							StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), m_current_dir.c_str(), "/", m_new_folder_name);
 							if (!os::makePath(fullpath)) {
 								logError("Failed to create ", fullpath);
 							}
