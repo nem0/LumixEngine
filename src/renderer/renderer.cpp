@@ -151,6 +151,7 @@ struct FrameData {
 	u32 frame_number = 0;
 	DrawStream begin_frame_draw_stream;
 	DrawStream draw_stream;
+	DrawStream end_frame_draw_stream;
 };
 
 
@@ -744,6 +745,11 @@ struct RendererImpl final : Renderer
 		return m_cpu_frame->draw_stream;
 	}
 
+	DrawStream& getEndFrameDrawStream() override {
+		wait(&m_cpu_frame->can_setup);
+		return m_cpu_frame->end_frame_draw_stream;
+	}
+
 	const char* getName() const override { return "renderer"; }
 	Engine& getEngine() override { return m_engine; }
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
@@ -826,6 +832,9 @@ struct RendererImpl final : Renderer
 
 		frame.draw_stream.run();
 		frame.draw_stream.reset();
+
+		frame.end_frame_draw_stream.run();
+		frame.end_frame_draw_stream.reset();
 
 		frame.linear_allocator.reset();
 		m_profiler.endQuery();
@@ -981,6 +990,7 @@ FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageA
 	, linear_allocator(1024 * 1024 * 64)
 	, draw_stream(renderer)
 	, begin_frame_draw_stream(renderer)
+	, end_frame_draw_stream(renderer)
 {}
 
 extern "C"

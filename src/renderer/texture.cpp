@@ -763,7 +763,7 @@ bool Texture::load(u64 size, const u8* mem)
 void Texture::unload()
 {
 	if (handle) {
-		renderer.getDrawStream().destroy(handle);
+		renderer.getEndFrameDrawStream().destroy(handle);
 		handle = gpu::INVALID_TEXTURE;
 	}
 	data.clear();

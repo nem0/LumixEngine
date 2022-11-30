@@ -83,6 +83,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 
 	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines) = 0;
 	virtual DrawStream& getDrawStream() = 0;
+	virtual DrawStream& getEndFrameDrawStream() = 0;
 
 	template <typename T> void pushJob(const char* name, const T& func);
 	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }

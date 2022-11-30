@@ -1152,7 +1152,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		if(m_texture_view) {
-			renderer->getDrawStream().destroy(m_texture_view);
+			renderer->getEndFrameDrawStream().destroy(m_texture_view);
 		}
 	}
 
@@ -1859,7 +1859,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
-		if (m_downscale_program) m_pipeline->getRenderer().getDrawStream().destroy(m_downscale_program);
+		if (m_downscale_program) m_pipeline->getRenderer().getEndFrameDrawStream().destroy(m_downscale_program);
 		jobs::wait(&m_subres_signal);
 		auto& engine = m_app.getEngine();
 		engine.destroyUniverse(*m_universe);
@@ -2773,7 +2773,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				saveAsLBC(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
-				m_renderer->getDrawStream().destroy(m_tile.texture);
+				m_renderer->getEndFrameDrawStream().destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
@@ -4251,7 +4251,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			}
 		}
 
-		if (pg.vertex_buffer) renderer.getDrawStream().destroy(pg.vertex_buffer);
+		if (pg.vertex_buffer) renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 		const Renderer::MemRef mem = renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 		pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);	
 	}
@@ -4593,9 +4593,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		for (gpu::ProgramHandle program : m_programs) {
-			renderer->getDrawStream().destroy(program);
+			renderer->getEndFrameDrawStream().destroy(program);
 		}
-		if (m_texture) renderer->getDrawStream().destroy(m_texture);
+		if (m_texture) renderer->getEndFrameDrawStream().destroy(m_texture);
 	}
 
 	void onWindowGUI() override {}

@@ -99,7 +99,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	~RenderSceneImpl()
 	{
-		m_renderer.getDrawStream().destroy(m_reflection_probes_texture);
+		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
 		m_universe.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
 		m_culling_system.reset();
@@ -202,8 +202,8 @@ struct RenderSceneImpl final : RenderScene {
 
 		for (ProceduralGeometry& pg : m_procedural_geometries) {
 			if (pg.material) pg.material->decRefCount();
-			if (pg.vertex_buffer) m_renderer.getDrawStream().destroy(pg.vertex_buffer);
-			if (pg.index_buffer) m_renderer.getDrawStream().destroy(pg.index_buffer);
+			if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
+			if (pg.index_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
 		}
 		m_procedural_geometries.clear();
 
@@ -217,7 +217,7 @@ struct RenderSceneImpl final : RenderScene {
 
 		for (InstancedModel& im : m_instanced_models) {
 			if (im.model) im.model->decRefCount();
-			if (im.gpu_data) m_renderer.getDrawStream().destroy(im.gpu_data);
+			if (im.gpu_data) m_renderer.getEndFrameDrawStream().destroy(im.gpu_data);
 		}
 		m_instanced_models.clear();
 
@@ -1194,7 +1194,7 @@ struct RenderSceneImpl final : RenderScene {
 		InstancedModel& im = m_instanced_models[entity];
 		if (im.gpu_data) {
 			if (im.gpu_capacity < (u32)im.instances.size()) {
-				m_renderer.getDrawStream().destroy(im.gpu_data);
+				m_renderer.getEndFrameDrawStream().destroy(im.gpu_data);
 				im.gpu_data = gpu::INVALID_BUFFER;
 				im.gpu_capacity = 0;
 			}
@@ -1274,7 +1274,7 @@ struct RenderSceneImpl final : RenderScene {
 	void destroyInstancedModel(EntityRef entity) {
 		Model* m = m_instanced_models[entity].model;
 		if (m) m->decRefCount();
-		if (m_instanced_models[entity].gpu_data) m_renderer.getDrawStream().destroy(m_instanced_models[entity].gpu_data);
+		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
 		m_instanced_models.erase(entity);
 		m_universe.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
 	}
@@ -1782,11 +1782,11 @@ struct RenderSceneImpl final : RenderScene {
 		pg.index_data.clear();
 		pg.vertex_data.clear();
 		if (pg.vertex_buffer) {
-			m_renderer.getDrawStream().destroy(pg.vertex_buffer);
+			m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 			pg.vertex_buffer = gpu::INVALID_BUFFER;
 		}
 		if (pg.index_buffer) {
-			m_renderer.getDrawStream().destroy(pg.index_buffer);
+			m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
 			pg.index_buffer = gpu::INVALID_BUFFER;
 		}
 		
@@ -1840,8 +1840,8 @@ struct RenderSceneImpl final : RenderScene {
 		pg.index_type = index_type;
 		pg.vertex_data.write(vertex_data.begin(), vertex_data.length());
 		
-		if (pg.index_buffer) m_renderer.getDrawStream().destroy(pg.index_buffer);
-		if (pg.vertex_buffer) m_renderer.getDrawStream().destroy(pg.vertex_buffer);
+		if (pg.index_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
+		if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 		
 		if (indices.length() > 0) {
 			pg.index_data.write(indices.begin(), indices.length());
@@ -3118,8 +3118,8 @@ struct RenderSceneImpl final : RenderScene {
 	void destroyProceduralGeometry(EntityRef entity) {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		if (pg.material) pg.material->decRefCount();
-		if (pg.vertex_buffer) m_renderer.getDrawStream().destroy(pg.vertex_buffer);
-		if (pg.index_buffer) m_renderer.getDrawStream().destroy(pg.index_buffer);
+		if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
+		if (pg.index_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
 		m_procedural_geometries.erase(entity);
 		m_universe.onComponentDestroyed(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
