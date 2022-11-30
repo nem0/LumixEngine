@@ -127,7 +127,7 @@ void Material::unload()
 	}
 	m_texture_count = 0;
 
-	m_renderer.getDrawStream().destroy(m_bind_group);
+	m_renderer.getEndFrameDrawStream().destroy(m_bind_group);
 	m_bind_group = gpu::INVALID_BIND_GROUP;
 	for (Texture*& tex : m_textures) tex = nullptr;
 	

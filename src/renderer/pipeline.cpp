@@ -964,7 +964,7 @@ struct PipelineImpl final : Pipeline
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
 			if (rb.frame_counter > 2 && rb.handle) {
-				m_renderer.getDrawStream().destroy(rb.handle);
+				m_renderer.getEndFrameDrawStream().destroy(rb.handle);
 				rb.handle = gpu::INVALID_TEXTURE;
 			}
 		}
