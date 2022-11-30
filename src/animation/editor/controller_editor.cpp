@@ -281,13 +281,11 @@ struct ControllerEditorImpl : ControllerEditor {
 		for (Blend1DNode::Child& child : node.m_children) {
 			ImGui::PushID(&child);
 		
-			ImGui::PushItemWidth(-1);
+			ImGui::SetNextItemWidth(-1);
 			changed = ImGui::InputFloat("##val", &child.value) || changed;
-			ImGui::PopItemWidth();
 			ImGui::NextColumn();
 		
-			ImGui::PushItemWidth(-1);
-		
+			ImGui::SetNextItemWidth(-1);
 			const Array<String>& slots = m_controller->m_animation_slots;
 			if (ImGui::BeginCombo("##anim", child.slot < (u32)slots.size() ? slots[child.slot].c_str() : "")) {
 				for (u32 i = 0; i < (u32)slots.size(); ++i) {
@@ -299,7 +297,6 @@ struct ControllerEditorImpl : ControllerEditor {
 				ImGui::EndCombo();
 			}
 		
-			ImGui::PopItemWidth();
 			ImGui::NextColumn();
 		
 		
@@ -1031,12 +1028,11 @@ struct ControllerEditorImpl : ControllerEditor {
 				for (u32 entry_idx = 0; entry_idx < (u32)m_controller->m_animation_entries.size(); ++entry_idx) {
 					ImGui::PushID(entry_idx);
 					Controller::AnimationEntry& entry = m_controller->m_animation_entries[entry_idx];
-					ImGui::PushItemWidth(-1);
+					ImGui::SetNextItemWidth(-1);
 					ImGui::InputInt("##set", (int*)&entry.set);
-					ImGui::PopItemWidth();
 					ImGui::NextColumn();
 					const char* preview = entry.slot < (u32)m_controller->m_animation_slots.size() ? m_controller->m_animation_slots[entry.slot].c_str() : "N/A";
-					ImGui::PushItemWidth(-1);
+					ImGui::SetNextItemWidth(-1);
 					if (ImGui::BeginCombo("##slot", preview, 0)) {
 						for (u32 i = 0, c = m_controller->m_animation_slots.size(); i < c; ++i) {
 							if (ImGui::Selectable(m_controller->m_animation_slots[i].c_str())) {
@@ -1046,7 +1042,6 @@ struct ControllerEditorImpl : ControllerEditor {
 						}
 						ImGui::EndCombo();
 					}
-					ImGui::PopItemWidth();
 					ImGui::NextColumn();
 					ImGui::PushItemWidth(-1);
 					char path[LUMIX_MAX_PATH];

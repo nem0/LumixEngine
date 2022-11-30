@@ -42,6 +42,10 @@ void Path::operator =(const char* rhs) {
 	endUpdate();
 }
 
+bool Path::operator==(const char* rhs) const {
+	return equalStrings(rhs, m_path);
+}
+
 bool Path::operator==(const Path& rhs) const {
 	ASSERT(equalIStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
 	return m_hash == rhs.m_hash;

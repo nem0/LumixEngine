@@ -239,19 +239,17 @@ void GameView::processInputEvents()
 	
 	Engine& engine = m_app.getEngine();
 	InputSystem& input = engine.getInputSystem();
-	const os::Event* events = m_app.getEvents();
-	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-		input.injectEvent(events[i], int(m_pos.x), int(m_pos.y));
+	for (const os::Event e : m_app.getEvents()) {
+		input.injectEvent(e, int(m_pos.x), int(m_pos.y));
 	}
 }
 
 void GameView::controlsGUI(WorldEditor& editor) {
 	Engine& engine = m_app.getEngine();
-	ImGui::PushItemWidth(50);
+	ImGui::SetNextItemWidth(50);
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
 		engine.setTimeMultiplier(m_time_multiplier);
 	}
-	ImGui::PopItemWidth();
 	if(editor.isGameMode()) {
 		ImGui::SameLine();
 		if (ImGui::Button("Fullscreen")) setFullscreen(true);

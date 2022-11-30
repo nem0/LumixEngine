@@ -2152,9 +2152,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			Vec2 delta(0, 0);
-			const os::Event* events = m_app.getEvents();
-			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-				const os::Event& e = events[i];
+			for (const os::Event e : m_app.getEvents()) {
 				if (e.type == os::Event::Type::MOUSE_MOVE) {
 					delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
 				}

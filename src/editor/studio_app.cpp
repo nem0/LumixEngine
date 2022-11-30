@@ -3232,10 +3232,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	const os::Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
-
-
-	int getEventsCount() const override { return m_events.size(); }
+	Span<const os::Event> getEvents() const override { return m_events; }
 
 	
 	static void checkWorkingDirectory()

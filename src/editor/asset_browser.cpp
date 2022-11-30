@@ -82,12 +82,12 @@ struct AssetBrowserImpl : AssetBrowser {
 		: m_selected_resources(app.getAllocator())
 		, m_is_focus_requested(false)
 		, m_history(app.getAllocator())
+		, m_dir_history(app.getAllocator())
 		, m_plugins(app.getAllocator())
 		, m_app(app)
 		, m_is_open(false)
 		, m_show_thumbnails(true)
 		, m_show_subresources(true)
-		, m_history_index(-1)
 		, m_file_infos(app.getAllocator())
 		, m_immediate_tiles(app.getAllocator())
 		, m_subdirs(app.getAllocator())
@@ -186,7 +186,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		FileSystem& fs = engine.getFileSystem();
 		StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), path.c_str());
 		if (os::dirExists(fullpath)) {
-			changeDir(m_dir);
+			changeDir(m_dir, false);
 			return;
 		}
 
@@ -276,7 +276,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_file_infos.push(tile);
 	}
 
-	void changeDir(const char* path)
+	void changeDir(const char* path, bool push_history)
 	{
 		Engine& engine = m_app.getEngine();
 		RenderInterface* ri = m_app.getRenderInterface();
@@ -286,6 +286,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_file_infos.clear();
 
 		Path::normalize(path, Span(m_dir.data));
+		if (push_history) pushDirHistory(m_dir);
 		int len = stringLength(m_dir);
 		if (len > 0 && (m_dir[len - 1] == '/' || m_dir[len - 1] == '\\')) {
 			m_dir.data[len - 1] = '\0';
@@ -336,7 +337,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		char tmp[LUMIX_MAX_PATH];
 		if (m_dir[0] != '.' || m_dir[1] != 0) {
 			if (ImGui::Button(".")) {
-				changeDir(".");
+				changeDir(".", true);
 			}
 			ImGui::SameLine();
 			ImGui::TextUnformatted("/");
@@ -358,7 +359,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			{
 				char new_dir[LUMIX_MAX_PATH];
 				copyNString(Span(new_dir), m_dir, int(c - m_dir.data));
-				changeDir(new_dir);
+				changeDir(new_dir, true);
 			}
 			ImGui::SameLine();
 			ImGui::TextUnformatted("/");
@@ -378,7 +379,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		{
 			char dir[LUMIX_MAX_PATH];
 			copyString(Span(dir), Path::getDir(m_dir));
-			changeDir(dir);
+			changeDir(dir, true);
 		}
 
 		for (auto& subdir : m_subdirs)
@@ -386,7 +387,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			if (ImGui::Selectable(subdir, &b))
 			{
 				StaticString<LUMIX_MAX_PATH> new_dir(m_dir, "/", subdir);
-				changeDir(new_dir);
+				changeDir(new_dir, true);
 			}
 		}
 
@@ -583,7 +584,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto common_popup = [&](){
 			const char* base_path = fs.getBasePath();
 			ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
-			if (ImGui::Checkbox("Subresources", &m_show_subresources)) changeDir(m_dir);
+			if (ImGui::Checkbox("Subresources", &m_show_subresources)) changeDir(m_dir, false);
 			if (ImGui::SliderFloat("Icon size", &m_thumbnail_size, 0.3f, 3.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
 				refreshLabels();
 			}
@@ -600,7 +601,7 @@ struct AssetBrowserImpl : AssetBrowser {
 					if (!os::makePath(path)) {
 						logError("Failed to create ", path);
 					}
-					changeDir(m_dir);
+					changeDir(m_dir, false);
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndMenu();
@@ -711,6 +712,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void detailsGUI()
 	{
+		m_details_focused = false;
 		if (!m_is_open) return;
 
 		if (m_is_focus_requested) ImGui::SetNextWindowFocus();
@@ -718,7 +720,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		
 		if (ImGui::Begin(ICON_FA_IMAGE  "Asset inspector##asset_inspector", &m_is_open, ImGuiWindowFlags_AlwaysVerticalScrollbar))
 		{
-			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
+			m_details_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+			m_has_focus = m_has_focus || m_details_focused;
 
 			ImVec2 pos = ImGui::GetCursorScreenPos();
 			if (m_history.size() > 1) {
@@ -824,9 +827,23 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	const char* getName() const override { return "asset_browser"; }
 
+	void checkExtendedMouseButtons() {
+		if (!m_has_focus) return;
+		
+		for (const os::Event e : m_app.getEvents()) {
+			if (e.type == os::Event::Type::MOUSE_BUTTON && !e.mouse_button.down) {
+				switch (e.mouse_button.button) {
+					case os::MouseButton::EXTENDED1: m_details_focused ? goBack() : goBackDir(); break;
+					case os::MouseButton::EXTENDED2: m_details_focused ? goForward() : goForwardDir(); break;
+					default: break;
+				}
+			}
+		}
+	}
+
 	void onWindowGUI() override {
 		m_has_focus = false;
-		if (m_dir.data[0] == '\0') changeDir(".");
+		if (m_dir.data[0] == '\0') changeDir(".", true);
 
 		if (!m_wanted_resource.isEmpty()) {
 			selectResource(m_wanted_resource, true, false);
@@ -844,13 +861,12 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
 
-			ImGui::PushItemWidth(150);
-			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue)) changeDir(m_dir);
-			ImGui::PopItemWidth();
+			ImGui::SetNextItemWidth(150);
+			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue)) changeDir(m_dir, false);
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear search")) {
 				m_filter[0] = '\0';
-				changeDir(m_dir);
+				changeDir(m_dir, false);
 			}
 
 			ImGui::SameLine();
@@ -877,8 +893,25 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	
 		detailsGUI();
+		checkExtendedMouseButtons();
 	}
 
+	void pushDirHistory(const char* path) {
+		if (m_dir_history_index + 1 == m_dir_history.size() && !m_dir_history.empty()) {
+			if (m_dir_history[m_dir_history_index] == path) return;
+		}
+		
+		while (m_dir_history_index < m_dir_history.size() - 1) {
+			m_dir_history.pop();
+		}
+		++m_dir_history_index;
+		m_dir_history.push(Path(path));
+
+		if (m_dir_history.size() > 20) {
+			--m_dir_history_index;
+			m_dir_history.erase(0);
+		}
+	}
 
 	void selectResource(Resource* resource, bool record_history, bool additive)
 	{
@@ -1220,17 +1253,24 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
+	void goBackDir() {
+		if (m_dir_history_index < 1) return;
+		m_dir_history_index = maximum(0, m_dir_history_index - 1);
+		changeDir(m_dir_history[m_dir_history_index].c_str(), false);
+	}
 
-	void goBack()
-	{
+	void goForwardDir() {
+		m_dir_history_index = minimum(m_dir_history_index + 1, m_dir_history.size() - 1);
+		changeDir(m_dir_history[m_dir_history_index].c_str(), false);
+	}
+
+	void goBack() {
 		if (m_history_index < 1) return;
 		m_history_index = maximum(0, m_history_index - 1);
 		selectResource(m_history[m_history_index], false, false);
 	}
 
-
-	void goForward()
-	{
+	void goForward() {
 		m_history_index = minimum(m_history_index + 1, m_history.size() - 1);
 		selectResource(m_history[m_history_index], false, false);
 	}
@@ -1268,10 +1308,15 @@ struct AssetBrowserImpl : AssetBrowser {
 	Array<StaticString<LUMIX_MAX_PATH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;
+	
 	Array<Path> m_history;
+	i32 m_history_index = -1;
+	
+	Array<Path> m_dir_history;
+	i32 m_dir_history_index = -1;
+
 	EntityPtr m_dropped_entity = INVALID_ENTITY;
 	char m_prefab_name[LUMIX_MAX_PATH] = "";
-	int m_history_index;
 	HashMap<ResourceType, IPlugin*> m_plugins;
 	Array<Resource*> m_selected_resources;
 	int m_context_resource;
@@ -1281,6 +1326,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	bool m_has_focus = false;
+	bool m_details_focused = false;
 	float m_thumbnail_size = 1.f;
 	Action m_toggle_ui;
 	Action m_back_action;

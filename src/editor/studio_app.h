@@ -22,8 +22,6 @@ namespace Lumix {
 template <typename T> struct Array;
 struct Action;
 struct ComponentUID;
-struct ResourceType;
-struct Vec2;
 namespace Gizmo { struct Config; }
 namespace os {
 	enum class MouseButton;
@@ -83,14 +81,21 @@ struct LUMIX_EDITOR_API StudioApp {
 
 	virtual struct IAllocator& getAllocator() = 0;
 	virtual struct Engine& getEngine() = 0;
+	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void run() = 0;
+	virtual int getExitCode() const = 0;
+	
 	virtual struct PropertyGrid& getPropertyGrid() = 0;
 	virtual struct LogUI& getLogUI() = 0;
 	virtual struct AssetBrowser& getAssetBrowser() = 0;
 	virtual struct AssetCompiler& getAssetCompiler() = 0;
 	virtual struct FileSelector& getFileSelector() = 0;
 	virtual struct DirSelector& getDirSelector() = 0;
-	virtual WorldEditor& getWorldEditor() = 0;
+	
+	virtual struct Settings& getSettings() = 0;
+	virtual struct RenderInterface* getRenderInterface() = 0;
+	virtual void setRenderInterface(RenderInterface* ifc) = 0;
+
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void addPlugin(MousePlugin& plugin) = 0;
 	virtual void addPlugin(GUIPlugin& plugin) = 0;
@@ -100,23 +105,22 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual GUIPlugin* getGUIPlugin(const char* name) = 0;
 	virtual MousePlugin* getMousePlugin(const char* name) = 0;
 	virtual Span<MousePlugin*> getMousePlugins() = 0;
+
 	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual const char* getComponentIcon(ComponentType cmp_type) const = 0;
 	virtual void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
-	virtual int getExitCode() const = 0;
-	virtual void runScript(const char* src, const char* script_name) = 0;
+
 	virtual const Array<Action*>& getActions() = 0;
 	virtual void addAction(Action* action) = 0;
 	virtual void removeAction(Action* action) = 0;
 	virtual void addToolAction(Action* action) = 0;
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
+	
+	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual void snapDown() = 0;
-	virtual struct Settings& getSettings() = 0;
-	virtual struct RenderInterface* getRenderInterface() = 0;
-	virtual void setRenderInterface(RenderInterface* ifc) = 0;
 	virtual float getFOV() const = 0;
 	virtual void setFOV(float fov_radians) = 0;
 	virtual Gizmo::Config& getGizmoConfig() = 0;
@@ -124,8 +128,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void saveSettings() = 0;
 	virtual int getImGuiKey(int keycode) const = 0;
 
-	virtual const os::Event* getEvents() const = 0;
-	virtual int getEventsCount() const = 0;
+	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getBoldFont() = 0;
 	virtual ImFont* getBigIconFont() = 0;
 	

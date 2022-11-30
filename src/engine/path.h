@@ -30,6 +30,7 @@ struct LUMIX_ENGINE_API Path {
 	explicit Path(const char* path);
 
 	void operator=(const char* rhs);
+	bool operator==(const char* rhs) const;
 	bool operator==(const Path& rhs) const;
 	bool operator!=(const Path& rhs) const;
 
