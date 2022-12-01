@@ -1,4 +1,3 @@
-#define LUMIX_NO_CUSTOM_CRT
 #include "particle_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/settings.h"

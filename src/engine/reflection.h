@@ -180,8 +180,8 @@ template <typename T>
 struct Property : PropertyBase {
 	Property(IAllocator& allocator) : PropertyBase(allocator) {}
 
-	typedef void (*Setter)(IScene*, EntityRef, u32, const T&);
-	typedef T (*Getter)(IScene*, EntityRef, u32);
+	using Setter = void (*)(IScene*, EntityRef, u32, const T&);
+	using Getter = T (*)(IScene*, EntityRef, u32);
 
 	void visit(IPropertyVisitor& visitor) const override;
 
@@ -280,24 +280,21 @@ inline Icon icon(const char* name) { return {name}; }
 
 namespace detail {
 
-static const unsigned int FRONT_SIZE = sizeof("Lumix::detail::GetTypeNameHelper<") - 1u;
+static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
 static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 
 template <typename T>
 struct GetTypeNameHelper
 {
-	static const char* GetTypeName()
+	static Span<const char> GetTypeName()
 	{
 		#if defined(_MSC_VER) && !defined(__clang__)
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-			static char typeName[size] = {};
-			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u); //-V594
+			return Span<const char>(__FUNCTION__ + FRONT_SIZE, size - 1);
 		#else
 			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-			static char typeName[size] = {};
-			memcpy(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
+			return Span<const char>(__PRETTY_FUNCTION__ + FRONT_SIZE, size - 1);
 		#endif
-		return typeName;
 	}
 };
 
@@ -313,7 +310,7 @@ const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
 }
 
 template <typename T>
-const char* getTypeName()
+Span<const char> getTypeName()
 {
 	return detail::GetTypeNameHelper<T>::GetTypeName();
 }
@@ -361,16 +358,31 @@ struct Variant {
 	void operator =(Color c) { color = c; type = COLOR; }
 };
 
+struct TypeDescriptor {
+	Variant::Type type;
+	bool is_const;
+	bool is_reference;
+};
+
+template <typename T> TypeDescriptor toTypeDescriptor() {
+	TypeDescriptor td;
+	td.type = getVariantType<T>();
+	td.is_const = !IsSame<T, RemoveConst<T>::Type>::Value;
+	td.is_reference = !IsSame<T, RemoveReference<T>::Type>::Value;
+	return td;
+}
+
 struct FunctionBase
 {
 	virtual ~FunctionBase() {}
 
 	virtual u32 getArgCount() const = 0;
-	virtual Variant::Type getReturnType() const = 0;
-	virtual const char* getReturnTypeName() const = 0;
-	virtual const char* getThisTypeName() const = 0;
-	virtual Variant::Type getArgType(int i) const = 0;
+	virtual TypeDescriptor getReturnType() const = 0;
+	virtual Span<const char> getReturnTypeName() const = 0;
+	virtual Span<const char> getThisTypeName() const = 0;
+	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual Variant invoke(void* obj, Span<Variant> args) const = 0;
+	virtual bool isConstMethod() = 0;
 
 	const char* decl_code;
 	const char* name;
@@ -437,14 +449,15 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 	F function;
 
 	u32 getArgCount() const override { return sizeof...(Args); }
-	Variant::Type getReturnType() const override { return getVariantType<R>(); }
-	const char* getReturnTypeName() const override { return getTypeName<R>(); }
-	const char* getThisTypeName() const override { return getTypeName<C>(); }
+	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
+	Span<const char> getReturnTypeName() const override { return getTypeName<R>(); }
+	Span<const char> getThisTypeName() const override { return getTypeName<C>(); }
+	bool isConstMethod() override { return false; }
 	
-	Variant::Type getArgType(int i) const override
+	TypeDescriptor getArgType(int i) const override
 	{
-		Variant::Type expand[] = {
-			getVariantType<Args>()...,
+		TypeDescriptor expand[] = {
+			toTypeDescriptor<Args>()...,
 			Variant::Type::VOID
 		};
 		return expand[i];
@@ -463,14 +476,15 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 	F function;
 
 	u32 getArgCount() const override { return sizeof...(Args); }
-	Variant::Type getReturnType() const override { return getVariantType<R>(); }
-	const char* getReturnTypeName() const override { return getTypeName<R>(); }
-	const char* getThisTypeName() const override { return getTypeName<C>(); }
+	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
+	Span<const char> getReturnTypeName() const override { return getTypeName<R>(); }
+	Span<const char> getThisTypeName() const override { return getTypeName<C>(); }
+	bool isConstMethod() override { return true; }
 	
-	Variant::Type getArgType(int i) const override
+	TypeDescriptor getArgType(int i) const override
 	{
-		Variant::Type expand[] = {
-			getVariantType<Args>()...,
+		TypeDescriptor expand[] = {
+			toTypeDescriptor<Args>()...,
 			Variant::Type::VOID
 		};
 		return expand[i];

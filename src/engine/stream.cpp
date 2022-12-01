@@ -66,6 +66,12 @@ OutputMemoryStream::~OutputMemoryStream()
 }
 
 
+IOutputStream& IOutputStream::operator << (Span<const char> str)
+{
+	write(str.begin(), str.length());
+	return *this;
+}
+
 IOutputStream& IOutputStream::operator << (const char* str)
 {
 	write(str, stringLength(str));

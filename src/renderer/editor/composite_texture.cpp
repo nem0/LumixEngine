@@ -1,3 +1,4 @@
+#define LUMIX_NO_CUSTOM_CRT
 #include "composite_texture.h"
 #include "engine/crt.h"
 #include "engine/engine.h"

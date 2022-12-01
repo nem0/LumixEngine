@@ -1,4 +1,3 @@
-#define LUMIX_NO_CUSTOM_CRT
 #include "physics/physics_system.h"
 
 #include <foundation/PxAllocatorCallback.h>

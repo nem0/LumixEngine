@@ -1,6 +1,5 @@
 #pragma once
 
-#define LUMIX_NO_CUSTOM_CRT
 #include "engine/array.h"
 #include "engine/path.h"
 #include "editor/studio_app.h"

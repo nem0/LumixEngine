@@ -1,4 +1,3 @@
-#define LUMIX_NO_CUSTOM_CRT
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
