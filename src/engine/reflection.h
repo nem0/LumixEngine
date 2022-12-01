@@ -364,11 +364,29 @@ struct TypeDescriptor {
 	bool is_reference;
 };
 
+template <typename T> struct VariantTag {};
+
+template <typename T> inline Variant::Type _getVariantType(VariantTag<T*>) { return Variant::PTR; }
+inline Variant::Type _getVariantType(VariantTag<void>) { return Variant::VOID; }
+inline Variant::Type _getVariantType(VariantTag<bool>) { return Variant::BOOL; }
+inline Variant::Type _getVariantType(VariantTag<i32>) { return Variant::I32; }
+inline Variant::Type _getVariantType(VariantTag<u32>) { return Variant::U32; }
+inline Variant::Type _getVariantType(VariantTag<float>) { return Variant::FLOAT; }
+inline Variant::Type _getVariantType(VariantTag<const char*>) { return Variant::CSTR; }
+inline Variant::Type _getVariantType(VariantTag<EntityPtr>) { return Variant::ENTITY; }
+inline Variant::Type _getVariantType(VariantTag<EntityRef>) { return Variant::ENTITY; }
+inline Variant::Type _getVariantType(VariantTag<Vec2>) { return Variant::VEC2; }
+inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
+inline Variant::Type _getVariantType(VariantTag<Path>) { return Variant::CSTR; }
+inline Variant::Type _getVariantType(VariantTag<Color>) { return Variant::COLOR; }
+inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
+template <typename T> inline Variant::Type getVariantType() { return _getVariantType(VariantTag<RemoveCVR<T>>{}); }
+
 template <typename T> TypeDescriptor toTypeDescriptor() {
 	TypeDescriptor td;
 	td.type = getVariantType<T>();
-	td.is_const = !IsSame<T, RemoveConst<T>::Type>::Value;
-	td.is_reference = !IsSame<T, RemoveReference<T>::Type>::Value;
+	td.is_const = !IsSame<T, typename RemoveConst<T>::Type>::Value;
+	td.is_reference = !IsSame<T, typename RemoveReference<T>::Type>::Value;
 	return td;
 }
 
@@ -387,24 +405,6 @@ struct FunctionBase
 	const char* decl_code;
 	const char* name;
 };
-
-template <typename T> struct VariantTag {};
-
-template <typename T> inline Variant::Type _getVariantType(VariantTag<T*>) { return Variant::PTR; }
-inline Variant::Type _getVariantType(VariantTag<void>) { return Variant::VOID; }
-inline Variant::Type _getVariantType(VariantTag<bool>) { return Variant::BOOL; }
-inline Variant::Type _getVariantType(VariantTag<i32>) { return Variant::I32; }
-inline Variant::Type _getVariantType(VariantTag<u32>) { return Variant::U32; }
-inline Variant::Type _getVariantType(VariantTag<float>) { return Variant::FLOAT; }
-inline Variant::Type _getVariantType(VariantTag<const char*>) { return Variant::CSTR; }
-inline Variant::Type _getVariantType(VariantTag<EntityPtr>) { return Variant::ENTITY; }
-inline Variant::Type _getVariantType(VariantTag<EntityRef>) { return Variant::ENTITY; }
-inline Variant::Type _getVariantType(VariantTag<Vec2>) { return Variant::VEC2; }
-inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
-inline Variant::Type _getVariantType(VariantTag<Path>) { return Variant::CSTR; }
-inline Variant::Type _getVariantType(VariantTag<Color>) { return Variant::COLOR; }
-inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
-template <typename T> inline Variant::Type getVariantType() { return _getVariantType(VariantTag<RemoveCVR<T>>{}); }
 
 inline bool fromVariant(int i, Span<Variant> args, VariantTag<bool>) { return args[i].b; }
 inline float fromVariant(int i, Span<Variant> args, VariantTag<float>) { return args[i].f; }
