@@ -3924,7 +3924,7 @@ void PhysicsScene::reflect() {
 	};
 
 	LUMIX_SCENE(PhysicsSceneImpl, "physics")
-		.LUMIX_FUNC(PhysicsSceneImpl::raycast)
+		.LUMIX_FUNC(PhysicsScene::raycast)
 		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
 			.LUMIX_PROP(JointConnectedBody, "Connected body")
 			.LUMIX_PROP(JointAxisPosition, "Axis position")

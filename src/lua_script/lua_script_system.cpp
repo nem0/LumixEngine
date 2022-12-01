@@ -24,14 +24,15 @@
 
 namespace Lumix
 {
-	static void pushObject(lua_State* L, void* obj, const char* type_name) {
+	static void pushObject(lua_State* L, void* obj, Span<const char> type_name) {
+		ASSERT(type_name.length() > 0);
 		LuaWrapper::DebugGuard guard(L, 1);
 		lua_getglobal(L, "LumixAPI");
 		char tmp[64];
-		const char* c = type_name + strlen(type_name);
-		while (*c != ':' && c != type_name) --c;
+		const char* c = type_name.end() - 1;
+		while (*c != ':' && c != type_name.begin()) --c;
 		if (*c == ':') ++c;
-		copyNString(Span(tmp), c, int(strlen(c)) - 2);
+		copyNString(Span(tmp), c, int(type_name.end() - c - 2));
 
 		if (LuaWrapper::getField(L, -1, tmp) != LUA_TTABLE) {
 			lua_pop(L, 2);
@@ -74,7 +75,7 @@ namespace Lumix
 		}	
 	}
 
-	static int push(lua_State* L, const reflection::Variant& v, const char* type_name) {
+	static int push(lua_State* L, const reflection::Variant& v, Span<const char> type_name) {
 		switch (v.type) {
 			case reflection::Variant::ENTITY: ASSERT(false); return 0;
 			case reflection::Variant::VOID: return 0;
@@ -101,12 +102,12 @@ namespace Lumix
 
 		reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
 		
-		LuaWrapper::DebugGuard guard(L, f->getReturnType() == reflection::Variant::VOID ? 0 : 1);
+		LuaWrapper::DebugGuard guard(L, f->getReturnType().type == reflection::Variant::VOID ? 0 : 1);
 
 		reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
-			reflection::Variant::Type type = f->getArgType(i);
+			reflection::Variant::Type type = f->getArgType(i).type;
 			toVariant(type, L, i + 2, args[i]);
 		}
 
@@ -126,7 +127,7 @@ namespace Lumix
 		reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
-			reflection::Variant::Type type = f->getArgType(i);
+			reflection::Variant::Type type = f->getArgType(i).type;
 			toVariant(type, L, i + 2, args[i]);
 		}
 		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
@@ -160,7 +161,7 @@ namespace Lumix
 		ASSERT(f->getArgCount() < lengthOf(args));
 		args[0] = entity;
 		for (u32 i = 1; i < f->getArgCount(); ++i) {
-			reflection::Variant::Type type = f->getArgType(i);
+			reflection::Variant::Type type = f->getArgType(i).type;
 			toVariant(type, L, i + 1, args[i]);
 		}
 		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
@@ -175,11 +176,12 @@ namespace Lumix
 		LuaWrapper::DebugGuard guard(L);
 		lua_getglobal(L, "LumixAPI");
 		for (auto* f : reflection::allFunctions()) {
-			const char* obj_type_name = f->getThisTypeName();
-			const char* c = obj_type_name + strlen(obj_type_name);
-			while (*c != ':' && c != obj_type_name) --c;
+			char tmp_obj_type_name[128];
+			copyString(Span(tmp_obj_type_name), f->getThisTypeName());
+			const char* c = tmp_obj_type_name + strlen(tmp_obj_type_name);
+			while (*c != ':' && c != tmp_obj_type_name) --c;
 			if (*c == ':') ++c;
-			obj_type_name = c;
+			const char* obj_type_name = c;
 			if (LuaWrapper::getField(L, -1, obj_type_name) != LUA_TTABLE) { // [LumixAPI, obj|nil ]
 				lua_pop(L, 1);						// [LumixAPI]
 				lua_newtable(L);					// [LumixAPI, obj]

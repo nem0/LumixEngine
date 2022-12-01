@@ -11,6 +11,7 @@ namespace Lumix
 struct LUMIX_ENGINE_API IOutputStream {
 	virtual bool write(const void* buffer, u64 size) = 0;
 
+	IOutputStream& operator << (Span<const char> str);
 	IOutputStream& operator << (const char* str);
 	IOutputStream& operator << (u64 value);
 	IOutputStream& operator << (i64 value);

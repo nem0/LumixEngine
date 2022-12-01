@@ -11,6 +11,7 @@ template <typename T> struct RemoveReference<T&> { using Type = T; };
 template <typename T> struct RemoveReference<T&&> { using Type = T; };
 template <typename T> struct RemoveConst { using Type = T; };
 template <typename T> struct RemoveConst<const T> { using Type = T; };
+template <typename T> struct RemoveConst<const T&> { using Type = T; };
 template <typename T> struct RemoveVolatile { using Type = T; };
 template <typename T> struct RemoveVolatile<volatile T> { using Type = T; };
 template <typename T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::Type>::Type;

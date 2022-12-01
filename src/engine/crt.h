@@ -3,6 +3,7 @@
 #include "lumix.h"
 
 #if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT) && !defined __clang__
+	#define _INC_FLOAT // if float.h is imported after this file, MCW_EM is redefined
 	#define LUMIX_CRT_API LUMIX_LIBRARY_IMPORT
 	#ifndef MCW_EM
 		#define _EM_OVERFLOW	0x00000004
@@ -40,6 +41,7 @@
 		double __cdecl fabs(double x);
 		LUMIX_CRT_API double __cdecl floor(double _X);
 		#ifndef _INC_MATH
+			#define _INC_MATH
 			inline float __cdecl fabsf(float x) { return (float)fabs(x); }
 			#ifdef LUMIX_DEBUG
 				inline float __cdecl floorf(float x) { return (float)floor(x); }	
