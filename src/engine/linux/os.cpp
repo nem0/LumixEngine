@@ -1052,7 +1052,9 @@ void copyToClipboard(const char* text) {
 }
 
 
-ExecuteOpenResult shellExecuteOpen(const char* path) {
+ExecuteOpenResult shellExecuteOpen(const char* path, const char* args, const char* working_dir) {
+	ASSERT(!args); // not supported 
+	ASSERT(!working_dir);
 	return system(path) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
 }
 
