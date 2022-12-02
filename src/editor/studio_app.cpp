@@ -3212,7 +3212,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void scanUniverses()
+	void scanUniverses() override
 	{
 		m_universes.clear();
 		auto* iter = m_engine->getFileSystem().createFileIterator("universes");

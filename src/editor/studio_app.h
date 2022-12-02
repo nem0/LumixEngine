@@ -118,6 +118,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	
+	virtual void scanUniverses() = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual void snapDown() = 0;
