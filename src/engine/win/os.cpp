@@ -1128,10 +1128,12 @@ void copyToClipboard(const char* text)
 }
 
 
-ExecuteOpenResult shellExecuteOpen(const char* path)
+ExecuteOpenResult shellExecuteOpen(const char* path, const char* args, const char* working_dir)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
-	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, NULL, NULL, SW_SHOW);
+	const WCharStr<LUMIX_MAX_PATH> wargs(args ? args : "");
+	const WCharStr<LUMIX_MAX_PATH> wdir(working_dir ? working_dir : "");
+	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, args ? wargs.data : NULL, working_dir ? wdir.data : NULL, SW_SHOW);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
 	return ExecuteOpenResult::OTHER_ERROR;

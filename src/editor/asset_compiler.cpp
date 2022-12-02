@@ -308,7 +308,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 		alignas(u32) char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
-		ASSERT(strlen(tmp) < 5);
+		if (strlen(tmp) >= 5) return INVALID_RESOURCE_TYPE;
 		auto iter = m_registered_extensions.find(*(u32*)tmp); //-V641 
 		if (iter.isValid()) return iter.value();
 

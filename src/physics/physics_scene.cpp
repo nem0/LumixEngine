@@ -3983,7 +3983,7 @@ void PhysicsScene::reflect() {
 			.LUMIX_FUNC_EX(PhysicsScene::getActorSpeed, "getSpeed")
 			.LUMIX_FUNC_EX(PhysicsScene::getActorVelocity, "getVelocity")
 			.LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyForce")
-			.LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyImpulse")
+			.LUMIX_FUNC_EX(PhysicsScene::applyImpulseToActor, "applyImpulse")
 			.LUMIX_FUNC_EX(PhysicsScene::addForceAtPos, "addForceAtPos")
 			.LUMIX_ENUM_PROP(ActorLayer, "Layer").attribute<LayerEnum>()
 			.LUMIX_ENUM_PROP(DynamicType, "Dynamic").attribute<DynamicTypeEnum>()
