@@ -180,7 +180,7 @@ LUMIX_ENGINE_API void getCurrentDirectory(Span<char> path);
 LUMIX_ENGINE_API [[nodiscard]] bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
 LUMIX_ENGINE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
 LUMIX_ENGINE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
-LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path);
+LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path, const char* args = nullptr, const char* working_dir = nullptr);
 LUMIX_ENGINE_API ExecuteOpenResult openExplorer(const char* path);
 LUMIX_ENGINE_API void copyToClipboard(const char* text);
 
