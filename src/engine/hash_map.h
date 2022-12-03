@@ -238,16 +238,11 @@ public:
 	ConstIterator end() const { return ConstIterator { this, m_capacity }; }
 
 	void clear() {
-		for(u32 i = 0, c = m_capacity; i < c; ++i) {
-			if (m_keys[i].valid) {
-				((Key*)m_keys[i].key_mem)->~Key();
-				m_values[i].~Value();
-				m_keys[i].valid = false;
-			}
+		auto iter = begin();
+		while (iter.isValid()) {
+			erase(iter);
+			iter = begin();
 		}
-		m_allocator.deallocate(m_keys);
-		m_allocator.deallocate(m_values);
-		init(8, true);
 	}
 
 	ConstIterator find(const Key& key) const {
