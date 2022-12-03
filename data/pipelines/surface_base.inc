@@ -2,6 +2,12 @@ function surface_shader_ex(args)
 	args.vertex_preface = args.vertex_preface or ""
 	args.fragment_preface = args.fragment_preface or ""
 	args.vertex = args.vertex or ""
+	
+	if args.need_local_position then
+		args.vertex_preface = args.vertex_preface .. "\nlayout(location = 8) out vec3 v_local_position;\n"
+		args.vertex = args.vertex .. "\nv_local_position = a_position;\n"
+		args.fragment_preface = args.fragment_preface .. "\nlayout(location = 8) in vec3 v_local_position;\n"
+	end
 
 	if args.texture_slots == nil then
 		args.texture_slots = {
