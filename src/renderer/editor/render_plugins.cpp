@@ -890,15 +890,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		Renderer& renderer = first->getRenderer();
 
-		const u8 alpha_cutout_idx = renderer.getShaderDefineIdx("ALPHA_CUTOUT");
-		if (shader->hasDefine(alpha_cutout_idx)) {
-			multiLabel<&Material::isAlphaCutout>("Alpha cutout", resources);
-			bool is_alpha_cutout = first->isAlphaCutout();
-			if (ImGui::Checkbox("##acutout", &is_alpha_cutout)) {
-				set<&Material::setAlphaCutout>(resources, is_alpha_cutout);
-			}
-		}
-
 		const char* current_layer_name = renderer.getLayerName(first->getLayer());
 		multiLabel<&Material::getLayer>("Layer", resources);
 		if (ImGui::BeginCombo("##layer", current_layer_name)) {
@@ -986,7 +977,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						changed = ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2);
 						break;
 					case Shader::Uniform::COLOR:
-						changed = ImGui::ColorEdit3(StaticString<256>("##", shader_uniform.name), uniform->vec3);
+						changed = ImGui::ColorEdit4(StaticString<256>("##", shader_uniform.name), uniform->vec4);
 						break;
 					default: ASSERT(false); break;
 				}
@@ -1038,7 +1029,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (!shader->hasDefine(i)) continue;
 
 				auto isBuiltinDefine = [](const char* define) {
-					const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "ALPHA_CUTOUT", "SKINNED"};
+					const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "SKINNED"};
 					for (const char* builtin_define : BUILTIN_DEFINES) {
 						if (equalStrings(builtin_define, define)) return true;
 					}

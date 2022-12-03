@@ -6,7 +6,7 @@ texture ""
 texture ""
 texture ""
 layer "default"
-uniform("Material color", { 1.000000, 1.000000, 1.000000, 0.000000 })
+uniform("Material color", { 1.000000, 1.000000, 1.000000, 1.000000 })
 uniform("Roughness", 1.000000)
 uniform("Metallic", 0.000000)
 uniform("Emission", 0.000000)
