@@ -41,6 +41,7 @@ struct LUMIX_ENGINE_API Path {
 	const char* c_str() const { return m_path; }
 	bool isEmpty() const { return m_path[0] == '\0'; }
 	static u32 capacity() { return LUMIX_MAX_PATH; }
+	operator Span<const char>() const;
 
 private:
 	char m_path[LUMIX_MAX_PATH];

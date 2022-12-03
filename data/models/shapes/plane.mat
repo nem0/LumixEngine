@@ -1,4 +1,4 @@
-shader "pipelines/standard.shd"
+shader "/pipelines/standard.shd"
 backface_culling(false)
 layer "default"
 emission(0.000000)

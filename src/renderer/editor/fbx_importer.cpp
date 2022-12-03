@@ -1250,7 +1250,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		}
 		out_file.clear();
 
-		writeString("shader \"pipelines/standard.shd\"\n");
+		writeString("shader \"/pipelines/standard.shd\"\n");
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
 		if (material.textures[2].is_valid) writeString("metallic(1.000000)");
 

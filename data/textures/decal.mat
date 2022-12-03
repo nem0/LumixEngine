@@ -1,4 +1,4 @@
-shader "pipelines/decal.shd"
+shader "/pipelines/decal.shd"
 backface_culling(true)
 layer "decal"
 defines {}
