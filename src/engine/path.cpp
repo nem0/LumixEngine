@@ -217,6 +217,10 @@ bool Path::hasExtension(const char* filename, const char* ext)
 	return equalIStrings(tmp, ext);
 }
 
+Path::operator Span<const char>() const {
+	return Span(m_path, stringLength(m_path));
+}
+
 PathInfo::PathInfo(const char* path) {
 	char tmp[LUMIX_MAX_PATH];
 	Path::normalize(path, Span(tmp));

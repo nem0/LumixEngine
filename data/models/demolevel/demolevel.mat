@@ -1,4 +1,4 @@
-shader "pipelines/world_grid.shd"
+shader "/pipelines/world_grid.shd"
 backface_culling(true)
 layer "default"
 defines {}

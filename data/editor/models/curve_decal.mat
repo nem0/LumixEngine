@@ -1,4 +1,4 @@
-shader "pipelines/editor_icon.shd"
+shader "/pipelines/editor_icon.shd"
 backface_culling(true)
 layer "default"
 defines {}

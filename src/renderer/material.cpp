@@ -1,4 +1,5 @@
 #include "renderer/material.h"
+#include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/hash.h"
 #include "engine/log.h"
@@ -144,7 +145,13 @@ bool Material::save(IOutputStream& file)
 	if(!isReady()) return false;
 	if(!m_shader) return false;
 	
-	file << "shader \"" << m_shader->getPath().c_str() << "\"\n";
+	Span<const char> mat_dir = Path::getDir(getPath().c_str());
+	if (startsWith(m_shader->getPath(), mat_dir)) {
+		file << "shader \"" << Span<const char>(m_shader->getPath()).fromLeft(mat_dir.length()) << "\"\n";
+	}
+	else {
+		file << "shader \"/" << m_shader->getPath().c_str() << "\"\n";
+	}
 	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
@@ -162,8 +169,7 @@ bool Material::save(IOutputStream& file)
 	for (u32 i = 0; i < m_texture_count; ++i) {
 		char path[LUMIX_MAX_PATH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
-			Span<const char> texture_path(m_textures[i]->getPath().c_str(), m_textures[i]->getPath().length());
-			Span<const char> mat_dir = Path::getDir(getPath().c_str());
+			Span<const char> texture_path(m_textures[i]->getPath());
 			if (startsWith(texture_path, mat_dir)) {
 				copyString(Span(path), Span(texture_path).fromLeft(mat_dir.length()));
 			}
@@ -599,7 +605,19 @@ int shader(lua_State* L)
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
-	material->setShader(Path(path));
+
+	if (!path[0]) material->setShader(nullptr);
+	else {
+		char c = path[0];
+		if (c != '\\' && c != '/') {
+			Span <const char> material_dir = Path::getDir(material->getPath().c_str());
+			StaticString<LUMIX_MAX_PATH> fullpath(material_dir, path);
+			material->setShader(Path(fullpath));
+		}
+		else {
+			material->setShader(Path(path));
+		}
+	}
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-shader "pipelines/particles.shd"
+shader "/pipelines/particles.shd"
 backface_culling(true)
 layer "default"
 defines {}
