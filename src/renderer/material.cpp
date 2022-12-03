@@ -457,16 +457,6 @@ void Material::enableBackfaceCulling(bool enable)
 	}
 }
 
-bool Material::isAlphaCutout() const {
-	static const u8 idx = m_renderer.getShaderDefineIdx("ALPHA_CUTOUT");
-	return isDefined(idx);
-}
-
-void Material::setAlphaCutout(bool enable) {
-	const u8 idx = m_renderer.getShaderDefineIdx("ALPHA_CUTOUT");
-	setDefine(idx, enable);
-}
-
 bool Material::isBackfaceCulling() const
 {
 	return u64(m_render_states & gpu::StateFlags::CULL_BACK);

@@ -21,7 +21,7 @@ texture_slot {
 include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
-uniform("Material color", "color", {1, 1, 1})
+uniform("Material color", "color", {1, 1, 1, 1})
 uniform("Roughness", "float", 1)
 uniform("Metallic", "float", 0)
 uniform("Emission", "float", 0)

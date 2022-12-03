@@ -4,4 +4,4 @@ layer "decal"
 defines {}
 texture "/textures/decal.png"
 layer "decal"
-uniform("Material color", { 1.000000, 1.000000, 1.000000, 0.000000 })
+uniform("Material color", { 1.000000, 1.000000, 1.000000, 1.000000 })
