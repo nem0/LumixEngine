@@ -28,11 +28,6 @@ surface_shader [[
 		data.alpha = saturate(data.alpha - v_fur_layer);
 	#endif
 
-	// dx shader has internal errors on this
-	#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
-		if(data.alpha < 0.5) discard;
-	#endif
-
 	vec3 N = v_normal;
 	vec3 tangent = v_tangent;
 

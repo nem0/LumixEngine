@@ -283,7 +283,7 @@ function surface_shader_ex(args)
 			void main()
 			{
 				Surface data = getSurface();
-				#if defined ALPHA_CUTOUT && defined LUMIX_DX_SHADER
+				#if defined ALPHA_CUTOUT
 					if(data.alpha < 0.5) discard;
 				#endif
 				packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);

@@ -2684,7 +2684,7 @@ struct PipelineImpl final : Pipeline
 						const Material* material =  mi->custom_material;
 
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | material->getDefineMask());
 						stream->useProgram(program);
 						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
