@@ -812,7 +812,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return false;
 		}
 
-		file << "shader \"pipelines/standard.shd\"";
+		file << "shader \"/pipelines/standard.shd\"";
 		file.close();
 		return true;
 	}
