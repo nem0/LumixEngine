@@ -4,6 +4,7 @@
 #include "engine/math.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "renderer/voxels.h"
 
 namespace Lumix {
 
@@ -20,17 +21,16 @@ private:
 	bool isOpen() const { return m_is_open; }
 	void toggleOpen() { m_is_open = !m_is_open; }
 	void open(const char* path);
-	void voxelize();
 	void draw();
+	void visualize(u32 mip);
+
+	Voxels m_scene;
 
 	Action m_toggle_ui;
 	bool m_is_open = false;
 	StudioApp& m_app;
 	struct Model* m_model = nullptr;
 	u32 m_max_resolution = 32;
-	float m_voxel_size;
-	IVec3 m_grid_resolution;
-	OutputMemoryStream m_voxels;
 	bool m_debug_draw = true;
 	Array<Vec3> m_debug_triangles;
 };
