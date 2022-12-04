@@ -350,7 +350,7 @@ public:
 
 	void erase(const Key& key) {
 		const u32 pos = findPos(key);
-		if (m_keys[pos].valid) erase(Iterator{this, pos});
+		if (pos < m_capacity && m_keys[pos].valid) erase(Iterator{this, pos});
 	}
 
 	bool empty() const { return m_size == 0; }
