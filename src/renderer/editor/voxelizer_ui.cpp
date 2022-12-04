@@ -71,8 +71,8 @@ void VoxelizerUI::voxelize() {
 		});
 
 		const float voxel_size = maximum(max.x - min.x, max.y - min.y, max.z - min.z) / m_max_resolution;
-		min -= Vec3(voxel_size);
-		max += Vec3(voxel_size);
+		min -= Vec3(voxel_size * 1.5f);
+		max += Vec3(voxel_size * 1.5f);
 
 		const IVec3 resolution = IVec3(i32((max.x - min.x) / voxel_size), i32((max.y - min.y) / voxel_size), i32((max.z - min.z) / voxel_size));
 		m_voxels.resize(resolution.x * resolution.y * resolution.z);
@@ -92,20 +92,29 @@ void VoxelizerUI::voxelize() {
 			return testAABBTriangleCollision(AABB(center - half, center + half), p0, p1, p2);
 		};
 
+		auto setVoxel = [&](i32 i, i32 j, i32 k, u8 value){
+			if (i < 0 || j < 0 || k < 0) return;
+			if (i >= resolution.x) return;
+			if (j >= resolution.y) return;
+			if (k >= resolution.z) return;
+
+			m_voxels[i + j * (resolution.x) + k * (resolution.x * resolution.y)] = value;
+		};
+
 		forEachTriangle(mesh, [&](const Vec3& p0, const Vec3& p1, const Vec3& p2){
 			AABB aabb;
 			aabb.min = aabb.max = p0;
 			aabb.addPoint(p1);
 			aabb.addPoint(p2);
 
-			const IVec3 ming = to_grid(aabb.min);
+			const IVec3 ming = to_grid(aabb.min - Vec3(voxel_size));
 			const IVec3 maxg = to_grid(aabb.max);
 
 			for (i32 k = ming.z; k <= maxg.z; ++k) {
 				for (i32 j = ming.y; j <= maxg.y; ++j) {
 					for (i32 i = ming.x; i <= maxg.x; ++i) {
 						if (intersect(p0, p1, p2, IVec3(i, j, k))) {
-							m_voxels[i + j * (resolution.x) + k * (resolution.x * resolution.y)] = 1;
+							setVoxel(i, j, k, 1);
 						}
 					}
 				}

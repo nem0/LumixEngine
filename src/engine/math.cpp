@@ -466,9 +466,9 @@ void Vec3::operator/=(float rhs) {
 	*this *= 1.0f / rhs;
 }
 
-Vec2 Vec3::xz() const {
-	return {x, z};
-}
+Vec2 Vec3::xz() const { return {x, z}; }
+Vec2 Vec3::yz() const { return {y, z}; }
+Vec2 Vec3::xy() const { return {x, y}; }
 
 DVec3::DVec3(float a) : x(a), y(a), z(a) {}
 

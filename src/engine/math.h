@@ -127,6 +127,8 @@ struct LUMIX_ENGINE_API Vec3 {
 	void operator*=(float rhs);
 
 	Vec2 xz() const;
+	Vec2 yz() const;
+	Vec2 xy() const;
 
 	union {
 		struct {
