@@ -113,9 +113,9 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		memset(m_imgui_key_map, 0, sizeof(m_imgui_key_map));
-		m_imgui_key_map[(int)os::Keycode::CTRL] = ImGuiKey_ModCtrl;
-		m_imgui_key_map[(int)os::Keycode::MENU] = ImGuiKey_ModAlt;
-		m_imgui_key_map[(int)os::Keycode::SHIFT] = ImGuiKey_ModShift;
+		m_imgui_key_map[(int)os::Keycode::CTRL] = ImGuiMod_Ctrl;
+		m_imgui_key_map[(int)os::Keycode::MENU] = ImGuiMod_Alt;
+		m_imgui_key_map[(int)os::Keycode::SHIFT] = ImGuiMod_Shift;
 		m_imgui_key_map[(int)os::Keycode::LSHIFT] = ImGuiKey_LeftShift;
 		m_imgui_key_map[(int)os::Keycode::RSHIFT] = ImGuiKey_RightShift;
 		m_imgui_key_map[(int)os::Keycode::SPACE] = ImGuiKey_Space;

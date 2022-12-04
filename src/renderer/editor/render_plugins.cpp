@@ -1822,6 +1822,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool split = false;
 		bool create_impostor = false;
 		bool bake_impostor_normals = false;
+		bool bake_vertex_ao = false;
 		bool use_mikktspace = false;
 		bool force_skin = false;
 		bool import_vertex_colors = false;
@@ -1883,6 +1884,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &meta.culling_scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &meta.bake_impostor_normals);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &meta.vertex_color_is_ao);
@@ -1893,7 +1895,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &meta.autolod_coefs[2])) meta.autolod_mask |= 4;
 			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod3", &meta.autolod_coefs[3])) meta.autolod_mask |= 8;
 
-			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "bake_vertex_ao") != LUA_TNIL) logWarning(path, ": `bake_vertex_ao` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
 			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "clips") == LUA_TTABLE) {
@@ -1916,7 +1917,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					lua_pop(L, 1);
 				}
 			}
-			lua_pop(L, 4);
+			lua_pop(L, 3);
 
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
@@ -1996,6 +1997,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.mesh_scale = meta.scale;
 		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
+		cfg.bake_vertex_ao = meta.bake_vertex_ao;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
 		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
 		cfg.lod_count = meta.lod_count;
@@ -2428,6 +2430,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_meta = getMeta(model->getPath());
 				m_meta_res = model->getPath().getHash();
 			}
+			ImGuiEx::Label("Bake vertex AO");
+			ImGui::Checkbox("##impnrm", &m_meta.bake_vertex_ao);
 			ImGuiEx::Label("Mikktspace tangents");
 			ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace);
 			ImGuiEx::Label("Force skinned");
@@ -2570,6 +2574,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
 				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
+					.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true" : "false")
 					.cat("\nbake_impostor_normals = ").cat(m_meta.bake_impostor_normals ? "true" : "false")
 					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace ? "true" : "false")
 					.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")

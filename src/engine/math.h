@@ -38,6 +38,7 @@ struct LUMIX_ENGINE_API IVec3 {
 	explicit IVec3(const Vec3& rhs);
 	bool operator==(const IVec3& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
 	DVec3 operator *(double i) const;
+	IVec2 xy() const { return {x, y}; }
 
 	i32 x;
 	i32 y;
@@ -104,6 +105,7 @@ struct LUMIX_ENGINE_API Vec3 {
 	Vec3(float a, float b, float c);
 	explicit Vec3(float a);
 	explicit Vec3(const DVec3& rhs);
+	explicit Vec3(const IVec3& rhs);
 
 	float& operator[](u32 i);
 	float operator[](u32 i) const;
@@ -117,6 +119,7 @@ struct LUMIX_ENGINE_API Vec3 {
 	Vec3 operator*(float s) const;
 	Vec3 operator*(const Vec3& rhs) const;
 	Vec3 operator*(const IVec3& rhs) const;
+	Vec3 operator/(const Vec3& rhs) const;
 	Vec3 operator/(const IVec3& rhs) const;
 	Vec3 operator-(float s) const;
 	Vec3 operator/(float s) const;
@@ -124,6 +127,8 @@ struct LUMIX_ENGINE_API Vec3 {
 	void operator*=(float rhs);
 
 	Vec2 xz() const;
+	Vec2 yz() const;
+	Vec2 xy() const;
 
 	union {
 		struct {
@@ -389,9 +394,8 @@ template <typename T> LUMIX_FORCE_INLINE T minimum(T a) {
 	return a;
 }
 
-template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 minimum(T1 a, T2... b) {
-	T1 min_b = minimum(b...);
-	return a < min_b ? a : min_b;
+template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b) {
+	return a < b ? a : b;
 }
 
 LUMIX_FORCE_INLINE Vec2 minimum(const Vec2& a, const Vec2& b) {
@@ -415,6 +419,11 @@ LUMIX_FORCE_INLINE Vec3 minimum(const Vec3& a, const Vec3& b) {
 		minimum(a.y, b.y),
 		minimum(a.z, b.z)
 	};
+}
+
+template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 minimum(T1 a, T2... b) {
+	T1 min_b = minimum(b...);
+	return minimum(a, min_b);
 }
 
 template <typename T> LUMIX_FORCE_INLINE T maximum(T a) {

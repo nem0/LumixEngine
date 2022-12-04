@@ -141,7 +141,7 @@ Frustum ShiftedFrustum::getRelative(const DVec3& origin) const
 	res.setPlane(Frustum::Planes::TOP, n_top, points[0] + offset);
 	res.setPlane(Frustum::Planes::BOTTOM, n_bottom, points[2] + offset);
 
-	for(Vec3& p : res.points) {
+	for (Vec3& p : res.points) {
 		p += offset;
 	}
 
@@ -192,7 +192,7 @@ void Frustum::transform(const Matrix& mtx)
 		else if (ys[i] != 0) p = Vec3(0, -ds[i] / ys[i], 0);
 		else p = Vec3(0, 0, -ds[i] / zs[i]);
 
-		Vec3 n = {xs[i], ys[i], zs[i]};
+		Vec3 n = { xs[i], ys[i], zs[i] };
 		n = mtx.transformVector(n);
 		p = mtx.transformPoint(p);
 
@@ -228,7 +228,7 @@ Frustum Frustum::transformed(const Matrix& mtx) const
 	return res;
 }
 
-Sphere Frustum::computeBoundingSphere() const 
+Sphere Frustum::computeBoundingSphere() const
 {
 	Sphere sphere;
 	sphere.position = points[0];
@@ -987,18 +987,80 @@ LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
 }
 
 static void getProjections(const Vec3& axis,
-	const Vec3 vertices[8],
-	float& min,
-	float& max)
+						const Vec3 vertices[8],
+						float& min,
+						float& max)
 {
 	max = dot(vertices[0], axis);
 	min = max;
-	for(int i = 1; i < 8; ++i)
+	for (int i = 1; i < 8; ++i)
 	{
 		float d = dot(vertices[i], axis);
 		min = minimum(d, min);
 		max = maximum(d, max);
 	}
+}
+
+
+bool testAABBTriangleCollision(const AABB& aabb, const Vec3& a, const Vec3& b, const Vec3& c) {
+	const Vec3 aabbcenter = (aabb.max + aabb.min) * 0.5f;
+	const Vec3 halfboxsize = (aabb.max - aabb.min) * 0.5f;
+
+	Vec3 v1 = a - aabbcenter;
+	Vec3 v2 = b - aabbcenter;
+	Vec3 v3 = c - aabbcenter;
+
+	const Vec3 us[] = {
+		{1, 0, 0},
+		{0, 1, 0},
+		{0, 0, 1},
+	};
+
+	const Vec3 es[] = {
+		v2 - v1,
+		v3 - v2,
+		v1 - v3
+	};
+
+	auto abs = [](const Vec3& v) {
+		return Vec3(fabsf(v.x), fabsf(v.y), fabsf(v.z));
+	};
+
+	for (Vec3 u : us) {
+		for (Vec3 e : es) {
+			Vec3 n = cross(u, e);
+			float p0 = dot(v1, n);
+			float p1 = dot(v2, n);
+			float p2 = dot(v3, n);
+			float r = dot(halfboxsize, abs(n));
+			if (maximum(-maximum(p0, p1, p2), minimum(p0, p1, p2)) > r) {
+				return false;
+			}
+		}
+	}
+
+	float min = minimum(v1.x, v2.x, v3.x);
+	float max = maximum(v1.x, v2.x, v3.x);
+	if (min > halfboxsize.x || max < -halfboxsize.x) return false;
+
+	min = minimum(v1.y, v2.y, v3.y);
+	max = maximum(v1.y, v2.y, v3.y);
+	if (min > halfboxsize.y || max < -halfboxsize.y) return false;
+
+	min = minimum(v1.z, v2.z, v3.z);
+	max = maximum(v1.z, v2.z, v3.z);
+	if (min > halfboxsize.z || max < -halfboxsize.z) return false;
+
+	Vec3 normal = cross(es[0], es[1]);
+	float d = dot(normal, v1);
+
+	Vec3 vmin;
+	vmin.x = normal.x > 0.0f ? -halfboxsize.x : halfboxsize.x;
+	vmin.y = normal.y > 0.0f ? -halfboxsize.y : halfboxsize.y;
+	vmin.z = normal.z > 0.0f ? -halfboxsize.z : halfboxsize.z;
+
+	if (dot(normal, vmin) > d) return false;
+	return -dot(normal, vmin) >= d;
 }
 
 static bool overlaps(float min1, float max1, float min2, float max2)
@@ -1014,26 +1076,26 @@ bool testOBBCollision(const AABB& a, const Matrix& mtx_b, const AABB& b)
 	a.getCorners(Matrix::IDENTITY, box_a_points);
 	b.getCorners(mtx_b, box_b_points);
 
-	const Vec3 normals[] = {Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(0, 0, 1)};
-	for(int i = 0; i < 3; i++)
+	const Vec3 normals[] = { Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(0, 0, 1) };
+	for (int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
 		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
 		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
-		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+		if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
 		{
 			return false;
 		}
 	}
 
 	Vec3 normals_b[] = {
-		normalize(mtx_b.getXVector()), normalize(mtx_b.getYVector()), normalize(mtx_b.getZVector())};
-	for(int i = 0; i < 3; i++)
+		normalize(mtx_b.getXVector()), normalize(mtx_b.getYVector()), normalize(mtx_b.getZVector()) };
+	for (int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
 		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
 		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
-		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+		if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
 		{
 			return false;
 		}
