@@ -582,7 +582,8 @@ if has_plugin("renderer") then
 			"../external/meshoptimizer/vertexcodec.cpp",
 			"../external/meshoptimizer/vertexfilter.cpp",
 			"../external/meshoptimizer/vfetchanalyzer.cpp",
-			"../external/meshoptimizer/vfetchoptimizer.cpp"
+			"../external/meshoptimizer/vfetchoptimizer.cpp",
+			"../src/renderer/editor/voxelizer_ui.cpp"
 		}
 		
 		if build_studio then

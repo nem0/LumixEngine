@@ -22,7 +22,8 @@ private:
 	void toggleOpen() { m_is_open = !m_is_open; }
 	void open(const char* path);
 	void draw();
-	void visualize(u32 mip);
+	void visualize();
+	void visualizeAO();
 
 	Voxels m_scene;
 
@@ -32,7 +33,13 @@ private:
 	struct Model* m_model = nullptr;
 	u32 m_max_resolution = 32;
 	bool m_debug_draw = true;
-	Array<Vec3> m_debug_triangles;
+	float m_ao_multiplier = 2;
+	struct Vertex {
+		Vec3 pos;
+		u32 color;
+	};
+	Array<Vertex> m_debug_triangles;
+	u32 m_ray_count = 16;
 };
 
 } // namespace Lumix

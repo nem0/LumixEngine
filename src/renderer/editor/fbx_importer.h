@@ -42,6 +42,7 @@ struct FBXImporter
 		bool mikktspace_tangents = false;
 		bool import_vertex_colors = true;
 		bool vertex_color_is_ao = false;
+		bool bake_vertex_ao = false;
 		Physics physics = Physics::NONE;
 		u32 lod_count = 1;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
@@ -119,6 +120,7 @@ struct FBXImporter
 			, vertex_data(allocator)
 			, computed_tangents(allocator)
 			, computed_normals(allocator)
+			, computed_ao(allocator)
 		{
 		}
 
@@ -127,6 +129,7 @@ struct FBXImporter
 		OutputMemoryStream vertex_data;
 		Array<ofbx::Vec3> computed_tangents;
 		Array<ofbx::Vec3> computed_normals;
+		Array<float> computed_ao;
 		u32 unique_vertex_count;
 	};
 
@@ -182,7 +185,7 @@ struct FBXImporter
 private:
 	void createAutoLODs(const ImportConfig& cfg, ImportMesh& import_mesh);
 	bool findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const;
-	const ImportGeometry& getImportGeometry(const ofbx::Geometry* geom) const;
+	ImportGeometry& getImportGeometry(const ofbx::Geometry* geom);
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
 	void gatherMaterials(const char* fbx_filename, const char* src_dir);
 
@@ -212,6 +215,7 @@ private:
 	int getAttributeCount(const ImportMesh& mesh, const ImportConfig& cfg) const;
 	bool areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cfg) const;
 	void writeModelHeader();
+	void bakeVertexAO(const ImportConfig& cfg);
 	
 	IAllocator& m_allocator;
 	struct FileSystem& m_filesystem;

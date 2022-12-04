@@ -28,6 +28,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "renderer/voxels.h"
 
 
 namespace Lumix {
@@ -629,9 +630,9 @@ static bool doesFlipHandness(const Matrix& mtx) {
 	return z.z < 0;
 }
 
-const FBXImporter::ImportGeometry& FBXImporter::getImportGeometry(const ofbx::Geometry* geom) const
+FBXImporter::ImportGeometry& FBXImporter::getImportGeometry(const ofbx::Geometry* geom)
 {
-	for (const ImportGeometry& import_geom : m_geometries) {
+	for (ImportGeometry& import_geom : m_geometries) {
 		if (import_geom.fbx == geom) {
 			return import_geom;
 		}
@@ -671,7 +672,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		}
 
 		import_geom.unique_vertex_count = (u32)meshopt_generateVertexRemapMulti(import_geom.indices.begin(), nullptr, vertex_count, vertex_count, streams, stream_count);
-
+		
 		if (!normals) {
 			computeNormals(import_geom.computed_normals, vertices, vertex_count, import_geom.indices.begin(), m_allocator);
 			normals = import_geom.computed_normals.begin();
@@ -687,6 +688,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		}
 	});
 	
+	if (cfg.bake_vertex_ao) bakeVertexAO(cfg);
+
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
 		ImportMesh& import_mesh = m_meshes[mesh_idx];
 		import_mesh.vertex_data.clear();
@@ -767,6 +770,12 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 
 			if (normals) writePackedVec3(normals[i], transform_matrix, &import_mesh.vertex_data);
 			if (uvs) writeUV(uvs[i], &import_mesh.vertex_data);
+			if (cfg.bake_vertex_ao) {
+				const float ao = import_geom.computed_ao[i];
+				u32 ao8 = u8(clamp(ao * 255.f, 0.f, 255.f) + 0.5f);
+				u32 ao32 = ao8 | ao8 << 8 | ao8 << 16 | ao8 << 24;
+				import_mesh.vertex_data.write(ao32);
+			}
 			if (colors) {
 				if (cfg.vertex_color_is_ao) {
 					const u8 ao[4] = { u8(colors[i].x * 255.f + 0.5f) };
@@ -818,6 +827,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			mem += vertex_size;
 		}
 	});
+
 	for (int mesh_idx = m_meshes.size() - 1; mesh_idx >= 0; --mesh_idx)
 	{
 		if (m_meshes[mesh_idx].indices.empty()) m_meshes.swapAndPop(mesh_idx);
@@ -1252,7 +1262,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 
 		writeString("shader \"/pipelines/standard.shd\"\n");
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
-		if (material.textures[2].is_valid) writeString("metallic(1.000000)");
+		if (material.textures[2].is_valid) writeString("uniform(\"Metallic\", 1.000000)");
 
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
@@ -1732,6 +1742,7 @@ int FBXImporter::getVertexSize(const ofbx::Geometry& geom, bool is_skinned, cons
 	int size = POSITION_SIZE + NORMAL_SIZE;
 
 	if (geom.getUVs()) size += UV_SIZE;
+	if (cfg.bake_vertex_ao) size += AO_SIZE;
 	if (geom.getColors() && cfg.import_vertex_colors) size += cfg.vertex_color_is_ao ? AO_SIZE : COLOR_SIZE;
 	if (hasTangents(geom)) size += TANGENT_SIZE;
 	if (is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
@@ -2076,6 +2087,11 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 			write(gpu::AttributeType::FLOAT);
 			write((u8)2);
 		}
+		if (cfg.bake_vertex_ao) {
+			write(Mesh::AttributeSemantic::AO);
+			write(gpu::AttributeType::U8);
+			write((u8)4); // 1+3 because of padding
+		}
 		if (geom->getColors() && cfg.import_vertex_colors) {
 			if (cfg.vertex_color_is_ao) {
 				write(Mesh::AttributeSemantic::AO);
@@ -2212,6 +2228,7 @@ int FBXImporter::getAttributeCount(const ImportMesh& mesh, const ImportConfig& c
 {
 	int count = 2; // position & normals
 	if (mesh.fbx->getGeometry()->getUVs()) ++count;
+	if (cfg.bake_vertex_ao) ++count;
 	if (mesh.fbx->getGeometry()->getColors() && cfg.import_vertex_colors) ++count;
 	if (hasTangents(*mesh.fbx->getGeometry())) ++count;
 	if (mesh.is_skinned) count += 2;
@@ -2225,6 +2242,53 @@ bool FBXImporter::areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cf
 	return !(mesh.import && mesh.vertex_data.size() / vertex_size > (1 << 16));
 }
 
+void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
+	PROFILE_FUNCTION();
+
+	AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
+	for (ImportMesh& import_mesh : m_meshes) {
+		const ofbx::Mesh& mesh = *import_mesh.fbx;
+		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
+		const i32 vertex_count = geom->getVertexCount();
+		const ofbx::Vec3* vertices = (ofbx::Vec3*)geom->getVertices();
+		
+		for (i32 i = 0; i < vertex_count; ++i) {
+			aabb.addPoint(toLumixVec3(vertices[i]));
+		}
+	}
+
+	Voxels voxels(m_allocator);
+	voxels.beginRaster(aabb, 64);
+	for (ImportMesh& import_mesh : m_meshes) {
+		const ofbx::Mesh& mesh = *import_mesh.fbx;
+		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
+		const i32 vertex_count = geom->getVertexCount();
+		const ofbx::Vec3* vertices = (ofbx::Vec3*)geom->getVertices();
+		
+		for (i32 i = 0; i < vertex_count; i += 3) {
+			voxels.raster(toLumixVec3(vertices[i]), toLumixVec3(vertices[i + 1]), toLumixVec3(vertices[i + 2]));
+		}
+	}
+	voxels.computeAO(32);
+	voxels.blurAO();
+
+	for (ImportMesh& import_mesh : m_meshes) {
+		const ofbx::Mesh& mesh = *import_mesh.fbx;
+		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
+		ImportGeometry& import_geom = getImportGeometry(geom);
+		const i32 vertex_count = geom->getVertexCount();
+		const ofbx::Vec3* vertices = (ofbx::Vec3*)geom->getVertices();
+
+		import_geom.computed_ao.reserve(vertex_count);
+		for (i32 i = 0; i < vertex_count; ++i) {
+			Vec3 p = toLumixVec3(vertices[i]);
+			float ao;
+			bool res = voxels.sampleAO(p, &ao);
+			ASSERT(res);
+			import_geom.computed_ao.push(ao);
+		}
+	}
+}
 
 void FBXImporter::writeModelHeader()
 {
