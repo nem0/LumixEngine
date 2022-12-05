@@ -1569,6 +1569,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const char* format = "unknown";
 		switch(texture->format) {
 			case gpu::TextureFormat::R8: format = "R8"; break;
+			case gpu::TextureFormat::RG32F: format = "RG32F"; break;
+			case gpu::TextureFormat::RG8: format = "RG8"; break;
+			case gpu::TextureFormat::D24S8: format = "D24S8"; break;
+			case gpu::TextureFormat::D32: format = "D32"; break;
+			case gpu::TextureFormat::BGRA8: format = "BGRA8"; break;
 			case gpu::TextureFormat::RGBA8: format = "RGBA8"; break;
 			case gpu::TextureFormat::RGBA16: format = "RGBA16"; break;
 			case gpu::TextureFormat::R11G11B10F: format = "R11G11B10F"; break;
@@ -1584,7 +1589,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case gpu::TextureFormat::BC3: format = "BC3"; break;
 			case gpu::TextureFormat::BC4: format = "BC4"; break;
 			case gpu::TextureFormat::BC5: format = "BC5"; break;
-			default: ASSERT(false); break;
 		}
 		ImGuiEx::Label("Format");
 		ImGui::TextUnformatted(format);

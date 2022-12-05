@@ -561,9 +561,6 @@ struct ResizeNode final : CompositeTexture::Node {
 				res = ImGui::DragInt("Width", (i32*)&size.x, 1, 0, 999999) || res;
 				res = ImGui::DragInt("Height", (i32*)&size.y, 1, 0, 999999) || res;
 				break;
-			default:
-				ASSERT(false);
-				break;
 		}
 		ImGui::EndGroup();
 		ImGui::SameLine();

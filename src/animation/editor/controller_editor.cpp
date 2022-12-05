@@ -157,7 +157,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 			case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 			case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
-			default: ASSERT(false); return nullptr;
+			case Node::LAYERS: ASSERT(false); return nullptr;
 		}
 
 		node->m_name = "new";
@@ -441,7 +441,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			case Node::ANIMATION: changed = properties_ui((AnimationNode&)node) || changed; break;
 			case Node::GROUP: changed = properties_ui((GroupNode&)node) || changed; break;
 			case Node::BLEND1D: changed = properties_ui((Blend1DNode&)node) || changed; break;
-			default: ASSERT(false); break;
+			case Node::LAYERS: ASSERT(false); break;
 		}
 
 		changed = editEvents(node.m_events) || changed;

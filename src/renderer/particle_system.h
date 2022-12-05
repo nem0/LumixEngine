@@ -6,6 +6,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "renderer/gpu/gpu.h"
 
 
 namespace Lumix
@@ -17,12 +18,15 @@ struct Material;
 struct Renderer;
 
 
-struct ParticleEmitterResource final : Resource
-{
+struct ParticleEmitterResource final : Resource {
+	enum class Version : u32{
+		VERTEX_DECL,
+		LAST
+	};
 	struct Header {
 		static constexpr u32 MAGIC = '_LPA';
 		const u32 magic = MAGIC;
-		u32 version = 0;
+		Version version = Version::LAST;
 	};
 	
 	struct DataStream {
@@ -83,6 +87,7 @@ struct ParticleEmitterResource final : Resource
 		u32 registers_count,
 		u32 outputs_count
 	);
+	const gpu::VertexDecl& getVertexDecl() const { return m_vertex_decl; }
 
 private:
 	OutputMemoryStream m_instructions;
@@ -92,6 +97,7 @@ private:
 	u32 m_registers_count;
 	u32 m_outputs_count;
 	Material* m_material;
+	gpu::VertexDecl m_vertex_decl;
 };
 
 

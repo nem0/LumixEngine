@@ -33,6 +33,7 @@ ParticleEmitterResource::ParticleEmitterResource(const Path& path
 	: Resource(path, manager, allocator)
 	, m_instructions(allocator)
 	, m_material(nullptr)
+	, m_vertex_decl(gpu::PrimitiveType::TRIANGLE_STRIP)
 {
 }
 
@@ -94,9 +95,21 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem) {
 		logError("Invalid file ", getPath());
 		return false;
 	}
-	if (header.version != 0) {
+
+	if (header.version > Version::LAST) {
 		logError("Unsupported version ", getPath());
 		return false;
+	}
+
+	if (header.version > Version::VERTEX_DECL) {
+		blob.read(m_vertex_decl);
+	}
+	else {
+		m_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
+		m_vertex_decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
+		m_vertex_decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
+		m_vertex_decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
+		m_vertex_decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // frame
 	}
 
 	setMaterial(Path(blob.readString()));

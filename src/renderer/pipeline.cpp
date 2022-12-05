@@ -1840,52 +1840,36 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 
-	void renderParticles(CameraParamsHandle cp_handle) {
-		const CameraParams cp = resolveCameraParams(cp_handle);
-		m_renderer.pushJob("particles", [this, cp](DrawStream& stream){
-			const auto& emitters = m_scene->getParticleEmitters();
-			if (emitters.size() == 0) return;
-				
-			Universe& universe = m_scene->getUniverse();
+	void setupParticles(View& view) {
+		if (view.cp.is_shadow) return;
 
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-			decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
-			decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
-			decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
-			decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
-			decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
+		const CameraParams cp = view.cp;
+		const auto& emitters = m_scene->getParticleEmitters();
+		if (emitters.size() == 0) return;
+			
+		Universe& universe = m_scene->getUniverse();
 
-			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+		const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+		Sorter::Inserter inserter(view.sorter);
 
-			for (const ParticleEmitter& emitter : emitters) {
-				if (!emitter.getResource() || !emitter.getResource()->isReady()) continue;
-					
-				const u32 size = emitter.getParticlesDataSizeBytes();
-				if (size == 0) continue;
+		// TODO culling
+		for (const ParticleEmitter& emitter : emitters) {
+			const Material* material = emitter.getResource()->getMaterial();
+			if (!material) continue;
 
-				const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
-				const Vec3 lpos = Vec3(tr.pos - cp.pos);
+			const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
+			if (bucket_idx == 0xff) continue;
 
-				const Material* material = emitter.getResource()->getMaterial();
-				if (!material) continue;
+			const u32 particles_count = emitter.getParticlesCount();
+			if (particles_count == 0) continue;
 
-				gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, 0);
-				const u32 particles_count = emitter.getParticlesCount();
-				const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
-				emitter.fillInstanceData((float*)slice.ptr);
-				Matrix mtx = tr.rot.toMatrix();
-				mtx.setTranslation(lpos);
+			const u32 size = emitter.getParticlesDataSizeBytes();
+			if (size == 0) continue;
 
-				const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
-				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				stream.bind(0, material->m_bind_group);
-				stream.useProgram(program);
-				stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-				stream.bindVertexBuffer(1, slice.buffer, slice.offset, 40);
-				stream.drawArraysInstanced(4, particles_count);
-			}
-		});
+			const u64 type_mask = (u64)RenderableTypes::PARTICLES << 32;
+			const u64 subrenderable = emitter.m_entity.index | type_mask;
+			inserter.push(material->getSortKey() | ((u64)bucket_idx << SORT_KEY_BUCKET_SHIFT), subrenderable);
+		}
 	}
 
 	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point, bool writable) {
@@ -2002,7 +1986,7 @@ struct PipelineImpl final : Pipeline
 
 	gpu::TextureHandle toHandle(PipelineTexture tex) const {
 		switch (tex.type) {
-		case PipelineTexture::RENDERBUFFER: return tex.renderbuffer < (u32)m_renderbuffers.size() ? m_renderbuffers[tex.renderbuffer].handle : gpu::INVALID_TEXTURE;
+			case PipelineTexture::RENDERBUFFER: return tex.renderbuffer < (u32)m_renderbuffers.size() ? m_renderbuffers[tex.renderbuffer].handle : gpu::INVALID_TEXTURE;
 			case PipelineTexture::RAW: return tex.raw;
 			case PipelineTexture::RESOURCE: {
 				if (tex.resource == -2) return m_shadow_atlas.texture;
@@ -2012,10 +1996,9 @@ struct PipelineImpl final : Pipeline
 				if (res->getType() != Texture::TYPE) return gpu::INVALID_TEXTURE;
 				return ((Texture*)res)->handle;
 			}
-			default:
-				ASSERT(false);
-				return gpu::INVALID_TEXTURE;
 		}
+		ASSERT(false);
+		return gpu::INVALID_TEXTURE;
 	}
 
 	void bindImageTexture(PipelineTexture texture, u32 unit) {
@@ -2244,7 +2227,6 @@ struct PipelineImpl final : Pipeline
 		
 		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
 		
-		// TODO handle sort order
 		// TODO frustum culling
 		// TODO render correct LOD
 		for (auto iter = furs.begin(); iter.isValid(); ++iter) {
@@ -2531,12 +2513,9 @@ struct PipelineImpl final : Pipeline
 		const i32 bucket_count = lua_gettop(L) - 1;
 		for (i32 i = 0; i < bucket_count; ++i) LuaWrapper::checkTableArg(L, 2 + i);
 		
-		Array<UniquePtr<View>>& views = pipeline->m_views;
-		UniquePtr<View>& view = views.emplace();
+		UniquePtr<View>& view = pipeline->m_views.emplace();
 		LinearAllocator& allocator = pipeline->m_renderer.getCurrentFrameAllocator();
-		view = UniquePtr<View>::create(allocator
-			, allocator
-			, pipeline->m_renderer.getEngine().getPageAllocator());
+		view = UniquePtr<View>::create(allocator, allocator, pipeline->m_renderer.getEngine().getPageAllocator());
 		view->cp = cp;
 		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
 
@@ -2587,6 +2566,7 @@ struct PipelineImpl final : Pipeline
 		jobs::setRed(&view->ready);
 		pipeline->m_renderer.pushJob("prepare view", [pipeline, view_ptr](DrawStream& stream){
 			pipeline->setupFur(*view_ptr);
+			pipeline->setupParticles(*view_ptr);
 			pipeline->encodeInstancedModels(stream, *view_ptr);
 			pipeline->encodeProceduralGeometry(*view_ptr);
 
@@ -2661,6 +2641,32 @@ struct PipelineImpl final : Pipeline
 			}
 
 			switch(type) {
+				case RenderableTypes::PARTICLES: {
+					const ParticleEmitter& emitter = m_scene->getParticleEmitter(entity);
+					const Material* material = emitter.getResource()->getMaterial();
+					const u32 particles_count = emitter.getParticlesCount();
+					const u32 size = emitter.getParticlesDataSizeBytes();
+
+					const ParticleEmitterResource* res = emitter.getResource();
+					const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
+					const Vec3 lpos = Vec3(tr.pos - camera_pos);
+					const gpu::VertexDecl& decl = res->getVertexDecl();
+					const gpu::StateFlags state = material->m_render_states | render_state;
+					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask());
+					const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
+					emitter.fillInstanceData((float*)slice.ptr);
+					const Matrix mtx(lpos, tr.rot);
+
+					const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
+					stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+					stream->bind(0, material->m_bind_group);
+					stream->useProgram(program);
+					stream->bindIndexBuffer(gpu::INVALID_BUFFER);
+					stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+					stream->bindVertexBuffer(1, slice.buffer, slice.offset, 40);
+					stream->drawArraysInstanced(4, particles_count);
+					break;
+				}
 				case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
@@ -2938,7 +2944,10 @@ struct PipelineImpl final : Pipeline
 					--i;
 					break;
 				}
-				default: ASSERT(false); break;
+				case RenderableTypes::COUNT:
+				case RenderableTypes::LOCAL_LIGHT:
+					ASSERT(false);
+					break;
 			}
 		}
 	}
@@ -3412,9 +3421,7 @@ struct PipelineImpl final : Pipeline
 				const u64 type_mask = (u64)type << 32;
 				
 				switch(type) {
-					case RenderableTypes::LOCAL_LIGHT: {
-						break;
-					}
+					case RenderableTypes::LOCAL_LIGHT: break;
 					case RenderableTypes::DECAL: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
@@ -3554,7 +3561,11 @@ struct PipelineImpl final : Pipeline
 						}
 						break;
 					}
-					default: ASSERT(false); break;
+					case RenderableTypes::PARTICLES:
+					case RenderableTypes::FUR:
+					case RenderableTypes::COUNT:
+						ASSERT(false);
+						break;
 				}
 			}
 			profiler::pushInt("count", total);
@@ -3867,7 +3878,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderGrass);
-		REGISTER_FUNCTION(renderParticles);
 		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderOpaque);
 		REGISTER_FUNCTION(renderTransparent);

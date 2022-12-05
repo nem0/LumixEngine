@@ -1,8 +1,7 @@
 shader "/pipelines/particles.shd"
 backface_culling(true)
-layer "default"
+layer "transparent"
 defines {}
-texture "/particles/demo/demo.png"
-layer "default"
+texture "demo.png"
 int_uniform("Frames cols", 2)
 int_uniform("Frames rows", 2)

@@ -15,6 +15,7 @@ struct Voxels {
 	void raster(const Vec3& a, const Vec3& b, const Vec3& c);
 	void voxelize(struct Model& model, u32 max_res);
 	void computeAO(u32 ray_count);
+	float computeAO(const Vec3& p, u32 ray_count);
 	void blurAO();
 	bool castRay(Vec3 p, Vec3 d) const;
 	bool sample(i32 x, i32 y, i32 z, u8* out) const;

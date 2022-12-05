@@ -487,7 +487,6 @@ static void setVAO(const VertexDecl& decl) {
 			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
 			case AttributeType::I8: gl_attr_type = GL_BYTE; break;
 			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
-			default: ASSERT(false); break;
 		}
 
 		const bool instanced = attr.flags & Attribute::INSTANCED;
@@ -602,7 +601,7 @@ static void setState(StateFlags state)
 			case StencilFuncs::ALWAYS: gl_func = GL_ALWAYS; break;
 			case StencilFuncs::EQUAL: gl_func = GL_EQUAL; break;
 			case StencilFuncs::NOT_EQUAL: gl_func = GL_NOTEQUAL; break;
-			default: ASSERT(false); break;
+			case StencilFuncs::DISABLE: ASSERT(false); break;
 		}
 		glStencilFunc(gl_func, ref, mask);
 		auto toGLOp = [](StencilOps op) {
@@ -1106,7 +1105,6 @@ void createBindGroup(BindGroupHandle group, Span<const BindGroupEntryDesc> descr
 				group->uniform_buffers[group->uniform_buffers_count].size = desc.size;
 				++group->uniform_buffers_count;
 				break;
-			default: ASSERT(false); break;
 		}
 	}
 }
@@ -1353,7 +1351,6 @@ void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl,
 				shader_type = GL_VERTEX_SHADER;
 				break;
 			}
-			default: ASSERT(false); return;
 		}
 		++src_idx;
 		for (u32 j = 0; j < decl.attributes_count; ++j) {

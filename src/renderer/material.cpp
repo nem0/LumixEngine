@@ -106,7 +106,7 @@ void Material::setDefine(u8 define_idx, bool enabled)
 	else {
 		m_define_mask &= ~(1 << define_idx);
 	}
-	if(old_mask != m_define_mask) updateRenderData(false);
+	if (old_mask != m_define_mask) updateRenderData(false);
 }
 
 
@@ -183,7 +183,6 @@ bool Material::save(IOutputStream& file)
 		}
 	}
 
-	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 	if (m_custom_flags != 0) {
 		for (int i = 0; i < 32; ++i)
 		{

@@ -706,7 +706,6 @@ struct ParticleEditorResource {
 			switch (op) {
 				case LT: instructions.write(InstructionType::LT); break;
 				case GT: instructions.write(InstructionType::GT); break;
-				default: ASSERT(false); break;
 			}
 			
 			instructions.write(i0);
@@ -1322,6 +1321,31 @@ struct ParticleEditorResource {
 
 		return v;
 	}
+	
+	void fillVertexDecl(gpu::VertexDecl& decl) const {
+		u32 idx = 0;
+		u32 offset = 0;
+		for (const ParticleEditorResource::Output& o : m_outputs) {
+			switch(o.type) {
+				case ParticleEditorResource::ValueType::FLOAT: {
+					decl.addAttribute(idx, offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(float);
+					break;
+				}
+				case ParticleEditorResource::ValueType::VEC3: {
+					decl.addAttribute(idx, offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(Vec3);
+					break;
+				}
+				case ParticleEditorResource::ValueType::VEC4: {
+					decl.addAttribute(idx, offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(Vec4);
+					break;
+				}
+			}
+			++idx;
+		}
+	}
 
 	IAllocator& m_allocator;
 	StaticString<LUMIX_MAX_PATH> m_mat_path;
@@ -1868,6 +1892,9 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 		ParticleEmitterResource::Header header;
 		output.write(header);
+		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+		m_resource->fillVertexDecl(decl);
+		output.write(decl);
 		output.writeString(res.m_mat_path); // material
 		const u32 count = u32(res.m_update.size() + res.m_emit.size() + res.m_output.size());
 		output.write(count);
@@ -1914,9 +1941,27 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	ImGuiID m_half_link_start = 0;
 };
 
-
 DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
 	return node ? node->generate(instructions, output_idx, output, subindex) : DataStream();
+}
+
+gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, StudioApp& app) {
+	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+	ParticleEditorResource res(app.getAllocator());
+	OutputMemoryStream blob(app.getAllocator());
+	if (app.getEngine().getFileSystem().getContentSync(Path(path), blob)) {
+		InputMemoryStream tmp(blob);
+		if (res.deserialize(tmp, path)) {
+			res.fillVertexDecl(decl);
+		}
+		else {
+			logError("Failed to parse ", path);
+		}
+	}
+	else {
+		logError("Failed to load ", path);
+	}
+	return decl;
 }
 
 UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app) {

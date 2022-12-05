@@ -165,7 +165,6 @@ function transparentPass(view_params, entities, colorbuffer, dsbuffer, shadowmap
 	pass(view_params)
 	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES, dsbuffer }, 5);
 	renderBucket(entities.transparent)
-	renderParticles(view_params)
 	renderTransparent()
 	endBlock()
 end

@@ -72,7 +72,7 @@ struct DrawStream {
 	void freeMemory(void* data, IAllocator& allocator);
 	void freeAlignedMemory(void* data, IAllocator& allocator);
 	u8* pushFunction(void (*func)(void*), u32 payload_size);
-	template <typename F>void pushLambda(const F& f);
+	template <typename F> void pushLambda(const F& f);
 
 	void run();
 	void reset();

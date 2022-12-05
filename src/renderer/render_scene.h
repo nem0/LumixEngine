@@ -252,6 +252,7 @@ enum class RenderableTypes : u8 {
 	MESH_MATERIAL_OVERRIDE,
 	FUR,
 	CURVE_DECAL,
+	PARTICLES,
 
 	COUNT
 };

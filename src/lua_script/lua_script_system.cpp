@@ -60,6 +60,7 @@ namespace Lumix
 			case reflection::Variant::FLOAT: val = LuaWrapper::checkArg<float>(L, idx); break;
 			case reflection::Variant::ENTITY: val = LuaWrapper::checkArg<EntityPtr>(L, idx); break;
 			case reflection::Variant::VEC2: val = LuaWrapper::checkArg<Vec2>(L, idx); break;
+			case reflection::Variant::COLOR:
 			case reflection::Variant::VEC3: val = LuaWrapper::checkArg<Vec3>(L, idx); break;
 			case reflection::Variant::DVEC3: val = LuaWrapper::checkArg<DVec3>(L, idx); break;
 			case reflection::Variant::CSTR: val = LuaWrapper::checkArg<const char*>(L, idx); break;
@@ -71,7 +72,7 @@ namespace Lumix
 				val = ptr;
 				break;
 			}
-			default: ASSERT(false); break;
+			case reflection::Variant::VOID: ASSERT(false); break;
 		}	
 	}
 
@@ -85,11 +86,13 @@ namespace Lumix
 			case reflection::Variant::FLOAT: LuaWrapper::push(L, v.f); return 1;
 			case reflection::Variant::CSTR: LuaWrapper::push(L, v.s); return 1;
 			case reflection::Variant::VEC2: LuaWrapper::push(L, v.v2); return 1;
+			case reflection::Variant::COLOR:
 			case reflection::Variant::VEC3: LuaWrapper::push(L, v.v3); return 1;
 			case reflection::Variant::DVEC3: LuaWrapper::push(L, v.dv3); return 1;
 			case reflection::Variant::PTR: pushObject(L, v.ptr, type_name); return 1;
-			default: ASSERT(false); return 0;
 		}
+		ASSERT(false);
+		return 0;
 	}
 
 	static int luaMethodClosure(lua_State* L) {
@@ -2163,9 +2166,6 @@ namespace Lumix
 					LuaWrapper::push(L, event.data.text.utf8); // [lua_event, utf8]
 					lua_setfield(L, -2, "text"); // [lua_event]
 					break;
-				default:
-					ASSERT(false);
-					break;
 			}
 
 
@@ -2567,7 +2567,7 @@ namespace Lumix
 				case LuaScriptScene::Property::Type::ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
 				case LuaScriptScene::Property::Type::RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
 				case LuaScriptScene::Property::Type::COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
-				default: ASSERT(false); break;
+				case LuaScriptScene::Property::Type::ANY: ASSERT(false); break;
 			}
 		}
 	};

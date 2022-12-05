@@ -94,6 +94,31 @@ bool Voxels::castRay(Vec3 p, Vec3 d) const {
 	return false;
 }
 
+float Voxels::computeAO(const Vec3& p, u32 ray_count) {
+	if (m_ao.empty()) {
+		m_ao.resize(m_grid_resolution.x * m_grid_resolution.y * m_grid_resolution.z);
+		for (float& f : m_ao) f = -1;
+	}
+	
+	IVec3 ip = IVec3((p - m_aabb.min) / (m_aabb.max - m_aabb.min) * Vec3(m_grid_resolution));
+
+	u32 idx = ip.x + (ip.y + ip.z * m_grid_resolution.y) * m_grid_resolution.x;
+	if (m_ao[idx] >= 0) return m_ao[idx];
+
+	float ao = 1;
+	for (u32 d = 0; d < ray_count; ++d) {
+		Vec3 dir = Vec3(randFloat(), randFloat(), randFloat()) * 2.f - 1.f;
+		dir /= maximum(fabsf(dir.x), fabsf(dir.y), fabsf(dir.z));
+		Vec3 p = Vec3((float)ip.x, (float)ip.y, (float)ip.z) + Vec3(0.5f * m_voxel_size);
+		p += dir;
+		if (castRay(p, dir)) {
+			ao -= 1.f / ray_count;
+		}
+	}
+	m_ao[idx] = ao;
+	return ao;
+}
+
 void Voxels::computeAO(u32 ray_count) {
 	m_ao.resize(m_grid_resolution.x * m_grid_resolution.y * m_grid_resolution.z);
 	for (i32 z = 0; z < m_grid_resolution.z; ++z) {

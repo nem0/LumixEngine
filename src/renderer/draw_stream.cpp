@@ -569,8 +569,9 @@ void DrawStream::bind(u32 idx, gpu::BindGroupHandle group) {
 		m_cache.dirty |= Dirty::BIND_GROUP0;
 	}
 	else {
-		m_cache.group0 = group;
-		m_cache.dirty |= Dirty::BIND_GROUP0;
+		ASSERT(idx == 1);
+		m_cache.group1 = group;
+		m_cache.dirty |= Dirty::BIND_GROUP1;
 	}
 }
 
