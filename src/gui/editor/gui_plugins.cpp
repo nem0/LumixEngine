@@ -38,10 +38,11 @@ static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_b
 static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
 
 
-struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	SpritePlugin(StudioApp& app) 
-		: m_app(app) 
+		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		m_app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
 	}
@@ -67,19 +68,28 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		file.close();
 		return true;
 	}
+	
+	void deserialize(InputMemoryStream& blob) override { 
+		((Sprite*)m_current_resources[0])->load(blob.size(), (const u8*)blob.getData());
+	}
+	
+	void serialize(OutputMemoryStream& blob) override {
+		((Sprite*)m_current_resources[0])->serialize(blob);
+	}
 
-
-	void onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<Resource*> resources) override
 	{
-		if (resources.length() > 1) return;
+		m_current_resources = resources;
+		if (resources.length() > 1) return false;
 
 		Sprite* sprite = (Sprite*)resources[0];
-		if (!sprite->isReady()) return;
+		if (!sprite->isReady()) return false;
 		
 		if (ImGui::Button(ICON_FA_SAVE "Save")) saveSprite(*sprite);
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(sprite);
 
+		bool changed = false;
 		char tmp[LUMIX_MAX_PATH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
@@ -87,52 +97,60 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_app.getAssetBrowser().resourceInput("texture", Span(tmp), Texture::TYPE))
 		{
 			sprite->setTexture(Path(tmp));
+			changed = true;
 		}
 
 		static const char* TYPES_STR[] = { "9 patch", "Simple" };
 		ImGuiEx::Label("type");
 		if (ImGui::BeginCombo("##type", TYPES_STR[sprite->type]))
 		{
-			if (ImGui::Selectable("9 patch")) sprite->type = Sprite::Type::PATCH9;
-			if (ImGui::Selectable("Simple")) sprite->type = Sprite::Type::SIMPLE;
+			if (ImGui::Selectable("9 patch")) {
+				changed = true;
+				sprite->type = Sprite::Type::PATCH9;
+			}
+			if (ImGui::Selectable("Simple")) {
+				changed = true;
+				sprite->type = Sprite::Type::SIMPLE;
+			}
 			ImGui::EndCombo();
 		}
 		switch (sprite->type) {
 			case Sprite::Type::PATCH9:
 				ImGuiEx::Label("Top");
-				ImGui::InputInt("##top", &sprite->top);
+				changed = ImGui::InputInt("##top", &sprite->top) || changed;
 				ImGuiEx::Label("Right");
-				ImGui::InputInt("##right", &sprite->right);
+				changed = ImGui::InputInt("##right", &sprite->right) || changed;
 				ImGuiEx::Label("Bottom");
-				ImGui::InputInt("##bottom", &sprite->bottom);
+				changed = ImGui::InputInt("##bottom", &sprite->bottom) || changed;
 				ImGuiEx::Label("Left");
-				ImGui::InputInt("##left", &sprite->left);
-				patch9edit(sprite);
+				changed = ImGui::InputInt("##left", &sprite->left) || changed;
+				changed = patch9edit(sprite) || changed;
 				break;
 			case Sprite::Type::SIMPLE: break;
 		}
+		return changed;
 	}
 
 
 
-	void patch9edit(Sprite* sprite)
+	bool patch9edit(Sprite* sprite)
 	{
 		Texture* texture = sprite->getTexture();
 
-		if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return;
+		if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return false;
 		ImVec2 size;
 		size.x = minimum(ImGui::GetContentRegionAvail().x, texture->width * 2.0f);
 		size.y = size.x / texture->width * texture->height;
 		float scale = size.x / texture->width;
-		ImGui::Dummy(size);
+		const float SIZE = 5;
+		ImGui::Dummy(size + ImVec2(4 * SIZE, 4 * SIZE));
 
 		ImDrawList* draw = ImGui::GetWindowDrawList();
-		ImVec2 a = ImGui::GetItemRectMin();
-		ImVec2 b = ImGui::GetItemRectMax();
+		ImVec2 a = ImGui::GetItemRectMin() + ImVec2(2 * SIZE, 2 * SIZE);
+		ImVec2 b = ImGui::GetItemRectMax() - ImVec2(2 * SIZE, 2 * SIZE);
 		draw->AddImage(texture->handle, a, b);
 
 		auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
-			const float SIZE = 5;
 			ImVec2 rect_pos((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
 			if (vertical)
 			{
@@ -178,11 +196,12 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 
 		ImVec2 cp = ImGui::GetCursorScreenPos();
-		drawHandle("left", { a.x + sprite->left * scale, a.y }, { a.x + sprite->left * scale, b.y }, &sprite->left, false);
-		drawHandle("right", { a.x + sprite->right * scale, a.y }, { a.x + sprite->right * scale, b.y }, &sprite->right, false);
-		drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true);
-		drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true);
+		bool changed = drawHandle("left", { a.x + sprite->left * scale, a.y }, { a.x + sprite->left * scale, b.y }, &sprite->left, false);
+		changed = drawHandle("right", { a.x + sprite->right * scale, a.y }, { a.x + sprite->right * scale, b.y }, &sprite->right, false) || changed;
+		changed = drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true) || changed;
+		changed = drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true) || changed;
 		ImGui::SetCursorScreenPos(cp);
+		return changed;
 	}
 
 
@@ -190,13 +209,8 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(sprite))
 		{
-			bool success = true;
-			if (!sprite.save(*file))
-			{
-				success = false;
-				logError("Could not save file ", sprite.getPath());
-			}
-			m_app.getAssetBrowser().endSaveResource(sprite, *file, success);
+			sprite.serialize(*file);
+			m_app.getAssetBrowser().endSaveResource(sprite, *file, true);
 		}
 	}
 
@@ -207,6 +221,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	StudioApp& m_app;
+	Span<Resource*> m_current_resources;
 };
 
 

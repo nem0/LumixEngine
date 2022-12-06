@@ -26,8 +26,13 @@ PropertyAnimation::Curve& PropertyAnimation::addCurve()
 }
 
 
-bool PropertyAnimation::save(OutputMemoryStream& blob) {
-	if (!isReady()) return false;
+void PropertyAnimation::deserialize(InputMemoryStream& blob) {
+	bool res = load(blob.size(), (const u8*)blob.getData());
+	ASSERT(res);
+}
+
+void PropertyAnimation::serialize(OutputMemoryStream& blob) {
+	ASSERT(isReady());
 
 	for (Curve& curve : curves) {
 		blob << "curve {\n";
@@ -46,8 +51,6 @@ bool PropertyAnimation::save(OutputMemoryStream& blob) {
 		}
 		blob << "}\n}\n\n";
 	}
-
-	return true;
 }
 
 void PropertyAnimation::LUA_curve(lua_State* L) {
@@ -58,7 +61,7 @@ void PropertyAnimation::LUA_curve(lua_State* L) {
 	if (!LuaWrapper::checkField<const char*>(L, 1, "component", &cmp_name)) {
 		luaL_argerror(L, 1, "`component` field must be a string");
 	}
-	if (!LuaWrapper::checkField<const char*>(L, 1, "prop_name", &prop_name)) {
+	if (!LuaWrapper::checkField<const char*>(L, 1, "property", &prop_name)) {
 		luaL_argerror(L, 1, "`property` field must be a string");
 	}
 	Curve& curve = curves.emplace(m_allocator);

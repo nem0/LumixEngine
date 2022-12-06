@@ -60,9 +60,38 @@ static Span<const char> getSubresource(const char* str)
 	return ret;
 }
 
-bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path, ResourceType type)
+bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path, ResourceType type)
 {
 	return false;
+}
+
+void AssetBrowser::Plugin::gui(Span<Resource*> resources) {
+	bool waiting = false;
+	for (const Resource* r : resources) {
+		if (r->isEmpty()) {
+			ImGui::TextUnformatted("Waiting for load...");
+			waiting = true;
+			break;
+		}
+	}
+
+	if (!waiting) {	
+		RuntimeHash hash = RuntimeHash(resources.begin(), resources.length() * sizeof(resources[0]));
+		if (hash != m_current_hash) {
+			// we remember undo only for currently selected resources
+			m_current_hash = hash;
+			clearUndoStack();
+			m_defer_push_undo = true;
+		}
+
+		if (onGUI(resources)) {
+			m_defer_push_undo = true;
+		}
+		else if (m_defer_push_undo) {
+			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+			m_defer_push_undo = false;
+		}
+	}
 }
 
 struct AssetBrowserImpl : AssetBrowser {
@@ -105,6 +134,16 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
 
+		m_undo_action.init(ICON_FA_UNDO "Undo", "Asset browser undo", "asset_browser_undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
+		m_undo_action.func.bind<&AssetBrowserImpl::undo>(this);
+		m_undo_action.plugin = this;
+		
+		m_redo_action.init(ICON_FA_REDO "Redo", "Asset browser redo", "asset_browser_redo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
+		m_redo_action.func.bind<&AssetBrowserImpl::redo>(this);
+		m_redo_action.plugin = this;
+
+		m_app.addAction(&m_undo_action);
+		m_app.addAction(&m_redo_action);
 		m_app.addAction(&m_back_action);
 		m_app.addAction(&m_forward_action);
 		m_app.addWindowAction(&m_toggle_ui);
@@ -135,6 +174,8 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	~AssetBrowserImpl() override
 	{
+		m_app.removeAction(&m_undo_action);
+		m_app.removeAction(&m_redo_action);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
@@ -412,7 +453,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	
 		tile.create_called = true;
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
-		for (IPlugin* plugin : m_plugins) {
+		for (Plugin* plugin : m_plugins) {
 			ResourceType type = compiler.getResourceType(tile.filepath);
 			if (plugin->createTile(tile.filepath, out_path, type)) break;
 		}
@@ -606,7 +647,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				ImGui::EndMenu();
 			}
-			for (IPlugin* plugin : m_plugins) {
+			for (Plugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
 				if (ImGui::BeginMenu(plugin->getName())) {
 					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -709,7 +750,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-
 	void detailsGUI()
 	{
 		m_details_focused = false;
@@ -761,14 +801,6 @@ struct AssetBrowserImpl : AssetBrowser {
 						selectResource(Path(getResourceFilePath(m_selected_resources[0]->getPath().c_str())), true, false);
 					}
 				}
-
-				const AssetCompiler& compiler = m_app.getAssetCompiler();
-				ResourceType resource_type = compiler.getResourceType(path);
-				auto iter = m_plugins.find(resource_type);
-				if (iter.isValid()) {
-					ImGui::Separator();
-					iter.value()->onGUI(m_selected_resources);
-				}
 			}
 			else {
 				ImGui::Separator();
@@ -778,12 +810,9 @@ struct AssetBrowserImpl : AssetBrowser {
 
 				u32 ready = 0;
 				u32 failed = 0;
-				const ResourceType type = m_selected_resources[0]->getType();
-				bool all_same_type = true;
 				for (Resource* res : m_selected_resources) {
 					ready += res->isReady() ? 1 : 0;
 					failed += res->isFailure() ? 1 : 0;
-					all_same_type = all_same_type && res->getType() == type;
 				}
 
 				ImGuiEx::Label("All");
@@ -792,21 +821,57 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::Text("%d", ready);
 				ImGuiEx::Label("Failed");
 				ImGui::Text("%d", failed);
+			}
 
-				if (all_same_type) {
-					auto iter = m_plugins.find(type);
-					if(iter.isValid()) {
-						iter.value()->onGUI(m_selected_resources);
-					}
+			const ResourceType type = m_selected_resources[0]->getType();
+			bool all_same_type = true;
+			for (Resource* res : m_selected_resources) {
+				all_same_type = all_same_type && res->getType() == type;
+			}
+
+			if (all_same_type) {
+				auto iter = m_plugins.find(type);
+				if (iter.isValid()) {
+					ImGui::Separator();
+					iter.value()->gui(m_selected_resources);
 				}
-				else {
-					ImGui::Text("Selected resources have different types.");
-				}
+			}
+			else {
+				ImGui::Text("Selected resources have different types.");
 			}
 		}
 		ImGui::End();
 	}
 
+	void redo() {
+		const ResourceType type = m_selected_resources[0]->getType();
+		bool all_same_type = true;
+		for (Resource* res : m_selected_resources) {
+			all_same_type = all_same_type && res->getType() == type;
+		}
+
+		if (all_same_type) {
+			auto iter = m_plugins.find(type);
+			if (iter.isValid()) {
+				iter.value()->redo();
+			}
+		}
+	}
+	
+	void undo() {
+		const ResourceType type = m_selected_resources[0]->getType();
+		bool all_same_type = true;
+		for (Resource* res : m_selected_resources) {
+			all_same_type = all_same_type && res->getType() == type;
+		}
+
+		if (all_same_type) {
+			auto iter = m_plugins.find(type);
+			if (iter.isValid()) {
+				iter.value()->undo();
+			}
+		}
+	}
 
 	void refreshLabels() {
 		for (FileInfo& tile : m_file_infos) {
@@ -948,13 +1013,13 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void removePlugin(IPlugin& plugin) override
+	void removePlugin(Plugin& plugin) override
 	{
 		m_plugins.erase(plugin.getResourceType());
 	}
 
 
-	void addPlugin(IPlugin& plugin) override
+	void addPlugin(Plugin& plugin) override
 	{
 		m_plugins.insert(plugin.getResourceType(), &plugin);
 	}
@@ -1171,7 +1236,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (!iter.isValid()) return false;
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		IPlugin* plugin = iter.value();
+		Plugin* plugin = iter.value();
 
 		static bool show_new_fs = false;
 		if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New", false, ImGuiSelectableFlags_DontClosePopups)) {
@@ -1317,7 +1382,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	EntityPtr m_dropped_entity = INVALID_ENTITY;
 	char m_prefab_name[LUMIX_MAX_PATH] = "";
-	HashMap<ResourceType, IPlugin*> m_plugins;
+	HashMap<ResourceType, Plugin*> m_plugins;
 	Array<Resource*> m_selected_resources;
 	int m_context_resource;
 	char m_filter[128];
@@ -1331,6 +1396,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	Action m_toggle_ui;
 	Action m_back_action;
 	Action m_forward_action;
+	Action m_undo_action;
+	Action m_redo_action;
 };
 
 UniquePtr<AssetBrowser> AssetBrowser::create(StudioApp& app) {

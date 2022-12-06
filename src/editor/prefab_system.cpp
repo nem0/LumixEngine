@@ -24,17 +24,20 @@ namespace Lumix
 {
 
 
-struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
 		, app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("fab", PrefabResource::TYPE);
 	}
 
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
 
-	void onGUI(Span<Resource*> resources) override {}
+	bool onGUI(Span<Resource*> resources) override { return false; }
 	
 	
 	bool compile(const Path& src) override

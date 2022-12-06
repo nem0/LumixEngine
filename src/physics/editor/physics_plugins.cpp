@@ -829,15 +829,19 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 };
 
 
-struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
+struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("phy", PhysicsGeometry::TYPE);
 	}
+	
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
 
-	void onGUI(Span<Resource*> resources) override {}
+	bool onGUI(Span<Resource*> resources) override { return false; }
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Physics geometry"; }
@@ -847,10 +851,11 @@ struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 	StudioApp& m_app;
 };
 
-struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	explicit PhysicsMaterialPlugin(StudioApp& app)
 		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("pma", PhysicsMaterial::TYPE);
 	}
@@ -887,24 +892,43 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		return fs.saveContentSync(mat->getPath(), blob);
 	}
+	
+	void deserialize(InputMemoryStream& blob) override {
+		((PhysicsMaterial*)m_current_resources[0])->deserialize(blob);
+	}
 
-	void onGUI(Span<Resource*> resources) override {
+	void serialize(OutputMemoryStream& blob) override {
+		((PhysicsMaterial*)m_current_resources[0])->serialize(blob);
+	}
+
+	bool onGUI(Span<Resource*> resources) override {
+		m_current_resources = resources;
 		if (resources.length() != 1) {
 			ImGui::TextUnformatted("Editing multiple materials is not supported.");
-			return;
+			return false;
 		}
 
+		bool changed = false;
 		PhysicsMaterial* mat = (PhysicsMaterial*)resources[0];
 		if (mat->isReady() && mat->material) {
 			float static_friction = mat->material->getStaticFriction();
 			float dynamic_friction = mat->material->getDynamicFriction();
 			float restitution = mat->material->getRestitution();
 			ImGuiEx::Label("Static friction");
-			if (ImGui::DragFloat("##s", &static_friction)) mat->material->setStaticFriction(static_friction);
+			if (ImGui::DragFloat("##s", &static_friction)) {
+				mat->material->setStaticFriction(static_friction);
+				changed = true;
+			}
 			ImGuiEx::Label("Dynamic friction");
-			if (ImGui::DragFloat("##d", &dynamic_friction)) mat->material->setDynamicFriction(dynamic_friction);
+			if (ImGui::DragFloat("##d", &dynamic_friction)) {
+				mat->material->setDynamicFriction(dynamic_friction);
+				changed = true;
+			}
 			ImGuiEx::Label("Restitution");
-			if (ImGui::DragFloat("##r", &restitution)) mat->material->setRestitution(restitution);
+			if (ImGui::DragFloat("##r", &restitution)) {
+				mat->material->setRestitution(restitution);
+				changed = true;
+			}
 
 			if (ImGui::Button(ICON_FA_SAVE "Save")) {
 				if (!save(mat)) {
@@ -916,6 +940,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 			m_app.getAssetBrowser().openInExternalEditor(resources[0]->getPath().c_str());
 		}
+		return changed;
 	}
 
 	void onResourceUnloaded(Resource* resource) override {}
@@ -924,6 +949,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 
 	StudioApp& m_app;
+	Span<Resource*> m_current_resources;
 };
 
 

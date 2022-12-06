@@ -23,7 +23,8 @@ struct PropertyAnimation final : Resource {
 
 	ResourceType getType() const override { return TYPE; }
 	Curve& addCurve();
-	bool save(OutputMemoryStream& blob);
+	void serialize(OutputMemoryStream& blob);
+	void deserialize(struct InputMemoryStream& blob);
 
 	IAllocator& m_allocator;
 	Array<Curve> curves;

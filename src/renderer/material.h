@@ -75,7 +75,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(u32 i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
-	bool save(struct IOutputStream& file);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
@@ -101,6 +100,9 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	static int getCustomFlagCount();
 	void updateRenderData(bool on_before_ready);
 	Array<Uniform>& getUniforms() { return m_uniforms; }
+
+	void deserialize(struct InputMemoryStream& blob);
+	void serialize(struct OutputMemoryStream& blob);
 
 	gpu::BindGroupHandle m_bind_group = gpu::INVALID_BIND_GROUP;
 	gpu::StateFlags m_render_states;

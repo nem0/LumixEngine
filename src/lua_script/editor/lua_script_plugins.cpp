@@ -33,15 +33,18 @@ namespace
 {
 
 
-struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	explicit AssetPlugin(StudioApp& app)
 		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("lua", LuaScript::TYPE);
 		m_text_buffer[0] = 0;
 	}
 
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
 
 	bool compile(const Path& src) override
 	{
@@ -49,9 +52,9 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 	
-	void onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<Resource*> resources) override
 	{
-		if (resources.length() > 1) return;
+		if (resources.length() > 1) return false;
 
 		auto* script = static_cast<LuaScript*>(resources[0]);
 
@@ -67,7 +70,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				FileSystem& fs = m_app.getEngine().getFileSystem();
 				if (!fs.saveContentSync(script->getPath(), Span((const u8*)m_text_buffer, stringLength(m_text_buffer)))) {
 					logWarning("Could not save ", script->getPath());
-					return;
+					return false;
 				}
 			}
 			ImGui::SameLine();
@@ -79,6 +82,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			m_app.getAssetBrowser().openInExternalEditor(script);
 		}
+		return false;
 	}
 
 

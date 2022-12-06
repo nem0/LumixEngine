@@ -139,32 +139,35 @@ void Material::unload()
 	m_render_states = gpu::StateFlags::CULL_BACK;
 }
 
+void Material::deserialize(InputMemoryStream& blob) {
+	unload();
+	bool res = load(blob.size(), (const u8*)blob.getData());
+	ASSERT(res);
+}
 
-bool Material::save(IOutputStream& file)
-{
-	if(!isReady()) return false;
-	if(!m_shader) return false;
+void Material::serialize(OutputMemoryStream& blob) {
+	ASSERT(isReady());
 	
 	Span<const char> mat_dir = Path::getDir(getPath().c_str());
 	if (startsWith(m_shader->getPath(), mat_dir)) {
-		file << "shader \"" << Span<const char>(m_shader->getPath()).fromLeft(mat_dir.length()) << "\"\n";
+		blob << "shader \"" << Span<const char>(m_shader->getPath()).fromLeft(mat_dir.length()) << "\"\n";
 	}
 	else {
-		file << "shader \"/" << m_shader->getPath().c_str() << "\"\n";
+		blob << "shader \"/" << m_shader->getPath().c_str() << "\"\n";
 	}
-	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
-	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
+	blob << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
+	blob << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
-	file << "defines {";
+	blob << "defines {";
 	bool first_define = true;
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
 		if ((m_define_mask & (1 << i)) == 0) continue;
 		const char* def = m_renderer.getShaderDefine(i);
-		if (!first_define) file << ", ";
+		if (!first_define) blob << ", ";
 		first_define = false;
-		file << "\"" << def << "\"";
+		blob << "\"" << def << "\"";
 	}
-	file << "}\n";
+	blob << "}\n";
 
 	for (u32 i = 0; i < m_texture_count; ++i) {
 		char path[LUMIX_MAX_PATH];
@@ -172,14 +175,14 @@ bool Material::save(IOutputStream& file)
 			Span<const char> texture_path(m_textures[i]->getPath());
 			if (startsWith(texture_path, mat_dir)) {
 				copyString(Span(path), Span(texture_path).fromLeft(mat_dir.length()));
+				blob << "texture \"" << path << "\"\n";
 			}
 			else {
-				copyString(Span(path), texture_path);
+				blob << "texture \"/" << texture_path << "\"\n";
 			}
-			file << "texture \"" << path << "\"\n";
 		}
 		else {
-			file << "texture \"\"\n";
+			blob << "texture \"\"\n";
 		}
 	}
 
@@ -187,45 +190,43 @@ bool Material::save(IOutputStream& file)
 		for (int i = 0; i < 32; ++i)
 		{
 			if (m_custom_flags & (1 << i)) {
-				file << "custom_flag \"" << s_custom_flags.flags[i] << "\"\n";
+				blob << "custom_flag \"" << s_custom_flags.flags[i] << "\"\n";
 			}
 		}
 	}
 	
-	auto writeArray = [&file](const float* value, u32 num) {
-		file << "{ ";
+	auto writeArray = [&blob](const float* value, u32 num) {
+		blob << "{ ";
 		for (u32 i = 0; i < num; ++i) {
-			if (i > 0) file << ", ";
-			file << value[i];
+			if (i > 0) blob << ", ";
+			blob << value[i];
 		}
-		file << " }";
+		blob << " }";
 	};
 
 	for (const Shader::Uniform& su : m_shader->m_uniforms) {
 		for (const Uniform& mu : m_uniforms) {
 			if(mu.name_hash == su.name_hash) {
 				if (su.type == Shader::Uniform::INT) {
-					file << "int_uniform(\"" << su.name << "\", " << mu.int_value << ")\n";
+					blob << "int_uniform(\"" << su.name << "\", " << mu.int_value << ")\n";
 				}
 				else {
-					file << "uniform(\"" << su.name << "\", ";
+					blob << "uniform(\"" << su.name << "\", ";
 					switch(su.type) {
-						case Shader::Uniform::INT: file << mu.int_value; break;
-						case Shader::Uniform::FLOAT: file << mu.float_value; break;
+						case Shader::Uniform::INT: blob << mu.int_value; break;
+						case Shader::Uniform::FLOAT: blob << mu.float_value; break;
 						case Shader::Uniform::COLOR: 
 						case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
 						case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
 						case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
 						case Shader::Uniform::MATRIX4: writeArray(mu.matrix, 16); break;
 					}
-					file << ")\n";
+					blob << ")\n";
 				}
 				break;
 			}
 		}
 	}
-
-	return true;
 }
 
 

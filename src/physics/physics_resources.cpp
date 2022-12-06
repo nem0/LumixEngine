@@ -140,6 +140,23 @@ namespace LuaAPI {
 	}
 } // namespace LuaAPI
 
+void PhysicsMaterial::serialize(OutputMemoryStream& blob) {
+	PhysicsMaterialLoadData data;
+	data.static_friction = material->getStaticFriction();
+	data.dynamic_friction = material->getDynamicFriction();
+	data.restitution = material->getRestitution();
+	blob.write(data);
+}
+
+void PhysicsMaterial::deserialize(InputMemoryStream& blob) {
+	PhysicsMaterialLoadData data;
+	blob.read(data);
+
+	material->setStaticFriction(data.static_friction);
+	material->setDynamicFriction(data.dynamic_friction);
+	material->setRestitution(data.restitution);
+}
+
 bool PhysicsMaterial::load(u64 size, const u8* mem) {
 	PhysicsMaterialManager& mng = static_cast<PhysicsMaterialManager&>(getResourceManager());
 	PhysicsMaterialLoadData tmp;

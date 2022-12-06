@@ -109,6 +109,15 @@ struct Span
 	[[nodiscard]] Span fromRight(u32 count) const { ASSERT(count <= length()); return Span(m_begin, m_end - count); }
 	T& back() { ASSERT(length() > 0); return *(m_end - 1); }
 	const T& back() const { ASSERT(length() > 0); return *(m_end - 1); }
+	bool equals(const Span<T>& rhs) {
+		bool res = true;
+		if (length() != rhs.length()) return false;
+		for (const T& v : *this) {
+			u32 i = u32(&v - m_begin);
+			if (v != rhs.m_begin[i]) return false;
+		}
+		return true;
+	}
 
 	template <typename F>
 	i32 find(const F& f) const { 

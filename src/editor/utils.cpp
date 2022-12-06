@@ -2,6 +2,7 @@
 
 #include "utils.h"
 #include "editor/render_interface.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -136,9 +137,11 @@ bool Action::isActive()
 
 	if (shortcut != os::Keycode::INVALID && !os::isKeyDown(shortcut)) return false;
 	
-	if ((modifiers & (u8)Modifiers::ALT) != 0 && !os::isKeyDown(os::Keycode::MENU)) return false;
-	if ((modifiers & (u8)Modifiers::SHIFT) != 0 && !os::isKeyDown(os::Keycode::SHIFT)) return false;
-	if ((modifiers & (u8)Modifiers::CTRL) != 0 && !os::isKeyDown(os::Keycode::CTRL)) return false;
+	Modifiers pressed_modifiers = Modifiers::NONE;
+	if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Modifiers::ALT;
+	if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Modifiers::SHIFT;
+	if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Modifiers::CTRL;
+	if (modifiers != pressed_modifiers) return false;
 
 	return true;
 }
@@ -231,7 +234,7 @@ bool InputString(const char* label, String* value) {
 }
 
 SimpleUndoRedo::SimpleUndoRedo(IAllocator& allocator)
-: m_stack(allocator)
+	: m_stack(allocator)
 	, m_allocator(allocator)
 {}
 
@@ -725,5 +728,55 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 
 	m_canvas.end();
 }
+
+RecentPaths::RecentPaths(const char* settings_name, u32 max_paths, StudioApp& app)
+	: m_app(app)
+	, m_settings_name(settings_name)
+	, m_max_paths(max_paths)
+	, m_paths(app.getAllocator())
+{
+}
+	
+void RecentPaths::onBeforeSettingsSaved() {
+	Settings& settings = m_app.getSettings();
+	for (const String& p : m_paths) {
+		const u32 i = u32(&p - m_paths.begin());
+		const StaticString<32> key(m_settings_name, i);
+		settings.setValue(Settings::LOCAL, key, p.c_str());
+	}
+}
+
+void RecentPaths::onSettingsLoaded() {
+	m_paths.clear();
+	char tmp[LUMIX_MAX_PATH];
+	Settings& settings = m_app.getSettings();
+	for (u32 i = 0; ; ++i) {
+		const StaticString<32> key(m_settings_name, i);
+		const u32 len = settings.getValue(Settings::LOCAL, key, Span(tmp));
+		if (len == 0) break;
+		m_paths.emplace(tmp, m_app.getAllocator());
+	}}
+
+void RecentPaths::push(const char* path) {
+	String p(path, m_app.getAllocator());
+	m_paths.eraseItems([&](const String& s) { return s == path; });
+	m_paths.push(static_cast<String&&>(p));
+	if (m_paths.size() > (i32)m_max_paths) {
+		m_paths.erase(0);
+	}
+}
+
+const char* RecentPaths::menu() {
+	const char* res = nullptr;
+	if (ImGui::BeginMenu("Recent", !m_paths.empty())) {
+		for (const String& s : m_paths) {
+			if (ImGui::MenuItem(s.c_str())) res = s.c_str();
+		}
+		ImGui::EndMenu();
+	}
+	ImGui::EndMenu();
+	return res;
+}
+
 
 } // namespace Lumix

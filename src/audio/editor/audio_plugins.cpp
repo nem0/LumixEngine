@@ -22,12 +22,13 @@ namespace
 {
 
 
-struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 		, m_browser(app.getAssetBrowser())
 		, m_playing_clip(-1)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("ogg", Clip::TYPE);
 		app.getAssetCompiler().registerExtension("wav", Clip::TYPE);
@@ -84,9 +85,9 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getName() const override { return "Audio"; }
 
 
-	void onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<Resource*> resources) override
 	{
-		if(resources.length() > 1) return;
+		if(resources.length() > 1) return false;
 
 		if(resources[0]->getPath().getHash() != m_meta_res) {
 			m_meta = getMeta(resources[0]->getPath());
@@ -94,9 +95,9 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		ImGuiEx::Label("Looped");
-		ImGui::Checkbox("##loop", &m_meta.looped);
+		bool changed = ImGui::Checkbox("##loop", &m_meta.looped);
 		ImGuiEx::Label("Volume");
-		ImGui::DragFloat("##vol", &m_meta.volume, 0.01f, 0, FLT_MAX);
+		changed = ImGui::DragFloat("##vol", &m_meta.volume, 0.01f, 0, FLT_MAX) || changed;
 
 		auto* clip = static_cast<Clip*>(resources[0]);
 		ImGuiEx::Label("Length");
@@ -108,7 +109,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_STOP "Stop"))
 			{
 				stopAudio();
-				return;
+				return changed;
 			}
 			float time = device.getCurrentTime(m_playing_clip);
 			ImGuiEx::Label("Time");
@@ -138,9 +139,11 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			compiler.updateMeta(resources[0]->getPath(), src);
 		}
-
+		return changed;
 	}
 
+	void deserialize(InputMemoryStream& blob) override { blob.read(m_meta); }
+	void serialize(OutputMemoryStream& blob) override { blob.write(m_meta); }
 
 	void onResourceUnloaded(Resource*) override { stopAudio(); }
 

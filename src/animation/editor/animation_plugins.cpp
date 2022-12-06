@@ -34,22 +34,26 @@ namespace
 {
 
 	
-struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
+struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
 {
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("ani", Animation::TYPE);
 	}
 
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
 
-	void onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<Resource*> resources) override
 	{
-		if (resources.length() > 1) return;
+		if (resources.length() > 1) return false;
 
 		auto* animation = static_cast<Animation*>(resources[0]);
 		ImGuiEx::Label("Length");
 		ImGui::Text("%.3fs", animation->getLength().seconds());
+		return false;
 	}
 
 
@@ -73,10 +77,11 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
-struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	explicit PropertyAnimationPlugin(StudioApp& app)
 		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("anp", PropertyAnimation::TYPE);
 	}
@@ -156,25 +161,30 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void savePropertyAnimation(PropertyAnimation& anim)
 	{
+		ASSERT(anim.isReady());
 		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
 		{
-			bool success = true;
-			if (!anim.save(*file))
-			{
-				success = false;
-				logError("Could not save file ", anim.getPath());
-			}
-			m_app.getAssetBrowser().endSaveResource(anim, *file, success);
+			anim.serialize(*file);
+			m_app.getAssetBrowser().endSaveResource(anim, *file, true);
 		}
+	}
+	
+	void deserialize(InputMemoryStream& blob) override {
+		((PropertyAnimation*)m_current_resources[0])->deserialize(blob);
+	}
+	
+	void serialize(OutputMemoryStream& blob) override {
+		((PropertyAnimation*)m_current_resources[0])->serialize(blob);
 	}
 
 
-	void onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<Resource*> resources) override
 	{
-		if (resources.length() > 1) return;
+		m_current_resources = resources;
+		if (resources.length() > 1) return false;
 
 		auto* animation = static_cast<PropertyAnimation*>(resources[0]);
-		if (!animation->isReady()) return;
+		if (!animation->isReady()) return false;
 
 		if (ImGui::Button(ICON_FA_SAVE "Save")) savePropertyAnimation(*animation);
 		ImGui::SameLine();
@@ -182,6 +192,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			
 		ShowAddCurveMenu(animation);
 
+		bool changed = false;
 		if (!animation->curves.empty())
 		{
 			int frames = animation->curves[0].frames.back();
@@ -191,6 +202,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				for (auto& curve : animation->curves)
 				{
 					curve.frames.back() = frames;
+					changed = true;
 				}
 			}
 		}
@@ -204,7 +216,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		if (m_selected_curve >= animation->curves.size()) m_selected_curve = -1;
-		if (m_selected_curve < 0) return;
+		if (m_selected_curve < 0) return changed;
 
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 20);
 		static ImVec2 size(-1, 200);
@@ -225,11 +237,11 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			flags |= (int)ImGuiEx::CurveEditorFlags::RESET;
 			m_fit_curve_in_editor = false;
 		}
-		int changed = ImGuiEx::CurveEditor("curve", (float*)points, curve.frames.size(), lengthOf(points), size, flags, &new_count, &m_selected_point);
-		if (changed >= 0)
+		int changed_idx = ImGuiEx::CurveEditor("curve", (float*)points, curve.frames.size(), lengthOf(points), size, flags, &new_count, &m_selected_point);
+		if (changed_idx >= 0)
 		{
-			curve.frames[changed] = int(points[changed].x + 0.5f);
-			curve.values[changed] = points[changed].y;
+			curve.frames[changed_idx] = int(points[changed_idx].x + 0.5f);
+			curve.values[changed_idx] = points[changed_idx].y;
 			curve.frames.back() = last_frame;
 			curve.frames[0] = 0;
 		}
@@ -256,12 +268,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
 		{
 			ImGuiEx::Label("Frame");
-			ImGui::InputInt("##frame", &curve.frames[m_selected_point]);
+			changed = ImGui::InputInt("##frame", &curve.frames[m_selected_point]) || changed;
 			ImGuiEx::Label("Value");
-			ImGui::InputFloat("##val", &curve.values[m_selected_point]);
+			changed = ImGui::InputFloat("##val", &curve.values[m_selected_point]) || changed;
 		}
 
 		ImGuiEx::HSplitter("sizer", &size);
+		return changed;
 	}
 
 
@@ -270,29 +283,35 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
 
 
+	StudioApp& m_app;
 	int m_selected_point = -1;
 	int m_selected_curve = -1;
 	bool m_fit_curve_in_editor = false;
-	StudioApp& m_app;
+	Span<Resource*> m_current_resources;
 };
 
 
-struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct AnimControllerAssetBrowserPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("act", anim::Controller::TYPE);
 	}
+
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
 
 	bool compile(const Path& src) override {
 		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	void onGUI(Span<Resource*> resources) override {
+	bool onGUI(Span<Resource*> resources) override {
 		if (resources.length() == 1 && ImGui::Button("Open in animation editor")) {
 			m_controller_editor->show(resources[0]->getPath().c_str());
 		}
+		return false;
 	}
 
 

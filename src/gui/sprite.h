@@ -22,7 +22,7 @@ public:
 
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-	bool save(struct IOutputStream& serializer);
+	void serialize(struct OutputMemoryStream& serializer);
 	
 	void setTexture(const Path& path);
 	struct Texture* getTexture() const { return m_texture; }

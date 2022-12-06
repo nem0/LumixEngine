@@ -47,6 +47,8 @@ struct PhysicsMaterial : Resource {
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
+	void serialize(OutputMemoryStream& blob);
+	void deserialize(struct InputMemoryStream& blob);
 
 	PhysicsSystem& system;
 	physx::PxMaterial* material;

@@ -1,4 +1,3 @@
-#define LUMIX_NO_CUSTOM_CRT
 #include "composite_texture.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
@@ -1638,7 +1637,7 @@ CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
 	: NodeEditor(app.getAllocator())
 	, m_allocator(app.getAllocator())
 	, m_app(app)
-	, m_recent_paths(app.getAllocator())
+	, m_recent_paths("proc_geom_editor_recent_", 10, app)
 {
 	newGraph();
 
@@ -1689,7 +1688,7 @@ bool CompositeTextureEditor::saveAs(const char* path) {
 	OutputMemoryStream blob(m_app.getAllocator());
 	serialize(blob);
 	if (!fs.saveContentSync(Path(path), blob)) return false;
-	pushRecent(path);
+	m_recent_paths.push(path);
 	m_path = path;
 	return true;
 }
@@ -1947,7 +1946,7 @@ void CompositeTextureEditor::open(const char* path) {
 		InputMemoryStream blob(content);
 		deserialize(blob);
 		pushUndo(NO_MERGE_UNDO);
-		pushRecent(path);
+		m_recent_paths.push(path);
 	}
 	else {
 		logError("Could not load", path);
@@ -1963,31 +1962,14 @@ void CompositeTextureEditor::onSettingsLoaded() {
 	Settings& settings = m_app.getSettings();
 	m_is_open = settings.getValue(Settings::GLOBAL, "is_composite_texture_editor_open", false);
 
-	m_recent_paths.clear();
-	char tmp[LUMIX_MAX_PATH];
-	for (u32 i = 0; ; ++i) {
-		const StaticString<32> key("proc_geom_editor_recent_", i);
-		const u32 len = settings.getValue(Settings::LOCAL, key, Span(tmp));
-		if (len == 0) break;
-		m_recent_paths.emplace(tmp, m_app.getAllocator());
-	}
+	m_recent_paths.onSettingsLoaded();
 }
 
 void CompositeTextureEditor::onBeforeSettingsSaved() {
 	Settings& settings = m_app.getSettings();
 	settings.setValue(Settings::GLOBAL, "is_composite_texture_editor_open", m_is_open);
-	
-	for (const String& p : m_recent_paths) {
-		const u32 i = u32(&p - m_recent_paths.begin());
-		const StaticString<32> key("proc_geom_editor_recent_", i);
-		settings.setValue(Settings::LOCAL, key, p.c_str());
-	}
-}
 
-void CompositeTextureEditor::pushRecent(const char* path) {
-	String p(path, m_app.getAllocator());
-	m_recent_paths.eraseItems([&](const String& s) { return s == path; });
-	m_recent_paths.push(static_cast<String&&>(p));
+	m_recent_paths.onBeforeSettingsSaved();
 }
 
 void CompositeTextureEditor::exportAs() {
@@ -2045,12 +2027,7 @@ void CompositeTextureEditor::onWindowGUI() {
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save As")) m_show_save_as = true;
 				if (ImGui::MenuItem("Export")) exportAs();
-				if (ImGui::BeginMenu("Recent", !m_recent_paths.empty())) {
-					for (const String& s : m_recent_paths) {
-						if (ImGui::MenuItem(s.c_str())) open(s.c_str());
-					}
-					ImGui::EndMenu();
-				}
+				if (const char* path = m_recent_paths.menu(); path) { open(path); }
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {

@@ -43,6 +43,6 @@ namespace ImGuiFreeType
     // Obsolete names (will be removed soon)
     // Prefer using '#define IMGUI_ENABLE_FREETYPE'
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-    bool BuildFontAtlas(ImFontAtlas* atlas, unsigned int flags = 0) { atlas->FontBuilderIO = GetBuilderForFreeType(); atlas->FontBuilderFlags = flags; return atlas->Build(); }
+    //bool BuildFontAtlas(ImFontAtlas* atlas, unsigned int flags = 0) { atlas->FontBuilderIO = GetBuilderForFreeType(); atlas->FontBuilderFlags = flags; return atlas->Build(); }
 #endif
 }

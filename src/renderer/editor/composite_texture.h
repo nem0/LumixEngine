@@ -83,7 +83,6 @@ struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {
 
 private:
 	void exportAs();
-	void pushRecent(const char* path);
 	bool saveAs(const char* path);
 	void newGraph();
 	void onWindowGUI() override;
@@ -117,7 +116,7 @@ private:
 	bool m_has_focus = false;
 	bool m_show_save_as = false;
 	bool m_show_open = false;
-	Array<String> m_recent_paths;
+	RecentPaths m_recent_paths;
 };
 
 } // namespace Lumix

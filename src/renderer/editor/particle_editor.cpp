@@ -1368,6 +1368,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		: m_allocator(allocator)
 		, m_app(app)
 		, NodeEditor(allocator)
+		, m_recent_paths("particle_editor_recent_", 10, app)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
@@ -1520,9 +1521,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void onSettingsLoaded() override {
 		m_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_particle_editor_open", false);
+		m_recent_paths.onSettingsLoaded();
 	}
+
 	void onBeforeSettingsSaved() override {
 		m_app.getSettings().setValue(Settings::GLOBAL, "is_particle_editor_open", m_open);
+		m_recent_paths.onBeforeSettingsSaved();
 	}
 
 	bool isOpen() const { return m_open; }
@@ -1749,6 +1753,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
+				if (const char* path = m_recent_paths.menu(); path) open(path);
 				ImGui::Separator();
 			
 				menuItem(m_apply_action, emitter && emitter->getResource());
@@ -1821,6 +1826,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_resource->deserialize(iblob, path);
 		m_path = path;
 		clearUndoStack();
+		m_recent_paths.push(path);
 		pushUndo(NO_MERGE_UNDO);
 		m_dirty = false;
 	}
@@ -1853,6 +1859,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 		
 		m_path = path;
+		m_recent_paths.push(path);
 		m_dirty = false;
 	}
 
@@ -1939,6 +1946,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
 	ImGuiID m_half_link_start = 0;
+	RecentPaths m_recent_paths;
 };
 
 DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
