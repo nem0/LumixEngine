@@ -228,7 +228,7 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data) {
 	return 0;
 }
 
-bool InputString(const char* label, String* value) {
+bool inputString(const char* label, String* value) {
 	ImGuiInputTextFlags flags = ImGuiInputTextFlags_CallbackResize;
 	return ImGui::InputText(label, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);
 }
@@ -427,7 +427,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 			if (m_creating_folder) {
 				ImGui::SetNextItemWidth(-1);
 				if (recently_open_create_folder) ImGui::SetKeyboardFocusHere();
-				ImGui::InputTextWithHint("##nf", "New folder name", m_new_folder_name, sizeof(m_new_folder_name));
+				ImGui::InputTextWithHint("##nf", "New folder name", m_new_folder_name, sizeof(m_new_folder_name), ImGuiInputTextFlags_AutoSelectAll);
 				if (ImGui::IsItemDeactivated()) {
 					m_creating_folder = false;
 					if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -489,7 +489,7 @@ const char* FileSelector::getPath() {
 bool FileSelector::gui(bool show_breadcrumbs) {
 	bool res = false;
 	ImGui::TextUnformatted("Filename"); ImGui::SameLine(); ImGui::SetNextItemWidth(-1);
-	bool changed = InputString("##fn", &m_filename);
+	bool changed = inputString("##fn", &m_filename);
 	
 	if (show_breadcrumbs) {
 		changed = breadcrumb(Span(m_current_dir.c_str(), m_current_dir.length())) || changed;
@@ -712,15 +712,14 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	}
 
 	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+		ImGui::OpenPopup("context_menu");
 		open_context = true;
 		m_half_link_start = 0;
 	}
 
-	if (open_context) ImGui::OpenPopup("context_menu");
-
 	if (ImGui::BeginPopup("context_menu")) {
 		const ImVec2 pos = ImGui::GetMousePosOnOpeningCurrentPopup() - origin - m_offset;
-		onContextMenu(open_context, pos);
+		onContextMenu(pos);
 		ImGui::EndPopup();
 	}		
 
@@ -750,11 +749,12 @@ void RecentPaths::onSettingsLoaded() {
 	m_paths.clear();
 	char tmp[LUMIX_MAX_PATH];
 	Settings& settings = m_app.getSettings();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	for (u32 i = 0; ; ++i) {
 		const StaticString<32> key(m_settings_name, i);
 		const u32 len = settings.getValue(Settings::LOCAL, key, Span(tmp));
 		if (len == 0) break;
-		m_paths.emplace(tmp, m_app.getAllocator());
+		if (fs.fileExists(tmp)) m_paths.emplace(tmp, m_app.getAllocator());
 	}}
 
 void RecentPaths::push(const char* path) {

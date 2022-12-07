@@ -1260,12 +1260,8 @@ void SceneView::searchUI() {
 			ImGui::EndPopup();
 		}
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(-1);
-		if(m_search_request) {
-			ImGui::SetKeyboardFocusHere();
-			m_search_selected = 0;
-		}
-		if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_search_buf, sizeof(m_search_buf), ImGuiInputTextFlags_AutoSelectAll)) {
+		if(m_search_request) m_search_selected = 0;
+		if (ImGuiEx::filter(ICON_FA_SEARCH " Search", m_search_buf, sizeof(m_search_buf), -1, m_search_request)) {
 			m_search_selected = 0;
 		}
 		bool scroll = false;

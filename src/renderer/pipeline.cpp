@@ -33,7 +33,7 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-//-V:WRITE:568
+
 namespace Lumix
 {
 

@@ -863,7 +863,7 @@ int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 				return -1;
 			}
 		}
-		if (token.type != Token::EMPTY) {//-V547
+		if (token.type != Token::EMPTY) {
 			if(token_count < tokens.length()) {
 				tokens[token_count] = token;
 			}

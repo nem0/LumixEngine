@@ -60,7 +60,7 @@ inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b;
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API void menuItem(Action& a, bool enabled);
 LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct Universe& editor, Span<char> buf, EntityPtr entity);
-LUMIX_EDITOR_API bool InputString(const char* label, String* value);
+LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 
 struct SimpleUndoRedo {
 	enum { NO_MERGE_UNDO = 0xffFFffFF };
@@ -156,7 +156,7 @@ struct NodeEditor : SimpleUndoRedo {
 
 	virtual void onCanvasClicked(ImVec2 pos, i32 hovered_link) = 0;
 	virtual void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) = 0;
-	virtual void onContextMenu(bool recently_opened, ImVec2 pos) = 0;
+	virtual void onContextMenu(ImVec2 pos) = 0;
 
 	void splitLink(const NodeEditorNode* node, Array<NodeEditorLink>& links, u32 link_idx);
 	void nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink>& links);

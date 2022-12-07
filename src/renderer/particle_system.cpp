@@ -75,7 +75,7 @@ void ParticleEmitterResource::overrideData(OutputMemoryStream&& instructions,
 void ParticleEmitterResource::setMaterial(const Path& path)
 {
 	Material* material = m_resource_manager.getOwner().load<Material>(path);
-	if (m_material) { //-V1051
+	if (m_material) {
 		Material* tmp = m_material;
 		m_material = nullptr;
 		removeDependency(*tmp);
@@ -274,7 +274,7 @@ static float4* getStream(const ParticleEmitter& emitter
 	, float4* register_mem)
 {
 	switch (stream.type) {
-		case DataStream::CHANNEL: return (float4*)emitter.getChannelData(stream.index) + offset; //-V1032
+		case DataStream::CHANNEL: return (float4*)emitter.getChannelData(stream.index) + offset;
 		case DataStream::REGISTER: return register_mem + 256 * stream.index;
 		default: ASSERT(false); return nullptr;
 	}

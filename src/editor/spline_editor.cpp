@@ -206,7 +206,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		static ImVec2 size(-1, 200);
 		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 		ImGui::SetNextItemWidth(-w);
-		ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
+		ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
 		ImGui::SameLine();
 		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) m_filter[0] = '\0';
 

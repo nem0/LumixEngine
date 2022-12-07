@@ -48,7 +48,7 @@ struct ParticleEditorResource {
 	struct NodeInput {
 		Node* node;
 		u16 output_idx;
-		DataStream generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const; //-V1071
+		DataStream generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const;
 	};
 
 	struct Node : NodeEditorNode {
@@ -1451,7 +1451,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		pushUndo(0xffFF);
 	}
 	
-	void onContextMenu(bool recently_opened, ImVec2 pos) override {
+	void onContextMenu(ImVec2 pos) override {
 		ImVec2 cp = ImGui::GetItemRectMin();
 		ParticleEditorResource::Node* n = nullptr;
 		if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
@@ -1705,11 +1705,11 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		emitter->getResource()->setMaterial(Path(m_resource->m_mat_path));
 	}
 
+	static constexpr const char* WINDOW_NAME = "Particle editor";
+
 	void onWindowGUI() override {
 		m_has_focus = false;
 		if (!m_open) return;
-		if (m_is_focus_requested) ImGui::SetNextWindowFocus();
-		m_is_focus_requested = false;
 
 		if (m_confirm_new) ImGui::OpenPopup("Confirm##cn");
 		if (m_confirm_load) ImGui::OpenPopup("Confirm##cl");
@@ -1738,7 +1738,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 
 		ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-		if (!ImGui::Begin("Particle editor", &m_open, ImGuiWindowFlags_MenuBar)) {
+		if (!ImGui::Begin(WINDOW_NAME, &m_open, ImGuiWindowFlags_MenuBar)) {
 			ImGui::End();
 			return;
 		}
@@ -1880,7 +1880,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	const char* getName() const override { return "Particle editor"; }
 
 	void open(const char* path) override {
-		m_is_focus_requested = true;
+		ImGui::SetWindowFocus(WINDOW_NAME);
 		m_open = true;
 		if (m_dirty) {
 			m_confirm_load = true;
@@ -1935,7 +1935,6 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	UniquePtr<ParticleEditorResource> m_resource;
 	bool m_open = false;
 	bool m_autoapply = false;
-	bool m_is_focus_requested = false; 
 	Action m_toggle_ui;
 	Action m_save_action;
 	Action m_undo_action;

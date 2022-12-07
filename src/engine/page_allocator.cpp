@@ -19,7 +19,7 @@ PageAllocator::~PageAllocator()
 	void* p = free_pages;
 	while (p) {
 		void* tmp = p;
-		memcpy(&p, p, sizeof(p)); //-V579
+		memcpy(&p, p, sizeof(p));
 		os::memRelease(tmp, PAGE_SIZE);
 	}
 }
@@ -43,7 +43,7 @@ void* PageAllocator::allocate(bool lock)
 	++allocated_count;
 	if (free_pages) {
 		void* tmp = free_pages;
-		memcpy(&free_pages, free_pages, sizeof(free_pages)); //-V579
+		memcpy(&free_pages, free_pages, sizeof(free_pages));
 		if (lock) mutex.exit();
 		return tmp;
 	}

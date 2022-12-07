@@ -2399,7 +2399,7 @@ void TerrainEditor::entityGUI() {
 	static char filter[100] = {0};
 	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 	ImGui::SetNextItemWidth(-w);
-	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 		filter[0] = '\0';

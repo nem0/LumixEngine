@@ -103,7 +103,7 @@ void Controller::processEvents(RuntimeContext& ctx) const {
 					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(float));
 					break;
 				case InputDecl::U32: 
-					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(u32)); //-V1037
+					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(u32));
 					break;
 				case InputDecl::BOOL: 
 					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(u32));

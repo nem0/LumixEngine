@@ -1386,13 +1386,8 @@ struct StudioAppImpl final : StudioApp
 			if (parent.isValid()) m_editor->makeParent(parent, e);
 		}
 
-		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-		ImGui::SetNextItemWidth(-w);
-		ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
-		ImGui::SameLine();
-		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-			m_component_filter[0] = '\0';
-		}
+		ImGuiEx::filter("Filter", m_component_filter, sizeof(m_component_filter), 150);
+		
 		showAddComponentNode(m_add_cmp_root.child, m_component_filter, parent, *m_editor);
 	}
 
@@ -1462,14 +1457,7 @@ struct StudioAppImpl final : StudioApp
 		menuItem("newUniverse", true);
 		if (ImGui::BeginMenu(NO_ICON "Open"))
 		{
-			ImGui::Dummy(ImVec2(200, 1)); // to force minimal menu size
-			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-			ImGui::SetNextItemWidth(-w);
-			ImGui::InputTextWithHint("##filter", "Filter", m_open_filter, sizeof(m_open_filter));
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-				m_open_filter[0] = '\0';
-			}
+			ImGuiEx::filter("Filter", m_open_filter, sizeof(m_open_filter), 150);
 
 			for (auto& univ : m_universes)
 			{
@@ -1900,14 +1888,8 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
 		{
 			Universe* universe = m_editor->getUniverse();
-			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-			ImGui::SetNextItemWidth(-w);
-			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-				filter[0] = '\0';
-			}
-
+			ImGuiEx::filter("Filter", filter, sizeof(filter));
+			
 			if (ImGui::BeginChild("entities")) {
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				

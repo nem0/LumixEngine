@@ -2375,7 +2375,7 @@ static void splat(std::vector<T>* out,
 		for (int i = 0, c = (int)original_indices.size(); i < c; ++i)
 		{
 			int idx = decodeIndex(original_indices[i]);
-			if ((idx < data_size) && (idx >= 0)) //-V560
+			if ((idx < data_size) && (idx >= 0))
 				(*out)[i] = data[idx];
 			else
 				(*out)[i] = T();
@@ -2481,7 +2481,7 @@ static void triangulate(
 	for (int i = 0; i < (int)old_indices.size(); ++i)
 	{
 		int idx = getIdx(i);
-		if (in_polygon_idx <= 2) //-V1051
+		if (in_polygon_idx <= 2)
 		{
 			to_old_vertices->push_back(idx);
 			to_old_indices->push_back(i);

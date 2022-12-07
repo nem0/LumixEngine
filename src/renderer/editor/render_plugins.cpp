@@ -818,8 +818,6 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	bool canCreateResource() const override { return true; }
-	const char* getFileDialogFilter() const override { return "Material\0*.mat\0"; }
-	const char* getFileDialogExtensions() const override { return "mat"; }
 	const char* getDefaultExtension() const override { return "mat"; }
 
 	bool createResource(const char* path) override {
@@ -844,10 +842,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	void saveMaterial(Material* material)
 	{
 		ASSERT(material->getShader());
-		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(*material)) {
-			material->serialize(*file);
-			m_app.getAssetBrowser().endSaveResource(*material, *file, true);
-		}
+		OutputMemoryStream blob(m_app.getAllocator());
+		material->serialize(blob);
+		m_app.getAssetBrowser().saveResource(*material, blob);
 	}
 
 	template <typename F, typename... Args>
@@ -930,7 +927,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1), //-V1028
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1),
 				ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
 				"%s",
 				"");
@@ -1155,8 +1152,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	const char* getDefaultExtension() const override { return "ltc"; }
-	const char* getFileDialogFilter() const override { return "Composite texture\0*.ltc\0"; }
-	const char* getFileDialogExtensions() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
 	bool createResource(const char* path) override { 
 		FileSystem& fs = m_app.getEngine().getFileSystem();

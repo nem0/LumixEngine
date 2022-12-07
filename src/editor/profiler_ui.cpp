@@ -656,11 +656,8 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-	ImGui::SetNextItemWidth(-w);
-	ImGui::InputTextWithHint("##resource_filter", "Filter", m_resource_filter, sizeof(m_resource_filter));
-	ImGui::SameLine();
-	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) m_resource_filter[0] = '\0';
+	ImGuiEx::filter("Filter", m_resource_filter, sizeof(m_resource_filter));
+	
 	ImGuiEx::Label("Filter size (KB)");
 	ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
 
@@ -966,7 +963,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(150);
-	ImGui::InputTextWithHint("##filter", "filter", m_filter, sizeof(m_filter));
+	ImGui::InputTextWithHint("##filter", "filter", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 		m_filter[0] = '\0';

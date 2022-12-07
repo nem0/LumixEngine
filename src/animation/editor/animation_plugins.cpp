@@ -87,8 +87,6 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	bool canCreateResource() const override { return true; }
-	const char* getFileDialogFilter() const override { return "Property animation\0*.anp\0"; }
-	const char* getFileDialogExtensions() const override { return "anp"; }
 	const char* getDefaultExtension() const override { return "anp"; }
 
 	bool compile(const Path& src) override {
@@ -162,11 +160,9 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	void savePropertyAnimation(PropertyAnimation& anim)
 	{
 		ASSERT(anim.isReady());
-		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
-		{
-			anim.serialize(*file);
-			m_app.getAssetBrowser().endSaveResource(anim, *file, true);
-		}
+		OutputMemoryStream blob(m_app.getAllocator());
+		anim.serialize(blob);
+		m_app.getAssetBrowser().saveResource(anim, blob);
 	}
 	
 	void deserialize(InputMemoryStream& blob) override {

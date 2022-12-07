@@ -310,7 +310,7 @@ void Allocator::checkLeaks()
 		AllocationInfo* info = m_root;
 		while (info != last_sentinel)
 		{
-			StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n"); //-V568
+			StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
 			OutputDebugString(tmp);
 			m_stack_tree.printCallstack(info->stack_leaf);
 			info = info->next;

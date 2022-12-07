@@ -109,7 +109,6 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	AssetBrowserImpl(StudioApp& app)
 		: m_selected_resources(app.getAllocator())
-		, m_is_focus_requested(false)
 		, m_history(app.getAllocator())
 		, m_dir_history(app.getAllocator())
 		, m_plugins(app.getAllocator())
@@ -635,7 +634,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				os::openExplorer(dir_full_path);
 			}
 			if (ImGui::BeginMenu("Create directory")) {
-				ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp));
+				ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
 				ImGui::SameLine();
 				if (ImGui::Button("Create")) {
 					StaticString<LUMIX_MAX_PATH> path(base_path, "/", m_dir, "/", tmp);
@@ -650,7 +649,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			for (Plugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
 				if (ImGui::BeginMenu(plugin->getName())) {
-					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue);
+					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 					ImGui::SameLine();
 					if (ImGui::Button("Create") || input_entered) {
 						StaticString<LUMIX_MAX_PATH> path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
@@ -680,7 +679,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				openInExternalEditor(m_file_infos[m_context_resource].filepath);
 			}
 			if (ImGui::BeginMenu("Rename")) {
-				ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp));
+				ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
 				if (ImGui::Button("Rename", ImVec2(100, 0))) {
 					PathInfo fi(m_file_infos[m_context_resource].filepath);
 					StaticString<LUMIX_MAX_PATH> new_path(fi.m_dir, tmp, ".", fi.m_extension);
@@ -755,10 +754,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_details_focused = false;
 		if (!m_is_open) return;
 
-		if (m_is_focus_requested) ImGui::SetNextWindowFocus();
-		m_is_focus_requested = false;
-		
-		if (ImGui::Begin(ICON_FA_IMAGE  "Asset inspector##asset_inspector", &m_is_open, ImGuiWindowFlags_AlwaysVerticalScrollbar))
+		if (ImGui::Begin(INSPECTOR_NAME, &m_is_open, ImGuiWindowFlags_AlwaysVerticalScrollbar))
 		{
 			m_details_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 			m_has_focus = m_has_focus || m_details_focused;
@@ -915,11 +911,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			m_wanted_resource = "";
 		}
 
-		m_is_open = m_is_open || m_is_focus_requested;
+		m_is_open = m_is_open;
 
 		if(m_is_open) {
-			if (m_is_focus_requested) ImGui::SetNextWindowFocus();
-			if (!ImGui::Begin(ICON_FA_IMAGES "Assets##assets", &m_is_open)) {
+			if (!ImGui::Begin(WINDOW_NAME, &m_is_open)) {
 				ImGui::End();
 				detailsGUI();
 				return;
@@ -927,7 +922,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
 
 			ImGui::SetNextItemWidth(150);
-			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue)) changeDir(m_dir, false);
+			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) changeDir(m_dir, false);
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear search")) {
 				m_filter[0] = '\0';
@@ -1009,6 +1004,9 @@ struct AssetBrowserImpl : AssetBrowser {
 			unloadResources();
 			m_selected_resources.push(resource);
 		}
+		char dir[LUMIX_MAX_PATH];
+		copyString(Span(dir), Path::getDir(resource->getPath().c_str()));
+		changeDir(dir, false);
 		ASSERT(resource->getRefCount() > 0);
 	}
 
@@ -1064,9 +1062,14 @@ struct AssetBrowserImpl : AssetBrowser {
 		return os::copyFile(path, dest);
 	}
 
+	static constexpr const char* WINDOW_NAME = ICON_FA_IMAGES "Assets##assets";
+	static constexpr const char* INSPECTOR_NAME = ICON_FA_IMAGE "Asset inspector##asset_inspector";
+
 	void selectResource(const Path& path, bool record_history, bool additive)  override
 	{
-		m_is_focus_requested = true;
+		ImGui::SetWindowFocus(INSPECTOR_NAME);
+		ImGui::SetWindowFocus(WINDOW_NAME);
+		m_is_open = true;
 		auto& manager = m_app.getEngine().getResourceManager();
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
 		const ResourceType type = compiler.getResourceType(path.c_str());
@@ -1135,8 +1138,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (span.length() > 0) {
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-				m_is_focus_requested = true;
-				m_is_open = true;
 				m_wanted_resource = buf.begin();
 			}
 			ImGui::SameLine();
@@ -1164,35 +1165,23 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	OutputMemoryStream* beginSaveResource(Resource& resource) override
+	void saveResource(Resource& resource, OutputMemoryStream& stream) override
 	{
-		IAllocator& allocator = m_app.getAllocator();
-		return LUMIX_NEW(allocator, OutputMemoryStream)(allocator);
-	}
-
-
-	void endSaveResource(Resource& resource, OutputMemoryStream& stream, bool success) override
-	{
-		if (!success) return;
-	
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		// use temporary because otherwise the resource is reloaded during saving
 		StaticString<LUMIX_MAX_PATH> tmp_path(resource.getPath().c_str(), ".tmp");
 
 		if (!fs.saveContentSync(Path(tmp_path), stream)) {
-			LUMIX_DELETE(m_app.getAllocator(), &stream);
 			logError("Could not save file ", resource.getPath());
 			return;
 		}
-		LUMIX_DELETE(m_app.getAllocator(), &stream);
 
-		auto& engine = m_app.getEngine();
+		Engine& engine = m_app.getEngine();
 		StaticString<LUMIX_MAX_PATH> src_full_path;
 		StaticString<LUMIX_MAX_PATH> dest_full_path;
-		src_full_path.data[0] = 0;
-		dest_full_path.data[0] = 0;
-		src_full_path << engine.getFileSystem().getBasePath() << tmp_path;
-		dest_full_path << engine.getFileSystem().getBasePath() << resource.getPath().c_str();
+		const char* base_path = engine.getFileSystem().getBasePath();
+		src_full_path << base_path << tmp_path;
+		dest_full_path << base_path << resource.getPath().c_str();
 
 		os::deleteFile(dest_full_path);
 
@@ -1244,7 +1233,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		FileSelector& file_selector = m_app.getFileSelector();
-		if (file_selector.gui("Save As", &show_new_fs, plugin->getFileDialogExtensions(), true)) {
+		if (file_selector.gui("Save As", &show_new_fs, plugin->getDefaultExtension(), true)) {
 			if (!plugin->createResource(file_selector.getPath())) {
 				logError("Failed to create ", file_selector.getPath());
 				return false;
@@ -1256,7 +1245,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		static char filter[128] = "";
 		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 		ImGui::SetNextItemWidth(-w);
-		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
 		ImGui::SameLine();
 		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 			filter[0] = '\0';
@@ -1280,7 +1269,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			if (is_enter_submit || ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 				selected_path_hash = res.path.getHash();
 			
-				if (selected || ImGui::IsMouseDoubleClicked(0) || is_enter_submit) { //-V1051
+				if (selected || ImGui::IsMouseDoubleClicked(0) || is_enter_submit) {
 					copyString(buf, res.path.c_str());
 					ImGui::CloseCurrentPopup();
 					ImGui::EndChild();
@@ -1387,7 +1376,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	int m_context_resource;
 	char m_filter[128];
 	Path m_wanted_resource;
-	bool m_is_focus_requested;
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	bool m_has_focus = false;

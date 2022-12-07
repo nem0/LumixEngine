@@ -69,6 +69,7 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		Mutex m_guard;
 		bool m_is_open = false;
 		Action m_toggle_ui;
+		char m_filter[128] = "";
 };
 
 

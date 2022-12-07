@@ -52,8 +52,6 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	bool canCreateResource() const override { return true; }
-	const char* getFileDialogFilter() const override { return "Sprite\0*.spr\0"; }
-	const char* getFileDialogExtensions() const override { return "spr"; }
 	const char* getDefaultExtension() const override { return "spr"; }
 
 	bool createResource(const char* path) override {
@@ -207,11 +205,9 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void saveSprite(Sprite& sprite)
 	{
-		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(sprite))
-		{
-			sprite.serialize(*file);
-			m_app.getAssetBrowser().endSaveResource(sprite, *file, true);
-		}
+		OutputMemoryStream blob(m_app.getAllocator());
+		sprite.serialize(blob);
+		m_app.getAssetBrowser().saveResource(sprite, blob);
 	}
 
 
@@ -437,7 +433,7 @@ private:
 			scene->render(*m_pipeline, { size.x, size.y }, false);
 			
 			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *scene, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
-			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode; //-V1051
+			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
 			if (ImGui::IsMouseReleased(0)) m_mouse_mode = MouseMode::NONE;
 			
 			if (editor.getSelectedEntities().size() == 1)

@@ -400,7 +400,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 		, ComponentUID cmp
 		, const HashMap<EntityPtr, u32>& map
 		, Span<const EntityRef> entities)
-		: deserializer(deserializer) //-V1041
+		: deserializer(deserializer)
 		, cmp(cmp)
 		, map(map)
 		, entities(entities)
@@ -486,7 +486,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 
 struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 	PropertySerializeVisitor(OutputMemoryStream& serializer, ComponentUID cmp)
-		: serializer(serializer) //-V1041
+		: serializer(serializer)
 		, cmp(cmp)
 	{}
 

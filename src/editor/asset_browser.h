@@ -19,8 +19,6 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual bool canCreateResource() const { return false; }
 		virtual bool createResource(const char* path) { return false; }
 
-		virtual const char* getFileDialogFilter() const { return ""; }
-		virtual const char* getFileDialogExtensions() const { return ""; }
 		virtual const char* getDefaultExtension() const { return ""; }
 
 		virtual bool onGUI(Span<struct Resource*> resource) = 0;
@@ -52,8 +50,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual void openInExternalEditor(const char* path) const = 0;
 	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, float height, bool can_create_new, bool enter_submit = false) const = 0;
 	virtual void tile(const Path& path, bool selected) = 0;
-	virtual struct OutputMemoryStream* beginSaveResource(Resource& resource) = 0;
-	virtual void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success) = 0;
+	virtual void saveResource(Resource& resource, OutputMemoryStream& file) = 0;
 	virtual void releaseResources() = 0;
 	virtual void reloadTile(FilePathHash hash) = 0; 
 	virtual bool copyTile(const char* from, const char* to) = 0;

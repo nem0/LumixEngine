@@ -168,15 +168,9 @@ void LogUI::onWindowGUI()
 		}
 
 		ImGui::SameLine();
-		char filter[128] = "";
 		ImGui::Checkbox("Autoscroll", &m_autoscroll);
-		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-		ImGui::SetNextItemWidth(-w);
-		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
-		ImGui::SameLine();
-		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-			filter[0] = '\0';
-		}
+
+		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter));
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
@@ -185,7 +179,7 @@ void LogUI::onWindowGUI()
 			{
 				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
 				const char* msg = m_messages[i].text.c_str();
-				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				if (m_filter[0] == '\0' || strstr(msg, m_filter) != nullptr)
 				{
 					ImGui::TextUnformatted(msg);
 				}
@@ -204,7 +198,7 @@ void LogUI::onWindowGUI()
 				for (int i = 0; i < m_messages.size(); ++i)
 				{
 					const char* msg = m_messages[i].text.c_str();
-					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+					if (m_filter[0] == '\0' || strstr(msg, m_filter) != nullptr)
 					{
 						len += stringLength(msg);
 						len += sizeof("\n");
@@ -219,7 +213,7 @@ void LogUI::onWindowGUI()
 					for (int i = 0; i < m_messages.size(); ++i)
 					{
 						const char* msg = m_messages[i].text.c_str();
-						if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+						if (m_filter[0] == '\0' || strstr(msg, m_filter) != nullptr)
 						{
 							catString(memspan, msg);
 							catString(memspan, "\n");

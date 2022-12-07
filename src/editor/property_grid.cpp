@@ -348,8 +348,10 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		}
 		
 		const float icons_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
+		bool recently_opened_popup = false;
 		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -icons_w : -1.f, 0))) {
 			ImGui::OpenPopup("popup");
+			recently_opened_popup = true;
 		}
 		if (!entity.isValid()) {
 			ImGui::PopStyleColor();
@@ -381,7 +383,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			static char entity_filter[32] = {};
 			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 			ImGui::SetNextItemWidth(-w);
-			ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter));
+			if (recently_opened_popup) ImGui::SetKeyboardFocusHere();
+			ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter), ImGuiInputTextFlags_AutoSelectAll);
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 				entity_filter[0] = '\0';
@@ -743,7 +746,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 	const char* entity_name = universe.getEntityName(entities[0]);
 	copyString(name, entity_name);
 	ImGui::SetNextItemWidth(-1);
-	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name))) editor.setEntityName(entities[0], name);
+	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name), ImGuiInputTextFlags_AutoSelectAll)) editor.setEntityName(entities[0], name);
 	ImGui::PushFont(m_app.getBoldFont());
 	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -903,20 +906,10 @@ void PropertyGrid::onWindowGUI()
 		ImGui::Separator();
 		const float x = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_PLUS "Add component").x - ImGui::GetStyle().FramePadding.x * 2) * 0.5f;
 		ImGui::SetCursorPosX(x);
-		if (ImGui::Button(ICON_FA_PLUS "Add component")) {
-			ImGui::OpenPopup("AddComponentPopup");
-		}
+		if (ImGui::Button(ICON_FA_PLUS "Add component")) ImGui::OpenPopup("AddComponentPopup");
 
 		if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
-			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-			ImGui::SetNextItemWidth(-w);
-			ImGui::SetNextItemWidth(200);
-			ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-				m_component_filter[0] = '\0';
-			}
-
+			ImGuiEx::filter("Filter", m_component_filter, sizeof(m_component_filter), 200, ImGui::IsWindowAppearing());
 			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
 			ImGui::EndPopup();
 		}

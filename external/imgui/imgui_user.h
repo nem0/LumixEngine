@@ -70,6 +70,7 @@ IMGUI_API bool IconButton(const char* icon, const char* tooltip);
 IMGUI_API bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values);
 IMGUI_API void PushReadOnly();
 IMGUI_API void PopReadOnly();
+IMGUI_API bool filter(const char* hint, char* buf, int buf_size, float width = -1, bool set_keyboard_focus = false);
 
 struct IMGUI_API Canvas {
 	~Canvas();

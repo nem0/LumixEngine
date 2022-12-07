@@ -861,8 +861,6 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 	}
 
 	bool canCreateResource() const override { return true; }
-	const char* getFileDialogFilter() const override { return "Physics material\0*.pma\0"; }
-	const char* getFileDialogExtensions() const override { return "pma"; }
 	const char* getDefaultExtension() const override { return "pma"; }
 
 	bool createResource(const char* path) override

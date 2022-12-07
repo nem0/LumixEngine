@@ -1128,7 +1128,7 @@ struct ControllerEditorImpl : ControllerEditor {
 								}
 								ImGui::EndCombo();
 							}
-							for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) { //-V621
+							for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
 								auto iter = m_model->getBoneIndex(ik.bones[j]);
 								if (iter.isValid()) {
 									ImGui::Text("%s", m_model->getBone(iter.value()).name.c_str());

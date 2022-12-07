@@ -995,7 +995,7 @@ namespace ImGuiEx {
 		ImGuiWindowFlags flags = ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
 		char name[32];
-		ImFormatString(name, 20, "##popup_%s", str_id);
+		ImFormatString(name, IM_ARRAYSIZE(name), "##popup_%s", str_id);
 
 		SetNextWindowSize(size_on_first_use, ImGuiCond_FirstUseEver);
 		bool opened = Begin(name, NULL, flags);
@@ -1051,6 +1051,7 @@ namespace ImGuiEx {
 
 
 	bool IconButton(const char* icon, const char* tooltip) {
+		ImGui::AlignTextToFramePadding();
 		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		PushStyleColor(ImGuiCol_Button, GetStyle().Colors[ImGuiCol_WindowBg]);
 		bool res = SmallButton(icon);
@@ -1252,6 +1253,20 @@ namespace ImGuiEx {
 	void PushReadOnly() {
 		PushItemFlag(ImGuiItemFlags_ReadOnly, true);
 		PushStyleColor(ImGuiCol_Text, GetStyle().Colors[ImGuiCol_TextDisabled]);
+	}
+
+	bool filter(const char* label, char* buf, int buf_size, float width, bool set_keyboard_focus) {
+		ASSERT(buf_size > 0);
+		bool changed = false;
+		if (IconButton(ICON_FA_TIMES, "Clear")) {
+			buf[0] = '\0';
+			changed = true;
+		}
+		SameLine();
+		SetNextItemWidth(width);
+		if (set_keyboard_focus) SetKeyboardFocusHere();
+		changed = InputTextWithHint("##filter", label, buf, buf_size, ImGuiInputTextFlags_AutoSelectAll);
+		return changed;
 	}
 
 	void PopReadOnly() {

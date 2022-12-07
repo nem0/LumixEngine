@@ -680,13 +680,7 @@ void Settings::writeCustom(lua_State* L, IOutputStream& file) {
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-	ImGui::SetNextItemWidth(-w);
-	ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
-	ImGui::SameLine();
-	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-		m_filter[0] = '\0';
-	}
+	ImGuiEx::filter("Filter", m_filter, sizeof(m_filter));
 
 	for (int i = 0; i < actions.size(); ++i)
 	{

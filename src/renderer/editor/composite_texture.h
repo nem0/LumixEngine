@@ -96,7 +96,7 @@ private:
 	void serialize(OutputMemoryStream& blob) override;
 	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override;
 	void onLinkDoubleClicked(CompositeTexture::Link& link, ImVec2 pos) override;
-	void onContextMenu(bool recently_opened, ImVec2 pos) override;
+	void onContextMenu(ImVec2 pos) override;
 	void toggleOpen() { m_is_open = !m_is_open; }
 	bool isOpen() const { return m_is_open; }
 	void save();
@@ -105,7 +105,6 @@ private:
 	StudioApp& m_app;
 	IAllocator& m_allocator;
 	bool m_is_open = false;
-	bool m_is_focus_request = false;
 	Action m_toggle_ui;
 	Action m_save_action;
 	Action m_delete_action;

@@ -1935,8 +1935,10 @@ void CompositeTextureEditor::onCanvasClicked(ImVec2 pos, i32 hovered_link) {
 	}	
 }
 
+static constexpr const char* WINDOW_NAME = "Composite texture";
+
 void CompositeTextureEditor::open(const char* path) {
-	m_is_focus_request = true;
+	ImGui::SetWindowFocus(WINDOW_NAME);
 	m_is_open = true;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	IAllocator& allocator = m_app.getAllocator();
@@ -2016,9 +2018,7 @@ void CompositeTextureEditor::onWindowGUI() {
 	if (!m_is_open) return;
 
 	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-	if (m_is_focus_request) ImGui::SetNextWindowFocus();
-	m_is_focus_request = false;
-	if (ImGui::Begin("Composite texture", &m_is_open, ImGuiWindowFlags_MenuBar)) {
+	if (ImGui::Begin(WINDOW_NAME, &m_is_open, ImGuiWindowFlags_MenuBar)) {
 		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
@@ -2049,12 +2049,12 @@ void CompositeTextureEditor::onWindowGUI() {
 
 void CompositeTextureEditor::onLinkDoubleClicked(CompositeTexture::Link& link, ImVec2 pos) {}
 
-void CompositeTextureEditor::onContextMenu(bool recently_opened, ImVec2 pos) {
+void CompositeTextureEditor::onContextMenu(ImVec2 pos) {
 	CompositeTexture::Node* node = nullptr;
 	static char filter[64] = "";
-	if (recently_opened) ImGui::SetKeyboardFocusHere();
+	if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
 	ImGui::SetNextItemWidth(150);
-	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
 	for (const auto& t : TYPES) {
 		if ((!filter[0] || stristr(t.label, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(t.label))) {
 			node = m_resource->addNode(t.type);
