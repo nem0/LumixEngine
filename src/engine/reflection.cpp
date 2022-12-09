@@ -52,6 +52,7 @@ const ComponentBase* getComponent(ComponentType cmp_type) {
 
 const PropertyBase* getProperty(ComponentType cmp_type, const char* prop_name) {
 	const ComponentBase* cmp = getComponent(cmp_type);
+	if (!cmp) return nullptr;
 	for (PropertyBase* prop : cmp->props) {
 		if (equalStrings(prop->name, prop_name)) return prop;
 	}
@@ -87,6 +88,30 @@ ComponentType getComponentTypeFromHash(RuntimeHash hash)
 	return {-1};
 }
 
+const PropertyBase* getPropertyFromHash(StableHash hash) {
+	for (const RegisteredComponent& cmp : getContext().component_bases) {
+		for (PropertyBase* prop : cmp.cmp->props) {
+			RollingStableHasher hasher;
+			hasher.begin();
+			hasher.update(cmp.cmp->name, stringLength(cmp.cmp->name));
+			hasher.update(prop->name, stringLength(prop->name));
+			hasher.end();
+			if (hasher.end64() == hash) return prop;
+		}
+	}
+	return nullptr;
+}
+
+StableHash getPropertyHash(ComponentType cmp_type, const char* property_name) {
+	RollingStableHasher hasher;
+	hasher.begin();
+	const ComponentBase* cmp = getComponent(cmp_type);
+	if (!cmp) return StableHash();
+	
+	hasher.update(cmp->name, stringLength(cmp->name));
+	hasher.update(property_name, stringLength(property_name));
+	return hasher.end64();
+}
 
 ComponentType getComponentType(const char* name)
 {

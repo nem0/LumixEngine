@@ -993,12 +993,9 @@ FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageA
 	, end_frame_draw_stream(renderer)
 {}
 
-extern "C"
+LUMIX_PLUGIN_ENTRY(renderer)
 {
-	LUMIX_PLUGIN_ENTRY(renderer)
-	{
-		return LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
-	}
+	return LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
 }
 
 

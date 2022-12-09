@@ -76,6 +76,7 @@ struct LUMIX_ENGINE_API RollingStableHasher {
 	void begin();
 	void update(const void* data, u32 len);
 	StableHash32 end();
+	StableHash end64();
 };
 
 struct LUMIX_ENGINE_API RollingHasher {

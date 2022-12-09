@@ -158,6 +158,11 @@ StableHash32 RollingStableHasher::end() {
 	return StableHash32::fromU32(u32(result ^ (result >> 32)));
 }
 
+StableHash RollingStableHasher::end64() {
+	const XXH64_hash_t result = XXH3_64bits_digest(g_rolling_hasher_state.state);
+	return StableHash::fromU64(result);
+}
+
 void RollingHasher::begin() {
 	XXH3_64bits_reset(g_rolling_hasher_state.state);
 }
