@@ -913,7 +913,7 @@ struct RendererImpl final : Renderer
 			key.defines = i.defines;
 			key.decl_hash = i.decl.hash;
 			key.state = i.state;
-			i.shader->m_programs.insert(key, i.program);
+			i.shader->m_programs.push({key, i.program});
 		}
 		m_cpu_frame->to_compile_shaders.clear();
 

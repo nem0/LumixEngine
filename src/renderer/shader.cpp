@@ -99,8 +99,9 @@ gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDe
 	key.decl_hash = decl.hash;
 	key.defines = defines;
 	key.state = state;
-	auto iter = m_programs.find(key);
-	if (iter.isValid()) return iter.value();
+	for (const ProgramPair& p : m_programs) {
+		if (p.key == key) return p.program;
+	}
 	return m_renderer.queueShaderCompile(*this, state, decl, defines);
 }
 
@@ -111,8 +112,9 @@ gpu::ProgramHandle Shader::getProgram(u32 defines) {
 	key.decl_hash = dummy_decl.hash;
 	key.defines = defines;
 	key.state = gpu::StateFlags::NONE;
-	auto iter = m_programs.find(key);
-	if (iter.isValid()) return iter.value();
+	for (const ProgramPair& p : m_programs) {
+		if (p.key == key) return p.program;
+	}
 	return m_renderer.queueShaderCompile(*this, gpu::StateFlags::NONE, dummy_decl, defines);
 }
 
@@ -400,8 +402,8 @@ bool Shader::load(u64 size, const u8* mem)
 
 void Shader::unload()
 {
-	for (gpu::ProgramHandle prg : m_programs) {
-		m_renderer.getEndFrameDrawStream().destroy(prg);
+	for (const ProgramPair& p : m_programs) {
+		m_renderer.getEndFrameDrawStream().destroy(p.program);
 	}
 	m_sources.common = "";
 	m_sources.stages.clear();

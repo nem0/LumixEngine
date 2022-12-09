@@ -141,7 +141,7 @@ bool Action::isActive()
 	if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Modifiers::ALT;
 	if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Modifiers::SHIFT;
 	if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Modifiers::CTRL;
-	if (modifiers != pressed_modifiers) return false;
+	if (modifiers != pressed_modifiers && modifiers != Modifiers::NONE) return false;
 
 	return true;
 }

@@ -118,7 +118,11 @@ public:
 	u32 m_texture_slot_count;
 	Array<Uniform> m_uniforms;
 	Array<u8> m_defines;
-	HashMap<ShaderKey, gpu::ProgramHandle> m_programs;
+	struct ProgramPair {
+		ShaderKey key;
+		gpu::ProgramHandle program;
+	};
+	Array<ProgramPair> m_programs;
 	Sources m_sources;
 
 
