@@ -63,6 +63,10 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+            - name: fetch visual script plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_visualscript.git visual_script
             - name: fetch empty plugin template
               working-directory: plugins
               run: |
