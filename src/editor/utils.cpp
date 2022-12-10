@@ -774,7 +774,6 @@ const char* RecentPaths::menu() {
 		}
 		ImGui::EndMenu();
 	}
-	ImGui::EndMenu();
 	return res;
 }
 
