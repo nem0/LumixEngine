@@ -488,7 +488,6 @@ int layer(lua_State* L)
 
 int roughness(lua_State* L)
 {
-	const float r = LuaWrapper::checkArg<float>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
@@ -524,7 +523,6 @@ int backface_culling(lua_State* L)
 
 int color(lua_State* L)
 {
-	const Vec4 c = LuaWrapper::checkArg<Vec4>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
@@ -552,7 +550,6 @@ int custom_flag(lua_State* L)
 
 int metallic(lua_State* L)
 {
-	const float m = LuaWrapper::checkArg<float>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
@@ -564,7 +561,6 @@ int metallic(lua_State* L)
 
 int emission(lua_State* L)
 {
-	const float m = LuaWrapper::checkArg<float>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
@@ -576,7 +572,6 @@ int emission(lua_State* L)
 
 int translucency(lua_State* L)
 {
-	const float m = LuaWrapper::checkArg<float>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);

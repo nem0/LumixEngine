@@ -638,4 +638,4 @@ Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {
 }
 
 
-} // namespace Lumix::anim
+} // namespace Lumix::anim

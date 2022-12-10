@@ -226,4 +226,11 @@ namespace reflection { LUMIX_ENGINE_API ComponentType getComponentType(const cha
 	#endif
 #endif
 
+#ifdef __clang__
+	#pragma clang diagnostic ignored "-Wreorder-ctor"
+	#pragma clang diagnostic ignored "-Wignored-pragma-optimize"
+	#pragma clang diagnostic ignored "-Wmissing-braces"
+	#pragma clang diagnostic ignored "-Wchar-subscripts"
+#endif
+
 } // namespace Lumix

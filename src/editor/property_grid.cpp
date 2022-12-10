@@ -618,7 +618,6 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ImGui::PushID(prop.name);
 		ComponentUID cmp = getComponent();
 		int count = prop.getCount(cmp);
-		const ImGuiStyle& style = ImGui::GetStyle();
 		ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_PLUS).x);
 		if (ImGuiEx::IconButton(ICON_FA_PLUS, "Add item"))
 		{
@@ -710,7 +709,6 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
 {
 	bool is_open = componentTreeNode(m_app, editor, cmp_type, &entities[0], entities.size());
-	ImGuiStyle& style = ImGui::GetStyle();
 	ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_ELLIPSIS_V).x);
 	if (ImGuiEx::IconButton(ICON_FA_ELLIPSIS_V, "Context menu"))
 	{

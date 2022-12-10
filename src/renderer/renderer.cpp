@@ -868,7 +868,7 @@ struct RendererImpl final : Renderer
 		}
 	}
 	
-	LinearAllocator& getCurrentFrameAllocator() { return m_cpu_frame->linear_allocator; }
+	LinearAllocator& getCurrentFrameAllocator() override { return m_cpu_frame->linear_allocator; }
 
 	void waitForCommandSetup() override
 	{

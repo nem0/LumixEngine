@@ -507,7 +507,6 @@ void Settings::setValue(Storage storage, const char* name, const char* value) co
 
 const char* Settings::getStringValue(Storage storage, const char* name, const char* default_value) const {
 	lua_State* L = getState(storage);
-	u32 res = 0;
 	lua_getglobal(L, "custom");
 
 	lua_getfield(L, -1, name);

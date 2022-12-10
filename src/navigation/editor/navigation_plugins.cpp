@@ -105,7 +105,6 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		}
 
 		ImGui::SameLine();
-		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
 			scene->loadZone(entities[0]);
 		}

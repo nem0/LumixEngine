@@ -273,7 +273,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_selected_resources.clear();
 	}
 	
-	bool hasFocus() { return m_has_focus; }
+	bool hasFocus() override { return m_has_focus; }
 
 	void update(float) override
 	{
@@ -911,8 +911,6 @@ struct AssetBrowserImpl : AssetBrowser {
 			m_wanted_resource = "";
 		}
 
-		m_is_open = m_is_open;
-
 		if(m_is_open) {
 			if (!ImGui::Begin(WINDOW_NAME, &m_is_open)) {
 				ImGui::End();
@@ -1224,7 +1222,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 
-		FileSystem& fs = m_app.getEngine().getFileSystem();
 		Plugin* plugin = iter.value();
 
 		static bool show_new_fs = false;

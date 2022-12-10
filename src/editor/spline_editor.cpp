@@ -30,7 +30,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		m_app.removePlugin(*this);
 	}
 
-	bool onMouseDown(UniverseView& view, int x, int y) {
+	bool onMouseDown(UniverseView& view, int x, int y) override {
 		Spline* spline = getSpline();
 		if (!spline) return false;
 		
@@ -61,7 +61,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		return INVALID_ENTITY;
 	}
 
-	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) {
+	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {
 		DVec3 origin;
 		Vec3 dir;
 		const Viewport& vp = view.getViewport();

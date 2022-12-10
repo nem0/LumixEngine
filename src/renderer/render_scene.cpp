@@ -189,9 +189,6 @@ struct RenderSceneImpl final : RenderScene {
 
 	void clear() override
 	{
-		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = rm.get(Material::TYPE);
-
 		for (Decal& decal : m_decals)
 		{
 			if (decal.material) decal.material->decRefCount();
@@ -790,7 +787,6 @@ struct RenderSceneImpl final : RenderScene {
 		u32 count;
 		serializer.read(count);
 		m_reflection_probes.reserve(count + m_reflection_probes.size());
-		ResourceManagerHub& manager = m_engine.getResourceManager();
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -839,7 +835,6 @@ struct RenderSceneImpl final : RenderScene {
 		u32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count + m_environment_probes.size());
-		ResourceManagerHub& manager = m_engine.getResourceManager();
 		StaticString<LUMIX_MAX_PATH> probe_dir("universes/probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
@@ -1181,11 +1176,11 @@ struct RenderSceneImpl final : RenderScene {
 		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
-	InstancedModel& beginInstancedModelEditing(EntityRef entity) {
+	InstancedModel& beginInstancedModelEditing(EntityRef entity) override {
 		return m_instanced_models[entity];
 	}
 
-	void endInstancedModelEditing(EntityRef entity) {
+	void endInstancedModelEditing(EntityRef entity) override {
 		m_instanced_models[entity].dirty = true;
 	}
 
@@ -2756,7 +2751,7 @@ struct RenderSceneImpl final : RenderScene {
 		return m_reflection_probes_texture;
 	}
 
-	void reloadReflectionProbes() {
+	void reloadReflectionProbes() override {
 		for (i32 i = 0; i < m_reflection_probes.size(); ++i) {
 			ReflectionProbe& probe = m_reflection_probes.at(i);
 			const EntityRef e = m_reflection_probes.getKey(i);

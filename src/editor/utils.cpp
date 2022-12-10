@@ -649,7 +649,6 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 		else pushUndo(moved);
 	}
 		
-	bool open_context = false;
 	i32 hovered_link = -1;
 	for (i32 i = 0, c = links.size(); i < c; ++i) {
 		NodeEditorLink& link = links[i];
@@ -686,7 +685,6 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	{
 		ImGuiID start_attr, end_attr;
 		if (ImGuiEx::GetHalfLink(&start_attr)) {
-			open_context = true;
 			m_half_link_start = start_attr;
 		}
 
@@ -713,7 +711,6 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 
 	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
 		ImGui::OpenPopup("context_menu");
-		open_context = true;
 		m_half_link_start = 0;
 	}
 

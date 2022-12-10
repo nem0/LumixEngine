@@ -1366,7 +1366,6 @@ struct PipelineImpl final : Pipeline
 
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 
-		IAllocator& allocator = m_renderer.getAllocator();
 		DrawStream& stream = m_renderer.getDrawStream();
 		
 		const i32 num_indices = data.getIndices().size();
@@ -1843,13 +1842,9 @@ struct PipelineImpl final : Pipeline
 	void setupParticles(View& view) {
 		if (view.cp.is_shadow) return;
 
-		const CameraParams cp = view.cp;
 		const auto& emitters = m_scene->getParticleEmitters();
 		if (emitters.size() == 0) return;
 			
-		Universe& universe = m_scene->getUniverse();
-
-		const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 		Sorter::Inserter inserter(view.sorter);
 
 		// TODO culling
@@ -2301,7 +2296,6 @@ struct PipelineImpl final : Pipeline
 		const float global_lod_multiplier = m_renderer.getLODMultiplier();
 		const Universe& universe = m_scene->getUniverse();
 		const HashMap<EntityRef, InstancedModel>& ims = m_scene->getInstancedModels();
-		Renderer& renderer = m_renderer;
 		
 		struct UBValues {
 			Vec4 camera_offset;
@@ -2955,7 +2949,7 @@ struct PipelineImpl final : Pipeline
 	void renderBucket(u32 viewbucket_id) {
 		View* view = m_views[viewbucket_id >> 16].get();
 		const u16 bucket_id = viewbucket_id & 0xffFF;
-		m_renderer.pushJob("render bucket", [this, view, bucket_id](DrawStream& stream){
+		m_renderer.pushJob("render bucket", [view, bucket_id](DrawStream& stream){
 			jobs::wait(&view->ready);
 			Bucket& bucket= view->buckets[bucket_id];
 			stream.merge(bucket.stream);
@@ -3806,7 +3800,6 @@ struct PipelineImpl final : Pipeline
 		DrawStream& stream = m_renderer.getDrawStream();
 
 		FileSystem* fs = &m_renderer.getEngine().getFileSystem();
-		const gpu::TextureHandle handle = m_renderbuffers[render_buffer].handle;
 		const Renderer::MemRef mem = m_renderer.allocate(sizeof(u32) * m_viewport.w * m_viewport.h);
 		const gpu::TextureHandle staging = gpu::allocTextureHandle();
 		const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
@@ -3947,7 +3940,7 @@ struct PipelineImpl final : Pipeline
 		return m_renderbuffers[m_output].handle;
 	}
 	
-	void setIndirectLightMultiplier(float value) { m_indirect_light_multiplier = value; }
+	void setIndirectLightMultiplier(float value) override { m_indirect_light_multiplier = value; }
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;

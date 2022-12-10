@@ -439,7 +439,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		m_is_simulating_selected = !m_is_simulating_selected;
 	}
 
-	void update(float time_delta) {
+	void update(float time_delta) override {
 		if (!m_is_simulating_selected) return;
 		if (m_app.getWorldEditor().isGameMode()) {
 			resetSimulation();

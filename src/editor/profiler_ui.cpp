@@ -213,8 +213,8 @@ struct ProfilerUIImpl final : ProfilerUI
 	void toggleUI() { m_is_open = !m_is_open; }
 	bool isOpen() { return m_is_open; }
 
-	void onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_profiler_open; }
-	void onBeforeSettingsSaved() { m_app.getSettings().m_is_profiler_open  = m_is_open; }
+	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_profiler_open; }
+	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_profiler_open  = m_is_open; }
 
 	void onPause() {
 		ASSERT(m_is_paused);

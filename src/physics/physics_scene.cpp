@@ -1784,8 +1784,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	void updateVehicles(float time_delta) {
-		const u32 count = (u32)m_vehicles.size();
-		
 		PxVehicleWheels* vehicles[16];
 
 		u32 valid_count = 0;
@@ -2883,7 +2881,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
-	Path getRigidActorMaterial(EntityRef entity) {
+	Path getRigidActorMaterial(EntityRef entity) override {
 		RigidActor& actor = m_actors[entity];
 		return actor.material ? actor.material->getPath() : Path();
 	}

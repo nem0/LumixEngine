@@ -785,13 +785,11 @@ public:
 	{
 		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
-		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
 		m_entities.reserve(count);
 		m_new_positions.reserve(count);
 		m_old_positions.reserve(count);
 		for (int i = count - 1; i >= 0; --i)
 		{
-			EntityPtr parent = universe->getParent(entities[i]);
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
 			m_old_positions.push(universe->getPosition(entities[i]));
@@ -1750,7 +1748,6 @@ private:
 			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(entities.length());
-			PrefabSystem& prefab_system = editor.getPrefabSystem();
 			for (EntityRef e : entities) {
 				if (!m_editor.getUniverse()->getComponent(e, m_cmp_type).isValid()) continue;
 				m_entities.push(e);
