@@ -558,15 +558,14 @@ struct StudioAppImpl final : StudioApp
 	void registerComponent(const char* icon, ComponentType cmp_type, const char* label, ResourceType resource_type, const char* property) {
 		struct Plugin final : IAddComponentPlugin {
 			void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override {
-				ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 				const char* last = reverseFind(label, nullptr, '/');
 				last = last && !from_filter ? last + 1 : label;
 				if (last[0] == ' ') ++last;
-				if (!ImGuiEx::BeginResizableMenu(last, nullptr, true)) return;
+				if (!ImGui::BeginMenu(last)) return;
 				char buf[LUMIX_MAX_PATH];
 				bool create_empty = ImGui::MenuItem(ICON_FA_BROOM " Empty");
 				static FilePathHash selected_res_hash;
-				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, 0, true) || create_empty) {
+				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, true) || create_empty) {
 					editor.beginCommandGroup("createEntityWithComponent");
 					if (create_entity) {
 						EntityRef entity = editor.addEntity();

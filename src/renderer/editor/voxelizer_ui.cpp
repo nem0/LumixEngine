@@ -159,7 +159,7 @@ void VoxelizerUI::onWindowGUI() {
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
 			ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-			if (ImGuiEx::BeginResizableMenu("Open", nullptr, true)) {
+			if (ImGui::BeginMenu("Open")) {
 				char buf[LUMIX_MAX_PATH];
 				static FilePathHash selected_res_hash;
 				if (m_app.getAssetBrowser().resourceList(Span(buf), selected_res_hash, Model::TYPE, 0, false)) {

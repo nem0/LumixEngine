@@ -4954,7 +4954,6 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 
-		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu("Terrain")) return;
 		char buf[LUMIX_MAX_PATH];
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
@@ -4974,7 +4973,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 		static FilePathHash selected_res_hash;
-		if (asset_browser.resourceList(Span(buf), selected_res_hash, Material::TYPE, 0, false) || create_empty || new_created)
+		if (asset_browser.resourceList(Span(buf), selected_res_hash, Material::TYPE, false) || create_empty || new_created)
 		{
 			if (create_entity)
 			{

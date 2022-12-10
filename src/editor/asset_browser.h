@@ -48,7 +48,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual void removePlugin(Plugin& plugin) = 0;
 	virtual void openInExternalEditor(Resource* resource) const = 0;
 	virtual void openInExternalEditor(const char* path) const = 0;
-	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, float height, bool can_create_new, bool enter_submit = false) const = 0;
+	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) const = 0;
 	virtual void tile(const Path& path, bool selected) = 0;
 	virtual void saveResource(Resource& resource, OutputMemoryStream& file) = 0;
 	virtual void releaseResources() = 0;

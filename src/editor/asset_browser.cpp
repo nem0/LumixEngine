@@ -1150,10 +1150,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 		ImGui::PopStyleVar();
 
-		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(300, 300))) {
+		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300))) {
 			static FilePathHash selected_path_hash;
 			if (popup_opened) ImGui::SetKeyboardFocusHere();
-			if (resourceList(buf, selected_path_hash, type, 0, true, true)) {
+			if (resourceList(buf, selected_path_hash, type, true, true)) {
 				ImGui::EndPopup();
 				ImGui::PopID();
 				return true;
@@ -1220,7 +1220,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
-	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, float height, bool can_create_new, bool enter_submit) const override {
+	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit) const override {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 
@@ -1243,15 +1243,9 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		static char filter[128] = "";
-		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-		ImGui::SetNextItemWidth(-w);
-		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
-		ImGui::SameLine();
-		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-			filter[0] = '\0';
-		}
-
-		ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 2), false, ImGuiWindowFlags_HorizontalScrollbar);
+		ImGuiEx::filter("Filter", filter, sizeof(filter), 200);
+		
+		ImGui::BeginChild("Resources", ImVec2(0, 200), false, ImGuiWindowFlags_HorizontalScrollbar);
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 	
 		const auto& resources = compiler.lockResources();
