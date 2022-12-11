@@ -3,8 +3,10 @@
 #include "engine/crt.h"
 #include "engine/math.h"
 #include "engine/os.h"
-#if !defined _WIN32 || defined __clang__
+#if !defined __linux__ && defined __clang__
 	#include <intrin.h>
+#endif
+#if !defined _WIN32 || defined __clang__
 	#include <malloc.h>
 	#include <string.h>
 #endif
