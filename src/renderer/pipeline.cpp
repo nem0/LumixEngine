@@ -497,8 +497,9 @@ struct PipelineImpl final : Pipeline
 			Page* p = first_page;
 			page_allocator.lock();
 			while (p) {
+				Page* n = p->header.next;
 				page_allocator.deallocate(p, false);
-				p = p->header.next;
+				p = n;
 			}
 			page_allocator.unlock();
 		}
