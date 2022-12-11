@@ -105,6 +105,7 @@ struct NodeEditorNode {
 	u16 m_id;
 	ImVec2 m_pos;
 
+	virtual ~NodeEditorNode() {}
 	virtual bool hasInputPins() const = 0;
 	virtual bool hasOutputPins() const = 0;
 	virtual bool nodeGUI() = 0;

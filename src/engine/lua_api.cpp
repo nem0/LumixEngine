@@ -518,13 +518,6 @@ static EntityRef LUA_createEntity(Universe* universe)
 }
 
 
-static int LUA_getComponentType(const char* component_type)
-{
-	return reflection::getComponentType(component_type).index;
-}
-
-
-
 static int LUA_setEntityRotation(lua_State* L)
 {
 	Universe* univ = LuaWrapper::checkArg<Universe*>(L, 1);
@@ -562,44 +555,6 @@ static const char* LUA_getResourcePath(Engine* engine, i32 resource_handle)
 {
 	Resource* res = engine->getLuaResource(resource_handle);
 	return res->getPath().c_str();
-}
-
-
-static void LUA_setEntityLocalRotation(Universe* universe, EntityRef entity, const Quat& rotation)
-{
-	if (!universe->getParent(entity).isValid()) return;
-
-	universe->setLocalRotation(entity, rotation);
-}
-
-
-static void LUA_setEntityLocalPosition(Universe* universe, EntityRef entity, const DVec3& position)
-{
-	if (!universe->getParent(entity).isValid()) return;
-
-	universe->setLocalPosition(entity, position);
-}
-
-static int LUA_multVecQuat(lua_State* L)
-{
-	Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
-	Quat q;
-	if (LuaWrapper::isType<Quat>(L, 2))
-	{
-		q = LuaWrapper::checkArg<Quat>(L, 2);
-	}
-	else
-	{
-		Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 2);
-		float angle = LuaWrapper::checkArg<float>(L, 3);
-
-		q = Quat(axis, angle);
-	}
-		
-	Vec3 res = q.rotate(v);
-
-	LuaWrapper::push(L, res);
-	return 1;
 }
 
 
@@ -642,28 +597,17 @@ static void LUA_setParent(Universe* universe, i32 parent, i32 child)
 }
 
 
-static Vec3 LUA_getEntityDirection(Universe* universe, i32 entity)
-{
-	Quat rot = universe->getRotation({entity});
-	return rot.rotate(Vec3(0, 0, 1));
-}
-
 static const char* LUA_getEntityName(Universe* univ, i32 entity) { return univ->getEntityName({entity}); }
 static void LUA_setEntityName(Universe* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
 static void LUA_setEntityScale(Universe* univ, i32 entity, float scale) { univ->setScale({entity}, scale); }
 static void LUA_setEntityPosition(Universe* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
-static float LUA_getLastTimeDelta(Engine* engine) { return engine->getLastTimeDelta(); }
 static void LUA_unloadResource(Engine* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 static Universe* LUA_createUniverse(Engine* engine) { return &engine->createUniverse(false); }
 static void LUA_destroyUniverse(Engine* engine, Universe* universe) { engine->destroyUniverse(*universe); }
 static void LUA_destroyEntity(Universe* universe, i32 entity) { universe->destroyEntity({entity}); }
-static Universe* LUA_getSceneUniverse(IScene* scene) { return &scene->getUniverse(); }
 static void LUA_logError(const char* text) { logError(text); }
 static void LUA_logInfo(const char* text) { logInfo(text); }
-static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
-static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
-static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
 
 static int LUA_loadUniverse(lua_State* L)
 {
@@ -769,8 +713,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(destroyEntity);
 	REGISTER_FUNCTION(destroyUniverse);
 	REGISTER_FUNCTION(findByName);
-	//REGISTER_FUNCTION(getComponentType);
-	//REGISTER_FUNCTION(getEntityDirection);
 	REGISTER_FUNCTION(getEntityName);
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);
@@ -778,24 +720,17 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getFirstChild);
 	REGISTER_FUNCTION(getParent);
 	REGISTER_FUNCTION(setParent);
-	//REGISTER_FUNCTION(getLastTimeDelta);
 	REGISTER_FUNCTION(getScene);
-	//REGISTER_FUNCTION(getSceneUniverse);
 	REGISTER_FUNCTION(loadResource);
 	REGISTER_FUNCTION(getResourcePath);
 	REGISTER_FUNCTION(logError);
-	//REGISTER_FUNCTION(logInfo);
-	//REGISTER_FUNCTION(multMatrixVec);
-	//REGISTER_FUNCTION(multQuat);
-	//REGISTER_FUNCTION(nextFrame);
-	//REGISTER_FUNCTION(setEntityLocalPosition);
-	//REGISTER_FUNCTION(setEntityLocalRotation);
+	REGISTER_FUNCTION(logInfo);
 	REGISTER_FUNCTION(setEntityName);
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
 	REGISTER_FUNCTION(setEntityScale);
-	//REGISTER_FUNCTION(setTimeMultiplier);
-	//REGISTER_FUNCTION(startGame);
+	REGISTER_FUNCTION(setTimeMultiplier);
+	REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
 
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadUniverse", LUA_loadUniverse);
@@ -811,15 +746,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			LuaWrapper::createSystemFunction(L, "LumixAPI", #F, f); \
 		} while(false)
 
-	//REGISTER_FUNCTION(cloneEntity);
-	//REGISTER_FUNCTION(getFirstEntity);
-	//REGISTER_FUNCTION(getNextEntity);
-	//REGISTER_FUNCTION(getNextSibling);
-
 	#undef REGISTER_FUNCTION
 
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "instantiatePrefab", &LUA_instantiatePrefab);
-	//LuaWrapper::createSystemFunction(L, "Engine", "multVecQuat", &LUA_multVecQuat);
 
 	lua_newtable(L);
 	lua_pushvalue(L, -1);

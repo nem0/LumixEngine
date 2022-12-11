@@ -4,8 +4,9 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #if !defined _WIN32 || defined __clang__
-	#include <string.h>
+	#include <intrin.h>
 	#include <malloc.h>
+	#include <string.h>
 #endif
 
 

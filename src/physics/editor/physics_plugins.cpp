@@ -308,7 +308,6 @@ void showHingeJointGizmo(UniverseView& view,
 	bool use_limit,
 	const RigidTransform& global_frame1)
 {
-	Universe& universe = phy_scene.getUniverse();
 	Vec3 y_vec = global_frame1.rot * Vec3(0, 1, 0);
 	Vec3 z_vec = global_frame1.rot * Vec3(0, 0, 1);
 
@@ -589,7 +588,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				const EntityRef entity = scene->getJointEntity(i);
 				cmp.entity = entity;
 				cmp.scene = scene;
-				physx::PxJoint* joint = scene->getJoint(entity);
+				//physx::PxJoint* joint = scene->getJoint(entity);
 				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(entity)->getConcreteType()) {
 					case physx::PxJointConcreteType::eDISTANCE:
 						cmp.type = DISTANCE_JOINT_TYPE;

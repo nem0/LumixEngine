@@ -2506,7 +2506,6 @@ struct RenderSceneImpl final : RenderScene {
 	
 	RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const RayCastModelHit::Filter& filter) override {
 		RayCastModelHit hit;
-		double cur_dist = DBL_MAX;
 		hit.is_hit = false;
 		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
 			const EntityRef e = iter.key();
@@ -2538,7 +2537,6 @@ struct RenderSceneImpl final : RenderScene {
 						hit = new_hit;
 						hit.t *= id.scale;
 						hit.is_hit = true;
-						cur_dist = length(ray_dir) * hit.t;
 						hit.subindex = u32(&id - im.instances.begin());
 					}
 				}

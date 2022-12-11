@@ -1452,7 +1452,6 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 	
 	void onContextMenu(ImVec2 pos) override {
-		ImVec2 cp = ImGui::GetItemRectMin();
 		ParticleEditorResource::Node* n = nullptr;
 		if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
 		if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);

@@ -1397,7 +1397,6 @@ struct SplatNode final : CompositeTexture::Node {
 		data->channels = 4;
 		data->pixels.resize(data->w * data->h * data->channels); 
 
-		u8* p = data->pixels.getMutableData();
 		for (u32 i = 0, c = tmp.w * tmp.h; i < c; ++i) {
 			for (u32 channel = 0; channel < 4; ++channel) {
 				data->pixels[i * 4 + channel] = tmp.pixels[i * tmp.channels + channel % tmp.channels];

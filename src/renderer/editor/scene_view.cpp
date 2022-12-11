@@ -469,7 +469,6 @@ struct UniverseViewImpl final : UniverseView {
 		const Universe* universe = m_editor.getUniverse();
 		DVec3 pos = m_viewport.pos;
 		Quat rot = m_viewport.rot;
-		const Quat old_rot = rot;
 
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
 		rot = normalize(yaw_rot * rot);
@@ -615,8 +614,6 @@ SceneView::SceneView(StudioApp& app)
 	m_show_stats = false;
 
 	Engine& engine = m_app.getEngine();
-	IAllocator& allocator = engine.getAllocator();
-
 
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
 	m_orbit_action.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
@@ -785,7 +782,6 @@ void SceneView::update(float time_delta)
 
 
 void SceneView::renderIcons() {
-	Engine& engine = m_app.getEngine();
 	Renderer& renderer = m_pipeline->getRenderer();
 	
 	renderer.pushJob("icons", [this, &renderer](DrawStream& stream) {
@@ -1094,7 +1090,6 @@ void SceneView::onToolbar()
 	pos = ImGui::GetCursorPos();
 	pos.y -= offset;
 	ImGui::SetCursorPos(pos);
-	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
 	ImGui::TextUnformatted(mode_action->font_icon);
 
 	ImGui::SameLine();
@@ -1226,7 +1221,6 @@ void SceneView::onBeforeSettingsSaved() {
 void SceneView::statsUI(float x, float y) {
 	if (!m_show_stats) return;
 
-	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 	ImVec2 view_pos(x, y);
 	view_pos.x += ImGui::GetStyle().FramePadding.x;
 	view_pos.y += ImGui::GetStyle().FramePadding.y;

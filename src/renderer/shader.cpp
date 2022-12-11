@@ -443,7 +443,7 @@ static void toName(char prefix, Span<char> out, const char* in) {
 	*o = '_';
 	++o;
 	while (o != out.end() - 1 && *c) {
-		if (*c >= 'a' && *c <= 'z' || *c >= '0' && *c <= '9') {
+		if ((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9')) {
 			*o = *c;
 		}
 		else if (*c >= 'A' && *c <= 'Z') {

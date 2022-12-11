@@ -4,7 +4,7 @@
 #include "engine/lumix.h"
 
 
-#ifdef _WIN32
+#if defined _WIN32 && !defined __clang__
 	#include <xmmintrin.h>
 #else
 	#include <math.h>
@@ -15,7 +15,7 @@ namespace Lumix
 {
 
 
-#ifdef _WIN32
+#if defined _WIN32 && !defined __clang__
 	using float4 = __m128;
 
 

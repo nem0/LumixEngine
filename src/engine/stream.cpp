@@ -369,7 +369,6 @@ bool InputMemoryStream::read(String& string)
 const char* InputMemoryStream::readString()
 {
 	const char* ret = (const char*)m_data + m_pos;
-	const char* end = (const char*)m_data + m_size;
 	while (m_pos < m_size && m_data[m_pos]) ++m_pos;
 	ASSERT(m_pos < m_size);
 	++m_pos;

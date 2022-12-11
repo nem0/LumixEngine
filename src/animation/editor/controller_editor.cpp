@@ -65,7 +65,6 @@ struct ControllerEditorImpl : ControllerEditor {
 		, m_event_types(app.getAllocator())
 		, m_copy_buffer(app.getAllocator())
 	{
-		IAllocator& allocator = app.getAllocator();
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
 		ASSERT(res_manager);
 

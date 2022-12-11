@@ -163,7 +163,6 @@ namespace ImGuiEx {
 		const ImVec2 half_extents(NODE_PIN_RADIUS + 4, NODE_PIN_RADIUS + 4);
 		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
 		const bool hovered = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-		ImGuiStyle& style = GetStyle();
 		const ImU32 color = GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab);
 		switch(shape) {
 			case PinShape::TRIANGLE:
@@ -350,7 +349,7 @@ namespace ImGuiEx {
 
 		if (IsItemActive() && IsMouseReleased(0)) ResetActiveID();
 		
-		if ((g_node_editor.dragged_node == g_node_editor.last_node_id || g_node_editor.is_node_selected && *g_node_editor.is_node_selected) 
+		if ((g_node_editor.dragged_node == g_node_editor.last_node_id || (g_node_editor.is_node_selected && *g_node_editor.is_node_selected)) 
 			&& IsMouseDragging(0) 
 			&& g_node_editor.dragged_node != 0
 			&& !g_node_editor.new_link_from 
@@ -787,7 +786,7 @@ namespace ImGuiEx {
 					window->StateStorage.SetFloat((ImGuiID)StorageValues::POINT_START_Y, pos.y);
 				}
 
-				if (IsItemHovered() || IsItemActive() && IsMouseDragging(0))
+				if (IsItemHovered() || (IsItemActive() && IsMouseDragging(0)))
 				{
 					char tmp[64];
 					ImFormatString(tmp, sizeof(tmp), "%0.2f, %0.2f", p.x, p.y);
@@ -1092,8 +1091,6 @@ namespace ImGuiEx {
 
 	void Label(const char* label) {
 		ImGuiWindow* window = GetCurrentWindow();
-		const ImVec2 lineStart = GetCursorScreenPos();
-		const ImGuiStyle& style = GetStyle();
 		float fullWidth = GetContentRegionAvail().x;
 		float itemWidth = fullWidth * 0.6f;
 		ImVec2 textSize = CalcTextSize(label);
@@ -1272,17 +1269,6 @@ namespace ImGuiEx {
 	void PopReadOnly() {
 		PopStyleColor();
 		PopItemFlag();
-	}
-
-	static bool IsRootOfOpenMenuSet()
-	{
-		ImGuiContext& g = *GImGui;
-		ImGuiWindow* window = g.CurrentWindow;
-		if ((g.OpenPopupStack.Size <= g.BeginPopupStack.Size) || (window->Flags & ImGuiWindowFlags_ChildMenu))
-			return false;
-
-		const ImGuiPopupData* upper_popup = &g.OpenPopupStack[g.BeginPopupStack.Size];
-		return (/*upper_popup->OpenParentId == window->IDStack.back() &&*/ upper_popup->Window && (upper_popup->Window->Flags & ImGuiWindowFlags_ChildMenu));
 	}
 
 	Canvas::~Canvas() {

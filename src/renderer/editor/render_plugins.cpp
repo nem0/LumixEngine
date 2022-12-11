@@ -345,7 +345,6 @@ static void scaleCoverage(Span<u8> data, u32 w, u32 h, float ref_norm, float wan
 		++histogram[pixels[i].a];
 	}
 
-	const u8 ref = u8(clamp(255 * ref_norm, 0.f, 255.f));
 	u32 count = u32(w * h  * (1 - wanted_coverage));
 	float new_ref;
 	for (new_ref = 0; new_ref < 255; ++new_ref) {
@@ -420,7 +419,6 @@ static bool isValid(const Input& src_data, const Options& options) {
 
 [[nodiscard]] static bool compress(const Input& src_data, const Options& options, OutputMemoryStream& dst, IAllocator& allocator) {
 	PROFILE_FUNCTION();
-	static bool once = []() { rgbcx::init(); return false; }();
 
 	if (!isValid(src_data, options)) return false;
 
@@ -858,7 +856,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return true;
 	}
 
-	bool onGUI(Span<Resource*> ress) {
+	bool onGUI(Span<Resource*> ress) override {
 		bool result = false;
 		Span<Material*> resources;
 		resources.m_begin = (Material**)ress.m_begin;
@@ -1128,6 +1126,8 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		, m_composite_texture_editor(composite_editor)
 		, AssetBrowser::Plugin(app.getAllocator())
 	{
+		rgbcx::init();
+
 		app.getAssetCompiler().registerExtension("png", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("jpeg", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("jpg", Texture::TYPE);
@@ -1260,7 +1260,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		TextureTileJob* m_next = nullptr;
 	};
 
-	void update() {
+	void update() override {
 		if (!m_tiles_to_create.tail) return;
 
 		TextureTileJob* job = m_tiles_to_create.tail;
@@ -1446,7 +1446,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			meta.mips = false;
 		}
 
-		m_app.getAssetCompiler().getMeta(path, [&path, &meta](lua_State* L){
+		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &meta.compress);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
@@ -1749,8 +1749,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	ModelPropertiesPlugin(StudioApp& app) : m_app(app) {}
-	
-	void update() {}
 	
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
 		if (cmp_type != MODEL_INSTANCE_TYPE) return;
@@ -2940,7 +2938,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 
-		Renderer::MemRef mem;
 		DrawStream& stream = m_renderer->getDrawStream();
 		
 		m_tile.texture = gpu::allocTextureHandle();
@@ -3007,15 +3004,12 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	void renderTile(Material* material) {
 		if (material->getTextureCount() == 0) return;
 		const char* in_path = material->getTexture(0)->getPath().c_str();
-		Engine& engine = m_app.getEngine();
 		StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
-
 		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
 	}
 
 	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
 	{
-		Engine& engine = m_app.getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -3078,7 +3072,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (type == Shader::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_shader.tga", out_path);
 
 		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
@@ -3717,7 +3710,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		if (cmp_type == ENVIRONMENT_PROBE_TYPE) {
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
-				const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
 				if (ImGui::CollapsingHeader("Generator")) {
 					if (ImGui::Button("Generate")) generateCubemaps(false, universe);
 					ImGui::SameLine();
@@ -4694,9 +4686,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	}
 
 	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program) {
-		const u32 num_indices = cmd_list->IdxBuffer.size() / sizeof(ImDrawIdx);
-		const u32 num_vertices = cmd_list->VtxBuffer.size() / sizeof(ImDrawVert);
-
 		const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
 		memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
 
@@ -4952,8 +4941,6 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 	void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override
 	{
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-
 		if (!ImGui::BeginMenu("Terrain")) return;
 		char buf[LUMIX_MAX_PATH];
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
@@ -5125,20 +5112,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		EntityRef e = (EntityRef)cmp.entity;
 		EnvironmentProbe& p = scene->getEnvironmentProbe(e);
 		Transform tr = universe.getTransform(e);
-		const DVec3 pos = universe.getPosition(e);
-		const Quat rot = universe.getRotation(e);
-
-		/*Vec3 x = rot.rotate(Vec3(p.outer_range.x, 0, 0));
-		Vec3 y = rot.rotate(Vec3(0, p.outer_range.y, 0));
-		Vec3 z = rot.rotate(Vec3(0, 0, p.outer_range.z));
-
-		addCube(view, pos, x, y, z, Color::BLUE);
-
-		x = rot.rotate(Vec3(p.inner_range.x, 0, 0));
-		y = rot.rotate(Vec3(0, p.inner_range.y, 0));
-		z = rot.rotate(Vec3(0, 0, p.inner_range.z));
-
-		addCube(view, pos, x, y, z, Color::BLUE);*/
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = view.getEditor();
@@ -5162,8 +5135,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		EntityRef e = (EntityRef)cmp.entity;
 		ReflectionProbe& p = scene->getReflectionProbe(e);
 		Transform tr = universe.getTransform(e);
-		const DVec3 pos = universe.getPosition(e);
-		const Quat rot = universe.getRotation(e);
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = view.getEditor();
@@ -5322,8 +5293,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	~StudioAppPlugin()
 	{
 		m_app.removeAction(&m_renderdoc_capture_action);
-
-		IAllocator& allocator = m_app.getAllocator();
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_model_plugin);

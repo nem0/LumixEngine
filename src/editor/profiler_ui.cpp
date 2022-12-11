@@ -464,6 +464,7 @@ struct ProfilerUIImpl final : ProfilerUI
 
 		InputMemoryStream blob(m_data);
 		const u32 version = blob.read<u32>();
+		ASSERT(version == 0);
 		const u32 counters_count = blob.read<u32>();
 		blob.skip(counters_count * sizeof(profiler::Counter));
 		const u32 count = blob.read<u32>();
@@ -871,38 +872,6 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 		showAllocationTree(child, SIZE);
 	}
 	ImGui::Columns(1);
-}
-
-static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
-{
-	const float h = ImGui::GetFontSize() * 1.00f;
-	float r = h * 0.40f * scale;
-	ImVec2 center = ImVec2(p_min.x + h * 0.50f, p_min.y + h * 0.50f * scale);
-
-	ImVec2 a, b, c;
-	switch (dir)
-	{
-	case ImGuiDir_Up:
-	case ImGuiDir_Down:
-		if (dir == ImGuiDir_Up) r = -r;
-		a = ImVec2(+0.000f * r,+0.750f * r);
-		b = ImVec2(-0.866f * r,-0.750f * r);
-		c = ImVec2(+0.866f * r,-0.750f * r);
-		break;
-	case ImGuiDir_Left:
-	case ImGuiDir_Right:
-		if (dir == ImGuiDir_Left) r = -r;
-		a = ImVec2(+0.750f * r,+0.000f * r);
-		b = ImVec2(-0.750f * r,+0.866f * r);
-		c = ImVec2(-0.750f * r,-0.866f * r);
-		break;
-	case ImGuiDir_None:
-	case ImGuiDir_COUNT:
-		IM_ASSERT(0);
-		break;
-	}
-
-	dl->AddTriangleFilled(center + a, center + b, center + c, ImGui::GetColorU32(ImGuiCol_Text));
 }
 
 void ProfilerUIImpl::onGUICPUProfiler()

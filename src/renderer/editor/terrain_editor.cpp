@@ -846,7 +846,6 @@ static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {
 	float p3 = p * p * p;
 	float q = kx * (2.f * kx * kx - 3.f * ky) + kz;
 	float h = q * q + 4.f * p3;
-	float res_t;
 
 	if (h >= 0.f) { // 1 root
 		h = sqrtf(h);
@@ -855,7 +854,6 @@ static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {
 		float t = clamp(uv.x + uv.y - kx, 0.f, 1.f);
 		Vec2 qv2 = d + (c + b * t) * t;
 		res = dot(qv2, qv2);
-		res_t = t;
 	}
 	else { // 3 roots
 		float z = sqrtf(-p);
@@ -869,10 +867,8 @@ static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {
 		float dy = dot(qy, qy), sy = cross2(c + b * 2.f * t.y, qy);
 		if (dx < dy) {
 			res = dx;
-			res_t = t.x;
 		} else {
 			res = dy;
-			res_t = t.y;
 		}
 	}
     
@@ -1178,7 +1174,6 @@ int TerrainEditor::placePrefabs(lua_State* L) {
 	Universe* universe = editor.getUniverse();
 	RenderScene* render_scene = (RenderScene*)universe->getScene(TERRAIN_TYPE);
 	Array<Array<Transform>> transforms(that->m_app.getAllocator());
-	const i32 prefabs_count = prefabs.size();
 	for (const auto& prefab : prefabs) {
 		transforms.emplace(that->m_app.getAllocator());
 	}
@@ -1604,8 +1599,6 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef entity, const DVec3
 	}
 
 	const Vec3 rel_pos = Vec3(terrain_transform.inverted().transform(center));
-	const i32 w = terrain->getWidth();
-	const i32 h = terrain->getHeight();
 	const float scale = terrain->getXZScale();
 	const IVec3 p = IVec3(rel_pos / scale);
 	const i32 half_extents = i32(1 + brush_size / scale);
@@ -2288,7 +2281,6 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 		}
 	}*/
 
-	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if ((albedo->getPath() != m_albedo_composite_path || albedo->depth != m_layer_views.size()) && albedo->isReady()) {
 		m_albedo_composite_path = albedo->getPath();
 

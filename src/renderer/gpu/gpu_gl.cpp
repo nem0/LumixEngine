@@ -596,7 +596,7 @@ static void setState(StateFlags state)
 		const u8 ref = u8(u64(state) >> 35);
 		const u8 mask = u8(u64(state) >> 43);
 		glEnable(GL_STENCIL_TEST);
-		GLenum gl_func;
+		GLenum gl_func = GL_ALWAYS;
 		switch(func) {
 			case StencilFuncs::ALWAYS: gl_func = GL_ALWAYS; break;
 			case StencilFuncs::EQUAL: gl_func = GL_EQUAL; break;
@@ -1153,13 +1153,11 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const bool no_mips = u32(flags & TextureFlags::NO_MIPS);
 	const bool is_3d = depth > 1 && u32(flags & TextureFlags::IS_3D);
 	const bool is_cubemap = u32(flags & TextureFlags::IS_CUBE);
-	const bool is_anisotropic_filter = u32(flags & TextureFlags::ANISOTROPIC_FILTER);
 
 	ASSERT(!is_cubemap || !is_3d);
 	ASSERT(debug_name && debug_name[0]);
 
 	GLuint texture;
-	int found_format = 0;
 	GLenum internal_format = 0;
 	GLenum target = GL_TEXTURE_2D; 
 	if (is_3d) target = GL_TEXTURE_3D;

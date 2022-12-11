@@ -180,7 +180,6 @@ struct NavigationSceneImpl final : NavigationScene
 			const EntityRef entity = (EntityRef)entity_ptr;
 			const Transform terrain_tr = m_universe.getTransform(entity);
 			const Transform to_zone = zone_tr.inverted() * terrain_tr;
-			const IVec2 res = render_scene->getTerrainResolution(entity);
 			float scaleXZ = render_scene->getTerrainXZScale(entity);
 			const Transform to_terrain = to_zone.inverted();
 			Matrix mtx = to_terrain.rot.toMatrix();
@@ -375,8 +374,6 @@ struct NavigationSceneImpl final : NavigationScene
 	void update(RecastZone& zone, float time_delta) {
 		if (!zone.crowd) return;
 		zone.crowd->update(time_delta, nullptr);
-
-		const Transform inv_tr = m_universe.getTransform(zone.entity).inverted();
 
 		for (auto& agent : m_agents) {
 			if (agent.agent < 0) continue;

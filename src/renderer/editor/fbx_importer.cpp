@@ -350,21 +350,6 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 }
 
 
-static int findSubblobIndex(const OutputMemoryStream& haystack, const OutputMemoryStream& needle, const Array<int>& subblobs, int first_subblob)
-{
-	const u8* data = (const u8*)haystack.data();
-	const u8* needle_data = (const u8*)needle.data();
-	int step_size = (int)needle.size();
-	int idx = first_subblob;
-	while(idx != -1)
-	{
-		if (memcmp(data + idx * step_size, needle_data, step_size) == 0) return idx;
-		idx = subblobs[idx];
-	}
-	return -1;
-}
-
-
 static Vec3 toLumixVec3(const ofbx::Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
 
 
@@ -1042,7 +1027,6 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	ASSERT(renderer);
 
-	IAllocator& allocator = renderer->getAllocator();
 	const u32 capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
 
@@ -1518,7 +1502,7 @@ static LocalRigidTransform sample(const ofbx::Object& bone, const ofbx::Animatio
 	convert(mtx, res.pos, res.rot);
 	return res;
 }
-
+/*
 static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& keys, const Quat& bind_rot, float error) {
 	if (count != 2) return false;
 	for (const FBXImporter::Key& key : keys) {
@@ -1530,7 +1514,7 @@ static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& ke
 	}
 	return true;
 }
-
+*/
 static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const Vec3& bind_pos) {
 	if (count != 2) return false;
 	const float ERROR = 0;
@@ -1924,14 +1908,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 	float origin_radius_squared = 0;
 	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
-	for (const ImportMesh& import_mesh : m_meshes) {
-		if (!import_mesh.import) continue;
-		if (!import_mesh.lod != 0) continue;
-
-		origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
-		center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
-		aabb.merge(import_mesh.aabb);
-	}
 
 	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes)
@@ -2002,7 +1978,7 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		for (const ImportMesh& import_mesh : m_meshes) {
 			if (!import_mesh.import) continue;
 			
-			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod) || import_mesh.lod == 0 && hasAutoLOD(cfg, lod)) {
+			if ((import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) || (import_mesh.lod == 0 && hasAutoLOD(cfg, lod))) {
 				write((i32)import_mesh.vertex_data.size());
 				write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
 			}
@@ -2013,7 +1989,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		const float r = maximum(squaredLength(aabb.max), squaredLength(aabb.min));
 		origin_radius_squared = maximum(origin_radius_squared, r);
 		center_radius_squared = maximum(center_radius_squared, squaredLength(aabb.max - aabb.min) * 0.5f);
-		const Vec3 impostor_center = Vec3(0, (aabb.max + aabb.min).y * 0.5f, 0);
 
 	}
 
@@ -2191,7 +2166,6 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 
 void FBXImporter::writeLODs(const ImportConfig& cfg)
 {
-	i32 last_mesh_idx = -1;
 	i32 lods[4] = {};
 	for (auto& mesh : m_meshes) {
 		if (!mesh.import) continue;
@@ -2247,7 +2221,6 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 
 	AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
 	for (ImportMesh& import_mesh : m_meshes) {
-		const ofbx::Mesh& mesh = *import_mesh.fbx;
 		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
 		const i32 vertex_count = geom->getVertexCount();
 		const ofbx::Vec3* vertices = (ofbx::Vec3*)geom->getVertices();
@@ -2260,7 +2233,6 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 	Voxels voxels(m_allocator);
 	voxels.beginRaster(aabb, 64);
 	for (ImportMesh& import_mesh : m_meshes) {
-		const ofbx::Mesh& mesh = *import_mesh.fbx;
 		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
 		const i32 vertex_count = geom->getVertexCount();
 		const ofbx::Vec3* vertices = (ofbx::Vec3*)geom->getVertices();
@@ -2273,7 +2245,6 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 	voxels.blurAO();
 
 	for (ImportMesh& import_mesh : m_meshes) {
-		const ofbx::Mesh& mesh = *import_mesh.fbx;
 		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
 		ImportGeometry& import_geom = getImportGeometry(geom);
 		const i32 vertex_count = geom->getVertexCount();
@@ -2424,7 +2395,6 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		writeModelHeader();
 		writeMeshes(src, i, cfg);
 		writeGeometry(i, cfg);
-		const ofbx::Skin* skin = m_meshes[i].fbx->getGeometry()->getSkin();
 		if (m_meshes[i].is_skinned) {
 			writeSkeleton(cfg);
 		}

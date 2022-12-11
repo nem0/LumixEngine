@@ -50,7 +50,6 @@ static constexpr u32 INSTANCED_MESHES_BUFFER_SIZE = 64 * 1024 * 1024; // TODO dy
 static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
-static constexpr u64 SORT_KEY_DEPTH_MASK = 0xffFFffFF;
 static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
 static constexpr u64 SORT_KEY_MESH_IDX_SHIFT = 40;
 
@@ -1368,9 +1367,6 @@ struct PipelineImpl final : Pipeline
 
 		DrawStream& stream = m_renderer.getDrawStream();
 		
-		const i32 num_indices = data.getIndices().size();
-		const i32 num_vertices = data.getVertices().size();
-
 		const Renderer::TransientSlice idx_buffer_mem = m_renderer.allocTransient(data.getIndices().byte_size());
 		const Renderer::TransientSlice vtx_buffer_mem = m_renderer.allocTransient(data.getVertices().byte_size());
 		memcpy(idx_buffer_mem.ptr, data.getIndices().begin(), data.getIndices().byte_size());
@@ -1760,11 +1756,6 @@ struct PipelineImpl final : Pipeline
 			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
 			const Universe& universe = m_scene->getUniverse();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
-
-			float fov_multiplier = 1;
-			if (!m_viewport.is_ortho) {
-				fov_multiplier = clamp(degreesToRadians(60) / m_viewport.fov, 1.f, 3.f);
-			}
 
 			u32 quad_count = 0;
 			u32 culled_count = 0;
@@ -2639,7 +2630,6 @@ struct PipelineImpl final : Pipeline
 					const ParticleEmitter& emitter = m_scene->getParticleEmitter(entity);
 					const Material* material = emitter.getResource()->getMaterial();
 					const u32 particles_count = emitter.getParticlesCount();
-					const u32 size = emitter.getParticlesDataSizeBytes();
 
 					const ParticleEmitterResource* res = emitter.getResource();
 					const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
@@ -3099,9 +3089,6 @@ struct PipelineImpl final : Pipeline
 			Vec4 zplanes[17];
 	
 			const Vec3 cam_dir = normalize(cross(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]));
-		
-			Vec3 near = (frustum.points[0] + frustum.points[2]) * 0.5f;
-			Vec3 far = (frustum.points[4] + frustum.points[6]) * 0.5f;
 		
 			for (i32 i = 0; i < size.z + 1; ++i) {
 				// TODO do not hardcode constants

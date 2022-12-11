@@ -720,10 +720,11 @@ static void getStack(CONTEXT& context, Span<char> out)
 		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
 		symbol->MaxNameLength = 255;
 
-		BOOL sybol_valid = SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
-		auto err = GetLastError();
+		BOOL symbol_valid = SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
+		if (!symbol_valid) return;
 		DWORD num_char = UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
 
+		if (num_char == 0) return;
 		if (!catString(out, symbol->Name)) return;
 		if (!catString(out, "\n")) return;
 

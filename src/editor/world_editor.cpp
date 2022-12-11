@@ -677,7 +677,6 @@ public:
 	{
 		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
-		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
 		m_entities.reserve(count);
 		m_new_positions.reserve(count);
 		m_new_rotations.reserve(count);
@@ -685,7 +684,6 @@ public:
 		m_old_rotations.reserve(count);
 		for (int i = count - 1; i >= 0; --i)
 		{
-			EntityPtr parent = universe->getParent(entities[i]);
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
 			m_new_rotations.push(new_rotations[i]);

@@ -19,9 +19,6 @@
 namespace Lumix
 {
 
-
-static const float GRASS_QUAD_SIZE = 10.0f;
-static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const ComponentType TERRAIN_HASH = reflection::getComponentType("terrain");
 
 struct Sample
@@ -551,11 +548,9 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 	if (new_state == Resource::State::READY)
 	{
 		m_heightmap = m_material->getTextureByName("Heightmap");
-		bool is_data_ready = true;
 		if (m_heightmap && m_heightmap->getData() == nullptr)
 		{
 			m_heightmap->addDataReference();
-			is_data_ready = false;
 		}
 		if (m_heightmap)
 		{
@@ -568,31 +563,7 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 
 		if (m_splatmap && !m_splatmap->getData()) {
 			m_splatmap->addDataReference();
-			is_data_ready = false;
 		}
-		/*
-		Texture* colormap = m_material->getTextureByUniform("u_colormap");
-		if (colormap && colormap->getData() == nullptr)
-		{
-			colormap->addDataReference();
-			is_data_ready = false;
-		}
-
-		if (is_data_ready)
-		{
-			LUMIX_DELETE(m_allocator, m_root);
-			if (m_heightmap)
-			{
-				m_width = m_heightmap->width;
-				m_height = m_heightmap->height;
-				m_root = generateQuadTree((float)m_width);
-			}
-		}*/
-	}
-	else
-	{
-		//LUMIX_DELETE(m_allocator, m_root);
-		//m_root = nullptr;
 	}
 }
 

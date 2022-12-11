@@ -71,9 +71,6 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		const Transform tr = universe->getTransform(e);
 
-		const Vec3 rel_pos = Vec3(origin - tr.pos);
-		const Vec3 n = tr.rot.rotate(Vec3(0, 1, 0));
-
 		Spline* spline = getSpline();
 		if (spline) {
 			for (const Vec3& point : spline->points) {

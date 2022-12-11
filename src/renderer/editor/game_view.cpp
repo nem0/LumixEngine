@@ -59,7 +59,6 @@ GameView::GameView(StudioApp& app)
 
 
 void GameView::init() {
-	IAllocator& allocator = m_app.getAllocator();
 	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", true);
 	m_toggle_ui.func.bind<&GameView::onAction>(this);
 	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
@@ -274,7 +273,6 @@ void GameView::onWindowGUI()
 	}
 	m_was_game_mode = is_game_mode;
 
-	ImGuiIO& io = ImGui::GetIO();
 	if (m_is_mouse_captured && (ImGui::IsKeyDown(ImGuiKey_Escape) || !editor.isGameMode())) {
 		captureMouse(false);
 	}

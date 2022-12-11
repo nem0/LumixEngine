@@ -765,7 +765,6 @@ struct StudioAppImpl final : StudioApp
 		Universe* universe = m_editor->getUniverse();
 
 		UniverseView& view = m_editor->getView();
-		const DVec3 cam_pos = view.getViewport().pos;
 		if (ents.size() > 1) {
 			DVec3 min(FLT_MAX), max(-FLT_MAX);
 			for (EntityRef e : ents) {
@@ -869,7 +868,6 @@ struct StudioAppImpl final : StudioApp
 			GetModuleFileNameA(NULL, exe_path, LUMIX_MAX_PATH);
 
 			// TODO extract only nonexistent files
-			u64 bundled_last_modified = os::getLastModified(exe_path);
 			InputMemoryStream str(res_mem, res_size);
 
 			TarHeader header;
@@ -878,7 +876,7 @@ struct StudioAppImpl final : StudioApp
 				str.read(&header, sizeof(header));
 				u32 size;
 				fromCStringOctal(Span(header.size, sizeof(header.size)), size); 
-				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
+				if (header.name[0] && (header.typeflag == 0 || header.typeflag == '0')) {
 					const StaticString<LUMIX_MAX_PATH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[LUMIX_MAX_PATH];
 					copyString(Span(dir), Path::getDir(path));
@@ -900,8 +898,6 @@ struct StudioAppImpl final : StudioApp
 				str.setPosition(str.getPosition() + (512 - str.getPosition() % 512) % 512);
 				str.setPosition(str.getPosition() + size + (512 - size % 512) % 512);
 			}
-
-			UnlockResource(res_mem);
 		#endif
 	}
 
