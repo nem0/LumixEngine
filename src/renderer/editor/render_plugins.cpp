@@ -3002,9 +3002,12 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 
 	void renderTile(Material* material) {
-		if (material->getTextureCount() == 0) return;
 		const char* in_path = material->getTexture(0)->getPath().c_str();
 		StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
+		if (material->getTextureCount() == 0) {
+			m_app.getAssetBrowser().copyTile("editor/textures/tile_material.tga", out_path);
+			return;
+		}
 		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
 	}
 
