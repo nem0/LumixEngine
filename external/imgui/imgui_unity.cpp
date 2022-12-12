@@ -1,4 +1,4 @@
-#ifndef _WIN32
+#ifdef __GNUC__
 	#pragma GCC diagnostic ignored "-Wsubobject-linkage"
 #endif
 #include "imgui.cpp"

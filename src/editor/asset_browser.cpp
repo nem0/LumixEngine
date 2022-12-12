@@ -1002,8 +1002,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			unloadResources();
 			m_selected_resources.push(resource);
 		}
+		const char* path = resource->getPath().c_str();
+		ResourceLocator rl(Span(path, stringLength(path)));
 		char dir[LUMIX_MAX_PATH];
-		copyString(Span(dir), Path::getDir(resource->getPath().c_str()));
+		copyString(Span(dir), rl.dir);
 		changeDir(dir, false);
 		ASSERT(resource->getRefCount() > 0);
 	}
