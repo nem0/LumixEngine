@@ -613,8 +613,6 @@ SceneView::SceneView(StudioApp& app)
 	m_is_mouse_captured = false;
 	m_show_stats = false;
 
-	Engine& engine = m_app.getEngine();
-
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
 	m_orbit_action.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
 	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);

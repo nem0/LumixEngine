@@ -336,7 +336,8 @@ int main(int args, char* argv[]) {
 		"void main() { gl_Position = vec4(gl_VertexID & 1, (gl_VertexID >> 1) & 1, 0, 1); }",
 		"layout(location = 0) out vec4 color; void main() { color = vec4(1, 0, 1, 1); }",
 	};
-	gpu::createProgram(shader, {}, srcs, types, 2, nullptr, 0, "shader");
+	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
+	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, srcs, types, 2, nullptr, 0, "shader");
 
 	bool finished = false;
 	while (!finished) {
@@ -345,6 +346,7 @@ int main(int args, char* argv[]) {
 			switch (e.type) {
 				case os::Event::Type::WINDOW_CLOSE:
 				case os::Event::Type::QUIT: finished = true; break;
+				default: break;
 			}
 		}
 
@@ -352,8 +354,7 @@ int main(int args, char* argv[]) {
 		const float clear_col[] = {0, 0, 0, 1};
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
 		gpu::useProgram(shader);
-		gpu::setState(gpu::StateFlags::NONE);
-		gpu::drawArrays(gpu::PrimitiveType::TRIANGLES, 0, 3);
+		gpu::drawArrays(0, 3);
 
 		u32 frame = gpu::swapBuffers();
 		gpu::waitFrame(frame);

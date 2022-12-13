@@ -38,12 +38,12 @@ Vec2::Vec2(float a, float b)
 	, y(b) {}
 
 float& Vec2::operator[](u32 i) {
-	ASSERT(i >= 0 && i < 2);
+	ASSERT(i < 2);
 	return (&x)[i];
 }
 
 float Vec2::operator[](u32 i) const {
-	ASSERT(i >= 0 && i < 2);
+	ASSERT(i < 2);
 	return (&x)[i];
 }
 
@@ -247,12 +247,12 @@ Vec2 Vec4::yz() const { return Vec2(y, z); }
 Vec3 Vec4::rgb() const { return Vec3(x, y, z); }
 
 float& Vec4::operator[](u32 i) {
-	ASSERT(i >= 0 && i < 4);
+	ASSERT(i < 4);
 	return (&x)[i];
 }
 
 float Vec4::operator[](u32 i) const {
-	ASSERT(i >= 0 && i < 4);
+	ASSERT(i < 4);
 	return (&x)[i];
 }
 
@@ -409,12 +409,12 @@ Vec3::Vec3(float a, float b, float c)
 	, z(c) {}
 
 float& Vec3::operator[](u32 i) {
-	ASSERT(i >= 0 && i < 3);
+	ASSERT(i < 3);
 	return (&x)[i];
 }
 
 float Vec3::operator[](u32 i) const {
-	ASSERT(i >= 0 && i < 3);
+	ASSERT(i < 3);
 	return (&x)[i];
 }
 

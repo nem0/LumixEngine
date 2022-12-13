@@ -429,11 +429,11 @@ struct ParticleEditorResource {
 		}
 
 		void serialize(OutputMemoryStream& blob) const override { 
-			if (T == Node::VEC3) blob.write(value.xyz());
+			if constexpr (T == Node::VEC3) blob.write(value.xyz());
 			else blob.write(value);
 		}
 		void deserialize(InputMemoryStream& blob) override { 
-			if (T == Node::VEC3) {
+			if constexpr (T == Node::VEC3) {
 				Vec3 v = blob.read<Vec3>();
 				value = Vec4(v, 0);
 			}
@@ -472,7 +472,7 @@ struct ParticleEditorResource {
 				changed = ImGui::DragFloat("Z", &value.z) || changed;
 			}
 
-			if (T == Node::Type::VEC4) {
+			if constexpr (T == Node::Type::VEC4) {
 				inputSlot();
 				if (getInput(3).node) {
 					ImGui::TextUnformatted("W");

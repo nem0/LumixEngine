@@ -862,9 +862,9 @@ static float bezierDistance(Vec2 pos, Vec2 A, Vec2 B, Vec2 C) {
 		float n = sinf(v) * 1.732050808f;
 		Vec3 t = clamp(Vec3(m + m, -n - m, n - m) * z - Vec3(kx), Vec3(0), Vec3(1));
 		Vec2 qx = d + (c + b * t.x) * t.x;
-		float dx = dot(qx, qx), sx = cross2(c + b * 2.f * t.x, qx);
+		float dx = dot(qx, qx);
 		Vec2 qy = d + (c + b * t.y) * t.y;
-		float dy = dot(qy, qy), sy = cross2(c + b * 2.f * t.y, qy);
+		float dy = dot(qy, qy);
 		if (dx < dy) {
 			res = dx;
 		} else {
@@ -1174,7 +1174,7 @@ int TerrainEditor::placePrefabs(lua_State* L) {
 	Universe* universe = editor.getUniverse();
 	RenderScene* render_scene = (RenderScene*)universe->getScene(TERRAIN_TYPE);
 	Array<Array<Transform>> transforms(that->m_app.getAllocator());
-	for (const auto& prefab : prefabs) {
+	for (i32 i = 0; i < prefabs.size(); ++i) {
 		transforms.emplace(that->m_app.getAllocator());
 	}
 

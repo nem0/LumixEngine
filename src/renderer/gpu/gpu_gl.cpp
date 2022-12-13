@@ -899,10 +899,8 @@ void setCurrentWindow(void* window_handle) {
 
 			wglMakeCurrent(hdc, gl->contexts[0].hglrc);
 
-			typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 			typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
 			PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)getGLFunc("wglCreateContextAttribsARB");
-			PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)getGLFunc("wglSwapIntervalEXT");
 		
 			#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
 			#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002

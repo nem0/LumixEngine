@@ -95,7 +95,7 @@ bool Texture::create(u32 w, u32 h, gpu::TextureFormat format, const void* data, 
 
 u32 Texture::getPixelNearest(u32 x, u32 y) const
 {
-	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || format != gpu::TextureFormat::RGBA8) return 0;
+	if (data.empty() || x >= width || y >= height || format != gpu::TextureFormat::RGBA8) return 0;
 
 	return *(u32*)&data.data()[(x + y * width) * 4];
 }

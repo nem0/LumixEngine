@@ -112,7 +112,7 @@ String::~String() { if (!isSmall()) m_allocator.deallocate(m_big); }
 
 char String::operator[](u32 index) const
 {
-	ASSERT(index >= 0 && index < m_size);
+	ASSERT(index < m_size);
 	return isSmall() ? m_small[index] : m_big[index];
 }
 

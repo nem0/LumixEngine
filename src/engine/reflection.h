@@ -120,6 +120,7 @@ struct StringEnumAttribute : IAttribute {
 
 struct LUMIX_ENGINE_API PropertyBase {
 	PropertyBase(IAllocator& allocator) : attributes(allocator) {}
+	virtual ~PropertyBase() {}
 	Array<IAttribute*> attributes;
 
 	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
