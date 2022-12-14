@@ -4,6 +4,7 @@ local right = 0
 local yaw = 0
 local sprint = 0
 local speed_input_idx = -1
+local dir_input_idx = -1
 
 function onInputEvent(event)
     if event.type == LumixAPI.INPUT_EVENT_AXIS and event.device.type == LumixAPI.INPUT_DEVICE_MOUSE then
@@ -18,14 +19,14 @@ function onInputEvent(event)
                     forward = 0
                 end
 			end
-			if event.key_id == LumixAPI.INPUT_KEYCODE_LEFT then
+			if event.key_id == string.byte("A") then
                 if event.down then
                     left = 1
                 else
                     left = 0
                 end
 			end
-			if event.key_id == LumixAPI.INPUT_KEYCODE_RIGHT then
+			if event.key_id == string.byte("D") then
                 if event.down then
                     right = 1
                 else
@@ -51,7 +52,7 @@ end
 
 function start()
     speed_input_idx = this.animator:getInputIndex("speed")
-    yaw_input_idx = this.animator:getInputIndex("yaw")
+    dir_input_idx = this.animator:getInputIndex("dir")
 end
 
 function clamp(x, a, b)
@@ -63,7 +64,7 @@ end
 function update(td)
     if speed_input_idx == -1 then 
         speed_input_idx = this.animator:getInputIndex("speed")
-        yaw_input_idx = this.animator:getInputIndex("yaw")
+        dir_input_idx = this.animator:getInputIndex("dir")
     end
 
     local speed = 0
@@ -74,8 +75,19 @@ function update(td)
             speed = 3
         end
     end
+    if left ~= 0 or right ~= 0 then
+        speed = 3
+    end
 
     this.animator:setFloatInput(speed_input_idx, speed)
+    local dir = 0;
+    if left ~= 0 then
+        dir = -1
+    end
+    if right ~= 0 then
+        dir = 1
+    end
+    this.animator:setFloatInput(dir_input_idx, dir)
     local a2 = yaw * 0.5
     this.rotation = {0, math.sin(a2), 0, math.cos(a2) }
 end
