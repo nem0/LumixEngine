@@ -42,11 +42,11 @@ public:
 		{
 			INT,
 			FLOAT,
-			MATRIX4,
 			COLOR,
 			VEC2,
 			VEC3,
-			VEC4
+			VEC4,
+			NORMALIZED_FLOAT
 		};
 
 		union
@@ -55,7 +55,6 @@ public:
 			float vec4[4];
 			float vec3[3];
 			float vec2[2];
-			float matrix[16];
 		} default_value;
 
 		char name[32];

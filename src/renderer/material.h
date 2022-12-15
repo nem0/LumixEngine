@@ -51,7 +51,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 			float vec4[4];
 			float vec3[3];
 			float vec2[2];
-			float matrix[16];
 		};
 	};
 

@@ -214,12 +214,12 @@ void Material::serialize(OutputMemoryStream& blob) {
 					blob << "uniform(\"" << su.name << "\", ";
 					switch(su.type) {
 						case Shader::Uniform::INT: blob << mu.int_value; break;
+						case Shader::Uniform::NORMALIZED_FLOAT: blob << mu.float_value; break;
 						case Shader::Uniform::FLOAT: blob << mu.float_value; break;
 						case Shader::Uniform::COLOR: 
 						case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
 						case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
 						case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
-						case Shader::Uniform::MATRIX4: writeArray(mu.matrix, 16); break;
 					}
 					blob << ")\n";
 				}
@@ -245,7 +245,6 @@ int Material::uniform(lua_State* L) {
 				case 2:	*(Vec2*)u.vec2 = LuaWrapper::toType<Vec2>(L, 2); break;
 				case 3: *(Vec3*)u.vec3 = LuaWrapper::toType<Vec3>(L, 2); break;
 				case 4: *(Vec4*)u.vec4 = LuaWrapper::toType<Vec4>(L, 2); break;
-				case 16: *(Matrix*)u.vec4 = LuaWrapper::toType<Matrix>(L, 2); break;
 				default: luaL_error(L, "Uniform %s has unsupported type", name); break;
 			}
 			break;
@@ -379,13 +378,13 @@ void Material::updateRenderData(bool on_before_ready)
 		const u32 size = shader_uniform.size();
 		for (Uniform& uniform : m_uniforms) {
 			if (shader_uniform.name_hash == uniform.name_hash) {
-				memcpy((u8*)cs + shader_uniform.offset, uniform.matrix, size);
+				memcpy((u8*)cs + shader_uniform.offset, uniform.vec4, size);
 				found = true;
 				break;
 			}
 		}
 		if (!found) {
-			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.matrix, size);
+			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.vec4, size);
 		}
 	}
 

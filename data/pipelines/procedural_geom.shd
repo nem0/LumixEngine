@@ -1,10 +1,10 @@
 import "pipelines/procedural_geom.inc"
 
 uniform("Material color", "color", {1, 1, 1, 1})
-uniform("Roughness", "float", 1)
-uniform("Metallic", "float", 0)
+uniform("Roughness", "normalized_float", 1)
+uniform("Metallic", "normalized_float", 0)
 uniform("Emission", "float", 0)
-uniform("Translucency", "float", 0)
+uniform("Translucency", "normalized_float", 0)
 
 texture_slot {
 	name = "Albedo",

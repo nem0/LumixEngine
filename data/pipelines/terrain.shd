@@ -30,8 +30,8 @@ texture_slot {
 	default_texture = "textures/common/blue_noise.tga"
 }
 
-uniform("Roughness", "float", 1)
-uniform("Metallic", "float", 0)
+uniform("Roughness", "normalized_float", 1)
+uniform("Metallic", "normalized_float", 0)
 uniform("Emission", "float", 0)
 uniform("Detail distance", "float")
 uniform("Detail scale", "float")

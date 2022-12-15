@@ -23,8 +23,8 @@ const ResourceType Shader::TYPE("shader");
 u32 Shader::Uniform::size() const {
 	switch (type) {
 		case INT: return 4;
+		case NORMALIZED_FLOAT: return 4;
 		case FLOAT: return 4;
-		case MATRIX4: return 64;
 		case COLOR: return 16;
 		case VEC2: return 8;
 		case VEC3: return 16; // pad to vec4
@@ -146,10 +146,10 @@ int uniform(lua_State* L)
 		const char* str;
 		Shader::Uniform::Type type;
 	} types[] = {
+		{ "normalized_float", Shader::Uniform::NORMALIZED_FLOAT },
 		{ "float", Shader::Uniform::FLOAT },
 		{ "color", Shader::Uniform::COLOR },
 		{ "int", Shader::Uniform::INT },
-		{ "mat4", Shader::Uniform::MATRIX4 },
 		{ "vec2", Shader::Uniform::VEC2 },
 		{ "vec3", Shader::Uniform::VEC3 },
 		{ "vec4", Shader::Uniform::VEC4 },
@@ -188,13 +188,14 @@ int uniform(lua_State* L)
 		}
 	}
 
-	// TODO std140 layout
 	if(shader->m_uniforms.size() == 1) {
 		u.offset = 0;
 	}
 	else {
 		const Shader::Uniform& prev = shader->m_uniforms[shader->m_uniforms.size() - 2];
 		u.offset = prev.offset + prev.size();
+		const u32 align = u.size();
+		u.offset += (align - u.offset % align) % align;
 	}
 	return 0;
 }
@@ -424,8 +425,8 @@ static const char* toString(Shader::Uniform::Type type) {
 	switch(type) {
 		case Shader::Uniform::COLOR: return "vec4";
 		case Shader::Uniform::FLOAT: return "float";
+		case Shader::Uniform::NORMALIZED_FLOAT: return "float";
 		case Shader::Uniform::INT: return "int";
-		case Shader::Uniform::MATRIX4: return "mat4";
 		case Shader::Uniform::VEC2: return "vec2";
 		case Shader::Uniform::VEC3: return "vec4"; // vec4 because of padding
 		case Shader::Uniform::VEC4: return "vec4";

@@ -957,7 +957,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				if (!uniform) {
 					uniform = &first->getUniforms().emplace();
 					uniform->name_hash = shader_uniform.name_hash;
-					memcpy(uniform->matrix, shader_uniform.default_value.matrix, sizeof(uniform->matrix)); 
+					memcpy(uniform->vec4, shader_uniform.default_value.vec4, sizeof(shader_uniform.default_value)); 
 				}
 
 				ImGuiEx::Label(shader_uniform.name);
@@ -965,6 +965,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				switch (shader_uniform.type) {
 					case Shader::Uniform::FLOAT:
 						changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value);
+						break;
+					case Shader::Uniform::NORMALIZED_FLOAT:
+						changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value, 0.01f, 0.f, 1.f);
 						break;
 					case Shader::Uniform::INT:
 						changed = ImGui::DragInt(StaticString<256>("##", shader_uniform.name), &uniform->int_value);
@@ -3274,8 +3277,8 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				{
 					case Shader::Uniform::COLOR: ImGui::Text("Color"); break;
 					case Shader::Uniform::FLOAT: ImGui::Text("Float"); break;
+					case Shader::Uniform::NORMALIZED_FLOAT: ImGui::Text("Float (0-1)"); break;
 					case Shader::Uniform::INT: ImGui::Text("Int"); break;
-					case Shader::Uniform::MATRIX4: ImGui::Text("Matrix 4x4"); break;
 					case Shader::Uniform::VEC4: ImGui::Text("Vector4"); break;
 					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
 					case Shader::Uniform::VEC2: ImGui::Text("Vector2"); break;
