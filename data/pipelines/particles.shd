@@ -43,6 +43,9 @@ surface_shader_ex({
 	]],
 	fragment = [[
 		vec4 c = texture(t_texture, v_uv) * saturate(v_color);
+		data.N = vec3(0);
+		data.V = vec3(0);
+		data.wpos = vec3(0);
 		data.albedo = c.rgb;
 		data.alpha = c.a;
 		data.emission = 1;
@@ -50,5 +53,6 @@ surface_shader_ex({
 		data.ao = 1;
 		data.roughness = 1;
 		data.metallic = 0;
+		data.translucency = 0;
 	]]
 })
