@@ -889,7 +889,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			result = true;
 		}
 
-		if (!first->getShader()) 
+		if (!first->getShader()) return false; 
 
 		multiLabel<&Material::isBackfaceCulling>("Backface culling", resources);
 		bool is_backface_culling = first->isBackfaceCulling();
