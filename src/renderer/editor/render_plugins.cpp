@@ -1296,11 +1296,20 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 		CompositeTexture tc(m_app, allocator);
 		InputMemoryStream blob(src_data);
-		if (!tc.deserialize(blob)) return false;
+		if (!tc.deserialize(blob)) {
+			logError("Failed to load ", src_path);
+			return false;
+		}
 
 		CompositeTexture::Result img(allocator);
-		if (!tc.generate(&img)) return false;
-		if (img.layers.empty()) return false;
+		if (!tc.generate(&img)) {
+			logError(src_path, " : ", tc.m_error.c_str());
+			return false;
+		}
+		if (img.layers.empty()) {
+			logError(src_path, " : empty output");
+			return false;
+		}
 		const u32 w = img.layers[0].w;
 		const u32 h = img.layers[0].h;
 
@@ -4541,7 +4550,7 @@ struct RenderInterfaceImpl final : RenderInterface
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
 		texture->create(w, h, gpu::TextureFormat::RGBA8, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, {texture, false});
-		return (ImTextureID)(uintptr_t)texture->handle;
+		return texture->handle;
 	}
 
 

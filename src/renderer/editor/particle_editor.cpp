@@ -1322,22 +1322,25 @@ struct ParticleEditorResource {
 		return v;
 	}
 	
-	void fillVertexDecl(gpu::VertexDecl& decl) const {
+	void fillVertexDecl(gpu::VertexDecl& decl, Array<String>* attribute_names, IAllocator& allocator) const {
 		u32 idx = 0;
 		u32 offset = 0;
 		for (const ParticleEditorResource::Output& o : m_outputs) {
 			switch(o.type) {
 				case ParticleEditorResource::ValueType::FLOAT: {
+					if (attribute_names) attribute_names->emplace(o.name, allocator);
 					decl.addAttribute(idx, offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(float);
 					break;
 				}
 				case ParticleEditorResource::ValueType::VEC3: {
+					if (attribute_names) attribute_names->emplace(o.name, allocator);
 					decl.addAttribute(idx, offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec3);
 					break;
 				}
 				case ParticleEditorResource::ValueType::VEC4: {
+					if (attribute_names) attribute_names->emplace(o.name, allocator);
 					decl.addAttribute(idx, offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec4);
 					break;
@@ -1899,7 +1902,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		ParticleEmitterResource::Header header;
 		output.write(header);
 		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-		m_resource->fillVertexDecl(decl);
+		m_resource->fillVertexDecl(decl, nullptr, m_allocator);
 		output.write(decl);
 		output.writeString(res.m_mat_path); // material
 		const u32 count = u32(res.m_update.size() + res.m_emit.size() + res.m_output.size());
@@ -1951,14 +1954,15 @@ DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instr
 	return node ? node->generate(instructions, output_idx, output, subindex) : DataStream();
 }
 
-gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, StudioApp& app) {
+gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, Array<String>& attribute_names, StudioApp& app) {
+	attribute_names.clear();
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 	ParticleEditorResource res(app.getAllocator());
 	OutputMemoryStream blob(app.getAllocator());
 	if (app.getEngine().getFileSystem().getContentSync(Path(path), blob)) {
 		InputMemoryStream tmp(blob);
 		if (res.deserialize(tmp, path)) {
-			res.fillVertexDecl(decl);
+			res.fillVertexDecl(decl, &attribute_names, app.getAllocator());
 		}
 		else {
 			logError("Failed to parse ", path);

@@ -103,7 +103,7 @@ CompositeTexture::Node* CompositeTexture::getNodeByID(u16 id) const {
 
 bool CompositeTexture::Node::getInputPixelData(u32 pin_idx, PixelData* pd) const {
 	const Input input = getInput(pin_idx);
-	if (!input) return false;
+	if (!input) return error("Missing input");
 	return input.getPixelData(pd);
 }
 
@@ -155,7 +155,7 @@ struct SplitNode final : CompositeTexture::Node {
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
 		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
 		if (!getInputPixelData(0, &tmp)) return false;
-		if (output_idx >= tmp.channels) return false;
+		if (output_idx >= tmp.channels) return error("Not enough channels");
 
 		data->channels = 1;
 		data->w = tmp.w;
@@ -188,11 +188,11 @@ struct MergeNode final : CompositeTexture::Node {
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
 		const Input inputs[] = { getInput(0), getInput(1), getInput(2), getInput(3) };
-		for (const Input& i : inputs) if (!i) return false;
+		for (const Input& i : inputs) if (!i) return error("Missing input");
 		
 		CompositeTexture::PixelData first_pd(m_resource->m_app.getAllocator());
 		if (!inputs[0].getPixelData(&first_pd)) return false;
-		if (first_pd.channels != 1) return false;
+		if (first_pd.channels != 1) return error("Incorrect number of channels");
 
 		data->w = first_pd.w;
 		data->h = first_pd.h;
@@ -486,7 +486,7 @@ struct MultiplyNode final : CompositeTexture::Node {
 		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
 		if (!getInputPixelData(0, data)) return false;
 		if (!getInputPixelData(1, &tmp)) return false;
-		if (tmp.channels != data->channels) return false;
+		if (tmp.channels != data->channels) return error("Number of channel does not match");
 		makeSameSize(&tmp, data);
 
 		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
@@ -539,11 +539,11 @@ struct ResizeNode final : CompositeTexture::Node {
 		tmp.resize(w * h * data->channels);
 
 		const i32 res = stbir_resize_uint8(data->pixels.data(), data->w, data->h, 0, tmp.getMutableData(), w, h, 0, data->channels);
-
 		data->w = w;
 		data->h = h;
 		data->pixels = tmp;
-		return res == 1;
+		if (res != 1) return error("Failed to resize image");
+		return true;
 	}
 
 	bool gui() override {
@@ -814,7 +814,7 @@ struct SetAlphaNode final : CompositeTexture::Node {
 		
 		if (!getInputPixelData(0, &rgb)) return false;
 		if (!getInputPixelData(1, &a)) return false;
-		if (rgb.channels < 3) return false;
+		if (rgb.channels < 3) return error("Input must have at least 3 channels");
 		makeSameSize(&rgb, &a);
 		data->w = rgb.w;
 		data->h = rgb.h;
@@ -861,8 +861,8 @@ struct CutNode final : CompositeTexture::Node {
 	
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
 		if (!getInputPixelData(0, data)) return false;
-		if (x + w > data->w) return false;
-		if (y + h > data->h) return false;
+		if (x + w > data->w) return error("Out of bounds access");
+		if (y + h > data->h) return error("Out of bounds access");
 
 		OutputMemoryStream tmp(m_resource->m_app.getAllocator());
 		tmp.resize(w * h * data->channels);
@@ -1203,7 +1203,7 @@ struct GreyscaleNode final : CompositeTexture::Node {
 	
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
 		if (!getInputPixelData(0, data)) return false;
-		if (data->channels < 3) return false;
+		if (data->channels < 3) return error("Input must have at least 3 channels");
 
 		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; i += data->channels) {
 			Vec3 v(data->pixels[i], data->pixels[i + 1], data->pixels[i + 2]);
@@ -1241,9 +1241,9 @@ struct MixNode final : CompositeTexture::Node {
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
 		if (!getInputPixelData(0, data)) return false;
-		CompositeTexture::PixelData tmp(m_resource->allocator);
+		CompositeTexture::PixelData tmp(m_resource->m_allocator);
 		if (!getInputPixelData(1, &tmp)) return false;
-		if (tmp.channels != data->channels) return false;
+		if (tmp.channels != data->channels) return error("Number of channel does not match");
 		makeSameSize(data, &tmp);
 
 		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
@@ -1430,15 +1430,15 @@ struct InputNode final : CompositeTexture::Node {
 	}
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (m_texture.isEmpty()) return false;
+		if (m_texture.isEmpty()) return error("Missing texture");
 		i32 w, h, cmp;
-		OutputMemoryStream file_content(m_resource->allocator);
+		OutputMemoryStream file_content(m_resource->m_allocator);
 		FileSystem& fs = m_resource->m_app.getEngine().getFileSystem();
 		file_content.clear();
-		if (!fs.getContentSync(m_texture, file_content)) return false;
+		if (!fs.getContentSync(m_texture, file_content)) return error("Failed to read file");
 
 		stbi_uc* pixels = stbi_load_from_memory(file_content.data(), (i32)file_content.size(), &w, &h, &cmp, 0);
-		if (!pixels) return false;
+		if (!pixels) return error("Failed to load file");
 
 		data->w = w;
 		data->h = h;
@@ -1586,10 +1586,11 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 } // anonymous namespace
 
 CompositeTexture::CompositeTexture(StudioApp& app, IAllocator& allocator)
-	: allocator(allocator)
+	: m_allocator(allocator)
 	, m_app(app)
 	, m_nodes(allocator)
 	, m_links(allocator)
+	, m_error(allocator)
 {}
 
 CompositeTexture::~CompositeTexture() {
@@ -1618,7 +1619,7 @@ void CompositeTexture::clear() {
 bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 	clear();
 
-	OutputMemoryStream data(allocator);
+	OutputMemoryStream data(m_allocator);
 	if (!fs.getContentSync(path, data)) return false;
 
 	InputMemoryStream blob(data);

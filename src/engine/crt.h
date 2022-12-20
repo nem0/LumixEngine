@@ -43,10 +43,8 @@
 		#ifndef _INC_MATH
 			#define _INC_MATH
 			inline float __cdecl fabsf(float x) { return (float)fabs(x); }
-			LUMIX_CRT_API float floorf(float x);
-			//inline float __cdecl floorf(float x) { return (float)floor(x); }	
+			LUMIX_CRT_API float __cdecl floorf(float x);
 			LUMIX_CRT_API float __cdecl ceilf(float x);
-			//inline float __cdecl ceilf(float x) { return (float)ceil(x); }	
 		#endif
 		LUMIX_CRT_API float fmodf(float x, float y);
 		double __cdecl fmod(double x, double y);

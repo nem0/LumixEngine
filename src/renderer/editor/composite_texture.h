@@ -39,6 +39,11 @@ struct CompositeTexture {
 		Input getInput(u32 pin_idx) const;
 		bool getInputPixelData(u32 pin_idx, PixelData* pd) const;
 		
+		bool error(const char* msg) const {
+			m_resource->m_error = msg;
+			return false;
+		}
+
 		bool m_selected = false;
 		u32 m_input_counter;
 		u32 m_output_counter;
@@ -68,11 +73,12 @@ struct CompositeTexture {
 	void initTerrainNormal();
 	void link(Node* from, u32 from_pin, Node* to, u32 to_pin);
 
-	IAllocator& allocator;
+	IAllocator& m_allocator;
 	StudioApp& m_app;
 	Array<Node*> m_nodes;
 	Array<Link> m_links;
 	u32 m_node_id_generator = 1;
+	String m_error;
 };
 
 struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {

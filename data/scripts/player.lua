@@ -55,12 +55,6 @@ function start()
     dir_input_idx = this.animator:getInputIndex("dir")
 end
 
-function clamp(x, a, b)
-    if x < a then return a end
-    if x > b then return b end
-    return x
-end
-
 function update(td)
     if speed_input_idx == -1 then 
         speed_input_idx = this.animator:getInputIndex("speed")
