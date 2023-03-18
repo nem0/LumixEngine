@@ -18,7 +18,7 @@ const Vec4 Vec4::MAX = Vec4(FLT_MAX);
 const Vec4 Vec4::MIN = Vec4(-FLT_MAX);
 const Vec4 Vec4::ZERO = Vec4(0);
 
-const Transform Transform::IDENTITY = Transform({0, 0, 0}, {0, 0, 0, 1}, 1.f);
+const Transform Transform::IDENTITY = Transform({0, 0, 0}, {0, 0, 0, 1}, {1, 1, 1});
 
 	
 Vec2::Vec2(const IVec2& rhs)
@@ -480,7 +480,11 @@ DVec3 DVec3::operator-() const { return {-x, -y, -z}; }
 
 DVec3 DVec3::operator*(float rhs) const { return {x * rhs, y * rhs, z * rhs}; }
 
+DVec3 DVec3::operator*(const Vec3& rhs) const { return {x * rhs.x, y * rhs.y, z * rhs.z}; }
+
 DVec3 DVec3::operator/(float rhs) const { return {x / rhs, y / rhs, z / rhs}; }
+
+DVec3 DVec3::operator/(const Vec3& rhs) const { return {x / rhs.x, y / rhs.y, z / rhs.z}; }
 
 DVec3 DVec3::operator/(const DVec3& rhs) const { return {x / rhs.x, y / rhs.y, z / rhs.z}; }
 
@@ -734,10 +738,10 @@ Matrix Quat::toMatrix() const
 	return mtx;
 }
 
-Transform::Transform(const DVec3& _pos, const Quat& _rot, float _scale)
-	: pos(_pos)
-	, rot(_rot)
-	, scale(_scale) {}
+Transform::Transform(const DVec3& pos, const Quat& rot, Vec3 scale)
+	: pos(pos)
+	, rot(rot)
+	, scale(scale) {}
 
 Transform Transform::operator*(const Transform& rhs) const { return {rot.rotate(rhs.pos * scale) + pos, rot * rhs.rot, scale * rhs.scale}; }
 
@@ -747,13 +751,15 @@ DVec3 Transform::transform(const Vec3& value) const { return pos + rot.rotate(va
 
 DVec3 Transform::transform(const DVec3& value) const { return pos + rot.rotate(value) * scale; }
 
+Vec3 Transform::transformVector(const Vec3& value) const { return rot.rotate(value) * scale; }
+
 RigidTransform Transform::getRigidPart() const { return {pos, rot}; }
 
 Transform Transform::inverted() const {
 	Transform result;
 	result.rot = rot.conjugated();
 	result.pos = result.rot.rotate(-pos / scale);
-	result.scale = 1.0f / scale;
+	result.scale = Vec3(1.0f) / scale;
 	return result;
 }
 
@@ -1128,6 +1134,18 @@ void Matrix::transpose() {
 	tmp = columns[3].z;
 	columns[3].z = columns[2].w;
 	columns[2].w = tmp;
+}
+
+void Matrix::multiply3x3(const Vec3& scale) {
+	columns[0].x *= scale.x;
+	columns[0].y *= scale.x;
+	columns[0].z *= scale.x;
+	columns[1].x *= scale.y;
+	columns[1].y *= scale.y;
+	columns[1].z *= scale.y;
+	columns[2].x *= scale.z;
+	columns[2].y *= scale.z;
+	columns[2].z *= scale.z;
 }
 
 void Matrix::multiply3x3(float scale) {

@@ -2897,7 +2897,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		Engine& engine = m_app.getEngine();
 
 		EntityMap entity_map(m_app.getAllocator());
-		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, entity_map)) return;
+		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, Vec3(1), entity_map)) return;
 		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
 
 		m_tile.path_hash = prefab->getPath().getHash();
@@ -4155,7 +4155,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			DVec3 origin = editor.getUniverse()->getPosition(entities[0]);
 			Transform tr;
 			tr.rot = getInstanceQuat(m_selected.rot_quat);
-			tr.scale = m_selected.scale;
+			tr.scale = Vec3(m_selected.scale);
 			tr.pos = origin + DVec3(m_selected.pos);
 			const Gizmo::Config& cfg = m_app.getGizmoConfig();
 			bool changed = Gizmo::manipulate(u64(4) << 32 | entities[0].index, editor.getView(), tr, cfg);
@@ -4175,7 +4175,10 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			}
 
 			ImGuiEx::Label("Scale");
-			changed = ImGui::DragFloat("##scale", &tr.scale, 0.01f) || changed;
+			if (ImGui::DragFloat("##scale", &tr.scale.x, 0.01f)) {
+				tr.scale.y = tr.scale.z = tr.scale.x;
+				changed = true;
+			}
 
 			if (changed) {
 				tr.pos = tr.pos - origin;
@@ -4184,7 +4187,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 				new_value.pos = Vec3(tr.pos);
 				new_value.rot_quat = Vec3(tr.rot.x, tr.rot.y, tr.rot.z);
 				if (tr.rot.w < 0) new_value.rot_quat *= -1;
-				new_value.scale = tr.scale;
+				new_value.scale = tr.scale.x;
 				new_value.lod = 3;
 				
 				UniquePtr<SetTransformCommand> cmd = UniquePtr<SetTransformCommand>::create(editor.getAllocator(), entities[0], m_selected, new_value, editor);
@@ -5242,7 +5245,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		Gizmo::Config cfg;
 		const DVec3 pos0 = tr.transform(DVec3(decal.bezier_p0.x, 0, decal.bezier_p0.y));
-		Transform p0_tr = { pos0, Quat::IDENTITY, 1 };
+		Transform p0_tr = { pos0, Quat::IDENTITY, Vec3(1) };
 		WorldEditor& editor = view.getEditor();
 		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, p0_tr, cfg)) {
 			const Vec2 p0 = Vec2(tr.inverted().transform(p0_tr.pos).xz());
@@ -5250,7 +5253,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		}
 
 		const DVec3 pos2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
-		Transform p2_tr = { pos2, Quat::IDENTITY, 1 };
+		Transform p2_tr = { pos2, Quat::IDENTITY, Vec3(1) };
 		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, p2_tr, cfg)) {
 			const Vec2 p2 = Vec2(tr.inverted().transform(p2_tr.pos).xz());
 			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);

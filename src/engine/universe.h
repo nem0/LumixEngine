@@ -109,7 +109,7 @@ struct LUMIX_ENGINE_API Universe {
 	ChildrenRange childrenOf(EntityRef entity) const;
 
 	Transform getLocalTransform(EntityRef entity) const;
-	float getLocalScale(EntityRef entity) const;
+	Vec3 getLocalScale(EntityRef entity) const;
 	void setParent(EntityPtr parent, EntityRef child);
 	void setLocalPosition(EntityRef entity, const DVec3& pos);
 	void setLocalRotation(EntityRef entity, const Quat& rot);
@@ -119,13 +119,13 @@ struct LUMIX_ENGINE_API Universe {
 	void setTransform(EntityRef entity, const RigidTransform& transform);
 	void setTransform(EntityRef entity, const Transform& transform);
 	void setTransformKeepChildren(EntityRef entity, const Transform& transform);
-	void setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, float scale);
+	void setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, const Vec3& scale);
 	const Transform& getTransform(EntityRef entity) const;
 	void setRotation(EntityRef entity, float x, float y, float z, float w);
 	void setRotation(EntityRef entity, const Quat& rot);
 	void setPosition(EntityRef entity, const DVec3& pos);
-	void setScale(EntityRef entity, float scale);
-	float getScale(EntityRef entity) const;
+	void setScale(EntityRef entity, const Vec3& scale);
+	const Vec3& getScale(EntityRef entity) const;
 	const DVec3& getPosition(EntityRef entity) const;
 	const Quat& getRotation(EntityRef entity) const;
 	const char* getName() const { return m_name; }
@@ -138,7 +138,7 @@ struct LUMIX_ENGINE_API Universe {
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
 	void serialize(struct OutputMemoryStream& serializer);
-	void deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map);
+	void deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale);
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(const char* name) const;

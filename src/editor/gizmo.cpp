@@ -644,7 +644,7 @@ bool scale(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) 
 	draw(view, gizmo, g_gizmo_state.axis, cfg);
 	if (squaredLength(delta) > 0) {
 		g_gizmo_state.prev_point = p;
-		tr.scale += length(delta) * sign;
+		tr.scale += Vec3(length(delta) * sign);
 		return true;
 	}
 	return false;

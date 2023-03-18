@@ -730,8 +730,8 @@ void SceneView::manipulate() {
 			break;
 		}
 		case Gizmo::Config::SCALE: {
-			const float diff = new_pivot_tr.scale / old_pivot_tr.scale;
-			Array<float> scales(m_app.getAllocator());
+			const Vec3 diff = new_pivot_tr.scale / old_pivot_tr.scale;
+			Array<Vec3> scales(m_app.getAllocator());
 			scales.resize(selected->size());
 			for (u32 i = 0, c = selected->size(); i < c; ++i) {
 				scales[i] = universe.getScale((*selected)[i]) * diff;
@@ -1027,7 +1027,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			while (fs.hasWork()) fs.processCallbacks();
 		}
 		if (prefab->isReady()) {
-			m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, 1);
+			m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, Vec3(1));
 		}
 		else {
 			ASSERT(prefab->isFailure());

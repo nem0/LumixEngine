@@ -184,10 +184,10 @@ struct EditorIconsImpl final : EditorIcons
 			ret.rot = camera_rot;
 		}
 		if (is_ortho) {
-			ret.scale = ortho_size * ORTHO_SIZE_SCALE;
+			ret.scale = Vec3(ortho_size * ORTHO_SIZE_SCALE);
 		}
 		else {
-			ret.scale = icon.scale > 0 ? icon.scale : 1;
+			ret.scale = Vec3(icon.scale > 0 ? icon.scale : 1);
 		}
 		return ret;
 	}

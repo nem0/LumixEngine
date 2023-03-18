@@ -422,7 +422,7 @@ struct RenderSceneImpl final : RenderScene {
 			unlockPose(model_instance, false);
 			return;
 		}
-		float original_scale = m_universe.getScale(bone_attachment.entity);
+		Vec3 original_scale = m_universe.getScale(bone_attachment.entity);
 		const LocalRigidTransform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx] };
 		const LocalRigidTransform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot };
 		Transform result = parent_entity_transform * bone_transform * relative_transform;
@@ -1463,7 +1463,7 @@ struct RenderSceneImpl final : RenderScene {
 				const Model* model = m_model_instances[entity.index].model;
 				ASSERT(model);
 				const float bounding_radius = model->getOriginBoundingRadius();
-				m_culling_system->set(entity, tr.pos, bounding_radius * tr.scale);
+				m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
 			}
 			else if (m_universe.hasComponent(entity, DECAL_TYPE)) {
 				auto iter = m_decals.find(entity);
@@ -1913,7 +1913,8 @@ struct RenderSceneImpl final : RenderScene {
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
 			const DVec3 pos = m_universe.getPosition(entity);
-			const float radius = model_instance.model->getOriginBoundingRadius() * m_universe.getScale(entity);
+			const Vec3& scale = m_universe.getScale(entity);
+			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 			if (!m_culling_system->isAdded(entity)) {
 				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.custom_material);
 				m_culling_system->add(entity, (u8)type, pos, radius);
@@ -1948,7 +1949,8 @@ struct RenderSceneImpl final : RenderScene {
 		}
 		const RenderableTypes type = getRenderableType(*mi.model, mi.custom_material);
 		const DVec3 pos = m_universe.getPosition(entity);
-		const float radius = mi.model->getOriginBoundingRadius() * m_universe.getScale(entity);
+		const Vec3& scale = m_universe.getScale(entity);
+		const float radius = mi.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 		m_culling_system->add(entity, (u8)type, pos, radius);
 	}
 
@@ -2612,8 +2614,10 @@ struct RenderSceneImpl final : RenderScene {
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
 		PROFILE_FUNCTION();
+		ASSERT(length(dir) > 0.99f && length(dir) < 1.01f);
+		
 		RayCastModelHit hit = castRayInstancedModels(origin, dir, filter);
-		double cur_dist = hit.is_hit ? hit.t * length(dir) : DBL_MAX;
+		double cur_dist = hit.is_hit ? hit.t : DBL_MAX;
 
 		const Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
@@ -2623,29 +2627,35 @@ struct RenderSceneImpl final : RenderScene {
 			if (!r.model) continue;
 
 			const EntityRef entity{i};
-			const DVec3& pos = universe.getPosition(entity);
-			float scale = universe.getScale(entity);
-			float radius = r.model->getOriginBoundingRadius() * scale;
-			const double dist = length(pos - origin);
+			const Transform& tr = universe.getTransform(entity);
+			float radius = r.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
+			const double dist = length(tr.pos - origin);
 			if (dist - radius > cur_dist) continue;
 			
+			const Transform& inv_tr = tr.inverted();
+			const Vec3 ray_origin_model_space = Vec3(inv_tr.transform(origin));
+			const Vec3 ray_dir_model_space = normalize(inv_tr.transformVector(dir));
+
 			float intersection_t;
-			Vec3 rel_pos = Vec3(origin - pos);
-			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
+			if (getRaySphereIntersection(ray_origin_model_space, ray_dir_model_space, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
 				Vec3 aabb_hit;
-				const Quat rot = universe.getRotation(entity).conjugated();
-				const Vec3 rel_dir = rot.rotate(dir);
 				const AABB& aabb = r.model->getAABB();
-				rel_pos = rot.rotate(rel_pos / scale);
-				if (getRayAABBIntersection(rel_pos, rel_dir, aabb.min, aabb.max - aabb.min, aabb_hit)) {
-					RayCastModelHit new_hit = r.model->castRay(rel_pos, rel_dir, r.pose, entity, &filter);
-					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
-						new_hit.entity = entity;
-						new_hit.component_type = MODEL_INSTANCE_TYPE;
-						hit = new_hit;
-						hit.t *= scale;
-						hit.is_hit = true;
-						cur_dist = length(dir) * hit.t;
+				if (getRayAABBIntersection(ray_origin_model_space, ray_dir_model_space, aabb.min, aabb.max - aabb.min, aabb_hit)) {
+					RayCastModelHit new_hit = r.model->castRay(ray_origin_model_space, ray_dir_model_space, r.pose, entity, &filter);
+					if (new_hit.is_hit) {
+						const Vec3 hit_pos_model_space = Vec3(new_hit.origin + new_hit.dir * new_hit.t);
+						const DVec3 new_hit_pos = tr.transform(hit_pos_model_space);
+						const float new_t = (float)length(origin - new_hit_pos);
+						if (!hit.is_hit || new_t < hit.t) {
+							new_hit.entity = entity;
+							new_hit.component_type = MODEL_INSTANCE_TYPE;
+							hit = new_hit;
+							hit.origin = origin;
+							hit.dir = dir;
+							hit.t = new_t;
+							hit.is_hit = true;
+							cur_dist = hit.t;
+						}
 					}
 				}
 			}
@@ -2806,9 +2816,9 @@ struct RenderSceneImpl final : RenderScene {
 		auto& r = m_model_instances[entity.index];
 
 		float bounding_radius = r.model->getOriginBoundingRadius();
-		float scale = m_universe.getScale(entity);
+		const Vec3& scale = m_universe.getScale(entity);
 		const DVec3 pos = m_universe.getPosition(entity);
-		const float radius = bounding_radius * scale;
+		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags.isSet(ModelInstance::ENABLED)) {
 			const RenderableTypes type = getRenderableType(*model, r.custom_material);
 			m_culling_system->add(entity, (u8)type, pos, radius);

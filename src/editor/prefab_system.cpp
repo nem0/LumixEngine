@@ -258,7 +258,7 @@ public:
 	}
 
 
-	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const DVec3& pos, const Quat& rot, float scale)
+	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const DVec3& pos, const Quat& rot, const Vec3& scale)
 	{
 		ASSERT(prefab_res.isReady());
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
@@ -290,7 +290,7 @@ public:
 		m_editor.executeCommand(cmd.move());
 	}
 
-	EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) override
+	EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, const Vec3& scale) override
 	{
 		ASSERT(prefab.isReady());
 		EntityPtr res;

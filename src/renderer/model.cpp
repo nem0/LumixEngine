@@ -335,6 +335,7 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Me
 	if (!is_skinned) {
 		vertex_decl->addAttribute(4, 0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		vertex_decl->addAttribute(5, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		vertex_decl->addAttribute(6, 32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 	}
 
 	return true;

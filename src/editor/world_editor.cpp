@@ -871,7 +871,7 @@ public:
 	ScaleEntityCommand(WorldEditor& editor,
 		const EntityRef* entities,
 		int count,
-		float scale,
+		const Vec3& scale,
 		IAllocator& allocator)
 		: m_old_scales(allocator)
 		, m_new_scales(allocator)
@@ -890,7 +890,7 @@ public:
 
 	ScaleEntityCommand(WorldEditor& editor,
 		const EntityRef* entities,
-		const float* scales,
+		const Vec3* scales,
 		int count,
 		IAllocator& allocator)
 		: m_old_scales(allocator)
@@ -964,8 +964,8 @@ public:
 private:
 	WorldEditor& m_editor;
 	Array<EntityPtr> m_entities;
-	Array<float> m_new_scales;
-	Array<float> m_old_scales;
+	Array<Vec3> m_new_scales;
+	Array<Vec3> m_old_scales;
 };
 
 
@@ -2050,7 +2050,7 @@ public:
 	}
 
 
-	void setEntitiesScales(const EntityRef* entities, const float* scales, int count) override
+	void setEntitiesScales(const EntityRef* entities, const Vec3* scales, int count) override
 	{
 		if (count <= 0) return;
 
@@ -2060,7 +2060,7 @@ public:
 	}
 
 
-	void setEntitiesScale(const EntityRef* entities, int count, float scale) override
+	void setEntitiesScale(const EntityRef* entities, int count, const Vec3& scale) override
 	{
 		if (count <= 0) return;
 
@@ -2884,7 +2884,7 @@ public:
 
 		Transform base_tr;
 		base_tr.pos = m_position;
-		base_tr.scale = 1;
+		base_tr.scale = Vec3(1);
 		base_tr.rot = Quat(0, 0, 0, 1);
 		m_map.reserve(entity_count);
 		for (int i = 0; i < entity_count; ++i) {

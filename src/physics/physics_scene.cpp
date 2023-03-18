@@ -369,7 +369,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxRigidActor* physx_actor = nullptr;
 		PhysicsGeometry* mesh  = nullptr;
 		PhysicsMaterial* material = nullptr;
-		float scale = 1;
+		Vec3 scale = Vec3(1);
 		i32 layer = 0;
 		EntityPtr prev_with_mesh = INVALID_ENTITY;
 		EntityPtr next_with_mesh = INVALID_ENTITY;
@@ -2463,7 +2463,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 					{
 						actor.physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
 					}
-					if (actor.mesh && actor.scale != trans.scale)
+					if (actor.mesh && (actor.scale != trans.scale))
 					{
 						actor.rescale();
 					}
@@ -4061,7 +4061,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		shape->userData = (void*)(intptr_t)index;
 #endif
 		scale = scene.getUniverse().getScale(entity);
-		PxMeshScale pxscale(scale);
+		PxMeshScale pxscale(toPhysx(scale));
 		PxConvexMeshGeometry convex_geom(mesh->convex_mesh, pxscale);
 		PxTriangleMeshGeometry tri_geom(mesh->tri_mesh, pxscale);
 		const PxGeometry* geom = mesh->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);

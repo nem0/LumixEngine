@@ -321,7 +321,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		if (m_rotate_by_90deg) rot = rot * Quat(0, 0.707f, 0, -0.707f);
 		if (m_random_rotation) rot = Quat(Vec3(0, 1, 0), randFloat() * PI * 2);
 		const DVec3 p = pos + m_dispersion * randomXZVec();
-		return prefab_system.instantiatePrefab(*res, p, rot, 1.f);		
+		return prefab_system.instantiatePrefab(*res, p, rot, {1, 1, 1});		
 	}
 
 	void init() override {

@@ -570,7 +570,7 @@ static Quat LUA_getEntityRotation(Universe* universe, i32 entity)
 }
 
 
-static float LUA_getEntityScale(Universe* universe, i32 entity)
+static Vec3 LUA_getEntityScale(Universe* universe, i32 entity)
 {
 	return universe->getScale({entity});
 }
@@ -599,7 +599,7 @@ static void LUA_setParent(Universe* universe, i32 parent, i32 child)
 
 static const char* LUA_getEntityName(Universe* univ, i32 entity) { return univ->getEntityName({entity}); }
 static void LUA_setEntityName(Universe* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
-static void LUA_setEntityScale(Universe* univ, i32 entity, float scale) { univ->setScale({entity}, scale); }
+static void LUA_setEntityScale(Universe* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
 static void LUA_setEntityPosition(Universe* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
 static void LUA_unloadResource(Engine* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 static Universe* LUA_createUniverse(Engine* engine) { return &engine->createUniverse(false); }
@@ -689,7 +689,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
 	}
 	EntityMap entity_map(engine->getAllocator());
-	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, 1, entity_map)) {
+	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, {1, 1, 1}, entity_map)) {
 		LuaWrapper::pushEntity(L, entity_map.m_map[0], universe);
 		return 1;
 	}

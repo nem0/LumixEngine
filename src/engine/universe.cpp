@@ -209,7 +209,7 @@ void Universe::setTransform(EntityRef entity, const RigidTransform& transform)
 }
 
 
-void Universe::setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, float scale)
+void Universe::setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, const Vec3& scale)
 {
 	auto& tmp = m_transforms[entity.index];
 	tmp.pos = pos;
@@ -310,7 +310,7 @@ void Universe::emplaceEntity(EntityRef entity)
 		data.name = -1;
 		data.hierarchy = -1;
 		data.next = m_first_free_slot;
-		tr.scale = -1;
+		tr.scale = Vec3(-1);
 		if (m_first_free_slot >= 0)
 		{
 			m_entities[m_first_free_slot].prev = m_entities.size() - 1;
@@ -333,7 +333,7 @@ void Universe::emplaceEntity(EntityRef entity)
 	Transform& tr = m_transforms[entity.index];
 	tr.pos = DVec3(0, 0, 0);
 	tr.rot.set(0, 0, 0, 1);
-	tr.scale = 1;
+	tr.scale = Vec3(1);
 	data.name = -1;
 	data.hierarchy = -1;
 	data.components = 0;
@@ -364,7 +364,7 @@ EntityRef Universe::createEntity(const DVec3& position, const Quat& rotation)
 	}
 	tr->pos = position;
 	tr->rot = rotation;
-	tr->scale = 1;
+	tr->scale = Vec3(1);
 	data->name = -1;
 	data->hierarchy = -1;
 	data->components = 0;
@@ -625,7 +625,7 @@ Transform Universe::getLocalTransform(EntityRef entity) const
 }
 
 
-float Universe::getLocalScale(EntityRef entity) const
+Vec3 Universe::getLocalScale(EntityRef entity) const
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -645,7 +645,9 @@ void Universe::serialize(OutputMemoryStream& serializer)
 		if (!m_entities[i].valid) continue;
 		const EntityRef e = {(i32)i};
 		serializer.write(e);
-		serializer.write(m_transforms[i]);
+		serializer.write(m_transforms[i].pos);
+		serializer.write(m_transforms[i].rot);
+		serializer.write(m_transforms[i].scale);
 	}
 	serializer.write(INVALID_ENTITY);
 
@@ -656,14 +658,24 @@ void Universe::serialize(OutputMemoryStream& serializer)
 	}
 
 	serializer.write((u32)m_hierarchy.size());
-	if (!m_hierarchy.empty()) serializer.write(&m_hierarchy[0], m_hierarchy.byte_size());
+	if (!m_hierarchy.empty()) {
+		for (const Hierarchy& h : m_hierarchy) {
+			serializer.write(h.entity);
+			serializer.write(h.parent);
+			serializer.write(h.first_child);
+			serializer.write(h.next_sibling);
+			serializer.write(h.local_transform.pos);
+			serializer.write(h.local_transform.rot);
+			serializer.write(h.local_transform.scale);
+		}
+	}
 }
 
 void Universe::setName(const char* name) { 
 	copyString(m_name, name);
 }
 
-void Universe::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
+void Universe::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale)
 {
 	u32 to_reserve;
 	serializer.read(to_reserve);
@@ -673,7 +685,17 @@ void Universe::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 		EntityRef orig = (EntityRef)e;
 		const EntityRef new_e = createEntity({0, 0, 0}, {0, 0, 0, 1});
 		entity_map.set(orig, new_e);
-		serializer.read(m_transforms[new_e.index]);
+		serializer.read(m_transforms[new_e.index].pos);
+		serializer.read(m_transforms[new_e.index].rot);
+		if (vec3_scale) {
+			serializer.read(m_transforms[new_e.index].scale);
+		}
+		else {
+			serializer.read(m_transforms[new_e.index].scale.x);
+			float padding;
+			serializer.read(padding);
+		}
+		m_transforms[new_e.index].scale.y = m_transforms[new_e.index].scale.z = m_transforms[new_e.index].scale.x;
 	}
 
 	u32 count;
@@ -690,27 +712,42 @@ void Universe::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 	const u32 old_count = m_hierarchy.size();
 	m_hierarchy.resize(count + old_count);
 	if (count > 0) {
-		serializer.read(&m_hierarchy[old_count], sizeof(m_hierarchy[0]) * count);
+		for (u32 i = 0; i < count; ++i) {
+			Hierarchy& h = m_hierarchy[old_count + i];
+			serializer.read(h.entity);
+			serializer.read(h.parent);
+			serializer.read(h.first_child);
+			serializer.read(h.next_sibling);
+			serializer.read(h.local_transform.pos);
+			serializer.read(h.local_transform.rot);
+			if (vec3_scale) {
+				serializer.read(h.local_transform.scale);
+			}
+			else {
+				serializer.read(h.local_transform.scale.x);
+				float padding;
+				serializer.read(padding);
+				h.local_transform.scale.z = h.local_transform.scale.y = h.local_transform.scale.x;
+			}
 
-		for (u32 i = old_count; i < count + old_count; ++i) {
-			m_hierarchy[i].entity = entity_map.get(m_hierarchy[i].entity);
-			m_hierarchy[i].first_child = entity_map.get(m_hierarchy[i].first_child);
-			m_hierarchy[i].next_sibling = entity_map.get(m_hierarchy[i].next_sibling);
-			m_hierarchy[i].parent = entity_map.get(m_hierarchy[i].parent);
-			m_entities[m_hierarchy[i].entity.index].hierarchy = i;
+			h.entity = entity_map.get(h.entity);
+			h.first_child = entity_map.get(h.first_child);
+			h.next_sibling = entity_map.get(h.next_sibling);
+			h.parent = entity_map.get(h.parent);
+			m_entities[h.entity.index].hierarchy = i + old_count;
 		}
 	}
 }
 
 
-void Universe::setScale(EntityRef entity, float scale)
+void Universe::setScale(EntityRef entity, const Vec3& scale)
 {
 	m_transforms[entity.index].scale = scale;
 	transformEntity(entity, true);
 }
 
 
-float Universe::getScale(EntityRef entity) const
+const Vec3& Universe::getScale(EntityRef entity) const
 {
 	return m_transforms[entity.index].scale;
 }

@@ -49,9 +49,10 @@ vertex_shader [[
 	const vec3 a_normal = vec3(0, 1, 0);
 	const vec3 a_tangent = vec3(1, 0, 0);
 
-	#if defined INSTANCED
-		layout(location = 4) in vec4 i_rot_quat;
-		layout(location = 5) in vec4 i_pos_scale;
+	#if defined AUTOINSTANCED
+		layout(location = 4) in vec4 i_rot;
+		layout(location = 5) in vec4 i_pos_lod;
+		layout(location = 6) in vec4 i_scale;
 	#else
 		layout(std140, binding = 4) uniform Model {
 			mat4 u_model;
@@ -67,11 +68,11 @@ vertex_shader [[
 	
 	void main() {
 		v_uv = a_uv;
-		#if defined INSTANCED
-			v_normal = rotateByQuat(i_rot_quat, a_normal);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
-			vec3 p = a_position * i_pos_scale.w;
-			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
+		#if defined AUTOINSTANCED
+			v_normal = rotateByQuat(i_rot, a_normal);
+			v_tangent = rotateByQuat(i_rot, a_tangent);
+			vec3 p = a_position * i_scale.xyz;
+			v_wpos = vec4(i_pos_lod.xyz + rotateByQuat(i_rot, p), 1);
 		#else 
 			mat4 model_mtx = u_model;
 			v_normal = mat3(model_mtx) * a_normal;

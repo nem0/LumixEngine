@@ -46,7 +46,7 @@ struct LUMIX_ENGINE_API Engine {
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,
 		const struct Quat& rot,
-		float scale,
+		const struct Vec3& scale,
 		struct EntityMap& entity_map) = 0;
 
 	virtual void startGame(Universe& context) = 0;

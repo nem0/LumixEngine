@@ -74,6 +74,13 @@ function surface_shader_ex(args)
 			} Model;
 		#endif
 
+		#if defined _HAS_ATTR7 && defined AUTOINSTANCED
+			#define HAS_VERTEX_COLOR
+		#endif
+		#if defined _HAS_ATTR6 && defined GRASS
+			#define HAS_VERTEX_COLOR
+		#endif
+
 		#if !defined GRASS && !defined PARTICLES
 			#define HAS_LOD
 		#endif
@@ -113,14 +120,18 @@ function surface_shader_ex(args)
 			#elif defined INSTANCED
 				layout(location = 4) in vec4 i_rot_lod;
 				layout(location = 5) in vec4 i_pos_scale;
-				#ifdef _HAS_ATTR6
-					layout(location = 6) in vec4 a_color;
+			#elif defined AUTOINSTANCED
+				layout(location = 4) in vec4 i_rot;
+				layout(location = 5) in vec4 i_pos_lod;
+				layout(location = 6) in vec4 i_scale;
+				#ifdef HAS_VERTEX_COLOR
+					layout(location = 7) in vec4 a_color;
 					layout(location = 5) out vec4 v_color;
 				#endif
 			#elif defined GRASS
 				layout(location = 4) in vec4 i_pos_scale;
 				layout(location = 5) in vec4 i_rot;
-				#ifdef _HAS_ATTR6
+				#ifdef HAS_VERTEX_COLOR
 					layout(location = 6) in vec4 a_color;
 					layout(location = 5) out vec4 v_color;
 				#endif
@@ -169,7 +180,15 @@ function surface_shader_ex(args)
 						v_lod = i_rot_lod.w;
 					#endif
 					v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
-					#ifdef _HAS_ATTR6
+				#elif defined AUTOINSTANCED
+					v_normal = rotateByQuat(i_rot, a_normal);
+					v_tangent = rotateByQuat(i_rot, a_tangent);
+					vec3 p = a_position * i_scale.xyz;
+					#ifdef HAS_LOD
+						v_lod = i_pos_lod.w;
+					#endif
+					v_wpos = vec4(i_pos_lod.xyz + rotateByQuat(i_rot, p), 1);
+					#ifdef HAS_VERTEX_COLOR
 						v_color = a_color;
 					#endif
 				#elif defined GRASS
@@ -181,7 +200,7 @@ function surface_shader_ex(args)
 					#ifdef GRASS
 						v_wpos.xyz += Grass.u_grass_origin;
 					#endif
-					#ifdef _HAS_ATTR6
+					#ifdef HAS_VERTEX_COLOR
 						v_color = a_color;
 					#endif
 				#elif defined SKINNED
@@ -242,7 +261,7 @@ function surface_shader_ex(args)
 			#ifdef HAS_LOD
 				layout(location = 4) in float v_lod;
 			#endif
-			#ifdef _HAS_ATTR6
+			#if HAS_VERTEX_COLOR
 				layout(location = 5) in vec4 v_color;
 			#endif
 			#ifdef _HAS_ATTR7

@@ -323,13 +323,13 @@ struct NavigationSceneImpl final : NavigationScene
 
 			Transform im_tr = m_universe.getTransform(iter.key());
 			im_tr.rot = Quat::IDENTITY;
-			im_tr.scale = 1;
+			im_tr.scale = Vec3(1);
 			for (const InstancedModel::InstanceData& i : im.instances) {
 				Transform tr;
 				tr.pos = DVec3(i.pos);
 				tr.rot = Quat(i.rot_quat.x, i.rot_quat.y, i.rot_quat.z, 0);
 				tr.rot.w = sqrtf(1 - dot(i.rot_quat, i.rot_quat));
-				tr.scale = i.scale;
+				tr.scale = Vec3(i.scale);
 				tr = im_tr * tr;
 				rasterizeModel(im.model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
 			}

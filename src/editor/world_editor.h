@@ -113,8 +113,8 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void setEntitiesPositions(const EntityRef* entities, const DVec3* positions, int count) = 0;
 	virtual void setEntitiesCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) = 0;
 	virtual void setEntitiesLocalCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) = 0;
-	virtual void setEntitiesScale(const EntityRef* entities, int count, float scale) = 0;
-	virtual void setEntitiesScales(const EntityRef* entities, const float* scales, int count) = 0;
+	virtual void setEntitiesScale(const EntityRef* entities, int count, const Vec3& scale) = 0;
+	virtual void setEntitiesScales(const EntityRef* entities, const Vec3* scales, int count) = 0;
 	virtual void setEntitiesRotations(const EntityRef* entity, const Quat* rotations, int count) = 0;
 	virtual void setEntitiesPositionsAndRotations(const EntityRef* entity,
 		const DVec3* position,

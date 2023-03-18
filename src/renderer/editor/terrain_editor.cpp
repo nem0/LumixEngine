@@ -1209,7 +1209,7 @@ int TerrainEditor::placePrefabs(lua_State* L) {
 
 					const Vec2& scale_range = prefabs[r].scale;
 					const float scale = lerp(scale_range.x, scale_range.y, randFloat());
-					transforms[r].push({pos, Quat(Vec3(0, 1, 0), randFloat() * 2 * PI), scale});
+					transforms[r].push({pos, Quat(Vec3(0, 1, 0), randFloat() * 2 * PI), Vec3(scale) });
 				}
 			}
 		}
@@ -1785,7 +1785,7 @@ static bool isOBBCollision(RenderScene& scene,
 	const EntityFolders& folders,
 	EntityFolders::FolderID folder)
 {
-	float radius_a_squared = model->getOriginBoundingRadius() * model_tr.scale;
+	float radius_a_squared = model->getOriginBoundingRadius() * maximum(model_tr.scale.x, model_tr.scale.y, model_tr.scale.z);
 	radius_a_squared = radius_a_squared * radius_a_squared;
 	Universe& universe = scene.getUniverse();
 	Span<const ModelInstance> model_instances = scene.getModelInstances();
@@ -1800,7 +1800,7 @@ static bool isOBBCollision(RenderScene& scene,
 
 			const ModelInstance& model_instance = model_instances[mesh.index];
 			const Transform& tr_b = transforms[mesh.index];
-			const float radius_b = model_instance.model->getOriginBoundingRadius() * tr_b.scale;
+			const float radius_b = model_instance.model->getOriginBoundingRadius() * maximum(tr_b.scale.x, tr_b.scale.y, tr_b.scale.z);
 			const float radius_squared = radius_a_squared + radius_b * radius_b;
 			if (squaredLength(model_tr.pos - tr_b.pos) < radius_squared) {
 				const Transform rel_tr = model_tr.inverted() * tr_b;
@@ -1909,11 +1909,11 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 				float size = randFloat(m_size_spread.x, m_size_spread.y);
 				int random_idx = rand(0, m_selected_prefabs.size() - 1);
 				if (!m_selected_prefabs[random_idx]) continue;
-				const EntityPtr entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
+				const EntityPtr entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, Vec3(size));
 				if (entity.isValid()) {
 					if (universe.hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
 						Model* model = scene->getModelInstanceModel((EntityRef)entity);
-						const Transform tr = { pos, rot, size * scale };
+						const Transform tr = { pos, rot, Vec3(size * scale) };
 						if (isOBBCollision(*scene, meshes, tr, model, m_ignore_entities_not_in_folder, folders, folder)) {
 							editor.undo();
 						}

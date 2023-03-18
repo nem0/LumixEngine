@@ -154,7 +154,9 @@ struct LUMIX_ENGINE_API DVec3
 
 	DVec3 operator-() const;
 	DVec3 operator*(float rhs) const;
+	DVec3 operator*(const Vec3& rhs) const;
 	DVec3 operator/(float rhs) const;
+	DVec3 operator/(const Vec3& rhs) const;
 	DVec3 operator/(const DVec3& rhs) const;
 	DVec3 operator-(const DVec3& rhs) const;
 	DVec3 operator+(const DVec3& rhs) const;
@@ -290,19 +292,20 @@ struct LUMIX_ENGINE_API LocalTransform {
 
 struct LUMIX_ENGINE_API Transform {
 	Transform() {}
-	Transform(const DVec3& _pos, const Quat& _rot, float _scale);
+	Transform(const DVec3& pos, const Quat& rot, Vec3 scale);
 
 	Transform inverted() const;
 
 	Transform operator*(const Transform& rhs) const;
 	Transform operator*(const LocalRigidTransform& rhs) const;
 	DVec3 transform(const Vec3& value) const;
+	Vec3 transformVector(const Vec3& value) const;
 	DVec3 transform(const DVec3& value) const;
 	RigidTransform getRigidPart() const;
 
 	DVec3 pos;
 	Quat rot;
-	float scale;
+	Vec3 scale;
 
 	static const Transform IDENTITY;
 };
@@ -356,6 +359,7 @@ struct alignas(16) LUMIX_ENGINE_API Matrix {
 	Vec3 transformPoint(const Vec3& pos) const;
 	Vec3 transformVector(const Vec3& pos) const;
 	void multiply3x3(float scale);
+	void multiply3x3(const Vec3& scale);
 	void setIdentity();
 
 	Vec4 columns[4];

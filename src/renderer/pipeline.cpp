@@ -2578,11 +2578,7 @@ struct PipelineImpl final : Pipeline
 		}
 		return 1;
 	}
-
-	static Vec4 packRotationLOD(const Quat& rot, float lod) {
-		return rot.w > 0 ? Vec4(rot.x, rot.y, rot.z, lod) : Vec4(-rot.x, -rot.y, -rot.z, lod);
-	}
-
+	   
 	void createCommands(View& view)
 	{
 		PROFILE_FUNCTION();
@@ -2601,7 +2597,7 @@ struct PipelineImpl final : Pipeline
 		
 		u64 instance_key_mask;
 		u32 define_mask;
-		u32 instanced_define_mask;
+		u32 autoinstanced_define_mask;
 		u32 skinned_define_mask;
 		u32 fur_define_mask;
 		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
@@ -2618,7 +2614,7 @@ struct PipelineImpl final : Pipeline
 				prev_bucket = bucket;
 				stream = &view.buckets[bucket].stream;
 				define_mask = view.buckets[bucket].define_mask;
-				instanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("INSTANCED"));
+				autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
 				skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
 				fur_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("FUR"));
 				const bool sort_depth = view.buckets[bucket].sort == Bucket::DEPTH;
@@ -2657,30 +2653,31 @@ struct PipelineImpl final : Pipeline
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
 					const Mesh& mesh = mi->meshes[mesh_idx];
 
-					const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 2);
+					const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 3);
 					u8* instance_data = slice.ptr;
 					const Transform& tr = entity_data[entity.index];
 					const float lod_d = model_instances[entity.index].lod - mesh.lod;
-					const Vec4 rot_lod = packRotationLOD(tr.rot, lod_d);
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
-					memcpy(instance_data, &rot_lod, sizeof(rot_lod));
-					instance_data += sizeof(rot_lod);
+					memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+					instance_data += sizeof(tr.rot);
 					memcpy(instance_data, &lpos, sizeof(lpos));
 					instance_data += sizeof(lpos);
+					memcpy(instance_data, &lod_d, sizeof(lod_d));
+					instance_data += sizeof(lod_d);
 					memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-					instance_data += sizeof(tr.scale);
+					instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
 
 					if (mi->custom_material->isReady()) {
 						Shader* shader = mi->custom_material->getShader();
 						const Material* material =  mi->custom_material;
 
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | material->getDefineMask());
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, autoinstanced_define_mask | material->getDefineMask());
 						stream->useProgram(program);
 						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 32);
+						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
 						stream->drawIndexedInstanced(mesh.indices_count, 1, mesh.index_type);
 					}
 					break;
@@ -2696,14 +2693,14 @@ struct PipelineImpl final : Pipeline
 						const Material* material = mesh.material;
 						Shader* shader = material->getShader();
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = instanced_define_mask | material->getDefineMask();
+						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
 						
 						stream->useProgram(program);
 						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, instances.slice.buffer, instances.slice.offset, 32);
+						stream->bindVertexBuffer(1, instances.slice.buffer, instances.slice.offset, 48);
 						stream->drawIndexedInstanced(mesh.indices_count, total_count, mesh.index_type);
 					}
 					else {
@@ -2717,33 +2714,34 @@ struct PipelineImpl final : Pipeline
 							++i;
 						}
 						const u32 count = u32(i - start_i);
-						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 2));
+						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 3));
 						u8* instance_data = slice.ptr;
 						for (int j = start_i; j < start_i + (i32)count; ++j) {
 							const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							const float lod_d = model_instances[e.index].lod - mesh_lod;
-							const Vec4 rot_lod = packRotationLOD(tr.rot, lod_d);
-							memcpy(instance_data, &rot_lod, sizeof(rot_lod));
-							instance_data += sizeof(rot_lod);
+							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+							instance_data += sizeof(tr.rot);
 							memcpy(instance_data, &lpos, sizeof(lpos));
 							instance_data += sizeof(lpos);
+							memcpy(instance_data, &lod_d, sizeof(lod_d));
+							instance_data += sizeof(lod_d);
 							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-							instance_data += sizeof(tr.scale);
+							instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
 						}
 
 						const Material* material = mesh.material;
 						Shader* shader = material->getShader();
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = instanced_define_mask | material->getDefineMask();
+						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
 						
 						stream->useProgram(program);
 						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 32);
+						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
 						stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
 						--i;
 					}
@@ -2759,7 +2757,6 @@ struct PipelineImpl final : Pipeline
 					Shader* shader = mesh.material->getShader();
 					u32 defines = skinned_define_mask | mesh.material->getDefineMask();
 					if (type == RenderableTypes::FUR) defines |= fur_define_mask;
-
 
 					const Quat* rotations = mi->pose->rotations;
 					const Vec3* positions = mi->pose->positions;
@@ -3567,7 +3564,7 @@ struct PipelineImpl final : Pipeline
 				if (!group) continue;
 
 				const u32 count = instances.end->offset + instances.end->count;
-				instances.slice = m_renderer.allocTransient(count * (2 * sizeof(Vec4)));
+				instances.slice = m_renderer.allocTransient(count * (3 * sizeof(Vec4)));
 				u8* instance_data = instances.slice.ptr;
 				const u32 sort_key = u32(&instances - instancer.instances.begin());
 				const Mesh* mesh = sort_key_to_mesh[sort_key];
@@ -3580,13 +3577,14 @@ struct PipelineImpl final : Pipeline
 						const Transform& tr = entity_data[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const float lod_d = model_instances[e.index].lod - mesh_lod;
-						const Vec4 r = packRotationLOD(tr.rot, lod_d);
-						memcpy(instance_data, &r, sizeof(r));
-						instance_data += sizeof(r);
+						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						instance_data += sizeof(tr.rot);
 						memcpy(instance_data, &lpos, sizeof(lpos));
 						instance_data += sizeof(lpos);
+						memcpy(instance_data, &lod_d, sizeof(lod_d));
+						instance_data += sizeof(lod_d);
 						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale);
+						instance_data += sizeof(tr.scale) + sizeof(float) /*padding to vec4*/;
 					}
 					group = group->next;
 				}

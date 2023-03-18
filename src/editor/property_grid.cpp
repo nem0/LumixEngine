@@ -841,9 +841,9 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 			editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
 		}
 
-		float scale = universe.getScale(entities[0]);
+		Vec3 scale = universe.getScale(entities[0]);
 		ImGuiEx::Label("Scale");
-		if (ImGui::DragFloat("##scale", &scale, 0.1f, 0, FLT_MAX))
+		if (ImGui::DragFloat3("##scale", &scale.x, 0.1f, 0, FLT_MAX))
 		{
 			editor.setEntitiesScale(&entities[0], entities.size(), scale);
 		}

@@ -29,11 +29,16 @@ static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 static const u32 SERIALIZED_PROJECT_MAGIC = 0x5f50524c; // == '_PRL'
 
 
+enum class SerializedEngineVersion : u32 {
+	VEC3_SCALE,
+	LAST
+};
+
 #pragma pack(1)
 struct SerializedEngineHeader
 {
 	u32 magic;
-	u32 version;
+	SerializedEngineVersion version;
 };
 #pragma pack()
 
@@ -214,7 +219,7 @@ public:
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,
 		const struct Quat& rot,
-		float scale,
+		const Vec3& scale,
 		EntityMap& entity_map) override
 	{
 		ASSERT(prefab.isReady());
@@ -432,12 +437,17 @@ public:
 		LAST,
 	};
 
+	struct ProjectHeader {
+		u32 magic;
+		ProjectVersion version;
+	};
+
 	DeserializeProjectResult deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) override {
-		SerializedEngineHeader header;
+		ProjectHeader header;
 		serializer.read(header);
 		if (header.magic != SERIALIZED_PROJECT_MAGIC) return DeserializeProjectResult::CORRUPTED_FILE;
-		if (header.version > (u32)ProjectVersion::LAST) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
-		if (header.version <= (u32)ProjectVersion::HASH64) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
+		if (header.version > ProjectVersion::LAST) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
+		if (header.version <= ProjectVersion::HASH64) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
 		const char* tmp = serializer.readString();
 		copyString(startup_universe, tmp);
 		i32 count = 0;
@@ -460,9 +470,9 @@ public:
 	}
 
 	void serializeProject(OutputMemoryStream& serializer, const char* startup_universe) const override {
-		SerializedEngineHeader header;
+		ProjectHeader header;
 		header.magic = SERIALIZED_PROJECT_MAGIC;
-		header.version = (u32)ProjectVersion::LAST;
+		header.version = ProjectVersion::LAST;
 		serializer.write(header);
 		serializer.writeString(startup_universe);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
@@ -479,7 +489,7 @@ public:
 	{
 		SerializedEngineHeader header;
 		header.magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
-		header.version = 0;
+		header.version = SerializedEngineVersion::LAST;
 		serializer.write(header);
 		serializePluginList(serializer);
 		ctx.serialize(serializer);
@@ -492,7 +502,7 @@ public:
 	}
 
 
-	bool deserialize(Universe& ctx, InputMemoryStream& serializer, EntityMap& entity_map) override
+	bool deserialize(Universe& universe, InputMemoryStream& serializer, EntityMap& entity_map) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
@@ -501,15 +511,19 @@ public:
 			logError("Wrong or corrupted file");
 			return false;
 		}
+		if (header.version > SerializedEngineVersion::LAST) {
+			logError("Unsupported version of universe");
+			return false;
+		}
 		if (!hasSerializedPlugins(serializer)) return false;
 
-		ctx.deserialize(serializer, entity_map);
+		universe.deserialize(serializer, entity_map, header.version > SerializedEngineVersion::VEC3_SCALE);
 		i32 scene_count;
 		serializer.read(scene_count);
 		for (int i = 0; i < scene_count; ++i)
 		{
 			const char* tmp = serializer.readString();
-			IScene* scene = ctx.getScene(tmp);
+			IScene* scene = universe.getScene(tmp);
 			const i32 version = serializer.read<i32>();
 			scene->deserialize(serializer, entity_map, version);
 		}
