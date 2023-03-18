@@ -11,7 +11,7 @@
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include <math.h>
 #include <imgui/imgui.h>
 
@@ -30,13 +30,13 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		m_app.removePlugin(*this);
 	}
 
-	bool onMouseDown(UniverseView& view, int x, int y) override {
+	bool onMouseDown(WorldView& view, int x, int y) override {
 		Spline* spline = getSpline();
 		if (!spline) return false;
 		
-		Universe* universe = m_app.getWorldEditor().getUniverse();
+		World* world = m_app.getWorldEditor().getWorld();
 		const EntityRef e = *getSplineEntity();
-		const Transform tr = universe->getTransform(e);
+		const Transform tr = world->getTransform(e);
 		DVec3 origin;
 		Vec3 dir;
 		const Viewport& vp = view.getViewport();
@@ -57,19 +57,19 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return INVALID_ENTITY;
 		
-		if (editor.getUniverse()->hasComponent(selected[0], SPLINE_TYPE)) return selected[0];
+		if (editor.getWorld()->hasComponent(selected[0], SPLINE_TYPE)) return selected[0];
 		return INVALID_ENTITY;
 	}
 
-	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {
+	void onMouseUp(WorldView& view, int x, int y, os::MouseButton button) override {
 		DVec3 origin;
 		Vec3 dir;
 		const Viewport& vp = view.getViewport();
 		vp.getRay(Vec2((float)x, (float)y), origin, dir);
 
 		const EntityRef e = *getSplineEntity();
-		Universe* universe = m_app.getWorldEditor().getUniverse();
-		const Transform tr = universe->getTransform(e);
+		World* world = m_app.getWorldEditor().getWorld();
+		const Transform tr = world->getTransform(e);
 
 		Spline* spline = getSpline();
 		if (spline) {
@@ -84,9 +84,9 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 			}
 		}
 
-		UniverseView::RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
+		WorldView::RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
 		if (hit.is_hit) {
-			CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
+			CoreScene* scene = (CoreScene*)world->getScene(SPLINE_TYPE);
 			Spline& hit_spline = scene->getSpline(e);
 			m_selected = (i32)hit_spline.points.size();
 			recordUndo(-1, hit_spline, e, [&](){
@@ -97,11 +97,11 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 	void setSplinePoints(EntityRef entity, Span<const Vec3> points) override {
 		WorldEditor& editor = m_app.getWorldEditor();
-		Universe* universe = editor.getUniverse();
+		World* world = editor.getWorld();
 
-		ASSERT(universe->hasComponent(entity, SPLINE_TYPE));
+		ASSERT(world->hasComponent(entity, SPLINE_TYPE));
 
-		CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
+		CoreScene* scene = (CoreScene*)world->getScene(SPLINE_TYPE);
 		Spline& spline = scene->getSpline(entity);
 		
 		recordUndo(-1, spline, entity, [&](){
@@ -115,11 +115,11 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return nullptr;
 
-		Universe* universe = editor.getUniverse();
+		World* world = editor.getWorld();
 
-		if (!universe->hasComponent(selected[0], SPLINE_TYPE)) return nullptr;
+		if (!world->hasComponent(selected[0], SPLINE_TYPE)) return nullptr;
 
-		CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
+		CoreScene* scene = (CoreScene*)world->getScene(SPLINE_TYPE);
 		return &scene->getSpline(selected[0]);
 	}
 
@@ -157,14 +157,14 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		{}
 
 		bool execute() override { 
-			CoreScene* scene = (CoreScene*)editor.getUniverse()->getScene(SPLINE_TYPE);
+			CoreScene* scene = (CoreScene*)editor.getWorld()->getScene(SPLINE_TYPE);
 			Spline& spline = scene->getSpline(e);
 			spline.points = new_points.makeCopy();
 			return true;
 		}
 
 		void undo() override {
-			CoreScene* scene = (CoreScene*)editor.getUniverse()->getScene(SPLINE_TYPE);
+			CoreScene* scene = (CoreScene*)editor.getWorld()->getScene(SPLINE_TYPE);
 			Spline& spline = scene->getSpline(e);
 			spline.points = old_points.makeCopy();
 		}
@@ -265,7 +265,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 			Spline* spline = getSpline();
 			WorldEditor& editor = m_app.getWorldEditor();
 			const EntityRef spline_entity = *getSplineEntity();
-			const Transform tr = editor.getUniverse()->getTransform(spline_entity);
+			const Transform tr = editor.getWorld()->getTransform(spline_entity);
 			float f = 0;
 			float offset = 0;
 			editor.beginCommandGroup("spline_place");
@@ -329,20 +329,20 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		m_app.addPlugin((StudioApp::MousePlugin&)*this);
 	}
 
-	bool showGizmo(struct UniverseView& view, struct ComponentUID cmp) override {
+	bool showGizmo(struct WorldView& view, struct ComponentUID cmp) override {
 		m_hovered_gizmo = false;
 		if (cmp.type != SPLINE_TYPE) return false;
 		
 		const EntityRef e = (EntityRef)cmp.entity;
-		Universe& universe = cmp.scene->getUniverse();
-		if (!universe.hasComponent(e, SPLINE_TYPE)) return false;
+		World& world = cmp.scene->getWorld();
+		if (!world.hasComponent(e, SPLINE_TYPE)) return false;
 
 		CoreScene* scene = (CoreScene*)cmp.scene;
 		Spline& spline = scene->getSpline(e);
 		if (spline.points.size() == 0) return false;
 
-		UniverseView::Vertex* vertices = view.render(true, (spline.points.size() - 1) * 2);
-		const Transform& tr = universe.getTransform(e);
+		WorldView::Vertex* vertices = view.render(true, (spline.points.size() - 1) * 2);
+		const Transform& tr = world.getTransform(e);
 		const DVec3 cam_pos = view.getViewport().pos;
 		const Vec3 offset = Vec3(tr.pos - cam_pos);
 		DVec3 origin;
@@ -368,7 +368,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		};
 
 		if (spline.points.size() > 2) {
-			UniverseView::Vertex* curves = view.render(true, (spline.points.size() - 2) * 20);
+			WorldView::Vertex* curves = view.render(true, (spline.points.size() - 2) * 20);
 			for (i32 i = 2; i < spline.points.size(); ++i) {
 				const Vec3 p1 = spline.points[i - 1];
 				const Vec3 p0 = lerp(spline.points[i - 2], p1, 0.5f);

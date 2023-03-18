@@ -27,7 +27,7 @@ struct IEditorCommand
 	virtual bool merge(IEditorCommand& command) = 0;
 };
 
-struct UniverseView {
+struct WorldView {
 	struct RayHit {
 		bool is_hit;
 		float t;
@@ -40,7 +40,7 @@ struct UniverseView {
 		u32 abgr;
 	};
 
-	virtual ~UniverseView() = default;
+	virtual ~WorldView() = default;
 	virtual const struct Viewport& getViewport() const = 0;
 	virtual void setViewport(const Viewport& vp) = 0;
 	virtual void lookAtSelected() = 0;
@@ -65,15 +65,15 @@ struct UniverseView {
 	virtual struct WorldEditor& getEditor() = 0;
 };
 
-LUMIX_EDITOR_API void addCircle(UniverseView& view, const DVec3& center, float radius, const Vec3& up, Color color);
-LUMIX_EDITOR_API void addSphere(UniverseView& view, const DVec3& center, float radius, Color color);
-LUMIX_EDITOR_API void addCube(UniverseView& view, const DVec3& center, const Vec3& x, const Vec3& y, const Vec3& z, Color color);
-LUMIX_EDITOR_API void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color);
-LUMIX_EDITOR_API void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color);
-LUMIX_EDITOR_API void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color);
-LUMIX_EDITOR_API void addCone(UniverseView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color);
-LUMIX_EDITOR_API void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color color);
-LUMIX_EDITOR_API void addCapsule(UniverseView& view, const DVec3& position, float height, float radius, Color color);
+LUMIX_EDITOR_API void addCircle(WorldView& view, const DVec3& center, float radius, const Vec3& up, Color color);
+LUMIX_EDITOR_API void addSphere(WorldView& view, const DVec3& center, float radius, Color color);
+LUMIX_EDITOR_API void addCube(WorldView& view, const DVec3& center, const Vec3& x, const Vec3& y, const Vec3& z, Color color);
+LUMIX_EDITOR_API void addCube(WorldView& view, const DVec3& min, const DVec3& max, Color color);
+LUMIX_EDITOR_API void addLine(WorldView& view, const DVec3& a, const DVec3& b, Color color);
+LUMIX_EDITOR_API void addCylinder(WorldView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color);
+LUMIX_EDITOR_API void addCone(WorldView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color);
+LUMIX_EDITOR_API void addFrustum(WorldView& view, const struct ShiftedFrustum& frustum, Color color);
+LUMIX_EDITOR_API void addCapsule(WorldView& view, const DVec3& position, float height, float radius, Color color);
 
 struct LUMIX_EDITOR_API WorldEditor
 {
@@ -89,16 +89,16 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void loadProject() = 0;
 	virtual void update() = 0;
 	virtual Engine& getEngine() = 0;
-	virtual struct Universe* getUniverse() = 0;
+	virtual struct World* getWorld() = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual UniverseView& getView() = 0;
-	virtual void setView(UniverseView* view) = 0;
+	virtual WorldView& getView() = 0;
+	virtual void setView(WorldView* view) = 0;
 	
 	virtual void beginCommandGroup(const char* type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void lockGroupCommand() = 0;
 	virtual void executeCommand(UniquePtr<IEditorCommand>&& command) = 0;
-	virtual bool isUniverseChanged() const = 0;
+	virtual bool isWorldChanged() const = 0;
 	virtual bool canUndo() const = 0;
 	virtual bool canRedo() const = 0;
 	virtual void undo() = 0;
@@ -145,14 +145,14 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void pasteEntities() = 0;
     virtual void duplicateEntities() = 0;
 
-	virtual void loadUniverse(const char* basename) = 0;
-	virtual void saveUniverse(const char* basename, bool save_path) = 0;
+	virtual void loadWorld(const char* basename) = 0;
+	virtual void saveWorld(const char* basename, bool save_path) = 0;
 	virtual bool isLoading() const = 0;
-	virtual void newUniverse() = 0;
+	virtual void newWorld() = 0;
 	virtual void toggleGameMode() = 0;
 	
-	virtual DelegateList<void()>& universeCreated() = 0;
-	virtual DelegateList<void()>& universeDestroyed() = 0;
+	virtual DelegateList<void()>& worldCreated() = 0;
+	virtual DelegateList<void()>& worldDestroyed() = 0;
 	virtual DelegateList<void()>& entitySelectionChanged() = 0;
 
 	virtual u16 createEntityFolder(u16 parent) = 0;

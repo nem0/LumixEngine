@@ -15,7 +15,7 @@
 #include "engine/path.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
@@ -285,7 +285,7 @@ private:
 		EntityRef e = selected_entities[0];
 		if (!scene.hasGUI(e)) return MouseMode::NONE;
 
-		const EntityPtr parent = scene.getUniverse().getParent(e);
+		const EntityPtr parent = scene.getWorld().getParent(e);
 		const GUIScene::Rect rect = scene.getRectEx(e, canvas_size);
 		GUIScene::Rect parent_rect = scene.getRectEx(parent, canvas_size);
 
@@ -366,7 +366,7 @@ private:
 
 	void copy(EntityRef e, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
+		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
 		m_copy_position_buffer_count = 0;
 
 		if (mask & (u8)EdgeMask::TOP)
@@ -427,9 +427,9 @@ private:
 				return;
 			}
 
-			m_pipeline->setUniverse(editor.getUniverse());
+			m_pipeline->setWorld(editor.getWorld());
 
-			GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
+			GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
 			scene->render(*m_pipeline, { size.x, size.y }, false);
 			
 			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *scene, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
@@ -493,7 +493,7 @@ private:
 				const Array<EntityRef>& selected = editor.getSelectedEntities();
 				bool parent_selected = false;
 				if (!selected.empty()) {
-					const EntityPtr parent = editor.getUniverse()->getParent(selected[0]);
+					const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
 					if (parent.isValid()) {
 						const GUIScene::Rect rect = scene->getRect(*parent);
 						if (mouse_canvas_pos.x >= rect.x 
@@ -520,7 +520,7 @@ private:
 			bool has_rect = false;
 			if (editor.getSelectedEntities().size() == 1)
 			{
-				has_rect = editor.getUniverse()->hasComponent(editor.getSelectedEntities()[0], GUI_RECT_TYPE);
+				has_rect = editor.getWorld()->hasComponent(editor.getSelectedEntities()[0], GUI_RECT_TYPE);
 			}
 			if (has_rect && ImGui::BeginPopupContextItem("context"))
 			{
@@ -632,15 +632,15 @@ private:
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		ASSERT(!selected.empty());
 		ASSERT(cols > 0);
-		const Universe& universe = *editor.getUniverse();
+		const World& world = *editor.getWorld();
 		const EntityRef e = selected[0];
 
 		editor.beginCommandGroup("layout_gui");
 
 		u32 y = 0;
 		u32 col = 0;
-		for (EntityRef ch : universe.childrenOf(e)) {
-			if (!universe.hasComponent(ch, GUI_RECT_TYPE)) continue;
+		for (EntityRef ch : world.childrenOf(e)) {
+			if (!world.hasComponent(ch, GUI_RECT_TYPE)) continue;
 
 			setRectProperty(ch, "Top Points", (float)y, editor);
 			setRectProperty(ch, "Bottom Points", (float)y + row_height, editor);
@@ -684,9 +684,9 @@ private:
 
 
 	void makeAbsolute(EntityRef entity, const Vec2& canvas_size, u8 mask, WorldEditor& editor) {
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
+		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
 
-		EntityRef parent = (EntityRef)scene->getUniverse().getParent(entity);
+		EntityRef parent = (EntityRef)scene->getWorld().getParent(entity);
 		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
 
@@ -753,7 +753,7 @@ private:
 
 	void align(EntityRef entity, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
+		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
 
 		editor.beginCommandGroup("align_gui_rect");
 
@@ -852,9 +852,9 @@ private:
 
 	void makeRelative(EntityRef entity, const Vec2& canvas_size, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getUniverse()->getScene("gui");
+		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
 		
-		EntityPtr parent = scene->getUniverse().getParent(entity);
+		EntityPtr parent = scene->getWorld().getParent(entity);
 		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
 
@@ -929,7 +929,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getAssetCompiler().addPlugin(m_sprite_plugin, sprite_exts);
 	}
 
-	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
+	bool showGizmo(WorldView&, ComponentUID) override { return false; }
 	
 	~StudioAppPlugin() {
 		m_app.removePlugin(m_gui_editor);

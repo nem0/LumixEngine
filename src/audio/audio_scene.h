@@ -51,7 +51,7 @@ struct AudioScene : IScene
 	static constexpr SoundHandle INVALID_SOUND_HANDLE = -1;
 
 	static UniquePtr<AudioScene> createInstance(AudioSystem& system,
-		Universe& universe,
+		World& world,
 		struct IAllocator& allocator);
 	static void reflect(struct Engine& engine);
 

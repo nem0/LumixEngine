@@ -17,7 +17,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_scene.h"
 #include "renderer/texture.h"
@@ -98,7 +98,7 @@ namespace Lumix
 		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
 		{
 			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::pushEntity(L, hit.entity, &scene->getUniverse());
+			LuaWrapper::pushEntity(L, hit.entity, &scene->getWorld());
 			LuaWrapper::push(L, hit.position);
 			LuaWrapper::push(L, hit.normal);
 			return 4;
@@ -186,10 +186,10 @@ namespace Lumix
 			return true;
 		}
 
-		void createScenes(Universe& universe) override
+		void createScenes(World& world) override
 		{
-			UniquePtr<PhysicsScene> scene = PhysicsScene::create(*this, universe, m_engine, m_allocator);
-			universe.addScene(scene.move());
+			UniquePtr<PhysicsScene> scene = PhysicsScene::create(*this, world, m_engine, m_allocator);
+			world.addScene(scene.move());
 		}
 
 		physx::PxPhysics* getPhysics() override { return m_physics; }

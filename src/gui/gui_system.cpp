@@ -6,7 +6,7 @@
 #include "engine/path.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
 #include "renderer/font.h"
@@ -74,11 +74,11 @@ struct GUISystemImpl final : GUISystem
 
 	Engine& getEngine() override { return m_engine; }
 
-	void createScenes(Universe& universe) override
+	void createScenes(World& world) override
 	{
 		IAllocator& allocator = m_engine.getAllocator();
-		UniquePtr<GUIScene> scene = GUIScene::createInstance(*this, universe, allocator);
-		universe.addScene(scene.move());
+		UniquePtr<GUIScene> scene = GUIScene::createInstance(*this, world, allocator);
+		world.addScene(scene.move());
 	}
 
 	void setCursor(os::CursorType type) override {
@@ -107,7 +107,7 @@ struct GUISystemImpl final : GUISystem
 		if (!m_interface) return;
 
 		Pipeline* pipeline = m_interface->getPipeline();
-		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene("gui");
+		auto* scene = (GUIScene*)pipeline->getScene()->getWorld().getScene("gui");
 		Vec2 size = m_interface->getSize();
 		scene->render(*pipeline, size, true);
 	}

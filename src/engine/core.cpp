@@ -3,7 +3,7 @@
 #include "hash_map.h"
 #include "reflection.h"
 #include "stream.h"
-#include "universe.h"
+#include "world.h"
 
 namespace Lumix {
 
@@ -14,10 +14,10 @@ Spline::Spline(IAllocator& allocator)
 {}
 
 struct CoreSceneImpl : CoreScene {
-	CoreSceneImpl(Engine& engine, IPlugin& plugin, Universe& universe)
+	CoreSceneImpl(Engine& engine, IPlugin& plugin, World& world)
 		: m_plugin(plugin)
 		, m_allocator(engine.getAllocator())
-		, m_universe(universe)
+		, m_world(world)
 		, m_splines(m_allocator)
 	{}
 
@@ -46,24 +46,24 @@ struct CoreSceneImpl : CoreScene {
 			serializer.read(spline.points.begin(), spline.points.byte_size());
 			
 			m_splines.insert(e, static_cast<Spline&&>(spline));
-			m_universe.onComponentCreated(e, SPLINE_TYPE, this);
+			m_world.onComponentCreated(e, SPLINE_TYPE, this);
 		}
 	}
 
 	IPlugin& getPlugin() const override { return m_plugin; }
 	void update(float time_delta, bool paused) override {}
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 	void clear() override { m_splines.clear(); }
 
 	void createSpline(EntityRef e) {
 		Spline spline(m_allocator);
 		m_splines.insert(e, static_cast<Spline&&>(spline));
-		m_universe.onComponentCreated(e, SPLINE_TYPE, this);
+		m_world.onComponentCreated(e, SPLINE_TYPE, this);
 	}
 	
 	void destroySpline(EntityRef e) {
 		m_splines.erase(e);
-		m_universe.onComponentDestroyed(e, SPLINE_TYPE, this);
+		m_world.onComponentDestroyed(e, SPLINE_TYPE, this);
 	}
 	
 	Spline& getSpline(EntityRef e) override {
@@ -82,7 +82,7 @@ struct CoreSceneImpl : CoreScene {
 	IAllocator& m_allocator;
 	HashMap<EntityRef, Spline> m_splines;
 	IPlugin& m_plugin;
-	Universe& m_universe;
+	World& m_world;
 };
 
 struct CorePlugin : IPlugin {
@@ -97,10 +97,10 @@ struct CorePlugin : IPlugin {
 	void serialize(OutputMemoryStream& serializer) const override {}
 	bool deserialize(u32 version, InputMemoryStream& serializer) override { return true; }
 
-	void createScenes(Universe& universe) override {
+	void createScenes(World& world) override {
 		IAllocator& allocator = m_engine.getAllocator();
-		UniquePtr<CoreSceneImpl> scene = UniquePtr<CoreSceneImpl>::create(allocator, m_engine, *this, universe);
-		universe.addScene(scene.move());
+		UniquePtr<CoreSceneImpl> scene = UniquePtr<CoreSceneImpl>::create(allocator, m_engine, *this, world);
+		world.addScene(scene.move());
 	}
 
 	Engine& m_engine;

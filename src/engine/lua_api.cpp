@@ -9,7 +9,7 @@
 #include "prefab.h"
 #include "reflection.h"
 #include "string.h"
-#include "universe.h"
+#include "world.h"
 #include <lua.hpp>
 
 namespace Lumix {
@@ -479,48 +479,48 @@ static int LUA_processFilesystemWork(lua_State* L)
 }
 
 
-static void LUA_startGame(Engine* engine, Universe* universe)
+static void LUA_startGame(Engine* engine, World* world)
 {
-	if(engine && universe) engine->startGame(*universe);
+	if(engine && world) engine->startGame(*world);
 }
 
 
-static bool LUA_createComponent(Universe* universe, i32 entity, const char* type)
+static bool LUA_createComponent(World* world, i32 entity, const char* type)
 {
-	if (!universe) return false;
+	if (!world) return false;
 	ComponentType cmp_type = reflection::getComponentType(type);
-	IScene* scene = universe->getScene(cmp_type);
+	IScene* scene = world->getScene(cmp_type);
 	if (!scene) return false;
-	if (universe->hasComponent({entity}, cmp_type))
+	if (world->hasComponent({entity}, cmp_type))
 	{
 		logError("Component ", type, " already exists in entity ", entity);
 		return false;
 	}
 
-	universe->createComponent(cmp_type, {entity});
+	world->createComponent(cmp_type, {entity});
 	return true;
 }
 
 
-static bool LUA_hasComponent(Universe* universe, i32 entity, const char* type)
+static bool LUA_hasComponent(World* world, i32 entity, const char* type)
 {
-	if (!universe) return false;
+	if (!world) return false;
 	ComponentType cmp_type = reflection::getComponentType(type);
-	IScene* scene = universe->getScene(cmp_type);
+	IScene* scene = world->getScene(cmp_type);
 	if (!scene) return false;
-	return universe->hasComponent({entity}, cmp_type);
+	return world->hasComponent({entity}, cmp_type);
 }
 
 
-static EntityRef LUA_createEntity(Universe* universe)
+static EntityRef LUA_createEntity(World* world)
 {
-	return universe->createEntity({0, 0, 0}, Quat::IDENTITY);
+	return world->createEntity({0, 0, 0}, Quat::IDENTITY);
 }
 
 
 static int LUA_setEntityRotation(lua_State* L)
 {
-	Universe* univ = LuaWrapper::checkArg<Universe*>(L, 1);
+	World* univ = LuaWrapper::checkArg<World*>(L, 1);
 	int entity_index = LuaWrapper::checkArg<int>(L, 2);
 	if (entity_index < 0) return 0;
 
@@ -539,9 +539,9 @@ static int LUA_setEntityRotation(lua_State* L)
 }
 
 
-static IScene* LUA_getScene(Universe* universe, const char* name)
+static IScene* LUA_getScene(World* world, const char* name)
 {
-	return universe->getScene(name);
+	return world->getScene(name);
 }
 
 
@@ -558,61 +558,61 @@ static const char* LUA_getResourcePath(Engine* engine, i32 resource_handle)
 }
 
 
-static DVec3 LUA_getEntityPosition(Universe* universe, i32 entity)
+static DVec3 LUA_getEntityPosition(World* world, i32 entity)
 {
-	return universe->getPosition({entity});
+	return world->getPosition({entity});
 }
 
 
-static Quat LUA_getEntityRotation(Universe* universe, i32 entity)
+static Quat LUA_getEntityRotation(World* world, i32 entity)
 {
-	return universe->getRotation({entity});
+	return world->getRotation({entity});
 }
 
 
-static Vec3 LUA_getEntityScale(Universe* universe, i32 entity)
+static Vec3 LUA_getEntityScale(World* world, i32 entity)
 {
-	return universe->getScale({entity});
+	return world->getScale({entity});
 }
 
 
-static i32 LUA_getFirstChild(Universe* universe, i32 entity)
+static i32 LUA_getFirstChild(World* world, i32 entity)
 {
-	return universe->getFirstChild({entity}).index;
+	return world->getFirstChild({entity}).index;
 }
 
-static i32 LUA_getParent(Universe* universe, i32 entity)
+static i32 LUA_getParent(World* world, i32 entity)
 {
-	return universe->getParent({entity}).index;
+	return world->getParent({entity}).index;
 }
 
-static i32 LUA_findByName(Universe* universe, i32 entity, const char* name)
+static i32 LUA_findByName(World* world, i32 entity, const char* name)
 {
-	return universe->findByName(EntityPtr{entity}, name).index;
+	return world->findByName(EntityPtr{entity}, name).index;
 }
 
-static void LUA_setParent(Universe* universe, i32 parent, i32 child)
+static void LUA_setParent(World* world, i32 parent, i32 child)
 {
-	return universe->setParent(EntityPtr{parent}, EntityRef{child});
+	return world->setParent(EntityPtr{parent}, EntityRef{child});
 }
 
 
-static const char* LUA_getEntityName(Universe* univ, i32 entity) { return univ->getEntityName({entity}); }
-static void LUA_setEntityName(Universe* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
-static void LUA_setEntityScale(Universe* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
-static void LUA_setEntityPosition(Universe* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
+static const char* LUA_getEntityName(World* univ, i32 entity) { return univ->getEntityName({entity}); }
+static void LUA_setEntityName(World* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
+static void LUA_setEntityScale(World* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
+static void LUA_setEntityPosition(World* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
 static void LUA_unloadResource(Engine* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
-static Universe* LUA_createUniverse(Engine* engine) { return &engine->createUniverse(false); }
-static void LUA_destroyUniverse(Engine* engine, Universe* universe) { engine->destroyUniverse(*universe); }
-static void LUA_destroyEntity(Universe* universe, i32 entity) { universe->destroyEntity({entity}); }
+static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(false); }
+static void LUA_destroyWorld(Engine* engine, World* world) { engine->destroyWorld(*world); }
+static void LUA_destroyEntity(World* world, i32 entity) { world->destroyEntity({entity}); }
 static void LUA_logError(const char* text) { logError(text); }
 static void LUA_logInfo(const char* text) { logInfo(text); }
 static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
 
-static int LUA_loadUniverse(lua_State* L)
+static int LUA_loadWorld(lua_State* L)
 {
 	Engine* engine = getEngineUpvalue(L);
-	auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
+	auto* world = LuaWrapper::checkArg<World*>(L, 1);
 	auto* name = LuaWrapper::checkArg<const char*>(L, 2);
 	if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
 	struct Callback {
@@ -620,7 +620,7 @@ static int LUA_loadUniverse(lua_State* L)
 
 		void invoke(u64 size, const u8* mem, bool success) {
 			if (!success) {
-				logError("Failed to open universe ", path);
+				logError("Failed to open world ", path);
 			} else {
 				InputMemoryStream blob(mem, size);
 				#pragma pack(1)
@@ -635,8 +635,8 @@ static int LUA_loadUniverse(lua_State* L)
 				blob.read(&header, sizeof(header));
 
 				EntityMap entity_map(engine->getAllocator());
-				if (!engine->deserialize(*universe, blob, entity_map)) {
-					logError("Failed to deserialize universe ", path);
+				if (!engine->deserialize(*world, blob, entity_map)) {
+					logError("Failed to deserialize world ", path);
 				} else {
 					lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func);
 					if (lua_type(L, -1) != LUA_TFUNCTION) {
@@ -653,7 +653,7 @@ static int LUA_loadUniverse(lua_State* L)
 		}
 
 		Engine* engine;
-		Universe* universe;
+		World* world;
 		Path path;
 		lua_State* L;
 		int lua_func;
@@ -662,7 +662,7 @@ static int LUA_loadUniverse(lua_State* L)
 	FileSystem& fs = engine->getFileSystem();
 	Callback* inst = LUMIX_NEW(engine->getAllocator(), Callback);
 	inst->engine = engine;
-	inst->universe = universe;
+	inst->world = world;
 	StaticString<LUMIX_MAX_PATH> path("universes/", name, ".unv");
 	inst->path = path;
 	inst->L = L;
@@ -675,9 +675,9 @@ static int LUA_instantiatePrefab(lua_State* L) {
 	Engine* engine = getEngineUpvalue(L);
 	LuaWrapper::checkTableArg(L, 1);
 	if (LuaWrapper::getField(L, 1, "value") != LUA_TLIGHTUSERDATA) {
-		LuaWrapper::argError(L, 1, "universe");
+		LuaWrapper::argError(L, 1, "world");
 	}
-	auto* universe = LuaWrapper::toType<Universe*>(L, -1);
+	auto* world = LuaWrapper::toType<World*>(L, -1);
 	lua_pop(L, 1);
 	DVec3 position = LuaWrapper::checkArg<DVec3>(L, 2);
 	int prefab_id = LuaWrapper::checkArg<int>(L, 3);
@@ -689,8 +689,8 @@ static int LUA_instantiatePrefab(lua_State* L) {
 		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
 	}
 	EntityMap entity_map(engine->getAllocator());
-	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, {1, 1, 1}, entity_map)) {
-		LuaWrapper::pushEntity(L, entity_map.m_map[0], universe);
+	if (engine->instantiatePrefab(*world, *prefab, position, {0, 0, 0, 1}, {1, 1, 1}, entity_map)) {
+		LuaWrapper::pushEntity(L, entity_map.m_map[0], world);
 		return 1;
 	}
 	luaL_error(L, "Failed to instantiate prefab");
@@ -709,9 +709,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(createComponent);
 	REGISTER_FUNCTION(hasComponent);
 	REGISTER_FUNCTION(createEntity);
-	REGISTER_FUNCTION(createUniverse);
+	REGISTER_FUNCTION(createWorld);
 	REGISTER_FUNCTION(destroyEntity);
-	REGISTER_FUNCTION(destroyUniverse);
+	REGISTER_FUNCTION(destroyWorld);
 	REGISTER_FUNCTION(findByName);
 	REGISTER_FUNCTION(getEntityName);
 	REGISTER_FUNCTION(getEntityPosition);
@@ -733,7 +733,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
 
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadUniverse", LUA_loadUniverse);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadWorld", LUA_loadWorld);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "hasFilesystemWork", LUA_hasFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
@@ -742,7 +742,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 
 	#define REGISTER_FUNCTION(F) \
 		do { \
-			auto f = &LuaWrapper::wrapMethod<&Universe::F>; \
+			auto f = &LuaWrapper::wrapMethod<&World::F>; \
 			LuaWrapper::createSystemFunction(L, "LumixAPI", #F, f); \
 		} while(false)
 
@@ -838,50 +838,50 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	const char* entity_src = R"#(
 		Lumix = {}
 		Lumix.Entity = {}
-		function Lumix.Entity:new(universe, entity)
-			local e = { _entity = entity, _universe = universe }
+		function Lumix.Entity:new(world, entity)
+			local e = { _entity = entity, _world = world }
 			setmetatable(e, self)
 			return e
 		end
 		function Lumix.Entity:destroy()
-			LumixAPI.destroyEntity(self._universe, self._entity)
+			LumixAPI.destroyEntity(self._world, self._entity)
 			self._entity = 0xffFFffFF
 		end
 		function Lumix.Entity:createComponent(cmp)
-			LumixAPI.createComponent(self._universe, self._entity, cmp)
-			return Lumix[cmp]:new(self._universe, self._entity)
+			LumixAPI.createComponent(self._world, self._entity, cmp)
+			return Lumix[cmp]:new(self._world, self._entity)
 		end
 		function Lumix.Entity:getComponent(cmp)
-			if not LumixAPI.hasComponent(self._universe, self._entity, cmp) then return nil end
-			return Lumix[cmp]:new(self._universe, self._entity)
+			if not LumixAPI.hasComponent(self._world, self._entity, cmp) then return nil end
+			return Lumix[cmp]:new(self._world, self._entity)
 		end
 		function Lumix.Entity:hasComponent(cmp)
-			return LumixAPI.hasComponent(self._universe, self._entity, cmp)
+			return LumixAPI.hasComponent(self._world, self._entity, cmp)
 		end
 		Lumix.Entity.__index = function(table, key)
 			if key == "position" then
-				return LumixAPI.getEntityPosition(table._universe, table._entity)
+				return LumixAPI.getEntityPosition(table._world, table._entity)
 			elseif key == "parent" then
-				local p = LumixAPI.getParent(table._universe, table._entity)
+				local p = LumixAPI.getParent(table._world, table._entity)
 				if p < 0 then return nil end
-				return Lumix.Entity:new(table._universe, p)
+				return Lumix.Entity:new(table._world, p)
 			elseif key == "first_child" then
-				local p = LumixAPI.getFirstChild(table._universe, table._entity)
+				local p = LumixAPI.getFirstChild(table._world, table._entity)
 				if p < 0 then return nil end
-				return Lumix.Entity:new(table._universe, p)
+				return Lumix.Entity:new(table._world, p)
 			elseif key == "rotation" then
-				return LumixAPI.getEntityRotation(table._universe, table._entity)
+				return LumixAPI.getEntityRotation(table._world, table._entity)
 			elseif key == "name" then
-				return LumixAPI.getEntityName(table._universe, table._entity)
+				return LumixAPI.getEntityName(table._world, table._entity)
 			elseif key == "scale" then
-				return LumixAPI.getEntityScale(table._universe, table._entity)
-			elseif key == "universe" then
-				return Lumix.Universe:new(table._universe)
+				return LumixAPI.getEntityScale(table._world, table._entity)
+			elseif key == "world" then
+				return Lumix.World:new(table._world)
 			elseif Lumix.Entity[key] ~= nil then
 				return Lumix.Entity[key]
 			else 
-				if LumixAPI.hasComponent(table._universe, table._entity, key) then
-					return Lumix[key]:new(table._universe, table._entity)
+				if LumixAPI.hasComponent(table._world, table._entity, key) then
+					return Lumix[key]:new(table._world, table._entity)
 				else
 					return nil
 				end
@@ -889,15 +889,15 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		Lumix.Entity.__newindex = function(table, key, value)
 			if key == "position" then
-				LumixAPI.setEntityPosition(table._universe, table._entity, value)
+				LumixAPI.setEntityPosition(table._world, table._entity, value)
 			elseif key == "name" then
-				LumixAPI.setEntityName(table._universe, table._entity, value)
+				LumixAPI.setEntityName(table._world, table._entity, value)
 			elseif key == "rotation" then
-				LumixAPI.setEntityRotation(table._universe, table._entity, value)
+				LumixAPI.setEntityRotation(table._world, table._entity, value)
 			elseif key == "scale" then
-				LumixAPI.setEntityScale(table._universe, table._entity, value)
+				LumixAPI.setEntityScale(table._world, table._entity, value)
 			elseif key == "parent" then
-				LumixAPI.setParent(table._universe, value._entity, table._entity)
+				LumixAPI.setParent(table._world, value._entity, table._entity)
 			elseif Lumix.Entity[key] ~= nil then
 				Lumix.Entity[key] = value
 			else
@@ -905,37 +905,37 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			end
 		end
 
-		Lumix.Universe = {}
-		function Lumix.Universe:create() 
-			local u = LumixAPI.createUniverse(LumixAPI.engine)
-			return Lumix.Universe:new(u)
+		Lumix.World = {}
+		function Lumix.World:create() 
+			local u = LumixAPI.createWorld(LumixAPI.engine)
+			return Lumix.World:new(u)
 		end
-		function Lumix.Universe:destroy()
-			LumixAPI.destroyUniverse(LumixAPI.engine, self.value)
+		function Lumix.World:destroy()
+			LumixAPI.destroyWorld(LumixAPI.engine, self.value)
 		end
-		function Lumix.Universe:load(path, callback_fn)
-			LumixAPI.loadUniverse(self.value, path, callback_fn)
+		function Lumix.World:load(path, callback_fn)
+			LumixAPI.loadWorld(self.value, path, callback_fn)
 		end
-		function Lumix.Universe:new(_universe)
-			local u = { value = _universe }
+		function Lumix.World:new(_world)
+			local u = { value = _world }
 			setmetatable(u, self)
 			self.__index = self
 			return u
 		end
-		function Lumix.Universe:createEntity()
+		function Lumix.World:createEntity()
 			local e = LumixAPI.createEntity(self.value)
 			return Lumix.Entity:new(self.value, e)
 		end
-		function Lumix.Universe:getScene(scene_name)
+		function Lumix.World:getScene(scene_name)
 			local scene = LumixAPI.getScene(self.value, scene_name)	
 			return Lumix[scene_name]:new(scene)
 		end
-		function Lumix.Universe:findEntityByName(parent, name)
+		function Lumix.World:findEntityByName(parent, name)
 			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)
 			if p < 0 then return nil end
 			return Lumix.Entity:new(self.value, p)			
 		end
-		function Lumix.Universe:createEntityEx(desc)
+		function Lumix.World:createEntityEx(desc)
 			local ent = self:createEntity()
 			for k, v in pairs(desc) do
 				if k == "position" then

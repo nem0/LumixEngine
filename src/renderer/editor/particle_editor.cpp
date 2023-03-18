@@ -10,7 +10,7 @@
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_scene.h"
@@ -1676,10 +1676,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return nullptr;
 
-		Universe* universe = editor.getUniverse();
+		World* world = editor.getWorld();
 		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
-		RenderScene* scene = (RenderScene*)universe->getScene(emitter_type);
-		const bool has = universe->hasComponent(selected[0], emitter_type);
+		RenderScene* scene = (RenderScene*)world->getScene(emitter_type);
+		const bool has = world->hasComponent(selected[0], emitter_type);
 		EntityRef e = selected[0];
 		return has ? &scene->getParticleEmitter(e) : nullptr;
 	}

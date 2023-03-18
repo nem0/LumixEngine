@@ -9,7 +9,7 @@
 
 namespace Lumix {
 
-struct Universe;
+struct World;
 struct CameraParams;
 struct PipelineTexture;
 
@@ -555,8 +555,8 @@ LUMIX_ENGINE_API void argError(lua_State* L, int index, const char* expected_typ
 LUMIX_ENGINE_API void checkTableArg(lua_State* L, int index);
 LUMIX_ENGINE_API bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out);
 LUMIX_ENGINE_API void push(lua_State* L, EntityRef value);
-LUMIX_ENGINE_API bool toEntity(lua_State* L, int idx, Universe*& universe, EntityRef& entity);
-LUMIX_ENGINE_API void pushEntity(lua_State* L, EntityPtr value, Universe* universe);
+LUMIX_ENGINE_API bool toEntity(lua_State* L, int idx, World*& world, EntityRef& entity);
+LUMIX_ENGINE_API void pushEntity(lua_State* L, EntityPtr value, World* world);
 LUMIX_ENGINE_API bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out);
 
 template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)

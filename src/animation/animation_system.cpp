@@ -5,7 +5,7 @@
 #include "animation/controller.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 
 namespace Lumix
@@ -13,7 +13,7 @@ namespace Lumix
 
 struct Animation;
 struct Engine;
-struct Universe;
+struct World;
 
 enum class AnimationSceneVersion
 {
@@ -50,7 +50,7 @@ struct AnimationSystemImpl final : IPlugin
 	explicit AnimationSystemImpl(Engine& engine);
 	~AnimationSystemImpl();
 
-	void createScenes(Universe& ctx) override;
+	void createScenes(World& ctx) override;
 	const char* getName() const override { return "animation"; }
 	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
@@ -86,7 +86,7 @@ AnimationSystemImpl::~AnimationSystemImpl()
 }
 
 
-void AnimationSystemImpl::createScenes(Universe& ctx)
+void AnimationSystemImpl::createScenes(World& ctx)
 {
 	UniquePtr<AnimationScene> scene = AnimationScene::create(m_engine, *this, ctx, m_allocator);
 	ctx.addScene(scene.move());

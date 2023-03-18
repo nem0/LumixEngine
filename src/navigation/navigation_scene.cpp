@@ -10,7 +10,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/sync.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
@@ -82,9 +82,9 @@ struct Agent
 
 struct NavigationSceneImpl final : NavigationScene
 {
-	NavigationSceneImpl(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator)
+	NavigationSceneImpl(Engine& engine, IPlugin& system, World& world, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe(universe)
+		, m_world(world)
 		, m_system(system)
 		, m_engine(engine)
 		, m_agents(m_allocator)
@@ -92,13 +92,13 @@ struct NavigationSceneImpl final : NavigationScene
 		, m_script_scene(nullptr)
 		, m_on_update(m_allocator)
 	{
-		m_universe.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
+		m_world.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
 	}
 
 
 	~NavigationSceneImpl()
 	{
-		m_universe.entityTransformed().unbind<&NavigationSceneImpl::onEntityMoved>(this);
+		m_world.entityTransformed().unbind<&NavigationSceneImpl::onEntityMoved>(this);
 	}
 
 
@@ -127,12 +127,12 @@ struct NavigationSceneImpl final : NavigationScene
 		RecastZone& zone = m_zones[(EntityRef)agent.zone];
 		if (!zone.crowd) return;
 
-		const DVec3 agent_pos = m_universe.getPosition(iter.key());
+		const DVec3 agent_pos = m_world.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
-		const Transform zone_tr = m_universe.getTransform((EntityRef)agent.zone);
+		const Transform zone_tr = m_world.getTransform((EntityRef)agent.zone);
 		const Vec3 pos = Vec3(zone_tr.inverted().transform(agent_pos));
 		if (squaredLength(pos.xz() - (*(Vec3*)dt_agent->npos).xz()) > 0.1f) {
-			const Transform old_zone_tr = m_universe.getTransform(zone.entity);
+			const Transform old_zone_tr = m_world.getTransform(zone.entity);
 			const DVec3 target_pos = old_zone_tr.transform(*(Vec3*)dt_agent->targetPos);
 			float speed = dt_agent->params.maxSpeed;
 			zone.crowd->removeAgent(agent.agent);
@@ -172,13 +172,13 @@ struct NavigationSceneImpl final : NavigationScene
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 
 		EntityPtr entity_ptr = render_scene->getFirstTerrain();
 		while (entity_ptr.isValid()) {
 			const EntityRef entity = (EntityRef)entity_ptr;
-			const Transform terrain_tr = m_universe.getTransform(entity);
+			const Transform terrain_tr = m_world.getTransform(entity);
 			const Transform to_zone = zone_tr.inverted() * terrain_tr;
 			float scaleXZ = render_scene->getTerrainXZScale(entity);
 			const Transform to_terrain = to_zone.inverted();
@@ -285,7 +285,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 		const Transform inv_zone_tr = zone_tr.inverted();
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 
 		const u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
@@ -298,7 +298,7 @@ struct NavigationSceneImpl final : NavigationScene
 			auto* model = render_scene->getModelInstanceModel(entity);
 			if (!model) return;
 		
-			const Transform tr = m_universe.getTransform(entity);
+			const Transform tr = m_world.getTransform(entity);
 			rasterizeModel(model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
 		}
 
@@ -321,7 +321,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 			if (all_meshes_no_nav) continue;
 
-			Transform im_tr = m_universe.getTransform(iter.key());
+			Transform im_tr = m_world.getTransform(iter.key());
 			im_tr.rot = Quat::IDENTITY;
 			im_tr.scale = Vec3(1);
 			for (const InstancedModel::InstanceData& i : im.instances) {
@@ -341,7 +341,7 @@ struct NavigationSceneImpl final : NavigationScene
 	{
 		if (!m_script_scene) return;
 		
-		if (!m_universe.hasComponent(agent.entity, LUA_SCRIPT_TYPE)) return;
+		if (!m_world.hasComponent(agent.entity, LUA_SCRIPT_TYPE)) return;
 
 		for (int i = 0, c = m_script_scene->getScriptCount(agent.entity); i < c; ++i)
 		{
@@ -382,7 +382,7 @@ struct NavigationSceneImpl final : NavigationScene
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			//if (dt_agent->paused) continue;
 
-			const Quat rot = m_universe.getRotation(agent.entity);
+			const Quat rot = m_world.getRotation(agent.entity);
 
 			const Vec3 velocity = *(Vec3*)dt_agent->nvel;
 			agent.speed = length(velocity);
@@ -408,7 +408,7 @@ struct NavigationSceneImpl final : NavigationScene
 	void lateUpdate(RecastZone& zone, float time_delta) {
 		if (!zone.crowd) return;
 		
-		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const Transform zone_tr = m_world.getTransform(zone.entity);
 
 		zone.crowd->doMove(time_delta);
 
@@ -421,7 +421,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 			if (agent.flags & Agent::MOVE_ENTITY) {
 				m_moving_agent = agent.entity;
-				m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
+				m_world.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
 
 				Vec3 vel = *(Vec3*)dt_agent->nvel;
 				vel.y = 0;
@@ -430,13 +430,13 @@ struct NavigationSceneImpl final : NavigationScene
 					vel *= 1 / len;
 					float angle = atan2f(vel.x, vel.z);
 					Quat wanted_rot(Vec3(0, 1, 0), angle);
-					Quat old_rot = m_universe.getRotation(agent.entity);
+					Quat old_rot = m_world.getRotation(agent.entity);
 					Quat new_rot = nlerp(wanted_rot, old_rot, 0.90f);
-					m_universe.setRotation(agent.entity, new_rot);
+					m_world.setRotation(agent.entity, new_rot);
 				}
 			}
 			else {
-				*(Vec3*)dt_agent->npos = Vec3(zone_tr.inverted().transform(m_universe.getPosition(agent.entity)));
+				*(Vec3*)dt_agent->npos = Vec3(zone_tr.inverted().transform(m_world.getPosition(agent.entity)));
 			}
 
 			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING) {
@@ -551,7 +551,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void debugDrawPath(EntityRef entity) override
 	{
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 		
 		auto agent_iter = m_agents.find(entity);
@@ -563,7 +563,7 @@ struct NavigationSceneImpl final : NavigationScene
 		const RecastZone& zone = m_zones[(EntityRef)agent.zone];
 		if (!zone.crowd) return;
 
-		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const Transform zone_tr = m_world.getTransform(zone.entity);
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 
 		const dtPolyRef* path = dt_agent->corridor.getPath();
@@ -585,7 +585,7 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 		render_scene->addDebugCross(zone_tr.transform(*(Vec3*)dt_agent->targetPos), 1.0f, Color::WHITE);
 		const Vec3 vel = *(Vec3*)dt_agent->vel;
-		const DVec3 pos = m_universe.getPosition(entity);
+		const DVec3 pos = m_world.getPosition(entity);
 		render_scene->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);
 	}
 
@@ -597,13 +597,13 @@ struct NavigationSceneImpl final : NavigationScene
 
 
 	void debugDrawContours(EntityRef zone_entity) override {
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.debug_contours) return;
 
-		const Transform tr = m_universe.getTransform(zone_entity);
+		const Transform tr = m_world.getTransform(zone_entity);
 
 		Vec3 orig = m_debug_tile_origin;
 		float cs = zone.debug_contours->cs;
@@ -726,13 +726,13 @@ struct NavigationSceneImpl final : NavigationScene
 
 
 	void debugDrawHeightfield(EntityRef zone_entity) override {
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 		
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.debug_heightfield) return;
 
-		const Transform tr = m_universe.getTransform(zone_entity);
+		const Transform tr = m_world.getTransform(zone_entity);
 
 		Vec3 orig = m_debug_tile_origin;
 		int width = zone.debug_heightfield->width;
@@ -758,13 +758,13 @@ struct NavigationSceneImpl final : NavigationScene
 	void debugDrawCompactHeightfield(EntityRef zone_entity) override {
 		static const int MAX_CUBES = 0xffFF;
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 		
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.debug_compact_heightfield) return;
 
-		const Transform tr = m_universe.getTransform(zone_entity);
+		const Transform tr = m_world.getTransform(zone_entity);
 
 		auto& chf = *zone.debug_compact_heightfield;
 		const float cs = chf.cs;
@@ -923,14 +923,14 @@ struct NavigationSceneImpl final : NavigationScene
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.navmesh) return;
 
-		const Transform tr = m_universe.getTransform(zone_entity);
+		const Transform tr = m_world.getTransform(zone_entity);
 		const Vec3 pos(tr.inverted().transform(world_pos));
 
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
 		if (pos.x > max.x || pos.x < min.x || pos.z > max.z || pos.z < min.z) return;
 
-		auto render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 
 		int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
@@ -972,7 +972,7 @@ struct NavigationSceneImpl final : NavigationScene
 	void startGame() override
 	{
 		m_is_game_running = true;
-		auto* scene = m_universe.getScene("lua_script");
+		auto* scene = m_world.getScene("lua_script");
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		
 		for (RecastZone& zone : m_zones) {
@@ -991,7 +991,7 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		const Transform inv_zone_tr = m_universe.getTransform(zone.entity).inverted();
+		const Transform inv_zone_tr = m_world.getTransform(zone.entity).inverted();
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
 
@@ -999,7 +999,7 @@ struct NavigationSceneImpl final : NavigationScene
 			Agent& agent = iter.value();
 			if (agent.zone.isValid() && agent.agent >= 0) continue;
 
-			const Vec3 pos = Vec3(inv_zone_tr.transform(m_universe.getPosition(agent.entity)));
+			const Vec3 pos = Vec3(inv_zone_tr.transform(m_world.getPosition(agent.entity)));
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
 				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
 			{
@@ -1064,7 +1064,7 @@ struct NavigationSceneImpl final : NavigationScene
 		dtQueryFilter filter;
 		static const float ext[] = { 1.0f, 20.0f, 1.0f };
 
-		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const Transform zone_tr = m_world.getTransform(zone.entity);
 		const Vec3 dest = Vec3(zone_tr.inverted().transform(world_dest));
 
 		zone.navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
@@ -1086,7 +1086,7 @@ struct NavigationSceneImpl final : NavigationScene
 		RecastZone& zone = m_zones[zone_entity];
 		if (!zone.navmesh) return false;
 
-		const Transform tr = m_universe.getTransform(zone_entity);
+		const Transform tr = m_world.getTransform(zone_entity);
 		const Vec3 pos = Vec3(tr.inverted().transform(world_pos));
 		const Vec3 min = -zone.zone.extents;
 		const int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
@@ -1150,7 +1150,7 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		const Transform tr = m_universe.getTransform(zone_entity);
+		const Transform tr = m_world.getTransform(zone_entity);
 		rasterizeGeometry(tr, AABB(bmin, bmax), ctx, config, *solid);
 
 		rcFilterLowHangingWalkableObstacles(&ctx, config.walkableClimb, *solid);
@@ -1404,8 +1404,8 @@ struct NavigationSceneImpl final : NavigationScene
 	void addCrowdAgent(Agent& agent, RecastZone& zone) {
 		ASSERT(zone.crowd);
 
-		const Transform zone_tr = m_universe.getTransform(zone.entity);
-		const Vec3 pos = Vec3(zone_tr.inverted().transform(m_universe.getPosition(agent.entity)));
+		const Transform zone_tr = m_world.getTransform(zone.entity);
+		const Vec3 pos = Vec3(zone_tr.inverted().transform(m_world.getPosition(agent.entity)));
 		dtCrowdAgentParams params = {};
 		params.radius = agent.radius;
 		params.height = agent.height;
@@ -1427,7 +1427,7 @@ struct NavigationSceneImpl final : NavigationScene
 		zone.zone.flags = NavmeshZone::AUTOLOAD | NavmeshZone::DETAILED;
 		zone.entity = entity;
 		m_zones.insert(entity, zone);
-		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
+		m_world.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
 	void destroyZone(EntityRef entity) {
@@ -1447,13 +1447,13 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 
 		m_zones.erase(iter);
-		m_universe.onComponentDestroyed(entity, NAVMESH_ZONE_TYPE, this);
+		m_world.onComponentDestroyed(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
 	void assignZone(Agent& agent) {
-		const DVec3 agent_pos = m_universe.getPosition(agent.entity);
+		const DVec3 agent_pos = m_world.getPosition(agent.entity);
 		for (RecastZone& zone : m_zones) {
-			const Transform inv_zone_tr = m_universe.getTransform(zone.entity).inverted();
+			const Transform inv_zone_tr = m_world.getTransform(zone.entity).inverted();
 			const Vec3 min = -zone.zone.extents;
 			const Vec3 max = zone.zone.extents;
 			const Vec3 pos = Vec3(inv_zone_tr.transform(agent_pos));
@@ -1478,7 +1478,7 @@ struct NavigationSceneImpl final : NavigationScene
 		agent.is_finished = true;
 		m_agents.insert(entity, agent);
 		assignZone(agent);
-		m_universe.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
+		m_world.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
 	void destroyAgent(EntityRef entity) {
@@ -1489,7 +1489,7 @@ struct NavigationSceneImpl final : NavigationScene
 			if (zone.crowd && agent.agent >= 0) zone.crowd->removeAgent(agent.agent);
 			m_agents.erase(iter);
 		}
-		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
+		m_world.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
 	i32 getVersion() const override { return (i32)NavigationSceneVersion::LATEST; }
@@ -1558,7 +1558,7 @@ struct NavigationSceneImpl final : NavigationScene
 			}
 
 			m_zones.insert(e, zone);
-			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
+			m_world.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
 			if (version > (i32)NavigationSceneVersion::ZONE_GUID && (zone.zone.flags & NavmeshZone::AUTOLOAD) != 0) {
 				loadZone(e);
 			}
@@ -1577,7 +1577,7 @@ struct NavigationSceneImpl final : NavigationScene
 			agent.agent = -1;
 			assignZone(agent);
 			m_agents.insert(agent.entity, agent);
-			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
+			m_world.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 		}
 	}
 
@@ -1643,10 +1643,10 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 	IPlugin& getPlugin() const override { return m_system; }
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 
 	IAllocator& m_allocator;
-	Universe& m_universe;
+	World& m_world;
 	IPlugin& m_system;
 	Engine& m_engine;
 	HashMap<EntityRef, RecastZone> m_zones;
@@ -1660,9 +1660,9 @@ struct NavigationSceneImpl final : NavigationScene
 };
 
 
-UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator)
+UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& system, World& world, IAllocator& allocator)
 {
-	return UniquePtr<NavigationSceneImpl>::create(allocator, engine, system, universe, allocator);
+	return UniquePtr<NavigationSceneImpl>::create(allocator, engine, system, world, allocator);
 }
 
 

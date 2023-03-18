@@ -13,7 +13,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "gui/gui_system.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
@@ -264,7 +264,7 @@ void GameView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();
-	m_pipeline->setUniverse(editor.getUniverse());
+	m_pipeline->setWorld(editor.getWorld());
 
 	const bool is_game_mode = m_app.getWorldEditor().isGameMode();
 	if (is_game_mode && !m_was_game_mode) {

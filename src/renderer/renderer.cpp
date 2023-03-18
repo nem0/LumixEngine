@@ -17,7 +17,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
@@ -734,7 +734,7 @@ struct RendererImpl final : Renderer
 	ResourceManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
 
-	void createScenes(Universe& ctx) override
+	void createScenes(World& ctx) override
 	{
 		UniquePtr<RenderScene> scene = RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
 		ctx.addScene(scene.move());

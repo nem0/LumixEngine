@@ -24,7 +24,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "render_interface.h"
 
 
@@ -32,8 +32,8 @@ namespace Lumix
 {
 
 
-void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3& up, const Vec3& dir, Color color) {
-	UniverseView::Vertex* vertices = view.render(true, 24);
+void addCube(WorldView& view, const DVec3& pos, const Vec3& right, const Vec3& up, const Vec3& dir, Color color) {
+	WorldView::Vertex* vertices = view.render(true, 24);
 	const DVec3& cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
@@ -60,12 +60,12 @@ void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3
 	add_line(pos - dir + up - right, pos - dir - up - right);
 }
 
-void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color) {
+void addCube(WorldView& view, const DVec3& min, const DVec3& max, Color color) {
 	DVec3 a = min;
 	DVec3 b = min;
 	b.x = max.x;
 	
-	UniverseView::Vertex* vertices = view.render(true, 24);
+	WorldView::Vertex* vertices = view.render(true, 24);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
@@ -111,7 +111,7 @@ void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color
 	add_line(a, b);
 }
 
-void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color) {
+void addCylinder(WorldView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color) {
 	Vec3 x_vec(0, up.z, -up.y);
 	if (squaredLength(x_vec) < 0.01) {
 		x_vec = Vec3(up.y, -up.x, 0);
@@ -120,7 +120,7 @@ void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float rad
 	const Vec3 z_vec = normalize(cross(x_vec, up));
 
 	const DVec3 top = pos + up * height;
-	UniverseView::Vertex* vertices = view.render(true, 32 * 6);
+	WorldView::Vertex* vertices = view.render(true, 32 * 6);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
@@ -146,8 +146,8 @@ void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float rad
 	}
 }
 
-void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color) {
-	UniverseView::Vertex* vertices = view.render(true, 2);
+void addLine(WorldView& view, const DVec3& a, const DVec3& b, Color color) {
+	WorldView::Vertex* vertices = view.render(true, 2);
 	const DVec3 cam_pos = view.getViewport().pos;
 	vertices[0].pos = Vec3(a - cam_pos);
 	vertices[1].pos = Vec3(b - cam_pos);
@@ -155,8 +155,8 @@ void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color) {
 	vertices[1].abgr = color.abgr();
 }
 
-void addCone(UniverseView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color) {
-	UniverseView::Vertex* vertices = view.render(true, 32 * 4);
+void addCone(WorldView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color) {
+	WorldView::Vertex* vertices = view.render(true, 32 * 4);
 	const DVec3 cam_pos = view.getViewport().pos;
 	auto add_line = [&](const DVec3& a, const DVec3& b){
 		vertices[0].pos = Vec3(a - cam_pos);
@@ -180,7 +180,7 @@ void addCone(UniverseView& view, const DVec3& vertex, const Vec3& dir, const Vec
 	}
 }
 
-void addHalfSphere(UniverseView& view, const DVec3& center, float radius, bool top, Color color)
+void addHalfSphere(WorldView& view, const DVec3& center, float radius, bool top, Color color)
 {
 	static const int COLS = 36;
 	static const int ROWS = COLS >> 1;
@@ -189,7 +189,7 @@ void addHalfSphere(UniverseView& view, const DVec3& center, float radius, bool t
 	int yfrom = top ? 0 : -(ROWS >> 1);
 	int yto = top ? ROWS >> 1 : 0;
 
-	UniverseView::Vertex* vertices = view.render(true, (yto - yfrom) * 2 * p2 * 6);
+	WorldView::Vertex* vertices = view.render(true, (yto - yfrom) * 2 * p2 * 6);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
@@ -237,7 +237,7 @@ void addHalfSphere(UniverseView& view, const DVec3& center, float radius, bool t
 	}
 }
 
-void addCapsule(UniverseView& view, const DVec3& position, float height, float radius, Color color) {
+void addCapsule(WorldView& view, const DVec3& position, float height, float radius, Color color) {
 	addHalfSphere(view, position + Vec3(0, radius, 0), radius, false, color);
 	addHalfSphere(view, position + Vec3(0, radius + height, 0), radius, true, color);
 
@@ -245,7 +245,7 @@ void addCapsule(UniverseView& view, const DVec3& position, float height, float r
 	Vec3 x_vec(1.0f, 0, 0);
 	const DVec3 bottom = position + Vec3(0, radius, 0);
 	const DVec3 top = bottom + Vec3(0, height, 0);
-	UniverseView::Vertex* vertices = view.render(true, 32 * 2);
+	WorldView::Vertex* vertices = view.render(true, 32 * 2);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
@@ -264,10 +264,10 @@ void addCapsule(UniverseView& view, const DVec3& position, float height, float r
 	}
 }
 
-void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color color) {
+void addFrustum(WorldView& view, const struct ShiftedFrustum& frustum, Color color) {
 	const DVec3 o = frustum.origin;
 
-	UniverseView::Vertex* vertices = view.render(true, 24);
+	WorldView::Vertex* vertices = view.render(true, 24);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
@@ -294,8 +294,8 @@ void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color 
 	add_line(o + frustum.points[3], o + frustum.points[7]);
 }
 
-void addCircle(UniverseView& view, const DVec3& center, float radius, const Vec3& up, Color color) {
-	UniverseView::Vertex* vertices = view.render(true, 64);
+void addCircle(WorldView& view, const DVec3& center, float radius, const Vec3& up, Color color) {
+	WorldView::Vertex* vertices = view.render(true, 64);
 	const Vec3 offset = Vec3(center - view.getViewport().pos);
 	const Vec3 x = normalize(fabsf(up.x) > 0.001f ? Vec3(up.y, -up.x, 0) : Vec3(0, up.z, -up.y));
 	const Vec3 y = cross(x, up);
@@ -313,7 +313,7 @@ void addCircle(UniverseView& view, const DVec3& center, float radius, const Vec3
 	}
 }
 
-void addSphere(UniverseView& view, const DVec3& center, float radius, Color color) {
+void addSphere(WorldView& view, const DVec3& center, float radius, Color color) {
 	static const int COLS = 36;
 	static const int ROWS = COLS >> 1;
 	static const float STEP = (PI / 180.0f) * 360.0f / COLS;
@@ -323,7 +323,7 @@ void addSphere(UniverseView& view, const DVec3& center, float radius, Color colo
 	float prev_si = 0;
 
 	const u32 count = 2 * r2 * 2 * p2;
-	UniverseView::Vertex* vertices = view.render(true, count * 6);
+	WorldView::Vertex* vertices = view.render(true, count * 6);
 	const DVec3& cam_pos = view.getViewport().pos;
 	auto add_line = [&](const DVec3& a, const DVec3& b){
 		vertices[0].pos = Vec3(a - cam_pos);
@@ -603,7 +603,7 @@ public:
 	SetEntityNameCommand(WorldEditor& editor, EntityRef entity, const char* name)
 		: m_entity(entity)
 		, m_new_name(name, editor.getAllocator())
-		, m_old_name(editor.getUniverse()->getEntityName(entity),
+		, m_old_name(editor.getWorld()->getEntityName(entity),
 					 editor.getAllocator())
 		, m_editor(editor)
 	{
@@ -612,14 +612,14 @@ public:
 
 	bool execute() override
 	{
-		m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_new_name.c_str());
+		m_editor.getWorld()->setEntityName((EntityRef)m_entity, m_new_name.c_str());
 		return true;
 	}
 
 
 	void undo() override
 	{
-		m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_old_name.c_str());
+		m_editor.getWorld()->setEntityName((EntityRef)m_entity, m_old_name.c_str());
 	}
 
 
@@ -676,7 +676,7 @@ public:
 		, m_editor(editor)
 	{
 		ASSERT(count > 0);
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		m_entities.reserve(count);
 		m_new_positions.reserve(count);
 		m_new_rotations.reserve(count);
@@ -687,20 +687,20 @@ public:
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
 			m_new_rotations.push(new_rotations[i]);
-			m_old_positions.push(universe->getPosition(entities[i]));
-			m_old_rotations.push(universe->getRotation(entities[i]));
+			m_old_positions.push(world->getPosition(entities[i]));
+			m_old_rotations.push(world->getRotation(entities[i]));
 		}
 	}
 
 
 	bool execute() override
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = 0, c = m_entities.size(); i < c; ++i) {
 			if(m_entities[i].isValid()) {
 				const EntityRef entity = (EntityRef)m_entities[i];
-				universe->setPosition(entity, m_new_positions[i]);
-				universe->setRotation(entity, m_new_rotations[i]);
+				world->setPosition(entity, m_new_positions[i]);
+				world->setRotation(entity, m_new_rotations[i]);
 			}
 		}
 		return true;
@@ -709,12 +709,12 @@ public:
 
 	void undo() override
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = 0, c = m_entities.size(); i < c; ++i) {
 			if(m_entities[i].isValid()) {
 				EntityRef entity = (EntityRef)m_entities[i];
-				universe->setPosition(entity, m_old_positions[i]);
-				universe->setRotation(entity, m_old_rotations[i]);
+				world->setPosition(entity, m_old_positions[i]);
+				world->setRotation(entity, m_old_rotations[i]);
 			}
 		}
 	}
@@ -782,7 +782,7 @@ public:
 		, m_editor(editor)
 	{
 		ASSERT(count > 0);
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		m_entities.reserve(count);
 		m_new_positions.reserve(count);
 		m_old_positions.reserve(count);
@@ -790,18 +790,18 @@ public:
 		{
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
-			m_old_positions.push(universe->getPosition(entities[i]));
+			m_old_positions.push(world->getPosition(entities[i]));
 		}
 	}
 
 
 	bool execute() override
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = 0, c = m_entities.size(); i < c; ++i) {
 			if (m_entities[i].isValid()) {
 				EntityRef entity = (EntityRef)m_entities[i];
-				universe->setLocalPosition(entity, m_new_positions[i]);
+				world->setLocalPosition(entity, m_new_positions[i]);
 			}
 		}
 		return true;
@@ -810,11 +810,11 @@ public:
 
 	void undo() override
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = 0, c = m_entities.size(); i < c; ++i) {
 			if (m_entities[i].isValid()) {
 				EntityRef entity = (EntityRef)m_entities[i];
-				universe->setLocalPosition(entity, m_old_positions[i]);
+				world->setLocalPosition(entity, m_old_positions[i]);
 			}
 		}
 	}
@@ -878,11 +878,11 @@ public:
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
-			m_old_scales.push(universe->getScale(entities[i]));
+			m_old_scales.push(world->getScale(entities[i]));
 			m_new_scales.push(scale);
 		}
 	}
@@ -898,11 +898,11 @@ public:
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
-			m_old_scales.push(universe->getScale(entities[i]));
+			m_old_scales.push(world->getScale(entities[i]));
 			m_new_scales.push(scales[i]);
 		}
 	}
@@ -910,11 +910,11 @@ public:
 
 	bool execute() override
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = 0, c = m_entities.size(); i < c; ++i) {
 			if (m_entities[i].isValid()) {
 				EntityRef entity = (EntityRef)m_entities[i];
-				universe->setScale(entity, m_new_scales[i]);
+				world->setScale(entity, m_new_scales[i]);
 			}
 		}
 		return true;
@@ -923,11 +923,11 @@ public:
 
 	void undo() override
 	{
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		for (int i = 0, c = m_entities.size(); i < c; ++i) {
 			if (m_entities[i].isValid()) {
 				EntityRef entity = (EntityRef)m_entities[i];
-				universe->setScale(entity, m_old_scales[i]);
+				world->setScale(entity, m_old_scales[i]);
 			}
 		}
 	}
@@ -1160,12 +1160,12 @@ public:
 		, m_new_value(StoredType<T>::construct(value, editor.getAllocator()))
 	{
 		m_entities.reserve(entities.length());
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 
 		const reflection::ComponentBase* cmp_desc = reflection::getComponent(component_type);
 
 		for (u32 i = 0; i < entities.length(); ++i) {
-			ComponentUID component = universe->getComponent(entities[i], component_type);
+			ComponentUID component = world->getComponent(entities[i], component_type);
 			if (!component.isValid()) continue;
 
 			PropertySerializeVisitor v(m_old_values, component);
@@ -1195,7 +1195,7 @@ public:
 				if (!equalIStrings(prop_name, prop.name)) return;
 				found = true;
 				for (EntityPtr entity : cmd->m_entities) {
-					const ComponentUID cmp = cmd->m_editor.getUniverse()->getComponent((EntityRef)entity, cmd->m_component_type);
+					const ComponentUID cmp = cmd->m_editor.getWorld()->getComponent((EntityRef)entity, cmd->m_component_type);
 					ASSERT(prop.setter);
 					prop.set(cmp, cmd->m_index, StoredType<T>::get(cmd->m_new_value));
 				}
@@ -1212,7 +1212,7 @@ public:
 
 			void visit(const reflection::DynamicProperties& prop) override { 
 				for (EntityPtr entity : cmd->m_entities) {
-					const ComponentUID cmp = cmd->m_editor.getUniverse()->getComponent((EntityRef)entity, cmd->m_component_type);
+					const ComponentUID cmp = cmd->m_editor.getWorld()->getComponent((EntityRef)entity, cmd->m_component_type);
 					const u32 c = prop.getCount(cmp, cmd->m_index);
 					for (u32 i = 0; i < c; ++i) {
 						const char* name = prop.getName(cmp, cmd->m_index, i);
@@ -1243,10 +1243,10 @@ public:
 		InputMemoryStream blob(m_old_values);
 		const reflection::ComponentBase* cmp_desc = reflection::getComponent(m_component_type);
 		HashMap<EntityPtr, u32> map(m_editor.getAllocator());
-		Universe* universe = m_editor.getUniverse();
+		World* world = m_editor.getWorld();
 		Span<const EntityRef> entities(nullptr, nullptr);
 		for (int i = 0; i < m_entities.size(); ++i) {
-			const ComponentUID cmp = universe->getComponent(m_entities[i], m_component_type);
+			const ComponentUID cmp = world->getComponent(m_entities[i], m_component_type);
 			PropertyDeserializeVisitor v(blob, cmp, map, entities);	
 			cmp_desc->visit(v);
 		}
@@ -1427,9 +1427,9 @@ private:
 		{
 			m_type = type;
 			m_entities.reserve(entities.length());
-			Universe* universe = m_editor.getUniverse();
+			World* world = m_editor.getWorld();
 			for (EntityRef e : entities) {
-				if (!universe->getComponent(e, type).isValid()) {
+				if (!world->getComponent(e, type).isValid()) {
 					m_entities.push(e);
 				}
 			}
@@ -1445,12 +1445,12 @@ private:
 		bool execute() override
 		{
 			bool ret = false;
-			Universe* universe = m_editor.getUniverse();
+			World* world = m_editor.getWorld();
 
 			for (EntityRef e : m_entities) {
-				ASSERT(!universe->hasComponent(e, m_type));
-				universe->createComponent(m_type, e);
-				if (universe->hasComponent(e, m_type)) {
+				ASSERT(!world->hasComponent(e, m_type));
+				world->createComponent(m_type, e);
+				if (world->hasComponent(e, m_type)) {
 					ret = true;
 				}
 				else {
@@ -1463,11 +1463,11 @@ private:
 
 		void undo() override
 		{
-			Universe* universe = m_editor.getUniverse();
+			World* world = m_editor.getWorld();
 			for (EntityRef e : m_entities) {
-				if (universe->hasComponent(e, m_type)) {
-					universe->destroyComponent(e, m_type);
-					ASSERT(!universe->hasComponent(e, m_type));
+				if (world->hasComponent(e, m_type)) {
+					world->destroyComponent(e, m_type);
+					ASSERT(!world->hasComponent(e, m_type));
 				}
 			}
 		}
@@ -1495,7 +1495,7 @@ private:
 			, m_child(child)
 		{
 			m_old_folder = editor.m_entity_folders->getFolder(child);
-			m_old_parent = m_editor.getUniverse()->getParent(m_child);
+			m_old_parent = m_editor.getWorld()->getParent(m_child);
 		}
 
 
@@ -1513,7 +1513,7 @@ private:
 
 		bool execute() override
 		{
-			m_editor.getUniverse()->setParent(m_parent, m_child);
+			m_editor.getWorld()->setParent(m_parent, m_child);
 			if (m_parent.isValid()) {
 				EntityFolders::FolderID f = m_editor.m_entity_folders->getFolder((EntityRef)m_parent);
 				m_editor.m_entity_folders->moveToFolder(m_child, f);
@@ -1524,7 +1524,7 @@ private:
 
 		void undo() override
 		{
-			m_editor.getUniverse()->setParent(m_old_parent, m_child);
+			m_editor.getWorld()->setParent(m_old_parent, m_child);
 			m_editor.m_entity_folders->moveToFolder(m_child, m_old_folder);
 		}
 
@@ -1581,8 +1581,8 @@ private:
 
 		void pushChildren(EntityRef entity)
 		{
-			Universe* universe = m_editor.getUniverse();
-			for (EntityRef e : universe->childrenOf(entity))
+			World* world = m_editor.getWorld();
+			for (EntityRef e : world->childrenOf(entity))
 			{
 				m_entities.push(e);
 				pushChildren(e);
@@ -1592,42 +1592,42 @@ private:
 
 		bool execute() override
 		{
-			Universe* universe = m_editor.getUniverse();
+			World* world = m_editor.getWorld();
 			m_transformations.clear();
 			m_old_values.clear();
 			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				m_transformations.emplace(universe->getTransform(m_entities[i]));
+				m_transformations.emplace(world->getTransform(m_entities[i]));
 				int count = 0;
-				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
+				for (ComponentUID cmp = world->getFirstComponent(m_entities[i]);
 					cmp.isValid();
-					cmp = universe->getNextComponent(cmp))
+					cmp = world->getNextComponent(cmp))
 				{
 					++count;
 				}
-				m_old_values.writeString(universe->getEntityName(m_entities[i]));
-				EntityPtr parent = universe->getParent(m_entities[i]);
+				m_old_values.writeString(world->getEntityName(m_entities[i]));
+				EntityPtr parent = world->getParent(m_entities[i]);
 				const EntityFolders::FolderID folder = m_editor.m_entity_folders->getFolder(m_entities[i]);
 				m_old_values.write(folder);
 				m_old_values.write(parent);
 				if (parent.isValid())
 				{
-					Transform local_tr = universe->getLocalTransform(m_entities[i]);
+					Transform local_tr = world->getLocalTransform(m_entities[i]);
 					m_old_values.write(local_tr);
 				}
-				for (EntityRef child : universe->childrenOf(m_entities[i]))
+				for (EntityRef child : world->childrenOf(m_entities[i]))
 				{
 					m_old_values.write(child);
-					Transform local_tr = universe->getLocalTransform(child);
+					Transform local_tr = world->getLocalTransform(child);
 					m_old_values.write(local_tr);
 				}
 				m_old_values.write(INVALID_ENTITY);
 
 				m_old_values.write(count);
-				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
+				for (ComponentUID cmp = world->getFirstComponent(m_entities[i]);
 					cmp.isValid();
-					cmp = universe->getNextComponent(cmp))
+					cmp = world->getNextComponent(cmp))
 				{
 					m_old_values.write(cmp.type);
 					const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
@@ -1646,7 +1646,7 @@ private:
 			}
 			for (EntityRef e : m_entities)
 			{
-				universe->destroyEntity(e);
+				world->destroyEntity(e);
 			}
 			return true;
 		}
@@ -1657,19 +1657,19 @@ private:
 
 		void undo() override
 		{
-			Universe* universe = m_editor.getUniverse();
+			World* world = m_editor.getWorld();
 			InputMemoryStream blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				universe->emplaceEntity(m_entities[i]);
+				world->emplaceEntity(m_entities[i]);
 			}
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				EntityRef new_entity = m_entities[i];
-				universe->setTransform(new_entity, m_transformations[i]);
+				world->setTransform(new_entity, m_transformations[i]);
 				int cmps_count;
 				const char* name = blob.readString();
-				universe->setEntityName(new_entity, name);
+				world->setEntityName(new_entity, name);
 				EntityPtr parent;
 				EntityFolders::FolderID folder;
 				blob.read(folder);
@@ -1679,16 +1679,16 @@ private:
 				{
 					Transform local_tr;
 					blob.read(local_tr);
-					universe->setParent(parent, new_entity);
-					universe->setLocalTransform(new_entity, local_tr);
+					world->setParent(parent, new_entity);
+					world->setLocalTransform(new_entity, local_tr);
 				}
 				EntityPtr child;
 				for(blob.read(child); child.isValid(); blob.read(child))
 				{
 					Transform local_tr;
 					blob.read(local_tr);
-					universe->setParent(new_entity, (EntityRef)child);
-					universe->setLocalTransform((EntityRef)child, local_tr);
+					world->setParent(new_entity, (EntityRef)child);
+					world->setLocalTransform((EntityRef)child, local_tr);
 				}
 
 				blob.read(cmps_count);
@@ -1697,9 +1697,9 @@ private:
 					ComponentType cmp_type;
 					blob.read(cmp_type);
 					ComponentUID new_component;
-					IScene* scene = universe->getScene(cmp_type);
+					IScene* scene = world->getScene(cmp_type);
 					ASSERT(scene);
-					universe->createComponent(cmp_type, new_entity);
+					world->createComponent(cmp_type, new_entity);
 					new_component.entity = new_entity;
 					new_component.scene = scene;
 					new_component.type = cmp_type;
@@ -1747,7 +1747,7 @@ private:
 		{
 			m_entities.reserve(entities.length());
 			for (EntityRef e : entities) {
-				if (!m_editor.getUniverse()->getComponent(e, m_cmp_type).isValid()) continue;
+				if (!m_editor.getWorld()->getComponent(e, m_cmp_type).isValid()) continue;
 				m_entities.push(e);
 			}
 		}
@@ -1764,15 +1764,15 @@ private:
 		void undo() override
 		{
 			ComponentUID cmp;
-			Universe* universe = m_editor.getUniverse();
-			cmp.scene = universe->getScene(m_cmp_type);
+			World* world = m_editor.getWorld();
+			cmp.scene = world->getScene(m_cmp_type);
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputMemoryStream blob(m_old_values);
 			for (EntityRef entity : m_entities)
 			{
 				cmp.entity = entity;
-				universe->createComponent(cmp.type, entity);
+				world->createComponent(cmp.type, entity);
 				::Lumix::load(cmp, blob);
 			}
 		}
@@ -1790,7 +1790,7 @@ private:
 			const reflection::ComponentBase* cmp_desc = reflection::getComponent(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
-			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
+			cmp.scene = m_editor.getWorld()->getScene(m_cmp_type);
 			ASSERT(cmp.scene);
 
 			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
@@ -1806,7 +1806,7 @@ private:
 				gather.resource_manager = &resource_manager;
 				cmp_desc->visit(gather);
 
-				m_editor.getUniverse()->destroyComponent(entity, m_cmp_type);
+				m_editor.getWorld()->destroyComponent(entity, m_cmp_type);
 			}
 			return true;
 		}
@@ -1834,11 +1834,11 @@ private:
 		bool execute() override
 		{
 			if (m_entity.isValid()) {
-				m_editor.getUniverse()->emplaceEntity((EntityRef)m_entity);
-				m_editor.getUniverse()->setPosition((EntityRef)m_entity, m_position);
+				m_editor.getWorld()->emplaceEntity((EntityRef)m_entity);
+				m_editor.getWorld()->setPosition((EntityRef)m_entity, m_position);
 			}
 			else {
-				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
+				m_entity = m_editor.getWorld()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			const EntityRef e = (EntityRef)m_entity;
 			if (m_output) {
@@ -1853,7 +1853,7 @@ private:
 			ASSERT(m_entity.isValid());
 
 			const EntityRef e = (EntityRef)m_entity;
-			m_editor.getUniverse()->destroyEntity(e);
+			m_editor.getWorld()->destroyEntity(e);
 		}
 
 
@@ -1871,13 +1871,13 @@ private:
 public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
-	UniverseView& getView() override { ASSERT(m_view); return *m_view; }
+	WorldView& getView() override { ASSERT(m_view); return *m_view; }
 
-	void setView(UniverseView* view) override { 
+	void setView(WorldView* view) override { 
 		m_view = view; 
 	}
 
-	Universe* getUniverse() override { return m_universe; }
+	World* getWorld() override { return m_world; }
 
 
 	Engine& getEngine() override { return m_engine; }
@@ -1894,7 +1894,7 @@ public:
 
 	~WorldEditorImpl()
 	{
-		destroyUniverse();
+		destroyWorld();
 
 		m_prefab_system.reset();
 	}
@@ -1908,14 +1908,14 @@ public:
 			for(auto e : m_selected_entities)
 			{
 				positions.push(hit_pos);
-				rotations.push(m_universe->getRotation(e));
+				rotations.push(m_world->getRotation(e));
 			}
 		}
 		else
 		{
 			for(auto e : m_selected_entities)
 			{
-				const DVec3 pos = m_universe->getPosition(e);
+				const DVec3 pos = m_world->getPosition(e);
 				Vec3 dir = normalize(Vec3(pos - hit_pos));
 				Matrix mtx = Matrix::IDENTITY;
 				Vec3 y(0, 1, 0);
@@ -1944,13 +1944,13 @@ public:
 	}
 
 
-	bool isUniverseChanged() const override { return m_is_universe_changed; }
+	bool isWorldChanged() const override { return m_is_world_changed; }
 
-	void saveUniverse(const char* basename, bool save_path) override
+	void saveWorld(const char* basename, bool save_path) override
 	{
 		saveProject();
 
-		logInfo("Saving universe ", basename, "...");
+		logInfo("Saving world ", basename, "...");
 		
 		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
 		if (!os::makePath(path)) logError("Could not create directory universes/");
@@ -1967,12 +1967,12 @@ public:
 			file.close();
 		}
 		else {
-			logError("Failed to save universe ", basename);
+			logError("Failed to save world ", basename);
 		}
 		
-		m_is_universe_changed = false;
+		m_is_world_changed = false;
 
-		if (save_path) m_universe->setName(basename);
+		if (save_path) m_world->setName(basename);
 	}
 
 
@@ -1980,28 +1980,28 @@ public:
 	{
 		while (m_engine.getFileSystem().hasWork()) m_engine.getFileSystem().processCallbacks();
 
-		ASSERT(m_universe);
+		ASSERT(m_world);
 
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
-		const UniverseHeader header = { UniverseHeader::MAGIC, UniverseSerializedVersion::LATEST };
+		const WorldHeader header = { WorldHeader::MAGIC, WorldSerializedVersion::LATEST };
 		blob.write(header);
 		StableHash hash;
 		blob.write(hash);
 		const u64 hashed_offset = blob.size();
 
-		m_engine.serialize(*m_universe, blob);
+		m_engine.serialize(*m_world, blob);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
 		const Viewport& vp = getView().getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
 		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
-		memcpy(blob.getMutableData() + sizeof(UniverseHeader), &hash, sizeof(hash));
+		memcpy(blob.getMutableData() + sizeof(WorldHeader), &hash, sizeof(hash));
 		file.write(blob.data(), blob.size());
 
-		logInfo("Universe saved");
+		logInfo("World saved");
 	}
 
 
@@ -2030,7 +2030,7 @@ public:
 		DVec3 origin;
 		Vec3 dir;
 
-		const UniverseView::RayHit hit = m_view->getCameraRaycastHit(camera_x, camera_y, INVALID_ENTITY);
+		const WorldView::RayHit hit = m_view->getCameraRaycastHit(camera_x, camera_y, INVALID_ENTITY);
 
 		EntityRef res;
 		UniquePtr<AddEntityCommand> command = UniquePtr<AddEntityCommand>::create(m_allocator, *this, hit.pos, &res);
@@ -2075,11 +2075,11 @@ public:
 		ASSERT(entities && rotations);
 		if (count <= 0) return;
 
-		Universe* universe = getUniverse();
+		World* world = getWorld();
 		Array<DVec3> positions(m_allocator);
 		for (int i = 0; i < count; ++i)
 		{
-			positions.push(universe->getPosition(entities[i]));
+			positions.push(world->getPosition(entities[i]));
 		}
 		UniquePtr<IEditorCommand> command =
 			UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, &positions[0], rotations, count, m_allocator);
@@ -2092,15 +2092,15 @@ public:
 		ASSERT(entities);
 		if (count <= 0) return;
 
-		Universe* universe = getUniverse();
+		World* world = getWorld();
 		Array<Quat> rots(m_allocator);
 		Array<DVec3> poss(m_allocator);
 		rots.reserve(count);
 		poss.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			rots.push(universe->getRotation(entities[i]));
-			poss.push(universe->getPosition(entities[i]));
+			rots.push(world->getRotation(entities[i]));
+			poss.push(world->getPosition(entities[i]));
 			(&poss[i].x)[(int)coord] = value;
 		}
 		UniquePtr<IEditorCommand> command = UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, &poss[0], &rots[0], count, m_allocator);
@@ -2113,12 +2113,12 @@ public:
 		ASSERT(entities);
 		if (count <= 0) return;
 
-		Universe* universe = getUniverse();
+		World* world = getWorld();
 		Array<DVec3> poss(m_allocator);
 		poss.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			poss.push(universe->getLocalTransform(entities[i]).pos);
+			poss.push(world->getLocalTransform(entities[i]).pos);
 			(&poss[i].x)[(int)coord] = value;
 		}
 		UniquePtr<IEditorCommand> command =
@@ -2132,11 +2132,11 @@ public:
 		ASSERT(entities && positions);
 		if (count <= 0) return;
 
-		Universe* universe = getUniverse();
+		World* world = getWorld();
 		Array<Quat> rots(m_allocator);
 		for (int i = 0; i < count; ++i)
 		{
-			rots.push(universe->getRotation(entities[i]));
+			rots.push(world->getRotation(entities[i]));
 		}
 		UniquePtr<IEditorCommand> command =
 			UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, positions, &rots[0], count, m_allocator);
@@ -2228,7 +2228,7 @@ public:
 
 	void doExecute(UniquePtr<IEditorCommand>&& command)
 	{
-		m_is_universe_changed = true;
+		m_is_world_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
 			if (command->merge(*m_undo_stack[m_undo_index]))
@@ -2260,7 +2260,7 @@ public:
 
 	void toggleGameMode() override
 	{
-		ASSERT(m_universe);
+		ASSERT(m_world);
 		if (m_is_game_mode) {
 			stopGameMode(true);
 			return;
@@ -2273,7 +2273,7 @@ public:
 		beginCommandGroup("");
 		endCommandGroup();
 		m_game_mode_commands = 2;
-		m_engine.startGame(*m_universe);
+		m_engine.startGame(*m_world);
 	}
 
 
@@ -2285,25 +2285,25 @@ public:
 			--m_undo_index;
 		}
 
-		ASSERT(m_universe);
+		ASSERT(m_world);
 		m_engine.getResourceManager().enableUnload(false);
-		m_engine.stopGame(*m_universe);
+		m_engine.stopGame(*m_world);
 		selectEntities({}, false);
 		m_is_game_mode = false;
 		if (reload)
 		{
-			m_universe_destroyed.invoke();
-			m_prefab_system->setUniverse(nullptr);
-			StaticString<64> name(m_universe->getName());
+			m_world_destroyed.invoke();
+			m_prefab_system->setWorld(nullptr);
+			StaticString<64> name(m_world->getName());
 			m_entity_folders.destroy();
-			m_engine.destroyUniverse(*m_universe);
+			m_engine.destroyWorld(*m_world);
 			
-			m_universe = &m_engine.createUniverse(true);
-			m_entity_folders.create(*m_universe, m_allocator);
-			m_prefab_system->setUniverse(m_universe);
-			m_universe_created.invoke();
-			m_universe->setName(name);
-			m_universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
+			m_world = &m_engine.createWorld(true);
+			m_entity_folders.create(*m_world, m_allocator);
+			m_prefab_system->setWorld(m_world);
+			m_world_created.invoke();
+			m_world->setName(name);
+			m_world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
             InputMemoryStream file(m_game_mode_file);
 			load(file, "game mode");
@@ -2371,14 +2371,14 @@ public:
 		}
 		for (int i = 0; i < count; ++i) {
 			EntityRef entity = entities[i];
-			Transform tr = m_universe->getTransform(entity);
+			Transform tr = m_world->getTransform(entity);
 			serializer.write(tr);
-			serializer.writeString(m_universe->getEntityName(entity));
-			serializer.write(m_universe->getParent(entity));
+			serializer.writeString(m_world->getEntityName(entity));
+			serializer.write(m_world->getParent(entity));
 
-			for (ComponentUID cmp = m_universe->getFirstComponent(entity);
+			for (ComponentUID cmp = m_world->getFirstComponent(entity);
 				cmp.isValid();
-				cmp = m_universe->getNextComponent(cmp))
+				cmp = m_world->getNextComponent(cmp))
 			{
 				const RuntimeHash cmp_type(reflection::getComponent(cmp.type)->name);
 				serializer.write(cmp_type);
@@ -2394,7 +2394,7 @@ public:
 
 	void gatherHierarchy(EntityRef e, Array<EntityRef>& entities) {
 		entities.push(e);
-		for (EntityRef child : m_universe->childrenOf(e)) {
+		for (EntityRef child : m_world->childrenOf(e)) {
 			if (entities.indexOf(child) < 0) {
 				gatherHierarchy(child, entities);
 			}
@@ -2474,34 +2474,34 @@ public:
 	
 	bool isLoading() const override { return m_is_loading; }
 
-	void loadUniverse(const char* basename) override
+	void loadWorld(const char* basename) override
 	{
 		if (m_is_game_mode) stopGameMode(false);
-		destroyUniverse();
-		createUniverse();
-		m_universe->setName(basename);
-		logInfo("Loading universe ", basename, "...");
+		destroyWorld();
+		createWorld();
+		m_world->setName(basename);
+		logInfo("Loading world ", basename, "...");
 		os::InputFile file;
 		const StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
 		if (file.open(path)) {
 			if (!load(file, path)) {
 				logError("Failed to parse ", path);
-				newUniverse();
+				newWorld();
 			}
 			file.close();
 		}
 		else {
 			logError("Failed to open ", path);
-			newUniverse();
+			newWorld();
 		}
 	}
 
 
-	void newUniverse() override
+	void newWorld() override
 	{
-		destroyUniverse();
-		createUniverse();
-		logInfo("Universe created.");
+		destroyWorld();
+		createWorld();
+		logInfo("World created.");
 	}
 
 
@@ -2509,7 +2509,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 		m_is_loading = true;
-		UniverseHeader header;
+		WorldHeader header;
 		const u64 file_size = file.size();
 		if (file_size < sizeof(header)) {
 			logError("Corrupted file.");
@@ -2523,7 +2523,7 @@ public:
 		}
 
 		os::Timer timer;
-		logInfo("Parsing universe...");
+		logInfo("Parsing world...");
 		OutputMemoryStream data(m_allocator);
 		if (!file.getBuffer()) {
 			data.resize((u32)file_size);
@@ -2535,7 +2535,7 @@ public:
 		}
 		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), file_size);
 		blob.read(header);
-		if ((u32)header.version <= (u32)UniverseSerializedVersion::HASH64) {
+		if ((u32)header.version <= (u32)WorldSerializedVersion::HASH64) {
 			u32 tmp;
 			blob.read(tmp);
 			blob.read(tmp);
@@ -2543,7 +2543,7 @@ public:
 		else {
 			const StableHash hash = blob.read<StableHash>();
 
-			if (header.magic != UniverseHeader::MAGIC 
+			if (header.magic != WorldHeader::MAGIC 
 				|| StableHash((const u8*)blob.getData() + blob.getPosition(), u32(blob.size() - blob.getPosition())) != hash)
 			{
 				logError("Corrupted file `", path, "`");
@@ -2553,13 +2553,13 @@ public:
 		}
 
 		EntityMap entity_map(m_allocator);
-		if (m_engine.deserialize(*m_universe, blob, entity_map))
+		if (m_engine.deserialize(*m_world, blob, entity_map))
 		{
 			m_prefab_system->deserialize(blob, entity_map, header.version);
-			if ((u32)header.version > (u32)UniverseSerializedVersion::ENTITY_FOLDERS) {
+			if ((u32)header.version > (u32)WorldSerializedVersion::ENTITY_FOLDERS) {
 				m_entity_folders->deserialize(blob, entity_map);
 			}
-			if ((u32)header.version > (u32)UniverseSerializedVersion::CAMERA) {
+			if ((u32)header.version > (u32)WorldSerializedVersion::CAMERA) {
 				DVec3 pos;
 				Quat rot;
 				blob.read(pos);
@@ -2572,13 +2572,13 @@ public:
 				}
 
 			}
-			logInfo("Universe parsed in ", timer.getTimeSinceStart(), " seconds");
+			logInfo("World parsed in ", timer.getTimeSinceStart(), " seconds");
 			m_view->refreshIcons();
 			m_is_loading = false;
 			return true;
 		}
 
-		newUniverse();
+		newWorld();
 		m_is_loading = false;
 		return false;
 	}
@@ -2586,14 +2586,14 @@ public:
 
 	WorldEditorImpl(Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe_destroyed(m_allocator)
-		, m_universe_created(m_allocator)
+		, m_world_destroyed(m_allocator)
+		, m_world_created(m_allocator)
 		, m_selected_entities(m_allocator)
 		, m_entity_selection_changed(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
 		, m_is_loading(false)
-		, m_universe(nullptr)
+		, m_world(nullptr)
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
 		, m_is_game_mode(false)
 		, m_undo_index(-1)
@@ -2604,7 +2604,7 @@ public:
 		logInfo("Initializing editor...");
 
 		m_prefab_system = PrefabSystem::create(*this);
-		createUniverse();
+		createWorld();
 	}
 
 
@@ -2696,30 +2696,30 @@ public:
 	}
 
 
-	void destroyUniverse()
+	void destroyWorld()
 	{
 		if (m_is_game_mode) stopGameMode(false);
 
-		ASSERT(m_universe);
+		ASSERT(m_world);
 		destroyUndoStack();
 		m_entity_folders.destroy();
-		m_universe_destroyed.invoke();
-		m_prefab_system->setUniverse(nullptr);
+		m_world_destroyed.invoke();
+		m_prefab_system->setWorld(nullptr);
 		selectEntities({}, false);
-		m_engine.destroyUniverse(*m_universe);
-		m_universe = nullptr;
+		m_engine.destroyWorld(*m_world);
+		m_world = nullptr;
 	}
 
 
-	DelegateList<void()>& universeCreated() override
+	DelegateList<void()>& worldCreated() override
 	{
-		return m_universe_created;
+		return m_world_created;
 	}
 
 
-	DelegateList<void()>& universeDestroyed() override
+	DelegateList<void()>& worldDestroyed() override
 	{
-		return m_universe_destroyed;
+		return m_world_destroyed;
 	}
 
 	DelegateList<void()>& entitySelectionChanged() override {
@@ -2733,21 +2733,21 @@ public:
 	}
 
 
-	void createUniverse()
+	void createWorld()
 	{
-		ASSERT(!m_universe);
+		ASSERT(!m_world);
 
-		m_is_universe_changed = false;
+		m_is_world_changed = false;
 		destroyUndoStack();
-		m_universe = &m_engine.createUniverse(true);
-		Universe* universe = m_universe;
+		m_world = &m_engine.createWorld(true);
+		World* world = m_world;
 
-		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
-		m_entity_folders.create(*m_universe, m_allocator);
+		world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
+		m_entity_folders.create(*m_world, m_allocator);
 
 		m_selected_entities.clear();
-		m_universe_created.invoke();
-		m_prefab_system->setUniverse(universe);
+		m_world_created.invoke();
+		m_prefab_system->setWorld(world);
 	}
 
 
@@ -2810,22 +2810,22 @@ public:
 	}
 
 
-	static int getEntitiesCount(Universe& universe)
+	static int getEntitiesCount(World& world)
 	{
 		int count = 0;
-		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) ++count;
+		for (EntityPtr e = world.getFirstEntity(); e.isValid(); e = world.getNextEntity((EntityRef)e)) ++count;
 		return count;
 	}
 
 private:
 	IAllocator& m_allocator;
 	Engine& m_engine;
-	UniverseView* m_view = nullptr;
+	WorldView* m_view = nullptr;
 	UniquePtr<PrefabSystem> m_prefab_system;
 	Local<EntityFolders> m_entity_folders;
-	Universe* m_universe;
+	World* m_world;
 	bool m_is_loading;
-	bool m_is_universe_changed;
+	bool m_is_world_changed;
 	
 	Array<UniquePtr<IEditorCommand>> m_undo_stack;
 	int m_undo_index;
@@ -2837,8 +2837,8 @@ private:
 	bool m_is_game_mode;
 	int m_game_mode_commands;
 	OutputMemoryStream m_game_mode_file;
-	DelegateList<void()> m_universe_destroyed;
-	DelegateList<void()> m_universe_created;
+	DelegateList<void()> m_world_destroyed;
+	DelegateList<void()> m_world_created;
 	DelegateList<void()> m_entity_selection_changed;
 
 	OutputMemoryStream m_copy_buffer;
@@ -2855,8 +2855,8 @@ public:
 		, m_map(editor.getAllocator())
 		, m_identity(identity)
 	{
-		UniverseView& view = editor.getView();
-		const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
+		WorldView& view = editor.getView();
+		const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 		m_position = hit.pos;
 	}
 
@@ -2864,20 +2864,20 @@ public:
 	{
 		InputMemoryStream blob(m_copy_buffer);
 
-		Universe& universe = *m_editor.getUniverse();
+		World& world = *m_editor.getWorld();
 		int entity_count;
 		blob.read(entity_count);
 		bool is_redo = !m_entities.empty();
 		if (is_redo)
 		{
 			for (int i = 0; i < entity_count; ++i) {
-				universe.emplaceEntity(m_entities[i]);
+				world.emplaceEntity(m_entities[i]);
 			}
 		}
 		else {
 			m_entities.resize(entity_count);
 			for (int i = 0; i < entity_count; ++i) {
-				m_entities[i] = universe.createEntity(DVec3(0), Quat(0, 0, 0, 1));
+				m_entities[i] = world.createEntity(DVec3(0), Quat(0, 0, 0, 1));
 			}
 		}
 		m_editor.selectEntities(m_entities, false);
@@ -2897,7 +2897,7 @@ public:
 			Transform tr;
 			blob.read(tr);
 			const char* name = blob.readString();
-			if (name[0]) universe.setEntityName(m_entities[i], name);
+			if (name[0]) world.setEntityName(m_entities[i], name);
 			EntityPtr parent;
 			blob.read(parent);
 
@@ -2921,8 +2921,8 @@ public:
 			}
 
 			const EntityRef new_entity = m_entities[i];
-			universe.setTransform(new_entity, tr);
-			universe.setParent(parent, new_entity);
+			world.setTransform(new_entity, tr);
+			world.setParent(parent, new_entity);
 			for (;;) {
 				RuntimeHash hash;
 				blob.read(hash);
@@ -2931,9 +2931,9 @@ public:
 				ComponentUID cmp;
 				cmp.entity = new_entity;
 				cmp.type = reflection::getComponentTypeFromHash(hash);
-				cmp.scene = universe.getScene(cmp.type);
+				cmp.scene = world.getScene(cmp.type);
 
-				cmp.scene->getUniverse().createComponent(cmp.type, new_entity);
+				cmp.scene->getWorld().createComponent(cmp.type, new_entity);
 
 				PropertyDeserializeVisitor visitor(blob, cmp, m_map, m_entities);
 				visitor.idx = -1;
@@ -2947,7 +2947,7 @@ public:
 	void undo() override
 	{
 		for (auto entity : m_entities) {
-			m_editor.getUniverse()->destroyEntity(entity);
+			m_editor.getWorld()->destroyEntity(entity);
 		}
 	}
 

@@ -19,16 +19,16 @@ struct StudioApp;
 struct Pipeline;
 struct RayCastModelHit;
 struct Shader;
-struct Universe;
+struct World;
 
 struct SceneView : StudioApp::GUIPlugin
 {
-	friend struct UniverseViewImpl;
+	friend struct WorldViewImpl;
 	explicit SceneView(StudioApp& app);
 	~SceneView();
 
 	void update(float time_delta) override;
-	void setUniverse(Universe* universe);
+	void setWorld(World* world);
 	void onWindowGUI() override;
 	Pipeline* getPipeline() { return m_pipeline.get(); }
 	const char* getName() const override { return "scene_view"; }
@@ -82,7 +82,7 @@ private:
 	UniquePtr<Pipeline> m_pipeline;
 	LogUI& m_log_ui;
 	Shader* m_debug_shape_shader;
-	struct UniverseViewImpl* m_view;
+	struct WorldViewImpl* m_view;
 
 	bool m_is_measure_active = false;
 	bool m_is_measure_from_set = false;

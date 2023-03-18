@@ -40,7 +40,7 @@ struct GUIScene : IScene
 	};
 
 	static UniquePtr<GUIScene> createInstance(struct GUISystem& system,
-		Universe& universe,
+		World& world,
 		struct IAllocator& allocator);
 	static void reflect();
 

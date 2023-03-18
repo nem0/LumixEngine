@@ -36,7 +36,7 @@ struct Path;
 struct PhysicsSystem;
 struct Quat;
 struct RigidTransform;
-struct Universe;
+struct World;
 template <typename T> struct DelegateList;
 
 
@@ -84,7 +84,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 
 	using ContactCallbackHandle = int;
 
-	static UniquePtr<PhysicsScene> create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
+	static UniquePtr<PhysicsScene> create(PhysicsSystem& system, World& context, Engine& engine, IAllocator& allocator);
 	static void reflect();
 
 	virtual ~PhysicsScene() {}

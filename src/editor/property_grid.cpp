@@ -13,7 +13,7 @@
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "engine/math.h"
 #include "utils.h"
 
@@ -64,7 +64,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	{
 		ComponentUID first_entity_cmp;
 		first_entity_cmp.type = m_cmp_type;
-		first_entity_cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
+		first_entity_cmp.scene = m_editor.getWorld()->getScene(m_cmp_type);
 		first_entity_cmp.entity = m_entities[0];
 		return first_entity_cmp;
 	}
@@ -336,7 +336,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		EntityPtr entity = prop.get(cmp, m_index);
 
 		char buf[128];
-		getEntityListDisplayName(m_app, *m_editor.getUniverse(), Span(buf), entity);
+		getEntityListDisplayName(m_app, *m_editor.getWorld(), Span(buf), entity);
 		ImGui::PushID(prop.name);
 		
 		ImGuiEx::Label(prop.name);
@@ -377,7 +377,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ImGui::PopStyleVar();
 
 
-		Universe& universe = *m_editor.getUniverse();
+		World& world = *m_editor.getWorld();
 		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300)))
 		{
 			static char entity_filter[32] = {};
@@ -391,9 +391,9 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			}
 			
 			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
-				for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
+				for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity((EntityRef)i))
 				{
-					getEntityListDisplayName(m_app, universe, Span(buf), i);
+					getEntityListDisplayName(m_app, world, Span(buf), i);
 					bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 					if (show && ImGui::Selectable(buf))
 					{
@@ -684,14 +684,14 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 	ImGui::PushFont(app.getBoldFont());
 	bool is_open;
 	bool enabled = true;
-	IScene* scene = editor.getUniverse()->getScene(cmp_type);
+	IScene* scene = editor.getWorld()->getScene(cmp_type);
 	if (entities_count == 1 && reflection::getPropertyValue(*scene, entities[0], cmp_type, "Enabled", enabled)) {
 		is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", "");
 		ImGui::SameLine();
 		ComponentUID cmp;
 		cmp.type = cmp_type;
 		cmp.entity = entities[0];
-		cmp.scene = editor.getUniverse()->getScene(cmp_type);
+		cmp.scene = editor.getWorld()->getScene(cmp_type);
 		if(ImGui::Checkbox(StaticString<256>(icon, cmp_type_name), &enabled))
 		{
 			editor.setProperty(cmp_type, "", -1, "Enabled", Span(entities, entities_count), enabled);
@@ -739,9 +739,9 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 
 void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const
 {
-	char name[Universe::ENTITY_NAME_MAX_LENGTH];
-	Universe& universe = *editor.getUniverse();
-	const char* entity_name = universe.getEntityName(entities[0]);
+	char name[World::ENTITY_NAME_MAX_LENGTH];
+	World& world = *editor.getWorld();
+	const char* entity_name = world.getEntityName(entities[0]);
 	copyString(name, entity_name);
 	ImGui::SetNextItemWidth(-1);
 	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name), ImGuiInputTextFlags_AutoSelectAll)) editor.setEntityName(entities[0], name);
@@ -773,15 +773,15 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 
 		ImGuiEx::Label("ID");
 		ImGui::Text("%d", entities[0].index);
-		EntityPtr parent = universe.getParent(entities[0]);
+		EntityPtr parent = world.getParent(entities[0]);
 		if (parent.isValid())
 		{
-			getEntityListDisplayName(m_app, universe, Span(name), parent);
+			getEntityListDisplayName(m_app, world, Span(name), parent);
 			ImGuiEx::Label("Parent");
 			ImGui::Text("%s", name);
 
-			if (!universe.hasComponent(entities[0], GUI_RECT_TYPE) || universe.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
-				Transform tr = universe.getLocalTransform(entities[0]);
+			if (!world.hasComponent(entities[0], GUI_RECT_TYPE) || world.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
+				Transform tr = world.getLocalTransform(entities[0]);
 				DVec3 old_pos = tr.pos;
 				ImGuiEx::Label("Local position");
 				if (ImGui::DragScalarN("##lcl_pos", ImGuiDataType_Double, &tr.pos.x, 3, 1.f))
@@ -807,8 +807,8 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 	}
 
 
-	if (!universe.hasComponent(entities[0], GUI_RECT_TYPE) || universe.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
-		DVec3 pos = universe.getPosition(entities[0]);
+	if (!world.hasComponent(entities[0], GUI_RECT_TYPE) || world.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
+		DVec3 pos = world.getPosition(entities[0]);
 		DVec3 old_pos = pos;
 		ImGuiEx::Label("Position");
 		if (ImGui::DragScalarN("##pos", ImGuiDataType_Double, &pos.x, 3, 1.f, 0, 0, "%.3f"))
@@ -825,13 +825,13 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 
 		ImGuiEx::Label("Rotation");
 		
-		Quat rot = universe.getRotation(entities[0]);
+		Quat rot = world.getRotation(entities[0]);
 		const Vec3 old_euler = rot.toEuler();
 		Vec3 euler = old_euler;
 		if (ImGuiEx::InputRotation("##rot", &euler.x)) {
 			Array<Quat> rots(editor.getAllocator());
 			for (EntityRef entity : entities) {
-				Vec3 tmp = universe.getRotation(entity).toEuler();
+				Vec3 tmp = world.getRotation(entity).toEuler();
 			
 				if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
 				if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
@@ -841,7 +841,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 			editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
 		}
 
-		Vec3 scale = universe.getScale(entities[0]);
+		Vec3 scale = world.getScale(entities[0]);
 		ImGuiEx::Label("Scale");
 		if (ImGui::DragFloat3("##scale", &scale.x, 0.1f, 0, FLT_MAX))
 		{
@@ -896,8 +896,8 @@ void PropertyGrid::onWindowGUI()
 	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open) && !ents.empty()) {
 		showCoreProperties(ents, editor);
 
-		Universe& universe = *editor.getUniverse();
-		for (ComponentUID cmp = universe.getFirstComponent(ents[0]); cmp.isValid(); cmp = universe.getNextComponent(cmp)) {
+		World& world = *editor.getWorld();
+		for (ComponentUID cmp = world.getFirstComponent(ents[0]); cmp.isValid(); cmp = world.getNextComponent(cmp)) {
 			showComponentProperties(ents, cmp.type, editor);
 		}
 

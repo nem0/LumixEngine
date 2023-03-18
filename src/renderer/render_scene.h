@@ -35,7 +35,7 @@ struct Shader;
 struct ShiftedFrustum;
 struct Terrain;
 struct Texture;
-struct Universe;
+struct World;
 template <typename T> struct Array;
 template <typename T> struct Delegate;
 template <typename T, typename T2> struct AssociativeArray;
@@ -285,7 +285,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 {
 	static UniquePtr<RenderScene> createInstance(Renderer& renderer,
 		Engine& engine,
-		Universe& universe,
+		World& world,
 		IAllocator& allocator);
 	static void registerLuaAPI(lua_State* L, Renderer& renderer);
 	static void reflect();

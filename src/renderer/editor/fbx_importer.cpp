@@ -16,7 +16,7 @@
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "meshoptimizer/meshoptimizer.h"
 #include "mikktspace/mikktspace.h"
 #include "physics/physics_resources.h"
@@ -2346,7 +2346,7 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 {
 	Engine& engine = m_app.getEngine();
-	Universe& universe = engine.createUniverse(false);
+	World& world = engine.createWorld(false);
 
 	os::OutputFile file;
 	PathInfo file_info(src);
@@ -2358,22 +2358,22 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 
 	OutputMemoryStream blob(m_allocator);
 	
-	const EntityRef root = universe.createEntity({0, 0, 0}, Quat::IDENTITY);
+	const EntityRef root = world.createEntity({0, 0, 0}, Quat::IDENTITY);
 
 	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 	for(int i  = 0; i < m_meshes.size(); ++i) {
-		const EntityRef e = universe.createEntity(DVec3(fixOrientation(m_meshes[i].origin) * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
-		universe.createComponent(MODEL_INSTANCE_TYPE, e);
-		universe.setParent(root, e);
+		const EntityRef e = world.createEntity(DVec3(fixOrientation(m_meshes[i].origin) * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
+		world.createComponent(MODEL_INSTANCE_TYPE, e);
+		world.setParent(root, e);
 		char mesh_name[256];
 		getImportMeshName(m_meshes[i], mesh_name);
 		StaticString<LUMIX_MAX_PATH> mesh_path(mesh_name, ".fbx:", src);
-		RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+		RenderScene* scene = (RenderScene*)world.getScene(MODEL_INSTANCE_TYPE);
 		scene->setModelInstancePath(e, Path(mesh_path));
 	}
 
-	engine.serialize(universe, blob);
-	engine.destroyUniverse(universe);
+	engine.serialize(world, blob);
+	engine.destroyWorld(world);
 
 	if (!file.write(blob.data(), blob.size())) {
 		logError("Could not write ", tmp);

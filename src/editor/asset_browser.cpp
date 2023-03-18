@@ -19,7 +19,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "utils.h"
 
 
@@ -721,10 +721,10 @@ struct AssetBrowserImpl : AssetBrowser {
 				const EntityRef e = *(EntityRef*)payload->Data;
 				m_dropped_entity = e;
 				ImGui::OpenPopup("Save as prefab");
-				Universe* universe = m_app.getWorldEditor().getUniverse();
+				World* world = m_app.getWorldEditor().getWorld();
 				const ComponentType model_inst_type = reflection::getComponentType("model_instance");
-				IScene* scene = universe->getScene(model_inst_type);
-				if (scene && universe->hasComponent(e, model_inst_type)) {
+				IScene* scene = world->getScene(model_inst_type);
+				if (scene && world->hasComponent(e, model_inst_type)) {
 					Path source;
 					if (reflection::getPropertyValue(*scene, e, model_inst_type, "Source", source)) {
 						copyString(Span(m_prefab_name), Path::getBasename(source.c_str()));

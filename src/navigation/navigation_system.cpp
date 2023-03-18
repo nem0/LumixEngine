@@ -3,7 +3,7 @@
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "navigation/navigation_scene.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -49,7 +49,7 @@ struct NavigationSystem final : IPlugin {
 	static void* recastAlloc(size_t size, rcAllocHint hint) { return s_instance->m_allocator.allocate(size); }
 
 	const char* getName() const override { return "navigation"; }
-	void createScenes(Universe& universe) override;
+	void createScenes(World& world) override;
 
 	static NavigationSystem* s_instance;
 
@@ -61,10 +61,10 @@ struct NavigationSystem final : IPlugin {
 NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 
-void NavigationSystem::createScenes(Universe& universe)
+void NavigationSystem::createScenes(World& world)
 {
-	UniquePtr<NavigationScene> scene = NavigationScene::create(m_engine, *this, universe, m_allocator);
-	universe.addScene(scene.move());
+	UniquePtr<NavigationScene> scene = NavigationScene::create(m_engine, *this, world, m_allocator);
+	world.addScene(scene.move());
 }
 
 

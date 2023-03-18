@@ -11,7 +11,7 @@
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/model.h"
 #include "../animation.h"
 #include "../controller.h"
@@ -450,28 +450,28 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool canLoadFromEntity() const {
 		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return false;
-		Universe* universe = m_app.getWorldEditor().getUniverse();
-		return universe->hasComponent(selected[0], reflection::getComponentType("animator"));
+		World* world = m_app.getWorldEditor().getWorld();
+		return world->hasComponent(selected[0], reflection::getComponentType("animator"));
 	}
 
 	void updateSelectedEntity() {
 		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return;
-		Universe* universe = m_app.getWorldEditor().getUniverse();
+		World* world = m_app.getWorldEditor().getWorld();
 		ComponentType animator_type = reflection::getComponentType("animator");
-		if (!universe->hasComponent(selected[0], animator_type)) return;
+		if (!world->hasComponent(selected[0], animator_type)) return;
 
-		AnimationScene* scene = (AnimationScene*)universe->getScene(animator_type);
+		AnimationScene* scene = (AnimationScene*)world->getScene(animator_type);
 		scene->updateAnimator(selected[0], m_app.getEngine().getLastTimeDelta());
 	}
 
 	Path getPathFromEntity() const {
 		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return Path();
-		Universe* universe = m_app.getWorldEditor().getUniverse();
+		World* world = m_app.getWorldEditor().getWorld();
 		const ComponentType cmp_type = reflection::getComponentType("animator");
-		if (!universe->hasComponent(selected[0], cmp_type)) return Path();
-		AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
+		if (!world->hasComponent(selected[0], cmp_type)) return Path();
+		AnimationScene* scene = (AnimationScene*)world->getScene(cmp_type);
 		return scene->getAnimatorSource(selected[0]);
 	}
 
@@ -728,15 +728,15 @@ struct ControllerEditorImpl : ControllerEditor {
 				return;
 			}
 
-			Universe* universe = m_app.getWorldEditor().getUniverse();
+			World* world = m_app.getWorldEditor().getWorld();
 			const ComponentType cmp_type = reflection::getComponentType("animator");
-			if (!universe->hasComponent(selected[0], cmp_type)) {
+			if (!world->hasComponent(selected[0], cmp_type)) {
 				ImGui::TextUnformatted("Selected entity does not have animator component");
 				ImGui::End();
 				return;
 			}
 
-			AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
+			AnimationScene* scene = (AnimationScene*)world->getScene(cmp_type);
 			Controller* ctrl = scene->getAnimatorController(selected[0]);
 			if (!ctrl) {
 				ImGui::TextUnformatted("Selected entity does not have resource assigned in animator component");

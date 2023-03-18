@@ -18,7 +18,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stack_array.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "culling_system.h"
 #include "draw2d.h"
 #include "draw_stream.h"
@@ -995,10 +995,10 @@ struct PipelineImpl final : Pipeline
 		for (int slice = 0; slice < 4; ++slice) {
 			const int shadowmap_width = 1024;
 
-			const Universe& universe = m_scene->getUniverse();
+			const World& world = m_scene->getWorld();
 			const EntityPtr light = m_scene->getActiveEnvironment();
 			const Vec4 cascades = light.isValid() ? m_scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
-			const Matrix light_mtx = light.isValid() ? universe.getRelativeMatrix((EntityRef)light, m_viewport.pos) : Matrix::IDENTITY;
+			const Matrix light_mtx = light.isValid() ? world.getRelativeMatrix((EntityRef)light, m_viewport.pos) : Matrix::IDENTITY;
 
 			const float camera_height = (float)m_viewport.h;
 			const float camera_fov = m_viewport.fov;
@@ -1094,13 +1094,13 @@ struct PipelineImpl final : Pipeline
 
 	bool bakeShadow(const PointLight& light, u32 atlas_idx) {
 		PROFILE_FUNCTION();
-		const Universe& universe = m_scene->getUniverse();
+		const World& world = m_scene->getWorld();
 		const Viewport backup_viewport = m_viewport;
 
 		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
 		m_viewport.is_ortho = false;
-		m_viewport.pos = universe.getPosition(light.entity);
-		m_viewport.rot = universe.getRotation(light.entity);
+		m_viewport.pos = world.getPosition(light.entity);
+		m_viewport.rot = world.getRotation(light.entity);
 		m_viewport.fov = light.fov;
 		m_viewport.near = 0.1f;
 		m_viewport.far = light.range;
@@ -1143,7 +1143,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void render3DUI(EntityRef e, const Draw2D& drawdata, Vec2 canvas_size, bool orient_to_cam) override {
-		Matrix matrix = m_scene->getUniverse().getRelativeMatrix(e, m_viewport.pos);
+		Matrix matrix = m_scene->getWorld().getRelativeMatrix(e, m_viewport.pos);
 		Matrix normalize(
 			Vec4(1 / canvas_size.x, 0, 0, 0),
 			Vec4(0, -1 / canvas_size.x, 0, 0),
@@ -1151,7 +1151,7 @@ struct PipelineImpl final : Pipeline
 			Vec4(-0.5f, 0.5f * canvas_size.y / canvas_size.x, 0, 1)
 		);
 		if (orient_to_cam) {
-			const Transform tr = m_scene->getUniverse().getTransform(e);
+			const Transform tr = m_scene->getWorld().getTransform(e);
 			matrix = m_viewport.rot.toMatrix();
 			matrix.setTranslation(Vec3(tr.pos - m_viewport.pos));
 			matrix.multiply3x3(tr.scale);
@@ -1223,7 +1223,7 @@ struct PipelineImpl final : Pipeline
 			if(global_light.isValid()) {
 				EntityRef gl = (EntityRef)global_light;
 				const Environment& env = m_scene->getEnvironment(gl);
-				global_state.light_direction = Vec4(normalize(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
+				global_state.light_direction = Vec4(normalize(m_scene->getWorld().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
 				global_state.light_color = Vec4(env.light_color, 456);
 				global_state.light_intensity = env.direct_intensity;
 				global_state.light_indirect_intensity = env.indirect_intensity * m_indirect_light_multiplier;
@@ -1420,8 +1420,8 @@ struct PipelineImpl final : Pipeline
 		stream.popDebugGroup();
 	}
 
-	void setUniverse(Universe* universe) override {
-		RenderScene* scene = universe ? (RenderScene*)universe->getScene("renderer") : nullptr;
+	void setWorld(World* world) override {
+		RenderScene* scene = world ? (RenderScene*)world->getScene("renderer") : nullptr;
 		if (m_scene == scene) return;
 		m_scene = scene;
 		if (m_lua_state && m_scene) callInitScene();
@@ -1633,14 +1633,14 @@ struct PipelineImpl final : Pipeline
 			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
 			if(terrains.empty()) return;
 
-			Universe& universe = m_scene->getUniverse();
+			World& world = m_scene->getWorld();
 			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 			for (const Terrain* terrain : terrains) {
 				if (!terrain->m_heightmap) continue;
 				if (!terrain->m_heightmap->isReady()) continue;
 				if (!terrain->m_material || !terrain->m_material->isReady()) continue;
 
-				const Transform& tr = universe.getTransform(terrain->m_entity);
+				const Transform& tr = world.getTransform(terrain->m_entity);
 				const Vec3 pos = Vec3(tr.pos- cp.pos);
 				Vec3 ref_pos = Vec3(tr.pos - m_viewport.pos);
 				const Quat rot = tr.rot;
@@ -1730,7 +1730,7 @@ struct PipelineImpl final : Pipeline
 		const CameraParams cp = resolveCameraParams(cp_handle);
 		if (!cp.is_shadow) {
 			for (Terrain* terrain : m_scene->getTerrains()) {
-				const Transform tr = m_scene->getUniverse().getTransform(terrain->m_entity);
+				const Transform tr = m_scene->getWorld().getTransform(terrain->m_entity);
 				Transform rel_tr = tr;
 				rel_tr.pos = tr.pos - cp.pos;
 				terrain->createGrass(Vec2(-(float)rel_tr.pos.x, -(float)rel_tr.pos.z), m_renderer.frameNumber());
@@ -1755,7 +1755,7 @@ struct PipelineImpl final : Pipeline
 
 		m_renderer.pushJob("grass", [this, cp, define_mask, render_state](DrawStream& stream){
 			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
-			const Universe& universe = m_scene->getUniverse();
+			const World& world = m_scene->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
 
 			u32 quad_count = 0;
@@ -1763,7 +1763,7 @@ struct PipelineImpl final : Pipeline
 			u32 total_instance_count = 0;
 
 			for (const Terrain* terrain : terrains) {
-				const Transform tr = universe.getTransform(terrain->m_entity);
+				const Transform tr = world.getTransform(terrain->m_entity);
 				Transform rel_tr = tr;
 				rel_tr.pos = tr.pos - cp.pos;
 				const Vec3 rel_pos(rel_tr.pos);
@@ -2154,7 +2154,7 @@ struct PipelineImpl final : Pipeline
 	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
 		Matrix prj;
 		prj.setPerspective(light.fov, 1, 0.1f, light.range, true);
-		const Quat rot = -m_scene->getUniverse().getRotation(light.entity);
+		const Quat rot = -m_scene->getWorld().getRotation(light.entity);
 		
 		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
 		const Matrix bias_matrix(
@@ -2242,7 +2242,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void encodeProceduralGeometry(View& view) {
-		const Universe& universe = m_scene->getUniverse();
+		const World& world = m_scene->getWorld();
 		const HashMap<EntityRef, ProceduralGeometry>& geometries = m_scene->getProceduralGeometries();
 		const DVec3 camera_pos = view.cp.pos;
 		for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
@@ -2255,7 +2255,7 @@ struct PipelineImpl final : Pipeline
 
 			Bucket& bucket = view.buckets[bucket_idx];
 			const gpu::StateFlags render_state = bucket.state;
-			const Matrix mtx = universe.getRelativeMatrix(iter.key(), camera_pos);
+			const Matrix mtx = world.getRelativeMatrix(iter.key(), camera_pos);
 			const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
@@ -2286,7 +2286,7 @@ struct PipelineImpl final : Pipeline
 		if (!m_instancing_shader->isReady()) return;
 
 		const float global_lod_multiplier = m_renderer.getLODMultiplier();
-		const Universe& universe = m_scene->getUniverse();
+		const World& world = m_scene->getWorld();
 		const HashMap<EntityRef, InstancedModel>& ims = m_scene->getInstancedModels();
 		
 		struct UBValues {
@@ -2332,7 +2332,7 @@ struct PipelineImpl final : Pipeline
 
 			const float draw_distance = getDrawDistance(*m);
 
-			const Transform origin = universe.getTransform(iter.key());
+			const Transform origin = world.getTransform(iter.key());
 			const Frustum frustum = view.cp.frustum.getRelative(origin.pos);
 			const float radius = m->getOriginBoundingRadius();
 
@@ -2589,10 +2589,10 @@ struct PipelineImpl final : Pipeline
 		const u64* LUMIX_RESTRICT renderables = view.sorter.values.begin();
 		const u64* LUMIX_RESTRICT sort_keys = view.sorter.keys.begin();
 
-		const Universe& universe = m_scene->getUniverse();
+		const World& world = m_scene->getWorld();
 		const ShiftedFrustum frustum = view.cp.frustum;
 		const ModelInstance* LUMIX_RESTRICT model_instances = m_scene->getModelInstances().begin();
-		const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
+		const Transform* LUMIX_RESTRICT entity_data = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
 		u64 instance_key_mask;
@@ -2629,7 +2629,7 @@ struct PipelineImpl final : Pipeline
 					const u32 particles_count = emitter.getParticlesCount();
 
 					const ParticleEmitterResource* res = emitter.getResource();
-					const Transform tr = universe.getTransform((EntityRef)emitter.m_entity);
+					const Transform tr = world.getTransform((EntityRef)emitter.m_entity);
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
 					const gpu::VertexDecl& decl = res->getVertexDecl();
 					const gpu::StateFlags state = material->m_render_states | render_state;
@@ -2997,7 +2997,7 @@ struct PipelineImpl final : Pipeline
 		memset(clusters, 0, sizeof(Cluster) * clusters_count);
 
 		const DVec3 cam_pos = cp.pos;
-		const Universe& universe = m_scene->getUniverse();
+		const World& world = m_scene->getWorld();
 		CullResult* light_entities = m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
 		const u32 lights_count = light_entities ? light_entities->count() : 0;
 		ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count);
@@ -3009,9 +3009,9 @@ struct PipelineImpl final : Pipeline
 				PointLight& pl = m_scene->getPointLight(e);
 				ClusterLight& light = lights[i];
 				light.radius = pl.range;
-				const DVec3 light_pos = universe.getPosition(e);
+				const DVec3 light_pos = world.getPosition(e);
 				light.pos = Vec3(light_pos - cam_pos);
-				light.rot = universe.getRotation(e);
+				light.rot = world.getRotation(e);
 				light.fov = pl.fov;
 				light.color = pl.color * pl.intensity;
 				light.attenuation_param = pl.attenuation_param;
@@ -3062,7 +3062,7 @@ struct PipelineImpl final : Pipeline
 		const Renderer::TransientSlice shadow_matrices_ub = m_renderer.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
 
-		m_renderer.pushJob([clusters_count, clusters, lights, lights_count, cam_pos, &universe, size, cp, this, &frame_allocator](DrawStream& stream){
+		m_renderer.pushJob([clusters_count, clusters, lights, lights_count, cam_pos, &world, size, cp, this, &frame_allocator](DrawStream& stream){
 			auto bind = [](auto& buffer, const void* data, u32 size, i32 idx, DrawStream& stream){
 				if (!size) return;
 				const u32 capacity = (size + 15) & ~15;
@@ -3124,8 +3124,8 @@ struct PipelineImpl final : Pipeline
 				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
 				const EntityRef e = refl_probe_entities[i];
 				ClusterReflProbe& probe =  refl_probes[i];
-				probe.pos = Vec3(universe.getPosition(e) - cam_pos);
-				probe.rot = universe.getRotation(e).conjugated();
+				probe.pos = Vec3(world.getPosition(e) - cam_pos);
+				probe.rot = world.getRotation(e).conjugated();
 				probe.half_extents = refl_probe.half_extents;
 				probe.layer = refl_probe.texture_id;
 			}
@@ -3147,8 +3147,8 @@ struct PipelineImpl final : Pipeline
 	
 				const EntityRef e = env_probe_entities[probe_idx];
 				ClusterEnvProbe& probe =  env_probes[probe_idx];
-				probe.pos = Vec3(universe.getPosition(e) - cam_pos);
-				probe.rot = universe.getRotation(e).conjugated();
+				probe.pos = Vec3(world.getPosition(e) - cam_pos);
+				probe.rot = world.getRotation(e).conjugated();
 				probe.inner_range = env_probe.inner_range;
 				probe.outer_range = env_probe.outer_range;
 				for (u32 i = 0; i < 9; ++i) {
@@ -3382,7 +3382,7 @@ struct PipelineImpl final : Pipeline
 			int total = 0;
 			RenderScene* scene = m_scene;
 			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
-			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
+			const Transform* LUMIX_RESTRICT entity_data = scene->getWorld().getTransforms();
 			const DVec3 camera_pos = view.cp.pos;
 			const DVec3 lod_ref_point = m_viewport.pos;
 			Sorter::Inserter inserter(view.sorter);

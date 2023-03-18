@@ -11,7 +11,7 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 
 namespace Lumix
@@ -171,7 +171,7 @@ void menuItem(Action& a, bool enabled)
 	}
 }
 
-void getEntityListDisplayName(StudioApp& app, Universe& universe, Span<char> buf, EntityPtr entity)
+void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity)
 {
 	if (!entity.isValid())
 	{
@@ -180,12 +180,12 @@ void getEntityListDisplayName(StudioApp& app, Universe& universe, Span<char> buf
 	}
 
 	EntityRef e = (EntityRef)entity;
-	const char* name = universe.getEntityName(e);
+	const char* name = world.getEntityName(e);
 	static const auto MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	if (universe.hasComponent(e, MODEL_INSTANCE_TYPE))
+	if (world.hasComponent(e, MODEL_INSTANCE_TYPE))
 	{
 		RenderInterface* render_interface = app.getRenderInterface();
-		const Path path = render_interface->getModelInstancePath(universe, e);
+		const Path path = render_interface->getModelInstancePath(world, e);
 		if (!path.isEmpty())
 		{
 			const char* c = path.c_str();

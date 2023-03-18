@@ -16,7 +16,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw_stream.h"
@@ -94,14 +94,14 @@ struct ReflectionProbe::LoadJob {
 struct RenderSceneImpl final : RenderScene {
 	RenderSceneImpl(Renderer& renderer,
 		Engine& engine,
-		Universe& universe,
+		World& world,
 		IAllocator& allocator);
 
 	~RenderSceneImpl()
 	{
 		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
-		m_universe.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
-		m_universe.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
+		m_world.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
+		m_world.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
 		m_culling_system.reset();
 	}
 
@@ -128,7 +128,7 @@ struct RenderSceneImpl final : RenderScene {
 			EntityPtr e = map_iter.value();
 			while(e.isValid()) {
 				const float radius = length(m_decals[(EntityRef)e].half_extents);
-				const DVec3 pos = m_universe.getPosition((EntityRef)e);
+				const DVec3 pos = m_world.getPosition((EntityRef)e);
 				m_culling_system->add((EntityRef)e, (u8)RenderableTypes::DECAL, pos, radius);
 				e = m_decals[(EntityRef)e].next_decal;
 			}
@@ -155,7 +155,7 @@ struct RenderSceneImpl final : RenderScene {
 			EntityPtr e = map_iter.value();
 			while(e.isValid()) {
 				const float radius = length(m_curve_decals[(EntityRef)e].half_extents);
-				const DVec3 pos = m_universe.getPosition((EntityRef)e);
+				const DVec3 pos = m_world.getPosition((EntityRef)e);
 				m_culling_system->add((EntityRef)e, (u8)RenderableTypes::CURVE_DECAL, pos, radius);
 				e = m_curve_decals[(EntityRef)e].next_decal;
 			}
@@ -259,7 +259,7 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 
 
 	IPlugin& getPlugin() const override { return m_renderer; }
@@ -271,13 +271,13 @@ struct RenderSceneImpl final : RenderScene {
 		Vec3& dir) override
 	{
 		Camera& camera = m_cameras[camera_entity];
-		origin = m_universe.getPosition(camera_entity);
+		origin = m_world.getPosition(camera_entity);
 
 		float width = camera.screen_width;
 		float height = camera.screen_height;
 		if (width <= 0 || height <= 0)
 		{
-			dir = m_universe.getRotation(camera_entity).rotate(Vec3(0, 0, 1));
+			dir = m_world.getRotation(camera_entity).rotate(Vec3(0, 0, 1));
 			return;
 		}
 
@@ -285,7 +285,7 @@ struct RenderSceneImpl final : RenderScene {
 		float ny = 2 * ((height - screen_pos.y) / height) - 1;
 
 		const Matrix projection_matrix = getCameraProjection(camera_entity);
-		const Transform view = m_universe.getTransform(camera_entity);
+		const Transform view = m_world.getTransform(camera_entity);
 
 		if (camera.is_ortho) {
 			const float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
@@ -321,8 +321,8 @@ struct RenderSceneImpl final : RenderScene {
 		else {
 			vp.fov = cam.fov;
 		}
-		vp.pos = m_universe.getPosition(entity);
-		vp.rot = m_universe.getRotation(entity);
+		vp.pos = m_world.getPosition(entity);
+		vp.rot = m_world.getRotation(entity);
 		return vp;
 	}
 
@@ -347,7 +347,7 @@ struct RenderSceneImpl final : RenderScene {
 	{
 		ShiftedFrustum ret;
 		const Camera& camera = m_cameras[entity];
-		const Transform tr = m_universe.getTransform(entity);
+		const Transform tr = m_world.getTransform(entity);
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		if (camera.is_ortho) {
 			ret.computeOrtho(tr.pos,
@@ -375,7 +375,7 @@ struct RenderSceneImpl final : RenderScene {
 	{
 		ShiftedFrustum ret;
 		const Camera& camera = m_cameras[entity];
-		const Transform tr = m_universe.getTransform(entity);
+		const Transform tr = m_world.getTransform(entity);
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		Vec2 viewport_min = { viewport_min_px.x / camera.screen_width * 2 - 1, (1 - viewport_max_px.y / camera.screen_height) * 2 - 1 };
 		Vec2 viewport_max = { viewport_max_px.x / camera.screen_width * 2 - 1, (1 - viewport_min_px.y / camera.screen_height) * 2 - 1 };
@@ -412,22 +412,22 @@ struct RenderSceneImpl final : RenderScene {
 		if (!model_instance_ptr.isValid()) return;
 
 		const EntityRef model_instance = (EntityRef)model_instance_ptr;
-		if (!m_universe.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
 		const Pose* parent_pose = lockPose(model_instance);
 		if (!parent_pose) return;
 
-		Transform parent_entity_transform = m_universe.getTransform((EntityRef)bone_attachment.parent_entity);
+		Transform parent_entity_transform = m_world.getTransform((EntityRef)bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
 		if (idx < 0 || idx >= (int)parent_pose->count) {
 			unlockPose(model_instance, false);
 			return;
 		}
-		Vec3 original_scale = m_universe.getScale(bone_attachment.entity);
+		Vec3 original_scale = m_world.getScale(bone_attachment.entity);
 		const LocalRigidTransform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx] };
 		const LocalRigidTransform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot };
 		Transform result = parent_entity_transform * bone_transform * relative_transform;
 		result.scale = original_scale;
-		m_universe.setTransform(bone_attachment.entity, result);
+		m_world.setTransform(bone_attachment.entity, result);
 		unlockPose(model_instance, false);
 	}
 
@@ -445,7 +445,7 @@ struct RenderSceneImpl final : RenderScene {
 		const EntityPtr model_instance_ptr = attachment.parent_entity;
 		if (!model_instance_ptr.isValid()) return;
 		const EntityRef model_instance = (EntityRef)model_instance_ptr;
-		if (!m_universe.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
 		const Pose* pose = lockPose(model_instance);
 		if (!pose) return;
 
@@ -457,9 +457,9 @@ struct RenderSceneImpl final : RenderScene {
 		const LocalRigidTransform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index]};
 
 		const EntityRef parent = (EntityRef)attachment.parent_entity;
-		Transform inv_parent_transform = m_universe.getTransform(parent) * bone_transform;
+		Transform inv_parent_transform = m_world.getTransform(parent) * bone_transform;
 		inv_parent_transform = inv_parent_transform.inverted();
-		const Transform child_transform = m_universe.getTransform(attachment.entity);
+		const Transform child_transform = m_world.getTransform(attachment.entity);
 		const Transform res = inv_parent_transform * child_transform;
 		attachment.relative_transform = {Vec3(res.pos), res.rot};
 		unlockPose(model_instance, false);
@@ -553,7 +553,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 		}
 		for (EntityRef e : to_delete) {
-			m_universe.destroyEntity(e);
+			m_world.destroyEntity(e);
 		}
 	}
 
@@ -658,7 +658,7 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.read(im.instances.begin(), im.instances.byte_size());
 			m_instanced_models.insert(e, static_cast<InstancedModel&&>(im));
 			initInstancedModelGPUData(e);
-			m_universe.onComponentCreated(e, INSTANCED_MODEL_TYPE, this);
+			m_world.onComponentCreated(e, INSTANCED_MODEL_TYPE, this);
 		}
 	}
 
@@ -681,7 +681,7 @@ struct RenderSceneImpl final : RenderScene {
 			FurComponent fur;
 			serializer.read(fur);
 			m_furs.insert(e, fur);
-			m_universe.onComponentCreated(e, FUR_TYPE, this);
+			m_world.onComponentCreated(e, FUR_TYPE, this);
 		}
 	}
 
@@ -703,7 +703,7 @@ struct RenderSceneImpl final : RenderScene {
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			setDecalMaterialPath(decal.entity, Path(tmp));
-			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
+			m_world.onComponentCreated(decal.entity, DECAL_TYPE, this);
 		}
 	}
 	
@@ -726,7 +726,7 @@ struct RenderSceneImpl final : RenderScene {
 			updateDecalInfo(decal);
 			m_curve_decals.insert(decal.entity, decal);
 			setCurveDecalMaterialPath(decal.entity, Path(tmp));
-			m_universe.onComponentCreated(decal.entity, CURVE_DECAL_TYPE, this);
+			m_world.onComponentCreated(decal.entity, CURVE_DECAL_TYPE, this);
 		}
 	}
 
@@ -798,7 +798,7 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.read(probe.half_extents);
 			load(probe, entity);
 
-			m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
+			m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 		}
 	}
 
@@ -843,7 +843,7 @@ struct RenderSceneImpl final : RenderScene {
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			serializer.read(probe);
 
-			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
+			m_world.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 		}
 	}
 
@@ -862,7 +862,7 @@ struct RenderSceneImpl final : RenderScene {
 			bone_attachment.parent_entity = entity_map.get(bone_attachment.parent_entity);
 			serializer.read(bone_attachment.relative_transform);
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
-			m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
+			m_world.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
 		}
 	}
 
@@ -877,7 +877,7 @@ struct RenderSceneImpl final : RenderScene {
 			if (emitter.m_entity.isValid()) {
 				EntityRef e = *emitter.m_entity;
 				m_particle_emitters.insert(e, static_cast<ParticleEmitter&&>(emitter));
-				m_universe.onComponentCreated(e, PARTICLE_EMITTER_TYPE, this);
+				m_world.onComponentCreated(e, PARTICLE_EMITTER_TYPE, this);
 			}
 		}
 	}
@@ -938,7 +938,7 @@ struct RenderSceneImpl final : RenderScene {
 			camera.entity = entity_map.get(camera.entity);
 
 			m_cameras.insert(camera.entity, camera);
-			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
+			m_world.onComponentCreated(camera.entity, CAMERA_TYPE, this);
 			if (!m_active_camera.isValid()) m_active_camera = camera.entity;
 		}
 	}
@@ -982,7 +982,7 @@ struct RenderSceneImpl final : RenderScene {
 					setModelInstanceMaterialOverride(e, Path(mat_path));
 				}
 
-				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
+				m_world.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
 		}
 	}
@@ -1028,7 +1028,7 @@ struct RenderSceneImpl final : RenderScene {
 					setModelInstanceMaterialOverride(e, Path(mat_path));
 				}
 
-				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
+				m_world.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
 		}
 	}
@@ -1043,9 +1043,9 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.read(light);
 			light.entity = entity_map.get(light.entity);
 			m_point_lights.insert(light.entity, light);
-			const DVec3 pos = m_universe.getPosition(light.entity);
+			const DVec3 pos = m_world.getPosition(light.entity);
 			m_culling_system->add(light.entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
-			m_universe.onComponentCreated(light.entity, POINT_LIGHT_TYPE, this);
+			m_world.onComponentCreated(light.entity, POINT_LIGHT_TYPE, this);
 		}
 
 		serializer.read(size);
@@ -1054,7 +1054,7 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.read(light);
 			light.entity = entity_map.get(light.entity);
 			m_environments.insert(light.entity, light);
-			m_universe.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
+			m_world.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
 		}
 		
 		EntityPtr tmp;
@@ -1102,7 +1102,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 			computeAABB(pg);
 			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
-			m_universe.onComponentCreated(e, PROCEDURAL_GEOM_TYPE, this);
+			m_world.onComponentCreated(e, PROCEDURAL_GEOM_TYPE, this);
 		}
 	}
 
@@ -1115,7 +1115,7 @@ struct RenderSceneImpl final : RenderScene {
 			serializer.read(entity);
 			entity = entity_map.get(entity);
 			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
-			terrain->deserialize(entity, serializer, m_universe, *this, version);
+			terrain->deserialize(entity, serializer, m_world, *this, version);
 			m_terrains.insert(entity, terrain);
 		}
 	}
@@ -1159,7 +1159,7 @@ struct RenderSceneImpl final : RenderScene {
 			mi.flags.unset(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 		m_bone_attachments.erase(entity);
-		m_universe.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
+		m_world.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 	
 	void destroyReflectionProbe(EntityRef entity)
@@ -1167,13 +1167,13 @@ struct RenderSceneImpl final : RenderScene {
 		ReflectionProbe& probe = m_reflection_probes[entity];
 		LUMIX_DELETE(m_allocator, probe.load_job);
 		m_reflection_probes.erase(entity);
-		m_universe.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
+		m_world.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
 	}
 
 	void destroyEnvironmentProbe(EntityRef entity)
 	{
 		m_environment_probes.erase(entity);
-		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
+		m_world.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
 	InstancedModel& beginInstancedModelEditing(EntityRef entity) override {
@@ -1271,7 +1271,7 @@ struct RenderSceneImpl final : RenderScene {
 		if (m) m->decRefCount();
 		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
 		m_instanced_models.erase(entity);
-		m_universe.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
+		m_world.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
 	}
 
 	void destroyModelInstance(EntityRef entity)
@@ -1284,12 +1284,12 @@ struct RenderSceneImpl final : RenderScene {
 		model_instance.flags.set(ModelInstance::VALID, false);
 		if (model_instance.custom_material) model_instance.custom_material->decRefCount();
 		model_instance.custom_material = nullptr;
-		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
+		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
 	void destroyEnvironment(EntityRef entity)
 	{
-		m_universe.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
+		m_world.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
 
 		if ((EntityPtr)entity == m_active_global_light_entity)
 		{
@@ -1300,35 +1300,35 @@ struct RenderSceneImpl final : RenderScene {
 
 	void destroyFur(EntityRef entity) {
 		m_furs.erase(entity);
-		m_universe.onComponentDestroyed(entity, FUR_TYPE, this);
+		m_world.onComponentDestroyed(entity, FUR_TYPE, this);
 	}
 
 	void destroyDecal(EntityRef entity)
 	{
 		m_culling_system->remove(entity);
 		m_decals.erase(entity);
-		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this);
+		m_world.onComponentDestroyed(entity, DECAL_TYPE, this);
 	}
 
 	void destroyCurveDecal(EntityRef entity)
 	{
 		m_culling_system->remove(entity);
 		m_curve_decals.erase(entity);
-		m_universe.onComponentDestroyed(entity, CURVE_DECAL_TYPE, this);
+		m_world.onComponentDestroyed(entity, CURVE_DECAL_TYPE, this);
 	}
 
 	void destroyPointLight(EntityRef entity)
 	{
 		m_point_lights.erase(entity);
 		m_culling_system->remove(entity);
-		m_universe.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
+		m_world.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
 	}
 
 
 	void destroyCamera(EntityRef entity)
 	{
 		m_cameras.erase(entity);
-		m_universe.onComponentDestroyed(entity, CAMERA_TYPE, this);
+		m_world.onComponentDestroyed(entity, CAMERA_TYPE, this);
 		if (m_active_camera == entity) m_active_camera = INVALID_ENTITY;
 	}
 
@@ -1337,21 +1337,21 @@ struct RenderSceneImpl final : RenderScene {
 	{
 		LUMIX_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
-		m_universe.onComponentDestroyed(entity, TERRAIN_TYPE, this);
+		m_world.onComponentDestroyed(entity, TERRAIN_TYPE, this);
 	}
 
 
 	void destroyParticleEmitter(EntityRef entity)
 	{
 		const ParticleEmitter& emitter = m_particle_emitters[entity];
-		m_universe.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
+		m_world.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
 		m_particle_emitters.erase(*emitter.m_entity);
 	}
 
 
 	void createFur(EntityRef entity) {
 		m_furs.insert(entity, {});
-		m_universe.onComponentCreated(entity, FUR_TYPE, this);
+		m_world.onComponentCreated(entity, FUR_TYPE, this);
 	}
 
 
@@ -1367,7 +1367,7 @@ struct RenderSceneImpl final : RenderScene {
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		m_cameras.insert(entity, camera);
-		m_universe.onComponentCreated(entity, CAMERA_TYPE, this);
+		m_world.onComponentCreated(entity, CAMERA_TYPE, this);
 
 		if (!m_active_camera.isValid()) m_active_camera = entity;
 	}
@@ -1377,14 +1377,14 @@ struct RenderSceneImpl final : RenderScene {
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
-		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this);
+		m_world.onComponentCreated(entity, TERRAIN_TYPE, this);
 	}
 
 
 	void createParticleEmitter(EntityRef entity)
 	{
 		m_particle_emitters.insert(entity, ParticleEmitter(entity, m_allocator));
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
+		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
 	bool getEnvironmentCastShadows(EntityRef entity) override {
@@ -1452,33 +1452,33 @@ struct RenderSceneImpl final : RenderScene {
 
 	void onEntityMoved(EntityRef entity)
 	{
-		const u64 cmp_mask = m_universe.getComponentsMask(entity);
+		const u64 cmp_mask = m_world.getComponentsMask(entity);
 		if ((cmp_mask & m_render_cmps_mask) == 0) {
 			return;
 		}
 
 		if (m_culling_system->isAdded(entity)) {
-			if (m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-				const Transform& tr = m_universe.getTransform(entity);
+			if (m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
+				const Transform& tr = m_world.getTransform(entity);
 				const Model* model = m_model_instances[entity.index].model;
 				ASSERT(model);
 				const float bounding_radius = model->getOriginBoundingRadius();
 				m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
 			}
-			else if (m_universe.hasComponent(entity, DECAL_TYPE)) {
+			else if (m_world.hasComponent(entity, DECAL_TYPE)) {
 				auto iter = m_decals.find(entity);
 				updateDecalInfo(iter.value());
-				const DVec3 position = m_universe.getPosition(entity);
+				const DVec3 position = m_world.getPosition(entity);
 				m_culling_system->setPosition(entity, position);
 			}
-			else if (m_universe.hasComponent(entity, CURVE_DECAL_TYPE)) {
+			else if (m_world.hasComponent(entity, CURVE_DECAL_TYPE)) {
 				auto iter = m_curve_decals.find(entity);
 				updateDecalInfo(iter.value());
-				const DVec3 position = m_universe.getPosition(entity);
+				const DVec3 position = m_world.getPosition(entity);
 				m_culling_system->setPosition(entity, position);
 			}
-			else if (m_universe.hasComponent(entity, POINT_LIGHT_TYPE)) {
-				const DVec3 pos = m_universe.getPosition(entity);
+			else if (m_world.hasComponent(entity, POINT_LIGHT_TYPE)) {
+				const DVec3 pos = m_world.getPosition(entity);
 				m_culling_system->setPosition(entity, pos);
 			}
 		}
@@ -1496,7 +1496,7 @@ struct RenderSceneImpl final : RenderScene {
 
 		if (m_is_updating_attachments || m_is_game_running) return;
 		
-		if(m_universe.hasComponent(entity, BONE_ATTACHMENT_TYPE)) {
+		if(m_world.hasComponent(entity, BONE_ATTACHMENT_TYPE)) {
 			for (auto& attachment : m_bone_attachments)
 			{
 				if (attachment.entity == entity)
@@ -1624,7 +1624,7 @@ struct RenderSceneImpl final : RenderScene {
 
 			if (decal.material->isReady()) {
 				const float radius = length(m_curve_decals[entity].half_extents);
-				const DVec3 pos = m_universe.getPosition(entity);
+				const DVec3 pos = m_world.getPosition(entity);
 				m_culling_system->add(entity, (u8)RenderableTypes::CURVE_DECAL, pos, radius);
 			}
 		}
@@ -1703,7 +1703,7 @@ struct RenderSceneImpl final : RenderScene {
 
 			if (decal.material->isReady()) {
 				const float radius = length(m_decals[entity].half_extents);
-				const DVec3 pos = m_universe.getPosition(entity);
+				const DVec3 pos = m_world.getPosition(entity);
 				m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, radius);
 			}
 		}
@@ -1912,8 +1912,8 @@ struct RenderSceneImpl final : RenderScene {
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
-			const DVec3 pos = m_universe.getPosition(entity);
-			const Vec3& scale = m_universe.getScale(entity);
+			const DVec3 pos = m_world.getPosition(entity);
+			const Vec3& scale = m_world.getScale(entity);
 			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 			if (!m_culling_system->isAdded(entity)) {
 				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.custom_material);
@@ -1948,8 +1948,8 @@ struct RenderSceneImpl final : RenderScene {
 			m_culling_system->remove(entity);
 		}
 		const RenderableTypes type = getRenderableType(*mi.model, mi.custom_material);
-		const DVec3 pos = m_universe.getPosition(entity);
-		const Vec3& scale = m_universe.getScale(entity);
+		const DVec3 pos = m_world.getPosition(entity);
+		const Vec3& scale = m_world.getScale(entity);
 		const float radius = mi.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 		m_culling_system->add(entity, (u8)type, pos, radius);
 	}
@@ -2511,7 +2511,7 @@ struct RenderSceneImpl final : RenderScene {
 		hit.is_hit = false;
 		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
 			const EntityRef e = iter.key();
-			const Transform tr = m_universe.getTransform(e);
+			const Transform tr = m_world.getTransform(e);
 			const InstancedModel& im = iter.value();
 			if (!im.model || !im.model->isReady()) continue;
 			
@@ -2560,8 +2560,8 @@ struct RenderSceneImpl final : RenderScene {
 			Vec3 a, b, c;
 			RayCastModelHit pg_hit;
 
-			const DVec3& pos = m_universe.getPosition(iter.key());
-			const Quat rot = m_universe.getRotation(iter.key()).conjugated();
+			const DVec3& pos = m_world.getPosition(iter.key());
+			const Quat rot = m_world.getRotation(iter.key()).conjugated();
 			const Vec3 rd = rot.rotate(dir);
 			Vec3 ro = Vec3(origin - pos);
 
@@ -2619,7 +2619,7 @@ struct RenderSceneImpl final : RenderScene {
 		RayCastModelHit hit = castRayInstancedModels(origin, dir, filter);
 		double cur_dist = hit.is_hit ? hit.t : DBL_MAX;
 
-		const Universe& universe = getUniverse();
+		const World& world = getWorld();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
@@ -2627,7 +2627,7 @@ struct RenderSceneImpl final : RenderScene {
 			if (!r.model) continue;
 
 			const EntityRef entity{i};
-			const Transform& tr = universe.getTransform(entity);
+			const Transform& tr = world.getTransform(entity);
 			float radius = r.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
 			const double dist = length(tr.pos - origin);
 			if (dist - radius > cur_dist) continue;
@@ -2816,8 +2816,8 @@ struct RenderSceneImpl final : RenderScene {
 		auto& r = m_model_instances[entity.index];
 
 		float bounding_radius = r.model->getOriginBoundingRadius();
-		const Vec3& scale = m_universe.getScale(entity);
-		const DVec3 pos = m_universe.getPosition(entity);
+		const Vec3& scale = m_world.getScale(entity);
+		const DVec3 pos = m_world.getPosition(entity);
 		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags.isSet(ModelInstance::ENABLED)) {
 			const RenderableTypes type = getRenderableType(*model, r.custom_material);
@@ -3040,7 +3040,7 @@ struct RenderSceneImpl final : RenderScene {
 		if (m_environments.empty()) m_active_global_light_entity = entity;
 
 		m_environments.insert(entity, light);
-		m_universe.onComponentCreated(entity, ENVIRONMENT_TYPE, this);
+		m_world.onComponentCreated(entity, ENVIRONMENT_TYPE, this);
 	}
 
 
@@ -3055,18 +3055,18 @@ struct RenderSceneImpl final : RenderScene {
 		light.attenuation_param = 2;
 		light.range = 10;
 		light.guid = randGUID();
-		const DVec3 pos = m_universe.getPosition(entity);
+		const DVec3 pos = m_world.getPosition(entity);
 		m_point_lights.insert(entity, light);
 		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
 
-		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
+		m_world.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
 	}
 
 
 	void updateDecalInfo(Decal& decal) const
 	{
 		decal.radius = length(decal.half_extents);
-		decal.transform = m_universe.getTransform(decal.entity);
+		decal.transform = m_world.getTransform(decal.entity);
 	}
 
 
@@ -3075,7 +3075,7 @@ struct RenderSceneImpl final : RenderScene {
 		decal.half_extents.x = maximum(fabsf(decal.bezier_p0.x), fabsf(decal.bezier_p2.x)) + decal.uv_scale.x * 0.5f;
 		decal.half_extents.z = maximum(fabsf(decal.bezier_p0.y), fabsf(decal.bezier_p2.y)) + decal.uv_scale.x * 0.5f;
 		decal.radius = length(decal.half_extents);
-		decal.transform = m_universe.getTransform(decal.entity);
+		decal.transform = m_world.getTransform(decal.entity);
 	}
 
 
@@ -3088,7 +3088,7 @@ struct RenderSceneImpl final : RenderScene {
 		decal.uv_scale = Vec2(1);
 		updateDecalInfo(decal);
 
-		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
+		m_world.onComponentCreated(entity, DECAL_TYPE, this);
 	}
 
 	void createCurveDecal(EntityRef entity)
@@ -3102,7 +3102,7 @@ struct RenderSceneImpl final : RenderScene {
 		decal.bezier_p2 = Vec2(1, 0);
 		updateDecalInfo(decal);
 
-		m_universe.onComponentCreated(entity, CURVE_DECAL_TYPE, this);
+		m_world.onComponentCreated(entity, CURVE_DECAL_TYPE, this);
 	}
 
 	void createEnvironmentProbe(EntityRef entity)
@@ -3115,7 +3115,7 @@ struct RenderSceneImpl final : RenderScene {
 		memset(probe.sh_coefs, 0, sizeof(probe.sh_coefs));
 		probe.sh_coefs[0] = Vec3(0.5f, 0.5f, 0.5f);
 
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
+		m_world.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 	
 	void destroyProceduralGeometry(EntityRef entity) {
@@ -3124,13 +3124,13 @@ struct RenderSceneImpl final : RenderScene {
 		if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 		if (pg.index_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
 		m_procedural_geometries.erase(entity);
-		m_universe.onComponentDestroyed(entity, PROCEDURAL_GEOM_TYPE, this);
+		m_world.onComponentDestroyed(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
 	
 	void createProceduralGeometry(EntityRef entity) {
 		ASSERT(!m_procedural_geometries.find(entity).isValid());
 		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
-		m_universe.onComponentCreated(entity, PROCEDURAL_GEOM_TYPE, this);
+		m_world.onComponentCreated(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
 
 	void createReflectionProbe(EntityRef entity)
@@ -3141,7 +3141,7 @@ struct RenderSceneImpl final : RenderScene {
 		StaticString<LUMIX_MAX_PATH> path;
 		probe.flags.set(ReflectionProbe::ENABLED);
 
-		m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
+		m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 	}
 
 	void createBoneAttachment(EntityRef entity)
@@ -3151,7 +3151,7 @@ struct RenderSceneImpl final : RenderScene {
 		attachment.parent_entity = INVALID_ENTITY;
 		attachment.bone_index = -1;
 
-		m_universe.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this);
+		m_world.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 
 	const HashMap<EntityRef, InstancedModel>& getInstancedModels() const override {
@@ -3163,7 +3163,7 @@ struct RenderSceneImpl final : RenderScene {
 		m_instanced_models.insert(entity, static_cast<InstancedModel&&>(im));
 
 		initInstancedModelGPUData(entity);
-		m_universe.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);
+		m_world.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);
 	}
 
 	void createModelInstance(EntityRef entity)
@@ -3184,7 +3184,7 @@ struct RenderSceneImpl final : RenderScene {
 		r.flags.set(ModelInstance::VALID);
 		r.flags.set(ModelInstance::ENABLED);
 		r.mesh_count = 0;
-		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
+		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
 	void updateParticleEmitter(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
@@ -3210,7 +3210,7 @@ struct RenderSceneImpl final : RenderScene {
 	const HashMap<EntityRef, ParticleEmitter>& getParticleEmitters() const override { return m_particle_emitters; }
 
 	IAllocator& m_allocator;
-	Universe& m_universe;
+	World& m_world;
 	Renderer& m_renderer;
 	Engine& m_engine;
 	UniquePtr<CullingSystem> m_culling_system;
@@ -3329,7 +3329,7 @@ void RenderScene::reflect() {
 		EntityPtr getModelInstance(RenderScene* render_scene, EntityRef bone_attachment) const {
 			EntityPtr parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
 			if (!parent_entity.isValid()) return INVALID_ENTITY;
-			return render_scene->getUniverse().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
+			return render_scene->getWorld().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 		}
 	};
 
@@ -3423,10 +3423,10 @@ void RenderScene::reflect() {
 
 RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	Engine& engine,
-	Universe& universe,
+	World& world,
 	IAllocator& allocator)
 	: m_engine(engine)
-	, m_universe(universe)
+	, m_world(world)
 	, m_renderer(renderer)
 	, m_allocator(allocator)
 	, m_model_entity_map(m_allocator)
@@ -3454,8 +3454,8 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_furs(m_allocator)
 {
 
-	m_universe.entityTransformed().bind<&RenderSceneImpl::onEntityMoved>(this);
-	m_universe.entityDestroyed().bind<&RenderSceneImpl::onEntityDestroyed>(this);
+	m_world.entityTransformed().bind<&RenderSceneImpl::onEntityMoved>(this);
+	m_world.entityDestroyed().bind<&RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
 
@@ -3474,10 +3474,10 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 
 UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
 	Engine& engine,
-	Universe& universe,
+	World& world,
 	IAllocator& allocator)
 {
-	return UniquePtr<RenderSceneImpl>::create(allocator, renderer, engine, universe, allocator);
+	return UniquePtr<RenderSceneImpl>::create(allocator, renderer, engine, world, allocator);
 }
 
 void RenderScene::registerLuaAPI(lua_State* L, Renderer& renderer)

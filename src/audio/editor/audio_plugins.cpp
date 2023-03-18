@@ -12,7 +12,7 @@
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 
 using namespace Lumix;
@@ -183,7 +183,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 
-	bool showGizmo(UniverseView& view, ComponentUID cmp) override
+	bool showGizmo(WorldView& view, ComponentUID cmp) override
 	{
 		static const ComponentType ECHO_ZONE_TYPE = reflection::getComponentType("echo_zone");
 		static const ComponentType CHORUS_ZONE_TYPE = reflection::getComponentType("chorus_zone");
@@ -193,8 +193,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
 			float radius = audio_scene->getEchoZone(entity).radius;
-			Universe& universe = audio_scene->getUniverse();
-			const DVec3 pos = universe.getPosition(entity);
+			World& world = audio_scene->getWorld();
+			const DVec3 pos = world.getPosition(entity);
 
 			addSphere(view, pos, radius, Color::BLUE);
 			return true;
@@ -203,8 +203,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
 			float radius = audio_scene->getChorusZone(entity).radius;
-			Universe& universe = audio_scene->getUniverse();
-			const DVec3 pos = universe.getPosition(entity);
+			World& world = audio_scene->getWorld();
+			const DVec3 pos = world.getPosition(entity);
 
 			addSphere(view, pos, radius, Color::BLUE);
 			return true;

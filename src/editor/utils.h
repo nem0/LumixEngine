@@ -59,7 +59,7 @@ inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b;
 
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API void menuItem(Action& a, bool enabled);
-LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct Universe& editor, Span<char> buf, EntityPtr entity);
+LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity);
 LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 
 struct SimpleUndoRedo {

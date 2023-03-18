@@ -14,7 +14,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "nodes.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -26,7 +26,7 @@ namespace Lumix
 
 struct Animation;
 struct Engine;
-struct Universe;
+struct World;
 
 enum class AnimationSceneVersion
 {
@@ -85,8 +85,8 @@ struct AnimationSceneImpl final : AnimationScene
 	};
 
 
-	AnimationSceneImpl(Engine& engine, IPlugin& anim_system, Universe& universe, IAllocator& allocator)
-		: m_universe(universe)
+	AnimationSceneImpl(Engine& engine, IPlugin& anim_system, World& world, IAllocator& allocator)
+		: m_world(world)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
@@ -99,7 +99,7 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 	void init() override {
-		m_render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		m_render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		ASSERT(m_render_scene);
 	}
 
@@ -246,7 +246,7 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 	
 	
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 
 
 	static void unloadResource(Resource* res)
@@ -300,7 +300,7 @@ struct AnimationSceneImpl final : AnimationScene
 		auto& animator = m_property_animators.at(idx);
 		unloadResource(animator.animation);
 		m_property_animators.erase(entity);
-		m_universe.onComponentDestroyed(entity, PROPERTY_ANIMATOR_TYPE, this);
+		m_world.onComponentDestroyed(entity, PROPERTY_ANIMATOR_TYPE, this);
 	}
 
 
@@ -309,7 +309,7 @@ struct AnimationSceneImpl final : AnimationScene
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
 		m_animables.erase(entity);
-		m_universe.onComponentDestroyed(entity, ANIMABLE_TYPE, this);
+		m_world.onComponentDestroyed(entity, ANIMABLE_TYPE, this);
 	}
 
 
@@ -323,7 +323,7 @@ struct AnimationSceneImpl final : AnimationScene
 		m_animator_map[last.entity] = idx;
 		m_animator_map.erase(entity);
 		m_animators.swapAndPop(idx);
-		m_universe.onComponentDestroyed(entity, ANIMATOR_TYPE, this);
+		m_world.onComponentDestroyed(entity, ANIMATOR_TYPE, this);
 	}
 
 
@@ -371,7 +371,7 @@ struct AnimationSceneImpl final : AnimationScene
 			const char* path = serializer.readString();
 			animable.animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			m_animables.insert(animable.entity, animable);
-			m_universe.onComponentCreated(animable.entity, ANIMABLE_TYPE, this);
+			m_world.onComponentCreated(animable.entity, ANIMABLE_TYPE, this);
 		}
 
 		serializer.read(count);
@@ -387,7 +387,7 @@ struct AnimationSceneImpl final : AnimationScene
 			serializer.read(animator.flags);
 			animator.time = 0;
 			animator.animation = loadPropertyAnimation(Path(path));
-			m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
+			m_world.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
 		}
 
 
@@ -404,7 +404,7 @@ struct AnimationSceneImpl final : AnimationScene
 			setSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_animator_map.insert(animator.entity, m_animators.size());
 			m_animators.push(animator);
-			m_universe.onComponentCreated(animator.entity, ANIMATOR_TYPE, this);
+			m_world.onComponentCreated(animator.entity, ANIMATOR_TYPE, this);
 		}
 	}
 
@@ -484,7 +484,7 @@ struct AnimationSceneImpl final : AnimationScene
 	{
 		if (!animable.animation || !animable.animation->isReady()) return;
 		EntityRef entity = animable.entity;
-		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(entity);
 		if (!model->isReady()) return;
@@ -624,7 +624,7 @@ struct AnimationSceneImpl final : AnimationScene
 		}
 
 		const EntityRef entity = animator.entity;
-		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(entity);
 		if (!model->isReady()) return;
@@ -773,7 +773,7 @@ struct AnimationSceneImpl final : AnimationScene
 					float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
 					ComponentUID cmp;
 					cmp.type = curve.cmp_type;
-					cmp.scene = m_universe.getScene(cmp.type);
+					cmp.scene = m_world.getScene(cmp.type);
 					cmp.entity = entity;
 					ASSERT(curve.property->setter);
 					curve.property->set(cmp, -1, v);
@@ -858,7 +858,7 @@ struct AnimationSceneImpl final : AnimationScene
 		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 		animator.animation = nullptr;
 		animator.time = 0;
-		m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
+		m_world.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
 	}
 
 
@@ -869,7 +869,7 @@ struct AnimationSceneImpl final : AnimationScene
 		animable.animation = nullptr;
 		animable.entity = entity;
 
-		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this);
+		m_world.onComponentCreated(entity, ANIMABLE_TYPE, this);
 	}
 
 
@@ -879,7 +879,7 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators.emplace();
 		animator.entity = entity;
 
-		m_universe.onComponentCreated(entity, ANIMATOR_TYPE, this);
+		m_world.onComponentCreated(entity, ANIMATOR_TYPE, this);
 	}
 
 
@@ -887,7 +887,7 @@ struct AnimationSceneImpl final : AnimationScene
 
 
 	IAllocator& m_allocator;
-	Universe& m_universe;
+	World& m_world;
 	IPlugin& m_anim_system;
 	Engine& m_engine;
 	AssociativeArray<EntityRef, Animable> m_animables;
@@ -899,9 +899,9 @@ struct AnimationSceneImpl final : AnimationScene
 };
 
 
-UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator)
+UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin, World& world, IAllocator& allocator)
 {
-	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, universe, allocator);
+	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, world, allocator);
 }
 
 void AnimationScene::reflect(Engine& engine) {

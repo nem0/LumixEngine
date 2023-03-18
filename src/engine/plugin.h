@@ -42,7 +42,7 @@ struct LUMIX_ENGINE_API IScene
 	virtual IPlugin& getPlugin() const = 0;
 	virtual void update(float time_delta, bool paused) = 0;
 	virtual void lateUpdate(float time_delta, bool paused) {}
-	virtual struct Universe& getUniverse() = 0;
+	virtual struct World& getWorld() = 0;
 	virtual void startGame() {}
 	virtual void stopGame() {}
 	virtual i32 getVersion() const { return -1; }
@@ -62,7 +62,7 @@ struct LUMIX_ENGINE_API IPlugin
 	virtual bool deserialize(u32 version, InputMemoryStream& serializer) = 0;
 	virtual void pluginAdded(IPlugin& plugin) {}
 
-	virtual void createScenes(Universe&) {}
+	virtual void createScenes(World&) {}
 	virtual void startGame() {}
 	virtual void stopGame() {}
 };

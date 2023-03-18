@@ -13,7 +13,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 
 namespace Lumix
@@ -324,7 +324,7 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene, i32 version)
+void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderScene& scene, i32 version)
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
@@ -357,7 +357,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Unive
 		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
 	}
-	universe.onComponentCreated(m_entity, TERRAIN_HASH, &scene);
+	world.onComponentCreated(m_entity, TERRAIN_HASH, &scene);
 }
 
 	
@@ -482,9 +482,9 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	hit.mesh = nullptr;
 	if (!m_heightmap || !m_heightmap->isReady()) return hit;
 
-	const Universe& universe = m_scene.getUniverse();
-	const Quat rot = universe.getRotation(m_entity);
-	const DVec3 pos = universe.getPosition(m_entity);
+	const World& world = m_scene.getWorld();
+	const Quat rot = world.getRotation(m_entity);
+	const DVec3 pos = world.getPosition(m_entity);
 	const Vec3 rel_dir = rot.rotate(dir);
 	const Vec3 terrain_to_ray = Vec3(origin - pos);
 	const Vec3 rel_origin = rot.conjugated().rotate(terrain_to_ray);

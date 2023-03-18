@@ -18,7 +18,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 namespace Lumix
 {
@@ -83,11 +83,11 @@ struct PrefabSystemImpl final : PrefabSystem
 			if (!entity.isValid()) return;
 			
 			EntityRef e = (EntityRef)entity;
-			Universe& universe = *editor.getUniverse();
-			destroyEntityRecursive(universe.getFirstChild(e));
-			destroyEntityRecursive(universe.getNextSibling(e));
+			World& world = *editor.getWorld();
+			destroyEntityRecursive(world.getFirstChild(e));
+			destroyEntityRecursive(world.getNextSibling(e));
 
-			universe.destroyEntity(e);
+			world.destroyEntity(e);
 
 		}
 
@@ -115,11 +115,11 @@ struct PrefabSystemImpl final : PrefabSystem
 		{
 			ASSERT(!entities.empty());
 
-			Universe& universe = *editor.getUniverse();
+			World& world = *editor.getWorld();
 
 			for (EntityRef e : entities) {
-				destroyEntityRecursive(universe.getFirstChild(e));
-				universe.destroyEntity(e);
+				destroyEntityRecursive(world.getFirstChild(e));
+				world.destroyEntity(e);
 			}
 			entities.clear();
 		}
@@ -143,30 +143,30 @@ struct PrefabSystemImpl final : PrefabSystem
 public:
 	explicit PrefabSystemImpl(WorldEditor& editor)
 		: m_editor(editor)
-		, m_universe(nullptr)
+		, m_world(nullptr)
 		, m_roots(editor.getAllocator())
 		, m_resources(editor.getAllocator())
 		, m_entity_to_prefab(editor.getAllocator())
 		, m_deferred_instances(editor.getAllocator())
 	{
-		setUniverse(editor.getUniverse());
+		setWorld(editor.getWorld());
 	}
 
 
 	~PrefabSystemImpl()
 	{
-		setUniverse(nullptr);
+		setWorld(nullptr);
 	}
 
 
 	WorldEditor& getEditor() const { return m_editor; }
 
 
-	void setUniverse(Universe* universe) override {
-		if (universe == m_universe) return;
+	void setWorld(World* world) override {
+		if (world == m_world) return;
 
-		if (m_universe) {
-			m_universe->entityDestroyed().unbind<&PrefabSystemImpl::onEntityDestroyed>(this);
+		if (m_world) {
+			m_world->entityDestroyed().unbind<&PrefabSystemImpl::onEntityDestroyed>(this);
 		}
 
 		m_roots.clear();
@@ -175,9 +175,9 @@ public:
 		}
 		m_resources.clear();
 		m_entity_to_prefab.clear();
-		m_universe = universe;
-		if (m_universe) {
-			m_universe->entityDestroyed().bind<&PrefabSystemImpl::onEntityDestroyed>(this);
+		m_world = world;
+		if (m_world) {
+			m_world->entityDestroyed().bind<&PrefabSystemImpl::onEntityDestroyed>(this);
 		}
 	}
 
@@ -242,7 +242,7 @@ public:
 		
 		for (const Transform& tr : transforms) {
 			entity_map.m_map.clear();
-			if (!engine.instantiatePrefab(*m_universe, prefab_res, tr.pos, tr.rot, tr.scale, entity_map)) {
+			if (!engine.instantiatePrefab(*m_world, prefab_res, tr.pos, tr.rot, tr.scale, entity_map)) {
 				logError("Failed to instantiate prefab ", prefab_res.getPath());
 				return;
 			}
@@ -268,7 +268,7 @@ public:
 		}
 		
 		EntityMap entity_map(m_editor.getAllocator());
-		if (!m_editor.getEngine().instantiatePrefab(*m_universe, prefab_res, pos, rot, scale, entity_map)) {
+		if (!m_editor.getEngine().instantiatePrefab(*m_world, prefab_res, pos, rot, scale, entity_map)) {
 			logError("Failed to instantiate prefab ", prefab_res.getPath());
 			return INVALID_ENTITY;
 		}
@@ -304,11 +304,11 @@ public:
 	EntityRef getPrefabRoot(EntityRef entity) const
 	{
 		EntityRef root = entity;
-		EntityPtr parent = m_universe->getParent(root);
+		EntityPtr parent = m_world->getParent(root);
 		while (parent.isValid() && getPrefab((EntityRef)parent).getHashValue() != 0)
 		{
 			root = (EntityRef)parent;
-			parent = m_universe->getParent(root);
+			parent = m_world->getParent(root);
 		}
 		return root;
 	}
@@ -392,7 +392,7 @@ public:
 	};
 
 
-	EntityRef cloneEntity(Universe& src_u, EntityRef src_e, Universe& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) {
+	EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) {
 		entities.push(src_e);
 		const EntityRef dst_e = (EntityRef)map[src_e];
 		if (dst_parent.isValid()) {
@@ -434,7 +434,7 @@ public:
 		return dst_e;
 	}
 
-	void cloneHierarchy(const Universe& src, EntityRef src_e, Universe& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
+	void cloneHierarchy(const World& src, EntityRef src_e, World& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
 		const EntityPtr child = src.getFirstChild(src_e);
 		const EntityPtr sibling = src.getNextSibling(src_e);
 
@@ -449,10 +449,10 @@ public:
 		}
 	}
 
-	Universe& createPrefabUniverse(EntityRef src_e, Array<EntityRef>& entities) {
+	World& createPrefabWorld(EntityRef src_e, Array<EntityRef>& entities) {
 		Engine& engine = m_editor.getEngine();
-		Universe& dst = engine.createUniverse(false);
-		Universe& src = *m_editor.getUniverse();
+		World& dst = engine.createWorld(false);
+		World& src = *m_editor.getWorld();
 
 		HashMap<EntityPtr, EntityPtr> map(m_editor.getAllocator());
 		map.reserve(256);
@@ -462,28 +462,28 @@ public:
 	}
 
 
-	static void destroySubtree(Universe& universe, EntityPtr entity)
+	static void destroySubtree(World& world, EntityPtr entity)
 	{
 		if (!entity.isValid()) return;
 
 		const EntityRef e = (EntityRef)entity;
 
-		const EntityPtr child = universe.getFirstChild(e);
-		destroySubtree(universe, child);
+		const EntityPtr child = world.getFirstChild(e);
+		destroySubtree(world, child);
 
-		const EntityPtr sib = universe.getNextSibling(e);
-		destroySubtree(universe, sib);
+		const EntityPtr sib = world.getNextSibling(e);
+		destroySubtree(world, sib);
 
-		universe.destroyEntity(e);
+		world.destroyEntity(e);
 	}
 
 	void breakPrefabRecursive(EntityRef e) {
 		m_entity_to_prefab[e.index] = FilePathHash();
-		const EntityPtr child = m_universe->getFirstChild(e);
+		const EntityPtr child = m_world->getFirstChild(e);
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
 		}
-		const EntityPtr sibling = m_universe->getNextSibling(e);
+		const EntityPtr sibling = m_world->getNextSibling(e);
 		if (sibling.isValid()) {
 			breakPrefabRecursive((EntityRef)sibling);
 		}
@@ -491,7 +491,7 @@ public:
 
 	void breakPrefab(EntityRef e) override {
 		const EntityRef root = getPrefabRoot(e);
-		const EntityPtr child = m_universe->getFirstChild(root);
+		const EntityPtr child = m_world->getFirstChild(root);
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);
 		}
@@ -508,9 +508,9 @@ public:
 		blob.reserve(4096);
 		Array<EntityRef> src_entities(m_editor.getAllocator());
 		src_entities.reserve(256);
-		Universe& prefab_universe = createPrefabUniverse(entity, src_entities);
-		engine.serialize(prefab_universe, blob);
-		engine.destroyUniverse(prefab_universe);
+		World& prefab_world = createPrefabWorld(entity, src_entities);
+		engine.serialize(prefab_world, blob);
+		engine.destroyWorld(prefab_world);
 
 		FileSystem& fs = engine.getFileSystem();
 		
@@ -530,12 +530,12 @@ public:
 				if (iter.value() != prefab) continue;
 				if (iter.key() == entity) continue;
 
-				const Transform tr = m_universe->getTransform(iter.key());
-				const EntityPtr parent = m_universe->getParent(iter.key());
+				const Transform tr = m_world->getTransform(iter.key());
+				const EntityPtr parent = m_world->getParent(iter.key());
 
 				m_deferred_instances.push({prefab_res, tr, parent});
-				destroySubtree(*m_universe, m_universe->getFirstChild(iter.key()));
-				m_universe->destroyEntity(iter.key());
+				destroySubtree(*m_world, m_world->getFirstChild(iter.key()));
+				m_world->destroyEntity(iter.key());
 			}
 		}
 		else {
@@ -561,13 +561,13 @@ public:
 			const EntityRef e = {idx};
 			if (!m_roots.find(e).isValid()) continue;
 
-			const Transform tr = m_universe->getTransform(e);
-			const EntityPtr parent = m_universe->getParent(e);
+			const Transform tr = m_world->getTransform(e);
+			const EntityPtr parent = m_world->getParent(e);
 			EntityFolders::FolderID folder = folders.getFolder(e);
 
 			m_deferred_instances.push({m_resources[prefab].resource, tr, parent, folder});
-			destroySubtree(*m_universe, m_universe->getFirstChild(e));
-			m_universe->destroyEntity(e);
+			destroySubtree(*m_world, m_world->getFirstChild(e));
+			m_world->destroyEntity(e);
 		}
 	}
 
@@ -608,7 +608,7 @@ public:
 				const EntityPtr root = doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
 				if (root.isValid()) {
 					folders.moveToFolder(*root, tmp.folder);
-					m_universe->setParent(tmp.parent, (EntityRef)root);
+					m_world->setParent(tmp.parent, (EntityRef)root);
 				}
 				m_deferred_instances.pop();
 			} else {
@@ -647,7 +647,7 @@ public:
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, UniverseSerializedVersion version) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldSerializedVersion version) override
 	{
 		u32 count;
 		serializer.read(count);
@@ -670,7 +670,7 @@ public:
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
 			StableHash content_hash;
-			if ((u32)version <= (u32)UniverseSerializedVersion::HASH64) {
+			if ((u32)version <= (u32)WorldSerializedVersion::HASH64) {
 				u32 dummy;
 				serializer.read(dummy);
 			}
@@ -713,7 +713,7 @@ private:
 	HashMap<EntityRef, PrefabHandle> m_roots;
 	HashMap<PrefabHandle, PrefabVersion> m_resources;
 	Array<DeferredInstance> m_deferred_instances;
-	Universe* m_universe;
+	World* m_world;
 	WorldEditor& m_editor;
 	bool m_check_update = false;
 }; // struct PrefabSystemImpl

@@ -12,7 +12,7 @@ namespace Lumix {
 struct ComponentUID;
 struct IScene;
 
-enum class UniverseSerializedVersion : u32
+enum class WorldSerializedVersion : u32
 {
 	CAMERA,
 	ENTITY_FOLDERS,
@@ -22,10 +22,10 @@ enum class UniverseSerializedVersion : u32
 };
 
 #pragma pack(1)
-	struct UniverseHeader {
+	struct WorldHeader {
 		static const u32 MAGIC = 'LUNV';
 		u32 magic;
-		UniverseSerializedVersion version;
+		WorldSerializedVersion version;
 	};
 #pragma pack()
 
@@ -46,18 +46,18 @@ struct LUMIX_ENGINE_API ChildrenRange {
 		bool operator !=(const Iterator& rhs);
 		EntityRef operator*();
 
-		const struct Universe* universe;
+		const struct World* world;
 		EntityPtr entity;
 	};
-	ChildrenRange(const Universe& universe, EntityRef parent);
+	ChildrenRange(const World& world, EntityRef parent);
 	Iterator begin() const;
 	Iterator end() const;
 
-	const Universe& universe;
+	const World& world;
 	EntityRef parent;
 };
 
-struct LUMIX_ENGINE_API Universe {
+struct LUMIX_ENGINE_API World {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 
 	struct EntityData {
@@ -76,8 +76,8 @@ struct LUMIX_ENGINE_API Universe {
 		bool valid;
 	};
 
-	explicit Universe(struct Engine& engine, IAllocator& allocator);
-	~Universe();
+	explicit World(struct Engine& engine, IAllocator& allocator);
+	~World();
 
 	IAllocator& getAllocator() { return m_allocator; }
 	const Transform* getTransforms() const { return m_transforms.begin(); }

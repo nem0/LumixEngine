@@ -29,7 +29,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
@@ -96,7 +96,7 @@ struct StudioAppImpl final : StudioApp
 		, m_confirm_exit(false)
 		, m_exit_code(0)
 		, m_allocator(m_main_allocator)
-		, m_universes(m_allocator)
+		, m_worlds(m_allocator)
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
@@ -358,7 +358,7 @@ struct StudioAppImpl final : StudioApp
 		m_asset_compiler = AssetCompiler::create(*this);
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		m_editor->entitySelectionChanged().bind<&StudioAppImpl::onEntitySelectionChanged>(this);
-		scanUniverses();
+		scanWorlds();
 		loadUserPlugins();
 		addActions();
 
@@ -392,7 +392,7 @@ struct StudioAppImpl final : StudioApp
 
 		setStudioApp();
 		loadSettings();
-		loadUniverseFromCommandLine();
+		loadWorldFromCommandLine();
 
 		m_asset_compiler->onInitFinished();
 		m_asset_browser->onInitFinished();
@@ -421,7 +421,7 @@ struct StudioAppImpl final : StudioApp
 			m_engine->getFileSystem().processCallbacks();
 		}
 
-		m_editor->newUniverse();
+		m_editor->newWorld();
 
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
@@ -762,13 +762,13 @@ struct StudioAppImpl final : StudioApp
 		const Array<EntityRef>& ents = m_editor->getSelectedEntities();
 		if (ents.empty()) return;
 
-		Universe* universe = m_editor->getUniverse();
+		World* world = m_editor->getWorld();
 
-		UniverseView& view = m_editor->getView();
+		WorldView& view = m_editor->getView();
 		if (ents.size() > 1) {
 			DVec3 min(FLT_MAX), max(-FLT_MAX);
 			for (EntityRef e : ents) {
-				const DVec3 p = universe->getPosition(e);
+				const DVec3 p = world->getPosition(e);
 				min = minimum(p, min);
 				max = maximum(p, max);
 			}
@@ -777,7 +777,7 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		for (ComponentUID cmp = universe->getFirstComponent(ents[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp)) {
+		for (ComponentUID cmp = world->getFirstComponent(ents[0]); cmp.isValid(); cmp = world->getNextComponent(cmp)) {
 			for (auto* plugin : m_plugins) {
 				if (plugin->showGizmo(view, cmp)) break;
 			}
@@ -832,7 +832,7 @@ struct StudioAppImpl final : StudioApp
 		m_editor->update();
 		showGizmos();
 		
-		m_engine->update(*m_editor->getUniverse());
+		m_engine->update(*m_editor->getWorld());
 
 		++m_fps_frame;
 		if (m_fps_timer.getTimeSinceTick() > 1.0f) {
@@ -902,8 +902,8 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void initDefaultUniverse() {
-		m_editor->beginCommandGroup("initUniverse");
+	void initDefaultWorld() {
+		m_editor->beginCommandGroup("initWorld");
 		EntityRef env = m_editor->addEntity();
 		m_editor->setEntityName(env, "environment");
 		ComponentType env_cmp_type = reflection::getComponentType("environment");
@@ -914,7 +914,7 @@ struct StudioAppImpl final : StudioApp
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
-		const ComponentUID cmp = m_editor->getUniverse()->getComponent(env, lua_script_cmp_type);
+		const ComponentUID cmp = m_editor->getWorld()->getComponent(env, lua_script_cmp_type);
 		m_editor->addArrayPropertyItem(cmp, "scripts");
 		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/atmo.lua"));
 		m_editor->endCommandGroup();
@@ -952,26 +952,26 @@ struct StudioAppImpl final : StudioApp
 						m_engine->getFileSystem().setBasePath(dir);
 						extractBundled();
 						m_editor->loadProject();
-						scanUniverses();
+						scanWorlds();
 						m_asset_compiler->onBasePathChanged();
 						m_engine->getResourceManager().reloadAll();
 					}
 				}
 				ImGui::Separator();
-				if (ImGui::Button("New universe")) {
-					initDefaultUniverse();
+				if (ImGui::Button("New world")) {
+					initDefaultWorld();
 					m_is_welcome_screen_open = false;
 				}
-				ImGui::Text("Open universe:");
+				ImGui::Text("Open world:");
 				ImGui::Indent();
-				if(m_universes.empty()) {
-					ImGui::Text("No universes found");
+				if(m_worlds.empty()) {
+					ImGui::Text("No worlds found");
 				}
-				for (auto& univ : m_universes)
+				for (auto& univ : m_worlds)
 				{
 					if (ImGui::MenuItem(univ.data))
 					{
-						m_editor->loadUniverse(univ.data);
+						m_editor->loadWorld(univ.data);
 						setTitle(univ.data);
 						m_is_welcome_screen_open = false;
 					}
@@ -1027,8 +1027,8 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		if (m_editor->getUniverse()->getName()[0]) {
-			m_editor->saveUniverse(m_editor->getUniverse()->getName(), true);
+		if (m_editor->getWorld()->getName()[0]) {
+			m_editor->saveWorld(m_editor->getWorld()->getName(), true);
 		} else {
 			saveAs();
 		}
@@ -1038,19 +1038,19 @@ struct StudioAppImpl final : StudioApp
 	void onSaveAsDialogGUI()
 	{
 		if (m_save_as_request) {
-			ImGui::OpenPopup("Save Universe As");
+			ImGui::OpenPopup("Save World As");
 			m_save_as_request = false;
 		}
 		ImGui::SetNextWindowSizeConstraints(ImVec2(300, 150), ImVec2(9000, 9000));
-		if (ImGui::BeginPopupModal("Save Universe As"))
+		if (ImGui::BeginPopupModal("Save World As"))
 		{
 			static char name[64] = "";
 			ImGuiEx::Label("Name");
 			ImGui::InputText("##name", name, lengthOf(name));
 			if (ImGui::Button(ICON_FA_SAVE "Save")) {
 				setTitle(name);
-				m_editor->saveUniverse(name, true);
-				scanUniverses();
+				m_editor->saveWorld(name, true);
+				scanWorlds();
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
@@ -1074,7 +1074,7 @@ struct StudioAppImpl final : StudioApp
 
 	void exit()
 	{
-		if (m_editor->isUniverseChanged())
+		if (m_editor->isWorldChanged())
 		{
 			m_confirm_exit = true;
 		}
@@ -1085,16 +1085,16 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void newUniverse()
+	void newWorld()
 	{
-		if (m_editor->isUniverseChanged())
+		if (m_editor->isWorldChanged())
 		{
 			m_confirm_new = true;
 		}
 		else
 		{
-			m_editor->newUniverse();
-			initDefaultUniverse();
+			m_editor->newWorld();
+			initDefaultWorld();
 		}
 	}
 
@@ -1223,21 +1223,21 @@ struct StudioAppImpl final : StudioApp
 		if (selected.empty()) return;
 
 		Array<DVec3> new_positions(m_allocator);
-		Universe* universe = m_editor->getUniverse();
+		World* world = m_editor->getWorld();
 
 		for (EntityRef entity : selected) {
-			const DVec3 origin = universe->getPosition(entity);
-			auto hit = getRenderInterface()->castRay(*universe, origin, Vec3(0, -1, 0), entity);
+			const DVec3 origin = world->getPosition(entity);
+			auto hit = getRenderInterface()->castRay(*world, origin, Vec3(0, -1, 0), entity);
 			if (hit.is_hit) {
 				new_positions.push(origin + Vec3(0, -hit.t, 0));
 			}
 			else {
-				hit = getRenderInterface()->castRay(*universe, origin, Vec3(0, 1, 0), entity);
+				hit = getRenderInterface()->castRay(*world, origin, Vec3(0, 1, 0), entity);
 				if (hit.is_hit) {
 					new_positions.push(origin + Vec3(0, hit.t, 0));
 				}
 				else {
-					new_positions.push(universe->getPosition(entity));
+					new_positions.push(world->getPosition(entity));
 				}
 			}
 		}
@@ -1402,7 +1402,7 @@ struct StudioAppImpl final : StudioApp
 		menuItem("savePrefab", selected_entities.size() == 1);
 		menuItem("makeParent", selected_entities.size() == 2);
 		bool can_unparent =
-			selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
+			selected_entities.size() == 1 && m_editor->getWorld()->getParent(selected_entities[0]).isValid();
 		menuItem("unparent", can_unparent);
 		ImGui::EndMenu();
 	}
@@ -1449,23 +1449,23 @@ struct StudioAppImpl final : StudioApp
 	{
 		if (!ImGui::BeginMenu("File")) return;
 
-		menuItem("newUniverse", true);
+		menuItem("newWorld", true);
 		if (ImGui::BeginMenu(NO_ICON "Open"))
 		{
 			ImGuiEx::filter("Filter", m_open_filter, sizeof(m_open_filter), 150);
 
-			for (auto& univ : m_universes)
+			for (auto& univ : m_worlds)
 			{
 				if ((m_open_filter[0] == '\0' || stristr(univ.data, m_open_filter)) && ImGui::MenuItem(univ.data))
 				{
-					if (m_editor->isUniverseChanged())
+					if (m_editor->isWorldChanged())
 					{
-						copyString(m_universe_to_load, univ.data);
+						copyString(m_world_to_load, univ.data);
 						m_confirm_load = true;
 					}
 					else
 					{
-						m_editor->loadUniverse(univ.data);
+						m_editor->loadWorld(univ.data);
 						setTitle(univ.data);
 					}
 				}
@@ -1536,8 +1536,8 @@ struct StudioAppImpl final : StudioApp
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
-				m_editor->newUniverse();
-				initDefaultUniverse();
+				m_editor->newWorld();
+				initDefaultWorld();
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
@@ -1555,8 +1555,8 @@ struct StudioAppImpl final : StudioApp
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
-				m_editor->loadUniverse(m_universe_to_load);
-				setTitle(m_universe_to_load);
+				m_editor->loadWorld(m_world_to_load);
+				setTitle(m_world_to_load);
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
@@ -1613,10 +1613,10 @@ struct StudioAppImpl final : StudioApp
 	void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
 		if (!e.isValid()) return;
 		
-		e = m_editor->getUniverse()->getParent(*e);
+		e = m_editor->getWorld()->getParent(*e);
 		while (e.isValid()) {
 			chain.push(*e);
-			e = m_editor->getUniverse()->getParent(*e);
+			e = m_editor->getWorld()->getParent(*e);
 		}
 		for (i32 i = 0; i < chain.size() / 2; ++i) {
 			swap(chain[i], chain[chain.size() - 1 - i]); 
@@ -1625,10 +1625,10 @@ struct StudioAppImpl final : StudioApp
 
 	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain)
 	{
-		Universe* universe = m_editor->getUniverse();
+		World* world = m_editor->getWorld();
 		bool is_selected = selected_entities.indexOf(entity) >= 0;
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
-		bool has_child = universe->getFirstChild(entity).isValid();
+		bool has_child = world->getFirstChild(entity).isValid();
 		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
 		if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
 		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
@@ -1669,7 +1669,7 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::IsItemVisible()) {
 				ImGui::SetCursorPos(cp);
 				char buffer[1024];
-				getEntityListDisplayName(*this, *universe, Span(buffer), entity);
+				getEntityListDisplayName(*this, *world, Span(buffer), entity);
 				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
 			}
 			else {
@@ -1697,7 +1697,7 @@ struct StudioAppImpl final : StudioApp
 
 				if (ImGui::MenuItem("Select all children")) {
 					Array<EntityRef> tmp(m_allocator);
-					for (EntityRef e : universe->childrenOf(entity)) {
+					for (EntityRef e : world->childrenOf(entity)) {
 						tmp.push(e);
 					}
 					m_editor->selectEntities(tmp, false);
@@ -1734,7 +1734,7 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::BeginDragDropSource())
 			{
 				char buffer[1024];
-				getEntityListDisplayName(*this, *universe, Span(buffer), entity);
+				getEntityListDisplayName(*this, *world, Span(buffer), entity);
 				ImGui::Text("%s", buffer);
 				
 				const Array<EntityRef>& selected = m_editor->getSelectedEntities();
@@ -1755,7 +1755,7 @@ struct StudioAppImpl final : StudioApp
 
 		if (node_open)
 		{
-			for (EntityRef e : universe->childrenOf(entity))
+			for (EntityRef e : world->childrenOf(entity))
 			{
 				showHierarchy(e, selected_entities, selection_chain);
 			}
@@ -1763,7 +1763,7 @@ struct StudioAppImpl final : StudioApp
 				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
 				if (m_renaming_entity.isValid()) {
 					m_set_rename_focus = true;
-					const char* name = m_editor->getUniverse()->getEntityName(selected_entities[0]);
+					const char* name = m_editor->getWorld()->getEntityName(selected_entities[0]);
 					copyString(m_rename_buf, name);
 				}
 			}
@@ -1864,7 +1864,7 @@ struct StudioAppImpl final : StudioApp
 
 		EntityPtr child_e = folder.first_entity;
 		while (child_e.isValid()) {
-			if (!m_editor->getUniverse()->getParent((EntityRef)child_e).isValid()) {
+			if (!m_editor->getWorld()->getParent((EntityRef)child_e).isValid()) {
 				showHierarchy((EntityRef)child_e, m_editor->getSelectedEntities(), selection_chain);
 			}
 			child_e = folders.getNextEntity((EntityRef)child_e);
@@ -1882,7 +1882,7 @@ struct StudioAppImpl final : StudioApp
 		if (!m_is_entity_list_open) return;
 		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
 		{
-			Universe* universe = m_editor->getUniverse();
+			World* world = m_editor->getWorld();
 			ImGuiEx::filter("Filter", filter, sizeof(filter));
 			
 			if (ImGui::BeginChild("entities")) {
@@ -1897,9 +1897,9 @@ struct StudioAppImpl final : StudioApp
 					}
 					folderUI(folders.getRoot(), folders, 0, selection_chain);
 				} else {
-					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e)) {
+					for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
 						char buffer[1024];
-						getEntityListDisplayName(*this, *universe, Span(buffer), e);
+						getEntityListDisplayName(*this, *world, Span(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
@@ -2186,11 +2186,11 @@ struct StudioAppImpl final : StudioApp
 
 	void addActions()
 	{
-		addAction<&StudioAppImpl::newUniverse>(ICON_FA_PLUS "New", "New universe", "newUniverse", ICON_FA_PLUS);
+		addAction<&StudioAppImpl::newWorld>(ICON_FA_PLUS "New", "New world", "newWorld", ICON_FA_PLUS);
 		addAction<&StudioAppImpl::save>(
-			ICON_FA_SAVE "Save", "Save universe", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL);
+			ICON_FA_SAVE "Save", "Save world", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::saveAs>(
-			NO_ICON "Save As", "Save universe as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
+			NO_ICON "Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::exit>(
 			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::redo>(
@@ -2375,8 +2375,8 @@ struct StudioAppImpl final : StudioApp
 		blob.reserve(16 * 1024);
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 
-		Universe* universe = m_editor->getUniverse();
-		auto& scenes = universe->getScenes();
+		World* world = m_editor->getWorld();
+		auto& scenes = world->getScenes();
 		for (i32 i = 0, c = scenes.size(); i < c; ++i) {
 			UniquePtr<IScene>& scene = scenes[i];
 			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
@@ -2398,8 +2398,8 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		InputMemoryStream input_blob(blob);
-		m_watched_plugin.plugin->createScenes(*universe);
-		for (const UniquePtr<IScene>& scene : universe->getScenes()) {
+		m_watched_plugin.plugin->createScenes(*world);
+		for (const UniquePtr<IScene>& scene : world->getScenes()) {
 			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
 			scene->afterReload(input_blob);
 		}
@@ -2428,7 +2428,7 @@ struct StudioAppImpl final : StudioApp
 
 	}
 
-	void loadUniverseFromCommandLine()
+	void loadWorldFromCommandLine()
 	{
 		char cmd_line[2048];
 		char path[LUMIX_MAX_PATH];
@@ -2441,7 +2441,7 @@ struct StudioAppImpl final : StudioApp
 			if (!parser.next()) break;
 
 			parser.getCurrent(path, lengthOf(path));
-			m_editor->loadUniverse(path);
+			m_editor->loadWorld(path);
 			setTitle(path);
 			m_is_welcome_screen_open = false;
 			break;
@@ -2788,7 +2788,7 @@ struct StudioAppImpl final : StudioApp
 				ComponentType cmp_type = reflection::getComponentType(parameter_name);
 				editor.addComponent(Span(&e, 1), cmp_type);
 
-				IScene* scene = editor.getUniverse()->getScene(cmp_type);
+				IScene* scene = editor.getWorld()->getScene(cmp_type);
 				if (scene)
 				{
 					ComponentUID cmp(e, cmp_type, scene);
@@ -2847,10 +2847,10 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void saveUniverseAs(const char* basename, bool save_path) { m_editor->saveUniverse(basename, save_path); }
+	void saveWorldAs(const char* basename, bool save_path) { m_editor->saveWorld(basename, save_path); }
 
 
-	void saveUniverse() { save(); }
+	void saveWorld() { save(); }
 
 
 	void createLua()
@@ -2871,9 +2871,9 @@ struct StudioAppImpl final : StudioApp
 		REGISTER_FUNCTION(createEntity);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(destroyEntity);
-		REGISTER_FUNCTION(newUniverse);
-		REGISTER_FUNCTION(saveUniverse);
-		REGISTER_FUNCTION(saveUniverseAs);
+		REGISTER_FUNCTION(newWorld);
+		REGISTER_FUNCTION(saveWorld);
+		REGISTER_FUNCTION(saveWorldAs);
 		REGISTER_FUNCTION(exitWithCode);
 		REGISTER_FUNCTION(exitGameMode);
 
@@ -3053,15 +3053,15 @@ struct StudioAppImpl final : StudioApp
 				m_settings.setValue(Settings::LOCAL, "export_pack", m_export.pack);
 			}
 			ImGuiEx::Label("Mode");
-			if (ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded universe\0")) {
+			if (ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0")) {
 				m_settings.setValue(Settings::LOCAL, "export_pack", (i32)m_export.mode);
 			}
 
-			ImGuiEx::Label("Startup universe");
-			if (m_universes.size() > 0 && m_export.startup_universe[0] == '\0') m_export.startup_universe = m_universes[0].data;
-			if (ImGui::BeginCombo("##startunv", m_export.startup_universe)) {
-				for (const auto& unv : m_universes) {
-					if (ImGui::Selectable(unv)) m_export.startup_universe = unv.data;
+			ImGuiEx::Label("Startup world");
+			if (m_worlds.size() > 0 && m_export.startup_world[0] == '\0') m_export.startup_world = m_worlds[0].data;
+			if (ImGui::BeginCombo("##startunv", m_export.startup_world)) {
+				for (const auto& unv : m_worlds) {
+					if (ImGui::Selectable(unv)) m_export.startup_world = unv.data;
 				}
 				ImGui::EndCombo();
 			}
@@ -3078,7 +3078,7 @@ struct StudioAppImpl final : StudioApp
 		FileSystem& fs = m_engine->getFileSystem(); 
 		{
 			OutputMemoryStream prj_blob(m_allocator);
-			m_engine->serializeProject(prj_blob, m_export.startup_universe);
+			m_engine->serializeProject(prj_blob, m_export.startup_world);
 
 			StaticString<LUMIX_MAX_PATH> project_path(fs.getBasePath(), "lumix.prj");
 			if (!fs.saveContentSync(Path(project_path), prj_blob)) {
@@ -3092,7 +3092,7 @@ struct StudioAppImpl final : StudioApp
 
 		switch (m_export.mode) {
 			case ExportConfig::Mode::ALL_FILES: scanCompiled(infos); break;
-			case ExportConfig::Mode::CURRENT_UNIVERSE: exportDataScanResources(infos); break;
+			case ExportConfig::Mode::CURRENT_WORLD: exportDataScanResources(infos); break;
 		}
 
 		if (m_export.pack) {
@@ -3188,9 +3188,9 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void scanUniverses() override
+	void scanWorlds() override
 	{
-		m_universes.clear();
+		m_worlds.clear();
 		auto* iter = m_engine->getFileSystem().createFileIterator("universes");
 		os::FileInfo info;
 		while (os::getNextFile(iter, &info))
@@ -3202,7 +3202,7 @@ struct StudioAppImpl final : StudioApp
 
 			char basename[LUMIX_MAX_PATH];
 			copyString(Span(basename), Path::getBasename(info.filename));
-			m_universes.emplace(basename);
+			m_worlds.emplace(basename);
 		}
 		os::destroyFileIterator(iter);
 	}
@@ -3293,7 +3293,7 @@ struct StudioAppImpl final : StudioApp
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 
-	Array<StaticString<LUMIX_MAX_PATH>> m_universes;
+	Array<StaticString<LUMIX_MAX_PATH>> m_worlds;
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, StaticString<5>> m_component_icons;
@@ -3308,7 +3308,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_load;
 	bool m_confirm_new;
 	
-	char m_universe_to_load[LUMIX_MAX_PATH];
+	char m_world_to_load[LUMIX_MAX_PATH];
 	
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
@@ -3334,13 +3334,13 @@ struct StudioAppImpl final : StudioApp
 	struct ExportConfig {
 		enum class Mode : i32 {
 			ALL_FILES,
-			CURRENT_UNIVERSE
+			CURRENT_WORLD
 		};
 
 		Mode mode = Mode::ALL_FILES;
 
 		bool pack = false;
-		StaticString<96> startup_universe;
+		StaticString<96> startup_world;
 		StaticString<LUMIX_MAX_PATH> dest_dir;
 	};
 
@@ -3357,7 +3357,7 @@ struct StudioAppImpl final : StudioApp
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
 	EntityFolders::FolderID m_renaming_folder = EntityFolders::INVALID_FOLDER;
 	bool m_set_rename_focus = false;
-	char m_rename_buf[Universe::ENTITY_NAME_MAX_LENGTH];
+	char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
 	bool m_is_f2_pressed = false;
 	
 	ImFont* m_font;

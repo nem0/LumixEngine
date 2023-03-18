@@ -41,7 +41,7 @@ struct NavmeshBuildJob {
 
 struct NavigationScene : IScene
 {
-	static UniquePtr<NavigationScene> create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
+	static UniquePtr<NavigationScene> create(Engine& engine, IPlugin& system, World& world, IAllocator& allocator);
 	static void reflect();
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;

@@ -21,7 +21,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
@@ -43,7 +43,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("m
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 
-struct UniverseViewImpl final : UniverseView {
+struct WorldViewImpl final : WorldView {
 	enum class MouseMode
 	{
 		NONE,
@@ -61,7 +61,7 @@ struct UniverseViewImpl final : UniverseView {
 		VERTEX
 	};
 
-	UniverseViewImpl(SceneView& view) 
+	WorldViewImpl(SceneView& view) 
 		: m_scene_view(view)
 		, m_app(view.m_app)
 		, m_editor(view.m_editor) 
@@ -69,8 +69,8 @@ struct UniverseViewImpl final : UniverseView {
 		, m_draw_cmds(view.m_app.getAllocator())
 		, m_draw_vertices(view.m_app.getAllocator())
 	{
-		m_editor.universeCreated().bind<&UniverseViewImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed().bind<&UniverseViewImpl::onUniverseDestroyed>(this);
+		m_editor.worldCreated().bind<&WorldViewImpl::onWorldCreated>(this);
+		m_editor.worldDestroyed().bind<&WorldViewImpl::onWorldDestroyed>(this);
 		m_viewport.is_ortho = false;
 		m_viewport.pos = DVec3(0);
 		m_viewport.rot.set(0, 0, 0, 1);
@@ -84,14 +84,14 @@ struct UniverseViewImpl final : UniverseView {
 		Path font_path("editor/fonts/notosans-regular.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
-		onUniverseCreated();
+		onWorldCreated();
 	}
 
-	~UniverseViewImpl() {
+	~WorldViewImpl() {
 		m_font_res->decRefCount();
-		m_editor.universeCreated().unbind<&UniverseViewImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed().unbind<&UniverseViewImpl::onUniverseDestroyed>(this);
-		onUniverseDestroyed();
+		m_editor.worldCreated().unbind<&WorldViewImpl::onWorldCreated>(this);
+		m_editor.worldDestroyed().unbind<&WorldViewImpl::onWorldDestroyed>(this);
+		onWorldDestroyed();
 	}
 	
 	WorldEditor& getEditor() override { return m_editor; }
@@ -102,12 +102,12 @@ struct UniverseViewImpl final : UniverseView {
 		addLine(*this, pos - Vec3(0, 0, size), pos + Vec3(0, 0, size), color);
 	}
 
-	void onUniverseCreated(){
-		m_scene = (RenderScene*)m_editor.getUniverse()->getScene("renderer");
+	void onWorldCreated(){
+		m_scene = (RenderScene*)m_editor.getWorld()->getScene("renderer");
 		m_icons = EditorIcons::create(m_editor, *m_scene);
 	}
 
-	void onUniverseDestroyed(){
+	void onWorldDestroyed(){
 		m_icons.reset();
 	}
 
@@ -191,7 +191,7 @@ struct UniverseViewImpl final : UniverseView {
 				{
 					DVec3 snap_pos = origin + dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-					const Quat rot = m_editor.getUniverse()->getRotation(selected_entities[0]);
+					const Quat rot = m_editor.getWorld()->getRotation(selected_entities[0]);
 					const Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
 					const Vec3 offset = rot.rotate(gizmo_cfg.getOffset());
 					m_editor.snapEntities(snap_pos - offset, gizmo_cfg.isTranslateMode());
@@ -245,7 +245,7 @@ struct UniverseViewImpl final : UniverseView {
 
 		const DVec3 snap_pos = getClosestVertex(hit);
 
-		const Transform tr = m_editor.getUniverse()->getTransform(selected_entities[0]);
+		const Transform tr = m_editor.getWorld()->getTransform(selected_entities[0]);
 		m_app.getGizmoConfig().setOffset(tr.rot.conjugated() * Vec3(snap_pos - tr.pos));
 	}
 
@@ -254,10 +254,10 @@ struct UniverseViewImpl final : UniverseView {
 		ASSERT(hit.entity.isValid());
 		const EntityRef entity = (EntityRef)hit.entity;
 		const DVec3& wpos = hit.origin + hit.t * hit.dir;
-		Universe& universe = m_scene->getUniverse();
-		const Transform tr = universe.getTransform(entity);
+		World& world = m_scene->getWorld();
+		const Transform tr = world.getTransform(entity);
 		const Vec3 lpos = tr.rot.conjugated() * Vec3(wpos - tr.pos);
-		if (!universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
+		if (!world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
 
 		Model* model = m_scene->getModelInstanceModel(entity);
 
@@ -394,14 +394,14 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void lookAtSelected() override {
-		const Universe* universe = m_editor.getUniverse();
+		const World* world = m_editor.getWorld();
 		if (m_editor.getSelectedEntities().empty()) return;
 
 		m_go_to_parameters.m_is_active = true;
 		m_go_to_parameters.m_t = 0;
 		m_go_to_parameters.m_from = m_viewport.pos;
 		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
-		m_go_to_parameters.m_to = universe->getPosition(m_editor.getSelectedEntities()[0]) + dir * 10;
+		m_go_to_parameters.m_to = world->getPosition(m_editor.getSelectedEntities()[0]) + dir * 10;
 		const double len = length(m_go_to_parameters.m_to - m_go_to_parameters.m_from);
 		m_go_to_parameters.m_speed = maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
 		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
@@ -415,8 +415,8 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
 		if (!selected_entities.empty()) {
-			auto* universe = m_editor.getUniverse();
-			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
+			auto* world = m_editor.getWorld();
+			m_go_to_parameters.m_to = world->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
 		}
 		m_go_to_parameters.m_speed = 2.0f;
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
@@ -430,8 +430,8 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
 		if (!selected_entities.empty()) {
-			auto* universe = m_editor.getUniverse();
-			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
+			auto* world = m_editor.getWorld();
+			m_go_to_parameters.m_to = world->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
 		}
 		m_go_to_parameters.m_speed = 2.0f;
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
@@ -446,8 +446,8 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
 		if (!selected_entities.empty()) {
-			auto* universe = m_editor.getUniverse();
-			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
+			auto* world = m_editor.getWorld();
+			m_go_to_parameters.m_to = world->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
 		}
 		m_go_to_parameters.m_speed = 2.0f;
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
@@ -466,7 +466,7 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void rotateCamera(float yaw, float pitch) {
-		const Universe* universe = m_editor.getUniverse();
+		const World* world = m_editor.getWorld();
 		DVec3 pos = m_viewport.pos;
 		Quat rot = m_viewport.rot;
 
@@ -479,7 +479,7 @@ struct UniverseViewImpl final : UniverseView {
 
 		if (m_scene_view.m_orbit_action.isActive() && !m_editor.getSelectedEntities().empty()) {
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			const Transform tr = universe->getTransform(m_editor.getSelectedEntities()[0]);
+			const Transform tr = world->getTransform(m_editor.getSelectedEntities()[0]);
 			Vec3 offset = m_app.getGizmoConfig().offset;
 			const DVec3 orbit_point = tr.pos + tr.rot.rotate(offset);
 			const float dist = float(length(orbit_point - pos));
@@ -642,7 +642,7 @@ SceneView::SceneView(StudioApp& app)
 }
 
 void SceneView::init() {
-	m_view = LUMIX_NEW(m_editor.getAllocator(), UniverseViewImpl)(*this);
+	m_view = LUMIX_NEW(m_editor.getAllocator(), WorldViewImpl)(*this);
 	m_editor.setView(m_view);
 
 	Engine& engine = m_app.getEngine();
@@ -684,7 +684,7 @@ void SceneView::manipulate() {
 	Gizmo::Config& cfg = m_app.getGizmoConfig();
 	cfg.enableStep(is_snap);
 		
-	Transform tr = m_editor.getUniverse()->getTransform((*selected)[0]);
+	Transform tr = m_editor.getWorld()->getTransform((*selected)[0]);
 	tr.pos += tr.rot.rotate(cfg.getOffset());
 	const Transform old_pivot_tr = tr;
 			
@@ -704,14 +704,14 @@ void SceneView::manipulate() {
 
 	const Transform new_pivot_tr = tr;
 	tr.pos -= tr.rot.rotate(cfg.getOffset());
-	Universe& universe = *m_editor.getUniverse();
+	World& world = *m_editor.getWorld();
 	switch (cfg.mode) {
 		case Gizmo::Config::TRANSLATE: {
 			const DVec3 diff = new_pivot_tr.pos - old_pivot_tr.pos;
 			Array<DVec3> positions(m_app.getAllocator());
 			positions.resize(selected->size());
 			for (u32 i = 0, c = selected->size(); i < c; ++i) {
-				positions[i] = universe.getPosition((*selected)[i]) + diff;
+				positions[i] = world.getPosition((*selected)[i]) + diff;
 			}
 			m_editor.setEntitiesPositions(selected->begin(), positions.begin(), positions.size());
 			break;
@@ -722,7 +722,7 @@ void SceneView::manipulate() {
 			rots.resize(selected->size());
 			poss.resize(selected->size());
 			for (u32 i = 0, c = selected->size(); i < c; ++i) {
-				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * universe.getTransform((*selected)[i]);
+				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * world.getTransform((*selected)[i]);
 				poss[i] = t.pos;
 				rots[i] = normalize(t.rot);
 			}
@@ -734,7 +734,7 @@ void SceneView::manipulate() {
 			Array<Vec3> scales(m_app.getAllocator());
 			scales.resize(selected->size());
 			for (u32 i = 0, c = selected->size(); i < c; ++i) {
-				scales[i] = universe.getScale((*selected)[i]) * diff;
+				scales[i] = world.getScale((*selected)[i]) * diff;
 			}
 			m_editor.setEntitiesScales(selected->begin(), scales.begin(), scales.size());
 			break;
@@ -746,7 +746,7 @@ void SceneView::manipulate() {
 void SceneView::update(float time_delta)
 {
 	PROFILE_FUNCTION();
-	m_pipeline->setUniverse(m_editor.getUniverse());
+	m_pipeline->setWorld(m_editor.getWorld());
 	m_view->update(time_delta);
 	if (m_is_measure_active) {
 		m_view->addCross(m_measure_from, 0.3f, Color::BLUE);
@@ -825,13 +825,13 @@ void SceneView::renderSelection()
 	
 	renderer.pushJob("selection", [&renderer, this, &engine, &entities](DrawStream& stream) {
 		RenderScene* scene = m_pipeline->getScene();
-		const Universe& universe = scene->getUniverse();
+		const World& world = scene->getWorld();
 		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
 		const u32 depth_define = 1 << renderer.getShaderDefineIdx("DEPTH");
 		const DVec3 view_pos = m_view->getViewport().pos;
 		Array<DualQuat> dq_pose(engine.getAllocator());
 		for (EntityRef e : entities) {
-			if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+			if (!scene->getWorld().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 
 			const Model* model = scene->getModelInstanceModel(e);
 			if (!model || !model->isReady()) continue;
@@ -842,7 +842,7 @@ void SceneView::renderSelection()
 					
 				Material* material = mesh.material;
 				u32 define_mask = material->getDefineMask() | depth_define;
-				const Matrix mtx = universe.getRelativeMatrix(e, view_pos);
+				const Matrix mtx = world.getRelativeMatrix(e, view_pos);
 				dq_pose.clear();
 				if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
 					define_mask |= skinned_define;
@@ -919,15 +919,15 @@ void SceneView::renderGizmos()
 	
 		u32 offset = 0;
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-		for (const UniverseViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
+		for (const WorldViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
 			const gpu::ProgramHandle program = cmd.lines ? lines_program : triangles_program;
 			stream.useProgram(program);
 			stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-			stream.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
+			stream.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(WorldView::Vertex));
 			stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			stream.drawArrays(0, cmd.vertex_count);
 
-			offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
+			offset += cmd.vertex_count * sizeof(WorldView::Vertex);
 		}
 
 		m_view->m_draw_cmds.clear();
@@ -1351,7 +1351,7 @@ void SceneView::searchUI() {
 void SceneView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
-	m_pipeline->setUniverse(m_editor.getUniverse());
+	m_pipeline->setWorld(m_editor.getWorld());
 
 	bool is_open = false;
 	ImVec2 view_pos;

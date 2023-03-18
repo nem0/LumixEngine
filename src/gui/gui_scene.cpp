@@ -9,7 +9,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "gui_scene.h"
 #include "gui_system.h"
 #include "renderer/draw2d.h"
@@ -160,9 +160,9 @@ struct GUISceneImpl final : GUIScene
 		CANVAS_3D,
 		LATEST
 	};
-	GUISceneImpl(GUISystem& system, Universe& context, IAllocator& allocator)
+	GUISceneImpl(GUISystem& system, World& context, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe(context)
+		, m_world(context)
 		, m_system(system)
 		, m_rects(allocator)
 		, m_buttons(allocator)
@@ -307,7 +307,7 @@ struct GUISceneImpl final : GUIScene
 			}
 		}
 
-		for (EntityRef child : m_universe.childrenOf(rect.entity)) {
+		for (EntityRef child : m_world.childrenOf(rect.entity)) {
 			auto iter = m_rects.find(child);
 			if (iter.isValid()) {
 				renderRect(*iter.value(), draw, { l, t, r - l, b - t }, is_main);
@@ -321,7 +321,7 @@ struct GUISceneImpl final : GUIScene
 	void draw3D(GUICanvas& canvas, Pipeline& pipeline) {
 		m_draw_2d.clear({2, 2});
 
-		for (EntityRef child : m_universe.childrenOf(canvas.entity)) {
+		for (EntityRef child : m_world.childrenOf(canvas.entity)) {
 			auto iter = m_rects.find(child);
 			if (iter.isValid()) {
 				renderRect(*iter.value(), m_draw_2d, { 0, 0, canvas.virtual_size.x, canvas.virtual_size.y }, false);
@@ -461,7 +461,7 @@ struct GUISceneImpl final : GUIScene
 
 		bool intersect = pos.x >= r.x && pos.y >= r.y && pos.x <= r.x + r.w && pos.y <= r.y + r.h;
 
-		for (EntityRef child : m_universe.childrenOf(rect.entity))
+		for (EntityRef child : m_world.childrenOf(rect.entity))
 		{
 			auto iter = m_rects.find(child);
 			if (!iter.isValid()) continue;
@@ -518,7 +518,7 @@ struct GUISceneImpl final : GUIScene
 		auto iter = m_rects.find((EntityRef)entity);
 		if (!iter.isValid()) return { 0, 0, canvas_size.x, canvas_size.y };
 
-		EntityPtr parent = m_universe.getParent((EntityRef)entity);
+		EntityPtr parent = m_world.getParent((EntityRef)entity);
 		Rect parent_rect = getRectEx(parent, canvas_size);
 		GUIRect* gui = m_rects[(EntityRef)entity];
 		float l = parent_rect.x + parent_rect.w * gui->left.relative + gui->left.points;
@@ -677,7 +677,7 @@ struct GUISceneImpl final : GUIScene
 			is  ? hover(rect) : hoverOut(rect);
 		}
 
-		for (EntityRef e : m_universe.childrenOf(rect.entity)) {
+		for (EntityRef e : m_world.childrenOf(rect.entity)) {
 			auto iter = m_rects.find(e);
 			if (!iter.isValid()) continue;
 			handleMouseAxisEvent(r, *iter.value(), mouse_pos, prev_mouse_pos);
@@ -747,7 +747,7 @@ struct GUISceneImpl final : GUIScene
 			}
 		}
 
-		for (EntityRef e : m_universe.childrenOf(rect.entity)) {
+		for (EntityRef e : m_world.childrenOf(rect.entity)) {
 			auto iter = m_rects.find((EntityRef)e);
 			if (!iter.isValid()) continue;
 			handled = handleMouseButtonEvent(r, *iter.value(), event) || handled;
@@ -921,7 +921,7 @@ struct GUISceneImpl final : GUIScene
 		rect->entity = entity;
 		rect->flags.set(GUIRect::IS_VALID);
 		rect->flags.set(GUIRect::IS_ENABLED);
-		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_RECT_TYPE, this);
 	}
 
 
@@ -936,7 +936,7 @@ struct GUISceneImpl final : GUIScene
 		GUIRect& rect = *iter.value();
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 
-		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_TEXT_TYPE, this);
 	}
 
 
@@ -949,7 +949,7 @@ struct GUISceneImpl final : GUIScene
 			iter = m_rects.find(entity);
 		}
 		iter.value()->render_target = &EMPTY_RENDER_TARGET;
-		m_universe.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
 	}
 
 
@@ -966,7 +966,7 @@ struct GUISceneImpl final : GUIScene
 		if (image) {
 			button.hovered_color = image->color;
 		}
-		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
 	}
 	
 
@@ -974,7 +974,7 @@ struct GUISceneImpl final : GUIScene
 	{
 		GUICanvas& canvas = m_canvas.insert(entity);
 		canvas.entity = entity;
-		m_universe.onComponentCreated(entity, GUI_CANVAS_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_CANVAS_TYPE, this);
 	}
 
 	void createInputField(EntityRef entity)
@@ -988,7 +988,7 @@ struct GUISceneImpl final : GUIScene
 		GUIRect& rect = *iter.value();
 		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
 
-		m_universe.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
 	}
 
 
@@ -1004,7 +1004,7 @@ struct GUISceneImpl final : GUIScene
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		rect.image->flags.set(GUIImage::IS_ENABLED);
 
-		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
+		m_world.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
 
 
@@ -1017,26 +1017,26 @@ struct GUISceneImpl final : GUIScene
 			LUMIX_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
 		}
-		m_universe.onComponentDestroyed(entity, GUI_RECT_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_RECT_TYPE, this);
 	}
 
 
 	void destroyButton(EntityRef entity)
 	{
 		m_buttons.erase(entity);
-		m_universe.onComponentDestroyed(entity, GUI_BUTTON_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_BUTTON_TYPE, this);
 	}
 
 	void destroyCanvas(EntityRef entity) {
 		m_canvas.erase(entity);
-		m_universe.onComponentDestroyed(entity, GUI_CANVAS_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_CANVAS_TYPE, this);
 	}
 
 	void destroyRenderTarget(EntityRef entity)
 	{
 		GUIRect* rect = m_rects[entity];
 		rect->render_target = nullptr;
-		m_universe.onComponentDestroyed(entity, GUI_RENDER_TARGET_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_RENDER_TARGET_TYPE, this);
 		checkGarbage(*rect);
 	}
 
@@ -1046,7 +1046,7 @@ struct GUISceneImpl final : GUIScene
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->input_field);
 		rect->input_field = nullptr;
-		m_universe.onComponentDestroyed(entity, GUI_INPUT_FIELD_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_INPUT_FIELD_TYPE, this);
 		checkGarbage(*rect);
 	}
 
@@ -1069,7 +1069,7 @@ struct GUISceneImpl final : GUIScene
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
-		m_universe.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this);
 		checkGarbage(*rect);
 	}
 
@@ -1079,7 +1079,7 @@ struct GUISceneImpl final : GUIScene
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
-		m_universe.onComponentDestroyed(entity, GUI_TEXT_TYPE, this);
+		m_world.onComponentDestroyed(entity, GUI_TEXT_TYPE, this);
 		checkGarbage(*rect);
 	}
 
@@ -1164,7 +1164,7 @@ struct GUISceneImpl final : GUIScene
 			serializer.read(rect->bottom);
 			serializer.read(rect->left);
 			if (rect->flags.isSet(GUIRect::IS_VALID)) {
-				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
+				m_world.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
 
 			bool has_image = serializer.read<bool>();
@@ -1183,14 +1183,14 @@ struct GUISceneImpl final : GUIScene
 				}
 				serializer.read(rect->image->color);
 				serializer.read(rect->image->flags);
-				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
+				m_world.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
 
 			}
 			bool has_input_field = serializer.read<bool>();
 			if (has_input_field)
 			{
 				rect->input_field = LUMIX_NEW(m_allocator, GUIInputField);
-				m_universe.onComponentCreated(rect->entity, GUI_INPUT_FIELD_TYPE, this);
+				m_world.onComponentCreated(rect->entity, GUI_INPUT_FIELD_TYPE, this);
 			}
 			bool has_text = serializer.read<bool>();
 			if (has_text)
@@ -1207,7 +1207,7 @@ struct GUISceneImpl final : GUIScene
 				serializer.read(text.text);
 				FontResource* res = tmp[0] == 0 ? nullptr : m_font_manager->getOwner().load<FontResource>(Path(tmp));
 				text.setFontResource(res);
-				m_universe.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this);
+				m_world.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this);
 			}
 		}
 		
@@ -1219,7 +1219,7 @@ struct GUISceneImpl final : GUIScene
 			GUIButton& button = m_buttons.insert(e);
 			serializer.read(button.hovered_color);
 			serializer.read(button.hovered_cursor);
-			m_universe.onComponentCreated(e, GUI_BUTTON_TYPE, this);
+			m_world.onComponentCreated(e, GUI_BUTTON_TYPE, this);
 		}
 		
 		count = serializer.read<u32>();
@@ -1235,7 +1235,7 @@ struct GUISceneImpl final : GUIScene
 			canvas.entity = entity_map.get(canvas.entity);
 			m_canvas.insert(canvas.entity, canvas);
 			
-			m_universe.onComponentCreated(canvas.entity, GUI_CANVAS_TYPE, this);
+			m_world.onComponentCreated(canvas.entity, GUI_CANVAS_TYPE, this);
 		}
 	}
 	
@@ -1252,11 +1252,11 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef, float, float)>& rectMouseDown() override { return m_rect_mouse_down; }
 	DelegateList<void(bool, int, int)>& mousedButtonUnhandled() override { return m_unhandled_mouse_button; }
 
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 	IPlugin& getPlugin() const override { return m_system; }
 
 	IAllocator& m_allocator;
-	Universe& m_universe;
+	World& m_world;
 	GUISystem& m_system;
 	
 	HashMap<EntityRef, GUIRect*> m_rects;
@@ -1281,10 +1281,10 @@ struct GUISceneImpl final : GUIScene
 
 
 UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
-	Universe& universe,
+	World& world,
 	IAllocator& allocator)
 {
-	return UniquePtr<GUISceneImpl>::create(allocator, system, universe, allocator);
+	return UniquePtr<GUISceneImpl>::create(allocator, system, world, allocator);
 }
 
 void GUIScene::reflect() {

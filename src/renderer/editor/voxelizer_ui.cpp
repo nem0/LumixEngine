@@ -5,7 +5,7 @@
 #include "engine/engine.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/model.h"
 #include <imgui/imgui.h>
 
@@ -133,15 +133,15 @@ void VoxelizerUI::open(const char* path) {
 void VoxelizerUI::draw() {
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();
-	UniverseView& view = editor.getView();
+	WorldView& view = editor.getView();
 	const Array<EntityRef>& selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 	if (m_debug_triangles.empty()) return;
 
-	const DVec3 p = editor.getUniverse()->getPosition(selected[0]) - Vec3(0.5f * m_scene.m_voxel_size);
+	const DVec3 p = editor.getWorld()->getPosition(selected[0]) - Vec3(0.5f * m_scene.m_voxel_size);
 	const DVec3 cam_pos = view.getViewport().pos;
 
- 	UniverseView::Vertex* vertices = view.render(false, m_debug_triangles.size());
+ 	WorldView::Vertex* vertices = view.render(false, m_debug_triangles.size());
 	for (u32 i = 0, c = m_debug_triangles.size(); i < c; ++i) {
 		vertices[i].pos = Vec3(p - cam_pos) + m_debug_triangles[i].pos;
 		vertices[i].abgr = m_debug_triangles[i].color;

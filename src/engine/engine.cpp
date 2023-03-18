@@ -17,7 +17,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include <lua.hpp>
 
 namespace Lumix
@@ -215,7 +215,7 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
-	bool instantiatePrefab(Universe& universe,
+	bool instantiatePrefab(World& world,
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,
 		const struct Quat& rot,
@@ -224,61 +224,61 @@ public:
 	{
 		ASSERT(prefab.isReady());
 		InputMemoryStream blob(prefab.data);
-		if (!deserialize(universe, blob, entity_map)) {
+		if (!deserialize(world, blob, entity_map)) {
 			logError("Failed to instantiate prefab ", prefab.getPath());
 			return false;
 		}
 
 		ASSERT(!entity_map.m_map.empty());
 		const EntityRef root = (EntityRef)entity_map.m_map[0];
-		ASSERT(!universe.getParent(root).isValid());
-		ASSERT(!universe.getNextSibling(root).isValid());
-		universe.setTransform(root, pos, rot, scale);
+		ASSERT(!world.getParent(root).isValid());
+		ASSERT(!world.getNextSibling(root).isValid());
+		world.setTransform(root, pos, rot, scale);
 		return true;
 	}
 
-	Universe& createUniverse(bool is_main_universe) override
+	World& createWorld(bool is_main_world) override
 	{
-		Universe* universe = LUMIX_NEW(m_allocator, Universe)(*this, m_allocator);
+		World* world = LUMIX_NEW(m_allocator, World)(*this, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins) {
-			plugin->createScenes(*universe);
+			plugin->createScenes(*world);
 		}
 
-		for (UniquePtr<IScene>& scene : universe->getScenes()) {
+		for (UniquePtr<IScene>& scene : world->getScenes()) {
 			scene->init();
 		}
 
-		if (is_main_universe) {
+		if (is_main_world) {
 			lua_State* L = m_state;
 			lua_getglobal(L, "Lumix"); // [ Lumix ]
-			lua_getfield(L, -1, "Universe"); // [ Lumix, Universe ]
-			lua_getfield(L, -1, "new"); // [ Lumix, Universe, new ]
-			lua_insert(L, -2); // [ Lumix, new, Universe ]
-			lua_pushlightuserdata(L, universe); // [ Lumix, new, Universe, c_universe ]
-			lua_call(L, 2, 1); // [ Lumix, universe ]
-			lua_setfield(L, -2, "main_universe");
+			lua_getfield(L, -1, "World"); // [ Lumix, World ]
+			lua_getfield(L, -1, "new"); // [ Lumix, World, new ]
+			lua_insert(L, -2); // [ Lumix, new, World ]
+			lua_pushlightuserdata(L, world); // [ Lumix, new, World, c_world]
+			lua_call(L, 2, 1); // [ Lumix, world ]
+			lua_setfield(L, -2, "main_world");
 			lua_pop(L, 1);
 		}
 
-		return *universe;
+		return *world;
 	}
 
 
-	void destroyUniverse(Universe& universe) override
+	void destroyWorld(World& world) override
 	{
-		Array<UniquePtr<IScene>>& scenes = universe.getScenes();
+		Array<UniquePtr<IScene>>& scenes = world.getScenes();
 		while (!scenes.empty()) {
 			UniquePtr<IScene>& scene = scenes.back();
 			scene->clear();
 			scenes.pop();
 		}
-		LUMIX_DELETE(m_allocator, &universe);
+		LUMIX_DELETE(m_allocator, &world);
 		m_resource_manager.removeUnreferenced();
 	}
 
 
-	void startGame(Universe& context) override
+	void startGame(World& context) override
 	{
 		ASSERT(!m_is_game_running);
 		m_is_game_running = true;
@@ -293,7 +293,7 @@ public:
 	}
 
 
-	void stopGame(Universe& context) override
+	void stopGame(World& context) override
 	{
 		ASSERT(m_is_game_running);
 		m_is_game_running = false;
@@ -343,7 +343,7 @@ public:
 		profiler::pushCounter(counter, m_smooth_time_delta * 1000.f);
 	}
 
-	void update(Universe& context) override
+	void update(World& context) override
 	{
 		PROFILE_FUNCTION();
 		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
@@ -442,14 +442,14 @@ public:
 		ProjectVersion version;
 	};
 
-	DeserializeProjectResult deserializeProject(InputMemoryStream& serializer, Span<char> startup_universe) override {
+	DeserializeProjectResult deserializeProject(InputMemoryStream& serializer, Span<char> startup_world) override {
 		ProjectHeader header;
 		serializer.read(header);
 		if (header.magic != SERIALIZED_PROJECT_MAGIC) return DeserializeProjectResult::CORRUPTED_FILE;
 		if (header.version > ProjectVersion::LAST) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
 		if (header.version <= ProjectVersion::HASH64) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
 		const char* tmp = serializer.readString();
-		copyString(startup_universe, tmp);
+		copyString(startup_world, tmp);
 		i32 count = 0;
 		serializer.read(count);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
@@ -469,12 +469,12 @@ public:
 		return DeserializeProjectResult::SUCCESS;
 	}
 
-	void serializeProject(OutputMemoryStream& serializer, const char* startup_universe) const override {
+	void serializeProject(OutputMemoryStream& serializer, const char* startup_world) const override {
 		ProjectHeader header;
 		header.magic = SERIALIZED_PROJECT_MAGIC;
 		header.version = ProjectVersion::LAST;
 		serializer.write(header);
-		serializer.writeString(startup_universe);
+		serializer.writeString(startup_world);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		serializer.write((i32)plugins.size());
 		for (IPlugin* plugin : plugins) {
@@ -485,7 +485,7 @@ public:
 		}
 	}
 
-	void serialize(Universe& ctx, OutputMemoryStream& serializer) override
+	void serialize(World& ctx, OutputMemoryStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -502,7 +502,7 @@ public:
 	}
 
 
-	bool deserialize(Universe& universe, InputMemoryStream& serializer, EntityMap& entity_map) override
+	bool deserialize(World& world, InputMemoryStream& serializer, EntityMap& entity_map) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
@@ -512,18 +512,18 @@ public:
 			return false;
 		}
 		if (header.version > SerializedEngineVersion::LAST) {
-			logError("Unsupported version of universe");
+			logError("Unsupported version of world");
 			return false;
 		}
 		if (!hasSerializedPlugins(serializer)) return false;
 
-		universe.deserialize(serializer, entity_map, header.version > SerializedEngineVersion::VEC3_SCALE);
+		world.deserialize(serializer, entity_map, header.version > SerializedEngineVersion::VEC3_SCALE);
 		i32 scene_count;
 		serializer.read(scene_count);
 		for (int i = 0; i < scene_count; ++i)
 		{
 			const char* tmp = serializer.readString();
-			IScene* scene = universe.getScene(tmp);
+			IScene* scene = world.getScene(tmp);
 			const i32 version = serializer.read<i32>();
 			scene->deserialize(serializer, entity_map, version);
 		}

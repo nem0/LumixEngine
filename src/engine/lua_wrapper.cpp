@@ -99,7 +99,7 @@ void push(lua_State* L, EntityRef value) {
 	lua_pushinteger(L, value.index);
 }
 
-bool toEntity(lua_State* L, int idx, Universe*& universe, EntityRef& entity) {
+bool toEntity(lua_State* L, int idx, World*& world, EntityRef& entity) {
 	if (!lua_istable(L, idx)) return false;
 	if (getField(L, 1, "_entity") != LUA_TNUMBER) {
 		lua_pop(L, 1);
@@ -108,17 +108,17 @@ bool toEntity(lua_State* L, int idx, Universe*& universe, EntityRef& entity) {
 	entity = EntityRef{toType<i32>(L, -1)};
 	lua_pop(L, 1);
 
-	if (getField(L, 1, "_universe") != LUA_TLIGHTUSERDATA) {
+	if (getField(L, 1, "_world") != LUA_TLIGHTUSERDATA) {
 		lua_pop(L, 1);
 		return false;
 	}
-	universe = toType<Universe*>(L, -1);
+	world = toType<World*>(L, -1);
 	lua_pop(L, 1);
 
 	return true;
 }
 
-void pushEntity(lua_State* L, EntityPtr value, Universe* universe) {
+void pushEntity(lua_State* L, EntityPtr value, World* world) {
 	if (!value.isValid()) {
 		lua_newtable(L); // [env, {}]
 		return;
@@ -130,8 +130,8 @@ void pushEntity(lua_State* L, EntityPtr value, Universe* universe) {
 	lua_getfield(L, -1, "new");						// [Lumix.Entity, Entity.new]
 	lua_pushvalue(L, -2);							// [Lumix.Entity, Entity.new, Lumix.Entity]
 	lua_remove(L, -3);								// [Entity.new, Lumix.Entity]
-	lua_pushlightuserdata(L, universe);				// [Entity.new, Lumix.Entity, universe]
-	lua_pushnumber(L, value.index);					// [Entity.new, Lumix.Entity, universe, entity_index]
+	lua_pushlightuserdata(L, world);				// [Entity.new, Lumix.Entity, world]
+	lua_pushnumber(L, value.index);					// [Entity.new, Lumix.Entity, world, entity_index]
 	const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
 	ASSERT(!error);
 }

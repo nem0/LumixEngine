@@ -5,7 +5,7 @@
 #include "engine/log.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 namespace Lumix
 {

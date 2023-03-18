@@ -15,7 +15,7 @@
 #include "engine/os.h"
 #include "controller_editor.h"
 #include "engine/reflection.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
@@ -342,7 +342,7 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 		if (entities.length() != 1) return;
 
 		const EntityRef entity = entities[0];
-		auto* scene = (AnimationScene*)editor.getUniverse()->getScene(cmp_type);
+		auto* scene = (AnimationScene*)editor.getWorld()->getScene(cmp_type);
 		auto* animation = scene->getAnimableAnimation(entity);
 		if (!animation) return;
 		if (!animation->isReady()) return;
@@ -363,8 +363,8 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 
 		if (ImGui::CollapsingHeader("Transformation"))
 		{
-			auto* render_scene = (RenderScene*)scene->getUniverse().getScene(RENDERABLE_TYPE);
-			if (scene->getUniverse().hasComponent(entity, RENDERABLE_TYPE))
+			auto* render_scene = (RenderScene*)scene->getWorld().getScene(RENDERABLE_TYPE);
+			if (scene->getWorld().hasComponent(entity, RENDERABLE_TYPE))
 			{
 				const Pose* pose = render_scene->lockPose(entity);
 				Model* model = render_scene->getModelInstanceModel(entity);
@@ -425,7 +425,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_anim_ctrl_plugin.m_controller_editor = m_anim_editor.get();
 	}
 
-	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
+	bool showGizmo(WorldView&, ComponentUID) override { return false; }
 	
 	~StudioAppPlugin() {
 		AssetCompiler& compiler = m_app.getAssetCompiler();

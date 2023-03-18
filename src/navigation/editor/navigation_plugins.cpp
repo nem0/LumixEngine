@@ -11,7 +11,7 @@
 #include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/os.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "navigation/navigation_scene.h"
 
 
@@ -33,8 +33,8 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 	}
 
 	void onAgentGUI(EntityRef entity, WorldEditor& editor) {
-		Universe& universe = *editor.getUniverse();
-		auto* scene = static_cast<NavigationScene*>(universe.getScene("navigation"));
+		World& world = *editor.getWorld();
+		auto* scene = static_cast<NavigationScene*>(world.getScene("navigation"));
 		static bool debug_draw_path = false;
 		const dtCrowdAgent* agent = scene->getDetourAgent(entity);
 		if (agent) {
@@ -59,7 +59,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 	void update() override {
 		if (!m_job) return;
-		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(NAVMESH_AGENT_TYPE));
+		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getWorld()->getScene(NAVMESH_AGENT_TYPE));
 		if (m_job->isFinished()) {
 			scene->free(m_job);
 			m_job = nullptr;
@@ -96,7 +96,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 		if (cmp_type != NAVMESH_ZONE_TYPE) return;
 		
-		auto* scene = static_cast<NavigationScene*>(editor.getUniverse()->getScene(cmp_type));
+		auto* scene = static_cast<NavigationScene*>(editor.getWorld()->getScene(cmp_type));
 		if (m_job) {
 			ImGui::TextUnformatted("Generating...");
 		}
@@ -121,8 +121,8 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
-			UniverseView& view = editor.getView();
-			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
+			WorldView& view = editor.getView();
+			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 			scene->generateTileAt(entities[0], hit.pos, true);
 		}
 
@@ -135,8 +135,8 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Inner boundaries", &inner_boundaries);
 			ImGui::Checkbox("Outer boundaries", &outer_boundaries);
 			ImGui::Checkbox("Portals", &portals);
-			UniverseView& view = editor.getView();
-			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
+			WorldView& view = editor.getView();
+			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 			scene->debugDrawNavmesh(entities[0], hit.pos, inner_boundaries, outer_boundaries, portals);
 		}
 
@@ -182,14 +182,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		return "navigation";
 	}
 
-	bool showGizmo(UniverseView& view, ComponentUID cmp) override {
+	bool showGizmo(WorldView& view, ComponentUID cmp) override {
 		if(cmp.type != NAVMESH_ZONE_TYPE) return false;
 
 		auto* scene = static_cast<NavigationScene*>(cmp.scene);
-		Universe& universe = scene->getUniverse();
+		World& world = scene->getWorld();
 		
 		const NavmeshZone& zone = scene->getZone((EntityRef)cmp.entity);
-		const Transform tr = universe.getTransform((EntityRef)cmp.entity);
+		const Transform tr = world.getTransform((EntityRef)cmp.entity);
 
 		const Vec3 x = tr.rot.rotate(Vec3(zone.extents.x, 0, 0));
 		const Vec3 y = tr.rot.rotate(Vec3(0, zone.extents.y, 0));

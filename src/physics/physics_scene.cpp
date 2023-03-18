@@ -45,7 +45,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
@@ -378,7 +378,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSystem& system, IAllocator& allocator);
+	PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem& system, IAllocator& allocator);
 
 
 	PxBatchQuery* createVehicleBatchQuery(u8* mem)
@@ -483,7 +483,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (!m_script_scene) return;
 
 		auto send = [this, touch_lost](EntityRef e1, EntityRef e2) {
-			if (!m_script_scene->getUniverse().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
+			if (!m_script_scene->getWorld().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
 
 			for (int i = 0, c = m_script_scene->getScriptCount(e1); i < c; ++i)
 			{
@@ -502,7 +502,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void onControllerHit(EntityRef controller, EntityRef obj) {
 		if (!m_script_scene) return;
-		if (!m_script_scene->getUniverse().hasComponent(controller, LUA_SCRIPT_TYPE)) return;
+		if (!m_script_scene->getWorld().hasComponent(controller, LUA_SCRIPT_TYPE)) return;
 
 		for (int i = 0, c = m_script_scene->getScriptCount(controller); i < c; ++i) {
 			auto* call = m_script_scene->beginFunctionCall(controller, i, "onControllerHit");
@@ -518,7 +518,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (!m_script_scene) return;
 
 		auto send = [this](EntityRef e1, EntityRef e2, const Vec3& position) {
-			if (!m_script_scene->getUniverse().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
+			if (!m_script_scene->getWorld().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
 
 			for (int i = 0, c = m_script_scene->getScriptCount(e1); i < c; ++i)
 			{
@@ -579,7 +579,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 
 
 	IPlugin& getPlugin() const override { return *m_system; }
@@ -621,7 +621,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	u32 getActorLayer(EntityRef entity) override { return m_actors[entity].layer; }
 
 	const Vehicle* getWheelVehicle(EntityRef wheel) const {
-		EntityPtr parent = m_universe.getParent(wheel);
+		EntityPtr parent = m_world.getParent(wheel);
 		if (!parent.isValid()) return nullptr;
 		auto iter = m_vehicles.find(*parent);
 		if (!iter.isValid()) return nullptr;
@@ -813,7 +813,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		if (!m_is_game_running) return;
 
-		const EntityPtr veh_entity = m_universe.getParent(entity);
+		const EntityPtr veh_entity = m_world.getParent(entity);
 		if (!veh_entity.isValid()) return;
 
 		auto iter = m_vehicles.find((EntityRef)veh_entity);
@@ -1209,9 +1209,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 		joint.physx->getActors(a0, a1);
 		if (a1) return fromPhysx(joint.physx->getLocalPose(PxJointActorIndex::eACTOR1));
 
-		Transform connected_body_tr = m_universe.getTransform((EntityRef)joint.connected_body);
+		Transform connected_body_tr = m_world.getTransform((EntityRef)joint.connected_body);
 		RigidTransform unscaled_connected_body_tr = {connected_body_tr.pos, connected_body_tr.rot};
-		Transform tr = m_universe.getTransform(entity);
+		Transform tr = m_world.getTransform(entity);
 		RigidTransform unscaled_tr = {tr.pos, tr.rot};
 
 		return unscaled_connected_body_tr.inverted() * unscaled_tr * fromPhysx(joint.local_frame0);
@@ -1285,7 +1285,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void destroyHeightfield(EntityRef entity)
 	{
 		m_terrains.erase(entity);
-		m_universe.onComponentDestroyed(entity, HEIGHTFIELD_TYPE, this);
+		m_world.onComponentDestroyed(entity, HEIGHTFIELD_TYPE, this);
 	}
 
 	void destroyInstancedCube(EntityRef entity) {
@@ -1293,7 +1293,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			actor->release();
 		}
 		m_instanced_cubes.erase(entity);
-		m_universe.onComponentDestroyed(entity, INSTANCED_CUBE_TYPE, this);
+		m_world.onComponentDestroyed(entity, INSTANCED_CUBE_TYPE, this);
 	}
 
 	void destroyInstancedMesh(EntityRef entity) {
@@ -1303,21 +1303,21 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		if (im.resource) im.resource->decRefCount();
 		m_instanced_meshes.erase(entity);
-		m_universe.onComponentDestroyed(entity, INSTANCED_MESH_TYPE, this);
+		m_world.onComponentDestroyed(entity, INSTANCED_MESH_TYPE, this);
 	}
 
 	void destroyController(EntityRef entity)
 	{
 		m_controllers[entity].controller->release();
 		m_controllers.erase(entity);
-		m_universe.onComponentDestroyed(entity, CONTROLLER_TYPE, this);
+		m_world.onComponentDestroyed(entity, CONTROLLER_TYPE, this);
 	}
 
 
 	void destroyWheel(EntityRef entity)
 	{
 		m_wheels.erase(entity);
-		m_universe.onComponentDestroyed(entity, WHEEL_TYPE, this);
+		m_world.onComponentDestroyed(entity, WHEEL_TYPE, this);
 
 		// we do not support removing wheels at runtime
 		// if you need this, you need to refresh physx part after removing the wheel
@@ -1338,7 +1338,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			veh->geom->decRefCount();
 		}
 		m_vehicles.erase(entity);
-		m_universe.onComponentDestroyed(entity, VEHICLE_TYPE, this);
+		m_world.onComponentDestroyed(entity, VEHICLE_TYPE, this);
 	}
 
 
@@ -1354,7 +1354,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		actor.setPhysxActor(nullptr);
 		m_actors.erase(entity);
 		m_dynamic_actors.eraseItem(entity);
-		m_universe.onComponentDestroyed(entity, RIGID_ACTOR_TYPE, this);
+		m_world.onComponentDestroyed(entity, RIGID_ACTOR_TYPE, this);
 		if (m_is_game_running)
 		{
 			for (int i = 0, c = m_joints.size(); i < c; ++i)
@@ -1379,7 +1379,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto& joint = m_joints[entity];
 		if (joint.physx) joint.physx->release();
 		m_joints.erase(entity);
-		m_universe.onComponentDestroyed(entity, type, this);
+		m_world.onComponentDestroyed(entity, type, this);
 	}
 
 
@@ -1395,7 +1395,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 		static_cast<PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
-		m_universe.onComponentCreated(entity, DISTANCE_JOINT_TYPE, this);
+		m_world.onComponentCreated(entity, DISTANCE_JOINT_TYPE, this);
 	}
 
 
@@ -1410,7 +1410,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
-		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this);
+		m_world.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this);
 	}
 
 
@@ -1429,7 +1429,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		d6_joint->setLinearLimit(linear_limit);
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
-		m_universe.onComponentCreated(entity, D6_JOINT_TYPE, this);
+		m_world.onComponentCreated(entity, D6_JOINT_TYPE, this);
 	}
 
 
@@ -1444,7 +1444,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
-		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this);
+		m_world.onComponentCreated(entity, HINGE_JOINT_TYPE, this);
 	}
 
 
@@ -1456,7 +1456,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		terrain.m_actor = nullptr;
 		terrain.m_entity = entity;
 
-		m_universe.onComponentCreated(entity, HEIGHTFIELD_TYPE, this);
+		m_world.onComponentCreated(entity, HEIGHTFIELD_TYPE, this);
 	}
 
 
@@ -1495,21 +1495,21 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void createInstancedMesh(EntityRef entity) {
 		InstancedMesh im(m_allocator);
 		m_instanced_meshes.insert(entity, static_cast<InstancedMesh&&>(im));
-		m_universe.onComponentCreated(entity, INSTANCED_MESH_TYPE, this);
+		m_world.onComponentCreated(entity, INSTANCED_MESH_TYPE, this);
 	}
 
 	void createInstancedCube(EntityRef entity) {
 		InstancedCube ic(m_allocator);
 		ic.half_extents = Vec3(1);
 		m_instanced_cubes.insert(entity, static_cast<InstancedCube&&>(ic));
-		m_universe.onComponentCreated(entity, INSTANCED_CUBE_TYPE, this);
+		m_world.onComponentCreated(entity, INSTANCED_CUBE_TYPE, this);
 	} 
 
 	void createController(EntityRef entity)
 	{
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
-		DVec3 position = m_universe.getPosition(entity);
+		DVec3 position = m_world.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		Controller& c = m_controllers.insert(entity);
 		c.controller = m_controller_manager->createController(cDesc);
@@ -1535,21 +1535,21 @@ struct PhysicsSceneImpl final : PhysicsScene
 			shapes[i]->setSimulationFilterData(data);
 		}
 
-		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
+		m_world.onComponentCreated(entity, CONTROLLER_TYPE, this);
 	}
 
 	void createWheel(EntityRef entity)
 	{
 		m_wheels.insert(entity, {});
 
-		m_universe.onComponentCreated(entity, WHEEL_TYPE, this);
+		m_world.onComponentCreated(entity, WHEEL_TYPE, this);
 	}
 
 
 	void createVehicle(EntityRef entity)
 	{
 		m_vehicles.insert(entity, UniquePtr<Vehicle>::create(m_allocator));
-		m_universe.onComponentCreated(entity, VEHICLE_TYPE, this);
+		m_world.onComponentCreated(entity, VEHICLE_TYPE, this);
 	}
 
 
@@ -1561,14 +1561,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		RigidActor actor(*this, entity);
 
-		Transform transform = m_universe.getTransform(entity);
+		Transform transform = m_world.getTransform(entity);
 		PxTransform px_transform = toPhysx(transform.getRigidPart());
 
 		PxRigidStatic* physx_actor = m_system->getPhysics()->createRigidStatic(px_transform);
 		actor.setPhysxActor(physx_actor);
 
 		m_actors.insert(entity, static_cast<RigidActor&&>(actor));
-		m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
+		m_world.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
 	}
 
 
@@ -1658,7 +1658,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 
 	void render() override {
-		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene("renderer"));
+		auto* render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
 		if (!render_scene) return;
 
 		const PxRenderBuffer& rb = m_scene->getRenderBuffer();
@@ -1698,7 +1698,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			RigidActor& actor = m_actors[e];
 			m_update_in_progress = &actor;
 			PxTransform trans = actor.physx_actor->getGlobalPose();
-			m_universe.setTransform(actor.entity, fromPhysx(trans));
+			m_world.setTransform(actor.entity, fromPhysx(trans));
 		}
 		m_update_in_progress = nullptr;
 
@@ -1708,7 +1708,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			Vehicle* veh = iter.value().get();
 			if (veh->actor) {
 				const PxTransform car_trans = veh->actor->getGlobalPose();
-				m_universe.setTransform(iter.key(), fromPhysx(car_trans));
+				m_world.setTransform(iter.key(), fromPhysx(car_trans));
 
 				EntityPtr wheels[4];
 				getWheels(iter.key(), Span(wheels));
@@ -1718,7 +1718,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				for (u32 i = 0; i < 4; ++i) {
 					if (!wheels[i].isValid()) continue;
 					const PxTransform trans = shapes[i]->getLocalPose();
-					m_universe.setTransform((EntityRef)wheels[i], fromPhysx(car_trans * trans));
+					m_world.setTransform((EntityRef)wheels[i], fromPhysx(car_trans * trans));
 				
 				}
 
@@ -1778,7 +1778,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
 				PxExtendedVec3 p = controller.controller->getFootPosition();
 
-				m_universe.setPosition(controller.entity, {p.x, p.y, p.z});
+				m_world.setPosition(controller.entity, {p.x, p.y, p.z});
 			}
 		}
 	}
@@ -1811,15 +1811,15 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void lateUpdate(float time_delta, bool paused) override {
 		if (!m_is_game_running || paused) return;
 
-		AnimationScene* anim_scene = (AnimationScene*)m_universe.getScene("animation");
+		AnimationScene* anim_scene = (AnimationScene*)m_world.getScene("animation");
 		if (!anim_scene) return;
 
 		for (Controller& ctrl : m_controllers) {
 			if (ctrl.use_root_motion) {
 				const LocalRigidTransform tr = anim_scene->getAnimatorRootMotion(ctrl.entity);
-				const Quat rot = m_universe.getRotation(ctrl.entity);
+				const Quat rot = m_world.getRotation(ctrl.entity);
 				ctrl.frame_change += rot.rotate(tr.pos);
-				m_universe.setRotation(ctrl.entity, rot * tr.rot);
+				m_world.setRotation(ctrl.entity, rot * tr.rot);
 			}
 		}
 	}
@@ -1859,10 +1859,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (iter.isValid()) actors[1] = iter.value().physx_actor;
 		if (!actors[0] || !actors[1]) return;
 
-		DVec3 pos0 = m_universe.getPosition(entity);
-		Quat rot0 = m_universe.getRotation(entity);
-		DVec3 pos1 = m_universe.getPosition((EntityRef)joint.connected_body);
-		Quat rot1 = m_universe.getRotation((EntityRef)joint.connected_body);
+		DVec3 pos0 = m_world.getPosition(entity);
+		Quat rot0 = m_world.getRotation(entity);
+		DVec3 pos1 = m_world.getPosition((EntityRef)joint.connected_body);
+		Quat rot1 = m_world.getRotation((EntityRef)joint.connected_body);
 		PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
 		PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
 
@@ -1882,7 +1882,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxVehicleSuspensionData suspensions[PX_MAX_NB_WHEELS];
 		PxVehicleWheelData wheels[PX_MAX_NB_WHEELS];
 		PxVec3 offsets[4];
-		const Transform& chassis_tr = m_universe.getTransform(entity);
+		const Transform& chassis_tr = m_world.getTransform(entity);
 		const PxF32 camber_angle_at_rest = 0.0;
 		const PxF32 camber_angle_at_max_droop = 0.01f;
 		const PxF32 camber_angle_at_max_compression = -0.01f;
@@ -1892,8 +1892,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 		wheels[PxVehicleDrive4WWheelOrder::eFRONT_LEFT].mMaxSteer = PxPi * 0.3333f;
 		wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
 
-		for (EntityRef e : m_universe.childrenOf(entity)) {
-			if (!m_universe.hasComponent(e, WHEEL_TYPE)) continue;
+		for (EntityRef e : m_world.childrenOf(entity)) {
+			if (!m_world.hasComponent(e, WHEEL_TYPE)) continue;
 
 			const Wheel& w = m_wheels[e];
 			const u32 idx = (u32)w.slot;
@@ -1913,7 +1913,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			wheels[idx].mRadius = w.radius;
 			wheels[idx].mWidth = w.width;
 
-			const Transform& wheel_tr = m_universe.getTransform((EntityRef)e);
+			const Transform& wheel_tr = m_world.getTransform((EntityRef)e);
 			offsets[idx] = toPhysx((chassis_tr.inverted() * wheel_tr).pos - vehicle.center_of_mass);
 			
 			wheel_sim_data->setTireData(idx, tire);
@@ -2057,7 +2057,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxVehicleDriveSimData4W drive_sim_data;
 		setupDriveSimData(*wheel_sim_data, drive_sim_data, vehicle);
 
-		const RigidTransform tr = m_universe.getTransform(entity).getRigidPart();
+		const RigidTransform tr = m_world.getTransform(entity).getRigidPart();
 
 		EntityPtr wheels_ptr[4];
 		getWheels(entity, Span(wheels_ptr));
@@ -2117,8 +2117,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void getWheels(EntityRef car, Span<EntityPtr> wheels) {
 		for (EntityPtr& e : wheels) e = INVALID_ENTITY;
-		for (EntityPtr e : m_universe.childrenOf(car)) {
-			if (m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) {
+		for (EntityPtr e : m_world.childrenOf(car)) {
+			if (m_world.hasComponent((EntityRef)e, WHEEL_TYPE)) {
 				const Wheel& w = m_wheels[(EntityRef)e];
 				wheels[(i32)w.slot] = e;
 			}
@@ -2127,22 +2127,22 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void getTransforms(Span<const EntityRef> entities, Span<RigidTransform> transforms) {
 		for (u32 i = 0; i < entities.length(); ++i) {
-			transforms[i] = m_universe.getTransform(entities[i]).getRigidPart();
+			transforms[i] = m_world.getTransform(entities[i]).getRigidPart();
 		}
 	}
 
 	void initInstancedCubes() {
 		PROFILE_FUNCTION();
-		RenderScene* rs = (RenderScene*)m_universe.getScene(INSTANCED_MODEL_TYPE);
+		RenderScene* rs = (RenderScene*)m_world.getScene(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
 		for (auto iter = m_instanced_cubes.begin(), end = m_instanced_cubes.end(); iter != end; ++iter) {
-			if (!m_universe.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
+			if (!m_world.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
 			
 			const InstancedModel& im = rs->getInstancedModels()[iter.key()];
 			InstancedCube& ic = iter.value();
 			
-			const RigidTransform tr = m_universe.getTransform(iter.key()).getRigidPart();
+			const RigidTransform tr = m_world.getTransform(iter.key()).getRigidPart();
 
 			ic.actors.reserve(im.instances.size());
 			for (const InstancedModel::InstanceData& id : im.instances) {
@@ -2164,18 +2164,18 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void initInstancedMeshes() {
 		PROFILE_FUNCTION();
-		RenderScene* rs = (RenderScene*)m_universe.getScene(INSTANCED_MODEL_TYPE);
+		RenderScene* rs = (RenderScene*)m_world.getScene(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
 		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
-			if (!m_universe.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
+			if (!m_world.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
 			
 			const InstancedModel& im = rs->getInstancedModels()[iter.key()];
 			InstancedMesh& mesh = iter.value();
 			if (!mesh.resource) continue;
 			if (!mesh.resource->isReady()) continue;
 			
-			const RigidTransform tr = m_universe.getTransform(iter.key()).getRigidPart();
+			const RigidTransform tr = m_world.getTransform(iter.key()).getRigidPart();
 
 			mesh.actors.reserve(im.instances.size());
 			
@@ -2224,7 +2224,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void startGame() override
 	{
-		auto* scene = m_universe.getScene("lua_script");
+		auto* scene = m_world.getScene("lua_script");
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		m_is_game_running = true;
 
@@ -2433,27 +2433,27 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void onEntityMoved(EntityRef entity)
 	{
-		const u64 cmp_mask = m_universe.getComponentsMask(entity);
+		const u64 cmp_mask = m_world.getComponentsMask(entity);
 		if ((cmp_mask & m_physics_cmps_mask) == 0) return;
 		
-		if (m_universe.hasComponent(entity, CONTROLLER_TYPE)) {
+		if (m_world.hasComponent(entity, CONTROLLER_TYPE)) {
 			auto iter = m_controllers.find(entity);
 			if (iter.isValid())
 			{
 				Controller& controller = iter.value();
-				DVec3 pos = m_universe.getPosition(entity);
+				DVec3 pos = m_world.getPosition(entity);
 				PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 				controller.controller->setFootPosition(pvec);
 			}
 		}
 
-		if (m_universe.hasComponent(entity, RIGID_ACTOR_TYPE)) {
+		if (m_world.hasComponent(entity, RIGID_ACTOR_TYPE)) {
 			auto iter = m_actors.find(entity);
 			if (iter.isValid()) {
 				RigidActor& actor = iter.value();
 				if (actor.physx_actor && m_update_in_progress != &actor)
 				{
-					Transform trans = m_universe.getTransform(entity);
+					Transform trans = m_world.getTransform(entity);
 					if (actor.dynamic_type == DynamicType::KINEMATIC)
 					{
 						auto* rigid_dynamic = (PxRigidDynamic*)actor.physx_actor;
@@ -2545,7 +2545,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				terrain.m_actor = nullptr;
 			}
 
-			PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity).getRigidPart());
+			PxTransform transform = toPhysx(m_world.getTransform(terrain.m_entity).getRigidPart());
 			transform.p.y += terrain.m_y_scale * 0.5f;
 
 			PxRigidActor* actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
@@ -2955,7 +2955,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		if (!actor.physx_actor) return;
 
-		PxTransform transform = toPhysx(m_universe.getTransform(actor.entity).getRigidPart());
+		PxTransform transform = toPhysx(m_world.getTransform(actor.entity).getRigidPart());
 		PxRigidActor* new_physx_actor;
 		switch (actor.dynamic_type)
 		{
@@ -3224,7 +3224,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			if (version > (i32)PhysicsSceneVersion::MATERIAL) material_path = serializer.readString();
 			const char* mesh_path = serializer.readString();
 
-			PxTransform transform = toPhysx(m_universe.getTransform(actor.entity).getRigidPart());
+			PxTransform transform = toPhysx(m_world.getTransform(actor.entity).getRigidPart());
 			PxRigidActor* physx_actor = actor.dynamic_type == DynamicType::STATIC
 				? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform)
 				: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
@@ -3290,7 +3290,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				m_actors[entity].setMesh(geom_res);
 			}
 
-			m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
+			m_world.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
 		}
 	}
 
@@ -3316,7 +3316,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			initControllerDesc(cDesc);
 			cDesc.height = c.height;
 			cDesc.radius = c.radius;
-			DVec3 position = m_universe.getPosition(entity);
+			DVec3 position = m_world.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.controller = m_controller_manager->createController(cDesc);
 			c.controller->getActor()->userData = (void*)(intptr_t)entity.index;
@@ -3332,7 +3332,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			for (u32 i = 0; i < shapes_count; ++i) shapes[i]->setSimulationFilterData(data);
 			c.controller->invalidateCache();
 
-			m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
+			m_world.onComponentCreated(entity, CONTROLLER_TYPE, this);
 		}
 	}
 
@@ -3358,7 +3358,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(Path(path));
 				iter.value()->geom = geom_res;
 			}
-			m_universe.onComponentCreated(e, VEHICLE_TYPE, this);
+			m_world.onComponentCreated(e, VEHICLE_TYPE, this);
 			if (m_is_game_running) tmp.push(e);
 		}
 
@@ -3369,7 +3369,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			e = entity_map.get(e);
 			Wheel& w = m_wheels.insert(e);
 			serializer.read(w);
-			m_universe.onComponentCreated(e, WHEEL_TYPE, this);
+			m_world.onComponentCreated(e, WHEEL_TYPE, this);
 		}
 
 		if (m_is_game_running) {
@@ -3468,7 +3468,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				default: ASSERT(false); break;
 			}
 
-			m_universe.onComponentCreated(entity, cmp_type, this);
+			m_world.onComponentCreated(entity, cmp_type, this);
 		}
 	}
 
@@ -3489,7 +3489,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 			m_terrains.insert(terrain.m_entity, terrain);
 			setHeightmapSource(terrain.m_entity, Path(tmp));
-			m_universe.onComponentCreated(terrain.m_entity, HEIGHTFIELD_TYPE, this);
+			m_world.onComponentCreated(terrain.m_entity, HEIGHTFIELD_TYPE, this);
 		}
 	}
 
@@ -3517,7 +3517,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				serializer.read(c.half_extents);
 				serializer.read(c.layer);
 				m_instanced_cubes.insert(e, static_cast<InstancedCube&&>(c));
-				m_universe.onComponentCreated(e, INSTANCED_CUBE_TYPE, this);
+				m_world.onComponentCreated(e, INSTANCED_CUBE_TYPE, this);
 			}
 		}
 
@@ -3533,7 +3533,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				m.resource = path[0] ? m_engine.getResourceManager().load<PhysicsGeometry>(Path(path)) : nullptr;
 				serializer.read(m.layer);
 				m_instanced_meshes.insert(e, static_cast<InstancedMesh&&>(m));
-				m_universe.onComponentCreated(e, INSTANCED_MESH_TYPE, this);
+				m_world.onComponentCreated(e, INSTANCED_MESH_TYPE, this);
 			}
 		}
 
@@ -3768,7 +3768,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	IAllocator& m_allocator;
 	Engine& m_engine;
-	Universe& m_universe;
+	World& m_world;
 	HitReport m_hit_report;
 	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
@@ -3804,7 +3804,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	CollisionLayers& m_layers;
 };
 
-PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSystem& system, IAllocator& allocator)
+PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem& system, IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_engine(engine)
 	, m_controllers(m_allocator)
@@ -3815,7 +3815,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	, m_dynamic_actors(m_allocator)
 	, m_instanced_cubes(m_allocator)
 	, m_instanced_meshes(m_allocator)
-	, m_universe(context)
+	, m_world(context)
 	, m_is_game_running(false)
 	, m_contact_callback(*this)
 	, m_contact_callbacks(m_allocator)
@@ -3842,11 +3842,11 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 }
 
 
-UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
+UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, World& context, Engine& engine, IAllocator& allocator)
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(engine, context, system, allocator);
-	impl->m_universe.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
-	impl->m_universe.entityDestroyed().bind<&PhysicsSceneImpl::onEntityDestroyed>(impl);
+	impl->m_world.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
+	impl->m_world.entityDestroyed().bind<&PhysicsSceneImpl::onEntityDestroyed>(impl);
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
 	sceneDesc.cpuDispatcher = &impl->m_cpu_dispatcher;
@@ -4060,7 +4060,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
 #endif
-		scale = scene.getUniverse().getScale(entity);
+		scale = scene.getWorld().getScale(entity);
 		PxMeshScale pxscale(toPhysx(scale));
 		PxConvexMeshGeometry convex_geom(mesh->convex_mesh, pxscale);
 		PxTriangleMeshGeometry tri_geom(mesh->tri_mesh, pxscale);

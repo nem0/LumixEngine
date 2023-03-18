@@ -4,7 +4,7 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/string.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "render_interface.h"
 
 
@@ -78,10 +78,10 @@ struct ScaleGizmo {
 	DVec3 pos;
 };
 
-void renderCube(UniverseView& view, u32 color, const Vec3& pos, float scale, const Vec3& x, const Vec3& y, const Vec3& z) {
-	UniverseView::Vertex* vertices = view.render(false, 36);
+void renderCube(WorldView& view, u32 color, const Vec3& pos, float scale, const Vec3& x, const Vec3& y, const Vec3& z) {
+	WorldView::Vertex* vertices = view.render(false, 36);
 
-	UniverseView::Vertex tmp[8];
+	WorldView::Vertex tmp[8];
 	for (int i = 0; i < 8; ++i) tmp[i].abgr = color;
 
 	tmp[0].pos = pos + (-x - y - z) * scale;
@@ -122,7 +122,7 @@ float getScale(const Viewport& viewport, const DVec3& pos, float base_scale) {
 }
 
 template <typename T>
-T getGizmo(UniverseView& view, Transform& tr, const Gizmo::Config& cfg)
+T getGizmo(WorldView& view, Transform& tr, const Gizmo::Config& cfg)
 {
 	T gizmo;
 	gizmo.pos = tr.pos;
@@ -147,7 +147,7 @@ T getGizmo(UniverseView& view, Transform& tr, const Gizmo::Config& cfg)
 	return gizmo;
 }
 
-Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) {
+Axis collide(const ScaleGizmo& gizmo, const WorldView& view, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
@@ -168,7 +168,7 @@ Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Con
 	return z_dist < influenced_dist ? Axis::Z : Axis::NONE;
 }
 
-Axis collide(const RotationGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) { 
+Axis collide(const RotationGizmo& gizmo, const WorldView& view, const Gizmo::Config& cfg) { 
 	const Viewport vp = view.getViewport();
 	const Vec3 pos(gizmo.pos - vp.pos);
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
@@ -208,7 +208,7 @@ Axis collide(const RotationGizmo& gizmo, const UniverseView& view, const Gizmo::
 	return axis;
 }
 
-Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const UniverseView& view, const Gizmo::Config& cfg) {
+Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const WorldView& view, const Gizmo::Config& cfg) {
 	DVec3 origin;
 	Vec3 dir;
 	const Viewport viewport = view.getViewport();
@@ -250,7 +250,7 @@ Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const UniverseV
 }
 
 template <typename Gizmo>
-DVec3 getMousePlaneIntersection(const UniverseView& view, const Gizmo& gizmo, Axis transform_axis) {
+DVec3 getMousePlaneIntersection(const WorldView& view, const Gizmo& gizmo, Axis transform_axis) {
 	const Viewport& vp = view.getViewport();
 	DVec3 origin;
 	Vec3 dir;
@@ -285,7 +285,7 @@ DVec3 getMousePlaneIntersection(const UniverseView& view, const Gizmo& gizmo, Ax
 	return gizmo.pos + axis * d;
 }
 
-void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr, Axis axis, const Gizmo::Config& cfg) {
+void draw(WorldView& view, const TranslationGizmo& gizmo, const Transform& tr, Axis axis, const Gizmo::Config& cfg) {
 	const DVec3 cam_pos = view.getViewport().pos;
 	const Vec3 rel_pos(gizmo.pos - cam_pos);
 
@@ -295,7 +295,7 @@ void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr
 	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
 	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
 
-	UniverseView::Vertex* line_vertices = view.render(true, 6);
+	WorldView::Vertex* line_vertices = view.render(true, 6);
 	line_vertices[0].pos = rel_pos;
 	line_vertices[0].abgr = axis == Axis::X ? SELECTED_COLOR : X_COLOR;
 	line_vertices[1].pos = rel_pos + x;
@@ -309,7 +309,7 @@ void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr
 	line_vertices[5].pos = rel_pos + z;
 	line_vertices[5].abgr = line_vertices[4].abgr;
 
-	UniverseView::Vertex* vertices = view.render(false, 9);
+	WorldView::Vertex* vertices = view.render(false, 9);
 
 	vertices[0].pos = rel_pos;
 	vertices[0].abgr = axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
@@ -333,9 +333,9 @@ void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr
 	vertices[8].abgr = vertices[6].abgr;
 }
 
-void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const Vec3& b, u32 color) {
+void renderQuarterRing(WorldView& view, const Vec3& p, const Vec3& a, const Vec3& b, u32 color) {
 	{
-		UniverseView::Vertex* vertices = view.render(false, 25*6);
+		WorldView::Vertex* vertices = view.render(false, 25*6);
 	
 		const float ANGLE_STEP = degreesToRadians(1.0f / 100.0f * 360.0f);
 		i32 offset = -1;
@@ -379,7 +379,7 @@ void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const V
 
 	{
 		const int GRID_SIZE = 5;
-		UniverseView::Vertex* vertices = view.render(true, (GRID_SIZE + 1) * 4);
+		WorldView::Vertex* vertices = view.render(true, (GRID_SIZE + 1) * 4);
 
 		i32 offset = -1;
 		for (int i = 0; i <= GRID_SIZE; ++i) {
@@ -405,8 +405,8 @@ void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const V
 	}
 }
 
-void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& origin, const Vec3& dst, float scale, u32 color) {
-	UniverseView::Vertex* vertices = view.render(false, 25 * 3);
+void renderArc(WorldView& view, const Vec3& pos, const Vec3& n, const Vec3& origin, const Vec3& dst, float scale, u32 color) {
+	WorldView::Vertex* vertices = view.render(false, 25 * 3);
 
 	int offset = -1;
 	for (int i = 0; i < 25; ++i) {
@@ -426,7 +426,7 @@ void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& o
 	}
 }
 
-void draw(UniverseView& view, const RotationGizmo& gizmo, Axis axis, bool active, const DVec3& current, const Gizmo::Config& cfg) {
+void draw(WorldView& view, const RotationGizmo& gizmo, Axis axis, bool active, const DVec3& current, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 	const Vec3 rel_pos(gizmo.pos - vp.pos);
@@ -477,7 +477,7 @@ Axis toPlane(Axis axis) {
 	}
 }
 
-float computeRotateAngle(UniverseView& view, const RotationGizmo& gizmo, Axis normal_axis) {
+float computeRotateAngle(WorldView& view, const RotationGizmo& gizmo, Axis normal_axis) {
 	Axis plane;
 	Vec3 axis;
 	switch (normal_axis) {
@@ -500,13 +500,13 @@ float computeRotateAngle(UniverseView& view, const RotationGizmo& gizmo, Axis no
 	return -atan2f(x, y);
 }
 	
-void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::Config& cfg) {
+void draw(WorldView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, gizmo.pos, cfg.scale) * 0.1f;
 	const Vec3 rel_pos = Vec3(gizmo.pos - vp.pos);
 
 	{
-		UniverseView::Vertex* vertices = view.render(true, 6);
+		WorldView::Vertex* vertices = view.render(true, 6);
 
 		vertices[0].pos = rel_pos;
 		vertices[0].abgr = axis == Axis::X ? SELECTED_COLOR : X_COLOR;
@@ -543,7 +543,7 @@ void setDragged(u64 id) {
 	g_gizmo_state.dragged_id = id;
 }
 
-bool translate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
+bool translate(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg) {
 	TranslationGizmo gizmo = getGizmo<TranslationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -608,7 +608,7 @@ bool translate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& c
 	return false;
 }
 
-bool scale(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
+bool scale(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg) {
 	ScaleGizmo gizmo = getGizmo<ScaleGizmo>(view, tr, cfg);
 		
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -651,7 +651,7 @@ bool scale(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) 
 }
 
 
-bool rotate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
+bool rotate(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg) {
 	RotationGizmo gizmo = getGizmo<RotationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -712,7 +712,7 @@ bool rotate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg)
 bool isActive() { return g_gizmo_state.active_id != ~(u64)0 || g_gizmo_state.dragged_id != ~(u64)0; }
 
 
-bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Config& cfg, bool keep_center) {
+bool box(u64 id, WorldView& view, Transform& tr, Vec3& half_extents, const Config& cfg, bool keep_center) {
 	id |= u64(0xff) << 56;
 	const Vec3 xn = tr.rot.rotate(Vec3(1, 0, 0));
 	const Vec3 yn = tr.rot.rotate(Vec3(0, 1, 0));
@@ -736,7 +736,7 @@ bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Co
 		float t;
 		if (getRaySphereIntersection(pos, dir, p, scale * 1.414f, t) && (prev_t < 0 || t < prev_t)) {
 			renderCube(view, SELECTED_COLOR, center + p, scale, xn, yn, zn);
-			UniverseView::Vertex* line = view.render(true, 2);
+			WorldView::Vertex* line = view.render(true, 2);
 			line[0].pos = center;
 			line[0].abgr = color;
 			line[1].pos = center + 2 * p;
@@ -851,7 +851,7 @@ bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Co
 }
 
 
-bool manipulate(u64 id, UniverseView& view, Transform& tr, const Config& cfg) {
+bool manipulate(u64 id, WorldView& view, Transform& tr, const Config& cfg) {
 	g_gizmo_state.last_manipulate_frame = g_gizmo_state.frame;
 	switch (cfg.mode) {
 		case Gizmo::Config::TRANSLATE: return translate(id, view, tr, cfg);

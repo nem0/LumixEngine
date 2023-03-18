@@ -14,7 +14,7 @@
 #include "editor/world_editor.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 
 namespace Lumix

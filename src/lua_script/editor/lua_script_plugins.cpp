@@ -17,7 +17,7 @@
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
 #include <lua.hpp>
@@ -185,7 +185,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 	void onLuaCallEventGUI(u8* data, AnimEditor::Component& component) const
 	{
-		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getUniverse()->getScene(LUA_SCRIPT_TYPE);
+		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getWorld()->getScene(LUA_SCRIPT_TYPE);
 		ImGui::InputText("Function", (char*)data, LUA_CALL_EVENT_SIZE);
 	}
 	*/
@@ -441,17 +441,17 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (editor.getSelectedEntities().empty()) return;
 			EntityRef entity = editor.getSelectedEntities()[0];
 
-			if (!editor.getUniverse()->hasComponent(entity, LUA_SCRIPT_TYPE))
+			if (!editor.getWorld()->hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
 				editor.addComponent(Span(&entity, 1), LUA_SCRIPT_TYPE);
 			}
 
-			const ComponentUID cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE);
+			const ComponentUID cmp = editor.getWorld()->getComponent(entity, LUA_SCRIPT_TYPE);
 			editor.beginCommandGroup("add_lua_script");
 			editor.addArrayPropertyItem(cmp, "scripts");
 
 			if (!create_empty) {
-				auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
+				auto* script_scene = static_cast<LuaScriptScene*>(editor.getWorld()->getScene(LUA_SCRIPT_TYPE));
 				int scr_count = script_scene->getScriptCount(entity);
 				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
 			}
@@ -481,7 +481,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin
 		if (cmp_type != LUA_SCRIPT_TYPE) return;
 		if (entities.length() != 1) return;
 
-		LuaScriptScene* scene = (LuaScriptScene*)editor.getUniverse()->getScene(cmp_type); 
+		LuaScriptScene* scene = (LuaScriptScene*)editor.getWorld()->getScene(cmp_type); 
 		const EntityRef e = entities[0];
 		const u32 count = scene->getScriptCount(e);
 		for (u32 i = 0; i < count; ++i) {
@@ -523,7 +523,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 	}
 
-	bool showGizmo(UniverseView& view, ComponentUID cmp) override
+	bool showGizmo(WorldView& view, ComponentUID cmp) override
 	{
 		if (cmp.type == LUA_SCRIPT_TYPE)
 		{

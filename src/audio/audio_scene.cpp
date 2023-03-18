@@ -12,7 +12,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 
 namespace Lumix
@@ -56,9 +56,9 @@ struct AudioSceneImpl final : AudioScene
 		LATEST
 	};
 
-	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
+	AudioSceneImpl(AudioSystem& system, World& context, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe(context)
+		, m_world(context)
 		, m_system(system)
 		, m_device(system.getDevice())
 		, m_ambient_sounds(allocator)
@@ -121,9 +121,9 @@ struct AudioSceneImpl final : AudioScene
 		if (m_listener.entity.isValid())
 		{
 			const EntityRef listener = (EntityRef) m_listener.entity;
-			const DVec3 pos = m_universe.getPosition(listener);
+			const DVec3 pos = m_world.getPosition(listener);
 			m_device.setListenerPosition(pos);
-			const Matrix orientation = m_universe.getRotation(listener).toMatrix();
+			const Matrix orientation = m_world.getRotation(listener).toMatrix();
 			const Vec3 front = orientation.getZVector();
 			const Vec3 up = orientation.getYVector();
 			m_device.setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);
@@ -134,7 +134,7 @@ struct AudioSceneImpl final : AudioScene
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
 			if (sound.is_3d && sound.entity.isValid())
 			{
-				const DVec3 pos = m_universe.getPosition((EntityRef)sound.entity);
+				const DVec3 pos = m_world.getPosition((EntityRef)sound.entity);
 				m_device.setSourcePosition(sound.buffer_id, pos);
 			}
 
@@ -177,7 +177,7 @@ struct AudioSceneImpl final : AudioScene
 
 	void startGame() override
 	{
-		m_animation_scene = (AnimationScene*)m_universe.getScene("animation");
+		m_animation_scene = (AnimationScene*)m_world.getScene("animation");
 		for (AmbientSound& sound : m_ambient_sounds)
 		{
 			if (sound.clip) sound.playing_sound = play(sound.entity, sound.clip, sound.is_3d);
@@ -207,7 +207,7 @@ struct AudioSceneImpl final : AudioScene
 	void createListener(EntityRef entity)
 	{
 		m_listener.entity = entity;
-		m_universe.onComponentCreated(entity, LISTENER_TYPE, this);
+		m_world.onComponentCreated(entity, LISTENER_TYPE, this);
 	}
 
 
@@ -234,7 +234,7 @@ struct AudioSceneImpl final : AudioScene
 		zone.entity = entity;
 		zone.delay = 500.0f;
 		zone.radius = 10;
-		m_universe.onComponentCreated(entity, ECHO_ZONE_TYPE, this);
+		m_world.onComponentCreated(entity, ECHO_ZONE_TYPE, this);
 	}
 
 
@@ -242,7 +242,7 @@ struct AudioSceneImpl final : AudioScene
 	{
 		int idx = m_echo_zones.find(entity);
 		m_echo_zones.eraseAt(idx);
-		m_universe.onComponentDestroyed(entity, ECHO_ZONE_TYPE, this);
+		m_world.onComponentDestroyed(entity, ECHO_ZONE_TYPE, this);
 	}
 
 	
@@ -263,7 +263,7 @@ struct AudioSceneImpl final : AudioScene
 		zone.frequency = 1;
 		zone.phase = 0;
 		zone.wet_dry_mix = 0.5f;
-		m_universe.onComponentCreated(entity, CHORUS_ZONE_TYPE, this);
+		m_world.onComponentCreated(entity, CHORUS_ZONE_TYPE, this);
 	}
 
 
@@ -277,7 +277,7 @@ struct AudioSceneImpl final : AudioScene
 	{
 		int idx = m_chorus_zones.find(entity);
 		m_chorus_zones.eraseAt(idx);
-		m_universe.onComponentDestroyed(entity, CHORUS_ZONE_TYPE, this);
+		m_world.onComponentDestroyed(entity, CHORUS_ZONE_TYPE, this);
 	}
 
 
@@ -287,21 +287,21 @@ struct AudioSceneImpl final : AudioScene
 		sound.entity = entity;
 		sound.clip = nullptr;
 		sound.playing_sound = -1;
-		m_universe.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this);
+		m_world.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this);
 	}
 
 
 	void destroyListener(EntityRef entity)
 	{
 		m_listener.entity = INVALID_ENTITY;
-		m_universe.onComponentDestroyed(entity, LISTENER_TYPE, this);
+		m_world.onComponentDestroyed(entity, LISTENER_TYPE, this);
 	}
 
 
 	void destroyAmbientSound(EntityRef entity)
 	{
 		m_ambient_sounds.erase(entity);
-		m_universe.onComponentDestroyed(entity, AMBIENT_SOUND_TYPE, this);
+		m_world.onComponentDestroyed(entity, AMBIENT_SOUND_TYPE, this);
 	}
 
 
@@ -336,7 +336,7 @@ struct AudioSceneImpl final : AudioScene
 		serializer.read(m_listener.entity);
 		m_listener.entity = entity_map.get(m_listener.entity);
 		if (m_listener.entity.isValid()) {
-			m_universe.onComponentCreated((EntityRef)m_listener.entity, LISTENER_TYPE, this);
+			m_world.onComponentCreated((EntityRef)m_listener.entity, LISTENER_TYPE, this);
 		}
 
 		if (version < (i32)Version::CLIPS_REWORKED) {
@@ -358,7 +358,7 @@ struct AudioSceneImpl final : AudioScene
 			serializer.read(sound.is_3d);
 
 			m_ambient_sounds.insert(sound.entity, sound);
-			m_universe.onComponentCreated(sound.entity, AMBIENT_SOUND_TYPE, this);
+			m_world.onComponentCreated(sound.entity, AMBIENT_SOUND_TYPE, this);
 		}
 
 		serializer.read(count);
@@ -368,7 +368,7 @@ struct AudioSceneImpl final : AudioScene
 			serializer.read(zone);
 			zone.entity = entity_map.get(zone.entity);
 			m_echo_zones.insert(zone.entity, zone);
-			m_universe.onComponentCreated(zone.entity, ECHO_ZONE_TYPE, this);
+			m_world.onComponentCreated(zone.entity, ECHO_ZONE_TYPE, this);
 		}
 
 		serializer.read(count);
@@ -379,7 +379,7 @@ struct AudioSceneImpl final : AudioScene
 			zone.entity = entity_map.get(zone.entity);
 
 			m_chorus_zones.insert(zone.entity, zone);
-			m_universe.onComponentCreated(zone.entity, CHORUS_ZONE_TYPE, this);
+			m_world.onComponentCreated(zone.entity, CHORUS_ZONE_TYPE, this);
 		}
 	}
 
@@ -404,7 +404,7 @@ struct AudioSceneImpl final : AudioScene
 				m_device.play(buffer, clip->m_looped);
 				m_device.setVolume(buffer, clip->m_volume);
 
-				const DVec3 pos = m_universe.getPosition(entity);
+				const DVec3 pos = m_world.getPosition(entity);
 				m_device.setSourcePosition(buffer, pos);
 
 				sound.is_3d = is_3d;
@@ -414,7 +414,7 @@ struct AudioSceneImpl final : AudioScene
 				sound.clip = clip;
 
 				for (const EchoZone& zone : m_echo_zones) {
-					const double dist2 = squaredLength(pos - m_universe.getPosition(zone.entity));
+					const double dist2 = squaredLength(pos - m_world.getPosition(zone.entity));
 					const double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 
@@ -424,7 +424,7 @@ struct AudioSceneImpl final : AudioScene
 				}
 
 				for (const ChorusZone& zone : m_chorus_zones) {
-					const double dist2 = squaredLength(pos - m_universe.getPosition(zone.entity));
+					const double dist2 = squaredLength(pos - m_world.getPosition(zone.entity));
 					double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 
@@ -478,7 +478,7 @@ struct AudioSceneImpl final : AudioScene
 		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
 	}
 
-	Universe& getUniverse() override { return m_universe; }
+	World& getWorld() override { return m_world; }
 	IPlugin& getPlugin() const override { return m_system; }
 
 	AssociativeArray<EntityRef, AmbientSound> m_ambient_sounds;
@@ -487,7 +487,7 @@ struct AudioSceneImpl final : AudioScene
 	AudioDevice& m_device;
 	Listener m_listener;
 	IAllocator& m_allocator;
-	Universe& m_universe;
+	World& m_world;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
 	AnimationScene* m_animation_scene = nullptr;
@@ -495,10 +495,10 @@ struct AudioSceneImpl final : AudioScene
 
 
 UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
-	Universe& universe,
+	World& world,
 	IAllocator& allocator)
 {
-	return UniquePtr<AudioSceneImpl>::create(allocator, system, universe, allocator);
+	return UniquePtr<AudioSceneImpl>::create(allocator, system, world, allocator);
 }
 
 void AudioScene::reflect(Engine& engine) {

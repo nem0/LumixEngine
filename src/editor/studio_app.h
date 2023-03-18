@@ -35,15 +35,15 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual bool dependsOn(IPlugin& plugin) const { return false; }
 		virtual const char* getName() const = 0;
 
-		virtual bool showGizmo(struct UniverseView& view, struct ComponentUID cmp) = 0;
+		virtual bool showGizmo(struct WorldView& view, struct ComponentUID cmp) = 0;
 	};
 
 	struct MousePlugin {
 		virtual ~MousePlugin() {}
 
-		virtual bool onMouseDown(UniverseView& view, int x, int y) { return false; }
-		virtual void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) {}
-		virtual void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) {}
+		virtual bool onMouseDown(WorldView& view, int x, int y) { return false; }
+		virtual void onMouseUp(WorldView& view, int x, int y, os::MouseButton button) {}
+		virtual void onMouseMove(WorldView& view, int x, int y, int rel_x, int rel_y) {}
 		virtual void onMouseWheel(float value) {}
 		virtual const char* getName() const = 0;
 	};
@@ -118,7 +118,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	
-	virtual void scanUniverses() = 0;
+	virtual void scanWorlds() = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual void snapDown() = 0;

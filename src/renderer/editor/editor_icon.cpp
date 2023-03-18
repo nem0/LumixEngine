@@ -6,7 +6,7 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 
@@ -47,10 +47,10 @@ struct EditorIconsImpl final : EditorIcons
 	{
 		m_icons.reserve(200);
 
-		auto& universe = scene.getUniverse();
-		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
-		universe.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
-		universe.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
+		World& world = scene.getWorld();
+		world.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
+		world.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
+		world.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
 
 		Engine& engine = m_editor.getEngine();
 		FileSystem& fs = engine.getFileSystem();
@@ -79,10 +79,10 @@ struct EditorIconsImpl final : EditorIcons
 	{
 		for (auto& model : m_models) model->decRefCount();
 
-		auto& universe = m_scene.getUniverse();
-		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
-		universe.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
-		universe.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
+		World& world = m_scene.getWorld();
+		world.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
+		world.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
+		world.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
 	}
 
 
@@ -95,8 +95,8 @@ struct EditorIconsImpl final : EditorIcons
 
 	void refresh() override {
 		m_icons.clear();
-		Universe& universe = m_scene.getUniverse();
-		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
+		World& world = m_scene.getWorld();
+		for (EntityPtr e = world.getFirstEntity(); e.isValid(); e = world.getNextEntity((EntityRef)e)) {
 			createIcon((EntityRef)e);
 		}
 	}
@@ -113,15 +113,15 @@ struct EditorIconsImpl final : EditorIcons
 
 	void createIcon(EntityRef entity)
 	{
-		Universe& universe = *m_editor.getUniverse();
+		World& world = *m_editor.getWorld();
 		
-		const u64 mask = universe.getComponentsMask(entity);
+		const u64 mask = world.getComponentsMask(entity);
 		if (mask & ((u64)1 << (u64)MODEL_INSTANCE_TYPE.index)) return;
 
 		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;
 		icon.type = IconType::ENTITY;
-		for (ComponentUID cmp = universe.getFirstComponent(entity); cmp.isValid(); cmp = universe.getNextComponent(cmp))
+		for (ComponentUID cmp = world.getFirstComponent(entity); cmp.isValid(); cmp = world.getNextComponent(cmp))
 		{
 			if(cmp.type == PHYSICAL_CONTROLLER_TYPE)
 			{
@@ -179,7 +179,7 @@ struct EditorIconsImpl final : EditorIcons
 
 	Transform getIconTransform(const Icon& icon, const Quat& camera_rot, bool is_ortho, float ortho_size)
 	{
-		Transform ret = m_editor.getUniverse()->getTransform(icon.entity);
+		Transform ret = m_editor.getWorld()->getTransform(icon.entity);
 		if (!m_is_3d[(int)icon.type]) {
 			ret.rot = camera_rot;
 		}
@@ -197,11 +197,11 @@ struct EditorIconsImpl final : EditorIcons
 		static const float MIN_SCALE_FACTOR = 10;
 		static const float MAX_SCALE_FACTOR = 60;
 
-		const Universe& universe = *m_editor.getUniverse();
+		const World& world = *m_editor.getWorld();
 		const Viewport& vp = m_editor.getView().getViewport();
 
 		for(auto& icon : m_icons) {
-			const DVec3 position = universe.getPosition(icon.entity);
+			const DVec3 position = world.getPosition(icon.entity);
 			const float distance = (float)length(position - vp.pos);
 			float scale_factor = MIN_SCALE_FACTOR + distance;
 			scale_factor = clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
@@ -214,12 +214,12 @@ struct EditorIconsImpl final : EditorIcons
 		Matrix ret;
 		if (m_is_3d[(int)icon.type])
 		{
-			ret = m_editor.getUniverse()->getRelativeMatrix(icon.entity, vp_pos);
+			ret = m_editor.getWorld()->getRelativeMatrix(icon.entity, vp_pos);
 		}
 		else
 		{
 			ret = camera_matrix;
-			ret.setTranslation(Vec3(m_editor.getUniverse()->getPosition(icon.entity) - vp_pos));
+			ret.setTranslation(Vec3(m_editor.getWorld()->getPosition(icon.entity) - vp_pos));
 		}
 		if (is_ortho)
 		{

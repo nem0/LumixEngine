@@ -35,7 +35,7 @@
 #include "engine/profiler.h"
 #include "engine/queue.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "renderer/culling_system.h"
@@ -690,7 +690,7 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 		if (cmp_type != PARTICLE_EMITTER_TYPE) return;
 		if (entities.length() != 1) return;
 		
-		RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(cmp_type);
+		RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(cmp_type);
 		ParticleEmitter& emitter = scene->getParticleEmitter(entities[0]);
 
 		if (m_playing && ImGui::Button(ICON_FA_STOP " Stop")) m_playing = false;
@@ -791,12 +791,12 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		if (selected.empty()) return;
 
-		Universe& universe = *editor.getUniverse();
-		RenderScene& scene = *(RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+		World& world = *editor.getWorld();
+		RenderScene& scene = *(RenderScene*)world.getScene(MODEL_INSTANCE_TYPE);
 
 		Array<Material*> materials(m_app.getAllocator());
 		for (EntityRef e : selected) {
-			if (universe.hasComponent(e, MODEL_INSTANCE_TYPE)) {
+			if (world.hasComponent(e, MODEL_INSTANCE_TYPE)) {
 				Model* model = scene.getModelInstanceModel(e);
 				if (!model->isReady()) continue;
 				
@@ -805,7 +805,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 					materials.push(mesh.material);
 				}
 			}
-			if (universe.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
+			if (world.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
 				materials.push(scene.getProceduralGeometry(e).material);
 			}
 		}
@@ -1766,7 +1766,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		if (cmp_type != MODEL_INSTANCE_TYPE) return;
 		if (entities.length() != 1) return;
 
-		RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(cmp_type);
+		RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(cmp_type);
 		EntityRef entity = entities[0];
 		Model* model = scene->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
@@ -1857,7 +1857,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 		, m_mesh(INVALID_ENTITY)
-		, m_universe(nullptr)
+		, m_world(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getAllocator())
 		, m_fbx_importer(app)
@@ -1873,17 +1873,17 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		if (m_downscale_program) m_pipeline->getRenderer().getEndFrameDrawStream().destroy(m_downscale_program);
 		jobs::wait(&m_subres_signal);
 		auto& engine = m_app.getEngine();
-		engine.destroyUniverse(*m_universe);
+		engine.destroyWorld(*m_world);
 		m_pipeline.reset();
-		engine.destroyUniverse(*m_tile.universe);
+		engine.destroyWorld(*m_tile.world);
 		m_tile.pipeline.reset();
 	}
 
 	void init() {
 		Engine& engine = m_app.getEngine();
 		m_renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		createPreviewUniverse();
-		createTileUniverse();
+		createPreviewWorld();
+		createTileWorld();
 		m_viewport.is_ortho = true;
 		m_viewport.near = 0.f;
 		m_viewport.far = 1000.f;
@@ -2050,61 +2050,61 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 
-	void createTileUniverse()
+	void createTileWorld()
 	{
 		Engine& engine = m_app.getEngine();
-		m_tile.universe = &engine.createUniverse(false);
+		m_tile.world = &engine.createWorld(false);
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW", engine.getAllocator());
 
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_tile.universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		RenderScene* render_scene = (RenderScene*)m_tile.world->getScene(MODEL_INSTANCE_TYPE);
+		const EntityRef env_probe = m_tile.world->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_tile.world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
 		render_scene->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
 		render_scene->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
-		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
+		const EntityRef light_entity = m_tile.world->createEntity({10, 10, 10}, mtx.getRotation());
+		m_tile.world->createComponent(ENVIRONMENT_TYPE, light_entity);
 		render_scene->getEnvironment(light_entity).direct_intensity = 5;
 		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 		
-		m_tile.pipeline->setUniverse(m_tile.universe);
+		m_tile.pipeline->setWorld(m_tile.world);
 	}
 
 
-	void createPreviewUniverse()
+	void createPreviewWorld()
 	{
 		Engine& engine = m_app.getEngine();
-		m_universe = &engine.createUniverse(false);
+		m_world = &engine.createWorld(false);
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 		m_pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW",  engine.getAllocator());
 
-		const EntityRef mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
+		const EntityRef mesh_entity = m_world->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		auto* render_scene = static_cast<RenderScene*>(m_world->getScene(MODEL_INSTANCE_TYPE));
 		m_mesh = mesh_entity;
-		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+		m_world->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
-		const EntityRef env_probe = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		const EntityRef env_probe = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
 		render_scene->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
 		render_scene->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
-		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
+		const EntityRef light_entity = m_world->createEntity({0, 0, 0}, mtx.getRotation());
+		m_world->createComponent(ENVIRONMENT_TYPE, light_entity);
 		render_scene->getEnvironment(light_entity).direct_intensity = 5;
 		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 
-		m_pipeline->setUniverse(m_universe);
+		m_pipeline->setWorld(m_world);
 	}
 
 
 	void showPreview(Model& model)
 	{
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
+		auto* render_scene = static_cast<RenderScene*>(m_world->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 		if (!m_mesh.isValid()) return;
@@ -2815,15 +2815,15 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		pushTileQueue(path);
 	}
 	
-	static void destroyEntityRecursive(Universe& universe, EntityPtr entity)
+	static void destroyEntityRecursive(World& world, EntityPtr entity)
 	{
 		if (!entity.isValid()) return;
 			
 		EntityRef e = (EntityRef)entity;
-		destroyEntityRecursive(universe, universe.getFirstChild(e));
-		destroyEntityRecursive(universe, universe.getNextSibling(e));
+		destroyEntityRecursive(world, world.getFirstChild(e));
+		destroyEntityRecursive(world, world.getNextSibling(e));
 
-		universe.destroyEntity(e);
+		world.destroyEntity(e);
 	}
 
 	void update() override
@@ -2837,7 +2837,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		if (m_tile.frame_countdown >= 0) {
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1) {
-				destroyEntityRecursive(*m_tile.universe, (EntityRef)m_tile.entity);
+				destroyEntityRecursive(*m_tile.world, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
 				StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".lbc");
@@ -2897,7 +2897,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		Engine& engine = m_app.getEngine();
 
 		EntityMap entity_map(m_app.getAllocator());
-		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, Vec3(1), entity_map)) return;
+		if (!engine.instantiatePrefab(*m_tile.world, *prefab, DVec3(0), Quat::IDENTITY, Vec3(1), entity_map)) return;
 		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
 
 		m_tile.path_hash = prefab->getPath().getHash();
@@ -2911,17 +2911,17 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	{
 		AABB aabb({0, 0, 0}, {0, 0, 0});
 		float radius = 1;
-		Universe& universe = *m_tile.universe;
-		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
+		World& world = *m_tile.world;
+		for (EntityPtr e = world.getFirstEntity(); e.isValid(); e = world.getNextEntity((EntityRef)e)) {
 			EntityRef ent = (EntityRef)e;
-			const DVec3 pos = universe.getPosition(ent);
+			const DVec3 pos = world.getPosition(ent);
 			aabb.addPoint(Vec3(pos));
-			if (universe.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
-				RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+			if (world.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
+				RenderScene* scene = (RenderScene*)world.getScene(MODEL_INSTANCE_TYPE);
 				Model* model = scene->getModelInstanceModel(ent);
 				scene->setModelInstanceLOD(ent, 0);
 				if (model->isReady()) {
-					const Transform tr = universe.getTransform(ent);
+					const Transform tr = world.getTransform(ent);
 					DVec3 points[8];
 					model->getAABB().getCorners(tr, points);
 					for (const DVec3& p : points) {
@@ -3025,11 +3025,11 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
 	{
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		RenderScene* render_scene = (RenderScene*)m_tile.world->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
-		EntityRef mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+		EntityRef mesh_entity = m_tile.world->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_tile.world->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		render_scene->setModelInstancePath(mesh_entity, model->getPath());
 		render_scene->setModelInstanceLOD(mesh_entity, 0);
@@ -3113,7 +3113,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		{
 		}
 
-		Universe* universe = nullptr;
+		World* world = nullptr;
 		UniquePtr<Pipeline> pipeline;
 		EntityPtr entity = INVALID_ENTITY;
 		int frame_countdown = -1;
@@ -3129,7 +3129,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
 	gpu::TextureHandle m_preview;
-	Universe* m_universe;
+	World* m_world;
 	Viewport m_viewport;
 	UniquePtr<Pipeline> m_pipeline;
 	EntityPtr m_mesh = INVALID_ENTITY;
@@ -3310,7 +3310,7 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 template <typename F>
 void captureCubemap(StudioApp& app
-	, Universe& universe
+	, World& world
 	, Pipeline& pipeline
 	, const u32 texture_size
 	, const DVec3& position
@@ -3329,7 +3329,7 @@ void captureCubemap(StudioApp& app
 	viewport.w = texture_size;
 	viewport.h = texture_size;
 
-	pipeline.setUniverse(&universe);
+	pipeline.setWorld(&world);
 	pipeline.setViewport(viewport);
 
 	Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
@@ -3439,32 +3439,32 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void generateCubemaps(bool bounce, Universe& universe) {
+	void generateCubemaps(bool bounce, World& world) {
 		ASSERT(m_probes.empty());
 
 		m_pipeline->setIndirectLightMultiplier(bounce ? 1.f : 0.f);
 
-		RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+		RenderScene* scene = (RenderScene*)world.getScene(ENVIRONMENT_PROBE_TYPE);
 		const Span<EntityRef> env_probes = scene->getEnvironmentProbesEntities();
 		const Span<EntityRef> reflection_probes = scene->getReflectionProbesEntities();
 		m_probes.reserve(env_probes.length() + reflection_probes.length());
 		IAllocator& allocator = m_app.getAllocator();
 		for (EntityRef p : env_probes) {
-			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, universe, p, allocator);
+			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, world, p, allocator);
 			
 			job->env_probe = scene->getEnvironmentProbe(p);
 			job->is_reflection = false;
-			job->position = universe.getPosition(p);
+			job->position = world.getPosition(p);
 
 			m_probes.push(job);
 		}
 
 		for (EntityRef p : reflection_probes) {
-			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, universe, p, allocator);
+			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, world, p, allocator);
 			
 			job->reflection_probe = scene->getReflectionProbe(p);
 			job->is_reflection = true;
-			job->position = universe.getPosition(p);
+			job->position = world.getPosition(p);
 
 			m_probes.push(job);
 		}
@@ -3473,11 +3473,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 	struct ProbeJob {
-		ProbeJob(EnvironmentProbePlugin& plugin, Universe& universe, EntityRef& entity, IAllocator& allocator) 
+		ProbeJob(EnvironmentProbePlugin& plugin, World& world, EntityRef& entity, IAllocator& allocator) 
 			: entity(entity)
 			, data(allocator)
 			, plugin(plugin)
-			, universe(universe)
+			, world(world)
 		{}
 		
 		EntityRef entity;
@@ -3489,7 +3489,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		EnvironmentProbePlugin& plugin;
 		DVec3 position;
 
-		Universe& universe;
+		World& world;
 		Array<Vec4> data;
 		SphericalHarmonics sh;
 		bool render_dispatched = false;
@@ -3500,7 +3500,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void render(ProbeJob& job) {
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
-		captureCubemap(m_app, job.universe, *m_pipeline, texture_size, job.position, job.data, [&job](){
+		captureCubemap(m_app, job.world, *m_pipeline, texture_size, job.position, job.data, [&job](){
 			jobs::runLambda([&job]() {
 				job.plugin.processData(job);
 			}, nullptr);
@@ -3587,8 +3587,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					}
 				}
 
-				if (job.universe.hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
-					scene = (RenderScene*)job.universe.getScene(ENVIRONMENT_PROBE_TYPE);
+				if (job.world.hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
+					scene = (RenderScene*)job.world.getScene(ENVIRONMENT_PROBE_TYPE);
 					EnvironmentProbe& p = scene->getEnvironmentProbe(job.entity);
 					static_assert(sizeof(p.sh_coefs) == sizeof(job.sh.coefs));
 					memcpy(p.sh_coefs, job.sh.coefs, sizeof(p.sh_coefs));
@@ -3719,16 +3719,16 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
 		if (entities.length() != 1) return;
 
-		Universe& universe = *editor.getUniverse();
+		World& world = *editor.getWorld();
 		const EntityRef e = entities[0];
-		auto* scene = static_cast<RenderScene*>(universe.getScene(cmp_type));
+		auto* scene = static_cast<RenderScene*>(world.getScene(cmp_type));
 		if (cmp_type == ENVIRONMENT_PROBE_TYPE) {
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
 				if (ImGui::CollapsingHeader("Generator")) {
-					if (ImGui::Button("Generate")) generateCubemaps(false, universe);
+					if (ImGui::Button("Generate")) generateCubemaps(false, world);
 					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true, universe);
+					if (ImGui::Button("Add bounce")) generateCubemaps(true, world);
 				}
 			}
 		}
@@ -3744,9 +3744,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(Path(path), true, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
-					if (ImGui::Button("Generate")) generateCubemaps(false, universe);
+					if (ImGui::Button("Generate")) generateCubemaps(false, world);
 					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true, universe);
+					if (ImGui::Button("Add bounce")) generateCubemaps(true, world);
 				}
 			}
 		}
@@ -3776,7 +3776,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 
 		bool execute() override {
-			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->beginInstancedModelEditing(entity);
 
 			for (auto& i : im.instances) {
@@ -3792,7 +3792,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 
 		void undo() override {
-			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->beginInstancedModelEditing(entity);
 
 			for (auto& i : im.instances) {
@@ -3834,7 +3834,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		bool execute() override {
 			instances.clear();
 			
-			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->beginInstancedModelEditing(entity);
 			for (i32 i = im.instances.size() - 1; i >= 0; --i) {
 				const InstancedModel::InstanceData& id = im.instances[i];
@@ -3849,7 +3849,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 		
 		void undo() override {
-			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->beginInstancedModelEditing(entity);
 			
 			for (const InstancedModel::InstanceData& id : instances) {
@@ -3877,7 +3877,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		{}
 
 		bool execute() override {
-			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->beginInstancedModelEditing(entity);
 			for (const InstancedModel::InstanceData& i : instances) {
 				im.instances.push(i);
@@ -3887,7 +3887,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 		
 		void undo() override {
-			RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(INSTANCED_MODEL_TYPE);
+			RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(INSTANCED_MODEL_TYPE);
 			InstancedModel& im = scene->beginInstancedModelEditing(entity);
 			for (u32 j = 0, cj = (u32)instances.size(); j < cj; ++j) {
 				for (u32 i = 0, ci = (u32)im.instances.size(); i < ci; ++i) {
@@ -3931,8 +3931,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
 		if (selected_entities.size() != 1) return { nullptr };
 
-		Universe& universe = *editor.getUniverse();
-		RenderScene* scene = (RenderScene*)universe.getScene(INSTANCED_MODEL_TYPE);
+		World& world = *editor.getWorld();
+		RenderScene* scene = (RenderScene*)world.getScene(INSTANCED_MODEL_TYPE);
 		auto iter = scene->getInstancedModels().find(selected_entities[0]);
 		if (!iter.isValid()) return { nullptr };
 		return { &iter.value(), selected_entities[0], scene };
@@ -3987,7 +3987,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (!hit.is_hit) return false;
 
 		const DVec3 hit_pos = hit.origin + hit.t * hit.dir;
-		const DVec3 origin = editor.getUniverse()->getPosition(cmp.entity);
+		const DVec3 origin = editor.getWorld()->getPosition(cmp.entity);
 		switch (m_brush) {
 			case Brush::SINGLE: {
 				UniquePtr<AddCommand> add_cmd = UniquePtr<AddCommand>::create(editor.getAllocator(), cmp.entity, editor);
@@ -4002,7 +4002,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			}
 			case Brush::TERRAIN: {
 				const EntityRef terrain = *hit.entity;
-				const Transform terrain_tr = editor.getUniverse()->getTransform(terrain);
+				const Transform terrain_tr = editor.getWorld()->getTransform(terrain);
 				const Transform inv_terrain_tr = terrain_tr.inverted();
 
 				const bool remove = ImGui::GetIO().KeyCtrl; // TODO
@@ -4081,20 +4081,20 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		return true;
 	}
 
-	void onMouseMove(UniverseView& view, int x, int y, int, int) override {
+	void onMouseMove(WorldView& view, int x, int y, int, int) override {
 		if (ImGui::GetIO().KeyShift && m_brush == Brush::TERRAIN) {
 			paint(x, y);
 		}
 	}
 
-	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {
+	void onMouseUp(WorldView& view, int x, int y, os::MouseButton button) override {
 		if (m_can_lock_group) {
 			m_app.getWorldEditor().lockGroupCommand();
 			m_can_lock_group = false;
 		}
 	}
 
-	bool onMouseDown(UniverseView& view, int x, int y) override {
+	bool onMouseDown(WorldView& view, int x, int y) override {
 		if (ImGui::GetIO().KeyShift) return paint(x, y);
 
 		auto cmp = getComponent();
@@ -4137,7 +4137,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (cmp_type != INSTANCED_MODEL_TYPE) return;
 		if (entities.length() != 1) return;
 
-		RenderScene* render_scene = (RenderScene*)editor.getUniverse()->getScene(cmp_type);
+		RenderScene* render_scene = (RenderScene*)editor.getWorld()->getScene(cmp_type);
 		const InstancedModel& im = render_scene->getInstancedModels()[entities[0]];
 		
 		ImGuiEx::Label("Instances");
@@ -4152,7 +4152,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 
 		if (selected >= 0 && selected < im.instances.size()) {
-			DVec3 origin = editor.getUniverse()->getPosition(entities[0]);
+			DVec3 origin = editor.getWorld()->getPosition(entities[0]);
 			Transform tr;
 			tr.rot = getInstanceQuat(m_selected.rot_quat);
 			tr.scale = Vec3(m_selected.scale);
@@ -4301,7 +4301,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	const char* getName() const override { return "procedural_geom"; }
 
 	void paint(const DVec3& pos
-		, const Universe& universe
+		, const World& world
 		, EntityRef entity
 		, ProceduralGeometry& pg
 		, Renderer& renderer) const
@@ -4311,7 +4311,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	
 		// TODO undo/redo
 
-		const Transform tr = universe.getTransform(entity);
+		const Transform tr = world.getTransform(entity);
 		const Vec3 center(tr.inverted().transform(pos));
 
 		const float R2 = m_brush_size * m_brush_size;
@@ -4341,7 +4341,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);	
 	}
 
-	bool paint(UniverseView& view, i32 x, i32 y) {
+	bool paint(WorldView& view, i32 x, i32 y) {
 		if (!m_is_open) return false;
 
 		WorldEditor& editor = view.getEditor();
@@ -4349,9 +4349,9 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (selected.size() != 1) return false;
 
 		const EntityRef entity = selected[0];
-		const Universe& universe = *editor.getUniverse();
-		RenderScene* scene = (RenderScene*)universe.getScene("renderer");
-		if (!universe.hasComponent(entity, PROCEDURAL_GEOM_TYPE)) return false;
+		const World& world = *editor.getWorld();
+		RenderScene* scene = (RenderScene*)world.getScene("renderer");
+		if (!world.hasComponent(entity, PROCEDURAL_GEOM_TYPE)) return false;
 
 		DVec3 origin;
 		Vec3 dir;
@@ -4366,18 +4366,18 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		ASSERT(renderer);
 
 		ProceduralGeometry& pg = scene->getProceduralGeometry(entity);
-		paint(hit.origin + hit.t * hit.dir, universe, entity, pg, *renderer);
+		paint(hit.origin + hit.t * hit.dir, world, entity, pg, *renderer);
 
 		return true;
 	}
 
 	void drawCursor(WorldEditor& editor, EntityRef entity) const {
 		if (!m_is_open) return;
-		const UniverseView& view = editor.getView();
+		const WorldView& view = editor.getView();
 		const Vec2 mp = view.getMousePos();
-		Universe& universe = *editor.getUniverse();
+		World& world = *editor.getWorld();
 	
-		RenderScene* scene = static_cast<RenderScene*>(universe.getScene("renderer"));
+		RenderScene* scene = static_cast<RenderScene*>(world.getScene("renderer"));
 		DVec3 origin;
 		Vec3 dir;
 		editor.getView().getViewport().getRay(mp, origin, dir);
@@ -4394,7 +4394,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 	void drawCursor(WorldEditor& editor, RenderScene& scene, EntityRef entity, const DVec3& center) const {
 		if (!m_is_open) return;
-		UniverseView& view = editor.getView();
+		WorldView& view = editor.getView();
 		addCircle(view, center, m_brush_size, Vec3(0, 1, 0), Color::GREEN);
 		const ProceduralGeometry& pg = scene.getProceduralGeometry(entity);
 
@@ -4405,7 +4405,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 		const float R2 = m_brush_size * m_brush_size;
 
-		const Transform tr = scene.getUniverse().getTransform(entity);
+		const Transform tr = scene.getWorld().getTransform(entity);
 		const Vec3 center_local = Vec3(tr.inverted().transform(center));
 
 		for (u32 i = 0, c = pg.getVertexCount(); i < c; ++i) {
@@ -4418,15 +4418,15 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	}
 
 	void onMouseWheel(float value) override { m_brush_size = maximum(0.f, m_brush_size + value * 0.2f); }
-	bool onMouseDown(UniverseView& view, int x, int y) override { return paint(view, x, y); }
-	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) override {}
-	void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) override { paint(view, x, y); }
+	bool onMouseDown(WorldView& view, int x, int y) override { return paint(view, x, y); }
+	void onMouseUp(WorldView& view, int x, int y, os::MouseButton button) override {}
+	void onMouseMove(WorldView& view, int x, int y, int rel_x, int rel_y) override { paint(view, x, y); }
 	
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
 		if (cmp_type != PROCEDURAL_GEOM_TYPE) return;
 		if (entities.length() != 1) return;
 
-		RenderScene* scene = (RenderScene*)editor.getUniverse()->getScene(PROCEDURAL_GEOM_TYPE);
+		RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(PROCEDURAL_GEOM_TYPE);
 		ProceduralGeometry& pg = scene->getProceduralGeometry(entities[0]);
 		ImGuiEx::Label("Vertex count");
 		const u32 stride = pg.vertex_decl.getStride();
@@ -4497,7 +4497,7 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 
 		ComponentUID cmp;
 		cmp.entity = entities[0];
-		cmp.scene = editor.getUniverse()->getScene(cmp_type);
+		cmp.scene = editor.getWorld()->getScene(cmp_type);
 		cmp.type = cmp_type;
 		m_terrain_editor.onGUI(cmp, editor);
 	}
@@ -4596,39 +4596,39 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	UniverseView::RayHit castRay(Universe& universe, const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
+	WorldView::RayHit castRay(World& world, const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
-		RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+		RenderScene* scene = (RenderScene*)world.getScene(ENVIRONMENT_PROBE_TYPE);
 		const RayCastModelHit hit = scene->castRay(origin, dir, ignored);
 
 		return {hit.is_hit, hit.t, hit.entity, hit.origin + hit.dir * hit.t};
 	}
 
 
-	AABB getEntityAABB(Universe& universe, EntityRef entity, const DVec3& base) override
+	AABB getEntityAABB(World& world, EntityRef entity, const DVec3& base) override
 	{
 		AABB aabb;
 
-		if (universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-			RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+		if (world.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
+			RenderScene* scene = (RenderScene*)world.getScene(ENVIRONMENT_PROBE_TYPE);
 			Model* model = scene->getModelInstanceModel(entity);
 			if (!model) return aabb;
 
 			aabb = model->getAABB();
-			aabb.transform(universe.getRelativeMatrix(entity, base));
+			aabb.transform(world.getRelativeMatrix(entity, base));
 
 			return aabb;
 		}
 
-		Vec3 pos = Vec3(universe.getPosition(entity) - base);
+		Vec3 pos = Vec3(world.getPosition(entity) - base);
 		aabb = AABB(pos, pos);
 
 		return aabb;
 	}
 
 
-	Path getModelInstancePath(Universe& universe, EntityRef entity) override {
-		RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+	Path getModelInstancePath(World& world, EntityRef entity) override {
+		RenderScene* scene = (RenderScene*)world.getScene(ENVIRONMENT_PROBE_TYPE);
 		return scene->getModelInstancePath(entity); 
 	}
 
@@ -4988,7 +4988,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (editor.getSelectedEntities().empty()) return;
 			EntityRef entity = editor.getSelectedEntities()[0];
 
-			if (!editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE))
+			if (!editor.getWorld()->hasComponent(entity, TERRAIN_TYPE))
 			{
 				editor.addComponent(Span(&entity, 1), TERRAIN_TYPE);
 			}
@@ -5124,12 +5124,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void captureRenderDoc() { gpu::captureRenderDocFrame(); }
 
-	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
+	void showEnvironmentProbeGizmo(WorldView& view, ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		const Universe& universe = scene->getUniverse();
+		const World& world = scene->getWorld();
 		EntityRef e = (EntityRef)cmp.entity;
 		EnvironmentProbe& p = scene->getEnvironmentProbe(e);
-		Transform tr = universe.getTransform(e);
+		Transform tr = world.getTransform(e);
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = view.getEditor();
@@ -5147,12 +5147,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		}
 	}
 
-	void showReflectionProbeGizmo(UniverseView& view, ComponentUID cmp) {
+	void showReflectionProbeGizmo(WorldView& view, ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		const Universe& universe = scene->getUniverse();
+		const World& world = scene->getWorld();
 		EntityRef e = (EntityRef)cmp.entity;
 		ReflectionProbe& p = scene->getReflectionProbe(e);
-		Transform tr = universe.getTransform(e);
+		Transform tr = world.getTransform(e);
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = view.getEditor();
@@ -5164,20 +5164,20 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		}
 	}
 
-	void showPointLightGizmo(UniverseView& view, ComponentUID light)
+	void showPointLightGizmo(WorldView& view, ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
+		World& world = scene->getWorld();
 
 		const float range = scene->getLightRange((EntityRef)light.entity);
 		const float fov = scene->getPointLight((EntityRef)light.entity).fov;
 
-		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
+		const DVec3 pos = world.getPosition((EntityRef)light.entity);
 		if (fov > PI) {
 			addSphere(view, pos, range, Color::BLUE);
 		}
 		else {
-			const Quat rot = universe.getRotation((EntityRef)light.entity);
+			const Quat rot = world.getRotation((EntityRef)light.entity);
 			const float t = tanf(fov * 0.5f);
 			addCone(view, pos, rot.rotate(Vec3(0, 0, -range)), rot.rotate(Vec3(0, range * t, 0)), rot.rotate(Vec3(range * t, 0, 0)), Color::BLUE);
 		}
@@ -5193,16 +5193,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		return Vec3(maximum(a.x, b.x), maximum(a.y, b.y), maximum(a.z, b.z));
 	}
 
-	void showGlobalLightGizmo(UniverseView& view, ComponentUID light)
+	void showGlobalLightGizmo(WorldView& view, ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		const Universe& universe = scene->getUniverse();
+		const World& world = scene->getWorld();
 		const EntityRef entity = (EntityRef)light.entity;
-		const DVec3 pos = universe.getPosition(entity);
+		const DVec3 pos = world.getPosition(entity);
 
-		const Vec3 dir = universe.getRotation(entity).rotate(Vec3(0, 0, 1));
-		const Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
-		const Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
+		const Vec3 dir = world.getRotation(entity).rotate(Vec3(0, 0, 1));
+		const Vec3 right = world.getRotation(entity).rotate(Vec3(1, 0, 0));
+		const Vec3 up = world.getRotation(entity).rotate(Vec3(0, 1, 0));
 
 		addLine(view, pos, pos + dir, Color::BLUE);
 		addLine(view, pos + right, pos + dir + right, Color::BLUE);
@@ -5218,26 +5218,26 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		addSphere(view, pos - dir, 0.1f, Color::BLUE);
 	}
 
-	void showDecalGizmo(UniverseView& view, ComponentUID cmp)
+	void showDecalGizmo(WorldView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const EntityRef e = (EntityRef)cmp.entity;
-		Universe& universe = scene->getUniverse();
+		World& world = scene->getWorld();
 		Decal& decal = scene->getDecal(e);
-		const Transform tr = universe.getTransform(e);
+		const Transform tr = world.getTransform(e);
 		const Vec3 x = tr.rot * Vec3(1, 0, 0) * decal.half_extents.x;
 		const Vec3 y = tr.rot * Vec3(0, 1, 0) * decal.half_extents.y;
 		const Vec3 z = tr.rot * Vec3(0, 0, 1) * decal.half_extents.z;
 		addCube(view, tr.pos, x, y, z, Color::BLUE);
 	}
 
-	void showCurveDecalGizmo(UniverseView& view, ComponentUID cmp)
+	void showCurveDecalGizmo(WorldView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const EntityRef e = (EntityRef)cmp.entity;
-		Universe& universe = scene->getUniverse();
+		World& world = scene->getWorld();
 		CurveDecal& decal = scene->getCurveDecal(e);
-		const Transform tr = universe.getTransform(e);
+		const Transform tr = world.getTransform(e);
 		const Vec3 x = tr.rot * Vec3(1, 0, 0) * decal.half_extents.x;
 		const Vec3 y = tr.rot * Vec3(0, 1, 0) * decal.half_extents.y;
 		const Vec3 z = tr.rot * Vec3(0, 0, 1) * decal.half_extents.z;
@@ -5263,14 +5263,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		addLine(view, tr.pos, p2_tr.pos, Color::GREEN);
 	}
 
-	void showCameraGizmo(UniverseView& view, ComponentUID cmp)
+	void showCameraGizmo(WorldView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 
 		addFrustum(view, scene->getCameraFrustum((EntityRef)cmp.entity), Color::BLUE);
 	}
 
-	bool showGizmo(UniverseView& view, ComponentUID cmp) override
+	bool showGizmo(WorldView& view, ComponentUID cmp) override
 	{
 		if (cmp.type == CAMERA_TYPE)
 		{

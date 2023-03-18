@@ -5,7 +5,7 @@
 #include "engine/engine.h"
 #include "engine/plugin.h"
 #include "engine/resource_manager.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 
 namespace Lumix
@@ -62,7 +62,7 @@ struct AudioSystemImpl final : AudioSystem {
 	const char* getName() const override { return "audio"; }
 
 
-	void createScenes(Universe& ctx) override
+	void createScenes(World& ctx) override
 	{
 		UniquePtr<AudioScene> scene = AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
 		ctx.addScene(scene.move());

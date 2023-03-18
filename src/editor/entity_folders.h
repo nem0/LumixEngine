@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/array.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 
 namespace Lumix {
 
@@ -24,7 +24,7 @@ struct LUMIX_EDITOR_API EntityFolders final {
 		EntityPtr prev = INVALID_ENTITY;
 	};
 
-	EntityFolders(Universe& universe, IAllocator& allocator);
+	EntityFolders(World& world, IAllocator& allocator);
 	~EntityFolders();
 
 	FolderID getRoot() const { return 0; }
@@ -58,7 +58,7 @@ private:
 	void onEntityDestroyed(EntityRef e);
 	void fix(Folder& folder, const EntityMap& entity_map);
 
-	Universe& m_universe;
+	World& m_world;
 	Array<Entity> m_entities;
 	FreeList m_folders;
 	FolderID m_selected_folder;

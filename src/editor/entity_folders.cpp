@@ -5,14 +5,14 @@
 namespace Lumix {
 
 
-EntityFolders::EntityFolders(Universe& universe, IAllocator& allocator)
+EntityFolders::EntityFolders(World& world, IAllocator& allocator)
 	: m_entities(allocator)
-	, m_universe(universe) 
+	, m_world(world) 
 	, m_folders(allocator)
 {
-	ASSERT(!universe.getFirstEntity().isValid());
-	universe.entityDestroyed().bind<&EntityFolders::onEntityDestroyed>(this);
-	universe.entityCreated().bind<&EntityFolders::onEntityCreated>(this);
+	ASSERT(!world.getFirstEntity().isValid());
+	world.entityDestroyed().bind<&EntityFolders::onEntityDestroyed>(this);
+	world.entityCreated().bind<&EntityFolders::onEntityCreated>(this);
 
 	const FolderID root_id = m_folders.alloc();
 	Folder& root = m_folders.getObject(root_id);
@@ -21,8 +21,8 @@ EntityFolders::EntityFolders(Universe& universe, IAllocator& allocator)
 }
 
 EntityFolders::~EntityFolders() {
-	m_universe.entityCreated().unbind<&EntityFolders::onEntityCreated>(this);
-	m_universe.entityDestroyed().unbind<&EntityFolders::onEntityDestroyed>(this);
+	m_world.entityCreated().unbind<&EntityFolders::onEntityCreated>(this);
+	m_world.entityDestroyed().unbind<&EntityFolders::onEntityDestroyed>(this);
 }
 
 void EntityFolders::onEntityDestroyed(EntityRef e) {

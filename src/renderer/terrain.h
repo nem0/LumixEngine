@@ -26,7 +26,7 @@ struct RenderScene;
 struct ShiftedFrustum;
 struct TerrainQuad;
 struct Texture;
-struct Universe;
+struct World;
 
 
 struct Terrain {
@@ -101,7 +101,7 @@ struct Terrain {
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 	void serialize(OutputMemoryStream& serializer);
-	void deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene, i32 version);
+	void deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderScene& scene, i32 version);
 
 	void addGrassType(int index);
 	void removeGrassType(int index);
