@@ -16,7 +16,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/thread.h"
-#include "engine/universe.h"
+#include "engine/world.h"
 #include "gui/gui_system.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
@@ -57,7 +57,7 @@ struct Runner final
 
 	~Runner() {
 		jobs::shutdown();
-		ASSERT(!m_universe); 
+		ASSERT(!m_world); 
 	}
 
 	void onResize() {
@@ -87,28 +87,28 @@ struct Runner final
 			m_engine->getFileSystem().processCallbacks();
 		}
 
-		m_pipeline->setUniverse(m_universe);
+		m_pipeline->setWorld(m_world);
 	}
 
 	void initDemoScene() {
-		const EntityRef env = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_universe->createComponent(ENVIRONMENT_TYPE, env);
-		m_universe->createComponent(LUA_SCRIPT_TYPE, env);
+		const EntityRef env = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_world->createComponent(ENVIRONMENT_TYPE, env);
+		m_world->createComponent(LUA_SCRIPT_TYPE, env);
 		
-		RenderScene* render_scene = (RenderScene*)m_universe->getScene("renderer");
+		RenderScene* render_scene = (RenderScene*)m_world->getScene("renderer");
 		Environment& environment = render_scene->getEnvironment(env);
 		environment.direct_intensity = 3;
 		
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
-		m_universe->setRotation(env, rot);
+		m_world->setRotation(env, rot);
 		
-		LuaScriptScene* lua_scene = (LuaScriptScene*)m_universe->getScene("lua_script");
+		LuaScriptScene* lua_scene = (LuaScriptScene*)m_world->getScene("lua_script");
 		lua_scene->addScript(env, 0);
 		lua_scene->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
-	bool loadUniverse(const char* path, const char* universe_name) {
+	bool loadWorld(const char* path, const char* world_name) {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) return false;
@@ -116,9 +116,9 @@ struct Runner final
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
-		UniverseHeader header;
+		WorldHeader header;
 		blob.read(header);
-		if ((u32)header.version <= (u32)UniverseSerializedVersion::HASH64) {
+		if ((u32)header.version <= (u32)WorldSerializedVersion::HASH64) {
 			u32 dummy;
 			blob.read(dummy);
 			blob.read(dummy);
@@ -133,8 +133,8 @@ struct Runner final
 			}
 		}
 
-		m_universe->setName(universe_name);
-		if (!m_engine->deserialize(*m_universe, blob, entity_map)) {
+		m_world->setName(world_name);
+		if (!m_engine->deserialize(*m_world, blob, entity_map)) {
 			logError("Failed to deserialize ", path);
 			return false;
 		}
@@ -159,7 +159,7 @@ struct Runner final
 		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
 
 		InputMemoryStream tmp(data);
-		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, Span(m_startup_universe));
+		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, Span(m_startup_world));
 		if (DeserializeProjectResult::SUCCESS != res) {
 			logError("Failed to deserialize project file");
 		}
@@ -180,7 +180,7 @@ struct Runner final
 			captureMouse(true);
 		}
 
-		m_universe = &m_engine->createUniverse(true);
+		m_world = &m_engine->createWorld(true);
 		initRenderPipeline();
 		
 		auto* gui = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
@@ -189,8 +189,8 @@ struct Runner final
 
 		loadProject();
 
-		const StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_startup_universe, ".unv");
-		if (!loadUniverse(unv_path, m_startup_universe)) {
+		const StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_startup_world, ".unv");
+		if (!loadWorld(unv_path, m_startup_world)) {
 			initDemoScene();
 		}
 		os::showCursor(false);
@@ -202,16 +202,16 @@ struct Runner final
 
 		os::showCursor(false);
 		onResize();
-		m_engine->startGame(*m_universe);
+		m_engine->startGame(*m_world);
 	}
 
 	void shutdown() {
-		m_engine->destroyUniverse(*m_universe);
+		m_engine->destroyWorld(*m_world);
 		auto* gui = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
 		gui->setInterface(nullptr);
 		m_pipeline.reset();
 		m_engine.reset();
-		m_universe = nullptr;
+		m_world = nullptr;
 	}
 
 	void captureMouse(bool capture) {
@@ -253,7 +253,7 @@ struct Runner final
 	}
 
 	void onIdle() {
-		m_engine->update(*m_universe);
+		m_engine->update(*m_world);
 
 		EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
 		if (camera.isValid()) {
@@ -273,9 +273,9 @@ struct Runner final
 	debug::Allocator m_allocator;
 	UniquePtr<Engine> m_engine;
 	Renderer* m_renderer = nullptr;
-	Universe* m_universe = nullptr;
+	World* m_world = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
-	char m_startup_universe[96] = "main";
+	char m_startup_world[96] = "main";
 
 	Viewport m_viewport;
 	bool m_finished = false;
