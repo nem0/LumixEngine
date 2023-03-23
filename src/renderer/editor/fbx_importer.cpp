@@ -149,17 +149,17 @@ static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
 bool FBXImporter::findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const {
 	PathInfo file_info(tex.path);
 	tex.src = src_dir;
-	tex.src << file_info.m_basename << "." << ext;
+	tex.src.append(file_info.m_basename, ".", ext);
 	tex.is_valid = m_filesystem.fileExists(tex.src);
 
 	if (!tex.is_valid) {
 		tex.src = src_dir;
-		tex.src << file_info.m_dir << "/" << file_info.m_basename << "." << ext;
+		tex.src.append(file_info.m_dir, "/", file_info.m_basename, ".", ext);
 		tex.is_valid = m_filesystem.fileExists(tex.src);
 					
 		if (!tex.is_valid) {
 			tex.src = src_dir;
-			tex.src << "textures/" << file_info.m_basename << "." << ext;
+			tex.src.append("textures/", file_info.m_basename, ".", ext);
 			tex.is_valid = m_filesystem.fileExists(tex.src);
 		}
 	}
@@ -336,7 +336,7 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 				take_info->filename.toString(tmp);
 				copyString(Span(anim.name.data), Path::getBasename(tmp));
 			}
-			if (anim.name.empty()) anim.name << "anim";
+			if (anim.name.empty()) anim.name.add("anim");
 		}
 		else
 		{

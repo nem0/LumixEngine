@@ -150,9 +150,9 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void onBasePathChanged() {
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix");
+		Path path(base_path, ".lumix");
 		bool success = os::makePath(path);
-		path << "/asset_tiles";
+		path.append("/asset_tiles");
 		success = os::makePath(path) && success;
 		if (!success) logError("Could not create ", path);
 	}
@@ -224,7 +224,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void onResourceListChanged(const Path& path) {
 		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
-		StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), path.c_str());
+		const Path fullpath(fs.getBasePath(), path.c_str());
 		if (os::dirExists(fullpath)) {
 			changeDir(m_dir, false);
 			return;
@@ -466,11 +466,11 @@ struct AssetBrowserImpl : AssetBrowser {
 	};
 	
 	static TileState getState(const FileInfo& info, FileSystem& fs) {
-		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", info.file_path_hash, ".lbc");
+		const Path path(".lumix/asset_tiles/", info.file_path_hash, ".lbc");
 		if (!fs.fileExists(info.filepath)) return TileState::DELETED;
 		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
 
-		StaticString<LUMIX_MAX_PATH> compiled_path(".lumix/resources/", info.file_path_hash, ".res");
+		const Path compiled_path(".lumix/resources/", info.file_path_hash, ".res");
 		const u64 last_modified = fs.getLastModified(path);
 		if (last_modified < fs.getLastModified(info.filepath) || last_modified < fs.getLastModified(compiled_path)) {
 			return TileState::OUTDATED;
@@ -501,8 +501,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		else
 		{
 			ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
-			StaticString<LUMIX_MAX_PATH> compiled_asset_path(".lumix/resources/", tile.file_path_hash, ".res");
-			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".lbc");
+			const Path compiled_asset_path(".lumix/resources/", tile.file_path_hash, ".res");
+			const Path path(".lumix/asset_tiles/", tile.file_path_hash, ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
 				case TileState::OK:
@@ -531,7 +531,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void deleteTile(u32 idx) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		StaticString<LUMIX_MAX_PATH> res_path(".lumix/resources/", m_file_infos[idx].file_path_hash, ".res");
+		const Path res_path(".lumix/resources/", m_file_infos[idx].file_path_hash, ".res");
 		fs.deleteFile(res_path);
 		if (!fs.deleteFile(m_file_infos[idx].filepath)) {
 			logError("Failed to delete ", m_file_infos[idx].filepath);
@@ -550,7 +550,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void recreateTiles() {
 		for (FileInfo& fi : m_file_infos) {
-			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", fi.file_path_hash, ".res");
+			const Path path(".lumix/asset_tiles/", fi.file_path_hash, ".res");
 			createTile(fi, path);
 		}
 	}
@@ -630,14 +630,14 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 			
 			if (ImGui::MenuItem("View in explorer")) {
-				StaticString<LUMIX_MAX_PATH> dir_full_path(base_path, "/", m_dir);
+				const Path dir_full_path(base_path, "/", m_dir);
 				os::openExplorer(dir_full_path);
 			}
 			if (ImGui::BeginMenu("Create directory")) {
 				ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
 				ImGui::SameLine();
 				if (ImGui::Button("Create")) {
-					StaticString<LUMIX_MAX_PATH> path(base_path, "/", m_dir, "/", tmp);
+					const Path path(base_path, "/", m_dir, "/", tmp);
 					if (!os::makePath(path)) {
 						logError("Failed to create ", path);
 					}
@@ -1053,12 +1053,12 @@ struct AssetBrowserImpl : AssetBrowser {
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (os::dirExists(path)) {
-			StaticString<LUMIX_MAX_PATH> tmp(fs.getBasePath(), "/", m_dir, "/");
+			const Path tmp(fs.getBasePath(), "/", m_dir, "/");
 			IAllocator& allocator = m_app.getAllocator();
 			copyDir(path, tmp, allocator);
 		}
 		PathInfo fi(path);
-		StaticString<LUMIX_MAX_PATH> dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
+		const Path dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
 		return os::copyFile(path, dest);
 	}
 
@@ -1080,10 +1080,10 @@ struct AssetBrowserImpl : AssetBrowser {
 	static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
 		StaticString<LUMIX_MAX_PATH> res("");
 		if (rl.full.length() > 0) {
-			res << rl.subresource << (rl.subresource.length() > 0 ? ":" : "") << rl.basename << "." << rl.ext;
+			res.append(rl.subresource, (rl.subresource.length() > 0 ? ":" : ""), rl.basename, ".", rl.ext);
 		}
 		if (hash_id) {
-			res << "##h" << RuntimeHash(rl.full.m_begin, rl.full.length()).getHashValue();
+			res.append("##h", RuntimeHash(rl.full.m_begin, rl.full.length()).getHashValue());
 		}
 		return res;
 	}
@@ -1177,11 +1177,9 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		Engine& engine = m_app.getEngine();
-		StaticString<LUMIX_MAX_PATH> src_full_path;
-		StaticString<LUMIX_MAX_PATH> dest_full_path;
 		const char* base_path = engine.getFileSystem().getBasePath();
-		src_full_path << base_path << tmp_path;
-		dest_full_path << base_path << resource.getPath().c_str();
+		StaticString<LUMIX_MAX_PATH> src_full_path(base_path, tmp_path);
+		StaticString<LUMIX_MAX_PATH> dest_full_path(base_path, resource.getPath().c_str());
 
 		os::deleteFile(dest_full_path);
 
@@ -1289,11 +1287,11 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void openInExternalEditor(const char* path) const override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path(m_app.getEngine().getFileSystem().getBasePath());
-		full_path << path;
+		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+		StaticString<LUMIX_MAX_PATH> full_path(base_path, path);
 		const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path);
 		if (res == os::ExecuteOpenResult::NO_ASSOCIATION) {
-			logError(full_path << " is not associated with any app.");
+			logError(full_path, " is not associated with any app.");
 		}
 		else if (res == os::ExecuteOpenResult::OTHER_ERROR) {
 			logError("Failed to open ", full_path, " in exeternal editor.");

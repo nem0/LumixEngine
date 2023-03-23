@@ -85,16 +85,10 @@ template <int SIZE> struct StaticString
 		(void)tmp;
 	}
 
-	template <int value_size> StaticString& operator<<(StaticString<value_size>& value)
+	template <typename... Args> void append(Args... args)
 	{
-		add(value);
-		return *this;
-	}
-
-	template <typename T> StaticString& operator<<(T value)
-	{
-		add(value);
-		return *this;
+		int tmp[] = { (add(args), 0)... };
+		(void)tmp;
 	}
 
 	template <int value_size> void add(StaticString<value_size>& value) { catString(data, value.data); }

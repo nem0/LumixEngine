@@ -87,13 +87,13 @@ struct FileSystemImpl : FileSystem {
 	{ 
 		Path::normalize(dir, Span(m_base_path.data));
 		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
-			m_base_path << '/';
+			m_base_path.add('/');
 		}
 	}
 
 	bool saveContentSync(const Path& path, Span<const u8> content) override {
 		os::OutputFile file;
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path.c_str());
+		const Path full_path(m_base_path, path.c_str());
 		if (!file.open(full_path)) return false;
 
 		bool res = file.write(content.begin(), content.length());
@@ -104,7 +104,7 @@ struct FileSystemImpl : FileSystem {
 
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		os::InputFile file;
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path.c_str());
+		const Path full_path(m_base_path, path.c_str());
 
 		if (!file.open(full_path)) return false;
 
@@ -157,58 +157,58 @@ struct FileSystemImpl : FileSystem {
 
 	bool open(const char* path, os::InputFile& file) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
+		const Path full_path(m_base_path, path);
 		return file.open(full_path);
 	}
 
 
 	bool open(const char* path, os::OutputFile& file) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
+		const Path full_path(m_base_path, path);
 		return file.open(full_path);
 	}
 
 
 	bool deleteFile(const char* path) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
+		const Path full_path(m_base_path, path);
 		return os::deleteFile(full_path);
 	}
 
 
 	bool moveFile(const char* from, const char* to) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path_from(m_base_path, from);
-		StaticString<LUMIX_MAX_PATH> full_path_to(m_base_path, to);
+		const Path full_path_from(m_base_path, from);
+		const Path full_path_to(m_base_path, to);
 		return os::moveFile(full_path_from, full_path_to);
 	}
 
 
 	bool copyFile(const char* from, const char* to) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path_from(m_base_path, from);
-		StaticString<LUMIX_MAX_PATH> full_path_to(m_base_path, to);
+		const Path full_path_from(m_base_path, from);
+		const Path full_path_to(m_base_path, to);
 		return os::copyFile(full_path_from, full_path_to);
 	}
 
 
 	bool fileExists(const char* path) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
+		const Path full_path(m_base_path, path);
 		return os::fileExists(full_path);
 	}
 
 
 	u64 getLastModified(const char* path) override
 	{
-		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
+		const Path full_path(m_base_path, path);
 		return os::getLastModified(full_path);
 	}
 
 
 	os::FileIterator* createFileIterator(const char* dir) override
 	{
-		StaticString<LUMIX_MAX_PATH> path(m_base_path, dir);
+		const Path path(m_base_path, dir);
 		return os::createFileIterator(path, m_allocator);
 	}
 

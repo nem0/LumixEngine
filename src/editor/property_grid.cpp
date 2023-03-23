@@ -829,7 +829,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 		const Vec3 old_euler = rot.toEuler();
 		Vec3 euler = old_euler;
 		if (ImGuiEx::InputRotation("##rot", &euler.x)) {
-			Array<Quat> rots(editor.getAllocator());
+			Array<Quat> rots(m_app.getAllocator());
 			for (EntityRef entity : entities) {
 				Vec3 tmp = world.getRotation(entity).toEuler();
 			

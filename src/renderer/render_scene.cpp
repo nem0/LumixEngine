@@ -819,15 +819,15 @@ struct RenderSceneImpl final : RenderScene {
 			}
 		}
 
-		StaticString<LUMIX_MAX_PATH> path_str("universes/probes/", probe.guid, ".lbc");
+		const Path path("universes/probes/", probe.guid, ".lbc");
 		if (probe.texture_id == 0xffFFffFF) {
-			logError("There's not enough space for ", path_str);
+			logError("There's not enough space for ", path);
 			return;
 		}
 		
 		probe.load_job = LUMIX_NEW(m_allocator, ReflectionProbe::LoadJob)(*this, entity, m_allocator);
 		FileSystem::ContentCallback cb = makeDelegate<&ReflectionProbe::LoadJob::callback>(probe.load_job);
-		probe.load_job->m_handle = m_engine.getFileSystem().getContent(Path(path_str), cb);
+		probe.load_job->m_handle = m_engine.getFileSystem().getContent(path, cb);
 	}
 
 	void deserializeEnvironmentProbes(InputMemoryStream& serializer, const EntityMap& entity_map)
@@ -835,7 +835,7 @@ struct RenderSceneImpl final : RenderScene {
 		u32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count + m_environment_probes.size());
-		StaticString<LUMIX_MAX_PATH> probe_dir("universes/probes/");
+		const Path probe_dir("universes/probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -3137,8 +3137,6 @@ struct RenderSceneImpl final : RenderScene {
 	{
 		ReflectionProbe& probe = m_reflection_probes.insert(entity);
 		probe.guid = randGUID();
-
-		StaticString<LUMIX_MAX_PATH> path;
 		probe.flags.set(ReflectionProbe::ENABLED);
 
 		m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);

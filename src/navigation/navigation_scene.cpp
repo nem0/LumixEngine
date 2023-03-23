@@ -693,9 +693,9 @@ struct NavigationSceneImpl final : NavigationScene
 
 		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
-		StaticString<LUMIX_MAX_PATH> path("universes/navzones/", zone.zone.guid, ".nav");
+		const Path path("universes/navzones/", zone.zone.guid, ".nav");
 		FileSystem& fs = m_engine.getFileSystem();
-		return fs.getContent(Path(path), makeDelegate<&LoadCallback::fileLoaded>(lcb)).isValid();
+		return fs.getContent(path, makeDelegate<&LoadCallback::fileLoaded>(lcb)).isValid();
 	}
 
 	bool saveZone(EntityRef zone_entity) override {
@@ -705,7 +705,7 @@ struct NavigationSceneImpl final : NavigationScene
 		FileSystem& fs = m_engine.getFileSystem();
 		
 		os::OutputFile file;
-		StaticString<LUMIX_MAX_PATH> path("universes/navzones/", zone.zone.guid, ".nav");
+		const Path path("universes/navzones/", zone.zone.guid, ".nav");
 		if (!fs.open(path, file)) return false;
 
 		bool success = file.write(zone.m_num_tiles_x);

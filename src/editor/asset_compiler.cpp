@@ -110,12 +110,12 @@ struct AssetCompilerImpl : AssetCompiler {
 		m_watcher = FileSystemWatcher::create(base_path, app.getAllocator());
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
-		StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix/resources");
+		Path path(base_path, ".lumix/resources");
 		if (!os::dirExists(path)) {
 			if (!os::makePath(path)) logError("Could not create ", path);
 			else {
 				os::OutputFile file;
-				path.add("/_version.bin");
+				path.append("/_version.bin");
 				if (!file.open(path)) {
 					logError("Could not open ", path);
 				}
@@ -140,7 +140,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				bool all_deleted = true;
 				while (os::getNextFile(iter, &info)) {
 					if (!info.is_directory) {
-						StaticString<LUMIX_MAX_PATH> filepath(".lumix/resources/", info.filename);
+						const Path filepath(".lumix/resources/", info.filename);
 						if (!os::deleteFile(filepath)) {
 							all_deleted = false;
 						}
@@ -255,7 +255,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		makeLowercase(Span(normalized), normalized);
 		const FilePathHash hash(normalized);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		StaticString<LUMIX_MAX_PATH> out_path(".lumix/resources/", hash, ".res");
+		const Path out_path(".lumix/resources/", hash, ".res");
 		os::OutputFile file;
 		if(!fs.open(out_path, file)) {
 			logError("Could not create ", out_path);
@@ -407,7 +407,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void fillDB() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const StaticString<LUMIX_MAX_PATH> list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
+		const Path list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
 		OutputMemoryStream content(m_app.getAllocator());
 		if (fs.getContentSync(Path(".lumix/resources/_list.txt"), content)) {
 			lua_State* L = luaL_newstate();
@@ -430,7 +430,7 @@ struct AssetCompilerImpl : AssetCompiler {
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
 						#ifdef CACHE_MASTER 
-							StaticString<LUMIX_MAX_PATH> res_path(".lumix/resources/", p.getHash(), ".res");
+							const Path res_path(".lumix/resources/", p.getHash(), ".res");
 							if (type.isValid() && fs.fileExists(res_path)) {
 								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 							}
@@ -443,7 +443,7 @@ struct AssetCompilerImpl : AssetCompiler {
 									m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 								}
 								else {
-									StaticString<LUMIX_MAX_PATH> res_path(".lumix/resources/", p.getHash(), ".res");
+									const Path res_path(".lumix/resources/", p.getHash(), ".res");
 									fs.deleteFile(res_path);
 								}
 							}
@@ -504,7 +504,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (equalIStrings(path, "lumix.log")) return;
 
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		const StaticString<LUMIX_MAX_PATH> full_path(base_path, "/", path);
+		const Path full_path(base_path, "/", path);
 
 		if (os::dirExists(full_path)) {
 			MutexGuard lock(m_changed_mutex);
@@ -602,7 +602,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (startsWith(filepath, ".lumix/asset_tiles/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 		const FilePathHash hash = res.getPath().getHash();
-		const StaticString<LUMIX_MAX_PATH> dst_path(".lumix/resources/", hash, ".res");
+		const Path dst_path(".lumix/resources/", hash, ".res");
 		const StaticString<LUMIX_MAX_PATH> meta_path(filepath, ".meta");
 
 		if (!fs.fileExists(dst_path)
@@ -741,9 +741,9 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (!path_obj.isEmpty()) {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
-				const StaticString<LUMIX_MAX_PATH> list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
+				const Path list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
 				const u64 list_last_modified = os::getLastModified(list_path);
-				StaticString<LUMIX_MAX_PATH> fullpath(fs.getBasePath(), path_obj.c_str());
+				const Path fullpath(fs.getBasePath(), path_obj.c_str());
 				if (os::dirExists(fullpath)) {
 					processDir(path_obj.c_str(), list_last_modified);
 					m_on_list_changed.invoke(path_obj);

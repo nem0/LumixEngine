@@ -753,9 +753,9 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		if(info)
 		{
 			getStack(*info->ContextRecord, Span(message.data));
-			message << "\nCode: " << (u32)info->ExceptionRecord->ExceptionCode;
-			message << "\nAddress: " << (uintptr)info->ExceptionRecord->ExceptionAddress;
-			message << "\nBase: " << (uintptr)base;
+			message.append("\nCode: ", (u32)info->ExceptionRecord->ExceptionCode);
+			message.append("\nAddress: ", (uintptr)info->ExceptionRecord->ExceptionAddress);
+			message.append("\nBase: ", (uintptr)base);
 			os::messageBox(message);
 		}
 		else

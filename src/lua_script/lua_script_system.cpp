@@ -1519,8 +1519,8 @@ namespace Lumix
 			}
 
 			StaticString<1024> tmp(name, " = ");
-			if (prop.type == Property::STRING) tmp << "\"" << value << "\"";
-			else tmp << value;
+			if (prop.type == Property::STRING) tmp.append("\"", value, "\"");
+			else tmp.add(value);
 
 			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
 			if (errors)

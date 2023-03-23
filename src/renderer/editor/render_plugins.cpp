@@ -1173,7 +1173,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 		void execute() {
 			const FilePathHash hash(m_in_path.c_str());
-			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".lbc");
+			const Path out_path(".lumix/asset_tiles/", hash, ".lbc");
 			OutputMemoryStream resized_data(m_allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 			FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -2721,7 +2721,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				}
 
 				img_path = fi.m_dir;
-				img_path << fi.m_basename << "_impostor1.tga";
+				img_path.append(fi.m_basename, "_impostor1.tga");
 				if (fs.open(img_path, file)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
@@ -2731,7 +2731,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				}
 
 				img_path = fi.m_dir;
-				img_path << fi.m_basename << "_impostor_depth.raw";
+				img_path.append(fi.m_basename, "_impostor_depth.raw");
 				if (fs.open(img_path, file)) {
 					RawTextureHeader header;
 					header.width = tile_size.x * 9;
@@ -2760,7 +2760,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				}
 
 				img_path = fi.m_dir;
-				img_path << fi.m_basename << "_impostor2.tga";
+				img_path.append(fi.m_basename, "_impostor2.tga");
 				if (fs.open(img_path, file)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
@@ -2840,7 +2840,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				destroyEntityRecursive(*m_tile.world, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
-				StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".lbc");
+				const Path path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".lbc");
 
 				if (!gpu::isOriginBottomLeft()) {
 					u32* p = (u32*)m_tile.data.getMutableData();
@@ -2866,7 +2866,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		Resource* resource = m_tile.queue.front();
 		if (resource->isFailure()) {
 			if (resource->getType() == Model::TYPE) {
-				StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
+				const Path out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
 				m_app.getAssetBrowser().copyTile("editor/textures/tile_animation.tga", out_path);
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
@@ -3015,7 +3015,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void renderTile(Material* material) {
 		const char* in_path = material->getTexture(0)->getPath().c_str();
-		StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
+		const Path out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
 		if (material->getTextureCount() == 0) {
 			m_app.getAssetBrowser().copyTile("editor/textures/tile_material.tga", out_path);
 			return;
@@ -3395,15 +3395,15 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count) {
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		StaticString<LUMIX_MAX_PATH> path(base_path, "universes");
+		Path path(base_path, "universes");
 		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
-		path << "/probes_tmp/";
+		path.append("/probes_tmp/");
 		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
-		path << probe_guid << ".lbc";
+		path.append(probe_guid, ".lbc");
 
 		OutputMemoryStream blob(m_app.getAllocator());
 
@@ -3557,11 +3557,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-			StaticString<LUMIX_MAX_PATH> dir_path(base_path, "universes/");
+			Path dir_path(base_path, "universes/");
 			if (!os::dirExists(dir_path) && !os::makePath(dir_path)) {
 				logError("Failed to create ", dir_path);
 			}
-			dir_path << "/probes/";
+			dir_path.append("/probes/");
 			if (!os::dirExists(dir_path) && !os::makePath(dir_path)) {
 				logError("Failed to create ", dir_path);
 			}
@@ -3576,8 +3576,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const u64 guid = job.reflection_probe.guid;
 
-					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/probes_tmp/", guid, ".lbc");
-					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/probes/", guid, ".lbc");
+					const Path tmp_path(base_path, "/universes/probes_tmp/", guid, ".lbc");
+					const Path path(base_path, "/universes/probes/", guid, ".lbc");
 					if (!os::fileExists(tmp_path)) {
 						if (scene) scene->reloadReflectionProbes();
 						return;
@@ -3738,10 +3738,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			else {
 				const ReflectionProbe& probe = scene->getReflectionProbe(e);
 				if (probe.flags.isSet(ReflectionProbe::ENABLED)) {
-					StaticString<LUMIX_MAX_PATH> path("universes/probes/", probe.guid, ".lbc");
+					const Path path("universes/probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
 					ImGui::TextUnformatted(path);
-					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(Path(path), true, false);
+					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(path, true, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
 					if (ImGui::Button("Generate")) generateCubemaps(false, world);
@@ -4845,11 +4845,11 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		Path::normalize(material_path, Span(normalized_material_path));
 
 		PathInfo info(normalized_material_path);
-		StaticString<LUMIX_MAX_PATH> hm_path(info.m_dir, info.m_basename, ".raw");
-		StaticString<LUMIX_MAX_PATH> albedo_path(info.m_dir, "albedo_detail.ltc");
-		StaticString<LUMIX_MAX_PATH> normal_path(info.m_dir, "normal_detail.ltc");
-		StaticString<LUMIX_MAX_PATH> splatmap_path(info.m_dir, "splatmap.tga");
-		StaticString<LUMIX_MAX_PATH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
+		const Path hm_path(info.m_dir, info.m_basename, ".raw");
+		const Path albedo_path(info.m_dir, "albedo_detail.ltc");
+		const Path normal_path(info.m_dir, "normal_detail.ltc");
+		const Path splatmap_path(info.m_dir, "splatmap.tga");
+		const Path splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(hm_path, file))
@@ -4898,7 +4898,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		OutputMemoryStream splatmap(m_app.getAllocator());
 		splatmap.resize(size * size * 4);
 		memset(splatmap.getMutableData(), 0, size * size * 4);
-		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, Path(splatmap_path), m_app.getAllocator())) {
+		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, splatmap_path, m_app.getAllocator())) {
 			logError("Failed to create texture ", splatmap_path);
 			os::deleteFile(hm_path);
 			return false;
@@ -4907,7 +4907,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		CompositeTexture albedo(m_app, m_app.getAllocator());
 		albedo.initTerrainAlbedo();
-		if (!albedo.save(fs, Path(albedo_path))) {
+		if (!albedo.save(fs, albedo_path)) {
 			logError("Failed to create texture ", albedo_path);
 			os::deleteFile(hm_path);
 			os::deleteFile(splatmap_path);
@@ -4917,7 +4917,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		CompositeTexture normal(m_app, m_app.getAllocator());
 		normal.initTerrainNormal();
-		if (!normal.save(fs, Path(normal_path))) {
+		if (!normal.save(fs, normal_path)) {
 			logError("Failed to create texture ", normal_path);
 			os::deleteFile(albedo_path);
 			os::deleteFile(hm_path);

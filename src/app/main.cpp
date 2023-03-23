@@ -189,7 +189,7 @@ struct Runner final
 
 		loadProject();
 
-		const StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_startup_world, ".unv");
+		const Path unv_path("universes/", m_startup_world, ".unv");
 		if (!loadWorld(unv_path, m_startup_world)) {
 			initDemoScene();
 		}

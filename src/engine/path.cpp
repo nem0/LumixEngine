@@ -23,6 +23,23 @@ Path::Path(const char* path) {
 	endUpdate();
 }
 
+void Path::add(const char* value) {
+	const i32 len = stringLength(m_path);
+	normalize(value, Span(m_path + len, lengthOf(m_path) - len));
+}
+
+void Path::add(StableHash hash) {
+	char tmp[32];
+	toCString(hash.getHashValue(), Span(tmp));
+	catString(m_path, tmp);
+}
+
+void Path::add(u64 value) {
+	char tmp[32];
+	toCString(value, Span(tmp));
+	catString(m_path, tmp);
+}
+
 i32 Path::length() const {
 	return stringLength(m_path);
 }
@@ -220,6 +237,8 @@ bool Path::hasExtension(const char* filename, const char* ext)
 Path::operator Span<const char>() const {
 	return Span(m_path, stringLength(m_path));
 }
+
+Path::operator const char*() const { return m_path; }
 
 PathInfo::PathInfo(const char* path) {
 	char tmp[LUMIX_MAX_PATH];

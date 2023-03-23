@@ -1483,8 +1483,8 @@ private:
 	struct MakeParentCommand final : IEditorCommand
 	{
 	public:
-		explicit MakeParentCommand(WorldEditor& editor)
-			: m_editor(static_cast<WorldEditorImpl&>(editor))
+		explicit MakeParentCommand(WorldEditorImpl& editor)
+			: m_editor(editor)
 		{
 		}
 
@@ -1540,8 +1540,8 @@ private:
 	struct DestroyEntitiesCommand final : IEditorCommand
 	{
 	public:
-		explicit DestroyEntitiesCommand(WorldEditor& editor)
-			: m_editor(static_cast<WorldEditorImpl&>(editor))
+		explicit DestroyEntitiesCommand(WorldEditorImpl& editor)
+			: m_editor(editor)
 			, m_entities(editor.getAllocator())
 			, m_transformations(editor.getAllocator())
 			, m_old_values(editor.getAllocator())
@@ -1728,8 +1728,8 @@ private:
 	struct DestroyComponentCommand final : IEditorCommand
 	{
 	public:
-		explicit DestroyComponentCommand(WorldEditor& editor)
-			: m_editor(static_cast<WorldEditorImpl&>(editor))
+		explicit DestroyComponentCommand(WorldEditorImpl& editor)
+			: m_editor(editor)
 			, m_old_values(editor.getAllocator())
 			, m_entities(editor.getAllocator())
 			, m_cmp_type(INVALID_COMPONENT_TYPE)
@@ -1952,9 +1952,9 @@ public:
 
 		logInfo("Saving world ", basename, "...");
 		
-		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
+		Path path(m_engine.getFileSystem().getBasePath(), "universes");
 		if (!os::makePath(path)) logError("Could not create directory universes/");
-		path << "/" << basename << ".unv";
+		path.append("/", basename, ".unv");
 		StaticString<LUMIX_MAX_PATH> bkp_path(path, ".bak");
 		if (os::fileExists(path)) {
 			if (!os::copyFile(path, bkp_path)) {
@@ -2482,7 +2482,7 @@ public:
 		m_world->setName(basename);
 		logInfo("Loading world ", basename, "...");
 		os::InputFile file;
-		const StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
+		const Path path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
 		if (file.open(path)) {
 			if (!load(file, path)) {
 				logError("Failed to parse ", path);
@@ -2701,7 +2701,7 @@ public:
 		if (m_is_game_mode) stopGameMode(false);
 
 		ASSERT(m_world);
-		destroyUndoStack();
+		clearUndoStack();
 		m_entity_folders.destroy();
 		m_world_destroyed.invoke();
 		m_prefab_system->setWorld(nullptr);
@@ -2726,7 +2726,7 @@ public:
 		return m_entity_selection_changed;
 	}
 
-	void destroyUndoStack()
+	void clearUndoStack()
 	{
 		m_undo_index = -1;
 		m_undo_stack.clear();
@@ -2738,7 +2738,7 @@ public:
 		ASSERT(!m_world);
 
 		m_is_world_changed = false;
-		destroyUndoStack();
+		clearUndoStack();
 		m_world = &m_engine.createWorld(true);
 		World* world = m_world;
 
@@ -2848,7 +2848,7 @@ private:
 struct PasteEntityCommand final : IEditorCommand
 {
 public:
-	PasteEntityCommand(WorldEditor& editor, const OutputMemoryStream& copy_buffer, bool identity = false)
+	PasteEntityCommand(WorldEditorImpl& editor, const OutputMemoryStream& copy_buffer, bool identity = false)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
 		, m_entities(editor.getAllocator())

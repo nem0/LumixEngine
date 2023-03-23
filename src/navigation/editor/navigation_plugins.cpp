@@ -10,6 +10,7 @@
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
+#include "engine/path.h"
 #include "engine/os.h"
 #include "engine/world.h"
 #include "navigation/navigation_scene.h"
@@ -112,7 +113,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		if(scene->isNavmeshReady(entities[0])) {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
-				StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
+				const Path dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
 				if (!os::makePath(dir) && !os::dirExists(dir)) {
 					logError("Could not create ", dir);
 				}

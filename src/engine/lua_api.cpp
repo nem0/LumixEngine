@@ -398,12 +398,12 @@ static int LUA_packageLoader(lua_State* L)
 	OutputMemoryStream buf(engine->getAllocator());
 	bool loaded = true;
 	if (!fs.getContentSync(Path(tmp), buf)) {
-		tmp << ".lua";
+		tmp.add(".lua");
 		if (!fs.getContentSync(Path(tmp), buf)) {
 			loaded = false;
 			logError("Failed to open file ", tmp);
 			StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
-			msg << tmp;
+			msg.add(tmp);
 			lua_pushstring(L, msg);
 		}
 	}
@@ -663,7 +663,7 @@ static int LUA_loadWorld(lua_State* L)
 	Callback* inst = LUMIX_NEW(engine->getAllocator(), Callback);
 	inst->engine = engine;
 	inst->world = world;
-	StaticString<LUMIX_MAX_PATH> path("universes/", name, ".unv");
+	const Path path("universes/", name, ".unv");
 	inst->path = path;
 	inst->L = L;
 	inst->lua_func = luaL_ref(L, LUA_REGISTRYINDEX);

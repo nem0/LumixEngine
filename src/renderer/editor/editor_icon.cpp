@@ -57,18 +57,15 @@ struct EditorIconsImpl final : EditorIcons
 		ResourceManagerHub& rm = engine.getResourceManager();
 		for (u32 i = 0; i < lengthOf(ICONS); ++i)
 		{
-			StaticString<LUMIX_MAX_PATH> tmp("editor/models/", ICONS[i], "_3d.fbx");
-			m_is_3d[i] = fs.fileExists(tmp);
+			const Path path_3d("editor/models/", ICONS[i], "_3d.fbx");
+			m_is_3d[i] = fs.fileExists(path_3d);
 			if (m_is_3d[i])
 			{
-				Path path(tmp);
-				m_models[i] = rm.load<Model>(path);
+				m_models[i] = rm.load<Model>(path_3d);
 			}
 			else
 			{
-				tmp.data[0] = '\0';
-				tmp << "editor/models/" << ICONS[i] << ".fbx";
-				Path path(tmp);
+				const Path path("editor/models/", ICONS[i], ".fbx");
 				m_models[i] = rm.load<Model>(path);
 			}
 		}

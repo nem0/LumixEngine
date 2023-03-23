@@ -552,7 +552,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				for (int j = 0; j <= i; ++j)
 				{
 					bool b = system->canLayersCollide(i, j);
-					if (ImGui::Checkbox(StaticString<10>("###", i, "-") << j, &b))
+					if (ImGui::Checkbox(StaticString<10>("###", i, "-", j), &b))
 					{
 						system->setLayersCanCollide(i, j, b);
 					}

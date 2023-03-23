@@ -365,7 +365,7 @@ struct StudioAppImpl final : StudioApp
 		m_asset_browser = AssetBrowser::create(*this);
 		m_property_grid.create(*this);
 		m_profiler_ui = ProfilerUI::create(*this);
-		m_log_ui.create(*this, m_editor->getAllocator());
+		m_log_ui.create(*this, m_allocator);
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
@@ -426,12 +426,12 @@ struct StudioAppImpl final : StudioApp
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
 		for (auto* i : m_plugins) {
-			LUMIX_DELETE(m_editor->getAllocator(), i);
+			LUMIX_DELETE(m_allocator, i);
 		}
 		m_plugins.clear();
 
 		for (auto* i : m_gui_plugins) {
-			LUMIX_DELETE(m_editor->getAllocator(), i);
+			LUMIX_DELETE(m_allocator, i);
 		}
 		m_gui_plugins.clear();
 
@@ -440,7 +440,7 @@ struct StudioAppImpl final : StudioApp
 
 		for (auto* i : m_add_cmp_plugins)
 		{
-			LUMIX_DELETE(m_editor->getAllocator(), i);
+			LUMIX_DELETE(m_allocator, i);
 		}
 		m_add_cmp_plugins.clear();
 
@@ -596,8 +596,7 @@ struct StudioAppImpl final : StudioApp
 			char label[50];
 		};
 
-		auto& allocator = m_editor->getAllocator();
-		auto* plugin = LUMIX_NEW(allocator, Plugin);
+		Plugin* plugin = LUMIX_NEW(m_allocator, Plugin);
 		plugin->property_grid = m_property_grid.get();
 		plugin->asset_browser = m_asset_browser.get();
 		plugin->type = cmp_type;
@@ -653,8 +652,7 @@ struct StudioAppImpl final : StudioApp
 			char label[64];
 		};
 
-		auto& allocator = m_editor->getAllocator();
-		auto* plugin = LUMIX_NEW(allocator, Plugin);
+		Plugin* plugin = LUMIX_NEW(m_allocator, Plugin);
 		plugin->property_grid = m_property_grid.get();
 		plugin->type = type;
 		copyString(plugin->label, label);
@@ -877,9 +875,9 @@ struct StudioAppImpl final : StudioApp
 				u32 size;
 				fromCStringOctal(Span(header.size, sizeof(header.size)), size); 
 				if (header.name[0] && (header.typeflag == 0 || header.typeflag == '0')) {
-					const StaticString<LUMIX_MAX_PATH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
+					const Path path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[LUMIX_MAX_PATH];
-					copyString(Span(dir), Path::getDir(path));
+					copyString(Span(dir), Path::getDir(path.c_str()));
 					if (!os::makePath(dir)) logError("");
 					if (!os::fileExists(path)) {
 						os::OutputFile file;
@@ -1303,7 +1301,7 @@ struct StudioAppImpl final : StudioApp
 	template <void (StudioAppImpl::*Func)()>
 	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
 	{
-		Action* a = LUMIX_NEW(m_editor->getAllocator(), Action);
+		Action* a = LUMIX_NEW(m_allocator, Action);
 		a->init(label_short, label_long, name, font_icon, true);
 		a->func.bind<Func>(this);
 		addAction(a);
@@ -1320,7 +1318,7 @@ struct StudioAppImpl final : StudioApp
 		os::Keycode shortcut,
 		Action::Modifiers modifiers)
 	{
-		Action* a = LUMIX_NEW(m_editor->getAllocator(), Action);
+		Action* a = LUMIX_NEW(m_allocator, Action);
 		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, true);
 		a->func.bind<Func>(this);
 		m_owned_actions.push(a);
@@ -1582,10 +1580,9 @@ struct StudioAppImpl final : StudioApp
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
 			StaticString<200> stats("");
-			if (m_engine->getFileSystem().hasWork()) stats << ICON_FA_HOURGLASS_HALF "Loading... | ";
-			stats << "FPS: ";
-			stats << (u32)(m_fps + 0.5f);
-			if (!isFocused()) stats << " - inactive window";
+			if (m_engine->getFileSystem().hasWork()) stats.add(ICON_FA_HOURGLASS_HALF "Loading... | ");
+			stats.append("FPS: ", u32(m_fps + 0.5f));
+			if (!isFocused()) stats.add(" - inactive window");
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text("%s", (const char*)stats);
@@ -2251,12 +2248,10 @@ struct StudioAppImpl final : StudioApp
 	{
 		char tmp_path[LUMIX_MAX_PATH];
 		os::getExecutablePath(Span(tmp_path));
-		StaticString<LUMIX_MAX_PATH> copy_path;
-		copyString(Span(copy_path.data), Path::getDir(tmp_path));
-		copy_path << "plugins/" << iteration;
+		StaticString<LUMIX_MAX_PATH> copy_path(Path::getDir(tmp_path), "plugins/", iteration);
 		if (!os::makePath(copy_path)) logError("Could not create ", copy_path);
 		copyString(Span(tmp_path), Path::getBasename(src));
-		copy_path << "/" << tmp_path << "." << getPluginExtension();
+		copy_path.append("/", tmp_path, ".", getPluginExtension());
 #ifdef _WIN32
 		StaticString<LUMIX_MAX_PATH> src_pdb(src);
 		StaticString<LUMIX_MAX_PATH> dest_pdb(copy_path);
@@ -2942,7 +2937,8 @@ struct StudioAppImpl final : StudioApp
 			fromCString(Span(basename), tmp_hash);
 			rec.hash = FilePathHash::fromU64(tmp_hash);
 			rec.offset = 0;
-			rec.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, ".lumix/resources/", info.filename));
+			const Path path(base_path, ".lumix/resources/", info.filename);
+			rec.size = os::getFileSize(path);
 			copyString(rec.path, ".lumix/resources/");
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
@@ -2962,7 +2958,8 @@ struct StudioAppImpl final : StudioApp
 		auto& out_info = infos.emplace(hash);
 		copyString(out_info.path, file_path);
 		out_info.hash = hash;
-		out_info.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, file_path));
+		const Path path(base_path, file_path);
+		out_info.size = os::getFileSize(path);
 		out_info.offset = ~0UL;
 	}
 
@@ -3004,7 +3001,8 @@ struct StudioAppImpl final : StudioApp
 			auto& out_info = infos.emplace(hash);
 			copyString(out_info.path, out_path);
 			out_info.hash = hash;
-			out_info.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, out_path.data));
+			const Path path(base_path, out_path.data);
+			out_info.size = os::getFileSize(path);
 			out_info.offset = ~0UL;
 		}
 		os::destroyFileIterator(iter);
@@ -3018,10 +3016,10 @@ struct StudioAppImpl final : StudioApp
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
 				const FilePathHash hash = res->getPath().getHash();
-				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/resources/", hash, ".res");
+				const Path baked_path(".lumix/resources/", hash, ".res");
 
 				auto& out_info = infos.emplace(hash);
-				copyString(Span(out_info.path), baked_path);
+				copyString(Span(out_info.path), baked_path.c_str());
 				out_info.hash = hash;
 				out_info.size = os::getFileSize(baked_path);
 				out_info.offset = ~0UL;
@@ -3080,8 +3078,8 @@ struct StudioAppImpl final : StudioApp
 			OutputMemoryStream prj_blob(m_allocator);
 			m_engine->serializeProject(prj_blob, m_export.startup_world);
 
-			StaticString<LUMIX_MAX_PATH> project_path(fs.getBasePath(), "lumix.prj");
-			if (!fs.saveContentSync(Path(project_path), prj_blob)) {
+			const Path project_path(fs.getBasePath(), "lumix.prj");
+			if (!fs.saveContentSync(project_path, prj_blob)) {
 				logError("Could not save ", project_path);
 				return;
 			}
@@ -3147,7 +3145,7 @@ struct StudioAppImpl final : StudioApp
 			copyString(dest, m_export.dest_dir);
 			const char* base_path = fs.getBasePath();
 			for (auto& info : infos) {
-				StaticString<LUMIX_MAX_PATH> src(base_path, info.path);
+				const Path src(base_path, info.path);
 				StaticString<LUMIX_MAX_PATH> dst(dest, info.path);
 
 				StaticString<LUMIX_MAX_PATH> dst_dir(dest, Path::getDir(info.path));

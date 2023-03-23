@@ -728,7 +728,7 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
 
 	FileSystem& fs = app.getEngine().getFileSystem();
-	StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), "/universes/distance_fields");
+	const Path path(fs.getBasePath(), "/universes/distance_fields");
 	os::FileIterator* iter = os::createFileIterator(path, app.getAllocator());
 	os::FileInfo info;
 	while (os::getNextFile(iter, &info)) {
@@ -764,7 +764,7 @@ void DistanceField::clear() {
 }
 
 bool DistanceField::load(FileSystem& fs, IAllocator& allocator) {
-	const StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), "universes/distance_fields/", name.c_str(), ".df");
+	const Path path(fs.getBasePath(), "universes/distance_fields/", name.c_str(), ".df");
 	os::InputFile file;
 	if (!file.open(path)) {
 		logError("Failed to open ", path);
@@ -796,12 +796,12 @@ bool DistanceField::load(InputMemoryStream& blob) {
 }
 
 void DistanceField::save(FileSystem& fs, IAllocator& allocator) {
-	StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), "universes/distance_fields/");
+	Path path(fs.getBasePath(), "universes/distance_fields/");
 	if (!os::makePath(path)) {
 		logError("Failed to create ", path);
 	}
-	path.add(name.c_str());
-	path.add(".df");
+	path.append(name.c_str());
+	path.append(".df");
 
 	OutputMemoryStream blob(allocator);
 	Header header;
@@ -1509,7 +1509,7 @@ void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Delete")) {
-				StaticString<LUMIX_MAX_PATH> path("universes/distance_fields/", df.name.c_str(), ".df");
+				const Path path("universes/distance_fields/", df.name.c_str(), ".df");
 				if (!m_app.getEngine().getFileSystem().deleteFile(path)) {
 					logError("Failed to delete ", path);
 				}

@@ -210,8 +210,8 @@ void Resource::doLoad()
 		m_async_op = fs.getContent(m_path, cb);
 	}
 	else {	
-		const StaticString<LUMIX_MAX_PATH> res_path(".lumix/resources/", hash.getHashValue(), ".res");
-		m_async_op = fs.getContent(Path(res_path), cb);
+		const Path res_path(".lumix/resources/", hash, ".res");
+		m_async_op = fs.getContent(res_path, cb);
 	}
 }
 

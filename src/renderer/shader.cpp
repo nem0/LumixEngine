@@ -84,7 +84,7 @@ void Shader::compile(gpu::ProgramHandle program
 	if (defines != 0) {
 		for(int i = 0; i < sizeof(defines) * 8; ++i) {
 			if((defines & (1 << i)) == 0) continue;
-			defines_code[defines_count] << "#define " << m_renderer.getShaderDefine(i) << "\n";
+			defines_code[defines_count].append("#define ", m_renderer.getShaderDefine(i), "\n");
 			prefixes[defines_count] = defines_code[defines_count];
 			++defines_count;
 		}
