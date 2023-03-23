@@ -24,8 +24,10 @@ Path::Path(const char* path) {
 }
 
 void Path::add(const char* value) {
-	const i32 len = stringLength(m_path);
-	normalize(value, Span(m_path + len, lengthOf(m_path) - len));
+	char tmp[LUMIX_MAX_PATH];
+	copyString(tmp, m_path);
+	catString(tmp, value);
+	normalize(tmp, Span(m_path));
 }
 
 void Path::add(StableHash hash) {
