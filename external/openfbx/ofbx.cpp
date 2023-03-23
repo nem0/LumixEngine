@@ -8,7 +8,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <inttypes.h>
 
+
+#if __cplusplus >= 202002L
+#include <bit> // for std::bit_cast (C++20 and later)
+#endif
+#include <map>
 
 namespace ofbx
 {
@@ -83,7 +89,19 @@ struct Video
 struct Error
 {
 	Error() {}
-	Error(const char* msg) { s_message = msg; }
+	Error(const char* msg)
+	{
+		s_message = msg;
+	}
+
+	// Format a message with printf-style arguments.
+    template <typename... Args>
+    Error(const char* fmt, Args... args) 
+	{
+        char buf[1024];
+        std::snprintf(buf, sizeof(buf), fmt, args...);
+        s_message = buf;
+    }
 
 	static const char* s_message;
 };
@@ -349,6 +367,11 @@ u32 DataView::toU32() const
 	return (u32)atoll((const char*)begin);
 }
 
+bool DataView::toBool() const
+{
+	return toInt() != 0;
+}
+
 
 double DataView::toDouble() const
 {
@@ -582,6 +605,20 @@ static OptionalError<DataView> readLongString(Cursor* cursor)
 	return value;
 }
 
+// 	Cheat sheet: //
+/*
+'S': Long string
+'Y': 16-bit signed integer
+'C': 8-bit signed integer
+'I': 32-bit signed integer
+'F': Single precision floating-point number
+'D': Double precision floating-point number
+'L': 64-bit signed integer
+'R': Binary data
+'b', 'f', 'd', 'l', 'c' and 'i': Arrays of binary data
+
+Src: https://code.blender.org/2013/08/fbx-binary-file-format-specification/
+*/
 
 static OptionalError<Property*> readProperty(Cursor* cursor, Allocator& allocator)
 {
@@ -617,6 +654,7 @@ static OptionalError<Property*> readProperty(Cursor* cursor, Allocator& allocato
 			break;
 		}
 		case 'b':
+		case 'c':
 		case 'f':
 		case 'd':
 		case 'l':
@@ -630,14 +668,18 @@ static OptionalError<Property*> readProperty(Cursor* cursor, Allocator& allocato
 			cursor->current += comp_len.getValue();
 			break;
 		}
-		default: return Error("Unknown property type");
+		default:
+		{
+			char str[32];
+			snprintf(str, sizeof(str), "Unknown property type: %c", prop->type);
+			return Error(str);
+		}
 	}
 	prop->value.end = cursor->current;
 	return prop;
 }
 
-
-static OptionalError<u64> readElementOffset(Cursor* cursor, u16 version)
+static OptionalError<u64> readElementOffset(Cursor* cursor, u32 version)
 {
 	if (version >= 7500)
 	{
@@ -962,13 +1004,22 @@ static OptionalError<Element*> tokenizeText(const u8* data, size_t size, Allocat
 
 static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& version, Allocator& allocator)
 {
+	if (size < sizeof(Header)) return Error("Invalid header");
+
 	Cursor cursor;
 	cursor.begin = data;
 	cursor.current = data;
 	cursor.end = data + size;
 
-	const Header* header = (const Header*)cursor.current;
-	cursor.current += sizeof(*header);
+#if __cplusplus >= 202002L
+	const Header* header = std::bit_cast<const Header*>(cursor.current);
+#else
+	Header header_temp;
+	std::memcpy(&header_temp, cursor.current, sizeof(Header));
+	const Header* header = &header_temp;
+#endif
+
+	cursor.current += sizeof(Header);
 	version = header->version;
 
 	Element* root = allocator.allocate<Element>();
@@ -982,15 +1033,16 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& versio
 	for (;;)
 	{
 		OptionalError<Element*> child = readElement(&cursor, header->version, allocator);
-		if (child.isError()) {
+		if (child.isError())
+		{
 			return Error();
 		}
+
 		*element = child.getValue();
 		if (!*element) return root;
 		element = &(*element)->sibling;
 	}
 }
-
 
 static void parseTemplates(const Element& root)
 {
@@ -1535,6 +1587,178 @@ struct TextureImpl : Texture
 	Type getType() const override { return Type::TEXTURE; }
 };
 
+struct LightImpl : Light
+{
+	LightImpl(const Scene& _scene, const IElement& _element)
+		: Light(_scene, _element)
+	{
+		// Initialize the light properties here
+	}
+
+	Type getType() const override { return Type::LIGHT; }
+
+	// Light type
+	LightType getLightType() const override { return lightType; }
+
+	// Light properties
+	bool doesCastLight() const override { return castLight; }
+
+	bool doesDrawVolumetricLight() const override
+	{
+		// Return the draw volumetric light property based on the stored data (WIP)
+		return false;
+	}
+
+	bool doesDrawGroundProjection() const override
+	{
+		// Return the draw ground projection property based on the stored data (WIP)
+		return false;
+	}
+
+	bool doesDrawFrontFacingVolumetricLight() const override
+	{
+		// Return the draw front-facing volumetric light property based on the stored data (WIP)
+		return false;
+	}
+
+	Color getColor() const override { return color; }
+	double getIntensity() const override { return intensity; }
+	double getInnerAngle() const override { return innerAngle; }
+	double getOuterAngle() const override { return outerAngle; }
+
+	double getFog() const override { return fog; }
+
+	DecayType getDecayType() const override { return decayType; }
+	double getDecayStart() const override { return decayStart; }
+
+	// Near attenuation
+	bool doesEnableNearAttenuation() const override { return enableNearAttenuation; }
+	double getNearAttenuationStart() const override { return nearAttenuationStart; }
+	double getNearAttenuationEnd() const override { return nearAttenuationEnd; }
+
+	// Far attenuation
+	bool doesEnableFarAttenuation() const override { return enableFarAttenuation; }
+	double getFarAttenuationStart() const override { return farAttenuationStart; }
+	double getFarAttenuationEnd() const override { return farAttenuationEnd; }
+
+	// Shadows
+	const Texture* getShadowTexture() const override { return shadowTexture; }
+	bool doesCastShadows() const override { return castShadows; }
+	Color getShadowColor() const override { return shadowColor; }
+
+	// Member variables to store light properties
+	//-------------------------------------------------------------------------
+	LightType lightType = LightType::POINT; // Light type
+	bool castLight = true;					// Whether the light casts light on objects
+	Color color = {1, 1, 1};					// Light color (RGB values)
+	double intensity = 100.0;				// Light intensity
+
+	// Spotlight properties
+	double innerAngle = 0.0;
+	double outerAngle = 45.0;
+
+	// Light fog intensity
+	double fog = 50;
+
+	// Light decay properties
+	DecayType decayType = DecayType::QUADRATIC;
+	double decayStart = 1.0;
+
+	// Near attenuation properties
+	bool enableNearAttenuation = false;
+	double nearAttenuationStart = 0.0;
+	double nearAttenuationEnd = 0.0;
+
+	// Far attenuation properties
+	bool enableFarAttenuation = false;
+	double farAttenuationStart = 0.0;
+	double farAttenuationEnd = 0.0;
+
+	// Shadow properties
+	const Texture* shadowTexture = nullptr;
+	bool castShadows = true;
+	Color shadowColor = {0, 0, 0};
+};
+
+static float M_PI = 3.14159265358979323846f;
+struct CameraImpl : public Camera
+{
+    CameraImpl(const Scene& _scene, const IElement& _element)
+        : Camera(_scene, _element)
+    {
+        // Initialize camera properties here
+    }
+
+    // Member variables to store camera properties
+    //-------------------------------------------------------------------------
+	ProjectionType projectionType = ProjectionType::PERSPECTIVE; // Projection type
+	ApertureMode apertureMode = ApertureMode::HORIZONTAL; // Used to determine the FOV
+
+	double filmHeight = 36.0;
+	double filmWidth = 24.0;
+
+	double aspectHeight = 1.0;
+	double aspectWidth = 1.0;
+
+	double nearPlane = 0.1;
+	double farPlane = 1000.0;
+	bool autoComputeClipPanes = true;
+	
+	GateFit gateFit = GateFit::HORIZONTAL;
+	double filmAspectRatio = 1.0;
+	double focalLength = 50.0;
+	double focusDistance = 50.0;
+	
+	Vec3 backgroundColor = {0, 0, 0};
+	Vec3 interestPosition = {0, 0, 0};
+
+	double fieldOfView = 60.0;
+
+	// Member functions to get camera properties
+	//-------------------------------------------------------------------------
+	Type getType() const override { return Type::CAMERA; }
+	ProjectionType getProjectionType() const override { return projectionType; }
+	ApertureMode getApertureMode() const override { return apertureMode; }
+
+	double getFilmHeight() const override { return filmHeight; }
+	double getFilmWidth() const override { return filmWidth; }
+
+	double getAspectHeight() const override { return aspectHeight; }
+	double getAspectWidth() const override { return aspectWidth; }
+
+	double getNearPlane() const override { return nearPlane; }
+	double getFarPlane() const override { return farPlane; }
+	bool doesAutoComputeClipPanes() const override { return autoComputeClipPanes; }
+
+	GateFit getGateFit() const override { return gateFit; }
+	double getFilmAspectRatio() const override { return filmAspectRatio; }
+	double getFocalLength() const override { return focalLength; }
+	double getFocusDistance() const override { return focusDistance; }
+
+	Vec3 getBackgroundColor() const override { return backgroundColor; }
+	Vec3 getInterestPosition() const override { return interestPosition; }
+
+	void CalculateFOV()
+	{
+		switch (apertureMode)
+		{
+			case Camera::ApertureMode::HORIZONTAL:
+				fieldOfView =  2.0 * atan(filmWidth / (2.0 * focalLength)) * 180.0 / M_PI;
+				return;
+			case Camera::ApertureMode::VERTICAL:
+				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / M_PI;
+				return;
+			case Camera::ApertureMode::HORIZANDVERT:
+				fieldOfView =  2.0 * atan(sqrt(filmWidth * filmWidth + filmHeight * filmHeight) / (2.0 * focalLength)) * 180.0 / M_PI;
+				return;
+			case Camera::ApertureMode::FOCALLENGTH:
+				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / M_PI; // Same as vertical ¯\_(ツ)_/¯
+				return;
+			default:
+				fieldOfView =  60.0;
+		}
+	}
+};
 
 struct Root : Object
 {
@@ -1555,13 +1779,16 @@ struct Scene : IScene
 		enum Type
 		{
 			OBJECT_OBJECT,
-			OBJECT_PROPERTY
+			OBJECT_PROPERTY,
+			PROPERTY_OBJECT,
+			PROPERTY_PROPERTY,
 		};
 
 		Type type = OBJECT_OBJECT;
 		u64 from = 0;
 		u64 to = 0;
-		DataView property;
+		DataView fromProperty;
+		DataView toProperty;
 	};
 
 	struct ObjectPair
@@ -1627,6 +1854,32 @@ struct Scene : IScene
 		return nullptr;
 	}
 
+	// Cameras
+	const Camera* getCamera(int index) const override
+	{
+		assert(index >= 0);
+		assert(index < m_cameras.size());
+		return m_cameras[index];
+	}
+
+	int getCameraCount() const override
+	{
+		return (int)m_cameras.size();
+	}
+
+	// Lights
+	const Light* getLight(int index) const override
+	{
+		assert(index >= 0);
+		assert(index < m_lights.size());
+		return m_lights[index];
+	}
+
+	int getLightCount() const override
+	{
+		return (int)m_lights.size();
+	}
+
 
 	const IElement* getRootElement() const override { return m_root_element; }
 	const Object* getRoot() const override { return m_root; }
@@ -1650,6 +1903,8 @@ struct Scene : IScene
 	std::vector<Mesh*> m_meshes;
 	std::vector<Geometry*> m_geometries;
 	std::vector<AnimationStack*> m_animation_stacks;
+	std::vector<Camera*> m_cameras;
+	std::vector<Light*> m_lights;
 	std::vector<Connection> m_connections;
 	std::vector<u8> m_data;
 	std::vector<TakeInfo> m_take_infos;
@@ -1798,6 +2053,33 @@ struct AnimationLayerImpl : AnimationLayer
 	std::vector<AnimationCurveNodeImpl*> curve_nodes;
 };
 
+/*
+	DEBUGGING ONLY (but im not your boss so do what you want)
+	- maps the contents of the given node for viewing in the debugger
+	
+	std::map<std::string, ofbx::IElementProperty*, std::less<>> allProperties;
+	mapProperties(element, allProperties);
+*/
+void mapProperties(const ofbx::IElement& parent, std::map<std::string, ofbx::IElementProperty*, std::less<>>& propMap)
+{
+	for (const ofbx::IElement* element = parent.getFirstChild(); element; element = element->getSibling())
+	{
+		char key[32];
+
+		if (element->getFirstProperty())
+			element->getFirstProperty()->getValue().toString(key);
+		else
+			element->getID().toString(key);
+
+
+		ofbx::IElementProperty* prop = element->getFirstProperty();
+		propMap.insert({key, prop});
+
+		if (element->getFirstChild()) mapProperties(*element, propMap);
+	}
+};
+
+
 void parseVideo(Scene& scene, const Element& element, Allocator& allocator)
 {
 	if (!element.first_property) return;
@@ -1845,6 +2127,132 @@ struct OptionalError<Object*> parseTexture(const Scene& scene, const Element& el
 	return texture;
 }
 
+struct OptionalError<Object*> parseLight(Scene& scene, const Element& element, Allocator& allocator)
+{
+	LightImpl* light = allocator.allocate<LightImpl>(scene, element);
+
+	light->lightType = static_cast<Light::LightType>(resolveEnumProperty(*light, "LightType", (int)Light::LightType::POINT));
+
+	const Element* prop = findChild(element, "Properties70");
+	if (prop) prop = prop->child;
+
+	// Can be replaced with a std::map for a Big O of O(log n) instead of O(n) for the if else statements - Possibly faster
+	while (prop)
+	{
+		if (prop->id == "P" && prop->first_property)
+		{
+			if (prop->first_property->value == "Color")
+			{
+				light->color.r = (float)prop->getProperty(4)->getValue().toDouble();
+				light->color.g = (float)prop->getProperty(5)->getValue().toDouble();
+				light->color.b = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			if (prop->first_property->value == "ShadowColor")
+			{
+				light->shadowColor.r = (float)prop->getProperty(4)->getValue().toDouble();
+				light->shadowColor.g = (float)prop->getProperty(5)->getValue().toDouble();
+				light->shadowColor.b = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "CastShadows")
+			{
+				light->castShadows = prop->getProperty(4)->getValue().toBool();
+			}
+			else if (prop->first_property->value == "InnerAngle")
+			{
+				light->innerAngle = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "OuterAngle")
+			{
+				light->outerAngle = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "Intensity")
+			{
+				light->intensity = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+		}
+		prop = prop->sibling;
+	}
+
+	scene.m_lights.push_back(light); // Implicit inheritance downcast
+	return light;
+}
+
+struct OptionalError<Object*> parseCamera(Scene& scene, const Element& element, Allocator& allocator)
+{
+	CameraImpl* camera = allocator.allocate<CameraImpl>(scene, element);
+
+	camera->projectionType = static_cast<Camera::ProjectionType>(resolveEnumProperty(*camera, "ProjectionType", (int)Camera::ProjectionType::PERSPECTIVE)); // ProjectionType
+	camera->apertureMode = static_cast<Camera::ApertureMode>(resolveEnumProperty(*camera, "ApertureMode", (int)Camera::ApertureMode::HORIZANDVERT)); // ApertureMode
+	camera->gateFit = static_cast<Camera::GateFit>(resolveEnumProperty(*camera, "GateFit", (int)Camera::GateFit::HORIZONTAL)); // GateFit
+
+	const Element* prop = findChild(element, "Properties70");
+	if (prop) prop = prop->child;
+
+	// Can be replaced with a std::map for a Big O of O(log n) instead of O(n) for the if else statements - Possibly faster
+	while (prop)
+	{
+		if (prop->id == "P" && prop->first_property)
+		{
+			if (prop->first_property->value == "InterestPosition")
+			{
+				camera->interestPosition.x = (float)prop->getProperty(4)->getValue().toDouble();
+				camera->interestPosition.y = (float)prop->getProperty(5)->getValue().toDouble();
+				camera->interestPosition.z = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "BackgroundColor")
+			{
+				camera->backgroundColor.x = (float)prop->getProperty(4)->getValue().toDouble();
+				camera->backgroundColor.y = (float)prop->getProperty(5)->getValue().toDouble();
+				camera->backgroundColor.z = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "FocalLength")
+			{
+				camera->focalLength = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "FocusDistance")
+			{
+				camera->focusDistance = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "FilmAspectRatio")
+			{
+				camera->filmAspectRatio = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "FilmWidth")
+			{
+				camera->filmWidth = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "FilmHeight")
+			{
+				camera->filmHeight = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "AspectHeight")
+			{
+				camera->aspectHeight = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "AspectWidth")
+			{
+				camera->aspectWidth = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "AutoComputeClipPanes")
+			{
+				camera->autoComputeClipPanes = prop->getProperty(4)->getValue().toBool();
+			}
+			else if (prop->first_property->value == "NearPlane")
+			{
+				camera->nearPlane = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "FarPlane")
+			{
+				camera->farPlane = prop->getProperty(4)->getValue().toDouble();
+			}
+		}
+		prop = prop->sibling;
+	}
+
+	camera->CalculateFOV();
+	scene.m_cameras.push_back(camera); // Implicit inheritance downcast
+	return camera;
+}
 
 struct OptionalError<Object*> parsePose(const Scene& scene, const Element& element, Allocator& allocator)
 {
@@ -2375,7 +2783,7 @@ static void splat(std::vector<T>* out,
 		for (int i = 0, c = (int)original_indices.size(); i < c; ++i)
 		{
 			int idx = decodeIndex(original_indices[i]);
-			if ((idx < data_size) && (idx >= 0))
+			if ((idx < data_size) && (idx >= 0)) //-V560
 				(*out)[i] = data[idx];
 			else
 				(*out)[i] = T();
@@ -2481,7 +2889,7 @@ static void triangulate(
 	for (int i = 0; i < (int)old_indices.size(); ++i)
 	{
 		int idx = getIdx(i);
-		if (in_polygon_idx <= 2)
+		if (in_polygon_idx <= 2) //-V1051
 		{
 			to_old_vertices->push_back(idx);
 			to_old_indices->push_back(i);
@@ -2814,29 +3222,57 @@ static bool parseConnections(const Element& root, Scene* scene)
 	while (connection)
 	{
 		if (!isString(connection->first_property)
-			|| !isLong(connection->first_property->next)
-			|| !isLong(connection->first_property->next->next))
+			|| !isLong(connection->first_property->next) ||
+			!(isLong(connection->first_property->next->next) || isString(connection->first_property->next->next)))
 		{
 			Error::s_message = "Invalid connection";
 			return false;
 		}
 
 		Scene::Connection c;
-		c.from = connection->first_property->next->value.toU64();
-		c.to = connection->first_property->next->next->value.toU64();
 		if (connection->first_property->value == "OO")
 		{
 			c.type = Scene::Connection::OBJECT_OBJECT;
+			c.from = connection->first_property->next->value.toU64();
+			c.to = connection->first_property->next->next->value.toU64();
 		}
 		else if (connection->first_property->value == "OP")
 		{
 			c.type = Scene::Connection::OBJECT_PROPERTY;
+			c.from = connection->first_property->next->value.toU64();
+			c.to = connection->first_property->next->next->value.toU64();
 			if (!connection->first_property->next->next->next)
 			{
 				Error::s_message = "Invalid connection";
 				return false;
 			}
-			c.property = connection->first_property->next->next->next->value;
+			c.toProperty = connection->first_property->next->next->next->value;
+		}
+		else if (connection->first_property->value == "PO")
+		{
+			c.type = Scene::Connection::PROPERTY_OBJECT;
+			c.from = connection->first_property->next->value.toU64();
+			c.fromProperty = connection->first_property->next->next->value;
+			if (!connection->first_property->next->next->next)
+			{
+				Error::s_message = "Invalid connection";
+				return false;
+			}
+			c.to = connection->first_property->next->next->next->value.toU64();
+		}
+		else if (connection->first_property->value == "PP")
+		{
+			c.type = Scene::Connection::PROPERTY_PROPERTY;
+			c.from = connection->first_property->next->value.toU64();
+			c.fromProperty = connection->first_property->next->next->value;
+			c.to = connection->first_property->next->next->next->value.toU64();
+
+			if (!connection->first_property->next->next->next->next)
+			{
+				Error::s_message = "Invalid connection";
+				return false;
+			}
+			c.toProperty = connection->first_property->next->next->next->next->value;
 		}
 		else
 		{
@@ -3009,12 +3445,27 @@ void sync_job_processor(JobFunction fn, void*, void* data, u32 size, u32 count) 
 	}
 }
 
-static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator& allocator, JobProcessor job_processor, void* job_user_ptr)
+static bool parseObjects(const Element& root, Scene* scene, u16 flags, Allocator& allocator, JobProcessor job_processor, void* job_user_ptr)
 {
 	if (!job_processor) job_processor = &sync_job_processor;
-	const bool triangulate = (flags & (u64)LoadFlags::TRIANGULATE) != 0;
-	const bool ignore_geometry = (flags & (u64)LoadFlags::IGNORE_GEOMETRY) != 0;
-	const bool ignore_blend_shapes = (flags & (u64)LoadFlags::IGNORE_BLEND_SHAPES) != 0;
+	const bool triangulate = (flags & (u16)LoadFlags::TRIANGULATE) != 0;
+
+	const bool ignore_geometry = (flags & (u16)LoadFlags::IGNORE_GEOMETRY) != 0;
+	const bool ignore_blend_shapes = (flags & (u16)LoadFlags::IGNORE_BLEND_SHAPES) != 0;
+	const bool ignore_cameras = (flags & (u16)LoadFlags::IGNORE_CAMERAS) != 0;
+	const bool ignore_lights = (flags & (u16)LoadFlags::IGNORE_LIGHTS) != 0;
+	const bool ignore_textures = (flags & (u16)LoadFlags::IGNORE_TEXTURES) != 0;
+	const bool ignore_skin = (flags & (u16)LoadFlags::IGNORE_SKIN) != 0;
+	const bool ignore_bones = (flags & (u16)LoadFlags::IGNORE_BONES) != 0;
+	const bool ignore_pivots = (flags & (u16)LoadFlags::IGNORE_PIVOTS) != 0;
+	const bool ignore_animations = (flags & (u16)LoadFlags::IGNORE_ANIMATIONS) != 0;
+	const bool ignore_materials = (flags & (u16)LoadFlags::IGNORE_MATERIALS) != 0;
+	const bool ignore_poses = (flags & (u16)LoadFlags::IGNORE_POSES) != 0;
+	const bool ignore_videos = (flags & (u16)LoadFlags::IGNORE_VIDEOS) != 0;
+	const bool ignore_limbs = (flags & (u16)LoadFlags::IGNORE_LIMBS) != 0;
+	const bool ignore_meshes = (flags & (u16)LoadFlags::IGNORE_MESHES) != 0;
+	const bool ignore_models = (flags & (u16)LoadFlags::IGNORE_MODELS) != 0;
+
 	const Element* objs = findChild(root, "Objects");
 	if (!objs) return true;
 
@@ -3043,11 +3494,11 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 
 		if (iter.second.object == scene->m_root) continue;
 
-		if (iter.second.element->id == "Geometry")
+		if (iter.second.element->id == "Geometry" && !ignore_geometry)
 		{
 			Property* last_prop = iter.second.element->first_property;
 			while (last_prop->next) last_prop = last_prop->next;
-			if (last_prop && last_prop->value == "Mesh" && !ignore_geometry)
+			if (last_prop && last_prop->value == "Mesh")
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(*scene, *iter.second.element);
 				scene->m_geometries.push_back(geom);
@@ -3055,16 +3506,16 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 				parse_geom_jobs.push_back(job);
 				continue;
 			}
-			if (last_prop && last_prop->value == "Shape" && !ignore_geometry)
+			if (last_prop && last_prop->value == "Shape")
 			{
 				obj = allocator.allocate<ShapeImpl>(*scene, *iter.second.element);
 			}
 		}
-		else if (iter.second.element->id == "Material")
+		else if (iter.second.element->id == "Material" && !ignore_materials)
 		{
 			obj = parseMaterial(*scene, *iter.second.element, allocator);
 		}
-		else if (iter.second.element->id == "AnimationStack")
+		else if (iter.second.element->id == "AnimationStack" && !ignore_animations)
 		{
 			obj = parse<AnimationStackImpl>(*scene, *iter.second.element, allocator);
 			if (!obj.isError())
@@ -3073,19 +3524,19 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 				scene->m_animation_stacks.push_back(stack);
 			}
 		}
-		else if (iter.second.element->id == "AnimationLayer")
+		else if (iter.second.element->id == "AnimationLayer" && !ignore_animations)
 		{
 			obj = parse<AnimationLayerImpl>(*scene, *iter.second.element, allocator);
 		}
-		else if (iter.second.element->id == "AnimationCurve")
+		else if (iter.second.element->id == "AnimationCurve" && !ignore_animations)
 		{
 			obj = parseAnimationCurve(*scene, *iter.second.element, allocator);
 		}
-		else if (iter.second.element->id == "AnimationCurveNode")
+		else if (iter.second.element->id == "AnimationCurveNode" && !ignore_animations)
 		{
 			obj = parse<AnimationCurveNodeImpl>(*scene, *iter.second.element, allocator);
 		}
-		else if (iter.second.element->id == "Deformer")
+		else if (iter.second.element->id == "Deformer" && !ignore_blend_shapes)
 		{
 			IElementProperty* class_prop = iter.second.element->getProperty(2);
 
@@ -3103,15 +3554,33 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 		}
 		else if (iter.second.element->id == "NodeAttribute")
 		{
-			obj = parseNodeAttribute(*scene, *iter.second.element, allocator);
+
+			// Add the support for lights and camera here.
+			Property* last_prop = iter.second.element->first_property;
+			while (last_prop->next) last_prop = last_prop->next;
+			if (last_prop)
+			{
+				if (last_prop->value == "Light" && !ignore_lights)
+				{
+					obj = parseLight(*scene, *iter.second.element, allocator);
+				}
+				else if (last_prop->value == "Camera" && !ignore_cameras)
+				{
+					obj = parseCamera(*scene, *iter.second.element, allocator);
+				}
+			}
+			else
+			{
+				obj = parseNodeAttribute(*scene, *iter.second.element, allocator);
+			}
 		}
-		else if (iter.second.element->id == "Model")
+		else if (iter.second.element->id == "Model" && !ignore_models)
 		{
 			IElementProperty* class_prop = iter.second.element->getProperty(2);
 
 			if (class_prop)
 			{
-				if (class_prop->getValue() == "Mesh")
+				if (class_prop->getValue() == "Mesh" && !ignore_meshes)
 				{
 					obj = parseMesh(*scene, *iter.second.element, allocator);
 					if (!obj.isError())
@@ -3121,21 +3590,21 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 						obj = mesh;
 					}
 				}
-				else if (class_prop->getValue() == "LimbNode")
+				else if (class_prop->getValue() == "LimbNode" && !ignore_limbs)
 					obj = parseLimbNode(*scene, *iter.second.element, allocator);
 				else
 					obj = parse<NullImpl>(*scene, *iter.second.element, allocator);
 			}
 		}
-		else if (iter.second.element->id == "Texture")
+		else if (iter.second.element->id == "Texture" && !ignore_textures)
 		{
 			obj = parseTexture(*scene, *iter.second.element, allocator);
 		}
-		else if (iter.second.element->id == "Video")
+		else if (iter.second.element->id == "Video" && !ignore_videos)
 		{
 			parseVideo(*scene, *iter.second.element, allocator);
 		}
-		else if (iter.second.element->id == "Pose")
+		else if (iter.second.element->id == "Pose" && !ignore_poses)
 		{
 			obj = parsePose(*scene, *iter.second.element, allocator);
 		}
@@ -3168,6 +3637,8 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 
 	for (const Scene::Connection& con : scene->m_connections)
 	{
+		if (con.type == Scene::Connection::PROPERTY_PROPERTY) continue;
+
 		Object* parent = scene->m_object_map[con.to].object;
 		Object* child = scene->m_object_map[con.from].object;
 		if (!child) continue;
@@ -3188,7 +3659,7 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 				{
 					AnimationCurveNodeImpl* node = (AnimationCurveNodeImpl*)child;
 					node->bone = parent;
-					node->bone_link_property = con.property;
+					node->bone_link_property = con.toProperty;
 				}
 				break;
 		}
@@ -3260,19 +3731,19 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 				if (child->getType() == Object::Type::TEXTURE)
 				{
 					Texture::TextureType type = Texture::COUNT;
-					if (con.property == "NormalMap")
+					if (con.toProperty == "NormalMap")
 						type = Texture::NORMAL;
-					else if (con.property == "DiffuseColor")
+					else if (con.toProperty == "DiffuseColor")
 						type = Texture::DIFFUSE;
-					else if (con.property == "SpecularColor")
+					else if (con.toProperty == "SpecularColor")
 						type = Texture::SPECULAR;
-                    else if (con.property == "ShininessExponent")
+					else if (con.toProperty == "ShininessExponent")
                         type = Texture::SHININESS;
-                    else if (con.property == "EmissiveColor")
+					else if (con.toProperty == "EmissiveColor")
                         type = Texture::EMISSIVE;
-                    else if (con.property == "AmbientColor")
+					else if (con.toProperty == "AmbientColor")
                         type = Texture::AMBIENT;
-                    else if (con.property == "ReflectionFactor")
+					else if (con.toProperty == "ReflectionFactor")
                         type = Texture::REFLECTION;
 					if (type == Texture::COUNT) break;
 
@@ -3323,7 +3794,7 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 				if (child->getType() == Object::Type::ANIMATION_CURVE)
 				{
 					char tmp[32];
-					con.property.toString(tmp);
+					con.toProperty.toString(tmp);
 					if (strcmp(tmp, "d|X") == 0)
 					{
 						node->curves[0].connection = &con;
@@ -3551,7 +4022,7 @@ Object* Object::resolveObjectLink(Object::Type type, const char* property, int i
 			Object* obj = scene.m_object_map.find(connection.from)->second.object;
 			if (obj && obj->getType() == type)
 			{
-				if (property == nullptr || connection.property == property)
+				if (property == nullptr || connection.toProperty == property)
 				{
 					if (idx == 0) return obj;
 					--idx;
@@ -3582,7 +4053,7 @@ Object* Object::getParent() const
 }
 
 
-IScene* load(const u8* data, int size, u64 flags, JobProcessor job_processor, void* job_user_ptr)
+IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor, void* job_user_ptr)
 {
 	std::unique_ptr<Scene> scene(new Scene());
 	scene->m_data.resize(size);

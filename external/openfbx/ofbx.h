@@ -25,12 +25,36 @@ static_assert(sizeof(i64) == 8, "i64 is not 8 bytes");
 using JobFunction = void (*)(void*);
 using JobProcessor = void (*)(JobFunction, void*, void*, u32, u32);
 
-enum class LoadFlags : u64 {
+// Ignoring certain nodes will only stop them from being processed not tokenised (i.e. they will still be in the tree)
+enum class LoadFlags : u16
+{
 	TRIANGULATE = 1 << 0,
 	IGNORE_GEOMETRY = 1 << 1,
 	IGNORE_BLEND_SHAPES = 1 << 2,
+	IGNORE_CAMERAS = 1 << 3,
+	IGNORE_LIGHTS = 1 << 4,
+	IGNORE_TEXTURES = 1 << 5,
+	IGNORE_SKIN = 1 << 6,
+	IGNORE_BONES = 1 << 7,
+	IGNORE_PIVOTS = 1 << 8,
+	IGNORE_ANIMATIONS = 1 << 9,
+	IGNORE_MATERIALS = 1 << 10,
+	IGNORE_POSES = 1 << 11,
+	IGNORE_VIDEOS = 1 << 12,
+	IGNORE_LIMBS = 1 << 13,
+	IGNORE_MESHES = 1 << 14,
+	IGNORE_MODELS = 1 << 15,
 };
 
+constexpr LoadFlags operator|(LoadFlags lhs, LoadFlags rhs)
+{
+	return static_cast<LoadFlags>(static_cast<u16>(lhs) | static_cast<u16>(rhs));
+}
+
+constexpr LoadFlags& operator|=(LoadFlags& lhs, LoadFlags rhs)
+{
+	return lhs = lhs | rhs;
+}
 
 struct Vec2
 {
@@ -81,6 +105,7 @@ struct DataView
 	i64 toI64() const;
 	int toInt() const;
 	u32 toU32() const;
+	bool toBool() const;
 	double toDouble() const;
 	float toFloat() const;
 
@@ -168,6 +193,8 @@ struct Object
 		TEXTURE,
 		LIMB_NODE,
 		NULL_NODE,
+		CAMERA,
+		LIGHT,
 		NODE_ATTRIBUTE,
 		CLUSTER,
 		SKIN,
@@ -255,6 +282,124 @@ struct Texture : Object
 	virtual DataView getEmbeddedData() const = 0;
 };
 
+struct Light : Object
+{
+public:
+	enum class LightType
+	{
+		POINT,
+		DIRECTIONAL,
+		SPOT,
+		AREA,
+		VOLUME,
+		COUNT
+	};
+
+	enum class DecayType
+	{
+		NO_DECAY,
+		LINEAR,
+		QUADRATIC,
+		CUBIC,
+		COUNT
+	};
+
+	Light(const Scene& _scene, const IElement& _element)
+		: Object(_scene, _element)
+	{
+		// Initialize the light properties here
+	}
+
+	// Light type
+	virtual LightType getLightType() const = 0;
+
+	// Light properties
+	virtual bool doesCastLight() const = 0;
+	virtual bool doesDrawVolumetricLight() const = 0;
+	virtual bool doesDrawGroundProjection() const = 0;
+	virtual bool doesDrawFrontFacingVolumetricLight() const = 0;
+	virtual Color getColor() const = 0;
+	virtual double getIntensity() const = 0;
+	virtual double getInnerAngle() const = 0;
+	virtual double getOuterAngle() const = 0;
+	virtual double getFog() const = 0;
+	virtual DecayType getDecayType() const = 0;
+	virtual double getDecayStart() const = 0;
+
+	// Near attenuation
+	virtual bool doesEnableNearAttenuation() const = 0;
+	virtual double getNearAttenuationStart() const = 0;
+	virtual double getNearAttenuationEnd() const = 0;
+
+	// Far attenuation
+	virtual bool doesEnableFarAttenuation() const = 0;
+	virtual double getFarAttenuationStart() const = 0;
+	virtual double getFarAttenuationEnd() const = 0;
+
+	// Shadows
+	virtual const Texture* getShadowTexture() const = 0;
+	virtual bool doesCastShadows() const = 0;
+	virtual Color getShadowColor() const = 0;
+};
+
+struct Camera : Object
+{
+	enum class ProjectionType
+	{
+		PERSPECTIVE,
+		ORTHOGRAPHIC,
+		COUNT
+	};
+
+	enum class ApertureMode // Used to determine how to calculate the FOV
+	{
+		HORIZANDVERT,
+		HORIZONTAL,
+		VERTICAL,
+		FOCALLENGTH,
+		COUNT
+	};
+
+	enum class GateFit
+	{
+		NONE,
+		VERTICAL,
+		HORIZONTAL,
+		FILL,
+		OVERSCAN,
+		STRETCH,
+		COUNT
+	};
+
+	static const Type s_type = Type::CAMERA;
+
+	Camera(const Scene& _scene, const IElement& _element)
+		: Object(_scene, _element)
+	{
+	}
+
+	virtual Type getType() const { return Type::CAMERA; }
+	virtual ProjectionType getProjectionType() const = 0;
+	virtual ApertureMode getApertureMode() const = 0;
+
+	virtual double getFilmHeight() const = 0;
+	virtual double getFilmWidth() const = 0;
+
+	virtual double getAspectHeight() const = 0;
+	virtual double getAspectWidth() const = 0;
+
+	virtual double getNearPlane() const = 0;
+	virtual double getFarPlane() const = 0;
+	virtual bool doesAutoComputeClipPanes() const = 0;
+
+	virtual GateFit getGateFit() const = 0;
+	virtual double getFilmAspectRatio() const = 0;
+	virtual double getFocalLength() const = 0;
+	virtual double getFocusDistance() const = 0;
+
+	virtual Vec3 getBackgroundColor() const = 0;
+	virtual Vec3 getInterestPosition() const = 0;
+};
 
 struct Material : Object
 {
@@ -508,29 +653,51 @@ struct GlobalSettings
 struct IScene
 {
 	virtual void destroy() = 0;
+
+	// Root Node
 	virtual const IElement* getRootElement() const = 0;
 	virtual const Object* getRoot() const = 0;
-	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
-	virtual int getGeometryCount() const = 0;
+
+	// Meshes
 	virtual int getMeshCount() const = 0;
-	virtual float getSceneFrameRate() const = 0;
-	virtual const GlobalSettings* getGlobalSettings() const = 0;
 	virtual const Mesh* getMesh(int index) const = 0;
+
+	// Geometry
+	virtual int getGeometryCount() const = 0;
 	virtual const Geometry* getGeometry(int index) const = 0;
+
+	// Animations
 	virtual int getAnimationStackCount() const = 0;
 	virtual const AnimationStack* getAnimationStack(int index) const = 0;
+
+	// Cameras
+	virtual int getCameraCount() const = 0;
+	virtual const Camera* getCamera(int index) const = 0;
+
+	// Lights
+	virtual int getLightCount() const = 0;
+	virtual const Light* getLight(int index) const = 0;
+
+	// Scene Objects (Everything in scene)
 	virtual const Object* const* getAllObjects() const = 0;
 	virtual int getAllObjectCount() const = 0;
+
+	// Embedded files/Data
 	virtual int getEmbeddedDataCount() const = 0;
 	virtual DataView getEmbeddedData(int index) const = 0;
 	virtual DataView getEmbeddedFilename(int index) const = 0;
+
+	// Scene Misc
+	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
+	virtual float getSceneFrameRate() const = 0;
+	virtual const GlobalSettings* getGlobalSettings() const = 0;
 
 protected:
 	virtual ~IScene() {}
 };
 
 
-IScene* load(const u8* data, int size, u64 flags, JobProcessor job_processor = nullptr, void* job_user_ptr = nullptr);
+IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor = nullptr, void* job_user_ptr = nullptr);
 const char* getError();
 double fbxTimeToSeconds(i64 value);
 i64 secondsToFbxTime(double value);

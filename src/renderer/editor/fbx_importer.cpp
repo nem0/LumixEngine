@@ -933,8 +933,8 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 	OutputMemoryStream data(m_allocator);
 	if (!m_filesystem.getContentSync(Path(filename), data)) return false;
 	
-	const u64 flags = ignore_geometry ? (u64)ofbx::LoadFlags::IGNORE_GEOMETRY : (u64)ofbx::LoadFlags::TRIANGULATE;
-	scene = ofbx::load(data.data(), (i32)data.size(), flags, &ofbx_job_processor, nullptr);
+	const ofbx::LoadFlags flags = ignore_geometry ? ofbx::LoadFlags::IGNORE_GEOMETRY : ofbx::LoadFlags::TRIANGULATE;
+	scene = ofbx::load(data.data(), (i32)data.size(), static_cast<u16>(flags), &ofbx_job_processor, nullptr);
 	if (!scene)
 	{
 		logError("Failed to import \"", filename, ": ", ofbx::getError(), "\n"
