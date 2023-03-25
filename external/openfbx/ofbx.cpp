@@ -95,13 +95,13 @@ struct Error
 	}
 
 	// Format a message with printf-style arguments.
-    template <typename... Args>
-    Error(const char* fmt, Args... args) 
+	template <typename... Args>
+	Error(const char* fmt, Args... args) 
 	{
-        char buf[1024];
-        std::snprintf(buf, sizeof(buf), fmt, args...);
-        s_message = buf;
-    }
+		char buf[1024];
+		std::snprintf(buf, sizeof(buf), fmt, args...);
+		s_message = buf;
+	}
 
 	static const char* s_message;
 };
@@ -741,7 +741,7 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version, Allocato
 		}
 
 		*link = child.getValue();
-        if (child.getValue() == 0) break;
+		if (child.getValue() == 0) break;
 		link = &(*link)->sibling;
 	}
 
@@ -1152,34 +1152,34 @@ struct MaterialImpl : Material
 	const Texture* getTexture(Texture::TextureType type) const override { return textures[type]; }
 	Color getDiffuseColor() const override { return diffuse_color; }
 	Color getSpecularColor() const override { return specular_color; }
-    Color getReflectionColor() const override { return reflection_color; };
-    Color getAmbientColor() const override { return ambient_color; };
-    Color getEmissiveColor() const override { return emissive_color; };
+	Color getReflectionColor() const override { return reflection_color; };
+	Color getAmbientColor() const override { return ambient_color; };
+	Color getEmissiveColor() const override { return emissive_color; };
 
-    double getDiffuseFactor() const override { return diffuse_factor; };
-    double getSpecularFactor() const override { return specular_factor; };
-    double getReflectionFactor() const override { return reflection_factor; };
-    double getShininess() const override { return shininess; };
-    double getShininessExponent() const override { return shininess_exponent; };
-    double getAmbientFactor() const override { return ambient_factor; };
-    double getBumpFactor() const override { return bump_factor; };
-    double getEmissiveFactor() const override { return emissive_factor; };
+	double getDiffuseFactor() const override { return diffuse_factor; };
+	double getSpecularFactor() const override { return specular_factor; };
+	double getReflectionFactor() const override { return reflection_factor; };
+	double getShininess() const override { return shininess; };
+	double getShininessExponent() const override { return shininess_exponent; };
+	double getAmbientFactor() const override { return ambient_factor; };
+	double getBumpFactor() const override { return bump_factor; };
+	double getEmissiveFactor() const override { return emissive_factor; };
 
 	const Texture* textures[Texture::TextureType::COUNT];
 	Color diffuse_color;
 	Color specular_color;
-    Color reflection_color;
-    Color ambient_color;
-    Color emissive_color;
+	Color reflection_color;
+	Color ambient_color;
+	Color emissive_color;
 
-    double diffuse_factor;
-    double specular_factor;
-    double reflection_factor;
-    double shininess;
-    double shininess_exponent;
-    double ambient_factor;
-    double bump_factor;
-    double emissive_factor;
+	double diffuse_factor;
+	double specular_factor;
+	double reflection_factor;
+	double shininess;
+	double shininess_exponent;
+	double ambient_factor;
+	double bump_factor;
+	double emissive_factor;
  };
 
 
@@ -1600,15 +1600,11 @@ struct LightImpl : Light
 	LightImpl(const Scene& _scene, const IElement& _element)
 		: Light(_scene, _element)
 	{
-		// Initialize the light properties here
 	}
 
 	Type getType() const override { return Type::LIGHT; }
-
-	// Light type
 	LightType getLightType() const override { return lightType; }
 
-	// Light properties
 	bool doesCastLight() const override { return castLight; }
 
 	bool doesDrawVolumetricLight() const override
@@ -1656,50 +1652,41 @@ struct LightImpl : Light
 
 	// Member variables to store light properties
 	//-------------------------------------------------------------------------
-	LightType lightType = LightType::POINT; // Light type
-	bool castLight = true;					// Whether the light casts light on objects
+	LightType lightType = LightType::POINT;
+	bool castLight = true;
 	Color color = {1, 1, 1};					// Light color (RGB values)
-	double intensity = 100.0;				// Light intensity
+	double intensity = 100.0;
 
-	// Spotlight properties
 	double innerAngle = 0.0;
 	double outerAngle = 45.0;
 
-	// Light fog intensity
 	double fog = 50;
 
-	// Light decay properties
 	DecayType decayType = DecayType::QUADRATIC;
 	double decayStart = 1.0;
 
-	// Near attenuation properties
 	bool enableNearAttenuation = false;
 	double nearAttenuationStart = 0.0;
 	double nearAttenuationEnd = 0.0;
 
-	// Far attenuation properties
 	bool enableFarAttenuation = false;
 	double farAttenuationStart = 0.0;
 	double farAttenuationEnd = 0.0;
 
-	// Shadow properties
 	const Texture* shadowTexture = nullptr;
 	bool castShadows = true;
 	Color shadowColor = {0, 0, 0};
 };
 
-static float M_PI = 3.14159265358979323846f;
+static float OFBX_PI = 3.14159265358979323846f;
 struct CameraImpl : public Camera
 {
-    CameraImpl(const Scene& _scene, const IElement& _element)
-        : Camera(_scene, _element)
-    {
-        // Initialize camera properties here
-    }
+	CameraImpl(const Scene& _scene, const IElement& _element)
+		: Camera(_scene, _element)
+	{
+	}
 
-    // Member variables to store camera properties
-    //-------------------------------------------------------------------------
-	ProjectionType projectionType = ProjectionType::PERSPECTIVE; // Projection type
+	ProjectionType projectionType = ProjectionType::PERSPECTIVE;
 	ApertureMode apertureMode = ApertureMode::HORIZONTAL; // Used to determine the FOV
 
 	double filmHeight = 36.0;
@@ -1722,8 +1709,6 @@ struct CameraImpl : public Camera
 
 	double fieldOfView = 60.0;
 
-	// Member functions to get camera properties
-	//-------------------------------------------------------------------------
 	Type getType() const override { return Type::CAMERA; }
 	ProjectionType getProjectionType() const override { return projectionType; }
 	ApertureMode getApertureMode() const override { return apertureMode; }
@@ -1751,16 +1736,16 @@ struct CameraImpl : public Camera
 		switch (apertureMode)
 		{
 			case Camera::ApertureMode::HORIZONTAL:
-				fieldOfView =  2.0 * atan(filmWidth / (2.0 * focalLength)) * 180.0 / M_PI;
+				fieldOfView =  2.0 * atan(filmWidth / (2.0 * focalLength)) * 180.0 / OFBX_PI;
 				return;
 			case Camera::ApertureMode::VERTICAL:
-				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / M_PI;
+				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / OFBX_PI;
 				return;
 			case Camera::ApertureMode::HORIZANDVERT:
-				fieldOfView =  2.0 * atan(sqrt(filmWidth * filmWidth + filmHeight * filmHeight) / (2.0 * focalLength)) * 180.0 / M_PI;
+				fieldOfView =  2.0 * atan(sqrt(filmWidth * filmWidth + filmHeight * filmHeight) / (2.0 * focalLength)) * 180.0 / OFBX_PI;
 				return;
 			case Camera::ApertureMode::FOCALLENGTH:
-				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / M_PI; // Same as vertical ¯\_(ツ)_/¯
+				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / OFBX_PI; // Same as vertical ¯\_(ツ)_/¯
 				return;
 			default:
 				fieldOfView =  60.0;
@@ -1862,7 +1847,6 @@ struct Scene : IScene
 		return nullptr;
 	}
 
-	// Cameras
 	const Camera* getCamera(int index) const override
 	{
 		assert(index >= 0);
@@ -1875,7 +1859,6 @@ struct Scene : IScene
 		return (int)m_cameras.size();
 	}
 
-	// Lights
 	const Light* getLight(int index) const override
 	{
 		assert(index >= 0);
@@ -2144,7 +2127,6 @@ struct OptionalError<Object*> parseLight(Scene& scene, const Element& element, A
 	const Element* prop = findChild(element, "Properties70");
 	if (prop) prop = prop->child;
 
-	// Can be replaced with a std::map for a Big O of O(log n) instead of O(n) for the if else statements - Possibly faster
 	while (prop)
 	{
 		if (prop->id == "P" && prop->first_property)
@@ -2181,7 +2163,7 @@ struct OptionalError<Object*> parseLight(Scene& scene, const Element& element, A
 		prop = prop->sibling;
 	}
 
-	scene.m_lights.push_back(light); // Implicit inheritance downcast
+	scene.m_lights.push_back(light);
 	return light;
 }
 
@@ -2189,14 +2171,13 @@ struct OptionalError<Object*> parseCamera(Scene& scene, const Element& element, 
 {
 	CameraImpl* camera = allocator.allocate<CameraImpl>(scene, element);
 
-	camera->projectionType = static_cast<Camera::ProjectionType>(resolveEnumProperty(*camera, "ProjectionType", (int)Camera::ProjectionType::PERSPECTIVE)); // ProjectionType
-	camera->apertureMode = static_cast<Camera::ApertureMode>(resolveEnumProperty(*camera, "ApertureMode", (int)Camera::ApertureMode::HORIZANDVERT)); // ApertureMode
-	camera->gateFit = static_cast<Camera::GateFit>(resolveEnumProperty(*camera, "GateFit", (int)Camera::GateFit::HORIZONTAL)); // GateFit
+	camera->projectionType = static_cast<Camera::ProjectionType>(resolveEnumProperty(*camera, "ProjectionType", (int)Camera::ProjectionType::PERSPECTIVE));
+	camera->apertureMode = static_cast<Camera::ApertureMode>(resolveEnumProperty(*camera, "ApertureMode", (int)Camera::ApertureMode::HORIZANDVERT));
+	camera->gateFit = static_cast<Camera::GateFit>(resolveEnumProperty(*camera, "GateFit", (int)Camera::GateFit::HORIZONTAL));
 
 	const Element* prop = findChild(element, "Properties70");
 	if (prop) prop = prop->child;
 
-	// Can be replaced with a std::map for a Big O of O(log n) instead of O(n) for the if else statements - Possibly faster
 	while (prop)
 	{
 		if (prop->id == "P" && prop->first_property)
@@ -2258,7 +2239,7 @@ struct OptionalError<Object*> parseCamera(Scene& scene, const Element& element, 
 	}
 
 	camera->CalculateFOV();
-	scene.m_cameras.push_back(camera); // Implicit inheritance downcast
+	scene.m_cameras.push_back(camera);
 	return camera;
 }
 
@@ -2378,56 +2359,56 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 				material->specular_color.g = (float)prop->getProperty(5)->getValue().toDouble();
 				material->specular_color.b = (float)prop->getProperty(6)->getValue().toDouble();
 			}
-            else if (prop->first_property->value == "Shininess")
-            {
-                material->shininess = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "ShininessExponent")
-            {
-                material->shininess_exponent = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "ReflectionColor")
-            {
-                material->reflection_color.r = (float)prop->getProperty(4)->getValue().toDouble();
-                material->reflection_color.g = (float)prop->getProperty(5)->getValue().toDouble();
-                material->reflection_color.b = (float)prop->getProperty(6)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "AmbientColor")
-            {
-                material->ambient_color.r = (float)prop->getProperty(4)->getValue().toDouble();
-                material->ambient_color.g = (float)prop->getProperty(5)->getValue().toDouble();
-                material->ambient_color.b = (float)prop->getProperty(6)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "EmissiveColor")
-            {
-                material->emissive_color.r = (float)prop->getProperty(4)->getValue().toDouble();
-                material->emissive_color.g = (float)prop->getProperty(5)->getValue().toDouble();
-                material->emissive_color.b = (float)prop->getProperty(6)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "ReflectionFactor")
-            {
-                material->reflection_factor = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "BumpFactor")
-            {
-                material->bump_factor = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "AmbientFactor")
-            {
-                material->ambient_factor = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "DiffuseFactor")
-            {
-                material->diffuse_factor = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "SpecularFactor")
-            {
-                material->specular_factor = (float)prop->getProperty(4)->getValue().toDouble();
-            }
-            else if (prop->first_property->value == "EmissiveFactor")
-            {
-                material->emissive_factor = (float)prop->getProperty(4)->getValue().toDouble();
-            }
+			else if (prop->first_property->value == "Shininess")
+			{
+				material->shininess = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "ShininessExponent")
+			{
+				material->shininess_exponent = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "ReflectionColor")
+			{
+				material->reflection_color.r = (float)prop->getProperty(4)->getValue().toDouble();
+				material->reflection_color.g = (float)prop->getProperty(5)->getValue().toDouble();
+				material->reflection_color.b = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "AmbientColor")
+			{
+				material->ambient_color.r = (float)prop->getProperty(4)->getValue().toDouble();
+				material->ambient_color.g = (float)prop->getProperty(5)->getValue().toDouble();
+				material->ambient_color.b = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "EmissiveColor")
+			{
+				material->emissive_color.r = (float)prop->getProperty(4)->getValue().toDouble();
+				material->emissive_color.g = (float)prop->getProperty(5)->getValue().toDouble();
+				material->emissive_color.b = (float)prop->getProperty(6)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "ReflectionFactor")
+			{
+				material->reflection_factor = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "BumpFactor")
+			{
+				material->bump_factor = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "AmbientFactor")
+			{
+				material->ambient_factor = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "DiffuseFactor")
+			{
+				material->diffuse_factor = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "SpecularFactor")
+			{
+				material->specular_factor = (float)prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "EmissiveFactor")
+			{
+				material->emissive_factor = (float)prop->getProperty(4)->getValue().toDouble();
+			}
 		}
 		prop = prop->sibling;
 	}
@@ -2659,7 +2640,7 @@ template <typename T> static bool parseDoubleVecData(Property& property, std::ve
 static bool parseDouble(Property& property, double* out)
 {
 	assert(out);
-    if (property.value.is_binary)
+	if (property.value.is_binary)
 	{
 		int elem_size = 1;
 		switch (property.type)
@@ -2673,11 +2654,11 @@ static bool parseDouble(Property& property, double* out)
 		memcpy(out, data, elem_size);
 		return true;
 	}
-    else
-    {
-        fromString<double>((const char*)property.value.begin, (const char*)property.value.end, out);
-        return true;
-    }
+	else
+	{
+		fromString<double>((const char*)property.value.begin, (const char*)property.value.end, out);
+		return true;
+	}
 }
 
 
@@ -3566,8 +3547,6 @@ static bool parseObjects(const Element& root, Scene* scene, u16 flags, Allocator
 		}
 		else if (iter.second.element->id == "NodeAttribute")
 		{
-
-			// Add the support for lights and camera here.
 			Property* last_prop = iter.second.element->first_property;
 			while (last_prop->next) last_prop = last_prop->next;
 			if (last_prop)
@@ -3750,13 +3729,13 @@ static bool parseObjects(const Element& root, Scene* scene, u16 flags, Allocator
 					else if (con.toProperty == "SpecularColor")
 						type = Texture::SPECULAR;
 					else if (con.toProperty == "ShininessExponent")
-                        type = Texture::SHININESS;
+						type = Texture::SHININESS;
 					else if (con.toProperty == "EmissiveColor")
-                        type = Texture::EMISSIVE;
+						type = Texture::EMISSIVE;
 					else if (con.toProperty == "AmbientColor")
-                        type = Texture::AMBIENT;
+						type = Texture::AMBIENT;
 					else if (con.toProperty == "ReflectionFactor")
-                        type = Texture::REFLECTION;
+						type = Texture::REFLECTION;
 					if (type == Texture::COUNT) break;
 
 					if (mat->textures[type])
