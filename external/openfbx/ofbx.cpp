@@ -1015,7 +1015,7 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& versio
 	const Header* header = std::bit_cast<const Header*>(cursor.current);
 #else
 	Header header_temp;
-	std::memcpy(&header_temp, cursor.current, sizeof(Header));
+	memcpy(&header_temp, cursor.current, sizeof(Header));
 	const Header* header = &header_temp;
 #endif
 
@@ -2263,7 +2263,9 @@ struct OptionalError<Object*> parsePose(const Scene& scene, const Element& eleme
 		const Element* matrix = findChild(*pose_node, "Matrix");
 
 		if (matrix->first_property) {
-			parseArrayRaw(*matrix->first_property, &pose->matrix, sizeof(pose->matrix));
+			if (!parseArrayRaw(*matrix->first_property, &pose->matrix, sizeof(pose->matrix))) {
+				return Error("Failed to parse pose");
+			}
 		}
 		pose->node_id = node->first_property->value;
 	}
