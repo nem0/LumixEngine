@@ -138,7 +138,8 @@ struct IElementProperty
 		ARRAY_INT = 'i',
 		ARRAY_LONG = 'l',
 		ARRAY_FLOAT = 'f',
-		BINARY = 'R'
+		BINARY = 'R',
+		VOID = ' '
 	};
 	virtual ~IElementProperty() {}
 	virtual Type getType() const = 0;
