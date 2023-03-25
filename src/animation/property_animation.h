@@ -13,7 +13,7 @@ struct PropertyAnimation final : Resource {
 		Curve(IAllocator& allocator) : frames(allocator), values(allocator) {}
 
 		ComponentType cmp_type;
-		const reflection::Property<float>* property;
+		const reflection::Property<float>* property = nullptr;
 		
 		Array<i32> frames;
 		Array<float> values;
@@ -28,7 +28,7 @@ struct PropertyAnimation final : Resource {
 
 	IAllocator& m_allocator;
 	Array<Curve> curves;
-	int fps;
+	u32 fps;
 
 	static const ResourceType TYPE;
 

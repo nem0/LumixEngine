@@ -66,7 +66,7 @@ void PropertyAnimation::LUA_curve(lua_State* L) {
 	}
 	Curve& curve = curves.emplace(m_allocator);
 	curve.cmp_type = reflection::getComponentType(cmp_name);
-	// TODO property
+	curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, prop_name));
 	if (!LuaWrapper::getField(L, 1, "keyframes")) {
 		luaL_argerror(L, 1, "`keyframes` field must be an array");
 	}
