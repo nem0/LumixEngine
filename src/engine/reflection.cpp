@@ -89,13 +89,14 @@ ComponentType getComponentTypeFromHash(RuntimeHash hash)
 }
 
 const PropertyBase* getPropertyFromHash(StableHash hash) {
-	for (const RegisteredComponent& cmp : getContext().component_bases) {
+	const Context& ctx = getContext();
+	for (u32 i = 0; i < ctx.components_count; ++i) {
+		const RegisteredComponent& cmp = ctx.component_bases[i];
 		for (PropertyBase* prop : cmp.cmp->props) {
 			RollingStableHasher hasher;
 			hasher.begin();
 			hasher.update(cmp.cmp->name, stringLength(cmp.cmp->name));
 			hasher.update(prop->name, stringLength(prop->name));
-			hasher.end();
 			if (hasher.end64() == hash) return prop;
 		}
 	}
