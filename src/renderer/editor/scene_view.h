@@ -49,6 +49,12 @@ private:
 	void searchUI();
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
+	void setTopView();
+	void setSideView();
+	void setFrontView();
+	void toggleProjection();
+	void lookAtSelected();
+	void copyViewTransform();
 
 private:
 	StudioApp& m_app;
@@ -62,9 +68,17 @@ private:
 	Action m_move_right_action;
 	Action m_move_up_action;
 	Action m_move_down_action;
-	bool m_is_mouse_captured;
+	Action m_set_pivot_action;
+	Action m_reset_pivot_action;
+	Action m_top_view_action;
+	Action m_side_view_action;
+	Action m_front_view_action;
+	Action m_toggle_projection_action;
+	Action m_look_at_selected_action;
+	Action m_copy_view_action;
+	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
-	bool m_show_stats;
+	bool m_show_stats = false;
 	bool m_search_request = false;
 	bool m_search_preview = false;
 	bool m_search_actions = true;
@@ -77,11 +91,12 @@ private:
 	int m_height;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
-	float m_camera_speed;
-	WorldEditor& m_editor;
+	float m_camera_speed = 0.1f;
 	UniquePtr<Pipeline> m_pipeline;
 	LogUI& m_log_ui;
 	Shader* m_debug_shape_shader;
+	
+	WorldEditor& m_editor;
 	struct WorldViewImpl* m_view;
 
 	bool m_is_measure_active = false;

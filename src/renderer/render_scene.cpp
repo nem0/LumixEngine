@@ -2628,9 +2628,9 @@ struct RenderSceneImpl final : RenderScene {
 
 			const EntityRef entity{i};
 			const Transform& tr = world.getTransform(entity);
-			float radius = r.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
+			float radius = r.model->getOriginBoundingRadius();
 			const double dist = length(tr.pos - origin);
-			if (dist - radius > cur_dist) continue;
+			if (dist - radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z) > cur_dist) continue;
 			
 			const Transform& inv_tr = tr.inverted();
 			const Vec3 ray_origin_model_space = Vec3(inv_tr.transform(origin));

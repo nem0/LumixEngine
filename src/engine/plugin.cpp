@@ -27,7 +27,7 @@ namespace Lumix
 				, m_allocator(allocator)
 				, m_engine(engine)
 				, m_library_loaded(allocator)
-			{ }
+			{}
 
 
 			~PluginManagerImpl()

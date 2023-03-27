@@ -1994,7 +1994,7 @@ public:
 		m_engine.serialize(*m_world, blob);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
-		const Viewport& vp = getView().getViewport();
+		const Viewport& vp = m_view->getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
 		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
@@ -2021,11 +2021,12 @@ public:
 
 	EntityRef addEntity() override
 	{
-		return addEntityAt(m_view->getViewport().w >> 1, m_view->getViewport().h >> 1);
+		const Viewport& vp = m_view->getViewport();
+		return addEntityAt(vp.w >> 1, vp.h >> 1);
 	}
 
 
-	EntityRef addEntityAt(int camera_x, int camera_y) override
+	EntityRef addEntityAt(i32 camera_x, i32 camera_y)
 	{
 		DVec3 origin;
 		Vec3 dir;

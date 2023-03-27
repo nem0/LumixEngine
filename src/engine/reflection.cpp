@@ -227,6 +227,7 @@ void builder::addProp(PropertyBase* p) {
 	}
 	else {
 		scene->cmps.back()->props.push(p);
+		p->cmp = scene->cmps.back();
 	}
 	last_prop = p;
 }

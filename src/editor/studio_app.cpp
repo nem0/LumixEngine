@@ -165,7 +165,6 @@ struct StudioAppImpl final : StudioApp
 			}
 			case os::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
-				m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 				if (handle_input || !event.mouse_button.down) {
 					io.AddMouseButtonEvent((int)event.mouse_button.button, event.mouse_button.down);
 				}
@@ -372,24 +371,6 @@ struct StudioAppImpl final : StudioApp
 		loadSettings();
 		initIMGUI();
 
-		m_set_pivot_action.init("Set custom pivot",
-			"Set custom pivot",
-			"set_custom_pivot",
-			"",
-			os::Keycode::K,
-			Action::Modifiers::NONE,
-			false);
-		addAction(&m_set_pivot_action);
-
-		m_reset_pivot_action.init("Reset pivot",
-			"Reset pivot",
-			"reset_pivot",
-			"",
-			os::Keycode::K,
-			Action::Modifiers::SHIFT,
-			false);
-		addAction(&m_reset_pivot_action);
-
 		setStudioApp();
 		loadSettings();
 		loadWorldFromCommandLine();
@@ -411,8 +392,6 @@ struct StudioAppImpl final : StudioApp
 		removePlugin(*m_profiler_ui.get());
 
 		m_asset_browser->releaseResources();
-		removeAction(&m_set_pivot_action);
-		removeAction(&m_reset_pivot_action);
 		m_watched_plugin.watcher.reset();
 
 		saveSettings();
@@ -817,16 +796,6 @@ struct StudioAppImpl final : StudioApp
 		float time_delta = m_engine->getLastTimeDelta();
 
 		ImGuiIO& io = ImGui::GetIO();
-		if (!io.KeyShift) {
-			m_editor->getView().setSnapMode(false, false);
-		}
-		else if (io.KeyCtrl) {
-			m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
-		}
-		if (m_set_pivot_action.isActive()) m_editor->getView().setCustomPivot();
-		if (m_reset_pivot_action.isActive()) m_editor->getView().resetPivot();
-
-		m_editor->getView().setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
 		showGizmos();
 		
@@ -1110,12 +1079,6 @@ struct StudioAppImpl final : StudioApp
 	
 	void setCursorCaptured(bool captured) override { m_cursor_captured = captured; }
 
-	void toggleProjection() { 
-		Viewport vp = m_editor->getView().getViewport(); 
-		vp.is_ortho = !vp.is_ortho;
-		m_editor->getView().setViewport(vp); 
-	}
-
 	void addEntity() {
 		const EntityRef e = m_editor->addEntity();
 		m_editor->selectEntities(Span(&e, 1), false);
@@ -1126,13 +1089,8 @@ struct StudioAppImpl final : StudioApp
 	void copy() { m_editor->copyEntities(); }
 	void paste() { m_editor->pasteEntities(); }
 	void duplicate() { m_editor->duplicateEntities(); }
-	void setTopView() { m_editor->getView().setTopView(); }
-	void setFrontView() { m_editor->getView().setFrontView(); }
-	void setSideView() { m_editor->getView().setSideView(); }
 	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
 	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
-	void lookAtSelected() { m_editor->getView().lookAtSelected(); }
-	void copyViewTransform() { m_editor->getView().copyTransform(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
 	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
@@ -2206,10 +2164,6 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&Gizmo::Config::isRotateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setScaleGizmoMode>(ICON_FA_EXPAND_ALT "Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
 			.is_selected.bind<&Gizmo::Config::isScaleMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::toggleProjection>(NO_ICON "Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection");
-		addAction<&StudioAppImpl::setTopView>(NO_ICON "Top", "Set top camera view", "viewTop");
-		addAction<&StudioAppImpl::setFrontView>(NO_ICON "Front", "Set front camera view", "viewFront");
-		addAction<&StudioAppImpl::setSideView>(NO_ICON "Side", "Set side camera view", "viewSide");
 		addAction<&StudioAppImpl::setLocalCoordSystem>(ICON_FA_HOME "Local", "Set local transform system", "setLocalCoordSystem", ICON_FA_HOME)
 			.is_selected.bind<&Gizmo::Config::isLocalCoordSystem>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setGlobalCoordSystem>(ICON_FA_GLOBE "Global", "Set global transform system", "setGlobalCoordSystem", ICON_FA_GLOBE)
@@ -2234,8 +2188,6 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
-		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleEntityList>(ICON_FA_STREAM "Hierarchy", "Toggle hierarchy", "entityList", ICON_FA_STREAM)
 			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>(ICON_FA_COG "Settings", "Toggle settings UI", "settings", ICON_FA_COG)
@@ -3295,9 +3247,6 @@ struct StudioAppImpl final : StudioApp
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, StaticString<5>> m_component_icons;
-
-	Action m_set_pivot_action;
-	Action m_reset_pivot_action;
 	Gizmo::Config m_gizmo_config;
 
 	bool m_save_as_request = false;

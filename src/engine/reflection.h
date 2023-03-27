@@ -125,6 +125,7 @@ struct LUMIX_ENGINE_API PropertyBase {
 
 	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
 	const char* name;
+	ComponentBase* cmp;
 };
 
 

@@ -108,7 +108,6 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual EntityRef addEntity() = 0;
 	virtual void destroyEntities(const EntityRef* entities, int count) = 0;
 	virtual void selectEntities(Span<const EntityRef> entities, bool toggle) = 0;
-	virtual EntityRef addEntityAt(int camera_x, int camera_y) = 0;
 	virtual EntityRef addEntityAt(const DVec3& pos) = 0;
 	virtual void setEntitiesPositions(const EntityRef* entities, const DVec3* positions, int count) = 0;
 	virtual void setEntitiesCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) = 0;

@@ -622,8 +622,27 @@ SceneView::SceneView(StudioApp& app)
 	m_move_right_action.init("Move right", "Move camera right", "moveRight", "", false);
 	m_move_up_action.init("Move up", "Move camera up", "moveUp", "", false);
 	m_move_down_action.init("Move down", "Move camera down", "moveDown", "", false);
+	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, false);
+	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, false);
 	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
 	m_search_action.func.bind<&SceneView::toggleSearch>(this);
+
+	#define NO_ICON "     "	
+
+	m_top_view_action.init(NO_ICON "Top", "Set top camera view", "viewTop", "", true);
+	m_top_view_action.func.bind<&SceneView::setTopView>(this);
+	m_side_view_action.init(NO_ICON "Side", "Set side camera view", "viewSide", "", true);
+	m_side_view_action.func.bind<&SceneView::setSideView>(this);
+	m_front_view_action.init(NO_ICON "Front", "Set front camera view", "viewFront", "", true);
+	m_front_view_action.func.bind<&SceneView::setFrontView>(this);
+	m_toggle_projection_action.init(NO_ICON "Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", true);
+	m_toggle_projection_action.func.bind<&SceneView::toggleProjection>(this);
+	m_look_at_selected_action.init(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected", "", true);
+	m_look_at_selected_action.func.bind<&SceneView::lookAtSelected>(this);
+	m_copy_view_action.init(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform", "", true);
+	m_copy_view_action.func.bind<&SceneView::copyViewTransform>(this);
+
+	#undef NO_ICON
 
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_orbit_action);
@@ -635,14 +654,33 @@ SceneView::SceneView(StudioApp& app)
 	m_app.addAction(&m_move_up_action);
 	m_app.addAction(&m_move_down_action);
 	m_app.addAction(&m_search_action);
+	m_app.addAction(&m_set_pivot_action);
+	m_app.addAction(&m_reset_pivot_action);
+	m_app.addAction(&m_top_view_action);
+	m_app.addAction(&m_side_view_action);
+	m_app.addAction(&m_front_view_action);
+	m_app.addAction(&m_look_at_selected_action);
+	m_app.addAction(&m_copy_view_action);
+	m_app.addAction(&m_toggle_projection_action);
 
 	const ResourceType pipeline_type("pipeline");
 	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
+}
 
+void SceneView::setTopView() { m_view->setTopView(); }
+void SceneView::setSideView() { m_view->setSideView(); }
+void SceneView::setFrontView() { m_view->setFrontView(); }
+void SceneView::lookAtSelected() { m_view->lookAtSelected(); }
+void SceneView::copyViewTransform() { m_view->copyTransform(); }
+
+void SceneView::toggleProjection() {
+	Viewport vp = m_view->getViewport(); 
+	vp.is_ortho = !vp.is_ortho;
+	m_view->setViewport(vp); 
 }
 
 void SceneView::init() {
-	m_view = LUMIX_NEW(m_editor.getAllocator(), WorldViewImpl)(*this);
+	m_view = LUMIX_NEW(m_app.getAllocator(), WorldViewImpl)(*this);
 	m_editor.setView(m_view);
 
 	Engine& engine = m_app.getEngine();
@@ -670,6 +708,14 @@ SceneView::~SceneView()
 	m_app.removeAction(&m_move_up_action);
 	m_app.removeAction(&m_move_down_action);
 	m_app.removeAction(&m_search_action);
+	m_app.removeAction(&m_set_pivot_action);
+	m_app.removeAction(&m_reset_pivot_action);
+	m_app.removeAction(&m_top_view_action);
+	m_app.removeAction(&m_side_view_action);
+	m_app.removeAction(&m_front_view_action);
+	m_app.removeAction(&m_look_at_selected_action);
+	m_app.removeAction(&m_copy_view_action);
+	m_app.removeAction(&m_toggle_projection_action);
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
 	m_debug_shape_shader->decRefCount();
@@ -747,7 +793,19 @@ void SceneView::update(float time_delta)
 {
 	PROFILE_FUNCTION();
 	m_pipeline->setWorld(m_editor.getWorld());
+	if (m_set_pivot_action.isActive()) m_view->setCustomPivot();
+	if (m_reset_pivot_action.isActive()) m_view->resetPivot();
+	ImGuiIO& io = ImGui::GetIO();
+	if (!io.KeyShift) {
+		m_view->setSnapMode(false, false);
+	}
+	else if (io.KeyCtrl) {
+		m_view->setSnapMode(io.KeyShift, io.KeyCtrl);
+	}
+	Settings& settings = m_app.getSettings();
+	m_view->setMouseSensitivity(settings.m_mouse_sensitivity.x, settings.m_mouse_sensitivity.y);
 	m_view->update(time_delta);
+
 	if (m_is_measure_active) {
 		m_view->addCross(m_measure_from, 0.3f, Color::BLUE);
 		m_view->addCross(m_measure_to, 0.3f, Color::BLUE);
@@ -1135,12 +1193,12 @@ void SceneView::onToolbar()
 
 	if (ImGui::BeginPopup("Camera transform")) {
 		if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
-			m_editor.getView().setViewport(vp);
+			m_view->setViewport(vp);
 		}
 		Vec3 angles = vp.rot.toEuler();
 		if (ImGuiEx::InputRotation("Rotation", &angles.x)) {
 			vp.rot.fromEuler(angles);
-			m_editor.getView().setViewport(vp);
+			m_view->setViewport(vp);
 		}
 		ImGui::Selectable(ICON_FA_TIMES " Close");
 		ImGui::EndPopup();
