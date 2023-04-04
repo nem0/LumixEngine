@@ -335,7 +335,7 @@ struct PackFileSystem : FileSystemImpl {
 
 		content.resize(iter.value().size);
 		MutexGuard lock(m_mutex);
-		const u32 header_size = sizeof(u32) + m_map.size() * (2 * sizeof(u64) + sizeof(u32));
+		const u32 header_size = sizeof(u32) + m_map.size() * (2 * sizeof(u64) + sizeof(FilePathHash));
 		if (!m_file.seek(iter.value().offset + header_size) || !m_file.read(content.getMutableData(), content.size())) {
 			logError("Could not read ", path);
 			return false;
