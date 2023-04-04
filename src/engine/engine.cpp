@@ -101,7 +101,7 @@ public:
 		installUnhandledExceptionHandler();
 
 		logInfo("Creating engine...");
-		logInfo("Working directory: ", init_data.working_dir);
+		if (init_data.working_dir) logInfo("Working directory: ", init_data.working_dir);
 		char cmd_line[2048] = "";
 		os::getCommandLine(Span(cmd_line));
 		logInfo("Command line: ", cmd_line);

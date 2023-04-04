@@ -682,6 +682,7 @@ struct StudioAppImpl final : StudioApp
 
 	void guiEndFrame()
 	{
+		PROFILE_FUNCTION();
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 									ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
 									ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
@@ -2987,7 +2988,10 @@ struct StudioAppImpl final : StudioApp
 
 
 	void onExportDataGUI() {
-		if (!m_is_export_game_dialog_open) return;
+		if (!m_is_export_game_dialog_open) {
+			m_export_msg_timer = -1;
+			return;
+		}
 
 		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
@@ -3016,24 +3020,32 @@ struct StudioAppImpl final : StudioApp
 				ImGui::EndCombo();
 			}
 
-			if (ImGui::Button("Export")) exportData();
+			if (m_export_msg_timer > 0) {
+				m_export_msg_timer -= m_engine->getLastTimeDelta();
+				if (ImGui::Button("Export finished")) m_export_msg_timer = -1;
+			}
+			else {
+				if (ImGui::Button("Export")) {
+					if (exportData()) m_export_msg_timer = 3.f;
+				}
+			}
 		}
 		ImGui::End();
 	}
 
 
-	void exportData() {
-		if (m_export.dest_dir.empty()) return;
+	bool exportData() {
+		if (m_export.dest_dir.empty()) return false;
 
 		FileSystem& fs = m_engine->getFileSystem(); 
 		{
 			OutputMemoryStream prj_blob(m_allocator);
 			m_engine->serializeProject(prj_blob, m_export.startup_world);
 
-			const Path project_path(fs.getBasePath(), "lumix.prj");
-			if (!fs.saveContentSync(project_path, prj_blob)) {
-				logError("Could not save ", project_path);
-				return;
+			const Path prj_file("lumix.prj");
+			if (!fs.saveContentSync(prj_file, prj_blob)) {
+				logError("Could not save ", prj_file);
+				return false;
 			}
 		}
 
@@ -3052,7 +3064,7 @@ struct StudioAppImpl final : StudioApp
 			catString(dest, OUT_FILENAME);
 			if (infos.size() == 0) {
 				logError("No files found while trying to create ", dest);
-				return;
+				return false;
 			}
 			u64 total_size = 0;
 			for (ExportFileInfo& info : infos) {
@@ -3063,7 +3075,7 @@ struct StudioAppImpl final : StudioApp
 			os::OutputFile file;
 			if (!file.open(dest)) {
 				logError("Could not create ", dest);
-				return;
+				return false;
 			}
 
 			const u32 count = (u32)infos.size();
@@ -3081,7 +3093,7 @@ struct StudioAppImpl final : StudioApp
 				if (!fs.getContentSync(Path(info.path), src)) {
 					logError("Could not read ", info.path);
 					file.close();
-					return;
+					return false;
 				}
 				success = file.write(src.data(), src.size()) && success;
 			}
@@ -3089,7 +3101,7 @@ struct StudioAppImpl final : StudioApp
 
 			if (!success) {
 				logError("Could not write ", dest);
-				return;
+				return false;
 			}
 		}
 		else {
@@ -3103,12 +3115,12 @@ struct StudioAppImpl final : StudioApp
 				StaticString<LUMIX_MAX_PATH> dst_dir(dest, Path::getDir(info.path));
 				if (!os::makePath(dst_dir) && !os::dirExists(dst_dir)) {
 					logError("Failed to create ", dst_dir);
-					return;
+					return false;
 				}
 
 				if (!os::copyFile(src, dst)) {
 					logError("Failed to copy ", src, " to ", dst);
-					return;
+					return false;
 				}
 			}
 		}
@@ -3135,6 +3147,7 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 		logInfo("Exporting finished.");
+		return true;
 	}
 
 
@@ -3292,6 +3305,7 @@ struct StudioAppImpl final : StudioApp
 	};
 
 	ExportConfig m_export;
+	float m_export_msg_timer = -1;
 	bool m_entity_selection_changed = false;
 	bool m_finished;
 	bool m_deferred_game_mode_exit;

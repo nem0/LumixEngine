@@ -569,7 +569,7 @@ function main()
 
 		drawArray(0, 3, textured_quad_shader
 			, { res }
-			, { depth_test = false })
+			, no_depth_state)
 	end
 	setOutput(res)
 end
