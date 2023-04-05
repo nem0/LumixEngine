@@ -3348,7 +3348,7 @@ struct PipelineImpl final : Pipeline
 		return setRenderTargets(L, true, true);
 	}
 
-	static int setRenderTargetsDS(lua_State* L) { 
+	static int setRenderTargetsDS(lua_State* L) {
 		return setRenderTargets(L, true, false);
 	}
 

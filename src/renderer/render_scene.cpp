@@ -540,11 +540,10 @@ struct RenderSceneImpl final : RenderScene {
 	void startGame() override { m_is_game_running = true; }
 	void stopGame() override { m_is_game_running = false; }
 
-	void update(float dt, bool paused) override {
+	void update(float dt) override {
 		PROFILE_FUNCTION();
 
 		if (!m_is_game_running) return;
-		if (paused) return;
 
 		Array<EntityRef> to_delete(m_allocator);
 		for (ParticleEmitter& emitter : m_particle_emitters) {

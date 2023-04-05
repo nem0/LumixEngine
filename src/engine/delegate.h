@@ -58,6 +58,11 @@ public:
 
 	bool isValid() { return m_stub.second != nullptr; }
 
+	void bindRaw(InstancePtr obj, InternalFunction fn) {
+		m_stub.first = obj;
+		m_stub.second = fn;
+	}
+
 	template <R (*Function)(Args...)> void bind()
 	{
 		m_stub.first = nullptr;

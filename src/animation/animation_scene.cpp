@@ -816,11 +816,10 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 
-	void update(float time_delta, bool paused) override
+	void update(float time_delta) override
 	{
 		PROFILE_FUNCTION();
 		if (!m_is_game_running) return;
-		if (paused) return;
 
 		updateAnimables(time_delta);
 		updatePropertyAnimators(time_delta);

@@ -54,7 +54,7 @@ namespace Lumix
 			}
 
 
-			void update(float dt, bool paused) override
+			void update(float dt) override
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0, c = m_plugins.size(); i < c; ++i)

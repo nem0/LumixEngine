@@ -366,11 +366,7 @@ public:
 		#endif
 
 		float dt = m_timer.tick() * m_time_multiplier;
-		if (m_next_frame)
-		{
-			m_paused = false;
-			dt = 1 / 30.0f;
-		}
+		if (m_next_frame) dt = 1 / 30.0f;
 		++m_last_time_deltas_frame;
 		m_last_time_deltas[m_last_time_deltas_frame % lengthOf(m_last_time_deltas)] = dt;
 		static u32 counter = profiler::createCounter("Raw time delta (ms)", 0);
@@ -378,29 +374,26 @@ public:
 
 		computeSmoothTimeDelta();
 
-		{
-			PROFILE_BLOCK("update scenes");
-			for (UniquePtr<IScene>& scene : context.getScenes())
+		if (!m_paused) {
 			{
-				scene->update(dt, m_paused);
+				PROFILE_BLOCK("update scenes");
+				for (UniquePtr<IScene>& scene : context.getScenes())
+				{
+					scene->update(dt);
+				}
 			}
-		}
-		{
-			PROFILE_BLOCK("late update scenes");
-			for (UniquePtr<IScene>& scene : context.getScenes())
 			{
-				scene->lateUpdate(dt, m_paused);
+				PROFILE_BLOCK("late update scenes");
+				for (UniquePtr<IScene>& scene : context.getScenes())
+				{
+					scene->lateUpdate(dt);
+				}
 			}
+			m_plugin_manager->update(dt);
 		}
-		m_plugin_manager->update(dt, m_paused);
 		m_input_system->update(dt);
 		m_file_system->processCallbacks();
-
-		if (m_next_frame)
-		{
-			m_paused = true;
-			m_next_frame = false;
-		}
+		m_next_frame = false;
 	}
 
 

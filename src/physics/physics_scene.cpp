@@ -1808,8 +1808,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
-	void lateUpdate(float time_delta, bool paused) override {
-		if (!m_is_game_running || paused) return;
+	void lateUpdate(float time_delta) override {
+		if (!m_is_game_running) return;
 
 		AnimationScene* anim_scene = (AnimationScene*)m_world.getScene("animation");
 		if (!anim_scene) return;
@@ -1832,9 +1832,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 		updateDynamicActors(false);
 	}
 
-	void update(float time_delta, bool paused) override
+	void update(float time_delta) override
 	{
-		if (!m_is_game_running || paused) return;
+		if (!m_is_game_running) return;
 
 		time_delta = minimum(1 / 20.0f, time_delta);
 		updateVehicles(time_delta);

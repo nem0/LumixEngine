@@ -62,6 +62,7 @@ const PropertyBase* getProperty(ComponentType cmp_type, const char* prop_name) {
 Scene::Scene(IAllocator& allocator)
 	: cmps(allocator)
 	, functions(allocator)
+	, events(allocator)
 {}
 
 builder::builder(IAllocator& allocator)

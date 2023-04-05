@@ -51,7 +51,7 @@ struct CoreSceneImpl : CoreScene {
 	}
 
 	IPlugin& getPlugin() const override { return m_plugin; }
-	void update(float time_delta, bool paused) override {}
+	void update(float time_delta) override {}
 	World& getWorld() override { return m_world; }
 	void clear() override { m_splines.clear(); }
 

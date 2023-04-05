@@ -116,7 +116,7 @@ struct AudioSceneImpl final : AudioScene
 		}*/
 	}
 
-	void update(float time_delta, bool paused) override
+	void update(float time_delta) override
 	{
 		if (m_listener.entity.isValid())
 		{

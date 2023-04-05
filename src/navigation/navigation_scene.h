@@ -13,7 +13,6 @@ namespace Lumix
 
 
 struct IAllocator;
-template <typename T> struct DelegateList;
 
 
 struct NavmeshZone {

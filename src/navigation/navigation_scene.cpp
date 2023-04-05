@@ -90,7 +90,6 @@ struct NavigationSceneImpl final : NavigationScene
 		, m_agents(m_allocator)
 		, m_zones(m_allocator)
 		, m_script_scene(nullptr)
-		, m_on_update(m_allocator)
 	{
 		m_world.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
 	}
@@ -395,9 +394,8 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 	}
 
-	void update(float time_delta, bool paused) override {
+	void update(float time_delta) override {
 		PROFILE_FUNCTION();
-		if (paused) return;
 		if (!m_is_game_running) return;
 		
 		for (RecastZone& zone : m_zones) {
@@ -461,9 +459,8 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 	}
 
-	void lateUpdate(float time_delta, bool paused) override {
+	void lateUpdate(float time_delta) override {
 		PROFILE_FUNCTION();
-		if (paused) return;
 		if (!m_is_game_running) return;
 
 		for (RecastZone& zone : m_zones) {
@@ -1656,7 +1653,6 @@ struct NavigationSceneImpl final : NavigationScene
 	
 	Vec3 m_debug_tile_origin;
 	LuaScriptScene* m_script_scene;
-	DelegateList<void(float)> m_on_update;
 };
 
 

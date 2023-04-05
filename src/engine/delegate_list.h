@@ -21,6 +21,23 @@ template <typename R, typename... Args> struct DelegateList<R(Args...)> {
 		m_delegates.push(cb);
 	}
 
+	void bindRaw(void* obj, void (*f)(void*, Args...)) {
+		Delegate<R(Args...)> cb;
+		cb.bindRaw(obj, f);
+		m_delegates.push(cb);
+	}
+	
+	void unbindRaw(void* obj, void (*f)(void*, Args...)) {
+		for (i32 i = 0; i < m_delegates.size(); ++i)
+		{
+			if (m_delegates[i].m_stub.first == obj && m_delegates[i].m_stub.second == f)
+			{
+				m_delegates.swapAndPop(i);
+				break;
+			}
+		}
+	}
+
 	template <R (*Function)(Args...)> void bind()
 	{
 		Delegate<R(Args...)> cb;

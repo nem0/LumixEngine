@@ -2372,6 +2372,15 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		scene->setModelInstancePath(e, Path(mesh_path));
 	}
 
+	static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
+	for (i32 i = 0, c = scene->getLightCount(); i < c; ++i) {
+		const ofbx::Light* light = scene->getLight(i);
+		const Matrix mtx = toLumix(light->getGlobalTransform());
+		const EntityRef e = world.createEntity(DVec3(mtx.getTranslation() * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
+		world.createComponent(POINT_LIGHT_TYPE, e);
+		world.setParent(root, e);
+	}
+
 	engine.serialize(world, blob);
 	engine.destroyWorld(world);
 

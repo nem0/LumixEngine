@@ -893,10 +893,8 @@ struct GUISceneImpl final : GUIScene
 	}
 
 
-	void update(float time_delta, bool paused) override
+	void update(float time_delta) override
 	{
-		if (paused) return;
-
 		handleInput();
 		m_system.setCursor(m_cursor_type);
 		blinkCursor(time_delta);
@@ -1332,6 +1330,11 @@ void GUIScene::reflect() {
 	};
 
 	LUMIX_SCENE(GUISceneImpl, "gui")
+		.LUMIX_EVENT(GUIScene::buttonClicked)
+		.LUMIX_EVENT(GUIScene::rectHovered)
+		.LUMIX_EVENT(GUIScene::rectHoveredOut)
+		.LUMIX_EVENT(GUIScene::rectMouseDown)
+		.LUMIX_EVENT(GUIScene::mousedButtonUnhandled)
 		.LUMIX_FUNC(GUIScene::getRectAt)
 		.LUMIX_FUNC(GUIScene::isOver)
 		.LUMIX_FUNC(GUIScene::getSystem)

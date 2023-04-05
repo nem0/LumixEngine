@@ -22,7 +22,7 @@ struct LUMIX_ENGINE_API PluginManager
 	virtual void unload(struct IPlugin* plugin) = 0;
 	virtual IPlugin* load(const char* path) = 0;
 	virtual void addPlugin(IPlugin* plugin, void* library) = 0;
-	virtual void update(float dt, bool paused) = 0;
+	virtual void update(float dt) = 0;
 	virtual IPlugin* getPlugin(const char* name) = 0;
 	virtual const Array<IPlugin*>& getPlugins() const = 0;
 	virtual const Array<void*>& getLibraries() const = 0;
@@ -40,8 +40,8 @@ struct LUMIX_ENGINE_API IScene
 	virtual void beforeReload(OutputMemoryStream& serializer) {}
 	virtual void afterReload(InputMemoryStream& serializer) {}
 	virtual IPlugin& getPlugin() const = 0;
-	virtual void update(float time_delta, bool paused) = 0;
-	virtual void lateUpdate(float time_delta, bool paused) {}
+	virtual void update(float time_delta) = 0;
+	virtual void lateUpdate(float time_delta) {}
 	virtual struct World& getWorld() = 0;
 	virtual void startGame() {}
 	virtual void stopGame() {}

@@ -2,6 +2,7 @@
 
 
 #include "engine/lumix.h"
+#include "engine/delegate_list.h"
 #include "engine/hash.h"
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
@@ -12,6 +13,7 @@
 #define LUMIX_SCENE(Class, Label) using ReflScene = Class; reflection::build_scene(Label)
 #define LUMIX_FUNC_EX(F, Name) function<&ReflScene::F>(Name, #F)
 #define LUMIX_FUNC(F) function<&F>(#F, #F)
+#define LUMIX_EVENT(F) event<&F>(#F)
 #define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
 #define LUMIX_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
 #define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
@@ -444,6 +446,61 @@ struct VariantCaller {
 	}
 };
 
+struct EventBase {
+	struct Callback {
+		virtual ~Callback() {}
+		virtual void invoke(Span<const Variant> args) = 0;
+	};
+
+	virtual ~EventBase() {}
+	virtual u32 getArgCount() const = 0;
+	virtual Span<const char> getThisTypeName() const = 0;
+	virtual TypeDescriptor getArgType(int i) const = 0;
+	virtual void bind(void* scene, Callback* callback) const = 0;
+
+	const char* name;
+};
+
+template <typename F> struct Event;
+
+template <typename C, typename... Args>
+struct Event<DelegateList<void (Args...)>& (C::*)()> : EventBase
+{
+	using F = DelegateList<void (Args...)>& (C::*)();
+	F function;
+
+	u32 getArgCount() const override { return sizeof...(Args); }
+	Span<const char> getThisTypeName() const override { return getTypeName<C>(); }
+
+	TypeDescriptor getArgType(int i) const override
+	{
+		TypeDescriptor expand[] = {
+			toTypeDescriptor<Args>()...,
+			Variant::Type::VOID
+		};
+		return expand[i];
+	}
+	
+	template <typename T>
+	static Variant toVariant(T value) {
+		Variant v;
+		v = value;
+		return v;
+	}
+
+	void bind(void* scene, Callback* callback) const override {
+		C* s = (C*)scene;
+		auto l = [](void* obj, Args... args){
+			Callback* cb = (Callback*)obj;
+			Variant a[] = {
+				toVariant(args)...
+			};
+			cb->invoke(Span(a));
+		};
+		(s->*function)().bindRaw(callback, l);
+	}
+};
+
 template <typename F> struct Function;
 
 template <typename R, typename C, typename... Args>
@@ -557,6 +614,7 @@ struct Scene {
 	Scene(IAllocator& allocator);
 
 	Array<FunctionBase*> functions;
+	Array<EventBase*> events;
 	Array<ComponentBase*> cmps;
 	const char* name;
 	Scene* next = nullptr;
@@ -751,6 +809,15 @@ struct LUMIX_ENGINE_API builder {
 	builder& attribute() {
 		auto* a = LUMIX_NEW(allocator, T);
 		last_prop->attributes.push(a);
+		return *this;
+	}
+
+	template <auto F>
+	builder& event(const char* name) {
+		auto* f = LUMIX_NEW(allocator, Event<decltype(F)>);
+		f->function = F;
+		f->name = name;
+		scene->events.push(f);
 		return *this;
 	}
 

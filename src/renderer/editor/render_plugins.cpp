@@ -4380,7 +4380,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		RenderScene* scene = static_cast<RenderScene*>(world.getScene("renderer"));
 		DVec3 origin;
 		Vec3 dir;
-		editor.getView().getViewport().getRay(mp, origin, dir);
+		view.getViewport().getRay(mp, origin, dir);
 		const RayCastModelHit hit = scene->castRay(origin, dir, [entity](const RayCastModelHit& hit){
 			return hit.entity == entity;
 		});
