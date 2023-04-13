@@ -349,6 +349,7 @@ bool getEvent(Event& event) {
 			event.type = Event::Type::KEY;
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
+			event.key.is_repeat = msg.lParam & (1 << 30);
 			break;
 		case WM_SYSCOMMAND:
 			if (msg.wParam != SC_KEYMENU || (msg.lParam >> 16) > 0) {
@@ -365,6 +366,7 @@ bool getEvent(Event& event) {
 			event.type = Event::Type::KEY;
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
+			event.key.is_repeat = msg.lParam & (1 << 30);
 			break;
 		case WM_KEYUP:
 			event.type = Event::Type::KEY;

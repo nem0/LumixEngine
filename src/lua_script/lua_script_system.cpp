@@ -2145,8 +2145,10 @@ namespace Lumix
 				case InputSystem::Event::BUTTON:
 					LuaWrapper::push(L, event.data.button.down); // [lua_event, button.down]
 					lua_setfield(L, -2, "down"); // [lua_event]
-					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.x_abs]
+					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.key_id]
 					lua_setfield(L, -2, "key_id"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.is_repeat); // [lua_event, button.is_repeat]
+					lua_setfield(L, -2, "is_repeat"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.x); // [lua_event, button.x_abs]
 					lua_setfield(L, -2, "x"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.y); // [lua_event, button.y_abs]

@@ -511,6 +511,7 @@ next:
 			e.type = Event::Type::KEY;
 			e.key.down = true;
 			e.key.keycode = getKeycode(keysym);
+			e.key.is_repeat = false;
 			G.key_states[(u8)e.key.keycode] = true;
 
 			switch (status) {

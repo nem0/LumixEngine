@@ -374,7 +374,7 @@ public:
 
 		computeSmoothTimeDelta();
 
-		if (!m_paused) {
+		if (!m_paused || m_next_frame) {
 			{
 				PROFILE_BLOCK("update scenes");
 				for (UniquePtr<IScene>& scene : context.getScenes())

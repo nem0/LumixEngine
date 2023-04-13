@@ -109,6 +109,7 @@ struct InputSystemImpl final : InputSystem
 				input_event.type = InputSystem::Event::BUTTON;
 				input_event.device = m_mouse_device;
 				input_event.data.button.key_id = (int)event.mouse_button.button;
+				input_event.data.button.is_repeat = false;
 				input_event.data.button.down = event.mouse_button.down;
 				const os::Point cp = os::getMouseScreenPos();
 				input_event.data.button.x = (float)cp.x - mouse_base_x;
@@ -134,6 +135,7 @@ struct InputSystemImpl final : InputSystem
 				input_event.device = m_keyboard_device;
 				input_event.data.button.down = event.key.down;
 				input_event.data.button.key_id = (int)event.key.keycode;
+				input_event.data.button.is_repeat = (int)event.key.is_repeat;
 				injectEvent(input_event);
 				break;
 			}

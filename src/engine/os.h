@@ -79,7 +79,7 @@ struct Event {
         struct { int x, y; } win_move;
 		struct { bool down; MouseButton button; } mouse_button;
 		struct { int xrel, yrel; } mouse_move;
-        struct { bool down; Keycode keycode; } key;
+        struct { bool down; Keycode keycode; bool is_repeat; } key;
         struct { void* handle; } file_drop;
         struct { float amount; } mouse_wheel;
 		struct { bool gained; } focus;

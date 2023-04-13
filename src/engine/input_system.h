@@ -28,6 +28,7 @@ struct LUMIX_ENGINE_API InputSystem {
 		float x;
 		float y;
 		bool down;
+		bool is_repeat;
 	};
 
 	struct AxisEvent {
