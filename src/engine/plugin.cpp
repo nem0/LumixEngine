@@ -32,9 +32,10 @@ namespace Lumix
 
 			~PluginManagerImpl()
 			{
-				for (int i = m_plugins.size() - 1; i >= 0; --i)
+				while (!m_plugins.empty())
 				{
-					LUMIX_DELETE(m_engine.getAllocator(), m_plugins[i]);
+					LUMIX_DELETE(m_engine.getAllocator(), m_plugins.back());
+					m_plugins.pop();
 				}
 
 				for (void* lib : m_libraries)
