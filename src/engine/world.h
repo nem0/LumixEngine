@@ -17,6 +17,7 @@ enum class WorldSerializedVersion : u32
 	CAMERA,
 	ENTITY_FOLDERS,
 	HASH64,
+	NEW_ENTITY_FOLDERS,
 
 	LATEST
 };
@@ -59,6 +60,7 @@ struct LUMIX_ENGINE_API ChildrenRange {
 
 struct LUMIX_ENGINE_API World {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
+	using PartitionHandle = u16;
 
 	struct EntityData {
 		EntityData() {}
@@ -73,7 +75,13 @@ struct LUMIX_ENGINE_API World {
 				int next;
 			};
 		};
+		PartitionHandle partition;
 		bool valid;
+	};
+
+	struct Partition {
+		PartitionHandle handle;
+		char name[64];
 	};
 
 	explicit World(struct Engine& engine, IAllocator& allocator);
@@ -93,6 +101,14 @@ struct LUMIX_ENGINE_API World {
 	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
 	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
+
+	PartitionHandle createPartition(const char* name);
+	void destroyPartition(PartitionHandle partition);
+	void setActivePartition(PartitionHandle partition);
+	PartitionHandle getActivePartition() const { return m_active_partition; }
+	Array<Partition>& getPartitions() { return m_partitions; }
+	Partition& getPartition(PartitionHandle partition);
+	PartitionHandle getPartition(EntityRef entity);
 
 	bool isValid(EntityRef e) const { return m_entities[e.index].valid; }
 	EntityPtr getFirstEntity() const;
@@ -177,6 +193,9 @@ private:
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;
 	Array<EntityName> m_names;
+	Array<Partition> m_partitions;
+	PartitionHandle m_partition_generator = 0;
+	PartitionHandle m_active_partition = 0;
 	DelegateList<void(EntityRef)> m_entity_created;
 	DelegateList<void(EntityRef)> m_entity_moved;
 	DelegateList<void(EntityRef)> m_entity_destroyed;

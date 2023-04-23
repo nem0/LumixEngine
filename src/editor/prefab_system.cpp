@@ -313,127 +313,6 @@ public:
 		return root;
 	}
 
-	struct PropertyCloner : reflection::IPropertyVisitor {
-		template <typename T>
-		void clone(const reflection::Property<T>& prop) { 
-			if (!prop.setter) return;
-			prop.set(dst, index, prop.get(src, index));
-		}
-
-		void visit(const reflection::Property<float>& prop) override { clone(prop); }
-		void visit(const reflection::Property<int>& prop) override { clone(prop); }
-		void visit(const reflection::Property<u32>& prop) override { clone(prop); }
-		void visit(const reflection::Property<EntityPtr>& prop) override { 
-			if (!prop.setter) return;
-
-			EntityPtr e = prop.get(src, index);
-			auto iter = map->find(e);
-			if (iter.isValid()) {
-				e = iter.value();
-			}
-			else {
-				e = INVALID_ENTITY;
-			}
-			prop.set(dst, index, e);
-		}
-		void visit(const reflection::Property<Vec2>& prop) override { clone(prop); }
-		void visit(const reflection::Property<Vec3>& prop) override { clone(prop); }
-		void visit(const reflection::Property<IVec3>& prop) override { clone(prop); }
-		void visit(const reflection::Property<Vec4>& prop) override { clone(prop); }
-		void visit(const reflection::Property<Path>& prop) override { clone(prop); }
-		void visit(const reflection::Property<bool>& prop) override { clone(prop); }
-		void visit(const reflection::Property<const char*>& prop) override { clone(prop); }
-		
-		void visit(const reflection::ArrayProperty& prop) override {
-			const u32 c = prop.getCount(src);
-			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
-			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
-			
-			ASSERT(index == -1);
-			for (u32 i = 0; i < c; ++i) {
-				index = i;
-				prop.visitChildren(*this);
-			}
-			index = -1;
-		}
-		
-		void visit(const reflection::DynamicProperties& prop) override { 
-			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
-				const char* name = prop.getName(src, index, i);
-				reflection::DynamicProperties::Type type = prop.getType(src, index, i);
-				reflection::DynamicProperties::Value val = prop.getValue(src, index, i);
-				if (type == reflection::DynamicProperties::ENTITY) {
-					auto iter = map->find(val.e);
-					if (iter.isValid()) {
-						val.e = iter.value();
-					}
-					else {
-						val.e = INVALID_ENTITY;
-					}
-				}
-				prop.set(dst, index, name, type, val);
-			}
-		}
-		
-
-		void visit(const reflection::BlobProperty& prop) override { 
-			OutputMemoryStream tmp(*allocator);
-			prop.getValue(src, index, tmp);
-			InputMemoryStream blob(tmp);
-			prop.setValue(dst, index, blob);
-		}
-		
-
-		const HashMap<EntityPtr, EntityPtr>* map; 
-		IAllocator* allocator;
-		ComponentUID src;
-		ComponentUID dst;
-		int index = -1;
-	};
-
-
-	EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) {
-		entities.push(src_e);
-		const EntityRef dst_e = (EntityRef)map[src_e];
-		if (dst_parent.isValid()) {
-			dst_u.setParent(dst_parent, dst_e);
-			dst_u.setLocalTransform(dst_e, src_u.getLocalTransform(src_e));
-		}
-		const char* name = src_u.getEntityName(src_e);
-		if (name[0]) {
-			dst_u.setEntityName(dst_e, name);
-		}
-
-		const EntityPtr c = src_u.getFirstChild(src_e);
-		if (c.isValid()) {
-			cloneEntity(src_u, (EntityRef)c, dst_u, dst_e, entities, map);
-		}
-
-		if (dst_parent.isValid()) {
-			const EntityPtr s = src_u.getNextSibling(src_e);
-			if (s.isValid()) {
-				cloneEntity(src_u, (EntityRef)s, dst_u, dst_parent, entities, map);
-			}
-		}
-
-		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
-			dst_u.createComponent(cmp.type, dst_e);
-
-			const reflection::ComponentBase* cmp_tpl = reflection::getComponent(cmp.type);
-	
-			PropertyCloner property_cloner;
-			property_cloner.allocator = &m_editor.getAllocator();
-			property_cloner.src = cmp;
-			property_cloner.dst.type = cmp.type;
-			property_cloner.dst.entity = dst_e;
-			property_cloner.dst.scene = dst_u.getScene(cmp.type);
-			property_cloner.map = &map;
-			cmp_tpl->visit(property_cloner);
-		}
-
-		return dst_e;
-	}
-
 	void cloneHierarchy(const World& src, EntityRef src_e, World& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
 		const EntityPtr child = src.getFirstChild(src_e);
 		const EntityPtr sibling = src.getNextSibling(src_e);
@@ -457,7 +336,7 @@ public:
 		HashMap<EntityPtr, EntityPtr> map(m_editor.getAllocator());
 		map.reserve(256);
 		cloneHierarchy(src, src_e, dst, false, map);
-		cloneEntity(src, src_e, dst, INVALID_ENTITY, entities, map);
+		m_editor.cloneEntity(src, src_e, dst, INVALID_ENTITY, entities, map);
 		return dst;
 	}
 

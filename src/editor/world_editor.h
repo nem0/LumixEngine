@@ -1,7 +1,9 @@
 #pragma once
 
 #include "engine/lumix.h"
+#include "engine/hash_map.h"
 #include "engine/math.h"
+#include "engine/world.h"
 
 
 struct lua_State;
@@ -144,11 +146,15 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void pasteEntities() = 0;
     virtual void duplicateEntities() = 0;
 
-	virtual void loadWorld(const char* basename) = 0;
+	virtual void loadWorld(const char* basename, bool additive) = 0;
+	virtual void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) = 0;
 	virtual void saveWorld(const char* basename, bool save_path) = 0;
 	virtual bool isLoading() const = 0;
 	virtual void newWorld() = 0;
 	virtual void toggleGameMode() = 0;
+	virtual void destroyWorldPartition(World::PartitionHandle partition) = 0;
+	virtual void serializeWorldPartition(World::PartitionHandle partition, OutputMemoryStream& blob) = 0;
+	virtual EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) const = 0;
 	
 	virtual DelegateList<void()>& worldCreated() = 0;
 	virtual DelegateList<void()>& worldDestroyed() = 0;

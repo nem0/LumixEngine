@@ -57,13 +57,48 @@ World::World(Engine& engine, IAllocator& allocator)
 	, m_scenes(m_allocator)
 	, m_hierarchy(m_allocator)
 	, m_transforms(m_allocator)
+	, m_partitions(m_allocator)
 	, m_name("")
 {
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
 	memset(m_component_type_map, 0, sizeof(m_component_type_map));
+
+	PartitionHandle p = createPartition("main");
+	setActivePartition(p);
 }
 
+World::PartitionHandle World::createPartition(const char* name) {
+	Partition& p = m_partitions.emplace();
+	p.handle = m_partition_generator;
+	++m_partition_generator;
+	copyString(p.name, name);
+	return p.handle;
+}
+
+void World::destroyPartition(PartitionHandle partition) {
+	for (EntityData& e : m_entities) {
+		if (!e.valid) continue;
+		if (e.partition == partition) destroyEntity({i32(&e - m_entities.begin())});
+	}
+	m_partitions.eraseItems([&](const Partition& p){ return p.handle == partition; });
+}
+
+void World::setActivePartition(PartitionHandle partition) {
+	m_active_partition = partition;
+}
+
+World::Partition& World::getPartition(PartitionHandle partition) {
+	for (Partition& p : m_partitions) {
+		if (p.handle == partition) return p;
+	}
+	ASSERT(false);
+	return m_partitions[0];
+}
+
+World::PartitionHandle World::getPartition(EntityRef entity) {
+	return m_entities[entity.index].partition;
+}
 
 IScene* World::getScene(ComponentType type) const {
 	return m_component_type_map[type.index].scene;
@@ -365,6 +400,7 @@ EntityRef World::createEntity(const DVec3& position, const Quat& rotation)
 	tr->pos = position;
 	tr->rot = rotation;
 	tr->scale = Vec3(1);
+	data->partition = m_active_partition;
 	data->name = -1;
 	data->hierarchy = -1;
 	data->components = 0;
@@ -673,6 +709,7 @@ void World::serialize(OutputMemoryStream& serializer)
 
 void World::setName(const char* name) { 
 	copyString(m_name, name);
+	copyString(m_partitions[0].name, name);
 }
 
 void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale)

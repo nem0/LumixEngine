@@ -1056,6 +1056,40 @@ private:
 };
 
 
+struct DestroyWorldPartitionCommand final : IEditorCommand {
+	DestroyWorldPartitionCommand(WorldEditor& editor, World::PartitionHandle partition)
+		: m_editor(editor)
+		, m_partition(partition)
+		, m_partition_name(editor.getAllocator())
+		, m_partition_data(editor.getAllocator())
+	{
+	}
+	
+	bool execute() override { 
+		if (m_partition_data.empty()) {
+			m_editor.serializeWorldPartition(m_partition, m_partition_data);
+			m_partition_name = m_editor.getWorld()->getPartition(m_partition).name;
+		}
+		m_editor.getWorld()->destroyPartition(m_partition);
+		m_editor.getEntityFolders().destroyPartitionFolders(m_partition);
+		return true;
+	}
+
+	void undo() override {
+		InputMemoryStream tmp(m_partition_data);
+		m_editor.loadWorld(tmp, m_partition_name.c_str(), true);
+		m_partition = m_editor.getWorld()->getActivePartition();
+	}
+
+	const char* getType() override { return "destroy_world_partition"; }
+	bool merge(IEditorCommand& command) override { return false; }
+
+	WorldEditor& m_editor;
+	World::PartitionHandle m_partition;
+	OutputMemoryStream m_partition_data;
+	String m_partition_name;
+};
+
 struct AddArrayPropertyItemCommand final : IEditorCommand
 {
 
@@ -1994,9 +2028,16 @@ public:
 		m_engine.serialize(*m_world, blob);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
-		const Viewport& vp = m_view->getViewport();
-		blob.write(vp.pos);
-		blob.write(vp.rot);
+		if (m_view) {
+			const Viewport& vp = m_view->getViewport();
+			blob.write(vp.pos);
+			blob.write(vp.rot);
+		}
+		else {
+			DVec3 pos(0);
+			blob.write(pos);
+			blob.write(Quat::IDENTITY);
+		}
 		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
 		memcpy(blob.getMutableData() + sizeof(WorldHeader), &hash, sizeof(hash));
 		file.write(blob.data(), blob.size());
@@ -2307,7 +2348,7 @@ public:
 			m_world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
             InputMemoryStream file(m_game_mode_file);
-			load(file, "game mode");
+			load(file, "game mode", false);
 		}
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
@@ -2474,18 +2515,42 @@ public:
 	}
 	
 	bool isLoading() const override { return m_is_loading; }
-
-	void loadWorld(const char* basename) override
+	
+	void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) override
+	{
+		ASSERT(!m_is_game_mode);
+		if (additive) {
+			World::PartitionHandle partition = m_world->createPartition(basename);
+			m_world->setActivePartition(partition);
+		}
+		else {
+			destroyWorld();
+			createWorld();
+			m_world->setName(basename);
+		}
+		logInfo("Loading world ", basename, "...");
+		if (!load(blob, basename, additive)) {
+			logError("Failed to parse ", basename);
+			newWorld();
+		}
+	}
+	void loadWorld(const char* basename, bool additive) override
 	{
 		if (m_is_game_mode) stopGameMode(false);
-		destroyWorld();
-		createWorld();
-		m_world->setName(basename);
+		if (additive) {
+			World::PartitionHandle partition = m_world->createPartition(basename);
+			m_world->setActivePartition(partition);
+		}
+		else {
+			destroyWorld();
+			createWorld();
+			m_world->setName(basename);
+		}
 		logInfo("Loading world ", basename, "...");
 		os::InputFile file;
 		const Path path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
 		if (file.open(path)) {
-			if (!load(file, path)) {
+			if (!load(file, path, additive)) {
 				logError("Failed to parse ", path);
 				newWorld();
 			}
@@ -2505,8 +2570,7 @@ public:
 		logInfo("World created.");
 	}
 
-
-	bool load(IInputStream& file, const char* path)
+	bool load(IInputStream& file, const char* path, bool additive)
 	{
 		PROFILE_FUNCTION();
 		m_is_loading = true;
@@ -2536,7 +2600,7 @@ public:
 		}
 		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), file_size);
 		blob.read(header);
-		if ((u32)header.version <= (u32)WorldSerializedVersion::HASH64) {
+		if (header.version <= WorldSerializedVersion::HASH64) {
 			u32 tmp;
 			blob.read(tmp);
 			blob.read(tmp);
@@ -2557,15 +2621,15 @@ public:
 		if (m_engine.deserialize(*m_world, blob, entity_map))
 		{
 			m_prefab_system->deserialize(blob, entity_map, header.version);
-			if ((u32)header.version > (u32)WorldSerializedVersion::ENTITY_FOLDERS) {
-				m_entity_folders->deserialize(blob, entity_map);
+			if (header.version > WorldSerializedVersion::ENTITY_FOLDERS) {
+				m_entity_folders->deserialize(blob, entity_map, additive, header.version > WorldSerializedVersion::NEW_ENTITY_FOLDERS);
 			}
-			if ((u32)header.version > (u32)WorldSerializedVersion::CAMERA) {
+			if (header.version > WorldSerializedVersion::CAMERA) {
 				DVec3 pos;
 				Quat rot;
 				blob.read(pos);
 				blob.read(rot);
-				if (m_view) {
+				if (m_view && !additive) {
 					Viewport vp = m_view->getViewport();
 					vp.pos = pos;
 					vp.rot = rot;
@@ -2620,6 +2684,182 @@ public:
 		return m_selected_entities;
 	}
 
+
+	struct PropertyCloner : reflection::IPropertyVisitor {
+		template <typename T>
+		void clone(const reflection::Property<T>& prop) { 
+			if (!prop.setter) return;
+			prop.set(dst, index, prop.get(src, index));
+		}
+
+		void visit(const reflection::Property<float>& prop) override { clone(prop); }
+		void visit(const reflection::Property<int>& prop) override { clone(prop); }
+		void visit(const reflection::Property<u32>& prop) override { clone(prop); }
+		void visit(const reflection::Property<EntityPtr>& prop) override { 
+			if (!prop.setter) return;
+
+			EntityPtr e = prop.get(src, index);
+			auto iter = map->find(e);
+			if (iter.isValid()) {
+				e = iter.value();
+			}
+			else {
+				e = INVALID_ENTITY;
+			}
+			prop.set(dst, index, e);
+		}
+		void visit(const reflection::Property<Vec2>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec3>& prop) override { clone(prop); }
+		void visit(const reflection::Property<IVec3>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec4>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Path>& prop) override { clone(prop); }
+		void visit(const reflection::Property<bool>& prop) override { clone(prop); }
+		void visit(const reflection::Property<const char*>& prop) override { clone(prop); }
+		
+		void visit(const reflection::ArrayProperty& prop) override {
+			const u32 c = prop.getCount(src);
+			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
+			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
+			
+			ASSERT(index == -1);
+			for (u32 i = 0; i < c; ++i) {
+				index = i;
+				prop.visitChildren(*this);
+			}
+			index = -1;
+		}
+		
+		void visit(const reflection::DynamicProperties& prop) override { 
+			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
+				const char* name = prop.getName(src, index, i);
+				reflection::DynamicProperties::Type type = prop.getType(src, index, i);
+				reflection::DynamicProperties::Value val = prop.getValue(src, index, i);
+				if (type == reflection::DynamicProperties::ENTITY) {
+					auto iter = map->find(val.e);
+					if (iter.isValid()) {
+						val.e = iter.value();
+					}
+					else {
+						val.e = INVALID_ENTITY;
+					}
+				}
+				prop.set(dst, index, name, type, val);
+			}
+		}
+		
+
+		void visit(const reflection::BlobProperty& prop) override { 
+			OutputMemoryStream tmp(*allocator);
+			prop.getValue(src, index, tmp);
+			InputMemoryStream blob(tmp);
+			prop.setValue(dst, index, blob);
+		}
+		
+
+		const HashMap<EntityPtr, EntityPtr>* map; 
+		IAllocator* allocator;
+		ComponentUID src;
+		ComponentUID dst;
+		int index = -1;
+	};
+
+
+	EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) const override {
+		entities.push(src_e);
+		const EntityRef dst_e = (EntityRef)map[src_e];
+		if (dst_parent.isValid()) {
+			dst_u.setParent(dst_parent, dst_e);
+			dst_u.setLocalTransform(dst_e, src_u.getLocalTransform(src_e));
+		}
+		else {
+			dst_u.setTransform(dst_e, src_u.getTransform(src_e));
+		}
+		const char* name = src_u.getEntityName(src_e);
+		if (name[0]) {
+			dst_u.setEntityName(dst_e, name);
+		}
+
+		const EntityPtr c = src_u.getFirstChild(src_e);
+		if (c.isValid()) {
+			cloneEntity(src_u, (EntityRef)c, dst_u, dst_e, entities, map);
+		}
+
+		if (dst_parent.isValid()) {
+			const EntityPtr s = src_u.getNextSibling(src_e);
+			if (s.isValid()) {
+				cloneEntity(src_u, (EntityRef)s, dst_u, dst_parent, entities, map);
+			}
+		}
+
+		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
+			dst_u.createComponent(cmp.type, dst_e);
+
+			const reflection::ComponentBase* cmp_tpl = reflection::getComponent(cmp.type);
+	
+			PropertyCloner property_cloner;
+			property_cloner.allocator = &m_allocator;
+			property_cloner.src = cmp;
+			property_cloner.dst.type = cmp.type;
+			property_cloner.dst.entity = dst_e;
+			property_cloner.dst.scene = dst_u.getScene(cmp.type);
+			property_cloner.map = &map;
+			cmp_tpl->visit(property_cloner);
+		}
+
+		return dst_e;
+	}
+
+
+	void cloneHierarchy(const World& src, EntityRef src_e, World& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
+		const EntityPtr child = src.getFirstChild(src_e);
+		const EntityPtr sibling = src.getNextSibling(src_e);
+
+		const EntityRef dst_e = dst.createEntity({0, 0, 0}, Quat::IDENTITY);
+		map.insert(src_e, dst_e);
+
+		if (child.isValid()) {
+			cloneHierarchy(src, (EntityRef)child, dst, true, map);
+		}
+		if (clone_siblings && sibling.isValid()) {
+			cloneHierarchy(src, (EntityRef)sibling, dst, true, map);
+		}
+	}
+
+	UniquePtr<WorldEditorImpl> createPartitionWorld(World::PartitionHandle partition) {
+		UniquePtr<WorldEditorImpl> res = WorldEditor::create(m_engine, m_allocator);
+
+		World& dst = *res->getWorld();
+		World& src = *m_world;
+
+		Array<EntityRef> entities(m_allocator);
+		HashMap<EntityPtr, EntityPtr> map(m_allocator);
+		map.reserve(256);
+		for (EntityPtr e = m_world->getFirstEntity(); e.isValid(); e = m_world->getNextEntity(*e)) {
+			if (m_world->getPartition(*e) == partition && !m_world->getParent(*e).isValid()) {
+				cloneHierarchy(src, *e, dst, false, map);
+			}
+		}
+		for (EntityPtr e = m_world->getFirstEntity(); e.isValid(); e = m_world->getNextEntity(*e)) {
+			if (m_world->getPartition(*e) == partition && !m_world->getParent(*e).isValid()) {
+				cloneEntity(src, *e, dst, INVALID_ENTITY, entities, map);
+			}
+		}
+
+		m_entity_folders->cloneTo(*res->m_entity_folders, partition, map);
+
+		return res.move();
+	}
+
+
+	void serializeWorldPartition(World::PartitionHandle partition, OutputMemoryStream& blob) override {
+		UniquePtr<WorldEditorImpl> ed = createPartitionWorld(partition);
+		ed->save(blob);
+	}
+
+	void destroyWorldPartition(World::PartitionHandle partition) override {
+		UniquePtr<IEditorCommand> command = UniquePtr<DestroyWorldPartitionCommand>::create(m_allocator, *this, partition);
+		executeCommand(command.move());
+	}
 
 	void addArrayPropertyItem(const ComponentUID& cmp, const char* property) override
 	{

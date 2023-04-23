@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/array.h"
+#include "engine/hash_map.h"
 #include "engine/world.h"
 
 namespace Lumix {
@@ -15,8 +16,12 @@ struct LUMIX_EDITOR_API EntityFolders final {
 		FolderID next_folder = INVALID_FOLDER;
 		FolderID prev_folder = INVALID_FOLDER;
 		EntityPtr first_entity = INVALID_ENTITY;
-		char name[116];
+		World::PartitionHandle partition;
+		bool valid = true;
+		char name[112];
 	};
+
+	static_assert(sizeof(Folder) == 128);
 
 	struct Entity {
 		FolderID folder = INVALID_FOLDER;
@@ -27,7 +32,7 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	EntityFolders(World& world, IAllocator& allocator);
 	~EntityFolders();
 
-	FolderID getRoot() const { return 0; }
+	FolderID getRoot(World::PartitionHandle partition) const;
 	Folder& getFolder(FolderID folder_id);
 	const Folder& getFolder(FolderID folder_id) const;
 	void moveToFolder(EntityRef e, FolderID folder);
@@ -38,7 +43,9 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	void selectFolder(FolderID folder) { m_selected_folder = folder; }
 	FolderID getSelectedFolder() const { return m_selected_folder; }
 	void serialize(OutputMemoryStream& blob);
-	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map);
+	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map, bool additive, bool new_format);
+	void cloneTo(EntityFolders& dst, World::PartitionHandle partition, HashMap<EntityPtr, EntityPtr>& entity_map);
+	void destroyPartitionFolders(World::PartitionHandle partition);
 
 private:
 	struct FreeList {
@@ -58,6 +65,7 @@ private:
 	void onEntityDestroyed(EntityRef e);
 	void fix(Folder& folder, const EntityMap& entity_map);
 
+	IAllocator& m_allocator;
 	World& m_world;
 	Array<Entity> m_entities;
 	FreeList m_folders;
