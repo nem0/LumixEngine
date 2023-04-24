@@ -23,25 +23,9 @@
 namespace Lumix
 {
 
-void registerEngineAPI(lua_State* L, Engine* engine);
-
-static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 static const u32 SERIALIZED_PROJECT_MAGIC = 0x5f50524c; // == '_PRL'
 
-
-enum class SerializedEngineVersion : u32 {
-	VEC3_SCALE,
-	LAST
-};
-
-#pragma pack(1)
-struct SerializedEngineHeader
-{
-	u32 magic;
-	SerializedEngineVersion version;
-};
-#pragma pack()
-
+void registerEngineAPI(lua_State* L, Engine* engine);
 
 struct PrefabResourceManager final : ResourceManager
 {
@@ -224,7 +208,7 @@ public:
 	{
 		ASSERT(prefab.isReady());
 		InputMemoryStream blob(prefab.data);
-		if (!deserialize(world, blob, entity_map)) {
+		if (!world.deserialize(blob, entity_map)) {
 			logError("Failed to instantiate prefab ", prefab.getPath());
 			return false;
 		}
@@ -396,33 +380,6 @@ public:
 		m_next_frame = false;
 	}
 
-
-	void serializePluginList(OutputMemoryStream& serializer)
-	{
-		serializer.write((i32)m_plugin_manager->getPlugins().size());
-		for (auto* plugin : m_plugin_manager->getPlugins())
-		{
-			serializer.writeString(plugin->getName());
-		}
-	}
-
-
-	bool hasSerializedPlugins(InputMemoryStream& serializer)
-	{
-		i32 count;
-		serializer.read(count);
-		for (int i = 0; i < count; ++i)
-		{
-			const char* tmp = serializer.readString();
-			if (!m_plugin_manager->getPlugin(tmp))
-			{
-				logError("Missing plugin ", tmp);
-				return false;
-			}
-		}
-		return true;
-	}
-
 	enum class ProjectVersion : u32 {
 		FIRST,
 		HASH64,
@@ -477,52 +434,6 @@ public:
 			plugin->serialize(serializer);
 		}
 	}
-
-	void serialize(World& ctx, OutputMemoryStream& serializer) override
-	{
-		SerializedEngineHeader header;
-		header.magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
-		header.version = SerializedEngineVersion::LAST;
-		serializer.write(header);
-		serializePluginList(serializer);
-		ctx.serialize(serializer);
-		serializer.write((i32)ctx.getScenes().size());
-		for (UniquePtr<IScene>& scene : ctx.getScenes()) {
-			serializer.writeString(scene->getPlugin().getName());
-			serializer.write(scene->getVersion());
-			scene->serialize(serializer);
-		}
-	}
-
-
-	bool deserialize(World& world, InputMemoryStream& serializer, EntityMap& entity_map) override
-	{
-		SerializedEngineHeader header;
-		serializer.read(header);
-		if (header.magic != SERIALIZED_ENGINE_MAGIC)
-		{
-			logError("Wrong or corrupted file");
-			return false;
-		}
-		if (header.version > SerializedEngineVersion::LAST) {
-			logError("Unsupported version of world");
-			return false;
-		}
-		if (!hasSerializedPlugins(serializer)) return false;
-
-		world.deserialize(serializer, entity_map, header.version > SerializedEngineVersion::VEC3_SCALE);
-		i32 scene_count;
-		serializer.read(scene_count);
-		for (int i = 0; i < scene_count; ++i)
-		{
-			const char* tmp = serializer.readString();
-			IScene* scene = world.getScene(tmp);
-			const i32 version = serializer.read<i32>();
-			scene->deserialize(serializer, entity_map, version);
-		}
-		return true;
-	}
-
 
 	void unloadLuaResource(LuaResourceHandle resource) override
 	{

@@ -388,7 +388,7 @@ public:
 		Array<EntityRef> src_entities(m_editor.getAllocator());
 		src_entities.reserve(256);
 		World& prefab_world = createPrefabWorld(entity, src_entities);
-		engine.serialize(prefab_world, blob);
+		prefab_world.serialize(blob);
 		engine.destroyWorld(prefab_world);
 
 		FileSystem& fs = engine.getFileSystem();
@@ -526,7 +526,7 @@ public:
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldSerializedVersion version) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldEditorHeaderVersion version) override
 	{
 		u32 count;
 		serializer.read(count);
@@ -549,7 +549,7 @@ public:
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
 			StableHash content_hash;
-			if ((u32)version <= (u32)WorldSerializedVersion::HASH64) {
+			if (version <= WorldEditorHeaderVersion::HASH64) {
 				u32 dummy;
 				serializer.read(dummy);
 			}
@@ -558,8 +558,8 @@ public:
 			}
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), {content_hash, res});
+			if (!res->isReady()) m_check_update = true;
 		}
-		m_check_update = true;
 
 		serializer.read(count);
 		m_roots.reserve(count);
@@ -573,6 +573,55 @@ public:
 		}
 	}
 
+	void cloneTo(PrefabSystem& dst_ps, const HashMap<EntityPtr, EntityPtr>& map) override {
+		ASSERT(m_deferred_instances.empty());
+		ASSERT(!m_check_update);
+		PrefabSystemImpl& dst = static_cast<PrefabSystemImpl&>(dst_ps);
+
+		auto get_mapped = [&](EntityPtr src) {
+			if (!src.isValid()) return INVALID_ENTITY;
+			auto iter = map.find(src);
+			if (!iter.isValid()) return INVALID_ENTITY;
+			return iter.value();
+		};
+
+		// clone roots
+		dst.m_roots.reserve(m_roots.size());
+		for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
+			const EntityPtr dst_e = get_mapped(iter.key());
+			if (dst_e.isValid()) {
+				dst.m_roots.insert(*dst_e, iter.value());
+			}
+		}
+
+		// clone resources
+		for (auto iter = dst.m_roots.begin(), end = dst.m_roots.end(); iter != end; ++iter) {
+			const PrefabHandle prefab_handle = iter.value();
+			auto res_iter = dst.m_resources.find(prefab_handle);
+			if (res_iter.isValid()) continue;
+
+			const PrefabVersion& src_version = m_resources[prefab_handle];
+			PrefabVersion& dst_version = dst.m_resources.insert(prefab_handle);
+			dst_version.content_hash = src_version.content_hash;
+			dst_version.resource = src_version.resource;
+			dst_version.resource->incRefCount();
+		}
+
+		// clone entity to prefab map
+		for (auto iter = map.begin(), end = map.end(); iter != end; ++iter) {
+			const EntityPtr src_entity = iter.key();
+			if (!src_entity.isValid()) continue;
+
+			const EntityPtr dst_entity = iter.value();
+			PrefabHandle prefab_handle = getPrefab(*src_entity);
+			if (prefab_handle.getHashValue() == 0) continue;
+
+			while(dst.m_entity_to_prefab.size() <= dst_entity.index) {
+				dst.m_entity_to_prefab.push(PrefabHandle());
+			}
+			dst.m_entity_to_prefab[dst_entity.index] = prefab_handle;
+		}
+	}
 
 private:
 	struct DeferredInstance {
@@ -585,6 +634,7 @@ private:
 	struct PrefabVersion {
 		StableHash content_hash;
 		PrefabResource* resource;
+		// used/valid only in serialize method
 		u32 instance_count = 0;
 	};
 

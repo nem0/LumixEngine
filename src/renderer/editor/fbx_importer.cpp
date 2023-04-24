@@ -2381,7 +2381,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		world.setParent(root, e);
 	}
 
-	engine.serialize(world, blob);
+	world.serialize(blob);
 	engine.destroyWorld(world);
 
 	if (!file.write(blob.data(), blob.size())) {

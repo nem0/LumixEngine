@@ -995,11 +995,18 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		if (m_editor->getWorld()->getName()[0]) {
-			m_editor->saveWorld(m_editor->getWorld()->getName(), true);
-		} else {
+		World* world = m_editor->getWorld();
+		const Array<World::Partition>& partitions = world->getPartitions();
+		
+		if (partitions.size() == 1 && partitions[0].name[0] == '\0') {
 			saveAs();
 		}
+		else {
+			for (const World::Partition& partition : partitions) {
+				m_editor->savePartition(partition.handle);
+			}
+		}
+
 	}
 
 
@@ -1017,7 +1024,11 @@ struct StudioAppImpl final : StudioApp
 			ImGui::InputText("##name", name, lengthOf(name));
 			if (ImGui::Button(ICON_FA_SAVE "Save")) {
 				setTitle(name);
-				m_editor->saveWorld(name, true);
+				World* world = m_editor->getWorld();
+				World::PartitionHandle active_partition_handle = world->getActivePartition();
+				World::Partition& active_partition = world->getPartition(active_partition_handle);
+				copyString(active_partition.name, name);
+				m_editor->savePartition(active_partition_handle);
 				scanWorlds();
 				ImGui::CloseCurrentPopup();
 			}
@@ -1028,10 +1039,8 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void saveAs()
-	{
-		if (m_editor->isGameMode())
-		{
+	void saveAs() {
+		if (m_editor->isGameMode()) {
 			logError("Can not save while the game is running");
 			return;
 		}
@@ -1407,8 +1416,10 @@ struct StudioAppImpl final : StudioApp
 		if (!ImGui::BeginMenu("File")) return;
 
 		menuItem("newWorld", true);
+		const Array<World::Partition>& partitions = m_editor->getWorld()->getPartitions();
+		const bool can_load_additive = partitions.size() != 1 || partitions[0].name[0] != '\0';
 		auto open_ui = [&](const char* label, bool additive){
-			if (ImGui::BeginMenu(label)) {
+			if (ImGui::BeginMenu(label, !additive || can_load_additive)) {
 				ImGuiEx::filter("Filter", m_open_filter, sizeof(m_open_filter), 150);
 	
 				for (auto& univ : m_worlds) {
@@ -1803,18 +1814,26 @@ struct StudioAppImpl final : StudioApp
 				m_renaming_folder = new_folder;
 				m_set_rename_focus = true;
 			}
-			const bool is_root = folder->parent_folder == EntityFolders::INVALID_FOLDER;
-			if (ImGui::Selectable("Delete")) {
-				if (is_root) {
-					m_editor->destroyWorldPartition(partition);
+			const bool is_root = folder->parent == EntityFolders::INVALID_FOLDER;
+			World* world = m_editor->getWorld();
+
+			if (is_root && world->getPartition(partition).name[0] && ImGui::Selectable("Save")) {
+				m_editor->savePartition(partition);
+			}
+
+			if (!is_root || world->getPartitions().size() > 1) {
+				if (ImGui::Selectable(is_root ? "Unload" : "Delete")) {
+					if (is_root) {
+						m_editor->destroyWorldPartition(partition);
+					}
+					else {
+						m_editor->destroyEntityFolder(folder_id);
+					}
+					ImGui::EndPopup();
+					if (node_open) ImGui::TreePop();
+					ImGui::PopID();
+					return;
 				}
-				else {
-					m_editor->destroyEntityFolder(folder_id);
-				}
-				ImGui::EndPopup();
-				if (node_open) ImGui::TreePop();
-				ImGui::PopID();
-				return;
 			}
 
 			const bool has_children = folders.getFolder(folder_id).first_entity.isValid();
@@ -1840,11 +1859,11 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		u16 child_id = folder->child_folder;
+		EntityFolders::FolderID child_id = folder->first_child;
 		while (child_id != EntityFolders::INVALID_FOLDER) {
 			folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
 			const EntityFolders::Folder& child = folders.getFolder(child_id);
-			child_id = child.next_folder;
+			child_id = child.next;
 		}
 
 		EntityPtr child_e = folder->first_entity;
@@ -2826,12 +2845,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void saveWorldAs(const char* basename, bool save_path) { m_editor->saveWorld(basename, save_path); }
-
-
-	void saveWorld() { save(); }
-
-
 	void createLua()
 	{
 		lua_State* L = m_engine->getState();
@@ -2851,8 +2864,6 @@ struct StudioAppImpl final : StudioApp
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(newWorld);
-		REGISTER_FUNCTION(saveWorld);
-		REGISTER_FUNCTION(saveWorldAs);
 		REGISTER_FUNCTION(exitWithCode);
 		REGISTER_FUNCTION(exitGameMode);
 

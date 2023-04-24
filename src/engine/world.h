@@ -12,8 +12,7 @@ namespace Lumix {
 struct ComponentUID;
 struct IScene;
 
-enum class WorldSerializedVersion : u32
-{
+enum class WorldEditorHeaderVersion : u32 {
 	CAMERA,
 	ENTITY_FOLDERS,
 	HASH64,
@@ -23,10 +22,10 @@ enum class WorldSerializedVersion : u32
 };
 
 #pragma pack(1)
-	struct WorldHeader {
+	struct WorldEditorHeader {
 		static const u32 MAGIC = 'LUNV';
 		u32 magic;
-		WorldSerializedVersion version;
+		WorldEditorHeaderVersion version;
 	};
 #pragma pack()
 
@@ -144,8 +143,6 @@ struct LUMIX_ENGINE_API World {
 	const Vec3& getScale(EntityRef entity) const;
 	const DVec3& getPosition(EntityRef entity) const;
 	const Quat& getRotation(EntityRef entity) const;
-	const char* getName() const { return m_name; }
-	void setName(const char* name);
 
 	DelegateList<void(EntityRef)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
@@ -154,7 +151,7 @@ struct LUMIX_ENGINE_API World {
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
 	void serialize(struct OutputMemoryStream& serializer);
-	void deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale);
+	bool deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map);
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(const char* name) const;
@@ -202,7 +199,6 @@ private:
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;
-	char m_name[64];
 };
 
 struct LUMIX_ENGINE_API ComponentUID final {

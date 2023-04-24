@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/entity_folders.h"
 #include "engine/lumix.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
@@ -148,7 +149,7 @@ struct LUMIX_EDITOR_API WorldEditor
 
 	virtual void loadWorld(const char* basename, bool additive) = 0;
 	virtual void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) = 0;
-	virtual void saveWorld(const char* basename, bool save_path) = 0;
+	virtual void savePartition(World::PartitionHandle partition) = 0;
 	virtual bool isLoading() const = 0;
 	virtual void newWorld() = 0;
 	virtual void toggleGameMode() = 0;
@@ -160,10 +161,10 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual DelegateList<void()>& worldDestroyed() = 0;
 	virtual DelegateList<void()>& entitySelectionChanged() = 0;
 
-	virtual u16 createEntityFolder(u16 parent) = 0;
-	virtual void destroyEntityFolder(u16 folder) = 0;
-	virtual void renameEntityFolder(u16 folder, const char* new_name) = 0;
-	virtual void moveEntityToFolder(EntityRef entity, u16 folder) = 0;
+	virtual EntityFolders::FolderID createEntityFolder(EntityFolders::FolderID parent) = 0;
+	virtual void destroyEntityFolder(EntityFolders::FolderID folder) = 0;
+	virtual void renameEntityFolder(EntityFolders::FolderID folder, const char* new_name) = 0;
+	virtual void moveEntityToFolder(EntityRef entity, EntityFolders::FolderID folder) = 0;
 
 	virtual struct PrefabSystem& getPrefabSystem() = 0;
 	virtual struct EntityFolders& getEntityFolders() = 0;

@@ -116,9 +116,9 @@ struct Runner final
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
-		WorldHeader header;
+		WorldEditorHeader header;
 		blob.read(header);
-		if ((u32)header.version <= (u32)WorldSerializedVersion::HASH64) {
+		if (header.version <= WorldEditorHeaderVersion::HASH64) {
 			u32 dummy;
 			blob.read(dummy);
 			blob.read(dummy);
@@ -133,8 +133,7 @@ struct Runner final
 			}
 		}
 
-		m_world->setName(world_name);
-		if (!m_engine->deserialize(*m_world, blob, entity_map)) {
+		if (!m_world->deserialize(blob, entity_map)) {
 			logError("Failed to deserialize ", path);
 			return false;
 		}

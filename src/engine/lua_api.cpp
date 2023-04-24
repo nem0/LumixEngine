@@ -635,7 +635,7 @@ static int LUA_loadWorld(lua_State* L)
 				blob.read(&header, sizeof(header));
 
 				EntityMap entity_map(engine->getAllocator());
-				if (!engine->deserialize(*world, blob, entity_map)) {
+				if (!world->deserialize(blob, entity_map)) {
 					logError("Failed to deserialize world ", path);
 				} else {
 					lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func);

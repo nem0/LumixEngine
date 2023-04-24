@@ -1,27 +1,26 @@
 #pragma once
 
 #include "engine/array.h"
+#include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/world.h"
 
 namespace Lumix {
 
 struct LUMIX_EDITOR_API EntityFolders final {
-	using FolderID = u16;
-	static constexpr FolderID INVALID_FOLDER = 0xffFF; 
+	using FolderID = u64;
+	static constexpr FolderID INVALID_FOLDER = 0;
 
 	struct Folder {
-		FolderID parent_folder = INVALID_FOLDER;
-		FolderID child_folder = INVALID_FOLDER;
-		FolderID next_folder = INVALID_FOLDER;
-		FolderID prev_folder = INVALID_FOLDER;
+		FolderID id;
+		FolderID parent = INVALID_FOLDER;
+		FolderID first_child = INVALID_FOLDER;
+		FolderID next = INVALID_FOLDER;
+		FolderID prev = INVALID_FOLDER;
 		EntityPtr first_entity = INVALID_ENTITY;
 		World::PartitionHandle partition;
-		bool valid = true;
-		char name[112];
+		char name[80];
 	};
-
-	static_assert(sizeof(Folder) == 128);
 
 	struct Entity {
 		FolderID folder = INVALID_FOLDER;
@@ -32,6 +31,7 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	EntityFolders(World& world, IAllocator& allocator);
 	~EntityFolders();
 
+	void ignoreNewEntities(bool ignore) { m_ignore_new_entities = ignore; }
 	FolderID getRoot(World::PartitionHandle partition) const;
 	Folder& getFolder(FolderID folder_id);
 	const Folder& getFolder(FolderID folder_id) const;
@@ -48,28 +48,16 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	void destroyPartitionFolders(World::PartitionHandle partition);
 
 private:
-	struct FreeList {
-		FreeList(IAllocator& allocator);
-		
-		FolderID alloc();
-		void free(FolderID folder);
-		Folder& getObject(FolderID id);
-		const Folder& getObject(FolderID id) const;
-
-		Array<Folder> data;
-		i32 first_free;
-	};
-
-	FolderID allocFolder();
 	void onEntityCreated(EntityRef e);
 	void onEntityDestroyed(EntityRef e);
-	void fix(Folder& folder, const EntityMap& entity_map);
+	FolderID generateUniqueID();
 
 	IAllocator& m_allocator;
 	World& m_world;
 	Array<Entity> m_entities;
-	FreeList m_folders;
+	Array<Folder> m_folders;
 	FolderID m_selected_folder;
+	bool m_ignore_new_entities = false;
 };
 
 } // namespace Lumix

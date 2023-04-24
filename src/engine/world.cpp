@@ -58,13 +58,12 @@ World::World(Engine& engine, IAllocator& allocator)
 	, m_hierarchy(m_allocator)
 	, m_transforms(m_allocator)
 	, m_partitions(m_allocator)
-	, m_name("")
 {
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
 	memset(m_component_type_map, 0, sizeof(m_component_type_map));
 
-	PartitionHandle p = createPartition("main");
+	PartitionHandle p = createPartition("");
 	setActivePartition(p);
 }
 
@@ -672,9 +671,46 @@ Vec3 World::getLocalScale(EntityRef entity) const
 	return m_hierarchy[hierarchy_idx].local_transform.scale;
 }
 
+static void serializeSceneList(World& world, OutputMemoryStream& serializer) {
+	const Array<UniquePtr<IScene>>& scenes = world.getScenes();
+	serializer.write((i32)scenes.size());
+	for (UniquePtr<IScene>& scene : scenes) {
+		serializer.writeString(scene->getPlugin().getName());
+	}
+}
+
+static bool hasSerializedScenes(World& world, InputMemoryStream& serializer) {
+	i32 count;
+	serializer.read(count);
+	for (int i = 0; i < count; ++i) {
+		const char* tmp = serializer.readString();
+		if (!world.getScene(tmp)) {
+			logError("Missing plugin ", tmp);
+			return false;
+		}
+	}
+	return true;
+}
+
+#pragma pack(1)
+struct WorldHeader {
+	enum class Version : u32 {
+		VEC3_SCALE,
+		LAST
+	};
+	static const u32 MAGIC = '_LEN';
+
+	u32 magic = MAGIC;
+	Version version = Version::LAST;
+};
+#pragma pack()
 
 void World::serialize(OutputMemoryStream& serializer)
 {
+	WorldHeader header;
+	serializer.write(header);
+	serializeSceneList(*this, serializer);
+
 	serializer.write((u32)m_entities.size());
 
 	for (u32 i = 0, c = m_entities.size(); i < c; ++i) {
@@ -705,15 +741,29 @@ void World::serialize(OutputMemoryStream& serializer)
 			serializer.write(h.local_transform.scale);
 		}
 	}
+
+	serializer.write((i32)m_scenes.size());
+	for (UniquePtr<IScene>& scene : m_scenes) {
+		serializer.writeString(scene->getPlugin().getName());
+		serializer.write(scene->getVersion());
+		scene->serialize(serializer);
+	}
 }
 
-void World::setName(const char* name) { 
-	copyString(m_name, name);
-	copyString(m_partitions[0].name, name);
-}
-
-void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale)
+bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 {
+	WorldHeader header;
+	serializer.read(header);
+	if (header.magic != WorldHeader::MAGIC) {
+		logError("Wrong or corrupted file");
+		return false;
+	}
+	if (header.version > WorldHeader::Version::LAST) {
+		logError("Unsupported version of world");
+		return false;
+	}
+	if (!hasSerializedScenes(*this, serializer)) return false;
+	
 	u32 to_reserve;
 	serializer.read(to_reserve);
 	entity_map.reserve(to_reserve);
@@ -724,7 +774,7 @@ void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bo
 		entity_map.set(orig, new_e);
 		serializer.read(m_transforms[new_e.index].pos);
 		serializer.read(m_transforms[new_e.index].rot);
-		if (vec3_scale) {
+		if (header.version > WorldHeader::Version::VEC3_SCALE) {
 			serializer.read(m_transforms[new_e.index].scale);
 		}
 		else {
@@ -757,7 +807,7 @@ void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bo
 			serializer.read(h.next_sibling);
 			serializer.read(h.local_transform.pos);
 			serializer.read(h.local_transform.rot);
-			if (vec3_scale) {
+			if (header.version > WorldHeader::Version::VEC3_SCALE) {
 				serializer.read(h.local_transform.scale);
 			}
 			else {
@@ -774,7 +824,16 @@ void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bo
 			m_entities[h.entity.index].hierarchy = i + old_count;
 		}
 	}
-}
+
+	i32 scene_count;
+	serializer.read(scene_count);
+	for (int i = 0; i < scene_count; ++i) {
+		const char* tmp = serializer.readString();
+		IScene* scene = getScene(tmp);
+		const i32 version = serializer.read<i32>();
+		scene->deserialize(serializer, entity_map, version);
+	}
+	return true;}
 
 
 void World::setScale(EntityRef entity, const Vec3& scale)
