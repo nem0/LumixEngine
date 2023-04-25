@@ -388,7 +388,7 @@ public:
 		Array<EntityRef> src_entities(m_editor.getAllocator());
 		src_entities.reserve(256);
 		World& prefab_world = createPrefabWorld(entity, src_entities);
-		prefab_world.serialize(blob);
+		prefab_world.serialize(blob, WorldSerializeFlags::NONE);
 		engine.destroyWorld(prefab_world);
 
 		FileSystem& fs = engine.getFileSystem();
@@ -405,14 +405,16 @@ public:
 			prefab_res->getResourceManager().reload(*prefab_res);
 
 			// TODO undo/redo might keep references do prefab entities, handle that
+			EntityFolders& folders = m_editor.getEntityFolders();
 			for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
 				if (iter.value() != prefab) continue;
 				if (iter.key() == entity) continue;
 
 				const Transform tr = m_world->getTransform(iter.key());
 				const EntityPtr parent = m_world->getParent(iter.key());
+				EntityFolders::FolderID folder = folders.getFolder(iter.key());
 
-				m_deferred_instances.push({prefab_res, tr, parent});
+				m_deferred_instances.push({prefab_res, tr, parent, folder});
 				destroySubtree(*m_world, m_world->getFirstChild(iter.key()));
 				m_world->destroyEntity(iter.key());
 			}

@@ -21,6 +21,12 @@ enum class WorldEditorHeaderVersion : u32 {
 	LATEST
 };
 
+enum class WorldSerializeFlags : u32 { 
+	HAS_PARTITIONS = 1 << 0,
+	
+	NONE = 0
+};
+
 #pragma pack(1)
 	struct WorldEditorHeader {
 		static const u32 MAGIC = 'LUNV';
@@ -108,6 +114,7 @@ struct LUMIX_ENGINE_API World {
 	Array<Partition>& getPartitions() { return m_partitions; }
 	Partition& getPartition(PartitionHandle partition);
 	PartitionHandle getPartition(EntityRef entity);
+	void setPartition(EntityRef entity, PartitionHandle partition);
 
 	bool isValid(EntityRef e) const { return m_entities[e.index].valid; }
 	EntityPtr getFirstEntity() const;
@@ -150,7 +157,7 @@ struct LUMIX_ENGINE_API World {
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serialize(struct OutputMemoryStream& serializer);
+	void serialize(struct OutputMemoryStream& serializer, WorldSerializeFlags flags);
 	bool deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map);
 
 	IScene* getScene(ComponentType type) const;

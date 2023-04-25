@@ -88,8 +88,7 @@ void EntityFolders::moveToFolder(EntityRef e, FolderID folder_id) {
 		if (src_folder.first_entity == e) src_folder.first_entity = entity.next;
 		if (entity.prev.isValid()) m_entities[entity.prev.index].next = entity.next;
 		if (entity.next.isValid()) m_entities[entity.next.index].prev = entity.prev;
-		// TODO make sure this is not possible in UI
-		ASSERT(src_folder.partition == dst_folder.partition);
+		m_world.setPartition(e, dst_folder.partition);
 	}
 
 	entity.folder = folder_id;
@@ -102,8 +101,6 @@ void EntityFolders::moveToFolder(EntityRef e, FolderID folder_id) {
 }
 
 void EntityFolders::destroyFolder(FolderID folder_id) {
-	if (m_selected_folder == folder_id) m_selected_folder = INVALID_FOLDER;
-	
 	Folder& f = getFolder(folder_id);
 	ASSERT(!f.first_entity.isValid());
 	ASSERT(f.first_child == INVALID_FOLDER);
@@ -114,6 +111,10 @@ void EntityFolders::destroyFolder(FolderID folder_id) {
 	if (f.next != INVALID_FOLDER) getFolder(f.next).prev = f.prev;
 
 	m_folders.eraseItems([&](const Folder& f){ return f.id == folder_id; });
+
+	if (m_selected_folder == folder_id) {
+		m_selected_folder = m_folders.empty() ? INVALID_FOLDER : m_folders[0].id;
+	}
 }
 
 EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID parent) {
@@ -133,6 +134,13 @@ EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID p
 	}
 	p.first_child = folder;
 	return folder;
+}
+
+void EntityFolders::selectFolder(FolderID folder)
+{
+	m_selected_folder = folder;
+	World::PartitionHandle partition = getFolder(folder).partition;
+	m_world.setActivePartition(partition);
 }
 
 EntityFolders::FolderID EntityFolders::getFolder(EntityRef e) const {
@@ -187,8 +195,8 @@ void EntityFolders::cloneTo(EntityFolders& dst, World::PartitionHandle partition
 	}
 }
 
-void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity_map, bool additive, bool new_format) {
-	if (!new_format) {
+void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity_map, bool additive, WorldEditorHeaderVersion version) {
+	if (version <= WorldEditorHeaderVersion::NEW_ENTITY_FOLDERS) {
 		// ignore old format folders
 		i32 count;
 		blob.read(count);
@@ -249,7 +257,6 @@ void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity
 	blob.read(&m_folders[folder_offset], sizeof(Folder) * folder_count);
 	for (u32 i = 0; i < folder_count; ++i) {
 		Folder& f = m_folders[folder_offset + i];
-		f.partition = m_world.getActivePartition();
 		f.first_entity = entity_map.get(f.first_entity);
 	}
 }

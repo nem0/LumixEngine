@@ -1056,41 +1056,6 @@ private:
 };
 
 
-struct DestroyWorldPartitionCommand final : IEditorCommand {
-	DestroyWorldPartitionCommand(WorldEditor& editor, World::PartitionHandle partition)
-		: m_editor(editor)
-		, m_partition(partition)
-		, m_partition_name(editor.getAllocator())
-		, m_partition_data(editor.getAllocator())
-	{
-	}
-	
-	bool execute() override { 
-		if (m_partition_data.empty()) {
-			m_editor.serializeWorldPartition(m_partition, m_partition_data);
-			m_partition_name = m_editor.getWorld()->getPartition(m_partition).name;
-		}
-		m_editor.getWorld()->destroyPartition(m_partition);
-		m_editor.getEntityFolders().destroyPartitionFolders(m_partition);
-		return true;
-	}
-
-	void undo() override {
-		// TODO entities are not "emplaced", so EntityRef-s do not match
-		InputMemoryStream tmp(m_partition_data);
-		m_editor.loadWorld(tmp, m_partition_name.c_str(), true);
-		m_partition = m_editor.getWorld()->getActivePartition();
-	}
-
-	const char* getType() override { return "destroy_world_partition"; }
-	bool merge(IEditorCommand& command) override { return false; }
-
-	WorldEditor& m_editor;
-	World::PartitionHandle m_partition;
-	OutputMemoryStream m_partition_data;
-	String m_partition_name;
-};
-
 struct AddArrayPropertyItemCommand final : IEditorCommand
 {
 
@@ -1854,11 +1819,15 @@ private:
 			, m_output(output)
 		{
 			m_entity = INVALID_ENTITY;
+			m_folder = m_editor.getEntityFolders().getSelectedFolder();
 		}
 
 
 		bool execute() override
 		{
+			EntityFolders& folders = m_editor.getEntityFolders();
+			EntityFolders::FolderID selected_folder = folders.getSelectedFolder();
+			folders.selectFolder(m_folder);
 			if (m_entity.isValid()) {
 				m_editor.getWorld()->emplaceEntity((EntityRef)m_entity);
 				m_editor.getWorld()->setPosition((EntityRef)m_entity, m_position);
@@ -1870,6 +1839,7 @@ private:
 			if (m_output) {
 				*m_output = e;
 			}
+			folders.selectFolder(selected_folder);
 			return true;
 		}
 
@@ -1892,6 +1862,7 @@ private:
 		EntityPtr m_entity;
 		DVec3 m_position;
 		EntityRef* m_output;
+		EntityFolders::FolderID m_folder;
 	};
 
 public:
@@ -1957,6 +1928,7 @@ public:
 	bool isWorldChanged() const override { return m_is_world_changed; }
 
 	void savePartition(World::PartitionHandle partition) override {
+		ASSERT(!isGameMode());
 		const Array<World::Partition>& partitions = m_world->getPartitions();
 		if (partitions.size() == 1) {
 			ASSERT(partition == partitions[0].handle);
@@ -1992,7 +1964,7 @@ public:
 		}
 		os::OutputFile file;
 		if (file.open(path)) {
-			save(file);
+			save(file, false);
 			file.close();
 		}
 		else {
@@ -2003,7 +1975,7 @@ public:
 	}
 
 
-	void save(IOutputStream& file)
+	void save(IOutputStream& file, bool is_game_mode_save)
 	{
 		while (m_engine.getFileSystem().hasWork()) m_engine.getFileSystem().processCallbacks();
 
@@ -2018,7 +1990,7 @@ public:
 		blob.write(hash);
 		const u64 hashed_offset = blob.size();
 
-		m_world->serialize(blob);
+		m_world->serialize(blob, is_game_mode_save ? WorldSerializeFlags::HAS_PARTITIONS : WorldSerializeFlags::NONE);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
 		if (m_view) {
@@ -2034,8 +2006,6 @@ public:
 		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
 		memcpy(blob.getMutableData() + sizeof(WorldEditorHeader), &hash, sizeof(hash));
 		file.write(blob.data(), blob.size());
-
-		logInfo("World saved");
 	}
 
 
@@ -2303,7 +2273,7 @@ public:
 
 		m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
 		m_game_mode_file.clear();
-		save(m_game_mode_file);
+		save(m_game_mode_file, true);
 		m_is_game_mode = true;
 		beginCommandGroup("");
 		endCommandGroup();
@@ -2338,10 +2308,10 @@ public:
 			m_world_created.invoke();
 			m_world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
-			InputMemoryStream file(m_game_mode_file);
-			// TODO save/load partitions
-			ASSERT(false);
-			load(file, "game mode", false);
+			
+			InputMemoryStream blob(m_game_mode_file);
+			EntityMap entity_map(m_allocator);
+			load(blob, "game mode", false, true);
 		}
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
@@ -2508,69 +2478,44 @@ public:
 	}
 	
 	bool isLoading() const override { return m_is_loading; }
-	
-	void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) override
-	{
-		ASSERT(!m_is_game_mode);
-		if (additive) {
-			World::PartitionHandle partition = m_world->createPartition(basename);
-			m_world->setActivePartition(partition);
-		}
-		else {
-			destroyWorld();
-			createWorld();
-			copyString(m_world->getPartitions()[0].name, basename);
-		}
-		logInfo("Loading world ", basename, "...");
-		if (!load(blob, basename, additive)) {
-			logError("Failed to parse ", basename);
-			newWorld();
-		}
-	}
 
-	void loadWorld(const char* basename, bool additive) override
-	{
-		if (m_is_game_mode) stopGameMode(false);
-		if (additive) {
-			World::PartitionHandle partition = m_world->createPartition(basename);
-			m_world->setActivePartition(partition);
-		}
-		else {
-			destroyWorld();
-			createWorld();
-			copyString(m_world->getPartitions()[0].name, basename);
-		}
-		logInfo("Loading world ", basename, "...");
-		os::InputFile file;
-		const Path path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
-		if (file.open(path)) {
-			if (!load(file, path, additive)) {
-				logError("Failed to parse ", path);
-				newWorld();
-			}
-			file.close();
-		}
-		else {
-			logError("Failed to open ", path);
-			newWorld();
-		}
-	}
-
-
-	void newWorld() override
-	{
+	void newWorld() override {
 		destroyWorld();
 		createWorld();
 		logInfo("World created.");
 	}
+	
+	void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) override {
+		ASSERT(!m_is_game_mode);
+		logInfo("Loading world ", basename, "...");
+		
+		if (additive) {
+			World::PartitionHandle partition = m_world->createPartition(basename);
+			m_world->setActivePartition(partition);
+		}
+		else {
+			destroyWorld();
+			createWorld();
+			copyString(m_world->getPartitions()[0].name, basename);
+		}
 
-	bool load(IInputStream& file, const char* path, bool additive)
-	{
+		if (!load(blob, basename, additive, false)) {
+			logError("Failed to parse ", basename);
+			newWorld();
+			return;
+		}
+
+		World::PartitionHandle partition = m_world->getActivePartition();
+		EntityFolders::FolderID root_folder = m_entity_folders->getRoot(partition);
+		m_entity_folders->selectFolder(root_folder);
+	}
+
+	bool load(InputMemoryStream& blob, const char* path, bool additive, bool is_game_mode_load) {
 		PROFILE_FUNCTION();
 		m_is_loading = true;
-		WorldEditorHeader header;
-		const u64 file_size = file.size();
-		if (file_size < sizeof(header)) {
+
+		const u64 file_size = blob.size();
+		if (file_size < sizeof(WorldEditorHeader)) {
 			logError("Corrupted file.");
 			m_is_loading = false;
 			return false;
@@ -2583,42 +2528,48 @@ public:
 
 		os::Timer timer;
 		logInfo("Parsing world...");
-		OutputMemoryStream data(m_allocator);
-		if (!file.getBuffer()) {
-			data.resize(file_size);
-			if (!file.read(data.getMutableData(), data.size())) {
-				logError("Failed to load file.");
+		WorldEditorHeader header;
+		blob.read(header);
+		if (header.version > WorldEditorHeaderVersion::LATEST) {
+			logError("`", path, "`: version not supported");
+			m_is_loading = false;
+			return false;
+		}
+
+		if (header.version > WorldEditorHeaderVersion::HASH64) {
+			const StableHash hash = blob.read<StableHash>();
+			const StableHash computed_hash((const u8*)blob.getData() + blob.getPosition(), u32(blob.remaining()));
+
+			if (header.magic != WorldEditorHeader::MAGIC || computed_hash != hash) {
+				logError("`", path, "`: file corrupted");
 				m_is_loading = false;
 				return false;
 			}
-		}
-		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), file_size);
-		blob.read(header);
-		if (header.version <= WorldEditorHeaderVersion::HASH64) {
-			u32 tmp;
-			blob.read(tmp);
-			blob.read(tmp);
 		}
 		else {
-			const StableHash hash = blob.read<StableHash>();
-
-			if (header.magic != WorldEditorHeader::MAGIC 
-				|| StableHash((const u8*)blob.getData() + blob.getPosition(), u32(blob.size() - blob.getPosition())) != hash)
-			{
-				logError("Corrupted file `", path, "`");
-				m_is_loading = false;
-				return false;
-			}
+			u64 tmp;
+			blob.read(tmp);
 		}
 
 		EntityMap entity_map(m_allocator);
 		m_entity_folders->ignoreNewEntities(true);
 		if (m_world->deserialize(blob, entity_map)) {
-			m_prefab_system->deserialize(blob, entity_map, header.version);
-			if (header.version > WorldEditorHeaderVersion::ENTITY_FOLDERS) {
-				m_entity_folders->deserialize(blob, entity_map, additive, header.version > WorldEditorHeaderVersion::NEW_ENTITY_FOLDERS);
-			}
 			m_entity_folders->ignoreNewEntities(false);
+			m_prefab_system->deserialize(blob, entity_map, header.version);
+
+			if (header.version > WorldEditorHeaderVersion::ENTITY_FOLDERS) {
+				Array<EntityFolders::Folder>& folders = m_entity_folders->getFolders();
+				const u32 offset = folders.size();
+				m_entity_folders->deserialize(blob, entity_map, additive, header.version);
+
+				if (!is_game_mode_load) {
+					const World::PartitionHandle partition = m_world->getActivePartition();
+					for (u32 i = offset, c = (u32)folders.size(); i < c; ++i) {
+						folders[i].partition = partition;
+					}
+				}
+			}
+
 			if (header.version > WorldEditorHeaderVersion::CAMERA) {
 				DVec3 pos;
 				Quat rot;
@@ -2630,7 +2581,6 @@ public:
 					vp.rot = rot;
 					m_view->setViewport(vp);
 				}
-
 			}
 			logInfo("World parsed in ", timer.getTimeSinceStart(), " seconds");
 			m_view->refreshIcons();
@@ -2850,12 +2800,14 @@ public:
 
 	void serializeWorldPartition(World::PartitionHandle partition, OutputMemoryStream& blob) override {
 		UniquePtr<WorldEditorImpl> ed = createPartitionWorld(partition);
-		ed->save(blob);
+		ed->save(blob, false);
 	}
 
 	void destroyWorldPartition(World::PartitionHandle partition) override {
-		UniquePtr<IEditorCommand> command = UniquePtr<DestroyWorldPartitionCommand>::create(m_allocator, *this, partition);
-		executeCommand(command.move());
+		m_world->destroyPartition(partition);
+		m_entity_folders->destroyPartitionFolders(partition);
+		clearUndoStack();
+		m_is_world_changed = true;
 	}
 
 	void addArrayPropertyItem(const ComponentUID& cmp, const char* property) override
@@ -2934,8 +2886,7 @@ public:
 	}
 
 
-	void destroyWorld()
-	{
+	void destroyWorld() {
 		if (m_is_game_mode) stopGameMode(false);
 
 		ASSERT(m_world);

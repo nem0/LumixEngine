@@ -236,8 +236,8 @@ struct LUMIX_ENGINE_API Timer {
 	Timer();
 
 	float tick();
-	float getTimeSinceStart();
-	float getTimeSinceTick();
+	float getTimeSinceStart() const;
+	float getTimeSinceTick() const;
 
 	static u64 getRawTimestamp();
 	static u64 getFrequency();

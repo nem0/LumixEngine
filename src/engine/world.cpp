@@ -87,6 +87,10 @@ void World::setActivePartition(PartitionHandle partition) {
 	m_active_partition = partition;
 }
 
+void World::setPartition(EntityRef entity, PartitionHandle partition) {
+	m_entities[entity.index].partition = partition;
+}
+
 World::Partition& World::getPartition(PartitionHandle partition) {
 	for (Partition& p : m_partitions) {
 		if (p.handle == partition) return p;
@@ -696,6 +700,7 @@ static bool hasSerializedScenes(World& world, InputMemoryStream& serializer) {
 struct WorldHeader {
 	enum class Version : u32 {
 		VEC3_SCALE,
+		FLAGS,
 		LAST
 	};
 	static const u32 MAGIC = '_LEN';
@@ -705,12 +710,12 @@ struct WorldHeader {
 };
 #pragma pack()
 
-void World::serialize(OutputMemoryStream& serializer)
-{
+void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags) {
+	const bool serialize_partitions = (u32)flags & (u32)WorldSerializeFlags::HAS_PARTITIONS;
 	WorldHeader header;
 	serializer.write(header);
 	serializeSceneList(*this, serializer);
-
+	serializer.write(flags);
 	serializer.write((u32)m_entities.size());
 
 	for (u32 i = 0, c = m_entities.size(); i < c; ++i) {
@@ -720,6 +725,7 @@ void World::serialize(OutputMemoryStream& serializer)
 		serializer.write(m_transforms[i].pos);
 		serializer.write(m_transforms[i].rot);
 		serializer.write(m_transforms[i].scale);
+		if (serialize_partitions) serializer.write(m_entities[i].partition);
 	}
 	serializer.write(INVALID_ENTITY);
 
@@ -748,10 +754,20 @@ void World::serialize(OutputMemoryStream& serializer)
 		serializer.write(scene->getVersion());
 		scene->serialize(serializer);
 	}
+
+	if (serialize_partitions) {
+		serializer.write((u32)m_partitions.size());
+		serializer.write(m_partitions.begin(), m_partitions.byte_size());
+		serializer.write(m_active_partition);
+	}
 }
 
 bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 {
+	if (serializer.remaining() < sizeof(WorldHeader)) {
+		logError("Wrong or corrupted file");
+		return false;
+	}
 	WorldHeader header;
 	serializer.read(header);
 	if (header.magic != WorldHeader::MAGIC) {
@@ -763,6 +779,13 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 		return false;
 	}
 	if (!hasSerializedScenes(*this, serializer)) return false;
+
+	bool deserialize_partitions = false;
+	if (header.version > WorldHeader::Version::FLAGS) {
+		WorldSerializeFlags flags;
+		serializer.read(flags);
+		deserialize_partitions = (u32)flags & (u32)WorldSerializeFlags::HAS_PARTITIONS;
+	}
 	
 	u32 to_reserve;
 	serializer.read(to_reserve);
@@ -781,8 +804,9 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 			serializer.read(m_transforms[new_e.index].scale.x);
 			float padding;
 			serializer.read(padding);
+			m_transforms[new_e.index].scale.y = m_transforms[new_e.index].scale.z = m_transforms[new_e.index].scale.x;
 		}
-		m_transforms[new_e.index].scale.y = m_transforms[new_e.index].scale.z = m_transforms[new_e.index].scale.x;
+		if (deserialize_partitions) serializer.read(m_entities[new_e.index].partition);
 	}
 
 	u32 count;
@@ -833,8 +857,16 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 		const i32 version = serializer.read<i32>();
 		scene->deserialize(serializer, entity_map, version);
 	}
-	return true;}
 
+	if (deserialize_partitions) {
+		u32 partitions_count;
+		serializer.read(partitions_count);
+		m_partitions.resize(partitions_count);
+		serializer.read(m_partitions.begin(), m_partitions.byte_size());
+		serializer.read(m_active_partition);
+	}
+	return true;
+}
 
 void World::setScale(EntityRef entity, const Vec3& scale)
 {

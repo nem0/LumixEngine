@@ -97,6 +97,7 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	const void* getData() const { return m_data; }
 	const void* getBuffer() const override { return m_data; }
 	u64 size() const override { return m_size; }
+	u64 remaining() const { return m_size - m_pos; }
 	u64 getPosition() const { return m_pos; }
 	void setPosition(u64 pos) { m_pos = pos; }
 	void rewind() { m_pos = 0; }

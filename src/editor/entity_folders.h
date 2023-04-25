@@ -40,12 +40,14 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	FolderID emplaceFolder(FolderID folder, FolderID parent);
 	void destroyFolder(FolderID folder);
 	FolderID getFolder(EntityRef e) const;
-	void selectFolder(FolderID folder) { m_selected_folder = folder; }
+	void selectFolder(FolderID folder);
 	FolderID getSelectedFolder() const { return m_selected_folder; }
 	void serialize(OutputMemoryStream& blob);
-	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map, bool additive, bool new_format);
+	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map, bool is_additive, WorldEditorHeaderVersion version);
 	void cloneTo(EntityFolders& dst, World::PartitionHandle partition, HashMap<EntityPtr, EntityPtr>& entity_map);
 	void destroyPartitionFolders(World::PartitionHandle partition);
+	Array<Folder>& getFolders() { return m_folders; }
+
 
 private:
 	void onEntityCreated(EntityRef e);

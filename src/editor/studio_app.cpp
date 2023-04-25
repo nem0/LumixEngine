@@ -91,9 +91,6 @@ struct StudioAppImpl final : StudioApp
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
 		, m_component_icons(m_allocator)
-		, m_confirm_load(false)
-		, m_confirm_new(false)
-		, m_confirm_exit(false)
 		, m_exit_code(0)
 		, m_allocator(m_main_allocator)
 		, m_worlds(m_allocator)
@@ -775,8 +772,10 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void update()
-	{
+	void update() {
+		PROFILE_FUNCTION();
+		profiler::blockColor(0x7f, 0x7f, 0x7f);
+		
 		updateGizmoOffset();
 
 		for (i32 i = m_deferred_destroy_windows.size() - 1; i >= 0; --i) {
@@ -787,16 +786,10 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 
-		PROFILE_FUNCTION();
-		profiler::blockColor(0x7f, 0x7f, 0x7f);
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
 		guiBeginFrame();
 		m_asset_compiler->update();
-
-		float time_delta = m_engine->getLastTimeDelta();
-
-		ImGuiIO& io = ImGui::GetIO();
 		m_editor->update();
 		showGizmos();
 		
@@ -813,9 +806,12 @@ struct StudioAppImpl final : StudioApp
 			m_editor->toggleGameMode();
 		}
 
+		float time_delta = m_engine->getLastTimeDelta();
 		for (auto* plugin : m_gui_plugins) {
 			plugin->update(time_delta);
 		}
+
+		if (m_settings.getTimeSinceLastSave() > 30.f) saveSettings();
 
 		guiEndFrame();
 	}
@@ -888,6 +884,29 @@ struct StudioAppImpl final : StudioApp
 		m_editor->endCommandGroup();
 	}
 
+	void loadWorld(const char* name, bool additive) {
+		const char* base_path = m_engine->getFileSystem().getBasePath();
+		os::InputFile file;
+		const Path path(base_path, "universes/", name, ".unv");
+
+		if (!file.open(path)) {
+			logError("Failed to open ", path);
+			m_editor->newWorld();
+			return;
+		}
+
+		OutputMemoryStream data(m_allocator);
+		data.resize(file.size());
+		if (!file.read(data.getMutableData(), data.size())) {
+			logError("Failed to read ", path);
+			file.close();
+			return;
+		}
+		file.close();
+
+		InputMemoryStream blob(data);
+		m_editor->loadWorld(blob, name, additive);
+	}
 
 	void showWelcomeScreen()
 	{
@@ -939,8 +958,7 @@ struct StudioAppImpl final : StudioApp
 				{
 					if (ImGui::MenuItem(univ.data))
 					{
-						m_editor->loadWorld(univ.data, false);
-						setTitle(univ.data);
+						loadWorld(univ.data, false);
 						m_is_welcome_screen_open = false;
 					}
 				}
@@ -979,16 +997,6 @@ struct StudioAppImpl final : StudioApp
 		ImGui::End();
 	}
 
-
-	void setTitle(const char* title) const
-	{
-		char tmp[100];
-		copyString(tmp, "Lumix Studio - ");
-		catString(tmp, title);
-		os::setWindowTitle(m_main_window, tmp);
-	}
-
-
 	void save() {
 		if (m_editor->isGameMode()) {
 			logError("Could not save while the game is running");
@@ -1017,13 +1025,12 @@ struct StudioAppImpl final : StudioApp
 			m_save_as_request = false;
 		}
 		ImGui::SetNextWindowSizeConstraints(ImVec2(300, 150), ImVec2(9000, 9000));
-		if (ImGui::BeginPopupModal("Save World As"))
-		{
+		if (ImGui::BeginPopupModal("Save World As")) {
 			static char name[64] = "";
 			ImGuiEx::Label("Name");
 			ImGui::InputText("##name", name, lengthOf(name));
 			if (ImGui::Button(ICON_FA_SAVE "Save")) {
-				setTitle(name);
+				ASSERT(!m_editor->isGameMode());
 				World* world = m_editor->getWorld();
 				World::PartitionHandle active_partition_handle = world->getActivePartition();
 				World::Partition& active_partition = world->getPartition(active_partition_handle);
@@ -1048,28 +1055,20 @@ struct StudioAppImpl final : StudioApp
 		m_save_as_request = true;
 	}
 
-
-	void exit()
-	{
-		if (m_editor->isWorldChanged())
-		{
+	void exit() {
+		if (m_editor->isWorldChanged()) {
 			m_confirm_exit = true;
 		}
-		else
-		{
+		else {
 			m_finished = true;
 		}
 	}
 
-
-	void newWorld()
-	{
-		if (m_editor->isWorldChanged())
-		{
+	void newWorld() {
+		if (m_editor->isWorldChanged()) {
 			m_confirm_new = true;
 		}
-		else
-		{
+		else {
 			m_editor->newWorld();
 			initDefaultWorld();
 		}
@@ -1342,9 +1341,11 @@ struct StudioAppImpl final : StudioApp
 		if (create_entity_action) getShortcut(*create_entity_action, Span(shortcut));
 		
 		if (ImGui::MenuItem("Create empty", shortcut)) {
+			m_editor->beginCommandGroup("create_child");
 			const EntityRef e = m_editor->addEntity();
 			m_editor->selectEntities(Span(&e, 1), false);
 			if (parent.isValid()) m_editor->makeParent(parent, e);
+			m_editor->endCommandGroup();
 		}
 
 		ImGuiEx::filter("Filter", m_component_filter, sizeof(m_component_filter), 150);
@@ -1417,20 +1418,18 @@ struct StudioAppImpl final : StudioApp
 
 		menuItem("newWorld", true);
 		const Array<World::Partition>& partitions = m_editor->getWorld()->getPartitions();
-		const bool can_load_additive = partitions.size() != 1 || partitions[0].name[0] != '\0';
 		auto open_ui = [&](const char* label, bool additive){
-			if (ImGui::BeginMenu(label, !additive || can_load_additive)) {
+			if (ImGui::BeginMenu(label)) {
 				ImGuiEx::filter("Filter", m_open_filter, sizeof(m_open_filter), 150);
 	
 				for (auto& univ : m_worlds) {
-					if ((m_open_filter[0] == '\0' || stristr(univ.data, m_open_filter)) && ImGui::MenuItem(univ.data)) {
-						if (m_editor->isWorldChanged()) {
-							copyString(m_world_to_load, univ.data);
+					if ((m_open_filter[0] == '\0' || stristr(univ, m_open_filter)) && ImGui::MenuItem(univ)) {
+						if (!additive && m_editor->isWorldChanged()) {
+							m_world_to_load = univ;
 							m_confirm_load = true;
 						}
 						else {
-							m_editor->loadWorld(univ.data, additive);
-							setTitle(univ.data);
+							loadWorld(univ, additive);
 						}
 					}
 				}
@@ -1438,7 +1437,16 @@ struct StudioAppImpl final : StudioApp
 			}
 		};
 		open_ui(NO_ICON "Open", false);
-		open_ui(NO_ICON "Open additive", true);
+		const bool can_load_additive = partitions.size() != 1 || partitions[0].name[0] != '\0';
+		if (can_load_additive) {
+			open_ui(NO_ICON "Open additive", true);
+		}
+		else {
+			if (ImGui::BeginMenu(NO_ICON "Open additive")) {
+				ImGui::TextUnformatted("Please save current partition first");
+				ImGui::EndMenu();
+			}
+		}
 		menuItem("save", !m_editor->isGameMode());
 		menuItem("saveAs", !m_editor->isGameMode());
 		menuItem("exit", true);
@@ -1476,13 +1484,11 @@ struct StudioAppImpl final : StudioApp
 
 	void mainMenu()
 	{
-		if (m_confirm_exit)
-		{
-			ImGui::OpenPopup("confirm_exit");
+		if (m_confirm_exit) {
+			ImGui::OpenPopup("Confirm##confirm_exit");
 			m_confirm_exit = false;
 		}
-		if (ImGui::BeginPopupModal("confirm_exit"))
-		{
+		if (ImGui::BeginPopupModal("Confirm##confirm_exit")) {
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
@@ -1493,13 +1499,27 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
 			ImGui::EndPopup();
 		}
-		if (m_confirm_new)
-		{
-			ImGui::OpenPopup("confirm_new");
+
+		if (m_confirm_destroy_partition) {
+			ImGui::OpenPopup("Confirm##confirm_destroy_partition");
+			m_confirm_destroy_partition = false;
+		}
+		if (ImGui::BeginPopupModal("Confirm##confirm_destroy_partition")) {
+			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
+			if (ImGui::Button("Continue")) {
+				m_editor->destroyWorldPartition(m_partition_to_destroy);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
+		if (m_confirm_new) {
+			ImGui::OpenPopup("Confirm##confirm_new");
 			m_confirm_new = false;
 		}
-		if (ImGui::BeginPopupModal("confirm_new"))
-		{
+		if (ImGui::BeginPopupModal("Confirm##confirm_new")) {
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
@@ -1522,8 +1542,7 @@ struct StudioAppImpl final : StudioApp
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
-				m_editor->loadWorld(m_world_to_load, false);
-				setTitle(m_world_to_load);
+				loadWorld(m_world_to_load, false);
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
@@ -1741,6 +1760,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+
 	void folderUI(EntityFolders::FolderID folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
 		static EntityFolders::FolderID force_open_folder = EntityFolders::INVALID_FOLDER;
 		const EntityFolders::Folder* folder = &folders.getFolder(folder_id);
@@ -1817,22 +1837,41 @@ struct StudioAppImpl final : StudioApp
 			const bool is_root = folder->parent == EntityFolders::INVALID_FOLDER;
 			World* world = m_editor->getWorld();
 
-			if (is_root && world->getPartition(partition).name[0] && ImGui::Selectable("Save")) {
-				m_editor->savePartition(partition);
+			if (is_root) {
+				const bool is_partition_named = world->getPartition(partition).name[0];
+				if (is_partition_named) {
+					if (ImGui::Selectable("Save")) {
+						if (m_editor->isGameMode()) {
+							logError("Could not save while the game is running");
+						}
+						else {
+							m_editor->savePartition(partition);
+						}
+					}
+				}
+				else {
+					if (ImGui::Selectable("Save As")) {
+						EntityFolders& folders = m_editor->getEntityFolders();
+						EntityFolders::FolderID root = folders.getRoot(partition);
+						folders.selectFolder(root);
+						saveAs();
+					}
+				}
 			}
 
 			if (!is_root || world->getPartitions().size() > 1) {
 				if (ImGui::Selectable(is_root ? "Unload" : "Delete")) {
 					if (is_root) {
-						m_editor->destroyWorldPartition(partition);
+						m_confirm_destroy_partition = true;
+						m_partition_to_destroy = partition;
 					}
 					else {
 						m_editor->destroyEntityFolder(folder_id);
+						ImGui::EndPopup();
+						if (node_open) ImGui::TreePop();
+						ImGui::PopID();
+						return;
 					}
-					ImGui::EndPopup();
-					if (node_open) ImGui::TreePop();
-					ImGui::PopID();
-					return;
 				}
 			}
 
@@ -1949,13 +1988,12 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-
-	void saveSettings() override
-	{
+	void saveSettings() override {
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.WantSaveIniSettings) {
 			const char* data = ImGui::SaveIniSettingsToMemory();
 			m_settings.m_imgui_state = data;
+			io.WantSaveIniSettings = false;
 		}
 		m_settings.m_is_entity_list_open = m_is_entity_list_open;
 		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
@@ -1964,7 +2002,12 @@ struct StudioAppImpl final : StudioApp
 			i->onBeforeSettingsSaved();
 		}
 
-		m_settings.save();
+		if (m_settings.save()) {
+			logInfo("Settings saved");
+		}
+		else {
+			logError("Settings failed to save");
+		}
 	}
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
@@ -2439,8 +2482,7 @@ struct StudioAppImpl final : StudioApp
 			if (!parser.next()) break;
 
 			parser.getCurrent(path, lengthOf(path));
-			m_editor->loadWorld(path, false);
-			setTitle(path);
+			loadWorld(path, false);
 			m_is_welcome_screen_open = false;
 			break;
 		}
@@ -3306,11 +3348,13 @@ struct StudioAppImpl final : StudioApp
 
 	bool m_save_as_request = false;
 	bool m_cursor_captured = false;
-	bool m_confirm_exit;
-	bool m_confirm_load;
-	bool m_confirm_new;
+	bool m_confirm_exit = false;
+	bool m_confirm_load = false;
+	bool m_confirm_new = false;
+	bool m_confirm_destroy_partition = false;
 	
-	char m_world_to_load[LUMIX_MAX_PATH];
+	World::PartitionHandle m_partition_to_destroy;
+	StaticString<LUMIX_MAX_PATH> m_world_to_load;
 	
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
