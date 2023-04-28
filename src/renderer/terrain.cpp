@@ -10,7 +10,7 @@
 #include "renderer/draw_stream.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "engine/world.h"

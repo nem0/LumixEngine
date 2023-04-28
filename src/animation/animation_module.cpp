@@ -1,4 +1,4 @@
-#include "animation_scene.h"
+#include "animation_module.h"
 
 #include "animation/animation.h"
 #include "animation/controller.h"
@@ -18,7 +18,7 @@
 #include "nodes.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 namespace Lumix

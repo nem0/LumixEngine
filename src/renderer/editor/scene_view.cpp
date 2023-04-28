@@ -32,7 +32,7 @@
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 

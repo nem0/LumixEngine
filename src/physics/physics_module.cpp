@@ -30,8 +30,8 @@
 #include <vehicle/PxVehicleUtilControl.h>
 #include <vehicle/PxVehicleUtilSetup.h>
 
-#include "physics/physics_scene.h"
-#include "animation/animation_scene.h"
+#include "physics/physics_module.h"
+#include "animation/animation_module.h"
 #include "engine/associative_array.h"
 #include "engine/atomic.h"
 #include "engine/engine.h"
@@ -51,7 +51,7 @@
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/texture.h"
 #include "imgui/IconsFontAwesome5.h"
 

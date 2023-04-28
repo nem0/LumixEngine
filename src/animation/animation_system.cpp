@@ -1,4 +1,4 @@
-#include "animation_scene.h"
+#include "animation_module.h"
 
 #include "animation/animation.h"
 #include "animation/property_animation.h"

@@ -16,7 +16,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_scene.h"
+#include "gui/gui_module.h"
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/gpu/gpu.h"

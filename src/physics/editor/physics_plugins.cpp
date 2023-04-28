@@ -22,10 +22,10 @@
 #include "engine/path.h"
 #include "engine/world.h"
 #include "physics/physics_resources.h"
-#include "physics/physics_scene.h"
+#include "physics/physics_module.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 using namespace Lumix;

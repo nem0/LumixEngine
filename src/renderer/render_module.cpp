@@ -1,4 +1,4 @@
-#include "render_scene.h"
+#include "render_module.h"
 
 #include "engine/array.h"
 #include "engine/associative_array.h"

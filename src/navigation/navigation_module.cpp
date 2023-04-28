@@ -1,4 +1,4 @@
-#include "navigation_scene.h"
+#include "navigation_module.h"
 #include "engine/array.h"
 #include "engine/atomic.h"
 #include "engine/crt.h"
@@ -15,7 +15,7 @@
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include <DetourAlloc.h>
 #include <DetourCrowd.h>
 #include <DetourNavMesh.h>

@@ -1,7 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "audio_device.h"
-#include "audio_scene.h"
+#include "audio_module.h"
 #include "audio_system.h"
 #include "clip.h"
 #include "editor/asset_browser.h"

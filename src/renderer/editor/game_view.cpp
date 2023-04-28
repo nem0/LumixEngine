@@ -17,7 +17,7 @@
 #include "gui/gui_system.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 

@@ -13,7 +13,7 @@
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "renderer/material.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "engine/world.h"
 
 

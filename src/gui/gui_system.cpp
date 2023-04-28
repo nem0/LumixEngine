@@ -7,13 +7,13 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_scene.h"
+#include "gui/gui_module.h"
 #include "gui/sprite.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/texture.h"
 
 

@@ -8,7 +8,7 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 namespace Lumix

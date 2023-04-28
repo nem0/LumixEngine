@@ -24,7 +24,7 @@
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/particle_system.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"

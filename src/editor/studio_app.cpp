@@ -1,7 +1,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
-#include "audio/audio_scene.h"
+#include "audio/audio_module.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/entity_folders.h"

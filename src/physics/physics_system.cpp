@@ -19,7 +19,7 @@
 #include "engine/string.h"
 #include "engine/world.h"
 #include "physics/physics_resources.h"
-#include "physics/physics_scene.h"
+#include "physics/physics_module.h"
 #include "renderer/texture.h"
 
 

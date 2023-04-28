@@ -29,7 +29,7 @@
 #include "pipeline.h"
 #include "pose.h"
 #include "renderer.h"
-#include "render_scene.h"
+#include "render_module.h"
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"

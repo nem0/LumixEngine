@@ -13,7 +13,7 @@
 #include "engine/path.h"
 #include "engine/os.h"
 #include "engine/world.h"
-#include "navigation/navigation_scene.h"
+#include "navigation/navigation_module.h"
 
 
 using namespace Lumix;

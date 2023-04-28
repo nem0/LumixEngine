@@ -1,6 +1,6 @@
 #include <imgui/imgui.h>
 
-#include "animation/animation_scene.h"
+#include "animation/animation_module.h"
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/settings.h"

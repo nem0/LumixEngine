@@ -1,7 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "animation/animation.h"
-#include "animation/animation_scene.h"
+#include "animation/animation_module.h"
 #include "animation/controller.h"
 #include "animation/property_animation.h"
 #include "editor/asset_browser.h"
@@ -18,7 +18,7 @@
 #include "engine/world.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 using namespace Lumix;

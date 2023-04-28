@@ -1,10 +1,10 @@
-#include "navigation_scene.h"
-#include "animation/animation_scene.h"
+#include "navigation_module.h"
+#include "animation/animation_module.h"
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/world.h"
-#include "navigation/navigation_scene.h"
+#include "navigation/navigation_module.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include <DetourAlloc.h>

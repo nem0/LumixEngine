@@ -1,5 +1,5 @@
 #include "lua_script_system.h"
-#include "animation/animation_scene.h"
+#include "animation/animation_module.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/hash.h"
@@ -18,7 +18,7 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "engine/world.h"
-#include "gui/gui_scene.h"
+#include "gui/gui_module.h"
 #include "lua_script/lua_script.h"
 
 

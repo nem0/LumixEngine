@@ -10,7 +10,7 @@
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/world.h"
-#include "gui_scene.h"
+#include "gui_module.h"
 #include "gui_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
