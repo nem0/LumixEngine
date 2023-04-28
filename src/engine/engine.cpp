@@ -395,7 +395,7 @@ public:
 			if (!system) return DeserializeProjectResult::PLUGIN_NOT_FOUND;
 			i32 version;
 			serializer.read(version);
-			if (version > system->getVersion()) DeserializeProjectResult::PLUGIN_VERSION_NOT_SUPPORTED;
+			if (version > system->getVersion()) return DeserializeProjectResult::PLUGIN_VERSION_NOT_SUPPORTED;
 			if (!system->deserialize(version, serializer)) return DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED;
 		}
 		return DeserializeProjectResult::SUCCESS;
