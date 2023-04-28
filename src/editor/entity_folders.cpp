@@ -25,7 +25,7 @@ EntityFolders::~EntityFolders() {
 	m_world.entityDestroyed().unbind<&EntityFolders::onEntityDestroyed>(this);
 }
 
-EntityFolders::FolderID EntityFolders::getRoot(World::PartitionHandle partition) const {
+EntityFolders::FolderHandle EntityFolders::getRoot(World::PartitionHandle partition) const {
 	for (const Folder& f : m_folders) {
 		if (f.parent != INVALID_FOLDER) continue;
 		ASSERT(f.next == INVALID_FOLDER);
@@ -35,9 +35,9 @@ EntityFolders::FolderID EntityFolders::getRoot(World::PartitionHandle partition)
 	return INVALID_FOLDER;
 }
 
-EntityFolders::FolderID EntityFolders::generateUniqueID() {
+EntityFolders::FolderHandle EntityFolders::generateUniqueID() {
 	for (;;) {
-		const FolderID id = randGUID();
+		const FolderHandle id = randGUID();
 		bool found = false;
 		for (const Folder& f : m_folders) {
 			if (f.id == id) {
@@ -77,7 +77,7 @@ EntityPtr EntityFolders::getNextEntity(EntityRef e) const {
 	return m_entities[e.index].next;
 }
 
-void EntityFolders::moveToFolder(EntityRef e, FolderID folder_id) {
+void EntityFolders::moveToFolder(EntityRef e, FolderHandle folder_id) {
 	ASSERT(folder_id != INVALID_FOLDER);
 	while (m_entities.size() <= e.index) m_entities.emplace();
 
@@ -100,15 +100,12 @@ void EntityFolders::moveToFolder(EntityRef e, FolderID folder_id) {
 	}
 }
 
-void EntityFolders::destroyFolder(FolderID folder_id) {
+void EntityFolders::destroyFolder(FolderHandle folder_id) {
 	Folder& f = getFolder(folder_id);
 	ASSERT(!f.first_entity.isValid());
 	ASSERT(f.first_child == INVALID_FOLDER);
 	ASSERT(f.parent != INVALID_FOLDER);
-	Folder& parent = getFolder(f.parent);
-	if (parent.first_child == folder_id) parent.first_child = f.next;
-	if (f.prev != INVALID_FOLDER) getFolder(f.prev).next = f.next;
-	if (f.next != INVALID_FOLDER) getFolder(f.next).prev = f.prev;
+	unlink(f);
 
 	m_folders.eraseItems([&](const Folder& f){ return f.id == folder_id; });
 
@@ -117,7 +114,7 @@ void EntityFolders::destroyFolder(FolderID folder_id) {
 	}
 }
 
-EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID parent) {
+EntityFolders::FolderHandle EntityFolders::emplaceFolder(FolderHandle folder, FolderHandle parent) {
 	ASSERT(parent != INVALID_FOLDER); // there's exactly 1 root folder
 	if (folder == INVALID_FOLDER) {
 		folder = generateUniqueID();
@@ -136,18 +133,18 @@ EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID p
 	return folder;
 }
 
-void EntityFolders::selectFolder(FolderID folder)
+void EntityFolders::selectFolder(FolderHandle folder)
 {
 	m_selected_folder = folder;
 	World::PartitionHandle partition = getFolder(folder).partition;
 	m_world.setActivePartition(partition);
 }
 
-EntityFolders::FolderID EntityFolders::getFolder(EntityRef e) const {
+EntityFolders::FolderHandle EntityFolders::getFolder(EntityRef e) const {
 	return m_entities[e.index].folder;
 }
 
-EntityFolders::Folder& EntityFolders::getFolder(FolderID folder_id) {
+EntityFolders::Folder& EntityFolders::getFolder(FolderHandle folder_id) {
 	for (Folder& folder : m_folders) {
 		if (folder.id == folder_id) return folder;
 	}
@@ -155,7 +152,7 @@ EntityFolders::Folder& EntityFolders::getFolder(FolderID folder_id) {
 	return m_folders[0];
 }
 
-const EntityFolders::Folder& EntityFolders::getFolder(FolderID folder_id) const {
+const EntityFolders::Folder& EntityFolders::getFolder(FolderHandle folder_id) const {
 	return const_cast<EntityFolders*>(this)->getFolder(folder_id);
 }
 
@@ -192,6 +189,58 @@ void EntityFolders::cloneTo(EntityFolders& dst, World::PartitionHandle partition
 		if (dst.m_entities.size() <= dst_e.index) dst.m_entities.resize(dst_e.index + 1);
 		dst.m_entities[dst_e.index].next = get_mapped(m_entities[src_e.index].next);
 		dst.m_entities[dst_e.index].prev = get_mapped(m_entities[src_e.index].prev);
+	}
+}
+
+void EntityFolders::unlink(Folder& folder) {
+	Folder& old_parent = getFolder(folder.parent);
+	if (old_parent.first_child == folder.id) old_parent.first_child = folder.next;
+	if (folder.prev != INVALID_FOLDER) getFolder(folder.prev).next = folder.next;
+	if (folder.next != INVALID_FOLDER) getFolder(folder.next).prev = folder.prev;
+	folder.next = folder.prev = INVALID_FOLDER;
+}
+
+void EntityFolders::renameFolder(FolderHandle folder, const char* new_name) {
+	Folder& f = getFolder(folder);
+	copyString(f.name, new_name);
+	// reinsert so it's sorted
+	moveFolder(folder, f.parent);
+}
+
+
+void EntityFolders::moveFolder(FolderHandle folder_id, FolderHandle new_parent_id) {
+	Folder& folder = getFolder(folder_id);
+	Folder& new_parent = getFolder(new_parent_id);
+	#ifdef LUMIX_DEBUG
+		Folder& old_parent = getFolder(folder.parent);
+		ASSERT(new_parent.partition == old_parent.partition);
+	#endif
+
+	unlink(folder);	
+	
+	folder.parent = new_parent.id;
+	if (new_parent.first_child == INVALID_FOLDER) {
+		new_parent.first_child = folder.id;
+	}
+	else {
+		FolderHandle i = new_parent.first_child;
+		for (;;) {
+			Folder& n = getFolder(i);
+			if (strcmp(folder.name, n.name) < 0) {
+				if (new_parent.first_child == n.id) new_parent.first_child = folder.id;
+				folder.prev = n.prev;
+				if (folder.prev != INVALID_FOLDER) getFolder(folder.prev).next = folder.id;
+				folder.next = n.id;
+				n.prev = folder.id;
+				break;
+			}
+			if (n.next == INVALID_FOLDER) {
+				n.next = folder.id;
+				folder.prev = n.id;
+				break;
+			}
+			i = n.next;
+		}
 	}
 }
 

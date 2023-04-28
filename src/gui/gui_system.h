@@ -12,7 +12,7 @@ namespace Lumix
 struct Vec2;
 
 
-struct GUISystem : IPlugin
+struct GUISystem : ISystem
 {
 	struct Interface
 	{

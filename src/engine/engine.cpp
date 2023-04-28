@@ -115,31 +115,31 @@ public:
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
 
-		m_plugin_manager = PluginManager::create(*this);
+		m_system_manager = SystemManager::create(*this);
 		m_input_system = InputSystem::create(*this);
 
 		logInfo("Engine created.");
 
-		PluginManager::createAllStatic(*this);
+		SystemManager::createAllStatic(*this);
 
-		m_plugin_manager->addPlugin(createCorePlugin(*this), nullptr);
+		m_system_manager->addSystem(createCorePlugin(*this), nullptr);
 
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };
 			for (auto* plugin_name : plugins) {
-				if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
+				if (plugin_name[0] && !m_system_manager->load(plugin_name)) {
 					logInfo(plugin_name, " plugin has not been loaded");
 				}
 			}
 		#endif
 
 		for (auto* plugin_name : init_data.plugins) {
-			if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
+			if (plugin_name[0] && !m_system_manager->load(plugin_name)) {
 				logInfo(plugin_name, " plugin has not been loaded");
 			}
 		}
 
-		m_plugin_manager->initPlugins();
+		m_system_manager->initSystems();
 	}
 
 	~EngineImpl()
@@ -149,7 +149,7 @@ public:
 			res->decRefCount();
 		}
 
-		m_plugin_manager.reset();
+		m_system_manager.reset();
 		m_input_system.reset();
 		m_file_system.reset();
 
@@ -221,17 +221,8 @@ public:
 		return true;
 	}
 
-	World& createWorld(bool is_main_world) override
-	{
+	World& createWorld(bool is_main_world) override {
 		World* world = LUMIX_NEW(m_allocator, World)(*this, m_allocator);
-		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
-		for (auto* plugin : plugins) {
-			plugin->createScenes(*world);
-		}
-
-		for (UniquePtr<IScene>& scene : world->getScenes()) {
-			scene->init();
-		}
 
 		if (is_main_world) {
 			lua_State* L = m_state;
@@ -251,43 +242,33 @@ public:
 
 	void destroyWorld(World& world) override
 	{
-		Array<UniquePtr<IScene>>& scenes = world.getScenes();
-		while (!scenes.empty()) {
-			UniquePtr<IScene>& scene = scenes.back();
-			scene->clear();
-			scenes.pop();
-		}
 		LUMIX_DELETE(m_allocator, &world);
 		m_resource_manager.removeUnreferenced();
 	}
 
 
-	void startGame(World& context) override
+	void startGame(World& world) override
 	{
 		ASSERT(!m_is_game_running);
 		m_is_game_running = true;
-		for (UniquePtr<IScene>& scene : context.getScenes())
-		{
-			scene->startGame();
+		for (UniquePtr<IModule>& module : world.getModules()) {
+			module->startGame();
 		}
-		for (auto* plugin : m_plugin_manager->getPlugins())
-		{
-			plugin->startGame();
+		for (auto* system : m_system_manager->getSystems()) {
+			system->startGame();
 		}
 	}
 
 
-	void stopGame(World& context) override
+	void stopGame(World& world) override
 	{
 		ASSERT(m_is_game_running);
 		m_is_game_running = false;
-		for (UniquePtr<IScene>& scene : context.getScenes())
-		{
-			scene->stopGame();
+		for (UniquePtr<IModule>& module : world.getModules()) {
+			module->stopGame();
 		}
-		for (auto* plugin : m_plugin_manager->getPlugins())
-		{
-			plugin->stopGame();
+		for (auto* system : m_system_manager->getSystems()) {
+			system->stopGame();
 		}
 	}
 
@@ -327,7 +308,7 @@ public:
 		profiler::pushCounter(counter, m_smooth_time_delta * 1000.f);
 	}
 
-	void update(World& context) override
+	void update(World& world) override
 	{
 		PROFILE_FUNCTION();
 		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
@@ -360,20 +341,20 @@ public:
 
 		if (!m_paused || m_next_frame) {
 			{
-				PROFILE_BLOCK("update scenes");
-				for (UniquePtr<IScene>& scene : context.getScenes())
+				PROFILE_BLOCK("update modules");
+				for (UniquePtr<IModule>& module : world.getModules())
 				{
-					scene->update(dt);
+					module->update(dt);
 				}
 			}
 			{
-				PROFILE_BLOCK("late update scenes");
-				for (UniquePtr<IScene>& scene : context.getScenes())
+				PROFILE_BLOCK("late update modules");
+				for (UniquePtr<IModule>& module : world.getModules())
 				{
-					scene->lateUpdate(dt);
+					module->lateUpdate(dt);
 				}
 			}
-			m_plugin_manager->update(dt);
+			m_system_manager->update(dt);
 		}
 		m_input_system->update(dt);
 		m_file_system->processCallbacks();
@@ -402,19 +383,20 @@ public:
 		copyString(startup_world, tmp);
 		i32 count = 0;
 		serializer.read(count);
-		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
+		const Array<ISystem*>& systems = m_system_manager->getSystems();
 		for (i32 i = 0; i < count; ++i) {
 			StableHash hash;
 			serializer.read(hash);
-			i32 idx = plugins.find([&](IPlugin* plugin){
-				return StableHash(plugin->getName()) == hash;
+			i32 idx = systems.find([&](ISystem* system){
+				return StableHash(system->getName()) == hash;
 			});
 			if (idx < 0) return DeserializeProjectResult::PLUGIN_NOT_FOUND;
-			IPlugin* plugin = plugins[idx];
-			if (!plugin) return DeserializeProjectResult::PLUGIN_NOT_FOUND;
-			u32 version;
+			ISystem* system = systems[idx];
+			if (!system) return DeserializeProjectResult::PLUGIN_NOT_FOUND;
+			i32 version;
 			serializer.read(version);
-			if (!plugin->deserialize(version, serializer)) return DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED;
+			if (version > system->getVersion()) DeserializeProjectResult::PLUGIN_VERSION_NOT_SUPPORTED;
+			if (!system->deserialize(version, serializer)) return DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED;
 		}
 		return DeserializeProjectResult::SUCCESS;
 	}
@@ -425,13 +407,13 @@ public:
 		header.version = ProjectVersion::LAST;
 		serializer.write(header);
 		serializer.writeString(startup_world);
-		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
-		serializer.write((i32)plugins.size());
-		for (IPlugin* plugin : plugins) {
-			const StableHash hash(plugin->getName());
+		const Array<ISystem*>& systems = m_system_manager->getSystems();
+		serializer.write((i32)systems.size());
+		for (ISystem* system : systems) {
+			const StableHash hash(system->getName());
 			serializer.write(hash);
-			serializer.write((u32)plugin->getVersion());
-			plugin->serialize(serializer);
+			serializer.write(system->getVersion());
+			system->serialize(serializer);
 		}
 	}
 
@@ -463,7 +445,7 @@ public:
 		return nullptr;
 	}
 
-	PluginManager& getPluginManager() override { return *m_plugin_manager; }
+	SystemManager& getSystemManager() override { return *m_system_manager; }
 	FileSystem& getFileSystem() override { return *m_file_system; }
 	InputSystem& getInputSystem() override { return *m_input_system; }
 	ResourceManagerHub& getResourceManager() override { return m_resource_manager; }
@@ -478,7 +460,7 @@ private:
 	PageAllocator m_page_allocator;
 	UniquePtr<FileSystem> m_file_system;
 	ResourceManagerHub m_resource_manager;
-	UniquePtr<PluginManager> m_plugin_manager;
+	UniquePtr<SystemManager> m_system_manager;
 	PrefabResourceManager m_prefab_resource_manager;
 	UniquePtr<InputSystem> m_input_system;
 	os::Timer m_timer;

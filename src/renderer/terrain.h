@@ -22,7 +22,7 @@ struct Mesh;
 struct Model;
 struct RayCastModelHit;
 struct Renderer;
-struct RenderScene;
+struct RenderModule;
 struct ShiftedFrustum;
 struct TerrainQuad;
 struct Texture;
@@ -65,7 +65,7 @@ struct Terrain {
 		RotationMode m_rotation_mode = RotationMode::Y_UP;
 	};
 
-	Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator);
+	Terrain(Renderer& renderer, EntityPtr entity, RenderModule& module, IAllocator& allocator);
 	~Terrain();
 
 	Material* getMaterial() const { return m_material; }
@@ -101,7 +101,7 @@ struct Terrain {
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 	void serialize(OutputMemoryStream& serializer);
-	void deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderScene& scene, i32 version);
+	void deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderModule& module, i32 version);
 
 	void addGrassType(int index);
 	void removeGrassType(int index);
@@ -120,7 +120,7 @@ struct Terrain {
 	Texture* m_heightmap;
 	Texture* m_splatmap;
 	Texture* m_albedomap;
-	RenderScene& m_scene;
+	RenderModule& m_module;
 	Array<GrassType> m_grass_types;
 	Renderer& m_renderer;
 	bool m_is_grass_dirty = false;

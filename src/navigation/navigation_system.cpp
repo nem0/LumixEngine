@@ -15,13 +15,13 @@ namespace Lumix
 {
 
 
-enum class NavigationSceneVersion : int
+enum class NavigationModuleVersion : int
 {
 	LATEST
 };
 
 
-struct NavigationSystem final : IPlugin {
+struct NavigationSystem final : ISystem {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
@@ -30,7 +30,7 @@ struct NavigationSystem final : IPlugin {
 		s_instance = this;
 		dtAllocSetCustom(&detourAlloc, &detourFree);
 		rcAllocSetCustom(&recastAlloc, &recastFree);
-		NavigationScene::reflect();
+		NavigationModule::reflect();
 		// register flags
 		Material::getCustomFlag("no_navigation");
 		Material::getCustomFlag("nonwalkable");
@@ -39,9 +39,8 @@ struct NavigationSystem final : IPlugin {
 
 	~NavigationSystem() { s_instance = nullptr; }
 
-	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
-	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
+	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	static void detourFree(void* ptr) { s_instance->m_allocator.deallocate(ptr); }
 	static void* detourAlloc(size_t size, dtAllocHint hint) { return s_instance->m_allocator.allocate(size); }
@@ -49,7 +48,7 @@ struct NavigationSystem final : IPlugin {
 	static void* recastAlloc(size_t size, rcAllocHint hint) { return s_instance->m_allocator.allocate(size); }
 
 	const char* getName() const override { return "navigation"; }
-	void createScenes(World& world) override;
+	void createModules(World& world) override;
 
 	static NavigationSystem* s_instance;
 
@@ -61,10 +60,10 @@ struct NavigationSystem final : IPlugin {
 NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 
-void NavigationSystem::createScenes(World& world)
+void NavigationSystem::createModules(World& world)
 {
-	UniquePtr<NavigationScene> scene = NavigationScene::create(m_engine, *this, world, m_allocator);
-	world.addScene(scene.move());
+	UniquePtr<NavigationModule> module = NavigationModule::create(m_engine, *this, world, m_allocator);
+	world.addModule(module.move());
 }
 
 

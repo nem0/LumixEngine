@@ -18,8 +18,8 @@ struct Animable {
 	EntityRef entity;
 };
 
-struct AnimationScene : IScene {
-	static UniquePtr<AnimationScene> create(Engine& engine, IPlugin& plugin, World& world, struct IAllocator& allocator);
+struct AnimationModule : IModule {
+	static UniquePtr<AnimationModule> create(Engine& engine, ISystem& system, World& world, struct IAllocator& allocator);
 	static void reflect(Engine& engine);
 
 	virtual const struct OutputMemoryStream* getEventStream(EntityRef e) const = 0;

@@ -18,7 +18,7 @@ namespace Lumix
 struct LuaScript;
 
 
-struct LuaScriptScene : IScene
+struct LuaScriptModule : IModule
 {
 	struct Property
 	{

@@ -87,7 +87,7 @@ struct StudioAppImpl final : StudioApp
 		, m_settings(*this)
 		, m_gui_plugins(m_allocator)
 		, m_mouse_plugins(m_allocator)
-		, m_plugins(m_allocator)
+		, m_systems(m_allocator)
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
 		, m_component_icons(m_allocator)
@@ -401,10 +401,10 @@ struct StudioAppImpl final : StudioApp
 
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
-		for (auto* i : m_plugins) {
+		for (auto* i : m_systems) {
 			LUMIX_DELETE(m_allocator, i);
 		}
-		m_plugins.clear();
+		m_systems.clear();
 
 		for (auto* i : m_gui_plugins) {
 			LUMIX_DELETE(m_allocator, i);
@@ -753,7 +753,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (ComponentUID cmp = world->getFirstComponent(ents[0]); cmp.isValid(); cmp = world->getNextComponent(cmp)) {
-			for (auto* plugin : m_plugins) {
+			for (auto* plugin : m_systems) {
 				if (plugin->showGizmo(view, cmp)) break;
 			}
 		}
@@ -1014,12 +1014,9 @@ struct StudioAppImpl final : StudioApp
 				m_editor->savePartition(partition.handle);
 			}
 		}
-
 	}
 
-
-	void onSaveAsDialogGUI()
-	{
+	void onSaveAsDialogGUI() {
 		if (m_save_as_request) {
 			ImGui::OpenPopup("Save World As");
 			m_save_as_request = false;
@@ -1761,10 +1758,10 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void folderUI(EntityFolders::FolderID folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
-		static EntityFolders::FolderID force_open_folder = EntityFolders::INVALID_FOLDER;
+	void folderUI(EntityFolders::FolderHandle folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
+		static EntityFolders::FolderHandle force_open_folder = EntityFolders::INVALID_FOLDER;
 		const EntityFolders::Folder* folder = &folders.getFolder(folder_id);
-		ImGui::PushID(folder);
+		ImGui::PushID((const char*)&folder->id, (const char*)&folder->id + sizeof(folder->id));
 		bool node_open;
 		ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 		flags |= ImGuiTreeNodeFlags_OpenOnArrow;
@@ -1829,7 +1826,7 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::BeginPopup("folder_context_menu")) {
 			if (ImGui::Selectable("New folder")) {
 				force_open_folder = folder_id;
-				EntityFolders::FolderID new_folder = m_editor->createEntityFolder(folder_id);
+				EntityFolders::FolderHandle new_folder = m_editor->createEntityFolder(folder_id);
 				folder = &folders.getFolder(folder_id);
 				m_renaming_folder = new_folder;
 				m_set_rename_focus = true;
@@ -1852,7 +1849,7 @@ struct StudioAppImpl final : StudioApp
 				else {
 					if (ImGui::Selectable("Save As")) {
 						EntityFolders& folders = m_editor->getEntityFolders();
-						EntityFolders::FolderID root = folders.getRoot(partition);
+						EntityFolders::FolderHandle root = folders.getRoot(partition);
 						folders.selectFolder(root);
 						saveAs();
 					}
@@ -1898,11 +1895,12 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		EntityFolders::FolderID child_id = folder->first_child;
+		EntityFolders::FolderHandle child_id = folder->first_child;
 		while (child_id != EntityFolders::INVALID_FOLDER) {
-			folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
 			const EntityFolders::Folder& child = folders.getFolder(child_id);
-			child_id = child.next;
+			const EntityFolders::FolderHandle next = child.next;
+			folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
+			child_id = next;
 		}
 
 		EntityPtr child_e = folder->first_entity;
@@ -2243,9 +2241,9 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::exit>(
 			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::redo>(
-			ICON_FA_REDO "Redo", "Redo scene action", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
+			ICON_FA_REDO "Redo", "Redo world action", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::undo>(
-			ICON_FA_UNDO "Undo", "Undo scene action", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL);
+			ICON_FA_UNDO "Undo", "Undo world action", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::copy>(
 			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::paste>(
@@ -2329,7 +2327,7 @@ struct StudioAppImpl final : StudioApp
 		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
-		auto& plugin_manager = m_engine->getPluginManager();
+		SystemManager& system_manager = m_engine->getSystemManager();
 		while (parser.next())
 		{
 			if (!parser.currentEquals("-plugin")) continue;
@@ -2339,16 +2337,16 @@ struct StudioAppImpl final : StudioApp
 			parser.getCurrent(src, lengthOf(src));
 
 			bool is_full_path = findSubstring(src, ".") != nullptr;
-			Lumix::IPlugin* loaded_plugin;
+			Lumix::ISystem* loaded_plugin;
 			if (is_full_path)
 			{
 				char copy_path[LUMIX_MAX_PATH];
 				copyPlugin(src, 0, copy_path);
-				loaded_plugin = plugin_manager.load(copy_path);
+				loaded_plugin = system_manager.load(copy_path);
 			}
 			else
 			{
-				loaded_plugin = plugin_manager.load(src);
+				loaded_plugin = system_manager.load(src);
 			}
 
 			if (!loaded_plugin)
@@ -2363,7 +2361,7 @@ struct StudioAppImpl final : StudioApp
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
 				m_watched_plugin.watcher->getCallback().bind<&StudioAppImpl::onPluginChanged>(this);
 				m_watched_plugin.dir = dir;
-				m_watched_plugin.plugin = loaded_plugin;
+				m_watched_plugin.system = loaded_plugin;
 			}
 		}
 	}
@@ -2414,35 +2412,33 @@ struct StudioAppImpl final : StudioApp
 
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(16 * 1024);
-		PluginManager& plugin_manager = m_engine->getPluginManager();
+		SystemManager& system_manager = m_engine->getSystemManager();
 
 		World* world = m_editor->getWorld();
-		auto& scenes = world->getScenes();
-		for (i32 i = 0, c = scenes.size(); i < c; ++i) {
-			UniquePtr<IScene>& scene = scenes[i];
-			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-			
-			scene->beforeReload(blob);
+		auto& modules = world->getModules();
+		for (i32 i = 0, c = modules.size(); i < c; ++i) {
+			UniquePtr<IModule>& module = modules[i];
+			if (&module->getSystem() != m_watched_plugin.system) continue;
 
-			scene->clear();
-			scenes.erase(i);
+			module->beforeReload(blob);
+			modules.erase(i);
 			break;
 		}
-		plugin_manager.unload(m_watched_plugin.plugin);
+		system_manager.unload(m_watched_plugin.system);
 
 		// TODO try to delete the old version
 
-		m_watched_plugin.plugin = plugin_manager.load(copy_path);
-		if (!m_watched_plugin.plugin) {
+		m_watched_plugin.system = system_manager.load(copy_path);
+		if (!m_watched_plugin.system) {
 			logError("Failed to load plugin ", copy_path, ". Reload failed.");
 			return;
 		}
 
 		InputMemoryStream input_blob(blob);
-		m_watched_plugin.plugin->createScenes(*world);
-		for (const UniquePtr<IScene>& scene : world->getScenes()) {
-			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-			scene->afterReload(input_blob);
+		m_watched_plugin.system->createModules(*world);
+		for (const UniquePtr<IModule>& module : world->getModules()) {
+			if (&module->getSystem() != m_watched_plugin.system) continue;
+			module->afterReload(input_blob);
 		}
 		logInfo("Finished reloading plugin.");
 	}
@@ -2514,7 +2510,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	IPlugin* getIPlugin(const char* name) override {
-		for (auto* i : m_plugins) {
+		for (auto* i : m_systems) {
 			if (equalStrings(i->getName(), name)) return i;
 		}
 		return nullptr;
@@ -2530,18 +2526,18 @@ struct StudioAppImpl final : StudioApp
 
 	void initPlugins()
 	{
-		for (int i = 1, c = m_plugins.size(); i < c; ++i) {
+		for (int i = 1, c = m_systems.size(); i < c; ++i) {
 			for (int j = 0; j < i; ++j) {
-				IPlugin* p = m_plugins[i];
-				if (m_plugins[j]->dependsOn(*p)) {
-					m_plugins.erase(i);
+				IPlugin* p = m_systems[i];
+				if (m_systems[j]->dependsOn(*p)) {
+					m_systems.erase(i);
 					--i;
-					m_plugins.insert(j, p);
+					m_systems.insert(j, p);
 				}
 			}
 		}
 
-		for (IPlugin* plugin : m_plugins) {
+		for (IPlugin* plugin : m_systems) {
 			plugin->init();
 		}
 
@@ -2578,7 +2574,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void addPlugin(IPlugin& plugin) override { m_plugins.push(&plugin); }
+	void addPlugin(IPlugin& plugin) override { m_systems.push(&plugin); }
 
 
 	void addPlugin(GUIPlugin& plugin) override
@@ -2603,7 +2599,7 @@ struct StudioAppImpl final : StudioApp
 		#include "engine/plugins.inl"
 		#undef LUMIX_EDITOR_PLUGINS
 #else
-		auto& plugin_manager = m_engine->getPluginManager();
+		auto& plugin_manager = m_engine->getSystemManager();
 		for (auto* lib : plugin_manager.getLibraries())
 		{
 			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) os::getLibrarySymbol(lib, "setStudioApp");
@@ -2620,7 +2616,7 @@ struct StudioAppImpl final : StudioApp
 		addPlugin(*m_asset_browser.get());
 		addPlugin(*m_profiler_ui.get());
 
-		for (IPlugin* plugin : m_plugins) {
+		for (IPlugin* plugin : m_systems) {
 			logInfo("Studio plugin ", plugin->getName(), " loaded");
 		}
 
@@ -2828,10 +2824,10 @@ struct StudioAppImpl final : StudioApp
 				ComponentType cmp_type = reflection::getComponentType(parameter_name);
 				editor.addComponent(Span(&e, 1), cmp_type);
 
-				IScene* scene = editor.getWorld()->getScene(cmp_type);
-				if (scene)
+				IModule* module = editor.getWorld()->getModule(cmp_type);
+				if (module)
 				{
-					ComponentUID cmp(e, cmp_type, scene);
+					ComponentUID cmp(e, cmp_type, module);
 					const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
@@ -2992,7 +2988,7 @@ struct StudioAppImpl final : StudioApp
 	void exportFile(const char* file_path, AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		const FilePathHash hash(file_path);
-		auto& out_info = infos.emplace(hash);
+		ExportFileInfo& out_info = infos.emplace(hash);
 		copyString(out_info.path, file_path);
 		out_info.hash = hash;
 		const Path path(base_path, file_path);
@@ -3337,7 +3333,7 @@ struct StudioAppImpl final : StudioApp
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
-	Array<IPlugin*> m_plugins;
+	Array<IPlugin*> m_systems;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 
 	Array<StaticString<LUMIX_MAX_PATH>> m_worlds;
@@ -3402,7 +3398,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_is_entity_list_open;
 	
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
-	EntityFolders::FolderID m_renaming_folder = EntityFolders::INVALID_FOLDER;
+	EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
 	bool m_set_rename_focus = false;
 	char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
 	bool m_is_f2_pressed = false;
@@ -3415,7 +3411,7 @@ struct StudioAppImpl final : StudioApp
 		UniquePtr<FileSystemWatcher> watcher;
 		StaticString<LUMIX_MAX_PATH> dir;
 		StaticString<LUMIX_MAX_PATH> basename;
-		Lumix::IPlugin* plugin = nullptr;
+		Lumix::ISystem* system = nullptr;
 		int iteration = 0;
 		bool reload_request = false;
 	} m_watched_plugin;

@@ -412,7 +412,7 @@ public:
 
 				const Transform tr = m_world->getTransform(iter.key());
 				const EntityPtr parent = m_world->getParent(iter.key());
-				EntityFolders::FolderID folder = folders.getFolder(iter.key());
+				EntityFolders::FolderHandle folder = folders.getFolder(iter.key());
 
 				m_deferred_instances.push({prefab_res, tr, parent, folder});
 				destroySubtree(*m_world, m_world->getFirstChild(iter.key()));
@@ -444,7 +444,7 @@ public:
 
 			const Transform tr = m_world->getTransform(e);
 			const EntityPtr parent = m_world->getParent(e);
-			EntityFolders::FolderID folder = folders.getFolder(e);
+			EntityFolders::FolderHandle folder = folders.getFolder(e);
 
 			m_deferred_instances.push({m_resources[prefab].resource, tr, parent, folder});
 			destroySubtree(*m_world, m_world->getFirstChild(e));
@@ -630,7 +630,7 @@ private:
 		PrefabResource* resource;
 		Transform transform;
 		EntityPtr parent;
-		EntityFolders::FolderID folder;
+		EntityFolders::FolderHandle folder;
 	};
 
 	struct PrefabVersion {

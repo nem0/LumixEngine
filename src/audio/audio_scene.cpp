@@ -48,7 +48,7 @@ struct PlayingSound
 };
 
 
-struct AudioSceneImpl final : AudioScene
+struct AudioModuleImpl final : AudioModule
 {
 	enum class Version : i32 {
 		INIT,
@@ -56,9 +56,9 @@ struct AudioSceneImpl final : AudioScene
 		LATEST
 	};
 
-	AudioSceneImpl(AudioSystem& system, World& context, IAllocator& allocator)
+	AudioModuleImpl(AudioSystem& system, World& world, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_world(context)
+		, m_world(world)
 		, m_system(system)
 		, m_device(system.getDevice())
 		, m_ambient_sounds(allocator)
@@ -75,21 +75,17 @@ struct AudioSceneImpl final : AudioScene
 
 	i32 getVersion() const override { return (i32)Version::LATEST; }
 
-	void clear() override 	{
+	~AudioModuleImpl() {
 		for (const AmbientSound& snd : m_ambient_sounds) {
 			if (snd.clip) snd.clip->decRefCount();
 		}
-		m_ambient_sounds.clear();
-		m_echo_zones.clear();
-		m_chorus_zones.clear();
 	}
-
 
 	void updateAnimationEvents()
 	{
-		/*if (!m_animation_scene) return;
+		/*if (!m_animation_module) return;
 		
-		InputMemoryStream blob(m_animation_scene->getEventStream());
+		InputMemoryStream blob(m_animation_module->getEventStream());
 		const RuntimeHash sound_type("sound");
 		while (blob.getPosition() < blob.size())
 		{
@@ -177,7 +173,7 @@ struct AudioSceneImpl final : AudioScene
 
 	void startGame() override
 	{
-		m_animation_scene = (AnimationScene*)m_world.getScene("animation");
+		m_animation_module = (AnimationModule*)m_world.getModule("animation");
 		for (AmbientSound& sound : m_ambient_sounds)
 		{
 			if (sound.clip) sound.playing_sound = play(sound.entity, sound.clip, sound.is_3d);
@@ -187,7 +183,7 @@ struct AudioSceneImpl final : AudioScene
 
 	void stopGame() override
 	{
-		m_animation_scene = nullptr;
+		m_animation_module = nullptr;
 		for (auto& i : m_playing_sounds)
 		{
 			if (i.buffer_id != AudioDevice::INVALID_BUFFER_HANDLE)
@@ -461,13 +457,13 @@ struct AudioSceneImpl final : AudioScene
 
 	void setVolume(SoundHandle sound_id, float volume) override
 	{
-		ASSERT(sound_id != AudioScene::INVALID_SOUND_HANDLE);
+		ASSERT(sound_id != AudioModule::INVALID_SOUND_HANDLE);
 		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
 		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
 	}
 
 	void setFrequency(SoundHandle sound_id, u32 frequency) override {
-		ASSERT(sound_id != AudioScene::INVALID_SOUND_HANDLE);
+		ASSERT(sound_id != AudioModule::INVALID_SOUND_HANDLE);
 		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
 		m_device.setFrequency(m_playing_sounds[sound_id].buffer_id, frequency);
 	}
@@ -479,7 +475,7 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 	World& getWorld() override { return m_world; }
-	IPlugin& getPlugin() const override { return m_system; }
+	ISystem& getSystem() const override { return m_system; }
 
 	AssociativeArray<EntityRef, AmbientSound> m_ambient_sounds;
 	AssociativeArray<EntityRef, EchoZone> m_echo_zones;
@@ -490,38 +486,38 @@ struct AudioSceneImpl final : AudioScene
 	World& m_world;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
-	AnimationScene* m_animation_scene = nullptr;
+	AnimationModule* m_animation_module = nullptr;
 };
 
 
-UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
+UniquePtr<AudioModule> AudioModule::createInstance(AudioSystem& system,
 	World& world,
 	IAllocator& allocator)
 {
-	return UniquePtr<AudioSceneImpl>::create(allocator, system, world, allocator);
+	return UniquePtr<AudioModuleImpl>::create(allocator, system, world, allocator);
 }
 
-void AudioScene::reflect(Engine& engine) {
-	LUMIX_SCENE(AudioSceneImpl, "audio")
-		.LUMIX_FUNC(AudioScene::setMasterVolume)
-		.function<(SoundHandle (AudioScene::*)(EntityRef, const Path&, bool))&AudioScene::play>("AudioScene::play", "AudioScene::play")
-		.LUMIX_FUNC(AudioScene::stop)
-		.LUMIX_FUNC(AudioScene::isEnd)
-		.LUMIX_FUNC(AudioScene::setFrequency)
-		.LUMIX_FUNC(AudioScene::setVolume)
-		.LUMIX_FUNC(AudioScene::setEcho)
+void AudioModule::reflect(Engine& engine) {
+	LUMIX_MODULE(AudioModuleImpl, "audio")
+		.LUMIX_FUNC(AudioModule::setMasterVolume)
+		.function<(SoundHandle (AudioModule::*)(EntityRef, const Path&, bool))&AudioModule::play>("AudioModule::play", "AudioModule::play")
+		.LUMIX_FUNC(AudioModule::stop)
+		.LUMIX_FUNC(AudioModule::isEnd)
+		.LUMIX_FUNC(AudioModule::setFrequency)
+		.LUMIX_FUNC(AudioModule::setVolume)
+		.LUMIX_FUNC(AudioModule::setEcho)
 		.LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound")
-			.LUMIX_FUNC_EX(AudioScene::pauseAmbientSound, "pause")
-			.LUMIX_FUNC_EX(AudioScene::resumeAmbientSound, "resume")
-			.prop<&AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D>("3D")
+			.LUMIX_FUNC_EX(AudioModule::pauseAmbientSound, "pause")
+			.LUMIX_FUNC_EX(AudioModule::resumeAmbientSound, "resume")
+			.prop<&AudioModule::isAmbientSound3D, &AudioModule::setAmbientSound3D>("3D")
 			.LUMIX_PROP(AmbientSoundClip, "Sound").resourceAttribute(Clip::TYPE)
 		.LUMIX_CMP(Listener, "audio_listener", "Audio / Listener").icon(ICON_FA_HEADPHONES)
 		.LUMIX_CMP(EchoZone, "echo_zone", "Audio / Echo zone")
-			.var_prop<&AudioScene::getEchoZone, &EchoZone::radius>("Radius").minAttribute(0)
-			.var_prop<&AudioScene::getEchoZone, &EchoZone::delay>("Delay (ms)").minAttribute(0)
+			.var_prop<&AudioModule::getEchoZone, &EchoZone::radius>("Radius").minAttribute(0)
+			.var_prop<&AudioModule::getEchoZone, &EchoZone::delay>("Delay (ms)").minAttribute(0)
 		.LUMIX_CMP(ChorusZone, "chorus_zone", "Audio / Chorus zone")
-			.var_prop<&AudioScene::getChorusZone, &ChorusZone::radius>("Radius").minAttribute(0)
-			.var_prop<&AudioScene::getChorusZone, &ChorusZone::delay>("Delay (ms)").minAttribute(0)
+			.var_prop<&AudioModule::getChorusZone, &ChorusZone::radius>("Radius").minAttribute(0)
+			.var_prop<&AudioModule::getChorusZone, &ChorusZone::delay>("Delay (ms)").minAttribute(0)
 	;
 }
 

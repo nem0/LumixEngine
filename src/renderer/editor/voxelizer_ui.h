@@ -25,7 +25,7 @@ private:
 	void visualize();
 	void visualizeAO();
 
-	Voxels m_scene;
+	Voxels m_module;
 
 	Action m_toggle_ui;
 	bool m_is_open = false;

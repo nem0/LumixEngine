@@ -13,11 +13,11 @@ struct Spline {
 	Array<Vec3> points;
 };
 
-struct CoreScene : IScene {
+struct CoreModule : IModule {
 	virtual Spline& getSpline(EntityRef e) = 0;
 	virtual const HashMap<EntityRef, Spline>& getSplines() = 0;
 };
 
-IPlugin* createCorePlugin(Engine& engine);
+ISystem* createCorePlugin(Engine& engine);
 
 }

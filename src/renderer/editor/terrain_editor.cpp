@@ -60,8 +60,8 @@ struct FillClearGrassCommand final : IEditorCommand {
 
 	Texture* getDestinationTexture() const
 	{
-		RenderScene* scene = (RenderScene*)m_world_editor.getWorld()->getScene(TERRAIN_TYPE);
-		return scene->getTerrainMaterial(m_terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		return module->getTerrainMaterial(m_terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
 	}
 
 	bool merge(IEditorCommand& command) override { return false; }
@@ -93,8 +93,8 @@ struct FillClearGrassCommand final : IEditorCommand {
 		}
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
 
-		RenderScene* scene = (RenderScene*)m_world_editor.getWorld()->getScene(TERRAIN_TYPE);
-		scene->getTerrain(m_terrain)->setGrassDirty();
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		module->getTerrain(m_terrain)->setGrassDirty();
 
 		return true;
 	}
@@ -113,8 +113,8 @@ struct FillClearGrassCommand final : IEditorCommand {
 		memcpy(data, m_old_data.begin(), m_old_data.byte_size());
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
 
-		RenderScene* scene = (RenderScene*)m_world_editor.getWorld()->getScene(TERRAIN_TYPE);
-		scene->getTerrain(m_terrain)->setGrassDirty();
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		module->getTerrain(m_terrain)->setGrassDirty();
 	}
 	const char* getType() override { return "fill_clear_grass"; }
 
@@ -173,9 +173,9 @@ struct PaintTerrainCommand final : IEditorCommand
 		m_width = m_height = m_x = m_y = -1;
 		World& world = *editor.getWorld();
 		const Transform entity_transform = world.getTransform(terrain).inverted();
-		RenderScene* scene = (RenderScene*)world.getScene(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
 		DVec3 local_pos = entity_transform.transform(hit_pos);
-		float terrain_size = scene->getTerrainSize(terrain).x;
+		float terrain_size = module->getTerrainSize(terrain).x;
 		local_pos = local_pos / terrain_size;
 		local_pos.y = -1;
 
@@ -260,8 +260,8 @@ private:
 				break;
 		}
 
-		RenderScene* scene = (RenderScene*)m_world_editor.getWorld()->getScene(TERRAIN_TYPE);
-		return scene->getTerrainMaterial(m_terrain)->getTextureByName(uniform_name);
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		return module->getTerrainMaterial(m_terrain)->getTextureByName(uniform_name);
 	}
 
 
@@ -564,17 +564,17 @@ private:
 
 		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::REMOVE_GRASS)
 		{
-			IScene* scene = m_world_editor.getWorld()->getScene("physics");
-			if (!scene) return;
+			IModule* module = m_world_editor.getWorld()->getModule("physics");
+			if (!module) return;
 
-			auto* phy_scene = static_cast<PhysicsScene*>(scene);
-			if (!scene->getWorld().hasComponent(m_terrain, HEIGHTFIELD_TYPE)) return;
+			auto* phy_module = static_cast<PhysicsModule*>(module);
+			if (!module->getWorld().hasComponent(m_terrain, HEIGHTFIELD_TYPE)) return;
 
-			phy_scene->updateHeighfieldData(m_terrain, m_x, m_y, m_width, m_height, &data[0], bpp);
+			phy_module->updateHeighfieldData(m_terrain, m_x, m_y, m_width, m_height, &data[0], bpp);
 		}
 		else {
-			RenderScene* scene = (RenderScene*)m_world_editor.getWorld()->getScene(TERRAIN_TYPE);
-			return scene->getTerrain(m_terrain)->setGrassDirty();
+			RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+			return module->getTerrain(m_terrain)->setGrassDirty();
 		}
 	}
 
@@ -683,8 +683,8 @@ TerrainEditor::~TerrainEditor()
 	m_app.removePlugin(*this);
 	
 	Engine& engine = m_app.getEngine();
-	Lumix::IPlugin* plugin = engine.getPluginManager().getPlugin("renderer");
-	Renderer& renderer = *static_cast<Renderer*>(plugin);
+	Lumix::ISystem* system = engine.getSystemManager().getSystem("renderer");
+	Renderer& renderer = *static_cast<Renderer*>(system);
 	DrawStream& stream = renderer.getDrawStream();
 	for (gpu::TextureHandle t : m_layer_views) stream.destroy(t);
 }
@@ -933,8 +933,8 @@ struct TerrainTextureChangeCommand : IEditorCommand {
 	}
 
 	bool apply(OutputMemoryStream& blob) {
-		RenderScene* render_scene = (RenderScene*)editor.getWorld()->getScene(TERRAIN_TYPE);
-		Terrain* terrain = render_scene->getTerrain(entity);
+		RenderModule* render_module = (RenderModule*)editor.getWorld()->getModule(TERRAIN_TYPE);
+		Terrain* terrain = render_module->getTerrain(entity);
 		if (!terrain) return false;
 		Texture* texture = splatmap ? terrain->m_splatmap : terrain->m_heightmap;
 		
@@ -981,8 +981,8 @@ Terrain* TerrainEditor::getTerrain() const {
 	bool is_terrain = world.hasComponent(selected_entities[0], TERRAIN_TYPE);
 	if (!is_terrain) return nullptr;
 
-	RenderScene* scene = (RenderScene*)world.getScene(TERRAIN_TYPE);
-	return scene->getTerrain(selected_entities[0]);
+	RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
+	return module->getTerrain(selected_entities[0]);
 }
 
 struct PrefabProbability {
@@ -1172,14 +1172,14 @@ int TerrainEditor::placePrefabs(lua_State* L) {
 
 	WorldEditor& editor = that->m_app.getWorldEditor();
 	World* world = editor.getWorld();
-	RenderScene* render_scene = (RenderScene*)world->getScene(TERRAIN_TYPE);
+	RenderModule* render_module = (RenderModule*)world->getModule(TERRAIN_TYPE);
 	Array<Array<Transform>> transforms(that->m_app.getAllocator());
 	for (i32 i = 0; i < prefabs.size(); ++i) {
 		transforms.emplace(that->m_app.getAllocator());
 	}
 
 	const double y_base = world->getPosition(terrain->m_entity).y;
-	const Vec2 size = render_scene->getTerrainSize(terrain->m_entity);
+	const Vec2 size = render_module->getTerrainSize(terrain->m_entity);
 	const Vec2 df_to_terrain = size / Vec2((float)df->width, (float)df->height);
 	const Vec2 terrain_to_df = Vec2((float)df->width, (float)df->height) / size;
 
@@ -1196,7 +1196,7 @@ int TerrainEditor::placePrefabs(lua_State* L) {
 				DVec3 pos;
 				pos.x = fx * df_to_terrain.x;
 				pos.z = fy * df_to_terrain.y;
-				pos.y = render_scene->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
+				pos.y = render_module->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
 
 				pos.x -= size.x * 0.5f;
 				pos.y += y_base;
@@ -1261,7 +1261,7 @@ int TerrainEditor::placeInstances(lua_State* L) {
 
 	WorldEditor& editor = that->m_app.getWorldEditor();
 	World* world = editor.getWorld();
-	RenderScene* render_scene = (RenderScene*)world->getScene(TERRAIN_TYPE);
+	RenderModule* render_module = (RenderModule*)world->getModule(TERRAIN_TYPE);
 	const DVec3 terrain_pos = world->getPosition(terrain->m_entity);
 
 	struct Group {
@@ -1281,11 +1281,11 @@ int TerrainEditor::placeInstances(lua_State* L) {
 	}
 
 	for (Group& g : groups) {
-		g.im = &render_scene->beginInstancedModelEditing(g.e);
+		g.im = &render_module->beginInstancedModelEditing(g.e);
 	}
 
 	const double y_base = terrain_pos.y;
-	const Vec2 size = render_scene->getTerrainSize(terrain->m_entity);
+	const Vec2 size = render_module->getTerrainSize(terrain->m_entity);
 	const Vec2 df_to_terrain = size / Vec2((float)df->width, (float)df->height);
 	const Vec2 terrain_to_df = Vec2((float)df->width, (float)df->height) / size;
 
@@ -1311,7 +1311,7 @@ int TerrainEditor::placeInstances(lua_State* L) {
 			const i32 idx = i32(fx) + i32(fy) * df->width;
 			const float distance = df->data[idx];
 			if (distance >= min_dist && distance <= max_dist) {
-				pos.y = render_scene->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
+				pos.y = render_module->getTerrainHeightAt(terrain->m_entity, (float)pos.x, (float)pos.z);
 
 				pos.x -= size.x * 0.5f;
 				pos.y += y_base;
@@ -1337,7 +1337,7 @@ int TerrainEditor::placeInstances(lua_State* L) {
 	}
 
 	for (Group& g : groups) {
-		render_scene->endInstancedModelEditing(g.e);
+		render_module->endInstancedModelEditing(g.e);
 	}
 
 	editor.endCommandGroup();
@@ -1389,8 +1389,8 @@ void TerrainEditor::exportDistanceField(const DistanceField& df) const {
 void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 	for (DistanceField& df : m_distance_fields) {
 		if (ImGui::TreeNode(df.name.c_str(), "%s %d x %d", df.name.c_str(), df.width, df.height)) {
-			RenderScene* render_scene = (RenderScene*)terrain_uid.scene;
-			Terrain* terrain = render_scene->getTerrain(*terrain_uid.entity);
+			RenderModule* render_module = (RenderModule*)terrain_uid.module;
+			Terrain* terrain = render_module->getTerrain(*terrain_uid.entity);
 				
 			static float dig_depth = -1.f;
 			bool can_edit = terrain->m_heightmap;
@@ -1484,7 +1484,7 @@ void TerrainEditor::distanceFieldsUI(ComponentUID terrain_uid) {
 			if (ImGuiEx::IconButton(ICON_FA_FILE_EXPORT, "Export as texture")) exportDistanceField(df);
 
 			if (ImGui::BeginPopup("add_spline")) {
-				CoreScene* core = (CoreScene*)render_scene->getWorld().getScene(SPLINE_TYPE);
+				CoreModule* core = (CoreModule*)render_module->getWorld().getModule(SPLINE_TYPE);
 				
 				const HashMap<EntityRef, Spline>& splines = core->getSplines();
 				static EntityPtr selected = INVALID_ENTITY;
@@ -1568,20 +1568,20 @@ void TerrainEditor::decreaseBrushSize()
 }
 
 
-void TerrainEditor::drawCursor(RenderScene& scene, EntityRef entity, const DVec3& center) const
+void TerrainEditor::drawCursor(RenderModule& module, EntityRef entity, const DVec3& center) const
 {
 	PROFILE_FUNCTION();
-	Terrain* terrain = scene.getTerrain(entity);
+	Terrain* terrain = module.getTerrain(entity);
 	constexpr int SLICE_COUNT = 30;
 	constexpr float angle_step = PI * 2 / SLICE_COUNT;
 	if (m_mode == Mode::HEIGHT && m_is_flat_height && ImGui::GetIO().KeyCtrl) {
-		scene.addDebugCross(center, 1.0f, 0xff0000ff);
+		module.addDebugCross(center, 1.0f, 0xff0000ff);
 		return;
 	}
 
 	float brush_size = m_terrain_brush_size;
-	const Vec3 local_center = Vec3(getRelativePosition(center, entity, scene.getWorld()));
-	const Transform terrain_transform = scene.getWorld().getTransform(entity);
+	const Vec3 local_center = Vec3(getRelativePosition(center, entity, module.getWorld()));
+	const Transform terrain_transform = module.getWorld().getTransform(entity);
 
 	for (int i = 0; i < SLICE_COUNT + 1; ++i) {
 		const float angle = i * angle_step;
@@ -1595,7 +1595,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef entity, const DVec3
 
 		const DVec3 from = terrain_transform.transform(local_from);
 		const DVec3 to = terrain_transform.transform(local_to);
-		scene.addDebugLine(from, to, Color::RED);
+		module.addDebugLine(from, to, Color::RED);
 	}
 
 	const Vec3 rel_pos = Vec3(terrain_transform.inverted().transform(center));
@@ -1619,11 +1619,11 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef entity, const DVec3
 			p01 = terrain_transform.transform(p01);
 			p11 = terrain_transform.transform(p11);
 
-			scene.addDebugLine(p10, p01, Color(0x80, 0, 0, 0xff));
-			scene.addDebugLine(p10, p11, Color(0x80, 0, 0, 0xff));
-			scene.addDebugLine(p00, p10, Color(0x80, 0, 0, 0xff));
-			scene.addDebugLine(p01, p11, Color(0x80, 0, 0, 0xff));
-			scene.addDebugLine(p00, p01, Color(0x80, 0, 0, 0xff));
+			module.addDebugLine(p10, p01, Color(0x80, 0, 0, 0xff));
+			module.addDebugLine(p10, p11, Color(0x80, 0, 0, 0xff));
+			module.addDebugLine(p00, p10, Color(0x80, 0, 0, 0xff));
+			module.addDebugLine(p01, p11, Color(0x80, 0, 0, 0xff));
+			module.addDebugLine(p00, p01, Color(0x80, 0, 0, 0xff));
 		}
 	}
 }
@@ -1638,18 +1638,18 @@ DVec3 TerrainEditor::getRelativePosition(const DVec3& world_pos, EntityRef terra
 }
 
 
-u16 TerrainEditor::getHeight(const DVec3& world_pos, RenderScene* scene, EntityRef terrain) const
+u16 TerrainEditor::getHeight(const DVec3& world_pos, RenderModule* module, EntityRef terrain) const
 {
-	const DVec3 rel_pos = getRelativePosition(world_pos, terrain, scene->getWorld());
+	const DVec3 rel_pos = getRelativePosition(world_pos, terrain, module->getWorld());
 	ComponentUID cmp;
 	cmp.entity = terrain;
-	cmp.scene = scene;
+	cmp.module = module;
 	cmp.type = TERRAIN_TYPE;
 	Texture* heightmap = getMaterial(cmp)->getTextureByName(HEIGHTMAP_SLOT_NAME);
 	if (!heightmap) return 0;
 
 	u16* data = (u16*)heightmap->getData();
-	float scale = scene->getTerrainXZScale(terrain);
+	float scale = module->getTerrainXZScale(terrain);
 	return data[int(rel_pos.x / scale) + int(rel_pos.z / scale) * heightmap->width];
 }
 
@@ -1669,11 +1669,11 @@ bool TerrainEditor::onMouseDown(WorldView& view, int x, int y)
 	bool is_terrain = world.hasComponent(selected_entities[0], TERRAIN_TYPE);
 	if (!is_terrain) return false;
 
-	RenderScene* scene = (RenderScene*)world.getScene(TERRAIN_TYPE);
+	RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
 	DVec3 origin;
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
-	const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
+	const RayCastModelHit hit = module->castRayTerrain(origin, dir);
 	if (!hit.is_hit) return false;
 
 	const DVec3 hit_pos = hit.origin + hit.dir * hit.t;
@@ -1689,7 +1689,7 @@ bool TerrainEditor::onMouseDown(WorldView& view, int x, int y)
 		case Mode::HEIGHT:
 			if (m_is_flat_height) {
 				if (ImGui::GetIO().KeyCtrl) {
-					m_flat_height = getHeight(hit_pos, scene, selected_entities[0]);
+					m_flat_height = getHeight(hit_pos, module, selected_entities[0]);
 				}
 				else {
 					paint(hit_pos, TerrainEditor::FLAT_HEIGHT, false, selected_entities[0], editor);
@@ -1725,7 +1725,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 	PROFILE_FUNCTION();
 
 	World& world = *editor.getWorld();
-	RenderScene* scene = static_cast<RenderScene*>(world.getScene(TERRAIN_TYPE));
+	RenderModule* module = static_cast<RenderModule*>(world.getModule(TERRAIN_TYPE));
 	ShiftedFrustum frustum;
 	frustum.computeOrtho(hit_pos,
 		Vec3(0, 0, 1),
@@ -1736,12 +1736,12 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 		m_terrain_brush_size);
 	const AABB brush_aabb(Vec3(-m_terrain_brush_size), Vec3(m_terrain_brush_size));
 
-	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
+	CullResult* meshes = module->getRenderables(frustum, RenderableTypes::MESH);
 	if(meshes) {
-		meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
+		meshes->merge(module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
 	}
 	else {
-		meshes = scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
+		meshes = module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
 	}
 	if(!meshes) return;
 
@@ -1751,7 +1751,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 		meshes->forEach([&](EntityRef entity){
 			if (prefab_system.getPrefab(entity).getHashValue() == 0) return; 
 			
-			const Model* model = scene->getModelInstanceModel(entity);
+			const Model* model = module->getModelInstanceModel(entity);
 			const AABB entity_aabb = model ? model->getAABB() : AABB(Vec3::ZERO, Vec3::ZERO);
 			const bool collide = testOBBCollision(brush_aabb, world.getRelativeMatrix(entity, hit_pos), entity_aabb);
 			if (collide) editor.destroyEntities(&entity, 1);
@@ -1764,7 +1764,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 			{
 				if (prefab_system.getPrefab(entity) == res->getPath().getHash())
 				{
-					const Model* model = scene->getModelInstanceModel(entity);
+					const Model* model = module->getModelInstanceModel(entity);
 					const AABB entity_aabb = model ? model->getAABB() : AABB(Vec3::ZERO, Vec3::ZERO);
 					const bool collide = testOBBCollision(brush_aabb, world.getRelativeMatrix(entity, hit_pos), entity_aabb);
 					if (collide) editor.destroyEntities(&entity, 1);
@@ -1773,22 +1773,22 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 		});
 	}
 	editor.endCommandGroup();
-	meshes->free(scene->getEngine().getPageAllocator());
+	meshes->free(module->getEngine().getPageAllocator());
 }
 
 
-static bool isOBBCollision(RenderScene& scene,
+static bool isOBBCollision(RenderModule& module,
 	const CullResult* meshes,
 	const Transform& model_tr,
 	Model* model,
 	bool ignore_not_in_folder,
 	const EntityFolders& folders,
-	EntityFolders::FolderID folder)
+	EntityFolders::FolderHandle folder)
 {
 	float radius_a_squared = model->getOriginBoundingRadius() * maximum(model_tr.scale.x, model_tr.scale.y, model_tr.scale.z);
 	radius_a_squared = radius_a_squared * radius_a_squared;
-	World& world = scene.getWorld();
-	Span<const ModelInstance> model_instances = scene.getModelInstances();
+	World& world = module.getWorld();
+	Span<const ModelInstance> model_instances = module.getModelInstances();
 	const Transform* transforms = world.getTransforms();
 	while(meshes) {
 		const EntityRef* entities = meshes->entities;
@@ -1838,7 +1838,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 	editor.beginCommandGroup("paint_entities");
 	{
 		World& world = *editor.getWorld();
-		RenderScene* scene = static_cast<RenderScene*>(world.getScene(TERRAIN_TYPE));
+		RenderModule* module = static_cast<RenderModule*>(world.getModule(TERRAIN_TYPE));
 		const Transform terrain_tr = world.getTransform(terrain);
 		const Transform inv_terrain_tr = terrain_tr.inverted();
 
@@ -1851,14 +1851,14 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
 		
-		CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
-		if (meshes) meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
-		else meshes = scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
+		CullResult* meshes = module->getRenderables(frustum, RenderableTypes::MESH);
+		if (meshes) meshes->merge(module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
+		else meshes = module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
 
 		const EntityFolders& folders = editor.getEntityFolders();
-		const EntityFolders::FolderID folder = folders.getSelectedFolder();
+		const EntityFolders::FolderHandle folder = folders.getSelectedFolder();
 
-		Vec2 terrain_size = scene->getTerrainSize(terrain);
+		Vec2 terrain_size = module->getTerrainSize(terrain);
 		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 100.0f * m_terrain_brush_strength; ++i)
 		{
@@ -1869,12 +1869,12 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 			const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= terrain_size.x && terrain_pos.z <= terrain_size.y)
 			{
-				pos.y = scene->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + y;
+				pos.y = module->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_tr.pos.y;
 				Quat rot(0, 0, 0, 1);
 				if(m_is_align_with_normal)
 				{
-					Vec3 normal = scene->getTerrainNormalAt(terrain, terrain_pos.x, terrain_pos.z);
+					Vec3 normal = module->getTerrainNormalAt(terrain, terrain_pos.x, terrain_pos.z);
 					Vec3 dir = normalize(cross(normal, Vec3(1, 0, 0)));
 					Matrix mtx = Matrix::IDENTITY;
 					mtx.setXVector(cross(normal, dir));
@@ -1912,9 +1912,9 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 				const EntityPtr entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, Vec3(size));
 				if (entity.isValid()) {
 					if (world.hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
-						Model* model = scene->getModelInstanceModel((EntityRef)entity);
+						Model* model = module->getModelInstanceModel((EntityRef)entity);
 						const Transform tr = { pos, rot, Vec3(size * scale) };
-						if (isOBBCollision(*scene, meshes, tr, model, m_ignore_entities_not_in_folder, folders, folder)) {
+						if (isOBBCollision(*module, meshes, tr, model, m_ignore_entities_not_in_folder, folders, folder)) {
 							editor.undo();
 						}
 					}
@@ -1938,12 +1938,12 @@ void TerrainEditor::onMouseMove(WorldView& view, int x, int y, int, int)
 	const EntityRef entity = selected_entities[0];
 	World& world = *editor.getWorld();
 	if (!world.hasComponent(entity, TERRAIN_TYPE)) return;
-	RenderScene* scene = (RenderScene*)world.getScene(TERRAIN_TYPE);
+	RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
 	DVec3 origin;
 	Vec3 dir;
 	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
 
-	const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
+	const RayCastModelHit hit = module->castRayTerrain(origin, dir);
 	if (!hit.is_hit) return;
 	if (hit.entity != entity) return;
 	
@@ -1961,7 +1961,7 @@ void TerrainEditor::onMouseMove(WorldView& view, int x, int y, int, int)
 		case Mode::HEIGHT:
 			if (m_is_flat_height) {
 				if (ImGui::GetIO().KeyCtrl) {
-					m_flat_height = getHeight(hit_pos, scene, entity);
+					m_flat_height = getHeight(hit_pos, module, entity);
 				}
 				else {
 					paint(hit_pos, TerrainEditor::FLAT_HEIGHT, true, selected_entities[0], editor);
@@ -1992,8 +1992,8 @@ void TerrainEditor::onMouseMove(WorldView& view, int x, int y, int, int)
 Material* TerrainEditor::getMaterial(ComponentUID cmp) const
 {
 	if (!cmp.isValid()) return nullptr;
-	auto* scene = static_cast<RenderScene*>(cmp.scene);
-	return scene->getTerrainMaterial((EntityRef)cmp.entity);
+	auto* module = static_cast<RenderModule*>(cmp.module);
+	return module->getTerrainMaterial((EntityRef)cmp.entity);
 }
 
 static Array<u8> getFileContent(const char* path, IAllocator& allocator) {
@@ -2010,8 +2010,8 @@ static Array<u8> getFileContent(const char* path, IAllocator& allocator) {
 
 void TerrainEditor::exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
 	OutputMemoryStream blob(editor.getAllocator());
-	RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(TERRAIN_TYPE);
-	Texture* texture = scene->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
+	RenderModule* module = (RenderModule*)editor.getWorld()->getModule(TERRAIN_TYPE);
+	Texture* texture = module->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
 	if (!texture) return;
 	
 	ASSERT(texture->format == gpu::TextureFormat::RGBA8);
@@ -2052,8 +2052,8 @@ void TerrainEditor::exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor)
 }
 
 void TerrainEditor::importGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
-	RenderScene* scene = (RenderScene*)editor.getWorld()->getScene(TERRAIN_TYPE);
-	Texture* texture = scene->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
+	RenderModule* module = (RenderModule*)editor.getWorld()->getModule(TERRAIN_TYPE);
+	Texture* texture = module->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
 	if (!texture) return;
 
 	u8* dst = texture->getData();
@@ -2124,15 +2124,15 @@ static void thumbnail(gpu::TextureHandle texture, float size, bool selected) {
 
 Renderer& TerrainEditor::getRenderer() {
 	Engine& engine = m_app.getEngine();
-	Lumix::IPlugin* plugin = engine.getPluginManager().getPlugin("renderer");
-	return *static_cast<Renderer*>(plugin);
+	Lumix::ISystem* system = engine.getSystemManager().getSystem("renderer");
+	return *static_cast<Renderer*>(system);
 }
 
 
 void TerrainEditor::layerGUI(ComponentUID cmp) {
 	m_mode = Mode::LAYER;
-	RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-	Material* material = scene->getTerrainMaterial((EntityRef)cmp.entity);
+	RenderModule* module = static_cast<RenderModule*>(cmp.module);
+	Material* material = module->getTerrainMaterial((EntityRef)cmp.entity);
 	if (!material) return;
 	if (material->getTextureByName(SPLATMAP_SLOT_NAME) && ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save"))
 	{
@@ -2197,13 +2197,13 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 		ImGuiEx::Label(StaticString<64>("Grass mode (", grass_mode_shortcut, ")"));
 		ImGui::TextUnformatted(m_remove_entity_action.isActive() ? "Remove" : "Add");
 	}
-	int type_count = scene->getGrassCount((EntityRef)cmp.entity);
+	int type_count = module->getGrassCount((EntityRef)cmp.entity);
 	for (int i = 0; i < type_count; ++i) {
 		ImGui::SameLine();
 		ImGui::PushID(i);
 		if (i == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
 		bool b = (m_grass_mask & (1 << i)) != 0;
-		m_app.getAssetBrowser().tile(scene->getGrassPath((EntityRef)cmp.entity, i), b);
+		m_app.getAssetBrowser().tile(module->getGrassPath((EntityRef)cmp.entity, i), b);
 		if (ImGui::IsItemClicked()) {
 			if (!ImGui::GetIO().KeyCtrl) m_grass_mask = 0;
 			if (b) {
@@ -2509,7 +2509,7 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 	char basename[LUMIX_MAX_PATH];
 	copyString(Span(basename), Path::getBasename(filename));
 
-	auto* scene = static_cast<RenderScene*>(cmp.scene);
+	auto* module = static_cast<RenderModule*>(cmp.module);
 	const EntityRef e = (EntityRef)cmp.entity;
 	const Texture* hm = getMaterial(cmp)->getTextureByName(HEIGHTMAP_SLOT_NAME);
 
@@ -2518,8 +2518,8 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 	blob << "mtllib " << basename << ".mtl\n";
 	blob << "o Terrain\n";
 	
-	const float xz_scale = scene->getTerrainXZScale(e);
-	const float y_scale = scene->getTerrainYScale(e);
+	const float xz_scale = module->getTerrainXZScale(e);
+	const float y_scale = module->getTerrainYScale(e);
 	ASSERT(hm->format == gpu::TextureFormat::R16);
 	const u16* hm_data = (const u16*)hm->getData();
 
@@ -2591,7 +2591,7 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 	ASSERT(cmp.type == TERRAIN_TYPE);
 	
-	RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+	RenderModule* module = static_cast<RenderModule*>(cmp.module);
 	ImGui::Unindent();
 	if (!ImGui::CollapsingHeader("Terrain editor")) {
 		ImGui::Indent();
@@ -2695,11 +2695,11 @@ void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 		DVec3 origin;
 		Vec3 dir;
 		editor.getView().getViewport().getRay(mp, origin, dir);
-		const RayCastModelHit hit = scene->castRayTerrain(origin, dir);
+		const RayCastModelHit hit = module->castRayTerrain(origin, dir);
 
 		if(hit.is_hit) {
 			DVec3 center = hit.origin + hit.dir * hit.t;
-			drawCursor(*scene, entity, center);
+			drawCursor(*module, entity, center);
 			return;
 		}
 	}

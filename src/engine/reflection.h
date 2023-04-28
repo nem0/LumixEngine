@@ -10,13 +10,13 @@
 #include "engine/world.h"
 
 
-#define LUMIX_SCENE(Class, Label) using ReflScene = Class; reflection::build_scene(Label)
-#define LUMIX_FUNC_EX(F, Name) function<&ReflScene::F>(Name, #F)
+#define LUMIX_MODULE(Class, Label) using ReflModule = Class; reflection::build_module(Label)
+#define LUMIX_FUNC_EX(F, Name) function<&ReflModule::F>(Name, #F)
 #define LUMIX_FUNC(F) function<&F>(#F, #F)
 #define LUMIX_EVENT(F) event<&F>(#F)
-#define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
-#define LUMIX_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
-#define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
+#define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflModule::create##Cmp, &ReflModule::destroy##Cmp>(Name, Label)
+#define LUMIX_PROP(Property, Label) prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
+#define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
 #define LUMIX_GLOBAL_FUNC(Func) reflection::function(&Func, #Func, nullptr)
 
 namespace Lumix
@@ -51,13 +51,13 @@ struct IAttribute {
 	virtual Type getType() const = 0;
 };
 
-// we don't use method pointers here because VS has sizeof issues if IScene is forward declared
-using CreateComponent = void (*)(IScene*, EntityRef);
-using DestroyComponent = void (*)(IScene*, EntityRef);
+// we don't use method pointers here because VS has sizeof issues if IModule is forward declared
+using CreateComponent = void (*)(IModule*, EntityRef);
+using DestroyComponent = void (*)(IModule*, EntityRef);
 
 struct RegisteredComponent {
 	RuntimeHash name_hash;
-	RuntimeHash scene;
+	RuntimeHash system_hash;
 	struct ComponentBase* cmp = nullptr;
 };
 
@@ -186,17 +186,17 @@ template <typename T>
 struct Property : PropertyBase {
 	Property(IAllocator& allocator) : PropertyBase(allocator) {}
 
-	using Setter = void (*)(IScene*, EntityRef, u32, const T&);
-	using Getter = T (*)(IScene*, EntityRef, u32);
+	using Setter = void (*)(IModule*, EntityRef, u32, const T&);
+	using Getter = T (*)(IModule*, EntityRef, u32);
 
 	void visit(IPropertyVisitor& visitor) const override;
 
 	virtual T get(ComponentUID cmp, u32 idx) const {
-		return getter(cmp.scene, (EntityRef)cmp.entity, idx);
+		return getter(cmp.module, (EntityRef)cmp.entity, idx);
 	}
 
 	virtual void set(ComponentUID cmp, u32 idx, T val) const {
-		setter(cmp.scene, (EntityRef)cmp.entity, idx, val);
+		setter(cmp.module, (EntityRef)cmp.entity, idx, val);
 	}
 
 	virtual bool isReadonly() const { return setter == nullptr; }
@@ -248,9 +248,9 @@ struct IEmptyPropertyVisitor : IPropertyVisitor {
 };
 
 struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
-	typedef u32 (*Counter)(IScene*, EntityRef);
-	typedef void (*Adder)(IScene*, EntityRef, u32);
-	typedef void (*Remover)(IScene*, EntityRef, u32);
+	typedef u32 (*Counter)(IModule*, EntityRef);
+	typedef void (*Adder)(IModule*, EntityRef, u32);
+	typedef void (*Remover)(IModule*, EntityRef, u32);
 
 	ArrayProperty(IAllocator& allocator);
 
@@ -274,8 +274,8 @@ struct LUMIX_ENGINE_API BlobProperty : PropertyBase {
 	void getValue(ComponentUID cmp, u32 idx, OutputMemoryStream& stream) const;
 	void setValue(ComponentUID cmp, u32 idx, InputMemoryStream& stream) const;
 
-	typedef void (*Getter)(IScene*, EntityRef, u32, OutputMemoryStream&);
-	typedef void (*Setter)(IScene*, EntityRef, u32, InputMemoryStream&);
+	typedef void (*Getter)(IModule*, EntityRef, u32, OutputMemoryStream&);
+	typedef void (*Setter)(IModule*, EntityRef, u32, InputMemoryStream&);
 
 	Getter getter;
 	Setter setter;
@@ -456,7 +456,7 @@ struct EventBase {
 	virtual u32 getArgCount() const = 0;
 	virtual Span<const char> getThisTypeName() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
-	virtual void bind(void* scene, Callback* callback) const = 0;
+	virtual void bind(void* object, Callback* callback) const = 0;
 
 	const char* name;
 };
@@ -488,8 +488,8 @@ struct Event<DelegateList<void (Args...)>& (C::*)()> : EventBase
 		return v;
 	}
 
-	void bind(void* scene, Callback* callback) const override {
-		C* s = (C*)scene;
+	void bind(void* object, Callback* callback) const override {
+		C* s = (C*)object;
 		auto l = [](void* obj, Args... args){
 			Callback* cb = (Callback*)obj;
 			Variant a[] = {
@@ -587,7 +587,7 @@ struct LUMIX_ENGINE_API ComponentBase {
 };
 
 template <typename T>
-bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, T& out) {
+bool getPropertyValue(IModule& module, EntityRef e, ComponentType cmp_type, const char* prop_name, T& out) {
 	struct : IEmptyPropertyVisitor {
 		void visit(const Property<T>& prop) override {
 			if (equalStrings(prop.name, prop_name)) {
@@ -601,7 +601,7 @@ bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const 
 		bool found = false;
 	} visitor;
 	visitor.prop_name = prop_name;
-	visitor.cmp.scene = &scene;
+	visitor.cmp.module = &module;
 	visitor.cmp.type = cmp_type;
 	visitor.cmp.entity = e;
 	const ComponentBase* cmp_desc = getComponent(cmp_type);
@@ -610,25 +610,25 @@ bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const 
 	return visitor.found;
 }
 
-struct Scene {
-	Scene(IAllocator& allocator);
+struct Module {
+	Module(IAllocator& allocator);
 
 	Array<FunctionBase*> functions;
 	Array<EventBase*> events;
 	Array<ComponentBase*> cmps;
 	const char* name;
-	Scene* next = nullptr;
+	Module* next = nullptr;
 };
 
-LUMIX_ENGINE_API Scene* getFirstScene();
+LUMIX_ENGINE_API Module* getFirstModule();
 
 struct LUMIX_ENGINE_API builder {
 	builder(IAllocator& allocator);
 
 	template <auto Creator, auto Destroyer>
 	builder& cmp(const char* name, const char* label) {
-		auto creator = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Creator))(e); };
-		auto destroyer = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Destroyer))(e); };
+		auto creator = [](IModule* module, EntityRef e){ (module->*static_cast<void (IModule::*)(EntityRef)>(Creator))(e); };
+		auto destroyer = [](IModule* module, EntityRef e){ (module->*static_cast<void (IModule::*)(EntityRef)>(Destroyer))(e); };
 	
 		ComponentBase* cmp = LUMIX_NEW(allocator, ComponentBase)(allocator);
 		cmp->name = name;
@@ -645,15 +645,15 @@ struct LUMIX_ENGINE_API builder {
 	builder& var_enum_prop(const char* name) {
 		using T = typename ResultOf<decltype(PropGetter)>::Type;
 		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
-		p->setter = [](IScene* scene, EntityRef e, u32, const i32& value) {
+		p->setter = [](IModule* module, EntityRef e, u32, const i32& value) {
 			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& c = (static_cast<C*>(module)->*Getter)(e);
 			auto& v = c.*PropGetter;
 			v = static_cast<T>(value);
 		};
-		p->getter = [](IScene* scene, EntityRef e, u32) -> i32 {
+		p->getter = [](IModule* module, EntityRef e, u32) -> i32 {
 			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& c = (static_cast<C*>(module)->*Getter)(e);
 			auto& v = c.*PropGetter;
 			return static_cast<i32>(v);
 		};
@@ -670,25 +670,25 @@ struct LUMIX_ENGINE_API builder {
 			p->setter = nullptr;
 		}
 		else {
-			p->setter = [](IScene* scene, EntityRef e, u32 idx, const i32& value) {
+			p->setter = [](IModule* module, EntityRef e, u32 idx, const i32& value) {
 				using T = typename ResultOf<decltype(Getter)>::Type;
 				using C = typename ClassOf<decltype(Setter)>::Type;
 				if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
-					(static_cast<C*>(scene)->*Setter)(e, static_cast<T>(value));
+					(static_cast<C*>(module)->*Setter)(e, static_cast<T>(value));
 				}
 				else {
-					(static_cast<C*>(scene)->*Setter)(e, idx, static_cast<T>(value));
+					(static_cast<C*>(module)->*Setter)(e, idx, static_cast<T>(value));
 				}
 			};
 		}
 
-		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> i32 {
+		p->getter = [](IModule* module, EntityRef e, u32 idx) -> i32 {
 			using C = typename ClassOf<decltype(Getter)>::Type;
 			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e));
+				return static_cast<i32>((static_cast<C*>(module)->*Getter)(e));
 			}
 			else {
-				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e, idx));
+				return static_cast<i32>((static_cast<C*>(module)->*Getter)(e, idx));
 			}
 		};
 		p->name = name;
@@ -712,24 +712,24 @@ struct LUMIX_ENGINE_API builder {
 			p->setter = nullptr;
 		}
 		else {
-			p->setter = [](IScene* scene, EntityRef e, u32 idx, const T& value) {
+			p->setter = [](IModule* module, EntityRef e, u32 idx, const T& value) {
 				using C = typename ClassOf<decltype(Setter)>::Type;
 				if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
-					(static_cast<C*>(scene)->*Setter)(e, value);
+					(static_cast<C*>(module)->*Setter)(e, value);
 				}
 				else {
-					(static_cast<C*>(scene)->*Setter)(e, idx, value);
+					(static_cast<C*>(module)->*Setter)(e, idx, value);
 				}
 			};
 		}
 
-		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> T {
+		p->getter = [](IModule* module, EntityRef e, u32 idx) -> T {
 			using C = typename ClassOf<decltype(Getter)>::Type;
 			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return (static_cast<C*>(scene)->*Getter)(e);
+				return (static_cast<C*>(module)->*Getter)(e);
 			}
 			else {
-				return (static_cast<C*>(scene)->*Getter)(e, idx);
+				return (static_cast<C*>(module)->*Getter)(e, idx);
 			}
 		};
 
@@ -742,22 +742,22 @@ struct LUMIX_ENGINE_API builder {
 	builder& blob_property(const char* name) {
 		auto* p = LUMIX_NEW(allocator, BlobProperty)(allocator);
 		p->name = name;
-		p->setter = [](IScene* scene, EntityRef e, u32 idx, InputMemoryStream& value) {
+		p->setter = [](IModule* module, EntityRef e, u32 idx, InputMemoryStream& value) {
 			using C = typename ClassOf<decltype(Setter)>::Type;
 			if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
-				(static_cast<C*>(scene)->*Setter)(e, value);
+				(static_cast<C*>(module)->*Setter)(e, value);
 			}
 			else {
-				(static_cast<C*>(scene)->*Setter)(e, idx, value);
+				(static_cast<C*>(module)->*Setter)(e, idx, value);
 			}
 		};
-		p->getter = [](IScene* scene, EntityRef e, u32 idx, OutputMemoryStream& value) {
+		p->getter = [](IModule* module, EntityRef e, u32 idx, OutputMemoryStream& value) {
 			using C = typename ClassOf<decltype(Getter)>::Type;
 			if constexpr (ArgsCount<decltype(Getter)>::value == 2) {
-				(static_cast<C*>(scene)->*Getter)(e, value);
+				(static_cast<C*>(module)->*Getter)(e, value);
 			}
 			else {
-				(static_cast<C*>(scene)->*Getter)(e, idx, value);
+				(static_cast<C*>(module)->*Getter)(e, idx, value);
 			}
 		};
 		addProp(p);
@@ -768,15 +768,15 @@ struct LUMIX_ENGINE_API builder {
 	builder& var_prop(const char* name) {
 		using T = typename ResultOf<decltype(PropGetter)>::Type;
 		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
-		p->setter = [](IScene* scene, EntityRef e, u32, const T& value) {
+		p->setter = [](IModule* module, EntityRef e, u32, const T& value) {
 			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& c = (static_cast<C*>(module)->*Getter)(e);
 			auto& v = c.*PropGetter;
 			v = value;
 		};
-		p->getter = [](IScene* scene, EntityRef e, u32) -> T {
+		p->getter = [](IModule* module, EntityRef e, u32) -> T {
 			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& c = (static_cast<C*>(module)->*Getter)(e);
 			auto& v = c.*PropGetter;
 			return static_cast<T>(v);
 		};
@@ -789,17 +789,17 @@ struct LUMIX_ENGINE_API builder {
 	builder& begin_array(const char* name) {
 		ArrayProperty* prop = LUMIX_NEW(allocator, ArrayProperty)(allocator);
 		using C = typename ClassOf<decltype(Counter)>::Type;
-		prop->counter = [](IScene* scene, EntityRef e) -> u32 {
-			return (static_cast<C*>(scene)->*Counter)(e);
+		prop->counter = [](IModule* module, EntityRef e) -> u32 {
+			return (static_cast<C*>(module)->*Counter)(e);
 		};
-		prop->adder = [](IScene* scene, EntityRef e, u32 idx) {
-			(static_cast<C*>(scene)->*Adder)(e, idx);
+		prop->adder = [](IModule* module, EntityRef e, u32 idx) {
+			(static_cast<C*>(module)->*Adder)(e, idx);
 		};
-		prop->remover = [](IScene* scene, EntityRef e, u32 idx) {
-			(static_cast<C*>(scene)->*Remover)(e, idx);
+		prop->remover = [](IModule* module, EntityRef e, u32 idx) {
+			(static_cast<C*>(module)->*Remover)(e, idx);
 		};
 		prop->name = name;
-		scene->cmps.back()->props.push(prop);
+		module->cmps.back()->props.push(prop);
 		array = prop;
 		last_prop = prop;
 		return *this;
@@ -817,7 +817,7 @@ struct LUMIX_ENGINE_API builder {
 		auto* f = LUMIX_NEW(allocator, Event<decltype(F)>);
 		f->function = F;
 		f->name = name;
-		scene->events.push(f);
+		module->events.push(f);
 		return *this;
 	}
 
@@ -827,11 +827,11 @@ struct LUMIX_ENGINE_API builder {
 		f->function = F;
 		f->name = name;
 		f->decl_code = decl_code;
-		if (scene->cmps.empty()) {
-			scene->functions.push(f);
+		if (module->cmps.empty()) {
+			module->functions.push(f);
 		}
 		else {
-			scene->cmps.back()->functions.push(f);
+			module->cmps.back()->functions.push(f);
 		}
 		return *this;
 	}
@@ -851,12 +851,12 @@ struct LUMIX_ENGINE_API builder {
 	void addProp(PropertyBase* prop);
 
 	IAllocator& allocator;
-	Scene* scene;
+	Module* module;
 	ArrayProperty* array = nullptr;
 	PropertyBase* last_prop = nullptr;
 };
 
-LUMIX_ENGINE_API builder build_scene(const char* scene_name);
+LUMIX_ENGINE_API builder build_module(const char* name);
 
 } // namespace reflection
 

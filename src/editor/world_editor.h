@@ -19,7 +19,6 @@ template <typename T> struct Array;
 template <typename T> struct DelegateList;
 template <typename T> struct UniquePtr;
 
-
 struct IEditorCommand
 {
 	virtual ~IEditorCommand() {}
@@ -160,10 +159,10 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual DelegateList<void()>& worldDestroyed() = 0;
 	virtual DelegateList<void()>& entitySelectionChanged() = 0;
 
-	virtual EntityFolders::FolderID createEntityFolder(EntityFolders::FolderID parent) = 0;
-	virtual void destroyEntityFolder(EntityFolders::FolderID folder) = 0;
-	virtual void renameEntityFolder(EntityFolders::FolderID folder, const char* new_name) = 0;
-	virtual void moveEntityToFolder(EntityRef entity, EntityFolders::FolderID folder) = 0;
+	virtual EntityFolders::FolderHandle createEntityFolder(EntityFolders::FolderHandle parent) = 0;
+	virtual void destroyEntityFolder(EntityFolders::FolderHandle folder) = 0;
+	virtual void renameEntityFolder(EntityFolders::FolderHandle folder, const char* new_name) = 0;
+	virtual void moveEntityToFolder(EntityRef entity, EntityFolders::FolderHandle folder) = 0;
 
 	virtual struct PrefabSystem& getPrefabSystem() = 0;
 	virtual struct EntityFolders& getEntityFolders() = 0;

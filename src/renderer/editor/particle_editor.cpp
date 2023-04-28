@@ -1678,10 +1678,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 		World* world = editor.getWorld();
 		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
-		RenderScene* scene = (RenderScene*)world->getScene(emitter_type);
+		RenderModule* module = (RenderModule*)world->getModule(emitter_type);
 		const bool has = world->hasComponent(selected[0], emitter_type);
 		EntityRef e = selected[0];
-		return has ? &scene->getParticleEmitter(e) : nullptr;
+		return has ? &module->getParticleEmitter(e) : nullptr;
 	}
 
 	void apply() {

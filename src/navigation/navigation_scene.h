@@ -38,9 +38,9 @@ struct NavmeshBuildJob {
 	virtual float getProgress() = 0;
 };
 
-struct NavigationScene : IScene
+struct NavigationModule : IModule
 {
-	static UniquePtr<NavigationScene> create(Engine& engine, IPlugin& system, World& world, IAllocator& allocator);
+	static UniquePtr<NavigationModule> create(Engine& engine, ISystem& system, World& world, IAllocator& allocator);
 	static void reflect();
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;

@@ -14,7 +14,8 @@ enum class DeserializeProjectResult {
 	CORRUPTED_FILE,
 	VERSION_NOT_SUPPORTED,
 	PLUGIN_NOT_FOUND,
-	PLUGIN_DESERIALIZATION_FAILED
+	PLUGIN_DESERIALIZATION_FAILED,
+	PLUGIN_VERSION_NOT_SUPPORTED
 };
 
 struct LUMIX_ENGINE_API Engine {
@@ -33,12 +34,12 @@ struct LUMIX_ENGINE_API Engine {
 	static UniquePtr<Engine> create(InitArgs&& init_data, struct IAllocator& allocator);
 
 	virtual struct World& createWorld(bool is_main_world) = 0;
-	virtual void destroyWorld(World& context) = 0;
+	virtual void destroyWorld(World& world) = 0;
 	virtual os::WindowHandle getWindowHandle() = 0;
 
 	virtual struct FileSystem& getFileSystem() = 0;
 	virtual struct InputSystem& getInputSystem() = 0;
-	virtual struct PluginManager& getPluginManager() = 0;
+	virtual struct SystemManager& getSystemManager() = 0;
 	virtual struct ResourceManagerHub& getResourceManager() = 0;
 	virtual struct PageAllocator& getPageAllocator() = 0;
 	virtual IAllocator& getAllocator() = 0;
@@ -49,10 +50,10 @@ struct LUMIX_ENGINE_API Engine {
 		const struct Vec3& scale,
 		struct EntityMap& entity_map) = 0;
 
-	virtual void startGame(World& context) = 0;
-	virtual void stopGame(World& context) = 0;
+	virtual void startGame(World& world) = 0;
+	virtual void stopGame(World& world) = 0;
 
-	virtual void update(World& context) = 0;
+	virtual void update(World& world) = 0;
 	[[nodiscard]] virtual DeserializeProjectResult deserializeProject(struct InputMemoryStream& serializer, Span<char> startup_world) = 0;
 	virtual void serializeProject(struct OutputMemoryStream& serializer, const char* startup_world) const = 0;
 	virtual float getLastTimeDelta() const = 0;

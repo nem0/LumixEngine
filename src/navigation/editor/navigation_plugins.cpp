@@ -35,9 +35,9 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 	void onAgentGUI(EntityRef entity, WorldEditor& editor) {
 		World& world = *editor.getWorld();
-		auto* scene = static_cast<NavigationScene*>(world.getScene("navigation"));
+		auto* module = static_cast<NavigationModule*>(world.getModule("navigation"));
 		static bool debug_draw_path = false;
-		const dtCrowdAgent* agent = scene->getDetourAgent(entity);
+		const dtCrowdAgent* agent = module->getDetourAgent(entity);
 		if (agent) {
 			ImGui::LabelText("Desired speed", "%f", agent->desiredSpeed);
 			ImGui::LabelText("Corners", "%d", agent->ncorners);
@@ -55,14 +55,14 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		}
 
 		ImGui::Checkbox("Draw path", &debug_draw_path);
-		if (debug_draw_path) scene->debugDrawPath(entity);
+		if (debug_draw_path) module->debugDrawPath(entity);
 	}
 
 	void update() override {
 		if (!m_job) return;
-		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getWorld()->getScene(NAVMESH_AGENT_TYPE));
+		auto* module = static_cast<NavigationModule*>(m_app.getWorldEditor().getWorld()->getModule(NAVMESH_AGENT_TYPE));
 		if (m_job->isFinished()) {
-			scene->free(m_job);
+			module->free(m_job);
 			m_job = nullptr;
 			return;
 		}
@@ -97,34 +97,34 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 		if (cmp_type != NAVMESH_ZONE_TYPE) return;
 		
-		auto* scene = static_cast<NavigationScene*>(editor.getWorld()->getScene(cmp_type));
+		auto* module = static_cast<NavigationModule*>(editor.getWorld()->getModule(cmp_type));
 		if (m_job) {
 			ImGui::TextUnformatted("Generating...");
 		}
 		else if (ImGui::Button("Generate")) {
-			m_job = scene->generateNavmesh(entities[0]);
+			m_job = module->generateNavmesh(entities[0]);
 		}
 
 		ImGui::SameLine();
 		if (ImGui::Button("Load")) {
-			scene->loadZone(entities[0]);
+			module->loadZone(entities[0]);
 		}
 
-		if(scene->isNavmeshReady(entities[0])) {
+		if(module->isNavmeshReady(entities[0])) {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
 				const Path dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
 				if (!os::makePath(dir) && !os::dirExists(dir)) {
 					logError("Could not create ", dir);
 				}
-				scene->saveZone(entities[0]);
+				module->saveZone(entities[0]);
 			}
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
 			WorldView& view = editor.getView();
 			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
-			scene->generateTileAt(entities[0], hit.pos, true);
+			module->generateTileAt(entities[0], hit.pos, true);
 		}
 
 		static bool debug_draw_navmesh = false;
@@ -138,21 +138,21 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Portals", &portals);
 			WorldView& view = editor.getView();
 			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
-			scene->debugDrawNavmesh(entities[0], hit.pos, inner_boundaries, outer_boundaries, portals);
+			module->debugDrawNavmesh(entities[0], hit.pos, inner_boundaries, outer_boundaries, portals);
 		}
 
-		if (scene->hasDebugDrawData(entities[0])) {
+		if (module->hasDebugDrawData(entities[0])) {
 			static bool debug_draw_compact_heightfield = false;
 			ImGui::Checkbox("Draw compact heightfield", &debug_draw_compact_heightfield);
-			if (debug_draw_compact_heightfield) scene->debugDrawCompactHeightfield(entities[0]);
+			if (debug_draw_compact_heightfield) module->debugDrawCompactHeightfield(entities[0]);
 
 			static bool debug_draw_heightfield = false;
 			ImGui::Checkbox("Draw heightfield", &debug_draw_heightfield);
-			if (debug_draw_heightfield) scene->debugDrawHeightfield(entities[0]);
+			if (debug_draw_heightfield) module->debugDrawHeightfield(entities[0]);
 
 			static bool debug_draw_contours = false;
 			ImGui::Checkbox("Draw contours", &debug_draw_contours);
-			if (debug_draw_contours) scene->debugDrawContours(entities[0]);
+			if (debug_draw_contours) module->debugDrawContours(entities[0]);
 		}
 		else {
 			ImGui::Text("For more info press \"Debug tile\"");
@@ -186,10 +186,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	bool showGizmo(WorldView& view, ComponentUID cmp) override {
 		if(cmp.type != NAVMESH_ZONE_TYPE) return false;
 
-		auto* scene = static_cast<NavigationScene*>(cmp.scene);
-		World& world = scene->getWorld();
+		auto* module = static_cast<NavigationModule*>(cmp.module);
+		World& world = module->getWorld();
 		
-		const NavmeshZone& zone = scene->getZone((EntityRef)cmp.entity);
+		const NavmeshZone& zone = module->getZone((EntityRef)cmp.entity);
 		const Transform tr = world.getTransform((EntityRef)cmp.entity);
 
 		const Vec3 x = tr.rot.rotate(Vec3(zone.extents.x, 0, 0));

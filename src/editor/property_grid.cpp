@@ -64,7 +64,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	{
 		ComponentUID first_entity_cmp;
 		first_entity_cmp.type = m_cmp_type;
-		first_entity_cmp.scene = m_editor.getWorld()->getScene(m_cmp_type);
+		first_entity_cmp.module = m_editor.getWorld()->getModule(m_cmp_type);
 		first_entity_cmp.entity = m_entities[0];
 		return first_entity_cmp;
 	}
@@ -684,14 +684,14 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 	ImGui::PushFont(app.getBoldFont());
 	bool is_open;
 	bool enabled = true;
-	IScene* scene = editor.getWorld()->getScene(cmp_type);
-	if (entities_count == 1 && reflection::getPropertyValue(*scene, entities[0], cmp_type, "Enabled", enabled)) {
+	IModule* module = editor.getWorld()->getModule(cmp_type);
+	if (entities_count == 1 && reflection::getPropertyValue(*module, entities[0], cmp_type, "Enabled", enabled)) {
 		is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", "");
 		ImGui::SameLine();
 		ComponentUID cmp;
 		cmp.type = cmp_type;
 		cmp.entity = entities[0];
-		cmp.scene = editor.getWorld()->getScene(cmp_type);
+		cmp.module = editor.getWorld()->getModule(cmp_type);
 		if(ImGui::Checkbox(StaticString<256>(icon, cmp_type_name), &enabled))
 		{
 			editor.setProperty(cmp_type, "", -1, "Enabled", Span(entities, entities_count), enabled);

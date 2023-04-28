@@ -84,8 +84,8 @@ struct GUIText
 
 
 	String text;
-	GUIScene::TextHAlign horizontal_align = GUIScene::TextHAlign::LEFT;
-	GUIScene::TextVAlign vertical_align = GUIScene::TextVAlign::TOP;
+	GUIModule::TextHAlign horizontal_align = GUIModule::TextHAlign::LEFT;
+	GUIModule::TextVAlign vertical_align = GUIModule::TextVAlign::TOP;
 	u32 color = 0xff000000;
 
 private:
@@ -94,23 +94,20 @@ private:
 	FontResource* m_font_resource = nullptr;
 };
 
-
-struct GUIButton
-{
+ 
+struct GUIButton {
 	u32 hovered_color = 0xffFFffFF;
 	os::CursorType hovered_cursor = os::CursorType::UNDEFINED;
 };
 
 
-struct GUIInputField
-{
+struct GUIInputField {
 	int cursor = 0;
 	float anim = 0;
 };
 
 
-struct GUIImage
-{
+struct GUIImage {
 	~GUIImage() {
 		if (sprite) sprite->decRefCount();
 	}
@@ -125,17 +122,14 @@ struct GUIImage
 };
 
 
-struct GUIRect
-{
-	enum Flags : u32
-	{
+struct GUIRect {
+	enum Flags : u32 {
 		IS_VALID = 1 << 0,
 		IS_ENABLED = 1 << 1,
 		IS_CLIP = 1 << 2
 	};
 
-	struct Anchor
-	{
+	struct Anchor {
 		float points = 0;
 		float relative = 0;
 	};
@@ -154,15 +148,15 @@ struct GUIRect
 };
 
 
-struct GUISceneImpl final : GUIScene
-{
+struct GUIModuleImpl final : GUIModule {
 	enum class Version : i32 {
 		CANVAS_3D,
 		LATEST
 	};
-	GUISceneImpl(GUISystem& system, World& context, IAllocator& allocator)
+
+	GUIModuleImpl(GUISystem& system, World& world, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_world(context)
+		, m_world(world)
 		, m_system(system)
 		, m_rects(allocator)
 		, m_buttons(allocator)
@@ -633,10 +627,8 @@ struct GUISceneImpl final : GUIScene
 	}
 
 
-	void clear() override
-	{
-		for (GUIRect* rect : m_rects)
-		{
+	~GUIModuleImpl() {
+		for (GUIRect* rect : m_rects) {
 			if (rect->flags.isSet(GUIRect::IS_VALID)) {
 				LUMIX_DELETE(m_allocator, rect->input_field);
 				LUMIX_DELETE(m_allocator, rect->image);
@@ -644,8 +636,6 @@ struct GUISceneImpl final : GUIScene
 				LUMIX_DELETE(m_allocator, rect);
 			}
 		}
-		m_rects.clear();
-		m_buttons.clear();
 	}
 
 
@@ -1237,8 +1227,6 @@ struct GUISceneImpl final : GUIScene
 		}
 	}
 	
-	GUISystem* getSystem() override { return &m_system; }
-
 	void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) override
 	{
 		m_rects[entity]->render_target = texture_handle;
@@ -1251,7 +1239,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(bool, int, int)>& mousedButtonUnhandled() override { return m_unhandled_mouse_button; }
 
 	World& getWorld() override { return m_world; }
-	IPlugin& getPlugin() const override { return m_system; }
+	ISystem& getSystem() const override { return m_system; }
 
 	IAllocator& m_allocator;
 	World& m_world;
@@ -1278,21 +1266,21 @@ struct GUISceneImpl final : GUIScene
 };
 
 
-UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
+UniquePtr<GUIModule> GUIModule::createInstance(GUISystem& system,
 	World& world,
 	IAllocator& allocator)
 {
-	return UniquePtr<GUISceneImpl>::create(allocator, system, world, allocator);
+	return UniquePtr<GUIModuleImpl>::create(allocator, system, world, allocator);
 }
 
-void GUIScene::reflect() {
+void GUIModule::reflect() {
 	struct TextHAlignEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((GUIScene::TextHAlign)idx) {
-				case GUIScene::TextHAlign::LEFT: return "Left";
-				case GUIScene::TextHAlign::RIGHT: return "Right";
-				case GUIScene::TextHAlign::CENTER: return "Center";
+			switch((GUIModule::TextHAlign)idx) {
+				case GUIModule::TextHAlign::LEFT: return "Left";
+				case GUIModule::TextHAlign::RIGHT: return "Right";
+				case GUIModule::TextHAlign::CENTER: return "Center";
 			}
 			ASSERT(false);
 			return "N/A";
@@ -1302,10 +1290,10 @@ void GUIScene::reflect() {
 	struct TextVAlignEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((GUIScene::TextVAlign)idx) {
-				case GUIScene::TextVAlign::TOP: return "Top";
-				case GUIScene::TextVAlign::MIDDLE: return "Middle";
-				case GUIScene::TextVAlign::BOTTOM: return "Bottom";
+			switch((GUIModule::TextVAlign)idx) {
+				case GUIModule::TextVAlign::TOP: return "Top";
+				case GUIModule::TextVAlign::MIDDLE: return "Middle";
+				case GUIModule::TextVAlign::BOTTOM: return "Bottom";
 			}
 			ASSERT(false);
 			return "N/A";
@@ -1329,15 +1317,14 @@ void GUIScene::reflect() {
 		}
 	};
 
-	LUMIX_SCENE(GUISceneImpl, "gui")
-		.LUMIX_EVENT(GUIScene::buttonClicked)
-		.LUMIX_EVENT(GUIScene::rectHovered)
-		.LUMIX_EVENT(GUIScene::rectHoveredOut)
-		.LUMIX_EVENT(GUIScene::rectMouseDown)
-		.LUMIX_EVENT(GUIScene::mousedButtonUnhandled)
-		.LUMIX_FUNC(GUIScene::getRectAt)
-		.LUMIX_FUNC(GUIScene::isOver)
-		.LUMIX_FUNC(GUIScene::getSystem)
+	LUMIX_MODULE(GUIModuleImpl, "gui")
+		.LUMIX_EVENT(GUIModule::buttonClicked)
+		.LUMIX_EVENT(GUIModule::rectHovered)
+		.LUMIX_EVENT(GUIModule::rectHoveredOut)
+		.LUMIX_EVENT(GUIModule::rectMouseDown)
+		.LUMIX_EVENT(GUIModule::mousedButtonUnhandled)
+		.LUMIX_FUNC(GUIModule::getRectAt)
+		.LUMIX_FUNC(GUIModule::isOver)
 		.LUMIX_CMP(RenderTarget, "gui_render_target", "GUI / Render taget")
 		.LUMIX_CMP(Text, "gui_text", "GUI / Text")
 			.icon(ICON_FA_FONT)
@@ -1349,19 +1336,19 @@ void GUIScene::reflect() {
 			.LUMIX_PROP(TextColorRGBA, "Color").colorAttribute()
 		.LUMIX_CMP(InputField, "gui_input_field", "GUI / Input field").icon(ICON_FA_KEYBOARD)
 		.LUMIX_CMP(Canvas, "gui_canvas", "GUI / Canvas")
-			.var_prop<&GUIScene::getCanvas, &GUICanvas::is_3d>("Is 3D")
-			.var_prop<&GUIScene::getCanvas, &GUICanvas::orient_to_camera>("Orient to camera")
-			.var_prop<&GUIScene::getCanvas, &GUICanvas::virtual_size>("Virtual size")
+			.var_prop<&GUIModule::getCanvas, &GUICanvas::is_3d>("Is 3D")
+			.var_prop<&GUIModule::getCanvas, &GUICanvas::orient_to_camera>("Orient to camera")
+			.var_prop<&GUIModule::getCanvas, &GUICanvas::virtual_size>("Virtual size")
 		.LUMIX_CMP(Button, "gui_button", "GUI / Button")
 			.LUMIX_PROP(ButtonHoveredColorRGBA, "Hovered color").colorAttribute()
 			.LUMIX_ENUM_PROP(ButtonHoveredCursor, "Cursor").attribute<CursorEnum>()
 		.LUMIX_CMP(Image, "gui_image", "GUI / Image")
 			.icon(ICON_FA_IMAGE)
-			.prop<&GUIScene::isImageEnabled, &GUIScene::enableImage>("Enabled")
+			.prop<&GUIModule::isImageEnabled, &GUIModule::enableImage>("Enabled")
 			.LUMIX_PROP(ImageColorRGBA, "Color").colorAttribute()
 			.LUMIX_PROP(ImageSprite, "Sprite").resourceAttribute(Sprite::TYPE)
 		.LUMIX_CMP(Rect, "gui_rect", "GUI / Rect")
-			.prop<&GUIScene::isRectEnabled, &GUIScene::enableRect>("Enabled")
+			.prop<&GUIModule::isRectEnabled, &GUIModule::enableRect>("Enabled")
 			.LUMIX_PROP(RectClip, "Clip content")
 			.LUMIX_PROP(RectTopPoints, "Top Points")
 			.LUMIX_PROP(RectTopRelative, "Top Relative")

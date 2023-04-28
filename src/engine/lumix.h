@@ -24,6 +24,7 @@
 	#endif
 #endif
 
+// TODO get rid of this to support long paths
 enum { LUMIX_MAX_PATH = 260 };
 
 namespace Lumix

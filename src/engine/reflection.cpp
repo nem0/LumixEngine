@@ -15,7 +15,7 @@ namespace reflection
 {
 	
 struct Context {
-	Scene* first_scene = nullptr; 
+	Module* first_module = nullptr; 
 	RegisteredComponent component_bases[ComponentType::MAX_TYPES_COUNT];
 	u32 components_count = 0;
 };
@@ -59,7 +59,7 @@ const PropertyBase* getProperty(ComponentType cmp_type, const char* prop_name) {
 	return nullptr;
 }
 
-Scene::Scene(IAllocator& allocator)
+Module::Module(IAllocator& allocator)
 	: cmps(allocator)
 	, functions(allocator)
 	, events(allocator)
@@ -68,14 +68,14 @@ Scene::Scene(IAllocator& allocator)
 builder::builder(IAllocator& allocator)
 	: allocator(allocator)
 {
-	scene = LUMIX_NEW(allocator, Scene)(allocator);
+	module = LUMIX_NEW(allocator, Module)(allocator);
 }
 
 void builder::registerCmp(ComponentBase* cmp) {
 	getContext().component_bases[cmp->component_type.index].cmp = cmp;
 	getContext().component_bases[cmp->component_type.index].name_hash = RuntimeHash(cmp->name);
-	getContext().component_bases[cmp->component_type.index].scene = RuntimeHash(scene->name);
-	scene->cmps.push(cmp);
+	getContext().component_bases[cmp->component_type.index].system_hash = RuntimeHash(module->name);
+	module->cmps.push(cmp);
 }
 
 ComponentType getComponentTypeFromHash(RuntimeHash hash)
@@ -133,11 +133,12 @@ ComponentType getComponentType(const char* name)
 	RegisteredComponent& type = ctx.component_bases[getContext().components_count];
 	type.name_hash = name_hash;
 	++ctx.components_count;
+	//logInfo("Component type ", name, ", hash ", name_hash.getHashValue()); 
 	return {i32(getContext().components_count - 1)};
 }
 
-Scene* getFirstScene() {
-	return getContext().first_scene;
+Module* getFirstModule() {
+	return getContext().first_module;
 }
 
 void DynamicProperties::visit(IPropertyVisitor& visitor) const { visitor.visit(*this); }
@@ -160,12 +161,12 @@ struct NoUIAttribute : IAttribute {
 	Type getType() const override { return NO_UI; }
 };
 
-builder build_scene(const char* name) {
+builder build_module(const char* name) {
 	builder res(getAllocator());
 	Context& ctx = getContext();
-	res.scene->next = ctx.first_scene;
-	ctx.first_scene = res.scene;
-	res.scene->name = name;
+	res.module->next = ctx.first_module;
+	ctx.first_module = res.module;
+	res.module->name = name;
 	return res;
 }
 
@@ -218,7 +219,7 @@ builder& builder::end_array() {
 }
 
 builder& builder::icon(const char* icon) {
-	scene->cmps.back()->icon = icon;
+	module->cmps.back()->icon = icon;
 	return *this;
 }
 
@@ -227,8 +228,8 @@ void builder::addProp(PropertyBase* p) {
 		array->children.push(p);
 	}
 	else {
-		scene->cmps.back()->props.push(p);
-		p->cmp = scene->cmps.back();
+		module->cmps.back()->props.push(p);
+		p->cmp = module->cmps.back();
 	}
 	last_prop = p;
 }
@@ -242,11 +243,11 @@ void BlobProperty::visit(struct IPropertyVisitor& visitor) const {
 }
 
 void BlobProperty::getValue(ComponentUID cmp, u32 idx, OutputMemoryStream& stream) const {
-	getter(cmp.scene, (EntityRef)cmp.entity, idx, stream);
+	getter(cmp.module, (EntityRef)cmp.entity, idx, stream);
 }
 
 void BlobProperty::setValue(ComponentUID cmp, u32 idx, InputMemoryStream& stream) const {
-	setter(cmp.scene, (EntityRef)cmp.entity, idx, stream);
+	setter(cmp.module, (EntityRef)cmp.entity, idx, stream);
 }
 
 ArrayProperty::ArrayProperty(IAllocator& allocator)
@@ -255,15 +256,15 @@ ArrayProperty::ArrayProperty(IAllocator& allocator)
 {}
 
 u32 ArrayProperty::getCount(ComponentUID cmp) const {
-	return counter(cmp.scene, (EntityRef)cmp.entity);
+	return counter(cmp.module, (EntityRef)cmp.entity);
 }
 
 void ArrayProperty::addItem(ComponentUID cmp, u32 idx) const {
-	adder(cmp.scene, (EntityRef)cmp.entity, idx);
+	adder(cmp.module, (EntityRef)cmp.entity, idx);
 }
 
 void ArrayProperty::removeItem(ComponentUID cmp, u32 idx) const {
-	remover(cmp.scene, (EntityRef)cmp.entity, idx);
+	remover(cmp.module, (EntityRef)cmp.entity, idx);
 }
 
 

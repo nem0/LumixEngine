@@ -18,7 +18,7 @@ struct GUICanvas {
 	Vec2 virtual_size = Vec2(1000);
 };
 
-struct GUIScene : IScene
+struct GUIModule : IModule
 {
 	enum class TextHAlign : int
 	{
@@ -39,14 +39,13 @@ struct GUIScene : IScene
 		float x, y, w, h;
 	};
 
-	static UniquePtr<GUIScene> createInstance(struct GUISystem& system,
+	static UniquePtr<GUIModule> createInstance(struct GUISystem& system,
 		World& world,
 		struct IAllocator& allocator);
 	static void reflect();
 
 	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
 	virtual IVec2 getCursorPosition() = 0;
-	virtual GUISystem* getSystem() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
 	virtual Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const = 0;

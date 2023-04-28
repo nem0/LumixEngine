@@ -77,7 +77,20 @@ struct CullingSystemImpl final : CullingSystem
 	
 	~CullingSystemImpl()
 	{
-		clear();
+		for(CellPage* page : m_cell_map) {
+			ASSERT(!page->header.prev);
+			CellPage* iter = page;
+			while(iter) {
+				CellPage* tmp = iter;
+				iter = tmp->header.next;
+				tmp->~CellPage();
+				m_page_allocator.deallocate(tmp, true);
+			}
+		}
+
+		m_cells.clear();
+		m_cell_map.clear();
+		m_entity_to_cell.clear();
 	}
 	
 	Sphere* addToCell(CellPage& cell, EntityPtr entity, const DVec3& pos, float radius)
@@ -240,25 +253,6 @@ struct CullingSystemImpl final : CullingSystem
 		const DVec3 pos = cell.header.origin + sphere->position;
 		remove(entity);
 		add(entity, type, pos, radius);
-	}
-
-
-	void clear() override
-	{
-		for(CellPage* page : m_cell_map) {
-			ASSERT(!page->header.prev);
-			CellPage* iter = page;
-			while(iter) {
-				CellPage* tmp = iter;
-				iter = tmp->header.next;
-				tmp->~CellPage();
-				m_page_allocator.deallocate(tmp, true);
-			}
-		}
-	   
-		m_cells.clear();
-		m_cell_map.clear();
-		m_entity_to_cell.clear();
 	}
 
 	LUMIX_FORCE_INLINE void doCulling(const CellPage& cell

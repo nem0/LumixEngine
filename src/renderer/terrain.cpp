@@ -142,7 +142,7 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 	}
 }
 
-Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator)
+Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderModule& module, IAllocator& allocator)
 	: m_material(nullptr)
 	, m_albedomap(nullptr)
 	, m_heightmap(nullptr)
@@ -152,7 +152,7 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	, m_layer_mask(1)
 	, m_scale(1, 100, 1)
 	, m_entity(entity)
-	, m_scene(scene)
+	, m_module(module)
 	, m_allocator(allocator)
 	, m_grass_types(m_allocator)
 	, m_renderer(renderer)
@@ -302,7 +302,7 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	}
 	if (!path.isEmpty())
 	{
-		type.m_grass_model = m_scene.getEngine().getResourceManager().load<Model>(path);
+		type.m_grass_model = m_module.getEngine().getResourceManager().load<Model>(path);
 	}
 }
 
@@ -324,19 +324,19 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderScene& scene, i32 version)
+void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderModule& module, i32 version)
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
 	const char* material_path = serializer.readString();
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
-	if (version > (i32)RenderSceneVersion::TESSELATED_TERRAIN) {
+	if (version > (i32)RenderModuleVersion::TESSELATED_TERRAIN) {
 		serializer.read(m_tesselation);
 		serializer.read(m_base_grid_res);
 	}
 	m_scale.z = m_scale.x;
-	setMaterial(scene.getEngine().getResourceManager().load<Material>(Path(material_path)));
+	setMaterial(module.getEngine().getResourceManager().load<Material>(Path(material_path)));
 	i32 count;
 	serializer.read(count);
 	while(m_grass_types.size() > count)
@@ -357,7 +357,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, World
 		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
 	}
-	world.onComponentCreated(m_entity, TERRAIN_HASH, &scene);
+	world.onComponentCreated(m_entity, TERRAIN_HASH, &module);
 }
 
 	
@@ -482,7 +482,7 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	hit.mesh = nullptr;
 	if (!m_heightmap || !m_heightmap->isReady()) return hit;
 
-	const World& world = m_scene.getWorld();
+	const World& world = m_module.getWorld();
 	const Quat rot = world.getRotation(m_entity);
 	const DVec3 pos = world.getPosition(m_entity);
 	const Vec3 rel_dir = rot.rotate(dir);

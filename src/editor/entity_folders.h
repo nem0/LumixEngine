@@ -7,23 +7,25 @@
 
 namespace Lumix {
 
+// Group entities in virtual folders (unrelated to filesystem) for better organization of entities
+// This is editor only concept, you should prefer folders to entity hierarchy for performance reasons
 struct LUMIX_EDITOR_API EntityFolders final {
-	using FolderID = u64;
-	static constexpr FolderID INVALID_FOLDER = 0;
+	using FolderHandle = u64;
+	static constexpr FolderHandle INVALID_FOLDER = 0;
 
 	struct Folder {
-		FolderID id;
-		FolderID parent = INVALID_FOLDER;
-		FolderID first_child = INVALID_FOLDER;
-		FolderID next = INVALID_FOLDER;
-		FolderID prev = INVALID_FOLDER;
+		FolderHandle id;
+		FolderHandle parent = INVALID_FOLDER;
+		FolderHandle first_child = INVALID_FOLDER;
+		FolderHandle next = INVALID_FOLDER;
+		FolderHandle prev = INVALID_FOLDER;
 		EntityPtr first_entity = INVALID_ENTITY;
 		World::PartitionHandle partition;
 		char name[80];
 	};
 
 	struct Entity {
-		FolderID folder = INVALID_FOLDER;
+		FolderHandle folder = INVALID_FOLDER;
 		EntityPtr next = INVALID_ENTITY;
 		EntityPtr prev = INVALID_ENTITY;
 	};
@@ -32,33 +34,35 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	~EntityFolders();
 
 	void ignoreNewEntities(bool ignore) { m_ignore_new_entities = ignore; }
-	FolderID getRoot(World::PartitionHandle partition) const;
-	Folder& getFolder(FolderID folder_id);
-	const Folder& getFolder(FolderID folder_id) const;
-	void moveToFolder(EntityRef e, FolderID folder);
+	FolderHandle getRoot(World::PartitionHandle partition) const;
+	Folder& getFolder(FolderHandle folder_handle);
+	const Folder& getFolder(FolderHandle folder_handle) const;
+	void moveToFolder(EntityRef e, FolderHandle folder);
 	EntityPtr getNextEntity(EntityRef e) const;
-	FolderID emplaceFolder(FolderID folder, FolderID parent);
-	void destroyFolder(FolderID folder);
-	FolderID getFolder(EntityRef e) const;
-	void selectFolder(FolderID folder);
-	FolderID getSelectedFolder() const { return m_selected_folder; }
+	FolderHandle emplaceFolder(FolderHandle folder, FolderHandle parent);
+	void destroyFolder(FolderHandle folder);
+	FolderHandle getFolder(EntityRef e) const;
+	void selectFolder(FolderHandle folder);
+	FolderHandle getSelectedFolder() const { return m_selected_folder; }
 	void serialize(OutputMemoryStream& blob);
 	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map, bool is_additive, WorldEditorHeaderVersion version);
 	void cloneTo(EntityFolders& dst, World::PartitionHandle partition, HashMap<EntityPtr, EntityPtr>& entity_map);
 	void destroyPartitionFolders(World::PartitionHandle partition);
 	Array<Folder>& getFolders() { return m_folders; }
-
+	void moveFolder(FolderHandle folder, FolderHandle new_parent);
+	void renameFolder(FolderHandle folder, const char* new_name);
 
 private:
 	void onEntityCreated(EntityRef e);
 	void onEntityDestroyed(EntityRef e);
-	FolderID generateUniqueID();
+	void unlink(Folder& folder);
+	FolderHandle generateUniqueID();
 
 	IAllocator& m_allocator;
 	World& m_world;
 	Array<Entity> m_entities;
 	Array<Folder> m_folders;
-	FolderID m_selected_folder;
+	FolderHandle m_selected_folder;
 	bool m_ignore_new_entities = false;
 };
 

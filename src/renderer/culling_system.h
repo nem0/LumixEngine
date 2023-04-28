@@ -64,8 +64,6 @@ struct LUMIX_RENDERER_API CullingSystem
 
 	static UniquePtr<CullingSystem> create(IAllocator& allocator, PageAllocator& page_allocator);
 
-	virtual void clear() = 0;
-
 	virtual CullResult* cull(const ShiftedFrustum& frustum, u8 type) = 0;
 	virtual CullResult* cull(const ShiftedFrustum& frustum) = 0;
 

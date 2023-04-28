@@ -19,7 +19,7 @@ namespace Lumix
 struct Path;
 struct Pipeline;
 struct PlatformData;
-struct RenderScene;
+struct RenderModule;
 struct StudioApp;
 
 
