@@ -15,12 +15,6 @@ namespace Lumix
 {
 
 
-enum class NavigationModuleVersion : int
-{
-	LATEST
-};
-
-
 struct NavigationSystem final : ISystem {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)
