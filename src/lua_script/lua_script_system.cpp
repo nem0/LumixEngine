@@ -1,5 +1,5 @@
 #include "lua_script_system.h"
-#include "animation/animation_scene.h"
+#include "animation/animation_module.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/hash.h"
@@ -18,7 +18,7 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "engine/world.h"
-#include "gui/gui_scene.h"
+#include "gui/gui_module.h"
 #include "lua_script/lua_script.h"
 
 
@@ -118,10 +118,10 @@ namespace Lumix
 		return push(L, res, f->getReturnTypeName());
 	}
 
-	static int luaSceneMethodClosure(lua_State* L) {
+	static int luaModuleMethodClosure(lua_State* L) {
 		LuaWrapper::checkTableArg(L, 1); // self
-		IScene* scene;
-		if (!LuaWrapper::checkField(L, 1, "_scene", &scene)) {
+		IModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) {
 			ASSERT(false);
 			return 0;
 		}
@@ -133,9 +133,9 @@ namespace Lumix
 			reflection::Variant::Type type = f->getArgType(i).type;
 			toVariant(type, L, i + 2, args[i]);
 		}
-		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+		const reflection::Variant res = f->invoke(module, Span(args, f->getArgCount()));
 		if (res.type == reflection::Variant::ENTITY) {
-			LuaWrapper::pushEntity(L, res.e, &scene->getWorld());
+			LuaWrapper::pushEntity(L, res.e, &module->getWorld());
 			return 1;
 		}
 		return push(L, res, f->getReturnTypeName());
@@ -143,12 +143,12 @@ namespace Lumix
 
 	static int luaCmpMethodClosure(lua_State* L) {
 		LuaWrapper::checkTableArg(L, 1); // self
-		if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
+		if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
 			ASSERT(false);
 			lua_pop(L, 1);
 			return 0;
 		}
-		IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
+		IModule* module = LuaWrapper::toType<IModule*>(L, -1);
 		lua_pop(L, 1);
 			
 		if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
@@ -167,9 +167,9 @@ namespace Lumix
 			reflection::Variant::Type type = f->getArgType(i).type;
 			toVariant(type, L, i + 1, args[i]);
 		}
-		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+		const reflection::Variant res = f->invoke(module, Span(args, f->getArgCount()));
 		if (res.type == reflection::Variant::ENTITY) {
-			LuaWrapper::pushEntity(L, res.e, &scene->getWorld());
+			LuaWrapper::pushEntity(L, res.e, &module->getWorld());
 			return 1;
 		}
 		return push(L, res, f->getReturnTypeName());
@@ -212,7 +212,7 @@ namespace Lumix
 	static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 	static const ComponentType LUA_SCRIPT_INLINE_TYPE = reflection::getComponentType("lua_script_inline");
 
-	enum class LuaSceneVersion : i32
+	enum class LuaModuleVersion : i32
 	{
 		HASH64,
 		INLINE_SCRIPT,
@@ -277,18 +277,17 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptSystemImpl final : IPlugin
+	struct LuaScriptSystemImpl final : ISystem
 	{
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
 		void init() override;
-		void createScenes(World& world) override;
+		void createModules(World& world) override;
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
-		u32 getVersion() const override { return 0; }
 		void serialize(OutputMemoryStream& stream) const override {}
-		bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
+		bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 		Engine& m_engine;
 		IAllocator& m_allocator;
@@ -296,7 +295,7 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptSceneImpl final : LuaScriptScene
+	struct LuaScriptModuleImpl final : LuaScriptModule
 	{
 		struct TimerData
 		{
@@ -331,8 +330,8 @@ namespace Lumix
 				: m_properties(allocator)
 				, m_cmp(&cmp)
 			{
-				LuaScriptSceneImpl& scene = cmp.m_scene;
-				Engine& engine = scene.m_system.m_engine;
+				LuaScriptModuleImpl& module = cmp.m_module;
+				Engine& engine = module.m_system.m_engine;
 				lua_State* L = engine.getState();
 				m_state = lua_newthread(L);
 				m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
@@ -354,7 +353,7 @@ namespace Lumix
 				lua_getfield(m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
 				lua_pushvalue(m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
 				lua_remove(m_state, -3); // [env, Entity.new, Lumix.Entity]
-				LuaWrapper::push(m_state, &scene.m_world); // [env, Entity.new, Lumix.Entity, world]
+				LuaWrapper::push(m_state, &module.m_world); // [env, Entity.new, Lumix.Entity, world]
 				LuaWrapper::push(m_state, cmp.m_entity.index); // [env, Entity.new, Lumix.Entity, world, entity_index]
 				const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
 				ASSERT(!error);
@@ -414,17 +413,17 @@ namespace Lumix
 						lua_pop(m_state, 1); // []
 					}
 
-					m_cmp->m_scene.disableScript(*this);
+					m_cmp->m_module.disableScript(*this);
 
-					Engine& engine = m_cmp->m_scene.m_system.m_engine;
+					Engine& engine = m_cmp->m_module.m_system.m_engine;
 					lua_State* L = engine.getState();
 					luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
 					luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
 				}
 			}
 
-			void onScriptLoaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
-			void onScriptUnloaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
+			void onScriptLoaded(LuaScriptModuleImpl& module, ScriptComponent& cmp, int scr_index);
+			void onScriptUnloaded(LuaScriptModuleImpl& module, ScriptComponent& cmp, int scr_index);
 
 			ScriptComponent* m_cmp;
 			LuaScript* m_script = nullptr;
@@ -433,12 +432,12 @@ namespace Lumix
 		};
 
 		struct InlineScriptComponent : ScriptEnvironment {
-			InlineScriptComponent(EntityRef entity, LuaScriptSceneImpl& scene, IAllocator& allocator)
+			InlineScriptComponent(EntityRef entity, LuaScriptModuleImpl& module, IAllocator& allocator)
 				: m_source(allocator)
 				, m_entity(entity)
-				, m_scene(scene)
+				, m_module(module)
 			{
-				Engine& engine = scene.m_system.m_engine;
+				Engine& engine = module.m_system.m_engine;
 				lua_State* L = engine.getState();
 				m_state = lua_newthread(L);
 				m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
@@ -460,7 +459,7 @@ namespace Lumix
 				lua_getfield(m_state, -1, "new");					  // [env, Lumix.Entity, Entity.new]
 				lua_pushvalue(m_state, -2);							  // [env, Lumix.Entity, Entity.new, Lumix.Entity]
 				lua_remove(m_state, -3);							  // [env, Entity.new, Lumix.Entity]
-				LuaWrapper::push(m_state, &scene.m_world);		  // [env, Entity.new, Lumix.Entity, world]
+				LuaWrapper::push(m_state, &module.m_world);		  // [env, Entity.new, Lumix.Entity, world]
 				LuaWrapper::push(m_state, entity.index);		  // [env, Entity.new, Lumix.Entity, world, entity_index]
 				const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
 				ASSERT(!error);
@@ -469,7 +468,7 @@ namespace Lumix
 			}
 
 			InlineScriptComponent(InlineScriptComponent&& rhs)
-				: m_scene(rhs.m_scene)
+				: m_module(rhs.m_module)
 				, m_source(rhs.m_source)
 			{
 				m_environment = rhs.m_environment;
@@ -483,9 +482,9 @@ namespace Lumix
 			~InlineScriptComponent() {
 				if (!m_state) return;
 			
-				m_scene.disableScript(*this);
+				m_module.disableScript(*this);
 
-				Engine& engine = m_scene.m_system.m_engine;
+				Engine& engine = m_module.m_system.m_engine;
 				lua_State* L = engine.getState();
 				luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
 				luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
@@ -514,16 +513,16 @@ namespace Lumix
 				lua_pop(m_state, 1); // []
 			}
 
-			LuaScriptSceneImpl& m_scene;
+			LuaScriptModuleImpl& m_module;
 			EntityRef m_entity;
 			String m_source;
 		};
 
 		struct ScriptComponent
 		{
-			ScriptComponent(LuaScriptSceneImpl& scene, EntityRef entity, IAllocator& allocator)
+			ScriptComponent(LuaScriptModuleImpl& module, EntityRef entity, IAllocator& allocator)
 				: m_scripts(allocator)
-				, m_scene(scene)
+				, m_module(module)
 				, m_entity(entity)
 			{
 			}
@@ -560,7 +559,7 @@ namespace Lumix
 				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment); // [env]
 				ASSERT(lua_type(L, -1) == LUA_TTABLE);
 				lua_pushnil(L); // [env, nil]
-				IAllocator& allocator = m_scene.m_system.m_allocator;
+				IAllocator& allocator = m_module.m_system.m_allocator;
 				u8 valid_properties[256];
 				if (inst.m_properties.size() >= sizeof(valid_properties) * 8) {
 					logError("Too many properties in ", inst.m_script->getPath(), ", entity ", m_entity.index
@@ -577,8 +576,8 @@ namespace Lumix
 						if(name[0] != '_' && !equalStrings(name, "enabled"))
 						{
 							const StableHash hash(name);
-							if (!m_scene.m_property_names.find(hash).isValid()) {
-								m_scene.m_property_names.insert(hash, String(name, allocator));
+							if (!m_module.m_property_names.find(hash).isValid()) {
+								m_module.m_property_names.insert(hash, String(name, allocator));
 							}
 							if (hash != INDEX_HASH && hash != THIS_HASH)
 							{
@@ -594,7 +593,7 @@ namespace Lumix
 											default: existing_prop.type = Property::FLOAT;
 										}
 									}
-									m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
+									m_module.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 								}
 								else {
 									const int size = inst.m_properties.size();
@@ -635,16 +634,16 @@ namespace Lumix
 					if (!script.m_script) continue;
 					if (script.m_script != &resource) continue;
 					if (new_state == Resource::State::READY) {
-						script.onScriptLoaded(m_scene, *this, scr_index);
+						script.onScriptLoaded(m_module, *this, scr_index);
 					}
 					else if (new_state == Resource::State::EMPTY) {
-						script.onScriptUnloaded(m_scene, *this, scr_index);
+						script.onScriptUnloaded(m_module, *this, scr_index);
 					}
 				}
 			}
 
 			Array<ScriptInstance> m_scripts;
-			LuaScriptSceneImpl& m_scene;
+			LuaScriptModuleImpl& m_module;
 			EntityRef m_entity;
 		};
 
@@ -698,9 +697,9 @@ namespace Lumix
 
 
 	public:
-		LuaScriptSceneImpl(LuaScriptSystemImpl& system, World& ctx)
+		LuaScriptModuleImpl(LuaScriptSystemImpl& system, World& world)
 			: m_system(system)
-			, m_world(ctx)
+			, m_world(world)
 			, m_scripts(system.m_allocator)
 			, m_inline_scripts(system.m_allocator)
 			, m_updates(system.m_allocator)
@@ -709,7 +708,7 @@ namespace Lumix
 			, m_property_names(system.m_allocator)
 			, m_is_game_running(false)
 			, m_is_api_registered(false)
-			, m_animation_scene(nullptr)
+			, m_animation_module(nullptr)
 		{
 			m_function_call.is_in_progress = false;
 			
@@ -717,7 +716,7 @@ namespace Lumix
 		}
 
 
-		int getVersion() const override { return (int)LuaSceneVersion::LATEST; }
+		int getVersion() const override { return (int)LuaModuleVersion::LATEST; }
 
 		IFunctionCall* beginFunctionCall(const ScriptEnvironment& env, const char* function) {
 			lua_rawgeti(env.m_state, LUA_REGISTRYINDEX, env.m_environment);
@@ -796,14 +795,12 @@ namespace Lumix
 		}
 
 
-		void clear() override
-		{
+		~LuaScriptModuleImpl() {
 			Path invalid_path;
 			for (auto* script_cmp : m_scripts) {
 				ASSERT(script_cmp);
 				LUMIX_DELETE(m_system.m_allocator, script_cmp);
 			}
-			m_scripts.clear();
 		}
 
 
@@ -838,12 +835,12 @@ namespace Lumix
 			}
 
 			auto* world = LuaWrapper::toType<World*>(L, -1);
-			auto* scene = (LuaScriptSceneImpl*)world->getScene(LUA_SCRIPT_TYPE);
+			auto* module = (LuaScriptModuleImpl*)world->getModule(LUA_SCRIPT_TYPE);
 
 			lua_pop(L, 2);
 			const StableHash prop_name_hash(prop_name);
 			const StableHash32 prop_name_hash32(prop_name);
-			for (auto& prop : scene->m_current_script_instance->m_properties)
+			for (auto& prop : module->m_current_script_instance->m_properties)
 			{
 				if (prop.name_hash == prop_name_hash || prop.name_hash_legacy == prop_name_hash32)
 				{
@@ -853,13 +850,13 @@ namespace Lumix
 				}
 			}
 
-			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.m_allocator);
+			auto& prop = module->m_current_script_instance->m_properties.emplace(module->m_system.m_allocator);
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
 			prop.resource_type = resource_type;
-			if (!scene->m_property_names.find(prop_name_hash).isValid())
+			if (!module->m_property_names.find(prop_name_hash).isValid())
 			{
-				scene->m_property_names.insert(prop_name_hash, String(prop_name, scene->m_system.m_allocator));
+				module->m_property_names.insert(prop_name_hash, String(prop_name, module->m_system.m_allocator));
 			}
 			return 0;
 		}
@@ -887,15 +884,15 @@ namespace Lumix
 				return 0;
 			}
 			
-			LuaScriptSceneImpl* scene = (LuaScriptSceneImpl*)world->getScene(LUA_SCRIPT_TYPE);
+			LuaScriptModuleImpl* module = (LuaScriptModuleImpl*)world->getModule(LUA_SCRIPT_TYPE);
 
-			const int count = scene->getScriptCount(entity);
+			const int count = module->getScriptCount(entity);
 			if (scr_index >= count) {
 				return 0;
 			}
 
 			/////
-			const ScriptInstance& instance = scene->m_scripts[entity]->m_scripts[scr_index];
+			const ScriptInstance& instance = module->m_scripts[entity]->m_scripts[scr_index];
 			LuaWrapper::DebugGuard guard(instance.m_state);
 			lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment);
 			if (lua_type(instance.m_state, -1) != LUA_TTABLE) {
@@ -905,14 +902,14 @@ namespace Lumix
 			}
 			lua_getfield(instance.m_state, -1, "update");
 			if (lua_type(instance.m_state, -1) == LUA_TFUNCTION) {
-				auto& update_data = scene->m_updates.emplace();
+				auto& update_data = module->m_updates.emplace();
 				update_data.state = instance.m_state;
 				update_data.environment = instance.m_environment;
 			}
 			lua_pop(instance.m_state, 1);
 			lua_getfield(instance.m_state, -1, "onInputEvent");
 			if (lua_type(instance.m_state, -1) == LUA_TFUNCTION) {
-				auto& callback = scene->m_input_handlers.emplace();
+				auto& callback = module->m_input_handlers.emplace();
 				callback.state = instance.m_state;
 				callback.environment = instance.m_environment;
 			}
@@ -950,16 +947,16 @@ namespace Lumix
 				return 1;
 			}
 			
-			LuaScriptScene* scene = (LuaScriptScene*)world->getScene(LUA_SCRIPT_TYPE);
+			LuaScriptModule* module = (LuaScriptModule*)world->getModule(LUA_SCRIPT_TYPE);
 
-			int count = scene->getScriptCount(entity);
+			int count = module->getScriptCount(entity);
 			if (scr_index >= count)
 			{
 				lua_pushnil(L);
 				return 1;
 			}
 
-			int env = scene->getEnvironment(entity, scr_index);
+			int env = module->getEnvironment(entity, scr_index);
 			if (env < 0)
 			{
 				lua_pushnil(L);
@@ -1008,7 +1005,7 @@ namespace Lumix
 					visitor.L = L;
 					visitor.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 					auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
-					visitor.cmp.scene = LuaWrapper::toType<IScene*>(L, lua_upvalueindex(2));
+					visitor.cmp.module = LuaWrapper::toType<IModule*>(L, lua_upvalueindex(2));
 					visitor.cmp.entity.index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
 					visitor.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
 					visitor.idx = LuaWrapper::toType<int>(L, lua_upvalueindex(5));
@@ -1022,7 +1019,7 @@ namespace Lumix
 					visitor.L = L;
 					visitor.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 					auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
-					visitor.cmp.scene = LuaWrapper::toType<IScene*>(L, lua_upvalueindex(2));
+					visitor.cmp.module = LuaWrapper::toType<IModule*>(L, lua_upvalueindex(2));
 					visitor.cmp.entity.index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
 					visitor.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
 					visitor.idx = LuaWrapper::toType<int>(L, lua_upvalueindex(5));
@@ -1032,7 +1029,7 @@ namespace Lumix
 				
 				LuaWrapper::DebugGuard guard(L, 1);
 				auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
-				auto* scene = LuaWrapper::toType<IScene*>(L, lua_upvalueindex(2));
+				auto* module = LuaWrapper::toType<IModule*>(L, lua_upvalueindex(2));
 				int entity_index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
 				ComponentType cmp_type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
 				LuaWrapper::checkTableArg(L, 1); // self
@@ -1041,7 +1038,7 @@ namespace Lumix
 				lua_newtable(L); // {}, mt
 
 				lua_pushlightuserdata(L, (void*)prop);
-				lua_pushlightuserdata(L, (void*)scene);
+				lua_pushlightuserdata(L, (void*)module);
 				LuaWrapper::push(L, entity_index);
 				LuaWrapper::push(L, cmp_type);
 				LuaWrapper::push(L, idx);
@@ -1049,7 +1046,7 @@ namespace Lumix
 				lua_setfield(L, -2, "__index"); // {}, mt
 
 				lua_pushlightuserdata(L, (void*)prop);
-				lua_pushlightuserdata(L, (void*)scene);
+				lua_pushlightuserdata(L, (void*)module);
 				LuaWrapper::push(L, entity_index);
 				LuaWrapper::push(L, cmp_type);
 				LuaWrapper::push(L, idx);
@@ -1062,9 +1059,9 @@ namespace Lumix
 			lua_newtable(L); // {}
 			lua_newtable(L); // {}, metatable
 			lua_pushlightuserdata(L, (void*)&prop); // {}, mt, &prop
-			lua_pushlightuserdata(L, (void*)cmp.scene); // {}, mt, &prop, scene
-			LuaWrapper::push(L, cmp.entity.index); // {}, mt, &prop, scene, entity.index
-			LuaWrapper::push(L, cmp.type); // {}, mt, &prop, scene, entity.index, cmp_type
+			lua_pushlightuserdata(L, (void*)cmp.module); // {}, mt, &prop, module
+			LuaWrapper::push(L, cmp.entity.index); // {}, mt, &prop, module, entity.index
+			LuaWrapper::push(L, cmp.type); // {}, mt, &prop, module, entity.index, cmp_type
 			lua_pushcclosure(L, getter, 4); // {}, mt, getter
 			lua_setfield(L, -2, "__index"); // {}, mt
 			lua_setmetatable(L, -2); // {}
@@ -1096,7 +1093,7 @@ namespace Lumix
 				
 				const EntityPtr val = prop.get(cmp, idx);
 				found = true;
-				LuaWrapper::pushEntity(L, val, &cmp.scene->getWorld());
+				LuaWrapper::pushEntity(L, val, &cmp.module->getWorld());
 			}
 
 			void visit(const reflection::Property<Path>& prop) override { 
@@ -1206,11 +1203,11 @@ namespace Lumix
 			LuaWrapper::getField(L, 1, "cmp_type");
 			const int cmp_type = LuaWrapper::toType<int>(L, -1);
 			lua_pop(L, 1);
-			IScene* scene = world->getScene(ComponentType{cmp_type});
+			IModule* module = world->getModule(ComponentType{cmp_type});
 
 			lua_newtable(L);
 			LuaWrapper::setField(L, -1, "_entity", e);
-			LuaWrapper::setField(L, -1, "_scene", scene);
+			LuaWrapper::setField(L, -1, "_module", module);
 			lua_pushvalue(L, 1);
 			lua_setmetatable(L, -2);
 			return 1;
@@ -1219,15 +1216,15 @@ namespace Lumix
 		static int lua_prop_getter(lua_State* L) {
 			LuaWrapper::checkTableArg(L, 1); // self
 
-			lua_getfield(L, 1, "_scene");
-			LuaScriptSceneImpl* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
+			lua_getfield(L, 1, "_module");
+			LuaScriptModuleImpl* module = LuaWrapper::toType<LuaScriptModuleImpl*>(L, -1);
 			lua_getfield(L, 1, "_entity");
 			const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
 			lua_pop(L, 2);
 
 			if (lua_isnumber(L, 2)) {
 				const i32 scr_index = LuaWrapper::toType<i32>(L, 2);
-				int env = scene->getEnvironment(entity, scr_index);
+				int env = module->getEnvironment(entity, scr_index);
 				if (env < 0) {
 					lua_pushnil(L);
 				}
@@ -1245,7 +1242,7 @@ namespace Lumix
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 			const reflection::ComponentBase* cmp = reflection::getComponent(v.cmp.type);
 
-			v.cmp.scene = scene;
+			v.cmp.module = module;
 			v.cmp.entity = entity;
 
 			cmp->visit(v);
@@ -1273,8 +1270,8 @@ namespace Lumix
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 			const reflection::ComponentBase* cmp = reflection::getComponent(v.cmp.type);
 
-			lua_getfield(L, 1, "_scene");
-			v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
+			lua_getfield(L, 1, "_module");
+			v.cmp.module = LuaWrapper::toType<IModule*>(L, -1);
 			lua_getfield(L, 1, "_entity");
 			v.cmp.entity.index = LuaWrapper::toType<i32>(L, -1);
 			lua_pop(L, 2);
@@ -1288,13 +1285,13 @@ namespace Lumix
 			return 0;
 		}
 
-		static int lua_new_scene(lua_State* L) {
+		static int lua_new_module(lua_State* L) {
 			LuaWrapper::DebugGuard guard(L, 1);
 			LuaWrapper::checkTableArg(L, 1); // self
-			IScene* scene = LuaWrapper::checkArg<IScene*>(L, 2);
+			IModule* module = LuaWrapper::checkArg<IModule*>(L, 2);
 			
 			lua_newtable(L);
-			LuaWrapper::setField(L, -1, "_scene", scene);
+			LuaWrapper::setField(L, -1, "_module", module);
 			lua_pushvalue(L, 1);
 			lua_setmetatable(L, -2);
 			return 1;
@@ -1305,32 +1302,32 @@ namespace Lumix
 			lua_State* L = m_system.m_engine.getState();
 			LuaWrapper::DebugGuard guard(L);
 
-			reflection::Scene* scene = reflection::getFirstScene();
-			while (scene) {
-				lua_newtable(L); // [ scene ]
-				lua_getglobal(L, "Lumix"); // [ scene, Lumix ]
-				lua_pushvalue(L, -2); // [ scene, Lumix, scene]
-				lua_setfield(L, -2, scene->name); // [ scene, Lumix ]
-				lua_pop(L, 1); // [ scene ]
+			reflection::Module* module = reflection::getFirstModule();
+			while (module) {
+				lua_newtable(L); // [ module ]
+				lua_getglobal(L, "Lumix"); // [ module, Lumix ]
+				lua_pushvalue(L, -2); // [ module, Lumix, module]
+				lua_setfield(L, -2, module->name); // [ module, Lumix ]
+				lua_pop(L, 1); // [ module ]
 
-				lua_pushvalue(L, -1); // [ scene, scene ]
-				lua_setfield(L, -2, "__index"); // [ scene ]
+				lua_pushvalue(L, -1); // [ module, module ]
+				lua_setfield(L, -2, "__index"); // [ module ]
 
-				lua_pushcfunction(L, lua_new_scene); // [ scene, fn_new_scene ]
-				lua_setfield(L, -2, "new"); // [ scene ]
+				lua_pushcfunction(L, lua_new_module); // [ module, fn_new_module ]
+				lua_setfield(L, -2, "new"); // [ module ]
 
-				for (const reflection::FunctionBase* f :  scene->functions) {
+				for (const reflection::FunctionBase* f :  module->functions) {
 					const char* c = f->decl_code;
 					while (*c != ':' && *c) ++c;
 					ASSERT(*c == ':');
 					c += 2;
-					lua_pushlightuserdata(L, (void*)f); // [scene, f]
-					lua_pushcclosure(L, luaSceneMethodClosure, 1); // [scene, fn]
-					lua_setfield(L, -2, c); // [scene]
+					lua_pushlightuserdata(L, (void*)f); // [module, f]
+					lua_pushcclosure(L, luaModuleMethodClosure, 1); // [module, fn]
+					lua_setfield(L, -2, c); // [module]
 				}
 				lua_pop(L, 1); // []
 
-				scene = scene->next;
+				module = module->next;
 			}
 
 			for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
@@ -1375,10 +1372,10 @@ namespace Lumix
 
 		static int setTimer(lua_State* L)
 		{
-			auto* scene = LuaWrapper::checkArg<LuaScriptSceneImpl*>(L, 1);
+			auto* module = LuaWrapper::checkArg<LuaScriptModuleImpl*>(L, 1);
 			float time = LuaWrapper::checkArg<float>(L, 2);
 			if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
-			TimerData& timer = scene->m_timers.emplace();
+			TimerData& timer = module->m_timers.emplace();
 			timer.time = time;
 			timer.state = L;
 			lua_pushvalue(L, 3);
@@ -1399,12 +1396,12 @@ namespace Lumix
 			
 			registerProperties();
 			registerPropertyAPI();
-			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
-			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "rescan", &LuaScriptSceneImpl::rescan);
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "getEnvironment", &LuaScriptModuleImpl::getEnvironment);
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "rescan", &LuaScriptModuleImpl::rescan);
 			
 			#define REGISTER_FUNCTION(F) \
 				do { \
-					auto f = &LuaWrapper::wrapMethod<&LuaScriptSceneImpl::F>; \
+					auto f = &LuaWrapper::wrapMethod<&LuaScriptModuleImpl::F>; \
 					LuaWrapper::createSystemFunction(engine_state, "LuaScript", #F, f); \
 				} while(false)
 
@@ -1412,7 +1409,7 @@ namespace Lumix
 
 			#undef REGISTER_FUNCTION
 
-			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "setTimer", &LuaScriptSceneImpl::setTimer);
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "setTimer", &LuaScriptModuleImpl::setTimer);
 		}
 
 
@@ -1757,35 +1754,35 @@ namespace Lumix
 
 		void startGame() override
 		{
-			m_animation_scene = (AnimationScene*)m_world.getScene("animation");
+			m_animation_module = (AnimationModule*)m_world.getModule("animation");
 			m_is_game_running = true;
-			m_gui_scene = (GUIScene*)m_world.getScene("gui");
-			if (m_gui_scene)
+			m_gui_module = (GUIModule*)m_world.getModule("gui");
+			if (m_gui_module)
 			{
-				m_gui_scene->buttonClicked().bind<&LuaScriptSceneImpl::onButtonClicked>(this);
-				m_gui_scene->rectHovered().bind<&LuaScriptSceneImpl::onRectHovered>(this);
-				m_gui_scene->rectHoveredOut().bind<&LuaScriptSceneImpl::onRectHoveredOut>(this);
-				m_gui_scene->rectMouseDown().bind<&LuaScriptSceneImpl::onRectMouseDown>(this);
+				m_gui_module->buttonClicked().bind<&LuaScriptModuleImpl::onButtonClicked>(this);
+				m_gui_module->rectHovered().bind<&LuaScriptModuleImpl::onRectHovered>(this);
+				m_gui_module->rectHoveredOut().bind<&LuaScriptModuleImpl::onRectHoveredOut>(this);
+				m_gui_module->rectMouseDown().bind<&LuaScriptModuleImpl::onRectMouseDown>(this);
 			}
 		}
 
 
 		void stopGame() override
 		{
-			if (m_gui_scene)
+			if (m_gui_module)
 			{
-				m_gui_scene->buttonClicked().unbind<&LuaScriptSceneImpl::onButtonClicked>(this);
-				m_gui_scene->rectHovered().unbind<&LuaScriptSceneImpl::onRectHovered>(this);
-				m_gui_scene->rectHoveredOut().unbind<&LuaScriptSceneImpl::onRectHoveredOut>(this);
-				m_gui_scene->rectMouseDown().unbind<&LuaScriptSceneImpl::onRectMouseDown>(this);
+				m_gui_module->buttonClicked().unbind<&LuaScriptModuleImpl::onButtonClicked>(this);
+				m_gui_module->rectHovered().unbind<&LuaScriptModuleImpl::onRectHovered>(this);
+				m_gui_module->rectHoveredOut().unbind<&LuaScriptModuleImpl::onRectHoveredOut>(this);
+				m_gui_module->rectMouseDown().unbind<&LuaScriptModuleImpl::onRectMouseDown>(this);
 			}
-			m_gui_scene = nullptr;
+			m_gui_module = nullptr;
 			m_scripts_start_called = false;
 			m_is_game_running = false;
 			m_updates.clear();
 			m_input_handlers.clear();
 			m_timers.clear();
-			m_animation_scene = nullptr;
+			m_animation_module = nullptr;
 		}
 
 		void createInlineScriptComponent(EntityRef entity) {
@@ -1986,7 +1983,7 @@ namespace Lumix
 
 		void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 		{
-			if (version > (i32)LuaSceneVersion::INLINE_SCRIPT) {
+			if (version > (i32)LuaModuleVersion::INLINE_SCRIPT) {
 				const i32 len = serializer.read<i32>();
 				m_inline_scripts.reserve(m_scripts.size() + len);
 				for (int i = 0; i < len; ++i) {
@@ -2025,7 +2022,7 @@ namespace Lumix
 					{
 						Property& prop = scr.m_properties.emplace(allocator);
 						prop.type = Property::ANY;
-						if (version <= (i32)LuaSceneVersion::HASH64) {
+						if (version <= (i32)LuaModuleVersion::HASH64) {
 							serializer.read(prop.name_hash_legacy);
 						}
 						else {
@@ -2052,7 +2049,7 @@ namespace Lumix
 		}
 
 
-		IPlugin& getPlugin() const override { return m_system; }
+		ISystem& getSystem() const override { return m_system; }
 
 
 		void startScripts()
@@ -2375,11 +2372,11 @@ namespace Lumix
 		bool m_scripts_start_called = false;
 		bool m_is_api_registered = false;
 		bool m_is_game_running = false;
-		GUIScene* m_gui_scene = nullptr;
-		AnimationScene* m_animation_scene;
+		GUIModule* m_gui_module = nullptr;
+		AnimationModule* m_animation_module;
 	};
 
-	void LuaScriptSceneImpl::ScriptInstance::onScriptUnloaded(LuaScriptSceneImpl& scene, struct ScriptComponent& cmp, int scr_index) {
+	void LuaScriptModuleImpl::ScriptInstance::onScriptUnloaded(LuaScriptModuleImpl& module, struct ScriptComponent& cmp, int scr_index) {
 		LuaWrapper::DebugGuard guard(m_state);
 		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
 		lua_getfield(m_state, -1, "onUnload"); // [env, awake]
@@ -2408,7 +2405,7 @@ namespace Lumix
 		lua_pop(m_state, 1);
 	}
 
-	void LuaScriptSceneImpl::ScriptInstance::onScriptLoaded(LuaScriptSceneImpl& scene, struct ScriptComponent& cmp, int scr_index) {
+	void LuaScriptModuleImpl::ScriptInstance::onScriptLoaded(LuaScriptModuleImpl& module, struct ScriptComponent& cmp, int scr_index) {
 		LuaWrapper::DebugGuard guard(m_state);
 		
 		bool is_reload = m_flags.isSet(LOADED);
@@ -2430,7 +2427,7 @@ namespace Lumix
 		lua_pushvalue(m_state, -2); // [env, func, env]
 		lua_setfenv(m_state, -2);
 
-		scene.m_current_script_instance = this;
+		module.m_current_script_instance = this;
 		errors = lua_pcall(m_state, 0, 0, 0) != 0; // [env]
 		if (errors)	{
 			logError(m_script->getPath(), ": ", lua_tostring(m_state, -1));
@@ -2441,7 +2438,7 @@ namespace Lumix
 		cmp.detectProperties(*this);
 					
 		bool enabled = m_flags.isSet(ScriptInstance::ENABLED);
-		scene.setEnableProperty(cmp.m_entity, scr_index, *this, enabled);
+		module.setEnableProperty(cmp.m_entity, scr_index, *this, enabled);
 		m_flags.set(LOADED);
 
 		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
@@ -2458,7 +2455,7 @@ namespace Lumix
 			lua_pop(m_state, 1); // []
 		}
 
-		if (scene.m_is_game_running) scene.startScript(m_cmp->m_entity, *this, is_reload);
+		if (module.m_is_game_running) module.startScript(m_cmp->m_entity, *this, is_reload);
 	}
 
 
@@ -2470,104 +2467,104 @@ namespace Lumix
 		}
 		
 		u32 getCount(ComponentUID cmp, int index) const override { 
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
-			return scene.getPropertyCount(e, index);
+			return module.getPropertyCount(e, index);
 		}
 
 		Type getType(ComponentUID cmp, int array_idx, u32 idx) const override { 
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
-			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
+			const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
 			switch(type) {
-				case LuaScriptScene::Property::Type::BOOLEAN: return BOOLEAN;
-				case LuaScriptScene::Property::Type::INT: return I32;
-				case LuaScriptScene::Property::Type::FLOAT: return FLOAT;
-				case LuaScriptScene::Property::Type::STRING: return STRING;
-				case LuaScriptScene::Property::Type::ENTITY: return ENTITY;
-				case LuaScriptScene::Property::Type::RESOURCE: return RESOURCE;
-				case LuaScriptScene::Property::Type::COLOR: return COLOR;
-				case LuaScriptScene::Property::Type::ANY: return NONE;
+				case LuaScriptModule::Property::Type::BOOLEAN: return BOOLEAN;
+				case LuaScriptModule::Property::Type::INT: return I32;
+				case LuaScriptModule::Property::Type::FLOAT: return FLOAT;
+				case LuaScriptModule::Property::Type::STRING: return STRING;
+				case LuaScriptModule::Property::Type::ENTITY: return ENTITY;
+				case LuaScriptModule::Property::Type::RESOURCE: return RESOURCE;
+				case LuaScriptModule::Property::Type::COLOR: return COLOR;
+				case LuaScriptModule::Property::Type::ANY: return NONE;
 			}
 			ASSERT(false);
 			return NONE;
 		}
 
 		const char* getName(ComponentUID cmp, int array_idx, u32 idx) const override {
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
-			return scene.getPropertyName(e, array_idx, idx);
+			return module.getPropertyName(e, array_idx, idx);
 		}
 
 		reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const override {
 			reflection::ResourceAttribute attr;
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
-			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
-			ASSERT(type == LuaScriptScene::Property::Type::RESOURCE);
-			attr.resource_type  = scene.getPropertyResourceType(e, array_idx, idx);
+			const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
+			ASSERT(type == LuaScriptModule::Property::Type::RESOURCE);
+			attr.resource_type  = module.getPropertyResourceType(e, array_idx, idx);
 			return attr;
 		}
 
 
 		Value getValue(ComponentUID cmp, int array_idx, u32 idx) const override { 
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
-			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
-			const char* name = scene.getPropertyName(e, array_idx, idx);
+			const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
+			const char* name = module.getPropertyName(e, array_idx, idx);
 			Value v = {};
 			switch(type) {
-				case LuaScriptScene::Property::Type::COLOR: reflection::set(v, scene.getPropertyValue<Vec3>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::BOOLEAN: reflection::set(v, scene.getPropertyValue<bool>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::INT: reflection::set(v, scene.getPropertyValue<i32>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::FLOAT: reflection::set(v, scene.getPropertyValue<float>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::STRING: reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::ENTITY: reflection::set(v, scene.getPropertyValue<EntityPtr>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::RESOURCE: {
-					const i32 res_idx = scene.getPropertyValue<i32>(e, array_idx, name);
+				case LuaScriptModule::Property::Type::COLOR: reflection::set(v, module.getPropertyValue<Vec3>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::BOOLEAN: reflection::set(v, module.getPropertyValue<bool>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::INT: reflection::set(v, module.getPropertyValue<i32>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::FLOAT: reflection::set(v, module.getPropertyValue<float>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::STRING: reflection::set(v, module.getPropertyValue<const char*>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::ENTITY: reflection::set(v, module.getPropertyValue<EntityPtr>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::RESOURCE: {
+					const i32 res_idx = module.getPropertyValue<i32>(e, array_idx, name);
 					if (res_idx < 0) {
 						reflection::set(v, ""); 
 					}
 					else {
-						Resource* res = scene.m_system.m_engine.getLuaResource(res_idx);
+						Resource* res = module.m_system.m_engine.getLuaResource(res_idx);
 						reflection::set(v, res ? res->getPath().c_str() : ""); 
 					}
 					break;
 				}
-				case LuaScriptScene::Property::Type::ANY: reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
+				case LuaScriptModule::Property::Type::ANY: reflection::set(v, module.getPropertyValue<const char*>(e, array_idx, name)); break;
 			}
 			return v;
 		}
 		
 		void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value v) const override { 
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
 			switch(type) {
-				case BOOLEAN: scene.setPropertyValue(e, array_idx, name, v.b); break;
-				case I32: scene.setPropertyValue(e, array_idx, name, v.i); break;
-				case FLOAT: scene.setPropertyValue(e, array_idx, name, v.f); break;
-				case STRING: scene.setPropertyValue(e, array_idx, name, v.s); break;
-				case ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
-				case RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
-				case COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
+				case BOOLEAN: module.setPropertyValue(e, array_idx, name, v.b); break;
+				case I32: module.setPropertyValue(e, array_idx, name, v.i); break;
+				case FLOAT: module.setPropertyValue(e, array_idx, name, v.f); break;
+				case STRING: module.setPropertyValue(e, array_idx, name, v.s); break;
+				case ENTITY: module.setPropertyValue(e, array_idx, name, v.e); break;
+				case RESOURCE: module.setPropertyValue(e, array_idx, name, v.s); break;
+				case COLOR: module.setPropertyValue(e, array_idx, name, v.v3); break;
 				case NONE: break;
 			}
 		}
 
 		void set(ComponentUID cmp, int array_idx, u32 idx, Value v) const override {
-			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
 			const EntityRef e = (EntityRef)cmp.entity;
-			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
-			const char* name = scene.getPropertyName(e, array_idx, idx);
+			const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
+			const char* name = module.getPropertyName(e, array_idx, idx);
 			switch(type) {
-				case LuaScriptScene::Property::Type::BOOLEAN: scene.setPropertyValue(e, array_idx, name, v.b); break;
-				case LuaScriptScene::Property::Type::INT: scene.setPropertyValue(e, array_idx, name, v.i); break;
-				case LuaScriptScene::Property::Type::FLOAT: scene.setPropertyValue(e, array_idx, name, v.f); break;
-				case LuaScriptScene::Property::Type::STRING: scene.setPropertyValue(e, array_idx, name, v.s); break;
-				case LuaScriptScene::Property::Type::ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
-				case LuaScriptScene::Property::Type::RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
-				case LuaScriptScene::Property::Type::COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
-				case LuaScriptScene::Property::Type::ANY: ASSERT(false); break;
+				case LuaScriptModule::Property::Type::BOOLEAN: module.setPropertyValue(e, array_idx, name, v.b); break;
+				case LuaScriptModule::Property::Type::INT: module.setPropertyValue(e, array_idx, name, v.i); break;
+				case LuaScriptModule::Property::Type::FLOAT: module.setPropertyValue(e, array_idx, name, v.f); break;
+				case LuaScriptModule::Property::Type::STRING: module.setPropertyValue(e, array_idx, name, v.s); break;
+				case LuaScriptModule::Property::Type::ENTITY: module.setPropertyValue(e, array_idx, name, v.e); break;
+				case LuaScriptModule::Property::Type::RESOURCE: module.setPropertyValue(e, array_idx, name, v.s); break;
+				case LuaScriptModule::Property::Type::COLOR: module.setPropertyValue(e, array_idx, name, v.v3); break;
+				case LuaScriptModule::Property::Type::ANY: ASSERT(false); break;
 			}
 		}
 	};
@@ -2580,12 +2577,12 @@ namespace Lumix
 	{
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
-		LUMIX_SCENE(LuaScriptSceneImpl, "lua_script")
+		LUMIX_MODULE(LuaScriptModuleImpl, "lua_script")
 			.LUMIX_CMP(InlineScriptComponent, "lua_script_inline", "Lua Script / Inline") 
 				.LUMIX_PROP(InlineScriptCode, "Code").multilineAttribute()
 			.LUMIX_CMP(ScriptComponent, "lua_script", "Lua Script / File") 
-			.begin_array<&LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript>("scripts")
-				.prop<&LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript>("Enabled")
+			.begin_array<&LuaScriptModule::getScriptCount, &LuaScriptModule::addScript, &LuaScriptModule::removeScript>("scripts")
+				.prop<&LuaScriptModule::isScriptEnabled, &LuaScriptModule::enableScript>("Enabled")
 				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
 				.property<LuaProperties>()
 			.end_array();
@@ -2600,10 +2597,10 @@ namespace Lumix
 		m_script_manager.destroy();
 	}
 
-	void LuaScriptSystemImpl::createScenes(World& ctx)
+	void LuaScriptSystemImpl::createModules(World& world)
 	{
-		UniquePtr<LuaScriptSceneImpl> scene = UniquePtr<LuaScriptSceneImpl>::create(m_allocator, *this, ctx);
-		ctx.addScene(scene.move());
+		UniquePtr<LuaScriptModuleImpl> module = UniquePtr<LuaScriptModuleImpl>::create(m_allocator, *this, world);
+		world.addModule(module.move());
 	}
 
 

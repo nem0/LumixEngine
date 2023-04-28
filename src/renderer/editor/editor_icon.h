@@ -35,7 +35,7 @@ struct EditorIcons
 		float t;
 	};
 
-	static UniquePtr<EditorIcons> create(struct WorldEditor& editor, struct RenderScene& scene);
+	static UniquePtr<EditorIcons> create(struct WorldEditor& editor, struct RenderModule& module);
 
 	virtual ~EditorIcons() {}
 

@@ -17,7 +17,7 @@
 #include "gui/gui_system.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 
@@ -69,11 +69,11 @@ void GameView::init() {
 	m_app.addAction(&m_fullscreen_action);
 
 	Engine& engine = m_app.getEngine();
-	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
 
-	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
+	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui)
 	{
 		m_gui_interface = UniquePtr<GUIInterface>::create(engine.getAllocator(), *this);
@@ -87,7 +87,7 @@ GameView::~GameView()
 	m_app.removeAction(&m_toggle_ui);
 	m_app.removeAction(&m_fullscreen_action);
 	Engine& engine = m_app.getEngine();
-	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
+	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui) {
 		gui->setInterface(nullptr);
 	}
@@ -156,12 +156,13 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 		return;
 	}
 
-	EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
+	RenderModule* render_module = m_pipeline->getModule();
+	EntityPtr camera = render_module->getActiveCamera();
 	if (camera.isValid()) {
-		Viewport vp = m_pipeline->getScene()->getCameraViewport((EntityRef)camera);
+		Viewport vp = render_module->getCameraViewport((EntityRef)camera);
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
-		m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
+		render_module->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
@@ -308,14 +309,14 @@ void GameView::onWindowGUI()
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
 		if (size.x > 0 && size.y > 0) {
-			RenderScene* scene = m_pipeline->getScene();
-			const EntityPtr camera = scene->getActiveCamera();
+			RenderModule* module = m_pipeline->getModule();
+			const EntityPtr camera = module->getActiveCamera();
 			Viewport vp;
 			if (camera.isValid()) {
-				vp = scene->getCameraViewport((EntityRef)camera);
+				vp = module->getCameraViewport((EntityRef)camera);
 				vp.w = (int)size.x;
 				vp.h = (int)size.y;
-				scene->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
+				module->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 			}
 			else {
 				vp.w = (int)size.x;

@@ -1287,21 +1287,19 @@ private:
 	String m_property_name;
 };
 
-struct PasteEntityCommand;
-
 
 struct WorldEditorImpl final : WorldEditor
 {
 	friend struct PasteEntityCommand;
 private:
 	struct DestroyEntityFolderCommand final : IEditorCommand {
-		DestroyEntityFolderCommand(WorldEditorImpl& editor, u16 folder)
+		DestroyEntityFolderCommand(WorldEditorImpl& editor, EntityFolders::FolderHandle folder)
 			: m_editor(editor)
 			, m_folder(folder)
 			, m_folder_name(editor.getAllocator())
 		{
-			EntityFolders::Folder& f = editor.m_entity_folders->getFolder(folder);
-			m_parent = f.parent_folder;
+			const EntityFolders::Folder& f = editor.m_entity_folders->getFolder(folder);
+			m_parent = f.parent;
 			m_folder_name = f.name;
 		}
 
@@ -1320,16 +1318,42 @@ private:
 		bool merge(IEditorCommand& command) override { return false; }
 
 		WorldEditorImpl& m_editor;
-		u16 m_parent;
-		u16 m_folder;
+		EntityFolders::FolderHandle m_parent;
+		EntityFolders::FolderHandle m_folder;
 		String m_folder_name;
 	};
 
+	struct MoveEntityFolderCommand final : IEditorCommand {
+		MoveEntityFolderCommand(WorldEditorImpl& editor, EntityFolders::FolderHandle folder, EntityFolders::FolderHandle new_parent)
+			: m_editor(editor)
+			, m_new_parent(new_parent)
+			, m_folder(folder)
+		{
+			m_old_parent = m_editor.getEntityFolders().getFolder(folder).parent;
+		}
+
+		bool execute() override {
+			m_editor.getEntityFolders().moveFolder(m_folder, m_new_parent);
+			return true;
+		}
+
+		void undo() override {
+			m_editor.getEntityFolders().moveFolder(m_folder, m_old_parent);
+		}
+
+		const char* getType() override { return "move_entity_folder"; }
+		bool merge(IEditorCommand& command) override { return false; }
+
+		WorldEditorImpl& m_editor;
+		EntityFolders::FolderHandle m_folder;
+		EntityFolders::FolderHandle m_new_parent;
+		EntityFolders::FolderHandle m_old_parent;
+	};
+
 	struct CreateEntityFolderCommand final : IEditorCommand {
-		CreateEntityFolderCommand(WorldEditorImpl& editor, EntityFolders::FolderID parent, EntityFolders::FolderID* out)
+		CreateEntityFolderCommand(WorldEditorImpl& editor, EntityFolders::FolderHandle parent, EntityFolders::FolderHandle* out)
 			: m_editor(editor)
 			, m_parent(parent)
-			, m_folder(0xffFF)
 			, m_out(out)
 		{}
 
@@ -1348,13 +1372,13 @@ private:
 		bool merge(IEditorCommand& command) override { return false; }
 	
 		WorldEditorImpl& m_editor;
-		EntityFolders::FolderID m_parent;
-		EntityFolders::FolderID m_folder;
-		EntityFolders::FolderID* m_out;
+		EntityFolders::FolderHandle m_parent;
+		EntityFolders::FolderHandle m_folder = EntityFolders::INVALID_FOLDER;
+		EntityFolders::FolderHandle* m_out;
 	};
 
 	struct RenameEntityFolderCommand final : IEditorCommand {
-		RenameEntityFolderCommand(WorldEditorImpl& editor, u16 folder, const char* new_name)
+		RenameEntityFolderCommand(WorldEditorImpl& editor, EntityFolders::FolderHandle folder, const char* new_name)
 			: m_editor(editor)
 			, m_folder(folder)
 			, m_new_name(new_name, editor.getAllocator())
@@ -1364,14 +1388,12 @@ private:
 		}
 
 		bool execute() override {
-			EntityFolders::Folder& f = m_editor.m_entity_folders->getFolder(m_folder);
-			copyString(f.name, m_new_name.c_str());
+			m_editor.m_entity_folders->renameFolder(m_folder, m_new_name.c_str());
 			return true;
 		}
 
 		void undo() override {
-			EntityFolders::Folder& f = m_editor.m_entity_folders->getFolder(m_folder);
-			copyString(f.name, m_old_name.c_str());
+			m_editor.m_entity_folders->renameFolder(m_folder, m_old_name.c_str());
 		}
 
 		const char* getType() override { return "rename_entity_folder"; }
@@ -1383,13 +1405,13 @@ private:
 		}
 	
 		WorldEditorImpl& m_editor;
-		u16 m_folder;
+		EntityFolders::FolderHandle m_folder;
 		String m_new_name;
 		String m_old_name;
 	};
 	
 	struct MoveEntityToFolderCommand final : IEditorCommand {
-		MoveEntityToFolderCommand(WorldEditorImpl& editor, EntityRef entity, u16 folder)
+		MoveEntityToFolderCommand(WorldEditorImpl& editor, EntityRef entity, EntityFolders::FolderHandle folder)
 			: m_editor(editor)
 			, m_new_folder(folder)
 			, m_entity(entity)
@@ -1411,14 +1433,13 @@ private:
 		bool merge(IEditorCommand& command) override { return false; }
 	
 		WorldEditorImpl& m_editor;
-		EntityFolders::FolderID m_new_folder;
-		EntityFolders::FolderID m_old_folder;
+		EntityFolders::FolderHandle m_new_folder;
+		EntityFolders::FolderHandle m_old_folder;
 		EntityRef m_entity;
 	};
 
 
-	struct AddComponentCommand final : IEditorCommand
-	{
+	struct AddComponentCommand final : IEditorCommand {
 		AddComponentCommand(WorldEditorImpl& editor,
 							Span<const EntityRef> entities,
 							ComponentType type)
@@ -1429,7 +1450,7 @@ private:
 			m_entities.reserve(entities.length());
 			World* world = m_editor.getWorld();
 			for (EntityRef e : entities) {
-				if (!world->getComponent(e, type).isValid()) {
+				if (!world->hasComponent(e, type)) {
 					m_entities.push(e);
 				}
 			}
@@ -1480,9 +1501,7 @@ private:
 	};
 
 
-	struct MakeParentCommand final : IEditorCommand
-	{
-	public:
+	struct MakeParentCommand final : IEditorCommand {
 		explicit MakeParentCommand(WorldEditorImpl& editor)
 			: m_editor(editor)
 		{
@@ -1515,7 +1534,7 @@ private:
 		{
 			m_editor.getWorld()->setParent(m_parent, m_child);
 			if (m_parent.isValid()) {
-				EntityFolders::FolderID f = m_editor.m_entity_folders->getFolder((EntityRef)m_parent);
+				EntityFolders::FolderHandle f = m_editor.m_entity_folders->getFolder((EntityRef)m_parent);
 				m_editor.m_entity_folders->moveToFolder(m_child, f);
 			}
 			return true;
@@ -1530,16 +1549,14 @@ private:
 
 	private:
 		WorldEditorImpl& m_editor;
-		EntityFolders::FolderID m_old_folder;
+		EntityFolders::FolderHandle m_old_folder;
 		EntityPtr m_parent;
 		EntityPtr m_old_parent;
 		EntityRef m_child;
 	};
 
 
-	struct DestroyEntitiesCommand final : IEditorCommand
-	{
-	public:
+	struct DestroyEntitiesCommand final : IEditorCommand {
 		explicit DestroyEntitiesCommand(WorldEditorImpl& editor)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
@@ -1608,7 +1625,7 @@ private:
 				}
 				m_old_values.writeString(world->getEntityName(m_entities[i]));
 				EntityPtr parent = world->getParent(m_entities[i]);
-				const EntityFolders::FolderID folder = m_editor.m_entity_folders->getFolder(m_entities[i]);
+				const EntityFolders::FolderHandle folder = m_editor.m_entity_folders->getFolder(m_entities[i]);
 				m_old_values.write(folder);
 				m_old_values.write(parent);
 				if (parent.isValid())
@@ -1671,7 +1688,7 @@ private:
 				const char* name = blob.readString();
 				world->setEntityName(new_entity, name);
 				EntityPtr parent;
-				EntityFolders::FolderID folder;
+				EntityFolders::FolderHandle folder;
 				blob.read(folder);
 				m_editor.m_entity_folders->moveToFolder(new_entity, folder);
 				blob.read(parent);
@@ -1697,11 +1714,11 @@ private:
 					ComponentType cmp_type;
 					blob.read(cmp_type);
 					ComponentUID new_component;
-					IScene* scene = world->getScene(cmp_type);
-					ASSERT(scene);
+					IModule* module = world->getModule(cmp_type);
+					ASSERT(module);
 					world->createComponent(cmp_type, new_entity);
 					new_component.entity = new_entity;
-					new_component.scene = scene;
+					new_component.module = module;
 					new_component.type = cmp_type;
 					
 					::Lumix::load(new_component, blob);
@@ -1725,9 +1742,7 @@ private:
 	};
 
 
-	struct DestroyComponentCommand final : IEditorCommand
-	{
-	public:
+	struct DestroyComponentCommand final : IEditorCommand {
 		explicit DestroyComponentCommand(WorldEditorImpl& editor)
 			: m_editor(editor)
 			, m_old_values(editor.getAllocator())
@@ -1747,7 +1762,7 @@ private:
 		{
 			m_entities.reserve(entities.length());
 			for (EntityRef e : entities) {
-				if (!m_editor.getWorld()->getComponent(e, m_cmp_type).isValid()) continue;
+				if (!m_editor.getWorld()->hasComponent(e, m_cmp_type)) continue;
 				m_entities.push(e);
 			}
 		}
@@ -1765,9 +1780,9 @@ private:
 		{
 			ComponentUID cmp;
 			World* world = m_editor.getWorld();
-			cmp.scene = world->getScene(m_cmp_type);
+			cmp.module = world->getModule(m_cmp_type);
 			cmp.type = m_cmp_type;
-			ASSERT(cmp.scene);
+			ASSERT(cmp.module);
 			InputMemoryStream blob(m_old_values);
 			for (EntityRef entity : m_entities)
 			{
@@ -1790,8 +1805,8 @@ private:
 			const reflection::ComponentBase* cmp_desc = reflection::getComponent(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
-			cmp.scene = m_editor.getWorld()->getScene(m_cmp_type);
-			ASSERT(cmp.scene);
+			cmp.module = m_editor.getWorld()->getModule(m_cmp_type);
+			ASSERT(cmp.module);
 
 			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 
@@ -1820,19 +1835,22 @@ private:
 	};
 
 
-	struct AddEntityCommand final : IEditorCommand
-	{
+	struct AddEntityCommand final : IEditorCommand {
 		AddEntityCommand(WorldEditorImpl& editor, const DVec3& position, EntityRef* output)
 			: m_editor(editor)
 			, m_position(position)
 			, m_output(output)
 		{
 			m_entity = INVALID_ENTITY;
+			m_folder = m_editor.getEntityFolders().getSelectedFolder();
 		}
 
 
 		bool execute() override
 		{
+			EntityFolders& folders = m_editor.getEntityFolders();
+			EntityFolders::FolderHandle selected_folder = folders.getSelectedFolder();
+			folders.selectFolder(m_folder);
 			if (m_entity.isValid()) {
 				m_editor.getWorld()->emplaceEntity((EntityRef)m_entity);
 				m_editor.getWorld()->setPosition((EntityRef)m_entity, m_position);
@@ -1844,6 +1862,7 @@ private:
 			if (m_output) {
 				*m_output = e;
 			}
+			folders.selectFolder(selected_folder);
 			return true;
 		}
 
@@ -1866,42 +1885,28 @@ private:
 		EntityPtr m_entity;
 		DVec3 m_position;
 		EntityRef* m_output;
+		EntityFolders::FolderHandle m_folder;
 	};
 
 public:
 	IAllocator& getAllocator() override { return m_allocator; }
-
 	WorldView& getView() override { ASSERT(m_view); return *m_view; }
-
-	void setView(WorldView* view) override { 
-		m_view = view; 
-	}
-
+	void setView(WorldView* view) override { m_view = view; }
 	World* getWorld() override { return m_world; }
-
-
 	Engine& getEngine() override { return m_engine; }
 
-
-	void update() override
-	{
+	void update() override {
 		PROFILE_FUNCTION();
-
 		Gizmo::frame();
 		m_prefab_system->update();
 	}
 
-
-	~WorldEditorImpl()
-	{
+	~WorldEditorImpl() {
 		destroyWorld();
-
 		m_prefab_system.reset();
 	}
 
-
-	void snapEntities(const DVec3& hit_pos, bool translate_mode) override
-	{
+	void snapEntities(const DVec3& hit_pos, bool translate_mode) override {
 		Array<DVec3> positions(m_allocator);
 		Array<Quat> rotations(m_allocator);
 		if(translate_mode) {
@@ -1943,11 +1948,30 @@ public:
 		executeCommand(cmd.move());
 	}
 
-
 	bool isWorldChanged() const override { return m_is_world_changed; }
 
-	void saveWorld(const char* basename, bool save_path) override
-	{
+	void savePartition(World::PartitionHandle partition) override {
+		ASSERT(!isGameMode());
+		const Array<World::Partition>& partitions = m_world->getPartitions();
+		if (partitions.size() == 1) {
+			ASSERT(partition == partitions[0].handle);
+			save();
+			return;
+		}
+
+		UniquePtr<WorldEditorImpl> partition_clone = createPartitionWorld(partition);
+		World* cloned_world = partition_clone->getWorld();
+		World::Partition& cloned_partition = cloned_world->getPartitions()[0];
+		World::Partition& src_partition = m_world->getPartition(partition);
+
+		copyString(cloned_partition.name, src_partition.name);
+		partition_clone->save();
+	}
+
+	void save() {
+		ASSERT(m_world->getPartitions().size() == 1);
+		const char* basename = m_world->getPartitions()[0].name;
+		ASSERT(basename[0]);
 		saveProject();
 
 		logInfo("Saving world ", basename, "...");
@@ -1963,7 +1987,7 @@ public:
 		}
 		os::OutputFile file;
 		if (file.open(path)) {
-			save(file);
+			save(file, false);
 			file.close();
 		}
 		else {
@@ -1971,12 +1995,10 @@ public:
 		}
 		
 		m_is_world_changed = false;
-
-		if (save_path) m_world->setName(basename);
 	}
 
 
-	void save(IOutputStream& file)
+	void save(IOutputStream& file, bool is_game_mode_save)
 	{
 		while (m_engine.getFileSystem().hasWork()) m_engine.getFileSystem().processCallbacks();
 
@@ -1985,23 +2007,28 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
-		const WorldHeader header = { WorldHeader::MAGIC, WorldSerializedVersion::LATEST };
+		const WorldEditorHeader header = { WorldEditorHeader::MAGIC, WorldEditorHeaderVersion::LATEST };
 		blob.write(header);
 		StableHash hash;
 		blob.write(hash);
 		const u64 hashed_offset = blob.size();
 
-		m_engine.serialize(*m_world, blob);
+		m_world->serialize(blob, is_game_mode_save ? WorldSerializeFlags::HAS_PARTITIONS : WorldSerializeFlags::NONE);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
-		const Viewport& vp = m_view->getViewport();
-		blob.write(vp.pos);
-		blob.write(vp.rot);
+		if (m_view) {
+			const Viewport& vp = m_view->getViewport();
+			blob.write(vp.pos);
+			blob.write(vp.rot);
+		}
+		else {
+			DVec3 pos(0);
+			blob.write(pos);
+			blob.write(Quat::IDENTITY);
+		}
 		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
-		memcpy(blob.getMutableData() + sizeof(WorldHeader), &hash, sizeof(hash));
+		memcpy(blob.getMutableData() + sizeof(WorldEditorHeader), &hash, sizeof(hash));
 		file.write(blob.data(), blob.size());
-
-		logInfo("World saved");
 	}
 
 
@@ -2268,8 +2295,9 @@ public:
 		}
 
 		m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
+		m_selected_folder_on_game_mode = m_entity_folders->getSelectedFolder();
 		m_game_mode_file.clear();
-		save(m_game_mode_file);
+		save(m_game_mode_file, true);
 		m_is_game_mode = true;
 		beginCommandGroup("");
 		endCommandGroup();
@@ -2295,7 +2323,6 @@ public:
 		{
 			m_world_destroyed.invoke();
 			m_prefab_system->setWorld(nullptr);
-			StaticString<64> name(m_world->getName());
 			m_entity_folders.destroy();
 			m_engine.destroyWorld(*m_world);
 			
@@ -2303,50 +2330,58 @@ public:
 			m_entity_folders.create(*m_world, m_allocator);
 			m_prefab_system->setWorld(m_world);
 			m_world_created.invoke();
-			m_world->setName(name);
 			m_world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
-            InputMemoryStream file(m_game_mode_file);
-			load(file, "game mode");
+			
+			InputMemoryStream blob(m_game_mode_file);
+			loadWorld(blob, "game mode", false, true);
 		}
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
 			EntityRef e = (EntityRef)m_selected_entity_on_game_mode;
 			selectEntities(Span(&e, 1), false);
 		}
+		m_entity_folders->selectFolder(m_selected_folder_on_game_mode);
 		m_engine.getResourceManager().enableUnload(true);
 	}
 	
-	void moveEntityToFolder(EntityRef entity, u16 folder) override {
+	void moveEntityToFolder(EntityRef entity, EntityFolders::FolderHandle folder) override {
 		UniquePtr<IEditorCommand> command = UniquePtr<MoveEntityToFolderCommand>::create(m_allocator, *this, entity, folder);
 		executeCommand(command.move());
 	}
 
-	void renameEntityFolder(u16 folder, const char* new_name) override {
+	void renameEntityFolder(EntityFolders::FolderHandle folder, const char* new_name) override {
 		UniquePtr<IEditorCommand> command = UniquePtr<RenameEntityFolderCommand>::create(m_allocator, *this, folder, new_name);
 		executeCommand(command.move());
 	}
 	
-	u16 createEntityFolder(u16 parent) override {
-		EntityFolders::FolderID res;
+	EntityFolders::FolderHandle createEntityFolder(EntityFolders::FolderHandle parent) override {
+		EntityFolders::FolderHandle res;
 		UniquePtr<IEditorCommand> command = UniquePtr<CreateEntityFolderCommand>::create(m_allocator, *this, parent, &res);
 		executeCommand(command.move());
 		return res;
 	}
 
-	void destroyEntityFolder(u16 folder) override {
-		const EntityFolders::Folder& f = m_entity_folders->getFolder(folder);
+	void moveEntityFolder(EntityFolders::FolderHandle folder, EntityFolders::FolderHandle new_parent) {
+		UniquePtr<IEditorCommand> command = UniquePtr<MoveEntityFolderCommand>::create(m_allocator, *this, folder, new_parent);
+		executeCommand(command.move());
+	}
 
+	void destroyEntityFolder(EntityFolders::FolderHandle folder) override {
 		beginCommandGroup("destroy_entity_folder");
-		Array<EntityRef> entities(m_allocator);
+		
+		for (;;) {
+			const EntityFolders::Folder& f = m_entity_folders->getFolder(folder);
+			ASSERT(f.parent != EntityFolders::INVALID_FOLDER);
+			if (f.first_child == EntityFolders::INVALID_FOLDER) break;
 
-		EntityPtr iter = f.first_entity;
-		while(iter.isValid()) {
-			entities.push((EntityRef)iter);
-			iter = m_entity_folders->getNextEntity((EntityRef)iter);
+			moveEntityFolder(f.first_child, f.parent);
 		}
 
-		if (!entities.empty()) destroyEntities(entities.begin(), (i32)entities.size());
+		const EntityFolders::Folder& f = m_entity_folders->getFolder(folder);
+		while (f.first_entity.isValid()) {
+			moveEntityToFolder(*f.first_entity, f.parent);
+		}
 
 		UniquePtr<IEditorCommand> command = UniquePtr<DestroyEntityFolderCommand>::create(m_allocator, *this, folder);
 		executeCommand(command.move());
@@ -2462,57 +2497,55 @@ public:
 		InputMemoryStream stream(data);
 		char dummy[1];
 		
-		
 		const DeserializeProjectResult res = m_engine.deserializeProject(stream, Span(dummy));
 		switch (res) {
 			case DeserializeProjectResult::SUCCESS: break;
 			case DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED: logError("Project file: Plugin deserialization failed"); break;
 			case DeserializeProjectResult::PLUGIN_NOT_FOUND: logError("Project file: Plugin not found"); break;
 			case DeserializeProjectResult::VERSION_NOT_SUPPORTED: logError("Project file: version not supported"); break;
+			case DeserializeProjectResult::PLUGIN_VERSION_NOT_SUPPORTED: logError("Project file: plugin version not supported"); break;
 			case DeserializeProjectResult::CORRUPTED_FILE: logError("Project file: corrupted"); break;
 		}
 	}
 	
 	bool isLoading() const override { return m_is_loading; }
 
-	void loadWorld(const char* basename) override
-	{
-		if (m_is_game_mode) stopGameMode(false);
-		destroyWorld();
-		createWorld();
-		m_world->setName(basename);
-		logInfo("Loading world ", basename, "...");
-		os::InputFile file;
-		const Path path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
-		if (file.open(path)) {
-			if (!load(file, path)) {
-				logError("Failed to parse ", path);
-				newWorld();
-			}
-			file.close();
-		}
-		else {
-			logError("Failed to open ", path);
-			newWorld();
-		}
-	}
-
-
-	void newWorld() override
-	{
+	void newWorld() override {
 		destroyWorld();
 		createWorld();
 		logInfo("World created.");
 	}
+	
+	void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) override {
+		ASSERT(!m_is_game_mode);
+		logInfo("Loading world ", basename, "...");
+		
+		if (additive) {
+			World::PartitionHandle partition = m_world->createPartition(basename);
+			m_world->setActivePartition(partition);
+		}
+		else {
+			destroyWorld();
+			createWorld();
+			copyString(m_world->getPartitions()[0].name, basename);
+		}
 
+		if (!loadWorld(blob, basename, additive, false)) {
+			newWorld();
+			return;
+		}
 
-	bool load(IInputStream& file, const char* path)
-	{
+		World::PartitionHandle partition = m_world->getActivePartition();
+		EntityFolders::FolderHandle root_folder = m_entity_folders->getRoot(partition);
+		m_entity_folders->selectFolder(root_folder);
+	}
+
+	bool loadWorld(InputMemoryStream& blob, const char* name, bool additive, bool is_game_mode_load) {
 		PROFILE_FUNCTION();
 		m_is_loading = true;
-		WorldHeader header;
-		const u64 file_size = file.size();
-		if (file_size < sizeof(header)) {
+
+		const u64 file_size = blob.size();
+		if (file_size < sizeof(WorldEditorHeader)) {
 			logError("Corrupted file.");
 			m_is_loading = false;
 			return false;
@@ -2525,53 +2558,59 @@ public:
 
 		os::Timer timer;
 		logInfo("Parsing world...");
-		OutputMemoryStream data(m_allocator);
-		if (!file.getBuffer()) {
-			data.resize((u32)file_size);
-			if (!file.read(data.getMutableData(), data.size())) {
-				logError("Failed to load file.");
+		WorldEditorHeader header;
+		blob.read(header);
+		if (header.version > WorldEditorHeaderVersion::LATEST) {
+			logError("`", name, "`: version not supported");
+			m_is_loading = false;
+			return false;
+		}
+
+		if (header.version > WorldEditorHeaderVersion::HASH64) {
+			const StableHash hash = blob.read<StableHash>();
+			const StableHash computed_hash((const u8*)blob.getData() + blob.getPosition(), u32(blob.remaining()));
+
+			if (header.magic != WorldEditorHeader::MAGIC || computed_hash != hash) {
+				logError("`", name, "`: file corrupted");
 				m_is_loading = false;
 				return false;
 			}
-		}
-		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), file_size);
-		blob.read(header);
-		if ((u32)header.version <= (u32)WorldSerializedVersion::HASH64) {
-			u32 tmp;
-			blob.read(tmp);
-			blob.read(tmp);
 		}
 		else {
-			const StableHash hash = blob.read<StableHash>();
-
-			if (header.magic != WorldHeader::MAGIC 
-				|| StableHash((const u8*)blob.getData() + blob.getPosition(), u32(blob.size() - blob.getPosition())) != hash)
-			{
-				logError("Corrupted file `", path, "`");
-				m_is_loading = false;
-				return false;
-			}
+			u64 tmp;
+			blob.read(tmp);
 		}
 
 		EntityMap entity_map(m_allocator);
-		if (m_engine.deserialize(*m_world, blob, entity_map))
-		{
+		m_entity_folders->ignoreNewEntities(true);
+		if (m_world->deserialize(blob, entity_map)) {
+			m_entity_folders->ignoreNewEntities(false);
 			m_prefab_system->deserialize(blob, entity_map, header.version);
-			if ((u32)header.version > (u32)WorldSerializedVersion::ENTITY_FOLDERS) {
-				m_entity_folders->deserialize(blob, entity_map);
+
+			if (header.version > WorldEditorHeaderVersion::ENTITY_FOLDERS) {
+				Array<EntityFolders::Folder>& folders = m_entity_folders->getFolders();
+				const u32 offset = folders.size();
+				m_entity_folders->deserialize(blob, entity_map, additive, header.version);
+
+				if (!is_game_mode_load) {
+					const World::PartitionHandle partition = m_world->getActivePartition();
+					for (u32 i = offset, c = (u32)folders.size(); i < c; ++i) {
+						folders[i].partition = partition;
+					}
+				}
 			}
-			if ((u32)header.version > (u32)WorldSerializedVersion::CAMERA) {
+
+			if (header.version > WorldEditorHeaderVersion::CAMERA) {
 				DVec3 pos;
 				Quat rot;
 				blob.read(pos);
 				blob.read(rot);
-				if (m_view) {
+				if (m_view && !additive) {
 					Viewport vp = m_view->getViewport();
 					vp.pos = pos;
 					vp.rot = rot;
 					m_view->setViewport(vp);
 				}
-
 			}
 			logInfo("World parsed in ", timer.getTimeSinceStart(), " seconds");
 			m_view->refreshIcons();
@@ -2579,6 +2618,7 @@ public:
 			return true;
 		}
 
+		m_entity_folders->ignoreNewEntities(false);
 		newWorld();
 		m_is_loading = false;
 		return false;
@@ -2620,6 +2660,185 @@ public:
 		return m_selected_entities;
 	}
 
+
+	struct PropertyCloner : reflection::IPropertyVisitor {
+		template <typename T>
+		void clone(const reflection::Property<T>& prop) { 
+			if (!prop.setter) return;
+			prop.set(dst, index, prop.get(src, index));
+		}
+
+		void visit(const reflection::Property<float>& prop) override { clone(prop); }
+		void visit(const reflection::Property<int>& prop) override { clone(prop); }
+		void visit(const reflection::Property<u32>& prop) override { clone(prop); }
+		void visit(const reflection::Property<EntityPtr>& prop) override { 
+			if (!prop.setter) return;
+
+			EntityPtr e = prop.get(src, index);
+			auto iter = map->find(e);
+			if (iter.isValid()) {
+				e = iter.value();
+			}
+			else {
+				e = INVALID_ENTITY;
+			}
+			prop.set(dst, index, e);
+		}
+		void visit(const reflection::Property<Vec2>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec3>& prop) override { clone(prop); }
+		void visit(const reflection::Property<IVec3>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec4>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Path>& prop) override { clone(prop); }
+		void visit(const reflection::Property<bool>& prop) override { clone(prop); }
+		void visit(const reflection::Property<const char*>& prop) override { clone(prop); }
+		
+		void visit(const reflection::ArrayProperty& prop) override {
+			const u32 c = prop.getCount(src);
+			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
+			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
+			
+			ASSERT(index == -1);
+			for (u32 i = 0; i < c; ++i) {
+				index = i;
+				prop.visitChildren(*this);
+			}
+			index = -1;
+		}
+		
+		void visit(const reflection::DynamicProperties& prop) override { 
+			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
+				const char* name = prop.getName(src, index, i);
+				reflection::DynamicProperties::Type type = prop.getType(src, index, i);
+				reflection::DynamicProperties::Value val = prop.getValue(src, index, i);
+				if (type == reflection::DynamicProperties::ENTITY) {
+					auto iter = map->find(val.e);
+					if (iter.isValid()) {
+						val.e = iter.value();
+					}
+					else {
+						val.e = INVALID_ENTITY;
+					}
+				}
+				prop.set(dst, index, name, type, val);
+			}
+		}
+		
+
+		void visit(const reflection::BlobProperty& prop) override { 
+			OutputMemoryStream tmp(*allocator);
+			prop.getValue(src, index, tmp);
+			InputMemoryStream blob(tmp);
+			prop.setValue(dst, index, blob);
+		}
+		
+
+		const HashMap<EntityPtr, EntityPtr>* map; 
+		IAllocator* allocator;
+		ComponentUID src;
+		ComponentUID dst;
+		int index = -1;
+	};
+
+
+	EntityRef cloneEntity(World& src_world, EntityRef src_e, World& dst_world, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) const override {
+		entities.push(src_e);
+		const EntityRef dst_e = (EntityRef)map[src_e];
+		if (dst_parent.isValid()) {
+			dst_world.setParent(dst_parent, dst_e);
+			dst_world.setLocalTransform(dst_e, src_world.getLocalTransform(src_e));
+		}
+		else {
+			dst_world.setTransform(dst_e, src_world.getTransform(src_e));
+		}
+		const char* name = src_world.getEntityName(src_e);
+		if (name[0]) {
+			dst_world.setEntityName(dst_e, name);
+		}
+
+		const EntityPtr c = src_world.getFirstChild(src_e);
+		if (c.isValid()) {
+			cloneEntity(src_world, (EntityRef)c, dst_world, dst_e, entities, map);
+		}
+
+		if (dst_parent.isValid()) {
+			const EntityPtr s = src_world.getNextSibling(src_e);
+			if (s.isValid()) {
+				cloneEntity(src_world, (EntityRef)s, dst_world, dst_parent, entities, map);
+			}
+		}
+
+		for (ComponentUID cmp = src_world.getFirstComponent(src_e); cmp.isValid(); cmp = src_world.getNextComponent(cmp)) {
+			dst_world.createComponent(cmp.type, dst_e);
+
+			const reflection::ComponentBase* cmp_tpl = reflection::getComponent(cmp.type);
+	
+			PropertyCloner property_cloner;
+			property_cloner.allocator = &m_allocator;
+			property_cloner.src = cmp;
+			property_cloner.dst.type = cmp.type;
+			property_cloner.dst.entity = dst_e;
+			property_cloner.dst.module = dst_world.getModule(cmp.type);
+			property_cloner.map = &map;
+			cmp_tpl->visit(property_cloner);
+		}
+
+		return dst_e;
+	}
+
+
+	void cloneHierarchy(const World& src, EntityRef src_e, World& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
+		const EntityPtr child = src.getFirstChild(src_e);
+		const EntityPtr sibling = src.getNextSibling(src_e);
+
+		const EntityRef dst_e = dst.createEntity({0, 0, 0}, Quat::IDENTITY);
+		map.insert(src_e, dst_e);
+
+		if (child.isValid()) {
+			cloneHierarchy(src, (EntityRef)child, dst, true, map);
+		}
+		if (clone_siblings && sibling.isValid()) {
+			cloneHierarchy(src, (EntityRef)sibling, dst, true, map);
+		}
+	}
+
+	UniquePtr<WorldEditorImpl> createPartitionWorld(World::PartitionHandle partition) {
+		UniquePtr<WorldEditorImpl> res = WorldEditor::create(m_engine, m_allocator);
+
+		World& dst = *res->getWorld();
+		World& src = *m_world;
+
+		Array<EntityRef> entities(m_allocator);
+		HashMap<EntityPtr, EntityPtr> map(m_allocator);
+		map.reserve(256);
+		for (EntityPtr e = m_world->getFirstEntity(); e.isValid(); e = m_world->getNextEntity(*e)) {
+			if (m_world->getPartition(*e) == partition && !m_world->getParent(*e).isValid()) {
+				cloneHierarchy(src, *e, dst, false, map);
+			}
+		}
+		for (EntityPtr e = m_world->getFirstEntity(); e.isValid(); e = m_world->getNextEntity(*e)) {
+			if (m_world->getPartition(*e) == partition && !m_world->getParent(*e).isValid()) {
+				cloneEntity(src, *e, dst, INVALID_ENTITY, entities, map);
+			}
+		}
+
+		m_entity_folders->cloneTo(*res->m_entity_folders, partition, map);
+		m_prefab_system->cloneTo(*res->m_prefab_system, map);
+
+		return res.move();
+	}
+
+
+	void serializeWorldPartition(World::PartitionHandle partition, OutputMemoryStream& blob) override {
+		UniquePtr<WorldEditorImpl> ed = createPartitionWorld(partition);
+		ed->save(blob, false);
+	}
+
+	void destroyWorldPartition(World::PartitionHandle partition) override {
+		m_world->destroyPartition(partition);
+		m_entity_folders->destroyPartitionFolders(partition);
+		clearUndoStack();
+		m_is_world_changed = true;
+	}
 
 	void addArrayPropertyItem(const ComponentUID& cmp, const char* property) override
 	{
@@ -2697,8 +2916,7 @@ public:
 	}
 
 
-	void destroyWorld()
-	{
+	void destroyWorld() {
 		if (m_is_game_mode) stopGameMode(false);
 
 		ASSERT(m_world);
@@ -2834,6 +3052,7 @@ private:
 
 	Array<EntityRef> m_selected_entities;
 	EntityPtr m_selected_entity_on_game_mode;
+	EntityFolders::FolderHandle m_selected_folder_on_game_mode;
 
 	bool m_is_game_mode;
 	int m_game_mode_commands;
@@ -2932,9 +3151,9 @@ public:
 				ComponentUID cmp;
 				cmp.entity = new_entity;
 				cmp.type = reflection::getComponentTypeFromHash(hash);
-				cmp.scene = world.getScene(cmp.type);
+				cmp.module = world.getModule(cmp.type);
 
-				cmp.scene->getWorld().createComponent(cmp.type, new_entity);
+				world.createComponent(cmp.type, new_entity);
 
 				PropertyDeserializeVisitor visitor(blob, cmp, m_map, m_entities);
 				visitor.idx = -1;

@@ -370,7 +370,11 @@ const char* InputMemoryStream::readString()
 {
 	const char* ret = (const char*)m_data + m_pos;
 	while (m_pos < m_size && m_data[m_pos]) ++m_pos;
-	ASSERT(m_pos < m_size);
+	// TODO this should be runtime error, not assert
+	if (m_pos >= m_size) {
+		ASSERT(false);
+		return nullptr;
+	}
 	++m_pos;
 	return ret;
 }

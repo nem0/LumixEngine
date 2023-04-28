@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/math.h"
+#include "engine/os.h"
 #include "engine/string.h"
 
 
@@ -49,7 +50,7 @@ struct LUMIX_EDITOR_API Settings {
 	explicit Settings(struct StudioApp& app);
 	~Settings();
 
-	bool save();
+	[[nodiscard]] bool save();
 	bool load();
 	void onGUI();
 	void setValue(Storage storage, const char* name, bool value) const;
@@ -62,6 +63,7 @@ struct LUMIX_EDITOR_API Settings {
 	u32 getValue(Storage storage, const char* name, Span<char> out) const;
 	const char* getStringValue(Storage storage, const char* name, const char* default_value) const;
 	const char* getAppDataPath() const { return m_app_data_path; }
+	float getTimeSinceLastSave() const { return m_time_since_last_save.getTimeSinceTick(); }
 
 private:
 	static void writeCustom(lua_State* L, struct IOutputStream& file);
@@ -73,6 +75,7 @@ private:
 	lua_State* m_global_state;
 	lua_State* m_local_state;
 	char m_app_data_path[LUMIX_MAX_PATH];
+	os::Timer m_time_since_last_save;
 
 private:
 	void showShortcutSettings();

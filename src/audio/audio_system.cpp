@@ -1,6 +1,6 @@
 #include "audio_system.h"
 #include "audio_device.h"
-#include "audio_scene.h"
+#include "audio_module.h"
 #include "clip.h"
 #include "engine/engine.h"
 #include "engine/plugin.h"
@@ -35,7 +35,7 @@ struct AudioSystemImpl final : AudioSystem {
 		: m_engine(engine)
 		, m_manager(engine.getAllocator())
 	{
-		AudioScene::reflect(engine);
+		AudioModule::reflect(engine);
 	}
 
 
@@ -44,9 +44,8 @@ struct AudioSystemImpl final : AudioSystem {
 		m_manager.destroy();
 	}
 
-	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
-	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
+	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	void init() override
 	{
@@ -62,10 +61,10 @@ struct AudioSystemImpl final : AudioSystem {
 	const char* getName() const override { return "audio"; }
 
 
-	void createScenes(World& ctx) override
+	void createModules(World& world) override
 	{
-		UniquePtr<AudioScene> scene = AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
-		ctx.addScene(scene.move());
+		UniquePtr<AudioModule> module = AudioModule::createInstance(*this, world, m_engine.getAllocator());
+		world.addModule(module.move());
 	}
 
 

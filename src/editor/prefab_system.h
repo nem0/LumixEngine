@@ -2,6 +2,7 @@
 
 
 #include "engine/hash.h"
+#include "engine/hash_map.h"
 
 
 namespace Lumix
@@ -10,7 +11,7 @@ namespace Lumix
 
 using PrefabHandle = FilePathHash;
 template <typename T> struct UniquePtr;
-enum class WorldSerializedVersion : u32;
+enum class WorldEditorHeaderVersion : u32;
 
 struct LUMIX_EDITOR_API PrefabSystem
 {
@@ -22,7 +23,7 @@ struct LUMIX_EDITOR_API PrefabSystem
 	virtual void setWorld(struct World*) = 0;
 	virtual void update() = 0;
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
-	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map, WorldSerializedVersion version) = 0;
+	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map, WorldEditorHeaderVersion version) = 0;
 	virtual EntityPtr instantiatePrefab(struct PrefabResource& prefab, const struct DVec3& pos, const struct Quat& rot, const struct Vec3& scale) = 0;
 	virtual void instantiatePrefabs(struct PrefabResource& prefab, Span<struct Transform> transforms) = 0;
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;
@@ -30,6 +31,7 @@ struct LUMIX_EDITOR_API PrefabSystem
 	virtual void savePrefab(EntityRef entity, const struct Path& path) = 0;
 	virtual void breakPrefab(EntityRef e) = 0;
 	virtual PrefabResource* getPrefabResource(EntityRef entity) = 0;
+	virtual void cloneTo(PrefabSystem& dst, const HashMap<EntityPtr, EntityPtr>& map) = 0;
 };
 
 

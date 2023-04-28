@@ -30,8 +30,8 @@
 #include <vehicle/PxVehicleUtilControl.h>
 #include <vehicle/PxVehicleUtilSetup.h>
 
-#include "physics/physics_scene.h"
-#include "animation/animation_scene.h"
+#include "physics/physics_module.h"
+#include "animation/animation_module.h"
 #include "engine/associative_array.h"
 #include "engine/atomic.h"
 #include "engine/engine.h"
@@ -51,7 +51,7 @@
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/texture.h"
 #include "imgui/IconsFontAwesome5.h"
 
@@ -81,7 +81,7 @@ enum class FilterFlags : u32 {
 	VEHICLE = 1 << 0
 };
 
-enum class PhysicsSceneVersion
+enum class PhysicsModuleVersion
 {
 	REMOVED_RAGDOLLS,
 	VEHICLE_PEAK_TORQUE,
@@ -227,12 +227,12 @@ struct Wheel
 	float max_compression = 0.3f;
 	float spring_strength = 10'000.f;
 	float spring_damper_rate = 4'500.f;
-	PhysicsScene::WheelSlot slot = PhysicsScene::WheelSlot::FRONT_LEFT;
+	PhysicsModule::WheelSlot slot = PhysicsModule::WheelSlot::FRONT_LEFT;
 	
-	static_assert((int)PhysicsScene::WheelSlot::FRONT_LEFT == PxVehicleDrive4WWheelOrder::eFRONT_LEFT);
-	static_assert((int)PhysicsScene::WheelSlot::FRONT_RIGHT == PxVehicleDrive4WWheelOrder::eFRONT_RIGHT);
-	static_assert((int)PhysicsScene::WheelSlot::REAR_LEFT == PxVehicleDrive4WWheelOrder::eREAR_LEFT);
-	static_assert((int)PhysicsScene::WheelSlot::REAR_RIGHT == PxVehicleDrive4WWheelOrder::eREAR_RIGHT);
+	static_assert((int)PhysicsModule::WheelSlot::FRONT_LEFT == PxVehicleDrive4WWheelOrder::eFRONT_LEFT);
+	static_assert((int)PhysicsModule::WheelSlot::FRONT_RIGHT == PxVehicleDrive4WWheelOrder::eFRONT_RIGHT);
+	static_assert((int)PhysicsModule::WheelSlot::REAR_LEFT == PxVehicleDrive4WWheelOrder::eREAR_LEFT);
+	static_assert((int)PhysicsModule::WheelSlot::REAR_RIGHT == PxVehicleDrive4WWheelOrder::eREAR_RIGHT);
 };
 
 
@@ -240,7 +240,7 @@ struct Heightfield {
 	~Heightfield();
 	void heightmapLoaded(Resource::State, Resource::State new_state, Resource&);
 
-	struct PhysicsSceneImpl* m_scene;
+	struct PhysicsModuleImpl* m_module;
 	EntityRef m_entity;
 	PxRigidActor* m_actor = nullptr;
 	Texture* m_heightmap = nullptr;
@@ -250,7 +250,7 @@ struct Heightfield {
 };
 
 
-struct PhysicsSceneImpl final : PhysicsScene
+struct PhysicsModuleImpl final : PhysicsModule
 {
 	struct CPUDispatcher : physx::PxCpuDispatcher
 	{
@@ -270,8 +270,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	struct PhysxContactCallback final : PxSimulationEventCallback
 	{
-		explicit PhysxContactCallback(PhysicsSceneImpl& scene)
-			: m_scene(scene)
+		explicit PhysxContactCallback(PhysicsModuleImpl& module)
+			: m_module(module)
 		{
 		}
 
@@ -297,7 +297,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				contact_data.e1 = {(int)(intptr_t)(pairHeader.actors[0]->userData)};
 				contact_data.e2 = {(int)(intptr_t)(pairHeader.actors[1]->userData)};
 
-				m_scene.onContact(contact_data);
+				m_module.onContact(contact_data);
 			}
 		}
 
@@ -313,7 +313,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				EntityRef e1 = {(int)(intptr_t)(pairs[i].triggerActor->userData)};
 				EntityRef e2 = {(int)(intptr_t)(pairs[i].otherActor->userData)};
 
-				m_scene.onTrigger(e1, e2, pairs[i].status == PxPairFlag::eNOTIFY_TOUCH_LOST);
+				m_module.onTrigger(e1, e2, pairs[i].status == PxPairFlag::eNOTIFY_TOUCH_LOST);
 			}
 		}
 
@@ -323,18 +323,18 @@ struct PhysicsSceneImpl final : PhysicsScene
 		void onSleep(PxActor**, PxU32) override {}
 
 
-		PhysicsSceneImpl& m_scene;
+		PhysicsModuleImpl& m_module;
 	};
 
 
 	struct RigidActor {
-		RigidActor(PhysicsSceneImpl& scene, EntityRef entity)
-			: scene(scene)
+		RigidActor(PhysicsModuleImpl& module, EntityRef entity)
+			: module(module)
 			, entity(entity)
 		{}
 
 		RigidActor(RigidActor&& rhs)
-			: scene(rhs.scene)
+			: module(rhs.module)
 			, entity(rhs.entity)
 			, physx_actor(rhs.physx_actor)
 			, mesh(rhs.mesh)
@@ -364,7 +364,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&);
 		void setIsTrigger(bool is);
 
-		PhysicsSceneImpl& scene;
+		PhysicsModuleImpl& module;
 		EntityRef entity;
 		PxRigidActor* physx_actor = nullptr;
 		PhysicsGeometry* mesh  = nullptr;
@@ -378,7 +378,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem& system, IAllocator& allocator);
+	PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem& system, IAllocator& allocator);
 
 
 	PxBatchQuery* createVehicleBatchQuery(u8* mem)
@@ -418,25 +418,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 		return surfaceTirePairs;
 	}
 
+	int getVersion() const override { return (int)PhysicsModuleVersion::LATEST; }
 
-	~PhysicsSceneImpl()
-	{
-		m_vehicle_batch_query->release();
-		m_vehicle_frictions->release();
-		m_controller_manager->release();
-		m_default_material->release();
-		m_dummy_actor->release();
-		m_scene->release();
-	}
-
-
-	int getVersion() const override { return (int)PhysicsSceneVersion::LATEST; }
-
-
-	void clear() override
-	{
-		for (auto& controller : m_controllers)
-		{
+	~PhysicsModuleImpl() {
+		for (auto& controller : m_controllers) {
 			controller.controller->release();
 		}
 		m_controllers.clear();
@@ -465,8 +450,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		m_instanced_meshes.clear();
 
-		for (auto& joint : m_joints)
-		{
+		for (auto& joint : m_joints) {
 			joint.physx->release();
 		}
 		m_joints.clear();
@@ -475,24 +459,31 @@ struct PhysicsSceneImpl final : PhysicsScene
 		m_dynamic_actors.clear();
 
 		m_terrains.clear();
+
+		m_vehicle_batch_query->release();
+		m_vehicle_frictions->release();
+		m_controller_manager->release();
+		m_default_material->release();
+		m_dummy_actor->release();
+		m_scene->release();
 	}
 
 
 	void onTrigger(EntityRef e1, EntityRef e2, bool touch_lost)
 	{
-		if (!m_script_scene) return;
+		if (!m_script_module) return;
 
 		auto send = [this, touch_lost](EntityRef e1, EntityRef e2) {
-			if (!m_script_scene->getWorld().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
+			if (!m_script_module->getWorld().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
 
-			for (int i = 0, c = m_script_scene->getScriptCount(e1); i < c; ++i)
+			for (int i = 0, c = m_script_module->getScriptCount(e1); i < c; ++i)
 			{
-				auto* call = m_script_scene->beginFunctionCall(e1, i, "onTrigger");
+				auto* call = m_script_module->beginFunctionCall(e1, i, "onTrigger");
 				if (!call) continue;
 
 				call->add(e2);
 				call->add(touch_lost);
-				m_script_scene->endFunctionCall();
+				m_script_module->endFunctionCall();
 			}
 		};
 
@@ -501,35 +492,35 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	void onControllerHit(EntityRef controller, EntityRef obj) {
-		if (!m_script_scene) return;
-		if (!m_script_scene->getWorld().hasComponent(controller, LUA_SCRIPT_TYPE)) return;
+		if (!m_script_module) return;
+		if (!m_script_module->getWorld().hasComponent(controller, LUA_SCRIPT_TYPE)) return;
 
-		for (int i = 0, c = m_script_scene->getScriptCount(controller); i < c; ++i) {
-			auto* call = m_script_scene->beginFunctionCall(controller, i, "onControllerHit");
+		for (int i = 0, c = m_script_module->getScriptCount(controller); i < c; ++i) {
+			auto* call = m_script_module->beginFunctionCall(controller, i, "onControllerHit");
 			if (!call) continue;
 
 			call->add(obj);
-			m_script_scene->endFunctionCall();
+			m_script_module->endFunctionCall();
 		}
 	}
 
 	void onContact(const ContactData& contact_data)
 	{
-		if (!m_script_scene) return;
+		if (!m_script_module) return;
 
 		auto send = [this](EntityRef e1, EntityRef e2, const Vec3& position) {
-			if (!m_script_scene->getWorld().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
+			if (!m_script_module->getWorld().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
 
-			for (int i = 0, c = m_script_scene->getScriptCount(e1); i < c; ++i)
+			for (int i = 0, c = m_script_module->getScriptCount(e1); i < c; ++i)
 			{
-				auto* call = m_script_scene->beginFunctionCall(e1, i, "onContact");
+				auto* call = m_script_module->beginFunctionCall(e1, i, "onContact");
 				if (!call) continue;
 
 				call->add(e2.index);
 				call->add(position.x);
 				call->add(position.y);
 				call->add(position.z);
-				m_script_scene->endFunctionCall();
+				m_script_module->endFunctionCall();
 			}
 		};
 
@@ -582,7 +573,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	World& getWorld() override { return m_world; }
 
 
-	IPlugin& getPlugin() const override { return *m_system; }
+	ISystem& getSystem() const override { return *m_system; }
 
 
 	u32 getControllerLayer(EntityRef entity) override { return m_controllers[entity].layer; }
@@ -1452,7 +1443,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		Heightfield& terrain = m_terrains.insert(entity);
 		terrain.m_heightmap = nullptr;
-		terrain.m_scene = this;
+		terrain.m_module = this;
 		terrain.m_actor = nullptr;
 		terrain.m_entity = entity;
 
@@ -1658,14 +1649,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 
 	void render() override {
-		auto* render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto* render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 
 		const PxRenderBuffer& rb = m_scene->getRenderBuffer();
 		const PxU32 num_lines = minimum(100000U, rb.getNbLines());
 		if (num_lines) {
 			const PxDebugLine* PX_RESTRICT lines = rb.getLines();
-			DebugLine* tmp = render_scene->addDebugLines(num_lines);
+			DebugLine* tmp = render_module->addDebugLines(num_lines);
 			for (PxU32 i = 0; i < num_lines; ++i)
 			{
 				const PxDebugLine& line = lines[i];
@@ -1677,7 +1668,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		const PxU32 num_tris = rb.getNbTriangles();
 		if (num_tris) {
 			const PxDebugTriangle* PX_RESTRICT tris = rb.getTriangles();
-			DebugTriangle* tmp = render_scene->addDebugTriangles(num_tris);
+			DebugTriangle* tmp = render_module->addDebugTriangles(num_tris);
 			for (PxU32 i = 0; i < num_tris; ++i)
 			{
 				const PxDebugTriangle& tri = tris[i];
@@ -1811,12 +1802,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void lateUpdate(float time_delta) override {
 		if (!m_is_game_running) return;
 
-		AnimationScene* anim_scene = (AnimationScene*)m_world.getScene("animation");
-		if (!anim_scene) return;
+		AnimationModule* anim_module = (AnimationModule*)m_world.getModule("animation");
+		if (!anim_module) return;
 
 		for (Controller& ctrl : m_controllers) {
 			if (ctrl.use_root_motion) {
-				const LocalRigidTransform tr = anim_scene->getAnimatorRootMotion(ctrl.entity);
+				const LocalRigidTransform tr = anim_module->getAnimatorRootMotion(ctrl.entity);
 				const Quat rot = m_world.getRotation(ctrl.entity);
 				ctrl.frame_change += rot.rotate(tr.pos);
 				m_world.setRotation(ctrl.entity, rot * tr.rot);
@@ -2133,7 +2124,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void initInstancedCubes() {
 		PROFILE_FUNCTION();
-		RenderScene* rs = (RenderScene*)m_world.getScene(INSTANCED_MODEL_TYPE);
+		RenderModule* rs = (RenderModule*)m_world.getModule(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
 		for (auto iter = m_instanced_cubes.begin(), end = m_instanced_cubes.end(); iter != end; ++iter) {
@@ -2164,7 +2155,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void initInstancedMeshes() {
 		PROFILE_FUNCTION();
-		RenderScene* rs = (RenderScene*)m_world.getScene(INSTANCED_MODEL_TYPE);
+		RenderModule* rs = (RenderModule*)m_world.getModule(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
 		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
@@ -2224,8 +2215,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void startGame() override
 	{
-		auto* scene = m_world.getScene("lua_script");
-		m_script_scene = static_cast<LuaScriptScene*>(scene);
+		auto* module = m_world.getModule("lua_script");
+		m_script_module = static_cast<LuaScriptModule*>(module);
 		m_is_game_running = true;
 
 		initJoints();
@@ -2351,7 +2342,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	struct Filter : PxQueryFilterCallback
 	{
-		bool canLayersCollide(int layer1, int layer2) const { return (scene->m_layers.filter[layer1] & (1 << layer2)) != 0; }
+		bool canLayersCollide(int layer1, int layer2) const { return (module->m_layers.filter[layer1] & (1 << layer2)) != 0; }
 
 		PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
 			const PxShape* shape,
@@ -2361,7 +2352,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			if (layer >= 0)
 			{
 				const EntityRef hit_entity = {(int)(intptr_t)actor->userData};
-				const auto iter = scene->m_actors.find(hit_entity);
+				const auto iter = module->m_actors.find(hit_entity);
 				if (iter.isValid())
 				{
 					const RigidActor& actor = iter.value();
@@ -2380,7 +2371,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		EntityPtr entity;
 		int layer;
-		PhysicsSceneImpl* scene;
+		PhysicsModuleImpl* module;
 	};
 
 
@@ -2401,7 +2392,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		Filter filter;
 		filter.entity = ignored;
 		filter.layer = layer;
-		filter.scene = this;
+		filter.module = this;
 		PxQueryFilterData filter_data;
 		filter_data.flags = PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC | PxQueryFlag::ePREFILTER;
 		bool status = m_scene->raycast(physx_origin, unit_dir, max_distance, hit, flags, filter_data, &filter);
@@ -3221,7 +3212,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(actor.layer);
 			
 			const char* material_path = "";
-			if (version > (i32)PhysicsSceneVersion::MATERIAL) material_path = serializer.readString();
+			if (version > (i32)PhysicsModuleVersion::MATERIAL) material_path = serializer.readString();
 			const char* mesh_path = serializer.readString();
 
 			PxTransform transform = toPhysx(m_world.getTransform(actor.entity).getRigidPart());
@@ -3350,8 +3341,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(iter.value()->moi_multiplier);
 			serializer.read(iter.value()->chassis_layer);
 			serializer.read(iter.value()->wheels_layer);
-			if (version > (i32)PhysicsSceneVersion::VEHICLE_PEAK_TORQUE) serializer.read(iter.value()->peak_torque);
-			if (version > (i32)PhysicsSceneVersion::VEHICLE_MAX_RPM) serializer.read(iter.value()->max_rpm);
+			if (version > (i32)PhysicsModuleVersion::VEHICLE_PEAK_TORQUE) serializer.read(iter.value()->peak_torque);
+			if (version > (i32)PhysicsModuleVersion::VEHICLE_MAX_RPM) serializer.read(iter.value()->max_rpm);
 			const char* path = serializer.readString();
 			if (path[0]) {
 				ResourceManagerHub& manager = m_engine.getResourceManager();
@@ -3479,7 +3470,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		serializer.read(count);
 		for (u32 i = 0; i < count; ++i) {
 			Heightfield terrain;
-			terrain.m_scene = this;
+			terrain.m_module = this;
 			serializer.read(terrain.m_entity);
 			terrain.m_entity = entity_map.get(terrain.m_entity);
 			const char* tmp = serializer.readString();
@@ -3500,13 +3491,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 		deserializeControllers(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map);
 
-		if (version <= (i32)PhysicsSceneVersion::REMOVED_RAGDOLLS) {
+		if (version <= (i32)PhysicsModuleVersion::REMOVED_RAGDOLLS) {
 			u32 count;
 			serializer.read(count);
 			ASSERT(count == 0); // ragdolls were removed
 		}
 
-		if (version > (i32)PhysicsSceneVersion::INSTANCED_CUBE) {
+		if (version > (i32)PhysicsModuleVersion::INSTANCED_CUBE) {
 			i32 count;
 			serializer.read(count);
 			for (i32 i = 0; i < count; ++i) {
@@ -3521,7 +3512,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 
-		if (version > (i32)PhysicsSceneVersion::INSTANCED_MESH) {
+		if (version > (i32)PhysicsModuleVersion::INSTANCED_MESH) {
 			i32 count;
 			serializer.read(count);
 			for (i32 i = 0; i < count; ++i) {
@@ -3540,9 +3531,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 		deserializeJoints(serializer, entity_map);
 		deserializeVehicles(serializer, entity_map, version);
 	}
-
-
-	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
 	Vec3 getActorVelocity(EntityRef entity) override
@@ -3738,18 +3726,18 @@ struct PhysicsSceneImpl final : PhysicsScene
 	};
 
 	struct HitReport : PxUserControllerHitReport {
-		HitReport(PhysicsSceneImpl& scene) : scene(scene) {}
+		HitReport(PhysicsModuleImpl& module) : module(module) {}
 		void onShapeHit(const PxControllerShapeHit& hit) override {
 			void* user_data = hit.controller->getActor()->userData;
 			const EntityRef e1 {(i32)(uintptr)user_data};
 			const EntityRef e2 {(i32)(uintptr)hit.actor->userData};
 
-			scene.onControllerHit(e1, e2);
+			module.onControllerHit(e1, e2);
 		}
 		void onControllerHit(const PxControllersHit& hit) override {}
 		void onObstacleHit(const PxControllerObstacleHit& hit) override {}
 
-		PhysicsSceneImpl& scene;
+		PhysicsModuleImpl& module;
 	} ;
 
 	struct InstancedCube {
@@ -3773,7 +3761,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
-	LuaScriptScene* m_script_scene;
+	LuaScriptModule* m_script_module;
 	PhysicsSystem* m_system;
 	PxRigidDynamic* m_dummy_actor;
 	PxControllerManager* m_controller_manager;
@@ -3804,7 +3792,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	CollisionLayers& m_layers;
 };
 
-PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem& system, IAllocator& allocator)
+PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem& system, IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_engine(engine)
 	, m_controllers(m_allocator)
@@ -3815,12 +3803,12 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem
 	, m_dynamic_actors(m_allocator)
 	, m_instanced_cubes(m_allocator)
 	, m_instanced_meshes(m_allocator)
-	, m_world(context)
+	, m_world(world)
 	, m_is_game_running(false)
 	, m_contact_callback(*this)
 	, m_contact_callbacks(m_allocator)
 	, m_joints(m_allocator)
-	, m_script_scene(nullptr)
+	, m_script_module(nullptr)
 	, m_debug_visualization_flags(0)
 	, m_update_in_progress(nullptr)
 	, m_vehicle_batch_query(nullptr)
@@ -3833,7 +3821,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem
 
 	const RuntimeHash hash("physics");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.scene == hash) {
+		if (cmp.system_hash == hash) {
 			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}
 	}
@@ -3842,11 +3830,11 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, World& context, PhysicsSystem
 }
 
 
-UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, World& context, Engine& engine, IAllocator& allocator)
+UniquePtr<PhysicsModule> PhysicsModule::create(PhysicsSystem& system, World& world, Engine& engine, IAllocator& allocator)
 {
-	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(engine, context, system, allocator);
-	impl->m_world.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
-	impl->m_world.entityDestroyed().bind<&PhysicsSceneImpl::onEntityDestroyed>(impl);
+	PhysicsModuleImpl* impl = LUMIX_NEW(allocator, PhysicsModuleImpl)(engine, world, system, allocator);
+	impl->m_world.entityTransformed().bind<&PhysicsModuleImpl::onEntityMoved>(impl);
+	impl->m_world.entityDestroyed().bind<&PhysicsModuleImpl::onEntityDestroyed>(impl);
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
 	sceneDesc.cpuDispatcher = &impl->m_cpu_dispatcher;
@@ -3858,7 +3846,7 @@ UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, World& conte
 	if (!impl->m_scene)
 	{
 		LUMIX_DELETE(allocator, impl);
-		return UniquePtr<PhysicsScene>(nullptr, nullptr);
+		return UniquePtr<PhysicsModule>(nullptr, nullptr);
 	}
 
 	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
@@ -3867,16 +3855,19 @@ UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, World& conte
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor = PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
 	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(impl->m_vehicle_query_mem);
-	return UniquePtr<PhysicsSceneImpl>(impl, &allocator);
+	return UniquePtr<PhysicsModuleImpl>(impl, &allocator);
 }
 
-void PhysicsScene::reflect() {
+void PhysicsModule::reflect() {
 	struct LayerEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { 
-			return ((PhysicsScene*)cmp.scene)->getSystem().getCollisionsLayersCount();
+			PhysicsModule* module = (PhysicsModule*)cmp.module;
+			PhysicsSystem& system = (PhysicsSystem&)module->getSystem();
+			return system.getCollisionsLayersCount();
 		}
 		const char* name(ComponentUID cmp, u32 idx) const override { 
-			PhysicsSystem& system = ((PhysicsScene*)cmp.scene)->getSystem();
+			PhysicsModule* module = (PhysicsModule*)cmp.module;
+			PhysicsSystem& system = (PhysicsSystem&)module->getSystem();
 			return system.getCollisionLayerName(idx);
 		}
 	};
@@ -3884,10 +3875,10 @@ void PhysicsScene::reflect() {
 	struct DynamicTypeEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override { 
-			switch ((PhysicsScene::DynamicType)idx) {
-				case PhysicsScene::DynamicType::DYNAMIC: return "Dynamic";
-				case PhysicsScene::DynamicType::STATIC: return "Static";
-				case PhysicsScene::DynamicType::KINEMATIC: return "Kinematic";
+			switch ((PhysicsModule::DynamicType)idx) {
+				case PhysicsModule::DynamicType::DYNAMIC: return "Dynamic";
+				case PhysicsModule::DynamicType::STATIC: return "Static";
+				case PhysicsModule::DynamicType::KINEMATIC: return "Kinematic";
 			}
 			ASSERT(false);
 			return "N/A";
@@ -3897,10 +3888,10 @@ void PhysicsScene::reflect() {
 	struct D6MotionEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override { 
-			switch ((PhysicsScene::D6Motion)idx) {
-				case PhysicsScene::D6Motion::LOCKED: return "Locked";
-				case PhysicsScene::D6Motion::LIMITED: return "Limited";
-				case PhysicsScene::D6Motion::FREE: return "Free";
+			switch ((PhysicsModule::D6Motion)idx) {
+				case PhysicsModule::D6Motion::LOCKED: return "Locked";
+				case PhysicsModule::D6Motion::LIMITED: return "Limited";
+				case PhysicsModule::D6Motion::FREE: return "Free";
 			}
 			ASSERT(false);
 			return "N/A";
@@ -3910,19 +3901,19 @@ void PhysicsScene::reflect() {
 	struct WheelSlotEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 4; }
 		const char* name(ComponentUID cmp, u32 idx) const override { 
-			switch ((PhysicsScene::WheelSlot)idx) {
-				case PhysicsScene::WheelSlot::FRONT_LEFT: return "Front left";
-				case PhysicsScene::WheelSlot::FRONT_RIGHT: return "Front right";
-				case PhysicsScene::WheelSlot::REAR_LEFT: return "Rear left";
-				case PhysicsScene::WheelSlot::REAR_RIGHT: return "Rear right";
+			switch ((PhysicsModule::WheelSlot)idx) {
+				case PhysicsModule::WheelSlot::FRONT_LEFT: return "Front left";
+				case PhysicsModule::WheelSlot::FRONT_RIGHT: return "Front right";
+				case PhysicsModule::WheelSlot::REAR_LEFT: return "Rear left";
+				case PhysicsModule::WheelSlot::REAR_RIGHT: return "Rear right";
 			}
 			ASSERT(false);
 			return "N/A";
 		}
 	};
 
-	LUMIX_SCENE(PhysicsSceneImpl, "physics")
-		.LUMIX_FUNC(PhysicsScene::raycast)
+	LUMIX_MODULE(PhysicsModuleImpl, "physics")
+		.LUMIX_FUNC(PhysicsModule::raycast)
 		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
 			.LUMIX_PROP(JointConnectedBody, "Connected body")
 			.LUMIX_PROP(JointAxisPosition, "Axis position")
@@ -3967,8 +3958,8 @@ void PhysicsScene::reflect() {
 			.LUMIX_PROP(InstancedMeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
 			.LUMIX_ENUM_PROP(InstancedMeshLayer, "Layer").attribute<LayerEnum>()
 		.LUMIX_CMP(Controller, "physical_controller", "Physics / Controller")
-			.LUMIX_FUNC_EX(PhysicsScene::moveController, "move")
-			.LUMIX_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown")
+			.LUMIX_FUNC_EX(PhysicsModule::moveController, "move")
+			.LUMIX_FUNC_EX(PhysicsModule::isControllerCollisionDown, "isCollisionDown")
 			.LUMIX_PROP(ControllerRadius, "Radius")
 			.LUMIX_PROP(ControllerHeight, "Height")
 			.LUMIX_ENUM_PROP(ControllerLayer, "Layer").attribute<LayerEnum>()
@@ -3977,21 +3968,21 @@ void PhysicsScene::reflect() {
 			.LUMIX_PROP(ControllerCustomGravityAcceleration, "Custom gravity acceleration")
 		.LUMIX_CMP(RigidActor, "rigid_actor", "Physics / Rigid actor")
 			.icon(ICON_FA_VOLLEYBALL_BALL)
-			.LUMIX_FUNC_EX(PhysicsScene::putToSleep, "putToSleep")
-			.LUMIX_FUNC_EX(PhysicsScene::getActorSpeed, "getSpeed")
-			.LUMIX_FUNC_EX(PhysicsScene::getActorVelocity, "getVelocity")
-			.LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyForce")
-			.LUMIX_FUNC_EX(PhysicsScene::applyImpulseToActor, "applyImpulse")
-			.LUMIX_FUNC_EX(PhysicsScene::addForceAtPos, "addForceAtPos")
+			.LUMIX_FUNC_EX(PhysicsModule::putToSleep, "putToSleep")
+			.LUMIX_FUNC_EX(PhysicsModule::getActorSpeed, "getSpeed")
+			.LUMIX_FUNC_EX(PhysicsModule::getActorVelocity, "getVelocity")
+			.LUMIX_FUNC_EX(PhysicsModule::applyForceToActor, "applyForce")
+			.LUMIX_FUNC_EX(PhysicsModule::applyImpulseToActor, "applyImpulse")
+			.LUMIX_FUNC_EX(PhysicsModule::addForceAtPos, "addForceAtPos")
 			.LUMIX_ENUM_PROP(ActorLayer, "Layer").attribute<LayerEnum>()
 			.LUMIX_ENUM_PROP(DynamicType, "Dynamic").attribute<DynamicTypeEnum>()
 			.LUMIX_PROP(IsTrigger, "Trigger")
-			.begin_array<&PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry>("Box geometry")	
+			.begin_array<&PhysicsModule::getBoxGeometryCount, &PhysicsModule::addBoxGeometry, &PhysicsModule::removeBoxGeometry>("Box geometry")	
 				.LUMIX_PROP(BoxGeomHalfExtents, "Size")
 				.LUMIX_PROP(BoxGeomOffsetPosition, "Position offset")
 				.LUMIX_PROP(BoxGeomOffsetRotation, "Rotation offset").radiansAttribute()
 			.end_array()
-			.begin_array<&PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry>("Sphere geometry")
+			.begin_array<&PhysicsModule::getSphereGeometryCount, &PhysicsModule::addSphereGeometry, &PhysicsModule::removeSphereGeometry>("Sphere geometry")
 				.LUMIX_PROP(SphereGeomRadius, "Radius").minAttribute(0)
 				.LUMIX_PROP(SphereGeomOffsetPosition, "Position offset")
 			.end_array()
@@ -3999,12 +3990,12 @@ void PhysicsScene::reflect() {
 			.LUMIX_PROP(RigidActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
 		.LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle")
 			.icon(ICON_FA_CAR_ALT)
-			.LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel")
-			.LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer")
-			.LUMIX_FUNC_EX(PhysicsScene::setVehicleBrake, "setBrake")
-			.prop<&PhysicsSceneImpl::getVehicleSpeed>("Speed")
-			.prop<&PhysicsSceneImpl::getVehicleCurrentGear>("Current gear")
-			.prop<&PhysicsSceneImpl::getVehicleRPM>("RPM")
+			.LUMIX_FUNC_EX(PhysicsModule::setVehicleAccel, "setAccel")
+			.LUMIX_FUNC_EX(PhysicsModule::setVehicleSteer, "setSteer")
+			.LUMIX_FUNC_EX(PhysicsModule::setVehicleBrake, "setBrake")
+			.prop<&PhysicsModuleImpl::getVehicleSpeed>("Speed")
+			.prop<&PhysicsModuleImpl::getVehicleCurrentGear>("Current gear")
+			.prop<&PhysicsModuleImpl::getVehicleRPM>("RPM")
 			.LUMIX_PROP(VehicleMass, "Mass").minAttribute(0)
 			.LUMIX_PROP(VehicleCenterOfMass, "Center of mass")
 			.LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier")
@@ -4021,7 +4012,7 @@ void PhysicsScene::reflect() {
 			.LUMIX_PROP(WheelSpringStrength, "Spring strength").minAttribute(0)
 			.LUMIX_PROP(WheelSpringDamperRate, "Spring damper rate").minAttribute(0)
 			.LUMIX_ENUM_PROP(WheelSlot, "Slot").attribute<WheelSlotEnum>()
-			.prop<&PhysicsSceneImpl::getWheelRPM>("RPM")
+			.prop<&PhysicsModuleImpl::getWheelRPM>("RPM")
 		.LUMIX_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield")
 			.LUMIX_ENUM_PROP(HeightfieldLayer, "Layer").attribute<LayerEnum>()
 			.LUMIX_PROP(HeightmapSource, "Heightmap").resourceAttribute(Texture::TYPE)
@@ -4030,7 +4021,7 @@ void PhysicsScene::reflect() {
 	;
 }
 
-void PhysicsSceneImpl::RigidActor::setIsTrigger(bool is) {
+void PhysicsModuleImpl::RigidActor::setIsTrigger(bool is) {
 	is_trigger = is;
 	if (physx_actor) {
 		PxShape* shape;
@@ -4046,7 +4037,7 @@ void PhysicsSceneImpl::RigidActor::setIsTrigger(bool is) {
 	}
 }
 
-void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state, Resource&)
+void PhysicsModuleImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state, Resource&)
 {
 	if (new_state == Resource::State::READY)
 	{
@@ -4060,19 +4051,19 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
 #endif
-		scale = scene.getWorld().getScale(entity);
+		scale = module.getWorld().getScale(entity);
 		PxMeshScale pxscale(toPhysx(scale));
 		PxConvexMeshGeometry convex_geom(mesh->convex_mesh, pxscale);
 		PxTriangleMeshGeometry tri_geom(mesh->tri_mesh, pxscale);
 		const PxGeometry* geom = mesh->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
-		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, material ? *material->material : *scene.m_default_material);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, material ? *material->material : *module.m_default_material);
 		(void)shape;
-		scene.updateFilterData(physx_actor, layer);
+		module.updateFilterData(physx_actor, layer);
 	}
 }
 
 
-void PhysicsSceneImpl::RigidActor::rescale()
+void PhysicsModuleImpl::RigidActor::rescale()
 {
 	if (!mesh || !mesh->isReady()) return;
 
@@ -4080,25 +4071,25 @@ void PhysicsSceneImpl::RigidActor::rescale()
 }
 
 
-void PhysicsSceneImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
+void PhysicsModuleImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 {
 	if (physx_actor)
 	{
-		scene.m_scene->removeActor(*physx_actor);
+		module.m_scene->removeActor(*physx_actor);
 		physx_actor->release();
 	}
 	physx_actor = actor;
 	if (actor)
 	{
-		scene.m_scene->addActor(*actor);
+		module.m_scene->addActor(*actor);
 		actor->userData = (void*)(intptr_t)entity.index;
-		scene.updateFilterData(actor, layer);
+		module.updateFilterData(actor, layer);
 		setIsTrigger(is_trigger);
 	}
 }
 
 
-void PhysicsSceneImpl::RigidActor::setMesh(PhysicsGeometry* new_value)
+void PhysicsModuleImpl::RigidActor::setMesh(PhysicsGeometry* new_value)
 {
 	if (physx_actor) {
 		const i32 shape_count = physx_actor->getNbShapes();
@@ -4116,35 +4107,35 @@ void PhysicsSceneImpl::RigidActor::setMesh(PhysicsGeometry* new_value)
 
 	if (mesh) {
 		if (!next_with_mesh.isValid() && !prev_with_mesh.isValid()) {
-			mesh->getObserverCb().unbind<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
-			scene.m_resource_actor_map.erase(mesh);
+			mesh->getObserverCb().unbind<&PhysicsModuleImpl::onActorResourceStateChanged>(&module);
+			module.m_resource_actor_map.erase(mesh);
 			mesh->decRefCount();
 		} else {
-			auto iter = scene.m_resource_actor_map.find(mesh);
+			auto iter = module.m_resource_actor_map.find(mesh);
 			if (iter.value() == entity) {
-				scene.m_resource_actor_map[mesh] = *next_with_mesh;
+				module.m_resource_actor_map[mesh] = *next_with_mesh;
 			}
 
-			if (next_with_mesh.isValid()) scene.m_actors[*next_with_mesh].prev_with_mesh = prev_with_mesh;
-			if (prev_with_mesh.isValid()) scene.m_actors[*prev_with_mesh].next_with_mesh = next_with_mesh;
+			if (next_with_mesh.isValid()) module.m_actors[*next_with_mesh].prev_with_mesh = prev_with_mesh;
+			if (prev_with_mesh.isValid()) module.m_actors[*prev_with_mesh].next_with_mesh = next_with_mesh;
 		}
 	}
 	mesh = new_value;
 	if (mesh) {
-		auto iter = scene.m_resource_actor_map.find(mesh);
+		auto iter = module.m_resource_actor_map.find(mesh);
 		if (iter.isValid()) {
 			EntityRef e = iter.value();
 			next_with_mesh = e;
-			scene.m_actors[*next_with_mesh].prev_with_mesh = entity;
+			module.m_actors[*next_with_mesh].prev_with_mesh = entity;
 			prev_with_mesh = INVALID_ENTITY;
-			scene.m_resource_actor_map[mesh] = entity;
+			module.m_resource_actor_map[mesh] = entity;
 			if (mesh->isReady()) {
 				onStateChanged(Resource::State::READY, Resource::State::READY, *new_value);
 			}
 			mesh->decRefCount();
 		} else {
-			scene.m_resource_actor_map.insert(mesh, entity);
-			mesh->onLoaded<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
+			module.m_resource_actor_map.insert(mesh, entity);
+			mesh->onLoaded<&PhysicsModuleImpl::onActorResourceStateChanged>(&module);
 			prev_with_mesh = INVALID_ENTITY;
 			next_with_mesh = INVALID_ENTITY;
 		}
@@ -4167,7 +4158,7 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 {
 	if (new_state == Resource::State::READY)
 	{
-		m_scene->heightmapLoaded(*this);
+		m_module->heightmapLoaded(*this);
 	}
 }
 

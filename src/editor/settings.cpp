@@ -584,7 +584,7 @@ lua_State* Settings::getState(Storage storage) const {
 
 bool Settings::save()
 {
-	auto& actions = m_app.getActions();
+	const Array<Action*>& actions = m_app.getActions();
 	os::OutputFile file;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!fs.open(SETTINGS_PATH, file)) return false;
@@ -641,7 +641,8 @@ bool Settings::save()
 		file.close();
 	}
 
-	return file.isError();
+	m_time_since_last_save.tick();
+	return !file.isError();
 }
 
 

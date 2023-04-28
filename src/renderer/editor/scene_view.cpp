@@ -32,7 +32,7 @@
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 
@@ -65,7 +65,7 @@ struct WorldViewImpl final : WorldView {
 		: m_scene_view(view)
 		, m_app(view.m_app)
 		, m_editor(view.m_editor) 
-		, m_scene(nullptr)
+		, m_module(nullptr)
 		, m_draw_cmds(view.m_app.getAllocator())
 		, m_draw_vertices(view.m_app.getAllocator())
 	{
@@ -103,8 +103,8 @@ struct WorldViewImpl final : WorldView {
 	}
 
 	void onWorldCreated(){
-		m_scene = (RenderScene*)m_editor.getWorld()->getScene("renderer");
-		m_icons = EditorIcons::create(m_editor, *m_scene);
+		m_module = (RenderModule*)m_editor.getWorld()->getModule("renderer");
+		m_icons = EditorIcons::create(m_editor, *m_module);
 	}
 
 	void onWorldDestroyed(){
@@ -123,7 +123,7 @@ struct WorldViewImpl final : WorldView {
 		DVec3 origin;
 		Vec3 dir;
 		m_viewport.getRay(m_mouse_pos, origin, dir);
-		const RayCastModelHit hit = m_scene->castRay(origin, dir, INVALID_ENTITY);
+		const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
 		if (!hit.is_hit) return;
 
 		const DVec3 snap_pos = getClosestVertex(hit);
@@ -152,7 +152,7 @@ struct WorldViewImpl final : WorldView {
 		m_editor.selectEntities({}, false);
 		
 		for (int i = 0; i < (int)RenderableTypes::COUNT; ++i) {
-			CullResult* renderables = m_scene->getRenderables(frustum, (RenderableTypes)i);
+			CullResult* renderables = m_module->getRenderables(frustum, (RenderableTypes)i);
 			CullResult* first = renderables;
 			while (renderables) {
 				m_editor.selectEntities(Span(renderables->entities, renderables->header.count), true);
@@ -184,7 +184,7 @@ struct WorldViewImpl final : WorldView {
 				DVec3 origin;
 				Vec3 dir;
 				m_viewport.getRay(m_mouse_pos, origin, dir);
-				const RayCastModelHit hit = m_scene->castRay(origin, dir, INVALID_ENTITY);
+				const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
 
 				const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
 				if (m_snap_mode != SnapMode::NONE && !selected_entities.empty() && hit.is_hit)
@@ -240,7 +240,7 @@ struct WorldViewImpl final : WorldView {
 		DVec3 origin;
 		Vec3 dir;		
 		m_viewport.getRay(m_mouse_pos, origin, dir);
-		const RayCastModelHit hit = m_scene->castRay(origin, dir, INVALID_ENTITY);
+		const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
 		if (!hit.is_hit || hit.entity != selected_entities[0]) return;
 
 		const DVec3 snap_pos = getClosestVertex(hit);
@@ -254,12 +254,12 @@ struct WorldViewImpl final : WorldView {
 		ASSERT(hit.entity.isValid());
 		const EntityRef entity = (EntityRef)hit.entity;
 		const DVec3& wpos = hit.origin + hit.t * hit.dir;
-		World& world = m_scene->getWorld();
+		World& world = m_module->getWorld();
 		const Transform tr = world.getTransform(entity);
 		const Vec3 lpos = tr.rot.conjugated() * Vec3(wpos - tr.pos);
 		if (!world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
 
-		Model* model = m_scene->getModelInstanceModel(entity);
+		Model* model = m_module->getModelInstanceModel(entity);
 
 		float min_dist_squared = FLT_MAX;
 		Vec3 closest_vertex = lpos;
@@ -352,7 +352,7 @@ struct WorldViewImpl final : WorldView {
 			DVec3 origin;
 			Vec3 dir;
 			m_viewport.getRay({(float)x, (float)y}, origin, dir);
-			const RayCastModelHit hit = m_scene->castRay(origin, dir, INVALID_ENTITY);
+			const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
 			if (Gizmo::isActive()) return;
 
 			if (m_scene_view.m_is_measure_active) {
@@ -538,7 +538,7 @@ struct WorldViewImpl final : WorldView {
 		DVec3 origin;
 		Vec3 dir;
 		m_viewport.getRay(center, origin, dir);
-		const RayCastModelHit hit = m_scene->castRay(origin, dir, ignore);
+		const RayCastModelHit hit = m_module->castRay(origin, dir, ignore);
 		DVec3 pos;
 		if (hit.is_hit) {
 			res.pos = origin + dir * hit.t;
@@ -598,7 +598,7 @@ struct WorldViewImpl final : WorldView {
 	Vec2 m_rect_selection_start;
 	float m_rect_selection_timer = 0;
 	UniquePtr<EditorIcons> m_icons;
-	RenderScene* m_scene;
+	RenderModule* m_module;
 	Array<Vertex> m_draw_vertices;
 	Array<DrawCmd> m_draw_cmds;
 };
@@ -684,7 +684,7 @@ void SceneView::init() {
 	m_editor.setView(m_view);
 
 	Engine& engine = m_app.getEngine();
-	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
@@ -882,19 +882,19 @@ void SceneView::renderSelection()
 	if (entities.size() > 5000) return;
 	
 	renderer.pushJob("selection", [&renderer, this, &engine, &entities](DrawStream& stream) {
-		RenderScene* scene = m_pipeline->getScene();
-		const World& world = scene->getWorld();
+		RenderModule* module = m_pipeline->getModule();
+		const World& world = module->getWorld();
 		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
 		const u32 depth_define = 1 << renderer.getShaderDefineIdx("DEPTH");
 		const DVec3 view_pos = m_view->getViewport().pos;
 		Array<DualQuat> dq_pose(engine.getAllocator());
 		for (EntityRef e : entities) {
-			if (!scene->getWorld().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+			if (!module->getWorld().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 
-			const Model* model = scene->getModelInstanceModel(e);
+			const Model* model = module->getModelInstanceModel(e);
 			if (!model || !model->isReady()) continue;
 
-			const Pose* pose = scene->lockPose(e);
+			const Pose* pose = module->lockPose(e);
 			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 				const Mesh& mesh = model->getMesh(i);
 					
@@ -945,7 +945,7 @@ void SceneView::renderSelection()
 				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
 			}
-			scene->unlockPose(e, false);
+			module->unlockPose(e, false);
 		}
 	});
 }
@@ -1014,14 +1014,14 @@ void SceneView::captureMouse(bool capture)
 
 RayCastModelHit SceneView::castRay(float x, float y)
 {
-	auto* scene =  m_pipeline->getScene();
-	ASSERT(scene);
+	auto* module =  m_pipeline->getModule();
+	ASSERT(module);
 	
 	const Viewport& vp = m_view->getViewport();
 	DVec3 origin;
 	Vec3 dir;
 	vp.getRay({x * vp.w, y * vp.h}, origin, dir);
-	return scene->castRay(origin, dir, INVALID_ENTITY);
+	return module->castRay(origin, dir, INVALID_ENTITY);
 }
 
 

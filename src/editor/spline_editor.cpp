@@ -86,8 +86,8 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 		WorldView::RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
 		if (hit.is_hit) {
-			CoreScene* scene = (CoreScene*)world->getScene(SPLINE_TYPE);
-			Spline& hit_spline = scene->getSpline(e);
+			CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
+			Spline& hit_spline = module->getSpline(e);
 			m_selected = (i32)hit_spline.points.size();
 			recordUndo(-1, hit_spline, e, [&](){
 				hit_spline.points.push(Vec3(hit.pos - tr.pos));
@@ -101,8 +101,8 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 		ASSERT(world->hasComponent(entity, SPLINE_TYPE));
 
-		CoreScene* scene = (CoreScene*)world->getScene(SPLINE_TYPE);
-		Spline& spline = scene->getSpline(entity);
+		CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
+		Spline& spline = module->getSpline(entity);
 		
 		recordUndo(-1, spline, entity, [&](){
 			spline.points.clear();
@@ -119,8 +119,8 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 		if (!world->hasComponent(selected[0], SPLINE_TYPE)) return nullptr;
 
-		CoreScene* scene = (CoreScene*)world->getScene(SPLINE_TYPE);
-		return &scene->getSpline(selected[0]);
+		CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
+		return &module->getSpline(selected[0]);
 	}
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
@@ -157,15 +157,15 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		{}
 
 		bool execute() override { 
-			CoreScene* scene = (CoreScene*)editor.getWorld()->getScene(SPLINE_TYPE);
-			Spline& spline = scene->getSpline(e);
+			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(SPLINE_TYPE);
+			Spline& spline = module->getSpline(e);
 			spline.points = new_points.makeCopy();
 			return true;
 		}
 
 		void undo() override {
-			CoreScene* scene = (CoreScene*)editor.getWorld()->getScene(SPLINE_TYPE);
-			Spline& spline = scene->getSpline(e);
+			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(SPLINE_TYPE);
+			Spline& spline = module->getSpline(e);
 			spline.points = old_points.makeCopy();
 		}
 
@@ -334,11 +334,11 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		if (cmp.type != SPLINE_TYPE) return false;
 		
 		const EntityRef e = (EntityRef)cmp.entity;
-		World& world = cmp.scene->getWorld();
+		World& world = cmp.module->getWorld();
 		if (!world.hasComponent(e, SPLINE_TYPE)) return false;
 
-		CoreScene* scene = (CoreScene*)cmp.scene;
-		Spline& spline = scene->getSpline(e);
+		CoreModule* module = (CoreModule*)cmp.module;
+		Spline& spline = module->getSpline(e);
 		if (spline.points.size() == 0) return false;
 
 		WorldView::Vertex* vertices = view.render(true, (spline.points.size() - 1) * 2);

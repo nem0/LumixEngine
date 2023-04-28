@@ -13,9 +13,9 @@ Spline::Spline(IAllocator& allocator)
 	: points(allocator)
 {}
 
-struct CoreSceneImpl : CoreScene {
-	CoreSceneImpl(Engine& engine, IPlugin& plugin, World& world)
-		: m_plugin(plugin)
+struct CoreModuleImpl : CoreModule {
+	CoreModuleImpl(Engine& engine, ISystem& system, World& world)
+		: m_system(system)
 		, m_allocator(engine.getAllocator())
 		, m_world(world)
 		, m_splines(m_allocator)
@@ -50,10 +50,9 @@ struct CoreSceneImpl : CoreScene {
 		}
 	}
 
-	IPlugin& getPlugin() const override { return m_plugin; }
+	ISystem& getSystem() const override { return m_system; }
 	void update(float time_delta) override {}
 	World& getWorld() override { return m_world; }
-	void clear() override { m_splines.clear(); }
 
 	void createSpline(EntityRef e) {
 		Spline spline(m_allocator);
@@ -73,40 +72,38 @@ struct CoreSceneImpl : CoreScene {
 	const HashMap<EntityRef, Spline>& getSplines() override { return m_splines; }
 
 	static void reflect() {
-		LUMIX_SCENE(CoreSceneImpl, "core")
+		LUMIX_MODULE(CoreModuleImpl, "core")
 			.LUMIX_CMP(Spline, "spline", "Core / Spline")
-				//.LUMIX_PROP(BoneAttachmentParent, "Parent")
-			;
+		;
 	}
 
 	IAllocator& m_allocator;
 	HashMap<EntityRef, Spline> m_splines;
-	IPlugin& m_plugin;
+	ISystem& m_system;
 	World& m_world;
 };
 
-struct CorePlugin : IPlugin {
+struct CorePlugin : ISystem {
 	CorePlugin(Engine& engine)
 		: m_engine(engine)
 	{
-		CoreSceneImpl::reflect();
+		CoreModuleImpl::reflect();
 	}
 
 	const char* getName() const override { return "core"; }
-	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& serializer) const override {}
-	bool deserialize(u32 version, InputMemoryStream& serializer) override { return true; }
+	bool deserialize(i32 version, InputMemoryStream& serializer) override { return version == 0; }
 
-	void createScenes(World& world) override {
+	void createModules(World& world) override {
 		IAllocator& allocator = m_engine.getAllocator();
-		UniquePtr<CoreSceneImpl> scene = UniquePtr<CoreSceneImpl>::create(allocator, m_engine, *this, world);
-		world.addScene(scene.move());
+		UniquePtr<CoreModuleImpl> module = UniquePtr<CoreModuleImpl>::create(allocator, m_engine, *this, world);
+		world.addModule(module.move());
 	}
 
 	Engine& m_engine;
 };
 
-IPlugin* createCorePlugin(Engine& engine) {
+ISystem* createCorePlugin(Engine& engine) {
 	return LUMIX_NEW(engine.getAllocator(), CorePlugin)(engine);
 }
 

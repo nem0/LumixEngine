@@ -45,12 +45,12 @@ struct ChorusZone
 };
 
 
-struct AudioScene : IScene
+struct AudioModule : IModule
 {
 	using SoundHandle = i32;
 	static constexpr SoundHandle INVALID_SOUND_HANDLE = -1;
 
-	static UniquePtr<AudioScene> createInstance(AudioSystem& system,
+	static UniquePtr<AudioModule> createInstance(AudioSystem& system,
 		World& world,
 		struct IAllocator& allocator);
 	static void reflect(struct Engine& engine);

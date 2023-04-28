@@ -1,4 +1,4 @@
-#include "navigation_scene.h"
+#include "navigation_module.h"
 #include "engine/array.h"
 #include "engine/atomic.h"
 #include "engine/crt.h"
@@ -15,7 +15,7 @@
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include <DetourAlloc.h>
 #include <DetourCrowd.h>
 #include <DetourNavMesh.h>
@@ -28,7 +28,7 @@ namespace Lumix
 {
 
 
-enum class NavigationSceneVersion : i32 {
+enum class NavigationModuleVersion : i32 {
 	ZONE_GUID,
 	DETAILED,
 	GENERATOR_PARAMS,
@@ -80,34 +80,26 @@ struct Agent
 };
 
 
-struct NavigationSceneImpl final : NavigationScene
+struct NavigationModuleImpl final : NavigationModule
 {
-	NavigationSceneImpl(Engine& engine, IPlugin& system, World& world, IAllocator& allocator)
+	NavigationModuleImpl(Engine& engine, ISystem& system, World& world, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_world(world)
 		, m_system(system)
 		, m_engine(engine)
 		, m_agents(m_allocator)
 		, m_zones(m_allocator)
-		, m_script_scene(nullptr)
+		, m_script_module(nullptr)
 	{
-		m_world.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
+		m_world.entityTransformed().bind<&NavigationModuleImpl::onEntityMoved>(this);
 	}
 
 
-	~NavigationSceneImpl()
-	{
-		m_world.entityTransformed().unbind<&NavigationSceneImpl::onEntityMoved>(this);
-	}
-
-
-	void clear() override
-	{
+	~NavigationModuleImpl() {
 		for(RecastZone& zone : m_zones) {
 			clearNavmesh(zone);
 		}
-		m_agents.clear();
-		m_zones.clear();
+		m_world.entityTransformed().unbind<&NavigationModuleImpl::onEntityMoved>(this);
 	}
 
 
@@ -171,15 +163,15 @@ struct NavigationSceneImpl final : NavigationScene
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
 
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 
-		EntityPtr entity_ptr = render_scene->getFirstTerrain();
+		EntityPtr entity_ptr = render_module->getFirstTerrain();
 		while (entity_ptr.isValid()) {
 			const EntityRef entity = (EntityRef)entity_ptr;
 			const Transform terrain_tr = m_world.getTransform(entity);
 			const Transform to_zone = zone_tr.inverted() * terrain_tr;
-			float scaleXZ = render_scene->getTerrainXZScale(entity);
+			float scaleXZ = render_module->getTerrainXZScale(entity);
 			const Transform to_terrain = to_zone.inverted();
 			Matrix mtx = to_terrain.rot.toMatrix();
 			mtx.setTranslation(Vec3(to_terrain.pos));
@@ -192,22 +184,22 @@ struct NavigationSceneImpl final : NavigationScene
 					float x = i * scaleXZ;
 					float z = j * scaleXZ;
 
-					const float h0 = render_scene->getTerrainHeightAt(entity, x, z);
+					const float h0 = render_module->getTerrainHeightAt(entity, x, z);
 					const Vec3 p0 = Vec3(to_zone.transform(Vec3(x, h0, z)));
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
-					const float h1 = render_scene->getTerrainHeightAt(entity, x, z);
+					const float h1 = render_module->getTerrainHeightAt(entity, x, z);
 					const Vec3 p1 = Vec3(to_zone.transform(Vec3(x, h1, z)));
 
 					x = (i + 1) * scaleXZ;
 					z = (j + 1) * scaleXZ;
-					const float h2 = render_scene->getTerrainHeightAt(entity, x, z);
+					const float h2 = render_module->getTerrainHeightAt(entity, x, z);
 					const Vec3 p2 = Vec3(to_zone.transform(Vec3(x, h2, z)));
 
 					x = i * scaleXZ;
 					z = (j + 1) * scaleXZ;
-					const float h3 = render_scene->getTerrainHeightAt(entity, x, z);
+					const float h3 = render_module->getTerrainHeightAt(entity, x, z);
 					const Vec3 p3 = Vec3(to_zone.transform(Vec3(x, h3, z)));
 
 					Vec3 n = normalize(cross(p1 - p0, p0 - p2));
@@ -219,7 +211,7 @@ struct NavigationSceneImpl final : NavigationScene
 					rcRasterizeTriangle(&ctx, &p0.x, &p2.x, &p3.x, area, solid);
 				}
 			}
-			entity_ptr = render_scene->getNextTerrain(entity);
+			entity_ptr = render_module->getNextTerrain(entity);
 		}
 	}
 
@@ -284,24 +276,24 @@ struct NavigationSceneImpl final : NavigationScene
 
 		const Transform inv_zone_tr = zone_tr.inverted();
 
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 
 		const u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
 		const u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
-		for (EntityPtr model_instance = render_scene->getFirstModelInstance(); 
+		for (EntityPtr model_instance = render_module->getFirstModelInstance(); 
 			model_instance.isValid();
-			model_instance = render_scene->getNextModelInstance(model_instance))
+			model_instance = render_module->getNextModelInstance(model_instance))
 		{
 			const EntityRef entity = (EntityRef)model_instance;
-			auto* model = render_scene->getModelInstanceModel(entity);
+			auto* model = render_module->getModelInstanceModel(entity);
 			if (!model) return;
 		
 			const Transform tr = m_world.getTransform(entity);
 			rasterizeModel(model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
 		}
 
-		const HashMap<EntityRef, InstancedModel>& ims = render_scene->getInstancedModels();
+		const HashMap<EntityRef, InstancedModel>& ims = render_module->getInstancedModels();
 		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
 			const InstancedModel& im = iter.value();
 			if (!im.model) continue;
@@ -338,16 +330,16 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void onPathFinished(const Agent& agent)
 	{
-		if (!m_script_scene) return;
+		if (!m_script_module) return;
 		
 		if (!m_world.hasComponent(agent.entity, LUA_SCRIPT_TYPE)) return;
 
-		for (int i = 0, c = m_script_scene->getScriptCount(agent.entity); i < c; ++i)
+		for (int i = 0, c = m_script_module->getScriptCount(agent.entity); i < c; ++i)
 		{
-			auto* call = m_script_scene->beginFunctionCall(agent.entity, i, "onPathFinished");
+			auto* call = m_script_module->beginFunctionCall(agent.entity, i, "onPathFinished");
 			if (!call) continue;
 
-			m_script_scene->endFunctionCall();
+			m_script_module->endFunctionCall();
 		}
 	}
 
@@ -483,7 +475,7 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	static void drawPoly(RenderScene* render_scene, const Transform& tr, const dtMeshTile& tile, const dtPoly& poly)
+	static void drawPoly(RenderModule* render_module, const Transform& tr, const dtMeshTile& tile, const dtPoly& poly)
 	{
 		const unsigned int ip = (unsigned int)(&poly - tile.polys);
 		const dtPolyDetail& pd = tile.detailMeshes[ip];
@@ -503,7 +495,7 @@ struct NavigationSceneImpl final : NavigationScene
 					v[k] = *(Vec3*)&tile.detailVerts[(pd.vertBase + t[k] - poly.vertCount) * 3];
 				}
 			}
-			render_scene->addDebugTriangle(tr.transform(v[0]), tr.transform(v[1]), tr.transform(v[2]), 0xff00aaff);
+			render_module->addDebugTriangle(tr.transform(v[0]), tr.transform(v[1]), tr.transform(v[2]), 0xff00aaff);
 		}
 
 		for (int k = 0; k < pd.triCount; ++k)
@@ -520,7 +512,7 @@ struct NavigationSceneImpl final : NavigationScene
 			for (int m = 0, n = 2; m < 3; n = m++)
 			{
 				if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
-				render_scene->addDebugLine(tr.transform(*(Vec3*)tv[n]), tr.transform(*(Vec3*)tv[m]), 0xff0000ff);
+				render_module->addDebugLine(tr.transform(*(Vec3*)tv[n]), tr.transform(*(Vec3*)tv[m]), 0xff0000ff);
 			}
 		}
 	}
@@ -548,8 +540,8 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void debugDrawPath(EntityRef entity) override
 	{
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 		
 		auto agent_iter = m_agents.find(entity);
 		if (!agent_iter.isValid()) return;
@@ -571,19 +563,19 @@ struct NavigationSceneImpl final : NavigationScene
 			const dtPoly* poly = nullptr;
 			if (dtStatusFailed(zone.navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
 
-			drawPoly(render_scene, zone_tr, *tile, *poly);
+			drawPoly(render_module, zone_tr, *tile, *poly);
 		}
 
 		Vec3 prev = *(Vec3*)dt_agent->npos;
 		for (int i = 0; i < dt_agent->ncorners; ++i) {
 			Vec3 tmp = *(Vec3*)&dt_agent->cornerVerts[i * 3];
-			render_scene->addDebugLine(zone_tr.transform(prev), zone_tr.transform(tmp), 0xffff0000);
+			render_module->addDebugLine(zone_tr.transform(prev), zone_tr.transform(tmp), 0xffff0000);
 			prev = tmp;
 		}
-		render_scene->addDebugCross(zone_tr.transform(*(Vec3*)dt_agent->targetPos), 1.0f, Color::WHITE);
+		render_module->addDebugCross(zone_tr.transform(*(Vec3*)dt_agent->targetPos), 1.0f, Color::WHITE);
 		const Vec3 vel = *(Vec3*)dt_agent->vel;
 		const DVec3 pos = m_world.getPosition(entity);
-		render_scene->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);
+		render_module->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);
 	}
 
 
@@ -594,8 +586,8 @@ struct NavigationSceneImpl final : NavigationScene
 
 
 	void debugDrawContours(EntityRef zone_entity) override {
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.debug_contours) return;
@@ -616,38 +608,38 @@ struct NavigationSceneImpl final : NavigationScene
 			for (int j = 1; j < c.nverts; ++j) {
 				const int* v = &c.verts[j * 4];
 				Vec3 cur = orig + Vec3((float)v[0] * cs, (float)v[1] * ch, (float)v[2] * cs);
-				render_scene->addDebugLine(tr.transform(prev), tr.transform(cur), i & 1 ? 0xffff00ff : 0xffff0000);
+				render_module->addDebugLine(tr.transform(prev), tr.transform(cur), i & 1 ? 0xffff00ff : 0xffff0000);
 				prev = cur;
 			}
 
-			render_scene->addDebugLine(tr.transform(prev), tr.transform(first), i & 1 ? 0xffff00ff : 0xffff0000);
+			render_module->addDebugLine(tr.transform(prev), tr.transform(first), i & 1 ? 0xffff00ff : 0xffff0000);
 		}
 	}
 
 	bool isNavmeshReady(EntityRef zone) const override { return m_zones[zone].navmesh != nullptr; }
 
 	struct LoadCallback {
-		LoadCallback(NavigationSceneImpl& scene, EntityRef entity)
-			: scene(scene)
+		LoadCallback(NavigationModuleImpl& module, EntityRef entity)
+			: module(module)
 			, entity(entity)
 		{}
 
 		void fileLoaded(u64 size, const u8* mem, bool success) {	
-			auto iter = scene.m_zones.find(entity);
+			auto iter = module.m_zones.find(entity);
 			if (!iter.isValid()) {
-				LUMIX_DELETE(scene.m_allocator, this);
+				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
 
 			if (!success) {
 				logError("Could not load navmesh, GUID ", iter.value().zone.guid);
-				LUMIX_DELETE(scene.m_allocator, this);
+				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
 
 			RecastZone& zone = iter.value();
-			if (!scene.initNavmesh(zone)) {
-				LUMIX_DELETE(scene.m_allocator, this);
+			if (!module.initNavmesh(zone)) {
+				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
 
@@ -658,7 +650,7 @@ struct NavigationSceneImpl final : NavigationScene
 			file.read(&params, sizeof(params));
 			if (dtStatusFailed(zone.navmesh->init(&params))) {
 				logError("Could not init Detour navmesh");
-				LUMIX_DELETE(scene.m_allocator, this);
+				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
 			for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
@@ -669,18 +661,18 @@ struct NavigationSceneImpl final : NavigationScene
 					file.read(data, data_size);
 					if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
 						dtFree(data);
-						LUMIX_DELETE(scene.m_allocator, this);
+						LUMIX_DELETE(module.m_allocator, this);
 						return;
 					}
 				}
 			}
 
-			if (!zone.crowd) scene.initCrowd(zone);
+			if (!zone.crowd) module.initCrowd(zone);
 
-			LUMIX_DELETE(scene.m_allocator, this);
+			LUMIX_DELETE(module.m_allocator, this);
 		}
 
-		NavigationSceneImpl& scene;
+		NavigationModuleImpl& module;
 		EntityRef entity;
 	};
 
@@ -723,8 +715,8 @@ struct NavigationSceneImpl final : NavigationScene
 
 
 	void debugDrawHeightfield(EntityRef zone_entity) override {
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 		
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.debug_heightfield) return;
@@ -743,8 +735,8 @@ struct NavigationSceneImpl final : NavigationScene
 					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
 					Vec3 maxs(fx + zone.zone.cell_size, orig.y + span->smax * cell_height, fz + zone.zone.cell_size);
 					u32 color = span->area == 0 ? 0xffff0000 : 0xff00aaff;
-					render_scene->addDebugCubeSolid(tr.transform(mins), tr.transform(maxs), color);
-					render_scene->addDebugCube(tr.transform(mins), tr.transform(maxs), 0xffffFFFF);
+					render_module->addDebugCubeSolid(tr.transform(mins), tr.transform(maxs), color);
+					render_module->addDebugCube(tr.transform(mins), tr.transform(maxs), 0xffffFFFF);
 					span = span->next;
 				}
 			}
@@ -755,8 +747,8 @@ struct NavigationSceneImpl final : NavigationScene
 	void debugDrawCompactHeightfield(EntityRef zone_entity) override {
 		static const int MAX_CUBES = 0xffFF;
 
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 		
 		const RecastZone& zone = m_zones[zone_entity];
 		if (!zone.debug_compact_heightfield) return;
@@ -779,11 +771,11 @@ struct NavigationSceneImpl final : NavigationScene
 
 				for (u32 i = c.index, ni = c.index + c.count; i < ni; ++i) {
 					float vy = orig.y + float(chf.spans[i].y) * ch;
-					render_scene->addDebugTriangle(tr.transform(Vec3(vx, vy, vz))
+					render_module->addDebugTriangle(tr.transform(Vec3(vx, vy, vz))
 						, tr.transform(Vec3(vx + cs, vy, vz + cs))
 						, tr.transform(Vec3(vx + cs, vy, vz))
 						, 0xffff00FF);
-					render_scene->addDebugTriangle(tr.transform(Vec3(vx, vy, vz))
+					render_module->addDebugTriangle(tr.transform(Vec3(vx, vy, vz))
 						, tr.transform(Vec3(vx, vy, vz + cs))
 						, tr.transform(Vec3(vx + cs, vy, vz + cs))
 						, 0xffff00FF);
@@ -795,7 +787,7 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	static void drawPolyBoundaries(RenderScene* render_scene,
+	static void drawPolyBoundaries(RenderModule* render_module,
 		const Transform& tr,
 		const dtMeshTile& tile,
 		const unsigned int col,
@@ -862,7 +854,7 @@ struct NavigationSceneImpl final : NavigationScene
 						if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
 						if (distancePtLine2d(tv[n], v0, v1) < thr && distancePtLine2d(tv[m], v0, v1) < thr)
 						{
-							render_scene->addDebugLine(tr.transform(*(Vec3*)tv[n] + Vec3(0, 0.5f, 0))
+							render_module->addDebugLine(tr.transform(*(Vec3*)tv[n] + Vec3(0, 0.5f, 0))
 								, tr.transform(*(Vec3*)tv[m] + Vec3(0, 0.5f, 0))
 								, c);
 						}
@@ -872,7 +864,7 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 	}
 
-	static void drawTilePortal(RenderScene* render_scene, const Transform& zone_tr, const dtMeshTile& tile) {
+	static void drawTilePortal(RenderModule* render_module, const Transform& zone_tr, const dtMeshTile& tile) {
 		const float padx = 0.04f;
 		const float pady = tile.header->walkableClimb;
 
@@ -894,20 +886,20 @@ struct NavigationSceneImpl final : NavigationScene
 
 						const float x = va[0] + ((side == 0) ? -padx : padx);
 
-						render_scene->addDebugLine(zone_tr.transform(Vec3(x, va[1] - pady, va[2])), zone_tr.transform(Vec3(x, va[1] + pady, va[2])), col);
-						render_scene->addDebugLine(zone_tr.transform(Vec3(x, va[1] + pady, va[2])), zone_tr.transform(Vec3(x, vb[1] + pady, vb[2])), col);
-						render_scene->addDebugLine(zone_tr.transform(Vec3(x, vb[1] + pady, vb[2])), zone_tr.transform(Vec3(x, vb[1] - pady, vb[2])), col);
-						render_scene->addDebugLine(zone_tr.transform(Vec3(x, vb[1] - pady, vb[2])), zone_tr.transform(Vec3(x, va[1] - pady, va[2])), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(x, va[1] - pady, va[2])), zone_tr.transform(Vec3(x, va[1] + pady, va[2])), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(x, va[1] + pady, va[2])), zone_tr.transform(Vec3(x, vb[1] + pady, vb[2])), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(x, vb[1] + pady, vb[2])), zone_tr.transform(Vec3(x, vb[1] - pady, vb[2])), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(x, vb[1] - pady, vb[2])), zone_tr.transform(Vec3(x, va[1] - pady, va[2])), col);
 					}
 					else if (side == 2 || side == 6) {
 						unsigned int col = side == 2 ? 0xff00aa00 : 0xffaaaa00;
 
 						const float z = va[2] + ((side == 2) ? -padx : padx);
 
-						render_scene->addDebugLine(zone_tr.transform(Vec3(va[0], va[1] - pady, z)), zone_tr.transform(Vec3(va[0], va[1] + pady, z)), col);
-						render_scene->addDebugLine(zone_tr.transform(Vec3(va[0], va[1] + pady, z)), zone_tr.transform(Vec3(vb[0], vb[1] + pady, z)), col);
-						render_scene->addDebugLine(zone_tr.transform(Vec3(vb[0], vb[1] + pady, z)), zone_tr.transform(Vec3(vb[0], vb[1] - pady, z)), col);
-						render_scene->addDebugLine(zone_tr.transform(Vec3(vb[0], vb[1] - pady, z)), zone_tr.transform(Vec3(va[0], va[1] - pady, z)), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(va[0], va[1] - pady, z)), zone_tr.transform(Vec3(va[0], va[1] + pady, z)), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(va[0], va[1] + pady, z)), zone_tr.transform(Vec3(vb[0], vb[1] + pady, z)), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(vb[0], vb[1] + pady, z)), zone_tr.transform(Vec3(vb[0], vb[1] - pady, z)), col);
+						render_module->addDebugLine(zone_tr.transform(Vec3(vb[0], vb[1] - pady, z)), zone_tr.transform(Vec3(va[0], va[1] - pady, z)), col);
 					}
 				}
 			}
@@ -927,8 +919,8 @@ struct NavigationSceneImpl final : NavigationScene
 		const Vec3 max = zone.zone.extents;
 		if (pos.x > max.x || pos.x < min.x || pos.z > max.z || pos.z < min.z) return;
 
-		auto render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		if (!render_scene) return;
+		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		if (!render_module) return;
 
 		int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
 		int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
@@ -938,13 +930,13 @@ struct NavigationSceneImpl final : NavigationScene
 		for (int i = 0; i < tile->header->polyCount; ++i) {
 			const dtPoly* p = &tile->polys[i];
 			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
-			drawPoly(render_scene, tr, *tile, *p);
+			drawPoly(render_module, tr, *tile, *p);
 		}
 
-		if (outer_boundaries) drawPolyBoundaries(render_scene, tr, *tile, 0xffff0000, false);
-		if (inner_boundaries) drawPolyBoundaries(render_scene, tr, *tile, 0xffff0000, true);
+		if (outer_boundaries) drawPolyBoundaries(render_module, tr, *tile, 0xffff0000, false);
+		if (inner_boundaries) drawPolyBoundaries(render_module, tr, *tile, 0xffff0000, true);
 
-		if (portals) drawTilePortal(render_scene, tr, *tile);
+		if (portals) drawTilePortal(render_module, tr, *tile);
 	}
 
 
@@ -969,8 +961,8 @@ struct NavigationSceneImpl final : NavigationScene
 	void startGame() override
 	{
 		m_is_game_running = true;
-		auto* scene = m_world.getScene("lua_script");
-		m_script_scene = static_cast<LuaScriptScene*>(scene);
+		auto* module = m_world.getModule("lua_script");
+		m_script_module = static_cast<LuaScriptModule*>(module);
 		
 		for (RecastZone& zone : m_zones) {
 			if (zone.navmesh && !zone.crowd) initCrowd(zone);
@@ -1326,7 +1318,7 @@ struct NavigationSceneImpl final : NavigationScene
 					return;
 				}
 
-				if (!scene->generateTile(*zone, zone_entity, i % zone->m_num_tiles_x, i / zone->m_num_tiles_x, false, mutex)) {
+				if (!module->generateTile(*zone, zone_entity, i % zone->m_num_tiles_x, i / zone->m_num_tiles_x, false, mutex)) {
 					atomicIncrement(&fail_counter);
 				}
 				else {
@@ -1351,7 +1343,7 @@ struct NavigationSceneImpl final : NavigationScene
 		Mutex mutex;
 		RecastZone* zone;
 		EntityRef zone_entity;
-		NavigationSceneImpl* scene;
+		NavigationModuleImpl* module;
 
 		jobs::Signal signal;
 	};
@@ -1392,7 +1384,7 @@ struct NavigationSceneImpl final : NavigationScene
 		NavmeshBuildJobImpl* job = LUMIX_NEW(m_allocator, NavmeshBuildJobImpl);
 		job->zone = &zone;
 		job->zone_entity = zone_entity;
-		job->scene = this;
+		job->module = this;
 		job->run();
 		return job;
 	}
@@ -1489,7 +1481,7 @@ struct NavigationSceneImpl final : NavigationScene
 		m_world.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
-	i32 getVersion() const override { return (i32)NavigationSceneVersion::LATEST; }
+	i32 getVersion() const override { return (i32)NavigationModuleVersion::LATEST; }
 
 
 	void serialize(OutputMemoryStream& serializer) override
@@ -1533,10 +1525,10 @@ struct NavigationSceneImpl final : NavigationScene
 			e = entity_map.get(e);
 			serializer.read(zone.zone.extents);
 			zone.entity = e;
-			if (version > (i32)NavigationSceneVersion::ZONE_GUID) {
+			if (version > (i32)NavigationModuleVersion::ZONE_GUID) {
 				serializer.read(zone.zone.guid);
 				serializer.read(zone.zone.flags);
-				if (version <= (i32)NavigationSceneVersion::DETAILED) {
+				if (version <= (i32)NavigationModuleVersion::DETAILED) {
 					zone.zone.flags |= NavmeshZone::DETAILED;
 				}
 			}
@@ -1545,7 +1537,7 @@ struct NavigationSceneImpl final : NavigationScene
 				zone.zone.flags = NavmeshZone::AUTOLOAD | NavmeshZone::DETAILED;
 			}
 
-			if (version > (i32)NavigationSceneVersion::GENERATOR_PARAMS) {
+			if (version > (i32)NavigationModuleVersion::GENERATOR_PARAMS) {
 				serializer.read(zone.zone.cell_size);
 				serializer.read(zone.zone.cell_height);
 				serializer.read(zone.zone.walkable_slope_angle);
@@ -1556,7 +1548,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 			m_zones.insert(e, zone);
 			m_world.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
-			if (version > (i32)NavigationSceneVersion::ZONE_GUID && (zone.zone.flags & NavmeshZone::AUTOLOAD) != 0) {
+			if (version > (i32)NavigationModuleVersion::ZONE_GUID && (zone.zone.flags & NavmeshZone::AUTOLOAD) != 0) {
 				loadZone(e);
 			}
 		}
@@ -1639,12 +1631,12 @@ struct NavigationSceneImpl final : NavigationScene
 		else m_zones[entity].zone.flags &= ~NavmeshZone::AUTOLOAD;
 	}
 
-	IPlugin& getPlugin() const override { return m_system; }
+	ISystem& getSystem() const override { return m_system; }
 	World& getWorld() override { return m_world; }
 
 	IAllocator& m_allocator;
 	World& m_world;
-	IPlugin& m_system;
+	ISystem& m_system;
 	Engine& m_engine;
 	HashMap<EntityRef, RecastZone> m_zones;
 	HashMap<EntityRef, Agent> m_agents;
@@ -1652,45 +1644,45 @@ struct NavigationSceneImpl final : NavigationScene
 	bool m_is_game_running = false;
 	
 	Vec3 m_debug_tile_origin;
-	LuaScriptScene* m_script_scene;
+	LuaScriptModule* m_script_module;
 };
 
 
-UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& system, World& world, IAllocator& allocator)
+UniquePtr<NavigationModule> NavigationModule::create(Engine& engine, ISystem& system, World& world, IAllocator& allocator)
 {
-	return UniquePtr<NavigationSceneImpl>::create(allocator, engine, system, world, allocator);
+	return UniquePtr<NavigationModuleImpl>::create(allocator, engine, system, world, allocator);
 }
 
 
-void NavigationScene::reflect() {
-	LUMIX_SCENE(NavigationSceneImpl, "navigation")
+void NavigationModule::reflect() {
+	LUMIX_MODULE(NavigationModuleImpl, "navigation")
 		.LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone")
 			.icon(ICON_FA_STREET_VIEW)
-			.LUMIX_FUNC_EX(NavigationScene::loadZone, "load")
-			.LUMIX_FUNC_EX(NavigationScene::debugDrawContours, "drawContours")
-			.LUMIX_FUNC_EX(NavigationScene::debugDrawNavmesh, "drawNavmesh")
-			.LUMIX_FUNC_EX(NavigationScene::debugDrawCompactHeightfield, "drawCompactHeightfield")
-			.LUMIX_FUNC_EX(NavigationScene::debugDrawHeightfield, "drawHeightfield")
-			.LUMIX_FUNC(NavigationScene::generateNavmesh)
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::extents>("Extents")
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::agent_height>("Agent height")
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::agent_radius>("Agent radius")
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::cell_size>("Cell size")
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::cell_height>("Cell height")
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::walkable_slope_angle>("Walkable slope angle")
-			.var_prop<&NavigationScene::getZone, &NavmeshZone::max_climb>("Max climb")
-			.prop<&NavigationScene::isZoneAutoload, &NavigationScene::setZoneAutoload>("Autoload")
-			.prop<&NavigationScene::isZoneDetailed, &NavigationScene::setZoneDetailed>("Detailed")
+			.LUMIX_FUNC_EX(NavigationModule::loadZone, "load")
+			.LUMIX_FUNC_EX(NavigationModule::debugDrawContours, "drawContours")
+			.LUMIX_FUNC_EX(NavigationModule::debugDrawNavmesh, "drawNavmesh")
+			.LUMIX_FUNC_EX(NavigationModule::debugDrawCompactHeightfield, "drawCompactHeightfield")
+			.LUMIX_FUNC_EX(NavigationModule::debugDrawHeightfield, "drawHeightfield")
+			.LUMIX_FUNC(NavigationModule::generateNavmesh)
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::extents>("Extents")
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::agent_height>("Agent height")
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::agent_radius>("Agent radius")
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::cell_size>("Cell size")
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::cell_height>("Cell height")
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::walkable_slope_angle>("Walkable slope angle")
+			.var_prop<&NavigationModule::getZone, &NavmeshZone::max_climb>("Max climb")
+			.prop<&NavigationModule::isZoneAutoload, &NavigationModule::setZoneAutoload>("Autoload")
+			.prop<&NavigationModule::isZoneDetailed, &NavigationModule::setZoneDetailed>("Detailed")
 		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
 			.icon(ICON_FA_MAP_MARKED_ALT)
-			.LUMIX_FUNC_EX(NavigationScene::setActorActive, "setActive")
-			.LUMIX_FUNC_EX(NavigationScene::navigate, "navigate")
-			.LUMIX_FUNC_EX(NavigationScene::cancelNavigation, "cancelNavigation")
-			.LUMIX_FUNC_EX(NavigationScene::debugDrawPath, "drawPath")
+			.LUMIX_FUNC_EX(NavigationModule::setActorActive, "setActive")
+			.LUMIX_FUNC_EX(NavigationModule::navigate, "navigate")
+			.LUMIX_FUNC_EX(NavigationModule::cancelNavigation, "cancelNavigation")
+			.LUMIX_FUNC_EX(NavigationModule::debugDrawPath, "drawPath")
 			.LUMIX_PROP(AgentRadius, "Radius").minAttribute(0)
 			.LUMIX_PROP(AgentHeight, "Height").minAttribute(0)
 			.LUMIX_PROP(AgentMoveEntity, "Move entity")
-			.prop<&NavigationSceneImpl::getAgentSpeed>("Speed");
+			.prop<&NavigationModuleImpl::getAgentSpeed>("Speed");
 }
 
 } // namespace Lumix

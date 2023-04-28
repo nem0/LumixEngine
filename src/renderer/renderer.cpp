@@ -24,7 +24,7 @@
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/particle_system.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
@@ -381,7 +381,7 @@ struct RendererImpl final : Renderer
 		, m_free_sort_keys(m_allocator)
 		, m_sort_key_to_mesh_map(m_allocator)
 	{
-		RenderScene::reflect();
+		RenderModule::reflect();
 
 		LUMIX_GLOBAL_FUNC(Model::getBoneCount);
 		LUMIX_GLOBAL_FUNC(Model::getBoneName);
@@ -398,9 +398,8 @@ struct RendererImpl final : Renderer
 	float getLODMultiplier() const override { return m_lod_multiplier; }
 	void setLODMultiplier(float value) override { m_lod_multiplier = maximum(0.f, value); }
 
-	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
-	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
+	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	~RendererImpl()
 	{
@@ -520,7 +519,7 @@ struct RendererImpl final : Renderer
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 
-		RenderScene::registerLuaAPI(m_engine.getState(), *this);
+		RenderModule::registerLuaAPI(m_engine.getState(), *this);
 
 		m_layers.emplace("default");
 	}
@@ -734,10 +733,10 @@ struct RendererImpl final : Renderer
 	ResourceManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
 
-	void createScenes(World& ctx) override
+	void createModules(World& world) override
 	{
-		UniquePtr<RenderScene> scene = RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
-		ctx.addScene(scene.move());
+		UniquePtr<RenderModule> module = RenderModule::createInstance(*this, m_engine, world, m_allocator);
+		world.addModule(module.move());
 	}
 
 	DrawStream& getDrawStream() override {

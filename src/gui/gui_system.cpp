@@ -7,13 +7,13 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_scene.h"
+#include "gui/gui_module.h"
 #include "gui/sprite.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/texture.h"
 
 
@@ -48,11 +48,11 @@ struct GUISystemImpl final : GUISystem
 {
 	static const char* getTextHAlignName(int index)
 	{
-		switch ((GUIScene::TextHAlign) index)
+		switch ((GUIModule::TextHAlign) index)
 		{
-			case GUIScene::TextHAlign::LEFT: return "left";
-			case GUIScene::TextHAlign::RIGHT: return "right";
-			case GUIScene::TextHAlign::CENTER: return "center";
+			case GUIModule::TextHAlign::LEFT: return "left";
+			case GUIModule::TextHAlign::RIGHT: return "right";
+			case GUIModule::TextHAlign::CENTER: return "center";
 		}
 		ASSERT(false);
 		return "Unknown";
@@ -64,7 +64,7 @@ struct GUISystemImpl final : GUISystem
 		, m_interface(nullptr)
 		, m_sprite_manager(engine.getAllocator())
 	{
-		GUIScene::reflect();
+		GUIModule::reflect();
 		LUMIX_GLOBAL_FUNC(GUISystem::enableCursor);
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
@@ -74,11 +74,11 @@ struct GUISystemImpl final : GUISystem
 
 	Engine& getEngine() override { return m_engine; }
 
-	void createScenes(World& world) override
+	void createModules(World& world) override
 	{
 		IAllocator& allocator = m_engine.getAllocator();
-		UniquePtr<GUIScene> scene = GUIScene::createInstance(*this, world, allocator);
-		world.addScene(scene.move());
+		UniquePtr<GUIModule> module = GUIModule::createInstance(*this, world, allocator);
+		world.addModule(module.move());
 	}
 
 	void setCursor(os::CursorType type) override {
@@ -107,9 +107,9 @@ struct GUISystemImpl final : GUISystem
 		if (!m_interface) return;
 
 		Pipeline* pipeline = m_interface->getPipeline();
-		auto* scene = (GUIScene*)pipeline->getScene()->getWorld().getScene("gui");
+		auto* module = (GUIModule*)pipeline->getModule()->getWorld().getModule("gui");
 		Vec2 size = m_interface->getSize();
-		scene->render(*pipeline, size, true);
+		module->render(*pipeline, size, true);
 	}
 
 
@@ -122,9 +122,8 @@ struct GUISystemImpl final : GUISystem
 
 	const char* getName() const override { return "gui"; }
 
-	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
-	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
+	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	Engine& m_engine;
 	SpriteManager m_sprite_manager;

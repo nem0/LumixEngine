@@ -1215,12 +1215,12 @@ Timer::Timer() {
 }
 
 
-float Timer::getTimeSinceStart() {
+float Timer::getTimeSinceStart() const {
 	return float(double(getRawTimestamp() - first_tick) / double(getFrequency()));
 }
 
 
-float Timer::getTimeSinceTick() {
+float Timer::getTimeSinceTick() const {
 	return float(double(getRawTimestamp() - last_tick) / double(getFrequency()));
 }
 

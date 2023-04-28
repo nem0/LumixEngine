@@ -1,7 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "animation/animation.h"
-#include "animation/animation_scene.h"
+#include "animation/animation_module.h"
 #include "animation/controller.h"
 #include "animation/property_animation.h"
 #include "editor/asset_browser.h"
@@ -18,7 +18,7 @@
 #include "engine/world.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 using namespace Lumix;
@@ -342,32 +342,32 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 		if (entities.length() != 1) return;
 
 		const EntityRef entity = entities[0];
-		auto* scene = (AnimationScene*)editor.getWorld()->getScene(cmp_type);
-		auto* animation = scene->getAnimableAnimation(entity);
+		auto* module = (AnimationModule*)editor.getWorld()->getModule(cmp_type);
+		auto* animation = module->getAnimableAnimation(entity);
 		if (!animation) return;
 		if (!animation->isReady()) return;
 
 		ImGui::Checkbox("Preview", &m_is_playing);
-		float time = scene->getAnimable(entity).time.seconds();
+		float time = module->getAnimable(entity).time.seconds();
 		if (ImGui::SliderFloat("Time", &time, 0, animation->getLength().seconds()))
 		{
-			scene->getAnimable(entity).time = Time::fromSeconds(time);
-			scene->updateAnimable(entity, 0);
+			module->getAnimable(entity).time = Time::fromSeconds(time);
+			module->updateAnimable(entity, 0);
 		}
 
 		if (m_is_playing)
 		{
 			float time_delta = m_app.getEngine().getLastTimeDelta();
-			scene->updateAnimable(entity, time_delta);
+			module->updateAnimable(entity, time_delta);
 		}
 
 		if (ImGui::CollapsingHeader("Transformation"))
 		{
-			auto* render_scene = (RenderScene*)scene->getWorld().getScene(RENDERABLE_TYPE);
-			if (scene->getWorld().hasComponent(entity, RENDERABLE_TYPE))
+			auto* render_module = (RenderModule*)module->getWorld().getModule(RENDERABLE_TYPE);
+			if (module->getWorld().hasComponent(entity, RENDERABLE_TYPE))
 			{
-				const Pose* pose = render_scene->lockPose(entity);
-				Model* model = render_scene->getModelInstanceModel(entity);
+				const Pose* pose = render_module->lockPose(entity);
+				Model* model = render_module->getModelInstanceModel(entity);
 				if (pose && model)
 				{
 					ImGui::Columns(3);
@@ -382,7 +382,7 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 					}
 					ImGui::Columns();
 				}
-				if (pose) render_scene->unlockPose(entity, false);
+				if (pose) render_module->unlockPose(entity, false);
 			}
 		}
 	}

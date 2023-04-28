@@ -54,53 +54,102 @@ World::World(Engine& engine, IAllocator& allocator)
 	, m_entity_moved(m_allocator)
 	, m_entity_created(m_allocator)
 	, m_first_free_slot(-1)
-	, m_scenes(m_allocator)
+	, m_modules(m_allocator)
 	, m_hierarchy(m_allocator)
 	, m_transforms(m_allocator)
-	, m_name("")
+	, m_partitions(m_allocator)
 {
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
 	memset(m_component_type_map, 0, sizeof(m_component_type_map));
+
+	PartitionHandle p = createPartition("");
+	setActivePartition(p);
+
+	const Array<ISystem*>& systems = engine.getSystemManager().getSystems();
+	for (ISystem* system : systems) {
+		system->createModules(*this);
+	}
+
+	for (UniquePtr<IModule>& module : m_modules) {
+		module->init();
+	}
+}
+
+World::PartitionHandle World::createPartition(const char* name) {
+	ASSERT(sizeof(m_partition_generator) == 2 && m_partition_generator <= 0xffFF); // TODO handle reuse
+
+	Partition& p = m_partitions.emplace();
+	p.handle = m_partition_generator;
+	++m_partition_generator;
+	copyString(p.name, name);
+	return p.handle;
+}
+
+void World::destroyPartition(PartitionHandle partition) {
+	for (EntityData& e : m_entities) {
+		if (!e.valid) continue;
+		if (e.partition == partition) destroyEntity({i32(&e - m_entities.begin())});
+	}
+	m_partitions.eraseItems([&](const Partition& p){ return p.handle == partition; });
+}
+
+void World::setActivePartition(PartitionHandle partition) {
+	m_active_partition = partition;
+}
+
+void World::setPartition(EntityRef entity, PartitionHandle partition) {
+	m_entities[entity.index].partition = partition;
+}
+
+World::Partition& World::getPartition(PartitionHandle partition) {
+	for (Partition& p : m_partitions) {
+		if (p.handle == partition) return p;
+	}
+	ASSERT(false);
+	return m_partitions[0];
+}
+
+World::PartitionHandle World::getPartition(EntityRef entity) {
+	return m_entities[entity.index].partition;
+}
+
+IModule* World::getModule(ComponentType type) const {
+	return m_component_type_map[type.index].module;
 }
 
 
-IScene* World::getScene(ComponentType type) const {
-	return m_component_type_map[type.index].scene;
-}
-
-
-IScene* World::getScene(const char* name) const
+IModule* World::getModule(const char* name) const
 {
-	for (auto& scene : m_scenes)
+	for (auto& module : m_modules)
 	{
-		if (equalStrings(scene->getPlugin().getName(), name))
+		if (equalStrings(module->getSystem().getName(), name))
 		{
-			return scene.get();
+			return module.get();
 		}
 	}
 	return nullptr;
 }
 
 
-Array<UniquePtr<IScene>>& World::getScenes()
+Array<UniquePtr<IModule>>& World::getModules()
 {
-	return m_scenes;
+	return m_modules;
 }
 
 
-void World::addScene(UniquePtr<IScene>&& scene)
+void World::addModule(UniquePtr<IModule>&& module)
 {
-	const RuntimeHash hash(scene->getPlugin().getName());
+	const RuntimeHash hash(module->getSystem().getName());
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.scene == hash) {
-			m_component_type_map[cmp.cmp->component_type.index].scene = scene.get();
+		if (cmp.system_hash == hash) {
+			m_component_type_map[cmp.cmp->component_type.index].module = module.get();
 			m_component_type_map[cmp.cmp->component_type.index].create = cmp.cmp->creator;
 			m_component_type_map[cmp.cmp->component_type.index].destroy = cmp.cmp->destroyer;
 		}
 	}
 
-	m_scenes.push(scene.move());
+	m_modules.push(module.move());
 }
 
 
@@ -365,6 +414,7 @@ EntityRef World::createEntity(const DVec3& position, const Quat& rotation)
 	tr->pos = position;
 	tr->rot = rotation;
 	tr->scale = Vec3(1);
+	data->partition = m_active_partition;
 	data->name = -1;
 	data->hierarchy = -1;
 	data->components = 0;
@@ -390,9 +440,9 @@ void World::destroyEntity(EntityRef entity)
 		if ((mask & ((u64)1 << i)) != 0)
 		{
 			auto original_mask = mask;
-			IScene* scene = m_component_type_map[i].scene;
+			IModule* module = m_component_type_map[i].module;
 			auto destroy_method = m_component_type_map[i].destroy;
-			destroy_method(scene, entity);
+			destroy_method(module, entity);
 			mask = entity_data.components;
 			ASSERT(original_mask != mask);
 		}
@@ -636,9 +686,48 @@ Vec3 World::getLocalScale(EntityRef entity) const
 	return m_hierarchy[hierarchy_idx].local_transform.scale;
 }
 
+static void serializeModuleList(World& world, OutputMemoryStream& serializer) {
+	const Array<UniquePtr<IModule>>& modules = world.getModules();
+	serializer.write((i32)modules.size());
+	for (UniquePtr<IModule>& module : modules) {
+		serializer.writeString(module->getSystem().getName());
+	}
+}
 
-void World::serialize(OutputMemoryStream& serializer)
-{
+static bool hasSerializedModules(World& world, InputMemoryStream& serializer) {
+	i32 count;
+	serializer.read(count);
+	for (int i = 0; i < count; ++i) {
+		const char* tmp = serializer.readString();
+		if (!world.getModule(tmp)) {
+			logError("Missing module ", tmp);
+			return false;
+		}
+	}
+	return true;
+}
+
+#pragma pack(1)
+// TODO "merge" with WorldEditorHeader, handle prefabs (they have no WorldEditorHeader)
+struct WorldHeader {
+	enum class Version : u32 {
+		VEC3_SCALE,
+		FLAGS,
+		LAST
+	};
+	static const u32 MAGIC = '_LEN';
+
+	u32 magic = MAGIC;
+	Version version = Version::LAST;
+};
+#pragma pack()
+
+void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags) {
+	const bool serialize_partitions = (u32)flags & (u32)WorldSerializeFlags::HAS_PARTITIONS;
+	WorldHeader header;
+	serializer.write(header);
+	serializeModuleList(*this, serializer);
+	serializer.write(flags);
 	serializer.write((u32)m_entities.size());
 
 	for (u32 i = 0, c = m_entities.size(); i < c; ++i) {
@@ -648,6 +737,7 @@ void World::serialize(OutputMemoryStream& serializer)
 		serializer.write(m_transforms[i].pos);
 		serializer.write(m_transforms[i].rot);
 		serializer.write(m_transforms[i].scale);
+		if (serialize_partitions) serializer.write(m_entities[i].partition);
 	}
 	serializer.write(INVALID_ENTITY);
 
@@ -669,14 +759,46 @@ void World::serialize(OutputMemoryStream& serializer)
 			serializer.write(h.local_transform.scale);
 		}
 	}
+
+	serializer.write((i32)m_modules.size());
+	for (UniquePtr<IModule>& module : m_modules) {
+		serializer.writeString(module->getSystem().getName());
+		serializer.write(module->getVersion());
+		module->serialize(serializer);
+	}
+
+	if (serialize_partitions) {
+		serializer.write((u32)m_partitions.size());
+		serializer.write(m_partitions.begin(), m_partitions.byte_size());
+		serializer.write(m_active_partition);
+	}
 }
 
-void World::setName(const char* name) { 
-	copyString(m_name, name);
-}
-
-void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale)
+bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 {
+	if (serializer.remaining() < sizeof(WorldHeader)) {
+		logError("Wrong or corrupted file");
+		return false;
+	}
+	WorldHeader header;
+	serializer.read(header);
+	if (header.magic != WorldHeader::MAGIC) {
+		logError("Wrong or corrupted file");
+		return false;
+	}
+	if (header.version > WorldHeader::Version::LAST) {
+		logError("Unsupported version of world");
+		return false;
+	}
+	if (!hasSerializedModules(*this, serializer)) return false;
+
+	bool deserialize_partitions = false;
+	if (header.version > WorldHeader::Version::FLAGS) {
+		WorldSerializeFlags flags;
+		serializer.read(flags);
+		deserialize_partitions = (u32)flags & (u32)WorldSerializeFlags::HAS_PARTITIONS;
+	}
+	
 	u32 to_reserve;
 	serializer.read(to_reserve);
 	entity_map.reserve(to_reserve);
@@ -687,15 +809,16 @@ void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bo
 		entity_map.set(orig, new_e);
 		serializer.read(m_transforms[new_e.index].pos);
 		serializer.read(m_transforms[new_e.index].rot);
-		if (vec3_scale) {
+		if (header.version > WorldHeader::Version::VEC3_SCALE) {
 			serializer.read(m_transforms[new_e.index].scale);
 		}
 		else {
 			serializer.read(m_transforms[new_e.index].scale.x);
 			float padding;
 			serializer.read(padding);
+			m_transforms[new_e.index].scale.y = m_transforms[new_e.index].scale.z = m_transforms[new_e.index].scale.x;
 		}
-		m_transforms[new_e.index].scale.y = m_transforms[new_e.index].scale.z = m_transforms[new_e.index].scale.x;
+		if (deserialize_partitions) serializer.read(m_entities[new_e.index].partition);
 	}
 
 	u32 count;
@@ -720,7 +843,7 @@ void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bo
 			serializer.read(h.next_sibling);
 			serializer.read(h.local_transform.pos);
 			serializer.read(h.local_transform.rot);
-			if (vec3_scale) {
+			if (header.version > WorldHeader::Version::VEC3_SCALE) {
 				serializer.read(h.local_transform.scale);
 			}
 			else {
@@ -737,8 +860,25 @@ void World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, bo
 			m_entities[h.entity.index].hierarchy = i + old_count;
 		}
 	}
-}
 
+	i32 module_count;
+	serializer.read(module_count);
+	for (int i = 0; i < module_count; ++i) {
+		const char* tmp = serializer.readString();
+		IModule* module = getModule(tmp);
+		const i32 version = serializer.read<i32>();
+		module->deserialize(serializer, entity_map, version);
+	}
+
+	if (deserialize_partitions) {
+		u32 partitions_count;
+		serializer.read(partitions_count);
+		m_partitions.resize(partitions_count);
+		serializer.read(m_partitions.begin(), m_partitions.byte_size());
+		serializer.read(m_active_partition);
+	}
+	return true;
+}
 
 void World::setScale(EntityRef entity, const Vec3& scale)
 {
@@ -760,8 +900,8 @@ ComponentUID World::getFirstComponent(EntityRef entity) const
 	{
 		if ((mask & (u64(1) << i)) != 0)
 		{
-			IScene* scene = m_component_type_map[i].scene;
-			return ComponentUID(entity, {i}, scene);
+			IModule* module = m_component_type_map[i].module;
+			return ComponentUID(entity, {i}, module);
 		}
 	}
 	return ComponentUID::INVALID;
@@ -775,8 +915,8 @@ ComponentUID World::getNextComponent(const ComponentUID& cmp) const
 	{
 		if ((mask & (u64(1) << i)) != 0)
 		{
-			IScene* scene = m_component_type_map[i].scene;
-			return ComponentUID(cmp.entity, {i}, scene);
+			IModule* module = m_component_type_map[i].module;
+			return ComponentUID(cmp.entity, {i}, module);
 		}
 	}
 	return ComponentUID::INVALID;
@@ -787,8 +927,8 @@ ComponentUID World::getComponent(EntityRef entity, ComponentType component_type)
 {
 	u64 mask = m_entities[entity.index].components;
 	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
-	IScene* scene = m_component_type_map[component_type.index].scene;
-	return ComponentUID(entity, component_type, scene);
+	IModule* module = m_component_type_map[component_type.index].module;
+	return ComponentUID(entity, component_type, module);
 }
 
 
@@ -805,36 +945,36 @@ bool World::hasComponent(EntityRef entity, ComponentType component_type) const
 }
 
 
-void World::onComponentDestroyed(EntityRef entity, ComponentType component_type, IScene* scene)
+void World::onComponentDestroyed(EntityRef entity, ComponentType component_type, IModule* module)
 {
 	auto mask = m_entities[entity.index].components;
 	auto old_mask = mask;
 	mask &= ~((u64)1 << component_type.index);
 	ASSERT(old_mask != mask);
 	m_entities[entity.index].components = mask;
-	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene));
+	m_component_destroyed.invoke(ComponentUID(entity, component_type, module));
 }
 
 
 void World::createComponent(ComponentType type, EntityRef entity)
 {
-	IScene* scene = m_component_type_map[type.index].scene;
+	IModule* module = m_component_type_map[type.index].module;
 	auto& create_method = m_component_type_map[type.index].create;
-	create_method(scene, entity);
+	create_method(module, entity);
 }
 
 
 void World::destroyComponent(EntityRef entity, ComponentType type)
 {
-	IScene* scene = m_component_type_map[type.index].scene;
+	IModule* module = m_component_type_map[type.index].module;
 	auto& destroy_method = m_component_type_map[type.index].destroy;
-	destroy_method(scene, entity);
+	destroy_method(module, entity);
 }
 
 
-void World::onComponentCreated(EntityRef entity, ComponentType component_type, IScene* scene)
+void World::onComponentCreated(EntityRef entity, ComponentType component_type, IModule* module)
 {
-	ComponentUID cmp(entity, component_type, scene);
+	ComponentUID cmp(entity, component_type, module);
 	m_entities[entity.index].components |= (u64)1 << component_type.index;
 	m_component_added.invoke(cmp);
 }

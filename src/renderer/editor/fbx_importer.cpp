@@ -25,7 +25,7 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/voxels.h"
@@ -119,12 +119,12 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 }
 
 
-static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
+static void extractEmbedded(const ofbx::IScene& module, const char* src_dir)
 {
-	for (int i = 0, c = scene.getEmbeddedDataCount(); i < c; ++i) {
-		const ofbx::DataView embedded = scene.getEmbeddedData(i);
+	for (int i = 0, c = module.getEmbeddedDataCount(); i < c; ++i) {
+		const ofbx::DataView embedded = module.getEmbeddedData(i);
 
-		ofbx::DataView filename = scene.getEmbeddedFilename(i);
+		ofbx::DataView filename = module.getEmbeddedFilename(i);
 		char path[LUMIX_MAX_PATH];
 		filename.toString(path);
 		const PathInfo pi(path);
@@ -275,7 +275,7 @@ void FBXImporter::sortBones(bool force_skinned)
 }
 
 
-void FBXImporter::gatherBones(const ofbx::IScene& scene, bool force_skinned)
+void FBXImporter::gatherBones(const ofbx::IScene& module, bool force_skinned)
 {
 	for (const ImportMesh& mesh : m_meshes)
 	{
@@ -296,9 +296,9 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene, bool force_skinned)
 		}
 	}
 
-	for (int i = 0, n = scene.getAnimationStackCount(); i < n; ++i)
+	for (int i = 0, n = module.getAnimationStackCount(); i < n; ++i)
 	{
-		const ofbx::AnimationStack* stack = scene.getAnimationStack(i);
+		const ofbx::AnimationStack* stack = module.getAnimationStack(i);
 		for (int j = 0; stack->getLayer(j); ++j)
 		{
 			const ofbx::AnimationLayer* layer = stack->getLayer(j);
@@ -315,15 +315,15 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene, bool force_skinned)
 }
 
 
-void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
+void FBXImporter::gatherAnimations(const ofbx::IScene& module)
 {
-	int anim_count = scene.getAnimationStackCount();
+	int anim_count = module.getAnimationStackCount();
 	for (int i = 0; i < anim_count; ++i) {
 		ImportAnimation& anim = m_animations.emplace();
-		anim.scene = &scene;
-		anim.fbx = (const ofbx::AnimationStack*)scene.getAnimationStack(i);
+		anim.module = &module;
+		anim.fbx = (const ofbx::AnimationStack*)module.getAnimationStack(i);
 		anim.import = true;
-		const ofbx::TakeInfo* take_info = scene.getTakeInfo(anim.fbx->name);
+		const ofbx::TakeInfo* take_info = module.getTakeInfo(anim.fbx->name);
 		if (take_info)
 		{
 			if (take_info->name.begin != take_info->name.end)
@@ -841,21 +841,21 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 }
 
 
-void FBXImporter::gatherGeometries(ofbx::IScene* scene)
+void FBXImporter::gatherGeometries(ofbx::IScene* module)
 {
-	const int c = scene->getGeometryCount();
+	const int c = module->getGeometryCount();
 	for (int i = 0; i < c; ++i) {
 		ImportGeometry& geom =  m_geometries.emplace(m_allocator);
-		geom.fbx = scene->getGeometry(i);
+		geom.fbx = module->getGeometry(i);
 	}
 }
 
 
-void FBXImporter::gatherMeshes(ofbx::IScene* scene)
+void FBXImporter::gatherMeshes(ofbx::IScene* plugin)
 {
-	int c = scene->getMeshCount();
+	int c = module->getMeshCount();
 	for (int mesh_idx = 0; mesh_idx < c; ++mesh_idx) {
-		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(mesh_idx);
+		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)module->getMesh(mesh_idx);
 		const int mat_count = fbx_mesh->getMaterialCount();
 		for (int j = 0; j < mat_count; ++j) {
 			ImportMesh& mesh = m_meshes.emplace(m_allocator);
@@ -880,7 +880,7 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 
 FBXImporter::~FBXImporter()
 {
-	if (scene) scene->destroy();
+	if (module) module->destroy();
 	if (m_impostor_shadow_shader) m_impostor_shadow_shader->decRefCount();
 }
 
@@ -888,7 +888,7 @@ FBXImporter::~FBXImporter()
 FBXImporter::FBXImporter(StudioApp& app)
 	: m_allocator(app.getAllocator())
 	, m_compiler(app.getAssetCompiler())
-	, scene(nullptr)
+	, module(nullptr)
 	, m_materials(m_allocator)
 	, m_meshes(m_allocator)
 	, m_geometries(m_allocator)
@@ -918,9 +918,9 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 {
 	out_file.reserve(1024 * 1024);
 	PROFILE_FUNCTION();
-	if(scene) {
-		scene->destroy();
-		scene = nullptr;	
+	if(module) {
+		module->destroy();
+		module = nullptr;	
 		m_meshes.clear();
 		m_geometries.clear();
 		m_materials.clear();
@@ -934,16 +934,16 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 	if (!m_filesystem.getContentSync(Path(filename), data)) return false;
 	
 	const ofbx::LoadFlags flags = ignore_geometry ? ofbx::LoadFlags::IGNORE_GEOMETRY : ofbx::LoadFlags::TRIANGULATE;
-	scene = ofbx::load(data.data(), (i32)data.size(), static_cast<u16>(flags), &ofbx_job_processor, nullptr);
-	if (!scene)
+	module = ofbx::load(data.data(), (i32)data.size(), static_cast<u16>(flags), &ofbx_job_processor, nullptr);
+	if (!module)
 	{
 		logError("Failed to import \"", filename, ": ", ofbx::getError(), "\n"
 			"Please try to convert the FBX file with Autodesk FBX Converter or some other software to the latest version.");
 		return false;
 	}
-	m_fbx_scale = scene->getGlobalSettings()->UnitScaleFactor * 0.01f;
+	m_fbx_scale = module->getGlobalSettings()->UnitScaleFactor * 0.01f;
 
-	const ofbx::GlobalSettings* settings = scene->getGlobalSettings();
+	const ofbx::GlobalSettings* settings = module->getGlobalSettings();
 	switch (settings->UpAxis) {
 		case ofbx::UpVector_AxisX: m_orientation = Orientation::X_UP; break;
 		case ofbx::UpVector_AxisY: m_orientation = Orientation::Y_UP; break;
@@ -952,18 +952,18 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 
 	char src_dir[LUMIX_MAX_PATH];
 	copyString(Span(src_dir), Path::getDir(filename));
-	if (!ignore_geometry) extractEmbedded(*scene, src_dir);
-	gatherGeometries(scene);
-	gatherMeshes(scene);
+	if (!ignore_geometry) extractEmbedded(*module, src_dir);
+	gatherGeometries(module);
+	gatherMeshes(module);
 
-	gatherAnimations(*scene);
+	gatherAnimations(*module);
 	if (!ignore_geometry) {
 		gatherMaterials(filename, src_dir);
 		m_materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
 		
 		bool any_skinned = false;
 		for (const ImportMesh& m : m_meshes) any_skinned = any_skinned || m.is_skinned;
-		gatherBones(*scene, force_skinned || any_skinned);
+		gatherBones(*module, force_skinned || any_skinned);
 	}
 
 	return true;
@@ -1024,7 +1024,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	ASSERT(m_impostor_shadow_shader->isReady());
 
 	Engine& engine = m_app.getEngine();
-	Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+	Renderer* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	ASSERT(renderer);
 
 	const u32 capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
@@ -1534,19 +1534,19 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 		const ofbx::AnimationStack* stack = anim.fbx;
 		const ofbx::AnimationLayer* layer = stack->getLayer(0);
-		ASSERT(anim.scene == scene);
-		const float fps = scene->getSceneFrameRate();
-		const ofbx::TakeInfo* take_info = scene->getTakeInfo(stack->name);
+		ASSERT(anim.module == module);
+		const float fps = module->getSceneFrameRate();
+		const ofbx::TakeInfo* take_info = module->getTakeInfo(stack->name);
 		if(!take_info && startsWith(stack->name, "AnimStack::")) {
-			take_info = scene->getTakeInfo(stack->name + 11);
+			take_info = module->getTakeInfo(stack->name + 11);
 		}
 
 		double full_len;
 		if (take_info) {
 			full_len = take_info->local_time_to - take_info->local_time_from;
 		}
-		else if(scene->getGlobalSettings()) {
-			full_len = scene->getGlobalSettings()->TimeSpanStop;
+		else if(module->getGlobalSettings()) {
+			full_len = module->getGlobalSettings()->TimeSpanStop;
 		}
 		else {
 			logError("Unsupported animation in ", src);
@@ -2285,7 +2285,7 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 	out_file.write(&header, sizeof(header));
 
 
-	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getPluginManager().getPlugin("physics");
+	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
 	if (!ps) {
 		logError(src, ": no physics system found while trying to cook physics data");
 		return;
@@ -2368,20 +2368,20 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		char mesh_name[256];
 		getImportMeshName(m_meshes[i], mesh_name);
 		StaticString<LUMIX_MAX_PATH> mesh_path(mesh_name, ".fbx:", src);
-		RenderScene* scene = (RenderScene*)world.getScene(MODEL_INSTANCE_TYPE);
-		scene->setModelInstancePath(e, Path(mesh_path));
+		RenderModule* module = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+		module->setModelInstancePath(e, Path(mesh_path));
 	}
 
 	static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
-	for (i32 i = 0, c = scene->getLightCount(); i < c; ++i) {
-		const ofbx::Light* light = scene->getLight(i);
+	for (i32 i = 0, c = module->getLightCount(); i < c; ++i) {
+		const ofbx::Light* light = module->getLight(i);
 		const Matrix mtx = toLumix(light->getGlobalTransform());
 		const EntityRef e = world.createEntity(DVec3(mtx.getTranslation() * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
 		world.createComponent(POINT_LIGHT_TYPE, e);
 		world.setParent(root, e);
 	}
 
-	engine.serialize(world, blob);
+	world.serialize(blob, WorldSerializeFlags::NONE);
 	engine.destroyWorld(world);
 
 	if (!file.write(blob.data(), blob.size())) {

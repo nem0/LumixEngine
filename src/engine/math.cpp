@@ -1,5 +1,6 @@
 #include "crt.h"
 #include "math.h"
+#include "os.h"
 #include "simd.h"
 
 namespace Lumix
@@ -1270,7 +1271,15 @@ u32 RandomGenerator::rand() {
 	return (u << 16) + v;
 }
 
-static thread_local RandomGenerator rg;
+static RandomGenerator initRandomGenerator() {
+	// TODO improve entropy
+	thread_local u64 dummy;
+	const u64 seed = uintptr(&dummy) ^ os::Timer::getRawTimestamp();
+	RandomGenerator res(u32(seed), u32(seed >> 32));
+	return res;
+}
+
+static thread_local RandomGenerator rg = initRandomGenerator();
 
 u32 rand() {
 	return rg.rand();

@@ -313,127 +313,6 @@ public:
 		return root;
 	}
 
-	struct PropertyCloner : reflection::IPropertyVisitor {
-		template <typename T>
-		void clone(const reflection::Property<T>& prop) { 
-			if (!prop.setter) return;
-			prop.set(dst, index, prop.get(src, index));
-		}
-
-		void visit(const reflection::Property<float>& prop) override { clone(prop); }
-		void visit(const reflection::Property<int>& prop) override { clone(prop); }
-		void visit(const reflection::Property<u32>& prop) override { clone(prop); }
-		void visit(const reflection::Property<EntityPtr>& prop) override { 
-			if (!prop.setter) return;
-
-			EntityPtr e = prop.get(src, index);
-			auto iter = map->find(e);
-			if (iter.isValid()) {
-				e = iter.value();
-			}
-			else {
-				e = INVALID_ENTITY;
-			}
-			prop.set(dst, index, e);
-		}
-		void visit(const reflection::Property<Vec2>& prop) override { clone(prop); }
-		void visit(const reflection::Property<Vec3>& prop) override { clone(prop); }
-		void visit(const reflection::Property<IVec3>& prop) override { clone(prop); }
-		void visit(const reflection::Property<Vec4>& prop) override { clone(prop); }
-		void visit(const reflection::Property<Path>& prop) override { clone(prop); }
-		void visit(const reflection::Property<bool>& prop) override { clone(prop); }
-		void visit(const reflection::Property<const char*>& prop) override { clone(prop); }
-		
-		void visit(const reflection::ArrayProperty& prop) override {
-			const u32 c = prop.getCount(src);
-			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
-			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
-			
-			ASSERT(index == -1);
-			for (u32 i = 0; i < c; ++i) {
-				index = i;
-				prop.visitChildren(*this);
-			}
-			index = -1;
-		}
-		
-		void visit(const reflection::DynamicProperties& prop) override { 
-			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
-				const char* name = prop.getName(src, index, i);
-				reflection::DynamicProperties::Type type = prop.getType(src, index, i);
-				reflection::DynamicProperties::Value val = prop.getValue(src, index, i);
-				if (type == reflection::DynamicProperties::ENTITY) {
-					auto iter = map->find(val.e);
-					if (iter.isValid()) {
-						val.e = iter.value();
-					}
-					else {
-						val.e = INVALID_ENTITY;
-					}
-				}
-				prop.set(dst, index, name, type, val);
-			}
-		}
-		
-
-		void visit(const reflection::BlobProperty& prop) override { 
-			OutputMemoryStream tmp(*allocator);
-			prop.getValue(src, index, tmp);
-			InputMemoryStream blob(tmp);
-			prop.setValue(dst, index, blob);
-		}
-		
-
-		const HashMap<EntityPtr, EntityPtr>* map; 
-		IAllocator* allocator;
-		ComponentUID src;
-		ComponentUID dst;
-		int index = -1;
-	};
-
-
-	EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) {
-		entities.push(src_e);
-		const EntityRef dst_e = (EntityRef)map[src_e];
-		if (dst_parent.isValid()) {
-			dst_u.setParent(dst_parent, dst_e);
-			dst_u.setLocalTransform(dst_e, src_u.getLocalTransform(src_e));
-		}
-		const char* name = src_u.getEntityName(src_e);
-		if (name[0]) {
-			dst_u.setEntityName(dst_e, name);
-		}
-
-		const EntityPtr c = src_u.getFirstChild(src_e);
-		if (c.isValid()) {
-			cloneEntity(src_u, (EntityRef)c, dst_u, dst_e, entities, map);
-		}
-
-		if (dst_parent.isValid()) {
-			const EntityPtr s = src_u.getNextSibling(src_e);
-			if (s.isValid()) {
-				cloneEntity(src_u, (EntityRef)s, dst_u, dst_parent, entities, map);
-			}
-		}
-
-		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
-			dst_u.createComponent(cmp.type, dst_e);
-
-			const reflection::ComponentBase* cmp_tpl = reflection::getComponent(cmp.type);
-	
-			PropertyCloner property_cloner;
-			property_cloner.allocator = &m_editor.getAllocator();
-			property_cloner.src = cmp;
-			property_cloner.dst.type = cmp.type;
-			property_cloner.dst.entity = dst_e;
-			property_cloner.dst.scene = dst_u.getScene(cmp.type);
-			property_cloner.map = &map;
-			cmp_tpl->visit(property_cloner);
-		}
-
-		return dst_e;
-	}
-
 	void cloneHierarchy(const World& src, EntityRef src_e, World& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
 		const EntityPtr child = src.getFirstChild(src_e);
 		const EntityPtr sibling = src.getNextSibling(src_e);
@@ -457,7 +336,7 @@ public:
 		HashMap<EntityPtr, EntityPtr> map(m_editor.getAllocator());
 		map.reserve(256);
 		cloneHierarchy(src, src_e, dst, false, map);
-		cloneEntity(src, src_e, dst, INVALID_ENTITY, entities, map);
+		m_editor.cloneEntity(src, src_e, dst, INVALID_ENTITY, entities, map);
 		return dst;
 	}
 
@@ -509,7 +388,7 @@ public:
 		Array<EntityRef> src_entities(m_editor.getAllocator());
 		src_entities.reserve(256);
 		World& prefab_world = createPrefabWorld(entity, src_entities);
-		engine.serialize(prefab_world, blob);
+		prefab_world.serialize(blob, WorldSerializeFlags::NONE);
 		engine.destroyWorld(prefab_world);
 
 		FileSystem& fs = engine.getFileSystem();
@@ -526,14 +405,16 @@ public:
 			prefab_res->getResourceManager().reload(*prefab_res);
 
 			// TODO undo/redo might keep references do prefab entities, handle that
+			EntityFolders& folders = m_editor.getEntityFolders();
 			for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
 				if (iter.value() != prefab) continue;
 				if (iter.key() == entity) continue;
 
 				const Transform tr = m_world->getTransform(iter.key());
 				const EntityPtr parent = m_world->getParent(iter.key());
+				EntityFolders::FolderHandle folder = folders.getFolder(iter.key());
 
-				m_deferred_instances.push({prefab_res, tr, parent});
+				m_deferred_instances.push({prefab_res, tr, parent, folder});
 				destroySubtree(*m_world, m_world->getFirstChild(iter.key()));
 				m_world->destroyEntity(iter.key());
 			}
@@ -563,7 +444,7 @@ public:
 
 			const Transform tr = m_world->getTransform(e);
 			const EntityPtr parent = m_world->getParent(e);
-			EntityFolders::FolderID folder = folders.getFolder(e);
+			EntityFolders::FolderHandle folder = folders.getFolder(e);
 
 			m_deferred_instances.push({m_resources[prefab].resource, tr, parent, folder});
 			destroySubtree(*m_world, m_world->getFirstChild(e));
@@ -647,7 +528,7 @@ public:
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldSerializedVersion version) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldEditorHeaderVersion version) override
 	{
 		u32 count;
 		serializer.read(count);
@@ -670,7 +551,7 @@ public:
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
 			StableHash content_hash;
-			if ((u32)version <= (u32)WorldSerializedVersion::HASH64) {
+			if (version <= WorldEditorHeaderVersion::HASH64) {
 				u32 dummy;
 				serializer.read(dummy);
 			}
@@ -679,8 +560,8 @@ public:
 			}
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), {content_hash, res});
+			if (!res->isReady()) m_check_update = true;
 		}
-		m_check_update = true;
 
 		serializer.read(count);
 		m_roots.reserve(count);
@@ -694,18 +575,68 @@ public:
 		}
 	}
 
+	void cloneTo(PrefabSystem& dst_ps, const HashMap<EntityPtr, EntityPtr>& map) override {
+		ASSERT(m_deferred_instances.empty());
+		ASSERT(!m_check_update);
+		PrefabSystemImpl& dst = static_cast<PrefabSystemImpl&>(dst_ps);
+
+		auto get_mapped = [&](EntityPtr src) {
+			if (!src.isValid()) return INVALID_ENTITY;
+			auto iter = map.find(src);
+			if (!iter.isValid()) return INVALID_ENTITY;
+			return iter.value();
+		};
+
+		// clone roots
+		dst.m_roots.reserve(m_roots.size());
+		for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
+			const EntityPtr dst_e = get_mapped(iter.key());
+			if (dst_e.isValid()) {
+				dst.m_roots.insert(*dst_e, iter.value());
+			}
+		}
+
+		// clone resources
+		for (auto iter = dst.m_roots.begin(), end = dst.m_roots.end(); iter != end; ++iter) {
+			const PrefabHandle prefab_handle = iter.value();
+			auto res_iter = dst.m_resources.find(prefab_handle);
+			if (res_iter.isValid()) continue;
+
+			const PrefabVersion& src_version = m_resources[prefab_handle];
+			PrefabVersion& dst_version = dst.m_resources.insert(prefab_handle);
+			dst_version.content_hash = src_version.content_hash;
+			dst_version.resource = src_version.resource;
+			dst_version.resource->incRefCount();
+		}
+
+		// clone entity to prefab map
+		for (auto iter = map.begin(), end = map.end(); iter != end; ++iter) {
+			const EntityPtr src_entity = iter.key();
+			if (!src_entity.isValid()) continue;
+
+			const EntityPtr dst_entity = iter.value();
+			PrefabHandle prefab_handle = getPrefab(*src_entity);
+			if (prefab_handle.getHashValue() == 0) continue;
+
+			while(dst.m_entity_to_prefab.size() <= dst_entity.index) {
+				dst.m_entity_to_prefab.push(PrefabHandle());
+			}
+			dst.m_entity_to_prefab[dst_entity.index] = prefab_handle;
+		}
+	}
 
 private:
 	struct DeferredInstance {
 		PrefabResource* resource;
 		Transform transform;
 		EntityPtr parent;
-		EntityFolders::FolderID folder;
+		EntityFolders::FolderHandle folder;
 	};
 
 	struct PrefabVersion {
 		StableHash content_hash;
 		PrefabResource* resource;
+		// used/valid only in serialize method
 		u32 instance_count = 0;
 	};
 

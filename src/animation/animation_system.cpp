@@ -1,4 +1,4 @@
-#include "animation_scene.h"
+#include "animation_module.h"
 
 #include "animation/animation.h"
 #include "animation/property_animation.h"
@@ -42,7 +42,7 @@ struct AnimResourceManager final : ResourceManager
 };
 
 
-struct AnimationSystemImpl final : IPlugin
+struct AnimationSystemImpl final : ISystem
 {
 	void operator=(const AnimationSystemImpl&) = delete;
 	AnimationSystemImpl(const AnimationSystemImpl&) = delete;
@@ -50,11 +50,10 @@ struct AnimationSystemImpl final : IPlugin
 	explicit AnimationSystemImpl(Engine& engine);
 	~AnimationSystemImpl();
 
-	void createScenes(World& ctx) override;
+	void createModules(World& ctx) override;
 	const char* getName() const override { return "animation"; }
-	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
-	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
+	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	IAllocator& m_allocator;
 	Engine& m_engine;
@@ -71,7 +70,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	, m_property_animation_manager(m_allocator)
 	, m_controller_manager(m_allocator)
 {
-	AnimationScene::reflect(engine);
+	AnimationModule::reflect(engine);
 	m_animation_manager.create(Animation::TYPE, m_engine.getResourceManager());
 	m_property_animation_manager.create(PropertyAnimation::TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(anim::Controller::TYPE, m_engine.getResourceManager());
@@ -86,10 +85,10 @@ AnimationSystemImpl::~AnimationSystemImpl()
 }
 
 
-void AnimationSystemImpl::createScenes(World& ctx)
+void AnimationSystemImpl::createModules(World& world)
 {
-	UniquePtr<AnimationScene> scene = AnimationScene::create(m_engine, *this, ctx, m_allocator);
-	ctx.addScene(scene.move());
+	UniquePtr<AnimationModule> module = AnimationModule::create(m_engine, *this, world, m_allocator);
+	world.addModule(module.move());
 }
 
 

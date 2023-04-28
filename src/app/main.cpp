@@ -20,7 +20,7 @@
 #include "gui/gui_system.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 
 #ifdef __linux__
@@ -78,7 +78,7 @@ struct Runner final
 		m_viewport.pos = {0, 0, 0};
 		m_viewport.rot = Quat::IDENTITY;
 
-		m_renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		m_renderer = static_cast<Renderer*>(m_engine->getSystemManager().getSystem("renderer"));
 		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 		m_pipeline = Pipeline::create(*m_renderer, pres, "APP", m_engine->getAllocator());
 
@@ -95,17 +95,17 @@ struct Runner final
 		m_world->createComponent(ENVIRONMENT_TYPE, env);
 		m_world->createComponent(LUA_SCRIPT_TYPE, env);
 		
-		RenderScene* render_scene = (RenderScene*)m_world->getScene("renderer");
-		Environment& environment = render_scene->getEnvironment(env);
+		RenderModule* render_module = (RenderModule*)m_world->getModule("renderer");
+		Environment& environment = render_module->getEnvironment(env);
 		environment.direct_intensity = 3;
 		
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_world->setRotation(env, rot);
 		
-		LuaScriptScene* lua_scene = (LuaScriptScene*)m_world->getScene("lua_script");
-		lua_scene->addScript(env, 0);
-		lua_scene->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
+		LuaScriptModule* lua_module = (LuaScriptModule*)m_world->getModule("lua_script");
+		lua_module->addScript(env, 0);
+		lua_module->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
 	bool loadWorld(const char* path, const char* world_name) {
@@ -116,9 +116,9 @@ struct Runner final
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
-		WorldHeader header;
+		WorldEditorHeader header;
 		blob.read(header);
-		if ((u32)header.version <= (u32)WorldSerializedVersion::HASH64) {
+		if (header.version <= WorldEditorHeaderVersion::HASH64) {
 			u32 dummy;
 			blob.read(dummy);
 			blob.read(dummy);
@@ -133,8 +133,7 @@ struct Runner final
 			}
 		}
 
-		m_world->setName(world_name);
-		if (!m_engine->deserialize(*m_world, blob, entity_map)) {
+		if (!m_world->deserialize(blob, entity_map)) {
 			logError("Failed to deserialize ", path);
 			return false;
 		}
@@ -183,7 +182,7 @@ struct Runner final
 		m_world = &m_engine->createWorld(true);
 		initRenderPipeline();
 		
-		auto* gui = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		auto* gui = static_cast<GUISystem*>(m_engine->getSystemManager().getSystem("gui"));
 		m_gui_interface.pipeline = m_pipeline.get();
 		gui->setInterface(&m_gui_interface);
 
@@ -207,7 +206,7 @@ struct Runner final
 
 	void shutdown() {
 		m_engine->destroyWorld(*m_world);
-		auto* gui = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		auto* gui = static_cast<GUISystem*>(m_engine->getSystemManager().getSystem("gui"));
 		gui->setInterface(nullptr);
 		m_pipeline.reset();
 		m_engine.reset();
@@ -255,11 +254,11 @@ struct Runner final
 	void onIdle() {
 		m_engine->update(*m_world);
 
-		EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
+		EntityPtr camera = m_pipeline->getModule()->getActiveCamera();
 		if (camera.isValid()) {
 			int w = m_viewport.w;
 			int h = m_viewport.h;
-			m_viewport = m_pipeline->getScene()->getCameraViewport((EntityRef)camera);
+			m_viewport = m_pipeline->getModule()->getCameraViewport((EntityRef)camera);
 			m_viewport.w = w;
 			m_viewport.h = h;
 		}

@@ -265,7 +265,7 @@ struct FurComponent {
 	bool enabled = true;
 };
 
-enum class RenderSceneVersion : i32 {
+enum class RenderModuleVersion : i32 {
 	DECAL_UV_SCALE,
 	CURVE_DECALS,
 	AUTODESTROY_EMITTER,
@@ -281,9 +281,9 @@ enum class RenderSceneVersion : i32 {
 	LATEST
 };
 
-struct LUMIX_RENDERER_API RenderScene : IScene
+struct LUMIX_RENDERER_API RenderModule : IModule
 {
-	static UniquePtr<RenderScene> createInstance(Renderer& renderer,
+	static UniquePtr<RenderModule> createInstance(Renderer& renderer,
 		Engine& engine,
 		World& world,
 		IAllocator& allocator);

@@ -22,10 +22,10 @@
 #include "engine/path.h"
 #include "engine/world.h"
 #include "physics/physics_resources.h"
-#include "physics/physics_scene.h"
+#include "physics/physics_module.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 using namespace Lumix;
@@ -149,15 +149,15 @@ void showD6JointGizmo(WorldView& view, const RigidTransform& global_frame, physx
 
 void showSphericalJointGizmo(WorldView& view, ComponentUID cmp)
 {
-	auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-	World& world = phy_scene->getWorld();
+	auto* phy_module = static_cast<PhysicsModule*>(cmp.module);
+	World& world = phy_module->getWorld();
 
 	const EntityRef entity = (EntityRef)cmp.entity;
-	EntityPtr other_entity = phy_scene->getJointConnectedBody(entity);
+	EntityPtr other_entity = phy_module->getJointConnectedBody(entity);
 	if (!other_entity.isValid()) return;
 
 
-	RigidTransform local_frame0 = phy_scene->getJointLocalFrame(entity);
+	RigidTransform local_frame0 = phy_module->getJointLocalFrame(entity);
 	const RigidTransform global_frame0 = world.getTransform(entity).getRigidPart() * local_frame0;
 	const DVec3 joint_pos = global_frame0.pos;
 	const Quat rot0 = global_frame0.rot;
@@ -166,14 +166,14 @@ void showSphericalJointGizmo(WorldView& view, ComponentUID cmp)
 	addLine(view, joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), Color::GREEN);
 	addLine(view, joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), Color::BLUE);
 
-	RigidTransform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(entity);
+	RigidTransform local_frame1 = phy_module->getJointConnectedBodyLocalFrame(entity);
 	RigidTransform global_frame1 = world.getTransform((EntityRef)other_entity).getRigidPart() * local_frame1;
 	const Quat rot1 = global_frame1.rot;
 
-	bool use_limit = phy_scene->getSphericalJointUseLimit(entity);
+	bool use_limit = phy_module->getSphericalJointUseLimit(entity);
 	if (use_limit)
 	{
-		Vec2 limit = phy_scene->getSphericalJointLimit(entity);
+		Vec2 limit = phy_module->getSphericalJointLimit(entity);
 		DVec3 other_pos = world.getPosition((EntityRef)other_entity);
 		addLine(view, joint_pos, other_pos, Color::RED);
 		addCone(view, joint_pos,
@@ -192,16 +192,16 @@ void showSphericalJointGizmo(WorldView& view, ComponentUID cmp)
 
 void showRigidActorGizmo(WorldView& view, ComponentUID cmp)
 {
-	auto* scene = static_cast<PhysicsScene*>(cmp.scene);
+	auto* module = static_cast<PhysicsModule*>(cmp.module);
 	const EntityRef e = (EntityRef)cmp.entity;
-	World& world = scene->getWorld();
+	World& world = module->getWorld();
 	const DVec3 pos = world.getPosition(e);
 	const Quat rot = world.getRotation(e);
-	const i32 box_count = scene->getBoxGeometryCount(e);
+	const i32 box_count = module->getBoxGeometryCount(e);
 	for (i32 i = 0; i < box_count; ++i) {
-		const Vec3 half = scene->getBoxGeomHalfExtents(e, i);
-		const Vec3 p = scene->getBoxGeomOffsetPosition(e, i);
-		const Quat r = rot * scene->getBoxGeomOffsetRotationQuat(e, i);
+		const Vec3 half = module->getBoxGeomHalfExtents(e, i);
+		const Vec3 p = module->getBoxGeomOffsetPosition(e, i);
+		const Quat r = rot * module->getBoxGeomOffsetRotationQuat(e, i);
 
 		addCube(view
 			, pos + rot.rotate(p)
@@ -210,21 +210,21 @@ void showRigidActorGizmo(WorldView& view, ComponentUID cmp)
 			, r.rotate(Vec3(0, 0, half.z))
 			, Color::BLUE);
 	}
-	const i32 sphere_count = scene->getSphereGeometryCount(e);
+	const i32 sphere_count = module->getSphereGeometryCount(e);
 	for (i32 i = 0; i < sphere_count; ++i) {
-		const float r = scene->getSphereGeomRadius(e, i);
-		const Vec3 p = scene->getSphereGeomOffsetPosition(e, i);
+		const float r = module->getSphereGeomRadius(e, i);
+		const Vec3 p = module->getSphereGeomOffsetPosition(e, i);
 		addSphere(view, pos + rot.rotate(p), r, Color::BLUE);
 	}
 }
 
 void showWheelGizmo(WorldView& view, ComponentUID cmp) {
-	World& world = cmp.scene->getWorld();
+	World& world = cmp.module->getWorld();
 	const EntityRef e = (EntityRef)cmp.entity;
-	PhysicsScene* scene = (PhysicsScene*)cmp.scene;
+	PhysicsModule* module = (PhysicsModule*)cmp.module;
 	const Transform wheel_tr = world.getTransform(e);
-	const float radius = scene->getWheelRadius(e);
-	const float width = scene->getWheelWidth(e);
+	const float radius = module->getWheelRadius(e);
+	const float width = module->getWheelWidth(e);
 
 	const Vec3 wheel_axis = wheel_tr.rot.rotate(Vec3(1, 0, 0));
 	addCylinder(view, wheel_tr.pos - wheel_axis * width * 0.5f, wheel_axis , radius, width, Color::BLUE);
@@ -232,22 +232,22 @@ void showWheelGizmo(WorldView& view, ComponentUID cmp) {
 
 void showVehicleGizmo(WorldView& view, ComponentUID cmp) {
 	const EntityRef e = (EntityRef)cmp.entity;
-	PhysicsScene* scene = (PhysicsScene*)cmp.scene;
-	World& world = cmp.scene->getWorld();
+	PhysicsModule* module = (PhysicsModule*)cmp.module;
+	World& world = cmp.module->getWorld();
 	const Transform vehicle_tr = world.getTransform(e);
 	for (EntityRef ch : world.childrenOf(e)) {
 		if (!world.hasComponent(ch, WHEEL_TYPE)) continue;
 			
 		ComponentUID wheel_cmp;
 		wheel_cmp.entity = ch;
-		wheel_cmp.scene = scene;
+		wheel_cmp.module = module;
 		wheel_cmp.type = WHEEL_TYPE;
 		showWheelGizmo(view, wheel_cmp);
 
 		const Transform wheel_tr = world.getTransform(ch);
 		addLine(view, vehicle_tr.pos, wheel_tr.pos, Color::BLUE);
 
-		const Vec3 cm = scene->getVehicleCenterOfMass(e);
+		const Vec3 cm = module->getVehicleCenterOfMass(e);
 		addLine(view, vehicle_tr.pos, vehicle_tr.pos + vehicle_tr.rot.rotate(cm), Color::RED);
 	}
 }
@@ -257,13 +257,13 @@ void showDistanceJointGizmo(WorldView& view, ComponentUID cmp)
 	static const int SEGMENT_COUNT = 100;
 	static const int TWIST_COUNT = 5;
 
-	auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-	World& world = phy_scene->getWorld();
+	auto* phy_module = static_cast<PhysicsModule*>(cmp.module);
+	World& world = phy_module->getWorld();
 
 	const EntityRef entity = (EntityRef)cmp.entity;
-	EntityPtr other_entity = phy_scene->getJointConnectedBody(entity);
+	EntityPtr other_entity = phy_module->getJointConnectedBody(entity);
 	if (!other_entity.isValid()) return;
-	RigidTransform local_frame = phy_scene->getJointConnectedBodyLocalFrame(entity);
+	RigidTransform local_frame = phy_module->getJointConnectedBodyLocalFrame(entity);
 
 	DVec3 pos = world.getPosition((EntityRef)other_entity);
 	DVec3 other_pos = (world.getTransform((EntityRef)other_entity).getRigidPart() * local_frame).pos;
@@ -281,7 +281,7 @@ void showDistanceJointGizmo(WorldView& view, ComponentUID cmp)
 	right *= minimum(1.0f, 5 * dir_len);
 	up *= minimum(1.0f, 5 * dir_len);
 
-	Vec3 force = phy_scene->getDistanceJointLinearForce(entity);
+	Vec3 force = phy_module->getDistanceJointLinearForce(entity);
 
 	float t = minimum(length(force) / 10.0f, 1.0f);
 	u32 color = 0xff000000 + (u32(t * 0xff) << 16) + u32((1 - t) * 0xff);
@@ -303,7 +303,7 @@ void showDistanceJointGizmo(WorldView& view, ComponentUID cmp)
 }
 
 void showHingeJointGizmo(WorldView& view, 
-	PhysicsScene& phy_scene,
+	PhysicsModule& phy_module,
 	const Vec2& limit,
 	bool use_limit,
 	const RigidTransform& global_frame1)
@@ -336,15 +336,15 @@ void showHingeJointGizmo(WorldView& view,
 
 void showHingeJointGizmo(WorldView& view, ComponentUID cmp)
 {
-	auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+	auto* phy_module = static_cast<PhysicsModule*>(cmp.module);
 	const EntityRef entity = (EntityRef)cmp.entity;
-	const EntityPtr connected_body = phy_scene->getJointConnectedBody(entity);
-	Vec2 limit = phy_scene->getHingeJointLimit(entity);
-	bool use_limit = phy_scene->getHingeJointUseLimit(entity);
+	const EntityPtr connected_body = phy_module->getJointConnectedBody(entity);
+	Vec2 limit = phy_module->getHingeJointLimit(entity);
+	bool use_limit = phy_module->getHingeJointUseLimit(entity);
 	if (!connected_body.isValid()) return;
-	RigidTransform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(entity);
-	global_frame1 = phy_scene->getWorld().getTransform((EntityRef)connected_body).getRigidPart() * global_frame1;
-	showHingeJointGizmo(view, *phy_scene, limit, use_limit, global_frame1);
+	RigidTransform global_frame1 = phy_module->getJointConnectedBodyLocalFrame(entity);
+	global_frame1 = phy_module->getWorld().getTransform((EntityRef)connected_body).getRigidPart() * global_frame1;
+	showHingeJointGizmo(view, *phy_module, limit, use_limit, global_frame1);
 }
 
 struct PhysicsUIPlugin final : StudioApp::GUIPlugin
@@ -384,11 +384,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	void resetSimulation() {
 		WorldEditor& editor = m_app.getWorldEditor();
 		World* world = editor.getWorld();
-		PhysicsScene* scene = (PhysicsScene*)world->getScene(RIGID_ACTOR_TYPE);
+		PhysicsModule* module = (PhysicsModule*)world->getModule(RIGID_ACTOR_TYPE);
 
 		if (!m_is_simulating_selected) return;
 		for (EntityRef e : m_reset_dynamic_entities) {
-			scene->setDynamicType(e, PhysicsScene::DynamicType::DYNAMIC);
+			module->setDynamicType(e, PhysicsModule::DynamicType::DYNAMIC);
 		}
 
 		m_reset_dynamic_entities.clear();
@@ -401,7 +401,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		if (editor.isGameMode()) return;
 
 		World* world = editor.getWorld();
-		PhysicsScene* scene = (PhysicsScene*)world->getScene(RIGID_ACTOR_TYPE);
+		PhysicsModule* module = (PhysicsModule*)world->getModule(RIGID_ACTOR_TYPE);
 		if (m_is_simulating_selected) {
 			editor.beginCommandGroup("phys_sim_end");
 			for (SimulatedEntity e : m_simulated_entities) {
@@ -412,7 +412,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			editor.endCommandGroup();
 			editor.lockGroupCommand();
 			for (EntityRef e : m_reset_dynamic_entities) {
-				scene->setDynamicType(e, PhysicsScene::DynamicType::DYNAMIC);
+				module->setDynamicType(e, PhysicsModule::DynamicType::DYNAMIC);
 			}
 
 			m_reset_dynamic_entities.clear();
@@ -427,9 +427,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				se.entity = e;
 				se.start_transform = world->getTransform(e);
 			}
-			for (EntityRef e : scene->getDynamicActors()) {
+			for (EntityRef e : module->getDynamicActors()) {
 				if (selected.indexOf(e) < 0) {
-					scene->setDynamicType(e, PhysicsScene::DynamicType::STATIC);
+					module->setDynamicType(e, PhysicsModule::DynamicType::STATIC);
 					m_reset_dynamic_entities.push(e);
 				}
 			}
@@ -445,8 +445,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			return;
 		}
 
-		PhysicsScene* scene = (PhysicsScene*)m_app.getWorldEditor().getWorld()->getScene(RIGID_ACTOR_TYPE);
-		scene->forceUpdateDynamicActors(time_delta);
+		PhysicsModule* module = (PhysicsModule*)m_app.getWorldEditor().getWorld()->getModule(RIGID_ACTOR_TYPE);
+		module->forceUpdateDynamicActors(time_delta);
 	}
 
 	bool exportData(const char* dest_dir) override
@@ -487,7 +487,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onLayersGUI()
 	{
-		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_app.getEngine().getPluginManager().getPlugin("physics"));
+		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_app.getEngine().getSystemManager().getSystem("physics"));
 		if (ImGui::CollapsingHeader("Layers"))
 		{
 			for (int i = 0; i < system->getCollisionsLayersCount(); ++i)
@@ -519,7 +519,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onCollisionMatrixGUI()
 	{
-		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_app.getEngine().getPluginManager().getPlugin("physics"));
+		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_app.getEngine().getSystemManager().getSystem("physics"));
 		if (ImGui::CollapsingHeader("Collision matrix"))
 		{
 			ImGui::Columns(1 + system->getCollisionsLayersCount(), "collision_matrix_col");
@@ -570,11 +570,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onJointGUI(WorldEditor& editor) {
 		World& world = *editor.getWorld();
-		auto* scene = static_cast<PhysicsScene*>(world.getScene(RIGID_ACTOR_TYPE));
-		auto* render_scene = static_cast<RenderScene*>(world.getScene(MODEL_INSTANCE_TYPE));
-		if (!render_scene) return;
+		auto* phy_module = static_cast<PhysicsModule*>(world.getModule(RIGID_ACTOR_TYPE));
+		auto* render_module = static_cast<RenderModule*>(world.getModule(MODEL_INSTANCE_TYPE));
+		if (!render_module) return;
 
-		int count = scene->getJointCount();
+		int count = phy_module->getJointCount();
 		if (count > 0 && ImGui::CollapsingHeader("Joints")) {
 			ImGui::Columns(2);
 			ImGui::Text("From");
@@ -585,11 +585,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			ImGui::Separator();
 			for (int i = 0; i < count; ++i) {
 				ComponentUID cmp;
-				const EntityRef entity = scene->getJointEntity(i);
+				const EntityRef entity = phy_module->getJointEntity(i);
 				cmp.entity = entity;
-				cmp.scene = scene;
-				//physx::PxJoint* joint = scene->getJoint(entity);
-				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(entity)->getConcreteType()) {
+				cmp.module = phy_module;
+				//physx::PxJoint* joint = phy_module->getJoint(entity);
+				switch ((physx::PxJointConcreteType::Enum)phy_module->getJoint(entity)->getConcreteType()) {
 					case physx::PxJointConcreteType::eDISTANCE:
 						cmp.type = DISTANCE_JOINT_TYPE;
 						// showDistanceJointGizmo(cmp);
@@ -605,7 +605,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 					case physx::PxJointConcreteType::eD6:
 						cmp.type = D6_JOINT_TYPE;
 						/*showD6JointGizmo(world.getTransform(entity).getRigidPart(),
-							*render_scene,
+							*render_module,
 							static_cast<physx::PxD6Joint*>(joint));*/
 						// TODO
 						break;
@@ -619,7 +619,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				if (ImGui::Selectable(tmp, &b)) editor.selectEntities(Span(&entity, 1), false);
 				ImGui::NextColumn();
 
-				EntityPtr other_entity = scene->getJointConnectedBody(entity);
+				EntityPtr other_entity = phy_module->getJointConnectedBody(entity);
 				getEntityListDisplayName(m_app, world, Span(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) {
 					const EntityRef e = (EntityRef)other_entity;
@@ -636,14 +636,14 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onVisualizationGUI(WorldEditor& editor)
 	{
-		auto* scene = static_cast<PhysicsScene*>(editor.getWorld()->getScene("physics"));
+		auto* module = static_cast<PhysicsModule*>(editor.getWorld()->getModule("physics"));
 		DVec3 camera_pos = editor.getView().getViewport().pos;
 		const Vec3 extents(20, 20, 20);
-		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
+		module->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
 
 		if (!ImGui::CollapsingHeader("Visualization")) return;
 
-		u32 viz_flags = scene->getDebugVisualizationFlags();
+		u32 viz_flags = module->getDebugVisualizationFlags();
 		auto flag_gui = [&viz_flags](const char* label, int flag) {
 			bool b = (viz_flags & (1 << flag)) != 0;
 			if (ImGui::Checkbox(label, &b))
@@ -668,7 +668,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		flag_gui("Collision AABBs", physx::PxVisualizationParameter::eCOLLISION_AABBS);
 		flag_gui("World axes", physx::PxVisualizationParameter::eWORLD_AXES);
 		flag_gui("Contact points", physx::PxVisualizationParameter::eCONTACT_POINT);
-		scene->setDebugVisualizationFlags(viz_flags);
+		module->setDebugVisualizationFlags(viz_flags);
 	}
 
 
@@ -684,9 +684,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		const EntityRef e = editor.getSelectedEntities()[0];
 
 		World& world = *editor.getWorld();
-		auto* scene = static_cast<PhysicsScene*>(world.getScene("physics"));
+		auto* module = static_cast<PhysicsModule*>(world.getModule("physics"));
 
-		if(!scene->getWorld().hasComponent(e, RIGID_ACTOR_TYPE)) {
+		if(!module->getWorld().hasComponent(e, RIGID_ACTOR_TYPE)) {
 			ImGui::Text("Entity does not have rigid actor component.");
 			return;
 		};
@@ -696,9 +696,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 		ImGui::Text("%s", tmp);
 		ImGui::SameLine();
-		bool is_debug_viz = scene->isActorDebugEnabled(e);
+		bool is_debug_viz = module->isActorDebugEnabled(e);
 		if (ImGui::Checkbox("Debug visualization", &is_debug_viz)) {
-			scene->enableActorDebug(e, is_debug_viz);
+			module->enableActorDebug(e, is_debug_viz);
 		}
 	}
 
@@ -715,11 +715,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	void autogeneratePhySkeleton(EntityRef entity, WorldEditor& editor) {
 		editor.beginCommandGroup("ragdoll");
 		World& world = *editor.getWorld();
-		auto* phy_scene = static_cast<PhysicsScene*>(world.getScene(RIGID_ACTOR_TYPE));
-		auto* render_scene = static_cast<RenderScene*>(world.getScene(MODEL_INSTANCE_TYPE));
+		auto* phy_module = static_cast<PhysicsModule*>(world.getModule(RIGID_ACTOR_TYPE));
+		auto* render_module = static_cast<RenderModule*>(world.getModule(MODEL_INSTANCE_TYPE));
 		const Transform root_tr = world.getTransform(entity);
-		ASSERT(render_scene);
-		Model* model = render_scene->getModelInstanceModel(entity);
+		ASSERT(render_module);
+		Model* model = render_module->getModelInstanceModel(entity);
 		ASSERT(model && model->isReady());
 		Array<EntityRef> entities(m_app.getAllocator());
 		for (int i = 0; i < model->getBoneCount(); ++i) {
@@ -747,7 +747,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 					editor.addComponent(Span(&bone_e, 1), RIGID_ACTOR_TYPE);
 					ComponentUID cmp;
 					cmp.entity = bone_e;
-					cmp.scene = phy_scene;
+					cmp.module = phy_module;
 					cmp.type = RIGID_ACTOR_TYPE;
 					editor.addArrayPropertyItem(cmp, "Box geometry");
 					editor.addComponent(Span(&bone_e, 1), BONE_ATTACHMENT_TYPE);
@@ -755,7 +755,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Bone", Span(&bone_e, 1), bone.parent_idx);
 					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Size", Span(&bone_e, 1), size);
 					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Position offset", Span(&bone_e, 1), Vec3(0, -size.y, 0));
-					editor.setProperty(RIGID_ACTOR_TYPE, "", 0, "Dynamic", Span(&bone_e, 1), (i32)PhysicsScene::DynamicType::KINEMATIC);
+					editor.setProperty(RIGID_ACTOR_TYPE, "", 0, "Dynamic", Span(&bone_e, 1), (i32)PhysicsModule::DynamicType::KINEMATIC);
 
 					editor.addComponent(Span(&bone_e, 1), SPHERICAL_JOINT_TYPE);
 					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Connected body", Span(&bone_e, 1), entities[bone.parent_idx]);
@@ -972,8 +972,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	bool showGizmo(WorldView& view, ComponentUID cmp) override
 	{
-		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		World& world = phy_scene->getWorld();
+		auto* phy_module = static_cast<PhysicsModule*>(cmp.module);
+		World& world = phy_module->getWorld();
 		
 		const EntityRef entity = (EntityRef)cmp.entity;
 		
@@ -994,8 +994,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		if (cmp.type == CONTROLLER_TYPE)
 		{
-			float height = phy_scene->getControllerHeight(entity);
-			float radius = phy_scene->getControllerRadius(entity);
+			float height = phy_module->getControllerHeight(entity);
+			float radius = phy_module->getControllerRadius(entity);
 
 			const DVec3 pos = world.getPosition(entity);
 			addCapsule(view, pos, height, radius, Color::BLUE);
@@ -1022,7 +1022,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		if (cmp.type == D6_JOINT_TYPE)
 		{
-			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(entity));
+			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_module->getJoint(entity));
 			showD6JointGizmo(view, world.getTransform(entity).getRigidPart(), joint);
 			return true;
 		}

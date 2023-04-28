@@ -17,9 +17,9 @@ struct CollisionLayers {
 	u32 count = 0;
 };
 
-struct PhysicsSystem : IPlugin {
-	friend struct PhysicsScene;
-	friend struct PhysicsSceneImpl;
+struct PhysicsSystem : ISystem {
+	friend struct PhysicsModule;
+	friend struct PhysicsModuleImpl;
 
 	const char* getName() const override { return "physics"; }
 	

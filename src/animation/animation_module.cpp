@@ -1,4 +1,4 @@
-#include "animation_scene.h"
+#include "animation_module.h"
 
 #include "animation/animation.h"
 #include "animation/controller.h"
@@ -18,7 +18,7 @@
 #include "nodes.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 namespace Lumix
@@ -28,7 +28,7 @@ struct Animation;
 struct Engine;
 struct World;
 
-enum class AnimationSceneVersion
+enum class AnimationModuleVersion
 {
 	LATEST
 };
@@ -40,7 +40,7 @@ static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType
 static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 
 
-struct AnimationSceneImpl final : AnimationScene
+struct AnimationModuleImpl final : AnimationModule
 {
 	friend struct AnimationSystemImpl;
 	
@@ -85,7 +85,7 @@ struct AnimationSceneImpl final : AnimationScene
 	};
 
 
-	AnimationSceneImpl(Engine& engine, IPlugin& anim_system, World& world, IAllocator& allocator)
+	AnimationModuleImpl(Engine& engine, ISystem& anim_system, World& world, IAllocator& allocator)
 		: m_world(world)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
@@ -99,34 +99,27 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 	void init() override {
-		m_render_scene = static_cast<RenderScene*>(m_world.getScene("renderer"));
-		ASSERT(m_render_scene);
+		m_render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
+		ASSERT(m_render_module);
 	}
 
 
-	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
+	int getVersion() const override { return (int)AnimationModuleVersion::LATEST; }
 
 
-	void clear() override
-	{
-		for (PropertyAnimator& anim : m_property_animators)
-		{
+	~AnimationModuleImpl() {
+		for (PropertyAnimator& anim : m_property_animators) {
 			unloadResource(anim.animation);
 		}
-		m_property_animators.clear();
 
-		for (Animable& animable : m_animables)
-		{
+		for (Animable& animable : m_animables) {
 			unloadResource(animable.animation);
 		}
-		m_animables.clear();
 
-		for (Animator& animator : m_animators)
-		{
+		for (Animator& animator : m_animators) {
 			unloadResource(animator.resource);
 			setSource(animator, nullptr);
 		}
-		m_animators.clear();
 	}
 
 
@@ -265,11 +258,11 @@ struct AnimationSceneImpl final : AnimationScene
 				animator.resource->destroyRuntime(*animator.ctx);
 				animator.ctx = nullptr;
 			}
-			animator.resource->getObserverCb().unbind<&AnimationSceneImpl::onControllerResourceChanged>(this);
+			animator.resource->getObserverCb().unbind<&AnimationModuleImpl::onControllerResourceChanged>(this);
 		}
 		animator.resource = res;
 		if (animator.resource != nullptr) {
-			animator.resource->onLoaded<&AnimationSceneImpl::onControllerResourceChanged>(this);
+			animator.resource->onLoaded<&AnimationModuleImpl::onControllerResourceChanged>(this);
 		}
 	}
 
@@ -486,10 +479,10 @@ struct AnimationSceneImpl final : AnimationScene
 		EntityRef entity = animable.entity;
 		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
-		Model* model = m_render_scene->getModelInstanceModel(entity);
+		Model* model = m_render_module->getModelInstanceModel(entity);
 		if (!model->isReady()) return;
 
-		Pose* pose = m_render_scene->lockPose(entity);
+		Pose* pose = m_render_module->lockPose(entity);
 		if (!pose) return;
 
 		model->getRelativePose(*pose);
@@ -501,7 +494,7 @@ struct AnimationSceneImpl final : AnimationScene
 		t = t % l;
 		animable.time = t;
 
-		m_render_scene->unlockPose(entity, true);
+		m_render_module->unlockPose(entity, true);
 	}
 
 
@@ -626,10 +619,10 @@ struct AnimationSceneImpl final : AnimationScene
 		const EntityRef entity = animator.entity;
 		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
-		Model* model = m_render_scene->getModelInstanceModel(entity);
+		Model* model = m_render_module->getModelInstanceModel(entity);
 		if (!model->isReady()) return;
 
-		Pose* pose = m_render_scene->lockPose(entity);
+		Pose* pose = m_render_module->lockPose(entity);
 		if (!pose) return;
 
 		animator.ctx->model = model;
@@ -648,7 +641,7 @@ struct AnimationSceneImpl final : AnimationScene
 
 		pose->computeAbsolute(*model);
 
-		m_render_scene->unlockPose(entity, true);
+		m_render_module->unlockPose(entity, true);
 	}
 
 	static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
@@ -773,7 +766,7 @@ struct AnimationSceneImpl final : AnimationScene
 					float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
 					ComponentUID cmp;
 					cmp.type = curve.cmp_type;
-					cmp.scene = m_world.getScene(cmp.type);
+					cmp.module = m_world.getModule(cmp.type);
 					cmp.entity = entity;
 					ASSERT(curve.property->setter);
 					curve.property->set(cmp, -1, v);
@@ -882,38 +875,38 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 
-	IPlugin& getPlugin() const override { return m_anim_system; }
+	ISystem& getSystem() const override { return m_anim_system; }
 
 
 	IAllocator& m_allocator;
 	World& m_world;
-	IPlugin& m_anim_system;
+	ISystem& m_anim_system;
 	Engine& m_engine;
 	AssociativeArray<EntityRef, Animable> m_animables;
 	AssociativeArray<EntityRef, PropertyAnimator> m_property_animators;
 	HashMap<EntityRef, u32> m_animator_map;
 	Array<Animator> m_animators;
-	RenderScene* m_render_scene;
+	RenderModule* m_render_module;
 	bool m_is_game_running;
 };
 
 
-UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin, World& world, IAllocator& allocator)
+UniquePtr<AnimationModule> AnimationModule::create(Engine& engine, ISystem& system, World& world, IAllocator& allocator)
 {
-	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, world, allocator);
+	return UniquePtr<AnimationModuleImpl>::create(allocator, engine, system, world, allocator);
 }
 
-void AnimationScene::reflect(Engine& engine) {
-	LUMIX_SCENE(AnimationSceneImpl, "animation")
+void AnimationModule::reflect(Engine& engine) {
+	LUMIX_MODULE(AnimationModuleImpl, "animation")
 		.LUMIX_CMP(PropertyAnimator, "property_animator", "Animation / Property animator")
 			.LUMIX_PROP(PropertyAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
-			.prop<&AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator>("Enabled")
+			.prop<&AnimationModule::isPropertyAnimatorEnabled, &AnimationModule::enablePropertyAnimator>("Enabled")
 		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
-			.function<(void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput>("setU32Input", "AnimationScene::setAnimatorInput")
-			.function<(void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput>("setFloatInput", "AnimationScene::setAnimatorInput")
-			.function<(void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput>("setBoolInput", "AnimationScene::setAnimatorInput")
-			.LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex")
-			.LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK")
+			.function<(void (AnimationModule::*)(EntityRef, u32, u32))&AnimationModule::setAnimatorInput>("setU32Input", "AnimationModule::setAnimatorInput")
+			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
+			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")
+			.LUMIX_FUNC_EX(AnimationModule::getAnimatorInputIndex, "getInputIndex")
+			.LUMIX_FUNC_EX(AnimationModule::setAnimatorIK, "setIK")
 			.LUMIX_PROP(AnimatorSource, "Source").resourceAttribute(anim::Controller::TYPE)
 			.LUMIX_PROP(AnimatorDefaultSet, "Default set")
 		.LUMIX_CMP(Animable, "animable", "Animation / Animable")

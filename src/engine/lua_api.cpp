@@ -489,8 +489,8 @@ static bool LUA_createComponent(World* world, i32 entity, const char* type)
 {
 	if (!world) return false;
 	ComponentType cmp_type = reflection::getComponentType(type);
-	IScene* scene = world->getScene(cmp_type);
-	if (!scene) return false;
+	IModule* module = world->getModule(cmp_type);
+	if (!module) return false;
 	if (world->hasComponent({entity}, cmp_type))
 	{
 		logError("Component ", type, " already exists in entity ", entity);
@@ -506,8 +506,6 @@ static bool LUA_hasComponent(World* world, i32 entity, const char* type)
 {
 	if (!world) return false;
 	ComponentType cmp_type = reflection::getComponentType(type);
-	IScene* scene = world->getScene(cmp_type);
-	if (!scene) return false;
 	return world->hasComponent({entity}, cmp_type);
 }
 
@@ -539,9 +537,9 @@ static int LUA_setEntityRotation(lua_State* L)
 }
 
 
-static IScene* LUA_getScene(World* world, const char* name)
+static IModule* LUA_getModule(World* world, const char* name)
 {
-	return world->getScene(name);
+	return world->getModule(name);
 }
 
 
@@ -635,7 +633,7 @@ static int LUA_loadWorld(lua_State* L)
 				blob.read(&header, sizeof(header));
 
 				EntityMap entity_map(engine->getAllocator());
-				if (!engine->deserialize(*world, blob, entity_map)) {
+				if (!world->deserialize(blob, entity_map)) {
 					logError("Failed to deserialize world ", path);
 				} else {
 					lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func);
@@ -720,7 +718,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getFirstChild);
 	REGISTER_FUNCTION(getParent);
 	REGISTER_FUNCTION(setParent);
-	REGISTER_FUNCTION(getScene);
+	REGISTER_FUNCTION(getModule);
 	REGISTER_FUNCTION(loadResource);
 	REGISTER_FUNCTION(getResourcePath);
 	REGISTER_FUNCTION(logError);
@@ -926,9 +924,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			local e = LumixAPI.createEntity(self.value)
 			return Lumix.Entity:new(self.value, e)
 		end
-		function Lumix.World:getScene(scene_name)
-			local scene = LumixAPI.getScene(self.value, scene_name)	
-			return Lumix[scene_name]:new(scene)
+		function Lumix.World:getModule(name)
+			local module = LumixAPI.getModule(self.value, name)	
+			return Lumix[name]:new(module)
 		end
 		function Lumix.World:findEntityByName(parent, name)
 			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)

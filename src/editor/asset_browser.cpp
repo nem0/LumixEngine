@@ -723,10 +723,10 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::OpenPopup("Save as prefab");
 				World* world = m_app.getWorldEditor().getWorld();
 				const ComponentType model_inst_type = reflection::getComponentType("model_instance");
-				IScene* scene = world->getScene(model_inst_type);
-				if (scene && world->hasComponent(e, model_inst_type)) {
+				IModule* module = world->getModule(model_inst_type);
+				if (module && world->hasComponent(e, model_inst_type)) {
 					Path source;
-					if (reflection::getPropertyValue(*scene, e, model_inst_type, "Source", source)) {
+					if (reflection::getPropertyValue(*module, e, model_inst_type, "Source", source)) {
 						copyString(Span(m_prefab_name), Path::getBasename(source.c_str()));
 					}
 				}

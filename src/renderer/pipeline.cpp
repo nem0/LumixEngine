@@ -29,7 +29,7 @@
 #include "pipeline.h"
 #include "pose.h"
 #include "renderer.h"
-#include "render_scene.h"
+#include "render_module.h"
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
@@ -689,7 +689,7 @@ struct PipelineImpl final : Pipeline
 		, m_lua_state(nullptr)
 		, m_custom_commands_handlers(allocator)
 		, m_define(define)
-		, m_scene(nullptr)
+		, m_module(nullptr)
 		, m_draw2d(allocator)
 		, m_output(-1)
 		, m_renderbuffer_descs(allocator)
@@ -814,11 +814,11 @@ struct PipelineImpl final : Pipeline
 		clearBuffers();
 	}
 
-	void callInitScene()
+	void callInitModule()
 	{
 		PROFILE_FUNCTION();
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_getfield(m_lua_state, -1, "initScene");
+		lua_getfield(m_lua_state, -1, "initModule");
 		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION)
 		{
 			lua_pushlightuserdata(m_lua_state, this);
@@ -956,7 +956,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		m_viewport.w = m_viewport.h = 800;
-		if (m_scene) callInitScene();
+		if (m_module) callInitModule();
 	}
 
 	void clearBuffers() {
@@ -995,9 +995,9 @@ struct PipelineImpl final : Pipeline
 		for (int slice = 0; slice < 4; ++slice) {
 			const int shadowmap_width = 1024;
 
-			const World& world = m_scene->getWorld();
-			const EntityPtr light = m_scene->getActiveEnvironment();
-			const Vec4 cascades = light.isValid() ? m_scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
+			const World& world = m_module->getWorld();
+			const EntityPtr light = m_module->getActiveEnvironment();
+			const Vec4 cascades = light.isValid() ? m_module->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
 			const Matrix light_mtx = light.isValid() ? world.getRelativeMatrix((EntityRef)light, m_viewport.pos) : Matrix::IDENTITY;
 
 			const float camera_height = (float)m_viewport.h;
@@ -1094,7 +1094,7 @@ struct PipelineImpl final : Pipeline
 
 	bool bakeShadow(const PointLight& light, u32 atlas_idx) {
 		PROFILE_FUNCTION();
-		const World& world = m_scene->getWorld();
+		const World& world = m_module->getWorld();
 		const Viewport backup_viewport = m_viewport;
 
 		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
@@ -1143,7 +1143,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void render3DUI(EntityRef e, const Draw2D& drawdata, Vec2 canvas_size, bool orient_to_cam) override {
-		Matrix matrix = m_scene->getWorld().getRelativeMatrix(e, m_viewport.pos);
+		Matrix matrix = m_module->getWorld().getRelativeMatrix(e, m_viewport.pos);
 		Matrix normalize(
 			Vec4(1 / canvas_size.x, 0, 0, 0),
 			Vec4(0, -1 / canvas_size.x, 0, 0),
@@ -1151,7 +1151,7 @@ struct PipelineImpl final : Pipeline
 			Vec4(-0.5f, 0.5f * canvas_size.y / canvas_size.x, 0, 1)
 		);
 		if (orient_to_cam) {
-			const Transform tr = m_scene->getWorld().getTransform(e);
+			const Transform tr = m_module->getWorld().getTransform(e);
 			matrix = m_viewport.rot.toMatrix();
 			matrix.setTranslation(Vec3(tr.pos - m_viewport.pos));
 			matrix.multiply3x3(tr.scale);
@@ -1177,9 +1177,9 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 
 		if (!isReady() || m_viewport.w <= 0 || m_viewport.h <= 0) {
-			if (m_scene) {
-				m_scene->clearDebugLines();
-				m_scene->clearDebugTriangles();
+			if (m_module) {
+				m_module->clearDebugLines();
+				m_module->clearDebugTriangles();
 			}
 			m_draw2d.clear(getAtlasSize());
 			return false;
@@ -1218,12 +1218,12 @@ struct PipelineImpl final : Pipeline
 		m_prev_viewport = m_viewport;
 		m_indirect_buffer_offset = 0;
 
-		if(m_scene) {
-			const EntityPtr global_light = m_scene->getActiveEnvironment();
+		if(m_module) {
+			const EntityPtr global_light = m_module->getActiveEnvironment();
 			if(global_light.isValid()) {
 				EntityRef gl = (EntityRef)global_light;
-				const Environment& env = m_scene->getEnvironment(gl);
-				global_state.light_direction = Vec4(normalize(m_scene->getWorld().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
+				const Environment& env = m_module->getEnvironment(gl);
+				global_state.light_direction = Vec4(normalize(m_module->getWorld().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
 				global_state.light_color = Vec4(env.light_color, 456);
 				global_state.light_intensity = env.direct_intensity;
 				global_state.light_indirect_intensity = env.indirect_intensity * m_indirect_light_multiplier;
@@ -1258,9 +1258,9 @@ struct PipelineImpl final : Pipeline
 		bool has_main = true;
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
 			lua_pop(m_lua_state, 2);
-			if (m_scene) {
-				m_scene->clearDebugLines();
-				m_scene->clearDebugTriangles();
+			if (m_module) {
+				m_module->clearDebugLines();
+				m_module->clearDebugTriangles();
 			}
 			has_main = false;
 		}
@@ -1281,7 +1281,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderDebugTriangles() {
-		const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
+		const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 		if (tris.empty() || !m_debug_shape_shader->isReady()) return;
 
 		m_renderer.pushJob("debug triangles", [this](DrawStream& stream){
@@ -1289,7 +1289,7 @@ struct PipelineImpl final : Pipeline
 				Vec3 pos;
 				u32 color;
 			};
-			const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
+			const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
 			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0);
 			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
@@ -1303,7 +1303,7 @@ struct PipelineImpl final : Pipeline
 				vertices[3 * i + 2].color = tris[i].color.abgr();
 				vertices[3 * i + 2].pos = Vec3(tris[i].p2 - m_viewport.pos);
 			}
-			m_scene->clearDebugTriangles();
+			m_module->clearDebugTriangles();
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
 			stream.useProgram(program);
@@ -1315,7 +1315,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void renderDebugLines()	{
-		const Array<DebugLine>& lines = m_scene->getDebugLines();
+		const Array<DebugLine>& lines = m_module->getDebugLines();
 		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
 
 		m_renderer.pushJob("debug lines", [this](DrawStream& stream){
@@ -1323,7 +1323,7 @@ struct PipelineImpl final : Pipeline
 				Vec3 pos;
 				u32 color;
 			};
-			const Array<DebugLine>& lines = m_scene->getDebugLines();
+			const Array<DebugLine>& lines = m_module->getDebugLines();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
 			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0);
 			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
@@ -1335,7 +1335,7 @@ struct PipelineImpl final : Pipeline
 				vertices[2 * i + 1].color = lines[i].color.abgr();
 				vertices[2 * i + 1].pos = Vec3(lines[i].to - m_viewport.pos);
 			}
-			m_scene->clearDebugLines();
+			m_module->clearDebugLines();
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
 			stream.useProgram(program);
@@ -1421,15 +1421,15 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void setWorld(World* world) override {
-		RenderScene* scene = world ? (RenderScene*)world->getScene("renderer") : nullptr;
-		if (m_scene == scene) return;
-		m_scene = scene;
-		if (m_lua_state && m_scene) callInitScene();
+		RenderModule* module = world ? (RenderModule*)world->getModule("renderer") : nullptr;
+		if (m_module == module) return;
+		m_module = module;
+		if (m_lua_state && m_module) callInitModule();
 	}
 	
 	Renderer& getRenderer() const override { return m_renderer; }
 
-	RenderScene* getScene() const override { return m_scene; }
+	RenderModule* getModule() const override { return m_module; }
 
 	CustomCommandHandler& addCustomCommandHandler(const char* name) override 
 	{
@@ -1600,7 +1600,7 @@ struct PipelineImpl final : Pipeline
 				CameraParams cp;
 				cp.pos = m_viewport.pos;
 				cp.frustum = m_viewport.getFrustum();
-				cp.lod_multiplier = m_scene->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
+				cp.lod_multiplier = m_module->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
 				cp.is_shadow = false;
 				cp.view = m_viewport.getView(cp.pos);
 				cp.projection = m_viewport.getProjectionWithJitter();
@@ -1614,7 +1614,7 @@ struct PipelineImpl final : Pipeline
 				CameraParams cp;
 				cp.pos = vp.pos;
 				cp.frustum = vp.getFrustum();
-				cp.lod_multiplier = m_scene->getCameraLODMultiplier(vp.fov, vp.is_ortho);
+				cp.lod_multiplier = m_module->getCameraLODMultiplier(vp.fov, vp.is_ortho);
 				cp.is_shadow = true;
 				cp.view = vp.getView(cp.pos);
 				cp.projection = vp.getProjectionNoJitter();
@@ -1630,10 +1630,10 @@ struct PipelineImpl final : Pipeline
 		const gpu::StateFlags render_state = m_render_states[render_state_handle];
 
 		m_renderer.pushJob("terrain", [this, cp, render_state, define_mask](DrawStream& stream){
-			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
+			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			if(terrains.empty()) return;
 
-			World& world = m_scene->getWorld();
+			World& world = m_module->getWorld();
 			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 			for (const Terrain* terrain : terrains) {
 				if (!terrain->m_heightmap) continue;
@@ -1729,8 +1729,8 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		const CameraParams cp = resolveCameraParams(cp_handle);
 		if (!cp.is_shadow) {
-			for (Terrain* terrain : m_scene->getTerrains()) {
-				const Transform tr = m_scene->getWorld().getTransform(terrain->m_entity);
+			for (Terrain* terrain : m_module->getTerrains()) {
+				const Transform tr = m_module->getWorld().getTransform(terrain->m_entity);
 				Transform rel_tr = tr;
 				rel_tr.pos = tr.pos - cp.pos;
 				terrain->createGrass(Vec2(-(float)rel_tr.pos.x, -(float)rel_tr.pos.z), m_renderer.frameNumber());
@@ -1754,8 +1754,8 @@ struct PipelineImpl final : Pipeline
 		gpu::StateFlags render_state = state_handle.valid ? m_render_states[state_handle.value] : gpu::StateFlags::NONE;
 
 		m_renderer.pushJob("grass", [this, cp, define_mask, render_state](DrawStream& stream){
-			const HashMap<EntityRef, Terrain*>& terrains = m_scene->getTerrains();
-			const World& world = m_scene->getWorld();
+			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
+			const World& world = m_module->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
 
 			u32 quad_count = 0;
@@ -1834,7 +1834,7 @@ struct PipelineImpl final : Pipeline
 	void setupParticles(View& view) {
 		if (view.cp.is_shadow) return;
 
-		const auto& emitters = m_scene->getParticleEmitters();
+		const auto& emitters = m_module->getParticleEmitters();
 		if (emitters.size() == 0) return;
 			
 		Sorter::Inserter inserter(view.sorter);
@@ -1977,7 +1977,7 @@ struct PipelineImpl final : Pipeline
 			case PipelineTexture::RAW: return tex.raw;
 			case PipelineTexture::RESOURCE: {
 				if (tex.resource == -2) return m_shadow_atlas.texture;
-				if (tex.resource == -3) return m_scene->getReflectionProbesTexture();
+				if (tex.resource == -3) return m_module->getReflectionProbesTexture();
 
 				Resource* res = m_renderer.getEngine().getLuaResource(tex.resource);
 				if (res->getType() != Texture::TYPE) return gpu::INVALID_TEXTURE;
@@ -2154,7 +2154,7 @@ struct PipelineImpl final : Pipeline
 	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
 		Matrix prj;
 		prj.setPerspective(light.fov, 1, 0.1f, light.range, true);
-		const Quat rot = -m_scene->getWorld().getRotation(light.entity);
+		const Quat rot = -m_module->getWorld().getRotation(light.entity);
 		
 		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
 		const Matrix bias_matrix(
@@ -2206,10 +2206,10 @@ struct PipelineImpl final : Pipeline
 	void setupFur(View& view) {
 		if (view.cp.is_shadow) return;
 
-		HashMap<EntityRef, FurComponent>& furs = m_scene->getFurs();
+		HashMap<EntityRef, FurComponent>& furs = m_module->getFurs();
 		if (furs.empty()) return;
 
-		Span<const ModelInstance> mi = m_scene->getModelInstances();
+		Span<const ModelInstance> mi = m_module->getModelInstances();
 		Sorter::Inserter inserter(view.sorter);
 		
 		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
@@ -2242,8 +2242,8 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void encodeProceduralGeometry(View& view) {
-		const World& world = m_scene->getWorld();
-		const HashMap<EntityRef, ProceduralGeometry>& geometries = m_scene->getProceduralGeometries();
+		const World& world = m_module->getWorld();
+		const HashMap<EntityRef, ProceduralGeometry>& geometries = m_module->getProceduralGeometries();
 		const DVec3 camera_pos = view.cp.pos;
 		for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
 			const ProceduralGeometry& pg = iter.value();
@@ -2286,8 +2286,8 @@ struct PipelineImpl final : Pipeline
 		if (!m_instancing_shader->isReady()) return;
 
 		const float global_lod_multiplier = m_renderer.getLODMultiplier();
-		const World& world = m_scene->getWorld();
-		const HashMap<EntityRef, InstancedModel>& ims = m_scene->getInstancedModels();
+		const World& world = m_module->getWorld();
+		const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
 		
 		struct UBValues {
 			Vec4 camera_offset;
@@ -2540,10 +2540,10 @@ struct PipelineImpl final : Pipeline
 		}
 
 		if (pipeline->m_instancing_shader->isReady()) {
-			const HashMap<EntityRef, InstancedModel>& ims = pipeline->m_scene->getInstancedModels();
+			const HashMap<EntityRef, InstancedModel>& ims = pipeline->m_module->getInstancedModels();
 			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
 				if (iter.value().dirty) {
-					pipeline->m_scene->initInstancedModelGPUData(iter.key());
+					pipeline->m_module->initInstancedModelGPUData(iter.key());
 				}
 			}
 		}
@@ -2556,7 +2556,7 @@ struct PipelineImpl final : Pipeline
 			pipeline->encodeInstancedModels(stream, *view_ptr);
 			pipeline->encodeProceduralGeometry(*view_ptr);
 
-			view_ptr->renderables = pipeline->m_scene->getRenderables(view_ptr->cp.frustum);
+			view_ptr->renderables = pipeline->m_module->getRenderables(view_ptr->cp.frustum);
 			
 			if (view_ptr->renderables) {
 				pipeline->createSortKeys(*view_ptr);
@@ -2589,10 +2589,10 @@ struct PipelineImpl final : Pipeline
 		const u64* LUMIX_RESTRICT renderables = view.sorter.values.begin();
 		const u64* LUMIX_RESTRICT sort_keys = view.sorter.keys.begin();
 
-		const World& world = m_scene->getWorld();
+		const World& world = m_module->getWorld();
 		const ShiftedFrustum frustum = view.cp.frustum;
-		const ModelInstance* LUMIX_RESTRICT model_instances = m_scene->getModelInstances().begin();
-		const Transform* LUMIX_RESTRICT entity_data = world.getTransforms(); 
+		const ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
+		const Transform* LUMIX_RESTRICT transforms = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
 		u64 instance_key_mask;
@@ -2624,7 +2624,7 @@ struct PipelineImpl final : Pipeline
 
 			switch(type) {
 				case RenderableTypes::PARTICLES: {
-					const ParticleEmitter& emitter = m_scene->getParticleEmitter(entity);
+					const ParticleEmitter& emitter = m_module->getParticleEmitter(entity);
 					const Material* material = emitter.getResource()->getMaterial();
 					const u32 particles_count = emitter.getParticlesCount();
 
@@ -2655,7 +2655,7 @@ struct PipelineImpl final : Pipeline
 
 					const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 3);
 					u8* instance_data = slice.ptr;
-					const Transform& tr = entity_data[entity.index];
+					const Transform& tr = transforms[entity.index];
 					const float lod_d = model_instances[entity.index].lod - mesh.lod;
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
 					memcpy(instance_data, &tr.rot, sizeof(tr.rot));
@@ -2718,7 +2718,7 @@ struct PipelineImpl final : Pipeline
 						u8* instance_data = slice.ptr;
 						for (int j = start_i; j < start_i + (i32)count; ++j) {
 							const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
-							const Transform& tr = entity_data[e.index];
+							const Transform& tr = transforms[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							const float lod_d = model_instances[e.index].lod - mesh_lod;
 							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
@@ -2751,7 +2751,7 @@ struct PipelineImpl final : Pipeline
 				case RenderableTypes::SKINNED: {
 					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-					const Transform& tr = entity_data[entity.index];
+					const Transform& tr = transforms[entity.index];
 					const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
 					const Mesh& mesh = mi->meshes[mesh_idx];
 					Shader* shader = mesh.material->getShader();
@@ -2778,7 +2778,7 @@ struct PipelineImpl final : Pipeline
 
 					u32 layers = 1;
 					if (type == RenderableTypes::FUR) {
-						FurComponent& fur = m_scene->getFur(entity);
+						FurComponent& fur = m_module->getFur(entity);
 						layers = fur.layers;
 						prefix->fur_scale = fur.scale;
 						prefix->gravity = fur.gravity;
@@ -2805,7 +2805,7 @@ struct PipelineImpl final : Pipeline
 					break;
 				}
 				case RenderableTypes::DECAL: {
-					const Material* material = m_scene->getDecal(entity).material;
+					const Material* material = m_module->getDecal(entity).material;
 
 					int start_i = i;
 					const u64 key = sort_keys[i];
@@ -2825,9 +2825,9 @@ struct PipelineImpl final : Pipeline
 					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 					for(u32 j = start_i; j < i; ++j) {
 						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-						const Transform& tr = entity_data[e.index];
+						const Transform& tr = transforms[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const Decal& decal = m_scene->getDecal(e);
+						const Decal& decal = m_module->getDecal(e);
 						const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
 						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
 						
@@ -2865,7 +2865,7 @@ struct PipelineImpl final : Pipeline
 					break;
 				}
 				case RenderableTypes::CURVE_DECAL: {
-					const Material* material = m_scene->getCurveDecal(entity).material;
+					const Material* material = m_module->getCurveDecal(entity).material;
 
 					int start_i = i;
 					const u64 key = sort_keys[i];
@@ -2886,9 +2886,9 @@ struct PipelineImpl final : Pipeline
 					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 					for(u32 j = start_i; j < i; ++j) {
 						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-						const Transform& tr = entity_data[e.index];
+						const Transform& tr = transforms[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const CurveDecal& decal = m_scene->getCurveDecal(e);
+						const CurveDecal& decal = m_module->getCurveDecal(e);
 						const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
 						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
 						
@@ -2997,8 +2997,8 @@ struct PipelineImpl final : Pipeline
 		memset(clusters, 0, sizeof(Cluster) * clusters_count);
 
 		const DVec3 cam_pos = cp.pos;
-		const World& world = m_scene->getWorld();
-		CullResult* light_entities = m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
+		const World& world = m_module->getWorld();
+		CullResult* light_entities = m_module->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
 		const u32 lights_count = light_entities ? light_entities->count() : 0;
 		ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count);
 
@@ -3006,7 +3006,7 @@ struct PipelineImpl final : Pipeline
 		if (light_entities) {
 			u32 i = 0;
 			light_entities->forEach([&](EntityRef e){
-				PointLight& pl = m_scene->getPointLight(e);
+				PointLight& pl = m_module->getPointLight(e);
 				ClusterLight& light = lights[i];
 				light.radius = pl.range;
 				const DVec3 light_pos = world.getPosition(e);
@@ -3048,7 +3048,7 @@ struct PipelineImpl final : Pipeline
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
 			ClusterLight& light = lights[atlas_sorter.lights[i].idx];
 			EntityRef e = atlas_sorter.lights[i].entity;
-			PointLight& pl = m_scene->getPointLight(e);
+			PointLight& pl = m_module->getPointLight(e);
 			// TODO bakeShadow reenters m_lua_state, this is not safe since it's inside another job
 			if (light.atlas_idx == -1) {
 				light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
@@ -3075,11 +3075,11 @@ struct PipelineImpl final : Pipeline
 				stream.update(buffer.buffer, data, size);
 				stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
 			};
-			const Span<const ReflectionProbe> scene_refl_probes = m_scene->getReflectionProbes();
-			const Span<const EnvironmentProbe> scene_env_probes = m_scene->getEnvironmentProbes();
+			const Span<const ReflectionProbe> module_refl_probes = m_module->getReflectionProbes();
+			const Span<const EnvironmentProbe> module_env_probes = m_module->getEnvironmentProbes();
 	
-			ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * scene_env_probes.length());
-			ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * scene_refl_probes.length());
+			ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * module_env_probes.length());
+			ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * module_refl_probes.length());
 	
 			const ShiftedFrustum& frustum = cp.frustum;
 			Vec4 xplanes[65];
@@ -3118,9 +3118,9 @@ struct PipelineImpl final : Pipeline
 			ASSERT(lengthOf(xplanes) >= (u32)size.x);
 			ASSERT(lengthOf(yplanes) >= (u32)size.y);
 	
-			const Span<EntityRef> refl_probe_entities = m_scene->getReflectionProbesEntities();
-			for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
-				const ReflectionProbe& refl_probe = scene_refl_probes[i];
+			const Span<EntityRef> refl_probe_entities = m_module->getReflectionProbesEntities();
+			for (u32 i = 0, c = module_refl_probes.length(); i < c; ++i) {
+				const ReflectionProbe& refl_probe = module_refl_probes[i];
 				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
 				const EntityRef e = refl_probe_entities[i];
 				ClusterReflProbe& probe =  refl_probes[i];
@@ -3130,7 +3130,7 @@ struct PipelineImpl final : Pipeline
 				probe.layer = refl_probe.texture_id;
 			}
 	
-			qsort(refl_probes, scene_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
+			qsort(refl_probes, module_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
 				const ClusterReflProbe* m = (const ClusterReflProbe*)a;
 				const ClusterReflProbe* n = (const ClusterReflProbe*)b;
 				const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
@@ -3140,9 +3140,9 @@ struct PipelineImpl final : Pipeline
 			});
 	
 	
-			const Span<EntityRef> env_probe_entities = m_scene->getEnvironmentProbesEntities();
-			for (u32 probe_idx = 0, c = scene_env_probes.length(); probe_idx < c; ++probe_idx) {
-				const EnvironmentProbe& env_probe = scene_env_probes[probe_idx];
+			const Span<EntityRef> env_probe_entities = m_module->getEnvironmentProbesEntities();
+			for (u32 probe_idx = 0, c = module_env_probes.length(); probe_idx < c; ++probe_idx) {
+				const EnvironmentProbe& env_probe = module_env_probes[probe_idx];
 				if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
 	
 				const EntityRef e = env_probe_entities[probe_idx];
@@ -3156,7 +3156,7 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 	
-			qsort(env_probes, scene_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
+			qsort(env_probes, module_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
 				const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
 				const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
 				const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
@@ -3212,7 +3212,7 @@ struct PipelineImpl final : Pipeline
 			};
 		
 			auto for_each_env_probe_pair = [&](auto f){
-				for (i32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
+				for (i32 i = 0, c = module_env_probes.length(); i < c; ++i) {
 					const Vec3 p = env_probes[i].pos;
 					const float r = length(env_probes[i].outer_range);
 			
@@ -3233,7 +3233,7 @@ struct PipelineImpl final : Pipeline
 			};
 	
 			auto for_each_refl_probe_pair = [&](auto f){
-				for (i32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
+				for (i32 i = 0, c = module_refl_probes.length(); i < c; ++i) {
 					const Vec3 p = refl_probes[i].pos;
 					const float r = length(refl_probes[i].half_extents);
 			
@@ -3296,8 +3296,8 @@ struct PipelineImpl final : Pipeline
 		
 			bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
 			bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
-			bind(m_cluster_buffers.env_probes, env_probes, scene_env_probes.length() * sizeof(env_probes[0]), 14, stream);
-			bind(m_cluster_buffers.refl_probes, refl_probes, scene_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
+			bind(m_cluster_buffers.env_probes, env_probes, module_env_probes.length() * sizeof(env_probes[0]), 14, stream);
+			bind(m_cluster_buffers.refl_probes, refl_probes, module_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
 			bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
 		});
 	}
@@ -3380,9 +3380,8 @@ struct PipelineImpl final : Pipeline
 		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
 			int total = 0;
-			RenderScene* scene = m_scene;
-			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
-			const Transform* LUMIX_RESTRICT entity_data = scene->getWorld().getTransforms();
+			ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
+			const Transform* LUMIX_RESTRICT transforms = m_module->getWorld().getTransforms();
 			const DVec3 camera_pos = view.cp.pos;
 			const DVec3 lod_ref_point = m_viewport.pos;
 			Sorter::Inserter inserter(view.sorter);
@@ -3404,7 +3403,7 @@ struct PipelineImpl final : Pipeline
 					case RenderableTypes::DECAL: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
-							const Material* material = scene->getDecal(e).material;
+							const Material* material = m_module->getDecal(e).material;
 							const int layer = material->getLayer();
 							const u8 bucket = bucket_map[layer];
 							if (bucket < 0xff) {
@@ -3418,7 +3417,7 @@ struct PipelineImpl final : Pipeline
 					case RenderableTypes::CURVE_DECAL: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
-							const Material* material = scene->getCurveDecal(e).material;
+							const Material* material = m_module->getCurveDecal(e).material;
 							const int layer = material->getLayer();
 							const u8 bucket = bucket_map[layer];
 							if (bucket < 0xff) {
@@ -3433,7 +3432,7 @@ struct PipelineImpl final : Pipeline
 					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
-							const DVec3 pos = entity_data[e.index].pos;
+							const DVec3 pos = transforms[e.index].pos;
 							ModelInstance& mi = model_instances[e.index];
 							const float squared_length = float(squaredLength(pos - lod_ref_point));
 								
@@ -3451,7 +3450,7 @@ struct PipelineImpl final : Pipeline
 										const u64 key = mesh_sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
 										inserter.push(key, subrenderable);
 									} else if (bucket < 0xffFF) {
-										const DVec3 pos = entity_data[e.index].pos;
+										const DVec3 pos = transforms[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
@@ -3493,7 +3492,7 @@ struct PipelineImpl final : Pipeline
 						const bool is_shadow = view.cp.is_shadow;
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
-							const DVec3 pos = entity_data[e.index].pos;
+							const DVec3 pos = transforms[e.index].pos;
 							ModelInstance& mi = model_instances[e.index];
 							const float squared_length = float(squaredLength(pos - lod_ref_point));
 								
@@ -3508,7 +3507,7 @@ struct PipelineImpl final : Pipeline
 									if (bucket < 0xff) {
 										instancer.add(mesh.sort_key, subrenderable);
 									} else if (bucket < 0xffFF) {
-										const DVec3 pos = entity_data[e.index].pos;
+										const DVec3 pos = transforms[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
@@ -3574,7 +3573,7 @@ struct PipelineImpl final : Pipeline
 				while (group) {
 					for (u32 i = 0; i < group->count; ++i) {
 						const EntityRef e = { (i32)group->renderables[i] };
-						const Transform& tr = entity_data[e.index];
+						const Transform& tr = transforms[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const float lod_d = model_instances[e.index].lod - mesh_lod;
 						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
@@ -3731,10 +3730,10 @@ struct PipelineImpl final : Pipeline
 	}
 
 	bool environmentCastShadows() {
-		if (!m_scene) return false;
-		const EntityPtr env = m_scene->getActiveEnvironment();
+		if (!m_module) return false;
+		const EntityPtr env = m_module->getActiveEnvironment();
 		if (!env.isValid()) return false;
-		return m_scene->getEnvironmentCastShadows((EntityRef)env);
+		return m_module->getEnvironmentCastShadows((EntityRef)env);
 	}
 
 	RenderStateHandle createRenderState(RenderState state) {
@@ -3936,7 +3935,7 @@ struct PipelineImpl final : Pipeline
 	int m_lua_env;
 	StaticString<32> m_define;
 	Array<gpu::StateFlags> m_render_states;
-	RenderScene* m_scene;
+	RenderModule* m_module;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
 	Array<UniquePtr<View>> m_views;

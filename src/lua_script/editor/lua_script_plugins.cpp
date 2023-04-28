@@ -171,7 +171,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 	/*static const int LUA_CALL_EVENT_SIZE = 32;
 
-	void pluginAdded(GUIPlugin& plugin) override
+	void systemAdded(GUIPlugin& plugin) override
 	{
 		if (!equalStrings(plugin.getName(), "animation_editor")) return;
 
@@ -185,7 +185,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 	void onLuaCallEventGUI(u8* data, AnimEditor::Component& component) const
 	{
-		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getWorld()->getScene(LUA_SCRIPT_TYPE);
+		LuaScriptModule* plugin = (LuaScriptModule*)app.getWorldEditor().getWorld()->getModule(LUA_SCRIPT_TYPE);
 		ImGui::InputText("Function", (char*)data, LUA_CALL_EVENT_SIZE);
 	}
 	*/
@@ -451,7 +451,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			editor.addArrayPropertyItem(cmp, "scripts");
 
 			if (!create_empty) {
-				auto* script_scene = static_cast<LuaScriptScene*>(editor.getWorld()->getScene(LUA_SCRIPT_TYPE));
+				auto* script_scene = static_cast<LuaScriptModule*>(editor.getWorld()->getModule(LUA_SCRIPT_TYPE));
 				int scr_count = script_scene->getScriptCount(entity);
 				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
 			}
@@ -481,12 +481,12 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin
 		if (cmp_type != LUA_SCRIPT_TYPE) return;
 		if (entities.length() != 1) return;
 
-		LuaScriptScene* scene = (LuaScriptScene*)editor.getWorld()->getScene(cmp_type); 
+		LuaScriptModule* module = (LuaScriptModule*)editor.getWorld()->getModule(cmp_type); 
 		const EntityRef e = entities[0];
-		const u32 count = scene->getScriptCount(e);
+		const u32 count = module->getScriptCount(e);
 		for (u32 i = 0; i < count; ++i) {
-			if (scene->beginFunctionCall(e, i, "onGUI")) {
-				scene->endFunctionCall();
+			if (module->beginFunctionCall(e, i, "onGUI")) {
+				module->endFunctionCall();
 			}
 		}
 	}
@@ -527,13 +527,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		if (cmp.type == LUA_SCRIPT_TYPE)
 		{
-			auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
-			int count = scene->getScriptCount((EntityRef)cmp.entity);
+			auto* module = static_cast<LuaScriptModule*>(cmp.module);
+			int count = module->getScriptCount((EntityRef)cmp.entity);
 			for (int i = 0; i < count; ++i)
 			{
-				if (scene->beginFunctionCall((EntityRef)cmp.entity, i, "onDrawGizmo"))
+				if (module->beginFunctionCall((EntityRef)cmp.entity, i, "onDrawGizmo"))
 				{
-					scene->endFunctionCall();
+					module->endFunctionCall();
 				}
 			}
 			return true;

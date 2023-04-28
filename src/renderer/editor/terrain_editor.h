@@ -19,7 +19,7 @@ namespace Lumix
 struct Material;
 struct Model;
 struct PrefabResource;
-struct RenderScene;
+struct RenderModule;
 struct Texture;
 struct Renderer;
 
@@ -90,7 +90,7 @@ private:
 	void saveCompositeTexture(const Path& path, const char* channel) const;
 	void layerGUI(ComponentUID cmp);
 	void entityGUI();
-	void drawCursor(RenderScene& scene, EntityRef terrain, const DVec3& center) const;
+	void drawCursor(RenderModule& module, EntityRef terrain, const DVec3& center) const;
 	Material* getMaterial(ComponentUID cmp) const;
 	void paint(const DVec3& hit, TerrainEditor::ActionType action_type, bool new_stroke, EntityRef terrain, WorldEditor& editor) const;
 
@@ -98,7 +98,7 @@ private:
 	void paintEntities(const DVec3& hit, WorldEditor& editor, EntityRef entity) const;
 	void increaseBrushSize();
 	void decreaseBrushSize();
-	u16 getHeight(const DVec3& world_pos, RenderScene* scene, EntityRef terrain) const;
+	u16 getHeight(const DVec3& world_pos, RenderModule* module, EntityRef terrain) const;
 	DVec3 getRelativePosition(const DVec3& world_pos, EntityRef terrain, World& world) const;
 	void exportToOBJ(ComponentUID cmp) const;
 	Renderer& getRenderer();

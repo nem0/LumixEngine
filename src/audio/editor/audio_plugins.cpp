@@ -1,7 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "audio_device.h"
-#include "audio_scene.h"
+#include "audio_module.h"
 #include "audio_system.h"
 #include "clip.h"
 #include "editor/asset_browser.h"
@@ -68,7 +68,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	static AudioDevice& getAudioDevice(Engine& engine)
 	{
-		auto* audio = static_cast<AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
+		auto* audio = static_cast<AudioSystem*>(engine.getSystemManager().getSystem("audio"));
 		return audio->getDevice();
 	}
 
@@ -191,9 +191,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const EntityRef entity = (EntityRef)cmp.entity;
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{
-			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getEchoZone(entity).radius;
-			World& world = audio_scene->getWorld();
+			auto* audio_module = static_cast<AudioModule*>(cmp.module);
+			float radius = audio_module->getEchoZone(entity).radius;
+			World& world = audio_module->getWorld();
 			const DVec3 pos = world.getPosition(entity);
 
 			addSphere(view, pos, radius, Color::BLUE);
@@ -201,9 +201,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		}
 		else if (cmp.type == CHORUS_ZONE_TYPE)
 		{
-			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getChorusZone(entity).radius;
-			World& world = audio_scene->getWorld();
+			auto* audio_module = static_cast<AudioModule*>(cmp.module);
+			float radius = audio_module->getChorusZone(entity).radius;
+			World& world = audio_module->getWorld();
 			const DVec3 pos = world.getPosition(entity);
 
 			addSphere(view, pos, radius, Color::BLUE);

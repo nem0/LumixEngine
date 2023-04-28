@@ -8,7 +8,7 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "renderer/render_module.h"
 
 
 namespace Lumix
@@ -40,14 +40,14 @@ static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
 struct EditorIconsImpl final : EditorIcons
 {
-	explicit EditorIconsImpl(WorldEditor& editor, RenderScene& scene)
+	explicit EditorIconsImpl(WorldEditor& editor, RenderModule& module)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
-		, m_scene(scene)
+		, m_module(module)
 	{
 		m_icons.reserve(200);
 
-		World& world = scene.getWorld();
+		World& world = module.getWorld();
 		world.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
 		world.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
 		world.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
@@ -76,7 +76,7 @@ struct EditorIconsImpl final : EditorIcons
 	{
 		for (auto& model : m_models) model->decRefCount();
 
-		World& world = m_scene.getWorld();
+		World& world = m_module.getWorld();
 		world.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
 		world.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
 		world.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
@@ -92,7 +92,7 @@ struct EditorIconsImpl final : EditorIcons
 
 	void refresh() override {
 		m_icons.clear();
-		World& world = m_scene.getWorld();
+		World& world = m_module.getWorld();
 		for (EntityPtr e = world.getFirstEntity(); e.isValid(); e = world.getNextEntity((EntityRef)e)) {
 			createIcon((EntityRef)e);
 		}
@@ -237,13 +237,13 @@ struct EditorIconsImpl final : EditorIcons
 	Model* m_models[(int)IconType::COUNT];
 	bool m_is_3d[(int)IconType::COUNT];
 	WorldEditor& m_editor;
-	RenderScene& m_scene;
+	RenderModule& m_module;
 };
 
 
-UniquePtr<EditorIcons> EditorIcons::create(WorldEditor& editor, RenderScene& scene)
+UniquePtr<EditorIcons> EditorIcons::create(WorldEditor& editor, RenderModule& module)
 {
-	return UniquePtr<EditorIconsImpl>::create(editor.getAllocator(), editor, scene);
+	return UniquePtr<EditorIconsImpl>::create(editor.getAllocator(), editor, module);
 }
 
 

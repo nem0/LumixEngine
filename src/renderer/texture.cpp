@@ -723,7 +723,6 @@ bool Texture::load(u64 size, const u8* mem)
 	PROFILE_FUNCTION();
 	profiler::pushString(getPath().c_str());
 	
-	
 	char ext[4] = {};
 	InputMemoryStream file(mem, size);
 	if (!file.read(ext, 3)) return false;

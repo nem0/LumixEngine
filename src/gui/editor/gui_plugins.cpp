@@ -16,7 +16,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_scene.h"
+#include "gui/gui_module.h"
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/gpu/gpu.h"
@@ -248,7 +248,7 @@ public:
 
 	void init() {
 		Engine& engine = m_app.getEngine();
-		Renderer& renderer = *static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
 		m_pipeline = Pipeline::create(renderer, pres, "", m_app.getAllocator());
 	}
@@ -278,21 +278,21 @@ private:
 	bool isOpen() const { return m_is_window_open; }
 
 
-	MouseMode drawGizmo(Draw2D& draw, GUIScene& scene, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos, Span<const EntityRef> selected_entities)
+	MouseMode drawGizmo(Draw2D& draw, GUIModule& module, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos, Span<const EntityRef> selected_entities)
 	{
 		if (selected_entities.length() != 1) return MouseMode::NONE;
 
 		EntityRef e = selected_entities[0];
-		if (!scene.hasGUI(e)) return MouseMode::NONE;
+		if (!module.hasGUI(e)) return MouseMode::NONE;
 
-		const EntityPtr parent = scene.getWorld().getParent(e);
-		const GUIScene::Rect rect = scene.getRectEx(e, canvas_size);
-		GUIScene::Rect parent_rect = scene.getRectEx(parent, canvas_size);
+		const EntityPtr parent = module.getWorld().getParent(e);
+		const GUIModule::Rect rect = module.getRectEx(e, canvas_size);
+		GUIModule::Rect parent_rect = module.getRectEx(parent, canvas_size);
 
-		const float br = scene.getRectBottomRelative(e);
-		const float tr = scene.getRectTopRelative(e);
-		const float lr = scene.getRectLeftRelative(e);
-		const float rr = scene.getRectRightRelative(e);
+		const float br = module.getRectBottomRelative(e);
+		const float tr = module.getRectTopRelative(e);
+		const float lr = module.getRectLeftRelative(e);
+		const float rr = module.getRectRightRelative(e);
 
 		const Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
 		draw.addRect({ rect.x, rect.y }, bottom_right, Color::BLACK, 1);
@@ -328,16 +328,16 @@ private:
 		MouseMode ret = MouseMode::NONE;
 		if (drawHandle(bottom_right, mouse_canvas_pos))
 		{
-			m_bottom_right_start_transform.x = scene.getRectRightPoints(e);
-			m_bottom_right_start_transform.y = scene.getRectBottomPoints(e);
+			m_bottom_right_start_transform.x = module.getRectRightPoints(e);
+			m_bottom_right_start_transform.y = module.getRectBottomPoints(e);
 			ret = MouseMode::RESIZE;
 		}
 		if (drawHandle(mid, mouse_canvas_pos))
 		{
-			m_bottom_right_start_transform.x = scene.getRectRightPoints(e);
-			m_bottom_right_start_transform.y = scene.getRectBottomPoints(e);
-			m_top_left_start_move.y = scene.getRectTopPoints(e);
-			m_top_left_start_move.x = scene.getRectLeftPoints(e);
+			m_bottom_right_start_transform.x = module.getRectRightPoints(e);
+			m_bottom_right_start_transform.y = module.getRectBottomPoints(e);
+			m_top_left_start_move.y = module.getRectTopPoints(e);
+			m_top_left_start_move.x = module.getRectLeftPoints(e);
 			ret = MouseMode::MOVE;
 		}
 		return ret;
@@ -354,9 +354,9 @@ private:
 		const char* prop;
 		float value;
 
-		void set(GUIScene* scene, EntityRef e, const char* prop_name)
+		void set(GUIModule* module, EntityRef e, const char* prop_name)
 		{
-			const bool found = reflection::getPropertyValue(*scene, e, GUI_RECT_TYPE, prop_name, value);
+			const bool found = reflection::getPropertyValue(*module, e, GUI_RECT_TYPE, prop_name, value);
 			ASSERT(found);
 			prop = prop_name;
 		}
@@ -366,34 +366,34 @@ private:
 
 	void copy(EntityRef e, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
+		GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
 		m_copy_position_buffer_count = 0;
 
 		if (mask & (u8)EdgeMask::TOP)
 		{
-			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Top Points");
-			m_copy_position_buffer[m_copy_position_buffer_count+1].set(scene, e, "Top Relative");
+			m_copy_position_buffer[m_copy_position_buffer_count].set(module, e, "Top Points");
+			m_copy_position_buffer[m_copy_position_buffer_count+1].set(module, e, "Top Relative");
 			m_copy_position_buffer_count += 2;
 		}
 
 		if (mask & (u8)EdgeMask::BOTTOM)
 		{
-			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Bottom Points");
-			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(scene, e, "Bottom Relative");
+			m_copy_position_buffer[m_copy_position_buffer_count].set(module, e, "Bottom Points");
+			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(module, e, "Bottom Relative");
 			m_copy_position_buffer_count += 2;
 		}
 
 		if (mask & (u8)EdgeMask::LEFT)
 		{
-			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Left Points");
-			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(scene, e, "Left Relative");
+			m_copy_position_buffer[m_copy_position_buffer_count].set(module, e, "Left Points");
+			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(module, e, "Left Relative");
 			m_copy_position_buffer_count += 2;
 		}
 
 		if (mask & (u8)EdgeMask::RIGHT)
 		{
-			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Right Points");
-			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(scene, e, "Right Relative");
+			m_copy_position_buffer[m_copy_position_buffer_count].set(module, e, "Right Points");
+			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(module, e, "Right Relative");
 			m_copy_position_buffer_count += 2;
 		}
 	}
@@ -429,10 +429,10 @@ private:
 
 			m_pipeline->setWorld(editor.getWorld());
 
-			GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
-			scene->render(*m_pipeline, { size.x, size.y }, false);
+			GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
+			module->render(*m_pipeline, { size.x, size.y }, false);
 			
-			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *scene, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
+			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *module, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
 			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
 			if (ImGui::IsMouseReleased(0)) m_mouse_mode = MouseMode::NONE;
 			
@@ -495,7 +495,7 @@ private:
 				if (!selected.empty()) {
 					const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
 					if (parent.isValid()) {
-						const GUIScene::Rect rect = scene->getRect(*parent);
+						const GUIModule::Rect rect = module->getRect(*parent);
 						if (mouse_canvas_pos.x >= rect.x 
 							&& mouse_canvas_pos.y >= rect.y 
 							&& mouse_canvas_pos.x <= rect.x + rect.w
@@ -509,7 +509,7 @@ private:
 				}
 
 				if (!parent_selected) {
-					EntityPtr e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), INVALID_ENTITY);
+					EntityPtr e = module->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), INVALID_ENTITY);
 					if (e.isValid()) {
 						EntityRef r = (EntityRef)e;
 						editor.selectEntities(Span(&r, 1), false);
@@ -684,11 +684,11 @@ private:
 
 
 	void makeAbsolute(EntityRef entity, const Vec2& canvas_size, u8 mask, WorldEditor& editor) {
-		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
+		GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
 
-		EntityRef parent = (EntityRef)scene->getWorld().getParent(entity);
-		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
-		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
+		EntityRef parent = (EntityRef)module->getWorld().getParent(entity);
+		GUIModule::Rect parent_rect = module->getRectEx(parent, canvas_size);
+		GUIModule::Rect child_rect = module->getRectEx(entity, canvas_size);
 
 		editor.beginCommandGroup("make_gui_rect_absolute");
 
@@ -753,18 +753,18 @@ private:
 
 	void align(EntityRef entity, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
+		GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
 
 		editor.beginCommandGroup("align_gui_rect");
 
-		float br = scene->getRectBottomRelative(entity);
-		float bp = scene->getRectBottomPoints(entity);
-		float tr = scene->getRectTopRelative(entity);
-		float tp = scene->getRectTopPoints(entity);
-		float rr = scene->getRectRightRelative(entity);
-		float rp = scene->getRectRightPoints(entity);
-		float lr = scene->getRectLeftRelative(entity);
-		float lp = scene->getRectLeftPoints(entity);
+		float br = module->getRectBottomRelative(entity);
+		float bp = module->getRectBottomPoints(entity);
+		float tr = module->getRectTopRelative(entity);
+		float tp = module->getRectTopPoints(entity);
+		float rr = module->getRectRightRelative(entity);
+		float rp = module->getRectRightPoints(entity);
+		float lr = module->getRectLeftRelative(entity);
+		float lp = module->getRectLeftPoints(entity);
 
 		if (mask & (u8)EdgeMask::TOP)
 		{
@@ -852,11 +852,12 @@ private:
 
 	void makeRelative(EntityRef entity, const Vec2& canvas_size, u8 mask, WorldEditor& editor)
 	{
-		GUIScene* scene = (GUIScene*)editor.getWorld()->getScene("gui");
+		World* world = editor.getWorld();
+		GUIModule* module = (GUIModule*)world->getModule("gui");
 		
-		EntityPtr parent = scene->getWorld().getParent(entity);
-		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
-		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
+		EntityPtr parent = world->getParent(entity);
+		GUIModule::Rect parent_rect = module->getRectEx(parent, canvas_size);
+		GUIModule::Rect child_rect = module->getRectEx(entity, canvas_size);
 
 		editor.beginCommandGroup("make_gui_rect_relative");
 		

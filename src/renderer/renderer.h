@@ -21,7 +21,7 @@ struct RenderPlugin {
 
 struct DrawStream;
 
-struct LUMIX_RENDERER_API Renderer : IPlugin {
+struct LUMIX_RENDERER_API Renderer : ISystem {
 	struct MemRef {
 		u32 size = 0;
 		void* data = nullptr;

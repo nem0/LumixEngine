@@ -48,7 +48,7 @@ struct RaycastHit
 };
 
 
-struct LUMIX_PHYSICS_API PhysicsScene : IScene
+struct LUMIX_PHYSICS_API PhysicsModule : IModule
 {
 	enum class D6Motion : int
 	{
@@ -84,16 +84,15 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 
 	using ContactCallbackHandle = int;
 
-	static UniquePtr<PhysicsScene> create(PhysicsSystem& system, World& context, Engine& engine, IAllocator& allocator);
+	static UniquePtr<PhysicsModule> create(PhysicsSystem& system, World& world, Engine& engine, IAllocator& allocator);
 	static void reflect();
 
-	virtual ~PhysicsScene() {}
+	virtual ~PhysicsModule() {}
 	virtual void forceUpdateDynamicActors(float time_delta) = 0;
 	virtual const Array<EntityRef>& getDynamicActors() = 0;
 	virtual void render() = 0;
 	virtual EntityPtr raycast(const Vec3& origin, const Vec3& dir, EntityPtr ignore_entity) = 0;
 	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, int layer) = 0;
-	virtual PhysicsSystem& getSystem() const = 0;
 
 	virtual DelegateList<void(const ContactData&)>& onContact() = 0;
 	virtual void setActorLayer(EntityRef entity, u32 layer) = 0;

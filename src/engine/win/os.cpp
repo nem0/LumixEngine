@@ -1328,7 +1328,7 @@ Timer::Timer()
 }
 
 
-float Timer::getTimeSinceStart()
+float Timer::getTimeSinceStart() const
 {
 	LARGE_INTEGER n;
 	QueryPerformanceCounter(&n);
@@ -1338,7 +1338,7 @@ float Timer::getTimeSinceStart()
 }
 
 
-float Timer::getTimeSinceTick()
+float Timer::getTimeSinceTick() const
 {
 	LARGE_INTEGER n;
 	QueryPerformanceCounter(&n);

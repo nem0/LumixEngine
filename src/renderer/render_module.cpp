@@ -1,4 +1,4 @@
-#include "render_scene.h"
+#include "render_module.h"
 
 #include "engine/array.h"
 #include "engine/associative_array.h"
@@ -75,8 +75,8 @@ static RenderableTypes getRenderableType(const Model& model, bool custom_materia
 }
 
 struct ReflectionProbe::LoadJob {
-	LoadJob(struct RenderSceneImpl& scene, EntityRef probe, IAllocator& allocator)
-		: m_scene(scene)
+	LoadJob(struct RenderModuleImpl& module, EntityRef probe, IAllocator& allocator)
+		: m_module(module)
 		, m_allocator(allocator)
 		, m_entity(probe)
 	{}
@@ -86,24 +86,16 @@ struct ReflectionProbe::LoadJob {
 	void callback(u64 size, const u8* data, bool success);
 
 	IAllocator& m_allocator;
-	RenderSceneImpl& m_scene;
+	RenderModuleImpl& m_module;
 	EntityRef m_entity;
 	FileSystem::AsyncHandle m_handle = FileSystem::AsyncHandle::invalid();
 };
 
-struct RenderSceneImpl final : RenderScene {
-	RenderSceneImpl(Renderer& renderer,
+struct RenderModuleImpl final : RenderModule {
+	RenderModuleImpl(Renderer& renderer,
 		Engine& engine,
 		World& world,
 		IAllocator& allocator);
-
-	~RenderSceneImpl()
-	{
-		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
-		m_world.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
-		m_world.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
-		m_culling_system.reset();
-	}
 
 	void getInstancedModelBlob(EntityRef entity, OutputMemoryStream& value) {
 		const Array<InstancedModel::InstanceData>& instances = m_instanced_models[entity].instances;
@@ -187,82 +179,67 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	void clear() override
+	~RenderModuleImpl()
 	{
-		for (Decal& decal : m_decals)
-		{
+		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
 		}
-		m_decals.clear();
-
-		m_cameras.clear();
 
 		for (ProceduralGeometry& pg : m_procedural_geometries) {
 			if (pg.material) pg.material->decRefCount();
 			if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 			if (pg.index_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
 		}
-		m_procedural_geometries.clear();
 
-		for (auto* terrain : m_terrains)
-		{
+		for (auto* terrain : m_terrains) {
 			LUMIX_DELETE(m_allocator, terrain);
 		}
-		m_terrains.clear();
-
-		m_particle_emitters.clear();
 
 		for (InstancedModel& im : m_instanced_models) {
 			if (im.model) im.model->decRefCount();
 			if (im.gpu_data) m_renderer.getEndFrameDrawStream().destroy(im.gpu_data);
 		}
-		m_instanced_models.clear();
 
 		for (ModelInstance& i : m_model_instances)
 		{
-			if (i.flags.isSet(ModelInstance::VALID) && i.model)
-			{
+			if (i.flags.isSet(ModelInstance::VALID) && i.model) {
 				i.model->decRefCount();
 				if (i.custom_material) i.custom_material->decRefCount();
 				i.custom_material = nullptr;
 				LUMIX_DELETE(m_allocator, i.pose);
-				i.pose = nullptr;
 			}
 		}
-		m_model_instances.clear();
+		
 		for(auto iter = m_model_entity_map.begin(), end = m_model_entity_map.end(); iter != end; ++iter) {
 			Model* model = iter.key();
-			model->getObserverCb().unbind<&RenderSceneImpl::modelStateChanged>(this);
+			model->getObserverCb().unbind<&RenderModuleImpl::modelStateChanged>(this);
 		}
-		m_model_entity_map.clear();
 
 		for(auto iter = m_material_decal_map.begin(), end = m_material_decal_map.end(); iter != end; ++iter) {
 			Material* mat = iter.key();
-			mat->getObserverCb().unbind<&RenderSceneImpl::decalMaterialStateChanged>(this);
+			mat->getObserverCb().unbind<&RenderModuleImpl::decalMaterialStateChanged>(this);
 		}
-		m_material_decal_map.clear();
 
 		for(auto iter = m_material_curve_decal_map.begin(), end = m_material_curve_decal_map.end(); iter != end; ++iter) {
 			Material* mat = iter.key();
-			mat->getObserverCb().unbind<&RenderSceneImpl::curveDecalMaterialStateChanged>(this);
+			mat->getObserverCb().unbind<&RenderModuleImpl::curveDecalMaterialStateChanged>(this);
 		}
-		m_material_curve_decal_map.clear();
-
-		m_culling_system->clear();
 
 		for (const ReflectionProbe& probe : m_reflection_probes) {
 			LUMIX_DELETE(m_allocator, probe.load_job);
 		}
 
-		m_reflection_probes.clear();
-		m_environment_probes.clear();
+		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
+		m_world.entityTransformed().unbind<&RenderModuleImpl::onEntityMoved>(this);
+		m_world.entityDestroyed().unbind<&RenderModuleImpl::onEntityDestroyed>(this);
+		m_culling_system.reset();
 	}
 
 
 	World& getWorld() override { return m_world; }
 
 
-	IPlugin& getPlugin() const override { return m_renderer; }
+	ISystem& getSystem() const override { return m_renderer; }
 
 
 	void getRay(EntityRef camera_entity,
@@ -556,7 +533,7 @@ struct RenderSceneImpl final : RenderScene {
 		}
 	}
 
-	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
+	int getVersion() const override { return (int)RenderModuleVersion::LATEST; }
 
 	void serializeBoneAttachments(OutputMemoryStream& serializer)
 	{
@@ -639,7 +616,7 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 	void deserializeInstancedModels(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
-		if (version <= (i32)RenderSceneVersion::INSTANCED_MODEL) return;
+		if (version <= (i32)RenderModuleVersion::INSTANCED_MODEL) return;
 		u32 count;
 		serializer.read(count);
 		m_instanced_models.reserve(count + m_instanced_models.size());
@@ -695,7 +672,7 @@ struct RenderSceneImpl final : RenderScene {
 			decal.entity = entity_map.get(decal.entity);
 			serializer.read(decal.half_extents);
 			decal.uv_scale = Vec2(1);
-			if (version > (i32)RenderSceneVersion::DECAL_UV_SCALE) {
+			if (version > (i32)RenderModuleVersion::DECAL_UV_SCALE) {
 				serializer.read(decal.uv_scale);
 			}
 			const char* tmp = serializer.readString();
@@ -708,7 +685,7 @@ struct RenderSceneImpl final : RenderScene {
 	
 	void deserializeCurveDecals(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
 	{
-		if (version <= (i32)RenderSceneVersion::CURVE_DECALS) return;
+		if (version <= (i32)RenderModuleVersion::CURVE_DECALS) return;
 		
 		u32 count;
 		serializer.read(count);
@@ -871,7 +848,7 @@ struct RenderSceneImpl final : RenderScene {
 		m_particle_emitters.reserve(count + m_particle_emitters.size());
 		for (u32 i = 0; i < count; ++i) {
 			ParticleEmitter emitter(INVALID_ENTITY, m_allocator);
-			emitter.deserialize(serializer, version > (i32)RenderSceneVersion::AUTODESTROY_EMITTER, m_engine.getResourceManager());
+			emitter.deserialize(serializer, version > (i32)RenderModuleVersion::AUTODESTROY_EMITTER, m_engine.getResourceManager());
 			emitter.m_entity = entity_map.get(emitter.m_entity);
 			if (emitter.m_entity.isValid()) {
 				EntityRef e = *emitter.m_entity;
@@ -1064,7 +1041,7 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 	void deserializeProceduralGeometries(InputMemoryStream& blob, const EntityMap& entity_map, i32 version) {
-		if (version <= (i32)RenderSceneVersion::SPLINES) return;
+		if (version <= (i32)RenderModuleVersion::SPLINES) return;
 
 		const u32 count = blob.read<u32>();
 		for (u32 i = 0; i < count; ++i) {
@@ -1078,10 +1055,10 @@ struct RenderSceneImpl final : RenderScene {
 			blob.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
 			blob.read(pg.vertex_decl.attributes_count);
 			blob.read(pg.vertex_decl.attributes, pg.vertex_decl.attributes_count * sizeof(pg.vertex_decl.attributes[0]));
-			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
+			if (version > (i32)RenderModuleVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
 				blob.read(pg.vertex_decl.primitive_type);
 			}
-			if (version > (i32)RenderSceneVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
+			if (version > (i32)RenderModuleVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
 				u32 index_buffer_size;
 				blob.read(index_buffer_size);
 				if (index_buffer_size > 0) {
@@ -1123,7 +1100,7 @@ struct RenderSceneImpl final : RenderScene {
 	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
 		deserializeCameras(serializer, entity_map);
-		if (version > (i32)RenderSceneVersion::SMALLER_MODEL_INSTANCES) {
+		if (version > (i32)RenderModuleVersion::SMALLER_MODEL_INSTANCES) {
 			deserializeModelInstances(serializer, entity_map);
 		}
 		else {
@@ -1139,7 +1116,7 @@ struct RenderSceneImpl final : RenderScene {
 		deserializeCurveDecals(serializer, entity_map, version);
 		deserializeFurs(serializer, entity_map);
 		deserializeInstancedModels(serializer, entity_map, version);
-		if (version <= (i32)RenderSceneVersion::REMOVED_SPLINE_GEOMETRY && version > (i32)RenderSceneVersion::SPLINES) {
+		if (version <= (i32)RenderModuleVersion::REMOVED_SPLINE_GEOMETRY && version > (i32)RenderModuleVersion::SPLINES) {
 			u32 count;
 			serializer.read(count);
 			ASSERT(count == 0);
@@ -1996,7 +1973,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	static int LUA_castCameraRay(lua_State* L)
 	{
-		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
+		auto* module = LuaWrapper::checkArg<RenderModuleImpl*>(L, 1);
 		EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 		float x, y;
 		if (lua_gettop(L) > 3) {
@@ -2004,15 +1981,15 @@ struct RenderSceneImpl final : RenderScene {
 			y = LuaWrapper::checkArg<float>(L, 4);
 		}
 		else {
-			x = scene->getCameraScreenWidth(camera_entity) * 0.5f;
-			y = scene->getCameraScreenHeight(camera_entity) * 0.5f;
+			x = module->getCameraScreenWidth(camera_entity) * 0.5f;
+			y = module->getCameraScreenHeight(camera_entity) * 0.5f;
 		}
 
 		DVec3 origin;
 		Vec3 dir;
-		scene->getRay(camera_entity, {x, y}, origin, dir);
+		module->getRay(camera_entity, {x, y}, origin, dir);
 
-		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_ENTITY);
+		RayCastModelHit hit = module->castRay(origin, dir, INVALID_ENTITY);
 		LuaWrapper::push(L, hit.is_hit);
 		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
 
@@ -2026,10 +2003,10 @@ struct RenderSceneImpl final : RenderScene {
 	}
 
 
-	static void LUA_setModelInstancePath(IScene* scene, int component, const char* path)
+	static void LUA_setModelInstancePath(IModule* module, int component, const char* path)
 	{
-		RenderScene* render_scene = (RenderScene*)scene;
-		render_scene->setModelInstancePath({component}, Path(path));
+		RenderModule* render_module = (RenderModule*)module;
+		render_module->setModelInstancePath({component}, Path(path));
 	}
 
 
@@ -2884,7 +2861,7 @@ struct RenderSceneImpl final : RenderScene {
 		else {
 			d.next_decal = INVALID_ENTITY;
 			m_material_decal_map.insert(material, entity);
-			material->getObserverCb().bind<&RenderSceneImpl::decalMaterialStateChanged>(this);
+			material->getObserverCb().bind<&RenderModuleImpl::decalMaterialStateChanged>(this);
 		}
 	}
 	
@@ -2900,7 +2877,7 @@ struct RenderSceneImpl final : RenderScene {
 		else {
 			d.next_decal = INVALID_ENTITY;
 			m_material_curve_decal_map.insert(material, entity);
-			material->getObserverCb().bind<&RenderSceneImpl::curveDecalMaterialStateChanged>(this);
+			material->getObserverCb().bind<&RenderModuleImpl::curveDecalMaterialStateChanged>(this);
 		}
 	}
 	
@@ -2917,7 +2894,7 @@ struct RenderSceneImpl final : RenderScene {
 		else {
 			r.next_model = INVALID_ENTITY;
 			m_model_entity_map.insert(model, entity);
-			model->getObserverCb().bind<&RenderSceneImpl::modelStateChanged>(this);
+			model->getObserverCb().bind<&RenderModuleImpl::modelStateChanged>(this);
 		}
 	}
 
@@ -2938,7 +2915,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 			else {
 				m_model_entity_map.erase(model);
-				model->getObserverCb().unbind<&RenderSceneImpl::modelStateChanged>(this);
+				model->getObserverCb().unbind<&RenderModuleImpl::modelStateChanged>(this);
 			}
 		}
 	}
@@ -2960,7 +2937,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 			else {
 				m_material_curve_decal_map.erase(material);
-				material->getObserverCb().unbind<&RenderSceneImpl::curveDecalMaterialStateChanged>(this);
+				material->getObserverCb().unbind<&RenderModuleImpl::curveDecalMaterialStateChanged>(this);
 			}
 		}
 	}
@@ -2982,7 +2959,7 @@ struct RenderSceneImpl final : RenderScene {
 			}
 			else {
 				m_material_decal_map.erase(material);
-				material->getObserverCb().unbind<&RenderSceneImpl::decalMaterialStateChanged>(this);
+				material->getObserverCb().unbind<&RenderModuleImpl::decalMaterialStateChanged>(this);
 			}
 		}
 	}
@@ -3244,12 +3221,12 @@ struct RenderSceneImpl final : RenderScene {
 
 ReflectionProbe::LoadJob::~LoadJob() {
 	if (m_handle.isValid()) {
-		m_scene.m_engine.getFileSystem().cancel(m_handle);
+		m_module.m_engine.getFileSystem().cancel(m_handle);
 	}
 }
 
 void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) {
-	ReflectionProbe& probe = m_scene.m_reflection_probes[m_entity];
+	ReflectionProbe& probe = m_module.m_reflection_probes[m_entity];
 	probe.load_job = nullptr;
 	m_handle = FileSystem::AsyncHandle::invalid();
 
@@ -3267,23 +3244,23 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 	ASSERT(desc.is_cubemap);
 
 	u32 layer = probe.texture_id;
-	DrawStream& stream = m_scene.m_renderer.getDrawStream();
+	DrawStream& stream = m_module.m_renderer.getDrawStream();
 	const u32 offset = u32(image_data - data);
-	const Renderer::MemRef mem = m_scene.m_renderer.copy(image_data, (u32)size - offset);
+	const Renderer::MemRef mem = m_module.m_renderer.copy(image_data, (u32)size - offset);
 	InputMemoryStream blob(mem.data, (u32)size - offset);
 	for (u32 side = 0; side < 6; ++side) {
 		for (u32 mip = 0; mip < desc.mips; ++mip) {
 			u32 w = maximum(desc.width >> mip, 1);
 			u32 h = maximum(desc.height >> mip, 1);
 			const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
-			stream.update(m_scene.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
+			stream.update(m_module.m_reflection_probes_texture, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
 		}
 	}
-	stream.freeMemory(mem.data, m_scene.m_renderer.getAllocator());
+	stream.freeMemory(mem.data, m_module.m_renderer.getAllocator());
 	LUMIX_DELETE(m_allocator, this);
 }
 
-void RenderScene::reflect() {
+void RenderModule::reflect() {
 	using namespace reflection;
 
 	struct RotationModeEnum : reflection::EnumAttribute {
@@ -3301,40 +3278,40 @@ void RenderScene::reflect() {
 
 	struct BoneEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override {
-			RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-			EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
+			RenderModule* render_module = static_cast<RenderModule*>(cmp.module);
+			EntityPtr model_instance = getModelInstance(render_module, (EntityRef)cmp.entity);
 			if (!model_instance.isValid()) return 0;
 
-			auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
+			auto* model = render_module->getModelInstanceModel((EntityRef)model_instance);
 			if (!model || !model->isReady()) return 0;
 
 			return model->getBoneCount();
 		}
 
 		const char* name(ComponentUID cmp, u32 idx) const override {
-			RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-			EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
+			RenderModule* render_module = static_cast<RenderModule*>(cmp.module);
+			EntityPtr model_instance = getModelInstance(render_module, (EntityRef)cmp.entity);
 			if (!model_instance.isValid()) return "";
 
-			auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
+			auto* model = render_module->getModelInstanceModel((EntityRef)model_instance);
 			if (!model) return "";
 
 			return idx < (u32)model->getBoneCount() ? model->getBone(idx).name.c_str() : "N/A";
 		}
 
 
-		EntityPtr getModelInstance(RenderScene* render_scene, EntityRef bone_attachment) const {
-			EntityPtr parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
+		EntityPtr getModelInstance(RenderModule* render_module, EntityRef bone_attachment) const {
+			EntityPtr parent_entity = render_module->getBoneAttachmentParent(bone_attachment);
 			if (!parent_entity.isValid()) return INVALID_ENTITY;
-			return render_scene->getWorld().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
+			return render_module->getWorld().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 		}
 	};
 
-	LUMIX_SCENE(RenderSceneImpl, "renderer")
-		.LUMIX_FUNC(RenderScene::addDebugCross)
-		.LUMIX_FUNC(RenderScene::addDebugLine)
-		.LUMIX_FUNC(RenderScene::addDebugTriangle)
-		.LUMIX_FUNC(RenderScene::setActiveCamera)
+	LUMIX_MODULE(RenderModuleImpl, "renderer")
+		.LUMIX_FUNC(RenderModule::addDebugCross)
+		.LUMIX_FUNC(RenderModule::addDebugLine)
+		.LUMIX_FUNC(RenderModule::addDebugTriangle)
+		.LUMIX_FUNC(RenderModule::setActiveCamera)
 		.LUMIX_CMP(ProceduralGeometry, "procedural_geom", "Render / Procedural geometry")
 			.LUMIX_PROP(ProceduralGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
 		.LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment")
@@ -3344,57 +3321,57 @@ void RenderScene::reflect() {
 			.LUMIX_PROP(BoneAttachmentRotation, "Relative rotation").radiansAttribute()
 			.LUMIX_PROP(BoneAttachmentBone, "Bone").attribute<BoneEnum>() 
 		.LUMIX_CMP(Fur, "fur", "Render / Fur")
-			.var_prop<&RenderScene::getFur, &FurComponent::layers>("Layers")
-			.var_prop<&RenderScene::getFur, &FurComponent::scale>("Scale")
-			.var_prop<&RenderScene::getFur, &FurComponent::gravity>("Gravity")
-			.var_prop<&RenderScene::getFur, &FurComponent::enabled>("Enabled")
+			.var_prop<&RenderModule::getFur, &FurComponent::layers>("Layers")
+			.var_prop<&RenderModule::getFur, &FurComponent::scale>("Scale")
+			.var_prop<&RenderModule::getFur, &FurComponent::gravity>("Gravity")
+			.var_prop<&RenderModule::getFur, &FurComponent::enabled>("Enabled")
 		.LUMIX_CMP(EnvironmentProbe, "environment_probe", "Render / Environment probe")
-			.prop<&RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe>("Enabled")
-			.var_prop<&RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range>("Inner range")
-			.var_prop<&RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range>("Outer range")
+			.prop<&RenderModule::isEnvironmentProbeEnabled, &RenderModule::enableEnvironmentProbe>("Enabled")
+			.var_prop<&RenderModule::getEnvironmentProbe, &EnvironmentProbe::inner_range>("Inner range")
+			.var_prop<&RenderModule::getEnvironmentProbe, &EnvironmentProbe::outer_range>("Outer range")
 		.LUMIX_CMP(ReflectionProbe, "reflection_probe", "Render / Reflection probe")
-			.prop<&RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe>("Enabled")
-			.var_prop<&RenderScene::getReflectionProbe, &ReflectionProbe::size>("size")
-			.var_prop<&RenderScene::getReflectionProbe, &ReflectionProbe::half_extents>("half_extents")
+			.prop<&RenderModule::isReflectionProbeEnabled, &RenderModule::enableReflectionProbe>("Enabled")
+			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::size>("size")
+			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::half_extents>("half_extents")
 		.LUMIX_CMP(ParticleEmitter, "particle_emitter", "Render / Particle emitter")
-			.var_prop<&RenderScene::getParticleEmitter, &ParticleEmitter::m_emit_rate>("Emit rate")
-			.var_prop<&RenderScene::getParticleEmitter, &ParticleEmitter::m_autodestroy>("Autodestroy")
+			.var_prop<&RenderModule::getParticleEmitter, &ParticleEmitter::m_emit_rate>("Emit rate")
+			.var_prop<&RenderModule::getParticleEmitter, &ParticleEmitter::m_autodestroy>("Autodestroy")
 			.LUMIX_PROP(ParticleEmitterPath, "Source").resourceAttribute(ParticleEmitterResource::TYPE)
 		.LUMIX_CMP(Camera, "camera", "Render / Camera")
 			.icon(ICON_FA_CAMERA)
-			.var_prop<&RenderScene::getCamera, &Camera::fov>("FOV").radiansAttribute()
-			.var_prop<&RenderScene::getCamera, &Camera::near>("Near").minAttribute(0)
-			.var_prop<&RenderScene::getCamera, &Camera::far>("Far").minAttribute(0)
-			.var_prop<&RenderScene::getCamera, &Camera::is_ortho>("Orthographic")
-			.var_prop<&RenderScene::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
+			.var_prop<&RenderModule::getCamera, &Camera::fov>("FOV").radiansAttribute()
+			.var_prop<&RenderModule::getCamera, &Camera::near>("Near").minAttribute(0)
+			.var_prop<&RenderModule::getCamera, &Camera::far>("Far").minAttribute(0)
+			.var_prop<&RenderModule::getCamera, &Camera::is_ortho>("Orthographic")
+			.var_prop<&RenderModule::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
 		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
 			.LUMIX_PROP(InstancedModelPath, "Model").resourceAttribute(Model::TYPE)
-			.blob_property<&RenderSceneImpl::getInstancedModelBlob, &RenderSceneImpl::setInstancedModelBlob>("Blob")
+			.blob_property<&RenderModuleImpl::getInstancedModelBlob, &RenderModuleImpl::setInstancedModelBlob>("Blob")
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
-			.LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
-			.prop<&RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance>("Enabled")
-			.prop<&RenderScene::getModelInstanceMaterialOverride,&RenderScene::setModelInstanceMaterialOverride>("Material").noUIAttribute()
+			.LUMIX_FUNC_EX(RenderModule::getModelInstanceModel, "getModel")
+			.prop<&RenderModule::isModelInstanceEnabled, &RenderModule::enableModelInstance>("Enabled")
+			.prop<&RenderModule::getModelInstanceMaterialOverride,&RenderModule::setModelInstanceMaterialOverride>("Material").noUIAttribute()
 			.LUMIX_PROP(ModelInstancePath, "Source").resourceAttribute(Model::TYPE)
 		.LUMIX_CMP(Environment, "environment", "Render / Environment")
 			.icon(ICON_FA_GLOBE)
-			.var_prop<&RenderScene::getEnvironment, &Environment::light_color>("Color").colorAttribute()
-			.var_prop<&RenderScene::getEnvironment, &Environment::direct_intensity>("Intensity").minAttribute(0)
-			.var_prop<&RenderScene::getEnvironment, &Environment::indirect_intensity>("Indirect intensity").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::light_color>("Color").colorAttribute()
+			.var_prop<&RenderModule::getEnvironment, &Environment::direct_intensity>("Intensity").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::indirect_intensity>("Indirect intensity").minAttribute(0)
 			.LUMIX_PROP(ShadowmapCascades, "Shadow cascades")
 			.LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")
 		.LUMIX_CMP(PointLight, "point_light", "Render / Point light")
 			.icon(ICON_FA_LIGHTBULB)
 			.LUMIX_PROP(PointLightCastShadows, "Cast shadows")
 			.LUMIX_PROP(PointLightDynamic, "Dynamic")
-			.var_prop<&RenderScene::getPointLight, &PointLight::intensity>("Intensity").minAttribute(0)
-			.var_prop<&RenderScene::getPointLight, &PointLight::fov>("FOV").clampAttribute(0, 360).radiansAttribute()
-			.var_prop<&RenderScene::getPointLight, &PointLight::attenuation_param>("Attenuation").clampAttribute(0, 100)
-			.var_prop<&RenderScene::getPointLight, &PointLight::color>("Color").colorAttribute()
+			.var_prop<&RenderModule::getPointLight, &PointLight::intensity>("Intensity").minAttribute(0)
+			.var_prop<&RenderModule::getPointLight, &PointLight::fov>("FOV").clampAttribute(0, 360).radiansAttribute()
+			.var_prop<&RenderModule::getPointLight, &PointLight::attenuation_param>("Attenuation").clampAttribute(0, 100)
+			.var_prop<&RenderModule::getPointLight, &PointLight::color>("Color").colorAttribute()
 			.LUMIX_PROP(LightRange, "Range").minAttribute(0)
 		.LUMIX_CMP(Decal, "decal", "Render / Decal")
 			.LUMIX_PROP(DecalMaterialPath, "Material").resourceAttribute(Material::TYPE)
 			.LUMIX_PROP(DecalHalfExtents, "Half extents").minAttribute(0)
-			.var_prop<&RenderScene::getDecal, &Decal::uv_scale>("UV scale").minAttribute(0)
+			.var_prop<&RenderModule::getDecal, &Decal::uv_scale>("UV scale").minAttribute(0)
 		.LUMIX_CMP(CurveDecal, "curve_decal", "Render / Curve decal")
 			.LUMIX_PROP(CurveDecalMaterialPath, "Material").resourceAttribute(Material::TYPE)
 			.LUMIX_PROP(CurveDecalHalfExtents, "Half extents").minAttribute(0)
@@ -3402,14 +3379,14 @@ void RenderScene::reflect() {
 			.LUMIX_PROP(CurveDecalBezierP0, "Bezier P0").noUIAttribute()
 			.LUMIX_PROP(CurveDecalBezierP2, "Bezier P2").noUIAttribute()
 		.LUMIX_CMP(Terrain, "terrain", "Render / Terrain")
-			.LUMIX_FUNC(RenderScene::getTerrainNormalAt)
-			.LUMIX_FUNC(RenderScene::getTerrainHeightAt)
+			.LUMIX_FUNC(RenderModule::getTerrainNormalAt)
+			.LUMIX_FUNC(RenderModule::getTerrainHeightAt)
 			.LUMIX_PROP(TerrainMaterialPath, "Material").resourceAttribute(Material::TYPE)
 			.LUMIX_PROP(TerrainXZScale, "XZ scale").minAttribute(0)
 			.LUMIX_PROP(TerrainYScale, "Height scale").minAttribute(0)
 			.LUMIX_PROP(TerrainTesselation, "Tesselation").minAttribute(1)
 			.LUMIX_PROP(TerrainBaseGridResolution, "Grid resolution").minAttribute(8)
-			.begin_array<&RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass>("grass")
+			.begin_array<&RenderModule::getGrassCount, &RenderModule::addGrass, &RenderModule::removeGrass>("grass")
 				.LUMIX_PROP(GrassPath, "Mesh").resourceAttribute(Model::TYPE)
 				.LUMIX_PROP(GrassDistance, "Distance").minAttribute(1)
 				.LUMIX_PROP(GrassSpacing, "Spacing")
@@ -3418,7 +3395,7 @@ void RenderScene::reflect() {
 	;
 }
 
-RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
+RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	Engine& engine,
 	World& world,
 	IAllocator& allocator)
@@ -3451,8 +3428,8 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_furs(m_allocator)
 {
 
-	m_world.entityTransformed().bind<&RenderSceneImpl::onEntityMoved>(this);
-	m_world.entityDestroyed().bind<&RenderSceneImpl::onEntityDestroyed>(this);
+	m_world.entityTransformed().bind<&RenderModuleImpl::onEntityMoved>(this);
+	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
 
@@ -3463,25 +3440,25 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 
 	const RuntimeHash hash("renderer");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.scene == hash) {
+		if (cmp.system_hash == hash) {
 			m_render_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}
 	}
 }
 
-UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
+UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,
 	Engine& engine,
 	World& world,
 	IAllocator& allocator)
 {
-	return UniquePtr<RenderSceneImpl>::create(allocator, renderer, engine, world, allocator);
+	return UniquePtr<RenderModuleImpl>::create(allocator, renderer, engine, world, allocator);
 }
 
-void RenderScene::registerLuaAPI(lua_State* L, Renderer& renderer)
+void RenderModule::registerLuaAPI(lua_State* L, Renderer& renderer)
 {
 	#define REGISTER_FUNCTION(F)\
 		do { \
-			auto f = &LuaWrapper::wrapMethod<&RenderSceneImpl::F>; \
+			auto f = &LuaWrapper::wrapMethod<&RenderModuleImpl::F>; \
 			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
@@ -3492,13 +3469,13 @@ void RenderScene::registerLuaAPI(lua_State* L, Renderer& renderer)
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
-		auto f = &LuaWrapper::wrap<&RenderSceneImpl::LUA_##F>; \
+		auto f = &LuaWrapper::wrap<&RenderModuleImpl::LUA_##F>; \
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
 	REGISTER_FUNCTION(getModelBoneIndex);
 
-	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
+	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderModuleImpl::LUA_castCameraRay);
 
 	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
 	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);

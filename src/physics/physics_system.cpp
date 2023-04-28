@@ -19,7 +19,7 @@
 #include "engine/string.h"
 #include "engine/world.h"
 #include "physics/physics_resources.h"
-#include "physics/physics_scene.h"
+#include "physics/physics_module.h"
 #include "renderer/texture.h"
 
 
@@ -90,15 +90,15 @@ namespace Lumix
 
 	static int LUA_raycast(lua_State* L)
 	{
-		auto* scene = LuaWrapper::checkArg<PhysicsScene*>(L, 1);
+		auto* module = LuaWrapper::checkArg<PhysicsModule*>(L, 1);
 		Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
 		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
 		const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
 		RaycastHit hit;
-		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
+		if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
 		{
 			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::pushEntity(L, hit.entity, &scene->getWorld());
+			LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());
 			LuaWrapper::push(L, hit.position);
 			LuaWrapper::push(L, hit.normal);
 			return 4;
@@ -116,7 +116,7 @@ namespace Lumix
 			, m_material_manager(*this, engine.getAllocator())
 			, m_physx_allocator(m_allocator)
 		{
-			PhysicsScene::reflect();
+			PhysicsModule::reflect();
 			m_layers.count = 2;
 			memset(m_layers.names, 0, sizeof(m_layers.names));
 			for (u32 i = 0; i < lengthOf(m_layers.names); ++i)
@@ -169,15 +169,13 @@ namespace Lumix
 			m_foundation->release();
 		}
 
-		u32 getVersion() const override { return 0; }
-
 		void serialize(OutputMemoryStream& serializer) const override {
 			serializer.write(m_layers.count);
 			serializer.write(m_layers.names);
 			serializer.write(m_layers.filter);
 		}
 
-		bool deserialize(u32 version, InputMemoryStream& serializer) override {
+		bool deserialize(i32 version, InputMemoryStream& serializer) override {
 			if (version != 0) return false;
 
 			serializer.read(m_layers.count);
@@ -186,10 +184,9 @@ namespace Lumix
 			return true;
 		}
 
-		void createScenes(World& world) override
-		{
-			UniquePtr<PhysicsScene> scene = PhysicsScene::create(*this, world, m_engine, m_allocator);
-			world.addScene(scene.move());
+		void createModules(World& world) override {
+			UniquePtr<PhysicsModule> module = PhysicsModule::create(*this, world, m_engine, m_allocator);
+			world.addModule(module.move());
 		}
 
 		physx::PxPhysics* getPhysics() override { return m_physics; }

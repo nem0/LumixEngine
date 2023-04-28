@@ -10,25 +10,33 @@
 namespace Lumix {
 
 struct ComponentUID;
-struct IScene;
+struct IModule;
+struct ChildrenRange;
 
-enum class WorldSerializedVersion : u32
-{
+enum class WorldEditorHeaderVersion : u32 {
 	CAMERA,
 	ENTITY_FOLDERS,
 	HASH64,
+	NEW_ENTITY_FOLDERS,
 
 	LATEST
 };
 
+enum class WorldSerializeFlags : u32 { 
+	HAS_PARTITIONS = 1 << 0,
+	
+	NONE = 0
+};
+
 #pragma pack(1)
-	struct WorldHeader {
+	struct WorldEditorHeader {
 		static const u32 MAGIC = 'LUNV';
 		u32 magic;
-		WorldSerializedVersion version;
+		WorldEditorHeaderVersion version;
 	};
 #pragma pack()
 
+// map one EntityPtr to another, used e.g. during additive loading or when instancing a prefab
 struct LUMIX_ENGINE_API EntityMap final {
 	EntityMap(IAllocator& allocator);
 	~EntityMap() = default;
@@ -40,40 +48,18 @@ struct LUMIX_ENGINE_API EntityMap final {
 	Array<EntityPtr> m_map;
 };
 
-struct LUMIX_ENGINE_API ChildrenRange {
-	struct LUMIX_ENGINE_API Iterator {
-		void operator ++();
-		bool operator !=(const Iterator& rhs);
-		EntityRef operator*();
-
-		const struct World* world;
-		EntityPtr entity;
-	};
-	ChildrenRange(const World& world, EntityRef parent);
-	Iterator begin() const;
-	Iterator end() const;
-
-	const World& world;
-	EntityRef parent;
-};
-
+// manages entities - contains basic entity data such as transforms or names
+// most of the components (rendering, animation, navigation, ...) are implemented in `IModule`s 
+// Each world has one instance of every module inherited from `IModule`
 struct LUMIX_ENGINE_API World {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
+	using PartitionHandle = u16;
 
-	struct EntityData {
-		EntityData() {}
-
-		i32 hierarchy;
-		i32 name;
-
-		union {
-			u64 components;
-			struct {
-				int prev;
-				int next;
-			};
-		};
-		bool valid;
+	// `Partition` is a set of entities, single world can have multiple partitions
+	// used for additive loading/unloading
+	struct Partition {
+		PartitionHandle handle;
+		char name[64];
 	};
 
 	explicit World(struct Engine& engine, IAllocator& allocator);
@@ -86,15 +72,23 @@ struct LUMIX_ENGINE_API World {
 	void destroyEntity(EntityRef entity);
 	void createComponent(ComponentType type, EntityRef entity);
 	void destroyComponent(EntityRef entity, ComponentType type);
-	void onComponentCreated(EntityRef entity, ComponentType component_type, IScene* scene);
-	void onComponentDestroyed(EntityRef entity, ComponentType component_type, IScene* scene);
+	void onComponentCreated(EntityRef entity, ComponentType component_type, IModule* module);
+	void onComponentDestroyed(EntityRef entity, ComponentType component_type, IModule* module);
     u64 getComponentsMask(EntityRef entity) const;
     bool hasComponent(EntityRef entity, ComponentType component_type) const;
 	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
 	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
 
-	bool isValid(EntityRef e) const { return m_entities[e.index].valid; }
+	PartitionHandle createPartition(const char* name);
+	void destroyPartition(PartitionHandle partition);
+	void setActivePartition(PartitionHandle partition);
+	PartitionHandle getActivePartition() const { return m_active_partition; }
+	Array<Partition>& getPartitions() { return m_partitions; }
+	Partition& getPartition(PartitionHandle partition);
+	PartitionHandle getPartition(EntityRef entity);
+	void setPartition(EntityRef entity, PartitionHandle partition);
+
 	EntityPtr getFirstEntity() const;
 	EntityPtr getNextEntity(EntityRef entity) const;
 	const char* getEntityName(EntityRef entity) const;
@@ -128,8 +122,6 @@ struct LUMIX_ENGINE_API World {
 	const Vec3& getScale(EntityRef entity) const;
 	const DVec3& getPosition(EntityRef entity) const;
 	const Quat& getRotation(EntityRef entity) const;
-	const char* getName() const { return m_name; }
-	void setName(const char* name);
 
 	DelegateList<void(EntityRef)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
@@ -137,17 +129,36 @@ struct LUMIX_ENGINE_API World {
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serialize(struct OutputMemoryStream& serializer);
-	void deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map, bool vec3_scale);
+	void serialize(struct OutputMemoryStream& serializer, WorldSerializeFlags flags);
+	bool deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map);
 
-	IScene* getScene(ComponentType type) const;
-	IScene* getScene(const char* name) const;
-	Array<UniquePtr<IScene>>& getScenes();
-	void addScene(UniquePtr<IScene>&& scene);
+	IModule* getModule(ComponentType type) const;
+	IModule* getModule(const char* name) const;
+	Array<UniquePtr<IModule>>& getModules();
+	void addModule(UniquePtr<IModule>&& moudle);
 
 private:
 	void transformEntity(EntityRef entity, bool update_local);
 	void updateGlobalTransform(EntityRef entity);
+
+	struct EntityData {
+		EntityData() {}
+
+		i32 hierarchy; // index into m_hierarchy, < 0 if no hierarchy (== no parent & no children) 
+		i32 name; // index into m_names, < 0 if no name
+
+		union {
+			u64 components; // bitmask of attached components
+			static_assert(sizeof(components) * 8 == ComponentType::MAX_TYPES_COUNT);
+			struct {
+				// freelist indices
+				int prev; 
+				int next;
+			};
+		};
+		PartitionHandle partition;
+		bool valid;
+	};
 
 	struct Hierarchy {
 		EntityRef entity;
@@ -164,48 +175,81 @@ private:
 	};
 
 	struct ComponentTypeEntry {
-		IScene* scene = nullptr;
-		void (*create)(IScene*, EntityRef);
-		void (*destroy)(IScene*, EntityRef);
+		IModule* module = nullptr;
+		void (*create)(IModule*, EntityRef);
+		void (*destroy)(IModule*, EntityRef);
 	};
 
 	IAllocator& m_allocator;
 	Engine& m_engine;
+	// TODO get rid of MAX_TYPES_COUNT limit (index archetypes maybe)
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
-	Array<UniquePtr<IScene>> m_scenes;
-	Array<Transform> m_transforms;
+	Array<UniquePtr<IModule>> m_modules;
+	
+	// m_entities/m_transforms are indexed by EntityRef::index
+	// not in single array (==EntityData does not contain Transform) because of cache/performance
 	Array<EntityData> m_entities;
+	Array<Transform> m_transforms;
+	
+	// indexed by EntityData::hierarchy
 	Array<Hierarchy> m_hierarchy;
+	// indexed by EntityData::name
 	Array<EntityName> m_names;
+	
+	Array<Partition> m_partitions;
+	PartitionHandle m_partition_generator = 0;
+	// all new entities are created in active partition
+	PartitionHandle m_active_partition = 0;
+	
 	DelegateList<void(EntityRef)> m_entity_created;
 	DelegateList<void(EntityRef)> m_entity_moved;
 	DelegateList<void(EntityRef)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
+	
+	// freelist for m_entities/m_transforms
 	int m_first_free_slot;
-	char m_name[64];
 };
 
+// contains necessary info to fully (==no other context needed) identify component at runtime
 struct LUMIX_ENGINE_API ComponentUID final {
 	ComponentUID() {
-		scene = nullptr;
+		module = nullptr;
 		entity = INVALID_ENTITY;
 		type = {-1};
 	}
 
-	ComponentUID(EntityPtr _entity, ComponentType _type, IScene* _scene)
-		: entity(_entity)
-		, type(_type)
-		, scene(_scene) {}
+	ComponentUID(EntityPtr entity, ComponentType type, IModule* module)
+		: entity(entity)
+		, type(type)
+		, module(module) {}
 
 	EntityPtr entity;
 	ComponentType type;
-	IScene* scene;
+	IModule* module;
 
 	static const ComponentUID INVALID;
 
-	bool operator==(const ComponentUID& rhs) const { return type == rhs.type && scene == rhs.scene && entity == rhs.entity; }
+	bool operator==(const ComponentUID& rhs) const { return type == rhs.type && module == rhs.module && entity == rhs.entity; }
 	bool isValid() const { return entity.isValid(); }
+};
+
+// to iterate children with range-based for loop: for (EntityRef child : world->childrenOf(parent))
+struct LUMIX_ENGINE_API ChildrenRange {
+	struct LUMIX_ENGINE_API Iterator {
+		void operator ++();
+		bool operator !=(const Iterator& rhs);
+		EntityRef operator*();
+
+		const struct World* world;
+		EntityPtr entity;
+	};
+	ChildrenRange(const World& world, EntityRef parent);
+	Iterator begin() const;
+	Iterator end() const;
+
+	const World& world;
+	EntityRef parent;
 };
 
 } // namespace Lumix

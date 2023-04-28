@@ -21,7 +21,7 @@ VoxelizerUI::~VoxelizerUI() {
 VoxelizerUI::VoxelizerUI(StudioApp& app)
 	: m_app(app)
 	, m_debug_triangles(app.getAllocator())
-	, m_scene(app.getAllocator())
+	, m_module(app.getAllocator())
 {
 	m_toggle_ui.init("Voxelizer editor", "Toggle voxelizer editor", "voxelizer_editor", "", true);
 	m_toggle_ui.func.bind<&VoxelizerUI::toggleOpen>(this);
@@ -30,8 +30,8 @@ VoxelizerUI::VoxelizerUI(StudioApp& app)
 }
 
 void VoxelizerUI::visualizeAO() {
-	if (m_scene.m_ao.empty()) {
-		m_scene.computeAO(m_ray_count);
+	if (m_module.m_ao.empty()) {
+		m_module.computeAO(m_ray_count);
 	}
 	m_debug_triangles.clear();
 	const u32 idcs[] = { 
@@ -44,10 +44,10 @@ void VoxelizerUI::visualizeAO() {
 		0, 2, 4,   2, 4, 6, // +z
 		1, 3, 5,   3, 5, 7, // -z
 	};
-	float voxel_size = m_scene.m_voxel_size;
-	IVec3 grid_resolution = m_scene.m_grid_resolution;
-	const Array<float>& ao = m_scene.m_ao;
-	const OutputMemoryStream& voxels = m_scene.m_voxels;
+	float voxel_size = m_module.m_voxel_size;
+	IVec3 grid_resolution = m_module.m_grid_resolution;
+	const Array<float>& ao = m_module.m_ao;
+	const OutputMemoryStream& voxels = m_module.m_voxels;
 	Vec3 x(voxel_size * 0.5f, 0, 0);
 	Vec3 y(0, voxel_size * 0.5f, 0);
 	Vec3 z(0, 0, voxel_size * 0.5f);
@@ -92,9 +92,9 @@ void VoxelizerUI::visualize() {
 		0, 2, 4,   2, 4, 6, // +z
 		1, 3, 5,   3, 5, 7, // -z
 	};
-	float voxel_size = m_scene.m_voxel_size;
-	IVec3 grid_resolution = m_scene.m_grid_resolution;
-	OutputMemoryStream& voxels = m_scene.m_voxels;
+	float voxel_size = m_module.m_voxel_size;
+	IVec3 grid_resolution = m_module.m_grid_resolution;
+	OutputMemoryStream& voxels = m_module.m_voxels;
 	Vec3 x(voxel_size * 0.5f, 0, 0);
 	Vec3 y(0, voxel_size * 0.5f, 0);
 	Vec3 z(0, 0, voxel_size * 0.5f);
@@ -138,7 +138,7 @@ void VoxelizerUI::draw() {
 	if (selected.size() != 1) return;
 	if (m_debug_triangles.empty()) return;
 
-	const DVec3 p = editor.getWorld()->getPosition(selected[0]) - Vec3(0.5f * m_scene.m_voxel_size);
+	const DVec3 p = editor.getWorld()->getPosition(selected[0]) - Vec3(0.5f * m_module.m_voxel_size);
 	const DVec3 cam_pos = view.getViewport().pos;
 
  	WorldView::Vertex* vertices = view.render(false, m_debug_triangles.size());
@@ -164,7 +164,7 @@ void VoxelizerUI::onWindowGUI() {
 				static FilePathHash selected_res_hash;
 				if (m_app.getAssetBrowser().resourceList(Span(buf), selected_res_hash, Model::TYPE, 0, false)) {
 					open(buf);
-					m_scene.m_voxels.clear();
+					m_module.m_voxels.clear();
 				}
 				ImGui::EndMenu();
 			}
@@ -174,24 +174,24 @@ void VoxelizerUI::onWindowGUI() {
 	}
 
 	if (ImGui::InputInt("Ray count", (i32*)&m_ray_count, 1, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
-		m_scene.computeAO(m_ray_count);
+		m_module.computeAO(m_ray_count);
 		visualizeAO();
 	}
 	if (ImGui::InputInt("Resolution", (i32*)&m_max_resolution, 1, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
-		m_scene.m_voxels.clear();
+		m_module.m_voxels.clear();
 	}
 	if (ImGui::Checkbox("Draw", &m_debug_draw)) {
 		visualize();
 	}
 	
-	if (ImGui::Button("Blur AO")) m_scene.blurAO();
+	if (ImGui::Button("Blur AO")) m_module.blurAO();
 	ImGui::DragFloat("AO multiplier", &m_ao_multiplier);
 	if (ImGui::Button("AO")) {
 		visualizeAO();
 	}
 
-	if (m_model && m_model->isReady() && m_scene.m_voxels.empty()) {
-		m_scene.voxelize(*m_model, m_max_resolution);
+	if (m_model && m_model->isReady() && m_module.m_voxels.empty()) {
+		m_module.voxelize(*m_model, m_max_resolution);
 		visualize();
 	}
 

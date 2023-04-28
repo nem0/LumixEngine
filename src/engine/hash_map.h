@@ -46,6 +46,13 @@ struct HashFunc<i32> {
 };
 
 template<>
+struct HashFunc<u16> {
+	static u32 get(u16 key) {
+		return HashFunc<i32>::get(key);
+	}
+};
+
+template<>
 struct HashFunc<ComponentType>
 {
 	static u32 get(const ComponentType& key)

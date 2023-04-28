@@ -1,6 +1,6 @@
 #include <imgui/imgui.h>
 
-#include "animation/animation_scene.h"
+#include "animation/animation_module.h"
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/settings.h"
@@ -461,8 +461,8 @@ struct ControllerEditorImpl : ControllerEditor {
 		ComponentType animator_type = reflection::getComponentType("animator");
 		if (!world->hasComponent(selected[0], animator_type)) return;
 
-		AnimationScene* scene = (AnimationScene*)world->getScene(animator_type);
-		scene->updateAnimator(selected[0], m_app.getEngine().getLastTimeDelta());
+		AnimationModule* module = (AnimationModule*)world->getModule(animator_type);
+		module->updateAnimator(selected[0], m_app.getEngine().getLastTimeDelta());
 	}
 
 	Path getPathFromEntity() const {
@@ -471,8 +471,8 @@ struct ControllerEditorImpl : ControllerEditor {
 		World* world = m_app.getWorldEditor().getWorld();
 		const ComponentType cmp_type = reflection::getComponentType("animator");
 		if (!world->hasComponent(selected[0], cmp_type)) return Path();
-		AnimationScene* scene = (AnimationScene*)world->getScene(cmp_type);
-		return scene->getAnimatorSource(selected[0]);
+		AnimationModule* module = (AnimationModule*)world->getModule(cmp_type);
+		return module->getAnimatorSource(selected[0]);
 	}
 
 	void load() {
@@ -736,8 +736,8 @@ struct ControllerEditorImpl : ControllerEditor {
 				return;
 			}
 
-			AnimationScene* scene = (AnimationScene*)world->getScene(cmp_type);
-			Controller* ctrl = scene->getAnimatorController(selected[0]);
+			AnimationModule* module = (AnimationModule*)world->getModule(cmp_type);
+			Controller* ctrl = module->getAnimatorController(selected[0]);
 			if (!ctrl) {
 				ImGui::TextUnformatted("Selected entity does not have resource assigned in animator component");
 				ImGui::End();
@@ -749,27 +749,27 @@ struct ControllerEditorImpl : ControllerEditor {
 				switch (input.type) {
 					case InputDecl::Type::EMPTY: break;
 					case InputDecl::Type::FLOAT: {
-						float val = scene->getAnimatorFloatInput(selected[0], idx);
+						float val = module->getAnimatorFloatInput(selected[0], idx);
 		
 						ImGuiEx::Label(input.name);
 						if (ImGui::DragFloat(input.name, &val)) {
-							scene->setAnimatorInput(selected[0], idx, val);
+							module->setAnimatorInput(selected[0], idx, val);
 						}
 						break;
 					}
 					case InputDecl::Type::BOOL: {
-						bool val = scene->getAnimatorBoolInput(selected[0], idx);
+						bool val = module->getAnimatorBoolInput(selected[0], idx);
 						ImGuiEx::Label(input.name);
 						if (ImGui::Checkbox(input.name, &val)) {
-							scene->setAnimatorInput(selected[0], idx, val);
+							module->setAnimatorInput(selected[0], idx, val);
 						}
 						break;
 					}
 					case InputDecl::Type::U32: {
-						u32 val = scene->getAnimatorU32Input(selected[0], idx);
+						u32 val = module->getAnimatorU32Input(selected[0], idx);
 						ImGuiEx::Label(input.name);
 						if (ImGui::DragInt(input.name, (int*)&val, 1, 0, 0x7ffFFff)) {
-							scene->setAnimatorInput(selected[0], idx, val);
+							module->setAnimatorInput(selected[0], idx, val);
 						}
 						break;
 					}
