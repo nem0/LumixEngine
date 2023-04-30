@@ -298,9 +298,10 @@ void World::setEntityName(EntityRef entity, const char* name)
 	{
 		if (name[0] == '\0') return;
 		m_entities[entity.index].name = m_names.size();
-		EntityName& name_data = m_names.emplace();
+		EntityName name_data;
 		name_data.entity = entity;
 		copyString(name_data.name, name);
+		m_names.push(name_data);
 	}
 	else
 	{
