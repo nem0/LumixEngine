@@ -535,6 +535,19 @@ Point toScreen(WindowHandle win, int x, int y)
 	return res;
 }
 
+void unclipCursor() {
+	ClipCursor(NULL);
+}
+
+void clipCursor(Rect screen_space_rect) {
+	RECT r;
+	r.left = screen_space_rect.left;
+	r.top= screen_space_rect.top;
+	r.right = screen_space_rect.left + screen_space_rect.width;
+	r.bottom = screen_space_rect.top + screen_space_rect.height;
+	ClipCursor(&r);
+}
+
 void updateGrabbedMouse() {
 	if (G.grabbed_window == INVALID_WINDOW) {
 		ClipCursor(NULL);

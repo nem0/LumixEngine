@@ -840,6 +840,16 @@ bool isMaximized(WindowHandle win) {
 	return maximized;
 }
 
+void unclipCursor() {
+	ASSERT(false);
+	// TODO
+}
+
+void clipCursor(Rect screen_space_rect) {
+	ASSERT(false);
+	// TODO
+}
+
 void restore(WindowHandle win, WindowState state) {
 	ASSERT(false);
 	// TODO

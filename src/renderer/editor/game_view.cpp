@@ -114,17 +114,7 @@ void GameView::captureMouse(bool capture)
 	m_app.setCursorCaptured(capture);
 	m_is_mouse_captured = capture;
 	os::showCursor(!capture || m_is_ingame_cursor);
-	
-	if (capture) {
-		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
-		const os::Point cp = os::getMouseScreenPos();
-		m_captured_mouse_x = cp.x;
-		m_captured_mouse_y = cp.y;
-	}
-	else {
-		os::grabMouse(os::INVALID_WINDOW);
-		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
-	}
+	if (!capture) os::unclipCursor();
 }
 
 void GameView::onSettingsLoaded() {
@@ -297,6 +287,7 @@ void GameView::onWindowGUI()
 	if (!m_pipeline->isReady()) captureMouse(false);
 
 	ImVec2 view_pos;
+	ImVec2 view_size;
 	bool is_game_view_visible = false;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
@@ -304,23 +295,23 @@ void GameView::onWindowGUI()
 		view_pos = ImGui::GetCursorScreenPos();
 
 		const ImVec2 content_min = view_pos;
-		ImVec2 size = ImGui::GetContentRegionAvail();
-		size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
-		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
-		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
-		if (size.x > 0 && size.y > 0) {
+		view_size = ImGui::GetContentRegionAvail();
+		view_size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
+		ImVec2 content_max(content_min.x + view_size.x, content_min.y + view_size.y);
+		if (m_forced_viewport.enabled) view_size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
+		if (view_size.x > 0 && view_size.y > 0) {
 			RenderModule* module = m_pipeline->getModule();
 			const EntityPtr camera = module->getActiveCamera();
 			Viewport vp;
 			if (camera.isValid()) {
 				vp = module->getCameraViewport((EntityRef)camera);
-				vp.w = (int)size.x;
-				vp.h = (int)size.y;
+				vp.w = (int)view_size.x;
+				vp.h = (int)view_size.y;
 				module->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 			}
 			else {
-				vp.w = (int)size.x;
-				vp.h = (int)size.y;
+				vp.w = (int)view_size.x;
+				vp.h = (int)view_size.y;
 				vp.fov = degreesToRadians(90.f);
 				vp.is_ortho = false;
 				vp.far = 10'000.f;
@@ -334,14 +325,14 @@ void GameView::onWindowGUI()
 
 			if (texture_handle) {
 				if (gpu::isOriginBottomLeft()) {
-					ImGui::Image(texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+					ImGui::Image(texture_handle, view_size, ImVec2(0, 1), ImVec2(1, 0));
 				}
 				else {
-					ImGui::Image(texture_handle, size);
+					ImGui::Image(texture_handle, view_size);
 				}
 			}
 			else {
-				ImGuiEx::Rect(size.x, size.y, 0xffFF00FF);
+				ImGuiEx::Rect(view_size.x, view_size.y, 0xffFF00FF);
 			}
 			const bool is_hovered = ImGui::IsItemHovered();
 			if (is_hovered && ImGui::IsMouseReleased(0) && editor.isGameMode()) captureMouse(true);
@@ -355,6 +346,14 @@ void GameView::onWindowGUI()
 	}
 
 	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
+	if (m_is_mouse_captured && is_game_view_visible) {
+		os::Rect r = os::getWindowScreenRect(ImGui::GetWindowViewport()->PlatformHandle);
+		r.left += (i32)view_pos.x;
+		r.top += (i32)view_pos.y;
+		r.width = (i32)view_size.x;
+		r.height = (i32)view_size.y;
+		os::clipCursor(r);
+	}
 	ImGui::End();
 	ImGui::PopStyleVar();
 	if (is_game_view_visible) onStatsGUI(view_pos);
