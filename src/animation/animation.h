@@ -18,7 +18,7 @@ struct Time {
 	explicit Time(u32 v) : value(v) {}
 	static Time fromSeconds(float time) {
 		ASSERT(time >= 0);
-		return Time{u32(time * ONE_SECOND)};
+		return Time{u32(time * float(ONE_SECOND))};
 	}
 	float seconds() const { return float(value / double(ONE_SECOND)); }
 	Time operator*(float t) const { return Time{u32(value * t)}; }

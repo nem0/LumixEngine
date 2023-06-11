@@ -60,7 +60,7 @@ void runOnWorkers(const F& f)
 		}, &signal);
 	}
 	f();
-	wait(&signal);
+	jobs::wait(&signal);
 }
 
 

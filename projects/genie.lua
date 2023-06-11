@@ -257,14 +257,14 @@ function defaultConfigurations()
 		links { "pthread" }
 
 	configuration { "vs20*"}
-		buildoptions { "/wd4503"}
+		buildoptions { "/wd4503 /Zc:char8_t-"}
 		
 	configuration {}
 		files {
 			path.join(ROOT_DIR, "projects/lumix.natvis"),
 			path.join(ROOT_DIR, ".editorconfig")
 		}
-		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
+		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO", "_SILENCE_CXX20_CISO646_REMOVED_WARNING" }
 		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
 end
 
@@ -382,7 +382,7 @@ function linkPhysX()
 end
 
 solution "LumixEngine"
-	flags { "Cpp17" }
+	flags { "Cpp20" }
 	if _ACTION == "gmake" or _ACTION == "ninja" then
 		if "linux-gcc" == _OPTIONS["gcc"] then
 			LOCATION = "tmp/gcc"
@@ -545,10 +545,10 @@ if has_plugin("physics") then
 			files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
 			files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
 			files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+			--copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+			--copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+			--copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+			--copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
 		configuration {}
 
 		includedirs { "../external/physx/include/" }
@@ -748,7 +748,7 @@ end
 function dbgHelp()
 	configuration { "windows" }
 		files { "../external/dbghelp/**.dll" }	
-		copy { "../external/dbghelp/**.dll" }
+		--copy { "../external/dbghelp/**.dll" }
 	configuration {}
 end
 

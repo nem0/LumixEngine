@@ -1,10 +1,8 @@
 #pragma once
 
 #include "gpu/gpu.h"
-#ifndef _WIN32
-	#include "engine/allocator.h"
-	#include <string.h>
-#endif
+#include "engine/allocator.h"
+#include <string.h>
 
 namespace Lumix {
 
