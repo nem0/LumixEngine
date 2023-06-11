@@ -1483,6 +1483,7 @@ struct NavigationModuleImpl final : NavigationModule
 
 	i32 getVersion() const override { return (i32)NavigationModuleVersion::LATEST; }
 
+	const char* getName() const override { return "navigation"; }
 
 	void serialize(OutputMemoryStream& serializer) override
 	{

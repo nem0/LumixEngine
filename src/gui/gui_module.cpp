@@ -174,6 +174,8 @@ struct GUIModuleImpl final : GUIModule {
 	}
 	
 	i32 getVersion() const override { return (i32)Version::LATEST; }
+	
+	const char* getName() const override { return "gui"; }
 
 	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
 	{

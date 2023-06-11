@@ -420,6 +420,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	int getVersion() const override { return (int)PhysicsModuleVersion::LATEST; }
 
+	const char* getName() const override { return "physics"; }
+
 	~PhysicsModuleImpl() {
 		for (auto& controller : m_controllers) {
 			controller.controller->release();
@@ -3821,7 +3823,7 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 
 	const RuntimeHash hash("physics");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.system_hash == hash) {
+		if (cmp.module_hash == hash) {
 			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}
 	}

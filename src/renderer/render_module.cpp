@@ -535,6 +535,8 @@ struct RenderModuleImpl final : RenderModule {
 
 	int getVersion() const override { return (int)RenderModuleVersion::LATEST; }
 
+	const char* getName() const override { return "renderer"; }
+
 	void serializeBoneAttachments(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_bone_attachments.size());
@@ -3440,7 +3442,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 
 	const RuntimeHash hash("renderer");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.system_hash == hash) {
+		if (cmp.module_hash == hash) {
 			m_render_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}
 	}

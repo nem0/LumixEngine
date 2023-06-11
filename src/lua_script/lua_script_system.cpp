@@ -718,6 +718,8 @@ namespace Lumix
 
 		int getVersion() const override { return (int)LuaModuleVersion::LATEST; }
 
+		const char* getName() const override { return "lua_script"; }
+
 		IFunctionCall* beginFunctionCall(const ScriptEnvironment& env, const char* function) {
 			lua_rawgeti(env.m_state, LUA_REGISTRYINDEX, env.m_environment);
 			ASSERT(lua_type(env.m_state, -1) == LUA_TTABLE);

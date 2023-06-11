@@ -74,7 +74,7 @@ builder::builder(IAllocator& allocator)
 void builder::registerCmp(ComponentBase* cmp) {
 	getContext().component_bases[cmp->component_type.index].cmp = cmp;
 	getContext().component_bases[cmp->component_type.index].name_hash = RuntimeHash(cmp->name);
-	getContext().component_bases[cmp->component_type.index].system_hash = RuntimeHash(module->name);
+	getContext().component_bases[cmp->component_type.index].module_hash = RuntimeHash(module->name);
 	module->cmps.push(cmp);
 }
 

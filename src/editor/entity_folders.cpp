@@ -244,8 +244,8 @@ void EntityFolders::moveFolder(FolderHandle folder_id, FolderHandle new_parent_i
 	}
 }
 
-void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity_map, bool additive, WorldEditorHeaderVersion version) {
-	if (version <= WorldEditorHeaderVersion::NEW_ENTITY_FOLDERS) {
+void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity_map, bool additive, WorldVersion version) {
+	if (version <= WorldVersion::NEW_ENTITY_FOLDERS) {
 		// ignore old format folders
 		i32 count;
 		blob.read(count);

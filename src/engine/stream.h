@@ -101,6 +101,7 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	u64 getPosition() const { return m_pos; }
 	void setPosition(u64 pos) { m_pos = pos; }
 	const char* readString();
+	bool hasOverflow() const { return m_has_overflow; }
 
 	template <typename T>
 	T getAs() const {
@@ -110,9 +111,10 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 
 	using IInputStream::read;
 private:
+	bool m_has_overflow = false;
 	const u8* m_data;
 	u64 m_size;
-	u64 m_pos;
+	u64 m_pos = 0;
 };
 
 template <typename T> void IInputStream::readArray(Array<T>* array) {

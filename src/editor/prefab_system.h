@@ -11,7 +11,7 @@ namespace Lumix
 
 using PrefabHandle = FilePathHash;
 template <typename T> struct UniquePtr;
-enum class WorldEditorHeaderVersion : u32;
+enum class WorldVersion : u32;
 
 struct LUMIX_EDITOR_API PrefabSystem
 {
@@ -23,7 +23,7 @@ struct LUMIX_EDITOR_API PrefabSystem
 	virtual void setWorld(struct World*) = 0;
 	virtual void update() = 0;
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
-	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map, WorldEditorHeaderVersion version) = 0;
+	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map, WorldVersion version) = 0;
 	virtual EntityPtr instantiatePrefab(struct PrefabResource& prefab, const struct DVec3& pos, const struct Quat& rot, const struct Vec3& scale) = 0;
 	virtual void instantiatePrefabs(struct PrefabResource& prefab, Span<struct Transform> transforms) = 0;
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;

@@ -2007,12 +2007,6 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
-		const WorldEditorHeader header = { WorldEditorHeader::MAGIC, WorldEditorHeaderVersion::LATEST };
-		blob.write(header);
-		StableHash hash;
-		blob.write(hash);
-		const u64 hashed_offset = blob.size();
-
 		m_world->serialize(blob, is_game_mode_save ? WorldSerializeFlags::HAS_PARTITIONS : WorldSerializeFlags::NONE);
 		m_prefab_system->serialize(blob);
 		m_entity_folders->serialize(blob);
@@ -2026,8 +2020,6 @@ public:
 			blob.write(pos);
 			blob.write(Quat::IDENTITY);
 		}
-		hash = StableHash((const u8*)blob.data() + hashed_offset, i32(blob.size() - hashed_offset));
-		memcpy(blob.getMutableData() + sizeof(WorldEditorHeader), &hash, sizeof(hash));
 		file.write(blob.data(), blob.size());
 	}
 
@@ -2545,11 +2537,6 @@ public:
 		m_is_loading = true;
 
 		const u64 file_size = blob.size();
-		if (file_size < sizeof(WorldEditorHeader)) {
-			logError("Corrupted file.");
-			m_is_loading = false;
-			return false;
-		}
 		if (file_size > 0xffFFffFF) {
 			logError("File too big.");
 			m_is_loading = false;
@@ -2558,39 +2545,18 @@ public:
 
 		os::Timer timer;
 		logInfo("Parsing world...");
-		WorldEditorHeader header;
-		blob.read(header);
-		if (header.version > WorldEditorHeaderVersion::LATEST) {
-			logError("`", name, "`: version not supported");
-			m_is_loading = false;
-			return false;
-		}
-
-		if (header.version > WorldEditorHeaderVersion::HASH64) {
-			const StableHash hash = blob.read<StableHash>();
-			const StableHash computed_hash((const u8*)blob.getData() + blob.getPosition(), u32(blob.remaining()));
-
-			if (header.magic != WorldEditorHeader::MAGIC || computed_hash != hash) {
-				logError("`", name, "`: file corrupted");
-				m_is_loading = false;
-				return false;
-			}
-		}
-		else {
-			u64 tmp;
-			blob.read(tmp);
-		}
 
 		EntityMap entity_map(m_allocator);
 		m_entity_folders->ignoreNewEntities(true);
-		if (m_world->deserialize(blob, entity_map)) {
+		WorldVersion editor_header_version;
+		if (m_world->deserialize(blob, entity_map, editor_header_version)) {
 			m_entity_folders->ignoreNewEntities(false);
-			m_prefab_system->deserialize(blob, entity_map, header.version);
+			m_prefab_system->deserialize(blob, entity_map, editor_header_version);
 
-			if (header.version > WorldEditorHeaderVersion::ENTITY_FOLDERS) {
+			if (editor_header_version > WorldVersion::ENTITY_FOLDERS) {
 				Array<EntityFolders::Folder>& folders = m_entity_folders->getFolders();
 				const u32 offset = folders.size();
-				m_entity_folders->deserialize(blob, entity_map, additive, header.version);
+				m_entity_folders->deserialize(blob, entity_map, additive, editor_header_version);
 
 				if (!is_game_mode_load) {
 					const World::PartitionHandle partition = m_world->getActivePartition();
@@ -2600,7 +2566,7 @@ public:
 				}
 			}
 
-			if (header.version > WorldEditorHeaderVersion::CAMERA) {
+			if (editor_header_version > WorldVersion::EDITOR_CAMERA) {
 				DVec3 pos;
 				Quat rot;
 				blob.read(pos);

@@ -106,6 +106,7 @@ struct AnimationModuleImpl final : AnimationModule
 
 	int getVersion() const override { return (int)AnimationModuleVersion::LATEST; }
 
+	const char* getName() const override { return "animation"; }
 
 	~AnimationModuleImpl() {
 		for (PropertyAnimator& anim : m_property_animators) {

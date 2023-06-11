@@ -57,7 +57,7 @@ using DestroyComponent = void (*)(IModule*, EntityRef);
 
 struct RegisteredComponent {
 	RuntimeHash name_hash;
-	RuntimeHash system_hash;
+	RuntimeHash module_hash;
 	struct ComponentBase* cmp = nullptr;
 };
 

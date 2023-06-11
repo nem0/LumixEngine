@@ -45,7 +45,7 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	void selectFolder(FolderHandle folder);
 	FolderHandle getSelectedFolder() const { return m_selected_folder; }
 	void serialize(OutputMemoryStream& blob);
-	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map, bool is_additive, WorldEditorHeaderVersion version);
+	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map, bool is_additive, WorldVersion version);
 	void cloneTo(EntityFolders& dst, World::PartitionHandle partition, HashMap<EntityPtr, EntityPtr>& entity_map);
 	void destroyPartitionFolders(World::PartitionHandle partition);
 	Array<Folder>& getFolders() { return m_folders; }

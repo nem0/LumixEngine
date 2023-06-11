@@ -310,14 +310,12 @@ void OutputMemoryStream::resize(u64 size)
 InputMemoryStream::InputMemoryStream(const void* data, u64 size)
 	: m_data((const u8*)data)
 	, m_size(size)
-	, m_pos(0)
 {}
 
 
 InputMemoryStream::InputMemoryStream(const OutputMemoryStream& blob)
 	: m_data((const u8*)blob.data())
 	, m_size(blob.size())
-	, m_pos(0)
 {}
 
 
@@ -325,6 +323,7 @@ void InputMemoryStream::set(const void* data, u64 size) {
 	m_data = (u8*)data;
 	m_size = size;
 	m_pos = 0;
+	m_has_overflow = false;
 }
 
 
@@ -336,6 +335,7 @@ const void* InputMemoryStream::skip(u64 size)
 	{
 		ASSERT(false);
 		m_pos = m_size;
+		m_has_overflow = true;
 	}
 
 	return (const void*)pos;
@@ -348,6 +348,7 @@ bool InputMemoryStream::read(void* data, u64 size)
 	{
 		for (i32 i = 0; i < size; ++i)
 			((unsigned char*)data)[i] = 0;
+		m_has_overflow = true;
 		return false;
 	}
 	if (size)
@@ -373,6 +374,7 @@ const char* InputMemoryStream::readString()
 	// TODO this should be runtime error, not assert
 	if (m_pos >= m_size) {
 		ASSERT(false);
+		m_has_overflow = true;
 		return nullptr;
 	}
 	++m_pos;

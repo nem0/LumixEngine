@@ -208,7 +208,8 @@ public:
 	{
 		ASSERT(prefab.isReady());
 		InputMemoryStream blob(prefab.data);
-		if (!world.deserialize(blob, entity_map)) {
+		WorldVersion editor_header_version;
+		if (!world.deserialize(blob, entity_map, editor_header_version)) {
 			logError("Failed to instantiate prefab ", prefab.getPath());
 			return false;
 		}

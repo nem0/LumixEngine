@@ -123,7 +123,7 @@ IModule* World::getModule(const char* name) const
 {
 	for (auto& module : m_modules)
 	{
-		if (equalStrings(module->getSystem().getName(), name))
+		if (equalStrings(module->getName(), name))
 		{
 			return module.get();
 		}
@@ -140,15 +140,18 @@ Array<UniquePtr<IModule>>& World::getModules()
 
 void World::addModule(UniquePtr<IModule>&& module)
 {
-	const RuntimeHash hash(module->getSystem().getName());
+	const RuntimeHash hash(module->getName());
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.system_hash == hash) {
+		if (cmp.module_hash == hash) {
 			m_component_type_map[cmp.cmp->component_type.index].module = module.get();
 			m_component_type_map[cmp.cmp->component_type.index].create = cmp.cmp->creator;
 			m_component_type_map[cmp.cmp->component_type.index].destroy = cmp.cmp->destroyer;
 		}
 	}
 
+	const char* name = module->getName();
+	const i32 idx = m_modules.find([name](const UniquePtr<IModule>& m){ return equalStrings(m->getName(), name); });
+	ASSERT(idx == -1);
 	m_modules.push(module.move());
 }
 
@@ -691,7 +694,7 @@ static void serializeModuleList(World& world, OutputMemoryStream& serializer) {
 	const Array<UniquePtr<IModule>>& modules = world.getModules();
 	serializer.write((i32)modules.size());
 	for (UniquePtr<IModule>& module : modules) {
-		serializer.writeString(module->getSystem().getName());
+		serializer.writeString(module->getName());
 	}
 }
 
@@ -709,8 +712,22 @@ static bool hasSerializedModules(World& world, InputMemoryStream& serializer) {
 }
 
 #pragma pack(1)
-// TODO "merge" with WorldEditorHeader, handle prefabs (they have no WorldEditorHeader)
-struct WorldHeader {
+struct WorldEditorHeaderLegacy {
+	enum class Version : u32 {
+		CAMERA,
+		ENTITY_FOLDERS,
+		HASH64,
+		NEW_ENTITY_FOLDERS,
+
+		LATEST
+	};
+
+	static const u32 MAGIC = 'LUNV';
+	u32 magic;
+	Version version;
+};
+
+struct WorldHeaderLegacy {
 	enum class Version : u32 {
 		VEC3_SCALE,
 		FLAGS,
@@ -718,8 +735,15 @@ struct WorldHeader {
 	};
 	static const u32 MAGIC = '_LEN';
 
+	u32 magic;
+	Version version;
+};
+
+struct WorldHeader {
+	static const u32 MAGIC = 'LWRL';
+
 	u32 magic = MAGIC;
-	Version version = Version::LAST;
+	WorldVersion version = WorldVersion::LATEST;
 };
 #pragma pack()
 
@@ -762,8 +786,8 @@ void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags)
 	}
 
 	serializer.write((i32)m_modules.size());
-	for (UniquePtr<IModule>& module : m_modules) {
-		serializer.writeString(module->getSystem().getName());
+	for (const UniquePtr<IModule>& module : m_modules) {
+		serializer.writeString(module->getName());
 		serializer.write(module->getVersion());
 		module->serialize(serializer);
 	}
@@ -775,26 +799,44 @@ void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags)
 	}
 }
 
-bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
+bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, WorldVersion& version)
 {
-	if (serializer.remaining() < sizeof(WorldHeader)) {
-		logError("Wrong or corrupted file");
-		return false;
-	}
 	WorldHeader header;
+	WorldHeaderLegacy::Version legacy_version = WorldHeaderLegacy::Version::LAST;
 	serializer.read(header);
-	if (header.magic != WorldHeader::MAGIC) {
+	if (header.magic == WorldEditorHeaderLegacy::MAGIC || header.magic == 0xffFFffFF) {
+		header.magic = WorldHeader::MAGIC;
+		// WorldEditorHeaderLegacy::Version matches first values of WorldHeaderVersion, so we can just use header.version as is
+		static_assert(sizeof(WorldEditorHeaderLegacy) == sizeof(WorldHeader));
+		serializer.read<u64>(); // hash
+		WorldHeaderLegacy legacy_header;
+		serializer.read(legacy_header);
+		if (serializer.hasOverflow() || legacy_header.magic != WorldHeaderLegacy::MAGIC) {
+			logError("Wrong or corrupted file");
+			return false;
+		}
+		legacy_version = legacy_header.version;
+	}
+	else if (header.magic == WorldHeaderLegacy::MAGIC) {
+		memcpy(&legacy_version, &header.version, sizeof(header.version));
+		header.magic = WorldHeader::MAGIC;
+		header.version = WorldVersion::MERGED_HEADERS;
+	}
+
+	version = header.version;
+
+	if (serializer.hasOverflow() || header.magic != WorldHeader::MAGIC) {
 		logError("Wrong or corrupted file");
 		return false;
 	}
-	if (header.version > WorldHeader::Version::LAST) {
+	if (header.version > WorldVersion::LATEST) {
 		logError("Unsupported version of world");
 		return false;
 	}
 	if (!hasSerializedModules(*this, serializer)) return false;
 
 	bool deserialize_partitions = false;
-	if (header.version > WorldHeader::Version::FLAGS) {
+	if (legacy_version > WorldHeaderLegacy::Version::FLAGS) {
 		WorldSerializeFlags flags;
 		serializer.read(flags);
 		deserialize_partitions = (u32)flags & (u32)WorldSerializeFlags::HAS_PARTITIONS;
@@ -808,16 +850,17 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 		EntityRef orig = (EntityRef)e;
 		const EntityRef new_e = createEntity({0, 0, 0}, {0, 0, 0, 1});
 		entity_map.set(orig, new_e);
-		serializer.read(m_transforms[new_e.index].pos);
-		serializer.read(m_transforms[new_e.index].rot);
-		if (header.version > WorldHeader::Version::VEC3_SCALE) {
-			serializer.read(m_transforms[new_e.index].scale);
+		Transform& tr = m_transforms[new_e.index];
+		serializer.read(tr.pos);
+		serializer.read(tr.rot);
+		if (legacy_version > WorldHeaderLegacy::Version::VEC3_SCALE) {
+			serializer.read(tr.scale);
 		}
 		else {
-			serializer.read(m_transforms[new_e.index].scale.x);
+			serializer.read(tr.scale.x);
 			float padding;
 			serializer.read(padding);
-			m_transforms[new_e.index].scale.y = m_transforms[new_e.index].scale.z = m_transforms[new_e.index].scale.x;
+			tr.scale.y = tr.scale.z = tr.scale.x;
 		}
 		if (deserialize_partitions) serializer.read(m_entities[new_e.index].partition);
 	}
@@ -844,7 +887,7 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 			serializer.read(h.next_sibling);
 			serializer.read(h.local_transform.pos);
 			serializer.read(h.local_transform.rot);
-			if (header.version > WorldHeader::Version::VEC3_SCALE) {
+			if (legacy_version > WorldHeaderLegacy::Version::VEC3_SCALE) {
 				serializer.read(h.local_transform.scale);
 			}
 			else {
@@ -877,6 +920,10 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 		m_partitions.resize(partitions_count);
 		serializer.read(m_partitions.begin(), m_partitions.byte_size());
 		serializer.read(m_active_partition);
+	}
+	if (serializer.hasOverflow()) {
+		logError("End of file encountered while trying to read data");
+		return false;
 	}
 	return true;
 }

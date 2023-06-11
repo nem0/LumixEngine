@@ -50,6 +50,7 @@ struct CoreModuleImpl : CoreModule {
 		}
 	}
 
+	const char* getName() const override { return "core"; }
 	ISystem& getSystem() const override { return m_system; }
 	void update(float time_delta) override {}
 	World& getWorld() override { return m_world; }

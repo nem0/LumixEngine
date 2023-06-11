@@ -74,6 +74,7 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 	i32 getVersion() const override { return (i32)Version::LATEST; }
+	const char* getName() const override { return "audio"; }
 
 	~AudioModuleImpl() {
 		for (const AmbientSound& snd : m_ambient_sounds) {

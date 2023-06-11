@@ -116,24 +116,8 @@ struct Runner final
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
-		WorldEditorHeader header;
-		blob.read(header);
-		if (header.version <= WorldEditorHeaderVersion::HASH64) {
-			u32 dummy;
-			blob.read(dummy);
-			blob.read(dummy);
-		}
-		else {
-			StableHash hash;
-			blob.read(hash);
-			const StableHash hash2((const u8*)blob.getData() + blob.getPosition(), u32(blob.size() - blob.getPosition()));
-			if (hash != hash2) {
-				logError("Corrupted file '", path, "'");
-				return false;
-			}
-		}
-
-		if (!m_world->deserialize(blob, entity_map)) {
+		WorldVersion editor_version;
+		if (!m_world->deserialize(blob, entity_map, editor_version)) {
 			logError("Failed to deserialize ", path);
 			return false;
 		}

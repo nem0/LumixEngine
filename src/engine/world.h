@@ -13,11 +13,12 @@ struct ComponentUID;
 struct IModule;
 struct ChildrenRange;
 
-enum class WorldEditorHeaderVersion : u32 {
-	CAMERA,
+enum class WorldVersion : u32 {
+	EDITOR_CAMERA,
 	ENTITY_FOLDERS,
 	HASH64,
 	NEW_ENTITY_FOLDERS,
+	MERGED_HEADERS,
 
 	LATEST
 };
@@ -27,14 +28,6 @@ enum class WorldSerializeFlags : u32 {
 	
 	NONE = 0
 };
-
-#pragma pack(1)
-	struct WorldEditorHeader {
-		static const u32 MAGIC = 'LUNV';
-		u32 magic;
-		WorldEditorHeaderVersion version;
-	};
-#pragma pack()
 
 // map one EntityPtr to another, used e.g. during additive loading or when instancing a prefab
 struct LUMIX_ENGINE_API EntityMap final {
@@ -130,7 +123,7 @@ struct LUMIX_ENGINE_API World {
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
 	void serialize(struct OutputMemoryStream& serializer, WorldSerializeFlags flags);
-	bool deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map);
+	[[nodiscard]] bool deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map, WorldVersion& version);
 
 	IModule* getModule(ComponentType type) const;
 	IModule* getModule(const char* name) const;

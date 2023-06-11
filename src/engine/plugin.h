@@ -43,6 +43,7 @@ struct LUMIX_ENGINE_API IModule
 	virtual void deserialize(struct InputMemoryStream& serialize, const struct EntityMap& entity_map, i32 version) = 0;
 	virtual void beforeReload(OutputMemoryStream& serializer) {}
 	virtual void afterReload(InputMemoryStream& serializer) {}
+	virtual const char* getName() const = 0;
 	virtual ISystem& getSystem() const = 0;
 	virtual void update(float time_delta) = 0;
 	virtual void lateUpdate(float time_delta) {}

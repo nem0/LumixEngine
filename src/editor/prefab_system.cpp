@@ -528,7 +528,7 @@ public:
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldEditorHeaderVersion version) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, WorldVersion version) override
 	{
 		u32 count;
 		serializer.read(count);
@@ -551,7 +551,7 @@ public:
 		for (u32 i = 0; i < count; ++i) {
 			const char* tmp = serializer.readString();
 			StableHash content_hash;
-			if (version <= WorldEditorHeaderVersion::HASH64) {
+			if (version <= WorldVersion::HASH64) {
 				u32 dummy;
 				serializer.read(dummy);
 			}
