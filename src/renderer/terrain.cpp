@@ -380,7 +380,7 @@ void Terrain::serialize(OutputMemoryStream& serializer)
 	}
 }
 
-Vec3 Terrain::getNormal(float x, float z)
+Vec3 Terrain::getNormal(float x, float z) const
 {
 	int int_x = (int)(x / m_scale.x);
 	int int_z = (int)(z / m_scale.x);

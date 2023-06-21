@@ -74,7 +74,7 @@ struct Terrain {
 	Texture* getHeightmap() const { return m_heightmap; }
 	i64 getLayerMask() const { return m_layer_mask; }
 	EntityRef getEntity() const { return m_entity; }
-	Vec3 getNormal(float x, float z);
+	Vec3 getNormal(float x, float z) const;
 	float getHeight(float x, float z) const;
 	float getXZScale() const { return m_scale.x; }
 	float getYScale() const { return m_scale.y; }
