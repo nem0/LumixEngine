@@ -23,29 +23,6 @@ struct RenderModule;
 struct Texture;
 struct Renderer;
 
-struct DistanceField {
-	DistanceField(IAllocator& allocator);
-	void resize(u32 w, u32 h);
-	void clear();
-
-	struct Header {
-		static constexpr u32 MAGIC = '_LDF';
-		u32 magic = MAGIC;
-		u32 version = 0;
-		u32 width;
-		u32 height;
-	};
-
-	bool load(FileSystem& fs, IAllocator& allocator);
-	bool load(InputMemoryStream& blob);
-	void save(FileSystem& fs, IAllocator& allocator);
-
-	u32 width;
-	u32 height;
-	Array<float> data;
-	String name;
-};
-
 struct TerrainEditor final : StudioApp::MousePlugin {
 	enum class Mode {
 		LAYER,
@@ -67,17 +44,10 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 	~TerrainEditor();
 
 	void onGUI(ComponentUID cmp, WorldEditor& editor);
-	DistanceField* findDistanceField(const char* name) const;
 	const char* getName() const override { return "terrain_editor"; }
-	void addSpline(const struct Terrain& terrain, DistanceField& df, const struct Spline& spline, EntityRef spline_entity) const;
 
 private:
-	void exportDistanceField(const DistanceField& df) const;
-	static int placeInstances(lua_State* L);
-	static int placePrefabs(lua_State* L);
-	void registerLuaAPI();
 	struct Terrain* getTerrain() const;
-	void distanceFieldsUI(ComponentUID cmp);
 	void fillGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	void clearGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	void exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
@@ -136,7 +106,6 @@ private:
 	Vec2 m_rotate_z_spread;
 	Array<gpu::TextureHandle> m_layer_views;
 	Path m_albedo_composite_path;
-	Array<DistanceField> m_distance_fields;
 
 	struct {
 		char albedo[LUMIX_MAX_PATH] = "";
