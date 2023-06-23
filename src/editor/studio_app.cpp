@@ -1961,17 +1961,6 @@ struct StudioAppImpl final : StudioApp
 				ImGui::PopItemWidth();
 			}
 			ImGui::EndChild();
-
-			if (ImGui::BeginDragDropTarget()) {
-				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-					EntityRef dropped_entity = *(EntityRef*)payload->Data;
-					m_editor->beginCommandGroup("move_entity_to_folder_group");
-					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
-					m_editor->moveEntityToFolder(dropped_entity, 0);
-					m_editor->endCommandGroup();
-				}
-				ImGui::EndDragDropTarget();
-			}
 		}
 		ImGui::End();
 	}
