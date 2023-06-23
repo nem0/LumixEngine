@@ -805,6 +805,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 					materials.push(mesh.material);
 				}
 			}
+			if (world.hasComponent(e, TERRAIN_TYPE)) {
+				materials.push(module.getTerrainMaterial(e));
+			}
 			if (world.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
 				materials.push(module.getProceduralGeometry(e).material);
 			}

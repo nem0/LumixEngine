@@ -1647,7 +1647,7 @@ struct PipelineImpl final : Pipeline
 				const Vec3 scale = terrain->getScale();
 				const Vec2 hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				const gpu::ProgramHandle program = shader->getProgram(render_state, decl, define_mask | terrain->m_material->getDefineMask());
+				const gpu::ProgramHandle program = shader->getProgram(render_state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask());
 				const Material* material = terrain->m_material;
 				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
