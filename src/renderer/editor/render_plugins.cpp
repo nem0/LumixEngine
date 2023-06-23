@@ -4535,8 +4535,9 @@ struct RenderInterfaceImpl final : RenderInterface
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
 	{
 		Path path(path_cstr);
+		FileSystem& fs = engine.getFileSystem();
 		os::OutputFile file;
-		if (!file.open(path_cstr)) return false;
+		if (!fs.open(path.c_str(), file)) return false;
 
 		if (!Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
 			file.close();
