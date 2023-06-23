@@ -1508,7 +1508,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void deleteSelectedNodes() {
 		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
 			Node* n = m_resource->m_nodes[i];
-			if (n->m_selected) {
+			if (n->m_selected && i > 2) {
 				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
 					return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 				});
