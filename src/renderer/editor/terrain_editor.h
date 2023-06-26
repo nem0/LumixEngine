@@ -45,9 +45,12 @@ struct TerrainEditor final : StudioApp::MousePlugin {
 
 	void onGUI(ComponentUID cmp, WorldEditor& editor);
 	const char* getName() const override { return "terrain_editor"; }
+	
+	void updateSplatmap(OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h, bool dirty_grass);
+	void updateHeightmap(OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h);
+	struct Terrain* getTerrain() const;
 
 private:
-	struct Terrain* getTerrain() const;
 	void fillGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	void clearGrass(u32 idx, EntityRef terrain, WorldEditor& editor);
 	void exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor);

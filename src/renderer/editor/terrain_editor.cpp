@@ -1989,6 +1989,117 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 	file.close();
 }
 
+static bool readData(Texture& texture, u32 x, u32 y, u32 w, u32 h, OutputMemoryStream& blob) {
+	u8* pixels = texture.getData();
+	if (!pixels) return false;
+	if (x + w > texture.width) return false;
+	if (y + h > texture.height) return false;
+
+	const u32 bpp = gpu::getBytesPerPixel(texture.format);
+	blob.resize(bpp * w * h);
+
+	u8* dst = blob.getMutableData();
+	for (u32 j = y; j < y + h; ++j) {
+		for (u32 i = x; i < x + w; ++i) {
+			const i32 index = bpp * (i + j * texture.width);
+			for (u32 k = 0; k < bpp; ++k) {
+				dst[index + k] = pixels[bpp * (i - x + (j - y) * w) + k];
+			}
+		}
+	}
+	return true;
+}
+
+struct TextureEditCommand final : IEditorCommand {
+	TextureEditCommand(WorldEditor& editor)
+		: m_editor(editor)
+		, m_new_data(editor.getAllocator())
+		, m_old_data(editor.getAllocator())
+	{}
+
+	bool set(OutputMemoryStream& data) {
+		World* world = m_editor.getWorld();
+		RenderModule* module = (RenderModule*)world->getModule(TERRAIN_TYPE);
+		Terrain* terrain = module->getTerrain(m_entity);
+		Texture* texture = m_is_splatmap ? terrain->getSplatmap() : terrain->getHeightmap();
+		if (!texture || !texture->isReady()) return false;
+
+		u8* pixels = texture->getData();
+		if (!pixels) return false;
+
+		const u32 bpp = gpu::getBytesPerPixel(texture->format);
+		ASSERT(data.size() >= m_w * m_h * bpp);
+
+		for (u32 j = m_y; j < m_y + m_h; ++j) {
+			for (u32 i = m_x; i < m_x + m_w; ++i) {
+				const i32 index = bpp * (i + j * texture->width);
+				for (u32 k = 0; k < bpp; ++k) {
+					pixels[index + k] = data[bpp * (i - m_x + (j - m_y) * m_w) + k];
+				}
+			}
+		}
+
+		texture->onDataUpdated(m_x, m_y, m_w, m_h);
+		if (m_dirty_grass) terrain->setGrassDirty();
+		return true;
+	}
+
+	bool execute() override { return set(m_new_data); }
+
+	void undo() override {
+		bool res = set(m_old_data);
+		ASSERT(res);
+	}
+
+	const char* getType() override { return "terrain_editor_tex_edit"; }
+	bool merge(IEditorCommand& command) override { return false; }
+
+	WorldEditor& m_editor;
+	OutputMemoryStream m_new_data;
+	OutputMemoryStream m_old_data;
+	EntityRef m_entity;
+	u32 m_x, m_y, m_w, m_h;
+	bool m_dirty_grass;
+	bool m_is_splatmap;
+};
+
+
+void TerrainEditor::updateHeightmap(OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h) {
+	Terrain* terrain = getTerrain();
+	Texture* texture = terrain->getHeightmap();
+	WorldEditor& world_editor = m_app.getWorldEditor();
+	UniquePtr<TextureEditCommand> cmd = UniquePtr<TextureEditCommand>::create(world_editor.getAllocator(), world_editor);
+	cmd->m_is_splatmap = false;
+	cmd->m_x = x;
+	cmd->m_y = y;
+	cmd->m_w = w;
+	cmd->m_h = h;
+	cmd->m_entity = terrain->m_entity;
+	cmd->m_dirty_grass = false;
+	if (!readData(*texture, x, y, w, h, cmd->m_old_data)) return;
+	cmd->m_new_data = static_cast<OutputMemoryStream&&>(new_data);
+
+	world_editor.executeCommand(cmd.move());	
+}
+
+void TerrainEditor::updateSplatmap(OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h, bool dirty_grass) {
+	Terrain* terrain = getTerrain();
+	Texture* texture = terrain->getSplatmap();
+	WorldEditor& world_editor = m_app.getWorldEditor();
+	UniquePtr<TextureEditCommand> cmd = UniquePtr<TextureEditCommand>::create(world_editor.getAllocator(), world_editor);
+	cmd->m_is_splatmap = true;
+	cmd->m_x = x;
+	cmd->m_y = y;
+	cmd->m_w = w;
+	cmd->m_h = h;
+	cmd->m_entity = terrain->m_entity;
+	cmd->m_dirty_grass = dirty_grass;
+	if (!readData(*texture, x, y, w, h, cmd->m_old_data)) return;
+	cmd->m_new_data = static_cast<OutputMemoryStream&&>(new_data);
+
+	world_editor.executeCommand(cmd.move());	
+}
+
 void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 	ASSERT(cmp.type == TERRAIN_TYPE);
 	
