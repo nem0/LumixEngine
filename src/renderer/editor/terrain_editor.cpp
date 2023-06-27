@@ -2064,8 +2064,7 @@ struct TextureEditCommand final : IEditorCommand {
 };
 
 
-void TerrainEditor::updateHeightmap(OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h) {
-	Terrain* terrain = getTerrain();
+void TerrainEditor::updateHeightmap(Terrain* terrain, OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h) {
 	Texture* texture = terrain->getHeightmap();
 	WorldEditor& world_editor = m_app.getWorldEditor();
 	UniquePtr<TextureEditCommand> cmd = UniquePtr<TextureEditCommand>::create(world_editor.getAllocator(), world_editor);
@@ -2082,8 +2081,7 @@ void TerrainEditor::updateHeightmap(OutputMemoryStream&& new_data, u32 x, u32 y,
 	world_editor.executeCommand(cmd.move());	
 }
 
-void TerrainEditor::updateSplatmap(OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h, bool dirty_grass) {
-	Terrain* terrain = getTerrain();
+void TerrainEditor::updateSplatmap(Terrain* terrain, OutputMemoryStream&& new_data, u32 x, u32 y, u32 w, u32 h, bool dirty_grass) {
 	Texture* texture = terrain->getSplatmap();
 	WorldEditor& world_editor = m_app.getWorldEditor();
 	UniquePtr<TextureEditCommand> cmd = UniquePtr<TextureEditCommand>::create(world_editor.getAllocator(), world_editor);

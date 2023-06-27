@@ -1094,6 +1094,20 @@ void Settings::onGUI()
 		if (ImGui::BeginTabBar("tabs")) {
 
 			if (ImGui::BeginTabItem("General")) {
+				if (ImGui::Button(ICON_FA_FOLDER "##open global")) {
+					StaticString<LUMIX_MAX_PATH> path(m_app.getEngine().getFileSystem().getBasePath());
+					os::openExplorer(path);
+				}
+				ImGui::SameLine();
+				ImGui::Text("Global settings path: %s", SETTINGS_PATH);
+
+				if (ImGui::Button(ICON_FA_FOLDER "##open_local")) {
+					StaticString<LUMIX_MAX_PATH> p(Path::getDir(m_app_data_path));
+					os::openExplorer(p);
+				}
+				ImGui::SameLine();
+				ImGui::Text("Local settings path: %s", m_app_data_path);
+				
 				if (m_force_no_crash_report)
 				{
 					ImGui::Text("Crash reporting disabled from command line");
