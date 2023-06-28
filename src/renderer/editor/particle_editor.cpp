@@ -1367,6 +1367,7 @@ struct ParticleEditorResource {
 
 struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	using Node = ParticleEditorResource::Node;
+	
 	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_app(app)
@@ -1415,32 +1416,103 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_app.removeAction(&m_apply_action);
 	}
 
-	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
-		static const struct {
-			char key;
-			Node::Type type;
-		} types[] = {
-			{ 'A', Node::Type::ADD },
-			{ 'D', Node::Type::DIV },
-			{ 'G', Node::Type::GRADIENT },
-			{ 'M', Node::Type::MUL },
-			{ 'R', Node::Type::RANDOM },
-			{ '1', Node::Type::NUMBER},
-			{ '3', Node::Type::VEC3 },
-			{ '4', Node::Type::VEC4 }
+	struct ICategoryVisitor {
+		struct INodeCreator {
+			virtual ParticleEditorResource::Node* create(ParticleEditorResource&) const = 0;
 		};
-		Node* n = nullptr;
-		for (const auto& t : types) {
-			if (os::isKeyDown((os::Keycode)t.key)) {
-				n = addNode(t.type);
-				break;
-			}
+
+		virtual bool beginCategory(const char* category) { return true; }
+		virtual void endCategory() {}
+		virtual ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut = 0) = 0;
+
+		ICategoryVisitor& visitType(ParticleEditorResource::Node::Type type, const char* label, char shortcut = 0) {
+			struct : INodeCreator {
+				ParticleEditorResource::Node* create(ParticleEditorResource& res) const override {
+					return res.addNode(type);
+				}
+				ParticleEditorResource::Node::Type type;
+			} creator;
+			creator.type = type;
+			return visitType(label, creator, shortcut);
 		}
-		if (n) {
-			n->m_pos = pos;
+	};
+
+	void visitCategories(ICategoryVisitor& visitor) {
+		if (visitor.beginCategory("Constants")) {
+			for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
+				struct : ICategoryVisitor::INodeCreator {
+					ParticleEditorResource::Node* create(ParticleEditorResource& res) const override {
+						auto* n = (ParticleEditorResource::ConstNode*)res.addNode(ParticleEditorResource::Node::CONST);
+						n->idx = i;
+						return n;
+					}
+					u8 i;
+				} creator;
+				creator.i = i;
+				visitor.visitType(m_resource->m_consts[i].name, creator);
+			}
+			visitor.endCategory();
+		}
+
+		if (visitor.beginCategory("Input")) {
+			for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
+				struct : ICategoryVisitor::INodeCreator {
+					ParticleEditorResource::Node* create(ParticleEditorResource& res) const override {
+						auto* n = (ParticleEditorResource::ConstNode*)res.addNode(ParticleEditorResource::Node::INPUT);
+						n->idx = i;
+						return n;
+					}
+					u8 i;
+				} creator;
+				creator.i = i;
+				visitor.visitType(m_resource->m_streams[i].name, creator);
+			}
+			visitor.endCategory();
+		}
+
+		if (visitor.beginCategory("Math")) {
+			visitor.visitType(ParticleEditorResource::Node::ADD, "Add", 'A')
+			.visitType(ParticleEditorResource::Node::COLOR_MIX, "Color mix")
+			.visitType(ParticleEditorResource::Node::COS, "Cos")
+			.visitType(ParticleEditorResource::Node::DIV, "Divide", 'D')
+			.visitType(ParticleEditorResource::Node::MUL, "Multiply", 'M')
+			.visitType(ParticleEditorResource::Node::MADD, "Multiply add")
+			.visitType(ParticleEditorResource::Node::SIN, "Sin")
+			.endCategory();
+		}
+
+		visitor
+			.visitType(ParticleEditorResource::Node::CMP, "Compare")
+			.visitType(ParticleEditorResource::Node::GRADIENT, "Gradient")
+			.visitType(ParticleEditorResource::Node::GRADIENT_COLOR, "Gradient color")
+			.visitType(ParticleEditorResource::Node::NUMBER, "Number")
+			.visitType(ParticleEditorResource::Node::RANDOM, "Random")
+			.visitType(ParticleEditorResource::Node::SWITCH, "Switch")
+			.visitType(ParticleEditorResource::Node::VEC3, "Vec3", '3')
+			.visitType(ParticleEditorResource::Node::VEC4, "Vec4", '4');
+	}
+
+	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
+		struct : ICategoryVisitor {
+			ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut = 0) override {
+				if (shortcut && os::isKeyDown((os::Keycode)shortcut)) {
+					ASSERT(!n);
+					n = creator.create(*editor->m_resource);
+					ASSERT(n);
+				}
+				return *this;
+			}
+			
+			ParticleEditorImpl* editor;
+			ParticleEditorResource::Node* n = nullptr;
+		} visitor;
+		visitor.editor = this;
+		visitCategories(visitor);
+		if (visitor.n) {
+			visitor.n->m_pos = pos;
 			if (hovered_link >= 0) splitLink(m_resource->m_nodes.back(), m_resource->m_links, hovered_link);
 			pushUndo(NO_MERGE_UNDO);
-		}	
+		}
 	}
 	
 	void onLinkDoubleClicked(ParticleEditorResource::Link& link, ImVec2 pos) override {
@@ -1453,43 +1525,52 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		n->m_pos = pos;
 		pushUndo(0xffFF);
 	}
-	
+
 	void onContextMenu(ImVec2 pos) override {
 		ParticleEditorResource::Node* n = nullptr;
-		if (ImGui::Selectable("Add")) n = addNode(ParticleEditorResource::Node::ADD);
-		if (ImGui::Selectable("Color mix")) n = addNode(ParticleEditorResource::Node::COLOR_MIX);
-		if (ImGui::Selectable("Compare")) n = addNode(ParticleEditorResource::Node::CMP);
-		if (ImGui::BeginMenu("Constant")) {
-			for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
-				if (ImGui::Selectable(m_resource->m_consts[i].name)) {
-					n = addNode(ParticleEditorResource::Node::CONST);
-					((ParticleEditorResource::ConstNode*)n)->idx = i;
+		ImGui::SetNextItemWidth(150);
+		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+		ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
+		if (m_filter[0]) {
+			struct : ICategoryVisitor {
+				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
+					if (n) return *this;
+					if (stristr(label, editor->m_filter)) {
+						if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label)) {
+							n = creator.create(*editor->m_resource);
+							ImGui::CloseCurrentPopup();
+						}
+					}
+					return *this;
 				}
-			}
-			ImGui::EndMenu();
+			
+				ParticleEditorImpl* editor;
+				ParticleEditorResource::Node* n = nullptr;
+			} visitor;
+			visitor.editor = this;
+			visitCategories(visitor);
+			n = visitor.n;
 		}
-		if (ImGui::Selectable("Cos")) n = addNode(ParticleEditorResource::Node::COS);
-		if (ImGui::Selectable("Gradient")) n = addNode(ParticleEditorResource::Node::GRADIENT);
-		if (ImGui::Selectable("Gradient color")) n = addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
-		if (ImGui::BeginMenu("Input")) {
-			for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
-				if (ImGui::Selectable(m_resource->m_streams[i].name)) {
-					n = addNode(ParticleEditorResource::Node::INPUT);
-					((ParticleEditorResource::InputNode*)n)->idx = i;
+		else {
+			struct : ICategoryVisitor {
+				void endCategory() override { ImGui::EndMenu(); }
+				bool beginCategory(const char* category) override { return ImGui::BeginMenu(category); }
+
+				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
+					if (ImGui::Selectable(label)) n = creator.create(*editor->m_resource);
+					return *this;
 				}
-			}
-			ImGui::EndMenu();
+			
+				ParticleEditorImpl* editor;
+				ParticleEditorResource::Node* n = nullptr;
+			} visitor;
+			visitor.editor = this;
+			visitCategories(visitor);
+			n = visitor.n;
 		}
-		if (ImGui::Selectable("Number")) n = addNode(ParticleEditorResource::Node::NUMBER);
-		if (ImGui::Selectable("Divide")) n = addNode(ParticleEditorResource::Node::DIV);
-		if (ImGui::Selectable("Multiply")) n = addNode(ParticleEditorResource::Node::MUL);
-		if (ImGui::Selectable("Multiply add")) n = addNode(ParticleEditorResource::Node::MADD);
-		if (ImGui::Selectable("Random")) n = addNode(ParticleEditorResource::Node::RANDOM);
-		if (ImGui::Selectable("Sin")) n = addNode(ParticleEditorResource::Node::SIN);
-		if (ImGui::Selectable("Switch")) n = addNode(ParticleEditorResource::Node::SWITCH);
-		if (ImGui::Selectable("Vec3")) n = addNode(ParticleEditorResource::Node::VEC3);
-		if (ImGui::Selectable("Vec4")) n = addNode(ParticleEditorResource::Node::VEC4);
+
 		if (n) {
+			m_filter[0] = '\0';
 			n->m_pos = pos;
 				
 			if (m_half_link_start) {
@@ -1946,8 +2027,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	bool m_has_focus = false;
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
-	ImGuiID m_half_link_start = 0;
 	RecentPaths m_recent_paths;
+	char m_filter[64] = "";
 };
 
 DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
