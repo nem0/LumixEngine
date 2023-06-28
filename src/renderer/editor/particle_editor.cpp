@@ -1832,7 +1832,14 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			if (ImGui::BeginMenu("File")) {
 				const ParticleEmitter* emitter = getSelectedEmitter();
 				if (ImGui::MenuItem("New")) newGraph();
-				if (ImGui::MenuItem("Open")) load();
+				if (ImGui::BeginMenu("Open")) {
+					char buf[LUMIX_MAX_PATH] = "";
+					FilePathHash dummy;
+					if (m_app.getAssetBrowser().resourceList(Span(buf), dummy, ParticleEmitterResource::TYPE, false, false)) {
+						open(buf);
+					}
+					ImGui::EndMenu();
+				}
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
@@ -1853,7 +1860,6 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 
 		FileSelector& fs = m_app.getFileSelector();
-		if (fs.gui("Open", &m_show_open, "par", false)) open(fs.getPath());
 		if (fs.gui("Save As", &m_show_save_as, "par", true)) saveAs(fs.getPath());
 
 		ImGui::Columns(2);
@@ -1894,10 +1900,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	void load(const char* path) {
-		if (!path || path[0] == '\0') {
-			load();
-			return;
-		}
+		ASSERT(path && path[0] != '\0');
+
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream blob(m_allocator);
 		if (!fs.getContentSync(Path(path), blob)) {
@@ -1915,12 +1919,6 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	void load() {
-		if (m_dirty) {
-			m_confirm_load = true;
-			m_confirm_load_path = "";
-			return;
-		}
-		m_show_open = true;
 	}
 
 	void save() {
@@ -2010,7 +2008,6 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	StudioApp& m_app;
 	Path m_path;
 	bool m_show_save_as = false;
-	bool m_show_open = false;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
 	bool m_confirm_load = false;
