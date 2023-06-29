@@ -67,14 +67,19 @@ struct ParticleEditorResource {
 			MADD,
 			CMP,
 			COLOR_MIX,
-			GRADIENT,
+			CURVE,
 			GRADIENT_COLOR,
 			VEC3,
 			DIV,
 			PIN,
 			COS,
 			SWITCH,
-			VEC4
+			VEC4,
+			SPLINE,
+			MESH,
+			MOD,
+			NOISE,
+			SUB
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -176,6 +181,61 @@ struct ParticleEditorResource {
 		}
 	};
 	
+	struct MeshNode : Node {
+		MeshNode(ParticleEditorResource& res) : Node(res) {}
+
+		Type getType() const override { return Type::MESH; }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+		
+		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
+			dst = m_resource.streamOrRegister(dst);
+			ip.write(InstructionType::MESH);
+			ip.write(dst);
+			ip.write(subindex);
+			return dst;
+		}
+
+		bool onGUI() override {
+			ImGuiEx::NodeTitle("Mesh");
+			outputSlot();
+			ImGui::TextUnformatted("Position");
+			return false;
+		}
+	};
+
+	struct SplineNode : Node {
+		SplineNode(ParticleEditorResource& res) : Node(res) {}
+
+		Type getType() const override { return Type::SPLINE; }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+		
+		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
+			const NodeInput input = getInput(0);
+			if (!input.node) return {};
+
+			DataStream op0;
+			op0 = input.generate(ip, op0, 0);
+
+			dst = m_resource.streamOrRegister(dst);
+			ip.write(InstructionType::SPLINE);
+			ip.write(dst);
+			ip.write(op0);
+			ip.write(subindex);
+			m_resource.freeRegister(op0);
+			return dst;
+		}
+
+		bool onGUI() override {
+			ImGuiEx::NodeTitle("Spline");
+			inputSlot();
+			outputSlot();
+			ImGui::TextUnformatted("Position");
+			return false;
+		}
+	};
+
 	struct GradientColorNode : Node {
 		GradientColorNode(ParticleEditorResource& res) : Node(res) {}
 
@@ -232,9 +292,9 @@ struct ParticleEditorResource {
 		u32 sentinel = 0xDEADBEAF;
 	};
 
-	struct GradientNode : Node {
-		GradientNode(ParticleEditorResource& res) : Node(res) {}
-		Type getType() const override { return Type::GRADIENT; }
+	struct CurveNode : Node {
+		CurveNode(ParticleEditorResource& res) : Node(res) {}
+		Type getType() const override { return Type::CURVE; }
 	
 		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
 			const NodeInput input = getInput(0);
@@ -269,32 +329,27 @@ struct ParticleEditorResource {
 		bool onGUI() override {
 			ImGuiEx::NodeTitle("Gradient");
 
-			ImGui::BeginGroup();
 			inputSlot(); 
-
-			ImGui::PushItemWidth(60);
-			bool changed = false;
-			for (u32 i = 0; i < count; ++i) {
-				ImGui::PushID(i);
-				changed = ImGui::DragFloat("##k", &keys[i]) || changed ;
-				ImGui::SameLine();
-				changed = ImGui::DragFloat("##v", &values[i]) || changed ;
-				ImGui::PopID();
-				keys[i] = clamp(keys[i], 0.f, 1.f);
-			}
-			ImGui::PopItemWidth();
-			if (ImGui::Button("Add")) {
-				ASSERT(count < lengthOf(values));
-				keys[count] = 0;
-				values[count] = 0;
-				++count;
-				changed = true;
-			}
-			ImGui::EndGroup();
-
-			ImGui::SameLine();
 			outputSlot();
-			return changed ;
+
+			int new_count;
+			float tmp[16];
+			for (u32 i = 0; i < count; ++i) {
+				tmp[i * 2] = keys[i];
+				tmp[i * 2 + 1] = values[i];
+			}
+
+			int flags = (int)ImGuiEx::CurveEditorFlags::NO_TANGENTS;
+			if (ImGuiEx::CurveEditor("##curve", tmp, count, lengthOf(tmp) / 2, ImVec2(150, 150), flags, &new_count) >= 0 || new_count != count) {
+				for (i32 i = 0; i < new_count; ++i) {
+					keys[i] = tmp[i * 2];
+					values[i] = tmp[i * 2 + 1];
+					count = new_count;
+				}
+				return true;
+			}
+
+			return false;
 		}
 
 		u32 count = 2;
@@ -334,6 +389,41 @@ struct ParticleEditorResource {
 		u8 idx;
 	};
 
+	struct NoiseNode : Node {
+		NoiseNode(ParticleEditorResource& res) : Node(res) {}
+		
+		Type getType() const override { return Type::NOISE; }
+
+		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
+			const NodeInput input0 = getInput(0);
+			if (!input0.node) return output;
+			DataStream op0;
+			op0 = input0.generate(instructions, op0, subindex);
+
+			instructions.write(InstructionType::NOISE);
+			DataStream dst = m_resource.streamOrRegister(output);
+			instructions.write(dst);
+			instructions.write(op0);
+			return dst;
+		}
+
+		void serialize(OutputMemoryStream& blob) const override {}
+		void deserialize(InputMemoryStream& blob) override {}
+
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+
+		bool onGUI() override {
+			ImGuiEx::NodeTitle("Noise");
+
+			outputSlot();
+			inputSlot();
+		
+			ImGui::TextUnformatted(" ");
+			return false;
+		}
+	};
+
 	struct RandomNode : Node {
 		RandomNode(ParticleEditorResource& res) : Node(res) {}
 		
@@ -341,7 +431,7 @@ struct ParticleEditorResource {
 
 		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			instructions.write(InstructionType::RAND);
-			DataStream op0, op1, dst;
+			DataStream dst;
 			dst = m_resource.streamOrRegister(output);
 			instructions.write(dst);
 			instructions.write(from);
@@ -983,6 +1073,8 @@ struct ParticleEditorResource {
 				case InstructionType::DIV: return Type::DIV;
 				case InstructionType::MUL: return Type::MUL;
 				case InstructionType::ADD: return Type::ADD;
+				case InstructionType::SUB: return Type::SUB;
+				case InstructionType::MOD: return Type::MOD;
 				default: ASSERT(false); return Type::MUL;
 			}
 		}
@@ -1023,8 +1115,10 @@ struct ParticleEditorResource {
 		static const char* getName() {
 			switch(OP_TYPE) {
 				case InstructionType::DIV: return "Divide";
+				case InstructionType::SUB: return "Subtract";
 				case InstructionType::MUL: return "Multiply";
 				case InstructionType::ADD: return "Add";
+				case InstructionType::MOD: return "Modulo";
 				default: ASSERT(false); return "Error";
 			}
 		}
@@ -1146,8 +1240,11 @@ struct ParticleEditorResource {
 		Node* node;
 		switch(type) {
 			case Node::CMP: node = LUMIX_NEW(m_allocator, CompareNode)(*this); break;
+			case Node::MESH: node = LUMIX_NEW(m_allocator, MeshNode)(*this); break;
+			case Node::SPLINE: node = LUMIX_NEW(m_allocator, SplineNode)(*this); break;
+			case Node::NOISE: node = LUMIX_NEW(m_allocator, NoiseNode)(*this); break;
 			case Node::GRADIENT_COLOR: node = LUMIX_NEW(m_allocator, GradientColorNode)(*this); break;
-			case Node::GRADIENT: node = LUMIX_NEW(m_allocator, GradientNode)(*this); break;
+			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
 			case Node::COLOR_MIX: node = LUMIX_NEW(m_allocator, ColorMixNode)(*this); break;
@@ -1160,8 +1257,10 @@ struct ParticleEditorResource {
 			case Node::OUTPUT: node = LUMIX_NEW(m_allocator, OutputNode)(*this); break;
 			case Node::PIN: node = LUMIX_NEW(m_allocator, PinNode)(*this); break;
 			case Node::DIV: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::DIV>)(*this); break;
+			case Node::MOD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MOD>)(*this); break;
 			case Node::MUL: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MUL>)(*this); break;
 			case Node::ADD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::ADD>)(*this); break;
+			case Node::SUB: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::SUB>)(*this); break;
 			case Node::CONST: node = LUMIX_NEW(m_allocator, ConstNode)(*this); break;
 			case Node::COS: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::COS>)(*this); break;
 			case Node::SIN: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::SIN>)(*this); break;
@@ -1274,6 +1373,7 @@ struct ParticleEditorResource {
 		m_outputs.emplace().name = "frame";
 
 		m_consts.emplace().name = "delta time";
+		m_consts.emplace().name = "emitter time";
 
 		m_nodes.push(LUMIX_NEW(m_allocator, UpdateNode)(*this));
 		m_nodes.push(LUMIX_NEW(m_allocator, OutputNode)(*this));
@@ -1363,6 +1463,8 @@ struct ParticleEditorResource {
 	int m_last_id = 0;
 	u8 m_register_mask = 0;
 	u8 m_registers_count = 0;
+	u32 m_init_emit_count = 0;
+	float m_emit_per_second = 100;
 };
 
 struct ParticleEditorImpl : ParticleEditor, NodeEditor {
@@ -1478,15 +1580,19 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			.visitType(ParticleEditorResource::Node::MUL, "Multiply", 'M')
 			.visitType(ParticleEditorResource::Node::MADD, "Multiply add")
 			.visitType(ParticleEditorResource::Node::SIN, "Sin")
+			.visitType(ParticleEditorResource::Node::SUB, "Subtract", 'S')
 			.endCategory();
 		}
 
 		visitor
 			.visitType(ParticleEditorResource::Node::CMP, "Compare")
-			.visitType(ParticleEditorResource::Node::GRADIENT, "Gradient")
+			.visitType(ParticleEditorResource::Node::CURVE, "Curve", 'C')
 			.visitType(ParticleEditorResource::Node::GRADIENT_COLOR, "Gradient color")
-			.visitType(ParticleEditorResource::Node::NUMBER, "Number")
-			.visitType(ParticleEditorResource::Node::RANDOM, "Random")
+			.visitType(ParticleEditorResource::Node::MESH, "Mesh")
+			.visitType(ParticleEditorResource::Node::NOISE, "Noise", 'N')
+			.visitType(ParticleEditorResource::Node::NUMBER, "Number", '1')
+			.visitType(ParticleEditorResource::Node::RANDOM, "Random", 'R')
+			.visitType(ParticleEditorResource::Node::SPLINE, "Spline")
 			.visitType(ParticleEditorResource::Node::SWITCH, "Switch")
 			.visitType(ParticleEditorResource::Node::VEC3, "Vec3", '3')
 			.visitType(ParticleEditorResource::Node::VEC4, "Vec4", '4');
@@ -1692,6 +1798,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void leftColumnGUI() {
 		ImGuiEx::Label("Material");
 		m_app.getAssetBrowser().resourceInput("material", Span(m_resource->m_mat_path.data), Material::TYPE);
+		ImGuiEx::Label("Emit per second");
+		ImGui::DragFloat("##eps", &m_resource->m_emit_per_second);
+		ImGuiEx::Label("Emit at start");
+		ImGui::DragInt("##eas", (i32*)&m_resource->m_init_emit_count);
 		if (ImGui::CollapsingHeader("Streams", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (ParticleEditorResource::Stream& s : m_resource->m_streams) {
 				ImGui::PushID(&s);
@@ -1784,7 +1894,9 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			, u32(m_resource->m_update.size() + m_resource->m_emit.size())
 			, getCount(m_resource->m_streams)
 			, m_resource->m_registers_count
-			, getCount(m_resource->m_outputs));
+			, getCount(m_resource->m_outputs)
+			, m_resource->m_init_emit_count
+			, m_resource->m_emit_per_second);
 		emitter->getResource()->setMaterial(Path(m_resource->m_mat_path));
 	}
 
@@ -2001,6 +2113,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		output.write(getCount(res.m_streams));
 		output.write((u32)res.m_registers_count);
 		output.write(getCount(res.m_outputs));
+		output.write(res.m_init_emit_count);
+		output.write(res.m_emit_per_second);
 		return true;
 	}
 

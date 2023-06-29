@@ -849,8 +849,10 @@ struct RenderModuleImpl final : RenderModule {
 		const u32 count = serializer.read<u32>();
 		m_particle_emitters.reserve(count + m_particle_emitters.size());
 		for (u32 i = 0; i < count; ++i) {
-			ParticleEmitter emitter(INVALID_ENTITY, m_allocator);
-			emitter.deserialize(serializer, version > (i32)RenderModuleVersion::AUTODESTROY_EMITTER, m_engine.getResourceManager());
+			ParticleEmitter emitter(INVALID_ENTITY, m_world, m_allocator);
+			bool has_autodestroy = version > (i32)RenderModuleVersion::AUTODESTROY_EMITTER;
+			bool emit_rate_removed = version > (i32)RenderModuleVersion::EMIT_RATE_REMOVED;
+			emitter.deserialize(serializer, has_autodestroy, emit_rate_removed, m_engine.getResourceManager());
 			emitter.m_entity = entity_map.get(emitter.m_entity);
 			if (emitter.m_entity.isValid()) {
 				EntityRef e = *emitter.m_entity;
@@ -1361,7 +1363,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	void createParticleEmitter(EntityRef entity)
 	{
-		m_particle_emitters.insert(entity, ParticleEmitter(entity, m_allocator));
+		m_particle_emitters.insert(entity, ParticleEmitter(entity, m_world, m_allocator));
 		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
@@ -3336,7 +3338,6 @@ void RenderModule::reflect() {
 			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::size>("size")
 			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::half_extents>("half_extents")
 		.LUMIX_CMP(ParticleEmitter, "particle_emitter", "Render / Particle emitter")
-			.var_prop<&RenderModule::getParticleEmitter, &ParticleEmitter::m_emit_rate>("Emit rate")
 			.var_prop<&RenderModule::getParticleEmitter, &ParticleEmitter::m_autodestroy>("Autodestroy")
 			.LUMIX_PROP(ParticleEmitterPath, "Source").resourceAttribute(ParticleEmitterResource::TYPE)
 		.LUMIX_CMP(Camera, "camera", "Render / Camera")

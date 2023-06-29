@@ -21,6 +21,7 @@ struct Renderer;
 struct ParticleEmitterResource final : Resource {
 	enum class Version : u32{
 		VERTEX_DECL,
+		EMIT_RATE,
 		LAST
 	};
 	struct Header {
@@ -49,7 +50,7 @@ struct ParticleEmitterResource final : Resource {
 		ADD,
 		COS,
 		SIN,
-		FREE0,
+		NOISE,
 		SUB,
 		FREE1,
 		MUL,
@@ -58,11 +59,14 @@ struct ParticleEmitterResource final : Resource {
 		MOV,
 		RAND,
 		KILL,
-		EMIT,
+		FREE2,
 		GT,
 		MIX,
 		GRADIENT,
-		DIV
+		DIV,
+		SPLINE,
+		MESH,
+		MOD
 	};
 
 	static const ResourceType TYPE;
@@ -85,9 +89,14 @@ struct ParticleEmitterResource final : Resource {
 		u32 output_offset,
 		u32 channels_count,
 		u32 registers_count,
-		u32 outputs_count
+		u32 outputs_count,
+		u32 init_emit_count,
+		float emit_rate
 	);
 	const gpu::VertexDecl& getVertexDecl() const { return m_vertex_decl; }
+	
+	u32 getInitEmitCount() const { return m_init_emit_count; }
+	float getEmitPerSecond() const { return m_emit_per_second; }
 
 private:
 	OutputMemoryStream m_instructions;
@@ -98,6 +107,8 @@ private:
 	u32 m_outputs_count;
 	Material* m_material;
 	gpu::VertexDecl m_vertex_decl;
+	u32 m_init_emit_count = 0;
+	float m_emit_per_second = 100;
 };
 
 
@@ -107,27 +118,27 @@ struct ResourceManagerHub;
 struct LUMIX_RENDERER_API ParticleEmitter
 {
 public:
-	ParticleEmitter(EntityPtr entity, IAllocator& allocator);
+	ParticleEmitter(EntityPtr entity, struct World& world, IAllocator& allocator);
 	ParticleEmitter(ParticleEmitter&& rhs);
 	~ParticleEmitter();
 
 	void serialize(OutputMemoryStream& blob) const;
-	void deserialize(InputMemoryStream& blob, bool has_autodestroy, ResourceManagerHub& manager);
+	void deserialize(InputMemoryStream& blob, bool has_autodestroy, bool emit_rate_removed, ResourceManagerHub& manager);
 	bool update(float dt, struct PageAllocator& allocator);
-	void emit(const float* args);
+	void emit();
 	void fillInstanceData(float* data) const;
 	u32 getParticlesDataSizeBytes() const;
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);
 	u32 getParticlesCount() const { return m_particles_count; }
 	float* getChannelData(u32 idx) const { return m_channels[idx].data; }
-	void reset() { m_particles_count = 0; }
+	void reset() { m_particles_count = 0; m_total_time = 0; }
 
 	EntityPtr m_entity;
-	u32 m_emit_rate = 10;
 	u32 m_particles_count = 0;
 	bool m_autodestroy = false;
 	float m_constants[16];
+	float m_total_time = 0;
 
 private:
 	struct Channel
@@ -137,11 +148,10 @@ private:
 	};
 
 	void operator =(ParticleEmitter&& rhs) = delete;
-	float readSingleValue(InputMemoryStream& blob) const;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
 
 	IAllocator& m_allocator;
-	OutputMemoryStream m_emit_buffer;
+	World& m_world;
 	Channel m_channels[16];
 	u32 m_capacity = 0;
 	float m_emit_timer = 0;

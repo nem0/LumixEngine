@@ -711,6 +711,9 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 			
 		ImGuiEx::Label("Particle count");
 		ImGui::Text("%d", emitter.m_particles_count);
+			
+		ImGuiEx::Label("Time");
+		ImGui::Text("%.2f", emitter.m_total_time);
 	}
 
 	StudioApp& m_app;
