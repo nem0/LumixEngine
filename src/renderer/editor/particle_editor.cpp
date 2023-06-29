@@ -30,6 +30,7 @@ struct ParticleEditorResource {
 
 	enum class Version {
 		LINK_ID_REMOVED,
+		EMIT_RATE,
 		LAST
 	};
 
@@ -79,7 +80,8 @@ struct ParticleEditorResource {
 			MESH,
 			MOD,
 			NOISE,
-			SUB
+			SUB,
+			CACHE
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -91,6 +93,7 @@ struct ParticleEditorResource {
 
 		virtual Type getType() const = 0;
 		virtual DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) = 0;
+		virtual void beforeGenerate() {};
 		virtual void serialize(OutputMemoryStream& blob) const {}
 		virtual void deserialize(InputMemoryStream& blob) {}
 
@@ -202,6 +205,50 @@ struct ParticleEditorResource {
 			ImGui::TextUnformatted("Position");
 			return false;
 		}
+	};
+
+	struct CacheNode : Node {
+		CacheNode(ParticleEditorResource& res) : Node(res) {}
+
+		Type getType() const override { return Type::CACHE; }
+		bool hasInputPins() const override { return true; }
+		bool hasOutputPins() const override { return true; }
+		
+		void beforeGenerate() override { m_cached = {}; }
+
+		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
+			if (m_cached.type == DataStream::NONE) {
+				const NodeInput input = getInput(0);
+				if (!input.node) return {};
+
+				DataStream op0;
+				op0 = input.generate(ip, op0, subindex);
+
+				m_cached = m_resource.streamOrRegister({});
+				ip.write(InstructionType::MOV);
+				ip.write(m_cached);
+				ip.write(op0);
+				m_resource.freeRegister(op0);
+
+				ip.write(InstructionType::MOV);
+				dst = m_resource.streamOrRegister(dst);
+				ip.write(dst);
+				ip.write(m_cached);
+				return dst;
+			}
+
+			return m_cached;
+		}
+
+		bool onGUI() override {
+			ImGuiEx::NodeTitle("Cache");
+			inputSlot();
+			outputSlot();
+			ImGui::TextUnformatted(" ");
+			return false;
+		}
+
+		DataStream m_cached;
 	};
 
 	struct SplineNode : Node {
@@ -1243,6 +1290,7 @@ struct ParticleEditorResource {
 			case Node::MESH: node = LUMIX_NEW(m_allocator, MeshNode)(*this); break;
 			case Node::SPLINE: node = LUMIX_NEW(m_allocator, SplineNode)(*this); break;
 			case Node::NOISE: node = LUMIX_NEW(m_allocator, NoiseNode)(*this); break;
+			case Node::CACHE: node = LUMIX_NEW(m_allocator, CacheNode)(*this); break;
 			case Node::GRADIENT_COLOR: node = LUMIX_NEW(m_allocator, GradientColorNode)(*this); break;
 			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
@@ -1284,7 +1332,12 @@ struct ParticleEditorResource {
 
 		blob.read(m_last_id);
 		m_mat_path = blob.readString();
-		
+
+		if (header.version > Version::EMIT_RATE) {
+			blob.read(m_init_emit_count);
+			blob.read(m_emit_per_second);
+		}
+
 		i32 count;
 
 		blob.read(count);
@@ -1334,6 +1387,8 @@ struct ParticleEditorResource {
 		blob.write(header);
 		blob.write(m_last_id);
 		blob.writeString(m_mat_path.data);
+		blob.write(m_init_emit_count);
+		blob.write(m_emit_per_second);
 		
 		blob.write((i32)m_streams.size());
 		blob.write(m_streams.begin(), m_streams.byte_size());
@@ -1386,6 +1441,8 @@ struct ParticleEditorResource {
 		m_update.clear();
 		m_output.clear();
 		m_emit.clear();
+
+		for (Node* n : m_nodes) n->beforeGenerate();
 
 		m_registers_count = 0;
 		m_nodes[0]->generate(m_update, 0, {}, 0);
@@ -1585,6 +1642,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 
 		visitor
+			.visitType(ParticleEditorResource::Node::CACHE, "Cache")
 			.visitType(ParticleEditorResource::Node::CMP, "Compare")
 			.visitType(ParticleEditorResource::Node::CURVE, "Curve", 'C')
 			.visitType(ParticleEditorResource::Node::GRADIENT_COLOR, "Gradient color")

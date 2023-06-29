@@ -627,6 +627,10 @@ namespace ImGuiEx {
 		window->StateStorage.SetFloat((ImGuiID)StorageValues::HEIGHT, height);
 
 		const ImRect inner_bb = window->InnerClipRect;
+		if (inner_bb.GetWidth() == 0 || inner_bb.GetHeight() == 0) {
+			EndChildFrame();
+			return -1;
+		}
 		const ImRect frame_bb(inner_bb.Min - style.FramePadding, inner_bb.Max + style.FramePadding);
 
 		auto transform = [&](const ImVec2& pos) -> ImVec2
