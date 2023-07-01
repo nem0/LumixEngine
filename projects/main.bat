@@ -528,7 +528,7 @@ exit /B 0
 exit /B 0
 
 :open_in_vs
-	start "" %devenv_cmd% "tmp/vs2022/LumixEngine.sln"
+	"tmp/vs2022/LumixEngine.sln"
 exit /B 0
 
 :create_bundle
