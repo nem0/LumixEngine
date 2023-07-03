@@ -523,7 +523,7 @@ struct RenderModuleImpl final : RenderModule {
 		if (!m_is_game_running) return;
 
 		Array<EntityRef> to_delete(m_allocator);
-		for (ParticleEmitter& emitter : m_particle_emitters) {
+		for (ParticleSystem& emitter : m_particle_emitters) {
 			if (emitter.update(dt, m_engine.getPageAllocator())) {
 				to_delete.push(*emitter.m_entity);
 			}
@@ -845,27 +845,27 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void deserializeParticleEmitters(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
+	void deserializeParticleSystems(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
 		const u32 count = serializer.read<u32>();
 		m_particle_emitters.reserve(count + m_particle_emitters.size());
 		for (u32 i = 0; i < count; ++i) {
-			ParticleEmitter emitter(INVALID_ENTITY, m_world, m_allocator);
+			ParticleSystem emitter(INVALID_ENTITY, m_world, m_allocator);
 			bool has_autodestroy = version > (i32)RenderModuleVersion::AUTODESTROY_EMITTER;
 			bool emit_rate_removed = version > (i32)RenderModuleVersion::EMIT_RATE_REMOVED;
 			emitter.deserialize(serializer, has_autodestroy, emit_rate_removed, m_engine.getResourceManager());
 			emitter.m_entity = entity_map.get(emitter.m_entity);
 			if (emitter.m_entity.isValid()) {
 				EntityRef e = *emitter.m_entity;
-				m_particle_emitters.insert(e, static_cast<ParticleEmitter&&>(emitter));
+				m_particle_emitters.insert(e, static_cast<ParticleSystem&&>(emitter));
 				m_world.onComponentCreated(e, PARTICLE_EMITTER_TYPE, this);
 			}
 		}
 	}
 
 
-	void serializeParticleEmitters(OutputMemoryStream& serializer) {
+	void serializeParticleSystems(OutputMemoryStream& serializer) {
 		serializer.write(m_particle_emitters.size());
-		for (const ParticleEmitter& emitter : m_particle_emitters) {
+		for (const ParticleSystem& emitter : m_particle_emitters) {
 			emitter.serialize(serializer);
 		}
 	}
@@ -894,7 +894,7 @@ struct RenderModuleImpl final : RenderModule {
 		serializeModelInstances(serializer);
 		serializeLights(serializer);
 		serializeTerrains(serializer);
-		serializeParticleEmitters(serializer);
+		serializeParticleSystems(serializer);
 		serializeBoneAttachments(serializer);
 		serializeEnvironmentProbes(serializer);
 		serializeReflectionProbes(serializer);
@@ -1112,7 +1112,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 		deserializeLights(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map, version);
-		deserializeParticleEmitters(serializer, entity_map, version);
+		deserializeParticleSystems(serializer, entity_map, version);
 		deserializeBoneAttachments(serializer, entity_map);
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
@@ -1321,9 +1321,9 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void destroyParticleEmitter(EntityRef entity)
+	void destroyParticleSystem(EntityRef entity)
 	{
-		const ParticleEmitter& emitter = m_particle_emitters[entity];
+		const ParticleSystem& emitter = m_particle_emitters[entity];
 		m_world.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
 		m_particle_emitters.erase(*emitter.m_entity);
 	}
@@ -1361,9 +1361,9 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void createParticleEmitter(EntityRef entity)
+	void createParticleSystem(EntityRef entity)
 	{
-		m_particle_emitters.insert(entity, ParticleEmitter(entity, m_world, m_allocator));
+		m_particle_emitters.insert(entity, ParticleSystem(entity, m_world, m_allocator));
 		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
@@ -3165,27 +3165,27 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void updateParticleEmitter(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
+	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
 
-	void setParticleEmitterPath(EntityRef entity, const Path& path) override {
-		ParticleEmitterResource* res = m_engine.getResourceManager().load<ParticleEmitterResource>(path);
+	void setParticleSystemPath(EntityRef entity, const Path& path) override {
+		ParticleSystemResource* res = m_engine.getResourceManager().load<ParticleSystemResource>(path);
 		m_particle_emitters[entity].setResource(res);
 	}
 
-	Path getParticleEmitterPath(EntityRef entity) override {
-		const ParticleEmitter& emitter = m_particle_emitters[entity];
+	Path getParticleSystemPath(EntityRef entity) override {
+		const ParticleSystem& emitter = m_particle_emitters[entity];
 		if (!emitter.getResource()) return Path("");
 
 		return emitter.getResource()->getPath();
 	}
 
-	ParticleEmitter& getParticleEmitter(EntityRef e) override {
+	ParticleSystem& getParticleSystem(EntityRef e) override {
 		auto iter = m_particle_emitters.find(e);
 		ASSERT(iter.isValid());
 		return iter.value();
 	}
 
-	const HashMap<EntityRef, ParticleEmitter>& getParticleEmitters() const override { return m_particle_emitters; }
+	const HashMap<EntityRef, ParticleSystem>& getParticleSystems() const override { return m_particle_emitters; }
 
 	IAllocator& m_allocator;
 	World& m_world;
@@ -3208,7 +3208,7 @@ struct RenderModuleImpl final : RenderModule {
 	AssociativeArray<EntityRef, ReflectionProbe> m_reflection_probes;
 	HashMap<EntityRef, ProceduralGeometry> m_procedural_geometries;
 	HashMap<EntityRef, Terrain*> m_terrains;
-	HashMap<EntityRef, ParticleEmitter> m_particle_emitters;
+	HashMap<EntityRef, ParticleSystem> m_particle_emitters;
 	gpu::TextureHandle m_reflection_probes_texture = gpu::INVALID_TEXTURE;
 
 	Array<DebugTriangle> m_debug_triangles;
@@ -3337,9 +3337,9 @@ void RenderModule::reflect() {
 			.prop<&RenderModule::isReflectionProbeEnabled, &RenderModule::enableReflectionProbe>("Enabled")
 			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::size>("size")
 			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::half_extents>("half_extents")
-		.LUMIX_CMP(ParticleEmitter, "particle_emitter", "Render / Particle emitter")
-			.var_prop<&RenderModule::getParticleEmitter, &ParticleEmitter::m_autodestroy>("Autodestroy")
-			.LUMIX_PROP(ParticleEmitterPath, "Source").resourceAttribute(ParticleEmitterResource::TYPE)
+		.LUMIX_CMP(ParticleSystem, "particle_emitter", "Render / Particle emitter")
+			.var_prop<&RenderModule::getParticleSystem, &ParticleSystem::m_autodestroy>("Autodestroy")
+			.LUMIX_PROP(ParticleSystemPath, "Source").resourceAttribute(ParticleSystemResource::TYPE)
 		.LUMIX_CMP(Camera, "camera", "Render / Camera")
 			.icon(ICON_FA_CAMERA)
 			.var_prop<&RenderModule::getCamera, &Camera::fov>("FOV").radiansAttribute()

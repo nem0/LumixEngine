@@ -20,26 +20,22 @@
 namespace Lumix {
 
 static constexpr u32 OUTPUT_FLAG = 1 << 31;
-using DataStream = ParticleEmitterResource::DataStream;
-using InstructionType = ParticleEmitterResource::InstructionType;
+using DataStream = ParticleSystemResource::DataStream;
+using InstructionType = ParticleSystemResource::InstructionType;
 
 struct ParticleEditorImpl;
 
-struct ParticleEditorResource {
+enum class ParticleSystemEditorVersion {
+	LINK_ID_REMOVED,
+	EMIT_RATE,
+	MULTIEMITTER,
+
+	LAST
+};
+
+struct ParticleEmitterEditorResource {
 	struct Node;
 
-	enum class Version {
-		LINK_ID_REMOVED,
-		EMIT_RATE,
-		LAST
-	};
-
-	struct Header {
-		static constexpr u32 MAGIC = '_LPE';
-		const u32 magic = MAGIC;
-		Version version = Version::LAST;
-	};
-	
 	enum class ValueType : i32 {
 		FLOAT,
 		VEC3,
@@ -84,7 +80,7 @@ struct ParticleEditorResource {
 			CACHE
 		};
 
-		Node(ParticleEditorResource& res) 
+		Node(ParticleEmitterEditorResource& res) 
 			: m_resource(res)
 		{
 			m_id = res.genID();
@@ -136,14 +132,14 @@ struct ParticleEditorResource {
 	protected:
 		virtual bool onGUI() = 0;
 		
-		ParticleEditorResource& m_resource;
+		ParticleEmitterEditorResource& m_resource;
 		u8 m_input_counter;
 		u8 m_output_counter;
 	};
 	
 	template <Node::Type T>
 	struct UnaryFunctionNode : Node {
-		UnaryFunctionNode(ParticleEditorResource& res) : Node(res) {}
+		UnaryFunctionNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return T; }
 
@@ -185,7 +181,7 @@ struct ParticleEditorResource {
 	};
 	
 	struct MeshNode : Node {
-		MeshNode(ParticleEditorResource& res) : Node(res) {}
+		MeshNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::MESH; }
 		bool hasInputPins() const override { return true; }
@@ -208,7 +204,7 @@ struct ParticleEditorResource {
 	};
 
 	struct CacheNode : Node {
-		CacheNode(ParticleEditorResource& res) : Node(res) {}
+		CacheNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::CACHE; }
 		bool hasInputPins() const override { return true; }
@@ -252,7 +248,7 @@ struct ParticleEditorResource {
 	};
 
 	struct SplineNode : Node {
-		SplineNode(ParticleEditorResource& res) : Node(res) {}
+		SplineNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::SPLINE; }
 		bool hasInputPins() const override { return true; }
@@ -284,7 +280,7 @@ struct ParticleEditorResource {
 	};
 
 	struct GradientColorNode : Node {
-		GradientColorNode(ParticleEditorResource& res) : Node(res) {}
+		GradientColorNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::GRADIENT_COLOR; }
 	
@@ -340,7 +336,7 @@ struct ParticleEditorResource {
 	};
 
 	struct CurveNode : Node {
-		CurveNode(ParticleEditorResource& res) : Node(res) {}
+		CurveNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		Type getType() const override { return Type::CURVE; }
 	
 		DataStream generate(OutputMemoryStream& ip, u16 output_idx, DataStream dst, u8 subindex) override {
@@ -405,7 +401,7 @@ struct ParticleEditorResource {
 	};
 
 	struct ConstNode : Node {
-		ConstNode(ParticleEditorResource& res) : Node(res) {}
+		ConstNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::CONST; }
 
@@ -424,11 +420,17 @@ struct ParticleEditorResource {
 
 		bool onGUI() override {
 			outputSlot(); 
-			if (m_resource.m_consts.size() <= idx) {
-				ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " INVALID CONSTANT");
-			}
-			else {
-				ImGui::TextUnformatted(m_resource.m_consts[idx].name);
+			switch (idx) {
+				// TODO enum
+				case 0:
+					ImGui::TextUnformatted("Time delta");
+					break;
+				case 1:
+					ImGui::TextUnformatted("Total time");
+					break;
+				default:
+					ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " INVALID CONSTANT");
+					break;
 			}
 			return false;
 		}
@@ -437,7 +439,7 @@ struct ParticleEditorResource {
 	};
 
 	struct NoiseNode : Node {
-		NoiseNode(ParticleEditorResource& res) : Node(res) {}
+		NoiseNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::NOISE; }
 
@@ -472,7 +474,7 @@ struct ParticleEditorResource {
 	};
 
 	struct RandomNode : Node {
-		RandomNode(ParticleEditorResource& res) : Node(res) {}
+		RandomNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::RANDOM; }
 
@@ -521,7 +523,7 @@ struct ParticleEditorResource {
 	};
 
 	struct LiteralNode : Node {
-		LiteralNode(ParticleEditorResource& res) : Node(res) {}
+		LiteralNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::NUMBER; }
 		bool hasInputPins() const override { return false; }
@@ -549,7 +551,7 @@ struct ParticleEditorResource {
 
 	template <Node::Type T>
 	struct VectorNode : Node {
-		VectorNode(ParticleEditorResource& res) : Node(res) {}
+		VectorNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return T; }
 
@@ -638,7 +640,7 @@ struct ParticleEditorResource {
 	};
 
 	struct InputNode : Node {
-		InputNode(ParticleEditorResource& res) : Node(res) {}
+		InputNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::INPUT; }
 		bool hasInputPins() const override { return false; }
@@ -669,14 +671,14 @@ struct ParticleEditorResource {
 	};
 
 	struct EmitNode : Node {
-		EmitNode(ParticleEditorResource& res) : Node(res) {}
+		EmitNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::EMIT; }
 		bool hasInputPins() const override { return true; }
 		bool hasOutputPins() const override { return false; }
 
 		bool onGUI() override {
-			ImGuiEx::NodeTitle(ICON_FA_PLUS " Emit", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
+			ImGuiEx::NodeTitle(ICON_FA_PLUS " Init", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
 			for (const Stream& stream : m_resource.m_streams) {
 				inputSlot(); ImGui::TextUnformatted(stream.name);
 			}
@@ -749,7 +751,7 @@ struct ParticleEditorResource {
 	}
 
 	struct UpdateNode : Node {
-		UpdateNode(ParticleEditorResource& res) : Node(res) {}
+		UpdateNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::UPDATE; }
 		bool hasInputPins() const override { return true; }
@@ -801,7 +803,7 @@ struct ParticleEditorResource {
 	};
 
 	struct CompareNode : Node {
-		CompareNode(ParticleEditorResource& res) : Node(res) {}
+		CompareNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::CMP; }
 
@@ -869,7 +871,7 @@ struct ParticleEditorResource {
 	};
 
 	struct SwitchNode : Node {
-		SwitchNode(ParticleEditorResource& res) : Node(res) {}
+		SwitchNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		bool hasInputPins() const override { return true; }
 		bool hasOutputPins() const override { return true; }
 		Type getType() const override { return Type::SWITCH; }
@@ -896,7 +898,7 @@ struct ParticleEditorResource {
 	};
 
 	struct PinNode : Node {
-		PinNode(ParticleEditorResource& res) : Node(res) {}
+		PinNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		DataStream generate(OutputMemoryStream& instructions, u16 output_idx, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(0);
@@ -918,7 +920,7 @@ struct ParticleEditorResource {
 	};
 
 	struct OutputNode : Node {
-		OutputNode(ParticleEditorResource& res) : Node(res) {}
+		OutputNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::OUTPUT; }
 		bool hasInputPins() const override { return true; }
@@ -979,7 +981,7 @@ struct ParticleEditorResource {
 	};
 
 	struct ColorMixNode : Node {
-		ColorMixNode(ParticleEditorResource& res) : Node(res) {}
+		ColorMixNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::COLOR_MIX; }
 
@@ -1026,7 +1028,7 @@ struct ParticleEditorResource {
 	};
 
 	struct MaddNode : Node {
-		MaddNode(ParticleEditorResource& res) : Node(res) {}
+		MaddNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { return Type::MADD; }
 
@@ -1113,7 +1115,7 @@ struct ParticleEditorResource {
 
 	template <InstructionType OP_TYPE>
 	struct BinaryOpNode : Node {
-		BinaryOpNode(ParticleEditorResource& res) : Node(res) {}
+		BinaryOpNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
 		Type getType() const override { 
 			switch(OP_TYPE) {
@@ -1201,11 +1203,6 @@ struct ParticleEditorResource {
 		ValueType type = ValueType::FLOAT;
 	};
 
-	struct Constant {
-		StaticString<32> name;
-		ValueType type = ValueType::FLOAT;
-	};
-
 	struct Output {
 		StaticString<32> name;
 		ValueType type = ValueType::FLOAT;
@@ -1213,19 +1210,19 @@ struct ParticleEditorResource {
 
 	using Link = NodeEditorLink;
 
-	ParticleEditorResource(IAllocator& allocator)
+	ParticleEmitterEditorResource(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_nodes(allocator)
 		, m_links(allocator)
 		, m_streams(allocator)
 		, m_outputs(allocator)
-		, m_consts(allocator)
 		, m_update(allocator)
 		, m_emit(allocator)
 		, m_output(allocator)
+		, m_name("default", allocator)
 	{}
 	
-	~ParticleEditorResource() {
+	~ParticleEmitterEditorResource() {
 		for (Node* node : m_nodes) LUMIX_DELETE(m_allocator, node);
 	}
 	
@@ -1237,7 +1234,7 @@ struct ParticleEditorResource {
 		}
 	}
 	
-	const ParticleEditorResource::Node* getNode(u16 id) const {
+	const ParticleEmitterEditorResource::Node* getNode(u16 id) const {
 		for(const auto& n : m_nodes) {
 			if (n->m_id == id) return n;
 		}
@@ -1255,17 +1252,17 @@ struct ParticleEditorResource {
 			IM_COL32(0xA0, 0xA0, 0xA0, 255),
 		};
 	
-		for (ParticleEditorResource::Link& l : m_links) {
+		for (ParticleEmitterEditorResource::Link& l : m_links) {
 			l.color = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
 		}
 
 		for (u32 i = 0, c = m_links.size(); i < c; ++i) {
-			const ParticleEditorResource::Link& link = m_links[i];
-			const ParticleEditorResource::Node* node = getNode(link.getToNode());
+			const ParticleEmitterEditorResource::Link& link = m_links[i];
+			const ParticleEmitterEditorResource::Node* node = getNode(link.getToNode());
 			switch(node->getType()) {
-				case ParticleEditorResource::Node::UPDATE:
-				case ParticleEditorResource::Node::EMIT:
-				case ParticleEditorResource::Node::OUTPUT:
+				case ParticleEmitterEditorResource::Node::UPDATE:
+				case ParticleEmitterEditorResource::Node::EMIT:
+				case ParticleEmitterEditorResource::Node::OUTPUT:
 					colorLinks(colors[link.getToPin() % lengthOf(colors)], i);
 					break;
 				default: break;
@@ -1318,74 +1315,11 @@ struct ParticleEditorResource {
 		return node;
 	}
 	
-	bool deserialize(InputMemoryStream& blob, const char* path) {
-		Header header;
-		blob.read(header);
-		if (header.magic != Header::MAGIC) {
-			logError("Invalid file ", path);
-			return false;
-		}
-		if (header.version > Version::LAST) {
-			logError("Unsupported file version ", path);
-			return false;
-		}
-
-		blob.read(m_last_id);
-		m_mat_path = blob.readString();
-
-		if (header.version > Version::EMIT_RATE) {
-			blob.read(m_init_emit_count);
-			blob.read(m_emit_per_second);
-		}
-
-		i32 count;
-
-		blob.read(count);
-		m_streams.resize(count);
-		blob.read(m_streams.begin(), m_streams.byte_size());
-
-		blob.read(count);
-		m_outputs.resize(count);
-		blob.read(m_outputs.begin(), m_outputs.byte_size());
-
-		blob.read(count);
-		m_consts.resize(count);
-		blob.read(m_consts.begin(), m_consts.byte_size());
-
-		blob.read(count);
-		m_links.resize(count);
-		if (header.version > Version::LINK_ID_REMOVED) {
-			for (i32 i = 0; i < count; ++i) {
-				blob.read(m_links[i].from);
-				blob.read(m_links[i].to);
-			}
-		}
-		else {
-			for (i32 i = 0; i < count; ++i) {
-				blob.read<i32>();
-				blob.read(m_links[i].from);
-				blob.read(m_links[i].to);
-			}
-		}
-
-		blob.read(count);
-		for (i32 i = 0; i < count; ++i) {
-			Node::Type type;
-			blob.read(type);
-			Node* n = addNode(type);
-			blob.read(n->m_id);
-			blob.read(n->m_pos);
-			n->deserialize(blob);
-		}
-		generate();
-		colorLinks();
-		return true;
-	}
+	bool deserialize(InputMemoryStream& blob, const char* path, ParticleSystemEditorVersion version);
 
 	void serialize(OutputMemoryStream& blob) {
-		Header header;
-		blob.write(header);
 		blob.write(m_last_id);
+		blob.writeString(m_name.c_str());
 		blob.writeString(m_mat_path.data);
 		blob.write(m_init_emit_count);
 		blob.write(m_emit_per_second);
@@ -1395,9 +1329,6 @@ struct ParticleEditorResource {
 
 		blob.write((i32)m_outputs.size());
 		blob.write(m_outputs.begin(), m_outputs.byte_size());
-
-		blob.write((i32)m_consts.size());
-		blob.write(m_consts.begin(), m_consts.byte_size());
 
 		blob.write((i32)m_links.size());
 		for (const Link& link : m_links) {
@@ -1426,9 +1357,6 @@ struct ParticleEditorResource {
 		m_outputs.back().type = ValueType::VEC4;
 		m_outputs.emplace().name = "rotation";
 		m_outputs.emplace().name = "frame";
-
-		m_consts.emplace().name = "delta time";
-		m_consts.emplace().name = "emitter time";
 
 		m_nodes.push(LUMIX_NEW(m_allocator, UpdateNode)(*this));
 		m_nodes.push(LUMIX_NEW(m_allocator, OutputNode)(*this));
@@ -1482,21 +1410,21 @@ struct ParticleEditorResource {
 	void fillVertexDecl(gpu::VertexDecl& decl, Array<String>* attribute_names, IAllocator& allocator) const {
 		u32 idx = 0;
 		u32 offset = 0;
-		for (const ParticleEditorResource::Output& o : m_outputs) {
+		for (const ParticleEmitterEditorResource::Output& o : m_outputs) {
 			switch(o.type) {
-				case ParticleEditorResource::ValueType::FLOAT: {
+				case ParticleEmitterEditorResource::ValueType::FLOAT: {
 					if (attribute_names) attribute_names->emplace(o.name, allocator);
 					decl.addAttribute(idx, offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(float);
 					break;
 				}
-				case ParticleEditorResource::ValueType::VEC3: {
+				case ParticleEmitterEditorResource::ValueType::VEC3: {
 					if (attribute_names) attribute_names->emplace(o.name, allocator);
 					decl.addAttribute(idx, offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec3);
 					break;
 				}
-				case ParticleEditorResource::ValueType::VEC4: {
+				case ParticleEmitterEditorResource::ValueType::VEC4: {
 					if (attribute_names) attribute_names->emplace(o.name, allocator);
 					decl.addAttribute(idx, offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec4);
@@ -1508,10 +1436,10 @@ struct ParticleEditorResource {
 	}
 
 	IAllocator& m_allocator;
+	String m_name;
 	StaticString<LUMIX_MAX_PATH> m_mat_path;
 	Array<Stream> m_streams;
 	Array<Output> m_outputs;
-	Array<Constant> m_consts;
 	Array<Node*> m_nodes;
 	Array<Link> m_links;
 	OutputMemoryStream m_update;
@@ -1524,8 +1452,140 @@ struct ParticleEditorResource {
 	float m_emit_per_second = 100;
 };
 
+struct ParticleSystemEditorResource {
+	struct Constant {
+		StaticString<32> name;
+		ParticleEmitterEditorResource::ValueType type = ParticleEmitterEditorResource::ValueType::FLOAT;
+	};
+
+	struct Header {
+		static constexpr u32 MAGIC = '_LPE';
+		const u32 magic = MAGIC;
+		ParticleSystemEditorVersion version = ParticleSystemEditorVersion::LAST;
+	};
+	
+	ParticleSystemEditorResource(IAllocator& allocator) 
+		: m_emitters(allocator)
+		, m_allocator(allocator)
+	{
+		addEmitter();
+	}
+
+	void serialize(OutputMemoryStream& blob) {
+		Header header;
+		blob.write(header);
+		blob.write(m_emitters.size());
+		for (const UniquePtr<ParticleEmitterEditorResource>& e : m_emitters) {
+			e->serialize(blob);
+		}
+	}
+
+	bool deserialize(InputMemoryStream& blob, const char* path) {
+		Header header;
+		blob.read(header);
+		if (header.magic != Header::MAGIC) {
+			logError("Invalid file ", path);
+			return false;
+		}
+		if (header.version > ParticleSystemEditorVersion::LAST) {
+			logError("Unsupported file version ", path);
+			return false;
+		}
+
+		m_emitters.clear();
+		u32 count = 1;
+		if (header.version > ParticleSystemEditorVersion::MULTIEMITTER) count = blob.read<u32>();
+		for (u32 i = 0; i < count; ++i) {
+			UniquePtr<ParticleEmitterEditorResource> emitter = UniquePtr<ParticleEmitterEditorResource>::create(m_allocator, m_allocator);
+			if (!emitter->deserialize(blob, path, header.version)) return false;
+			m_emitters.push(emitter.move());
+		}
+		return true;
+	}
+
+	void removeEmitter(ParticleEmitterEditorResource* to_remove) {
+		m_emitters.eraseItems([&](UniquePtr<ParticleEmitterEditorResource>& e){ return e.get() == to_remove; });
+	}
+
+	ParticleEmitterEditorResource* addEmitter() {
+		UniquePtr<ParticleEmitterEditorResource> emitter = UniquePtr<ParticleEmitterEditorResource>::create(m_allocator, m_allocator);
+		ParticleEmitterEditorResource* res = emitter.get();
+		u32 iter = 0;
+		for (;;) {
+			i32 idx = m_emitters.find([&](UniquePtr<ParticleEmitterEditorResource>& e){ return e->m_name == emitter->m_name; });
+			if (idx < 0) break;
+
+			++iter;
+			emitter->m_name = "default";
+			emitter->m_name.cat(iter);
+		}
+		m_emitters.push(emitter.move());
+		return res;
+	}
+
+	Array<UniquePtr<ParticleEmitterEditorResource>> m_emitters;
+	IAllocator& m_allocator;
+};
+
+
+bool ParticleEmitterEditorResource::deserialize(InputMemoryStream& blob, const char* path, ParticleSystemEditorVersion version) {
+		blob.read(m_last_id);
+		if (version > ParticleSystemEditorVersion::MULTIEMITTER) m_name = blob.readString();
+		m_mat_path = blob.readString();
+
+		if (version > ParticleSystemEditorVersion::EMIT_RATE) {
+			blob.read(m_init_emit_count);
+			blob.read(m_emit_per_second);
+		}
+
+		i32 count;
+
+		blob.read(count);
+		m_streams.resize(count);
+		blob.read(m_streams.begin(), m_streams.byte_size());
+
+		blob.read(count);
+		m_outputs.resize(count);
+		blob.read(m_outputs.begin(), m_outputs.byte_size());
+
+		if (version <= ParticleSystemEditorVersion::MULTIEMITTER) {
+			blob.read(count);
+			blob.skip(count * 36);
+		}
+
+		blob.read(count);
+		m_links.resize(count);
+		if (version > ParticleSystemEditorVersion::LINK_ID_REMOVED) {
+			for (i32 i = 0; i < count; ++i) {
+				blob.read(m_links[i].from);
+				blob.read(m_links[i].to);
+			}
+		}
+		else {
+			for (i32 i = 0; i < count; ++i) {
+				blob.read<i32>();
+				blob.read(m_links[i].from);
+				blob.read(m_links[i].to);
+			}
+		}
+
+		blob.read(count);
+		for (i32 i = 0; i < count; ++i) {
+			Node::Type type;
+			blob.read(type);
+			Node* n = addNode(type);
+			blob.read(n->m_id);
+			blob.read(n->m_pos);
+			n->deserialize(blob);
+		}
+		generate();
+		colorLinks();
+		return true;
+	}
+
+
 struct ParticleEditorImpl : ParticleEditor, NodeEditor {
-	using Node = ParticleEditorResource::Node;
+	using Node = ParticleEmitterEditorResource::Node;
 	
 	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -1577,19 +1637,19 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	struct ICategoryVisitor {
 		struct INodeCreator {
-			virtual ParticleEditorResource::Node* create(ParticleEditorResource&) const = 0;
+			virtual ParticleEmitterEditorResource::Node* create(ParticleEmitterEditorResource&) const = 0;
 		};
 
 		virtual bool beginCategory(const char* category) { return true; }
 		virtual void endCategory() {}
 		virtual ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut = 0) = 0;
 
-		ICategoryVisitor& visitType(ParticleEditorResource::Node::Type type, const char* label, char shortcut = 0) {
+		ICategoryVisitor& visitType(ParticleEmitterEditorResource::Node::Type type, const char* label, char shortcut = 0) {
 			struct : INodeCreator {
-				ParticleEditorResource::Node* create(ParticleEditorResource& res) const override {
+				ParticleEmitterEditorResource::Node* create(ParticleEmitterEditorResource& res) const override {
 					return res.addNode(type);
 				}
-				ParticleEditorResource::Node::Type type;
+				ParticleEmitterEditorResource::Node::Type type;
 			} creator;
 			creator.type = type;
 			return visitType(label, creator, shortcut);
@@ -1598,62 +1658,62 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void visitCategories(ICategoryVisitor& visitor) {
 		if (visitor.beginCategory("Constants")) {
-			for (u8 i = 0; i < m_resource->m_consts.size(); ++i) {
-				struct : ICategoryVisitor::INodeCreator {
-					ParticleEditorResource::Node* create(ParticleEditorResource& res) const override {
-						auto* n = (ParticleEditorResource::ConstNode*)res.addNode(ParticleEditorResource::Node::CONST);
-						n->idx = i;
-						return n;
-					}
-					u8 i;
-				} creator;
-				creator.i = i;
-				visitor.visitType(m_resource->m_consts[i].name, creator);
-			}
+			struct : ICategoryVisitor::INodeCreator {
+				ParticleEmitterEditorResource::Node* create(ParticleEmitterEditorResource& res) const override {
+					auto* n = (ParticleEmitterEditorResource::ConstNode*)res.addNode(ParticleEmitterEditorResource::Node::CONST);
+					n->idx = i;
+					return n;
+				}
+				u8 i;
+			} creator;
+			creator.i = 0;
+			visitor.visitType("Time delta", creator);
+			creator.i = 1;
+			visitor.visitType("Total time", creator);
 			visitor.endCategory();
 		}
 
 		if (visitor.beginCategory("Input")) {
-			for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
+			for (u8 i = 0; i < m_active_emitter->m_streams.size(); ++i) {
 				struct : ICategoryVisitor::INodeCreator {
-					ParticleEditorResource::Node* create(ParticleEditorResource& res) const override {
-						auto* n = (ParticleEditorResource::ConstNode*)res.addNode(ParticleEditorResource::Node::INPUT);
+					ParticleEmitterEditorResource::Node* create(ParticleEmitterEditorResource& res) const override {
+						auto* n = (ParticleEmitterEditorResource::ConstNode*)res.addNode(ParticleEmitterEditorResource::Node::INPUT);
 						n->idx = i;
 						return n;
 					}
 					u8 i;
 				} creator;
 				creator.i = i;
-				visitor.visitType(m_resource->m_streams[i].name, creator);
+				visitor.visitType(m_active_emitter->m_streams[i].name, creator);
 			}
 			visitor.endCategory();
 		}
 
 		if (visitor.beginCategory("Math")) {
-			visitor.visitType(ParticleEditorResource::Node::ADD, "Add", 'A')
-			.visitType(ParticleEditorResource::Node::COLOR_MIX, "Color mix")
-			.visitType(ParticleEditorResource::Node::COS, "Cos")
-			.visitType(ParticleEditorResource::Node::DIV, "Divide", 'D')
-			.visitType(ParticleEditorResource::Node::MUL, "Multiply", 'M')
-			.visitType(ParticleEditorResource::Node::MADD, "Multiply add")
-			.visitType(ParticleEditorResource::Node::SIN, "Sin")
-			.visitType(ParticleEditorResource::Node::SUB, "Subtract", 'S')
+			visitor.visitType(ParticleEmitterEditorResource::Node::ADD, "Add", 'A')
+			.visitType(ParticleEmitterEditorResource::Node::COLOR_MIX, "Color mix")
+			.visitType(ParticleEmitterEditorResource::Node::COS, "Cos")
+			.visitType(ParticleEmitterEditorResource::Node::DIV, "Divide", 'D')
+			.visitType(ParticleEmitterEditorResource::Node::MUL, "Multiply", 'M')
+			.visitType(ParticleEmitterEditorResource::Node::MADD, "Multiply add")
+			.visitType(ParticleEmitterEditorResource::Node::SIN, "Sin")
+			.visitType(ParticleEmitterEditorResource::Node::SUB, "Subtract", 'S')
 			.endCategory();
 		}
 
 		visitor
-			.visitType(ParticleEditorResource::Node::CACHE, "Cache")
-			.visitType(ParticleEditorResource::Node::CMP, "Compare")
-			.visitType(ParticleEditorResource::Node::CURVE, "Curve", 'C')
-			.visitType(ParticleEditorResource::Node::GRADIENT_COLOR, "Gradient color")
-			.visitType(ParticleEditorResource::Node::MESH, "Mesh")
-			.visitType(ParticleEditorResource::Node::NOISE, "Noise", 'N')
-			.visitType(ParticleEditorResource::Node::NUMBER, "Number", '1')
-			.visitType(ParticleEditorResource::Node::RANDOM, "Random", 'R')
-			.visitType(ParticleEditorResource::Node::SPLINE, "Spline")
-			.visitType(ParticleEditorResource::Node::SWITCH, "Switch")
-			.visitType(ParticleEditorResource::Node::VEC3, "Vec3", '3')
-			.visitType(ParticleEditorResource::Node::VEC4, "Vec4", '4');
+			.visitType(ParticleEmitterEditorResource::Node::CACHE, "Cache")
+			.visitType(ParticleEmitterEditorResource::Node::CMP, "Compare")
+			.visitType(ParticleEmitterEditorResource::Node::CURVE, "Curve", 'C')
+			.visitType(ParticleEmitterEditorResource::Node::GRADIENT_COLOR, "Gradient color")
+			.visitType(ParticleEmitterEditorResource::Node::MESH, "Mesh")
+			.visitType(ParticleEmitterEditorResource::Node::NOISE, "Noise", 'N')
+			.visitType(ParticleEmitterEditorResource::Node::NUMBER, "Number", '1')
+			.visitType(ParticleEmitterEditorResource::Node::RANDOM, "Random", 'R')
+			.visitType(ParticleEmitterEditorResource::Node::SPLINE, "Spline")
+			.visitType(ParticleEmitterEditorResource::Node::SWITCH, "Switch")
+			.visitType(ParticleEmitterEditorResource::Node::VEC3, "Vec3", '3')
+			.visitType(ParticleEmitterEditorResource::Node::VEC4, "Vec4", '4');
 	}
 
 	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
@@ -1661,37 +1721,37 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut = 0) override {
 				if (shortcut && os::isKeyDown((os::Keycode)shortcut)) {
 					ASSERT(!n);
-					n = creator.create(*editor->m_resource);
+					n = creator.create(*editor->m_active_emitter);
 					ASSERT(n);
 				}
 				return *this;
 			}
 			
 			ParticleEditorImpl* editor;
-			ParticleEditorResource::Node* n = nullptr;
+			ParticleEmitterEditorResource::Node* n = nullptr;
 		} visitor;
 		visitor.editor = this;
 		visitCategories(visitor);
 		if (visitor.n) {
 			visitor.n->m_pos = pos;
-			if (hovered_link >= 0) splitLink(m_resource->m_nodes.back(), m_resource->m_links, hovered_link);
+			if (hovered_link >= 0) splitLink(m_active_emitter->m_nodes.back(), m_active_emitter->m_links, hovered_link);
 			pushUndo(NO_MERGE_UNDO);
 		}
 	}
 	
-	void onLinkDoubleClicked(ParticleEditorResource::Link& link, ImVec2 pos) override {
-		Node* n = addNode(ParticleEditorResource::Node::Type::PIN);
-		ParticleEditorResource::Link new_link;
+	void onLinkDoubleClicked(ParticleEmitterEditorResource::Link& link, ImVec2 pos) override {
+		Node* n = addNode(ParticleEmitterEditorResource::Node::Type::PIN);
+		ParticleEmitterEditorResource::Link new_link;
 		new_link.from = n->m_id | OUTPUT_FLAG; 
 		new_link.to = link.to;
 		link.to = n->m_id;
-		m_resource->m_links.push(new_link);
+		m_active_emitter->m_links.push(new_link);
 		n->m_pos = pos;
 		pushUndo(0xffFF);
 	}
 
 	void onContextMenu(ImVec2 pos) override {
-		ParticleEditorResource::Node* n = nullptr;
+		ParticleEmitterEditorResource::Node* n = nullptr;
 		ImGui::SetNextItemWidth(150);
 		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
 		ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
@@ -1701,7 +1761,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					if (n) return *this;
 					if (stristr(label, editor->m_filter)) {
 						if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label)) {
-							n = creator.create(*editor->m_resource);
+							n = creator.create(*editor->m_active_emitter);
 							ImGui::CloseCurrentPopup();
 						}
 					}
@@ -1709,7 +1769,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 			
 				ParticleEditorImpl* editor;
-				ParticleEditorResource::Node* n = nullptr;
+				ParticleEmitterEditorResource::Node* n = nullptr;
 			} visitor;
 			visitor.editor = this;
 			visitCategories(visitor);
@@ -1721,12 +1781,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				bool beginCategory(const char* category) override { return ImGui::BeginMenu(category); }
 
 				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
-					if (ImGui::Selectable(label)) n = creator.create(*editor->m_resource);
+					if (ImGui::Selectable(label)) n = creator.create(*editor->m_active_emitter);
 					return *this;
 				}
 			
 				ParticleEditorImpl* editor;
-				ParticleEditorResource::Node* n = nullptr;
+				ParticleEmitterEditorResource::Node* n = nullptr;
 			} visitor;
 			visitor.editor = this;
 			visitCategories(visitor);
@@ -1739,10 +1799,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				
 			if (m_half_link_start) {
 				if (m_half_link_start & OUTPUT_FLAG) {
-					if (n->hasInputPins()) m_resource->m_links.push({u32(m_half_link_start), u32(n->m_id)});
+					if (n->hasInputPins()) m_active_emitter->m_links.push({u32(m_half_link_start), u32(n->m_id)});
 				}
 				else {
-					if (n->hasOutputPins()) m_resource->m_links.push({u32(n->m_id | OUTPUT_FLAG) , u32(m_half_link_start)});
+					if (n->hasOutputPins()) m_active_emitter->m_links.push({u32(n->m_id | OUTPUT_FLAG) , u32(m_half_link_start)});
 				}
 				m_half_link_start = 0;
 			}
@@ -1751,14 +1811,14 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	void deleteSelectedNodes() {
-		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
-			Node* n = m_resource->m_nodes[i];
+		for (i32 i = m_active_emitter->m_nodes.size() - 1; i >= 0; --i) {
+			Node* n = m_active_emitter->m_nodes[i];
 			if (n->m_selected && i > 2) {
-				m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
+				m_active_emitter->m_links.eraseItems([&](const ParticleEmitterEditorResource::Link& link){
 					return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 				});
 				LUMIX_DELETE(m_allocator, n);
-				m_resource->m_nodes.swapAndPop(i);
+				m_active_emitter->m_nodes.swapAndPop(i);
 			}
 		}
 		pushUndo(NO_MERGE_UNDO);
@@ -1780,14 +1840,14 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void toggleOpen() { m_open = !m_open; }
 
 	void deleteOutput(u32 output_idx) {
-		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
-			Node* n = m_resource->m_nodes[i];
+		for (i32 i = m_active_emitter->m_nodes.size() - 1; i >= 0; --i) {
+			Node* n = m_active_emitter->m_nodes[i];
 			if (n->getType() == Node::OUTPUT) {
-				for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
-					ParticleEditorResource::Link& link = m_resource->m_links[j];
+				for (i32 j = m_active_emitter->m_links.size() - 1; j >= 0; --j) {
+					ParticleEmitterEditorResource::Link& link = m_active_emitter->m_links[j];
 					if (link.getToNode() == n->m_id) {
 						if (link.getToPin() == output_idx) {
-							m_resource->m_links.swapAndPop(j);
+							m_active_emitter->m_links.swapAndPop(j);
 						}
 						else if (link.getToPin() > output_idx) {
 							link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
@@ -1796,22 +1856,22 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 			}
 		}
-		m_resource->m_outputs.erase(output_idx);
+		m_active_emitter->m_outputs.erase(output_idx);
 		pushUndo(NO_MERGE_UNDO);
 	}
 
 	void deleteStream(u32 stream_idx) {
-		for (i32 i = m_resource->m_nodes.size() - 1; i >= 0; --i) {
-			Node* n = m_resource->m_nodes[i];
+		for (i32 i = m_active_emitter->m_nodes.size() - 1; i >= 0; --i) {
+			Node* n = m_active_emitter->m_nodes[i];
 			switch (n->getType()) {
 				case Node::UPDATE: {
-					auto* node = (ParticleEditorResource::UpdateNode*)n;
-					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
-						ParticleEditorResource::Link& link = m_resource->m_links[j];
+					auto* node = (ParticleEmitterEditorResource::UpdateNode*)n;
+					for (i32 j = m_active_emitter->m_links.size() - 1; j >= 0; --j) {
+						ParticleEmitterEditorResource::Link& link = m_active_emitter->m_links[j];
 						if (link.getToNode() == node->m_id) {
 							// `stream_idx + 1` because of the "kill" input pin
 							if (link.getToPin() == stream_idx + 1) {
-								m_resource->m_links.swapAndPop(j);
+								m_active_emitter->m_links.swapAndPop(j);
 							}
 							else if (link.getToPin() > stream_idx + 1) {
 								link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
@@ -1821,12 +1881,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					break;
 				}
 				case Node::EMIT: {
-					auto* node = (ParticleEditorResource::EmitNode*)n;
-					for (i32 j = m_resource->m_links.size() - 1; j >= 0; --j) {
-						ParticleEditorResource::Link& link = m_resource->m_links[j];
+					auto* node = (ParticleEmitterEditorResource::EmitNode*)n;
+					for (i32 j = m_active_emitter->m_links.size() - 1; j >= 0; --j) {
+						ParticleEmitterEditorResource::Link& link = m_active_emitter->m_links[j];
 						if (link.getToNode() == node->m_id) {
 							if (link.getToPin() == stream_idx) {
-								m_resource->m_links.swapAndPop(j);
+								m_active_emitter->m_links.swapAndPop(j);
 							}
 							else if (link.getToPin() > stream_idx) {
 								link.to = link.getToNode() | (u32(link.getToPin() - 1) << 16);
@@ -1836,35 +1896,36 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					break;
 				}
 				case Node::INPUT: {
-					auto* node = (ParticleEditorResource::InputNode*)n;
+					auto* node = (ParticleEmitterEditorResource::InputNode*)n;
 					if (node->idx == stream_idx) {
-						m_resource->m_links.eraseItems([&](const ParticleEditorResource::Link& link){
+						m_active_emitter->m_links.eraseItems([&](const ParticleEmitterEditorResource::Link& link){
 							return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 						});
 						LUMIX_DELETE(m_allocator, n)
-						m_resource->m_nodes.swapAndPop(i);
+						m_active_emitter->m_nodes.swapAndPop(i);
 					}
 					break;
 				}
 				default: break;
 			}
 		}
-		m_resource->m_streams.erase(stream_idx);
+		m_active_emitter->m_streams.erase(stream_idx);
 		pushUndo(NO_MERGE_UNDO);
 	}
 
 	void leftColumnGUI() {
+		inputString("##name", "Emitter name", &m_active_emitter->m_name);
 		ImGuiEx::Label("Material");
-		m_app.getAssetBrowser().resourceInput("material", Span(m_resource->m_mat_path.data), Material::TYPE);
+		m_app.getAssetBrowser().resourceInput("material", Span(m_active_emitter->m_mat_path.data), Material::TYPE);
 		ImGuiEx::Label("Emit per second");
-		ImGui::DragFloat("##eps", &m_resource->m_emit_per_second);
+		ImGui::DragFloat("##eps", &m_active_emitter->m_emit_per_second);
 		ImGuiEx::Label("Emit at start");
-		ImGui::DragInt("##eas", (i32*)&m_resource->m_init_emit_count);
+		ImGui::DragInt("##eas", (i32*)&m_active_emitter->m_init_emit_count);
 		if (ImGui::CollapsingHeader("Streams", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (ParticleEditorResource::Stream& s : m_resource->m_streams) {
+			for (ParticleEmitterEditorResource::Stream& s : m_active_emitter->m_streams) {
 				ImGui::PushID(&s);
 				if (ImGui::Button(ICON_FA_TRASH)) {
-					deleteStream(u32(&s - m_resource->m_streams.begin()));
+					deleteStream(u32(&s - m_active_emitter->m_streams.begin()));
 					ImGui::PopID();
 					break;
 				}
@@ -1877,14 +1938,14 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				ImGui::PopID();
 			}
 			if (ImGui::Button(ICON_FA_PLUS "##add_stream")) {
-				m_resource->m_streams.emplace();
+				m_active_emitter->m_streams.emplace();
 			}
 		}
 		if (ImGui::CollapsingHeader("Outputs", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (ParticleEditorResource::Output& s : m_resource->m_outputs) {
+			for (ParticleEmitterEditorResource::Output& s : m_active_emitter->m_outputs) {
 				ImGui::PushID(&s);
 				if (ImGui::Button(ICON_FA_TRASH)) {
-					deleteOutput(u32(&s - m_resource->m_outputs.begin()));
+					deleteOutput(u32(&s - m_active_emitter->m_outputs.begin()));
 					ImGui::PopID();
 					break;
 				}
@@ -1897,30 +1958,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				ImGui::PopID();
 			}
 			if (ImGui::Button(ICON_FA_PLUS "##add_output")) {
-				m_resource->m_outputs.emplace();
-			}
-		}
-		if (ImGui::CollapsingHeader("Constants", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (ParticleEditorResource::Constant& s : m_resource->m_consts) {
-				ImGui::PushID(&s);
-				if (ImGui::Button(ICON_FA_TRASH)) {
-					m_resource->m_consts.erase(u32(&s - m_resource->m_consts.begin()));
-					ImGui::PopID();
-					pushUndo(NO_MERGE_UNDO);
-					break;
-				}
-				ImGui::SameLine();
-				ImGui::SetNextItemWidth(-1);
-				ImGui::InputText("##v", s.name.data, sizeof(s.name.data));
-				ImGui::PopID();
-			}
-			if (ImGui::Button(ICON_FA_PLUS "##add_const")) {
-				m_resource->m_consts.emplace();
+				m_active_emitter->m_outputs.emplace();
 			}
 		}
 	}
 
-	const ParticleEmitter* getSelectedEmitter() {
+	const ParticleSystem* getSelectedEmitter() {
 		WorldEditor& editor = m_app.getWorldEditor();
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return nullptr;
@@ -1929,33 +1972,38 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
 		RenderModule* module = (RenderModule*)world->getModule(emitter_type);
 		const bool has = world->hasComponent(selected[0], emitter_type);
-		EntityRef e = selected[0];
-		return has ? &module->getParticleEmitter(e) : nullptr;
+		return has ? &module->getParticleSystem(selected[0]) : nullptr;
 	}
 
 	void apply() {
-		const ParticleEmitter* emitter = getSelectedEmitter();
-		if (!emitter) return;
+		const ParticleSystem* system = getSelectedEmitter();
+		if (!system) return;
 
-		OutputMemoryStream instructions(m_allocator);
-		instructions.resize(m_resource->m_update.size() + m_resource->m_emit.size() + m_resource->m_output.size());
-		memcpy(instructions.getMutableData(), m_resource->m_update.data(), m_resource->m_update.size());
-		memcpy(instructions.getMutableData() + m_resource->m_update.size(), m_resource->m_emit.data(), m_resource->m_emit.size());
-		memcpy(instructions.getMutableData() + m_resource->m_update.size() + m_resource->m_emit.size(), m_resource->m_output.data(), m_resource->m_output.size());
-		auto getCount = [](const auto& x){
-			u32 c = 0;
-			for (const auto& i : x) c += ParticleEditorResource::getCount(i.type);
-			return c;
-		};
-		emitter->getResource()->overrideData(static_cast<OutputMemoryStream&&>(instructions)
-			, u32(m_resource->m_update.size())
-			, u32(m_resource->m_update.size() + m_resource->m_emit.size())
-			, getCount(m_resource->m_streams)
-			, m_resource->m_registers_count
-			, getCount(m_resource->m_outputs)
-			, m_resource->m_init_emit_count
-			, m_resource->m_emit_per_second);
-		emitter->getResource()->setMaterial(Path(m_resource->m_mat_path));
+		for (u32 emitter_idx = 0, c = system->getEmitters().size(); emitter_idx < c; ++emitter_idx) {
+			ASSERT(c == m_resource->m_emitters.size());
+			const ParticleSystem::Emitter& emitter = system->getEmitters()[emitter_idx];
+			const UniquePtr<ParticleEmitterEditorResource>& editor_emitter = m_resource->m_emitters[emitter_idx];
+			OutputMemoryStream instructions(m_allocator);
+			instructions.resize(editor_emitter->m_update.size() + editor_emitter->m_emit.size() + editor_emitter->m_output.size());
+			memcpy(instructions.getMutableData(), editor_emitter->m_update.data(), editor_emitter->m_update.size());
+			memcpy(instructions.getMutableData() + editor_emitter->m_update.size(), editor_emitter->m_emit.data(), editor_emitter->m_emit.size());
+			memcpy(instructions.getMutableData() + editor_emitter->m_update.size() + editor_emitter->m_emit.size(), editor_emitter->m_output.data(), editor_emitter->m_output.size());
+			auto getCount = [](const auto& x){
+				u32 c = 0;
+				for (const auto& i : x) c += ParticleEmitterEditorResource::getCount(i.type);
+				return c;
+			};
+			system->getResource()->overrideData(emitter_idx
+				, static_cast<OutputMemoryStream&&>(instructions)
+				, u32(editor_emitter->m_update.size())
+				, u32(editor_emitter->m_update.size() + editor_emitter->m_emit.size())
+				, getCount(editor_emitter->m_streams)
+				, editor_emitter->m_registers_count
+				, getCount(editor_emitter->m_outputs)
+				, editor_emitter->m_init_emit_count
+				, editor_emitter->m_emit_per_second
+				, Path(editor_emitter->m_mat_path));
+		}
 	}
 
 	static constexpr const char* WINDOW_NAME = "Particle editor";
@@ -2000,12 +2048,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
-				const ParticleEmitter* emitter = getSelectedEmitter();
+				const ParticleSystem* emitter = getSelectedEmitter();
 				if (ImGui::MenuItem("New")) newGraph();
 				if (ImGui::BeginMenu("Open")) {
 					char buf[LUMIX_MAX_PATH] = "";
 					FilePathHash dummy;
-					if (m_app.getAssetBrowser().resourceList(Span(buf), dummy, ParticleEmitterResource::TYPE, false, false)) {
+					if (m_app.getAssetBrowser().resourceList(Span(buf), dummy, ParticleSystemResource::TYPE, false, false)) {
 						open(buf);
 					}
 					ImGui::EndMenu();
@@ -2024,6 +2072,21 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			if (ImGui::BeginMenu("Edit")) {
 				menuItem(m_undo_action, canUndo());
 				menuItem(m_redo_action, canRedo());
+				if (ImGui::MenuItem("Add emitter")) {
+					ParticleEmitterEditorResource* emitter = m_resource->addEmitter();
+					emitter->initDefault();
+					pushUndo(NO_MERGE_UNDO);
+				}
+				if (ImGui::MenuItem("Remove emitter")) {
+					if (m_resource->m_emitters.size() <= 1) {
+						logError("Can not remove the last emitter");
+					}
+					else {
+						m_resource->removeEmitter(m_active_emitter);
+						m_active_emitter = m_resource->m_emitters[0].get();
+						pushUndo(NO_MERGE_UNDO);
+					}
+				}
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
@@ -2032,22 +2095,35 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		FileSelector& fs = m_app.getFileSelector();
 		if (fs.gui("Save As", &m_show_save_as, "par", true)) saveAs(fs.getPath());
 
-		ImGui::Columns(2);
-		leftColumnGUI();
-		ImGui::NextColumn();
-		nodeEditorGUI(m_resource->m_nodes, m_resource->m_links);
-		ImGui::Columns();
+		if (ImGui::BeginTabBar("tabbar")) {
+			for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
+				u32 idx = u32(&emitter - m_resource->m_emitters.begin());
+				if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx))) {
+					ImGui::Columns(2);
+					leftColumnGUI();
+					ImGui::NextColumn();
+					m_active_emitter = emitter.get();
+					nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+					ImGui::Columns();
+					ImGui::EndTabItem();
+				}
+			}
+			ImGui::EndTabBar();
+		}
 
 		ImGui::End();
 	}
 
-	ParticleEditorResource::Node* addNode(ParticleEditorResource::Node::Type type) {
-		return m_resource->addNode(type);
+	ParticleEmitterEditorResource::Node* addNode(ParticleEmitterEditorResource::Node::Type type) {
+		return m_active_emitter->addNode(type);
 	}
 
 	void pushUndo(u32 tag) override {
-		m_resource->colorLinks();
-		m_resource->generate();
+		m_active_emitter->colorLinks();
+		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
+			// TODO generate only active emitter and make sure other emitters are up-to-date
+			emitter->generate();
+		}
 		if (m_autoapply) apply();
 		m_dirty = true;
 		
@@ -2055,7 +2131,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	void loadFromEntity() {
-		const ParticleEmitter* emitter = getSelectedEmitter();
+		const ParticleSystem* emitter = getSelectedEmitter();
 		ASSERT(emitter);
 
 		const Path& path = emitter->getResource()->getPath();
@@ -2065,8 +2141,9 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void serialize(OutputMemoryStream& blob) override { m_resource->serialize(blob); }
 	
 	void deserialize(InputMemoryStream& blob) override { 
-		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
+		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_allocator);
 		m_resource->deserialize(blob, "");
+		m_active_emitter = m_resource->m_emitters[0].get();
 	}
 
 	void load(const char* path) {
@@ -2078,17 +2155,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			logError("Failed to read ", path);
 			return;
 		}
-		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
+		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_allocator);
 		InputMemoryStream iblob(blob);
 		m_resource->deserialize(iblob, path);
+		m_active_emitter = m_resource->m_emitters[0].get();
 		m_path = path;
 		clearUndoStack();
 		m_recent_paths.push(path);
 		pushUndo(NO_MERGE_UNDO);
 		m_dirty = false;
-	}
-
-	void load() {
 	}
 
 	void save() {
@@ -2121,8 +2196,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 
 		clearUndoStack();
-		m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
-		m_resource->initDefault();
+		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_allocator);
+		m_active_emitter = m_resource->m_emitters[0].get();
+		m_active_emitter->initDefault();
+
 		m_path = "";
 		pushUndo(NO_MERGE_UNDO);
 		m_dirty = false;
@@ -2143,36 +2220,39 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
-		ParticleEditorResource res(m_allocator);
+		ParticleSystemEditorResource res(m_allocator);
 		if (!res.deserialize(input, path)) return false;
 
-		res.generate();
-
-		ParticleEmitterResource::Header header;
+		ParticleSystemResource::Header header;
 		output.write(header);
-		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-		m_resource->fillVertexDecl(decl, nullptr, m_allocator);
-		output.write(decl);
-		output.writeString(res.m_mat_path); // material
-		const u32 count = u32(res.m_update.size() + res.m_emit.size() + res.m_output.size());
-		output.write(count);
-		output.write(res.m_update.data(), res.m_update.size());
-		output.write(res.m_emit.data(), res.m_emit.size());
-		output.write(res.m_output.data(), res.m_output.size());
-		output.write((u32)res.m_update.size());
-		output.write(u32(res.m_update.size() + res.m_emit.size()));
+		output.write(res.m_emitters.size());
+		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : res.m_emitters) {
+			emitter->generate();
 
-		auto getCount = [](const auto& x){
-			u32 c = 0;
-			for (const auto& i : x) c += ParticleEditorResource::getCount(i.type);
-			return c;
-		};
+			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+			emitter->fillVertexDecl(decl, nullptr, m_allocator);
+			output.write(decl);
+			output.writeString(emitter->m_mat_path);
+			const u32 count = u32(emitter->m_update.size() + emitter->m_emit.size() + emitter->m_output.size());
+			output.write(count);
+			output.write(emitter->m_update.data(), emitter->m_update.size());
+			output.write(emitter->m_emit.data(), emitter->m_emit.size());
+			output.write(emitter->m_output.data(), emitter->m_output.size());
+			output.write((u32)emitter->m_update.size());
+			output.write(u32(emitter->m_update.size() + emitter->m_emit.size()));
 
-		output.write(getCount(res.m_streams));
-		output.write((u32)res.m_registers_count);
-		output.write(getCount(res.m_outputs));
-		output.write(res.m_init_emit_count);
-		output.write(res.m_emit_per_second);
+			auto getCount = [](const auto& x){
+				u32 c = 0;
+				for (const auto& i : x) c += ParticleEmitterEditorResource::getCount(i.type);
+				return c;
+			};
+
+			output.write(getCount(emitter->m_streams));
+			output.write((u32)emitter->m_registers_count);
+			output.write(getCount(emitter->m_outputs));
+			output.write(emitter->m_init_emit_count);
+			output.write(emitter->m_emit_per_second);
+		}
 		return true;
 	}
 
@@ -2184,7 +2264,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	bool m_confirm_new = false;
 	bool m_confirm_load = false;
 	StaticString<LUMIX_MAX_PATH> m_confirm_load_path;
-	UniquePtr<ParticleEditorResource> m_resource;
+	UniquePtr<ParticleSystemEditorResource> m_resource;
+	ParticleEmitterEditorResource* m_active_emitter = nullptr;
 	bool m_open = false;
 	bool m_autoapply = false;
 	Action m_toggle_ui;
@@ -2200,19 +2281,20 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	char m_filter[64] = "";
 };
 
-DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
+DataStream ParticleEmitterEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
 	return node ? node->generate(instructions, output_idx, output, subindex) : DataStream();
 }
 
 gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, Array<String>& attribute_names, StudioApp& app) {
 	attribute_names.clear();
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-	ParticleEditorResource res(app.getAllocator());
+#if 0
+	ParticleSystemEditorResource system(app.getAllocator());
 	OutputMemoryStream blob(app.getAllocator());
 	if (app.getEngine().getFileSystem().getContentSync(Path(path), blob)) {
 		InputMemoryStream tmp(blob);
-		if (res.deserialize(tmp, path)) {
-			res.fillVertexDecl(decl, &attribute_names, app.getAllocator());
+		if (system.deserialize(tmp, path)) {
+			system.fillVertexDecl(decl, &attribute_names, app.getAllocator());
 		}
 		else {
 			logError("Failed to parse ", path);
@@ -2221,6 +2303,10 @@ gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, Array<String>& a
 	else {
 		logError("Failed to load ", path);
 	}
+	return decl;
+#endif
+	ASSERT(false);
+	// TODO
 	return decl;
 }
 

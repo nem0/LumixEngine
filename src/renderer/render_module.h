@@ -348,11 +348,11 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 
-	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0;
-	virtual Path getParticleEmitterPath(EntityRef entity) = 0;
-	virtual void updateParticleEmitter(EntityRef entity, float dt) = 0;
-	virtual const HashMap<EntityRef, struct ParticleEmitter>& getParticleEmitters() const = 0;
-	virtual ParticleEmitter& getParticleEmitter(EntityRef e) = 0;
+	virtual void setParticleSystemPath(EntityRef entity, const Path& path) = 0;
+	virtual Path getParticleSystemPath(EntityRef entity) = 0;
+	virtual void updateParticleSystem(EntityRef entity, float dt) = 0;
+	virtual const HashMap<EntityRef, struct ParticleSystem>& getParticleSystems() const = 0;
+	virtual ParticleSystem& getParticleSystem(EntityRef e) = 0;
 
 	virtual Path getInstancedModelPath(EntityRef entity) = 0;
 	virtual void setInstancedModelPath(EntityRef entity, const Path& path) = 0;

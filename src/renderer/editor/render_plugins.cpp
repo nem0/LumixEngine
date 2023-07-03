@@ -682,38 +682,40 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 };
 
 
-struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
+struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 {
-	ParticleEmitterPropertyPlugin(StudioApp& app) : m_app(app) {}
+	ParticleSystemPropertyPlugin(StudioApp& app) : m_app(app) {}
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
 		if (cmp_type != PARTICLE_EMITTER_TYPE) return;
 		if (entities.length() != 1) return;
 		
 		RenderModule* module = (RenderModule*)editor.getWorld()->getModule(cmp_type);
-		ParticleEmitter& emitter = module->getParticleEmitter(entities[0]);
+		ParticleSystem& system = module->getParticleSystem(entities[0]);
 
 		if (m_playing && ImGui::Button(ICON_FA_STOP " Stop")) m_playing = false;
 		else if (!m_playing && ImGui::Button(ICON_FA_PLAY " Play")) m_playing = true;
 
 		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) emitter.reset();
+		if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
 
 		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_EDIT " Edit")) m_particle_editor->open(emitter.getResource()->getPath().c_str());
+		if (ImGui::Button(ICON_FA_EDIT " Edit")) m_particle_editor->open(system.getResource()->getPath().c_str());
 
 		ImGuiEx::Label("Time scale");
 		ImGui::SliderFloat("##ts", &m_time_scale, 0, 1);
 		if (m_playing) {
 			float dt = m_app.getEngine().getLastTimeDelta() * m_time_scale;
-			module->updateParticleEmitter(entities[0], dt);
+			module->updateParticleSystem(entities[0], dt);
 		}
 			
 		ImGuiEx::Label("Particle count");
-		ImGui::Text("%d", emitter.m_particles_count);
+		for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
+			ImGui::Text("%d", emitter.particles_count);
+		}
 			
 		ImGuiEx::Label("Time");
-		ImGui::Text("%.2f", emitter.m_total_time);
+		ImGui::Text("%.2f", system.m_total_time);
 	}
 
 	StudioApp& m_app;
@@ -722,13 +724,13 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 	ParticleEditor* m_particle_editor;
 };
 
-struct ParticleEmitterPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
+struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
-	explicit ParticleEmitterPlugin(StudioApp& app)
+	explicit ParticleSystemPlugin(StudioApp& app)
 		: m_app(app)
 		, AssetBrowser::Plugin(app.getAllocator())
 	{
-		app.getAssetCompiler().registerExtension("par", ParticleEmitterResource::TYPE);
+		app.getAssetCompiler().registerExtension("par", ParticleSystemResource::TYPE);
 	}
 
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
@@ -757,7 +759,7 @@ struct ParticleEmitterPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Particle Emitter"; }
-	ResourceType getResourceType() const override { return ParticleEmitterResource::TYPE; }
+	ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
 
 	StudioApp& m_app;
 	ParticleEditor* m_particle_editor;
@@ -3026,7 +3028,10 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			m_app.getAssetBrowser().copyTile("editor/textures/tile_material.tga", out_path);
 			return;
 		}
-		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
+		if (!m_texture_plugin->createTile(in_path, out_path, Texture::TYPE)) {
+			m_app.getAssetBrowser().copyTile("editor/textures/tile_material.tga", out_path);
+		}
+		material->decRefCount();
 	}
 
 	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
@@ -5358,8 +5363,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
-	ParticleEmitterPlugin m_particle_emitter_plugin;
-	ParticleEmitterPropertyPlugin m_particle_emitter_property_plugin;
+	ParticleSystemPlugin m_particle_emitter_plugin;
+	ParticleSystemPropertyPlugin m_particle_emitter_property_plugin;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
 	ShaderPlugin m_shader_plugin;

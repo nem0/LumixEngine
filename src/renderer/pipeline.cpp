@@ -52,6 +52,7 @@ static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
 static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
 static constexpr u64 SORT_KEY_MESH_IDX_SHIFT = 40;
+static constexpr u64 SORT_KEY_EMITTER_SHIFT = 40;
 
 struct CameraParams
 {
@@ -1834,28 +1835,31 @@ struct PipelineImpl final : Pipeline
 	void setupParticles(View& view) {
 		if (view.cp.is_shadow) return;
 
-		const auto& emitters = m_module->getParticleEmitters();
-		if (emitters.size() == 0) return;
+		const auto& particle_systems = m_module->getParticleSystems();
+		if (particle_systems.size() == 0) return;
 			
 		Sorter::Inserter inserter(view.sorter);
 
 		// TODO culling
-		for (const ParticleEmitter& emitter : emitters) {
-			const Material* material = emitter.getResource()->getMaterial();
-			if (!material) continue;
+		for (const ParticleSystem& system : particle_systems) {
+			for (const ParticleSystem::Emitter& emitter : system.getEmitters()) {
+				const Material* material = emitter.resource_emitter.material;
+				if (!material) continue;
 
-			const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
-			if (bucket_idx == 0xff) continue;
+				const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
+				if (bucket_idx == 0xff) continue;
 
-			const u32 particles_count = emitter.getParticlesCount();
-			if (particles_count == 0) continue;
+				const u32 particles_count = emitter.particles_count;
+				if (particles_count == 0) continue;
 
-			const u32 size = emitter.getParticlesDataSizeBytes();
-			if (size == 0) continue;
+				const u32 size = emitter.getParticlesDataSizeBytes();
+				if (size == 0) continue;
 
-			const u64 type_mask = (u64)RenderableTypes::PARTICLES << 32;
-			const u64 subrenderable = emitter.m_entity.index | type_mask;
-			inserter.push(material->getSortKey() | ((u64)bucket_idx << SORT_KEY_BUCKET_SHIFT), subrenderable);
+				const u64 type_mask = (u64)RenderableTypes::PARTICLES << 32;
+				const u32 emitter_idx = u32(&emitter - system.getEmitters().begin());
+				const u64 subrenderable = system.m_entity.index | type_mask | ((u64)emitter_idx << SORT_KEY_EMITTER_SHIFT);
+				inserter.push(material->getSortKey() | ((u64)bucket_idx << SORT_KEY_BUCKET_SHIFT), subrenderable);
+			}
 		}
 	}
 
@@ -2624,14 +2628,15 @@ struct PipelineImpl final : Pipeline
 
 			switch(type) {
 				case RenderableTypes::PARTICLES: {
-					const ParticleEmitter& emitter = m_module->getParticleEmitter(entity);
-					const Material* material = emitter.getResource()->getMaterial();
-					const u32 particles_count = emitter.getParticlesCount();
+					const u32 emitter_idx = u32(renderables[i] >> SORT_KEY_EMITTER_SHIFT);
+					const ParticleSystem& particle_system = m_module->getParticleSystem(entity);
+					const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
+					const Material* material = emitter.resource_emitter.material;
+					const u32 particles_count = emitter.particles_count;
 
-					const ParticleEmitterResource* res = emitter.getResource();
-					const Transform tr = world.getTransform((EntityRef)emitter.m_entity);
+					const Transform tr = world.getTransform(*particle_system.m_entity);
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
-					const gpu::VertexDecl& decl = res->getVertexDecl();
+					const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 					const gpu::StateFlags state = material->m_render_states | render_state;
 					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask());
 					const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());

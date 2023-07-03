@@ -514,7 +514,7 @@ struct RendererImpl final : Renderer
 		m_texture_manager.create(Texture::TYPE, manager);
 		m_model_manager.create(Model::TYPE, manager);
 		m_material_manager.create(Material::TYPE, manager);
-		m_particle_emitter_manager.create(ParticleEmitterResource::TYPE, manager);
+		m_particle_emitter_manager.create(ParticleSystemResource::TYPE, manager);
 		m_shader_manager.create(Shader::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
@@ -943,7 +943,7 @@ struct RendererImpl final : Renderer
 	FontManager* m_font_manager;
 	MaterialManager m_material_manager;
 	RenderResourceManager<Model> m_model_manager;
-	RenderResourceManager<ParticleEmitterResource> m_particle_emitter_manager;
+	RenderResourceManager<ParticleSystemResource> m_particle_emitter_manager;
 	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;

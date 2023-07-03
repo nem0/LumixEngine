@@ -233,6 +233,12 @@ bool inputString(const char* label, String* value) {
 	return ImGui::InputText(label, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);
 }
 
+bool inputString(const char* str_id, const char* label, String* value) {
+	ImGuiInputTextFlags flags = ImGuiInputTextFlags_CallbackResize;
+	ImGuiEx::Label(label);
+	return ImGui::InputText(str_id, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);
+}
+
 SimpleUndoRedo::SimpleUndoRedo(IAllocator& allocator)
 	: m_stack(allocator)
 	, m_allocator(allocator)

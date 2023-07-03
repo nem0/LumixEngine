@@ -23,80 +23,95 @@
 namespace Lumix
 {
 
-using DataStream = ParticleEmitterResource::DataStream;
-using InstructionType = ParticleEmitterResource::InstructionType;
+using DataStream = ParticleSystemResource::DataStream;
+using InstructionType = ParticleSystemResource::InstructionType;
 
-const ResourceType ParticleEmitterResource::TYPE = ResourceType("particle_emitter");
+const ResourceType ParticleSystemResource::TYPE = ResourceType("particle_emitter");
 static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 
+ParticleSystemResource::Emitter::Emitter(ParticleSystemResource& resource)
+	: resource(resource)
+	, instructions(resource.m_allocator)
+	, material(nullptr)
+	, vertex_decl(gpu::PrimitiveType::TRIANGLE_STRIP)
+{
+}
 
-ParticleEmitterResource::ParticleEmitterResource(const Path& path
+ParticleSystemResource::ParticleSystemResource(const Path& path
 	, ResourceManager& manager
 	, Renderer& renderer
-	, IAllocator& allocator)
+	, IAllocator& allocator
+)
 	: Resource(path, manager, allocator)
-	, m_instructions(allocator)
-	, m_material(nullptr)
-	, m_vertex_decl(gpu::PrimitiveType::TRIANGLE_STRIP)
+	, m_allocator(allocator)
+	, m_emitters(allocator)
 {
 }
 
 
-void ParticleEmitterResource::unload()
+void ParticleSystemResource::unload()
 {
-	if (m_material) {
-		Material* tmp = m_material;
-		m_material = nullptr;
-		removeDependency(*tmp);
-		tmp->decRefCount();
+	for (Emitter& emitter : m_emitters) {
+		if (emitter.material) {
+			Material* tmp = emitter.material;
+			emitter.material = nullptr;
+			removeDependency(*tmp);
+			tmp->decRefCount();
+		}
+		emitter.instructions.clear();
 	}
-	m_instructions.clear();
+	m_emitters.clear();
 }
 
 
-void ParticleEmitterResource::overrideData(OutputMemoryStream&& instructions,
-	u32 emit_offset,
-	u32 output_offset,
-	u32 channels_count,
-	u32 registers_count,
-	u32 outputs_count,
-	u32 init_emit_count,
-	float emit_rate
+void ParticleSystemResource::overrideData(u32 emitter_idx
+	, OutputMemoryStream&& instructions
+	, u32 emit_offset
+	, u32 output_offset
+	, u32 channels_count
+	, u32 registers_count
+	, u32 outputs_count
+	, u32 init_emit_count
+	, float emit_rate
+	, const Path& material
 )
 {
 	++m_empty_dep_count;
 	checkState();
 	
-	m_instructions = static_cast<OutputMemoryStream&&>(instructions);
-	m_emit_offset = emit_offset;
-	m_output_offset = output_offset;
-	m_channels_count = channels_count;
-	m_registers_count = registers_count;
-	m_outputs_count = outputs_count;
-	m_init_emit_count = m_init_emit_count;
-	m_emit_per_second = emit_rate;
+	Emitter& emitter = m_emitters[emitter_idx];
+
+	emitter.instructions = static_cast<OutputMemoryStream&&>(instructions);
+	emitter.emit_offset = emit_offset;
+	emitter.output_offset = output_offset;
+	emitter.channels_count = channels_count;
+	emitter.registers_count = registers_count;
+	emitter.outputs_count = outputs_count;
+	emitter.init_emit_count = init_emit_count;
+	emitter.emit_per_second = emit_rate;
+	emitter.setMaterial(material);
 	
 	--m_empty_dep_count;
 	checkState();
 }
 
-void ParticleEmitterResource::setMaterial(const Path& path)
+void ParticleSystemResource::Emitter::setMaterial(const Path& path)
 {
-	Material* material = m_resource_manager.getOwner().load<Material>(path);
-	if (m_material) {
-		Material* tmp = m_material;
-		m_material = nullptr;
-		removeDependency(*tmp);
+	Material* new_material = resource.m_resource_manager.getOwner().load<Material>(path);
+	if (material) {
+		Material* tmp = material;
+		material = nullptr;
+		resource.removeDependency(*tmp);
 		tmp->decRefCount();
 	}
-	m_material = material;
-	if (m_material) {
-		addDependency(*m_material);
+	material = new_material;
+	if (material) {
+		resource.addDependency(*material);
 	}
 }
 
-bool ParticleEmitterResource::load(u64 size, const u8* mem) {
+bool ParticleSystemResource::load(u64 size, const u8* mem) {
 	Header header;
 	InputMemoryStream blob(mem, size);
 	blob.read(header);
@@ -110,91 +125,125 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem) {
 		return false;
 	}
 
-	if (header.version > Version::VERTEX_DECL) {
-		blob.read(m_vertex_decl);
-	}
-	else {
-		m_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
-		m_vertex_decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
-		m_vertex_decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
-		m_vertex_decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
-		m_vertex_decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // frame
+	u32 emitter_count = 1;
+	if (header.version > Version::MULTIEMITTER) {
+		emitter_count = blob.read<u32>();
 	}
 
-	setMaterial(Path(blob.readString()));
-	const u32 isize = blob.read<u32>();
-	m_instructions.resize(isize);
-	blob.read(m_instructions.getMutableData(), m_instructions.size());
-	blob.read(m_emit_offset);
-	blob.read(m_output_offset);
-	blob.read(m_channels_count);
-	blob.read(m_registers_count);
-	blob.read(m_outputs_count);
-	if (header.version > Version::EMIT_RATE) {
-		blob.read(m_init_emit_count);
-		blob.read(m_emit_per_second);
-	}
+	for (u32 i = 0; i < emitter_count; ++i) {
+		Emitter& emitter = m_emitters.emplace(*this);
+		if (header.version > Version::VERTEX_DECL) {
+			blob.read(emitter.vertex_decl);
+		}
+		else {
+			emitter.vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
+			emitter.vertex_decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
+			emitter.vertex_decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
+			emitter.vertex_decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// rot
+			emitter.vertex_decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// frame
+		}
 
+		emitter.setMaterial(Path(blob.readString()));
+		const u32 isize = blob.read<u32>();
+		emitter.instructions.resize(isize);
+		blob.read(emitter.instructions.getMutableData(), emitter.instructions.size());
+		blob.read(emitter.emit_offset);
+		blob.read(emitter.output_offset);
+		blob.read(emitter.channels_count);
+		blob.read(emitter.registers_count);
+		blob.read(emitter.outputs_count);
+		if (header.version > Version::EMIT_RATE) {
+			blob.read(emitter.init_emit_count);
+			blob.read(emitter.emit_per_second);
+		}
+	}
 	return true;
 }
 
-
-ParticleEmitter::ParticleEmitter(EntityPtr entity, World& world, IAllocator& allocator)
+ParticleSystem::ParticleSystem(EntityPtr entity, World& world, IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_world(world)
 	, m_entity(entity)
+	, m_emitters(allocator)
 {
 }
 
-ParticleEmitter::ParticleEmitter(ParticleEmitter&& rhs)
+ParticleSystem::Emitter::Emitter(ParticleSystem::Emitter&& rhs)
+	: system(rhs.system)
+	, resource_emitter(rhs.resource_emitter)
+{
+	memcpy(channels, rhs.channels, sizeof(channels));
+	memset(rhs.channels, 0, sizeof(rhs.channels));
+}
+
+ParticleSystem::ParticleSystem(ParticleSystem&& rhs)
 	: m_allocator(rhs.m_allocator)
 	, m_world(rhs.m_world)
-	, m_capacity(rhs.m_capacity)
-	, m_emit_timer(rhs.m_emit_timer)
+	, m_emitters(rhs.m_emitters.move())
 	, m_resource(rhs.m_resource)
 	, m_entity(rhs.m_entity)
-	, m_particles_count(rhs.m_particles_count)
 	, m_autodestroy(rhs.m_autodestroy)
 {
-	memcpy(m_channels, rhs.m_channels, sizeof(m_channels));
 	memcpy(m_constants, rhs.m_constants, sizeof(m_constants));
-	memset(rhs.m_channels, 0, sizeof(rhs.m_channels));
+	
 	if (rhs.m_resource) {
-		rhs.m_resource->getObserverCb().unbind<&ParticleEmitter::onResourceChanged>(&rhs);
+		rhs.m_resource->getObserverCb().unbind<&ParticleSystem::onResourceChanged>(&rhs);
 	}
 	rhs.m_resource = nullptr;
 	if (m_resource) {
-		m_resource->onLoaded<&ParticleEmitter::onResourceChanged>(this);
+		m_resource->onLoaded<&ParticleSystem::onResourceChanged>(this);
 	}
 }
 
-ParticleEmitter::~ParticleEmitter()
+ParticleSystem::~ParticleSystem()
 {
 	setResource(nullptr);
-	for (const Channel& c : m_channels) {
-		m_allocator.deallocate_aligned(c.data);
+	for (Emitter& emitter : m_emitters) {
+		for (const Channel& c : emitter.channels) {
+			m_allocator.deallocate_aligned(c.data);
+		}
 	}
 }
 
-void ParticleEmitter::onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&) {
-	m_particles_count = 0;
-	m_capacity = 0;
-	m_emit_timer = 0;
-	for (Channel& c : m_channels) {
-		m_allocator.deallocate_aligned(c.data);
-		c.data = nullptr;
+void ParticleSystem::reset() {
+	m_total_time = 0;
+	for (Emitter& emitter : m_emitters) {
+		emitter.particles_count = 0;
 	}
 }
 
-void ParticleEmitter::setResource(ParticleEmitterResource* res)
+void ParticleSystem::onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&) {
+	if (new_state == Resource::State::READY) {
+		for (Emitter& emitter : m_emitters) {
+			for (Channel& c : emitter.channels) {
+				m_allocator.deallocate_aligned(c.data);
+			}
+		}
+		m_emitters.clear();
+		for (u32 i = 0, c = m_resource->getEmitters().size(); i < c; ++i) {
+			m_emitters.emplace(*this, m_resource->getEmitters()[i]);
+		}
+	}
+	for (Emitter& emitter : m_emitters) {
+		emitter.emit_timer = 0;
+		emitter.particles_count = 0;
+		emitter.capacity = 0;
+		for (Channel& c : emitter.channels) {
+			m_allocator.deallocate_aligned(c.data);
+			c.data = nullptr;
+		}
+	}
+}
+
+void ParticleSystem::setResource(ParticleSystemResource* res)
 {
 	if (m_resource) {
-		m_resource->getObserverCb().unbind<&ParticleEmitter::onResourceChanged>(this);
+		m_resource->getObserverCb().unbind<&ParticleSystem::onResourceChanged>(this);
 		m_resource->decRefCount();
 	}
 	m_resource = res;
 	if (m_resource) {
-		m_resource->onLoaded<&ParticleEmitter::onResourceChanged>(this);
+		m_resource->onLoaded<&ParticleSystem::onResourceChanged>(this);
 	}
 }
 
@@ -218,30 +267,33 @@ namespace {
 	}
 }
 
-void ParticleEmitter::emit() {
-	if (m_particles_count == m_capacity) {
-		const u32 channels_count = m_resource->getChannelsCount();
-		u32 new_capacity = maximum(16, m_capacity << 1);
+void ParticleSystem::emit(u32 emitter_idx) {
+	Emitter& emitter = m_emitters[emitter_idx];
+	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
+
+	if (emitter.particles_count == emitter.capacity) {
+		const u32 channels_count = res_emitter.channels_count;
+		u32 new_capacity = maximum(16, emitter.capacity << 1);
 		for (u32 i = 0; i < channels_count; ++i)
 		{
-			m_channels[i].data = (float*)m_allocator.reallocate_aligned(m_channels[i].data, new_capacity * sizeof(float), 16);
+			emitter.channels[i].data = (float*)m_allocator.reallocate_aligned(emitter.channels[i].data, new_capacity * sizeof(float), 16);
 		}
-		m_capacity = new_capacity;
+		emitter.capacity = new_capacity;
 	}
 
-	const OutputMemoryStream& instructions = m_resource->getInstructions();
+	const OutputMemoryStream& instructions = res_emitter.instructions;
 
 	InputMemoryStream ip(instructions);
-	ip.skip(m_resource->getEmitOffset());
+	ip.skip(res_emitter.emit_offset);
 	StackArray<float, 16> registers(m_allocator);
-	registers.resize(m_resource->getRegistersCount());
+	registers.resize(res_emitter.registers_count);
 
 	auto getConstValue = [&](const DataStream& str) -> float {
 		switch (str.type) {
 			case DataStream::LITERAL: return str.value;
 			case DataStream::CONST: return m_constants[str.index];
 			case DataStream::REGISTER: return registers[str.index];
-			case DataStream::CHANNEL: return m_channels[str.index].data[m_particles_count];
+			case DataStream::CHANNEL: return emitter.channels[str.index].data[emitter.particles_count];
 			default: ASSERT(false); return str.value;
 		}
 	};
@@ -249,7 +301,7 @@ void ParticleEmitter::emit() {
 	auto getValue = [&](const DataStream& str) -> float& {
 		switch (str.type) {
 			case DataStream::REGISTER: return registers[str.index];
-			case DataStream::CHANNEL: return m_channels[str.index].data[m_particles_count];
+			case DataStream::CHANNEL: return emitter.channels[str.index].data[emitter.particles_count];
 			default: ASSERT(false); return registers[0];
 		}
 	};
@@ -258,7 +310,7 @@ void ParticleEmitter::emit() {
 		const InstructionType it = ip.read<InstructionType>();
 		switch (it) {
 			case InstructionType::END:
-				++m_particles_count;
+				++emitter.particles_count;
 				return;
 			case InstructionType::MESH: {
 				DataStream dst = ip.read<DataStream>();
@@ -403,7 +455,7 @@ void ParticleEmitter::emit() {
 }
 
 
-void ParticleEmitter::serialize(OutputMemoryStream& blob) const
+void ParticleSystem::serialize(OutputMemoryStream& blob) const
 {
 	blob.write(m_entity);
 	blob.write(m_autodestroy);
@@ -411,7 +463,7 @@ void ParticleEmitter::serialize(OutputMemoryStream& blob) const
 }
 
 
-void ParticleEmitter::deserialize(InputMemoryStream& blob, bool has_autodestroy, bool emit_rate_removed, ResourceManagerHub& manager)
+void ParticleSystem::deserialize(InputMemoryStream& blob, bool has_autodestroy, bool emit_rate_removed, ResourceManagerHub& manager)
 {
 	blob.read(m_entity);
 	if (!emit_rate_removed) {
@@ -421,17 +473,17 @@ void ParticleEmitter::deserialize(InputMemoryStream& blob, bool has_autodestroy,
 	m_autodestroy = false;
 	if (has_autodestroy) blob.read(m_autodestroy);
 	const char* path = blob.readString();
-	auto* res = manager.load<ParticleEmitterResource>(Path(path));
+	auto* res = manager.load<ParticleSystemResource>(Path(path));
 	setResource(res);
 }
 
-static float4* getStream(const ParticleEmitter& emitter
+static float4* getStream(const ParticleSystem::Emitter& emitter
 	, DataStream stream
 	, u32 offset
 	, float4* register_mem)
 {
 	switch (stream.type) {
-		case DataStream::CHANNEL: return (float4*)emitter.getChannelData(stream.index) + offset;
+		case DataStream::CHANNEL: return (float4*)emitter.channels[stream.index].data + offset;
 		case DataStream::REGISTER: return register_mem + 256 * stream.index;
 		default: ASSERT(false); return nullptr;
 	}
@@ -440,7 +492,7 @@ static float4* getStream(const ParticleEmitter& emitter
 struct LiteralGetter {
 	LiteralGetter(DataStream stream) : stream(stream) {}
 
-	float4* get(const ParticleEmitter& emitter, i32, i32, float4*) {
+	float4* get(const ParticleSystem::Emitter& emitter, i32, i32, float4*) {
 		value = f4Splat(stream.value);
 		return &value;
 	}
@@ -452,8 +504,8 @@ struct LiteralGetter {
 
 struct ChannelGetter {
 	ChannelGetter(DataStream stream) : stream(stream) {}
-	float4* get(const ParticleEmitter& emitter, i32, i32, float4*) {
-		return (float4*)emitter.getChannelData(stream.index);
+	float4* get(const ParticleSystem::Emitter& emitter, i32, i32, float4*) {
+		return (float4*)emitter.channels[stream.index].data;
 	}
 	static void step(float4*& val) { ++val; }
 	DataStream stream;
@@ -462,8 +514,8 @@ struct ChannelGetter {
 struct ConstGetter {
 	ConstGetter(DataStream stream) : stream(stream) {}
 
-	float4* get(const ParticleEmitter& emitter, i32, i32, float4*) {
-		value = f4Splat(emitter.m_constants[stream.index]);
+	float4* get(const ParticleSystem::Emitter& emitter, i32, i32, float4*) {
+		value = f4Splat(emitter.system.m_constants[stream.index]);
 		return &value;
 	}
 	static void step(float4*& val) {}
@@ -475,7 +527,7 @@ struct ConstGetter {
 struct RegisterGetter {
 	RegisterGetter(DataStream stream) : stream(stream) {}
 
-	float4* get(const ParticleEmitter& emitter, i32, i32 stepf4, float4* reg_mem) {
+	float4* get(const ParticleSystem::Emitter& emitter, i32, i32 stepf4, float4* reg_mem) {
 		return reg_mem + 256 * stream.index;
 	}
 
@@ -502,7 +554,7 @@ struct BinaryHelper {
 		float4* arg1 = t1.get(*emitter, fromf4, stepf4, reg_mem);
 		
 		if (dst.type == DataStream::OUT) {
-			const u32 stride = emitter->getResource()->getOutputsCount();
+			const u32 stride = emitter->resource_emitter.outputs_count;
 			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1)) {
 				float4 tmp = F(*arg0, *arg1);
 				u32 idx = dst.index + (fromf4 + i) * 4 * stride;
@@ -538,7 +590,7 @@ struct BinaryHelper {
 		return f4Load(r);
 	}
 
-	const ParticleEmitter* emitter;
+	const ParticleSystem::Emitter* emitter;
 	i32 fromf4;
 	i32 stepf4;
 	float4* reg_mem;
@@ -574,7 +626,7 @@ struct TernaryHelper {
 		float4* arg2 = t2.get(*emitter, fromf4, stepf4, reg_mem);
 
 		if (dst.type == DataStream::OUT) {
-			const u32 stride = emitter->getResource()->getOutputsCount();
+			const u32 stride = emitter->resource_emitter.outputs_count;
 			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1), T2::step(arg2)) {
 				float4 tmp = F(*arg0, *arg1, *arg2);
 				u32 idx = dst.index + (fromf4 + i) * 4 * stride;
@@ -597,7 +649,7 @@ struct TernaryHelper {
 		}
 	}
 
-	const ParticleEmitter* emitter;
+	const ParticleSystem::Emitter* emitter;
 	i32 fromf4;
 	i32 stepf4;
 	float4* reg_mem;
@@ -606,30 +658,24 @@ struct TernaryHelper {
 
 
 // TODO world space particles
-bool ParticleEmitter::update(float dt, PageAllocator& allocator)
-{
-	if (!m_resource || !m_resource->isReady()) return false;
-	
-	m_constants[0] = dt;
-	m_constants[1] = m_total_time;
-	
-	if (m_total_time == 0) {
-		for (u32 i = 0, c = m_resource->getInitEmitCount(); i < c; ++i) emit();
-	}
+void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator) {
+	PROFILE_FUNCTION();
 
-	if (m_resource->getEmitPerSecond() > 0) {
-		m_emit_timer += dt;
-		const float d = 1.f / m_resource->getEmitPerSecond();
-		while (m_emit_timer > 0) {
-			emit();
-			m_emit_timer -= d;
+	Emitter& emitter = m_emitters[emitter_idx];
+	ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
+
+	if (res_emitter.emit_per_second > 0) {
+		emitter.emit_timer += dt;
+		const float d = 1.f / res_emitter.emit_per_second;
+		while (emitter.emit_timer > 0) {
+			emit(emitter_idx);
+			emitter.emit_timer -= d;
 		}
 	}
 
-	m_total_time += dt;
-	if (m_particles_count == 0) return false;
+	if (emitter.particles_count == 0) return;
 
-	profiler::pushInt("particle count", m_particles_count);
+	profiler::pushInt("particle count", emitter.particles_count);
 	u32* kill_list = (u32*)allocator.allocate(true);
 	volatile i32 kill_counter = 0;
 
@@ -637,14 +683,14 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 	jobs::runOnWorkers([&](){
 		PROFILE_FUNCTION();
 		Array<float4> reg_mem(m_allocator);
-		reg_mem.resize(m_resource->getRegistersCount() * 256);
+		reg_mem.resize(res_emitter.registers_count * 256);
 		for (;;) {
 			const i32 from = atomicAdd(&counter, 1024);
-			if (from >= (i32)m_particles_count) return;
+			if (from >= (i32)emitter.particles_count) return;
 
 			const i32 fromf4 = from / 4;
-			const i32 stepf4 = minimum(1024, m_particles_count - from + 3) / 4;
-			InputMemoryStream ip = InputMemoryStream(m_resource->getInstructions());
+			const i32 stepf4 = minimum(1024, emitter.particles_count - from + 3) / 4;
+			InputMemoryStream ip = InputMemoryStream(res_emitter.instructions);
 			InstructionType itype = ip.read<InstructionType>();
 
 			while (itype != InstructionType::END) {
@@ -653,12 +699,12 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					case InstructionType::GT: {
 						DataStream dst = ip.read<DataStream>();
 						DataStream op0 = ip.read<DataStream>();
-						const float4* arg0 = getStream(*this, dst, fromf4, reg_mem.begin());
+						const float4* arg0 = getStream(emitter, dst, fromf4, reg_mem.begin());
 						const float4* end = arg0 + stepf4;
 						const InstructionType inner_type = ip.read<InstructionType>();
 
 						auto helper = [&](auto f, auto arg1_getter){
-							float4* arg1 = arg1_getter.get(*this, fromf4, stepf4, reg_mem.begin());
+							float4* arg1 = arg1_getter.get(emitter, fromf4, stepf4, reg_mem.begin());
 							for (const float4* beg = arg0; arg0 != end; ++arg0) {
 								const float4 tmp = f(*arg0, *arg1);
 								const int m = f4MoveMask(tmp);
@@ -667,7 +713,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 										switch(inner_type) {
 											case InstructionType::KILL: {
 												const u32 idx = u32(from + (arg0 - beg) * 4 + i);
-												if (idx < m_particles_count) {
+												if (idx < emitter.particles_count) {
 													const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
 													if (kill_idx < PageAllocator::PAGE_SIZE / sizeof(kill_list[0])) {
 														kill_list[kill_idx] = idx;
@@ -714,7 +760,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					}	
 					case InstructionType::MUL: {
 						BinaryHelper helper;
-						helper.emitter = this;
+						helper.emitter = &emitter;
 						helper.fromf4 = fromf4;
 						helper.stepf4 = stepf4;
 						helper.reg_mem = reg_mem.begin();
@@ -724,7 +770,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					}
 					case InstructionType::MOD: {
 						BinaryHelper helper;
-						helper.emitter = this;
+						helper.emitter = &emitter;
 						helper.fromf4 = fromf4;
 						helper.stepf4 = stepf4;
 						helper.reg_mem = reg_mem.begin();
@@ -734,7 +780,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					}
 					case InstructionType::DIV: {
 						BinaryHelper helper;
-						helper.emitter = this;
+						helper.emitter = &emitter;
 						helper.fromf4 = fromf4;
 						helper.stepf4 = stepf4;
 						helper.reg_mem = reg_mem.begin();
@@ -744,7 +790,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					}
 					case InstructionType::SUB: {
 						BinaryHelper helper;
-						helper.emitter = this;
+						helper.emitter = &emitter;
 						helper.fromf4 = fromf4;
 						helper.stepf4 = stepf4;
 						helper.reg_mem = reg_mem.begin();
@@ -754,7 +800,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					}
 					case InstructionType::MULTIPLY_ADD: {
 						TernaryHelper helper;
-						helper.emitter = this;
+						helper.emitter = &emitter;
 						helper.fromf4 = fromf4;
 						helper.stepf4 = stepf4;
 						helper.reg_mem = reg_mem.begin();
@@ -764,7 +810,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					}
 					case InstructionType::ADD: {
 						BinaryHelper helper;
-						helper.emitter = this;
+						helper.emitter = &emitter;
 						helper.fromf4 = fromf4;
 						helper.stepf4 = stepf4;
 						helper.reg_mem = reg_mem.begin();
@@ -775,7 +821,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					case InstructionType::MOV: {
 						const DataStream dst = ip.read<DataStream>();
 						const DataStream op0 = ip.read<DataStream>();
-						float4* result = getStream(*this, dst, fromf4, reg_mem.begin());
+						float4* result = getStream(emitter, dst, fromf4, reg_mem.begin());
 						const float4* const end = result + stepf4;
 				
 						if (op0.type == DataStream::CONST) {
@@ -786,7 +832,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 							}
 						}
 						else {
-							const float4* src = getStream(*this, op0, fromf4, reg_mem.begin());
+							const float4* src = getStream(emitter, op0, fromf4, reg_mem.begin());
 
 							for (; result != end; ++result, ++src) {
 								*result = *src;
@@ -798,8 +844,8 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					case InstructionType::COS: {
 						const DataStream dst = ip.read<DataStream>();
 						const DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
-						float* result = (float*)getStream(*this, dst, fromf4, reg_mem.begin());
+						const float* arg = (float*)getStream(emitter, op0, fromf4, reg_mem.begin());
+						float* result = (float*)getStream(emitter, dst, fromf4, reg_mem.begin());
 						const float* const end = result + stepf4 * 4;
 
 						for (; result != end; ++result, ++arg) {
@@ -810,8 +856,8 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 					case InstructionType::SIN: {
 						const DataStream dst = ip.read<DataStream>();
 						const DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
-						float* result = (float*)getStream(*this, dst, fromf4, reg_mem.begin());
+						const float* arg = (float*)getStream(emitter, op0, fromf4, reg_mem.begin());
+						float* result = (float*)getStream(emitter, dst, fromf4, reg_mem.begin());
 						const float* const end = result + stepf4 * 4;
 
 						for (; result != end; ++result, ++arg) {
@@ -829,7 +875,7 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 	});
 
 	if (kill_counter > 0) {
-		ASSERT(kill_counter <= (i32)m_particles_count);
+		ASSERT(kill_counter <= (i32)emitter.particles_count);
 		kill_counter = minimum(kill_counter, i32(PageAllocator::PAGE_SIZE / sizeof(kill_list[0])));
 		qsort(kill_list, kill_counter, sizeof(u32), [](const void* a, const void* b) -> int {
 			const u32 i = *(u32*)a;
@@ -838,45 +884,69 @@ bool ParticleEmitter::update(float dt, PageAllocator& allocator)
 			if (i > j) return 1;
 			return 0;
 		});
-		const i32 channels_count = m_resource->getChannelsCount();
+		const i32 channels_count = res_emitter.channels_count;
 		for (i32 j = kill_counter - 1; j >= 0; --j) {
-			const u32 last = m_particles_count - 1;
+			const u32 last = emitter.particles_count - 1;
 			const u32 particle_index = kill_list[j];
 			for (i32 i = 0; i < channels_count; ++i) {
-				float* data = m_channels[i].data;
+				float* data = emitter.channels[i].data;
 				data[particle_index] = data[last];
 			}
-			--m_particles_count;
+			--emitter.particles_count;
 		}
 	}
 
 	allocator.deallocate(kill_list, true);
-	return kill_counter > 0 && m_particles_count == 0 && m_autodestroy;
 }
 
-
-u32 ParticleEmitter::getParticlesDataSizeBytes() const
+bool ParticleSystem::update(float dt, PageAllocator& allocator)
 {
-	return m_resource ? ((m_particles_count + 3) & ~3) * m_resource->getOutputsCount() * sizeof(float) : 0;
+	if (!m_resource || !m_resource->isReady()) return false;
+	
+	m_constants[0] = dt;
+	m_constants[1] = m_total_time;
+	
+	if (m_total_time == 0) {
+		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
+			for (u32 i = 0, c = m_resource->getEmitters()[emitter_idx].init_emit_count; i < c; ++i) emit(emitter_idx);
+		}
+	}
+
+	m_total_time += dt;
+
+	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
+		update(dt, emitter_idx, allocator);
+	}
+
+	u32 c = 0;
+	for (const Emitter& emitter : m_emitters) {
+		c += emitter.particles_count;
+	}
+	return c == 0 && m_autodestroy;
 }
 
 
-void ParticleEmitter::fillInstanceData(float* data) const {
-	if (m_particles_count == 0) return;
+u32 ParticleSystem::Emitter::getParticlesDataSizeBytes() const {
+	return ((particles_count + 3) & ~3) * resource_emitter.outputs_count * sizeof(float);
+}
+
+
+void ParticleSystem::Emitter::fillInstanceData(float* data) const {
+	if (particles_count == 0) return;
 
 	volatile i32 counter = 0;
 	jobs::runOnWorkers([&](){
 		PROFILE_FUNCTION();
-		Array<float4> reg_mem(m_allocator);
-		reg_mem.resize(m_resource->getRegistersCount() * 256);
+		Array<float4> reg_mem(system.m_allocator);
+		reg_mem.resize(resource_emitter.registers_count * 256);
 		for (;;) {
 			const u32 from = (u32)atomicAdd(&counter, 1024);
-			if (from >= m_particles_count) return;
+			if (from >= particles_count) return;
 			const u32 fromf4 = from / 4;
-			const u32 stepf4 = minimum(1024, m_particles_count - from + 3) / 4;
+			const u32 stepf4 = minimum(1024, particles_count - from + 3) / 4;
 
-			InputMemoryStream ip(m_resource->getInstructions());
-			ip.skip(m_resource->getOutputOffset());
+			InputMemoryStream ip(resource_emitter.instructions);
+			ip.skip(resource_emitter.output_offset);
 
 			InstructionType itype = ip.read<InstructionType>();
 			while (itype != InstructionType::END) {
@@ -888,7 +958,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 						
 						if (dst_stream.type == DataStream::OUT) {
 							u8 output_idx = dst_stream.index;
-							const u32 stride = m_resource->getOutputsCount();
+							const u32 stride = resource_emitter.outputs_count;
 							float* dst = data + output_idx + fromf4 * 4 * stride;
 							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
 								dst[j] = sinf(arg[i]);
@@ -911,7 +981,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
 						if (dst_stream.type == DataStream::OUT) {
 							i32 output_idx = dst_stream.index;
-							const u32 stride = m_resource->getOutputsCount();
+							const u32 stride = resource_emitter.outputs_count;
 							float* dst = data + output_idx + fromf4 * 4 * stride;
 							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
 								dst[j] = gnoise(arg[i]);
@@ -933,7 +1003,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
 						if (dst_stream.type == DataStream::OUT) {
 							i32 output_idx = dst_stream.index;
-							const u32 stride = m_resource->getOutputsCount();
+							const u32 stride = resource_emitter.outputs_count;
 							float* dst = data + output_idx + fromf4 * 4 * stride;
 							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
 								dst[j] = cosf(arg[i]);
@@ -1032,12 +1102,12 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 						const u8 subindex = ip.read<u8>();
 						ASSERT(dst.type == DataStream::OUT);
 
-						CoreModule* core_module = (CoreModule*)m_world.getModule(SPLINE_TYPE);
-						if (!m_world.hasComponent(*m_entity, SPLINE_TYPE)) return; // TODO error message
-						Spline& spline = core_module->getSpline(*m_entity);
+						CoreModule* core_module = (CoreModule*)system.m_world.getModule(SPLINE_TYPE);
+						if (!system.m_world.hasComponent(*system.m_entity, SPLINE_TYPE)) return; // TODO error message
+						Spline& spline = core_module->getSpline(*system.m_entity);
 
 						const u8 output_idx = dst.index;
-						const u32 stride = m_resource->getOutputsCount();
+						const u32 stride = resource_emitter.outputs_count;
 						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
 						float* out = data + output_idx + fromf4 * 4 * stride;
 						const i32 last_idx = spline.points.size() - 2;
@@ -1066,7 +1136,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 
 						ASSERT(dst.type == DataStream::OUT);
 						const u8 output_idx = dst.index;
-						const u32 stride = m_resource->getOutputsCount();
+						const u32 stride = resource_emitter.outputs_count;
 						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
 						float* out = data + output_idx + fromf4 * 4 * stride;
 						for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
@@ -1090,7 +1160,7 @@ void ParticleEmitter::fillInstanceData(float* data) const {
 						break;
 					}
 					case InstructionType::MOV: {
-						const u32 stride = m_resource->getOutputsCount();
+						const u32 stride = resource_emitter.outputs_count;
 						DataStream dst = ip.read<DataStream>();
 						DataStream op0 = ip.read<DataStream>();
 
