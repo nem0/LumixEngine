@@ -73,6 +73,7 @@ void ParticleSystemResource::overrideData(u32 emitter_idx
 	, u32 registers_count
 	, u32 outputs_count
 	, u32 init_emit_count
+	, u32 emit_inputs_count
 	, float emit_rate
 	, const Path& material
 )
@@ -90,6 +91,7 @@ void ParticleSystemResource::overrideData(u32 emitter_idx
 	emitter.outputs_count = outputs_count;
 	emitter.init_emit_count = init_emit_count;
 	emitter.emit_per_second = emit_rate;
+	emitter.emit_inputs_count = emit_inputs_count;
 	emitter.setMaterial(material);
 	
 	--m_empty_dep_count;
@@ -155,6 +157,9 @@ bool ParticleSystemResource::load(u64 size, const u8* mem) {
 		if (header.version > Version::EMIT_RATE) {
 			blob.read(emitter.init_emit_count);
 			blob.read(emitter.emit_per_second);
+		}
+		if (header.version > Version::EMIT) {
+			blob.read(emitter.emit_inputs_count);
 		}
 	}
 	return true;
@@ -266,8 +271,21 @@ namespace {
 		return 2.4f * lerp(g0 * (f - 0.f), g1 * (f - 1.f), u);
 	}
 }
+struct ParticleSystem::RunningContext {
+	RunningContext(Emitter& emitter, IAllocator& allocator)
+		: registers(allocator)
+		, outputs(allocator)
+		, emitter(emitter)
+		, instructions(nullptr, 0)
+	{}
+	StackArray<float, 16> registers;
+	StackArray<float, 16> outputs;
+	InputMemoryStream instructions;
+	Emitter& emitter;
+	u32 particle_idx;
+};
 
-void ParticleSystem::emit(u32 emitter_idx) {
+void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data) {
 	Emitter& emitter = m_emitters[emitter_idx];
 	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
 
@@ -281,177 +299,15 @@ void ParticleSystem::emit(u32 emitter_idx) {
 		emitter.capacity = new_capacity;
 	}
 
-	const OutputMemoryStream& instructions = res_emitter.instructions;
-
-	InputMemoryStream ip(instructions);
-	ip.skip(res_emitter.emit_offset);
-	StackArray<float, 16> registers(m_allocator);
-	registers.resize(res_emitter.registers_count);
-
-	auto getConstValue = [&](const DataStream& str) -> float {
-		switch (str.type) {
-			case DataStream::LITERAL: return str.value;
-			case DataStream::CONST: return m_constants[str.index];
-			case DataStream::REGISTER: return registers[str.index];
-			case DataStream::CHANNEL: return emitter.channels[str.index].data[emitter.particles_count];
-			default: ASSERT(false); return str.value;
-		}
-	};
-
-	auto getValue = [&](const DataStream& str) -> float& {
-		switch (str.type) {
-			case DataStream::REGISTER: return registers[str.index];
-			case DataStream::CHANNEL: return emitter.channels[str.index].data[emitter.particles_count];
-			default: ASSERT(false); return registers[0];
-		}
-	};
-
-	for (;;) {
-		const InstructionType it = ip.read<InstructionType>();
-		switch (it) {
-			case InstructionType::END:
-				++emitter.particles_count;
-				return;
-			case InstructionType::MESH: {
-				DataStream dst = ip.read<DataStream>();
-				const u8 subindex = ip.read<u8>();
-
-				RenderModule* render_module = (RenderModule*)m_world.getModule(MODEL_INSTANCE_TYPE);
-				if (!m_world.hasComponent(*m_entity, MODEL_INSTANCE_TYPE)) return; // TODO error message
-				
-				Model* model = render_module->getModelInstanceModel(*m_entity);
-				if (!model || !model->isReady()) return;
-
-				u32 idx = 0; // TODO random index, subindexes must have matching idx
-				u32 mesh_idx = 0; // TODO random mesh
-				const float v = model->getMesh(mesh_idx).vertices[idx][subindex];
-				getValue(dst) = v;
-				break;
-			}
-			case InstructionType::SPLINE: {
-				DataStream dst = ip.read<DataStream>();
-				DataStream op0 = ip.read<DataStream>();
-				const u8 subindex = ip.read<u8>();
-
-				CoreModule* core_module = (CoreModule*)m_world.getModule(SPLINE_TYPE);
-				if (!m_world.hasComponent(*m_entity, SPLINE_TYPE)) return; // TODO error message
-				Spline& spline = core_module->getSpline(*m_entity);
-
-				float t = getConstValue(op0);
-
-				t *= spline.points.size() - 2;
-				u32 segment = clamp(u32(t), 0, spline.points.size() - 3);
-				float rel_t = t - segment;
-				float p0 = spline.points[segment + 0][subindex];
-				float p1 = spline.points[segment + 1][subindex];
-				float p2 = spline.points[segment + 2][subindex];
-				p0 = (p1 + p0) * 0.5f;
-				p2 = (p1 + p2) * 0.5f;
-
-				getValue(dst) = lerp(lerp(p0, p1, rel_t), lerp(p1, p2, rel_t), rel_t);
-				break;
-			}
-			case InstructionType::MUL: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-
-				getValue(dst) = getConstValue(op0) * getConstValue(op1);
-				break;
-			}
-			case InstructionType::ADD: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-
-				getValue(dst) = getConstValue(op0) + getConstValue(op1);
-				break;
-			}
-			case InstructionType::MULTIPLY_ADD: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-				const DataStream op2 = ip.read<DataStream>();
-
-				getValue(dst) = getConstValue(op0) * getConstValue(op1) + getConstValue(op2);
-				break;
-			}
-			case InstructionType::MIX: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-				const DataStream op2 = ip.read<DataStream>();
-
-				getValue(dst) = lerp(getConstValue(op0), getConstValue(op1), getConstValue(op2));
-				break;
-			}
-			case InstructionType::MOD: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-
-				getValue(dst) = fmodf(getConstValue(op0), getConstValue(op1));
-				break;
-			}
-			case InstructionType::DIV: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-
-				getValue(dst) = getConstValue(op0) / getConstValue(op1);
-				break;
-			}
-			case InstructionType::SUB: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				const DataStream op1 = ip.read<DataStream>();
-
-				getValue(dst) = getConstValue(op0) - getConstValue(op1);
-				break;
-			}
-			case InstructionType::MOV: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				getValue(dst) = getConstValue(op0);
-				break;
-			}
-			case InstructionType::SIN: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				getValue(dst) = sinf(getConstValue(op0));
-				break;
-			}
-			case InstructionType::COS: {
-				const DataStream dst = ip.read<DataStream>();
-				const DataStream op0 = ip.read<DataStream>();
-				getValue(dst) = cosf(getConstValue(op0));
-				break;
-			}
-			case InstructionType::RAND: {
-				DataStream dst = ip.read<DataStream>();
-				float from = ip.read<float>();
-				float to = ip.read<float>();
-				
-				getValue(dst) = randFloat(from, to);
-				break;
-			}
-			case InstructionType::NOISE: {
-				DataStream dst = ip.read<DataStream>();
-				DataStream op0 = ip.read<DataStream>();
-
-				getValue(dst) = gnoise(getConstValue(op0));
-				break;
-			}
-			case InstructionType::GRADIENT:
-			case InstructionType::FREE2:
-			case InstructionType::FREE1:
-			case InstructionType::KILL:
-			case InstructionType::LT:
-			case InstructionType::GT:
-				ASSERT(false);
-				break;
-		}
+	RunningContext ctx(emitter, m_allocator);
+	ctx.registers.resize(res_emitter.registers_count + emit_data.length());
+	if (emit_data.length() > 0) {
+		memcpy(ctx.registers.begin(), emit_data.begin(), emit_data.length() * sizeof(emit_data[0]));
 	}
+	ctx.particle_idx = emitter.particles_count;
+	ctx.instructions.set(res_emitter.instructions.data() + res_emitter.emit_offset, res_emitter.instructions.size() - res_emitter.emit_offset);
+	run(ctx);
+	++emitter.particles_count;
 }
 
 
@@ -656,6 +512,179 @@ struct TernaryHelper {
 	float* out_mem = nullptr;
 };
 
+void ParticleSystem::run(RunningContext& ctx) {
+	StackArray<float, 16>& registers = ctx.registers;
+	StackArray<float, 16>& outputs = ctx.outputs;
+	Emitter& emitter = ctx.emitter;
+	InputMemoryStream& ip = ctx.instructions;
+	const u32 particle_idx = ctx.particle_idx;
+
+	auto getConstValue = [&](const DataStream& str) -> float {
+		switch (str.type) {
+			case DataStream::LITERAL: return str.value;
+			case DataStream::CONST: return m_constants[str.index];
+			case DataStream::OUT: return outputs[str.index];
+			case DataStream::REGISTER: return registers[str.index];
+			case DataStream::CHANNEL: return emitter.channels[str.index].data[particle_idx];
+			default: ASSERT(false); return str.value;
+		}
+	};
+
+	auto getValue = [&](const DataStream& str) -> float& {
+		switch (str.type) {
+			case DataStream::OUT: return outputs[str.index];
+			case DataStream::REGISTER: return registers[str.index];
+			case DataStream::CHANNEL: return emitter.channels[str.index].data[particle_idx];
+			default: ASSERT(false); return registers[0];
+		}
+	};
+
+	for (;;) {
+		const InstructionType it = ip.read<InstructionType>();
+		switch (it) {
+			case InstructionType::END:
+				return;
+			case InstructionType::MESH: {
+				DataStream dst = ip.read<DataStream>();
+				const u8 subindex = ip.read<u8>();
+
+				RenderModule* render_module = (RenderModule*)m_world.getModule(MODEL_INSTANCE_TYPE);
+				if (!m_world.hasComponent(*m_entity, MODEL_INSTANCE_TYPE)) return; // TODO error message
+				
+				Model* model = render_module->getModelInstanceModel(*m_entity);
+				if (!model || !model->isReady()) return;
+
+				u32 idx = 0; // TODO random index, subindexes must have matching idx
+				u32 mesh_idx = 0; // TODO random mesh
+				const float v = model->getMesh(mesh_idx).vertices[idx][subindex];
+				getValue(dst) = v;
+				break;
+			}
+			case InstructionType::SPLINE: {
+				DataStream dst = ip.read<DataStream>();
+				DataStream op0 = ip.read<DataStream>();
+				const u8 subindex = ip.read<u8>();
+
+				CoreModule* core_module = (CoreModule*)m_world.getModule(SPLINE_TYPE);
+				if (!m_world.hasComponent(*m_entity, SPLINE_TYPE)) return; // TODO error message
+				Spline& spline = core_module->getSpline(*m_entity);
+
+				float t = getConstValue(op0);
+
+				t *= spline.points.size() - 2;
+				u32 segment = clamp(u32(t), 0, spline.points.size() - 3);
+				float rel_t = t - segment;
+				float p0 = spline.points[segment + 0][subindex];
+				float p1 = spline.points[segment + 1][subindex];
+				float p2 = spline.points[segment + 2][subindex];
+				p0 = (p1 + p0) * 0.5f;
+				p2 = (p1 + p2) * 0.5f;
+
+				getValue(dst) = lerp(lerp(p0, p1, rel_t), lerp(p1, p2, rel_t), rel_t);
+				break;
+			}
+			case InstructionType::MUL: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+
+				getValue(dst) = getConstValue(op0) * getConstValue(op1);
+				break;
+			}
+			case InstructionType::ADD: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+
+				getValue(dst) = getConstValue(op0) + getConstValue(op1);
+				break;
+			}
+			case InstructionType::MULTIPLY_ADD: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+				const DataStream op2 = ip.read<DataStream>();
+
+				getValue(dst) = getConstValue(op0) * getConstValue(op1) + getConstValue(op2);
+				break;
+			}
+			case InstructionType::MIX: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+				const DataStream op2 = ip.read<DataStream>();
+
+				getValue(dst) = lerp(getConstValue(op0), getConstValue(op1), getConstValue(op2));
+				break;
+			}
+			case InstructionType::MOD: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+
+				getValue(dst) = fmodf(getConstValue(op0), getConstValue(op1));
+				break;
+			}
+			case InstructionType::DIV: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+
+				getValue(dst) = getConstValue(op0) / getConstValue(op1);
+				break;
+			}
+			case InstructionType::SUB: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				const DataStream op1 = ip.read<DataStream>();
+
+				getValue(dst) = getConstValue(op0) - getConstValue(op1);
+				break;
+			}
+			case InstructionType::MOV: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				getValue(dst) = getConstValue(op0);
+				break;
+			}
+			case InstructionType::SIN: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				getValue(dst) = sinf(getConstValue(op0));
+				break;
+			}
+			case InstructionType::COS: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				getValue(dst) = cosf(getConstValue(op0));
+				break;
+			}
+			case InstructionType::RAND: {
+				DataStream dst = ip.read<DataStream>();
+				float from = ip.read<float>();
+				float to = ip.read<float>();
+				
+				getValue(dst) = randFloat(from, to);
+				break;
+			}
+			case InstructionType::NOISE: {
+				DataStream dst = ip.read<DataStream>();
+				DataStream op0 = ip.read<DataStream>();
+
+				getValue(dst) = gnoise(getConstValue(op0));
+				break;
+			}
+			case InstructionType::GRADIENT:
+			case InstructionType::FREE2:
+			case InstructionType::EMIT:
+			case InstructionType::KILL:
+			case InstructionType::LT:
+			case InstructionType::GT:
+				ASSERT(false);
+				break;
+		}
+	}
+}
 
 // TODO world space particles
 void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator) {
@@ -668,7 +697,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 		emitter.emit_timer += dt;
 		const float d = 1.f / res_emitter.emit_per_second;
 		while (emitter.emit_timer > 0) {
-			emit(emitter_idx);
+			emit(emitter_idx, {});
 			emitter.emit_timer -= d;
 		}
 	}
@@ -678,6 +707,8 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 	profiler::pushInt("particle count", emitter.particles_count);
 	u32* kill_list = (u32*)allocator.allocate(true);
 	volatile i32 kill_counter = 0;
+	OutputMemoryStream emit_stream(allocator.allocate(true), allocator.PAGE_SIZE);
+	jobs::Mutex emit_mutex;
 
 	volatile i32 counter = 0;
 	jobs::runOnWorkers([&](){
@@ -711,6 +742,22 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 								for (int i = 0; i < 4; ++i) {
 									if ((m & (1 << i))) {
 										switch(inner_type) {
+											case InstructionType::EMIT: {
+												InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+												u32 emitter_idx = tmp_instr.read<u32>();
+												RunningContext ctx(emitter, m_allocator);
+												ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
+												ctx.particle_idx = u32(from + (arg0 - beg) * 4 + i);
+												ctx.registers.resize(res_emitter.registers_count);
+												ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+												run(ctx);
+												jobs::enter(&emit_mutex);
+												emit_stream.write(emitter_idx);
+												emit_stream.write(ctx.outputs.size());
+												emit_stream.write(ctx.outputs.begin(), ctx.outputs.byte_size());
+												jobs::exit(&emit_mutex);
+												break;
+											}
 											case InstructionType::KILL: {
 												const u32 idx = u32(from + (arg0 - beg) * 4 + i);
 												if (idx < emitter.particles_count) {
@@ -755,6 +802,19 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 								break;
 							}
 							default: ASSERT(false); break;
+						}
+
+						if (inner_type == InstructionType::EMIT) {
+							ip.read<u32>(); // emitter idx
+							// skip emit subroutine
+							RunningContext ctx(emitter, m_allocator);
+							ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+							ctx.particle_idx = 0;
+							ctx.registers.resize(res_emitter.registers_count);
+							ctx.outputs.resize(res_emitter.outputs_count);
+							run(ctx);
+							ip.setPosition(ip.size() - ctx.instructions.remaining());
+
 						}
 						break;
 					}	
@@ -896,7 +956,18 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 		}
 	}
 
+	if (emit_stream.size() > 0) {
+		InputMemoryStream blob(emit_stream);
+		while (blob.getPosition() < blob.size()) {
+			u32 emitter_idx = blob.read<u32>();
+			u32 outputs_count = blob.read<u32>();
+			const float* outputs = (const float*)blob.skip(outputs_count * sizeof(float));
+			emit(emitter_idx, Span(outputs, outputs_count));
+		}
+	}
+
 	allocator.deallocate(kill_list, true);
+	allocator.deallocate(emit_stream.getMutableData(), true);
 }
 
 bool ParticleSystem::update(float dt, PageAllocator& allocator)
@@ -908,7 +979,7 @@ bool ParticleSystem::update(float dt, PageAllocator& allocator)
 	
 	if (m_total_time == 0) {
 		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
-			for (u32 i = 0, c = m_resource->getEmitters()[emitter_idx].init_emit_count; i < c; ++i) emit(emitter_idx);
+			for (u32 i = 0, c = m_resource->getEmitters()[emitter_idx].init_emit_count; i < c; ++i) emit(emitter_idx, {});
 		}
 	}
 
