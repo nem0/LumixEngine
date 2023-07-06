@@ -145,6 +145,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		u32 particles_count = 0;
 		u32 capacity = 0;
 		float emit_timer = 0;
+		u32 emit_index = 0;
 	};
 
 	ParticleSystem(EntityPtr entity, struct World& world, IAllocator& allocator);

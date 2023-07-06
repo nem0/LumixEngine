@@ -67,7 +67,7 @@ struct GenerateContext {
 			DataStream r;
 			r.type = DataStream::REGISTER;
 			r.index = 0xff;
-			for (u32 i = 0; i < 8; ++i) {
+			for (u32 i = 0; i < sizeof(m_register_mask) * 8; ++i) {
 				if ((m_register_mask & (1 << i)) == 0) {
 					r.index = i;
 					break;
@@ -84,7 +84,7 @@ struct GenerateContext {
 
 	OutputMemoryStream& ip;
 	Context context;
-	u8 m_register_mask = 0;
+	u16 m_register_mask = 0;
 	u8 m_registers_count = 0;
 };
 
@@ -125,7 +125,8 @@ struct Node : NodeEditorNode {
 		SUB,
 		CACHE,
 		EMIT_INPUT,
-		EMIT
+		EMIT,
+		CHANNEL_MASK
 	};
 
 	Node(struct ParticleEmitterEditorResource& res);
@@ -687,10 +688,25 @@ struct MeshNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 		
+	void beforeGenerate() override {
+		index = DataStream();
+	}
+
 	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+		if (index.type == DataStream::NONE) {
+			index = ctx.streamOrRegister(index);
+			ctx.write(InstructionType::MOV);
+			ctx.write(index);
+			DataStream init_value;
+			init_value.type = DataStream::LITERAL;
+			init_value.value = -1;
+			ctx.write(init_value);
+		}
+
 		dst = ctx.streamOrRegister(dst);
 		ctx.write(InstructionType::MESH);
 		ctx.write(dst);
+		ctx.write(index);
 		ctx.write(subindex);
 		return dst;
 	}
@@ -701,6 +717,8 @@ struct MeshNode : Node {
 		ImGui::TextUnformatted("Position");
 		return false;
 	}
+
+	DataStream index;
 };
 
 struct CacheNode : Node {
@@ -889,6 +907,37 @@ struct CurveNode : Node {
 	u32 count = 2;
 	float keys[8] = {};
 	float values[8] = {};
+};
+
+struct ChannelMaskNode : Node {
+	ChannelMaskNode(ParticleEmitterEditorResource& res) : Node(res) {}
+
+	Type getType() const override { return Type::CHANNEL_MASK; }
+
+	void serialize(OutputMemoryStream& blob) const override { blob.write(channel); }
+	void deserialize(InputMemoryStream& blob) override { blob.read(channel); }
+		
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+		if (subindex > 0) return error("Invalid subindex");
+
+		const NodeInput input = getInput(0);
+		if (!input.node) return error("Invalid input");
+
+		return input.generate(ctx, dst, channel);
+	}
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle("Channel mask");
+		inputSlot();
+		outputSlot(); 
+		ImGui::SetNextItemWidth(60);
+		return ImGui::Combo("##ch", (int*)&channel, "X\0Y\0Z\0W\0");
+	}
+
+	u32 channel = 0;
 };
 
 struct EmitInputNode : Node {
@@ -1189,10 +1238,13 @@ struct InitNode : Node {
 		if (ctx.context != GenerateContext::INIT) return error("Invalid context");
 
 		ASSERT(ctx.m_register_mask == 0);
-		for (i32 i = 0; i < m_resource.m_emit_inputs.size(); ++i) {
-			ctx.m_register_mask |= 1 << i;
+		ASSERT(ctx.m_registers_count == 0);
+		for (ParticleEmitterEditorResource::EmitInput& emit_input : m_resource.m_emit_inputs) {
+			for (u32 i = 0; i < getCount(emit_input.type); ++i) {
+				ctx.m_register_mask |= 1 << ctx.m_registers_count;
+				++ctx.m_registers_count;
+			}
 		} 
-		ctx.m_registers_count = m_resource.m_emit_inputs.size();
 		i32 output_idx = 0;
 		for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
 			const NodeInput input = getInput(i);
@@ -1695,7 +1747,8 @@ struct BinaryOpNode : Node {
 struct ConstNode : Node {
 	enum class Const : u8 {
 		TIME_DELTA,
-		TOTAL_TIME
+		TOTAL_TIME,
+		EMIT_INDEX
 	};
 
 	ConstNode(ParticleEmitterEditorResource& res) : Node(res) {}
@@ -1710,6 +1763,8 @@ struct ConstNode : Node {
 
 	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (subindex > 0) return error("Invalid subindex");
+		if (ctx.context != GenerateContext::INIT && constant == Const::EMIT_INDEX) return error("Invalid context");
+		
 		DataStream r;
 		r.type = DataStream::CONST;
 		r.index = (u8)constant;
@@ -1724,6 +1779,9 @@ struct ConstNode : Node {
 				break;
 			case Const::TOTAL_TIME:
 				ImGui::TextUnformatted("Total time");
+				break;
+			case Const::EMIT_INDEX:
+				ImGui::TextUnformatted("Emit index");
 				break;
 			default:
 				ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " INVALID CONSTANT");
@@ -1785,12 +1843,12 @@ struct EmitNode : Node {
 	bool onGUI() override {
 		ParticleEmitterEditorResource& emitter = *m_resource.m_system.m_emitters[emitter_idx].get();
 
-		ImGuiEx::BeginNodeTitleBar();
+		ImGuiEx::BeginNodeTitleBar(ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
 		ImGui::Text("Emit %s", emitter.m_name.c_str());
 		ImGuiEx::EndNodeTitleBar();
 
 		inputSlot(ImGuiEx::PinShape::TRIANGLE);
-		ImGui::TextUnformatted(" ");
+		ImGui::TextUnformatted("Condition");
 
 		for (const ParticleEmitterEditorResource::EmitInput& input : emitter.m_emit_inputs) {
 			inputSlot();
@@ -1814,6 +1872,7 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::EMIT_INPUT: node = LUMIX_NEW(m_allocator, EmitInputNode)(*this); break;
 			case Node::EMIT: node = LUMIX_NEW(m_allocator, EmitNode)(*this); break;
 			case Node::GRADIENT_COLOR: node = LUMIX_NEW(m_allocator, GradientColorNode)(*this); break;
+			case Node::CHANNEL_MASK: node = LUMIX_NEW(m_allocator, ChannelMaskNode)(*this); break;
 			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
@@ -1922,10 +1981,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 				u8 i;
 			} creator;
-			creator.i = 0;
+			creator.i = (u8)ConstNode::Const::TIME_DELTA;
 			visitor.visitType("Time delta", creator);
-			creator.i = 1;
+			creator.i = (u8)ConstNode::Const::TOTAL_TIME;
 			visitor.visitType("Total time", creator);
+			creator.i = (u8)ConstNode::Const::EMIT_INDEX;
+			visitor.visitType("Emit index", creator);
 			visitor.endCategory();
 		}
 
@@ -1992,6 +2053,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 		visitor
 			.visitType(Node::CACHE, "Cache")
+			.visitType(Node::CHANNEL_MASK, "Channel mask")
 			.visitType(Node::CMP, "Compare")
 			.visitType(Node::CURVE, "Curve", 'C')
 			.visitType(Node::GRADIENT_COLOR, "Gradient color")

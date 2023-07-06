@@ -214,6 +214,8 @@ void ParticleSystem::reset() {
 	m_total_time = 0;
 	for (Emitter& emitter : m_emitters) {
 		emitter.particles_count = 0;
+		emitter.emit_index = 0;
+		emitter.emit_timer = 0;
 	}
 }
 
@@ -287,6 +289,8 @@ struct ParticleSystem::RunningContext {
 
 void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data) {
 	Emitter& emitter = m_emitters[emitter_idx];
+	m_constants[2] = (float)emitter.emit_index; // TODO
+	++emitter.emit_index;
 	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
 
 	if (emitter.particles_count == emitter.capacity) {
@@ -546,6 +550,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 				return;
 			case InstructionType::MESH: {
 				DataStream dst = ip.read<DataStream>();
+				DataStream index = ip.read<DataStream>();
 				const u8 subindex = ip.read<u8>();
 
 				RenderModule* render_module = (RenderModule*)m_world.getModule(MODEL_INSTANCE_TYPE);
@@ -554,9 +559,16 @@ void ParticleSystem::run(RunningContext& ctx) {
 				Model* model = render_module->getModelInstanceModel(*m_entity);
 				if (!model || !model->isReady()) return;
 
-				u32 idx = 0; // TODO random index, subindexes must have matching idx
+
 				u32 mesh_idx = 0; // TODO random mesh
-				const float v = model->getMesh(mesh_idx).vertices[idx][subindex];
+				const Mesh& mesh = model->getMesh(mesh_idx);
+
+				if (getConstValue(index) < 0) {
+					getValue(index) = (float)rand(0, mesh.vertices.size() - 1);
+				} 
+
+				const u32 idx = u32(getConstValue(index) + 0.5f);
+				const float v = mesh.vertices[idx][subindex];
 				getValue(dst) = v;
 				break;
 			}
@@ -696,7 +708,9 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 	if (res_emitter.emit_per_second > 0) {
 		emitter.emit_timer += dt;
 		const float d = 1.f / res_emitter.emit_per_second;
+		m_constants[1] = m_total_time;
 		while (emitter.emit_timer > 0) {
+			m_constants[1] += d;
 			emit(emitter_idx, {});
 			emitter.emit_timer -= d;
 		}
@@ -704,6 +718,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 
 	if (emitter.particles_count == 0) return;
 
+	m_constants[1] = m_total_time;
 	profiler::pushInt("particle count", emitter.particles_count);
 	u32* kill_list = (u32*)allocator.allocate(true);
 	volatile i32 kill_counter = 0;
@@ -739,40 +754,43 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 							for (const float4* beg = arg0; arg0 != end; ++arg0) {
 								const float4 tmp = f(*arg0, *arg1);
 								const int m = f4MoveMask(tmp);
-								for (int i = 0; i < 4; ++i) {
-									if ((m & (1 << i))) {
-										switch(inner_type) {
-											case InstructionType::EMIT: {
-												InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-												u32 emitter_idx = tmp_instr.read<u32>();
-												RunningContext ctx(emitter, m_allocator);
-												ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
-												ctx.particle_idx = u32(from + (arg0 - beg) * 4 + i);
-												ctx.registers.resize(res_emitter.registers_count);
-												ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-												run(ctx);
-												jobs::enter(&emit_mutex);
-												emit_stream.write(emitter_idx);
-												emit_stream.write(ctx.outputs.size());
-												emit_stream.write(ctx.outputs.begin(), ctx.outputs.byte_size());
-												jobs::exit(&emit_mutex);
-												break;
-											}
-											case InstructionType::KILL: {
-												const u32 idx = u32(from + (arg0 - beg) * 4 + i);
-												if (idx < emitter.particles_count) {
-													const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
-													if (kill_idx < PageAllocator::PAGE_SIZE / sizeof(kill_list[0])) {
-														kill_list[kill_idx] = idx;
-													}
-													else {
-														// TODO
-														ASSERT(false);
-													}
+								if (m) {
+									for (int i = 0; i < 4; ++i) {
+										const u32 particle_index = u32(from + (arg0 - beg) * 4 + i);
+										if ((m & (1 << i)) && particle_index < emitter.particles_count) {
+											switch(inner_type) {
+												case InstructionType::EMIT: {
+													InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+													u32 emitter_idx = tmp_instr.read<u32>();
+													RunningContext ctx(emitter, m_allocator);
+													ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
+													ctx.particle_idx = particle_index;
+													ctx.registers.resize(res_emitter.registers_count);
+													ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+													run(ctx);
+													jobs::enter(&emit_mutex);
+													emit_stream.write(emitter_idx);
+													emit_stream.write(ctx.outputs.size());
+													emit_stream.write(ctx.outputs.begin(), ctx.outputs.byte_size());
+													jobs::exit(&emit_mutex);
+													break;
 												}
-												break;
+												case InstructionType::KILL: {
+													const u32 idx = u32(from + (arg0 - beg) * 4 + i);
+													if (idx < emitter.particles_count) {
+														const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
+														if (kill_idx < PageAllocator::PAGE_SIZE / sizeof(kill_list[0])) {
+															kill_list[kill_idx] = idx;
+														}
+														else {
+															// TODO
+															ASSERT(false);
+														}
+													}
+													break;
+												}
+												default: ASSERT(false); break;
 											}
-											default: ASSERT(false); break;
 										}
 									}
 								}
@@ -962,7 +980,12 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 			u32 emitter_idx = blob.read<u32>();
 			u32 outputs_count = blob.read<u32>();
 			const float* outputs = (const float*)blob.skip(outputs_count * sizeof(float));
-			emit(emitter_idx, Span(outputs, outputs_count));
+	
+			const Emitter& dst_emitter = m_emitters[emitter_idx];
+			
+			for (u32 i = 0; i < dst_emitter.resource_emitter.init_emit_count; ++i) {
+				emit(emitter_idx, Span(outputs, outputs_count));
+			}
 		}
 	}
 
@@ -979,7 +1002,10 @@ bool ParticleSystem::update(float dt, PageAllocator& allocator)
 	
 	if (m_total_time == 0) {
 		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
-			for (u32 i = 0, c = m_resource->getEmitters()[emitter_idx].init_emit_count; i < c; ++i) emit(emitter_idx, {});
+			const ParticleSystemResource::Emitter& emitter = m_resource->getEmitters()[emitter_idx];
+			if (emitter.emit_inputs_count == 0) {
+				for (u32 i = 0, c = emitter.init_emit_count; i < c; ++i) emit(emitter_idx, {});
+			}
 		}
 	}
 

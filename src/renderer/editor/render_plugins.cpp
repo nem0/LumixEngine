@@ -709,7 +709,7 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 			module->updateParticleSystem(entities[0], dt);
 		}
 			
-		ImGuiEx::Label("Particle count");
+		ImGui::TextUnformatted("Particle count");
 		for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
 			ImGui::Text("%d", emitter.particles_count);
 		}
