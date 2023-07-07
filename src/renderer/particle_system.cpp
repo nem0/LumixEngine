@@ -366,8 +366,8 @@ struct LiteralGetter {
 
 struct ChannelGetter {
 	ChannelGetter(DataStream stream) : stream(stream) {}
-	float4* get(const ParticleSystem::Emitter& emitter, i32, i32, float4*) {
-		return (float4*)emitter.channels[stream.index].data;
+	float4* get(const ParticleSystem::Emitter& emitter, i32 fromf4, i32, float4*) {
+		return ((float4*)emitter.channels[stream.index].data) + fromf4;
 	}
 	static void step(float4*& val) { ++val; }
 	DataStream stream;

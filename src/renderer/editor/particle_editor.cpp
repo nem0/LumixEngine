@@ -2405,6 +2405,41 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	static constexpr const char* WINDOW_NAME = "Particle editor";
 
+	void debugUI() {
+		if (!m_show_debug) return;
+		if (ImGui::Begin("Debug particles", &m_show_debug)) {
+			const ParticleSystem* system = getSelectedParticleSystem();
+			if (system) {
+				const Array<ParticleSystem::Emitter>& emitters = system->getEmitters();
+				const Array<ParticleSystemResource::Emitter>& res_emitters =  system->getResource()->getEmitters();
+				if (ImGui::BeginTabBar("tb")) { 
+					for (i32 emitter_idx = 0; emitter_idx < emitters.size(); ++emitter_idx) {
+						const ParticleSystem::Emitter& emitter = emitters[emitter_idx];
+						const ParticleSystemResource::Emitter& res_emitter = res_emitters[emitter_idx];
+						if (ImGui::BeginTabItem(StaticString<64>(emitter_idx + 1))) {
+							if (ImGui::BeginTable("tab", res_emitter.channels_count + 1)) {
+								for (u32 j = 0; j < emitter.particles_count; ++j) {
+									ImGui::TableNextRow();
+									ImGui::TableNextColumn();
+									ImGui::Text("%d", j);
+									for (u32 i = 0; i < res_emitter.channels_count; ++i) {
+										ImGui::TableNextColumn();
+										ImGui::Text("%f", emitter.channels[i].data[j]);
+									}
+								}
+								ImGui::EndTable();
+							}
+							ImGui::EndTabItem();
+						}
+					}
+					ImGui::EndTabBar();
+				}
+			}
+		}
+		ImGui::End();
+	}
+
+
 	void onWindowGUI() override {
 		m_has_focus = false;
 		if (!m_open) return;
@@ -2435,6 +2470,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			ImGui::EndPopup();
 		}
 
+		debugUI();
+
 		ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 		if (!ImGui::Begin(WINDOW_NAME, &m_open, ImGuiWindowFlags_MenuBar)) {
 			ImGui::End();
@@ -2456,6 +2493,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					ImGui::EndMenu();
 				}
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
+				if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
 				menuItem(m_save_action, true);
 				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
 				if (const char* path = m_recent_paths.menu(); path) open(path);
@@ -2663,6 +2701,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	IAllocator& m_allocator;
 	StudioApp& m_app;
 	Path m_path;
+	bool m_show_debug = false;
 	bool m_show_save_as = false;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
