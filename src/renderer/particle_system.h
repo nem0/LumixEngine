@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/array.h"
+#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
@@ -24,6 +25,8 @@ struct ParticleSystemResource final : Resource {
 		EMIT_RATE,
 		MULTIEMITTER,
 		EMIT,
+		FLAGS,
+
 		LAST
 	};
 	struct Header {
@@ -66,6 +69,12 @@ struct ParticleSystemResource final : Resource {
 		Type type = NONE;
 		u8 index;
 		float value;
+	};
+
+	enum class Flags : u32 {
+		WORLD_SPACE = 1 << 0,
+
+		NONE = 0
 	};
 
 	enum class InstructionType : u8{
@@ -113,11 +122,12 @@ struct ParticleSystemResource final : Resource {
 	);
 
 	Array<Emitter>& getEmitters() { return m_emitters; }
-
+	Flags getFlags() const { return m_flags; }
 
 private:
 	Array<Emitter> m_emitters;
 	IAllocator& m_allocator;
+	Flags m_flags = Flags::NONE;
 };
 
 
@@ -164,6 +174,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	struct RunningContext;
 	void run(RunningContext& ctx);
 
+	World& m_world;
 	EntityPtr m_entity;
 	bool m_autodestroy = false;
 	float m_constants[16];
@@ -172,12 +183,12 @@ struct LUMIX_RENDERER_API ParticleSystem {
 private:
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
-	void update(float dt, u32 emitter_idx, PageAllocator& allocator);
+	void update(float dt, u32 emitter_idx, const Transform& delta_transform, PageAllocator& allocator);
 
 	IAllocator& m_allocator;
-	World& m_world;
 	Array<Emitter> m_emitters;
 	ParticleSystemResource* m_resource = nullptr;
+	Transform m_prev_frame_transform;
 };
 
 

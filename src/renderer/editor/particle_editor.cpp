@@ -30,6 +30,7 @@ enum class Version {
 	EMIT_RATE,
 	MULTIEMITTER,
 	EMIT_NODE,
+	WORLD_SPACE,
 
 	LAST
 };
@@ -580,6 +581,7 @@ struct ParticleSystemEditorResource {
 	void serialize(OutputMemoryStream& blob) {
 		Header header;
 		blob.write(header);
+		blob.write(m_world_space);
 		blob.write(m_emitters.size());
 		for (const UniquePtr<ParticleEmitterEditorResource>& e : m_emitters) {
 			e->serialize(blob);
@@ -597,6 +599,8 @@ struct ParticleSystemEditorResource {
 			logError("Unsupported file version ", path);
 			return false;
 		}
+
+		if (header.version > Version::WORLD_SPACE) blob.read(m_world_space);
 
 		m_emitters.clear();
 		u32 count = 1;
@@ -635,6 +639,7 @@ struct ParticleSystemEditorResource {
 
 	Array<UniquePtr<ParticleEmitterEditorResource>> m_emitters;
 	IAllocator& m_allocator;
+	bool m_world_space = false;
 };
 
 template <Node::Type T>
@@ -879,7 +884,7 @@ struct CurveNode : Node {
 	bool hasOutputPins() const override { return true; }
 
 	bool onGUI() override {
-		ImGuiEx::NodeTitle("Gradient");
+		ImGuiEx::NodeTitle("Curve");
 
 		inputSlot(); 
 		outputSlot();
@@ -905,8 +910,8 @@ struct CurveNode : Node {
 	}
 
 	u32 count = 2;
-	float keys[8] = {};
-	float values[8] = {};
+	float keys[8] = {0, 1};
+	float values[8] = {0, 1};
 };
 
 struct ChannelMaskNode : Node {
@@ -2462,6 +2467,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {
+				ImGui::MenuItem("World space", 0, &m_resource->m_world_space);
 				menuItem(m_undo_action, canUndo());
 				menuItem(m_redo_action, canRedo());
 				if (ImGui::MenuItem("Add emitter")) {
@@ -2617,6 +2623,11 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 		ParticleSystemResource::Header header;
 		output.write(header);
+		
+		ParticleSystemResource::Flags flags = ParticleSystemResource::Flags::NONE;
+		if (res.m_world_space) flags = ParticleSystemResource::Flags::WORLD_SPACE;
+		output.write(flags);
+		
 		output.write(res.m_emitters.size());
 		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : res.m_emitters) {
 			if (!emitter->generate()) return false;

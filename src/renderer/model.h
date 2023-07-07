@@ -191,6 +191,7 @@ public:
 	const float* getLODDistances() const { return m_lod_distances; }
 	float* getLODDistances() { return m_lod_distances; }
 	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }
+	Vec3 evalVertexPose(const Pose& pose, u32 mesh, u32 index) const;
 
 public:
 	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LM2'

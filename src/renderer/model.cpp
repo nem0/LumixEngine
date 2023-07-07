@@ -121,13 +121,32 @@ Model::~Model()
 	ASSERT(isEmpty());
 }
 
-
 static Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
 {
 	Matrix m = matrices[s.indices[0]] * s.weights.x + matrices[s.indices[1]] * s.weights.y +
 			   matrices[s.indices[2]] * s.weights.z + matrices[s.indices[3]] * s.weights.w;
 
 	return m.transformPoint(p);
+}
+
+Vec3 Model::evalVertexPose(const Pose& pose, u32 mesh_idx, u32 index) const {
+	const Mesh& mesh = m_meshes[mesh_idx];
+	const Mesh::Skin& skin = mesh.skin[index];
+
+	Matrix matrices[4];
+	for (u32 i = 0; i < 4; ++i) {
+		const i16 bone_idx = skin.indices[i];
+		const Bone& bone = m_bones[bone_idx];
+		LocalRigidTransform tmp = { pose.positions[bone_idx], pose.rotations[bone_idx] };
+		matrices[i] = (tmp * bone.inv_bind_transform).toMatrix();
+	}
+
+	const Matrix m = matrices[0] * skin.weights.x
+		+ matrices[1] * skin.weights.y
+		+ matrices[2] * skin.weights.z
+		+ matrices[3] * skin.weights.w;
+
+	return m.transformPoint(mesh.vertices[index]);
 }
 
 

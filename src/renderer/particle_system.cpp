@@ -127,6 +127,8 @@ bool ParticleSystemResource::load(u64 size, const u8* mem) {
 		return false;
 	}
 
+	if (header.version > Version::FLAGS) blob.read(m_flags);
+
 	u32 emitter_count = 1;
 	if (header.version > Version::MULTIEMITTER) {
 		emitter_count = blob.read<u32>();
@@ -559,17 +561,26 @@ void ParticleSystem::run(RunningContext& ctx) {
 				Model* model = render_module->getModelInstanceModel(*m_entity);
 				if (!model || !model->isReady()) return;
 
-
 				u32 mesh_idx = 0; // TODO random mesh
+				if (mesh_idx >= (u32)model->getMeshCount()) return;
+				
 				const Mesh& mesh = model->getMesh(mesh_idx);
-
 				if (getConstValue(index) < 0) {
 					getValue(index) = (float)rand(0, mesh.vertices.size() - 1);
-				} 
+				}
 
 				const u32 idx = u32(getConstValue(index) + 0.5f);
-				const float v = mesh.vertices[idx][subindex];
-				getValue(dst) = v;
+				if (model->getBoneCount() > 0) {
+					ModelInstance* mi = render_module->getModelInstance(*m_entity);
+					if (!mi->pose) return;
+
+					const float v = mi->model->evalVertexPose(*mi->pose, mesh_idx, idx)[subindex];
+					getValue(dst) = v;
+				}
+				else {
+					const float v = mesh.vertices[idx][subindex];
+					getValue(dst) = v;
+				}
 				break;
 			}
 			case InstructionType::SPLINE: {
@@ -698,8 +709,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 	}
 }
 
-// TODO world space particles
-void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator) {
+void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr, PageAllocator& allocator) {
 	PROFILE_FUNCTION();
 
 	Emitter& emitter = m_emitters[emitter_idx];
@@ -991,6 +1001,20 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& allocator)
 
 	allocator.deallocate(kill_list, true);
 	allocator.deallocate(emit_stream.getMutableData(), true);
+
+	if ((u32)m_resource->getFlags() & (u32)ParticleSystemResource::Flags::WORLD_SPACE) {
+		// TODO make sure first 3 channels are position
+		float* x = emitter.channels[0].data;
+		float* y = emitter.channels[1].data;
+		float* z = emitter.channels[2].data;
+		for (u32 i = 0, c = emitter.particles_count; i < c; ++i) {
+			Vec3 p{x[i], y[i], z[i]};
+			p = Vec3(delta_tr.transform(p));
+			x[i] = p.x;
+			y[i] = p.y;
+			z[i] = p.z;
+		}
+	}
 }
 
 bool ParticleSystem::update(float dt, PageAllocator& allocator)
@@ -1001,6 +1025,7 @@ bool ParticleSystem::update(float dt, PageAllocator& allocator)
 	m_constants[1] = m_total_time;
 	
 	if (m_total_time == 0) {
+		m_prev_frame_transform = m_world.getTransform(*m_entity);
 		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 			const ParticleSystemResource::Emitter& emitter = m_resource->getEmitters()[emitter_idx];
 			if (emitter.emit_inputs_count == 0) {
@@ -1011,14 +1036,17 @@ bool ParticleSystem::update(float dt, PageAllocator& allocator)
 
 	m_total_time += dt;
 
+	const Transform world_tr = m_world.getTransform(*m_entity);
+	const Transform delta_tr = world_tr.inverted() * m_prev_frame_transform;
 	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
-		update(dt, emitter_idx, allocator);
+		update(dt, emitter_idx, delta_tr, allocator);
 	}
 
 	u32 c = 0;
 	for (const Emitter& emitter : m_emitters) {
 		c += emitter.particles_count;
 	}
+	m_prev_frame_transform = world_tr;
 	return c == 0 && m_autodestroy;
 }
 
