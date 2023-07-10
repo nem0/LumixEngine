@@ -35,6 +35,42 @@ struct LUMIX_ENGINE_API IInputStream {
 };
 
 
+struct LUMIX_ENGINE_API OutputPagedStream final : IOutputStream {
+	friend struct InputPagedStream;
+
+	OutputPagedStream(struct PageAllocator& allocator);
+	~OutputPagedStream();
+	bool write(const void* buffer, u64 size) override;
+	
+	using IOutputStream::write;
+
+	struct Page {
+		Page* next = nullptr;
+		u32 size = 0;
+		u8 data[4096 - sizeof(next) - sizeof(size)];
+	};
+
+private:
+	Span<u8> reserve(u32 size);
+	PageAllocator& m_allocator;
+	Page* m_head;
+	Page* m_tail;
+};
+
+struct LUMIX_ENGINE_API InputPagedStream final : IInputStream {
+	InputPagedStream(const OutputPagedStream& src);
+	bool read(void* buffer, u64 size) override;
+	const void* getBuffer() const override { ASSERT(false); return nullptr; }
+	u64 size() const override { ASSERT(false); return 0; }
+	bool isEnd() const { return !m_page || (!m_page->next && m_page_pos == m_page->size); }
+	
+	using IInputStream::read;
+
+private:
+	const OutputPagedStream::Page* m_page = nullptr;
+	u32 m_page_pos = 0;
+};
+
 struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	explicit OutputMemoryStream(struct IAllocator& allocator);
 	OutputMemoryStream(void* data, u64 size);
@@ -56,6 +92,7 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	void reserve(u64 size);
 	const u8* data() const { return m_data; }
 	u8* getMutableData() { return m_data; }
+	u64 capacity() const { return m_capacity; }
 	u64 size() const { return m_size; }
 	void write(const struct String& string);
 	void writeString(const char* string);

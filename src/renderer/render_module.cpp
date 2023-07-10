@@ -524,7 +524,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		Array<EntityRef> to_delete(m_allocator);
 		for (ParticleSystem& emitter : m_particle_emitters) {
-			if (emitter.update(dt, m_engine.getPageAllocator())) {
+			if (emitter.update(dt, m_scratch_buffer, m_engine.getPageAllocator())) {
 				to_delete.push(*emitter.m_entity);
 			}
 		}
@@ -3165,7 +3165,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
+	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_scratch_buffer, m_engine.getPageAllocator()); }
 
 	void setParticleSystemPath(EntityRef entity, const Path& path) override {
 		ParticleSystemResource* res = m_engine.getResourceManager().load<ParticleSystemResource>(path);
@@ -3221,6 +3221,7 @@ struct RenderModuleImpl final : RenderModule {
 	HashMap<Model*, EntityRef> m_model_entity_map;
 	HashMap<Material*, EntityRef> m_material_decal_map;
 	HashMap<Material*, EntityRef> m_material_curve_decal_map;
+	OutputMemoryStream m_scratch_buffer;
 };
 
 ReflectionProbe::LoadJob::~LoadJob() {
@@ -3429,12 +3430,14 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
 	, m_furs(m_allocator)
+	, m_scratch_buffer(m_allocator)
 {
 
 	m_world.entityTransformed().bind<&RenderModuleImpl::onEntityMoved>(this);
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
+	m_scratch_buffer.resize(16 * 1024);
 
 	m_render_cmps_mask = 0;
 

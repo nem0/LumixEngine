@@ -91,7 +91,7 @@ struct ParticleSystemResource final : Resource {
 		MOV,
 		RAND,
 		KILL,
-		FREE2,
+		SQRT,
 		GT,
 		MIX,
 		GRADIENT,
@@ -147,7 +147,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 			, resource_emitter(resource_emitter)
 		{}
 		u32 getParticlesDataSizeBytes() const;
-		void fillInstanceData(float* data) const;
+		void fillInstanceData(float* data, PageAllocator& page_allocator) const;
 		
 		ParticleSystem& system;
 		ParticleSystemResource::Emitter& resource_emitter;
@@ -164,15 +164,12 @@ struct LUMIX_RENDERER_API ParticleSystem {
 
 	void serialize(OutputMemoryStream& blob) const;
 	void deserialize(InputMemoryStream& blob, bool has_autodestroy, bool emit_rate_removed, ResourceManagerHub& manager);
-	bool update(float dt, struct PageAllocator& allocator);
-	void emit(u32 emitter_idx, Span<const float> emit_data);
+	bool update(float dt, OutputMemoryStream& scratch_buffer, PageAllocator& page_allocator);
 	ParticleSystemResource* getResource() const { return m_resource; }
 	void setResource(ParticleSystemResource* res);
 	const Emitter& getEmitter(u32 emitter_idx) const { return m_emitters[emitter_idx]; }
 	const Array<Emitter>& getEmitters() const { return m_emitters; }
 	void reset();
-	struct RunningContext;
-	void run(RunningContext& ctx);
 
 	World& m_world;
 	EntityPtr m_entity;
@@ -181,9 +178,14 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	float m_total_time = 0;
 
 private:
+	struct RunningContext;
+
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
-	void update(float dt, u32 emitter_idx, const Transform& delta_transform, PageAllocator& allocator);
+	void update(float dt, u32 emitter_idx, const Transform& delta_transform, OutputMemoryStream& scratch_buffer, PageAllocator& page_allocator);
+	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
+	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
+	void run(RunningContext& ctx);
 
 	IAllocator& m_allocator;
 	Array<Emitter> m_emitters;

@@ -1,6 +1,8 @@
 #include "stream.h"
 #include "engine/allocator.h"
 #include "engine/crt.h"
+#include "engine/math.h"
+#include "engine/page_allocator.h"
 #include "engine/string.h"
 
 
@@ -229,6 +231,72 @@ u8 OutputMemoryStream::operator[](u32 idx) const {
 u8& OutputMemoryStream::operator[](u32 idx) {
 	ASSERT(idx < m_size);
 	return m_data[idx];
+}
+
+static_assert(sizeof(OutputPagedStream::Page) == PageAllocator::PAGE_SIZE);
+
+OutputPagedStream::OutputPagedStream(struct PageAllocator& allocator)
+	: m_allocator(allocator)
+{
+	m_tail = m_head = new (NewPlaceholder(), m_allocator.allocate(true)) Page;
+}
+
+OutputPagedStream::~OutputPagedStream() {
+	Page* p = m_head;
+	m_allocator.lock();
+	while (p) {
+		Page* tmp = p;
+		p = p->next;
+		m_allocator.deallocate(tmp, false);
+	}
+	m_allocator.unlock();
+}
+
+Span<u8> OutputPagedStream::reserve(u32 size) {
+	if (m_tail->size == lengthOf(m_tail->data)) {
+		Page* new_page = new (NewPlaceholder(), m_allocator.allocate(true)) Page;
+		m_tail->next = new_page;
+		m_tail = new_page;
+	}
+
+	u8* res = m_tail->data + m_tail->size;
+	size = minimum(size, u32(sizeof(m_tail->data) - m_tail->size));
+	m_tail->size += size;
+	return Span(res, size);
+}
+
+bool OutputPagedStream::write(const void* data, u64 size) {
+	const u8* src = (const u8*)data;
+	while (size > 0) {
+		Span<u8> dst = reserve((u32)size);
+		memcpy(dst.begin(), data, dst.length());
+		size -= dst.length();
+	}
+	return true;
+}
+
+InputPagedStream::InputPagedStream(const OutputPagedStream& src)
+	: m_page(src.m_head)
+{
+}
+
+
+bool InputPagedStream::read(void* buffer, u64 size) {
+	u8* dst = (u8*)buffer;
+
+	while (size > 0) {
+		if (m_page_pos == m_page->size) {
+			if (!m_page->next) return false;
+
+			m_page_pos = 0;
+			m_page = m_page->next;
+		}
+		const u32 chunk_size = minimum(u32(size), m_page->size - m_page_pos);
+		memcpy(dst, m_page->data + m_page_pos, chunk_size);
+		m_page_pos += chunk_size;
+		size -= chunk_size;
+	}
+	return true;
 }
 
 bool OutputMemoryStream::write(const void* data, u64 size)

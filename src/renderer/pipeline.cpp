@@ -2640,7 +2640,7 @@ struct PipelineImpl final : Pipeline
 					const gpu::StateFlags state = material->m_render_states | render_state;
 					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask());
 					const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
-					emitter.fillInstanceData((float*)slice.ptr);
+					emitter.fillInstanceData((float*)slice.ptr, m_renderer.getEngine().getPageAllocator());
 					const Matrix mtx(lpos, tr.rot);
 
 					const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));

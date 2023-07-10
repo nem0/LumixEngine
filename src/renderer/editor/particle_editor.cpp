@@ -127,7 +127,8 @@ struct Node : NodeEditorNode {
 		CACHE,
 		EMIT_INPUT,
 		EMIT,
-		CHANNEL_MASK
+		CHANNEL_MASK,
+		VEC3_LENGTH
 	};
 
 	Node(struct ParticleEmitterEditorResource& res);
@@ -1525,6 +1526,61 @@ struct OutputNode : Node {
 	}
 };
 
+struct Vec3LengthNode : Node {
+	Vec3LengthNode(ParticleEmitterEditorResource& res) : Node(res) {}
+
+	Type getType() const override { return Type::VEC3_LENGTH; }
+
+	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+		const NodeInput input = getInput(0);
+		if (!input.node) return error("Invalid input");
+
+		const DataStream x = input.generate(ctx, {}, 0);
+		if (x.isError()) return x;
+		const DataStream y = input.generate(ctx, {}, 1);
+		if (y.isError()) return y;
+		const DataStream z = input.generate(ctx, {}, 2);
+		if (z.isError()) return z;
+
+		DataStream dst = ctx.streamOrRegister(output);
+		ctx.write(InstructionType::MUL);
+		ctx.write(dst);
+		ctx.write(x);
+		ctx.write(x);
+		
+		ctx.write(InstructionType::MULTIPLY_ADD);
+		ctx.write(dst);
+		ctx.write(y);
+		ctx.write(y);
+		ctx.write(dst);
+		
+		ctx.write(InstructionType::MULTIPLY_ADD);
+		ctx.write(dst);
+		ctx.write(z);
+		ctx.write(z);
+		ctx.write(dst);
+
+		ctx.write(InstructionType::SQRT);
+		ctx.write(dst);
+		ctx.write(dst);
+		
+		return dst;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {}
+	void deserialize(InputMemoryStream& blob) override {}
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle("Vec3 length");
+		inputSlot();
+		outputSlot();
+		ImGui::TextUnformatted(" ");
+		return false;
+	}
+};
+
 struct ColorMixNode : Node {
 	ColorMixNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
@@ -1881,6 +1937,7 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
+			case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
 			case Node::COLOR_MIX: node = LUMIX_NEW(m_allocator, ColorMixNode)(*this); break;
 			case Node::MADD: node = LUMIX_NEW(m_allocator, MaddNode)(*this); break;
 			case Node::SWITCH: node = LUMIX_NEW(m_allocator, SwitchNode)(*this); break;
@@ -2053,6 +2110,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			.visitType(Node::MADD, "Multiply add")
 			.visitType(Node::SIN, "Sin")
 			.visitType(Node::SUB, "Subtract", 'S')
+			.visitType(Node::VEC3_LENGTH, "Vector3 length", 'L')
 			.endCategory();
 		}
 
