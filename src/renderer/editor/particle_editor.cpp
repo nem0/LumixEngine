@@ -60,7 +60,25 @@ struct GenerateContext {
 
 	void freeRegister(DataStream v) {
 		if (v.type != DataStream::REGISTER) return;
+		if (m_persistent_register_mask & (1 << v.index)) return;
 		m_register_mask &= ~(1 << v.index);
+	}
+
+	DataStream persistentRegister() {
+		DataStream r;
+		r.type = DataStream::REGISTER;
+		r.index = 0xff;
+		for (u32 i = 0; i < sizeof(m_register_mask) * 8; ++i) {
+			if ((m_register_mask & (1 << i)) == 0) {
+				r.index = i;
+				break;
+			}
+		}
+		ASSERT(r.index != 0xFF);
+		m_register_mask |= 1 << r.index;
+		m_persistent_register_mask |= 1 << r.index;
+		m_registers_count = maximum(m_registers_count, r.index + 1);
+		return r;
 	}
 
 	DataStream streamOrRegister(DataStream v) {
@@ -86,6 +104,7 @@ struct GenerateContext {
 	OutputMemoryStream& ip;
 	Context context;
 	u16 m_register_mask = 0;
+	u16 m_persistent_register_mask = 0;
 	u8 m_registers_count = 0;
 };
 
@@ -128,7 +147,9 @@ struct Node : NodeEditorNode {
 		EMIT_INPUT,
 		EMIT,
 		CHANNEL_MASK,
-		VEC3_LENGTH
+		VEC3_LENGTH,
+		OR,
+		AND
 	};
 
 	Node(struct ParticleEmitterEditorResource& res);
@@ -745,7 +766,7 @@ struct CacheNode : Node {
 			op0 = input.generate(ctx, op0, subindex);
 			if (op0.isError()) return op0;
 
-			m_cached = ctx.streamOrRegister({});
+			m_cached = ctx.persistentRegister();
 			ctx.write(InstructionType::MOV);
 			ctx.write(m_cached);
 			ctx.write(op0);
@@ -1310,6 +1331,7 @@ struct UpdateNode : Node {
 			DataStream res = kill_input.generate(ctx, {}, 0);
 			if (res.isError()) return res;
 			ctx.write(InstructionType::KILL);
+			ctx.write(res);
 		}
 
 		i32 out_index = 0 ;
@@ -1372,7 +1394,7 @@ struct CompareNode : Node {
 	void serialize(OutputMemoryStream& blob) const override { blob.write(op); blob.write(value); }
 	void deserialize(InputMemoryStream& blob) override { blob.read(op); blob.read(value); }
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
 		const NodeInput input1 = getInput(1);
 		if (!input0.node) return error("Invalid input");
@@ -1388,6 +1410,9 @@ struct CompareNode : Node {
 			case GT: ctx.write(InstructionType::GT); break;
 		}
 			
+		dst = ctx.streamOrRegister(dst);
+
+		ctx.write(dst);
 		ctx.write(i0);
 		if (input1.node) {
 			ctx.write(i1);
@@ -1399,7 +1424,7 @@ struct CompareNode : Node {
 			ctx.write(op0);
 		}
 
-		return {};
+		return dst;
 	}
 
 	enum Op : int {
@@ -1525,6 +1550,62 @@ struct OutputNode : Node {
 		return {};
 	}
 };
+
+template <InstructionType OP_TYPE>
+struct LogicOpNode : Node {
+	LogicOpNode(ParticleEmitterEditorResource& res) : Node(res) {}
+
+	Type getType() const override {
+		switch(OP_TYPE) {
+			case InstructionType::OR: return Type::OR;
+			case InstructionType::AND: return Type::AND;
+			default: ASSERT(false); return Type::MUL;
+		}
+	}
+
+	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+		const NodeInput i0 = getInput(0);
+		if (!i0.node) return error("Invalid input");
+
+		const NodeInput i1 = getInput(1);
+		if (!i1.node) return error("Invalid input");
+
+		const DataStream arg0 = i0.generate(ctx, {}, 0);
+		if (arg0.isError()) return arg0;
+
+		const DataStream arg1 = i1.generate(ctx, {}, 0);
+		if (arg1.isError()) return arg1;
+
+		
+		DataStream dst = ctx.streamOrRegister(output);
+		ctx.write(OP_TYPE);
+		ctx.write(dst);
+		ctx.write(arg0);
+		ctx.write(arg1);
+		return dst;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {}
+	void deserialize(InputMemoryStream& blob) override {}
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	bool onGUI() override {
+		switch(OP_TYPE) {
+			case InstructionType::OR: ImGuiEx::NodeTitle("Or"); break;
+			case InstructionType::AND: ImGuiEx::NodeTitle("And"); break;
+			default: ASSERT(false); break;
+		}
+
+		outputSlot(ImGuiEx::PinShape::TRIANGLE);
+		inputSlot(ImGuiEx::PinShape::TRIANGLE);
+		ImGui::TextUnformatted("A");
+		inputSlot(ImGuiEx::PinShape::TRIANGLE);
+		ImGui::TextUnformatted("B");
+		return false;
+	}
+};
+
 
 struct Vec3LengthNode : Node {
 	Vec3LengthNode(ParticleEmitterEditorResource& res) : Node(res) {}
@@ -1875,6 +1956,7 @@ struct EmitNode : Node {
 		if (res.isError()) return res;
 
 		ctx.write(InstructionType::EMIT);
+		ctx.write(res);
 		ctx.write(emitter_idx);
 		
 		ParticleEmitterEditorResource& emitter = *m_resource.m_system.m_emitters[emitter_idx].get();
@@ -1938,6 +2020,8 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
 			case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
+			case Node::OR: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::OR>)(*this); break;
+			case Node::AND: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::AND>)(*this); break;
 			case Node::COLOR_MIX: node = LUMIX_NEW(m_allocator, ColorMixNode)(*this); break;
 			case Node::MADD: node = LUMIX_NEW(m_allocator, MaddNode)(*this); break;
 			case Node::SWITCH: node = LUMIX_NEW(m_allocator, SwitchNode)(*this); break;
@@ -2099,6 +2183,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				visitor.visitType(m_active_emitter->m_streams[i].name, creator);
 			}
 			visitor.endCategory();
+		}
+
+		if (visitor.beginCategory("Logic")) {
+			visitor.visitType(Node::OR, "Or")
+			.visitType(Node::AND, "And")
+			.endCategory();
 		}
 
 		if (visitor.beginCategory("Math")) {
@@ -2354,6 +2444,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		ImGui::DragFloat("##eps", &m_active_emitter->m_emit_per_second);
 		ImGuiEx::Label("Emit at start");
 		ImGui::DragInt("##eas", (i32*)&m_active_emitter->m_init_emit_count);
+		ImGuiEx::Label("Register count");
+		ImGui::Text("%d", m_active_emitter->m_registers_count);
 		if (ImGui::CollapsingHeader("Streams", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (ParticleEmitterEditorResource::Stream& s : m_active_emitter->m_streams) {
 				ImGui::PushID(&s);

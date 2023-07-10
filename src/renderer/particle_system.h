@@ -98,7 +98,9 @@ struct ParticleSystemResource final : Resource {
 		DIV,
 		SPLINE,
 		MESH,
-		MOD
+		MOD,
+		OR,
+		AND
 	};
 
 	static const ResourceType TYPE;

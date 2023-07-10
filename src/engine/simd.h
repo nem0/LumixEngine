@@ -73,7 +73,17 @@ namespace Lumix
 	{
 		return _mm_cmplt_ps(a, b);
 	}
-	
+
+	LUMIX_FORCE_INLINE float4 f4Or(float4 a, float4 b)
+	{
+		return _mm_or_ps(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 f4And(float4 a, float4 b)
+	{
+		return _mm_and_ps(a, b);
+	}
+
 	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
 	{
 		return _mm_movemask_ps(a);
@@ -197,6 +207,38 @@ namespace Lumix
 	LUMIX_FORCE_INLINE void f4Store(void* dest, float4 src)
 	{
 		(*(float4*)dest) = src;
+	}
+
+	LUMIX_FORCE_INLINE float4 f4And(float4 a, float4 b)
+	{
+		static const float true_val = [](){
+			u32 u = 0xffFFffFF;
+			float f;
+			memcpy(&f, &u, sizeof(f));
+			return f;
+		}();
+		return {
+			a.x && b.x ? true_val : 0,
+			a.y && b.y ? true_val : 0,
+			a.z && b.z ? true_val : 0,
+			a.w && b.w ? true_val : 0
+		};
+	}
+
+	LUMIX_FORCE_INLINE float4 f4Or(float4 a, float4 b)
+	{
+		static const float true_val = [](){
+			u32 u = 0xffFFffFF;
+			float f;
+			memcpy(&f, &u, sizeof(f));
+			return f;
+		}();
+		return {
+			a.x || b.x ? true_val : 0,
+			a.y || b.y ? true_val : 0,
+			a.z || b.z ? true_val : 0,
+			a.w || b.w ? true_val : 0
+		};
 	}
 
 	LUMIX_FORCE_INLINE float4 f4CmpGT(float4 a, float4 b)
