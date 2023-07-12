@@ -43,6 +43,8 @@ enum class ValueType : i32 {
 
 struct Node;
 
+// TODO constant propagation
+
 struct GenerateContext {
 	enum Context {
 		INIT,
@@ -57,6 +59,7 @@ struct GenerateContext {
 	
 	void write(const void* data, u64 size) { ip.write(data, size); }
 	template <typename T> void write(const T& value) { ip.write(value); }
+	void write(InstructionType value) { ip.write(value); ++m_instruction_count; }
 
 	void freeRegister(DataStream v) {
 		if (v.type != DataStream::REGISTER) return;
@@ -106,6 +109,7 @@ struct GenerateContext {
 	u16 m_register_mask = 0;
 	u16 m_persistent_register_mask = 0;
 	u8 m_registers_count = 0;
+	u32 m_instruction_count = 0;
 };
 
 struct NodeInput {
@@ -149,7 +153,8 @@ struct Node : NodeEditorNode {
 		CHANNEL_MASK,
 		VEC3_LENGTH,
 		OR,
-		AND
+		AND,
+		SET_CHANNEL
 	};
 
 	Node(struct ParticleEmitterEditorResource& res);
@@ -467,6 +472,9 @@ struct ParticleEmitterEditorResource {
 		}
 
 		m_registers_count = 0;
+		m_update_instructions_count = 0;
+		m_init_instructions_count = 0;
+		m_output_instructions_count = 0;
 
 		bool emit_fail = false;
 		for (Node* n : m_nodes) {
@@ -475,6 +483,7 @@ struct ParticleEmitterEditorResource {
 				if (n->generate(ctx, {}, 0).isError()) {
 					emit_fail = true;
 				}
+				m_update_instructions_count += ctx.m_instruction_count;
 				m_registers_count = maximum(ctx.m_registers_count, m_registers_count);
 			}
 		}
@@ -489,6 +498,7 @@ struct ParticleEmitterEditorResource {
 			else {
 				m_update.write(InstructionType::END);
 				m_registers_count = maximum(ctx.m_registers_count, m_registers_count);
+				m_update_instructions_count += ctx.m_instruction_count;
 			}
 		}
 
@@ -501,6 +511,7 @@ struct ParticleEmitterEditorResource {
 			else {
 				m_output.write(InstructionType::END);
 				m_registers_count = maximum(ctx.m_registers_count, m_registers_count);
+				m_output_instructions_count += ctx.m_instruction_count;
 			}
 		}
 
@@ -513,6 +524,7 @@ struct ParticleEmitterEditorResource {
 			else {
 				m_emit.write(InstructionType::END);
 				m_registers_count = maximum(ctx.m_registers_count, m_registers_count);
+				m_init_instructions_count += ctx.m_instruction_count;
 			}
 		}
 
@@ -556,6 +568,9 @@ struct ParticleEmitterEditorResource {
 	Array<Output> m_outputs;
 	Array<Node*> m_nodes;
 	u32 m_registers_count;
+	u32 m_update_instructions_count;
+	u32 m_init_instructions_count;
+	u32 m_output_instructions_count;
 	Array<NodeEditorLink> m_links;
 	OutputMemoryStream m_update;
 	OutputMemoryStream m_emit;
@@ -1621,6 +1636,44 @@ struct LogicOpNode : Node {
 	}
 };
 
+struct SetChannelNode : Node {
+	SetChannelNode(ParticleEmitterEditorResource& res) : Node(res) {}
+
+	Type getType() const override { return Type::SET_CHANNEL; }
+
+	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+		const NodeInput i0 = getInput(0);
+		if (!i0.node) return error("Invalid input");
+
+		const NodeInput i1 = getInput(1);
+		if (!i1.node) return error("Invalid input");
+
+		if (subindex != channel) {
+			const DataStream arg0 = i0.generate(ctx, output, subindex);
+			return arg0;
+		}
+
+		const DataStream arg1 = i1.generate(ctx, output, 0);
+		return arg1;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override { blob.write(channel); }
+	void deserialize(InputMemoryStream& blob) override {  blob.read(channel);  }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle("Set channel");
+		inputSlot();
+		outputSlot();
+		ImGui::TextUnformatted("Input vector");
+		inputSlot();
+		bool res = ImGui::Combo("Channel", &channel, "X\0Y\0Z\0W\0");
+		return res;
+	}
+
+	i32 channel = 0;
+};
 
 struct Vec3LengthNode : Node {
 	Vec3LengthNode(ParticleEmitterEditorResource& res) : Node(res) {}
@@ -1919,7 +1972,6 @@ struct ConstNode : Node {
 	bool hasOutputPins() const override { return true; }
 
 	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
-		if (subindex > 0) return error("Invalid subindex");
 		if (ctx.context != GenerateContext::INIT && constant == Const::EMIT_INDEX) return error("Invalid context");
 		
 		DataStream r;
@@ -2034,6 +2086,7 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
+			case Node::SET_CHANNEL: node = LUMIX_NEW(m_allocator, SetChannelNode)(*this); break;
 			case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
 			case Node::OR: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::OR>)(*this); break;
 			case Node::AND: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::AND>)(*this); break;
@@ -2229,6 +2282,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			.visitType(Node::NOISE, "Noise", 'N')
 			.visitType(Node::NUMBER, "Number", '1')
 			.visitType(Node::RANDOM, "Random", 'R')
+			.visitType(Node::SET_CHANNEL, "Set channel")
 			.visitType(Node::SPLINE, "Spline")
 			.visitType(Node::SWITCH, "Switch")
 			.visitType(Node::VEC3, "Vec3", '3')
@@ -2435,7 +2489,10 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 				case Node::STREAM: {
 					auto* node = (StreamNode*)n;
-					if (node->idx == stream_idx) {
+					if (node->idx > stream_idx) {
+						--node->idx;
+					}
+					else if (node->idx == stream_idx) {
 						m_active_emitter->m_links.eraseItems([&](const NodeEditorLink& link){
 							return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 						});
@@ -2461,6 +2518,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		ImGui::DragInt("##eas", (i32*)&m_active_emitter->m_init_emit_count);
 		ImGuiEx::Label("Register count");
 		ImGui::Text("%d", m_active_emitter->m_registers_count);
+		ImGuiEx::Label("Update instructions");
+		ImGui::Text("%d", m_active_emitter->m_update_instructions_count);
+		ImGuiEx::Label("Init instructions");
+		ImGui::Text("%d", m_active_emitter->m_init_instructions_count);
+		ImGuiEx::Label("Output instructions");
+		ImGui::Text("%d", m_active_emitter->m_output_instructions_count);
 		if (ImGui::CollapsingHeader("Streams", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (ParticleEmitterEditorResource::Stream& s : m_active_emitter->m_streams) {
 				ImGui::PushID(&s);
