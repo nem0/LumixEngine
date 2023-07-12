@@ -1833,27 +1833,48 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void setupParticles(View& view) {
+		PROFILE_FUNCTION();
+
 		if (view.cp.is_shadow) return;
 
 		const auto& particle_systems = m_module->getParticleSystems();
 		if (particle_systems.size() == 0) return;
 			
 		Sorter::Inserter inserter(view.sorter);
-
 		// TODO culling
-		for (const ParticleSystem& system : particle_systems) {
-			for (const ParticleSystem::Emitter& emitter : system.getEmitters()) {
+
+		jobs::forEach(particle_systems.capacity(), 1, [&](i32 idx, i32){
+			const ParticleSystem* system = particle_systems.getFromIndex(idx);
+			if (!system) return;
+			
+			PROFILE_BLOCK("setup particles");
+			for (ParticleSystem::Emitter& emitter : system->getEmitters()) {
 				const Material* material = emitter.resource_emitter.material;
 				if (!material) continue;
 
 				const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
 				if (bucket_idx == 0xff) continue;
 
-				const u32 particles_count = emitter.particles_count;
-				if (particles_count == 0) continue;
+				const u32 size = emitter.getParticlesDataSizeBytes();
+				if (size == 0) continue;
+
+				emitter.slice = m_renderer.allocTransient(size);
+				emitter.fillInstanceData((float*)emitter.slice.ptr, m_renderer.getEngine().getPageAllocator());
+			}
+		});
+
+		for (const ParticleSystem& system : particle_systems) {
+			for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
+				const Material* material = emitter.resource_emitter.material;
+				if (!material) continue;
+
+				const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
+				if (bucket_idx == 0xff) continue;
 
 				const u32 size = emitter.getParticlesDataSizeBytes();
 				if (size == 0) continue;
+				
+				ASSERT(emitter.particles_count > 0);
 
 				const u64 type_mask = (u64)RenderableTypes::PARTICLES << 32;
 				const u32 emitter_idx = u32(&emitter - system.getEmitters().begin());
@@ -2639,8 +2660,7 @@ struct PipelineImpl final : Pipeline
 					const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 					const gpu::StateFlags state = material->m_render_states | render_state;
 					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask());
-					const Renderer::TransientSlice slice = m_renderer.allocTransient(emitter.getParticlesDataSizeBytes());
-					emitter.fillInstanceData((float*)slice.ptr, m_renderer.getEngine().getPageAllocator());
+					const Renderer::TransientSlice slice = emitter.slice;
 					const Matrix mtx(lpos, tr.rot);
 
 					const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));

@@ -7,6 +7,7 @@
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/hash.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
@@ -15,6 +16,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/stack_array.h"
 #include "engine/stream.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
@@ -522,12 +524,28 @@ struct RenderModuleImpl final : RenderModule {
 
 		if (!m_is_game_running) return;
 
-		Array<EntityRef> to_delete(m_allocator);
-		for (ParticleSystem& emitter : m_particle_emitters) {
-			if (emitter.update(dt, m_scratch_buffer, m_engine.getPageAllocator())) {
-				to_delete.push(*emitter.m_entity);
+		StackArray<EntityRef, 16> to_delete(m_allocator);
+		jobs::Mutex mutex;
+		auto iter = m_particle_emitters.begin();
+		auto end = m_particle_emitters.end();
+		jobs::runOnWorkers([&](){
+			for (;;) {
+				jobs::enter(&mutex);
+				if (iter == end) {
+					jobs::exit(&mutex);
+					return;
+				}
+				ParticleSystem& ps = iter.value();
+				++iter;
+				jobs::exit(&mutex);
+
+				if (ps.update(dt, m_engine.getPageAllocator())) {
+					jobs::enter(&mutex);
+					to_delete.push(*ps.m_entity);
+					jobs::exit(&mutex);
+				}
 			}
-		}
+		});
 		for (EntityRef e : to_delete) {
 			m_world.destroyEntity(e);
 		}
@@ -3165,7 +3183,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_scratch_buffer, m_engine.getPageAllocator()); }
+	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
 
 	void setParticleSystemPath(EntityRef entity, const Path& path) override {
 		ParticleSystemResource* res = m_engine.getResourceManager().load<ParticleSystemResource>(path);
@@ -3221,7 +3239,6 @@ struct RenderModuleImpl final : RenderModule {
 	HashMap<Model*, EntityRef> m_model_entity_map;
 	HashMap<Material*, EntityRef> m_material_decal_map;
 	HashMap<Material*, EntityRef> m_material_curve_decal_map;
-	OutputMemoryStream m_scratch_buffer;
 };
 
 ReflectionProbe::LoadJob::~LoadJob() {
@@ -3430,14 +3447,12 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
 	, m_furs(m_allocator)
-	, m_scratch_buffer(m_allocator)
 {
 
 	m_world.entityTransformed().bind<&RenderModuleImpl::onEntityMoved>(this);
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
-	m_scratch_buffer.resize(16 * 1024);
 
 	m_render_cmps_mask = 0;
 

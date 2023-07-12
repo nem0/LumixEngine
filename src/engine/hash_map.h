@@ -245,11 +245,14 @@ public:
 	ConstIterator end() const { return ConstIterator { this, m_capacity }; }
 
 	void clear() {
-		auto iter = begin();
-		while (iter.isValid()) {
-			erase(iter);
-			iter = begin();
+		for (u32 i = 0; i < m_capacity; ++i) {
+			if (m_keys[i].valid) {
+				((Key*)m_keys[i].key_mem)->~Key();
+				m_values[i].~Value();
+				m_keys[i].valid = false;
+			}
 		}
+		m_size = 0;
 	}
 
 	ConstIterator find(const Key& key) const {
@@ -260,6 +263,11 @@ public:
 		return { this, findPos(key) };
 	}
 	
+	const Value* getFromIndex(u32 index) const {
+		if (!m_keys[index].valid) return nullptr;
+		return &m_values[index];
+	}
+
 	Value& operator[](const Key& key) {
 		const u32 pos = findPos(key);
 		ASSERT(pos < m_capacity);
@@ -362,6 +370,7 @@ public:
 
 	bool empty() const { return m_size == 0; }
 	u32 size() const { return m_size; }
+	u32 capacity() const { return m_capacity; }
 
 	void reserve(u32 new_capacity) {
 		if (new_capacity > m_capacity) grow(nextPow2(new_capacity));

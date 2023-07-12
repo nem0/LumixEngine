@@ -3,6 +3,7 @@
 
 #include "allocator.h"
 #include "atomic.h"
+#include "ring_buffer.h"
 #include "sync.h"
 
 
@@ -15,7 +16,7 @@ struct LUMIX_ENGINE_API PageAllocator final
 public:
 	enum { PAGE_SIZE = 4096 };
 
-	PageAllocator();
+	PageAllocator(IAllocator& fallback);
 	~PageAllocator();
 		
 	void* allocate(bool lock);
@@ -27,9 +28,9 @@ public:
 	void unlock();
 		
 private:
-	u32 allocated_count = 0;
+	volatile i32 allocated_count = 0;
 	u32 reserved_count = 0;
-	void* free_pages = nullptr;
+	RingBuffer<void*, 512> free_pages;
 	Mutex mutex;
 };
 

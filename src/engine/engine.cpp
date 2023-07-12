@@ -56,6 +56,7 @@ public:
 
 	EngineImpl(InitArgs&& init_data, IAllocator& allocator)
 		: m_allocator(allocator)
+		, m_page_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
 		, m_lua_resources(m_allocator)

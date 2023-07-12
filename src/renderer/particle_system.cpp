@@ -6,6 +6,7 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/metaprogramming.h"
 #include "engine/page_allocator.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
@@ -275,7 +276,7 @@ namespace {
 	}
 }
 struct ParticleSystem::RunningContext {
-	RunningContext(Emitter& emitter, IAllocator& allocator)
+	RunningContext(const Emitter& emitter, IAllocator& allocator)
 		: registers(allocator)
 		, outputs(allocator)
 		, emitter(emitter)
@@ -284,7 +285,7 @@ struct ParticleSystem::RunningContext {
 	StackArray<float, 16> registers;
 	StackArray<float, 16> outputs;
 	InputMemoryStream instructions;
-	Emitter& emitter;
+	const Emitter& emitter;
 	u32 particle_idx;
 };
 
@@ -408,69 +409,14 @@ struct RegisterGetter {
 	DataStream stream;
 };
 
-struct BinaryHelper {
-	template <auto F, typename... T>
-	void run(DataStream dst, InputMemoryStream& ip, T&... args) {
-		const DataStream stream = ip.read<DataStream>();
-		switch(stream.type) {
-			case DataStream::CHANNEL: { ChannelGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			case DataStream::LITERAL: { LiteralGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			case DataStream::CONST: { ConstGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			case DataStream::REGISTER: { RegisterGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			default: ASSERT(false);
-		}
-	}
+struct ProcessHelper {
+	ProcessHelper(const ParticleSystem::Emitter& emitter, i32 fromf4, i32 stepf4, float4** reg_mem)
+		: emitter(emitter)
+		, fromf4(fromf4)
+		, stepf4(stepf4)
+		, reg_mem(reg_mem)
+	{}
 
-	template <auto F, typename T0, typename T1>
-	void run(DataStream dst, InputMemoryStream& ip, T0& t0, T1& t1) {
-		float4* arg0 = t0.get(*emitter, fromf4, stepf4, reg_mem);
-		float4* arg1 = t1.get(*emitter, fromf4, stepf4, reg_mem);
-		
-		if (dst.type == DataStream::OUT) {
-			const u32 stride = emitter->resource_emitter.outputs_count;
-			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1)) {
-				float4 tmp = F(*arg0, *arg1);
-				u32 idx = dst.index + (fromf4 + i) * 4 * stride;
-				out_mem[idx] = f4GetX(tmp);
-				idx += stride;
-				out_mem[idx] = f4GetY(tmp);
-				idx += stride;
-				out_mem[idx] = f4GetZ(tmp);
-				idx += stride;
-				out_mem[idx] = f4GetW(tmp);
-			}
-		}
-		else {
-			float4* result = getStream(*emitter, dst, fromf4, reg_mem);
-			const float4* const end = result + stepf4;
-
-			for (; result != end; ++result, T0::step(arg0), T1::step(arg1)) {
-				*result = F(*arg0, *arg1);
-			}
-		}
-	}
-	
-	LUMIX_FORCE_INLINE static float4 f4Mod(float4 a, float4 b) {
-		float af[4];
-		float bf[4];
-		float r[4];
-		f4Store(af, a);
-		f4Store(bf, b);
-		r[0] = fmodf(af[0], bf[0]);
-		r[1] = fmodf(af[1], bf[1]);
-		r[2] = fmodf(af[2], bf[2]);
-		r[3] = fmodf(af[3], bf[3]);
-		return f4Load(r);
-	}
-
-	const ParticleSystem::Emitter* emitter;
-	i32 fromf4;
-	i32 stepf4;
-	float4** reg_mem;
-	float* out_mem = nullptr;
-};
-
-struct TernaryHelper {
 	static float4 madd(float4 a, float4 b, float4 c) {
 		return f4Add(f4Mul(a, b), c);
 	}
@@ -480,26 +426,140 @@ struct TernaryHelper {
 		return f4Add(f4Mul(b, c), f4Mul(a, invc));
 	}
 
+	template <auto F>
+	void runSingle(InputMemoryStream& ip) {
+		const DataStream dst = ip.read<DataStream>();
+		DataStream op0 = ip.read<DataStream>();
+		const float* arg0 = (float*)getStream(emitter, op0, fromf4, reg_mem);
+		
+		if constexpr (ArgsCount<decltype(F)>::value == 1) {
+			if (dst.type == DataStream::OUT) {
+				i32 output_idx = dst.index;
+				const u32 stride = emitter.resource_emitter.outputs_count;
+				float* result = out_mem + output_idx + fromf4 * 4 * stride;
+				for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+					result[j] = F(arg0[i]);
+				}
+			}
+			else {
+				float* result = (float*)getStream(emitter, dst, fromf4, reg_mem);
+				const float* const end = result + stepf4 * 4;
+
+				for (; result != end; ++result, ++arg0) {
+					*result = F(*arg0);
+				}
+			}
+		}
+		else {
+			DataStream op1 = ip.read<DataStream>();
+			const float* arg1 = (float*)getStream(emitter, op1, fromf4, reg_mem);
+
+			if (dst.type == DataStream::OUT) {
+				i32 output_idx = dst.index;
+				const u32 stride = emitter.resource_emitter.outputs_count;
+				float* result = out_mem + output_idx + fromf4 * 4 * stride;
+				for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+					result[j] = F(arg0[i], arg1[i]);
+				}
+			}
+			else {
+				float* result = (float*)getStream(emitter, dst, fromf4, reg_mem);
+				const float* const end = result + stepf4 * 4;
+
+				for (; result != end; ++result, ++arg0, ++arg1) {
+					*result = F(*arg0, *arg1);
+				}
+			}
+		}
+	}
+
+	template <auto F>
+	void run(InputMemoryStream& ip) {
+		if constexpr (IsSame<ResultOf<decltype(F)>::Type, float>::Value) {
+			runSingle<F>(ip);
+		}
+		else if constexpr (ArgsCount<decltype(F)>::value == 2) {
+			const DataStream dst = ip.read<DataStream>();
+			run2<F>(dst, ip);
+		}
+		else if constexpr (ArgsCount<decltype(F)>::value == 3) {
+			const DataStream dst = ip.read<DataStream>();
+			run3<F>(dst, ip);
+		}
+		else {
+			static_assert(false);
+		}
+	}
+
+	const ParticleSystem::Emitter& emitter;
+	const i32 fromf4;
+	const i32 stepf4;
+	float4** reg_mem;
+	float* out_mem = nullptr;
+
+private:
 	template <auto F, typename... T>
-	void run(DataStream dst, InputMemoryStream& ip, T&... args) {
+	void run2(DataStream dst, InputMemoryStream& ip, T&... args) {
 		const DataStream stream = ip.read<DataStream>();
 		switch(stream.type) {
-			case DataStream::CHANNEL: { ChannelGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			case DataStream::LITERAL: { LiteralGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			case DataStream::CONST: { ConstGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
-			case DataStream::REGISTER: { RegisterGetter tmp(stream); run<F>(dst, ip, args..., tmp); break; }
+			case DataStream::CHANNEL: { ChannelGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
+			case DataStream::LITERAL: { LiteralGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
+			case DataStream::CONST: { ConstGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
+			case DataStream::REGISTER: { RegisterGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
+			default: ASSERT(false);
+		}
+	}
+
+	template <auto F, typename T0, typename T1>
+	void run2(DataStream dst, InputMemoryStream& ip, T0& t0, T1& t1) {
+		float4* arg0 = t0.get(emitter, fromf4, stepf4, reg_mem);
+		float4* arg1 = t1.get(emitter, fromf4, stepf4, reg_mem);
+		
+		if (dst.type == DataStream::OUT) {
+			const u32 stride = emitter.resource_emitter.outputs_count;
+			u32 idx = dst.index + fromf4 * 4 * stride;
+			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1)) {
+				float4 tmp = F(*arg0, *arg1);
+				out_mem[idx] = f4GetX(tmp);
+				idx += stride;
+				out_mem[idx] = f4GetY(tmp);
+				idx += stride;
+				out_mem[idx] = f4GetZ(tmp);
+				idx += stride;
+				out_mem[idx] = f4GetW(tmp);
+				idx += stride;
+			}
+		}
+		else {
+			float4* result = getStream(emitter, dst, fromf4, reg_mem);
+			const float4* const end = result + stepf4;
+
+			for (; result != end; ++result, T0::step(arg0), T1::step(arg1)) {
+				*result = F(*arg0, *arg1);
+			}
+		}
+	}
+
+	template <auto F, typename... T>
+	void run3(DataStream dst, InputMemoryStream& ip, T&... args) {
+		const DataStream stream = ip.read<DataStream>();
+		switch(stream.type) {
+			case DataStream::CHANNEL: { ChannelGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
+			case DataStream::LITERAL: { LiteralGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
+			case DataStream::CONST: { ConstGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
+			case DataStream::REGISTER: { RegisterGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
 			default: ASSERT(false);
 		}
 	}
 
 	template <auto F, typename T0, typename T1, typename T2>
-	void run(DataStream dst, InputMemoryStream& ip, T0& t0, T1& t1, T2& t2) {
-		float4* arg0 = t0.get(*emitter, fromf4, stepf4, reg_mem);
-		float4* arg1 = t1.get(*emitter, fromf4, stepf4, reg_mem);
-		float4* arg2 = t2.get(*emitter, fromf4, stepf4, reg_mem);
+	void run3(DataStream dst, InputMemoryStream& ip, T0& t0, T1& t1, T2& t2) {
+		float4* arg0 = t0.get(emitter, fromf4, stepf4, reg_mem);
+		float4* arg1 = t1.get(emitter, fromf4, stepf4, reg_mem);
+		float4* arg2 = t2.get(emitter, fromf4, stepf4, reg_mem);
 
 		if (dst.type == DataStream::OUT) {
-			const u32 stride = emitter->resource_emitter.outputs_count;
+			const u32 stride = emitter.resource_emitter.outputs_count;
 			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1), T2::step(arg2)) {
 				float4 tmp = F(*arg0, *arg1, *arg2);
 				u32 idx = dst.index + (fromf4 + i) * 4 * stride;
@@ -513,7 +573,7 @@ struct TernaryHelper {
 			}
 		}
 		else {
-			float4* result = getStream(*emitter, dst, fromf4, reg_mem);
+			float4* result = getStream(emitter, dst, fromf4, reg_mem);
 			const float4* const end = result + stepf4;
 
 			for (; result != end; ++result, T0::step(arg0), T1::step(arg1), T2::step(arg2)) {
@@ -521,18 +581,13 @@ struct TernaryHelper {
 			}
 		}
 	}
-
-	const ParticleSystem::Emitter* emitter;
-	i32 fromf4;
-	i32 stepf4;
-	float4** reg_mem;
-	float* out_mem = nullptr;
 };
+
 
 void ParticleSystem::run(RunningContext& ctx) {
 	StackArray<float, 16>& registers = ctx.registers;
 	StackArray<float, 16>& outputs = ctx.outputs;
-	Emitter& emitter = ctx.emitter;
+	const Emitter& emitter = ctx.emitter;
 	InputMemoryStream& ip = ctx.instructions;
 	const u32 particle_idx = ctx.particle_idx;
 
@@ -743,7 +798,252 @@ void ParticleSystem::run(RunningContext& ctx) {
 	}
 }
 
-void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr, OutputMemoryStream& scratch_buffer, PageAllocator& page_allocator) {
+struct ParticleSystem::ChunkProcessorContext {
+	ChunkProcessorContext(const Emitter& emitter, PageAllocator& page_allocator)
+		: emitter(emitter)
+		, page_allocator(page_allocator)
+	{
+		ASSERT(emitter.resource_emitter.registers_count <= lengthOf(registers));
+		for (u32 i = 0; i < emitter.resource_emitter.registers_count; ++i) {
+			registers[i] = (float4*)page_allocator.allocate(true);
+		}
+	}
+
+	~ChunkProcessorContext() {
+		for (u32 i = 0; i < emitter.resource_emitter.registers_count; ++i) {
+			page_allocator.deallocate(registers[i], true);
+		}
+	}
+
+	const Emitter& emitter;
+	PageAllocator& page_allocator;
+	i32 from;
+	float4* registers[16] = {};
+
+	u32 instructions_offset = 0;
+	u32* kill_counter = nullptr;
+	jobs::Mutex* emit_mutex = nullptr;
+	OutputPagedStream* emit_stream = nullptr;
+	float time_delta = 0;
+	float* output_memory = nullptr;
+};
+
+void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
+	const Emitter& emitter = ctx.emitter;
+	const i32 from = ctx.from;
+
+	ParticleSystemResource::Emitter& res_emitter = emitter.resource_emitter;
+	const i32 fromf4 = from / 4;
+	const i32 stepf4 = minimum(1024, emitter.particles_count - from + 3) / 4;
+	InputMemoryStream ip = InputMemoryStream(res_emitter.instructions);
+	ip.skip(ctx.instructions_offset);
+	InstructionType itype = ip.read<InstructionType>();
+
+	ProcessHelper op_helper(emitter, fromf4, stepf4, ctx.registers);
+	op_helper.out_mem = ctx.output_memory;
+
+	while (itype != InstructionType::END) {
+		switch (itype) {
+			case InstructionType::KILL: {
+				DataStream condition_stream = ip.read<DataStream>();
+				const float4* start = getStream(emitter, condition_stream, fromf4, ctx.registers);
+				const float4* const end = start + stepf4;
+				u32 kill_count = 0;
+				u32 last = minimum(from + stepf4 * 4 - 1, emitter.particles_count);
+				const i32 channels_count = res_emitter.channels_count;
+				for (const float4* cond = end - 1; cond >= start; --cond) {
+					const int m = f4MoveMask(*cond);
+					if (m) {
+						for (int i = 3; i >= 0; --i) {
+							const u32 index_in_chunk = u32((cond - start) * 4 + i);
+							const u32 particle_index = u32(from + index_in_chunk);
+							if ((m & (1 << i)) && particle_index < emitter.particles_count) {
+								for (i32 ch = 0; ch < channels_count; ++ch) {
+									float* data = emitter.channels[ch].data;
+									data[particle_index] = data[last];
+								}
+								--last;
+								++kill_count;
+							}
+						}
+					}
+				}
+				const u32 chunk_idx = from / 1024;
+				ctx.kill_counter[chunk_idx] = kill_count;
+				// TODO update stepf4 and maybe some other vars
+				break;
+			}
+			case InstructionType::EMIT: {
+				DataStream condition_stream = ip.read<DataStream>();
+				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
+				const float4* const end = cond + stepf4;
+				RunningContext emit_ctx(emitter, m_allocator);
+				for (const float4* beg = cond; cond != end; ++cond) {
+					const int m = f4MoveMask(*cond);
+					if (m) {
+						for (int i = 0; i < 4; ++i) {
+							const u32 particle_index = u32(from + (cond - beg) * 4 + i);
+							if ((m & (1 << i)) && particle_index < emitter.particles_count) {
+								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+								u32 emitter_idx = tmp_instr.read<u32>();
+								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
+								emit_ctx.particle_idx = particle_index;
+								emit_ctx.registers.resize(res_emitter.registers_count);
+								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+								run(emit_ctx);
+								
+								jobs::enter(ctx.emit_mutex);
+								ctx.emit_stream->write(emitter_idx);
+								ctx.emit_stream->write(emit_ctx.outputs.size());
+								ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
+								jobs::exit(ctx.emit_mutex);
+							}
+						}
+					}
+				}
+
+				// skip emit subroutine
+				ip.read<u32>(); // emitter idx
+				RunningContext ctx(emitter, m_allocator);
+				ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+				ctx.particle_idx = 0;
+				ctx.registers.resize(res_emitter.registers_count);
+				ctx.outputs.resize(res_emitter.outputs_count);
+				run(ctx);
+				ip.setPosition(ip.size() - ctx.instructions.remaining());
+				break;
+			}
+			case InstructionType::SPLINE: {
+				DataStream dst = ip.read<DataStream>();
+				DataStream op0 = ip.read<DataStream>();
+				const u8 subindex = ip.read<u8>();
+				ASSERT(dst.type == DataStream::OUT);
+
+				CoreModule* core_module = (CoreModule*)m_world.getModule(SPLINE_TYPE);
+				if (!m_world.hasComponent(*m_entity, SPLINE_TYPE)) {
+					return; // TODO error message
+				}
+				Spline& spline = core_module->getSpline(*m_entity);
+
+				const u8 output_idx = dst.index;
+				const u32 stride = res_emitter.outputs_count;
+				const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
+				float* out = ctx.output_memory + output_idx + fromf4 * 4 * stride;
+				const i32 last_idx = spline.points.size() - 2;
+				for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+					const float t = arg[i] * last_idx;
+					u32 segment = clamp(u32(t), 0, spline.points.size() - 3);
+					float rel_t = t - segment;
+					float p0 = spline.points[segment + 0][subindex];
+					float p1 = spline.points[segment + 1][subindex];
+					float p2 = spline.points[segment + 2][subindex];
+					p0 = (p1 + p0) * 0.5f;
+					p2 = (p1 + p2) * 0.5f;
+
+					out[j] = lerp(lerp(p0, p1, rel_t), lerp(p1, p2, rel_t), rel_t);
+				}
+				break;
+			}
+			case InstructionType::GRADIENT: {
+				DataStream dst = ip.read<DataStream>();
+				DataStream op0 = ip.read<DataStream>();
+				u32 count = ip.read<u32>();
+				float keys[8];
+				float values[8];
+				ip.read(keys, sizeof(keys[0]) * count);
+				ip.read(values, sizeof(values[0]) * count);
+
+				ASSERT(dst.type == DataStream::OUT);
+				const u8 output_idx = dst.index;
+				const u32 stride = emitter.resource_emitter.outputs_count;
+				const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
+				float* out = ctx.output_memory + output_idx + fromf4 * 4 * stride;
+				for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+					const float v = arg[i];
+					if (v < keys[0]) {
+						out[j] = values[0];
+					}
+					else if (v >= keys[count - 1]) {
+						out[j] = values[count - 1];
+					}
+					else {
+						u32 k = 1;
+						while (v >= keys[k]) ++k;
+						const float t = (v - keys[k - 1]) / (keys[k] - keys[k - 1]);
+						ASSERT(t >= 0 && t <= 1);
+						out[j] = t * values[k] + (1 - t) * values[k - 1];
+					}
+				}
+				break;
+			}
+			case InstructionType::LT: op_helper.run<f4CmpLT>(ip); break;
+			case InstructionType::GT: op_helper.run<f4CmpGT>(ip); break;
+			case InstructionType::MUL: op_helper.run<f4Mul>(ip); break; 
+			case InstructionType::MOD: op_helper.run<fmodf>(ip); break; 
+			case InstructionType::DIV: op_helper.run<f4Div>(ip); break; 
+			case InstructionType::SUB: op_helper.run<f4Sub>(ip); break; 
+			case InstructionType::AND: op_helper.run<f4And>(ip); break; 
+			case InstructionType::OR: op_helper.run<f4Or>(ip); break; 
+			case InstructionType::ADD: op_helper.run<f4Add>(ip); break; 
+			case InstructionType::MIX: op_helper.run<ProcessHelper::mix>(ip); break; 
+			case InstructionType::MULTIPLY_ADD: op_helper.run<ProcessHelper::madd>(ip); break; 
+			case InstructionType::SQRT: op_helper.run<sqrtf>(ip); break;
+			case InstructionType::COS: op_helper.run<cosf>(ip); break;
+			case InstructionType::NOISE: op_helper.run<gnoise>(ip); break;
+			case InstructionType::SIN: op_helper.run<sinf>(ip); break;
+			case InstructionType::MOV: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+				if (dst.type == DataStream::OUT) {
+					const u32 stride = emitter.resource_emitter.outputs_count;
+					if (op0.type == DataStream::LITERAL) {
+						const float arg = op0.value;
+						u8 output_idx = dst.index;
+						float* res = ctx.output_memory + output_idx + fromf4 * 4 * stride;
+						for (i32 i = 0; i < stepf4 * 4; ++i) {
+							res[i * stride] = arg;
+						}
+					}
+					else {
+						const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
+						u8 output_idx = dst.index;
+						float* res = ctx.output_memory + output_idx + fromf4 * 4 * stride;
+						for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+							res[j] = arg[i];
+						}
+					}
+				}
+				else {
+					float4* result = getStream(emitter, dst, fromf4, ctx.registers);
+					const float4* const end = result + stepf4;
+				
+					if (op0.type == DataStream::CONST) {
+						const float4 src = f4Splat(m_constants[op0.index]);
+						for (; result != end; ++result) {
+							*result = src;
+						}
+					}
+					else {
+						const float4* src = getStream(emitter, op0, fromf4, ctx.registers);
+
+						for (; result != end; ++result, ++src) {
+							*result = *src;
+						}
+					}
+				}
+				break;
+			}
+			case InstructionType::END:
+			case InstructionType::RAND:
+			case InstructionType::MESH:
+				ASSERT(false);
+				break;
+		}
+		itype = ip.read<InstructionType>();
+	}
+}
+
+void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr, PageAllocator& page_allocator) {
 	PROFILE_FUNCTION();
 
 	Emitter& emitter = m_emitters[emitter_idx];
@@ -766,287 +1066,62 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 
 	m_constants[1] = m_total_time;
 	profiler::pushInt("particle count", emitter.particles_count);
-	scratch_buffer.reserve(emitter.particles_count * sizeof(u32));
-	u32* kill_list = (u32*)scratch_buffer.getMutableData();
-	volatile i32 kill_counter = 0;
+	u32* kill_counter = (u32*)page_allocator.allocate(true);
+	const u32 chunks_count = (emitter.particles_count + 1023) / 1024;
+	ASSERT(chunks_count <= PageAllocator::PAGE_SIZE / sizeof(u32));
 	OutputPagedStream emit_stream(page_allocator);
 	jobs::Mutex emit_mutex;
 
 	volatile i32 counter = 0;
 	auto update = [&](){
-		PROFILE_FUNCTION();
-		float4* reg_mem[16] = {};
-		ASSERT(res_emitter.registers_count <= lengthOf(reg_mem));
-		page_allocator.lock();
-		for (u32 i = 0; i < res_emitter.registers_count; ++i) {
-			reg_mem[i] = (float4*)page_allocator.allocate(false);
-		}
-		page_allocator.unlock();
+		PROFILE_BLOCK("update particles");
+		
+		ChunkProcessorContext ctx(emitter, page_allocator);
+		ctx.kill_counter = kill_counter;
+		ctx.emit_mutex = &emit_mutex;
+		ctx.emit_stream = &emit_stream;
+		ctx.time_delta = dt;
+
+		u32 processed = 0;
 		for (;;) {
-			const i32 from = atomicAdd(&counter, 1024);
-			if (from >= (i32)emitter.particles_count) {
-				page_allocator.lock();
-				for (u32 i = 0; i < res_emitter.registers_count; ++i) {
-					page_allocator.deallocate(reg_mem[i], false);
-				}
-				page_allocator.unlock();
-				return;
-			}
+			ctx.from = atomicAdd(&counter, 1024);
+			if (ctx.from >= (i32)emitter.particles_count) return;
 
-			const i32 fromf4 = from / 4;
-			const i32 stepf4 = minimum(1024, emitter.particles_count - from + 3) / 4;
-			InputMemoryStream ip = InputMemoryStream(res_emitter.instructions);
-			InstructionType itype = ip.read<InstructionType>();
-
-			while (itype != InstructionType::END) {
-				switch (itype) {
-					case InstructionType::LT:
-					case InstructionType::GT: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						if (itype == InstructionType::LT) {
-							helper.run<f4CmpLT>(dst, ip);
-						}
-						else {
-							helper.run<f4CmpGT>(dst, ip);
-						}
-						break;
-					}
-					case InstructionType::KILL: {
-						DataStream condition_stream = ip.read<DataStream>();
-						const float4* cond = getStream(emitter, condition_stream, fromf4, reg_mem);
-						const float4* const end = cond + stepf4;
-						for (const float4* beg = cond; cond != end; ++cond) {
-							const int m = f4MoveMask(*cond);
-							if (m) {
-								for (int i = 0; i < 4; ++i) {
-									const u32 particle_index = u32(from + (cond - beg) * 4 + i);
-									if ((m & (1 << i)) && particle_index < emitter.particles_count) {
-										const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
-										ASSERT(kill_idx < scratch_buffer.capacity() / sizeof(kill_list[0]));
-										kill_list[kill_idx] = particle_index;
-									}
-								}
-							}
-						}
-						break;
-					}
-					case InstructionType::EMIT: {
-						DataStream condition_stream = ip.read<DataStream>();
-						const float4* cond = getStream(emitter, condition_stream, fromf4, reg_mem);
-						const float4* const end = cond + stepf4;
-						for (const float4* beg = cond; cond != end; ++cond) {
-							const int m = f4MoveMask(*cond);
-							if (m) {
-								for (int i = 0; i < 4; ++i) {
-									const u32 particle_index = u32(from + (cond - beg) * 4 + i);
-									if ((m & (1 << i)) && particle_index < emitter.particles_count) {
-										InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-										u32 emitter_idx = tmp_instr.read<u32>();
-										RunningContext ctx(emitter, m_allocator); // TODO RunningContext can allocate, reuse it
-										ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
-										ctx.particle_idx = particle_index;
-										ctx.registers.resize(res_emitter.registers_count);
-										ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-										run(ctx);
-										jobs::enter(&emit_mutex);
-										emit_stream.write(emitter_idx);
-										emit_stream.write(ctx.outputs.size());
-										emit_stream.write(ctx.outputs.begin(), ctx.outputs.byte_size());
-										jobs::exit(&emit_mutex);
-									}
-								}
-							}
-						}
-
-						// skip emit subroutine
-						ip.read<u32>(); // emitter idx
-						RunningContext ctx(emitter, m_allocator);
-						ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-						ctx.particle_idx = 0;
-						ctx.registers.resize(res_emitter.registers_count);
-						ctx.outputs.resize(res_emitter.outputs_count);
-						run(ctx);
-						ip.setPosition(ip.size() - ctx.instructions.remaining());
-
-						break;
-					}
-					case InstructionType::MUL: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<f4Mul>(dst, ip);
-						break;
-					}
-					case InstructionType::MOD: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<BinaryHelper::f4Mod>(dst, ip);
-						break;
-					}
-					case InstructionType::DIV: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<f4Div>(dst, ip);
-						break;
-					}
-					case InstructionType::SUB: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<f4Sub>(dst, ip);
-						break;
-					}
-					case InstructionType::AND: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<f4And>(dst, ip);
-						break;
-					}
-					case InstructionType::OR: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<f4Or>(dst, ip);
-						break;
-					}
-					case InstructionType::MULTIPLY_ADD: {
-						TernaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<TernaryHelper::madd>(dst, ip);
-						break;
-					}
-					case InstructionType::ADD: {
-						BinaryHelper helper;
-						helper.emitter = &emitter;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						const DataStream dst = ip.read<DataStream>();
-						helper.run<f4Add>(dst, ip);
-						break;
-					}
-					case InstructionType::MOV: {
-						const DataStream dst = ip.read<DataStream>();
-						const DataStream op0 = ip.read<DataStream>();
-						float4* result = getStream(emitter, dst, fromf4, reg_mem);
-						const float4* const end = result + stepf4;
-				
-						if (op0.type == DataStream::CONST) {
-							ASSERT(op0.index == 0);
-							const float4 src = f4Splat(dt);
-							for (; result != end; ++result) {
-								*result = src;
-							}
-						}
-						else {
-							const float4* src = getStream(emitter, op0, fromf4, reg_mem);
-
-							for (; result != end; ++result, ++src) {
-								*result = *src;
-							}
-						}
-
-						break;
-					}
-					case InstructionType::SQRT: {
-						const DataStream dst = ip.read<DataStream>();
-						const DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(emitter, op0, fromf4, reg_mem);
-						float* result = (float*)getStream(emitter, dst, fromf4, reg_mem);
-						const float* const end = result + stepf4 * 4;
-
-						for (; result != end; ++result, ++arg) {
-							*result = sqrtf(*arg);
-						}
-						break;
-					}
-					case InstructionType::COS: {
-						const DataStream dst = ip.read<DataStream>();
-						const DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(emitter, op0, fromf4, reg_mem);
-						float* result = (float*)getStream(emitter, dst, fromf4, reg_mem);
-						const float* const end = result + stepf4 * 4;
-
-						for (; result != end; ++result, ++arg) {
-							*result = cosf(*arg);
-						}
-						break;
-					}
-					case InstructionType::SIN: {
-						const DataStream dst = ip.read<DataStream>();
-						const DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(emitter, op0, fromf4, reg_mem);
-						float* result = (float*)getStream(emitter, dst, fromf4, reg_mem);
-						const float* const end = result + stepf4 * 4;
-
-						for (; result != end; ++result, ++arg) {
-							*result = sinf(*arg);
-						}
-						break;
-					}
-					default:
-						ASSERT(false);
-						break;
-				}
-				itype = ip.read<InstructionType>();
-			}
+			processChunk(ctx);
+			processed += minimum(1024, emitter.particles_count - ctx.from);
 		}
+		profiler::pushInt("Total count", processed);
 	};
 	
-	if (emitter.particles_count <= 1024) update();
+	if (emitter.particles_count <= 4096) update();
 	else jobs::runOnWorkers(update);
 
-	if (kill_counter > 0) {
-		PROFILE_BLOCK("kill");
-		profiler::pushInt("count", kill_counter);
-		ASSERT(kill_counter <= (i32)emitter.particles_count);
-		qsort(kill_list, kill_counter, sizeof(u32), [](const void* a, const void* b) -> int {
-			const u32 i = *(u32*)a;
-			const u32 j = *(u32*)b;
-			if (i < j) return -1;
-			if (i > j) return 1;
-			return 0;
-		});
-		const i32 channels_count = res_emitter.channels_count;
-		for (i32 j = kill_counter - 1; j >= 0; --j) {
-			const u32 last = emitter.particles_count - 1;
-			const u32 particle_index = kill_list[j];
-			for (i32 i = 0; i < channels_count; ++i) {
-				float* data = emitter.channels[i].data;
-				data[particle_index] = data[last];
+	{
+		PROFILE_BLOCK("compact");
+		u32 compacted = 1024 - kill_counter[0];
+		const u32 channels_count = res_emitter.channels_count;
+		u32 total_killed = kill_counter[0];
+		for (u32 chunk_idx = 1; chunk_idx < chunks_count; ++chunk_idx) {
+			const u32 chunk_begin = 1024 * chunk_idx;
+			const u32 chunk_size = minimum(1024, emitter.particles_count - chunk_begin);
+
+			const u32 empty_space = chunk_begin - compacted;
+			if (empty_space == 0) {
+				compacted += chunk_size - kill_counter[chunk_idx];
+				continue;
 			}
-			--emitter.particles_count;
+				
+			const u32 to_copy = minimum(empty_space, chunk_size);
+			for (u32 i = 0; i < channels_count; ++i) {
+				float* data = emitter.channels[i].data;
+				memcpy(data + compacted, data + chunk_begin + chunk_size - to_copy, to_copy * sizeof(float));
+			}
+			compacted += chunk_size;
+			total_killed += kill_counter[chunk_idx];
 		}
+		emitter.particles_count -= total_killed;
+		profiler::pushInt("kill count", total_killed);
+		page_allocator.deallocate(kill_counter, true);
 	}
 
 	InputPagedStream blob(emit_stream);
@@ -1082,8 +1157,9 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 	}
 }
 
-bool ParticleSystem::update(float dt, OutputMemoryStream& scratch_buffer, PageAllocator& page_allocator)
+bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 {
+	PROFILE_FUNCTION();
 	if (!m_resource || !m_resource->isReady()) return false;
 	
 	m_constants[0] = dt;
@@ -1104,7 +1180,7 @@ bool ParticleSystem::update(float dt, OutputMemoryStream& scratch_buffer, PageAl
 	const Transform world_tr = m_world.getTransform(*m_entity);
 	const Transform delta_tr = world_tr.inverted() * m_prev_frame_transform;
 	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
-		update(dt, emitter_idx, delta_tr, scratch_buffer, page_allocator);
+		update(dt, emitter_idx, delta_tr, page_allocator);
 	}
 
 	u32 c = 0;
@@ -1125,304 +1201,23 @@ void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_
 	if (particles_count == 0) return;
 
 	volatile i32 counter = 0;
-	jobs::runOnWorkers([&](){
-		PROFILE_FUNCTION();
-		float4* reg_mem[16] = {};
-		ASSERT(resource_emitter.registers_count <= lengthOf(reg_mem));
-		page_allocator.lock();
-		for (u32 i = 0; i < resource_emitter.registers_count; ++i) {
-			reg_mem[i] = (float4*)page_allocator.allocate(false);
-		}
-		page_allocator.unlock();
+	auto fill = [&](){
+		PROFILE_BLOCK("fill particle gpu data");
+
+		ChunkProcessorContext ctx(*this, page_allocator);
+		ctx.instructions_offset = resource_emitter.output_offset;
+		ctx.output_memory = data;
+
 		for (;;) {
-			const u32 from = (u32)atomicAdd(&counter, 1024);
-			if (from >= particles_count) {
-				page_allocator.lock();
-				for (u32 i = 0; i < resource_emitter.registers_count; ++i) {
-					page_allocator.deallocate(reg_mem[i], false);
-				}
-				page_allocator.unlock();
-				return;
-			}
-			const u32 fromf4 = from / 4;
-			const u32 stepf4 = minimum(1024, particles_count - from + 3) / 4;
-
-			InputMemoryStream ip(resource_emitter.instructions);
-			ip.skip(resource_emitter.output_offset);
-
-			InstructionType itype = ip.read<InstructionType>();
-			while (itype != InstructionType::END) {
-				switch (itype) {
-					case InstructionType::SIN: {
-						DataStream dst_stream = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-						
-						if (dst_stream.type == DataStream::OUT) {
-							u8 output_idx = dst_stream.index;
-							const u32 stride = resource_emitter.outputs_count;
-							float* dst = data + output_idx + fromf4 * 4 * stride;
-							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-								dst[j] = sinf(arg[i]);
-							}
-						}
-						else {
-							float* result = (float*)getStream(*this, dst_stream, fromf4, reg_mem);
-							const float* const end = result + stepf4 * 4;
-
-							for (; result != end; ++result, ++arg) {
-								*result = sinf(*arg);
-							}
-						}
-						break;
-					}
-					case InstructionType::NOISE: {
-						DataStream dst_stream = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-						if (dst_stream.type == DataStream::OUT) {
-							i32 output_idx = dst_stream.index;
-							const u32 stride = resource_emitter.outputs_count;
-							float* dst = data + output_idx + fromf4 * 4 * stride;
-							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-								dst[j] = gnoise(arg[i]);
-							}
-						}
-						else {
-							float* result = (float*)getStream(*this, dst_stream, fromf4, reg_mem);
-							const float* const end = result + stepf4 * 4;
-
-							for (; result != end; ++result, ++arg) {
-								*result = gnoise(*arg);
-							}
-						}
-						break;
-					}
-					case InstructionType::COS: {
-						DataStream dst_stream = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-						if (dst_stream.type == DataStream::OUT) {
-							i32 output_idx = dst_stream.index;
-							const u32 stride = resource_emitter.outputs_count;
-							float* dst = data + output_idx + fromf4 * 4 * stride;
-							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-								dst[j] = cosf(arg[i]);
-							}
-						}
-						else {
-							float* result = (float*)getStream(*this, dst_stream, fromf4, reg_mem);
-							const float* const end = result + stepf4 * 4;
-
-							for (; result != end; ++result, ++arg) {
-								*result = cosf(*arg);
-							}
-						}
-						break;
-					}
-					case InstructionType::SQRT: {
-						DataStream dst_stream = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-						if (dst_stream.type == DataStream::OUT) {
-							i32 output_idx = dst_stream.index;
-							const u32 stride = resource_emitter.outputs_count;
-							float* dst = data + output_idx + fromf4 * 4 * stride;
-							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-								dst[j] = sqrtf(arg[i]);
-							}
-						}
-						else {
-							float* result = (float*)getStream(*this, dst_stream, fromf4, reg_mem);
-							const float* const end = result + stepf4 * 4;
-
-							for (; result != end; ++result, ++arg) {
-								*result = sqrtf(*arg);
-							}
-						}
-						break;
-					}
-					case InstructionType::MULTIPLY_ADD: {
-						TernaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<TernaryHelper::madd>(dst, ip);
-						break;
-					}
-					case InstructionType::MIX: {
-						TernaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<TernaryHelper::mix>(dst, ip);
-						break;
-					}
-					case InstructionType::MOD: {
-						BinaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<BinaryHelper::f4Mod>(dst, ip);
-						break;
-					}
-					case InstructionType::MUL: {
-						BinaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<f4Mul>(dst, ip);
-						break;
-					}
-					case InstructionType::DIV: {
-						BinaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<f4Div>(dst, ip);
-						break;
-					}
-					case InstructionType::SUB: {
-						BinaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<f4Sub>(dst, ip);
-						break;
-					}
-					case InstructionType::ADD: {
-						BinaryHelper helper;
-						helper.emitter = this;
-						helper.fromf4 = fromf4;
-						helper.stepf4 = stepf4;
-						helper.reg_mem = reg_mem;
-						helper.out_mem = data;
-						DataStream dst = ip.read<DataStream>();
-						helper.run<f4Add>(dst, ip);
-						break;
-					}
-					case InstructionType::SPLINE: {
-						DataStream dst = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-						const u8 subindex = ip.read<u8>();
-						ASSERT(dst.type == DataStream::OUT);
-
-						CoreModule* core_module = (CoreModule*)system.m_world.getModule(SPLINE_TYPE);
-						if (!system.m_world.hasComponent(*system.m_entity, SPLINE_TYPE)) {
-							page_allocator.lock();
-							for (u32 i = 0; i < resource_emitter.registers_count; ++i) {
-								page_allocator.deallocate(reg_mem[i], false);
-							}
-							page_allocator.unlock();
-							return; // TODO error message
-						}
-						Spline& spline = core_module->getSpline(*system.m_entity);
-
-						const u8 output_idx = dst.index;
-						const u32 stride = resource_emitter.outputs_count;
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-						float* out = data + output_idx + fromf4 * 4 * stride;
-						const i32 last_idx = spline.points.size() - 2;
-						for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-							const float t = arg[i] * last_idx;
-							u32 segment = clamp(u32(t), 0, spline.points.size() - 3);
-							float rel_t = t - segment;
-							float p0 = spline.points[segment + 0][subindex];
-							float p1 = spline.points[segment + 1][subindex];
-							float p2 = spline.points[segment + 2][subindex];
-							p0 = (p1 + p0) * 0.5f;
-							p2 = (p1 + p2) * 0.5f;
-
-							out[j] = lerp(lerp(p0, p1, rel_t), lerp(p1, p2, rel_t), rel_t);
-						}
-						break;
-					}
-					case InstructionType::GRADIENT: {
-						DataStream dst = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-						u32 count = ip.read<u32>();
-						float keys[8];
-						float values[8];
-						ip.read(keys, sizeof(keys[0]) * count);
-						ip.read(values, sizeof(values[0]) * count);
-
-						ASSERT(dst.type == DataStream::OUT);
-						const u8 output_idx = dst.index;
-						const u32 stride = resource_emitter.outputs_count;
-						const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-						float* out = data + output_idx + fromf4 * 4 * stride;
-						for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-							if (arg[i] < keys[0]) {
-								out[j] = values[0];
-							}
-							else if (arg[i] >= keys[count - 1]) {
-								out[j] = values[count - 1];
-							}
-							else {
-								for (u32 k = 1; k < count; ++k) {
-									if (arg[i] < keys[k]) {
-										const float t = (arg[i] - keys[k - 1]) / (keys[k] - keys[k - 1]);
-										ASSERT(t >= 0 && t <= 1);
-										out[j] = t * values[k] + (1 - t) * values[k - 1];
-										break;
-									}
-								}
-							}
-						}
-						break;
-					}
-					case InstructionType::MOV: {
-						const u32 stride = resource_emitter.outputs_count;
-						DataStream dst = ip.read<DataStream>();
-						DataStream op0 = ip.read<DataStream>();
-
-						if (op0.type == DataStream::LITERAL) {
-							const float arg = op0.value;
-							ASSERT(dst.type == DataStream::OUT);
-							u8 output_idx = dst.index;
-							float* res = data + output_idx + fromf4 * 4 * stride;
-							for (u32 i = 0; i < stepf4 * 4; ++i) {
-								res[i * stride] = arg;
-							}
-						}
-						else {
-							const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem);
-							ASSERT(dst.type == DataStream::OUT);
-							u8 output_idx = dst.index;
-							float* res = data + output_idx + fromf4 * 4 * stride;
-							for (u32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-								res[j] = arg[i];
-							}
-						}
-						break;
-					}
-					default:
-						ASSERT(false);
-						break;
-				}
-				itype = ip.read<InstructionType>();
-			}
+			ctx.from = atomicAdd(&counter, 1024);
+			if (ctx.from >= (i32)particles_count) return;
+			
+			system.processChunk(ctx);
 		}
-	});
+	};
+
+	if (particles_count <= 4096) fill();
+	else jobs::runOnWorkers(fill);
 }
 
 

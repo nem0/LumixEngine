@@ -8,6 +8,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/renderer.h"
 
 
 namespace Lumix
@@ -158,6 +159,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		u32 capacity = 0;
 		float emit_timer = 0;
 		u32 emit_index = 0;
+		Renderer::TransientSlice slice;
 	};
 
 	ParticleSystem(EntityPtr entity, struct World& world, IAllocator& allocator);
@@ -166,7 +168,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 
 	void serialize(OutputMemoryStream& blob) const;
 	void deserialize(InputMemoryStream& blob, bool has_autodestroy, bool emit_rate_removed, ResourceManagerHub& manager);
-	bool update(float dt, OutputMemoryStream& scratch_buffer, PageAllocator& page_allocator);
+	bool update(float dt, PageAllocator& page_allocator);
 	ParticleSystemResource* getResource() const { return m_resource; }
 	void setResource(ParticleSystemResource* res);
 	const Emitter& getEmitter(u32 emitter_idx) const { return m_emitters[emitter_idx]; }
@@ -181,13 +183,15 @@ struct LUMIX_RENDERER_API ParticleSystem {
 
 private:
 	struct RunningContext;
+	struct ChunkProcessorContext;
 
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
-	void update(float dt, u32 emitter_idx, const Transform& delta_transform, OutputMemoryStream& scratch_buffer, PageAllocator& page_allocator);
+	void update(float dt, u32 emitter_idx, const Transform& delta_transform, PageAllocator& page_allocator);
 	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
 	void run(RunningContext& ctx);
+	void processChunk(ChunkProcessorContext& ctx);
 
 	IAllocator& m_allocator;
 	Array<Emitter> m_emitters;

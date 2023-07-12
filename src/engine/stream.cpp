@@ -243,13 +243,11 @@ OutputPagedStream::OutputPagedStream(struct PageAllocator& allocator)
 
 OutputPagedStream::~OutputPagedStream() {
 	Page* p = m_head;
-	m_allocator.lock();
 	while (p) {
 		Page* tmp = p;
 		p = p->next;
-		m_allocator.deallocate(tmp, false);
+		m_allocator.deallocate(tmp, true);
 	}
-	m_allocator.unlock();
 }
 
 Span<u8> OutputPagedStream::reserve(u32 size) {

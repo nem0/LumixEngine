@@ -6,6 +6,7 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
+#include "engine/ring_buffer.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
 #include "engine/profiler.h"
@@ -19,82 +20,6 @@ struct Job {
 	void* data = nullptr;
 	Signal* dec_on_finish;
 	u8 worker_index;
-};
-
-template <typename T, u32 CAPACITY>
-struct RingBuffer {
-	struct Item {
-		T value;
-		volatile i32 seq;
-	};
-
-	RingBuffer(IAllocator& allocator)
-		: m_fallback(allocator)
-	{
-		static_assert(CAPACITY > 2);
-		for (u32 i = 0; i < CAPACITY; ++i) {
-			objects[i].seq = i;
-		}
-		memoryBarrier();
-	}
-
-	LUMIX_FORCE_INLINE bool pop(T& obj) {
-		i32 pos = rd;
-		Item* j;
-		for (;;) {
-			j = &objects[pos % CAPACITY];
-			const i32 seq = j->seq;
-			if (seq < pos + 1) {
-				return false;
-			}
-			else if (seq == pos + 1) {
-				if (compareAndExchange(&rd, pos + 1, pos)) break;
-			}
-			else {
-				pos = rd;
-			}
-		}
-		obj = j->value;
-		j->seq = pos + CAPACITY;
-		return true;
-	}
-
-	LUMIX_FORCE_INLINE void push(const T& obj, Lumix::Mutex& mutex) {
-		volatile i32 pos = wr;
-		Item* j;
-		for (;;) {
-			j = &objects[pos % CAPACITY];
-			const i32 seq = j->seq;
-			if (seq < pos) {
-				// buffer full
-				Lumix::MutexGuard guard(mutex);
-				m_fallback.push(obj);
-				return;
-			}
-			else if (seq == pos) {
-				// we can try to push
-				if (compareAndExchange(&wr, pos + 1, pos)) break;
-			}
-			else {
-				// somebody pushed before us, try again
-				pos = wr;
-			}
-		}
-		j->value = obj;
-		j->seq = pos + 1;
-	}
-
-	LUMIX_FORCE_INLINE bool popSecondary(T& obj) {
-		if (m_fallback.empty()) return false;
-		obj = m_fallback.back();
-		m_fallback.pop();
-		return true;
-	}
-
-	Item objects[CAPACITY];
-	volatile i32 rd = 0;
-	volatile i32 wr = 0;
-	Array<T> m_fallback;
 };
 
 struct WorkerTask;
@@ -251,11 +176,11 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 			Waitor* next = waitor->next;
 			const u8 worker_idx = waitor->fiber->current_job.worker_index;
 			if (worker_idx == ANY_WORKER) {
-				g_system->m_work_queue.push(waitor->fiber, g_system->m_job_queue_sync);
+				g_system->m_work_queue.push(waitor->fiber, &g_system->m_job_queue_sync);
 			}
 			else {
 				WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
-				worker->m_work_queue.push(waitor->fiber, g_system->m_job_queue_sync);
+				worker->m_work_queue.push(waitor->fiber, &g_system->m_job_queue_sync);
 			}
 			waitor = next;
 		}
@@ -338,12 +263,12 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 
 	if (worker_index != ANY_WORKER) {
 		WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-		worker->m_work_queue.push(job, g_system->m_job_queue_sync);
+		worker->m_work_queue.push(job, &g_system->m_job_queue_sync);
 		wake();
 		return;
 	}
 
-	g_system->m_work_queue.push(job, g_system->m_job_queue_sync);
+	g_system->m_work_queue.push(job, &g_system->m_job_queue_sync);
 	wake();
 }
 
