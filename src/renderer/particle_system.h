@@ -143,6 +143,12 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		u32 name = 0;
 	};
 
+	struct Stats {
+		i32 emitted = 0;
+		i32 killed = 0;
+		i32 processed = 0;
+	};
+
 	struct Emitter {
 		Emitter(Emitter&& rhs);
 		Emitter(ParticleSystem& system, ParticleSystemResource::Emitter& resource_emitter) 
@@ -180,6 +186,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	bool m_autodestroy = false;
 	float m_constants[16];
 	float m_total_time = 0;
+	Stats m_last_update_stats;
 
 private:
 	struct RunningContext;

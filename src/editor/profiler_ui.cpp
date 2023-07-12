@@ -969,6 +969,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	m_filtered_time = 0;
 	m_filtered_count = 0;
+	static i32 hovered_block_id = -1;
+	bool hovered_any = false;
 
 	forEachThread([&](const ThreadContextProxy& ctx) {
 		if (ctx.thread_id == 0) return;
@@ -1024,7 +1026,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 		};
 
-		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
+		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color, i32 block_id) {
 			const Block& block = m_blocks[open_blocks.last().id];
 			if (hovered_fiber_wait.signal == block.job_info.signal_on_finish && hovered_fiber_wait.frame > frame_id - 2) {
 				const float t_start = float(int(from - view_start) / double(m_range));
@@ -1033,7 +1035,55 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				dl->AddLine(hovered_fiber_wait.pos, ImVec2(x_start, y), 0xff0000ff);
 				dl->ChannelsSetCurrent(0);
 			}
-			if (from > m_end || to < view_start) return;
+			auto draw_block_tooltip = [&](bool header){
+				const float t_start = float(int(from - view_start) / double(m_range));
+				const float t_end = float(int(to - view_start) / double(m_range));
+				const float x_start = from_x * (1 - t_start) + to_x * t_start;
+				const float t = 1000 * float((to - from) / double(freq));
+				ImGui::BeginTooltip();
+				if (header) {
+					ImGui::Text("%s (%.4f ms)", name, t);
+					if (block.link) {
+						ImGui::Text("Link: %" PRId64, block.link);
+						hovered_link.frame = frame_id;
+						hovered_link.link = block.link;
+					}
+					if (block.job_info.signal_on_finish) {
+						ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
+						hovered_job.frame = frame_id;
+						hovered_job.pos = ImVec2(x_start, y);
+						hovered_job.signal = block.job_info.signal_on_finish;
+					}
+				}
+				for (const Property& prop : properties) {
+					if (prop.level != open_blocks.size() - 1) continue;
+
+					switch (prop.header.type) {
+						case profiler::EventType::INT: {
+							profiler::IntRecord r;
+							read(ctx, prop.offset, (u8*)&r, sizeof(r));
+							ImGui::Text("%s: %d", r.key, r.value);
+							break;
+						}
+						case profiler::EventType::STRING: {
+							char tmp[128];
+							const int tmp_size = prop.header.size - sizeof(prop.header);
+							read(ctx, prop.offset, (u8*)tmp, tmp_size);
+							ImGui::Text("%s", tmp);
+							break;
+						}
+						default: ASSERT(false); break;
+					}
+				}
+				ImGui::EndTooltip();
+			};
+
+			if (from > m_end || to < view_start) {
+				if (hovered_block_id == block_id) {
+					draw_block_tooltip(false);
+				}
+				return;
+			}
 
 			const float t_start = float(int(from - view_start) / double(m_range));
 			const float t_end = float(int(to - view_start) / double(m_range));
@@ -1066,40 +1116,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				++m_filtered_count;
 			}
 			if (ImGui::IsMouseHoveringRect(ra, rb)) {
-				ImGui::BeginTooltip();
-				ImGui::Text("%s (%.4f ms)", name, t);
-				if (block.link) {
-					ImGui::Text("Link: %" PRId64, block.link);
-					hovered_link.frame = frame_id;
-					hovered_link.link = block.link;
-				}
-				if (block.job_info.signal_on_finish) {
-					ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
-					hovered_job.frame = frame_id;
-					hovered_job.pos = ImVec2(x_start, block_y);
-					hovered_job.signal = block.job_info.signal_on_finish;
-				}
-				for (const Property& prop : properties) {
-					if (prop.level != open_blocks.size() - 1) continue;
-
-					switch (prop.header.type) {
-						case profiler::EventType::INT: {
-							profiler::IntRecord r;
-							read(ctx, prop.offset, (u8*)&r, sizeof(r));
-							ImGui::Text("%s: %d", r.key, r.value);
-							break;
-						}
-						case profiler::EventType::STRING: {
-							char tmp[128];
-							const int tmp_size = prop.header.size - sizeof(prop.header);
-							read(ctx, prop.offset, (u8*)tmp, tmp_size);
-							ImGui::Text("%s", tmp);
-							break;
-						}
-						default: ASSERT(false); break;
-					}
-				}
-				ImGui::EndTooltip();
+				hovered_block_id = block_id;
+				hovered_any = true;
+				draw_block_tooltip(true);
+			}
+			else if (hovered_block_id == block_id) {
+				draw_block_tooltip(false);
 			}
 		};
 
@@ -1186,7 +1208,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				if (open_blocks.size() > 0) {
 					const Block& block = m_blocks[open_blocks.last().id];
 					const u32 color = block.color;
-					draw_block(open_blocks.last().start_time, header.time, block.name, color);
+					draw_block(open_blocks.last().start_time, header.time, block.name, color, open_blocks.last().id);
 					while (properties.size() > 0 && properties.last().level == open_blocks.size() - 1) {
 						properties.pop();
 					}
@@ -1226,7 +1248,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		while (open_blocks.size() > 0) {
 			y -= line_height;
 			const Block& b = m_blocks[open_blocks.last().id];
-			draw_block(open_blocks.last().start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			draw_block(open_blocks.last().start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram), open_blocks.last().id);
 			open_blocks.pop();
 		}
 
@@ -1234,6 +1256,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 		ImGui::TreePop();
 	});
+
+	if (!hovered_any) hovered_block_id = -1;
 
 	auto get_view_x = [&](u64 time) {
 		const float t = time > view_start

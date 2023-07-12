@@ -884,18 +884,33 @@ struct CurveNode : Node {
 		const NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 
-		DataStream op0 = input.generate(ctx, {}, 0);
-		if (op0.isError()) return op0;
+		DataStream t = input.generate(ctx, {}, 0);
+		if (t.isError()) return t;
 
 		dst = ctx.streamOrRegister(dst);
-		ctx.write(InstructionType::GRADIENT);
-		ctx.write(dst);
-		ctx.write(op0);
-		ctx.write(count);
-		ctx.write(keys, sizeof(keys[0]) * count);
-		ctx.write(values, sizeof(values[0]) * count);
+		
+		if (count == 2 && fabs(keys[0]) < 0.001f && fabsf(keys[1] - 1) < 0.001f) {
+			DataStream op0, op1;
+			op0.type = DataStream::LITERAL;
+			op0.value = values[0];
+			op1.type = DataStream::LITERAL;
+			op1.value = values[1];
+			ctx.write(InstructionType::MIX);
+			ctx.write(dst);
+			ctx.write(op0);
+			ctx.write(op1);
+			ctx.write(t);
+		}
+		else {
+			ctx.write(InstructionType::GRADIENT);
+			ctx.write(dst);
+			ctx.write(t);
+			ctx.write(count);
+			ctx.write(keys, sizeof(keys[0]) * count);
+			ctx.write(values, sizeof(values[0]) * count);
+		}
 
-		ctx.freeRegister(op0);
+		ctx.freeRegister(t);
 		return dst;
 	}
 

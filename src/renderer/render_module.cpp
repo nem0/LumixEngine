@@ -526,26 +526,30 @@ struct RenderModuleImpl final : RenderModule {
 
 		StackArray<EntityRef, 16> to_delete(m_allocator);
 		jobs::Mutex mutex;
-		auto iter = m_particle_emitters.begin();
-		auto end = m_particle_emitters.end();
-		jobs::runOnWorkers([&](){
-			for (;;) {
-				jobs::enter(&mutex);
-				if (iter == end) {
-					jobs::exit(&mutex);
-					return;
-				}
-				ParticleSystem& ps = iter.value();
-				++iter;
-				jobs::exit(&mutex);
+		volatile ParticleSystem::Stats stats = {};
+		jobs::forEach(m_particle_emitters.capacity(), 1, [&](i32 idx, i32){
+			ParticleSystem* ps = m_particle_emitters.getFromIndex(idx);
+			if (!ps) return;
 
-				if (ps.update(dt, m_engine.getPageAllocator())) {
-					jobs::enter(&mutex);
-					to_delete.push(*ps.m_entity);
-					jobs::exit(&mutex);
-				}
+			if (ps->update(dt, m_engine.getPageAllocator())) {
+				jobs::enter(&mutex);
+				to_delete.push(*ps->m_entity);
+				jobs::exit(&mutex);
 			}
+
+			atomicAdd(&stats.emitted, ps->m_last_update_stats.emitted);
+			atomicAdd(&stats.killed, ps->m_last_update_stats.killed);
+			atomicAdd(&stats.processed, ps->m_last_update_stats.processed);
 		});
+
+		static u32 emitted_particles_stat = profiler::createCounter("Emitted particles", 0);
+		static u32 killed_particles_stat = profiler::createCounter("Killed particles", 0);
+		static u32 processed_particles_stat = profiler::createCounter("Processed particles", 0);
+
+		profiler::pushCounter(emitted_particles_stat, (float)stats.emitted);
+		profiler::pushCounter(killed_particles_stat, (float)stats.killed);
+		profiler::pushCounter(processed_particles_stat, (float)stats.processed);
+
 		for (EntityRef e : to_delete) {
 			m_world.destroyEntity(e);
 		}

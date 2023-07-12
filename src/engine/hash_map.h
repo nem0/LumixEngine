@@ -267,6 +267,11 @@ public:
 		if (!m_keys[index].valid) return nullptr;
 		return &m_values[index];
 	}
+	
+	Value* getFromIndex(u32 index) {
+		if (!m_keys[index].valid) return nullptr;
+		return &m_values[index];
+	}
 
 	Value& operator[](const Key& key) {
 		const u32 pos = findPos(key);

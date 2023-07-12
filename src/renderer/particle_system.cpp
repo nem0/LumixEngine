@@ -325,6 +325,7 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 		++emitter.emit_index;
 		m_constants[1] += time_step;
 	}
+	m_last_update_stats.emitted += count;
 	m_constants[1] = c1;
 }
 
@@ -849,7 +850,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const float4* start = getStream(emitter, condition_stream, fromf4, ctx.registers);
 				const float4* const end = start + stepf4;
 				u32 kill_count = 0;
-				u32 last = minimum(from + stepf4 * 4 - 1, emitter.particles_count);
+				u32 last = minimum(from + stepf4 * 4, emitter.particles_count) - 1;
 				const i32 channels_count = res_emitter.channels_count;
 				for (const float4* cond = end - 1; cond >= start; --cond) {
 					const int m = f4MoveMask(*cond);
@@ -953,26 +954,21 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				ip.read(keys, sizeof(keys[0]) * count);
 				ip.read(values, sizeof(values[0]) * count);
 
+				float ms[8];
+				for (u32 i = 1; i < count; ++i) {
+					ms[i] = values[i] - values[i - 1] / (keys[i] - keys[i - 1]);
+				}
+
 				ASSERT(dst.type == DataStream::OUT);
 				const u8 output_idx = dst.index;
 				const u32 stride = emitter.resource_emitter.outputs_count;
 				const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
 				float* out = ctx.output_memory + output_idx + fromf4 * 4 * stride;
 				for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-					const float v = arg[i];
-					if (v < keys[0]) {
-						out[j] = values[0];
-					}
-					else if (v >= keys[count - 1]) {
-						out[j] = values[count - 1];
-					}
-					else {
-						u32 k = 1;
-						while (v >= keys[k]) ++k;
-						const float t = (v - keys[k - 1]) / (keys[k] - keys[k - 1]);
-						ASSERT(t >= 0 && t <= 1);
-						out[j] = t * values[k] + (1 - t) * values[k - 1];
-					}
+					const float v = clamp(arg[i], keys[0], keys[count - 1]);
+					u32 k = 1;
+					while (v > keys[k]) ++k;
+					out[j] = values[k] - (keys[k] - v) * ms[k];
 				}
 				break;
 			}
@@ -1093,32 +1089,45 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 		profiler::pushInt("Total count", processed);
 	};
 	
+	m_last_update_stats.processed += emitter.particles_count;
 	if (emitter.particles_count <= 4096) update();
 	else jobs::runOnWorkers(update);
 
 	{
 		PROFILE_BLOCK("compact");
-		u32 compacted = 1024 - kill_counter[0];
+		u32 head = 0;
+		u32 tail = chunks_count - 1;
 		const u32 channels_count = res_emitter.channels_count;
-		u32 total_killed = kill_counter[0];
-		for (u32 chunk_idx = 1; chunk_idx < chunks_count; ++chunk_idx) {
-			const u32 chunk_begin = 1024 * chunk_idx;
-			const u32 chunk_size = minimum(1024, emitter.particles_count - chunk_begin);
-
-			const u32 empty_space = chunk_begin - compacted;
-			if (empty_space == 0) {
-				compacted += chunk_size - kill_counter[chunk_idx];
+		u32 total_killed = 0;
+		for (u32 i = 0; i < chunks_count; ++i) total_killed += kill_counter[i];
+		while (head != tail) {
+			if (kill_counter[head] == 0) {
+				++head;
 				continue;
 			}
-				
-			const u32 to_copy = minimum(empty_space, chunk_size);
-			for (u32 i = 0; i < channels_count; ++i) {
-				float* data = emitter.channels[i].data;
-				memcpy(data + compacted, data + chunk_begin + chunk_size - to_copy, to_copy * sizeof(float));
+
+			const u32 tail_start = 1024 * tail;
+			const u32 tail_count = minimum(1024, emitter.particles_count - tail_start) - kill_counter[tail];
+
+			if (tail_count <= kill_counter[head]) {
+				for (u32 i = 0; i < channels_count; ++i) {
+					float* data = emitter.channels[i].data;
+					memcpy(data + head * 1024 + 1024 - kill_counter[head], data + tail_start, tail_count * sizeof(float));
+				}
+				--tail;
+				kill_counter[head] -= tail_count;
 			}
-			compacted += chunk_size;
-			total_killed += kill_counter[chunk_idx];
+			else {
+				for (u32 i = 0; i < channels_count; ++i) {
+					float* data = emitter.channels[i].data;
+					memcpy(data + head * 1024 + 1024 - kill_counter[head], data + tail_start + tail_count - kill_counter[head], kill_counter[head] * sizeof(float));
+				}
+				kill_counter[tail] += kill_counter[head];
+				++head;
+			}
 		}
+		
+		m_last_update_stats.killed += total_killed;
 		emitter.particles_count -= total_killed;
 		profiler::pushInt("kill count", total_killed);
 		page_allocator.deallocate(kill_counter, true);
@@ -1160,6 +1169,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 {
 	PROFILE_FUNCTION();
+	m_last_update_stats = {};
 	if (!m_resource || !m_resource->isReady()) return false;
 	
 	m_constants[0] = dt;
