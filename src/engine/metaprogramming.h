@@ -35,6 +35,7 @@ struct BuildIndices<offset, 0, T...>
 
 template <typename T> struct ResultOf;
 template <typename R, typename... Args> struct ResultOf<R(*)(Args...)> { using Type = R; };
+template <typename R, typename... Args> struct ResultOf<R(*)(Args...) noexcept> { using Type = R; };
 template <typename R, typename... Args> struct ResultOf<R(&)(Args...)> { using Type = R; };
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...) const> { using Type = R; };
@@ -49,6 +50,7 @@ template <typename R, typename C> struct ClassOf<R(C::*)> { using Type = C; };
 
 template <typename T> struct ArgsCount;
 template <typename R, typename... Args> struct ArgsCount<R (&)(Args...)> { static constexpr u32 value = sizeof...(Args); };
+template <typename R, typename... Args> struct ArgsCount<R (*)(Args...) noexcept> { static constexpr u32 value = sizeof...(Args); };
 template <typename R, typename... Args> struct ArgsCount<R (*)(Args...)> { static constexpr u32 value = sizeof...(Args); };
 template <typename R, typename C, typename... Args> struct ArgsCount<R(C::*)(Args...)> { static constexpr u32 value = sizeof...(Args); };
 template <typename R, typename C, typename... Args> struct ArgsCount<R(C::*)(Args...)const > { static constexpr u32 value = sizeof...(Args); };

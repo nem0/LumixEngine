@@ -476,7 +476,7 @@ struct ProcessHelper {
 
 	template <auto F>
 	void run(InputMemoryStream& ip) {
-		if constexpr (IsSame<ResultOf<decltype(F)>::Type, float>::Value) {
+		if constexpr (IsSame<typename ResultOf<decltype(F)>::Type, float>::Value) {
 			runSingle<F>(ip);
 		}
 		else if constexpr (ArgsCount<decltype(F)>::value == 2) {
@@ -488,7 +488,10 @@ struct ProcessHelper {
 			run3<F>(dst, ip);
 		}
 		else {
-			static_assert(false);
+			#ifdef _WIN32
+				// TODO linux
+				static_assert(false);
+			#endif
 		}
 	}
 

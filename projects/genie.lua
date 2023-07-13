@@ -410,6 +410,7 @@ solution "LumixEngine"
 	configuration { "linux" }
 		buildoptions {
 			"-m64",
+			"-fno-exceptions",
 			"-fPIC",
 			"-no-canonical-prefixes",
 			"-Wa,--noexecstack",
@@ -420,6 +421,7 @@ solution "LumixEngine"
 			"-msse2",
 			"-Wno-multichar",
 			"-Wno-undef",
+			"-Wno-ignored-attributes"
 		}
 		
 		if "linux-clang" ~= _OPTIONS["gcc"] then

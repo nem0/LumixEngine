@@ -1,5 +1,8 @@
 #pragma once
 #include "lumix.h"
+#ifndef _WIN32
+	#include "atomic.h"
+#endif
 
 namespace Lumix {
 

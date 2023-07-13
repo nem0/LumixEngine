@@ -250,7 +250,7 @@ namespace Lumix
 
 	LUMIX_FORCE_INLINE float4 f4Blend(float4 false_val, float4 true_val, float4 mask) {
 		u32 umask[4];
-		memcpy(umask, mask, sizeof(mask));
+		memcpy(umask, &mask, sizeof(mask));
 		
 		float4 res;
 		res.x = umask[0] & (1 << 31) ? true_val.x : false_val.x;
