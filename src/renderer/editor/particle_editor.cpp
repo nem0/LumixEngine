@@ -25,6 +25,12 @@ static constexpr u32 OUTPUT_FLAG = 1 << 31;
 using DataStream = ParticleSystemResource::DataStream;
 using InstructionType = ParticleSystemResource::InstructionType;
 
+bool operator !=(const DataStream& a, const DataStream& b) {
+	if (a.type != b.type) return true;
+	if (a.type == DataStream::LITERAL) return a.value != b.value;
+	return a.index != b.index;
+}
+
 enum class Version {
 	LINK_ID_REMOVED,
 	EMIT_RATE,
@@ -154,7 +160,8 @@ struct Node : NodeEditorNode {
 		VEC3_LENGTH,
 		OR,
 		AND,
-		SET_CHANNEL
+		SET_CHANNEL,
+		SELECT
 	};
 
 	Node(struct ParticleEmitterEditorResource& res);
@@ -1391,6 +1398,56 @@ struct UpdateNode : Node {
 	}
 };
 
+struct SelectNode : Node {
+	SelectNode(ParticleEmitterEditorResource& res) : Node(res) {}
+		
+	Type getType() const override { return Type::SELECT; }
+
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle("Select");
+		outputSlot();
+		inputSlot();
+		ImGui::TextUnformatted("False");
+		inputSlot();
+		ImGui::TextUnformatted("True");
+		inputSlot(ImGuiEx::PinShape::TRIANGLE);
+		ImGui::TextUnformatted("Condition");
+		return false;
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {}
+	void deserialize(InputMemoryStream& blob) override {}
+
+	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+		const NodeInput input0 = getInput(0);
+		const NodeInput input1 = getInput(1);
+		const NodeInput input2 = getInput(2);
+
+		if (!input0.node || !input1.node || !input2.node) return error("Invalid input");
+
+		DataStream i0 = input0.generate(ctx, {}, subindex);
+		if (i0.isError()) return i0;
+
+		DataStream i1 = input1.generate(ctx, {}, subindex);
+		if (i1.isError()) return i1;
+		
+		DataStream i2 = input2.generate(ctx, {}, 0);
+		if (i2.isError()) return i2;
+
+		dst = ctx.streamOrRegister(dst);
+		ctx.write(InstructionType::BLEND);
+		ctx.write(dst);
+		ctx.write(i0);
+		ctx.write(i1);
+		ctx.write(i2);
+		
+		return dst;
+	}
+};
+
 struct CompareNode : Node {
 	CompareNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
@@ -1453,6 +1510,9 @@ struct CompareNode : Node {
 			op0.value = value;
 			ctx.write(op0);
 		}
+
+		if (dst != i0) ctx.freeRegister(i0);
+		if (dst != i1) ctx.freeRegister(i1);
 
 		return dst;
 	}
@@ -1605,13 +1665,15 @@ struct LogicOpNode : Node {
 
 		const DataStream arg1 = i1.generate(ctx, {}, 0);
 		if (arg1.isError()) return arg1;
-
 		
 		DataStream dst = ctx.streamOrRegister(output);
 		ctx.write(OP_TYPE);
 		ctx.write(dst);
 		ctx.write(arg0);
 		ctx.write(arg1);
+
+		if (arg0 != dst) ctx.freeRegister(arg0);
+		if (arg1 != dst) ctx.freeRegister(arg1);
 		return dst;
 	}
 
@@ -2086,6 +2148,7 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
 			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
+			case Node::SELECT: node = LUMIX_NEW(m_allocator, SelectNode)(*this); break;
 			case Node::SET_CHANNEL: node = LUMIX_NEW(m_allocator, SetChannelNode)(*this); break;
 			case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
 			case Node::OR: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::OR>)(*this); break;
@@ -2282,6 +2345,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			.visitType(Node::NOISE, "Noise", 'N')
 			.visitType(Node::NUMBER, "Number", '1')
 			.visitType(Node::RANDOM, "Random", 'R')
+			.visitType(Node::SELECT, "Select")
 			.visitType(Node::SET_CHANNEL, "Set channel")
 			.visitType(Node::SPLINE, "Spline")
 			.visitType(Node::SWITCH, "Switch")

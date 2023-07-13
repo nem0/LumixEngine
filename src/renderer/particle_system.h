@@ -101,7 +101,8 @@ struct ParticleSystemResource final : Resource {
 		MESH,
 		MOD,
 		OR,
-		AND
+		AND,
+		BLEND
 	};
 
 	static const ResourceType TYPE;

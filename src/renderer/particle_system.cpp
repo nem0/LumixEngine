@@ -791,6 +791,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 			case InstructionType::GRADIENT:
 			case InstructionType::EMIT:
 			case InstructionType::KILL:
+			case InstructionType::BLEND:
 			case InstructionType::LT:
 			case InstructionType::GT:
 				ASSERT(false);
@@ -972,6 +973,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				}
 				break;
 			}
+			case InstructionType::BLEND: op_helper.run<f4Blend>(ip); break;
 			case InstructionType::LT: op_helper.run<f4CmpLT>(ip); break;
 			case InstructionType::GT: op_helper.run<f4CmpGT>(ip); break;
 			case InstructionType::MUL: op_helper.run<f4Mul>(ip); break; 
