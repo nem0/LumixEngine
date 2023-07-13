@@ -1,4 +1,4 @@
-#ifdef __GNUC__
+#if defined __GNUC__ && !defined __clang__
 	#pragma GCC diagnostic ignored "-Wsubobject-linkage"
 #endif
 #include "imgui.cpp"

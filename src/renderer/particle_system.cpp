@@ -488,10 +488,9 @@ struct ProcessHelper {
 			run3<F>(dst, ip);
 		}
 		else {
-			#ifdef _WIN32
-				// TODO linux
-				static_assert(false);
-			#endif
+			// basically static_assert(false), but that does not compile on gcc and clang
+			// https://devblogs.microsoft.com/oldnewthing/20200311-00/?p=103553
+			static_assert(sizeof(F) == 0);
 		}
 	}
 

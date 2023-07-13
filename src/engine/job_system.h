@@ -53,6 +53,25 @@ void runLambda(F&& f, Signal* on_finish, u8 worker = ANY_WORKER) {
 	}
 }
 
+struct MutexGuard {
+	MutexGuard(Mutex& mutex) : mutex(mutex) { enter(&mutex); }
+	~MutexGuard() { exit(&mutex); }
+
+	Mutex& mutex;
+};
+
+struct Signal {
+	~Signal() { ASSERT(!waitor); ASSERT(!counter); }
+
+	struct Waitor* waitor = nullptr;
+	volatile i32 counter = 0;
+	i32 generation; // identify different red-green pairs on the same signal, used by profiler
+};
+
+struct Mutex {
+	Signal signal; // do not access this outside of job_system.cpp
+};
+
 template <typename F>
 void runOnWorkers(const F& f)
 {
@@ -88,25 +107,6 @@ void forEach(i32 count, i32 step, const F& f)
 		}
 	});
 }
-
-struct MutexGuard {
-	MutexGuard(Mutex& mutex) : mutex(mutex) { enter(&mutex); }
-	~MutexGuard() { exit(&mutex); }
-
-	Mutex& mutex;
-};
-
-struct Signal {
-	~Signal() { ASSERT(!waitor); ASSERT(!counter); }
-
-	struct Waitor* waitor = nullptr;
-	volatile i32 counter = 0;
-	i32 generation; // identify different red-green pairs on the same signal, used by profiler
-};
-
-struct Mutex {
-	Signal signal; // do not access this outside of job_system.cpp
-};
 
 } // namespace jobs
 
