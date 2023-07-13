@@ -5,6 +5,7 @@
 
 
 #if defined _WIN32 && !defined __clang__
+	#include <intrin.h>
 	#include <xmmintrin.h>
 #else
 	#include <math.h>
@@ -62,6 +63,11 @@ namespace Lumix
 	LUMIX_FORCE_INLINE void f4Store(void* dest, float4 src)
 	{
 		_mm_store_ps((float*)dest, src);
+	}
+
+	LUMIX_FORCE_INLINE float4 f4Blend(float4 false_val, float4 true_val, float4 mask)
+	{
+		return _mm_blendv_ps(false_val, true_val, mask);
 	}
 
 	LUMIX_FORCE_INLINE float4 f4CmpGT(float4 a, float4 b)
@@ -158,6 +164,7 @@ namespace Lumix
 #else 
 	struct float4
 	{
+		// TODO union with u32
 		float x, y, z, w;
 	};
 
@@ -239,6 +246,18 @@ namespace Lumix
 			a.z || b.z ? true_val : 0,
 			a.w || b.w ? true_val : 0
 		};
+	}
+
+	LUMIX_FORCE_INLINE float4 f4Blend(float4 false_val, float4 true_val, float4 mask) {
+		u32 umask[4];
+		memcpy(umask, mask, sizeof(mask));
+		
+		float4 res;
+		res.x = umask[0] & (1 << 31) ? true_val.x : false_val.x;
+		res.y = umask[1] & (1 << 31) ? true_val.y : false_val.y;
+		res.z = umask[2] & (1 << 31) ? true_val.z : false_val.z;
+		res.w = umask[3] & (1 << 31) ? true_val.w : false_val.w;
+		return res;
 	}
 
 	LUMIX_FORCE_INLINE float4 f4CmpGT(float4 a, float4 b)

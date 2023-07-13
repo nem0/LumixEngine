@@ -26,28 +26,16 @@
 namespace Lumix
 {
 
+namespace {
 
-static constexpr int DEFAULT_RANGE = 100'000;
+static constexpr i32 DEFAULT_RANGE = 100'000;
 
-
-enum Column
-{
-	NAME,
-	TIME,
-	EXCLUSIVE_TIME,
-	HIT_COUNT,
-	HITS
-};
-
-
-enum MemoryColumn
-{
+enum class MemoryColumn {
 	FUNCTION,
 	SIZE
 };
 
-struct ThreadRecord
-{
+struct ThreadRecord {
 	float y;
 	u32 thread_id;
 	const char* name;
@@ -82,8 +70,7 @@ struct ThreadContextProxy {
 	u8* buffer;
 };
 
-static const char* getContexSwitchReasonString(i8 reason)
-{
+const char* getContexSwitchReasonString(i8 reason) {
 	const char* reasons[] = {
 		"Executive"		   ,
 		"FreePage"		   ,
@@ -128,9 +115,17 @@ static const char* getContexSwitchReasonString(i8 reason)
 	return reasons[reason];
 }
 
+const char* toString(Resource::State state) {
+	switch (state) {
+		case Resource::State::EMPTY: return "Empty";
+		case Resource::State::FAILURE: return "Failure";
+		case Resource::State::READY: return "Ready";
+	}
+	return "Unknown";
+}
+
 template <typename T>
-static void read(const ThreadContextProxy& ctx, u32 p, T& value)
-{
+void read(const ThreadContextProxy& ctx, u32 p, T& value) {
 	const u8* buf = ctx.buffer;
 	const u32 buf_size = ctx.buffer_size;
 	const u32 l = p % buf_size;
@@ -143,8 +138,7 @@ static void read(const ThreadContextProxy& ctx, u32 p, T& value)
 	memcpy((u8*)&value + (buf_size - l), buf, sizeof(value) - (buf_size - l));
 }
 
-static void read(const ThreadContextProxy& ctx, u32 p, u8* ptr, int size)
-{
+void read(const ThreadContextProxy& ctx, u32 p, u8* ptr, int size) {
 	const u8* buf = ctx.buffer;
 	const u32 buf_size = ctx.buffer_size;
 	const u32 l = p % buf_size;
@@ -158,7 +152,7 @@ static void read(const ThreadContextProxy& ctx, u32 p, u8* ptr, int size)
 }
 
 template <typename T>
-static void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
+void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 	p = p % ctx.buffer_size;
 	if (ctx.buffer_size - p >= sizeof(v)) {
 		memcpy(ctx.buffer + p, &v, sizeof(v));
@@ -170,8 +164,61 @@ static void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 	}
 }
 
-struct ProfilerUIImpl final : ProfilerUI
-{
+struct AllocationStackNode {
+	explicit AllocationStackNode(debug::StackNode* stack_node,
+		size_t inclusive_size,
+		IAllocator& allocator)
+		: m_children(allocator)
+		, m_allocations(allocator)
+		, m_stack_node(stack_node)
+		, m_inclusive_size(inclusive_size)
+		, m_open(false)
+	{
+	}
+
+	~AllocationStackNode() {
+		ASSERT(m_children.empty());
+	}
+
+	void clear(IAllocator& allocator) {
+		for (auto* child : m_children) {
+			child->clear(allocator);
+			LUMIX_DELETE(allocator, child);
+		}
+		m_children.clear();
+	}
+
+	size_t m_inclusive_size;
+	bool m_open;
+	debug::StackNode* m_stack_node;
+	Array<AllocationStackNode*> m_children;
+	Array<debug::Allocator::AllocationInfo*> m_allocations;
+};
+
+struct Counter {
+	struct Record {
+		u64 time;
+		float value;
+	};
+	Counter(IAllocator& allocator) : records(allocator) {}
+	Array<Record> records;
+	StaticString<64> name;
+	float min = FLT_MAX;
+	float max = -FLT_MAX;
+};
+
+struct Block {
+	Block() {
+		job_info.signal_on_finish = 0;
+	}
+
+	const char* name;
+	i64 link = 0;
+	u32 color = 0xffdddddd;
+	profiler::JobRecord job_info;
+};
+
+struct ProfilerUIImpl final : ProfilerUI {
 	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
 		: m_debug_allocator(allocator)
 		, m_app(app)
@@ -179,7 +226,6 @@ struct ProfilerUIImpl final : ProfilerUI
 		, m_data(m_allocator)
 		, m_blocks(m_allocator)
 		, m_counters(m_allocator)
-		, m_resource_manager(engine.getResourceManager())
 		, m_engine(engine)
 	{
 		m_allocation_size_from = 0;
@@ -210,12 +256,6 @@ struct ProfilerUIImpl final : ProfilerUI
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 	}
 	
-	void toggleUI() { m_is_open = !m_is_open; }
-	bool isOpen() { return m_is_open; }
-
-	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_profiler_open; }
-	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_profiler_open  = m_is_open; }
-
 	void onPause() {
 		ASSERT(m_is_paused);
 		m_data.clear();
@@ -246,6 +286,70 @@ struct ProfilerUIImpl final : ProfilerUI
 		blob.skip(count * sizeof(profiler::Counter));
 		blob.skip(sizeof(u32));
 		return ThreadContextProxy(m_data.getMutableData() + blob.getPosition());
+	}
+
+	void timeline(float from_x, float to_x, float top, float bottom, u64 start_t) {
+		const float view_length_us = (float)1'000'000 * float(m_range / double(profiler::frequency()));
+		const float timeline_height = ImGui::GetTextLineHeightWithSpacing();
+		const ImColor border_color(ImGui::GetStyle().Colors[ImGuiCol_FrameBg]);
+		
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		float steps = (to_x - from_x) / 100;
+		float step_len_us = view_length_us / steps;
+		if (step_len_us > 2000) {
+			step_len_us = floorf(step_len_us / 1000) * 1000;
+		}
+		steps = view_length_us / step_len_us;
+		const float step_w = (to_x - from_x) / steps;
+
+		const u64 view_start = m_end - m_range;
+		const float start_x = from_x - i64(view_start - start_t) / float(m_range) * (to_x - from_x);
+		float x = start_x;
+		float t = 0;
+		
+		if (x < from_x) {
+			const u32 presteps = u32((from_x - x) / step_w);
+			x += step_w * presteps;
+			t += step_len_us * presteps;
+		}
+
+		while (x < to_x) {
+			const ImVec2 p(x, top);
+			if (step_len_us < 2000) {
+				StaticString<64> text(u32(t), "us");
+				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+			}
+			else {
+				StaticString<64> text(u32(t / 1000), "ms");
+				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+			}
+			dl->AddLine(p, ImVec2(p.x, bottom), border_color);
+			x += step_w;
+			t += step_len_us;
+		}
+
+		x = start_x - step_w;
+		t = -step_len_us;
+		if (x > to_x) {
+			const u32 presteps = u32((x - to_x) / step_w);
+			x -= step_w * presteps;
+			t -= step_len_us * presteps;
+		}
+
+		while (x > from_x) {
+			const ImVec2 p(x, top);
+			if (step_len_us < 2000) {
+				StaticString<64> text(i32(t), "us");
+				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+			}
+			else {
+				StaticString<64> text(i32(t / 1000), "ms");
+				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+			}
+			dl->AddLine(p, ImVec2(p.x, bottom), border_color);
+			x -= step_w;
+			t -= step_len_us;
+		}
 	}
 
 	void countersUI(float from_x, float to_x) {
@@ -496,8 +600,6 @@ struct ProfilerUIImpl final : ProfilerUI
 		}	
 	}
 
-	const char* getName() const override { return "profiler"; }
-
 	void onWindowGUI() override
 	{
 		PROFILE_FUNCTION();
@@ -505,77 +607,785 @@ struct ProfilerUIImpl final : ProfilerUI
 		if (!m_is_open) return;
 		if (ImGui::Begin(ICON_FA_CHART_AREA "Profiler##profiler", &m_is_open))
 		{
-			onGUICPUProfiler();
-			onGUIMemoryProfiler();
-			onGUIResources();
+			if (ImGui::BeginTabBar("tb")) {
+				if (ImGui::BeginTabItem("GPU/CPU")) {
+					onGUICPUProfiler();
+					ImGui::EndTabItem();
+				}
+				if (ImGui::BeginTabItem("Memory")) {
+					onGUIMemoryProfiler();
+					ImGui::EndTabItem();
+				}
+				if (ImGui::BeginTabItem("Resources")) {
+					onGUIResources();
+					ImGui::EndTabItem();
+				}
+				ImGui::EndTabBar();
+			}
+			++m_frame_idx;
 		}
 		ImGui::End();
 	}
 
-
-	struct AllocationStackNode
+	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
+		debug::StackNode* external_node,
+		size_t size)
 	{
-		explicit AllocationStackNode(debug::StackNode* stack_node,
-			size_t inclusive_size,
-			IAllocator& allocator)
-			: m_children(allocator)
-			, m_allocations(allocator)
-			, m_stack_node(stack_node)
-			, m_inclusive_size(inclusive_size)
-			, m_open(false)
+		for (auto* child : my_node->m_children)
 		{
-		}
-
-
-		~AllocationStackNode()
-		{
-			ASSERT(m_children.empty());
-		}
-
-
-		void clear(IAllocator& allocator)
-		{
-			for (auto* child : m_children)
+			if (child->m_stack_node == external_node)
 			{
-				child->clear(allocator);
-				LUMIX_DELETE(allocator, child);
+				child->m_inclusive_size += size;
+				return child;
 			}
-			m_children.clear();
 		}
 
+		auto new_node = LUMIX_NEW(m_allocator, AllocationStackNode)(external_node, size, m_allocator);
+		my_node->m_children.push(new_node);
+		return new_node;
+	}
 
-		size_t m_inclusive_size;
-		bool m_open;
-		debug::StackNode* m_stack_node;
-		Array<AllocationStackNode*> m_children;
-		Array<debug::Allocator::AllocationInfo*> m_allocations;
-	};
+	const char* getName() const override { return "profiler"; }
+	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_profiler_open; }
+	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_profiler_open  = m_is_open; }
+	void toggleUI() { m_is_open = !m_is_open; }
+	bool isOpen() { return m_is_open; }
 
+	const char* getThreadName(u32 thread_id) const {
+		auto iter = m_threads.find(thread_id);
+		return iter.isValid() ? iter.value().name : "Unknown";
+	}
 
-	void onGUICPUProfiler();
-	void onGUIMemoryProfiler();
-	void onGUIResources();
-	void onFrame();
-	void addToTree(debug::Allocator::AllocationInfo* info);
-	void refreshAllocations();
-	void showAllocationTree(AllocationStackNode* node, int column) const;
-	AllocationStackNode* getOrCreate(AllocationStackNode* my_node, debug::StackNode* external_node, size_t size);
+	void onGUIResources() {
+		ImGuiEx::filter("Filter", m_resource_filter, sizeof(m_resource_filter));
+	
+		ImGuiEx::Label("Filter size (KB)");
+		ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
 
-	struct Block {
-		Block() {
-			job_info.signal_on_finish = 0;
+		static const struct {
+			ResourceType type;
+			const char* name;
+		} RESOURCE_TYPES[] = { 
+			{ ResourceType("animation"), "Animations" },
+			{ ResourceType("material"), "Materials" },
+			{ ResourceType("model"), "Models" },
+			{ ResourceType("physics_geometry"), "Physics geometries" },
+			{ ResourceType("physics_material"), "Physics materials" },
+			{ ResourceType("shader"), "Shaders" },
+			{ ResourceType("texture"), "Textures" }
+		};
+		ImGui::Indent();
+		for (u32 i = 0; i < lengthOf(RESOURCE_TYPES); ++i)
+		{
+			if (!ImGui::CollapsingHeader(RESOURCE_TYPES[i].name)) continue;
+
+			ResourceManager* resource_manager = m_engine.getResourceManager().get(RESOURCE_TYPES[i].type);
+			ResourceManager::ResourceTable& resources = resource_manager->getResourceTable();
+
+			if (ImGui::BeginTable("resc", 4)) {
+				ImGui::TableSetupColumn("Path");
+				ImGui::TableSetupColumn("Size");
+				ImGui::TableSetupColumn("State");
+				ImGui::TableSetupColumn("References");
+				ImGui::TableHeadersRow();
+
+				size_t sum = 0;
+				for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
+					if (m_resource_filter[0] != '\0' && stristr(iter.value()->getPath().c_str(), m_resource_filter) == nullptr) continue;
+					if (m_resource_size_filter > iter.value()->size() / 1000) continue;
+				
+					ImGui::TableNextColumn();
+					ImGui::PushID(iter.value());
+					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+						m_app.getAssetBrowser().selectResource(iter.value()->getPath(), true, false);
+					}
+					ImGui::PopID();
+					ImGui::SameLine();
+					ImGui::Text("%s", iter.value()->getPath().c_str());
+					ImGui::TableNextColumn();
+					ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
+					sum += iter.value()->size();
+					ImGui::TableNextColumn();
+					ImGui::Text("%s", toString(iter.value()->getState()));
+					ImGui::TableNextColumn();
+					ImGui::Text("%u", iter.value()->getRefCount());
+				}
+
+				ImGui::TableNextColumn();
+				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImColor(ImGui::GetStyle().Colors[ImGuiCol_FrameBgHovered]));
+				ImGui::Text("All");
+				ImGui::TableNextColumn();
+				ImGui::Text("%.3fKB", sum / 1024.0f);
+				ImGui::TableNextColumn();
+				ImGui::TableNextColumn();
+
+				ImGui::EndTable();
+			}
+		}
+		ImGui::Unindent();
+	}
+
+	void showAllocationTree(AllocationStackNode* node, MemoryColumn column) const {
+		if (column == MemoryColumn::FUNCTION) {
+			char fn_name[100];
+			int line;
+			if (debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), line)) {
+				if (line >= 0) {
+					int len = stringLength(fn_name);
+					if (len + 2 < sizeof(fn_name)) {
+						fn_name[len] = ' ';
+						fn_name[len + 1] = '\0';
+						++len;
+						toCString(line, Span(fn_name).fromLeft(len));
+					}
+				}
+			}
+			else {
+				copyString(fn_name, "N/A");
+			}
+
+			if (ImGui::TreeNode(node, "%s", fn_name)) {
+				node->m_open = true;
+				for (auto* child : node->m_children) {
+					showAllocationTree(child, column);
+				}
+				ImGui::TreePop();
+			}
+			else {
+				node->m_open = false;
+			}
+			return;
 		}
 
-		const char* name;
-		i64 link = 0;
-		u32 color = 0xffdddddd;
-		profiler::JobRecord job_info;
-	};
+		ASSERT(column == MemoryColumn::SIZE);
+		#ifdef _MSC_VER
+			char size[50];
+			toCStringPretty(node->m_inclusive_size, Span(size));
+			ImGui::Text("%s", size);
+			if (node->m_open) {
+				for (auto* child : node->m_children) {
+					showAllocationTree(child, column);
+				}
+			}
+		#endif
+	}
 
+	void onGUIMemoryProfiler()
+	{
+		if (m_debug_allocator) {
+			if (ImGui::Button("Refresh"))
+			{
+				refreshAllocations();
+			}
+
+			ImGui::SameLine();
+			if (ImGui::Button("Check memory"))
+			{
+				m_debug_allocator->checkGuards();
+			}
+		}
+		else {
+			ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
+		}
+
+		ImGui::Columns(2, "memc");
+		for (auto* child : m_allocation_root->m_children)
+		{
+			showAllocationTree(child, MemoryColumn::FUNCTION);
+		}
+		ImGui::NextColumn();
+		for (auto* child : m_allocation_root->m_children)
+		{
+			showAllocationTree(child, MemoryColumn::SIZE);
+		}
+		ImGui::Columns();
+	}
+
+	void onGUICPUProfiler() {
+		if (m_autopause > 0 && !m_is_paused && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
+			m_is_paused = true;
+			profiler::pause(m_is_paused);
+			onPause();
+		}
+
+		if (ImGui::Button(m_is_paused ? ICON_FA_PLAY : ICON_FA_PAUSE)) {
+			m_is_paused = !m_is_paused;
+			profiler::pause(m_is_paused);
+			if (m_is_paused) onPause();
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_COGS)) {
+			ImGui::OpenPopup("profiler_advanced");
+		}
+		if (ImGui::BeginPopup("profiler_advanced")) {
+			if (ImGui::MenuItem("Load")) load();
+			if (ImGui::MenuItem("Save")) save();
+			ImGui::Checkbox("Show frames", &m_show_frames);
+			ImGui::Text("Zoom: %f", m_range / double(DEFAULT_RANGE));
+			if (ImGui::MenuItem("Reset zoom")) m_range = DEFAULT_RANGE;
+			bool do_autopause = m_autopause >= 0;
+			if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
+				m_autopause = -m_autopause;
+			}
+			if (m_autopause >= 0) {
+				ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, "%.2f");
+			}
+			if (ImGui::BeginMenu("Threads")) {
+				forEachThread([&](const ThreadContextProxy& ctx){
+					auto thread = m_threads.find(ctx.thread_id);
+					if (thread.isValid()) {
+						ImGui::Checkbox(StaticString<128>(ctx.name, "##t", ctx.thread_id), &thread.value().show);
+					}
+				});
+				ImGui::EndMenu();
+			}
+			if (profiler::contextSwitchesEnabled())
+			{
+				ImGui::Checkbox("Show context switches", &m_show_context_switches);
+			}
+			else {
+				ImGui::Separator();
+				#ifdef _WIN32
+					ImGui::Text("Context switch tracing not available.");
+					ImGui::Text("Run the app as an administrator.");
+				#else
+					ImGui::Text("Context switch tracing not available on this platform.");
+				#endif
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(150);
+		ImGui::InputTextWithHint("##filter", "filter", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+			m_filter[0] = '\0';
+		}
+		if (m_filter[0]) {
+			ImGui::SameLine();
+			ImGui::Text("%f ms (%d calls) / ", (float)m_filtered_time, m_filtered_count);
+		}
+		const u64 freq = profiler::frequency();
+		ImGui::SameLine();
+		ImGui::Text("%f ms", (float)1000 * float(m_range / double(freq)));
+
+		if (m_data.empty()) return;
+		if (!m_is_paused) return;
+
+		const float timeline_y = ImGui::GetCursorScreenPos().y;
+		ImGui::Dummy(ImVec2(-1, ImGui::GetTextLineHeightWithSpacing())); // reserve space for timeline
+		const float from_y = ImGui::GetCursorScreenPos().y;
+		const float from_x = ImGui::GetCursorScreenPos().x;
+		const float to_x = from_x + ImGui::GetContentRegionAvail().x;
+		const u64 view_start = m_end - m_range;
+		u64 timeline_start_t = view_start;
+		float before_gpu_y = from_y;
+		if (ImGui::BeginChild("cpu_gpu")) {
+			countersUI(from_x, to_x);
+			auto get_view_x = [&](u64 time) {
+				const float t = time > view_start
+					? float((time - view_start) / double(m_range))
+					: -float((view_start - time) / double(m_range));
+				return from_x * (1 - t) + to_x * t;
+			};
+
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			dl->ChannelsSplit(2);
+			const float line_height = ImGui::GetTextLineHeightWithSpacing();
+
+			m_filtered_time = 0;
+			m_filtered_count = 0;
+
+			forEachThread([&](const ThreadContextProxy& ctx) {
+				if (ctx.thread_id == 0) return;
+				auto thread = m_threads.find(ctx.thread_id);
+		
+				if (!thread.isValid()) {
+					thread = m_threads.insert(ctx.thread_id, { 0, ctx.thread_id, ctx.name, ctx.default_show, 0});
+				}
+				thread.value().y = ImGui::GetCursorScreenPos().y;
+				if (!thread.value().show) return;
+				if (!ImGui::TreeNode(ctx.buffer, "%s", ctx.name)) return;
+
+				float y = ImGui::GetCursorScreenPos().y;
+				float top = y;
+				u32 lines = 0;
+
+				struct OpenBlock {
+					i32 id;
+					u64 start_time;
+				};
+				StackArray<OpenBlock, 64> open_blocks(m_allocator);
+		
+				struct Property {
+					profiler::EventHeader header;
+					int level;
+					int offset;
+				};
+				StackArray<Property, 64> properties(m_allocator);
+
+				auto draw_triggered_signal = [&](u64 time, i32 signal) {
+					const float x = get_view_x(time);
+			
+					if (m_hovered_fiber_wait.signal == signal && m_hovered_fiber_wait.frame > m_frame_idx - 2) {
+						dl->ChannelsSetCurrent(1);
+						dl->AddLine(m_hovered_fiber_wait.pos, ImVec2(x, y), 0xff0000ff);
+						dl->ChannelsSetCurrent(0);
+					}
+
+					if (time > m_end || time < view_start) return;
+					dl->AddTriangle(ImVec2(x - 2, y), ImVec2(x + 2, y - 2), ImVec2(x + 2, y + 2), 0xffffff00);
+					if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
+						ImGui::BeginTooltip();
+						ImGui::Text("Signal triggered: %" PRIx64, (u64)signal);
+						ImGui::EndTooltip();
+
+						m_hovered_signal_trigger.signal = signal;
+						m_hovered_signal_trigger.frame = m_frame_idx;
+						m_hovered_signal_trigger.pos = ImVec2(x, y);
+					}
+				};
+
+				auto draw_block = [&](u64 from, u64 to, const char* name, u32 color, i32 block_id) {
+					const Block& block = m_blocks[open_blocks.last().id];
+					if (m_hovered_fiber_wait.signal == block.job_info.signal_on_finish && m_hovered_fiber_wait.frame > m_frame_idx - 2) {
+						const float x_start = get_view_x(from);
+						dl->ChannelsSetCurrent(1);
+						dl->AddLine(m_hovered_fiber_wait.pos, ImVec2(x_start, y), 0xff0000ff);
+						dl->ChannelsSetCurrent(0);
+					}
+					auto draw_block_tooltip = [&](bool header){
+						const float x_start = get_view_x(from);
+						const float t = 1000 * float((to - from) / double(freq));
+						ImGui::BeginTooltip();
+						if (header) {
+							ImGui::Text("%s (%.4f ms)", name, t);
+							if (block.link) {
+								ImGui::Text("Link: %" PRId64, block.link);
+								m_hovered_link.frame = m_frame_idx;
+								m_hovered_link.link = block.link;
+							}
+							if (block.job_info.signal_on_finish) {
+								ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
+								m_hovered_job.frame = m_frame_idx;
+								m_hovered_job.pos = ImVec2(x_start, y);
+								m_hovered_job.signal = block.job_info.signal_on_finish;
+							}
+						}
+						for (const Property& prop : properties) {
+							if (prop.level != open_blocks.size() - 1) continue;
+
+							switch (prop.header.type) {
+								case profiler::EventType::INT: {
+									profiler::IntRecord r;
+									read(ctx, prop.offset, (u8*)&r, sizeof(r));
+									ImGui::Text("%s: %d", r.key, r.value);
+									break;
+								}
+								case profiler::EventType::STRING: {
+									char tmp[128];
+									const int tmp_size = prop.header.size - sizeof(prop.header);
+									read(ctx, prop.offset, (u8*)tmp, tmp_size);
+									ImGui::Text("%s", tmp);
+									break;
+								}
+								default: ASSERT(false); break;
+							}
+						}
+						ImGui::EndTooltip();
+					};
+
+					if (from > m_end || to < view_start) {
+						if (m_hovered_block.id == block_id && m_hovered_block.frame > m_frame_idx - 2) {
+							draw_block_tooltip(false);
+						}
+						return;
+					}
+
+					const float x_start = get_view_x(from);
+					float x_end = get_view_x(to);
+					if (int(x_end) == int(x_start)) ++x_end;
+					const float block_y = y;
+					const float w = ImGui::CalcTextSize(name).x;
+
+					const bool is_filtered = m_filter[0] && stristr(name, m_filter) == 0;
+					const u32 alpha = is_filtered ? 0x2000'0000 : 0xff00'0000;
+					if (m_hovered_link.link == block.link && m_hovered_link.frame > m_frame_idx - 2) color = 0xff0000ff;
+					color = alpha | (color & 0x00ffffff);
+					const u32 hovered_color = ImGui::GetColorU32(ImGuiCol_ButtonActive);
+					u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
+					border_color = alpha | (border_color & 0x00ffffff);
+
+					const ImVec2 ra(x_start, block_y);
+					const ImVec2 rb(x_end, block_y + line_height - 1);
+
+					bool is_hovered = false;
+					if (ImGui::IsMouseHoveringRect(ra, rb)) {
+						if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+							copyString(m_filter, name);
+						}
+						is_hovered = true;
+						m_hovered_block.id = block_id;
+						m_hovered_block.frame = m_frame_idx;
+						draw_block_tooltip(true);
+					}
+					else if (m_hovered_block.id == block_id && m_hovered_block.frame > m_frame_idx - 2) {
+						draw_block_tooltip(false);
+					}
+
+					dl->AddRectFilled(ra, rb, color);
+					if (x_end - x_start > 2) {
+						dl->AddRect(ra, rb, is_hovered ? hovered_color : border_color);
+					}
+					if (w + 2 < x_end - x_start) {
+						dl->AddText(ImVec2(x_start + 2, block_y), 0x00000000 | alpha, name);
+					}
+					const float t = 1000 * float((to - from) / double(freq));
+					if (!is_filtered && m_filter[0]) {
+						m_filtered_time += t;
+						++m_filtered_count;
+					}
+				};
+
+				u32 p = ctx.begin;
+				while (p != ctx.end) {
+					profiler::EventHeader header;
+					read(ctx, p, header);
+					switch (header.type) {
+						case profiler::EventType::END_FIBER_WAIT:
+						case profiler::EventType::BEGIN_FIBER_WAIT: {
+							const bool is_begin = header.type == profiler::EventType::BEGIN_FIBER_WAIT;
+							profiler::FiberWaitRecord r;
+							read(ctx, p + sizeof(profiler::EventHeader), r);
+				
+							const float x = get_view_x(header.time);
+
+							if (m_hovered_job.signal == r.job_system_signal && m_hovered_job.frame > m_frame_idx - 2) {
+								dl->ChannelsSetCurrent(1);
+								dl->AddLine(ImVec2(x, y - 2), m_hovered_job.pos, 0xff0000ff);
+								dl->ChannelsSetCurrent(0);
+							}
+
+							if (m_hovered_fiber_wait.id == r.id && m_hovered_fiber_wait.frame > m_frame_idx - 2) {
+								dl->ChannelsSetCurrent(1);
+								dl->AddLine(ImVec2(x, y - 2), m_hovered_fiber_wait.pos, 0xff00ff00);
+								dl->ChannelsSetCurrent(0);
+							}
+
+							if (m_hovered_signal_trigger.signal == r.job_system_signal && m_hovered_signal_trigger.frame > m_frame_idx - 2) {
+								dl->ChannelsSetCurrent(1);
+								dl->AddLine(ImVec2(x, y - 2), m_hovered_signal_trigger.pos, 0xff0000ff);
+								dl->ChannelsSetCurrent(0);
+							}
+
+							if (header.time >= view_start && header.time <= m_end) {
+								const u32 color = r.is_mutex ? 0xff0000ff : is_begin ? 0xff00ff00 : 0xffff0000;
+								dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
+								const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
+								if (mouse_hovered) {
+									m_hovered_fiber_wait.frame = m_frame_idx;
+									m_hovered_fiber_wait.id = r.id;
+									m_hovered_fiber_wait.pos = ImVec2(x, y);
+									m_hovered_fiber_wait.signal = r.job_system_signal;
+
+									ImGui::BeginTooltip();
+									ImGui::Text("Fiber wait");
+									ImGui::Text("  Wait ID: %d", r.id);
+									ImGui::Text("  Waiting for signal: %" PRIx64, (u64)r.job_system_signal);
+									ImGui::EndTooltip();
+								}
+							}
+							break;
+						}
+						case profiler::EventType::LINK:
+							if (open_blocks.size() > 0) {
+								read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].link);
+							}
+							break;
+						case profiler::EventType::BEGIN_BLOCK:
+							profiler::BlockRecord tmp;
+							read(ctx, p + sizeof(profiler::EventHeader), tmp);
+							open_blocks.push({tmp.id, header.time});
+							lines = maximum(lines, open_blocks.size());
+							y += line_height;
+							break;
+						case profiler::EventType::CONTINUE_BLOCK: {
+							i32 id;
+							read(ctx, p + sizeof(profiler::EventHeader), id);
+							open_blocks.push({id, header.time});
+							lines = maximum(lines, open_blocks.size());
+							y += line_height;
+							break;
+						}
+						case profiler::EventType::SIGNAL_TRIGGERED: {
+							i32 signal;
+							read(ctx, p + sizeof(profiler::EventHeader), signal);
+							draw_triggered_signal(header.time, signal);
+							break;
+						}
+						case profiler::EventType::END_BLOCK:
+							y = maximum(y - line_height, top);
+							if (open_blocks.size() > 0) {
+								const Block& block = m_blocks[open_blocks.last().id];
+								const u32 color = block.color;
+								draw_block(open_blocks.last().start_time, header.time, block.name, color, open_blocks.last().id);
+								while (properties.size() > 0 && properties.last().level == open_blocks.size() - 1) {
+									properties.pop();
+								}
+								open_blocks.pop();
+							}
+							break;
+						case profiler::EventType::FRAME:
+							ASSERT(false);	//should be in global context
+							break;
+						case profiler::EventType::INT:
+						case profiler::EventType::STRING: {
+							if (open_blocks.size() > 0) {
+								Property& prop = properties.emplace();
+								prop.header = header;
+								prop.level = open_blocks.size() - 1;
+								prop.offset = sizeof(profiler::EventHeader) + p;
+							}
+							else {
+								ASSERT(properties.size() == 0);
+							}
+							break;
+						}
+						case profiler::EventType::JOB_INFO:
+							if (open_blocks.size() > 0) {
+								read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].job_info);
+							}
+							break;
+						case profiler::EventType::BLOCK_COLOR:
+							if (open_blocks.size() > 0) {
+								read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].color);
+							}
+							break;
+						default: ASSERT(false); break;
+					}
+					p += header.size;
+				}
+				while (open_blocks.size() > 0) {
+					y -= line_height;
+					const Block& b = m_blocks[open_blocks.last().id];
+					draw_block(open_blocks.last().start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram), open_blocks.last().id);
+					open_blocks.pop();
+				}
+
+				ImGui::Dummy(ImVec2(to_x - from_x, lines * line_height));
+
+				ImGui::TreePop();
+			});
+
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && m_hovered_block.frame < m_frame_idx - 2) {
+				m_filter[0] = '\0';
+			}
+
+			auto draw_cswitch = [&](float x, const profiler::ContextSwitchRecord& r, ThreadRecord& tr, bool is_enter) {
+				const float y = tr.y + 10;
+				dl->AddLine(ImVec2(x + (is_enter ? -2.f : 2.f), y - 5), ImVec2(x, y), 0xff00ff00);
+				if (!is_enter) {
+					const u64 prev_switch = tr.last_context_switch.time;
+					if (prev_switch) {
+						if (tr.last_context_switch.is_enter) {
+							float prev_x = get_view_x(prev_switch);
+							dl->AddLine(ImVec2(prev_x, y), ImVec2(x, y), 0xff00ff00);
+						}
+					}
+					else {
+						dl->AddLine(ImVec2(x, y), ImVec2(0, y), 0xff00ff00);
+					}
+				}
+
+				if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, y - 3), ImVec2(x + 3, y + 3))) {
+					ImGui::BeginTooltip();
+					ImGui::Text("Context switch:");
+					ImGui::Text("  from: %s (%d)", getThreadName(r.old_thread_id), r.old_thread_id);
+					ImGui::Text("  to: %s (%d)", getThreadName(r.new_thread_id), r.new_thread_id);
+					ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
+					ImGui::EndTooltip();
+				}
+				tr.last_context_switch.time = r.timestamp;
+				tr.last_context_switch.is_enter = is_enter;
+			};
+
+			before_gpu_y = ImGui::GetCursorScreenPos().y;
+			{
+				const ThreadContextProxy& ctx = getGlobalThreadContextProxy();
+				const bool gpu_open = ImGui::TreeNode(ctx.buffer, "GPU");
+				const float y = ImGui::GetCursorScreenPos().y;
+
+				StackArray<u32, 32> open_blocks(m_allocator);
+				u32 lines = 0;
+				bool has_gpu_stats = false;
+				u64 primitives_generated;
+				u32 p = ctx.begin;
+				const u32 end = ctx.end;
+				while (p != end) {
+					profiler::EventHeader header;
+					read(ctx, p, header);
+					switch (header.type) {
+						case profiler::EventType::BEGIN_GPU_BLOCK:
+							open_blocks.push(p);
+							lines = maximum(lines, open_blocks.size());
+							break;
+						case profiler::EventType::END_GPU_BLOCK:
+							if (open_blocks.size() > 0 && gpu_open) {
+								profiler::EventHeader start_header;
+								read(ctx, open_blocks.last(), start_header);
+								profiler::GPUBlock data;
+								read(ctx, open_blocks.last() + sizeof(profiler::EventHeader), data);
+								u64 to;
+								read(ctx, p + sizeof(profiler::EventHeader), to);
+								const u64 from = data.timestamp;
+								const float x_start = get_view_x(from);
+								float x_end = get_view_x(to);
+								if (int(x_end) == int(x_start)) ++x_end;
+								const float block_y = (open_blocks.size() - 1) * line_height + y;
+								const float w = ImGui::CalcTextSize(data.name).x;
+
+								const ImVec2 ra(x_start, block_y);
+								const ImVec2 rb(x_end, block_y + line_height - 1);
+								u32 color = 0xffDDddDD;
+								if (m_hovered_link.link == data.profiler_link && m_hovered_link.frame > m_frame_idx - 2) color = 0xff0000ff;
+								dl->AddRectFilled(ra, rb, color);
+								if (x_end - x_start > 2) {
+									dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
+								}
+								if (w + 2 < x_end - x_start) {
+									dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, data.name);
+								}
+								if (ImGui::IsMouseHoveringRect(ra, rb)) {
+									const float t = 1000 * float((to - from) / double(freq));
+									ImGui::BeginTooltip();
+									ImGui::Text("%s (%.4f ms)", data.name, t);
+									if (data.profiler_link) {
+										ImGui::Text("Link: %" PRId64, data.profiler_link);
+										m_hovered_link.frame = m_frame_idx;
+										m_hovered_link.link = data.profiler_link;
+									}
+									if (has_gpu_stats) {
+										char tmp[32];
+										toCStringPretty(primitives_generated, Span(tmp));
+										ImGui::Text("Primitives: %s", tmp);
+									}
+									ImGui::EndTooltip();
+								}
+							}
+							if (open_blocks.size() > 0) open_blocks.pop();
+							has_gpu_stats = false;
+							break;
+						case profiler::EventType::GPU_STATS:
+							read(ctx, p + sizeof(profiler::EventHeader), primitives_generated);
+							has_gpu_stats = true;
+							break;
+						case profiler::EventType::FRAME:
+							if (header.time < view_start) timeline_start_t = header.time;
+							else {
+								if (header.time <= m_end && m_show_frames) {
+									if (timeline_start_t <= view_start) timeline_start_t = header.time;
+									const float x = get_view_x(header.time);
+									dl->ChannelsSetCurrent(1);
+									dl->AddLine(ImVec2(x, from_y), ImVec2(x, before_gpu_y), 0xffff0000);
+									dl->ChannelsSetCurrent(0);
+								}
+							}
+							break;
+						case profiler::EventType::CONTEXT_SWITCH:
+							if (m_show_context_switches && header.time >= view_start && header.time <= m_end) {
+								profiler::ContextSwitchRecord r;
+								read(ctx, p + sizeof(profiler::EventHeader), r);
+								auto new_iter = m_threads.find(r.new_thread_id);
+								auto old_iter = m_threads.find(r.old_thread_id);
+								const float x = get_view_x(header.time);
+
+								if (new_iter.isValid()) draw_cswitch(x, r, new_iter.value(), true);
+								if (old_iter.isValid()) draw_cswitch(x, r, old_iter.value(), false);
+							}
+							break;
+						case profiler::EventType::COUNTER:
+						case profiler::EventType::PAUSE:
+							break;
+						default: ASSERT(false); break;
+					}
+					p += header.size;
+				}
+
+				if (gpu_open) {
+					if (lines > 0) ImGui::Dummy(ImVec2(to_x - from_x, lines * line_height));
+					ImGui::TreePop();
+				}
+
+				if (ImGui::IsMouseHoveringRect(ImVec2(from_x, from_y), ImVec2(to_x, ImGui::GetCursorScreenPos().y))) {
+					if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+						m_end -= i64((ImGui::GetIO().MouseDelta.x / (to_x - from_x)) * m_range);
+					}
+					const u64 cursor = u64(((ImGui::GetMousePos().x - from_x) / (to_x - from_x)) * m_range) + view_start;
+					u64 cursor_to_end = m_end - cursor;
+					if (ImGui::GetIO().KeyCtrl) {
+						if (ImGui::GetIO().MouseWheel > 0 && m_range > 1) {
+							m_range >>= 1;
+							cursor_to_end >>= 1;
+						}
+						else if (ImGui::GetIO().MouseWheel < 0) {
+							m_range <<= 1;
+							cursor_to_end <<= 1;
+						}
+						m_end = cursor_to_end + cursor;
+					}
+				}
+			}
+
+			for (ThreadRecord& tr : m_threads) {
+				if (tr.last_context_switch.is_enter) {
+					const float x = get_view_x(tr.last_context_switch.time);
+					dl->AddLine(ImVec2(x + 10, tr.y + 10), ImVec2(x, tr.y + 10), 0xffffff00);
+				}
+				tr.last_context_switch.time = 0;
+			}
+
+			dl->ChannelsMerge();
+		}
+		ImGui::EndChild();
+
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		timeline(from_x, to_x, timeline_y, before_gpu_y, timeline_start_t);
+	}
+
+	void addToTree(debug::Allocator::AllocationInfo* info) {
+		debug::StackNode* nodes[1024];
+		int count = debug::StackTree::getPath(info->stack_leaf, Span(nodes));
+
+		auto node = m_allocation_root;
+		for (int i = count - 1; i >= 0; --i)
+		{
+			node = getOrCreate(node, nodes[i], info->size);
+		}
+		node->m_allocations.push(info);
+	}
+
+	void refreshAllocations() {
+		if (!m_debug_allocator) return;
+
+		m_allocation_root->clear(m_allocator);
+		LUMIX_DELETE(m_allocator, m_allocation_root);
+		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
+
+		m_debug_allocator->lock();
+		auto* current_info = m_debug_allocator->getFirstAllocationInfo();
+
+		while (current_info)
+		{
+			addToTree(current_info);
+			current_info = current_info->next;
+		}
+		m_debug_allocator->unlock();
+	}
+
+	StudioApp& m_app;
 	DefaultAllocator m_allocator;
 	debug::Allocator* m_debug_allocator;
-	ResourceManagerHub& m_resource_manager;
-	StudioApp& m_app;
 	AllocationStackNode* m_allocation_root;
 	int m_allocation_size_from;
 	int m_allocation_size_to;
@@ -595,845 +1405,43 @@ struct ProfilerUIImpl final : ProfilerUI
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_show_frames = true;
-	
+	Array<Counter> m_counters;
+	bool m_is_open = false;
+	Action m_toggle_ui;
+	HashMap<i32, Block> m_blocks;
+	u32 m_frame_idx = 0;
+
 	struct {
 		u32 frame = 0;
 		i64 link;
-	} hovered_link;
+	} m_hovered_link;
 
 	struct {
 		u32 frame = 0;
 		i32 id = 0;
 		ImVec2 pos;
 		i32 signal = 0;
-	} hovered_fiber_wait;
+	} m_hovered_fiber_wait;
 
 	struct {
 		u32 frame = 0;
 		i32 signal = 0;
 		ImVec2 pos;
-	} hovered_signal_trigger;
+	} m_hovered_signal_trigger;
 
 	struct {
 		u32 frame = 0;
 		i32 signal = 0;
 		ImVec2 pos;
-	} hovered_job;
+	} m_hovered_job;
 
-	HashMap<i32, Block> m_blocks;
-	
-	struct Counter {
-		struct Record {
-			u64 time;
-			float value;
-		};
-		Counter(IAllocator& allocator) : records(allocator) {}
-		Array<Record> records;
-		StaticString<64> name;
-		float min = FLT_MAX;
-		float max = -FLT_MAX;
-	};
-
-	Array<Counter> m_counters;
-	bool m_is_open = false;
-	Action m_toggle_ui;
+	struct {
+		u32 frame = 0;
+		i32 id = -1;
+	} m_hovered_block;
 };
 
-
-static const char* getResourceStateString(Resource::State state)
-{
-	switch (state)
-	{
-		case Resource::State::EMPTY: return "Empty";
-		case Resource::State::FAILURE: return "Failure";
-		case Resource::State::READY: return "Ready";
-	}
-
-	return "Unknown";
-}
-
-
-void ProfilerUIImpl::onGUIResources()
-{
-	if (!ImGui::CollapsingHeader("Resources")) return;
-
-	ImGuiEx::filter("Filter", m_resource_filter, sizeof(m_resource_filter));
-	
-	ImGuiEx::Label("Filter size (KB)");
-	ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
-
-	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
-		ResourceType("material"),
-		ResourceType("model"),
-		ResourceType("physics_geometry"),
-		ResourceType("physics_material"),
-		ResourceType("shader"),
-		ResourceType("texture") };
-	static const char* MANAGER_NAMES[] = {
-		"Animations",
-		"Materials",
-		"Models",
-		"Physics geometries",
-		"Physics materials",
-		"Shaders",
-		"Textures"
-	};
-	ASSERT(lengthOf(RESOURCE_TYPES) == lengthOf(MANAGER_NAMES));
-	ImGui::Indent();
-	for (u32 i = 0; i < lengthOf(RESOURCE_TYPES); ++i)
-	{
-		if (!ImGui::CollapsingHeader(MANAGER_NAMES[i])) continue;
-
-		auto* resource_manager = m_resource_manager.get(RESOURCE_TYPES[i]);
-		auto& resources = resource_manager->getResourceTable();
-
-		if (ImGui::BeginTable("resc", 4)) {
-            ImGui::TableSetupColumn("Path");
-            ImGui::TableSetupColumn("Size");
-            ImGui::TableSetupColumn("State");
-            ImGui::TableSetupColumn("References");
-            ImGui::TableHeadersRow();
-            
-			size_t sum = 0;
-			for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
-				if (m_resource_filter[0] != '\0' && stristr(iter.value()->getPath().c_str(), m_resource_filter) == nullptr) continue;
-				if (m_resource_size_filter > iter.value()->size() / 1000) continue;
-				
-				ImGui::TableNextColumn();
-				ImGui::PushID(iter.value());
-				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-					m_app.getAssetBrowser().selectResource(iter.value()->getPath(), true, false);
-				}
-				ImGui::PopID();
-				ImGui::SameLine();
-				ImGui::Text("%s", iter.value()->getPath().c_str());
-				ImGui::TableNextColumn();
-				ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
-				sum += iter.value()->size();
-				ImGui::TableNextColumn();
-				ImGui::Text("%s", getResourceStateString(iter.value()->getState()));
-				ImGui::TableNextColumn();
-				ImGui::Text("%u", iter.value()->getRefCount());
-			}
-
-			ImGui::TableNextColumn();
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImColor(ImGui::GetStyle().Colors[ImGuiCol_FrameBgHovered]));
-			ImGui::Text("All");
-			ImGui::TableNextColumn();
-			ImGui::Text("%.3fKB", sum / 1024.0f);
-			ImGui::TableNextColumn();
-			ImGui::TableNextColumn();
-
-			ImGui::EndTable();
-		}
-	}
-	ImGui::Unindent();
-}
-
-
-ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStackNode* my_node,
-	debug::StackNode* external_node,
-	size_t size)
-{
-	for (auto* child : my_node->m_children)
-	{
-		if (child->m_stack_node == external_node)
-		{
-			child->m_inclusive_size += size;
-			return child;
-		}
-	}
-
-	auto new_node = LUMIX_NEW(m_allocator, AllocationStackNode)(external_node, size, m_allocator);
-	my_node->m_children.push(new_node);
-	return new_node;
-}
-
-
-void ProfilerUIImpl::addToTree(debug::Allocator::AllocationInfo* info)
-{
-	debug::StackNode* nodes[1024];
-	int count = debug::StackTree::getPath(info->stack_leaf, Span(nodes));
-
-	auto node = m_allocation_root;
-	for (int i = count - 1; i >= 0; --i)
-	{
-		node = getOrCreate(node, nodes[i], info->size);
-	}
-	node->m_allocations.push(info);
-}
-
-
-void ProfilerUIImpl::refreshAllocations()
-{
-	if (!m_debug_allocator) return;
-
-	m_allocation_root->clear(m_allocator);
-	LUMIX_DELETE(m_allocator, m_allocation_root);
-	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
-
-	m_debug_allocator->lock();
-	auto* current_info = m_debug_allocator->getFirstAllocationInfo();
-
-	while (current_info)
-	{
-		addToTree(current_info);
-		current_info = current_info->next;
-	}
-	m_debug_allocator->unlock();
-}
-
-
-void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) const
-{
-	if (column == FUNCTION)
-	{
-		char fn_name[100];
-		int line;
-		if (debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), line))
-		{
-			if (line >= 0)
-			{
-				int len = stringLength(fn_name);
-				if (len + 2 < sizeof(fn_name))
-				{
-					fn_name[len] = ' ';
-					fn_name[len + 1] = '\0';
-					++len;
-					toCString(line, Span(fn_name).fromLeft(len));
-				}
-			}
-		}
-		else
-		{
-			copyString(fn_name, "N/A");
-		}
-
-		if (ImGui::TreeNode(node, "%s", fn_name))
-		{
-			node->m_open = true;
-			for (auto* child : node->m_children)
-			{
-				showAllocationTree(child, column);
-			}
-			ImGui::TreePop();
-		}
-		else
-		{
-			node->m_open = false;
-		}
-		return;
-	}
-
-	ASSERT(column == SIZE);
-	#ifdef _MSC_VER
-		char size[50];
-		toCStringPretty(node->m_inclusive_size, Span(size));
-		ImGui::Text("%s", size);
-		if (node->m_open)
-		{
-			for (auto* child : node->m_children)
-			{
-				showAllocationTree(child, column);
-			}
-		}
-	#endif
-}
-
-
-void ProfilerUIImpl::onGUIMemoryProfiler()
-{
-	if (!ImGui::CollapsingHeader("Memory")) return;
-
-	if (m_debug_allocator) {
-		if (ImGui::Button("Refresh"))
-		{
-			refreshAllocations();
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button("Check memory"))
-		{
-			m_debug_allocator->checkGuards();
-		}
-	}
-	else {
-		ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
-	}
-
-	ImGui::Columns(2, "memc");
-	for (auto* child : m_allocation_root->m_children)
-	{
-		showAllocationTree(child, FUNCTION);
-	}
-	ImGui::NextColumn();
-	for (auto* child : m_allocation_root->m_children)
-	{
-		showAllocationTree(child, SIZE);
-	}
-	ImGui::Columns(1);
-}
-
-void ProfilerUIImpl::onGUICPUProfiler()
-{
-	static u32 frame_id = 0;
-	++frame_id;
-
-	if (!ImGui::CollapsingHeader("CPU/GPU")) return;
-
-	if (m_autopause > 0 && !m_is_paused && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
-		m_is_paused = true;
-		profiler::pause(m_is_paused);
-		onPause();
-	}
-
-	if (ImGui::Button(m_is_paused ? ICON_FA_PLAY : ICON_FA_PAUSE)) {
-		m_is_paused = !m_is_paused;
-		profiler::pause(m_is_paused);
-		if (m_is_paused) onPause();
-	}
-
-	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_COGS)) {
-		ImGui::OpenPopup("profiler_advanced");
-	}
-	if (ImGui::BeginPopup("profiler_advanced")) {
-		if (ImGui::MenuItem("Load")) load();
-		if (ImGui::MenuItem("Save")) save();
-		ImGui::Checkbox("Show frames", &m_show_frames);
-		ImGui::Text("Zoom: %f", m_range / double(DEFAULT_RANGE));
-		if (ImGui::MenuItem("Reset zoom")) m_range = DEFAULT_RANGE;
-		bool do_autopause = m_autopause >= 0;
-		if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
-			m_autopause = -m_autopause;
-		}
-		if (m_autopause >= 0) {
-			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, "%.2f");
-		}
-		if (ImGui::BeginMenu("Threads")) {
-			forEachThread([&](const ThreadContextProxy& ctx){
-				auto thread = m_threads.find(ctx.thread_id);
-				if (thread.isValid()) {
-					ImGui::Checkbox(StaticString<128>(ctx.name, "##t", ctx.thread_id), &thread.value().show);
-				}
-			});
-			ImGui::EndMenu();
-		}
-		if (profiler::contextSwitchesEnabled())
-		{
-			ImGui::Checkbox("Show context switches", &m_show_context_switches);
-		}
-		else {
-			ImGui::Separator();
-			ImGui::Text("Context switch tracing not available.");
-			ImGui::Text("Run the app as an administrator.");
-		}
-		ImGui::EndPopup();
-	}
-	ImGui::SameLine();
-	ImGui::SetNextItemWidth(150);
-	ImGui::InputTextWithHint("##filter", "filter", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
-	ImGui::SameLine();
-	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-		m_filter[0] = '\0';
-	}
-	if (m_filter[0]) {
-		ImGui::SameLine();
-		ImGui::Text("%f ms (%d calls) / ", (float)m_filtered_time, m_filtered_count);
-	}
-	const u64 freq = profiler::frequency();
-	ImGui::SameLine();
-	ImGui::Text("%f ms", (float)1000 * float(m_range / double(freq)));
-
-	if (m_data.empty()) return;
-	if (!m_is_paused) return;
-
-	const float from_y = ImGui::GetCursorScreenPos().y;
-	const float from_x = ImGui::GetCursorScreenPos().x;
-	const float to_x = from_x + ImGui::GetContentRegionAvail().x;
-	countersUI(from_x, to_x);
-
-	ThreadContextProxy global = getGlobalThreadContextProxy();
-
-	const u64 view_start = m_end - m_range;
-
-	ImDrawList* dl = ImGui::GetWindowDrawList();
-	dl->ChannelsSplit(2);
-
-	auto getThreadName = [&](u32 thread_id){
-		auto iter = m_threads.find(thread_id);
-		return iter.isValid() ? iter.value().name : "Unknown";
-	};
-
-	const float line_height = ImGui::GetTextLineHeightWithSpacing();
-
-	m_filtered_time = 0;
-	m_filtered_count = 0;
-	static i32 hovered_block_id = -1;
-	bool hovered_any = false;
-
-	forEachThread([&](const ThreadContextProxy& ctx) {
-		if (ctx.thread_id == 0) return;
-		auto thread = m_threads.find(ctx.thread_id);
-		
-		if (!thread.isValid()) {
-			thread = m_threads.insert(ctx.thread_id, { 0, ctx.thread_id, ctx.name, ctx.default_show, 0});
-		}
-		thread.value().y = ImGui::GetCursorScreenPos().y;
-		if (!thread.value().show) return;
-		if (!ImGui::TreeNode(ctx.buffer, "%s", ctx.name)) return;
-
-		float y = ImGui::GetCursorScreenPos().y;
-		float top = y;
-		u32 lines = 0;
-
-		struct OpenBlock {
-			i32 id;
-			u64 start_time;
-		};
-		StackArray<OpenBlock, 64> open_blocks(m_allocator);
-		
-		u32 p = ctx.begin;
-		const u32 end = ctx.end;
-
-		struct Property {
-			profiler::EventHeader header;
-			int level;
-			int offset;
-		};
-		StackArray<Property, 64> properties(m_allocator);
-
-		auto draw_triggered_signal = [&](u64 time, i32 signal) {
-			const float t_start = float(int(time - view_start) / double(m_range));
-			const float x = from_x * (1 - t_start) + to_x * t_start;
-			
-			if (hovered_fiber_wait.signal == signal && hovered_fiber_wait.frame > frame_id - 2) {
-				dl->ChannelsSetCurrent(1);
-				dl->AddLine(hovered_fiber_wait.pos, ImVec2(x, y), 0xff0000ff);
-				dl->ChannelsSetCurrent(0);
-			}
-
-			if (time > m_end || time < view_start) return;
-			dl->AddTriangle(ImVec2(x - 2, y), ImVec2(x + 2, y - 2), ImVec2(x + 2, y + 2), 0xffffff00);
-			if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
-				ImGui::BeginTooltip();
-				ImGui::Text("Signal triggered: %" PRIx64, (u64)signal);
-				ImGui::EndTooltip();
-
-				hovered_signal_trigger.signal = signal;
-				hovered_signal_trigger.frame = frame_id;
-				hovered_signal_trigger.pos = ImVec2(x, y);
-			}
-		};
-
-		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color, i32 block_id) {
-			const Block& block = m_blocks[open_blocks.last().id];
-			if (hovered_fiber_wait.signal == block.job_info.signal_on_finish && hovered_fiber_wait.frame > frame_id - 2) {
-				const float t_start = float(int(from - view_start) / double(m_range));
-				const float x_start = from_x * (1 - t_start) + to_x * t_start;
-				dl->ChannelsSetCurrent(1);
-				dl->AddLine(hovered_fiber_wait.pos, ImVec2(x_start, y), 0xff0000ff);
-				dl->ChannelsSetCurrent(0);
-			}
-			auto draw_block_tooltip = [&](bool header){
-				const float t_start = float(int(from - view_start) / double(m_range));
-				const float t_end = float(int(to - view_start) / double(m_range));
-				const float x_start = from_x * (1 - t_start) + to_x * t_start;
-				const float t = 1000 * float((to - from) / double(freq));
-				ImGui::BeginTooltip();
-				if (header) {
-					ImGui::Text("%s (%.4f ms)", name, t);
-					if (block.link) {
-						ImGui::Text("Link: %" PRId64, block.link);
-						hovered_link.frame = frame_id;
-						hovered_link.link = block.link;
-					}
-					if (block.job_info.signal_on_finish) {
-						ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
-						hovered_job.frame = frame_id;
-						hovered_job.pos = ImVec2(x_start, y);
-						hovered_job.signal = block.job_info.signal_on_finish;
-					}
-				}
-				for (const Property& prop : properties) {
-					if (prop.level != open_blocks.size() - 1) continue;
-
-					switch (prop.header.type) {
-						case profiler::EventType::INT: {
-							profiler::IntRecord r;
-							read(ctx, prop.offset, (u8*)&r, sizeof(r));
-							ImGui::Text("%s: %d", r.key, r.value);
-							break;
-						}
-						case profiler::EventType::STRING: {
-							char tmp[128];
-							const int tmp_size = prop.header.size - sizeof(prop.header);
-							read(ctx, prop.offset, (u8*)tmp, tmp_size);
-							ImGui::Text("%s", tmp);
-							break;
-						}
-						default: ASSERT(false); break;
-					}
-				}
-				ImGui::EndTooltip();
-			};
-
-			if (from > m_end || to < view_start) {
-				if (hovered_block_id == block_id) {
-					draw_block_tooltip(false);
-				}
-				return;
-			}
-
-			const float t_start = float(int(from - view_start) / double(m_range));
-			const float t_end = float(int(to - view_start) / double(m_range));
-			const float x_start = from_x * (1 - t_start) + to_x * t_start;
-			float x_end = from_x * (1 - t_end) + to_x * t_end;
-			if (int(x_end) == int(x_start)) ++x_end;
-			const float block_y = y;
-			const float w = ImGui::CalcTextSize(name).x;
-
-			const bool is_filtered = m_filter[0] && stristr(name, m_filter) == 0;
-			const u32 alpha = is_filtered ? 0x2000'0000 : 0xff00'0000;
-			if (hovered_link.link == block.link && hovered_link.frame > frame_id - 2) color = 0xff0000ff;
-			color = alpha | (color & 0x00ffffff);
-			u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
-			border_color = alpha | (border_color & 0x00ffffff);
-
-			const ImVec2 ra(x_start, block_y);
-			const ImVec2 rb(x_end, block_y + line_height - 1);
-
-			dl->AddRectFilled(ra, rb, color);
-			if (x_end - x_start > 2) {
-				dl->AddRect(ra, rb, border_color);
-			}
-			if (w + 2 < x_end - x_start) {
-				dl->AddText(ImVec2(x_start + 2, block_y), 0x00000000 | alpha, name);
-			}
-			const float t = 1000 * float((to - from) / double(freq));
-			if (!is_filtered && m_filter[0]) {
-				m_filtered_time += t;
-				++m_filtered_count;
-			}
-			if (ImGui::IsMouseHoveringRect(ra, rb)) {
-				hovered_block_id = block_id;
-				hovered_any = true;
-				draw_block_tooltip(true);
-			}
-			else if (hovered_block_id == block_id) {
-				draw_block_tooltip(false);
-			}
-		};
-
-		while (p != end) {
-			profiler::EventHeader header;
-			read(ctx, p, header);
-			switch (header.type) {
-			case profiler::EventType::END_FIBER_WAIT:
-			case profiler::EventType::BEGIN_FIBER_WAIT: {
-				const bool is_begin = header.type == profiler::EventType::BEGIN_FIBER_WAIT;
-				profiler::FiberWaitRecord r;
-				read(ctx, p + sizeof(profiler::EventHeader), r);
-				
-				const float t = view_start <= header.time
-					? float((header.time - view_start) / double(m_range))
-					: -float((view_start - header.time) / double(m_range));
-				const float x = from_x * (1 - t) + to_x * t;
-
-				if (hovered_job.signal == r.job_system_signal && hovered_job.frame > frame_id - 2) {
-					dl->ChannelsSetCurrent(1);
-					dl->AddLine(ImVec2(x, y - 2), hovered_job.pos, 0xff0000ff);
-					dl->ChannelsSetCurrent(0);
-				}
-
-				if (hovered_fiber_wait.id == r.id && hovered_fiber_wait.frame > frame_id - 2) {
-					dl->ChannelsSetCurrent(1);
-					dl->AddLine(ImVec2(x, y - 2), hovered_fiber_wait.pos, 0xff00ff00);
-					dl->ChannelsSetCurrent(0);
-				}
-
-				if (hovered_signal_trigger.signal == r.job_system_signal && hovered_signal_trigger.frame > frame_id - 2) {
-					dl->ChannelsSetCurrent(1);
-					dl->AddLine(ImVec2(x, y - 2), hovered_signal_trigger.pos, 0xff0000ff);
-					dl->ChannelsSetCurrent(0);
-				}
-
-				if (header.time >= view_start && header.time <= m_end) {
-					const u32 color = r.is_mutex ? 0xff0000ff : is_begin ? 0xff00ff00 : 0xffff0000;
-					dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
-					const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
-					if (mouse_hovered) {
-						hovered_fiber_wait.frame = frame_id;
-						hovered_fiber_wait.id = r.id;
-						hovered_fiber_wait.pos = ImVec2(x, y);
-						hovered_fiber_wait.signal = r.job_system_signal;
-
-						ImGui::BeginTooltip();
-						ImGui::Text("Fiber wait");
-						ImGui::Text("  Wait ID: %d", r.id);
-						ImGui::Text("  Waiting for signal: %" PRIx64, (u64)r.job_system_signal);
-						ImGui::EndTooltip();
-					}
-				}
-				break;
-			}
-			case profiler::EventType::LINK:
-				if (open_blocks.size() > 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].link);
-				}
-				break;
-			case profiler::EventType::BEGIN_BLOCK:
-				profiler::BlockRecord tmp;
-				read(ctx, p + sizeof(profiler::EventHeader), tmp);
-				open_blocks.push({tmp.id, header.time});
-				lines = maximum(lines, open_blocks.size());
-				y += line_height;
-				break;
-			case profiler::EventType::CONTINUE_BLOCK: {
-				i32 id;
-				read(ctx, p + sizeof(profiler::EventHeader), id);
-				open_blocks.push({id, header.time});
-				lines = maximum(lines, open_blocks.size());
-				y += line_height;
-				break;
-			}
-			case profiler::EventType::SIGNAL_TRIGGERED: {
-				i32 signal;
-				read(ctx, p + sizeof(profiler::EventHeader), signal);
-				draw_triggered_signal(header.time, signal);
-				break;
-			}
-			case profiler::EventType::END_BLOCK:
-				y = maximum(y - line_height, top);
-				if (open_blocks.size() > 0) {
-					const Block& block = m_blocks[open_blocks.last().id];
-					const u32 color = block.color;
-					draw_block(open_blocks.last().start_time, header.time, block.name, color, open_blocks.last().id);
-					while (properties.size() > 0 && properties.last().level == open_blocks.size() - 1) {
-						properties.pop();
-					}
-					open_blocks.pop();
-				}
-				break;
-			case profiler::EventType::FRAME:
-				ASSERT(false);	//should be in global context
-				break;
-			case profiler::EventType::INT:
-			case profiler::EventType::STRING: {
-				if (open_blocks.size() > 0) {
-					Property& prop = properties.emplace();
-					prop.header = header;
-					prop.level = open_blocks.size() - 1;
-					prop.offset = sizeof(profiler::EventHeader) + p;
-				}
-				else {
-					ASSERT(properties.size() == 0);
-				}
-				break;
-			}
-			case profiler::EventType::JOB_INFO:
-				if (open_blocks.size() > 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].job_info);
-				}
-				break;
-			case profiler::EventType::BLOCK_COLOR:
-				if (open_blocks.size() > 0) {
-					read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].color);
-				}
-				break;
-			default: ASSERT(false); break;
-			}
-			p += header.size;
-		}
-		while (open_blocks.size() > 0) {
-			y -= line_height;
-			const Block& b = m_blocks[open_blocks.last().id];
-			draw_block(open_blocks.last().start_time, m_end, b.name, ImGui::GetColorU32(ImGuiCol_PlotHistogram), open_blocks.last().id);
-			open_blocks.pop();
-		}
-
-		ImGui::Dummy(ImVec2(to_x - from_x, lines * line_height));
-
-		ImGui::TreePop();
-	});
-
-	if (!hovered_any) hovered_block_id = -1;
-
-	auto get_view_x = [&](u64 time) {
-		const float t = time > view_start
-			? float((time - view_start) / double(m_range))
-			: -float((view_start - time) / double(m_range));
-		return from_x * (1 - t) + to_x * t;
-	};
-
-	auto draw_cswitch = [&](float x, const profiler::ContextSwitchRecord& r, ThreadRecord& tr, bool is_enter) {
-		const float y = tr.y + 10;
-		dl->AddLine(ImVec2(x + (is_enter ? -2.f : 2.f), y - 5), ImVec2(x, y), 0xff00ff00);
-		if (!is_enter) {
-			const u64 prev_switch = tr.last_context_switch.time;
-			if (prev_switch) {
-				if (tr.last_context_switch.is_enter) {
-					float prev_x = get_view_x(prev_switch);
-					dl->AddLine(ImVec2(prev_x, y), ImVec2(x, y), 0xff00ff00);
-				}
-			}
-			else {
-				dl->AddLine(ImVec2(x, y), ImVec2(0, y), 0xff00ff00);
-			}
-		}
-
-		if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, y - 3), ImVec2(x + 3, y + 3))) {
-			ImGui::BeginTooltip();
-			ImGui::Text("Context switch:");
-			ImGui::Text("  from: %s (%d)", getThreadName(r.old_thread_id), r.old_thread_id);
-			ImGui::Text("  to: %s (%d)", getThreadName(r.new_thread_id), r.new_thread_id);
-			ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
-			ImGui::EndTooltip();
-		}
-		tr.last_context_switch.time = r.timestamp;
-		tr.last_context_switch.is_enter = is_enter;
-	};
-
-	{
-		ThreadContextProxy& ctx = global;
-
-		float before_gpu_y = ImGui::GetCursorScreenPos().y;
-
-		const bool gpu_open = ImGui::TreeNode(ctx.buffer, "GPU");
-		
-		float y = ImGui::GetCursorScreenPos().y;
-
-		StackArray<u32, 32> open_blocks(m_allocator);
-		u32 lines = 0;
-
-		bool has_stats = false;
-		u64 primitives_generated;
-		u32 p = ctx.begin;
-		const u32 end = ctx.end;
-		while (p != end) {
-			profiler::EventHeader header;
-			read(ctx, p, header);
-			switch (header.type) {
-				case profiler::EventType::BEGIN_GPU_BLOCK:
-					open_blocks.push(p);
-					lines = maximum(lines, open_blocks.size());
-					break;
-				case profiler::EventType::END_GPU_BLOCK:
-					if (open_blocks.size() > 0 && gpu_open) {
-						profiler::EventHeader start_header;
-						read(ctx, open_blocks.last(), start_header);
-						profiler::GPUBlock data;
-						read(ctx, open_blocks.last() + sizeof(profiler::EventHeader), data);
-						u64 to;
-						read(ctx, p + sizeof(profiler::EventHeader), to);
-						const u64 from = data.timestamp;
-						const float t_start = float(int(from - view_start) / double(m_range));
-						const float t_end = float(int(to - view_start) / double(m_range));
-						const float x_start = from_x * (1 - t_start) + to_x * t_start;
-						float x_end = from_x * (1 - t_end) + to_x * t_end;
-						if (int(x_end) == int(x_start)) ++x_end;
-						const float block_y = (open_blocks.size() - 1) * line_height + y;
-						const float w = ImGui::CalcTextSize(data.name).x;
-
-						const ImVec2 ra(x_start, block_y);
-						const ImVec2 rb(x_end, block_y + line_height - 1);
-						u32 color = 0xffDDddDD;
-						if (hovered_link.link == data.profiler_link && hovered_link.frame > frame_id - 2) color = 0xff0000ff;
-						dl->AddRectFilled(ra, rb, color);
-						if (x_end - x_start > 2) {
-							dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
-						}
-						if (w + 2 < x_end - x_start) {
-							dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, data.name);
-						}
-						if (ImGui::IsMouseHoveringRect(ra, rb)) {
-							const float t = 1000 * float((to - from) / double(freq));
-							ImGui::BeginTooltip();
-							ImGui::Text("%s (%.4f ms)", data.name, t);
-							if (data.profiler_link) {
-								ImGui::Text("Link: %" PRId64, data.profiler_link);
-								hovered_link.frame = frame_id;
-								hovered_link.link = data.profiler_link;
-							}
-							if (has_stats) {
-								char tmp[32];
-								toCStringPretty(primitives_generated, Span(tmp));
-								ImGui::Text("Primitives: %s", tmp);
-							}
-							ImGui::EndTooltip();
-						}
-					}
-					if (open_blocks.size() > 0) open_blocks.pop();
-					has_stats = false;
-					break;
-				case profiler::EventType::GPU_STATS:
-					read(ctx, p + sizeof(profiler::EventHeader), primitives_generated);
-					has_stats = true;
-					break;
-				case profiler::EventType::FRAME:
-					if (header.time >= view_start && header.time <= m_end && m_show_frames) {
-						const float t = float((header.time - view_start) / double(m_range));
-						const float x = from_x * (1 - t) + to_x * t;
-						dl->ChannelsSetCurrent(1);
-						dl->AddLine(ImVec2(x, from_y), ImVec2(x, before_gpu_y), 0xffff0000);
-						dl->ChannelsSetCurrent(0);
-					}
-					break;
-				case profiler::EventType::CONTEXT_SWITCH:
-					if (m_show_context_switches && header.time >= view_start && header.time <= m_end) {
-						profiler::ContextSwitchRecord r;
-						read(ctx, p + sizeof(profiler::EventHeader), r);
-						auto new_iter = m_threads.find(r.new_thread_id);
-						auto old_iter = m_threads.find(r.old_thread_id);
-						const float x = get_view_x(header.time);
-
-						if (new_iter.isValid()) draw_cswitch(x, r, new_iter.value(), true);
-						if (old_iter.isValid()) draw_cswitch(x, r, old_iter.value(), false);
-					}
-					break;
-				case profiler::EventType::COUNTER:
-				case profiler::EventType::PAUSE:
-					break;
-				default: ASSERT(false); break;
-			}
-			p += header.size;
-		}
-
-		if (gpu_open) {
-			if (lines > 0) ImGui::Dummy(ImVec2(to_x - from_x, lines * line_height));
-			ImGui::TreePop();
-		}
-
-		if (ImGui::IsMouseHoveringRect(ImVec2(from_x, from_y), ImVec2(to_x, ImGui::GetCursorScreenPos().y))) {
-			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-				m_end -= i64((ImGui::GetIO().MouseDelta.x / (to_x - from_x)) * m_range);
-			}
-			const u64 cursor = u64(((ImGui::GetMousePos().x - from_x) / (to_x - from_x)) * m_range) + view_start;
-			u64 cursor_to_end = m_end - cursor;
-			if (ImGui::GetIO().KeyCtrl) {
-				if (ImGui::GetIO().MouseWheel > 0 && m_range > 1) {
-					m_range >>= 1;
-					cursor_to_end >>= 1;
-				}
-				else if (ImGui::GetIO().MouseWheel < 0) {
-					m_range <<= 1;
-					cursor_to_end <<= 1;
-				}
-				m_end = cursor_to_end + cursor;
-			}
-		}
-	}
-
-	for (ThreadRecord& tr : m_threads) {
-		if (tr.last_context_switch.is_enter) {
-			const float x = get_view_x(tr.last_context_switch.time);
-			dl->AddLine(ImVec2(x + 10, tr.y + 10), ImVec2(x, tr.y + 10), 0xffffff00);
-		}
-		tr.last_context_switch.time = 0;
-	}
-
-	dl->ChannelsMerge();
-}
+} // anonymous namespace
 
 
 UniquePtr<ProfilerUI> ProfilerUI::create(StudioApp& app)
