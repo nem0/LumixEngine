@@ -787,15 +787,21 @@ struct CacheNode : Node {
 			const NodeInput input = getInput(0);
 			if (!input.node) return error("Invalid input");
 
+			m_cached = ctx.persistentRegister();
 			DataStream op0;
-			op0 = input.generate(ctx, op0, subindex);
+			op0 = input.generate(ctx, m_cached, subindex);
 			if (op0.isError()) return op0;
 
-			m_cached = ctx.persistentRegister();
-			ctx.write(InstructionType::MOV);
-			ctx.write(m_cached);
-			ctx.write(op0);
-			ctx.freeRegister(op0);
+			if (op0 != m_cached) {
+				ctx.write(InstructionType::MOV);
+				ctx.write(m_cached);
+				ctx.write(op0);
+				ctx.freeRegister(op0);
+			}
+
+			if (dst.type == DataStream::NONE) {
+				return m_cached;
+			}
 
 			ctx.write(InstructionType::MOV);
 			dst = ctx.streamOrRegister(dst);
@@ -1304,7 +1310,7 @@ struct StreamNode : Node {
 				ImGui::TextUnformatted(m_resource.m_streams[idx].name);
 			}
 			else {
-				ImGui::Text("%s.%s", m_resource.m_streams[idx].name, toString(channel));
+				ImGui::Text("%s.%s", m_resource.m_streams[idx].name.data, toString(channel));
 			}
 		}
 		else {
