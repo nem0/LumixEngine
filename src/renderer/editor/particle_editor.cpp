@@ -37,6 +37,7 @@ enum class Version {
 	MULTIEMITTER,
 	EMIT_NODE,
 	WORLD_SPACE,
+	STREAM_NODE_CHANNELS,
 
 	LAST
 };
@@ -49,6 +50,7 @@ enum class ValueType : i32 {
 
 struct Node;
 
+// TODO freeRegister is not called in some places event when possible - maybe design a better system?
 // TODO constant propagation
 
 struct GenerateContext {
@@ -171,7 +173,7 @@ struct Node : NodeEditorNode {
 	virtual DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) = 0;
 	virtual void beforeGenerate() {};
 	virtual void serialize(OutputMemoryStream& blob) const {}
-	virtual void deserialize(InputMemoryStream& blob) {}
+	virtual void deserialize(InputMemoryStream& blob, Version version) {}
 
 	NodeInput getInput(u8 input_idx);
 
@@ -413,7 +415,7 @@ struct ParticleEmitterEditorResource {
 			Node* n = addNode(type);
 			blob.read(n->m_id);
 			blob.read(n->m_pos);
-			n->deserialize(blob);
+			n->deserialize(blob, version);
 		}
 		colorLinks();
 		return true;
@@ -693,7 +695,7 @@ struct UnaryFunctionNode : Node {
 	Type getType() const override { return T; }
 
 	void serialize(OutputMemoryStream& blob) const override {}
-	void deserialize(InputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob, Version) override {}
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 		
@@ -874,7 +876,7 @@ struct GradientColorNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(count); blob.write(keys); blob.write(values); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -937,7 +939,7 @@ struct CurveNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(count); blob.write(keys); blob.write(values); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -979,7 +981,7 @@ struct ChannelMaskNode : Node {
 	Type getType() const override { return Type::CHANNEL_MASK; }
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(channel); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(channel); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(channel); }
 		
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1010,7 +1012,7 @@ struct EmitInputNode : Node {
 	Type getType() const override { return Type::EMIT_INPUT; }
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(idx); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(idx); }
 		
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
@@ -1059,7 +1061,7 @@ struct NoiseNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override {}
-	void deserialize(InputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob, Version) override {}
 
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1097,7 +1099,7 @@ struct RandomNode : Node {
 		blob.write(to);
 	}
 
-	void deserialize(InputMemoryStream& blob) override {
+	void deserialize(InputMemoryStream& blob, Version) override {
 		blob.read(from);
 		blob.read(to);
 	}
@@ -1143,7 +1145,7 @@ struct LiteralNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(value); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(value); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(value); }
 
 	bool onGUI() override {
 		outputSlot();
@@ -1182,7 +1184,7 @@ struct VectorNode : Node {
 		else blob.write(value);
 	}
 
-	void deserialize(InputMemoryStream& blob) override { 
+	void deserialize(InputMemoryStream& blob, Version) override { 
 		if constexpr (T == Node::VEC3) {
 			Vec3 v = blob.read<Vec3>();
 			value = Vec4(v, 0);
@@ -1251,6 +1253,8 @@ struct VectorNode : Node {
 };
 
 struct StreamNode : Node {
+	enum Channel : u8 { ALL, X, Y, Z, W };
+
 	StreamNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 	Type getType() const override { return Type::STREAM; }
@@ -1262,17 +1266,45 @@ struct StreamNode : Node {
 
 		DataStream r;
 		r.type = DataStream::CHANNEL;
-		r.index = m_resource.getChannelIndex(idx, subindex);
+		switch (channel) {
+			case ALL : r.index = m_resource.getChannelIndex(idx, subindex); break;
+			case X : r.index = m_resource.getChannelIndex(idx, 0); break;
+			case Y : r.index = m_resource.getChannelIndex(idx, 1); break;
+			case Z : r.index = m_resource.getChannelIndex(idx, 2); break;
+			case W : r.index = m_resource.getChannelIndex(idx, 3); break;
+		}
 		return r;
 	}
 
-	void serialize(OutputMemoryStream& blob) const override { blob.write(idx); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
+	static const char* toString(Channel c) {
+		switch (c) {
+			case X: return "x";
+			case Y: return "y";
+			case Z: return "z";
+			case W: return "w";
+			case ALL: return "";
+		}
+		ASSERT(false);
+		return "ERROR";
+	}
+
+	void serialize(OutputMemoryStream& blob) const override { blob.write(idx); blob.write(channel); }
+	void deserialize(InputMemoryStream& blob, Version version) override {
+		blob.read(idx);
+		if (version > Version::STREAM_NODE_CHANNELS) {
+			blob.read(channel);
+		}
+	}
 
 	bool onGUI() override {
 		outputSlot();
 		if (idx < m_resource.m_streams.size()) {
-			ImGui::TextUnformatted(m_resource.m_streams[idx].name);
+			if (channel == ALL) {
+				ImGui::TextUnformatted(m_resource.m_streams[idx].name);
+			}
+			else {
+				ImGui::Text("%s.%s", m_resource.m_streams[idx].name, toString(channel));
+			}
 		}
 		else {
 			ImGui::TextUnformatted(ICON_FA_EXCLAMATION "Deleted stream");
@@ -1281,6 +1313,7 @@ struct StreamNode : Node {
 	}
 
 	u8 idx;
+	Channel channel = ALL;
 };
 
 struct InitNode : Node {
@@ -1419,7 +1452,7 @@ struct SelectNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override {}
-	void deserialize(InputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob, Version) override {}
 
 	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
@@ -1479,7 +1512,7 @@ struct CompareNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(op); blob.write(value); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(op); blob.read(value); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(op); blob.read(value); }
 
 	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
@@ -1678,7 +1711,7 @@ struct LogicOpNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override {}
-	void deserialize(InputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob, Version) override {}
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -1720,7 +1753,7 @@ struct SetChannelNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(channel); }
-	void deserialize(InputMemoryStream& blob) override {  blob.read(channel);  }
+	void deserialize(InputMemoryStream& blob, Version) override {  blob.read(channel);  }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -1779,7 +1812,7 @@ struct Vec3LengthNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override {}
-	void deserialize(InputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob, Version) override {}
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -1819,7 +1852,7 @@ struct ColorMixNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(color0); blob.write(color1); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(color0); blob.read(color1); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(color0); blob.read(color1); }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -1846,7 +1879,7 @@ struct MaddNode : Node {
 	Type getType() const override { return Type::MADD; }
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(value1); blob.write(value2); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(value1); blob.read(value2); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(value1); blob.read(value2); }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -1945,7 +1978,7 @@ struct BinaryOpNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(value); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(value); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(value); }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -2028,7 +2061,7 @@ struct ConstNode : Node {
 	Type getType() const override { return Type::CONST; }
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(constant); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(constant); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(constant); }
 		
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
@@ -2070,7 +2103,7 @@ struct EmitNode : Node {
 	Type getType() const override { return Type::EMIT; }
 
 	void serialize(OutputMemoryStream& blob) const override { blob.write(emitter_idx); }
-	void deserialize(InputMemoryStream& blob) override { blob.read(emitter_idx); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(emitter_idx); }
 		
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return false; }
@@ -2301,17 +2334,38 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 
 		if (visitor.beginCategory("Streams")) {
+			struct : ICategoryVisitor::INodeCreator {
+				Node* create(ParticleEmitterEditorResource& res) const override {
+					auto* n = (StreamNode*)res.addNode(Node::STREAM);
+					n->idx = i;
+					n->channel = channel;
+					return n;
+				}
+				u8 i;
+				StreamNode::Channel channel;
+			} creator;
 			for (u8 i = 0; i < m_active_emitter->m_streams.size(); ++i) {
-				struct : ICategoryVisitor::INodeCreator {
-					Node* create(ParticleEmitterEditorResource& res) const override {
-						auto* n = (StreamNode*)res.addNode(Node::STREAM);
-						n->idx = i;
-						return n;
-					}
-					u8 i;
-				} creator;
 				creator.i = i;
-				visitor.visitType(m_active_emitter->m_streams[i].name, creator);
+				ParticleEmitterEditorResource::Stream& stream = m_active_emitter->m_streams[i];
+				if (stream.type == ValueType::FLOAT) {
+					creator.channel = StreamNode::ALL;
+					visitor.visitType(stream.name, creator);
+				}
+				else {
+					if (visitor.beginCategory(stream.name)) {
+						for (u32 ch = 0; ch < 5; ++ch) {
+							if (stream.type == ValueType::VEC3 && ch == StreamNode::W) continue;
+
+							creator.channel = (StreamNode::Channel)ch;
+							if (ch == StreamNode::ALL) visitor.visitType(stream.name, creator);
+							else {
+								StaticString<128> name(stream.name, ".", StreamNode::toString(creator.channel));
+								visitor.visitType(name, creator);
+							}
+						}
+						visitor.endCategory();
+					}
+				}
 			}
 			visitor.endCategory();
 		}
