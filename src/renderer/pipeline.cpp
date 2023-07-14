@@ -2669,7 +2669,7 @@ struct PipelineImpl final : Pipeline
 					stream->useProgram(program);
 					stream->bindIndexBuffer(gpu::INVALID_BUFFER);
 					stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-					stream->bindVertexBuffer(1, slice.buffer, slice.offset, 40);
+					stream->bindVertexBuffer(1, slice.buffer, slice.offset, decl.getStride());
 					stream->drawArraysInstanced(4, particles_count);
 					break;
 				}

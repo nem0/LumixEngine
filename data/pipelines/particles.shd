@@ -18,8 +18,10 @@ surface_shader_ex({
 		layout(location = 2) in vec4 i_color;
 		layout(location = 3) in float i_rot;
 		layout(location = 4) in float i_frame;
+		layout(location = 5) in float i_emission;
 		layout(location = 0) out vec2 v_uv;
 		layout(location = 1) out vec4 v_color;
+		layout(location = 2) out float v_emission;
 	]],
 	vertex = [[
 		vec2 pos = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
@@ -35,11 +37,13 @@ surface_shader_ex({
 		pos *= i_scale;
 		
 		v_color = i_color;
+		v_emission = i_emission;
 		gl_Position = Pass.projection * ((Pass.view * u_model * vec4(i_position.xyz, 1)) + vec4(pos.xy, 0, 0));
 	]],
 	fragment_preface = [[
 		layout(location = 0) in vec2 v_uv;
 		layout(location = 1) in vec4 v_color;
+		layout(location = 2) in float v_emission;
 	]],
 	fragment = [[
 		vec4 c = texture(t_texture, v_uv) * saturate(v_color);
@@ -48,7 +52,7 @@ surface_shader_ex({
 		data.wpos = vec3(0);
 		data.albedo = c.rgb;
 		data.alpha = c.a;
-		data.emission = 1;
+		data.emission = v_emission;
 		data.shadow = 1;
 		data.ao = 1;
 		data.roughness = 1;

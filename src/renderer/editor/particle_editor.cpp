@@ -464,6 +464,7 @@ struct ParticleEmitterEditorResource {
 		m_outputs.back().type = ValueType::VEC4;
 		m_outputs.emplace().name = "rotation";
 		m_outputs.emplace().name = "frame";
+		m_outputs.emplace().name = "emission";
 
 		addNode(Node::Type::UPDATE);
 		addNode(Node::Type::OUTPUT)->m_pos = ImVec2(100, 300);
