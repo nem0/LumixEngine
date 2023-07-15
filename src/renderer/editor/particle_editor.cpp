@@ -1632,6 +1632,9 @@ struct SwitchNode : Node {
 	bool hasOutputPins() const override { return true; }
 	Type getType() const override { return Type::SWITCH; }
 
+	void serialize(OutputMemoryStream& blob) const override { blob.write(m_is_on); }
+	void deserialize(InputMemoryStream& blob, Version) override { blob.read(m_is_on); }
+
 	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input = getInput(m_is_on ? 0 : 1);
 		if (!input.node) return error("Invalid input");
