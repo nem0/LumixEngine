@@ -423,8 +423,7 @@ struct ProcessHelper {
 	}
 
 	static float4 mix(float4 a, float4 b, float4 c) {
-		float4 invc = f4Sub(f4Splat(1.f), c);
-		return f4Add(f4Mul(b, c), f4Mul(a, invc));
+		return f4Add(a, f4Mul(f4Sub(b, a), c));
 	}
 
 	template <auto F>
@@ -954,12 +953,13 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				u32 count = ip.read<u32>();
 				float keys[8];
 				float values[8];
+				ASSERT(count <= lengthOf(keys));
 				ip.read(keys, sizeof(keys[0]) * count);
 				ip.read(values, sizeof(values[0]) * count);
 
 				float ms[8];
 				for (u32 i = 1; i < count; ++i) {
-					ms[i] = values[i] - values[i - 1] / (keys[i] - keys[i - 1]);
+					ms[i] = (values[i] - values[i - 1]) / (keys[i] - keys[i - 1]);
 				}
 
 				ASSERT(dst.type == DataStream::OUT);
