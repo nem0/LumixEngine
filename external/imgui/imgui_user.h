@@ -37,7 +37,8 @@ IMGUI_API int CurveEditor(const char* label
 	, const ImVec2& size = ImVec2(-1, -1)
 	, ImU32 flags = 0
 	, int* new_count = nullptr
-	, int* selected_point = nullptr);
+	, int* selected_point = nullptr
+	, int* hovered_point = nullptr);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
 IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void VSplitter(const char* str_id, ImVec2* size);

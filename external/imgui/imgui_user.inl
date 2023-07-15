@@ -557,7 +557,8 @@ namespace ImGuiEx {
 		, const ImVec2& editor_size
 		, ImU32 flags
 		, int* new_count
-		, int* selected_point)
+		, int* selected_point
+		, int* hovered_point)
 	{
 		enum class StorageValues : ImGuiID
 		{
@@ -578,6 +579,7 @@ namespace ImGuiEx {
 		ImVec2 size = editor_size;
 		size.x = size.x < 0 ? CalcItemWidth() + (style.FramePadding.x * 2) : size.x;
 		size.y = size.y < 0 ? HEIGHT : size.y;
+		if (hovered_point) *hovered_point = -1;
 
 		ImGuiWindow* parent_window = GetCurrentWindow();
 		ImGuiID id = parent_window->GetID(label);
@@ -703,9 +705,12 @@ namespace ImGuiEx {
 			}
 		}
 
+		const ImGuiID dragger_id = GetID("##_node_dragger");
+		ItemAdd(inner_bb, dragger_id);
+
 		if (GetIO().MouseWheel != 0 && IsItemHovered())
 		{
-			float scale = powf(2, GetIO().MouseWheel);
+			float scale = powf(2, -GetIO().MouseWheel);
 			width *= scale;
 			height *= scale;
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::WIDTH, width);
@@ -980,6 +985,8 @@ namespace ImGuiEx {
 				}
 			}
 		}
+
+		if (hovered_point) *hovered_point = hovered_idx;
 
 		EndChildFrame();
 		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);

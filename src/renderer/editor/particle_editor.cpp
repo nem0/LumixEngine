@@ -951,35 +951,95 @@ struct CurveNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
+	static ImVec2 ImMax(const ImVec2& lhs, const ImVec2& rhs) {
+		return ImVec2(lhs.x >= rhs.x ? lhs.x : rhs.x, lhs.y >= rhs.y ? lhs.y : rhs.y);
+	}
+	
+	static ImVec2 ImMin(const ImVec2& lhs, const ImVec2& rhs) {
+		return ImVec2(lhs.x < rhs.x ? lhs.x : rhs.x, lhs.y < rhs.y ? lhs.y : rhs.y);
+	}
+
 	bool onGUI() override {
 		ImGuiEx::NodeTitle("Curve");
 
 		inputSlot(); 
 		outputSlot();
 
-		int new_count;
-		float tmp[16];
+		if (ImGui::InvisibleButton("curve", ImVec2(150, 30))) {
+			ImGui::OpenPopup("Edit curve");
+			fit_curve_in_editor = true;
+		}
+		const ImVec2 from = ImGui::GetItemRectMin();
+		const ImVec2 to = ImGui::GetItemRectMax();
+		
+		ImVec2 points_max(-FLT_MAX, -FLT_MAX);
+		ImVec2 points_min(FLT_MAX, FLT_MAX);
 		for (u32 i = 0; i < count; ++i) {
-			tmp[i * 2] = keys[i];
-			tmp[i * 2 + 1] = values[i];
+			ImVec2 point(keys[i], values[i]);
+			points_max = ImMax(points_max, point);
+			points_min = ImMin(points_min, point);
 		}
 
-		int flags = (int)ImGuiEx::CurveEditorFlags::NO_TANGENTS;
-		if (ImGuiEx::CurveEditor("##curve", tmp, count, lengthOf(tmp) / 2, ImVec2(150, 150), flags, &new_count) >= 0 || new_count != count) {
-			for (i32 i = 0; i < new_count; ++i) {
-				keys[i] = tmp[i * 2];
-				values[i] = tmp[i * 2 + 1];
-				count = new_count;
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const ImU32 col = ImGui::GetColorU32(ImGuiCol_PlotLinesHovered);
+		auto to_preview = [&](u32 i) -> ImVec2 {
+			return {
+				from.x + (keys[i] - points_min.x) / (points_max.x - points_min.x) * (to.x - from.x),
+				to.y - (values[i] - points_min.y) / (points_max.y - points_min.y) * (to.y - from.y)
+			};
+		};
+		for (u32 i = 1; i < count; ++i) {
+			dl->AddLine(to_preview(i - 1), to_preview(i), col);
+		}
+		
+		bool res = false;
+		bool open = true;
+		if (ImGui::BeginPopupModal("Edit curve", &open)) {
+			int new_count;
+			float tmp[16];
+			for (u32 i = 0; i < count; ++i) {
+				tmp[i * 2] = keys[i];
+				tmp[i * 2 + 1] = values[i];
 			}
-			return true;
-		}
 
-		return false;
+			int flags = (int)ImGuiEx::CurveEditorFlags::NO_TANGENTS | (int)ImGuiEx::CurveEditorFlags::SHOW_GRID;
+			if (fit_curve_in_editor) {
+				fit_curve_in_editor = false;
+				flags |= (int)ImGuiEx::CurveEditorFlags::RESET;
+			}
+			i32 hovered_point = -1;
+			if (ImGuiEx::CurveEditor("##curve", tmp, count, lengthOf(tmp) / 2, ImGui::GetContentRegionAvail(), flags, &new_count, nullptr, &hovered_point) >= 0 || new_count != count) {
+				for (i32 i = 0; i < new_count; ++i) {
+					keys[i] = tmp[i * 2];
+					values[i] = tmp[i * 2 + 1];
+					count = new_count;
+				}
+				res = true;
+			}
+
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+				hovered_context_point = hovered_point;
+				ImGui::OpenPopup("curve");
+			}
+
+			if (ImGui::BeginPopup("curve", ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings)) {
+				if (ImGui::Selectable("Fit data")) fit_curve_in_editor = true;
+				if (hovered_context_point >= 0 && hovered_context_point < (i32)count) {
+					res = ImGui::DragFloat("X", &keys[hovered_context_point]) || res;
+					res = ImGui::DragFloat("Y", &values[hovered_context_point]) || res;
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::EndPopup();
+		}
+		return res;
 	}
 
 	u32 count = 2;
 	float keys[8] = {0, 1};
 	float values[8] = {0, 1};
+	bool fit_curve_in_editor = false;
+	i32 hovered_context_point = -1;
 };
 
 struct ChannelMaskNode : Node {
