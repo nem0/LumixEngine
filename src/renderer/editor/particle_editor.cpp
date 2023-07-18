@@ -2666,6 +2666,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 			}
 		}
+		os::destroyFileIterator(iter);
 	}
 
 	void addFunction(const Path& path) {
