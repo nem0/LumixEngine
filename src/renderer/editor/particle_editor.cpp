@@ -111,6 +111,11 @@ struct GenerateContext {
 
 		return v;
 	}
+	
+	struct FunctionInput {
+		u64 guid;
+		Node* node = nullptr;
+	};
 
 	OutputMemoryStream& ip;
 	Context context;
@@ -118,6 +123,7 @@ struct GenerateContext {
 	u16 m_persistent_register_mask = 0;
 	u8 m_registers_count = 0;
 	u32 m_instruction_count = 0;
+	FunctionInput m_function_inputs[16] = {};
 };
 
 struct NodeInput {
@@ -141,7 +147,7 @@ struct Node : NodeEditorNode {
 		SIN,
 		MADD,
 		CMP,
-		COLOR_MIX,
+		FREE0,
 		CURVE,
 		GRADIENT_COLOR,
 		VEC3,
@@ -163,7 +169,10 @@ struct Node : NodeEditorNode {
 		OR,
 		AND,
 		SET_CHANNEL,
-		SELECT
+		SELECT,
+		FUNCTION_OUTPUT,
+		FUNCTION_CALL,
+		FUNCTION_INPUT
 	};
 
 	Node(struct ParticleEmitterEditorResource& res);
@@ -174,6 +183,7 @@ struct Node : NodeEditorNode {
 	virtual void beforeGenerate() {};
 	virtual void serialize(OutputMemoryStream& blob) const {}
 	virtual void deserialize(InputMemoryStream& blob, Version version) {}
+	virtual bool canDelete() const { return true; }
 
 	NodeInput getInput(u8 input_idx);
 
@@ -235,6 +245,11 @@ static u32 getCount(ValueType type) {
 	ASSERT(false);
 	return 1;
 }
+
+enum class ParticleSystemResourceType : u32 {
+	SYSTEM,
+	FUNCTION
+};
 
 struct ParticleEmitterEditorResource {
 	struct EmitInput {
@@ -452,23 +467,32 @@ struct ParticleEmitterEditorResource {
 		}
 	}
 
-	void initDefault() {
-		m_streams.emplace().name = "pos";
-		m_streams.back().type = ValueType::VEC3;
-		m_streams.emplace().name = "life";
+	void initDefault(ParticleSystemResourceType type) {
+		switch (type) {
+			case ParticleSystemResourceType::SYSTEM: {
+				m_streams.emplace().name = "pos";
+				m_streams.back().type = ValueType::VEC3;
+				m_streams.emplace().name = "life";
 
-		m_outputs.emplace().name = "pos";
-		m_outputs.back().type = ValueType::VEC3;
-		m_outputs.emplace().name = "scale";
-		m_outputs.emplace().name = "color";
-		m_outputs.back().type = ValueType::VEC4;
-		m_outputs.emplace().name = "rotation";
-		m_outputs.emplace().name = "frame";
-		m_outputs.emplace().name = "emission";
+				m_outputs.emplace().name = "pos";
+				m_outputs.back().type = ValueType::VEC3;
+				m_outputs.emplace().name = "scale";
+				m_outputs.emplace().name = "color";
+				m_outputs.back().type = ValueType::VEC4;
+				m_outputs.emplace().name = "rotation";
+				m_outputs.emplace().name = "frame";
+				m_outputs.emplace().name = "emission";
 
-		addNode(Node::Type::UPDATE);
-		addNode(Node::Type::OUTPUT)->m_pos = ImVec2(100, 300);
-		addNode(Node::Type::INIT)->m_pos = ImVec2(100, 200);
+				addNode(Node::Type::UPDATE);
+				addNode(Node::Type::OUTPUT)->m_pos = ImVec2(100, 300);
+				addNode(Node::Type::INIT)->m_pos = ImVec2(100, 200);
+				break;
+			}
+			case ParticleSystemResourceType::FUNCTION: {
+				addNode(Node::Type::FUNCTION_OUTPUT);
+				break;
+			}
+		}
 	}
 
 	bool generate() {
@@ -618,11 +642,17 @@ struct ParticleSystemEditorResource {
 		Version version = Version::LAST;
 	};
 	
-	ParticleSystemEditorResource(IAllocator& allocator) 
+	ParticleSystemEditorResource(StudioApp& app, IAllocator& allocator) 
 		: m_emitters(allocator)
 		, m_allocator(allocator)
+		, m_name(allocator)
+		, m_app(app)
 	{
 		addEmitter();
+	}
+
+	bool isFunction() const {
+		return m_emitters[0]->m_nodes.size() == 0 || m_emitters[0]->m_nodes[0]->getType() != Node::UPDATE;
 	}
 
 	void serialize(OutputMemoryStream& blob) {
@@ -658,9 +688,13 @@ struct ParticleSystemEditorResource {
 			m_emitters.push(emitter.move());
 		}
 
-		for (UniquePtr<ParticleEmitterEditorResource>& emitter : m_emitters) {
-			if (!emitter->generate()) return false;
+		if (!isFunction()) {
+			for (UniquePtr<ParticleEmitterEditorResource>& emitter : m_emitters) {
+				if (!emitter->generate()) return false;
+			}
 		}
+		m_path = path;
+		m_name = Path::getBasename(path);
 		return true;
 	}
 
@@ -684,8 +718,36 @@ struct ParticleSystemEditorResource {
 		return res;
 	}
 
-	Array<UniquePtr<ParticleEmitterEditorResource>> m_emitters;
+	Node* getFunctionOutput(u32 idx) {
+		for (u32 i = 0, c = m_emitters[0]->m_nodes.size(); i < c; ++i) {
+			if (m_emitters[0]->m_nodes[i]->getType() == Node::FUNCTION_OUTPUT) return m_emitters[0]->m_nodes[i];
+		}
+		return nullptr;
+	}
+
+	u32 getFunctionInputsCount() const {
+		ASSERT(m_emitters.size() == 1);
+		u32 count = 0;
+		for (u32 i = 0, c = m_emitters[0]->m_nodes.size(); i < c; ++i) {
+			if (m_emitters[0]->m_nodes[i]->getType() == Node::FUNCTION_INPUT) ++count;
+		}
+		return count;
+	}
+
+	u32 getFunctionOutputsCount() const {
+		ASSERT(m_emitters.size() == 1);
+		u32 count = 0;
+		for (u32 i = 0, c = m_emitters[0]->m_nodes.size(); i < c; ++i) {
+			if (m_emitters[0]->m_nodes[i]->getType() == Node::FUNCTION_OUTPUT) ++count;
+		}
+		return count;
+	}
+
+	StudioApp& m_app;
 	IAllocator& m_allocator;
+	Array<UniquePtr<ParticleEmitterEditorResource>> m_emitters;
+	Path m_path;
+	String m_name;
 	bool m_world_space = false;
 };
 
@@ -865,20 +927,35 @@ struct GradientColorNode : Node {
 		const NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 
-		DataStream op0 = input.generate(ctx, {}, subindex);
-		if (op0.isError()) return op0;
+		DataStream t = input.generate(ctx, {}, subindex);
+		if (t.isError()) return t;
 
 		dst = ctx.streamOrRegister(dst);
+
+		if (count == 2 && fabsf(keys[0]) < 0.001f && fabsf(keys[1] - 1) < 0.001f) {
+			DataStream op0, op1;
+			op0.type = DataStream::LITERAL;
+			op0.value = values[0][subindex];
+			op1.type = DataStream::LITERAL;
+			op1.value = values[1][subindex];
+			ctx.write(InstructionType::MIX);
+			ctx.write(dst);
+			ctx.write(op0);
+			ctx.write(op1);
+			ctx.write(t);
+			return dst;
+		}
+
 		ctx.write(InstructionType::GRADIENT);
 		ctx.write(dst);
-		ctx.write(op0);
+		ctx.write(t);
 		ctx.write(count);
 		ctx.write(keys, sizeof(keys[0]) * count);
 		for (u32 i = 0; i < count; ++i) {
 			ctx.write(values[i][subindex]);
 		}
 
-		ctx.freeRegister(op0);
+		ctx.freeRegister(t);
 		return dst;
 	}
 
@@ -994,6 +1071,7 @@ struct CurveNode : Node {
 		
 		bool res = false;
 		bool open = true;
+		ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::BeginPopupModal("Edit curve", &open)) {
 			int new_count;
 			float tmp[16];
@@ -1203,8 +1281,6 @@ struct LiteralNode : Node {
 	bool hasOutputPins() const override { return true; }
 
 	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
-		if (subindex > 0) return error("Invalid subindex");
-
 		DataStream r;
 		r.type = DataStream::LITERAL;
 		r.value = value;
@@ -1389,6 +1465,7 @@ struct InitNode : Node {
 	Type getType() const override { return Type::INIT; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return false; }
+	bool canDelete() const override { return false; }
 
 	bool onGUI() override {
 		ImGuiEx::NodeTitle(ICON_FA_PLUS " Init", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
@@ -1448,6 +1525,7 @@ struct UpdateNode : Node {
 	Type getType() const override { return Type::UPDATE; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return false; }
+	bool canDelete() const override { return false; }
 
 	bool onGUI() override {
 		ImGuiEx::NodeTitle(ICON_FA_CLOCK " Update", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
@@ -1496,6 +1574,283 @@ struct UpdateNode : Node {
 		}
 		return {};
 	}
+};
+
+
+struct FunctionInputNode : Node {
+	FunctionInputNode(ParticleEmitterEditorResource& res)
+		: Node(res)
+		, m_name(res.m_allocator)
+	{
+		m_guid = randGUID();
+	}
+		
+	Type getType() const override { return Type::FUNCTION_INPUT; }
+
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+	
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.writeString(m_name.c_str());
+		blob.write(m_guid);
+	}
+	
+	void deserialize(InputMemoryStream& blob, Version) override {
+		m_name = blob.readString();
+		blob.read(m_guid);
+	}
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle("Function input", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
+		outputSlot();
+		return inputString("Name", &m_name);
+	}
+
+	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+		for (const GenerateContext::FunctionInput& i : ctx.m_function_inputs) {
+			if (i.guid == m_guid && i.node) {
+				return i.node->generate(ctx, dst, subindex);
+			}
+		}
+		return error("Invalid input");
+	}
+
+	String m_name;
+	u64 m_guid;
+};
+
+struct FunctionOutputNode : Node {
+	FunctionOutputNode(ParticleEmitterEditorResource& res)
+		: Node(res)
+		, m_name(res.m_allocator)
+	{
+		m_guid = randGUID();
+	}
+		
+	Type getType() const override { return Type::FUNCTION_OUTPUT; }
+
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return false; }
+	
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.writeString(m_name.c_str());
+		blob.write(m_guid);
+	}
+	
+	void deserialize(InputMemoryStream& blob, Version) override {
+		m_name = blob.readString();
+		blob.read(m_guid);
+	}
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle("Function output", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
+		inputSlot();
+		return inputString("Name", &m_name);
+	}
+
+	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+		NodeInput input = getInput(0);
+		if (!input.node) return error("Invalid input");
+		
+		return input.generate(ctx, dst, subindex);
+	}
+
+	String m_name;
+	u64 m_guid;
+};
+
+struct FunctionCallNode : Node {
+	// TODO multiple outputs
+	// TODO remove inputs which do not exist in funcion anymore and are not connected
+	FunctionCallNode(ParticleEmitterEditorResource& res)
+		: Node(res)
+		, m_inputs(res.m_allocator)
+		, m_outputs(res.m_allocator)
+	{}
+		
+	Type getType() const override { return Type::FUNCTION_CALL; }
+
+	bool hasInputPins() const override { return !m_inputs.empty(); }
+	bool hasOutputPins() const override { return !m_outputs.empty(); }
+
+	void setFunction(const Path& path, FileSystem& fs) {
+		IAllocator& allocator = m_resource.m_allocator;
+		StudioApp& app = m_resource.m_system.m_app;
+		m_function = UniquePtr<ParticleSystemEditorResource>::create(allocator, app, allocator);
+		OutputMemoryStream blob(allocator);
+		if (fs.getContentSync(path, blob)) {
+			InputMemoryStream iblob(blob);
+			if (m_function->deserialize(iblob, path)) {
+				for (Node* n : m_function->m_emitters[0]->m_nodes) {
+					switch (n->getType()) {
+						case Node::FUNCTION_OUTPUT: {
+							Output& i = m_outputs.emplace(m_resource.m_allocator);
+							auto* fn = (FunctionOutputNode*)n;
+							i.name = fn->m_name;
+							i.guid = fn->m_guid;
+							break;
+						}
+						case Node::FUNCTION_INPUT: {
+							Input& i = m_inputs.emplace(m_resource.m_allocator);
+							auto* fn = (FunctionInputNode*)n;
+							i.name = fn->m_name;
+							i.guid = fn->m_guid;
+							break;
+						}
+						default: break;
+
+					}
+				}			
+			}
+		}
+		else {
+			logError("Failed to read ", path);
+		}
+	}
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.writeString(m_function->m_path.c_str());
+		blob.write(m_inputs.size());
+		for (const Input& i : m_inputs) {
+			blob.writeString(i.name.c_str());
+			blob.write(i.guid);
+		}
+		blob.write(m_outputs.size());
+		for (const Output& i : m_outputs) {
+			blob.writeString(i.name.c_str());
+			blob.write(i.guid);
+		}
+	}
+	
+	void deserialize(InputMemoryStream& blob, Version) override {
+		const char* path = blob.readString();
+		IAllocator& allocator = m_resource.m_allocator;
+		StudioApp& app = m_resource.m_system.m_app;
+		m_function = UniquePtr<ParticleSystemEditorResource>::create(allocator, app, allocator);
+		{
+			OutputMemoryStream fnblob(allocator);
+			FileSystem& fs = app.getEngine().getFileSystem();
+			if (fs.getContentSync(Path(path), fnblob)) {
+				InputMemoryStream iblob(fnblob);
+				m_function->deserialize(iblob, path);
+			}
+			else {
+				logError("Failed to read ", path);
+			}
+		}
+
+		u32 count;
+		blob.read(count);
+		for (u32 i = 0; i < count; ++i) {
+			Input& input = m_inputs.emplace(m_resource.m_allocator);
+			input.name = blob.readString();
+			blob.read(input.guid);
+			input.removed = true;
+		}
+
+		blob.read(count);
+		for (u32 i = 0; i < count; ++i) {
+			Output& output = m_outputs.emplace(m_resource.m_allocator);
+			output.name = blob.readString();
+			blob.read(output.guid);
+			output.removed = true;
+		}
+
+		for (Node* n : m_function->m_emitters[0]->m_nodes) {
+			switch (n->getType()) {
+				case Node::FUNCTION_OUTPUT: {
+					FunctionOutputNode* on = (FunctionOutputNode*)n;
+					const u64 guid = on->m_guid;
+					bool found = false;
+					for (Output& i : m_outputs) {
+						if (i.guid == guid) {
+							i.removed = false;
+							found = true;
+							break;
+						}
+					}
+					if (!found) {
+						Output& output = m_outputs.emplace(m_resource.m_allocator);
+						output.name = on->m_name;
+						output.guid = on->m_guid;
+						
+					}
+					break;
+				}
+				case Node::FUNCTION_INPUT: {
+					FunctionInputNode* on = (FunctionInputNode*)n;
+					const u64 guid = on->m_guid;
+					bool found = false;
+					for (Input& i : m_inputs) {
+						if (i.guid == guid) {
+							i.removed = false;
+							found = true;
+							break;
+						}
+					}
+					if (!found) {
+						Input& input = m_inputs.emplace(m_resource.m_allocator);
+						input.name = on->m_name;
+						input.guid = on->m_guid;
+					}
+					break;
+				}
+				default: break;
+			}
+		}
+	}
+
+	bool onGUI() override {
+		ImGuiEx::NodeTitle(m_function->m_name.c_str());
+		ImGui::BeginGroup();
+		for (const Input& i : m_inputs) {
+			inputSlot();
+			if (i.removed) {
+				ImGui::Text("%s (removed)", i.name.c_str());
+			}
+			else {
+				ImGui::TextUnformatted(i.name.c_str());
+			}
+		}
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		ImGui::BeginGroup();
+		for (const Output& i : m_outputs) {
+			outputSlot();
+			if (i.removed) {
+				ImGui::Text("%s (removed)", i.name.c_str());
+			}
+			else {
+				ImGui::TextUnformatted(i.name.c_str());
+			}
+		}
+		ImGui::EndGroup();
+		return false;
+	}
+
+	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+		Node* output_node = m_function->getFunctionOutput(0);
+		// TODO function in function
+		for (u32 i = 0; i < (u32)m_inputs.size(); ++i) {
+			NodeInput input = getInput(i);
+			ctx.m_function_inputs[i].node = input.node;
+			ctx.m_function_inputs[i].guid = m_inputs[i].guid;
+		}
+		return output_node->generate(ctx, dst, subindex);
+	}
+
+	struct Input {
+		Input(IAllocator& allocator) : name(allocator) {}
+		String name;
+		u64 guid;
+		bool removed = false;
+	};
+
+	using Output = Input;
+
+	UniquePtr<ParticleSystemEditorResource> m_function;
+	Array<Input> m_inputs;
+	Array<Output> m_outputs;
 };
 
 struct SelectNode : Node {
@@ -1687,6 +2042,7 @@ struct OutputNode : Node {
 	Type getType() const override { return Type::OUTPUT; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return false; }
+	bool canDelete() const override { return false; }
 
 	bool onGUI() override {
 		ImGuiEx::NodeTitle(ICON_FA_EYE " Output", ImGui::GetColorU32(ImGuiCol_PlotLinesHovered));
@@ -1895,54 +2251,6 @@ struct Vec3LengthNode : Node {
 	}
 };
 
-struct ColorMixNode : Node {
-	ColorMixNode(ParticleEmitterEditorResource& res) : Node(res) {}
-
-	Type getType() const override { return Type::COLOR_MIX; }
-
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
-		const NodeInput input = getInput(0);
-		if (!input.node) return error("Invalid input");
-
-		const DataStream w = input.generate(ctx, {}, subindex);
-		if (w.isError()) return w;
-
-		ctx.write(InstructionType::MIX);
-		DataStream dst, op0, op1;
-		dst = ctx.streamOrRegister(DataStream());
-		op0.type = DataStream::LITERAL;
-		op0.value = *(&color0.x + subindex);
-		op1.type = DataStream::LITERAL;
-		op1.value = *(&color1.x + subindex);
-		ctx.write(dst);
-		ctx.write(op0);
-		ctx.write(op1);
-		ctx.write(w);
-		return dst;
-	}
-
-	void serialize(OutputMemoryStream& blob) const override { blob.write(color0); blob.write(color1); }
-	void deserialize(InputMemoryStream& blob, Version) override { blob.read(color0); blob.read(color1); }
-	bool hasInputPins() const override { return true; }
-	bool hasOutputPins() const override { return true; }
-
-	bool onGUI() override {
-		ImGui::BeginGroup();
-		inputSlot(); ImGui::TextUnformatted("Weight");
-		bool changed = ImGui::ColorEdit4("A", &color0.x, ImGuiColorEditFlags_NoInputs);
-		changed = ImGui::ColorEdit4("B", &color1.x, ImGuiColorEditFlags_NoInputs) || changed;
-		ImGui::EndGroup();
-			
-		ImGui::SameLine();
-		outputSlot();
-			
-		return changed;
-	}
-
-	Vec4 color0 = Vec4(1);
-	Vec4 color1 = Vec4(1);
-};
-
 struct MaddNode : Node {
 	MaddNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
@@ -2032,6 +2340,7 @@ struct MaddNode : Node {
 	float value2 = 0;
 };
 
+// TODO optimize +0, *1, -0, /1, e.g v + Vec3(0, y, 0)
 template <InstructionType OP_TYPE>
 struct BinaryOpNode : Node {
 	BinaryOpNode(ParticleEmitterEditorResource& res) : Node(res) {}
@@ -2237,7 +2546,7 @@ struct EmitNode : Node {
 };
 
 Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
-		Node* node;
+		Node* node = nullptr;
 		switch(type) {
 			case Node::CMP: node = LUMIX_NEW(m_allocator, CompareNode)(*this); break;
 			case Node::MESH: node = LUMIX_NEW(m_allocator, MeshNode)(*this); break;
@@ -2253,10 +2562,12 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
 			case Node::SELECT: node = LUMIX_NEW(m_allocator, SelectNode)(*this); break;
 			case Node::SET_CHANNEL: node = LUMIX_NEW(m_allocator, SetChannelNode)(*this); break;
+			case Node::FUNCTION_INPUT: node = LUMIX_NEW(m_allocator, FunctionInputNode)(*this); break;
+			case Node::FUNCTION_OUTPUT: node = LUMIX_NEW(m_allocator, FunctionOutputNode)(*this); break;
+			case Node::FUNCTION_CALL: node = LUMIX_NEW(m_allocator, FunctionCallNode)(*this); break;
 			case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
 			case Node::OR: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::OR>)(*this); break;
 			case Node::AND: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::AND>)(*this); break;
-			case Node::COLOR_MIX: node = LUMIX_NEW(m_allocator, ColorMixNode)(*this); break;
 			case Node::MADD: node = LUMIX_NEW(m_allocator, MaddNode)(*this); break;
 			case Node::SWITCH: node = LUMIX_NEW(m_allocator, SwitchNode)(*this); break;
 			case Node::RANDOM: node = LUMIX_NEW(m_allocator, RandomNode)(*this); break;
@@ -2274,6 +2585,7 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 			case Node::COS: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::COS>)(*this); break;
 			case Node::SIN: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::SIN>)(*this); break;
 			case Node::NUMBER: node = LUMIX_NEW(m_allocator, LiteralNode)(*this); break;
+			case Node::FREE0: ASSERT(false); break;
 		}
 		m_nodes.push(node);
 		return node;
@@ -2286,6 +2598,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		: m_allocator(allocator)
 		, m_app(app)
 		, NodeEditor(allocator)
+		, m_functions(allocator)
 		, m_recent_paths("particle_editor_recent_", 10, app)
 	{
 		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
@@ -2318,7 +2631,9 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		app.addAction(&m_redo_action);
 		app.addAction(&m_apply_action);
 		app.addAction(&m_delete_action);
-		newGraph();
+		newGraph(ParticleSystemResourceType::SYSTEM);
+
+		scanFunctions("");
 	}
 
 	~ParticleEditorImpl() {
@@ -2328,6 +2643,35 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_app.removeAction(&m_redo_action);
 		m_app.removeAction(&m_delete_action);
 		m_app.removeAction(&m_apply_action);
+	}
+
+	// TODO update m_functions when existing function is resaved
+	// TODO reuse scan already done in asset compiler, maybe make this compiler plugin?
+	void scanFunctions(const char* dir) {
+		os::FileIterator* iter = m_app.getEngine().getFileSystem().createFileIterator(dir);
+		os::FileInfo info;
+		while (getNextFile(iter, &info)) {
+			if (info.filename[0] == '.') continue;
+
+			Path path(dir);
+			if (dir[0]) path.append("/");
+			path.append(info.filename);
+
+			if (info.is_directory) {
+				scanFunctions(path);
+			}
+			else {
+				if (Path::hasExtension(info.filename, "pfn")) {
+					addFunction(path);
+				}
+			}
+		}
+	}
+
+	void addFunction(const Path& path) {
+		Function& func = m_functions.emplace(m_allocator);
+		func.path = path;
+		func.name = Path::getBasename(path.c_str());
 	}
 
 	struct ICategoryVisitor {
@@ -2370,86 +2714,109 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			visitor.endCategory();
 		}
 
-		if (visitor.beginCategory("Emit inputs")) {
-			for (u8 i = 0; i < m_active_emitter->m_emit_inputs.size(); ++i) {
+		if (!m_resource->isFunction()) {
+			if (visitor.beginCategory("Emit inputs")) {
+				for (u8 i = 0; i < m_active_emitter->m_emit_inputs.size(); ++i) {
+					struct : ICategoryVisitor::INodeCreator {
+						Node* create(ParticleEmitterEditorResource& res) const override {
+							auto* n = (EmitInputNode*)res.addNode(Node::EMIT_INPUT);
+							n->idx = i;
+							return n;
+						}
+						u8 i;
+					} creator;
+					creator.i = i;
+					visitor.visitType(m_active_emitter->m_emit_inputs[i].name, creator);
+				}
+				visitor.endCategory();
+			}
+
+			if (visitor.beginCategory("Emit")) {
+				for (i32 i = 0; i < m_resource->m_emitters.size(); ++i) {
+					ParticleEmitterEditorResource& emitter = *m_resource->m_emitters[i].get();
+					struct : ICategoryVisitor::INodeCreator {
+						Node* create(ParticleEmitterEditorResource& res) const override {
+							auto* n = (EmitNode*)res.addNode(Node::EMIT);
+							n->emitter_idx = i;
+							return n;
+						}
+						u32 i;
+					} creator;
+					creator.i = i;
+					visitor.visitType(emitter.m_name.c_str(), creator);
+				}
+				visitor.endCategory();
+			}
+
+			if (visitor.beginCategory("Streams")) {
 				struct : ICategoryVisitor::INodeCreator {
 					Node* create(ParticleEmitterEditorResource& res) const override {
-						auto* n = (EmitInputNode*)res.addNode(Node::EMIT_INPUT);
+						auto* n = (StreamNode*)res.addNode(Node::STREAM);
 						n->idx = i;
+						n->channel = channel;
 						return n;
 					}
 					u8 i;
+					StreamNode::Channel channel;
 				} creator;
-				creator.i = i;
-				visitor.visitType(m_active_emitter->m_emit_inputs[i].name, creator);
-			}
-			visitor.endCategory();
-		}
-
-		if (visitor.beginCategory("Emit")) {
-			for (i32 i = 0; i < m_resource->m_emitters.size(); ++i) {
-				ParticleEmitterEditorResource& emitter = *m_resource->m_emitters[i].get();
-				struct : ICategoryVisitor::INodeCreator {
-					Node* create(ParticleEmitterEditorResource& res) const override {
-						auto* n = (EmitNode*)res.addNode(Node::EMIT);
-						n->emitter_idx = i;
-						return n;
+				for (u8 i = 0; i < m_active_emitter->m_streams.size(); ++i) {
+					creator.i = i;
+					ParticleEmitterEditorResource::Stream& stream = m_active_emitter->m_streams[i];
+					if (stream.type == ValueType::FLOAT) {
+						creator.channel = StreamNode::ALL;
+						visitor.visitType(stream.name, creator);
 					}
-					u32 i;
-				} creator;
-				creator.i = i;
-				visitor.visitType(emitter.m_name.c_str(), creator);
-			}
-			visitor.endCategory();
-		}
+					else {
+						if (visitor.beginCategory(stream.name)) {
+							for (u32 ch = 0; ch < 5; ++ch) {
+								if (stream.type == ValueType::VEC3 && ch == StreamNode::W) continue;
 
-		if (visitor.beginCategory("Streams")) {
-			struct : ICategoryVisitor::INodeCreator {
-				Node* create(ParticleEmitterEditorResource& res) const override {
-					auto* n = (StreamNode*)res.addNode(Node::STREAM);
-					n->idx = i;
-					n->channel = channel;
-					return n;
-				}
-				u8 i;
-				StreamNode::Channel channel;
-			} creator;
-			for (u8 i = 0; i < m_active_emitter->m_streams.size(); ++i) {
-				creator.i = i;
-				ParticleEmitterEditorResource::Stream& stream = m_active_emitter->m_streams[i];
-				if (stream.type == ValueType::FLOAT) {
-					creator.channel = StreamNode::ALL;
-					visitor.visitType(stream.name, creator);
-				}
-				else {
-					if (visitor.beginCategory(stream.name)) {
-						for (u32 ch = 0; ch < 5; ++ch) {
-							if (stream.type == ValueType::VEC3 && ch == StreamNode::W) continue;
-
-							creator.channel = (StreamNode::Channel)ch;
-							if (ch == StreamNode::ALL) visitor.visitType(stream.name, creator);
-							else {
-								StaticString<128> name(stream.name, ".", StreamNode::toString(creator.channel));
-								visitor.visitType(name, creator);
+								creator.channel = (StreamNode::Channel)ch;
+								if (ch == StreamNode::ALL) visitor.visitType(stream.name, creator);
+								else {
+									StaticString<128> name(stream.name, ".", StreamNode::toString(creator.channel));
+									visitor.visitType(name, creator);
+								}
 							}
+							visitor.endCategory();
 						}
-						visitor.endCategory();
 					}
 				}
+				visitor.endCategory();
 			}
-			visitor.endCategory();
+		}
+
+		if (m_functions.size() > 0) {
+			if (visitor.beginCategory("Functions")) {
+				for (const Function& f : m_functions) {
+					struct : ICategoryVisitor::INodeCreator {
+						Node* create(ParticleEmitterEditorResource& parent) const override {
+							auto* n = (FunctionCallNode*)parent.addNode(Node::FUNCTION_CALL);
+							n->setFunction(path, editor->m_app.getEngine().getFileSystem());
+							return n;
+						}
+						Path path;
+						ParticleEditorImpl* editor;
+					} creator;
+					creator.path = f.path;
+					creator.editor = this;
+					visitor.visitType(f.name.c_str(), creator);
+				}
+				visitor.endCategory();
+			}
 		}
 
 		if (visitor.beginCategory("Logic")) {
-			visitor.visitType(Node::OR, "Or")
+			visitor.visitType(Node::CMP, "Compare")
 			.visitType(Node::AND, "And")
+			.visitType(Node::OR, "Or")
 			.endCategory();
 		}
 
 		if (visitor.beginCategory("Math")) {
 			visitor.visitType(Node::ADD, "Add", 'A')
-			.visitType(Node::COLOR_MIX, "Color mix")
 			.visitType(Node::COS, "Cos")
+			.visitType(Node::CURVE, "Curve", 'C')
 			.visitType(Node::DIV, "Divide", 'D')
 			.visitType(Node::MUL, "Multiply", 'M')
 			.visitType(Node::MADD, "Multiply add")
@@ -2459,12 +2826,18 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			.endCategory();
 		}
 
+		if (m_resource->isFunction()) {
+			if (visitor.beginCategory("Function")) {
+				visitor.visitType(Node::FUNCTION_INPUT, "Function input")
+				.visitType(Node::FUNCTION_OUTPUT, "Function output")
+				.endCategory();
+			}
+		}
+
 		visitor
 			.visitType(Node::CACHE, "Cache")
 			.visitType(Node::CHANNEL_MASK, "Channel mask")
-			.visitType(Node::CMP, "Compare")
-			.visitType(Node::CURVE, "Curve", 'C')
-			.visitType(Node::GRADIENT_COLOR, "Gradient color")
+			.visitType(Node::GRADIENT_COLOR, "Gradient")
 			.visitType(Node::MESH, "Mesh")
 			.visitType(Node::NOISE, "Noise", 'N')
 			.visitType(Node::NUMBER, "Number", '1')
@@ -2574,7 +2947,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void deleteSelectedNodes() {
 		for (i32 i = m_active_emitter->m_nodes.size() - 1; i >= 0; --i) {
 			Node* n = m_active_emitter->m_nodes[i];
-			if (n->m_selected && i > 2) {
+			if (n->m_selected && n->canDelete()) {
 				m_active_emitter->m_links.eraseItems([&](const NodeEditorLink& link){
 					return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 				});
@@ -2601,6 +2974,29 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void toggleOpen() { m_open = !m_open; }
 
 	void deleteEmitInput(u32 input_idx) {
+		const i32 emitter_index = m_resource->m_emitters.find([this](const UniquePtr<ParticleEmitterEditorResource>& e){ return e.get() == m_active_emitter; });
+		ASSERT(emitter_index >= 0);
+		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource->m_emitters) {
+			for (Node* n : e->m_nodes) {
+				if (n->getType() != Node::EMIT) continue;
+				EmitNode* en = (EmitNode*)n;
+
+				if (en->emitter_idx != emitter_index) continue; 
+
+				for (i32 link_idx = e->m_links.size() - 1; link_idx >= 0; --link_idx) {
+					NodeEditorLink& link = e->m_links[link_idx];
+					if (link.getToNode() == en->m_id) {
+						if (link.getToPin() > input_idx + 1) {
+							link.to = link.getToNode() | ((link.getToPin() - 1) << 16);
+						}
+						else if (link.getToPin() == input_idx + 1) {
+							e->m_links.erase(link_idx);
+						}
+					}
+				}
+			}
+		}
+
 		for (i32 i = m_active_emitter->m_nodes.size() - 1; i >= 0; --i) {
 			Node* n = m_active_emitter->m_nodes[i];
 			if (n->getType() == Node::EMIT_INPUT && ((EmitInputNode*)n)->idx == input_idx) {
@@ -2697,6 +3093,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	void leftColumnGUI() {
+		// TODO undo/redo
 		inputString("##name", "Emitter name", &m_active_emitter->m_name);
 		ImGuiEx::Label("Material");
 		m_app.getAssetBrowser().resourceInput("material", Span(m_active_emitter->m_mat_path.data), Material::TYPE);
@@ -2870,7 +3267,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			ImGui::TextUnformatted("Graph not saved, all changes will be lost. Are you sure?");
 			if (ImGui::Selectable("Yes")) {
 				m_dirty = false;
-				newGraph();
+				newGraph(m_confirm_new_type);
 			}
 			ImGui::Selectable("No");
 			ImGui::EndPopup();
@@ -2899,7 +3296,11 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
 				const ParticleSystem* emitter = getSelectedParticleSystem();
-				if (ImGui::MenuItem("New")) newGraph();
+				if (ImGui::BeginMenu("New")) {
+					if (ImGui::MenuItem("System")) newGraph(ParticleSystemResourceType::SYSTEM);
+					if (ImGui::MenuItem("Function")) newGraph(ParticleSystemResourceType::FUNCTION);
+					ImGui::EndMenu();
+				}
 				if (ImGui::BeginMenu("Open")) {
 					char buf[LUMIX_MAX_PATH] = "";
 					FilePathHash dummy;
@@ -2908,6 +3309,20 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					}
 					ImGui::EndMenu();
 				}
+
+				if (!m_functions.empty()) {
+					if (ImGui::BeginMenu("Open function")) {
+						char buf[LUMIX_MAX_PATH] = "";
+						FilePathHash dummy;
+						for (const Function& f : m_functions) {
+							if (ImGui::Selectable(f.name.c_str())) {
+								load(f.path);
+							}
+						}
+						ImGui::EndMenu();
+					}
+				}
+
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
 				if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
 				menuItem(m_save_action, true);
@@ -2924,45 +3339,64 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				ImGui::MenuItem("World space", 0, &m_resource->m_world_space);
 				menuItem(m_undo_action, canUndo());
 				menuItem(m_redo_action, canRedo());
-				if (ImGui::MenuItem("Add emitter")) {
-					ParticleEmitterEditorResource* emitter = m_resource->addEmitter();
-					emitter->initDefault();
-					pushUndo(NO_MERGE_UNDO);
-				}
-				if (ImGui::MenuItem("Remove emitter")) {
-					if (m_resource->m_emitters.size() <= 1) {
-						logError("Can not remove the last emitter");
-					}
-					else {
-						m_resource->removeEmitter(m_active_emitter);
-						m_active_emitter = m_resource->m_emitters[0].get();
-						pushUndo(NO_MERGE_UNDO);
-					}
-				}
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
 		}
 
 		FileSelector& fs = m_app.getFileSelector();
-		if (fs.gui("Save As", &m_show_save_as, "par", true)) saveAs(fs.getPath());
+		if (fs.gui("Save As", &m_show_save_as, m_resource->isFunction() ? "pfn" : "par", true)) saveAs(fs.getPath());
 
-		if (ImGui::BeginTabBar("tabbar")) {
-			for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
-				u32 idx = u32(&emitter - m_resource->m_emitters.begin());
-				if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx))) {
-					ImGui::Columns(2);
-					leftColumnGUI();
-					ImGui::NextColumn();
-					m_active_emitter = emitter.get();
-					nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
-					ImGui::Columns();
-					ImGui::EndTabItem();
+		if (m_resource->isFunction()) {
+			m_active_emitter = m_resource->m_emitters[0].get();
+			nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+		}
+		else {
+			if (ImGui::BeginTabBar("tabbar")) {
+				i32 remove = -1;
+				const bool can_remove = m_resource->m_emitters.size() > 1;
+				for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
+					u32 idx = u32(&emitter - m_resource->m_emitters.begin());
+					bool open = true;
+					if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &open : nullptr)) {
+						ImGui::Columns(2);
+						leftColumnGUI();
+						ImGui::NextColumn();
+						m_active_emitter = emitter.get();
+						nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+						ImGui::Columns();
+						ImGui::EndTabItem();
+					}
+					if (!open) remove = idx;
+				}
+				if (ImGui::TabItemButton(ICON_FA_PLUS)) {
+					ParticleEmitterEditorResource* emitter = m_resource->addEmitter();
+					emitter->initDefault(ParticleSystemResourceType::SYSTEM);
+					pushUndo(NO_MERGE_UNDO);
+				}
+				ImGui::EndTabBar();
+				if (remove >= 0) {
+					for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource->m_emitters) {
+						for (i32 i = e->m_nodes.size() - 1; i >= 0; --i) {
+							Node* n = e->m_nodes[i];
+							if (n->getType() != Node::EMIT) continue;
+
+							EmitNode* en = (EmitNode*)n;
+							if (en->emitter_idx == remove) {
+								e->m_links.eraseItems([&](const NodeEditorLink& link){
+									return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
+								});
+								LUMIX_DELETE(m_allocator, n);
+								e->m_nodes.swapAndPop(i);
+							}
+						}
+					}
+					m_resource->removeEmitter(m_resource->m_emitters[remove].get());
+					m_active_emitter = m_resource->m_emitters[0].get();
+					pushUndo(NO_MERGE_UNDO);
 				}
 			}
-			ImGui::EndTabBar();
 		}
-
 		ImGui::End();
 	}
 
@@ -2972,11 +3406,13 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void pushUndo(u32 tag) override {
 		m_active_emitter->colorLinks();
-		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
-			// TODO generate only active emitter and make sure other emitters are up-to-date
-			emitter->generate();
+		if (!m_resource->isFunction()) {
+			for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
+				// TODO generate only active emitter and make sure other emitters are up-to-date
+				emitter->generate();
+			}
+			if (m_autoapply) apply();
 		}
-		if (m_autoapply) apply();
 		m_dirty = true;
 		
 		SimpleUndoRedo::pushUndo(tag);
@@ -2993,7 +3429,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	void serialize(OutputMemoryStream& blob) override { m_resource->serialize(blob); }
 	
 	void deserialize(InputMemoryStream& blob) override { 
-		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_allocator);
+		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_app, m_allocator);
 		m_resource->deserialize(blob, "");
 		m_active_emitter = m_resource->m_emitters[0].get();
 	}
@@ -3007,7 +3443,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			logError("Failed to read ", path);
 			return;
 		}
-		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_allocator);
+		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_app, m_allocator);
 		InputMemoryStream iblob(blob);
 		m_resource->deserialize(iblob, path);
 		m_active_emitter = m_resource->m_emitters[0].get();
@@ -3041,16 +3477,17 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_dirty = false;
 	}
 
-	void newGraph() {
+	void newGraph(ParticleSystemResourceType type) {
 		if (m_dirty) {
 			m_confirm_new = true;
+			m_confirm_new_type = type;
 			return;
 		}
 
 		clearUndoStack();
-		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_allocator);
+		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_app, m_allocator);
 		m_active_emitter = m_resource->m_emitters[0].get();
-		m_active_emitter->initDefault();
+		m_active_emitter->initDefault(type);
 
 		m_path = "";
 		pushUndo(NO_MERGE_UNDO);
@@ -3072,7 +3509,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
-		ParticleSystemEditorResource res(m_allocator);
+		ParticleSystemEditorResource res(m_app, m_allocator);
 		if (!res.deserialize(input, path)) return false;
 
 		ParticleSystemResource::Header header;
@@ -3114,13 +3551,21 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		return true;
 	}
 
+	struct Function {
+		Function(IAllocator& allocator) : name(allocator) {}
+		String name;
+		Path path;
+	};
+
 	IAllocator& m_allocator;
 	StudioApp& m_app;
+	Array<Function> m_functions;
 	Path m_path;
 	bool m_show_debug = false;
 	bool m_show_save_as = false;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
+	ParticleSystemResourceType m_confirm_new_type;
 	bool m_confirm_load = false;
 	StaticString<LUMIX_MAX_PATH> m_confirm_load_path;
 	UniquePtr<ParticleSystemEditorResource> m_resource;

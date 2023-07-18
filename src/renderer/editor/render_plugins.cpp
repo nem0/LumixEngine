@@ -4309,6 +4309,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 };
 
 struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugin {
+	ProceduralGeomPlugin(StudioApp& app) : m_app(app) {}
+
 	const char* getName() const override { return "procedural_geom"; }
 
 	void paint(const DVec3& pos
@@ -4433,6 +4435,98 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	void onMouseUp(WorldView& view, int x, int y, os::MouseButton button) override {}
 	void onMouseMove(WorldView& view, int x, int y, int rel_x, int rel_y) override { paint(view, x, y); }
 	
+	void exportToOBJ(const ProceduralGeometry& pg) {
+		char filename[LUMIX_MAX_PATH];
+		if (!os::getSaveFilename(Span(filename), "Wavefront obj\0*.obj\0", "obj")) return;
+		
+		os::OutputFile file;
+		if (!file.open(filename)) {
+			logError("Failed to open ", filename);
+			return;
+		}
+
+		Span<const char> basename = Path::getBasename(filename);
+
+		OutputMemoryStream blob(m_app.getAllocator());
+		blob.reserve(8 * 1024 * 1024);
+		blob << "mtllib " << basename << ".mtl\n";
+		blob << "o Terrain\n";
+	
+		const u32 stride = pg.vertex_decl.getStride();
+		const u8* vertex_data = pg.vertex_data.data();
+		const u32 uv_offset = 12;
+
+		for (u32 i = 0, c = u32(pg.vertex_data.size() / stride); i < c; ++i) {
+			Vec3 p;
+			Vec2 uv;
+			memcpy(&p, vertex_data + i * stride, sizeof(p));
+			memcpy(&uv, vertex_data + i * stride + uv_offset, sizeof(uv));
+			blob << "v " << p.x << " " << p.y << " " << p.z << "\n";
+			blob << "vt " << uv.x << " " << uv.y << "\n";
+		}
+
+		blob << "usemtl Material\n";
+
+		auto write_face_vertex = [&](u32 idx){
+			blob << idx + 1 << "/" << idx + 1;
+		};
+
+		u32 index_size = 4;
+		switch (pg.index_type) {
+			case gpu::DataType::U16: index_size = 2; break;
+			case gpu::DataType::U32: index_size = 4; break;
+		}
+
+		const u16* idx16 = (const u16*)pg.index_data.data();
+		const u32* idx32 = (const u32*)pg.index_data.data();
+		for (u32 i = 0, c = u32(pg.index_data.size() / index_size); i < c; i += 3) {
+			u32 idx[3];
+			switch (pg.index_type) {
+				case gpu::DataType::U16:
+					idx[0] = idx16[i];
+					idx[1] = idx16[i + 1];
+					idx[2] = idx16[i + 2];
+					break;
+				case gpu::DataType::U32:
+					idx[0] = idx32[i];
+					idx[1] = idx32[i + 1];
+					idx[2] = idx32[i + 2];
+					break;
+			}
+
+			blob << "f ";
+			write_face_vertex(idx[0]);
+			blob << " ";
+			write_face_vertex(idx[1]);
+			blob << " ";
+			write_face_vertex(idx[2]);
+			blob << "\n";
+		}
+
+		if (!file.write(blob.data(), blob.size())) {
+			logError("Failed to write ", filename);
+		}
+
+		file.close();
+
+		Span<const char> dir = Path::getDir(filename);
+		StaticString<LUMIX_MAX_PATH> mtl_filename(dir, basename, ".mtl");
+
+		if (!file.open(mtl_filename)) {
+			logError("Failed to open ", mtl_filename);
+			return;
+		}
+
+		blob.clear();
+		blob << "newmtl Material";
+
+		if (!file.write(blob.data(), blob.size())) {
+			logError("Failed to write ", mtl_filename);
+		}
+
+		file.close();
+	}
+
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
 		if (cmp_type != PROCEDURAL_GEOM_TYPE) return;
 		if (entities.length() != 1) return;
@@ -4453,6 +4547,8 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			}
 		}
 		ImGui::Text("%d", index_count);
+
+		if (ImGui::Button(ICON_FA_FILE_EXPORT)) exportToOBJ(pg);
 
 		m_is_open = false;
 		if (ImGui::CollapsingHeader("Edit")) {
@@ -4487,6 +4583,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 	}
 
+	StudioApp& m_app;
 	float m_brush_size = 1.f;
 	u32 m_brush_channel = 0;
 	u8 m_brush_value = 0xff;
@@ -5046,6 +5143,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
 		, m_composite_texture_editor(app)
+		, m_procedural_geom_plugin(app)
 	{}
 
 	const char* getName() const override { return "renderer"; }
