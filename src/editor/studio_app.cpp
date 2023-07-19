@@ -431,6 +431,7 @@ struct StudioAppImpl final : StudioApp
 		removeAction(&m_save_action);
 		removeAction(&m_undo_action);
 		removeAction(&m_redo_action);
+		removeAction(&m_delete_action);
 
 		for (Action* action : m_owned_actions) {
 			removeAction(action);

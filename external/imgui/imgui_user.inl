@@ -1171,7 +1171,7 @@ namespace ImGuiEx {
 		dl->AddRectFilledMultiColor(from, max, c0, c0, c0, c0);
 
 		SetCursorScreenPos(min);
-		InvisibleButton("gradient", max - min, ImGuiButtonFlags_AllowItemOverlap);
+		InvisibleButton("gradient", max - min, ImGuiButtonFlags_AllowOverlap);
 		if (IsItemActive() && IsMouseDoubleClicked(0) && *count < max_count) {
 			const float x = GetMousePos().x;
 			const float key = (x - min.x) / (max.x - min.x);
@@ -1208,7 +1208,7 @@ namespace ImGuiEx {
 
 			PushID(i);
 			SetCursorScreenPos(p - ImVec2(5, 9));
-			InvisibleButton("button", ImVec2(10, 15), ImGuiButtonFlags_AllowItemOverlap);
+			InvisibleButton("button", ImVec2(10, 15), ImGuiButtonFlags_AllowOverlap);
 
 			const bool hovered = IsItemHovered();
 			const ImU32 col = hovered ? GetColorU32(ImGuiCol_SliderGrabActive) : GetColorU32(ImGuiCol_SliderGrab);
