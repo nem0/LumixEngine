@@ -181,6 +181,22 @@ Span<const char> Path::getBasename(const char* src)
 }
 
 
+Span<const char> Path::getExtension(const char* src)
+{
+	if (src[0] == '\0') return Span<const char>(nullptr, u32(0));
+
+	Span<const char> res;
+	res.m_end = src + stringLength(src);
+	res.m_begin = res.m_end - 1;
+
+	while(res.m_begin != src && *res.m_begin != '.') {
+		--res.m_begin;
+	}
+	if (*res.m_begin != '.') return Span<const char>(nullptr, nullptr);
+	++res.m_begin;
+	return res;
+}
+
 Span<const char> Path::getExtension(Span<const char> src)
 {
 	if (src.length() == 0) return src;

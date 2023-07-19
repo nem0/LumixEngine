@@ -37,8 +37,8 @@ public:
 	void forceViewport(bool enable, int w, int h);
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }
-	void onAction() { m_is_open = !m_is_open; }
-	void onWindowGUI() override;
+	void onToggleOpen() { m_is_open = !m_is_open; }
+	void onGUI() override;
 	void init();
 
 public:

@@ -69,7 +69,6 @@ void Action::init(const char* label_short, const char* label_long, const char* n
 	this->font_icon = font_icon;
 	this->name = name;
 	this->is_global = is_global;
-	plugin = nullptr;
 	shortcut = os::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
@@ -90,7 +89,6 @@ void Action::init(const char* label_short,
 	this->is_global = is_global;
 	this->shortcut = shortcut;
 	this->modifiers = modifiers;
-	plugin = nullptr;
 	is_selected.bind<falseConst>();
 }
 
@@ -161,14 +159,14 @@ void getShortcut(const Action& action, Span<char> buf) {
 	}
 }
 
-void menuItem(Action& a, bool enabled)
-{
+bool menuItem(Action& a, bool enabled) {
 	char buf[20];
 	getShortcut(a, Span(buf));
-	if (ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled))
-	{
-		a.func.invoke();
+	if (ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled)) {
+		if (a.func.isValid()) a.func.invoke();
+		return true;
 	}
+	return false;
 }
 
 void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity)
@@ -593,7 +591,7 @@ bool FileSelector::gui(const char* label, bool* open, const char* extension, boo
 enum { OUTPUT_FLAG = 1 << 31 };
 
 NodeEditor::NodeEditor(IAllocator& allocator)
-: SimpleUndoRedo(allocator)
+	: SimpleUndoRedo(allocator)
 {}
 
 void NodeEditor::splitLink(const NodeEditorNode* node, Array<NodeEditorLink>& links, u32 link_idx) {

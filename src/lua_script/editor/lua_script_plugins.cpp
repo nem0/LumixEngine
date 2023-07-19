@@ -292,7 +292,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	}
 
 
-	void onWindowGUI() override
+	void onGUI() override
 	{
 		if (!open) return;
 		if (ImGui::Begin(ICON_FA_SCROLL "Lua console##lua_console", &open))

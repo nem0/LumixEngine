@@ -20,6 +20,7 @@ namespace Lumix {
 
 
 template <typename T> struct Array;
+template <typename T> struct UniquePtr;
 struct Action;
 struct ComponentUID;
 namespace Gizmo { struct Config; }
@@ -50,9 +51,9 @@ struct LUMIX_EDITOR_API StudioApp {
 
 	struct GUIPlugin {
 		virtual ~GUIPlugin() {}
-
-		virtual void onWindowGUI() = 0;
-		virtual bool hasFocus() { return false; }
+		virtual void onGUI() = 0;
+		virtual bool hasFocus() const { return false; }
+		virtual bool onAction(const Action& action) { return false; }
 		virtual void update(float) {}
 		virtual void pluginAdded(GUIPlugin& plugin) {}
 		virtual const char* getName() const = 0;
@@ -128,11 +129,17 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void setCursorCaptured(bool captured) = 0;
 	virtual void saveSettings() = 0;
 	virtual int getImGuiKey(int keycode) const = 0;
+	virtual u32 getDockspaceID() const = 0;
 
 	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getBoldFont() = 0;
 	virtual ImFont* getBigIconFont() = 0;
 	
+	virtual Action& getSaveAction() = 0;
+	virtual Action& getUndoAction() = 0;
+	virtual Action& getRedoAction() = 0;
+	virtual Action& getDeleteAction() = 0;
+
 	virtual ~StudioApp() {}
 };
 

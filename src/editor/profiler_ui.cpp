@@ -600,7 +600,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 		}	
 	}
 
-	void onWindowGUI() override
+	void onGUI() override
 	{
 		PROFILE_FUNCTION();
 

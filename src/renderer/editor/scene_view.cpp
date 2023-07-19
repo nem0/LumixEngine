@@ -1406,7 +1406,7 @@ void SceneView::searchUI() {
 	m_search_request = false;
 }
 
-void SceneView::onWindowGUI()
+void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
 	m_pipeline->setWorld(m_editor.getWorld());

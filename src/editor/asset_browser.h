@@ -7,6 +7,7 @@
 
 namespace Lumix {
 
+template <typename T> struct DelegateList;
 template <typename T> struct Span;
 template <typename T> struct UniquePtr;
 

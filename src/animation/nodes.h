@@ -40,10 +40,12 @@ struct Node {
 		ANIMATION,
 		GROUP,
 		BLEND1D,
-		LAYERS
+		LAYERS,
+		CONDITION,
+		NONE
 	};
 
-	Node(GroupNode* parent, IAllocator& allocator) 
+	Node(Node* parent, IAllocator& allocator) 
 		: m_name("", allocator)
 		, m_parent(parent)
 		, m_events(allocator)
@@ -62,15 +64,15 @@ struct Node {
 
 	void emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeContext& ctx) const;
 
-	static Node* create(GroupNode* parent, Type type, IAllocator& allocator);
+	static Node* create(Node* parent, Type type, IAllocator& allocator);
 
-	GroupNode* m_parent;
+	Node* m_parent;
 	String m_name;
 	OutputMemoryStream m_events;
 };
 
 struct AnimationNode final : Node {
-	AnimationNode(GroupNode* parent, IAllocator& allocator);
+	AnimationNode(Node* parent, IAllocator& allocator);
 	Type type() const override { return ANIMATION; }
 	
 	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
@@ -91,7 +93,7 @@ struct AnimationNode final : Node {
 };
 
 struct Blend1DNode final : Node {
-	Blend1DNode(GroupNode* parent, IAllocator& allocator);
+	Blend1DNode(Node* parent, IAllocator& allocator);
 	Type type() const override { return BLEND1D; }
 	
 	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
@@ -112,8 +114,36 @@ struct Blend1DNode final : Node {
 	u32 m_input_index = 0;
 };
 
+struct ConditionNode final : Node {
+	struct RuntimeData {
+		bool is_true;
+		Time t;
+	};
+
+	ConditionNode(Node* parent, IAllocator& allocator);
+	~ConditionNode();
+	Type type() const override { return CONDITION; }
+	
+	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void enter(RuntimeContext& ctx) const override;
+	void skip(RuntimeContext& ctx) const override;
+	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
+
+
+	IAllocator& m_allocator;
+	Condition m_condition;
+	Node* m_true_node = nullptr;
+	Node* m_false_node = nullptr;
+	String m_condition_str;
+	Time m_blend_length = Time::fromSeconds(0.3f);
+};
+
 struct GroupNode final : Node {
-	GroupNode(GroupNode* parent, IAllocator& allocator);
+	GroupNode(Node* parent, IAllocator& allocator);
 	GroupNode(GroupNode&& rhs) = default;
 	~GroupNode();
 	Type type() const override { return GROUP; }
@@ -164,7 +194,8 @@ struct GroupNode final : Node {
 };
 
 struct LayersNode final : Node {
-	LayersNode(GroupNode* parent, IAllocator& allocator);
+	LayersNode(Node* parent, IAllocator& allocator);
+	~LayersNode();
 	Type type() const override { return LAYERS; }
 	
 	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
@@ -177,9 +208,9 @@ struct LayersNode final : Node {
 	Time time(const RuntimeContext& ctx) const override;
 
 	struct Layer {
-		Layer(GroupNode* parent, IAllocator& allocator);
+		Layer(IAllocator& allocator);
 
-		GroupNode node;
+		Node* node = nullptr;
 		u32 mask = 0;
 		String name;
 	};

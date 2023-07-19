@@ -41,12 +41,6 @@ void Controller::unload() {
 	m_root = nullptr;
 }
 
-void Controller::initEmpty() {
-	ASSERT(!m_root);
-	m_root = LUMIX_NEW(m_allocator, GroupNode)(nullptr, m_allocator);
-	m_root->m_name = "Root";
-}
-
 bool Controller::load(u64 size, const u8* mem) {
 	InputMemoryStream str(mem, size);
 	deserialize(str);
@@ -201,7 +195,13 @@ void Controller::serialize(OutputMemoryStream& stream) {
 	}
 	stream.write(m_ik);
 	stream.write(m_ik_count);
-	m_root->serialize(stream);
+	if (m_root) {
+		stream.write(m_root->type());
+		m_root->serialize(stream);
+	}
+	else {
+		stream.write(Node::NONE);
+	}
 }
 
 bool Controller::deserialize(InputMemoryStream& stream) {
@@ -228,7 +228,10 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(type);
 	}
 	m_inputs.recalculateOffsets();
-	initEmpty();
+	if (header.version <= ControllerVersion::NO_ROOT) {
+		m_root = LUMIX_NEW(m_allocator, GroupNode)(nullptr, m_allocator);
+		m_root->m_name = "Root";
+	}
 	const u32 slots_count = stream.read<u32>();
 	m_animation_slots.reserve(slots_count);
 	for (u32 i = 0; i < slots_count; ++i) {
@@ -259,7 +262,12 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(m_ik);
 		stream.read(m_ik_count);
 	}
-	m_root->deserialize(stream, *this, (u32)header.version);
+	if (header.version > ControllerVersion::NO_ROOT) {
+		Node::Type root_type;
+		stream.read(root_type);
+		if (root_type != Node::NONE) m_root = Node::create(nullptr, root_type, m_allocator);
+	}
+	if (m_root) m_root->deserialize(stream, *this, (u32)header.version);
 	return true;
 }
 

@@ -81,47 +81,15 @@ struct CompositeTexture {
 	String m_error;
 };
 
-struct CompositeTextureEditor final : StudioApp::GUIPlugin, NodeEditor {
+struct CompositeTextureEditorWindow;
+
+struct CompositeTextureEditor final {
 	CompositeTextureEditor(StudioApp& app);
-	~CompositeTextureEditor();
 
-	void open(const char* path);
-
-private:
-	void exportAs();
-	bool saveAs(const char* path);
-	void newGraph();
-	void onWindowGUI() override;
-	const char* getName() const override { return "composite_texture_editor"; }
-	void onSettingsLoaded() override;
-	void onBeforeSettingsSaved() override;
-
-	bool getSavePath();
-	bool hasFocus() override { return m_has_focus; }
-	void deserialize(InputMemoryStream& blob) override;
-	void serialize(OutputMemoryStream& blob) override;
-	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override;
-	void onLinkDoubleClicked(CompositeTexture::Link& link, ImVec2 pos) override;
-	void onContextMenu(ImVec2 pos) override;
-	void toggleOpen() { m_is_open = !m_is_open; }
-	bool isOpen() const { return m_is_open; }
-	void save();
-	void deleteSelectedNodes();
+	void open(const Path& path);
 
 	StudioApp& m_app;
-	IAllocator& m_allocator;
-	bool m_is_open = false;
-	Action m_toggle_ui;
-	Action m_save_action;
-	Action m_delete_action;
-	Action m_undo_action;
-	Action m_redo_action;
-	Path m_path;
-	CompositeTexture* m_resource = nullptr;
-	bool m_has_focus = false;
-	bool m_show_save_as = false;
-	bool m_show_open = false;
-	RecentPaths m_recent_paths;
+	Array<CompositeTextureEditorWindow*> m_windows;
 };
 
 } // namespace Lumix

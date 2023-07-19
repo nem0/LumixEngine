@@ -730,11 +730,17 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		: m_app(app)
 		, AssetBrowser::Plugin(app.getAllocator())
 	{
-		app.getAssetCompiler().registerExtension("par", ParticleSystemResource::TYPE);
+		AssetCompiler& compiler = app.getAssetCompiler();
+		compiler.registerExtension("par", ParticleSystemResource::TYPE);
 	}
 
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
 	void serialize(OutputMemoryStream& blob) override {}
+
+	void addSubresources(AssetCompiler& compiler, const char* path) override {
+		compiler.addResource(ParticleSystemResource::TYPE, path);
+		ParticleEditor::registerDependencies(path, m_app);
+	}
 
 	bool compile(const Path& src) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -1670,7 +1676,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		}
 
 		if (!is_ltc && ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
-		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath().c_str());
+		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath());
 
 		bool changed = false;
 		if (ImGui::CollapsingHeader("Import")) {
@@ -4792,7 +4798,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		if (m_texture) renderer->getEndFrameDrawStream().destroy(m_texture);
 	}
 
-	void onWindowGUI() override {}
+	void onGUI() override {}
 
 	const char* getName() const override { return "editor_ui_render"; }
 
@@ -5206,7 +5212,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(m_shader_plugin);
 		asset_browser.addPlugin(m_texture_plugin);
 
-		m_app.addPlugin(m_composite_texture_editor);
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);
 		m_app.addPlugin(m_editor_ui_render_plugin);
@@ -5440,7 +5445,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.removePlugin(*m_particle_editor.get());
 		m_app.removePlugin(m_scene_view);
-		m_app.removePlugin(m_composite_texture_editor);
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
 		m_app.removePlugin(m_procedural_geom_plugin);

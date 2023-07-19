@@ -60,7 +60,7 @@ GameView::GameView(StudioApp& app)
 
 void GameView::init() {
 	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", true);
-	m_toggle_ui.func.bind<&GameView::onAction>(this);
+	m_toggle_ui.func.bind<&GameView::onToggleOpen>(this);
 	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
 	m_app.addWindowAction(&m_toggle_ui);
 
@@ -251,7 +251,7 @@ void GameView::controlsGUI(WorldEditor& editor) {
 }
 
 
-void GameView::onWindowGUI()
+void GameView::onGUI()
 {
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();

@@ -29,7 +29,7 @@ struct SceneView : StudioApp::GUIPlugin
 
 	void update(float time_delta) override;
 	void setWorld(World* world);
-	void onWindowGUI() override;
+	void onGUI() override;
 	Pipeline* getPipeline() { return m_pipeline.get(); }
 	const char* getName() const override { return "scene_view"; }
 	void init();

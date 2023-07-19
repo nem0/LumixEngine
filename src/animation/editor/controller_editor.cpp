@@ -64,6 +64,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		, m_undo_stack(app.getAllocator())
 		, m_event_types(app.getAllocator())
 		, m_copy_buffer(app.getAllocator())
+		, m_recent_paths("anim_editor_recet_", 10, app)
 	{
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
 		ASSERT(res_manager);
@@ -72,15 +73,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		m_toggle_ui.func.bind<&ControllerEditorImpl::toggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&ControllerEditorImpl::isOpen>(this);
 
-		m_undo_action.init(ICON_FA_UNDO "Undo", "Animation editor undo", "animation_editor_undo", ICON_FA_UNDO, true);
-		m_undo_action.func.bind<&ControllerEditorImpl::undo>(this);
-
-		m_redo_action.init(ICON_FA_REDO "Redo", "Animation editor redo", "animation_editor_redo", ICON_FA_REDO, true);
-		m_redo_action.func.bind<&ControllerEditorImpl::redo>(this);
-
 		app.addWindowAction(&m_toggle_ui);
-		app.addAction(&m_undo_action);
-		app.addAction(&m_redo_action);
 
 		newGraph();
 
@@ -89,8 +82,14 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	~ControllerEditorImpl() {
 		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_undo_action);
-		m_app.removeAction(&m_redo_action);
+	}
+
+	bool onAction(const Action& action) override {
+		if (&action == &m_app.getSaveAction()) save();
+		else if (&action == &m_app.getUndoAction()) undo();
+		else if (&action == &m_app.getRedoAction()) redo();
+		else return false;
+		return true;
 	}
 
 	bool inputInput(const char* label, u32* input_index) const {
@@ -115,40 +114,35 @@ struct ControllerEditorImpl : ControllerEditor {
 		return changed;
 	}
 
-	template <typename F> void forEachNode(F f, Node* node = nullptr) {
-		if (!node) node = m_controller->m_root;
-		f(*node);
-
-		switch (node->type()) {
-			case Node::ANIMATION: break;
-			case Node::BLEND1D: break;
-			case Node::LAYERS: {
-				LayersNode* n = (LayersNode*)node;
-				for (LayersNode::Layer& layer : n->m_layers) {
-					forEachNode(f, &layer.node);
-				}
-				break;
-			}
-			case Node::GROUP: {
-				GroupNode* g = (GroupNode*)node;
-				for (GroupNode::Child& ch : g->m_children) {
-					forEachNode(f, ch.node);
-				}
-				break;
-			}
-		}
-	}
-
 	void onSettingsLoaded() override {
 		m_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_anim_editor_open", false);
+		m_recent_paths.onSettingsLoaded();
 	}
 
 	void onBeforeSettingsSaved() override {
 		m_app.getSettings().setValue(Settings::GLOBAL, "is_anim_editor_open", m_open);
+		m_recent_paths.onBeforeSettingsSaved();
 	}
 
 	bool isOpen() const { return m_open; }
 	void toggleOpen() { m_open = !m_open; }
+
+	Node* createRoot(Node::Type type, IAllocator& allocator) {
+		Node* node = nullptr;
+		switch(type) {
+			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(nullptr, allocator); break;
+			case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(nullptr, allocator); break;
+			case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(nullptr, allocator); break;
+			case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(nullptr, allocator); break;
+			case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(nullptr, allocator); break;
+			case Node::NONE: ASSERT(false); return nullptr;
+		}
+
+		node->m_name = "root";
+		m_controller->m_root = node;
+		pushUndo();
+		return node;
+	}
 
 	Node* createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
 		Node* node = nullptr;
@@ -156,12 +150,54 @@ struct ControllerEditorImpl : ControllerEditor {
 			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 			case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 			case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
-			case Node::LAYERS: ASSERT(false); return nullptr;
+			case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
+			case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
+			case Node::NONE: ASSERT(false); return nullptr;
 		}
 
 		node->m_name = "new";
 		parent.m_children.emplace(allocator);
 		parent.m_children.back().node = node;
+		pushUndo();
+		return node;
+	}
+
+	Node* createChild(LayersNode& parent, Node::Type type, IAllocator& allocator) {
+		Node* node = nullptr;
+		switch(type) {
+			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
+			case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
+			case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+			case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
+			case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
+			case Node::NONE: ASSERT(false); return nullptr;
+		}
+		node->m_name = "new";
+		LayersNode::Layer& layer = parent.m_layers.emplace(allocator);
+		layer.node = node;
+		pushUndo();
+		return node;
+	}
+
+	Node* createChild(ConditionNode& parent, Node::Type type, IAllocator& allocator) {
+		Node* node = nullptr;
+		switch(type) {
+			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
+			case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
+			case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+			case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
+			case Node::LAYERS: ASSERT(false); return nullptr;
+			case Node::NONE: ASSERT(false); return nullptr;
+		}
+
+		node->m_name = "new";
+		if (!parent.m_true_node) {
+			parent.m_true_node = node;
+		}
+		else {
+			ASSERT(!parent.m_false_node);
+			parent.m_false_node = node;
+		}
 		pushUndo();
 		return node;
 	}
@@ -256,6 +292,11 @@ struct ControllerEditorImpl : ControllerEditor {
 		return changed;
 	}
 
+	bool properties_ui(ConditionNode& node) {
+		bool changed = conditionInput("Condition", m_controller->m_inputs, node.m_condition_str, node.m_condition);
+		return false;
+	}
+
 	bool properties_ui(Blend1DNode& node) {
 		const InputDecl::Input& current_input = m_controller->m_inputs.inputs[node.m_input_index];
 		bool changed = false;
@@ -314,12 +355,30 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	bool child_properties_ui(Node& node) {
 		bool changed = false;
-		if (node.m_parent && node.m_parent->type() == Node::Type::GROUP) {
+		if (node.m_parent && node.m_parent->type() == Node::Type::LAYERS) {
+			if (!m_controller->m_bone_masks.empty()) {
+				LayersNode* layers = (LayersNode*)node.m_parent;
+				i32 idx = layers->m_layers.find([&](const LayersNode::Layer& l){ return l.node == &node; });
+				ASSERT(idx >= 0);
+
+				const char* preview = m_controller->m_bone_masks[layers->m_layers[idx].mask].name;
+				ImGuiEx::Label("Bone mask");
+				if (ImGui::BeginCombo("##bonemask", preview)) {
+					for (const BoneMask& mask : m_controller->m_bone_masks) {
+						if (ImGui::Selectable(mask.name)) {
+							layers->m_layers[idx].mask = u32(&mask - m_controller->m_bone_masks.begin());
+						}
+					}
+					ImGui::EndCombo();
+				}
+			}
+		}
+		else if (node.m_parent && node.m_parent->type() == Node::Type::GROUP) {
 			GroupNode* group = (GroupNode*)node.m_parent;
 			for (GroupNode::Child& c : group->m_children) {
 				if (c.node != &node) continue;
 				
-				changed = conditionInput("Condition", m_controller->m_inputs, c.condition_str, c.condition) || changed;
+				changed = conditionInput("Group condition", m_controller->m_inputs, c.condition_str, c.condition) || changed;
 				bool selectable = c.flags & GroupNode::Child::SELECTABLE;
 				ImGuiEx::Label("Selectable");
 				if (ImGui::Checkbox("##sel", &selectable)) {
@@ -440,7 +499,9 @@ struct ControllerEditorImpl : ControllerEditor {
 			case Node::ANIMATION: changed = properties_ui((AnimationNode&)node) || changed; break;
 			case Node::GROUP: changed = properties_ui((GroupNode&)node) || changed; break;
 			case Node::BLEND1D: changed = properties_ui((Blend1DNode&)node) || changed; break;
-			case Node::LAYERS: ASSERT(false); break;
+			case Node::CONDITION: changed = properties_ui((ConditionNode&)node) || changed; break;
+			case Node::LAYERS: break;
+			case Node::NONE: ASSERT(false); break;
 		}
 
 		changed = editEvents(node.m_events) || changed;
@@ -511,6 +572,7 @@ struct ControllerEditorImpl : ControllerEditor {
 				m_undo_stack.clear();
 				m_undo_idx = -1;
 			}
+			m_recent_paths.push(path);
 			pushUndo();
 			m_dirty = false;
 		}
@@ -564,6 +626,8 @@ struct ControllerEditorImpl : ControllerEditor {
 			case Node::Type::BLEND1D: return "Blend 1D";
 			case Node::Type::GROUP: return "Group";
 			case Node::Type::LAYERS: return "Layers";
+			case Node::Type::CONDITION: return "Condition";
+			case Node::Type::NONE: return "N/A";
 		}
 		ASSERT(false);
 		return "N/A";
@@ -573,8 +637,12 @@ struct ControllerEditorImpl : ControllerEditor {
 		switch (node.type()) {
 			case Node::Type::ANIMATION: 
 			case Node::Type::BLEND1D: return false;
+			case Node::Type::CONDITION:
 			case Node::Type::GROUP:
 			case Node::Type::LAYERS: return true;
+			case Node::Type::NONE:
+				ASSERT(false);
+				return false;
 		}
 		ASSERT(false);
 		return false;
@@ -582,8 +650,12 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	bool isSelectable(Node& node) {
 		if (!node.m_parent) return false;
-		for (auto& c : node.m_parent->m_children) {
-			if (c.node == &node && (c.flags & GroupNode::Child::SELECTABLE)) return true;
+		if (node.m_parent->type() == Node::CONDITION) return true;
+		if (node.m_parent->type() == Node::GROUP) {
+			GroupNode* group = (GroupNode*)node.m_parent;
+			for (auto& c : group->m_children) {
+				if (c.node == &node && (c.flags & GroupNode::Child::SELECTABLE)) return true;
+			}
 		}
 		return false;
 	}
@@ -592,6 +664,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		bool changed = false;
 		const bool is_container = isContainer(node);
 		const bool is_parent_group = node.m_parent && node.m_parent->type() == Node::Type::GROUP;
+		const bool is_parent_condition = node.m_parent && node.m_parent->type() == Node::Type::CONDITION;
 		const bool is_layer = node.m_parent && node.m_parent->type() == Node::Type::LAYERS;
 		const bool is_group = node.type() == Node::Type::GROUP;
 
@@ -601,7 +674,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		const char* type_str = toString(node.type());
 		const bool is_selectable = isSelectable(node);
 		if (!is_selectable) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-		const bool open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str);
+		bool open;
+		if (node.m_parent && node.m_parent->type() == Node::CONDITION) {
+			bool is_true = ((ConditionNode*)node.m_parent)->m_true_node == &node;
+			open = ImGui::TreeNodeEx(&node, flags, is_true ? "true: %s (%s)" : "false: %s (%s)", node.m_name.c_str(), type_str);
+		}
+		else {
+			open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str);
+		}
 		if (is_parent_group) {
 			if (ImGui::BeginDragDropSource()) {
 				ImGui::Text("%s", node.m_name.c_str());
@@ -613,7 +693,7 @@ struct ControllerEditorImpl : ControllerEditor {
 
 		if (is_group) {
 			if (ImGui::BeginDragDropTarget()) {
-				if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
+				/*if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
 					Node* dropped_node = *(Node**)payload->Data;
 					OutputMemoryStream blob(m_app.getAllocator());
 					dropped_node->serialize(blob);
@@ -639,7 +719,9 @@ struct ControllerEditorImpl : ControllerEditor {
 					LUMIX_DELETE(m_controller->m_allocator, dropped_node);
 					ImGui::TreePop();
 					return true;
-				}
+				}*/
+				ASSERT(false);
+				// TODO
 			}
 		}
 
@@ -649,6 +731,9 @@ struct ControllerEditorImpl : ControllerEditor {
 				m_current_node = &node;
 			}
 
+			if (is_parent_condition && ImGui::IsMouseClicked(1) && ImGui::IsItemHovered()) {
+				ImGui::OpenPopup("condition_popup");
+			}
 			if (is_parent_group && ImGui::IsMouseClicked(1) && ImGui::IsItemHovered()) {
 				ImGui::OpenPopup("group_popup");
 			}
@@ -671,6 +756,22 @@ struct ControllerEditorImpl : ControllerEditor {
 
 			if (ImGui::BeginPopup("popup")) {
 				paste_ui((GroupNode&)node);
+				ImGui::EndPopup();
+			}
+
+			if (ImGui::BeginPopup("condition_popup")) {
+				ImGui::TextUnformatted(node.m_name.c_str());
+				ImGui::Separator();
+				if (ImGui::Selectable("Remove")) {
+					if (m_current_node == &node) m_current_node = nullptr;
+					ConditionNode* cond = (ConditionNode*)node.m_parent;
+					if (cond->m_true_node == &node) cond->m_true_node = nullptr;
+					else if (cond->m_false_node == &node) cond->m_false_node = nullptr;
+					LUMIX_DELETE(m_controller->m_allocator, &node);
+					ImGui::EndPopup();
+					ImGui::TreePop();
+					return true;
+				}
 				ImGui::EndPopup();
 			}
 
@@ -702,10 +803,16 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 					break;
 				}
+				case Node::Type::CONDITION: {
+					ConditionNode& cond = (ConditionNode&)node;
+					if (cond.m_true_node) changed = hierarchy_ui(*cond.m_true_node) || changed;
+					if (cond.m_false_node) changed = hierarchy_ui(*cond.m_false_node) || changed;
+					break;
+				}
 				case Node::Type::LAYERS: {
 					LayersNode& layers = (LayersNode&)node;
 					for (LayersNode::Layer& l : layers.m_layers) {
-						changed = hierarchy_ui(l.node) || changed;
+						changed = hierarchy_ui(*l.node) || changed;
 					}
 					break;
 				}
@@ -779,7 +886,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		ImGui::End();
 	}
 
-	void save(const char* path) {
+	void saveAs(const char* path) {
 		OutputMemoryStream blob(m_controller->m_allocator);
 		m_controller->serialize(blob);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -789,6 +896,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 		m_path = path;
 		m_dirty = false;
+		m_recent_paths.push(path);
 	}
 
 	void newGraph() {
@@ -800,8 +908,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		IAllocator& allocator = m_app.getAllocator();
 		m_path = "";
 		m_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
-		m_controller->initEmpty();
-		m_current_node = m_controller->m_root;
+		m_current_node = nullptr;
 		m_undo_stack.clear();
 		m_undo_idx = -1;
 		pushUndo();
@@ -810,7 +917,7 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	void save() {
 		if (m_path.empty()) m_show_save_as = true;
-		else save(m_path);
+		else saveAs(m_path);
 	}
 
 	void pushUndo(u64 tag = ~u64(0)) {
@@ -857,24 +964,24 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool canUndo() const { return m_undo_idx > 0; }
 	bool canRedo() const { return m_undo_idx < m_undo_stack.size() - 1; }
 
-	bool hasFocus() override { return m_has_focus; }
+	bool hasFocus() const override { return m_has_focus; }
 
-	void onWindowGUI() override {
+	void onGUI() override {
 		m_has_focus = false;
 		if (!m_open) return;
 
 		debuggerUI();
 
 		if (m_confirm_new) {
-			ImGui::OpenPopup("Confirm##cn");
+			ImGui::OpenPopup("Confirm##cna");
 			m_confirm_new = false;
 		}
 		if (m_confirm_load) {
-			ImGui::OpenPopup("Confirm##cl");
+			ImGui::OpenPopup("Confirm##cla");
 			m_confirm_load = false;
 		}
 
-		if (ImGui::BeginPopupModal("Confirm##cn")) {
+		if (ImGui::BeginPopupModal("Confirm##cna")) {
 			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
 			if (ImGui::Selectable("Yes")) {
 				m_dirty = false;
@@ -884,22 +991,12 @@ struct ControllerEditorImpl : ControllerEditor {
 			ImGui::EndPopup();
 		}
 
-		if (ImGui::BeginPopupModal("Confirm##cl")) {
+		if (ImGui::BeginPopupModal("Confirm##cla")) {
 			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
 			if (ImGui::Selectable("Yes")) {
 				m_dirty = false;
 				load(m_confirm_path);
 				m_confirm_path = "";
-			}
-			ImGui::Selectable("No");
-			ImGui::EndPopup();
-		}
-
-		if (ImGui::BeginPopupModal("Confirm##cn")) {
-			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
-			if (ImGui::Selectable("Yes")) {
-				m_dirty = false;
-				newGraph();
 			}
 			ImGui::Selectable("No");
 			ImGui::EndPopup();
@@ -911,9 +1008,10 @@ struct ControllerEditorImpl : ControllerEditor {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGui::BeginMenu("File")) {
 					if (ImGui::MenuItem("New")) newGraph();
-					if (ImGui::MenuItem("Save")) save();
+					menuItem(m_app.getSaveAction(), true);
 					if (ImGui::MenuItem("Save As")) m_show_save_as = true;
 					if (ImGui::MenuItem("Load")) load();
+					if (const char* path = m_recent_paths.menu(); path) load(path);
 				
 					if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity())) {
 						load(getPathFromEntity().c_str());
@@ -922,16 +1020,47 @@ struct ControllerEditorImpl : ControllerEditor {
 				}
 				
 				if (ImGui::BeginMenu("Edit")) {
-					menuItem(m_undo_action, canUndo());
-					menuItem(m_redo_action, canRedo());
+					menuItem(m_app.getUndoAction(), canUndo());
+					menuItem(m_app.getRedoAction(), canRedo());
 					ImGui::EndMenu();
 				}
 
-				if (m_current_node && m_current_node->type() == Node::Type::GROUP) {
+				if (!m_current_node && !m_controller->m_root) {
+					if (ImGui::BeginMenu("Create root")) {
+						if (ImGui::MenuItem("Animation")) createRoot(Node::ANIMATION, m_controller->m_allocator);
+						if (ImGui::MenuItem("Blend1D")) createRoot(Node::BLEND1D, m_controller->m_allocator);
+						if (ImGui::MenuItem("Condition")) createRoot(Node::CONDITION, m_controller->m_allocator);
+						if (ImGui::MenuItem("Group")) createRoot(Node::GROUP, m_controller->m_allocator);
+						if (ImGui::MenuItem("Layers")) createRoot(Node::LAYERS, m_controller->m_allocator);
+						ImGui::EndMenu();
+					}
+				}
+				else if (m_current_node && m_current_node->type() == Node::Type::LAYERS) {
+					LayersNode& layers = (LayersNode&)*m_current_node;
+					if (ImGui::BeginMenu("Create layer")) {
+						if (ImGui::MenuItem("Animation")) createChild(layers, Node::ANIMATION, m_controller->m_allocator);
+						if (ImGui::MenuItem("Blend1D")) createChild(layers, Node::BLEND1D, m_controller->m_allocator);
+						if (ImGui::MenuItem("Condition")) createChild(layers, Node::CONDITION, m_controller->m_allocator);
+						if (ImGui::MenuItem("Group")) createChild(layers, Node::GROUP, m_controller->m_allocator);
+						ImGui::EndMenu();
+					}
+				}
+				else if (m_current_node && m_current_node->type() == Node::Type::CONDITION) {
+					ConditionNode& cond = (ConditionNode&)*m_current_node;
+					if ((!cond.m_true_node || !cond.m_false_node) && ImGui::BeginMenu("Create node")) {
+						if (ImGui::MenuItem("Animation")) createChild(cond, Node::ANIMATION, m_controller->m_allocator);
+						if (ImGui::MenuItem("Blend1D")) createChild(cond, Node::BLEND1D, m_controller->m_allocator);
+						if (ImGui::MenuItem("Condition")) createChild(cond, Node::CONDITION, m_controller->m_allocator);
+						if (ImGui::MenuItem("Group")) createChild(cond, Node::GROUP, m_controller->m_allocator);
+						ImGui::EndMenu();
+					}
+				}
+				else if (m_current_node && m_current_node->type() == Node::Type::GROUP) {
 					if (ImGui::BeginMenu("Create node")) {
 						GroupNode& group = (GroupNode&)*m_current_node;
 						if (ImGui::MenuItem("Animation")) createChild(group, Node::ANIMATION, m_controller->m_allocator);
 						if (ImGui::MenuItem("Blend1D")) createChild(group, Node::BLEND1D, m_controller->m_allocator);
+						if (ImGui::MenuItem("Condition")) createChild(group, Node::CONDITION, m_controller->m_allocator);
 						if (ImGui::MenuItem("Group")) createChild(group, Node::GROUP, m_controller->m_allocator);
 						if (ImGui::MenuItem("Layers")) createChild(group, Node::LAYERS, m_controller->m_allocator);
 						ImGui::EndMenu();
@@ -945,11 +1074,11 @@ struct ControllerEditorImpl : ControllerEditor {
 
 			FileSelector& fs = m_app.getFileSelector();
 			if (fs.gui("Open", &m_show_open, "act", false)) load(fs.getPath());
-			if (fs.gui("Save As", &m_show_save_as, "act", true)) save(fs.getPath());
+			if (fs.gui("Save As", &m_show_save_as, "act", true)) saveAs(fs.getPath());
 
 			if (m_update) updateSelectedEntity();
 
-			if (hierarchy_ui(*m_controller->m_root)) {
+			if (m_controller->m_root && hierarchy_ui(*m_controller->m_root)) {
 				pushUndo();
 			}
 
@@ -1217,13 +1346,12 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool m_confirm_load = false;
 	StaticString<LUMIX_MAX_PATH> m_confirm_path;
 	Action m_toggle_ui;
-	Action m_undo_action;
-	Action m_redo_action;
 	bool m_update = false;
 	StaticString<LUMIX_MAX_PATH> m_path;
 	bool m_show_save_as = false;
 	bool m_show_open = false;
 	Array<UniquePtr<EventType>> m_event_types;
+	RecentPaths m_recent_paths;
 }; // ControllerEditorImpl
 
 UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {

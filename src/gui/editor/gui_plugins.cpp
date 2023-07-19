@@ -241,7 +241,7 @@ public:
 		: m_app(app)
 	{
 		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "", true);
-		m_toggle_ui.func.bind<&GUIEditor::onAction>(this);
+		m_toggle_ui.func.bind<&GUIEditor::onToggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);
 	}
@@ -274,7 +274,7 @@ private:
 		m_app.getSettings().setValue(Settings::GLOBAL, "is_gui_editor_open", m_is_window_open);
 	}
 
-	void onAction() { m_is_window_open = !m_is_window_open; }
+	void onToggleOpen() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
 
 
@@ -411,7 +411,7 @@ private:
 	}
 
 
-	void onWindowGUI() override
+	void onGUI() override
 	{
 		if (!m_is_window_open) return;
 		if (ImGui::Begin("GUIEditor", &m_is_window_open))

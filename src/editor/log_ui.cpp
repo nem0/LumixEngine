@@ -142,7 +142,7 @@ int LogUI::getUnreadErrorCount() const
 void LogUI::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_log_open; }
 void LogUI::onBeforeSettingsSaved() { m_app.getSettings().m_is_log_open  = m_is_open; }
 
-void LogUI::onWindowGUI()
+void LogUI::onGUI()
 {
 	MutexGuard lock(m_guard);
 	showNotifications();

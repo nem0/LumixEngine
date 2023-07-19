@@ -50,7 +50,7 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		void onSettingsLoaded() override;
 		void onBeforeSettingsSaved() override;
 		const char* getName() const override { return "log"; }
-		void onWindowGUI() override;
+		void onGUI() override;
 		void update(float time_delta) override;
 		bool isOpen() const { return m_is_open; }
 		void toggleUI() { m_is_open = !m_is_open; }

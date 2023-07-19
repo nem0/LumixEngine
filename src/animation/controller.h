@@ -14,13 +14,14 @@ struct Pose;
 
 namespace anim {
 
-struct GroupNode;
+struct Node;
 struct RuntimeContext;
 
 enum class ControllerVersion : u32 {
 	EVENTS,
 	TRANSITIONS,
 	HASH64,
+	NO_ROOT,
 
 	LATEST
 };
@@ -37,7 +38,6 @@ public:
 	void destroyRuntime(RuntimeContext& ctx);
 	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const;
 	void getPose(RuntimeContext& ctx, struct Pose& pose);
-	void initEmpty();
 	void destroy();
 
 	ResourceType getType() const override { return TYPE; }
@@ -50,7 +50,7 @@ public:
 	};
 
 	IAllocator& m_allocator;
-	GroupNode* m_root = nullptr;
+	Node* m_root = nullptr;
 	Array<AnimationEntry> m_animation_entries;
 	Array<String> m_animation_slots;
 	Array<BoneMask> m_bone_masks;

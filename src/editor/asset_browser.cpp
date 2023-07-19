@@ -125,24 +125,12 @@ struct AssetBrowserImpl : AssetBrowser {
 		onBasePathChanged();
 
 		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
-		m_back_action.func.bind<&AssetBrowserImpl::goBack>(this);
 		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, false);
-		m_forward_action.func.bind<&AssetBrowserImpl::goForward>(this);
 
 		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", false);
 		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
 
-		m_undo_action.init(ICON_FA_UNDO "Undo", "Asset browser undo", "asset_browser_undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
-		m_undo_action.func.bind<&AssetBrowserImpl::undo>(this);
-		m_undo_action.plugin = this;
-		
-		m_redo_action.init(ICON_FA_REDO "Redo", "Asset browser redo", "asset_browser_redo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
-		m_redo_action.func.bind<&AssetBrowserImpl::redo>(this);
-		m_redo_action.plugin = this;
-
-		m_app.addAction(&m_undo_action);
-		m_app.addAction(&m_redo_action);
 		m_app.addAction(&m_back_action);
 		m_app.addAction(&m_forward_action);
 		m_app.addWindowAction(&m_toggle_ui);
@@ -173,8 +161,6 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	~AssetBrowserImpl() override
 	{
-		m_app.removeAction(&m_undo_action);
-		m_app.removeAction(&m_redo_action);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
@@ -182,6 +168,15 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.getAssetCompiler().resourceCompiled().unbind<&AssetBrowserImpl::onResourceCompiled>(this);
 
 		ASSERT(m_plugins.size() == 0);
+	}
+
+	bool onAction(const Action& action) override {
+		if (&action == &m_back_action) goBack();
+		else if (&action == &m_forward_action) goForward();
+		else if (&action == &m_app.getUndoAction()) undo();
+		else if (&action == &m_app.getRedoAction()) redo();
+		else return false;
+		return true;
 	}
 
 	void onInitFinished() override {
@@ -273,7 +268,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_selected_resources.clear();
 	}
 	
-	bool hasFocus() override { return m_has_focus; }
+	bool hasFocus() const override { return m_has_focus; }
 
 	void update(float) override
 	{
@@ -411,9 +406,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void dirColumn()
 	{
-		ImVec2 size(maximum(120.f, m_left_column_width), 0);
-		ImGui::BeginChild("left_col", size);
-		ImGui::PushItemWidth(120);
+		ImGui::BeginChild("left_col");
 		bool b = false;
 		if ((m_dir[0] != '.' || m_dir[1] != 0) && ImGui::Selectable("..", &b))
 		{
@@ -431,7 +424,6 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 
-		ImGui::PopItemWidth();
 		ImGui::EndChild();
 	}
 
@@ -902,7 +894,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void onWindowGUI() override {
+	void onGUI() override {
 		m_has_focus = false;
 		if (m_dir.data[0] == '\0') changeDir(".", true);
 
@@ -931,21 +923,14 @@ struct AssetBrowserImpl : AssetBrowser {
 			breadcrumbs();
 			ImGui::Separator();
 
-			float content_w = ImGui::GetContentRegionAvail().x;
-			ImVec2 left_size(m_left_column_width, 0);
-			if (left_size.x < 10) left_size.x = 10;
-			if (left_size.x > content_w - 10) left_size.x = content_w - 10;
-	
-			dirColumn();
-
-			ImGui::SameLine();
-			ImGuiEx::VSplitter("vsplit1", &left_size);
-			if (left_size.x >= 120) {
-				m_left_column_width = left_size.x;
+			if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				dirColumn();
+				ImGui::TableNextColumn();
+				fileColumn();
+				ImGui::EndTable();
 			}
-			ImGui::SameLine();
-
-			fileColumn();
 
 			ImGui::End();
 		}
@@ -1347,7 +1332,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	bool m_is_open;
-	float m_left_column_width = 120;
 	StudioApp& m_app;
 	StaticString<LUMIX_MAX_PATH> m_dir;
 	Array<StaticString<LUMIX_MAX_PATH> > m_subdirs;
@@ -1375,8 +1359,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	Action m_toggle_ui;
 	Action m_back_action;
 	Action m_forward_action;
-	Action m_undo_action;
-	Action m_redo_action;
 };
 
 UniquePtr<AssetBrowser> AssetBrowser::create(StudioApp& app) {

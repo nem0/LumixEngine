@@ -24,7 +24,7 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
 
 private:
-	void onWindowGUI() override;
+	void onGUI() override;
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
 	const char* getName() const override { return "property_grid"; }

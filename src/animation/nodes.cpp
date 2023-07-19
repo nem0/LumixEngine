@@ -110,7 +110,7 @@ void RuntimeContext::setInput(u32 input_idx, bool value) {
 	memcpy(&inputs[offset], &value, sizeof(value));
 }
 
-Blend1DNode::Blend1DNode(GroupNode* parent, IAllocator& allocator)
+Blend1DNode::Blend1DNode(Node* parent, IAllocator& allocator)
 	: Node(parent, allocator) 
 	, m_children(allocator)
 {}
@@ -263,7 +263,142 @@ void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 v
 	stream.read(m_children.begin(), m_children.byte_size());
 }
 
-AnimationNode::AnimationNode(GroupNode* parent, IAllocator& allocator) 
+ConditionNode::ConditionNode(Node* parent, IAllocator& allocator)
+	: Node(parent, allocator)
+	, m_condition(allocator)
+	, m_condition_str(allocator)
+	, m_allocator(allocator)
+{
+}
+
+ConditionNode::~ConditionNode() {
+	LUMIX_DELETE(m_allocator, m_true_node);
+	LUMIX_DELETE(m_allocator, m_false_node);
+}
+
+void ConditionNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+	if (!m_true_node || !m_false_node) return;
+
+	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	
+	const bool is_transitioning = data.t < m_blend_length;
+	if (is_transitioning) {
+		data.t += ctx.time_delta;
+		
+		const bool transition_finished = data.t >= m_blend_length;
+		if (transition_finished) {
+			// TODO remaining root motion from skipped node
+			(data.is_true ? m_false_node : m_true_node)->skip(ctx);
+			ctx.data.write(data);
+			(data.is_true ? m_true_node : m_false_node)->update(ctx, root_motion);
+			return;
+		}
+		
+		ctx.data.write(data);
+
+		(data.is_true ? m_false_node : m_true_node)->update(ctx, root_motion);
+		LocalRigidTransform tmp;
+		(data.is_true ? m_true_node : m_false_node)->update(ctx, tmp);
+		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
+		return;
+	}
+	
+	const bool is_true = m_condition.eval(ctx);
+	if (data.is_true != is_true) {
+		data.t = Time(0);
+		data.is_true = is_true;
+		ctx.data.write(data);
+		(is_true ? m_false_node : m_true_node)->update(ctx, root_motion);
+		(is_true ? m_true_node : m_false_node)->enter(ctx);
+		return;
+	}
+
+	ctx.data.write(data);
+	(data.is_true ? m_true_node : m_false_node)->update(ctx, root_motion);
+}
+
+void ConditionNode::enter(RuntimeContext& ctx) const {
+	if (!m_true_node || !m_false_node) return;
+
+	RuntimeData rdata;
+	rdata.t = m_blend_length;
+	rdata.is_true = m_condition.eval(ctx);
+	ctx.data.write(rdata);
+	(rdata.is_true ? m_true_node : m_false_node)->enter(ctx);
+}
+
+void ConditionNode::skip(RuntimeContext& ctx) const {
+	if (!m_true_node || !m_false_node) return;
+
+	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	Node* running_child = data.is_true ? m_true_node : m_false_node;
+	running_child->skip(ctx);
+}
+
+void ConditionNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
+	if (!m_true_node || !m_false_node) return;
+
+	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	const bool is_transitioning = data.t < m_blend_length;
+	if (is_transitioning) {
+		(data.is_true ? m_false_node : m_true_node)->getPose(ctx, weight, pose, mask);
+		const float t = clamp(data.t / m_blend_length, 0.f, 1.f);
+		(data.is_true ? m_true_node : m_false_node)->getPose(ctx, weight * t, pose, mask);
+	}
+	else {
+		(data.is_true ? m_true_node : m_false_node)->getPose(ctx, weight, pose, mask);
+	}
+}
+
+void ConditionNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+
+	stream.write(m_condition_str);
+	stream.write(m_blend_length);
+
+	stream.write(m_true_node != nullptr);
+	if (m_true_node) {
+		stream.write(m_true_node->type());
+		m_true_node->serialize(stream);
+	}
+	stream.write(m_false_node != nullptr);
+	if (m_false_node) {
+		stream.write(m_false_node->type());
+		m_false_node->serialize(stream);
+	}
+}
+
+void ConditionNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
+
+	stream.read(m_condition_str);
+	m_condition.compile(m_condition_str.c_str(), ctrl.m_inputs);
+	stream.read(m_blend_length);
+
+	if (stream.read<bool>()) {
+		Node::Type type;
+		stream.read(type);
+		m_true_node = Node::create(this, type, m_allocator);
+		m_true_node->deserialize(stream, ctrl, version);
+	}
+
+	if (stream.read<bool>()) {
+		Node::Type type;
+		stream.read(type);
+		m_false_node = Node::create(this, type, m_allocator);
+		m_false_node->deserialize(stream, ctrl, version);
+	}
+}
+
+Time ConditionNode::length(const RuntimeContext& ctx) const {
+	return Time::fromSeconds(1);
+}
+
+Time ConditionNode::time(const RuntimeContext& ctx) const {
+	return Time::fromSeconds(0);
+}
+
+AnimationNode::AnimationNode(Node* parent, IAllocator& allocator) 
 	: Node(parent, allocator) 
 {}
 
@@ -361,23 +496,28 @@ void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32
 	stream.read(m_flags);
 }
 
-LayersNode::Layer::Layer(GroupNode* parent, IAllocator& allocator) 
- : node(parent, allocator)
- , name(allocator)
+LayersNode::Layer::Layer(IAllocator& allocator) 
+	: name(allocator)
 {
 }
 
-LayersNode::LayersNode(GroupNode* parent, IAllocator& allocator) 
+LayersNode::LayersNode(Node* parent, IAllocator& allocator) 
 	: Node(parent, allocator)
 	, m_layers(allocator)
 	, m_allocator(allocator)
 {
 }
 
+LayersNode::~LayersNode() {
+	for (Layer& l : m_layers) {
+		LUMIX_DELETE(m_allocator, l.node);
+	}
+}
+
 void LayersNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	for (const Layer& layer : m_layers) {
 		LocalRigidTransform tmp_rm;
-		layer.node.update(ctx, tmp_rm);
+		layer.node->update(ctx, tmp_rm);
 		if (&layer == m_layers.begin()) {
 			root_motion = tmp_rm;
 		}
@@ -394,19 +534,19 @@ Time LayersNode::time(const RuntimeContext& ctx) const {
 
 void LayersNode::enter(RuntimeContext& ctx) const {
 	for (const Layer& layer : m_layers) {
-		layer.node.enter(ctx);
+		layer.node->enter(ctx);
 	}
 }
 
 void LayersNode::skip(RuntimeContext& ctx) const {
 	for (const Layer& layer : m_layers) {
-		layer.node.skip(ctx);
+		layer.node->skip(ctx);
 	}
 }
 
 void LayersNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
 	for (const Layer& layer : m_layers) {
-		layer.node.getPose(ctx, weight, pose, layer.mask);
+		layer.node->getPose(ctx, weight, pose, layer.mask);
 	}
 }
 
@@ -415,7 +555,8 @@ void LayersNode::serialize(OutputMemoryStream& stream) const {
 	for (const Layer& layer : m_layers) {
 		stream.writeString(layer.name.c_str());
 		stream.write(layer.mask);
-		layer.node.serialize(stream);
+		stream.write(layer.node->type());
+		layer.node->serialize(stream);
 	}
 }
 
@@ -424,14 +565,17 @@ void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ve
 	u32 c;
 	stream.read(c);
 	for (u32 i = 0; i < c; ++i) {
-		Layer& layer = m_layers.emplace(m_parent, m_allocator);
+		Layer& layer = m_layers.emplace(m_allocator);
 		layer.name = stream.readString();
 		stream.read(layer.mask);
-		layer.node.deserialize(stream, ctrl, version);
+		Node::Type type;
+		stream.read(type);
+		layer.node = Node::create(this, type, m_allocator);
+		layer.node->deserialize(stream, ctrl, version);
 	}
 }
 
-GroupNode::GroupNode(GroupNode* parent, IAllocator& allocator)
+GroupNode::GroupNode(Node* parent, IAllocator& allocator)
 	: Node(parent, allocator)
 	, m_allocator(allocator)
 	, m_children(allocator)
@@ -626,12 +770,14 @@ void Node::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version)
 	}
 }
 
-Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {
+Node* Node::create(Node* parent, Type type, IAllocator& allocator) {
 	switch (type) {
 		case Node::ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(parent, allocator);
 		case Node::GROUP: return LUMIX_NEW(allocator, GroupNode)(parent, allocator);
 		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, allocator);
 		case Node::LAYERS: return LUMIX_NEW(allocator, LayersNode)(parent, allocator);
+		case Node::CONDITION: return LUMIX_NEW(allocator, ConditionNode)(parent, allocator);
+		case Node::NONE: ASSERT(false); return nullptr;
 	}
 	ASSERT(false);
 	return nullptr;

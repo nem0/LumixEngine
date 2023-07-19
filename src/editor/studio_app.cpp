@@ -428,6 +428,10 @@ struct StudioAppImpl final : StudioApp
 		m_asset_compiler.reset();
 		m_editor.reset();
 
+		removeAction(&m_save_action);
+		removeAction(&m_undo_action);
+		removeAction(&m_redo_action);
+
 		for (Action* action : m_owned_actions) {
 			removeAction(action);
 			LUMIX_DELETE(m_allocator, action);
@@ -676,6 +680,9 @@ struct StudioAppImpl final : StudioApp
 		ImGui::PushFont(m_font);
 	}
 
+	u32 getDockspaceID() const override {
+		return m_dockspace_id;
+	}
 
 	void guiEndFrame()
 	{
@@ -694,8 +701,8 @@ struct StudioAppImpl final : StudioApp
 			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 				ImGui::Begin("MainDockspace", nullptr, flags);
 				ImGui::PopStyleVar();
-				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
-				ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
+				m_dockspace_id = ImGui::GetID("MyDockspace");
+				ImGui::DockSpace(m_dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
 				ImGui::End();
 				showWelcomeScreen();
 			}
@@ -708,16 +715,16 @@ struct StudioAppImpl final : StudioApp
 				ImGui::Begin("MainDockspace", nullptr, flags);
 				ImGui::PopStyleVar();
 				mainMenu();
-				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
-				ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
+				m_dockspace_id = ImGui::GetID("MyDockspace");
+				ImGui::DockSpace(m_dockspace_id, ImVec2(0, 0));
 				ImGui::End();
 			
 				m_asset_compiler->onGUI();
 				onEntityListGUI();
 				onSaveAsDialogGUI();
-				for (auto* plugin : m_gui_plugins)
-				{
-					plugin->onWindowGUI();
+				for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
+					GUIPlugin* win = m_gui_plugins[i];
+					win->onGUI();
 				}
 				m_settings.onGUI();
 				onExportDataGUI();
@@ -1072,11 +1079,9 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	GUIPlugin* getFocusedPlugin()
-	{
-		for (GUIPlugin* plugin : m_gui_plugins)
-		{
-			if (plugin->hasFocus()) return plugin;
+	GUIPlugin* getFocusedWindow() {
+		for (GUIPlugin* win : m_gui_plugins) {
+			if (win->hasFocus()) return win;
 		}
 		return nullptr;
 	}
@@ -1362,7 +1367,7 @@ struct StudioAppImpl final : StudioApp
 			onCreateEntityWithComponentGUI(INVALID_ENTITY);
 			ImGui::EndMenu();
 		}
-		menuItem("destroyEntity", is_any_entity_selected);
+		menuItem("delete", is_any_entity_selected);
 		menuItem("savePrefab", selected_entities.size() == 1);
 		menuItem("makeParent", selected_entities.size() == 2);
 		bool can_unparent =
@@ -2219,20 +2224,31 @@ struct StudioAppImpl final : StudioApp
 		m_file_selector.m_current_dir = m_settings.getStringValue(Settings::LOCAL, "fileselector_dir", "");
 	}
 
+	Action& getRedoAction() override { return m_redo_action; }
+	Action& getUndoAction() override { return m_undo_action; }
+	Action& getSaveAction() override { return m_save_action; }
+	Action& getDeleteAction() override { return m_delete_action; }
 
 	void addActions()
 	{
+		m_save_action.init(ICON_FA_SAVE "Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
+		m_save_action.func.bind<&StudioAppImpl::save>(this);
+		addAction(&m_save_action);
+		m_undo_action.init(ICON_FA_UNDO "Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
+		m_undo_action.func.bind<&StudioAppImpl::undo>(this);
+		addAction(&m_undo_action);
+		m_redo_action.init(ICON_FA_REDO "Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
+		m_redo_action.func.bind<&StudioAppImpl::redo>(this);
+		addAction(&m_redo_action);
+		m_delete_action.init(ICON_FA_MINUS_SQUARE "Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, true);
+		m_delete_action.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
+		addAction(&m_delete_action);
+
 		addAction<&StudioAppImpl::newWorld>(ICON_FA_PLUS "New", "New world", "newWorld", ICON_FA_PLUS);
-		addAction<&StudioAppImpl::save>(
-			ICON_FA_SAVE "Save", "Save world", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::saveAs>(
 			NO_ICON "Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::exit>(
 			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::redo>(
-			ICON_FA_REDO "Redo", "Redo world action", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
-		addAction<&StudioAppImpl::undo>(
-			ICON_FA_UNDO "Undo", "Undo world action", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::copy>(
 			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::paste>(
@@ -2251,12 +2267,7 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&Gizmo::Config::isGlobalCoordSystem>(&getGizmoConfig());
 
 		addAction<&StudioAppImpl::addEntity>(ICON_FA_PLUS_SQUARE "Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE);
-		addAction<&StudioAppImpl::destroySelectedEntity>(ICON_FA_MINUS_SQUARE "Destroy",
-			"Destroy entity",
-			"destroyEntity",
-			ICON_FA_MINUS_SQUARE,
-			os::Keycode::DEL,
-			Action::Modifiers::NONE);
+		
 		addAction<&StudioAppImpl::savePrefab>(ICON_FA_SAVE "Save prefab", "Save selected entities as prefab", "savePrefab", ICON_FA_SAVE);
 		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
 		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
@@ -2579,7 +2590,6 @@ struct StudioAppImpl final : StudioApp
 	void addPlugin(MousePlugin& plugin) override { m_mouse_plugins.push(&plugin); }
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
-
 
 	void setStudioApp()
 	{
@@ -3264,23 +3274,28 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void checkShortcuts()
-	{
+	void checkShortcuts() {
 		if (ImGui::IsAnyItemActive()) return;
-		GUIPlugin* plugin = getFocusedPlugin();
+
+		GUIPlugin* window = getFocusedWindow();
 		u8 pressed_modifiers = 0;
 		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
 		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
 		if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Action::Modifiers::ALT;
 
-		for (Action* a : m_actions) {
-			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers ==0)) continue;
-			if (a->plugin != plugin) continue;
+		// os::isKeyDown is useless on windows, since GetAsyncKeyStates returns only state from the last call
+		for (Action*& a : m_actions) {
+			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers == 0)) continue;
 			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;
 			if (a->modifiers != pressed_modifiers) continue;
+			
+			if (window && window->onAction(*a))
+				return;
 
-			a->func.invoke();
-			return;
+			if (a->func.isValid()) {
+				a->func.invoke();
+				return;
+			}
 		}
 	}
 
@@ -3319,6 +3334,11 @@ struct StudioAppImpl final : StudioApp
 	Array<Action*> m_tools_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
+
+	Action m_save_action;
+	Action m_delete_action;
+	Action m_undo_action;
+	Action m_redo_action;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
@@ -3395,6 +3415,7 @@ struct StudioAppImpl final : StudioApp
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
 	ImFont* m_bold_font;
+	ImGuiID m_dockspace_id = 0;
 
 	struct WatchedPlugin {
 		UniquePtr<FileSystemWatcher> watcher;

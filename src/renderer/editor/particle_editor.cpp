@@ -1,5 +1,6 @@
 #include "particle_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -50,7 +51,6 @@ enum class ValueType : i32 {
 
 struct Node;
 
-// TODO freeRegister is not called in some places event when possible - maybe design a better system?
 // TODO constant propagation
 
 struct GenerateContext {
@@ -68,12 +68,6 @@ struct GenerateContext {
 	void write(const void* data, u64 size) { ip.write(data, size); }
 	template <typename T> void write(const T& value) { ip.write(value); }
 	void write(InstructionType value) { ip.write(value); ++m_instruction_count; }
-
-	void freeRegister(DataStream v) {
-		if (v.type != DataStream::REGISTER) return;
-		if (m_persistent_register_mask & (1 << v.index)) return;
-		m_register_mask &= ~(1 << v.index);
-	}
 
 	DataStream persistentRegister() {
 		DataStream r;
@@ -179,12 +173,13 @@ struct Node : NodeEditorNode {
 	virtual ~Node() {}
 
 	virtual Type getType() const = 0;
-	virtual DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) = 0;
+	virtual DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) = 0;
 	virtual void beforeGenerate() {};
 	virtual void serialize(OutputMemoryStream& blob) const {}
 	virtual void deserialize(InputMemoryStream& blob, Version version) {}
 	virtual bool canDelete() const { return true; }
 
+	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex);
 	NodeInput getInput(u8 input_idx);
 
 	void inputSlot(ImGuiEx::PinShape shape = ImGuiEx::PinShape::CIRCLE) {
@@ -222,7 +217,7 @@ struct Node : NodeEditorNode {
 			ImGui::PopStyleColor();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
 		}
-		return res || old_pos.x != m_pos.x || old_pos.y != m_pos.y;
+		return res;
 	}
 
 	bool m_selected = false;
@@ -621,6 +616,24 @@ Node::Node(struct ParticleEmitterEditorResource& res)
 	m_id = res.genID();
 }
 
+DataStream Node::generate(GenerateContext& ctx, DataStream output, u8 subindex) {
+	using MaskType = decltype(ctx.m_register_mask);
+	
+	const MaskType old_mask = ctx.m_register_mask;
+	const DataStream res = generateInternal(ctx, output, subindex);
+	if (res.type == DataStream::ERROR) return res;
+
+	for (u32 i = 0; i < sizeof(ctx.m_register_mask) * 8; ++i) {
+		const MaskType m = MaskType(1 << i);
+		const bool is_set = ctx.m_register_mask & m;
+		const bool was_set = (old_mask & m) != 0;
+		const bool is_persistent = (ctx.m_persistent_register_mask & m) != 0;
+		const bool is_output = res.type == DataStream::REGISTER || res.index == i;
+		if (is_set && !was_set && !is_persistent && !is_output) ctx.m_register_mask &= ~m;
+	}
+	return res;
+}
+
 NodeInput Node::getInput(u8 input_idx) {
 	for (const NodeEditorLink& link : m_resource.m_links) {
 		if (link.getToNode() != m_id) continue;
@@ -654,6 +667,8 @@ struct ParticleSystemEditorResource {
 	bool isFunction() const {
 		return m_emitters[0]->m_nodes.size() == 0 || m_emitters[0]->m_nodes[0]->getType() != Node::UPDATE;
 	}
+
+	void registerDependencies();
 
 	void serialize(OutputMemoryStream& blob) {
 		Header header;
@@ -762,7 +777,7 @@ struct UnaryFunctionNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 		
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 			
@@ -776,8 +791,6 @@ struct UnaryFunctionNode : Node {
 		}
 		ctx.write(dst);
 		ctx.write(op0);
-
-		ctx.freeRegister(op0);
 
 		return dst;
 	}
@@ -806,7 +819,7 @@ struct MeshNode : Node {
 		index = DataStream();
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		if (index.type == DataStream::NONE) {
 			index = ctx.streamOrRegister(index);
 			ctx.write(InstructionType::MOV);
@@ -844,7 +857,7 @@ struct CacheNode : Node {
 		
 	void beforeGenerate() override { m_cached = {}; }
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		if (m_cached.type == DataStream::NONE) {
 			const NodeInput input = getInput(0);
 			if (!input.node) return error("Invalid input");
@@ -858,7 +871,6 @@ struct CacheNode : Node {
 				ctx.write(InstructionType::MOV);
 				ctx.write(m_cached);
 				ctx.write(op0);
-				ctx.freeRegister(op0);
 			}
 
 			if (dst.type == DataStream::NONE) {
@@ -893,7 +905,7 @@ struct SplineNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 		
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 
@@ -905,7 +917,6 @@ struct SplineNode : Node {
 		ctx.write(dst);
 		ctx.write(op0);
 		ctx.write(subindex);
-		ctx.freeRegister(op0);
 		return dst;
 	}
 
@@ -923,7 +934,7 @@ struct GradientColorNode : Node {
 
 	Type getType() const override { return Type::GRADIENT_COLOR; }
 	
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 
@@ -955,7 +966,6 @@ struct GradientColorNode : Node {
 			ctx.write(values[i][subindex]);
 		}
 
-		ctx.freeRegister(t);
 		return dst;
 	}
 
@@ -988,7 +998,7 @@ struct CurveNode : Node {
 	CurveNode(ParticleEmitterEditorResource& res) : Node(res) {}
 	Type getType() const override { return Type::CURVE; }
 	
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 
@@ -1018,7 +1028,6 @@ struct CurveNode : Node {
 			ctx.write(values, sizeof(values[0]) * count);
 		}
 
-		ctx.freeRegister(t);
 		return dst;
 	}
 
@@ -1131,7 +1140,7 @@ struct ChannelMaskNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		if (subindex > 0) return error("Invalid subindex");
 
 		const NodeInput input = getInput(0);
@@ -1162,7 +1171,7 @@ struct EmitInputNode : Node {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (subindex >= getCount(m_resource.m_emit_inputs[idx].type)) return error("Invalid subindex");
 		if (ctx.context != GenerateContext::INIT) return error("Invalid context");
 		DataStream res;
@@ -1189,7 +1198,7 @@ struct NoiseNode : Node {
 		
 	Type getType() const override { return Type::NOISE; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		if (subindex > 0) return error("Invalid subindex");
 
 		const NodeInput input0 = getInput(0);
@@ -1227,7 +1236,7 @@ struct RandomNode : Node {
 		
 	Type getType() const override { return Type::RANDOM; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		if (subindex > 0) return error("Invalid subindex");
 
 		ctx.write(InstructionType::RAND);
@@ -1280,7 +1289,7 @@ struct LiteralNode : Node {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		DataStream r;
 		r.type = DataStream::LITERAL;
 		r.value = value;
@@ -1306,7 +1315,7 @@ struct VectorNode : Node {
 		
 	Type getType() const override { return T; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		if constexpr (T == Node::Type::VEC3) {
 			if (subindex > 2) return error("Invalid subindex");
 		}
@@ -1404,7 +1413,7 @@ struct StreamNode : Node {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (ctx.context == GenerateContext::INIT) return error("Invalid context");
 
 		DataStream r;
@@ -1475,7 +1484,7 @@ struct InitNode : Node {
 		return false;
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (ctx.context != GenerateContext::INIT) return error("Invalid context");
 
 		ASSERT(ctx.m_register_mask == 0);
@@ -1538,7 +1547,7 @@ struct UpdateNode : Node {
 		return false;
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (ctx.context != GenerateContext::UPDATE) return error("Invalid context");
 
 		const NodeInput kill_input = getInput(0);
@@ -1606,7 +1615,7 @@ struct FunctionInputNode : Node {
 		return inputString("Name", &m_name);
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		for (const GenerateContext::FunctionInput& i : ctx.m_function_inputs) {
 			if (i.guid == m_guid && i.node) {
 				return i.node->generate(ctx, dst, subindex);
@@ -1648,7 +1657,7 @@ struct FunctionOutputNode : Node {
 		return inputString("Name", &m_name);
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 		
@@ -1828,11 +1837,12 @@ struct FunctionCallNode : Node {
 		return false;
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		Node* output_node = m_function->getFunctionOutput(0);
 		// TODO function in function
 		for (u32 i = 0; i < (u32)m_inputs.size(); ++i) {
 			NodeInput input = getInput(i);
+			ASSERT(i < lengthOf(ctx.m_function_inputs)); // TODO make sure this can't happen
 			ctx.m_function_inputs[i].node = input.node;
 			ctx.m_function_inputs[i].guid = m_inputs[i].guid;
 		}
@@ -1876,7 +1886,7 @@ struct SelectNode : Node {
 	void serialize(OutputMemoryStream& blob) const override {}
 	void deserialize(InputMemoryStream& blob, Version) override {}
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
 		const NodeInput input1 = getInput(1);
 		const NodeInput input2 = getInput(2);
@@ -1936,7 +1946,7 @@ struct CompareNode : Node {
 	void serialize(OutputMemoryStream& blob) const override { blob.write(op); blob.write(value); }
 	void deserialize(InputMemoryStream& blob, Version) override { blob.read(op); blob.read(value); }
 
-	DataStream generate(GenerateContext& ctx, DataStream dst, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream dst, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
 		const NodeInput input1 = getInput(1);
 		if (!input0.node) return error("Invalid input");
@@ -1966,9 +1976,6 @@ struct CompareNode : Node {
 			ctx.write(op0);
 		}
 
-		if (dst != i0) ctx.freeRegister(i0);
-		if (dst != i1) ctx.freeRegister(i1);
-
 		return dst;
 	}
 
@@ -1990,7 +1997,7 @@ struct SwitchNode : Node {
 	void serialize(OutputMemoryStream& blob) const override { blob.write(m_is_on); }
 	void deserialize(InputMemoryStream& blob, Version) override { blob.read(m_is_on); }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input = getInput(m_is_on ? 0 : 1);
 		if (!input.node) return error("Invalid input");
 		return input.generate(ctx, output, subindex);
@@ -2014,7 +2021,7 @@ struct SwitchNode : Node {
 struct PinNode : Node {
 	PinNode(ParticleEmitterEditorResource& res) : Node(res) {}
 		
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input = getInput(0);
 		if (!input.node) {
 			ASSERT(false);
@@ -2052,7 +2059,7 @@ struct OutputNode : Node {
 		return false;
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (ctx.context != GenerateContext::OUTPUT) return error("Invalid context");
 
 		u32 output_idx = 0;
@@ -2112,7 +2119,7 @@ struct LogicOpNode : Node {
 		}
 	}
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput i0 = getInput(0);
 		if (!i0.node) return error("Invalid input");
 
@@ -2131,8 +2138,6 @@ struct LogicOpNode : Node {
 		ctx.write(arg0);
 		ctx.write(arg1);
 
-		if (arg0 != dst) ctx.freeRegister(arg0);
-		if (arg1 != dst) ctx.freeRegister(arg1);
 		return dst;
 	}
 
@@ -2162,7 +2167,7 @@ struct SetChannelNode : Node {
 
 	Type getType() const override { return Type::SET_CHANNEL; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput i0 = getInput(0);
 		if (!i0.node) return error("Invalid input");
 
@@ -2201,7 +2206,7 @@ struct Vec3LengthNode : Node {
 
 	Type getType() const override { return Type::VEC3_LENGTH; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 
@@ -2261,7 +2266,7 @@ struct MaddNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
 		if (!input0.node) return error("Invalid input");
 		const NodeInput input1 = getInput(1);
@@ -2295,10 +2300,6 @@ struct MaddNode : Node {
 		ctx.write(op0);
 		ctx.write(op1);
 		ctx.write(op2);
-			
-		ctx.freeRegister(op0);
-		ctx.freeRegister(op1);
-		ctx.freeRegister(op2);
 		return dst;
 	}
 
@@ -2340,7 +2341,6 @@ struct MaddNode : Node {
 	float value2 = 0;
 };
 
-// TODO optimize +0, *1, -0, /1, e.g v + Vec3(0, y, 0)
 template <InstructionType OP_TYPE>
 struct BinaryOpNode : Node {
 	BinaryOpNode(ParticleEmitterEditorResource& res) : Node(res) {}
@@ -2361,7 +2361,16 @@ struct BinaryOpNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream output, u8 subindex) override {
+	static DataStream passThrough(GenerateContext& ctx, DataStream value, DataStream output) {
+		if (output.type == DataStream::NONE) return value;
+		
+		ctx.write(InstructionType::MOV);
+		ctx.write(output);
+		ctx.write(value);
+		return output;
+	}
+
+	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input0 = getInput(0);
 		if (!input0.node) return error("Invalid input");
 		const NodeInput input1 = getInput(1);
@@ -2379,6 +2388,22 @@ struct BinaryOpNode : Node {
 			op1.value = value;
 		}
 
+		switch (OP_TYPE) {
+			case InstructionType::DIV:
+			case InstructionType::MUL:
+				if (op1.type == DataStream::LITERAL && op1.value == 1) {
+					return passThrough(ctx, op0, output);
+				}
+				break;
+			case InstructionType::SUB:
+			case InstructionType::ADD:
+				if (op1.type == DataStream::LITERAL && op1.value == 0) {
+					return passThrough(ctx, op0, output);
+				}
+				break;
+			default: ASSERT(false); break;
+		}
+
 		ctx.write(OP_TYPE);
 		dst = ctx.streamOrRegister(output);
 
@@ -2386,8 +2411,6 @@ struct BinaryOpNode : Node {
 		ctx.write(op0);
 		ctx.write(op1);
 
-		ctx.freeRegister(op0);
-		ctx.freeRegister(op1);
 		return dst;
 	}
 
@@ -2445,7 +2468,7 @@ struct ConstNode : Node {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (ctx.context != GenerateContext::INIT && constant == Const::EMIT_INDEX) return error("Invalid context");
 		
 		DataStream r;
@@ -2487,7 +2510,7 @@ struct EmitNode : Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return false; }
 
-	DataStream generate(GenerateContext& ctx, DataStream, u8 subindex) override {
+	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
 		if (ctx.context != GenerateContext::UPDATE) return error("Invalid context");
 
 		const NodeInput cond_input = getInput(0);
@@ -2541,7 +2564,6 @@ struct EmitNode : Node {
 		return false;
 	}
 
-	// TODO update emitter_idx when emitter is deleted
 	u32 emitter_idx;
 };
 
@@ -2605,68 +2627,29 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&ParticleEditorImpl::isOpen>(this);
 
-		m_save_action.init(ICON_FA_SAVE "Save", "Particle editor save", "particle_editor_save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
-		m_save_action.func.bind<&ParticleEditorImpl::save>(this);
-		m_save_action.plugin = this;
-
-		m_undo_action.init(ICON_FA_UNDO "Undo", "Particle editor undo", "particle_editor_undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
-		m_undo_action.func.bind<&ParticleEditorImpl::undo>((SimpleUndoRedo*)this);
-		m_undo_action.plugin = this;
-
-		m_redo_action.init(ICON_FA_REDO "Redo", "Particle editor redo", "particle_editor_redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
-		m_redo_action.func.bind<&ParticleEditorImpl::redo>((SimpleUndoRedo*)this);
-		m_redo_action.plugin = this;
-
 		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, true);
-		m_apply_action.func.bind<&ParticleEditorImpl::apply>(this);
-		m_apply_action.plugin = this;
-
-		m_delete_action.init(ICON_FA_TRASH "Delete", "Particle editor delete", "particle_editor_delete", ICON_FA_TRASH, os::Keycode::DEL, Action::Modifiers::NONE, true);
-		m_delete_action.func.bind<&ParticleEditorImpl::deleteSelectedNodes>(this);
-		m_delete_action.plugin = this;
 
 		app.addWindowAction(&m_toggle_ui);
-		app.addAction(&m_save_action);
-		app.addAction(&m_undo_action);
-		app.addAction(&m_redo_action);
 		app.addAction(&m_apply_action);
-		app.addAction(&m_delete_action);
 		newGraph(ParticleSystemResourceType::SYSTEM);
 
-		scanFunctions("");
+		m_app.getAssetCompiler().addHook("pfn").bind<&ParticleEditorImpl::onFunctionChange>(this);
 	}
 
 	~ParticleEditorImpl() {
 		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_save_action);
-		m_app.removeAction(&m_undo_action);
-		m_app.removeAction(&m_redo_action);
-		m_app.removeAction(&m_delete_action);
 		m_app.removeAction(&m_apply_action);
 	}
 
-	// TODO update m_functions when existing function is resaved
-	// TODO reuse scan already done in asset compiler, maybe make this compiler plugin?
-	void scanFunctions(const char* dir) {
-		os::FileIterator* iter = m_app.getEngine().getFileSystem().createFileIterator(dir);
-		os::FileInfo info;
-		while (getNextFile(iter, &info)) {
-			if (info.filename[0] == '.') continue;
+	void onFunctionChange(const Path& path) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.fileExists(path)) return;
 
-			Path path(dir);
-			if (dir[0]) path.append("/");
-			path.append(info.filename);
-
-			if (info.is_directory) {
-				scanFunctions(path);
-			}
-			else {
-				if (Path::hasExtension(info.filename, "pfn")) {
-					addFunction(path);
-				}
-			}
+		for (Function& f : m_functions) {
+			if (f.path == path) return;
 		}
-		os::destroyFileIterator(iter);
+
+		addFunction(path);
 	}
 
 	void addFunction(const Path& path) {
@@ -2887,14 +2870,12 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void onContextMenu(ImVec2 pos) override {
 		Node* n = nullptr;
-		ImGui::SetNextItemWidth(150);
-		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-		ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
-		if (m_filter[0]) {
+		ImGuiEx::filter("Filter", m_node_filter, sizeof(m_node_filter), 150, ImGui::IsWindowAppearing());
+		if (m_node_filter[0]) {
 			struct : ICategoryVisitor {
 				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
 					if (n) return *this;
-					if (stristr(label, editor->m_filter)) {
+					if (stristr(label, editor->m_node_filter)) {
 						if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label)) {
 							n = creator.create(*editor->m_active_emitter);
 							ImGui::CloseCurrentPopup();
@@ -2929,7 +2910,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		}
 
 		if (n) {
-			m_filter[0] = '\0';
+			m_node_filter[0] = '\0';
 			n->m_pos = pos;
 				
 			if (m_half_link_start) {
@@ -2959,7 +2940,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		pushUndo(NO_MERGE_UNDO);
 	}
 
-	bool hasFocus() override { return m_has_focus; }
+	bool hasFocus() const override { return m_has_focus; }
 
 	void onSettingsLoaded() override {
 		m_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_particle_editor_open", false);
@@ -2973,6 +2954,30 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	bool isOpen() const { return m_open; }
 	void toggleOpen() { m_open = !m_open; }
+
+	void deleteEmitter(u32 emitter_idx) {
+		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource->m_emitters) {
+			for (i32 i = e->m_nodes.size() - 1; i >= 0; --i) {
+				Node* n = e->m_nodes[i];
+				if (n->getType() != Node::EMIT) continue;
+
+				EmitNode* en = (EmitNode*)n;
+				if (en->emitter_idx > emitter_idx) {
+					--en->emitter_idx;
+				}
+				else if (en->emitter_idx == emitter_idx) {
+					e->m_links.eraseItems([&](const NodeEditorLink& link){
+						return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
+					});
+					LUMIX_DELETE(m_allocator, n);
+					e->m_nodes.swapAndPop(i);
+				}
+			}
+		}
+		m_resource->removeEmitter(m_resource->m_emitters[emitter_idx].get());
+		m_active_emitter = m_resource->m_emitters[0].get();
+		pushUndo(NO_MERGE_UNDO);	
+	}
 
 	void deleteEmitInput(u32 input_idx) {
 		const i32 emitter_index = m_resource->m_emitters.find([this](const UniquePtr<ParticleEmitterEditorResource>& e){ return e.get() == m_active_emitter; });
@@ -3094,14 +3099,13 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 	void leftColumnGUI() {
-		// TODO undo/redo
-		inputString("##name", "Emitter name", &m_active_emitter->m_name);
+		bool changed = inputString("##name", "Emitter name", &m_active_emitter->m_name);
 		ImGuiEx::Label("Material");
-		m_app.getAssetBrowser().resourceInput("material", Span(m_active_emitter->m_mat_path.data), Material::TYPE);
+		changed = m_app.getAssetBrowser().resourceInput("material", Span(m_active_emitter->m_mat_path.data), Material::TYPE) || changed;
 		ImGuiEx::Label("Emit per second");
-		ImGui::DragFloat("##eps", &m_active_emitter->m_emit_per_second);
+		changed = ImGui::DragFloat("##eps", &m_active_emitter->m_emit_per_second) || changed;
 		ImGuiEx::Label("Emit at start");
-		ImGui::DragInt("##eas", (i32*)&m_active_emitter->m_init_emit_count);
+		changed = ImGui::DragInt("##eas", (i32*)&m_active_emitter->m_init_emit_count) || changed;
 		ImGuiEx::Label("Register count");
 		ImGui::Text("%d", m_active_emitter->m_registers_count);
 		ImGuiEx::Label("Update instructions");
@@ -3120,14 +3124,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-				ImGui::Combo("##t", (i32*)&s.type, "float\0vec3\0vec4\0");
+				changed = ImGui::Combo("##t", (i32*)&s.type, "float\0vec3\0vec4\0") || changed;
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(-1);
-				ImGui::InputText("##v", s.name.data, sizeof(s.name.data));
+				changed = ImGui::InputText("##v", s.name.data, sizeof(s.name.data)) || changed;
 				ImGui::PopID();
 			}
 			if (ImGui::Button(ICON_FA_PLUS "##add_stream")) {
 				m_active_emitter->m_streams.emplace();
+				pushUndo(NO_MERGE_UNDO);
 			}
 		}
 		if (ImGui::CollapsingHeader("Outputs", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -3140,14 +3145,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-				ImGui::Combo("##t", (i32*)&s.type, "float\0vec3\0vec4\0");
+				changed = ImGui::Combo("##t", (i32*)&s.type, "float\0vec3\0vec4\0") || changed;
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(-1);
-				ImGui::InputText("##o", s.name.data, sizeof(s.name.data));
+				changed = ImGui::InputText("##o", s.name.data, sizeof(s.name.data)) || changed;
 				ImGui::PopID();
 			}
 			if (ImGui::Button(ICON_FA_PLUS "##add_output")) {
 				m_active_emitter->m_outputs.emplace();
+				pushUndo(NO_MERGE_UNDO);
 			}
 		}
 
@@ -3161,16 +3167,19 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-				ImGui::Combo("##t", (i32*)&input.type, "float\0vec3\0vec4\0");
+				changed = ImGui::Combo("##t", (i32*)&input.type, "float\0vec3\0vec4\0") || changed;
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(-1);
-				ImGui::InputText("##o", input.name.data, sizeof(input.name.data));
+				changed = ImGui::InputText("##o", input.name.data, sizeof(input.name.data)) || changed;
 				ImGui::PopID();
 			}
 			if (ImGui::Button(ICON_FA_PLUS "##add_input")) {
 				m_active_emitter->m_emit_inputs.emplace();
+				pushUndo(NO_MERGE_UNDO);
 			}
 		}
+
+		if (changed) pushUndo(NO_MERGE_UNDO - 1);
 	}
 
 	const ParticleSystem* getSelectedParticleSystem() {
@@ -3254,17 +3263,17 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	}
 
 
-	void onWindowGUI() override {
+	void onGUI() override {
 		m_has_focus = false;
 		if (!m_open) return;
 
-		if (m_confirm_new) ImGui::OpenPopup("Confirm##cn");
-		if (m_confirm_load) ImGui::OpenPopup("Confirm##cl");
+		if (m_confirm_new) ImGui::OpenPopup("Confirm##cnp");
+		if (m_confirm_load) ImGui::OpenPopup("Confirm##clp");
 
 		m_confirm_new = false;
 		m_confirm_load = false;
 
-		if (ImGui::BeginPopupModal("Confirm##cn")) {
+		if (ImGui::BeginPopupModal("Confirm##cnp")) {
 			ImGui::TextUnformatted("Graph not saved, all changes will be lost. Are you sure?");
 			if (ImGui::Selectable("Yes")) {
 				m_dirty = false;
@@ -3274,7 +3283,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			ImGui::EndPopup();
 		}
 
-		if (ImGui::BeginPopupModal("Confirm##cl")) {
+		if (ImGui::BeginPopupModal("Confirm##clp")) {
 			ImGui::TextUnformatted("Graph not saved, all changes will be lost. Are you sure?");
 			if (ImGui::Selectable("Yes")) {
 				m_dirty = false;
@@ -3313,11 +3322,16 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 				if (!m_functions.empty()) {
 					if (ImGui::BeginMenu("Open function")) {
-						char buf[LUMIX_MAX_PATH] = "";
+						ImGuiEx::filter("Filter", m_function_filter, sizeof(m_function_filter), 200, ImGui::IsWindowAppearing());
 						FilePathHash dummy;
+						const bool is_enter = ImGui::IsKeyPressed(ImGuiKey_Enter);
 						for (const Function& f : m_functions) {
-							if (ImGui::Selectable(f.name.c_str())) {
+							const bool pass_filter = m_function_filter[0] == '\0' || stristr(f.name.c_str(), m_function_filter);
+							if (pass_filter && (is_enter || ImGui::Selectable(f.name.c_str()))) {
 								load(f.path);
+								m_function_filter[0] = '\0';
+								ImGui::CloseCurrentPopup();
+								break;
 							}
 						}
 						ImGui::EndMenu();
@@ -3326,7 +3340,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
 				if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
-				menuItem(m_save_action, true);
+				menuItem(m_app.getSaveAction(), true);
 				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
 				if (const char* path = m_recent_paths.menu(); path) open(path);
 				ImGui::Separator();
@@ -3338,15 +3352,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			}
 			if (ImGui::BeginMenu("Edit")) {
 				ImGui::MenuItem("World space", 0, &m_resource->m_world_space);
-				menuItem(m_undo_action, canUndo());
-				menuItem(m_redo_action, canRedo());
+				menuItem(m_app.getUndoAction(), canUndo());
+				menuItem(m_app.getRedoAction(), canRedo());
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
 		}
 
 		FileSelector& fs = m_app.getFileSelector();
-		if (fs.gui("Save As", &m_show_save_as, m_resource->isFunction() ? "pfn" : "par", true)) saveAs(fs.getPath());
+		if (fs.gui("Save As", &m_show_save_as, m_resource->isFunction() ? "pfn" : "par", true)) saveAs(Path(fs.getPath()));
 
 		if (m_resource->isFunction()) {
 			m_active_emitter = m_resource->m_emitters[0].get();
@@ -3360,12 +3374,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					u32 idx = u32(&emitter - m_resource->m_emitters.begin());
 					bool open = true;
 					if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &open : nullptr)) {
-						ImGui::Columns(2);
-						leftColumnGUI();
-						ImGui::NextColumn();
-						m_active_emitter = emitter.get();
-						nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
-						ImGui::Columns();
+						if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
+							ImGui::TableNextRow();
+							ImGui::TableNextColumn();
+							leftColumnGUI();
+							ImGui::TableNextColumn();
+							m_active_emitter = emitter.get();
+							nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+							ImGui::EndTable();
+						}
 						ImGui::EndTabItem();
 					}
 					if (!open) remove = idx;
@@ -3377,28 +3394,21 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 				ImGui::EndTabBar();
 				if (remove >= 0) {
-					for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource->m_emitters) {
-						for (i32 i = e->m_nodes.size() - 1; i >= 0; --i) {
-							Node* n = e->m_nodes[i];
-							if (n->getType() != Node::EMIT) continue;
-
-							EmitNode* en = (EmitNode*)n;
-							if (en->emitter_idx == remove) {
-								e->m_links.eraseItems([&](const NodeEditorLink& link){
-									return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
-								});
-								LUMIX_DELETE(m_allocator, n);
-								e->m_nodes.swapAndPop(i);
-							}
-						}
-					}
-					m_resource->removeEmitter(m_resource->m_emitters[remove].get());
-					m_active_emitter = m_resource->m_emitters[0].get();
-					pushUndo(NO_MERGE_UNDO);
+					deleteEmitter(remove);
 				}
 			}
 		}
 		ImGui::End();
+	}
+
+	bool onAction(const Action& action) override {
+		if (&action == &m_apply_action) apply();
+		else if (&action == &m_app.getDeleteAction()) deleteSelectedNodes();
+		else if (&action == &m_app.getSaveAction()) save();
+		else if (&action == &m_app.getUndoAction()) undo();
+		else if (&action == &m_app.getRedoAction()) redo();
+		else return false;
+		return true;
 	}
 
 	Node* addNode(Node::Type type) {
@@ -3457,18 +3467,18 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void save() {
 		if (!m_path.isEmpty()) {
-			saveAs(m_path.c_str());
+			saveAs(m_path);
 			return;
 		}
 		m_show_save_as = true;
 	}
 
-	void saveAs(const char* path) {
+	void saveAs(const Path& path) {
 		OutputMemoryStream blob(m_allocator);
 		m_resource->serialize(blob);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.saveContentSync(Path(path), blob)) {
+		if (!fs.saveContentSync(path, blob)) {
 			logError("Failed to save ", path);
 			return;
 		}
@@ -3476,6 +3486,11 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		m_path = path;
 		m_recent_paths.push(path);
 		m_dirty = false;
+
+		m_resource->registerDependencies();
+
+		const i32 fidx = m_functions.find([&](const Function& f){ return f.path == path; });
+		if (fidx < 0) addFunction(path);
 	}
 
 	void newGraph(ParticleSystemResourceType type) {
@@ -3561,6 +3576,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	IAllocator& m_allocator;
 	StudioApp& m_app;
 	Array<Function> m_functions;
+	char m_function_filter[128] = "";
 	Path m_path;
 	bool m_show_debug = false;
 	bool m_show_save_as = false;
@@ -3574,46 +3590,68 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 	bool m_open = false;
 	bool m_autoapply = false;
 	Action m_toggle_ui;
-	Action m_save_action;
-	Action m_undo_action;
-	Action m_redo_action;
 	Action m_apply_action;
-	Action m_delete_action;
 	bool m_has_focus = false;
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
 	RecentPaths m_recent_paths;
-	char m_filter[64] = "";
+	char m_node_filter[64] = "";
 };
 
 DataStream NodeInput::generate(GenerateContext& ctx, DataStream output, u8 subindex) const {
 	return node ? node->generate(ctx, output, subindex) : DataStream();
 }
 
-gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, Array<String>& attribute_names, StudioApp& app) {
+gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, u32 emitter_idx, Array<String>& attribute_names, StudioApp& app) {
 	attribute_names.clear();
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-#if 0
-	ParticleSystemEditorResource system(app.getAllocator());
-	OutputMemoryStream blob(app.getAllocator());
-	if (app.getEngine().getFileSystem().getContentSync(Path(path), blob)) {
-		InputMemoryStream tmp(blob);
-		if (system.deserialize(tmp, path)) {
-			system.fillVertexDecl(decl, &attribute_names, app.getAllocator());
-		}
-		else {
-			logError("Failed to parse ", path);
-		}
-	}
-	else {
+
+	IAllocator& allocator = app.getAllocator();
+	ParticleSystemEditorResource system(app, allocator);
+	OutputMemoryStream blob(allocator);
+	FileSystem& fs = app.getEngine().getFileSystem();
+	if (!fs.getContentSync(Path(path), blob)) {
 		logError("Failed to load ", path);
+		return decl;
 	}
-	return decl;
-#endif
-	ASSERT(false);
-	// TODO
+
+	InputMemoryStream tmp(blob);
+	if (!system.deserialize(tmp, path)) {
+		logError("Failed to parse ", path);
+		return decl;
+	}
+
+	system.m_emitters[emitter_idx]->fillVertexDecl(decl, &attribute_names, allocator);
 	return decl;
 }
+
+void ParticleSystemEditorResource::registerDependencies() {
+	for (UniquePtr<ParticleEmitterEditorResource>& e : m_emitters) {
+		for (Node* n : e->m_nodes) {
+			if (n->getType() == Node::FUNCTION_CALL) {
+				FunctionCallNode* fn = (FunctionCallNode*)n;
+				m_app.getAssetCompiler().registerDependency(m_path, fn->m_function->m_path);
+			}
+		}
+	}
+}
+
+void ParticleEditor::registerDependencies(const char* path, StudioApp& app) {
+	ParticleSystemEditorResource system(app, app.getAllocator());
+	OutputMemoryStream content(app.getAllocator());
+	if (!app.getEngine().getFileSystem().getContentSync(Path(path), content)) {
+		logError("Failed to load ", path);
+		return;
+	}
+	InputMemoryStream blob(content);
+	if (!system.deserialize(blob, path)) {
+		logError("Failed to deserialize ", path);
+		return;
+	}
+
+	system.registerDependencies();
+}
+
 
 UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app) {
 	IAllocator& allocator = app.getAllocator();

@@ -798,7 +798,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		m_app.getSettings().setValue(Settings::GLOBAL, "is_physics_ui_open", m_is_window_open);
 	}
 
-	void onWindowGUI() override
+	void onGUI() override
 	{
 		if (!m_is_window_open) return;
 		if (ImGui::Begin("Physics", &m_is_window_open))

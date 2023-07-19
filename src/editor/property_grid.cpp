@@ -883,7 +883,7 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 void PropertyGrid::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_properties_open; }
 void PropertyGrid::onBeforeSettingsSaved() { m_app.getSettings().m_is_properties_open  = m_is_open; }
 
-void PropertyGrid::onWindowGUI()
+void PropertyGrid::onGUI()
 {
 	for (IPlugin* i : m_plugins) {
 		i->update();

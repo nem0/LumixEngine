@@ -28,7 +28,7 @@ enum class CompositeTexture::NodeType : u32 {
 	GAMMA,
 	CONTRAST,
 	BRIGHTNESS,
-	GREYSCALE,
+	GRAYSCALE,
 	MULTIPLY,
 	MIX,
 	GRADIENT,
@@ -901,24 +901,16 @@ struct StaticSwitchNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::STATIC_SWITCH; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
-	
-	void serialize(OutputMemoryStream& blob) const override {
-		blob.write(m_is_on);
-	}
-
-	void deserialize(InputMemoryStream& blob) override {
-		blob.read(m_is_on);
-	}
+	void serialize(OutputMemoryStream& blob) const override { blob.write(m_is_on); }
+	void deserialize(InputMemoryStream& blob) override { blob.read(m_is_on); }
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (m_is_on) {
-			return getInputPixelData(0, data);
-		}
+		if (m_is_on) return getInputPixelData(0, data);
 		return getInputPixelData(1, data);
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Sharpen");
+		ImGuiEx::NodeTitle("Switch");
 		ImGui::BeginGroup();
 		inputSlot(); ImGui::TextUnformatted("On");
 		inputSlot(); ImGui::TextUnformatted("Off");
@@ -1196,8 +1188,8 @@ struct CircleNode final : CompositeTexture::Node {
 	float power = 1.f;
 };
 
-struct GreyscaleNode final : CompositeTexture::Node {
-	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GREYSCALE; }
+struct GrayscaleNode final : CompositeTexture::Node {
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GRAYSCALE; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 	
@@ -1209,15 +1201,15 @@ struct GreyscaleNode final : CompositeTexture::Node {
 			Vec3 v(data->pixels[i], data->pixels[i + 1], data->pixels[i + 2]);
 			v *= 1/255.f;
 
-			float greyscale = v.x * 0.299f + v.y * 0.587f + v.z * 0.114f;
-			greyscale = clamp(greyscale * 255.f, 0.f, 255.f);
-			data->pixels[i] = data->pixels[i + 1] = data->pixels[i + 2] = u8(greyscale + 0.5f);
+			float grayscale = v.x * 0.299f + v.y * 0.587f + v.z * 0.114f;
+			grayscale = clamp(grayscale * 255.f, 0.f, 255.f);
+			data->pixels[i] = data->pixels[i + 1] = data->pixels[i + 2] = u8(grayscale + 0.5f);
 		}
 		return true;
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Greyscale");
+		ImGuiEx::NodeTitle("Grayscale");
 		inputSlot();
 		ImGui::TextUnformatted(" ");
 		ImGui::SameLine();
@@ -1569,7 +1561,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode); break; 
 		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode); break; 
 		case CompositeTexture::NodeType::CURVE: node = LUMIX_NEW(allocator, CurveNode); break; 
-		case CompositeTexture::NodeType::GREYSCALE: node = LUMIX_NEW(allocator, GreyscaleNode); break; 
+		case CompositeTexture::NodeType::GRAYSCALE: node = LUMIX_NEW(allocator, GrayscaleNode); break; 
 		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
 		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode); break; 
@@ -1631,66 +1623,6 @@ bool CompositeTexture::save(FileSystem& fs, const Path& path) {
 	OutputMemoryStream blob(m_app.getAllocator());
 	serialize(blob);
 	return fs.saveContentSync(path, blob);
-}
-
-CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
-	: NodeEditor(app.getAllocator())
-	, m_allocator(app.getAllocator())
-	, m_app(app)
-	, m_recent_paths("proc_geom_editor_recent_", 10, app)
-{
-	newGraph();
-
-	m_save_action.init(ICON_FA_SAVE "Save", "Composite texture editor save", "composite_texture_editor_save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
-	m_save_action.func.bind<&CompositeTextureEditor::save>(this);
-	m_save_action.plugin = this;
-
-	m_delete_action.init(ICON_FA_TRASH "Delete", "Composite texture editor delete", "composite_texture_editor_delete", ICON_FA_TRASH, os::Keycode::DEL, Action::Modifiers::NONE, true);
-	m_delete_action.func.bind<&CompositeTextureEditor::deleteSelectedNodes>(this);
-	m_delete_action.plugin = this;
-
-	m_undo_action.init(ICON_FA_UNDO "Undo", "Composite texture editor undo", "composite_texture_editor_undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
-	m_undo_action.func.bind<&CompositeTextureEditor::undo>((SimpleUndoRedo*)this);
-	m_undo_action.plugin = this;
-
-	m_redo_action.init(ICON_FA_REDO "Redo", "Composite texture editor redo", "composite_texture_editor_redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
-	m_redo_action.func.bind<&CompositeTextureEditor::redo>((SimpleUndoRedo*)this);
-	m_redo_action.plugin = this;
-
-	m_toggle_ui.init("Composite texture editor", "Toggle composite texture editor", "composite_texture_editor", "", true);
-	m_toggle_ui.func.bind<&CompositeTextureEditor::toggleOpen>(this);
-	m_toggle_ui.is_selected.bind<&CompositeTextureEditor::isOpen>(this);
-	
-	m_app.addWindowAction(&m_toggle_ui);
-	m_app.addAction(&m_undo_action);
-	m_app.addAction(&m_redo_action);
-	m_app.addAction(&m_save_action);
-	m_app.addAction(&m_delete_action);
-}
-
-CompositeTextureEditor::~CompositeTextureEditor() {
-	m_app.removeAction(&m_toggle_ui);
-	m_app.removeAction(&m_undo_action);
-	m_app.removeAction(&m_redo_action);
-	m_app.removeAction(&m_save_action);
-	m_app.removeAction(&m_delete_action);
-	if (m_resource) LUMIX_DELETE(m_allocator, m_resource);
-}
-
-void CompositeTextureEditor::deleteSelectedNodes() {
-	if (m_is_any_item_active) return;
-	m_resource->deleteSelectedNodes();
-	pushUndo(NO_MERGE_UNDO);
-}
-
-bool CompositeTextureEditor::saveAs(const char* path) {
-	FileSystem& fs = m_app.getEngine().getFileSystem();
-	OutputMemoryStream blob(m_app.getAllocator());
-	serialize(blob);
-	if (!fs.saveContentSync(Path(path), blob)) return false;
-	m_recent_paths.push(path);
-	m_path = path;
-	return true;
 }
 
 struct CompositeTextureHeader {
@@ -1867,26 +1799,6 @@ u32 CompositeTexture::getLayersCount() const {
 	return 1;
 }
 
-void CompositeTextureEditor::newGraph() {
-	if (m_resource) LUMIX_DELETE(m_allocator, m_resource);
-	m_resource = LUMIX_NEW(m_allocator, CompositeTexture)(m_app, m_allocator);
-	clearUndoStack();
-
-	m_resource->initDefault();
-	m_path = "";
-	pushUndo(NO_MERGE_UNDO);
-}
-
-void CompositeTextureEditor::deserialize(InputMemoryStream& blob) {
-	LUMIX_DELETE(m_allocator, m_resource);
-	m_resource = LUMIX_NEW(m_allocator, CompositeTexture)(m_app, m_allocator);
-	m_resource->deserialize(blob);
-}
-
-void CompositeTextureEditor::serialize(OutputMemoryStream& blob) {
-	m_resource->serialize(blob);
-}
-
 static const struct {
 	char key;
 	const char* label;
@@ -1903,7 +1815,7 @@ static const struct {
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
-	{ 'G', "Greyscale", CompositeTexture::NodeType::GREYSCALE },
+	{ 'G', "Grayscale", CompositeTexture::NodeType::GRAYSCALE },
 	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
 	{ 'I', "Invert", CompositeTexture::NodeType::INVERT },
 	{ 'M', "Merge", CompositeTexture::NodeType::MERGE },
@@ -1920,153 +1832,227 @@ static const struct {
 	{ 'W', "Wave noise", CompositeTexture::NodeType::WAVE_NOISE }
 };
 
-void CompositeTextureEditor::onCanvasClicked(ImVec2 pos, i32 hovered_link) {
-	CompositeTexture::Node* n = nullptr;
-	for (const auto& t : TYPES) {
-		if (t.key && os::isKeyDown((os::Keycode)t.key)) {
-			n = m_resource->addNode(t.type);
-			break;
-		}
-	}
-	if (n) {
-		n->m_pos = pos;
-		if (hovered_link >= 0) splitLink(m_resource->m_nodes.back(), m_resource->m_links, hovered_link);
-		pushUndo(NO_MERGE_UNDO);
-	}	
-}
-
-static constexpr const char* WINDOW_NAME = "Composite texture";
-
-void CompositeTextureEditor::open(const char* path) {
-	ImGui::SetWindowFocus(WINDOW_NAME);
-	m_is_open = true;
-	FileSystem& fs = m_app.getEngine().getFileSystem();
-	IAllocator& allocator = m_app.getAllocator();
-	OutputMemoryStream content(allocator);
-	if (fs.getContentSync(Path(path), content)) {
+struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
+	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app)
+		: NodeEditor(app.getAllocator())
+		, m_editor(editor)
+		, m_app(app)
+		, m_resource(app, app.getAllocator())
+	{
+		IAllocator& allocator = m_app.getAllocator();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		m_path = path;
-		InputMemoryStream blob(content);
-		deserialize(blob);
-		pushUndo(NO_MERGE_UNDO);
-		m_recent_paths.push(path);
-	}
-	else {
-		logError("Could not load", path);
-	}
-}
-
-void CompositeTextureEditor::save() {
-	if (m_path.isEmpty()) m_show_save_as = true;
-	else saveAs(m_path.c_str());
-}
-
-void CompositeTextureEditor::onSettingsLoaded() {
-	Settings& settings = m_app.getSettings();
-	m_is_open = settings.getValue(Settings::GLOBAL, "is_composite_texture_editor_open", false);
-
-	m_recent_paths.onSettingsLoaded();
-}
-
-void CompositeTextureEditor::onBeforeSettingsSaved() {
-	Settings& settings = m_app.getSettings();
-	settings.setValue(Settings::GLOBAL, "is_composite_texture_editor_open", m_is_open);
-
-	m_recent_paths.onBeforeSettingsSaved();
-}
-
-void CompositeTextureEditor::exportAs() {
-	char path[LUMIX_MAX_PATH];
-	if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
-
-	CompositeTexture::Result img(m_allocator);
-	if (!m_resource->generate(&img)) {
-		logError("Could not generate ", path);
-		return;
-	}
-	
-	if (img.is_cubemap) {
-		logError("Could not export ", path, " because it's a cubemap");
-		return;
-	}
-	
-	if (img.layers.size() != 1) {
-		logError("Could not export ", path, " because it's an array");
-		return;
+		m_loading_handle = fs.getContent(path, makeDelegate<&CompositeTextureEditorWindow::onLoaded>(this));
 	}
 
-	if (img.layers[0].channels != 4) {
-		logError("Could not export ", path, " because it's does not have 4 channels");
-		return;
+	~CompositeTextureEditorWindow() {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (m_loading_handle.isValid()) fs.cancel(m_loading_handle);
 	}
 
-	os::OutputFile file;
-	if (!file.open(path)) {
-		logError("Could not save ", path);
-		return;
-	}
-
-	bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, img.layers[0].pixels.data(), true, Path(path), m_allocator);
-	file.close();
-
-	if (!res) {
-		logError("Could not save ", path);
-	}
-}
-
-void CompositeTextureEditor::onWindowGUI() {
-	m_has_focus = false;
-	if (!m_is_open) return;
-
-	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-	if (ImGui::Begin(WINDOW_NAME, &m_is_open, ImGuiWindowFlags_MenuBar)) {
-		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-		if (ImGui::BeginMenuBar()) {
-			if (ImGui::BeginMenu("File")) {
-				if (ImGui::MenuItem("New")) newGraph();
-				if (ImGui::MenuItem("Open")) m_show_open = true;
-				menuItem(m_save_action, true);
-				if (ImGui::MenuItem("Save As")) m_show_save_as = true;
-				if (ImGui::MenuItem("Export")) exportAs();
-				if (const char* path = m_recent_paths.menu(); path) { open(path); }
-				ImGui::EndMenu();
+	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
+		CompositeTexture::Node* n = nullptr;
+		for (const auto& t : TYPES) {
+			if (t.key && os::isKeyDown((os::Keycode)t.key)) {
+				n = m_resource.addNode(t.type);
+				break;
 			}
-			if (ImGui::BeginMenu("Edit")) {
-				menuItem(m_undo_action, canUndo());
-				menuItem(m_redo_action, canRedo());
-				ImGui::EndMenu();
-			}
-			ImGui::EndMenuBar();
 		}
-
-		FileSelector& fs = m_app.getFileSelector();
-		if (fs.gui("Open", &m_show_open, "ltc", false)) open(fs.getPath());
-		if (fs.gui("Save As", &m_show_save_as, "ltc", true)) saveAs(fs.getPath());
-
-		nodeEditorGUI(m_resource->m_nodes, m_resource->m_links);
+		if (n) {
+			n->m_pos = pos;
+			if (hovered_link >= 0) splitLink(m_resource.m_nodes.back(), m_resource.m_links, hovered_link);
+			pushUndo(NO_MERGE_UNDO);
+		}	
 	}
-	ImGui::End();
-}
 
-void CompositeTextureEditor::onLinkDoubleClicked(CompositeTexture::Link& link, ImVec2 pos) {}
-
-void CompositeTextureEditor::onContextMenu(ImVec2 pos) {
-	CompositeTexture::Node* node = nullptr;
-	static char filter[64] = "";
-	if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-	ImGui::SetNextItemWidth(150);
-	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
-	for (const auto& t : TYPES) {
-		if ((!filter[0] || stristr(t.label, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(t.label))) {
-			node = m_resource->addNode(t.type);
-			filter[0] = '\0';
-			ImGui::CloseCurrentPopup();
-			break;
+	void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) override {}
+	
+	void onContextMenu(ImVec2 pos) override {
+		CompositeTexture::Node* node = nullptr;
+		static char filter[64] = "";
+		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+		ImGui::SetNextItemWidth(150);
+		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
+		for (const auto& t : TYPES) {
+			if ((!filter[0] || stristr(t.label, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(t.label))) {
+				node = m_resource.addNode(t.type);
+				filter[0] = '\0';
+				ImGui::CloseCurrentPopup();
+				break;
+			}
+		}
+		if (node) {
+			node->m_pos = pos;
+			pushUndo(NO_MERGE_UNDO);
 		}
 	}
-	if (node) {
-		node->m_pos = pos;
+	
+	void deserialize(InputMemoryStream& blob) override {
+		m_resource.clear();
+		m_resource.deserialize(blob);
+	}
+	
+	void serialize(OutputMemoryStream& blob) override { m_resource.serialize(blob); }
+
+	void deleteSelectedNodes() {
+		if (m_is_any_item_active) return;
+		m_resource.deleteSelectedNodes();
 		pushUndo(NO_MERGE_UNDO);
 	}
+
+	bool onAction(const Action& action) override {
+		ASSERT(m_has_focus);
+
+		if (&action == &m_app.getUndoAction()) undo();
+		else if (&action == &m_app.getRedoAction()) redo();
+		else if (&action == &m_app.getSaveAction()) saveAs(m_path);
+		else if (&action == &m_app.getDeleteAction()) deleteSelectedNodes();
+		else return false;
+		
+		return true;
+	}
+
+	void onLoaded(u64 size, const u8* data, bool success) {
+		m_loading_handle = FileSystem::AsyncHandle::invalid();
+		if (!success) {
+			logError("Failed to load ", m_path);
+			return;
+		}
+		
+		InputMemoryStream blob(data, size);
+		m_resource.deserialize(blob);
+		pushUndo(NO_MERGE_UNDO);
+	}
+	
+	void exportAs() {
+		char path[LUMIX_MAX_PATH];
+		if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
+
+		IAllocator& allocator = m_app.getAllocator();
+		CompositeTexture::Result img(allocator);
+		if (!m_resource.generate(&img)) {
+			logError("Could not generate ", path);
+			return;
+		}
+	
+		if (img.is_cubemap) {
+			logError("Could not export ", path, " because it's a cubemap");
+			return;
+		}
+	
+		if (img.layers.size() != 1) {
+			logError("Could not export ", path, " because it's an array");
+			return;
+		}
+
+		if (img.layers[0].channels != 4) {
+			logError("Could not export ", path, " because it's does not have 4 channels");
+			return;
+		}
+
+		os::OutputFile file;
+		if (!file.open(path)) {
+			logError("Could not save ", path);
+			return;
+		}
+
+		bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, img.layers[0].pixels.data(), true, Path(path), allocator);
+		file.close();
+
+		if (!res) {
+			logError("Could not save ", path);
+		}
+	}
+
+	void saveAs(const Path& path) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_resource.serialize(blob);
+		if (!fs.saveContentSync(path, blob)) {
+			logError("Failed to save ", path);
+			return;
+		}
+		m_path = path;
+	}
+
+	void onGUI() override {
+		Span<const char> basename = Path::getBasename(m_path.c_str());
+		StaticString<128> title(basename, "##cte", (uintptr)this);
+		bool open = true;
+		m_has_focus = false;
+		if (m_focus_request) {
+			ImGui::SetNextWindowFocus();
+			m_focus_request = false;
+		}
+		ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
+		if (ImGui::Begin(title, &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings)) {
+			m_dock_id = ImGui::GetWindowDockID();
+			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+			if (ImGui::BeginMenuBar()) {
+				if (ImGui::BeginMenu("File")) {
+					if (menuItem(m_app.getSaveAction(), true)) saveAs(m_path);
+					if (ImGui::MenuItem("Save As")) m_show_save_as = true;
+					if (ImGui::MenuItem("Export")) exportAs();
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Edit")) {
+					if (menuItem(m_app.getUndoAction(), canUndo())) undo();
+					if (menuItem(m_app.getRedoAction(), canRedo())) redo();
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenuBar();
+			}
+		
+			FileSelector& fs = m_app.getFileSelector();
+			if (fs.gui("Save As", &m_show_save_as, "ltc", true)) saveAs(Path(fs.getPath()));
+
+			if (m_loading_handle.isValid()) {
+				ImGui::TextUnformatted("Loading...");
+			}
+			else {
+				nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
+			}
+		}
+		ImGui::End();
+		if (!open) {
+			m_editor.m_windows.eraseItem(this);
+			m_app.removePlugin(*this);
+			LUMIX_DELETE(m_app.getAllocator(), this);
+		}
+	}
+
+	const char* getName() const override { return "composite_texture_editor"; }
+	bool hasFocus() const override { return m_has_focus; }
+	
+	CompositeTextureEditor& m_editor;
+	StudioApp& m_app;
+	Path m_path;
+	CompositeTexture m_resource;
+	FileSystem::AsyncHandle m_loading_handle = FileSystem::AsyncHandle::invalid();
+	bool m_has_focus = false;
+	bool m_show_save_as = false;
+	bool m_focus_request = false;
+	ImGuiID m_dock_id = 0;
+};
+
+CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
+	: m_app(app)
+	, m_windows(app.getAllocator())
+{}
+
+void CompositeTextureEditor::open(const Path& path) {
+	for (CompositeTextureEditorWindow* win : m_windows) {
+		if (win->m_path == path) {
+			win->m_focus_request = true;
+			return;
+		}
+	}
+	
+	IAllocator& allocator = m_app.getAllocator();
+	CompositeTextureEditorWindow* win = LUMIX_NEW(allocator, CompositeTextureEditorWindow)(Path(path), *this, m_app);
+	if (!m_windows.empty()) win->m_dock_id = m_windows.last()->m_dock_id;
+	m_windows.push(win);
+	m_app.addPlugin(*win);
 }
 
 } // namespace Lumix
