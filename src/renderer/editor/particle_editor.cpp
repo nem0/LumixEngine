@@ -86,24 +86,35 @@ struct GenerateContext {
 		return r;
 	}
 
-	DataStream streamOrRegister(DataStream v) {
-		if (v.type == DataStream::NONE) { 
-			DataStream r;
-			r.type = DataStream::REGISTER;
-			r.index = 0xff;
-			for (u32 i = 0; i < sizeof(m_register_mask) * 8; ++i) {
-				if ((m_register_mask & (1 << i)) == 0) {
-					r.index = i;
-					break;
-				}
-			}
-			ASSERT(r.index != 0xFF);
-			m_register_mask |= 1 << r.index;
-			m_registers_count = maximum(m_registers_count, r.index + 1);
-			return r;
-		}
 
-		return v;
+	DataStream streamOrRegisterInternal() { return {}; }
+
+	template <typename T, typename... Tail>
+	DataStream streamOrRegisterInternal(T v, Tail... tail) {
+		if (v.type == DataStream::REGISTER && (m_persistent_register_mask & (1 << v.index)) == 0) return v;
+		return streamOrRegisterInternal(tail...);
+	}
+	
+	template <typename... T>
+	DataStream streamOrRegister(DataStream v, T... tail) {
+		if (v.type != DataStream::NONE) return v;
+
+		DataStream t = streamOrRegisterInternal(tail...);
+		if (t.type != DataStream::NONE) return t;
+		
+		DataStream r;
+		r.type = DataStream::REGISTER;
+		r.index = 0xff;
+		for (u32 i = 0; i < sizeof(m_register_mask) * 8; ++i) {
+			if ((m_register_mask & (1 << i)) == 0) {
+				r.index = i;
+				break;
+			}
+		}
+		ASSERT(r.index != 0xFF);
+		m_register_mask |= 1 << r.index;
+		m_registers_count = maximum(m_registers_count, r.index + 1);
+		return r;
 	}
 	
 	struct FunctionInput {
@@ -628,7 +639,7 @@ DataStream Node::generate(GenerateContext& ctx, DataStream output, u8 subindex) 
 		const bool is_set = ctx.m_register_mask & m;
 		const bool was_set = (old_mask & m) != 0;
 		const bool is_persistent = (ctx.m_persistent_register_mask & m) != 0;
-		const bool is_output = res.type == DataStream::REGISTER || res.index == i;
+		const bool is_output = res.type == DataStream::REGISTER && res.index == i;
 		if (is_set && !was_set && !is_persistent && !is_output) ctx.m_register_mask &= ~m;
 	}
 	return res;
@@ -796,7 +807,6 @@ struct UnaryFunctionNode : Node {
 		NodeInput input = getInput(0);
 		if (!input.node) return error("Invalid input");
 			
-		DataStream dst = ctx.streamOrRegister(output);
 		DataStream op0 = input.generate(ctx, {}, subindex);
 		if (op0.isError()) return op0;
 		switch (T) {
@@ -804,6 +814,8 @@ struct UnaryFunctionNode : Node {
 			case SIN: ctx.write(InstructionType::SIN); break;
 			default: ASSERT(false); break;
 		}
+		
+		DataStream dst = ctx.streamOrRegister(output, op0);
 		ctx.write(dst);
 		ctx.write(op0);
 
@@ -927,7 +939,7 @@ struct SplineNode : Node {
 		DataStream op0 = input.generate(ctx, {}, 0);
 		if (op0.isError()) return op0;
 
-		dst = ctx.streamOrRegister(dst);
+		dst = ctx.streamOrRegister(dst, op0);
 		ctx.write(InstructionType::SPLINE);
 		ctx.write(dst);
 		ctx.write(op0);
@@ -956,8 +968,7 @@ struct GradientColorNode : Node {
 		DataStream t = input.generate(ctx, {}, subindex);
 		if (t.isError()) return t;
 
-		dst = ctx.streamOrRegister(dst);
-
+		dst = ctx.streamOrRegister(dst, t);
 		if (count == 2 && fabsf(keys[0]) < 0.001f && fabsf(keys[1] - 1) < 0.001f) {
 			DataStream op0, op1;
 			op0.type = DataStream::LITERAL;
@@ -1020,8 +1031,8 @@ struct CurveNode : Node {
 		DataStream t = input.generate(ctx, {}, 0);
 		if (t.isError()) return t;
 
-		dst = ctx.streamOrRegister(dst);
 		
+		dst = ctx.streamOrRegister(dst, t);
 		if (count == 2 && fabs(keys[0]) < 0.001f && fabsf(keys[1] - 1) < 0.001f) {
 			DataStream op0, op1;
 			op0.type = DataStream::LITERAL;
@@ -1223,7 +1234,7 @@ struct NoiseNode : Node {
 		if (op0.isError()) return op0;
 
 		ctx.write(InstructionType::NOISE);
-		DataStream dst = ctx.streamOrRegister(output);
+		DataStream dst = ctx.streamOrRegister(output, op0);
 		ctx.write(dst);
 		ctx.write(op0);
 		return dst;
@@ -1255,8 +1266,7 @@ struct RandomNode : Node {
 		if (subindex > 0) return error("Invalid subindex");
 
 		ctx.write(InstructionType::RAND);
-		DataStream dst;
-		dst = ctx.streamOrRegister(output);
+		DataStream dst = ctx.streamOrRegister(output);
 		ctx.write(dst);
 		ctx.write(from);
 		ctx.write(to);
@@ -1573,6 +1583,8 @@ struct UpdateNode : Node {
 			ctx.write(res);
 		}
 
+		ctx.m_register_mask = ctx.m_persistent_register_mask;
+		
 		i32 out_index = 0 ;
 		for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
 			const NodeInput input = getInput(i + 1);
@@ -1905,7 +1917,7 @@ struct SelectNode : Node {
 		DataStream i2 = input2.generate(ctx, {}, 0);
 		if (i2.isError()) return i2;
 
-		dst = ctx.streamOrRegister(dst);
+		dst = ctx.streamOrRegister(dst, i0, i1, i2);
 		ctx.write(InstructionType::BLEND);
 		ctx.write(dst);
 		ctx.write(i0);
@@ -1965,7 +1977,7 @@ struct CompareNode : Node {
 			case GT: ctx.write(InstructionType::GT); break;
 		}
 			
-		dst = ctx.streamOrRegister(dst);
+		dst = ctx.streamOrRegister(dst, i0, i1);
 
 		ctx.write(dst);
 		ctx.write(i0);
@@ -2026,10 +2038,7 @@ struct PinNode : Node {
 		
 	DataStream generateInternal(GenerateContext& ctx, DataStream output, u8 subindex) override {
 		const NodeInput input = getInput(0);
-		if (!input.node) {
-			ASSERT(false);
-			return error("Invalid input");
-		}
+		if (!input.node) return error("Invalid input");
 		return input.generate(ctx, output, subindex);
 	}
 		
@@ -2135,7 +2144,7 @@ struct LogicOpNode : Node {
 		const DataStream arg1 = i1.generate(ctx, {}, 0);
 		if (arg1.isError()) return arg1;
 		
-		DataStream dst = ctx.streamOrRegister(output);
+		DataStream dst = ctx.streamOrRegister(output, arg0, arg1);
 		ctx.write(OP_TYPE);
 		ctx.write(dst);
 		ctx.write(arg0);
@@ -2297,7 +2306,7 @@ struct MaddNode : Node {
 		}
 
 		ctx.write(InstructionType::MULTIPLY_ADD);
-		dst = ctx.streamOrRegister(output);
+		dst = ctx.streamOrRegister(output, op0, op1, op2);
 
 		ctx.write(dst);
 		ctx.write(op0);
@@ -2408,7 +2417,7 @@ struct BinaryOpNode : Node {
 		}
 
 		ctx.write(OP_TYPE);
-		dst = ctx.streamOrRegister(output);
+		dst = ctx.streamOrRegister(output, op0, op1);
 
 		ctx.write(dst);
 		ctx.write(op0);
