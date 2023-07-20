@@ -216,6 +216,8 @@ Span<const char> Path::getExtension(Span<const char> src)
 bool Path::isSame(Span<const char> a, Span<const char> b) {
 	if (a.length() > 0 && (a.back() == '\\' || a.back() == '/')) --a.m_end;
 	if (b.length() > 0 && (b.back() == '\\' || b.back() == '/')) --b.m_end;
+	if (a.length() == 0 && b.length() == 1 && b[0] == '.') return true; 
+	if (b.length() == 0 && a.length() == 1 && a[0] == '.') return true; 
 	return equalStrings(a, b);
 }
 

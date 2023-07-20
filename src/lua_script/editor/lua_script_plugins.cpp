@@ -85,23 +85,31 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return false;
 	}
 
-
 	void onResourceUnloaded(AssetBrowser::ResourceView&) override { m_text_buffer[0] = 0; }
-	const char* getName() const override { return "Lua Script"; }
-
-
+	const char* getName() const override { return "Lua script"; }
 	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 
-
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
-		if (type == LuaScript::TYPE)
-		{
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
+		if (type == LuaScript::TYPE) {
 			return m_app.getAssetBrowser().copyTile("editor/textures/tile_lua_script.tga", out_path);
 		}
 		return false;
 	}
 
+	bool canCreateResource() const { return true; }
+
+	bool createResource(const char* path) {
+		OutputMemoryStream blob(m_app.getAllocator());
+		blob << "function update(time_delta)\nend\n";
+
+		if (!m_app.getEngine().getFileSystem().saveContentSync(Path(path), blob)) {
+			logError("Failed to write ", path);
+			return false;
+		}
+		return true;
+	}
+
+	const char* getDefaultExtension() const override { return "lua"; }
 
 	StudioApp& m_app;
 	char m_text_buffer[8192];
