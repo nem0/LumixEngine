@@ -830,7 +830,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			}
 		}
 
-		auto forEachMaterial = [&](auto& F){
+		auto forEachMaterial = [&](const auto& F){
 			for (AssetBrowser::ResourceView* view : resources) {
 				F(static_cast<Material*>(view->getResource()));
 			}
