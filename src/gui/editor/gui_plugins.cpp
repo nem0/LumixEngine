@@ -68,19 +68,20 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 	
 	void deserialize(InputMemoryStream& blob) override { 
-		((Sprite*)m_current_resources[0])->load(blob.size(), (const u8*)blob.getData());
+		m_current_resource->load(blob.size(), (const u8*)blob.getData());
 	}
 	
 	void serialize(OutputMemoryStream& blob) override {
-		((Sprite*)m_current_resources[0])->serialize(blob);
+		m_current_resource->serialize(blob);
 	}
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
-		m_current_resources = resources;
+		m_current_resource = nullptr;
 		if (resources.length() > 1) return false;
 
-		Sprite* sprite = (Sprite*)resources[0];
+		Sprite* sprite = static_cast<Sprite*>(resources[0]->getResource());
+		m_current_resource = sprite;
 		if (!sprite->isReady()) return false;
 		
 		if (ImGui::Button(ICON_FA_SAVE "Save")) saveSprite(*sprite);
@@ -210,14 +211,11 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		m_app.getAssetBrowser().saveResource(sprite, blob);
 	}
 
-
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Sprite"; }
 	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
-
 	StudioApp& m_app;
-	Span<Resource*> m_current_resources;
+	Sprite* m_current_resource = nullptr;
 };
 
 

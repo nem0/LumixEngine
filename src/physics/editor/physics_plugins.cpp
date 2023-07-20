@@ -840,12 +840,9 @@ struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
 	void serialize(OutputMemoryStream& blob) override {}
 
-	bool onGUI(Span<Resource*> resources) override { return false; }
-
-	void onResourceUnloaded(Resource* resource) override {}
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override { return false; }
 	const char* getName() const override { return "Physics geometry"; }
 	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
-
 
 	StudioApp& m_app;
 };
@@ -891,22 +888,23 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 	}
 	
 	void deserialize(InputMemoryStream& blob) override {
-		((PhysicsMaterial*)m_current_resources[0])->deserialize(blob);
+		m_current_resource->deserialize(blob);
 	}
 
 	void serialize(OutputMemoryStream& blob) override {
-		((PhysicsMaterial*)m_current_resources[0])->serialize(blob);
+		m_current_resource->serialize(blob);
 	}
 
-	bool onGUI(Span<Resource*> resources) override {
-		m_current_resources = resources;
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
+		m_current_resource = nullptr;
 		if (resources.length() != 1) {
 			ImGui::TextUnformatted("Editing multiple materials is not supported.");
 			return false;
 		}
 
 		bool changed = false;
-		PhysicsMaterial* mat = (PhysicsMaterial*)resources[0];
+		PhysicsMaterial* mat = static_cast<PhysicsMaterial*>(resources[0]->getResource());
+		m_current_resource = mat;
 		if (mat->isReady() && mat->material) {
 			float static_friction = mat->material->getStaticFriction();
 			float dynamic_friction = mat->material->getDynamicFriction();
@@ -940,13 +938,11 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 		return changed;
 	}
 
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Physics material"; }
 	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
-
 	StudioApp& m_app;
-	Span<Resource*> m_current_resources;
+	PhysicsMaterial* m_current_resource = nullptr;
 };
 
 

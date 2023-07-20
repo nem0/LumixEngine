@@ -8,7 +8,9 @@ namespace gpu { struct VertexDecl; }
 
 template <typename T> struct UniquePtr;
 
-struct ParticleEditor : StudioApp::GUIPlugin {
+struct ParticleEditor {
+	virtual ~ParticleEditor() {}
+
 	static UniquePtr<ParticleEditor> create(StudioApp& app);
 	static gpu::VertexDecl getVertexDecl(const char* path, u32 emitter_idx, Array<struct String>& attribute_names, StudioApp& app);
 	static void registerDependencies(const char* path, StudioApp& app);

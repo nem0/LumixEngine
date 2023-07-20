@@ -85,7 +85,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	const char* getName() const override { return "Audio"; }
 
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if(resources.length() > 1) return false;
 
@@ -99,7 +99,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		ImGuiEx::Label("Volume");
 		changed = ImGui::DragFloat("##vol", &m_meta.volume, 0.01f, 0, FLT_MAX) || changed;
 
-		auto* clip = static_cast<Clip*>(resources[0]);
+		auto* clip = static_cast<Clip*>(resources[0]->getResource());
 		ImGuiEx::Label("Length");
 		ImGui::Text("%f", clip->getLengthSeconds());
 		auto& device = getAudioDevice(m_app.getEngine());
@@ -145,8 +145,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	void deserialize(InputMemoryStream& blob) override { blob.read(m_meta); }
 	void serialize(OutputMemoryStream& blob) override { blob.write(m_meta); }
 
-	void onResourceUnloaded(Resource*) override { stopAudio(); }
-
+	void onResourceUnloaded(AssetBrowser::ResourceView&) override { stopAudio(); }
 
 	ResourceType getResourceType() const override { return Clip::TYPE; }
 	

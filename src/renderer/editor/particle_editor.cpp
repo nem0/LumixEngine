@@ -655,20 +655,35 @@ struct ParticleSystemEditorResource {
 		Version version = Version::LAST;
 	};
 	
-	ParticleSystemEditorResource(StudioApp& app, IAllocator& allocator) 
-		: m_emitters(allocator)
+	static ResourceType TYPE;
+
+	ParticleSystemEditorResource(const Path& path, StudioApp& app, IAllocator& allocator) 
+		: m_path(path)
+		, m_emitters(allocator)
 		, m_allocator(allocator)
 		, m_name(allocator)
 		, m_app(app)
 	{
-		addEmitter();
+		m_name = Path::getBasename(m_path.c_str());
 	}
-
+	
 	bool isFunction() const {
 		return m_emitters[0]->m_nodes.size() == 0 || m_emitters[0]->m_nodes[0]->getType() != Node::UPDATE;
 	}
 
 	void registerDependencies();
+
+	bool load() {
+		OutputMemoryStream content(m_app.getAllocator());
+		if (!m_app.getEngine().getFileSystem().getContentSync(m_path, content)) {
+			logError("Failed to read ", m_path);
+			return false;
+		}
+		
+		InputMemoryStream blob(content);
+		if (!deserialize(blob)) logError("Failed to deserialize ", m_path);
+		return true;
+	}
 
 	void serialize(OutputMemoryStream& blob) {
 		Header header;
@@ -680,15 +695,15 @@ struct ParticleSystemEditorResource {
 		}
 	}
 
-	bool deserialize(InputMemoryStream& blob, const char* path) {
+	bool deserialize(InputMemoryStream& blob) {
 		Header header;
 		blob.read(header);
 		if (header.magic != Header::MAGIC) {
-			logError("Invalid file ", path);
+			logError("Invalid file ", m_path);
 			return false;
 		}
 		if (header.version > Version::LAST) {
-			logError("Unsupported file version ", path);
+			logError("Unsupported file version ", m_path);
 			return false;
 		}
 
@@ -699,7 +714,7 @@ struct ParticleSystemEditorResource {
 		if (header.version > Version::MULTIEMITTER) count = blob.read<u32>();
 		for (u32 i = 0; i < count; ++i) {
 			UniquePtr<ParticleEmitterEditorResource> emitter = UniquePtr<ParticleEmitterEditorResource>::create(m_allocator, *this, m_allocator);
-			if (!emitter->deserialize(blob, path, header.version)) return false;
+			if (!emitter->deserialize(blob, m_path, header.version)) return false;
 			m_emitters.push(emitter.move());
 		}
 
@@ -708,8 +723,6 @@ struct ParticleSystemEditorResource {
 				if (!emitter->generate()) return false;
 			}
 		}
-		m_path = path;
-		m_name = Path::getBasename(path);
 		return true;
 	}
 
@@ -765,6 +778,8 @@ struct ParticleSystemEditorResource {
 	String m_name;
 	bool m_world_space = false;
 };
+
+ResourceType ParticleSystemEditorResource::TYPE = ResourceType("editor_particle");
 
 template <Node::Type T>
 struct UnaryFunctionNode : Node {
@@ -1682,35 +1697,32 @@ struct FunctionCallNode : Node {
 	bool hasInputPins() const override { return !m_inputs.empty(); }
 	bool hasOutputPins() const override { return !m_outputs.empty(); }
 
-	void setFunction(const Path& path, FileSystem& fs) {
+	void setFunction(const Path& path) {
 		IAllocator& allocator = m_resource.m_allocator;
 		StudioApp& app = m_resource.m_system.m_app;
-		m_function = UniquePtr<ParticleSystemEditorResource>::create(allocator, app, allocator);
-		OutputMemoryStream blob(allocator);
-		if (fs.getContentSync(path, blob)) {
-			InputMemoryStream iblob(blob);
-			if (m_function->deserialize(iblob, path)) {
-				for (Node* n : m_function->m_emitters[0]->m_nodes) {
-					switch (n->getType()) {
-						case Node::FUNCTION_OUTPUT: {
-							Output& i = m_outputs.emplace(m_resource.m_allocator);
-							auto* fn = (FunctionOutputNode*)n;
-							i.name = fn->m_name;
-							i.guid = fn->m_guid;
-							break;
-						}
-						case Node::FUNCTION_INPUT: {
-							Input& i = m_inputs.emplace(m_resource.m_allocator);
-							auto* fn = (FunctionInputNode*)n;
-							i.name = fn->m_name;
-							i.guid = fn->m_guid;
-							break;
-						}
-						default: break;
-
+		if (m_function.get()) m_function.destroy();
+		m_function.create(path, app, allocator);
+		if (m_function->load()) {
+			for (Node* n : m_function->m_emitters[0]->m_nodes) {
+				switch (n->getType()) {
+					case Node::FUNCTION_OUTPUT: {
+						Output& i = m_outputs.emplace(m_resource.m_allocator);
+						auto* fn = (FunctionOutputNode*)n;
+						i.name = fn->m_name;
+						i.guid = fn->m_guid;
+						break;
 					}
-				}			
-			}
+					case Node::FUNCTION_INPUT: {
+						Input& i = m_inputs.emplace(m_resource.m_allocator);
+						auto* fn = (FunctionInputNode*)n;
+						i.name = fn->m_name;
+						i.guid = fn->m_guid;
+						break;
+					}
+					default: break;
+
+				}
+			}			
 		}
 		else {
 			logError("Failed to read ", path);
@@ -1735,18 +1747,9 @@ struct FunctionCallNode : Node {
 		const char* path = blob.readString();
 		IAllocator& allocator = m_resource.m_allocator;
 		StudioApp& app = m_resource.m_system.m_app;
-		m_function = UniquePtr<ParticleSystemEditorResource>::create(allocator, app, allocator);
-		{
-			OutputMemoryStream fnblob(allocator);
-			FileSystem& fs = app.getEngine().getFileSystem();
-			if (fs.getContentSync(Path(path), fnblob)) {
-				InputMemoryStream iblob(fnblob);
-				m_function->deserialize(iblob, path);
-			}
-			else {
-				logError("Failed to read ", path);
-			}
-		}
+		if (m_function.get()) m_function.destroy();
+		m_function.create(Path(path), app, allocator);
+		m_function->load();
 
 		u32 count;
 		blob.read(count);
@@ -1858,7 +1861,7 @@ struct FunctionCallNode : Node {
 
 	using Output = Input;
 
-	UniquePtr<ParticleSystemEditorResource> m_function;
+	Local<ParticleSystemEditorResource> m_function;
 	Array<Input> m_inputs;
 	Array<Output> m_outputs;
 };
@@ -2568,94 +2571,315 @@ struct EmitNode : Node {
 };
 
 Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
-		Node* node = nullptr;
-		switch(type) {
-			case Node::CMP: node = LUMIX_NEW(m_allocator, CompareNode)(*this); break;
-			case Node::MESH: node = LUMIX_NEW(m_allocator, MeshNode)(*this); break;
-			case Node::SPLINE: node = LUMIX_NEW(m_allocator, SplineNode)(*this); break;
-			case Node::NOISE: node = LUMIX_NEW(m_allocator, NoiseNode)(*this); break;
-			case Node::CACHE: node = LUMIX_NEW(m_allocator, CacheNode)(*this); break;
-			case Node::EMIT_INPUT: node = LUMIX_NEW(m_allocator, EmitInputNode)(*this); break;
-			case Node::EMIT: node = LUMIX_NEW(m_allocator, EmitNode)(*this); break;
-			case Node::GRADIENT_COLOR: node = LUMIX_NEW(m_allocator, GradientColorNode)(*this); break;
-			case Node::CHANNEL_MASK: node = LUMIX_NEW(m_allocator, ChannelMaskNode)(*this); break;
-			case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
-			case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
-			case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
-			case Node::SELECT: node = LUMIX_NEW(m_allocator, SelectNode)(*this); break;
-			case Node::SET_CHANNEL: node = LUMIX_NEW(m_allocator, SetChannelNode)(*this); break;
-			case Node::FUNCTION_INPUT: node = LUMIX_NEW(m_allocator, FunctionInputNode)(*this); break;
-			case Node::FUNCTION_OUTPUT: node = LUMIX_NEW(m_allocator, FunctionOutputNode)(*this); break;
-			case Node::FUNCTION_CALL: node = LUMIX_NEW(m_allocator, FunctionCallNode)(*this); break;
-			case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
-			case Node::OR: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::OR>)(*this); break;
-			case Node::AND: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::AND>)(*this); break;
-			case Node::MADD: node = LUMIX_NEW(m_allocator, MaddNode)(*this); break;
-			case Node::SWITCH: node = LUMIX_NEW(m_allocator, SwitchNode)(*this); break;
-			case Node::RANDOM: node = LUMIX_NEW(m_allocator, RandomNode)(*this); break;
-			case Node::INIT: node = LUMIX_NEW(m_allocator, InitNode)(*this); break;
-			case Node::UPDATE: node = LUMIX_NEW(m_allocator, UpdateNode)(*this); break;
-			case Node::STREAM: node = LUMIX_NEW(m_allocator, StreamNode)(*this); break;
-			case Node::OUTPUT: node = LUMIX_NEW(m_allocator, OutputNode)(*this); break;
-			case Node::PIN: node = LUMIX_NEW(m_allocator, PinNode)(*this); break;
-			case Node::DIV: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::DIV>)(*this); break;
-			case Node::MOD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MOD>)(*this); break;
-			case Node::MUL: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MUL>)(*this); break;
-			case Node::ADD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::ADD>)(*this); break;
-			case Node::SUB: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::SUB>)(*this); break;
-			case Node::CONST: node = LUMIX_NEW(m_allocator, ConstNode)(*this); break;
-			case Node::COS: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::COS>)(*this); break;
-			case Node::SIN: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::SIN>)(*this); break;
-			case Node::NUMBER: node = LUMIX_NEW(m_allocator, LiteralNode)(*this); break;
-			case Node::FREE0: ASSERT(false); break;
-		}
-		m_nodes.push(node);
-		return node;
+	Node* node = nullptr;
+	switch(type) {
+		case Node::CMP: node = LUMIX_NEW(m_allocator, CompareNode)(*this); break;
+		case Node::MESH: node = LUMIX_NEW(m_allocator, MeshNode)(*this); break;
+		case Node::SPLINE: node = LUMIX_NEW(m_allocator, SplineNode)(*this); break;
+		case Node::NOISE: node = LUMIX_NEW(m_allocator, NoiseNode)(*this); break;
+		case Node::CACHE: node = LUMIX_NEW(m_allocator, CacheNode)(*this); break;
+		case Node::EMIT_INPUT: node = LUMIX_NEW(m_allocator, EmitInputNode)(*this); break;
+		case Node::EMIT: node = LUMIX_NEW(m_allocator, EmitNode)(*this); break;
+		case Node::GRADIENT_COLOR: node = LUMIX_NEW(m_allocator, GradientColorNode)(*this); break;
+		case Node::CHANNEL_MASK: node = LUMIX_NEW(m_allocator, ChannelMaskNode)(*this); break;
+		case Node::CURVE: node = LUMIX_NEW(m_allocator, CurveNode)(*this); break;
+		case Node::VEC3: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC3>)(*this); break;
+		case Node::VEC4: node = LUMIX_NEW(m_allocator, VectorNode<Node::VEC4>)(*this); break;
+		case Node::SELECT: node = LUMIX_NEW(m_allocator, SelectNode)(*this); break;
+		case Node::SET_CHANNEL: node = LUMIX_NEW(m_allocator, SetChannelNode)(*this); break;
+		case Node::FUNCTION_INPUT: node = LUMIX_NEW(m_allocator, FunctionInputNode)(*this); break;
+		case Node::FUNCTION_OUTPUT: node = LUMIX_NEW(m_allocator, FunctionOutputNode)(*this); break;
+		case Node::FUNCTION_CALL: node = LUMIX_NEW(m_allocator, FunctionCallNode)(*this); break;
+		case Node::VEC3_LENGTH: node = LUMIX_NEW(m_allocator, Vec3LengthNode)(*this); break;
+		case Node::OR: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::OR>)(*this); break;
+		case Node::AND: node = LUMIX_NEW(m_allocator, LogicOpNode<InstructionType::AND>)(*this); break;
+		case Node::MADD: node = LUMIX_NEW(m_allocator, MaddNode)(*this); break;
+		case Node::SWITCH: node = LUMIX_NEW(m_allocator, SwitchNode)(*this); break;
+		case Node::RANDOM: node = LUMIX_NEW(m_allocator, RandomNode)(*this); break;
+		case Node::INIT: node = LUMIX_NEW(m_allocator, InitNode)(*this); break;
+		case Node::UPDATE: node = LUMIX_NEW(m_allocator, UpdateNode)(*this); break;
+		case Node::STREAM: node = LUMIX_NEW(m_allocator, StreamNode)(*this); break;
+		case Node::OUTPUT: node = LUMIX_NEW(m_allocator, OutputNode)(*this); break;
+		case Node::PIN: node = LUMIX_NEW(m_allocator, PinNode)(*this); break;
+		case Node::DIV: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::DIV>)(*this); break;
+		case Node::MOD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MOD>)(*this); break;
+		case Node::MUL: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::MUL>)(*this); break;
+		case Node::ADD: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::ADD>)(*this); break;
+		case Node::SUB: node = LUMIX_NEW(m_allocator, BinaryOpNode<InstructionType::SUB>)(*this); break;
+		case Node::CONST: node = LUMIX_NEW(m_allocator, ConstNode)(*this); break;
+		case Node::COS: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::COS>)(*this); break;
+		case Node::SIN: node = LUMIX_NEW(m_allocator, UnaryFunctionNode<Node::SIN>)(*this); break;
+		case Node::NUMBER: node = LUMIX_NEW(m_allocator, LiteralNode)(*this); break;
+		case Node::FREE0: ASSERT(false); break;
 	}
+	m_nodes.push(node);
+	return node;
+}
+
+
+struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
+{
+	explicit ParticleSystemPlugin(StudioApp& app)
+		: m_app(app)
+		, AssetBrowser::Plugin(app.getAllocator())
+	{
+		AssetCompiler& compiler = app.getAssetCompiler();
+		compiler.registerExtension("par", ParticleSystemResource::TYPE);
+	}
+
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
+
+	void addSubresources(AssetCompiler& compiler, const char* path) override {
+		compiler.addResource(ParticleSystemResource::TYPE, path);
+		ParticleEditor::registerDependencies(path, m_app);
+	}
+
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		InputMemoryStream input(src_data);
+		OutputMemoryStream output(m_app.getAllocator());
+		if (!m_particle_editor->compile(input, output, src.c_str())) return false;
+
+		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
+	}
+
+	bool canCreateResource() const { return true; }
+
+	bool createResource(const char* path) {
+		ParticleSystemEditorResource res(Path(path), m_app, m_app.getAllocator());
+		res.addEmitter();
+		res.m_emitters[0]->initDefault(ParticleSystemResourceType::SYSTEM);
+		OutputMemoryStream blob(m_app.getAllocator());
+		res.serialize(blob);
+		if (!m_app.getEngine().getFileSystem().saveContentSync(Path(path), blob)) {
+			logError("Failed to write ", path);
+			return false;
+		}
+		return true;
+	}
+
+	const char* getDefaultExtension() const override { return "par"; }
+	
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
+		if (resources.length() != 1) return false;
+
+		if (ImGui::Button(ICON_FA_EDIT " Edit")) {
+			m_particle_editor->open(resources[0]->getPath().c_str());
+		}
+		return false;
+	}
+
+	const char* getName() const override { return "Particle system"; }
+	ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
+
+	StudioApp& m_app;
+	ParticleEditor* m_particle_editor;
+};
+
+struct FunctionCompilerPlugin : AssetCompiler::IPlugin {
+	FunctionCompilerPlugin(ParticleEditor& editor) : m_editor(editor) {}
+
+	void addSubresources(AssetCompiler& compiler, const char* path) override;
+	bool compile(const Path& src) override { return true; }
+	void listLoaded() override;
+
+	ParticleEditor& m_editor;
+};
+
+struct FunctionBrowserPlugin : AssetBrowser::Plugin {
+	FunctionBrowserPlugin(ParticleEditor& editor, StudioApp& app) 
+		: Plugin(app.getAllocator())
+		, m_app(app)
+		, m_editor(editor)
+	{}
+
+	AssetBrowser::ResourceView& createView(const Path& path, StudioApp&) override {
+		struct View : AssetBrowser::ResourceView {
+			View(const Path& path, StudioApp& app)
+				: resource(path, app, app.getAllocator())
+			{
+				FileSystem& fs = app.getEngine().getFileSystem();
+				OutputMemoryStream content(app.getAllocator());
+				if (fs.getContentSync(path, content)) {
+					InputMemoryStream blob(content);
+					m_is_ready = resource.deserialize(blob);
+				}
+			}
+			
+			const struct Path& getPath() override { return resource.m_path; }
+			struct ResourceType getType() override { return ParticleSystemEditorResource::TYPE; }
+			bool isEmpty() override { return false; }
+			bool isReady() override { return m_is_ready; }
+			bool isFailure() override { return !m_is_ready; }
+			u64 size() override { return 0; }
+			void destroy() { LUMIX_DELETE(*allocator, this); }
+			Resource* getResource() override { ASSERT(false); return nullptr; }
+
+			ParticleSystemEditorResource resource;
+			IAllocator* allocator;
+			bool m_is_ready = false;
+		};
+
+		IAllocator& allocator = m_app.getAllocator();
+		View* view = LUMIX_NEW(allocator, View)(path, m_app);
+		view->allocator = &allocator;
+		return *view;
+	}
+
+	bool canCreateResource() const { return true; }
+
+	bool createResource(const char* path) {
+		ParticleSystemEditorResource res(Path(path), m_app, m_app.getAllocator());
+		res.addEmitter();
+		res.m_emitters[0]->initDefault(ParticleSystemResourceType::FUNCTION);
+		OutputMemoryStream blob(m_app.getAllocator());
+		res.serialize(blob);
+		if (!m_app.getEngine().getFileSystem().saveContentSync(Path(path), blob)) {
+			logError("Failed to write ", path);
+			return false;
+		}
+		return true;
+	}
+
+	const char* getDefaultExtension() const override { return "pfn"; }
+
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
+		if (resources.length() != 1) return false;
+
+		if (ImGui::Button(ICON_FA_EDIT " Edit")) {
+			m_editor.open(resources[0]->getPath().c_str());
+		}
+		return false;
+	}
+
+	const char* getName() const override { return "Particle function"; }
+	ResourceType getResourceType() const override { return ParticleSystemEditorResource::TYPE; }
+	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
+	void serialize(OutputMemoryStream& blob) override {}
+
+	StudioApp& m_app;
+	ParticleEditor& m_editor;
+};
 
 } // anonymous namespace
 
-struct ParticleEditorImpl : ParticleEditor, NodeEditor {
-	ParticleEditorImpl(StudioApp& app, IAllocator& allocator)
-		: m_allocator(allocator)
-		, m_app(app)
-		, NodeEditor(allocator)
-		, m_functions(allocator)
-		, m_recent_paths("particle_editor_recent_", 10, app)
+struct ParticleEditorImpl : ParticleEditor {
+	ParticleEditorImpl(StudioApp& app)
+		: m_app(app)
+		, m_function_browser_plugin(*this, app)
+		, m_function_compiler_plugin(*this)
+		, m_functions(app.getAllocator())
+		, m_windows(app.getAllocator())
+		, m_particle_system_plugin(app)
 	{
-		m_toggle_ui.init("Particle editor", "Toggle particle editor", "particle_editor", "", true);
-		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
-		m_toggle_ui.is_selected.bind<&ParticleEditorImpl::isOpen>(this);
-
 		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, true);
-
-		app.addWindowAction(&m_toggle_ui);
 		app.addAction(&m_apply_action);
-		newGraph(ParticleSystemResourceType::SYSTEM);
 
-		m_app.getAssetCompiler().addHook("pfn").bind<&ParticleEditorImpl::onFunctionChange>(this);
+		AssetCompiler& compiler = m_app.getAssetCompiler();
+		compiler.registerExtension("pfn", ParticleSystemEditorResource::TYPE);
+		const char* extensions[] = { "pfn", nullptr };
+		compiler.addPlugin(m_function_compiler_plugin, extensions);
+		AssetBrowser& browser = m_app.getAssetBrowser();
+		browser.addPlugin(m_function_browser_plugin);
+
+		const char* particle_emitter_exts[] = {"par", nullptr};
+		compiler.addPlugin(m_particle_system_plugin, particle_emitter_exts);
+		browser.addPlugin(m_particle_system_plugin);
+
+		m_particle_system_plugin.m_particle_editor = this;
 	}
 
 	~ParticleEditorImpl() {
-		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_apply_action);
+
+		AssetCompiler& compiler = m_app.getAssetCompiler();
+		compiler.removePlugin(m_function_compiler_plugin);
+		compiler.removePlugin(m_particle_system_plugin);
+
+		AssetBrowser& browser = m_app.getAssetBrowser();
+		browser.removePlugin(m_function_browser_plugin);
+		browser.removePlugin(m_particle_system_plugin);
 	}
 
-	void onFunctionChange(const Path& path) {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.fileExists(path)) return;
-
-		for (Function& f : m_functions) {
-			if (f.path == path) return;
-		}
-
-		addFunction(path);
-	}
+	void open(const char* path) override;
 
 	void addFunction(const Path& path) {
-		Function& func = m_functions.emplace(m_allocator);
+		Function& func = m_functions.emplace(m_app.getAllocator());
 		func.path = path;
 		func.name = Path::getBasename(path.c_str());
+	}
+
+	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
+		IAllocator& allocator = m_app.getAllocator();
+		ParticleSystemEditorResource res(Path(path), m_app, allocator);
+		if (!res.deserialize(input)) return false;
+
+		ParticleSystemResource::Header header;
+		output.write(header);
+		
+		ParticleSystemResource::Flags flags = ParticleSystemResource::Flags::NONE;
+		if (res.m_world_space) flags = ParticleSystemResource::Flags::WORLD_SPACE;
+		output.write(flags);
+		
+		output.write(res.m_emitters.size());
+		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : res.m_emitters) {
+			if (!emitter->generate()) return false;
+
+			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+			emitter->fillVertexDecl(decl, nullptr, allocator);
+			output.write(decl);
+			output.writeString(emitter->m_mat_path);
+			const u32 count = u32(emitter->m_update.size() + emitter->m_emit.size() + emitter->m_output.size());
+			output.write(count);
+			output.write(emitter->m_update.data(), emitter->m_update.size());
+			output.write(emitter->m_emit.data(), emitter->m_emit.size());
+			output.write(emitter->m_output.data(), emitter->m_output.size());
+			output.write((u32)emitter->m_update.size());
+			output.write(u32(emitter->m_update.size() + emitter->m_emit.size()));
+
+			auto getCount = [](const auto& x){
+				u32 c = 0;
+				for (const auto& i : x) c += Lumix::getCount(i.type);
+				return c;
+			};
+
+			output.write(getCount(emitter->m_streams));
+			output.write((u32)emitter->m_registers_count);
+			output.write(getCount(emitter->m_outputs));
+			output.write(emitter->m_init_emit_count);
+			output.write(emitter->m_emit_per_second);
+			output.write(getCount(emitter->m_emit_inputs));
+		}
+		return true;
+	}
+
+	struct Function {
+		Function(IAllocator& allocator) : name(allocator) {}
+		String name;
+		Path path;
+	};
+
+	StudioApp& m_app;
+	Array<Function> m_functions;
+	ParticleSystemPlugin m_particle_system_plugin;
+	FunctionCompilerPlugin m_function_compiler_plugin;
+	FunctionBrowserPlugin m_function_browser_plugin;
+	Array<struct ParticleEditorWindow*> m_windows;
+	Action m_apply_action;
+};
+
+struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
+	ParticleEditorWindow(const Path& path, ParticleEditorImpl& editor, StudioApp& app, IAllocator& allocator)
+		: NodeEditor(allocator)
+		, m_allocator(allocator)
+		, m_app(app)
+		, m_editor(editor)
+		, m_resource(path, m_app, m_allocator)
+	{
 	}
 
 	struct ICategoryVisitor {
@@ -2698,7 +2922,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			visitor.endCategory();
 		}
 
-		if (!m_resource->isFunction()) {
+		if (!m_resource.isFunction()) {
 			if (visitor.beginCategory("Emit inputs")) {
 				for (u8 i = 0; i < m_active_emitter->m_emit_inputs.size(); ++i) {
 					struct : ICategoryVisitor::INodeCreator {
@@ -2716,8 +2940,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			}
 
 			if (visitor.beginCategory("Emit")) {
-				for (i32 i = 0; i < m_resource->m_emitters.size(); ++i) {
-					ParticleEmitterEditorResource& emitter = *m_resource->m_emitters[i].get();
+				for (i32 i = 0; i < m_resource.m_emitters.size(); ++i) {
+					ParticleEmitterEditorResource& emitter = *m_resource.m_emitters[i].get();
 					struct : ICategoryVisitor::INodeCreator {
 						Node* create(ParticleEmitterEditorResource& res) const override {
 							auto* n = (EmitNode*)res.addNode(Node::EMIT);
@@ -2770,17 +2994,17 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			}
 		}
 
-		if (m_functions.size() > 0) {
+		if (m_editor.m_functions.size() > 0) {
 			if (visitor.beginCategory("Functions")) {
-				for (const Function& f : m_functions) {
+				for (const ParticleEditorImpl::Function& f : m_editor.m_functions) {
 					struct : ICategoryVisitor::INodeCreator {
 						Node* create(ParticleEmitterEditorResource& parent) const override {
 							auto* n = (FunctionCallNode*)parent.addNode(Node::FUNCTION_CALL);
-							n->setFunction(path, editor->m_app.getEngine().getFileSystem());
+							n->setFunction(path);
 							return n;
 						}
 						Path path;
-						ParticleEditorImpl* editor;
+						ParticleEditorWindow* editor;
 					} creator;
 					creator.path = f.path;
 					creator.editor = this;
@@ -2810,7 +3034,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			.endCategory();
 		}
 
-		if (m_resource->isFunction()) {
+		if (m_resource.isFunction()) {
 			if (visitor.beginCategory("Function")) {
 				visitor.visitType(Node::FUNCTION_INPUT, "Function input")
 				.visitType(Node::FUNCTION_OUTPUT, "Function output")
@@ -2845,7 +3069,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				return *this;
 			}
 			
-			ParticleEditorImpl* editor;
+			ParticleEditorWindow* editor;
 			Node* n = nullptr;
 		} visitor;
 		visitor.editor = this;
@@ -2884,7 +3108,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					return *this;
 				}
 			
-				ParticleEditorImpl* editor;
+				ParticleEditorWindow* editor;
 				Node* n = nullptr;
 			} visitor;
 			visitor.editor = this;
@@ -2901,7 +3125,7 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 					return *this;
 				}
 			
-				ParticleEditorImpl* editor;
+				ParticleEditorWindow* editor;
 				Node* n = nullptr;
 			} visitor;
 			visitor.editor = this;
@@ -2942,21 +3166,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	bool hasFocus() const override { return m_has_focus; }
 
-	void onSettingsLoaded() override {
-		m_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_particle_editor_open", false);
-		m_recent_paths.onSettingsLoaded();
-	}
-
-	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue(Settings::GLOBAL, "is_particle_editor_open", m_open);
-		m_recent_paths.onBeforeSettingsSaved();
-	}
-
-	bool isOpen() const { return m_open; }
-	void toggleOpen() { m_open = !m_open; }
-
 	void deleteEmitter(u32 emitter_idx) {
-		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource->m_emitters) {
+		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource.m_emitters) {
 			for (i32 i = e->m_nodes.size() - 1; i >= 0; --i) {
 				Node* n = e->m_nodes[i];
 				if (n->getType() != Node::EMIT) continue;
@@ -2974,15 +3185,15 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				}
 			}
 		}
-		m_resource->removeEmitter(m_resource->m_emitters[emitter_idx].get());
-		m_active_emitter = m_resource->m_emitters[0].get();
+		m_resource.removeEmitter(m_resource.m_emitters[emitter_idx].get());
+		m_active_emitter = m_resource.m_emitters[0].get();
 		pushUndo(NO_MERGE_UNDO);	
 	}
 
 	void deleteEmitInput(u32 input_idx) {
-		const i32 emitter_index = m_resource->m_emitters.find([this](const UniquePtr<ParticleEmitterEditorResource>& e){ return e.get() == m_active_emitter; });
+		const i32 emitter_index = m_resource.m_emitters.find([this](const UniquePtr<ParticleEmitterEditorResource>& e){ return e.get() == m_active_emitter; });
 		ASSERT(emitter_index >= 0);
-		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource->m_emitters) {
+		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource.m_emitters) {
 			for (Node* n : e->m_nodes) {
 				if (n->getType() != Node::EMIT) continue;
 				EmitNode* en = (EmitNode*)n;
@@ -3199,9 +3410,9 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		if (!system) return;
 
 		for (u32 emitter_idx = 0, c = system->getEmitters().size(); emitter_idx < c; ++emitter_idx) {
-			ASSERT(c == m_resource->m_emitters.size());
+			ASSERT(c == m_resource.m_emitters.size());
 			const ParticleSystem::Emitter& emitter = system->getEmitters()[emitter_idx];
-			const UniquePtr<ParticleEmitterEditorResource>& editor_emitter = m_resource->m_emitters[emitter_idx];
+			const UniquePtr<ParticleEmitterEditorResource>& editor_emitter = m_resource.m_emitters[emitter_idx];
 			OutputMemoryStream instructions(m_allocator);
 			instructions.resize(editor_emitter->m_update.size() + editor_emitter->m_emit.size() + editor_emitter->m_output.size());
 			memcpy(instructions.getMutableData(), editor_emitter->m_update.data(), editor_emitter->m_update.size());
@@ -3225,8 +3436,6 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 				, Path(editor_emitter->m_mat_path));
 		}
 	}
-
-	static constexpr const char* WINDOW_NAME = "Particle editor";
 
 	void debugUI() {
 		if (!m_show_debug) return;
@@ -3265,146 +3474,93 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void onGUI() override {
 		m_has_focus = false;
-		if (!m_open) return;
-
-		if (m_confirm_new) ImGui::OpenPopup("Confirm##cnp");
-		if (m_confirm_load) ImGui::OpenPopup("Confirm##clp");
-
-		m_confirm_new = false;
-		m_confirm_load = false;
-
-		if (ImGui::BeginPopupModal("Confirm##cnp")) {
-			ImGui::TextUnformatted("Graph not saved, all changes will be lost. Are you sure?");
-			if (ImGui::Selectable("Yes")) {
-				m_dirty = false;
-				newGraph(m_confirm_new_type);
-			}
-			ImGui::Selectable("No");
-			ImGui::EndPopup();
-		}
-
-		if (ImGui::BeginPopupModal("Confirm##clp")) {
-			ImGui::TextUnformatted("Graph not saved, all changes will be lost. Are you sure?");
-			if (ImGui::Selectable("Yes")) {
-				m_dirty = false;
-				load(m_confirm_load_path);
-			}
-			ImGui::Selectable("No");
-			ImGui::EndPopup();
-		}
 
 		debugUI();
 
-		ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-		if (!ImGui::Begin(WINDOW_NAME, &m_open, ImGuiWindowFlags_MenuBar)) {
-			ImGui::End();
-			return;
+		if (m_focus_request) {
+			ImGui::SetNextWindowFocus();
+			m_focus_request = false;
 		}
+		bool open = true;
+		Span<const char> basename = Path::getBasename(m_resource.m_path.c_str());
+		StaticString<128> title(basename, "##pe", (uintptr)this);
+		ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
+		if (ImGui::Begin(title, &open, ImGuiWindowFlags_MenuBar)) {
+			m_dock_id = ImGui::GetWindowDockID();
+			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		
-		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-		
-		if (ImGui::BeginMenuBar()) {
-			if (ImGui::BeginMenu("File")) {
-				const ParticleSystem* emitter = getSelectedParticleSystem();
-				if (ImGui::BeginMenu("New")) {
-					if (ImGui::MenuItem("System")) newGraph(ParticleSystemResourceType::SYSTEM);
-					if (ImGui::MenuItem("Function")) newGraph(ParticleSystemResourceType::FUNCTION);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Open")) {
-					char buf[LUMIX_MAX_PATH] = "";
-					FilePathHash dummy;
-					if (m_app.getAssetBrowser().resourceList(Span(buf), dummy, ParticleSystemResource::TYPE, false, false)) {
-						open(buf);
-					}
-					ImGui::EndMenu();
-				}
+			if (ImGui::BeginMenuBar()) {
+				if (ImGui::BeginMenu("File")) {
+					const ParticleSystem* emitter = getSelectedParticleSystem();
+					menuItem(m_app.getSaveAction(), true);
+					if (ImGui::MenuItem("Save as")) m_show_save_as = true;
+					menuItem(m_editor.m_apply_action, emitter && emitter->getResource());
+					ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
+					if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
 
-				if (!m_functions.empty()) {
-					if (ImGui::BeginMenu("Open function")) {
-						ImGuiEx::filter("Filter", m_function_filter, sizeof(m_function_filter), 200, ImGui::IsWindowAppearing());
-						FilePathHash dummy;
-						const bool is_enter = ImGui::IsKeyPressed(ImGuiKey_Enter);
-						for (const Function& f : m_functions) {
-							const bool pass_filter = m_function_filter[0] == '\0' || stristr(f.name.c_str(), m_function_filter);
-							if (pass_filter && (is_enter || ImGui::Selectable(f.name.c_str()))) {
-								load(f.path);
-								m_function_filter[0] = '\0';
-								ImGui::CloseCurrentPopup();
-								break;
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Edit")) {
+					ImGui::MenuItem("World space", 0, &m_resource.m_world_space);
+					menuItem(m_app.getUndoAction(), canUndo());
+					menuItem(m_app.getRedoAction(), canRedo());
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenuBar();
+			}
+
+			FileSelector& fs = m_app.getFileSelector();
+			if (fs.gui("Save As", &m_show_save_as, m_resource.isFunction() ? "pfn" : "par", true)) saveAs(Path(fs.getPath()));
+
+			if (m_resource.isFunction()) {
+				m_active_emitter = m_resource.m_emitters[0].get();
+				nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+			}
+			else {
+				if (ImGui::BeginTabBar("tabbar")) {
+					i32 remove = -1;
+					const bool can_remove = m_resource.m_emitters.size() > 1;
+					for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource.m_emitters) {
+						u32 idx = u32(&emitter - m_resource.m_emitters.begin());
+						bool emitter_open = true;
+						if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &emitter_open : nullptr)) {
+							if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
+								m_active_emitter = emitter.get();
+								ImGui::TableNextRow();
+								ImGui::TableNextColumn();
+								leftColumnGUI();
+								ImGui::TableNextColumn();
+								nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+								ImGui::EndTable();
 							}
+							ImGui::EndTabItem();
 						}
-						ImGui::EndMenu();
+						if (!emitter_open) remove = idx;
 					}
-				}
-
-				if (ImGui::MenuItem("Load from entity", nullptr, false, emitter)) loadFromEntity();
-				if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
-				menuItem(m_app.getSaveAction(), true);
-				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
-				if (const char* path = m_recent_paths.menu(); path) open(path);
-				ImGui::Separator();
-			
-				menuItem(m_apply_action, emitter && emitter->getResource());
-				ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
-
-				ImGui::EndMenu();
-			}
-			if (ImGui::BeginMenu("Edit")) {
-				ImGui::MenuItem("World space", 0, &m_resource->m_world_space);
-				menuItem(m_app.getUndoAction(), canUndo());
-				menuItem(m_app.getRedoAction(), canRedo());
-				ImGui::EndMenu();
-			}
-			ImGui::EndMenuBar();
-		}
-
-		FileSelector& fs = m_app.getFileSelector();
-		if (fs.gui("Save As", &m_show_save_as, m_resource->isFunction() ? "pfn" : "par", true)) saveAs(Path(fs.getPath()));
-
-		if (m_resource->isFunction()) {
-			m_active_emitter = m_resource->m_emitters[0].get();
-			nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
-		}
-		else {
-			if (ImGui::BeginTabBar("tabbar")) {
-				i32 remove = -1;
-				const bool can_remove = m_resource->m_emitters.size() > 1;
-				for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
-					u32 idx = u32(&emitter - m_resource->m_emitters.begin());
-					bool open = true;
-					if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &open : nullptr)) {
-						if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
-							ImGui::TableNextRow();
-							ImGui::TableNextColumn();
-							leftColumnGUI();
-							ImGui::TableNextColumn();
-							m_active_emitter = emitter.get();
-							nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
-							ImGui::EndTable();
-						}
-						ImGui::EndTabItem();
+					if (ImGui::TabItemButton(ICON_FA_PLUS)) {
+						ParticleEmitterEditorResource* emitter = m_resource.addEmitter();
+						emitter->initDefault(ParticleSystemResourceType::SYSTEM);
+						pushUndo(NO_MERGE_UNDO);
 					}
-					if (!open) remove = idx;
-				}
-				if (ImGui::TabItemButton(ICON_FA_PLUS)) {
-					ParticleEmitterEditorResource* emitter = m_resource->addEmitter();
-					emitter->initDefault(ParticleSystemResourceType::SYSTEM);
-					pushUndo(NO_MERGE_UNDO);
-				}
-				ImGui::EndTabBar();
-				if (remove >= 0) {
-					deleteEmitter(remove);
+					ImGui::EndTabBar();
+					if (remove >= 0) {
+						deleteEmitter(remove);
+					}
 				}
 			}
 		}
 		ImGui::End();
+		if (!open) {
+			m_editor.m_windows.eraseItem(this);
+			m_app.removePlugin(*this);
+			LUMIX_DELETE(m_app.getAllocator(), this);
+		}
 	}
 
 	bool onAction(const Action& action) override {
-		if (&action == &m_apply_action) apply();
+		if (&action == &m_editor.m_apply_action) apply();
 		else if (&action == &m_app.getDeleteAction()) deleteSelectedNodes();
-		else if (&action == &m_app.getSaveAction()) save();
+		else if (&action == &m_app.getSaveAction()) saveAs(m_resource.m_path);
 		else if (&action == &m_app.getUndoAction()) undo();
 		else if (&action == &m_app.getRedoAction()) redo();
 		else return false;
@@ -3417,8 +3573,8 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 
 	void pushUndo(u32 tag) override {
 		m_active_emitter->colorLinks();
-		if (!m_resource->isFunction()) {
-			for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource->m_emitters) {
+		if (!m_resource.isFunction()) {
+			for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource.m_emitters) {
 				// TODO generate only active emitter and make sure other emitters are up-to-date
 				emitter->generate();
 			}
@@ -3429,53 +3585,17 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 		SimpleUndoRedo::pushUndo(tag);
 	}
 
-	void loadFromEntity() {
-		const ParticleSystem* emitter = getSelectedParticleSystem();
-		ASSERT(emitter);
-
-		const Path& path = emitter->getResource()->getPath();
-		load(path.c_str());
-	}
-
-	void serialize(OutputMemoryStream& blob) override { m_resource->serialize(blob); }
+	void serialize(OutputMemoryStream& blob) override { m_resource.serialize(blob); }
 	
 	void deserialize(InputMemoryStream& blob) override { 
-		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_app, m_allocator);
-		m_resource->deserialize(blob, "");
-		m_active_emitter = m_resource->m_emitters[0].get();
-	}
-
-	void load(const char* path) {
-		ASSERT(path && path[0] != '\0');
-
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream blob(m_allocator);
-		if (!fs.getContentSync(Path(path), blob)) {
-			logError("Failed to read ", path);
-			return;
-		}
-		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_app, m_allocator);
-		InputMemoryStream iblob(blob);
-		m_resource->deserialize(iblob, path);
-		m_active_emitter = m_resource->m_emitters[0].get();
-		m_path = path;
-		clearUndoStack();
-		m_recent_paths.push(path);
-		pushUndo(NO_MERGE_UNDO);
-		m_dirty = false;
-	}
-
-	void save() {
-		if (!m_path.isEmpty()) {
-			saveAs(m_path);
-			return;
-		}
-		m_show_save_as = true;
+		m_resource.m_emitters.clear();
+		m_resource.deserialize(blob);
+		m_active_emitter = m_resource.m_emitters[0].get();
 	}
 
 	void saveAs(const Path& path) {
 		OutputMemoryStream blob(m_allocator);
-		m_resource->serialize(blob);
+		m_resource.serialize(blob);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.saveContentSync(path, blob)) {
@@ -3483,120 +3603,74 @@ struct ParticleEditorImpl : ParticleEditor, NodeEditor {
 			return;
 		}
 		
-		m_path = path;
-		m_recent_paths.push(path);
+		m_resource.m_path = path;
+		m_resource.m_name = Path::getBasename(m_resource.m_path.c_str());
+
 		m_dirty = false;
 
-		m_resource->registerDependencies();
+		m_resource.registerDependencies();
 
-		const i32 fidx = m_functions.find([&](const Function& f){ return f.path == path; });
-		if (fidx < 0) addFunction(path);
+		const i32 fidx = m_editor.m_functions.find([&](const ParticleEditorImpl::Function& f){ return f.path == path; });
+		if (fidx < 0) m_editor.addFunction(path);
 	}
 
-	void newGraph(ParticleSystemResourceType type) {
-		if (m_dirty) {
-			m_confirm_new = true;
-			m_confirm_new_type = type;
-			return;
-		}
-
-		clearUndoStack();
-		m_resource = UniquePtr<ParticleSystemEditorResource>::create(m_allocator, m_app, m_allocator);
-		m_active_emitter = m_resource->m_emitters[0].get();
-		m_active_emitter->initDefault(type);
-
-		m_path = "";
+	void loadResource() {
+		m_resource.load();
+		m_active_emitter = m_resource.m_emitters[0].get();
 		pushUndo(NO_MERGE_UNDO);
-		m_dirty = false;
 	}
 
 	const char* getName() const override { return "Particle editor"; }
 
-	void open(const char* path) override {
-		ImGui::SetWindowFocus(WINDOW_NAME);
-		m_open = true;
-		if (m_dirty) {
-			m_confirm_load = true;
-			m_confirm_load_path = path;
-			return;
-		}
-		
-		load(path);
-	}
-
-	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
-		ParticleSystemEditorResource res(m_app, m_allocator);
-		if (!res.deserialize(input, path)) return false;
-
-		ParticleSystemResource::Header header;
-		output.write(header);
-		
-		ParticleSystemResource::Flags flags = ParticleSystemResource::Flags::NONE;
-		if (res.m_world_space) flags = ParticleSystemResource::Flags::WORLD_SPACE;
-		output.write(flags);
-		
-		output.write(res.m_emitters.size());
-		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : res.m_emitters) {
-			if (!emitter->generate()) return false;
-
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-			emitter->fillVertexDecl(decl, nullptr, m_allocator);
-			output.write(decl);
-			output.writeString(emitter->m_mat_path);
-			const u32 count = u32(emitter->m_update.size() + emitter->m_emit.size() + emitter->m_output.size());
-			output.write(count);
-			output.write(emitter->m_update.data(), emitter->m_update.size());
-			output.write(emitter->m_emit.data(), emitter->m_emit.size());
-			output.write(emitter->m_output.data(), emitter->m_output.size());
-			output.write((u32)emitter->m_update.size());
-			output.write(u32(emitter->m_update.size() + emitter->m_emit.size()));
-
-			auto getCount = [](const auto& x){
-				u32 c = 0;
-				for (const auto& i : x) c += Lumix::getCount(i.type);
-				return c;
-			};
-
-			output.write(getCount(emitter->m_streams));
-			output.write((u32)emitter->m_registers_count);
-			output.write(getCount(emitter->m_outputs));
-			output.write(emitter->m_init_emit_count);
-			output.write(emitter->m_emit_per_second);
-			output.write(getCount(emitter->m_emit_inputs));
-		}
-		return true;
-	}
-
-	struct Function {
-		Function(IAllocator& allocator) : name(allocator) {}
-		String name;
-		Path path;
-	};
-
 	IAllocator& m_allocator;
 	StudioApp& m_app;
-	Array<Function> m_functions;
+	ParticleEditorImpl& m_editor;
 	char m_function_filter[128] = "";
-	Path m_path;
 	bool m_show_debug = false;
 	bool m_show_save_as = false;
 	bool m_dirty = false;
-	bool m_confirm_new = false;
-	ParticleSystemResourceType m_confirm_new_type;
-	bool m_confirm_load = false;
-	StaticString<LUMIX_MAX_PATH> m_confirm_load_path;
-	UniquePtr<ParticleSystemEditorResource> m_resource;
+	ParticleSystemEditorResource m_resource;
 	ParticleEmitterEditorResource* m_active_emitter = nullptr;
-	bool m_open = false;
 	bool m_autoapply = false;
-	Action m_toggle_ui;
-	Action m_apply_action;
 	bool m_has_focus = false;
+	bool m_focus_request = false;
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
-	RecentPaths m_recent_paths;
 	char m_node_filter[64] = "";
+	ImGuiID m_dock_id = 0;
 };
+
+
+void ParticleEditorImpl::open(const char* path) {
+	for (ParticleEditorWindow* win : m_windows) {
+		if (win->m_resource.m_path == path) {
+			win->m_focus_request = true;
+			return;
+		}
+	}
+	
+	IAllocator& allocator = m_app.getAllocator();
+	ParticleEditorWindow* win = LUMIX_NEW(allocator, ParticleEditorWindow)(Path(path), *this, m_app, m_app.getAllocator());
+	win->loadResource();
+	if (!m_windows.empty()) win->m_dock_id = m_windows.last()->m_dock_id;
+	m_windows.push(win);
+	m_app.addPlugin(*win);
+}
+
+void FunctionCompilerPlugin::addSubresources(AssetCompiler& compiler, const char* path) {
+	compiler.addResource(ParticleSystemEditorResource::TYPE, path);
+	((ParticleEditorImpl&)m_editor).addFunction(Path(path));
+}
+
+void FunctionCompilerPlugin::listLoaded() {
+	ParticleEditorImpl& editor = (ParticleEditorImpl&)m_editor;
+	AssetCompiler& compiler = editor.m_app.getAssetCompiler();
+	auto& resources = compiler.lockResources();
+	for (const AssetCompiler::ResourceItem& ri : resources) {
+		if (ri.type == ParticleSystemEditorResource::TYPE) editor.addFunction(ri.path);
+	}
+	compiler.unlockResources();
+}
 
 DataStream NodeInput::generate(GenerateContext& ctx, DataStream output, u8 subindex) const {
 	return node ? node->generate(ctx, output, subindex) : DataStream();
@@ -3607,7 +3681,7 @@ gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, u32 emitter_idx,
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 
 	IAllocator& allocator = app.getAllocator();
-	ParticleSystemEditorResource system(app, allocator);
+	ParticleSystemEditorResource system(Path(path), app, allocator);
 	OutputMemoryStream blob(allocator);
 	FileSystem& fs = app.getEngine().getFileSystem();
 	if (!fs.getContentSync(Path(path), blob)) {
@@ -3616,7 +3690,7 @@ gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, u32 emitter_idx,
 	}
 
 	InputMemoryStream tmp(blob);
-	if (!system.deserialize(tmp, path)) {
+	if (!system.deserialize(tmp)) {
 		logError("Failed to parse ", path);
 		return decl;
 	}
@@ -3637,14 +3711,14 @@ void ParticleSystemEditorResource::registerDependencies() {
 }
 
 void ParticleEditor::registerDependencies(const char* path, StudioApp& app) {
-	ParticleSystemEditorResource system(app, app.getAllocator());
+	ParticleSystemEditorResource system(Path(path), app, app.getAllocator());
 	OutputMemoryStream content(app.getAllocator());
 	if (!app.getEngine().getFileSystem().getContentSync(Path(path), content)) {
 		logError("Failed to load ", path);
 		return;
 	}
 	InputMemoryStream blob(content);
-	if (!system.deserialize(blob, path)) {
+	if (!system.deserialize(blob)) {
 		logError("Failed to deserialize ", path);
 		return;
 	}
@@ -3655,7 +3729,7 @@ void ParticleEditor::registerDependencies(const char* path, StudioApp& app) {
 
 UniquePtr<ParticleEditor> ParticleEditor::create(StudioApp& app) {
 	IAllocator& allocator = app.getAllocator();
-	return UniquePtr<ParticleEditorImpl>::create(allocator, app, allocator);
+	return UniquePtr<ParticleEditorImpl>::create(allocator, app);
 }
 
 

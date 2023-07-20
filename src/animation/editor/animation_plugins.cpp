@@ -46,25 +46,18 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
 	void serialize(OutputMemoryStream& blob) override {}
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if (resources.length() > 1) return false;
 
-		auto* animation = static_cast<Animation*>(resources[0]);
+		auto* animation = static_cast<Animation*>(resources[0]->getResource());
 		ImGuiEx::Label("Length");
 		ImGui::Text("%.3fs", animation->getLength().seconds());
 		return false;
 	}
 
-
-	void onResourceUnloaded(Resource* resource) override {}
-
-
 	const char* getName() const override { return "Animation"; }
-
-
 	ResourceType getResourceType() const override { return Animation::TYPE; }
-
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
@@ -165,20 +158,21 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 	
 	void deserialize(InputMemoryStream& blob) override {
-		((PropertyAnimation*)m_current_resources[0])->deserialize(blob);
+		m_current_resource->deserialize(blob);
 	}
 	
 	void serialize(OutputMemoryStream& blob) override {
-		((PropertyAnimation*)m_current_resources[0])->serialize(blob);
+		m_current_resource->serialize(blob);
 	}
 
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
-		m_current_resources = resources;
+		m_current_resource = nullptr;
 		if (resources.length() > 1) return false;
-
-		auto* animation = static_cast<PropertyAnimation*>(resources[0]);
+		
+		auto* animation = static_cast<PropertyAnimation*>(resources[0]->getResource());
+		m_current_resource = animation;
 		if (!animation->isReady()) return false;
 
 		if (ImGui::Button(ICON_FA_SAVE "Save")) savePropertyAnimation(*animation);
@@ -272,17 +266,14 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return changed;
 	}
 
-
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Property animation"; }
 	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
-
 
 	StudioApp& m_app;
 	int m_selected_point = -1;
 	int m_selected_curve = -1;
 	bool m_fit_curve_in_editor = false;
-	Span<Resource*> m_current_resources;
+	PropertyAnimation* m_current_resource = nullptr;
 };
 
 
@@ -302,18 +293,15 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::Plugin, AssetCompiler::I
 		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	bool onGUI(Span<Resource*> resources) override {
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
 		if (resources.length() == 1 && ImGui::Button("Open in animation editor")) {
 			m_controller_editor->show(resources[0]->getPath().c_str());
 		}
 		return false;
 	}
 
-
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Animation Controller"; }
 	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
-
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{

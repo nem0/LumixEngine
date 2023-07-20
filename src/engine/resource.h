@@ -94,7 +94,7 @@ protected:
 	u16 m_empty_dep_count;
 	ResourceManager& m_resource_manager;
 
-private:
+protected:
 	void doLoad();
 	void fileLoaded(u64 size, const u8* mem, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);

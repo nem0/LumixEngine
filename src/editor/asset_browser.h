@@ -14,22 +14,34 @@ template <typename T> struct UniquePtr;
 struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	static constexpr int TILE_SIZE = 96;
 
+	struct ResourceView {
+		virtual ~ResourceView() {}
+		virtual const struct Path& getPath() = 0;
+		virtual struct ResourceType getType() = 0;
+		virtual bool isEmpty() = 0;
+		virtual bool isReady() = 0;
+		virtual bool isFailure() = 0;
+		virtual u64 size() = 0;
+		virtual void destroy() = 0;
+		virtual struct Resource* getResource() = 0;
+	};
+
 	struct LUMIX_EDITOR_API Plugin : SimpleUndoRedo {
 		Plugin(IAllocator& allocator) : SimpleUndoRedo(allocator) {}
 
 		virtual bool canCreateResource() const { return false; }
 		virtual bool createResource(const char* path) { return false; }
-
 		virtual const char* getDefaultExtension() const { return ""; }
 
-		virtual bool onGUI(Span<struct Resource*> resource) = 0;
-		virtual void onResourceUnloaded(Resource* resource) = 0;
+		virtual bool onGUI(Span<ResourceView*> resource) = 0;
+		virtual void onResourceUnloaded(ResourceView& resource) {}
 		virtual const char* getName() const = 0;
-		virtual struct ResourceType getResourceType() const = 0;
+		virtual ResourceType getResourceType() const = 0;
 		virtual bool createTile(const char* in_path, const char* out_path, ResourceType type);
 		virtual void update() {}
+		virtual ResourceView& createView(const Path& path, StudioApp& app);
 
-		void gui(Span<Resource*> resources);
+		void gui(Span<ResourceView*> resources);
 
 	private:
 		RuntimeHash m_current_hash;
@@ -43,11 +55,11 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 
 	virtual ~AssetBrowser() {}
 	virtual void onInitFinished() = 0;
-	virtual void selectResource(const struct Path& resource, bool record_history, bool additive) = 0;
+	virtual void selectResource(const Path& resource, bool record_history, bool additive) = 0;
 	virtual bool resourceInput(const char* str_id, Span<char> buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
-	virtual void openInExternalEditor(Resource* resource) const = 0;
+	virtual void openInExternalEditor(struct Resource* resource) const = 0;
 	virtual void openInExternalEditor(const char* path) const = 0;
 	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) const = 0;
 	virtual void tile(const Path& path, bool selected) = 0;

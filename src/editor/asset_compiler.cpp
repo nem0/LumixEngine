@@ -73,12 +73,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		Path path;
 	};
 
-	struct Hook {
-		Hook(IAllocator& allocator) : callback(allocator) {}
-		DelegateList<void (const Path&)> callback;
-		char extension[5];
-	};
-
 	struct LoadHook : ResourceManagerHub::LoadHook
 	{
 		LoadHook(AssetCompilerImpl& compiler) : compiler(compiler) {}
@@ -109,7 +103,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_on_list_changed(app.getAllocator())
 		, m_resource_compiled(app.getAllocator())
 		, m_on_init_load(app.getAllocator())
-		, m_hooks(app.getAllocator())
 	{
 		Engine& engine = app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
@@ -333,16 +326,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		return iter.value() == type;
 	}
 
-	DelegateList<void(const Path&)>& addHook(const char* extension) override {
-		for (Hook& h : m_hooks) {
-			if (equalStrings(h.extension, extension)) return h.callback;
-		}
-
-		Hook& h = m_hooks.emplace(m_app.getAllocator());
-		copyString(h.extension, extension);
-		return h.callback;
-	}
-
 	void registerExtension(const char* extension, ResourceType type) override
 	{
 		alignas(u32) char tmp[6] = {};
@@ -354,21 +337,11 @@ struct AssetCompilerImpl : AssetCompiler {
 		m_registered_extensions.insert(q, type);
 	}
 
-	Hook* getHook(const char* ext) {
-		for (Hook& h : m_hooks) {
-			if (equalStrings(h.extension, ext)) return &h;
-		}
-		return nullptr;
-	}
-
 	void addResource(const char* fullpath) {
 		char ext[10];
 		copyString(Span(ext), Path::getExtension(Span(fullpath, stringLength(fullpath))));
 		makeLowercase(Span(ext), ext);
 		
-		Hook* hook = getHook(ext);
-		if (hook) hook->callback.invoke(Path(fullpath));
-	
 		auto iter = m_plugins.find(RuntimeHash(ext));
 		if (!iter.isValid()) return;
 
@@ -504,6 +477,9 @@ struct AssetCompilerImpl : AssetCompiler {
 			}();
 		
 			lua_close(L);
+			for (IPlugin* plugin : m_plugins) {
+				plugin->listLoaded();
+			}
 		}
 
 		const u64 list_last_modified = os::getLastModified(list_path);
@@ -816,8 +792,6 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 			else {
 				Span<const char> ext = Path::getExtension(path_obj.c_str());
-				Hook* hook = getHook(ext.begin());
-				if (hook) hook->callback.invoke(path_obj);
 
 				auto dep_iter = m_dependencies.find(path_obj);
 				if (dep_iter.isValid()) {
@@ -884,7 +858,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	UniquePtr<FileSystemWatcher> m_watcher;
 	HashMap<FilePathHash, ResourceItem> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
-	Array<Hook> m_hooks;
 	DelegateList<void(const Path&)> m_on_list_changed;
 	DelegateList<void(Resource&)> m_resource_compiled;
 	bool m_init_finished = false;

@@ -37,7 +37,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
 	void serialize(OutputMemoryStream& blob) override {}
 
-	bool onGUI(Span<Resource*> resources) override { return false; }
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override { return false; }
 	
 	
 	bool compile(const Path& src) override
@@ -45,11 +45,8 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return app.getAssetCompiler().copyCompile(src);
 	}
 
-
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Prefab"; }
 	ResourceType getResourceType() const override { return PrefabResource::TYPE; }
-
 
 	PrefabSystem& system;
 	StudioApp& app;

@@ -52,11 +52,11 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if (resources.length() > 1) return false;
 
-		auto* script = static_cast<LuaScript*>(resources[0]);
+		auto* script = static_cast<LuaScript*>(resources[0]->getResource());
 
 		if (m_text_buffer[0] == '\0')
 		{
@@ -86,7 +86,7 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 
-	void onResourceUnloaded(Resource*) override { m_text_buffer[0] = 0; }
+	void onResourceUnloaded(AssetBrowser::ResourceView&) override { m_text_buffer[0] = 0; }
 	const char* getName() const override { return "Lua Script"; }
 
 

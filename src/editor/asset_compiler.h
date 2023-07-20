@@ -16,6 +16,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 		virtual ~IPlugin() {}
 		virtual bool compile(const Path& src) = 0;
 		virtual void addSubresources(AssetCompiler& compiler, const char* path);
+		virtual void listLoaded() {}
 	};
 
 	struct ResourceItem {
@@ -48,7 +49,6 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual ResourceType getResourceType(const char* path) const = 0;
 	virtual void registerExtension(const char* extension, ResourceType type) = 0;
 	virtual bool acceptExtension(const char* ext, ResourceType type) const = 0;
-	virtual DelegateList<void(const Path&)>& addHook(const char* extension) = 0;
 
 	template <typename T>
 	bool getMeta(const Path& path, T callback) {

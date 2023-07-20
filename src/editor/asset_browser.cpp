@@ -60,14 +60,36 @@ static Span<const char> getSubresource(const char* str)
 	return ret;
 }
 
+AssetBrowser::ResourceView& AssetBrowser::Plugin::createView(const Path& path, StudioApp& app) {
+	struct View : ResourceView {
+		const struct Path& getPath() override { return resource->getPath(); }
+		struct ResourceType getType() override { return resource->getType(); }
+		bool isEmpty() override { return resource->isEmpty(); }
+		bool isReady() override { return resource->isReady(); }
+		bool isFailure() override { return resource->isFailure(); }
+		u64 size() override { return resource->size(); }
+		void destroy() { LUMIX_DELETE(*allocator, this); }
+		Resource* getResource() override { return resource; }
+
+		IAllocator* allocator;
+		Resource* resource;
+	};
+	View* view = LUMIX_NEW(app.getAllocator(), View);
+	view->allocator = &app.getAllocator();
+	auto& manager = app.getEngine().getResourceManager();
+	view->resource = manager.load(getResourceType(), path);
+	ASSERT(view->resource);
+	return *view;
+}
+
 bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path, ResourceType type)
 {
 	return false;
 }
 
-void AssetBrowser::Plugin::gui(Span<Resource*> resources) {
+void AssetBrowser::Plugin::gui(Span<ResourceView*> resources) {
 	bool waiting = false;
-	for (const Resource* r : resources) {
+	for (ResourceView* r : resources) {
 		if (r->isEmpty()) {
 			ImGui::TextUnformatted("Waiting for load...");
 			waiting = true;
@@ -258,11 +280,11 @@ struct AssetBrowserImpl : AssetBrowser {
 	{
 		if (m_selected_resources.empty()) return;
 
-		for (Resource* res : m_selected_resources) {
+		for (ResourceView* res : m_selected_resources) {
 			for (auto* plugin : m_plugins) {
-				plugin->onResourceUnloaded(res);
+				plugin->onResourceUnloaded(*res);
 			}
-			res->decRefCount();
+			res->destroy();
 		}
 
 		m_selected_resources.clear();
@@ -595,7 +617,7 @@ struct AssetBrowserImpl : AssetBrowser {
 							break;
 						}
 						FileInfo& tile = m_file_infos[idx];
-						bool selected = m_selected_resources.find([&](Resource* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
+						bool selected = m_selected_resources.find([&](ResourceView* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
 						thumbnail(tile, m_thumbnail_size * TILE_SIZE, selected);
 						callbacks(tile, idx);
 					}
@@ -603,7 +625,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				else
 				{
 					FileInfo& tile = m_file_infos[j];
-					bool b = m_selected_resources.find([&](Resource* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
+					bool b = m_selected_resources.find([&](ResourceView* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
 					ImGui::Selectable(tile.filepath, b);
 					callbacks(tile, j);
 				}
@@ -638,8 +660,23 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				ImGui::EndMenu();
 			}
+
+			if (ImGui::MenuItem("Select all")) {
+				m_selected_resources.clear();
+				m_selected_resources.reserve(m_file_infos.size());
+				for (const FileInfo& fi : m_file_infos) {
+					selectResource(Path(fi.filepath), false, true);
+				}
+			}
+			if (ImGui::MenuItem("Recreate tiles")) {
+				recreateTiles();
+			}
+			ImGui::Separator();
+			static char filter[64] = "";
+			ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
 			for (Plugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
+				if (filter[0] && stristr(plugin->getName(), filter) == nullptr) continue;
 				if (ImGui::BeginMenu(plugin->getName())) {
 					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 					ImGui::SameLine();
@@ -652,16 +689,6 @@ struct AssetBrowserImpl : AssetBrowser {
 
 					ImGui::EndMenu();
 				}
-			}
-			if (ImGui::MenuItem("Select all")) {
-				m_selected_resources.clear();
-				m_selected_resources.reserve(m_file_infos.size());
-				for (const FileInfo& fi : m_file_infos) {
-					selectResource(Path(fi.filepath), false, true);
-				}
-			}
-			if (ImGui::MenuItem("Recreate tiles")) {
-				recreateTiles();
 			}
 		};
 		if (ImGui::BeginPopup("item_ctx")) {
@@ -768,7 +795,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 
 			if (m_selected_resources.size() == 1) {
-				Resource* res = m_selected_resources[0];
+				ResourceView* res = m_selected_resources[0];
 				const char* path = res->getPath().c_str();
 				ImGuiEx::Label("Selected resource");
 				ImGui::TextUnformatted(path);
@@ -798,7 +825,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 				u32 ready = 0;
 				u32 failed = 0;
-				for (Resource* res : m_selected_resources) {
+				for (ResourceView* res : m_selected_resources) {
 					ready += res->isReady() ? 1 : 0;
 					failed += res->isFailure() ? 1 : 0;
 				}
@@ -813,7 +840,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 			const ResourceType type = m_selected_resources[0]->getType();
 			bool all_same_type = true;
-			for (Resource* res : m_selected_resources) {
+			for (ResourceView* res : m_selected_resources) {
 				all_same_type = all_same_type && res->getType() == type;
 			}
 
@@ -834,7 +861,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void redo() {
 		const ResourceType type = m_selected_resources[0]->getType();
 		bool all_same_type = true;
-		for (Resource* res : m_selected_resources) {
+		for (ResourceView* res : m_selected_resources) {
 			all_same_type = all_same_type && res->getType() == type;
 		}
 
@@ -849,7 +876,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void undo() {
 		const ResourceType type = m_selected_resources[0]->getType();
 		bool all_same_type = true;
-		for (Resource* res : m_selected_resources) {
+		for (ResourceView* res : m_selected_resources) {
 			all_same_type = all_same_type && res->getType() == type;
 		}
 
@@ -956,7 +983,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void selectResource(Resource* resource, bool record_history, bool additive)
+	void selectResource(ResourceView& view, bool record_history, bool additive)
 	{
 		if (record_history)
 		{
@@ -965,7 +992,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_history.pop();
 			}
 			m_history_index++;
-			m_history.push(resource->getPath());
+			m_history.push(view.getPath());
 
 			if (m_history.size() > 20)
 			{
@@ -976,23 +1003,22 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		m_wanted_resource = "";
 		if(additive) {
-			if(m_selected_resources.indexOf(resource) >= 0) {
-				m_selected_resources.swapAndPopItem(resource);
+			if(m_selected_resources.indexOf(&view) >= 0) {
+				m_selected_resources.swapAndPopItem(&view);
 			}
 			else {
-				m_selected_resources.push(resource);
+				m_selected_resources.push(&view);
 			}
 		}
 		else {
 			unloadResources();
-			m_selected_resources.push(resource);
+			m_selected_resources.push(&view);
 		}
-		const char* path = resource->getPath().c_str();
+		const char* path = view.getPath().c_str();
 		ResourceLocator rl(Span(path, stringLength(path)));
 		char dir[LUMIX_MAX_PATH];
 		copyString(Span(dir), rl.dir);
 		changeDir(dir, false);
-		ASSERT(resource->getRefCount() > 0);
 	}
 
 
@@ -1055,11 +1081,17 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::SetWindowFocus(INSPECTOR_NAME);
 		ImGui::SetWindowFocus(WINDOW_NAME);
 		m_is_open = true;
-		auto& manager = m_app.getEngine().getResourceManager();
+
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
 		const ResourceType type = compiler.getResourceType(path.c_str());
-		Resource* res = manager.load(type, path);
-		if (res) selectResource(res, record_history, additive);
+		
+		for (Plugin* p : m_plugins) {
+			if (p->getResourceType() == type) {
+				ResourceView& res = p->createView(path, m_app);
+				selectResource(res, record_history, additive);
+				break;
+			}
+		}
 	}
 
 	static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
@@ -1347,7 +1379,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	EntityPtr m_dropped_entity = INVALID_ENTITY;
 	char m_prefab_name[LUMIX_MAX_PATH] = "";
 	HashMap<ResourceType, Plugin*> m_plugins;
-	Array<Resource*> m_selected_resources;
+	Array<ResourceView*> m_selected_resources;
 	int m_context_resource;
 	char m_filter[128];
 	Path m_wanted_resource;

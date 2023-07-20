@@ -657,10 +657,8 @@ struct FontPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	bool onGUI(Span<Resource*> resources) override { return false; }
-	void onResourceUnloaded(Resource* resource) override {}
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override { return false; }
 	const char* getName() const override { return "Font"; }
-
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
 	StudioApp& m_app;
@@ -723,54 +721,6 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 	float m_time_scale = 1.f;
 	ParticleEditor* m_particle_editor;
 };
-
-struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
-	explicit ParticleSystemPlugin(StudioApp& app)
-		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
-	{
-		AssetCompiler& compiler = app.getAssetCompiler();
-		compiler.registerExtension("par", ParticleSystemResource::TYPE);
-	}
-
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
-
-	void addSubresources(AssetCompiler& compiler, const char* path) override {
-		compiler.addResource(ParticleSystemResource::TYPE, path);
-		ParticleEditor::registerDependencies(path, m_app);
-	}
-
-	bool compile(const Path& src) override {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream src_data(m_app.getAllocator());
-		if (!fs.getContentSync(src, src_data)) return false;
-
-		InputMemoryStream input(src_data);
-		OutputMemoryStream output(m_app.getAllocator());
-		if (!m_particle_editor->compile(input, output, src.c_str())) return false;
-
-		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
-	}
-	
-	bool onGUI(Span<Resource*> resources) override {
-		if (resources.length() != 1) return false;
-
-		if (ImGui::Button(ICON_FA_EDIT " Edit")) {
-			m_particle_editor->open(resources[0]->getPath().c_str());
-		}
-		return false;
-	}
-
-	void onResourceUnloaded(Resource* resource) override {}
-	const char* getName() const override { return "Particle Emitter"; }
-	ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
-
-	StudioApp& m_app;
-	ParticleEditor* m_particle_editor;
-};
-
 
 struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
@@ -860,35 +810,38 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	template <typename F, typename... Args>
-	bool isSame(Span<Material*> materials, F func, Args... args) {
+	bool isSame(Span<AssetBrowser::ResourceView*> materials, F func, Args... args) {
 		if (materials.length() <= 1) return true;
-		auto v = (materials[0]->*func)(args...);
+		auto v = (static_cast<Material*>(materials[0]->getResource())->*func)(args...);
 		for (u32 i = 1, c = materials.length(); i < c; ++i) {
-			auto v2 = (materials[0]->*func)(args...);
+			auto v2 = (static_cast<Material*>(materials[i]->getResource())->*func)(args...);
 			if (v != v2) return false;
 		}
 		return true;
 	}
 
-	bool onGUI(Span<Resource*> ress) override {
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
 		bool result = false;
-		Span<Material*> resources;
-		resources.m_begin = (Material**)ress.m_begin;
-		resources.m_end = (Material**)ress.m_end;
-		m_current_materials = resources;
+		//m_current_materials = resources;
 
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
-			for (Resource* res : resources) {
-				m_app.getAssetBrowser().openInExternalEditor(res);
+			for (AssetBrowser::ResourceView* res : resources) {
+				m_app.getAssetBrowser().openInExternalEditor(res->getResource());
 			}
 		}
 
-		ImGui::SameLine();
-		Material* first = static_cast<Material*>(resources[0]);
-		if (first->getShader() && ImGui::Button(ICON_FA_SAVE "Save")) {
-			for (Material* res : resources) {
-				saveMaterial(res);
+		auto forEachMaterial = [&](auto& F){
+			for (AssetBrowser::ResourceView* view : resources) {
+				F(static_cast<Material*>(view->getResource()));
 			}
+		};
+
+		ImGui::SameLine();
+		Material* first = static_cast<Material*>(resources[0]->getResource());
+		if (first->getShader() && ImGui::Button(ICON_FA_SAVE "Save")) {
+			forEachMaterial([&](Material* res){
+				saveMaterial(res);
+			});
 		}
 
 		char buf[LUMIX_MAX_PATH];
@@ -897,9 +850,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 		bool same_shader = multiLabel<&Material::getShader>("Shader", resources);
 		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
-			for (Material* res : resources) {
+			forEachMaterial([&](Material* res){
 				res->setShader(Path(buf));
-			}
+			});
 			result = true;
 		}
 
@@ -948,9 +901,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 			multiLabel<&Material::getTexture>(slot.name, resources, i);
 			if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE)) { 
-				for (Material* res : resources) {
+				forEachMaterial([&](Material* res){
 					res->setTexturePath(i, Path(buf));
-				}
+				});
 				result = true;
 			}
 			if (!texture && is_node_open) {
@@ -1001,14 +954,14 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 					default: ASSERT(false); break;
 				}
 				if (changed) {
-					for(Material* mat : resources) {
+					forEachMaterial([&](Material* mat){
 						if (mat != first) {
 							Material::Uniform* u = mat->findUniform(shader_uniform.name_hash);
 							if (!u) u = &mat->getUniforms().emplace();
 							memcpy(u, uniform, sizeof(*u));
 						}
 						mat->updateRenderData(false);
-					}
+					});
 					result = true;
 				}
 			}
@@ -1020,12 +973,12 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				bool is_same = isSame(resources, &Material::isCustomFlag, 1 << i);
 				bool b = first->isCustomFlag(1 << i);
 				if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
-					for (Material* mat : resources) {
+					forEachMaterial([&](Material* mat){
 						if (b)
 							mat->setCustomFlag(1 << i);
 						else
 							mat->unsetCustomFlag(1 << i);
-					}
+					});
 					result = true;
 				}
 				if (!is_same) {
@@ -1058,9 +1011,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				
 				bool is_same = isSame(resources, &Material::isDefined, i);
 				if (ImGui::Checkbox(define, &value)) {
-					for (Material* res : resources) {
+					forEachMaterial([&](Material* res){
 						res->setDefine(i, value);
-					}
+					});
 					result = true;
 				}
 				if (!is_same) {
@@ -1076,19 +1029,19 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	template <auto F, typename T>
-	void set(Span<Material*> resources, T value) {
-		for (Material* r : resources) {
-			(r->*F)(value);
+	void set(Span<AssetBrowser::ResourceView*> resources, T value) {
+		for (AssetBrowser::ResourceView* r : resources) {
+			(static_cast<Material*>(r->getResource())->*F)(value);
 		}
 	}
 
 	template <auto F, typename... Args>
-	static bool multiLabel(const char* label, Span<Material*> resources, Args... args) {
+	static bool multiLabel(const char* label, Span<AssetBrowser::ResourceView*> resources, Args... args) {
 		bool is_same = true;
 		ASSERT(resources.length() > 0);
-		auto v = (resources[0]->*F)(args...);
-		for (Material* r : resources) {
-			auto v2 = (r->*F)(args...);
+		auto v = (static_cast<Material*>(resources[0]->getResource())->*F)(args...);
+		for (AssetBrowser::ResourceView* r : resources) {
+			auto v2 = (static_cast<Material*>(r->getResource())->*F)(args...);
 			if (v2 != v) {
 				is_same = false;
 				ImGui::TextUnformatted("(?)");
@@ -1103,7 +1056,6 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return is_same;
 	}
 
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Material"; }
 	ResourceType getResourceType() const override { return Material::TYPE; }
 
@@ -1576,11 +1528,11 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		}
 	}
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if(resources.length() > 1) return false;
 
-		Texture* texture = static_cast<Texture*>(resources[0]);
+		Texture* texture = static_cast<Texture*>(resources[0]->getResource());
 
 		ImGuiEx::Label("Size");
 		ImGui::Text("%dx%d", texture->width, texture->height);
@@ -1752,8 +1704,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void deserialize(InputMemoryStream& blob) override { blob.read(m_meta); }
 	void serialize(OutputMemoryStream& blob) override { blob.write(m_meta); }
-
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Texture"; }
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
@@ -2392,12 +2342,11 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		blob.write(m_meta.clips.begin(), m_meta.clips.byte_size());
 	}
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
-		m_current_resources = resources;
 		if (resources.length() > 1) return false;
 
-		auto* model = static_cast<Model*>(resources[0]);
+		auto* model = static_cast<Model*>(resources[0]->getResource());
 
 		if (model->isReady()) {
 			ImGuiEx::Label("Bounding radius (from origin)");
@@ -2794,10 +2743,8 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return changed;
 	}
 
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
 	ResourceType getResourceType() const override { return Model::TYPE; }
-
 
 	void pushTileQueue(const Path& path)
 	{
@@ -3159,7 +3106,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	Meta m_meta;
 	FilePathHash m_meta_res;
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
-	Span<Resource*> m_current_resources;
 };
 
 
@@ -3265,11 +3211,11 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
 	void serialize(OutputMemoryStream& blob) override {}
 
-	bool onGUI(Span<Resource*> resources) override
+	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if(resources.length() > 1) return false;
 
-		auto* shader = static_cast<Shader*>(resources[0]);
+		auto* shader = static_cast<Shader*>(resources[0]->getResource());
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally"))
 		{
 			m_app.getAssetBrowser().openInExternalEditor(shader->getPath().c_str());
@@ -3316,11 +3262,8 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return false;
 	}
 
-
-	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Shader"; }
 	ResourceType getResourceType() const override { return Shader::TYPE; }
-
 
 	StudioApp& m_app;
 };
@@ -5136,7 +5079,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_pipeline_plugin(app)
 		, m_font_plugin(app)
 		, m_material_plugin(app)
-		, m_particle_emitter_plugin(app)
 		, m_particle_emitter_property_plugin(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
@@ -5191,9 +5133,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* pipeline_exts[] = {"pln", nullptr};
 		asset_compiler.addPlugin(m_pipeline_plugin, pipeline_exts);
 
-		const char* particle_emitter_exts[] = {"par", nullptr};
-		asset_compiler.addPlugin(m_particle_emitter_plugin, particle_emitter_exts);
-
 		const char* material_exts[] = {"mat", nullptr};
 		asset_compiler.addPlugin(m_material_plugin, material_exts);
 
@@ -5206,7 +5145,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(m_model_plugin);
-		asset_browser.addPlugin(m_particle_emitter_plugin);
 		asset_browser.addPlugin(m_material_plugin);
 		asset_browser.addPlugin(m_font_plugin);
 		asset_browser.addPlugin(m_shader_plugin);
@@ -5231,9 +5169,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_model_plugin.init();
 
 		m_particle_editor = ParticleEditor::create(m_app);
-		m_app.addPlugin(*m_particle_editor.get());
-
-		m_particle_emitter_plugin.m_particle_editor = m_particle_editor.get();
 		m_particle_emitter_property_plugin.m_particle_editor = m_particle_editor.get();
 	}
 
@@ -5428,7 +5363,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_model_plugin);
-		asset_browser.removePlugin(m_particle_emitter_plugin);
 		asset_browser.removePlugin(m_material_plugin);
 		asset_browser.removePlugin(m_font_plugin);
 		asset_browser.removePlugin(m_texture_plugin);
@@ -5440,10 +5374,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.removePlugin(m_texture_plugin);
 		asset_compiler.removePlugin(m_model_plugin);
 		asset_compiler.removePlugin(m_material_plugin);
-		asset_compiler.removePlugin(m_particle_emitter_plugin);
 		asset_compiler.removePlugin(m_pipeline_plugin);
 
-		m_app.removePlugin(*m_particle_editor.get());
 		m_app.removePlugin(m_scene_view);
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
@@ -5465,7 +5397,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
-	ParticleSystemPlugin m_particle_emitter_plugin;
 	ParticleSystemPropertyPlugin m_particle_emitter_property_plugin;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
