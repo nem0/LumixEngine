@@ -47,6 +47,7 @@ struct CompositeTexture {
 		}
 
 		bool m_selected = false;
+		bool m_reachable = false;
 		u32 m_input_counter;
 		u32 m_output_counter;
 		CompositeTexture* m_resource;
@@ -62,6 +63,7 @@ struct CompositeTexture {
 	Node* addNode(CompositeTexture::NodeType type);
 	Node* getNodeByID(u16 id) const;
 	void deleteSelectedNodes();
+	void deleteUnreachable();
 	u32 getLayersCount() const;
 	void clear();
 	void initDefault();

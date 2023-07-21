@@ -223,15 +223,22 @@ struct Node : NodeEditorNode {
 		if (m_error.length() > 0) {
 			ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xff, 0, 0, 0xff));
 		}
+		else if (!m_reachable) {
+			ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetColorU32(ImGuiCol_TitleBg));
+		}
 		ImGuiEx::EndNode();
 		if (m_error.length() > 0) {
 			ImGui::PopStyleColor();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
 		}
+		else if (!m_reachable) {
+			ImGui::PopStyleColor();
+		}
 		return res;
 	}
 
 	bool m_selected = false;
+	bool m_reachable = false;
 	
 protected:
 	virtual bool onGUI() = 0;
@@ -334,12 +341,38 @@ struct ParticleEmitterEditorResource {
 		}
 	}
 	
-	const Node* getNode(u16 id) const {
+	Node* getNode(u16 id) {
 		for(const auto& n : m_nodes) {
 			if (n->m_id == id) return n;
 		}
 		return nullptr;
 	}
+
+	void markReachable(Node* n) {
+		n->m_reachable = true;
+		for (NodeEditorLink& link : m_links) {
+			if (link.getToNode() == n->m_id) markReachable(getNode(link.getFromNode()));
+		}
+	}
+
+	void markUnreachableNodes() {
+		for (Node* n : m_nodes) n->m_reachable = false;
+		
+		for (Node* n : m_nodes) {
+			switch(n->getType()) {
+				case Node::UPDATE:
+				case Node::INIT:
+				case Node::OUTPUT:
+				case Node::FUNCTION_OUTPUT:
+					markReachable(n);
+					break;
+				default: break;
+			}
+
+		}
+	}
+
+
 
 	void colorLinks() {
 		const ImU32 colors[] = {
@@ -365,10 +398,13 @@ struct ParticleEmitterEditorResource {
 				case Node::OUTPUT:
 					colorLinks(colors[link.getToPin() % lengthOf(colors)], i);
 					break;
+				case Node::FUNCTION_OUTPUT:
+					colorLinks(colors[link.getToNode() % lengthOf(colors)], i);
+					break;
 				default: break;
 			}
 
-		}		
+		}
 	}
 
 	u16 genID() { return ++m_last_id; }
@@ -439,6 +475,7 @@ struct ParticleEmitterEditorResource {
 			n->deserialize(blob, version);
 		}
 		colorLinks();
+		markUnreachableNodes();
 		return true;
 	}
 
@@ -3490,6 +3527,19 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		ImGui::End();
 	}
 
+	void deleteUnreachable() {
+		for (i32 i = m_active_emitter->m_nodes.size() - 1; i >= 0; --i) {
+			Node* n = m_active_emitter->m_nodes[i];
+			if (!n->m_reachable && n->canDelete()) {
+				m_active_emitter->m_links.eraseItems([&](const NodeEditorLink& link){
+					return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
+				});
+				LUMIX_DELETE(m_allocator, n);
+				m_active_emitter->m_nodes.swapAndPop(i);
+			}
+		}
+		pushUndo(NO_MERGE_UNDO);
+	}
 
 	void onGUI() override {
 		m_has_focus = false;
@@ -3504,7 +3554,9 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		Span<const char> basename = Path::getBasename(m_resource.m_path.c_str());
 		StaticString<128> title(basename, "##pe", (uintptr)this);
 		ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
-		if (ImGui::Begin(title, &open, ImGuiWindowFlags_MenuBar)) {
+		ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings;
+		if (m_dirty) flags |= ImGuiWindowFlags_UnsavedDocument;
+		if (ImGui::Begin(title, &open, flags)) {
 			m_dock_id = ImGui::GetWindowDockID();
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		
@@ -3523,9 +3575,11 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 					ImGui::MenuItem("World space", 0, &m_resource.m_world_space);
 					menuItem(m_app.getUndoAction(), canUndo());
 					menuItem(m_app.getRedoAction(), canRedo());
+					if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
 					ImGui::EndMenu();
 				}
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_resource.m_path);
+				if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear")) deleteUnreachable();
 				ImGui::EndMenuBar();
 			}
 
@@ -3571,9 +3625,25 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 		ImGui::End();
 		if (!open) {
-			m_editor.m_windows.eraseItem(this);
-			m_app.removePlugin(*this);
-			LUMIX_DELETE(m_app.getAllocator(), this);
+			if (m_dirty) {
+				ImGui::OpenPopup("Confirm##cc");
+			}
+			else {
+				m_editor.m_windows.eraseItem(this);
+				m_app.removePlugin(*this);
+				LUMIX_DELETE(m_app.getAllocator(), this);
+			}
+		}
+
+		if (ImGui::BeginPopupModal("Confirm##cc")) {
+			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
+			if (ImGui::Selectable("Yes")) {
+				m_editor.m_windows.eraseItem(this);
+				m_app.removePlugin(*this);
+				LUMIX_DELETE(m_app.getAllocator(), this);
+			}
+			ImGui::Selectable("No");
+			ImGui::EndPopup();
 		}
 	}
 
@@ -3593,6 +3663,7 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 
 	void pushUndo(u32 tag) override {
 		m_active_emitter->colorLinks();
+		m_active_emitter->markUnreachableNodes();
 		if (!m_resource.isFunction()) {
 			for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource.m_emitters) {
 				// TODO generate only active emitter and make sure other emitters are up-to-date
@@ -3638,6 +3709,7 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		m_resource.load();
 		m_active_emitter = m_resource.m_emitters[0].get();
 		pushUndo(NO_MERGE_UNDO);
+		m_dirty = false;
 	}
 
 	const char* getName() const override { return "Particle editor"; }

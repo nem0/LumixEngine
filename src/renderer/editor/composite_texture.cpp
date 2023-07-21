@@ -70,10 +70,16 @@ bool CompositeTexture::Node::nodeGUI() {
 	if (m_error.length() > 0) {
 		ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xff, 0, 0, 0xff));
 	}
+	else if (!m_reachable) {
+		ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetColorU32(ImGuiCol_TitleBg));
+	}
 	ImGuiEx::EndNode();
 	if (m_error.length() > 0) {
 		ImGui::PopStyleColor();
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
+	}
+	else if (!m_reachable) {
+		ImGui::PopStyleColor();
 	}
 	return res;
 }
@@ -87,6 +93,43 @@ struct CompositeTexture::Node::Input {
 		return node->getPixelData(data, output_idx);
 	}
 };
+
+static void markReachable(CompositeTexture::Node* node, CompositeTexture& texture) {
+	if (!node) return;
+	node->m_reachable = true;
+
+	for (const CompositeTexture::Link& link : texture.m_links) {
+		if (link.getToNode() != node->m_id) continue;
+
+		CompositeTexture::Node* from_node = texture.getNodeByID(link.getFromNode());
+		markReachable(from_node, texture);
+	}
+}
+
+static void markReachable(CompositeTexture& texture) {
+	for (CompositeTexture::Node* n : texture.m_nodes) {
+		n->m_reachable = false;
+	}
+	markReachable(texture.m_nodes[0], texture);
+}
+
+void CompositeTexture::deleteUnreachable() {
+	markReachable(*this);
+	for (i32 i = m_nodes.size() - 1; i > 0; --i) { // we really don't want to delete node 0 (output)
+		Node* node = m_nodes[i];
+		if (!node->m_reachable) {
+			for (i32 j = m_links.size() - 1; j >= 0; --j) {
+				if (m_links[j].getFromNode() == node->m_id || m_links[j].getToNode() == node->m_id) {
+					m_links.erase(j);
+				}
+			}
+
+			LUMIX_DELETE(m_app.getAllocator(), node);
+			m_nodes.swapAndPop(i);
+		}
+	}	
+}
+
 
 void CompositeTexture::deleteSelectedNodes() {
 	for (i32 i = m_nodes.size() - 1; i > 0; --i) { // we really don't want to delete node 0 (output)
@@ -1970,6 +2013,23 @@ void CompositeTexture::addArrayLayer(const char* path) {
 	++node->m_layers_count;
 }
 
+static void colorLinks(Array<CompositeTexture::Link>& links) {
+	const ImU32 colors[] = {
+		IM_COL32(0x20, 0x20, 0xA0, 0xFF),
+		IM_COL32(0x20, 0xA0, 0x20, 0xFF),
+		IM_COL32(0x20, 0xA0, 0xA0, 0xFF),
+		IM_COL32(0xA0, 0x20, 0x20, 0xFF),
+		IM_COL32(0xA0, 0x20, 0xA0, 0xFF),
+		IM_COL32(0xA0, 0xA0, 0x20, 0xFF),
+		IM_COL32(0xA0, 0xA0, 0xA0, 0xFF),
+	};
+	
+	for (i32 i = 0, c = links.size(); i < c; ++i) {
+		CompositeTexture::Link& l = links[i];
+		l.color = colors[i % lengthOf(colors)];
+	}
+}
+
 bool CompositeTexture::generate(Result* result) {
 	for (Node* n : m_nodes) n->m_error = "";
 
@@ -2018,8 +2078,11 @@ bool CompositeTexture::generate(Result* result) {
 		}
 	}
 
+	colorLinks(m_links);
+	markReachable(*this);
 	return true;
 }
+
 
 bool CompositeTexture::deserialize(InputMemoryStream& blob) {
 	CompositeTextureHeader header;
@@ -2043,6 +2106,8 @@ bool CompositeTexture::deserialize(InputMemoryStream& blob) {
 		blob.read(link.from);
 		blob.read(link.to);
 	}
+	colorLinks(m_links);
+	markReachable(*this);
 	return true;
 }
 
@@ -2134,6 +2199,11 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}	
 	}
 
+	void pushUndo(u32 tag) override {
+		m_dirty = true;
+		SimpleUndoRedo::pushUndo(tag);
+	}
+
 	void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) override {}
 	
 	void onContextMenu(ImVec2 pos) override {
@@ -2163,6 +2233,11 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	
 	void serialize(OutputMemoryStream& blob) override { m_resource.serialize(blob); }
 
+	void deleteUnreachable() {
+		m_resource.deleteUnreachable();
+		pushUndo(NO_MERGE_UNDO);
+	}
+
 	void deleteSelectedNodes() {
 		if (m_is_any_item_active) return;
 		m_resource.deleteSelectedNodes();
@@ -2191,6 +2266,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		InputMemoryStream blob(data, size);
 		m_resource.deserialize(blob);
 		pushUndo(NO_MERGE_UNDO);
+		m_dirty = false;
 	}
 	
 	void exportAs() {
@@ -2246,6 +2322,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		m_resource.generate(&img);
 
 		m_path = path;
+		m_dirty = false;
 	}
 
 	void onGUI() override {
@@ -2258,7 +2335,9 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			m_focus_request = false;
 		}
 		ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
-		if (ImGui::Begin(title, &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings)) {
+		ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings;
+		if (m_dirty) flags |= ImGuiWindowFlags_UnsavedDocument;
+		if (ImGui::Begin(title, &open, flags)) {
 			m_dock_id = ImGui::GetWindowDockID();
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 			if (ImGui::BeginMenuBar()) {
@@ -2271,8 +2350,11 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				if (ImGui::BeginMenu("Edit")) {
 					if (menuItem(m_app.getUndoAction(), canUndo())) undo();
 					if (menuItem(m_app.getRedoAction(), canRedo())) redo();
+					if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
 					ImGui::EndMenu();
 				}
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
+				if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
 				ImGui::EndMenuBar();
 			}
 		
@@ -2288,9 +2370,25 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 		ImGui::End();
 		if (!open) {
-			m_editor.m_windows.eraseItem(this);
-			m_app.removePlugin(*this);
-			LUMIX_DELETE(m_app.getAllocator(), this);
+			if (m_dirty) {
+				ImGui::OpenPopup("Confirm##cc");
+			}
+			else {
+				m_editor.m_windows.eraseItem(this);
+				m_app.removePlugin(*this);
+				LUMIX_DELETE(m_app.getAllocator(), this);
+			}
+		}
+
+		if (ImGui::BeginPopupModal("Confirm##cc")) {
+			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
+			if (ImGui::Selectable("Yes")) {
+				m_editor.m_windows.eraseItem(this);
+				m_app.removePlugin(*this);
+				LUMIX_DELETE(m_app.getAllocator(), this);
+			}
+			ImGui::Selectable("No");
+			ImGui::EndPopup();
 		}
 	}
 
@@ -2305,6 +2403,8 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	bool m_has_focus = false;
 	bool m_show_save_as = false;
 	bool m_focus_request = false;
+	bool m_dirty = false;
+	bool m_show_confirm = false;
 	ImGuiID m_dock_id = 0;
 };
 
