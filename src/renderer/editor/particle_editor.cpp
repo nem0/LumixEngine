@@ -3525,6 +3525,7 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 					menuItem(m_app.getRedoAction(), canRedo());
 					ImGui::EndMenu();
 				}
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_resource.m_path);
 				ImGui::EndMenuBar();
 			}
 

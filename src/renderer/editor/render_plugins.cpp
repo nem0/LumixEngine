@@ -1162,7 +1162,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				}
 				CompositeTexture::Result res(m_app.getAllocator());
 				if (!ct.generate(&res)) {
-					logError("Failed to generate ", m_in_path);
 					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 					return;
 				}
@@ -1268,10 +1267,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		}
 
 		CompositeTexture::Result img(allocator);
-		if (!tc.generate(&img)) {
-			logError(src_path, " : ", tc.m_error.c_str());
-			return false;
-		}
+		if (!tc.generate(&img)) return false;
 		if (img.layers.empty()) {
 			logError(src_path, " : empty output");
 			return false;

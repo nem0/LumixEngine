@@ -25,6 +25,8 @@ struct CompositeTexture {
 	};
 	
 	struct Node : NodeEditorNode {
+		Node(IAllocator& allocator) : m_error(allocator) {}
+
 		virtual NodeType getType() const = 0;
 		virtual bool gui() = 0;
 		virtual bool getPixelData(PixelData* data, u32 output_idx) = 0;
@@ -37,10 +39,10 @@ struct CompositeTexture {
 		void outputSlot();
 		struct Input;
 		Input getInput(u32 pin_idx) const;
-		bool getInputPixelData(u32 pin_idx, PixelData* pd) const;
+		bool getInputPixelData(u32 pin_idx, PixelData* pd);
 		
-		bool error(const char* msg) const {
-			m_resource->m_error = msg;
+		bool error(const char* msg) {
+			m_error = msg;
 			return false;
 		}
 
@@ -48,6 +50,7 @@ struct CompositeTexture {
 		u32 m_input_counter;
 		u32 m_output_counter;
 		CompositeTexture* m_resource;
+		String m_error;
 	};
 
 	using Link = NodeEditorLink;
@@ -78,7 +81,6 @@ struct CompositeTexture {
 	Array<Node*> m_nodes;
 	Array<Link> m_links;
 	u32 m_node_id_generator = 1;
-	String m_error;
 };
 
 struct CompositeTextureEditorWindow;

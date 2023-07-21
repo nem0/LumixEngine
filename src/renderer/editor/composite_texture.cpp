@@ -44,7 +44,8 @@ enum class CompositeTexture::NodeType : u32 {
 	SET_ALPHA,
 	CUT,
 	SHARPEN,
-	STATIC_SWITCH
+	STATIC_SWITCH,
+	STEP
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -64,7 +65,14 @@ bool CompositeTexture::Node::nodeGUI() {
 	m_output_counter = 0;
 	ImGuiEx::BeginNode(m_id, m_pos, &m_selected);
 	bool res = gui();
+	if (m_error.length() > 0) {
+		ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xff, 0, 0, 0xff));
+	}
 	ImGuiEx::EndNode();
+	if (m_error.length() > 0) {
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
+	}
 	return res;
 }
 
@@ -101,7 +109,7 @@ CompositeTexture::Node* CompositeTexture::getNodeByID(u16 id) const {
 	return nullptr;
 }
 
-bool CompositeTexture::Node::getInputPixelData(u32 pin_idx, PixelData* pd) const {
+bool CompositeTexture::Node::getInputPixelData(u32 pin_idx, PixelData* pd) {
 	const Input input = getInput(pin_idx);
 	if (!input) return error("Missing input");
 	return input.getPixelData(pd);
@@ -147,6 +155,8 @@ void makeSameSize(CompositeTexture::PixelData* a, CompositeTexture::PixelData* b
 }
 
 struct SplitNode final : CompositeTexture::Node {
+	SplitNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SPLIT; }
 	
 	bool hasInputPins() const override { return true; }
@@ -181,6 +191,8 @@ struct SplitNode final : CompositeTexture::Node {
 };
 
 struct MergeNode final : CompositeTexture::Node {
+	MergeNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::MERGE; }
 	
 	bool hasInputPins() const override { return true; }
@@ -231,6 +243,8 @@ struct MergeNode final : CompositeTexture::Node {
 };
 
 struct ConstantNode final : CompositeTexture::Node {
+	ConstantNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CONSTANT; }
 
 	bool hasInputPins() const override { return false; }
@@ -265,6 +279,8 @@ struct ConstantNode final : CompositeTexture::Node {
 };
 
 struct ColorNode final : CompositeTexture::Node {
+	ColorNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::COLOR; }
 
 	bool hasInputPins() const override { return false; }
@@ -300,6 +316,8 @@ struct ColorNode final : CompositeTexture::Node {
 };
 
 struct FlipNode final : CompositeTexture::Node {
+	FlipNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::FLIP; }
 
 	bool hasInputPins() const override { return true; }
@@ -359,6 +377,8 @@ struct FlipNode final : CompositeTexture::Node {
 };
 
 struct RandomPixelsNode final : CompositeTexture::Node {
+	RandomPixelsNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::RANDOM_PIXELS; }
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
@@ -402,6 +422,8 @@ struct RandomPixelsNode final : CompositeTexture::Node {
 };
 
 struct GradientNode final : CompositeTexture::Node {
+	GradientNode(IAllocator& allocator) : Node(allocator) {}
+	
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GRADIENT; }
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
@@ -437,6 +459,8 @@ struct GradientNode final : CompositeTexture::Node {
 };
 
 struct GammaNode final : CompositeTexture::Node {
+	GammaNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GAMMA; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -478,6 +502,8 @@ struct GammaNode final : CompositeTexture::Node {
 };
 
 struct MultiplyNode final : CompositeTexture::Node {
+	MultiplyNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::MULTIPLY; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -512,6 +538,8 @@ struct MultiplyNode final : CompositeTexture::Node {
 };
 
 struct ResizeNode final : CompositeTexture::Node {
+	ResizeNode(IAllocator& allocator) : Node(allocator) {}
+	
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::RESIZE; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -586,6 +614,8 @@ static Vec2 hash(Vec2 p) {
 }
 
 struct WaveNoiseNode final : CompositeTexture::Node {
+	WaveNoiseNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::WAVE_NOISE; }
 
 	bool hasInputPins() const override { return false; }
@@ -660,6 +690,8 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 };
 
 struct SimplexNode final : CompositeTexture::Node {
+	SimplexNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SIMPLEX; }
 
 	bool hasInputPins() const override { return false; }
@@ -731,6 +763,8 @@ struct SimplexNode final : CompositeTexture::Node {
 };
 
 struct CellularNoiseNode final : CompositeTexture::Node {
+	CellularNoiseNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CELLULAR_NOISE; }
 
 	bool hasInputPins() const override { return false; }
@@ -804,6 +838,8 @@ struct CellularNoiseNode final : CompositeTexture::Node {
 
 
 struct SetAlphaNode final : CompositeTexture::Node {
+	SetAlphaNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SET_ALPHA; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -841,6 +877,8 @@ struct SetAlphaNode final : CompositeTexture::Node {
 };
 
 struct CutNode final : CompositeTexture::Node {
+	CutNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CUT; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -898,6 +936,8 @@ struct CutNode final : CompositeTexture::Node {
 };
 
 struct StaticSwitchNode final : CompositeTexture::Node {
+	StaticSwitchNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::STATIC_SWITCH; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -925,7 +965,50 @@ struct StaticSwitchNode final : CompositeTexture::Node {
 	bool m_is_on = true;
 };
 
+struct StepNode final : CompositeTexture::Node {
+	StepNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::STEP; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	void serialize(OutputMemoryStream& blob) const override { blob.write(m_value); }
+	void deserialize(InputMemoryStream& blob) override { blob.read(m_value); }
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(0, &tmp)) return false;
+
+		data->w = tmp.w;
+		data->h = tmp.h;
+		data->channels = tmp.channels;
+		data->pixels.resize(data->w * data->h * data->channels);
+
+		for (i32 j = 0; j < (i32)data->h; ++j) {
+			for (i32 i = 0; i < (i32)data->w; ++i) {
+				for (u32 ch = 0; ch < data->channels; ++ch) {
+					float v = tmp.pixels[(i + j * tmp.w) * tmp.channels + ch];
+					v = v < m_value[ch] * 255.f ? 0.f : 255.f;
+					data->pixels[(i + j * data->w) * data->channels + ch] = u8(v + 0.5f);
+				}
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Step");
+		inputSlot();
+		outputSlot();
+		ImGui::ColorEdit4("Value", &m_value.x);
+		return false;
+	}
+
+	Vec4 m_value = Vec4(1, 1, 1, 1);
+};
+
 struct SharpenNode final : CompositeTexture::Node {
+	SharpenNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SHARPEN; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -975,6 +1058,8 @@ struct SharpenNode final : CompositeTexture::Node {
 };
 
 struct CurveNode final : CompositeTexture::Node {
+	CurveNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CURVE; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1137,6 +1222,8 @@ struct CurveNode final : CompositeTexture::Node {
 };
 
 struct CircleNode final : CompositeTexture::Node {
+	CircleNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CIRCLE; }
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
@@ -1189,6 +1276,8 @@ struct CircleNode final : CompositeTexture::Node {
 };
 
 struct GrayscaleNode final : CompositeTexture::Node {
+	GrayscaleNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GRAYSCALE; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1219,6 +1308,8 @@ struct GrayscaleNode final : CompositeTexture::Node {
 };
 
 struct MixNode final : CompositeTexture::Node {
+	MixNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::MIX; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1266,6 +1357,8 @@ struct MixNode final : CompositeTexture::Node {
 };
 
 struct BrightnessNode final : CompositeTexture::Node {
+	BrightnessNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::BRIGHTNESS; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1307,6 +1400,8 @@ struct BrightnessNode final : CompositeTexture::Node {
 };
 
 struct ContrastNode final : CompositeTexture::Node {
+	ContrastNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CONTRAST; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
@@ -1350,6 +1445,8 @@ struct ContrastNode final : CompositeTexture::Node {
 };
 
 struct InvertNode final : CompositeTexture::Node {
+	InvertNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::INVERT; }
 
 	bool hasInputPins() const override { return true; }
@@ -1376,6 +1473,8 @@ struct InvertNode final : CompositeTexture::Node {
 };
 
 struct SplatNode final : CompositeTexture::Node {
+	SplatNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SPLAT; }
 
 	bool hasInputPins() const override { return true; }
@@ -1408,6 +1507,8 @@ struct SplatNode final : CompositeTexture::Node {
 };
 
 struct InputNode final : CompositeTexture::Node {
+	InputNode(IAllocator& allocator) : Node(allocator) {}
+	
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::INPUT; }
 
 	bool hasInputPins() const override { return false; }
@@ -1454,6 +1555,8 @@ struct InputNode final : CompositeTexture::Node {
 };
 
 struct OutputNode final : CompositeTexture::Node {
+	OutputNode(IAllocator& allocator) : Node(allocator) {}
+
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::OUTPUT; }
 
 	bool hasInputPins() const override { return true; }
@@ -1542,33 +1645,34 @@ struct OutputNode final : CompositeTexture::Node {
 CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTexture& resource, IAllocator& allocator) {
 	CompositeTexture::Node* node = nullptr;
 	switch (type) {
-		case CompositeTexture::NodeType::OUTPUT: node = LUMIX_NEW(allocator, OutputNode); break; 
-		case CompositeTexture::NodeType::INPUT: node = LUMIX_NEW(allocator, InputNode); break; 
-		case CompositeTexture::NodeType::FLIP: node = LUMIX_NEW(allocator, FlipNode); break; 
-		case CompositeTexture::NodeType::INVERT: node = LUMIX_NEW(allocator, InvertNode); break; 
-		case CompositeTexture::NodeType::COLOR: node = LUMIX_NEW(allocator, ColorNode); break; 
-		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode); break; 
-		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode); break; 
-		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode); break; 
-		case CompositeTexture::NodeType::CUT: node = LUMIX_NEW(allocator, CutNode); break; 
-		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode); break; 
-		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode); break; 
-		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode); break; 
-		case CompositeTexture::NodeType::SPLAT: node = LUMIX_NEW(allocator, SplatNode); break; 
-		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode); break; 
-		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode); break; 
-		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode); break; 
-		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode); break; 
-		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode); break; 
-		case CompositeTexture::NodeType::CURVE: node = LUMIX_NEW(allocator, CurveNode); break; 
-		case CompositeTexture::NodeType::GRAYSCALE: node = LUMIX_NEW(allocator, GrayscaleNode); break; 
-		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode); break; 
-		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode); break; 
-		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode); break; 
-		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode); break; 
-		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode); break; 
-		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode); break; 
-		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode); break; 
+		case CompositeTexture::NodeType::OUTPUT: node = LUMIX_NEW(allocator, OutputNode)(allocator); break;
+		case CompositeTexture::NodeType::INPUT: node = LUMIX_NEW(allocator, InputNode)(allocator); break;
+		case CompositeTexture::NodeType::FLIP: node = LUMIX_NEW(allocator, FlipNode)(allocator); break;
+		case CompositeTexture::NodeType::INVERT: node = LUMIX_NEW(allocator, InvertNode)(allocator); break;
+		case CompositeTexture::NodeType::COLOR: node = LUMIX_NEW(allocator, ColorNode)(allocator); break;
+		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode)(allocator); break;
+		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode)(allocator); break;
+		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode)(allocator); break;
+		case CompositeTexture::NodeType::CUT: node = LUMIX_NEW(allocator, CutNode)(allocator); break;
+		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode)(allocator); break;
+		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode)(allocator); break;
+		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode)(allocator); break;
+		case CompositeTexture::NodeType::SPLAT: node = LUMIX_NEW(allocator, SplatNode)(allocator); break;
+		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
+		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode)(allocator); break;
+		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode)(allocator); break;
+		case CompositeTexture::NodeType::CURVE: node = LUMIX_NEW(allocator, CurveNode)(allocator); break;
+		case CompositeTexture::NodeType::GRAYSCALE: node = LUMIX_NEW(allocator, GrayscaleNode)(allocator); break;
+		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode)(allocator); break;
+		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode)(allocator); break;
+		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode)(allocator); break;
+		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode)(allocator); break;
+		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode)(allocator); break;
+		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode)(allocator); break;
+		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode)(allocator); break;
+		case CompositeTexture::NodeType::STEP: node = LUMIX_NEW(allocator, StepNode)(allocator); break;
 	}
 	if (!node) return nullptr;
 	node->m_resource = &resource;
@@ -1582,7 +1686,6 @@ CompositeTexture::CompositeTexture(StudioApp& app, IAllocator& allocator)
 	, m_app(app)
 	, m_nodes(allocator)
 	, m_links(allocator)
-	, m_error(allocator)
 {}
 
 CompositeTexture::~CompositeTexture() {
@@ -1707,7 +1810,9 @@ void CompositeTexture::addArrayLayer(const char* path) {
 }
 
 bool CompositeTexture::generate(Result* result) {
-	const OutputNode* node = (OutputNode*)m_nodes[0];
+	for (Node* n : m_nodes) n->m_error = "";
+
+	OutputNode* node = (OutputNode*)m_nodes[0];
 	switch(node->m_output_type) {
 		case OutputNode::OutputType::SIMPLE: {
 			result->is_cubemap = false;
@@ -1829,6 +1934,7 @@ static const struct {
 	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 0, "Static switch", CompositeTexture::NodeType::STATIC_SWITCH },
+	{ 0, "Step", CompositeTexture::NodeType::STEP },
 	{ 'W', "Wave noise", CompositeTexture::NodeType::WAVE_NOISE }
 };
 
@@ -1966,12 +2072,16 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 
 	void saveAs(const Path& path) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream blob(m_app.getAllocator());
+		IAllocator& allocator = m_app.getAllocator();
+		OutputMemoryStream blob(allocator);
 		m_resource.serialize(blob);
 		if (!fs.saveContentSync(path, blob)) {
 			logError("Failed to save ", path);
 			return;
 		}
+		CompositeTexture::Result img(allocator);
+		m_resource.generate(&img);
+
 		m_path = path;
 	}
 
