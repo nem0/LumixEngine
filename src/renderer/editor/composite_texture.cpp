@@ -45,7 +45,9 @@ enum class CompositeTexture::NodeType : u32 {
 	CUT,
 	SHARPEN,
 	STATIC_SWITCH,
-	STEP
+	STEP,
+	SPLATTER,
+	GRADIENT_MAP
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -1014,6 +1016,155 @@ struct StepNode final : CompositeTexture::Node {
 	Vec4 m_value = Vec4(1, 1, 1, 1);
 };
 
+
+struct GradientMapNode final : CompositeTexture::Node {
+	GradientMapNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GRADIENT_MAP; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(m_count);
+		blob.write(m_keys);
+		blob.write(m_values);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(m_count);
+		blob.read(m_keys);
+		blob.read(m_values);
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData input(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(0, &input)) return error("Invalid input");
+		if (input.channels != 1) return error("Input must have only 1 channel");
+
+		data->channels = 4;
+		data->w = input.w;
+		data->h = input.h;
+		data->pixels.resize(data->channels * data->w * data->h);
+
+		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; i += data->channels) {
+			const float v = input.pixels[i / 4] / 255.f;
+			
+			for (i32 k = 1; k < m_count; ++k) {
+				if (v <= m_keys[k]) {
+					float t = (v - m_keys[k - 1]) / (m_keys[k] - m_keys[k - 1]);
+					const Vec4 color = lerp(m_values[k - 1], m_values[k], t);
+					data->pixels[i + 0] = u8(clamp(color.x * 255.f, 0.f, 255.f) + 0.5f);
+					data->pixels[i + 1] = u8(clamp(color.y * 255.f, 0.f, 255.f) + 0.5f);
+					data->pixels[i + 2] = u8(clamp(color.z * 255.f, 0.f, 255.f) + 0.5f);
+					data->pixels[i + 3] = u8(clamp(color.w * 255.f, 0.f, 255.f) + 0.5f);
+					break;
+				}
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Gradient map");
+		inputSlot();
+		outputSlot();
+		ImGui::SetNextItemWidth(150);
+		bool res = ImGuiEx::Gradient4("##g", lengthOf(m_keys), &m_count, m_keys, &m_values[0].x);
+		m_keys[0] = 0;
+		m_keys[m_count - 1] = 1;
+		return res;
+	}
+
+	i32 m_count = 2;
+	float m_keys[8] = { 0, 1 };
+	Vec4 m_values[8] = { Vec4(0, 0, 0, 1), Vec4(1, 1, 1, 1) };
+};
+
+
+struct SplatterNode final : CompositeTexture::Node {
+	SplatterNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SPLATTER; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(x_count);
+		blob.write(y_count);
+		blob.write(x_spread);
+		blob.write(y_spread);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(x_count);
+		blob.read(y_count);
+		blob.read(x_spread);
+		blob.read(y_spread);
+	}
+
+	void blit(CompositeTexture::PixelData& dst, CompositeTexture::PixelData& src, i32 dst_x, i32 dst_y) {
+		if (dst_x >= (i32)dst.w) return;
+		if (dst_y >= (i32)dst.h) return;
+		ASSERT(dst.channels == src.channels);
+		
+		for (i32 y = maximum(0, -dst_y); y < (i32)src.h && y + dst_y < (i32)dst.h; ++y) {
+			for (i32 x = maximum(0, -dst_x); x < (i32)src.w && x + dst_x < (i32)dst.w; ++x) {
+				i32 src_pixel = (x + y * src.w) * src.channels;
+				float alpha = src.channels < 4 ? 1.f : src.pixels[src_pixel + 3] / 255.f;
+				for (u32 ch = 0; ch < dst.channels; ++ch) {
+					u8& dst_p = dst.pixels[(x + dst_x + (y + dst_y) * dst.w) * dst.channels + ch];
+					dst_p = u8(src.pixels[src_pixel + ch] * alpha + dst_p * (1 - alpha) + 0.5f);
+				}
+			}
+		}
+	}
+
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		if (!getInputPixelData(0, data)) return error("Missing input");
+		
+		CompositeTexture::PixelData pattern(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(1, &pattern)) return error("Missing input");
+
+		for (u32 j = 0; j < y_count; ++j) {
+			for (u32 i = 0; i < x_count; ++i) {
+				i32 x = i32(((float)i / x_count) * w);
+				i32 y = i32(((float)j / y_count) * h);
+				x += rand(0, 2 * x_spread) - x_spread;
+				y += rand(0, 2 * y_spread) - y_spread;
+				blit(*data, pattern, x, y);
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		ImGuiEx::NodeTitle("Splatter");
+		inputSlot();
+		outputSlot();
+		ImGui::TextUnformatted("Background");
+		inputSlot();
+		ImGui::TextUnformatted("Pattern");
+		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999);
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		res = ImGui::DragInt("X count", (i32*)&x_count, 1, 1, 999999) || res;
+		res = ImGui::DragInt("Y count", (i32*)&y_count, 1, 1, 999999) || res;
+		res = ImGui::DragInt("X spread", (i32*)&x_spread, 1, 1, 999999) || res;
+		res = ImGui::DragInt("Y spread", (i32*)&y_spread, 1, 1, 999999) || res;
+		return res;
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	u32 x_count = 10;
+	u32 y_count = 10;
+	u32 x_spread = 0;
+	u32 y_spread = 0;
+};
+
 struct SharpenNode final : CompositeTexture::Node {
 	SharpenNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -1679,6 +1830,8 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode)(allocator); break;
 		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode)(allocator); break;
 		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode)(allocator); break;
+		case CompositeTexture::NodeType::GRADIENT_MAP: node = LUMIX_NEW(allocator, GradientMapNode)(allocator); break;
+		case CompositeTexture::NodeType::SPLATTER: node = LUMIX_NEW(allocator, SplatterNode)(allocator); break;
 		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode)(allocator); break;
 		case CompositeTexture::NodeType::STEP: node = LUMIX_NEW(allocator, StepNode)(allocator); break;
 	}
@@ -1928,6 +2081,7 @@ static const struct {
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
+	{ 0, "Gradient map", CompositeTexture::NodeType::GRADIENT_MAP },
 	{ 'G', "Grayscale", CompositeTexture::NodeType::GRAYSCALE },
 	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
 	{ 'I', "Invert", CompositeTexture::NodeType::INVERT },
@@ -1940,6 +2094,7 @@ static const struct {
 	{ 0, "Sharpen", CompositeTexture::NodeType::SHARPEN },
 	{ 'N', "Simplex", CompositeTexture::NodeType::SIMPLEX },
 	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
+	{ 0, "Splatter", CompositeTexture::NodeType::SPLATTER },
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 0, "Static switch", CompositeTexture::NodeType::STATIC_SWITCH },
 	{ 0, "Step", CompositeTexture::NodeType::STEP },
