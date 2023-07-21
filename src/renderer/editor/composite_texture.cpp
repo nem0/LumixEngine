@@ -200,31 +200,39 @@ struct MergeNode final : CompositeTexture::Node {
 
 	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
 		const Input inputs[] = { getInput(0), getInput(1), getInput(2), getInput(3) };
-		for (const Input& i : inputs) if (!i) return error("Missing input");
+		u32 channels_count = 0;
+		for (u32 i = 0; i < 4; ++i) {
+			if (!inputs[i]) break;
+			++channels_count;
+		}
 		
+		for (u32 i = channels_count; i < 4; ++i) {
+			if (inputs[i]) return error("Missing input");	
+		}
+
 		CompositeTexture::PixelData first_pd(m_resource->m_app.getAllocator());
 		if (!inputs[0].getPixelData(&first_pd)) return false;
 		if (first_pd.channels != 1) return error("Incorrect number of channels");
 
 		data->w = first_pd.w;
 		data->h = first_pd.h;
-		data->channels = 4;
-		data->pixels.resize(4 * first_pd.w * first_pd.h);
+		data->channels = channels_count;
+		data->pixels.resize(channels_count * first_pd.w * first_pd.h);
 		u8* dst = data->pixels.getMutableData();
 		const u8* first_src = first_pd.pixels.data();
 		for (u32 i = 0; i < first_pd.w * first_pd.h; ++i) {
-			dst[i * 4] = first_src[i];
+			dst[i * channels_count] = first_src[i];
 		}
 
-		for (u32 i = 1; i < 4; ++i) {
+		for (u32 i = 1; i < channels_count; ++i) {
 			CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
 			if (!inputs[i].getPixelData(&tmp)) return false;
-			if (tmp.channels != 1) return false;
+			if (tmp.channels != 1) return error("Incorrect number of channels");
 			resize(&tmp, first_pd.w, first_pd.h);
 			
 			const u8* src = tmp.pixels.data();
 			for (u32 j = 0; j < tmp.w * tmp.h; ++j) {
-				dst[j * 4 + i] = src[j];
+				dst[j * channels_count + i] = src[j];
 			}
 		}
 
