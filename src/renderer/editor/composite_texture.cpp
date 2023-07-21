@@ -569,7 +569,7 @@ struct ResizeNode final : CompositeTexture::Node {
 		
 		const u32 w = type == Type::PIXELS ? size.x : u32(data->w * scale.x * 0.01f + 0.5f);
 		const u32 h = type == Type::PIXELS ? size.y : u32(data->h * scale.y * 0.01f + 0.5f);
-		if (data->w == w && data->h != h) return true;
+		if (data->w == w && data->h == h) return true;
 
 		OutputMemoryStream tmp(m_resource->m_app.getAllocator());
 		tmp.resize(w * h * data->channels);
