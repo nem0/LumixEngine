@@ -250,12 +250,9 @@ struct AssetCompilerImpl : AssetCompiler {
 			compressed.resize(compressed_size);
 		}
 
-		char normalized[LUMIX_MAX_PATH];
-		Path::normalize(locator, Span(normalized));
-		makeLowercase(Span(normalized), normalized);
-		const FilePathHash hash(normalized);
+		Path path(locator);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const Path out_path(".lumix/resources/", hash, ".res");
+		const Path out_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
 		os::OutputFile file;
 		if(!fs.open(out_path, file)) {
 			logError("Could not create ", out_path);
