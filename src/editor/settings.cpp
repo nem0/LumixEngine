@@ -1085,11 +1085,6 @@ void Settings::onGUI()
 		if (ImGui::Button(ICON_FA_SAVE "Save")) m_app.saveSettings();
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_REDO_ALT "Reload")) load();
-		ImGui::SameLine();
-		ImGui::TextDisabled("(?)");
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("%s", "Settings are saved in studio.ini when the application closes");
-		}
 
 		if (ImGui::BeginTabBar("tabs")) {
 
