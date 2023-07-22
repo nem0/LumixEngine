@@ -194,8 +194,6 @@ LUMIX_ENGINE_API [[nodiscard]] bool makePath(const char* path);
 
 LUMIX_ENGINE_API void setCursor(CursorType type);
 LUMIX_ENGINE_API void grabMouse(WindowHandle win);
-LUMIX_ENGINE_API void clipCursor(Rect screen_space_rect);
-LUMIX_ENGINE_API void unclipCursor();
 
 LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, Span<char> out);
 LUMIX_ENGINE_API int getDropFileCount(const Event& event);

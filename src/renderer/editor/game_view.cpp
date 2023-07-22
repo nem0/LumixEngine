@@ -114,7 +114,7 @@ void GameView::captureMouse(bool capture)
 	m_app.setCursorCaptured(capture);
 	m_is_mouse_captured = capture;
 	os::showCursor(!capture || m_is_ingame_cursor);
-	if (!capture) os::unclipCursor();
+	if (!capture) os::grabMouse(os::INVALID_WINDOW);
 }
 
 void GameView::onSettingsLoaded() {
@@ -347,12 +347,7 @@ void GameView::onGUI()
 
 	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
 	if (m_is_mouse_captured && is_game_view_visible) {
-		os::Rect r = os::getWindowScreenRect(ImGui::GetWindowViewport()->PlatformHandle);
-		r.left += (i32)view_pos.x;
-		r.top += (i32)view_pos.y;
-		r.width = (i32)view_size.x;
-		r.height = (i32)view_size.y;
-		os::clipCursor(r);
+		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();

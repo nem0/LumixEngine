@@ -56,6 +56,7 @@ static struct {
 	Cursor load_cursor = None;
 	Cursor text_input_cursor = None;
 	Cursor hidden_cursor = None;
+	bool is_cursor_visible = true;
 
 	int argc = 0;
 	char** argv = nullptr;
@@ -706,6 +707,7 @@ static void initCursors() {
 
 void setCursor(CursorType type) {
 	initCursors();
+	if (!G.is_cursor_visible) return;
 	switch (type) {
 		case CursorType::DEFAULT: XDefineCursor(G.display, (Window)G.win, G.arrow_cursor); break;
 		case CursorType::SIZE_NS: XDefineCursor(G.display, (Window)G.win, G.size_ns_cursor); break;
@@ -720,6 +722,7 @@ void setCursor(CursorType type) {
 void showCursor(bool show) {
 	initCursors();
 
+	G.is_cursor_visible = show;
 	if (show) {
 		XDefineCursor(G.display, (Window)G.win, G.arrow_cursor);
 	}
@@ -838,16 +841,6 @@ bool isMaximized(WindowHandle win) {
 	XFree(states);
 
 	return maximized;
-}
-
-void unclipCursor() {
-	ASSERT(false);
-	// TODO
-}
-
-void clipCursor(Rect screen_space_rect) {
-	ASSERT(false);
-	// TODO
 }
 
 void restore(WindowHandle win, WindowState state) {
