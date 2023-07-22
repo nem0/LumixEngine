@@ -1064,9 +1064,8 @@ ExecuteOpenResult shellExecuteOpen(const char* path, const char* args, const cha
 
 
 ExecuteOpenResult openExplorer(const char* path) {
-	ASSERT(false);
-	// TODO
-	return {};
+	StaticString<1024> tmp("xdg-open ", path);
+	return system(tmp) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
 }
 
 
