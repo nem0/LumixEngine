@@ -34,6 +34,7 @@
 #include <gtk/gtk.h>
 
 
+#define _NET_WM_STATE_REMOVE 0
 #define _NET_WM_STATE_ADD 1
 
 namespace Lumix::os {
@@ -65,6 +66,7 @@ static struct {
 	XIM im;
 	IVec2 mouse_screen_pos = {}; // only valid if has_raw_inputs == false
 	bool key_states[256] = {};
+	Atom net_wm_state_fullscreen_atom;
 	Atom net_wm_state_atom;
 	Atom net_wm_state_maximized_vert_atom;
 	Atom net_wm_state_maximized_horz_atom;
@@ -286,7 +288,7 @@ void init() {
 		s_from_x11_keysym.insert(m.x11, m.lumix);
 		s_keycode_names[(u8)m.lumix] = m.name;
 	}
-
+	G.net_wm_state_fullscreen_atom = XInternAtom(G.display, "_NET_WM_STATE_FULLSCREEN", False);
 	G.net_wm_state_atom = XInternAtom(G.display, "_NET_WM_STATE", False);
 	G.net_wm_state_maximized_horz_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
 	G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
@@ -844,13 +846,37 @@ bool isMaximized(WindowHandle win) {
 }
 
 void restore(WindowHandle win, WindowState state) {
-	ASSERT(false);
-	// TODO
+	XEvent event = {ClientMessage};
+	event.xclient.window = (Window)win;
+	event.xclient.format = 32;
+	event.xclient.message_type = G.net_wm_state_atom;
+	event.xclient.data.l[0] = _NET_WM_STATE_REMOVE;
+	event.xclient.data.l[1] = G.net_wm_state_fullscreen_atom;
+	event.xclient.data.l[2] = 0;
+	event.xclient.data.l[3] = 0;
+	event.xclient.data.l[4] = 0;
+
+	XWindowAttributes attrs;
+	XGetWindowAttributes(G.display, (Window)win, &attrs);
+	Window root = RootWindowOfScreen(attrs.screen);
+	XSendEvent(G.display, root, False, SubstructureNotifyMask | SubstructureRedirectMask, &event);
 }
 
 WindowState setFullscreen(WindowHandle win) {
-	ASSERT(false);
-	// TODO
+	XEvent event = {ClientMessage};
+	event.xclient.window = (Window)win;
+	event.xclient.format = 32;
+	event.xclient.message_type = G.net_wm_state_atom;
+	event.xclient.data.l[0] = _NET_WM_STATE_ADD;
+	event.xclient.data.l[1] = G.net_wm_state_fullscreen_atom;
+	event.xclient.data.l[2] = 0;
+	event.xclient.data.l[3] = 0;
+	event.xclient.data.l[4] = 0;
+
+	XWindowAttributes attrs;
+	XGetWindowAttributes(G.display, (Window)win, &attrs);
+	Window root = RootWindowOfScreen(attrs.screen);
+	XSendEvent(G.display, root, False, SubstructureNotifyMask | SubstructureRedirectMask, &event);
 	return {};
 }
 
