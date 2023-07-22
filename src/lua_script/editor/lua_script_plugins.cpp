@@ -96,9 +96,9 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return false;
 	}
 
-	bool canCreateResource() const { return true; }
+	bool canCreateResource() const override { return true; }
 
-	bool createResource(const char* path) {
+	bool createResource(const char* path) override {
 		OutputMemoryStream blob(m_app.getAllocator());
 		blob << "function update(time_delta)\nend\n";
 

@@ -2693,9 +2693,9 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
 	}
 
-	bool canCreateResource() const { return true; }
+	bool canCreateResource() const override { return true; }
 
-	bool createResource(const char* path) {
+	bool createResource(const char* path) override {
 		ParticleSystemEditorResource res(Path(path), m_app, m_app.getAllocator());
 		res.addEmitter();
 		res.m_emitters[0]->initDefault(ParticleSystemResourceType::SYSTEM);
@@ -2767,7 +2767,7 @@ struct FunctionBrowserPlugin : AssetBrowser::Plugin {
 			bool isReady() override { return m_is_ready; }
 			bool isFailure() override { return !m_is_ready; }
 			u64 size() override { return 0; }
-			void destroy() { LUMIX_DELETE(*allocator, this); }
+			void destroy() override { LUMIX_DELETE(*allocator, this); }
 			Resource* getResource() override { ASSERT(false); return nullptr; }
 
 			ParticleSystemEditorResource resource;
@@ -2781,9 +2781,9 @@ struct FunctionBrowserPlugin : AssetBrowser::Plugin {
 		return *view;
 	}
 
-	bool canCreateResource() const { return true; }
+	bool canCreateResource() const override { return true; }
 
-	bool createResource(const char* path) {
+	bool createResource(const char* path) override {
 		ParticleSystemEditorResource res(Path(path), m_app, m_app.getAllocator());
 		res.addEmitter();
 		res.m_emitters[0]->initDefault(ParticleSystemResourceType::FUNCTION);

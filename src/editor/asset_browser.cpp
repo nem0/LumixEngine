@@ -68,7 +68,7 @@ AssetBrowser::ResourceView& AssetBrowser::Plugin::createView(const Path& path, S
 		bool isReady() override { return resource->isReady(); }
 		bool isFailure() override { return resource->isFailure(); }
 		u64 size() override { return resource->size(); }
-		void destroy() { LUMIX_DELETE(*allocator, this); }
+		void destroy() override { LUMIX_DELETE(*allocator, this); }
 		Resource* getResource() override { return resource; }
 
 		IAllocator* allocator;

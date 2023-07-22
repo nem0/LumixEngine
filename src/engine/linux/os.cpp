@@ -1211,7 +1211,7 @@ void* loadLibrary(const char* path) {
 
 
 void unloadLibrary(void* handle) {
-	dlclose(handle);
+	if (handle != NULL) dlclose(handle);
 }
 
 
