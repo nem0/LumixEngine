@@ -38,7 +38,10 @@ namespace Lumix
 			unsigned long res;
 			return _BitScanReverse(&res, ((unsigned long)n - 1) >> 2) ? res : 0;
 		#else
-			return 31 - __builtin_clz((n - 1) >> 2);
+			size_t tmp = (n - 1) >> 2;
+			auto res = tmp == 0 ? 0 : 31 - __builtin_clz(tmp);
+			ASSERT(res <= lengthOf(((DefaultAllocator*)nullptr)->m_free_lists));
+			return res;
 		#endif
 	}
 
