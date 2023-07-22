@@ -1149,7 +1149,8 @@ bool makePath(const char* path) {
 		++cout;
 		++cin;
 	}
-	return mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != -1;
+	int res = mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	return res == 0 || (res == -1 && errno == EEXIST);
 }
 
 
