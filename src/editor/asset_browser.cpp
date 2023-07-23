@@ -597,7 +597,7 @@ struct AssetBrowserImpl : AssetBrowser {
 						}
 					}
 				}
-				else if (ImGui::IsMouseClicked(0)) {
+				else if (ImGui::IsMouseReleased(0)) {
 					const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
 					selectResource(Path(tile.filepath), true, additive);
 				}
@@ -1024,9 +1024,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 		const char* path = view.getPath().c_str();
 		ResourceLocator rl(Span(path, stringLength(path)));
-		char dir[LUMIX_MAX_PATH];
-		copyString(Span(dir), rl.dir);
-		changeDir(dir, false);
+		if (!Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
+			StaticString<LUMIX_MAX_PATH> dir(rl.dir);
+			changeDir(dir, record_history);
+		}
 	}
 
 
@@ -1325,12 +1326,13 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void goBackDir() {
 		if (m_dir_history_index < 1) return;
-		m_dir_history_index = maximum(0, m_dir_history_index - 1);
+		--m_dir_history_index;
 		changeDir(m_dir_history[m_dir_history_index].c_str(), false);
 	}
 
 	void goForwardDir() {
-		m_dir_history_index = minimum(m_dir_history_index + 1, m_dir_history.size() - 1);
+		if (m_dir_history_index >= m_dir_history.size() - 1) return;
+		++m_dir_history_index;
 		changeDir(m_dir_history[m_dir_history_index].c_str(), false);
 	}
 

@@ -15466,6 +15466,7 @@ static void ImGui::DockContextBuildNodesFromSettings(ImGuiContext* ctx, ImGuiDoc
         else if (node->ParentNode && node->ParentNode->ChildNodes[1] == NULL)
             node->ParentNode->ChildNodes[1] = node;
         node->SelectedTabId = settings->SelectedTabId;
+        node->TabIdFromSettings = settings->SelectedTabId;
         node->SplitAxis = (ImGuiAxis)settings->SplitAxis;
         node->SetLocalFlags(settings->Flags & ImGuiDockNodeFlags_SavedFlagsMask_);
 
@@ -16553,7 +16554,16 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
         node->IsFocused = false;
     }
     if (node->TabBar && node->TabBar->SelectedTabId)
-        node->SelectedTabId = node->TabBar->SelectedTabId;
+    {
+        // restore selected tab from previous session
+        if (node->TabIdFromSettings) {
+            node->TabBar->SelectedTabId = node->SelectedTabId = node->TabIdFromSettings;
+            node->TabIdFromSettings = 0;
+        }
+        else {
+            node->SelectedTabId = node->TabBar->SelectedTabId;
+        }
+    }
     else if (node->Windows.Size > 0)
         node->SelectedTabId = node->Windows[0]->TabId;
 

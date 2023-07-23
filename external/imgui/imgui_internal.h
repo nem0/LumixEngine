@@ -1685,6 +1685,7 @@ struct IMGUI_API ImGuiDockNode
     int                     LastFrameFocused;           // Last frame number the node was focused.
     ImGuiID                 LastFocusedNodeId;          // [Root node only] Which of our child docking node (any ancestor in the hierarchy) was last focused.
     ImGuiID                 SelectedTabId;              // [Leaf node only] Which of our tab/window is selected.
+    ImGuiID                 TabIdFromSettings;
     ImGuiID                 WantCloseTabId;             // [Leaf node only] Set when closing a specific tab/window.
     ImGuiID                 RefViewportId;              // Reference viewport ID from visible window when HostWindow == NULL.
     ImGuiDataAuthority      AuthorityForPos         :3;
