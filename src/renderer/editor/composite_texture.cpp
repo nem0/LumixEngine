@@ -2368,10 +2368,9 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
 			}
 		}
-		ImGui::End();
 		if (!open) {
 			if (m_dirty) {
-				ImGui::OpenPopup("Confirm##cc");
+				ImGui::OpenPopup("Confirm##cct");
 			}
 			else {
 				m_editor.m_windows.eraseItem(this);
@@ -2380,7 +2379,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			}
 		}
 
-		if (ImGui::BeginPopupModal("Confirm##cc")) {
+		if (ImGui::BeginPopupModal("Confirm##cct")) {
 			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
 			if (ImGui::Selectable("Yes")) {
 				m_editor.m_windows.eraseItem(this);
@@ -2390,6 +2389,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			ImGui::Selectable("No");
 			ImGui::EndPopup();
 		}
+		ImGui::End();
 	}
 
 	const char* getName() const override { return "composite_texture_editor"; }

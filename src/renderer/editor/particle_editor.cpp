@@ -3623,10 +3623,9 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				}
 			}
 		}
-		ImGui::End();
 		if (!open) {
 			if (m_dirty) {
-				ImGui::OpenPopup("Confirm##cc");
+				ImGui::OpenPopup("Confirm##cpe");
 			}
 			else {
 				m_editor.m_windows.eraseItem(this);
@@ -3635,7 +3634,7 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			}
 		}
 
-		if (ImGui::BeginPopupModal("Confirm##cc")) {
+		if (ImGui::BeginPopupModal("Confirm##cpe", nullptr, ImGuiWindowFlags_NoSavedSettings)) {
 			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
 			if (ImGui::Selectable("Yes")) {
 				m_editor.m_windows.eraseItem(this);
@@ -3645,6 +3644,7 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			ImGui::Selectable("No");
 			ImGui::EndPopup();
 		}
+		ImGui::End();
 	}
 
 	bool onAction(const Action& action) override {
