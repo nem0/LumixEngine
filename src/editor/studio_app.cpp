@@ -711,25 +711,29 @@ struct StudioAppImpl final : StudioApp
 		else {
 			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
 				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
-				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
-			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-				ImGui::Begin("MainDockspace", nullptr, flags);
-				ImGui::PopStyleVar();
-				mainMenu();
-				m_dockspace_id = ImGui::GetID("MyDockspace");
-				ImGui::DockSpace(m_dockspace_id, ImVec2(0, 0));
-				ImGui::End();
-			
-				m_asset_compiler->onGUI();
-				onEntityListGUI();
-				onSaveAsDialogGUI();
-				for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
-					GUIPlugin* win = m_gui_plugins[i];
-					win->onGUI();
-				}
-				m_settings.onGUI();
-				onExportDataGUI();
 			}
+			else {
+				// we keep processing imgui to remember active dock nodes
+				ImGui::SetNextWindowSize(ImVec2(100, 100));
+			}
+			ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+			ImGui::Begin("MainDockspace", nullptr, flags);
+			ImGui::PopStyleVar();
+			mainMenu();
+			m_dockspace_id = ImGui::GetID("MyDockspace");
+			ImGui::DockSpace(m_dockspace_id, ImVec2(0, 0));
+			ImGui::End();
+			
+			m_asset_compiler->onGUI();
+			onEntityListGUI();
+			onSaveAsDialogGUI();
+			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
+				GUIPlugin* win = m_gui_plugins[i];
+				win->onGUI();
+			}
+			m_settings.onGUI();
+			onExportDataGUI();
 		}
 		ImGui::PopFont();
 		ImGui::Render();
