@@ -12,7 +12,6 @@
 #include "engine/profiler.h"
 #include "job_system.h"
 
-#pragma clang optimize off 
 namespace Lumix::jobs {
 
 struct Job {
