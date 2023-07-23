@@ -81,14 +81,18 @@ static Local<System> g_system;
 static volatile i32 g_generation = 0;
 static thread_local WorkerTask* g_worker = nullptr;
 
-#pragma clang optimize off 
+#ifndef _WIN32
+	#pragma clang optimize off 
+#endif
 #pragma optimize( "", off )
 WorkerTask* getWorker()
 {
 	return g_worker;
 }
 #pragma optimize( "", on )
-#pragma clang optimize on
+#ifndef _WIN32
+	#pragma clang optimize on
+#endif
 
 struct WorkerTask : Thread
 {

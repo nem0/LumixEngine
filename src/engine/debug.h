@@ -45,13 +45,13 @@ private:
 struct LUMIX_ENGINE_API GuardAllocator final : IAllocator {
 	void* allocate(size_t size) override { ASSERT(false); return nullptr; }
 	void deallocate(void* ptr) override { ASSERT(false); }
-	void* reallocate(void* ptr, size_t size) override { ASSERT(false); return nullptr; }
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override { ASSERT(false); return nullptr; }
 
 	void* allocate_aligned(size_t size, size_t align) override;
 	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t size, size_t align) override { 
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override { 
 		ASSERT(!ptr);
-		return allocate_aligned(size, align); 
+		return allocate_aligned(new_size, align); 
 	}
 };
 #endif

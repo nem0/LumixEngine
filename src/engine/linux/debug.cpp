@@ -269,14 +269,14 @@ void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size) {
 #ifndef LUMIX_DEBUG
 	return m_source.reallocate(user_ptr, new_size, old_size);
 #else
-	if (user_ptr == nullptr) return allocate(size);
-	if (size == 0) return nullptr;
+	if (user_ptr == nullptr) return allocate(new_size);
+	if (new_size == 0) return nullptr;
 
-	void* new_data = allocate(size);
+	void* new_data = allocate(new_size);
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < size ? info->size : size);
+	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
 
 	deallocate(user_ptr);
 
@@ -368,14 +368,14 @@ void* Allocator::reallocate_aligned(void* user_ptr, size_t new_size, size_t old_
 #ifndef LUMIX_DEBUG
 	return m_source.reallocate_aligned(user_ptr, new_size, old_size, align);
 #else
-	if (user_ptr == nullptr) return allocate_aligned(size, align);
-	if (size == 0) return nullptr;
+	if (user_ptr == nullptr) return allocate_aligned(new_size, align);
+	if (new_size == 0) return nullptr;
 
-	void* new_data = allocate_aligned(size, align);
+	void* new_data = allocate_aligned(new_size, align);
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < size ? info->size : size);
+	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
 
 	deallocate_aligned(user_ptr);
 

@@ -411,16 +411,16 @@ u8* Allocator::getSystemFromUser(void* user_ptr)
 }
 
 
-void* Allocator::reallocate(void* user_ptr, size_t size)
+void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size)
 {
-	if (user_ptr == nullptr) return allocate(size);
-	if (size == 0) return nullptr;
+	if (user_ptr == nullptr) return allocate(new_size);
+	if (new_size == 0) return nullptr;
 
-	void* new_data = allocate(size);
+	void* new_data = allocate(new_size);
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < size ? info->size : size);
+	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
 
 	deallocate(user_ptr);
 
@@ -507,16 +507,16 @@ void Allocator::deallocate_aligned(void* user_ptr)
 }
 
 
-void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
+void* Allocator::reallocate_aligned(void* user_ptr, size_t new_size, size_t old_size, size_t align)
 {
-	if (user_ptr == nullptr) return allocate_aligned(size, align);
-	if (size == 0) return nullptr;
+	if (user_ptr == nullptr) return allocate_aligned(new_size, align);
+	if (new_size == 0) return nullptr;
 
-	void* new_data = allocate_aligned(size, align);
+	void* new_data = allocate_aligned(new_size, align);
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < size ? info->size : size);
+	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
 
 	deallocate_aligned(user_ptr);
 
