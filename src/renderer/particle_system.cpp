@@ -294,6 +294,7 @@ void ParticleSystem::ensureCapacity(Emitter& emitter, u32 num_new_particles) {
 	if (new_capacity > emitter.capacity) {
 		const u32 channels_count = emitter.resource_emitter.channels_count;
 		new_capacity = maximum(16, new_capacity, emitter.capacity * 3 / 2);
+		new_capacity = (new_capacity + 3) & ~u32(3);
 		for (u32 i = 0; i < channels_count; ++i)
 		{
 			emitter.channels[i].data = (float*)m_allocator.reallocate_aligned(emitter.channels[i].data, new_capacity * sizeof(float), 16);
