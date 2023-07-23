@@ -216,6 +216,7 @@ LUMIX_ENGINE_API void maximizeWindow(WindowHandle win);
 LUMIX_ENGINE_API WindowState setFullscreen(WindowHandle win);
 LUMIX_ENGINE_API void restore(WindowHandle win, WindowState state);
 LUMIX_ENGINE_API bool isMaximized(WindowHandle win);
+LUMIX_ENGINE_API bool isMinimized(WindowHandle win);
 LUMIX_ENGINE_API WindowHandle getFocused();
 
 LUMIX_ENGINE_API bool isKeyDown(Keycode keycode);

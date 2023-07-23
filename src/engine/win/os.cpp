@@ -823,6 +823,13 @@ bool isMaximized(WindowHandle win) {
 	return placement.showCmd == SW_SHOWMAXIMIZED;
 }
 
+bool isMinimized(WindowHandle win) {
+	WINDOWPLACEMENT placement;
+	BOOL res = GetWindowPlacement((HWND)win, &placement);
+	ASSERT(res);
+	return placement.showCmd == SW_SHOWMINIMIZED;
+}
+
 void restore(WindowHandle win, WindowState state) {
 	SetWindowLongPtr((HWND)win, GWL_STYLE, state.style);
 	os::setWindowScreenRect(win, state.rect);

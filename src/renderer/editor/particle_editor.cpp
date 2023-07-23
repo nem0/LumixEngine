@@ -2718,6 +2718,10 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		}
 		return false;
 	}
+
+	void onResourceDoubleClicked(const Path& path) override {
+		m_particle_editor->open(path.c_str());
+	}
 	
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
 		if (type == ParticleSystemResource::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_particle.tga", out_path);
@@ -2807,6 +2811,10 @@ struct FunctionBrowserPlugin : AssetBrowser::Plugin {
 		return false;
 	}
 	
+	void onResourceDoubleClicked(const Path& path) override {
+		m_editor.open(path.c_str());
+	}
+
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
 		if (type == ParticleSystemEditorResource::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_particle_function.tga", out_path);
 		return false;

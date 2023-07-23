@@ -68,6 +68,7 @@ static struct {
 	bool key_states[256] = {};
 	Atom net_wm_state_fullscreen_atom;
 	Atom net_wm_state_atom;
+	Atom net_wm_state_hidden;
 	Atom net_wm_state_maximized_vert_atom;
 	Atom net_wm_state_maximized_horz_atom;
 	Atom wm_protocols_atom;
@@ -290,6 +291,7 @@ void init() {
 	}
 	G.net_wm_state_fullscreen_atom = XInternAtom(G.display, "_NET_WM_STATE_FULLSCREEN", False);
 	G.net_wm_state_atom = XInternAtom(G.display, "_NET_WM_STATE", False);
+	G.net_wm_state_hidden = XInternAtom(G.display, "_NET_WM_STATE_HIDDEN ", False);
 	G.net_wm_state_maximized_horz_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
 	G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
 	G.wm_protocols_atom = XInternAtom(G.display, "WM_PROTOCOLS", False);
@@ -823,6 +825,25 @@ WindowHandle getFocused() {
 	return (WindowHandle)win;
 }
 
+bool isMinimized(WindowHandle win) {
+	if (!G.net_wm_state_atom) return false;
+	if (!G.net_wm_state_hidden) return false;
+
+	Atom* states;
+	const unsigned long count = get_window_property((Window)win, G.net_wm_state_atom, XA_ATOM, (unsigned char**)&states);
+
+	bool minimized = false;
+	for (unsigned long i = 0; i < count; ++i) {
+		if (states[i] == G.net_wm_state_hidden) {
+			minimized = true;
+			break;
+		}
+	}
+
+	XFree(states);
+
+	return minimized;
+}
 
 bool isMaximized(WindowHandle win) {
 	if (!G.net_wm_state_atom) return false;

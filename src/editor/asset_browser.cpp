@@ -589,7 +589,15 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 			else if (ImGui::IsItemHovered())
 			{
-				if (ImGui::IsMouseReleased(0)) {
+				if (ImGui::IsMouseDoubleClicked(0)) {
+					const ResourceType type = m_app.getAssetCompiler().getResourceType(tile.filepath);
+					for (Plugin* p : m_plugins) {
+						if (p->getResourceType() == type) {
+							p->onResourceDoubleClicked(Path(tile.filepath));
+						}
+					}
+				}
+				else if (ImGui::IsMouseClicked(0)) {
 					const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
 					selectResource(Path(tile.filepath), true, additive);
 				}

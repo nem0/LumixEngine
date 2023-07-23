@@ -1116,6 +1116,10 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		}
 	}
 
+	void onResourceDoubleClicked(const Path& path) override {
+		if (Path::hasExtension(path, "ltc")) m_composite_texture_editor.open(path);
+	}
+
 	void onResourceCompiled(Resource& res) {
 		if (m_texture == &res) m_texture = nullptr;
 	}

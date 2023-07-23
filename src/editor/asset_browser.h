@@ -40,6 +40,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual bool createTile(const char* in_path, const char* out_path, ResourceType type);
 		virtual void update() {}
 		virtual ResourceView& createView(const Path& path, StudioApp& app);
+		virtual void onResourceDoubleClicked(const Path& path) {}
 
 		void gui(Span<ResourceView*> resources);
 

@@ -189,7 +189,7 @@ struct StudioAppImpl final : StudioApp
 					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
 					if (vp) vp->PlatformRequestMove = true;
 				}
-				if (event.window == m_main_window) {
+				if (event.window == m_main_window && !os::isMinimized(event.window)) {
 					m_settings.m_window.x = event.win_move.x;
 					m_settings.m_window.y = event.win_move.y;
 					m_settings.m_is_maximized = os::isMaximized(m_main_window);
