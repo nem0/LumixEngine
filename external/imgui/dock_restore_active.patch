@@ -1,63 +1,42 @@
 diff --git a/imgui.cpp b/imgui.cpp
-index 6f3e9494..1aebd03d 100644
+index 52be84ba8..3b440247b 100644
 --- a/imgui.cpp
 +++ b/imgui.cpp
-@@ -6943,7 +6943,10 @@ void ImGui::FocusWindow(ImGuiWindow* window)
+@@ -15466,6 +15466,7 @@ static void ImGui::DockContextBuildNodesFromSettings(ImGuiContext* ctx, ImGuiDoc
+         else if (node->ParentNode && node->ParentNode->ChildNodes[1] == NULL)
+             node->ParentNode->ChildNodes[1] = node;
+         node->SelectedTabId = settings->SelectedTabId;
++        node->TabIdFromSettings = settings->SelectedTabId;
+         node->SplitAxis = (ImGuiAxis)settings->SplitAxis;
+         node->SetLocalFlags(settings->Flags & ImGuiDockNodeFlags_SavedFlagsMask_);
  
-     // Select in dock node
-     if (dock_node && dock_node->TabBar)
-+    {
-         dock_node->TabBar->SelectedTabId = dock_node->TabBar->NextSelectedTabId = window->ID;
-+        MarkIniSettingsDirty(window);
-+    }
- 
-     // Bring to front
-     BringWindowToFocusFront(focus_front_window);
-@@ -6973,6 +6976,18 @@ void ImGui::FocusTopMostWindowUnderOne(ImGuiWindow* under_this_window, ImGuiWind
-                 // If A and B are docked into window and B disappear, at the NewFrame() call site window->NavLastChildNavWindow will still point to B.
-                 // We might leverage the tab order implicitly stored in window->DockNodeAsHost->TabBar (essentially the 'most_recently_selected_tab' code in tab bar will do that but on next update)
-                 // to tell which is the "previous" window. Or we may leverage 'LastFrameFocused/LastFrameJustFocused' and have this function handle child window itself?
-+                if (window->DockNode)
-+                {
-+                    for (int i = 0; i < window->DockNode->Windows.Size; ++i)
-+                    {
-+                        if (window->DockNode->Windows[i]->ID == window->DockNode->SelectedTabId)
-+                        {
-+                            window = window->DockNode->Windows[i];
-+                            break;
-+                        }
-+                    }
-+                }
-+
-                 ImGuiWindow* focus_window = NavRestoreLastChildNavWindow(window);
-                 FocusWindow(focus_window);
-                 return;
-@@ -13181,6 +13196,7 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
- {
-     ImGuiContext& g = *GImGui;
-     IM_ASSERT(node->LastFrameActive != g.FrameCount);
-+    bool first_time_alive = node->LastFrameAlive == -1; 
-     node->LastFrameAlive = g.FrameCount;
-     node->MarkedForPosSizeWrite = false;
- 
-@@ -13431,7 +13447,20 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
+@@ -16553,7 +16554,16 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
          node->IsFocused = false;
      }
      if (node->TabBar && node->TabBar->SelectedTabId)
+-        node->SelectedTabId = node->TabBar->SelectedTabId;
 +    {
 +        // restore selected tab from previous session
-+        if (first_time_alive) {
-+            for (int i = 0; i < node->Windows.Size; ++i)
-+            {
-+                if (node->SelectedTabId == node->Windows[i]->ID)
-+                {
-+                    node->TabBar->SelectedTabId = node->TabBar->NextSelectedTabId = node->SelectedTabId;
-+                    break;
-+                }
-+            }
++        if (node->TabIdFromSettings) {
++            node->TabBar->SelectedTabId = node->SelectedTabId = node->TabIdFromSettings;
++            node->TabIdFromSettings = 0;
 +        }
-         node->SelectedTabId = node->TabBar->SelectedTabId;
++        else {
++            node->SelectedTabId = node->TabBar->SelectedTabId;
++        }
 +    }
      else if (node->Windows.Size > 0)
-         node->SelectedTabId = node->Windows[0]->ID;
+         node->SelectedTabId = node->Windows[0]->TabId;
  
+diff --git a/imgui_internal.h b/imgui_internal.h
+index 3190224ff..f5088fd5d 100644
+--- a/imgui_internal.h
++++ b/imgui_internal.h
+@@ -1685,6 +1685,7 @@ struct IMGUI_API ImGuiDockNode
+     int                     LastFrameFocused;           // Last frame number the node was focused.
+     ImGuiID                 LastFocusedNodeId;          // [Root node only] Which of our child docking node (any ancestor in the hierarchy) was last focused.
+     ImGuiID                 SelectedTabId;              // [Leaf node only] Which of our tab/window is selected.
++    ImGuiID                 TabIdFromSettings;
+     ImGuiID                 WantCloseTabId;             // [Leaf node only] Set when closing a specific tab/window.
+     ImGuiID                 RefViewportId;              // Reference viewport ID from visible window when HostWindow == NULL.
+     ImGuiDataAuthority      AuthorityForPos         :3;
