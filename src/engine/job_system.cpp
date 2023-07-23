@@ -12,7 +12,7 @@
 #include "engine/profiler.h"
 #include "job_system.h"
 
-
+#pragma clang optimize off 
 namespace Lumix::jobs {
 
 struct Job {
@@ -82,12 +82,14 @@ static Local<System> g_system;
 static volatile i32 g_generation = 0;
 static thread_local WorkerTask* g_worker = nullptr;
 
+#pragma clang optimize off 
 #pragma optimize( "", off )
 WorkerTask* getWorker()
 {
 	return g_worker;
 }
 #pragma optimize( "", on )
+#pragma clang optimize on
 
 struct WorkerTask : Thread
 {

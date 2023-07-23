@@ -215,7 +215,7 @@ void String::resize(u32 size)
 			m_allocator.deallocate(tmp);
 		}
 		else {
-			m_big = (char*)m_allocator.reallocate(m_big, size + 1);
+			m_big = (char*)m_allocator.reallocate(m_big, size + 1, m_size + 1);
 			m_size = size;
 			m_big[size] = '\0';
 		}

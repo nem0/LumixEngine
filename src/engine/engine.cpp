@@ -171,7 +171,7 @@ public:
 		}
 		if (!ptr) return engine->m_lua_allocator.allocate(nsize);
 
-		return engine->m_lua_allocator.reallocate(ptr, nsize);
+		return engine->m_lua_allocator.reallocate(ptr, nsize, osize);
 	}
 
 	static void logToDebugOutput(LogLevel level, const char* message)

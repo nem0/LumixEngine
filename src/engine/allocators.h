@@ -16,10 +16,10 @@ struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 
 	void* allocate(size_t n) override;
 	void deallocate(void* p) override;
-	void* reallocate(void* ptr, size_t size) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
 	void* allocate_aligned(size_t size, size_t align) override;
 	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 
 	u8* m_small_allocations = nullptr;
 	Page* m_free_lists[4];
@@ -34,10 +34,10 @@ struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 
 	void* allocate_aligned(size_t size, size_t align) override;
 	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 	void* allocate(size_t size) override;
 	void deallocate(void* ptr) override;
-	void* reallocate(void* ptr, size_t size) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
 	IAllocator& getSourceAllocator() { return m_source; }
 
 private:
@@ -54,10 +54,10 @@ struct LUMIX_ENGINE_API LinearAllocator : IAllocator {
 	void reset();
 	void* allocate_aligned(size_t size, size_t align) override;
 	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 	void* allocate(size_t size) override;
 	void deallocate(void* ptr) override;
-	void* reallocate(void* ptr, size_t size) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
 
 	u32 getCommited() const { return m_commited; }
 
@@ -95,22 +95,22 @@ struct StackAllocator final : IAllocator {
 		m_fallback.deallocate_aligned(ptr);
 	}
 
-	void* reallocate_aligned(void* ptr, size_t size, size_t align) override {
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override {
 		ASSERT(align <= ALIGN);
-		if (!ptr) return allocate_aligned(size, align);
+		if (!ptr) return allocate_aligned(new_size, align);
 		if (ptr == m_mem) {
 			ASSERT(m_allocated);
-			if (size <= CAPACITY) return m_mem;
+			if (new_size <= CAPACITY) return m_mem;
 			
 			m_allocated = false;
-			void* n = m_fallback.allocate_aligned(size, align);
+			void* n = m_fallback.allocate_aligned(new_size, align);
 			memcpy(n, m_mem, CAPACITY);
 			return n;
 		}
 		
 		ASSERT(ptr < m_mem || ptr > m_mem + CAPACITY);
-		if (size > CAPACITY) return m_fallback.reallocate_aligned(ptr, size, align);
-		memcpy(m_mem, ptr, size);
+		if (new_size > CAPACITY) return m_fallback.reallocate_aligned(ptr, new_size, old_size, align);
+		memcpy(m_mem, ptr, new_size);
 		m_allocated = true;
 		m_fallback.deallocate_aligned(ptr);
 		return m_mem;
@@ -118,7 +118,7 @@ struct StackAllocator final : IAllocator {
 
 	void* allocate(size_t size) override { ASSERT(false); return nullptr; }
 	void deallocate(void* ptr) override { ASSERT(false); }
-	void* reallocate(void* ptr, size_t size) override { ASSERT(false); return nullptr; }
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override { ASSERT(false); return nullptr; }
 
 private:
 	bool m_allocated = false;

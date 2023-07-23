@@ -297,7 +297,7 @@ void ParticleSystem::ensureCapacity(Emitter& emitter, u32 num_new_particles) {
 		new_capacity = (new_capacity + 3) & ~u32(3);
 		for (u32 i = 0; i < channels_count; ++i)
 		{
-			emitter.channels[i].data = (float*)m_allocator.reallocate_aligned(emitter.channels[i].data, new_capacity * sizeof(float), 16);
+			emitter.channels[i].data = (float*)m_allocator.reallocate_aligned(emitter.channels[i].data, new_capacity * sizeof(float), emitter.capacity * sizeof(float), 16);
 		}
 		emitter.capacity = new_capacity;
 	}

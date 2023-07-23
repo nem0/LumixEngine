@@ -217,9 +217,14 @@ template <typename T> struct Array {
 
 	void moveRange(T* dst, T* src, u32 count) {
 		ASSERT(dst > src || dst + count < src);
-		for (u32 i = count - 1; i < count; --i) {
-			new (NewPlaceholder(), dst + i) T(static_cast<T&&>(src[i]));
-			src[i].~T();
+		if constexpr (__is_trivially_copyable(T)) {
+			memcpy(dst, src, sizeof(T) * count);
+		}
+		else {
+			for (u32 i = count - 1; i < count; --i) {
+				new (NewPlaceholder(), dst + i) T(static_cast<T&&>(src[i]));
+				src[i].~T();
+			}
 		}
 	}
 
@@ -284,14 +289,10 @@ template <typename T> struct Array {
 
 	void reserve(u32 capacity) {
 		if (capacity > m_capacity) {
-			if constexpr (__is_trivially_copyable(T)) {
-				m_data = (T*)m_allocator.reallocate_aligned(m_data, capacity * sizeof(T), alignof(T));
-			} else {
-				T* new_data = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), alignof(T));
-				moveRange(new_data, m_data, m_size);
-				m_allocator.deallocate_aligned(m_data);
-				m_data = new_data;
-			}
+			T* new_data = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), alignof(T));
+			moveRange(new_data, m_data, m_size);
+			m_allocator.deallocate_aligned(m_data);
+			m_data = new_data;
 			m_capacity = capacity;
 		}
 	}

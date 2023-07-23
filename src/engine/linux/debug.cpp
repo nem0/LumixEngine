@@ -265,9 +265,9 @@ u8* Allocator::getSystemFromUser(void* user_ptr) {
 }
 
 
-void* Allocator::reallocate(void* user_ptr, size_t size) {
+void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size) {
 #ifndef LUMIX_DEBUG
-	return m_source.reallocate(user_ptr, size);
+	return m_source.reallocate(user_ptr, new_size, old_size);
 #else
 	if (user_ptr == nullptr) return allocate(size);
 	if (size == 0) return nullptr;
@@ -364,9 +364,9 @@ void Allocator::deallocate_aligned(void* user_ptr) {
 }
 
 
-void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align) {
+void* Allocator::reallocate_aligned(void* user_ptr, size_t new_size, size_t old_size, size_t align) {
 #ifndef LUMIX_DEBUG
-	return m_source.reallocate_aligned(user_ptr, size, align);
+	return m_source.reallocate_aligned(user_ptr, new_size, old_size, align);
 #else
 	if (user_ptr == nullptr) return allocate_aligned(size, align);
 	if (size == 0) return nullptr;

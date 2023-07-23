@@ -177,12 +177,12 @@ namespace Lumix
 	}
 
 
-	void* DefaultAllocator::reallocate(void* ptr, size_t size)
+	void* DefaultAllocator::reallocate(void* ptr, size_t new_size, size_t old_size)
 	{
 		if (isSmallAlloc(*this, ptr)) {
-			return reallocSmall(*this, ptr, size);
+			return reallocSmall(*this, ptr, new_size);
 		}
-		return realloc(ptr, size);
+		return realloc(ptr, new_size);
 	}
 
 #ifdef _WIN32
@@ -205,38 +205,48 @@ namespace Lumix
 	}
 
 
-	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t size, size_t align)
+	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align)
 	{
 		if (isSmallAlloc(*this, ptr)) {
-			return reallocSmallAligned(*this, ptr, size, align);
+			return reallocSmallAligned(*this, ptr, new_size, align);
 		}
-		return _aligned_realloc(ptr, size, align);
+		return _aligned_realloc(ptr, new_size, align);
 	}
 #else
 	void* DefaultAllocator::allocate_aligned(size_t size, size_t align)
 	{
+		if (size <= SMALL_ALLOC_MAX_SIZE && align <= size) {
+			return allocSmall(*this, size);
+		}
 		return aligned_alloc(align, size);
 	}
 
 
 	void DefaultAllocator::deallocate_aligned(void* ptr)
 	{
+		if (isSmallAlloc(*this, ptr)) {
+			freeSmall(*this, ptr);
+			return;
+		}
 		free(ptr);
 	}
 
 
-	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t size, size_t align)
+	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align)
 	{
+		if (isSmallAlloc(*this, ptr)) {
+			return reallocSmallAligned(*this, ptr, new_size, align);
+		}
 		// POSIX and glibc do not provide a way to realloc with alignment preservation
-		if (size == 0) {
+		if (new_size == 0) {
 			free(ptr);
 			return nullptr;
 		}
-		void* newptr = aligned_alloc(align, size);
+		void* newptr = aligned_alloc(align, new_size);
 		if (newptr == nullptr) {
 			return nullptr;
 		}
-		memcpy(newptr, ptr, malloc_usable_size(ptr));
+		if (ptr) memcpy(newptr, ptr, minimum(new_size, old_size));
 		free(ptr);
 		return newptr;
 	}
@@ -269,11 +279,11 @@ void BaseProxyAllocator::deallocate_aligned(void* ptr)
 }
 
 
-void* BaseProxyAllocator::reallocate_aligned(void* ptr, size_t size, size_t align)
+void* BaseProxyAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align)
 {
 	if (!ptr) atomicIncrement(&m_allocation_count);
-	if (size == 0) atomicDecrement(&m_allocation_count);
-	return m_source.reallocate_aligned(ptr, size, align);
+	if (new_size == 0) atomicDecrement(&m_allocation_count);
+	return m_source.reallocate_aligned(ptr, new_size, old_size, align);
 }
 
 
@@ -292,11 +302,11 @@ void BaseProxyAllocator::deallocate(void* ptr)
 	}
 }
 
-void* BaseProxyAllocator::reallocate(void* ptr, size_t size)
+void* BaseProxyAllocator::reallocate(void* ptr, size_t new_size, size_t old_size)
 {
 	if (!ptr) atomicIncrement(&m_allocation_count);
-	if (size == 0) atomicDecrement(&m_allocation_count);
-	return m_source.reallocate(ptr, size);
+	if (new_size == 0) atomicDecrement(&m_allocation_count);
+	return m_source.reallocate(ptr, new_size, old_size);
 }
 
 LinearAllocator::LinearAllocator(u32 reserved) {
@@ -343,8 +353,8 @@ void* LinearAllocator::allocate_aligned(size_t size, size_t align) {
 }
 
 void LinearAllocator::deallocate_aligned(void* ptr) { /*everything should be "deallocated" with reset()*/ }
-void* LinearAllocator::reallocate_aligned(void* ptr, size_t size, size_t align) { 
-	if (!ptr) return allocate_aligned(size, align);
+void* LinearAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) { 
+	if (!ptr) return allocate_aligned(new_size, align);
 	// realloc not supported
 	ASSERT(false); 
 	return nullptr;
@@ -368,8 +378,8 @@ void* LinearAllocator::allocate(size_t size) {
 }
 
 void LinearAllocator::deallocate(void* ptr) { /*everything should be "deallocated" with reset()*/ }
-void* LinearAllocator::reallocate(void* ptr, size_t size) {
-	if (!ptr) return allocate(size);
+void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
+	if (!ptr) return allocate(new_size);
 	// realloc not supported
 	ASSERT(false); 
 	return nullptr;

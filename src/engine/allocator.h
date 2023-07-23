@@ -18,11 +18,11 @@ struct LUMIX_ENGINE_API IAllocator {
 
 	virtual void* allocate(size_t size) = 0;
 	virtual void deallocate(void* ptr) = 0;
-	virtual void* reallocate(void* ptr, size_t size) = 0;
+	virtual void* reallocate(void* ptr, size_t new_size, size_t old_size) = 0;
 
 	virtual void* allocate_aligned(size_t size, size_t align) = 0;
 	virtual void deallocate_aligned(void* ptr) = 0;
-	virtual void* reallocate_aligned(void* ptr, size_t size, size_t align) = 0;
+	virtual void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) = 0;
 
 	template <typename T> void deleteObject(T* ptr) {
 		if (ptr)
