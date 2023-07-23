@@ -799,7 +799,7 @@ void SceneView::update(float time_delta)
 	if (!io.KeyShift) {
 		m_view->setSnapMode(false, false);
 	}
-	else if (io.KeyCtrl) {
+	else {
 		m_view->setSnapMode(io.KeyShift, io.KeyCtrl);
 	}
 	Settings& settings = m_app.getSettings();
