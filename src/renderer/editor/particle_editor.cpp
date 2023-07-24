@@ -222,13 +222,19 @@ struct Node : NodeEditorNode {
 		bool res = onGUI();
 		if (m_error.length() > 0) {
 			ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xff, 0, 0, 0xff));
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 4);
 		}
 		else if (!m_reachable) {
 			ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetColorU32(ImGuiCol_TitleBg));
 		}
 		ImGuiEx::EndNode();
 		if (m_error.length() > 0) {
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			const ImVec2 p = ImGui::GetItemRectMax() - ImGui::GetStyle().FramePadding;
+			dl->AddText(p, IM_COL32(0xff, 0, 0, 0xff), ICON_FA_EXCLAMATION_TRIANGLE);
+			
 			ImGui::PopStyleColor();
+			ImGui::PopStyleVar();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
 		}
 		else if (!m_reachable) {
@@ -2987,7 +2993,7 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 
 		if (!m_resource.isFunction()) {
-			if (visitor.beginCategory("Emit inputs")) {
+			if (!m_active_emitter->m_emit_inputs.empty() && visitor.beginCategory("Emit inputs")) {
 				for (u8 i = 0; i < m_active_emitter->m_emit_inputs.size(); ++i) {
 					struct : ICategoryVisitor::INodeCreator {
 						Node* create(ParticleEmitterEditorResource& res) const override {
@@ -3185,7 +3191,16 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				bool beginCategory(const char* category) override { return ImGui::BeginMenu(category); }
 
 				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
-					if (ImGui::Selectable(label)) n = creator.create(*editor->m_active_emitter);
+					if (shortcut) {
+						StaticString<64> tmp(label);
+						if (shortcut) {
+							tmp.append(" (LMB + ", shortcut, ")");
+						}
+						if (ImGui::Selectable(tmp)) n = creator.create(*editor->m_active_emitter);
+					}
+					else {
+						if (ImGui::Selectable(label)) n = creator.create(*editor->m_active_emitter);
+					}
 					return *this;
 				}
 			
@@ -3392,6 +3407,14 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		if (ImGui::CollapsingHeader("Streams", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (ParticleEmitterEditorResource::Stream& s : m_active_emitter->m_streams) {
 				ImGui::PushID(&s);
+				ImGui::Button(ICON_FA_ARROWS_ALT);
+				if (ImGui::BeginDragDropSource()) {
+					ImGui::TextUnformatted(s.name);
+					void* ptr = &s;
+					ImGui::SetDragDropPayload("particle_stream", &ptr, sizeof(ptr), ImGuiCond_Once);
+					ImGui::EndDragDropSource();
+				}
+				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_TRASH)) {
 					deleteStream(u32(&s - m_active_emitter->m_streams.begin()));
 					ImGui::PopID();
@@ -3607,12 +3630,24 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 						bool emitter_open = true;
 						if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &emitter_open : nullptr)) {
 							if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
+								ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 200);
+
 								m_active_emitter = emitter.get();
 								ImGui::TableNextRow();
 								ImGui::TableNextColumn();
 								leftColumnGUI();
 								ImGui::TableNextColumn();
 								nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+								if (ImGui::BeginDragDropTarget()) {
+									if (auto* payload = ImGui::AcceptDragDropPayload("particle_stream")) {
+										const ParticleEmitterEditorResource::Stream* s = *(ParticleEmitterEditorResource::Stream**)payload->Data;
+										auto* n = (StreamNode*)m_active_emitter->addNode(Node::STREAM);
+										n->idx = u32(s - m_active_emitter->m_streams.begin());
+										n->m_pos = m_mouse_pos_canvas;
+										pushUndo(NO_MERGE_UNDO);
+									}
+									ImGui::EndDragDropTarget();
+								}
 								ImGui::EndTable();
 							}
 							ImGui::EndTabItem();

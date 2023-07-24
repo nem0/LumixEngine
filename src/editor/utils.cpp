@@ -725,6 +725,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	}		
 
 	m_is_any_item_active = ImGui::IsAnyItemActive();
+	m_mouse_pos_canvas = ImGui::GetMousePos() - origin - m_offset;
 
 	m_canvas.end();
 }

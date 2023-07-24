@@ -1038,6 +1038,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.addComponent(Span(&entity, 1), PARTICLE_EMITTER_TYPE);
 		m_editor.setProperty(PARTICLE_EMITTER_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
 		m_editor.endCommandGroup();
+		m_editor.selectEntities(Span(&entity, 1), false);
 	}
 	else if (Path::hasExtension(path, "fbx"))
 	{

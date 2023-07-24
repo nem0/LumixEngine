@@ -164,6 +164,7 @@ struct NodeEditor : SimpleUndoRedo {
 
 	ImGuiEx::Canvas m_canvas;
 	ImVec2 m_offset = ImVec2(0, 0);
+	ImVec2 m_mouse_pos_canvas;
 	ImGuiID m_half_link_start = 0;
 	bool m_is_any_item_active = false;
 	u32 m_dragged_node = 0xFFffFFff;
