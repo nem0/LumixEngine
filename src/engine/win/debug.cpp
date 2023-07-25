@@ -428,6 +428,8 @@ void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size)
 }
 
 
+thread_local const char* active_tag = nullptr;
+
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
 	void* system_ptr;
@@ -452,6 +454,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	m_total_size += size;
 	m_mutex.exit();
 
+	info->tag = active_tag;
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
@@ -549,6 +552,7 @@ void* Allocator::allocate(size_t size)
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
 	info->align = 0;
+	info->tag = active_tag;
 	if (m_is_fill_enabled)
 	{
 		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
@@ -599,6 +603,48 @@ void Allocator::deallocate(void* user_ptr)
 	}
 }
 
+TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
+	: m_allocator(allocator)
+	, m_tag(tag_name)
+{
+}
+
+
+void* TagAllocator::allocate(size_t size) {
+	if (!active_tag) active_tag = m_tag;
+	void* mem = m_allocator.allocate(size);
+	active_tag = nullptr;
+	return mem;
+}
+
+void TagAllocator::deallocate(void* ptr) {
+	m_allocator.deallocate(ptr);
+}
+
+void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
+	if (!active_tag) active_tag = m_tag;
+	void* mem = m_allocator.reallocate(ptr, new_size, old_size);
+	active_tag = nullptr;
+	return mem;
+}
+
+void* TagAllocator::allocate_aligned(size_t size, size_t align) {
+	if (!active_tag) active_tag = m_tag;
+	void* mem = m_allocator.allocate_aligned(size, align);
+	active_tag = nullptr;
+	return mem;
+}
+
+void TagAllocator::deallocate_aligned(void* ptr) {
+	m_allocator.deallocate_aligned(ptr);
+}
+
+void* TagAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) {
+	if (!active_tag) active_tag = m_tag;
+	void* mem = m_allocator.reallocate_aligned(ptr, new_size, old_size, align);
+	active_tag = nullptr;
+	return mem;
+}
 
 } // namespace Debug
 

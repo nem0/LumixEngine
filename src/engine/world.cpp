@@ -43,8 +43,8 @@ void EntityMap::set(EntityRef src, EntityRef dst) {
 World::~World() = default;
 
 
-World::World(Engine& engine, IAllocator& allocator)
-	: m_allocator(allocator)
+World::World(Engine& engine)
+	: m_allocator(engine.getAllocator(), "world")
 	, m_engine(engine)
 	, m_names(m_allocator)
 	, m_entities(m_allocator)

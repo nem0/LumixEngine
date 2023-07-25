@@ -248,7 +248,7 @@ public:
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
-		m_pipeline = Pipeline::create(renderer, pres, "", m_app.getAllocator());
+		m_pipeline = Pipeline::create(renderer, pres, "");
 	}
 
 

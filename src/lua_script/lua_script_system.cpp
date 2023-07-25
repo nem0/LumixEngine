@@ -289,8 +289,8 @@ namespace Lumix
 		void serialize(OutputMemoryStream& stream) const override {}
 		bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
+		debug::TagAllocator m_allocator;
 		Engine& m_engine;
-		IAllocator& m_allocator;
 		LuaScriptManager m_script_manager;
 	};
 
@@ -2574,7 +2574,7 @@ namespace Lumix
 
 	LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 		: m_engine(engine)
-		, m_allocator(engine.getAllocator())
+		, m_allocator(engine.getAllocator(), "lua system")
 		, m_script_manager(m_allocator)
 	{
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());

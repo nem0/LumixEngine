@@ -56,9 +56,7 @@ struct LUMIX_ENGINE_API GuardAllocator final : IAllocator {
 };
 #endif
 
-struct LUMIX_ENGINE_API Allocator final : IAllocator
-{
-public:
+struct LUMIX_ENGINE_API Allocator final : IAllocator {
 	struct AllocationInfo
 	{
 		AllocationInfo* previous;
@@ -66,9 +64,9 @@ public:
 		size_t size;
 		StackNode* stack_leaf;
 		u16 align;
+		const char* tag;
 	};
 
-public:
 	explicit Allocator(IAllocator& source);
 	~Allocator();
 
@@ -88,6 +86,8 @@ public:
 	AllocationInfo* getFirstAllocationInfo() const { return m_root; }
 	void lock();
 	void unlock();
+	
+	IAllocator* getParent() override { return &m_source; }
 
 private:
 	inline size_t getAllocationOffset();
@@ -99,7 +99,6 @@ private:
 	inline size_t getNeededMemory(size_t size, size_t align);
 	inline void* getUserPtrFromAllocationInfo(AllocationInfo* info);
 
-private:
 	IAllocator& m_source;
 	StackTree m_stack_tree;
 	Mutex m_mutex;
@@ -110,6 +109,22 @@ private:
 	bool m_are_guards_enabled;
 };
 
+struct LUMIX_ENGINE_API TagAllocator final : IAllocator {
+	TagAllocator(IAllocator& allocator, const char* tag_name);
+
+	void* allocate(size_t size) override;
+	void deallocate(void* ptr) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
+
+	void* allocate_aligned(size_t size, size_t align) override;
+	void deallocate_aligned(void* ptr) override;
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
+
+	IAllocator* getParent() override { return &m_allocator; }
+
+	IAllocator& m_allocator;
+	const char* m_tag;
+};
 
 } // namespace Debug
 

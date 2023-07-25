@@ -12,6 +12,7 @@
 #include <vehicle/PxVehicleSDK.h>
 
 #include "cooking/PxCooking.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -47,18 +48,16 @@ namespace Lumix
 	};
 
 
-	struct AssertNullAllocator : physx::PxAllocatorCallback
-	{
-		AssertNullAllocator(IAllocator& source)
+	struct PhysxAllocator : physx::PxAllocatorCallback {
+		PhysxAllocator(IAllocator& source)
 			: source(source)
 		{}
 
-		void* allocate(size_t size, const char*, const char*, int) override
-		{
+		void* allocate(size_t size, const char*, const char*, int) override {
 			void* ret = source.allocate_aligned(size, 16);
 			// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
 			// from " << filename << "(" << line << ")";
-			ASSERT(ret);
+			//ASSERT(ret);
 			return ret;
 		}
 		
@@ -110,10 +109,10 @@ namespace Lumix
 	struct PhysicsSystemImpl final : PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
-			: m_allocator(engine.getAllocator())
+			: m_allocator(engine.getAllocator(), "physics")
 			, m_engine(engine)
-			, m_geometry_manager(*this, engine.getAllocator())
-			, m_material_manager(*this, engine.getAllocator())
+			, m_geometry_manager(*this, m_allocator)
+			, m_material_manager(*this, m_allocator)
 			, m_physx_allocator(m_allocator)
 		{
 			PhysicsModule::reflect();
@@ -248,11 +247,11 @@ namespace Lumix
 		}
 
 
-		IAllocator& m_allocator;
+		debug::TagAllocator m_allocator;
 		physx::PxPhysics* m_physics;
 		physx::PxFoundation* m_foundation;
 		physx::PxControllerManager* m_controller_manager;
-		AssertNullAllocator m_physx_allocator;
+		PhysxAllocator m_physx_allocator;
 		CustomErrorCallback m_error_callback;
 		physx::PxCooking* m_cooking;
 		PhysicsGeometryManager m_geometry_manager;

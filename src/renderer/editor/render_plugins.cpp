@@ -2019,7 +2019,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		Engine& engine = m_app.getEngine();
 		m_tile.world = &engine.createWorld(false);
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW", engine.getAllocator());
+		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
 
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
 		const EntityRef env_probe = m_tile.world->createEntity({0, 0, 0}, Quat::IDENTITY);
@@ -2043,7 +2043,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		Engine& engine = m_app.getEngine();
 		m_world = &engine.createWorld(false);
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW",  engine.getAllocator());
+		m_pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
 
 		const EntityRef mesh_entity = m_world->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
@@ -3345,10 +3345,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		Engine& engine = m_app.getEngine();
 		SystemManager& system_manager = engine.getSystemManager();
 		Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
-		IAllocator& allocator = m_app.getAllocator();
 		ResourceManagerHub& rm = engine.getResourceManager();
 		PipelineResource* pres = rm.load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
+		m_pipeline = Pipeline::create(*renderer, pres, "PROBE");
 		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
 	}
 
@@ -4721,6 +4720,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		atlas->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
+		atlas->ClearTexData();
 		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = m_texture;
 

@@ -33,7 +33,8 @@ struct ClipManager final : ResourceManager {
 struct AudioSystemImpl final : AudioSystem {
 	explicit AudioSystemImpl(Engine& engine)
 		: m_engine(engine)
-		, m_manager(engine.getAllocator())
+		, m_allocator(engine.getAllocator(), "audio")
+		, m_manager(m_allocator)
 	{
 		AudioModule::reflect(engine);
 	}
@@ -63,13 +64,14 @@ struct AudioSystemImpl final : AudioSystem {
 
 	void createModules(World& world) override
 	{
-		UniquePtr<AudioModule> module = AudioModule::createInstance(*this, world, m_engine.getAllocator());
+		UniquePtr<AudioModule> module = AudioModule::createInstance(*this, world, m_allocator);
 		world.addModule(module.move());
 	}
 
 
-	ClipManager m_manager;
 	Engine& m_engine;
+	debug::TagAllocator m_allocator;
+	ClipManager m_manager;
 	UniquePtr<AudioDevice> m_device;
 };
 

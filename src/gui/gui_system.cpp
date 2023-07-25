@@ -61,8 +61,9 @@ struct GUISystemImpl final : GUISystem
 
 	explicit GUISystemImpl(Engine& engine)
 		: m_engine(engine)
+		, m_allocator(engine.getAllocator(), "gui")
 		, m_interface(nullptr)
-		, m_sprite_manager(engine.getAllocator())
+		, m_sprite_manager(m_allocator)
 	{
 		GUIModule::reflect();
 		LUMIX_GLOBAL_FUNC(GUISystem::enableCursor);
@@ -76,8 +77,7 @@ struct GUISystemImpl final : GUISystem
 
 	void createModules(World& world) override
 	{
-		IAllocator& allocator = m_engine.getAllocator();
-		UniquePtr<GUIModule> module = GUIModule::createInstance(*this, world, allocator);
+		UniquePtr<GUIModule> module = GUIModule::createInstance(*this, world, m_allocator);
 		world.addModule(module.move());
 	}
 
@@ -125,6 +125,7 @@ struct GUISystemImpl final : GUISystem
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
+	debug::TagAllocator m_allocator;
 	Engine& m_engine;
 	SpriteManager m_sprite_manager;
 	Interface* m_interface;

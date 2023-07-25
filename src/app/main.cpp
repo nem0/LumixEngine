@@ -80,7 +80,7 @@ struct Runner final
 
 		m_renderer = static_cast<Renderer*>(m_engine->getSystemManager().getSystem("renderer"));
 		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*m_renderer, pres, "APP", m_engine->getAllocator());
+		m_pipeline = Pipeline::create(*m_renderer, pres, "APP");
 
 		while (m_engine->getFileSystem().hasWork()) {
 			os::sleep(100);

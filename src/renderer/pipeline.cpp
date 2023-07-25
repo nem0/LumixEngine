@@ -4007,9 +4007,9 @@ struct PipelineImpl final : Pipeline
 };
 
 
-UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
+UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, PipelineResource* resource, const char* define)
 {
-	return UniquePtr<PipelineImpl>::create(allocator, renderer, resource, define, allocator);
+	return UniquePtr<PipelineImpl>::create(renderer.getAllocator(), renderer, resource, define, renderer.getAllocator());
 }
 
 

@@ -686,7 +686,7 @@ void SceneView::init() {
 	Engine& engine = m_app.getEngine();
 	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
+	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW");
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<&SceneView::renderIcons>(this);

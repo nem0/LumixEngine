@@ -92,13 +92,15 @@ struct StudioAppImpl final : StudioApp
 		, m_component_labels(m_allocator)
 		, m_component_icons(m_allocator)
 		, m_exit_code(0)
-		, m_allocator(m_main_allocator)
 		, m_worlds(m_allocator)
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
 		, m_file_selector(*this)
 		, m_dir_selector(*this)
+		, m_debug_allocator(m_main_allocator)
+		, m_imgui_allocator(m_debug_allocator, "imgui")
+		, m_allocator(m_debug_allocator, "studio")
 	{
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
 		u32 workers;
@@ -296,13 +298,13 @@ struct StudioAppImpl final : StudioApp
 	
 	static void* imguiAlloc(size_t size, void* user_data) {
 		StudioAppImpl* app = (StudioAppImpl*)user_data;
-		return app->m_allocator.allocate(size);
+		return app->m_imgui_allocator.allocate(size);
 	}
 
 
 	static void imguiFree(void* ptr, void* user_data) {
 		StudioAppImpl* app = (StudioAppImpl*)user_data;
-		return app->m_allocator.deallocate(ptr);
+		return app->m_imgui_allocator.deallocate(ptr);
 	}
 
 	void onEntitySelectionChanged() {
@@ -3326,7 +3328,10 @@ struct StudioAppImpl final : StudioApp
 	};
 
 	DefaultAllocator m_main_allocator;
-	debug::Allocator m_allocator;
+	debug::Allocator m_debug_allocator;
+	debug::TagAllocator m_allocator;
+	debug::TagAllocator m_imgui_allocator;
+	
 	UniquePtr<Engine> m_engine;
 	UniquePtr<WorldEditor> m_editor;
 	ImGuiKey m_imgui_key_map[255];

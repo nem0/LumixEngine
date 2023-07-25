@@ -1,5 +1,6 @@
 #include "navigation_module.h"
 #include "animation/animation_module.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
@@ -18,7 +19,7 @@ namespace Lumix
 struct NavigationSystem final : ISystem {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)
-		, m_allocator(engine.getAllocator())
+		, m_allocator(engine.getAllocator(), "navigation")
 	{
 		ASSERT(s_instance == nullptr);
 		s_instance = this;
@@ -46,7 +47,7 @@ struct NavigationSystem final : ISystem {
 
 	static NavigationSystem* s_instance;
 
-	IAllocator& m_allocator;
+	debug::TagAllocator m_allocator;
 	Engine& m_engine;
 };
 

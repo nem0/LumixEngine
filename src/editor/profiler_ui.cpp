@@ -30,11 +30,6 @@ namespace {
 
 static constexpr i32 DEFAULT_RANGE = 100'000;
 
-enum class MemoryColumn {
-	FUNCTION,
-	SIZE
-};
-
 struct ThreadRecord {
 	float y;
 	u32 thread_id;
@@ -164,35 +159,21 @@ void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 	}
 }
 
-struct AllocationStackNode {
-	explicit AllocationStackNode(debug::StackNode* stack_node,
-		size_t inclusive_size,
-		IAllocator& allocator)
-		: m_children(allocator)
-		, m_allocations(allocator)
-		, m_stack_node(stack_node)
-		, m_inclusive_size(inclusive_size)
-		, m_open(false)
-	{
-	}
+struct AllocationTag {
+	AllocationTag(const char* tag, IAllocator& allocator)
+		: m_allocations(allocator)
+		, m_tag(tag)
+	{}
 
-	~AllocationStackNode() {
-		ASSERT(m_children.empty());
-	}
+	struct Allocation {
+		debug::StackNode* stack_node;
+		size_t size;
+		u32 count = 1;
+	};
 
-	void clear(IAllocator& allocator) {
-		for (auto* child : m_children) {
-			child->clear(allocator);
-			LUMIX_DELETE(allocator, child);
-		}
-		m_children.clear();
-	}
-
-	size_t m_inclusive_size;
-	bool m_open;
-	debug::StackNode* m_stack_node;
-	Array<AllocationStackNode*> m_children;
-	Array<debug::Allocator::AllocationInfo*> m_allocations;
+	Array<Allocation> m_allocations;
+	const char* m_tag;
+	size_t m_size = 0;
 };
 
 struct Counter {
@@ -226,14 +207,12 @@ struct ProfilerUIImpl final : ProfilerUI {
 		, m_data(m_allocator)
 		, m_blocks(m_allocator)
 		, m_counters(m_allocator)
+		, m_allocation_tags(m_allocator)
 		, m_engine(engine)
 	{
-		m_allocation_size_from = 0;
-		m_allocation_size_to = 1024 * 1024;
 		m_current_frame = -1;
 		m_is_open = false;
 		m_is_paused = true;
-		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 		m_filter[0] = 0;
 		m_resource_filter[0] = 0;
 
@@ -244,16 +223,11 @@ struct ProfilerUIImpl final : ProfilerUI {
 		m_app.addWindowAction(&m_toggle_ui);
 	}
 
-	~ProfilerUIImpl()
-	{
+	~ProfilerUIImpl() {
 		m_app.removeAction(&m_toggle_ui);
-		while (m_engine.getFileSystem().hasWork())
-		{
+		while (m_engine.getFileSystem().hasWork()) {
 			m_engine.getFileSystem().processCallbacks();
 		}
-
-		m_allocation_root->clear(m_allocator);
-		LUMIX_DELETE(m_allocator, m_allocation_root);
 	}
 	
 	void onPause() {
@@ -627,24 +601,6 @@ struct ProfilerUIImpl final : ProfilerUI {
 		ImGui::End();
 	}
 
-	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
-		debug::StackNode* external_node,
-		size_t size)
-	{
-		for (auto* child : my_node->m_children)
-		{
-			if (child->m_stack_node == external_node)
-			{
-				child->m_inclusive_size += size;
-				return child;
-			}
-		}
-
-		auto new_node = LUMIX_NEW(m_allocator, AllocationStackNode)(external_node, size, m_allocator);
-		my_node->m_children.push(new_node);
-		return new_node;
-	}
-
 	const char* getName() const override { return "profiler"; }
 	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_profiler_open; }
 	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_profiler_open  = m_is_open; }
@@ -725,53 +681,25 @@ struct ProfilerUIImpl final : ProfilerUI {
 		ImGui::Unindent();
 	}
 
-	void showAllocationTree(AllocationStackNode* node, MemoryColumn column) const {
-		if (column == MemoryColumn::FUNCTION) {
-			char fn_name[100];
-			int line;
-			if (debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), line)) {
-				if (line >= 0) {
-					int len = stringLength(fn_name);
-					if (len + 2 < sizeof(fn_name)) {
-						fn_name[len] = ' ';
-						fn_name[len + 1] = '\0';
-						++len;
-						toCString(line, Span(fn_name).fromLeft(len));
-					}
-				}
-			}
-			else {
-				copyString(fn_name, "N/A");
-			}
+	static void callstackTooltip(debug::StackNode* n) {
+		if (!ImGui::BeginTooltip()) return;
 
-			if (ImGui::TreeNode(node, "%s", fn_name)) {
-				node->m_open = true;
-				for (auto* child : node->m_children) {
-					showAllocationTree(child, column);
-				}
-				ImGui::TreePop();
+		ImGui::TextUnformatted("Callstack:");
+		while (n) {
+			char fn_name[256];
+			i32 line;
+			if (debug::StackTree::getFunction(n, Span(fn_name), line)) {
+				ImGui::Text("%s: %d", fn_name, line);
 			}
 			else {
-				node->m_open = false;
+				ImGui::TextUnformatted("N/A");
 			}
-			return;
+			n = debug::StackTree::getParent(n);
 		}
-
-		ASSERT(column == MemoryColumn::SIZE);
-		#ifdef _MSC_VER
-			char size[50];
-			toCStringPretty(node->m_inclusive_size, Span(size));
-			ImGui::Text("%s", size);
-			if (node->m_open) {
-				for (auto* child : node->m_children) {
-					showAllocationTree(child, column);
-				}
-			}
-		#endif
+		ImGui::EndTooltip();
 	}
 
-	void onGUIMemoryProfiler()
-	{
+	void onGUIMemoryProfiler() {
 		if (m_debug_allocator) {
 			if (ImGui::Button("Refresh"))
 			{
@@ -788,17 +716,46 @@ struct ProfilerUIImpl final : ProfilerUI {
 			ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
 		}
 
-		ImGui::Columns(2, "memc");
-		for (auto* child : m_allocation_root->m_children)
-		{
-			showAllocationTree(child, MemoryColumn::FUNCTION);
+		size_t total = 0;
+		for (AllocationTag& tag : m_allocation_tags) {
+			total += tag.m_size;
+			if (ImGui::TreeNode(&tag, "%s - %.1f MB", tag.m_tag, tag.m_size / 1024.f / 1024.f)) {
+				ImGui::Columns(3);
+				ImGuiListClipper clipper;
+				clipper.Begin(tag.m_allocations.size());
+				while (clipper.Step()) {
+					for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j) {
+						AllocationTag::Allocation& a = tag.m_allocations[j];
+						char fn_name[256] = "N/A";
+						i32 line;
+						debug::StackNode* n = a.stack_node;
+						do {
+							if (!debug::StackTree::getFunction(n, Span(fn_name), line)) {
+								copyString(fn_name, "N/A");
+								break;
+							}
+							n = debug::StackTree::getParent(n);
+						} while (n && strstr(fn_name, "TagAllocator::allocate") != 0);
+						ImGui::Text("%s: L%d:", fn_name, line);
+						if (ImGui::IsItemHovered()) callstackTooltip(a.stack_node);
+						ImGui::NextColumn();
+						ImGui::Text("%.3f kB", a.size / 1024.f);
+						ImGui::NextColumn();
+						ImGui::Text("%d", a.count);
+						ImGui::NextColumn();
+					}
+				}
+				ImGui::Columns();
+				ImGui::TreePop();
+			}
 		}
-		ImGui::NextColumn();
-		for (auto* child : m_allocation_root->m_children)
-		{
-			showAllocationTree(child, MemoryColumn::SIZE);
-		}
-		ImGui::Columns();
+		ImGui::Separator();
+		ImGui::Text("Total: %d MB", u32(total / 1024 / 1024));
+		const u32 reserved_pages = m_app.getEngine().getPageAllocator().getReservedCount() * PageAllocator::PAGE_SIZE;
+		ImGui::Text("Page allocator: %.1f MB", reserved_pages / 1024.f / 1024.f);
+		ImGui::Text("Lua: %.1f MB", m_app.getEngine().getLuaAllocated() / 1024.f / 1024.f);
+		// TODO os::memcommit sources, e.g. linear allocators
+		// TODO gpu mem
 	}
 
 	void onGUICPUProfiler() {
@@ -1353,42 +1310,66 @@ struct ProfilerUIImpl final : ProfilerUI {
 		timeline(from_x, to_x, timeline_y, before_gpu_y, timeline_start_t);
 	}
 
-	void addToTree(debug::Allocator::AllocationInfo* info) {
-		debug::StackNode* nodes[1024];
-		int count = debug::StackTree::getPath(info->stack_leaf, Span(nodes));
-
-		auto node = m_allocation_root;
-		for (int i = count - 1; i >= 0; --i)
-		{
-			node = getOrCreate(node, nodes[i], info->size);
+	AllocationTag& getTag(const char* name) {
+		for (AllocationTag& tag : m_allocation_tags) {
+			if (tag.m_tag == name) return tag;
 		}
-		node->m_allocations.push(info);
+		return m_allocation_tags.emplace(name, m_allocator);
 	}
 
 	void refreshAllocations() {
 		if (!m_debug_allocator) return;
 
-		m_allocation_root->clear(m_allocator);
-		LUMIX_DELETE(m_allocator, m_allocation_root);
-		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
+		m_allocation_tags.clear();
 
 		m_debug_allocator->lock();
 		auto* current_info = m_debug_allocator->getFirstAllocationInfo();
 
-		while (current_info)
-		{
-			addToTree(current_info);
+		while (current_info) {
+			if (current_info->stack_leaf) {
+				AllocationTag& tag = getTag(current_info->tag);
+				AllocationTag::Allocation& a =  tag.m_allocations.emplace();
+				a.size = current_info->size;
+				a.stack_node = current_info->stack_leaf;
+				tag.m_size += a.size;
+			}
 			current_info = current_info->next;
 		}
 		m_debug_allocator->unlock();
+
+		for (AllocationTag& tag : m_allocation_tags) {
+			qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
+				const void* sa = ((AllocationTag::Allocation*)a)->stack_node;
+				const void* sb = ((AllocationTag::Allocation*)b)->stack_node;
+
+				if (sa > sb) return -1;
+				if (sa < sb) return 1;
+				return 0;
+			});
+
+			for (i32 i = tag.m_allocations.size() - 1; i > 0; --i) {
+				if (tag.m_allocations[i].stack_node != tag.m_allocations[i - 1].stack_node) continue;
+
+				tag.m_allocations[i - 1].size += tag.m_allocations[i].size;
+				tag.m_allocations[i - 1].count += tag.m_allocations[i].count;
+				tag.m_allocations.swapAndPop(i);
+			}
+
+			qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
+				const size_t sa = ((AllocationTag::Allocation*)a)->size;
+				const size_t sb = ((AllocationTag::Allocation*)b)->size;
+
+				if (sa > sb) return -1;
+				if (sa < sb) return 1;
+				return 0;
+			});
+		}
 	}
 
 	StudioApp& m_app;
 	DefaultAllocator m_allocator;
 	debug::Allocator* m_debug_allocator;
-	AllocationStackNode* m_allocation_root;
-	int m_allocation_size_from;
-	int m_allocation_size_to;
+	Array<AllocationTag> m_allocation_tags;
 	int m_current_frame;
 	bool m_is_paused;
 	u64 m_end;
@@ -1447,8 +1428,17 @@ struct ProfilerUIImpl final : ProfilerUI {
 UniquePtr<ProfilerUI> ProfilerUI::create(StudioApp& app)
 {
 	Engine& engine = app.getEngine();
-	debug::Allocator* allocator = engine.getAllocator().isDebug() ? static_cast<debug::Allocator*>(&engine.getAllocator()) : nullptr;
-	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), app, allocator, engine);
+	debug::Allocator* debug_allocator = nullptr;
+	IAllocator* allocator = &engine.getAllocator();
+	do {
+		if (allocator->isDebug()) {
+			debug_allocator = (debug::Allocator*)allocator;
+			break;
+		}
+		allocator = allocator->getParent();
+	} while(allocator);
+
+	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), app, debug_allocator, engine);
 }
 
 

@@ -71,7 +71,7 @@ void GameView::init() {
 	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
+	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW");
 
 	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui)

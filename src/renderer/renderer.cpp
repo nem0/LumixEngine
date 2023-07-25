@@ -365,7 +365,7 @@ struct RendererImpl final : Renderer
 {
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
-		, m_allocator(engine.getAllocator())
+		, m_allocator(engine.getAllocator(), "renderer")
 		, m_texture_manager(*this, m_allocator)
 		, m_pipeline_manager(*this, m_allocator)
 		, m_model_manager(*this, m_allocator)
@@ -815,6 +815,7 @@ struct RendererImpl final : Renderer
 			//static u32 dedicated_counter = profiler::createCounter("Dedicate Vid memory (MB)", 0);
 			static u32 buffer_counter = profiler::createCounter("Buffer memory (MB)", 0);
 			static u32 texture_counter = profiler::createCounter("Texture memory (MB)", 0);
+			static u32 rt_counter = profiler::createCounter("Render target memory (MB)", 0);
 			auto to_MB = [](u64 B){
 				return float(double(B) / (1024.0 * 1024.0));
 			};
@@ -823,6 +824,7 @@ struct RendererImpl final : Renderer
 			//profiler::pushCounter(dedicated_counter, to_MB(mem_stats.dedicated_vidmem));
 			profiler::pushCounter(buffer_counter, to_MB(mem_stats.buffer_mem));
 			profiler::pushCounter(texture_counter, to_MB(mem_stats.texture_mem));
+			profiler::pushCounter(rt_counter, to_MB(mem_stats.render_target_mem));
 		}
 
 		m_profiler.beginQuery("frame", 0, false);
@@ -935,7 +937,7 @@ struct RendererImpl final : Renderer
 	}
 
 	Engine& m_engine;
-	IAllocator& m_allocator;
+	debug::TagAllocator m_allocator;
 	Array<StaticString<32>> m_shader_defines;
 	jobs::Mutex m_render_mutex;
 	jobs::Mutex m_shader_defines_mutex;

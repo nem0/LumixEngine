@@ -1,5 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/allocators.h"
+#include "engine/atomic.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/os.h"

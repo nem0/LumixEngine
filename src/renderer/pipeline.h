@@ -63,7 +63,7 @@ struct LUMIX_RENDERER_API Pipeline {
 		RuntimeHash hash;
 	};
 
-	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);
+	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineResource* resource, const char* define);
 	
 	virtual ~Pipeline() {}
 

@@ -7,6 +7,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/atomic.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/hash.h"
 #include "engine/job_system.h"
@@ -89,20 +90,21 @@ struct AssetCompilerImpl : AssetCompiler {
 	AssetCompilerImpl(StudioApp& app) 
 		: m_app(app)
 		, m_load_hook(*this)
-		, m_plugins(app.getAllocator())
-		, m_task(*this, app.getAllocator())
-		, m_to_compile(app.getAllocator())
-		, m_compiled(app.getAllocator())
+		, m_allocator(app.getAllocator(), "asset compiler")
+		, m_plugins(m_allocator)
+		, m_task(*this, m_allocator)
+		, m_to_compile(m_allocator)
+		, m_compiled(m_allocator)
 		, m_semaphore(0, 0x7fFFffFF)
-		, m_registered_extensions(app.getAllocator())
-		, m_resources(app.getAllocator())
-		, m_generations(app.getAllocator())
-		, m_dependencies(app.getAllocator())
-		, m_changed_files(app.getAllocator())
-		, m_changed_dirs(app.getAllocator())
-		, m_on_list_changed(app.getAllocator())
-		, m_resource_compiled(app.getAllocator())
-		, m_on_init_load(app.getAllocator())
+		, m_registered_extensions(m_allocator)
+		, m_resources(m_allocator)
+		, m_generations(m_allocator)
+		, m_dependencies(m_allocator)
+		, m_changed_files(m_allocator)
+		, m_changed_dirs(m_allocator)
+		, m_on_list_changed(m_allocator)
+		, m_resource_compiled(m_allocator)
+		, m_on_init_load(m_allocator)
 	{
 		Engine& engine = app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
@@ -836,6 +838,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		return m_resources;
 	}
 
+	debug::TagAllocator m_allocator;
 	Semaphore m_semaphore;
 	Mutex m_to_compile_mutex;
 	Mutex m_compiled_mutex;

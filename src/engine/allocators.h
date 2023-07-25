@@ -39,6 +39,8 @@ struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
 	IAllocator& getSourceAllocator() { return m_source; }
+	
+	IAllocator* getParent() override { return &m_source; }
 
 private:
 	IAllocator& m_source;

@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/debug.h"
 #include "engine/delegate_list.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
@@ -55,7 +56,7 @@ struct LUMIX_ENGINE_API World {
 		char name[64];
 	};
 
-	explicit World(struct Engine& engine, IAllocator& allocator);
+	explicit World(struct Engine& engine);
 	~World();
 
 	IAllocator& getAllocator() { return m_allocator; }
@@ -173,7 +174,7 @@ private:
 		void (*destroy)(IModule*, EntityRef);
 	};
 
-	IAllocator& m_allocator;
+	debug::TagAllocator m_allocator;
 	Engine& m_engine;
 	// TODO get rid of MAX_TYPES_COUNT limit (index archetypes maybe)
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];

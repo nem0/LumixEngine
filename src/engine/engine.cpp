@@ -55,7 +55,7 @@ public:
 	EngineImpl(const EngineImpl&) = delete;
 
 	EngineImpl(InitArgs&& init_data, IAllocator& allocator)
-		: m_allocator(allocator)
+		: m_allocator(allocator, "engine")
 		, m_page_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
@@ -65,7 +65,8 @@ public:
 		, m_smooth_time_delta(1/60.f)
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
-		, m_next_frame(false)
+		, m_next_frame(false)\
+		//, m_lua_allocator(allocator, "lua")
 	{
 		for (float& f : m_last_time_deltas) f = 1/60.f;
 		os::init();
@@ -169,7 +170,9 @@ public:
 			if (osize > 0) engine->m_lua_allocator.deallocate(ptr);
 			return nullptr;
 		}
-		if (!ptr) return engine->m_lua_allocator.allocate(nsize);
+		if (!ptr) {
+			return engine->m_lua_allocator.allocate(nsize);
+		}
 
 		return engine->m_lua_allocator.reallocate(ptr, nsize, osize);
 	}
@@ -224,7 +227,7 @@ public:
 	}
 
 	World& createWorld(bool is_main_world) override {
-		World* world = LUMIX_NEW(m_allocator, World)(*this, m_allocator);
+		World* world = LUMIX_NEW(m_allocator, World)(*this);
 
 		if (is_main_world) {
 			lua_State* L = m_state;
@@ -453,10 +456,11 @@ public:
 	ResourceManagerHub& getResourceManager() override { return m_resource_manager; }
 	lua_State* getState() override { return m_state; }
 	float getLastTimeDelta() const override { return m_smooth_time_delta / m_time_multiplier; }
+	u64 getLuaAllocated() const override { return m_lua_allocated; }
 
 private:
-	IAllocator& m_allocator;
-	// lua callstacks are incomplete and they polute memory report if using main allocator 
+	debug::TagAllocator m_allocator;
+	// TODO replace with tag allocator
 	DefaultAllocator m_lua_allocator; 
 	size_t m_lua_allocated = 0;
 	PageAllocator m_page_allocator;
