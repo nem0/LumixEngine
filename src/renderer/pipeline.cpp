@@ -684,23 +684,23 @@ struct PipelineImpl final : Pipeline
 
 
 	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
-		: m_allocator(allocator)
+		: m_allocator(allocator, "pipeline")
 		, m_renderer(renderer)
 		, m_resource(resource)
 		, m_lua_state(nullptr)
-		, m_custom_commands_handlers(allocator)
+		, m_custom_commands_handlers(m_allocator)
 		, m_define(define)
 		, m_module(nullptr)
-		, m_draw2d(allocator)
+		, m_draw2d(m_allocator)
 		, m_output(-1)
-		, m_renderbuffer_descs(allocator)
-		, m_renderbuffers(allocator)
-		, m_shaders(allocator)
-		, m_shadow_atlas(allocator)
-		, m_textures(allocator)
-		, m_buffers(allocator)
-		, m_views(allocator)
-		, m_render_states(allocator)
+		, m_renderbuffer_descs(m_allocator)
+		, m_renderbuffers(m_allocator)
+		, m_shaders(m_allocator)
+		, m_shadow_atlas(m_allocator)
+		, m_textures(m_allocator)
+		, m_buffers(m_allocator)
+		, m_views(m_allocator)
+		, m_render_states(m_allocator)
 		, m_base_vertex_decl(gpu::PrimitiveType::TRIANGLES)
 		, m_base_line_vertex_decl(gpu::PrimitiveType::LINES)
 		, m_decal_decl(gpu::PrimitiveType::TRIANGLES)
@@ -3952,7 +3952,7 @@ struct PipelineImpl final : Pipeline
 	
 	void setIndirectLightMultiplier(float value) override { m_indirect_light_multiplier = value; }
 
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	Renderer& m_renderer;
 	PipelineResource* m_resource;
 	lua_State* m_lua_state;

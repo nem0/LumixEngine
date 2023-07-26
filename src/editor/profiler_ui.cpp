@@ -159,9 +159,11 @@ void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 }
 
 struct AllocationTag {
-	AllocationTag(const char* tag, IAllocator& allocator)
+	AllocationTag(const TagAllocator* tag_allocator, IAllocator& allocator)
 		: m_allocations(allocator)
-		, m_tag(tag)
+		, m_child_tags(allocator)
+		, m_tag(tag_allocator->m_tag, allocator)
+		, m_tag_allocator((uintptr)tag_allocator)
 	{}
 
 	struct Allocation {
@@ -170,9 +172,12 @@ struct AllocationTag {
 		u32 count = 1;
 	};
 
+	Array<AllocationTag> m_child_tags;
 	Array<Allocation> m_allocations;
-	const char* m_tag;
+	String m_tag;
+	uintptr m_tag_allocator; // don't deref
 	size_t m_size = 0;
+	size_t m_exclusive_size = 0;
 };
 
 struct Counter {
@@ -700,26 +705,21 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		ImGui::EndTooltip();
 	}
 
-	void onGUIMemoryProfiler() {
-		if (!m_debug_allocator) {
-			ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
-			return;
+	void gui(const AllocationTag& tag) {
+		if (m_filter[0]) {
+			for (const AllocationTag& child : tag.m_child_tags) gui(child);
+
+			if (stristr(tag.m_tag.c_str(), m_filter) == 0) return;
 		}
-
-		if (ImGui::Button("Capture")) captureAllocations();
-		ImGui::SameLine();
-		if (ImGui::Button("Check memory")) m_debug_allocator->checkGuards();
-
-		size_t total = 0;
-		for (AllocationTag& tag : m_allocation_tags) {
-			total += tag.m_size;
-			if (ImGui::TreeNode(&tag, "%s - %.1f MB", tag.m_tag, tag.m_size / 1024.f / 1024.f)) {
+		if (ImGui::TreeNode(&tag, "%s - %.1f MB", tag.m_tag.c_str(), tag.m_size / 1024.f / 1024.f)) {
+			for (const AllocationTag& child : tag.m_child_tags) gui(child);
+			if (tag.m_child_tags.empty() || m_filter[0] || ImGui::TreeNode("allocs", "Allocations - %.1f MB", tag.m_exclusive_size / 1024.f / 1024.f)) {
 				ImGui::Columns(3);
 				ImGuiListClipper clipper;
 				clipper.Begin(tag.m_allocations.size());
 				while (clipper.Step()) {
 					for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j) {
-						AllocationTag::Allocation& a = tag.m_allocations[j];
+						const AllocationTag::Allocation& a = tag.m_allocations[j];
 						char fn_name[256] = "N/A";
 						i32 line;
 						debug::StackNode* n = a.stack_node;
@@ -740,8 +740,28 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					}
 				}
 				ImGui::Columns();
-				ImGui::TreePop();
+				if (!tag.m_child_tags.empty() && !m_filter[0]) ImGui::TreePop();
 			}
+			ImGui::TreePop();
+		}
+	}
+
+	void onGUIMemoryProfiler() {
+		if (!m_debug_allocator) {
+			ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
+			return;
+		}
+
+		if (ImGui::Button("Capture")) captureAllocations();
+		ImGui::SameLine();
+		if (ImGui::Button("Check memory")) m_debug_allocator->checkGuards();
+		ImGui::SameLine();
+
+		size_t total = 0;
+		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter), 150, false);
+		for (AllocationTag& tag : m_allocation_tags) {
+			total += tag.m_size;
+			gui(tag);
 		}
 		ImGui::Separator();
 		ImGui::Text("Total: %d MB", u32(total / 1024 / 1024));
@@ -1303,11 +1323,63 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		timeline(from_x, to_x, timeline_y, before_gpu_y, timeline_start_t);
 	}
 
-	AllocationTag& getTag(const char* name) {
-		for (AllocationTag& tag : m_allocation_tags) {
-			if (tag.m_tag == name) return tag;
+	AllocationTag& getTag(const TagAllocator* tag_allocator) {
+		IAllocator* parent = tag_allocator->getParent();
+		if (parent && parent->isTagAllocator()) {
+			AllocationTag& parent_tag = getTag((TagAllocator*)parent);
+			for (AllocationTag& tag : parent_tag.m_child_tags) {
+				if (tag.m_tag_allocator == (uintptr)tag_allocator) return tag;
+			}
+			return parent_tag.m_child_tags.emplace(tag_allocator, getGlobalAllocator());
 		}
-		return m_allocation_tags.emplace(name, getGlobalAllocator());
+
+		for (AllocationTag& tag : m_allocation_tags) {
+			if (tag.m_tag_allocator == (uintptr)tag_allocator) return tag;
+		}
+		return m_allocation_tags.emplace(tag_allocator, getGlobalAllocator());
+	}
+
+	void postprocess(AllocationTag& tag) {
+		tag.m_exclusive_size = tag.m_size;
+		for (AllocationTag& child : tag.m_child_tags) {
+			postprocess(child);
+			tag.m_size += child.m_size;
+		}
+
+		qsort(tag.m_child_tags.begin(), tag.m_child_tags.size(), sizeof(tag.m_child_tags[0]), [](const void* a, const void* b){
+			size_t sa = ((AllocationTag*)a)->m_size;
+			size_t sb = ((AllocationTag*)b)->m_size;
+
+			if (sa > sb) return -1;
+			if (sa < sb) return 1;
+			return 0;
+		});
+
+		qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
+			const void* sa = ((AllocationTag::Allocation*)a)->stack_node;
+			const void* sb = ((AllocationTag::Allocation*)b)->stack_node;
+
+			if (sa > sb) return -1;
+			if (sa < sb) return 1;
+			return 0;
+		});
+
+		for (i32 i = tag.m_allocations.size() - 1; i > 0; --i) {
+			if (tag.m_allocations[i].stack_node != tag.m_allocations[i - 1].stack_node) continue;
+
+			tag.m_allocations[i - 1].size += tag.m_allocations[i].size;
+			tag.m_allocations[i - 1].count += tag.m_allocations[i].count;
+			tag.m_allocations.swapAndPop(i);
+		}
+
+		qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
+			const size_t sa = ((AllocationTag::Allocation*)a)->size;
+			const size_t sb = ((AllocationTag::Allocation*)b)->size;
+
+			if (sa > sb) return -1;
+			if (sa < sb) return 1;
+			return 0;
+		});
 	}
 
 	void captureAllocations() {
@@ -1330,33 +1402,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		}
 		m_debug_allocator->unlock();
 
-		for (AllocationTag& tag : m_allocation_tags) {
-			qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
-				const void* sa = ((AllocationTag::Allocation*)a)->stack_node;
-				const void* sb = ((AllocationTag::Allocation*)b)->stack_node;
-
-				if (sa > sb) return -1;
-				if (sa < sb) return 1;
-				return 0;
-			});
-
-			for (i32 i = tag.m_allocations.size() - 1; i > 0; --i) {
-				if (tag.m_allocations[i].stack_node != tag.m_allocations[i - 1].stack_node) continue;
-
-				tag.m_allocations[i - 1].size += tag.m_allocations[i].size;
-				tag.m_allocations[i - 1].count += tag.m_allocations[i].count;
-				tag.m_allocations.swapAndPop(i);
-			}
-
-			qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
-				const size_t sa = ((AllocationTag::Allocation*)a)->size;
-				const size_t sb = ((AllocationTag::Allocation*)b)->size;
-
-				if (sa > sb) return -1;
-				if (sa < sb) return 1;
-				return 0;
-			});
-		}
+		for (AllocationTag& tag : m_allocation_tags) postprocess(tag);
 	}
 
 	StudioApp& m_app;

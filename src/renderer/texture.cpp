@@ -27,7 +27,7 @@ const ResourceType Texture::TYPE("texture");
 Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
-	, allocator(_allocator)
+	, allocator(_allocator, m_path.c_str())
 	, data(_allocator)
 	, format(gpu::TextureFormat::RGBA8)
 	, depth(1)

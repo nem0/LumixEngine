@@ -130,7 +130,7 @@ bool FontManager::build()
 
 	for(Font* font : m_fonts) {
 		FT_Face face;
-		error = FT_New_Memory_Face(ft_library, font->resource->file_data.data(), (u32)font->resource->file_data.size(), 0, &face);
+		error = FT_New_Memory_Face(ft_library, font->resource->m_file_data.data(), (u32)font->resource->m_file_data.size(), 0, &face);
 		if (error != 0) {
 			logError("Failed to create font ", font->resource->getPath());
 			continue;
@@ -233,7 +233,8 @@ const ResourceType FontResource::TYPE("font");
 
 FontResource::FontResource(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
-	, file_data(allocator)
+	, m_allocator(allocator, m_path.c_str())
+	, m_file_data(m_allocator)
 {
 }
 
@@ -242,8 +243,8 @@ bool FontResource::load(u64 size, const u8* mem)
 {
 	if (size <= 0) return false;
 	
-	file_data.resize((int)size);
-	memcpy(file_data.getMutableData(), mem, size);
+	m_file_data.resize((int)size);
+	memcpy(m_file_data.getMutableData(), mem, size);
 	return true;
 }
 
@@ -289,7 +290,7 @@ void FontResource::removeRef(Font& font)
 
 FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 	: ResourceManager(allocator)
-	, m_allocator(allocator)
+	, m_allocator(allocator, "fonts")
 	, m_renderer(renderer)
 	, m_atlas_texture(nullptr)
 	, m_fonts(allocator)

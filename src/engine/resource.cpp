@@ -156,7 +156,6 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
-	m_async_op = FileSystem::AsyncHandle::invalid();
 }
 
 

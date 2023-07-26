@@ -1,4 +1,5 @@
 #pragma once
+#include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/hash.h"
 #include "engine/hash_map.h"
@@ -110,7 +111,7 @@ public:
 		u32 decl_hash;
 	};
 
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	Renderer& m_renderer;
 	u32 m_all_defines_mask;
 	TextureSlot m_texture_slots[16];

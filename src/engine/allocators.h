@@ -39,13 +39,15 @@ struct LUMIX_ENGINE_API TagAllocator final : IAllocator {
 	void deallocate_aligned(void* ptr) override;
 	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 
-	IAllocator* getParent() override { return m_allocator; }
+	IAllocator* getParent() const override { return m_direct_parent; }
 	bool isTagAllocator() const override { return true; }
 
-	IAllocator* m_allocator;
+	IAllocator* m_direct_parent;
+	// skip TagAllocator parents when actually allocating
+	IAllocator* m_effective_allocator;
 	const char* m_tag;
 
-	static thread_local const char* active_tag;
+	static thread_local TagAllocator* active_allocator;
 };
 
 // detects memory leaks, just by counting number of allocations - very fast
@@ -61,7 +63,7 @@ struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
 	IAllocator& getSourceAllocator() { return m_source; }
 	
-	IAllocator* getParent() override { return &m_source; }
+	IAllocator* getParent() const override { return &m_source; }
 
 private:
 	IAllocator& m_source;

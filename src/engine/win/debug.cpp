@@ -451,7 +451,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	m_total_size += size;
 	m_mutex.exit();
 
-	info->tag = TagAllocator::active_tag;
+	info->tag = TagAllocator::active_allocator;
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
@@ -549,7 +549,7 @@ void* Allocator::allocate(size_t size)
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
 	info->align = 0;
-	info->tag = TagAllocator::active_tag;
+	info->tag = TagAllocator::active_allocator;
 	if (m_is_fill_enabled)
 	{
 		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);

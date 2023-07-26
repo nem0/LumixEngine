@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/allocators.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
 #include "gpu/gpu.h"
@@ -122,7 +123,7 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 	bool is_cubemap;
 	u32 flags;
 	gpu::TextureHandle handle;
-	IAllocator& allocator;
+	TagAllocator allocator;
 	u32 data_reference;
 	OutputMemoryStream data;
 	Renderer& renderer;

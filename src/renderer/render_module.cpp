@@ -3209,7 +3209,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	const HashMap<EntityRef, ParticleSystem>& getParticleSystems() const override { return m_particle_emitters; }
 
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	World& m_world;
 	Renderer& m_renderer;
 	Engine& m_engine;
@@ -3427,7 +3427,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	: m_engine(engine)
 	, m_world(world)
 	, m_renderer(renderer)
-	, m_allocator(allocator)
+	, m_allocator(allocator, "renderer module")
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_instanced_models(m_allocator)

@@ -105,7 +105,7 @@ const ResourceType Model::TYPE("model");
 
 Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_allocator(allocator)
+	, m_allocator(allocator, m_path.c_str())
 	, m_bone_map(m_allocator)
 	, m_meshes(m_allocator)
 	, m_bones(m_allocator)

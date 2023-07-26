@@ -16,7 +16,7 @@ namespace Lumix
 {
 	static constexpr u32 PAGE_SIZE = 4096;
 	static constexpr size_t MAX_PAGE_COUNT = 16384;
-	static constexpr u32 SMALL_ALLOC_MAX_SIZE = 64;
+	static constexpr u32 SMALL_ALLOC_MAX_SIZE = 0;
 
 	struct DefaultAllocator::Page {
 		struct Header {
@@ -392,40 +392,40 @@ void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
 TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
 	: m_tag(tag_name)
 {
-	m_allocator = &allocator;
-	while (m_allocator->getParent() && m_allocator->isTagAllocator()) {
-		m_allocator = m_allocator->getParent();
+	m_effective_allocator = m_direct_parent = &allocator;
+	while (m_effective_allocator->getParent() && m_effective_allocator->isTagAllocator()) {
+		m_effective_allocator = m_effective_allocator->getParent();
 	}
 }
 
-thread_local const char* TagAllocator::active_tag = nullptr;
+thread_local TagAllocator* TagAllocator::active_allocator = nullptr;
 
 void* TagAllocator::allocate(size_t size) {
-	active_tag = m_tag;
-	return m_allocator->allocate(size);
+	active_allocator = this;
+	return m_effective_allocator->allocate(size);
 }
 
 void TagAllocator::deallocate(void* ptr) {
-	m_allocator->deallocate(ptr);
+	m_effective_allocator->deallocate(ptr);
 }
 
 void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
-	active_tag = m_tag;
-	return m_allocator->reallocate(ptr, new_size, old_size);
+	active_allocator = this;
+	return m_effective_allocator->reallocate(ptr, new_size, old_size);
 }
 
 void* TagAllocator::allocate_aligned(size_t size, size_t align) {
-	active_tag = m_tag;
-	return m_allocator->allocate_aligned(size, align);
+	active_allocator = this;
+	return m_effective_allocator->allocate_aligned(size, align);
 }
 
 void TagAllocator::deallocate_aligned(void* ptr) {
-	m_allocator->deallocate_aligned(ptr);
+	m_effective_allocator->deallocate_aligned(ptr);
 }
 
 void* TagAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) {
-	active_tag = m_tag;
-	return m_allocator->reallocate_aligned(ptr, new_size, old_size, align);
+	active_allocator = this;
+	return m_effective_allocator->reallocate_aligned(ptr, new_size, old_size, align);
 }
 
 IAllocator& getGlobalAllocator() {

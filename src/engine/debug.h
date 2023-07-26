@@ -8,6 +8,9 @@
 
 namespace Lumix
 {
+
+struct TagAllocator;
+
 namespace debug
 {
 
@@ -64,7 +67,7 @@ struct LUMIX_ENGINE_API Allocator final : IAllocator {
 		size_t size;
 		StackNode* stack_leaf;
 		u16 align;
-		const char* tag;
+		TagAllocator* tag;
 	};
 
 	explicit Allocator(IAllocator& source);
@@ -87,7 +90,7 @@ struct LUMIX_ENGINE_API Allocator final : IAllocator {
 	void lock();
 	void unlock();
 	
-	IAllocator* getParent() override { return &m_source; }
+	IAllocator* getParent() const override { return &m_source; }
 
 private:
 	inline size_t getAllocationOffset();

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/allocators.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/resource.h"
@@ -38,12 +39,14 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 
 	ResourceType getType() const override { return TYPE; }
 
-	void unload() override { file_data.free(); }
+	void unload() override { m_file_data.free(); }
 	bool load(u64 size, const u8* mem) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 
-	OutputMemoryStream file_data;
+	TagAllocator m_allocator;
+	OutputMemoryStream m_file_data;
+
 	static const ResourceType TYPE;
 };
 
@@ -63,7 +66,7 @@ private:
 	bool build();
 
 private:
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	Renderer& m_renderer;
 	Texture* m_atlas_texture;
 	Array<Font*> m_fonts;

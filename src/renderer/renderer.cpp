@@ -157,9 +157,10 @@ struct FrameData {
 template <typename T>
 struct RenderResourceManager : ResourceManager
 {
-	RenderResourceManager(Renderer& renderer, IAllocator& allocator) 
+	RenderResourceManager(const char* type_name ,Renderer& renderer, IAllocator& allocator) 
 		: ResourceManager(allocator)
 		, m_renderer(renderer)
+		, m_allocator(allocator, type_name)
 	{}
 
 
@@ -175,6 +176,7 @@ struct RenderResourceManager : ResourceManager
 	}
 
 	Renderer& m_renderer;
+	TagAllocator m_allocator;
 };
 
 
@@ -365,12 +367,12 @@ struct RendererImpl final : Renderer
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "renderer")
-		, m_texture_manager(*this, m_allocator)
-		, m_pipeline_manager(*this, m_allocator)
-		, m_model_manager(*this, m_allocator)
-		, m_particle_emitter_manager(*this, m_allocator)
+		, m_texture_manager("textures", *this, m_allocator)
+		, m_pipeline_manager("pipelines", *this, m_allocator)
+		, m_model_manager("models", *this, m_allocator)
+		, m_particle_emitter_manager("particle emitters", *this, m_allocator)
 		, m_material_manager(*this, m_allocator)
-		, m_shader_manager(*this, m_allocator)
+		, m_shader_manager("shaders", *this, m_allocator)
 		, m_font_manager(nullptr)
 		, m_shader_defines(m_allocator)
 		, m_profiler(m_allocator)

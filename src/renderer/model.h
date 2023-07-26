@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/flag_set.h"
 #include "engine/geometry.h"
@@ -209,7 +210,7 @@ private:
 	bool load(u64 size, const u8* mem) override;
 
 private:
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	Renderer& m_renderer;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;

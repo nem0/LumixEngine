@@ -37,7 +37,7 @@ u32 Shader::Uniform::size() const {
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_allocator(allocator)
+	, m_allocator(allocator, m_path.c_str())
 	, m_renderer(renderer)
 	, m_texture_slot_count(0)
 	, m_uniforms(m_allocator)
