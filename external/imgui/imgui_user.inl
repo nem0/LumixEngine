@@ -1086,6 +1086,16 @@ namespace ImGuiEx {
 		ItemSize(text_rect);
 	}
 
+	bool InputAngle(const char* label, float* angle_radians) {
+		float deg = Lumix::radiansToDegrees(*angle_radians);
+		if (DragFloat(label, &deg)) {
+			*angle_radians = Lumix::degreesToRadians(deg);
+			return true;
+		}
+		return false;
+	}
+
+
 	bool InputRotation(const char* label, float* feuler) {
 		Lumix::Vec3 euler = radiansToDegrees(*(Lumix::Vec3*)feuler);
 		const float rot_change_speed = GetIO().KeyAlt ? 10.f : 1.f; // we won't have precision without this

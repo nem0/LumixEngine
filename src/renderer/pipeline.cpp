@@ -684,7 +684,7 @@ struct PipelineImpl final : Pipeline
 
 
 	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
-		: m_allocator(allocator, "pipeline")
+		: m_allocator(allocator)
 		, m_renderer(renderer)
 		, m_resource(resource)
 		, m_lua_state(nullptr)
@@ -3952,7 +3952,7 @@ struct PipelineImpl final : Pipeline
 	
 	void setIndirectLightMultiplier(float value) override { m_indirect_light_multiplier = value; }
 
-	TagAllocator m_allocator;
+	IAllocator& m_allocator;
 	Renderer& m_renderer;
 	PipelineResource* m_resource;
 	lua_State* m_lua_state;

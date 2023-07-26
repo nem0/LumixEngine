@@ -63,6 +63,7 @@ IMGUI_API void NodeLinkEx(ImGuiID from, ImGuiID to, ImU32 color, ImU32 active_co
 IMGUI_API bool IsLinkHovered();
 IMGUI_API bool IsLinkStartHovered();
 
+IMGUI_API bool InputAngle(const char* label, float* angle_radians);
 IMGUI_API bool InputRotation(const char* label, float* euler);
 IMGUI_API void Label(const char* label);
 IMGUI_API void TextClipped(const char* text, float size);
