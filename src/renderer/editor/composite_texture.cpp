@@ -42,12 +42,13 @@ enum class CompositeTexture::NodeType : u32 {
 	WAVE_NOISE,
 	CURVE,
 	SET_ALPHA,
-	CUT,
+	CROP,
 	SHARPEN,
 	STATIC_SWITCH,
 	STEP,
 	SPLATTER,
-	GRADIENT_MAP
+	GRADIENT_MAP,
+	TRANSLATE
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -929,10 +930,62 @@ struct SetAlphaNode final : CompositeTexture::Node {
 	}
 };
 
-struct CutNode final : CompositeTexture::Node {
-	CutNode(IAllocator& allocator) : Node(allocator) {}
+struct TranslateNode final : CompositeTexture::Node {
+	TranslateNode(IAllocator& allocator) : Node(allocator) {}
 
-	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CUT; }
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::TRANSLATE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(x);
+		blob.write(y);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(x);
+		blob.read(y);
+	}
+	
+	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
+		if (!getInputPixelData(0, &tmp)) return false;
+
+		data->w = tmp.w;
+		data->h = tmp.h;
+		data->channels = tmp.channels;
+		data->pixels.resize(data->w * data->h * data->channels);
+		
+		for (u32 j = 0; j < data->h; ++j) {
+			for (u32 i = 0; i < data->w; ++i) {
+				memcpy(&data->pixels[(((x + i) % data->w) + ((y + j) % data->h) * data->w) * data->channels]
+					, &tmp.pixels[(i + j * tmp.w) * tmp.channels]
+					, data->channels);
+			}
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Translate");
+		inputSlot();
+		ImGui::BeginGroup();
+		bool res = ImGui::DragInt("X", (i32*)&x, 1, 0, 999999);
+		res = ImGui::DragInt("Y", (i32*)&y, 1, 0, 999999) || res;
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 x = 0, y = 0;
+};
+
+
+struct CropNode final : CompositeTexture::Node {
+	CropNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CROP; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
@@ -971,7 +1024,7 @@ struct CutNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Cut");
+		ImGuiEx::NodeTitle("Crop");
 		inputSlot();
 		ImGui::BeginGroup();
 		bool res = ImGui::DragInt("X", (i32*)&x, 1, 0, 999999);
@@ -1855,7 +1908,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode)(allocator); break;
 		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode)(allocator); break;
 		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode)(allocator); break;
-		case CompositeTexture::NodeType::CUT: node = LUMIX_NEW(allocator, CutNode)(allocator); break;
+		case CompositeTexture::NodeType::CROP: node = LUMIX_NEW(allocator, CropNode)(allocator); break;
 		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode)(allocator); break;
 		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode)(allocator); break;
 		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode)(allocator); break;
@@ -1875,6 +1928,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode)(allocator); break;
 		case CompositeTexture::NodeType::GRADIENT_MAP: node = LUMIX_NEW(allocator, GradientMapNode)(allocator); break;
 		case CompositeTexture::NodeType::SPLATTER: node = LUMIX_NEW(allocator, SplatterNode)(allocator); break;
+		case CompositeTexture::NodeType::TRANSLATE: node = LUMIX_NEW(allocator, TranslateNode)(allocator); break;
 		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode)(allocator); break;
 		case CompositeTexture::NodeType::STEP: node = LUMIX_NEW(allocator, StepNode)(allocator); break;
 	}
@@ -2141,8 +2195,8 @@ static const struct {
 	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
 	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
 	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
+	{ 0, "Crop", CompositeTexture::NodeType::CROP },
 	{ 'U', "Curve", CompositeTexture::NodeType::CURVE },
-	{ 0, "Cut", CompositeTexture::NodeType::CUT },
 	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
 	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
 	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
@@ -2163,6 +2217,7 @@ static const struct {
 	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
 	{ 0, "Static switch", CompositeTexture::NodeType::STATIC_SWITCH },
 	{ 0, "Step", CompositeTexture::NodeType::STEP },
+	{ 0, "Translate", CompositeTexture::NodeType::TRANSLATE },
 	{ 'W', "Wave noise", CompositeTexture::NodeType::WAVE_NOISE }
 };
 
@@ -2208,14 +2263,13 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	
 	void onContextMenu(ImVec2 pos) override {
 		CompositeTexture::Node* node = nullptr;
-		static char filter[64] = "";
-		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-		ImGui::SetNextItemWidth(150);
-		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter), ImGuiInputTextFlags_AutoSelectAll);
+		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter), 150, ImGui::IsWindowAppearing());
 		for (const auto& t : TYPES) {
-			if ((!filter[0] || stristr(t.label, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(t.label))) {
+			StaticString<64> label(t.label);
+			if (t.key) label.append(" (LMB + ", t.key, ")");
+			if ((!m_filter[0] || stristr(t.label, m_filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
 				node = m_resource.addNode(t.type);
-				filter[0] = '\0';
+				m_filter[0] = '\0';
 				ImGui::CloseCurrentPopup();
 				break;
 			}
@@ -2406,6 +2460,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	bool m_dirty = false;
 	bool m_show_confirm = false;
 	ImGuiID m_dock_id = 0;
+	char m_filter[64] = "";
 };
 
 CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)

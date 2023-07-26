@@ -20,6 +20,7 @@
 namespace Lumix
 {
 
+static constexpr u32 FILE_MAGIC = 0x5f4c4d4f;
 
 static LocalRigidTransform invert(const LocalRigidTransform& tr)
 {

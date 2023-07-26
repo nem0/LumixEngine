@@ -2264,7 +2264,7 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 void FBXImporter::writeModelHeader()
 {
 	Model::FileHeader header;
-	header.magic = 0x5f4c4d4f; // == '_LMO';
+	header.magic = 0x5f4c4d4f;
 	header.version = (u32)Model::FileVersion::LATEST;
 	write(header);
 }

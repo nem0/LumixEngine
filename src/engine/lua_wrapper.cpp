@@ -237,4 +237,4 @@ void argError(lua_State* L, int index, const char* expected_type) {
 }
 
 
-} // namespace Lumix::LuaWrapper
+} // namespace Lumix::LuaWrapper

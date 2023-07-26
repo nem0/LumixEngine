@@ -1,8 +1,8 @@
 #pragma once
 
 
+#include "engine/allocators.h"
 #include "engine/array.h"
-#include "engine/debug.h"
 #include "engine/delegate_list.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
@@ -174,7 +174,7 @@ private:
 		void (*destroy)(IModule*, EntityRef);
 	};
 
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	Engine& m_engine;
 	// TODO get rid of MAX_TYPES_COUNT limit (index archetypes maybe)
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];

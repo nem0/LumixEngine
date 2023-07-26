@@ -14,16 +14,14 @@ namespace Lumix
 
 namespace detail {
 	struct Logger {
-		Logger() : callback(allocator) {}
+		Logger() : callback(getGlobalAllocator()) {}
 
 		Mutex mutex;
-		DefaultAllocator allocator;
 		LogCallback callback;
 	};
 
 	struct Log {
-		Log() : message(allocator) { message.reserve(4096); }
-		DefaultAllocator allocator;
+		Log() : message(getGlobalAllocator()) { message.reserve(4096); }
 		OutputMemoryStream message;
 	};
 

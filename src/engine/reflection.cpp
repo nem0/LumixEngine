@@ -25,13 +25,8 @@ static Context& getContext() {
 	return ctx;
 }
 
-static IAllocator& getAllocator() {
-	static DefaultAllocator alloc;
-	return alloc;
-}
-
 Array<FunctionBase*>& allFunctions() {
-	static Array<FunctionBase*> fncs(getAllocator());
+	static Array<FunctionBase*> fncs(getGlobalAllocator());
 	return fncs;
 }
 
@@ -162,7 +157,7 @@ struct NoUIAttribute : IAttribute {
 };
 
 builder build_module(const char* name) {
-	builder res(getAllocator());
+	builder res(getGlobalAllocator());
 	Context& ctx = getContext();
 	res.module->next = ctx.first_module;
 	ctx.first_module = res.module;

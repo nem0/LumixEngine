@@ -311,7 +311,7 @@ void* BaseProxyAllocator::reallocate(void* ptr, size_t new_size, size_t old_size
 
 LinearAllocator::LinearAllocator(u32 reserved) {
 	m_end = 0;
-	m_commited = 0;
+	m_commited_bytes = 0;
 	m_reserved = reserved;
 	m_mem = (u8*)os::memReserve(reserved);
 }
@@ -319,6 +319,7 @@ LinearAllocator::LinearAllocator(u32 reserved) {
 LinearAllocator::~LinearAllocator() {
 	ASSERT(m_end == 0);
 	os::memRelease(m_mem, m_reserved);
+	atomicSubtract(&g_total_commited_bytes, m_commited_bytes);
 }
 
 void LinearAllocator::reset() {
@@ -339,18 +340,21 @@ void* LinearAllocator::allocate_aligned(size_t size, size_t align) {
 		if (compareAndExchange(&m_end, u32(start + size), end)) break;
 	}
 
-	if (start + size <= m_commited) return m_mem + start;
+	if (start + size <= m_commited_bytes) return m_mem + start;
 
 	MutexGuard guard(m_mutex);
-	if (start + size <= m_commited) return m_mem + start;
+	if (start + size <= m_commited_bytes) return m_mem + start;
 
 	const u32 commited = roundUp(start + (u32)size, 4096);
 	ASSERT(commited < m_reserved);
-	os::memCommit(m_mem + m_commited, commited - m_commited);
-	m_commited = commited;
+	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
+	atomicAdd(&g_total_commited_bytes, commited - m_commited_bytes);
+	m_commited_bytes = commited;
 
 	return m_mem + start;
 }
+
+volatile i64 LinearAllocator::g_total_commited_bytes = 0;
 
 void LinearAllocator::deallocate_aligned(void* ptr) { /*everything should be "deallocated" with reset()*/ }
 void* LinearAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) { 
@@ -364,15 +368,15 @@ void* LinearAllocator::allocate(size_t size) {
 	ASSERT(size < 0xffFFffFF);
 	const u32 start = atomicAdd(&m_end, (u32)size);
 
-	if (start + size <= m_commited) return m_mem + start;
+	if (start + size <= m_commited_bytes) return m_mem + start;
 
 	MutexGuard guard(m_mutex);
-	if (start + size <= m_commited) return m_mem + start;
+	if (start + size <= m_commited_bytes) return m_mem + start;
 
 	const u32 commited = roundUp(start + (u32)size, 4096);
 	ASSERT(commited < m_reserved);
-	os::memCommit(m_mem + m_commited, commited - m_commited);
-	m_commited = commited;
+	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
+	m_commited_bytes = commited;
 
 	return m_mem + start;
 }
@@ -383,6 +387,50 @@ void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
 	// realloc not supported
 	ASSERT(false); 
 	return nullptr;
+}
+
+TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
+	: m_tag(tag_name)
+{
+	m_allocator = &allocator;
+	while (m_allocator->getParent() && m_allocator->isTagAllocator()) {
+		m_allocator = m_allocator->getParent();
+	}
+}
+
+thread_local const char* TagAllocator::active_tag = nullptr;
+
+void* TagAllocator::allocate(size_t size) {
+	active_tag = m_tag;
+	return m_allocator->allocate(size);
+}
+
+void TagAllocator::deallocate(void* ptr) {
+	m_allocator->deallocate(ptr);
+}
+
+void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
+	active_tag = m_tag;
+	return m_allocator->reallocate(ptr, new_size, old_size);
+}
+
+void* TagAllocator::allocate_aligned(size_t size, size_t align) {
+	active_tag = m_tag;
+	return m_allocator->allocate_aligned(size, align);
+}
+
+void TagAllocator::deallocate_aligned(void* ptr) {
+	m_allocator->deallocate_aligned(ptr);
+}
+
+void* TagAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) {
+	active_tag = m_tag;
+	return m_allocator->reallocate_aligned(ptr, new_size, old_size, align);
+}
+
+IAllocator& getGlobalAllocator() {
+	static DefaultAllocator alloc;
+	return alloc;
 }
 
 } // namespace Lumix

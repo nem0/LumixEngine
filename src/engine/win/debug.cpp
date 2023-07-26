@@ -21,7 +21,6 @@
 
 
 static bool g_is_crash_reporting_enabled = false;
-static Lumix::DefaultAllocator stack_node_allocator;
 
 
 namespace Lumix
@@ -66,8 +65,8 @@ struct StackNode
 {
 	~StackNode()
 	{
-		LUMIX_DELETE(stack_node_allocator, m_next);
-		LUMIX_DELETE(stack_node_allocator, m_first_child);
+		LUMIX_DELETE(getGlobalAllocator(), m_next);
+		LUMIX_DELETE(getGlobalAllocator(), m_first_child);
 	}
 
 	void* m_instruction;
@@ -90,7 +89,7 @@ StackTree::StackTree()
 
 StackTree::~StackTree()
 {
-	LUMIX_DELETE(stack_node_allocator, m_root);
+	LUMIX_DELETE(getGlobalAllocator(), m_root);
 	if (atomicDecrement(&s_instances) == 0)
 	{
 		HANDLE process = GetCurrentProcess();
@@ -192,7 +191,7 @@ StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, v
 	StackNode* node = root_node;
 	while (instruction >= stack)
 	{
-		StackNode* new_node = LUMIX_NEW(stack_node_allocator, StackNode)();
+		StackNode* new_node = LUMIX_NEW(getGlobalAllocator(), StackNode)();
 		node->m_first_child = new_node;
 		new_node->m_parent = node;
 		new_node->m_next = nullptr;
@@ -212,7 +211,7 @@ StackNode* StackTree::record()
 
 	void** ptr = stack + captured_frames_count - 1;
 	if (!m_root) {
-		m_root = LUMIX_NEW(stack_node_allocator, StackNode)();
+		m_root = LUMIX_NEW(getGlobalAllocator(), StackNode)();
 		m_root->m_instruction = *ptr;
 		m_root->m_first_child = nullptr;
 		m_root->m_next = nullptr;
@@ -230,7 +229,7 @@ StackNode* StackTree::record()
 		}
 		if (node->m_instruction != *ptr)
 		{
-			node->m_next = LUMIX_NEW(stack_node_allocator, StackNode);
+			node->m_next = LUMIX_NEW(getGlobalAllocator(), StackNode);
 			node->m_next->m_parent = node->m_parent;
 			node->m_next->m_instruction = *ptr;
 			node->m_next->m_next = nullptr;
@@ -428,8 +427,6 @@ void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size)
 }
 
 
-thread_local const char* active_tag = nullptr;
-
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
 	void* system_ptr;
@@ -454,7 +451,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	m_total_size += size;
 	m_mutex.exit();
 
-	info->tag = active_tag;
+	info->tag = TagAllocator::active_tag;
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
@@ -552,7 +549,7 @@ void* Allocator::allocate(size_t size)
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
 	info->align = 0;
-	info->tag = active_tag;
+	info->tag = TagAllocator::active_tag;
 	if (m_is_fill_enabled)
 	{
 		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
@@ -601,49 +598,6 @@ void Allocator::deallocate(void* user_ptr)
 
 		m_source.deallocate((void*)system_ptr);
 	}
-}
-
-TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
-	: m_allocator(allocator)
-	, m_tag(tag_name)
-{
-}
-
-
-void* TagAllocator::allocate(size_t size) {
-	if (!active_tag) active_tag = m_tag;
-	void* mem = m_allocator.allocate(size);
-	active_tag = nullptr;
-	return mem;
-}
-
-void TagAllocator::deallocate(void* ptr) {
-	m_allocator.deallocate(ptr);
-}
-
-void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
-	if (!active_tag) active_tag = m_tag;
-	void* mem = m_allocator.reallocate(ptr, new_size, old_size);
-	active_tag = nullptr;
-	return mem;
-}
-
-void* TagAllocator::allocate_aligned(size_t size, size_t align) {
-	if (!active_tag) active_tag = m_tag;
-	void* mem = m_allocator.allocate_aligned(size, align);
-	active_tag = nullptr;
-	return mem;
-}
-
-void TagAllocator::deallocate_aligned(void* ptr) {
-	m_allocator.deallocate_aligned(ptr);
-}
-
-void* TagAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) {
-	if (!active_tag) active_tag = m_tag;
-	void* mem = m_allocator.reallocate_aligned(ptr, new_size, old_size, align);
-	active_tag = nullptr;
-	return mem;
 }
 
 } // namespace Debug

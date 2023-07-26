@@ -23,8 +23,7 @@
 #include "engine/string.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 namespace {
 
@@ -199,15 +198,17 @@ struct Block {
 	profiler::JobRecord job_info;
 };
 
-struct ProfilerUIImpl final : ProfilerUI {
+struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
-		: m_debug_allocator(allocator)
+		: m_allocator(engine.getAllocator())
+		, m_debug_allocator(allocator)
 		, m_app(app)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
 		, m_blocks(m_allocator)
 		, m_counters(m_allocator)
-		, m_allocation_tags(m_allocator)
+		// we can't use m_allocator for tags, because it would create circular dependency and deadlock
+		, m_allocation_tags(getGlobalAllocator())
 		, m_engine(engine)
 	{
 		m_current_frame = -1;
@@ -700,21 +701,14 @@ struct ProfilerUIImpl final : ProfilerUI {
 	}
 
 	void onGUIMemoryProfiler() {
-		if (m_debug_allocator) {
-			if (ImGui::Button("Refresh"))
-			{
-				refreshAllocations();
-			}
-
-			ImGui::SameLine();
-			if (ImGui::Button("Check memory"))
-			{
-				m_debug_allocator->checkGuards();
-			}
-		}
-		else {
+		if (!m_debug_allocator) {
 			ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
+			return;
 		}
+
+		if (ImGui::Button("Capture")) captureAllocations();
+		ImGui::SameLine();
+		if (ImGui::Button("Check memory")) m_debug_allocator->checkGuards();
 
 		size_t total = 0;
 		for (AllocationTag& tag : m_allocation_tags) {
@@ -735,7 +729,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 								break;
 							}
 							n = debug::StackTree::getParent(n);
-						} while (n && strstr(fn_name, "TagAllocator::allocate") != 0);
+						} while (n && strstr(fn_name, "Allocator::") != 0);
 						ImGui::Text("%s: L%d:", fn_name, line);
 						if (ImGui::IsItemHovered()) callstackTooltip(a.stack_node);
 						ImGui::NextColumn();
@@ -753,8 +747,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 		ImGui::Text("Total: %d MB", u32(total / 1024 / 1024));
 		const u32 reserved_pages = m_app.getEngine().getPageAllocator().getReservedCount() * PageAllocator::PAGE_SIZE;
 		ImGui::Text("Page allocator: %.1f MB", reserved_pages / 1024.f / 1024.f);
-		ImGui::Text("Lua: %.1f MB", m_app.getEngine().getLuaAllocated() / 1024.f / 1024.f);
-		// TODO os::memcommit sources, e.g. linear allocators
+		ImGui::Text("Linear allocators: %.1f MB", LinearAllocator::getTotalCommitedBytes() / 1024.f / 1024.f);
 		// TODO gpu mem
 	}
 
@@ -1314,10 +1307,10 @@ struct ProfilerUIImpl final : ProfilerUI {
 		for (AllocationTag& tag : m_allocation_tags) {
 			if (tag.m_tag == name) return tag;
 		}
-		return m_allocation_tags.emplace(name, m_allocator);
+		return m_allocation_tags.emplace(name, getGlobalAllocator());
 	}
 
-	void refreshAllocations() {
+	void captureAllocations() {
 		if (!m_debug_allocator) return;
 
 		m_allocation_tags.clear();
@@ -1367,7 +1360,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 	}
 
 	StudioApp& m_app;
-	DefaultAllocator m_allocator;
+	IAllocator& m_allocator;
 	debug::Allocator* m_debug_allocator;
 	Array<AllocationTag> m_allocation_tags;
 	int m_current_frame;
@@ -1425,8 +1418,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 } // anonymous namespace
 
 
-UniquePtr<ProfilerUI> ProfilerUI::create(StudioApp& app)
-{
+UniquePtr<StudioApp::GUIPlugin> createProfilerUI(StudioApp& app) {
 	Engine& engine = app.getEngine();
 	debug::Allocator* debug_allocator = nullptr;
 	IAllocator* allocator = &engine.getAllocator();

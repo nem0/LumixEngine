@@ -7,7 +7,6 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/atomic.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/hash.h"
 #include "engine/job_system.h"
@@ -838,7 +837,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		return m_resources;
 	}
 
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	Semaphore m_semaphore;
 	Mutex m_to_compile_mutex;
 	Mutex m_compiled_mutex;

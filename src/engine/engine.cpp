@@ -23,24 +23,21 @@
 namespace Lumix
 {
 
-static const u32 SERIALIZED_PROJECT_MAGIC = 0x5f50524c; // == '_PRL'
+static const u32 SERIALIZED_PROJECT_MAGIC = 0x5f50524c;
 
 void registerEngineAPI(lua_State* L, Engine* engine);
 
-struct PrefabResourceManager final : ResourceManager
-{
+struct PrefabResourceManager final : ResourceManager {
 	explicit PrefabResourceManager(IAllocator& allocator)
 		: m_allocator(allocator)
 		, ResourceManager(allocator)
 	{}
 
-	Resource* createResource(const Path& path) override
-	{
+	Resource* createResource(const Path& path) override {
 		return LUMIX_NEW(m_allocator, PrefabResource)(path, *this, m_allocator);
 	}
 
-	void destroyResource(Resource& resource) override
-	{
+	void destroyResource(Resource& resource) override {
 		return LUMIX_DELETE(m_allocator, &static_cast<PrefabResource&>(resource));
 	}
 
@@ -48,9 +45,7 @@ struct PrefabResourceManager final : ResourceManager
 };
 
 
-struct EngineImpl final : Engine
-{
-public:
+struct EngineImpl final : Engine {
 	void operator=(const EngineImpl&) = delete;
 	EngineImpl(const EngineImpl&) = delete;
 
@@ -65,8 +60,8 @@ public:
 		, m_smooth_time_delta(1/60.f)
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
-		, m_next_frame(false)\
-		//, m_lua_allocator(allocator, "lua")
+		, m_next_frame(false)
+		, m_lua_allocator(allocator, "lua")
 	{
 		for (float& f : m_last_time_deltas) f = 1/60.f;
 		os::init();
@@ -83,7 +78,6 @@ public:
 
 		m_is_log_file_open = m_log_file.open("lumix.log");
 		
-		profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
 		logInfo("Creating engine...");
@@ -94,12 +88,8 @@ public:
 
 		os::logInfo();
 
-		m_state = luaL_newstate();
-		#ifdef _WIN32
-			lua_setallocf(m_state, luaAlloc, this);
-		#endif
+		m_state = lua_newstate(luaAlloc, this);
 		luaL_openlibs(m_state);
-
 		registerEngineAPI(m_state, this);
 
 		if (init_data.file_system.get()) {
@@ -171,9 +161,11 @@ public:
 			return nullptr;
 		}
 		if (!ptr) {
+			ASSERT(osize == 0);
 			return engine->m_lua_allocator.allocate(nsize);
 		}
 
+		ASSERT(osize > 0);
 		return engine->m_lua_allocator.reallocate(ptr, nsize, osize);
 	}
 
@@ -456,12 +448,10 @@ public:
 	ResourceManagerHub& getResourceManager() override { return m_resource_manager; }
 	lua_State* getState() override { return m_state; }
 	float getLastTimeDelta() const override { return m_smooth_time_delta / m_time_multiplier; }
-	u64 getLuaAllocated() const override { return m_lua_allocated; }
 
 private:
-	debug::TagAllocator m_allocator;
-	// TODO replace with tag allocator
-	DefaultAllocator m_lua_allocator; 
+	TagAllocator m_allocator;
+	TagAllocator m_lua_allocator;
 	size_t m_lua_allocated = 0;
 	PageAllocator m_page_allocator;
 	UniquePtr<FileSystem> m_file_system;

@@ -29,6 +29,16 @@ i32 atomicSubtract(i32 volatile* addend, i32 value)
 	return _InterlockedExchangeAdd((volatile long*)addend, -value);
 }
 
+i64 atomicAdd(i64 volatile* addend, i64 value)
+{
+	return _InterlockedExchangeAdd64((volatile long long*)addend, value);
+}
+
+i64 atomicSubtract(i64 volatile* addend, i64 value)
+{
+	return _InterlockedExchangeAdd64((volatile long long*)addend, -value);
+}
+
 bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand)
 {
 	return _InterlockedCompareExchange((volatile long*)dest, exchange, comperand) == comperand;

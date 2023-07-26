@@ -109,23 +109,6 @@ private:
 	bool m_are_guards_enabled;
 };
 
-struct LUMIX_ENGINE_API TagAllocator final : IAllocator {
-	TagAllocator(IAllocator& allocator, const char* tag_name);
-
-	void* allocate(size_t size) override;
-	void deallocate(void* ptr) override;
-	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
-
-	void* allocate_aligned(size_t size, size_t align) override;
-	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
-
-	IAllocator* getParent() override { return &m_allocator; }
-
-	IAllocator& m_allocator;
-	const char* m_tag;
-};
-
 } // namespace Debug
 
 

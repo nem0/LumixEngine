@@ -194,8 +194,7 @@ public:
 	Vec3 evalVertexPose(const Pose& pose, u32 mesh, u32 index) const;
 
 public:
-	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LM2'
-	static const u32 MAX_LOD_COUNT = 4;
+	static constexpr u32 MAX_LOD_COUNT = 4;
 
 private:
 	Model(const Model&);

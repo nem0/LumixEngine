@@ -4,7 +4,6 @@
 #include "engine/array.h"
 #include "engine/atomic.h"
 #include "engine/command_line_parser.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/hash.h"
 #include "engine/log.h"
@@ -920,7 +919,7 @@ struct RendererImpl final : Renderer
 
 		u32 frame_data_mem = 0;
 		for (const Local<FrameData>& fd : m_frames) {
-			frame_data_mem += fd->linear_allocator.getCommited();
+			frame_data_mem += fd->linear_allocator.getCommitedBytes();
 		}
 		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
@@ -937,7 +936,7 @@ struct RendererImpl final : Renderer
 	}
 
 	Engine& m_engine;
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	Array<StaticString<32>> m_shader_defines;
 	jobs::Mutex m_render_mutex;
 	jobs::Mutex m_shader_defines_mutex;

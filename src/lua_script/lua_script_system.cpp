@@ -3,7 +3,6 @@
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/hash.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/allocator.h"
@@ -289,7 +288,7 @@ namespace Lumix
 		void serialize(OutputMemoryStream& stream) const override {}
 		bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
-		debug::TagAllocator m_allocator;
+		TagAllocator m_allocator;
 		Engine& m_engine;
 		LuaScriptManager m_script_manager;
 	};

@@ -27,6 +27,27 @@ struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 	Mutex m_mutex;
 };
 
+// set active_tag before calling its parent allocator, parent allocator can use the tag to e.g. group allocations
+struct LUMIX_ENGINE_API TagAllocator final : IAllocator {
+	TagAllocator(IAllocator& allocator, const char* tag_name);
+
+	void* allocate(size_t size) override;
+	void deallocate(void* ptr) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
+
+	void* allocate_aligned(size_t size, size_t align) override;
+	void deallocate_aligned(void* ptr) override;
+	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
+
+	IAllocator* getParent() override { return m_allocator; }
+	bool isTagAllocator() const override { return true; }
+
+	IAllocator* m_allocator;
+	const char* m_tag;
+
+	static thread_local const char* active_tag;
+};
+
 // detects memory leaks, just by counting number of allocations - very fast
 struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 	explicit BaseProxyAllocator(IAllocator& source);
@@ -61,14 +82,17 @@ struct LUMIX_ENGINE_API LinearAllocator : IAllocator {
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
 
-	u32 getCommited() const { return m_commited; }
+	u32 getCommitedBytes() const { return m_commited_bytes; }
+	static size_t getTotalCommitedBytes() { return g_total_commited_bytes; }
 
 private:
-	u32 m_commited;
+	u32 m_commited_bytes;
 	u32 m_reserved;
 	volatile i32 m_end;
 	u8* m_mem;
 	Mutex m_mutex;
+
+	static volatile i64 g_total_commited_bytes;
 };
 
 // one allocation from local memory backing (m_mem), use fallback allocator otherwise
@@ -127,5 +151,8 @@ private:
 	alignas(ALIGN) u8 m_mem[CAPACITY];
 	IAllocator& m_fallback;
 };
+
+// used for stuff that can't access engine's allocator, e.g. global objects constructed before engine such as logger
+LUMIX_ENGINE_API IAllocator& getGlobalAllocator();
 
 } // namespace Lumix

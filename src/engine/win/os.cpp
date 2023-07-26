@@ -34,7 +34,7 @@ struct EventQueue {
 	};
 
 	void pushBack(const Event& e) {
-		Rec* n = LUMIX_NEW(allocator, Rec);
+		Rec* n = LUMIX_NEW(getGlobalAllocator(), Rec);
 		n->prev = back;
 		if (back) back->next = n;
 		back = n;
@@ -48,7 +48,7 @@ struct EventQueue {
 		Rec* tmp = front;
 		front = tmp->next;
 		if (!front) back = nullptr;
-		LUMIX_DELETE(allocator, tmp);
+		LUMIX_DELETE(getGlobalAllocator(), tmp);
 		return e;
 	}
 
@@ -58,7 +58,6 @@ struct EventQueue {
 
 	Rec* front = nullptr;
 	Rec* back = nullptr;
-	DefaultAllocator allocator;
 };
 
 static struct

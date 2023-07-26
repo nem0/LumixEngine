@@ -3,7 +3,6 @@
 #include "animation/animation.h"
 #include "animation/property_animation.h"
 #include "animation/controller.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -56,7 +55,7 @@ struct AnimationSystemImpl final : ISystem
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	Engine& m_engine;
 	AnimResourceManager<Animation> m_animation_manager;
 	AnimResourceManager<PropertyAnimation> m_property_animation_manager;

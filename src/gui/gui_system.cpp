@@ -125,7 +125,7 @@ struct GUISystemImpl final : GUISystem
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	Engine& m_engine;
 	SpriteManager m_sprite_manager;
 	Interface* m_interface;

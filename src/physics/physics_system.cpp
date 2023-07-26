@@ -12,7 +12,6 @@
 #include <vehicle/PxVehicleSDK.h>
 
 #include "cooking/PxCooking.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -247,7 +246,7 @@ namespace Lumix
 		}
 
 
-		debug::TagAllocator m_allocator;
+		TagAllocator m_allocator;
 		physx::PxPhysics* m_physics;
 		physx::PxFoundation* m_foundation;
 		physx::PxControllerManager* m_controller_manager;

@@ -1,6 +1,5 @@
 #include "navigation_module.h"
 #include "animation/animation_module.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
@@ -47,7 +46,7 @@ struct NavigationSystem final : ISystem {
 
 	static NavigationSystem* s_instance;
 
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	Engine& m_engine;
 };
 

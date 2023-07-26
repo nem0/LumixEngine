@@ -105,10 +105,10 @@ struct ThreadContext
 static struct Instance
 {
 	Instance()
-		: contexts(allocator)
-		, trace_task(allocator)
-		, counters(allocator)
-		, global_context(default_global_context_size, allocator)
+		: contexts(getGlobalAllocator())
+		, trace_task(getGlobalAllocator())
+		, counters(getGlobalAllocator())
+		, global_context(default_global_context_size, getGlobalAllocator())
 	{
 		startTrace();
 	}
@@ -163,7 +163,7 @@ static struct Instance
 	ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
-			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(default_context_size, allocator);
+			ThreadContext* new_ctx = LUMIX_NEW(getGlobalAllocator(), ThreadContext)(default_context_size, getGlobalAllocator());
 			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
@@ -173,7 +173,6 @@ static struct Instance
 		return ctx;
 	}
 
-	DefaultAllocator allocator;
 	Array<Counter> counters;
 	Array<ThreadContext*> contexts;
 	Mutex mutex;
@@ -551,7 +550,7 @@ static void read(const ThreadContext& ctx, u32 p, T& value)
 }
 
 static void saveStrings(OutputMemoryStream& blob) {
-	HashMap<const char*, const char*> map(g_instance.allocator);
+	HashMap<const char*, const char*> map(getGlobalAllocator());
 	map.reserve(512);
 	auto gather = [&](const ThreadContext& ctx){
 		u32 p = ctx.begin;

@@ -87,7 +87,7 @@ struct StudioAppImpl final : StudioApp
 		, m_settings(*this)
 		, m_gui_plugins(m_allocator)
 		, m_mouse_plugins(m_allocator)
-		, m_systems(m_allocator)
+		, m_plugins(m_allocator)
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
 		, m_component_icons(m_allocator)
@@ -144,19 +144,7 @@ struct StudioAppImpl final : StudioApp
 		const bool handle_input = isFocused();
 		m_events.push(event);
 		switch (event.type) {
-			case os::Event::Type::MOUSE_MOVE: 
-				if (!m_cursor_captured) {
-					ImGuiIO& io = ImGui::GetIO();
-					const os::Point cp = os::getMouseScreenPos();
-					if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-						io.AddMousePosEvent((float)cp.x, (float)cp.y);
-					}
-					else {
-						const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
-						io.AddMousePosEvent((float)cp.x - screen_rect.left, (float)cp.y - screen_rect.top);
-					}
-				}
-				break;
+			case os::Event::Type::MOUSE_MOVE: break;
 			case os::Event::Type::FOCUS: {
 				ImGuiIO& io = ImGui::GetIO();
 				io.AddFocusEvent(isFocused());
@@ -180,21 +168,11 @@ struct StudioAppImpl final : StudioApp
 					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
 					if (vp) vp->PlatformRequestResize = true;
 				}
-				if (event.window == m_main_window && event.win_size.h > 0 && event.win_size.w > 0) {
-					m_settings.m_window.w = event.win_size.w;
-					m_settings.m_window.h = event.win_size.h;
-					m_settings.m_is_maximized = os::isMaximized(m_main_window);
-				}
 				break;
 			case os::Event::Type::WINDOW_MOVE:
 				if (ImGui::GetCurrentContext()) {
 					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
 					if (vp) vp->PlatformRequestMove = true;
-				}
-				if (event.window == m_main_window && !os::isMinimized(event.window)) {
-					m_settings.m_window.x = event.win_move.x;
-					m_settings.m_window.y = event.win_move.y;
-					m_settings.m_is_maximized = os::isMaximized(m_main_window);
 				}
 				break;
 			case os::Event::Type::WINDOW_CLOSE: {
@@ -250,8 +228,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void onIdle()
-	{
+	void onIdle() {
 		update();
 
 		if (m_settings.m_sleep_when_inactive && !isFocused()) {
@@ -350,7 +327,7 @@ struct StudioAppImpl final : StudioApp
 		m_windows.push(m_main_window);
 		logInfo("Current directory: ", current_dir);
 
-		createLua();
+		registerLuaAPI();
 		extractBundled();
 
 		m_asset_compiler = AssetCompiler::create(*this);
@@ -362,16 +339,17 @@ struct StudioAppImpl final : StudioApp
 
 		m_asset_browser = AssetBrowser::create(*this);
 		m_property_grid.create(*this);
-		m_profiler_ui = ProfilerUI::create(*this);
+		m_profiler_ui = createProfilerUI(*this);
 		m_log_ui.create(*this, m_allocator);
 
+		// TODO refactor so we don't need to call loadSettings twice
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
-		loadSettings();
-		initIMGUI();
+		loadSettings(); // needs imgui context
+		initIMGUI(); // needs settings
+		initPlugins(); // needs initialized imgui
+		loadSettings(); // needs plugins
 
-		setStudioApp();
-		loadSettings();
 		loadWorldFromCommandLine();
 
 		m_asset_compiler->onInitFinished();
@@ -403,10 +381,10 @@ struct StudioAppImpl final : StudioApp
 
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
-		for (auto* i : m_systems) {
+		for (auto* i : m_plugins) {
 			LUMIX_DELETE(m_allocator, i);
 		}
-		m_systems.clear();
+		m_plugins.clear();
 
 		for (auto* i : m_gui_plugins) {
 			LUMIX_DELETE(m_allocator, i);
@@ -668,6 +646,17 @@ struct StudioAppImpl final : StudioApp
 		}
 		io.DeltaTime = m_engine->getLastTimeDelta();
 
+		if (!m_cursor_captured) {
+			const os::Point cp = os::getMouseScreenPos();
+			if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+				io.AddMousePosEvent((float)cp.x, (float)cp.y);
+			}
+			else {
+				const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
+				io.AddMousePosEvent((float)cp.x - screen_rect.left, (float)cp.y - screen_rect.top);
+			}
+		}
+
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
 		if (!m_cursor_captured) {
@@ -767,7 +756,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (ComponentUID cmp = world->getFirstComponent(ents[0]); cmp.isValid(); cmp = world->getNextComponent(cmp)) {
-			for (auto* plugin : m_systems) {
+			for (auto* plugin : m_plugins) {
 				if (plugin->showGizmo(view, cmp)) break;
 			}
 		}
@@ -1997,6 +1986,14 @@ struct StudioAppImpl final : StudioApp
 		m_settings.m_is_entity_list_open = m_is_entity_list_open;
 		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
 
+		if (!os::isMinimized(m_main_window)) {
+			os::Rect win_rect = os::getWindowScreenRect(m_main_window);
+			m_settings.m_window.x = win_rect.left;
+			m_settings.m_window.y = win_rect.top;
+			m_settings.m_window.w = win_rect.width;
+			m_settings.m_window.h = win_rect.height;
+		}
+
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
 		}
@@ -2517,7 +2514,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	IPlugin* getIPlugin(const char* name) override {
-		for (auto* i : m_systems) {
+		for (auto* i : m_plugins) {
 			if (equalStrings(i->getName(), name)) return i;
 		}
 		return nullptr;
@@ -2531,20 +2528,45 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void initPlugins()
-	{
-		for (int i = 1, c = m_systems.size(); i < c; ++i) {
+	void initPlugins() {
+		#ifdef STATIC_PLUGINS
+			#define LUMIX_EDITOR_PLUGINS
+			#include "engine/plugins.inl"
+			#undef LUMIX_EDITOR_PLUGINS
+		#else
+			auto& plugin_manager = m_engine->getSystemManager();
+			for (auto* lib : plugin_manager.getLibraries())
+			{
+				auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) os::getLibrarySymbol(lib, "setStudioApp");
+				if (f)
+				{
+					StudioApp::IPlugin* plugin = f(*this);
+					if (plugin) addPlugin(*plugin);
+				}
+			}
+		#endif
+		addPlugin(*createSplineEditor(*this));
+		addPlugin(*m_property_grid.get());
+		addPlugin(*m_log_ui.get());
+		addPlugin(*m_asset_browser.get());
+		addPlugin(*m_profiler_ui.get());
+
+		for (IPlugin* plugin : m_plugins) {
+			logInfo("Studio plugin ", plugin->getName(), " loaded");
+		}
+
+		for (int i = 1, c = m_plugins.size(); i < c; ++i) {
 			for (int j = 0; j < i; ++j) {
-				IPlugin* p = m_systems[i];
-				if (m_systems[j]->dependsOn(*p)) {
-					m_systems.erase(i);
+				IPlugin* p = m_plugins[i];
+				if (m_plugins[j]->dependsOn(*p)) {
+					m_plugins.erase(i);
 					--i;
-					m_systems.insert(j, p);
+					m_plugins.insert(j, p);
 				}
 			}
 		}
 
-		for (IPlugin* plugin : m_systems) {
+		for (IPlugin* plugin : m_plugins) {
 			plugin->init();
 		}
 
@@ -2578,10 +2600,11 @@ struct StudioAppImpl final : StudioApp
 				registerComponent(r->icon, r->component_type, r->label);
 			}
 		}
+		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}
 
 
-	void addPlugin(IPlugin& plugin) override { m_systems.push(&plugin); }
+	void addPlugin(IPlugin& plugin) override { m_plugins.push(&plugin); }
 
 
 	void addPlugin(GUIPlugin& plugin) override
@@ -2597,38 +2620,6 @@ struct StudioAppImpl final : StudioApp
 	void addPlugin(MousePlugin& plugin) override { m_mouse_plugins.push(&plugin); }
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
-
-	void setStudioApp()
-	{
-#ifdef STATIC_PLUGINS
-		#define LUMIX_EDITOR_PLUGINS
-		#include "engine/plugins.inl"
-		#undef LUMIX_EDITOR_PLUGINS
-#else
-		auto& plugin_manager = m_engine->getSystemManager();
-		for (auto* lib : plugin_manager.getLibraries())
-		{
-			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) os::getLibrarySymbol(lib, "setStudioApp");
-			if (f)
-			{
-				StudioApp::IPlugin* plugin = f(*this);
-				if (plugin) addPlugin(*plugin);
-			}
-		}
-#endif
-		addPlugin(*createSplineEditor(*this));
-		addPlugin(*m_property_grid.get());
-		addPlugin(*m_log_ui.get());
-		addPlugin(*m_asset_browser.get());
-		addPlugin(*m_profiler_ui.get());
-
-		for (IPlugin* plugin : m_systems) {
-			logInfo("Studio plugin ", plugin->getName(), " loaded");
-		}
-
-		initPlugins();
-		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
-	}
 
 
 	void runScript(const char* src, const char* script_name) override
@@ -2889,7 +2880,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void createLua()
+	void registerLuaAPI()
 	{
 		lua_State* L = m_engine->getState();
 
@@ -3329,8 +3320,8 @@ struct StudioAppImpl final : StudioApp
 
 	DefaultAllocator m_main_allocator;
 	debug::Allocator m_debug_allocator;
-	debug::TagAllocator m_allocator;
-	debug::TagAllocator m_imgui_allocator;
+	TagAllocator m_allocator;
+	TagAllocator m_imgui_allocator;
 	
 	UniquePtr<Engine> m_engine;
 	UniquePtr<WorldEditor> m_editor;
@@ -3352,7 +3343,7 @@ struct StudioAppImpl final : StudioApp
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
-	Array<IPlugin*> m_systems;
+	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 
 	Array<StaticString<LUMIX_MAX_PATH>> m_worlds;
@@ -3374,7 +3365,7 @@ struct StudioAppImpl final : StudioApp
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
-	UniquePtr<ProfilerUI> m_profiler_ui;
+	UniquePtr<GUIPlugin> m_profiler_ui;
 	Local<LogUI> m_log_ui;
 	Settings m_settings;
 	

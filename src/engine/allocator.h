@@ -15,6 +15,7 @@ namespace Lumix {
 struct LUMIX_ENGINE_API IAllocator {
 	virtual ~IAllocator() {}
 	virtual bool isDebug() const { return false; }
+	virtual bool isTagAllocator() const { return false; }
 	virtual IAllocator* getParent() { return nullptr; }
 
 	virtual void* allocate(size_t size) = 0;

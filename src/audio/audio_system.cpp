@@ -70,7 +70,7 @@ struct AudioSystemImpl final : AudioSystem {
 
 
 	Engine& m_engine;
-	debug::TagAllocator m_allocator;
+	TagAllocator m_allocator;
 	ClipManager m_manager;
 	UniquePtr<AudioDevice> m_device;
 };
