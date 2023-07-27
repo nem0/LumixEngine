@@ -10,7 +10,9 @@
 #include "editor/asset_browser.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
+#include "renderer/draw_stream.h"
 #include "renderer/texture.h"
+#include "renderer/renderer.h"
 #include "stb/stb_image.h"
 #include <math.h>
 #include <stb/stb_image_resize.h>
@@ -49,10 +51,48 @@ enum class CompositeTexture::NodeType : u32 {
 	SPLATTER,
 	GRADIENT_MAP,
 	TRANSLATE,
-	CIRCULAR_SPLATTER
+	CIRCULAR_SPLATTER,
+	PIXEL_PROCESSOR,
+	PIXEL_COLOR,
+	PIXEL_X,
+	PIXEL_Y,
+	PIXEL_CTX_W,
+	PIXEL_CTX_H,
+	DIVIDE,
+	MIN,
+	MAX
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
+
+CompositeTexture::PixelData::PixelData(IAllocator& allocator)
+	: pixels(allocator)
+{}
+
+CompositeTexture::PixelData::PixelData(u32 w, u32 h, u32 channels, IAllocator& allocator)
+	: w(w)
+	, h(h)
+	, channels(channels)
+	, pixels(allocator)
+{
+	pixels.resize(w * h * channels);
+}
+
+void CompositeTexture::PixelData::init(u32 _w, u32 _h, u32 _channels) {
+	w = _w;
+	h = _h;
+	channels = _channels;
+	pixels.resize(w * h * channels);
+}
+
+OutputMemoryStream CompositeTexture::PixelData::asU8() const {
+	OutputMemoryStream res(pixels.getAllocator());
+	res.resize(w * h * channels);
+	for (u32 i = 0; i < u32(w * h * channels); ++i) {
+		res[i] = u8(clamp(pixels[i] * 255.f, 0.f, 255.f) + 0.5f);
+	}
+	return static_cast<OutputMemoryStream&&>(res);
+}
 
 void CompositeTexture::Node::inputSlot() {
 	ImGuiEx::Pin(m_id | (m_input_counter << 16), true);
@@ -64,11 +104,38 @@ void CompositeTexture::Node::outputSlot() {
 	++m_output_counter;
 }
 
+
+bool CompositeTexture::Node::generate() {
+	if (!m_dirty && !m_outputs.empty()) return true;
+
+	m_error = "";
+	m_outputs.clear();
+
+	bool res = generateInternal();
+	if (res) m_dirty = false;
+	return res;
+}
+
+void CompositeTexture::Node::markDirty() {
+	if (m_preview) {
+		Renderer* renderer = (Renderer*)m_resource->m_app.getEngine().getSystemManager().getSystem("renderer");
+		renderer->getEndFrameDrawStream().destroy(m_preview);
+		m_preview = gpu::INVALID_TEXTURE;
+	}
+	m_dirty = true;
+	for (const Link& link : m_resource->m_links) {
+		if (link.getFromNode() != m_id) continue;
+		CompositeTexture::Node* n = m_resource->getNodeByID(link.getToNode());
+		n->markDirty();
+	}
+}
+
 bool CompositeTexture::Node::nodeGUI() {
 	m_input_counter = 0;
 	m_output_counter = 0;
 	ImGuiEx::BeginNode(m_id, m_pos, &m_selected);
 	bool res = gui();
+
 	if (m_error.length() > 0) {
 		ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xff, 0, 0, 0xff));
 	}
@@ -83,6 +150,10 @@ bool CompositeTexture::Node::nodeGUI() {
 	else if (!m_reachable) {
 		ImGui::PopStyleColor();
 	}
+	if (res) {
+		markDirty();
+ 		generate();
+	}
 	return res;
 }
 
@@ -91,8 +162,9 @@ struct CompositeTexture::Node::Input {
 	u32 output_idx;
 
 	operator bool() const { return node; }
-	bool getPixelData(CompositeTexture::PixelData* data) const {
-		return node->getPixelData(data, output_idx);
+
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) const {
+		return node->getValue(ctx);
 	}
 };
 
@@ -156,10 +228,22 @@ CompositeTexture::Node* CompositeTexture::getNodeByID(u16 id) const {
 	return nullptr;
 }
 
-bool CompositeTexture::Node::getInputPixelData(u32 pin_idx, PixelData* pd) {
+CompositeTexture::ValueResult CompositeTexture::Node::getInputValue(u32 pin_idx, const CompositeTexture::PixelContext& ctx) {
 	const Input input = getInput(pin_idx);
-	if (!input) return error("Missing input");
-	return input.getPixelData(pd);
+	if (!input) return errorValue("Missing input");
+	return input.getValue(ctx);
+}
+
+bool CompositeTexture::Node::generateInput(u32 pin_idx) {
+	const Input input = getInput(pin_idx);
+	if (!input) return error("Invalid input");
+	return input.node->generate();
+}
+
+CompositeTexture::PixelData& CompositeTexture::Node::getInputPixelData(u32 pin_idx) const {
+	const Input input = getInput(pin_idx);
+	ASSERT(input);
+	return input.node->m_outputs[input.output_idx];
 }
 
 CompositeTexture::Node::Input CompositeTexture::Node::getInput(u32 pin_idx) const {
@@ -178,29 +262,6 @@ CompositeTexture::Node::Input CompositeTexture::Node::getInput(u32 pin_idx) cons
 
 namespace {
 
-bool resize(CompositeTexture::PixelData* pd, u32 w, u32 h) {
-	if (pd->w == w && pd->h == h) return true;
-
-	OutputMemoryStream tmp(pd->pixels.getAllocator());
-	tmp.resize(w * h * pd->channels);
-	const i32 res = stbir_resize_uint8(pd->pixels.data(), pd->w, pd->h, 0, tmp.getMutableData(), w, h, 0, pd->channels);
-	pd->pixels = tmp;
-	pd->w = w;
-	pd->h = h;
-	return res == 1;
-}
-
-void makeSameSize(CompositeTexture::PixelData* a, CompositeTexture::PixelData* b) {
-	if (a->w == b->w && a->h == b->h) return;
-
-	if (a->w * a->h > b->w * b->h) {
-		resize(b, a->w, a->h);
-	}
-	else {
-		resize(a, b->w, b->h);
-	}
-}
-
 struct SplitNode final : CompositeTexture::Node {
 	SplitNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -209,19 +270,20 @@ struct SplitNode final : CompositeTexture::Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, &tmp)) return false;
-		if (output_idx >= tmp.channels) return error("Not enough channels");
+	bool generateInternal() override {
+		m_outputs.clear();
+		if (!generateInput(0)) return false;
+		
+		CompositeTexture::PixelData& input = getInputPixelData(0);
 
-		data->channels = 1;
-		data->w = tmp.w;
-		data->h = tmp.h;
-		data->pixels.resize(tmp.w * tmp.h);
-		u8* dst = data->pixels.getMutableData();
-		const u8* src = tmp.pixels.data();
-		for (u32 i = 0; i < tmp.w * tmp.h; ++i) {
-			dst[i] = src[i * tmp.channels + output_idx];
+		for (u32 ch = 0; ch < input.channels; ++ch) {
+			CompositeTexture::PixelData& o = m_outputs.emplace(input.w, input.h, 1, m_allocator);
+			
+			float* dst = o.pixels.begin();
+			const float* src = input.pixels.begin();
+			for (u32 i = 0; i < input.w * input.h; ++i) {
+				dst[i] = src[i * input.channels + ch];
+			}
 		}
 		return true;
 	}
@@ -245,40 +307,38 @@ struct MergeNode final : CompositeTexture::Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+	bool generateInternal() override {
 		const Input inputs[] = { getInput(0), getInput(1), getInput(2), getInput(3) };
 		u32 channels_count = 0;
 		for (u32 i = 0; i < 4; ++i) {
 			if (!inputs[i]) break;
+			if (!generateInput(0)) return error("Invalid input");
 			++channels_count;
 		}
 		
 		for (u32 i = channels_count; i < 4; ++i) {
 			if (inputs[i]) return error("Missing input");	
 		}
+		if (channels_count == 0) return error("Missing inputs");
+		
+		const CompositeTexture::PixelData& r = getInputPixelData(0);
+		if (r.channels != 1) return error("Input must have only one channel");
 
-		CompositeTexture::PixelData first_pd(m_resource->m_app.getAllocator());
-		if (!inputs[0].getPixelData(&first_pd)) return false;
-		if (first_pd.channels != 1) return error("Incorrect number of channels");
+		CompositeTexture::PixelData& out = m_outputs.emplace(r.w, r.h, channels_count, m_allocator);
 
-		data->w = first_pd.w;
-		data->h = first_pd.h;
-		data->channels = channels_count;
-		data->pixels.resize(channels_count * first_pd.w * first_pd.h);
-		u8* dst = data->pixels.getMutableData();
-		const u8* first_src = first_pd.pixels.data();
-		for (u32 i = 0; i < first_pd.w * first_pd.h; ++i) {
+		float* dst = out.pixels.data();
+		const float* first_src = r.pixels.data();
+		for (u32 i = 0; i < r.w * r.h; ++i) {
 			dst[i * channels_count] = first_src[i];
 		}
 
 		for (u32 i = 1; i < channels_count; ++i) {
-			CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-			if (!inputs[i].getPixelData(&tmp)) return false;
-			if (tmp.channels != 1) return error("Incorrect number of channels");
-			resize(&tmp, first_pd.w, first_pd.h);
+			const CompositeTexture::PixelData& p = getInputPixelData(i);
+			if (p.channels != 1) return error("Input must have only one channel");
+			if (p.w != r.w || p.h != r.h) return error("Inputs must have matching sizes");
 			
-			const u8* src = tmp.pixels.data();
-			for (u32 j = 0; j < tmp.w * tmp.h; ++j) {
+			const float* src = p.pixels.data();
+			for (u32 j = 0; j < p.w * p.h; ++j) {
 				dst[j * channels_count + i] = src[j];
 			}
 		}
@@ -312,25 +372,17 @@ struct ConstantNode final : CompositeTexture::Node {
 	void deserialize(InputMemoryStream& blob) override {
 		blob.read(value);
 	}
-
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->w = 4;
-		data->h = 4;
-		data->channels = 1;
-		data->pixels.reserve(4 * 4);
-		for (u32 i = 0; i < 16; ++i) {
-			data->pixels.write(u8(value));
-		}
-		return true;
-	}
+	
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override { return value; }
+	bool generateInternal() override { return error("Invalid context"); }
 
 	bool gui() override {
 		ImGuiEx::NodeTitle("Constant");
 		outputSlot();
-		return ImGui::SliderInt("Value", &value, 0, 255);
+		return ImGui::DragFloat("Value", &value, 0.01f, -FLT_MAX, FLT_MAX);
 	}
 
-	i32 value = 0xff;
+	float value = 1.f;
 };
 
 struct ColorNode final : CompositeTexture::Node {
@@ -348,15 +400,15 @@ struct ColorNode final : CompositeTexture::Node {
 	void deserialize(InputMemoryStream& blob) override {
 		blob.read(color);
 	}
+	
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		return color;
+	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->w = 4;
-		data->h = 4;
-		data->channels = 4;
-		data->pixels.reserve(4 * 4 * 4);
-		const u8 u8color[] = { u8(color.x * 0xff + 0.5f), u8(color.y * 0xff + 0.5f), u8(color.z * 0xff + 0.5f), u8(color.w * 0xff + 0.5f) };
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(4, 4, 4, m_allocator);
 		for (u32 i = 0; i < 16; ++i) {
-			data->pixels.write(u8color, sizeof(u8color));
+			memcpy(&out.pixels[i * 4], &color, sizeof(color));
 		}
 		return true;
 	}
@@ -386,34 +438,26 @@ struct FlipNode final : CompositeTexture::Node {
 		blob.read(horizontal);
 	}
 	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
-		u8* ptr = data->pixels.getMutableData();
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+
+		const float* src = in.pixels.data();
+		float* dst = out.pixels.data();
 		if (horizontal) {
-			for (u32 j = 0; j < data->h; ++j) {
-				for (u32 i = 0; i < data->w / 2; ++i) {
-					u32 tmp;
-					u8* p0 = ptr + (i + j * data->w) * data->channels;
-					u8* p1 = ptr + (data->w - i - 1 + j * data->w) * data->channels;
-				
-					memcpy(&tmp, p0, data->channels);
-					memcpy(p0, p1, data->channels);
-					memcpy(p1, &tmp, data->channels);
+			for (u32 j = 0; j < in.h; ++j) {
+				for (u32 i = 0; i < in.w; ++i) {
+					memcpy(&dst[(i + j * in.w) * in.channels], &src[(in.w - i - 1 + j * in.w) * in.channels], sizeof(float) * in.channels);
 				}
 			}
 			return true;
 		}
 
-		for (u32 j = 0; j < data->h / 2; ++j) {
-			for (u32 i = 0; i < data->w; ++i) {
-				u32 tmp;
-				u8* p0 = ptr + (i + j * data->w) * data->channels;
-				u8* p1 = ptr + (i + (data->h - j - 1) * data->w) * data->channels;
-				
-				memcpy(&tmp, p0, data->channels);
-				memcpy(p0, p1, data->channels);
-				memcpy(p1, &tmp, data->channels);
+		for (u32 j = 0; j < in.h; ++j) {
+			for (u32 i = 0; i < in.w; ++i) {
+				memcpy(&dst[(i + j * in.w) * in.channels], &src[(i + (in.h - j - 1) * in.w) * in.channels], sizeof(float) * in.channels);
 			}
 		}
 		return true;
@@ -430,6 +474,85 @@ struct FlipNode final : CompositeTexture::Node {
 
 	bool horizontal = false;
 };
+
+template <CompositeTexture::NodeType TYPE>
+struct PixelNode final : CompositeTexture::Node {
+	PixelNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return TYPE; }
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+	void serialize(OutputMemoryStream& blob) const override {}
+	void deserialize(InputMemoryStream& blob) override {}
+	
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_COLOR) return ctx.color;
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_X) return (float)ctx.x;
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_Y) return (float)ctx.y;
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_CTX_W) return (float)ctx.image->w;
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_CTX_H) return (float)ctx.image->h;
+	}
+
+	bool generateInternal() override { return error("Invalid context"); }
+
+	bool gui() override {
+		outputSlot();
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_COLOR) ImGui::TextUnformatted("Pixel");
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_X) ImGui::TextUnformatted("Pixel X");
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_Y) ImGui::TextUnformatted("Pixel Y");
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_CTX_W) ImGui::TextUnformatted("Pixel context width");
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_CTX_H) ImGui::TextUnformatted("Pixel context height");
+		return false;
+	}
+};
+
+
+struct PixelProcessorNode final : CompositeTexture::Node {
+	PixelProcessorNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::PIXEL_PROCESSOR; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	void serialize(OutputMemoryStream& blob) const override {}
+	void deserialize(InputMemoryStream& blob) override {}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::Node::Input i1 = getInput(1);
+		if (!i1) return error("Invalid input");
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+
+		CompositeTexture::PixelContext ctx;
+		ctx.image = &in;
+		for (u32 j = 0; j < in.h; ++j) {
+			ctx.y = j;
+			for (u32 i = 0; i < in.w; ++i) {
+				ctx.x = i;
+				ctx.color = Vec4(0);
+				memcpy(&ctx.color, &in.pixels[(i + j * in.w) * in.channels], in.channels * sizeof(float));
+				CompositeTexture::ValueResult r = i1.getValue(ctx);
+				if (!r.isValid()) return error("Invalid pixel");
+				
+				memcpy(&out.pixels[(i + j * out.w) * out.channels], &r.value, out.channels * sizeof(float));
+			}
+		}
+		return true;
+	}
+
+	bool gui() override {
+		ImGuiEx::NodeTitle("Pixel processor");
+		inputSlot();
+		outputSlot();
+		ImGui::TextUnformatted("Image");
+		inputSlot();
+		ImGui::TextUnformatted("Pixel");
+		return false;
+	}
+};
+
 
 struct RandomPixelsNode final : CompositeTexture::Node {
 	RandomPixelsNode(IAllocator& allocator) : Node(allocator) {}
@@ -450,14 +573,12 @@ struct RandomPixelsNode final : CompositeTexture::Node {
 		blob.read(seed);
 	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+		
 		RandomGenerator rng(seed);
-		data->w = w;
-		data->h = h;
-		data->channels = 1;
-		data->pixels.resize(w * h);
 		for (u32 i = 0; i < w * h; ++i) {
-			data->pixels[i] = u8(rng.rand() % 256);
+			out.pixels[i] = rng.randFloat();
 		}
 		return true;
 	}
@@ -491,14 +612,12 @@ struct GradientNode final : CompositeTexture::Node {
 		blob.read(size);
 	}
 	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->pixels.resize(size);
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(size, 1, 1, m_allocator); 
+		
 		for (u32 i = 0; i < size; ++i) {
-			data->pixels[i] = 255 * i / (size - 1);
+			out.pixels[i] = float(i) / (size - 1);
 		}
-		data->channels = 1;
-		data->w = size;
-		data->h = 1;
 		return true;
 	}
 	
@@ -527,18 +646,31 @@ struct GammaNode final : CompositeTexture::Node {
 	void deserialize(InputMemoryStream& blob) override {
 		blob.read(gamma);
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
 
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
-			const bool is_alpha = data->channels == 4 && i % 4 == 3;
-			if (is_alpha) continue;
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult a = getInputValue(0, ctx);
+		if (!a.isValid()) return errorValue("Error");
 
-			float v = data->pixels[i] / 255.f;
-			v = powf(v, 1 / gamma);
-			v = clamp(v * 255.f, 0.f, 255.f);
-			data->pixels[i] = u8(v + 0.5f);
+		for (u32 i = 0; i < a.channels; ++i) {
+			a.value[i] = powf(a.value[i], 1 / gamma);
+		}
+		return a;
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+
+		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
+			const bool is_alpha = in.channels == 4 && i % 4 == 3;
+			if (is_alpha) {
+				out.pixels[i] = in.pixels[i];
+				continue;
+			}
+
+			out.pixels[i] = powf(in.pixels[i], 1 / gamma);
 		}
 		return true;
 	}
@@ -556,26 +688,82 @@ struct GammaNode final : CompositeTexture::Node {
 	float gamma = 2.2f;
 };
 
+template <CompositeTexture::NodeType TYPE>
+struct MathNode final : CompositeTexture::Node {
+	MathNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return TYPE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	template <typename T>
+	auto op(T a, T b) {
+		if constexpr (TYPE == CompositeTexture::NodeType::DIVIDE) return a / b;
+		if constexpr (TYPE == CompositeTexture::NodeType::MAX) return maximum(a, b);
+		if constexpr (TYPE == CompositeTexture::NodeType::MIN) return minimum(a, b);
+	}
+
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult a = getInputValue(0, ctx);
+		if (!a.isValid()) return a;
+
+		CompositeTexture::ValueResult b = getInputValue(1, ctx);
+		if (!b.isValid()) return b;
+
+		if (a.isFloat() && b.isFloat()) return op(a.value.x, b.value.x);
+		ASSERT(a.channels == b.channels && a.channels == 4);
+		return op(a.value, b.value);
+	}
+
+	bool generateInternal() override { return error("Invalid context"); }
+
+	bool gui() override {
+		if constexpr (TYPE == CompositeTexture::NodeType::DIVIDE) ImGuiEx::NodeTitle("Divide");
+		if constexpr (TYPE == CompositeTexture::NodeType::MAX) ImGuiEx::NodeTitle("Max");
+		if constexpr (TYPE == CompositeTexture::NodeType::MIN) ImGuiEx::NodeTitle("Min");
+		
+		ImGui::BeginGroup();
+		inputSlot(); ImGui::TextUnformatted("A");
+		inputSlot(); ImGui::TextUnformatted("B");
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return false;
+	}
+};
+
 struct MultiplyNode final : CompositeTexture::Node {
 	MultiplyNode(IAllocator& allocator) : Node(allocator) {}
 
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::MULTIPLY; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, data)) return false;
-		if (!getInputPixelData(1, &tmp)) return false;
-		if (tmp.channels != data->channels) return error("Number of channel does not match");
-		makeSameSize(&tmp, data);
 
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
-			const float a = tmp.pixels[i];
-			const float b = data->pixels[i];
-			float v = (a * b) / 255.f;
-			v = clamp(v, 0.f, 255.f);
-			data->pixels[i] = u8(v + 0.5f);
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult a = getInputValue(0, ctx);
+		if (!a.isValid()) return {};
+
+		CompositeTexture::ValueResult b = getInputValue(1, ctx);
+		if (!b.isValid()) return {};
+
+		if (a.isFloat() && b.isFloat()) return a.value.x * b.value.x;
+		return a.value * b.value;
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+		if (!generateInput(1)) return false;
+
+		CompositeTexture::PixelData& in0 = getInputPixelData(0);
+		CompositeTexture::PixelData& in1 = getInputPixelData(1);
+		if (in0.channels != in1.channels) return error("Number of channel does not match");
+		if (in0.w != in1.w) return error("Width does not match");
+		if (in0.h != in1.h) return error("Height does not match");
+		
+		CompositeTexture::PixelData& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator); 
+
+		for (u32 i = 0, c = (u32)in0.pixels.size(); i < c; ++i) {
+			out.pixels[i] = in0.pixels[i] * in1.pixels[i];
 		}
 		return true;
 	}
@@ -610,24 +798,20 @@ struct ResizeNode final : CompositeTexture::Node {
 		blob.read(size);
 		blob.read(scale);
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
 		
-		const u32 w = type == Type::PIXELS ? size.x : u32(data->w * scale.x * 0.01f + 0.5f);
-		const u32 h = type == Type::PIXELS ? size.y : u32(data->h * scale.y * 0.01f + 0.5f);
-		if (data->w == w && data->h == h) return true;
-
-		OutputMemoryStream tmp(m_resource->m_app.getAllocator());
-		tmp.resize(w * h * data->channels);
-
-		const i32 res = stbir_resize_uint8(data->pixels.data(), data->w, data->h, 0, tmp.getMutableData(), w, h, 0, data->channels);
-		data->w = w;
-		data->h = h;
-		data->pixels = tmp;
+		const u32 w = type == Type::PIXELS ? size.x : u32(in.w * scale.x * 0.01f + 0.5f);
+		const u32 h = type == Type::PIXELS ? size.y : u32(in.h * scale.y * 0.01f + 0.5f);
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
+		
+		const i32 res = stbir_resize_float(in.pixels.data(), in.w, in.h, 0, out.pixels.data(), w, h, 0, out.channels);
 		if (res != 1) return error("Failed to resize image");
 		return true;
-	}
+	}	
 
 	bool gui() override {
 		ImGuiEx::NodeTitle("Resize");
@@ -703,19 +887,16 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
 		return res;
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->w = w;
-		data->h = h;
-		data->channels = 1;
-		data->pixels.resize(w * h);
+
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+
 		for (u32 j = 0; j < h; ++j) {
 			const float v = j / float(h - 1);
 			for (u32 i = 0; i < w; ++i) {
 				float u = i / float(w - 1);
 				float d = noise(Vec2(u, v) * scale + offset) * 0.5f + 0.5f;
-				d = clamp(d * 255.f, 0.f, 255.f);
-				data->pixels[i + j * w] = u8(d + 0.5f);
+				out.pixels[i + j * w] = d;
 			}
 		}
 		return true;
@@ -782,19 +963,16 @@ struct SimplexNode final : CompositeTexture::Node {
 		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
 		return res;
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->w = w;
-		data->h = h;
-		data->channels = 1;
-		data->pixels.resize(w * h);
+
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+
 		for (u32 j = 0; j < h; ++j) {
 			const float v = j / float(h - 1);
 			for (u32 i = 0; i < w; ++i) {
 				float u = i / float(w - 1);
 				float d = noise(Vec2(u, v) * scale);
-				d = clamp(d * 255.f, 0.f, 255.f);
-				data->pixels[i + j * w] = u8(d + 0.5f);
+				out.pixels[i + j * w] = d;
 			}
 		}
 		return true;
@@ -853,19 +1031,16 @@ struct CellularNoiseNode final : CompositeTexture::Node {
 		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
 		return res;
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->w = w;
-		data->h = h;
-		data->channels = 1;
-		data->pixels.resize(w * h);
+
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+
 		for (u32 j = 0; j < h; ++j) {
 			const float v = j / float(h - 1);
 			for (u32 i = 0; i < w; ++i) {
 				float u = i / float(w - 1);
 				float d = voronoi(Vec2(u, v) * scale).x;
-				d = clamp(d * 255.f, 0.f, 255.f);
-				data->pixels[i + j * w] = u8(d + 0.5f);
+				out.pixels[i + j * w] = d;
 			}
 		}
 		return true;
@@ -899,23 +1074,35 @@ struct SetAlphaNode final : CompositeTexture::Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData rgb(m_resource->m_app.getAllocator());
-		CompositeTexture::PixelData a(m_resource->m_app.getAllocator());
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult rgb = getInputValue(0, ctx);
+		CompositeTexture::ValueResult a = getInputValue(1, ctx);
+		if (!rgb.isValid() || !a.isValid()) return errorValue("Invalid input");
+		if (rgb.channels < 3) return errorValue("First input must have at least 3 channels");
+		if (a.channels != 1) return errorValue("Second input must have only 1 channel");
 		
-		if (!getInputPixelData(0, &rgb)) return false;
-		if (!getInputPixelData(1, &a)) return false;
-		if (rgb.channels < 3) return error("Input must have at least 3 channels");
-		makeSameSize(&rgb, &a);
-		data->w = rgb.w;
-		data->h = rgb.h;
-		data->channels = 4;
-		data->pixels.resize(data->w * data->h * 4);
+		return Vec4(rgb.value.xyz(), a.value.x);
+	}
+
+	
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+		if (!generateInput(1)) return false;
+
+		CompositeTexture::PixelData& rgb = getInputPixelData(0);
+		CompositeTexture::PixelData& a = getInputPixelData(1);
+		if (rgb.channels < 3) return error("First input must have at least 3 channels");
+		if (a.channels != 1) return error("Second input must have only 1 channel");
+		if (rgb.w != a.w) return error("Width does not match");
+		if (rgb.h != a.h) return error("Height does not match");
 		
-		for (u32 i = 0; i < data->w * data->h; ++i) {
-			memcpy(&data->pixels[i * 4], &rgb.pixels[i * rgb.channels], rgb.channels);
-			data->pixels[i * 4 + 3] = a.pixels[i * a.channels + a.channels - 1];
+		CompositeTexture::PixelData& out = m_outputs.emplace(rgb.w, rgb.h, 4, m_allocator); 
+
+		for (u32 i = 0; i < out.w * out.h; ++i) {
+			memcpy(&out.pixels[i * 4], &rgb.pixels[i * rgb.channels], rgb.channels * sizeof(float));
+			out.pixels[i * 4 + 3] = a.pixels[i];
 		}
+
 		return true;
 	}
 
@@ -947,21 +1134,18 @@ struct TranslateNode final : CompositeTexture::Node {
 		blob.read(x);
 		blob.read(y);
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, &tmp)) return false;
 
-		data->w = tmp.w;
-		data->h = tmp.h;
-		data->channels = tmp.channels;
-		data->pixels.resize(data->w * data->h * data->channels);
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
-		for (u32 j = 0; j < data->h; ++j) {
-			for (u32 i = 0; i < data->w; ++i) {
-				memcpy(&data->pixels[(((x + i) % data->w) + ((y + j) % data->h) * data->w) * data->channels]
-					, &tmp.pixels[(i + j * tmp.w) * tmp.channels]
-					, data->channels);
+		for (u32 j = 0; j < in.h; ++j) {
+			for (u32 i = 0; i < in.w; ++i) {
+				memcpy(&out.pixels[(((x + i) % out.w) + ((y + j) % out.h) * out.w) * out.channels]
+					, &in.pixels[(i + j * in.w) * in.channels]
+					, in.channels * sizeof(float));
 			}
 		}
 		return true;
@@ -1004,23 +1188,20 @@ struct CropNode final : CompositeTexture::Node {
 		blob.read(h);
 	}
 	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
-		if (x + w > data->w) return error("Out of bounds access");
-		if (y + h > data->h) return error("Out of bounds access");
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
-		OutputMemoryStream tmp(m_resource->m_app.getAllocator());
-		tmp.resize(w * h * data->channels);
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		if (x + w > in.w) return error("Out of bounds access");
+		if (y + h > in.h) return error("Out of bounds access");
+
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
+		
 		for (u32 j = 0; j < h; ++j) {
-			for (u32 i = 0; i < w; ++i) {
-				memcpy(&tmp[(i + j * w) * data->channels]
-				, &data->pixels[((x + i) + (y + j) * data->w) * data->channels]
-				, data->channels);
-			}
+			memcpy(&out.pixels[j * w * out.channels]
+				, &in.pixels[(x + (y + j) * in.w) * in.channels]
+				, w * in.channels * sizeof(float));
 		}
-		data->pixels = static_cast<OutputMemoryStream&&>(tmp);
-		data->w = w;
-		data->h = h;
 		return true;
 	}
 
@@ -1051,9 +1232,17 @@ struct StaticSwitchNode final : CompositeTexture::Node {
 	void serialize(OutputMemoryStream& blob) const override { blob.write(m_is_on); }
 	void deserialize(InputMemoryStream& blob) override { blob.read(m_is_on); }
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (m_is_on) return getInputPixelData(0, data);
-		return getInputPixelData(1, data);
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		return getInputValue(m_is_on ? 0 : 1, ctx);
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(m_is_on ? 0 : 1)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(m_is_on ? 0 : 1);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+		memcpy(out.pixels.begin(), in.pixels.begin(), in.pixels.byte_size());
+		return true;
 	}
 	
 	bool gui() override {
@@ -1081,21 +1270,28 @@ struct StepNode final : CompositeTexture::Node {
 	void serialize(OutputMemoryStream& blob) const override { blob.write(m_value); }
 	void deserialize(InputMemoryStream& blob) override { blob.read(m_value); }
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, &tmp)) return false;
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult arg0 = getInputValue(0, ctx);
+		if (!arg0.isValid()) return errorValue("Invalid input");
+		
+		for (u32 ch = 0; ch < arg0.channels; ++ch) {
+			arg0.value[ch] = arg0.value[ch] < m_value[ch] ? 0.f : 1.f;
+		}
+		return arg0;
+	}
 
-		data->w = tmp.w;
-		data->h = tmp.h;
-		data->channels = tmp.channels;
-		data->pixels.resize(data->w * data->h * data->channels);
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
-		for (i32 j = 0; j < (i32)data->h; ++j) {
-			for (i32 i = 0; i < (i32)data->w; ++i) {
-				for (u32 ch = 0; ch < data->channels; ++ch) {
-					float v = tmp.pixels[(i + j * tmp.w) * tmp.channels + ch];
-					v = v < m_value[ch] * 255.f ? 0.f : 255.f;
-					data->pixels[(i + j * data->w) * data->channels + ch] = u8(v + 0.5f);
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
+		for (i32 j = 0; j < (i32)in.h; ++j) {
+			for (i32 i = 0; i < (i32)in.w; ++i) {
+				for (u32 ch = 0; ch < in.channels; ++ch) {
+					float v = in.pixels[(i + j * in.w) * in.channels + ch];
+					v = v < m_value[ch] ? 0.f : 1.f;
+					out.pixels[(i + j * out.w) * out.channels + ch] = v;
 				}
 			}
 		}
@@ -1106,7 +1302,7 @@ struct StepNode final : CompositeTexture::Node {
 		ImGuiEx::NodeTitle("Step");
 		inputSlot();
 		outputSlot();
-		ImGui::ColorEdit4("Value", &m_value.x);
+		ImGui::ColorEdit4("Value", &m_value.x, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
 		return false;
 	}
 
@@ -1132,35 +1328,44 @@ struct GradientMapNode final : CompositeTexture::Node {
 		blob.read(m_keys);
 		blob.read(m_values);
 	}
+	
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult arg = getInputValue(0, ctx);
+		if (!arg.isValid()) return errorValue("Invalid input");
+		if (arg.channels != 1) return errorValue("Input must have only 1 channel");
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData input(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, &input)) return error("Invalid input");
-		if (input.channels != 1) return error("Input must have only 1 channel");
+		for (i32 k = 1; k < m_count; ++k) {
+			if (arg.value.x <= m_keys[k]) {
+				float t = (arg.value.x - m_keys[k - 1]) / (m_keys[k] - m_keys[k - 1]);
+				return lerp(m_values[k - 1], m_values[k], t);
+			}
+		}
+		return m_values[m_count - 1];
+	}
 
-		data->channels = 4;
-		data->w = input.w;
-		data->h = input.h;
-		data->pixels.resize(data->channels * data->w * data->h);
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; i += data->channels) {
-			const float v = input.pixels[i / 4] / 255.f;
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		if (in.channels != 1) return error("Input must have only 1 channel");
+
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, 4, m_allocator); 
+		
+		for (u32 i = 0, c = (u32)out.pixels.size(); i < c; i += out.channels) {
+			const float v = minimum(in.pixels[i / 4], m_keys[m_count - 1]);
 			
 			for (i32 k = 1; k < m_count; ++k) {
 				if (v <= m_keys[k]) {
 					float t = (v - m_keys[k - 1]) / (m_keys[k] - m_keys[k - 1]);
 					const Vec4 color = lerp(m_values[k - 1], m_values[k], t);
-					data->pixels[i + 0] = u8(clamp(color.x * 255.f, 0.f, 255.f) + 0.5f);
-					data->pixels[i + 1] = u8(clamp(color.y * 255.f, 0.f, 255.f) + 0.5f);
-					data->pixels[i + 2] = u8(clamp(color.z * 255.f, 0.f, 255.f) + 0.5f);
-					data->pixels[i + 3] = u8(clamp(color.w * 255.f, 0.f, 255.f) + 0.5f);
+					memcpy(&out.pixels[i], &color, sizeof(color));
 					break;
 				}
 			}
 		}
 		return true;
 	}
-	
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Gradient map");
 		inputSlot();
@@ -1176,6 +1381,23 @@ struct GradientMapNode final : CompositeTexture::Node {
 	float m_keys[8] = { 0, 1 };
 	Vec4 m_values[8] = { Vec4(0, 0, 0, 1), Vec4(1, 1, 1, 1) };
 };
+
+static void blit(CompositeTexture::PixelData& dst, CompositeTexture::PixelData& src, i32 dst_x, i32 dst_y) {
+	if (dst_x >= (i32)dst.w) return;
+	if (dst_y >= (i32)dst.h) return;
+	ASSERT(dst.channels == src.channels);
+		
+	for (i32 y = maximum(0, -dst_y); y < (i32)src.h && y + dst_y < (i32)dst.h; ++y) {
+		for (i32 x = maximum(0, -dst_x); x < (i32)src.w && x + dst_x < (i32)dst.w; ++x) {
+			i32 src_pixel = (x + y * src.w) * src.channels;
+			float alpha = src.channels < 4 ? 1.f : src.pixels[src_pixel + 3];
+			for (u32 ch = 0; ch < dst.channels; ++ch) {
+				float& dst_p = dst.pixels[(x + dst_x + (y + dst_y) * dst.w) * dst.channels + ch];
+				dst_p = lerp(dst_p, src.pixels[src_pixel + ch], alpha);
+			}
+		}
+	}
+}
 
 struct CircularSplatterNode final : CompositeTexture::Node {
 	CircularSplatterNode(IAllocator& allocator) : Node(allocator) {}
@@ -1202,42 +1424,29 @@ struct CircularSplatterNode final : CompositeTexture::Node {
 		blob.read(angle_spread);
 	}
 
-	void blit(CompositeTexture::PixelData& dst, CompositeTexture::PixelData& src, i32 dst_x, i32 dst_y) {
-		if (dst_x >= (i32)dst.w) return;
-		if (dst_y >= (i32)dst.h) return;
-		ASSERT(dst.channels == src.channels);
-		
-		for (i32 y = maximum(0, -dst_y); y < (i32)src.h && y + dst_y < (i32)dst.h; ++y) {
-			for (i32 x = maximum(0, -dst_x); x < (i32)src.w && x + dst_x < (i32)dst.w; ++x) {
-				i32 src_pixel = (x + y * src.w) * src.channels;
-				float alpha = src.channels < 4 ? 1.f : src.pixels[src_pixel + 3] / 255.f;
-				for (u32 ch = 0; ch < dst.channels; ++ch) {
-					u8& dst_p = dst.pixels[(x + dst_x + (y + dst_y) * dst.w) * dst.channels + ch];
-					dst_p = u8(src.pixels[src_pixel + ch] * alpha + dst_p * (1 - alpha) + 0.5f);
-				}
-			}
-		}
-	}
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+		if (!generateInput(1)) return false;
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return error("Missing input");
-		
-		CompositeTexture::PixelData pattern(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(1, &pattern)) return error("Missing input");
-		if (data->channels != pattern.channels) return error("Inputs must have the same number of channels");
+		CompositeTexture::PixelData& bg = getInputPixelData(0);
+		CompositeTexture::PixelData& pattern = getInputPixelData(1);
+		if (bg.channels != pattern.channels) return error("Inputs must have the same number of channels");
 
+		CompositeTexture::PixelData& out = m_outputs.emplace(bg.w, bg.h, bg.channels, m_allocator); 
+		memcpy(out.pixels.data(), bg.pixels.data(), bg.pixels.byte_size());
+		
 		for (u32 i = 0; i < count; ++i) {
 			const float angle = i * angle_step + randFloat(-angle_spread, angle_spread);
 			const float r = radius + radius_step * i + randFloat(-radius_spread, radius_spread);
 
-			float x = data->w * 0.5f + r * cosf(angle) - pattern.w * 0.5f;
-			float y = data->h * 0.5f + r * sinf(angle) - pattern.h * 0.5f;
+			float x = out.w * 0.5f + r * cosf(angle) - pattern.w * 0.5f;
+			float y = out.h * 0.5f + r * sinf(angle) - pattern.h * 0.5f;
 
-			blit(*data, pattern, u32(x + 0.5f), u32(y + 0.5f));
+			blit(out, pattern, u32(x + 0.5f), u32(y + 0.5f));
 		}
 		return true;
 	}
-	
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Circular splatter");
 		inputSlot();
@@ -1248,7 +1457,7 @@ struct CircularSplatterNode final : CompositeTexture::Node {
 		bool res = ImGui::DragInt("Count", (i32*)&count, 1, 1, 999999);
 		res = ImGui::DragFloat("Radius", &radius, 1, 0, FLT_MAX) || res;
 		res = ImGui::DragFloat("Radius step", &radius_step, 1, -FLT_MAX, FLT_MAX) || res;
-		res = ImGuiEx::InputAngle("Angle ste", &angle_step) || res;
+		res = ImGuiEx::InputAngle("Angle step", &angle_step) || res;
 		res = ImGuiEx::InputAngle("Angle spread", &angle_spread) || res;
 		res = ImGui::DragFloat("Radius spread", &radius_spread, 1, -FLT_MAX, FLT_MAX) || res;
 		return res;
@@ -1283,42 +1492,29 @@ struct SplatterNode final : CompositeTexture::Node {
 		blob.read(y_spread);
 	}
 
-	void blit(CompositeTexture::PixelData& dst, CompositeTexture::PixelData& src, i32 dst_x, i32 dst_y) {
-		if (dst_x >= (i32)dst.w) return;
-		if (dst_y >= (i32)dst.h) return;
-		ASSERT(dst.channels == src.channels);
-		
-		for (i32 y = maximum(0, -dst_y); y < (i32)src.h && y + dst_y < (i32)dst.h; ++y) {
-			for (i32 x = maximum(0, -dst_x); x < (i32)src.w && x + dst_x < (i32)dst.w; ++x) {
-				i32 src_pixel = (x + y * src.w) * src.channels;
-				float alpha = src.channels < 4 ? 1.f : src.pixels[src_pixel + 3] / 255.f;
-				for (u32 ch = 0; ch < dst.channels; ++ch) {
-					u8& dst_p = dst.pixels[(x + dst_x + (y + dst_y) * dst.w) * dst.channels + ch];
-					dst_p = u8(src.pixels[src_pixel + ch] * alpha + dst_p * (1 - alpha) + 0.5f);
-				}
-			}
-		}
-	}
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+		if (!generateInput(1)) return false;
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return error("Missing input");
-		
-		CompositeTexture::PixelData pattern(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(1, &pattern)) return error("Missing input");
-		if (data->channels != pattern.channels) return error("Inputs must have the same number of channels");
+		CompositeTexture::PixelData& bg = getInputPixelData(0);
+		CompositeTexture::PixelData& pattern = getInputPixelData(1);
+		if (bg.channels != pattern.channels) return error("Inputs must have the same number of channels");
 
+		CompositeTexture::PixelData& out = m_outputs.emplace(bg.w, bg.h, bg.channels, m_allocator); 
+		memcpy(out.pixels.data(), bg.pixels.data(), bg.pixels.byte_size());
+		
 		for (u32 j = 0; j < y_count; ++j) {
 			for (u32 i = 0; i < x_count; ++i) {
-				i32 x = i32(((float)i / x_count) * data->w);
-				i32 y = i32(((float)j / y_count) * data->h);
+				i32 x = i32(((float)i / x_count) * out.w);
+				i32 y = i32(((float)j / y_count) * out.h);
 				x += rand(0, 2 * x_spread) - x_spread;
 				y += rand(0, 2 * y_spread) - y_spread;
-				blit(*data, pattern, x, y);
+				blit(out, pattern, x, y);
 			}
 		}
 		return true;
 	}
-	
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Splatter");
 		inputSlot();
@@ -1345,16 +1541,13 @@ struct SharpenNode final : CompositeTexture::Node {
 	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SHARPEN; }
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, &tmp)) return false;
 
-		data->w = tmp.w;
-		data->h = tmp.h;
-		data->channels = tmp.channels;
-		data->pixels.resize(data->w * data->h * data->channels);
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
 		float inv = 1/9.f;
 		const float conv_mtx[] = {
 			-inv, -inv, -inv,
@@ -1362,25 +1555,24 @@ struct SharpenNode final : CompositeTexture::Node {
 			-inv, -inv, -inv
 		};
 
-		for (i32 j = 0; j < (i32)data->h; ++j) {
-			for (i32 i = 0; i < (i32)data->w; ++i) {
-				for (u32 ch = 0; ch < data->channels; ++ch) {
+		for (i32 j = 0; j < (i32)in.h; ++j) {
+			for (i32 i = 0; i < (i32)in.w; ++i) {
+				for (u32 ch = 0; ch < in.channels; ++ch) {
 					float v = 0;
 					for (i32 cj = -1; cj <= 1; ++cj) {
 						for (i32 ci = -1; ci <= 1; ++ci) {
-							const u32 x = clamp(i + ci, 0, tmp.w - 1);
-							const u32 y = clamp(j + cj, 0, tmp.h - 1);
-							v += tmp.pixels[(x + y * tmp.w) * tmp.channels + ch] * conv_mtx[(ci + 1) + (cj + 1) * 3];
+							const u32 x = clamp(i + ci, 0, in.w - 1);
+							const u32 y = clamp(j + cj, 0, in.h - 1);
+							v += in.pixels[(x + y * in.w) * in.channels + ch] * conv_mtx[(ci + 1) + (cj + 1) * 3];
 						}
 					}
-					v = clamp(v, 0.f, 255.f);
-					data->pixels[(i + j * data->w) * data->channels + ch] = u8(v + 0.5f);
+					out.pixels[(i + j * out.w) * out.channels + ch] = v;
 				}
 			}
 		}
 		return true;
 	}
-	
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Sharpen");
 		inputSlot();
@@ -1406,14 +1598,27 @@ struct CurveNode final : CompositeTexture::Node {
 		blob.read(point_count);
 		blob.read(points, sizeof(points));
 	}
+	
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult r = getInputValue(0, ctx);
+		if (!r.isValid()) return errorValue("Invalid input");
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
-		for (u32 i = 0; i < data->pixels.size(); ++i) {
-			float v = data->pixels[i] / 255.f;
+		for (u32 i = 0; i < r.channels; ++i) {
+			r.value[i] = eval(r.value[i]);
+		}
+		return r;
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
+		for (u32 i = 0; i < (u32)in.pixels.size(); ++i) {
+			float v = in.pixels[i];
 			v = eval(v);
-			v = clamp(v * 255.f, 0.f, 255.f);
-			data->pixels[i] = u8(v + 0.5f);
+			out.pixels[i] = v;
 		}
 		return true;
 	}
@@ -1573,19 +1778,14 @@ struct CircleNode final : CompositeTexture::Node {
 		blob.read(power);
 	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		data->pixels.resize(w * h);
-		data->channels = 1;
-		data->w = w;
-		data->h = h;
-
+	bool generateInternal() override {
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator);
 		for (u32 j = 0; j < h; ++j) {
 			for (u32 i = 0; i < w; ++i) {
 				Vec2 v(i / float(w - 1) - 0.5f
 					, j / float(h - 1) - 0.5f);
 				float d = powf(length(v) * 2, power);
-				d = clamp(d * 255.f, 0.f, 255.f);
-				data->pixels[i + j * w] = u8(d + 0.5f);
+				out.pixels[i + j * w] = d;
 			}
 		}
 		return true;
@@ -1615,17 +1815,28 @@ struct GrayscaleNode final : CompositeTexture::Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
-		if (data->channels < 3) return error("Input must have at least 3 channels");
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult r = getInputValue(0, ctx);
+		if (!r.isValid()) return errorValue("Invalid input");
+		if (r.channels < 3) return errorValue("Input must have at least 3 channels");
+			
+		float grayscale = r.value.x * 0.299f + r.value.y * 0.587f + r.value.z * 0.114f;
+		r.value.x = r.value.y = r.value.z = grayscale;
+		return r;
+	}
 
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; i += data->channels) {
-			Vec3 v(data->pixels[i], data->pixels[i + 1], data->pixels[i + 2]);
-			v *= 1/255.f;
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		if (in.channels < 3) return error("Input must have at least 3 channels");
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
+		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; i += in.channels) {
+			Vec3 v(in.pixels[i], in.pixels[i + 1], in.pixels[i + 2]);
 			float grayscale = v.x * 0.299f + v.y * 0.587f + v.z * 0.114f;
-			grayscale = clamp(grayscale * 255.f, 0.f, 255.f);
-			data->pixels[i] = data->pixels[i + 1] = data->pixels[i + 2] = u8(grayscale + 0.5f);
+			out.pixels[i] = out.pixels[i + 1] = out.pixels[i + 2] = grayscale;
+			if (in.channels > 3) out.pixels[i + 3] = in.pixels[i +  3];
 		}
 		return true;
 	}
@@ -1655,19 +1866,33 @@ struct MixNode final : CompositeTexture::Node {
 		blob.read(alpha);
 	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
-		CompositeTexture::PixelData tmp(m_resource->m_allocator);
-		if (!getInputPixelData(1, &tmp)) return false;
-		if (tmp.channels != data->channels) return error("Number of channel does not match");
-		makeSameSize(data, &tmp);
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult a = getInputValue(0, ctx);
+		CompositeTexture::ValueResult b = getInputValue(1, ctx);
 
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
-			float a = data->pixels[i] / 255.f;
-			const float b = tmp.pixels[i] / 255.f;
-			a = a * (1 - alpha) + b * alpha;
-			a = clamp(a * 255.f, 0.f, 255.f);
-			data->pixels[i] = u8(a + 0.5f);
+		if (!a.isValid() || !b.isValid()) return errorValue("Invalid input");
+		if (a.channels != b.channels) return errorValue("Inputs must have the same number of channels");
+
+		a.value = lerp(a.value, b.value, alpha);
+		return a;
+	}	
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+		if (!generateInput(1)) return false;
+
+		CompositeTexture::PixelData& in0 = getInputPixelData(0);
+		CompositeTexture::PixelData& in1 = getInputPixelData(1);
+		if (in0.channels != in1.channels) return error("Number of channel does not match");
+		if (in0.w != in1.w) return error("Width does not match");
+		if (in0.h != in1.h) return error("Height does not match");
+		
+		CompositeTexture::PixelData& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator); 
+
+		for (u32 i = 0, c = (u32)out.pixels.size(); i < c; ++i) {
+			const float a = in0.pixels[i];
+			const float b = in1.pixels[i];
+			out.pixels[i] = a * (1 - alpha) + b * alpha;
 		}
 		return true;
 	}
@@ -1704,17 +1929,15 @@ struct BrightnessNode final : CompositeTexture::Node {
 		blob.read(brightness);
 	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
-			const bool is_alpha = data->channels == 4 && i % 4 == 3;
-			if (is_alpha) continue;
-
-			float v = data->pixels[i] / 255.f;
-			v += brightness;
-			v = clamp(v * 255.f, 0.f, 255.f);
-			data->pixels[i] = u8(v + 0.5f);
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
+		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
+			const bool is_alpha = in.channels == 4 && i % 4 == 3;
+			out.pixels[i] = in.pixels[i] + (is_alpha ? 0 : brightness);
 		}
 		return true;
 	}
@@ -1746,24 +1969,21 @@ struct ContrastNode final : CompositeTexture::Node {
 	void deserialize(InputMemoryStream& blob) override {
 		blob.read(contrast);
 	}
-	
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
 
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
 		const float factor = 259 * (contrast + 255) / (255 * (259 - contrast));
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
-			const bool is_alpha = data->channels == 4 && i % 4 == 3;
-			if (is_alpha) continue;
-
-			float v = data->pixels[i] / 255.f;
-			v = factor * (v - 0.5f) + 0.5f;
-			v = clamp(v * 255.f, 0.f, 255.f);
-			data->pixels[i] = u8(v + 0.5f);
+		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
+			const bool is_alpha = in.channels == 4 && i % 4 == 3;
+			out.pixels[i] = is_alpha ? in.pixels[i] : factor * (in.pixels[i] - 0.5f) + 0.5f;
 		}
 		return true;
 	}
-	
-	
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Contrast");
 		inputSlot();
@@ -1784,17 +2004,28 @@ struct InvertNode final : CompositeTexture::Node {
 
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
+	
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult r = getInputValue(0, ctx);
+		if (!r.isValid()) return errorValue("Invalid input");
+		for (u32 i = 0; i < r.channels; ++i) {
+			r.value[i] = 1 - r.value[i];
+		}
+		return r;
+	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		if (!getInputPixelData(0, data)) return false;
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
 
-		u8* p = data->pixels.getMutableData();
-		for (u32 i = 0, c = (u32)data->pixels.size(); i < c; ++i) {
-			p[i] = 0xff - p[i];
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		
+		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
+			out.pixels[i] = 1 - in.pixels[i];
 		}
 		return true;
-	};
-	
+	}
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Invert");
 		inputSlot();
@@ -1813,22 +2044,31 @@ struct SplatNode final : CompositeTexture::Node {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
-		CompositeTexture::PixelData tmp(m_resource->m_app.getAllocator());
-		if (!getInputPixelData(0, &tmp)) return false;
-		data->w = tmp.w;
-		data->h = tmp.h;
-		data->channels = 4;
-		data->pixels.resize(data->w * data->h * data->channels); 
+	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
+		CompositeTexture::ValueResult r = getInputValue(0, ctx);
+		if (!r.isValid()) return errorValue("Invalid input");
+		if (r.channels != 1) return errorValue("Input must have only 1 channel");
+		
+		return Vec4(r.value.x);
+	}
 
-		for (u32 i = 0, c = tmp.w * tmp.h; i < c; ++i) {
-			for (u32 channel = 0; channel < 4; ++channel) {
-				data->pixels[i * 4 + channel] = tmp.pixels[i * tmp.channels + channel % tmp.channels];
-			}
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::PixelData& in = getInputPixelData(0);
+		if (in.channels != 1) return error("Input must have only 1 channel");
+
+		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, 4, m_allocator); 
+		
+		for (u32 i = 0, c = in.w * in.h; i < c; ++i) {
+			out.pixels[i * 4 + 0] = in.pixels[i];
+			out.pixels[i * 4 + 1] = in.pixels[i];
+			out.pixels[i * 4 + 2] = in.pixels[i];
+			out.pixels[i * 4 + 3] = in.pixels[i];
 		}
 		return true;
-	};
-	
+	}
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Splat");
 		inputSlot();
@@ -1855,7 +2095,7 @@ struct InputNode final : CompositeTexture::Node {
 		m_texture = blob.readString();
 	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override {
+	bool generateInternal() override {
 		if (m_texture.isEmpty()) return error("Missing texture");
 		i32 w, h, cmp;
 		OutputMemoryStream file_content(m_resource->m_allocator);
@@ -1866,15 +2106,14 @@ struct InputNode final : CompositeTexture::Node {
 		stbi_uc* pixels = stbi_load_from_memory(file_content.data(), (i32)file_content.size(), &w, &h, &cmp, 0);
 		if (!pixels) return error("Failed to load file");
 
-		data->w = w;
-		data->h = h;
-		data->channels = cmp;
-		data->pixels.resize(w * h * cmp);
-		memcpy(data->pixels.getMutableData(), pixels, w * h * cmp);
+		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, cmp, m_allocator); 
+		for (u32 i = 0; i < u32(w * h * cmp); ++i) {
+			out.pixels[i] = pixels[i] / 255.f;
+		}
 		free(pixels);
 		return true;
-	};
-	
+	}
+
 	bool gui() override {
 		ImGuiEx::NodeTitle("Input");
 		outputSlot(); 
@@ -1907,7 +2146,23 @@ struct OutputNode final : CompositeTexture::Node {
 		blob.read(m_channels_count);
 	}
 
-	bool getPixelData(CompositeTexture::PixelData* data, u32 output_idx) override { return false; };
+	bool generateInternal() override {
+		switch(m_output_type) {
+			case OutputType::SIMPLE: return generateInput(0);
+			case OutputType::ARRAY:
+				for (u32 i = 0; i < m_layers_count; ++i) {
+					if (!generateInput(i)) return false;
+				}
+				return true;
+			case OutputType::CUBEMAP:
+				for (u32 i = 0; i < 6; ++i) {
+					if (!generateInput(i)) return false;
+				}
+				return true;
+		}
+		ASSERT(false);
+		return false;
+	};
 
 	bool gui() override {
 		ImGuiEx::NodeTitle("Output");
@@ -2006,10 +2261,19 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode)(allocator); break;
 		case CompositeTexture::NodeType::GRADIENT_MAP: node = LUMIX_NEW(allocator, GradientMapNode)(allocator); break;
 		case CompositeTexture::NodeType::CIRCULAR_SPLATTER: node = LUMIX_NEW(allocator, CircularSplatterNode)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_PROCESSOR: node = LUMIX_NEW(allocator, PixelProcessorNode)(allocator); break;
 		case CompositeTexture::NodeType::SPLATTER: node = LUMIX_NEW(allocator, SplatterNode)(allocator); break;
 		case CompositeTexture::NodeType::TRANSLATE: node = LUMIX_NEW(allocator, TranslateNode)(allocator); break;
 		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode)(allocator); break;
 		case CompositeTexture::NodeType::STEP: node = LUMIX_NEW(allocator, StepNode)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_COLOR: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_COLOR>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_X: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_X>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_Y: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_Y>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_CTX_W: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_CTX_W>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_CTX_H: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_CTX_H>)(allocator); break;
+		case CompositeTexture::NodeType::DIVIDE: node = LUMIX_NEW(allocator, MathNode<CompositeTexture::NodeType::DIVIDE>)(allocator); break;
+		case CompositeTexture::NodeType::MAX: node = LUMIX_NEW(allocator, MathNode<CompositeTexture::NodeType::MAX>)(allocator); break;
+		case CompositeTexture::NodeType::MIN: node = LUMIX_NEW(allocator, MathNode<CompositeTexture::NodeType::MIN>)(allocator); break;
 	}
 	if (!node) return nullptr;
 	node->m_resource = &resource;
@@ -2041,7 +2305,9 @@ void CompositeTexture::initDefault() {
 
 void CompositeTexture::clear() {
 	m_links.clear();
+	Renderer* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
 	for (Node* n : m_nodes) {
+		if (n->m_preview) renderer->getEndFrameDrawStream().destroy(n->m_preview);
 		LUMIX_DELETE(m_app.getAllocator(), n);
 	}
 	m_nodes.clear();
@@ -2163,24 +2429,27 @@ static void colorLinks(Array<CompositeTexture::Link>& links) {
 	}
 }
 
-bool CompositeTexture::generate(Result* result) {
-	for (Node* n : m_nodes) n->m_error = "";
+static void copy(CompositeTexture::PixelData& dst, const CompositeTexture::PixelData& src) {
+	dst.init(src.w, src.h, src.channels);
+	memcpy(dst.pixels.data(), src.pixels.data(), src.pixels.byte_size());
+}
 
+bool CompositeTexture::generate(Result* result) {
 	OutputNode* node = (OutputNode*)m_nodes[0];
+	if (!node->generate()) return false;
+
 	switch(node->m_output_type) {
 		case OutputNode::OutputType::SIMPLE: {
 			result->is_cubemap = false;
 			PixelData& pd = result->layers.emplace(m_app.getAllocator());
-			if (!node->getInputPixelData(0, &pd)) return false;
+			copy(pd, node->getInputPixelData(0));
 			break;
 		}
 		case OutputNode::OutputType::CUBEMAP: {
 			result->is_cubemap = true;
 			for (u32 i = 0; i < 6; ++i) {
 				PixelData& pd = result->layers.emplace(m_app.getAllocator());
-				const Node::Input input = node->getInput(i);
-				if (!input) return false;
-				if (!input.getPixelData(&pd)) return false;
+				copy(pd, node->getInputPixelData(i));
 			}
 			break;
 		}
@@ -2188,9 +2457,7 @@ bool CompositeTexture::generate(Result* result) {
 			result->is_cubemap = false;
 			for (u32 i = 0; i < node->m_layers_count; ++i) {
 				PixelData& pd = result->layers.emplace(m_app.getAllocator());
-				const Node::Input input = node->getInput(i);
-				if (!input) return false;
-				if (!input.getPixelData(&pd)) return false;
+				copy(pd, node->getInputPixelData(i));
 			}
 			break;
 		}
@@ -2198,15 +2465,15 @@ bool CompositeTexture::generate(Result* result) {
 
 	for (PixelData& pd : result->layers) {
 		if (pd.channels != node->m_channels_count) {
-			OutputMemoryStream tmp(m_app.getAllocator());
+			Array<float> tmp(m_app.getAllocator());
 			const u32 n = node->m_channels_count;
 			tmp.resize(pd.w * pd.h * n);
 			for (u32 i = 0; i < pd.w * pd.h; ++i) {
 				for (u32 ch = 0; ch < n; ++ch) {
-					tmp[i * n + ch] = ch < pd.channels ? pd.pixels[i * pd.channels + ch] : ((pd.channels == 1 && ch < 3) ? pd.pixels[i * pd.channels] : 0xff);
+					tmp[i * n + ch] = ch < pd.channels ? pd.pixels[i * pd.channels + ch] : ((pd.channels == 1 && ch < 3) ? pd.pixels[i * pd.channels] : 1.f);
 				}
 			}
-			pd.pixels = static_cast<OutputMemoryStream&&>(tmp);
+			pd.pixels = tmp.move();
 			pd.channels = n;
 		}
 	}
@@ -2241,6 +2508,8 @@ bool CompositeTexture::deserialize(InputMemoryStream& blob) {
 	}
 	colorLinks(m_links);
 	markReachable(*this);
+	CompositeTexture::Result img(m_app.getAllocator());
+	generate(&img);
 	return true;
 }
 
@@ -2263,44 +2532,6 @@ u32 CompositeTexture::getLayersCount() const {
 	return 1;
 }
 
-static const struct {
-	char key;
-	const char* label;
-	CompositeTexture::NodeType type;
-} TYPES[] = {
-	{ 'B', "Brightness", CompositeTexture::NodeType::BRIGHTNESS },
-	{ 'V', "Cell noise", CompositeTexture::NodeType::CELLULAR_NOISE },
-	{ 'O', "Circle", CompositeTexture::NodeType::CIRCLE },
-	{ 0, "Circular splatter", CompositeTexture::NodeType::CIRCULAR_SPLATTER },
-	{ 'C', "Color", CompositeTexture::NodeType::COLOR },
-	{ '1', "Constant", CompositeTexture::NodeType::CONSTANT },
-	{ 0, "Contrast", CompositeTexture::NodeType::CONTRAST },
-	{ 0, "Crop", CompositeTexture::NodeType::CROP },
-	{ 'U', "Curve", CompositeTexture::NodeType::CURVE },
-	{ 'F', "Flip", CompositeTexture::NodeType::FLIP },
-	{ 0, "Gamma", CompositeTexture::NodeType::GAMMA },
-	{ 0, "Gradient", CompositeTexture::NodeType::GRADIENT },
-	{ 'G', "Gradient map", CompositeTexture::NodeType::GRADIENT_MAP },
-	{ 0, "Grayscale", CompositeTexture::NodeType::GRAYSCALE },
-	{ 'T', "Input", CompositeTexture::NodeType::INPUT },
-	{ 'I', "Invert", CompositeTexture::NodeType::INVERT },
-	{ 'M', "Merge", CompositeTexture::NodeType::MERGE },
-	{ 'X', "Mix", CompositeTexture::NodeType::MIX },
-	{ 0, "Multiply", CompositeTexture::NodeType::MULTIPLY },
-	{ 0, "Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS },
-	{ 'R', "Resize", CompositeTexture::NodeType::RESIZE },
-	{ 'A', "Set alpha", CompositeTexture::NodeType::SET_ALPHA },
-	{ 0, "Sharpen", CompositeTexture::NodeType::SHARPEN },
-	{ 'N', "Simplex", CompositeTexture::NodeType::SIMPLEX },
-	{ 0, "Splat", CompositeTexture::NodeType::SPLAT },
-	{ 0, "Splatter", CompositeTexture::NodeType::SPLATTER },
-	{ 'S', "Split", CompositeTexture::NodeType::SPLIT },
-	{ 0, "Static switch", CompositeTexture::NodeType::STATIC_SWITCH },
-	{ 0, "Step", CompositeTexture::NodeType::STEP },
-	{ 0, "Translate", CompositeTexture::NodeType::TRANSLATE },
-	{ 'W', "Wave noise", CompositeTexture::NodeType::WAVE_NOISE }
-};
-
 struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app)
 		: NodeEditor(app.getAllocator())
@@ -2319,16 +2550,78 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		if (m_loading_handle.isValid()) fs.cancel(m_loading_handle);
 	}
 
-	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
-		CompositeTexture::Node* n = nullptr;
-		for (const auto& t : TYPES) {
-			if (t.key && os::isKeyDown((os::Keycode)t.key)) {
-				n = m_resource.addNode(t.type);
-				break;
-			}
+	struct INodeTypeVisitor {
+		virtual bool beginCategory(const char* category) { return true; }
+		virtual void endCategory() {}
+		virtual INodeTypeVisitor& visitType(const char* label, CompositeTexture::NodeType type, char shortcut = 0) = 0;
+	};
+
+	void visitNodeTypes(INodeTypeVisitor& visitor) {
+		if (visitor.beginCategory("Math")) {
+			visitor
+				.visitType("Curve", CompositeTexture::NodeType::CURVE, 'C')
+				.visitType("Divide", CompositeTexture::NodeType::DIVIDE, 'D')
+				.visitType("Invert", CompositeTexture::NodeType::INVERT, 'I')
+				.visitType("Min", CompositeTexture::NodeType::MIN)
+				.visitType("Max", CompositeTexture::NodeType::MAX)
+				.visitType("Multiply", CompositeTexture::NodeType::MULTIPLY, 'M')
+				.visitType("Step", CompositeTexture::NodeType::STEP)
+				.endCategory();
 		}
-		if (n) {
-			n->m_pos = pos;
+		if (visitor.beginCategory("Noise")) {
+			visitor
+				.visitType("Cell noise", CompositeTexture::NodeType::CELLULAR_NOISE)
+				.visitType("Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS)
+				.visitType("Simplex", CompositeTexture::NodeType::SIMPLEX)
+				.visitType("Wave noise", CompositeTexture::NodeType::WAVE_NOISE)
+				.endCategory();
+		}
+		visitor.visitType("Brightness", CompositeTexture::NodeType::BRIGHTNESS, 'B')
+			.visitType("Circle", CompositeTexture::NodeType::CIRCLE, 'O')
+			.visitType("Circular splatter", CompositeTexture::NodeType::CIRCULAR_SPLATTER)
+			.visitType("Color", CompositeTexture::NodeType::COLOR, '4')
+			.visitType("Constant", CompositeTexture::NodeType::CONSTANT, '1')
+			.visitType("Contrast", CompositeTexture::NodeType::CONTRAST)
+			.visitType("Crop", CompositeTexture::NodeType::CROP)
+			.visitType("Flip", CompositeTexture::NodeType::FLIP, 'F')
+			.visitType("Gamma", CompositeTexture::NodeType::GAMMA)
+			.visitType("Gradient", CompositeTexture::NodeType::GRADIENT)
+			.visitType("Gradient map", CompositeTexture::NodeType::GRADIENT_MAP, 'G')
+			.visitType("Grayscale", CompositeTexture::NodeType::GRAYSCALE)
+			.visitType("Input", CompositeTexture::NodeType::INPUT)
+			.visitType("Merge", CompositeTexture::NodeType::MERGE)
+			.visitType("Mix", CompositeTexture::NodeType::MIX)
+			.visitType("Pixel color", CompositeTexture::NodeType::PIXEL_COLOR)
+			.visitType("Pixel X", CompositeTexture::NodeType::PIXEL_X, 'X')
+			.visitType("Pixel Y", CompositeTexture::NodeType::PIXEL_Y, 'Y')
+			.visitType("Pixel context width", CompositeTexture::NodeType::PIXEL_CTX_W, 'W')
+			.visitType("Pixel context height", CompositeTexture::NodeType::PIXEL_CTX_H, 'H')
+			.visitType("Pixel processor", CompositeTexture::NodeType::PIXEL_PROCESSOR)
+			.visitType("Resize", CompositeTexture::NodeType::RESIZE, 'R')
+			.visitType("Set alpha", CompositeTexture::NodeType::SET_ALPHA)
+			.visitType("Sharpen", CompositeTexture::NodeType::SHARPEN)
+			.visitType("Splat", CompositeTexture::NodeType::SPLAT, 'S')
+			.visitType("Splatter", CompositeTexture::NodeType::SPLATTER)
+			.visitType("Split", CompositeTexture::NodeType::SPLIT)
+			.visitType("Static switch", CompositeTexture::NodeType::STATIC_SWITCH, 'W')
+			.visitType("Translate", CompositeTexture::NodeType::TRANSLATE);
+	}
+
+	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
+		struct : INodeTypeVisitor {
+			INodeTypeVisitor& visitType(const char* label, CompositeTexture::NodeType type, char shortcut) override {
+				if (!n && shortcut && os::isKeyDown((os::Keycode)shortcut)) {
+					n = win->m_resource.addNode(type);
+				}
+				return *this;
+			}
+			CompositeTextureEditorWindow* win;
+			CompositeTexture::Node* n = nullptr;
+		} visitor;
+		visitor.win = this;
+		visitNodeTypes(visitor);
+		if (visitor.n) {
+			visitor.n->m_pos = pos;
 			if (hovered_link >= 0) splitLink(m_resource.m_nodes.back(), m_resource.m_links, hovered_link);
 			pushUndo(NO_MERGE_UNDO);
 		}	
@@ -2336,26 +2629,41 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 
 	void pushUndo(u32 tag) override {
 		m_dirty = true;
+		if (tag == NO_MERGE_UNDO) {
+			for (CompositeTexture::Node* n : m_resource.m_nodes) {
+				n->m_dirty = true;
+			}
+			m_resource.m_nodes[0]->generate();
+		}
 		SimpleUndoRedo::pushUndo(tag);
 	}
 
 	void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) override {}
 	
 	void onContextMenu(ImVec2 pos) override {
-		CompositeTexture::Node* node = nullptr;
 		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter), 150, ImGui::IsWindowAppearing());
-		for (const auto& t : TYPES) {
-			StaticString<64> label(t.label);
-			if (t.key) label.append(" (LMB + ", t.key, ")");
-			if ((!m_filter[0] || stristr(t.label, m_filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
-				node = m_resource.addNode(t.type);
-				m_filter[0] = '\0';
-				ImGui::CloseCurrentPopup();
-				break;
+		
+		struct : INodeTypeVisitor {
+			bool beginCategory(const char* category) { return ImGui::BeginMenu(category); }
+			void endCategory() { ImGui::EndMenu(); }
+
+			INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
+				StaticString<64> label(_label);
+				if (shortcut) label.append(" (LMB + ", shortcut, ")");
+				if ((!win->m_filter[0] || stristr(_label, win->m_filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
+					node = win->m_resource.addNode(type);
+					win->m_filter[0] = '\0';
+					ImGui::CloseCurrentPopup();
+				}
+				return *this;
 			}
-		}
-		if (node) {
-			node->m_pos = pos;
+			CompositeTextureEditorWindow* win;
+			CompositeTexture::Node* node = nullptr;
+		} visitor;
+		visitor.win = this;
+		visitNodeTypes(visitor);
+		if (visitor.node) {
+			visitor.node->m_pos = pos;
 			pushUndo(NO_MERGE_UNDO);
 		}
 	}
@@ -2435,7 +2743,8 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			return;
 		}
 
-		bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, img.layers[0].pixels.data(), true, Path(path), allocator);
+		OutputMemoryStream pixel8 = img.layers[0].asU8();
+		bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, pixel8.data(), true, Path(path), allocator);
 		file.close();
 
 		if (!res) {
@@ -2452,11 +2761,53 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			logError("Failed to save ", path);
 			return;
 		}
-		CompositeTexture::Result img(allocator);
-		m_resource.generate(&img);
 
 		m_path = path;
 		m_dirty = false;
+	}
+
+	void previewGUI() {
+		if (!m_show_preview) return;
+		
+		for (CompositeTexture::Node* n : m_resource.m_nodes) {
+			if (n->m_selected) {
+				m_preview_node_id = n->m_id;
+				break;
+			}
+		}
+
+		CompositeTexture::Node* preview_node = m_resource.getNodeByID(m_preview_node_id);
+		if (!preview_node) return;
+
+		ImVec2 p = ImGui::GetItemRectMin();
+		if (!preview_node->m_preview && !preview_node->m_outputs.empty()) {
+			Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
+			if (renderer) {
+				const CompositeTexture::PixelData& pd = preview_node->m_outputs[0];
+				gpu::TextureFormat format;
+				switch (pd.channels) {
+					case 1: format = gpu::TextureFormat::R32F; break;
+					case 2: ASSERT(false); break; // TODO
+					case 3: ASSERT(false); break;
+					case 4: format = gpu::TextureFormat::RGBA32F; break;
+					default: ASSERT(false);
+				}
+				Renderer::MemRef mem = renderer->copy(pd.pixels.begin(), pd.pixels.byte_size());
+				preview_node->m_preview = renderer->createTexture(pd.w
+				, pd.h
+				, 1
+				, format
+				, gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
+				, mem
+				, "composite texture");
+			}	
+		}
+		if (preview_node->m_preview && !preview_node->m_outputs.empty()) {
+			ImGui::SetCursorScreenPos(p);
+			const CompositeTexture::PixelData& pd = preview_node->m_outputs[0];
+			ImVec2 size((float)pd.w, (float)pd.h);
+			ImGui::Image(preview_node->m_preview, size);
+		}
 	}
 
 	void onGUI() override {
@@ -2489,6 +2840,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				}
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
 				if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
+				ImGui::Checkbox("Preview", &m_show_preview);
 				ImGui::EndMenuBar();
 			}
 		
@@ -2500,6 +2852,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			}
 			else {
 				nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
+				previewGUI();
 			}
 		}
 		if (!open) {
@@ -2533,12 +2886,14 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	StudioApp& m_app;
 	Path m_path;
 	CompositeTexture m_resource;
+	u16 m_preview_node_id = 0xffFF;
 	FileSystem::AsyncHandle m_loading_handle = FileSystem::AsyncHandle::invalid();
 	bool m_has_focus = false;
 	bool m_show_save_as = false;
 	bool m_focus_request = false;
 	bool m_dirty = false;
 	bool m_show_confirm = false;
+	bool m_show_preview = true;
 	ImGuiID m_dock_id = 0;
 	char m_filter[64] = "";
 };

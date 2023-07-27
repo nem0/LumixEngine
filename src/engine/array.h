@@ -25,6 +25,7 @@ template <typename T> struct Array {
 
 	Array<T>&& move() { return static_cast<Array<T>&&>(*this); }
 
+	T* data() const { return m_data; }
 	T* begin() const { return m_data; }
 	T* end() const { return m_data ? m_data + m_size : nullptr; }
 
@@ -320,6 +321,7 @@ template <typename T> struct Array {
 	}
 
 	u32 capacity() const { return m_capacity; }
+	IAllocator& getAllocator() const { return m_allocator; }
 
 protected:
 	void grow() { reserve(m_capacity < 4 ? 4 : m_capacity + m_capacity / 2); }

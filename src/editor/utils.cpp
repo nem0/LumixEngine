@@ -697,7 +697,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 			links.eraseItems([&](const NodeEditorLink& link) { return link.to == end_attr; });
 			links.push({u32(start_attr) & ~OUTPUT_FLAG, u32(end_attr)});
 			
-			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+			pushUndo(NO_MERGE_UNDO);
 		}
 	}
 
@@ -706,7 +706,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
 		if (ImGui::GetIO().KeyAlt && hovered_link != -1) {
 			links.erase(hovered_link);
-			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
+			pushUndo(NO_MERGE_UNDO);
 		}
 		else {
 			onCanvasClicked(ImGui::GetMousePos() - origin - m_offset, hovered_link);

@@ -1176,7 +1176,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 					return;
 				}
 
-				stbir_resize_uint8(layer0.pixels.data(),
+				stbir_resize_uint8(layer0.asU8().data(),
 					layer0.w,
 					layer0.h,
 					0,
@@ -1290,7 +1290,8 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			if (layer.channels != 4) {
 				TextureCompressor::Input::Image& tmp = input.add(img.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
 				tmp.pixels.resize(layer.w * layer.h * 4);
-				const u8* src = layer.pixels.data();
+				OutputMemoryStream pixels = layer.asU8();
+				const u8* src = pixels.data();
 				u8* dst = tmp.pixels.getMutableData();
 	
 				for(u32 i = 0; i < layer.w * layer.h; ++i) {
@@ -1301,8 +1302,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				}
 			}
 			else {
-				Span<const u8> span(layer.pixels.data(), (u32)layer.pixels.size());
-				input.add(span, img.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
+				input.add(layer.asU8(), img.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);
 			}
 		}
 

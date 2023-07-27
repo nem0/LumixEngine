@@ -198,7 +198,10 @@ struct LUMIX_ENGINE_API Vec4 {
 	void operator+=(const Vec4& rhs);
 	void operator-=(const Vec4& rhs);
 	void operator/=(float rhs);
+	Vec4 operator/(float s);
+	Vec4 operator/(const Vec4& v);
 	Vec4 operator*(float s);
+	Vec4 operator*(const Vec4& v);
 	void operator*=(float rhs);
 
 	union {
@@ -425,6 +428,15 @@ LUMIX_FORCE_INLINE Vec3 minimum(const Vec3& a, const Vec3& b) {
 	};
 }
 
+LUMIX_FORCE_INLINE Vec4 minimum(const Vec4& a, const Vec4& b) {
+	return {
+		minimum(a.x, b.x),
+		minimum(a.y, b.y),
+		minimum(a.z, b.z),
+		minimum(a.w, b.w)
+	};
+}
+
 template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 minimum(T1 a, T2... b) {
 	T1 min_b = minimum(b...);
 	return minimum(a, min_b);
@@ -466,6 +478,15 @@ LUMIX_FORCE_INLINE Vec3 maximum(const Vec3& a, const Vec3& b) {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),
 		maximum(a.z, b.z)
+	};
+}
+
+LUMIX_FORCE_INLINE Vec4 maximum(const Vec4& a, const Vec4& b) {
+	return {
+		maximum(a.x, b.x),
+		maximum(a.y, b.y),
+		maximum(a.z, b.z),
+		maximum(a.w, b.w)
 	};
 }
 
