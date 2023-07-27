@@ -1170,7 +1170,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 					return;
 				}
 
-				const CompositeTexture::PixelData& layer0 = res.layers[0];
+				const CompositeTexture::Image& layer0 = res.layers[0];
 				if (layer0.channels != 4) {
 					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 					return;
@@ -1285,7 +1285,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		input.is_cubemap = img.is_cubemap;
 		input.has_alpha = img.layers[0].channels == 4;
 
-		for (CompositeTexture::PixelData& layer : img.layers) {
+		for (CompositeTexture::Image& layer : img.layers) {
 			const u32 idx = u32(&layer - img.layers.begin());
 			if (layer.channels != 4) {
 				TextureCompressor::Input::Image& tmp = input.add(img.is_cubemap ? idx : 0, input.is_cubemap ? 0 : idx, 0);

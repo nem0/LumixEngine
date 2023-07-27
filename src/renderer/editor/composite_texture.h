@@ -12,9 +12,9 @@ namespace Lumix {
 struct CompositeTexture {
 	enum class NodeType : u32;
 	
-	struct PixelData {
-		PixelData(IAllocator& allocator);
-		PixelData(u32 w, u32 h, u32 channels, IAllocator& allocator);
+	struct Image {
+		Image(IAllocator& allocator);
+		Image(u32 w, u32 h, u32 channels, IAllocator& allocator);
 		void init(u32 w, u32 h, u32 channels);
 		OutputMemoryStream asU8() const;
 		Array<float> pixels;
@@ -25,12 +25,12 @@ struct CompositeTexture {
 
 	struct Result {
 		Result(IAllocator& allocator) : layers(allocator) {}
-		Array<PixelData> layers;
+		Array<Image> layers;
 		bool is_cubemap;
 	};
 	
 	struct PixelContext {
-		const PixelData* image;
+		const Image* image;
 		Vec4 color;
 		u32 x;
 		u32 y;
@@ -60,15 +60,16 @@ struct CompositeTexture {
 		
 		bool nodeGUI() override;
 
+		void nodeTitle(const char* title);
 		bool generate();
 		void markDirty();
 		void inputSlot();
 		void outputSlot();
 		struct Input;
 		Input getInput(u32 pin_idx) const;
-		PixelData& getInputPixelData(u32 pin_idx) const;
+		Image& getInputImage(u32 pin_idx) const;
 		bool generateInput(u32 pin_idx);
-		bool getInputPixelData(u32 pin_idx, PixelData* pd);
+		bool getInputImage(u32 pin_idx, Image* pd);
 		ValueResult getInputValue(u32 pin_idx, const CompositeTexture::PixelContext& ctx);
 		
 		ValueResult errorValue(const char* msg) {
@@ -83,7 +84,8 @@ struct CompositeTexture {
 		}
 
 		IAllocator& m_allocator;
-		Array<PixelData> m_outputs;
+		Array<Image> m_outputs;
+		float m_generate_duration = -1;
 		bool m_selected = false;
 		bool m_reachable = false;
 		bool m_dirty = true;

@@ -65,11 +65,11 @@ enum class CompositeTexture::NodeType : u32 {
 
 enum { OUTPUT_FLAG = 1 << 31 };
 
-CompositeTexture::PixelData::PixelData(IAllocator& allocator)
+CompositeTexture::Image::Image(IAllocator& allocator)
 	: pixels(allocator)
 {}
 
-CompositeTexture::PixelData::PixelData(u32 w, u32 h, u32 channels, IAllocator& allocator)
+CompositeTexture::Image::Image(u32 w, u32 h, u32 channels, IAllocator& allocator)
 	: w(w)
 	, h(h)
 	, channels(channels)
@@ -78,14 +78,14 @@ CompositeTexture::PixelData::PixelData(u32 w, u32 h, u32 channels, IAllocator& a
 	pixels.resize(w * h * channels);
 }
 
-void CompositeTexture::PixelData::init(u32 _w, u32 _h, u32 _channels) {
+void CompositeTexture::Image::init(u32 _w, u32 _h, u32 _channels) {
 	w = _w;
 	h = _h;
 	channels = _channels;
 	pixels.resize(w * h * channels);
 }
 
-OutputMemoryStream CompositeTexture::PixelData::asU8() const {
+OutputMemoryStream CompositeTexture::Image::asU8() const {
 	OutputMemoryStream res(pixels.getAllocator());
 	res.resize(w * h * channels);
 	for (u32 i = 0; i < u32(w * h * channels); ++i) {
@@ -104,14 +104,25 @@ void CompositeTexture::Node::outputSlot() {
 	++m_output_counter;
 }
 
+void CompositeTexture::Node::nodeTitle(const char* title) {
+	ImGuiEx::BeginNodeTitleBar();
+	ImGui::TextUnformatted(title);
+	if (m_generate_duration >= 0) {
+		ImGui::SameLine();
+		ImGui::Text(" - %d ms", u32(m_generate_duration * 1000));
+	}
+	
+	ImGuiEx::EndNodeTitleBar();
+}
 
 bool CompositeTexture::Node::generate() {
 	if (!m_dirty && !m_outputs.empty()) return true;
 
 	m_error = "";
 	m_outputs.clear();
-
+	os::Timer timer;
 	bool res = generateInternal();
+	m_generate_duration = timer.getTimeSinceStart();
 	if (res) m_dirty = false;
 	return res;
 }
@@ -144,6 +155,10 @@ bool CompositeTexture::Node::nodeGUI() {
 	}
 	ImGuiEx::EndNode();
 	if (m_error.length() > 0) {
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const ImVec2 p = ImGui::GetItemRectMax() - ImGui::GetStyle().FramePadding;
+		dl->AddText(p, IM_COL32(0xff, 0, 0, 0xff), ICON_FA_EXCLAMATION_TRIANGLE);
+
 		ImGui::PopStyleColor();
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
 	}
@@ -198,7 +213,7 @@ void CompositeTexture::deleteUnreachable() {
 				}
 			}
 
-			LUMIX_DELETE(m_app.getAllocator(), node);
+			LUMIX_DELETE(m_allocator, node);
 			m_nodes.swapAndPop(i);
 		}
 	}	
@@ -215,7 +230,7 @@ void CompositeTexture::deleteSelectedNodes() {
 				}
 			}
 
-			LUMIX_DELETE(m_app.getAllocator(), node);
+			LUMIX_DELETE(m_allocator, node);
 			m_nodes.swapAndPop(i);
 		}
 	}
@@ -240,7 +255,7 @@ bool CompositeTexture::Node::generateInput(u32 pin_idx) {
 	return input.node->generate();
 }
 
-CompositeTexture::PixelData& CompositeTexture::Node::getInputPixelData(u32 pin_idx) const {
+CompositeTexture::Image& CompositeTexture::Node::getInputImage(u32 pin_idx) const {
 	const Input input = getInput(pin_idx);
 	ASSERT(input);
 	return input.node->m_outputs[input.output_idx];
@@ -274,10 +289,10 @@ struct SplitNode final : CompositeTexture::Node {
 		m_outputs.clear();
 		if (!generateInput(0)) return false;
 		
-		CompositeTexture::PixelData& input = getInputPixelData(0);
+		CompositeTexture::Image& input = getInputImage(0);
 
 		for (u32 ch = 0; ch < input.channels; ++ch) {
-			CompositeTexture::PixelData& o = m_outputs.emplace(input.w, input.h, 1, m_allocator);
+			CompositeTexture::Image& o = m_outputs.emplace(input.w, input.h, 1, m_allocator);
 			
 			float* dst = o.pixels.begin();
 			const float* src = input.pixels.begin();
@@ -289,7 +304,7 @@ struct SplitNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Split");
+		nodeTitle("Split");
 		inputSlot();
 		outputSlot(); ImGui::TextUnformatted("R");
 		outputSlot(); ImGui::TextUnformatted("G");
@@ -321,10 +336,10 @@ struct MergeNode final : CompositeTexture::Node {
 		}
 		if (channels_count == 0) return error("Missing inputs");
 		
-		const CompositeTexture::PixelData& r = getInputPixelData(0);
+		const CompositeTexture::Image& r = getInputImage(0);
 		if (r.channels != 1) return error("Input must have only one channel");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(r.w, r.h, channels_count, m_allocator);
+		CompositeTexture::Image& out = m_outputs.emplace(r.w, r.h, channels_count, m_allocator);
 
 		float* dst = out.pixels.data();
 		const float* first_src = r.pixels.data();
@@ -333,7 +348,7 @@ struct MergeNode final : CompositeTexture::Node {
 		}
 
 		for (u32 i = 1; i < channels_count; ++i) {
-			const CompositeTexture::PixelData& p = getInputPixelData(i);
+			const CompositeTexture::Image& p = getInputImage(i);
 			if (p.channels != 1) return error("Input must have only one channel");
 			if (p.w != r.w || p.h != r.h) return error("Inputs must have matching sizes");
 			
@@ -347,7 +362,7 @@ struct MergeNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Merge");
+		nodeTitle("Merge");
 		outputSlot();
 		inputSlot(); ImGui::TextUnformatted("R");
 		inputSlot(); ImGui::TextUnformatted("G");
@@ -377,7 +392,7 @@ struct ConstantNode final : CompositeTexture::Node {
 	bool generateInternal() override { return error("Invalid context"); }
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Constant");
+		nodeTitle("Constant");
 		outputSlot();
 		return ImGui::DragFloat("Value", &value, 0.01f, -FLT_MAX, FLT_MAX);
 	}
@@ -406,7 +421,7 @@ struct ColorNode final : CompositeTexture::Node {
 	}
 
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(4, 4, 4, m_allocator);
+		CompositeTexture::Image& out = m_outputs.emplace(4, 4, 4, m_allocator);
 		for (u32 i = 0; i < 16; ++i) {
 			memcpy(&out.pixels[i * 4], &color, sizeof(color));
 		}
@@ -414,7 +429,7 @@ struct ColorNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Color");
+		nodeTitle("Color");
 		outputSlot();
 		return ImGui::ColorPicker4("##color", &color.x);
 	}
@@ -441,8 +456,8 @@ struct FlipNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
 
 		const float* src = in.pixels.data();
 		float* dst = out.pixels.data();
@@ -464,7 +479,7 @@ struct FlipNode final : CompositeTexture::Node {
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Flip");
+		nodeTitle("Flip");
 		inputSlot();
 		bool res = ImGui::Checkbox("Horizontal", &horizontal);
 		ImGui::SameLine();
@@ -522,8 +537,8 @@ struct PixelProcessorNode final : CompositeTexture::Node {
 		CompositeTexture::Node::Input i1 = getInput(1);
 		if (!i1) return error("Invalid input");
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
 
 		CompositeTexture::PixelContext ctx;
 		ctx.image = &in;
@@ -543,7 +558,7 @@ struct PixelProcessorNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Pixel processor");
+		nodeTitle("Pixel processor");
 		inputSlot();
 		outputSlot();
 		ImGui::TextUnformatted("Image");
@@ -574,7 +589,7 @@ struct RandomPixelsNode final : CompositeTexture::Node {
 	}
 
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator); 
 		
 		RandomGenerator rng(seed);
 		for (u32 i = 0; i < w * h; ++i) {
@@ -584,7 +599,7 @@ struct RandomPixelsNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Random pixels");
+		nodeTitle("Random pixels");
 		outputSlot();
 		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 9000);
 		ImGui::DragInt("Height", (i32*)&h, 1, 1, 9000) || res;
@@ -613,7 +628,7 @@ struct GradientNode final : CompositeTexture::Node {
 	}
 	
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(size, 1, 1, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(size, 1, 1, m_allocator); 
 		
 		for (u32 i = 0; i < size; ++i) {
 			out.pixels[i] = float(i) / (size - 1);
@@ -622,7 +637,7 @@ struct GradientNode final : CompositeTexture::Node {
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Gradient");
+		nodeTitle("Gradient");
 		bool res = ImGui::DragInt("Size (px)", (i32*)&size, 1, 2, 1024);
 		ImGui::SameLine();
 		outputSlot();
@@ -660,8 +675,8 @@ struct GammaNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 
 		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
 			const bool is_alpha = in.channels == 4 && i % 4 == 3;
@@ -676,7 +691,7 @@ struct GammaNode final : CompositeTexture::Node {
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Gamma");
+		nodeTitle("Gamma");
 		inputSlot();
 		ImGui::SetNextItemWidth(150);
 		bool res = ImGui::DragFloat("##v", &gamma);
@@ -718,9 +733,9 @@ struct MathNode final : CompositeTexture::Node {
 	bool generateInternal() override { return error("Invalid context"); }
 
 	bool gui() override {
-		if constexpr (TYPE == CompositeTexture::NodeType::DIVIDE) ImGuiEx::NodeTitle("Divide");
-		if constexpr (TYPE == CompositeTexture::NodeType::MAX) ImGuiEx::NodeTitle("Max");
-		if constexpr (TYPE == CompositeTexture::NodeType::MIN) ImGuiEx::NodeTitle("Min");
+		if constexpr (TYPE == CompositeTexture::NodeType::DIVIDE) nodeTitle("Divide");
+		if constexpr (TYPE == CompositeTexture::NodeType::MAX) nodeTitle("Max");
+		if constexpr (TYPE == CompositeTexture::NodeType::MIN) nodeTitle("Min");
 		
 		ImGui::BeginGroup();
 		inputSlot(); ImGui::TextUnformatted("A");
@@ -754,13 +769,13 @@ struct MultiplyNode final : CompositeTexture::Node {
 		if (!generateInput(0)) return false;
 		if (!generateInput(1)) return false;
 
-		CompositeTexture::PixelData& in0 = getInputPixelData(0);
-		CompositeTexture::PixelData& in1 = getInputPixelData(1);
+		CompositeTexture::Image& in0 = getInputImage(0);
+		CompositeTexture::Image& in1 = getInputImage(1);
 		if (in0.channels != in1.channels) return error("Number of channel does not match");
 		if (in0.w != in1.w) return error("Width does not match");
 		if (in0.h != in1.h) return error("Height does not match");
 		
-		CompositeTexture::PixelData& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator); 
 
 		for (u32 i = 0, c = (u32)in0.pixels.size(); i < c; ++i) {
 			out.pixels[i] = in0.pixels[i] * in1.pixels[i];
@@ -769,7 +784,7 @@ struct MultiplyNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Multiply");
+		nodeTitle("Multiply");
 		ImGui::BeginGroup();
 		inputSlot(); ImGui::TextUnformatted("A");
 		inputSlot(); ImGui::TextUnformatted("B");
@@ -802,11 +817,11 @@ struct ResizeNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::Image& in = getInputImage(0);
 		
 		const u32 w = type == Type::PIXELS ? size.x : u32(in.w * scale.x * 0.01f + 0.5f);
 		const u32 h = type == Type::PIXELS ? size.y : u32(in.h * scale.y * 0.01f + 0.5f);
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
 		
 		const i32 res = stbir_resize_float(in.pixels.data(), in.w, in.h, 0, out.pixels.data(), w, h, 0, out.channels);
 		if (res != 1) return error("Failed to resize image");
@@ -814,7 +829,7 @@ struct ResizeNode final : CompositeTexture::Node {
 	}	
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Resize");
+		nodeTitle("Resize");
 		inputSlot();
 		ImGui::BeginGroup();
 		bool res = ImGui::Combo("##type", (int*)&type, "Pixels\0Percent\0");
@@ -878,7 +893,7 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Wave noise");
+		nodeTitle("Wave noise");
 		outputSlot();
 		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
 		res = ImGui::DragFloat("Magic", &magic, 0.01f, 1, 12) || res;
@@ -889,7 +904,7 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 	}
 
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator); 
 
 		for (u32 j = 0; j < h; ++j) {
 			const float v = j / float(h - 1);
@@ -956,7 +971,7 @@ struct SimplexNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Simplex");
+		nodeTitle("Simplex");
 		outputSlot();
 		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
 		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
@@ -965,7 +980,7 @@ struct SimplexNode final : CompositeTexture::Node {
 	}
 
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator); 
 
 		for (u32 j = 0; j < h; ++j) {
 			const float v = j / float(h - 1);
@@ -1023,7 +1038,7 @@ struct CellularNoiseNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Cellular noise");
+		nodeTitle("Cellular noise");
 		outputSlot();
 		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
 		res = ImGui::DragFloat("Offset", &offset, 0.01f, FLT_MIN, FLT_MAX) || res;
@@ -1033,7 +1048,7 @@ struct CellularNoiseNode final : CompositeTexture::Node {
 	}
 
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator); 
 
 		for (u32 j = 0; j < h; ++j) {
 			const float v = j / float(h - 1);
@@ -1089,14 +1104,14 @@ struct SetAlphaNode final : CompositeTexture::Node {
 		if (!generateInput(0)) return false;
 		if (!generateInput(1)) return false;
 
-		CompositeTexture::PixelData& rgb = getInputPixelData(0);
-		CompositeTexture::PixelData& a = getInputPixelData(1);
+		CompositeTexture::Image& rgb = getInputImage(0);
+		CompositeTexture::Image& a = getInputImage(1);
 		if (rgb.channels < 3) return error("First input must have at least 3 channels");
 		if (a.channels != 1) return error("Second input must have only 1 channel");
 		if (rgb.w != a.w) return error("Width does not match");
 		if (rgb.h != a.h) return error("Height does not match");
 		
-		CompositeTexture::PixelData& out = m_outputs.emplace(rgb.w, rgb.h, 4, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(rgb.w, rgb.h, 4, m_allocator); 
 
 		for (u32 i = 0; i < out.w * out.h; ++i) {
 			memcpy(&out.pixels[i * 4], &rgb.pixels[i * rgb.channels], rgb.channels * sizeof(float));
@@ -1107,7 +1122,7 @@ struct SetAlphaNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Set alpha");
+		nodeTitle("Set alpha");
 		ImGui::BeginGroup();
 		inputSlot(); ImGui::TextUnformatted("RGB");
 		inputSlot(); ImGui::TextUnformatted("A");
@@ -1138,8 +1153,8 @@ struct TranslateNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		for (u32 j = 0; j < in.h; ++j) {
 			for (u32 i = 0; i < in.w; ++i) {
@@ -1152,7 +1167,7 @@ struct TranslateNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Translate");
+		nodeTitle("Translate");
 		inputSlot();
 		ImGui::BeginGroup();
 		bool res = ImGui::DragInt("X", (i32*)&x, 1, 0, 999999);
@@ -1191,11 +1206,11 @@ struct CropNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::Image& in = getInputImage(0);
 		if (x + w > in.w) return error("Out of bounds access");
 		if (y + h > in.h) return error("Out of bounds access");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
 		
 		for (u32 j = 0; j < h; ++j) {
 			memcpy(&out.pixels[j * w * out.channels]
@@ -1206,7 +1221,7 @@ struct CropNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Crop");
+		nodeTitle("Crop");
 		inputSlot();
 		ImGui::BeginGroup();
 		bool res = ImGui::DragInt("X", (i32*)&x, 1, 0, 999999);
@@ -1239,14 +1254,14 @@ struct StaticSwitchNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(m_is_on ? 0 : 1)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(m_is_on ? 0 : 1);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+		CompositeTexture::Image& in = getInputImage(m_is_on ? 0 : 1);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
 		memcpy(out.pixels.begin(), in.pixels.begin(), in.pixels.byte_size());
 		return true;
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Switch");
+		nodeTitle("Switch");
 		ImGui::BeginGroup();
 		inputSlot(); ImGui::TextUnformatted("On");
 		inputSlot(); ImGui::TextUnformatted("Off");
@@ -1283,8 +1298,8 @@ struct StepNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		for (i32 j = 0; j < (i32)in.h; ++j) {
 			for (i32 i = 0; i < (i32)in.w; ++i) {
@@ -1299,7 +1314,7 @@ struct StepNode final : CompositeTexture::Node {
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Step");
+		nodeTitle("Step");
 		inputSlot();
 		outputSlot();
 		ImGui::ColorEdit4("Value", &m_value.x, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
@@ -1346,10 +1361,10 @@ struct GradientMapNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::Image& in = getInputImage(0);
 		if (in.channels != 1) return error("Input must have only 1 channel");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, 4, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, 4, m_allocator); 
 		
 		for (u32 i = 0, c = (u32)out.pixels.size(); i < c; i += out.channels) {
 			const float v = minimum(in.pixels[i / 4], m_keys[m_count - 1]);
@@ -1367,7 +1382,7 @@ struct GradientMapNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Gradient map");
+		nodeTitle("Gradient map");
 		inputSlot();
 		outputSlot();
 		ImGui::SetNextItemWidth(150);
@@ -1382,7 +1397,7 @@ struct GradientMapNode final : CompositeTexture::Node {
 	Vec4 m_values[8] = { Vec4(0, 0, 0, 1), Vec4(1, 1, 1, 1) };
 };
 
-static void blit(CompositeTexture::PixelData& dst, CompositeTexture::PixelData& src, i32 dst_x, i32 dst_y) {
+static void blit(CompositeTexture::Image& dst, CompositeTexture::Image& src, i32 dst_x, i32 dst_y) {
 	if (dst_x >= (i32)dst.w) return;
 	if (dst_y >= (i32)dst.h) return;
 	ASSERT(dst.channels == src.channels);
@@ -1428,11 +1443,11 @@ struct CircularSplatterNode final : CompositeTexture::Node {
 		if (!generateInput(0)) return false;
 		if (!generateInput(1)) return false;
 
-		CompositeTexture::PixelData& bg = getInputPixelData(0);
-		CompositeTexture::PixelData& pattern = getInputPixelData(1);
+		CompositeTexture::Image& bg = getInputImage(0);
+		CompositeTexture::Image& pattern = getInputImage(1);
 		if (bg.channels != pattern.channels) return error("Inputs must have the same number of channels");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(bg.w, bg.h, bg.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(bg.w, bg.h, bg.channels, m_allocator); 
 		memcpy(out.pixels.data(), bg.pixels.data(), bg.pixels.byte_size());
 		
 		for (u32 i = 0; i < count; ++i) {
@@ -1448,7 +1463,7 @@ struct CircularSplatterNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Circular splatter");
+		nodeTitle("Circular splatter");
 		inputSlot();
 		outputSlot();
 		ImGui::TextUnformatted("Background");
@@ -1496,11 +1511,11 @@ struct SplatterNode final : CompositeTexture::Node {
 		if (!generateInput(0)) return false;
 		if (!generateInput(1)) return false;
 
-		CompositeTexture::PixelData& bg = getInputPixelData(0);
-		CompositeTexture::PixelData& pattern = getInputPixelData(1);
+		CompositeTexture::Image& bg = getInputImage(0);
+		CompositeTexture::Image& pattern = getInputImage(1);
 		if (bg.channels != pattern.channels) return error("Inputs must have the same number of channels");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(bg.w, bg.h, bg.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(bg.w, bg.h, bg.channels, m_allocator); 
 		memcpy(out.pixels.data(), bg.pixels.data(), bg.pixels.byte_size());
 		
 		for (u32 j = 0; j < y_count; ++j) {
@@ -1516,7 +1531,7 @@ struct SplatterNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Splatter");
+		nodeTitle("Splatter");
 		inputSlot();
 		outputSlot();
 		ImGui::TextUnformatted("Background");
@@ -1545,8 +1560,8 @@ struct SharpenNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		float inv = 1/9.f;
 		const float conv_mtx[] = {
@@ -1574,7 +1589,7 @@ struct SharpenNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Sharpen");
+		nodeTitle("Sharpen");
 		inputSlot();
 		outputSlot();
 		ImGui::TextUnformatted(" ");
@@ -1612,8 +1627,8 @@ struct CurveNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		for (u32 i = 0; i < (u32)in.pixels.size(); ++i) {
 			float v = in.pixels[i];
@@ -1746,7 +1761,7 @@ struct CurveNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Curve");
+		nodeTitle("Curve");
 		inputSlot();
 		bool res = curve();
 		ImGui::SameLine();
@@ -1779,7 +1794,7 @@ struct CircleNode final : CompositeTexture::Node {
 	}
 
 	bool generateInternal() override {
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, 1, m_allocator);
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator);
 		for (u32 j = 0; j < h; ++j) {
 			for (u32 i = 0; i < w; ++i) {
 				Vec2 v(i / float(w - 1) - 0.5f
@@ -1792,7 +1807,7 @@ struct CircleNode final : CompositeTexture::Node {
 	}
 	
 	bool gui() override {
-		ImGuiEx::NodeTitle("Circle");
+		nodeTitle("Circle");
 		ImGui::BeginGroup();
 		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999);
 		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
@@ -1828,9 +1843,9 @@ struct GrayscaleNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::Image& in = getInputImage(0);
 		if (in.channels < 3) return error("Input must have at least 3 channels");
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; i += in.channels) {
 			Vec3 v(in.pixels[i], in.pixels[i + 1], in.pixels[i + 2]);
@@ -1842,7 +1857,7 @@ struct GrayscaleNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Grayscale");
+		nodeTitle("Grayscale");
 		inputSlot();
 		ImGui::TextUnformatted(" ");
 		ImGui::SameLine();
@@ -1881,13 +1896,13 @@ struct MixNode final : CompositeTexture::Node {
 		if (!generateInput(0)) return false;
 		if (!generateInput(1)) return false;
 
-		CompositeTexture::PixelData& in0 = getInputPixelData(0);
-		CompositeTexture::PixelData& in1 = getInputPixelData(1);
+		CompositeTexture::Image& in0 = getInputImage(0);
+		CompositeTexture::Image& in1 = getInputImage(1);
 		if (in0.channels != in1.channels) return error("Number of channel does not match");
 		if (in0.w != in1.w) return error("Width does not match");
 		if (in0.h != in1.h) return error("Height does not match");
 		
-		CompositeTexture::PixelData& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator); 
 
 		for (u32 i = 0, c = (u32)out.pixels.size(); i < c; ++i) {
 			const float a = in0.pixels[i];
@@ -1898,7 +1913,7 @@ struct MixNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Mix");
+		nodeTitle("Mix");
 		ImGui::BeginGroup();
 		inputSlot(); ImGui::TextUnformatted("A");
 		inputSlot(); ImGui::TextUnformatted("B");
@@ -1932,8 +1947,8 @@ struct BrightnessNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
 			const bool is_alpha = in.channels == 4 && i % 4 == 3;
@@ -1943,7 +1958,7 @@ struct BrightnessNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Brightness");
+		nodeTitle("Brightness");
 		inputSlot();
 		ImGui::SetNextItemWidth(150);
 		bool res = ImGui::SliderFloat("##v", &brightness, -1.f, 1.f);
@@ -1973,8 +1988,8 @@ struct ContrastNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		const float factor = 259 * (contrast + 255) / (255 * (259 - contrast));
 		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
@@ -1985,7 +2000,7 @@ struct ContrastNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Contrast");
+		nodeTitle("Contrast");
 		inputSlot();
 		ImGui::SetNextItemWidth(150);
 		bool res = ImGui::SliderFloat("##v", &contrast, -255.f, 255.f);
@@ -2017,8 +2032,8 @@ struct InvertNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
 		for (u32 i = 0, c = (u32)in.pixels.size(); i < c; ++i) {
 			out.pixels[i] = 1 - in.pixels[i];
@@ -2027,7 +2042,7 @@ struct InvertNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Invert");
+		nodeTitle("Invert");
 		inputSlot();
 		ImGui::TextUnformatted(" ");
 		ImGui::SameLine();
@@ -2055,10 +2070,10 @@ struct SplatNode final : CompositeTexture::Node {
 	bool generateInternal() override {
 		if (!generateInput(0)) return false;
 
-		CompositeTexture::PixelData& in = getInputPixelData(0);
+		CompositeTexture::Image& in = getInputImage(0);
 		if (in.channels != 1) return error("Input must have only 1 channel");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(in.w, in.h, 4, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, 4, m_allocator); 
 		
 		for (u32 i = 0, c = in.w * in.h; i < c; ++i) {
 			out.pixels[i * 4 + 0] = in.pixels[i];
@@ -2070,7 +2085,7 @@ struct SplatNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Splat");
+		nodeTitle("Splat");
 		inputSlot();
 		ImGui::TextUnformatted(" ");
 		ImGui::SameLine();
@@ -2106,7 +2121,7 @@ struct InputNode final : CompositeTexture::Node {
 		stbi_uc* pixels = stbi_load_from_memory(file_content.data(), (i32)file_content.size(), &w, &h, &cmp, 0);
 		if (!pixels) return error("Failed to load file");
 
-		CompositeTexture::PixelData& out = m_outputs.emplace(w, h, cmp, m_allocator); 
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, cmp, m_allocator); 
 		for (u32 i = 0; i < u32(w * h * cmp); ++i) {
 			out.pixels[i] = pixels[i] / 255.f;
 		}
@@ -2115,7 +2130,7 @@ struct InputNode final : CompositeTexture::Node {
 	}
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Input");
+		nodeTitle("Input");
 		outputSlot(); 
 		Span<char> span(m_texture.beginUpdate(), m_texture.capacity());
 		bool res = m_resource->m_app.getAssetBrowser().resourceInput("Source", span, Texture::TYPE, 150);
@@ -2165,7 +2180,7 @@ struct OutputNode final : CompositeTexture::Node {
 	};
 
 	bool gui() override {
-		ImGuiEx::NodeTitle("Output");
+		nodeTitle("Output");
 		switch(m_output_type) {
 			case OutputType::SIMPLE:
 				inputSlot(); ImGui::TextUnformatted("Color");
@@ -2308,7 +2323,7 @@ void CompositeTexture::clear() {
 	Renderer* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
 	for (Node* n : m_nodes) {
 		if (n->m_preview) renderer->getEndFrameDrawStream().destroy(n->m_preview);
-		LUMIX_DELETE(m_app.getAllocator(), n);
+		LUMIX_DELETE(m_allocator, n);
 	}
 	m_nodes.clear();
 	m_node_id_generator = 1;
@@ -2326,7 +2341,7 @@ bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 }
 
 bool CompositeTexture::save(FileSystem& fs, const Path& path) {
-	OutputMemoryStream blob(m_app.getAllocator());
+	OutputMemoryStream blob(m_allocator);
 	serialize(blob);
 	return fs.saveContentSync(path, blob);
 }
@@ -2390,7 +2405,7 @@ void CompositeTexture::removeArrayLayer(u32 idx) {
 	const Node::Input input = node->getInput(idx);
 	if (!input) return;
 	m_links.eraseItems([&](const Link& link){ return link.getFromNode() == input.node->m_id; });
-	LUMIX_DELETE(m_app.getAllocator(), input.node);
+	LUMIX_DELETE(m_allocator, input.node);
 	m_nodes.eraseItem(input.node);
 	--node->m_layers_count;
 	for (Link& link : m_links) {
@@ -2429,7 +2444,7 @@ static void colorLinks(Array<CompositeTexture::Link>& links) {
 	}
 }
 
-static void copy(CompositeTexture::PixelData& dst, const CompositeTexture::PixelData& src) {
+static void copy(CompositeTexture::Image& dst, const CompositeTexture::Image& src) {
 	dst.init(src.w, src.h, src.channels);
 	memcpy(dst.pixels.data(), src.pixels.data(), src.pixels.byte_size());
 }
@@ -2441,31 +2456,31 @@ bool CompositeTexture::generate(Result* result) {
 	switch(node->m_output_type) {
 		case OutputNode::OutputType::SIMPLE: {
 			result->is_cubemap = false;
-			PixelData& pd = result->layers.emplace(m_app.getAllocator());
-			copy(pd, node->getInputPixelData(0));
+			Image& pd = result->layers.emplace(m_allocator);
+			copy(pd, node->getInputImage(0));
 			break;
 		}
 		case OutputNode::OutputType::CUBEMAP: {
 			result->is_cubemap = true;
 			for (u32 i = 0; i < 6; ++i) {
-				PixelData& pd = result->layers.emplace(m_app.getAllocator());
-				copy(pd, node->getInputPixelData(i));
+				Image& pd = result->layers.emplace(m_allocator);
+				copy(pd, node->getInputImage(i));
 			}
 			break;
 		}
 		case OutputNode::OutputType::ARRAY: {
 			result->is_cubemap = false;
 			for (u32 i = 0; i < node->m_layers_count; ++i) {
-				PixelData& pd = result->layers.emplace(m_app.getAllocator());
-				copy(pd, node->getInputPixelData(i));
+				Image& pd = result->layers.emplace(m_allocator);
+				copy(pd, node->getInputImage(i));
 			}
 			break;
 		}
 	}
 
-	for (PixelData& pd : result->layers) {
+	for (Image& pd : result->layers) {
 		if (pd.channels != node->m_channels_count) {
-			Array<float> tmp(m_app.getAllocator());
+			Array<float> tmp(m_allocator);
 			const u32 n = node->m_channels_count;
 			tmp.resize(pd.w * pd.h * n);
 			for (u32 i = 0; i < pd.w * pd.h; ++i) {
@@ -2508,13 +2523,13 @@ bool CompositeTexture::deserialize(InputMemoryStream& blob) {
 	}
 	colorLinks(m_links);
 	markReachable(*this);
-	CompositeTexture::Result img(m_app.getAllocator());
+	CompositeTexture::Result img(m_allocator);
 	generate(&img);
 	return true;
 }
 
 CompositeTexture::Node* CompositeTexture::addNode(CompositeTexture::NodeType type) {
-	CompositeTexture::Node* node = createNode(type, *this, m_app.getAllocator());
+	CompositeTexture::Node* node = createNode(type, *this, m_allocator);
 	if (!node) return nullptr;
 	node->m_id = ++m_node_id_generator;
 	m_nodes.push(node);
@@ -2535,11 +2550,11 @@ u32 CompositeTexture::getLayersCount() const {
 struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app)
 		: NodeEditor(app.getAllocator())
+		, m_allocator(app.getAllocator(), "composite texture")
 		, m_editor(editor)
 		, m_app(app)
-		, m_resource(app, app.getAllocator())
+		, m_resource(app, m_allocator)
 	{
-		IAllocator& allocator = m_app.getAllocator();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		m_path = path;
 		m_loading_handle = fs.getContent(path, makeDelegate<&CompositeTextureEditorWindow::onLoaded>(this));
@@ -2715,8 +2730,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		char path[LUMIX_MAX_PATH];
 		if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
 
-		IAllocator& allocator = m_app.getAllocator();
-		CompositeTexture::Result img(allocator);
+		CompositeTexture::Result img(m_allocator);
 		if (!m_resource.generate(&img)) {
 			logError("Could not generate ", path);
 			return;
@@ -2744,7 +2758,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 
 		OutputMemoryStream pixel8 = img.layers[0].asU8();
-		bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, pixel8.data(), true, Path(path), allocator);
+		bool res = Texture::saveTGA(&file, img.layers[0].w, img.layers[0].h, gpu::TextureFormat::RGBA8, pixel8.data(), true, Path(path), m_allocator);
 		file.close();
 
 		if (!res) {
@@ -2754,8 +2768,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 
 	void saveAs(const Path& path) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		IAllocator& allocator = m_app.getAllocator();
-		OutputMemoryStream blob(allocator);
+		OutputMemoryStream blob(m_allocator);
 		m_resource.serialize(blob);
 		if (!fs.saveContentSync(path, blob)) {
 			logError("Failed to save ", path);
@@ -2783,7 +2796,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		if (!preview_node->m_preview && !preview_node->m_outputs.empty()) {
 			Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
 			if (renderer) {
-				const CompositeTexture::PixelData& pd = preview_node->m_outputs[0];
+				const CompositeTexture::Image& pd = preview_node->m_outputs[0];
 				gpu::TextureFormat format;
 				switch (pd.channels) {
 					case 1: format = gpu::TextureFormat::R32F; break;
@@ -2804,7 +2817,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 		if (preview_node->m_preview && !preview_node->m_outputs.empty()) {
 			ImGui::SetCursorScreenPos(p);
-			const CompositeTexture::PixelData& pd = preview_node->m_outputs[0];
+			const CompositeTexture::Image& pd = preview_node->m_outputs[0];
 			ImVec2 size((float)pd.w, (float)pd.h);
 			ImGui::Image(preview_node->m_preview, size);
 		}
@@ -2882,6 +2895,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	const char* getName() const override { return "composite_texture_editor"; }
 	bool hasFocus() const override { return m_has_focus; }
 	
+	TagAllocator m_allocator;
 	CompositeTextureEditor& m_editor;
 	StudioApp& m_app;
 	Path m_path;
