@@ -1179,6 +1179,7 @@ namespace ImGuiEx {
 		from.x = min.x * (1 - keys[*count - 1]) + max.x * keys[*count - 1];
 		from.y = min.y;
 		dl->AddRectFilledMultiColor(from, max, c0, c0, c0, c0);
+		bool changed = false;
 
 		SetCursorScreenPos(min);
 		InvisibleButton("gradient", max - min, ImGuiButtonFlags_AllowOverlap);
@@ -1207,9 +1208,9 @@ namespace ImGuiEx {
 			}
 
 			++*count;
+			changed = true;
 		}
 		SetItemAllowOverlap();
-		bool changed = false;
 		for (int i = 0; i < *count; ++i) {
 			const float t = keys[i];
 			ImVec2 p;
@@ -1243,7 +1244,7 @@ namespace ImGuiEx {
 			}
 
 			if (BeginPopup("edit")) {
-				ColorPicker4("Color", &values[i * 4]);
+				changed = ColorPicker4("Color", &values[i * 4]) || changed;
 				EndPopup();
 			}
 
