@@ -61,7 +61,8 @@ enum class CompositeTexture::NodeType : u32 {
 	DIVIDE,
 	MIN,
 	MAX,
-	SQUARE
+	SQUARE,
+	TRIANGLE
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -1320,8 +1321,7 @@ struct StepNode final : CompositeTexture::Node {
 		nodeTitle("Step");
 		inputSlot();
 		outputSlot();
-		ImGui::ColorEdit4("Value", &m_value.x, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
-		return false;
+		return ImGui::ColorEdit4("Value", &m_value.x, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
 	}
 
 	Vec4 m_value = Vec4(1, 1, 1, 1);
@@ -1777,6 +1777,58 @@ struct CurveNode final : CompositeTexture::Node {
 	i32 dragged_point = -1;
 };
 
+struct TriangleNode final : CompositeTexture::Node {
+	TriangleNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::TRIANGLE; }
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(power);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(power);
+	}
+
+	bool generateInternal() override {
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator);
+		const float mx = SQRT3 * 0.5f;
+		const float my = 0.5f;
+		for (u32 j = 0; j < h; ++j) {
+			for (u32 i = 0; i < w; ++i) {
+				Vec2 v(i / float(w - 1) - 0.5f
+					, j / float(h - 1) - 0.5f);
+				
+				float d = 2 * maximum(v.y, mx * v.x - my * v.y, mx * -v.x - my * v.y);
+				d = powf(d, power);
+				out.pixels[i + j * w] = d;
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		nodeTitle("Triangle");
+		ImGui::BeginGroup();
+		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999);
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		res = ImGui::DragFloat("Power", &power, 0.1f, FLT_MIN, FLT_MAX) || res;
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	float power = 1.f;
+};
 struct SquareNode final : CompositeTexture::Node {
 	SquareNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -2316,6 +2368,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::TRIANGLE: node = LUMIX_NEW(allocator, TriangleNode)(allocator); break;
 		case CompositeTexture::NodeType::SQUARE: node = LUMIX_NEW(allocator, SquareNode)(allocator); break;
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode)(allocator); break;
 		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode)(allocator); break;
@@ -2632,6 +2685,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.visitType("Gradient", CompositeTexture::NodeType::GRADIENT)
 				.visitType("Grid splatter", CompositeTexture::NodeType::SPLATTER)
 				.visitType("Square", CompositeTexture::NodeType::SQUARE)
+				.visitType("Triangle", CompositeTexture::NodeType::TRIANGLE)
 				.endCategory();
 		}
 		if (visitor.beginCategory("Image")) {
@@ -2895,6 +2949,12 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		if (!preview_node) return;
 
 		ImVec2 p = ImGui::GetItemRectMin();
+		if (preview_node->m_preview && preview_node->m_dirty) {
+			Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
+			renderer->getEndFrameDrawStream().destroy(preview_node->m_preview);
+			preview_node->m_preview = gpu::INVALID_TEXTURE;
+		}
+
 		if (!preview_node->m_preview) {
 			if (preview_node->m_dirty) preview_node->generate();
 			if (!preview_node->m_outputs.empty()) {
