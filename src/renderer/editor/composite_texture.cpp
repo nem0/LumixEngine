@@ -179,7 +179,9 @@ struct CompositeTexture::Node::Input {
 	operator bool() const { return node; }
 
 	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) const {
-		return node->getValue(ctx);
+		CompositeTexture::ValueResult res = node->getValue(ctx);
+		if (res.isValid()) node->m_error = "";
+		return res;
 	}
 };
 
@@ -756,10 +758,10 @@ struct MultiplyNode final : CompositeTexture::Node {
 
 	CompositeTexture::ValueResult getValue(const CompositeTexture::PixelContext& ctx) override {
 		CompositeTexture::ValueResult a = getInputValue(0, ctx);
-		if (!a.isValid()) return {};
+		if (!a.isValid()) return errorValue("Invalid input");
 
 		CompositeTexture::ValueResult b = getInputValue(1, ctx);
-		if (!b.isValid()) return {};
+		if (!b.isValid()) return errorValue("Invalid input");
 
 		if (a.isFloat() && b.isFloat()) return a.value.x * b.value.x;
 		return a.value * b.value;
@@ -2842,6 +2844,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 
 		ImVec2 p = ImGui::GetItemRectMin();
 		if (!preview_node->m_preview && !preview_node->m_outputs.empty()) {
+			if (preview_node->m_dirty) preview_node->generate();
 			Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
 			if (renderer) {
 				const CompositeTexture::Image& pd = preview_node->m_outputs[0];
