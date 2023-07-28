@@ -512,7 +512,7 @@ struct PixelNode final : CompositeTexture::Node {
 
 	bool gui() override {
 		outputSlot();
-		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_COLOR) ImGui::TextUnformatted("Pixel");
+		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_COLOR) ImGui::TextUnformatted("Pixel color");
 		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_X) ImGui::TextUnformatted("Pixel X");
 		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_Y) ImGui::TextUnformatted("Pixel Y");
 		if constexpr (TYPE == CompositeTexture::NodeType::PIXEL_CTX_W) ImGui::TextUnformatted("Pixel context width");
@@ -2572,15 +2572,44 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	};
 
 	void visitNodeTypes(INodeTypeVisitor& visitor) {
+		if (visitor.beginCategory("Generate")) {
+			visitor
+				.visitType("Circle", CompositeTexture::NodeType::CIRCLE, 'O')
+				.visitType("Circular splatter", CompositeTexture::NodeType::CIRCULAR_SPLATTER)
+				.visitType("Gradient", CompositeTexture::NodeType::GRADIENT)
+				.visitType("Grid splatter", CompositeTexture::NodeType::SPLATTER)
+				.endCategory();
+		}
+		if (visitor.beginCategory("Image")) {
+			visitor
+				.visitType("Crop", CompositeTexture::NodeType::CROP)
+				.visitType("Flip", CompositeTexture::NodeType::FLIP, 'F')
+				.visitType("Input", CompositeTexture::NodeType::INPUT)
+				.visitType("Resize", CompositeTexture::NodeType::RESIZE, 'R')
+				.visitType("Translate", CompositeTexture::NodeType::TRANSLATE)
+				.endCategory();
+		}
 		if (visitor.beginCategory("Math")) {
 			visitor
 				.visitType("Curve", CompositeTexture::NodeType::CURVE, 'C')
 				.visitType("Divide", CompositeTexture::NodeType::DIVIDE, 'D')
 				.visitType("Invert", CompositeTexture::NodeType::INVERT, 'I')
 				.visitType("Min", CompositeTexture::NodeType::MIN)
+				.visitType("Mix", CompositeTexture::NodeType::MIX)
 				.visitType("Max", CompositeTexture::NodeType::MAX)
 				.visitType("Multiply", CompositeTexture::NodeType::MULTIPLY, 'M')
 				.visitType("Step", CompositeTexture::NodeType::STEP)
+				.endCategory();
+		}
+		if (visitor.beginCategory("Misc")) {
+			visitor
+				.visitType("Color", CompositeTexture::NodeType::COLOR, '4')
+				.visitType("Constant", CompositeTexture::NodeType::CONSTANT, '1')
+				.visitType("Merge", CompositeTexture::NodeType::MERGE)
+				.visitType("Set alpha", CompositeTexture::NodeType::SET_ALPHA)
+				.visitType("Splat", CompositeTexture::NodeType::SPLAT, 'S')
+				.visitType("Split", CompositeTexture::NodeType::SPLIT)
+				.visitType("Static switch", CompositeTexture::NodeType::STATIC_SWITCH, 'W')
 				.endCategory();
 		}
 		if (visitor.beginCategory("Noise")) {
@@ -2591,35 +2620,24 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.visitType("Wave noise", CompositeTexture::NodeType::WAVE_NOISE)
 				.endCategory();
 		}
+		if (visitor.beginCategory("Pixel")) {
+			visitor
+				.visitType("Color", CompositeTexture::NodeType::PIXEL_COLOR)
+				.visitType("Context width", CompositeTexture::NodeType::PIXEL_CTX_W, 'W')
+				.visitType("Context height", CompositeTexture::NodeType::PIXEL_CTX_H, 'H')
+				.visitType("Processor", CompositeTexture::NodeType::PIXEL_PROCESSOR)
+				.visitType("X", CompositeTexture::NodeType::PIXEL_X, 'X')
+				.visitType("Y", CompositeTexture::NodeType::PIXEL_Y, 'Y')
+				.endCategory();
+		}
+
 		visitor.visitType("Brightness", CompositeTexture::NodeType::BRIGHTNESS, 'B')
-			.visitType("Circle", CompositeTexture::NodeType::CIRCLE, 'O')
-			.visitType("Circular splatter", CompositeTexture::NodeType::CIRCULAR_SPLATTER)
-			.visitType("Color", CompositeTexture::NodeType::COLOR, '4')
-			.visitType("Constant", CompositeTexture::NodeType::CONSTANT, '1')
 			.visitType("Contrast", CompositeTexture::NodeType::CONTRAST)
-			.visitType("Crop", CompositeTexture::NodeType::CROP)
-			.visitType("Flip", CompositeTexture::NodeType::FLIP, 'F')
 			.visitType("Gamma", CompositeTexture::NodeType::GAMMA)
-			.visitType("Gradient", CompositeTexture::NodeType::GRADIENT)
 			.visitType("Gradient map", CompositeTexture::NodeType::GRADIENT_MAP, 'G')
 			.visitType("Grayscale", CompositeTexture::NodeType::GRAYSCALE)
-			.visitType("Input", CompositeTexture::NodeType::INPUT)
-			.visitType("Merge", CompositeTexture::NodeType::MERGE)
-			.visitType("Mix", CompositeTexture::NodeType::MIX)
-			.visitType("Pixel color", CompositeTexture::NodeType::PIXEL_COLOR)
-			.visitType("Pixel X", CompositeTexture::NodeType::PIXEL_X, 'X')
-			.visitType("Pixel Y", CompositeTexture::NodeType::PIXEL_Y, 'Y')
-			.visitType("Pixel context width", CompositeTexture::NodeType::PIXEL_CTX_W, 'W')
-			.visitType("Pixel context height", CompositeTexture::NodeType::PIXEL_CTX_H, 'H')
-			.visitType("Pixel processor", CompositeTexture::NodeType::PIXEL_PROCESSOR)
-			.visitType("Resize", CompositeTexture::NodeType::RESIZE, 'R')
-			.visitType("Set alpha", CompositeTexture::NodeType::SET_ALPHA)
-			.visitType("Sharpen", CompositeTexture::NodeType::SHARPEN)
-			.visitType("Splat", CompositeTexture::NodeType::SPLAT, 'S')
-			.visitType("Splatter", CompositeTexture::NodeType::SPLATTER)
-			.visitType("Split", CompositeTexture::NodeType::SPLIT)
-			.visitType("Static switch", CompositeTexture::NodeType::STATIC_SWITCH, 'W')
-			.visitType("Translate", CompositeTexture::NodeType::TRANSLATE);
+			.visitType("Sharpen", CompositeTexture::NodeType::SHARPEN);
+			
 	}
 
 	void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
@@ -2658,28 +2676,58 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	void onContextMenu(ImVec2 pos) override {
 		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter), 150, ImGui::IsWindowAppearing());
 		
-		struct : INodeTypeVisitor {
-			bool beginCategory(const char* category) { return ImGui::BeginMenu(category); }
-			void endCategory() { ImGui::EndMenu(); }
-
-			INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
-				StaticString<64> label(_label);
-				if (shortcut) label.append(" (LMB + ", shortcut, ")");
-				if ((!win->m_filter[0] || stristr(_label, win->m_filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
-					node = win->m_resource.addNode(type);
-					win->m_filter[0] = '\0';
-					ImGui::CloseCurrentPopup();
+		if (m_filter[0]) {
+			struct : INodeTypeVisitor {
+				bool beginCategory(const char* _category) {
+					category = _category;
+					category.add(" / ");
+					return true;
 				}
-				return *this;
+				void endCategory() { category = ""; }
+
+				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
+					StaticString<128> label(category, _label);
+					if (shortcut) label.append(" (LMB + ", shortcut, ")");
+					if (!node && stristr(label, win->m_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
+						node = win->m_resource.addNode(type);
+						ImGui::CloseCurrentPopup();
+					}
+					return *this;
+				}
+				StaticString<64> category;
+				CompositeTextureEditorWindow* win;
+				CompositeTexture::Node* node = nullptr;
+			} visitor;
+			visitor.win = this;
+			visitNodeTypes(visitor);
+			if (visitor.node) {
+				visitor.node->m_pos = pos;
+				pushUndo(NO_MERGE_UNDO);
+			}		
+		}
+		else {
+			struct : INodeTypeVisitor {
+				bool beginCategory(const char* category) { return ImGui::BeginMenu(category); }
+				void endCategory() { ImGui::EndMenu(); }
+
+				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
+					StaticString<64> label(_label);
+					if (shortcut) label.append(" (LMB + ", shortcut, ")");
+					if (!node && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
+						node = win->m_resource.addNode(type);
+						ImGui::CloseCurrentPopup();
+					}
+					return *this;
+				}
+				CompositeTextureEditorWindow* win;
+				CompositeTexture::Node* node = nullptr;
+			} visitor;
+			visitor.win = this;
+			visitNodeTypes(visitor);
+			if (visitor.node) {
+				visitor.node->m_pos = pos;
+				pushUndo(NO_MERGE_UNDO);
 			}
-			CompositeTextureEditorWindow* win;
-			CompositeTexture::Node* node = nullptr;
-		} visitor;
-		visitor.win = this;
-		visitNodeTypes(visitor);
-		if (visitor.node) {
-			visitor.node->m_pos = pos;
-			pushUndo(NO_MERGE_UNDO);
 		}
 	}
 	
