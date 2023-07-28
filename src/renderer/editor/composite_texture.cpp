@@ -60,7 +60,8 @@ enum class CompositeTexture::NodeType : u32 {
 	PIXEL_CTX_H,
 	DIVIDE,
 	MIN,
-	MAX
+	MAX,
+	SQUARE
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -1776,6 +1777,55 @@ struct CurveNode final : CompositeTexture::Node {
 	i32 dragged_point = -1;
 };
 
+struct SquareNode final : CompositeTexture::Node {
+	SquareNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SQUARE; }
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(power);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(power);
+	}
+
+	bool generateInternal() override {
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator);
+		for (u32 j = 0; j < h; ++j) {
+			for (u32 i = 0; i < w; ++i) {
+				Vec2 v(i / float(w - 1) - 0.5f
+					, j / float(h - 1) - 0.5f);
+				float d = powf(maximum(fabsf(v.x), fabsf(v.y)) * 2, power);
+				out.pixels[i + j * w] = d;
+			}
+		}
+		return true;
+	}
+	
+	bool gui() override {
+		nodeTitle("Square");
+		ImGui::BeginGroup();
+		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999);
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
+		res = ImGui::DragFloat("Power", &power, 0.1f, FLT_MIN, FLT_MAX) || res;
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	float power = 1.f;
+};
+
 struct CircleNode final : CompositeTexture::Node {
 	CircleNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -2266,6 +2316,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::SQUARE: node = LUMIX_NEW(allocator, SquareNode)(allocator); break;
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode)(allocator); break;
 		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode)(allocator); break;
 		case CompositeTexture::NodeType::CURVE: node = LUMIX_NEW(allocator, CurveNode)(allocator); break;
@@ -2580,6 +2631,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.visitType("Circular splatter", CompositeTexture::NodeType::CIRCULAR_SPLATTER)
 				.visitType("Gradient", CompositeTexture::NodeType::GRADIENT)
 				.visitType("Grid splatter", CompositeTexture::NodeType::SPLATTER)
+				.visitType("Square", CompositeTexture::NodeType::SQUARE)
 				.endCategory();
 		}
 		if (visitor.beginCategory("Image")) {
@@ -2843,28 +2895,30 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		if (!preview_node) return;
 
 		ImVec2 p = ImGui::GetItemRectMin();
-		if (!preview_node->m_preview && !preview_node->m_outputs.empty()) {
+		if (!preview_node->m_preview) {
 			if (preview_node->m_dirty) preview_node->generate();
-			Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
-			if (renderer) {
-				const CompositeTexture::Image& pd = preview_node->m_outputs[0];
-				gpu::TextureFormat format;
-				switch (pd.channels) {
-					case 1: format = gpu::TextureFormat::R32F; break;
-					case 2: ASSERT(false); break; // TODO
-					case 3: ASSERT(false); break;
-					case 4: format = gpu::TextureFormat::RGBA32F; break;
-					default: ASSERT(false);
+			if (!preview_node->m_outputs.empty()) {
+				Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
+				if (renderer) {
+					const CompositeTexture::Image& pd = preview_node->m_outputs[0];
+					gpu::TextureFormat format;
+					switch (pd.channels) {
+						case 1: format = gpu::TextureFormat::R32F; break;
+						case 2: ASSERT(false); break; // TODO
+						case 3: ASSERT(false); break;
+						case 4: format = gpu::TextureFormat::RGBA32F; break;
+						default: ASSERT(false);
+					}
+					Renderer::MemRef mem = renderer->copy(pd.pixels.begin(), pd.pixels.byte_size());
+					preview_node->m_preview = renderer->createTexture(pd.w
+					, pd.h
+					, 1
+					, format
+					, gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
+					, mem
+					, "composite texture");
 				}
-				Renderer::MemRef mem = renderer->copy(pd.pixels.begin(), pd.pixels.byte_size());
-				preview_node->m_preview = renderer->createTexture(pd.w
-				, pd.h
-				, 1
-				, format
-				, gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
-				, mem
-				, "composite texture");
-			}	
+			}
 		}
 		if (preview_node->m_preview && !preview_node->m_outputs.empty()) {
 			ImGui::SetCursorScreenPos(p);
