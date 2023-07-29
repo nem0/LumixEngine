@@ -185,6 +185,7 @@ struct FormatDesc {
 			case TextureFormat::R11G11B10F: return {	false,		false, 4,	GL_R11F_G11F_B10F,					GL_ZERO, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV};
 			case TextureFormat::RGBA32F: return {		false,		false, 16,	GL_RGBA32F,							GL_ZERO, GL_RGBA, GL_FLOAT};
 			case TextureFormat::RG32F: return {			false,		false, 8,	GL_RG32F,							GL_ZERO, GL_RG, GL_FLOAT};
+			case TextureFormat::R32F: return {			false,		false, 4,	GL_R32F,							GL_ZERO, GL_RED, GL_FLOAT};
 			
 			case TextureFormat::D32: return {			false,		false, 4,	GL_DEPTH_COMPONENT32,			    GL_ZERO, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
 			case TextureFormat::D24S8: return {			false,		false, 4,	GL_DEPTH24_STENCIL8,			    GL_ZERO, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT_24_8};

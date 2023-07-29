@@ -62,7 +62,8 @@ enum class CompositeTexture::NodeType : u32 {
 	MIN,
 	MAX,
 	SQUARE,
-	TRIANGLE
+	TRIANGLE,
+	BLUR
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -1173,12 +1174,9 @@ struct TranslateNode final : CompositeTexture::Node {
 	bool gui() override {
 		nodeTitle("Translate");
 		inputSlot();
-		ImGui::BeginGroup();
-		bool res = ImGui::DragInt("X", (i32*)&x, 1, 0, 999999);
-		res = ImGui::DragInt("Y", (i32*)&y, 1, 0, 999999) || res;
-		ImGui::EndGroup();
-		ImGui::SameLine();
 		outputSlot();
+		bool res = ImGui::DragInt("X", (i32*)&x, 1, INT_MIN, INT_MAX);
+		res = ImGui::DragInt("Y", (i32*)&y, 1, INT_MIN, INT_MAX) || res;
 		return res;
 	}
 
@@ -1294,7 +1292,7 @@ struct StepNode final : CompositeTexture::Node {
 		if (!arg0.isValid()) return errorValue("Invalid input");
 		
 		for (u32 ch = 0; ch < arg0.channels; ++ch) {
-			arg0.value[ch] = arg0.value[ch] < m_value[ch] ? 0.f : 1.f;
+			arg0.value[ch] = arg0.value[ch] < m_value ? 0.f : 1.f;
 		}
 		return arg0;
 	}
@@ -1309,7 +1307,7 @@ struct StepNode final : CompositeTexture::Node {
 			for (i32 i = 0; i < (i32)in.w; ++i) {
 				for (u32 ch = 0; ch < in.channels; ++ch) {
 					float v = in.pixels[(i + j * in.w) * in.channels + ch];
-					v = v < m_value[ch] ? 0.f : 1.f;
+					v = v < m_value ? 0.f : 1.f;
 					out.pixels[(i + j * out.w) * out.channels + ch] = v;
 				}
 			}
@@ -1321,10 +1319,10 @@ struct StepNode final : CompositeTexture::Node {
 		nodeTitle("Step");
 		inputSlot();
 		outputSlot();
-		return ImGui::ColorEdit4("Value", &m_value.x, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
+		return ImGui::DragFloat("Value", &m_value);
 	}
 
-	Vec4 m_value = Vec4(1, 1, 1, 1);
+	float m_value = 1;
 };
 
 
@@ -1777,6 +1775,102 @@ struct CurveNode final : CompositeTexture::Node {
 	i32 dragged_point = -1;
 };
 
+struct BlurNode final : CompositeTexture::Node {
+	BlurNode(IAllocator& allocator)
+		: Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::BLUR; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(iterations);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(iterations);
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+
+		Array<float> tmp(m_resource->m_allocator);
+		tmp.resize(out.pixels.size());
+
+		for (u32 iter = 0; iter < iterations; ++iter) {
+			if (in.w > 1) {
+				CompositeTexture::Image& src = iter == 0 ? in : out;
+				for (u32 j = 0; j < out.h; ++j) {
+					for (u32 ch = 0; ch < out.channels; ++ch) {
+						const u32 idx = j * src.w * src.channels + ch;
+						const float* f = &src.pixels[idx];
+						tmp[idx] = (f[0] * 2 + f[src.channels]) / 3;
+					}
+
+					for (u32 i = 1; i < out.w - 1; ++i) {
+						u32 idx = (i + j * src.w) * src.channels;
+						for (u32 ch = 0; ch < out.channels; ++ch) {
+							const float* f = &src.pixels[idx + ch];
+							tmp[idx + ch] = (f[-(i32)src.channels] + *f + f[src.channels]) / 3;
+						}
+					}
+
+					for (u32 ch = 0; ch < out.channels; ++ch) {
+						const u32 idx = (out.w - 1 + j * src.w) * src.channels + ch;
+						const float* f = &src.pixels[idx];
+						tmp[idx] = (f[0] * 2 + f[-(i32)src.channels]) / 3;
+					}
+				}
+			} else {
+				CompositeTexture::Image& src = iter == 0 ? in : out;
+				memcpy(tmp.data(), src.pixels.data(), tmp.byte_size());
+			}
+
+			if (in.h > 1) {
+				const i32 line_offset = out.w * out.channels;
+				for (u32 i = 0; i < out.w; ++i) {
+					for (u32 ch = 0; ch < out.channels; ++ch) {
+						const u32 idx = i * out.channels + ch;
+						const float* f = &tmp[idx];
+						out.pixels[idx] = (f[0] * 2 + f[line_offset]) / 3;
+					}
+
+					for (u32 j = 1; j < out.h - 1; ++j) {
+						u32 idx = (i + j * out.w) * out.channels;
+						for (u32 ch = 0; ch < out.channels; ++ch) {
+							const float* f = &tmp[idx + ch];
+							out.pixels[idx + ch] = (f[-line_offset] + *f + f[line_offset]) / 3;
+						}
+					}
+
+					for (u32 ch = 0; ch < out.channels; ++ch) {
+						const u32 idx = (i + (out.h - 1) * out.w) * out.channels + ch;
+						const float* f = &tmp[idx];
+						out.pixels[idx] = (f[0] * 2 + f[-line_offset]) / 3;
+					}
+				}
+			} else {
+				memcpy(out.pixels.data(), tmp.data() , tmp.byte_size());
+			}
+		}
+
+		return true;
+	}
+
+	bool gui() override {
+		nodeTitle("Blur");
+		inputSlot();
+		outputSlot();
+		bool res = ImGui::DragInt("Iterations", (i32*)&iterations, 1, 1, 999999);
+		return res;
+	}
+
+	u32 iterations = 4;
+};
+
 struct TriangleNode final : CompositeTexture::Node {
 	TriangleNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -1829,6 +1923,7 @@ struct TriangleNode final : CompositeTexture::Node {
 	u32 h = 256;
 	float power = 1.f;
 };
+
 struct SquareNode final : CompositeTexture::Node {
 	SquareNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -2368,6 +2463,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
 		case CompositeTexture::NodeType::TRIANGLE: node = LUMIX_NEW(allocator, TriangleNode)(allocator); break;
 		case CompositeTexture::NodeType::SQUARE: node = LUMIX_NEW(allocator, SquareNode)(allocator); break;
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode)(allocator); break;
@@ -2711,6 +2807,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 		if (visitor.beginCategory("Misc")) {
 			visitor
+				.visitType("Blur", CompositeTexture::NodeType::BLUR, 'B')
 				.visitType("Color", CompositeTexture::NodeType::COLOR, '4')
 				.visitType("Constant", CompositeTexture::NodeType::CONSTANT, '1')
 				.visitType("Merge", CompositeTexture::NodeType::MERGE)
@@ -2739,7 +2836,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.endCategory();
 		}
 
-		visitor.visitType("Brightness", CompositeTexture::NodeType::BRIGHTNESS, 'B')
+		visitor.visitType("Brightness", CompositeTexture::NodeType::BRIGHTNESS)
 			.visitType("Contrast", CompositeTexture::NodeType::CONTRAST)
 			.visitType("Gamma", CompositeTexture::NodeType::GAMMA)
 			.visitType("Gradient map", CompositeTexture::NodeType::GRADIENT_MAP, 'G')
