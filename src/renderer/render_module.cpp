@@ -3456,7 +3456,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	m_world.entityTransformed().bind<&RenderModuleImpl::onEntityMoved>(this);
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
-	m_model_instances.reserve(5000);
+	m_model_instances.reserve(1024);
 
 	m_render_cmps_mask = 0;
 

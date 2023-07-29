@@ -305,16 +305,25 @@ struct EngineImpl final : Engine {
 		profiler::pushCounter(counter, m_smooth_time_delta * 1000.f);
 	}
 
+	debug::Allocator* getDebugAllocator() {
+		IAllocator* a = &m_allocator;
+		while (a) {
+			if (a->isDebug()) return (debug::Allocator*)a;
+			a = a->getParent();
+		}
+		return nullptr;
+	}
+
 	void update(World& world) override
 	{
 		PROFILE_FUNCTION();
 		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
 		profiler::pushCounter(lua_mem_counter, float(double(m_lua_allocated) / 1024.0));
 
-		if (m_allocator.isDebug()) {
-			debug::Allocator& a = (debug::Allocator&)m_allocator;
+		debug::Allocator* debug_allocator = getDebugAllocator();
+		if (debug_allocator) {
 			static u32 mem_counter = profiler::createCounter("Main allocator (MB)", 0);
-			profiler::pushCounter(mem_counter, float(double(a.getTotalSize()) / (1024.0 * 1024.0)));
+			profiler::pushCounter(mem_counter, float(double(debug_allocator->getTotalSize()) / (1024.0 * 1024.0)));
 		}
 
 		const float reserved_pages_size = (m_page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
