@@ -81,6 +81,7 @@
 #elif defined(__linux__) || defined(__clang__)
 	#include <float.h>
 	#include <inttypes.h>
+	#include <limits.h>
 	#include <math.h>
 	#include <stdlib.h>
 	#include <string.h>
