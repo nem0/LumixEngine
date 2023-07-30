@@ -65,7 +65,8 @@ enum class CompositeTexture::NodeType : u32 {
 	TRIANGLE,
 	BLUR,
 	CHECKERBOARD,
-	WARP
+	WARP,
+	TWIRL
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -96,6 +97,29 @@ Vec4 CompositeTexture::Image::sample(i32 x, i32 y) {
 	Vec4 res;
 	memcpy(&res, &pixels[(x + y * w) * channels], channels * sizeof(float));
 	return res;
+}
+
+Vec4 CompositeTexture::Image::sampleWrap(i32 x, i32 y) {
+	x = x < 0 ? -i32(-x % w) + w : x % w;
+	y = y < 0 ? -i32(-y % h) + h : y % h;
+	Vec4 res;
+	memcpy(&res, &pixels[(x + y * w) * channels], channels * sizeof(float));
+	return res;
+}
+
+Vec4 CompositeTexture::Image::sampleWrap(float x, float y) {
+	const i32 ix = i32(x);
+	const i32 iy = i32(y);
+	const float tx = x - ix;
+	const float ty = y - iy;
+	Vec4 v00 = sampleWrap(ix, iy);
+	Vec4 v10 = sampleWrap(ix + 1, iy);
+	Vec4 v01 = sampleWrap(ix, iy + 1);
+	Vec4 v11 = sampleWrap(ix + 1, iy + 1);
+	return lerp(
+		lerp(v00, v10, tx),
+		lerp(v01, v11, tx),
+		ty);
 }
 
 Vec4 CompositeTexture::Image::sample(float x, float y) {
@@ -1823,6 +1847,59 @@ struct CurveNode final : CompositeTexture::Node {
 	i32 dragged_point = -1;
 };
 
+struct TwirlNode final : CompositeTexture::Node {
+	TwirlNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::TWIRL; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(intensity);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(intensity);
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::Image& in = getInputImage(0);
+
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+		
+		for (i32 j = 0; j < (i32)out.h; ++j) {
+			for (i32 i = 0; i < (i32)out.w; ++i) {
+				const float tx = (i - out.w * 0.5f) / (out.w * 0.5f);
+				const float ty = (j - out.h * 0.5f) / (out.h * 0.5f);
+				const float r = sqrtf(tx * tx + ty * ty) * intensity;
+				const float s = sinf(r);
+				const float c = cosf(r);
+				float x = tx * c + ty * s;
+				float y = tx * -s + ty * c;
+
+				x = x * out.w * 0.5f + out.w * 0.5f;
+				y = y * out.h * 0.5f + out.h * 0.5f;
+
+				const Vec4 p = in.sampleWrap(x, y);
+				out.setPixel(i, j, p);
+			}
+		}
+
+		return true;
+	}
+
+	bool gui() override {
+		nodeTitle("Twirl");
+		inputSlot();
+		outputSlot();
+		return ImGui::DragFloat("Intensity", &intensity, 0.1f, -FLT_MAX, FLT_MAX);
+	}
+
+	float intensity = 1.f;
+};
+
 struct WarpNode final : CompositeTexture::Node {
 	WarpNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -1873,7 +1950,7 @@ struct WarpNode final : CompositeTexture::Node {
 		return ImGui::DragFloat("Intensity", &intensity, 1.f, -FLT_MAX, FLT_MAX);
 	}
 
-	float intensity = 0.1f;
+	float intensity = 1000.f;
 };
 
 struct BlurNode final : CompositeTexture::Node {
@@ -2612,6 +2689,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
+		case CompositeTexture::NodeType::TWIRL: node = LUMIX_NEW(allocator, TwirlNode)(allocator); break;
 		case CompositeTexture::NodeType::WARP: node = LUMIX_NEW(allocator, WarpNode)(allocator); break;
 		case CompositeTexture::NodeType::CHECKERBOARD: node = LUMIX_NEW(allocator, CheckerboardNode)(allocator); break;
 		case CompositeTexture::NodeType::TRIANGLE: node = LUMIX_NEW(allocator, TriangleNode)(allocator); break;
@@ -2966,6 +3044,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.visitType("Splat", CompositeTexture::NodeType::SPLAT, 'S')
 				.visitType("Split", CompositeTexture::NodeType::SPLIT)
 				.visitType("Static switch", CompositeTexture::NodeType::STATIC_SWITCH, 'W')
+				.visitType("Twirl", CompositeTexture::NodeType::TWIRL)
 				.visitType("Warp", CompositeTexture::NodeType::WARP)
 				.endCategory();
 		}
