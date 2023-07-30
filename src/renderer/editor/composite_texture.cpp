@@ -66,7 +66,8 @@ enum class CompositeTexture::NodeType : u32 {
 	BLUR,
 	CHECKERBOARD,
 	WARP,
-	TWIRL
+	TWIRL,
+	NORMALMAP
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -1900,6 +1901,51 @@ struct TwirlNode final : CompositeTexture::Node {
 	float intensity = 1.f;
 };
 
+struct NormalmapNode final : CompositeTexture::Node {
+	NormalmapNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::NORMALMAP; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(intensity);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(intensity);
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::Image& in = getInputImage(0);
+		if (in.channels != 1) return error("Input must have only 1 channel");
+
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, 2, m_allocator);
+		for (i32 j = 0; j < (i32)out.h; ++j) {
+			for (i32 i = 0; i < (i32)out.w; ++i) {
+				const float dx = clamp((in.sample(i + 1, j) - in.sample(i - 1, j)).x * intensity, -1.f, 1.f);
+				const float dy = clamp((in.sample(i, j + 1) - in.sample(i, j - 1)).x * intensity, -1.f, 1.f);
+				
+				out.setPixel(i, j, Vec4(dx * 0.5f + 0.5f, dy * 0.5f + 0.5f, 0, 0));
+			}
+		}
+
+		return true;
+	}
+
+	bool gui() override {
+		nodeTitle("Normalmap");
+		inputSlot();
+		outputSlot();
+		
+		return ImGui::DragFloat("Intensity", &intensity, 0.1f, 0, FLT_MAX);
+	}
+
+	float intensity = 1.f;
+};
+
 struct WarpNode final : CompositeTexture::Node {
 	WarpNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -2689,6 +2735,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
+		case CompositeTexture::NodeType::NORMALMAP: node = LUMIX_NEW(allocator, NormalmapNode)(allocator); break;
 		case CompositeTexture::NodeType::TWIRL: node = LUMIX_NEW(allocator, TwirlNode)(allocator); break;
 		case CompositeTexture::NodeType::WARP: node = LUMIX_NEW(allocator, WarpNode)(allocator); break;
 		case CompositeTexture::NodeType::CHECKERBOARD: node = LUMIX_NEW(allocator, CheckerboardNode)(allocator); break;
@@ -3040,6 +3087,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.visitType("Color", CompositeTexture::NodeType::COLOR, '4')
 				.visitType("Constant", CompositeTexture::NodeType::CONSTANT, '1')
 				.visitType("Merge", CompositeTexture::NodeType::MERGE)
+				.visitType("Normalmap", CompositeTexture::NodeType::NORMALMAP)
 				.visitType("Set alpha", CompositeTexture::NodeType::SET_ALPHA)
 				.visitType("Splat", CompositeTexture::NodeType::SPLAT, 'S')
 				.visitType("Split", CompositeTexture::NodeType::SPLIT)
@@ -3292,8 +3340,8 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 					gpu::TextureFormat format;
 					switch (pd.channels) {
 						case 1: format = gpu::TextureFormat::R32F; break;
-						case 2: ASSERT(false); break; // TODO
-						case 3: ASSERT(false); break;
+						case 2: format = gpu::TextureFormat::RG32F; break;
+						case 3: ASSERT(false); break; // TODO
 						case 4: format = gpu::TextureFormat::RGBA32F; break;
 						default: ASSERT(false);
 					}
