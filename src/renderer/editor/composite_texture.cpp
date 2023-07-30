@@ -64,7 +64,8 @@ enum class CompositeTexture::NodeType : u32 {
 	SQUARE,
 	TRIANGLE,
 	BLUR,
-	CHECKERBOARD
+	CHECKERBOARD,
+	WARP
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -87,6 +88,35 @@ void CompositeTexture::Image::init(u32 _w, u32 _h, u32 _channels) {
 	h = _h;
 	channels = _channels;
 	pixels.resize(w * h * channels);
+}
+
+Vec4 CompositeTexture::Image::sample(i32 x, i32 y) {
+	x = clamp(x, 0, w - 1);
+	y = clamp(y, 0, h - 1);
+	Vec4 res;
+	memcpy(&res, &pixels[(x + y * w) * channels], channels * sizeof(float));
+	return res;
+}
+
+Vec4 CompositeTexture::Image::sample(float x, float y) {
+	const i32 ix = i32(x);
+	const i32 iy = i32(y);
+	const float tx = x - ix;
+	const float ty = y - iy;
+	Vec4 v00 = sample(ix, iy);
+	Vec4 v10 = sample(ix + 1, iy);
+	Vec4 v01 = sample(ix, iy + 1);
+	Vec4 v11 = sample(ix + 1, iy + 1);
+	return lerp(
+		lerp(v00, v10, tx),
+		lerp(v01, v11, tx),
+		ty);
+}
+
+void CompositeTexture::Image::setPixel(u32 x, u32 y, const Vec4& color) {
+	ASSERT(x < w);
+	ASSERT(y < h);
+	memcpy(&pixels[(x + y * w) * channels], &color, sizeof(float) * channels);
 }
 
 OutputMemoryStream CompositeTexture::Image::asU8() const {
@@ -887,22 +917,19 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 
 	// https://www.shadertoy.com/view/tldSRj
 	float noise(Vec2 p) const {
-		const float kF = magic;
-
 		Vec2 i = floor(p);
 		Vec2 f = fract(p);
 		f = f * f * (f * -2.f + 3.f);
-		return mix(mix(sinf(kF * dot(p, hash(i + Vec2(0.f, 0.f)))),
-		               sinf(kF * dot(p, hash(i + Vec2(1.f, 0.f)))), f.x),
-		               mix(sinf(kF * dot(p, hash(i + Vec2(0.f, 1.f)))),
-		                   sinf(kF * dot(p, hash(i + Vec2(1.f, 1.f)))), f.x), f.y);
+		return mix(mix(sinf(dot(p, hash(i + Vec2(0.f, 0.f)))),
+		               sinf(dot(p, hash(i + Vec2(1.f, 0.f)))), f.x),
+		               mix(sinf(dot(p, hash(i + Vec2(0.f, 1.f)))),
+		                   sinf(dot(p, hash(i + Vec2(1.f, 1.f)))), f.x), f.y);
 	}
 
 	bool gui() override {
 		nodeTitle("Wave noise");
 		outputSlot();
 		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
-		res = ImGui::DragFloat("Magic", &magic, 0.01f, 1, 12) || res;
 		res = ImGui::DragFloat("Offset", &offset, 0.01f, FLT_MIN, FLT_MAX) || res;
 		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
 		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, 999999) || res;
@@ -927,7 +954,6 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 		blob.write(w);
 		blob.write(h);
 		blob.write(scale);
-		blob.write(magic);
 		blob.write(offset);
 	}
 
@@ -935,14 +961,12 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 		blob.read(w);
 		blob.read(h);
 		blob.read(scale);
-		blob.read(magic);
 		blob.read(offset);
 	}
 
 	u32 w = 256;
 	u32 h = 256;
 	float scale = 4;
-	float magic = 6.f;
 	float offset = 0;
 };
 
@@ -1799,6 +1823,59 @@ struct CurveNode final : CompositeTexture::Node {
 	i32 dragged_point = -1;
 };
 
+struct WarpNode final : CompositeTexture::Node {
+	WarpNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::WARP; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(intensity);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(intensity);
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+		if (!generateInput(1)) return false;
+
+		CompositeTexture::Image& in0 = getInputImage(0);
+		CompositeTexture::Image& in1 = getInputImage(1);
+		if (in0.w != in1.w) return error("Width does not match");
+		if (in0.h != in1.h) return error("Height does not match");
+		if (in1.channels != 1) return error("Second input must have only 1 channel");
+
+		CompositeTexture::Image& out = m_outputs.emplace(in0.w, in0.h, in0.channels, m_allocator);
+		for (i32 j = 0; j < (i32)out.h; ++j) {
+			for (i32 i = 0; i < (i32)out.w; ++i) {
+				const float dx = (in1.sample(i + 1, j) - in1.sample(i - 1, j)).x;
+				const float dy = (in1.sample(i, j + 1) - in1.sample(i, j - 1)).x;
+				
+				const Vec4 p = in0.sample(i + dx * intensity, j + dy * intensity);
+				out.setPixel(i, j, p);
+			}
+		}
+
+		return true;
+	}
+
+	bool gui() override {
+		nodeTitle("Warp");
+		inputSlot();
+		outputSlot();
+		ImGui::TextUnformatted("Source");
+		inputSlot();
+		ImGui::TextUnformatted("Pattern");
+		
+		return ImGui::DragFloat("Intensity", &intensity, 1.f, -FLT_MAX, FLT_MAX);
+	}
+
+	float intensity = 0.1f;
+};
+
 struct BlurNode final : CompositeTexture::Node {
 	BlurNode(IAllocator& allocator)
 		: Node(allocator) {}
@@ -2535,6 +2612,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
+		case CompositeTexture::NodeType::WARP: node = LUMIX_NEW(allocator, WarpNode)(allocator); break;
 		case CompositeTexture::NodeType::CHECKERBOARD: node = LUMIX_NEW(allocator, CheckerboardNode)(allocator); break;
 		case CompositeTexture::NodeType::TRIANGLE: node = LUMIX_NEW(allocator, TriangleNode)(allocator); break;
 		case CompositeTexture::NodeType::SQUARE: node = LUMIX_NEW(allocator, SquareNode)(allocator); break;
@@ -2888,6 +2966,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				.visitType("Splat", CompositeTexture::NodeType::SPLAT, 'S')
 				.visitType("Split", CompositeTexture::NodeType::SPLIT)
 				.visitType("Static switch", CompositeTexture::NodeType::STATIC_SWITCH, 'W')
+				.visitType("Warp", CompositeTexture::NodeType::WARP)
 				.endCategory();
 		}
 		if (visitor.beginCategory("Noise")) {

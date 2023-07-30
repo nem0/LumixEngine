@@ -15,6 +15,9 @@ struct CompositeTexture {
 	struct Image {
 		Image(IAllocator& allocator);
 		Image(u32 w, u32 h, u32 channels, IAllocator& allocator);
+		Vec4 sample(i32 x, i32 y);
+		Vec4 sample(float x, float y);
+		void setPixel(u32 x, u32 y, const Vec4& color);
 		void init(u32 w, u32 h, u32 channels);
 		OutputMemoryStream asU8() const;
 		Array<float> pixels;
