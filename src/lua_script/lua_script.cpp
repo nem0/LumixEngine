@@ -13,7 +13,8 @@ const ResourceType LuaScript::TYPE("lua_script");
 
 LuaScript::LuaScript(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_source_code(allocator)
+	, m_allocator(allocator, m_path.c_str())
+	, m_source_code(m_allocator)
 {
 }
 

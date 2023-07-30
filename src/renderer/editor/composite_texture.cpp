@@ -63,7 +63,8 @@ enum class CompositeTexture::NodeType : u32 {
 	MAX,
 	SQUARE,
 	TRIANGLE,
-	BLUR
+	BLUR,
+	CHECKERBOARD
 };
 
 enum { OUTPUT_FLAG = 1 << 31 };
@@ -1148,11 +1149,13 @@ struct TranslateNode final : CompositeTexture::Node {
 	void serialize(OutputMemoryStream& blob) const override {
 		blob.write(x);
 		blob.write(y);
+		blob.write(wrap);
 	}
 
 	void deserialize(InputMemoryStream& blob) override {
 		blob.read(x);
 		blob.read(y);
+		blob.read(wrap);
 	}
 
 	bool generateInternal() override {
@@ -1161,13 +1164,32 @@ struct TranslateNode final : CompositeTexture::Node {
 		CompositeTexture::Image& in = getInputImage(0);
 		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator); 
 		
-		for (u32 j = 0; j < in.h; ++j) {
-			for (u32 i = 0; i < in.w; ++i) {
-				memcpy(&out.pixels[(((x + i) % out.w) + ((y + j) % out.h) * out.w) * out.channels]
-					, &in.pixels[(i + j * in.w) * in.channels]
-					, in.channels * sizeof(float));
+		const i32 tx = x < 0 ? -i32(-x % out.w) : x % out.w; 
+		const i32 ty = y < 0 ? -i32(-y % out.h) : y % out.h;
+
+		if (wrap) {
+			for (i32 j = 0; j < (i32)in.h; ++j) {
+				const i32 src_y = (j + ty + out.h) % out.h;
+				for (u32 i = 0; i < (i32)in.w; ++i) {
+					const u32 src_x = (i + tx + out.w) % out.w;
+					memcpy(&out.pixels[(i + j * out.w) * out.channels]
+						, &in.pixels[(src_x + src_y * in.w) * in.channels]
+						, in.channels * sizeof(float));
+				}
 			}
 		}
+		else {
+			for (i32 j = 0; j < (i32)in.h; ++j) {
+				const u32 src_y = clamp(j + ty, 0, out.h - 1);
+				for (i32 i = 0; i < (i32)in.w; ++i) {
+					const u32 src_x = clamp(i + tx, 0, out.w - 1);
+					memcpy(&out.pixels[(i + j * out.w) * out.channels]
+						, &in.pixels[(src_x + src_y * in.w) * in.channels]
+						, in.channels * sizeof(float));
+				}
+			}
+		}
+
 		return true;
 	}
 
@@ -1175,12 +1197,14 @@ struct TranslateNode final : CompositeTexture::Node {
 		nodeTitle("Translate");
 		inputSlot();
 		outputSlot();
-		bool res = ImGui::DragInt("X", (i32*)&x, 1, INT_MIN, INT_MAX);
-		res = ImGui::DragInt("Y", (i32*)&y, 1, INT_MIN, INT_MAX) || res;
+		bool res = ImGui::DragInt("X", &x, 1, INT_MIN, INT_MAX);
+		res = ImGui::DragInt("Y", &y, 1, INT_MIN, INT_MAX) || res;
+		res = ImGui::Checkbox("Wrap", &wrap) || res;
 		return res;
 	}
 
-	u32 x = 0, y = 0;
+	i32 x = 0, y = 0;
+	bool wrap = true;
 };
 
 
@@ -1871,6 +1895,53 @@ struct BlurNode final : CompositeTexture::Node {
 	u32 iterations = 4;
 };
 
+struct CheckerboardNode final : CompositeTexture::Node {
+	CheckerboardNode(IAllocator& allocator) : Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::CHECKERBOARD; }
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(w);
+		blob.write(h);
+		blob.write(size);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(w);
+		blob.read(h);
+		blob.read(size);
+	}
+
+	bool generateInternal() override {
+		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator);
+		for (u32 j = 0; j < h; ++j) {
+			for (u32 i = 0; i < w; ++i) {
+				u32 color = ((i / size) + (j / size)) % 2;
+				out.pixels[i + j * out.w] = (float)color;
+			}
+		}
+		return true;
+	}
+
+	bool gui() override {
+		nodeTitle("Checkerboard");
+		ImGui::BeginGroup();
+		bool res = ImGui::DragInt("Width", (i32*)&w, 1, 1, INT_MAX);
+		res = ImGui::DragInt("Height", (i32*)&h, 1, 1, INT_MAX) || res;
+		res = ImGui::DragInt("Size", (i32*)&size, 1, 1, INT_MAX) || res;
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		outputSlot();
+		return res;
+	}
+
+	u32 w = 256;
+	u32 h = 256;
+	u32 size = 16;
+};
+
 struct TriangleNode final : CompositeTexture::Node {
 	TriangleNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -2464,6 +2535,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
+		case CompositeTexture::NodeType::CHECKERBOARD: node = LUMIX_NEW(allocator, CheckerboardNode)(allocator); break;
 		case CompositeTexture::NodeType::TRIANGLE: node = LUMIX_NEW(allocator, TriangleNode)(allocator); break;
 		case CompositeTexture::NodeType::SQUARE: node = LUMIX_NEW(allocator, SquareNode)(allocator); break;
 		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode)(allocator); break;
@@ -2776,6 +2848,7 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	void visitNodeTypes(INodeTypeVisitor& visitor) {
 		if (visitor.beginCategory("Generate")) {
 			visitor
+				.visitType("Checkerboard", CompositeTexture::NodeType::CHECKERBOARD)
 				.visitType("Circle", CompositeTexture::NodeType::CIRCLE, 'O')
 				.visitType("Circular splatter", CompositeTexture::NodeType::CIRCULAR_SPLATTER)
 				.visitType("Gradient", CompositeTexture::NodeType::GRADIENT)

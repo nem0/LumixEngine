@@ -1832,22 +1832,20 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 
-	~ModelPlugin()
-	{
+	~ModelPlugin() {
 		if (m_downscale_program) m_pipeline->getRenderer().getEndFrameDrawStream().destroy(m_downscale_program);
 		jobs::wait(&m_subres_signal);
-		auto& engine = m_app.getEngine();
-		engine.destroyWorld(*m_world);
+		
+		Engine& engine = m_app.getEngine();
+		if (m_world) engine.destroyWorld(*m_world);
 		m_pipeline.reset();
-		engine.destroyWorld(*m_tile.world);
+		if (m_tile.world) engine.destroyWorld(*m_tile.world);
 		m_tile.pipeline.reset();
 	}
 
 	void init() {
 		Engine& engine = m_app.getEngine();
 		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		createPreviewWorld();
-		createTileWorld();
 		m_viewport.is_ortho = true;
 		m_viewport.near = 0.f;
 		m_viewport.far = 1000.f;
@@ -2038,8 +2036,8 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 
-	void createPreviewWorld()
-	{
+	void createPreviewWorld() {
+		ASSERT(!m_world);
 		Engine& engine = m_app.getEngine();
 		m_world = &engine.createWorld(false);
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
@@ -2068,6 +2066,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void showPreview(Model& model)
 	{
+		if (!m_world) createPreviewWorld();
 		auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
 		if (!render_module) return;
 		if (!model.isReady()) return;
@@ -2853,8 +2852,8 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 
-	void renderTile(PrefabResource* prefab)
-	{
+	void renderTile(PrefabResource* prefab) {
+		if (!m_tile.world) createTileWorld();
 		Engine& engine = m_app.getEngine();
 
 		EntityMap entity_map(m_app.getAllocator());
@@ -2868,8 +2867,8 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 
-	void renderPrefabSecondStage()
-	{
+	void renderPrefabSecondStage() {
+		if (!m_tile.world) createTileWorld();
 		AABB aabb({0, 0, 0}, {0, 0, 0});
 		float radius = 1;
 		World& world = *m_tile.world;
@@ -2989,6 +2988,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
 	{
+		if (!m_tile.world) createTileWorld();
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
 		if (!render_module) return;
 
@@ -3093,7 +3093,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
 	gpu::TextureHandle m_preview;
-	World* m_world;
+	World* m_world = nullptr;
 	Viewport m_viewport;
 	UniquePtr<Pipeline> m_pipeline;
 	EntityPtr m_mesh = INVALID_ENTITY;

@@ -1,10 +1,11 @@
 #include "gpu.h"
-#include "engine/page_allocator.h"
+#include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/page_allocator.h"
 #include "engine/stream.h"
 #include "engine/sync.h"
 #include "engine/os.h"
@@ -113,9 +114,9 @@ struct WindowContext {
 };
 
 struct GL {
-	GL(IAllocator& allocator) : allocator(allocator) {}
+	GL(IAllocator& allocator) : allocator(allocator, "gl") {}
 
-	IAllocator& allocator;
+	TagAllocator allocator;
 	u32 frame = 0;
 	RENDERDOC_API_1_0_2* rdoc_api;
 	WindowContext contexts[64];

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/allocators.h"
 #include "engine/resource.h"
 #include "engine/string.h"
 
@@ -24,6 +25,7 @@ public:
 	static const ResourceType TYPE;
 
 private:
+	TagAllocator m_allocator;
 	String m_source_code;
 };
 

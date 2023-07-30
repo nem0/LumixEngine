@@ -576,11 +576,10 @@ struct NullAudioDevice final : AudioDevice
 };
 
 
-UniquePtr<AudioDevice> AudioDevice::create(Engine& engine)
+UniquePtr<AudioDevice> AudioDevice::create(Engine& engine, IAllocator& allocator)
 {
-	UniquePtr<AudioDeviceImpl> device = UniquePtr<AudioDeviceImpl>::create(engine.getAllocator());
-	if (!device->init(engine))
-	{
+	UniquePtr<AudioDeviceImpl> device = UniquePtr<AudioDeviceImpl>::create(allocator);
+	if (!device->init(engine)) {
 		logWarning("Using null device");
 		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
 	}

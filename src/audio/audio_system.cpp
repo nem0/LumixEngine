@@ -50,7 +50,7 @@ struct AudioSystemImpl final : AudioSystem {
 
 	void init() override
 	{
-		m_device = AudioDevice::create(m_engine);
+		m_device = AudioDevice::create(m_engine, m_allocator);
 		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}
 

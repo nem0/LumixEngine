@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/allocators.h"
 #include "engine/hash.h"
 #include "engine/hash_map.h"
 #include "engine/resource.h"
@@ -47,70 +48,68 @@ struct BoneMask
 };
 
 
-struct Animation final : Resource
-{
-	public:
-		static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
-		static const ResourceType TYPE;
+struct Animation final : Resource {
+	static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+	static const ResourceType TYPE;
 
-	public:
-		enum class CurveType : u8 {
-			KEYFRAMED,
-			SAMPLED
-		};
+	enum class CurveType : u8 {
+		KEYFRAMED,
+		SAMPLED
+	};
 
-		enum class Version : u32 {
-			FIRST = 3,
+	enum class Version : u32 {
+		FIRST = 3,
 
-			LAST
-		};
+		LAST
+	};
 
-		struct Header {
-			u32 magic;
-			Version version;
-			Time length;
-			u32 frame_count;
-		};
+	struct Header {
+		u32 magic;
+		Version version;
+		Time length;
+		u32 frame_count;
+	};
 
-	public:
-		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 
-		ResourceType getType() const override { return TYPE; }
+	ResourceType getType() const override { return TYPE; }
 
-		Vec3 getTranslation(Time time, u32 curve_idx) const;
-		Quat getRotation(Time time, u32 curve_idx) const;
-		int getTranslationCurveIndex(BoneNameHash name_hash) const;
-		int getRotationCurveIndex(BoneNameHash name_hash) const;
-		void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
-		void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
-		Time getLength() const { return m_length; }
+	Vec3 getTranslation(Time time, u32 curve_idx) const;
+	Quat getRotation(Time time, u32 curve_idx) const;
+	int getTranslationCurveIndex(BoneNameHash name_hash) const;
+	int getRotationCurveIndex(BoneNameHash name_hash) const;
+	void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
+	void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
+	Time getLength() const { return m_length; }
 
-	private:
-		void unload() override;
-		bool load(u64 size, const u8* mem) override;
+private:
+	void unload() override;
+	bool load(u64 size, const u8* mem) override;
 
-	private:
-		Time m_length;
-		struct TranslationCurve
-		{
-			BoneNameHash name;
-			u32 count;
-			const u16* times;
-			const Vec3* pos;
-		};
-		struct RotationCurve
-		{
-			BoneNameHash name;
-			u32 count;
-			const u16* times;
-			const Quat* rot;
-		};
-		Array<TranslationCurve> m_translations;
-		Array<RotationCurve> m_rotations;
-		Array<u8> m_mem;
-		u32 m_frame_count = 0;
+	struct TranslationCurve
+	{
+		BoneNameHash name;
+		u32 count;
+		const u16* times;
+		const Vec3* pos;
+	};
 
-		friend struct AnimationSampler;
+	struct RotationCurve
+	{
+		BoneNameHash name;
+		u32 count;
+		const u16* times;
+		const Quat* rot;
+	};
+
+	TagAllocator m_allocator;
+	Time m_length;
+	Array<TranslationCurve> m_translations;
+	Array<RotationCurve> m_rotations;
+	Array<u8> m_mem;
+	u32 m_frame_count = 0;
+
+	friend struct AnimationSampler;
 };
 
 

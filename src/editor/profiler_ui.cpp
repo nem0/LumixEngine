@@ -711,7 +711,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 			if (stristr(tag.m_tag.c_str(), m_filter) == 0) return;
 		}
-		if (ImGui::TreeNode(&tag, "%s - %.1f MB", tag.m_tag.c_str(), tag.m_size / 1024.f / 1024.f)) {
+		if (ImGui::TreeNode(&tag, "%s - %.2f MB", tag.m_tag.c_str(), tag.m_size / 1024.f / 1024.f)) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
 			if (tag.m_child_tags.empty() || m_filter[0] || ImGui::TreeNode("allocs", "Allocations - %.1f MB", tag.m_exclusive_size / 1024.f / 1024.f)) {
 				ImGui::Columns(3);
@@ -1476,7 +1476,7 @@ UniquePtr<StudioApp::GUIPlugin> createProfilerUI(StudioApp& app) {
 		allocator = allocator->getParent();
 	} while(allocator);
 
-	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), app, debug_allocator, engine);
+	return UniquePtr<ProfilerUIImpl>::create(app.getAllocator(), app, debug_allocator, engine);
 }
 
 

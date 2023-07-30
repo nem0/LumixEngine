@@ -198,7 +198,12 @@ namespace Lumix
 			
 			//physx::PxPvdTransport* transport = physx::PxDefaultPvdFileTransportCreate("physx.pvd");
 			m_pvd_transport = physx::PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 100);
-			return m_pvd->connect(*m_pvd_transport, physx::PxPvdInstrumentationFlag::eALL);
+			bool connected = m_pvd->connect(*m_pvd_transport, physx::PxPvdInstrumentationFlag::eALL);
+			if (!connected) {
+				m_pvd_transport->release();
+				m_pvd->release();
+			}
+			return connected;
 		}
 
 		bool cookTriMesh(Span<const Vec3> verts, Span<const u32> indices, IOutputStream& blob) override {

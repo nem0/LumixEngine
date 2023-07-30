@@ -38,7 +38,7 @@ struct LUMIX_AUDIO_API AudioDevice
 
 	virtual ~AudioDevice() {}
 
-	static UniquePtr<AudioDevice> create(Engine& engine);
+	static UniquePtr<AudioDevice> create(Engine& engine, IAllocator& allocator);
 
 	virtual BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags) = 0;
 	virtual void setEcho(BufferHandle handle,

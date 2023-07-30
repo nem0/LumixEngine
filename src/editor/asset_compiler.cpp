@@ -391,8 +391,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	{
 		auto iter = m_dependencies.find(dependency);
 		if (!iter.isValid()) {
-			IAllocator& allocator = m_app.getAllocator();
-			m_dependencies.insert(dependency, Array<Path>(allocator));
+			m_dependencies.insert(dependency, Array<Path>(m_allocator));
 			iter = m_dependencies.find(dependency);
 		}
 		if (iter.value().indexOf(included_from) < 0) {
