@@ -1,5 +1,6 @@
-#include "engine/atomic.h"
+#include "engine/allocators.h"
 #include "engine/array.h"
+#include "engine/atomic.h"
 #include "engine/engine.h"
 #include "engine/fibers.h"
 #include "engine/allocator.h"
@@ -51,18 +52,18 @@ struct Work {
 	Type type;
 };
 
-struct System
-{
+struct System {
 	System(IAllocator& allocator) 
-		: m_allocator(allocator)
-		, m_workers(allocator)
-		, m_free_fibers(allocator)
-		, m_backup_workers(allocator)
-		, m_work_queue(allocator)
-		, m_sleeping_workers(allocator)
+		: m_allocator(allocator, "job system")
+		, m_workers(m_allocator)
+		, m_free_fibers(m_allocator)
+		, m_backup_workers(m_allocator)
+		, m_work_queue(m_allocator)
+		, m_sleeping_workers(m_allocator)
 	{}
 
 
+	TagAllocator m_allocator;
 	Lumix::Mutex m_sync;
 	Lumix::Mutex m_job_queue_sync;
 	Lumix::Mutex m_sleeping_sync;
@@ -71,7 +72,6 @@ struct System
 	Array<WorkerTask*> m_backup_workers;
 	FiberDecl m_fiber_pool[512];
 	Array<FiberDecl*> m_free_fibers;
-	IAllocator& m_allocator;
 	RingBuffer<Work, 64> m_work_queue;
 };
 
@@ -359,6 +359,9 @@ static bool popWork(Work& work, WorkerTask* worker) {
 	Fiber::switchTo(&this_fiber->fiber, getWorker()->m_primary_fiber);
 }
 
+IAllocator& getAllocator() {
+	return g_system->m_allocator;
+}
 
 bool init(u8 workers_count, IAllocator& allocator)
 {
@@ -377,7 +380,7 @@ bool init(u8 workers_count, IAllocator& allocator)
 
 	int count = maximum(1, int(workers_count));
 	for (int i = 0; i < count; ++i) {
-		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
+		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
 		if (task->create("Worker", false)) {
 			task->m_is_enabled = true;
 			g_system->m_workers.push(task);
@@ -385,7 +388,7 @@ bool init(u8 workers_count, IAllocator& allocator)
 		}
 		else {
 			logError("Job system worker failed to initialize.");
-			LUMIX_DELETE(allocator, task);
+			LUMIX_DELETE(getAllocator(), task);
 		}
 	}
 
@@ -398,10 +401,6 @@ u8 getWorkersCount()
 	const int c = g_system->m_workers.size();
 	ASSERT(c <= 0xff);
 	return (u8)c;
-}
-
-IAllocator& getAllocator() {
-	return g_system->m_allocator;
 }
 
 void shutdown()

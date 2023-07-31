@@ -2701,17 +2701,11 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool canCreateResource() const override { return true; }
 
-	bool createResource(const char* path) override {
-		ParticleSystemEditorResource res(Path(path), m_app, m_app.getAllocator());
+	void createResource(OutputMemoryStream& blob) override {
+		ParticleSystemEditorResource res(Path("new particle system"), m_app, m_app.getAllocator());
 		res.addEmitter();
 		res.m_emitters[0]->initDefault(ParticleSystemResourceType::SYSTEM);
-		OutputMemoryStream blob(m_app.getAllocator());
 		res.serialize(blob);
-		if (!m_app.getEngine().getFileSystem().saveContentSync(Path(path), blob)) {
-			logError("Failed to write ", path);
-			return false;
-		}
-		return true;
 	}
 
 	const char* getDefaultExtension() const override { return "par"; }
@@ -2793,17 +2787,11 @@ struct FunctionBrowserPlugin : AssetBrowser::Plugin {
 
 	bool canCreateResource() const override { return true; }
 
-	bool createResource(const char* path) override {
-		ParticleSystemEditorResource res(Path(path), m_app, m_app.getAllocator());
+	void createResource(OutputMemoryStream& blob) override {
+		ParticleSystemEditorResource res(Path("new particle function"), m_app, m_app.getAllocator());
 		res.addEmitter();
 		res.m_emitters[0]->initDefault(ParticleSystemResourceType::FUNCTION);
-		OutputMemoryStream blob(m_app.getAllocator());
 		res.serialize(blob);
-		if (!m_app.getEngine().getFileSystem().saveContentSync(Path(path), blob)) {
-			logError("Failed to write ", path);
-			return false;
-		}
-		return true;
 	}
 
 	const char* getDefaultExtension() const override { return "pfn"; }
@@ -3594,9 +3582,9 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGui::BeginMenu("File")) {
 					const ParticleSystem* emitter = getSelectedParticleSystem();
-					menuItem(m_app.getSaveAction(), true);
+					if (menuItem(m_app.getSaveAction(), true)) saveAs(m_resource.m_path);
 					if (ImGui::MenuItem("Save as")) m_show_save_as = true;
-					menuItem(m_editor.m_apply_action, emitter && emitter->getResource());
+					if (menuItem(m_editor.m_apply_action, emitter && emitter->getResource())) apply();
 					ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
 					if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
 
@@ -3604,8 +3592,8 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 				}
 				if (ImGui::BeginMenu("Edit")) {
 					ImGui::MenuItem("World space", 0, &m_resource.m_world_space);
-					menuItem(m_app.getUndoAction(), canUndo());
-					menuItem(m_app.getRedoAction(), canRedo());
+					if (menuItem(m_app.getUndoAction(), canUndo())) undo();
+					if (menuItem(m_app.getRedoAction(), canRedo())) redo();
 					if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
 					ImGui::EndMenu();
 				}

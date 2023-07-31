@@ -1378,7 +1378,7 @@ struct StudioAppImpl final : StudioApp
 			ASSERT(false);
 			return;
 		}
-		Lumix::menuItem(*action, enabled);
+		if (Lumix::menuItem(*action, enabled)) action->func.invoke();
 	}
 
 	void editMenu()
@@ -1463,7 +1463,9 @@ struct StudioAppImpl final : StudioApp
 		menuItem("autosnapDown", true);
 		menuItem("export_game", true);
 		for (Action* action : m_tools_actions) {
-			Lumix::menuItem(*action, true);
+			if (Lumix::menuItem(*action, true)) {
+				action->func.invoke();
+			}
 		}
 		ImGui::EndMenu();
 	}
@@ -1475,7 +1477,7 @@ struct StudioAppImpl final : StudioApp
 		menuItem("settings", true);
 		ImGui::Separator();
 		for (Action* action : m_window_actions) {
-			Lumix::menuItem(*action, true);
+			if (Lumix::menuItem(*action, true)) action->func.invoke();
 		}
 		ImGui::EndMenu();
 	}
@@ -1986,6 +1988,7 @@ struct StudioAppImpl final : StudioApp
 		m_settings.m_is_entity_list_open = m_is_entity_list_open;
 		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
 
+		m_settings.m_is_maximized = os::isMaximized(m_main_window);
 		if (!os::isMinimized(m_main_window)) {
 			os::Rect win_rect = os::getWindowScreenRect(m_main_window);
 			m_settings.m_window.x = win_rect.left;

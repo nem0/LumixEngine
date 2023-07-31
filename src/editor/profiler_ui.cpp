@@ -205,7 +205,7 @@ struct Block {
 
 struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
-		: m_allocator(engine.getAllocator())
+		: m_allocator(engine.getAllocator(), "profiler ui")
 		, m_debug_allocator(allocator)
 		, m_app(app)
 		, m_threads(m_allocator)
@@ -1406,7 +1406,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	StudioApp& m_app;
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	debug::Allocator* m_debug_allocator;
 	Array<AllocationTag> m_allocation_tags;
 	int m_current_frame;

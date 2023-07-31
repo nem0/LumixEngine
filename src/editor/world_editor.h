@@ -153,7 +153,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void toggleGameMode() = 0;
 	virtual void destroyWorldPartition(World::PartitionHandle partition) = 0;
 	virtual void serializeWorldPartition(World::PartitionHandle partition, OutputMemoryStream& blob) = 0;
-	virtual EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) const = 0;
+	virtual EntityRef cloneEntity(World& src_u, EntityRef src_e, World& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) = 0;
 	
 	virtual DelegateList<void()>& worldCreated() = 0;
 	virtual DelegateList<void()>& worldDestroyed() = 0;

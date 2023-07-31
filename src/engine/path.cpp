@@ -57,6 +57,8 @@ void Path::endUpdate() {
 }
 
 void Path::operator =(const char* rhs) {
+	if (rhs == m_path) return;
+
 	normalize(rhs, Span(m_path));
 	endUpdate();
 }

@@ -108,7 +108,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		Engine& engine = app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
 		const char* base_path = fs.getBasePath();
-		m_watcher = FileSystemWatcher::create(base_path, app.getAllocator());
+		m_watcher = FileSystemWatcher::create(base_path, m_allocator);
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
 		Path path(base_path, ".lumix/resources");
@@ -136,7 +136,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			file.close();
 			if (version != 0) {
 				logWarning("Unsupported version of .lumix/resources. Rebuilding all assets.");
-				os::FileIterator* iter = os::createFileIterator(".lumix/resources", m_app.getAllocator());
+				os::FileIterator* iter = os::createFileIterator(".lumix/resources", m_allocator);
 				os::FileInfo info;
 				bool all_deleted = true;
 				while (os::getNextFile(iter, &info)) {
@@ -209,7 +209,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
 		const char* base_path = fs.getBasePath();
-		m_watcher = FileSystemWatcher::create(base_path, m_app.getAllocator());
+		m_watcher = FileSystemWatcher::create(base_path, m_allocator);
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 		m_dependencies.clear();
 		m_resources.clear();
@@ -226,7 +226,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool copyCompile(const Path& src) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream tmp(m_app.getAllocator());
+		OutputMemoryStream tmp(m_allocator);
 		if (!fs.getContentSync(src, tmp)) {
 			logError("Failed to read ", src);
 			return false;
@@ -238,7 +238,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool writeCompiledResource(const char* locator, Span<const u8> data) override {
 		constexpr u32 COMPRESSION_SIZE_LIMIT = 4096;
-		OutputMemoryStream compressed(m_app.getAllocator());
+		OutputMemoryStream compressed(m_allocator);
 		i32 compressed_size = 0;
 		if (data.length() > COMPRESSION_SIZE_LIMIT) {
 			const i32 cap = LZ4_compressBound((i32)data.length());
@@ -402,7 +402,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	void fillDB() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const Path list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
-		OutputMemoryStream content(m_app.getAllocator());
+		OutputMemoryStream content(m_allocator);
 		if (fs.getContentSync(Path(".lumix/resources/_list.txt"), content)) {
 			lua_State* L = luaL_newstate();
 			[&](){
@@ -458,9 +458,8 @@ struct AssetCompilerImpl : AssetCompiler {
 					}
 					
 					const char* key = lua_tostring(L, -2);
-					IAllocator& allocator = m_app.getAllocator();
 					const Path key_path(key);
-					m_dependencies.insert(key_path, Array<Path>(allocator));
+					m_dependencies.insert(key_path, Array<Path>(m_allocator));
 					Array<Path>& values = m_dependencies.find(key_path).value();
 
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
@@ -513,12 +512,12 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 	}
 
-	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
+	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) override
 	{
 		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
 		
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream buf(m_app.getAllocator());
+		OutputMemoryStream buf(m_allocator);
 		
 		if (!fs.getContentSync(Path(meta_path), buf)) return false;
 

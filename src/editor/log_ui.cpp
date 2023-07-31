@@ -12,11 +12,11 @@ namespace Lumix
 
 
 LogUI::LogUI(StudioApp& app, IAllocator& allocator)
-	: m_allocator(allocator)
+	: m_allocator(allocator, "log ui")
 	, m_app(app)
-	, m_messages(allocator)
+	, m_messages(m_allocator)
 	, m_level_filter(2 | 4)
-	, m_notifications(allocator)
+	, m_notifications(m_allocator)
 	, m_last_uid(1)
 	, m_is_open(false)
 	, m_are_notifications_hovered(false)

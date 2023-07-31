@@ -782,17 +782,8 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "mat"; }
 
-	bool createResource(const char* path) override {
-		os::OutputFile file;
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(path, file)) {
-			logError("Failed to create ", path);
-			return false;
-		}
-
-		file << "shader \"/pipelines/standard.shd\"";
-		file.close();
-		return true;
+	void createResource(OutputMemoryStream& blob) override {
+		blob << "shader \"/pipelines/standard.shd\"";
 	}
 
 	bool compile(const Path& src) override
@@ -1126,11 +1117,10 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	const char* getDefaultExtension() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
-	bool createResource(const char* path) override { 
-		FileSystem& fs = m_app.getEngine().getFileSystem();
+	void createResource(OutputMemoryStream& blob) override { 
 		CompositeTexture ltc(m_app, m_app.getAllocator());
 		ltc.initDefault();
-		return ltc.save(fs, Path(path));
+		ltc.serialize(blob);
 	}
 
 	struct TextureTileJob
@@ -5414,6 +5404,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(renderer)
 {
-	auto& allocator = app.getAllocator();
+	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

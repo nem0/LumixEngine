@@ -13,6 +13,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/os.h"
+#include "engine/resource_manager.h"
 #include "controller_editor.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
@@ -80,22 +81,10 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "anp"; }
+	void createResource(OutputMemoryStream& blob) override {}
 
 	bool compile(const Path& src) override {
 		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
-	bool createResource(const char* path) override
-	{
-		os::OutputFile file;
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(path, file)) {
-			logError("Failed to create ", path);
-			return false;
-		}
-
-		file.close();
-		return true;
 	}
 
 	static bool hasFloatProperty(const reflection::ComponentBase* cmp) {
@@ -276,45 +265,6 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	PropertyAnimation* m_current_resource = nullptr;
 };
 
-
-struct AnimControllerAssetBrowserPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
-	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
-		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
-	{
-		app.getAssetCompiler().registerExtension("act", anim::Controller::TYPE);
-	}
-
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
-
-	bool compile(const Path& src) override {
-		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
-		if (resources.length() == 1 && ImGui::Button("Open in animation editor")) {
-			m_controller_editor->show(resources[0]->getPath().c_str());
-		}
-		return false;
-	}
-
-	const char* getName() const override { return "Animation Controller"; }
-	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
-
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
-		if (type == anim::Controller::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_animation_graph.tga", out_path);
-		return false;
-	}
-
-
-	StudioApp& m_app;
-	anim::ControllerEditor* m_controller_editor = nullptr;
-};
-
-
 struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 {
 	explicit AnimablePropertyGridPlugin(StudioApp& app)
@@ -388,44 +338,34 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_animable_plugin(app)
 		, m_animation_plugin(app)
 		, m_prop_anim_plugin(app)
-		, m_anim_ctrl_plugin(app)
 	{}
 
 	const char* getName() const override { return "animation"; }
 
 	void init() override {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
-		const char* act_exts[] = { "act", nullptr };
 		const char* anp_exts[] = { "anp", nullptr };
-		compiler.addPlugin(m_anim_ctrl_plugin, act_exts);
 		compiler.addPlugin(m_prop_anim_plugin, anp_exts);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(m_animation_plugin);
 		asset_browser.addPlugin(m_prop_anim_plugin);
-		asset_browser.addPlugin(m_anim_ctrl_plugin);
 
 		m_app.getPropertyGrid().addPlugin(m_animable_plugin);
-		
-		m_anim_editor = anim::ControllerEditor::create(m_app);
-		m_app.addPlugin(*m_anim_editor);
 
-		m_anim_ctrl_plugin.m_controller_editor = m_anim_editor.get();
+		m_anim_editor = anim::ControllerEditor::create(m_app);
 	}
 
 	bool showGizmo(WorldView&, ComponentUID) override { return false; }
 	
 	~StudioAppPlugin() {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
-		compiler.removePlugin(m_anim_ctrl_plugin);
 		compiler.removePlugin(m_prop_anim_plugin);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_animation_plugin);
 		asset_browser.removePlugin(m_prop_anim_plugin);
-		asset_browser.removePlugin(m_anim_ctrl_plugin);
 		m_app.getPropertyGrid().removePlugin(m_animable_plugin);
-		m_app.removePlugin(*m_anim_editor);
 	}
 
 
@@ -433,7 +373,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AnimablePropertyGridPlugin m_animable_plugin;
 	AnimationAssetBrowserPlugin m_animation_plugin;
 	PropertyAnimationPlugin m_prop_anim_plugin;
-	AnimControllerAssetBrowserPlugin m_anim_ctrl_plugin;
 	UniquePtr<anim::ControllerEditor> m_anim_editor;
 };
 

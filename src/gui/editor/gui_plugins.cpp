@@ -54,17 +54,8 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "spr"; }
 
-	bool createResource(const char* path) override {
-		os::OutputFile file;
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(path, file)) {
-			logError("Failed to create ", path);
-			return false;
-		}
-
-		file << "type \"simple\"";
-		file.close();
-		return true;
+	void createResource(OutputMemoryStream& blob) override {
+		blob << "type \"simple\"";
 	}
 	
 	void deserialize(InputMemoryStream& blob) override { 

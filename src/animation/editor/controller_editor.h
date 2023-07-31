@@ -1,10 +1,6 @@
 #pragma once
 
-
-#include "engine/hash.h"
 #include "editor/studio_app.h"
-#include "engine/string.h"
-
 
 namespace Lumix {
 
@@ -18,17 +14,15 @@ struct EventType {
 	u16 size;
 
 	virtual ~EventType() {}
-	virtual bool onGUI(u8* data, const struct ControllerEditor& editor) const = 0;
+	virtual bool onGUI(u8* data, const struct Controller& controller) const = 0;
 };
 
-struct ControllerEditor : StudioApp::GUIPlugin {
+struct ControllerEditor {
 	static UniquePtr<ControllerEditor> create(StudioApp& app);
 	
-	virtual void show(const char* path) = 0;
 	virtual void registerEventType(UniquePtr<EventType>&& type) = 0;
 	virtual ~ControllerEditor() {}
 };
 
-
 } // namespace anim
-} // namespace Lumix
+} // namespace Lumix

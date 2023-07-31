@@ -98,15 +98,8 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool canCreateResource() const override { return true; }
 
-	bool createResource(const char* path) override {
-		OutputMemoryStream blob(m_app.getAllocator());
+	void createResource(OutputMemoryStream& blob) override {
 		blob << "function update(time_delta)\nend\n";
-
-		if (!m_app.getEngine().getFileSystem().saveContentSync(Path(path), blob)) {
-			logError("Failed to write ", path);
-			return false;
-		}
-		return true;
 	}
 
 	const char* getDefaultExtension() const override { return "lua"; }

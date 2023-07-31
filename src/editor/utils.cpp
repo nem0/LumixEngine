@@ -162,11 +162,7 @@ void getShortcut(const Action& action, Span<char> buf) {
 bool menuItem(Action& a, bool enabled) {
 	char buf[20];
 	getShortcut(a, Span(buf));
-	if (ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled)) {
-		if (a.func.isValid()) a.func.invoke();
-		return true;
-	}
-	return false;
+	return ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled);
 }
 
 void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity)

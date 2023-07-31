@@ -38,7 +38,7 @@ public:
 	void destroyRuntime(RuntimeContext& ctx);
 	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const;
 	void getPose(RuntimeContext& ctx, struct Pose& pose);
-	void destroy();
+	void clear();
 
 	ResourceType getType() const override { return TYPE; }
 	static const ResourceType TYPE;

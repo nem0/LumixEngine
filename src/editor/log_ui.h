@@ -3,6 +3,7 @@
 
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/log.h"
 #include "engine/sync.h"
@@ -55,7 +56,7 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		bool isOpen() const { return m_is_open; }
 		void toggleUI() { m_is_open = !m_is_open; }
 
-		IAllocator& m_allocator;
+		TagAllocator m_allocator;
 		StudioApp& m_app;
 		Array<Message> m_messages;
 		Array<Notification> m_notifications;

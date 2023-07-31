@@ -30,7 +30,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		Plugin(IAllocator& allocator) : SimpleUndoRedo(allocator) {}
 
 		virtual bool canCreateResource() const { return false; }
-		virtual bool createResource(const char* path) { return false; }
+		virtual void createResource(OutputMemoryStream& content) {}
 		virtual const char* getDefaultExtension() const { return ""; }
 
 		virtual bool onGUI(Span<ResourceView*> resource) = 0;
@@ -62,7 +62,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual void removePlugin(Plugin& plugin) = 0;
 	virtual void openInExternalEditor(struct Resource* resource) const = 0;
 	virtual void openInExternalEditor(const char* path) const = 0;
-	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) const = 0;
+	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) = 0;
 	virtual void tile(const Path& path, bool selected) = 0;
 	virtual void saveResource(Resource& resource, OutputMemoryStream& file) = 0;
 	virtual void releaseResources() = 0;

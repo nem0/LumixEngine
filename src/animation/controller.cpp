@@ -25,7 +25,7 @@ Controller::~Controller() {
 	ASSERT(isEmpty());
 }
 
-void Controller::destroy() {
+void Controller::clear() {
 	unload();
 }
 

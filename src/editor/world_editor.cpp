@@ -2592,7 +2592,7 @@ public:
 
 
 	WorldEditorImpl(Engine& engine, IAllocator& allocator)
-		: m_allocator(allocator)
+		: m_allocator(allocator, "world editor")
 		, m_world_destroyed(m_allocator)
 		, m_world_created(m_allocator)
 		, m_selected_entities(m_allocator)
@@ -2706,7 +2706,7 @@ public:
 	};
 
 
-	EntityRef cloneEntity(World& src_world, EntityRef src_e, World& dst_world, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) const override {
+	EntityRef cloneEntity(World& src_world, EntityRef src_e, World& dst_world, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) override {
 		entities.push(src_e);
 		const EntityRef dst_e = (EntityRef)map[src_e];
 		if (dst_parent.isValid()) {
@@ -3003,7 +3003,7 @@ public:
 	}
 
 private:
-	IAllocator& m_allocator;
+	TagAllocator m_allocator;
 	Engine& m_engine;
 	WorldView* m_view = nullptr;
 	UniquePtr<PrefabSystem> m_prefab_system;

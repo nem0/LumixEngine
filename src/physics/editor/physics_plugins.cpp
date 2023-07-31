@@ -858,19 +858,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "pma"; }
-
-	bool createResource(const char* path) override
-	{
-		os::OutputFile file;
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(path, file)) {
-			logError("Failed to create ", path);
-			return false;
-		}
-
-		file.close();
-		return true;
-	}
+	void createResource(OutputMemoryStream& blob) override {}
 
 	bool compile(const Path& src) override {
 		return m_app.getAssetCompiler().copyCompile(src);

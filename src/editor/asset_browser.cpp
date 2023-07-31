@@ -130,17 +130,18 @@ struct AssetBrowserImpl : AssetBrowser {
 	};
 
 	AssetBrowserImpl(StudioApp& app)
-		: m_selected_resources(app.getAllocator())
-		, m_history(app.getAllocator())
-		, m_dir_history(app.getAllocator())
-		, m_plugins(app.getAllocator())
+		: m_allocator(app.getAllocator(), "asset browser")
+		, m_selected_resources(m_allocator)
+		, m_history(m_allocator)
+		, m_dir_history(m_allocator)
+		, m_plugins(m_allocator)
 		, m_app(app)
 		, m_is_open(false)
 		, m_show_thumbnails(true)
 		, m_show_subresources(true)
-		, m_file_infos(app.getAllocator())
-		, m_immediate_tiles(app.getAllocator())
-		, m_subdirs(app.getAllocator())
+		, m_file_infos(m_allocator)
+		, m_immediate_tiles(m_allocator)
+		, m_subdirs(m_allocator)
 	{
 		m_filter[0] = '\0';
 
@@ -689,8 +690,12 @@ struct AssetBrowserImpl : AssetBrowser {
 					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 					ImGui::SameLine();
 					if (ImGui::Button("Create") || input_entered) {
+						OutputMemoryStream blob(m_allocator);
+						plugin->createResource(blob);
 						StaticString<LUMIX_MAX_PATH> path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
-						plugin->createResource(path);
+						if (!fs.saveContentSync(Path(path), blob)) {
+							logError("Failed to write ", path);
+						}
 						m_wanted_resource = path;
 						ImGui::CloseCurrentPopup();
 					}
@@ -1074,8 +1079,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (os::dirExists(path)) {
 			const Path tmp(fs.getBasePath(), "/", m_dir, "/");
-			IAllocator& allocator = m_app.getAllocator();
-			copyDir(path, tmp, allocator);
+			copyDir(path, tmp, m_allocator);
 		}
 		PathInfo fi(path);
 		const Path dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
@@ -1244,7 +1248,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
-	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit) const override {
+	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit) override {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 
@@ -1257,8 +1261,11 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		FileSelector& file_selector = m_app.getFileSelector();
 		if (file_selector.gui("Save As", &show_new_fs, plugin->getDefaultExtension(), true)) {
-			if (!plugin->createResource(file_selector.getPath())) {
-				logError("Failed to create ", file_selector.getPath());
+			OutputMemoryStream blob(m_allocator);
+			plugin->createResource(blob);
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			if (!fs.saveContentSync(Path(file_selector.getPath()), blob)) {
+				logError("Failed to write ", file_selector.getPath());
 				return false;
 			}
 			copyString(buf, file_selector.getPath());
@@ -1354,7 +1361,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_asset_browser_open  = m_is_open; }
 
 	bool copyTile(const char* from, const char* to) override {
-		OutputMemoryStream img(m_app.getAllocator());
+		OutputMemoryStream img(m_allocator);
 		if (!m_app.getEngine().getFileSystem().getContentSync(Path(from), img)) return false;
 		
 		os::OutputFile file;
@@ -1373,6 +1380,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		return !file.isError();
 	}
 
+	TagAllocator m_allocator;
 	bool m_is_open;
 	StudioApp& m_app;
 	StaticString<LUMIX_MAX_PATH> m_dir;
