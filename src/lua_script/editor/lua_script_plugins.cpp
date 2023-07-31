@@ -51,7 +51,6 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	
 	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if (resources.length() > 1) return false;
@@ -103,6 +102,10 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	const char* getDefaultExtension() const override { return "lua"; }
+
+	void onResourceDoubleClicked(const Path& path) override {
+		m_app.getAssetBrowser().openInExternalEditor(path);
+	}
 
 	StudioApp& m_app;
 	char m_text_buffer[8192];
