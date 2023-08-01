@@ -1526,6 +1526,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		const char* format = "unknown";
 		switch(texture->format) {
 			case gpu::TextureFormat::R8: format = "R8"; break;
+			case gpu::TextureFormat::RGB32F: format = "RGB32F"; break;
 			case gpu::TextureFormat::RG32F: format = "RG32F"; break;
 			case gpu::TextureFormat::RG8: format = "RG8"; break;
 			case gpu::TextureFormat::D24S8: format = "D24S8"; break;

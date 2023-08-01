@@ -3026,10 +3026,10 @@ u32 CompositeTexture::getLayersCount() const {
 }
 
 struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
-	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app)
-		: NodeEditor(m_allocator)
+	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app, IAllocator& allocator)
+		: NodeEditor(allocator)
 		, AssetEditorWindow(app)
-		, m_allocator(app.getAllocator(), "composite texture")
+		, m_allocator(allocator)
 		, m_editor(editor)
 		, m_app(app)
 		, m_resource(app, m_allocator)
@@ -3343,7 +3343,7 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 					switch (pd.channels) {
 						case 1: format = gpu::TextureFormat::R32F; break;
 						case 2: format = gpu::TextureFormat::RG32F; break;
-						case 3: ASSERT(false); break; // TODO
+						case 3: format = gpu::TextureFormat::RGB32F; break;
 						case 4: format = gpu::TextureFormat::RGBA32F; break;
 						default: ASSERT(false);
 					}
@@ -3402,7 +3402,7 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 	const Path& getPath() override { return m_path; }
 	const char* getName() const override { return "composite_texture_editor"; }
 	
-	TagAllocator m_allocator;
+	IAllocator& m_allocator;
 	CompositeTextureEditor& m_editor;
 	StudioApp& m_app;
 	Path m_path;
@@ -3417,6 +3417,7 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 
 CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
 	: m_app(app)
+	, m_allocator(app.getAllocator(), "composite texture editor")
 {}
 
 void CompositeTextureEditor::open(const Path& path) {
@@ -3427,7 +3428,7 @@ void CompositeTextureEditor::open(const Path& path) {
 	}
 	
 	IAllocator& allocator = m_app.getAllocator();
-	CompositeTextureEditorWindow* win = LUMIX_NEW(allocator, CompositeTextureEditorWindow)(Path(path), *this, m_app);
+	CompositeTextureEditorWindow* win = LUMIX_NEW(allocator, CompositeTextureEditorWindow)(Path(path), *this, m_app, m_allocator);
 	ab.addWindow(win);
 }
 

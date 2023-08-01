@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/allocators.h"
 #include "engine/array.h"
 #include "engine/math.h"
 #include "engine/path.h"
@@ -139,6 +140,7 @@ struct CompositeTextureEditor final {
 
 	void open(const Path& path);
 
+	TagAllocator m_allocator;
 	StudioApp& m_app;
 };
 

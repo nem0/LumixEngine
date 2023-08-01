@@ -1462,6 +1462,7 @@ struct PipelineImpl final : Pipeline
 			{"r8", gpu::TextureFormat::R8},
 			{"r32f", gpu::TextureFormat::R32F},
 			{"rg32f", gpu::TextureFormat::RG32F},
+			{"rgb32f", gpu::TextureFormat::RGB32F},
 			{"r11g11b10f", gpu::TextureFormat::R11G11B10F },
 		};
 
