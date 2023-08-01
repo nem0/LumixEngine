@@ -88,7 +88,11 @@ struct EngineImpl final : Engine {
 
 		os::logInfo();
 
-		m_state = lua_newstate(luaAlloc, this);
+		#ifdef _WIN32
+			m_state = lua_newstate(luaAlloc, this);
+		#else 
+			m_state = luaL_newstate();
+		#endif
 		luaL_openlibs(m_state);
 		registerEngineAPI(m_state, this);
 
