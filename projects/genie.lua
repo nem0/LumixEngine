@@ -221,12 +221,11 @@ if _OPTIONS["with-basis-universal"] then
 end
 
 function detect_plugins()
-	local f = io.popen([[if exist ..\plugins dir /B ..\plugins]])
-	if not f then return end
-	for line in f:lines() do 
-		table.insert(plugins, line)
+	local plugins_dirs = os.matchdirs("../plugins/*")
+	for k, plugin_dir in ipairs(plugins_dirs) do
+		local dir = string.sub(plugin_dir, 12, -1)
+		table.insert(plugins, dir)
 	end
-	f:close()
 end
 detect_plugins()
 

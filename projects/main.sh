@@ -16,6 +16,7 @@ download_project()
 
 download_plugin()
 {
+    cd ..
 	if [ ! -d "plugins" ]; then
         mkdir plugins
     fi
@@ -27,7 +28,7 @@ download_plugin()
 	    git pull
 		cd ..
     fi
-	cd ..
+	cd ../projects
 }
 
 
