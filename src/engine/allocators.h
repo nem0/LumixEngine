@@ -27,7 +27,7 @@ struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 	Mutex m_mutex;
 };
 
-// set active_tag before calling its parent allocator, parent allocator can use the tag to e.g. group allocations
+// set active_allocator before calling its parent allocator, parent allocator can use the tag to e.g. group allocations
 struct LUMIX_ENGINE_API TagAllocator final : IAllocator {
 	TagAllocator(IAllocator& allocator, const char* tag_name);
 

@@ -140,7 +140,6 @@ struct CompositeTextureEditor final {
 	void open(const Path& path);
 
 	StudioApp& m_app;
-	Array<CompositeTextureEditorWindow*> m_windows;
 };
 
 } // namespace Lumix

@@ -67,7 +67,9 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual void saveResource(Resource& resource, OutputMemoryStream& file) = 0;
 	virtual void releaseResources() = 0;
 	virtual void reloadTile(FilePathHash hash) = 0; 
-	virtual bool copyTile(const char* from, const char* to) = 0;
+	virtual void addWindow(struct AssetEditorWindow* window) = 0;
+	virtual AssetEditorWindow* getWindow(const Path& path) = 0;
+	virtual void closeWindow(AssetEditorWindow& window) = 0;
 };
 
 

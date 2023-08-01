@@ -60,12 +60,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
 	const char* getName() const override { return "Animation"; }
 	ResourceType getResourceType() const override { return Animation::TYPE; }
 
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
-		if (type == Animation::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_animation.tga", out_path);
-		return false;
-	}
-
 	StudioApp& m_app;
 };
 

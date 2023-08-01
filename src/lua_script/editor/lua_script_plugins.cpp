@@ -88,13 +88,6 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	const char* getName() const override { return "Lua script"; }
 	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
-		if (type == LuaScript::TYPE) {
-			return m_app.getAssetBrowser().copyTile("editor/textures/tile_lua_script.tga", out_path);
-		}
-		return false;
-	}
-
 	bool canCreateResource() const override { return true; }
 
 	void createResource(OutputMemoryStream& blob) override {

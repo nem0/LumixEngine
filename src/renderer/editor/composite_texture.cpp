@@ -8,6 +8,7 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "editor/asset_browser.h"
+#include "editor/editor_asset.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "renderer/draw_stream.h"
@@ -3024,9 +3025,10 @@ u32 CompositeTexture::getLayersCount() const {
 	return 1;
 }
 
-struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
+struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app)
-		: NodeEditor(app.getAllocator())
+		: NodeEditor(m_allocator)
+		, AssetEditorWindow(app)
 		, m_allocator(app.getAllocator(), "composite texture")
 		, m_editor(editor)
 		, m_app(app)
@@ -3364,77 +3366,41 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 	}
 
-	void onGUI() override {
-		Span<const char> basename = Path::getBasename(m_path.c_str());
-		StaticString<128> title(basename, "##cte", (uintptr)this);
-		bool open = true;
-		m_has_focus = false;
-		if (m_focus_request) {
-			ImGui::SetNextWindowFocus();
-			m_focus_request = false;
-		}
-		ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
-		ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings;
-		if (m_dirty) flags |= ImGuiWindowFlags_UnsavedDocument;
-		if (ImGui::Begin(title, &open, flags)) {
-			m_dock_id = ImGui::GetWindowDockID();
-			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-			if (ImGui::BeginMenuBar()) {
-				if (ImGui::BeginMenu("File")) {
-					if (menuItem(m_app.getSaveAction(), true)) saveAs(m_path);
-					if (ImGui::MenuItem("Save As")) m_show_save_as = true;
-					if (ImGui::MenuItem("Export")) exportAs();
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Edit")) {
-					if (menuItem(m_app.getUndoAction(), canUndo())) undo();
-					if (menuItem(m_app.getRedoAction(), canRedo())) redo();
-					if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
-					ImGui::EndMenu();
-				}
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
-				if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
-				ImGui::Checkbox("Preview", &m_show_preview);
-				ImGui::EndMenuBar();
+	void windowGUI() override {
+		if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("File")) {
+				if (menuItem(m_app.getSaveAction(), true)) saveAs(m_path);
+				if (ImGui::MenuItem("Save As")) m_show_save_as = true;
+				if (ImGui::MenuItem("Export")) exportAs();
+				ImGui::EndMenu();
 			}
+			if (ImGui::BeginMenu("Edit")) {
+				if (menuItem(m_app.getUndoAction(), canUndo())) undo();
+				if (menuItem(m_app.getRedoAction(), canRedo())) redo();
+				if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
+				ImGui::EndMenu();
+			}
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
+			if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
+			ImGui::Checkbox("Preview", &m_show_preview);
+			ImGui::EndMenuBar();
+		}
 		
-			FileSelector& fs = m_app.getFileSelector();
-			if (fs.gui("Save As", &m_show_save_as, "ltc", true)) saveAs(Path(fs.getPath()));
+		FileSelector& fs = m_app.getFileSelector();
+		if (fs.gui("Save As", &m_show_save_as, "ltc", true)) saveAs(Path(fs.getPath()));
 
-			if (m_loading_handle.isValid()) {
-				ImGui::TextUnformatted("Loading...");
-			}
-			else {
-				nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
-				previewGUI();
-			}
+		if (m_loading_handle.isValid()) {
+			ImGui::TextUnformatted("Loading...");
 		}
-		if (!open) {
-			if (m_dirty) {
-				ImGui::OpenPopup("Confirm##cct");
-			}
-			else {
-				m_editor.m_windows.eraseItem(this);
-				m_app.removePlugin(*this);
-				LUMIX_DELETE(m_app.getAllocator(), this);
-			}
+		else {
+			nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
+			previewGUI();
 		}
-
-		if (ImGui::BeginPopupModal("Confirm##cct")) {
-			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
-			if (ImGui::Selectable("Yes")) {
-				m_editor.m_windows.eraseItem(this);
-				m_app.removePlugin(*this);
-				LUMIX_DELETE(m_app.getAllocator(), this);
-			}
-			ImGui::Selectable("No");
-			ImGui::EndPopup();
-		}
-		ImGui::End();
 	}
 
+	void destroy() override { LUMIX_DELETE(m_app.getAllocator(), this); }
+	const Path& getPath() override { return m_path; }
 	const char* getName() const override { return "composite_texture_editor"; }
-	bool hasFocus() const override { return m_has_focus; }
 	
 	TagAllocator m_allocator;
 	CompositeTextureEditor& m_editor;
@@ -3443,34 +3409,26 @@ struct CompositeTextureEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	CompositeTexture m_resource;
 	u16 m_preview_node_id = 0xffFF;
 	FileSystem::AsyncHandle m_loading_handle = FileSystem::AsyncHandle::invalid();
-	bool m_has_focus = false;
 	bool m_show_save_as = false;
-	bool m_focus_request = false;
-	bool m_dirty = false;
 	bool m_show_confirm = false;
 	bool m_show_preview = true;
-	ImGuiID m_dock_id = 0;
 	char m_filter[64] = "";
 };
 
 CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
 	: m_app(app)
-	, m_windows(app.getAllocator())
 {}
 
 void CompositeTextureEditor::open(const Path& path) {
-	for (CompositeTextureEditorWindow* win : m_windows) {
-		if (win->m_path == path) {
-			win->m_focus_request = true;
-			return;
-		}
+	AssetBrowser& ab = m_app.getAssetBrowser();
+	if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+		win->m_focus_request = true;
+		return;
 	}
 	
 	IAllocator& allocator = m_app.getAllocator();
 	CompositeTextureEditorWindow* win = LUMIX_NEW(allocator, CompositeTextureEditorWindow)(Path(path), *this, m_app);
-	if (!m_windows.empty()) win->m_dock_id = m_windows.last()->m_dock_id;
-	m_windows.push(win);
-	m_app.addPlugin(*win);
+	ab.addWindow(win);
 }
 
 } // namespace Lumix

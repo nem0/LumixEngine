@@ -2724,11 +2724,6 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		m_particle_editor->open(path.c_str());
 	}
 	
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
-		if (type == ParticleSystemResource::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_particle.tga", out_path);
-		return false;
-	}
-
 	const char* getName() const override { return "Particle system"; }
 	ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
 
@@ -2738,7 +2733,7 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 struct FunctionPlugin : EditorAssetPlugin {
 	FunctionPlugin(ParticleEditor& editor, StudioApp& app, IAllocator& allocator)
-		: EditorAssetPlugin("Particle system function", "pfn", ParticleSystemEditorResource::TYPE, app, allocator)
+		: EditorAssetPlugin("Particle function", "pfn", ParticleSystemEditorResource::TYPE, app, allocator)
 		, m_app(app)
 		, m_editor(editor)
 	{}
@@ -2767,11 +2762,6 @@ struct FunctionPlugin : EditorAssetPlugin {
 		m_editor.open(path.c_str());
 	}
 
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
-		if (type == ParticleSystemEditorResource::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_particle_function.tga", out_path);
-		return false;
-	}
-
 	StudioApp& m_app;
 	ParticleEditor& m_editor;
 };
@@ -2784,7 +2774,6 @@ struct ParticleEditorImpl : ParticleEditor {
 		, m_allocator(app.getAllocator(), "particle editor")
 		, m_function_plugin(*this, app, m_allocator)
 		, m_functions(m_allocator)
-		, m_windows(m_allocator)
 		, m_particle_system_plugin(app)
 	{
 		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, true);
@@ -2866,18 +2855,22 @@ struct ParticleEditorImpl : ParticleEditor {
 	Array<Function> m_functions;
 	ParticleSystemPlugin m_particle_system_plugin;
 	FunctionPlugin m_function_plugin;
-	Array<struct ParticleEditorWindow*> m_windows;
 	Action m_apply_action;
 };
 
-struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
+struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	ParticleEditorWindow(const Path& path, ParticleEditorImpl& editor, StudioApp& app, IAllocator& allocator)
 		: NodeEditor(allocator)
+		, AssetEditorWindow(app)
 		, m_allocator(allocator)
 		, m_app(app)
 		, m_editor(editor)
 		, m_resource(path, m_app, m_allocator)
 	{
+	}
+
+	~ParticleEditorWindow() {
+
 	}
 
 	struct ICategoryVisitor {
@@ -3170,8 +3163,6 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		}
 		pushUndo(NO_MERGE_UNDO);
 	}
-
-	bool hasFocus() const override { return m_has_focus; }
 
 	void deleteEmitter(u32 emitter_idx) {
 		for (UniquePtr<ParticleEmitterEditorResource>& e : m_resource.m_emitters) {
@@ -3500,123 +3491,89 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 		pushUndo(NO_MERGE_UNDO);
 	}
 
-	void onGUI() override {
-		m_has_focus = false;
-
+	void windowGUI() override {
 		debugUI();
 
-		if (m_focus_request) {
-			ImGui::SetNextWindowFocus();
-			m_focus_request = false;
+		if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("File")) {
+				const ParticleSystem* emitter = getSelectedParticleSystem();
+				if (menuItem(m_app.getSaveAction(), true)) saveAs(m_resource.m_path);
+				if (ImGui::MenuItem("Save as")) m_show_save_as = true;
+				if (menuItem(m_editor.m_apply_action, emitter && emitter->getResource())) apply();
+				ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
+				if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
+
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Edit")) {
+				ImGui::MenuItem("World space", 0, &m_resource.m_world_space);
+				if (menuItem(m_app.getUndoAction(), canUndo())) undo();
+				if (menuItem(m_app.getRedoAction(), canRedo())) redo();
+				if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
+				ImGui::EndMenu();
+			}
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_resource.m_path);
+			if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
+			if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+			if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear")) deleteUnreachable();
+			ImGui::EndMenuBar();
 		}
-		bool open = true;
-		Span<const char> basename = Path::getBasename(m_resource.m_path.c_str());
-		StaticString<128> title(basename, "##pe", (uintptr)this);
-		ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
-		ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings;
-		if (m_dirty) flags |= ImGuiWindowFlags_UnsavedDocument;
-		if (ImGui::Begin(title, &open, flags)) {
-			m_dock_id = ImGui::GetWindowDockID();
-			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-		
-			if (ImGui::BeginMenuBar()) {
-				if (ImGui::BeginMenu("File")) {
-					const ParticleSystem* emitter = getSelectedParticleSystem();
-					if (menuItem(m_app.getSaveAction(), true)) saveAs(m_resource.m_path);
-					if (ImGui::MenuItem("Save as")) m_show_save_as = true;
-					if (menuItem(m_editor.m_apply_action, emitter && emitter->getResource())) apply();
-					ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
-					if (ImGui::MenuItem("Debug entity", nullptr, false, emitter)) m_show_debug = true;
 
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Edit")) {
-					ImGui::MenuItem("World space", 0, &m_resource.m_world_space);
-					if (menuItem(m_app.getUndoAction(), canUndo())) undo();
-					if (menuItem(m_app.getRedoAction(), canRedo())) redo();
-					if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
-					ImGui::EndMenu();
-				}
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_resource.m_path);
-				if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear")) deleteUnreachable();
-				ImGui::EndMenuBar();
-			}
+		FileSelector& fs = m_app.getFileSelector();
+		if (fs.gui("Save As", &m_show_save_as, m_resource.isFunction() ? "pfn" : "par", true)) saveAs(Path(fs.getPath()));
 
-			FileSelector& fs = m_app.getFileSelector();
-			if (fs.gui("Save As", &m_show_save_as, m_resource.isFunction() ? "pfn" : "par", true)) saveAs(Path(fs.getPath()));
+		if (m_resource.isFunction()) {
+			m_active_emitter = m_resource.m_emitters[0].get();
+			nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+		}
+		else {
+			if (ImGui::BeginTabBar("tabbar")) {
+				i32 remove = -1;
+				const bool can_remove = m_resource.m_emitters.size() > 1;
+				for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource.m_emitters) {
+					u32 idx = u32(&emitter - m_resource.m_emitters.begin());
+					bool emitter_open = true;
+					if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &emitter_open : nullptr)) {
+						if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
+							ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 200);
 
-			if (m_resource.isFunction()) {
-				m_active_emitter = m_resource.m_emitters[0].get();
-				nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
-			}
-			else {
-				if (ImGui::BeginTabBar("tabbar")) {
-					i32 remove = -1;
-					const bool can_remove = m_resource.m_emitters.size() > 1;
-					for (const UniquePtr<ParticleEmitterEditorResource>& emitter : m_resource.m_emitters) {
-						u32 idx = u32(&emitter - m_resource.m_emitters.begin());
-						bool emitter_open = true;
-						if (ImGui::BeginTabItem(StaticString<256>(emitter->m_name.c_str(), "###", idx), can_remove ? &emitter_open : nullptr)) {
-							if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
-								ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 200);
-
-								m_active_emitter = emitter.get();
-								ImGui::TableNextRow();
-								ImGui::TableNextColumn();
-								leftColumnGUI();
-								ImGui::TableNextColumn();
-								nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
-								if (ImGui::BeginDragDropTarget()) {
-									if (auto* payload = ImGui::AcceptDragDropPayload("particle_stream")) {
-										const ParticleEmitterEditorResource::Stream* s = *(ParticleEmitterEditorResource::Stream**)payload->Data;
-										auto* n = (StreamNode*)m_active_emitter->addNode(Node::STREAM);
-										n->idx = u32(s - m_active_emitter->m_streams.begin());
-										n->m_pos = m_mouse_pos_canvas;
-										pushUndo(NO_MERGE_UNDO);
-									}
-									ImGui::EndDragDropTarget();
+							m_active_emitter = emitter.get();
+							ImGui::TableNextRow();
+							ImGui::TableNextColumn();
+							leftColumnGUI();
+							ImGui::TableNextColumn();
+							nodeEditorGUI(m_active_emitter->m_nodes, m_active_emitter->m_links);
+							if (ImGui::BeginDragDropTarget()) {
+								if (auto* payload = ImGui::AcceptDragDropPayload("particle_stream")) {
+									const ParticleEmitterEditorResource::Stream* s = *(ParticleEmitterEditorResource::Stream**)payload->Data;
+									auto* n = (StreamNode*)m_active_emitter->addNode(Node::STREAM);
+									n->idx = u32(s - m_active_emitter->m_streams.begin());
+									n->m_pos = m_mouse_pos_canvas;
+									pushUndo(NO_MERGE_UNDO);
 								}
-								ImGui::EndTable();
+								ImGui::EndDragDropTarget();
 							}
-							ImGui::EndTabItem();
+							ImGui::EndTable();
 						}
-						if (!emitter_open) remove = idx;
+						ImGui::EndTabItem();
 					}
-					if (ImGui::TabItemButton(ICON_FA_PLUS)) {
-						ParticleEmitterEditorResource* emitter = m_resource.addEmitter();
-						emitter->initDefault(ParticleSystemResourceType::SYSTEM);
-						pushUndo(NO_MERGE_UNDO);
-					}
-					ImGui::EndTabBar();
-					if (remove >= 0) {
-						deleteEmitter(remove);
-					}
+					if (!emitter_open) remove = idx;
+				}
+				if (ImGui::TabItemButton(ICON_FA_PLUS)) {
+					ParticleEmitterEditorResource* emitter = m_resource.addEmitter();
+					emitter->initDefault(ParticleSystemResourceType::SYSTEM);
+					pushUndo(NO_MERGE_UNDO);
+				}
+				ImGui::EndTabBar();
+				if (remove >= 0) {
+					deleteEmitter(remove);
 				}
 			}
 		}
-		if (!open) {
-			if (m_dirty) {
-				ImGui::OpenPopup("Confirm##cpe");
-			}
-			else {
-				m_editor.m_windows.eraseItem(this);
-				m_app.removePlugin(*this);
-				LUMIX_DELETE(m_app.getAllocator(), this);
-			}
-		}
-
-		if (ImGui::BeginPopupModal("Confirm##cpe", nullptr, ImGuiWindowFlags_NoSavedSettings)) {
-			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
-			if (ImGui::Selectable("Yes")) {
-				m_editor.m_windows.eraseItem(this);
-				m_app.removePlugin(*this);
-				LUMIX_DELETE(m_app.getAllocator(), this);
-			}
-			ImGui::Selectable("No");
-			ImGui::EndPopup();
-		}
-		ImGui::End();
 	}
+
+	const Path& getPath() override { return m_resource.m_path; }
+	void destroy() override { LUMIX_DELETE(m_app.getAllocator(), this); }
 
 	bool onAction(const Action& action) override {
 		if (&action == &m_editor.m_apply_action) apply();
@@ -3691,33 +3648,25 @@ struct ParticleEditorWindow : StudioApp::GUIPlugin, NodeEditor {
 	char m_function_filter[128] = "";
 	bool m_show_debug = false;
 	bool m_show_save_as = false;
-	bool m_dirty = false;
 	ParticleSystemEditorResource m_resource;
 	ParticleEmitterEditorResource* m_active_emitter = nullptr;
 	bool m_autoapply = false;
-	bool m_has_focus = false;
-	bool m_focus_request = false;
 	ImGuiEx::Canvas m_canvas;
-	ImVec2 m_offset = ImVec2(0, 0);
 	char m_node_filter[64] = "";
-	ImGuiID m_dock_id = 0;
 };
 
 
 void ParticleEditorImpl::open(const char* path) {
-	for (ParticleEditorWindow* win : m_windows) {
-		if (win->m_resource.m_path == path) {
-			win->m_focus_request = true;
-			return;
-		}
+	AssetBrowser& ab = m_app.getAssetBrowser();
+	if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+		win->m_focus_request = true;
+		return;
 	}
 	
 	IAllocator& allocator = m_app.getAllocator();
 	ParticleEditorWindow* win = LUMIX_NEW(allocator, ParticleEditorWindow)(Path(path), *this, m_app, m_app.getAllocator());
 	win->loadResource();
-	if (!m_windows.empty()) win->m_dock_id = m_windows.last()->m_dock_id;
-	m_windows.push(win);
-	m_app.addPlugin(*win);
+	ab.addWindow(win);
 }
 
 void FunctionPlugin::addSubresources(AssetCompiler& compiler, const char* path) {

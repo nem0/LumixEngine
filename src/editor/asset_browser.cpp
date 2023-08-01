@@ -2,6 +2,7 @@
 
 #include "asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/editor_asset.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/settings.h"
@@ -142,6 +143,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_file_infos(m_allocator)
 		, m_immediate_tiles(m_allocator)
 		, m_subdirs(m_allocator)
+		, m_windows(m_allocator)
 	{
 		m_filter[0] = '\0';
 
@@ -179,6 +181,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			ri->unloadTexture(info.tex);
 		}
 		m_immediate_tiles.clear();
+
+		while (!m_windows.empty()) {
+			closeWindow(*m_windows.last());
+		}
 	}
 
 
@@ -198,6 +204,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		else if (&action == &m_forward_action) goForward();
 		else if (&action == &m_app.getUndoAction()) undo();
 		else if (&action == &m_app.getRedoAction()) redo();
+		else if (&action == &m_app.getDeleteAction() && !m_selected_resources.empty()) m_request_delete = true;
 		else return false;
 		return true;
 	}
@@ -336,6 +343,9 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void changeDir(const char* path, bool push_history)
 	{
+		for (ResourceView* view: m_selected_resources) view->destroy();
+		m_selected_resources.clear();
+
 		Engine& engine = m_app.getEngine();
 		RenderInterface* ri = m_app.getRenderInterface();
 		for (FileInfo& info : m_file_infos) {
@@ -515,13 +525,32 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 		else
 		{
-			ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
-			const Path compiled_asset_path(".lumix/resources/", tile.file_path_hash, ".res");
+			//ImGuiEx::Rect(img_size.x, img_size.y, 0xfff00FFF);
+
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			ImVec2 screen_pos = ImGui::GetCursorScreenPos();
+			ImVec2 end_pos = screen_pos + img_size;
+			dl->AddRectFilled(screen_pos, end_pos, 0xffFFffFF);
+			
+			const ResourceType type = m_app.getAssetCompiler().getResourceType(tile.filepath);
+			auto iter = m_plugins.find(type);
+			if (iter.isValid()) {
+				const char* type_str = iter.value()->getName();
+				ImGui::PushFont(m_app.getBoldFont());
+				float wrap_width = img_size.x * 0.9f;
+				const ImVec2 text_size = ImGui::CalcTextSize(type_str, nullptr, false, wrap_width);
+				
+				dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), screen_pos + (img_size - text_size) * 0.5f, IM_COL32(0, 0, 0, 0xff), type_str, nullptr, wrap_width);
+				ImGui::PopFont();
+			}
+
+			ImGui::Dummy(img_size);
+
 			const Path path(".lumix/asset_tiles/", tile.file_path_hash, ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
 				case TileState::OK:
-					tile.tex = ri->loadTexture(Path(path));
+					tile.tex = ri->loadTexture(path);
 					break;
 				case TileState::NOT_CREATED:
 				case TileState::OUTDATED:
@@ -544,13 +573,18 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void deleteTile(u32 idx) {
+	void deleteSelectedFiles() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const Path res_path(".lumix/resources/", m_file_infos[idx].file_path_hash, ".res");
-		fs.deleteFile(res_path);
-		if (!fs.deleteFile(m_file_infos[idx].filepath)) {
-			logError("Failed to delete ", m_file_infos[idx].filepath);
+		for (ResourceView* view : m_selected_resources) {
+			const Path& path = view->getPath();
+			const Path res_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
+			fs.deleteFile(res_path);
+			if (!fs.deleteFile(path)) {
+				logError("Failed to delete ", path);
+			}
+			view->destroy();
 		}
+		m_selected_resources.clear();
 	}
 
 	void reloadTile(FilePathHash hash) override {
@@ -732,12 +766,21 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGui::EndPopup();
 		}
 
-		if (open_delete_popup) ImGui::OpenPopup("Delete file");
+		if (open_delete_popup || m_request_delete) {
+			ImGui::OpenPopup("Delete file");
+			m_request_delete = false;
+		}
 
 		if (ImGui::BeginPopupModal("Delete file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+			if (m_selected_resources.size() > 1) {
+				ImGui::Text("%d files will be delted.", m_selected_resources.size());
+			}
+			else {
+				ImGui::TextUnformatted(m_selected_resources[0]->getPath());
+			}
 			ImGui::Text("Are you sure? This can not be undone.");
 			if (ImGui::Button("Yes, delete", ImVec2(100, 0))) {
-				deleteTile(m_context_resource);
+				deleteSelectedFiles();
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine(ImGui::GetWindowWidth() - 100 - ImGui::GetStyle().WindowPadding.x);
@@ -1360,24 +1403,22 @@ struct AssetBrowserImpl : AssetBrowser {
 	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_asset_browser_open; }
 	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_asset_browser_open  = m_is_open; }
 
-	bool copyTile(const char* from, const char* to) override {
-		OutputMemoryStream img(m_allocator);
-		if (!m_app.getEngine().getFileSystem().getContentSync(Path(from), img)) return false;
-		
-		os::OutputFile file;
-		if (!m_app.getEngine().getFileSystem().open(to, file)) return false;
-		Span<const char> ext = Path::getExtension(Span(from, stringLength(from)));
-		if (ext.length() != 3) {
-			file.close();
-			return false;
-		}
-		char ext_tmp[4];
-		makeLowercase(Span(ext_tmp), ext.begin());
-		(void)file.write(ext_tmp, 3);
-		(void)file.write(u32(0));
-		(void)file.write(img.data(), img.size());
-		file.close();
-		return !file.isError();
+	void addWindow(AssetEditorWindow* window) override {
+		if (!m_windows.empty()) window->m_dock_id = m_windows.last()->m_dock_id;
+		m_windows.push(window);
+		m_app.addPlugin(*window);
+	}
+	
+	void closeWindow(AssetEditorWindow& window) override {
+		m_windows.eraseItem(&window);
+		m_app.removePlugin(window);
+		window.destroy();
+	}
+
+	AssetEditorWindow* getWindow(const Path& path) override {
+		i32 idx = m_windows.find([&](AssetEditorWindow* win){ return win->getPath() == path; });
+		if (idx < 0) return nullptr;
+		return m_windows[idx];
 	}
 
 	TagAllocator m_allocator;
@@ -1387,6 +1428,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	Array<StaticString<LUMIX_MAX_PATH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;
+	Array<AssetEditorWindow*> m_windows;
 	
 	Array<Path> m_history;
 	i32 m_history_index = -1;
@@ -1405,6 +1447,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_subresources;
 	bool m_has_focus = false;
 	bool m_details_focused = false;
+	bool m_request_delete = false;
 	float m_thumbnail_size = 1.f;
 	Action m_toggle_ui;
 	Action m_back_action;

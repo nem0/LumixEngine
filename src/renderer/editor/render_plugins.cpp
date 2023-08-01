@@ -1140,7 +1140,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			OutputMemoryStream tmp(m_allocator);
 			if (!fs.getContentSync(m_in_path, tmp)) {
 				logError("Failed to load ", m_in_path);
-				m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 				return;
 			}
 
@@ -1151,20 +1150,13 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				InputMemoryStream blob(tmp);
 				if (!ct.deserialize(blob)) {
 					logError("Failed to deserialize ", m_in_path);
-					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 					return;
 				}
 				CompositeTexture::Result res(m_app.getAllocator());
-				if (!ct.generate(&res)) {
-					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
-					return;
-				}
+				if (!ct.generate(&res)) return;
 
 				const CompositeTexture::Image& layer0 = res.layers[0];
-				if (layer0.channels != 4) {
-					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
-					return;
-				}
+				if (layer0.channels != 4) return;
 
 				stbir_resize_uint8(layer0.asU8().data(),
 					layer0.w,
@@ -1186,7 +1178,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				if (!data)
 				{
 					logError("Failed to load ", m_in_path);
-					m_app.getAssetBrowser().copyTile("editor/textures/tile_texture.tga", out_path);
 					return;
 				}
 
@@ -2817,7 +2808,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		if (resource->isFailure()) {
 			if (resource->getType() == Model::TYPE) {
 				const Path out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
-				m_app.getAssetBrowser().copyTile("editor/textures/tile_animation.tga", out_path);
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
 			popTileQueue();
@@ -2967,12 +2957,9 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		const char* in_path = material->getTexture(0)->getPath().c_str();
 		const Path out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
 		if (material->getTextureCount() == 0) {
-			m_app.getAssetBrowser().copyTile("editor/textures/tile_material.tga", out_path);
 			return;
 		}
-		if (!m_texture_plugin->createTile(in_path, out_path, Texture::TYPE)) {
-			m_app.getAssetBrowser().copyTile("editor/textures/tile_material.tga", out_path);
-		}
+		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
 		material->decRefCount();
 	}
 
@@ -3041,7 +3028,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Shader::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_shader.tga", out_path);
+		if (type == Shader::TYPE) return true;
 
 		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
 

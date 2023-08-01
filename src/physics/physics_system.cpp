@@ -202,6 +202,7 @@ namespace Lumix
 			if (!connected) {
 				m_pvd_transport->release();
 				m_pvd->release();
+				m_pvd = nullptr;
 			}
 			return connected;
 		}

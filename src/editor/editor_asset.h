@@ -5,6 +5,7 @@ namespace Lumix {
 
 // use this if you want an editor-only asset to be visible in asset browser
 // editor only assets do not inherit from Resource, e.g. particle system function
+// it can also be used as a base for normal asset plugin
 struct EditorAssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	EditorAssetPlugin(const char* name, const char* ext, ResourceType type, StudioApp& app, IAllocator& allocator);
 	~EditorAssetPlugin();
@@ -26,6 +27,24 @@ protected:
 	const char* m_extension;
 	const char* m_name;
 	ResourceType m_resource_type;
+};
+
+// common funcitonality for asset editor windows
+struct AssetEditorWindow : StudioApp::GUIPlugin {
+	AssetEditorWindow(StudioApp& app) : m_app(app) {}
+
+	virtual void windowGUI() = 0;
+	virtual void destroy() = 0;
+	virtual const Path& getPath() = 0;
+
+	bool hasFocus() const override { return m_has_focus; }
+	void StudioApp::GUIPlugin::onGUI() override;
+
+	StudioApp& m_app;
+	ImGuiID m_dock_id = 0;
+	bool m_focus_request = false;
+	bool m_has_focus = false;
+	bool m_dirty = false;
 };
 
 }

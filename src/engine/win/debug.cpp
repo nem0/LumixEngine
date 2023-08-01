@@ -476,16 +476,16 @@ void Allocator::deallocate_aligned(void* user_ptr)
 	{
 		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
 		void* system_ptr = getSystemFromUser(user_ptr);
-		if (m_is_fill_enabled)
-		{
-			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
-		}
-
 		if (m_are_guards_enabled)
 		{
 			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
 			size_t system_size = getNeededMemory(info->size, info->align);
 			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
+		}
+
+		if (m_is_fill_enabled)
+		{
+			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
 		}
 
 		{

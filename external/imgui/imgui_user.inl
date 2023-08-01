@@ -1060,7 +1060,8 @@ namespace ImGuiEx {
 	}
 
 
-	bool IconButton(const char* icon, const char* tooltip) {
+	bool IconButton(const char* icon, const char* tooltip, bool enabled) {
+		if (!enabled) ImGui::BeginDisabled();
 		ImGui::AlignTextToFramePadding();
 		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		PushStyleColor(ImGuiCol_Button, GetStyle().Colors[ImGuiCol_WindowBg]);
@@ -1070,6 +1071,7 @@ namespace ImGuiEx {
 		}
 		PopStyleColor();
 		PopStyleVar();
+		if (!enabled) ImGui::EndDisabled();
 		return res;
 	}
 	

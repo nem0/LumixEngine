@@ -149,14 +149,6 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	ResourceType getResourceType() const override { return Clip::TYPE; }
 	
-
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
-		if (type == Clip::TYPE) return m_app.getAssetBrowser().copyTile("editor/textures/tile_audio.tga", out_path);
-		return false;
-	}
-
-
 	int m_playing_clip;
 	StudioApp& m_app;
 	AssetBrowser& m_browser;
