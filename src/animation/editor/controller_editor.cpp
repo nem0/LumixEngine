@@ -1221,7 +1221,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 	}
 
 	bool canCreateResource() const override { return true; }
-	void onResourceDoubleClicked(const Path& path) { open(path); }
+	void onResourceDoubleClicked(const Path& path) override { open(path); }
 	const char* getDefaultExtension() const override { return "act"; }
 	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
 	void serialize(OutputMemoryStream& blob) override {}

@@ -3164,12 +3164,12 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 		
 		if (m_filter[0]) {
 			struct : INodeTypeVisitor {
-				bool beginCategory(const char* _category) {
+				bool beginCategory(const char* _category) override {
 					category = _category;
 					category.add(" / ");
 					return true;
 				}
-				void endCategory() { category = ""; }
+				void endCategory() override { category = ""; }
 
 				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
 					StaticString<128> label(category, _label);
@@ -3193,8 +3193,8 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 		}
 		else {
 			struct : INodeTypeVisitor {
-				bool beginCategory(const char* category) { return ImGui::BeginMenu(category); }
-				void endCategory() { ImGui::EndMenu(); }
+				bool beginCategory(const char* category) override { return ImGui::BeginMenu(category); }
+				void endCategory() override { ImGui::EndMenu(); }
 
 				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
 					StaticString<64> label(_label);
