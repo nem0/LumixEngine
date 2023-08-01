@@ -14,6 +14,24 @@ download_project()
 	cd ..
 }
 
+download_plugin()
+{
+	if [ ! -d "plugins" ]; then
+        mkdir plugins
+    fi
+	cd plugins
+	if [ ! -d $1 ]; then
+	    git clone --depth=1 $2 $1
+    else
+		cd $1
+	    git pull
+		cd ..
+    fi
+	cd ..
+}
+
+
+
 build_recast()
 {
     ./genie --file=recastnavigation.lua gmake
@@ -132,6 +150,23 @@ init_3rdparty()
     pause;
 }
 
+plugins_menu()
+{
+    while :; do
+        clear;
+        echo "plugins"
+        options=("shader editor" "visual script" "back")
+        select opt in "${options[@]}"
+        do
+            case "$REPLY" in
+                1 ) download_plugin "shader_editor" "https://github.com/nem0/lumixengine_shader_editor.git" break;;
+                2 ) download_plugin "visualscript" "https://github.com/nem0/lumixengine_visualscript.git"; break;;
+                3 ) break 2;;
+            esac
+        done
+    done
+}
+
 thirdparty_menu()
 {
     while :; do
@@ -192,7 +227,7 @@ main_menu()
 {
     clear;
     PS3="Wut? "
-    options=("create project" "build release" "build debug" "3rdparty", "push to itch.io", "exit")
+    options=("create project" "build release" "build debug" "3rdparty", "push to itch.io", "plugins", "exit")
     select opt in "${options[@]}"
     do
         case "$REPLY" in
@@ -201,7 +236,8 @@ main_menu()
             3 ) build debug64; pause; break;;
             4 ) thirdparty_menu; break;;
             5 ) push_to_itch_io; break;;
-            6 ) exit;;
+            6 ) plugins_menu; break;;
+            7 ) exit;;
         esac
     done
     pause

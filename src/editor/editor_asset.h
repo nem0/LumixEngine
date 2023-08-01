@@ -38,7 +38,7 @@ struct AssetEditorWindow : StudioApp::GUIPlugin {
 	virtual const Path& getPath() = 0;
 
 	bool hasFocus() const override { return m_has_focus; }
-	void StudioApp::GUIPlugin::onGUI() override;
+	void onGUI() override;
 
 	StudioApp& m_app;
 	ImGuiID m_dock_id = 0;
