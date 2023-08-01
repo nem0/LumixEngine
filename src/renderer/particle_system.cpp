@@ -29,6 +29,10 @@ const ResourceType ParticleSystemResource::TYPE = ResourceType("particle_emitter
 static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 
+ParticleSystemResource::Emitter::~Emitter() {
+	if (material) material->decRefCount();
+}
+
 ParticleSystemResource::Emitter::Emitter(ParticleSystemResource& resource)
 	: resource(resource)
 	, instructions(resource.m_allocator)

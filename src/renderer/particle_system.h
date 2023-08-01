@@ -38,6 +38,7 @@ struct ParticleSystemResource final : Resource {
 
 	struct Emitter {
 		Emitter(ParticleSystemResource& resource);
+		~Emitter();
 		void setMaterial(const Path& path);
 		
 		ParticleSystemResource& resource;
