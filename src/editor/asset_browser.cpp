@@ -61,24 +61,6 @@ static Span<const char> getSubresource(const char* str)
 	return ret;
 }
 
-AssetBrowser::ResourceView& AssetBrowser::Plugin::createView(const Path& path, StudioApp& app) {
-	struct View : ResourceView {
-		const struct Path& getPath() override { return resource->getPath(); }
-		struct ResourceType getType() override { return resource->getType(); }
-		void destroy() override { LUMIX_DELETE(*allocator, this); }
-		Resource* getResource() override { return resource; }
-
-		IAllocator* allocator;
-		Resource* resource;
-	};
-	View* view = LUMIX_NEW(app.getAllocator(), View);
-	view->allocator = &app.getAllocator();
-	auto& manager = app.getEngine().getResourceManager();
-	view->resource = manager.load(getResourceType(), path);
-	ASSERT(view->resource);
-	return *view;
-}
-
 bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path, ResourceType type)
 {
 	return false;
@@ -137,7 +119,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void releaseResources() override {
-		unloadResources();
+		m_selected_resources.clear();
 		RenderInterface* ri = m_app.getRenderInterface();
 		for (FileInfo& info : m_file_infos) {
 			ri->unloadTexture(info.tex);
@@ -248,17 +230,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		sortTiles();
 	}
 
-	void unloadResources()
-	{
-		if (m_selected_resources.empty()) return;
-
-		for (ResourceView* res : m_selected_resources) {
-			res->destroy();
-		}
-
-		m_selected_resources.clear();
-	}
-	
 	bool hasFocus() const override { return m_has_focus; }
 
 	void update(float) override
@@ -301,9 +272,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_file_infos.push(tile);
 	}
 
-	void changeDir(const char* path, bool push_history)
-	{
-		for (ResourceView* view: m_selected_resources) view->destroy();
+	void changeDir(const char* path, bool push_history) {
 		m_selected_resources.clear();
 
 		Engine& engine = m_app.getEngine();
@@ -539,14 +508,12 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void deleteSelectedFiles() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		for (ResourceView* view : m_selected_resources) {
-			const Path& path = view->getPath();
+		for (const Path& path : m_selected_resources) {
 			const Path res_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
 			fs.deleteFile(res_path);
 			if (!fs.deleteFile(path)) {
 				logError("Failed to delete ", path);
 			}
-			view->destroy();
 		}
 		m_selected_resources.clear();
 	}
@@ -598,7 +565,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				else if (ImGui::IsMouseReleased(0)) {
 					const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
-					selectResource(Path(tile.filepath), additive);
+					selectResourceInternal(Path(tile.filepath), additive);
 				}
 				else if(ImGui::IsMouseReleased(1)) {
 					m_context_resource = idx;
@@ -624,7 +591,7 @@ struct AssetBrowserImpl : AssetBrowser {
 							break;
 						}
 						FileInfo& tile = m_file_infos[idx];
-						bool selected = m_selected_resources.find([&](ResourceView* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
+						bool selected = m_selected_resources.find([&](const Path& p){ return p.getHash() == tile.file_path_hash; }) >= 0;
 						thumbnail(tile, m_thumbnail_size * TILE_SIZE, selected);
 						callbacks(tile, idx);
 					}
@@ -632,7 +599,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				else
 				{
 					FileInfo& tile = m_file_infos[j];
-					bool b = m_selected_resources.find([&](ResourceView* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
+					bool b = m_selected_resources.find([&](const Path& p){ return p.getHash() == tile.file_path_hash; }) >= 0;
 					ImGui::Selectable(tile.filepath, b);
 					callbacks(tile, j);
 				}
@@ -672,7 +639,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_selected_resources.clear();
 				m_selected_resources.reserve(m_file_infos.size());
 				for (const FileInfo& fi : m_file_infos) {
-					selectResource(Path(fi.filepath), true);
+					selectResourceInternal(Path(fi.filepath), true);
 				}
 			}
 			if (ImGui::MenuItem("Recreate tiles")) {
@@ -740,7 +707,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::Text("%d files will be delted.", m_selected_resources.size());
 			}
 			else {
-				ImGui::TextUnformatted(m_selected_resources[0]->getPath());
+				ImGui::TextUnformatted(m_selected_resources[0]);
 			}
 			ImGui::Text("Are you sure? This can not be undone.");
 			if (ImGui::Button("Yes, delete", ImVec2(100, 0))) {
@@ -826,7 +793,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_dir.data[0] == '\0') changeDir(".", true);
 
 		if (!m_wanted_resource.isEmpty()) {
-			selectResource(m_wanted_resource, false);
+			selectResourceInternal(m_wanted_resource, false);
 			m_wanted_resource = "";
 		}
 
@@ -881,30 +848,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void selectResource(ResourceView& view, bool additive)
-	{
-		m_wanted_resource = "";
-		if(additive) {
-			if(m_selected_resources.indexOf(&view) >= 0) {
-				m_selected_resources.swapAndPopItem(&view);
-			}
-			else {
-				m_selected_resources.push(&view);
-			}
-		}
-		else {
-			unloadResources();
-			m_selected_resources.push(&view);
-		}
-		const char* path = view.getPath().c_str();
-		ResourceLocator rl(Span(path, stringLength(path)));
-		if (!m_filter[0] && !Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
-			StaticString<LUMIX_MAX_PATH> dir(rl.dir);
-			changeDir(dir, true);
-		}
-	}
-
-
 	void removePlugin(Plugin& plugin) override
 	{
 		m_plugins.erase(plugin.getResourceType());
@@ -956,22 +899,32 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	static constexpr const char* WINDOW_NAME = ICON_FA_IMAGES "Assets##assets";
-
-	void selectResource(const Path& path, bool additive)  override
-	{
-		ImGui::SetWindowFocus(WINDOW_NAME);
-		m_is_open = true;
-
-		const AssetCompiler& compiler = m_app.getAssetCompiler();
-		const ResourceType type = compiler.getResourceType(path.c_str());
-		
-		for (Plugin* p : m_plugins) {
-			if (p->getResourceType() == type) {
-				ResourceView& res = p->createView(path, m_app);
-				selectResource(res, additive);
-				break;
+	
+	void selectResourceInternal(const Path& path, bool additive) {
+		m_wanted_resource = "";
+		if(additive) {
+			if(m_selected_resources.indexOf(path) >= 0) {
+				m_selected_resources.swapAndPopItem(path);
+			}
+			else {
+				m_selected_resources.push(path);
 			}
 		}
+		else {
+			m_selected_resources.clear();
+			m_selected_resources.push(path);
+		}
+		ResourceLocator rl(Span(path.c_str(), stringLength(path)));
+		if (!m_filter[0] && !Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
+			StaticString<LUMIX_MAX_PATH> dir(rl.dir);
+			changeDir(dir, true);
+		}
+	}
+
+	void selectResource(const Path& path, bool additive) override {
+		ImGui::SetWindowFocus(WINDOW_NAME);
+		m_is_open = true;
+		selectResourceInternal(path, additive);
 	}
 
 	static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
@@ -1257,7 +1210,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	EntityPtr m_dropped_entity = INVALID_ENTITY;
 	char m_prefab_name[LUMIX_MAX_PATH] = "";
 	HashMap<ResourceType, Plugin*> m_plugins;
-	Array<ResourceView*> m_selected_resources;
+	Array<Path> m_selected_resources;
 	int m_context_resource;
 	char m_filter[128];
 	Path m_wanted_resource;

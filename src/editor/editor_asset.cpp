@@ -21,29 +21,6 @@ EditorAssetPlugin::~EditorAssetPlugin() {
 	m_app.getAssetCompiler().removePlugin(*this);
 }
 
-AssetBrowser::ResourceView& EditorAssetPlugin::createView(const Path& path, StudioApp& app) {
-	struct View : AssetBrowser::ResourceView {
-		View(const Path& path, ResourceType type, IAllocator& allocator) 
-			: m_path(path)
-			, m_allocator(allocator)
-			, m_type(type)
-		{}
-			
-		const struct Path& getPath() override { return m_path; }
-		struct ResourceType getType() override { return m_type; }
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
-		Resource* getResource() override { ASSERT(false); return nullptr; }
-
-		IAllocator& m_allocator;
-		Path m_path;
-		ResourceType m_type;
-	};
-
-	IAllocator& allocator = app.getAllocator();
-	View* view = LUMIX_NEW(allocator, View)(path, m_resource_type, allocator);
-	return *view;
-}
-
 void AssetEditorWindow::onGUI() {
 	bool open = true;
 	m_has_focus = false;

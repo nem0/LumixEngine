@@ -16,7 +16,6 @@ struct EditorAssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 
 	const char* getName() const override { return m_name; }
 	ResourceType getResourceType() const override { return m_resource_type; }
-	AssetBrowser::ResourceView& createView(const Path& path, StudioApp& app) override;
 
 protected:
 	StudioApp& m_app;
