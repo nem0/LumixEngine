@@ -557,9 +557,15 @@ struct AssetBrowserImpl : AssetBrowser {
 			{
 				if (ImGui::IsMouseDoubleClicked(0)) {
 					const ResourceType type = m_app.getAssetCompiler().getResourceType(tile.filepath);
+					Path path(tile.filepath);
 					for (Plugin* p : m_plugins) {
 						if (p->getResourceType() == type) {
-							p->onResourceDoubleClicked(Path(tile.filepath));
+							if (AssetEditorWindow* win = getWindow(path)) {
+								win->m_focus_request = true;
+							}
+							else {
+								p->onResourceDoubleClicked(path);
+							}
 						}
 					}
 				}

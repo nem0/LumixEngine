@@ -930,15 +930,9 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
 	void onResourceDoubleClicked(const Path& path) override {
-		AssetBrowser& ab = m_app.getAssetBrowser();
-		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
-			win->m_focus_request = true;
-			return;
-		}
-	
 		IAllocator& allocator = m_app.getAllocator();
 		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		ab.addWindow(win);
+		m_app.getAssetBrowser().addWindow(win);
 	}
 
 	StudioApp& m_app;

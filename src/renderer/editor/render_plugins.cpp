@@ -918,15 +918,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 	void onResourceDoubleClicked(const Path& path) override {
-		AssetBrowser& ab = m_app.getAssetBrowser();
-		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
-			win->m_focus_request = true;
-			return;
-		}
-	
 		IAllocator& allocator = m_app.getAllocator();
 		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		ab.addWindow(win);
+		m_app.getAssetBrowser().addWindow(win);
 	}
 
 	void toggleWireframe() {
@@ -1303,15 +1297,9 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	void onResourceDoubleClicked(const Path& path) override {
 		if (Path::hasExtension(path, "ltc")) m_composite_texture_editor.open(path);
 		else {
-			AssetBrowser& ab = m_app.getAssetBrowser();
-			if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
-				win->m_focus_request = true;
-				return;
-			}
-	
 			IAllocator& allocator = m_app.getAllocator();
 			TextureAssetEditorWindow* win = LUMIX_NEW(allocator, TextureAssetEditorWindow)(Path(path), m_app);
-			ab.addWindow(win);		
+			m_app.getAssetBrowser().addWindow(win);		
 		}
 	}
 
@@ -2617,15 +2605,9 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 	void onResourceDoubleClicked(const Path& path) override {
-		AssetBrowser& ab = m_app.getAssetBrowser();
-		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
-			win->m_focus_request = true;
-			return;
-		}
-	
 		IAllocator& allocator = m_app.getAllocator();
 		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), *this, m_app, m_app.getAllocator());
-		ab.addWindow(win);
+		m_app.getAssetBrowser().addWindow(win);
 	}
 
 	void init() {

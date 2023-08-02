@@ -1219,8 +1219,12 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 		controller.serialize(blob);
 	}
 
+	void onResourceDoubleClicked(const Path& path) override {
+		EditorWindow* win = LUMIX_NEW(m_allocator, EditorWindow)(Path(path), *this, m_app, m_allocator);
+		m_app.getAssetBrowser().addWindow(win);
+	}
+
 	bool canCreateResource() const override { return true; }
-	void onResourceDoubleClicked(const Path& path) override { open(path); }
 	const char* getDefaultExtension() const override { return "act"; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Animation Controller"; }
@@ -1232,17 +1236,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 		}
 		ASSERT(false);
 		return *m_event_types[0].get();
-	}
-
-	void open(const char* path) {
-		AssetBrowser& ab = m_app.getAssetBrowser();
-		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
-			win->m_focus_request = true;
-			return;
-		}
-
-		EditorWindow* win = LUMIX_NEW(m_allocator, EditorWindow)(Path(path), *this, m_app, m_allocator);
-		ab.addWindow(win);
 	}
 
 	void registerEventType(UniquePtr<EventType>&& type) override {
