@@ -65,10 +65,6 @@ AssetBrowser::ResourceView& AssetBrowser::Plugin::createView(const Path& path, S
 	struct View : ResourceView {
 		const struct Path& getPath() override { return resource->getPath(); }
 		struct ResourceType getType() override { return resource->getType(); }
-		bool isEmpty() override { return resource->isEmpty(); }
-		bool isReady() override { return resource->isReady(); }
-		bool isFailure() override { return resource->isFailure(); }
-		u64 size() override { return resource->size(); }
 		void destroy() override { LUMIX_DELETE(*allocator, this); }
 		Resource* getResource() override { return resource; }
 
@@ -257,9 +253,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_selected_resources.empty()) return;
 
 		for (ResourceView* res : m_selected_resources) {
-			for (auto* plugin : m_plugins) {
-				plugin->onResourceUnloaded(*res);
-			}
 			res->destroy();
 		}
 

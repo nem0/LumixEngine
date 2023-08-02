@@ -31,10 +31,6 @@ AssetBrowser::ResourceView& EditorAssetPlugin::createView(const Path& path, Stud
 			
 		const struct Path& getPath() override { return m_path; }
 		struct ResourceType getType() override { return m_type; }
-		bool isEmpty() override { return false; }
-		bool isReady() override { return true; }
-		bool isFailure() override { return false; }
-		u64 size() override { return 0; }
 		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		Resource* getResource() override { ASSERT(false); return nullptr; }
 

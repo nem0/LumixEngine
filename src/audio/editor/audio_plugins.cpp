@@ -48,12 +48,16 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		}
 
 		~EditorWindow() {
+			stopAudio();
 			m_resource->decRefCount();
 		}
 
 		void save() {
-			//Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
-			//m_app.getAssetBrowser().saveResource(*m_resource, data);
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			const StaticString<512> src("looped = ", m_meta.looped ? "true" : "false"
+				, "\nvolume = ", m_meta.volume
+			);
+			compiler.updateMeta(m_resource->getPath(), src);
 			m_dirty = false;
 		}
 		

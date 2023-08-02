@@ -18,10 +18,6 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual ~ResourceView() {}
 		virtual const struct Path& getPath() = 0;
 		virtual struct ResourceType getType() = 0;
-		virtual bool isEmpty() = 0;
-		virtual bool isReady() = 0;
-		virtual bool isFailure() = 0;
-		virtual u64 size() = 0;
 		virtual void destroy() = 0;
 		virtual struct Resource* getResource() = 0;
 	};
@@ -31,14 +27,12 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual void createResource(OutputMemoryStream& content) {}
 		virtual const char* getDefaultExtension() const { return ""; }
 
-		virtual void onResourceUnloaded(ResourceView& resource) {}
 		virtual const char* getName() const = 0;
 		virtual ResourceType getResourceType() const = 0;
 		virtual bool createTile(const char* in_path, const char* out_path, ResourceType type);
 		virtual void update() {}
 		virtual ResourceView& createView(const Path& path, StudioApp& app);
 		virtual void onResourceDoubleClicked(const Path& path) {}
-
 	};
 
 	static UniquePtr<AssetBrowser> create(struct StudioApp& app);
