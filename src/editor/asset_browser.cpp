@@ -571,7 +571,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				else if (ImGui::IsMouseReleased(0)) {
 					const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
-					selectResourceInternal(Path(tile.filepath), additive);
+					selectResource(Path(tile.filepath), additive);
 				}
 				else if(ImGui::IsMouseReleased(1)) {
 					m_context_resource = idx;
@@ -645,7 +645,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_selected_resources.clear();
 				m_selected_resources.reserve(m_file_infos.size());
 				for (const FileInfo& fi : m_file_infos) {
-					selectResourceInternal(Path(fi.filepath), true);
+					selectResource(Path(fi.filepath), true);
 				}
 			}
 			if (ImGui::MenuItem("Recreate tiles")) {
@@ -799,7 +799,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_dir.data[0] == '\0') changeDir(".", true);
 
 		if (!m_wanted_resource.isEmpty()) {
-			selectResourceInternal(m_wanted_resource, false);
+			selectResource(m_wanted_resource, false);
 			m_wanted_resource = "";
 		}
 
@@ -906,8 +906,9 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	static constexpr const char* WINDOW_NAME = ICON_FA_IMAGES "Assets##assets";
 	
-	void selectResourceInternal(const Path& path, bool additive) {
-		m_wanted_resource = "";
+	void selectResource(const Path& path, bool additive) override {
+		ImGui::SetWindowFocus(WINDOW_NAME);
+		m_is_open = true;
 		if(additive) {
 			if(m_selected_resources.indexOf(path) >= 0) {
 				m_selected_resources.swapAndPopItem(path);
@@ -925,12 +926,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			StaticString<LUMIX_MAX_PATH> dir(rl.dir);
 			changeDir(dir, true);
 		}
-	}
-
-	void selectResource(const Path& path, bool additive) override {
-		ImGui::SetWindowFocus(WINDOW_NAME);
-		m_is_open = true;
-		selectResourceInternal(path, additive);
+		m_wanted_resource = "";
 	}
 
 	static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
