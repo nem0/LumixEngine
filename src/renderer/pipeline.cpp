@@ -358,14 +358,15 @@ ResourceType PipelineResource::TYPE("pipeline");
 
 void PipelineResource::unload()
 {
-	content.clear();
+	content.resize(0);
 }
 
 
 bool PipelineResource::load(u64 size, const u8* mem)
 {
 	content.resize((int)size);
-	memcpy(content.begin(), mem, size);
+	memcpy(content.getData(), mem, size);
+	content.getData()[size] = '\0';
 	return true;
 }
 
@@ -931,8 +932,8 @@ struct PipelineImpl final : Pipeline
 
 		setDefine();
 
-		const char* content = m_resource->content.begin();
-		const int content_size = m_resource->content.size();
+		const char* content = m_resource->content.c_str();
+		const int content_size = m_resource->content.length();
 		bool errors =
 			luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
 		if (errors)

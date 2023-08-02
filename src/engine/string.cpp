@@ -197,13 +197,11 @@ void String::resize(u32 size)
 {
 	if (isSmall()) {
 		if (size < sizeof(m_small)) {
-			m_size = size;
 			m_small[size] = '\0';
 		}
 		else {
 			char* tmp = (char*)m_allocator.allocate(size + 1);
 			memcpy(tmp, m_small, m_size + 1);
-			m_size = size;
 			m_big = tmp;
 		}
 	}
@@ -216,10 +214,10 @@ void String::resize(u32 size)
 		}
 		else {
 			m_big = (char*)m_allocator.reallocate(m_big, size + 1, m_size + 1);
-			m_size = size;
 			m_big[size] = '\0';
 		}
 	}
+	m_size = size;
 }
 
 

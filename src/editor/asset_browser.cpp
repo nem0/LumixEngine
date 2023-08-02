@@ -918,13 +918,13 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 		else {
+			ResourceLocator rl(Span(path.c_str(), stringLength(path)));
+			if (!m_filter[0] && !Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
+				StaticString<LUMIX_MAX_PATH> dir(rl.dir);
+				changeDir(dir, true);
+			}
 			m_selected_resources.clear();
 			m_selected_resources.push(path);
-		}
-		ResourceLocator rl(Span(path.c_str(), stringLength(path)));
-		if (!m_filter[0] && !Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
-			StaticString<LUMIX_MAX_PATH> dir(rl.dir);
-			changeDir(dir, true);
 		}
 		m_wanted_resource = "";
 	}

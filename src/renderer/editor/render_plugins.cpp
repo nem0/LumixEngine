@@ -657,15 +657,74 @@ struct FontPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 };
 
 
-struct PipelinePlugin final : AssetCompiler::IPlugin
-{
+struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+			: AssetEditorWindow(app)
+			, m_allocator(allocator)
+			, m_buffer(allocator)
+			, m_app(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<PipelineResource>(path);
+		}
+
+		~EditorWindow() {
+			m_resource->decRefCount();
+		}
+
+		void save() {
+			Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+			m_app.getAssetBrowser().saveResource(*m_resource, data);
+			m_dirty = false;
+		}
+	
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getSaveAction()) save();
+			else return false;
+			return true;
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			if (m_buffer.length() == 0) m_buffer = m_resource->content;
+
+			if (inputStringMultiline("##code", &m_buffer, ImGui::GetContentRegionAvail())) {
+				m_dirty = true;
+			}
+		}
+	
+		void destroy() override { LUMIX_DELETE(m_allocator, this); }
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "lua script editor"; }
+
+		IAllocator& m_allocator;
+		StudioApp& m_app;
+		PipelineResource* m_resource;
+		String m_buffer;
+	};
+	
 	explicit PipelinePlugin(StudioApp& app)
 		: m_app(app)
 	{}
 
-	bool compile(const Path& src) override
-	{
-		return m_app.getAssetCompiler().copyCompile(src);
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	const char* getName() const override { return "Pipeline"; }
+	ResourceType getResourceType() const override { return ResourceType("pipeline"); }
+
+	void onResourceDoubleClicked(const struct Path& path) {
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		m_app.getAssetBrowser().addWindow(win);
 	}
 
 	StudioApp& m_app;
@@ -5206,6 +5265,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(m_font_plugin);
 		asset_browser.addPlugin(m_shader_plugin);
 		asset_browser.addPlugin(m_texture_plugin);
+		asset_browser.addPlugin(m_pipeline_plugin);
 
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);
@@ -5424,6 +5484,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(m_font_plugin);
 		asset_browser.removePlugin(m_texture_plugin);
 		asset_browser.removePlugin(m_shader_plugin);
+		asset_browser.removePlugin(m_pipeline_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 		asset_compiler.removePlugin(m_font_plugin);

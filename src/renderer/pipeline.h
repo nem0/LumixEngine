@@ -4,6 +4,7 @@
 #include "engine/delegate.h"
 #include "engine/hash.h"
 #include "engine/resource.h"
+#include "engine/string.h"
 #include "renderer/gpu/gpu.h"
 
 
@@ -52,7 +53,7 @@ struct LUMIX_RENDERER_API PipelineResource : Resource {
 	bool load(u64 size, const u8* mem) override;
 	ResourceType getType() const override { return TYPE; }
 
-	Array<char> content;
+	String content;
 };
 
 
