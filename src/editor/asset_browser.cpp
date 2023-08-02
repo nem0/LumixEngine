@@ -88,35 +88,6 @@ bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path,
 	return false;
 }
 
-void AssetBrowser::Plugin::gui(Span<ResourceView*> resources) {
-	bool waiting = false;
-	for (ResourceView* r : resources) {
-		if (r->isEmpty()) {
-			ImGui::TextUnformatted("Waiting for load...");
-			waiting = true;
-			break;
-		}
-	}
-
-	if (!waiting) {	
-		RuntimeHash hash = RuntimeHash(resources.begin(), resources.length() * sizeof(resources[0]));
-		if (hash != m_current_hash) {
-			// we remember undo only for currently selected resources
-			m_current_hash = hash;
-			clearUndoStack();
-			m_defer_push_undo = true;
-		}
-
-		if (onGUI(resources)) {
-			m_defer_push_undo = true;
-		}
-		else if (m_defer_push_undo) {
-			pushUndo(SimpleUndoRedo::NO_MERGE_UNDO);
-			m_defer_push_undo = false;
-		}
-	}
-}
-
 struct AssetBrowserImpl : AssetBrowser {
 	struct FileInfo {
 		StaticString<LUMIX_MAX_PATH> clamped_filename;
@@ -133,7 +104,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	AssetBrowserImpl(StudioApp& app)
 		: m_allocator(app.getAllocator(), "asset browser")
 		, m_selected_resources(m_allocator)
-		, m_history(m_allocator)
 		, m_dir_history(m_allocator)
 		, m_plugins(m_allocator)
 		, m_app(app)
@@ -200,10 +170,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	bool onAction(const Action& action) override {
-		if (&action == &m_back_action) goBack();
-		else if (&action == &m_forward_action) goForward();
-		else if (&action == &m_app.getUndoAction()) undo();
-		else if (&action == &m_app.getRedoAction()) redo();
+		if (&action == &m_back_action) goBackDir();
+		else if (&action == &m_forward_action) goForwardDir();
 		else if (&action == &m_app.getDeleteAction() && !m_selected_resources.empty()) m_request_delete = true;
 		else return false;
 		return true;
@@ -332,7 +300,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		else {
 			copyString(Span(filename), Path::getBasename(path.c_str()));
 		}
-		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
 
 		tile.file_path_hash = path.getHash();
 		tile.filepath = path.c_str();
@@ -561,6 +528,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 		ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
+		if (text_size.x > int(TILE_SIZE * m_thumbnail_size)) {
+			clampText(tile.clamped_filename.data, int(TILE_SIZE * m_thumbnail_size));
+			text_size = ImGui::CalcTextSize(tile.clamped_filename);
+		}
 		ImVec2 pos = ImGui::GetCursorPos();
 		pos.x += (size - text_size.x) * 0.5f;
 		ImGui::SetCursorPos(pos);
@@ -634,7 +605,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				else if (ImGui::IsMouseReleased(0)) {
 					const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
-					selectResource(Path(tile.filepath), true, additive);
+					selectResource(Path(tile.filepath), additive);
 				}
 				else if(ImGui::IsMouseReleased(1)) {
 					m_context_resource = idx;
@@ -708,7 +679,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_selected_resources.clear();
 				m_selected_resources.reserve(m_file_infos.size());
 				for (const FileInfo& fi : m_file_infos) {
-					selectResource(Path(fi.filepath), false, true);
+					selectResource(Path(fi.filepath), true);
 				}
 			}
 			if (ImGui::MenuItem("Recreate tiles")) {
@@ -824,126 +795,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void detailsGUI()
-	{
-		m_details_focused = false;
-		if (!m_is_open) return;
-
-		if (ImGui::Begin(INSPECTOR_NAME, &m_is_open, ImGuiWindowFlags_AlwaysVerticalScrollbar))
-		{
-			m_details_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-			m_has_focus = m_has_focus || m_details_focused;
-
-			ImVec2 pos = ImGui::GetCursorScreenPos();
-			if (m_history.size() > 1) {
-				if (ImGuiEx::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
-				{
-					if (m_history_index > 0) m_back_action.toolbarButton(m_app.getBigIconFont());
-					if (m_history_index < m_history.size() - 1) m_forward_action.toolbarButton(m_app.getBigIconFont());
-				}
-				ImGuiEx::EndToolbar();
-			}
-
-			if (m_selected_resources.empty())
-			{
-				ImGui::End();
-				return;
-			}
-
-			if (m_selected_resources.size() == 1) {
-				ResourceView* res = m_selected_resources[0];
-				const char* path = res->getPath().c_str();
-				ImGuiEx::Label("Selected resource");
-				ImGui::TextUnformatted(path);
-				ImGui::Separator();
-
-				ImGuiEx::Label("Status");
-				ImGui::TextUnformatted(res->isFailure() ? "failure" : (res->isReady() ? "Ready" : "Not ready"));
-				ImGuiEx::Label("Compiled size");
-				if (res->isReady()) {
-					ImGui::Text("%.2f KB", res->size() / 1024.f);
-				}
-				else {
-					ImGui::TextUnformatted("N/A");
-				}
-				const Span<const char> subres = getSubresource(m_selected_resources[0]->getPath().c_str());
-				if (*subres.end()) {
-					if (ImGui::Button("View parent")) {
-						selectResource(Path(getResourceFilePath(m_selected_resources[0]->getPath().c_str())), true, false);
-					}
-				}
-			}
-			else {
-				ImGui::Separator();
-				ImGuiEx::Label("Selected resource");
-				ImGui::TextUnformatted("multiple");
-				ImGui::Separator();
-
-				u32 ready = 0;
-				u32 failed = 0;
-				for (ResourceView* res : m_selected_resources) {
-					ready += res->isReady() ? 1 : 0;
-					failed += res->isFailure() ? 1 : 0;
-				}
-
-				ImGuiEx::Label("All");
-				ImGui::Text("%d", m_selected_resources.size());
-				ImGuiEx::Label("Ready");
-				ImGui::Text("%d", ready);
-				ImGuiEx::Label("Failed");
-				ImGui::Text("%d", failed);
-			}
-
-			const ResourceType type = m_selected_resources[0]->getType();
-			bool all_same_type = true;
-			for (ResourceView* res : m_selected_resources) {
-				all_same_type = all_same_type && res->getType() == type;
-			}
-
-			if (all_same_type) {
-				auto iter = m_plugins.find(type);
-				if (iter.isValid()) {
-					ImGui::Separator();
-					iter.value()->gui(m_selected_resources);
-				}
-			}
-			else {
-				ImGui::Text("Selected resources have different types.");
-			}
-		}
-		ImGui::End();
-	}
-
-	void redo() {
-		const ResourceType type = m_selected_resources[0]->getType();
-		bool all_same_type = true;
-		for (ResourceView* res : m_selected_resources) {
-			all_same_type = all_same_type && res->getType() == type;
-		}
-
-		if (all_same_type) {
-			auto iter = m_plugins.find(type);
-			if (iter.isValid()) {
-				iter.value()->redo();
-			}
-		}
-	}
-	
-	void undo() {
-		const ResourceType type = m_selected_resources[0]->getType();
-		bool all_same_type = true;
-		for (ResourceView* res : m_selected_resources) {
-			all_same_type = all_same_type && res->getType() == type;
-		}
-
-		if (all_same_type) {
-			auto iter = m_plugins.find(type);
-			if (iter.isValid()) {
-				iter.value()->undo();
-			}
-		}
-	}
-
 	void refreshLabels() {
 		for (FileInfo& tile : m_file_infos) {
 			char filename[LUMIX_MAX_PATH];
@@ -969,8 +820,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		for (const os::Event e : m_app.getEvents()) {
 			if (e.type == os::Event::Type::MOUSE_BUTTON && !e.mouse_button.down) {
 				switch (e.mouse_button.button) {
-					case os::MouseButton::EXTENDED1: m_details_focused ? goBack() : goBackDir(); break;
-					case os::MouseButton::EXTENDED2: m_details_focused ? goForward() : goForwardDir(); break;
+					case os::MouseButton::EXTENDED1: goBackDir(); break;
+					case os::MouseButton::EXTENDED2: goForwardDir(); break;
 					default: break;
 				}
 			}
@@ -982,14 +833,13 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_dir.data[0] == '\0') changeDir(".", true);
 
 		if (!m_wanted_resource.isEmpty()) {
-			selectResource(m_wanted_resource, true, false);
+			selectResource(m_wanted_resource, false);
 			m_wanted_resource = "";
 		}
 
 		if(m_is_open) {
 			if (!ImGui::Begin(WINDOW_NAME, &m_is_open)) {
 				ImGui::End();
-				detailsGUI();
 				return;
 			}
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
@@ -1018,7 +868,6 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGui::End();
 		}
 	
-		detailsGUI();
 		checkExtendedMouseButtons();
 	}
 
@@ -1039,24 +888,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void selectResource(ResourceView& view, bool record_history, bool additive)
+	void selectResource(ResourceView& view, bool additive)
 	{
-		if (record_history)
-		{
-			while (m_history_index < m_history.size() - 1)
-			{
-				m_history.pop();
-			}
-			m_history_index++;
-			m_history.push(view.getPath());
-
-			if (m_history.size() > 20)
-			{
-				--m_history_index;
-				m_history.erase(0);
-			}
-		}
-
 		m_wanted_resource = "";
 		if(additive) {
 			if(m_selected_resources.indexOf(&view) >= 0) {
@@ -1072,9 +905,9 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 		const char* path = view.getPath().c_str();
 		ResourceLocator rl(Span(path, stringLength(path)));
-		if (!Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
+		if (!m_filter[0] && !Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
 			StaticString<LUMIX_MAX_PATH> dir(rl.dir);
-			changeDir(dir, record_history);
+			changeDir(dir, true);
 		}
 	}
 
@@ -1130,11 +963,9 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	static constexpr const char* WINDOW_NAME = ICON_FA_IMAGES "Assets##assets";
-	static constexpr const char* INSPECTOR_NAME = ICON_FA_IMAGE "Asset inspector##asset_inspector";
 
-	void selectResource(const Path& path, bool record_history, bool additive)  override
+	void selectResource(const Path& path, bool additive)  override
 	{
-		ImGui::SetWindowFocus(INSPECTOR_NAME);
 		ImGui::SetWindowFocus(WINDOW_NAME);
 		m_is_open = true;
 
@@ -1144,7 +975,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		for (Plugin* p : m_plugins) {
 			if (p->getResourceType() == type) {
 				ResourceView& res = p->createView(path, m_app);
-				selectResource(res, record_history, additive);
+				selectResource(res, additive);
 				break;
 			}
 		}
@@ -1238,13 +1069,13 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void saveResource(Resource& resource, OutputMemoryStream& stream) override
+	void saveResource(Resource& resource, Span<const u8> data) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		// use temporary because otherwise the resource is reloaded during saving
 		StaticString<LUMIX_MAX_PATH> tmp_path(resource.getPath().c_str(), ".tmp");
 
-		if (!fs.saveContentSync(Path(tmp_path), stream)) {
+		if (!fs.saveContentSync(Path(tmp_path), data)) {
 			logError("Could not save file ", resource.getPath());
 			return;
 		}
@@ -1355,6 +1186,14 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
+	void locate(const Resource& resource) override {
+		m_filter[0] = '\0';
+		char dir[LUMIX_MAX_PATH];
+		copyString(Span(dir), Path::getDir(resource.getPath().c_str()));
+		changeDir(dir, true);
+	}
+
+
 	void openInExternalEditor(Resource* resource) const override
 	{
 		openInExternalEditor(resource->getPath().c_str());
@@ -1386,17 +1225,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		changeDir(m_dir_history[m_dir_history_index].c_str(), false);
 	}
 
-	void goBack() {
-		if (m_history_index < 1) return;
-		m_history_index = maximum(0, m_history_index - 1);
-		selectResource(m_history[m_history_index], false, false);
-	}
-
-	void goForward() {
-		m_history_index = minimum(m_history_index + 1, m_history.size() - 1);
-		selectResource(m_history[m_history_index], false, false);
-	}
-	
 	bool isOpen() const { return m_is_open; }
 	void toggleUI() { m_is_open = !m_is_open; }
 	
@@ -1430,9 +1258,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	Array<ImmediateTile> m_immediate_tiles;
 	Array<AssetEditorWindow*> m_windows;
 	
-	Array<Path> m_history;
-	i32 m_history_index = -1;
-	
 	Array<Path> m_dir_history;
 	i32 m_dir_history_index = -1;
 
@@ -1446,7 +1271,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	bool m_has_focus = false;
-	bool m_details_focused = false;
 	bool m_request_delete = false;
 	float m_thumbnail_size = 1.f;
 	Action m_toggle_ui;

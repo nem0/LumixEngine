@@ -29,22 +29,11 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
 		, app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("fab", PrefabResource::TYPE);
 	}
-
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override { return false; }
 	
-	
-	bool compile(const Path& src) override
-	{
-		return app.getAssetCompiler().copyCompile(src);
-	}
-
+	bool compile(const Path& src) override { return app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Prefab"; }
 	ResourceType getResourceType() const override { return PrefabResource::TYPE; }
 

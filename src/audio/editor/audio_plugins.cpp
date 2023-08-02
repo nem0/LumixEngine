@@ -6,11 +6,13 @@
 #include "clip.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/editor_asset.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
+#include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/world.h"
 
@@ -22,30 +24,142 @@ namespace
 {
 
 
-struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+	struct Meta {
+		bool looped = true;
+		float volume = 1.f;
+
+		void load(const Path& path, StudioApp& app) {
+			app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "looped", &looped);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "volume", &volume);
+			});
+		}
+	};
+
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+			: AssetEditorWindow(app)
+			, m_allocator(allocator)
+			, m_app(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<Clip>(path);
+			m_meta.load(path, app);
+		}
+
+		~EditorWindow() {
+			m_resource->decRefCount();
+		}
+
+		void save() {
+			//Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+			//m_app.getAssetBrowser().saveResource(*m_resource, data);
+			m_dirty = false;
+		}
+		
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getSaveAction()) save();
+			else return false;
+			return true;
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			ImGuiEx::Label("Looped");
+			m_dirty = ImGui::Checkbox("##loop", &m_meta.looped) || m_dirty;
+			ImGuiEx::Label("Volume");
+			m_dirty = ImGui::DragFloat("##vol", &m_meta.volume, 0.01f, 0, FLT_MAX) || m_dirty;
+
+			ImGuiEx::Label("Length");
+			ImGui::Text("%f", m_resource->getLengthSeconds());
+			auto& device = getAudioDevice(m_app.getEngine());
+
+			if (m_playing_clip >= 0)
+			{
+				if (ImGui::Button(ICON_FA_STOP "Stop")) {
+					stopAudio();
+					return;
+				}
+				float time = device.getCurrentTime(m_playing_clip);
+				ImGuiEx::Label("Time");
+				if (ImGui::SliderFloat("##time", &time, 0, m_resource->getLengthSeconds(), "%.2fs")) {
+					device.setCurrentTime(m_playing_clip, time);
+				}
+			}
+
+			if (m_playing_clip < 0 && ImGui::Button(ICON_FA_PLAY "Play")) {
+				stopAudio();
+
+				AudioDevice::BufferHandle handle = device.createBuffer(m_resource->getData(), m_resource->getSize(), m_resource->getChannels(), m_resource->getSampleRate(), 0);
+				if (handle != AudioDevice::INVALID_BUFFER_HANDLE) {
+					device.setVolume(handle, m_resource->m_volume);
+					device.play(handle, true);
+					m_playing_clip = handle;
+				}
+			}
+
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
+				const StaticString<512> src("volume = ", m_meta.volume
+					, "\nlooped = ", m_meta.looped ? "true" : "false"
+				);
+				AssetCompiler& compiler = m_app.getAssetCompiler();
+				compiler.updateMeta(m_resource->getPath(), src);
+			}
+		}
+	
+		void destroy() override { LUMIX_DELETE(m_allocator, this); }
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "audio clip editor"; }
+		
+		static AudioDevice& getAudioDevice(Engine& engine) {
+			auto* audio = static_cast<AudioSystem*>(engine.getSystemManager().getSystem("audio"));
+			return audio->getDevice();
+		}
+
+
+		void stopAudio() {
+			if (m_playing_clip < 0) return;
+
+			getAudioDevice(m_app.getEngine()).stop(m_playing_clip);
+			m_playing_clip = -1;
+		}
+
+		IAllocator& m_allocator;
+		StudioApp& m_app;
+		Clip* m_resource;
+		Meta m_meta;
+		i32 m_playing_clip;
+	};
+
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 		, m_browser(app.getAssetBrowser())
-		, m_playing_clip(-1)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("ogg", Clip::TYPE);
 		app.getAssetCompiler().registerExtension("wav", Clip::TYPE);
 	}
-
-	struct Meta {
-		bool looped = true;
-		float volume = 1.f;
-	};
-
-	Meta getMeta(const Path& path) const {
-		Meta meta;
-		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "looped", &meta.looped);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "volume", &meta.volume);
-		});
-		return meta;
+	
+	void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
+	
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		ab.addWindow(win);
 	}
 
 	bool compile(const Path& src) override {
@@ -53,7 +167,8 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		OutputMemoryStream src_data(m_app.getAllocator());
 		if (!fs.getContentSync(src, src_data)) return false;
 		
-		Meta meta = getMeta(src);
+		Meta meta;
+		meta.load(src, m_app);
 
 		OutputMemoryStream compiled(m_app.getAllocator());
 		compiled.reserve(64 + src_data.size());
@@ -66,94 +181,11 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(compiled.data(), (i32)compiled.size()));
 	}
 
-	static AudioDevice& getAudioDevice(Engine& engine)
-	{
-		auto* audio = static_cast<AudioSystem*>(engine.getSystemManager().getSystem("audio"));
-		return audio->getDevice();
-	}
-
-
-	void stopAudio()
-	{
-		if (m_playing_clip < 0) return;
-
-		getAudioDevice(m_app.getEngine()).stop(m_playing_clip);
-		m_playing_clip = -1;
-	}
-
-
 	const char* getName() const override { return "Audio"; }
-
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
-	{
-		if(resources.length() > 1) return false;
-
-		if(resources[0]->getPath().getHash() != m_meta_res) {
-			m_meta = getMeta(resources[0]->getPath());
-			m_meta_res = resources[0]->getPath().getHash();
-		}
-
-		ImGuiEx::Label("Looped");
-		bool changed = ImGui::Checkbox("##loop", &m_meta.looped);
-		ImGuiEx::Label("Volume");
-		changed = ImGui::DragFloat("##vol", &m_meta.volume, 0.01f, 0, FLT_MAX) || changed;
-
-		auto* clip = static_cast<Clip*>(resources[0]->getResource());
-		ImGuiEx::Label("Length");
-		ImGui::Text("%f", clip->getLengthSeconds());
-		auto& device = getAudioDevice(m_app.getEngine());
-
-		if (m_playing_clip >= 0)
-		{
-			if (ImGui::Button(ICON_FA_STOP "Stop"))
-			{
-				stopAudio();
-				return changed;
-			}
-			float time = device.getCurrentTime(m_playing_clip);
-			ImGuiEx::Label("Time");
-			if (ImGui::SliderFloat("##time", &time, 0, clip->getLengthSeconds(), "%.2fs"))
-			{
-				device.setCurrentTime(m_playing_clip, time);
-			}
-		}
-
-		if (m_playing_clip < 0 && ImGui::Button(ICON_FA_PLAY "Play"))
-		{
-			stopAudio();
-
-			AudioDevice::BufferHandle handle = device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
-			if (handle != AudioDevice::INVALID_BUFFER_HANDLE) {
-				device.setVolume(handle, clip->m_volume);
-				device.play(handle, true);
-				m_playing_clip = handle;
-			}
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_CHECK "Apply")) {
-			const StaticString<512> src("volume = ", m_meta.volume
-				, "\nlooped = ", m_meta.looped ? "true" : "false"
-			);
-			AssetCompiler& compiler = m_app.getAssetCompiler();
-			compiler.updateMeta(resources[0]->getPath(), src);
-		}
-		return changed;
-	}
-
-	void deserialize(InputMemoryStream& blob) override { blob.read(m_meta); }
-	void serialize(OutputMemoryStream& blob) override { blob.write(m_meta); }
-
-	void onResourceUnloaded(AssetBrowser::ResourceView&) override { stopAudio(); }
-
 	ResourceType getResourceType() const override { return Clip::TYPE; }
 	
-	int m_playing_clip;
 	StudioApp& m_app;
 	AssetBrowser& m_browser;
-	Meta m_meta;
-	FilePathHash m_meta_res;
 };
 
 

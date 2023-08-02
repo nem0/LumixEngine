@@ -2674,14 +2674,10 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	explicit ParticleSystemPlugin(StudioApp& app)
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		AssetCompiler& compiler = app.getAssetCompiler();
 		compiler.registerExtension("par", ParticleSystemResource::TYPE);
 	}
-
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
 
 	void addSubresources(AssetCompiler& compiler, const char* path) override {
 		compiler.addResource(ParticleSystemResource::TYPE, path);
@@ -2700,8 +2696,6 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
 	}
 
-	bool canCreateResource() const override { return true; }
-
 	void createResource(OutputMemoryStream& blob) override {
 		ParticleSystemEditorResource res(Path("new particle system"), m_app, m_app.getAllocator());
 		res.addEmitter();
@@ -2709,21 +2703,9 @@ struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		res.serialize(blob);
 	}
 
+	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "par"; }
-	
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
-		if (resources.length() != 1) return false;
-
-		if (ImGui::Button(ICON_FA_EDIT " Edit")) {
-			m_particle_editor->open(resources[0]->getPath().c_str());
-		}
-		return false;
-	}
-
-	void onResourceDoubleClicked(const Path& path) override {
-		m_particle_editor->open(path.c_str());
-	}
-	
+	void onResourceDoubleClicked(const Path& path) override { m_particle_editor->open(path.c_str()); }
 	const char* getName() const override { return "Particle system"; }
 	ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
 
@@ -2741,25 +2723,13 @@ struct FunctionPlugin : EditorAssetPlugin {
 	void addSubresources(AssetCompiler& compiler, const char* path) override;
 	bool compile(const Path& src) override { return true; }
 	void listLoaded() override;
+	void onResourceDoubleClicked(const Path& path) override { m_editor.open(path.c_str()); }
 
 	void createResource(OutputMemoryStream& blob) override {
 		ParticleSystemEditorResource res(Path("new particle function"), m_app, m_app.getAllocator());
 		res.addEmitter();
 		res.m_emitters[0]->initDefault(ParticleSystemResourceType::FUNCTION);
 		res.serialize(blob);
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
-		if (resources.length() != 1) return false;
-
-		if (ImGui::Button(ICON_FA_EDIT " Edit")) {
-			m_editor.open(resources[0]->getPath().c_str());
-		}
-		return false;
-	}
-	
-	void onResourceDoubleClicked(const Path& path) override {
-		m_editor.open(path.c_str());
 	}
 
 	StudioApp& m_app;

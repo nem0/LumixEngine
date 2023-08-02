@@ -222,6 +222,11 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data) {
 	return 0;
 }
 
+bool inputStringMultiline(const char* label, String* value, const ImVec2& size) {
+	ImGuiInputTextFlags flags = ImGuiInputTextFlags_CallbackResize;
+	return ImGui::InputTextMultiline(label, (char*)value->c_str(), value->length() + 1, size, flags, inputTextCallback, value);
+}
+
 bool inputString(const char* label, String* value) {
 	ImGuiInputTextFlags flags = ImGuiInputTextFlags_CallbackResize;
 	return ImGui::InputText(label, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);

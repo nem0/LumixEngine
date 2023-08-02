@@ -780,13 +780,9 @@ struct PipelineImpl final : Pipeline
 
 	~PipelineImpl()
 	{
-		DrawStream& stream = m_renderer.getDrawStream();
+		DrawStream& stream = m_renderer.getEndFrameDrawStream();
 		for (gpu::TextureHandle t : m_textures) stream.destroy(t);
 		for (gpu::BufferHandle b : m_buffers) stream.destroy(b);
-
-		m_renderer.frame();
-		m_renderer.frame();
-		m_renderer.frame();
 
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();

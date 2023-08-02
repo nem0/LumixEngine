@@ -3,8 +3,7 @@
 namespace Lumix {
 
 EditorAssetPlugin::EditorAssetPlugin(const char* name, const char* ext, ResourceType type, StudioApp& app, IAllocator& allocator)
-	: AssetBrowser::Plugin(allocator)
-	, m_app(app)
+	: m_app(app)
 	, m_name(name)
 	, m_extension(ext)
 	, m_resource_type(type)

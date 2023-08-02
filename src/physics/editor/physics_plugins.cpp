@@ -8,6 +8,7 @@
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/editor_asset.h"
 #include "editor/gizmo.h"
 #include "editor/property_grid.h"
 #include "editor/settings.h"
@@ -832,26 +833,90 @@ struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("phy", PhysicsGeometry::TYPE);
 	}
-	
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
 
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override { return false; }
 	const char* getName() const override { return "Physics geometry"; }
 	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
 
 	StudioApp& m_app;
 };
 
-struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+			: AssetEditorWindow(app)
+			, m_allocator(allocator)
+			, m_app(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<PhysicsMaterial>(path);
+		}
+
+		~EditorWindow() { m_resource->decRefCount(); }
+
+		void save() {
+			OutputMemoryStream blob(m_app.getAllocator());
+			blob << "static_friction(" << m_resource->material->getStaticFriction() << ")\n";
+			blob << "dynamic_friction(" << m_resource->material->getDynamicFriction() << ")\n";
+			blob << "restitution(" << m_resource->material->getRestitution() << ")\n";
+
+			m_app.getAssetBrowser().saveResource(*m_resource, blob);
+			m_dirty = false;
+		}
+		
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getSaveAction()) save();
+			else return false;
+			return true;
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			if (m_resource->isReady() && m_resource->material) {
+				float static_friction = m_resource->material->getStaticFriction();
+				float dynamic_friction = m_resource->material->getDynamicFriction();
+				float restitution = m_resource->material->getRestitution();
+				ImGuiEx::Label("Static friction");
+				if (ImGui::DragFloat("##s", &static_friction)) {
+					m_resource->material->setStaticFriction(static_friction);
+					m_dirty = true;
+				}
+				ImGuiEx::Label("Dynamic friction");
+				if (ImGui::DragFloat("##d", &dynamic_friction)) {
+					m_resource->material->setDynamicFriction(dynamic_friction);
+					m_dirty = true;
+				}
+				ImGuiEx::Label("Restitution");
+				if (ImGui::DragFloat("##r", &restitution)) {
+					m_resource->material->setRestitution(restitution);
+					m_dirty = true;
+				}
+			}
+		}
+	
+		void destroy() override { LUMIX_DELETE(m_allocator, this); }
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "physics material editor"; }
+
+		IAllocator& m_allocator;
+		StudioApp& m_app;
+		PhysicsMaterial* m_resource;
+	};
+
+
 	explicit PhysicsMaterialPlugin(StudioApp& app)
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("pma", PhysicsMaterial::TYPE);
 	}
@@ -860,77 +925,23 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 	const char* getDefaultExtension() const override { return "pma"; }
 	void createResource(OutputMemoryStream& blob) override {}
 
-	bool compile(const Path& src) override {
-		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
-	bool save(PhysicsMaterial* mat) {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-	
-		OutputMemoryStream blob(m_app.getAllocator());
-		blob << "static_friction(" << mat->material->getStaticFriction() << ")\n";
-		blob << "dynamic_friction(" << mat->material->getDynamicFriction() << ")\n";
-		blob << "restitution(" << mat->material->getRestitution() << ")\n";
-
-		return fs.saveContentSync(mat->getPath(), blob);
-	}
-	
-	void deserialize(InputMemoryStream& blob) override {
-		m_current_resource->deserialize(blob);
-	}
-
-	void serialize(OutputMemoryStream& blob) override {
-		m_current_resource->serialize(blob);
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
-		m_current_resource = nullptr;
-		if (resources.length() != 1) {
-			ImGui::TextUnformatted("Editing multiple materials is not supported.");
-			return false;
-		}
-
-		bool changed = false;
-		PhysicsMaterial* mat = static_cast<PhysicsMaterial*>(resources[0]->getResource());
-		m_current_resource = mat;
-		if (mat->isReady() && mat->material) {
-			float static_friction = mat->material->getStaticFriction();
-			float dynamic_friction = mat->material->getDynamicFriction();
-			float restitution = mat->material->getRestitution();
-			ImGuiEx::Label("Static friction");
-			if (ImGui::DragFloat("##s", &static_friction)) {
-				mat->material->setStaticFriction(static_friction);
-				changed = true;
-			}
-			ImGuiEx::Label("Dynamic friction");
-			if (ImGui::DragFloat("##d", &dynamic_friction)) {
-				mat->material->setDynamicFriction(dynamic_friction);
-				changed = true;
-			}
-			ImGuiEx::Label("Restitution");
-			if (ImGui::DragFloat("##r", &restitution)) {
-				mat->material->setRestitution(restitution);
-				changed = true;
-			}
-
-			if (ImGui::Button(ICON_FA_SAVE "Save")) {
-				if (!save(mat)) {
-					logError("Failed to save ", mat->getPath());
-				}
-			}
-			ImGui::SameLine();
-		}
-		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
-			m_app.getAssetBrowser().openInExternalEditor(resources[0]->getPath().c_str());
-		}
-		return changed;
-	}
-
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Physics material"; }
 	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
+	void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
+	
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		ab.addWindow(win);
+	}
+
 	StudioApp& m_app;
-	PhysicsMaterial* m_current_resource = nullptr;
 };
 
 

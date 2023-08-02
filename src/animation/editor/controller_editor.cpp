@@ -1196,8 +1196,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 	};
 
 	ControllerEditorImpl(StudioApp& app)
-		: AssetBrowser::Plugin(m_allocator)
-		, m_allocator(app.getAllocator(), "anim controller editor")
+		: m_allocator(app.getAllocator(), "anim controller editor")
 		, m_app(app)
 		, m_event_types(m_allocator)
 	{
@@ -1223,18 +1222,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 	bool canCreateResource() const override { return true; }
 	void onResourceDoubleClicked(const Path& path) override { open(path); }
 	const char* getDefaultExtension() const override { return "act"; }
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Animation Controller"; }
 	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
-		if (resources.length() == 1 && ImGui::Button("Open in animation editor")) {
-			open(resources[0]->getPath().c_str());
-		}
-		return false;
-	}
 
 	const EventType& getEventType(RuntimeHash type) const {
 		for (const UniquePtr<EventType>& t : m_event_types) {

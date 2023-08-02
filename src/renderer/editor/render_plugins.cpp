@@ -10,6 +10,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
 #include "renderer/editor/particle_editor.h"
+#include "editor/editor_asset.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
 #include "editor/settings.h"
@@ -644,20 +645,11 @@ struct FontPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 {
 	FontPlugin(StudioApp& app) 
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("ttf", FontResource::TYPE); 
 	}
 
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
-
-	bool compile(const Path& src) override
-	{
-		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override { return false; }
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Font"; }
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
@@ -722,11 +714,197 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 	ParticleEditor* m_particle_editor;
 };
 
-struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+			: AssetEditorWindow(app)
+			, m_allocator(allocator)
+			, m_app(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<Material>(path);
+		}
+
+		~EditorWindow() {
+			m_resource->decRefCount();
+		}
+
+		void save() {
+			ASSERT(m_resource->getShader());
+			OutputMemoryStream blob(m_app.getAllocator());
+			m_resource->serialize(blob);
+			m_app.getAssetBrowser().saveResource(*m_resource, blob);
+			m_dirty = false;
+		}
+		
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getSaveAction()) save();
+			else return false;
+			return true;
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			char buf[LUMIX_MAX_PATH];
+			Shader* shader = m_resource->getShader();
+			copyString(buf, shader ? shader->getPath().c_str() : "");
+			
+			if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
+				m_resource->setShader(Path(buf));
+				shader = m_resource->getShader();
+			}
+
+			bool changed = false;
+			ImGuiEx::Label("Backface culling");
+			bool is_backface_culling = m_resource->isBackfaceCulling();
+			if (ImGui::Checkbox("##bfcul", &is_backface_culling)) {
+				m_resource->enableBackfaceCulling(is_backface_culling);
+				changed = true;
+			}
+
+			Renderer& renderer = m_resource->getRenderer();
+
+			const char* current_layer_name = renderer.getLayerName(m_resource->getLayer());
+			ImGuiEx::Label("Layer");
+			if (ImGui::BeginCombo("##layer", current_layer_name)) {
+				for (u8 i = 0, c = renderer.getLayersCount(); i < c; ++i) {
+					const char* name = renderer.getLayerName(i);
+					if (ImGui::Selectable(name)) {
+						m_resource->setLayer(i);
+						changed = true;
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			if (!shader || !shader->isReady()) return;
+
+			for (u32 i = 0; i < shader->m_texture_slot_count; ++i) {
+				auto& slot = shader->m_texture_slots[i];
+				Texture* texture = m_resource->getTexture(i);
+				copyString(buf, texture ? texture->getPath().c_str() : "");
+				ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
+				ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
+				ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
+				ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+				bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1),
+					ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
+					"%s",
+					"");
+				ImGui::PopStyleColor(4);
+				ImGui::SameLine();
+
+				ImGuiEx::Label(slot.name);
+				if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE)) { 
+					m_resource->setTexturePath(i, Path(buf));
+					changed = true;
+				}
+				if (!texture && is_node_open) {
+					ImGui::TreePop();
+					continue;
+				}
+
+				if (is_node_open) {
+					ImGui::Image(texture->handle, ImVec2(96, 96));
+					ImGui::TreePop();
+				}
+			}
+
+			if (m_resource->isReady()) {
+				for (int i = 0; i < shader->m_uniforms.size(); ++i) {
+					const Shader::Uniform& shader_uniform = shader->m_uniforms[i];
+					Material::Uniform* uniform = m_resource->findUniform(shader_uniform.name_hash);
+					if (!uniform) {
+						uniform = &m_resource->getUniforms().emplace();
+						uniform->name_hash = shader_uniform.name_hash;
+						memcpy(uniform->vec4, shader_uniform.default_value.vec4, sizeof(shader_uniform.default_value)); 
+					}
+
+					ImGuiEx::Label(shader_uniform.name);
+					switch (shader_uniform.type) {
+						case Shader::Uniform::FLOAT:
+							changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value) || changed;
+							break;
+						case Shader::Uniform::NORMALIZED_FLOAT:
+							changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value, 0.01f, 0.f, 1.f) || changed;
+							break;
+						case Shader::Uniform::INT:
+							changed = ImGui::DragInt(StaticString<256>("##", shader_uniform.name), &uniform->int_value) || changed;
+							break;
+						case Shader::Uniform::VEC3:
+							changed = ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3) || changed;
+							break;
+						case Shader::Uniform::VEC4:
+							changed = ImGui::DragFloat4(StaticString<256>("##", shader_uniform.name), uniform->vec4) || changed;
+							break;
+						case Shader::Uniform::VEC2:
+							changed = ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2) || changed;
+							break;
+						case Shader::Uniform::COLOR:
+							changed = ImGui::ColorEdit4(StaticString<256>("##", shader_uniform.name), uniform->vec4) || changed;
+							break;
+						default: ASSERT(false); break;
+					}
+				}
+			}
+
+			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags")) {
+				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
+					bool b = m_resource->isCustomFlag(1 << i);
+					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
+						if (b) m_resource->setCustomFlag(1 << i);
+						else m_resource->unsetCustomFlag(1 << i);
+						changed = true;
+					}
+				}
+			}
+		
+			if (ImGui::CollapsingHeader("Defines")) {
+				for (int i = 0; i < renderer.getShaderDefinesCount(); ++i) {
+					const char* define = renderer.getShaderDefine(i);
+					if (!shader->hasDefine(i)) continue;
+
+					auto isBuiltinDefine = [](const char* define) {
+						const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "SKINNED"};
+						for (const char* builtin_define : BUILTIN_DEFINES) {
+							if (equalStrings(builtin_define, define)) return true;
+						}
+						return false;
+					};
+
+					bool value = m_resource->isDefined(i);
+					bool is_texture_define = m_resource->isTextureDefine(i);
+					if (is_texture_define || isBuiltinDefine(define)) continue;
+				
+					if (ImGui::Checkbox(define, &value)) {
+						m_resource->setDefine(i, value);
+						changed = true;
+					}
+				}
+			}
+			if (changed) m_dirty = true;
+		}
+	
+		void destroy() override { LUMIX_DELETE(m_allocator, this); }
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "material editor"; }
+
+		IAllocator& m_allocator;
+		StudioApp& m_app;
+		Material* m_resource;
+	};
+
 	explicit MaterialPlugin(StudioApp& app)
-		: AssetBrowser::Plugin(app.getAllocator())
-		, m_app(app)
+		: m_app(app)
 	{
 		m_wireframe_action.init("     Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL, true);
 		m_wireframe_action.func.bind<&MaterialPlugin::toggleWireframe>(this);
@@ -739,12 +917,16 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		m_app.removeAction(&m_wireframe_action);
 	}
 
-	void deserialize(InputMemoryStream& blob) override {
-		for (Material* mat : m_current_materials) mat->deserialize(blob);
-	}
-
-	void serialize(OutputMemoryStream& blob) override {
-		for (Material* mat : m_current_materials) mat->serialize(blob);
+	void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
+	
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		ab.addWindow(win);
 	}
 
 	void toggleWireframe() {
@@ -781,310 +963,321 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "mat"; }
-
-	void createResource(OutputMemoryStream& blob) override {
-		blob << "shader \"/pipelines/standard.shd\"";
-	}
-
-	bool compile(const Path& src) override
-	{
-		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
-
-	void saveMaterial(Material* material)
-	{
-		ASSERT(material->getShader());
-		OutputMemoryStream blob(m_app.getAllocator());
-		material->serialize(blob);
-		m_app.getAssetBrowser().saveResource(*material, blob);
-	}
-
-	template <typename F, typename... Args>
-	bool isSame(Span<AssetBrowser::ResourceView*> materials, F func, Args... args) {
-		if (materials.length() <= 1) return true;
-		auto v = (static_cast<Material*>(materials[0]->getResource())->*func)(args...);
-		for (u32 i = 1, c = materials.length(); i < c; ++i) {
-			auto v2 = (static_cast<Material*>(materials[i]->getResource())->*func)(args...);
-			if (v != v2) return false;
-		}
-		return true;
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override {
-		bool result = false;
-		//m_current_materials = resources;
-
-		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
-			for (AssetBrowser::ResourceView* res : resources) {
-				m_app.getAssetBrowser().openInExternalEditor(res->getResource());
-			}
-		}
-
-		auto forEachMaterial = [&](const auto& F){
-			for (AssetBrowser::ResourceView* view : resources) {
-				F(static_cast<Material*>(view->getResource()));
-			}
-		};
-
-		ImGui::SameLine();
-		Material* first = static_cast<Material*>(resources[0]->getResource());
-		if (first->getShader() && ImGui::Button(ICON_FA_SAVE "Save")) {
-			forEachMaterial([&](Material* res){
-				saveMaterial(res);
-			});
-		}
-
-		char buf[LUMIX_MAX_PATH];
-		Shader* shader = first->getShader();
-		copyString(buf, shader ? shader->getPath().c_str() : "");
-
-		bool same_shader = multiLabel<&Material::getShader>("Shader", resources);
-		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
-			forEachMaterial([&](Material* res){
-				res->setShader(Path(buf));
-			});
-			result = true;
-		}
-
-		if (!first->getShader()) return false; 
-
-		multiLabel<&Material::isBackfaceCulling>("Backface culling", resources);
-		bool is_backface_culling = first->isBackfaceCulling();
-		if (ImGui::Checkbox("##bfcul", &is_backface_culling)) {
-			set<&Material::enableBackfaceCulling>(resources, is_backface_culling);
-			result = true;
-		}
-		
-		Renderer& renderer = first->getRenderer();
-
-		const char* current_layer_name = renderer.getLayerName(first->getLayer());
-		multiLabel<&Material::getLayer>("Layer", resources);
-		if (ImGui::BeginCombo("##layer", current_layer_name)) {
-			for (u8 i = 0, c = renderer.getLayersCount(); i < c; ++i) {
-				const char* name = renderer.getLayerName(i);
-				if (ImGui::Selectable(name)) {
-					set<&Material::setLayer>(resources, i);
-					result = true;
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		if (!same_shader) return result;
-		if (!shader) return result;
-		if (!shader->isReady()) return result;
-
-		for (u32 i = 0; i < shader->m_texture_slot_count; ++i) {
-			auto& slot = shader->m_texture_slots[i];
-			Texture* texture = first->getTexture(i);
-			copyString(buf, texture ? texture->getPath().c_str() : "");
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
-			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
-			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
-			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1),
-				ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
-				"%s",
-				"");
-			ImGui::PopStyleColor(4);
-			ImGui::SameLine();
-
-			multiLabel<&Material::getTexture>(slot.name, resources, i);
-			if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE)) { 
-				forEachMaterial([&](Material* res){
-					res->setTexturePath(i, Path(buf));
-				});
-				result = true;
-			}
-			if (!texture && is_node_open) {
-				ImGui::TreePop();
-				continue;
-			}
-
-			if (is_node_open) {
-				ImGui::Image(texture->handle, ImVec2(96, 96));
-				ImGui::TreePop();
-			}
-		}
-
-		if (first->isReady()) {
-			for (int i = 0; i < shader->m_uniforms.size(); ++i) {
-				const Shader::Uniform& shader_uniform = shader->m_uniforms[i];
-				Material::Uniform* uniform = first->findUniform(shader_uniform.name_hash);
-				if (!uniform) {
-					uniform = &first->getUniforms().emplace();
-					uniform->name_hash = shader_uniform.name_hash;
-					memcpy(uniform->vec4, shader_uniform.default_value.vec4, sizeof(shader_uniform.default_value)); 
-				}
-
-				ImGuiEx::Label(shader_uniform.name);
-				bool changed = false;
-				switch (shader_uniform.type) {
-					case Shader::Uniform::FLOAT:
-						changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value);
-						break;
-					case Shader::Uniform::NORMALIZED_FLOAT:
-						changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value, 0.01f, 0.f, 1.f);
-						break;
-					case Shader::Uniform::INT:
-						changed = ImGui::DragInt(StaticString<256>("##", shader_uniform.name), &uniform->int_value);
-						break;
-					case Shader::Uniform::VEC3:
-						changed = ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3);
-						break;
-					case Shader::Uniform::VEC4:
-						changed = ImGui::DragFloat4(StaticString<256>("##", shader_uniform.name), uniform->vec4);
-						break;
-					case Shader::Uniform::VEC2:
-						changed = ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2);
-						break;
-					case Shader::Uniform::COLOR:
-						changed = ImGui::ColorEdit4(StaticString<256>("##", shader_uniform.name), uniform->vec4);
-						break;
-					default: ASSERT(false); break;
-				}
-				if (changed) {
-					forEachMaterial([&](Material* mat){
-						if (mat != first) {
-							Material::Uniform* u = mat->findUniform(shader_uniform.name_hash);
-							if (!u) u = &mat->getUniforms().emplace();
-							memcpy(u, uniform, sizeof(*u));
-						}
-						mat->updateRenderData(false);
-					});
-					result = true;
-				}
-			}
-		}
-
-		if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags")) {
-
-			for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
-				bool is_same = isSame(resources, &Material::isCustomFlag, 1 << i);
-				bool b = first->isCustomFlag(1 << i);
-				if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
-					forEachMaterial([&](Material* mat){
-						if (b)
-							mat->setCustomFlag(1 << i);
-						else
-							mat->unsetCustomFlag(1 << i);
-					});
-					result = true;
-				}
-				if (!is_same) {
-					ImGui::SameLine();
-					ImGui::TextUnformatted("(?)");
-					if (ImGui::IsItemHovered()) {
-						ImGui::SetTooltip("Objects have different values");
-					}
-				}
-			}
-		}
-		
-		if (ImGui::CollapsingHeader("Defines")) {
-			for (int i = 0; i < renderer.getShaderDefinesCount(); ++i) {
-				const char* define = renderer.getShaderDefine(i);
-				if (!shader->hasDefine(i)) continue;
-
-				auto isBuiltinDefine = [](const char* define) {
-					const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "SKINNED"};
-					for (const char* builtin_define : BUILTIN_DEFINES) {
-						if (equalStrings(builtin_define, define)) return true;
-					}
-					return false;
-				};
-
-
-				bool value = first->isDefined(i);
-				bool is_texture_define = first->isTextureDefine(i);
-				if (is_texture_define || isBuiltinDefine(define)) continue;
-				
-				bool is_same = isSame(resources, &Material::isDefined, i);
-				if (ImGui::Checkbox(define, &value)) {
-					forEachMaterial([&](Material* res){
-						res->setDefine(i, value);
-					});
-					result = true;
-				}
-				if (!is_same) {
-					ImGui::SameLine();
-					ImGui::TextUnformatted("(?)");
-					if (ImGui::IsItemHovered()) {
-						ImGui::SetTooltip("Objects have different values");
-					}
-				}
-			}
-		}
-		return result;
-	}
-
-	template <auto F, typename T>
-	void set(Span<AssetBrowser::ResourceView*> resources, T value) {
-		for (AssetBrowser::ResourceView* r : resources) {
-			(static_cast<Material*>(r->getResource())->*F)(value);
-		}
-	}
-
-	template <auto F, typename... Args>
-	static bool multiLabel(const char* label, Span<AssetBrowser::ResourceView*> resources, Args... args) {
-		bool is_same = true;
-		ASSERT(resources.length() > 0);
-		auto v = (static_cast<Material*>(resources[0]->getResource())->*F)(args...);
-		for (AssetBrowser::ResourceView* r : resources) {
-			auto v2 = (static_cast<Material*>(r->getResource())->*F)(args...);
-			if (v2 != v) {
-				is_same = false;
-				ImGui::TextUnformatted("(?)");
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("Objects have different values");
-				}
-				ImGui::SameLine();
-				break;
-			}
-		}
-		ImGuiEx::Label(label);
-		return is_same;
-	}
-
+	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/pipelines/standard.shd\""; }
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Material"; }
 	ResourceType getResourceType() const override { return Material::TYPE; }
 
 	StudioApp& m_app;
 	Action m_wireframe_action;
-	Span<Material*> m_current_materials;
 };
 
-struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
-	struct Meta
-	{
-		enum WrapMode : u32 {
-			REPEAT,
-			CLAMP
-		};
-		enum Filter : u32 {
-			LINEAR,
-			POINT,
-			ANISOTROPIC
-		};
-		bool srgb = false;
-		bool is_normalmap = false;
-		bool invert_normal_y = false;
-		bool mips = true;
-		float scale_coverage = -0.5f;
-		bool stochastic_mipmap = false;
-		bool compress = true;
-		WrapMode wrap_mode_u = WrapMode::REPEAT;
-		WrapMode wrap_mode_v = WrapMode::REPEAT;
-		WrapMode wrap_mode_w = WrapMode::REPEAT;
-		Filter filter = Filter::LINEAR;
+struct TextureMeta {
+	enum WrapMode : u32 {
+		REPEAT,
+		CLAMP
 	};
+	enum Filter : u32 {
+		LINEAR,
+		POINT,
+		ANISOTROPIC
+	};
+	bool srgb = false;
+	bool is_normalmap = false;
+	bool invert_normal_y = false;
+	bool mips = true;
+	float scale_coverage = -0.5f;
+	bool stochastic_mipmap = false;
+	bool compress = true;
+	WrapMode wrap_mode_u = WrapMode::REPEAT;
+	WrapMode wrap_mode_v = WrapMode::REPEAT;
+	WrapMode wrap_mode_w = WrapMode::REPEAT;
+	Filter filter = Filter::LINEAR;
+};
 
+static const char* toString(TextureMeta::Filter filter) {
+	switch (filter) {
+		case TextureMeta::Filter::POINT: return "point";
+		case TextureMeta::Filter::LINEAR: return "linear";
+		case TextureMeta::Filter::ANISOTROPIC: return "anisotropic";
+	}
+	ASSERT(false);
+	return "linear";
+}
+
+static const char* toString(TextureMeta::WrapMode wrap) {
+	switch (wrap) {
+		case TextureMeta::WrapMode::CLAMP: return "clamp";
+		case TextureMeta::WrapMode::REPEAT: return "repeat";
+	}
+	ASSERT(false);
+	return "repeat";
+}
+
+static const char* getCubemapLabel(u32 idx) {
+	switch (idx) {
+		case 0: return "X+";
+		case 1: return "X-";
+		case 2: return "Y+ (top)";
+		case 3: return "Y- (bottom)";
+		case 4: return "Z+";
+		case 5: return "Z-";
+		default: return "Too many faces in cubemap";
+	}
+}
+
+struct TextureAssetEditorWindow : AssetEditorWindow {
+	TextureAssetEditorWindow(const Path& path, StudioApp& app)
+		: AssetEditorWindow(app)
+		, m_app(app)
+	{
+		m_texture = app.getEngine().getResourceManager().load<Texture>(path);
+		m_meta = getMeta();
+	}
+
+	~TextureAssetEditorWindow() {
+		m_texture->decRefCount();
+
+		SystemManager& system_manager = m_app.getEngine().getSystemManager();
+		auto* renderer = (Renderer*)system_manager.getSystem("renderer");
+		if(m_texture_view) {
+			renderer->getEndFrameDrawStream().destroy(m_texture_view);
+		}
+	}
+
+	void saveMeta() {
+		AssetCompiler& compiler = m_app.getAssetCompiler();
+		const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
+			, "\ncompress = ", m_meta.compress ? "true" : "false"
+			, "\nstochastic_mip = ", m_meta.stochastic_mipmap ? "true" : "false"
+			, "\nmip_scale_coverage = ", m_meta.scale_coverage
+			, "\nmips = ", m_meta.mips ? "true" : "false"
+			, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
+			, "\ninvert_green = ", m_meta.invert_normal_y ? "true" : "false"
+			, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
+			, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""
+			, "\nwrap_mode_w = \"", toString(m_meta.wrap_mode_w), "\""
+			, "\nfilter = \"", toString(m_meta.filter), "\""
+		);
+		compiler.updateMeta(m_texture->getPath(), src);
+	}
+
+	TextureMeta getMeta() const
+	{
+		TextureMeta meta;
+		if (Path::hasExtension(m_texture->getPath().c_str(), "raw")) {
+			meta.compress = false;
+			meta.mips = false;
+		}
+
+		m_app.getAssetCompiler().getMeta(m_texture->getPath(), [&meta](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &meta.compress);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &meta.stochastic_mipmap);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "invert_green", &meta.invert_normal_y);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &meta.mips);
+			char tmp[32];
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
+				if (equalIStrings(tmp, "point")) {
+					meta.filter = TextureMeta::Filter::POINT;
+				}
+				else if (equalIStrings(tmp, "anisotropic")) {
+					meta.filter = TextureMeta::Filter::ANISOTROPIC;
+				}
+				else {
+					meta.filter = TextureMeta::Filter::LINEAR;
+				}
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_u", Span(tmp))) {
+				meta.wrap_mode_u = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_v", Span(tmp))) {
+				meta.wrap_mode_v = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
+				meta.wrap_mode_w = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
+			}
+		});
+		return meta;
+	}
+
+	void windowGUI() override {
+		if (ImGui::BeginMenuBar()) {
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveMeta();
+			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_texture);
+			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "Go to in browser")) m_app.getAssetBrowser().locate(*m_texture);
+			if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
+				StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath().c_str()));
+				os::openExplorer(dir);
+			}
+			
+			ImGui::EndMenuBar();
+		}
+		if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
+		ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+
+		ImGuiEx::Label("Path");
+		ImGui::TextUnformatted(m_texture->getPath().c_str());
+		ImGuiEx::Label("Size");
+		ImGui::Text("%dx%d", m_texture->width, m_texture->height);
+		ImGuiEx::Label("Mips");
+		ImGui::Text("%d", m_texture->mips);
+		if (m_texture->depth > 1) {
+			ImGuiEx::Label("Depth");
+			ImGui::Text("%d", m_texture->depth);
+		}
+		const char* format = "unknown";
+		switch(m_texture->format) {
+			case gpu::TextureFormat::R8: format = "R8"; break;
+			case gpu::TextureFormat::RGB32F: format = "RGB32F"; break;
+			case gpu::TextureFormat::RG32F: format = "RG32F"; break;
+			case gpu::TextureFormat::RG8: format = "RG8"; break;
+			case gpu::TextureFormat::D24S8: format = "D24S8"; break;
+			case gpu::TextureFormat::D32: format = "D32"; break;
+			case gpu::TextureFormat::BGRA8: format = "BGRA8"; break;
+			case gpu::TextureFormat::RGBA8: format = "RGBA8"; break;
+			case gpu::TextureFormat::RGBA16: format = "RGBA16"; break;
+			case gpu::TextureFormat::R11G11B10F: format = "R11G11B10F"; break;
+			case gpu::TextureFormat::RGBA16F: format = "RGBA16F"; break;
+			case gpu::TextureFormat::RGBA32F: format = "RGBA32F"; break;
+			case gpu::TextureFormat::R16F: format = "R16F"; break;
+			case gpu::TextureFormat::R16: format = "R16"; break;
+			case gpu::TextureFormat::R32F: format = "R32F"; break;
+			case gpu::TextureFormat::SRGB: format = "SRGB"; break;
+			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
+			case gpu::TextureFormat::BC1: format = "BC1"; break;
+			case gpu::TextureFormat::BC2: format = "BC2"; break;
+			case gpu::TextureFormat::BC3: format = "BC3"; break;
+			case gpu::TextureFormat::BC4: format = "BC4"; break;
+			case gpu::TextureFormat::BC5: format = "BC5"; break;
+		}
+		ImGuiEx::Label("Format");
+		ImGui::TextUnformatted(format);
+
+		ImGuiEx::Label("SRGB");
+		bool changed = ImGui::Checkbox("##srgb", &m_meta.srgb);
+		ImGuiEx::Label("Mipmaps");
+		changed = ImGui::Checkbox("##mip", &m_meta.mips) || changed;
+		if (m_meta.mips) {
+			ImGuiEx::Label("Stochastic mipmap");
+			changed = ImGui::Checkbox("##stomip", &m_meta.stochastic_mipmap) || changed;
+		}
+
+		ImGuiEx::Label("Compress");
+		changed = ImGui::Checkbox("##cmprs", &m_meta.compress) || changed;
+			
+		if (m_meta.compress && (m_texture->width % 4 != 0 || m_texture->height % 4 != 0)) {
+			ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
+		}
+
+		bool scale_coverage = m_meta.scale_coverage >= 0;
+		ImGuiEx::Label("Mipmap scale coverage");
+		if (ImGui::Checkbox("##mmapsccov", &scale_coverage)) {
+			m_meta.scale_coverage *= -1;
+			changed = true;
+		}
+		if (m_meta.scale_coverage >= 0) {
+			ImGuiEx::Label("Coverage alpha ref");
+			ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1);
+			changed = true;
+		}
+		ImGuiEx::Label("Is normalmap");
+		changed = ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap) || changed;
+
+		if (m_meta.is_normalmap) {
+			ImGuiEx::Label("Invert normalmap Y");
+			changed = ImGui::Checkbox("##nrmmapinvy", &m_meta.invert_normal_y) || changed;
+		}
+
+		ImGuiEx::Label("U Wrap mode");
+		changed = ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0") || changed;
+		ImGuiEx::Label("V Wrap mode");
+		changed = ImGui::Combo("##vwrp", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0") || changed;
+		ImGuiEx::Label("W Wrap mode");
+		changed = ImGui::Combo("##wwrp", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0") || changed;
+		ImGuiEx::Label("Filter");
+		changed = ImGui::Combo("##Filter", (int*)&m_meta.filter, "Linear\0Point\0Anisotropic\0") || changed;
+
+		ImGui::TableNextColumn();
+		ImGui::CheckboxFlags("Red", &m_channel_view_mask, 1);
+		ImGui::SameLine();
+		ImGui::CheckboxFlags("Green", &m_channel_view_mask, 2);
+		ImGui::SameLine();
+		ImGui::CheckboxFlags("Blue", &m_channel_view_mask, 4);
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(150);
+		ImGui::DragFloat("Zoom", &m_zoom, 0.01f, 0.01f, 100.f);
+
+		if (m_texture->depth > 1) {
+			if (ImGui::InputInt("View layer", (i32*)&m_view_layer)) {
+				m_view_layer = m_view_layer % m_texture->depth;
+				// TODO
+				ASSERT(false);
+			}
+		}
+		if (m_texture->is_cubemap) {
+			if (ImGui::Combo("Side", (i32*)&m_view_layer, "X+\0X-\0Y+\0Y-\0Z+\0Z-\0")) {
+				// TODO
+				ASSERT(false);
+			}
+		}
+		if (!m_texture_view && m_texture->isReady()) {
+			m_texture_view = gpu::allocTextureHandle();
+
+			SystemManager& system_manager = m_app.getEngine().getSystemManager();
+			auto* renderer = (Renderer*)system_manager.getSystem("renderer");
+			DrawStream& stream = renderer->getDrawStream();
+
+			stream.createTextureView(m_texture_view
+				, m_texture->handle
+				, m_texture->is_cubemap ? m_view_layer : m_view_layer % m_texture->depth);
+		}
+		if (m_texture_view) {
+			ImVec2 texture_size((float)m_texture->width, (float)m_texture->height);
+			texture_size = texture_size * m_zoom;
+		
+			ImGui::BeginChild("imgpreview", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+			const ImVec4 tint(float(m_channel_view_mask & 1)
+				, float((m_channel_view_mask >> 1) & 1)
+				, float((m_channel_view_mask >> 2) & 1)
+				, 1.f);
+			if (texture_size.x < ImGui::GetContentRegionAvail().x) {
+				ImVec2 cp = ImGui::GetCursorPos();
+				cp.x += (ImGui::GetContentRegionAvail().x - texture_size.x) * 0.5f;
+				ImGui::SetCursorPos(cp);
+			}
+
+			ImGui::Image(m_texture_view, texture_size, ImVec2(0, 0), ImVec2(1, 1), tint);
+			ImGui::EndChild();
+		}
+		ImGui::EndTable();
+	}
+
+	void destroy() override {
+		LUMIX_DELETE(m_app.getAllocator(), this);
+	}
+
+	const char* getName() const override { return "texture editor"; }
+
+	const Path& getPath() { return m_texture->getPath(); }
+
+	StudioApp& m_app;
+	Texture* m_texture;
+	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
+	u32 m_view_layer = 0;
+	float m_zoom = 1.f;
+	u32 m_channel_view_mask = 0b1111;
+	TextureMeta m_meta;
+};
+
+struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	explicit TexturePlugin(CompositeTextureEditor& composite_editor, StudioApp& app)
 		: m_app(app)
 		, m_composite_texture_editor(composite_editor)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		rgbcx::init();
 
@@ -1109,6 +1302,17 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	void onResourceDoubleClicked(const Path& path) override {
 		if (Path::hasExtension(path, "ltc")) m_composite_texture_editor.open(path);
+		else {
+			AssetBrowser& ab = m_app.getAssetBrowser();
+			if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+				win->m_focus_request = true;
+				return;
+			}
+	
+			IAllocator& allocator = m_app.getAllocator();
+			TextureAssetEditorWindow* win = LUMIX_NEW(allocator, TextureAssetEditorWindow)(Path(path), m_app);
+			ab.addWindow(win);		
+		}
 	}
 
 	void onResourceCompiled(Resource& res) {
@@ -1242,7 +1446,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return false;
 	}
 
-	bool createComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
+	bool createComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta, const char* src_path) {
 		IAllocator& allocator = m_app.getAllocator();
 		CompositeTexture tc(m_app, allocator);
 		InputMemoryStream blob(src_data);
@@ -1289,11 +1493,11 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 		dst.write("lbc", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-		flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-		flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
+		flags |= meta.wrap_mode_u == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+		flags |= meta.wrap_mode_v == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+		flags |= meta.wrap_mode_w == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+		flags |= meta.filter == TextureMeta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+		flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
 		TextureCompressor::Options options;
 		options.generate_mipmaps = meta.mips;
@@ -1302,7 +1506,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return TextureCompressor::compress(input, options, dst, allocator);
 	}
 
-	bool compileImage(const Path& path, const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta)
+	bool compileImage(const Path& path, const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta)
 	{
 		PROFILE_FUNCTION();
 		int w, h, comps;
@@ -1374,11 +1578,11 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		#else
 			dst.write("lbc", 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
+			flags |= meta.wrap_mode_u == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == TextureMeta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			dst.write(&flags, sizeof(flags));
 
 			TextureCompressor::Input input(w, h, 1, 1, m_app.getAllocator());
@@ -1397,9 +1601,9 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		#endif
 	}
 
-	Meta getMeta(const Path& path) const
+	TextureMeta getMeta(const Path& path) const
 	{
-		Meta meta;
+		TextureMeta meta;
 		if (Path::hasExtension(path.c_str(), "raw")) {
 			meta.compress = false;
 			meta.mips = false;
@@ -1416,23 +1620,23 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			char tmp[32];
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
 				if (equalIStrings(tmp, "point")) {
-					meta.filter = Meta::Filter::POINT;
+					meta.filter = TextureMeta::Filter::POINT;
 				}
 				else if (equalIStrings(tmp, "anisotropic")) {
-					meta.filter = Meta::Filter::ANISOTROPIC;
+					meta.filter = TextureMeta::Filter::ANISOTROPIC;
 				}
 				else {
-					meta.filter = Meta::Filter::LINEAR;
+					meta.filter = TextureMeta::Filter::LINEAR;
 				}
 			}
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_u", Span(tmp))) {
-				meta.wrap_mode_u = equalIStrings(tmp, "repeat") ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+				meta.wrap_mode_u = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
 			}
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_v", Span(tmp))) {
-				meta.wrap_mode_v = equalIStrings(tmp, "repeat") ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+				meta.wrap_mode_v = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
 			}
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
-				meta.wrap_mode_w = equalIStrings(tmp, "repeat") ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+				meta.wrap_mode_w = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
 			}
 		});
 		return meta;
@@ -1449,7 +1653,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		if (!fs.getContentSync(src, src_data)) return false;
 		
 		OutputMemoryStream out(m_app.getAllocator());
-		Meta meta = getMeta(src);
+		TextureMeta meta = getMeta(src);
 		if (equalStrings(ext, "raw")) {
 			if (meta.scale_coverage >= 0) logError(src, ": RAW can not scale coverage");
 			if (meta.compress) logError(src, ": RAW can not be copressed");
@@ -1457,11 +1661,11 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			
 			out.write(ext, 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
+			flags |= meta.wrap_mode_u == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == TextureMeta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			out.write(flags);
 			out.write(src_data.data(), src_data.size());
 		}
@@ -1478,20 +1682,20 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(out.data(), (i32)out.size()));
 	}
 
-	const char* toString(Meta::Filter filter) {
+	const char* toString(TextureMeta::Filter filter) {
 		switch (filter) {
-			case Meta::Filter::POINT: return "point";
-			case Meta::Filter::LINEAR: return "linear";
-			case Meta::Filter::ANISOTROPIC: return "anisotropic";
+			case TextureMeta::Filter::POINT: return "point";
+			case TextureMeta::Filter::LINEAR: return "linear";
+			case TextureMeta::Filter::ANISOTROPIC: return "anisotropic";
 		}
 		ASSERT(false);
 		return "linear";
 	}
 
-	const char* toString(Meta::WrapMode wrap) {
+	const char* toString(TextureMeta::WrapMode wrap) {
 		switch (wrap) {
-			case Meta::WrapMode::CLAMP: return "clamp";
-			case Meta::WrapMode::REPEAT: return "repeat";
+			case TextureMeta::WrapMode::CLAMP: return "clamp";
+			case TextureMeta::WrapMode::REPEAT: return "repeat";
 		}
 		ASSERT(false);
 		return "repeat";
@@ -1509,6 +1713,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		}
 	}
 
+#if 0
 	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
 	{
 		if(resources.length() > 1) return false;
@@ -1609,83 +1814,12 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			m_texture = nullptr;
 		}
 
-		if (!is_ltc && ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath());
 
-		bool changed = false;
-		if (ImGui::CollapsingHeader("Import")) {
-			AssetCompiler& compiler = m_app.getAssetCompiler();
-			
-			if (texture->getPath().getHash() != m_meta_res) {
-				m_meta = getMeta(texture->getPath());
-				m_meta_res = texture->getPath().getHash();
-			}
-			
-			ImGuiEx::Label("SRGB");
-			changed = ImGui::Checkbox("##srgb", &m_meta.srgb);
-			ImGuiEx::Label("Mipmaps");
-			changed = ImGui::Checkbox("##mip", &m_meta.mips) || changed;
-			if (m_meta.mips) {
-				ImGuiEx::Label("Stochastic mipmap");
-				changed = ImGui::Checkbox("##stomip", &m_meta.stochastic_mipmap) || changed;
-			}
-
-			ImGuiEx::Label("Compress");
-			changed = ImGui::Checkbox("##cmprs", &m_meta.compress) || changed;
-			
-			if (m_meta.compress && (texture->width % 4 != 0 || texture->height % 4 != 0)) {
-				ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
-			}
-
-			bool scale_coverage = m_meta.scale_coverage >= 0;
-			ImGuiEx::Label("Mipmap scale coverage");
-			if (ImGui::Checkbox("##mmapsccov", &scale_coverage)) {
-				m_meta.scale_coverage *= -1;
-				changed = true;
-			}
-			if (m_meta.scale_coverage >= 0) {
-				ImGuiEx::Label("Coverage alpha ref");
-				ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1);
-				changed = true;
-			}
-			ImGuiEx::Label("Is normalmap");
-			changed = ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap) || changed;
-
-			if (m_meta.is_normalmap) {
-				ImGuiEx::Label("Invert normalmap Y");
-				changed = ImGui::Checkbox("##nrmmapinvy", &m_meta.invert_normal_y) || changed;
-			}
-
-			ImGuiEx::Label("U Wrap mode");
-			changed = ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0") || changed;
-			ImGuiEx::Label("V Wrap mode");
-			changed = ImGui::Combo("##vwrp", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0") || changed;
-			ImGuiEx::Label("W Wrap mode");
-			changed = ImGui::Combo("##wwrp", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0") || changed;
-			ImGuiEx::Label("Filter");
-			changed = ImGui::Combo("##Filter", (int*)&m_meta.filter, "Linear\0Point\0Anisotropic\0") || changed;
-
-			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
-				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
-					, "\ncompress = ", m_meta.compress ? "true" : "false"
-					, "\nstochastic_mip = ", m_meta.stochastic_mipmap ? "true" : "false"
-					, "\nmip_scale_coverage = ", m_meta.scale_coverage
-					, "\nmips = ", m_meta.mips ? "true" : "false"
-					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
-					, "\ninvert_green = ", m_meta.invert_normal_y ? "true" : "false"
-					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
-					, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""
-					, "\nwrap_mode_w = \"", toString(m_meta.wrap_mode_w), "\""
-					, "\nfilter = \"", toString(m_meta.filter), "\""
-				);
-				compiler.updateMeta(texture->getPath(), src);
-			}
-		}
-		return changed;
+		return false;
 	}
+#endif
 
-	void deserialize(InputMemoryStream& blob) override { blob.read(m_meta); }
-	void serialize(OutputMemoryStream& blob) override { blob.write(m_meta); }
 	const char* getName() const override { return "Texture"; }
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
@@ -1701,7 +1835,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	u32 m_view_layer = 0;
 	float m_zoom = 1.f;
 	u32 m_channel_view_mask = 0b1111;
-	Meta m_meta;
+	TextureMeta m_meta;
 	FilePathHash m_meta_res;
 };
 
@@ -1756,7 +1890,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 				ImGui::SameLine();
 				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
 				{
-					m_app.getAssetBrowser().selectResource(material->getPath(), true, false);
+					m_app.getAssetBrowser().selectResource(material->getPath(), false);
 				}
 				ImGui::PopID();
 			}
@@ -1776,10 +1910,66 @@ static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 
 	stream.destroy(staging);
 }
 
-struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	struct Meta {
 		Meta(IAllocator& allocator) : clips(allocator) {}
+
+		void load(const Path& path, StudioApp& app) {
+			app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+				LuaWrapper::DebugGuard guard(L);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &use_mikktspace);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &force_skin);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &scale);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &culling_scale);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &split);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &bake_impostor_normals);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &bake_vertex_ao);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &create_impostor);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &import_vertex_colors);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &vertex_color_is_ao);
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &lod_count);
+			
+				if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &autolod_coefs[0])) autolod_mask |= 1;
+				if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &autolod_coefs[1])) autolod_mask |= 2;
+				if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &autolod_coefs[2])) autolod_mask |= 4;
+				if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod3", &autolod_coefs[3])) autolod_mask |= 8;
+
+				if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
+				if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
+				if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "clips") == LUA_TTABLE) {
+					const size_t count = lua_objlen(L, -1);
+					for (int i = 0; i < count; ++i) {
+						lua_rawgeti(L, -1, i + 1);
+						if (lua_istable(L, -1)) {
+							FBXImporter::ImportConfig::Clip& clip = clips.emplace();
+							char name[128];
+							if (!LuaWrapper::checkStringField(L, -1, "name", Span(name)) 
+								|| !LuaWrapper::checkField(L, -1, "from_frame", &clip.from_frame)
+								|| !LuaWrapper::checkField(L, -1, "to_frame", &clip.to_frame))
+							{
+								logError(path, ": clip ", i, " is invalid");
+								clips.pop();
+								continue;
+							}
+							clip.name = name;
+						}
+						lua_pop(L, 1);
+					}
+				}
+				lua_pop(L, 3);
+
+				char tmp[64];
+				if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
+					if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+					else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
+					else physics = FBXImporter::ImportConfig::Physics::NONE;
+				}
+
+				for (u32 i = 0; i < lengthOf(lods_distances); ++i) {
+					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &lods_distances[i]);
+				}
+			});
+		}
 
 		float scale = 1.f;
 		float culling_scale = 1.f;
@@ -1800,645 +1990,134 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		Array<FBXImporter::ImportConfig::Clip> clips;
 	};
 
-	explicit ModelPlugin(StudioApp& app)
-		: m_app(app)
-		, m_mesh(INVALID_ENTITY)
-		, m_world(nullptr)
-		, m_is_mouse_captured(false)
-		, m_tile(app.getAllocator())
-		, m_fbx_importer(app)
-		, m_meta(app.getAllocator())
-		, AssetBrowser::Plugin(app.getAllocator())
-	{
-		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
-	}
-
-
-	~ModelPlugin() {
-		if (m_downscale_program) m_pipeline->getRenderer().getEndFrameDrawStream().destroy(m_downscale_program);
-		jobs::wait(&m_subres_signal);
-		
-		Engine& engine = m_app.getEngine();
-		if (m_world) engine.destroyWorld(*m_world);
-		m_pipeline.reset();
-		if (m_tile.world) engine.destroyWorld(*m_tile.world);
-		m_tile.pipeline.reset();
-	}
-
-	void init() {
-		Engine& engine = m_app.getEngine();
-		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		m_viewport.is_ortho = true;
-		m_viewport.near = 0.f;
-		m_viewport.far = 1000.f;
-		m_fbx_importer.init();
-	}
-
-
-	Meta getMeta(const Path& path) const
-	{
-		Meta meta(m_app.getAllocator());
-		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
-			LuaWrapper::DebugGuard guard(L);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &meta.use_mikktspace);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &meta.force_skin);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &meta.culling_scale);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &meta.bake_impostor_normals);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &meta.bake_vertex_ao);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &meta.vertex_color_is_ao);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &meta.lod_count);
-			
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &meta.autolod_coefs[0])) meta.autolod_mask |= 1;
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &meta.autolod_coefs[1])) meta.autolod_mask |= 2;
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &meta.autolod_coefs[2])) meta.autolod_mask |= 4;
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod3", &meta.autolod_coefs[3])) meta.autolod_mask |= 8;
-
-			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "position_error") != LUA_TNIL) logWarning(path, ": `position_error` deprecated");
-			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "rotation_error") != LUA_TNIL) logWarning(path, ": `rotation_error` deprecated");
-			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "clips") == LUA_TTABLE) {
-				const size_t count = lua_objlen(L, -1);
-				for (int i = 0; i < count; ++i) {
-					lua_rawgeti(L, -1, i + 1);
-					if (lua_istable(L, -1)) {
-						FBXImporter::ImportConfig::Clip& clip = meta.clips.emplace();
-						char name[128];
-						if (!LuaWrapper::checkStringField(L, -1, "name", Span(name)) 
-							|| !LuaWrapper::checkField(L, -1, "from_frame", &clip.from_frame)
-							|| !LuaWrapper::checkField(L, -1, "to_frame", &clip.to_frame))
-						{
-							logError(path, ": clip ", i, " is invalid");
-							meta.clips.pop();
-							continue;
-						}
-						clip.name = name;
-					}
-					lua_pop(L, 1);
-				}
-			}
-			lua_pop(L, 3);
-
-			char tmp[64];
-			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
-				if (equalIStrings(tmp, "trimesh")) meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
-				else if (equalIStrings(tmp, "convex")) meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
-				else meta.physics = FBXImporter::ImportConfig::Physics::NONE;
-			}
-
-			for (u32 i = 0; i < lengthOf(meta.lods_distances); ++i) {
-				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &meta.lods_distances[i]);
-			}
-		});
-		return meta;
-	}
-
-	void addSubresources(AssetCompiler& compiler, const char* _path) override {
-		compiler.addResource(Model::TYPE, _path);
-
-		Meta meta = getMeta(Path(_path));
-		StaticString<LUMIX_MAX_PATH> pathstr = _path;
-		jobs::runLambda([this, pathstr, meta = static_cast<Meta&&>(meta)]() {
-			FBXImporter importer(m_app);
-			AssetCompiler& compiler = m_app.getAssetCompiler();
-
-			const char* path = pathstr[0] == '/' ? pathstr.data + 1 : pathstr.data;
-			importer.setSource(path, true, false);
-
-			if(meta.split) {
-				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
-				for (int i = 0; i < meshes.size(); ++i) {
-					char mesh_name[256];
-					importer.getImportMeshName(meshes[i], mesh_name);
-					StaticString<LUMIX_MAX_PATH> tmp(mesh_name, ".fbx:", path);
-					compiler.addResource(Model::TYPE, tmp);
-				}
-			}
-
-			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
-				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
-				ResourceType physics_geom("physics_geometry");
-				compiler.addResource(physics_geom, tmp);
-			}
-
-			if (meta.clips.empty()) {
-				const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
-				for (const FBXImporter::ImportAnimation& anim : animations) {
-					StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
-					compiler.addResource(ResourceType("animation"), tmp);
-				}
-			}
-			else {
-				for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
-					StaticString<LUMIX_MAX_PATH> tmp(clip.name, ".ani:", path);
-					compiler.addResource(ResourceType("animation"), tmp);
-				}
-			}
-
-		}, &m_subres_signal, 2);			
-	}
-
-	static const char* getResourceFilePath(const char* str)
-	{
-		const char* c = str;
-		while (*c && *c != ':') ++c;
-		return *c != ':' ? str : c + 1;
-	}
-
-	bool compile(const Path& src) override
-	{
-		ASSERT(Path::hasExtension(src.c_str(), "fbx"));
-		const char* filepath = getResourceFilePath(src.c_str());
-		FBXImporter::ImportConfig cfg;
-		const Meta meta = getMeta(Path(filepath));
-		cfg.autolod_mask = meta.autolod_mask;
-		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
-		cfg.mikktspace_tangents = meta.use_mikktspace;
-		cfg.mesh_scale = meta.scale;
-		cfg.bounding_scale = meta.culling_scale;
-		cfg.physics = meta.physics;
-		cfg.bake_vertex_ao = meta.bake_vertex_ao;
-		cfg.import_vertex_colors = meta.import_vertex_colors;
-		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
-		cfg.lod_count = meta.lod_count;
-		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
-		cfg.create_impostor = meta.create_impostor;
-		cfg.clips = meta.clips;
-		const PathInfo src_info(filepath);
-		m_fbx_importer.setSource(filepath, false, meta.force_skin);
-		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
-			if (m_fbx_importer.getOFBXScene()) {
-				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("No meshes with materials found in ", src);
-				}
-				else {
-					logError("No meshes or animations found in ", src);
-				}
-			}
-		}
-
-		const StaticString<32> hash_str("", src.getHash());
-		if (meta.split) {
-			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-			m_fbx_importer.writeSubmodels(filepath, cfg);
-			m_fbx_importer.writePrefab(filepath, cfg);
-		}
-		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
-		m_fbx_importer.writeModel(src.c_str(), cfg);
-		m_fbx_importer.writeMaterials(filepath, cfg);
-		m_fbx_importer.writeAnimations(filepath, cfg);
-		m_fbx_importer.writePhysics(filepath, cfg);
-		return true;
-	}
-
-
-	void createTileWorld()
-	{
-		Engine& engine = m_app.getEngine();
-		m_tile.world = &engine.createWorld(false);
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
-
-		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
-		const EntityRef env_probe = m_tile.world->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_tile.world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_module->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
-		render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
-
-		Matrix mtx;
-		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_tile.world->createEntity({10, 10, 10}, mtx.getRotation());
-		m_tile.world->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_module->getEnvironment(light_entity).direct_intensity = 5;
-		render_module->getEnvironment(light_entity).indirect_intensity = 1;
-		
-		m_tile.pipeline->setWorld(m_tile.world);
-	}
-
-
-	void createPreviewWorld() {
-		ASSERT(!m_world);
-		Engine& engine = m_app.getEngine();
-		m_world = &engine.createWorld(false);
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
-
-		const EntityRef mesh_entity = m_world->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
-		m_mesh = mesh_entity;
-		m_world->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
-
-		const EntityRef env_probe = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
-		render_module->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
-
-		Matrix mtx;
-		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_world->createEntity({0, 0, 0}, mtx.getRotation());
-		m_world->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_module->getEnvironment(light_entity).direct_intensity = 5;
-		render_module->getEnvironment(light_entity).indirect_intensity = 1;
-
-		m_pipeline->setWorld(m_world);
-	}
-
-
-	void showPreview(Model& model)
-	{
-		if (!m_world) createPreviewWorld();
-		auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
-		if (!render_module) return;
-		if (!model.isReady()) return;
-		if (!m_mesh.isValid()) return;
-
-		if (render_module->getModelInstanceModel((EntityRef)m_mesh) != &model)
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, ModelPlugin& plugin, StudioApp& app, IAllocator& allocator)
+			: AssetEditorWindow(app)
+			, m_allocator(allocator)
+			, m_app(app)
+			, m_plugin(plugin)
+			, m_meta(allocator)
 		{
-			render_module->setModelInstancePath((EntityRef)m_mesh, model.getPath());
-			AABB aabb = model.getAABB();
+			Engine& engine = app.getEngine();
+			m_resource = engine.getResourceManager().load<Model>(path);
+			m_meta.load(path, m_app);
+
+			m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
+			m_viewport.is_ortho = true;
+			m_viewport.near = 0.f;
+			m_viewport.far = 1000.f;
+
+			m_world = &engine.createWorld(false);
+			PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+			m_pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
+
+			const EntityRef mesh_entity = m_world->createEntity({0, 0, 0}, {0, 0, 0, 1});
+			auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
+			m_mesh = mesh_entity;
+			m_world->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+
+			const EntityRef env_probe = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
+			m_world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+			render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
+			render_module->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
+
+			Matrix light_mtx;
+			light_mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
+			const EntityRef light_entity = m_world->createEntity({0, 0, 0}, light_mtx.getRotation());
+			m_world->createComponent(ENVIRONMENT_TYPE, light_entity);
+			render_module->getEnvironment(light_entity).direct_intensity = 5;
+			render_module->getEnvironment(light_entity).indirect_intensity = 1;
+
+			m_pipeline->setWorld(m_world);
+
+			render_module->setModelInstancePath((EntityRef)m_mesh, m_resource->getPath());
+			AABB aabb = m_resource->getAABB();
 
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * length(aabb.max - aabb.min);
 			
 			Matrix mtx;
-			Vec3 eye = center + Vec3(model.getCenterBoundingRadius() * 2);
+			Vec3 eye = center + Vec3(m_resource->getCenterBoundingRadius() * 2);
 			mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 			mtx = mtx.inverted();
 
 			m_viewport.rot = mtx.getRotation();
 		}
-		render_module->setModelInstanceLOD((EntityRef)m_mesh, 0);
-		ImVec2 image_size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x);
 
-		m_viewport.w = (int)image_size.x;
-		m_viewport.h = (int)image_size.y;
-		m_viewport.ortho_size = model.getCenterBoundingRadius();
-		m_pipeline->setViewport(m_viewport);
-		m_pipeline->render(false);
-		m_preview = m_pipeline->getOutput();
-		if (gpu::isOriginBottomLeft()) {
-			ImGui::Image(m_preview, image_size);
+		~EditorWindow() {
+			Engine& engine = m_app.getEngine();
+			engine.destroyWorld(*m_world);
+			m_resource->decRefCount();
+			m_pipeline.reset();
 		}
-		else {
-			ImGui::Image(m_preview, image_size, ImVec2(0, 1), ImVec2(1, 0));
+
+		void save() {
+			String src(m_app.getAllocator());
+			src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
+				.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true" : "false")
+				.cat("\nbake_impostor_normals = ").cat(m_meta.bake_impostor_normals ? "true" : "false")
+				.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace ? "true" : "false")
+				.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")
+				.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
+				.cat("\nscale = ").cat(m_meta.scale)
+				.cat("\nlod_count = ").cat(m_meta.lod_count)
+				.cat("\nculling_scale = ").cat(m_meta.culling_scale)
+				.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
+				.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
+				.cat("\nvertex_color_is_ao = ").cat(m_meta.vertex_color_is_ao ? "true" : "false");
+
+			if (!m_meta.clips.empty()) {
+				src.cat("\nclips = {");
+				for (const FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+					src.cat("\n\n{");
+					src.cat("\n\n\nname = \"").cat(clip.name.data).cat("\",");
+					src.cat("\n\n\nfrom_frame = ").cat(clip.from_frame).cat(",");
+					src.cat("\n\n\nto_frame = ").cat(clip.to_frame);
+					src.cat("\n\n},");
+				}
+				src.cat("\n}");
+			}
+
+			if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
+			if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);
+			if (m_meta.autolod_mask & 4) src.cat("\nautolod2 = ").cat(m_meta.autolod_coefs[2]);
+			if (m_meta.autolod_mask & 4) src.cat("\nautolod3 = ").cat(m_meta.autolod_coefs[3]);
+
+			for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
+				if (m_meta.lods_distances[i] > 0) {
+					src.cat("\nlod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]);
+				}
+			}
+
+			m_app.getAssetCompiler().updateMeta(m_resource->getPath(), src.c_str());
+			m_dirty = false;
 		}
 		
-		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
-		if (m_is_mouse_captured && !mouse_down)
-		{
-			m_is_mouse_captured = false;
-			os::showCursor(true);
-			os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getSaveAction()) save();
+			else return false;
+			return true;
 		}
 
-		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
-
-		if (ImGui::BeginPopup("PreviewPopup"))
-		{
-			if (ImGui::Selectable("Save preview"))
-			{
-				model.incRefCount();
-				renderTile(&model, &m_viewport.pos, &m_viewport.rot);
-			}
-			ImGui::EndPopup();
-		}
-
-		if (ImGui::IsItemHovered() && mouse_down)
-		{
-			Vec2 delta(0, 0);
-			for (const os::Event e : m_app.getEvents()) {
-				if (e.type == os::Event::Type::MOUSE_MOVE) {
-					delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
-				}
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				ImGui::EndMenuBar();
 			}
 
-			if (!m_is_mouse_captured)
-			{
-				m_is_mouse_captured = true;
-				os::showCursor(false);
-				const os::Point p = os::getMouseScreenPos();
-				m_captured_mouse_x = p.x;
-				m_captured_mouse_y = p.y;
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
 			}
 
-			if (delta.x != 0 || delta.y != 0)
-			{
-				const Vec2 MOUSE_SENSITIVITY(50, 50);
-				DVec3 pos = m_viewport.pos;
-				Quat rot = m_viewport.rot;
+			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
 
-				float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
-				Quat yaw_rot(Vec3(0, 1, 0), yaw);
-				rot = normalize(yaw_rot * rot);
+			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
 
-				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-				float pitch =
-					-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
-				Quat pitch_rot(pitch_axis, pitch);
-				rot = normalize(pitch_rot * rot);
-
-				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
-
-				float dist = length(origin - Vec3(pos));
-				pos = DVec3(0) + origin + dir * dist;
-
-				m_viewport.rot = rot;
-				m_viewport.pos = pos;
-			}
-		}
-	}
-
-
-	static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, Array<u32>& shadow, const IVec2& tile_size, IAllocator& allocator) {
-		struct Cell {
-			i16 x, y;
-		};
-		const IVec2 size = tile_size * 9;
-		Array<Cell> cells(allocator);
-		cells.resize(gb0.size());
-		const u32* data = gb0.begin();
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[i].x = i;
-					cells[i].y = j;
-				}
-				else {
-					cells[i].x = -3 * size.x;
-					cells[i].y = -3 * size.y;
-				}
-			}
-		}
-
-		auto pow2 = [](i32 v){
-			return v * v;
-		};
-
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[idx].x = i;
-					cells[idx].y = j;
-				}
-				else {
-					if(i > 0) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
-						if(dist_x < dist_0) {
-							cells[idx] = cells[idx - 1];
-						}
-					}					
-					if(j > 0) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
-						if(dist_y < dist_0) {
-							cells[idx] = cells[idx - size.x];
-						}
-					}					
-				}
-			}
-		}
-
-		for (i32 j = size.y - 1; j >= 0; --j) {
-			for (i32 i = size.x - 1; i>= 0; --i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[idx].x = i;
-					cells[idx].y = j;
-				}
-				else {
-					if(i < size.x - 1) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
-						if(dist_x < dist_0) {
-							cells[idx] = cells[idx + 1];
-						}
-					}					
-					if(j < size.y - 1) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
-						if(dist_y < dist_0) {
-							cells[idx] = cells[idx + size.x];
-						}
-					}					
-				}
-			}
-		}
-
-		Array<u32> tmp(allocator);
-		tmp.resize(gb0.size());
-		if (cells[0].x >= 0) {
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					const u8 alpha = data[idx] >> 24;
-					tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
-					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
-				}
-			}
-			memcpy(gb0.begin(), tmp.begin(), tmp.byte_size());
-
-			const u32* gb1_data = gb1.begin();
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
-				}
-			}
-			memcpy(gb1.begin(), tmp.begin(), tmp.byte_size());
-
-			const u32* shadow_data = shadow.begin();
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					tmp[idx] = shadow_data[cells[idx].x + cells[idx].y * size.x];
-				}
-			}
-			memcpy(shadow.begin(), tmp.begin(), tmp.byte_size());
-		}
-		else {
-			// nothing was rendered
-			memset(gb0.begin(), 0xff, gb0.byte_size());
-			memset(gb1.begin(), 0xff, gb1.byte_size());
-		}
-	}
-
-	static const char* toString(FBXImporter::ImportConfig::Physics value) {
-		switch (value) {
-			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
-			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
-			case FBXImporter::ImportConfig::Physics::NONE: return "None";
-		}
-		ASSERT(false);
-		return "none";
-	}
-
-	void deserialize(InputMemoryStream& blob) override {
-		blob.read(m_meta.scale);
-		blob.read(m_meta.culling_scale);
-		blob.read(m_meta.split);
-		blob.read(m_meta.create_impostor);
-		blob.read(m_meta.bake_impostor_normals);
-		blob.read(m_meta.bake_vertex_ao);
-		blob.read(m_meta.use_mikktspace);
-		blob.read(m_meta.force_skin);
-		blob.read(m_meta.import_vertex_colors);
-		blob.read(m_meta.vertex_color_is_ao);
-		blob.read(m_meta.autolod_mask);
-		blob.read(m_meta.lod_count);
-		blob.read(m_meta.autolod_coefs);
-		blob.read(m_meta.lods_distances);
-		blob.read(m_meta.origin);
-		blob.read(m_meta.physics);
-		u32 size;
-		blob.read(size);
-		m_meta.clips.resize(size);
-		blob.read(m_meta.clips.begin(), m_meta.clips.byte_size());
-	}
-
-	void serialize(OutputMemoryStream& blob) override {
-		blob.write(m_meta.scale);
-		blob.write(m_meta.culling_scale);
-		blob.write(m_meta.split);
-		blob.write(m_meta.create_impostor);
-		blob.write(m_meta.bake_impostor_normals);
-		blob.write(m_meta.bake_vertex_ao);
-		blob.write(m_meta.use_mikktspace);
-		blob.write(m_meta.force_skin);
-		blob.write(m_meta.import_vertex_colors);
-		blob.write(m_meta.vertex_color_is_ao);
-		blob.write(m_meta.autolod_mask);
-		blob.write(m_meta.lod_count);
-		blob.write(m_meta.autolod_coefs);
-		blob.write(m_meta.lods_distances);
-		blob.write(m_meta.origin);
-		blob.write(m_meta.physics);
-		blob.write(m_meta.physics);
-		blob.write(m_meta.clips.size());
-		blob.write(m_meta.clips.begin(), m_meta.clips.byte_size());
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
-	{
-		if (resources.length() > 1) return false;
-
-		auto* model = static_cast<Model*>(resources[0]->getResource());
-
-		if (model->isReady()) {
-			ImGuiEx::Label("Bounding radius (from origin)");
-			ImGui::Text("%f", model->getOriginBoundingRadius());
-			ImGuiEx::Label("Bounding radius (from center)");
-			ImGui::Text("%f", model->getCenterBoundingRadius());
-
-			if (ImGui::CollapsingHeader("LODs")) {
-				auto* lods = model->getLODIndices();
-				auto* distances = model->getLODDistances();
-				if (lods[0].to >= 0 && !model->isFailure())
-				{
-					ImGui::Separator();
-					ImGui::Columns(4);
-					ImGui::Text("LOD");
-					ImGui::NextColumn();
-					ImGui::Text("Distance");
-					ImGui::NextColumn();
-					ImGui::Text("# of meshes");
-					ImGui::NextColumn();
-					ImGui::Text("# of triangles");
-					ImGui::NextColumn();
-					ImGui::Separator();
-					int lod_count = 1;
-					for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i)
-					{
-						ImGui::PushID(i);
-						ImGui::Text("%d", i);
-						ImGui::NextColumn();
-						float dist = sqrtf(distances[i]);
-						if (ImGui::DragFloat("", &dist)) {
-							distances[i] = dist * dist;
-						}
-						ImGui::NextColumn();
-						ImGui::Text("%d", lods[i].to - lods[i].from + 1);
-						ImGui::NextColumn();
-						int tri_count = 0;
-						for (int j = lods[i].from; j <= lods[i].to; ++j)
-						{
-							i32 indices_count = (i32)model->getMesh(j).indices.size() >> 1;
-							if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
-								indices_count >>= 1;
-							}
-							tri_count += indices_count / 3;
-
-						}
-
-						ImGui::Text("%d", tri_count);
-						ImGui::NextColumn();
-						++lod_count;
-						ImGui::PopID();
-					}
-
-					ImGui::Columns(1);
-				}
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Meshes")) {
-			const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& mesh = model->getMesh(i);
-				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
-				{
-					ImGuiEx::Label("Triangle count");
-					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
-					ImGuiEx::Label("Material");
-					const float w = ImGui::GetContentRegionAvail().x - go_to_w;
-					ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
-					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
-					{
-						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
-					}
-					ImGui::TreePop();
-				}
-			}
-		}
-
-		if (model->isReady() && ImGui::CollapsingHeader("Bones")) {
-			ImGuiEx::Label("Count");
-			ImGui::Text("%d", model->getBoneCount());
-			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
-				ImGui::Columns(4);
-				for (int i = 0; i < model->getBoneCount(); ++i)
-				{
-					ImGui::Text("%s", model->getBone(i).name.c_str());
-					ImGui::NextColumn();
-					Vec3 pos = model->getBone(i).transform.pos;
-					ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
-					ImGui::NextColumn();
-					Quat rot = model->getBone(i).transform.rot;
-					ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
-					ImGui::NextColumn();
-					const i32 parent = model->getBone(i).parent_idx;
-					if (parent >= 0) {
-						ImGui::Text("%s", model->getBone(parent).name.c_str());
-					}
-					ImGui::NextColumn();
-				}
-			}
-		}
-
-		bool changed = false;
-		if (ImGui::CollapsingHeader("Import")) {
-			AssetCompiler& compiler = m_app.getAssetCompiler();
-			if(m_meta_res != model->getPath().getHash()) {
-				m_meta = getMeta(model->getPath());
-				m_meta_res = model->getPath().getHash();
-			}
+			bool changed = false;
 			ImGuiEx::Label("Bake vertex AO");
 			changed = ImGui::Checkbox("##impnrm", &m_meta.bake_vertex_ao) || changed;
 			ImGuiEx::Label("Mikktspace tangents");
@@ -2598,47 +2277,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				changed = true;
 			}
 
-			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
-				String src(m_app.getAllocator());
-				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
-					.cat("\nbake_vertex_ao = ").cat(m_meta.bake_vertex_ao ? "true" : "false")
-					.cat("\nbake_impostor_normals = ").cat(m_meta.bake_impostor_normals ? "true" : "false")
-					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace ? "true" : "false")
-					.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")
-					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
-					.cat("\nscale = ").cat(m_meta.scale)
-					.cat("\nlod_count = ").cat(m_meta.lod_count)
-					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
-					.cat("\nsplit = ").cat(m_meta.split ? "true" : "false")
-					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true" : "false")
-					.cat("\nvertex_color_is_ao = ").cat(m_meta.vertex_color_is_ao ? "true" : "false");
-
-				if (!m_meta.clips.empty()) {
-					src.cat("\nclips = {");
-					for (const FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
-						src.cat("\n\n{");
-						src.cat("\n\n\nname = \"").cat(clip.name.data).cat("\",");
-						src.cat("\n\n\nfrom_frame = ").cat(clip.from_frame).cat(",");
-						src.cat("\n\n\nto_frame = ").cat(clip.to_frame);
-						src.cat("\n\n},");
-					}
-					src.cat("\n}");
-				}
-
-				if (m_meta.autolod_mask & 1) src.cat("\nautolod0 = ").cat(m_meta.autolod_coefs[0]);
-				if (m_meta.autolod_mask & 2) src.cat("\nautolod1 = ").cat(m_meta.autolod_coefs[1]);
-				if (m_meta.autolod_mask & 4) src.cat("\nautolod2 = ").cat(m_meta.autolod_coefs[2]);
-				if (m_meta.autolod_mask & 4) src.cat("\nautolod3 = ").cat(m_meta.autolod_coefs[3]);
-
-				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
-					if (m_meta.lods_distances[i] > 0) {
-						src.cat("\nlod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]);
-					}
-				}
-
-				compiler.updateMeta(model->getPath(), src.c_str());
-			}
-			ImGui::SameLine();
 			if (ImGui::Button("Create impostor texture")) {
 				FBXImporter importer(m_app);
 				importer.init();
@@ -2648,9 +2286,9 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 				Array<u16> gbdepth(allocator);
 				Array<u32> shadow(allocator); 
 				IVec2 tile_size;
-				importer.createImpostorTextures(model, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
+				importer.createImpostorTextures(m_resource, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
 				postprocessImpostor(gb0, gb1, shadow, tile_size, allocator);
-				const PathInfo fi(model->getPath().c_str());
+				const PathInfo fi(m_resource->getPath().c_str());
 				StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
@@ -2715,13 +2353,539 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 			}
 			ImGui::SameLine();
 			ImGui::TextDisabled("(?)");
-			if (ImGui::IsItemHovered())
+			if (ImGui::IsItemHovered()) {
 				ImGui::SetTooltip("%s", "To use impostors, check `Create impostor mesh` and press this button. "
 				"When the mesh changes, you need to regenerate the impostor texture by pressing this button again.");
 			}
 
-		showPreview(*model);
-		return changed;
+			if (changed) m_dirty = true;
+
+			ImGui::Separator();
+			if (m_resource->isReady()) {
+				ImGuiEx::Label("Bounding radius (from origin)");
+				ImGui::Text("%f", m_resource->getOriginBoundingRadius());
+				ImGuiEx::Label("Bounding radius (from center)");
+				ImGui::Text("%f", m_resource->getCenterBoundingRadius());
+
+				if (ImGui::CollapsingHeader("LODs")) {
+					auto* lods = m_resource->getLODIndices();
+					auto* distances = m_resource->getLODDistances();
+					if (lods[0].to >= 0 && !m_resource->isFailure())
+					{
+						ImGui::Separator();
+						ImGui::Columns(4);
+						ImGui::Text("LOD");
+						ImGui::NextColumn();
+						ImGui::Text("Distance");
+						ImGui::NextColumn();
+						ImGui::Text("# of meshes");
+						ImGui::NextColumn();
+						ImGui::Text("# of triangles");
+						ImGui::NextColumn();
+						ImGui::Separator();
+						int lod_count = 1;
+						for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i)
+						{
+							ImGui::PushID(i);
+							ImGui::Text("%d", i);
+							ImGui::NextColumn();
+							float dist = sqrtf(distances[i]);
+							if (ImGui::DragFloat("", &dist)) {
+								distances[i] = dist * dist;
+							}
+							ImGui::NextColumn();
+							ImGui::Text("%d", lods[i].to - lods[i].from + 1);
+							ImGui::NextColumn();
+							int tri_count = 0;
+							for (int j = lods[i].from; j <= lods[i].to; ++j)
+							{
+								i32 indices_count = (i32)m_resource->getMesh(j).indices.size() >> 1;
+								if (!m_resource->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
+									indices_count >>= 1;
+								}
+								tri_count += indices_count / 3;
+
+							}
+
+							ImGui::Text("%d", tri_count);
+							ImGui::NextColumn();
+							++lod_count;
+							ImGui::PopID();
+						}
+
+						ImGui::Columns(1);
+					}
+				}
+			}
+
+			if (ImGui::CollapsingHeader("Meshes")) {
+				const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
+				for (int i = 0; i < m_resource->getMeshCount(); ++i)
+				{
+					auto& mesh = m_resource->getMesh(i);
+					if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
+					{
+						ImGuiEx::Label("Triangle count");
+						ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
+						ImGuiEx::Label("Material");
+						const float w = ImGui::GetContentRegionAvail().x - go_to_w;
+						ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
+						ImGui::SameLine();
+						if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
+						{
+							m_app.getAssetBrowser().selectResource(mesh.material->getPath(), false);
+						}
+						ImGui::TreePop();
+					}
+				}
+			}
+
+			if (m_resource->isReady() && ImGui::CollapsingHeader("Bones")) {
+				ImGuiEx::Label("Count");
+				ImGui::Text("%d", m_resource->getBoneCount());
+				if (m_resource->getBoneCount() > 0) {
+					ImGui::Columns(4);
+					for (int i = 0; i < m_resource->getBoneCount(); ++i)
+					{
+						ImGui::Text("%s", m_resource->getBone(i).name.c_str());
+						ImGui::NextColumn();
+						Vec3 pos = m_resource->getBone(i).transform.pos;
+						ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
+						ImGui::NextColumn();
+						Quat rot = m_resource->getBone(i).transform.rot;
+						ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+						ImGui::NextColumn();
+						const i32 parent = m_resource->getBone(i).parent_idx;
+						if (parent >= 0) {
+							ImGui::Text("%s", m_resource->getBone(parent).name.c_str());
+						}
+						ImGui::NextColumn();
+					}
+					ImGui::Columns();
+				}
+			}
+			
+			ImGui::TableNextColumn();
+			previewGUI();
+
+			ImGui::EndTable();
+		}
+
+		static u32 getMaxLOD(Model& model) {
+			for (u32 i = 1; i < Model::MAX_LOD_COUNT; ++i) {
+				if (model.getLODIndices()[i].to < 0) return i - 1;
+			}
+			return 0;
+		}
+		 
+		static void enableWireframe(Model& model, bool enable) {
+			for (u32 i = 0; i < (u32)model.getMeshCount(); ++i) {
+				Mesh& mesh = model.getMesh(i);
+				mesh.material->setWireframe(enable);
+			}
+		}
+
+		void previewGUI() {
+			if (!m_resource->isReady()) return;
+			auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
+			ASSERT(render_module);
+
+			if (ImGui::Checkbox("Wireframe", &m_wireframe)) enableWireframe(*m_resource, m_wireframe);
+			// TODO this does not work, two lods are rendered
+			/*
+			ImGui::SameLine();
+			ImGui::InputInt("LOD", &m_preview_lod);
+			m_preview_lod = clamp(m_preview_lod, 0, getMaxLOD(*m_resource));
+			render_module->setModelInstanceLOD((EntityRef)m_mesh, m_preview_lod);
+			*/
+
+			const ImVec2 image_size = ImGui::GetContentRegionAvail();
+
+			m_viewport.w = (int)image_size.x;
+			m_viewport.h = (int)image_size.y;
+			m_viewport.ortho_size = m_resource->getCenterBoundingRadius();
+			m_pipeline->setViewport(m_viewport);
+			m_pipeline->render(false);
+			m_preview = m_pipeline->getOutput();
+			if (gpu::isOriginBottomLeft()) {
+				ImGui::Image(m_preview, image_size);
+			}
+			else {
+				ImGui::Image(m_preview, image_size, ImVec2(0, 1), ImVec2(1, 0));
+			}
+		
+			bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
+			if (m_is_mouse_captured && !mouse_down)
+			{
+				m_is_mouse_captured = false;
+				os::showCursor(true);
+				os::setMouseScreenPos(m_captured_mouse_pos.x, m_captured_mouse_pos.y);
+			}
+
+			if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
+
+			if (ImGui::BeginPopup("PreviewPopup"))
+			{
+				if (ImGui::Selectable("Save preview"))
+				{
+					m_resource->incRefCount();
+					m_plugin.renderTile(m_resource, &m_viewport.pos, &m_viewport.rot);
+				}
+				ImGui::EndPopup();
+			}
+
+			if (ImGui::IsItemHovered() && mouse_down)
+			{
+				Vec2 delta(0, 0);
+				for (const os::Event e : m_app.getEvents()) {
+					if (e.type == os::Event::Type::MOUSE_MOVE) {
+						delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
+					}
+				}
+
+				if (!m_is_mouse_captured) {
+					m_is_mouse_captured = true;
+					os::showCursor(false);
+					m_captured_mouse_pos = os::getMouseScreenPos();
+				}
+
+				if (delta.x != 0 || delta.y != 0) {
+					const Vec2 MOUSE_SENSITIVITY(50, 50);
+					DVec3 pos = m_viewport.pos;
+					Quat rot = m_viewport.rot;
+
+					float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+					Quat yaw_rot(Vec3(0, 1, 0), yaw);
+					rot = normalize(yaw_rot * rot);
+
+					Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
+					float pitch =
+						-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+					Quat pitch_rot(pitch_axis, pitch);
+					rot = normalize(pitch_rot * rot);
+
+					Vec3 dir = rot.rotate(Vec3(0, 0, 1));
+					Vec3 origin = (m_resource->getAABB().max + m_resource->getAABB().min) * 0.5f;
+
+					float dist = length(origin - Vec3(pos));
+					pos = DVec3(0) + origin + dir * dist;
+
+					m_viewport.rot = rot;
+					m_viewport.pos = pos;
+				}
+			}
+		}
+	
+		void destroy() override { LUMIX_DELETE(m_allocator, this); }
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "model editor"; }
+
+		IAllocator& m_allocator;
+		StudioApp& m_app;
+		ModelPlugin& m_plugin;
+		Model* m_resource;
+		World* m_world;
+		Viewport m_viewport;
+		UniquePtr<Pipeline> m_pipeline;
+		EntityPtr m_mesh;
+		bool m_is_mouse_captured = false;
+		os::Point m_captured_mouse_pos;
+		Renderer* m_renderer;
+		Meta m_meta;
+		bool m_wireframe = false;
+		i32 m_preview_lod = 0;
+		gpu::TextureHandle m_preview = gpu::INVALID_TEXTURE;
+	};
+
+	explicit ModelPlugin(StudioApp& app)
+		: m_app(app)
+		, m_tile(app.getAllocator())
+		, m_fbx_importer(app)
+		, m_meta(app.getAllocator())
+	{
+		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
+	}
+
+
+	~ModelPlugin() {
+		if (m_downscale_program) m_renderer->getEndFrameDrawStream().destroy(m_downscale_program);
+		jobs::wait(&m_subres_signal);
+		
+		Engine& engine = m_app.getEngine();
+		if (m_tile.world) engine.destroyWorld(*m_tile.world);
+		m_tile.pipeline.reset();
+	}
+
+	void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
+	
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), *this, m_app, m_app.getAllocator());
+		ab.addWindow(win);
+	}
+
+	void init() {
+		Engine& engine = m_app.getEngine();
+		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
+		m_viewport.is_ortho = true;
+		m_viewport.near = 0.f;
+		m_viewport.far = 1000.f;
+		m_fbx_importer.init();
+	}
+
+
+	void addSubresources(AssetCompiler& compiler, const char* _path) override {
+		compiler.addResource(Model::TYPE, _path);
+
+		Meta meta(m_app.getAllocator());
+		meta.load(Path(_path), m_app);
+		StaticString<LUMIX_MAX_PATH> pathstr = _path;
+		jobs::runLambda([this, pathstr, meta = static_cast<Meta&&>(meta)]() {
+			FBXImporter importer(m_app);
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+
+			const char* path = pathstr[0] == '/' ? pathstr.data + 1 : pathstr.data;
+			importer.setSource(path, true, false);
+
+			if(meta.split) {
+				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
+				for (int i = 0; i < meshes.size(); ++i) {
+					char mesh_name[256];
+					importer.getImportMeshName(meshes[i], mesh_name);
+					StaticString<LUMIX_MAX_PATH> tmp(mesh_name, ".fbx:", path);
+					compiler.addResource(Model::TYPE, tmp);
+				}
+			}
+
+			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
+				ResourceType physics_geom("physics_geometry");
+				compiler.addResource(physics_geom, tmp);
+			}
+
+			if (meta.clips.empty()) {
+				const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
+				for (const FBXImporter::ImportAnimation& anim : animations) {
+					StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
+					compiler.addResource(ResourceType("animation"), tmp);
+				}
+			}
+			else {
+				for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
+					StaticString<LUMIX_MAX_PATH> tmp(clip.name, ".ani:", path);
+					compiler.addResource(ResourceType("animation"), tmp);
+				}
+			}
+
+		}, &m_subres_signal, 2);			
+	}
+
+	static const char* getResourceFilePath(const char* str)
+	{
+		const char* c = str;
+		while (*c && *c != ':') ++c;
+		return *c != ':' ? str : c + 1;
+	}
+
+	bool compile(const Path& src) override {
+		ASSERT(Path::hasExtension(src.c_str(), "fbx"));
+		const char* filepath = getResourceFilePath(src.c_str());
+		FBXImporter::ImportConfig cfg;
+		Meta meta(m_app.getAllocator()); 
+		meta.load(Path(filepath), m_app);
+		cfg.autolod_mask = meta.autolod_mask;
+		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
+		cfg.mikktspace_tangents = meta.use_mikktspace;
+		cfg.mesh_scale = meta.scale;
+		cfg.bounding_scale = meta.culling_scale;
+		cfg.physics = meta.physics;
+		cfg.bake_vertex_ao = meta.bake_vertex_ao;
+		cfg.import_vertex_colors = meta.import_vertex_colors;
+		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
+		cfg.lod_count = meta.lod_count;
+		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
+		cfg.create_impostor = meta.create_impostor;
+		cfg.clips = meta.clips;
+		const PathInfo src_info(filepath);
+		m_fbx_importer.setSource(filepath, false, meta.force_skin);
+		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
+			if (m_fbx_importer.getOFBXScene()) {
+				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+					logError("No meshes with materials found in ", src);
+				}
+				else {
+					logError("No meshes or animations found in ", src);
+				}
+			}
+		}
+
+		const StaticString<32> hash_str("", src.getHash());
+		if (meta.split) {
+			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+			m_fbx_importer.writeSubmodels(filepath, cfg);
+			m_fbx_importer.writePrefab(filepath, cfg);
+		}
+		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
+		m_fbx_importer.writeModel(src.c_str(), cfg);
+		m_fbx_importer.writeMaterials(filepath, cfg);
+		m_fbx_importer.writeAnimations(filepath, cfg);
+		m_fbx_importer.writePhysics(filepath, cfg);
+		return true;
+	}
+
+
+	void createTileWorld()
+	{
+		Engine& engine = m_app.getEngine();
+		m_tile.world = &engine.createWorld(false);
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
+
+		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
+		const EntityRef env_probe = m_tile.world->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_tile.world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		render_module->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
+		render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
+
+		Matrix mtx;
+		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
+		const EntityRef light_entity = m_tile.world->createEntity({10, 10, 10}, mtx.getRotation());
+		m_tile.world->createComponent(ENVIRONMENT_TYPE, light_entity);
+		render_module->getEnvironment(light_entity).direct_intensity = 5;
+		render_module->getEnvironment(light_entity).indirect_intensity = 1;
+		
+		m_tile.pipeline->setWorld(m_tile.world);
+	}
+
+
+	static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, Array<u32>& shadow, const IVec2& tile_size, IAllocator& allocator) {
+		struct Cell {
+			i16 x, y;
+		};
+		const IVec2 size = tile_size * 9;
+		Array<Cell> cells(allocator);
+		cells.resize(gb0.size());
+		const u32* data = gb0.begin();
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff000000) {
+					cells[i].x = i;
+					cells[i].y = j;
+				}
+				else {
+					cells[i].x = -3 * size.x;
+					cells[i].y = -3 * size.y;
+				}
+			}
+		}
+
+		auto pow2 = [](i32 v){
+			return v * v;
+		};
+
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff000000) {
+					cells[idx].x = i;
+					cells[idx].y = j;
+				}
+				else {
+					if(i > 0) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
+						if(dist_x < dist_0) {
+							cells[idx] = cells[idx - 1];
+						}
+					}					
+					if(j > 0) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
+						if(dist_y < dist_0) {
+							cells[idx] = cells[idx - size.x];
+						}
+					}					
+				}
+			}
+		}
+
+		for (i32 j = size.y - 1; j >= 0; --j) {
+			for (i32 i = size.x - 1; i>= 0; --i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff000000) {
+					cells[idx].x = i;
+					cells[idx].y = j;
+				}
+				else {
+					if(i < size.x - 1) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
+						if(dist_x < dist_0) {
+							cells[idx] = cells[idx + 1];
+						}
+					}					
+					if(j < size.y - 1) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
+						if(dist_y < dist_0) {
+							cells[idx] = cells[idx + size.x];
+						}
+					}					
+				}
+			}
+		}
+
+		Array<u32> tmp(allocator);
+		tmp.resize(gb0.size());
+		if (cells[0].x >= 0) {
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					const u8 alpha = data[idx] >> 24;
+					tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
+					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
+				}
+			}
+			memcpy(gb0.begin(), tmp.begin(), tmp.byte_size());
+
+			const u32* gb1_data = gb1.begin();
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
+				}
+			}
+			memcpy(gb1.begin(), tmp.begin(), tmp.byte_size());
+
+			const u32* shadow_data = shadow.begin();
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					tmp[idx] = shadow_data[cells[idx].x + cells[idx].y * size.x];
+				}
+			}
+			memcpy(shadow.begin(), tmp.begin(), tmp.byte_size());
+		}
+		else {
+			// nothing was rendered
+			memset(gb0.begin(), 0xff, gb0.byte_size());
+			memset(gb1.begin(), 0xff, gb1.byte_size());
+		}
+	}
+
+	static const char* toString(FBXImporter::ImportConfig::Physics value) {
+		switch (value) {
+			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
+			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
+			case FBXImporter::ImportConfig::Physics::NONE: return "None";
+		}
+		ASSERT(false);
+		return "none";
 	}
 
 	const char* getName() const override { return "Model"; }
@@ -2992,7 +3156,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		viewport.ortho_size = radius * 1.1f;
 		viewport.h = AssetBrowser::TILE_SIZE * 4;
 		viewport.w = AssetBrowser::TILE_SIZE * 4;
-		viewport.pos = DVec3(center - dir * 4 * radius);
+		viewport.pos = in_pos ? *in_pos : DVec3(center - dir * 4 * radius);
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
@@ -3071,13 +3235,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
 	gpu::TextureHandle m_preview;
-	World* m_world = nullptr;
 	Viewport m_viewport;
-	UniquePtr<Pipeline> m_pipeline;
-	EntityPtr m_mesh = INVALID_ENTITY;
-	bool m_is_mouse_captured;
-	int m_captured_mouse_x;
-	int m_captured_mouse_y;
 	TexturePlugin* m_texture_plugin;
 	FBXImporter m_fbx_importer;
 	jobs::Signal m_subres_signal;
@@ -3087,18 +3245,14 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 };
 
 
-struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("shd", Shader::TYPE);
 	}
 
-
-	void findIncludes(const char* path)
-	{
+	void findIncludes(const char* path) {
 		lua_State* L = luaL_newstate();
 		luaL_openlibs(L);
 
@@ -3181,67 +3335,10 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 		findIncludes(path);
 	}
 
-	bool compile(const Path& src) override
-	{
-		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
-	{
-		if(resources.length() > 1) return false;
-
-		auto* shader = static_cast<Shader*>(resources[0]->getResource());
-		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally"))
-		{
-			m_app.getAssetBrowser().openInExternalEditor(shader->getPath().c_str());
-		}
-
-		if (shader->m_texture_slot_count > 0 &&
-			ImGui::CollapsingHeader(
-				"Texture slots", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
-		{
-			for (u32 i = 0; i < shader->m_texture_slot_count; ++i)
-			{
-				auto& slot = shader->m_texture_slots[i];
-				ImGui::Text("%s", slot.name);
-			}
-		}
-		if (!shader->m_uniforms.empty() &&
-			ImGui::CollapsingHeader("Uniforms", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
-		{
-			ImGui::Columns(2);
-			ImGui::Text("name");
-			ImGui::NextColumn();
-			ImGui::Text("type");
-			ImGui::NextColumn();
-			ImGui::Separator();
-			for (int i = 0; i < shader->m_uniforms.size(); ++i)
-			{
-				auto& uniform = shader->m_uniforms[i];
-				ImGui::Text("%s", uniform.name);
-				ImGui::NextColumn();
-				switch (uniform.type)
-				{
-					case Shader::Uniform::COLOR: ImGui::Text("Color"); break;
-					case Shader::Uniform::FLOAT: ImGui::Text("Float"); break;
-					case Shader::Uniform::NORMALIZED_FLOAT: ImGui::Text("Float (0-1)"); break;
-					case Shader::Uniform::INT: ImGui::Text("Int"); break;
-					case Shader::Uniform::VEC4: ImGui::Text("Vector4"); break;
-					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
-					case Shader::Uniform::VEC2: ImGui::Text("Vector2"); break;
-				}
-				ImGui::NextColumn();
-			}
-			ImGui::Columns(1);
-		}
-		return false;
-	}
-
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Shader"; }
 	ResourceType getResourceType() const override { return Shader::TYPE; }
+	void onResourceDoubleClicked(const Path& path) override { m_app.getAssetBrowser().openInExternalEditor(path); }
 
 	StudioApp& m_app;
 };
@@ -3678,7 +3775,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					const Path path("universes/probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
 					ImGui::TextUnformatted(path);
-					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(path, true, false);
+					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(path, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
 					if (ImGui::Button("Generate")) generateCubemaps(false, world);

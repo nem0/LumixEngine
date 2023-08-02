@@ -14,13 +14,9 @@ struct EditorAssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return m_extension; }
 
-	bool onGUI(Span<AssetBrowser::ResourceView*> resource) override { return false; }
 	const char* getName() const override { return m_name; }
 	ResourceType getResourceType() const override { return m_resource_type; }
 	AssetBrowser::ResourceView& createView(const Path& path, StudioApp& app) override;
-
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
 
 protected:
 	StudioApp& m_app;

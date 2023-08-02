@@ -659,7 +659,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					ImGui::TableNextColumn();
 					ImGui::PushID(iter.value());
 					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-						m_app.getAssetBrowser().selectResource(iter.value()->getPath(), true, false);
+						m_app.getAssetBrowser().selectResource(iter.value()->getPath(), false);
 					}
 					ImGui::PopID();
 					ImGui::SameLine();

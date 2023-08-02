@@ -61,6 +61,7 @@ LUMIX_EDITOR_API [[nodiscard]] bool menuItem(Action& a, bool enabled);
 LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity);
 LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 LUMIX_EDITOR_API bool inputString(const char* str_id, const char* label, String* value);
+LUMIX_EDITOR_API bool inputStringMultiline(const char* label, String* value, const ImVec2& size = ImVec2(0, 0));
 
 struct SimpleUndoRedo {
 	enum { NO_MERGE_UNDO = 0xffFFffFF };

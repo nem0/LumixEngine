@@ -2,6 +2,7 @@
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/editor_asset.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -27,9 +28,7 @@
 using namespace Lumix;
 
 
-namespace
-{
-
+namespace {
 
 static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = reflection::getComponentType("gui_image");
@@ -37,176 +36,192 @@ static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_tex
 static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_button");
 static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
 
+struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+			: AssetEditorWindow(app)
+			, m_allocator(allocator)
+			, m_app(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<Sprite>(path);
+		}
 
-struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+		~EditorWindow() {
+			m_resource->decRefCount();
+		}
+
+		void save() {
+			OutputMemoryStream blob(m_app.getAllocator());
+			m_resource->serialize(blob);
+			m_app.getAssetBrowser().saveResource(*m_resource, blob);
+			m_dirty = false;
+		}
+		
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getSaveAction()) save();
+			else return false;
+			return true;
+		}
+
+		bool patch9edit(Sprite* sprite) {
+			Texture* texture = sprite->getTexture();
+
+			if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return false;
+			ImVec2 size;
+			size.x = minimum(ImGui::GetContentRegionAvail().x, texture->width * 2.0f);
+			size.y = size.x / texture->width * texture->height;
+			float scale = size.x / texture->width;
+			const float SIZE = 5;
+			ImGui::Dummy(size + ImVec2(4 * SIZE, 4 * SIZE));
+
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			ImVec2 a = ImGui::GetItemRectMin() + ImVec2(2 * SIZE, 2 * SIZE);
+			ImVec2 b = ImGui::GetItemRectMax() - ImVec2(2 * SIZE, 2 * SIZE);
+			draw->AddImage(texture->handle, a, b);
+
+			auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
+				ImVec2 rect_pos((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+				if (vertical)
+				{
+					rect_pos.x = a.x + (sprite->left + sprite->right) * 0.5f * scale;
+				}
+				else
+				{
+					rect_pos.y = a.y + (sprite->top + sprite->bottom) * 0.5f * scale;
+				}
+
+				ImGui::SetCursorScreenPos({ rect_pos.x - SIZE, rect_pos.y - SIZE });
+				ImGui::InvisibleButton(id, { SIZE * 2, SIZE * 2 });
+				bool changed = false;
+				if (ImGui::IsItemActive())
+				{
+					static int start_drag_value;
+					if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+					{
+						ImVec2 drag = ImGui::GetMouseDragDelta();
+						if (vertical)
+						{
+							*value = int(start_drag_value + drag.y / scale);
+						}
+						else
+						{
+							*value = int(start_drag_value + drag.x / scale);
+						}
+					}
+					else if (ImGui::IsMouseClicked(0))
+					{
+						start_drag_value = *value;
+					}
+					changed = true;
+				}
+
+
+				bool is_hovered = ImGui::IsItemHovered();
+				draw->AddLine(a, b, 0xffff00ff);
+				draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), is_hovered ? 0xffffffff : 0x77ffFFff);
+				draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0xff777777);
+
+				return changed;
+			};
+
+			ImVec2 cp = ImGui::GetCursorScreenPos();
+			bool changed = drawHandle("left", { a.x + sprite->left * scale, a.y }, { a.x + sprite->left * scale, b.y }, &sprite->left, false);
+			changed = drawHandle("right", { a.x + sprite->right * scale, a.y }, { a.x + sprite->right * scale, b.y }, &sprite->right, false) || changed;
+			changed = drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true) || changed;
+			changed = drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true) || changed;
+			ImGui::SetCursorScreenPos(cp);
+			return changed;
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			if (!m_resource->isReady()) return;
+		
+			char tmp[LUMIX_MAX_PATH];
+			Texture* tex = m_resource->getTexture();
+			copyString(tmp, tex ? tex->getPath().c_str() : "");
+			ImGuiEx::Label("Texture");
+			if (m_app.getAssetBrowser().resourceInput("texture", Span(tmp), Texture::TYPE)) {
+				m_resource->setTexture(Path(tmp));
+				m_dirty = true;
+			}
+
+			static const char* TYPES_STR[] = { "9 patch", "Simple" };
+			ImGuiEx::Label("type");
+			if (ImGui::BeginCombo("##type", TYPES_STR[m_resource->type]))
+			{
+				if (ImGui::Selectable("9 patch")) {
+					m_dirty = true;
+					m_resource->type = Sprite::Type::PATCH9;
+				}
+				if (ImGui::Selectable("Simple")) {
+					m_dirty = true;
+					m_resource->type = Sprite::Type::SIMPLE;
+				}
+				ImGui::EndCombo();
+			}
+			switch (m_resource->type) {
+				case Sprite::Type::PATCH9:
+					ImGuiEx::Label("Top");
+					m_dirty = ImGui::InputInt("##top", &m_resource->top) || m_dirty;
+					ImGuiEx::Label("Right");
+					m_dirty = ImGui::InputInt("##right", &m_resource->right) || m_dirty;
+					ImGuiEx::Label("Bottom");
+					m_dirty = ImGui::InputInt("##bottom", &m_resource->bottom) || m_dirty;
+					ImGuiEx::Label("Left");
+					m_dirty = ImGui::InputInt("##left", &m_resource->left) || m_dirty;
+					m_dirty = patch9edit(m_resource) || m_dirty;
+					break;
+				case Sprite::Type::SIMPLE: break;
+			}
+		}
+	
+		void destroy() override { LUMIX_DELETE(m_allocator, this); }
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "sprite editor"; }
+
+		IAllocator& m_allocator;
+		StudioApp& m_app;
+		Sprite* m_resource;
+	};
+
 	SpritePlugin(StudioApp& app) 
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		m_app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
 	}
 
-	bool compile(const Path& src) override {
-		return m_app.getAssetCompiler().copyCompile(src);
-	}
-
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "spr"; }
+	void createResource(OutputMemoryStream& blob) override { blob << "type \"simple\""; }
 
-	void createResource(OutputMemoryStream& blob) override {
-		blob << "type \"simple\"";
-	}
+	void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
 	
-	void deserialize(InputMemoryStream& blob) override { 
-		m_current_resource->load(blob.size(), (const u8*)blob.getData());
-	}
-	
-	void serialize(OutputMemoryStream& blob) override {
-		m_current_resource->serialize(blob);
-	}
-
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
-	{
-		m_current_resource = nullptr;
-		if (resources.length() > 1) return false;
-
-		Sprite* sprite = static_cast<Sprite*>(resources[0]->getResource());
-		m_current_resource = sprite;
-		if (!sprite->isReady()) return false;
-		
-		if (ImGui::Button(ICON_FA_SAVE "Save")) saveSprite(*sprite);
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(sprite);
-
-		bool changed = false;
-		char tmp[LUMIX_MAX_PATH];
-		Texture* tex = sprite->getTexture();
-		copyString(tmp, tex ? tex->getPath().c_str() : "");
-		ImGuiEx::Label("Texture");
-		if (m_app.getAssetBrowser().resourceInput("texture", Span(tmp), Texture::TYPE))
-		{
-			sprite->setTexture(Path(tmp));
-			changed = true;
-		}
-
-		static const char* TYPES_STR[] = { "9 patch", "Simple" };
-		ImGuiEx::Label("type");
-		if (ImGui::BeginCombo("##type", TYPES_STR[sprite->type]))
-		{
-			if (ImGui::Selectable("9 patch")) {
-				changed = true;
-				sprite->type = Sprite::Type::PATCH9;
-			}
-			if (ImGui::Selectable("Simple")) {
-				changed = true;
-				sprite->type = Sprite::Type::SIMPLE;
-			}
-			ImGui::EndCombo();
-		}
-		switch (sprite->type) {
-			case Sprite::Type::PATCH9:
-				ImGuiEx::Label("Top");
-				changed = ImGui::InputInt("##top", &sprite->top) || changed;
-				ImGuiEx::Label("Right");
-				changed = ImGui::InputInt("##right", &sprite->right) || changed;
-				ImGuiEx::Label("Bottom");
-				changed = ImGui::InputInt("##bottom", &sprite->bottom) || changed;
-				ImGuiEx::Label("Left");
-				changed = ImGui::InputInt("##left", &sprite->left) || changed;
-				changed = patch9edit(sprite) || changed;
-				break;
-			case Sprite::Type::SIMPLE: break;
-		}
-		return changed;
-	}
-
-
-
-	bool patch9edit(Sprite* sprite)
-	{
-		Texture* texture = sprite->getTexture();
-
-		if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return false;
-		ImVec2 size;
-		size.x = minimum(ImGui::GetContentRegionAvail().x, texture->width * 2.0f);
-		size.y = size.x / texture->width * texture->height;
-		float scale = size.x / texture->width;
-		const float SIZE = 5;
-		ImGui::Dummy(size + ImVec2(4 * SIZE, 4 * SIZE));
-
-		ImDrawList* draw = ImGui::GetWindowDrawList();
-		ImVec2 a = ImGui::GetItemRectMin() + ImVec2(2 * SIZE, 2 * SIZE);
-		ImVec2 b = ImGui::GetItemRectMax() - ImVec2(2 * SIZE, 2 * SIZE);
-		draw->AddImage(texture->handle, a, b);
-
-		auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
-			ImVec2 rect_pos((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
-			if (vertical)
-			{
-				rect_pos.x = a.x + (sprite->left + sprite->right) * 0.5f * scale;
-			}
-			else
-			{
-				rect_pos.y = a.y + (sprite->top + sprite->bottom) * 0.5f * scale;
-			}
-
-			ImGui::SetCursorScreenPos({ rect_pos.x - SIZE, rect_pos.y - SIZE });
-			ImGui::InvisibleButton(id, { SIZE * 2, SIZE * 2 });
-			bool changed = false;
-			if (ImGui::IsItemActive())
-			{
-				static int start_drag_value;
-				if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-				{
-					ImVec2 drag = ImGui::GetMouseDragDelta();
-					if (vertical)
-					{
-						*value = int(start_drag_value + drag.y / scale);
-					}
-					else
-					{
-						*value = int(start_drag_value + drag.x / scale);
-					}
-				}
-				else if (ImGui::IsMouseClicked(0))
-				{
-					start_drag_value = *value;
-				}
-				changed = true;
-			}
-
-
-			bool is_hovered = ImGui::IsItemHovered();
-			draw->AddLine(a, b, 0xffff00ff);
-			draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), is_hovered ? 0xffffffff : 0x77ffFFff);
-			draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0xff777777);
-
-			return changed;
-		};
-
-		ImVec2 cp = ImGui::GetCursorScreenPos();
-		bool changed = drawHandle("left", { a.x + sprite->left * scale, a.y }, { a.x + sprite->left * scale, b.y }, &sprite->left, false);
-		changed = drawHandle("right", { a.x + sprite->right * scale, a.y }, { a.x + sprite->right * scale, b.y }, &sprite->right, false) || changed;
-		changed = drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true) || changed;
-		changed = drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true) || changed;
-		ImGui::SetCursorScreenPos(cp);
-		return changed;
-	}
-
-
-	void saveSprite(Sprite& sprite)
-	{
-		OutputMemoryStream blob(m_app.getAllocator());
-		sprite.serialize(blob);
-		m_app.getAssetBrowser().saveResource(sprite, blob);
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		ab.addWindow(win);
 	}
 
 	const char* getName() const override { return "Sprite"; }
 	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
 	StudioApp& m_app;
-	Sprite* m_current_resource = nullptr;
 };
 
 

@@ -2,6 +2,7 @@
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/editor_asset.h"
 #include "editor/property_grid.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
@@ -16,6 +17,7 @@
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/world.h"
 #include "lua_script/lua_script.h"
@@ -29,80 +31,155 @@ using namespace Lumix;
 static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 
 
-namespace
-{
+namespace {
+
+#if 0
+struct EditorWindow : AssetEditorWindow {
+	EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		: AssetEditorWindow(app)
+		, m_allocator(allocator)
+		, m_app(app)
+	{
+		m_resource = app.getEngine().getResourceManager().load<LuaScript>(path);
+	}
+
+	~EditorWindow() {
+		m_resource->decRefCount();
+	}
+
+	void save() {
+		Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+		m_app.getAssetBrowser().saveResource(*m_resource, data);
+		m_dirty = false;
+	}
+		
+	bool onAction(const Action& action) override { 
+		if (&action == &m_app.getSaveAction()) save();
+		else return false;
+		return true;
+	}
+
+	void windowGUI() override {
+		if (ImGui::BeginMenuBar()) {
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+			ImGui::EndMenuBar();
+		}
+
+		if (m_resource->isEmpty()) {
+			ImGui::TextUnformatted("Loading...");
+			return;
+		}
+	}
+	
+	void destroy() override { LUMIX_DELETE(m_allocator, this); }
+	const Path& getPath() override { return m_resource->getPath(); }
+	const char* getName() const override { return "lua script editor"; }
+
+	IAllocator& m_allocator;
+	StudioApp& m_app;
+	LuaScript* m_resource;
+};
+
+void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
+	
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		ab.addWindow(win);
+	}
+#endif
+
+struct EditorWindow : AssetEditorWindow {
+	EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		: AssetEditorWindow(app)
+		, m_allocator(allocator)
+		, m_buffer(allocator)
+		, m_app(app)
+	{
+		m_resource = app.getEngine().getResourceManager().load<LuaScript>(path);
+	}
+
+	~EditorWindow() {
+		m_resource->decRefCount();
+	}
+
+	void save() {
+		Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+		m_app.getAssetBrowser().saveResource(*m_resource, data);
+		m_dirty = false;
+	}
+	
+	bool onAction(const Action& action) override { 
+		if (&action == &m_app.getSaveAction()) save();
+		else return false;
+		return true;
+	}
+
+	void windowGUI() override {
+		if (ImGui::BeginMenuBar()) {
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+			ImGui::EndMenuBar();
+		}
+
+		if (m_resource->isEmpty()) {
+			ImGui::TextUnformatted("Loading...");
+			return;
+		}
+
+		if (m_buffer.length() == 0) m_buffer = m_resource->getSourceCode();
+
+		if (inputStringMultiline("##code", &m_buffer, ImGui::GetContentRegionAvail())) {
+			m_dirty = true;
+		}
+	}
+	
+	void destroy() override { LUMIX_DELETE(m_allocator, this); }
+	const Path& getPath() override { return m_resource->getPath(); }
+	const char* getName() const override { return "lua script editor"; }
+
+	IAllocator& m_allocator;
+	StudioApp& m_app;
+	LuaScript* m_resource;
+	String m_buffer;
+};
 
 
-struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	explicit AssetPlugin(StudioApp& app)
 		: m_app(app)
-		, AssetBrowser::Plugin(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("lua", LuaScript::TYPE);
-		m_text_buffer[0] = 0;
 	}
 
-	void deserialize(InputMemoryStream& blob) override { ASSERT(false); }
-	void serialize(OutputMemoryStream& blob) override {}
-
-	bool compile(const Path& src) override
-	{
-		return m_app.getAssetCompiler().copyCompile(src);
+	void onResourceDoubleClicked(const Path& path) override {
+		AssetBrowser& ab = m_app.getAssetBrowser();
+		if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
+			win->m_focus_request = true;
+			return;
+		}
+	
+		IAllocator& allocator = m_app.getAllocator();
+		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
+		ab.addWindow(win);
 	}
 
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
-	{
-		if (resources.length() > 1) return false;
-
-		auto* script = static_cast<LuaScript*>(resources[0]->getResource());
-
-		if (m_text_buffer[0] == '\0')
-		{
-			m_too_long = !copyString(m_text_buffer, script->getSourceCode());
-		}
-		ImGui::SetNextItemWidth(-1);
-		if (!m_too_long) {
-			ImGui::InputTextMultiline("##code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
-			if (ImGui::Button(ICON_FA_SAVE "Save"))
-			{
-				FileSystem& fs = m_app.getEngine().getFileSystem();
-				if (!fs.saveContentSync(script->getPath(), Span((const u8*)m_text_buffer, stringLength(m_text_buffer)))) {
-					logWarning("Could not save ", script->getPath());
-					return false;
-				}
-			}
-			ImGui::SameLine();
-		}
-		else {
-			ImGui::Text(ICON_FA_EXCLAMATION_TRIANGLE "File is too big to be edited here, please use external editor");
-		}
-		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally"))
-		{
-			m_app.getAssetBrowser().openInExternalEditor(script);
-		}
-		return false;
-	}
-
-	void onResourceUnloaded(AssetBrowser::ResourceView&) override { m_text_buffer[0] = 0; }
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getName() const override { return "Lua script"; }
 	ResourceType getResourceType() const override { return LuaScript::TYPE; }
-
 	bool canCreateResource() const override { return true; }
+	const char* getDefaultExtension() const override { return "lua"; }
 
 	void createResource(OutputMemoryStream& blob) override {
 		blob << "function update(time_delta)\nend\n";
 	}
 
-	const char* getDefaultExtension() const override { return "lua"; }
-
-	void onResourceDoubleClicked(const Path& path) override {
-		m_app.getAssetBrowser().openInExternalEditor(path);
-	}
-
 	StudioApp& m_app;
-	char m_text_buffer[8192];
-	bool m_too_long = false;
 };
 
 

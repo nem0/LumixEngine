@@ -107,6 +107,7 @@ struct TransientBuffer {
 
 		ASSERT(!m_ptr);
 		m_ptr = (u8*)gpu::map(m_buffer, m_size);
+		ASSERT(m_ptr);
 		m_offset = 0;
 	}
 
@@ -900,6 +901,8 @@ struct RendererImpl final : Renderer
 	{
 		PROFILE_FUNCTION();
 		
+		// we have to wait for `can_setup` in case somebody calls frame() several times in a row
+		jobs::wait(&m_cpu_frame->can_setup);
 		jobs::wait(&m_cpu_frame->setup_done);
 
 		m_cpu_frame->draw_stream.useProgram(gpu::INVALID_PROGRAM);
@@ -927,7 +930,7 @@ struct RendererImpl final : Renderer
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
 
 		jobs::setRed(&m_cpu_frame->can_setup);
-		
+
 		m_cpu_frame = m_frames[(getFrameIndex(m_cpu_frame) + 1) % lengthOf(m_frames)].get();
 		++m_frame_number;
 		m_cpu_frame->frame_number = m_frame_number;
@@ -935,6 +938,7 @@ struct RendererImpl final : Renderer
 		jobs::runLambda([this](){
 			render();
 		}, &m_last_render, 1);
+
 	}
 
 	Engine& m_engine;
