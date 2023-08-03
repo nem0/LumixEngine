@@ -281,7 +281,7 @@ namespace Lumix
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
-		void init() override;
+		void initBegin() override;
 		void createModules(World& world) override;
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
@@ -2589,7 +2589,8 @@ namespace Lumix
 			.end_array();
 	}
 
-	void LuaScriptSystemImpl::init() {
+	void LuaScriptSystemImpl::initBegin() {
+		PROFILE_FUNCTION();
 		createClasses(m_engine.getState());
 	}
 
@@ -2605,8 +2606,8 @@ namespace Lumix
 	}
 
 
-	LUMIX_PLUGIN_ENTRY(lua_script)
-	{
+	LUMIX_PLUGIN_ENTRY(lua_script) {
+		PROFILE_FUNCTION();
 		return LUMIX_NEW(engine.getAllocator(), LuaScriptSystemImpl)(engine);
 	}
 } // namespace Lumix

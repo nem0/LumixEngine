@@ -1472,6 +1472,7 @@ bool getMemoryStats(MemoryStats& stats) {
 
 bool init(void* window_handle, InitFlags init_flags)
 {
+	PROFILE_FUNCTION();
 	#ifdef LUMIX_DEBUG
 		const bool debug = true;
 	#else 

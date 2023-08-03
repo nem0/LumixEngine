@@ -1,5 +1,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include <imgui/imgui_freetype.h>
 
 #include "audio/audio_module.h"
 #include "editor/asset_browser.h"
@@ -47,7 +48,6 @@ namespace Lumix
 #define LUMIX_EDITOR_PLUGINS_DECLS
 #include "engine/plugins.inl"
 #undef LUMIX_EDITOR_PLUGINS_DECLS
-	
 
 struct TarHeader {
 	char name[100];
@@ -102,6 +102,7 @@ struct StudioAppImpl final : StudioApp
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
 	{
+		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
 		u32 workers;
 		if (workersCountOption(workers)) {
@@ -247,9 +248,18 @@ struct StudioAppImpl final : StudioApp
 		m_is_f2_pressed = false;
 	}
 
+	bool profileStart() {
+		char cmd_line[2048];
+		os::getCommandLine(Span(cmd_line));
 
-	void run() override
-	{
+		CommandLineParser parser(cmd_line);
+		while (parser.next()) {
+			if (parser.currentEquals("-profile_start")) return true;
+		}
+		return false;
+	}
+
+	void run() override {
 		profiler::setThreadName("Main thread");
 		Semaphore semaphore(0, 1);
 		struct Data {
@@ -258,6 +268,9 @@ struct StudioAppImpl final : StudioApp
 		} data = {this, &semaphore};
 		jobs::runLambda([&data]() {
 			data.that->onInit();
+			if (data.that->profileStart()) {
+				profiler::pause(true);
+			}
 			while (!data.that->m_finished) {
 				os::Event e;
 				while(os::getEvent(e)) {
@@ -290,8 +303,9 @@ struct StudioAppImpl final : StudioApp
 
 	void onInit()
 	{
-		os::Timer init_timer;
+		PROFILE_FUNCTION();
 
+		os::Timer init_timer;
 		m_add_cmp_root.label[0] = '\0';
 		m_open_filter[0] = '\0';
 
@@ -325,6 +339,11 @@ struct StudioAppImpl final : StudioApp
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		m_main_window = m_engine->getWindowHandle();
 		m_windows.push(m_main_window);
+		
+		beginInitIMGUI();
+		m_engine->init();
+		jobs::wait(&m_init_imgui_signal);
+		
 		logInfo("Current directory: ", current_dir);
 
 		registerLuaAPI();
@@ -342,11 +361,7 @@ struct StudioAppImpl final : StudioApp
 		m_profiler_ui = createProfilerUI(*this);
 		m_log_ui.create(*this, m_allocator);
 
-		// TODO refactor so we don't need to call loadSettings twice
-		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
-		ImGui::CreateContext();
-		loadSettings(); // needs imgui context
-		initIMGUI(); // needs settings
+		// TODO refactor so we don't need to call loadSettings twice (once in beginInitIMGUI)
 		initPlugins(); // needs initialized imgui
 		loadSettings(); // needs plugins
 
@@ -357,7 +372,10 @@ struct StudioAppImpl final : StudioApp
 		
 		checkScriptCommandLine();
 
-		logInfo("Startup took ", init_timer.getTimeSinceStart(), " s"); 
+		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
+		#ifdef _WIN32
+			logInfo(os::getTimeSinceProcessStart(), " s since process started");
+		#endif
 	}
 
 
@@ -2012,6 +2030,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
+		PROFILE_FUNCTION();
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) return nullptr;
@@ -2129,60 +2148,74 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void initIMGUI()
-	{
-		logInfo("Initializing imgui...");
-		ImGuiIO& io = ImGui::GetIO();
-		io.IniFilename = nullptr;
-		#ifdef __linux__ 
-			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-			io.BackendFlags = ImGuiBackendFlags_HasMouseCursors;
-		#else
-			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
-			io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
-		#endif
+	void beginInitIMGUI() {
+		PROFILE_FUNCTION();
+		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
+		ImGui::CreateContext();
+		loadSettings(); // needs imgui context
 
-		initIMGUIPlatformIO();
+		jobs::runLambda([this](){
+			PROFILE_BLOCK("init imgui");
+			ImGuiIO& io = ImGui::GetIO();
+			io.IniFilename = nullptr;
+			#ifdef __linux__ 
+				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+				io.BackendFlags = ImGuiBackendFlags_HasMouseCursors;
+			#else
+				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+				io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
+			#endif
 
-		const int dpi = os::getDPI();
-		float font_scale = dpi / 96.f;
-		FileSystem& fs = m_engine->getFileSystem();
+			initIMGUIPlatformIO();
+
+			const int dpi = os::getDPI();
+			float font_scale = dpi / 96.f;
+			FileSystem& fs = m_engine->getFileSystem();
 		
-		ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
+			ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-		m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
-		m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_settings.m_font_size * font_scale, true);
-		
-		OutputMemoryStream data(m_allocator);
-		if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
-			const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
-			ImFontConfig cfg;
-			copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
-			cfg.FontDataOwnedByAtlas = false;
-			cfg.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
-			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-			m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
-			cfg.MergeMode = true;
-			copyString(cfg.Name, "editor/fonts/fa-regular-400.ttf");
-			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), data)) {
-				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
-				ASSERT(icons_font);
+			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
+			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_settings.m_font_size * font_scale, true);
+
+			OutputMemoryStream data(m_allocator);
+			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
+				const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
+				ImFontConfig cfg;
+				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
+				cfg.FontDataOwnedByAtlas = false;
+				cfg.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
+				static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+				m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
+				cfg.MergeMode = true;
+				copyString(cfg.Name, "editor/fonts/fa-regular-400.ttf");
+				if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), data)) {
+					ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
+					ASSERT(icons_font);
+				}
 			}
-		}
 
-		if (!m_font || !m_bold_font) {
-			os::messageBox(
-				"Could not open editor/fonts/notosans-regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
-				"It very likely means that data are not bundled with\n"
-				"the exe and the exe is not in the correct directory.\n"
-				"The program will eventually crash!"
-			);
-		}
+			if (!m_font || !m_bold_font) {
+				os::messageBox(
+					"Could not open editor/fonts/notosans-regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
+					"It very likely means that data are not bundled with\n"
+					"the exe and the exe is not in the correct directory.\n"
+					"The program will eventually crash!"
+				);
+			}
 
-		ImGuiStyle& style = ImGui::GetStyle();
-		style.FramePadding.y = 0;
-		style.ItemSpacing.y = 2;
-		style.ItemInnerSpacing.x = 2;
+			{
+				PROFILE_BLOCK("build atlas");
+				ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+				atlas->FontBuilderIO = ImGuiFreeType::GetBuilderForFreeType();
+				atlas->FontBuilderFlags = 0;
+				atlas->Build();
+			}
+
+			ImGuiStyle& style = ImGui::GetStyle();
+			style.FramePadding.y = 0;
+			style.ItemSpacing.y = 2;
+			style.ItemInnerSpacing.x = 2;
+		}, &m_init_imgui_signal);
 	}
 
 	void setRenderInterface(RenderInterface* ri) override { m_render_interface = ri; }
@@ -2192,8 +2225,8 @@ struct StudioAppImpl final : StudioApp
 	void setFOV(float fov_radians) override { m_fov = fov_radians; }
 	Settings& getSettings() override { return m_settings; }
 
-	void loadSettings()
-	{
+	void loadSettings() {
+		PROFILE_FUNCTION();
 		logInfo("Loading settings...");
 		char cmd_line[2048];
 		os::getCommandLine(Span(cmd_line));
@@ -2342,8 +2375,8 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void loadUserPlugins()
-	{
+	void loadUserPlugins() {
+		PROFILE_FUNCTION();
 		char cmd_line[2048];
 		os::getCommandLine(Span(cmd_line));
 
@@ -2546,6 +2579,7 @@ struct StudioAppImpl final : StudioApp
 
 
 	void initPlugins() {
+		PROFILE_FUNCTION();
 		#ifdef STATIC_PLUGINS
 			#define LUMIX_EDITOR_PLUGINS
 			#include "engine/plugins.inl"
@@ -3245,8 +3279,8 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void scanWorlds() override
-	{
+	void scanWorlds() override {
+		PROFILE_FUNCTION();
 		m_worlds.clear();
 		auto* iter = m_engine->getFileSystem().createFileIterator("universes");
 		os::FileInfo info;
@@ -3347,6 +3381,7 @@ struct StudioAppImpl final : StudioApp
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	os::WindowHandle m_main_window;
 	os::WindowState m_fullscreen_restore_state;
+	jobs::Signal m_init_imgui_signal;
 
 	Array<Action*> m_owned_actions;
 	Array<Action*> m_tools_actions;

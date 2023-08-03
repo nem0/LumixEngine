@@ -4,6 +4,7 @@
 #include "engine/input_system.h"
 #include "engine/math.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -132,8 +133,8 @@ struct GUISystemImpl final : GUISystem
 };
 
 
-LUMIX_PLUGIN_ENTRY(gui)
-{
+LUMIX_PLUGIN_ENTRY(gui) {
+	PROFILE_FUNCTION();
 	return LUMIX_NEW(engine.getAllocator(), GUISystemImpl)(engine);
 }
 

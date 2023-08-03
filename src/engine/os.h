@@ -232,6 +232,8 @@ LUMIX_ENGINE_API bool getCommandLine(Span<char> output);
 LUMIX_ENGINE_API void* loadLibrary(const char* path);
 LUMIX_ENGINE_API void unloadLibrary(void* handle);
 LUMIX_ENGINE_API void* getLibrarySymbol(void* handle, const char* name);
+LUMIX_ENGINE_API float getTimeSinceProcessStart();
+
 
 struct LUMIX_ENGINE_API Timer {
 	Timer();

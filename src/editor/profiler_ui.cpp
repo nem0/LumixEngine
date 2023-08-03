@@ -6,6 +6,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "engine/allocators.h"
+#include "engine/command_line_parser.h"
 #include "engine/crt.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
@@ -533,6 +534,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 						else {
 							Block& b = m_blocks.insert(tmp.id);
 							b.name = tmp.name;
+							if (startsWith(b.name, "Lumix::")) b.name += 7;
+							else if (startsWith(b.name, "`anonymous-namespace'::")) b.name += 23;
 						}
 						break;
 					}
@@ -771,7 +774,27 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		// TODO gpu mem
 	}
 
+	void profileStart() {
+		static bool done = false;
+		if (done) return;
+		done = true;
+
+		char cmd_line[2048];
+		os::getCommandLine(Span(cmd_line));
+
+		CommandLineParser parser(cmd_line);
+		while (parser.next()) {
+			if (parser.currentEquals("-profile_start")) {
+				m_is_paused = true;
+				onPause();
+				return;
+			}
+		}
+	}
+
 	void onGUICPUProfiler() {
+		profileStart();
+
 		if (m_autopause > 0 && !m_is_paused && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
 			m_is_paused = true;
 			profiler::pause(m_is_paused);

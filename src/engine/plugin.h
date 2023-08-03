@@ -58,7 +58,11 @@ struct LUMIX_ENGINE_API ISystem
 {
 	virtual ~ISystem();
 
-	virtual void init() {}
+	// can start async stuff, called for all systems at once
+	virtual void initBegin() {}
+	// wait for all async stuff to finish, called after initBegin is called on all system
+	virtual void initEnd() {}
+	
 	virtual void update(float) {}
 	virtual const char* getName() const = 0;
 	virtual i32 getVersion() const { return 0; }

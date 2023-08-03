@@ -4,6 +4,7 @@
 #include "clip.h"
 #include "engine/engine.h"
 #include "engine/plugin.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 
@@ -48,8 +49,9 @@ struct AudioSystemImpl final : AudioSystem {
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
-	void init() override
+	void initBegin() override
 	{
+		PROFILE_FUNCTION();
 		m_device = AudioDevice::create(m_engine, m_allocator);
 		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}
@@ -76,8 +78,8 @@ struct AudioSystemImpl final : AudioSystem {
 };
 
 
-LUMIX_PLUGIN_ENTRY(audio)
-{
+LUMIX_PLUGIN_ENTRY(audio) {
+	PROFILE_FUNCTION();
 	return LUMIX_NEW(engine.getAllocator(), AudioSystemImpl)(engine);
 }
 

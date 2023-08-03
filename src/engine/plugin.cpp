@@ -47,9 +47,11 @@ namespace Lumix
 		void initSystems() override
 		{
 			PROFILE_FUNCTION();
-			for (int i = 0, c = m_systems.size(); i < c; ++i)
-			{
-				m_systems[i]->init();
+			for (i32 i = 0, c = m_systems.size(); i < c; ++i) {
+				m_systems[i]->initBegin();
+			}
+			for (i32 i = 0, c = m_systems.size(); i < c; ++i) {
+				m_systems[i]->initEnd();
 			}
 		}
 
@@ -194,6 +196,7 @@ namespace Lumix
 	}
 
 	void SystemManager::createAllStatic(Engine& engine) {
+		PROFILE_FUNCTION();
 		#include "plugins.inl"
 		for (ISystem* system : engine.getSystemManager().getSystems()) {
 			logInfo("Plugin ", system->getName(), " loaded");

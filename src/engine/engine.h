@@ -33,6 +33,7 @@ struct LUMIX_ENGINE_API Engine {
 
 	static UniquePtr<Engine> create(InitArgs&& init_data, struct IAllocator& allocator);
 
+	virtual void init() = 0;
 	virtual struct World& createWorld(bool is_main_world) = 0;
 	virtual void destroyWorld(World& world) = 0;
 	virtual os::WindowHandle getWindowHandle() = 0;

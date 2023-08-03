@@ -7,6 +7,7 @@
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/profiler.h"
 
 
 namespace Lumix
@@ -87,6 +88,7 @@ struct AudioDeviceImpl final : AudioDevice
 
 	bool init(Engine& engine)
 	{
+		PROFILE_FUNCTION();
 		m_engine = &engine;
 
 		auto coinitialize_result = CoInitialize(nullptr);

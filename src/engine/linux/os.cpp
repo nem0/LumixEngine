@@ -1259,6 +1259,8 @@ void* getLibrarySymbol(void* handle, const char* name) {
 	return dlsym(handle, name);
 }
 
+float getTimeSinceProcessStart() { return -1; }
+
 Timer::Timer() {
 	last_tick = getRawTimestamp();
 	first_tick = last_tick;

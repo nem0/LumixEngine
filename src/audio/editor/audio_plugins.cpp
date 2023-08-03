@@ -12,6 +12,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/world.h"
@@ -248,8 +249,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous namespace
 
 
-LUMIX_STUDIO_ENTRY(audio)
-{
+LUMIX_STUDIO_ENTRY(audio) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

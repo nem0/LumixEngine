@@ -5,6 +5,7 @@
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/string.h"
 #define UNICODE
 #pragma warning(push)
@@ -12,6 +13,7 @@
 #include <Shobjidl_core.h>
 #include <shlobj_core.h>
 #include <Psapi.h>
+#include <sysinfoapi.h>
 #pragma warning(pop)
 #pragma warning(disable : 4996)
 
@@ -551,6 +553,7 @@ void updateGrabbedMouse() {
 }
 
 WindowHandle createWindow(const InitWindowArgs& args) {
+	PROFILE_FUNCTION();
 	WCharStr<LUMIX_MAX_PATH> cls_name("lunex_window");
 	static WNDCLASS wndcls = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
@@ -1319,6 +1322,15 @@ void unloadLibrary(void* handle)
 	FreeLibrary((HMODULE)handle);
 }
 
+float getTimeSinceProcessStart() {
+	FILETIME now, created, dummy;
+	GetSystemTimeAsFileTime(&now);
+	if (!GetProcessTimes(GetCurrentProcess(), &created, &dummy, &dummy, &dummy)) return 0;
+
+	u64 now_t = u64(now.dwHighDateTime) << 32 | now.dwLowDateTime;
+	u64 created_t = u64(created.dwHighDateTime) << 32 | created.dwLowDateTime;
+	return float(double((now_t - created_t) / 10) / 1000.0 / 1000.0);
+}
 
 void* getLibrarySymbol(void* handle, const char* name)
 {

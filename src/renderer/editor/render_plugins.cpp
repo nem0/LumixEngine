@@ -3,8 +3,6 @@
 	#include <encoder/basisu_comp.h>
 #endif
 
-#include <imgui/imgui_freetype.h>
-
 #include "animation/animation.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -1353,6 +1351,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "texture editor")
 	{
+		PROFILE_FUNCTION();
 		rgbcx::init();
 
 		app.getAssetCompiler().registerExtension("png", Texture::TYPE);
@@ -4749,16 +4748,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		, m_engine(app.getEngine())
 		, m_programs(app.getAllocator())
 	{
-
+		PROFILE_FUNCTION();
 		SystemManager& system_manager = m_engine.getSystemManager();
 		Renderer* renderer = (Renderer*)system_manager.getSystem("renderer");
 
 		unsigned char* pixels;
 		int width, height;
 		ImFontAtlas* atlas = ImGui::GetIO().Fonts;
-		atlas->FontBuilderIO = ImGuiFreeType::GetBuilderForFreeType();
-		atlas->FontBuilderFlags = 0;
-		atlas->Build();
 		atlas->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
@@ -5144,6 +5140,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
+		PROFILE_FUNCTION();
 		m_renderdoc_capture_action.init("     Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", false);
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
 
@@ -5448,8 +5445,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 }
 
-LUMIX_STUDIO_ENTRY(renderer)
-{
+LUMIX_STUDIO_ENTRY(renderer) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

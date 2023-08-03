@@ -21,6 +21,7 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/world.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_module.h"
@@ -1037,8 +1038,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous
 
 
-LUMIX_STUDIO_ENTRY(physics)
-{
+LUMIX_STUDIO_ENTRY(physics) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

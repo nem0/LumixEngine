@@ -14,6 +14,7 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -916,6 +917,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 
 	void init() override {
+		PROFILE_FUNCTION();
 		m_gui_editor.init();
 
 		m_app.addPlugin(m_gui_editor);
@@ -946,8 +948,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous namespace
 
 
-LUMIX_STUDIO_ENTRY(gui)
-{
+LUMIX_STUDIO_ENTRY(gui) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

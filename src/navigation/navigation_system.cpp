@@ -3,6 +3,7 @@
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
+#include "engine/profiler.h"
 #include "engine/world.h"
 #include "navigation/navigation_module.h"
 #include "renderer/material.h"
@@ -61,8 +62,8 @@ void NavigationSystem::createModules(World& world)
 }
 
 
-LUMIX_PLUGIN_ENTRY(navigation)
-{
+LUMIX_PLUGIN_ENTRY(navigation) {
+	PROFILE_FUNCTION();
 	return LUMIX_NEW(engine.getAllocator(), NavigationSystem)(engine);
 }
 

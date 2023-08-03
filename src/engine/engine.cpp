@@ -63,6 +63,7 @@ struct EngineImpl final : Engine {
 		, m_next_frame(false)
 		, m_lua_allocator(allocator, "lua")
 	{
+		PROFILE_FUNCTION();
 		for (float& f : m_last_time_deltas) f = 1/60.f;
 		os::init();
 		registerLogCallback<&EngineImpl::logToFile>(this);
@@ -134,7 +135,9 @@ struct EngineImpl final : Engine {
 				logInfo(plugin_name, " plugin has not been loaded");
 			}
 		}
+	}
 
+	void init() override {
 		m_system_manager->initSystems();
 	}
 
@@ -182,8 +185,7 @@ struct EngineImpl final : Engine {
 		debug::debugOutput("\n");
 	}
 
-	void logToFile(LogLevel level, const char* message)
-	{
+	void logToFile(LogLevel level, const char* message) {
 		if (!m_is_log_file_open) return;
 		bool success = true;
 		if (level == LogLevel::ERROR) {
@@ -192,7 +194,9 @@ struct EngineImpl final : Engine {
 		success = m_log_file.write(message, stringLength(message)) && success ;
 		success = m_log_file.write("\n", 1) && success ;
 		ASSERT(success);
-		m_log_file.flush();
+		if (level == LogLevel::ERROR) {
+			m_log_file.flush();
+		}
 	}
 
 	os::WindowHandle getWindowHandle() override { return m_window_handle; }

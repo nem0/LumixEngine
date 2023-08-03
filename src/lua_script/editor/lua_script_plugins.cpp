@@ -17,6 +17,7 @@
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/world.h"
@@ -557,8 +558,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous namespace
 
 
-LUMIX_STUDIO_ENTRY(lua_script)
-{
+LUMIX_STUDIO_ENTRY(lua_script) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

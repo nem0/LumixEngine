@@ -88,6 +88,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_subdirs(m_allocator)
 		, m_windows(m_allocator)
 	{
+		PROFILE_FUNCTION();
 		m_filter[0] = '\0';
 
 		onBasePathChanged();

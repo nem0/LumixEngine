@@ -157,6 +157,7 @@ struct Runner final
 		}
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		m_engine->init();
 		
 		if (!isWindowCommandLineOption()) {
 			os::setFullscreen(m_engine->getWindowHandle());

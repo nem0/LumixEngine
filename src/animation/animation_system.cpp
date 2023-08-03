@@ -4,6 +4,7 @@
 #include "animation/property_animation.h"
 #include "animation/controller.h"
 #include "engine/engine.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 
@@ -92,8 +93,8 @@ void AnimationSystemImpl::createModules(World& world)
 }
 
 
-LUMIX_PLUGIN_ENTRY(animation)
-{
+LUMIX_PLUGIN_ENTRY(animation) {
+	PROFILE_FUNCTION();
 	return LUMIX_NEW(engine.getAllocator(), AnimationSystemImpl)(engine);
 }
 }

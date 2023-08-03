@@ -14,6 +14,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/os.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "controller_editor.h"
 #include "engine/reflection.h"
@@ -333,6 +334,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	const char* getName() const override { return "animation"; }
 
 	void init() override {
+		PROFILE_FUNCTION();
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 		const char* anp_exts[] = { "anp", nullptr };
 		compiler.addPlugin(m_prop_anim_plugin, anp_exts);
@@ -370,8 +372,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous namespace
 
 
-LUMIX_STUDIO_ENTRY(animation)
-{
+LUMIX_STUDIO_ENTRY(animation) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

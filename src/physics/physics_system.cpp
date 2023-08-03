@@ -15,6 +15,7 @@
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/world.h"
@@ -267,8 +268,8 @@ namespace Lumix
 		physx::PxPvdTransport* m_pvd_transport = nullptr;
 	};
 
-	LUMIX_PLUGIN_ENTRY(physics)
-	{
+	LUMIX_PLUGIN_ENTRY(physics) {
+		PROFILE_FUNCTION();
 		return LUMIX_NEW(engine.getAllocator(), PhysicsSystemImpl)(engine);
 	}
 

@@ -219,6 +219,7 @@ struct GPUProfiler
 
 	void init()
 	{
+		PROFILE_FUNCTION();
 		gpu::QueryHandle q = gpu::createQuery(gpu::QueryType::TIMESTAMP);
 		gpu::queryTimestamp(q);
 		const u64 cpu_timestamp = os::Timer::getRawTimestamp();
@@ -445,7 +446,12 @@ struct RendererImpl final : Renderer
 		return false;
 	}
 
-	void init() override {
+	void initEnd() override {
+		jobs::wait(&m_init_signal);
+	}
+
+	void initBegin() override {
+		PROFILE_FUNCTION();
 		gpu::InitFlags flags = gpu::InitFlags::VSYNC;
 		
 		char cmd_line[4096];
@@ -481,8 +487,7 @@ struct RendererImpl final : Renderer
 				frame->uniform_buffer.init(gpu::BufferFlags::UNIFORM_BUFFER);
 			}
 			m_profiler.init();
-		}, &signal, 1);
-		jobs::wait(&signal);
+		}, &m_init_signal, 1);
 
 		m_cpu_frame = m_frames[0].get();
 		m_gpu_frame = m_frames[0].get();
@@ -966,6 +971,8 @@ struct RendererImpl final : Renderer
 	u32 m_max_sort_key = 0;
 	u32 m_frame_number = 0;
 	float m_lod_multiplier = 1;
+	jobs::Signal m_init_signal;
+
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];
@@ -1006,8 +1013,8 @@ FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageA
 	, end_frame_draw_stream(renderer)
 {}
 
-LUMIX_PLUGIN_ENTRY(renderer)
-{
+LUMIX_PLUGIN_ENTRY(renderer) {
+	PROFILE_FUNCTION();
 	return LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
 }
 

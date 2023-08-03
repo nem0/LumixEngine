@@ -12,6 +12,7 @@
 #include "engine/log.h"
 #include "engine/path.h"
 #include "engine/os.h"
+#include "engine/profiler.h"
 #include "engine/world.h"
 #include "navigation/navigation_module.h"
 
@@ -209,8 +210,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous
 
 
-LUMIX_STUDIO_ENTRY(navigation)
-{
+LUMIX_STUDIO_ENTRY(navigation) {
+	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
