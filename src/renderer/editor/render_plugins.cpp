@@ -65,6 +65,8 @@
 
 using namespace Lumix;
 
+namespace {
+
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
@@ -650,7 +652,7 @@ struct FontPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Font"; }
+	const char* getLabel() const override { return "Font"; }
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
 	StudioApp& m_app;
@@ -661,7 +663,6 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_buffer(allocator)
 			, m_app(app)
 		{
@@ -679,7 +680,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
 		}
 	
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
@@ -688,6 +689,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -703,11 +705,9 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
 			}
 		}
 	
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "lua script editor"; }
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		PipelineResource* m_resource;
 		String m_buffer;
@@ -718,13 +718,13 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
 	{}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Pipeline"; }
+	const char* getLabel() const override { return "Pipeline"; }
 	ResourceType getResourceType() const override { return ResourceType("pipeline"); }
 
-	void onResourceDoubleClicked(const struct Path& path) {
+	void openEditor(const struct Path& path) {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app, m_app.getAllocator());
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	StudioApp& m_app;
@@ -748,9 +748,6 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
 
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_EDIT " Edit")) m_particle_editor->open(system.getResource()->getPath().c_str());
-
 		ImGuiEx::Label("Time scale");
 		ImGui::SliderFloat("##ts", &m_time_scale, 0, 1);
 		if (m_playing) {
@@ -770,14 +767,12 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 	StudioApp& m_app;
 	bool m_playing = false;
 	float m_time_scale = 1.f;
-	ParticleEditor* m_particle_editor;
 };
 
 struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<Material>(path);
@@ -796,7 +791,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		}
 		
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
@@ -805,6 +800,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -953,11 +949,9 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			if (changed) m_dirty = true;
 		}
 	
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "material editor"; }
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		Material* m_resource;
 	};
@@ -976,10 +970,10 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		m_app.removeAction(&m_wireframe_action);
 	}
 
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	void toggleWireframe() {
@@ -1018,7 +1012,7 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	const char* getDefaultExtension() const override { return "mat"; }
 	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/pipelines/standard.shd\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Material"; }
+	const char* getLabel() const override { return "Material"; }
 	ResourceType getResourceType() const override { return Material::TYPE; }
 
 	StudioApp& m_app;
@@ -1026,6 +1020,44 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 };
 
 struct TextureMeta {
+	void load(const Path& path, StudioApp& app) {
+		if (Path::hasExtension(path.c_str(), "raw")) {
+			compress = false;
+			mips = false;
+		}
+
+		app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &compress);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &scale_coverage);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &stochastic_mipmap);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &is_normalmap);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "invert_green", &invert_normal_y);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &mips);
+			char tmp[32];
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
+				if (equalIStrings(tmp, "point")) {
+					filter = TextureMeta::Filter::POINT;
+				}
+				else if (equalIStrings(tmp, "anisotropic")) {
+					filter = TextureMeta::Filter::ANISOTROPIC;
+				}
+				else {
+					filter = TextureMeta::Filter::LINEAR;
+				}
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_u", Span(tmp))) {
+				wrap_mode_u = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_v", Span(tmp))) {
+				wrap_mode_v = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
+				wrap_mode_w = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
+			}
+		});
+	}
+
 	enum WrapMode : u32 {
 		REPEAT,
 		CLAMP
@@ -1048,59 +1080,31 @@ struct TextureMeta {
 	Filter filter = Filter::LINEAR;
 };
 
-static const char* toString(TextureMeta::Filter filter) {
-	switch (filter) {
-		case TextureMeta::Filter::POINT: return "point";
-		case TextureMeta::Filter::LINEAR: return "linear";
-		case TextureMeta::Filter::ANISOTROPIC: return "anisotropic";
-	}
-	ASSERT(false);
-	return "linear";
-}
-
-static const char* toString(TextureMeta::WrapMode wrap) {
-	switch (wrap) {
-		case TextureMeta::WrapMode::CLAMP: return "clamp";
-		case TextureMeta::WrapMode::REPEAT: return "repeat";
-	}
-	ASSERT(false);
-	return "repeat";
-}
-
-static const char* getCubemapLabel(u32 idx) {
-	switch (idx) {
-		case 0: return "X+";
-		case 1: return "X-";
-		case 2: return "Y+ (top)";
-		case 3: return "Y- (bottom)";
-		case 4: return "Z+";
-		case 5: return "Z-";
-		default: return "Too many faces in cubemap";
-	}
-}
-
 struct TextureAssetEditorWindow : AssetEditorWindow {
-	TextureAssetEditorWindow(const Path& path, StudioApp& app)
+	TextureAssetEditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
 		: AssetEditorWindow(app)
 		, m_app(app)
+		, m_allocator(allocator)
 	{
 		m_texture = app.getEngine().getResourceManager().load<Texture>(path);
-		m_meta = getMeta();
+		m_meta.load(m_texture->getPath(), m_app);
+		if (Path::hasExtension(path, "ltc")) {
+			m_composite_editor = CompositeTextureEditor::open(path, app, m_allocator);
+		}
+		app.getAssetCompiler().resourceCompiled().bind<&TextureAssetEditorWindow::onResourceCompiled>(this);
 	}
 
 	~TextureAssetEditorWindow() {
+		m_app.getAssetCompiler().resourceCompiled().unbind<&TextureAssetEditorWindow::onResourceCompiled>(this);
 		m_texture->decRefCount();
-
-		SystemManager& system_manager = m_app.getEngine().getSystemManager();
-		auto* renderer = (Renderer*)system_manager.getSystem("renderer");
-		if(m_texture_view) {
-			renderer->getEndFrameDrawStream().destroy(m_texture_view);
-		}
+		clearTextureView();
 	}
 
-	void saveMeta() {
+	void onResourceCompiled(Resource& res) { if (m_texture == &res) clearTextureView(); }
+
+	void save() {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
-		const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
+		const StaticString<1024> src("srgb = ", m_meta.srgb ? "true" : "false"
 			, "\ncompress = ", m_meta.compress ? "true" : "false"
 			, "\nstochastic_mip = ", m_meta.stochastic_mipmap ? "true" : "false"
 			, "\nmip_scale_coverage = ", m_meta.scale_coverage
@@ -1113,62 +1117,97 @@ struct TextureAssetEditorWindow : AssetEditorWindow {
 			, "\nfilter = \"", toString(m_meta.filter), "\""
 		);
 		compiler.updateMeta(m_texture->getPath(), src);
+		if (m_composite_editor) m_composite_editor->save();
 	}
 
-	TextureMeta getMeta() const
-	{
-		TextureMeta meta;
-		if (Path::hasExtension(m_texture->getPath().c_str(), "raw")) {
-			meta.compress = false;
-			meta.mips = false;
-		}
+	void clearTextureView() {
+		if (!m_texture_view) return;
+		SystemManager& system_manager = m_app.getEngine().getSystemManager();
+		auto* renderer = (Renderer*)system_manager.getSystem("renderer");
+		renderer->getEndFrameDrawStream().destroy(m_texture_view);
+		m_texture_view = gpu::INVALID_TEXTURE;
+	}
 
-		m_app.getAssetCompiler().getMeta(m_texture->getPath(), [&meta](lua_State* L){
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &meta.compress);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &meta.stochastic_mipmap);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "invert_green", &meta.invert_normal_y);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &meta.mips);
-			char tmp[32];
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
-				if (equalIStrings(tmp, "point")) {
-					meta.filter = TextureMeta::Filter::POINT;
-				}
-				else if (equalIStrings(tmp, "anisotropic")) {
-					meta.filter = TextureMeta::Filter::ANISOTROPIC;
-				}
-				else {
-					meta.filter = TextureMeta::Filter::LINEAR;
-				}
-			}
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_u", Span(tmp))) {
-				meta.wrap_mode_u = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
-			}
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_v", Span(tmp))) {
-				meta.wrap_mode_v = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
-			}
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
-				meta.wrap_mode_w = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
-			}
-		});
-		return meta;
+	static const char* toString(TextureMeta::Filter filter) {
+		switch (filter) {
+			case TextureMeta::Filter::POINT: return "point";
+			case TextureMeta::Filter::LINEAR: return "linear";
+			case TextureMeta::Filter::ANISOTROPIC: return "anisotropic";
+		}
+		ASSERT(false);
+		return "linear";
+	}
+
+	static const char* toString(TextureMeta::WrapMode wrap) {
+		switch (wrap) {
+			case TextureMeta::WrapMode::CLAMP: return "clamp";
+			case TextureMeta::WrapMode::REPEAT: return "repeat";
+		}
+		ASSERT(false);
+		return "repeat";
+	}
+
+	static const char* getCubemapLabel(u32 idx) {
+		switch (idx) {
+			case 0: return "X+";
+			case 1: return "X-";
+			case 2: return "Y+ (top)";
+			case 3: return "Y- (bottom)";
+			case 4: return "Z+";
+			case 5: return "Z-";
+			default: return "Too many faces in cubemap";
+		}
+	}
+
+	static const char* toString(gpu::TextureFormat format) {
+		switch (format) {
+			case gpu::TextureFormat::R8: return "R8";
+			case gpu::TextureFormat::RGB32F: return "RGB32F";
+			case gpu::TextureFormat::RG32F: return "RG32F";
+			case gpu::TextureFormat::RG8: return "RG8";
+			case gpu::TextureFormat::D24S8: return "D24S8";
+			case gpu::TextureFormat::D32: return "D32";
+			case gpu::TextureFormat::BGRA8: return "BGRA8";
+			case gpu::TextureFormat::RGBA8: return "RGBA8";
+			case gpu::TextureFormat::RGBA16: return "RGBA16";
+			case gpu::TextureFormat::R11G11B10F: return "R11G11B10F";
+			case gpu::TextureFormat::RGBA16F: return "RGBA16F";
+			case gpu::TextureFormat::RGBA32F: return "RGBA32F";
+			case gpu::TextureFormat::R16F: return "R16F";
+			case gpu::TextureFormat::R16: return "R16";
+			case gpu::TextureFormat::R32F: return "R32F";
+			case gpu::TextureFormat::SRGB: return "SRGB";
+			case gpu::TextureFormat::SRGBA: return "SRGBA";
+			case gpu::TextureFormat::BC1: return "BC1";
+			case gpu::TextureFormat::BC2: return "BC2";
+			case gpu::TextureFormat::BC3: return "BC3";
+			case gpu::TextureFormat::BC4: return "BC4";
+			case gpu::TextureFormat::BC5: return "BC5";
+		}
+		ASSERT(false);
+		return "Unknown";
 	}
 
 	void windowGUI() override {
 		if (ImGui::BeginMenuBar()) {
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveMeta();
-			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_texture);
-			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "Go to in browser")) m_app.getAssetBrowser().locate(*m_texture);
-			if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
-				StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath().c_str()));
-				os::openExplorer(dir);
+			if (m_composite_editor && ImGui::BeginMenu("Graph")) {
+				m_composite_editor->menu();
+				ImGui::EndMenu();
 			}
-			
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+			if (!m_composite_editor) {
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_texture);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_texture);
+				if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
+					StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath().c_str()));
+					os::openExplorer(dir);
+				}
+			}
 			ImGui::EndMenuBar();
 		}
-		if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
+
+		if (!ImGui::BeginTable("tab", m_composite_editor ? 3 : 2, ImGuiTableFlags_Resizable)) return;
+
 		ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
@@ -1183,33 +1222,8 @@ struct TextureAssetEditorWindow : AssetEditorWindow {
 			ImGuiEx::Label("Depth");
 			ImGui::Text("%d", m_texture->depth);
 		}
-		const char* format = "unknown";
-		switch(m_texture->format) {
-			case gpu::TextureFormat::R8: format = "R8"; break;
-			case gpu::TextureFormat::RGB32F: format = "RGB32F"; break;
-			case gpu::TextureFormat::RG32F: format = "RG32F"; break;
-			case gpu::TextureFormat::RG8: format = "RG8"; break;
-			case gpu::TextureFormat::D24S8: format = "D24S8"; break;
-			case gpu::TextureFormat::D32: format = "D32"; break;
-			case gpu::TextureFormat::BGRA8: format = "BGRA8"; break;
-			case gpu::TextureFormat::RGBA8: format = "RGBA8"; break;
-			case gpu::TextureFormat::RGBA16: format = "RGBA16"; break;
-			case gpu::TextureFormat::R11G11B10F: format = "R11G11B10F"; break;
-			case gpu::TextureFormat::RGBA16F: format = "RGBA16F"; break;
-			case gpu::TextureFormat::RGBA32F: format = "RGBA32F"; break;
-			case gpu::TextureFormat::R16F: format = "R16F"; break;
-			case gpu::TextureFormat::R16: format = "R16"; break;
-			case gpu::TextureFormat::R32F: format = "R32F"; break;
-			case gpu::TextureFormat::SRGB: format = "SRGB"; break;
-			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
-			case gpu::TextureFormat::BC1: format = "BC1"; break;
-			case gpu::TextureFormat::BC2: format = "BC2"; break;
-			case gpu::TextureFormat::BC3: format = "BC3"; break;
-			case gpu::TextureFormat::BC4: format = "BC4"; break;
-			case gpu::TextureFormat::BC5: format = "BC5"; break;
-		}
 		ImGuiEx::Label("Format");
-		ImGui::TextUnformatted(format);
+		ImGui::TextUnformatted(toString(m_texture->format));
 
 		ImGuiEx::Label("SRGB");
 		bool changed = ImGui::Checkbox("##srgb", &m_meta.srgb);
@@ -1262,20 +1276,22 @@ struct TextureAssetEditorWindow : AssetEditorWindow {
 		ImGui::SameLine();
 		ImGui::CheckboxFlags("Blue", &m_channel_view_mask, 4);
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(150);
+		ImGui::SetNextItemWidth(100);
 		ImGui::DragFloat("Zoom", &m_zoom, 0.01f, 0.01f, 100.f);
 
 		if (m_texture->depth > 1) {
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(100);
 			if (ImGui::InputInt("View layer", (i32*)&m_view_layer)) {
 				m_view_layer = m_view_layer % m_texture->depth;
-				// TODO
-				ASSERT(false);
+				clearTextureView();
 			}
 		}
 		if (m_texture->is_cubemap) {
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(100);
 			if (ImGui::Combo("Side", (i32*)&m_view_layer, "X+\0X-\0Y+\0Y-\0Z+\0Z-\0")) {
-				// TODO
-				ASSERT(false);
+				clearTextureView();
 			}
 		}
 		if (!m_texture_view && m_texture->isReady()) {
@@ -1307,18 +1323,23 @@ struct TextureAssetEditorWindow : AssetEditorWindow {
 			ImGui::Image(m_texture_view, texture_size, ImVec2(0, 0), ImVec2(1, 1), tint);
 			ImGui::EndChild();
 		}
-		ImGui::EndTable();
-	}
 
-	void destroy() override {
-		LUMIX_DELETE(m_app.getAllocator(), this);
+		if (m_composite_editor) {
+			ImGui::TableNextColumn();
+			m_composite_editor->gui();
+			m_dirty = m_dirty || m_composite_editor->isDirty();
+		}
+
+		ImGui::EndTable();
 	}
 
 	const char* getName() const override { return "texture editor"; }
 
 	const Path& getPath() { return m_texture->getPath(); }
 
+	IAllocator& m_allocator;
 	StudioApp& m_app;
+	UniquePtr<CompositeTextureEditor> m_composite_editor;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	u32 m_view_layer = 0;
@@ -1328,9 +1349,9 @@ struct TextureAssetEditorWindow : AssetEditorWindow {
 };
 
 struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
-	explicit TexturePlugin(CompositeTextureEditor& composite_editor, StudioApp& app)
+	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
-		, m_composite_texture_editor(composite_editor)
+		, m_allocator(app.getAllocator(), "texture editor")
 	{
 		rgbcx::init();
 
@@ -1340,36 +1361,17 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("raw", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("ltc", Texture::TYPE);
-		app.getAssetCompiler().resourceCompiled().bind<&TexturePlugin::onResourceCompiled>(this);
 	}
 
-
-	~TexturePlugin() {
-		m_app.getAssetCompiler().resourceCompiled().unbind<&TexturePlugin::onResourceCompiled>(this);
-		SystemManager& system_manager = m_app.getEngine().getSystemManager();
-		auto* renderer = (Renderer*)system_manager.getSystem("renderer");
-		if(m_texture_view) {
-			renderer->getEndFrameDrawStream().destroy(m_texture_view);
-		}
-	}
-
-	void onResourceDoubleClicked(const Path& path) override {
-		if (Path::hasExtension(path, "ltc")) m_composite_texture_editor.open(path);
-		else {
-			IAllocator& allocator = m_app.getAllocator();
-			TextureAssetEditorWindow* win = LUMIX_NEW(allocator, TextureAssetEditorWindow)(Path(path), m_app);
-			m_app.getAssetBrowser().addWindow(win);		
-		}
-	}
-
-	void onResourceCompiled(Resource& res) {
-		if (m_texture == &res) m_texture = nullptr;
+	void openEditor(const Path& path) override {
+		UniquePtr<TextureAssetEditorWindow> win = UniquePtr<TextureAssetEditorWindow>::create(m_allocator, path, m_app, m_allocator);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	const char* getDefaultExtension() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
 	void createResource(OutputMemoryStream& blob) override { 
-		CompositeTexture ltc(m_app, m_app.getAllocator());
+		CompositeTexture ltc(m_app, m_allocator);
 		ltc.initDefault();
 		ltc.serialize(blob);
 	}
@@ -1397,13 +1399,13 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			int image_comp;
 			int w, h;
 			if (Path::hasExtension(m_in_path.c_str(), "ltc")) {
-				CompositeTexture ct(m_app, m_app.getAllocator());
+				CompositeTexture ct(m_app, m_allocator);
 				InputMemoryStream blob(tmp);
 				if (!ct.deserialize(blob)) {
 					logError("Failed to deserialize ", m_in_path);
 					return;
 				}
-				CompositeTexture::Result res(m_app.getAllocator());
+				CompositeTexture::Result res(m_allocator);
 				if (!ct.generate(&res)) return;
 
 				const CompositeTexture::Image& layer0 = res.layers[0];
@@ -1465,44 +1467,42 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	};
 
 	void update() override {
-		if (!m_tiles_to_create.tail) return;
+		if (!m_jobs_tail) return;
 
-		TextureTileJob* job = m_tiles_to_create.tail;
-		m_tiles_to_create.tail = job->m_next;
-		if (!m_tiles_to_create.tail) m_tiles_to_create.head = nullptr;
+		TextureTileJob* job = m_jobs_tail;
+		m_jobs_tail = job->m_next;
+		if (!m_jobs_tail) m_jobs_head = nullptr;
 
 		// to keep editor responsive, we don't want to create too many tiles per frame 
 		jobs::runEx(job, &TextureTileJob::execute, nullptr, jobs::getWorkersCount() - 1);
 	}
 
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
 		if (type != Texture::TYPE) return false;
 		if (!Path::hasExtension(in_path, "raw")) {
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			TextureTileJob* job = LUMIX_NEW(m_app.getAllocator(), TextureTileJob)(m_app, fs, m_app.getAllocator());
+			TextureTileJob* job = LUMIX_NEW(m_allocator, TextureTileJob)(m_app, fs, m_allocator);
 			job->m_in_path = in_path;
 			job->m_out_path = out_path;
-			if (m_tiles_to_create.head) m_tiles_to_create.head->m_next = job;
+			if (m_jobs_head) m_jobs_head->m_next = job;
 			else {
-				m_tiles_to_create.tail = job;
+				m_jobs_tail = job;
 			}
-			m_tiles_to_create.head = job;
+			m_jobs_head = job;
 			return true;
 		}
 		return false;
 	}
 
-	bool createComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta, const char* src_path) {
-		IAllocator& allocator = m_app.getAllocator();
-		CompositeTexture tc(m_app, allocator);
+	bool compileComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta, const char* src_path) {
+		CompositeTexture tc(m_app, m_allocator);
 		InputMemoryStream blob(src_data);
 		if (!tc.deserialize(blob)) {
 			logError("Failed to load ", src_path);
 			return false;
 		}
 
-		CompositeTexture::Result img(allocator);
+		CompositeTexture::Result img(m_allocator);
 		if (!tc.generate(&img)) return false;
 		if (img.layers.empty()) {
 			logError(src_path, " : empty output");
@@ -1511,7 +1511,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		const u32 w = img.layers[0].w;
 		const u32 h = img.layers[0].h;
 
-		TextureCompressor::Input input(w, h, img.is_cubemap ? 1 : img.layers.size(), 1, allocator);
+		TextureCompressor::Input input(w, h, img.is_cubemap ? 1 : img.layers.size(), 1, m_allocator);
 		input.is_normalmap = meta.is_normalmap;
 		input.is_srgb = meta.srgb;
 		input.is_cubemap = img.is_cubemap;
@@ -1550,7 +1550,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		options.generate_mipmaps = meta.mips;
 		options.stochastic_mipmap = meta.stochastic_mipmap;
 		options.scale_coverage_ref = meta.scale_coverage;
-		return TextureCompressor::compress(input, options, dst, allocator);
+		return TextureCompressor::compress(input, options, dst, m_allocator);
 	}
 
 	bool compileImage(const Path& path, const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta)
@@ -1564,7 +1564,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		if (!stb_data) return false;
 
 		const u8* data;
-		Array<u8> inverted_y_data(m_app.getAllocator());
+		Array<u8> inverted_y_data(m_allocator);
 		if (meta.is_normalmap && meta.invert_normal_y) {
 			inverted_y_data.resize(w * h * 4);
 			for (i32 y = 0; y < h; ++y) {
@@ -1632,7 +1632,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			dst.write(&flags, sizeof(flags));
 
-			TextureCompressor::Input input(w, h, 1, 1, m_app.getAllocator());
+			TextureCompressor::Input input(w, h, 1, 1, m_allocator);
 			input.add(Span(data, w * h * 4), 0, 0, 0);
 			input.is_srgb = meta.srgb;
 			input.is_normalmap = meta.is_normalmap;
@@ -1642,14 +1642,13 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			options.stochastic_mipmap = meta.stochastic_mipmap; 
 			options.scale_coverage_ref = meta.scale_coverage;
 			options.compress = meta.compress;
-			const bool res = TextureCompressor::compress(input, options, dst, m_app.getAllocator());
+			const bool res = TextureCompressor::compress(input, options, dst, m_allocator);
 			stbi_image_free(stb_data);
 			return res;
 		#endif
 	}
 
-	TextureMeta getMeta(const Path& path) const
-	{
+	TextureMeta getMeta(const Path& path) const {
 		TextureMeta meta;
 		if (Path::hasExtension(path.c_str(), "raw")) {
 			meta.compress = false;
@@ -1689,17 +1688,16 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		return meta;
 	}
 
-	bool compile(const Path& src) override
-	{
+	bool compile(const Path& src) override {
 		char ext[5] = {};
 		copyString(Span(ext), Path::getExtension(Span(src.c_str(), src.length())));
 		makeLowercase(Span(ext), ext);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream src_data(m_app.getAllocator());
+		OutputMemoryStream src_data(m_allocator);
 		if (!fs.getContentSync(src, src_data)) return false;
 		
-		OutputMemoryStream out(m_app.getAllocator());
+		OutputMemoryStream out(m_allocator);
 		TextureMeta meta = getMeta(src);
 		if (equalStrings(ext, "raw")) {
 			if (meta.scale_coverage >= 0) logError(src, ": RAW can not scale coverage");
@@ -1720,7 +1718,7 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			if (!compileImage(src, src_data, out, meta)) return false;
 		}
 		else if (equalStrings(ext, "ltc")) {
-			if (!createComposite(src_data, out, meta, src.c_str())) return false;
+			if (!compileComposite(src_data, out, meta, src.c_str())) return false;
 		}
 		else {
 			ASSERT(false);
@@ -1729,159 +1727,13 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(out.data(), (i32)out.size()));
 	}
 
-	const char* toString(TextureMeta::Filter filter) {
-		switch (filter) {
-			case TextureMeta::Filter::POINT: return "point";
-			case TextureMeta::Filter::LINEAR: return "linear";
-			case TextureMeta::Filter::ANISOTROPIC: return "anisotropic";
-		}
-		ASSERT(false);
-		return "linear";
-	}
-
-	const char* toString(TextureMeta::WrapMode wrap) {
-		switch (wrap) {
-			case TextureMeta::WrapMode::CLAMP: return "clamp";
-			case TextureMeta::WrapMode::REPEAT: return "repeat";
-		}
-		ASSERT(false);
-		return "repeat";
-	}
-
-	static const char* getCubemapLabel(u32 idx) {
-		switch (idx) {
-			case 0: return "X+";
-			case 1: return "X-";
-			case 2: return "Y+ (top)";
-			case 3: return "Y- (bottom)";
-			case 4: return "Z+";
-			case 5: return "Z-";
-			default: return "Too many faces in cubemap";
-		}
-	}
-
-#if 0
-	bool onGUI(Span<AssetBrowser::ResourceView*> resources) override
-	{
-		if(resources.length() > 1) return false;
-
-		Texture* texture = static_cast<Texture*>(resources[0]->getResource());
-
-		ImGuiEx::Label("Size");
-		ImGui::Text("%dx%d", texture->width, texture->height);
-		ImGuiEx::Label("Mips");
-		ImGui::Text("%d", texture->mips);
-		if (texture->depth > 1) {
-			ImGuiEx::Label("Depth");
-			ImGui::Text("%d", texture->depth);
-		}
-		const char* format = "unknown";
-		switch(texture->format) {
-			case gpu::TextureFormat::R8: format = "R8"; break;
-			case gpu::TextureFormat::RGB32F: format = "RGB32F"; break;
-			case gpu::TextureFormat::RG32F: format = "RG32F"; break;
-			case gpu::TextureFormat::RG8: format = "RG8"; break;
-			case gpu::TextureFormat::D24S8: format = "D24S8"; break;
-			case gpu::TextureFormat::D32: format = "D32"; break;
-			case gpu::TextureFormat::BGRA8: format = "BGRA8"; break;
-			case gpu::TextureFormat::RGBA8: format = "RGBA8"; break;
-			case gpu::TextureFormat::RGBA16: format = "RGBA16"; break;
-			case gpu::TextureFormat::R11G11B10F: format = "R11G11B10F"; break;
-			case gpu::TextureFormat::RGBA16F: format = "RGBA16F"; break;
-			case gpu::TextureFormat::RGBA32F: format = "RGBA32F"; break;
-			case gpu::TextureFormat::R16F: format = "R16F"; break;
-			case gpu::TextureFormat::R16: format = "R16"; break;
-			case gpu::TextureFormat::R32F: format = "R32F"; break;
-			case gpu::TextureFormat::SRGB: format = "SRGB"; break;
-			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
-			case gpu::TextureFormat::BC1: format = "BC1"; break;
-			case gpu::TextureFormat::BC2: format = "BC2"; break;
-			case gpu::TextureFormat::BC3: format = "BC3"; break;
-			case gpu::TextureFormat::BC4: format = "BC4"; break;
-			case gpu::TextureFormat::BC5: format = "BC5"; break;
-		}
-		ImGuiEx::Label("Format");
-		ImGui::TextUnformatted(format);
-
-		const bool is_ltc = Path::hasExtension(texture->getPath().c_str(), "ltc");
-		if (texture->handle) {
-			ImVec2 texture_size(200, 200);
-			if (texture->width > texture->height) {
-				texture_size.y = texture_size.x * texture->height / texture->width;
-			}
-			else {
-				texture_size.x = texture_size.y * texture->width / texture->height;
-			}
-			texture_size = texture_size * m_zoom;
-
-			if (!texture->isReady()) m_texture = nullptr;
-
-			if (texture != m_texture && texture->isReady()) {
-				m_texture = texture;
-				SystemManager& system_manager = m_app.getEngine().getSystemManager();
-				auto* renderer = (Renderer*)system_manager.getSystem("renderer");
-
-				if (!m_texture_view) m_texture_view = gpu::allocTextureHandle();
-				DrawStream& stream = renderer->getDrawStream();
-				stream.createTextureView(m_texture_view
-					, m_texture->handle
-					, m_texture->is_cubemap ? m_view_layer : m_view_layer % m_texture->depth);
-			}
-
-			if (m_texture_view) {
-				const float w = ImGui::GetContentRegionAvail().x;
-				ImGui::BeginChild("imgpreview", ImVec2(w, minimum(w, texture_size.y + 5)), false, ImGuiWindowFlags_HorizontalScrollbar);
-				const ImVec4 tint(float(m_channel_view_mask & 1)
-					, float((m_channel_view_mask >> 1) & 1)
-					, float((m_channel_view_mask >> 2) & 1)
-					, 1.f);
-				ImGui::Image(m_texture_view, texture_size, ImVec2(0, 0), ImVec2(1, 1), tint);
-				if (ImGui::BeginPopupContextItem("img_ctx")) {
-					if (texture->isReady() && texture->depth > 1) {
-						if (ImGui::InputInt("View layer", (i32*)&m_view_layer)) {
-							m_view_layer = m_view_layer % m_texture->depth;
-							m_texture = nullptr;
-						}
-					}
-					if (texture->isReady() && texture->is_cubemap) {
-						if (ImGui::Combo("Side", (i32*)&m_view_layer, "X+\0X-\0Y+\0Y-\0Z+\0Z-\0")) {
-							m_texture = nullptr;
-						}
-					}
-					ImGui::DragFloat("Zoom", &m_zoom, 0.01f, 0.01f, 100.f);
-					ImGui::CheckboxFlags("Red", &m_channel_view_mask, 1);
-					ImGui::CheckboxFlags("Green", &m_channel_view_mask, 2);
-					ImGui::CheckboxFlags("Blue", &m_channel_view_mask, 4);
-					ImGui::EndPopup();
-				}
-				ImGui::EndChild();
-			}
-		}
-		else {
-			m_texture = nullptr;
-		}
-
-		if (is_ltc && ImGui::Button("Edit")) m_composite_texture_editor.open(texture->getPath());
-
-		return false;
-	}
-#endif
-
-	const char* getName() const override { return "Texture"; }
+	const char* getLabel() const override { return "Texture"; }
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
+	TagAllocator m_allocator;
 	StudioApp& m_app;
-	CompositeTextureEditor& m_composite_texture_editor;
-
-	struct {
-		TextureTileJob* head = nullptr;
-		TextureTileJob* tail = nullptr;
-	} m_tiles_to_create;
-	Texture* m_texture;
-	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
-	u32 m_view_layer = 0;
-	float m_zoom = 1.f;
-	u32 m_channel_view_mask = 0b1111;
+	TextureTileJob* m_jobs_head = nullptr;
+	TextureTileJob* m_jobs_tail = nullptr;
 	TextureMeta m_meta;
 	FilePathHash m_meta_res;
 };
@@ -1937,7 +1789,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 				ImGui::SameLine();
 				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
 				{
-					m_app.getAssetBrowser().selectResource(material->getPath(), false);
+					m_app.getAssetBrowser().openEditor(material->getPath());
 				}
 				ImGui::PopID();
 			}
@@ -2040,7 +1892,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, ModelPlugin& plugin, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_app(app)
 			, m_plugin(plugin)
 			, m_meta(allocator)
@@ -2050,8 +1901,9 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			m_meta.load(path, m_app);
 
 			m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-			m_viewport.is_ortho = true;
-			m_viewport.near = 0.f;
+			m_viewport.is_ortho = false;
+			m_viewport.fov = m_app.getFOV();
+			m_viewport.near = 0.1f;
 			m_viewport.far = 1000.f;
 
 			m_world = &engine.createWorld(false);
@@ -2078,17 +1930,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			m_pipeline->setWorld(m_world);
 
 			render_module->setModelInstancePath((EntityRef)m_mesh, m_resource->getPath());
-			AABB aabb = m_resource->getAABB();
-
-			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * length(aabb.max - aabb.min);
-			
-			Matrix mtx;
-			Vec3 eye = center + Vec3(m_resource->getCenterBoundingRadius() * 2);
-			mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
-			mtx = mtx.inverted();
-
-			m_viewport.rot = mtx.getRotation();
 		}
 
 		~EditorWindow() {
@@ -2141,29 +1982,12 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		}
 		
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
 
-		void windowGUI() override {
-			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				ImGui::EndMenuBar();
-			}
-
-			if (m_resource->isEmpty()) {
-				ImGui::TextUnformatted("Loading...");
-				return;
-			}
-
-			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
-
-			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-
+		void importGUI() {
 			bool changed = false;
 			ImGuiEx::Label("Bake vertex AO");
 			changed = ImGui::Checkbox("##impnrm", &m_meta.bake_vertex_ao) || changed;
@@ -2406,112 +2230,134 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			}
 
 			if (changed) m_dirty = true;
+		}
 
-			ImGui::Separator();
-			if (m_resource->isReady()) {
-				ImGuiEx::Label("Bounding radius (from origin)");
-				ImGui::Text("%f", m_resource->getOriginBoundingRadius());
-				ImGuiEx::Label("Bounding radius (from center)");
-				ImGui::Text("%f", m_resource->getCenterBoundingRadius());
+		void infoGUI() {
+			if (!m_resource->isReady()) {
+				ImGui::TextUnformatted("Failed to load.");
+				return;
+			}
 
-				if (ImGui::CollapsingHeader("LODs")) {
-					auto* lods = m_resource->getLODIndices();
-					auto* distances = m_resource->getLODDistances();
-					if (lods[0].to >= 0 && !m_resource->isFailure())
-					{
-						ImGui::Separator();
-						ImGui::Columns(4);
-						ImGui::Text("LOD");
-						ImGui::NextColumn();
-						ImGui::Text("Distance");
-						ImGui::NextColumn();
-						ImGui::Text("# of meshes");
-						ImGui::NextColumn();
-						ImGui::Text("# of triangles");
-						ImGui::NextColumn();
-						ImGui::Separator();
-						int lod_count = 1;
-						for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i)
-						{
-							ImGui::PushID(i);
-							ImGui::Text("%d", i);
-							ImGui::NextColumn();
-							float dist = sqrtf(distances[i]);
-							if (ImGui::DragFloat("", &dist)) {
-								distances[i] = dist * dist;
-							}
-							ImGui::NextColumn();
-							ImGui::Text("%d", lods[i].to - lods[i].from + 1);
-							ImGui::NextColumn();
-							int tri_count = 0;
-							for (int j = lods[i].from; j <= lods[i].to; ++j)
-							{
-								i32 indices_count = (i32)m_resource->getMesh(j).indices.size() >> 1;
-								if (!m_resource->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
-									indices_count >>= 1;
-								}
-								tri_count += indices_count / 3;
+			ImGuiEx::Label("Bounding radius (from origin)");
+			ImGui::Text("%f", m_resource->getOriginBoundingRadius());
+			ImGuiEx::Label("Bounding radius (from center)");
+			ImGui::Text("%f", m_resource->getCenterBoundingRadius());
 
-							}
+			if (ImGui::CollapsingHeader("LODs")) {
+				const LODMeshIndices* lods = m_resource->getLODIndices();
+				float* distances = m_resource->getLODDistances();
+				if (lods[0].to >= 0 && !m_resource->isFailure() && ImGui::BeginTable("lodtbl", 4, ImGuiTableFlags_Resizable)) {
+					ImGui::TableSetupColumn("LOD");
+					ImGui::TableSetupColumn("Distance");
+					ImGui::TableSetupColumn("# of meshes");
+					ImGui::TableSetupColumn("# of triangles");
+					ImGui::TableHeadersRow();
 
-							ImGui::Text("%d", tri_count);
-							ImGui::NextColumn();
-							++lod_count;
-							ImGui::PopID();
+					for (i32 i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i) {
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::Text("%d", i);
+						ImGui::TableNextColumn();
+						float dist = sqrtf(distances[i]);
+						if (ImGui::DragFloat("", &dist)) {
+							distances[i] = dist * dist;
 						}
-
-						ImGui::Columns(1);
+						ImGui::TableNextColumn();
+						ImGui::Text("%d", lods[i].to - lods[i].from + 1);
+						ImGui::TableNextColumn();
+						int tri_count = 0;
+						for (i32 j = lods[i].from; j <= lods[i].to; ++j) {
+							i32 indices_count = (i32)m_resource->getMesh(j).indices.size() >> 1;
+							if (!m_resource->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
+								indices_count >>= 1;
+							}
+							tri_count += indices_count / 3;
+						}
+						ImGui::Text("%d", tri_count);
 					}
+
+					ImGui::EndTable();
 				}
 			}
 
-			if (ImGui::CollapsingHeader("Meshes")) {
+			if (ImGui::CollapsingHeader("Meshes") && ImGui::BeginTable("mshtbl", 3, ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupColumn("Triangles");
+				ImGui::TableSetupColumn("Material");
+				ImGui::TableHeadersRow();
+				
 				const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
-				for (int i = 0; i < m_resource->getMeshCount(); ++i)
-				{
-					auto& mesh = m_resource->getMesh(i);
-					if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
-					{
-						ImGuiEx::Label("Triangle count");
-						ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
-						ImGuiEx::Label("Material");
-						const float w = ImGui::GetContentRegionAvail().x - go_to_w;
-						ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
-						ImGui::SameLine();
-						if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
-						{
-							m_app.getAssetBrowser().selectResource(mesh.material->getPath(), false);
-						}
-						ImGui::TreePop();
+				for (i32 i = 0; i < m_resource->getMeshCount(); ++i) {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					const Mesh& mesh = m_resource->getMesh(i);
+					ImGui::TextUnformatted(mesh.name.c_str());
+					ImGui::TableNextColumn();
+					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2)) / 3);
+					ImGui::TableNextColumn();
+					const float w = ImGui::GetContentRegionAvail().x - go_to_w;
+					ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+						m_app.getAssetBrowser().openEditor(mesh.material->getPath());
 					}
 				}
+				ImGui::EndTable();
 			}
 
 			if (m_resource->isReady() && ImGui::CollapsingHeader("Bones")) {
 				ImGuiEx::Label("Count");
 				ImGui::Text("%d", m_resource->getBoneCount());
-				if (m_resource->getBoneCount() > 0) {
-					ImGui::Columns(4);
-					for (int i = 0; i < m_resource->getBoneCount(); ++i)
-					{
-						ImGui::Text("%s", m_resource->getBone(i).name.c_str());
-						ImGui::NextColumn();
-						Vec3 pos = m_resource->getBone(i).transform.pos;
+				if (m_resource->getBoneCount() > 0 && ImGui::BeginTable("bnstbl", 4, ImGuiTableFlags_Resizable)) {
+					ImGui::TableSetupColumn("Name");
+					ImGui::TableSetupColumn("Position");
+					ImGui::TableSetupColumn("Rotation");
+					ImGui::TableSetupColumn("Parent");
+					ImGui::TableHeadersRow();
+					for (i32 i = 0; i < m_resource->getBoneCount(); ++i) {
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						const Model::Bone& bone = m_resource->getBone(i);
+						ImGui::Text("%s", bone.name.c_str());
+						ImGui::TableNextColumn();
+						Vec3 pos = bone.transform.pos;
 						ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
-						ImGui::NextColumn();
-						Quat rot = m_resource->getBone(i).transform.rot;
+						ImGui::TableNextColumn();
+						Quat rot = bone.transform.rot;
 						ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
-						ImGui::NextColumn();
-						const i32 parent = m_resource->getBone(i).parent_idx;
-						if (parent >= 0) {
-							ImGui::Text("%s", m_resource->getBone(parent).name.c_str());
+						ImGui::TableNextColumn();
+						if (bone.parent_idx >= 0) {
+							ImGui::Text("%s", m_resource->getBone(bone.parent_idx).name.c_str());
 						}
-						ImGui::NextColumn();
 					}
-					ImGui::Columns();
+					ImGui::EndTable();
 				}
 			}
-			
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
+
+			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+
+			importGUI();
+			ImGui::Separator();
+			infoGUI();
+
 			ImGui::TableNextColumn();
 			previewGUI();
 
@@ -2532,12 +2378,32 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			}
 		}
 
+		void resetCamera() {
+			const AABB aabb = m_resource->getAABB();
+			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * length(aabb.max - aabb.min);
+			Matrix mtx;
+			const Vec3 eye = center + Vec3(m_resource->getCenterBoundingRadius() * 2);
+			mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
+			mtx = mtx.inverted();
+			m_viewport.rot = mtx.getRotation();
+			m_camera_speed = 1;
+		}
+
 		void previewGUI() {
 			if (!m_resource->isReady()) return;
+
 			auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
 			ASSERT(render_module);
 
 			if (ImGui::Checkbox("Wireframe", &m_wireframe)) enableWireframe(*m_resource, m_wireframe);
+			ImGui::SameLine();
+			if (ImGui::Button("Save preview")) {
+				m_resource->incRefCount();
+				m_plugin.renderTile(m_resource, &m_viewport);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset camera")) resetCamera();
 			// TODO this does not work, two lods are rendered
 			/*
 			ImGui::SameLine();
@@ -2546,43 +2412,36 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			render_module->setModelInstanceLOD((EntityRef)m_mesh, m_preview_lod);
 			*/
 
+			if (!m_init) {
+				m_init = true;
+				resetCamera();
+			}
+
 			const ImVec2 image_size = ImGui::GetContentRegionAvail();
 
+			m_viewport.fov = m_app.getFOV();
 			m_viewport.w = (int)image_size.x;
 			m_viewport.h = (int)image_size.y;
-			m_viewport.ortho_size = m_resource->getCenterBoundingRadius();
 			m_pipeline->setViewport(m_viewport);
 			m_pipeline->render(false);
-			m_preview = m_pipeline->getOutput();
+			gpu::TextureHandle preview = m_pipeline->getOutput();
 			if (gpu::isOriginBottomLeft()) {
-				ImGui::Image(m_preview, image_size);
+				ImGui::Image(preview, image_size);
 			}
 			else {
-				ImGui::Image(m_preview, image_size, ImVec2(0, 1), ImVec2(1, 0));
+				ImGui::Image(preview, image_size, ImVec2(0, 1), ImVec2(1, 0));
 			}
 		
-			bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
-			if (m_is_mouse_captured && !mouse_down)
-			{
+			const bool mouse_down = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+			if (m_is_mouse_captured && !mouse_down) {
 				m_is_mouse_captured = false;
+				m_app.setCursorCaptured(false);
 				os::showCursor(true);
+				os::grabMouse(os::INVALID_WINDOW);
 				os::setMouseScreenPos(m_captured_mouse_pos.x, m_captured_mouse_pos.y);
 			}
 
-			if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
-
-			if (ImGui::BeginPopup("PreviewPopup"))
-			{
-				if (ImGui::Selectable("Save preview"))
-				{
-					m_resource->incRefCount();
-					m_plugin.renderTile(m_resource, &m_viewport.pos, &m_viewport.rot);
-				}
-				ImGui::EndPopup();
-			}
-
-			if (ImGui::IsItemHovered() && mouse_down)
-			{
+			if ((m_is_mouse_captured || ImGui::IsItemHovered()) && mouse_down) {
 				Vec2 delta(0, 0);
 				for (const os::Event e : m_app.getEvents()) {
 					if (e.type == os::Event::Type::MOUSE_MOVE) {
@@ -2592,42 +2451,62 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 
 				if (!m_is_mouse_captured) {
 					m_is_mouse_captured = true;
+					m_app.setCursorCaptured(true);
 					os::showCursor(false);
+					os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
 					m_captured_mouse_pos = os::getMouseScreenPos();
 				}
 
+				m_camera_speed = maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+
+				auto moveCamera = [&](const Vec3& dir){
+					float speed = m_camera_speed;
+					if (os::isKeyDown(os::Keycode::SHIFT)) speed *= 10;
+					const Vec3 d = m_viewport.rot.rotate(dir);
+					m_viewport.pos -= d * m_app.getEngine().getLastTimeDelta() * speed;
+				};
+
+				const CommonActions& actions = m_app.getCommonActions();
+				const bool is_orbit = actions.cam_orbit.isActive();
+				if (actions.cam_forward.isActive()) moveCamera(Vec3(0, 0, 1));
+				else if (actions.cam_backward.isActive())  moveCamera(Vec3(0, 0, -1));
+
+				if (!is_orbit) {
+					if (actions.cam_left.isActive())  moveCamera(Vec3(1, 0, 0));
+					else if (actions.cam_right.isActive())  moveCamera(Vec3(-1, 0, 0));
+					if (actions.cam_up.isActive())  moveCamera(Vec3(0, 1, 0));
+					else if (actions.cam_down.isActive())  moveCamera(Vec3(0, -1, 0));
+				}
+
 				if (delta.x != 0 || delta.y != 0) {
-					const Vec2 MOUSE_SENSITIVITY(50, 50);
-					DVec3 pos = m_viewport.pos;
+					const Vec2 mouse_sensitivity = m_app.getSettings().m_mouse_sensitivity;
 					Quat rot = m_viewport.rot;
 
-					float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+					float yaw = signum(delta.x) * (powf(fabsf(delta.x / 10000 * mouse_sensitivity.x), 1.2f));
 					Quat yaw_rot(Vec3(0, 1, 0), yaw);
 					rot = normalize(yaw_rot * rot);
 
 					Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-					float pitch =
-						-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+					float pitch = signum(delta.y) * (powf(fabsf(delta.y / 10000 * mouse_sensitivity.y), 1.2f));
 					Quat pitch_rot(pitch_axis, pitch);
 					rot = normalize(pitch_rot * rot);
 
 					Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 					Vec3 origin = (m_resource->getAABB().max + m_resource->getAABB().min) * 0.5f;
 
-					float dist = length(origin - Vec3(pos));
-					pos = DVec3(0) + origin + dir * dist;
+					if (is_orbit) {
+						const float dist = float(length(origin - Vec3(m_viewport.pos)));
+						m_viewport.pos = DVec3(origin + dir * dist);
+					}
 
 					m_viewport.rot = rot;
-					m_viewport.pos = pos;
 				}
 			}
 		}
 	
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "model editor"; }
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		ModelPlugin& m_plugin;
 		Model* m_resource;
@@ -2640,19 +2519,18 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		Renderer* m_renderer;
 		Meta m_meta;
 		bool m_wireframe = false;
+		bool m_init = false;
 		i32 m_preview_lod = 0;
-		gpu::TextureHandle m_preview = gpu::INVALID_TEXTURE;
+		float m_camera_speed = 1;
 	};
 
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 		, m_tile(app.getAllocator())
 		, m_fbx_importer(app)
-		, m_meta(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 	}
-
 
 	~ModelPlugin() {
 		if (m_downscale_program) m_renderer->getEndFrameDrawStream().destroy(m_downscale_program);
@@ -2663,21 +2541,17 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		m_tile.pipeline.reset();
 	}
 
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), *this, m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, *this, m_app, m_app.getAllocator());
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	void init() {
 		Engine& engine = m_app.getEngine();
 		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		m_viewport.is_ortho = true;
-		m_viewport.near = 0.f;
-		m_viewport.far = 1000.f;
 		m_fbx_importer.init();
 	}
-
 
 	void addSubresources(AssetCompiler& compiler, const char* _path) override {
 		compiler.addResource(Model::TYPE, _path);
@@ -2929,7 +2803,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		return "none";
 	}
 
-	const char* getName() const override { return "Model"; }
+	const char* getLabel() const override { return "Model"; }
 	ResourceType getResourceType() const override { return Model::TYPE; }
 
 	void pushTileQueue(const Path& path)
@@ -3017,6 +2891,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
 			popTileQueue();
+			resource->decRefCount();
 			return;
 		}
 		if (!resource->isReady()) return;
@@ -3024,7 +2899,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		popTileQueue();
 
 		if (resource->getType() == Model::TYPE) {
-			renderTile((Model*)resource, nullptr, nullptr);
+			renderTile((Model*)resource, nullptr);
 		}
 		else if (resource->getType() == Material::TYPE) {
 			renderTile((Material*)resource);
@@ -3169,7 +3044,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		material->decRefCount();
 	}
 
-	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
+	void renderTile(Model* model, const Viewport* in_viewport)
 	{
 		if (!m_tile.world) createTileWorld();
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
@@ -3191,14 +3066,19 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		mtx = mtx.inverted();
 
 		Viewport viewport;
-		viewport.near = 0.01f;
-		viewport.far = 8 * radius;
-		viewport.is_ortho = true;
-		viewport.ortho_size = radius * 1.1f;
+		if (in_viewport) {
+			viewport = *in_viewport;
+		}
+		else {
+			viewport.near = 0.01f;
+			viewport.far = 8 * radius;
+			viewport.is_ortho = true;
+			viewport.ortho_size = radius * 1.1f;
+			viewport.pos = DVec3(center - dir * 4 * radius);
+			viewport.rot = mtx.getRotation();
+		}
 		viewport.h = AssetBrowser::TILE_SIZE * 4;
 		viewport.w = AssetBrowser::TILE_SIZE * 4;
-		viewport.pos = in_pos ? *in_pos : DVec3(center - dir * 4 * radius);
-		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
 		if (!m_tile.pipeline->getOutput()) {
@@ -3275,18 +3155,61 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
-	gpu::TextureHandle m_preview;
-	Viewport m_viewport;
 	TexturePlugin* m_texture_plugin;
 	FBXImporter m_fbx_importer;
 	jobs::Signal m_subres_signal;
-	Meta m_meta;
-	FilePathHash m_meta_res;
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
 };
 
 
 struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app)
+			: AssetEditorWindow(app)
+			, m_buffer(app.getAllocator())
+			, m_app(app)
+			, m_path(path)
+		{
+			OutputMemoryStream blob(app.getAllocator());
+			if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
+				m_buffer.resize((u32)blob.size());
+				memcpy(m_buffer.getData(), blob.data(), blob.size());
+			}
+		}
+
+		void save() {
+			Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+			m_app.getAssetBrowser().saveResource(m_path, data);
+			m_dirty = false;
+		}
+	
+		bool onAction(const Action& action) override { 
+			if (&action == &m_app.getCommonActions().save) save();
+			else return false;
+			return true;
+		}
+
+		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
+				ImGui::EndMenuBar();
+			}
+
+			if (inputStringMultiline("##code", &m_buffer, ImGui::GetContentRegionAvail())) {
+				m_dirty = true;
+			}
+		}
+	
+		const Path& getPath() override { return m_path; }
+		const char* getName() const override { return "shader editor"; }
+
+		StudioApp& m_app;
+		String m_buffer;
+		Path m_path;
+	};
+
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -3375,11 +3298,14 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		compiler.addResource(Shader::TYPE, path);
 		findIncludes(path);
 	}
+	
+	void openEditor(const Path& path) override {
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(m_app.getAllocator(), path, m_app);
+	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Shader"; }
+	const char* getLabel() const override { return "Shader"; }
 	ResourceType getResourceType() const override { return Shader::TYPE; }
-	void onResourceDoubleClicked(const Path& path) override { m_app.getAssetBrowser().openInExternalEditor(path); }
 
 	StudioApp& m_app;
 };
@@ -3816,7 +3742,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					const Path path("universes/probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
 					ImGui::TextUnformatted(path);
-					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(path, false);
+					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().openEditor(path);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
 					if (ImGui::Button("Generate")) generateCubemaps(false, world);
@@ -5003,15 +4929,11 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	Local<RenderInterfaceImpl> m_render_interface;
 };
 
-struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
-{
-	explicit AddTerrainComponentPlugin(CompositeTextureEditor& comp_tex_editor, StudioApp& app)
+struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
+	explicit AddTerrainComponentPlugin(StudioApp& app)
 		: m_app(app)
 		, m_file_selector("mat", app)
-		, m_composite_texture_editor(comp_tex_editor)
-	{
-	}
-
+	{}
 
 	bool createHeightmap(const char* material_path, int size)
 	{
@@ -5177,14 +5099,11 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		ImGui::EndMenu();
 	}
 
-
 	const char* getLabel() const override { return "Render / Terrain"; }
-
 
 	StudioApp& m_app;
 	FileSelector m_file_selector;
 	bool m_show_save_as = false;
-	CompositeTextureEditor& m_composite_texture_editor;
 };
 
 
@@ -5198,7 +5117,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_particle_emitter_property_plugin(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
-		, m_texture_plugin(m_composite_texture_editor, app)
+		, m_texture_plugin(app)
 		, m_game_view(app)
 		, m_scene_view(app)
 		, m_editor_ui_render_plugin(app)
@@ -5206,7 +5125,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_terrain_plugin(app)
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
-		, m_composite_texture_editor(app)
 		, m_procedural_geom_plugin(app)
 	{}
 
@@ -5235,7 +5153,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		IAllocator& allocator = m_app.getAllocator();
 
-		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_composite_texture_editor, m_app);
+		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
 		m_app.registerComponent(ICON_FA_MAP, "terrain", *add_terrain_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
@@ -5286,7 +5204,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_model_plugin.init();
 
 		m_particle_editor = ParticleEditor::create(m_app);
-		m_particle_emitter_property_plugin.m_particle_editor = m_particle_editor.get();
 	}
 
 	void captureRenderDoc() { gpu::captureRenderDocFrame(); }
@@ -5511,7 +5428,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	StudioApp& m_app;
 	Action m_renderdoc_capture_action;
-	CompositeTextureEditor m_composite_texture_editor;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
@@ -5529,6 +5445,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	InstancedModelPlugin m_instanced_model_plugin;
 	ModelPlugin m_model_plugin;
 };
+
+}
 
 LUMIX_STUDIO_ENTRY(renderer)
 {

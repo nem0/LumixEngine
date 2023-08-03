@@ -114,9 +114,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 		}
 
 		bool onAction(const Action& action) override {
-			if (&action == &m_app.getSaveAction()) saveAs(m_path);
-			else if (&action == &m_app.getUndoAction()) undo();
-			else if (&action == &m_app.getRedoAction()) redo();
+			const CommonActions& actions = m_app.getCommonActions();
+			if (&action == &actions.save) saveAs(m_path);
+			else if (&action == &actions.undo) undo();
+			else if (&action == &actions.redo) redo();
 			else return false;
 			return true;
 		}
@@ -868,17 +869,18 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 		bool canRedo() const { return m_undo_idx < m_undo_stack.size() - 1; }
 
 		void windowGUI() override {
+			const CommonActions& actions = m_app.getCommonActions();
 
 			if (ImGui::BeginMenuBar()) {
 				if (ImGui::BeginMenu("File")) {
-					if (menuItem(m_app.getSaveAction(), true)) saveAs(m_path);
+					if (menuItem(actions.save, true)) saveAs(m_path);
 					if (ImGui::MenuItem("Save As")) m_show_save_as = true;
 					ImGui::EndMenu();
 				}
 				
 				if (ImGui::BeginMenu("Edit")) {
-					if (menuItem(m_app.getUndoAction(), canUndo())) undo();
-					if (menuItem(m_app.getRedoAction(), canRedo())) redo();
+					if (menuItem(actions.undo, canUndo())) undo();
+					if (menuItem(actions.redo, canRedo())) redo();
 					ImGui::EndMenu();
 				}
 
@@ -1167,7 +1169,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 		}
 
 		const Path& getPath() override { return m_path; }
-		void destroy() override { LUMIX_DELETE(m_plugin.m_allocator, this); }
 		const char* getName() const override { return "Animation Editor"; }
 
 		struct UndoRecord {
@@ -1219,15 +1220,15 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 		controller.serialize(blob);
 	}
 
-	void onResourceDoubleClicked(const Path& path) override {
-		EditorWindow* win = LUMIX_NEW(m_allocator, EditorWindow)(Path(path), *this, m_app, m_allocator);
-		m_app.getAssetBrowser().addWindow(win);
+	void openEditor(const Path& path) override {
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(m_allocator, path, *this, m_app, m_allocator);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "act"; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Animation Controller"; }
+	const char* getLabel() const override { return "Animation Controller"; }
 	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
 
 	const EventType& getEventType(RuntimeHash type) const {

@@ -135,10 +135,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual ImFont* getBoldFont() = 0;
 	virtual ImFont* getBigIconFont() = 0;
 	
-	virtual Action& getSaveAction() = 0;
-	virtual Action& getUndoAction() = 0;
-	virtual Action& getRedoAction() = 0;
-	virtual Action& getDeleteAction() = 0;
+	virtual struct CommonActions& getCommonActions() = 0;
 
 	virtual ~StudioApp() {}
 };

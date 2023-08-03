@@ -35,10 +35,9 @@ namespace {
 
 
 struct EditorWindow : AssetEditorWindow {
-	EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+	EditorWindow(const Path& path, StudioApp& app)
 		: AssetEditorWindow(app)
-		, m_allocator(allocator)
-		, m_buffer(allocator)
+		, m_buffer(app.getAllocator())
 		, m_app(app)
 	{
 		m_resource = app.getEngine().getResourceManager().load<LuaScript>(path);
@@ -55,7 +54,7 @@ struct EditorWindow : AssetEditorWindow {
 	}
 	
 	bool onAction(const Action& action) override { 
-		if (&action == &m_app.getSaveAction()) save();
+		if (&action == &m_app.getCommonActions().save) save();
 		else return false;
 		return true;
 	}
@@ -64,6 +63,7 @@ struct EditorWindow : AssetEditorWindow {
 		if (ImGui::BeginMenuBar()) {
 			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 			ImGui::EndMenuBar();
 		}
 
@@ -79,11 +79,9 @@ struct EditorWindow : AssetEditorWindow {
 		}
 	}
 	
-	void destroy() override { LUMIX_DELETE(m_allocator, this); }
 	const Path& getPath() override { return m_resource->getPath(); }
 	const char* getName() const override { return "lua script editor"; }
 
-	IAllocator& m_allocator;
 	StudioApp& m_app;
 	LuaScript* m_resource;
 	String m_buffer;
@@ -97,14 +95,14 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("lua", LuaScript::TYPE);
 	}
 
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Lua script"; }
+	const char* getLabel() const override { return "Lua script"; }
 	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "lua"; }

@@ -14,7 +14,6 @@ struct ParticleEditor {
 	static UniquePtr<ParticleEditor> create(StudioApp& app);
 	static gpu::VertexDecl getVertexDecl(const char* path, u32 emitter_idx, Array<struct String>& attribute_names, StudioApp& app);
 	static void registerDependencies(const char* path, StudioApp& app);
-	virtual void open(const char* path) = 0;
 	virtual bool compile(struct InputMemoryStream& input, struct OutputMemoryStream& output, const char* path) = 0;
 };
 

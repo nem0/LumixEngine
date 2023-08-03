@@ -799,7 +799,7 @@ struct RendererImpl final : Renderer
 		FrameData* next_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
 
 		if (next_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(next_frame->gpu_frame)) {
-			next_frame->gpu_frame = 0xFFffFFff;   
+			next_frame->gpu_frame = 0xFFffFFff;
 			next_frame->transient_buffer.renderDone();
 			next_frame->uniform_buffer.renderDone();
 			jobs::setGreen(&next_frame->can_setup);
@@ -846,7 +846,7 @@ struct RendererImpl final : Renderer
 
 		FrameData* prev_frame = m_frames[(getFrameIndex(m_gpu_frame) + lengthOf(m_frames) - 1) % lengthOf(m_frames)].get();
 		if (prev_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(prev_frame->gpu_frame)) {
-			prev_frame->gpu_frame = 0xFFffFFff;   
+			prev_frame->gpu_frame = 0xFFffFFff;
 			prev_frame->transient_buffer.renderDone();
 			prev_frame->uniform_buffer.renderDone();
 			jobs::setGreen(&prev_frame->can_setup);
@@ -856,7 +856,14 @@ struct RendererImpl final : Renderer
 			PROFILE_BLOCK("swap buffers");
 			frame.gpu_frame = gpu::swapBuffers();
 		}
-			
+		
+		if (frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(frame.gpu_frame)) {
+			frame.gpu_frame = 0xFFffFFff;
+			frame.transient_buffer.renderDone();
+			frame.uniform_buffer.renderDone();
+			jobs::setGreen(&frame.can_setup);
+		}
+
 		jobs::enableBackupWorker(false);
 		m_profiler.frame();
 
@@ -864,7 +871,7 @@ struct RendererImpl final : Renderer
 
 		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
 			gpu::waitFrame(m_gpu_frame->gpu_frame);
-			m_gpu_frame->gpu_frame = 0xFFffFFff;   
+			m_gpu_frame->gpu_frame = 0xFFffFFff;
 			m_gpu_frame->transient_buffer.renderDone();
 			m_gpu_frame->uniform_buffer.renderDone();
 			jobs::setGreen(&m_gpu_frame->can_setup);

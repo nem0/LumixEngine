@@ -540,12 +540,11 @@ struct AssetCompilerImpl : AssetCompiler {
 		return true;
 	}
 
-
 	void updateMeta(const Path& res, const char* src) const override {
-		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
+		const Path meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.saveContentSync(Path(meta_path), Span((const u8*)src, stringLength(src)))) {
+		if (!fs.saveContentSync(meta_path, Span((const u8*)src, stringLength(src)))) {
 			logError("Could not save ", meta_path);
 		}
 	}

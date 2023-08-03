@@ -27,14 +27,12 @@
 namespace Lumix {
 
 		
-static void clampText(char* text, int width)
-{
+static void clampText(char* text, int width) {
 	char* end = text + stringLength(text);
 	ImVec2 size = ImGui::CalcTextSize(text);
 	if (size.x <= width) return;
 
-	do
-	{
+	do {
 		*(end - 1) = '\0';
 		*(end - 2) = '.';
 		*(end - 3) = '.';
@@ -45,15 +43,13 @@ static void clampText(char* text, int width)
 	} while (size.x > width && end - text > 4);
 }
 
-static const char* getResourceFilePath(const char* str)
-{
+static const char* getResourceFilePath(const char* str) {
 	const char* c = str;
 	while (*c && *c != ':') ++c;
 	return *c != ':' ? str : c + 1;
 }
 
-static Span<const char> getSubresource(const char* str)
-{
+static Span<const char> getSubresource(const char* str) {
 	Span<const char> ret;
 	ret.m_begin = str;
 	ret.m_end = str;
@@ -61,8 +57,7 @@ static Span<const char> getSubresource(const char* str)
 	return ret;
 }
 
-bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path, ResourceType type)
-{
+bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path, ResourceType type) {
 	return false;
 }
 
@@ -135,9 +130,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-
-	~AssetBrowserImpl() override
-	{
+	~AssetBrowserImpl() override {
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
@@ -150,7 +143,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool onAction(const Action& action) override {
 		if (&action == &m_back_action) goBackDir();
 		else if (&action == &m_forward_action) goForwardDir();
-		else if (&action == &m_app.getDeleteAction() && !m_selected_resources.empty()) m_request_delete = true;
+		else if (&action == &m_app.getCommonActions().del && !m_selected_resources.empty()) m_request_delete = true;
 		else return false;
 		return true;
 	}
@@ -464,12 +457,12 @@ struct AssetBrowserImpl : AssetBrowser {
 			const ResourceType type = m_app.getAssetCompiler().getResourceType(tile.filepath);
 			auto iter = m_plugins.find(type);
 			if (iter.isValid()) {
-				const char* type_str = iter.value()->getName();
+				const char* label = iter.value()->getLabel();
 				ImGui::PushFont(m_app.getBoldFont());
 				float wrap_width = img_size.x * 0.9f;
-				const ImVec2 text_size = ImGui::CalcTextSize(type_str, nullptr, false, wrap_width);
+				const ImVec2 text_size = ImGui::CalcTextSize(label, nullptr, false, wrap_width);
 				
-				dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), screen_pos + (img_size - text_size) * 0.5f, IM_COL32(0, 0, 0, 0xff), type_str, nullptr, wrap_width);
+				dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), screen_pos + (img_size - text_size) * 0.5f, IM_COL32(0, 0, 0, 0xff), label, nullptr, wrap_width);
 				ImGui::PopFont();
 			}
 
@@ -535,8 +528,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void fileColumn()
-	{
+	void fileColumn() {
 		ImGui::BeginChild("main_col");
 
 		float w = ImGui::GetContentRegionAvail().x;
@@ -556,21 +548,11 @@ struct AssetBrowserImpl : AssetBrowser {
 			else if (ImGui::IsItemHovered())
 			{
 				if (ImGui::IsMouseDoubleClicked(0)) {
-					const ResourceType type = m_app.getAssetCompiler().getResourceType(tile.filepath);
 					Path path(tile.filepath);
-					for (Plugin* p : m_plugins) {
-						if (p->getResourceType() == type) {
-							if (AssetEditorWindow* win = getWindow(path)) {
-								win->m_focus_request = true;
-							}
-							else {
-								p->onResourceDoubleClicked(path);
-							}
-						}
-					}
+					openEditor(path);
 				}
 				else if (ImGui::IsMouseReleased(0)) {
-					const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
+					const bool additive = os::isKeyDown(os::Keycode::CTRL);
 					selectResource(Path(tile.filepath), additive);
 				}
 				else if(ImGui::IsMouseReleased(1)) {
@@ -656,18 +638,18 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
 			for (Plugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
-				if (filter[0] && stristr(plugin->getName(), filter) == nullptr) continue;
-				if (ImGui::BeginMenu(plugin->getName())) {
+				if (filter[0] && stristr(plugin->getLabel(), filter) == nullptr) continue;
+				if (ImGui::BeginMenu(plugin->getLabel())) {
 					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 					ImGui::SameLine();
 					if (ImGui::Button("Create") || input_entered) {
 						OutputMemoryStream blob(m_allocator);
 						plugin->createResource(blob);
-						StaticString<LUMIX_MAX_PATH> path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
-						if (!fs.saveContentSync(Path(path), blob)) {
+						Path path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
+						if (!fs.saveContentSync(path, blob)) {
 							logError("Failed to write ", path);
 						}
-						m_wanted_resource = path;
+						selectResource(path, false);
 						ImGui::CloseCurrentPopup();
 					}
 
@@ -798,13 +780,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_has_focus = false;
 		if (m_dir.data[0] == '\0') changeDir(".", true);
 
-		if (!m_wanted_resource.isEmpty()) {
-			selectResource(m_wanted_resource, false);
-			m_wanted_resource = "";
-		}
-
 		if(m_is_open) {
-			if (!ImGui::Begin(WINDOW_NAME, &m_is_open)) {
+			if (!ImGui::Begin("Assets", &m_is_open)) {
 				ImGui::End();
 				return;
 			}
@@ -904,29 +881,34 @@ struct AssetBrowserImpl : AssetBrowser {
 		return os::copyFile(path, dest);
 	}
 
-	static constexpr const char* WINDOW_NAME = ICON_FA_IMAGES "Assets##assets";
-	
-	void selectResource(const Path& path, bool additive) override {
-		ImGui::SetWindowFocus(WINDOW_NAME);
-		m_is_open = true;
-		if(additive) {
-			if(m_selected_resources.indexOf(path) >= 0) {
-				m_selected_resources.swapAndPopItem(path);
+	void openEditor(const Path& path) override {
+		if (AssetEditorWindow* win = getWindow(path)) {
+			win->m_focus_request = true;
+			return;
+		}
+
+		const ResourceType type = m_app.getAssetCompiler().getResourceType(path);
+		for (Plugin* p : m_plugins) {
+			if (p->getResourceType() == type) {
+				p->openEditor(path);
+				break;
 			}
-			else {
+		}
+	}
+
+	void selectResource(const Path& path, bool additive) {
+		if (additive) {
+			i32 idx = m_selected_resources.indexOf(path);
+			if (idx >= 0) {
+				m_selected_resources.swapAndPop(idx);
+			} else {
 				m_selected_resources.push(path);
 			}
+			return;
 		}
-		else {
-			ResourceLocator rl(Span(path.c_str(), stringLength(path)));
-			if (!m_filter[0] && !Path::isSame(Span<const char>(m_dir, stringLength(m_dir)), rl.dir)) {
-				StaticString<LUMIX_MAX_PATH> dir(rl.dir);
-				changeDir(dir, true);
-			}
-			m_selected_resources.clear();
-			m_selected_resources.push(path);
-		}
-		m_wanted_resource = "";
+
+		m_selected_resources.clear();
+		m_selected_resources.push(path);
 	}
 
 	static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
@@ -990,7 +972,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (span.length() > 0) {
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-				m_wanted_resource = buf.begin();
+				openEditor(Path(buf.begin()));
 			}
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
@@ -1016,28 +998,30 @@ struct AssetBrowserImpl : AssetBrowser {
 		return false;
 	}
 
+	void saveResource(Resource& resource, Span<const u8> data) override {
+		saveResource(resource.getPath(), data);
+	}
 
-	void saveResource(Resource& resource, Span<const u8> data) override
-	{
+	void saveResource(const Path& path, Span<const u8> data) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		// use temporary because otherwise the resource is reloaded during saving
-		StaticString<LUMIX_MAX_PATH> tmp_path(resource.getPath().c_str(), ".tmp");
+		StaticString<LUMIX_MAX_PATH> tmp_path(path.c_str(), ".tmp");
 
 		if (!fs.saveContentSync(Path(tmp_path), data)) {
-			logError("Could not save file ", resource.getPath());
+			logError("Could not save file ", path);
 			return;
 		}
 
 		Engine& engine = m_app.getEngine();
 		const char* base_path = engine.getFileSystem().getBasePath();
 		StaticString<LUMIX_MAX_PATH> src_full_path(base_path, tmp_path);
-		StaticString<LUMIX_MAX_PATH> dest_full_path(base_path, resource.getPath().c_str());
+		StaticString<LUMIX_MAX_PATH> dest_full_path(base_path, path.c_str());
 
 		os::deleteFile(dest_full_path);
 
 		if (!os::moveFile(src_full_path, dest_full_path))
 		{
-			logError("Could not save file ", resource.getPath());
+			logError("Could not save file ", path);
 		}
 	}
 
@@ -1133,23 +1117,27 @@ struct AssetBrowserImpl : AssetBrowser {
 		return false;
 	}
 
-
 	void locate(const Resource& resource) override {
-		m_filter[0] = '\0';
-		char dir[LUMIX_MAX_PATH];
-		copyString(Span(dir), Path::getDir(resource.getPath().c_str()));
-		changeDir(dir, true);
+		locate(resource.getPath());
 	}
 
+	void locate(const Path& path) override {
+		m_is_open = true;
+		m_filter[0] = '\0';
+		Span<const char> new_dir = Path::getDir(path.c_str());
+		Span<const char> current_dir(m_dir, stringLength(m_dir));
+		if (!Path::isSame(new_dir, current_dir)) {
+			StaticString<LUMIX_MAX_PATH> dir(new_dir);
+			changeDir(dir[0] ? dir : ".", true);
+		}
+		selectResource(path, false);
+	}
 
-	void openInExternalEditor(Resource* resource) const override
-	{
+	void openInExternalEditor(Resource* resource) const override {
 		openInExternalEditor(resource->getPath().c_str());
 	}
 
-
-	void openInExternalEditor(const char* path) const override
-	{
+	void openInExternalEditor(const char* path) const override {
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<LUMIX_MAX_PATH> full_path(base_path, path);
 		const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path);
@@ -1179,22 +1167,21 @@ struct AssetBrowserImpl : AssetBrowser {
 	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_asset_browser_open; }
 	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_asset_browser_open  = m_is_open; }
 
-	void addWindow(AssetEditorWindow* window) override {
+	void addWindow(UniquePtr<AssetEditorWindow>&& window) override {
 		if (!m_windows.empty()) window->m_dock_id = m_windows.last()->m_dock_id;
-		m_windows.push(window);
 		m_app.addPlugin(*window);
+		m_windows.push(window.move());
 	}
 	
 	void closeWindow(AssetEditorWindow& window) override {
-		m_windows.eraseItem(&window);
 		m_app.removePlugin(window);
-		window.destroy();
+		m_windows.eraseItems([&](const UniquePtr<AssetEditorWindow>& win){ return win.get() == &window; });
 	}
 
 	AssetEditorWindow* getWindow(const Path& path) override {
-		i32 idx = m_windows.find([&](AssetEditorWindow* win){ return win->getPath() == path; });
+		i32 idx = m_windows.find([&](const UniquePtr<AssetEditorWindow>& win){ return win->getPath() == path; });
 		if (idx < 0) return nullptr;
-		return m_windows[idx];
+		return m_windows[idx].get();
 	}
 
 	TagAllocator m_allocator;
@@ -1204,7 +1191,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	Array<StaticString<LUMIX_MAX_PATH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;
-	Array<AssetEditorWindow*> m_windows;
+	Array<UniquePtr<AssetEditorWindow>> m_windows;
 	
 	Array<Path> m_dir_history;
 	i32 m_dir_history_index = -1;
@@ -1215,7 +1202,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	Array<Path> m_selected_resources;
 	int m_context_resource;
 	char m_filter[128];
-	Path m_wanted_resource;
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	bool m_has_focus = false;

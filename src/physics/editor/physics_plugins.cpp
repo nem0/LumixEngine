@@ -837,7 +837,7 @@ struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
 		app.getAssetCompiler().registerExtension("phy", PhysicsGeometry::TYPE);
 	}
 
-	const char* getName() const override { return "Physics geometry"; }
+	const char* getLabel() const override { return "Physics geometry"; }
 	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
 
 	StudioApp& m_app;
@@ -845,9 +845,8 @@ struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
 
 struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<PhysicsMaterial>(path);
@@ -866,7 +865,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 		}
 		
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
@@ -875,6 +874,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -905,15 +905,12 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 			}
 		}
 	
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "physics material editor"; }
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		PhysicsMaterial* m_resource;
 	};
-
 
 	explicit PhysicsMaterialPlugin(StudioApp& app)
 		: m_app(app)
@@ -926,13 +923,13 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 	void createResource(OutputMemoryStream& blob) override {}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Physics material"; }
+	const char* getLabel() const override { return "Physics material"; }
 	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	StudioApp& m_app;

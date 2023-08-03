@@ -457,8 +457,8 @@ struct WorldViewImpl final : WorldView {
 	void moveCamera(float forward, float right, float up, float speed) override
 	{
 		const Quat rot = m_viewport.rot;
-
-		right = m_scene_view.m_orbit_action.isActive() ? 0 : right;
+		
+		right = m_app.getCommonActions().cam_orbit.isActive() ? 0 : right;
 
 		m_viewport.pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
 		m_viewport.pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
@@ -477,7 +477,7 @@ struct WorldViewImpl final : WorldView {
 		const Quat pitch_rot(pitch_axis, pitch);
 		rot = normalize(pitch_rot * rot);
 
-		if (m_scene_view.m_orbit_action.isActive() && !m_editor.getSelectedEntities().empty()) {
+		if (m_app.getCommonActions().cam_orbit.isActive() && !m_editor.getSelectedEntities().empty()) {
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			const Transform tr = world->getTransform(m_editor.getSelectedEntities()[0]);
 			Vec3 offset = m_app.getGizmoConfig().offset;
@@ -614,14 +614,7 @@ SceneView::SceneView(StudioApp& app)
 	m_show_stats = false;
 
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
-	m_orbit_action.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
 	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);
-	m_move_forward_action.init("Move forward", "Move camera forward", "moveForward", "", false);
-	m_move_back_action.init("Move back", "Move camera back", "moveBack", "", false);
-	m_move_left_action.init("Move left", "Move camera left", "moveLeft", "", false);
-	m_move_right_action.init("Move right", "Move camera right", "moveRight", "", false);
-	m_move_up_action.init("Move up", "Move camera up", "moveUp", "", false);
-	m_move_down_action.init("Move down", "Move camera down", "moveDown", "", false);
 	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, false);
 	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, false);
 	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
@@ -645,14 +638,7 @@ SceneView::SceneView(StudioApp& app)
 	#undef NO_ICON
 
 	m_app.addAction(&m_copy_move_action);
-	m_app.addAction(&m_orbit_action);
 	m_app.addAction(&m_toggle_gizmo_step_action);
-	m_app.addAction(&m_move_forward_action);
-	m_app.addAction(&m_move_back_action);
-	m_app.addAction(&m_move_left_action);
-	m_app.addAction(&m_move_right_action);
-	m_app.addAction(&m_move_up_action);
-	m_app.addAction(&m_move_down_action);
 	m_app.addAction(&m_search_action);
 	m_app.addAction(&m_set_pivot_action);
 	m_app.addAction(&m_reset_pivot_action);
@@ -699,14 +685,7 @@ void SceneView::init() {
 SceneView::~SceneView()
 {
 	m_app.removeAction(&m_copy_move_action);
-	m_app.removeAction(&m_orbit_action);
 	m_app.removeAction(&m_toggle_gizmo_step_action);
-	m_app.removeAction(&m_move_forward_action);
-	m_app.removeAction(&m_move_back_action);
-	m_app.removeAction(&m_move_left_action);
-	m_app.removeAction(&m_move_right_action);
-	m_app.removeAction(&m_move_up_action);
-	m_app.removeAction(&m_move_down_action);
 	m_app.removeAction(&m_search_action);
 	m_app.removeAction(&m_set_pivot_action);
 	m_app.removeAction(&m_reset_pivot_action);
@@ -828,12 +807,13 @@ void SceneView::update(float time_delta)
 
 	float speed = m_camera_speed * time_delta * 60.f;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
-	if (m_move_forward_action.isActive()) m_view->moveCamera(1.0f, 0, 0, speed);
-	if (m_move_back_action.isActive()) m_view->moveCamera(-1.0f, 0, 0, speed);
-	if (m_move_left_action.isActive()) m_view->moveCamera(0.0f, -1.0f, 0, speed);
-	if (m_move_right_action.isActive()) m_view->moveCamera(0.0f, 1.0f, 0, speed);
-	if (m_move_down_action.isActive()) m_view->moveCamera(0, 0, -1.0f, speed);
-	if (m_move_up_action.isActive()) m_view->moveCamera(0, 0, 1.0f, speed);
+	const CommonActions& actions = m_app.getCommonActions();
+	if (actions.cam_forward.isActive()) m_view->moveCamera(1.0f, 0, 0, speed);
+	if (actions.cam_backward.isActive()) m_view->moveCamera(-1.0f, 0, 0, speed);
+	if (actions.cam_left.isActive()) m_view->moveCamera(0.0f, -1.0f, 0, speed);
+	if (actions.cam_right.isActive()) m_view->moveCamera(0.0f, 1.0f, 0, speed);
+	if (actions.cam_down.isActive()) m_view->moveCamera(0, 0, -1.0f, speed);
+	if (actions.cam_up.isActive()) m_view->moveCamera(0, 0, 1.0f, speed);
 }
 
 

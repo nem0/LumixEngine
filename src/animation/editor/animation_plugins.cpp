@@ -44,7 +44,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
 		app.getAssetCompiler().registerExtension("ani", Animation::TYPE);
 	}
 
-	const char* getName() const override { return "Animation"; }
+	const char* getLabel() const override { return "Animation"; }
 	ResourceType getResourceType() const override { return Animation::TYPE; }
 
 	StudioApp& m_app;
@@ -53,9 +53,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
 
 struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<PropertyAnimation>(path);
@@ -73,7 +72,7 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		}
 		
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
@@ -82,6 +81,7 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -223,11 +223,9 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			return visitor.result;
 		}
 
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "lua script editor"; }
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		PropertyAnimation* m_resource;
 		int m_selected_point = -1;
@@ -245,13 +243,13 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	const char* getDefaultExtension() const override { return "anp"; }
 	void createResource(OutputMemoryStream& blob) override {}
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getName() const override { return "Property animation"; }
+	const char* getLabel() const override { return "Property animation"; }
 	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
 	
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	StudioApp& m_app;

@@ -1,5 +1,6 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/utils.h"
 
 namespace Lumix {
 
@@ -14,7 +15,7 @@ struct EditorAssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return m_extension; }
 
-	const char* getName() const override { return m_name; }
+	const char* getLabel() const override { return m_name; }
 	ResourceType getResourceType() const override { return m_resource_type; }
 
 protected:
@@ -29,7 +30,6 @@ struct AssetEditorWindow : StudioApp::GUIPlugin {
 	AssetEditorWindow(StudioApp& app) : m_app(app) {}
 
 	virtual void windowGUI() = 0;
-	virtual void destroy() = 0;
 	virtual const Path& getPath() = 0;
 
 	bool hasFocus() const override { return m_has_focus; }

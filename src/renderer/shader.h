@@ -20,9 +20,7 @@ struct Renderer;
 struct Texture;
 
 
-struct LUMIX_RENDERER_API Shader final : Resource
-{
-public:
+struct LUMIX_RENDERER_API Shader final : Resource {
 	struct TextureSlot
 	{
 		TextureSlot()
@@ -124,7 +122,6 @@ public:
 	};
 	Array<ProgramPair> m_programs;
 	Sources m_sources;
-
 
 	static const ResourceType TYPE;
 

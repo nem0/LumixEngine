@@ -128,7 +128,7 @@ bool Action::toolbarButton(ImFont* font)
 }
 
 
-bool Action::isActive()
+bool Action::isActive() const 
 {
 	if (ImGui::IsAnyItemFocused()) return false;
 	if (shortcut == os::Keycode::INVALID && modifiers == 0) return false;
@@ -159,7 +159,7 @@ void getShortcut(const Action& action, Span<char> buf) {
 	}
 }
 
-bool menuItem(Action& a, bool enabled) {
+bool menuItem(const Action& a, bool enabled) {
 	char buf[20];
 	getShortcut(a, Span(buf));
 	return ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled);

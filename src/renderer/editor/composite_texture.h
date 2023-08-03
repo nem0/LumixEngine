@@ -133,15 +133,15 @@ struct CompositeTexture {
 	u32 m_node_id_generator = 1;
 };
 
-struct CompositeTextureEditorWindow;
+struct CompositeTextureEditor {
+	virtual ~CompositeTextureEditor() {}
 
-struct CompositeTextureEditor final {
-	CompositeTextureEditor(StudioApp& app);
-
-	void open(const Path& path);
-
-	TagAllocator m_allocator;
-	StudioApp& m_app;
+	virtual void gui() = 0;
+	virtual void menu() = 0;
+	virtual void save() = 0;
+	virtual bool isDirty() const = 0;
+	
+	static UniquePtr<CompositeTextureEditor> open(const Path& path, StudioApp& app, IAllocator& allocator);
 };
 
 } // namespace Lumix

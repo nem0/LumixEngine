@@ -59,16 +59,9 @@ private:
 private:
 	StudioApp& m_app;
 	Action m_search_action;
-	Action m_orbit_action;
+	Action m_set_pivot_action;
 	Action m_toggle_gizmo_step_action;
 	Action m_copy_move_action;
-	Action m_move_forward_action;
-	Action m_move_back_action;
-	Action m_move_left_action;
-	Action m_move_right_action;
-	Action m_move_up_action;
-	Action m_move_down_action;
-	Action m_set_pivot_action;
 	Action m_reset_pivot_action;
 	Action m_top_view_action;
 	Action m_side_view_action;

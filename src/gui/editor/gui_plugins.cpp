@@ -38,9 +38,8 @@ static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType
 
 struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<Sprite>(path);
@@ -58,7 +57,7 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		}
 		
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
@@ -137,6 +136,7 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -186,11 +186,9 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			}
 		}
 	
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "sprite editor"; }
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		Sprite* m_resource;
 	};
@@ -206,13 +204,13 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	const char* getDefaultExtension() const override { return "spr"; }
 	void createResource(OutputMemoryStream& blob) override { blob << "type \"simple\""; }
 
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
-	const char* getName() const override { return "Sprite"; }
+	const char* getLabel() const override { return "Sprite"; }
 	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
 	StudioApp& m_app;

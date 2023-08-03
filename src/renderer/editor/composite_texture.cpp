@@ -3025,21 +3025,19 @@ u32 CompositeTexture::getLayersCount() const {
 	return 1;
 }
 
-struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
-	CompositeTextureEditorWindow(const Path& path, CompositeTextureEditor& editor, StudioApp& app, IAllocator& allocator)
+struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
+	CompositeTextureEditorImpl(const Path& path, StudioApp& app, IAllocator& allocator)
 		: NodeEditor(allocator)
-		, AssetEditorWindow(app)
 		, m_allocator(allocator)
-		, m_editor(editor)
 		, m_app(app)
 		, m_resource(app, m_allocator)
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		m_path = path;
-		m_loading_handle = fs.getContent(path, makeDelegate<&CompositeTextureEditorWindow::onLoaded>(this));
+		m_loading_handle = fs.getContent(path, makeDelegate<&CompositeTextureEditorImpl::onLoaded>(this));
 	}
 
-	~CompositeTextureEditorWindow() {
+	~CompositeTextureEditorImpl() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (m_loading_handle.isValid()) fs.cancel(m_loading_handle);
 	}
@@ -3134,7 +3132,7 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 				}
 				return *this;
 			}
-			CompositeTextureEditorWindow* win;
+			CompositeTextureEditorImpl* win;
 			CompositeTexture::Node* n = nullptr;
 		} visitor;
 		visitor.win = this;
@@ -3160,9 +3158,9 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 	void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) override {}
 	
 	void onContextMenu(ImVec2 pos) override {
-		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter), 150, ImGui::IsWindowAppearing());
+		ImGuiEx::filter("Filter", m_node_filter, sizeof(m_node_filter), 150, ImGui::IsWindowAppearing());
 		
-		if (m_filter[0]) {
+		if (m_node_filter[0]) {
 			struct : INodeTypeVisitor {
 				bool beginCategory(const char* _category) override {
 					category = _category;
@@ -3174,14 +3172,14 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
 					StaticString<128> label(category, _label);
 					if (shortcut) label.append(" (LMB + ", shortcut, ")");
-					if (!node && stristr(label, win->m_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
+					if (!node && stristr(label, win->m_node_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
 						node = win->m_resource.addNode(type);
 						ImGui::CloseCurrentPopup();
 					}
 					return *this;
 				}
 				StaticString<64> category;
-				CompositeTextureEditorWindow* win;
+				CompositeTextureEditorImpl* win;
 				CompositeTexture::Node* node = nullptr;
 			} visitor;
 			visitor.win = this;
@@ -3205,7 +3203,7 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 					}
 					return *this;
 				}
-				CompositeTextureEditorWindow* win;
+				CompositeTextureEditorImpl* win;
 				CompositeTexture::Node* node = nullptr;
 			} visitor;
 			visitor.win = this;
@@ -3233,18 +3231,6 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 		if (m_is_any_item_active) return;
 		m_resource.deleteSelectedNodes();
 		pushUndo(NO_MERGE_UNDO);
-	}
-
-	bool onAction(const Action& action) override {
-		ASSERT(m_has_focus);
-
-		if (&action == &m_app.getUndoAction()) undo();
-		else if (&action == &m_app.getRedoAction()) redo();
-		else if (&action == &m_app.getSaveAction()) saveAs(m_path);
-		else if (&action == &m_app.getDeleteAction()) deleteSelectedNodes();
-		else return false;
-		
-		return true;
 	}
 
 	void onLoaded(u64 size, const u8* data, bool success) {
@@ -3366,70 +3352,44 @@ struct CompositeTextureEditorWindow : AssetEditorWindow, NodeEditor {
 		}
 	}
 
-	void windowGUI() override {
-		if (ImGui::BeginMenuBar()) {
-			if (ImGui::BeginMenu("File")) {
-				if (menuItem(m_app.getSaveAction(), true)) saveAs(m_path);
-				if (ImGui::MenuItem("Save As")) m_show_save_as = true;
-				if (ImGui::MenuItem("Export")) exportAs();
-				ImGui::EndMenu();
-			}
-			if (ImGui::BeginMenu("Edit")) {
-				if (menuItem(m_app.getUndoAction(), canUndo())) undo();
-				if (menuItem(m_app.getRedoAction(), canRedo())) redo();
-				if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
-				ImGui::EndMenu();
-			}
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
-			if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
-			ImGui::Checkbox("Preview", &m_show_preview);
-			ImGui::EndMenuBar();
-		}
-		
-		FileSelector& fs = m_app.getFileSelector();
-		if (fs.gui("Save As", &m_show_save_as, "ltc", true)) saveAs(Path(fs.getPath()));
+	void save() override { saveAs(m_path); }
 
-		if (m_loading_handle.isValid()) {
-			ImGui::TextUnformatted("Loading...");
-		}
-		else {
-			nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
-			previewGUI();
-		}
+	void menu() override {
+		const CommonActions& actions = m_app.getCommonActions();
+		if (ImGui::MenuItem("Export")) exportAs();
+		if (menuItem(actions.undo, canUndo())) undo();
+		if (menuItem(actions.redo, canRedo())) redo();
+		if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
+		//if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
+		//if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
+		ImGui::Checkbox("Preview", &m_show_preview);
 	}
 
-	void destroy() override { LUMIX_DELETE(m_app.getAllocator(), this); }
-	const Path& getPath() override { return m_path; }
-	const char* getName() const override { return "composite_texture_editor"; }
+	bool isDirty() const override { return m_dirty; }
+
+	void gui() override {
+		if (m_loading_handle.isValid()) {
+			ImGui::TextUnformatted("Loading...");
+			return;
+		}
+
+		nodeEditorGUI(m_resource.m_nodes, m_resource.m_links);
+		previewGUI();
+	}
 	
 	IAllocator& m_allocator;
-	CompositeTextureEditor& m_editor;
 	StudioApp& m_app;
 	Path m_path;
 	CompositeTexture m_resource;
 	u16 m_preview_node_id = 0xffFF;
 	FileSystem::AsyncHandle m_loading_handle = FileSystem::AsyncHandle::invalid();
-	bool m_show_save_as = false;
-	bool m_show_confirm = false;
 	bool m_show_preview = true;
-	char m_filter[64] = "";
+	bool m_dirty = false;
+	char m_node_filter[64] = "";
 };
 
-CompositeTextureEditor::CompositeTextureEditor(StudioApp& app)
-	: m_app(app)
-	, m_allocator(app.getAllocator(), "composite texture editor")
-{}
-
-void CompositeTextureEditor::open(const Path& path) {
-	AssetBrowser& ab = m_app.getAssetBrowser();
-	if (AssetEditorWindow* win = ab.getWindow(Path(path))) {
-		win->m_focus_request = true;
-		return;
-	}
-	
-	IAllocator& allocator = m_app.getAllocator();
-	CompositeTextureEditorWindow* win = LUMIX_NEW(allocator, CompositeTextureEditorWindow)(Path(path), *this, m_app, m_allocator);
-	ab.addWindow(win);
+UniquePtr<CompositeTextureEditor> CompositeTextureEditor::open(const Path& path, StudioApp& app, IAllocator& allocator) {
+	return UniquePtr<CompositeTextureEditorImpl>::create(allocator, Path(path), app, allocator);
 }
 
 } // namespace Lumix

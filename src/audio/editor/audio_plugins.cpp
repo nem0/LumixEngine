@@ -38,9 +38,8 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	};
 
 	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
+		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
-			, m_allocator(allocator)
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<Clip>(path);
@@ -62,7 +61,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		}
 		
 		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getSaveAction()) save();
+			if (&action == &m_app.getCommonActions().save) save();
 			else return false;
 			return true;
 		}
@@ -71,6 +70,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -122,7 +122,6 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			}
 		}
 	
-		void destroy() override { LUMIX_DELETE(m_allocator, this); }
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "audio clip editor"; }
 		
@@ -139,7 +138,6 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			m_playing_clip = -1;
 		}
 
-		IAllocator& m_allocator;
 		StudioApp& m_app;
 		Clip* m_resource;
 		Meta m_meta;
@@ -154,10 +152,10 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("wav", Clip::TYPE);
 	}
 	
-	void onResourceDoubleClicked(const Path& path) override {
+	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
-		EditorWindow* win = LUMIX_NEW(allocator, EditorWindow)(Path(path), m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win);
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	bool compile(const Path& src) override {
@@ -179,7 +177,7 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(compiled.data(), (i32)compiled.size()));
 	}
 
-	const char* getName() const override { return "Audio"; }
+	const char* getLabel() const override { return "Audio"; }
 	ResourceType getResourceType() const override { return Clip::TYPE; }
 	
 	StudioApp& m_app;

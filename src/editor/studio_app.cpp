@@ -408,10 +408,17 @@ struct StudioAppImpl final : StudioApp
 		m_asset_compiler.reset();
 		m_editor.reset();
 
-		removeAction(&m_save_action);
-		removeAction(&m_undo_action);
-		removeAction(&m_redo_action);
-		removeAction(&m_delete_action);
+		removeAction(&m_common_actions.save);
+		removeAction(&m_common_actions.undo);
+		removeAction(&m_common_actions.redo);
+		removeAction(&m_common_actions.del);
+		removeAction(&m_common_actions.cam_orbit);
+		removeAction(&m_common_actions.cam_forward);
+		removeAction(&m_common_actions.cam_backward);
+		removeAction(&m_common_actions.cam_right);
+		removeAction(&m_common_actions.cam_left);
+		removeAction(&m_common_actions.cam_up);
+		removeAction(&m_common_actions.cam_down);
 
 		for (Action* action : m_owned_actions) {
 			removeAction(action);
@@ -1248,20 +1255,15 @@ struct StudioAppImpl final : StudioApp
 		m_window_actions.push(action);
 	}
 
-
-	void addAction(Action* action) override
-	{
-		for (int i = 0; i < m_actions.size(); ++i)
-		{
-			if (compareString(m_actions[i]->label_long, action->label_long) > 0)
-			{
+	void addAction(Action* action) override {
+		for (int i = 0; i < m_actions.size(); ++i) {
+			if (compareString(m_actions[i]->label_long, action->label_long) > 0) {
 				m_actions.insert(i, action);
 				return;
 			}
 		}
 		m_actions.push(action);
 	}
-
 
 	template <void (StudioAppImpl::*Func)()>
 	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
@@ -2231,25 +2233,37 @@ struct StudioAppImpl final : StudioApp
 		m_file_selector.m_current_dir = m_settings.getStringValue(Settings::LOCAL, "fileselector_dir", "");
 	}
 
-	Action& getRedoAction() override { return m_redo_action; }
-	Action& getUndoAction() override { return m_undo_action; }
-	Action& getSaveAction() override { return m_save_action; }
-	Action& getDeleteAction() override { return m_delete_action; }
+	CommonActions& getCommonActions() override { return m_common_actions; }
 
 	void addActions()
 	{
-		m_save_action.init(ICON_FA_SAVE "Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
-		m_save_action.func.bind<&StudioAppImpl::save>(this);
-		addAction(&m_save_action);
-		m_undo_action.init(ICON_FA_UNDO "Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
-		m_undo_action.func.bind<&StudioAppImpl::undo>(this);
-		addAction(&m_undo_action);
-		m_redo_action.init(ICON_FA_REDO "Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
-		m_redo_action.func.bind<&StudioAppImpl::redo>(this);
-		addAction(&m_redo_action);
-		m_delete_action.init(ICON_FA_MINUS_SQUARE "Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, true);
-		m_delete_action.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
-		addAction(&m_delete_action);
+		m_common_actions.save.init(ICON_FA_SAVE "Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
+		m_common_actions.save.func.bind<&StudioAppImpl::save>(this);
+		addAction(&m_common_actions.save);
+		m_common_actions.undo.init(ICON_FA_UNDO "Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
+		m_common_actions.undo.func.bind<&StudioAppImpl::undo>(this);
+		addAction(&m_common_actions.undo);
+		m_common_actions.redo.init(ICON_FA_REDO "Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
+		m_common_actions.redo.func.bind<&StudioAppImpl::redo>(this);
+		addAction(&m_common_actions.redo);
+		m_common_actions.del.init(ICON_FA_MINUS_SQUARE "Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, true);
+		m_common_actions.del.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
+		addAction(&m_common_actions.del);
+
+		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
+		addAction(&m_common_actions.cam_orbit);
+		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "", false);
+		addAction(&m_common_actions.cam_forward);
+		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "", false);
+		addAction(&m_common_actions.cam_backward);
+		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "", false);
+		addAction(&m_common_actions.cam_left);
+		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "", false);
+		addAction(&m_common_actions.cam_right);
+		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "", false);
+		addAction(&m_common_actions.cam_up);
+		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", false);
+		addAction(&m_common_actions.cam_down);
 
 		addAction<&StudioAppImpl::newWorld>(ICON_FA_PLUS "New", "New world", "newWorld", ICON_FA_PLUS);
 		addAction<&StudioAppImpl::saveAs>(
@@ -3339,10 +3353,7 @@ struct StudioAppImpl final : StudioApp
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
 
-	Action m_save_action;
-	Action m_delete_action;
-	Action m_undo_action;
-	Action m_redo_action;
+	CommonActions m_common_actions;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;

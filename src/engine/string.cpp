@@ -193,8 +193,7 @@ String String::substr(u32 start, u32 length) const
 }
 
 
-void String::resize(u32 size)
-{
+void String::resize(u32 size) {
 	if (isSmall()) {
 		if (size < sizeof(m_small)) {
 			m_small[size] = '\0';
@@ -202,6 +201,7 @@ void String::resize(u32 size)
 		else {
 			char* tmp = (char*)m_allocator.allocate(size + 1);
 			memcpy(tmp, m_small, m_size + 1);
+			tmp[size] = '\0';
 			m_big = tmp;
 		}
 	}

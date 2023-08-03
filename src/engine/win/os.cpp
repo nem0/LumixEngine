@@ -60,14 +60,14 @@ struct EventQueue {
 	Rec* back = nullptr;
 };
 
-static struct
-{
+static struct {
 	WindowHandle grabbed_window = INVALID_WINDOW;
 	EventQueue event_queue;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	bool raw_input_registered = false;
 	u16 surrogate = 0;
+	bool key_states[256] = {};
 	struct {
 		HCURSOR load;
 		HCURSOR size_ns;
@@ -350,6 +350,7 @@ bool getEvent(Event& event) {
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
 			event.key.is_repeat = msg.lParam & (1 << 30);
+			G.key_states[(u32)event.key.keycode] = true;
 			break;
 		case WM_SYSCOMMAND:
 			if (msg.wParam != SC_KEYMENU || (msg.lParam >> 16) > 0) {
@@ -361,17 +362,20 @@ bool getEvent(Event& event) {
 			event.type = Event::Type::KEY;
 			event.key.down = false;
 			event.key.keycode = (Keycode)msg.wParam;
+			G.key_states[(u32)event.key.keycode] = false;
 			break;
 		case WM_KEYDOWN:
 			event.type = Event::Type::KEY;
 			event.key.down = true;
 			event.key.keycode = (Keycode)msg.wParam;
 			event.key.is_repeat = msg.lParam & (1 << 30);
+			G.key_states[(u32)event.key.keycode] = true;
 			break;
 		case WM_KEYUP:
 			event.type = Event::Type::KEY;
 			event.key.down = false;
 			event.key.keycode = (Keycode)msg.wParam;
+			G.key_states[(u32)event.key.keycode] = false;
 			break;
 		case WM_CHAR: {
 			event.type = Event::Type::CHAR;
@@ -650,10 +654,8 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 }
 
 
-bool isKeyDown(Keycode keycode)
-{
-	const SHORT res = GetAsyncKeyState((int)keycode);
-	return (res & 0x8000) != 0;
+bool isKeyDown(Keycode keycode) {
+	return G.key_states[(i32)keycode];
 }
 
 
