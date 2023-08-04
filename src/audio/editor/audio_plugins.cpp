@@ -31,10 +31,11 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		float volume = 1.f;
 
 		void load(const Path& path, StudioApp& app) {
-			app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			if (lua_State* L = app.getAssetCompiler().getMeta(path)) {
 				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "looped", &looped);
 				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "volume", &volume);
-			});
+				lua_close(L);
+			}
 		}
 	};
 
@@ -57,7 +58,8 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 			const StaticString<512> src("looped = ", m_meta.looped ? "true" : "false"
 				, "\nvolume = ", m_meta.volume
 			);
-			compiler.updateMeta(m_resource->getPath(), src);
+			Span span((const u8*)src.data, stringLength(src.data));
+			compiler.updateMeta(m_resource->getPath(), span);
 			m_dirty = false;
 		}
 		
@@ -111,15 +113,6 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 					device.play(handle, true);
 					m_playing_clip = handle;
 				}
-			}
-
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
-				const StaticString<512> src("volume = ", m_meta.volume
-					, "\nlooped = ", m_meta.looped ? "true" : "false"
-				);
-				AssetCompiler& compiler = m_app.getAssetCompiler();
-				compiler.updateMeta(m_resource->getPath(), src);
 			}
 		}
 	

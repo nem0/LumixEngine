@@ -733,7 +733,12 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 							}
 							n = debug::StackTree::getParent(n);
 						} while (n && strstr(fn_name, "Allocator::") != 0);
-						ImGui::Text("%s: L%d:", fn_name, line);
+						if (startsWith(fn_name, "Lumix::")) {
+							ImGui::Text("%s: L%d:", fn_name + 7, line);
+						}
+						else {
+							ImGui::Text("%s: L%d:", fn_name, line);
+						}
 						if (ImGui::IsItemHovered()) callstackTooltip(a.stack_node);
 						ImGui::NextColumn();
 						ImGui::Text("%.3f kB", a.size / 1024.f);

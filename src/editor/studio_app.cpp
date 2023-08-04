@@ -3332,7 +3332,6 @@ struct StudioAppImpl final : StudioApp
 		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
 		if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Action::Modifiers::ALT;
 
-		// os::isKeyDown is useless on windows, since GetAsyncKeyStates returns only state from the last call
 		for (Action*& a : m_actions) {
 			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers == 0)) continue;
 			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;

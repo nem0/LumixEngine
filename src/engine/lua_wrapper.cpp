@@ -75,7 +75,7 @@ bool execute(lua_State* L
 	}
 
 	if (lua_pcall(L, 0, nresults, -2) != 0) {
-		logError(lua_tostring(L, -1));
+		logError(name, ": ", lua_tostring(L, -1));
 		lua_pop(L, 2);
 		return false;
 	}

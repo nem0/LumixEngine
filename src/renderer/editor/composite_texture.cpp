@@ -3355,17 +3355,21 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 	void save() override { saveAs(m_path); }
 
 	void menu() override {
-		const CommonActions& actions = m_app.getCommonActions();
-		if (ImGui::MenuItem("Export")) exportAs();
-		if (menuItem(actions.undo, canUndo())) undo();
-		if (menuItem(actions.redo, canRedo())) redo();
-		if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
-		//if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
-		//if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear unreachble nodes")) deleteUnreachable();
-		ImGui::Checkbox("Preview", &m_show_preview);
+		if (ImGui::BeginMenu("Graph")) {
+			const CommonActions& actions = m_app.getCommonActions();
+			if (ImGui::MenuItem("Export")) exportAs();
+			if (menuItem(actions.undo, canUndo())) undo();
+			if (menuItem(actions.redo, canRedo())) redo();
+			if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
+			ImGui::Checkbox("Preview", &m_show_preview);
+			ImGui::EndMenu();
+		}
 	}
 
 	bool isDirty() const override { return m_dirty; }
+
+	void doUndo() override { NodeEditor::undo(); }
+	void doRedo() override { NodeEditor::redo(); }
 
 	void gui() override {
 		if (m_loading_handle.isValid()) {

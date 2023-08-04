@@ -512,39 +512,27 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 	}
 
-	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) override
-	{
-		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
-		
+	lua_State* getMeta(const Path& res) override {
+		const Path meta_path(res.c_str(), ".meta");
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream buf(m_allocator);
 		
-		if (!fs.getContentSync(Path(meta_path), buf)) return false;
+		if (!fs.getContentSync(meta_path, buf)) return nullptr;
 
 		lua_State* L = luaL_newstate();
-		if (luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), meta_path) != 0) {
-			logError(meta_path, ": ", lua_tostring(L, -1));
+		if (!LuaWrapper::execute(L, Span((const char*)buf.data(), (u32)buf.size()), meta_path, 0)) {
 			lua_close(L);
-			return false;
+			return nullptr;
 		}
 
-		if (lua_pcall(L, 0, 0, 0) != 0) {
-			logError(meta_path, ": ", lua_tostring(L, -1));
-			lua_close(L);
-			return false;
-		}
-
-		callback(user_ptr, L);
-
-		lua_close(L);
-		return true;
+		return L;
 	}
 
-	void updateMeta(const Path& res, const char* src) const override {
+	void updateMeta(const Path& res, Span<const u8> data) const override {
 		const Path meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.saveContentSync(meta_path, Span((const u8*)src, stringLength(src)))) {
+		if (!fs.saveContentSync(meta_path, data)) {
 			logError("Could not save ", meta_path);
 		}
 	}

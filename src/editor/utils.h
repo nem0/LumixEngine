@@ -94,6 +94,7 @@ struct SimpleUndoRedo {
 	void redo();
 	virtual void pushUndo(u32 tag);
 	void clearUndoStack();
+	bool isReady() const { return !m_stack.empty(); }
 
 	virtual void deserialize(InputMemoryStream& blob) = 0;
 	virtual void serialize(OutputMemoryStream& blob) = 0;
