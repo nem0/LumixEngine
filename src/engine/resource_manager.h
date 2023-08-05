@@ -21,7 +21,7 @@ struct LUMIX_ENGINE_API ResourceManager {
 
 	void removeUnreferenced();
 
-	void reload(const Path& path);
+	void reload(const struct Path& path);
 	void reload(Resource& resource);
 	ResourceTable& getResourceTable() { return m_resources; }
 

@@ -324,23 +324,24 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& module)
 		anim.fbx = (const ofbx::AnimationStack*)module.getAnimationStack(i);
 		anim.import = true;
 		const ofbx::TakeInfo* take_info = module.getTakeInfo(anim.fbx->name);
-		if (take_info)
-		{
-			if (take_info->name.begin != take_info->name.end)
-			{
+		if (take_info) {
+			if (take_info->name.begin != take_info->name.end) {
 				take_info->name.toString(anim.name.data);
 			}
-			if (anim.name.empty() && take_info->filename.begin != take_info->filename.end)
-			{
+			if (anim.name.empty() && take_info->filename.begin != take_info->filename.end) {
 				char tmp[LUMIX_MAX_PATH];
 				take_info->filename.toString(tmp);
 				copyString(Span(anim.name.data), Path::getBasename(tmp));
 			}
 			if (anim.name.empty()) anim.name.add("anim");
 		}
-		else
-		{
+		else {
 			anim.name = "";
+		}
+
+		const ofbx::AnimationLayer* anim_layer = anim.fbx->getLayer(0);
+		if (!anim_layer || !anim_layer->getCurveNode(0)) {
+			m_animations.pop();
 		}
 	}
 
@@ -1990,6 +1991,27 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		origin_radius_squared = maximum(origin_radius_squared, r);
 		center_radius_squared = maximum(center_radius_squared, squaredLength(aabb.max - aabb.min) * 0.5f);
 
+	}
+
+	if (m_meshes.empty()) {
+		#if 0
+		Matrix transform_matrix = Matrix::IDENTITY;
+		Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
+		transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
+		if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
+		if (cfg.origin != ImportConfig::Origin::SOURCE) {
+			const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
+			centerMesh(vertices, vertex_count, bottom, transform_matrix, import_mesh.origin);
+		}
+		import_mesh.transform_matrix = transform_matrix.inverted();
+#endif
+		for (const ofbx::Object* bone : m_bones) {
+			const Matrix mtx = toLumix(bone->getGlobalTransform());
+			const Vec3 p = mtx.getTranslation() * cfg.mesh_scale * m_fbx_scale;
+			origin_radius_squared = maximum(origin_radius_squared, squaredLength(p));
+			aabb.addPoint(p);
+		}
+		center_radius_squared = squaredLength(aabb.max - aabb.min) * 0.5f;
 	}
 
 	write(sqrtf(origin_radius_squared) * cfg.bounding_scale);

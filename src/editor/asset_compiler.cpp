@@ -301,7 +301,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	ResourceType getResourceType(const char* path) const override
 	{
-		const Span<const char> subres = getSubresource(path);
+		const Span<const char> subres = Path::getSubresource(path);
 		Span<const char> ext = Path::getExtension(subres);
 
 		alignas(u32) char tmp[6] = {};
@@ -564,15 +564,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		const char* c = str;
 		while (*c && *c != ':') ++c;
 		return *c != ':' ? str : c + 1;
-	}
-
-	static Span<const char> getSubresource(const char* str)
-	{
-		Span<const char> ret;
-		ret.m_begin = str;
-		ret.m_end = str;
-		while(*ret.m_end && *ret.m_end != ':') ++ret.m_end;
-		return ret;
 	}
 
 	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res)

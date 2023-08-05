@@ -8,6 +8,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
 #include "editor/property_grid.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -21,7 +22,11 @@
 #include "engine/world.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
+#include "renderer/model.h"
+#include "renderer/pipeline.h"
 #include "renderer/render_module.h"
+#include "renderer/renderer.h"
+#include "renderer/editor/world_viewer.h"
 
 
 using namespace Lumix;
@@ -30,14 +35,150 @@ using namespace Lumix;
 static const ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
 static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType("property_animator");
 static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
-static const ComponentType RENDERABLE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
+static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 
-
-namespace
-{
-
+namespace {
 	
 struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app)
+			: AssetEditorWindow(app)
+			, m_app(app)
+			, m_viewer(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<Animation>(path);
+
+			Engine& engine = m_app.getEngine();
+
+			Span<const char> subres = Path::getSubresource(path);
+			if (subres.length() != path.length()) {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(subres.end() + 1));
+				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+				render_module->setModelInstancePath((EntityRef)m_viewer.m_mesh, m_model->getPath());
+			}
+
+			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
+
+			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			anim_module->setAnimation(*m_viewer.m_mesh, path);
+		}
+
+		~EditorWindow() {
+			m_resource->decRefCount();
+			if (m_model) m_model->decRefCount();
+		}
+
+		void windowGUI() override {
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			if (!m_resource->isReady()) return;
+
+			if (m_play) {
+				auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+				anim_module->updateAnimable(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
+			}
+
+			char model_path[LUMIX_MAX_PATH];
+			copyString(model_path, m_model ? m_model->getPath() : "");
+			if (m_app.getAssetBrowser().resourceInput("Model", Span(model_path), ResourceType("model"))) {
+				if (m_model) m_model->decRefCount();
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+				render_module->setModelInstancePath(*m_viewer.m_mesh, m_model ? m_model->getPath() : Path());
+			}
+
+			if (!m_model->isReady()) return;
+
+			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
+			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+
+			const Array<Animation::RotationCurve>& rotations = m_resource->getRotations();
+			const Array<Animation::TranslationCurve>& translations = m_resource->getTranslations();
+
+			if (!translations.empty() && ImGui::TreeNode("Translations")) {
+				for (const Animation::TranslationCurve& curve : translations) {
+					auto iter = m_model->getBoneIndex(curve.name);
+					if (!iter.isValid()) continue;
+					const Model::Bone& bone = m_model->getBone(iter.value());
+					if (ImGui::TreeNode(bone.name.c_str())) {
+						for (u32 i = 0; i < curve.count; ++i) {
+							const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
+							const Vec3 p = curve.pos[i];
+							ImGui::Text("%.2f s: %f %f %f", t, p.x, p.y, p.z);
+						}
+						ImGui::TreePop();
+					}
+				}
+				ImGui::TreePop();
+			}
+
+			if (!rotations.empty() && ImGui::TreeNode("Rotations")) {
+				for (const Animation::RotationCurve& curve : rotations) {
+					auto iter = m_model->getBoneIndex(curve.name);
+					if (!iter.isValid()) continue;
+					const Model::Bone& bone = m_model->getBone(iter.value());
+					if (ImGui::TreeNode(bone.name.c_str())) {
+						ImGui::TreePop();
+					}
+				}
+				ImGui::TreePop();
+			}
+
+			ImGui::TableNextColumn();
+			previewGUI();
+
+			ImGui::EndTable();
+		}
+		
+		void previewGUI() {
+			ASSERT(m_model->isReady());
+
+			if (m_play) {
+				if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
+			}
+			else {
+				if (ImGuiEx::IconButton(ICON_FA_PLAY, "Play")) m_play = true;
+			}
+			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			Animable& animable = anim_module->getAnimable(*m_viewer.m_mesh);
+			float t = animable.time.seconds();
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(-1);
+			if (ImGui::SliderFloat("##time", &t, 0, m_resource->getLength().seconds())) {
+				animable.time = Time::fromSeconds(t);
+				anim_module->updateAnimable(*m_viewer.m_mesh, 0);
+			}
+
+			ImGuiEx::Label("Playback speed");
+			ImGui::DragFloat("##spd", &m_playback_speed, 0.01f, 0, FLT_MAX);
+
+			if (!m_init) {
+				m_viewer.resetCamera(*m_model);
+				m_init = true;
+			}
+
+			m_viewer.gui();
+		}
+
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "animation editor"; }
+
+		StudioApp& m_app;
+		Animation* m_resource;
+		Model* m_model = nullptr;
+		bool m_init = false;
+		bool m_play = true;
+		float m_playback_speed = 1.f;
+		WorldViewer m_viewer;
+	};
+	
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -46,7 +187,14 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 	const char* getLabel() const override { return "Animation"; }
 
+	void openEditor(const Path& path) override {
+		IAllocator& allocator = m_app.getAllocator();
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
+
 	StudioApp& m_app;
+	Animation* m_resource;
 };
 
 
@@ -223,7 +371,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		const Path& getPath() override { return m_resource->getPath(); }
-		const char* getName() const override { return "lua script editor"; }
+		const char* getName() const override { return "property animation editor"; }
 
 		StudioApp& m_app;
 		PropertyAnimation* m_resource;
@@ -253,8 +401,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	StudioApp& m_app;
 };
 
-struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
-{
+struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin {
 	explicit AnimablePropertyGridPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -289,8 +436,8 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 
 		if (ImGui::CollapsingHeader("Transformation"))
 		{
-			auto* render_module = (RenderModule*)module->getWorld().getModule(RENDERABLE_TYPE);
-			if (module->getWorld().hasComponent(entity, RENDERABLE_TYPE))
+			auto* render_module = (RenderModule*)module->getWorld().getModule(MODEL_INSTANCE_TYPE);
+			if (module->getWorld().hasComponent(entity, MODEL_INSTANCE_TYPE))
 			{
 				const Pose* pose = render_module->lockPose(entity);
 				Model* model = render_module->getModelInstanceModel(entity);
@@ -319,8 +466,7 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 };
 
 
-struct StudioAppPlugin : StudioApp::IPlugin
-{
+struct StudioAppPlugin : StudioApp::IPlugin {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_animable_plugin(app)

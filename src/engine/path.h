@@ -23,6 +23,7 @@ struct LUMIX_ENGINE_API Path {
 	static Span<const char> getBasename(Span<const char> src);
 	static Span<const char> getExtension(const char* src);
 	static Span<const char> getExtension(Span<const char> src);
+	static Span<const char> getSubresource(const char* str);
 	static bool hasExtension(const char* filename, const char* ext);
 	static bool replaceExtension(char* path, const char* ext);
 	static bool isSame(Span<const char> a, Span<const char> b);

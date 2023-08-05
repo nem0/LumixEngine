@@ -114,7 +114,7 @@ struct StudioAppImpl final : StudioApp
 
 		memset(m_imgui_key_map, 0, sizeof(m_imgui_key_map));
 		m_imgui_key_map[(int)os::Keycode::CTRL] = ImGuiMod_Ctrl;
-		m_imgui_key_map[(int)os::Keycode::MENU] = ImGuiMod_Alt;
+		m_imgui_key_map[(int)os::Keycode::ALT] = ImGuiMod_Alt;
 		m_imgui_key_map[(int)os::Keycode::SHIFT] = ImGuiMod_Shift;
 		m_imgui_key_map[(int)os::Keycode::LSHIFT] = ImGuiKey_LeftShift;
 		m_imgui_key_map[(int)os::Keycode::RSHIFT] = ImGuiKey_RightShift;
@@ -3330,7 +3330,7 @@ struct StudioAppImpl final : StudioApp
 		u8 pressed_modifiers = 0;
 		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
 		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
-		if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::ALT)) pressed_modifiers |= Action::Modifiers::ALT;
 
 		for (Action*& a : m_actions) {
 			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers == 0)) continue;

@@ -70,10 +70,22 @@ struct Animation final : Resource {
 		u32 frame_count;
 	};
 
+	struct TranslationCurve {
+		BoneNameHash name;
+		u32 count;
+		const u16* times;
+		const Vec3* pos;
+	};
+
+	struct RotationCurve {
+		BoneNameHash name;
+		u32 count;
+		const u16* times;
+		const Quat* rot;
+	};
+
 	Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
-
 	ResourceType getType() const override { return TYPE; }
-
 	Vec3 getTranslation(Time time, u32 curve_idx) const;
 	Quat getRotation(Time time, u32 curve_idx) const;
 	int getTranslationCurveIndex(BoneNameHash name_hash) const;
@@ -81,26 +93,12 @@ struct Animation final : Resource {
 	void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
 	void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
 	Time getLength() const { return m_length; }
+	const Array<TranslationCurve>& getTranslations() const { return m_translations; }
+	const Array<RotationCurve>& getRotations() const { return m_rotations; }
 
 private:
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-
-	struct TranslationCurve
-	{
-		BoneNameHash name;
-		u32 count;
-		const u16* times;
-		const Vec3* pos;
-	};
-
-	struct RotationCurve
-	{
-		BoneNameHash name;
-		u32 count;
-		const u16* times;
-		const Quat* rot;
-	};
 
 	TagAllocator m_allocator;
 	Time m_length;

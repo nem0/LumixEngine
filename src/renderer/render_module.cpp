@@ -2826,14 +2826,13 @@ struct RenderModuleImpl final : RenderModule {
 			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
 		ASSERT(!r.pose);
-		if (model->getBoneCount() > 0)
-		{
+		if (model->getBoneCount() > 0) {
 			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
 			r.pose->resize(model->getBoneCount());
 			model->getPose(*r.pose);
 		}
-		r.meshes = &r.model->getMesh(0);
 		r.mesh_count = r.model->getMeshCount();
+		r.meshes = r.mesh_count > 0 ? &r.model->getMesh(0) : nullptr;
 
 		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) {
 			for (auto& attachment : m_bone_attachments) {

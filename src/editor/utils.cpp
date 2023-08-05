@@ -136,7 +136,7 @@ bool Action::isActive() const
 	if (shortcut != os::Keycode::INVALID && !os::isKeyDown(shortcut)) return false;
 	
 	Modifiers pressed_modifiers = Modifiers::NONE;
-	if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= Modifiers::ALT;
+	if (os::isKeyDown(os::Keycode::ALT)) pressed_modifiers |= Modifiers::ALT;
 	if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Modifiers::SHIFT;
 	if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Modifiers::CTRL;
 	if (modifiers != pressed_modifiers && modifiers != Modifiers::NONE) return false;

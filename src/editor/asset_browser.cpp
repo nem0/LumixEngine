@@ -49,14 +49,6 @@ static const char* getResourceFilePath(const char* str) {
 	return *c != ':' ? str : c + 1;
 }
 
-static Span<const char> getSubresource(const char* str) {
-	Span<const char> ret;
-	ret.m_begin = str;
-	ret.m_end = str;
-	while(*ret.m_end && *ret.m_end != ':') ++ret.m_end;
-	return ret;
-}
-
 bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path, ResourceType type) {
 	return false;
 }
@@ -251,7 +243,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		FileInfo tile;
 		char filename[LUMIX_MAX_PATH];
-		Span<const char> subres = getSubresource(path.c_str());
+		Span<const char> subres = Path::getSubresource(path.c_str());
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
 			catString(filename, ":");
@@ -752,7 +744,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void refreshLabels() {
 		for (FileInfo& tile : m_file_infos) {
 			char filename[LUMIX_MAX_PATH];
-			Span<const char> subres = getSubresource(tile.filepath.data);
+			Span<const char> subres = Path::getSubresource(tile.filepath.data);
 			if (*subres.end()) {
 				copyNString(Span(filename), subres.begin(), subres.length());
 				catString(filename, ":");
@@ -896,7 +888,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			return;
 		}
 
-		Span<const char> ext = Path::getExtension(path.c_str());
+		Span<const char> ext = Path::getExtension(Path::getSubresource(path.c_str()));
 		u64 key = 0;
 		ASSERT(ext.length() <= sizeof(key));
 		memcpy(&key, ext.begin(), ext.length());
@@ -964,7 +956,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
 				char ext[10];
 				const char* path = (const char*)payload->Data;
-				Span<const char> subres = getSubresource(path);
+				Span<const char> subres = Path::getSubresource(path);
 				copyString(Span(ext), Path::getExtension(subres));
 				const AssetCompiler& compiler = m_app.getAssetCompiler();
 				if (compiler.acceptExtension(ext, type)) {
@@ -1043,7 +1035,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			fi.filepath = path.c_str();
 
 			char filename[LUMIX_MAX_PATH];
-			Span<const char> subres = getSubresource(path.c_str());
+			Span<const char> subres = Path::getSubresource(path.c_str());
 			if (*subres.end()) {
 				copyNString(Span(filename), subres.begin(), subres.length());
 				catString(filename, ":");

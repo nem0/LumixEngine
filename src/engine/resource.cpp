@@ -37,7 +37,6 @@ Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocat
 
 Resource::~Resource() = default;
 
-
 void Resource::refresh() {
 	if (m_current_state == State::EMPTY) return;
 

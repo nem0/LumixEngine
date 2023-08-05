@@ -586,6 +586,12 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					if (wParam == WA_INACTIVE) {
 						showCursor(true);
 						grabMouse(INVALID_WINDOW);
+						G.key_states[(u32)os::Keycode::SHIFT] = false;
+						G.key_states[(u32)os::Keycode::CTRL] = false;
+						G.key_states[(u32)os::Keycode::ALT] = false;
+						G.key_states[(u32)os::Keycode::LSHIFT] = false;
+						G.key_states[(u32)os::Keycode::LCTRL] = false;
+						G.key_states[(u32)os::Keycode::LALT] = false;
 					}
 
 					e.type = Event::Type::FOCUS;

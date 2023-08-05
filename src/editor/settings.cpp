@@ -200,7 +200,7 @@ static bool shortcutInput(Action& action, bool edit)
 	ImGui::InputText("", button_label, sizeof(button_label), ImGuiInputTextFlags_ReadOnly);
 	if (ImGui::IsItemActive()) {
 		if (os::isKeyDown(os::Keycode::SHIFT)) action.modifiers |= Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::MENU)) action.modifiers |= Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::ALT)) action.modifiers |= Action::Modifiers::ALT;
 		if (os::isKeyDown(os::Keycode::CTRL)) action.modifiers |= Action::Modifiers::CTRL;
 
 		for (int i = 0; i < (int)os::Keycode::MAX; ++i) {
@@ -209,9 +209,9 @@ static bool shortcutInput(Action& action, bool edit)
 			const bool is_modifier = kc == os::Keycode::SHIFT 
 				|| kc == os::Keycode::LSHIFT 
 				|| kc == os::Keycode::RSHIFT 
-				|| kc == os::Keycode::MENU 
-				|| kc == os::Keycode::LMENU 
-				|| kc == os::Keycode::RMENU 
+				|| kc == os::Keycode::ALT
+				|| kc == os::Keycode::LALT
+				|| kc == os::Keycode::RALT
 				|| kc == os::Keycode::CTRL 
 				|| kc == os::Keycode::LCTRL 
 				|| kc == os::Keycode::RCTRL;

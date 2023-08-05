@@ -474,7 +474,6 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 {
 	int object_count = 0;
 	file.read(object_count);
-	if (object_count <= 0) return false;
 
 	ASSERT(m_meshes.empty());
 	m_meshes.reserve(object_count);
@@ -570,9 +569,7 @@ bool Model::parseLODs(InputMemoryStream& file)
 {
 	u32 lod_count;
 	file.read(lod_count);
-	if (lod_count <= 0 || lod_count > lengthOf(m_lod_indices)) {
-		return false;
-	}
+	if (lod_count > lengthOf(m_lod_indices)) return false;
 
 	for (float& d : m_lod_distances) d = -1;
 	for (LODMeshIndices& i : m_lod_indices) {
