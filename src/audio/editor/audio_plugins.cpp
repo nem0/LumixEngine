@@ -25,7 +25,7 @@ namespace
 {
 
 
-struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct Meta {
 		bool looped = true;
 		float volume = 1.f;
@@ -172,7 +172,6 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Audio"; }
-	ResourceType getResourceType() const override { return Clip::TYPE; }
 	
 	StudioApp& m_app;
 	AssetBrowser& m_browser;
@@ -190,9 +189,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override 
 	{
-		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin);
-		const char* extensions[] = { "ogg", "wav", nullptr };
-		m_app.getAssetCompiler().addPlugin(m_asset_browser_plugin, extensions);
+		const char* extensions[] = { "ogg", "wav" };
+		m_app.getAssetCompiler().addPlugin(m_asset_browser_plugin, Span(extensions));
+		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin, Span(extensions));
 	}
 
 

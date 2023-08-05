@@ -6,14 +6,13 @@ EditorAssetPlugin::EditorAssetPlugin(const char* name, const char* ext, Resource
 	: m_app(app)
 	, m_name(name)
 	, m_extension(ext)
-	, m_resource_type(type)
 {
 	AssetCompiler& compiler = app.getAssetCompiler();
 	compiler.registerExtension(ext, type);
-	const char* extensions[] = { ext, nullptr };
-	compiler.addPlugin(*this, extensions);
+	const char* extensions[] = { ext };
+	compiler.addPlugin(*this, Span(extensions));
 	AssetBrowser& browser = app.getAssetBrowser();
-	browser.addPlugin(*this);
+	browser.addPlugin(*this, Span(extensions));
 }
 
 EditorAssetPlugin::~EditorAssetPlugin() {

@@ -89,7 +89,7 @@ struct EditorWindow : AssetEditorWindow {
 };
 
 
-struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit AssetPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -104,7 +104,6 @@ struct AssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Lua script"; }
-	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "lua"; }
 
@@ -515,9 +514,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		AddComponentPlugin* add_cmp_plugin = LUMIX_NEW(m_app.getAllocator(), AddComponentPlugin)(m_app);
 		m_app.registerComponent(ICON_FA_MOON, "lua_script", *add_cmp_plugin);
 
-		const char* exts[] = { "lua", nullptr };
-		m_app.getAssetCompiler().addPlugin(m_asset_plugin, exts);
-		m_app.getAssetBrowser().addPlugin(m_asset_plugin);
+		const char* exts[] = { "lua" };
+		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(exts));
+		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(exts));
 		m_app.addPlugin(m_console_plugin);
 		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 	}

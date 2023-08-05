@@ -11,14 +11,13 @@ template <typename T> struct UniquePtr;
 struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	static constexpr int TILE_SIZE = 96;
 
-	struct LUMIX_EDITOR_API Plugin {
+	struct LUMIX_EDITOR_API IPlugin {
 		virtual bool canCreateResource() const { return false; }
 		virtual void createResource(struct OutputMemoryStream& content) {}
 		virtual const char* getDefaultExtension() const { return ""; }
 
 		virtual const char* getLabel() const = 0;
-		virtual struct ResourceType getResourceType() const = 0;
-		virtual bool createTile(const char* in_path, const char* out_path, ResourceType type);
+		virtual bool createTile(const char* in_path, const char* out_path, struct ResourceType type);
 		virtual void update() {}
 		virtual void openEditor(const struct Path& path) {}
 	};
@@ -29,8 +28,8 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual void onInitFinished() = 0;
 	virtual void openEditor(const Path& resource) = 0;
 	virtual bool resourceInput(const char* str_id, Span<char> buf, ResourceType type, float width = -1) = 0;
-	virtual void addPlugin(Plugin& plugin) = 0;
-	virtual void removePlugin(Plugin& plugin) = 0;
+	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
+	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual void openInExternalEditor(struct Resource* resource) const = 0;
 	virtual void openInExternalEditor(const char* path) const = 0;
 	virtual void locate(const Resource& resource) = 0;

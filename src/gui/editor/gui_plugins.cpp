@@ -37,7 +37,7 @@ static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_tex
 static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_button");
 static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
 
-struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
@@ -212,7 +212,6 @@ struct SpritePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Sprite"; }
-	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
 	StudioApp& m_app;
 };
@@ -919,13 +918,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override {
 		PROFILE_FUNCTION();
 		m_gui_editor.init();
-
 		m_app.addPlugin(m_gui_editor);
 
-		m_app.getAssetBrowser().addPlugin(m_sprite_plugin);
-
-		const char* sprite_exts[] = {"spr", nullptr};
-		m_app.getAssetCompiler().addPlugin(m_sprite_plugin, sprite_exts);
+		const char* exts[] = {"spr"};
+		m_app.getAssetBrowser().addPlugin(m_sprite_plugin, Span(exts));
+		m_app.getAssetCompiler().addPlugin(m_sprite_plugin, Span(exts));
 	}
 
 	bool showGizmo(WorldView&, ComponentUID) override { return false; }

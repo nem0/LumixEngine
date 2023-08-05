@@ -830,7 +830,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 };
 
 
-struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
+struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)
@@ -839,12 +839,11 @@ struct PhysicsGeometryPlugin final : AssetBrowser::Plugin
 	}
 
 	const char* getLabel() const override { return "Physics geometry"; }
-	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
 
 	StudioApp& m_app;
 };
 
-struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
@@ -925,7 +924,6 @@ struct PhysicsMaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugi
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Physics material"; }
-	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
@@ -950,10 +948,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		m_app.addPlugin(m_ui_plugin);
-		m_app.getAssetBrowser().addPlugin(m_material_plugin);
-		m_app.getAssetBrowser().addPlugin(m_geometry_plugin);
-		const char* exts[] = { "pma", nullptr };
-		m_app.getAssetCompiler().addPlugin(m_material_plugin, exts);
+		const char* geom_exts[] = { "phy" };
+		m_app.getAssetBrowser().addPlugin(m_geometry_plugin, Span(geom_exts));
+		const char* mat_exts[] = { "pma" };
+		m_app.getAssetBrowser().addPlugin(m_material_plugin, Span(mat_exts));
+		m_app.getAssetCompiler().addPlugin(m_material_plugin, Span(mat_exts));
 	}
 
 

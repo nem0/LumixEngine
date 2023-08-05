@@ -24,8 +24,7 @@ namespace Lumix
 {
 
 
-struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
-{
+struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
 		, app(app)
@@ -35,7 +34,6 @@ struct AssetBrowserPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 	
 	bool compile(const Path& src) override { return app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Prefab"; }
-	ResourceType getResourceType() const override { return PrefabResource::TYPE; }
 
 	PrefabSystem& system;
 	StudioApp& app;
@@ -648,9 +646,9 @@ static AssetBrowserPlugin* ab_plugin = nullptr;
 void PrefabSystem::createEditorPlugins(StudioApp& app, PrefabSystem& system)
 {
 	ab_plugin = LUMIX_NEW(app.getAllocator(), AssetBrowserPlugin)(app, system);
-	app.getAssetBrowser().addPlugin(*ab_plugin);
-	const char* extensions[] = { "fab", nullptr };
-	app.getAssetCompiler().addPlugin(*ab_plugin, extensions);
+	const char* extensions[] = { "fab" };
+	app.getAssetBrowser().addPlugin(*ab_plugin, Span(extensions));
+	app.getAssetCompiler().addPlugin(*ab_plugin, Span(extensions));
 }
 
 

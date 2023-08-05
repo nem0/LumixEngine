@@ -32,7 +32,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual void onInitFinished() = 0;
 	virtual void onGUI() = 0;
 	virtual void update() = 0;
-	virtual void addPlugin(IPlugin& plugin, const char** extensions) = 0;
+	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual bool compile(const Path& path) = 0;
 	virtual lua_State* getMeta(const Path& res) = 0;

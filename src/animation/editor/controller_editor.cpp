@@ -44,7 +44,7 @@ static bool editInput(const char* label, u32* input_index, const Controller& con
 	return changed;
 }
 
-struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct SetInputEventType : EventType {
 		SetInputEventType() {
 			type = RuntimeHash("set_input");
@@ -1203,10 +1203,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 	{
 		m_event_types.push(UniquePtr<SetInputEventType>::create(m_allocator));
 		AssetCompiler& compiler = app.getAssetCompiler();
+		const char* act_exts[] = { "act" };
 		compiler.registerExtension("act", anim::Controller::TYPE);
-		const char* act_exts[] = { "act", nullptr };
-		compiler.addPlugin(*this, act_exts);
-		app.getAssetBrowser().addPlugin(*this);
+		compiler.addPlugin(*this, Span(act_exts));
+		app.getAssetBrowser().addPlugin(*this, Span(act_exts));
 	}
 
 	~ControllerEditorImpl() {
@@ -1229,7 +1229,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::Plugin, AssetCompi
 	const char* getDefaultExtension() const override { return "act"; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Animation Controller"; }
-	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
 
 	const EventType& getEventType(RuntimeHash type) const {
 		for (const UniquePtr<EventType>& t : m_event_types) {

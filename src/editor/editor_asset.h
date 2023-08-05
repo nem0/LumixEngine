@@ -7,22 +7,19 @@ namespace Lumix {
 // use this if you want an editor-only asset to be visible in asset browser
 // editor only assets do not inherit from Resource, e.g. particle system function
 // it can also be used as a base for normal asset plugin
-struct EditorAssetPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct EditorAssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	EditorAssetPlugin(const char* name, const char* ext, ResourceType type, StudioApp& app, IAllocator& allocator);
 	~EditorAssetPlugin();
 
 	bool compile(const Path& src) override { return true; }
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return m_extension; }
-
 	const char* getLabel() const override { return m_name; }
-	ResourceType getResourceType() const override { return m_resource_type; }
 
 protected:
 	StudioApp& m_app;
 	const char* m_extension;
 	const char* m_name;
-	ResourceType m_resource_type;
 };
 
 // common funcitonality for asset editor windows

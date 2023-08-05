@@ -37,8 +37,7 @@ namespace
 {
 
 	
-struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
-{
+struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -46,13 +45,12 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::Plugin
 	}
 
 	const char* getLabel() const override { return "Animation"; }
-	ResourceType getResourceType() const override { return Animation::TYPE; }
 
 	StudioApp& m_app;
 };
 
 
-struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
@@ -245,7 +243,6 @@ struct PropertyAnimationPlugin : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	void createResource(OutputMemoryStream& blob) override {}
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Property animation"; }
-	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
 	
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
@@ -336,12 +333,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override {
 		PROFILE_FUNCTION();
 		AssetCompiler& compiler = m_app.getAssetCompiler();
-		const char* anp_exts[] = { "anp", nullptr };
-		compiler.addPlugin(m_prop_anim_plugin, anp_exts);
+		const char* anp_exts[] = { "anp" };
+		const char* ani_exts[] = { "ani" };
+		compiler.addPlugin(m_prop_anim_plugin, Span(anp_exts));
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.addPlugin(m_animation_plugin);
-		asset_browser.addPlugin(m_prop_anim_plugin);
+		asset_browser.addPlugin(m_animation_plugin, Span(ani_exts));
+		asset_browser.addPlugin(m_prop_anim_plugin, Span(anp_exts));
 
 		m_app.getPropertyGrid().addPlugin(m_animable_plugin);
 

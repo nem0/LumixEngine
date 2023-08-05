@@ -2672,7 +2672,7 @@ Node* ParticleEmitterEditorResource::addNode(Node::Type type) {
 } // anonymous namespace
 
 struct ParticleEditorImpl : ParticleEditor {
-	struct ParticleSystemPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+	struct ParticleSystemPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		explicit ParticleSystemPlugin(ParticleEditorImpl& editor, StudioApp& app)
 			: m_app(app)
 			, m_editor(editor)
@@ -2709,7 +2709,6 @@ struct ParticleEditorImpl : ParticleEditor {
 		const char* getDefaultExtension() const override { return "par"; }
 		void openEditor(const Path& path) override { m_editor.open(path.c_str()); }
 		const char* getLabel() const override { return "Particle system"; }
-		ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
 
 		StudioApp& m_app;
 		ParticleEditorImpl& m_editor;
@@ -2748,9 +2747,9 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, true);
 		app.addAction(&m_apply_action);
 
-		const char* particle_emitter_exts[] = {"par", nullptr};
-		m_app.getAssetCompiler().addPlugin(m_particle_system_plugin, particle_emitter_exts);
-		m_app.getAssetBrowser().addPlugin(m_particle_system_plugin);
+		const char* particle_emitter_exts[] = {"par" };
+		m_app.getAssetCompiler().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
+		m_app.getAssetBrowser().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 	}
 
 	~ParticleEditorImpl() {

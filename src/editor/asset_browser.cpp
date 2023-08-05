@@ -57,7 +57,7 @@ static Span<const char> getSubresource(const char* str) {
 	return ret;
 }
 
-bool AssetBrowser::Plugin::createTile(const char* in_path, const char* out_path, ResourceType type) {
+bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path, ResourceType type) {
 	return false;
 }
 
@@ -68,6 +68,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		FilePathHash file_path_hash;
 		void* tex = nullptr;
 		bool create_called = false;
+		u64 extension = 0;
 	};
 
 	struct ImmediateTile : FileInfo {
@@ -79,6 +80,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_selected_resources(m_allocator)
 		, m_dir_history(m_allocator)
 		, m_plugins(m_allocator)
+		, m_plugin_map(m_allocator)
 		, m_app(app)
 		, m_is_open(false)
 		, m_show_thumbnails(true)
@@ -262,6 +264,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		tile.file_path_hash = path.getHash();
 		tile.filepath = path.c_str();
 		tile.clamped_filename = filename;
+		Span<const char> ext = Path::getExtension(subres);
+		tile.extension = 0;
+		ASSERT(ext.length() <= sizeof(tile.extension));
+		memcpy(&tile.extension, ext.begin(), ext.length());
 
 		m_file_infos.push(tile);
 	}
@@ -400,7 +406,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	
 		tile.create_called = true;
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
-		for (Plugin* plugin : m_plugins) {
+		for (IPlugin* plugin : m_plugins) {
 			ResourceType type = compiler.getResourceType(tile.filepath);
 			if (plugin->createTile(tile.filepath, out_path, type)) break;
 		}
@@ -455,8 +461,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImVec2 end_pos = screen_pos + img_size;
 			dl->AddRectFilled(screen_pos, end_pos, 0xffFFffFF);
 			
-			const ResourceType type = m_app.getAssetCompiler().getResourceType(tile.filepath);
-			auto iter = m_plugins.find(type);
+			auto iter = m_plugin_map.find(tile.extension);
 			if (iter.isValid()) {
 				const char* label = iter.value()->getLabel();
 				ImGui::PushFont(m_app.getBoldFont());
@@ -637,7 +642,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGui::Separator();
 			static char filter[64] = "";
 			ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
-			for (Plugin* plugin : m_plugins) {
+			for (IPlugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
 				if (filter[0] && stristr(plugin->getLabel(), filter) == nullptr) continue;
 				if (ImGui::BeginMenu(plugin->getLabel())) {
@@ -832,19 +837,22 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void removePlugin(Plugin& plugin) override
-	{
-		m_plugins.erase(plugin.getResourceType());
+	void removePlugin(IPlugin& plugin) override {
+		m_plugins.eraseItem(&plugin);
+		m_plugin_map.eraseIf([&plugin](IPlugin* p){ return p == &plugin; });
 	}
 
-
-	void addPlugin(Plugin& plugin) override
-	{
-		m_plugins.insert(plugin.getResourceType(), &plugin);
+	void addPlugin(IPlugin& plugin, Span<const char*> extensions) override {
+		m_plugins.push(&plugin);
+		for (const char* ext : extensions) {
+			u64 key = 0;
+			ASSERT(stringLength(ext) <= sizeof(key));
+			memcpy(&key, ext, stringLength(ext));
+			m_plugin_map.insert(key, &plugin);
+		}
 	}
 
-	static void copyDir(const char* src, const char* dest, IAllocator& allocator)
-	{
+	static void copyDir(const char* src, const char* dest, IAllocator& allocator) {
 		PathInfo fi(src);
 		StaticString<LUMIX_MAX_PATH> dst_dir(dest, "/", fi.m_basename);
 		if (!os::makePath(dst_dir)) logError("Could not create ", dst_dir);
@@ -888,13 +896,12 @@ struct AssetBrowserImpl : AssetBrowser {
 			return;
 		}
 
-		const ResourceType type = m_app.getAssetCompiler().getResourceType(path);
-		for (Plugin* p : m_plugins) {
-			if (p->getResourceType() == type) {
-				p->openEditor(path);
-				break;
-			}
-		}
+		Span<const char> ext = Path::getExtension(path.c_str());
+		u64 key = 0;
+		ASSERT(ext.length() <= sizeof(key));
+		memcpy(&key, ext.begin(), ext.length());
+		auto iter = m_plugin_map.find(key);
+		if (iter.isValid()) iter.value()->openEditor(path);
 	}
 
 	void selectResource(const Path& path, bool additive) {
@@ -1048,6 +1055,11 @@ struct AssetBrowserImpl : AssetBrowser {
 			clampText(filename, 50);
 			fi.clamped_filename = filename;
 			fi.create_called = false;
+			Span<const char> ext = Path::getExtension(filename);
+			fi.extension = 0;
+			ASSERT(ext.length() <= sizeof(fi.extension));
+			memcpy(&fi.extension, ext.begin(), ext.length());
+
 			idx = m_immediate_tiles.size() - 1;
 		}
 
@@ -1056,29 +1068,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	bool resourceList(Span<char> buf, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit) override {
-		auto iter = m_plugins.find(type);
-		if (!iter.isValid()) return false;
-
-		Plugin* plugin = iter.value();
-
-		static bool show_new_fs = false;
-		if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New", false, ImGuiSelectableFlags_DontClosePopups)) {
-			show_new_fs = true;
-		}
-
-		FileSelector& file_selector = m_app.getFileSelector();
-		if (file_selector.gui("Save As", &show_new_fs, plugin->getDefaultExtension(), true)) {
-			OutputMemoryStream blob(m_allocator);
-			plugin->createResource(blob);
-			FileSystem& fs = m_app.getEngine().getFileSystem();
-			if (!fs.saveContentSync(Path(file_selector.getPath()), blob)) {
-				logError("Failed to write ", file_selector.getPath());
-				return false;
-			}
-			copyString(buf, file_selector.getPath());
-			return true;
-		}
-
 		static char filter[128] = "";
 		ImGuiEx::filter("Filter", filter, sizeof(filter), 200);
 		
@@ -1199,7 +1188,8 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	EntityPtr m_dropped_entity = INVALID_ENTITY;
 	char m_prefab_name[LUMIX_MAX_PATH] = "";
-	HashMap<ResourceType, Plugin*> m_plugins;
+	Array<IPlugin*> m_plugins;
+	HashMap<u64, IPlugin*> m_plugin_map;
 	Array<Path> m_selected_resources;
 	int m_context_resource;
 	char m_filter[128];

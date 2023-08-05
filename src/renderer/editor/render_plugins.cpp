@@ -641,7 +641,7 @@ static bool saveAsLBC(const char* path, const u8* data, int w, int h, bool gener
 }
 
 
-struct FontPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
+struct FontPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	FontPlugin(StudioApp& app) 
 		: m_app(app)
@@ -651,13 +651,12 @@ struct FontPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Font"; }
-	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
 	StudioApp& m_app;
 };
 
 
-struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
+struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
@@ -717,7 +716,6 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::Plugin {
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Pipeline"; }
-	ResourceType getResourceType() const override { return ResourceType("pipeline"); }
 
 	void openEditor(const struct Path& path) {
 		IAllocator& allocator = m_app.getAllocator();
@@ -767,7 +765,7 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 	float m_time_scale = 1.f;
 };
 
-struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
@@ -1033,7 +1031,6 @@ struct MaterialPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/pipelines/standard.shd\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Material"; }
-	ResourceType getResourceType() const override { return Material::TYPE; }
 
 	StudioApp& m_app;
 	TagAllocator m_allocator;
@@ -1430,7 +1427,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 	TextureMeta m_meta;
 };
 
-struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "texture editor")
@@ -1772,7 +1769,6 @@ struct TexturePlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Texture"; }
-	ResourceType getResourceType() const override { return Texture::TYPE; }
 
 	TagAllocator m_allocator;
 	StudioApp& m_app;
@@ -1853,7 +1849,7 @@ static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 
 	stream.destroy(staging);
 }
 
-struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct Meta {
 		Meta(IAllocator& allocator) : clips(allocator) {}
 
@@ -2882,7 +2878,6 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Model"; }
-	ResourceType getResourceType() const override { return Model::TYPE; }
 
 	void pushTileQueue(const Path& path)
 	{
@@ -3190,16 +3185,11 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	}
 
 
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
-		if (type == Shader::TYPE) return true;
-
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
 		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
 
 		Path path(in_path);
-
-		if (!m_tile.queue.full())
-		{
+		if (!m_tile.queue.full()) {
 			pushTileQueue(path);
 			return true;
 		}
@@ -3208,15 +3198,12 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 		return true;
 	}
 
-
-	struct TileData
-	{
+	struct TileData {
 		TileData(IAllocator& allocator)
 			: data(allocator)
 			, paths(allocator)
 			, queue()
-		{
-		}
+		{}
 
 		World* world = nullptr;
 		UniquePtr<Pipeline> pipeline;
@@ -3240,7 +3227,7 @@ struct ModelPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 };
 
 
-struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
+struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
@@ -3379,11 +3366,11 @@ struct ShaderPlugin final : AssetBrowser::Plugin, AssetCompiler::IPlugin {
 	
 	void openEditor(const Path& path) override {
 		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(m_app.getAllocator(), path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Shader"; }
-	ResourceType getResourceType() const override { return Shader::TYPE; }
 
 	StudioApp& m_app;
 };
@@ -5234,32 +5221,32 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 
-		const char* shader_exts[] = {"shd", nullptr};
-		asset_compiler.addPlugin(m_shader_plugin, shader_exts);
+		const char* shader_exts[] = {"shd"};
+		asset_compiler.addPlugin(m_shader_plugin, Span(shader_exts));
 
-		const char* texture_exts[] = { "png", "jpg", "jpeg", "tga", "raw", "ltc", nullptr};
-		asset_compiler.addPlugin(m_texture_plugin, texture_exts);
+		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc"};
+		asset_compiler.addPlugin(m_texture_plugin, Span(texture_exts));
 
-		const char* pipeline_exts[] = {"pln", nullptr};
-		asset_compiler.addPlugin(m_pipeline_plugin, pipeline_exts);
+		const char* pipeline_exts[] = {"pln"};
+		asset_compiler.addPlugin(m_pipeline_plugin, Span(pipeline_exts));
 
-		const char* material_exts[] = {"mat", nullptr};
-		asset_compiler.addPlugin(m_material_plugin, material_exts);
+		const char* material_exts[] = {"mat"};
+		asset_compiler.addPlugin(m_material_plugin, Span(material_exts));
 
 		m_model_plugin.m_texture_plugin = &m_texture_plugin;
-		const char* model_exts[] = {"fbx", nullptr};
-		asset_compiler.addPlugin(m_model_plugin, model_exts);
+		const char* model_exts[] = {"fbx"};
+		asset_compiler.addPlugin(m_model_plugin, Span(model_exts));
 
-		const char* fonts_exts[] = {"ttf", nullptr};
-		asset_compiler.addPlugin(m_font_plugin, fonts_exts);
+		const char* fonts_exts[] = {"ttf"};
+		asset_compiler.addPlugin(m_font_plugin, Span(fonts_exts));
 		
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.addPlugin(m_model_plugin);
-		asset_browser.addPlugin(m_material_plugin);
-		asset_browser.addPlugin(m_font_plugin);
-		asset_browser.addPlugin(m_shader_plugin);
-		asset_browser.addPlugin(m_texture_plugin);
-		asset_browser.addPlugin(m_pipeline_plugin);
+		asset_browser.addPlugin(m_model_plugin, Span(model_exts));
+		asset_browser.addPlugin(m_material_plugin, Span(material_exts));
+		asset_browser.addPlugin(m_font_plugin, Span(fonts_exts));
+		asset_browser.addPlugin(m_shader_plugin, Span(shader_exts));
+		asset_browser.addPlugin(m_texture_plugin, Span(texture_exts));
+		asset_browser.addPlugin(m_pipeline_plugin, Span(pipeline_exts));
 
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);

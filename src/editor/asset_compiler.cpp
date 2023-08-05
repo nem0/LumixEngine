@@ -802,14 +802,11 @@ struct AssetCompilerImpl : AssetCompiler {
 		} while(removed);
 	}
 
-	void addPlugin(IPlugin& plugin, const char** extensions) override
-	{
-		const char** i = extensions;
-		while(*i) {
-			const RuntimeHash hash(*i);
+	void addPlugin(IPlugin& plugin, Span<const char*> extensions) override {
+		for (const char* ext : extensions) {
+			const RuntimeHash hash(ext);
 			MutexGuard lock(m_plugin_mutex);
 			m_plugins.insert(hash, &plugin);
-			++i;
 		}
 	}
 
