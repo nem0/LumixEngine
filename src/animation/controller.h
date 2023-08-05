@@ -27,7 +27,6 @@ enum class ControllerVersion : u32 {
 };
 
 struct Controller final : Resource {
-public:
 	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Controller();
 

@@ -25,6 +25,8 @@ WorldViewer::WorldViewer(StudioApp& app)
 	m_viewport.fov = m_app.getFOV();
 	m_viewport.near = 0.1f;
 	m_viewport.far = 1000.f;
+	m_viewport.pos = DVec3(0, 0, 0);
+	m_viewport.rot = Quat::IDENTITY;
 
 	m_world = &engine.createWorld(false);
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
@@ -44,8 +46,13 @@ WorldViewer::WorldViewer(StudioApp& app)
 	light_mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 	const EntityRef light_entity = m_world->createEntity({0, 0, 0}, light_mtx.getRotation());
 	m_world->createComponent(ENVIRONMENT_TYPE, light_entity);
-	render_module->getEnvironment(light_entity).direct_intensity = 5;
+	render_module->getEnvironment(light_entity).direct_intensity = 3;
 	render_module->getEnvironment(light_entity).indirect_intensity = 1;
+	
+	const EntityRef e = m_world->createEntity(DVec3(0, 0, 0), Quat::IDENTITY);
+	m_world->createComponent(MODEL_INSTANCE_TYPE, e);
+	m_world->setScale(e, Vec3(100));
+	render_module->setModelInstancePath(e, Path("models/shapes/plane.fbx"));
 
 	m_pipeline->setWorld(m_world);
 }
@@ -73,7 +80,8 @@ void WorldViewer::gui() {
 	auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
 	ASSERT(render_module);
 
-	const ImVec2 image_size = ImGui::GetContentRegionAvail();
+	ImVec2 image_size = ImGui::GetContentRegionAvail();
+	image_size.y = maximum(200.f, image_size.y);
 
 	m_viewport.fov = m_app.getFOV();
 	m_viewport.w = (int)image_size.x;
@@ -147,10 +155,14 @@ void WorldViewer::gui() {
 			Quat pitch_rot(pitch_axis, pitch);
 			rot = normalize(pitch_rot * rot);
 
-			Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			Vec3 origin = Vec3::ZERO;
-
 			if (is_orbit) {
+				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
+				Vec3 origin = Vec3::ZERO;
+				Model* model = render_module->getModelInstanceModel(*m_mesh);
+				if (model && model->isReady()) {
+					const AABB& aabb = model->getAABB();
+					origin = (aabb.min + aabb.max) * 0.5f;
+				}
 				const float dist = float(length(origin - Vec3(m_viewport.pos)));
 				m_viewport.pos = DVec3(origin + dir * dist);
 			}
