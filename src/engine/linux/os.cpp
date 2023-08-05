@@ -117,7 +117,7 @@ void init() {
 		{XK_Return, Keycode::RETURN, "Return"},
 		{XK_Shift_L, Keycode::SHIFT, "Shift"},
 		{XK_Control_L, Keycode::CTRL, "Ctrl"},
-		{XK_Menu, Keycode::MENU, "Menu"},
+		{XK_Menu, Keycode::ALT, "Menu"},
 		{XK_Pause, Keycode::PAUSE, "Pause"},
 		//{ XK_, Keycode::CAPITAL, "" },
 		//{ XK_, Keycode::KANA, "" },
