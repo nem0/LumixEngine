@@ -4140,7 +4140,7 @@ Object* Object::resolveObjectLink(int idx) const
 Object* Object::resolveObjectLink(Object::Type type, const char* property, int idx) const
 {
 	u64 id;
-	if (!toObjectID(scene, ((Element&)element).first_property, &id)) return false;
+	if (!toObjectID(scene, ((Element&)element).first_property, &id)) return nullptr;
 	for (auto& connection : scene.m_connections)
 	{
 		if (connection.to_object == id && connection.from_object != 0)
