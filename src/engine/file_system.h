@@ -14,7 +14,7 @@ namespace os {
 }
 
 struct LUMIX_ENGINE_API FileSystem {
-	using ContentCallback = Delegate<void(u64, const u8*, bool)>;
+	using ContentCallback = Delegate<void(Span<const u8>, bool)>;
 
 	struct LUMIX_ENGINE_API AsyncHandle {
 		static AsyncHandle invalid() { return AsyncHandle(0xffFFffFF); };

@@ -88,7 +88,7 @@ void Resource::checkState()
 }
 
 
-void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
+void Resource::fileLoaded(Span<const u8> blob, bool success) {
 	ASSERT(m_async_op.isValid());
 	m_async_op = FileSystem::AsyncHandle::invalid();
 	if (m_desired_state != State::READY) return;
@@ -117,14 +117,14 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 		return;
 	}
 
-	const CompiledResourceHeader* header = (const CompiledResourceHeader*)mem;
+	const CompiledResourceHeader* header = (const CompiledResourceHeader*)blob.begin();
 	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
-		if (!load(Span(mem, mem + size))) {
+		if (!load(blob)) {
 			++m_failed_dep_count;
 		}
-		m_size = size;
+		m_size = blob.length();
 	}
-	else if (size < sizeof(*header)) {
+	else if (blob.length() < sizeof(*header)) {
 		logError("Invalid resource file, please delete .lumix directory");
 		++m_failed_dep_count;
 	}
@@ -139,14 +139,15 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	else if (header->flags & CompiledResourceHeader::COMPRESSED) {
 		OutputMemoryStream tmp(m_resource_manager.m_allocator);
 		tmp.resize(header->decompressed_size);
-		const i32 res = LZ4_decompress_safe((const char*)mem + sizeof(*header), (char*)tmp.getMutableData(), i32(size - sizeof(*header)), (i32)tmp.size());
+		const i32 res = LZ4_decompress_safe((const char*)blob.begin() + sizeof(*header), (char*)tmp.getMutableData(), i32(blob.length() - sizeof(*header)), (i32)tmp.size());
 		if (res != header->decompressed_size || !load(tmp)) {
 			++m_failed_dep_count;
 		}
 		m_size = header->decompressed_size;
 	}
 	else {
-		if (!load(Span(mem + sizeof(*header), mem + size))) {
+		
+		if (!load(blob.fromLeft(sizeof(*header)))) {
 			++m_failed_dep_count;
 		}
 		m_size = header->decompressed_size;

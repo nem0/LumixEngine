@@ -232,7 +232,7 @@ struct FileSystemImpl : FileSystem {
 			m_mutex.exit();
 
 			if(!item.isCanceled()) {
-				item.callback.invoke(item.data.size(), (const u8*)item.data.data(), !item.isFailed());
+				item.callback.invoke(Span((const u8*)item.data.data(), (u32)item.data.size()), !item.isFailed());
 			}
 
 			if (timer.getTimeSinceStart() > 0.1f) {

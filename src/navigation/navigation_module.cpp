@@ -624,7 +624,7 @@ struct NavigationModuleImpl final : NavigationModule
 			, entity(entity)
 		{}
 
-		void fileLoaded(u64 size, const u8* mem, bool success) {	
+		void fileLoaded(Span<const u8> mem, bool success) {	
 			auto iter = module.m_zones.find(entity);
 			if (!iter.isValid()) {
 				LUMIX_DELETE(module.m_allocator, this);
@@ -643,7 +643,7 @@ struct NavigationModuleImpl final : NavigationModule
 				return;
 			}
 
-			InputMemoryStream file(mem, size);
+			InputMemoryStream file(mem);
 			file.read(zone.m_num_tiles_x);
 			file.read(zone.m_num_tiles_z);
 			dtNavMeshParams params;

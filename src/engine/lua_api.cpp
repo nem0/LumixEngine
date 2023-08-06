@@ -616,11 +616,11 @@ static int LUA_loadWorld(lua_State* L)
 	struct Callback {
 		~Callback() { luaL_unref(L, LUA_REGISTRYINDEX, lua_func); }
 
-		void invoke(u64 size, const u8* mem, bool success) {
+		void invoke(Span<const u8> mem, bool success) {
 			if (!success) {
 				logError("Failed to open world ", path);
 			} else {
-				InputMemoryStream blob(mem, size);
+				InputMemoryStream blob(mem);
 				#pragma pack(1)
 					struct Header {
 						u32 magic;

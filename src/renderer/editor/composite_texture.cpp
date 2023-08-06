@@ -3233,14 +3233,14 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 		pushUndo(NO_MERGE_UNDO);
 	}
 
-	void onLoaded(u64 size, const u8* data, bool success) {
+	void onLoaded(Span<const u8> data, bool success) {
 		m_loading_handle = FileSystem::AsyncHandle::invalid();
 		if (!success) {
 			logError("Failed to load ", m_path);
 			return;
 		}
 		
-		InputMemoryStream blob(data, size);
+		InputMemoryStream blob(data);
 		m_resource.deserialize(blob);
 		pushUndo(NO_MERGE_UNDO);
 		m_dirty = false;

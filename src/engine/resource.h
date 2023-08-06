@@ -96,7 +96,7 @@ protected:
 
 protected:
 	void doLoad();
-	void fileLoaded(u64 size, const u8* mem, bool success);
+	void fileLoaded(Span<const u8> mem, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);
 
 	Resource(const Resource&) = delete;

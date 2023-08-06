@@ -85,7 +85,7 @@ struct ReflectionProbe::LoadJob {
 
 	~LoadJob();
 
-	void callback(u64 size, const u8* data, bool success);
+	void callback(Span<const u8> data, bool success);
 
 	IAllocator& m_allocator;
 	RenderModuleImpl& m_module;
@@ -3250,7 +3250,7 @@ ReflectionProbe::LoadJob::~LoadJob() {
 	}
 }
 
-void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) {
+void ReflectionProbe::LoadJob::callback(Span<const u8> data, bool success) {
 	ReflectionProbe& probe = m_module.m_reflection_probes[m_entity];
 	probe.load_job = nullptr;
 	m_handle = FileSystem::AsyncHandle::invalid();
@@ -3262,7 +3262,7 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 	}
 
 	gpu::TextureDesc desc;
-	const u8* image_data = Texture::getLBCInfo(data, desc);
+	const u8* image_data = Texture::getLBCInfo(data.begin(), desc);
 	if (!image_data) return;
 
 	ASSERT(desc.depth == 1);
@@ -3270,9 +3270,9 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 
 	u32 layer = probe.texture_id;
 	DrawStream& stream = m_module.m_renderer.getDrawStream();
-	const u32 offset = u32(image_data - data);
-	const Renderer::MemRef mem = m_module.m_renderer.copy(image_data, (u32)size - offset);
-	InputMemoryStream blob(mem.data, (u32)size - offset);
+	const u32 offset = u32(image_data - data.begin());
+	const Renderer::MemRef mem = m_module.m_renderer.copy(image_data, data.length() - offset);
+	InputMemoryStream blob(mem.data, data.length() - offset);
 	for (u32 side = 0; side < 6; ++side) {
 		for (u32 mip = 0; mip < desc.mips; ++mip) {
 			u32 w = maximum(desc.width >> mip, 1);
