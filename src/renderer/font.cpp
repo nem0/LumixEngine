@@ -239,12 +239,11 @@ FontResource::FontResource(const Path& path, ResourceManager& manager, IAllocato
 }
 
 
-bool FontResource::load(u64 size, const u8* mem)
-{
-	if (size <= 0) return false;
+bool FontResource::load(Span<const u8> mem) {
+	if (mem.length() == 0) return false;
 	
-	m_file_data.resize((int)size);
-	memcpy(m_file_data.getMutableData(), mem, size);
+	m_file_data.resize(mem.length());
+	memcpy(m_file_data.getMutableData(), mem.begin(), mem.length());
 	return true;
 }
 

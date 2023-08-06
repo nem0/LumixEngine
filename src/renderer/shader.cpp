@@ -361,8 +361,7 @@ int include(lua_State* L)
 } // namespace LuaAPI
 
 
-bool Shader::load(u64 size, const u8* mem)
-{
+bool Shader::load(Span<const u8> mem) {
 	lua_State* root_state = m_renderer.getEngine().getState();
 	lua_State* L = lua_newthread(root_state);
 	const int state_ref = luaL_ref(root_state, LUA_REGISTRYINDEX);
@@ -390,7 +389,7 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_pushcfunction(L, LuaAPI::uniform);
 	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
 
-	const Span<const char> content((const char*)mem, (int)size);
+	const Span<const char> content((const char*)mem.begin(), (i32)mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
 		return false;

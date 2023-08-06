@@ -116,9 +116,9 @@ void ParticleSystemResource::Emitter::setMaterial(const Path& path)
 	}
 }
 
-bool ParticleSystemResource::load(u64 size, const u8* mem) {
+bool ParticleSystemResource::load(Span<const u8> mem) {
 	Header header;
-	InputMemoryStream blob(mem, size);
+	InputMemoryStream blob(mem);
 	blob.read(header);
 	if (header.magic != Header::MAGIC) {
 		logError("Invalid file ", getPath());

@@ -40,7 +40,7 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override { m_file_data.free(); }
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 

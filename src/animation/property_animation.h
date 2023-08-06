@@ -35,7 +35,7 @@ struct PropertyAnimation final : Resource {
 private:
 	void LUA_curve(lua_State* L);
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 };
 
 

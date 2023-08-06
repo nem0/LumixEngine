@@ -81,7 +81,7 @@ protected:
 
 	virtual void onBeforeReady() {}
 	virtual void unload() = 0;
-	virtual bool load(u64 size, const u8* mem) = 0;
+	virtual bool load(Span<const u8> blob) = 0;
 
 	void onCreated(State state);
 	void doUnload();

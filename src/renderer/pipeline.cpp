@@ -362,11 +362,8 @@ void PipelineResource::unload()
 }
 
 
-bool PipelineResource::load(u64 size, const u8* mem)
-{
-	content.resize((int)size);
-	memcpy(content.getData(), mem, size);
-	content.getData()[size] = '\0';
+bool PipelineResource::load(Span<const u8> mem) {
+	content = Span((const char*)mem.begin(), mem.length());
 	return true;
 }
 

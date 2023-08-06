@@ -112,7 +112,7 @@ struct ParticleSystemResource final : Resource {
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	void overrideData(u32 emitter_idx
 		, OutputMemoryStream&& instructions
 		, u32 emit_offset

@@ -41,10 +41,9 @@ struct WAVChunk {
 	u32 size;
 };
 
-bool Clip::load(u64 size, const u8* mem)
-{
+bool Clip::load(Span<const u8> mem) {
 	PROFILE_FUNCTION();
-	InputMemoryStream blob(mem, size);
+	InputMemoryStream blob(mem);
 	const u32 version = blob.read<u32>();
 	if (version != 0) return false;
 
@@ -74,7 +73,7 @@ bool Clip::load(u64 size, const u8* mem)
 		case Format::OGG: {
 			PROFILE_BLOCK("ogg");
 			short* output = nullptr;
-			auto res = stb_vorbis_decode_memory((unsigned char*)blob.skip(0), (int)(size - blob.getPosition()), &m_channels, &m_sample_rate, &output);
+			auto res = stb_vorbis_decode_memory((unsigned char*)blob.skip(0), (int)blob.remaining(), &m_channels, &m_sample_rate, &output);
 			if (res <= 0) return false;
 
 			m_data.resize(res * m_channels);

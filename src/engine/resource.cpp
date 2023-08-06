@@ -119,7 +119,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 
 	const CompiledResourceHeader* header = (const CompiledResourceHeader*)mem;
 	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
-		if (!load(size, mem)) {
+		if (!load(Span(mem, mem + size))) {
 			++m_failed_dep_count;
 		}
 		m_size = size;
@@ -140,13 +140,13 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 		OutputMemoryStream tmp(m_resource_manager.m_allocator);
 		tmp.resize(header->decompressed_size);
 		const i32 res = LZ4_decompress_safe((const char*)mem + sizeof(*header), (char*)tmp.getMutableData(), i32(size - sizeof(*header)), (i32)tmp.size());
-		if (res != header->decompressed_size || !load(header->decompressed_size, tmp.data())) {
+		if (res != header->decompressed_size || !load(tmp)) {
 			++m_failed_dep_count;
 		}
 		m_size = header->decompressed_size;
 	}
 	else {
-		if (!load(size - sizeof(*header), mem + sizeof(*header))) {
+		if (!load(Span(mem + sizeof(*header), mem + size))) {
 			++m_failed_dep_count;
 		}
 		m_size = header->decompressed_size;

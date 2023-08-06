@@ -22,11 +22,11 @@ ResourceType PrefabResource::getType() const { return TYPE; }
 void PrefabResource::unload() { data.clear(); }
 
 
-bool PrefabResource::load(u64 size, const u8* mem)
+bool PrefabResource::load(Span<const u8> blob)
 {
-	data.resize((int)size);
-	memcpy(data.getMutableData(), mem, size);
-	content_hash = StableHash(mem, (u32)size);
+	data.resize((int)blob.length());
+	memcpy(data.getMutableData(), blob.begin(), blob.length());
+	content_hash = StableHash(blob.begin(), (u32)blob.length());
 	return true;
 }
 

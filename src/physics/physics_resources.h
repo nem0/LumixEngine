@@ -46,7 +46,7 @@ struct PhysicsMaterial : Resource {
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	void serialize(OutputMemoryStream& blob);
 	void deserialize(struct InputMemoryStream& blob);
 
@@ -91,7 +91,7 @@ struct PhysicsGeometry final : Resource
 		PhysicsSystem& system;
 
 		void unload() override;
-		bool load(u64 size, const u8* mem) override;
+		bool load(Span<const u8> mem) override;
 
 };
 

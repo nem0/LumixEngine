@@ -237,13 +237,12 @@ void Animation::getRelativePose(Time time, Pose& pose, const Model& model, const
 	}
 }
 
-bool Animation::load(u64 mem_size, const u8* mem)
-{
+bool Animation::load(Span<const u8> mem) {
 	m_translations.clear();
 	m_rotations.clear();
 	m_mem.clear();
 	Header header;
-	InputMemoryStream file(mem, mem_size);
+	InputMemoryStream file(mem);
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC) {
 		logError("Invalid animation file ", getPath());

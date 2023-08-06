@@ -41,8 +41,8 @@ void Controller::unload() {
 	m_root = nullptr;
 }
 
-bool Controller::load(u64 size, const u8* mem) {
-	InputMemoryStream str(mem, size);
+bool Controller::load(Span<const u8> mem) {
+	InputMemoryStream str(mem);
 	deserialize(str);
 	return true;
 }

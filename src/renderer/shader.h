@@ -127,7 +127,7 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 
 private:
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	void onBeforeReady() override;
 };
 

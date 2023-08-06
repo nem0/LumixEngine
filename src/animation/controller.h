@@ -70,7 +70,7 @@ struct Controller final : Resource {
 private:
 	void processEvents(RuntimeContext& ctx) const;
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 };
 
 } // namespace anim

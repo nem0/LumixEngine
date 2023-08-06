@@ -718,13 +718,13 @@ gpu::TextureFlags Texture::getGPUFlags() const
 }
 
 
-bool Texture::load(u64 size, const u8* mem)
+bool Texture::load(Span<const u8> mem)
 {
 	PROFILE_FUNCTION();
 	profiler::pushString(getPath().c_str());
 	
 	char ext[4] = {};
-	InputMemoryStream file(mem, size);
+	InputMemoryStream file(mem);
 	if (!file.read(ext, 3)) return false;
 	if (!file.read(&flags, sizeof(flags))) return false;
 
@@ -742,7 +742,7 @@ bool Texture::load(u64 size, const u8* mem)
 	}
 	
 	if (equalIStrings(ext, "lbc")) {
-		loaded = loadLBC(*this, (const u8*)file.getBuffer() + file.getPosition(), u32(file.size() - file.getPosition()));
+		loaded = loadLBC(*this, (const u8*)file.getBuffer() + file.getPosition(), u32(file.remaining()));
 	}
 	else if (equalIStrings(ext, "raw")) {
 		loaded = loadRaw(*this, file, allocator);

@@ -46,11 +46,10 @@ PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_man
 PhysicsGeometry::~PhysicsGeometry() = default;
 
 
-bool PhysicsGeometry::load(u64 size, const u8* mem)
-{
+bool PhysicsGeometry::load(Span<const u8> mem) {
 	PROFILE_FUNCTION();
 	Header header;
-	InputMemoryStream file(mem, size);
+	InputMemoryStream file(mem);
  	file.read(&header, sizeof(header));
 
 	if (header.m_magic != HEADER_MAGIC) {
@@ -157,12 +156,12 @@ void PhysicsMaterial::deserialize(InputMemoryStream& blob) {
 	material->setRestitution(data.restitution);
 }
 
-bool PhysicsMaterial::load(u64 size, const u8* mem) {
+bool PhysicsMaterial::load(Span<const u8> mem) {
 	PhysicsMaterialManager& mng = static_cast<PhysicsMaterialManager&>(getResourceManager());
 	PhysicsMaterialLoadData tmp;
 	lua_State* L = mng.getState(tmp);
 
-	const Span<const char> content((const char*)mem, (u32)size);
+	const Span<const char> content((const char*)mem.begin(), mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		return false;
 	}

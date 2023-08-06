@@ -24,7 +24,7 @@ struct Clip final : Resource
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	int getChannels() const { return m_channels; }
 	int getSampleRate() const { return m_sample_rate; }
 	int getSize() const { return m_data.size() * sizeof(m_data[0]); }

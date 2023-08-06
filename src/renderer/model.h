@@ -207,7 +207,7 @@ private:
 	int getBoneIdx(const char* name);
 
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 
 private:
 	TagAllocator m_allocator;

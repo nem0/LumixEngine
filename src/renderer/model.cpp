@@ -586,11 +586,11 @@ bool Model::parseLODs(InputMemoryStream& file)
 }
 
 
-bool Model::load(u64 size, const u8* mem)
+bool Model::load(Span<const u8> mem)
 {
 	PROFILE_FUNCTION();
 	FileHeader header;
-	InputMemoryStream file(mem, size);
+	InputMemoryStream file(mem);
 	file.read(header);
 
 	if (header.magic != FILE_MAGIC)

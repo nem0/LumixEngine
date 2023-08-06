@@ -141,7 +141,7 @@ void Material::unload()
 
 void Material::deserialize(InputMemoryStream& blob) {
 	unload();
-	bool res = load(blob.size(), (const u8*)blob.getData());
+	bool res = load(Span((const u8*)blob.getData(), (u32)blob.size()));
 	ASSERT(res);
 }
 
@@ -689,8 +689,7 @@ void Material::setWireframe(bool enable) {
 	else m_render_states = m_render_states & ~gpu::StateFlags::WIREFRAME;
 }
 
-bool Material::load(u64 size, const u8* mem)
-{
+bool Material::load(Span<const u8> mem) {
 	PROFILE_FUNCTION();
 
 	MaterialManager& mng = static_cast<MaterialManager&>(getResourceManager());
@@ -700,7 +699,7 @@ bool Material::load(u64 size, const u8* mem)
 	m_render_states = gpu::StateFlags::CULL_BACK;
 	m_custom_flags = 0;
 
-	const Span<const char> content((const char*)mem, (u32)size);
+	const Span<const char> content((const char*)mem.begin(), (u32)mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		return false;
 	}

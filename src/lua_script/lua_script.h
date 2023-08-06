@@ -19,7 +19,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	const char* getSourceCode() const { return m_source_code.c_str(); }
 
 	static const ResourceType TYPE;

@@ -125,6 +125,7 @@ template <> inline void OutputMemoryStream::write<bool>(const bool& value)
 
 struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	InputMemoryStream(const void* data, u64 size);
+	InputMemoryStream(Span<const u8> data);
 	explicit InputMemoryStream(const OutputMemoryStream& blob);
 
 	void set(const void* data, u64 size);

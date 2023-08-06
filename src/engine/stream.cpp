@@ -371,13 +371,15 @@ void OutputMemoryStream::resize(u64 size)
 	m_capacity = size;
 }
 
-
+InputMemoryStream::InputMemoryStream(Span<const u8> data)
+	: m_data(data.begin())
+	, m_size(data.length())
+{}
 
 InputMemoryStream::InputMemoryStream(const void* data, u64 size)
 	: m_data((const u8*)data)
 	, m_size(size)
 {}
-
 
 InputMemoryStream::InputMemoryStream(const OutputMemoryStream& blob)
 	: m_data((const u8*)blob.data())

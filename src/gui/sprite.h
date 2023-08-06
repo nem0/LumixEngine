@@ -21,7 +21,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
-	bool load(u64 size, const u8* mem) override;
+	bool load(Span<const u8> mem) override;
 	void serialize(struct OutputMemoryStream& serializer);
 	
 	void setTexture(const Path& path);
