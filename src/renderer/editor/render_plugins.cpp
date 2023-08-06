@@ -2035,7 +2035,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void importGUI() {
 			ImGuiEx::Label("Bake vertex AO");
-			saveUndo(ImGui::Checkbox("##impnrm", &m_meta.bake_vertex_ao));
+			saveUndo(ImGui::Checkbox("##vrtxao", &m_meta.bake_vertex_ao));
 			ImGuiEx::Label("Mikktspace tangents");
 			saveUndo(ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace));
 			ImGuiEx::Label("Force skinned");
