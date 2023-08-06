@@ -534,6 +534,23 @@ struct Mesh : Object
 	virtual Matrix getGeometricMatrix() const = 0;
 	virtual const Material* getMaterial(int idx) const = 0;
 	virtual int getMaterialCount() const = 0;
+
+	// use following functions to access vertex data instead of using getGeometry,
+	// since old formats do not have Geometry nodes
+	virtual const Vec3* getVertices() const = 0;
+	virtual int getVertexCount() const = 0;
+
+	virtual const int* getFaceIndices() const = 0;
+	virtual int getIndexCount() const = 0;
+
+	virtual const Vec3* getNormals() const = 0;
+	virtual const Vec2* getUVs(int index = 0) const = 0;
+	virtual const Vec4* getColors() const = 0;
+	virtual const Vec3* getTangents() const = 0;
+	virtual const int* getMaterialIndices() const = 0;
+
+	virtual const Skin* getSkin() const = 0;
+	virtual const BlendShape* getBlendShape() const = 0;
 };
 
 
@@ -632,7 +649,7 @@ enum FrameRate
 
 struct GlobalSettings
 {
-	UpVector UpAxis = UpVector_AxisX;
+	UpVector UpAxis = UpVector_AxisY;
 	int UpAxisSign = 1;
 	// this seems to be 1-2 in Autodesk (odd/even parity), and 0-2 in Blender (axis as in UpAxis)
 	// I recommend to ignore FrontAxis and use just UpVector

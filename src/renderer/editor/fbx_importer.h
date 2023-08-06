@@ -113,33 +113,25 @@ struct FBXImporter
 		char shader[20];
 	};
 
-	struct ImportGeometry
+	struct ImportMesh
 	{
-		ImportGeometry(IAllocator& allocator)
-			: indices(allocator)
-			, vertex_data(allocator)
+		ImportMesh(IAllocator& allocator)
+			: vertex_data(allocator)
+			, indices(allocator)
+			, geom_indices(allocator)
+			, geom_vertex_data(allocator)
 			, computed_tangents(allocator)
 			, computed_normals(allocator)
 			, computed_ao(allocator)
 		{
 		}
 
-		const ofbx::Geometry* fbx = nullptr;
-		Array<u32> indices;
-		OutputMemoryStream vertex_data;
+		Array<u32> geom_indices;
+		OutputMemoryStream geom_vertex_data;
 		Array<ofbx::Vec3> computed_tangents;
 		Array<ofbx::Vec3> computed_normals;
 		Array<float> computed_ao;
 		u32 unique_vertex_count;
-	};
-
-	struct ImportMesh
-	{
-		ImportMesh(IAllocator& allocator)
-			: vertex_data(allocator)
-			, indices(allocator)
-		{
-		}
 
 		const ofbx::Mesh* fbx = nullptr;
 		const ofbx::Material* fbx_mat = nullptr;
@@ -185,7 +177,6 @@ struct FBXImporter
 private:
 	void createAutoLODs(const ImportConfig& cfg, ImportMesh& import_mesh);
 	bool findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const;
-	ImportGeometry& getImportGeometry(const ofbx::Geometry* geom);
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
 	void gatherMaterials(const char* fbx_filename, const char* src_dir);
 
@@ -195,13 +186,12 @@ private:
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg, const char* path);
 	void gatherMeshes(ofbx::IScene* module);
-	void gatherGeometries(ofbx::IScene* module);
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
-	int getVertexSize(const ofbx::Geometry& geom, bool is_skinned, const ImportConfig& cfg) const;
+	int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
@@ -225,7 +215,6 @@ private:
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
 	HashMap<const ofbx::Material*, String> m_material_name_map;
-	Array<ImportGeometry> m_geometries;
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;
 	Array<Matrix> m_bind_pose;
