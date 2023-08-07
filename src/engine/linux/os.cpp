@@ -1061,8 +1061,8 @@ static bool dialog(Span<char> out, const char* filter_str, const char* starting_
 	if (name) {
 		copyString(out, name);
 		if (is_save) {
-			Span<const char> ext = Path::getExtension(Span(name, strlen(name)));
-			if (ext.length() == 0) {
+			StringView ext = Path::getExtension(name);
+			if (ext.empty()) {
 				catString(out, default_ext);
 			}
 		}

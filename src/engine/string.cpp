@@ -451,14 +451,14 @@ const char* findChar(StringView haystack, char needle) {
 			if (*c == needle) return c;
 			++c;
 		}
-		return false;
+		return nullptr;
 	}
 
 	while (*c) {
 		if (*c == needle) return c;
 		++c;
 	}
-	return false;
+	return nullptr;
 }
 
 
