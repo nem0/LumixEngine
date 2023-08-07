@@ -298,7 +298,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto& resources = compiler.lockResources();
 		if (m_filter[0]) {
 			for (const AssetCompiler::ResourceItem& res : resources) {
-				if (tmp[0] != '.' && tmp[1] != '\'' && !startsWithInsensitive(res.path, tmp)) continue;
+				if (tmp[0] != '.' && tmp[1] != '\'' && !startsWithInsensitive(Path::getResource(res.path), tmp)) continue;
 				addTile(res.path);
 			}
 		}

@@ -1030,7 +1030,7 @@ bool startsWith(StringView str, StringView prefix) {
 bool startsWithInsensitive(StringView str, StringView prefix) {
 	str.ensureEnd();
 	const char* lhs = str.begin;
-	const char* rhs = prefix.end;
+	const char* rhs = prefix.begin;
 	if (prefix.end) {
 		while (rhs != prefix.end && lhs != str.end && toLower(*lhs) == toLower(*rhs)) {
 			++lhs;

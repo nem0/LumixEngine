@@ -175,6 +175,22 @@ StringView Path::getExtension(StringView src) {
 	return res;
 }
 
+StringView Path::getResource(StringView str) {
+	const char* c = str.begin;
+	if (str.end) {
+		while (c != str.end) {
+			if (*c == ':') return StringView(c + 1, str.end);
+			++c;
+		}
+		return str;
+	}
+	while (*c) {
+		if (*c == ':') return c + 1;
+		++c;
+	}
+	return str;
+}
+
 StringView Path::getSubresource(StringView str) {
 	StringView ret;
 	ret.begin = str.begin;
