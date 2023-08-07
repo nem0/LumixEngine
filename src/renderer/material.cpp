@@ -148,13 +148,11 @@ void Material::deserialize(InputMemoryStream& blob) {
 void Material::serialize(OutputMemoryStream& blob) {
 	ASSERT(isReady());
 	
-	Span<const char> mat_dir = Path::getDir(getPath().c_str());
-	if (startsWith(m_shader->getPath(), mat_dir)) {
-		blob << "shader \"" << Span<const char>(m_shader->getPath()).fromLeft(mat_dir.length()) << "\"\n";
-	}
-	else {
-		blob << "shader \"/" << m_shader->getPath().c_str() << "\"\n";
-	}
+	StringView mat_dir = Path::getDir(getPath());
+	StringView shader_path = m_shader->getPath();
+	if (startsWith(shader_path, mat_dir)) shader_path.removePrefix(mat_dir.size());
+
+	blob << "shader \"" << shader_path << "\"\n";
 	blob << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	blob << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
@@ -170,16 +168,12 @@ void Material::serialize(OutputMemoryStream& blob) {
 	blob << "}\n";
 
 	for (u32 i = 0; i < m_texture_count; ++i) {
-		char path[LUMIX_MAX_PATH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
-			Span<const char> texture_path(m_textures[i]->getPath());
+			StringView texture_path = m_textures[i]->getPath();
 			if (startsWith(texture_path, mat_dir)) {
-				copyString(Span(path), Span(texture_path).fromLeft(mat_dir.length()));
-				blob << "texture \"" << path << "\"\n";
+				shader_path.removePrefix(mat_dir.size());
 			}
-			else {
-				blob << "texture \"/" << texture_path << "\"\n";
-			}
+			blob << "texture \"/" << texture_path << "\"\n";
 		}
 		else {
 			blob << "texture \"\"\n";
@@ -604,7 +598,7 @@ int shader(lua_State* L)
 	else {
 		char c = path[0];
 		if (c != '\\' && c != '/') {
-			Span <const char> material_dir = Path::getDir(material->getPath().c_str());
+			StringView material_dir = Path::getDir(material->getPath().c_str());
 			StaticString<LUMIX_MAX_PATH> fullpath(material_dir, path);
 			material->setShader(Path(fullpath));
 		}
@@ -699,7 +693,7 @@ bool Material::load(Span<const u8> mem) {
 	m_render_states = gpu::StateFlags::CULL_BACK;
 	m_custom_flags = 0;
 
-	const Span<const char> content((const char*)mem.begin(), (u32)mem.length());
+	StringView content((const char*)mem.begin(), (u32)mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		return false;
 	}

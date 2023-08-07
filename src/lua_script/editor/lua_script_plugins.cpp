@@ -137,7 +137,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		Settings& settings = app.getSettings();
 		open = settings.getValue(Settings::GLOBAL, "is_script_console_open", false);
 		if (!buf[0]) {
-			Span<const char> dir = Path::getDir(settings.getAppDataPath());
+			StringView dir = Path::getDir(settings.getAppDataPath());
 			const StaticString<LUMIX_MAX_PATH> path(dir, "/lua_console_content.lua");
 			os::InputFile file;
 			if (file.open(path)) {
@@ -160,7 +160,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		Settings& settings = app.getSettings();
 		settings.setValue(Settings::GLOBAL, "is_script_console_open", open);
 		if (buf[0]) {
-			Span<const char> dir = Path::getDir(settings.getAppDataPath());
+			StringView dir = Path::getDir(settings.getAppDataPath());
 			const StaticString<LUMIX_MAX_PATH> path(dir, "/lua_console_content.lua");
 			os::OutputFile file;
 			if (!file.open(path)) {
@@ -263,7 +263,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 				c = data->Buf[start_word - 1];
 			}
 			char tmp[128];
-			copyNString(Span(tmp), data->Buf + start_word, data->CursorPos - start_word);
+			copyString(Span(tmp), StringView(data->Buf + start_word, data->CursorPos - start_word));
 
 			that->autocomplete.clear();
 			lua_pushvalue(L, LUA_GLOBALSINDEX);

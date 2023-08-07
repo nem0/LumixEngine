@@ -575,6 +575,132 @@ void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ve
 	}
 }
 
+SelectNode::SelectNode(Node* parent, IAllocator& allocator)
+	: Node(parent, allocator)
+	, m_allocator(allocator)
+	, m_children(allocator)
+{}
+
+SelectNode::~SelectNode() {
+	for (Child& c : m_children) {
+		LUMIX_DELETE(m_allocator, c.node);
+	}
+}
+
+u32 SelectNode::getChildIndex(float input_val) const {
+	ASSERT(m_children.size() > 0);
+	for (u32 i = 0, c = m_children.size(); i < c; ++i) {
+		const Child& child = m_children[i];
+		if (input_val <= child.max_value) {
+			return i;
+		}
+	}
+	return m_children.size() - 1;
+}
+
+void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	
+	const float input_val = getInputValue(ctx, m_input_index);
+	const u32 child_idx = getChildIndex(input_val);
+
+	if (data.from != data.to) {
+		data.t += ctx.time_delta;
+
+		if (m_blend_length < data.t) {
+			// TODO root motion in data.from
+			m_children[data.from].node->skip(ctx);
+			data.from = data.to;
+			data.t = Time(0);
+			ctx.data.write(data);
+			m_children[data.to].node->update(ctx, root_motion);
+			return;
+		}
+
+		ctx.data.write(data);
+
+		m_children[data.from].node->update(ctx, root_motion);
+		LocalRigidTransform tmp;
+		m_children[data.to].node->update(ctx, tmp);
+		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
+		return;
+	}
+
+	if (child_idx != data.from) {
+		data.to = child_idx;
+		data.t = Time(0);
+		ctx.data.write(data);
+		m_children[data.from].node->update(ctx, root_motion);
+		m_children[data.to].node->enter(ctx);
+		return;
+	}
+
+	data.t += ctx.time_delta;
+	ctx.data.write(data);
+	m_children[data.from].node->update(ctx, root_motion);
+}
+
+void SelectNode::enter(RuntimeContext& ctx) const {
+	RuntimeData runtime_data = { 0, 0, Time(0) };
+	const float input_val = getInputValue(ctx, m_input_index);
+	runtime_data.from = getChildIndex(input_val);
+	runtime_data.to = runtime_data.from;
+	ctx.data.write(runtime_data);
+	if(runtime_data.from < (u32)m_children.size())
+		m_children[runtime_data.from].node->enter(ctx);
+}
+
+void SelectNode::skip(RuntimeContext& ctx) const {
+	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	m_children[data.from].node->skip(ctx);
+	if (data.from != data.to) {
+		m_children[data.to].node->skip(ctx);
+	}
+}
+
+void SelectNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
+	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+
+	m_children[data.from].node->getPose(ctx, weight, pose, mask);
+	if(data.from != data.to) {
+		const float t = clamp(data.t.seconds() / m_blend_length.seconds(), 0.f, 1.f);
+		m_children[data.to].node->getPose(ctx, weight * t, pose, mask);
+	}
+}
+
+Time SelectNode::length(const RuntimeContext& ctx) const {	return Time::fromSeconds(1); }
+
+Time SelectNode::time(const RuntimeContext& ctx) const { return Time(0); }
+
+void SelectNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
+	stream.read(m_blend_length);
+	stream.read(m_input_index);
+	u32 size;
+	stream.read(size);
+	m_children.reserve(size);
+	for (u32 i = 0; i < size; ++i) {
+		Child& child = m_children.emplace();
+		stream.read(child.max_value);
+		Node::Type type;
+		stream.read(type);
+		child.node = Node::create(this, type, m_allocator);
+		child.node->deserialize(stream, ctrl, version);
+	}
+}
+
+void SelectNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+	stream.write(m_blend_length);
+	stream.write(m_input_index);
+	stream.write((u32)m_children.size());
+	for (const Child& child : m_children) {
+		stream.write(child.max_value);
+		stream.write(child.node->type());
+		child.node->serialize(stream);
+	}
+}
+
 GroupNode::GroupNode(Node* parent, IAllocator& allocator)
 	: Node(parent, allocator)
 	, m_allocator(allocator)
@@ -777,6 +903,7 @@ Node* Node::create(Node* parent, Type type, IAllocator& allocator) {
 		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, allocator);
 		case Node::LAYERS: return LUMIX_NEW(allocator, LayersNode)(parent, allocator);
 		case Node::CONDITION: return LUMIX_NEW(allocator, ConditionNode)(parent, allocator);
+		case Node::SELECT: return LUMIX_NEW(allocator, SelectNode)(parent, allocator);
 		case Node::NONE: ASSERT(false); return nullptr;
 	}
 	ASSERT(false);

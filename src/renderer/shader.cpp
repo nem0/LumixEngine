@@ -328,7 +328,7 @@ int import(lua_State* L)
 	}
 	
 	if (!content.empty()) {
-		LuaWrapper::execute(L, Span((const char*)content.data(), (u32)content.size()), path, 0);
+		LuaWrapper::execute(L, StringView((const char*)content.data(), (u32)content.size()), path, 0);
 	}
 
 	return 0;
@@ -351,7 +351,7 @@ int include(lua_State* L)
 	if (!content.empty()) {
 		content << "\n";
 		shader->m_sources.common.cat("#line 0\n");
-		shader->m_sources.common.cat(Span((const char*)content.data(), (u32)content.size()));
+		shader->m_sources.common.cat(StringView((const char*)content.data(), (u32)content.size()));
 	}
 
 	return 0;
@@ -389,7 +389,7 @@ bool Shader::load(Span<const u8> mem) {
 	lua_pushcfunction(L, LuaAPI::uniform);
 	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
 
-	const Span<const char> content((const char*)mem.begin(), (i32)mem.length());
+	StringView content((const char*)mem.begin(), (u32)mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
 		return false;

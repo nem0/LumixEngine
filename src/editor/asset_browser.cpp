@@ -149,8 +149,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void onResourceCompiled(Resource& resource) {
-		Span<const char> dir = Path::getDir(resource.getPath().c_str());
-		if (!Path::isSame(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
+		StringView dir = Path::getDir(resource.getPath());
+		if (!Path::isSame(dir, m_dir)) return;
 		
 		RenderInterface* ri = m_app.getRenderInterface();
 		Engine& engine = m_app.getEngine();
@@ -183,14 +183,14 @@ struct AssetBrowserImpl : AssetBrowser {
 	void onResourceListChanged(const Path& path) {
 		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
-		const Path fullpath(fs.getBasePath(), path.c_str());
+		const Path fullpath(fs.getBasePath(), path);
 		if (os::dirExists(fullpath)) {
 			changeDir(m_dir, false);
 			return;
 		}
 
-		Span<const char> dir = Path::getDir(path.c_str());
-		if (!Path::isSame(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
+		StringView dir = Path::getDir(path);
+		if (!Path::isSame(dir, m_dir)) return;
 
 		RenderInterface* ri = m_app.getRenderInterface();
 
@@ -238,28 +238,28 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void addTile(const Path& path) {
-		if (!m_show_subresources && contains(path.c_str(), ':')) return;
-		if (m_filter[0] && !stristr(path.c_str(), m_filter)) return;
+		if (!m_show_subresources && contains(path, ':')) return;
+		if (m_filter[0] && !stristr(path, m_filter)) return;
 
 		FileInfo tile;
 		char filename[LUMIX_MAX_PATH];
-		Span<const char> subres = Path::getSubresource(path.c_str());
-		if (*subres.end()) {
-			copyNString(Span(filename), subres.begin(), subres.length());
+		StringView subres = Path::getSubresource(path);
+		if (*subres.end) {
+			copyString(Span(filename), subres);
 			catString(filename, ":");
-			catString(Span(filename), Path::getBasename(path.c_str()));
+			catString(Span(filename), Path::getBasename(path));
 		}
 		else {
-			copyString(Span(filename), Path::getBasename(path.c_str()));
+			copyString(Span(filename), Path::getBasename(path));
 		}
 
 		tile.file_path_hash = path.getHash();
 		tile.filepath = path.c_str();
 		tile.clamped_filename = filename;
-		Span<const char> ext = Path::getExtension(subres);
+		StringView ext = Path::getExtension(subres);
 		tile.extension = 0;
-		ASSERT(ext.length() <= sizeof(tile.extension));
-		memcpy(&tile.extension, ext.begin(), ext.length());
+		ASSERT(ext.size() <= sizeof(tile.extension));
+		memcpy(&tile.extension, ext.begin, ext.size());
 
 		m_file_infos.push(tile);
 	}
@@ -298,7 +298,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto& resources = compiler.lockResources();
 		if (m_filter[0]) {
 			for (const AssetCompiler::ResourceItem& res : resources) {
-				if (tmp[0] != '.' && tmp[1] != '\'' && !startsWithInsensitive(res.path.c_str(), tmp)) continue;
+				if (tmp[0] != '.' && tmp[1] != '\'' && !startsWithInsensitive(res.path, tmp)) continue;
 				addTile(res.path);
 			}
 		}
@@ -347,7 +347,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			if (ImGui::Button(tmp))
 			{
 				char new_dir[LUMIX_MAX_PATH];
-				copyNString(Span(new_dir), m_dir, int(c - m_dir.data));
+				copyString(Span(new_dir), StringView(m_dir, u32(c - m_dir.data)));
 				changeDir(new_dir, true);
 			}
 			ImGui::SameLine();
@@ -719,7 +719,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				if (module && world->hasComponent(e, model_inst_type)) {
 					Path source;
 					if (reflection::getPropertyValue(*module, e, model_inst_type, "Source", source)) {
-						copyString(Span(m_prefab_name), Path::getBasename(source.c_str()));
+						copyString(Span(m_prefab_name), Path::getBasename(source));
 					}
 				}
 			}
@@ -744,9 +744,9 @@ struct AssetBrowserImpl : AssetBrowser {
 	void refreshLabels() {
 		for (FileInfo& tile : m_file_infos) {
 			char filename[LUMIX_MAX_PATH];
-			Span<const char> subres = Path::getSubresource(tile.filepath.data);
-			if (*subres.end()) {
-				copyNString(Span(filename), subres.begin(), subres.length());
+			StringView subres = Path::getSubresource(tile.filepath.data);
+			if (*subres.end) {
+				copyString(Span(filename), subres);
 				catString(filename, ":");
 				catString(Span(filename), Path::getBasename(tile.filepath.data));
 			} else {
@@ -888,10 +888,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			return;
 		}
 
-		Span<const char> ext = Path::getExtension(Path::getSubresource(path.c_str()));
+		StringView ext = Path::getExtension(Path::getSubresource(path));
 		u64 key = 0;
-		ASSERT(ext.length() <= sizeof(key));
-		memcpy(&key, ext.begin(), ext.length());
+		ASSERT(ext.size() <= sizeof(key));
+		memcpy(&key, ext.begin, ext.size());
 		auto iter = m_plugin_map.find(key);
 		if (iter.isValid()) iter.value()->openEditor(path);
 	}
@@ -913,11 +913,11 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
 		StaticString<LUMIX_MAX_PATH> res("");
-		if (rl.full.length() > 0) {
-			res.append(rl.subresource, (rl.subresource.length() > 0 ? ":" : ""), rl.basename, ".", rl.ext);
+		if (!rl.full.empty()) {
+			res.append(rl.subresource, (rl.subresource.empty() ? "" : ":"), rl.basename, ".", rl.ext);
 		}
 		if (hash_id) {
-			res.append("##h", RuntimeHash(rl.full.m_begin, rl.full.length()).getHashValue());
+			res.append("##h", RuntimeHash(rl.full.begin, rl.full.size()).getHashValue());
 		}
 		return res;
 	}
@@ -926,12 +926,12 @@ struct AssetBrowserImpl : AssetBrowser {
 	{
 		ImGui::PushID(str_id);
 
-		const Span span(buf.m_begin, stringLength(buf.m_begin));
-		const ResourceLocator rl(span);
+		StringView span(buf.m_begin, stringLength(buf.m_begin));
+		const ResourceLocator rl{span};
 	
 		bool popup_opened = false;
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ImGui::GetStyle().ItemSpacing.y));
-		if (span.length() == 0) {
+		if (span.empty()) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 			if (ImGui::Button("No resource (click to set)", ImVec2(width, 0))) {
 				ImGui::OpenPopup("popup");
@@ -945,10 +945,10 @@ struct AssetBrowserImpl : AssetBrowser {
 				popup_opened = true;
 			}
 		}
-		if (span.length() == 0) {
+		if (span.empty()) {
 			ImGui::PopStyleColor();
 		}
-		if (span.length() > 0 && ImGui::IsItemHovered()) {
+		else if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("%s", buf.m_begin);
 		}
 	
@@ -956,7 +956,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
 				char ext[10];
 				const char* path = (const char*)payload->Data;
-				Span<const char> subres = Path::getSubresource(path);
+				StringView subres = Path::getSubresource(path);
 				copyString(Span(ext), Path::getExtension(subres));
 				const AssetCompiler& compiler = m_app.getAssetCompiler();
 				if (compiler.acceptExtension(ext, type)) {
@@ -969,7 +969,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 			ImGui::EndDragDropTarget();
 		}
-		if (span.length() > 0) {
+		if (!span.empty()) {
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
 				openEditor(Path(buf.begin()));
@@ -1034,23 +1034,21 @@ struct AssetBrowserImpl : AssetBrowser {
 			fi.file_path_hash = path.getHash();
 			fi.filepath = path.c_str();
 
-			char filename[LUMIX_MAX_PATH];
-			Span<const char> subres = Path::getSubresource(path.c_str());
-			if (*subres.end()) {
-				copyNString(Span(filename), subres.begin(), subres.length());
-				catString(filename, ":");
-				catString(Span(filename), Path::getBasename(path.c_str()));
+			StaticString<LUMIX_MAX_PATH> filename;
+			StringView subres = Path::getSubresource(path.c_str());
+			if (*subres.end) {
+				filename.append(subres, ":", Path::getBasename(path.c_str()));
 			}
 			else {
-				copyString(Span(filename), Path::getBasename(path.c_str()));
+				filename.append(Path::getBasename(path.c_str()));
 			}
-			clampText(filename, 50);
+			clampText(filename.data, 50);
 			fi.clamped_filename = filename;
 			fi.create_called = false;
-			Span<const char> ext = Path::getExtension(filename);
+			StringView ext = Path::getExtension(filename);
 			fi.extension = 0;
-			ASSERT(ext.length() <= sizeof(fi.extension));
-			memcpy(&fi.extension, ext.begin(), ext.length());
+			ASSERT(ext.size() <= sizeof(fi.extension));
+			memcpy(&fi.extension, ext.begin, ext.size());
 
 			idx = m_immediate_tiles.size() - 1;
 		}
@@ -1074,8 +1072,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 			const bool selected = selected_path_hash == res.path.getHash();
 			if(selected) selected_path = res.path;
-			const Span span(res.path.c_str(), res.path.length());
-			const ResourceLocator rl(span);
+			const ResourceLocator rl(res.path);
 			StaticString<LUMIX_MAX_PATH> label = getImGuiLabelID(rl, true);
 			const bool is_enter_submit = (enter_submit && ImGui::IsKeyPressed(ImGuiKey_Enter));
 			if (is_enter_submit || ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
@@ -1106,9 +1103,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	void locate(const Path& path) override {
 		m_is_open = true;
 		m_filter[0] = '\0';
-		Span<const char> new_dir = Path::getDir(path.c_str());
-		Span<const char> current_dir(m_dir, stringLength(m_dir));
-		if (!Path::isSame(new_dir, current_dir)) {
+		StringView new_dir = Path::getDir(path);
+		if (!Path::isSame(new_dir, m_dir)) {
 			StaticString<LUMIX_MAX_PATH> dir(new_dir);
 			changeDir(dir[0] ? dir : ".", true);
 		}

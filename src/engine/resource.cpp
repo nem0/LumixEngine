@@ -108,7 +108,7 @@ void Resource::fileLoaded(Span<const u8> blob, bool success) {
 			}
 		}
 
-		logError("Could not open ", getPath().c_str());
+		logError("Could not open ", getPath());
 		ASSERT(m_empty_dep_count > 0);
 		--m_empty_dep_count;
 		++m_failed_dep_count;
@@ -118,10 +118,8 @@ void Resource::fileLoaded(Span<const u8> blob, bool success) {
 	}
 
 	const CompiledResourceHeader* header = (const CompiledResourceHeader*)blob.begin();
-	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
-		if (!load(blob)) {
-			++m_failed_dep_count;
-		}
+	if (startsWith(getPath(), ".lumix/asset_tiles/")) {
+		if (!load(blob)) ++m_failed_dep_count;
 		m_size = blob.length();
 	}
 	else if (blob.length() < sizeof(*header)) {
@@ -205,7 +203,7 @@ void Resource::doLoad()
 	FileSystem::ContentCallback cb = makeDelegate<&Resource::fileLoaded>(this);
 
 	const FilePathHash hash = m_path.getHash();
-	if (startsWith(m_path.c_str(), ".lumix/asset_tiles/")) {
+	if (startsWith(m_path, ".lumix/asset_tiles/")) {
 		m_async_op = fs.getContent(m_path, cb);
 	}
 	else {	

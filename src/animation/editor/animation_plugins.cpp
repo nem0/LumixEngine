@@ -52,9 +52,9 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			Engine& engine = m_app.getEngine();
 
-			Span<const char> subres = Path::getSubresource(path);
-			if (subres.length() != path.length()) {
-				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(subres.end() + 1));
+			StringView subres = Path::getSubresource(path);
+			if (subres.size() != path.length()) {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(subres.end + 1));
 				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
 				render_module->setModelInstancePath((EntityRef)m_viewer.m_mesh, m_model->getPath());
 			}
@@ -109,9 +109,14 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					const Model::Bone& bone = m_model->getBone(iter.value());
 					if (ImGui::TreeNode(bone.name.c_str())) {
 						for (u32 i = 0; i < curve.count; ++i) {
-							const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
 							const Vec3 p = curve.pos[i];
-							ImGui::Text("%.2f s: %f %f %f", t, p.x, p.y, p.z);
+							if (curve.times) {
+								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
+								ImGui::Text("%.2f s: %f %f %f", t, p.x, p.y, p.z);
+							}
+							else {
+								ImGui::Text("frame %d s: %f %f %f", i, p.x, p.y, p.z);
+							}
 						}
 						ImGui::TreePop();
 					}
@@ -125,6 +130,16 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					if (!iter.isValid()) continue;
 					const Model::Bone& bone = m_model->getBone(iter.value());
 					if (ImGui::TreeNode(bone.name.c_str())) {
+						for (u32 i = 0; i < curve.count; ++i) {
+							const Quat r = curve.rot[i];
+							if (curve.times) {
+								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
+								ImGui::Text("%.2f s: %f %f %f %f", t, r.x, r.y, r.z, r.w);
+							}
+							else {
+								ImGui::Text("frame %d s: %f %f %f %f", i, r.x, r.y, r.z, r.w);
+							}
+						}
 						ImGui::TreePop();
 					}
 				}

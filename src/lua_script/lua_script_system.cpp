@@ -23,15 +23,16 @@
 
 namespace Lumix
 {
-	static void pushObject(lua_State* L, void* obj, Span<const char> type_name) {
-		ASSERT(type_name.length() > 0);
+	static void pushObject(lua_State* L, void* obj, StringView type_name) {
+		ASSERT(!type_name.empty());
+		type_name.ensureEnd();
 		LuaWrapper::DebugGuard guard(L, 1);
 		lua_getglobal(L, "LumixAPI");
 		char tmp[64];
-		const char* c = type_name.end() - 1;
-		while (*c != ':' && c != type_name.begin()) --c;
+		const char* c = type_name.end - 1;
+		while (*c != ':' && c != type_name.begin) --c;
 		if (*c == ':') ++c;
-		copyNString(Span(tmp), c, int(type_name.end() - c - 2));
+		copyString(Span(tmp), StringView(c, u32(type_name.end - c - 2)));
 
 		if (LuaWrapper::getField(L, -1, tmp) != LUA_TTABLE) {
 			lua_pop(L, 2);
@@ -75,7 +76,7 @@ namespace Lumix
 		}	
 	}
 
-	static int push(lua_State* L, const reflection::Variant& v, Span<const char> type_name) {
+	static int push(lua_State* L, const reflection::Variant& v, StringView type_name) {
 		switch (v.type) {
 			case reflection::Variant::ENTITY: ASSERT(false); return 0;
 			case reflection::Variant::VOID: return 0;
@@ -221,7 +222,7 @@ namespace Lumix
 
 	template <typename T> static T fromString(const char* val) {
 		T res;
-		fromCString(Span(val, stringLength(val) + 1), res);
+		fromCString(val, res);
 		return res;
 	}
 
@@ -2034,7 +2035,7 @@ namespace Lumix
 						const char* tmp = serializer.readString();
 						if (type == Property::ENTITY) {
 							EntityPtr prop_value;
-							fromCString(Span(tmp, stringLength(tmp)), prop_value.index);
+							fromCString(tmp, prop_value.index);
 							prop_value = entity_map.get(prop_value);
 							StaticString<64> buf(prop_value.index);
 							prop.stored_value = buf;
@@ -2192,16 +2193,14 @@ namespace Lumix
 		}
 
 
-		void processInputEvents()
-		{
+		void processInputEvents() {
 			if (m_input_handlers.empty()) return;
+
 			InputSystem& input_system = m_system.m_engine.getInputSystem();
-			const InputSystem::Event* events = input_system.getEvents();
-			for (int i = 0, c = input_system.getEventsCount(); i < c; ++i)
-			{
-				for (const CallbackData& cb : m_input_handlers)
-				{
-					processInputEvent(cb, events[i]);
+			Span<const InputSystem::Event> events = input_system.getEvents();
+			for (const InputSystem::Event& e : events) {
+				for (const CallbackData& cb : m_input_handlers) {
+					processInputEvent(cb, e);
 				}
 			}
 		}

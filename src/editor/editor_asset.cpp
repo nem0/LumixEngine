@@ -34,7 +34,7 @@ void AssetEditorWindow::onGUI() {
 	ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings;
 	if (m_dirty) flags |= ImGuiWindowFlags_UnsavedDocument;
 
-	Span<const char> basename = Path::getBasename(getPath().c_str());
+	StringView basename = Path::getBasename(getPath());
 	StaticString<128> title(basename, "##ae", (uintptr)this);
 
 	if (ImGui::Begin(title, &open, flags)) {

@@ -6,8 +6,7 @@
 #include "engine/string.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 OutputMemoryStream::OutputMemoryStream(IAllocator& allocator)
 	: m_allocator(&allocator)
@@ -68,18 +67,11 @@ OutputMemoryStream::~OutputMemoryStream()
 }
 
 
-IOutputStream& IOutputStream::operator << (Span<const char> str)
-{
-	write(str.begin(), str.length());
+IOutputStream& IOutputStream::operator << (StringView str) {
+	str.ensureEnd();
+	write(str.begin, str.size());
 	return *this;
 }
-
-IOutputStream& IOutputStream::operator << (const char* str)
-{
-	write(str, stringLength(str));
-	return *this;
-}
-
 
 IOutputStream& IOutputStream::operator << (i32 value)
 {

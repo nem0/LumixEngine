@@ -93,7 +93,7 @@ struct FileSystemImpl : FileSystem {
 
 	bool saveContentSync(const Path& path, Span<const u8> content) override {
 		os::OutputFile file;
-		const Path full_path(m_base_path, path.c_str());
+		const Path full_path(m_base_path, path);
 		if (!file.open(full_path)) return false;
 
 		bool res = file.write(content.begin(), content.length());
@@ -104,7 +104,7 @@ struct FileSystemImpl : FileSystem {
 
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		os::InputFile file;
-		const Path full_path(m_base_path, path.c_str());
+		const Path full_path(m_base_path, path);
 
 		if (!file.open(full_path)) return false;
 
@@ -320,7 +320,7 @@ struct PackFileSystem : FileSystemImpl {
 
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		ASSERT(content.size() == 0);
-		Span<const char> basename = Path::getBasename(path.c_str());
+		StringView basename = Path::getBasename(path);
 		u64 hashu64;
 		fromCString(basename, hashu64);
 		FilePathHash hash = FilePathHash::fromU64(hashu64);

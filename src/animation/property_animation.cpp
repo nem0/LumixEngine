@@ -90,7 +90,7 @@ bool PropertyAnimation::load(Span<const u8> mem) {
 	lua_pushcclosure(L, fn, 1);
 	lua_setglobal(L, "curve");
 
-	return LuaWrapper::execute(L, Span((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);
+	return LuaWrapper::execute(L, StringView((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);
 }
 
 

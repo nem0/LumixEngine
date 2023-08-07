@@ -529,14 +529,14 @@ struct StudioAppImpl final : StudioApp
 		}
 		const char* rest = node->label + stringLength(parent.label);
 		if (parent.label[0] != '\0') ++rest; // include '/'
-		const char* slash = findSubstring(rest, "/");
+		const char* slash = findChar(rest, '/');
 		if (!slash)
 		{
 			insertAddCmpNodeOrdered(parent, node);
 			return;
 		}
 		auto* new_group = LUMIX_NEW(m_allocator, AddCmpTreeNode);
-		copyNString(Span(new_group->label), node->label, int(slash - node->label));
+		copyString(Span(new_group->label), StringView(node->label, u32(slash - node->label)));
 		insertAddCmpNodeOrdered(parent, new_group);
 		insertAddCmpNode(*new_group, node);
 	}
@@ -544,7 +544,7 @@ struct StudioAppImpl final : StudioApp
 	void registerComponent(const char* icon, ComponentType cmp_type, const char* label, ResourceType resource_type, const char* property) {
 		struct Plugin final : IAddComponentPlugin {
 			void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override {
-				const char* last = reverseFind(label, nullptr, '/');
+				const char* last = reverseFind(label, '/');
 				last = last && !from_filter ? last + 1 : label;
 				if (last[0] == ' ') ++last;
 				if (!ImGui::BeginMenu(last)) return;
@@ -611,7 +611,7 @@ struct StudioAppImpl final : StudioApp
 		{
 			void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override
 			{
-				const char* last = reverseFind(label, nullptr, '/');
+				const char* last = reverseFind(label, '/');
 				last = last && !from_filter ? last + 1 : label;
 				if (last[0] == ' ') ++last;
 				if (ImGui::MenuItem(last))
@@ -867,7 +867,7 @@ struct StudioAppImpl final : StudioApp
 				const u8* ptr = (const u8*)str.getData() + str.getPosition();
 				str.read(&header, sizeof(header));
 				u32 size;
-				fromCStringOctal(Span(header.size, sizeof(header.size)), size); 
+				fromCStringOctal(StringView(header.size, sizeof(header.size)), size); 
 				if (header.name[0] && (header.typeflag == 0 || header.typeflag == '0')) {
 					const Path path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[LUMIX_MAX_PATH];
@@ -1340,7 +1340,7 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		const char* last = reverseFind(node->label, nullptr, '/');
+		const char* last = reverseFind(node->label, '/');
 		last = last ? last + 1 : node->label;
 		if (last[0] == ' ') ++last;
 		if (ImGui::BeginMenu(last))
@@ -1669,7 +1669,7 @@ struct StudioAppImpl final : StudioApp
 			ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
 			if (selection_chain.length() > 0 && selection_chain[0] == entity) {
 				ImGui::SetNextItemOpen(true);
-				selection_chain = selection_chain.fromLeft(1);
+				selection_chain.removePrefix(1);
 				if (selection_chain.length() == 0) {
 					ImGui::SetScrollHereY();
 				}
@@ -2390,7 +2390,7 @@ struct StudioAppImpl final : StudioApp
 			char src[LUMIX_MAX_PATH];
 			parser.getCurrent(src, lengthOf(src));
 
-			bool is_full_path = findSubstring(src, ".") != nullptr;
+			bool is_full_path = contains(src, '.');
 			Lumix::ISystem* loaded_plugin;
 			if (is_full_path)
 			{
@@ -2511,7 +2511,7 @@ struct StudioAppImpl final : StudioApp
 				}
 				char tmp[64];
 				parser.getCurrent(tmp, sizeof(tmp));
-				fromCString(Span(tmp, (u32)strlen(tmp)), workers_count);
+				fromCString(tmp, workers_count);
 				return true;
 			}
 		}
@@ -2985,7 +2985,7 @@ struct StudioAppImpl final : StudioApp
 
 	static bool includeFileInExport(const char* filename) {
 		if (filename[0] == '.') return false;
-		if (compareStringN("bin/", filename, 4) == 0) return false;
+		if (startsWith(filename, "bin/")) return false;
 		if (equalStrings("main.pak", filename)) return false;
 		if (equalStrings("error.log", filename)) return false;
 		return true;
@@ -2993,7 +2993,7 @@ struct StudioAppImpl final : StudioApp
 
 	static bool includeDirInExport(const char* filename) {
 		if (filename[0] == '.') return false;
-		if (compareStringN("bin", filename, 4) == 0) return false;
+		if (startsWith(filename, "bin") == 0) return false;
 		return true;
 	}
 
@@ -3012,10 +3012,10 @@ struct StudioAppImpl final : StudioApp
 		while (os::getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
-			Span<const char> basename = Path::getBasename(info.filename);
+			StringView basename = Path::getBasename(info.filename);
 			ExportFileInfo rec;
 			u64 tmp_hash;
-			fromCString(Span(basename), tmp_hash);
+			fromCString(basename, tmp_hash);
 			rec.hash = FilePathHash::fromU64(tmp_hash);
 			rec.offset = 0;
 			const Path path(base_path, ".lumix/resources/", info.filename);

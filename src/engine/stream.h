@@ -3,16 +3,12 @@
 #include "array.h"
 #include "lumix.h"
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct LUMIX_ENGINE_API IOutputStream {
 	virtual bool write(const void* buffer, u64 size) = 0;
 
-	IOutputStream& operator << (Span<const char> str);
-	IOutputStream& operator << (const char* str);
+	IOutputStream& operator << (struct StringView str);
 	IOutputStream& operator << (u64 value);
 	IOutputStream& operator << (i64 value);
 	IOutputStream& operator << (i32 value);
@@ -23,7 +19,6 @@ struct LUMIX_ENGINE_API IOutputStream {
 	template <typename T> bool writeArray(const Array<T>& value);
 };
 
-
 struct LUMIX_ENGINE_API IInputStream {
 	virtual bool read(void* buffer, u64 size) = 0;
 	virtual const void* getBuffer() const = 0;
@@ -33,7 +28,6 @@ struct LUMIX_ENGINE_API IInputStream {
 	template <typename T> T read();
 	template <typename T> void readArray(Array<T>* array);
 };
-
 
 struct LUMIX_ENGINE_API OutputPagedStream final : IOutputStream {
 	friend struct InputPagedStream;
@@ -110,19 +104,6 @@ private:
 	IAllocator* m_allocator;
 };
 
-
-template <typename T> void OutputMemoryStream::write(const T& value)
-{
-	write(&value, sizeof(T));
-}
-
-template <> inline void OutputMemoryStream::write<bool>(const bool& value)
-{
-	u8 v = value;
-	write(&v, sizeof(v));
-}
-
-
 struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	InputMemoryStream(const void* data, u64 size);
 	InputMemoryStream(Span<const u8> data);
@@ -184,5 +165,15 @@ template <typename T> bool IOutputStream::write(const T& value)
 	return write(&value, sizeof(T));
 }
 
+template <typename T> void OutputMemoryStream::write(const T& value)
+{
+	write(&value, sizeof(T));
+}
+
+template <> inline void OutputMemoryStream::write<bool>(const bool& value)
+{
+	u8 v = value;
+	write(&v, sizeof(v));
+}
 
 } // namespace Lumix

@@ -63,12 +63,13 @@ bool pcall(lua_State* L, int nargs, int nres)
 
 
 bool execute(lua_State* L
-	, Span<const char> content
+	, StringView content
 	, const char* name
 	, int nresults)
 {
+	content.ensureEnd();
 	lua_pushcfunction(L, traceback);
-	if (luaL_loadbuffer(L, content.begin(), content.length(), name) != 0) {
+	if (luaL_loadbuffer(L, content.begin, content.size(), name) != 0) {
 		logError(name, ": ", lua_tostring(L, -1));
 		lua_pop(L, 2);
 		return false;

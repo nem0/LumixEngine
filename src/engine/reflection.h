@@ -174,6 +174,7 @@ template <> inline bool get(DynamicProperties::Value v) { return v.b; }
 template <> inline Vec3 get(DynamicProperties::Value v) { return v.v3; }
 
 template <typename T> inline void set(DynamicProperties::Value& v, T);
+template <> inline void set(DynamicProperties::Value& v, Path val) { v.s = val; }
 template <> inline void set(DynamicProperties::Value& v, float val) { v.f = val; }
 template <> inline void set(DynamicProperties::Value& v, i32 val) { v.i = val; }
 template <> inline void set(DynamicProperties::Value& v, const char* val) { v.s = val; }
@@ -292,14 +293,14 @@ static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 template <typename T>
 struct GetTypeNameHelper
 {
-	static Span<const char> GetTypeName()
+	static StringView GetTypeName()
 	{
 		#if defined(_MSC_VER) && !defined(__clang__)
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-			return Span<const char>(__FUNCTION__ + FRONT_SIZE, size - 1);
+			return StringView(__FUNCTION__ + FRONT_SIZE, size - 1);
 		#else
 			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-			return Span<const char>(__PRETTY_FUNCTION__ + FRONT_SIZE, size - 1);
+			return StringView(__PRETTY_FUNCTION__ + FRONT_SIZE, size - 1);
 		#endif
 	}
 };
@@ -316,7 +317,7 @@ const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
 }
 
 template <typename T>
-Span<const char> getTypeName()
+StringView getTypeName()
 {
 	return detail::GetTypeNameHelper<T>::GetTypeName();
 }
@@ -402,8 +403,8 @@ struct FunctionBase
 
 	virtual u32 getArgCount() const = 0;
 	virtual TypeDescriptor getReturnType() const = 0;
-	virtual Span<const char> getReturnTypeName() const = 0;
-	virtual Span<const char> getThisTypeName() const = 0;
+	virtual StringView getReturnTypeName() const = 0;
+	virtual StringView getThisTypeName() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual Variant invoke(void* obj, Span<Variant> args) const = 0;
 	virtual bool isConstMethod() = 0;
@@ -454,7 +455,7 @@ struct EventBase {
 
 	virtual ~EventBase() {}
 	virtual u32 getArgCount() const = 0;
-	virtual Span<const char> getThisTypeName() const = 0;
+	virtual StringView getThisTypeName() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void bind(void* object, Callback* callback) const = 0;
 
@@ -470,7 +471,7 @@ struct Event<DelegateList<void (Args...)>& (C::*)()> : EventBase
 	F function;
 
 	u32 getArgCount() const override { return sizeof...(Args); }
-	Span<const char> getThisTypeName() const override { return getTypeName<C>(); }
+	StringView getThisTypeName() const override { return getTypeName<C>(); }
 
 	TypeDescriptor getArgType(int i) const override
 	{
@@ -511,8 +512,8 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 
 	u32 getArgCount() const override { return sizeof...(Args); }
 	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	Span<const char> getReturnTypeName() const override { return getTypeName<R>(); }
-	Span<const char> getThisTypeName() const override { return getTypeName<C>(); }
+	StringView getReturnTypeName() const override { return getTypeName<R>(); }
+	StringView getThisTypeName() const override { return getTypeName<C>(); }
 	bool isConstMethod() override { return false; }
 	
 	TypeDescriptor getArgType(int i) const override
@@ -538,8 +539,8 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 
 	u32 getArgCount() const override { return sizeof...(Args); }
 	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	Span<const char> getReturnTypeName() const override { return getTypeName<R>(); }
-	Span<const char> getThisTypeName() const override { return getTypeName<C>(); }
+	StringView getReturnTypeName() const override { return getTypeName<R>(); }
+	StringView getThisTypeName() const override { return getTypeName<C>(); }
 	bool isConstMethod() override { return true; }
 	
 	TypeDescriptor getArgType(int i) const override

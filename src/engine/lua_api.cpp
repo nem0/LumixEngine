@@ -954,7 +954,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 
 	#define TO_STR_HELPER(x) #x
 	#define TO_STR(x) TO_STR_HELPER(x)
-	if (!LuaWrapper::execute(L, Span(entity_src, stringLength(entity_src)), __FILE__ "(" TO_STR(__LINE__) ")", 0)) {
+	if (!LuaWrapper::execute(L, entity_src, __FILE__ "(" TO_STR(__LINE__) ")", 0)) {
 		logError("Failed to init entity api");
 	}
 

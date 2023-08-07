@@ -191,7 +191,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 
 						void set(ComponentUID cmp, u32 array_index, Path value) const override {
 							reflection::DynamicProperties::Value v;
-							reflection::set(v, value.c_str());
+							reflection::set(v, value);
 							prop->set(cmp, array_index, index, v);
 						}
 
@@ -527,7 +527,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ComponentUID cmp = getComponent();
 		const Path p = prop.get(cmp, m_index);
 		char tmp[LUMIX_MAX_PATH];
-		copyString(tmp, p.c_str());
+		copyString(tmp, p);
 
 		Attributes attrs = getAttributes(prop);
 		if (attrs.no_ui) return;
@@ -871,7 +871,7 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 		return;
 	}
 
-	const char* last = reverseFind(node->label, nullptr, '/');
+	const char* last = reverseFind(node->label, '/');
 	if (ImGui::BeginMenu(last ? last + 1 : node->label))
 	{
 		showAddComponentNode(node->child, filter, parent, editor);

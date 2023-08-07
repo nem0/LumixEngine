@@ -11,15 +11,15 @@ namespace Lumix {
 namespace os { enum class Keycode : u8; }
 
 struct LUMIX_EDITOR_API ResourceLocator {
-	ResourceLocator(const Span<const char>& path);
+	ResourceLocator(StringView path);
 
-	Span<const char> subresource;
-	Span<const char> dir;
-	Span<const char> basename;
-	Span<const char> ext;
-	Span<const char> resource;
+	StringView subresource;
+	StringView dir;
+	StringView basename;
+	StringView ext;
+	StringView resource;
 
-	Span<const char> full;
+	StringView full;
 };
 
 
@@ -134,7 +134,7 @@ struct DirSelector {
 
 private:
 	void fillSubitems();
-	bool breadcrumb(Span<const char> path);
+	bool breadcrumb(StringView path);
 
 	StudioApp& m_app;
 	String m_current_dir;
@@ -154,7 +154,7 @@ struct FileSelector {
 	String m_current_dir;
 
 private:
-	bool breadcrumb(Span<const char> path);
+	bool breadcrumb(StringView path);
 	void fillSubitems();
 
 	StudioApp& m_app;

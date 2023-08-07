@@ -18,45 +18,45 @@ namespace Lumix
 {
 
 
-ResourceLocator::ResourceLocator(const Span<const char>& path)
-{
+ResourceLocator::ResourceLocator(StringView path) {
+	path.ensureEnd();
 	full = path;
-	const char* c = path.m_begin;
-	subresource.m_begin = c;
-	while(c != path.m_end && *c != ':') {
+	const char* c = path.begin;
+	subresource.begin = c;
+	while(c != path.end && *c != ':') {
 		++c;
 	}
-	if(c != path.m_end) {
-		subresource.m_end = c;
-		dir.m_begin = c + 1;
+	if(c != path.end) {
+		subresource.end = c;
+		dir.begin = c + 1;
 	}
 	else {
-		subresource.m_end = subresource.m_begin;
-		dir.m_begin = path.m_begin;
+		subresource.end = subresource.begin;
+		dir.begin = path.begin;
 	}
 	
-	ext.m_end = path.m_end;
-	ext.m_begin = reverseFind(dir.m_begin, ext.m_end, '.');
-	if (ext.m_begin) {
-		basename.m_end = ext.m_begin;
-		++ext.m_begin;
+	ext.end = path.end;
+	ext.begin = reverseFind(StringView(dir.begin, ext.end), '.');
+	if (ext.begin) {
+		basename.end = ext.begin;
+		++ext.begin;
 	}
 	else {
-		ext.m_begin = ext.m_end;
-		basename.m_end = path.m_end;
+		ext.begin = ext.end;
+		basename.end = path.end;
 	}
-	basename.m_begin = reverseFind(dir.m_begin, basename.m_end, '/');
-	if (!basename.m_begin) basename.m_begin = reverseFind(dir.m_begin, basename.m_end, '\\');
-	if (basename.m_begin)  {
-		dir.m_end = basename.m_begin;
-		++basename.m_begin;
+	basename.begin = reverseFind(StringView(dir.begin, basename.end), '/');
+	if (!basename.begin) basename.begin = reverseFind(StringView(dir.begin, basename.end), '\\');
+	if (basename.begin)  {
+		dir.end = basename.begin;
+		++basename.begin;
 	}
 	else {
-		basename.m_begin = dir.m_begin;
-		dir.m_end = dir.m_begin;
+		basename.begin = dir.begin;
+		dir.end = dir.begin;
 	}
-	resource.m_begin = dir.m_begin;
-	resource.m_end = ext.m_end;
+	resource.begin = dir.begin;
+	resource.end = ext.end;
 }
 
 Action::Action() {
@@ -185,12 +185,12 @@ void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, Enti
 			const char* c = path.c_str();
 			while (*c && *c != ':') ++c;
 			if (*c == ':') {
-				copyNString(buf, path.c_str(), int(c - path.c_str() + 1));
+				copyString(buf, StringView(path.c_str(), u32(c - path.c_str() + 1)));
 				return;
 			}
 
-			copyString(buf, path.c_str());
-			Span<const char> basename = Path::getBasename(path.c_str());
+			copyString(buf, path);
+			StringView basename = Path::getBasename(path);
 			if (name && name[0] != '\0')
 				copyString(buf, name);
 			else
@@ -310,8 +310,8 @@ void FileSelector::fillSubitems() {
 }
 
 
-bool FileSelector::breadcrumb(Span<const char> path) {
-	if (path.length() == 0) {
+bool FileSelector::breadcrumb(StringView path) {
+	if (path.empty()) {
 		if (ImGui::Button(".")) {
 			m_current_dir = "";
 			fillSubitems();
@@ -319,10 +319,12 @@ bool FileSelector::breadcrumb(Span<const char> path) {
 		}
 		return false;
 	}
-	if (path.back() == '/') path = path.fromRight(1);
+
+	path.ensureEnd();
+	if (path.back() == '/') path.removeSuffix(1);
 	
-	Span<const char> dir = Path::getDir(path);
-	Span<const char> basename = Path::getBasename(path);
+	StringView dir = Path::getDir(path);
+	StringView basename = Path::getBasename(path);
 	if (breadcrumb(dir)) return true;
 	ImGui::SameLine();
 	ImGui::TextUnformatted("/");
@@ -377,8 +379,8 @@ void DirSelector::fillSubitems() {
 	os::destroyFileIterator(iter);
 }
 
-bool DirSelector::breadcrumb(Span<const char> path) {
-	if (path.length() == 0) {
+bool DirSelector::breadcrumb(StringView path) {
+	if (path.empty()) {
 		if (ImGui::Button(".")) {
 			m_current_dir = "";
 			fillSubitems();
@@ -386,10 +388,11 @@ bool DirSelector::breadcrumb(Span<const char> path) {
 		}
 		return false;
 	}
-	if (path.back() == '/') path = path.fromRight(1);
+	path.ensureEnd();
+	if (path.back() == '/') path.removeSuffix(1);
 	
-	Span<const char> dir = Path::getDir(path);
-	Span<const char> basename = Path::getBasename(path);
+	StringView dir = Path::getDir(path);
+	StringView basename = Path::getBasename(path);
 	if (breadcrumb(dir)) return true;
 	ImGui::SameLine();
 	ImGui::TextUnformatted("/");
@@ -418,12 +421,12 @@ bool DirSelector::gui(const char* label, bool* open) {
 			m_new_folder_name[0] = '\0';
 			recently_open_create_folder = true;
 		}
-		breadcrumb(Span(m_current_dir.c_str(), m_current_dir.length()));
+		breadcrumb(m_current_dir);
 		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
 			if (m_current_dir.length() > 0) {
 				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
-					Span<const char> dir = Path::getDir(m_current_dir.c_str());
-					if (dir.length() > 0) dir = dir.fromRight(1);
+					StringView dir = Path::getDir(m_current_dir.c_str());
+					if (!dir.empty()) dir.removeSuffix(1);
 					m_current_dir = String(dir, m_app.getAllocator());
 					fillSubitems();
 				}
@@ -486,8 +489,7 @@ FileSelector::FileSelector(StudioApp& app)
 {}
 
 const char* FileSelector::getPath() {
-	Span<const char> span(m_full_path.c_str(), m_full_path.length());
-	if (Path::getExtension(span).length() == 0) m_full_path.cat(".").cat(m_accepted_extension.c_str());
+	if (Path::getExtension(m_full_path).empty()) m_full_path.cat(".").cat(m_accepted_extension.c_str());
 	return m_full_path.c_str();
 }
 
@@ -497,13 +499,13 @@ bool FileSelector::gui(bool show_breadcrumbs) {
 	bool changed = inputString("##fn", &m_filename);
 	
 	if (show_breadcrumbs) {
-		changed = breadcrumb(Span(m_current_dir.c_str(), m_current_dir.length())) || changed;
+		changed = breadcrumb(m_current_dir) || changed;
 	}
 	if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
 		if (m_current_dir.length() > 0) {
 			if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
-				Span<const char> dir = Path::getDir(m_current_dir.c_str());
-				if (dir.length() > 0) dir = dir.fromRight(1);
+				StringView dir = Path::getDir(m_current_dir.c_str());
+				if (!dir.empty()) dir.removeSuffix(1);
 				m_current_dir = String(dir, m_app.getAllocator());
 				fillSubitems();
 				changed = true;

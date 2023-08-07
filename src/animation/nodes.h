@@ -42,7 +42,8 @@ struct Node {
 		BLEND1D,
 		LAYERS,
 		CONDITION,
-		NONE
+		NONE,
+		SELECT
 	};
 
 	Node(Node* parent, IAllocator& allocator) 
@@ -69,6 +70,39 @@ struct Node {
 	Node* m_parent;
 	String m_name;
 	OutputMemoryStream m_events;
+};
+
+struct SelectNode final : Node {
+	struct RuntimeData {
+		u32 from;
+		u32 to;
+		Time t;
+	};
+
+	SelectNode(Node* parent, IAllocator& allocator);
+	~SelectNode();
+
+	Type type() const override { return SELECT; }
+	
+	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void enter(RuntimeContext& ctx) const override;
+	void skip(RuntimeContext& ctx) const override;
+	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
+	u32 getChildIndex(float input_val) const;
+
+	struct Child {
+		float max_value = 0;
+		Node* node = nullptr;
+	};
+
+	IAllocator& m_allocator;
+	Array<Child> m_children;
+	u32 m_input_index = 0;
+	Time m_blend_length = Time::fromSeconds(0.3f);
 };
 
 struct AnimationNode final : Node {

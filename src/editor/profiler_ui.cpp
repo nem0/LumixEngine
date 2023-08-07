@@ -656,7 +656,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 				size_t sum = 0;
 				for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
-					if (m_resource_filter[0] != '\0' && stristr(iter.value()->getPath().c_str(), m_resource_filter) == nullptr) continue;
+					if (m_resource_filter[0] != '\0' && stristr(iter.value()->getPath(), m_resource_filter) == nullptr) continue;
 					if (m_resource_size_filter > iter.value()->size() / 1000) continue;
 				
 					ImGui::TableNextColumn();

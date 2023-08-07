@@ -158,8 +158,7 @@ struct InputSystemImpl final : InputSystem
 	}
 
 
-	int getEventsCount() const override { return m_events.size(); }
-	const Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
+	Span<const Event> getEvents() const override { return m_events; }
 
 	int getDevicesCount() const override { return m_devices.size(); }
 	Device* getDevice(int index) override { return m_devices[index]; }

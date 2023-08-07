@@ -1,14 +1,15 @@
 #pragma once
 
 #include "engine/hash.h"
+#include "engine/string.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
-struct LUMIX_ENGINE_API PathInfo
-{
-	explicit PathInfo(const char* path);
+struct StringView;
+
+struct LUMIX_ENGINE_API PathInfo {
+	explicit PathInfo(StringView path);
 
 	char m_extension[10];
 	char m_basename[LUMIX_MAX_PATH];
@@ -16,20 +17,17 @@ struct LUMIX_ENGINE_API PathInfo
 };
 
 struct LUMIX_ENGINE_API Path {
-	static void normalize(const char* path, Span<char> out);
-	static Span<const char> getDir(const char* src);
-	static Span<const char> getDir(Span<const char> src);
-	static Span<const char> getBasename(const char* src);
-	static Span<const char> getBasename(Span<const char> src);
-	static Span<const char> getExtension(const char* src);
-	static Span<const char> getExtension(Span<const char> src);
-	static Span<const char> getSubresource(const char* str);
-	static bool hasExtension(const char* filename, const char* ext);
+	static void normalize(StringView path, Span<char> out);
+	static StringView getDir(StringView src);
+	static StringView getBasename(StringView src);
+	static StringView getExtension(StringView src);
+	static StringView getSubresource(StringView str);
+	static bool hasExtension(StringView filename, StringView ext);
 	static bool replaceExtension(char* path, const char* ext);
-	static bool isSame(Span<const char> a, Span<const char> b);
+	static bool isSame(StringView a, StringView b);
 
 	Path();
-	explicit Path(const char* path);
+	explicit Path(StringView path);
 	template <typename... Args> explicit Path(Args... args);
 
 	void operator=(const char* rhs);
@@ -45,11 +43,11 @@ struct LUMIX_ENGINE_API Path {
 	const char* c_str() const { return m_path; }
 	bool isEmpty() const { return m_path[0] == '\0'; }
 	static u32 capacity() { return LUMIX_MAX_PATH; }
-	operator Span<const char>() const;
+	operator StringView() const;
 	operator const char*() const;
 
 private:
-	void add(const char*);
+	void add(StringView);
 	void add(StableHash hash);
 	void add(u64 value);
 

@@ -175,14 +175,14 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (fs.open(".lumix/resources/_list.txt_tmp", file)) {
 			file << "resources = {\n";
 			for (const ResourceItem& ri : m_resources) {
-				file << "\"" << ri.path.c_str() << "\",\n";
+				file << "\"" << ri.path << "\",\n";
 			}
 			file << "}\n\n";
 			file << "dependencies = {\n";
 			for (auto iter = m_dependencies.begin(), end = m_dependencies.end(); iter != end; ++iter) {
-				file << "\t[\"" << iter.key().c_str() << "\"] = {\n";
+				file << "\t[\"" << iter.key() << "\"] = {\n";
 				for (const Path& p : iter.value()) {
-					file << "\t\t\"" << p.c_str() << "\",\n";
+					file << "\t\t\"" << p << "\",\n";
 				}
 				file << "\t},\n";
 			}
@@ -279,11 +279,10 @@ struct AssetCompilerImpl : AssetCompiler {
 		char tmp[LUMIX_MAX_PATH];
 		copyString(Span(tmp), Path::getDir(getResourceFilePath(path)));
 		makeLowercase(Span(tmp), tmp);
-		Span<const char> dir(tmp, stringLength(tmp));
-		if (dir.m_end > dir.m_begin && (*(dir.m_end - 1) == '\\' || *(dir.m_end - 1) == '/')) {
-			--dir.m_end;
-		} 
-		return RuntimeHash(dir.begin(), dir.length());
+		StringView dir(tmp);
+		dir.ensureEnd();
+		if (!dir.empty() && (dir.back() == '\\' || dir.back() == '/')) dir.removeSuffix(1);
+		return RuntimeHash(dir.begin, dir.size());
 	}
 
 	void addResource(ResourceType type, const char* path) override {
@@ -301,8 +300,8 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	ResourceType getResourceType(const char* path) const override
 	{
-		const Span<const char> subres = Path::getSubresource(path);
-		Span<const char> ext = Path::getExtension(subres);
+		StringView subres = Path::getSubresource(path);
+		StringView ext = Path::getExtension(subres);
 
 		alignas(u32) char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);
@@ -337,7 +336,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void addResource(const char* fullpath) {
 		char ext[10];
-		copyString(Span(ext), Path::getExtension(Span(fullpath, stringLength(fullpath))));
+		copyString(Span(ext), Path::getExtension(fullpath));
 		makeLowercase(Span(ext), ext);
 		
 		auto iter = m_plugins.find(RuntimeHash(ext));
@@ -430,7 +429,7 @@ struct AssetCompilerImpl : AssetCompiler {
 							}
 						#else
 							if (type.isValid()) {
-								ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
+								ResourceLocator locator{p};
 								char tmp[LUMIX_MAX_PATH];
 								copyString(Span(tmp), locator.resource);
 								if (fs.fileExists(tmp)) {
@@ -520,7 +519,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (!fs.getContentSync(meta_path, buf)) return nullptr;
 
 		lua_State* L = luaL_newstate();
-		if (!LuaWrapper::execute(L, Span((const char*)buf.data(), (u32)buf.size()), meta_path, 0)) {
+		if (!LuaWrapper::execute(L, StringView((const char*)buf.data(), (u32)buf.size()), meta_path, 0)) {
 			lua_close(L);
 			return nullptr;
 		}
@@ -529,7 +528,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void updateMeta(const Path& res, Span<const u8> data) const override {
-		const Path meta_path(res.c_str(), ".meta");
+		const Path meta_path(res, ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.saveContentSync(meta_path, data)) {
@@ -538,7 +537,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	IPlugin* getPlugin(const Path& path) {
-		Span<const char> ext = Path::getExtension(Span(path.c_str(), path.length()));
+		StringView ext = Path::getExtension(path);
 		char tmp[64];
 		copyString(Span(tmp), ext);
 		makeLowercase(Span(tmp), tmp);
@@ -684,7 +683,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			MutexGuard lock(m_compiled_mutex);
 			// reload/continue loading resource and its subresources
 			for (const ResourceItem& ri : m_resources) {
-				if (!endsWithInsensitive(ri.path.c_str(), job.path.c_str())) continue;;
+				if (!endsWithInsensitive(ri.path, job.path)) continue;;
 				
 				Resource* r = getResource(ri.path);
 				if (r && (r->isReady() || r->isFailure())) r->getResourceManager().reload(*r);
@@ -717,7 +716,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
 				const Path list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
 				const u64 list_last_modified = os::getLastModified(list_path);
-				const Path fullpath(fs.getBasePath(), path_obj.c_str());
+				const Path fullpath(fs.getBasePath(), path_obj);
 				if (os::dirExists(fullpath)) {
 					processDir(path_obj.c_str(), list_last_modified);
 					m_on_list_changed.invoke(path_obj);
@@ -725,7 +724,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				else {
 					jobs::MutexGuard lock(m_resources_mutex);
 					m_resources.eraseIf([&](const ResourceItem& ri){
-						if (!startsWith(ri.path.c_str(), path_obj.c_str())) return false;
+						if (!startsWith(ri.path, path_obj)) return false;
 						return true;
 					});
 					m_on_list_changed.invoke(path_obj);
@@ -746,7 +745,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (Path::hasExtension(path_obj.c_str(), "meta")) {
 				char tmp[LUMIX_MAX_PATH];
-				copyNString(Span(tmp), path_obj.c_str(), path_obj.length() - 5);
+				copyString(Span(tmp), StringView(path_obj.c_str(), path_obj.length() - 5));
 				path_obj = tmp;
 			}
 
@@ -765,7 +764,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				}
 			}
 			else {
-				Span<const char> ext = Path::getExtension(path_obj.c_str());
+				StringView ext = Path::getExtension(path_obj.c_str());
 
 				auto dep_iter = m_dependencies.find(path_obj);
 				if (dep_iter.isValid()) {

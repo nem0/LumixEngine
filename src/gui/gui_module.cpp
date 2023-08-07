@@ -813,20 +813,15 @@ struct GUIModuleImpl final : GUIModule {
 	void handleInput()
 	{
 		InputSystem& input = m_system.getEngine().getInputSystem();
-		const InputSystem::Event* events = input.getEvents();
-		int events_count = input.getEventsCount();
+		Span<const InputSystem::Event> events = input.getEvents();
 		static Vec2 old_pos = {0, 0};
-		for (int i = 0; i < events_count; ++i)
-		{
-			const InputSystem::Event& event = events[i];
-			switch (event.type)
-			{
+		for (const InputSystem::Event& event : events) {
+			switch (event.type) {
 				case InputSystem::Event::TEXT_INPUT:
 					handleTextInput(event);
 					break;
 				case InputSystem::Event::AXIS:
-					if (event.device->type == InputSystem::Device::MOUSE)
-					{
+					if (event.device->type == InputSystem::Device::MOUSE) {
 						Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 						m_cursor_pos = IVec2((i32)pos.x, (i32)pos.y);
 						for (const GUICanvas& canvas : m_canvas) {
@@ -840,11 +835,9 @@ struct GUIModuleImpl final : GUIModule {
 					}
 					break;
 				case InputSystem::Event::BUTTON:
-					if (event.device->type == InputSystem::Device::MOUSE)
-					{
+					if (event.device->type == InputSystem::Device::MOUSE) {
 						if (event.data.button.key_id != (u32)os::MouseButton::LEFT) break;
-						if (event.data.button.down)
-						{
+						if (event.data.button.down) {
 							m_mouse_down_pos.x = event.data.button.x;
 							m_mouse_down_pos.y = event.data.button.y;
 						}
@@ -862,8 +855,7 @@ struct GUIModuleImpl final : GUIModule {
 						}
 						if (!event.data.button.down) m_buttons_down_count = 0;
 					}
-					else if (event.device->type == InputSystem::Device::KEYBOARD)
-					{
+					else if (event.device->type == InputSystem::Device::KEYBOARD) {
 						handleKeyboardButtonEvent(event);
 					}
 					break;

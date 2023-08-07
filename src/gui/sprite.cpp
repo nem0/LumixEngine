@@ -126,7 +126,7 @@ bool Sprite::load(Span<const u8> mem) {
 
 	#undef DEFINE_LUA_FUNC
 
-	bool res = LuaWrapper::execute(L, Span((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);
+	bool res = LuaWrapper::execute(L, StringView((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);
 	lua_close(L);
 
 	return res;

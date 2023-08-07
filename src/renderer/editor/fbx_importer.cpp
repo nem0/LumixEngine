@@ -822,7 +822,7 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 	lod_str += stringLength("_LOD");
 
 	int lod;
-	fromCString(Span(lod_str, stringLength(lod_str)), lod);
+	fromCString(lod_str, lod);
 
 	return lod;
 }

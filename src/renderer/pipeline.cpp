@@ -363,7 +363,7 @@ void PipelineResource::unload()
 
 
 bool PipelineResource::load(Span<const u8> mem) {
-	content = Span((const char*)mem.begin(), mem.length());
+	content = StringView((const char*)mem.begin(), mem.length());
 	return true;
 }
 

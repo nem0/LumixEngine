@@ -5,24 +5,15 @@
 
 namespace Lumix
 {
-	
-bool isLetter(char c)
-{
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+
+static char toLower(char c) {
+	if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
+	return c;
 }
 
-
-bool isNumeric(char c)
-{
-	return c >= '0' && c <= '9';
-}
-
-
-bool isUpperCase(char c)
-{
-	return c >= 'A' && c <= 'Z';
-}
-
+bool isLetter(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+bool isNumeric(char c) { return c >= '0' && c <= '9'; }
+bool isUpperCase(char c) { return c >= 'A' && c <= 'Z'; }
 
 String::String(IAllocator& allocator)
 	: m_allocator(allocator)
@@ -36,12 +27,12 @@ String::String(const String& rhs, u32 start, u32 length)
 	: m_allocator(rhs.m_allocator)
 {
 	m_size = 0;
-	*this = Span(rhs.c_str() + start, length);
+	*this = StringView(rhs.c_str() + start, length);
 }
 
 
 
-String::String(Span<const char> rhs, IAllocator& allocator)
+String::String(StringView rhs, IAllocator& allocator)
 	: m_allocator(allocator)
 {
 	m_size = 0;
@@ -53,7 +44,7 @@ String::String(const String& rhs)
 	: m_allocator(rhs.m_allocator)
 {
 	m_size = 0;
-	*this = Span(rhs.c_str(), rhs.length());
+	*this = rhs;
 }
 
 
@@ -93,20 +84,6 @@ void String::operator=(String&& rhs)
 }
 
 
-String::String(const char* rhs, IAllocator& allocator)
-	: m_allocator(allocator)
-{
-	m_size = stringLength(rhs);
-	if (isSmall()) {
-		memcpy(m_small, rhs, m_size + 1);
-	}
-	else {
-		m_big = (char*)m_allocator.allocate(m_size + 1);
-		memcpy(m_big, rhs, m_size + 1);
-	}
-}
-
-
 String::~String() { if (!isSmall()) m_allocator.deallocate(m_big); }
 
 
@@ -121,69 +98,63 @@ void String::operator=(const String& rhs)
 {
 	if (&rhs == this) return;
 
-	*this = Span(rhs.c_str(), rhs.length());
+	*this = StringView{rhs};
 }
 
-void String::operator=(Span<const char> rhs)
-{
+void String::operator=(StringView rhs) {
+	rhs.ensureEnd();
 	if (!isSmall()) {
-		ASSERT(rhs.begin() > m_big + m_size || rhs.end() < m_big);
+		ASSERT(rhs.begin > m_big + m_size || rhs.end < m_big);
 		m_allocator.deallocate(m_big);
 	}
 		
-	if (rhs.length() < sizeof(m_small)) {
-		ASSERT(rhs.begin() > m_small + m_size || rhs.end() < m_small);
-		memcpy(m_small, rhs.m_begin, rhs.length());
-		m_small[rhs.length()] = '\0';
+	if (rhs.size() < sizeof(m_small)) {
+		ASSERT(rhs.begin > m_small + m_size || rhs.end < m_small);
+		memcpy(m_small, rhs.begin, rhs.size());
+		m_small[rhs.size()] = '\0';
 	}
 	else {
-		m_big = (char*)m_allocator.allocate(rhs.length() + 1);
-		memcpy(m_big, rhs.m_begin, rhs.length());
-		m_big[rhs.length()] = '\0';
+		m_big = (char*)m_allocator.allocate(rhs.size() + 1);
+		memcpy(m_big, rhs.begin, rhs.size());
+		m_big[rhs.size()] = '\0';
 	}
-	m_size = rhs.length();
-}
-
-
-void String::operator=(const char* rhs)
-{
-	*this = Span(rhs, stringLength(rhs));
+	m_size = rhs.size();
 }
 
 
 bool String::operator!=(const String& rhs) const
 {
-	return compareString(c_str(), rhs.c_str()) != 0;
+	return !equalStrings(*this, rhs);
 }
 
 
 bool String::operator!=(const char* rhs) const
 {
-	return compareString(c_str(), rhs) != 0;
+	return !equalStrings(*this, rhs);
 }
 
 
 bool String::operator==(const String& rhs) const
 {
-	return compareString(c_str(), rhs.c_str()) == 0;
+	return equalStrings(*this, rhs);
 }
 
 
 bool String::operator==(const char* rhs) const
 {
-	return compareString(c_str(), rhs) == 0;
+	return equalStrings(*this, rhs);
 }
 
 
 bool String::operator<(const String& rhs) const
 {
-	return compareString(c_str(), rhs.c_str()) < 0;
+	return compareString(*this, rhs) < 0;
 }
 
 
 bool String::operator>(const String& rhs) const
 {
-	return compareString(c_str(), rhs.c_str()) > 0;
+	return compareString(*this, rhs) > 0;
 }
 
 
@@ -221,14 +192,14 @@ void String::resize(u32 size) {
 }
 
 
-String& String::cat(Span<const char> value)
-{
-	ASSERT(value.begin() < c_str() || value.begin() >= c_str() + m_size);
+String& String::cat(StringView value) {
+	value.ensureEnd();
+	ASSERT(value.begin < c_str() || value.begin >= c_str() + m_size);
 
 	const int old_s = m_size;
-	resize(m_size + value.length());
-	memcpy(getData() + old_s, value.m_begin, value.length());
-	getData()[old_s + value.length()] = '\0';
+	resize(m_size + value.size());
+	memcpy(getData() + old_s, value.begin, value.size());
+	getData()[old_s + value.size()] = '\0';
 	return *this;
 }
 
@@ -286,95 +257,107 @@ String& String::cat(const char* rhs)
 	return *this;
 }
 
-
-static char makeLowercase(char c)
-{
+static char makeLowercase(char c) {
 	return c >= 'A' && c <= 'Z' ? c - ('A' - 'a') : c;
 }
 
+int compareString(StringView lhs, StringView rhs) {
+	const char* a = lhs.begin;
+	const char* b = rhs.begin;
 
-int compareMemory(const void* lhs, const void* rhs, size_t size)
-{
-	return memcmp(lhs, rhs, size);
+	if (!lhs.end && !rhs.end) {
+		while (*a && *a == *b) {
+			++a;
+			++b;
+		}
+		return i32(*a) - i32(*b);
+	}
+
+	lhs.ensureEnd();
+	rhs.ensureEnd();
+
+	while (a != lhs.end && b != lhs.end && *a == *b) {
+		++a;
+		++b;
+	}
+
+	i32 ac = a == lhs.end ? 0 : *a;
+	i32 bc = b == rhs.end ? 0 : *b;
+
+	return ac - bc;
 }
 
+bool equalStrings(StringView lhs, StringView rhs) {
+	if (!lhs.end && !rhs.end) return strcmp(lhs.begin, rhs.begin) == 0;
+	
+	if (lhs.end && rhs.end) {
+		if (rhs.size() != lhs.size()) return false;
+		return strncmp(lhs.begin, rhs.begin, lhs.size()) == 0;
+	}
 
-int compareStringN(const char* lhs, const char* rhs, int length)
-{
-	return strncmp(lhs, rhs, length);
+	if (!lhs.end) {
+		StringView tmp = lhs;
+		lhs = rhs;
+		rhs = tmp;
+	}
+
+	ASSERT(lhs.end);
+	const char* a = lhs.begin;
+	const char* b = rhs.begin;
+	while (a != lhs.end && *b) {
+		++a;
+		++b;
+	}
+	return a == lhs.end && !*b;
 }
 
+bool equalIStrings(StringView lhs, StringView rhs) {
+	if (!lhs.end && !rhs.end) {
+		#ifdef _WIN32
+			return _stricmp(lhs.begin, rhs.begin) == 0;
+		#else
+			return strcasecmp(lhs.begin, rhs.begin) == 0;
+		#endif
+	}
 
-int compareIStringN(const char* lhs, const char* rhs, int length)
-{
-#ifdef _WIN32
-	return _strnicmp(lhs, rhs, length);
-#else
-	return strncasecmp(lhs, rhs, length);
-#endif
+	lhs.ensureEnd();
+	rhs.ensureEnd();
+	if (lhs.size() != rhs.size()) return false;
+
+	for (u32 i = 0, c = lhs.size(); i < c; ++i) {
+		if (toLower(lhs[i]) != toLower(rhs[i])) return false;
+	}
+	return true;
 }
-
-
-int compareString(const char* lhs, const char* rhs)
-{
-	return strcmp(lhs, rhs);
-}
-
-
-bool equalStrings(const char* lhs, const char* rhs)
-{
-	return strcmp(lhs, rhs) == 0;
-}
-
-bool equalStrings(Span<const char> lhs, Span<const char> rhs)
-{
-	if (rhs.length() != lhs.length()) return false;
-	return strncmp(lhs.begin(), rhs.begin(), lhs.length()) == 0;
-}
-
-
-bool equalIStrings(const char* lhs, const char* rhs)
-{
-#ifdef _WIN32
-	return _stricmp(lhs, rhs) == 0;
-#else
-	return strcasecmp(lhs, rhs) == 0;
-#endif
-}
-
-bool equalIStrings(Span<const char> lhs, const char* rhs)
-{
-#ifdef _WIN32
-	return _strnicmp(lhs.begin(), rhs, lhs.length()) == 0 && strlen(rhs) == lhs.length();
-#else
-	return strncasecmp(lhs.begin(), rhs, lhs.length()) == 0 && strlen(rhs) == lhs.length();
-#endif
-}
-
 
 int stringLength(const char* str)
 {
 	return (int)strlen(str);
 }
 
-bool endsWithInsensitive(const char* str, const char* substr)
-{
-	int len = stringLength(str);
-	int len2 = stringLength(substr);
-	if (len2 > len) return false;
-	return equalIStrings(str + len - len2, substr);
-}
-bool endsWith(const char* str, const char* substr)
-{
-	int len = stringLength(str);
-	int len2 = stringLength(substr);
-	if (len2 > len) return false;
-	return equalStrings(str + len - len2, substr);
+bool endsWithInsensitive(StringView str, StringView suffix) {
+	str.ensureEnd();
+	suffix.ensureEnd();
+	if (str.size() > suffix.size()) return false;
+	return equalIStrings(str.end - suffix.size(), suffix);
 }
 
-bool contains(const char* haystack, char needle)
-{
-	const char* c = haystack;
+bool endsWith(StringView str, StringView suffix) {
+	str.ensureEnd();
+	suffix.ensureEnd();
+	if (str.size() > suffix.size()) return false;
+	return equalStrings(str.end - suffix.size(), suffix);
+}
+
+bool contains(StringView haystack, char needle) {
+	const char* c = haystack.begin;
+	if (haystack.end) {
+		while (c != haystack.end) {
+			if (*c == needle) return true;
+			++c;
+		}
+		return false;
+	}
 	while (*c) {
 		if (*c == needle) return true;
 		++c;
@@ -382,35 +365,52 @@ bool contains(const char* haystack, char needle)
 	return false;
 }
 
-const char* stristr(const char* haystack, const char* needle)
-{
-	const char* c = haystack;
-	while (*c)
-	{
-		if (makeLowercase(*c) == makeLowercase(needle[0]))
-		{
-			const char* n = needle + 1;
+const char* stristr(StringView haystack, StringView needle) {
+	ASSERT(!needle.empty());
+
+	needle.ensureEnd();
+
+	const char* c = haystack.begin;
+	if (haystack.end) {
+		while (c != haystack.end) {
+			if (makeLowercase(*c) == makeLowercase(needle[0])) {
+				const char* n = needle.begin + 1;
+				const char* c2 = c + 1;
+				while (n != needle.end && c2 != haystack.end) {
+					if (makeLowercase(*n) != makeLowercase(*c2)) break;
+					++n;
+					++c2;
+				}
+				if (n == needle.end) return c;
+			}
+			++c;
+		}
+		return nullptr;
+	}
+	
+	while (*c) {
+		if (makeLowercase(*c) == makeLowercase(needle[0])) {
+			const char* n = needle.begin + 1;
 			const char* c2 = c + 1;
-			while (*n && *c2)
-			{
+			while (n != needle.end && *c2) {
 				if (makeLowercase(*n) != makeLowercase(*c2)) break;
 				++n;
 				++c2;
 			}
-			if (*n == 0) return c;
+			if (n == needle.end) return c;
 		}
 		++c;
 	}
 	return nullptr;
 }
 
-bool makeLowercase(Span<char> output, Span<const char> src) {
+bool makeLowercase(Span<char> output, StringView src) {
 	char* destination = output.begin();
-	if (src.length() + 1 > output.length()) return false;
+	src.ensureEnd();
+	if (src.size() + 1 > output.length()) return false;
 
-	const char* source = src.begin();
-	while (source != src.end())
-	{
+	const char* source = src.begin;
+	while (source != src.end) {
 		*destination = makeLowercase(*source);
 		++destination;
 		++source;
@@ -444,9 +444,21 @@ bool makeLowercase(Span<char> dst, const char* source)
 }
 
 
-const char* findSubstring(const char* haystack, const char* needle)
-{
-	return strstr(haystack, needle);
+const char* findChar(StringView haystack, char needle) {
+	const char* c = haystack.begin;
+	if (haystack.end) {
+		while (c != haystack.end) {
+			if (*c == needle) return c;
+			++c;
+		}
+		return false;
+	}
+
+	while (*c) {
+		if (*c == needle) return c;
+		++c;
+	}
+	return false;
 }
 
 
@@ -475,97 +487,48 @@ bool copyNString(Span<char> dst, const char* src, int N)
 	return false;
 }
 
-bool copyString(Span<char> dst, Span<const char> src)
-{
+bool copyString(Span<char> dst, StringView src) {
 	if (dst.length() < 1) return false;
-	if (src.length() < 1) {
-		*dst.m_begin = 0;
-		return true;
-	}
 
 	u32 length = dst.length();
 	char* tmp = dst.begin();
-	const char* srcp = src.m_begin;
-	while (srcp != src.m_end && length > 1) {
-		*tmp = *srcp;
-		--length;
-		++tmp;
-		++srcp;
-	}
-	*tmp = 0;
-	return srcp == src.m_end;
-}
-
-bool copyString(Span<char> dst, const char* src)
-{
-	if (!src || dst.length() < 1) return false;
-
-	u32 length = dst.length();
-	char* tmp = dst.begin();
-	while (*src && length > 1) {
-		*tmp = *src;
-		--length;
-		++tmp;
-		++src;
-	}
-	*tmp = 0;
-	return *src == '\0';
-}
-
-
-const char* reverseFind(const char* begin_haystack, const char* end_haystack, char c)
-{
-	const char* tmp = end_haystack == nullptr ? nullptr : end_haystack - 1;
-	if (tmp == nullptr)
-	{
-		tmp = begin_haystack;
-		while (*tmp)
-		{
+	const char* srcp = src.begin;
+	if (src.end) {
+		while (srcp != src.end && length > 1) {
+			*tmp = *srcp;
+			--length;
 			++tmp;
+			++srcp;
 		}
 	}
-	while (tmp >= begin_haystack && *tmp != c)
-	{
-		--tmp;
+	else {
+		while (*srcp && length > 1) {
+			*tmp = *srcp;
+			--length;
+			++tmp;
+			++srcp;
+		}
 	}
-	if (tmp >= begin_haystack)
-	{
-		return tmp;
+	*tmp = 0;
+	return srcp == src.end;
+}
+
+const char* reverseFind(StringView haystack, char c) {
+	haystack.ensureEnd();
+	if (haystack.size() == 0) return nullptr;
+
+	const char* tmp = haystack.end - 1;
+	while (tmp >= haystack.begin) {
+		if (*tmp == c) return tmp;
+		--tmp;
 	}
 	return nullptr;
 }
 
-
-bool catNString(Span<char> dst, const char* src, int N)
-{
-	char* destination = dst.begin();
-	u32 length = dst.length();
-	while (*destination && length) {
-		--length;
-		++destination;
-	}
-	return copyNString(Span(destination, length), src, N);
-}
-
-
-bool catString(Span<char> destination, const char* source)
-{
+bool catString(Span<char> destination, StringView source) {
 	char* dst = destination.begin();
 	u32 length = destination.length();
-	while (*dst && length)
-	{
-		--length;
-		++dst;
-	}
-	return copyString(Span(dst, length), source);
-}
-
-bool catString(Span<char> destination, Span<const char> source)
-{
-	char* dst = destination.begin();
-	u32 length = destination.length();
-	while (*dst && length)
-	{
+	while (*dst && length) {
 		--length;
 		++dst;
 	}
@@ -586,125 +549,70 @@ static void reverse(char* str, int length)
 	}
 }
 
-const char* fromCString(Span<const char> input, i32& value)
-{
+const char* fromCString(StringView input, i32& value) {
 	i64 val;
 	const char* ret = fromCString(input, val);
 	value = (i32)val;
 	return ret;
 }
 
-const char* fromCString(Span<const char> input, i64& value)
-{
-	u32 length = input.length();
-	if (length > 0)
-	{
-		const char* c = input.begin();
-		value = 0;
-		if (*c == '-')
-		{
-			++c;
-			--length;
-			if (!length)
-			{
-				return nullptr;
-			}
-		}
-		while (length && *c >= '0' && *c <= '9')
-		{
-			value *= 10;
-			value += *c - '0';
-			++c;
-			--length;
-		}
-		if (input[0] == '-')
-		{
-			value = -value;
-		}
-		return c;
-	}
-	return nullptr;
+const char* fromCString(StringView input, i64& value) {
+	if (input.empty()) return nullptr;
+
+	const char* c = input.begin;
+	if (*c == '-') ++c;
+
+	u64 tmp;
+	const char* res = fromCString(StringView(c, input.end), tmp);
+	if (!res) return nullptr;
+
+	value = input[0] == '-' ? -i64(tmp) : i64(tmp);
+
+	return res;
 }
 
-const char* fromCString(Span<const char> input, u16& value)
-{
+const char* fromCString(StringView input, u16& value) {
 	u32 tmp;
 	const char* ret = fromCString(input, tmp);
 	value = u16(tmp);
 	return ret;
 }
 
-const char* fromCString(Span<const char> input, u32& value)
-{
-	u32 length = input.length();
-	if (length > 0)
-	{
-		const char* c = input.begin();
-		value = 0;
-		if (*c == '-')
-		{
-			return nullptr;
-		}
-		while (length && *c >= '0' && *c <= '9')
-		{
-			value *= 10;
-			value += *c - '0';
-			++c;
-			--length;
-		}
-		return c;
-	}
-	return nullptr;
+const char* fromCString(StringView input, u32& value) {
+	u64 tmp;
+	const char* ret = fromCString(input, tmp);
+	value = u32(tmp);
+	return ret;
 }
 
-const char* fromCStringOctal(Span<const char> input, u32& value)
-{
-	u32 length = input.length();
-	if (length > 0)
-	{
-		const char* c = input.begin();
-		value = 0;
-		if (*c == '-') {
-			return nullptr;
-		}
-		while (length && *c >= '0' && *c <= '7') {
-			value *= 8;
-			value += *c - '0';
-			++c;
-			--length;
-		}
-		return c;
+const char* fromCStringOctal(StringView input, u32& value) {
+	if (input.empty()) return nullptr;
+
+	const char* c = input.begin;
+	value = 0;
+	if (*c < '0' || *c > '7') return nullptr;
+
+	while (c != input.end && *c >= '0' && *c <= '7') {
+		value *= 8;
+		value += *c - '0';
+		++c;
 	}
-	return nullptr;
+	return c;
 }
 
-const char* fromCString(Span<const char> input, u64& value)
-{
-	u32 length = input.length();
-	if (length > 0)
-	{
-		const char* c = input.begin();
-		value = 0;
-		if (*c == '-')
-		{
-			return nullptr;
-		}
-		while (length && *c >= '0' && *c <= '9')
-		{
-			value *= 10;
-			value += *c - '0';
-			++c;
-			--length;
-		}
-		return c;
-	}
-	return nullptr;
-}
+const char* fromCString(StringView input, u64& value) {
+	if (input.empty()) return nullptr;
+	
+	const char* c = input.begin;
+	value = 0;
+	if (*c < '0' || *c > '9') return nullptr;
 
-const char* fromCString(Span<const char> input, bool& value)
-{
-	value = equalIStrings(input, "true");
-	return input.end();
+	while (c != input.end && *c >= '0' && *c <= '9') {
+		value *= 10;
+		value += *c - '0';
+		++c;
+	}
+	return c;
 }
 
 bool toCStringPretty(i32 value, Span<char> output)
@@ -1095,44 +1003,48 @@ bool toCString(double value, Span<char> out, int after_point)
 	return true;
 }
 
+void StringView::ensureEnd() {
+	ASSERT(begin);
+	if (!end) end = begin + stringLength(begin);
+}
 
-bool startsWith(Span<const char> str, Span<const char> prefix) {
-	const char* lhs = str.begin();
-	const char* rhs = prefix.begin();
-	while (rhs != prefix.end() && lhs != str.end() && *lhs == *rhs) {
+bool startsWith(StringView str, StringView prefix) {
+	str.ensureEnd();
+
+	const char* lhs = str.begin;
+	const char* rhs = prefix.begin;
+	if (prefix.end) {
+		while (rhs != prefix.end && lhs != str.end && *lhs == *rhs) {
+			++lhs;
+			++rhs;
+		}
+		return rhs == prefix.end;
+	}
+	while (*rhs && lhs != str.end && *lhs == *rhs) {
 		++lhs;
 		++rhs;
 	}
-
-	return rhs == prefix.end();
+	return !*rhs;
 }
 
-bool startsWith(const char* str, const char* prefix) {
-	const char* lhs = str;
-	const char* rhs = prefix;
-	while (*rhs && *lhs && *lhs == *rhs) {
-		++lhs;
-		++rhs;
+bool startsWithInsensitive(StringView str, StringView prefix) {
+	str.ensureEnd();
+	const char* lhs = str.begin;
+	const char* rhs = prefix.end;
+	if (prefix.end) {
+		while (rhs != prefix.end && lhs != str.end && toLower(*lhs) == toLower(*rhs)) {
+			++lhs;
+			++rhs;
+		}
+		return rhs == prefix.end;
 	}
-
-	return *rhs == 0;
-}
-
-static char toLower(char c) {
-	if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
-	return c;
-}
-
-bool startsWithInsensitive(const char* str, const char* prefix) {
-	const char* lhs = str;
-	const char* rhs = prefix;
-	while (*rhs && *lhs && toLower(*lhs) == toLower(*rhs)) {
-		++lhs;
-		++rhs;
+	else {
+		while (*rhs && lhs != str.end && toLower(*lhs) == toLower(*rhs)) {
+			++lhs;
+			++rhs;
+		}
+		return *rhs == 0;
 	}
-
-	return *rhs == 0;
 }
-
 
 } // namespace Lumix

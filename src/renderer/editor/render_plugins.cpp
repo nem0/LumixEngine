@@ -1103,7 +1103,7 @@ struct TextureMeta {
 	bool deserialize(InputMemoryStream& blob, const char* path) {
 		ASSERT(blob.getPosition() == 0);
 		lua_State* L = luaL_newstate();
-		if (!LuaWrapper::execute(L, Span<const char>((const char*)blob.getData(), (u32)blob.size()), path, 0)) {
+		if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path, 0)) {
 			return false;
 		}
 		
@@ -1162,7 +1162,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		m_texture = app.getEngine().getResourceManager().load<Texture>(path);
 		m_meta.load(m_texture->getPath(), m_app);
 		pushUndo(NO_MERGE_UNDO);
-		if (Path::hasExtension(path, "ltc")) {
+		if (Path::hasExtension(path.c_str(), "ltc")) {
 			m_composite_editor = CompositeTextureEditor::open(path, app, m_allocator);
 		}
 		app.getAssetCompiler().resourceCompiled().bind<&TextureAssetEditorWindow::onResourceCompiled>(this);
@@ -1731,7 +1731,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool compile(const Path& src) override {
 		char ext[5] = {};
-		copyString(Span(ext), Path::getExtension(Span(src.c_str(), src.length())));
+		copyString(Span(ext), Path::getExtension(src));
 		makeLowercase(Span(ext), ext);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -1895,7 +1895,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		bool deserialize(InputMemoryStream& blob, const char* path) {
 			ASSERT(blob.getPosition() == 0);
 			lua_State* L = luaL_newstate();
-			if (!LuaWrapper::execute(L, Span<const char>((const char*)blob.getData(), (u32)blob.size()), path, 0)) {
+			if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path, 0)) {
 				return false;
 			}
 		
@@ -4396,7 +4396,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			return;
 		}
 
-		Span<const char> basename = Path::getBasename(filename);
+		StringView basename = Path::getBasename(filename);
 
 		OutputMemoryStream blob(m_app.getAllocator());
 		blob.reserve(8 * 1024 * 1024);
@@ -4460,7 +4460,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 		file.close();
 
-		Span<const char> dir = Path::getDir(filename);
+		StringView dir = Path::getDir(filename);
 		StaticString<LUMIX_MAX_PATH> mtl_filename(dir, basename, ".mtl");
 
 		if (!file.open(mtl_filename)) {

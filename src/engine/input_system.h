@@ -76,8 +76,7 @@ struct LUMIX_ENGINE_API InputSystem {
 
 	virtual void injectEvent(const Event& event) = 0;
 	virtual void injectEvent(const os::Event& event, int mouse_base_x, int mouse_base_y) = 0;
-	virtual int getEventsCount() const = 0;
-	virtual const Event* getEvents() const = 0;
+	virtual Span<const Event> getEvents() const = 0;
 
 	virtual void addDevice(Device* device) = 0;
 	virtual void removeDevice(Device* device) = 0;

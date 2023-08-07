@@ -41,7 +41,7 @@ private:
 struct LUMIX_ENGINE_API StableHash {
 	static StableHash fromU64(u64 hash);
 	StableHash() {}
-	StableHash(const char* str);
+	explicit StableHash(const char* str);
 	StableHash(const void* data, u32 len);
 
 	bool operator != (StableHash rhs) const { return hash != rhs.hash; }

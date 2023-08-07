@@ -360,7 +360,7 @@ bool Settings::load()
 		return false;
 	}
 
-	Span<const char> content((const char*)buf.data(), (u32)buf.size());
+	StringView content((const char*)buf.data(), (u32)buf.size());
 	if (!LuaWrapper::execute(L, content, "settings", 0)) {
 		return false;
 	}
@@ -379,7 +379,7 @@ bool Settings::load()
 			return false;
 		}
 
-		Span<const char> default_content((const char*)buf.data(), (u32)buf.size());
+		StringView default_content((const char*)buf.data(), (u32)buf.size());
 		if (!LuaWrapper::execute(L, default_content, "settings", 0)) {
 			return false;
 		}
@@ -462,7 +462,7 @@ bool Settings::loadAppData() {
 		return false;
 	}
 	file.close();
-	Span<const char> content((const char*)buf.data(), (u32)buf.size());
+	StringView content((const char*)buf.data(), (u32)buf.size());
 	return LuaWrapper::execute(m_local_state, content, m_app_data_path, 0);
 }
 

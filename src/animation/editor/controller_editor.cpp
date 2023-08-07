@@ -10,6 +10,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/hash.h"
+#include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/resource_manager.h"
@@ -150,6 +151,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(nullptr, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(nullptr, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(nullptr, allocator); break;
+				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(nullptr, allocator); break;
 				case Node::NONE: ASSERT(false); return nullptr;
 			}
 
@@ -167,11 +169,31 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
+				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
 				case Node::NONE: ASSERT(false); return nullptr;
 			}
 
 			node->m_name = "new";
 			parent.m_children.emplace(allocator);
+			parent.m_children.back().node = node;
+			pushUndo();
+			return node;
+		}
+
+		Node* createChild(SelectNode& parent, Node::Type type, IAllocator& allocator) {
+			Node* node = nullptr;
+			switch(type) {
+				case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
+				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
+				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
+				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
+				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
+				case Node::NONE: ASSERT(false); return nullptr;
+			}
+
+			node->m_name = "new";
+			parent.m_children.emplace();
 			parent.m_children.back().node = node;
 			pushUndo();
 			return node;
@@ -185,6 +207,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
+				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
 				case Node::NONE: ASSERT(false); return nullptr;
 			}
 			node->m_name = "new";
@@ -203,6 +226,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
+				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
 				case Node::LAYERS: ASSERT(false); return nullptr;
 				case Node::NONE: ASSERT(false); return nullptr;
 			}
@@ -218,54 +242,52 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			return node;
 		}
 
-		bool properties_ui(AnimationNode& node) {
-			const Array<String>& names = m_controller.m_animation_slots;
-	
-			const char* preview = node.m_slot < (u32)names.size() ? names[node.m_slot].c_str() : "";
-			bool changed = false;
+		void properties_ui(AnimationNode& node) {
 			ImGuiEx::Label("Animation");
-			if (ImGui::BeginCombo("##anim", preview)) {
-				for (u32 i = 0; i < (u32)names.size(); ++i) {
-					if (ImGui::Selectable(names[i].c_str())) {
-						node.m_slot = i;
-						changed = true;
-					}
-				}
-				ImGui::EndCombo();
-			}
+			saveUndo(inputSlot("##anim", &node.m_slot));
+
 			bool looped = node.m_flags & AnimationNode::LOOPED;
 			ImGuiEx::Label("Looped");
 			if (ImGui::Checkbox("##looped", &looped)) {
-				changed = true;
 				if (looped) {
 					node.m_flags = node.m_flags | AnimationNode::LOOPED;
 				}
 				else {
 					node.m_flags = node.m_flags & ~AnimationNode::LOOPED;
 				}
+				saveUndo(true);
 			}
-			return changed;
 		}
 
-		bool properties_ui(GroupNode& node) {
+		const char* getName(const Node& node) const {
+			if (node.type() == Node::ANIMATION) {
+				const u32 slot = ((AnimationNode&)node).m_slot;
+				if (slot < (u32)m_controller.m_animation_slots.size()) {
+					return m_controller.m_animation_slots[slot].c_str();
+				}
+				return "Deleted slot";
+			}
+			return node.m_name.c_str();
+		}
+
+		void properties_ui(GroupNode& node) {
 			float node_blend_length = node.m_blend_length.seconds();
 			ImGuiEx::Label("Blend length");
-			bool changed = false;
 			if (ImGui::DragFloat("##bl", &node_blend_length)) {
 				node.m_blend_length = Time::fromSeconds(node_blend_length);
-				changed = true;
+				saveUndo(true);
 			}
 
 			if (ImGui::TreeNode("Transitions")) {
 				for (GroupNode::Transition& tr : node.m_transitions) {
-					const char* name_from = tr.from == 0xFFffFFff ? "*" : node.m_children[tr.from].node->m_name.c_str();
-					const char* name_to = tr.to == 0xFFffFFff ? "*" : node.m_children[tr.to].node->m_name.c_str();
+					const char* name_from = tr.from == 0xFFffFFff ? "*" : getName(*node.m_children[tr.from].node);
+					const char* name_to = tr.to == 0xFFffFFff ? "*" : getName(*node.m_children[tr.to].node);
 					const bool open = ImGui::TreeNodeEx(&tr, 0, "%s -> %s", name_from, name_to);
 					if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("context_menu");
 					if (ImGui::BeginPopup("context_menu")) {
 						if (ImGui::Selectable("Remove")) {
-							changed = true;
 							node.m_transitions.erase(u32(&tr - node.m_transitions.begin()));
+							pushUndo();
 							ImGui::EndPopup();
 							if (open) ImGui::TreePop();
 							break;
@@ -273,58 +295,76 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						ImGui::EndPopup();
 					}
 					if (open) {
-						changed = nodeInput("From", tr.from, node.m_children, true) || changed;
-						changed = nodeInput("To", tr.to, node.m_children, true) || changed;
+						saveUndo(inputChild("From", tr.from, node.m_children, true));
+						saveUndo(inputChild("To", tr.to, node.m_children, true));
 						bool has_exit_time = tr.exit_time >= 0;
+						
 						ImGuiEx::Label("Blend length");
 						float l = tr.blend_length.seconds();
 						if (ImGui::DragFloat("##bl", &l, 0.1f, 0.0, FLT_MAX, "%.2f")) {
 							tr.blend_length = Time::fromSeconds(l);
-							changed = true;
+							saveUndo(true);
 						}
+						
 						ImGuiEx::Label("Has exit time");
 						if (ImGui::Checkbox("##het", &has_exit_time)) {
 							if (has_exit_time) tr.exit_time = 0;
 							else tr.exit_time = -1;
-							changed = true;
+							saveUndo(true);
 						}
 						if (has_exit_time) {
 							ImGuiEx::Label("Exit time");
-							changed = ImGui::DragFloat("##et", &tr.exit_time, 0.01f, 0, 1, "%.2f", ImGuiSliderFlags_AlwaysClamp) || changed;
+							saveUndo(ImGui::DragFloat("##et", &tr.exit_time, 0.01f, 0, 1, "%.2f", ImGuiSliderFlags_AlwaysClamp));
 						}
 
 						ImGui::TreePop();
 					}
 				}
 
-				if (!node.m_children.empty() && ImGui::Button(ICON_FA_PLUS_CIRCLE "Add")) {
+				if (!node.m_children.empty() && ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
 					node.m_transitions.emplace();
-					changed = true;
+					pushUndo();
 				}
 
 				ImGui::TreePop();
 			}
-
-			return changed;
 		}
 
-		bool properties_ui(ConditionNode& node) {
-			bool changed = conditionInput("Condition", m_controller.m_inputs, node.m_condition_str, node.m_condition);
-			return false;
-		}
-
-		bool properties_ui(Blend1DNode& node) {
+		bool properties_ui(SelectNode& node) {
 			const InputDecl::Input& current_input = m_controller.m_inputs.inputs[node.m_input_index];
 			bool changed = false;
 			ImGuiEx::Label("Input");
 			if (ImGui::BeginCombo("##input", current_input.name)) {
 				for (const InputDecl::Input& input : m_controller.m_inputs.inputs) {
+					if (input.type == InputDecl::EMPTY) continue;
 					if (ImGui::Selectable(input.name)) {
 						changed = true;
 						node.m_input_index = u32(&input - m_controller.m_inputs.inputs);
 					}
 				}
 				ImGui::EndCombo();
+			}
+			return changed;
+		}
+
+		void properties_ui(ConditionNode& node) {
+			if (conditionInput("Condition", m_controller.m_inputs, node.m_condition_str, node.m_condition)) pushUndo();
+		}
+
+		void properties_ui(Blend1DNode& node) {
+			const InputDecl::Input& current_input = m_controller.m_inputs.inputs[node.m_input_index];
+			ImGuiEx::Label("Input");
+			if (ImGui::BeginCombo("##input", current_input.name)) {
+				bool selected = false;
+				for (const InputDecl::Input& input : m_controller.m_inputs.inputs) {
+					if (input.type == InputDecl::EMPTY) continue;
+					if (ImGui::Selectable(input.name.empty() ? "##tmp" : input.name)) {
+						selected = true;
+						node.m_input_index = u32(&input - m_controller.m_inputs.inputs);
+					}
+				}
+				ImGui::EndCombo();
+				saveUndo(selected);
 			}
 
 			ImGui::Columns(2);
@@ -338,74 +378,67 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PushID(&child);
 		
 				ImGui::SetNextItemWidth(-1);
-				changed = ImGui::InputFloat("##val", &child.value) || changed;
+				saveUndo(ImGui::InputFloat("##val", &child.value));
 				ImGui::NextColumn();
 		
 				ImGui::SetNextItemWidth(-1);
-				const Array<String>& slots = m_controller.m_animation_slots;
-				if (ImGui::BeginCombo("##anim", child.slot < (u32)slots.size() ? slots[child.slot].c_str() : "")) {
-					for (u32 i = 0; i < (u32)slots.size(); ++i) {
-						if (ImGui::Selectable(slots[i].c_str())) {
-							child.slot = i;
-							changed = true;
-						}
-					}
-					ImGui::EndCombo();
-				}
-		
+				saveUndo(inputSlot("##anim", &child.slot));
 				ImGui::NextColumn();
-		
-		
+
 				ImGui::PopID();
 			}
 			ImGui::Columns();
-			if (ImGui::Button("Add")) {
-				changed = true;
+
+			if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
 				node.m_children.emplace();
 				if(node.m_children.size() > 1) {
 					node.m_children.back().value = node.m_children[node.m_children.size() - 2].value;
 				}
+				pushUndo();
 			}
-			return changed;
 		}
 
-		bool child_properties_ui(Node& node) {
-			bool changed = false;
-			if (node.m_parent && node.m_parent->type() == Node::Type::LAYERS) {
-				if (!m_controller.m_bone_masks.empty()) {
-					LayersNode* layers = (LayersNode*)node.m_parent;
-					i32 idx = layers->m_layers.find([&](const LayersNode::Layer& l){ return l.node == &node; });
-					ASSERT(idx >= 0);
+		void child_properties_ui(Node& node) {
+			if (!node.m_parent) return;
 
-					const char* preview = m_controller.m_bone_masks[layers->m_layers[idx].mask].name;
-					ImGuiEx::Label("Bone mask");
-					if (ImGui::BeginCombo("##bonemask", preview)) {
-						for (const BoneMask& mask : m_controller.m_bone_masks) {
-							if (ImGui::Selectable(mask.name)) {
-								layers->m_layers[idx].mask = u32(&mask - m_controller.m_bone_masks.begin());
+			switch (node.m_parent->type()) {
+				default: break;
+				case Node::Type::LAYERS:
+					if (!m_controller.m_bone_masks.empty()) {
+						LayersNode* layers = (LayersNode*)node.m_parent;
+						i32 idx = layers->m_layers.find([&](const LayersNode::Layer& l){ return l.node == &node; });
+						ASSERT(idx >= 0);
+
+						const char* preview = m_controller.m_bone_masks[layers->m_layers[idx].mask].name;
+						ImGuiEx::Label("Bone mask");
+						if (ImGui::BeginCombo("##bonemask", preview)) {
+							for (const BoneMask& mask : m_controller.m_bone_masks) {
+								if (ImGui::Selectable(mask.name)) {
+									layers->m_layers[idx].mask = u32(&mask - m_controller.m_bone_masks.begin());
+								}
 							}
+							ImGui::EndCombo();
 						}
-						ImGui::EndCombo();
 					}
-				}
-			}
-			else if (node.m_parent && node.m_parent->type() == Node::Type::GROUP) {
-				GroupNode* group = (GroupNode*)node.m_parent;
-				for (GroupNode::Child& c : group->m_children) {
-					if (c.node != &node) continue;
+					break;
+				case Node::Type::GROUP: {
+					GroupNode* group = (GroupNode*)node.m_parent;
+					for (GroupNode::Child& c : group->m_children) {
+						if (c.node != &node) continue;
 				
-					changed = conditionInput("Group condition", m_controller.m_inputs, c.condition_str, c.condition) || changed;
-					bool selectable = c.flags & GroupNode::Child::SELECTABLE;
-					ImGuiEx::Label("Selectable");
-					if (ImGui::Checkbox("##sel", &selectable)) {
-						if (selectable) c.flags |= GroupNode::Child::SELECTABLE;
-						else c.flags &= ~GroupNode::Child::SELECTABLE;
-						changed = true;
+						saveUndo(conditionInput("Group condition", m_controller.m_inputs, c.condition_str, c.condition));
+						bool selectable = c.flags & GroupNode::Child::SELECTABLE;
+						ImGuiEx::Label("Selectable");
+						if (ImGui::Checkbox("##sel", &selectable)) {
+							if (selectable) c.flags |= GroupNode::Child::SELECTABLE;
+							else c.flags &= ~GroupNode::Child::SELECTABLE;
+							saveUndo(true);
+						}
+						break;
 					}
 					break;
 				}
 			}
-			return changed;
 		}
 
 		void addEvent(OutputMemoryStream& events, const EventType& type) {
@@ -438,12 +471,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			events = static_cast<OutputMemoryStream&&>(tmp);
 		}
 
-		bool editEvents(OutputMemoryStream& events) {
-			if (!ImGui::TreeNode("Events")) return false;
-			ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_PLUS_CIRCLE).x);
-			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add event")) ImGui::OpenPopup("add_event_popup");
+		void editEvents(OutputMemoryStream& events) {
+			if (!ImGui::TreeNode("Events")) return;
 
-			bool changed = false;
 			if (!events.empty()) {
 				u32 i = 0;
 				InputMemoryStream blob(events);
@@ -457,10 +487,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					u8* data = (u8*)blob.skip(type_obj.size);
 				
 					bool open = ImGui::TreeNodeEx((void*)(uintptr)i, ImGuiTreeNodeFlags_AllowItemOverlap, "%d %s", i, type_obj.label.data);
-					ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_MINUS_CIRCLE).x);
-					if (ImGuiEx::IconButton(ICON_FA_MINUS_CIRCLE, "Delete")) {
+					ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_TIMES_CIRCLE).x);
+					if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Delete")) {
 						ImGui::TreePop();
 						removeEvent(events, i - 1);
+						pushUndo();
 						break;
 					}
 				
@@ -469,51 +500,52 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						float t = *rel_time / float(0xffff);
 						if (ImGui::DragFloat("##t", &t, 0.01f, 0.f, 1.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
 							*rel_time = u16(t * 0xffFF);
-							changed = true;
+							saveUndo(true);
 						}
-						changed = type_obj.onGUI(data, m_controller) || changed;
+						if (type_obj.onGUI(data, m_controller)) pushUndo();
 						ImGui::TreePop();
 					}
 				}
 			}
 
+			if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) ImGui::OpenPopup("add_event_popup");
 			if (ImGui::BeginPopup("add_event_popup")) {
 				for (const UniquePtr<EventType>& type : m_plugin.m_event_types) {
 					if (ImGui::Selectable(type->label)) {
 						addEvent(events, *type.get());
-						changed = true;
+						pushUndo();
 					}
 				}
 				ImGui::EndPopup();
 			}
 			ImGui::TreePop();
-			return changed;
 		}
 
-		bool ui_dispatch(Node& node) {
-			char tmp[64];
-			copyString(tmp, node.m_name.c_str());
-			bool changed = false;
+		void ui_dispatch(Node& node) {
+			if (node.type() != Node::ANIMATION) {
+				char tmp[64];
+				copyString(tmp, getName(node));
 
-			ImGuiEx::Label("Name");		
-			if (ImGui::InputText("##name", tmp, sizeof(tmp))) {
-				node.m_name = tmp;
-				changed = true;
+				ImGuiEx::Label("Name");
+				if (ImGui::InputText("##name", tmp, sizeof(tmp))) {
+					node.m_name = tmp;
+					saveUndo(true);
+				}
 			}
 
-			changed = child_properties_ui(node) || changed;
+			child_properties_ui(node);
 
 			switch(node.type()) {
-				case Node::ANIMATION: changed = properties_ui((AnimationNode&)node) || changed; break;
-				case Node::GROUP: changed = properties_ui((GroupNode&)node) || changed; break;
-				case Node::BLEND1D: changed = properties_ui((Blend1DNode&)node) || changed; break;
-				case Node::CONDITION: changed = properties_ui((ConditionNode&)node) || changed; break;
+				case Node::ANIMATION: properties_ui((AnimationNode&)node); break;
+				case Node::GROUP: properties_ui((GroupNode&)node); break;
+				case Node::BLEND1D: properties_ui((Blend1DNode&)node); break;
+				case Node::CONDITION: properties_ui((ConditionNode&)node); break;
+				case Node::SELECT: properties_ui((SelectNode&)node); break;
 				case Node::LAYERS: break;
 				case Node::NONE: ASSERT(false); break;
 			}
 
-			changed = editEvents(node.m_events) || changed;
-			return changed;
+			editEvents(node.m_events);
 		}
 
 		static bool conditionInput(const char* label, InputDecl& input, String& condition_str, Condition& condition) {
@@ -532,10 +564,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			return false;
 		}
 
-		static bool nodeInput(const char* label, u32& value, const Array<GroupNode::Child>& children, bool has_any) {
+		bool inputChild(const char* label, u32& value, const Array<GroupNode::Child>& children, bool has_any) const {
 			ImGuiEx::Label(label);		
 			bool changed = false;
-			if (!ImGui::BeginCombo(StaticString<64>("##_", label), value == 0xffFFffFF ? "*" : children[value].node->m_name.c_str())) return false;
+			if (!ImGui::BeginCombo(StaticString<64>("##_", label), value == 0xffFFffFF ? "*" : getName(*children[value].node))) return false;
 
 			if (has_any) {
 				if (ImGui::Selectable("*")) {
@@ -545,7 +577,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 
 			for (GroupNode::Child& child : children) {
-				if (ImGui::Selectable(child.node->m_name.c_str())) {
+				if (ImGui::Selectable(getName(*child.node))) {
 					value = u32(&child - children.begin());
 					changed = true;
 				}
@@ -562,6 +594,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::Type::GROUP: return "Group";
 				case Node::Type::LAYERS: return "Layers";
 				case Node::Type::CONDITION: return "Condition";
+				case Node::Type::SELECT: return "Select";
 				case Node::Type::NONE: return "N/A";
 			}
 			ASSERT(false);
@@ -574,6 +607,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::Type::BLEND1D: return false;
 				case Node::Type::CONDITION:
 				case Node::Type::GROUP:
+				case Node::Type::SELECT:
 				case Node::Type::LAYERS: return true;
 				case Node::Type::NONE:
 					ASSERT(false);
@@ -585,6 +619,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		bool isSelectable(Node& node) {
 			if (!node.m_parent) return false;
+			if (node.m_parent->type() == Node::SELECT) return true;
 			if (node.m_parent->type() == Node::CONDITION) return true;
 			if (node.m_parent->type() == Node::GROUP) {
 				GroupNode* group = (GroupNode*)node.m_parent;
@@ -595,8 +630,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			return false;
 		}
 
-		bool hierarchy_ui(Node& node) {
-			bool changed = false;
+		void hierarchy_ui(Node& node) {
 			const bool is_container = isContainer(node);
 			const bool is_parent_group = node.m_parent && node.m_parent->type() == Node::Type::GROUP;
 			const bool is_parent_condition = node.m_parent && node.m_parent->type() == Node::Type::CONDITION;
@@ -611,16 +645,15 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (!is_selectable) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 			bool open;
 			ImGui::PushID(&node);
-			if (node.m_parent && node.m_parent->type() == Node::CONDITION) {
-				bool is_true = ((ConditionNode*)node.m_parent)->m_true_node == &node;
-				open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str);
+			if (node.type() == Node::ANIMATION) {
+				open = ImGui::TreeNodeEx(&node, flags, "%s", getName(node));
 			}
 			else {
-				open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str);
+				open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", getName(node), type_str);
 			}
 			if (is_parent_group) {
 				if (ImGui::BeginDragDropSource()) {
-					ImGui::Text("%s", node.m_name.c_str());
+					ImGui::TextUnformatted(getName(node));
 					void* ptr = &node;
 					ImGui::SetDragDropPayload("anim_node", &ptr, sizeof(ptr));
 					ImGui::EndDragDropSource();
@@ -629,17 +662,18 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			if (is_group) {
 				if (ImGui::BeginDragDropTarget()) {
-					/*if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
+					if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
 						Node* dropped_node = *(Node**)payload->Data;
+						ASSERT(dropped_node->m_parent);
+						ASSERT(dropped_node->m_parent->type() == Node::GROUP);
 						OutputMemoryStream blob(m_app.getAllocator());
 						dropped_node->serialize(blob);
 						Node* new_node = createChild((GroupNode&)node, dropped_node->type(), m_controller.m_allocator);
 						InputMemoryStream iblob(blob);
-						new_node->deserialize(iblob, *m_controller.get(), (u32)ControllerVersion::LATEST);
-						ASSERT(dropped_node->m_parent);
-						for (GroupNode::Child& src : dropped_node->m_parent->m_children) {
+						new_node->deserialize(iblob, m_controller, (u32)ControllerVersion::LATEST);
+						for (GroupNode::Child& src : ((GroupNode*)dropped_node->m_parent)->m_children) {
 							if (src.node == dropped_node) {
-								for (GroupNode::Child& c : new_node->m_parent->m_children) {
+								for (GroupNode::Child& c : ((GroupNode*)new_node->m_parent)->m_children) {
 									if (c.node == new_node) {
 										c.flags = src.flags;
 										c.condition_str = src.condition_str;
@@ -651,13 +685,14 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 							}
 						}
 						if (m_current_node == dropped_node) m_current_node = nullptr;
-						dropped_node->m_parent->m_children.eraseItems([dropped_node](GroupNode::Child& c){ return c.node == dropped_node; });
+						((GroupNode*)dropped_node->m_parent)->m_children.eraseItems([dropped_node](GroupNode::Child& c){ return c.node == dropped_node; });
 						LUMIX_DELETE(m_controller.m_allocator, dropped_node);
 						ImGui::TreePop();
-						return true;
-					}*/
-					ASSERT(false);
-					// TODO
+						ImGui::PopID();
+						if (!is_selectable) ImGui::PopStyleColor();
+						pushUndo();
+						return;
+					}
 				}
 			}
 
@@ -668,7 +703,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 
 			if (ImGui::BeginPopup("popup")) {
-				ImGui::TextUnformatted(node.m_name.c_str());
+				ImGui::TextUnformatted(getName(node));
 				ImGui::Separator();
 
 				switch (node.type()) {
@@ -682,6 +717,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 							if (ImGui::MenuItem("Blend1D")) createChild(layers, Node::BLEND1D, m_controller.m_allocator);
 							if (ImGui::MenuItem("Condition")) createChild(layers, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(layers, Node::GROUP, m_controller.m_allocator);
+							if (ImGui::MenuItem("Select")) createChild(layers, Node::SELECT, m_controller.m_allocator);
 							ImGui::EndMenu();
 						}
 						break;
@@ -693,6 +729,19 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 							if (ImGui::MenuItem("Blend1D")) createChild(cond, Node::BLEND1D, m_controller.m_allocator);
 							if (ImGui::MenuItem("Condition")) createChild(cond, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(cond, Node::GROUP, m_controller.m_allocator);
+							if (ImGui::MenuItem("Select")) createChild(cond, Node::SELECT, m_controller.m_allocator);
+							ImGui::EndMenu();
+						}
+						break;
+					}
+					case Node::Type::SELECT: {
+						SelectNode& select = (SelectNode&)node;
+						if (ImGui::BeginMenu("Create child")) {
+							if (ImGui::MenuItem("Animation")) createChild(select, Node::ANIMATION, m_controller.m_allocator);
+							if (ImGui::MenuItem("Blend1D")) createChild(select, Node::BLEND1D, m_controller.m_allocator);
+							if (ImGui::MenuItem("Condition")) createChild(select, Node::CONDITION, m_controller.m_allocator);
+							if (ImGui::MenuItem("Group")) createChild(select, Node::GROUP, m_controller.m_allocator);
+							if (ImGui::MenuItem("Select")) createChild(select, Node::SELECT, m_controller.m_allocator);
 							ImGui::EndMenu();
 						}
 						break;
@@ -705,6 +754,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 							if (ImGui::MenuItem("Condition")) createChild(group, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(group, Node::GROUP, m_controller.m_allocator);
 							if (ImGui::MenuItem("Layers")) createChild(group, Node::LAYERS, m_controller.m_allocator);
+							if (ImGui::MenuItem("Select")) createChild(group, Node::SELECT, m_controller.m_allocator);
 							ImGui::EndMenu();
 						}
 						break;
@@ -724,6 +774,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						case Node::Type::ANIMATION:
 						case Node::Type::BLEND1D:
 							break;
+						case Node::Type::SELECT: pasted = createChild((SelectNode&)node, m_copy_buffer.node_type, m_controller.m_allocator); break;
 						case Node::Type::GROUP: pasted = createChild((GroupNode&)node, m_copy_buffer.node_type, m_controller.m_allocator); break;
 						case Node::Type::CONDITION: pasted = createChild((ConditionNode&)node, m_copy_buffer.node_type, m_controller.m_allocator); break;
 						case Node::Type::LAYERS: pasted = createChild((LayersNode&)node, m_copy_buffer.node_type, m_controller.m_allocator); break;
@@ -753,7 +804,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					ImGui::EndPopup();
 					ImGui::TreePop();
 					ImGui::PopID();
-					return true;
+					pushUndo();
+					return;
 				}
 
 				ImGui::EndPopup();
@@ -761,32 +813,40 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			if (open) {
 				switch (node.type()) {
+					case Node::Type::NONE:
+					case Node::Type::BLEND1D:
+					case Node::Type::ANIMATION: break;
 					case Node::Type::GROUP: {
 						GroupNode& group = (GroupNode&)node;
 						for (GroupNode::Child& c : group.m_children) {
-							changed = hierarchy_ui(*c.node) || changed;
+							hierarchy_ui(*c.node);
+						}
+						break;
+					}
+					case Node::Type::SELECT: {
+						SelectNode& select = (SelectNode&)node;
+						for (SelectNode::Child& c : select.m_children) {
+							hierarchy_ui(*c.node);
 						}
 						break;
 					}
 					case Node::Type::CONDITION: {
 						ConditionNode& cond = (ConditionNode&)node;
-						if (cond.m_true_node) changed = hierarchy_ui(*cond.m_true_node) || changed;
-						if (cond.m_false_node) changed = hierarchy_ui(*cond.m_false_node) || changed;
+						if (cond.m_true_node) hierarchy_ui(*cond.m_true_node);
+						if (cond.m_false_node) hierarchy_ui(*cond.m_false_node);
 						break;
 					}
 					case Node::Type::LAYERS: {
 						LayersNode& layers = (LayersNode&)node;
 						for (LayersNode::Layer& l : layers.m_layers) {
-							changed = hierarchy_ui(*l.node) || changed;
+							hierarchy_ui(*l.node);
 						}
 						break;
 					}
-					default: break;
 				}
 				ImGui::TreePop();
 			}
 			ImGui::PopID();
-			return changed;
 		}
 
 		void previewUI() { 
@@ -853,7 +913,28 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			debuggerUI(world, entity);
 		}
 
+		void processControllerMapping(World& world, EntityRef entity) {
+			if (m_controller_debug_mapping.axis_x < 0 && m_controller_debug_mapping.axis_y < 0) return;
+
+			const ComponentType animator_type = reflection::getComponentType("animator");
+			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
+			const InputSystem& input_system = m_app.getEngine().getInputSystem();
+			Span<const InputSystem::Event> events = input_system.getEvents();
+			for (const InputSystem::Event& e : events) {
+				if (e.device->type == InputSystem::Device::CONTROLLER && e.type == InputSystem::Event::AXIS) {
+					if (m_controller_debug_mapping.axis_x >= 0) {
+						module->setAnimatorInput(entity, m_controller_debug_mapping.axis_x, e.data.axis.x);
+					}
+					if (m_controller_debug_mapping.axis_y >= 0) {
+						module->setAnimatorInput(entity, m_controller_debug_mapping.axis_y, e.data.axis.y);
+					}
+				}
+			}
+		}
+
 		void debuggerUI(World& world, EntityRef entity) {
+			processControllerMapping(world, entity);
+
 			const ComponentType animator_type = reflection::getComponentType("animator");
 			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
 			Controller* ctrl = module->getAnimatorController(entity);
@@ -873,6 +954,21 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						ImGuiEx::Label(input.name);
 						if (ImGui::DragFloat(str_id, &val)) {
 							module->setAnimatorInput(entity, idx, val);
+						}
+						if (ImGui::BeginPopupContextItem()) {
+							if (m_controller_debug_mapping.axis_x == idx) {
+								if (ImGui::Selectable("Unmap controller X axis")) m_controller_debug_mapping.axis_x = -1;
+							}
+							else {
+								if (ImGui::Selectable("Map to controller X axis")) m_controller_debug_mapping.axis_x = idx;
+							}
+							if (m_controller_debug_mapping.axis_y == idx) {
+								if (ImGui::Selectable("Unmap controller Y axis")) m_controller_debug_mapping.axis_y = -1;
+							}
+							else {
+								if (ImGui::Selectable("Map to controller Y axis")) m_controller_debug_mapping.axis_y = idx;
+							}
+							ImGui::EndPopup();
 						}
 						break;
 					}
@@ -906,6 +1002,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 			m_path = path;
 			m_dirty = false;
+		}
+
+		void saveUndo(bool changed) {
+			if (changed) pushUndo(ImGui::GetItemID());
 		}
 
 		void pushUndo(u64 tag = ~u64(0)) {
@@ -950,27 +1050,351 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		bool canUndo() const { return m_undo_idx > 0; }
 		bool canRedo() const { return m_undo_idx < m_undo_stack.size() - 1; }
 
+		void IKGUI() {
+			char model_path[LUMIX_MAX_PATH];
+			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
+			ImGuiEx::Label("Model");
+			if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+			}
+			if(m_model) {
+				for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
+					const StaticString<32> label("Chain ", i);
+					
+					ImGui::PushID(i);
+					if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
+						if (i < m_controller.m_ik_count - 1) {
+							memmove(&m_controller.m_ik[i]
+								, &m_controller.m_ik[i + 1]
+								, sizeof(m_controller.m_ik[i + 1]) * (m_controller.m_ik_count - 1 - i)
+							);
+						}
+						--m_controller.m_ik_count;
+						ImGui::PopID();
+						continue;
+					}
+					ImGui::PopID();
+					ImGui::SameLine();
+
+					if (ImGui::TreeNode(label)) {
+						Controller::IK& ik = m_controller.m_ik[i];
+						ASSERT(ik.bones_count > 0);
+						const u32 bones_count = m_model->getBoneCount();
+						auto leaf_iter = m_model->getBoneIndex(ik.bones[ik.bones_count - 1]);
+						ImGuiEx::Label("Leaf");
+						if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
+							bool selected = false;
+							for (u32 j = 0; j < bones_count; ++j) {
+								const char* bone_name = m_model->getBone(j).name.c_str();
+								if (ImGui::Selectable(bone_name)) {
+									ik.bones_count = 1;
+									ik.bones[0] = BoneNameHash(bone_name);
+									selected = true;
+								}
+							}
+							ImGui::EndCombo();
+							saveUndo(selected);
+						}
+						for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
+							auto iter = m_model->getBoneIndex(ik.bones[j]);
+							if (iter.isValid()) {
+								ImGui::Text("%s", m_model->getBone(iter.value()).name.c_str());
+							}
+							else {
+								ImGui::Text("Unknown bone");
+							}
+						}
+
+						auto iter = m_model->getBoneIndex(ik.bones[0]);
+						if (iter.isValid()) {
+							if (ik.bones_count < lengthOf(ik.bones)) {
+								const int parent_idx = m_model->getBone(iter.value()).parent_idx;
+								if (parent_idx >= 0) {
+									const char* bone_name = m_model->getBone(parent_idx).name.c_str();
+									const StaticString<64> add_label("Add ", bone_name);
+									if (ImGui::Button(add_label)) {
+										memmove(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
+										ik.bones[0] = BoneNameHash(bone_name);
+										++ik.bones_count;
+										pushUndo();
+									}
+								}
+							}
+							else {
+								ImGui::Text("IK is full");
+							}
+						}
+						else {
+							ImGui::Text("Unknown bone.");
+						}
+						if (ik.bones_count > 1) {
+							ImGui::SameLine();
+							if (ImGui::Button("Pop")) {
+								--ik.bones_count;
+								pushUndo();
+							}
+						} 
+
+						ImGui::TreePop();
+					}
+				}
+
+				if (m_controller.m_ik_count < (u32)lengthOf(m_controller.m_ik) && ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
+					m_controller.m_ik[m_controller.m_ik_count].bones_count = 1;
+					m_controller.m_ik[m_controller.m_ik_count].bones[0] = BoneNameHash();
+					++m_controller.m_ik_count;
+					pushUndo();
+				}
+			}
+			else {
+				ImGui::Text("Please select a model.");
+			}
+		}
+
+		void removeSlot(u32 idx) {
+			m_controller.m_animation_slots.erase(idx);
+			for (Controller::AnimationEntry& e : m_controller.m_animation_entries) {
+				if (e.slot > idx) --e.slot;
+			}
+			m_controller.m_animation_entries.eraseItems([idx](Controller::AnimationEntry& e){ return e.slot == idx; });
+			// TODO update slots in nodes
+			pushUndo();
+		}
+
+		void boneMasksGUI() {
+			char model_path[LUMIX_MAX_PATH];
+			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
+			ImGuiEx::Label("Model");
+			if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+			}
+
+			if (!m_model) {
+				ImGui::Text("Please select a model.");
+				return;
+			}
+
+			for (BoneMask& mask : m_controller.m_bone_masks) {
+				ImGui::PushID(&mask);
+				if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
+					m_controller.m_bone_masks.erase(u32(&mask - m_controller.m_bone_masks.begin()));
+					// TODO update references in nodes
+					ImGui::PopID();
+					continue;
+				}
+				ImGui::PopID();
+
+				ImGui::SameLine();
+				if (!ImGui::TreeNodeEx(&mask, 0, "%s", mask.name.data)) continue;
+				
+				ImGuiEx::Label("Name");
+				saveUndo(ImGui::InputText("##name", mask.name.data, sizeof(mask.name.data)));
+				for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
+					const char* bone_name = m_model->getBone(i).name.c_str();
+					const BoneNameHash bone_name_hash(bone_name);
+					const bool is_masked = mask.bones.find(bone_name_hash).isValid();
+					bool b = is_masked;
+					ImGuiEx::Label(bone_name);
+					if (ImGui::Checkbox(StaticString<256>("##", bone_name), &b)) {
+						ASSERT(b != is_masked);
+						if (is_masked) {
+							mask.bones.erase(bone_name_hash);
+						}
+						else {
+							mask.bones.insert(bone_name_hash, 1);
+						}
+						saveUndo(true);
+					}
+				}
+				ImGui::TreePop();
+			}
+
+			if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
+				m_controller.m_bone_masks.emplace(m_controller.m_allocator);
+				pushUndo();
+			}
+		}
+
+		void slotsGUI() {
+			for (u32 i = 0; i < (u32)m_controller.m_animation_slots.size(); ++i) {
+				ImGui::PushID(i);
+				String& slot = m_controller.m_animation_slots[i];
+				char tmp[64];
+				copyString(tmp, slot.c_str());
+				if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
+					removeSlot(i);
+				}
+				else {
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::InputText("##name", tmp, sizeof(tmp))) {
+						slot = tmp;
+						saveUndo(true);
+					}
+				}
+				ImGui::PopID();
+			}
+			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add slot")) {
+				m_controller.m_animation_slots.emplace("", m_controller.m_allocator);
+				pushUndo();
+			}
+
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("path")) {
+					const char* path = (const char*)payload->Data;
+					StringView subres = Path::getSubresource(path);
+					if (Path::hasExtension(subres, "ani")) {
+						Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
+						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
+						entry.animation = res_manager.load<Animation>(Path(path));
+						entry.set = 0;
+						entry.slot = m_controller.m_animation_slots.size();
+
+						m_controller.m_animation_slots.emplace(Path::getBasename(path), m_controller.m_allocator);
+
+						pushUndo();
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+		}
+
+		bool inputSlot(const char* str_id, u32* slot) {
+			bool changed = false;
+			const char* preview = *slot < (u32)m_controller.m_animation_slots.size() ? m_controller.m_animation_slots[*slot].c_str() : "N/A";
+			if (ImGui::BeginCombo(str_id, preview, 0)) {
+				static char filter[64] = "";
+				ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
+				bool selected = false;
+				for (u32 i = 0, c = m_controller.m_animation_slots.size(); i < c; ++i) {
+					const char* name = m_controller.m_animation_slots[i].c_str();
+					if ((!filter[0] || stristr(name, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
+						*slot = i;
+						changed = true;
+						filter[0] = '\0';
+						ImGui::CloseCurrentPopup();
+						break;
+					}
+				}
+				ImGui::EndCombo();
+			}
+			return changed;
+		}
+
+		void setsGUI() {
+			u32 max_set = 0;
+			for (const Controller::AnimationEntry& e : m_controller.m_animation_entries) {
+				max_set = maximum(max_set, e.set);
+			}
+
+			for (u32 set_idx = 0; set_idx <= max_set; ++set_idx) {
+				ImGui::PushID(set_idx);
+				if (ImGui::Button(ICON_FA_TIMES_CIRCLE "##del_set")) {
+					m_controller.m_animation_entries.eraseItems([set_idx](Controller::AnimationEntry& e){ return e.set == set_idx; });
+					pushUndo();
+					ImGui::PopID();
+					continue;
+				}
+				ImGui::PopID();
+				ImGui::SameLine();
+				if (ImGui::TreeNode((const void*)(uintptr)set_idx, "Set %d", set_idx)) {
+
+					ImGui::Columns(2);
+					for (u32 entry_idx = 0; entry_idx < (u32)m_controller.m_animation_entries.size(); ++entry_idx) {
+						Controller::AnimationEntry& entry = m_controller.m_animation_entries[entry_idx];
+						if (entry.set != set_idx) continue;
+
+						ImGui::PushID(entry_idx);
+						if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Delete")) {
+							m_controller.m_animation_entries.swapAndPop(entry_idx);
+							pushUndo();
+							ImGui::PopID();
+							continue;
+						}
+						ImGui::SameLine();
+						ImGui::SetNextItemWidth(-1);
+						saveUndo(inputSlot("##slot", &entry.slot));
+						ImGui::NextColumn();
+						ImGui::PushItemWidth(-1);
+						char path[LUMIX_MAX_PATH];
+						copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
+						if (m_app.getAssetBrowser().resourceInput("anim", Span(path), Animation::TYPE)) {
+							if (entry.animation) entry.animation->decRefCount();
+							ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
+							entry.animation = res_manager.load<Animation>(Path(path));
+							saveUndo(true);
+						}
+						ImGui::PopItemWidth();
+						ImGui::NextColumn();
+						ImGui::PopID();
+					}
+					ImGui::Columns();
+					if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add animation")) {
+						Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
+						entry.animation = nullptr;
+						entry.set = set_idx;
+						entry.slot = 0;
+						pushUndo();
+					}
+					ImGui::Columns();
+					ImGui::TreePop();
+				}
+			}
+
+			if (ImGui::Button(ICON_FA_PLUS_CIRCLE "##create_set")) {
+				Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
+				entry.animation = nullptr;
+				entry.set = max_set + 1;
+				entry.slot = 0;
+				pushUndo();
+			}
+			ImGui::SameLine();
+			ImGui::Bullet();
+			ImGui::TextUnformatted("New set");
+		}
+
+		void inputsGUI() {
+			InputDecl& inputs = m_controller.m_inputs;
+
+			ImGui::Columns(2);
+			ImGui::TextUnformatted("Name"); ImGui::NextColumn();
+			ImGui::TextUnformatted("Type"); ImGui::NextColumn();
+			for (InputDecl::Input& input : inputs.inputs) {
+				if (input.type == InputDecl::Type::EMPTY) continue;
+				ImGui::PushID(&input);
+				if(ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
+					inputs.removeInput(int(&input - inputs.inputs));
+					// TODO update input references in nodes
+					pushUndo();
+				}
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(-1);
+				saveUndo(ImGui::InputText("##name", input.name.data, sizeof(input.name.data)));
+				ImGui::NextColumn();
+				ImGui::SetNextItemWidth(-1);
+				if (ImGui::Combo("##type", (int*)&input.type, "float\0u32\0bool")) {
+					inputs.recalculateOffsets();
+					saveUndo(true);
+				}
+				ImGui::NextColumn();
+				ImGui::PopID();
+			}
+			ImGui::Columns();
+			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add input")) {
+				inputs.addInput();
+				pushUndo();
+			}
+		}
+
 		void windowGUI() override {
 			const CommonActions& actions = m_app.getCommonActions();
 
 			if (ImGui::BeginMenuBar()) {
-				if (ImGui::BeginMenu("File")) {
-					if (menuItem(actions.save, true)) saveAs(m_path);
-					if (ImGui::MenuItem("Save As")) m_show_save_as = true;
-					ImGui::EndMenu();
-				}
-				
-				if (ImGui::BeginMenu("Edit")) {
-					if (menuItem(actions.undo, canUndo())) undo();
-					if (menuItem(actions.redo, canRedo())) redo();
-					ImGui::EndMenu();
-				}
-
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
+				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo")) undo();
+				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo")) redo();
 				ImGui::EndMenuBar();
 			}
-
-			FileSelector& fs = m_app.getFileSelector();
-			if (fs.gui("Save As", &m_show_save_as, "act", true)) saveAs(fs.getPath());
 
 			if (!m_controller.m_root) {
 				ImGui::TextUnformatted("Create root:");
@@ -983,233 +1407,53 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::Unindent();
 			}
 
-			if (m_controller.m_root && hierarchy_ui(*m_controller.m_root)) {
-				pushUndo();
-			}
+			if (m_controller.m_root) hierarchy_ui(*m_controller.m_root);
 
-			if (m_current_node && ImGui::CollapsingHeader("Node")) {
-				if (ui_dispatch(*m_current_node)) {
-					pushUndo((uintptr)m_current_node);
-				}
+			if (m_current_node && ImGui::CollapsingHeader("Selected node")) {
+				ui_dispatch(*m_current_node);
 			}
 
 			if (ImGui::CollapsingHeader("Controller")) {
 				ImGuiEx::Label("Root motion bone");
-				ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data));
+				saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
 				bool xz_root_motion = m_controller.m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
 				ImGuiEx::Label("XZ root motion");
 				if (ImGui::Checkbox("##xzrm", &xz_root_motion)) {
 					m_controller.m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
-					pushUndo();
+					saveUndo(true);
+				}
+
+				if (ImGui::BeginTabBar("ctb")) {
+					if (ImGui::BeginTabItem("Inputs")) {
+						inputsGUI();
+						ImGui::EndTabItem();
+					}
+
+					if (ImGui::BeginTabItem("Bone masks")) {
+						boneMasksGUI();
+						ImGui::EndTabItem();
+					}
+
+					if (ImGui::BeginTabItem("IK")) {
+						IKGUI();
+						ImGui::EndTabItem();
+					}
+
+					ImGui::EndTabBar();
 				}
 			}
 
-			if (ImGui::CollapsingHeader("Inputs")) {
-				InputDecl& inputs = m_controller.m_inputs;
-				
-				ImGui::Columns(2);
-				if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) inputs.addInput();
-				ImGui::SameLine();
-				ImGui::TextUnformatted("Name"); ImGui::NextColumn();
-				ImGui::TextUnformatted("Type"); ImGui::NextColumn();
-				for (InputDecl::Input& input : inputs.inputs) {
-					if (input.type == InputDecl::Type::EMPTY) continue;
-					ImGui::PushID(&input);
-					if(ImGui::Button(ICON_FA_MINUS_CIRCLE)) inputs.removeInput(int(&input - inputs.inputs));
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(-1);
-					ImGui::InputText("##name", input.name.data, sizeof(input.name.data));
-					ImGui::NextColumn();
-					ImGui::SetNextItemWidth(-1);
-					if (ImGui::Combo("##type", (int*)&input.type, "float\0u32\0bool")) {
-						inputs.recalculateOffsets();
-						pushUndo();
-					}
-					ImGui::NextColumn();
-					ImGui::PopID();
-				}
-				ImGui::Columns();
-			}
-
-			if (ImGui::CollapsingHeader("Slots")) {
-				for (u32 i = 0; i < (u32)m_controller.m_animation_slots.size(); ++i) {
-					String& slot = m_controller.m_animation_slots[i];
-					char tmp[64];
-					copyString(tmp, slot.c_str());
-					ImGui::SetNextItemWidth(-1);
-					if (ImGui::InputText(StaticString<32>("##", (u64)(uintptr)&slot), tmp, sizeof(tmp))) {
-						// update AnimationNode::m_animation_hash
-						slot = tmp;
-						pushUndo();
-					}
-				}
-				if (ImGui::Button(ICON_FA_PLUS_CIRCLE "##create_slot")) {
-					m_controller.m_animation_slots.emplace("", m_controller.m_allocator);
-					pushUndo();
-				}
-			}
-
-			if (ImGui::CollapsingHeader("Animations")) {
-				ImGui::Columns(3);
-				ImGui::Text("Set");
-				ImGui::NextColumn();
-				ImGui::Text("Slot");
-				ImGui::NextColumn();
-				ImGui::Text("Animation");
-				ImGui::NextColumn();
-				ImGui::Separator();
-				for (u32 entry_idx = 0; entry_idx < (u32)m_controller.m_animation_entries.size(); ++entry_idx) {
-					ImGui::PushID(entry_idx);
-					Controller::AnimationEntry& entry = m_controller.m_animation_entries[entry_idx];
-					ImGui::SetNextItemWidth(-1);
-					ImGui::InputInt("##set", (int*)&entry.set);
-					ImGui::NextColumn();
-					const char* preview = entry.slot < (u32)m_controller.m_animation_slots.size() ? m_controller.m_animation_slots[entry.slot].c_str() : "N/A";
-					ImGui::SetNextItemWidth(-1);
-					if (ImGui::BeginCombo("##slot", preview, 0)) {
-						for (u32 i = 0, c = m_controller.m_animation_slots.size(); i < c; ++i) {
-							if (ImGui::Selectable(m_controller.m_animation_slots[i].c_str())) {
-								entry.slot = i;
-								pushUndo();
-							}
-						}
-						ImGui::EndCombo();
-					}
-					ImGui::NextColumn();
-					ImGui::PushItemWidth(-1);
-					char path[LUMIX_MAX_PATH];
-					copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
-					if (m_app.getAssetBrowser().resourceInput("anim", Span(path), Animation::TYPE)) {
-						if (entry.animation) entry.animation->decRefCount();
-						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
-						entry.animation = res_manager.load<Animation>(Path(path));
-						pushUndo();
-					}
-					ImGui::PopItemWidth();
-					ImGui::NextColumn();
-					ImGui::PopID();
-				}
-				ImGui::Columns();
-				if (ImGui::Button("Create##create_animation")) {
-					Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
-					entry.animation = nullptr;
-					entry.set = 0;
-					entry.slot = 0;
-					pushUndo();
-				}
-			}
-
-			if (ImGui::CollapsingHeader("Bone masks")) {
-				char model_path[LUMIX_MAX_PATH];
-				copyString(model_path, m_model ? m_model->getPath().c_str() : "");
-				ImGuiEx::Label("Model");
-				if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
-					m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+			if (ImGui::CollapsingHeader("Animations") && ImGui::BeginTabBar("tb")) {
+				if (ImGui::BeginTabItem("Slots")) {
+					slotsGUI();
+					ImGui::EndTabItem();
 				}
 
-				if (m_model) {
-					for (BoneMask& mask : m_controller.m_bone_masks) {
-						if (!ImGui::TreeNodeEx(&mask, 0, "%s", mask.name.data)) continue;
-				
-						ImGuiEx::Label("Name");
-						ImGui::InputText("##name", mask.name.data, sizeof(mask.name.data));
-						for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
-							const char* bone_name = m_model->getBone(i).name.c_str();
-							const BoneNameHash bone_name_hash(bone_name);
-							const bool is_masked = mask.bones.find(bone_name_hash).isValid();
-							bool b = is_masked;
-							ImGuiEx::Label(bone_name);
-							if (ImGui::Checkbox(StaticString<256>("##", bone_name), &b)) {
-								ASSERT(b != is_masked);
-								if (is_masked) {
-									mask.bones.erase(bone_name_hash);
-								}
-								else {
-									mask.bones.insert(bone_name_hash, 1);
-								}
-							}
-						}
-						ImGui::TreePop();
-					}
-					if (ImGui::Button("Add layer")) m_controller.m_bone_masks.emplace(m_controller.m_allocator);
+				if (ImGui::BeginTabItem("Sets")) {
+					setsGUI();
+					ImGui::EndTabItem();
 				}
-			}
-
-			if (ImGui::CollapsingHeader("IK")) {
-				char model_path[LUMIX_MAX_PATH];
-				copyString(model_path, m_model ? m_model->getPath().c_str() : "");
-				ImGuiEx::Label("Model");
-				if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
-					m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
-				}
-				if(m_model) {
-					for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
-						const StaticString<32> label("Chain ", i);
-						if (ImGui::TreeNode(label)) {
-							Controller::IK& ik = m_controller.m_ik[i];
-							ASSERT(ik.bones_count > 0);
-							const u32 bones_count = m_model->getBoneCount();
-							auto leaf_iter = m_model->getBoneIndex(ik.bones[ik.bones_count - 1]);
-							ImGuiEx::Label("Leaf");
-							if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
-								for (u32 j = 0; j < bones_count; ++j) {
-									const char* bone_name = m_model->getBone(j).name.c_str();
-									if (ImGui::Selectable(bone_name)) {
-										ik.bones_count = 1;
-										ik.bones[0] = BoneNameHash(bone_name);
-									}
-								}
-								ImGui::EndCombo();
-							}
-							for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
-								auto iter = m_model->getBoneIndex(ik.bones[j]);
-								if (iter.isValid()) {
-									ImGui::Text("%s", m_model->getBone(iter.value()).name.c_str());
-								}
-								else {
-									ImGui::Text("Unknown bone");
-								}
-							}
-
-							auto iter = m_model->getBoneIndex(ik.bones[0]);
-							if (iter.isValid()) {
-								if (ik.bones_count < lengthOf(ik.bones)) {
-									const int parent_idx = m_model->getBone(iter.value()).parent_idx;
-									if (parent_idx >= 0) {
-										const char* bone_name = m_model->getBone(parent_idx).name.c_str();
-										const StaticString<64> add_label("Add ", bone_name);
-										if (ImGui::Button(add_label)) {
-											memmove(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
-											ik.bones[0] = BoneNameHash(bone_name);
-											++ik.bones_count;
-										}
-									}
-								}
-								else {
-									ImGui::Text("IK is full");
-								}
-							}
-							else {
-								ImGui::Text("Unknown bone.");
-							}
-							if (ik.bones_count > 1) {
-								ImGui::SameLine();
-								if (ImGui::Button("Pop")) --ik.bones_count;
-							} 
-
-							ImGui::TreePop();
-						}
-					}
-
-					if (m_controller.m_ik_count < (u32)lengthOf(m_controller.m_ik[0].bones) && ImGui::Button("Add chain")) {
-						m_controller.m_ik[m_controller.m_ik_count].bones_count = 1;
-						m_controller.m_ik[m_controller.m_ik_count].bones[0] = BoneNameHash();
-						++m_controller.m_ik_count;
-					}
-				}
-				else {
-					ImGui::Text("Please select a model.");
-				}
+				ImGui::EndTabBar();
 			}
 
 			debuggerUI();
@@ -1231,6 +1475,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			Node::Type node_type;
 		} m_copy_buffer;
 
+		struct ControllerDebugMapping {
+			i32 axis_x = -1;
+			i32 axis_y = -1;
+		};
+
 		WorldViewer m_viewer;
 		IAllocator& m_allocator;
 		StudioApp& m_app;
@@ -1241,9 +1490,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		Node* m_current_node = nullptr;
 		Model* m_model = nullptr;
 		Path m_path;
-		bool m_show_save_as = false;
 		bool m_was_preview_ready = false;
 		float m_playback_speed = 1.f;
+		ControllerDebugMapping m_controller_debug_mapping;
 	};
 
 	ControllerEditorImpl(StudioApp& app)

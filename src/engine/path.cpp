@@ -18,12 +18,12 @@ Path::Path()
 {}
 
 
-Path::Path(const char* path) {
+Path::Path(StringView path) {
 	normalize(path, Span(m_path));
 	endUpdate();
 }
 
-void Path::add(const char* value) {
+void Path::add(StringView value) {
 	char tmp[LUMIX_MAX_PATH];
 	copyString(tmp, m_path);
 	catString(tmp, value);
@@ -81,153 +81,120 @@ bool Path::operator!=(const Path& rhs) const {
 	#endif
 }
 
-void Path::normalize(const char* path, Span<char> output)
-{
-	char* out = output.begin();
+void Path::normalize(StringView path, Span<char> output) {
 	u32 max_size = output.length();
 	ASSERT(max_size > 0);
-	u32 i = 0;
+	char* out = output.begin();
+	
+	path.ensureEnd();
+	if (path.size() == 0) {
+		*out = '\0';
+		return;
+	}
 
+	u32 i = 0;
 	bool is_prev_slash = false;
 
-	if (path[0] == '.' && (path[1] == '\\' || path[1] == '/'))
-		path += 2;
+	const char* c = path.begin;
+	if (c[0] == '.' && path.size() > 1 && (c[1] == '\\' || c[1] == '/')) c += 2;
+	
 	#ifdef _WIN32
-		if (path[0] == '\\' || path[0] == '/')
-			++path;
+		if (c != path.end && (c[0] == '\\' || c[0] == '/')) ++c;
 	#endif
-	while (*path != '\0' && i < max_size)
-	{
-		bool is_current_slash = *path == '\\' || *path == '/';
 
-		if (is_current_slash && is_prev_slash)
-		{
-			++path;
+	while (c != path.end && i < max_size) {
+		bool is_current_slash = *c == '\\' || *c == '/';
+
+		if (is_current_slash && is_prev_slash) {
+			++c;
 			continue;
 		}
 
-		*out = *path == '\\' ? '/' : *path;
+		*out = *c == '\\' ? '/' : *c;
 
-		path++;
+		c++;
 		out++;
 		i++;
 
 		is_prev_slash = is_current_slash;
 	}
+	ASSERT(i < max_size);
 	(i < max_size ? *out : *(out - 1)) = '\0';
 }
 
-Span<const char> Path::getDir(Span<const char> src) {
-	if (src.length() == 0) return {nullptr, nullptr};
+StringView Path::getDir(StringView src) {
+	if (src.empty()) return src;
 	
-	Span<const char> dir = src.fromRight(1);
-	while (dir.m_end != dir.m_begin && *dir.m_end != '\\' && *dir.m_end != '/') {
-		--dir.m_end;
+	src.ensureEnd();
+	StringView dir = src;
+	dir.removeSuffix(1);
+
+	while (dir.end != dir.begin && *dir.end != '\\' && *dir.end != '/') {
+		--dir.end;
 	}
-	if (dir.m_end != dir.m_begin) ++dir.m_end;
+	if (dir.end != dir.begin) ++dir.end;
 	return dir;
 }
 
-Span<const char> Path::getDir(const char* src)
-{
-	if (!src[0]) return {nullptr, nullptr};
+StringView Path::getBasename(StringView src) {
+	src.ensureEnd();
 	
-	Span<const char> dir;
-	dir.m_begin = src;
-	dir.m_end = src + stringLength(src) - 1;
-	while (dir.m_end != dir.m_begin && *dir.m_end != '\\' && *dir.m_end != '/') {
-		--dir.m_end;
-	}
-	if (dir.m_end != dir.m_begin) ++dir.m_end;
-	return dir;
-}
+	if (src.size() == 0) return src;
+	if (src.back() == '/' || src.back() == '\\') src.removeSuffix(1);
 
-Span<const char> Path::getBasename(Span<const char> src)
-{
-	if (src.length() == 0) return src;
-	if (src.back() == '/' || src.back() == '\\') src = src.fromRight(1);
-
-	Span<const char> res;
-	const char* end = src.end();
-	res.m_end = end;
-	res.m_begin = end - 1;
-	while (res.m_begin != src.begin() && *res.m_begin != '\\' && *res.m_begin != '/') {
-		--res.m_begin;
+	StringView res;
+	const char* end = src.end;
+	res.end = end;
+	res.begin = end - 1;
+	while (res.begin != src.begin && *res.begin != '\\' && *res.begin != '/') {
+		--res.begin;
 	}
 
-	if (*res.m_begin == '\\' || *res.m_begin == '/') ++res.m_begin;
-	res.m_end = res.m_begin;
+	if (*res.begin == '\\' || *res.begin == '/') ++res.begin;
+	res.end = res.begin;
 
-	while (res.m_end != end && *res.m_end != '.') ++res.m_end;
-
-	return res;
-}
-Span<const char> Path::getBasename(const char* src)
-{
-	if (!src[0]) return Span<const char>(src, src);
-
-	Span<const char> res;
-	const char* end = src + stringLength(src);
-	res.m_end = end;
-	res.m_begin = end;
-	while (res.m_begin != src && *res.m_begin != '\\' && *res.m_begin != '/') {
-		--res.m_begin;
-	}
-
-	if (*res.m_begin == '\\' || *res.m_begin == '/') ++res.m_begin;
-	res.m_end = res.m_begin;
-
-	while (res.m_end != end && *res.m_end != '.') ++res.m_end;
+	while (res.end != end && *res.end != '.') ++res.end;
 
 	return res;
 }
 
+StringView Path::getExtension(StringView src) {
+	src.ensureEnd();
+	
+	if (src.size() == 0) return src;
 
-Span<const char> Path::getExtension(const char* src)
-{
-	if (src[0] == '\0') return Span<const char>(nullptr, u32(0));
+	StringView res;
+	res.end = src.end;
+	res.begin = src.end - 1;
 
-	Span<const char> res;
-	res.m_end = src + stringLength(src);
-	res.m_begin = res.m_end - 1;
-
-	while(res.m_begin != src && *res.m_begin != '.') {
-		--res.m_begin;
+	while(res.begin != src.begin && *res.begin != '.') {
+		--res.begin;
 	}
-	if (*res.m_begin != '.') return Span<const char>(nullptr, nullptr);
-	++res.m_begin;
+	if (*res.begin != '.') return StringView(nullptr, nullptr);
+	++res.begin;
 	return res;
 }
 
-Span<const char> Path::getExtension(Span<const char> src)
-{
-	if (src.length() == 0) return src;
-
-	Span<const char> res;
-	res.m_end = src.m_end;
-	res.m_begin = src.m_end - 1;
-
-	while(res.m_begin != src.m_begin && *res.m_begin != '.') {
-		--res.m_begin;
+StringView Path::getSubresource(StringView str) {
+	StringView ret;
+	ret.begin = str.begin;
+	ret.end = str.begin;
+	if (str.end) {
+		while(ret.end != str.end && *ret.end != ':') ++ret.end;
 	}
-	if (*res.m_begin != '.') return Span<const char>(nullptr, nullptr);
-	++res.m_begin;
-	return res;
-}
-
-Span<const char> Path::getSubresource(const char* str) {
-	Span<const char> ret;
-	ret.m_begin = str;
-	ret.m_end = str;
-	while(*ret.m_end && *ret.m_end != ':') ++ret.m_end;
+	else {
+		while(*ret.end && *ret.end != ':') ++ret.end;
+	}
 	return ret;
 }
 
-bool Path::isSame(Span<const char> a, Span<const char> b) {
-	if (a.length() > 0 && (a.back() == '\\' || a.back() == '/')) --a.m_end;
-	if (b.length() > 0 && (b.back() == '\\' || b.back() == '/')) --b.m_end;
-	if (a.length() == 0 && b.length() == 1 && b[0] == '.') return true; 
-	if (b.length() == 0 && a.length() == 1 && a[0] == '.') return true; 
+bool Path::isSame(StringView a, StringView b) {
+	a.ensureEnd();
+	b.ensureEnd();
+	if (a.size() > 0 && (a.back() == '\\' || a.back() == '/')) --a.end;
+	if (b.size() > 0 && (b.back() == '\\' || b.back() == '/')) --b.end;
+	if (a.size() == 0 && b.size() == 1 && b[0] == '.') return true; 
+	if (b.size() == 0 && a.size() == 1 && a[0] == '.') return true; 
 	return equalStrings(a, b);
 }
 
@@ -255,25 +222,19 @@ bool Path::replaceExtension(char* path, const char* ext)
 	return true;
 }
 
-
-bool Path::hasExtension(const char* filename, const char* ext)
-{
-	char tmp[20];
-	copyString(Span(tmp), getExtension(Span(filename, stringLength(filename))));
-
-	return equalIStrings(tmp, ext);
+bool Path::hasExtension(StringView filename, StringView ext) {
+	return equalIStrings(getExtension(filename), ext);
 }
 
-Path::operator Span<const char>() const {
-	return Span(m_path, stringLength(m_path));
+Path::operator StringView() const {
+	return StringView(m_path);
 }
 
 Path::operator const char*() const { return m_path; }
 
-PathInfo::PathInfo(const char* path) {
-	char tmp[LUMIX_MAX_PATH];
-	Path::normalize(path, Span(tmp));
-	copyString(Span(m_extension), Path::getExtension(Span(tmp, stringLength(tmp))));
+PathInfo::PathInfo(StringView path) {
+	Path tmp(path);
+	copyString(Span(m_extension), Path::getExtension(tmp));
 	copyString(Span(m_basename), Path::getBasename(tmp));
 	copyString(Span(m_dir), Path::getDir(tmp));
 }

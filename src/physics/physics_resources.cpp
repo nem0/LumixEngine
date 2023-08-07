@@ -161,7 +161,7 @@ bool PhysicsMaterial::load(Span<const u8> mem) {
 	PhysicsMaterialLoadData tmp;
 	lua_State* L = mng.getState(tmp);
 
-	const Span<const char> content((const char*)mem.begin(), mem.length());
+	StringView content((const char*)mem.begin(), mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		return false;
 	}

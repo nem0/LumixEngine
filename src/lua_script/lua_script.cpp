@@ -18,7 +18,7 @@ LuaScript::~LuaScript() = default;
 void LuaScript::unload() { m_source_code = ""; }
 
 bool LuaScript::load(Span<const u8> mem) {
-	m_source_code = Span((const char*)mem.begin(), mem.length());
+	m_source_code = StringView((const char*)mem.begin(), mem.length());
 	return true;
 }
 
