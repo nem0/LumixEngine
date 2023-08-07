@@ -599,6 +599,8 @@ u32 SelectNode::getChildIndex(float input_val) const {
 }
 
 void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+	if (m_children.empty()) return;
+
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	
 	const float input_val = getInputValue(ctx, m_input_index);
@@ -641,16 +643,21 @@ void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 }
 
 void SelectNode::enter(RuntimeContext& ctx) const {
+	if (m_children.empty()) return;
+
 	RuntimeData runtime_data = { 0, 0, Time(0) };
 	const float input_val = getInputValue(ctx, m_input_index);
 	runtime_data.from = getChildIndex(input_val);
 	runtime_data.to = runtime_data.from;
 	ctx.data.write(runtime_data);
-	if(runtime_data.from < (u32)m_children.size())
+	if (runtime_data.from < (u32)m_children.size()) {
 		m_children[runtime_data.from].node->enter(ctx);
+	}
 }
 
 void SelectNode::skip(RuntimeContext& ctx) const {
+	if (m_children.empty()) return;
+
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	m_children[data.from].node->skip(ctx);
 	if (data.from != data.to) {
@@ -659,6 +666,8 @@ void SelectNode::skip(RuntimeContext& ctx) const {
 }
 
 void SelectNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
+	if (m_children.empty()) return;
+
 	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 
 	m_children[data.from].node->getPose(ctx, weight, pose, mask);

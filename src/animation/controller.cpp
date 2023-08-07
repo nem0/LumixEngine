@@ -75,7 +75,7 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 			ctx->animations[anim.slot] = anim.animation;
 		}
 	}
-	m_root->enter(*ctx);
+	if (m_root) m_root->enter(*ctx);
 	return ctx;
 }
 
@@ -115,7 +115,7 @@ void Controller::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 	ctx.data.reserve(mem.length());
 	ctx.events.clear();
 	ctx.input_runtime.set(mem.begin(), mem.length());
-	m_root->update(ctx, root_motion);
+	if (m_root) m_root->update(ctx, root_motion);
 	processEvents(ctx);
 
 	m_allocator.deallocate(mem.begin());
@@ -148,7 +148,7 @@ void Controller::getPose(RuntimeContext& ctx, Pose& pose) {
 		root_bind_pose.rot = pose.rotations[root_bone_idx];
 	}
 	
-	m_root->getPose(ctx, 1.f, pose, 0xffFFffFF);
+	if (m_root) m_root->getPose(ctx, 1.f, pose, 0xffFFffFF);
 	
 	// TODO this should be in AnimationNode
 	if (root_bone_iter.isValid()) {

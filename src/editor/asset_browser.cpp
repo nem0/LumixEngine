@@ -598,7 +598,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto common_popup = [&](){
 			const char* base_path = fs.getBasePath();
 			ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
-			if (ImGui::Checkbox("Subresources", &m_show_subresources)) changeDir(m_dir, false);
+			if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
+				ImGui::CloseCurrentPopup();
+				changeDir(m_dir, false);
+			}
 			if (ImGui::SliderFloat("Icon size", &m_thumbnail_size, 0.3f, 3.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
 				refreshLabels();
 			}

@@ -403,6 +403,18 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			switch (node.m_parent->type()) {
 				default: break;
+				case Node::Type::SELECT: {
+					SelectNode* select = (SelectNode*)node.m_parent;
+					for (SelectNode::Child& c : select->m_children) {
+						if (c.node != &node) continue;
+					
+						const InputDecl::Input& input = m_controller.m_inputs.inputs[select->m_input_index];
+						ImGuiEx::Label(StaticString<64>(input.name, " <= "));
+						saveUndo(ImGui::DragFloat("##mv", &c.max_value));
+						// TODO sort children by c.max_value
+					}
+					break;
+				}
 				case Node::Type::LAYERS:
 					if (!m_controller.m_bone_masks.empty()) {
 						LayersNode* layers = (LayersNode*)node.m_parent;
@@ -1404,6 +1416,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (ImGui::Selectable("Condition")) createRoot(Node::CONDITION, m_controller.m_allocator);
 				if (ImGui::Selectable("Group")) createRoot(Node::GROUP, m_controller.m_allocator);
 				if (ImGui::Selectable("Layers")) createRoot(Node::LAYERS, m_controller.m_allocator);
+				if (ImGui::Selectable("Select")) createRoot(Node::SELECT, m_controller.m_allocator);
 				ImGui::Unindent();
 			}
 
