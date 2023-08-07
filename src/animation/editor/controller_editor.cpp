@@ -199,6 +199,52 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			return node;
 		}
 
+		void deleteNode(Node& node) {
+			if (m_current_node == &node) m_current_node = nullptr;
+						
+			if (!node.m_parent) { 
+				m_controller.m_root = nullptr;
+			}
+			else {
+				switch(node.m_parent->type()) {
+					case Node::NONE:
+					case Node::BLEND1D:
+					case Node::ANIMATION: ASSERT(false); break;
+					case Node::LAYERS: 
+						((LayersNode*)node.m_parent)->m_layers.eraseItems([&node](LayersNode::Layer& c){ return c.node == &node; });
+						break;
+					case Node::CONDITION: {
+						ConditionNode* cond = (ConditionNode*)node.m_parent;
+						if (cond->m_true_node == &node) cond->m_true_node = nullptr;
+						else if (cond->m_false_node == &node) cond->m_false_node = nullptr;
+						break;
+					}
+					case Node::SELECT:
+						((SelectNode*)node.m_parent)->m_children.eraseItems([&node](SelectNode::Child& c){ return c.node == &node; });
+						break;
+					case Node::GROUP:
+						((GroupNode*)node.m_parent)->m_children.eraseItems([&node](GroupNode::Child& c){ return c.node == &node; });
+						break;
+				}
+			} 
+				
+			LUMIX_DELETE(m_controller.m_allocator, &node);
+		}
+
+		Node* createChild(Node& parent, Node::Type type, IAllocator& allocator) {
+			switch(parent.type()) {
+				case Node::BLEND1D:
+				case Node::NONE:
+				case Node::ANIMATION: ASSERT(false); return nullptr;
+				case Node::GROUP: return createChild((GroupNode&)parent, type, allocator);
+				case Node::CONDITION: return createChild((ConditionNode&)parent, type, allocator);
+				case Node::LAYERS: return createChild((LayersNode&)parent, type, allocator);
+				case Node::SELECT: return createChild((SelectNode&)parent, type, allocator);
+			}
+			ASSERT(false);
+			return nullptr;
+		}
+
 		Node* createChild(LayersNode& parent, Node::Type type, IAllocator& allocator) {
 			Node* node = nullptr;
 			switch(type) {
@@ -642,6 +688,69 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			return false;
 		}
 
+		void copyChildData(Node& src, Node& dst) {
+			if (!dst.m_parent) return;
+			if (!src.m_parent) return;
+			if (src.m_parent->type() != dst.m_parent->type()) return;
+
+			switch (src.m_parent->type()) {
+				case Node::NONE:
+				case Node::ANIMATION:
+				case Node::BLEND1D: ASSERT(false); break;
+				case Node::CONDITION: break;
+				case Node::LAYERS: {
+					auto* src_p = (LayersNode*)src.m_parent;
+					auto* dst_p = (LayersNode*)dst.m_parent;
+					for (LayersNode::Layer& s : src_p->m_layers) {
+						if (s.node == &src) {
+							for (LayersNode::Layer& c : dst_p->m_layers) {
+								if (c.node == &dst) {
+									c.mask = s.mask;
+									c.name = s.name;
+									break;
+								}
+							}
+							break;
+						}
+					}
+					break;
+				}
+				case Node::SELECT: {
+					auto* src_p = (SelectNode*)src.m_parent;
+					auto* dst_p = (SelectNode*)dst.m_parent;
+					if (src_p->m_input_index != dst_p->m_input_index) return;
+
+					for (SelectNode::Child& s : src_p->m_children) {
+						if (s.node == &src) {
+							for (SelectNode::Child& c : dst_p->m_children) {
+								if (c.node == &dst) {
+									c.max_value = s.max_value;
+									break;
+								}
+							}
+							break;
+						}
+					}
+					break;
+				}
+				case Node::GROUP:
+					for (GroupNode::Child& s : ((GroupNode*)src.m_parent)->m_children) {
+						if (s.node == &src) {
+							for (GroupNode::Child& c : ((GroupNode*)dst.m_parent)->m_children) {
+								if (c.node == &dst) {
+									c.flags = s.flags;
+									c.condition_str = s.condition_str;
+									c.condition.compile(s.condition_str.c_str(), m_controller.m_inputs);
+									break;
+								}
+							}
+							break;
+						}
+					}
+					break;
+			}
+		}
+
 		void hierarchy_ui(Node& node) {
 			const bool is_container = isContainer(node);
 			const bool is_parent_group = node.m_parent && node.m_parent->type() == Node::Type::GROUP;
@@ -663,42 +772,27 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			else {
 				open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", getName(node), type_str);
 			}
-			if (is_parent_group) {
-				if (ImGui::BeginDragDropSource()) {
-					ImGui::TextUnformatted(getName(node));
-					void* ptr = &node;
-					ImGui::SetDragDropPayload("anim_node", &ptr, sizeof(ptr));
-					ImGui::EndDragDropSource();
-				}
+
+			if (ImGui::BeginDragDropSource()) {
+				ImGui::TextUnformatted(getName(node));
+				void* ptr = &node;
+				ImGui::SetDragDropPayload("anim_node", &ptr, sizeof(ptr));
+				ImGui::EndDragDropSource();
 			}
 
-			if (is_group) {
+			if (is_container) {
 				if (ImGui::BeginDragDropTarget()) {
 					if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
 						Node* dropped_node = *(Node**)payload->Data;
 						ASSERT(dropped_node->m_parent);
-						ASSERT(dropped_node->m_parent->type() == Node::GROUP);
 						OutputMemoryStream blob(m_app.getAllocator());
 						dropped_node->serialize(blob);
-						Node* new_node = createChild((GroupNode&)node, dropped_node->type(), m_controller.m_allocator);
+						Node* new_node = createChild(node, dropped_node->type(), m_controller.m_allocator);
 						InputMemoryStream iblob(blob);
 						new_node->deserialize(iblob, m_controller, (u32)ControllerVersion::LATEST);
-						for (GroupNode::Child& src : ((GroupNode*)dropped_node->m_parent)->m_children) {
-							if (src.node == dropped_node) {
-								for (GroupNode::Child& c : ((GroupNode*)new_node->m_parent)->m_children) {
-									if (c.node == new_node) {
-										c.flags = src.flags;
-										c.condition_str = src.condition_str;
-										c.condition.compile(src.condition_str.c_str(), m_controller.m_inputs);
-										break;
-									}
-								}
-								break;
-							}
-						}
+						copyChildData(*dropped_node, *new_node);
 						if (m_current_node == dropped_node) m_current_node = nullptr;
-						((GroupNode*)dropped_node->m_parent)->m_children.eraseItems([dropped_node](GroupNode::Child& c){ return c.node == dropped_node; });
-						LUMIX_DELETE(m_controller.m_allocator, dropped_node);
+						deleteNode(*dropped_node);
 						ImGui::TreePop();
 						ImGui::PopID();
 						if (!is_selectable) ImGui::PopStyleColor();
@@ -798,21 +892,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				}
 
 				if (ImGui::Selectable("Remove")) {
-					if (m_current_node == &node) m_current_node = nullptr;
-						
-					if (!node.m_parent) {
-						m_controller.m_root = nullptr;
-					}
-					else if (is_parent_condition) {
-						ConditionNode* cond = (ConditionNode*)node.m_parent;
-						if (cond->m_true_node == &node) cond->m_true_node = nullptr;
-						else if (cond->m_false_node == &node) cond->m_false_node = nullptr;
-					}
-					else if (is_parent_group) {
-						((GroupNode*)node.m_parent)->m_children.eraseItems([&node](GroupNode::Child& c){ return c.node == &node; });
-					}
-	
-					LUMIX_DELETE(m_controller.m_allocator, &node);
+					deleteNode(node);
 					ImGui::EndPopup();
 					ImGui::TreePop();
 					ImGui::PopID();
