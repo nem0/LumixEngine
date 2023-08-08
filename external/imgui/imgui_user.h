@@ -4,6 +4,7 @@
 
 struct lua_State;
 
+namespace Lumix { struct StringView; }
 
 namespace ImGuiEx
 {
@@ -72,6 +73,7 @@ IMGUI_API bool Gradient4(const char* label, int max_count, int* count, float* ke
 IMGUI_API void PushReadOnly();
 IMGUI_API void PopReadOnly();
 IMGUI_API bool filter(const char* hint, char* buf, int buf_size, float width = -1, bool set_keyboard_focus = false);
+IMGUI_API void TextUnformatted(Lumix::StringView str);
 
 struct IMGUI_API Canvas {
 	~Canvas();

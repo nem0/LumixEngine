@@ -1,4 +1,5 @@
 #include "engine/math.h"
+#include "engine/string.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <math.h>
@@ -48,6 +49,10 @@ namespace ImGuiEx {
 
 	ImVec2 GetNodeEditorOffset() {
 		return *g_node_editor.canvas_offset;
+	}
+
+	void TextUnformatted(Lumix::StringView str) {
+		ImGui::TextUnformatted(str.begin, str.end);
 	}
 
 	void BeginNodeEditor(const char* title, ImVec2* offset) {
