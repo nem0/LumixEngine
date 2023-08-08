@@ -294,12 +294,12 @@ void World::setPosition(EntityRef entity, const DVec3& pos)
 }
 
 
-void World::setEntityName(EntityRef entity, const char* name)
+void World::setEntityName(EntityRef entity, StringView name)
 {
 	int name_idx = m_entities[entity.index].name;
 	if (name_idx < 0)
 	{
-		if (name[0] == '\0') return;
+		if (name.empty()) return;
 		m_entities[entity.index].name = m_names.size();
 		EntityName name_data;
 		name_data.entity = entity;

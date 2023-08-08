@@ -108,7 +108,7 @@ void LogUI::showNotifications()
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{
 		if (i > 0) ImGui::Separator();
-		ImGui::Text("%s", m_notifications[i].message.c_str());
+		ImGuiEx::TextUnformatted(m_notifications[i].message);
 	}
 
 end:

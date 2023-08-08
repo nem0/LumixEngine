@@ -1733,9 +1733,9 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
 	if (ImGui::BeginPopupModal("Add surface")) {
 		ImGuiEx::Label("Albedo");
-		m_app.getAssetBrowser().resourceInput("albedo", Span(m_add_layer_popup.albedo), Texture::TYPE);
+		m_app.getAssetBrowser().resourceInput("albedo", m_add_layer_popup.albedo, Texture::TYPE);
 		ImGuiEx::Label("Normal");
-		m_app.getAssetBrowser().resourceInput("normal", Span(m_add_layer_popup.normal), Texture::TYPE);
+		m_app.getAssetBrowser().resourceInput("normal", m_add_layer_popup.normal, Texture::TYPE);
 		if (ImGui::Button(ICON_FA_PLUS "Add")) {
 			saveCompositeTexture(albedo->getPath(), m_add_layer_popup.albedo);
 			saveCompositeTexture(normal->getPath(), m_add_layer_popup.normal);
@@ -1763,7 +1763,7 @@ void TerrainEditor::compositeTextureRemoveLayer(const Path& path, i32 layer) con
 	}
 }
 
-void TerrainEditor::saveCompositeTexture(const Path& path, const char* channel) const
+void TerrainEditor::saveCompositeTexture(const Path& path, const Path& channel) const
 {
 	CompositeTexture texture(m_app, m_app.getAllocator());
 	FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -1805,13 +1805,13 @@ void TerrainEditor::entityGUI() {
 		for (const AssetCompiler::ResourceItem& res : resources) {
 			if (res.type != PrefabResource::TYPE) continue;
 			++count;
-			if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
+			if (filter[0] != 0 && stristr(res.path, filter) == nullptr) continue;
 			int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
 				return r && r->getPath() == res.path;
 			});
 			bool selected = selected_idx >= 0;
 			const char* loading_str = selected_idx >= 0 && m_selected_prefabs[selected_idx]->isEmpty() ? " - loading..." : "";
-			StaticString<LUMIX_MAX_PATH + 15> label(res.path.c_str(), loading_str);
+			StaticString<LUMIX_MAX_PATH + 15> label(res.path, loading_str);
 			if (ImGui::Selectable(label, &selected)) {
 				if (selected) {
 					ResourceManagerHub& manager = m_app.getEngine().getResourceManager();
@@ -1907,8 +1907,7 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 		return;
 	}
 
-	char basename[LUMIX_MAX_PATH];
-	copyString(Span(basename), Path::getBasename(filename));
+	StringView basename = Path::getBasename(filename);
 
 	auto* module = static_cast<RenderModule*>(cmp.module);
 	const EntityRef e = (EntityRef)cmp.entity;
@@ -1970,9 +1969,7 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 
 	file.close();
 
-	char dir[LUMIX_MAX_PATH];
-	copyString(Span(dir), Path::getDir(filename));
-	StaticString<LUMIX_MAX_PATH> mtl_filename(dir, basename, ".mtl");
+	StaticString<LUMIX_MAX_PATH> mtl_filename(Path::getDir(filename), basename, ".mtl");
 
 	if (!file.open(mtl_filename)) {
 		logError("Failed to open ", mtl_filename);

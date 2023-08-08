@@ -80,7 +80,7 @@ struct LUMIX_RENDERER_API Mesh {
 	Mesh(Material* mat,
 		const gpu::VertexDecl& vertex_decl,
 		u8 vb_stride,
-		const char* name,
+		StringView name,
 		const AttributeSemantic* semantics,
 		Renderer& renderer,
 		IAllocator& allocator);

@@ -163,12 +163,12 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin 
 		OutputMemoryStream compiled(m_app.getAllocator());
 		compiled.reserve(64 + src_data.size());
 		compiled.write((u32)0);
-		const bool is_wav = Path::hasExtension(src.c_str(), "wav");
+		const bool is_wav = Path::hasExtension(src, "wav");
 		compiled.write(is_wav ? Clip::Format::WAV : Clip::Format::OGG);
 		compiled.write(meta.looped);
 		compiled.write(meta.volume);
 		compiled.write(src_data.data(), src_data.size());
-		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(compiled.data(), (i32)compiled.size()));
+		return m_app.getAssetCompiler().writeCompiledResource(src, Span(compiled.data(), (i32)compiled.size()));
 	}
 
 	const char* getLabel() const override { return "Audio"; }

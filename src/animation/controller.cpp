@@ -185,13 +185,13 @@ void Controller::serialize(OutputMemoryStream& stream) {
 	stream.write(InputDecl::EMPTY);
 	stream.write((u32)m_animation_slots.size());
 	for (const String& slot : m_animation_slots) {
-		stream.writeString(slot.c_str());
+		stream.writeString(slot);
 	}
 	stream.write((u32)m_animation_entries.size());
 	for (const AnimationEntry& entry : m_animation_entries) {
 		stream.write(entry.slot);
 		stream.write(entry.set);
-		stream.writeString(entry.animation ? entry.animation->getPath().c_str() : "");
+		stream.writeString(entry.animation ? entry.animation->getPath() : Path());
 	}
 	stream.write(m_ik);
 	stream.write(m_ik_count);

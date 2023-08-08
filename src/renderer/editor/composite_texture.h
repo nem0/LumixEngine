@@ -120,7 +120,7 @@ struct CompositeTexture {
 	bool deserialize(InputMemoryStream& blob);
 	bool generate(Result* result);
 	
-	void addArrayLayer(const char* path);
+	void addArrayLayer(const Path& path);
 	void removeArrayLayer(u32 idx);
 	void initTerrainAlbedo();
 	void initTerrainNormal();

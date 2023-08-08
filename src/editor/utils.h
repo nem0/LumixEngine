@@ -186,18 +186,4 @@ struct NodeEditor : SimpleUndoRedo {
 	u32 m_dragged_node = 0xFFffFFff;
 };
 
-struct RecentPaths {
-	RecentPaths(const char* settings_name, u32 max_paths, StudioApp& app);
-	
-	void onBeforeSettingsSaved();
-	void onSettingsLoaded();
-	void push(const char* path);
-	const char* menu();
-	
-	StudioApp& m_app;
-	Array<String> m_paths;
-	const char* m_settings_name;
-	u32 m_max_paths;
-};
-
 } // namespace Lumix

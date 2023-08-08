@@ -128,7 +128,7 @@ int SliderFloat(lua_State* L)
 int Text(lua_State* L)
 {
 	auto* text = LuaWrapper::checkArg<const char*>(L, 1);
-	ImGui::Text("%s", text);
+	ImGui::TextUnformatted(text);
 	return 0;
 }
 
@@ -388,7 +388,7 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 static int LUA_packageLoader(lua_State* L)
 {
 	const char* module = LuaWrapper::toType<const char*>(L, 1);
-	StaticString<LUMIX_MAX_PATH> tmp(module);
+	Path tmp(module);
 	lua_getglobal(L, "LumixAPI");
 	lua_getfield(L, -1, "engine");
 	lua_remove(L, -2);
@@ -397,17 +397,17 @@ static int LUA_packageLoader(lua_State* L)
 	auto& fs = engine->getFileSystem();
 	OutputMemoryStream buf(engine->getAllocator());
 	bool loaded = true;
-	if (!fs.getContentSync(Path(tmp), buf)) {
-		tmp.add(".lua");
-		if (!fs.getContentSync(Path(tmp), buf)) {
+	if (!fs.getContentSync(tmp, buf)) {
+		tmp.append(".lua");
+		if (!fs.getContentSync(tmp, buf)) {
 			loaded = false;
 			logError("Failed to open file ", tmp);
 			StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
-			msg.add(tmp);
+			msg.append(tmp.c_str());
 			lua_pushstring(L, msg);
 		}
 	}
-	if (loaded && luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp) != 0) {
+	if (loaded && luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp.c_str()) != 0) {
 		logError("Failed to load package ", tmp, ": ", lua_tostring(L, -1));
 	}
 	return 1;
@@ -685,7 +685,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 		luaL_argerror(L, 3, "Unknown prefab.");
 	}
 	if (!prefab->isReady()) {
-		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
+		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath());
 	}
 	EntityMap entity_map(engine->getAllocator());
 	if (engine->instantiatePrefab(*world, *prefab, position, {0, 0, 0, 1}, {1, 1, 1}, entity_map)) {

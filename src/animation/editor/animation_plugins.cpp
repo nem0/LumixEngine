@@ -83,11 +83,10 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				anim_module->updateAnimable(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
 			}
 
-			char model_path[LUMIX_MAX_PATH];
-			copyString(model_path, m_model ? m_model->getPath() : "");
-			if (m_app.getAssetBrowser().resourceInput("Model", Span(model_path), ResourceType("model"))) {
+			Path model_path = m_model ? m_model->getPath() : Path();
+			if (m_app.getAssetBrowser().resourceInput("Model", model_path, ResourceType("model"))) {
 				if (m_model) m_model->decRefCount();
-				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
 				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
 				render_module->setModelInstancePath(*m_viewer.m_mesh, m_model ? m_model->getPath() : Path());
 			}
@@ -461,7 +460,7 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin {
 					ImGui::Columns(3);
 					for (u32 i = 0; i < pose->count; ++i)
 					{
-						ImGui::Text("%s", model->getBone(i).name.c_str());
+						ImGuiEx::TextUnformatted(model->getBone(i).name);
 						ImGui::NextColumn();
 						ImGui::Text("%f; %f; %f", pose->positions[i].x, pose->positions[i].y, pose->positions[i].z);
 						ImGui::NextColumn();

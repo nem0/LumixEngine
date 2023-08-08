@@ -34,7 +34,7 @@ static LocalRigidTransform invert(const LocalRigidTransform& tr)
 Mesh::Mesh(Material* mat,
 	const gpu::VertexDecl& vertex_decl,
 	u8 vb_stride,
-	const char* name,
+	StringView name,
 	const AttributeSemantic* semantics,
 	Renderer& renderer,
 	IAllocator& allocator)
@@ -385,22 +385,17 @@ bool Model::parseBones(InputMemoryStream& file)
 	file.read(bone_count);
 	if (bone_count < 0) return false;
 	if (bone_count > Bone::MAX_COUNT) {
-		logWarning("Model ", getPath().c_str(), " has too many bones.");
+		logWarning("Model ", getPath(), " has too many bones.");
 		return false;
 	}
 
 	m_bones.reserve(bone_count);
 	for (int i = 0; i < bone_count; ++i) {
 		Model::Bone& b = m_bones.emplace(m_allocator);
-		int len;
+		u32 len;
 		file.read(len);
-		char tmp[LUMIX_MAX_PATH];
-		if (len >= LUMIX_MAX_PATH) {
-			return false;
-		}
-		file.read(tmp, len);
-		tmp[len] = 0;
-		b.name = tmp;
+		const void* name = file.skip(len);
+		b.name = StringView((const char*)name, (const char*)name + len);
 		m_bone_map.insert(BoneNameHash(b.name.c_str()), m_bones.size() - 1);
 		file.read(b.parent_idx);
 		file.read(b.transform.pos);
@@ -486,19 +481,17 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		if (!parseVertexDecl(file, &vertex_decl, semantics, vb_stride)) return false;
 
 		u32 mat_path_length;
-		char mat_path[LUMIX_MAX_PATH + 128];
 		file.read(mat_path_length);
-		if (mat_path_length + 1 > lengthOf(mat_path)) return false;
-		file.read(mat_path, mat_path_length);
-		mat_path[mat_path_length] = '\0';
+		const void* mat_path_v = file.skip(mat_path_length);
+		StringView mat_path((const char*)mat_path_v, mat_path_length);
 		
 		Material* material = m_resource_manager.getOwner().load<Material>(Path(mat_path));
 	
-		i32 str_size;
+		u32 str_size;
 		file.read(str_size);
-		char mesh_name[LUMIX_MAX_PATH];
-		mesh_name[str_size] = 0;
-		file.read(mesh_name, str_size);
+		const void* tmp = file.skip(str_size);
+
+		StringView mesh_name((const char*)tmp, str_size);
 
 		m_meshes.emplace(material, vertex_decl, vb_stride, mesh_name, semantics, m_renderer, m_allocator);
 		addDependency(*material);

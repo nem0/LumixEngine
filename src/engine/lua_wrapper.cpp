@@ -67,7 +67,6 @@ bool execute(lua_State* L
 	, const char* name
 	, int nresults)
 {
-	content.ensureEnd();
 	lua_pushcfunction(L, traceback);
 	if (luaL_loadbuffer(L, content.begin, content.size(), name) != 0) {
 		logError(name, ": ", lua_tostring(L, -1));

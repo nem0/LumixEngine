@@ -1081,7 +1081,7 @@ struct GUIModuleImpl final : GUIModule {
 			serializer.write(rect->image != nullptr);
 			if (rect->image)
 			{
-				serializer.writeString(rect->image->sprite ? rect->image->sprite->getPath().c_str() : "");
+				serializer.writeString(rect->image->sprite ? rect->image->sprite->getPath() : Path());
 				serializer.write(rect->image->color);
 				serializer.write(rect->image->flags);
 			}
@@ -1091,7 +1091,7 @@ struct GUIModuleImpl final : GUIModule {
 			serializer.write(rect->text != nullptr);
 			if (rect->text)
 			{
-				serializer.writeString(rect->text->getFontResource() ? rect->text->getFontResource()->getPath().c_str() : "");
+				serializer.writeString(rect->text->getFontResource() ? rect->text->getFontResource()->getPath() : Path());
 				serializer.write(rect->text->horizontal_align);
 				serializer.write(rect->text->vertical_align);
 				serializer.write(rect->text->color);

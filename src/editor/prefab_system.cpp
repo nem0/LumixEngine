@@ -500,7 +500,7 @@ public:
 		for (const PrefabVersion& prefab : m_resources) {
 			if (prefab.instance_count == 0) continue;
 
-			serializer.writeString(prefab.resource->getPath().c_str());
+			serializer.writeString(prefab.resource->getPath());
 			serializer.write(prefab.content_hash);
 		}
 

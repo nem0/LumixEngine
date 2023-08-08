@@ -25,7 +25,6 @@ namespace Lumix
 {
 	static void pushObject(lua_State* L, void* obj, StringView type_name) {
 		ASSERT(!type_name.empty());
-		type_name.ensureEnd();
 		LuaWrapper::DebugGuard guard(L, 1);
 		lua_getglobal(L, "LumixAPI");
 		char tmp[64];
@@ -1519,7 +1518,7 @@ namespace Lumix
 
 			StaticString<1024> tmp(name, " = ");
 			if (prop.type == Property::STRING) tmp.append("\"", value, "\"");
-			else tmp.add(value);
+			else tmp.append(value);
 
 			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
 			if (errors)
@@ -1842,7 +1841,7 @@ namespace Lumix
 					if (inst.m_script->isReady())
 						getProperty(prop, property_name, inst, out);
 					else
-						copyString(out, prop.stored_value.c_str());
+						copyString(out, prop.stored_value);
 					return;
 				}
 			}
@@ -1870,7 +1869,7 @@ namespace Lumix
 			if (out.length() <= 0) return;
 			if (!scr.m_state)
 			{
-				copyString(out, prop.stored_value.c_str());
+				copyString(out, prop.stored_value);
 				return;
 			}
 
@@ -1880,7 +1879,7 @@ namespace Lumix
 			const int type = lua_type(scr.m_state, -1);
 			if (type == LUA_TNIL)
 			{
-				copyString(out, prop.stored_value.c_str());
+				copyString(out, prop.stored_value);
 				lua_pop(scr.m_state, 2);
 				return;
 			}
@@ -1935,7 +1934,7 @@ namespace Lumix
 				{
 					int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
 					Resource* res = m_system.m_engine.getLuaResource(res_idx);
-					copyString(out, res ? res->getPath().c_str() : "");
+					copyString(out, res ? res->getPath() : Path());
 				}
 				break;
 				default: ASSERT(false); break;
@@ -1959,7 +1958,7 @@ namespace Lumix
 				serializer.write(script_cmp->m_scripts.size());
 				for (auto& scr : script_cmp->m_scripts)
 				{
-					serializer.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
+					serializer.writeString(scr.m_script ? scr.m_script->getPath() : Path());
 					serializer.write(scr.m_flags);
 					serializer.write(scr.m_properties.size());
 					for (Property& prop : scr.m_properties)
@@ -2414,8 +2413,8 @@ namespace Lumix
 		ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
 
 		bool errors = luaL_loadbuffer(m_state,
-			m_script->getSourceCode(),
-			stringLength(m_script->getSourceCode()),
+			m_script->getSourceCode().begin,
+			m_script->getSourceCode().size(),
 			m_script->getPath().c_str()) != 0; // [env, func]
 
 		if (errors) {

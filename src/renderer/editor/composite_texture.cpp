@@ -2574,7 +2574,7 @@ struct InputNode final : CompositeTexture::Node {
 	bool hasOutputPins() const override { return true; }
 	
 	void serialize(OutputMemoryStream& blob) const override {
-		blob.writeString(m_texture.c_str());
+		blob.writeString(m_texture);
 	}
 	
 	void deserialize(InputMemoryStream& blob) override {
@@ -2603,10 +2603,7 @@ struct InputNode final : CompositeTexture::Node {
 	bool gui() override {
 		nodeTitle("Input");
 		outputSlot(); 
-		Span<char> span(m_texture.beginUpdate(), m_texture.capacity());
-		bool res = m_resource->m_app.getAssetBrowser().resourceInput("Source", span, Texture::TYPE, 150);
-		m_texture.endUpdate();
-		return res;
+		return m_resource->m_app.getAssetBrowser().resourceInput("Source", m_texture, Texture::TYPE, 150);
 	}
 
 	Path m_texture;
@@ -2894,7 +2891,7 @@ void CompositeTexture::removeArrayLayer(u32 idx) {
 
 }
 
-void CompositeTexture::addArrayLayer(const char* path) {
+void CompositeTexture::addArrayLayer(const Path& path) {
 	OutputNode* node = (OutputNode*)m_nodes[0];
 	if (node->m_output_type != OutputNode::OutputType::ARRAY) return;
 	InputNode* inode = (InputNode*)addNode(NodeType::INPUT);
@@ -3164,7 +3161,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 			struct : INodeTypeVisitor {
 				bool beginCategory(const char* _category) override {
 					category = _category;
-					category.add(" / ");
+					category.append(" / ");
 					return true;
 				}
 				void endCategory() override { category = ""; }

@@ -204,12 +204,10 @@ static void fromWChar(Span<char> out, const WCHAR* in)
 }
 
 
-template <int N> static void toWChar(WCHAR (&out)[N], const char* in)
-{
-	const char* c = in;
+template <int N> static void toWChar(WCHAR (&out)[N], StringView in) {
+	const char* c = in.begin;
 	WCHAR* cout = out;
-	while (*c && c - in < N - 1)
-	{
+	while (c != in.end && c - in.begin < N - 1) {
 		*cout = *c;
 		++cout;
 		++c;
@@ -219,9 +217,8 @@ template <int N> static void toWChar(WCHAR (&out)[N], const char* in)
 
 
 template <int N>
-struct WCharStr
-{
-	WCharStr(const char* rhs)
+struct WCharStr {
+	WCharStr(StringView rhs)
 	{
 		toWChar(data, rhs);
 	}
@@ -916,7 +913,7 @@ struct FileIterator
 };
 
 
-FileIterator* createFileIterator(const char* path, IAllocator& allocator)
+FileIterator* createFileIterator(StringView path, IAllocator& allocator)
 {
 	char tmp[LUMIX_MAX_PATH];
 	copyString(tmp, path);
@@ -950,7 +947,7 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 }
 
 
-void setCurrentDirectory(const char* path)
+void setCurrentDirectory(StringView path)
 {
 	WCharStr<LUMIX_MAX_PATH> tmp(path);
 	SetCurrentDirectory(tmp);
@@ -1148,19 +1145,19 @@ void copyToClipboard(const char* text)
 }
 
 
-ExecuteOpenResult shellExecuteOpen(const char* path, const char* args, const char* working_dir)
+ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
-	const WCharStr<LUMIX_MAX_PATH> wargs(args ? args : "");
-	const WCharStr<LUMIX_MAX_PATH> wdir(working_dir ? working_dir : "");
-	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, args ? wargs.data : NULL, working_dir ? wdir.data : NULL, SW_SHOW);
+	const WCharStr<LUMIX_MAX_PATH> wargs(args);
+	const WCharStr<LUMIX_MAX_PATH> wdir(working_dir);
+	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, args.empty() ? NULL : wargs.data, working_dir.empty() ? NULL : wdir.data, SW_SHOW);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
 	return ExecuteOpenResult::OTHER_ERROR;
 }
 
 
-ExecuteOpenResult openExplorer(const char* path)
+ExecuteOpenResult openExplorer(StringView path)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	const uintptr_t res = (uintptr_t)ShellExecute(NULL, L"explore", wpath, NULL, NULL, SW_SHOWNORMAL);
@@ -1170,14 +1167,14 @@ ExecuteOpenResult openExplorer(const char* path)
 }
 
 
-bool deleteFile(const char* path)
+bool deleteFile(StringView path)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	return DeleteFile(wpath) != FALSE;
 }
 
 
-bool moveFile(const char* from, const char* to)
+bool moveFile(StringView from, StringView to)
 {
 	const WCharStr<LUMIX_MAX_PATH> wfrom(from);
 	const WCharStr<LUMIX_MAX_PATH> wto(to);
@@ -1185,7 +1182,7 @@ bool moveFile(const char* from, const char* to)
 }
 
 
-size_t getFileSize(const char* path)
+size_t getFileSize(StringView path)
 {
 	WIN32_FILE_ATTRIBUTE_DATA fad;
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
@@ -1197,7 +1194,7 @@ size_t getFileSize(const char* path)
 }
 
 
-bool fileExists(const char* path)
+bool fileExists(StringView path)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	DWORD dwAttrib = GetFileAttributes(wpath);
@@ -1205,7 +1202,7 @@ bool fileExists(const char* path)
 }
 
 
-bool dirExists(const char* path)
+bool dirExists(StringView path)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	DWORD dwAttrib = GetFileAttributes(wpath);
@@ -1213,7 +1210,7 @@ bool dirExists(const char* path)
 }
 
 
-u64 getLastModified(const char* path)
+u64 getLastModified(StringView path)
 {
 	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	FILETIME ft;
@@ -1256,7 +1253,7 @@ void grabMouse(WindowHandle win) {
 }
 
 
-bool copyFile(const char* from, const char* to)
+bool copyFile(StringView from, StringView to)
 {
 	WCHAR tmp_from[MAX_PATH];
 	WCHAR tmp_to[MAX_PATH];

@@ -10,32 +10,28 @@
 #include "engine/string.h"
 #include "openfbx/ofbx.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-
-struct FBXImporter
-{
-	struct ImportConfig 
-	{
+struct FBXImporter {
+	struct ImportConfig {
 		struct Clip {
 			StaticString<64> name;
 			u32 from_frame;
 			u32 to_frame;
 		};
 
-		enum class Origin : int
-		{
+		enum class Origin : i32 {
 			SOURCE,
 			CENTER,
 			BOTTOM
 		};
+
 		enum class Physics {
 			NONE,
 			CONVEX,
 			TRIMESH
 		};
+
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
 		bool create_impostor = false;
@@ -53,9 +49,7 @@ struct FBXImporter
 
 	};
 
-
-	enum class Orientation
-	{
+	enum class Orientation {
 		Y_UP,
 		Z_UP,
 		Z_MINUS_UP,
@@ -63,33 +57,28 @@ struct FBXImporter
 		X_UP
 	};
 
-	struct Key
-	{
+	struct Key {
 		Vec3 pos;
 		Quat rot;
 		i64 time;
 		u8 flags = 0;
 	};
 
-	struct Skin
-	{
+	struct Skin {
 		float weights[4];
 		i16 joints[4];
 		int count = 0;
 	};
 
-	struct ImportAnimation
-	{
+	struct ImportAnimation {
 		const ofbx::AnimationStack* fbx = nullptr;
 		const ofbx::IScene* module = nullptr;
-		StaticString<LUMIX_MAX_PATH> name;
+		StringView name;
 		bool import = true;
 	};
 
-	struct ImportTexture
-	{
-		enum Type
-		{
+	struct ImportTexture {
+		enum Type {
 			DIFFUSE,
 			NORMAL,
 			SPECULAR,
@@ -100,12 +89,11 @@ struct FBXImporter
 		bool import = true;
 		bool to_dds = true;
 		bool is_valid = false;
-		StaticString<LUMIX_MAX_PATH> path;
+		StringView path;
 		StaticString<LUMIX_MAX_PATH> src;
 	};
 
-	struct ImportMaterial
-	{
+	struct ImportMaterial {
 		const ofbx::Material* fbx = nullptr;
 		bool import = true;
 		bool alpha_cutout = false;
@@ -113,8 +101,7 @@ struct FBXImporter
 		char shader[20];
 	};
 
-	struct ImportMesh
-	{
+	struct ImportMesh {
 		ImportMesh(IAllocator& allocator)
 			: vertex_data(allocator)
 			, indices(allocator)
@@ -153,13 +140,13 @@ struct FBXImporter
 	FBXImporter(struct StudioApp& app);
 	~FBXImporter();
 	void init();
-	bool setSource(const char* filename, bool ignore_geometry, bool force_skinned);
-	void writeMaterials(const char* src, const ImportConfig& cfg);
-	void writeAnimations(const char* src, const ImportConfig& cfg);
-	void writeSubmodels(const char* src, const ImportConfig& cfg);
-	void writePrefab(const char* src, const ImportConfig& cfg);
-	void writeModel(const char* src, const ImportConfig& cfg);
-	void writePhysics(const char* src, const ImportConfig& cfg);
+	bool setSource(const Path& filename, bool ignore_geometry, bool force_skinned);
+	void writeMaterials(const Path& src, const ImportConfig& cfg);
+	void writeAnimations(const Path& src, const ImportConfig& cfg);
+	void writeSubmodels(const Path& src, const ImportConfig& cfg);
+	void writePrefab(const Path& src, const ImportConfig& cfg);
+	void writeModel(const Path& src, const ImportConfig& cfg);
+	void writePhysics(const Path& src, const ImportConfig& cfg);
 	bool createImpostorTextures(struct Model* model
 		, Array<u32>& gb0_rgba
 		, Array<u32>& gb1_rgba
@@ -176,15 +163,15 @@ struct FBXImporter
 
 private:
 	void createAutoLODs(const ImportConfig& cfg, ImportMesh& import_mesh);
-	bool findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const;
+	bool findTexture(StringView src_dir, StringView ext, FBXImporter::ImportTexture& tex) const;
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
-	void gatherMaterials(const char* fbx_filename, const char* src_dir);
+	void gatherMaterials(StringView fbx_filename, StringView src_dir);
 
 	void sortBones(bool force_skinned);
 	void gatherBones(const ofbx::IScene& module, bool force_skinned);
 	void gatherAnimations(const ofbx::IScene& module);
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
-	void postprocessMeshes(const ImportConfig& cfg, const char* path);
+	void postprocessMeshes(const ImportConfig& cfg, const Path& path);
 	void gatherMeshes(ofbx::IScene* module);
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
@@ -198,8 +185,8 @@ private:
 	void writeImpostorVertices(const AABB& aabb);
 	void writeGeometry(const ImportConfig& cfg);
 	void writeGeometry(int mesh_idx, const ImportConfig& cfg);
-	void writeImpostorMesh(const char* dir, const char* model_name);
-	void writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg);
+	void writeImpostorMesh(StringView dir, StringView model_name);
+	void writeMeshes(const Path& src, int mesh_idx, const ImportConfig& cfg);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs(const ImportConfig& cfg);
 	int getAttributeCount(const ImportMesh& mesh, const ImportConfig& cfg) const;

@@ -56,15 +56,19 @@ void Path::endUpdate() {
 	#endif
 }
 
-void Path::operator =(const char* rhs) {
-	if (rhs == m_path) return;
-
+void Path::operator =(StringView rhs) {
+	ASSERT(rhs.size() < lengthOf(m_path));
 	normalize(rhs, Span(m_path));
+	m_path[rhs.size()] = '\0';
 	endUpdate();
 }
 
 bool Path::operator==(const char* rhs) const {
 	return equalStrings(rhs, m_path);
+}
+
+bool Path::operator!=(const char* rhs) const {
+	return !equalStrings(rhs, m_path);
 }
 
 bool Path::operator==(const Path& rhs) const {
@@ -82,11 +86,11 @@ bool Path::operator!=(const Path& rhs) const {
 }
 
 void Path::normalize(StringView path, Span<char> output) {
+	ASSERT(path.begin <= output.begin() || path.begin > output.end());
 	u32 max_size = output.length();
 	ASSERT(max_size > 0);
 	char* out = output.begin();
 	
-	path.ensureEnd();
 	if (path.size() == 0) {
 		*out = '\0';
 		return;
@@ -125,7 +129,6 @@ void Path::normalize(StringView path, Span<char> output) {
 StringView Path::getDir(StringView src) {
 	if (src.empty()) return src;
 	
-	src.ensureEnd();
 	StringView dir = src;
 	dir.removeSuffix(1);
 
@@ -137,9 +140,7 @@ StringView Path::getDir(StringView src) {
 }
 
 StringView Path::getBasename(StringView src) {
-	src.ensureEnd();
-	
-	if (src.size() == 0) return src;
+	if (src.empty()) return src;
 	if (src.back() == '/' || src.back() == '\\') src.removeSuffix(1);
 
 	StringView res;
@@ -159,9 +160,7 @@ StringView Path::getBasename(StringView src) {
 }
 
 StringView Path::getExtension(StringView src) {
-	src.ensureEnd();
-	
-	if (src.size() == 0) return src;
+	if (src.empty()) return src;
 
 	StringView res;
 	res.end = src.end;
@@ -205,8 +204,6 @@ StringView Path::getSubresource(StringView str) {
 }
 
 bool Path::isSame(StringView a, StringView b) {
-	a.ensureEnd();
-	b.ensureEnd();
 	if (a.size() > 0 && (a.back() == '\\' || a.back() == '/')) --a.end;
 	if (b.size() > 0 && (b.back() == '\\' || b.back() == '/')) --b.end;
 	if (a.size() == 0 && b.size() == 1 && b[0] == '.') return true; 
@@ -246,13 +243,10 @@ Path::operator StringView() const {
 	return StringView(m_path);
 }
 
-Path::operator const char*() const { return m_path; }
-
 PathInfo::PathInfo(StringView path) {
-	Path tmp(path);
-	copyString(Span(m_extension), Path::getExtension(tmp));
-	copyString(Span(m_basename), Path::getBasename(tmp));
-	copyString(Span(m_dir), Path::getDir(tmp));
+	extension = Path::getExtension(path);
+	basename = Path::getBasename(path);
+	dir = Path::getDir(path);
 }
 
 

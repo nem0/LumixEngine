@@ -174,7 +174,7 @@ template <> inline bool get(DynamicProperties::Value v) { return v.b; }
 template <> inline Vec3 get(DynamicProperties::Value v) { return v.v3; }
 
 template <typename T> inline void set(DynamicProperties::Value& v, T);
-template <> inline void set(DynamicProperties::Value& v, Path val) { v.s = val; }
+template <> inline void set(DynamicProperties::Value& v, Path val) { v.s = val.c_str(); }
 template <> inline void set(DynamicProperties::Value& v, float val) { v.f = val; }
 template <> inline void set(DynamicProperties::Value& v, i32 val) { v.i = val; }
 template <> inline void set(DynamicProperties::Value& v, const char* val) { v.s = val; }

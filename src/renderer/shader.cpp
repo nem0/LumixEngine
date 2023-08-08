@@ -230,10 +230,11 @@ int texture_slot(lua_State* L)
 		slot.define_idx = shader->m_renderer.getShaderDefineIdx(define);
 	}
 
-	char tmp[LUMIX_MAX_PATH];
-	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", Span(tmp))) {
+	Path tmp;
+	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", Span(tmp.beginUpdate(), tmp.capacity()))) {
+		tmp.endUpdate();
 		ResourceManagerHub& manager = shader->getResourceManager().getOwner();
-		slot.default_texture = manager.load<Texture>(Path(tmp));
+		slot.default_texture = manager.load<Texture>(tmp);
 	}
 
 	++shader->m_texture_slot_count;

@@ -160,10 +160,10 @@ void VoxelizerUI::onWindowGUI() {
 		if (ImGui::BeginMenu("File")) {
 			ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
 			if (ImGui::BeginMenu("Open")) {
-				char buf[LUMIX_MAX_PATH];
+				Path path;
 				static FilePathHash selected_res_hash;
-				if (m_app.getAssetBrowser().resourceList(Span(buf), selected_res_hash, Model::TYPE, 0, false)) {
-					open(buf);
+				if (m_app.getAssetBrowser().resourceList(path, selected_res_hash, Model::TYPE, 0, false)) {
+					open(path);
 					m_module.m_voxels.clear();
 				}
 				ImGui::EndMenu();

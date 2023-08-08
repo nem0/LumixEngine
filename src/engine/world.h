@@ -87,7 +87,7 @@ struct LUMIX_ENGINE_API World {
 	EntityPtr getNextEntity(EntityRef entity) const;
 	const char* getEntityName(EntityRef entity) const;
 	EntityPtr findByName(EntityPtr parent, const char* name);
-	void setEntityName(EntityRef entity, const char* name);
+	void setEntityName(EntityRef entity, struct StringView name);
 	bool hasEntity(EntityRef entity) const;
 
 	bool isDescendant(EntityRef ancestor, EntityRef descendant) const;

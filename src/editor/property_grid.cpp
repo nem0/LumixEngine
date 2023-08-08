@@ -522,12 +522,9 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	}
 
 
-	void visit(const reflection::Property<Path>& prop) override
-	{
+	void visit(const reflection::Property<Path>& prop) override {
 		ComponentUID cmp = getComponent();
-		const Path p = prop.get(cmp, m_index);
-		char tmp[LUMIX_MAX_PATH];
-		copyString(tmp, p);
+		Path path = prop.get(cmp, m_index);
 
 		Attributes attrs = getAttributes(prop);
 		if (attrs.no_ui) return;
@@ -535,18 +532,15 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
-		if (attrs.resource_type.isValid())
-		{
-			if (m_app.getAssetBrowser().resourceInput(prop.name, Span(tmp), attrs.resource_type))
-			{
-				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, Path(tmp));
+		if (attrs.resource_type.isValid()) {
+			if (m_app.getAssetBrowser().resourceInput(prop.name, path, attrs.resource_type)) {
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, path);
 			}
 		}
-		else
-		{
-			if (ImGui::InputText("##v", tmp, sizeof(tmp)))
-			{
-				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, Path(tmp));
+		else {
+			if (ImGui::InputText("##v", path.beginUpdate(), path.capacity())) {
+				path.endUpdate();
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, path);
 			}
 		}
 		ImGui::PopID();
@@ -759,7 +753,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 		if (prefab)
 		{
 			ImGuiEx::Label("Prefab");
-			ImGui::TextUnformatted(prefab->getPath().c_str());
+			ImGuiEx::TextUnformatted(prefab->getPath());
 			if (ImGui::Button(ICON_FA_SAVE "Save prefab"))
 			{
 				prefab_system.savePrefab(entities[0], prefab->getPath());
@@ -778,7 +772,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 		{
 			getEntityListDisplayName(m_app, world, Span(name), parent);
 			ImGuiEx::Label("Parent");
-			ImGui::Text("%s", name);
+			ImGui::TextUnformatted(name);
 
 			if (!world.hasComponent(entities[0], GUI_RECT_TYPE) || world.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
 				Transform tr = world.getLocalTransform(entities[0]);
@@ -801,9 +795,9 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 	else
 	{
 		ImGuiEx::Label("ID");
-		ImGui::Text("%s", "Multiple objects");
+		ImGui::TextUnformatted("Multiple objects");
 		ImGuiEx::Label("Name");
-		ImGui::Text("%s", "Multi-object editing not supported.");
+		ImGui::TextUnformatted("Multi-object editing not supported.");
 	}
 
 

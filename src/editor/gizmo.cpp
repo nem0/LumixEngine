@@ -582,7 +582,7 @@ bool translate(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg)
 	auto print_delta = [&](){
 		const Vec2 p = view.getViewport().worldToScreenPixels(gizmo.pos);
 		const Vec3 from_start = Vec3(tr.pos - g_gizmo_state.start_pos);
-		StaticString<128> tmp("", from_start.x, "; ", from_start.y, "; ", from_start.z);
+		StaticString<128> tmp(from_start.x, "; ", from_start.y, "; ", from_start.z);
 		view.addText2D(p.x + 31, p.y + 31, 0xff000000, tmp);
 		view.addText2D(p.x + 30, p.y + 30, 0xffffFFFF, tmp);
 	};

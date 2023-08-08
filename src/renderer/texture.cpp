@@ -65,7 +65,7 @@ void Texture::setFlag(Flags flag, bool value)
 void Texture::setFlags(u32 flags)
 {
 	if (isReady() && this->flags != flags) {
-		logWarning("Trying to set different flags for texture ", getPath().c_str(), ". They are ignored.");
+		logWarning("Trying to set different flags for texture ", getPath(), ". They are ignored.");
 		return;
 	}
 	this->flags = flags;
@@ -194,7 +194,7 @@ static void saveTGA(Texture& texture)
 
 	os::OutputFile file;
 	FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
-	if (!fs.open(texture.getPath().c_str(), file)) {
+	if (!fs.open(texture.getPath(), file)) {
 		logError("Failed to create file ", texture.getPath());
 		return;
 	}
@@ -219,7 +219,7 @@ void Texture::save() {
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		os::OutputFile file;
-		if (!fs.open(getPath().c_str(), file)) {
+		if (!fs.open(getPath(), file)) {
 			logError("Failed to create file ", getPath());
 			return;
 		}

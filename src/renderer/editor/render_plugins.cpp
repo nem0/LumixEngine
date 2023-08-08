@@ -828,12 +828,11 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			if (!SimpleUndoRedo::isReady()) pushUndo(NO_MERGE_UNDO);
 
-			char buf[LUMIX_MAX_PATH];
 			Shader* shader = m_resource->getShader();
-			copyString(buf, shader ? shader->getPath().c_str() : "");
+			Path shader_path = shader ? shader->getPath() : Path();
 			
-			if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
-				m_resource->setShader(Path(buf));
+			if (m_app.getAssetBrowser().resourceInput("shader", shader_path, Shader::TYPE)) {
+				m_resource->setShader(shader_path);
 				shader = m_resource->getShader();
 				saveUndo(true);
 			}
@@ -865,7 +864,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			for (u32 i = 0; i < shader->m_texture_slot_count; ++i) {
 				auto& slot = shader->m_texture_slots[i];
 				Texture* texture = m_resource->getTexture(i);
-				copyString(buf, texture ? texture->getPath().c_str() : "");
+				Path path = texture ? texture->getPath() : Path();
 				ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
 				ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 				ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
@@ -878,10 +877,12 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::SameLine();
 
 				ImGuiEx::Label(slot.name);
-				if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE)) { 
-					m_resource->setTexturePath(i, Path(buf));
+				ImGui::PushID(&slot);
+				if (m_app.getAssetBrowser().resourceInput("##res", path, Texture::TYPE)) { 
+					m_resource->setTexturePath(i, path);
 					saveUndo(true);
 				}
+				ImGui::PopID();
 				if (!texture && is_node_open) {
 					ImGui::TreePop();
 					continue;
@@ -1128,7 +1129,7 @@ struct TextureMeta {
 	}
 
 	void load(const Path& path, StudioApp& app) {
-		if (Path::hasExtension(path.c_str(), "raw")) {
+		if (Path::hasExtension(path, "raw")) {
 			compress = false;
 			mips = false;
 		}
@@ -1162,7 +1163,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		m_texture = app.getEngine().getResourceManager().load<Texture>(path);
 		m_meta.load(m_texture->getPath(), m_app);
 		pushUndo(NO_MERGE_UNDO);
-		if (Path::hasExtension(path.c_str(), "ltc")) {
+		if (Path::hasExtension(path, "ltc")) {
 			m_composite_editor = CompositeTextureEditor::open(path, app, m_allocator);
 		}
 		app.getAssetCompiler().resourceCompiled().bind<&TextureAssetEditorWindow::onResourceCompiled>(this);
@@ -1267,7 +1268,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
-					StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath().c_str()));
+					StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath()));
 					os::openExplorer(dir);
 				}
 				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
@@ -1289,7 +1290,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		}
 
 		ImGuiEx::Label("Path");
-		ImGui::TextUnformatted(m_texture->getPath().c_str());
+		ImGuiEx::TextUnformatted(m_texture->getPath());
 		ImGuiEx::Label("Size");
 		ImGui::Text("%dx%d", m_texture->width, m_texture->height);
 		ImGuiEx::Label("Mips");
@@ -1479,7 +1480,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			int image_comp;
 			int w, h;
-			if (Path::hasExtension(m_in_path.c_str(), "ltc")) {
+			if (Path::hasExtension(m_in_path, "ltc")) {
 				CompositeTexture ct(m_app, m_allocator);
 				InputMemoryStream blob(tmp);
 				if (!ct.deserialize(blob)) {
@@ -1575,7 +1576,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		return false;
 	}
 
-	bool compileComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta, const char* src_path) {
+	bool compileComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta, StringView src_path) {
 		CompositeTexture tc(m_app, m_allocator);
 		InputMemoryStream blob(src_data);
 		if (!tc.deserialize(blob)) {
@@ -1760,13 +1761,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (!compileImage(src, src_data, out, meta)) return false;
 		}
 		else if (equalStrings(ext, "ltc")) {
-			if (!compileComposite(src_data, out, meta, src.c_str())) return false;
+			if (!compileComposite(src_data, out, meta, src)) return false;
 		}
 		else {
 			ASSERT(false);
 		}
 
-		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(out.data(), (i32)out.size()));
+		return m_app.getAssetCompiler().writeCompiledResource(src, Span(out.data(), (i32)out.size()));
 	}
 
 	const char* getLabel() const override { return "Texture"; }
@@ -1794,14 +1795,12 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		const i32 count = model->getMeshCount();
 		if (count == 1) {
 			ImGuiEx::Label("Material");
-			char mat_path[LUMIX_MAX_PATH];
+			
 			Path path = module->getModelInstanceMaterialOverride(entity);
 			if (path.isEmpty()) {
 				path = model->getMesh(0).material->getPath();
 			}
-			copyString(mat_path, path.c_str());
-			if (m_app.getAssetBrowser().resourceInput("##mat", Span(mat_path), Material::TYPE)) {
-				path = mat_path;
+			if (m_app.getAssetBrowser().resourceInput("##mat", path, Material::TYPE)) {
 				editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Material", Span(&entity, 1), path);
 			}
 			return;
@@ -1892,10 +1891,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 		}
 
-		bool deserialize(InputMemoryStream& blob, const char* path) {
+		bool deserialize(InputMemoryStream& blob, const Path& path) {
 			ASSERT(blob.getPosition() == 0);
 			lua_State* L = luaL_newstate();
-			if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path, 0)) {
+			if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path.c_str(), 0)) {
 				return false;
 			}
 		
@@ -1905,7 +1904,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			return true;	
 		}
 
-		void deserialize(lua_State* L, const char* path) {
+		void deserialize(lua_State* L, const Path& path) {
 			LuaWrapper::DebugGuard guard(L);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &use_mikktspace);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &force_skin);
@@ -2024,7 +2023,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			fbx_scene->destroy();
 		}
 
-		void deserialize(InputMemoryStream& blob) override { m_meta.deserialize(blob, "undo/redo"); }
+		void deserialize(InputMemoryStream& blob) override { m_meta.deserialize(blob, Path("undo/redo")); }
 		void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob); }
 
 		void saveUndo(bool changed) {
@@ -2186,8 +2185,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					IVec2 tile_size;
 					importer.createImpostorTextures(m_resource, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
 					postprocessImpostor(gb0, gb1, shadow, tile_size, allocator);
-					const PathInfo fi(m_resource->getPath().c_str());
-					StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
+					const PathInfo fi(m_resource->getPath());
+					Path img_path(fi.dir, fi.basename, "_impostor0.tga");
 					ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
 					os::OutputFile file;
@@ -2200,8 +2199,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						logError("Failed to open ", img_path);
 					}
 
-					img_path = fi.m_dir;
-					img_path.append(fi.m_basename, "_impostor1.tga");
+					img_path = Path(fi.dir, fi.basename, "_impostor1.tga");
 					if (fs.open(img_path, file)) {
 						Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 						file.close();
@@ -2210,8 +2208,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						logError("Failed to open ", img_path);
 					}
 
-					img_path = fi.m_dir;
-					img_path.append(fi.m_basename, "_impostor_depth.raw");
+					img_path = Path(fi.dir, fi.basename, "_impostor_depth.raw");
 					if (fs.open(img_path, file)) {
 						RawTextureHeader header;
 						header.width = tile_size.x * 9;
@@ -2239,8 +2236,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						logError("Failed to open ", img_path);
 					}
 
-					img_path = fi.m_dir;
-					img_path.append(fi.m_basename, "_impostor2.tga");
+					img_path = Path(fi.dir, fi.basename, "_impostor2.tga");
 					if (fs.open(img_path, file)) {
 						Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 						file.close();
@@ -2357,7 +2353,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					const Mesh& mesh = m_resource->getMesh(i);
-					ImGui::TextUnformatted(mesh.name.c_str());
+					ImGuiEx::TextUnformatted(mesh.name);
 					ImGui::TableNextColumn();
 					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2)) / 3);
 					ImGui::TableNextColumn();
@@ -2384,7 +2380,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
 						const Model::Bone& bone = m_resource->getBone(i);
-						ImGui::Text("%s", bone.name.c_str());
+						ImGuiEx::TextUnformatted(bone.name);
 						ImGui::TableNextColumn();
 						Vec3 pos = bone.transform.pos;
 						ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
@@ -2393,7 +2389,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
 						ImGui::TableNextColumn();
 						if (bone.parent_idx >= 0) {
-							ImGui::Text("%s", m_resource->getBone(bone.parent_idx).name.c_str());
+							ImGuiEx::TextUnformatted(m_resource->getBone(bone.parent_idx).name);
 						}
 					}
 					ImGui::EndTable();
@@ -2520,31 +2516,31 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_fbx_importer.init();
 	}
 
-	void addSubresources(AssetCompiler& compiler, const char* _path) override {
+	void addSubresources(AssetCompiler& compiler, const Path& _path) override {
 		compiler.addResource(Model::TYPE, _path);
 
 		Meta meta(m_app.getAllocator());
-		meta.load(Path(_path), m_app);
-		StaticString<LUMIX_MAX_PATH> pathstr = _path;
-		jobs::runLambda([this, pathstr, meta = static_cast<Meta&&>(meta)]() {
+		meta.load(_path, m_app);
+		jobs::runLambda([this, _path, meta = static_cast<Meta&&>(meta)]() {
 			FBXImporter importer(m_app);
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 
-			const char* path = pathstr[0] == '/' ? pathstr.data + 1 : pathstr.data;
-			importer.setSource(path, true, false);
+			const char* path = _path.c_str();
+			if (path[0] == '/') ++path;
+			importer.setSource(Path(path), true, false);
 
 			if(meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
 				for (int i = 0; i < meshes.size(); ++i) {
 					char mesh_name[256];
 					importer.getImportMeshName(meshes[i], mesh_name);
-					StaticString<LUMIX_MAX_PATH> tmp(mesh_name, ".fbx:", path);
+					Path tmp(mesh_name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
 				}
 			}
 
 			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
-				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
+				Path tmp(".phy:", path);
 				ResourceType physics_geom("physics_geometry");
 				compiler.addResource(physics_geom, tmp);
 			}
@@ -2552,13 +2548,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (meta.clips.empty()) {
 				const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
 				for (const FBXImporter::ImportAnimation& anim : animations) {
-					StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
+					Path tmp(anim.name, ".ani:", path);
 					compiler.addResource(ResourceType("animation"), tmp);
 				}
 			}
 			else {
 				for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
-					StaticString<LUMIX_MAX_PATH> tmp(clip.name, ".ani:", path);
+					Path tmp(clip.name, ".ani:", Path(path));
 					compiler.addResource(ResourceType("animation"), tmp);
 				}
 			}
@@ -2566,16 +2562,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}, &m_subres_signal, 2);			
 	}
 
-	static const char* getResourceFilePath(const char* str)
-	{
-		const char* c = str;
-		while (*c && *c != ':') ++c;
-		return *c != ':' ? str : c + 1;
-	}
-
 	bool compile(const Path& src) override {
-		ASSERT(Path::hasExtension(src.c_str(), "fbx"));
-		const char* filepath = getResourceFilePath(src.c_str());
+		ASSERT(Path::hasExtension(src, "fbx"));
+		Path filepath = Path(Path::getResource(src));
 		FBXImporter::ImportConfig cfg;
 		Meta meta(m_app.getAllocator()); 
 		meta.load(Path(filepath), m_app);
@@ -2592,7 +2581,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		cfg.clips = meta.clips;
-		const PathInfo src_info(filepath);
 		m_fbx_importer.setSource(filepath, false, meta.force_skin);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
@@ -2612,7 +2600,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_fbx_importer.writePrefab(filepath, cfg);
 		}
 		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
-		m_fbx_importer.writeModel(src.c_str(), cfg);
+		m_fbx_importer.writeModel(src, cfg);
 		m_fbx_importer.writeMaterials(filepath, cfg);
 		m_fbx_importer.writeAnimations(filepath, cfg);
 		m_fbx_importer.writePhysics(filepath, cfg);
@@ -2779,10 +2767,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		ResourceManagerHub& resource_manager = engine.getResourceManager();
 
 		Resource* resource;
-		if (Path::hasExtension(path.c_str(), "fab")) {
+		if (Path::hasExtension(path, "fab")) {
 			resource = resource_manager.load<PrefabResource>(path);
 		}
-		else if (Path::hasExtension(path.c_str(), "mat")) {
+		else if (Path::hasExtension(path, "mat")) {
 			resource = resource_manager.load<Material>(path);
 		}
 		else {
@@ -2838,7 +2826,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					}
 				}
 
-				saveAsLBC(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
+				saveAsLBC(path.c_str(), m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				m_renderer->getEndFrameDrawStream().destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
@@ -3001,12 +2989,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 
 	void renderTile(Material* material) {
-		const char* in_path = material->getTexture(0)->getPath().c_str();
+		const Path& in_path = material->getTexture(0)->getPath();
 		const Path out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
 		if (material->getTextureCount() == 0) {
 			return;
 		}
-		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
+		m_texture_plugin->createTile(in_path.c_str(), out_path.c_str(), Texture::TYPE);
 		material->decRefCount();
 	}
 
@@ -3177,12 +3165,12 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("shd", Shader::TYPE);
 	}
 
-	void findIncludes(const char* path) {
+	void findIncludes(const Path& path) {
 		lua_State* L = luaL_newstate();
 		luaL_openlibs(L);
 
 		os::InputFile file;
-		if (!file.open(path[0] == '/' ? path + 1 : path)) return;
+		if (!file.open(path.c_str()[0] == '/' ? path.c_str() + 1 : path.c_str())) return;
 		
 		IAllocator& allocator = m_app.getAllocator();
 		OutputMemoryStream content(allocator);
@@ -3194,7 +3182,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		file.close();
 
 		struct Context {
-			const char* path;
+			const Path& path;
 			ShaderPlugin* plugin;
 			u8* content;
 			u32 content_len;
@@ -3209,7 +3197,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			Context* that = LuaWrapper::toType<Context*>(L, -1);
 			lua_pop(L, 1);
 			const char* path = LuaWrapper::checkArg<const char*>(L, 1);
-			that->plugin->m_app.getAssetCompiler().registerDependency(Path(that->path), Path(path));
+			that->plugin->m_app.getAssetCompiler().registerDependency(that->path, Path(path));
 			return 0;
 		};
 
@@ -3238,7 +3226,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 		};
 
-		if (lua_load(L, reader, &ctx, path) != 0) {
+		if (lua_load(L, reader, &ctx, path.c_str()) != 0) {
 			logError(path, ": ", lua_tostring(L, -1));
 			lua_pop(L, 2);
 			lua_close(L);
@@ -3255,7 +3243,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		lua_close(L);
 	}
 
-	void addSubresources(AssetCompiler& compiler, const char* path) override {
+	void addSubresources(AssetCompiler& compiler, const Path& path) override {
 		compiler.addResource(Shader::TYPE, path);
 		findIncludes(path);
 	}
@@ -3358,11 +3346,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		Path path(base_path, "universes");
-		if (!os::makePath(path) && !os::dirExists(path)) {
+		if (!os::makePath(path.c_str()) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
 		path.append("/probes_tmp/");
-		if (!os::makePath(path) && !os::dirExists(path)) {
+		if (!os::makePath(path.c_str()) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
 		path.append(probe_guid, ".lbc");
@@ -3391,7 +3379,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		if (!TextureCompressor::compress(input, TextureCompressor::Options(), blob, m_app.getAllocator())) return false;
 
 		os::OutputFile file;
-		if (!file.open(path)) {
+		if (!file.open(path.c_str())) {
 			logError("Failed to create ", path);
 			return false;
 		}
@@ -3489,8 +3477,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				| ImGuiWindowFlags_NoSavedSettings;
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 			if (ImGui::Begin("Env probe generation", nullptr, flags)) {
-				ImGui::Text("%s", "Generating probes...");
-				ImGui::Text("%s", "Manipulating with entities at this time can produce incorrect probes.");
+				ImGui::TextUnformatted("Generating probes...");
+				ImGui::TextUnformatted("Manipulating with entities at this time can produce incorrect probes.");
 				ImGui::ProgressBar(((float)m_done_counter) / m_probe_counter, ImVec2(-1, 0), StaticString<64>(m_done_counter, " / ", m_probe_counter));
 			}
 			ImGui::End();
@@ -3520,11 +3508,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 			Path dir_path(base_path, "universes/");
-			if (!os::dirExists(dir_path) && !os::makePath(dir_path)) {
+			if (!os::dirExists(dir_path) && !os::makePath(dir_path.c_str())) {
 				logError("Failed to create ", dir_path);
 			}
 			dir_path.append("/probes/");
-			if (!os::dirExists(dir_path) && !os::makePath(dir_path)) {
+			if (!os::dirExists(dir_path) && !os::makePath(dir_path.c_str())) {
 				logError("Failed to create ", dir_path);
 			}
 			RenderModule* module = nullptr;
@@ -3702,7 +3690,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				if (probe.flags.isSet(ReflectionProbe::ENABLED)) {
 					const Path path("universes/probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
-					ImGui::TextUnformatted(path);
+					ImGuiEx::TextUnformatted(path);
 					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().openEditor(path);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
@@ -4593,7 +4581,7 @@ struct RenderInterfaceImpl final : RenderInterface
 		Path path(path_cstr);
 		FileSystem& fs = engine.getFileSystem();
 		os::OutputFile file;
-		if (!fs.open(path.c_str(), file)) return false;
+		if (!fs.open(path, file)) return false;
 
 		if (!Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
 			file.close();
@@ -4893,17 +4881,14 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 		, m_file_selector("mat", app)
 	{}
 
-	bool createHeightmap(const char* material_path, int size)
+	bool createHeightmap(const Path& material_path, int size)
 	{
-		char normalized_material_path[LUMIX_MAX_PATH];
-		Path::normalize(material_path, Span(normalized_material_path));
-
-		PathInfo info(normalized_material_path);
-		const Path hm_path(info.m_dir, info.m_basename, ".raw");
-		const Path albedo_path(info.m_dir, "albedo_detail.ltc");
-		const Path normal_path(info.m_dir, "normal_detail.ltc");
-		const Path splatmap_path(info.m_dir, "splatmap.tga");
-		const Path splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
+		PathInfo info(material_path);
+		const Path hm_path(info.dir, info.basename, ".raw");
+		const Path albedo_path(info.dir, "albedo_detail.ltc");
+		const Path normal_path(info.dir, "normal_detail.ltc");
+		const Path splatmap_path(info.dir, "splatmap.tga");
+		const Path splatmap_meta_path(info.dir, "splatmap.tga.meta");
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(hm_path, file))
@@ -4980,9 +4965,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			return false;
 		}
 
-		if (!fs.open(normalized_material_path, file))
-		{
-			logError("Failed to create material ", normalized_material_path);
+		if (!fs.open(material_path, file)) {
+			logError("Failed to create material ", material_path);
 			os::deleteFile(normal_path);
 			os::deleteFile(albedo_path);
 			os::deleteFile(hm_path);
@@ -4994,7 +4978,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 		file << R"#(
 			shader "pipelines/terrain.shd"
 			texture ")#";
-		file << info.m_basename;
+		file << info.basename;
 		file << R"#(.raw"
 			texture "albedo_detail.ltc"
 			texture "normal_detail.ltc"
@@ -5014,7 +4998,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 	void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override
 	{
 		if (!ImGui::BeginMenu("Terrain")) return;
-		char buf[LUMIX_MAX_PATH];
+		Path path;
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::BeginMenu("New"))
@@ -5025,14 +5009,14 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			m_file_selector.gui(false);
 			if (m_file_selector.getPath()[0] &&  ImGui::Button("Create"))
 			{
-				new_created = createHeightmap(m_file_selector.getPath(), size);
-				copyString(Span(buf), m_file_selector.getPath());
+				new_created = createHeightmap(Path(m_file_selector.getPath()), size);
+				path = m_file_selector.getPath();
 			}
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 		static FilePathHash selected_res_hash;
-		if (asset_browser.resourceList(Span(buf), selected_res_hash, Material::TYPE, false) || create_empty || new_created)
+		if (asset_browser.resourceList(path, selected_res_hash, Material::TYPE, false) || create_empty || new_created)
 		{
 			if (create_entity)
 			{
@@ -5049,7 +5033,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 
 			if (!create_empty)
 			{
-				editor.setProperty(TERRAIN_TYPE, "", -1, "Material", Span(&entity, 1), Path(buf));
+				editor.setProperty(TERRAIN_TYPE, "", -1, "Material", Span(&entity, 1), path);
 			}
 			if (parent.isValid()) editor.makeParent(parent, entity);
 			ImGui::CloseCurrentPopup();

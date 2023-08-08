@@ -2,12 +2,9 @@
 
 #include "engine/lumix.h"
 #include "engine/delegate_list.h"
+#include "engine/string.h"
 
 namespace Lumix {
-
-struct Path;
-struct String;
-template <typename T> struct DelegateList;
 
 enum class LogLevel {
 	INFO,
@@ -19,9 +16,7 @@ enum class LogLevel {
 
 namespace detail {
 	using LogCallback = DelegateList<void (LogLevel, const char*)>;
-	LUMIX_ENGINE_API void addLog(const char* val);
-	LUMIX_ENGINE_API void addLog(const Path& val);
-	LUMIX_ENGINE_API void addLog(const String& val);
+	LUMIX_ENGINE_API void addLog(StringView val);
 	LUMIX_ENGINE_API void addLog(u64 val);
 	LUMIX_ENGINE_API void addLog(u32 val);
 	LUMIX_ENGINE_API void addLog(i32 val);

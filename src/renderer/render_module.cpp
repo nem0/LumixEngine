@@ -605,7 +605,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		serializer.write(len);
 		for (auto iter = m_model_entity_map.begin(); iter.isValid(); ++iter) {
-			serializer.writeString(iter.key()->getPath().c_str());
+			serializer.writeString(iter.key()->getPath());
 		}
 
 		serializer.write((i32)m_model_instances.size());
@@ -633,7 +633,7 @@ struct RenderModuleImpl final : RenderModule {
 		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
 			serializer.write(iter.key());
 			const InstancedModel& im = iter.value();
-			serializer.writeString(im.model ? im.model->getPath().c_str() : "");
+			serializer.writeString(im.model ? im.model->getPath() : Path());
 			serializer.write(im.instances.size());
 			serializer.write(im.instances.begin(), im.instances.byte_size());
 		}
@@ -737,7 +737,7 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.write(decal.entity);
 			serializer.write(decal.half_extents);
 			serializer.write(decal.uv_scale);
-			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
+			serializer.writeString(decal.material ? decal.material->getPath() : Path());
 		}
 	}
 
@@ -750,7 +750,7 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.write(decal.half_extents.y);
 			serializer.write(decal.bezier_p0);
 			serializer.write(decal.bezier_p2);
-			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
+			serializer.writeString(decal.material ? decal.material->getPath() : Path());
 		}
 	}
 
@@ -897,7 +897,7 @@ struct RenderModuleImpl final : RenderModule {
 		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
 			blob.write(iter.key());
 			const ProceduralGeometry& pg = iter.value();
-			blob.writeString(pg.material ? pg.material->getPath().c_str() : "");
+			blob.writeString(pg.material ? pg.material->getPath() : Path());
 			blob.write((u32)pg.vertex_data.size());
 			blob.write(pg.vertex_data.data(), pg.vertex_data.size());
 			blob.write(pg.vertex_decl.attributes_count);

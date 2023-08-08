@@ -367,19 +367,18 @@ template <> LUMIX_EDITOR_API Path readFromStream<Path>(InputMemoryStream& stream
 }
 
 
-template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path)
-{
-	const char* str = path.c_str();
-	stream.write(str, stringLength(str) + 1);
+template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path) {
+	StringView str = path;
+	stream.write(str.begin, str.size());
+	stream.write((char)0);
 }
 
 
-template <> LUMIX_EDITOR_API void writeToStream<Path>(OutputMemoryStream& stream, Path path)
-{
-	const char* str = path.c_str();
-	stream.write(str, stringLength(str) + 1);
+template <> LUMIX_EDITOR_API void writeToStream<Path>(OutputMemoryStream& stream, Path path) {
+	StringView str = path;
+	stream.write(str.begin, str.size());
+	stream.write((char)0);
 }
-
 
 template <> LUMIX_EDITOR_API const char* readFromStream<const char*>(InputMemoryStream& stream)
 {
@@ -612,14 +611,14 @@ public:
 
 	bool execute() override
 	{
-		m_editor.getWorld()->setEntityName((EntityRef)m_entity, m_new_name.c_str());
+		m_editor.getWorld()->setEntityName((EntityRef)m_entity, m_new_name);
 		return true;
 	}
 
 
 	void undo() override
 	{
-		m_editor.getWorld()->setEntityName((EntityRef)m_entity, m_old_name.c_str());
+		m_editor.getWorld()->setEntityName((EntityRef)m_entity, m_old_name);
 	}
 
 
@@ -1311,7 +1310,7 @@ private:
 		void undo() override {
 			m_editor.m_entity_folders->emplaceFolder(m_folder, m_parent);
 			EntityFolders::Folder& f = m_editor.m_entity_folders->getFolder(m_folder);
-			copyString(f.name, m_folder_name.c_str());
+			copyString(f.name, m_folder_name);
 		}
 
 		const char* getType() override { return "destroy_entity_folder"; }
@@ -1388,12 +1387,12 @@ private:
 		}
 
 		bool execute() override {
-			m_editor.m_entity_folders->renameFolder(m_folder, m_new_name.c_str());
+			m_editor.m_entity_folders->renameFolder(m_folder, m_new_name);
 			return true;
 		}
 
 		void undo() override {
-			m_editor.m_entity_folders->renameFolder(m_folder, m_old_name.c_str());
+			m_editor.m_entity_folders->renameFolder(m_folder, m_old_name);
 		}
 
 		const char* getType() override { return "rename_entity_folder"; }
@@ -1976,7 +1975,7 @@ public:
 
 		logInfo("Saving world ", basename, "...");
 		
-		Path path(m_engine.getFileSystem().getBasePath(), "universes");
+		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
 		if (!os::makePath(path)) logError("Could not create directory universes/");
 		path.append("/", basename, ".unv");
 		StaticString<LUMIX_MAX_PATH> bkp_path(path, ".bak");

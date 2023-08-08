@@ -20,7 +20,7 @@ public:
 
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	const char* getSourceCode() const { return m_source_code.c_str(); }
+	StringView getSourceCode() const { return m_source_code; }
 
 	static const ResourceType TYPE;
 

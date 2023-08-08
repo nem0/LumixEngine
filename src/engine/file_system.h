@@ -28,14 +28,14 @@ struct LUMIX_ENGINE_API FileSystem {
 
 	virtual ~FileSystem() {}
 
-	virtual u64 getLastModified(const char* path) = 0;
-	virtual bool copyFile(const char* from, const char* to) = 0;
-	virtual bool moveFile(const char* from, const char* to) = 0;
-	virtual bool deleteFile(const char* path) = 0;
-	virtual bool fileExists(const char* path) = 0;
-	virtual os::FileIterator* createFileIterator(const char* dir) = 0;
-	virtual bool open(const char* path, os::InputFile& file) = 0;
-	virtual bool open(const char* path, os::OutputFile& file) = 0;
+	virtual u64 getLastModified(struct StringView path) = 0;
+	virtual bool copyFile(StringView from, StringView to) = 0;
+	virtual bool moveFile(StringView from, StringView to) = 0;
+	virtual bool deleteFile(StringView path) = 0;
+	virtual bool fileExists(StringView path) = 0;
+	virtual os::FileIterator* createFileIterator(StringView dir) = 0;
+	virtual bool open(StringView path, os::InputFile& file) = 0;
+	virtual bool open(StringView path, os::OutputFile& file) = 0;
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;

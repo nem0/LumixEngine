@@ -122,7 +122,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			anim_module->setAnimatorSource(*m_viewer.m_mesh, path);
 
 			char fbx_path[LUMIX_MAX_PATH];
-			copyString(fbx_path, path.c_str());
+			copyString(fbx_path, path);
 			Path::replaceExtension(fbx_path, "fbx");
 			if (fs.fileExists(fbx_path)) {
 				auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
@@ -608,7 +608,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		static bool conditionInput(const char* label, InputDecl& input, String& condition_str, Condition& condition) {
 			char tmp[1024];
-			copyString(tmp, condition_str.c_str());
+			copyString(tmp, condition_str);
 			if (condition.error != Condition::Error::NONE) {
 				ImGui::TextUnformatted(Condition::errorToString(condition.error));
 			}
@@ -951,12 +951,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			ImGui::Separator();
 			auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
 			auto* anim_module = (AnimationModule*)m_viewer.m_world->getModule("animation");
-			char model_path_str[LUMIX_MAX_PATH];
-			const Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
-			copyString(model_path_str, model_path.c_str());
+			Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
 			ImGuiEx::Label("Preview model");
-			if (m_app.getAssetBrowser().resourceInput("model", Span(model_path_str), Model::TYPE)) {
-				render_module->setModelInstancePath(*m_viewer.m_mesh, Path(model_path_str));
+			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
+				render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
 				anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.getPath());
 			}
 			Model* model = render_module->getModelInstanceModel(*m_viewer.m_mesh);
@@ -1084,11 +1082,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 		}
 
-		void saveAs(const char* path) {
+		void saveAs(const Path& path) {
 			OutputMemoryStream blob(m_controller.m_allocator);
 			m_controller.serialize(blob);
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			if (!fs.saveContentSync(Path(path), blob)) {
+			if (!fs.saveContentSync(path, blob)) {
 				logError("Failed to save ", path);
 				return;
 			}
@@ -1143,11 +1141,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		bool canRedo() const { return m_undo_idx < m_undo_stack.size() - 1; }
 
 		void IKGUI() {
-			char model_path[LUMIX_MAX_PATH];
-			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
+			Path model_path = m_model ? m_model->getPath() : Path();
 			ImGuiEx::Label("Model");
-			if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
-				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
 			}
 			if(m_model) {
 				for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
@@ -1190,7 +1187,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
 							auto iter = m_model->getBoneIndex(ik.bones[j]);
 							if (iter.isValid()) {
-								ImGui::Text("%s", m_model->getBone(iter.value()).name.c_str());
+								ImGuiEx::TextUnformatted(m_model->getBone(iter.value()).name);
 							}
 							else {
 								ImGui::Text("Unknown bone");
@@ -1254,11 +1251,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void boneMasksGUI() {
-			char model_path[LUMIX_MAX_PATH];
-			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
+			Path model_path = m_model ? m_model->getPath() : Path();
 			ImGuiEx::Label("Model");
-			if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
-				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
+			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
 			}
 
 			if (!m_model) {
@@ -1312,7 +1308,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PushID(i);
 				String& slot = m_controller.m_animation_slots[i];
 				char tmp[64];
-				copyString(tmp, slot.c_str());
+				copyString(tmp, slot);
 				if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
 					removeSlot(i);
 				}
@@ -1408,12 +1404,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						saveUndo(inputSlot("##slot", &entry.slot));
 						ImGui::NextColumn();
 						ImGui::PushItemWidth(-1);
-						char path[LUMIX_MAX_PATH];
-						copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
-						if (m_app.getAssetBrowser().resourceInput("anim", Span(path), Animation::TYPE)) {
+						Path path = entry.animation ? entry.animation->getPath() : Path();
+						if (m_app.getAssetBrowser().resourceInput("anim", path, Animation::TYPE)) {
 							if (entry.animation) entry.animation->decRefCount();
 							ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
-							entry.animation = res_manager.load<Animation>(Path(path));
+							entry.animation = res_manager.load<Animation>(path);
 							saveUndo(true);
 						}
 						ImGui::PopItemWidth();

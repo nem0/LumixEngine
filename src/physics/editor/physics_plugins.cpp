@@ -537,10 +537,10 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 			for (int i = 0, c = system->getCollisionsLayersCount(); i < c; ++i)
 			{
-				auto* layer_name = system->getCollisionLayerName(i);
+				const char* layer_name = system->getCollisionLayerName(i);
 				float offset = basic_offset + i * 35.0f;
 				ImGui::SetColumnOffset(-1, offset);
-				ImGui::Text("%s", layer_name);
+				ImGui::TextUnformatted(layer_name);
 				ImGui::NextColumn();
 			}
 			ImGui::PopTextWrapPos();
@@ -548,7 +548,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			ImGui::Separator();
 			for (int i = 0, c = system->getCollisionsLayersCount(); i < c; ++i)
 			{
-				ImGui::Text("%s", system->getCollisionLayerName(i));
+				ImGui::TextUnformatted(system->getCollisionLayerName(i));
 				ImGui::NextColumn();
 
 				for (int j = 0; j <= i; ++j)
@@ -696,7 +696,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		char tmp[255];
 		getEntityListDisplayName(m_app, world, Span(tmp), e);
 
-		ImGui::Text("%s", tmp);
+		ImGui::TextUnformatted(tmp);
 		ImGui::SameLine();
 		bool is_debug_viz = module->isActorDebugEnabled(e);
 		if (ImGui::Checkbox("Debug visualization", &is_debug_viz)) {
@@ -784,7 +784,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		if (!ImGui::CollapsingHeader("Ragdoll")) return;
 
 		if (editor.getSelectedEntities().size() != 1) {
-			ImGui::Text("%s", "Please select single entity.");
+			ImGui::TextUnformatted("Please select single entity.");
 			return;
 		}
 

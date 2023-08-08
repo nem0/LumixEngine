@@ -6,41 +6,43 @@
 namespace Lumix {
 
 struct IAllocator;
+struct Path;
 template <int SIZE> struct StaticString;
+
+LUMIX_ENGINE_API int stringLength(const char* str);
 
 struct StringView {
 	StringView() {}
-	StringView(const char* str) : begin(str) {}
+	StringView(const char* str) : begin(str), end(str + stringLength(str)) {}
 	StringView(const char* str, u32 len) : begin(str), end(str + len) {}
 	StringView(const char* begin, const char* end) : begin(begin), end(end) {}
 	template <int N> StringView(const StaticString<N>& str);
 
 	u32 size() const { ASSERT(end); return u32(end - begin); }
 	char operator[](u32 idx) { ASSERT(!end || begin + idx < end); return begin[idx]; }
-	void ensureEnd();
 	char back() const { ASSERT(end && begin != end); return *(end - 1); }
-	void removeSuffix(u32 count) { ensureEnd(); ASSERT(count <= size()); end -= count; }
-	void removePrefix(u32 count) { ensureEnd(); ASSERT(count <= size()); begin += count; }
+	void removeSuffix(u32 count) { ASSERT(count <= size()); end -= count; }
+	void removePrefix(u32 count) { ASSERT(count <= size()); begin += count; }
 	bool empty() const { return begin == end || !begin[0]; }
 
 	const char* begin = nullptr;
-	const char* end = nullptr; // if end is null and begin is not null, begin is null-terminated
+	const char* end = nullptr;
 };
 
 LUMIX_ENGINE_API const char* stristr(StringView haystack, StringView needle);
 LUMIX_ENGINE_API bool contains(StringView haystack, char needle);
-LUMIX_ENGINE_API bool toCStringHex(u8 value, Span<char> output);
-LUMIX_ENGINE_API bool toCStringPretty(i32 value, Span<char> output);
-LUMIX_ENGINE_API bool toCStringPretty(u32 value, Span<char> output);
-LUMIX_ENGINE_API bool toCStringPretty(u64 value, Span<char> output);
-LUMIX_ENGINE_API bool toCString(bool value, Span<char> output);
-LUMIX_ENGINE_API bool toCString(i32 value, Span<char> output);
-inline bool toCString(EntityPtr value, Span<char> output) { return toCString(value.index, output); }
-LUMIX_ENGINE_API bool toCString(i64 value, Span<char> output);
-LUMIX_ENGINE_API bool toCString(u64 value, Span<char> output);
-LUMIX_ENGINE_API bool toCString(u32 value, Span<char> output);
-LUMIX_ENGINE_API bool toCString(float value, Span<char> output, int after_point);
-LUMIX_ENGINE_API bool toCString(double value, Span<char> output, int after_point);
+LUMIX_ENGINE_API void toCStringHex(u8 value, Span<char> output);
+LUMIX_ENGINE_API void toCStringPretty(i32 value, Span<char> output);
+LUMIX_ENGINE_API void toCStringPretty(u32 value, Span<char> output);
+LUMIX_ENGINE_API void toCStringPretty(u64 value, Span<char> output);
+LUMIX_ENGINE_API char* toCString(bool value, Span<char> output);
+LUMIX_ENGINE_API char* toCString(i32 value, Span<char> output);
+inline void toCString(EntityPtr value, Span<char> output) { toCString(value.index, output); }
+LUMIX_ENGINE_API char* toCString(i64 value, Span<char> output);
+LUMIX_ENGINE_API char* toCString(u64 value, Span<char> output);
+LUMIX_ENGINE_API char* toCString(u32 value, Span<char> output);
+LUMIX_ENGINE_API char* toCString(float value, Span<char> output, int after_point);
+LUMIX_ENGINE_API char* toCString(double value, Span<char> output, int after_point);
 LUMIX_ENGINE_API const char* reverseFind(StringView haystack, char c);
 LUMIX_ENGINE_API const char* fromCStringOctal(StringView input, u32& value);
 LUMIX_ENGINE_API const char* fromCString(StringView input, i32& value);
@@ -50,12 +52,11 @@ LUMIX_ENGINE_API const char* fromCString(StringView input, u32& value);
 LUMIX_ENGINE_API const char* fromCString(StringView input, u16& value);
 LUMIX_ENGINE_API const char* fromCString(StringView input, bool& value);
 inline const char* fromCString(StringView input, EntityPtr& value) { return fromCString(input, value.index); };
-LUMIX_ENGINE_API bool copyString(Span<char> output, StringView source);
-LUMIX_ENGINE_API bool catString(Span<char> output, StringView source);
+LUMIX_ENGINE_API char* copyString(Span<char> output, StringView source);
+LUMIX_ENGINE_API char* catString(Span<char> output, StringView source);
 LUMIX_ENGINE_API bool makeLowercase(Span<char> output, StringView source);
 LUMIX_ENGINE_API bool startsWith(StringView str, StringView prefix);
 LUMIX_ENGINE_API bool startsWithInsensitive(StringView str, StringView prefix);
-LUMIX_ENGINE_API int stringLength(const char* str);
 LUMIX_ENGINE_API bool equalStrings(StringView lhs, StringView rhs);
 LUMIX_ENGINE_API bool equalIStrings(StringView lhs, StringView rhs);
 LUMIX_ENGINE_API int compareString(StringView lhs, StringView rhs);
@@ -66,54 +67,26 @@ LUMIX_ENGINE_API bool isLetter(char c);
 LUMIX_ENGINE_API bool isNumeric(char c);
 LUMIX_ENGINE_API bool isUpperCase(char c);
 
-template <int SIZE> bool copyString(char(&destination)[SIZE], StringView source) {
+template <int SIZE> char* copyString(char(&destination)[SIZE], StringView source) {
 	return copyString(Span<char>(destination, SIZE), source);
 }
 
-template <int SIZE> bool catString(char(&destination)[SIZE], StringView source) {
+template <int SIZE> char* catString(char(&destination)[SIZE], StringView source) {
 	return catString(Span<char>(destination, SIZE), source);
 }
 
 template <int SIZE> struct StaticString {
 	StaticString() { data[0] = '\0'; }
 
-	explicit StaticString(const char* str) { copyString(Span(data), str); }
-
 	template <typename... Args> StaticString(Args... args) {
 		data[0] = '\0';
-		int tmp[] = { (add(args), 0)... };
-		(void)tmp;
+		append(args...);
 	}
 
 	template <typename... Args> void append(Args... args) {
-		int tmp[] = { (add(args), 0)... };
+		Span dst(data + stringLength(data), data + SIZE);
+		int tmp[] = { ( add(args, dst), 0)... };
 		(void)tmp;
-	}
-
-	template <int value_size> void add(StaticString<value_size>& value) { catString(data, value.data); }
-	void add(const char* value) { catString(data, value); }
-	void add(char* value) { catString(data, value); }
-	void add(StringView value) { catString(Span(data), value); }
-	void add(StableHash value) { add(value.getHashValue()); }
-
-	void add(char value) {
-		char tmp[2] = {value, 0};
-		catString(data, tmp);
-	}
-
-	void add(float value) {
-		int len = stringLength(data);
-		toCString(value, Span<char>(data).fromLeft(len), 3);
-	}
-
-	void add(double value) {
-		int len = stringLength(data);
-		toCString(value, Span<char>(data).fromLeft(len), 10);
-	}
-
-	template <typename T> void add(T value) {
-		int len = stringLength(data);
-		toCString(value, Span(data + len, u32(SIZE - len)));
 	}
 
 	void operator=(const char* str) { copyString(data, str); }
@@ -125,6 +98,24 @@ template <int SIZE> struct StaticString {
 	operator const char*() const { return data; }
 
 	char data[SIZE];
+
+private:
+	template <typename T> void add(T value, Span<char>& dst) { dst.m_begin = toCString(value, dst); }
+	template <int S> void add(StaticString<S>& value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
+	void add(StringView value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
+	void add(const char* value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
+	void add(char* value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
+	void add(const Path& value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
+	void add(StableHash value, Span<char>& dst) { add(value.getHashValue(), dst); }
+	void add(float value, Span<char>& dst) { dst.m_begin = toCString(value, dst, 3); }
+	void add(double value, Span<char>& dst) { dst.m_begin = toCString(value, dst, 10); }
+
+	void add(char value, Span<char>& dst) {
+		if (dst.length() < 2) return;
+		dst[0] = value;
+		dst[1] = '\0';
+		dst.m_begin += 1;
+	}
 };
 
 
@@ -179,6 +170,9 @@ private:
 	};
 };
 
-template <int N> StringView::StringView(const StaticString<N>& str) : begin(str.data) {}
+template <int N> StringView::StringView(const StaticString<N>& str)
+	: begin(str.data)
+	, end(str.data + stringLength(str.data))
+{}
 
 } // namespace Lumix

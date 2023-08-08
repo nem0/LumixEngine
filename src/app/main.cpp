@@ -174,7 +174,7 @@ struct Runner final
 		loadProject();
 
 		const Path unv_path("universes/", m_startup_world, ".unv");
-		if (!loadWorld(unv_path, m_startup_world)) {
+		if (!loadWorld(unv_path.c_str(), m_startup_world)) {
 			initDemoScene();
 		}
 		os::showCursor(false);

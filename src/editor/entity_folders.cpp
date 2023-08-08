@@ -200,7 +200,7 @@ void EntityFolders::unlink(Folder& folder) {
 	folder.next = folder.prev = INVALID_FOLDER;
 }
 
-void EntityFolders::renameFolder(FolderHandle folder, const char* new_name) {
+void EntityFolders::renameFolder(FolderHandle folder, StringView new_name) {
 	Folder& f = getFolder(folder);
 	copyString(f.name, new_name);
 	// reinsert so it's sorted

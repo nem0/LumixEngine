@@ -52,7 +52,7 @@ void Sprite::serialize(OutputMemoryStream& out)
 	out << "bottom(" << bottom << ")\n";
 	out << "left(" << left << ")\n";
 	out << "right(" << right << ")\n";
-	out << "texture \"" << (m_texture ? m_texture->getPath().c_str() : "") << "\"";
+	out << "texture \"" << (m_texture ? m_texture->getPath() : Path()) << "\"";
 }
 
 namespace LuaSpriteAPI {

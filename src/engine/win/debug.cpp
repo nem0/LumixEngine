@@ -615,10 +615,7 @@ BOOL SendFile(LPCSTR lpszSubject,
 
 	PathInfo fi(lpszFullFileName);
 
-	char szFileName[MAX_PATH] = {0};
-	strcat_s(szFileName, fi.m_basename);
-	strcat_s(szFileName, ".");
-	strcat_s(szFileName, fi.m_extension);
+	StaticString<MAX_PATH> szFileName(fi.basename, ".", fi.extension);
 
 	char szFullFileName[MAX_PATH] = {0};
 	strcat_s(szFullFileName, lpszFullFileName);
@@ -627,7 +624,7 @@ BOOL SendFile(LPCSTR lpszSubject,
 	ZeroMemory(&MAPIfile, sizeof(MapiFileDesc));
 	MAPIfile.nPosition = 0xFFFFFFFF;
 	MAPIfile.lpszPathName = szFullFileName;
-	MAPIfile.lpszFileName = szFileName;
+	MAPIfile.lpszFileName = szFileName.data;
 
 	char szTo[MAX_PATH] = {0};
 	strcat_s(szTo, lpszTo);
@@ -725,8 +722,8 @@ static void getStack(CONTEXT& context, Span<char> out)
 		DWORD num_char = UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
 
 		if (num_char == 0) return;
-		if (!catString(out, symbol->Name)) return;
-		if (!catString(out, "\n")) return;
+		catString(out, symbol->Name);
+		catString(out, "\n");
 
 	} while (result);
 }

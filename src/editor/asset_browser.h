@@ -27,14 +27,14 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual ~AssetBrowser() {}
 	virtual void onInitFinished() = 0;
 	virtual void openEditor(const Path& resource) = 0;
-	virtual bool resourceInput(const char* str_id, Span<char> buf, ResourceType type, float width = -1) = 0;
+	virtual bool resourceInput(const char* str_id, Path& buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual void openInExternalEditor(struct Resource* resource) const = 0;
-	virtual void openInExternalEditor(const char* path) const = 0;
+	virtual void openInExternalEditor(struct StringView path) const = 0;
 	virtual void locate(const Resource& resource) = 0;
 	virtual void locate(const Path& resource) = 0;
-	virtual bool resourceList(Span<char> buf, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) = 0;
+	virtual bool resourceList(Path& path, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) = 0;
 	virtual void tile(const Path& path, bool selected) = 0;
 	virtual void saveResource(const Path& path, Span<const u8> data) = 0;
 	virtual void saveResource(Resource& resource, Span<const u8> data) = 0;

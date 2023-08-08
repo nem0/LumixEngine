@@ -89,7 +89,7 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	u64 capacity() const { return m_capacity; }
 	u64 size() const { return m_size; }
 	void write(const struct String& string);
-	void writeString(const char* string);
+	void writeString(StringView string);
 	template <typename T> void write(const T& value);
 	void clear();
 	void* skip(u64 size);

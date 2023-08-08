@@ -68,7 +68,6 @@ OutputMemoryStream::~OutputMemoryStream()
 
 
 IOutputStream& IOutputStream::operator << (StringView str) {
-	str.ensureEnd();
 	write(str.begin, str.size());
 	return *this;
 }
@@ -196,12 +195,6 @@ void OutputMemoryStream::operator =(OutputMemoryStream&& rhs)
 }
 	
 
-void OutputMemoryStream::write(const String& string)
-{
-	writeString(string.c_str());
-}
-
-
 void* OutputMemoryStream::skip(u64 size)
 {
 	ASSERT(size > 0 || m_capacity > 0);
@@ -303,14 +296,10 @@ bool OutputMemoryStream::write(const void* data, u64 size)
 }
 
 
-void OutputMemoryStream::writeString(const char* string)
-{
-	if (string) {
-		const i32 size = stringLength(string) + 1;
-		write(string, size);
-	} else {
-		write((char)0);
-	}
+void OutputMemoryStream::writeString(StringView string) {
+	const i32 size = string.size() + 1;
+	write(string.begin, size - 1);
+	write((char)0);
 }
 
 
@@ -419,6 +408,9 @@ bool InputMemoryStream::read(void* data, u64 size)
 	return true;
 }
 
+void OutputMemoryStream::write(const String& string) {
+	writeString(string);
+}
 
 bool InputMemoryStream::read(String& string)
 {

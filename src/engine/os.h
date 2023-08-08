@@ -3,6 +3,7 @@
 
 #include "lumix.h"
 #include "stream.h"
+#include "string.h"
 #ifdef __linux__
 	#include <pthread.h>
 #endif
@@ -171,25 +172,25 @@ LUMIX_ENGINE_API u32 getMemPageSize();
 LUMIX_ENGINE_API u32 getMemPageAlignment();
 LUMIX_ENGINE_API u64 getProcessMemory();
 
-LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
+LUMIX_ENGINE_API FileIterator* createFileIterator(StringView path, IAllocator& allocator);
 LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);
 LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
-LUMIX_ENGINE_API void setCurrentDirectory(const char* path);
+LUMIX_ENGINE_API void setCurrentDirectory(StringView path);
 LUMIX_ENGINE_API void getCurrentDirectory(Span<char> path);
 LUMIX_ENGINE_API [[nodiscard]] bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
 LUMIX_ENGINE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
 LUMIX_ENGINE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
-LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path, const char* args = nullptr, const char* working_dir = nullptr);
-LUMIX_ENGINE_API ExecuteOpenResult openExplorer(const char* path);
+LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(StringView path, StringView args = {}, StringView working_dir = {});
+LUMIX_ENGINE_API ExecuteOpenResult openExplorer(StringView path);
 LUMIX_ENGINE_API void copyToClipboard(const char* text);
 
-LUMIX_ENGINE_API bool deleteFile(const char* path);
-LUMIX_ENGINE_API [[nodiscard]] bool moveFile(const char* from, const char* to);
-LUMIX_ENGINE_API size_t getFileSize(const char* path);
-LUMIX_ENGINE_API bool fileExists(const char* path);
-LUMIX_ENGINE_API bool dirExists(const char* path);
-LUMIX_ENGINE_API u64 getLastModified(const char* file);
+LUMIX_ENGINE_API bool deleteFile(StringView path);
+LUMIX_ENGINE_API [[nodiscard]] bool moveFile(StringView from, StringView to);
+LUMIX_ENGINE_API size_t getFileSize(StringView path);
+LUMIX_ENGINE_API bool fileExists(StringView path);
+LUMIX_ENGINE_API bool dirExists(StringView path);
+LUMIX_ENGINE_API u64 getLastModified(StringView file);
 LUMIX_ENGINE_API [[nodiscard]] bool makePath(const char* path);
 
 LUMIX_ENGINE_API void setCursor(CursorType type);
@@ -223,7 +224,7 @@ LUMIX_ENGINE_API bool isKeyDown(Keycode keycode);
 LUMIX_ENGINE_API void getKeyName(Keycode keycode, Span<char> out);
 LUMIX_ENGINE_API int getDPI();
 
-LUMIX_ENGINE_API [[nodiscard]] bool copyFile(const char* from, const char* to);
+LUMIX_ENGINE_API [[nodiscard]] bool copyFile(StringView from, StringView to);
 LUMIX_ENGINE_API void getExecutablePath(Span<char> path);
 LUMIX_ENGINE_API [[nodiscard]] bool getAppDataDir(Span<char> path);
 LUMIX_ENGINE_API void messageBox(const char* text);

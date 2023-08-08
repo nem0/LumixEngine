@@ -79,8 +79,8 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			| ImGuiWindowFlags_NoSavedSettings;
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 		if (ImGui::Begin("Navmesh building", nullptr, flags)) {
-			ImGui::Text("%s", "Building navmesh...");
-			ImGui::Text("%s", "Manipulating with entities at this time can produce incorrect results and even crashes.");
+			ImGui::TextUnformatted("Building navmesh...");
+			ImGui::TextUnformatted("Manipulating with entities at this time can produce incorrect results and even crashes.");
 			float progress = m_job->getProgress();
 			ImGui::ProgressBar(progress, ImVec2(-1, 0), StaticString<64>(i32(progress * 100), "%"));
 		}
@@ -115,7 +115,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
 				const Path dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
-				if (!os::makePath(dir) && !os::dirExists(dir)) {
+				if (!os::makePath(dir.c_str()) && !os::dirExists(dir)) {
 					logError("Could not create ", dir);
 				}
 				module->saveZone(entities[0]);

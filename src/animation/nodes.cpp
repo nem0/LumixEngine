@@ -553,7 +553,7 @@ void LayersNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask
 void LayersNode::serialize(OutputMemoryStream& stream) const {
 	stream.write((u32)m_layers.size());
 	for (const Layer& layer : m_layers) {
-		stream.writeString(layer.name.c_str());
+		stream.writeString(layer.name);
 		stream.write(layer.mask);
 		stream.write(layer.node->type());
 		layer.node->serialize(stream);
@@ -855,7 +855,7 @@ void GroupNode::serialize(OutputMemoryStream& stream) const {
 	for (const Child& child : m_children) {
 		stream.write(child.node->type());
 		stream.write(child.flags);
-		stream.writeString(child.condition_str.c_str());
+		stream.writeString(child.condition_str);
 		child.node->serialize(stream);
 	}
 	
@@ -891,7 +891,7 @@ void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ver
 }
 
 void Node::serialize(OutputMemoryStream& stream) const {
-	stream.writeString(m_name.c_str());
+	stream.writeString(m_name);
 	stream.write((u32)m_events.size());
 	stream.write(m_events.data(), m_events.size());
 }

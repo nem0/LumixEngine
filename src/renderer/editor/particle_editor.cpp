@@ -425,7 +425,7 @@ struct ParticleEmitterEditorResource {
 
 	Node* addNode(Node::Type type);
 	
-	bool deserialize(InputMemoryStream& blob, const char* path, Version version) {
+	bool deserialize(InputMemoryStream& blob, Version version) {
 		blob.read(m_last_id);
 		if (version > Version::MULTIEMITTER) m_name = blob.readString();
 		m_mat_path = blob.readString();
@@ -488,8 +488,8 @@ struct ParticleEmitterEditorResource {
 
 	void serialize(OutputMemoryStream& blob) {
 		blob.write(m_last_id);
-		blob.writeString(m_name.c_str());
-		blob.writeString(m_mat_path.data);
+		blob.writeString(m_name);
+		blob.writeString(m_mat_path);
 		blob.write(m_init_emit_count);
 		blob.write(m_emit_per_second);
 		
@@ -646,7 +646,7 @@ struct ParticleEmitterEditorResource {
 	ParticleSystemEditorResource& m_system;
 	IAllocator& m_allocator;
 	String m_name;
-	StaticString<LUMIX_MAX_PATH> m_mat_path;
+	Path m_mat_path;
 	Array<EmitInput> m_emit_inputs;
 	Array<Stream> m_streams;
 	Array<Output> m_outputs;
@@ -719,7 +719,7 @@ struct ParticleSystemEditorResource {
 		, m_name(allocator)
 		, m_app(app)
 	{
-		m_name = Path::getBasename(m_path.c_str());
+		m_name = Path::getBasename(m_path);
 	}
 	
 	bool isFunction() const {
@@ -769,7 +769,7 @@ struct ParticleSystemEditorResource {
 		if (header.version > Version::MULTIEMITTER) count = blob.read<u32>();
 		for (u32 i = 0; i < count; ++i) {
 			UniquePtr<ParticleEmitterEditorResource> emitter = UniquePtr<ParticleEmitterEditorResource>::create(m_allocator, *this, m_allocator);
-			if (!emitter->deserialize(blob, m_path, header.version)) return false;
+			if (!emitter->deserialize(blob, header.version)) return false;
 			m_emitters.push(emitter.move());
 		}
 
@@ -1671,7 +1671,7 @@ struct FunctionInputNode : Node {
 	bool hasOutputPins() const override { return true; }
 	
 	void serialize(OutputMemoryStream& blob) const override {
-		blob.writeString(m_name.c_str());
+		blob.writeString(m_name);
 		blob.write(m_guid);
 	}
 	
@@ -1713,7 +1713,7 @@ struct FunctionOutputNode : Node {
 	bool hasOutputPins() const override { return false; }
 	
 	void serialize(OutputMemoryStream& blob) const override {
-		blob.writeString(m_name.c_str());
+		blob.writeString(m_name);
 		blob.write(m_guid);
 	}
 	
@@ -1786,15 +1786,15 @@ struct FunctionCallNode : Node {
 	}
 
 	void serialize(OutputMemoryStream& blob) const override {
-		blob.writeString(m_function->m_path.c_str());
+		blob.writeString(m_function->m_path);
 		blob.write(m_inputs.size());
 		for (const Input& i : m_inputs) {
-			blob.writeString(i.name.c_str());
+			blob.writeString(i.name);
 			blob.write(i.guid);
 		}
 		blob.write(m_outputs.size());
 		for (const Output& i : m_outputs) {
-			blob.writeString(i.name.c_str());
+			blob.writeString(i.name);
 			blob.write(i.guid);
 		}
 	}
@@ -1877,7 +1877,7 @@ struct FunctionCallNode : Node {
 				ImGui::Text("%s (removed)", i.name.c_str());
 			}
 			else {
-				ImGui::TextUnformatted(i.name.c_str());
+				ImGuiEx::TextUnformatted(i.name);
 			}
 		}
 		ImGui::EndGroup();
@@ -1889,7 +1889,7 @@ struct FunctionCallNode : Node {
 				ImGui::Text("%s (removed)", i.name.c_str());
 			}
 			else {
-				ImGui::TextUnformatted(i.name.c_str());
+				ImGuiEx::TextUnformatted(i.name);
 			}
 		}
 		ImGui::EndGroup();
@@ -2681,7 +2681,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			compiler.registerExtension("par", ParticleSystemResource::TYPE);
 		}
 
-		void addSubresources(AssetCompiler& compiler, const char* path) override {
+		void addSubresources(AssetCompiler& compiler, const Path& path) override {
 			compiler.addResource(ParticleSystemResource::TYPE, path);
 			ParticleEditor::registerDependencies(path, m_app);
 		}
@@ -2695,7 +2695,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			OutputMemoryStream output(m_app.getAllocator());
 			if (!m_editor.compile(input, output, src.c_str())) return false;
 
-			return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
+			return m_app.getAssetCompiler().writeCompiledResource(src, Span(output.data(), (i32)output.size()));
 		}
 
 		void createResource(OutputMemoryStream& blob) override {
@@ -2707,7 +2707,7 @@ struct ParticleEditorImpl : ParticleEditor {
 
 		bool canCreateResource() const override { return true; }
 		const char* getDefaultExtension() const override { return "par"; }
-		void openEditor(const Path& path) override { m_editor.open(path.c_str()); }
+		void openEditor(const Path& path) override { m_editor.open(path); }
 		const char* getLabel() const override { return "Particle system"; }
 
 		StudioApp& m_app;
@@ -2721,10 +2721,10 @@ struct ParticleEditorImpl : ParticleEditor {
 			, m_editor(editor)
 		{}
 
-		void addSubresources(AssetCompiler& compiler, const char* path) override;
+		void addSubresources(AssetCompiler& compiler, const Path& path) override;
 		bool compile(const Path& src) override { return true; }
 		void listLoaded() override;
-		void openEditor(const Path& path) override { m_editor.open(path.c_str()); }
+		void openEditor(const Path& path) override { m_editor.open(path); }
 
 		void createResource(OutputMemoryStream& blob) override {
 			ParticleSystemEditorResource res(Path("new particle function"), m_app, m_app.getAllocator());
@@ -2758,12 +2758,12 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_app.getAssetBrowser().removePlugin(m_particle_system_plugin);
 	}
 
-	void open(const char* path);
+	void open(const Path& path);
 
 	void addFunction(const Path& path) {
 		Function& func = m_functions.emplace(m_allocator);
 		func.path = path;
-		func.name = Path::getBasename(path.c_str());
+		func.name = Path::getBasename(path);
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
@@ -3275,7 +3275,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	void leftColumnGUI() {
 		bool changed = inputString("##name", "Emitter name", &m_active_emitter->m_name);
 		ImGuiEx::Label("Material");
-		changed = m_app.getAssetBrowser().resourceInput("material", Span(m_active_emitter->m_mat_path.data), Material::TYPE) || changed;
+		changed = m_app.getAssetBrowser().resourceInput("material", m_active_emitter->m_mat_path, Material::TYPE) || changed;
 		ImGuiEx::Label("Emit per second");
 		changed = ImGui::DragFloat("##eps", &m_active_emitter->m_emit_per_second) || changed;
 		ImGuiEx::Label("Emit at start");
@@ -3589,7 +3589,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 		}
 		
 		m_resource.m_path = path;
-		m_resource.m_name = Path::getBasename(m_resource.m_path.c_str());
+		m_resource.m_name = Path::getBasename(m_resource.m_path);
 
 		m_dirty = false;
 
@@ -3622,15 +3622,15 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 };
 
 
-void ParticleEditorImpl::open(const char* path) {
-	UniquePtr<ParticleEditorWindow> win = UniquePtr<ParticleEditorWindow>::create(m_allocator, Path(path), *this, m_app, m_allocator);
+void ParticleEditorImpl::open(const Path& path) {
+	UniquePtr<ParticleEditorWindow> win = UniquePtr<ParticleEditorWindow>::create(m_allocator, path, *this, m_app, m_allocator);
 	win->loadResource();
 	m_app.getAssetBrowser().addWindow(win.move());
 }
 
-void ParticleEditorImpl::FunctionPlugin::addSubresources(AssetCompiler& compiler, const char* path) {
+void ParticleEditorImpl::FunctionPlugin::addSubresources(AssetCompiler& compiler, const Path& path) {
 	compiler.addResource(ParticleSystemEditorResource::TYPE, path);
-	((ParticleEditorImpl&)m_editor).addFunction(Path(path));
+	((ParticleEditorImpl&)m_editor).addFunction(path);
 }
 
 void ParticleEditorImpl::FunctionPlugin::listLoaded() {
@@ -3681,10 +3681,10 @@ void ParticleSystemEditorResource::registerDependencies() {
 	}
 }
 
-void ParticleEditor::registerDependencies(const char* path, StudioApp& app) {
-	ParticleSystemEditorResource system(Path(path), app, app.getAllocator());
+void ParticleEditor::registerDependencies(const Path& path, StudioApp& app) {
+	ParticleSystemEditorResource system(path, app, app.getAllocator());
 	OutputMemoryStream content(app.getAllocator());
-	if (!app.getEngine().getFileSystem().getContentSync(Path(path), content)) {
+	if (!app.getEngine().getFileSystem().getContentSync(path, content)) {
 		logError("Failed to load ", path);
 		return;
 	}

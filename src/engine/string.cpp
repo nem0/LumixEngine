@@ -102,7 +102,6 @@ void String::operator=(const String& rhs)
 }
 
 void String::operator=(StringView rhs) {
-	rhs.ensureEnd();
 	if (!isSmall()) {
 		ASSERT(rhs.begin > m_big + m_size || rhs.end < m_big);
 		m_allocator.deallocate(m_big);
@@ -193,7 +192,6 @@ void String::resize(u32 size) {
 
 
 String& String::cat(StringView value) {
-	value.ensureEnd();
 	ASSERT(value.begin < c_str() || value.begin >= c_str() + m_size);
 
 	const int old_s = m_size;
@@ -265,17 +263,6 @@ int compareString(StringView lhs, StringView rhs) {
 	const char* a = lhs.begin;
 	const char* b = rhs.begin;
 
-	if (!lhs.end && !rhs.end) {
-		while (*a && *a == *b) {
-			++a;
-			++b;
-		}
-		return i32(*a) - i32(*b);
-	}
-
-	lhs.ensureEnd();
-	rhs.ensureEnd();
-
 	while (a != lhs.end && b != lhs.end && *a == *b) {
 		++a;
 		++b;
@@ -288,40 +275,11 @@ int compareString(StringView lhs, StringView rhs) {
 }
 
 bool equalStrings(StringView lhs, StringView rhs) {
-	if (!lhs.end && !rhs.end) return strcmp(lhs.begin, rhs.begin) == 0;
-	
-	if (lhs.end && rhs.end) {
-		if (rhs.size() != lhs.size()) return false;
-		return strncmp(lhs.begin, rhs.begin, lhs.size()) == 0;
-	}
-
-	if (!lhs.end) {
-		StringView tmp = lhs;
-		lhs = rhs;
-		rhs = tmp;
-	}
-
-	ASSERT(lhs.end);
-	const char* a = lhs.begin;
-	const char* b = rhs.begin;
-	while (a != lhs.end && *b) {
-		++a;
-		++b;
-	}
-	return a == lhs.end && !*b;
+	if (rhs.size() != lhs.size()) return false;
+	return strncmp(lhs.begin, rhs.begin, lhs.size()) == 0;
 }
 
 bool equalIStrings(StringView lhs, StringView rhs) {
-	if (!lhs.end && !rhs.end) {
-		#ifdef _WIN32
-			return _stricmp(lhs.begin, rhs.begin) == 0;
-		#else
-			return strcasecmp(lhs.begin, rhs.begin) == 0;
-		#endif
-	}
-
-	lhs.ensureEnd();
-	rhs.ensureEnd();
 	if (lhs.size() != rhs.size()) return false;
 
 	for (u32 i = 0, c = lhs.size(); i < c; ++i) {
@@ -336,63 +294,26 @@ int stringLength(const char* str)
 }
 
 bool endsWithInsensitive(StringView str, StringView suffix) {
-	str.ensureEnd();
-	suffix.ensureEnd();
 	if (str.size() > suffix.size()) return false;
-	return equalIStrings(str.end - suffix.size(), suffix);
+	str.begin = str.end - suffix.size();
+	return equalIStrings(str, suffix);
 }
 
 bool endsWith(StringView str, StringView suffix) {
-	str.ensureEnd();
-	suffix.ensureEnd();
 	if (str.size() > suffix.size()) return false;
-	return equalStrings(str.end - suffix.size(), suffix);
-}
-
-bool contains(StringView haystack, char needle) {
-	const char* c = haystack.begin;
-	if (haystack.end) {
-		while (c != haystack.end) {
-			if (*c == needle) return true;
-			++c;
-		}
-		return false;
-	}
-	while (*c) {
-		if (*c == needle) return true;
-		++c;
-	}
-	return false;
+	str.begin = str.end - suffix.size();
+	return equalStrings(str, suffix);
 }
 
 const char* stristr(StringView haystack, StringView needle) {
 	ASSERT(!needle.empty());
 
-	needle.ensureEnd();
-
 	const char* c = haystack.begin;
-	if (haystack.end) {
-		while (c != haystack.end) {
-			if (makeLowercase(*c) == makeLowercase(needle[0])) {
-				const char* n = needle.begin + 1;
-				const char* c2 = c + 1;
-				while (n != needle.end && c2 != haystack.end) {
-					if (makeLowercase(*n) != makeLowercase(*c2)) break;
-					++n;
-					++c2;
-				}
-				if (n == needle.end) return c;
-			}
-			++c;
-		}
-		return nullptr;
-	}
-	
-	while (*c) {
+	while (c != haystack.end) {
 		if (makeLowercase(*c) == makeLowercase(needle[0])) {
 			const char* n = needle.begin + 1;
 			const char* c2 = c + 1;
-			while (n != needle.end && *c2) {
+			while (n != needle.end && c2 != haystack.end) {
 				if (makeLowercase(*n) != makeLowercase(*c2)) break;
 				++n;
 				++c2;
@@ -406,7 +327,6 @@ const char* stristr(StringView haystack, StringView needle) {
 
 bool makeLowercase(Span<char> output, StringView src) {
 	char* destination = output.begin();
-	src.ensureEnd();
 	if (src.size() + 1 > output.length()) return false;
 
 	const char* source = src.begin;
@@ -419,102 +339,38 @@ bool makeLowercase(Span<char> output, StringView src) {
 	return true;
 }
 
-bool makeLowercase(Span<char> dst, const char* source)
-{
-	char* destination = dst.begin();
-	u32 length = dst.length();
-	if (!source)
-	{
-		return false;
-	}
-
-	while (*source && length)
-	{
-		*destination = makeLowercase(*source);
-		--length;
-		++destination;
-		++source;
-	}
-	if (length > 0)
-	{
-		*destination = 0;
-		return true;
-	}
-	return false;
-}
-
-
 const char* findChar(StringView haystack, char needle) {
 	const char* c = haystack.begin;
-	if (haystack.end) {
-		while (c != haystack.end) {
-			if (*c == needle) return c;
-			++c;
-		}
-		return nullptr;
-	}
-
-	while (*c) {
+	while (c != haystack.end) {
 		if (*c == needle) return c;
 		++c;
 	}
 	return nullptr;
 }
 
-
-bool copyNString(Span<char> dst, const char* src, int N)
-{
-	if (!src) return false;
-
-	char* destination = dst.begin();
-	const char* source = src;
-	u32 length = dst.length();
-	ASSERT(N >= 0);
-
-	while (*source && length > 1 && N)
-	{
-		*destination = *source;
-		--N;
-		--length;
-		++destination;
-		++source;
-	}
-	if (length > 0)
-	{
-		*destination = 0;
-		return *source == '\0' || N == 0;
-	}
-	return false;
+bool contains(StringView haystack, char needle) {
+	return findChar(haystack, needle) != nullptr;
 }
 
-bool copyString(Span<char> dst, StringView src) {
-	if (dst.length() < 1) return false;
+char* copyString(Span<char> dst, StringView src) {
+	if (dst.length() < 1) return dst.begin();
+
+	ASSERT(dst.begin() >= src.end || dst.begin() <= src.begin);
 
 	u32 length = dst.length();
 	char* tmp = dst.begin();
 	const char* srcp = src.begin;
-	if (src.end) {
-		while (srcp != src.end && length > 1) {
-			*tmp = *srcp;
-			--length;
-			++tmp;
-			++srcp;
-		}
-	}
-	else {
-		while (*srcp && length > 1) {
-			*tmp = *srcp;
-			--length;
-			++tmp;
-			++srcp;
-		}
+	while (srcp != src.end && length > 1) {
+		*tmp = *srcp;
+		--length;
+		++tmp;
+		++srcp;
 	}
 	*tmp = 0;
-	return srcp == src.end;
+	return tmp;
 }
 
 const char* reverseFind(StringView haystack, char c) {
-	haystack.ensureEnd();
 	if (haystack.size() == 0) return nullptr;
 
 	const char* tmp = haystack.end - 1;
@@ -525,7 +381,7 @@ const char* reverseFind(StringView haystack, char c) {
 	return nullptr;
 }
 
-bool catString(Span<char> destination, StringView source) {
+char* catString(Span<char> destination, StringView source) {
 	char* dst = destination.begin();
 	u32 length = destination.length();
 	while (*dst && length) {
@@ -615,7 +471,7 @@ const char* fromCString(StringView input, u64& value) {
 	return c;
 }
 
-bool toCStringPretty(i32 value, Span<char> output)
+void toCStringPretty(i32 value, Span<char> output)
 {
 	char* c = output.begin();
 	u32 length = output.length();
@@ -630,17 +486,16 @@ bool toCStringPretty(i32 value, Span<char> output)
 		}
 		return toCStringPretty((unsigned int)value, Span(c, length));
 	}
-	return false;
 }
 
 
-bool toCStringPretty(u32 value, Span<char> output)
+void toCStringPretty(u32 value, Span<char> output)
 {
 	return toCStringPretty(u64(value), output);
 }
 
 
-bool toCStringPretty(u64 value, Span<char> output)
+void toCStringPretty(u64 value, Span<char> output)
 {
 	char* c = output.begin();
 	char* num_start = output.begin();
@@ -651,11 +506,11 @@ bool toCStringPretty(u64 value, Span<char> output)
 		{
 			if (length == 1)
 			{
-				return false;
+				return;
 			}
 			*c = '0';
 			*(c + 1) = 0;
-			return true;
+			return;
 		}
 		int counter = 0;
 		while (value > 0 && length > 1)
@@ -679,88 +534,79 @@ bool toCStringPretty(u64 value, Span<char> output)
 		{
 			reverse(num_start, (int)(c - num_start));
 			*c = 0;
-			return true;
+			return;
 		}
 	}
-	return false;
+	return;
 }
 
 
-bool toCString(i32 value, Span<char> output)
+char* toCString(i32 value, Span<char> output)
 {
 	char* c = output.begin();
 	u32 length = output.length();
-	if (length > 0)
-	{
-		if (value < 0)
-		{
-			value = -value;
-			--length;
-			*c = '-';
-			++c;
-		}
-		return toCString((unsigned int)value, Span(c, length));
+	if (length < 2) return nullptr;
+
+	if (value < 0) {
+		value = -value;
+		--length;
+		c[0] = '-';
+		c[1] = 0;
+		++c;
 	}
-	return false;
+	return toCString((u32)value, Span(c, length));
 }
 
-bool toCString(i64 value, Span<char> output)
+char* toCString(i64 value, Span<char> output)
 {
 	char* c = output.begin();
 	u32 length = output.length();
-	if (length > 0)
-	{
-		if (value < 0)
-		{
-			value = -value;
-			--length;
-			*c = '-';
-			++c;
-		}
-		return toCString((u64)value, Span(c, length));
+	if (length < 2) return nullptr;
+	if (value < 0) {
+		value = -value;
+		--length;
+		c[0] = '-';
+		c[1] = 0;
+		++c;
 	}
-	return false;
+	return toCString((u64)value, Span(c, length));
 }
 
-bool toCString(u64 value, Span<char> output)
+char* toCString(u64 value, Span<char> output)
 {
 	char* c = output.begin();
 	char* num_start = output.begin();
 	u32 length = output.length();
-	if (length > 0)
-	{
-		if (value == 0)
-		{
-			if (length == 1)
-			{
-				return false;
-			}
-			*c = '0';
-			*(c + 1) = 0;
-			return true;
-		}
-		while (value > 0 && length > 1)
-		{
-			*c = value % 10 + '0';
-			value = value / 10;
-			--length;
-			++c;
-		}
-		if (length > 0)
-		{
-			reverse(num_start, (int)(c - num_start));
-			*c = 0;
-			return true;
-		}
+	if (length < 2) return nullptr;
+
+	if (value == 0) {
+		*c = '0';
+		*(c + 1) = 0;
+		return c + 1;
 	}
-	return false;
+
+	while (value > 0 && length > 0) {
+		*c = value % 10 + '0';
+		value = value / 10;
+		--length;
+		++c;
+	}
+
+	if (length > 0) {
+		reverse(num_start, (int)(c - num_start));
+		*c = 0;
+		return c;
+	}
+
+	*(c - 1) = 0;
+	return nullptr;
 }
 
-bool toCStringHex(u8 value, Span<char> output)
+void toCStringHex(u8 value, Span<char> output)
 {
 	if (output.length() < 2)
 	{
-		return false;
+		return;
 	}
 	u8 first = value / 16;
 	if (first > 9)
@@ -780,48 +626,43 @@ bool toCStringHex(u8 value, Span<char> output)
 	{
 		output[1] = '0' + second;
 	}
-	return true;
+	return;
 }
 
-bool toCString(u32 value, Span<char> output)
+char* toCString(u32 value, Span<char> output)
 {
 	char* c = output.begin();
 	char* num_start = output.begin();
 	u32 length = output.length();
-	if (length > 0)
-	{
-		if (value == 0)
-		{
-			if (length == 1)
-			{
-				return false;
-			}
-			*c = '0';
-			*(c + 1) = 0;
-			return true;
-		}
-		while (value > 0 && length > 1)
-		{
-			*c = value % 10 + '0';
-			value = value / 10;
-			--length;
-			++c;
-		}
-		if (length > 0)
-		{
-			reverse(num_start, (int)(c - num_start));
-			*c = 0;
-			return true;
-		}
+	if (length < 2) return nullptr;
+
+	if (value == 0) {
+		*c = '0';
+		*(c + 1) = 0;
+		return c + 1;
 	}
-	return false;
+
+	while (value > 0 && length > 0) {
+		*c = value % 10 + '0';
+		value = value / 10;
+		--length;
+		++c;
+	}
+	if (length > 0) {
+		reverse(num_start, (int)(c - num_start));
+		*c = 0;
+		return c;
+	}
+	*(c- 1) = 0;
+	return nullptr;
 }
 
-static bool increment(const char* output, char* end, bool is_space_after)
+// returns new end or null if failed
+static char* increment(const char* output, char* end, bool is_space_after)
 {
 	char carry = 1;
 	{
-		char* c = end;
+		char* c = end - 1; // skip '\0'
 		while (c >= output)
 		{
 			if (*c == '.')
@@ -842,32 +683,33 @@ static bool increment(const char* output, char* end, bool is_space_after)
 			--c;
 		}
 	}
-	if (carry && is_space_after)
-	{
-		char* c = end + 1; // including '\0' at the end of the String
-		while (c >= output)
-		{
+	if (carry && is_space_after) {
+		char* c = end; // including '\0' at the end of the String
+		while (c >= output) {
 			*(c + 1) = *c;
 			--c;
 		}
 		++c;
 		*c = '1';
-		return true;
+		return end + 1;
 	}
-	return !carry;
+	if (carry) return nullptr;
+	return end;
 }
 
 
-bool toCString(float value, Span<char> out, int after_point)
-{
+char* toCString(float value, Span<char> out, int after_point) {
+	return toCString(double(value), out, after_point);
+}
+
+char* toCString(bool value, Span<char> output) { return copyString(output, value ? "true" : "false"); }
+
+char* toCString(double value, Span<char> out, int after_point) {
 	char* output = out.begin();
 	u32 length = out.length();
-	if (length < 2)
-	{
-		return false;
-	}
-	if (value < 0)
-	{
+	if (length < 2) return nullptr;
+	
+	if (value < 0) {
 		*output = '-';
 		++output;
 		value = -value;
@@ -877,16 +719,13 @@ bool toCString(float value, Span<char> out, int after_point)
 	int exponent = value == 0 ? 0 : (int)log10(value);
 	double num = value;
 	char* c = output;
-	if (num  < 1 && num > -1 && length > 1)
-	{
+	if (num < 1 && length > 1) {
 		*c = '0';
 		++c;
 		--length;
 	}
-	else
-	{
-		while ((num >= 1 || exponent >= 0) && length > 1)
-		{
+	else {
+		while ((num >= 1 || exponent >= 0) && length > 1) {
 			const double power = pow(10.0, (double)exponent);
 			char digit = (char)floor(num / power);
 			num -= digit * power;
@@ -898,23 +737,19 @@ bool toCString(float value, Span<char> out, int after_point)
 	}
 	// decimal part
 	double dec_part = num;
-	if (length > 1 && after_point > 0)
-	{
+	if (length > 1 && after_point > 0) {
 		*c = '.';
 		++c;
 		--length;
 	}
-	else if (length > 0 && after_point == 0)
-	{
+	else if (length > 0 && after_point == 0) {
 		*c = 0;
-		return true;
+		return c;
 	}
-	else
-	{
-		return false;
+	else {
+		return nullptr;
 	}
-	while (length > 1 && after_point > 0)
-	{
+	while (length > 1 && after_point > 0) {
 		dec_part *= 10;
 		char tmp = (char)dec_part;
 		*c = tmp + '0';
@@ -925,126 +760,20 @@ bool toCString(float value, Span<char> out, int after_point)
 	}
 	*c = 0;
 	if ((int)(dec_part + 0.5f))
-		increment(output, c - 1, length > 1);
-	return true;
-}
-
-bool toCString(bool value, Span<char> output) { return copyString(output, value ? "true" : "false"); }
-
-
-bool toCString(double value, Span<char> out, int after_point)
-{
-	char* output = out.begin();
-	u32 length = out.length();
-	if (length < 2)
-	{
-		return false;
-	}
-	if (value < 0)
-	{
-		*output = '-';
-		++output;
-		value = -value;
-		--length;
-	}
-	// int part
-	int exponent = value == 0 ? 0 : (int)log10(value);
-	double num = value;
-	char* c = output;
-	if (num  < 1 && num > -1 && length > 1)
-	{
-		*c = '0';
-		++c;
-		--length;
-	}
-	else
-	{
-		while ((num >= 1 || exponent >= 0) && length > 1)
-		{
-			double power = (double)pow(10, exponent);
-			char digit = (char)floor(num / power);
-			num -= digit * power;
-			*c = digit + '0';
-			--exponent;
-			--length;
-			++c;
-		}
-	}
-	// decimal part
-	double dec_part = num;
-	if (length > 1 && after_point > 0)
-	{
-		*c = '.';
-		++c;
-		--length;
-	}
-	else if (length > 0 && after_point == 0)
-	{
-		*c = 0;
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-	while (length > 1 && after_point > 0)
-	{
-		dec_part *= 10;
-		char tmp = (char)dec_part;
-		*c = tmp + '0';
-		dec_part -= tmp;
-		++c;
-		--length;
-		--after_point;
-	}
-	*c = 0;
-	if ((int)(dec_part + 0.5f))
-		increment(output, c - 1, length > 1);
-	return true;
-}
-
-void StringView::ensureEnd() {
-	ASSERT(begin);
-	if (!end) end = begin + stringLength(begin);
+		c = increment(output, c, length > 1);
+	return c;
 }
 
 bool startsWith(StringView str, StringView prefix) {
-	str.ensureEnd();
-
-	const char* lhs = str.begin;
-	const char* rhs = prefix.begin;
-	if (prefix.end) {
-		while (rhs != prefix.end && lhs != str.end && *lhs == *rhs) {
-			++lhs;
-			++rhs;
-		}
-		return rhs == prefix.end;
-	}
-	while (*rhs && lhs != str.end && *lhs == *rhs) {
-		++lhs;
-		++rhs;
-	}
-	return !*rhs;
+	if (str.size() < prefix.size()) return false;
+	str.end = str.begin + prefix.size();
+	return equalStrings(str, prefix);
 }
 
 bool startsWithInsensitive(StringView str, StringView prefix) {
-	str.ensureEnd();
-	const char* lhs = str.begin;
-	const char* rhs = prefix.begin;
-	if (prefix.end) {
-		while (rhs != prefix.end && lhs != str.end && toLower(*lhs) == toLower(*rhs)) {
-			++lhs;
-			++rhs;
-		}
-		return rhs == prefix.end;
-	}
-	else {
-		while (*rhs && lhs != str.end && toLower(*lhs) == toLower(*rhs)) {
-			++lhs;
-			++rhs;
-		}
-		return *rhs == 0;
-	}
+	if (str.size() < prefix.size()) return false;
+	str.end = str.begin + prefix.size();
+	return equalIStrings(str, prefix);
 }
 
 } // namespace Lumix

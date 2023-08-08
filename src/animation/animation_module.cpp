@@ -327,7 +327,7 @@ struct AnimationModuleImpl final : AnimationModule
 		for (const Animable& animable : m_animables)
 		{
 			serializer.write(animable.entity);
-			serializer.writeString(animable.animation ? animable.animation->getPath().c_str() : "");
+			serializer.writeString(animable.animation ? animable.animation->getPath() : Path());
 		}
 
 		serializer.write((u32)m_property_animators.size());
@@ -336,7 +336,7 @@ struct AnimationModuleImpl final : AnimationModule
 			const PropertyAnimator& animator = m_property_animators.at(i);
 			EntityRef entity = m_property_animators.getKey(i);
 			serializer.write(entity);
-			serializer.writeString(animator.animation ? animator.animation->getPath().c_str() : "");
+			serializer.writeString(animator.animation ? animator.animation->getPath() : Path());
 			serializer.write(animator.flags);
 		}
 
@@ -345,7 +345,7 @@ struct AnimationModuleImpl final : AnimationModule
 		{
 			serializer.write(animator.default_set);
 			serializer.write(animator.entity);
-			serializer.writeString(animator.resource ? animator.resource->getPath().c_str() : "");
+			serializer.writeString(animator.resource ? animator.resource->getPath() : Path());
 		}
 	}
 

@@ -146,13 +146,15 @@ void Material::deserialize(InputMemoryStream& blob) {
 }
 
 void Material::serialize(OutputMemoryStream& blob) {
-	ASSERT(isReady());
-	
 	StringView mat_dir = Path::getDir(getPath());
 	StringView shader_path = m_shader->getPath();
-	if (startsWith(shader_path, mat_dir)) shader_path.removePrefix(mat_dir.size());
-
-	blob << "shader \"" << shader_path << "\"\n";
+	if (startsWith(shader_path, mat_dir)) {
+		shader_path.removePrefix(mat_dir.size());
+		blob << "shader \"" << shader_path << "\"\n";
+	}
+	else {
+		blob << "shader \"/" << shader_path << "\"\n";
+	}
 	blob << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	blob << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
@@ -172,8 +174,11 @@ void Material::serialize(OutputMemoryStream& blob) {
 			StringView texture_path = m_textures[i]->getPath();
 			if (startsWith(texture_path, mat_dir)) {
 				shader_path.removePrefix(mat_dir.size());
+				blob << "texture \"" << texture_path << "\"\n";
 			}
-			blob << "texture \"/" << texture_path << "\"\n";
+			else {
+				blob << "texture \"/" << texture_path << "\"\n";
+			}
 		}
 		else {
 			blob << "texture \"\"\n";
@@ -485,7 +490,7 @@ int roughness(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	logWarning(material->getPath().c_str(), ": roughness deprecated");
+	logWarning(material->getPath(), ": roughness deprecated");
 	return 0;
 }
 
@@ -520,7 +525,7 @@ int color(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	logWarning(material->getPath().c_str(), ": color deprecated");
+	logWarning(material->getPath(), ": color deprecated");
 
 	return 0;
 }
@@ -547,7 +552,7 @@ int metallic(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	logWarning(material->getPath().c_str(), ": metallic deprecated");
+	logWarning(material->getPath(), ": metallic deprecated");
 	return 0;
 }
 
@@ -558,7 +563,7 @@ int emission(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	logWarning(material->getPath().c_str(), ": emission deprecated");
+	logWarning(material->getPath(), ": emission deprecated");
 	return 0;
 }
 
@@ -569,7 +574,7 @@ int translucency(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	logWarning(material->getPath().c_str(), ": translucency deprecated");
+	logWarning(material->getPath(), ": translucency deprecated");
 	return 0;
 }
 
@@ -598,9 +603,9 @@ int shader(lua_State* L)
 	else {
 		char c = path[0];
 		if (c != '\\' && c != '/') {
-			StringView material_dir = Path::getDir(material->getPath().c_str());
-			StaticString<LUMIX_MAX_PATH> fullpath(material_dir, path);
-			material->setShader(Path(fullpath));
+			StringView material_dir = Path::getDir(material->getPath());
+			Path fullpath(material_dir, path);
+			material->setShader(fullpath);
 		}
 		else {
 			material->setShader(Path(path));
@@ -610,13 +615,11 @@ int shader(lua_State* L)
 }
 
 
-int texture(lua_State* L)
-{
+int texture(lua_State* L) {
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
-	char material_dir[LUMIX_MAX_PATH];
-	copyString(Span(material_dir), Path::getDir(material->getPath().c_str()));
+	StringView material_dir = Path::getDir(material->getPath());
 
 	if (lua_istable(L, 1)) {
 		lua_getfield(L, 1, "source");
@@ -624,18 +627,16 @@ int texture(lua_State* L)
 			const char* path = lua_tostring(L, -1);
 			const int idx = material->getTextureCount();
 			
-			char texture_path[LUMIX_MAX_PATH];
-			if (path[0] != '/' && path[0] != '\\' && path[0] != '\0')
-			{
-				copyString(texture_path, material_dir);
-				catString(texture_path, path);
+			Path texture_path;
+			if (path[0] != '/' && path[0] != '\\' && path[0] != '\0') {
+				texture_path = material_dir;
+				texture_path.append(path);
 			}
-			else
-			{
-				copyString(texture_path, path);
+			else {
+				texture_path = path;
 			}
 
-			material->setTexturePath(idx, Path(texture_path));
+			material->setTexturePath(idx, texture_path);
 		}
 		else {
 			logError(material->getPath(), " texture's source is not a string.");
@@ -656,18 +657,15 @@ int texture(lua_State* L)
 	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 	const int idx = material->getTextureCount();
 	
-	char texture_path[LUMIX_MAX_PATH];
-	if (path[0] != '/' && path[0] != '\\' && path[0] != '\0')
-	{
-		copyString(texture_path, material_dir);
-		catString(texture_path, path);
+	Path texture_path;
+	if (path[0] != '/' && path[0] != '\\' && path[0] != '\0') {
+		texture_path.append(material_dir, path);
 	}
-	else
-	{
-		copyString(texture_path, path);
+	else {
+		texture_path = path;
 	}
 
-	material->setTexturePath(idx, Path(texture_path));
+	material->setTexturePath(idx, texture_path);
 	return 0;
 }
 

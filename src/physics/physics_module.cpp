@@ -3022,11 +3022,11 @@ struct PhysicsModuleImpl final : PhysicsModule
 		serializer.write(actor.dynamic_type);
 		serializer.write(actor.is_trigger);
 		serializer.write(actor.layer);
-		serializer.writeString(actor.material ? actor.material->getPath().c_str() : "");
+		serializer.writeString(actor.material ? actor.material->getPath() : Path());
 		auto* px_actor = actor.physx_actor;
 		PxShape* shape;
 		int shape_count = px_actor->getNbShapes();
-		serializer.writeString(actor.mesh ? actor.mesh->getPath().c_str() : "");
+		serializer.writeString(actor.mesh ? actor.mesh->getPath() : Path());
 		serializer.write(shape_count);
 		for (int i = 0; i < shape_count; ++i)
 		{
@@ -3083,7 +3083,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		for (auto& terrain : m_terrains)
 		{
 			serializer.write(terrain.m_entity);
-			serializer.writeString(terrain.m_heightmap ? terrain.m_heightmap->getPath().c_str() : "");
+			serializer.writeString(terrain.m_heightmap ? terrain.m_heightmap->getPath() : Path());
 			serializer.write(terrain.m_xz_scale);
 			serializer.write(terrain.m_y_scale);
 			serializer.write(terrain.m_layer);
@@ -3099,7 +3099,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		serializer.write((i32)m_instanced_meshes.size());
 		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
 			serializer.write(iter.key());
-			serializer.writeString(iter.value().resource ? iter.value().resource->getPath().c_str() : "");
+			serializer.writeString(iter.value().resource ? iter.value().resource->getPath() : Path());
 			serializer.write(iter.value().layer);
 		}
 
@@ -3121,7 +3121,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			serializer.write(veh->wheels_layer);
 			serializer.write(veh->peak_torque);
 			serializer.write(veh->max_rpm);
-			serializer.writeString(veh->geom ? veh->geom->getPath().c_str() : "");
+			serializer.writeString(veh->geom ? veh->geom->getPath() : Path());
 		}
 
 		serializer.write(m_wheels.size());

@@ -148,12 +148,11 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			if (!m_resource->isReady()) return;
 		
-			char tmp[LUMIX_MAX_PATH];
 			Texture* tex = m_resource->getTexture();
-			copyString(tmp, tex ? tex->getPath().c_str() : "");
+			Path tmp = tex ? tex->getPath() : Path();
 			ImGuiEx::Label("Texture");
-			if (m_app.getAssetBrowser().resourceInput("texture", Span(tmp), Texture::TYPE)) {
-				m_resource->setTexture(Path(tmp));
+			if (m_app.getAssetBrowser().resourceInput("texture", tmp, Texture::TYPE)) {
+				m_resource->setTexture(tmp);
 				m_dirty = true;
 			}
 

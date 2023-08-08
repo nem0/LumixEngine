@@ -118,17 +118,21 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 	return node->getGlobalTransform();
 }
 
+static StringView toStringView(ofbx::DataView data) {
+	return StringView(
+		(const char*)data.begin,
+		(const char*)data.end
+	);
+}
 
-static void extractEmbedded(const ofbx::IScene& module, const char* src_dir)
+static void extractEmbedded(const ofbx::IScene& module, StringView src_dir)
 {
 	for (int i = 0, c = module.getEmbeddedDataCount(); i < c; ++i) {
 		const ofbx::DataView embedded = module.getEmbeddedData(i);
 
-		ofbx::DataView filename = module.getEmbeddedFilename(i);
-		char path[LUMIX_MAX_PATH];
-		filename.toString(path);
-		const PathInfo pi(path);
-		const StaticString<LUMIX_MAX_PATH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
+		StringView filename = toStringView(module.getEmbeddedFilename(i));
+		const PathInfo pi(filename);
+		const StaticString<LUMIX_MAX_PATH> fullpath(src_dir, pi.basename, ".", pi.extension);
 
 		if (os::fileExists(fullpath)) return;
 
@@ -146,28 +150,27 @@ static void extractEmbedded(const ofbx::IScene& module, const char* src_dir)
 }
 
 
-bool FBXImporter::findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const {
+bool FBXImporter::findTexture(StringView src_dir, StringView ext, FBXImporter::ImportTexture& tex) const {
 	PathInfo file_info(tex.path);
 	tex.src = src_dir;
-	tex.src.append(file_info.m_basename, ".", ext);
+	tex.src.append(file_info.basename, ".", ext);
 	tex.is_valid = m_filesystem.fileExists(tex.src);
 
 	if (!tex.is_valid) {
 		tex.src = src_dir;
-		tex.src.append(file_info.m_dir, "/", file_info.m_basename, ".", ext);
+		tex.src.append(file_info.dir, "/", file_info.basename, ".", ext);
 		tex.is_valid = m_filesystem.fileExists(tex.src);
 					
 		if (!tex.is_valid) {
 			tex.src = src_dir;
-			tex.src.append("textures/", file_info.m_basename, ".", ext);
+			tex.src.append("textures/", file_info.basename, ".", ext);
 			tex.is_valid = m_filesystem.fileExists(tex.src);
 		}
 	}
 	return tex.is_valid;
 }
 
-
-void FBXImporter::gatherMaterials(const char* fbx_filename, const char* src_dir)
+void FBXImporter::gatherMaterials(StringView fbx_filename, StringView src_dir)
 {
 	for (ImportMesh& mesh : m_meshes)
 	{
@@ -185,12 +188,12 @@ void FBXImporter::gatherMaterials(const char* fbx_filename, const char* src_dir)
 			tex.fbx = texture;
 			ofbx::DataView filename = tex.fbx->getRelativeFileName();
 			if (filename == "") filename = tex.fbx->getFileName();
-			filename.toString(tex.path.data);
+			tex.path = toStringView(filename);
 			tex.src = tex.path;
 			tex.is_valid = m_filesystem.fileExists(tex.src);
 
-			PathInfo file_info(tex.path);
-			if (!tex.is_valid && !findTexture(src_dir, file_info.m_extension, tex)) {
+			StringView tex_ext = Path::getExtension(tex.path);
+			if (!tex.is_valid && !findTexture(src_dir, tex_ext, tex)) {
 				const char* exts[] = { "dds", "png", "jpg", "jpeg", "tga", "bmp" };
 				for (const char* ext : exts) {
 					if (findTexture(src_dir, ext, tex)) break;
@@ -325,14 +328,13 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& module)
 		const ofbx::TakeInfo* take_info = module.getTakeInfo(anim.fbx->name);
 		if (take_info) {
 			if (take_info->name.begin != take_info->name.end) {
-				take_info->name.toString(anim.name.data);
+				anim.name = toStringView(take_info->name);
 			}
 			if (anim.name.empty() && take_info->filename.begin != take_info->filename.end) {
-				char tmp[LUMIX_MAX_PATH];
-				take_info->filename.toString(tmp);
-				copyString(Span(anim.name.data), Path::getBasename(tmp));
+				StringView tmp = toStringView(take_info->filename);
+				anim.name = Path::getBasename(tmp);
 			}
-			if (anim.name.empty()) anim.name.add("anim");
+			if (anim.name.empty()) anim.name = "anim";
 		}
 		else {
 			anim.name = "";
@@ -546,7 +548,7 @@ static void computeNormals(Array<ofbx::Vec3>& out, const ofbx::Vec3* vertices, i
 	}
 }
 
-static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs, const char* path)
+static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs, const Path& path)
 {
 	out.resize(vertex_count);
 
@@ -615,7 +617,7 @@ static bool doesFlipHandness(const Matrix& mtx) {
 	return z.z < 0;
 }
 
-void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
+void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 {
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
 		ImportMesh& import_mesh = m_meshes[mesh_idx];
@@ -890,7 +892,7 @@ void FBXImporter::init() {
 	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("pipelines/impostor_shadow.shd"));
 }
 
-bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool force_skinned)
+bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool force_skinned)
 {
 	out_file.reserve(1024 * 1024);
 	PROFILE_FUNCTION();
@@ -925,8 +927,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 		case ofbx::UpVector_AxisZ: m_orientation = Orientation::Z_UP; break;
 	}
 
-	char src_dir[LUMIX_MAX_PATH];
-	copyString(Span(src_dir), Path::getDir(filename));
+	StringView src_dir = Path::getDir(filename);
 	if (!ignore_geometry) extractEmbedded(*module, src_dir);
 	gatherMeshes(module);
 
@@ -1159,8 +1160,8 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 	renderer->frame();
 	renderer->waitForRender();
 
-	const PathInfo src_info(model->getPath().c_str());
-	const StaticString<LUMIX_MAX_PATH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
+	const PathInfo src_info(model->getPath());
+	const Path mat_src(src_info.dir, src_info.basename, "_impostor.mat");
 	os::OutputFile f;
 	if (!m_filesystem.fileExists(mat_src)) {
 		if (!m_filesystem.open(mat_src, f)) {
@@ -1170,10 +1171,10 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			const AABB& aabb = model->getAABB();
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			f << "shader \"/pipelines/impostor.shd\"\n";
-			f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
+			f << "texture \"" << src_info.basename << "_impostor0.tga\"\n";
 			f << "texture \"\"\n";
-			f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
-			f << "texture \"" << src_info.m_basename << "_impostor_depth.raw\"\n";
+			f << "texture \"" << src_info.basename << "_impostor2.tga\"\n";
+			f << "texture \"" << src_info.basename << "_impostor_depth.raw\"\n";
 			f << "defines { \"ALPHA_CUTOUT\" }\n";
 			f << "layer \"impostor\"\n";
 			f << "backface_culling(false)\n";
@@ -1183,7 +1184,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		}
 	}
 	
-	const StaticString<LUMIX_MAX_PATH> albedo_meta(src_info.m_dir, src_info.m_basename, "_impostor0.tga.meta");
+	const Path albedo_meta(src_info.dir, src_info.basename, "_impostor0.tga.meta");
 	if (!m_filesystem.fileExists(albedo_meta)) {
 		if (!m_filesystem.open(albedo_meta, f)) {
 			logError("Failed to create ", albedo_meta);
@@ -1198,16 +1199,16 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 }
 
 
-void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
+void FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION()
-	const PathInfo src_info(src);
+	StringView dir = Path::getDir(src);
 	for (const ImportMaterial& material : m_materials) {
 		if (!material.import) continue;
 
 		const String& mat_name = m_material_name_map[material.fbx];
 
-		const StaticString<LUMIX_MAX_PATH + 128> mat_src(src_info.m_dir, mat_name.c_str(), ".mat");
+		const Path mat_src(dir, mat_name, ".mat");
 		if (m_filesystem.fileExists(mat_src)) continue;
 
 		os::OutputFile f;
@@ -1224,11 +1225,10 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
-				const StaticString<LUMIX_MAX_PATH> meta_path(texture.src, ".meta");
+				const Path meta_path(texture.src, ".meta");
 				if (!m_filesystem.fileExists(meta_path)) {
 					os::OutputFile file;
 					if (m_filesystem.open(meta_path, file)) {
-						
 						file << (idx == 0 ? "srgb = true\n" : "normalmap = true\n");
 						file.close();
 					}
@@ -1500,7 +1500,7 @@ static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& ke
 	return true;
 }
 
-void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
+void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
 	for (const FBXImporter::ImportAnimation& anim : m_animations) { 
@@ -1527,7 +1527,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			continue;
 		}
 
-		auto write_animation = [&](const char* name, u32 from_frame, u32 to_frame) {
+		auto write_animation = [&](StringView name, u32 from_frame, u32 to_frame) {
 			out_file.clear();
 			const double anim_len = double(to_frame - from_frame) / fps;
 			Animation::Header header;
@@ -1674,7 +1674,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 			memcpy(out_file.getMutableData() + stream_rotations_count_pos, &rotation_curves_count, sizeof(rotation_curves_count));
 
-			const StaticString<LUMIX_MAX_PATH> anim_path(name, ".ani:", src);
+			Path anim_path(name, ".ani:", src);
 			m_compiler.writeCompiledResource(anim_path, Span(out_file.data(), (i32)out_file.size()));
 		};
 		if (cfg.clips.length() == 0) {
@@ -1992,7 +1992,7 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 }
 
 
-void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
+void FBXImporter::writeImpostorMesh(StringView dir, StringView model_name)
 {
 	const i32 attribute_count = 2;
 	write(attribute_count);
@@ -2005,10 +2005,10 @@ void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 	write(gpu::AttributeType::FLOAT);
 	write((u8)2);
 
-	const StaticString<LUMIX_MAX_PATH + 10> material_name(dir, model_name, "_impostor.mat");
-	i32 length = stringLength(material_name);
+	const Path material_name(dir, model_name, "_impostor.mat");
+	u32 length = material_name.length();
 	write(length);
-	write(material_name, length);
+	write(material_name.c_str(), length);
 
 	const char* mesh_name = "impostor";
 	length = stringLength(mesh_name);
@@ -2017,8 +2017,7 @@ void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 }
 
 
-void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg)
-{
+void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig& cfg) {
 	const PathInfo src_info(src);
 	i32 mesh_count = 0;
 	if (mesh_idx >= 0) {
@@ -2089,10 +2088,10 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 
 		const ofbx::Material* material = import_mesh.fbx_mat;
 		const String& mat_name = m_material_name_map[material];
-		StaticString<LUMIX_MAX_PATH + 128> mat_id(src_info.m_dir, mat_name.c_str(), ".mat");
-		const i32 len = stringLength(mat_id.data);
+		const Path mat_id(src_info.dir, mat_name, ".mat");
+		const i32 len = mat_id.length();
 		write(len);
-		write(mat_id.data, len);
+		write(mat_id.c_str(), len);
 
 		char name[256];
 		getImportMeshName(import_mesh, name);
@@ -2114,7 +2113,7 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 	}
 
 	if (mesh_idx < 0 && cfg.create_impostor) {
-		writeImpostorMesh(src_info.m_dir, src_info.m_basename);
+		writeImpostorMesh(src_info.dir, src_info.basename);
 	}
 }
 
@@ -2262,7 +2261,7 @@ void FBXImporter::writeModelHeader()
 }
 
 
-void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
+void FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 {
 	if (m_meshes.empty()) return;
 	if (cfg.physics == ImportConfig::Physics::NONE) return;
@@ -2330,19 +2329,19 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 		}
 	}
 
-	const StaticString<LUMIX_MAX_PATH> phy_path(".phy:", src);
+	Path phy_path(".phy:", src);
 	m_compiler.writeCompiledResource(phy_path, Span(out_file.data(), (i32)out_file.size()));
 }
 
 
-void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
+void FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 {
 	Engine& engine = m_app.getEngine();
 	World& world = engine.createWorld(false);
 
 	os::OutputFile file;
 	PathInfo file_info(src);
-	StaticString<LUMIX_MAX_PATH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
+	Path tmp(file_info.dir, "/", file_info.basename, ".fab");
 	if (!m_filesystem.open(tmp, file)) {
 		logError("Could not create ", tmp);
 		return;
@@ -2359,9 +2358,9 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		world.setParent(root, e);
 		char mesh_name[256];
 		getImportMeshName(m_meshes[i], mesh_name);
-		StaticString<LUMIX_MAX_PATH> mesh_path(mesh_name, ".fbx:", src);
+		Path mesh_path(mesh_name, ".fbx:", src);
 		RenderModule* module = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
-		module->setModelInstancePath(e, Path(mesh_path));
+		module->setModelInstancePath(e, mesh_path);
 	}
 
 	static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
@@ -2383,7 +2382,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 }
 
 
-void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
+void FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg, src);
@@ -2412,14 +2411,14 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		write(to_mesh);
 		write(factor);
 
-		StaticString<LUMIX_MAX_PATH> resource_locator(name, ".fbx:", src);
+		Path path(name, ".fbx:", src);
 
-		m_compiler.writeCompiledResource(resource_locator, Span(out_file.data(), (i32)out_file.size()));
+		m_compiler.writeCompiledResource(path, Span(out_file.data(), (i32)out_file.size()));
 	}
 }
 
 
-void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
+void FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg, src);
@@ -2437,7 +2436,7 @@ void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
 	writeSkeleton(cfg);
 	writeLODs(cfg);
 
-	m_compiler.writeCompiledResource(src, Span(out_file.data(), (i32)out_file.size()));
+	m_compiler.writeCompiledResource(Path(src), Span(out_file.data(), (i32)out_file.size()));
 }
 
 

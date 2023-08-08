@@ -50,7 +50,7 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	void destroyPartitionFolders(World::PartitionHandle partition);
 	Array<Folder>& getFolders() { return m_folders; }
 	void moveFolder(FolderHandle folder, FolderHandle new_parent);
-	void renameFolder(FolderHandle folder, const char* new_name);
+	void renameFolder(FolderHandle folder, StringView new_name);
 
 private:
 	void onEntityCreated(EntityRef e);

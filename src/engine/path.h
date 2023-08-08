@@ -11,9 +11,9 @@ struct StringView;
 struct LUMIX_ENGINE_API PathInfo {
 	explicit PathInfo(StringView path);
 
-	char m_extension[10];
-	char m_basename[LUMIX_MAX_PATH];
-	char m_dir[LUMIX_MAX_PATH];
+	StringView extension;
+	StringView basename;
+	StringView dir;
 };
 
 struct LUMIX_ENGINE_API Path {
@@ -31,9 +31,10 @@ struct LUMIX_ENGINE_API Path {
 	explicit Path(StringView path);
 	template <typename... Args> explicit Path(Args... args);
 
-	void operator=(const char* rhs);
+	void operator=(StringView rhs);
 	bool operator==(const char* rhs) const;
 	bool operator==(const Path& rhs) const;
+	bool operator!=(const char* rhs) const;
 	bool operator!=(const Path& rhs) const;
 
 	i32 length() const;
@@ -45,7 +46,6 @@ struct LUMIX_ENGINE_API Path {
 	bool isEmpty() const { return m_path[0] == '\0'; }
 	static u32 capacity() { return LUMIX_MAX_PATH; }
 	operator StringView() const;
-	operator const char*() const;
 
 private:
 	void add(StringView);

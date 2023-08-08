@@ -60,7 +60,7 @@ private:
 	void onMouseMove(WorldView& view, int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	void onMouseUp(WorldView& view, int, int, os::MouseButton) override {};
 	void compositeTextureRemoveLayer(const Path& path, i32 layer) const;
-	void saveCompositeTexture(const Path& path, const char* channel) const;
+	void saveCompositeTexture(const Path& path, const Path& channel) const;
 	void layerGUI(ComponentUID cmp);
 	void entityGUI();
 	void drawCursor(RenderModule& module, EntityRef terrain, const DVec3& center) const;
@@ -111,8 +111,8 @@ private:
 	Path m_albedo_composite_path;
 
 	struct {
-		char albedo[LUMIX_MAX_PATH] = "";
-		char normal[LUMIX_MAX_PATH] = "";
+		Path albedo;
+		Path normal;
 	} m_add_layer_popup;
 };
 

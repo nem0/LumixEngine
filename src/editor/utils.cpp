@@ -19,7 +19,6 @@ namespace Lumix
 
 
 ResourceLocator::ResourceLocator(StringView path) {
-	path.ensureEnd();
 	full = path;
 	const char* c = path.begin;
 	subresource.begin = c;
@@ -288,7 +287,7 @@ void FileSelector::fillSubitems() {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const char* base_path = fs.getBasePath();
 	
-	const Path path(base_path, "/", m_current_dir.c_str());
+	const Path path(base_path, "/", m_current_dir);
 	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
 	os::FileInfo info;
 	const char* ext = m_accepted_extension.c_str();
@@ -320,7 +319,6 @@ bool FileSelector::breadcrumb(StringView path) {
 		return false;
 	}
 
-	path.ensureEnd();
 	if (path.back() == '/') path.removeSuffix(1);
 	
 	StringView dir = Path::getDir(path);
@@ -364,7 +362,7 @@ void DirSelector::fillSubitems() {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const char* base_path = fs.getBasePath();
 	
-	const Path path(base_path, "/", m_current_dir.c_str());
+	const Path path(base_path, "/", m_current_dir);
 	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
 	os::FileInfo info;
 	while (os::getNextFile(iter, &info)) {
@@ -388,7 +386,6 @@ bool DirSelector::breadcrumb(StringView path) {
 		}
 		return false;
 	}
-	path.ensureEnd();
 	if (path.back() == '/') path.removeSuffix(1);
 	
 	StringView dir = Path::getDir(path);
@@ -425,7 +422,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
 			if (m_current_dir.length() > 0) {
 				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
-					StringView dir = Path::getDir(m_current_dir.c_str());
+					StringView dir = Path::getDir(m_current_dir);
 					if (!dir.empty()) dir.removeSuffix(1);
 					m_current_dir = String(dir, m_app.getAllocator());
 					fillSubitems();
@@ -441,8 +438,8 @@ bool DirSelector::gui(const char* label, bool* open) {
 					if (ImGui::IsItemDeactivatedAfterEdit()) {
 						if (m_new_folder_name[0]) {
 							FileSystem& fs = m_app.getEngine().getFileSystem();
-							const Path fullpath(fs.getBasePath(), m_current_dir.c_str(), "/", m_new_folder_name);
-							if (!os::makePath(fullpath)) {
+							const Path fullpath(fs.getBasePath(), m_current_dir, "/", m_new_folder_name);
+							if (!os::makePath(fullpath.c_str())) {
 								logError("Failed to create ", fullpath);
 							}
 							else {
@@ -504,7 +501,7 @@ bool FileSelector::gui(bool show_breadcrumbs) {
 	if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
 		if (m_current_dir.length() > 0) {
 			if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
-				StringView dir = Path::getDir(m_current_dir.c_str());
+				StringView dir = Path::getDir(m_current_dir);
 				if (!dir.empty()) dir.removeSuffix(1);
 				m_current_dir = String(dir, m_app.getAllocator());
 				fillSubitems();
@@ -556,10 +553,10 @@ bool FileSelector::gui(const char* label, bool* open, const char* extension, boo
 	
 		if (m_save) {
 			if (ImGui::Button(ICON_FA_SAVE " Save")) {
-				if (!Path::hasExtension(m_full_path.c_str(), m_accepted_extension.c_str())) {
+				if (!Path::hasExtension(m_full_path, m_accepted_extension)) {
 					m_full_path.cat(".").cat(m_accepted_extension.c_str());
 				}
-				if (m_app.getEngine().getFileSystem().fileExists(m_full_path.c_str())) {
+				if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
 					ImGui::OpenPopup("warn_overwrite");
 				}
 				else {
@@ -569,7 +566,7 @@ bool FileSelector::gui(const char* label, bool* open, const char* extension, boo
 		}
 		else {
 			if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open")) {
-				if (m_app.getEngine().getFileSystem().fileExists(m_full_path.c_str())) {
+				if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
 					res = true;
 				}
 			}
@@ -732,55 +729,5 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 
 	m_canvas.end();
 }
-
-RecentPaths::RecentPaths(const char* settings_name, u32 max_paths, StudioApp& app)
-	: m_app(app)
-	, m_settings_name(settings_name)
-	, m_max_paths(max_paths)
-	, m_paths(app.getAllocator())
-{
-}
-	
-void RecentPaths::onBeforeSettingsSaved() {
-	Settings& settings = m_app.getSettings();
-	for (const String& p : m_paths) {
-		const u32 i = u32(&p - m_paths.begin());
-		const StaticString<32> key(m_settings_name, i);
-		settings.setValue(Settings::LOCAL, key, p.c_str());
-	}
-}
-
-void RecentPaths::onSettingsLoaded() {
-	m_paths.clear();
-	char tmp[LUMIX_MAX_PATH];
-	Settings& settings = m_app.getSettings();
-	FileSystem& fs = m_app.getEngine().getFileSystem();
-	for (u32 i = 0; ; ++i) {
-		const StaticString<32> key(m_settings_name, i);
-		const u32 len = settings.getValue(Settings::LOCAL, key, Span(tmp));
-		if (len == 0) break;
-		if (fs.fileExists(tmp)) m_paths.emplace(tmp, m_app.getAllocator());
-	}}
-
-void RecentPaths::push(const char* path) {
-	String p(path, m_app.getAllocator());
-	m_paths.eraseItems([&](const String& s) { return s == path; });
-	m_paths.push(static_cast<String&&>(p));
-	if (m_paths.size() > (i32)m_max_paths) {
-		m_paths.erase(0);
-	}
-}
-
-const char* RecentPaths::menu() {
-	const char* res = nullptr;
-	if (ImGui::BeginMenu("Recent", !m_paths.empty())) {
-		for (const String& s : m_paths) {
-			if (ImGui::MenuItem(s.c_str())) res = s.c_str();
-		}
-		ImGui::EndMenu();
-	}
-	return res;
-}
-
 
 } // namespace Lumix

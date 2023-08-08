@@ -276,9 +276,9 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 					that->autocomplete.size(),
 					sizeof(that->autocomplete[0]),
 					[](const void* a, const void* b) {
-					const char* a_str = ((const String*)a)->c_str();
-					const char* b_str = ((const String*)b)->c_str();
-					return compareString(a_str, b_str);
+					const String* a_str = (const String*)a;
+					const String* b_str = (const String*)b;
+					return compareString(*a_str, *b_str);
 				});
 			}
 		}
@@ -414,13 +414,13 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 	void onGUI(bool create_entity, bool, EntityPtr parent, WorldEditor& editor) override
 	{
 		if (!ImGui::BeginMenu("File")) return;
-		char buf[LUMIX_MAX_PATH];
+		Path path;
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::BeginMenu("New")) {
 			file_selector.gui(false);
 			if (ImGui::Button("Create")) {
-				copyString(Span(buf), file_selector.getPath());
+				path = file_selector.getPath();
 				os::OutputFile file;
 				FileSystem& fs = app.getEngine().getFileSystem();
 				if (fs.open(file_selector.getPath(), file)) {
@@ -428,7 +428,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 					file.close();
 				}
 				else {
-					logError("Failed to create ", buf);
+					logError("Failed to create ", path);
 				}
 			}
 			ImGui::EndMenu();
@@ -436,7 +436,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		bool create_empty = ImGui::Selectable("Empty", false);
 
 		static FilePathHash selected_res_hash;
-		if (asset_browser.resourceList(Span(buf), selected_res_hash, LuaScript::TYPE, false) || create_empty || new_created)
+		if (asset_browser.resourceList(path, selected_res_hash, LuaScript::TYPE, false) || create_empty || new_created)
 		{
 			editor.beginCommandGroup("createEntityWithComponent");
 			if (create_entity)
@@ -459,7 +459,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (!create_empty) {
 				auto* script_scene = static_cast<LuaScriptModule*>(editor.getWorld()->getModule(LUA_SCRIPT_TYPE));
 				int scr_count = script_scene->getScriptCount(entity);
-				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
+				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), path);
 			}
 			editor.endCommandGroup();
 			if (parent.isValid()) editor.makeParent(parent, entity);

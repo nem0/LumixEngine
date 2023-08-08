@@ -619,7 +619,7 @@ bool Settings::save()
 
 	saveStyle(file);
 
-	file << "imgui = [[" << m_imgui_state.c_str() << "]]\n";
+	file << "imgui = [[" << m_imgui_state << "]]\n";
 
 	writeCustom(m_global_state, file);
 
@@ -1090,15 +1090,13 @@ void Settings::onGUI()
 
 			if (ImGui::BeginTabItem("General")) {
 				if (ImGui::Button(ICON_FA_FOLDER "##open global")) {
-					StaticString<LUMIX_MAX_PATH> path(m_app.getEngine().getFileSystem().getBasePath());
-					os::openExplorer(path);
+					os::openExplorer(m_app.getEngine().getFileSystem().getBasePath());
 				}
 				ImGui::SameLine();
 				ImGui::Text("Global settings path: %s", SETTINGS_PATH);
 
 				if (ImGui::Button(ICON_FA_FOLDER "##open_local")) {
-					StaticString<LUMIX_MAX_PATH> p(Path::getDir(m_app_data_path));
-					os::openExplorer(p);
+					os::openExplorer(Path::getDir(m_app_data_path));
 				}
 				ImGui::SameLine();
 				ImGui::Text("Local settings path: %s", m_app_data_path);

@@ -1329,7 +1329,7 @@ void SceneView::searchUI() {
 					u32 idx = 0;
 					for (const auto& res : resources) {
 						if (res.type != Model::TYPE) continue;
-						if (stristr(res.path.c_str(), m_search_buf) == 0) continue;
+						if (stristr(res.path, m_search_buf) == 0) continue;
 
 						const bool selected = idx == m_search_selected;
 						if (m_search_preview) {

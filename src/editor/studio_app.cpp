@@ -309,8 +309,6 @@ struct StudioAppImpl final : StudioApp
 		m_add_cmp_root.label[0] = '\0';
 		m_open_filter[0] = '\0';
 
-		checkWorkingDirectory();
-
 		char saved_data_dir[LUMIX_MAX_PATH] = {};
 		os::InputFile cfg_file;
 		if (cfg_file.open(".lumixuser")) {
@@ -548,10 +546,10 @@ struct StudioAppImpl final : StudioApp
 				last = last && !from_filter ? last + 1 : label;
 				if (last[0] == ' ') ++last;
 				if (!ImGui::BeginMenu(last)) return;
-				char buf[LUMIX_MAX_PATH];
+				Path path;
 				bool create_empty = ImGui::MenuItem(ICON_FA_BROOM " Empty");
 				static FilePathHash selected_res_hash;
-				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, true) || create_empty) {
+				if (asset_browser->resourceList(path, selected_res_hash, resource_type, true) || create_empty) {
 					editor.beginCommandGroup("createEntityWithComponent");
 					if (create_entity) {
 						EntityRef entity = editor.addEntity();
@@ -561,7 +559,7 @@ struct StudioAppImpl final : StudioApp
 					const Array<EntityRef>& selected_entites = editor.getSelectedEntities();
 					editor.addComponent(selected_entites, type);
 					if (!create_empty) {
-						editor.setProperty(type, "", -1, property, editor.getSelectedEntities(), Path(buf));
+						editor.setProperty(type, "", -1, property, editor.getSelectedEntities(), path);
 					}
 					if (parent.isValid()) editor.makeParent(parent, selected_entites[0]);
 					editor.endCommandGroup();
@@ -871,11 +869,11 @@ struct StudioAppImpl final : StudioApp
 				if (header.name[0] && (header.typeflag == 0 || header.typeflag == '0')) {
 					const Path path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[LUMIX_MAX_PATH];
-					copyString(Span(dir), Path::getDir(path.c_str()));
+					copyString(Span(dir), Path::getDir(path));
 					if (!os::makePath(dir)) logError("");
 					if (!os::fileExists(path)) {
 						os::OutputFile file;
-						if (file.open(path)) {
+						if (file.open(path.c_str())) {
 							if (!file.write(ptr + 512, size)) {
 								logError("Failed to write ", path);
 							}
@@ -917,7 +915,7 @@ struct StudioAppImpl final : StudioApp
 		os::InputFile file;
 		const Path path(base_path, "universes/", name, ".unv");
 
-		if (!file.open(path)) {
+		if (!file.open(path.c_str())) {
 			logError("Failed to open ", path);
 			m_editor->newWorld();
 			return;
@@ -1588,12 +1586,12 @@ struct StudioAppImpl final : StudioApp
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
 			StaticString<200> stats("");
-			if (m_engine->getFileSystem().hasWork()) stats.add(ICON_FA_HOURGLASS_HALF "Loading... | ");
+			if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
 			stats.append("FPS: ", u32(m_fps + 0.5f));
-			if (!isFocused()) stats.add(" - inactive window");
+			if (!isFocused()) stats.append(" - inactive window");
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
-			ImGui::Text("%s", (const char*)stats);
+			ImGuiEx::TextUnformatted(stats);
 
 			if (m_log_ui->getUnreadErrorCount() == 1)
 			{
@@ -1743,7 +1741,7 @@ struct StudioAppImpl final : StudioApp
 			{
 				char buffer[1024];
 				getEntityListDisplayName(*this, *world, Span(buffer), entity);
-				ImGui::Text("%s", buffer);
+				ImGui::TextUnformatted(buffer);
 				
 				const Array<EntityRef>& selected = m_editor->getSelectedEntities();
 				if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
@@ -1974,7 +1972,7 @@ struct StudioAppImpl final : StudioApp
 							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
 						}
 						if (ImGui::BeginDragDropSource()) {
-							ImGui::Text("%s", buffer);
+							ImGui::TextUnformatted(buffer);
 							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
 							ImGui::EndDragDropSource();
 						}
@@ -3100,7 +3098,7 @@ struct StudioAppImpl final : StudioApp
 				const Path baked_path(".lumix/resources/", hash, ".res");
 
 				auto& out_info = infos.emplace(hash);
-				copyString(Span(out_info.path), baked_path.c_str());
+				copyString(Span(out_info.path), baked_path);
 				out_info.hash = hash;
 				out_info.size = os::getFileSize(baked_path);
 				out_info.offset = ~0UL;
@@ -3233,14 +3231,11 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 		else {
-			char dest[LUMIX_MAX_PATH];
-			copyString(dest, m_export.dest_dir);
 			const char* base_path = fs.getBasePath();
 			for (auto& info : infos) {
 				const Path src(base_path, info.path);
-				StaticString<LUMIX_MAX_PATH> dst(dest, info.path);
-
-				StaticString<LUMIX_MAX_PATH> dst_dir(dest, Path::getDir(info.path));
+				StaticString<LUMIX_MAX_PATH> dst(m_export.dest_dir, info.path);
+				StaticString<LUMIX_MAX_PATH> dst_dir(m_export.dest_dir, Path::getDir(info.path));
 				if (!os::makePath(dst_dir) && !os::dirExists(dst_dir)) {
 					logError("Failed to create ", dst_dir);
 					return false;
@@ -3291,9 +3286,7 @@ struct StudioAppImpl final : StudioApp
 			if (startsWith(info.filename, "__")) continue;
 			if (!Path::hasExtension(info.filename, "unv")) continue;
 
-			char basename[LUMIX_MAX_PATH];
-			copyString(Span(basename), Path::getBasename(info.filename));
-			m_worlds.emplace(basename);
+			m_worlds.emplace(Path::getBasename(info.filename));
 		}
 		os::destroyFileIterator(iter);
 	}
@@ -3302,27 +3295,6 @@ struct StudioAppImpl final : StudioApp
 	Span<const os::Event> getEvents() const override { return m_events; }
 
 	
-	static void checkWorkingDirectory()
-	{
-		if (!os::fileExists("../LumixStudio.lnk")) return;
-
-		if (!os::dirExists("bin") && os::dirExists("../bin") &&
-			os::dirExists("../pipelines"))
-		{
-			os::setCurrentDirectory("../");
-		}
-
-		if (!os::dirExists("bin"))
-		{
-			os::messageBox("Bin directory not found, please check working directory.");
-		}
-		else if (!os::dirExists("pipelines"))
-		{
-			os::messageBox("Pipelines directory not found, please check working directory.");
-		}
-	}
-
-
 	void checkShortcuts() {
 		if (ImGui::IsAnyItemActive()) return;
 

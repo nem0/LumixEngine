@@ -3801,7 +3801,7 @@ struct PipelineImpl final : Pipeline
 
 	void saveRenderbuffer(lua_State* L) { 
 		const i32 render_buffer = toRenderbufferIdx(L, 1);
-		StaticString<LUMIX_MAX_PATH> path = LuaWrapper::checkArg<const char*>(L, 2);
+		Path path = Path(LuaWrapper::checkArg<const char*>(L, 2));
 		DrawStream& stream = m_renderer.getDrawStream();
 
 		FileSystem* fs = &m_renderer.getEngine().getFileSystem();
@@ -3817,7 +3817,7 @@ struct PipelineImpl final : Pipeline
 		stream.pushLambda([fs, path, w, h, mem, this](){
 			os::OutputFile file;
 			if (fs->open(path, file)) {
-				Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)mem.data, false, Path(path), m_renderer.getAllocator());
+				Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)mem.data, false, path, m_renderer.getAllocator());
 				file.close();
 			}
 			else {

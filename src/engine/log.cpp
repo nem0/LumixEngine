@@ -28,9 +28,7 @@ namespace detail {
 	static Logger g_logger;
 	thread_local Log g_log;
 
-	void addLog(const char* val) { g_log.message << val; }
-	void addLog(const String& val) { g_log.message << val.c_str(); }
-	void addLog(const Path& val) { g_log.message << val.c_str(); }
+	void addLog(StringView val) { g_log.message << val; }
 	void addLog(u32 val) { g_log.message << val; }
 	void addLog(u64 val) { g_log.message << val; }
 	void addLog(i32 val) { g_log.message << val; }

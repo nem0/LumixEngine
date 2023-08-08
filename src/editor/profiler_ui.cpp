@@ -666,12 +666,12 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					}
 					ImGui::PopID();
 					ImGui::SameLine();
-					ImGui::Text("%s", iter.value()->getPath().c_str());
+					ImGuiEx::TextUnformatted(iter.value()->getPath());
 					ImGui::TableNextColumn();
 					ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
 					sum += iter.value()->size();
 					ImGui::TableNextColumn();
-					ImGui::Text("%s", toString(iter.value()->getState()));
+					ImGui::TextUnformatted(toString(iter.value()->getState()));
 					ImGui::TableNextColumn();
 					ImGui::Text("%u", iter.value()->getRefCount());
 				}
@@ -712,7 +712,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		if (m_filter[0]) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
 
-			if (stristr(tag.m_tag.c_str(), m_filter) == 0) return;
+			if (stristr(tag.m_tag, m_filter) == 0) return;
 		}
 		if (ImGui::TreeNode(&tag, "%s - %.2f MB", tag.m_tag.c_str(), tag.m_size / 1024.f / 1024.f)) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
@@ -985,7 +985,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 									char tmp[128];
 									const int tmp_size = prop.header.size - sizeof(prop.header);
 									read(ctx, prop.offset, (u8*)tmp, tmp_size);
-									ImGui::Text("%s", tmp);
+									ImGui::TextUnformatted(tmp);
 									break;
 								}
 								default: ASSERT(false); break;
