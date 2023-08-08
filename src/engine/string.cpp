@@ -121,45 +121,15 @@ void String::operator=(StringView rhs) {
 }
 
 
-bool String::operator!=(const String& rhs) const
+bool String::operator!=(StringView rhs) const
 {
 	return !equalStrings(*this, rhs);
 }
 
 
-bool String::operator!=(const char* rhs) const
-{
-	return !equalStrings(*this, rhs);
-}
-
-
-bool String::operator==(const String& rhs) const
+bool String::operator==(StringView rhs) const
 {
 	return equalStrings(*this, rhs);
-}
-
-
-bool String::operator==(const char* rhs) const
-{
-	return equalStrings(*this, rhs);
-}
-
-
-bool String::operator<(const String& rhs) const
-{
-	return compareString(*this, rhs) < 0;
-}
-
-
-bool String::operator>(const String& rhs) const
-{
-	return compareString(*this, rhs) > 0;
-}
-
-
-String String::substr(u32 start, u32 length) const
-{
-	return String(*this, start, length);
 }
 
 
@@ -202,22 +172,6 @@ String& String::cat(StringView value) {
 }
 
 
-String& String::cat(float value)
-{
-	char tmp[40];
-	toCString(value, Span(tmp), 10);
-	cat(tmp);
-	return *this;
-}
-
-
-String& String::cat(char* value)
-{
-	cat((const char*)value);
-	return *this;
-}
-
-
 void String::eraseAt(u32 position)
 {
 	ASSERT(position < m_size);
@@ -242,18 +196,6 @@ void String::insert(u32 position, const char* value)
 	memcpy(tmp + position, value, len);
 }
 
-
-String& String::cat(const char* rhs)
-{
-	ASSERT(rhs < c_str() || rhs >= c_str() + m_size);
-	
-	const int len = stringLength(rhs);
-	if(len == 0) return *this;
-	const int old_s = m_size;
-	resize(len + old_s);
-	memcpy(getData() + old_s, rhs, len + 1);
-	return *this;
-}
 
 static char makeLowercase(char c) {
 	return c >= 'A' && c <= 'Z' ? c - ('A' - 'a') : c;

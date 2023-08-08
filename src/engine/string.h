@@ -67,6 +67,7 @@ LUMIX_ENGINE_API bool isLetter(char c);
 LUMIX_ENGINE_API bool isNumeric(char c);
 LUMIX_ENGINE_API bool isUpperCase(char c);
 
+
 template <int SIZE> char* copyString(char(&destination)[SIZE], StringView source) {
 	return copyString(Span<char>(destination, SIZE), source);
 }
@@ -100,7 +101,6 @@ template <int SIZE> struct StaticString {
 	char data[SIZE];
 
 private:
-	template <typename T> void add(T value, Span<char>& dst) { dst.m_begin = toCString(value, dst); }
 	template <int S> void add(StaticString<S>& value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
 	void add(StringView value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
 	void add(const char* value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
@@ -109,6 +109,10 @@ private:
 	void add(StableHash value, Span<char>& dst) { add(value.getHashValue(), dst); }
 	void add(float value, Span<char>& dst) { dst.m_begin = toCString(value, dst, 3); }
 	void add(double value, Span<char>& dst) { dst.m_begin = toCString(value, dst, 10); }
+	void add(u32 value, Span<char>& dst) { dst.m_begin = toCString(value, dst); }
+	void add(i32 value, Span<char>& dst) { dst.m_begin = toCString(value, dst); }
+	void add(u64 value, Span<char>& dst) { dst.m_begin = toCString(value, dst); }
+	void add(i64 value, Span<char>& dst) { dst.m_begin = toCString(value, dst); }
 
 	void add(char value, Span<char>& dst) {
 		if (dst.length() < 2) return;
@@ -133,30 +137,14 @@ struct LUMIX_ENGINE_API String {
 	void operator=(const String& rhs);
 	void operator=(StringView rhs);
 	void operator=(String&& rhs);
-	bool operator!=(const String& rhs) const;
-	bool operator!=(const char* rhs) const;
-	bool operator==(const String& rhs) const;
-	bool operator==(const char* rhs) const;
-	bool operator<(const String& rhs) const;
-	bool operator>(const String& rhs) const;
+	bool operator!=(StringView rhs) const;
+	bool operator==(StringView rhs) const;
 	operator StringView() const { return StringView{c_str(), m_size}; }
-	int length() const { return m_size; }
+	i32 length() const { return m_size; }
 	const char* c_str() const { return isSmall() ? m_small : m_big; }
-	String substr(u32 start, u32 length) const;
 	String& cat(StringView value);
-	String& cat(float value);
-	String& cat(char* value);
-	String& cat(const char* value);
 	void insert(u32 position, const char* value);
 	void eraseAt(u32 position);
-
-	template <typename V> String& cat(V value)
-	{
-		char tmp[64];
-		toCString(value, Span<char>(tmp));
-		cat(tmp);
-		return *this;
-	}
 
 	IAllocator& m_allocator;
 private:

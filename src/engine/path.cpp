@@ -24,9 +24,7 @@ Path::Path(StringView path) {
 }
 
 void Path::add(StringView value) {
-	char tmp[LUMIX_MAX_PATH];
-	copyString(tmp, m_path);
-	catString(tmp, value);
+	StaticString<LUMIX_MAX_PATH> tmp(m_path, value);
 	normalize(tmp, Span(m_path));
 }
 

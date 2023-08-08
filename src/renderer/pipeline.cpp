@@ -877,12 +877,7 @@ struct PipelineImpl final : Pipeline
 	{
 		if (!m_lua_state) return;
 
-		char tmp[1024];
-		copyString(tmp, "function ");
-		catString(tmp, handler.name);
-		catString(tmp, "() executeCustomCommand(\"");
-		catString(tmp, handler.name);
-		catString(tmp, "\") end");
+		StaticString<1024> tmp("function ", handler.name, "() executeCustomCommand(\"", handler.name, "\") end");
 
 		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), "exposeCustomCommandToLua") != 0;
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);

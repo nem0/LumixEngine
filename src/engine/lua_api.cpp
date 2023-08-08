@@ -403,7 +403,7 @@ static int LUA_packageLoader(lua_State* L)
 			loaded = false;
 			logError("Failed to open file ", tmp);
 			StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
-			msg.append(tmp.c_str());
+			msg.append(tmp);
 			lua_pushstring(L, msg);
 		}
 	}

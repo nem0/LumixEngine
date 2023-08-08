@@ -915,9 +915,7 @@ struct FileIterator
 
 FileIterator* createFileIterator(StringView path, IAllocator& allocator)
 {
-	char tmp[LUMIX_MAX_PATH];
-	copyString(tmp, path);
-	catString(tmp, "/*");
+	StaticString<LUMIX_MAX_PATH> tmp(path, "/*");
 	
 	WCharStr<LUMIX_MAX_PATH> wtmp(tmp);
 	auto* iter = LUMIX_NEW(allocator, FileIterator);

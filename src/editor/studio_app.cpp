@@ -2443,9 +2443,7 @@ struct StudioAppImpl final : StudioApp
 		)
 			return;
 
-		char basename[LUMIX_MAX_PATH];
-		copyString(Span(basename), Path::getBasename(path));
-		if (!equalIStrings(basename, m_watched_plugin.basename)) return;
+		if (!equalIStrings(Path::getBasename(path), m_watched_plugin.basename)) return;
 
 		m_watched_plugin.reload_request = true;
 	}
@@ -3184,10 +3182,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		if (m_export.pack) {
-			static const char* OUT_FILENAME = "main.pak";
-			char dest[LUMIX_MAX_PATH];
-			copyString(dest, m_export.dest_dir);
-			catString(dest, OUT_FILENAME);
+			StaticString<LUMIX_MAX_PATH> dest(m_export.dest_dir, "main.pak");
 			if (infos.size() == 0) {
 				logError("No files found while trying to create ", dest);
 				return false;

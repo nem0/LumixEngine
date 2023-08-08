@@ -307,7 +307,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override
+	bool acceptExtension(StringView ext, ResourceType type) const override
 	{
 		alignas(u32) char tmp[6] = {};
 		makeLowercase(Span(tmp), ext);

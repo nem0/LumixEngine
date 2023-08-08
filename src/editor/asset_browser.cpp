@@ -235,15 +235,13 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_filter[0] && !stristr(path, m_filter)) return;
 
 		FileInfo tile;
-		char filename[LUMIX_MAX_PATH];
+		StaticString<LUMIX_MAX_PATH> filename;
 		StringView subres = Path::getSubresource(path);
 		if (*subres.end) {
-			copyString(Span(filename), subres);
-			catString(filename, ":");
-			catString(Span(filename), Path::getBasename(path));
+			filename.append(subres, ":", Path::getBasename(path));
 		}
 		else {
-			copyString(Span(filename), Path::getBasename(path));
+			filename = Path::getBasename(path);
 		}
 
 		tile.filepath = path;
@@ -332,9 +330,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			*c_out = '\0';
 			if (*c == '/') ++c;
 			if (ImGui::Button(tmp)){
-				char new_dir[LUMIX_MAX_PATH];
-				copyString(Span(new_dir), StringView(m_dir.c_str(), u32(c - m_dir.c_str())));
-				changeDir(new_dir, true);
+				changeDir(StringView(m_dir.c_str(), u32(c - m_dir.c_str())), true);
 			}
 			ImGui::SameLine();
 			ImGui::TextUnformatted("/");
@@ -344,21 +340,15 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void dirColumn()
-	{
+	void dirColumn() {
 		ImGui::BeginChild("left_col");
 		bool b = false;
-		if (m_dir != "." && ImGui::Selectable("..", &b))
-		{
-			char dir[LUMIX_MAX_PATH];
-			copyString(Span(dir), Path::getDir(m_dir));
-			changeDir(dir, true);
+		if (m_dir != "." && ImGui::Selectable("..", &b)) {
+			changeDir(Path::getDir(m_dir), true);
 		}
 
-		for (const Path& subdir : m_subdirs)
-		{
-			if (ImGui::Selectable(subdir.c_str(), &b))
-			{
+		for (const Path& subdir : m_subdirs) {
+			if (ImGui::Selectable(subdir.c_str(), &b)) {
 				StaticString<LUMIX_MAX_PATH> new_dir(m_dir, "/", subdir);
 				changeDir(new_dir, true);
 			}
@@ -733,16 +723,14 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void refreshLabels() {
 		for (FileInfo& tile : m_file_infos) {
-			char filename[LUMIX_MAX_PATH];
+			StaticString<LUMIX_MAX_PATH> filename;
 			StringView subres = Path::getSubresource(tile.filepath);
 			if (*subres.end) {
-				copyString(Span(filename), subres);
-				catString(filename, ":");
-				catString(Span(filename), Path::getBasename(tile.filepath));
+				filename.append(subres, ":", Path::getBasename(tile.filepath));
 			} else {
-				copyString(Span(filename), Path::getBasename(tile.filepath));
+				filename = Path::getBasename(tile.filepath);
 			}
-			clampText(filename, int(TILE_SIZE * m_thumbnail_size));
+			clampText(filename.data, int(TILE_SIZE * m_thumbnail_size));
 
 			tile.clamped_filename = filename;
 		}
@@ -942,10 +930,9 @@ struct AssetBrowserImpl : AssetBrowser {
 	
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
-				char ext[10];
 				const char* dropped_path = (const char*)payload->Data;
 				StringView subres = Path::getSubresource(dropped_path);
-				copyString(Span(ext), Path::getExtension(subres));
+				StringView ext = Path::getExtension(subres);
 				const AssetCompiler& compiler = m_app.getAssetCompiler();
 				if (compiler.acceptExtension(ext, type)) {
 					path = dropped_path;

@@ -794,8 +794,7 @@ struct ParticleSystemEditorResource {
 			if (idx < 0) break;
 
 			++iter;
-			emitter->m_name = "default";
-			emitter->m_name.cat(iter);
+			emitter->m_name = StaticString<32>("default", iter);
 		}
 		m_emitters.push(emitter.move());
 		return res;

@@ -227,12 +227,8 @@ const char* luaTypeToString(int type) {
 }
 
 void argError(lua_State* L, int index, const char* expected_type) {
-	char buf[128];
-	copyString(buf, "expected ");
-	catString(buf, expected_type);
-	catString(buf, ", got ");
 	int type = lua_type(L, index);
-	catString(buf, LuaWrapper::luaTypeToString(type));
+	StaticString<128> buf("expected ", expected_type, ", got ", LuaWrapper::luaTypeToString(type));
 	luaL_argerror(L, index, buf);
 }
 

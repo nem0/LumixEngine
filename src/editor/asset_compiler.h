@@ -48,7 +48,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual void onBasePathChanged() = 0;
 	virtual ResourceType getResourceType(StringView path) const = 0;
 	virtual void registerExtension(const char* extension, ResourceType type) = 0;
-	virtual bool acceptExtension(const char* ext, ResourceType type) const = 0;
+	virtual bool acceptExtension(StringView ext, ResourceType type) const = 0;
 };
 
 

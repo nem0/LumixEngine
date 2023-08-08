@@ -52,12 +52,9 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			Engine& engine = m_app.getEngine();
 
-			StringView subres = Path::getSubresource(path);
-			if (subres.size() != path.length()) {
-				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(subres.end + 1));
-				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
-				render_module->setModelInstancePath((EntityRef)m_viewer.m_mesh, m_model->getPath());
-			}
+			m_model = m_app.getEngine().getResourceManager().load<Model>(Path(Path::getResource(path)));
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+			render_module->setModelInstancePath((EntityRef)m_viewer.m_mesh, m_model->getPath());
 
 			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
 
