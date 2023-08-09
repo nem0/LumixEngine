@@ -394,7 +394,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity((EntityRef)i))
 				{
 					getEntityListDisplayName(m_app, world, Span(buf), i);
-					bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
+					bool show = entity_filter[0] == '\0' || findInsensitive(buf, entity_filter);
 					if (show && ImGui::Selectable(buf))
 					{
 						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, i);
@@ -853,7 +853,7 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 	if (filter[0])
 	{
 		if (!node->plugin) showAddComponentNode(node->child, filter, parent, editor);
-		else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, parent, editor);
+		else if (findInsensitive(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, parent, editor);
 		showAddComponentNode(node->next, filter, parent, editor);
 		return;
 	}

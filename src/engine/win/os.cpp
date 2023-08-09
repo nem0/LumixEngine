@@ -24,6 +24,12 @@ extern "C" {
 	LUMIX_LIBRARY_EXPORT DWORD NvOptimusEnablement = 0x00000001;
 }
 
+// some winapi calls can fail but we don't have any known way to "fix" the issue
+// some of these calls are not fatal (e.g. if we fail to move a window), so we just assert -> DEBUG_CHECK
+#define DEBUG_CHECK(R) ASSERT(R)
+// some may end up corrupting user data (e.g. not having enought space for path string and using such shorter path), so we better abort
+#define FATAL_CHECK(R) do { if (!(R)) abort(); } while(false)
+
 
 namespace Lumix::os
 {
@@ -200,6 +206,7 @@ static void fromWChar(Span<char> out, const WCHAR* in)
 		++cout;
 		++c;
 	}
+	FATAL_CHECK(!*c);
 	*cout = 0;
 }
 
@@ -212,6 +219,7 @@ template <int N> static void toWChar(WCHAR (&out)[N], StringView in) {
 		++cout;
 		++c;
 	}
+	FATAL_CHECK(c == in.end);
 	*cout = 0;
 }
 
@@ -269,19 +277,15 @@ void logInfo() {
 }
 
 
-void getDropFile(const Event& event, int idx, Span<char> out)
-{
+bool getDropFile(const Event& event, int idx, Span<char> out) {
 	ASSERT(out.length() > 0);
 	HDROP drop = (HDROP)event.file_drop.handle;
 	WCHAR buffer[MAX_PATH];
-	if (DragQueryFile(drop, idx, buffer, MAX_PATH))
-	{
+	if (DragQueryFile(drop, idx, buffer, MAX_PATH)) {
 		fromWChar(out, buffer);
+		return true;
 	}
-	else
-	{
-		ASSERT(false);
-	}
+	return false;
 }
 
 
@@ -531,7 +535,7 @@ Point toScreen(WindowHandle win, int x, int y)
 	POINT p;
 	p.x = x;
 	p.y = y;
-	::ClientToScreen((HWND)win, &p);
+	FATAL_CHECK(::ClientToScreen((HWND)win, &p));
 	Point res;
 	res.x = p.x;
 	res.y = p.y;
@@ -540,18 +544,18 @@ Point toScreen(WindowHandle win, int x, int y)
 
 void updateGrabbedMouse() {
 	if (G.grabbed_window == INVALID_WINDOW) {
-		ClipCursor(NULL);
+		DEBUG_CHECK(ClipCursor(NULL));
 		return;
 	}
 
 	RECT rect;
-	GetWindowRect((HWND)G.grabbed_window, &rect);
-	ClipCursor(&rect);
+	DEBUG_CHECK(GetWindowRect((HWND)G.grabbed_window, &rect));
+	DEBUG_CHECK(ClipCursor(&rect));
 }
 
 WindowHandle createWindow(const InitWindowArgs& args) {
 	PROFILE_FUNCTION();
-	WCharStr<LUMIX_MAX_PATH> cls_name("lunex_window");
+	WCharStr<MAX_PATH> cls_name("lunex_window");
 	static WNDCLASS wndcls = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
 		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
@@ -610,16 +614,13 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		wc.hbrBackground = NULL;
 		wc.lpszClassName = cls_name;
 
-		if (!RegisterClass(&wc)) {
-			ASSERT(false);
-			return {};
-		}
+		FATAL_CHECK(RegisterClass(&wc));
 		return wc;
 	}();
 
 	HWND parent_window = (HWND)args.parent;
 
-	WCharStr<LUMIX_MAX_PATH> wname(args.name);
+	WCharStr<MAX_PATH> wname(args.name);
 	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION ? WS_POPUP : WS_OVERLAPPEDWINDOW ;
 	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
 	const HWND hwnd = CreateWindowEx(
@@ -635,7 +636,8 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		NULL,
 		wndcls.hInstance,
 		NULL);
-	ASSERT(hwnd);
+
+	FATAL_CHECK(hwnd);
 
 	if (args.handle_file_drops)
 	{
@@ -643,7 +645,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	}
 
 	ShowWindow(hwnd, SW_SHOW);
-	UpdateWindow(hwnd);
+	DEBUG_CHECK(UpdateWindow(hwnd));
 
 	if (!G.raw_input_registered) {
 		RAWINPUTDEVICE device;
@@ -651,8 +653,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		device.usUsage = 0x02;
 		device.dwFlags = RIDEV_INPUTSINK;
 		device.hwndTarget = hwnd;
-		BOOL status = RegisterRawInputDevices(&device, 1, sizeof(device));
-		ASSERT(status);
+		FATAL_CHECK(RegisterRawInputDevices(&device, 1, sizeof(device)));
 		G.raw_input_registered = true;
 	}
 
@@ -709,6 +710,10 @@ void showCursor(bool show)
 	}
 }
 
+void abort() {
+	ASSERT(false);
+	::abort();
+}
 
 void init() {
 	G.cursors.arrow = LoadCursor(NULL, IDC_ARROW);
@@ -734,28 +739,27 @@ void setCursor(CursorType type) {
 void setWindowTitle(WindowHandle win, const char* title)
 {
 	WCharStr<256> tmp(title);
-	SetWindowText((HWND)win, tmp);
+	DEBUG_CHECK(SetWindowText((HWND)win, tmp));
 }
 
 
 Rect getWindowScreenRect(WindowHandle win)
 {
 	RECT rect;
-	GetWindowRect((HWND)win, &rect);
+	FATAL_CHECK(GetWindowRect((HWND)win, &rect));
 	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
 }
 
 Rect getWindowClientRect(WindowHandle win)
 {
 	RECT rect;
-	BOOL status = GetClientRect((HWND)win, &rect);
-	ASSERT(status);
+	FATAL_CHECK(GetClientRect((HWND)win, &rect));
 	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
 }
 
 void setWindowScreenRect(WindowHandle win, const Rect& rect)
 {
-	MoveWindow((HWND)win, rect.left, rect.top, rect.width, rect.height, TRUE);
+	DEBUG_CHECK(MoveWindow((HWND)win, rect.left, rect.top, rect.width, rect.height, TRUE));
 }
 
 u32 getMonitors(Span<Monitor> monitors)
@@ -798,13 +802,13 @@ u32 getMonitors(Span<Monitor> monitors)
 		0
 	};
 
-	::EnumDisplayMonitors(NULL, NULL, &Callback::func, (LPARAM)&data);
+	DEBUG_CHECK(::EnumDisplayMonitors(NULL, NULL, &Callback::func, (LPARAM)&data));
 	return data.index;
 }
 
 void setMouseScreenPos(int x, int y)
 {
-	SetCursorPos(x, y);
+	DEBUG_CHECK(SetCursorPos(x, y));
 }
 
 Point getMouseScreenPos()
@@ -813,7 +817,10 @@ Point getMouseScreenPos()
 	static POINT last_p = {};
 	const BOOL b = GetCursorPos(&p);
 	// under some unknown (permission denied...) rare circumstances GetCursorPos fails, we returns last known position
-	if (!b) p = last_p;
+	if (!b) {
+		ASSERT(false);
+		p = last_p;
+	}
 	last_p = p;
 	return {p.x, p.y};
 }
@@ -826,36 +833,35 @@ WindowHandle getFocused()
 
 bool isMaximized(WindowHandle win) {
 	WINDOWPLACEMENT placement;
-	BOOL res = GetWindowPlacement((HWND)win, &placement);
-	ASSERT(res);
+	DEBUG_CHECK(GetWindowPlacement((HWND)win, &placement));
 	return placement.showCmd == SW_SHOWMAXIMIZED;
 }
 
 bool isMinimized(WindowHandle win) {
 	WINDOWPLACEMENT placement;
-	BOOL res = GetWindowPlacement((HWND)win, &placement);
-	ASSERT(res);
+	DEBUG_CHECK(GetWindowPlacement((HWND)win, &placement));
 	return placement.showCmd == SW_SHOWMINIMIZED;
 }
 
 void restore(WindowHandle win, WindowState state) {
-	SetWindowLongPtr((HWND)win, GWL_STYLE, state.style);
-	os::setWindowScreenRect(win, state.rect);
+	DEBUG_CHECK(SetWindowLongPtr((HWND)win, GWL_STYLE, state.style));
+	setWindowScreenRect(win, state.rect);
 }
 
 WindowState setFullscreen(WindowHandle win) {
 	WindowState res;
-	res.rect = os::getWindowScreenRect(win);
+	res.rect = getWindowScreenRect(win);
 	res.style = SetWindowLongPtr((HWND)win, GWL_STYLE, WS_VISIBLE | WS_POPUP);
+	DEBUG_CHECK(res.style);
 	int w = GetSystemMetrics(SM_CXSCREEN);
 	int h = GetSystemMetrics(SM_CYSCREEN);
-	SetWindowPos((HWND)win, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED);
+	DEBUG_CHECK(SetWindowPos((HWND)win, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED));
 	return res;
 }
 
 void maximizeWindow(WindowHandle win)
 {
-	ShowWindow((HWND)win, SW_SHOWMAXIMIZED);
+	DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMAXIMIZED));
 }
 
 
@@ -915,12 +921,13 @@ struct FileIterator
 
 FileIterator* createFileIterator(StringView path, IAllocator& allocator)
 {
-	StaticString<LUMIX_MAX_PATH> tmp(path, "/*");
+	StaticString<MAX_PATH> tmp(path, "/*");
 	
-	WCharStr<LUMIX_MAX_PATH> wtmp(tmp);
+	WCharStr<MAX_PATH> wtmp(tmp);
 	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(wtmp, &iter->ffd);
+	DEBUG_CHECK(iter->handle);
 	iter->is_valid = iter->handle != INVALID_HANDLE_VALUE;
 	return iter;
 }
@@ -928,7 +935,7 @@ FileIterator* createFileIterator(StringView path, IAllocator& allocator)
 
 void destroyFileIterator(FileIterator* iterator)
 {
-	FindClose(iterator->handle);
+	DEBUG_CHECK(FindClose(iterator->handle));
 	LUMIX_DELETE(*iterator->allocator, iterator);
 }
 
@@ -947,27 +954,27 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 
 void setCurrentDirectory(StringView path)
 {
-	WCharStr<LUMIX_MAX_PATH> tmp(path);
-	SetCurrentDirectory(tmp);
+	WCharStr<MAX_PATH> tmp(path);
+	FATAL_CHECK(SetCurrentDirectory(tmp));
 }
 
 
 void getCurrentDirectory(Span<char> output)
 {
-	WCHAR tmp[LUMIX_MAX_PATH];
-	GetCurrentDirectory(lengthOf(tmp), tmp);
+	WCHAR tmp[MAX_PATH];
+	FATAL_CHECK(GetCurrentDirectory(lengthOf(tmp), tmp));
 	fromWChar(output, tmp);
 }
 
 
 bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension)
 {
-	WCharStr<LUMIX_MAX_PATH> wtmp("");
-	WCHAR wfilter[LUMIX_MAX_PATH];
+	WCharStr<MAX_PATH> wtmp("");
+	WCHAR wfilter[MAX_PATH];
 	
 	const char* c = filter;
 	WCHAR* cout = wfilter;
-	while ((*c || *(c + 1)) && (c - filter) < LUMIX_MAX_PATH - 2) {
+	while ((*c || *(c + 1)) && (c - filter) < MAX_PATH - 2) {
 		*cout = *c;
 		++cout;
 		++c;
@@ -976,7 +983,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 	++cout;
 	*cout = 0;
 
-	WCharStr<LUMIX_MAX_PATH> wdefault_extension(default_extension ? default_extension : "");
+	WCharStr<MAX_PATH> wdefault_extension(default_extension ? default_extension : "");
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
@@ -994,7 +1001,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 
 	bool res = GetSaveFileName(&ofn) != FALSE;
 
-	char tmp[LUMIX_MAX_PATH];
+	char tmp[MAX_PATH];
 	fromWChar(Span(tmp), wtmp);
 	if (res) Path::normalize(tmp, out);
 	return res;
@@ -1021,12 +1028,12 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 	{
 		out[0] = '\0';
 	}
-	WCHAR wout[LUMIX_MAX_PATH] = {};
-	WCHAR wfilter[LUMIX_MAX_PATH];
+	WCHAR wout[MAX_PATH] = {};
+	WCHAR wfilter[MAX_PATH];
 	
 	const char* c = filter;
 	WCHAR* cout = wfilter;
-	while ((*c || *(c + 1)) && (c - filter) < LUMIX_MAX_PATH - 2) {
+	while ((*c || *(c + 1)) && (c - filter) < MAX_PATH - 2) {
 		*cout = *c;
 		++cout;
 		++c;
@@ -1046,7 +1053,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 
 	const bool res = GetOpenFileName(&ofn) != FALSE;
 	if (res) {
-		char tmp[LUMIX_MAX_PATH];
+		char tmp[MAX_PATH];
 		fromWChar(Span(tmp), wout);
 		Path::normalize(tmp, out);
 	}
@@ -1145,9 +1152,9 @@ void copyToClipboard(const char* text)
 
 ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir)
 {
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
-	const WCharStr<LUMIX_MAX_PATH> wargs(args);
-	const WCharStr<LUMIX_MAX_PATH> wdir(working_dir);
+	const WCharStr<MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wargs(args);
+	const WCharStr<MAX_PATH> wdir(working_dir);
 	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, args.empty() ? NULL : wargs.data, working_dir.empty() ? NULL : wdir.data, SW_SHOW);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
@@ -1157,7 +1164,7 @@ ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView 
 
 ExecuteOpenResult openExplorer(StringView path)
 {
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wpath(path);
 	const uintptr_t res = (uintptr_t)ShellExecute(NULL, L"explore", wpath, NULL, NULL, SW_SHOWNORMAL);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
@@ -1167,15 +1174,15 @@ ExecuteOpenResult openExplorer(StringView path)
 
 bool deleteFile(StringView path)
 {
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wpath(path);
 	return DeleteFile(wpath) != FALSE;
 }
 
 
 bool moveFile(StringView from, StringView to)
 {
-	const WCharStr<LUMIX_MAX_PATH> wfrom(from);
-	const WCharStr<LUMIX_MAX_PATH> wto(to);
+	const WCharStr<MAX_PATH> wfrom(from);
+	const WCharStr<MAX_PATH> wto(to);
 	return MoveFileEx(wfrom, wto, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) != FALSE;
 }
 
@@ -1183,7 +1190,7 @@ bool moveFile(StringView from, StringView to)
 size_t getFileSize(StringView path)
 {
 	WIN32_FILE_ATTRIBUTE_DATA fad;
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wpath(path);
 	if (!GetFileAttributesEx(wpath, GetFileExInfoStandard, &fad)) return -1;
 	LARGE_INTEGER size;
 	size.HighPart = fad.nFileSizeHigh;
@@ -1194,7 +1201,7 @@ size_t getFileSize(StringView path)
 
 bool fileExists(StringView path)
 {
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wpath(path);
 	DWORD dwAttrib = GetFileAttributes(wpath);
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -1202,7 +1209,7 @@ bool fileExists(StringView path)
 
 bool dirExists(StringView path)
 {
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wpath(path);
 	DWORD dwAttrib = GetFileAttributes(wpath);
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -1210,7 +1217,7 @@ bool dirExists(StringView path)
 
 u64 getLastModified(StringView path)
 {
-	const WCharStr<LUMIX_MAX_PATH> wpath(path);
+	const WCharStr<MAX_PATH> wpath(path);
 	FILETIME ft;
 	HANDLE handle = CreateFile(wpath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == INVALID_HANDLE_VALUE) return 0;
@@ -1240,7 +1247,7 @@ bool makePath(const char* path)
 	}
 	*out = '\0';
 
-	const WCharStr<LUMIX_MAX_PATH> wpath(tmp);
+	const WCharStr<MAX_PATH> wpath(tmp);
 	int error_code = SHCreateDirectoryEx(NULL, wpath, NULL);
 	return error_code == ERROR_SUCCESS || error_code == ERROR_ALREADY_EXISTS;
 }
@@ -1283,7 +1290,7 @@ bool getAppDataDir(Span<char> out) {
 void getExecutablePath(Span<char> buffer)
 {
 	WCHAR tmp[MAX_PATH];
-	GetModuleFileName(NULL, tmp, sizeof(tmp));
+	FATAL_CHECK(GetModuleFileName(NULL, tmp, sizeof(tmp)));
 	fromWChar(buffer, tmp);
 }
 
@@ -1292,7 +1299,7 @@ void messageBox(const char* text)
 {
 	WCHAR tmp[2048];
 	toWChar(tmp, text);
-	MessageBox(NULL, tmp, L"Message", MB_OK);
+	DEBUG_CHECK(MessageBox(NULL, tmp, L"Message", MB_OK));
 }
 
 	
@@ -1320,7 +1327,7 @@ void* loadLibrary(const char* path)
 
 void unloadLibrary(void* handle)
 {
-	FreeLibrary((HMODULE)handle);
+	DEBUG_CHECK(FreeLibrary((HMODULE)handle));
 }
 
 float getTimeSinceProcessStart() {
@@ -1342,8 +1349,8 @@ Timer::Timer()
 {
 	LARGE_INTEGER f, n;
 
-	QueryPerformanceFrequency(&f);
-	QueryPerformanceCounter(&n);
+	DEBUG_CHECK(QueryPerformanceFrequency(&f));
+	DEBUG_CHECK(QueryPerformanceCounter(&n));
 	first_tick = last_tick = n.QuadPart;
 	frequency = f.QuadPart;
 
@@ -1353,7 +1360,7 @@ Timer::Timer()
 float Timer::getTimeSinceStart() const
 {
 	LARGE_INTEGER n;
-	QueryPerformanceCounter(&n);
+	DEBUG_CHECK(QueryPerformanceCounter(&n));
 	const u64 tick = n.QuadPart;
 	float delta = static_cast<float>((double)(tick - first_tick) / (double)frequency);
 	return delta;
@@ -1363,7 +1370,7 @@ float Timer::getTimeSinceStart() const
 float Timer::getTimeSinceTick() const
 {
 	LARGE_INTEGER n;
-	QueryPerformanceCounter(&n);
+	DEBUG_CHECK(QueryPerformanceCounter(&n));
 	const u64 tick = n.QuadPart;
 	float delta = static_cast<float>((double)(tick - last_tick) / (double)frequency);
 	return delta;
@@ -1373,7 +1380,7 @@ float Timer::getTimeSinceTick() const
 float Timer::tick()
 {
 	LARGE_INTEGER n;
-	QueryPerformanceCounter(&n);
+	DEBUG_CHECK(QueryPerformanceCounter(&n));
 	const u64 tick = n.QuadPart;
 	float delta = static_cast<float>((double)(tick - last_tick) / (double)frequency);
 	last_tick = tick;
@@ -1385,7 +1392,7 @@ u64 Timer::getFrequency()
 {
 	static u64 freq = []() {
 		LARGE_INTEGER f;
-		QueryPerformanceFrequency(&f);
+		DEBUG_CHECK(QueryPerformanceFrequency(&f));
 		return f.QuadPart;
 	}();
 	return freq;
@@ -1395,7 +1402,7 @@ u64 Timer::getFrequency()
 u64 Timer::getRawTimestamp()
 {
 	LARGE_INTEGER tick;
-	QueryPerformanceCounter(&tick);
+	DEBUG_CHECK(QueryPerformanceCounter(&tick));
 	return tick.QuadPart;
 }
 

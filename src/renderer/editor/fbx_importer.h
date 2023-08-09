@@ -90,7 +90,7 @@ struct FBXImporter {
 		bool to_dds = true;
 		bool is_valid = false;
 		StringView path;
-		StaticString<LUMIX_MAX_PATH> src;
+		StaticString<MAX_PATH> src;
 	};
 
 	struct ImportMaterial {

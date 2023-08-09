@@ -154,14 +154,14 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		bool execute() override { 
 			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(SPLINE_TYPE);
 			Spline& spline = module->getSpline(e);
-			spline.points = new_points.makeCopy();
+			new_points.copyTo(spline.points);
 			return true;
 		}
 
 		void undo() override {
 			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(SPLINE_TYPE);
 			Spline& spline = module->getSpline(e);
-			spline.points = old_points.makeCopy();
+			old_points.copyTo(spline.points);
 		}
 
 		const char* getType() override { return "edit_spline"; }
@@ -184,11 +184,11 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();
 		UniquePtr<EditorCommand> cmd = UniquePtr<EditorCommand>::create(allocator, editor, allocator);
-		cmd->old_points = spline.points.makeCopy();
+		spline.points.copyTo(cmd->old_points);
 		cmd->e = e;
 		cmd->id = id;
 		f();
-		cmd->new_points = spline.points.makeCopy();
+		spline.points.copyTo(cmd->new_points);
 		m_app.getWorldEditor().executeCommand(cmd.move());
 	}
 

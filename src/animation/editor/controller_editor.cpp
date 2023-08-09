@@ -121,7 +121,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			auto* anim_module = (AnimationModule*)m_viewer.m_world->getModule("animation");
 			anim_module->setAnimatorSource(*m_viewer.m_mesh, path);
 
-			char fbx_path[LUMIX_MAX_PATH];
+			char fbx_path[MAX_PATH];
 			copyString(fbx_path, path);
 			Path::replaceExtension(fbx_path, "fbx");
 			if (fs.fileExists(fbx_path)) {
@@ -612,13 +612,16 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (condition.error != Condition::Error::NONE) {
 				ImGui::TextUnformatted(Condition::errorToString(condition.error));
 			}
-			ImGuiEx::Label(label);		
-			if (ImGui::InputText(StaticString<64>("##_", label), tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
+			ImGuiEx::Label(label);
+			ImGui::PushID(label);
+			if (ImGui::InputText("##ci", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
 				condition_str = tmp;
 				condition.compile(tmp, input);
+				ImGui::PopID();
 				return true;
 			}
 
+			ImGui::PopID();
 			return false;
 		}
 
@@ -1034,7 +1037,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 			
 			for (const InputDecl::Input& input : ctrl->m_inputs.inputs) {
-				StaticString<32> str_id("##i", (uintptr)&input);
+				ImGui::PushID(&input);
 				const u32 idx = u32(&input - ctrl->m_inputs.inputs);
 				switch (input.type) {
 					case InputDecl::Type::EMPTY: break;
@@ -1042,7 +1045,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						float val = module->getAnimatorFloatInput(entity, idx);
 		
 						ImGuiEx::Label(input.name);
-						if (ImGui::DragFloat(str_id, &val)) {
+						if (ImGui::DragFloat("##i", &val)) {
 							module->setAnimatorInput(entity, idx, val);
 						}
 						if (ImGui::BeginPopupContextItem()) {
@@ -1065,7 +1068,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					case InputDecl::Type::BOOL: {
 						bool val = module->getAnimatorBoolInput(entity, idx);
 						ImGuiEx::Label(input.name);
-						if (ImGui::Checkbox(str_id, &val)) {
+						if (ImGui::Checkbox("##i", &val)) {
 							module->setAnimatorInput(entity, idx, val);
 						}
 						break;
@@ -1073,12 +1076,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					case InputDecl::Type::U32: {
 						u32 val = module->getAnimatorU32Input(entity, idx);
 						ImGuiEx::Label(input.name);
-						if (ImGui::DragInt(str_id, (int*)&val, 1, 0, 0x7ffFFff)) {
+						if (ImGui::DragInt("##i", (int*)&val, 1, 0, 0x7ffFFff)) {
 							module->setAnimatorInput(entity, idx, val);
 						}
 						break;
 					}
 				}
+				ImGui::PopID();
 			}
 		}
 
@@ -1148,8 +1152,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 			if(m_model) {
 				for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
-					const StaticString<32> label("Chain ", i);
-					
 					ImGui::PushID(i);
 					if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
 						if (i < m_controller.m_ik_count - 1) {
@@ -1165,7 +1167,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					ImGui::PopID();
 					ImGui::SameLine();
 
-					if (ImGui::TreeNode(label)) {
+					if (ImGui::TreeNode((const void*)(uintptr)i, "Chain %d", i)) {
 						Controller::IK& ik = m_controller.m_ik[i];
 						ASSERT(ik.bones_count > 0);
 						const u32 bones_count = m_model->getBoneCount();
@@ -1283,7 +1285,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					const bool is_masked = mask.bones.find(bone_name_hash).isValid();
 					bool b = is_masked;
 					ImGuiEx::Label(bone_name);
-					if (ImGui::Checkbox(StaticString<256>("##", bone_name), &b)) {
+					ImGui::PushID(bone_name);
+					if (ImGui::Checkbox("##bn", &b)) {
 						ASSERT(b != is_masked);
 						if (is_masked) {
 							mask.bones.erase(bone_name_hash);
@@ -1293,6 +1296,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						}
 						saveUndo(true);
 					}
+					ImGui::PopID();
 				}
 				ImGui::TreePop();
 			}
@@ -1356,7 +1360,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				bool selected = false;
 				for (u32 i = 0, c = m_controller.m_animation_slots.size(); i < c; ++i) {
 					const char* name = m_controller.m_animation_slots[i].c_str();
-					if ((!filter[0] || stristr(name, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
+					if ((!filter[0] || findInsensitive(name, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
 						*slot = i;
 						changed = true;
 						filter[0] = '\0';

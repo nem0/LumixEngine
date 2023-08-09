@@ -16,7 +16,7 @@ namespace Lumix
 {
 	static constexpr u32 PAGE_SIZE = 4096;
 	static constexpr size_t MAX_PAGE_COUNT = 16384;
-	static constexpr u32 SMALL_ALLOC_MAX_SIZE = 0;
+	static constexpr u32 SMALL_ALLOC_MAX_SIZE = 64;
 
 	struct DefaultAllocator::Page {
 		struct Header {

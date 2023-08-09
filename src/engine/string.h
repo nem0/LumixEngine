@@ -3,6 +3,10 @@
 #include "engine/lumix.h"
 #include "engine/hash.h"
 
+// all functions here handle bytes independently of the encoding used
+// it means some are valid only for ascii (e.g. makeLowercase)
+// some functions can return unexpected results e.g. stringLength returns number of bytes for utf-8, not number of characters
+
 namespace Lumix {
 
 struct IAllocator;
@@ -29,8 +33,7 @@ struct StringView {
 	const char* end = nullptr;
 };
 
-LUMIX_ENGINE_API const char* stristr(StringView haystack, StringView needle);
-LUMIX_ENGINE_API bool contains(StringView haystack, char needle);
+LUMIX_ENGINE_API const char* findInsensitive(StringView haystack, StringView needle);
 LUMIX_ENGINE_API void toCStringHex(u8 value, Span<char> output);
 LUMIX_ENGINE_API void toCStringPretty(i32 value, Span<char> output);
 LUMIX_ENGINE_API void toCStringPretty(u32 value, Span<char> output);
@@ -43,7 +46,6 @@ LUMIX_ENGINE_API char* toCString(u64 value, Span<char> output);
 LUMIX_ENGINE_API char* toCString(u32 value, Span<char> output);
 LUMIX_ENGINE_API char* toCString(float value, Span<char> output, int after_point);
 LUMIX_ENGINE_API char* toCString(double value, Span<char> output, int after_point);
-LUMIX_ENGINE_API const char* reverseFind(StringView haystack, char c);
 LUMIX_ENGINE_API const char* fromCStringOctal(StringView input, u32& value);
 LUMIX_ENGINE_API const char* fromCString(StringView input, i32& value);
 LUMIX_ENGINE_API const char* fromCString(StringView input, u64& value);
@@ -55,27 +57,22 @@ inline const char* fromCString(StringView input, EntityPtr& value) { return from
 LUMIX_ENGINE_API char* copyString(Span<char> output, StringView source);
 LUMIX_ENGINE_API char* catString(Span<char> output, StringView source);
 LUMIX_ENGINE_API bool makeLowercase(Span<char> output, StringView source);
-LUMIX_ENGINE_API bool startsWith(StringView str, StringView prefix);
-LUMIX_ENGINE_API bool startsWithInsensitive(StringView str, StringView prefix);
 LUMIX_ENGINE_API bool equalStrings(StringView lhs, StringView rhs);
 LUMIX_ENGINE_API bool equalIStrings(StringView lhs, StringView rhs);
 LUMIX_ENGINE_API int compareString(StringView lhs, StringView rhs);
-LUMIX_ENGINE_API const char* findChar(StringView str, char needle);
+LUMIX_ENGINE_API const char* reverseFind(StringView haystack, char c);
+LUMIX_ENGINE_API const char* find(StringView str, char needle);
+LUMIX_ENGINE_API bool contains(StringView haystack, char needle);
+LUMIX_ENGINE_API bool startsWith(StringView str, StringView prefix);
+LUMIX_ENGINE_API bool startsWithInsensitive(StringView str, StringView prefix);
 LUMIX_ENGINE_API bool endsWith(StringView str, StringView suffix);
 LUMIX_ENGINE_API bool endsWithInsensitive(StringView str, StringView suffix);
 LUMIX_ENGINE_API bool isLetter(char c);
 LUMIX_ENGINE_API bool isNumeric(char c);
 LUMIX_ENGINE_API bool isUpperCase(char c);
 
-
-template <int SIZE> char* copyString(char(&destination)[SIZE], StringView source) {
-	return copyString(Span<char>(destination, SIZE), source);
-}
-
-template <int SIZE> char* catString(char(&destination)[SIZE], StringView source) {
-	return catString(Span<char>(destination, SIZE), source);
-}
-
+// string with included fixed-size storage - i.e. it does not allocate
+// example usage: StaticString<MAX_PATH> path(dir, "/", basename, ".", extension);
 template <int SIZE> struct StaticString {
 	StaticString() { data[0] = '\0'; }
 
@@ -103,9 +100,6 @@ template <int SIZE> struct StaticString {
 private:
 	template <int S> void add(StaticString<S>& value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
 	void add(StringView value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
-	void add(const char* value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
-	void add(char* value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
-	void add(const Path& value, Span<char>& dst) { dst.m_begin = copyString(dst, value); }
 	void add(StableHash value, Span<char>& dst) { add(value.getHashValue(), dst); }
 	void add(float value, Span<char>& dst) { dst.m_begin = toCString(value, dst, 3); }
 	void add(double value, Span<char>& dst) { dst.m_begin = toCString(value, dst, 10); }
@@ -122,7 +116,7 @@ private:
 	}
 };
 
-
+// dynamically allocated string, similar to std::string
 struct LUMIX_ENGINE_API String {
 	explicit String(IAllocator& allocator);
 	String(const String& rhs, u32 start, u32 length);
@@ -132,7 +126,7 @@ struct LUMIX_ENGINE_API String {
 	~String();
 
 	void resize(u32 size);
-	char* getData() { return isSmall() ? m_small : m_big; }
+	char* getMutableData() { return isSmall() ? m_small : m_big; }
 	char operator[](u32 index) const;
 	void operator=(const String& rhs);
 	void operator=(StringView rhs);
@@ -140,16 +134,17 @@ struct LUMIX_ENGINE_API String {
 	bool operator!=(StringView rhs) const;
 	bool operator==(StringView rhs) const;
 	operator StringView() const { return StringView{c_str(), m_size}; }
-	i32 length() const { return m_size; }
+	u32 length() const { return m_size; }
 	const char* c_str() const { return isSmall() ? m_small : m_big; }
-	String& cat(StringView value);
+	template <typename... T> 
+	void append(T... args) { int tmp[] = { 0, (add(args), 0)... }; }
 	void insert(u32 position, const char* value);
 	void eraseAt(u32 position);
 
 	IAllocator& m_allocator;
 private:
+	String& add(StringView value);
 	bool isSmall() const { return m_size < sizeof(m_small); }
-	void ensure(u32 size);
 
 	u32 m_size;
 	union {

@@ -202,11 +202,11 @@ void Resource::doLoad()
 	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FileSystem::ContentCallback cb = makeDelegate<&Resource::fileLoaded>(this);
 
-	const FilePathHash hash = m_path.getHash();
 	if (startsWith(m_path, ".lumix/asset_tiles/")) {
 		m_async_op = fs.getContent(m_path, cb);
 	}
 	else {	
+		const FilePathHash hash = m_path.getHash();
 		const Path res_path(".lumix/resources/", hash, ".res");
 		m_async_op = fs.getContent(res_path, cb);
 	}

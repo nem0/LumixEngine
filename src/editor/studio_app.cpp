@@ -207,10 +207,11 @@ struct StudioAppImpl final : StudioApp
 				break;
 			case os::Event::Type::DROP_FILE:
 				for(int i = 0, c = os::getDropFileCount(event); i < c; ++i) {
-					char tmp[LUMIX_MAX_PATH];
-					os::getDropFile(event, i, Span(tmp));
-					for (GUIPlugin* plugin : m_gui_plugins) {
-						if (plugin->onDropFile(tmp)) break;
+					char tmp[MAX_PATH];
+					if (os::getDropFile(event, i, Span(tmp))) {
+						for (GUIPlugin* plugin : m_gui_plugins) {
+							if (plugin->onDropFile(tmp)) break;
+						}
 					}
 				}
 				break;
@@ -309,7 +310,7 @@ struct StudioAppImpl final : StudioApp
 		m_add_cmp_root.label[0] = '\0';
 		m_open_filter[0] = '\0';
 
-		char saved_data_dir[LUMIX_MAX_PATH] = {};
+		char saved_data_dir[MAX_PATH] = {};
 		os::InputFile cfg_file;
 		if (cfg_file.open(".lumixuser")) {
 			if (!cfg_file.read(saved_data_dir, minimum(lengthOf(saved_data_dir), (int)cfg_file.size()))) {
@@ -318,10 +319,10 @@ struct StudioAppImpl final : StudioApp
 			cfg_file.close();
 		}
 
-		char current_dir[LUMIX_MAX_PATH] = "";
+		char current_dir[MAX_PATH] = "";
 		os::getCurrentDirectory(Span(current_dir));
 
-		char data_dir[LUMIX_MAX_PATH] = "";
+		char data_dir[MAX_PATH] = "";
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
 		Engine::InitArgs init_data = {};
@@ -527,7 +528,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		const char* rest = node->label + stringLength(parent.label);
 		if (parent.label[0] != '\0') ++rest; // include '/'
-		const char* slash = findChar(rest, '/');
+		const char* slash = find(rest, '/');
 		if (!slash)
 		{
 			insertAddCmpNodeOrdered(parent, node);
@@ -746,6 +747,7 @@ struct StudioAppImpl final : StudioApp
 				GUIPlugin* win = m_gui_plugins[i];
 				win->onGUI();
 			}
+
 			m_settings.onGUI();
 			onExportDataGUI();
 		}
@@ -854,8 +856,8 @@ struct StudioAppImpl final : StudioApp
 			const void* res_mem = LockResource(hglobal);
 			if (!res_mem) return;
 	
-			TCHAR exe_path[LUMIX_MAX_PATH];
-			GetModuleFileNameA(NULL, exe_path, LUMIX_MAX_PATH);
+			TCHAR exe_path[MAX_PATH];
+			GetModuleFileNameA(NULL, exe_path, MAX_PATH);
 
 			// TODO extract only nonexistent files
 			InputMemoryStream str(res_mem, res_size);
@@ -868,7 +870,7 @@ struct StudioAppImpl final : StudioApp
 				fromCStringOctal(StringView(header.size, sizeof(header.size)), size); 
 				if (header.name[0] && (header.typeflag == 0 || header.typeflag == '0')) {
 					const Path path(m_engine->getFileSystem().getBasePath(), "/", header.name);
-					char dir[LUMIX_MAX_PATH];
+					char dir[MAX_PATH];
 					copyString(Span(dir), Path::getDir(path));
 					if (!os::makePath(dir)) logError("");
 					if (!os::fileExists(path)) {
@@ -955,7 +957,7 @@ struct StudioAppImpl final : StudioApp
 				ImGui::Text("Working directory: %s", m_engine->getFileSystem().getBasePath());
 				ImGui::SameLine();
 				if (ImGui::Button("Change...")) {
-					char dir[LUMIX_MAX_PATH];
+					char dir[MAX_PATH];
 					if (os::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
 						os::OutputFile cfg_file;
 						if (cfg_file.open(".lumixuser")) {
@@ -982,9 +984,9 @@ struct StudioAppImpl final : StudioApp
 				}
 				for (auto& univ : m_worlds)
 				{
-					if (ImGui::MenuItem(univ.data))
+					if (ImGui::MenuItem(univ))
 					{
-						loadWorld(univ.data, false);
+						loadWorld(univ, false);
 						m_is_welcome_screen_open = false;
 					}
 				}
@@ -1181,29 +1183,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void savePrefab()
-	{
-		char filename[LUMIX_MAX_PATH];
-		char tmp[LUMIX_MAX_PATH];
-		if (os::getSaveFilename(Span(tmp), "Prefab files\0*.fab\0", "fab"))
-		{
-			Path::normalize(tmp, Span(filename));
-			const char* base_path = m_engine->getFileSystem().getBasePath();
-			auto& selected_entities = m_editor->getSelectedEntities();
-			if (selected_entities.size() != 1) return;
-
-			EntityRef entity = selected_entities[0];
-			if (startsWith(filename, base_path))
-			{
-				m_editor->getPrefabSystem().savePrefab(entity, Path(filename + stringLength(base_path)));
-			}
-			else
-			{
-				m_editor->getPrefabSystem().savePrefab(entity, Path(filename));
-			}
-		}
-	}
-
 	void snapDown() override {
 		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
 		if (selected.empty()) return;
@@ -1326,7 +1305,7 @@ struct StudioAppImpl final : StudioApp
 		if (filter[0])
 		{
 			if (!node->plugin) showAddComponentNode(node->child, filter, parent, editor);
-			else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(true, true, parent, editor);
+			else if (findInsensitive(node->plugin->getLabel(), filter)) node->plugin->onGUI(true, true, parent, editor);
 			showAddComponentNode(node->next, filter, parent, editor);
 			return;
 		}
@@ -1382,10 +1361,23 @@ struct StudioAppImpl final : StudioApp
 			ImGui::EndMenu();
 		}
 		menuItem("delete", is_any_entity_selected);
-		menuItem("savePrefab", selected_entities.size() == 1);
+		
+		if (ImGui::BeginMenu("Save as prefab", selected_entities.size() == 1)) {
+			bool selected = m_file_selector.gui(false, "fab");
+			selected = ImGui::Button(ICON_FA_SAVE " Save") || selected;
+			if (selected) {
+				char filename[MAX_PATH];
+				Path::normalize(m_file_selector.getPath(), filename);
+				const char* base_path = m_engine->getFileSystem().getBasePath();
+				EntityRef entity = selected_entities[0];
+				m_editor->getPrefabSystem().savePrefab(entity, Path(filename));
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndMenu();
+		}
+		
 		menuItem("makeParent", selected_entities.size() == 2);
-		bool can_unparent =
-			selected_entities.size() == 1 && m_editor->getWorld()->getParent(selected_entities[0]).isValid();
+		bool can_unparent = selected_entities.size() == 1 && m_editor->getWorld()->getParent(selected_entities[0]).isValid();
 		menuItem("unparent", can_unparent);
 		ImGui::EndMenu();
 	}
@@ -1439,7 +1431,7 @@ struct StudioAppImpl final : StudioApp
 				ImGuiEx::filter("Filter", m_open_filter, sizeof(m_open_filter), 150);
 	
 				for (auto& univ : m_worlds) {
-					if ((m_open_filter[0] == '\0' || stristr(univ, m_open_filter)) && ImGui::MenuItem(univ)) {
+					if ((m_open_filter[0] == '\0' || findInsensitive(univ, m_open_filter)) && ImGui::MenuItem(univ)) {
 						if (!additive && m_editor->isWorldChanged()) {
 							m_world_to_load = univ;
 							m_confirm_load = true;
@@ -1585,7 +1577,7 @@ struct StudioAppImpl final : StudioApp
 			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
-			StaticString<200> stats("");
+			StaticString<200> stats;
 			if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
 			stats.append("FPS: ", u32(m_fps + 0.5f));
 			if (!isFocused()) stats.append(" - inactive window");
@@ -1964,7 +1956,7 @@ struct StudioAppImpl final : StudioApp
 					for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
 						char buffer[1024];
 						getEntityListDisplayName(*this, *world, Span(buffer), e);
-						if (stristr(buffer, filter) == nullptr) continue;
+						if (!findInsensitive(buffer, filter)) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
 						bool selected = entities.indexOf(e_ref) >= 0;
@@ -2320,7 +2312,6 @@ struct StudioAppImpl final : StudioApp
 
 		addAction<&StudioAppImpl::addEntity>(ICON_FA_PLUS_SQUARE "Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE);
 		
-		addAction<&StudioAppImpl::savePrefab>(ICON_FA_SAVE "Save prefab", "Save selected entities as prefab", "savePrefab", ICON_FA_SAVE);
 		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
 		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
 
@@ -2340,17 +2331,17 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	static bool copyPlugin(const char* src, int iteration, char (&out)[LUMIX_MAX_PATH])
+	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH])
 	{
-		char tmp_path[LUMIX_MAX_PATH];
+		char tmp_path[MAX_PATH];
 		os::getExecutablePath(Span(tmp_path));
-		StaticString<LUMIX_MAX_PATH> copy_path(Path::getDir(tmp_path), "plugins/", iteration);
+		StaticString<MAX_PATH> copy_path(Path::getDir(tmp_path), "plugins/", iteration);
 		if (!os::makePath(copy_path)) logError("Could not create ", copy_path);
 		copyString(Span(tmp_path), Path::getBasename(src));
 		copy_path.append("/", tmp_path, ".", getPluginExtension());
 #ifdef _WIN32
-		StaticString<LUMIX_MAX_PATH> src_pdb(src);
-		StaticString<LUMIX_MAX_PATH> dest_pdb(copy_path);
+		StaticString<MAX_PATH> src_pdb(src);
+		StaticString<MAX_PATH> dest_pdb(copy_path);
 		if (Path::replaceExtension(dest_pdb.data, "pdb") && Path::replaceExtension(src_pdb.data, "pda"))
 		{
 			os::deleteFile(dest_pdb);
@@ -2385,14 +2376,14 @@ struct StudioAppImpl final : StudioApp
 			if (!parser.currentEquals("-plugin")) continue;
 			if (!parser.next()) break;
 
-			char src[LUMIX_MAX_PATH];
+			char src[MAX_PATH];
 			parser.getCurrent(src, lengthOf(src));
 
 			bool is_full_path = contains(src, '.');
 			Lumix::ISystem* loaded_plugin;
 			if (is_full_path)
 			{
-				char copy_path[LUMIX_MAX_PATH];
+				char copy_path[MAX_PATH];
 				copyPlugin(src, 0, copy_path);
 				loaded_plugin = system_manager.load(copy_path);
 			}
@@ -2407,7 +2398,7 @@ struct StudioAppImpl final : StudioApp
 			}
 			else if (is_full_path && !m_watched_plugin.watcher.get())
 			{
-				char dir[LUMIX_MAX_PATH];
+				char dir[MAX_PATH];
 				copyString(Span(m_watched_plugin.basename.data), Path::getBasename(src));
 				copyString(Span(dir), Path::getDir(src));
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
@@ -2452,8 +2443,8 @@ struct StudioAppImpl final : StudioApp
 	void tryReloadPlugin() {
 		m_watched_plugin.reload_request = false;
 
-		StaticString<LUMIX_MAX_PATH> src(m_watched_plugin.dir, m_watched_plugin.basename, ".", getPluginExtension());
-		char copy_path[LUMIX_MAX_PATH];
+		StaticString<MAX_PATH> src(m_watched_plugin.dir, m_watched_plugin.basename, ".", getPluginExtension());
+		char copy_path[MAX_PATH];
 		++m_watched_plugin.iteration;
 
 		if (!copyPlugin(src, m_watched_plugin.iteration, copy_path)) return;
@@ -2518,7 +2509,7 @@ struct StudioAppImpl final : StudioApp
 	void loadWorldFromCommandLine()
 	{
 		char cmd_line[2048];
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH];
 		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
@@ -2963,7 +2954,7 @@ struct StudioAppImpl final : StudioApp
 			if (parser.currentEquals("-run_script")) {
 				if (!parser.next()) break;
 
-				char tmp[LUMIX_MAX_PATH];
+				char tmp[MAX_PATH];
 				parser.getCurrent(tmp, lengthOf(tmp));
 				OutputMemoryStream content(m_allocator);
 				
@@ -2998,7 +2989,7 @@ struct StudioAppImpl final : StudioApp
 		u64 offset;
 		u64 size;
 
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH];
 	};
 
 	void scanCompiled(AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
@@ -3046,13 +3037,13 @@ struct StudioAppImpl final : StudioApp
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
 		while (os::getNextFile(iter, &info)) {
-			char normalized_path[LUMIX_MAX_PATH];
+			char normalized_path[MAX_PATH];
 			Path::normalize(info.filename, Span(normalized_path));
 			if (info.is_directory)
 			{
 				if (!includeDirInExport(normalized_path)) continue;
 
-				char dir[LUMIX_MAX_PATH] = {0};
+				char dir[MAX_PATH] = {0};
 				if (dir_path[0] != '.') copyString(dir, dir_path);
 				catString(dir, info.filename);
 				catString(dir, "/");
@@ -3062,7 +3053,7 @@ struct StudioAppImpl final : StudioApp
 
 			if (!includeFileInExport(normalized_path)) continue;
 
-			StaticString<LUMIX_MAX_PATH> out_path;
+			StaticString<MAX_PATH> out_path;
 			if (dir_path[0] == '.')
 			{
 				copyString(out_path.data, normalized_path);
@@ -3078,7 +3069,7 @@ struct StudioAppImpl final : StudioApp
 			auto& out_info = infos.emplace(hash);
 			copyString(out_info.path, out_path);
 			out_info.hash = hash;
-			const Path path(base_path, out_path.data);
+			const Path path(base_path, out_path);
 			out_info.size = os::getFileSize(path);
 			out_info.offset = ~0UL;
 		}
@@ -3120,7 +3111,7 @@ struct StudioAppImpl final : StudioApp
 		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
-			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir.data)) {
+			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir)) {
 				if (os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
 					m_settings.setValue(Settings::LOCAL, "export_dir", m_export.dest_dir);
 				}
@@ -3182,7 +3173,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		if (m_export.pack) {
-			StaticString<LUMIX_MAX_PATH> dest(m_export.dest_dir, "main.pak");
+			StaticString<MAX_PATH> dest(m_export.dest_dir, "main.pak");
 			if (infos.size() == 0) {
 				logError("No files found while trying to create ", dest);
 				return false;
@@ -3229,8 +3220,8 @@ struct StudioAppImpl final : StudioApp
 			const char* base_path = fs.getBasePath();
 			for (auto& info : infos) {
 				const Path src(base_path, info.path);
-				StaticString<LUMIX_MAX_PATH> dst(m_export.dest_dir, info.path);
-				StaticString<LUMIX_MAX_PATH> dst_dir(m_export.dest_dir, Path::getDir(info.path));
+				StaticString<MAX_PATH> dst(m_export.dest_dir, info.path);
+				StaticString<MAX_PATH> dst_dir(m_export.dest_dir, Path::getDir(info.path));
 				if (!os::makePath(dst_dir) && !os::dirExists(dst_dir)) {
 					logError("Failed to create ", dst_dir);
 					return false;
@@ -3244,16 +3235,16 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
-		StaticString<LUMIX_MAX_PATH> src_dir("bin/");
+		StaticString<MAX_PATH> src_dir("bin/");
 		if (!os::fileExists("bin/app.exe")) {
-			char tmp[LUMIX_MAX_PATH];
+			char tmp[MAX_PATH];
 			os::getExecutablePath(Span(tmp));
 			copyString(Span(src_dir.data), Path::getDir(tmp));
 		}
 
 		for (auto& file : bin_files) {
-			StaticString<LUMIX_MAX_PATH> tmp(m_export.dest_dir, file);
-			StaticString<LUMIX_MAX_PATH> src(src_dir, file);
+			StaticString<MAX_PATH> tmp(m_export.dest_dir, file);
+			StaticString<MAX_PATH> src(src_dir, file);
 			if (!os::copyFile(src, tmp)) {
 				logError("Failed to copy ", src, " to ", tmp);
 			}
@@ -3361,7 +3352,7 @@ struct StudioAppImpl final : StudioApp
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 
-	Array<StaticString<LUMIX_MAX_PATH>> m_worlds;
+	Array<StaticString<MAX_PATH>> m_worlds;
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, StaticString<5>> m_component_icons;
@@ -3375,7 +3366,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_destroy_partition = false;
 	
 	World::PartitionHandle m_partition_to_destroy;
-	StaticString<LUMIX_MAX_PATH> m_world_to_load;
+	StaticString<MAX_PATH> m_world_to_load;
 	
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
@@ -3408,7 +3399,7 @@ struct StudioAppImpl final : StudioApp
 
 		bool pack = false;
 		StaticString<96> startup_world;
-		StaticString<LUMIX_MAX_PATH> dest_dir;
+		StaticString<MAX_PATH> dest_dir;
 	};
 
 	ExportConfig m_export;
@@ -3435,8 +3426,8 @@ struct StudioAppImpl final : StudioApp
 
 	struct WatchedPlugin {
 		UniquePtr<FileSystemWatcher> watcher;
-		StaticString<LUMIX_MAX_PATH> dir;
-		StaticString<LUMIX_MAX_PATH> basename;
+		StaticString<MAX_PATH> dir;
+		StaticString<MAX_PATH> basename;
 		Lumix::ISystem* system = nullptr;
 		int iteration = 0;
 		bool reload_request = false;

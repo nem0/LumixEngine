@@ -16,8 +16,10 @@ struct LUMIX_ENGINE_API PathInfo {
 	StringView dir;
 };
 
+
 struct LUMIX_ENGINE_API Path {
-	static void normalize(StringView path, Span<char> out);
+	static char* normalize(StringView in_path, Span<char> out_normalized);
+	static char* normalize(char* in_out_path);
 	static StringView getDir(StringView src);
 	static StringView getBasename(StringView src);
 	static StringView getExtension(StringView src);
@@ -37,14 +39,14 @@ struct LUMIX_ENGINE_API Path {
 	bool operator!=(const char* rhs) const;
 	bool operator!=(const Path& rhs) const;
 
-	i32 length() const;
+	u32 length() const { return m_length; }
 	FilePathHash getHash() const { return m_hash; }
 	template <typename... Args> void append(Args... args);
 	char* beginUpdate() { return m_path; }
 	void endUpdate();
 	const char* c_str() const { return m_path; }
 	bool isEmpty() const { return m_path[0] == '\0'; }
-	static u32 capacity() { return LUMIX_MAX_PATH; }
+	static u32 capacity() { return MAX_PATH; }
 	operator StringView() const;
 
 private:
@@ -52,7 +54,8 @@ private:
 	void add(StableHash hash);
 	void add(u64 value);
 
-	char m_path[LUMIX_MAX_PATH];
+	char m_path[MAX_PATH];
+	u32 m_length = 0;
 	FilePathHash m_hash;
 };
 

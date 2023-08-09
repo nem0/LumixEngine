@@ -104,7 +104,7 @@ struct EngineImpl final : Engine {
 			m_file_system = FileSystem::create(init_data.working_dir, m_allocator);
 		}
 		else {
-			char current_dir[LUMIX_MAX_PATH];
+			char current_dir[MAX_PATH];
 			os::getCurrentDirectory(Span(current_dir)); 
 			m_file_system = FileSystem::create(current_dir, m_allocator);
 		}

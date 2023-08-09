@@ -844,7 +844,7 @@ struct PipelineImpl final : Pipeline
 		if (m_define == "") return;
 		StaticString<256> tmp(m_define, " = true");
 
-		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_resource->getPath().c_str()) != 0;
+		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
 			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));

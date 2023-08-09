@@ -131,7 +131,6 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 private:
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	bool loadTGA(IInputStream& file);
 };
 
 

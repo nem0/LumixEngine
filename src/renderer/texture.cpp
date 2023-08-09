@@ -213,10 +213,8 @@ static void saveTGA(Texture& texture)
 
 
 void Texture::save() {
-	char ext[5];
-	makeLowercase(Span(ext), Path::getExtension(getPath()));
-	if (equalStrings(ext, "raw") && format == gpu::TextureFormat::R16)
-	{
+	StringView ext = Path::getExtension(getPath());
+	if (equalIStrings(ext, "raw") && format == gpu::TextureFormat::R16) {
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		os::OutputFile file;
 		if (!fs.open(getPath(), file)) {
@@ -239,16 +237,13 @@ void Texture::save() {
 		}
 		file.close();
 	}
-	else if (equalStrings(ext, "tga") && format == gpu::TextureFormat::RGBA8)
-	{
+	else if (equalIStrings(ext, "tga") && format == gpu::TextureFormat::RGBA8) {
 		Lumix::saveTGA(*this);
 	}
-	else
-	{
+	else {
 		logError("Texture ", getPath(), " can not be saved - unsupported format");
 	}
 }
-
 
 void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 {
@@ -271,7 +266,6 @@ void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 	stream.update(handle, 0, x, y, 0, w, h, format, mem.data, mem.size);
 	stream.freeMemory(mem.data, renderer.getAllocator());
 }
-
 
 static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& allocator)
 {
@@ -315,7 +309,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	}
 
 	const u64 size = file.size() - file.getPosition();
-	const u8* data = (const u8*)file.getBuffer() + file.getPosition();
+	const u8* data = (const u8*)file.getData() + file.getPosition();
 
 	if (texture.data_reference) {
 		texture.data.resize((int)size);
@@ -337,182 +331,6 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	texture.is_cubemap = false;
 	return texture.handle;
 }
-
-
-static void flipVertical(u32* image, int width, int height)
-{
-	PROFILE_FUNCTION();
-	for (int j = 0; j < height / 2; ++j)
-	{
-		int row_offset = width * j;
-		int inv_j = height - j - 1;
-		int inv_row_offset = width * inv_j;
-		for (int i = 0; i < width; ++i)
-		{
-			u32 tmp = image[i + row_offset];
-			image[i + row_offset] = image[i + inv_row_offset];
-			image[i + inv_row_offset] = tmp;
-		}
-	}
-}
-
-
-bool Texture::loadTGA(IInputStream& file)
-{
-	PROFILE_FUNCTION();
-	TGAHeader header;
-	file.read(&header, sizeof(header));
-
-	int image_size = header.width * header.height * 4;
-	if (header.dataType != 2 && header.dataType != 10)
-	{
-		int w, h, cmp;
-		stbi_uc* stb_data = stbi_load_from_memory(static_cast<const stbi_uc*>(file.getBuffer()) + 7, (int)file.size() - 7, &w, &h, &cmp, 4);
-		if (!stb_data) {
-			logError("Unsupported texture format ", getPath());
-			return false;
-		}
-		Renderer::MemRef mem;
-		if (!data_reference) mem = renderer.allocate(image_size);
-		u8* image_dest = data_reference ? data.getMutableData() : (u8*)mem.data;
-		memcpy(image_dest, stb_data, image_size);
-		stbi_image_free(stb_data);
-
-		//if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
-
-		is_cubemap = false;
-		width = header.width;
-		height = header.height;
-		mips = 1;
-		if (data_reference) mem = renderer.copy(image_dest, image_size);
-		const bool is_srgb = flags & (u32)Flags::SRGB;
-		format = is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8;
-		handle = renderer.createTexture(header.width
-			, header.height
-			, 1
-			, format
-			, getGPUFlags() & ~gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
-			, mem
-			, getPath().c_str());
-		depth = 1;
-		return handle;
-	}
-
-	if (header.bitsPerPixel < 24)
-	{
-		logError("Unsupported color mode ", getPath());
-		return false;
-	}
-
-	width = header.width;
-	height = header.height;
-	int pixel_count = width * height;
-	is_cubemap = false;
-	if (data_reference) data.resize(image_size);
-
-	Renderer::MemRef mem;
-	if (!data_reference) mem = renderer.allocate(image_size);
-
-	u8* image_dest = data_reference ? data.getMutableData() : (u8*)mem.data;
-
-	u32 bytes_per_pixel = header.bitsPerPixel / 8;
-	bool is_rle = header.dataType == 10;
-	if (is_rle)
-	{
-		PROFILE_BLOCK("read rle");
-		u8* out = image_dest;
-		u8 byte;
-		struct Pixel {
-			u8 uint8[4];
-		} pixel;
-		do
-		{
-			file.read(&byte, sizeof(byte));
-			if (byte < 128)
-			{
-				u8 count = byte + 1;
-				for (u8 i = 0; i < count; ++i)
-				{
-					file.read(&pixel, bytes_per_pixel);
-					out[0] = pixel.uint8[2];
-					out[1] = pixel.uint8[1];
-					out[2] = pixel.uint8[0];
-					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
-					else out[3] = 255;
-					out += 4;
-				}
-			}
-			else
-			{
-				byte -= 127;
-				file.read(&pixel, bytes_per_pixel);
-				for (int i = 0; i < byte; ++i)
-				{
-					out[0] = pixel.uint8[2];
-					out[1] = pixel.uint8[1];
-					out[2] = pixel.uint8[0];
-					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
-					else out[3] = 255;
-					out += 4;
-				}
-			}
-		} while (out - image_dest < pixel_count * 4);
-	}
-	else
-	{
-		PROFILE_BLOCK("read");
-		if (bytes_per_pixel == 4)
-		{
-			PROFILE_BLOCK("read 4BPP");
-			file.read(image_dest, header.width * header.height * bytes_per_pixel);
-			for (long y = 0; y < header.height; y++)
-			{
-				long idx = y * header.width * bytes_per_pixel;
-				u8* LUMIX_RESTRICT cursor = &image_dest[idx];
-				const u8* row_end = cursor + header.width * bytes_per_pixel;
-				while(cursor != row_end)
-				{
-					const u8 tmp = cursor[0];
-					cursor[0] = cursor[2];
-					cursor[2] = tmp;
-					cursor += 4;
-				}
-			}
-		}
-		else
-		{
-			PROFILE_BLOCK("read 3BPP");
-			for (long y = 0; y < header.height; y++)
-			{
-				long idx = y * header.width * 4;
-				for (long x = 0; x < header.width; x++)
-				{
-					file.read(&image_dest[idx + 2], sizeof(u8));
-					file.read(&image_dest[idx + 1], sizeof(u8));
-					file.read(&image_dest[idx + 0], sizeof(u8));
-					image_dest[idx + 3] = 255;
-					idx += 4;
-				}
-			}
-		}
-	}
-	if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
-
-	mips = 1;
-	if (data_reference) mem = renderer.copy(image_dest, image_size);
-	const bool is_srgb = flags & (u32)Flags::SRGB;
-	format = is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8;
-	handle = renderer.createTexture(header.width
-		, header.height
-		, 1
-		, format
-		, getGPUFlags() & ~gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
-		, mem
-		, getPath().c_str());
-	depth = 1;
-	return handle;
-}
-
 
 void Texture::addDataReference()
 {
@@ -741,13 +559,13 @@ bool Texture::load(Span<const u8> mem)
 	}
 	
 	if (equalIStrings(ext, "lbc")) {
-		loaded = loadLBC(*this, (const u8*)file.getBuffer() + file.getPosition(), u32(file.remaining()));
+		loaded = loadLBC(*this, (const u8*)file.getData() + file.getPosition(), u32(file.remaining()));
 	}
 	else if (equalIStrings(ext, "raw")) {
 		loaded = loadRaw(*this, file, allocator);
 	}
 	else {
-		loaded = loadTGA(file);
+		logWarning(getPath(), ": unknown extentions", ext);
 	}
 	if (!loaded) {
 		logWarning("Error loading texture ", getPath());

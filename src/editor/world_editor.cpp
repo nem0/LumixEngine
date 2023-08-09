@@ -1975,10 +1975,10 @@ public:
 
 		logInfo("Saving world ", basename, "...");
 		
-		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
+		StaticString<MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
 		if (!os::makePath(path)) logError("Could not create directory universes/");
 		path.append("/", basename, ".unv");
-		StaticString<LUMIX_MAX_PATH> bkp_path(path, ".bak");
+		StaticString<MAX_PATH> bkp_path(path, ".bak");
 		if (os::fileExists(path)) {
 			if (!os::copyFile(path, bkp_path)) {
 				logError("Could not copy ", path, " to ", bkp_path);
@@ -2179,7 +2179,6 @@ public:
 		UniquePtr<IEditorCommand> command = UniquePtr<SetEntityNameCommand>::create(m_allocator, *this, entity, name);
 		executeCommand(command.move());
 	}
-
 
 	void beginCommandGroup(const char* type_str) override
 	{

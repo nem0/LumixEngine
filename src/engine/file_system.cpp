@@ -85,7 +85,7 @@ struct FileSystemImpl : FileSystem {
 
 	void setBasePath(const char* dir) final
 	{ 
-		Path::normalize(dir, Span(m_base_path.data));
+		Path::normalize(dir, m_base_path.data);
 		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
 			m_base_path.append('/');
 		}
@@ -243,7 +243,7 @@ struct FileSystemImpl : FileSystem {
 
 	IAllocator& m_allocator;
 	Local<FSTask> m_task;
-	StaticString<LUMIX_MAX_PATH> m_base_path;
+	StaticString<MAX_PATH> m_base_path;
 	Array<AsyncItem> m_queue;
 	u32 m_work_counter = 0;
 	Array<AsyncItem> m_finished;

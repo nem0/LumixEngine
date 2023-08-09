@@ -685,10 +685,10 @@ void Settings::showShortcutSettings()
 	for (int i = 0; i < actions.size(); ++i)
 	{
 		Action& a = *actions[i];
-		if (m_filter[0] == 0 || stristr(a.label_long, m_filter) != 0)
+		if (m_filter[0] == 0 || findInsensitive(a.label_long, m_filter))
 		{
 			ImGui::PushID(&a);
-			ImGuiEx::Label(a.label_long.data);
+			ImGuiEx::Label(a.label_long);
 			if (shortcutInput(a, &a == m_edit_action)) {
 				m_edit_action = &a;
 			}

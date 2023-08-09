@@ -757,10 +757,10 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		}
 		else
 		{
-			message.data[0] = '\0';
+			message = "";
 		}
 
-		char minidump_path[LUMIX_MAX_PATH];
+		char minidump_path[MAX_PATH];
 		GetCurrentDirectory(sizeof(minidump_path), minidump_path);
 		catString(minidump_path, "\\minidump.dmp");
 

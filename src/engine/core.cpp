@@ -26,8 +26,7 @@ struct CoreModuleImpl : CoreModule {
 		for (auto iter = m_splines.begin(); iter.isValid(); ++iter) {
 			const Spline& spline = iter.value();
 			serializer.write(iter.key());
-			serializer.write((u32)spline.points.size());
-			serializer.write(spline.points.begin(), spline.points.byte_size());
+			serializer.writeArray(spline.points);
 		}
 	}
 
@@ -40,10 +39,7 @@ struct CoreModuleImpl : CoreModule {
 			EntityRef e;
 			serializer.read(e);
 			e = entity_map.get(e);
-			u32 pts_count;
-			serializer.read(pts_count);
-			spline.points.resize(pts_count);
-			serializer.read(spline.points.begin(), spline.points.byte_size());
+			serializer.readArray(&spline.points);
 			
 			m_splines.insert(e, static_cast<Spline&&>(spline));
 			m_world.onComponentCreated(e, SPLINE_TYPE, this);

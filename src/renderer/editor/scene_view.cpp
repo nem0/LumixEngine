@@ -1022,7 +1022,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	}
 	else if (Path::hasExtension(path, "fbx"))
 	{
-		if (stristr(path, ".phy:"))
+		if (findInsensitive(path, ".phy:"))
 		{
 			if (hit.is_hit && hit.entity.isValid())
 			{
@@ -1329,7 +1329,7 @@ void SceneView::searchUI() {
 					u32 idx = 0;
 					for (const auto& res : resources) {
 						if (res.type != Model::TYPE) continue;
-						if (stristr(res.path, m_search_buf) == 0) continue;
+						if (!findInsensitive(res.path, m_search_buf)) continue;
 
 						const bool selected = idx == m_search_selected;
 						if (m_search_preview) {
@@ -1360,20 +1360,19 @@ void SceneView::searchUI() {
 					ImGui::TextUnformatted("Actions:");
 					const auto& actions = m_app.getActions();
 					for (Action* act : actions) {
-						if (stristr(act->label_long, m_search_buf)) {
-							char buf[20] = " (";
-							getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
-							if (buf[2]) {
-								catString(buf, ")");
-							}
-							else { 
-								buf[0] = '\0';
-							}
-							if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf))) {
-								ImGui::CloseCurrentPopup();
-								act->func.invoke();
-								break;
-							}
+						if (!findInsensitive(act->label_long, m_search_buf)) continue;
+						char buf[20] = " (";
+						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
+						if (buf[2]) {
+							catString(buf, ")");
+						}
+						else { 
+							buf[0] = '\0';
+						}
+						if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf))) {
+							ImGui::CloseCurrentPopup();
+							act->func.invoke();
+							break;
 						}
 					}
 				}

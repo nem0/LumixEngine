@@ -24,12 +24,13 @@
 	#endif
 #endif
 
-// TODO get rid of this to support long paths
-enum { LUMIX_MAX_PATH = 260 };
+namespace Lumix {
 
-namespace Lumix
-{
+#ifdef MAX_PATH
+	#undef MAX_PATH
+#endif
 
+enum { MAX_PATH = 260 };
 
 using i8 = char;
 using u8 = unsigned char;
@@ -103,7 +104,7 @@ struct Span
 	Span() : m_begin(nullptr), m_end(nullptr) {}
 	Span(T* begin, u32 len) : m_begin(begin), m_end(begin + len) {}
 	Span(T* begin, T* end) : m_begin(begin), m_end(end) {}
-	template <int N> explicit Span(T (&value)[N]) : m_begin(value), m_end(value + N) {}
+	template <int N> Span(T (&value)[N]) : m_begin(value), m_end(value + N) {}
 	T& operator[](u32 idx) const { ASSERT(m_begin + idx < m_end); return m_begin[idx]; }
 	operator Span<const T>() const { return Span<const T>(m_begin, m_end); }
 	void removePrefix(u32 count) { ASSERT(count <= length()); m_begin += count; }
@@ -217,6 +218,7 @@ inline EntityRef EntityPtr::operator *() const
 }
 
 namespace reflection { LUMIX_ENGINE_API ComponentType getComponentType(const char* id); }
+namespace os { void abort(); }
 
 #ifdef _MSC_VER
 	#pragma warning(error : 4101)

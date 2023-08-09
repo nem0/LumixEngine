@@ -161,13 +161,14 @@ void String::resize(u32 size) {
 }
 
 
-String& String::cat(StringView value) {
+String& String::add(StringView value) {
 	ASSERT(value.begin < c_str() || value.begin >= c_str() + m_size);
 
 	const int old_s = m_size;
 	resize(m_size + value.size());
-	memcpy(getData() + old_s, value.begin, value.size());
-	getData()[old_s + value.size()] = '\0';
+	char* data = getMutableData();
+	memcpy(data + old_s, value.begin, value.size());
+	data[old_s + value.size()] = '\0';
 	return *this;
 }
 
@@ -177,9 +178,9 @@ void String::eraseAt(u32 position)
 	ASSERT(position < m_size);
 	if (position >= m_size) return;
 	
-	memmove(getData() + position, getData() + position + 1, m_size - position - 1);
+	memmove(getMutableData() + position, getMutableData() + position + 1, m_size - position - 1);
 	--m_size;
-	getData()[m_size] = '\0';
+	getMutableData()[m_size] = '\0';
 }
 
 
@@ -191,7 +192,7 @@ void String::insert(u32 position, const char* value)
 	const int len = stringLength(value);
 	resize(old_size + len);
 
-	char* tmp = getData();
+	char* tmp = getMutableData();
 	memmove(tmp + position + len, tmp + position, old_size - position);
 	memcpy(tmp + position, value, len);
 }
@@ -247,12 +248,16 @@ bool endsWith(StringView str, StringView suffix) {
 	return equalStrings(str, suffix);
 }
 
-const char* stristr(StringView haystack, StringView needle) {
+const char* findInsensitive(StringView haystack, StringView needle) {
 	ASSERT(!needle.empty());
+	if (needle.size() > haystack.size()) return nullptr;
+
+	const char* search_end = haystack.end - needle.size();
+	const char needle0 = makeLowercase(needle[0]);
 
 	const char* c = haystack.begin;
-	while (c != haystack.end) {
-		if (makeLowercase(*c) == makeLowercase(needle[0])) {
+	while (c != search_end) {
+		if (makeLowercase(*c) == needle0) {
 			const char* n = needle.begin + 1;
 			const char* c2 = c + 1;
 			while (n != needle.end && c2 != haystack.end) {
@@ -281,7 +286,7 @@ bool makeLowercase(Span<char> output, StringView src) {
 	return true;
 }
 
-const char* findChar(StringView haystack, char needle) {
+const char* find(StringView haystack, char needle) {
 	const char* c = haystack.begin;
 	while (c != haystack.end) {
 		if (*c == needle) return c;
@@ -291,7 +296,7 @@ const char* findChar(StringView haystack, char needle) {
 }
 
 bool contains(StringView haystack, char needle) {
-	return findChar(haystack, needle) != nullptr;
+	return find(haystack, needle) != nullptr;
 }
 
 char* copyString(Span<char> dst, StringView src) {

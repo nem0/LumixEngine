@@ -1419,7 +1419,7 @@ void TerrainEditor::exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor)
 	const u8* src = texture->getData();
 	ASSERT(src);
 
-	char filename[LUMIX_MAX_PATH];
+	char filename[MAX_PATH];
 	if (!os::getSaveFilename(Span(filename), "Targa TGA\0*.tga\0", "tga")) return;
 	
 	const Path path(filename);
@@ -1460,7 +1460,7 @@ void TerrainEditor::importGrass(u32 idx, EntityRef terrain, WorldEditor& editor)
 	u8* dst = texture->getData();
 	ASSERT(dst);
 
-	char filename[LUMIX_MAX_PATH];
+	char filename[MAX_PATH];
 	if (!os::getOpenFilename(Span(filename), "Targa TGA\0*.tga\0", nullptr)) return;
 
 	Array<u8> src = getFileContent(filename, editor.getAllocator());
@@ -1556,7 +1556,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	ImGui::SameLine();
 	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_MASK, ImGui::GetStyle().Colors[ImGuiCol_Text], "Select brush mask"))
 	{
-		char filename[LUMIX_MAX_PATH];
+		char filename[MAX_PATH];
 		if (os::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
 		{
 			int image_width;
@@ -1805,13 +1805,13 @@ void TerrainEditor::entityGUI() {
 		for (const AssetCompiler::ResourceItem& res : resources) {
 			if (res.type != PrefabResource::TYPE) continue;
 			++count;
-			if (filter[0] != 0 && stristr(res.path, filter) == nullptr) continue;
+			if (filter[0] != 0 && !findInsensitive(res.path, filter)) continue;
 			int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
 				return r && r->getPath() == res.path;
 			});
 			bool selected = selected_idx >= 0;
 			const char* loading_str = selected_idx >= 0 && m_selected_prefabs[selected_idx]->isEmpty() ? " - loading..." : "";
-			StaticString<LUMIX_MAX_PATH + 15> label(res.path, loading_str);
+			StaticString<MAX_PATH + 15> label(res.path, loading_str);
 			if (ImGui::Selectable(label, &selected)) {
 				if (selected) {
 					ResourceManagerHub& manager = m_app.getEngine().getResourceManager();
@@ -1898,7 +1898,7 @@ void TerrainEditor::entityGUI() {
 
 
 void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
-	char filename[LUMIX_MAX_PATH];
+	char filename[MAX_PATH];
 	if (!os::getSaveFilename(Span(filename), "Wavefront obj\0*.obj\0", "obj")) return;
 
 	os::OutputFile file;
@@ -1969,7 +1969,7 @@ void TerrainEditor::exportToOBJ(ComponentUID cmp) const {
 
 	file.close();
 
-	StaticString<LUMIX_MAX_PATH> mtl_filename(Path::getDir(filename), basename, ".mtl");
+	StaticString<MAX_PATH> mtl_filename(Path::getDir(filename), basename, ".mtl");
 
 	if (!file.open(mtl_filename)) {
 		logError("Failed to open ", mtl_filename);

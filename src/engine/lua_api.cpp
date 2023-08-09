@@ -402,7 +402,7 @@ static int LUA_packageLoader(lua_State* L)
 		if (!fs.getContentSync(tmp, buf)) {
 			loaded = false;
 			logError("Failed to open file ", tmp);
-			StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
+			StaticString<MAX_PATH + 40> msg("Failed to open file ");
 			msg.append(tmp);
 			lua_pushstring(L, msg);
 		}

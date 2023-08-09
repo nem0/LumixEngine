@@ -116,7 +116,6 @@ struct LUMIX_ENGINE_API InputFile final : IInputStream {
 	
 	using IInputStream::read;
 	[[nodiscard]] bool read(void* data, u64 size) override;
-	const void* getBuffer() const override { return nullptr; }
 
 	u64 size() const override;
 	u64 pos();
@@ -149,7 +148,7 @@ private:
 
 struct FileInfo {
 	bool is_directory;
-	char filename[LUMIX_MAX_PATH];
+	char filename[MAX_PATH];
 };
 
 struct FileIterator;
@@ -160,6 +159,7 @@ struct WindowState {
 };
 
 LUMIX_ENGINE_API void init();
+LUMIX_ENGINE_API void abort();
 LUMIX_ENGINE_API void logInfo();
 LUMIX_ENGINE_API u32 getCPUsCount();
 LUMIX_ENGINE_API void sleep(u32 milliseconds);
@@ -196,7 +196,7 @@ LUMIX_ENGINE_API [[nodiscard]] bool makePath(const char* path);
 LUMIX_ENGINE_API void setCursor(CursorType type);
 LUMIX_ENGINE_API void grabMouse(WindowHandle win);
 
-LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, Span<char> out);
+LUMIX_ENGINE_API [[nodiscard]] bool getDropFile(const Event& event, int idx, Span<char> out);
 LUMIX_ENGINE_API int getDropFileCount(const Event& event);
 LUMIX_ENGINE_API void finishDrag(const Event& event);
 

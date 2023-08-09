@@ -328,7 +328,7 @@ bool FileSelector::breadcrumb(StringView path) {
 	ImGui::TextUnformatted("/");
 	ImGui::SameLine();
 	
-	char tmp[LUMIX_MAX_PATH];
+	char tmp[MAX_PATH];
 	copyString(Span(tmp), basename);
 	if (ImGui::Button(tmp)) {
 		m_current_dir = String(path, m_app.getAllocator());
@@ -395,7 +395,7 @@ bool DirSelector::breadcrumb(StringView path) {
 	ImGui::TextUnformatted("/");
 	ImGui::SameLine();
 	
-	char tmp[LUMIX_MAX_PATH];
+	char tmp[MAX_PATH];
 	copyString(Span(tmp), basename);
 	if (ImGui::Button(tmp)) {
 		m_current_dir = String(path, m_app.getAllocator());
@@ -443,7 +443,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 								logError("Failed to create ", fullpath);
 							}
 							else {
-								m_current_dir.cat("/").cat(m_new_folder_name); 
+								m_current_dir.append("/", m_new_folder_name); 
 								m_new_folder_name[0] = '\0';
 							}
 							fillSubitems();
@@ -455,8 +455,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 			for (const String& subdir : m_subdirs) {
 				ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
 				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
-					m_current_dir.cat("/");
-					m_current_dir.cat(subdir.c_str());
+					m_current_dir.append("/", subdir.c_str());
 					fillSubitems();
 				}
 			}
@@ -486,15 +485,22 @@ FileSelector::FileSelector(StudioApp& app)
 {}
 
 const char* FileSelector::getPath() {
-	if (Path::getExtension(m_full_path).empty()) m_full_path.cat(".").cat(m_accepted_extension.c_str());
+	if (Path::getExtension(m_full_path).empty()) m_full_path.append(".", m_accepted_extension.c_str());
 	return m_full_path.c_str();
 }
 
-bool FileSelector::gui(bool show_breadcrumbs) {
+bool FileSelector::gui(bool show_breadcrumbs, const char* accepted_extension) {
+	if (m_accepted_extension != accepted_extension) {
+		m_accepted_extension = accepted_extension;
+		fillSubitems();
+	}
+
 	bool res = false;
+	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted("Filename"); ImGui::SameLine(); ImGui::SetNextItemWidth(-1);
 	bool changed = inputString("##fn", &m_filename);
-	
+	if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) res = true;
+
 	if (show_breadcrumbs) {
 		changed = breadcrumb(m_current_dir) || changed;
 	}
@@ -512,8 +518,7 @@ bool FileSelector::gui(bool show_breadcrumbs) {
 		for (const String& subdir : m_subdirs) {
 			ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
 			if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
-				m_current_dir.cat("/");
-				m_current_dir.cat(subdir.c_str());
+				m_current_dir.append("/", subdir.c_str());
 				fillSubitems();
 				changed = true;
 			}
@@ -532,7 +537,7 @@ bool FileSelector::gui(bool show_breadcrumbs) {
 	ImGui::EndChild();
 	if (changed) {
 		m_full_path = m_current_dir;
-		m_full_path.cat("/").cat(m_filename.c_str());
+		m_full_path.append("/", m_filename.c_str());
 	}
 	return res;
 }
@@ -549,12 +554,12 @@ bool FileSelector::gui(const char* label, bool* open, const char* extension, boo
 
 	bool res = false;
 	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-		res = gui(true);
+		res = gui(true, extension);
 	
 		if (m_save) {
 			if (ImGui::Button(ICON_FA_SAVE " Save")) {
 				if (!Path::hasExtension(m_full_path, m_accepted_extension)) {
-					m_full_path.cat(".").cat(m_accepted_extension.c_str());
+					m_full_path.append(".", m_accepted_extension.c_str());
 				}
 				if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
 					ImGui::OpenPopup("warn_overwrite");

@@ -74,7 +74,7 @@ private:
 	struct Action* m_edit_action = nullptr;
 	lua_State* m_global_state;
 	lua_State* m_local_state;
-	char m_app_data_path[LUMIX_MAX_PATH];
+	char m_app_data_path[MAX_PATH];
 	os::Timer m_time_since_last_save;
 
 private:

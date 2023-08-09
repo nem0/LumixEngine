@@ -298,11 +298,11 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			const ImVec2 p(x, top);
 			if (step_len_us < 2000) {
 				StaticString<64> text(u32(t), "us");
-				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+				dl->AddText(ImVec2(1, 0) + p, border_color, text);
 			}
 			else {
 				StaticString<64> text(u32(t / 1000), "ms");
-				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+				dl->AddText(ImVec2(1, 0) + p, border_color, text);
 			}
 			dl->AddLine(p, ImVec2(p.x, bottom), border_color);
 			x += step_w;
@@ -321,11 +321,11 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			const ImVec2 p(x, top);
 			if (step_len_us < 2000) {
 				StaticString<64> text(i32(t), "us");
-				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+				dl->AddText(ImVec2(1, 0) + p, border_color, text);
 			}
 			else {
 				StaticString<64> text(i32(t / 1000), "ms");
-				dl->AddText(ImVec2(1, 0) + p, border_color, text.data);
+				dl->AddText(ImVec2(1, 0) + p, border_color, text);
 			}
 			dl->AddLine(p, ImVec2(p.x, bottom), border_color);
 			x -= step_w;
@@ -339,7 +339,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		
 		for (Counter& counter : m_counters) {
 			const char* name = counter.name;
-			if (m_filter[0] && stristr(name, m_filter) == nullptr) continue;
+			if (m_filter[0] && findInsensitive(name, m_filter) == nullptr) continue;
 			if (!ImGui::TreeNode(name)) continue;
 
 			const float top = ImGui::GetCursorScreenPos().y;
@@ -447,7 +447,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	void load() {
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH];
 		if (os::getOpenFilename(Span(path), "Profile data\0*.lpd", nullptr)) {
 			os::InputFile file;
 			if (file.open(path)) {
@@ -567,7 +567,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	void save() {
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH];
 		if (os::getSaveFilename(Span(path), "Profile data\0*.lpd\0", "lpd")) {
 			os::OutputFile file;
 			if (file.open(path)) {
@@ -656,7 +656,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 				size_t sum = 0;
 				for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
-					if (m_resource_filter[0] != '\0' && stristr(iter.value()->getPath(), m_resource_filter) == nullptr) continue;
+					if (m_resource_filter[0] != '\0' && findInsensitive(iter.value()->getPath(), m_resource_filter) == nullptr) continue;
 					if (m_resource_size_filter > iter.value()->size() / 1000) continue;
 				
 					ImGui::TableNextColumn();
@@ -712,7 +712,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		if (m_filter[0]) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
 
-			if (stristr(tag.m_tag, m_filter) == 0) return;
+			if (findInsensitive(tag.m_tag, m_filter) == nullptr) return;
 		}
 		if (ImGui::TreeNode(&tag, "%s - %.2f MB", tag.m_tag.c_str(), tag.m_size / 1024.f / 1024.f)) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
@@ -1007,7 +1007,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					const float block_y = y;
 					const float w = ImGui::CalcTextSize(name).x;
 
-					const bool is_filtered = m_filter[0] && stristr(name, m_filter) == 0;
+					const bool is_filtered = m_filter[0] && !findInsensitive(name, m_filter);
 					const u32 alpha = is_filtered ? 0x2000'0000 : 0xff00'0000;
 					if (m_hovered_link.link == block.link && m_hovered_link.frame > m_frame_idx - 2) color = 0xff0000ff;
 					color = alpha | (color & 0x00ffffff);

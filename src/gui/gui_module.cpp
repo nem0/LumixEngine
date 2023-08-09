@@ -794,7 +794,7 @@ struct GUIModuleImpl final : GUIModule {
 				}
 				break;
 			case os::Keycode::DEL:
-				if (rect->input_field->cursor < rect->text->text.length())
+				if (rect->input_field->cursor < (i32)rect->text->text.length())
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor);
 				}
@@ -803,7 +803,7 @@ struct GUIModuleImpl final : GUIModule {
 				if (rect->input_field->cursor > 0) --rect->input_field->cursor;
 				break;
 			case os::Keycode::RIGHT:
-				if (rect->input_field->cursor < rect->text->text.length()) ++rect->input_field->cursor;
+				if (rect->input_field->cursor < (i32)rect->text->text.length()) ++rect->input_field->cursor;
 				break;
 			default: break;
 		}

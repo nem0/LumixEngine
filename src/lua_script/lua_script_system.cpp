@@ -1901,7 +1901,7 @@ namespace Lumix
 				{
 					const Vec3 val = LuaWrapper::toType<Vec3>(scr.m_state, -1);
 					const StaticString<512> tmp("{", val.x, ",", val.y, ",", val.z, "}");
-					copyString(out, tmp.data);
+					copyString(out, tmp);
 				}
 				break;
 				case Property::INT:

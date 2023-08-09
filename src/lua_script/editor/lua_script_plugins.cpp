@@ -49,7 +49,7 @@ struct EditorWindow : AssetEditorWindow {
 	}
 
 	void save() {
-		Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+		Span<const u8> data((const u8*)m_buffer.c_str(), m_buffer.length());
 		m_app.getAssetBrowser().saveResource(*m_resource, data);
 		m_dirty = false;
 	}
@@ -138,7 +138,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		open = settings.getValue(Settings::GLOBAL, "is_script_console_open", false);
 		if (!buf[0]) {
 			StringView dir = Path::getDir(settings.getAppDataPath());
-			const StaticString<LUMIX_MAX_PATH> path(dir, "/lua_console_content.lua");
+			const StaticString<MAX_PATH> path(dir, "/lua_console_content.lua");
 			os::InputFile file;
 			if (file.open(path)) {
 				const u64 size = file.size();
@@ -161,7 +161,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		settings.setValue(Settings::GLOBAL, "is_script_console_open", open);
 		if (buf[0]) {
 			StringView dir = Path::getDir(settings.getAppDataPath());
-			const StaticString<LUMIX_MAX_PATH> path(dir, "/lua_console_content.lua");
+			const StaticString<MAX_PATH> path(dir, "/lua_console_content.lua");
 			os::OutputFile file;
 			if (!file.open(path)) {
 				logError("Failed to save ", path);
@@ -319,7 +319,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 			ImGui::SameLine();
 			if (ImGui::Button("Execute file"))
 			{
-				char tmp[LUMIX_MAX_PATH] = {};
+				char tmp[MAX_PATH] = {};
 				if (os::getOpenFilename(Span(tmp), "Scripts\0*.lua\0", nullptr))
 				{
 					os::InputFile file;
@@ -418,7 +418,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::BeginMenu("New")) {
-			file_selector.gui(false);
+			file_selector.gui(false, "lua");
 			if (ImGui::Button("Create")) {
 				path = file_selector.getPath();
 				os::OutputFile file;
@@ -453,7 +453,6 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			}
 
 			const ComponentUID cmp = editor.getWorld()->getComponent(entity, LUA_SCRIPT_TYPE);
-			editor.beginCommandGroup("add_lua_script");
 			editor.addArrayPropertyItem(cmp, "scripts");
 
 			if (!create_empty) {
@@ -461,7 +460,6 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 				int scr_count = script_scene->getScriptCount(entity);
 				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), path);
 			}
-			editor.endCommandGroup();
 			if (parent.isValid()) editor.makeParent(parent, entity);
 			editor.endCommandGroup();
 			editor.lockGroupCommand();

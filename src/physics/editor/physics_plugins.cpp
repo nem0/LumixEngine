@@ -454,9 +454,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	bool exportData(const char* dest_dir) override
 	{
 		#ifndef LUMIX_STATIC_PHYSX
-			char exe_path[LUMIX_MAX_PATH];
+			char exe_path[MAX_PATH];
 			os::getExecutablePath(Span(exe_path));
-			char exe_dir[LUMIX_MAX_PATH];
+			char exe_dir[MAX_PATH];
 
 			const char* physx_dlls[] = {
 				"PhysX_64.dll",
@@ -467,9 +467,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			for (const char* dll : physx_dlls)
 			{
 				copyString(Span(exe_dir), Path::getDir(exe_path));
-				StaticString<LUMIX_MAX_PATH> tmp(exe_dir, dll);
+				StaticString<MAX_PATH> tmp(exe_dir, dll);
 				if (!os::fileExists(tmp)) return false;
-				StaticString<LUMIX_MAX_PATH> dest(dest_dir, dll);
+				StaticString<MAX_PATH> dest(dest_dir, dll);
 				if (!os::copyFile(tmp, dest))
 				{
 					logError("Failed to copy ", tmp, " to ", dest);

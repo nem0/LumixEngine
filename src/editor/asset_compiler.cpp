@@ -351,7 +351,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (info.is_directory)
 			{
-				char child_path[LUMIX_MAX_PATH];
+				char child_path[MAX_PATH];
 				copyString(child_path, dir);
 				if(!dir.empty()) catString(child_path, "/");
 				catString(child_path, info.filename);
@@ -359,7 +359,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 			else
 			{
-				char fullpath[LUMIX_MAX_PATH];
+				char fullpath[MAX_PATH];
 				copyString(fullpath, dir);
 				if(!dir.empty()) catString(fullpath, "/");
 				catString(fullpath, info.filename);

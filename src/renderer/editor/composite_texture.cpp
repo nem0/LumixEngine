@@ -3169,7 +3169,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
 					StaticString<128> label(category, _label);
 					if (shortcut) label.append(" (LMB + ", shortcut, ")");
-					if (!node && stristr(label, win->m_node_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
+					if (!node && findInsensitive(label, win->m_node_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
 						node = win->m_resource.addNode(type);
 						ImGui::CloseCurrentPopup();
 					}
@@ -3244,7 +3244,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 	}
 	
 	void exportAs() {
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH];
 		if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
 
 		CompositeTexture::Result img(m_allocator);

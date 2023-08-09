@@ -1,64 +1,68 @@
-#include "engine/lumix.h"
 #include "engine/path.h"
 
-#include "engine/hash.h"
-#include "engine/hash_map.h"
-#include "engine/sync.h"
-#include "engine/path.h"
-#include "engine/stream.h"
-#include "engine/string.h"
+namespace Lumix {
 
-
-namespace Lumix
-{
-
-
-Path::Path()
-	: m_path{}
-{}
-
+Path::Path() : m_path{} {}
 
 Path::Path(StringView path) {
-	normalize(path, Span(m_path));
-	endUpdate();
+	m_length = u32(normalize(path, Span(m_path)) - m_path);
+	m_hash = StableHash(m_path);
 }
 
 void Path::add(StringView value) {
-	StaticString<LUMIX_MAX_PATH> tmp(m_path, value);
-	normalize(tmp, Span(m_path));
+	Span span(m_path + m_length, m_path + MAX_PATH);
+	m_length = u32(copyString(span, value) - m_path);
 }
 
 void Path::add(StableHash hash) {
-	char tmp[32];
-	toCString(hash.getHashValue(), Span(tmp));
-	catString(m_path, tmp);
+	Span span(m_path + m_length, m_path + MAX_PATH);
+	m_length = u32(toCString(hash.getHashValue(), span) - m_path);
 }
 
 void Path::add(u64 value) {
-	char tmp[32];
-	toCString(value, Span(tmp));
-	catString(m_path, tmp);
+	Span span(m_path + m_length, m_path + MAX_PATH);
+	m_length = u32(toCString(value, span) - m_path);
 }
 
-i32 Path::length() const {
-	return stringLength(m_path);
+char* Path::normalize(char* path) {
+	bool is_prev_slash = false;
+
+	char* dst = path;
+	const char* src = dst;
+	if (src[0] == '.' && (src[1] == '\\' || src[1] == '/')) src += 2;
+	
+	#ifdef _WIN32
+		if (src[0] == '\\' || src[0] == '/') ++src;
+	#endif
+
+	while (*src) {
+		bool is_current_slash = *src == '\\' || *src == '/';
+
+		if (is_current_slash && is_prev_slash) {
+			++src;
+			continue;
+		}
+
+		*dst = *src == '\\' ? '/' : *src;
+
+		src++;
+		dst++;
+
+		is_prev_slash = is_current_slash;
+	}
+	*dst = 0;
+	return dst;
 }
 
 void Path::endUpdate() {
-	#ifdef _WIN32
-		char tmp[LUMIX_MAX_PATH];
-		makeLowercase(Span(tmp), m_path);
-		m_hash = FilePathHash(tmp);
-	#else
-		m_hash = FilePathHash(m_path);
-	#endif
+	m_length = u32(normalize(m_path) - m_path);
+	m_hash = StableHash(m_path);
 }
 
-void Path::operator =(StringView rhs) {
+void Path::operator=(StringView rhs) {
 	ASSERT(rhs.size() < lengthOf(m_path));
-	normalize(rhs, Span(m_path));
-	m_path[rhs.size()] = '\0';
-	endUpdate();
+	m_length = u32(normalize(rhs, Span(m_path)) - m_path);
+	m_hash = StableHash(m_path); 
 }
 
 bool Path::operator==(const char* rhs) const {
@@ -76,14 +80,10 @@ bool Path::operator==(const Path& rhs) const {
 
 bool Path::operator!=(const Path& rhs) const {
 	ASSERT(equalIStrings(m_path, rhs.m_path) == (m_hash == rhs.m_hash));
-	#ifdef _WIN32
-		return m_hash != rhs.m_hash || !equalIStrings(m_path, rhs.m_path);
-	#else
-		return m_hash != rhs.m_hash || !equalStrings(m_path, rhs.m_path);
-	#endif
+	return m_hash != rhs.m_hash;
 }
 
-void Path::normalize(StringView path, Span<char> output) {
+char* Path::normalize(StringView path, Span<char> output) {
 	ASSERT(path.begin <= output.begin() || path.begin > output.end());
 	u32 max_size = output.length();
 	ASSERT(max_size > 0);
@@ -91,7 +91,7 @@ void Path::normalize(StringView path, Span<char> output) {
 	
 	if (path.size() == 0) {
 		*out = '\0';
-		return;
+		return out;
 	}
 
 	u32 i = 0;
@@ -121,7 +121,12 @@ void Path::normalize(StringView path, Span<char> output) {
 		is_prev_slash = is_current_slash;
 	}
 	ASSERT(i < max_size);
-	(i < max_size ? *out : *(out - 1)) = '\0';
+	if (i < max_size) {
+		*out = '\0';
+		return out;
+	}
+	*(out - 1) = '\0';
+	return out - 1;
 }
 
 StringView Path::getDir(StringView src) {
@@ -238,7 +243,7 @@ bool Path::hasExtension(StringView filename, StringView ext) {
 }
 
 Path::operator StringView() const {
-	return StringView(m_path);
+	return StringView(m_path, m_length);
 }
 
 PathInfo::PathInfo(StringView path) {

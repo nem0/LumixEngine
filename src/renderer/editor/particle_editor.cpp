@@ -3054,7 +3054,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 			struct : ICategoryVisitor {
 				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
 					if (n) return *this;
-					if (stristr(label, editor->m_node_filter)) {
+					if (findInsensitive(label, editor->m_node_filter)) {
 						if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label)) {
 							n = creator.create(*editor->m_active_emitter);
 							ImGui::CloseCurrentPopup();

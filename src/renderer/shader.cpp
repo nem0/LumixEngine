@@ -282,9 +282,7 @@ static int common(lua_State* L)
 
 	const StaticString<32> line_str("#line ", line, "\n");
 
-	shader->m_sources.common
-		.cat(line_str.data)
-		.cat(src);
+	shader->m_sources.common.append(line_str, src);
 	return 0;
 }
 
@@ -351,8 +349,7 @@ int include(lua_State* L)
 	
 	if (!content.empty()) {
 		content << "\n";
-		shader->m_sources.common.cat("#line 0\n");
-		shader->m_sources.common.cat(StringView((const char*)content.data(), (u32)content.size()));
+		shader->m_sources.common.append("#line 0\n", StringView((const char*)content.data(), (u32)content.size()));
 	}
 
 	return 0;
@@ -470,18 +467,15 @@ void Shader::toTextureVarName(Span<char> out, const char* in) {
 void Shader::onBeforeReady() {
 	if (m_uniforms.empty()) return;
 
-	m_sources.common.cat("layout (std140, binding = 2) uniform MaterialState {");
+	m_sources.common.append("layout (std140, binding = 2) uniform MaterialState {");
 
 	for (const Uniform& u : m_uniforms) {
-		m_sources.common.cat(toString(u.type));
-		m_sources.common.cat(" ");
 		char var_name[64];
 		toUniformVarName(Span(var_name), u.name);
-		m_sources.common.cat(var_name);
-		m_sources.common.cat(";\n");
+		m_sources.common.append(toString(u.type), " ", var_name, ";\n");
 	}
 
-	m_sources.common.cat("};\n");
+	m_sources.common.append("};\n");
 }
 
 

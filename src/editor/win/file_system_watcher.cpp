@@ -32,7 +32,7 @@ struct FileSystemWatcherTask final : Thread {
 	HANDLE m_handle;
 	DWORD m_received;
 	OVERLAPPED m_overlapped;
-	StaticString<LUMIX_MAX_PATH> m_path;
+	StaticString<MAX_PATH> m_path;
 	FileSystemWatcherPC& m_watcher;
 };
 

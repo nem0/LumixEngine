@@ -67,8 +67,10 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 		Stage(IAllocator& allocator) : code(allocator) {}
 		Stage(const Stage& rhs)
 			: type(rhs.type)
-			, code(rhs.code.makeCopy())
-		{}
+			, code(rhs.code.getAllocator())
+		{
+			rhs.code.copyTo(code);
+		}
 
 		gpu::ShaderType type;
 		Array<char> code;
@@ -80,10 +82,12 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 			, common(allocator)
 		{}
 		Sources(const Sources& rhs)
-			: stages(rhs.stages.makeCopy())
+			: stages(rhs.stages.getAllocator())
 			, common(rhs.common)
 			, path(rhs.path)
-		{}
+		{
+			rhs.stages.copyTo(stages);
+		}
 
 		Path path;
 		Array<Shader::Stage> stages;

@@ -179,7 +179,7 @@ void LogUI::onGUI()
 			{
 				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
 				const char* msg = m_messages[i].text.c_str();
-				if (m_filter[0] == '\0' || strstr(msg, m_filter) != nullptr)
+				if (m_filter[0] == '\0' || findInsensitive(msg, m_filter))
 				{
 					ImGui::TextUnformatted(msg);
 				}
@@ -198,7 +198,7 @@ void LogUI::onGUI()
 				for (int i = 0; i < m_messages.size(); ++i)
 				{
 					const char* msg = m_messages[i].text.c_str();
-					if (m_filter[0] == '\0' || strstr(msg, m_filter) != nullptr)
+					if (m_filter[0] == '\0' || findInsensitive(msg, m_filter))
 					{
 						len += stringLength(msg);
 						len += sizeof("\n");
@@ -213,7 +213,7 @@ void LogUI::onGUI()
 					for (int i = 0; i < m_messages.size(); ++i)
 					{
 						const char* msg = m_messages[i].text.c_str();
-						if (m_filter[0] == '\0' || strstr(msg, m_filter) != nullptr)
+						if (m_filter[0] == '\0' || findInsensitive(msg, m_filter))
 						{
 							catString(memspan, msg);
 							catString(memspan, "\n");

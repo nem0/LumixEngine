@@ -132,7 +132,7 @@ static void extractEmbedded(const ofbx::IScene& module, StringView src_dir)
 
 		StringView filename = toStringView(module.getEmbeddedFilename(i));
 		const PathInfo pi(filename);
-		const StaticString<LUMIX_MAX_PATH> fullpath(src_dir, pi.basename, ".", pi.extension);
+		const StaticString<MAX_PATH> fullpath(src_dir, pi.basename, ".", pi.extension);
 
 		if (os::fileExists(fullpath)) return;
 
@@ -200,9 +200,7 @@ void FBXImporter::gatherMaterials(StringView fbx_filename, StringView src_dir)
 				}
 			}
 
-			char tmp[LUMIX_MAX_PATH];
-			Path::normalize(tex.src, Span(tmp));
-			tex.src = tmp;
+			Path::normalize(tex.src.data);
 
 			if (!tex.is_valid) {
 				logInfo(fbx_filename, ": texture ", tex.src, " not found");
@@ -812,12 +810,12 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 {
 	const char* node_name = mesh.fbx->name;
-	const char* lod_str = stristr(node_name, "_LOD");
+	const char* lod_str = findInsensitive(node_name, "_LOD");
 	if (!lod_str)
 	{
 		char mesh_name[256];
 		FBXImporter::getImportMeshName(mesh, mesh_name);
-		lod_str = stristr(mesh_name, "_LOD");
+		lod_str = findInsensitive(mesh_name, "_LOD");
 		if (!lod_str) return 0;
 	}
 
@@ -1234,8 +1232,7 @@ void FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 					}
 				}
 			}
-			if (texture.fbx && texture.src.data[0])
-			{
+			if (texture.fbx && !texture.src.empty()) {
 				writeString("texture \"/");
 				writeString(texture.src);
 				writeString("\"\n");

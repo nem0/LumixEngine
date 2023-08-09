@@ -21,7 +21,6 @@ struct LUMIX_ENGINE_API IOutputStream {
 
 struct LUMIX_ENGINE_API IInputStream {
 	virtual bool read(void* buffer, u64 size) = 0;
-	virtual const void* getBuffer() const = 0;
 	virtual u64 size() const = 0;
 	
 	template <typename T> void read(T& value) { read(&value, sizeof(T)); }
@@ -54,7 +53,7 @@ private:
 struct LUMIX_ENGINE_API InputPagedStream final : IInputStream {
 	InputPagedStream(const OutputPagedStream& src);
 	bool read(void* buffer, u64 size) override;
-	const void* getBuffer() const override { ASSERT(false); return nullptr; }
+
 	u64 size() const override { ASSERT(false); return 0; }
 	bool isEnd() const { return !m_page || (!m_page->next && m_page_pos == m_page->size); }
 	
@@ -114,7 +113,6 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	bool read(String& string);
 	const void* skip(u64 size);
 	const void* getData() const { return m_data; }
-	const void* getBuffer() const override { return m_data; }
 	u64 size() const override { return m_size; }
 	u64 remaining() const { return m_size - m_pos; }
 	u64 getPosition() const { return m_pos; }

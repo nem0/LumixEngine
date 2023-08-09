@@ -76,17 +76,20 @@ template <typename T> struct Array {
 		}
 	}
 
-	Array<T> makeCopy() const {
-		Array<T> res(m_allocator);
-		if (m_size == 0) return res;
-
-		res.m_data = (T*)m_allocator.allocate_aligned(m_size * sizeof(T), alignof(T));
-		res.m_capacity = m_size;
-		res.m_size = m_size;
-		for (u32 i = 0; i < m_size; ++i) {
-			new (NewPlaceholder(), res.m_data + i) T(m_data[i]);
+	void copyTo(Array<T>& dst) const {
+		if (m_size == 0) return;
+		if constexpr (__is_trivially_copyable(T)) {
+			dst.resize(m_size);
+			memcpy(dst.begin(), begin(), sizeof(T) * m_size);
+			return;
 		}
-		return res;
+		else {
+			dst.clear();
+			dst.reserve(m_size);
+			for (const T& v : *this) {
+				dst.push(v);
+			}
+		}
 	}
 
 	void operator=(Array&& rhs) {
@@ -216,7 +219,7 @@ template <typename T> struct Array {
 		return m_data[m_size - 1];
 	}
 
-	void moveRange(T* dst, T* src, u32 count) {
+	static void moveRange(T* dst, T* src, u32 count) {
 		ASSERT(dst > src || dst + count < src);
 		if constexpr (__is_trivially_copyable(T)) {
 			memcpy(dst, src, sizeof(T) * count);

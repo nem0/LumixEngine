@@ -34,6 +34,7 @@
 #include "engine/profiler.h"
 #include "engine/queue.h"
 #include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/world.h"
 #include "fbx_importer.h"
 #include "game_view.h"
@@ -672,7 +673,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 		}
 
 		void save() {
-			Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+			Span<const u8> data((const u8*)m_buffer.c_str(), m_buffer.length());
 			m_app.getAssetBrowser().saveResource(*m_resource, data);
 			m_dirty = false;
 		}
@@ -904,31 +905,33 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						memcpy(uniform->vec4, shader_uniform.default_value.vec4, sizeof(shader_uniform.default_value)); 
 					}
 
+					ImGui::PushID(&shader_uniform);
 					ImGuiEx::Label(shader_uniform.name);
 					switch (shader_uniform.type) {
 						case Shader::Uniform::FLOAT:
-							saveUndo(ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value));
+							saveUndo(ImGui::DragFloat("##f", &uniform->float_value));
 							break;
 						case Shader::Uniform::NORMALIZED_FLOAT:
-							saveUndo(ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value, 0.01f, 0.f, 1.f));
+							saveUndo(ImGui::DragFloat("##nf", &uniform->float_value, 0.01f, 0.f, 1.f));
 							break;
 						case Shader::Uniform::INT:
-							saveUndo(ImGui::DragInt(StaticString<256>("##", shader_uniform.name), &uniform->int_value));
+							saveUndo(ImGui::DragInt("##i", &uniform->int_value));
 							break;
 						case Shader::Uniform::VEC3:
-							saveUndo(ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3));
+							saveUndo(ImGui::DragFloat3("##v3", uniform->vec3));
 							break;
 						case Shader::Uniform::VEC4:
-							saveUndo(ImGui::DragFloat4(StaticString<256>("##", shader_uniform.name), uniform->vec4));
+							saveUndo(ImGui::DragFloat4("##v4", uniform->vec4));
 							break;
 						case Shader::Uniform::VEC2:
-							saveUndo(ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2));
+							saveUndo(ImGui::DragFloat2("##v2", uniform->vec2));
 							break;
 						case Shader::Uniform::COLOR:
-							saveUndo(ImGui::ColorEdit4(StaticString<256>("##", shader_uniform.name), uniform->vec4));
+							saveUndo(ImGui::ColorEdit4("##c", uniform->vec4));
 							break;
 						default: ASSERT(false); break;
 					}
+					ImGui::PopID();
 				}
 			}
 
@@ -1268,7 +1271,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
-					StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath()));
+					StaticString<MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath()));
 					os::openExplorer(dir);
 				}
 				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
@@ -1871,7 +1874,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				blob << "\nclips = {";
 				for (const FBXImporter::ImportConfig::Clip& clip : clips) {
 					blob << "\n\n{";
-					blob << "\n\n\nname = \"" << clip.name.data << "\",";
+					blob << "\n\n\nname = \"" << clip.name << "\",";
 					blob << "\n\n\nfrom_frame = " << clip.from_frame << ",";
 					blob << "\n\n\nto_frame = " << clip.to_frame;
 					blob << "\n\n},";
@@ -2593,7 +2596,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 		}
 
-		const StaticString<32> hash_str("", src.getHash());
 		if (meta.split) {
 			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
 			m_fbx_importer.writeSubmodels(filepath, cfg);
@@ -3121,13 +3123,12 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		{
 			OutputMemoryStream blob(app.getAllocator());
 			if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
-				m_buffer.resize((u32)blob.size());
-				memcpy(m_buffer.getData(), blob.data(), blob.size());
+				m_buffer = StringView((const char*)blob.data(), (u32)blob.size());
 			}
 		}
 
 		void save() {
-			Span<const u8> data((const u8*)m_buffer.getData(), m_buffer.length());
+			Span<const u8> data((const u8*)m_buffer.c_str(), m_buffer.length());
 			m_app.getAssetBrowser().saveResource(m_path, data);
 			m_dirty = false;
 		}
@@ -4375,7 +4376,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 	void onMouseMove(WorldView& view, int x, int y, int rel_x, int rel_y) override { paint(view, x, y); }
 	
 	void exportToOBJ(const ProceduralGeometry& pg) {
-		char filename[LUMIX_MAX_PATH];
+		char filename[MAX_PATH];
 		if (!os::getSaveFilename(Span(filename), "Wavefront obj\0*.obj\0", "obj")) return;
 		
 		os::OutputFile file;
@@ -4449,7 +4450,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		file.close();
 
 		StringView dir = Path::getDir(filename);
-		StaticString<LUMIX_MAX_PATH> mtl_filename(dir, basename, ".mtl");
+		StaticString<MAX_PATH> mtl_filename(dir, basename, ".mtl");
 
 		if (!file.open(mtl_filename)) {
 			logError("Failed to open ", mtl_filename);
@@ -5006,7 +5007,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			static int size = 1024;
 			ImGuiEx::Label("Size");
 			ImGui::InputInt("##size", &size);
-			m_file_selector.gui(false);
+			m_file_selector.gui(false, "mat");
 			if (m_file_selector.getPath()[0] &&  ImGui::Button("Create"))
 			{
 				new_created = createHeightmap(Path(m_file_selector.getPath()), size);

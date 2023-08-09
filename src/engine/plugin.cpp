@@ -119,7 +119,7 @@ namespace Lumix
 
 		ISystem* load(const char* path) override
 		{
-			char path_with_ext[LUMIX_MAX_PATH];
+			char path_with_ext[MAX_PATH];
 			copyString(path_with_ext, path);
 			const char* ext =
 			#ifdef _WIN32

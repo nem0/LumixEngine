@@ -410,9 +410,7 @@ function main_shadowmap()
 end
 
 function render_preview()
-	local shadowmap = createRenderbuffer(shadowmap_1x1)
-	setRenderTargetsDS(shadowmap)
-	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
+	local shadowmap = shadowPass()
 
 	local view_params = getCameraParams()
 	local entities = cull(view_params
