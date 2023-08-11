@@ -1327,7 +1327,9 @@ void* loadLibrary(const char* path)
 
 void unloadLibrary(void* handle)
 {
-	DEBUG_CHECK(FreeLibrary((HMODULE)handle));
+	if (handle) {
+		DEBUG_CHECK(FreeLibrary((HMODULE)handle));
+	}
 }
 
 float getTimeSinceProcessStart() {

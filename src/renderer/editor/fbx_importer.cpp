@@ -1533,6 +1533,7 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 			header.length = Time::fromSeconds((float)anim_len);
 			header.frame_count = to_frame - from_frame;
 			write(header);
+			write(cfg.animation_flags);
 
 			const i64 from_fbx_time = ofbx::secondsToFbxTime((double)from_frame / fps);
 			const i64 to_fbx_time = ofbx::secondsToFbxTime((double)to_frame / fps);

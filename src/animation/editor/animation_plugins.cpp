@@ -33,8 +33,6 @@ using namespace Lumix;
 
 
 static const ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
-static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType("property_animator");
-static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
@@ -74,11 +72,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			}
 
 			if (!m_resource->isReady()) return;
-
-			if (m_play) {
-				auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
-				anim_module->updateAnimable(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
-			}
 
 			Path model_path = m_model ? m_model->getPath() : Path();
 			if (m_app.getAssetBrowser().resourceInput("Model", model_path, ResourceType("model"))) {
@@ -167,8 +160,28 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				anim_module->updateAnimable(*m_viewer.m_mesh, 0);
 			}
 
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+			bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
+			ImGuiEx::Label("Show mesh");
+			if (ImGui::Checkbox("##sm", &show_mesh)) {
+				render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
+			}
+			
+			ImGuiEx::Label("Show skeleton");
+			ImGui::Checkbox("##ss", &m_show_skeleton);
+			if (m_show_skeleton) m_viewer.drawSkeleton();
+			
 			ImGuiEx::Label("Playback speed");
 			ImGui::DragFloat("##spd", &m_playback_speed, 0.01f, 0, FLT_MAX);
+
+			if (m_play && m_playback_speed > 0) {
+				anim_module->updateAnimable(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
+			}
+			else {
+				if (ImGui::Button("Step")) {
+					anim_module->updateAnimable(*m_viewer.m_mesh, 1 / 30.f);
+				}
+			}
 
 			if (!m_init) {
 				m_viewer.resetCamera(*m_model);
@@ -185,6 +198,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		Animation* m_resource;
 		Model* m_model = nullptr;
 		bool m_init = false;
+		bool m_show_skeleton = true;
 		bool m_play = true;
 		float m_playback_speed = 1.f;
 		WorldViewer m_viewer;

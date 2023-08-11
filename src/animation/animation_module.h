@@ -40,6 +40,8 @@ struct AnimationModule : IModule {
 	virtual bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) = 0;
 	virtual u32 getAnimatorU32Input(EntityRef entity, u32 input_idx) = 0;
 	virtual struct LocalRigidTransform getAnimatorRootMotion(EntityRef entity) = 0;
+	virtual void setAnimatorUseRootMotion(EntityRef entity, bool value) = 0;
+	virtual bool getAnimatorUseRootMotion(EntityRef entity) = 0;
 	virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;
 	virtual struct Path getAnimatorSource(EntityRef entity) = 0;
 	virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;

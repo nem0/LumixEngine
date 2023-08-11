@@ -428,6 +428,7 @@ function render_preview()
 	bindTextures({ shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 5)
 	renderBucket(entities.default)
 	renderBucket(entities.transparent)
+	renderDebugShapes()
 
 	local output = tonemap(rb)
 	setOutput(output)

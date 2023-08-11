@@ -6,6 +6,7 @@
 #include "editor/settings.h"
 #include "editor/utils.h"
 #include "renderer/model.h"
+#include "renderer/pose.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "world_viewer.h"
@@ -57,6 +58,34 @@ WorldViewer::WorldViewer(StudioApp& app)
 	m_pipeline->setWorld(m_world);
 }
 
+void WorldViewer::drawSkeleton() {
+	auto* render_module = (RenderModule*)m_world->getModule("renderer");
+	Pose* pose = render_module->lockPose(*m_mesh);
+	Model* model = render_module->getModelInstanceModel(*m_mesh);
+	if (pose && model->isReady()) {
+		Transform tr = m_world->getTransform(*m_mesh);
+		ASSERT(pose->is_absolute);
+		for (u32 i = 0, c = model->getBoneCount(); i < c; ++i) {
+			const i32 parent_idx = model->getBone(i).parent_idx;
+			if (parent_idx < 0) continue;
+
+			
+			Vec3 bone_dir = pose->positions[i] - pose->positions[parent_idx];
+			const float bone_len = length(bone_dir);
+			const Quat r = Quat::vec3ToVec3(pose->rotations[i].rotate(Vec3(1, 0, 0)), normalize(bone_dir));
+			//line(pose->positions[i], pose->positions[parent_idx]);
+
+			Vec3 up = r.rotate(Vec3(0, 0.1f * bone_len, 0));
+			Vec3 right = r.rotate(Vec3(0, 0, 0.1f * bone_len));
+
+			DVec3 a = tr.transform(pose->positions[i] - bone_dir * 0.5f);
+			render_module->addDebugCube(a, tr.rot.rotate(bone_dir * 0.5f), tr.rot.rotate(up), tr.rot.rotate(right), Color::RED);
+		}
+		render_module->unlockPose(*m_mesh, false);
+	}
+}
+
+
 WorldViewer::~WorldViewer() {
 	Engine& engine = m_app.getEngine();
 	engine.destroyWorld(*m_world);
@@ -80,13 +109,22 @@ void WorldViewer::gui() {
 	auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
 	ASSERT(render_module);
 
+	Transform tr = m_world->getTransform(*m_mesh);
+	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(1, 0, 0)), Color::RED);
+	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 1, 0)), Color::GREEN);
+	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 0, 1)), Color::BLUE);
+
 	ImVec2 image_size = ImGui::GetContentRegionAvail();
 	image_size.y = maximum(200.f, image_size.y);
 
 	m_viewport.fov = m_app.getFOV();
 	m_viewport.w = (int)image_size.x;
 	m_viewport.h = (int)image_size.y;
-	m_pipeline->setViewport(m_viewport);
+	Viewport vp = m_viewport;
+	if (m_focus_mesh) {
+		vp.pos += m_world->getPosition(*m_mesh);
+	}
+	m_pipeline->setViewport(vp);
 	m_pipeline->render(false);
 	gpu::TextureHandle preview = m_pipeline->getOutput();
 	if (gpu::isOriginBottomLeft()) {

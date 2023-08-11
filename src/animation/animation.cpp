@@ -259,6 +259,10 @@ bool Animation::load(Span<const u8> mem) {
 		return false;
 	}
 
+	if (header.version > Version::FLAGS) {
+		file.read(m_flags);
+	}
+
 	m_length = header.length;
 	m_frame_count = header.frame_count;
 	u32 translations_count;

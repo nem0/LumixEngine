@@ -59,8 +59,18 @@ struct Animation final : Resource {
 
 	enum class Version : u32 {
 		FIRST = 3,
+		FLAGS,
 
 		LAST
+	};
+
+	enum Flags : u32 {
+		NONE = 0,
+		Y_ROOT_TRANSLATION = 1 << 0,
+		XZ_ROOT_TRANSLATION = 1 << 1,
+		ROOT_ROTATION = 1 << 2,
+
+		ANY_ROOT_MOTION = Y_ROOT_TRANSLATION | XZ_ROOT_TRANSLATION | ROOT_ROTATION
 	};
 
 	struct Header {
@@ -95,6 +105,8 @@ struct Animation final : Resource {
 	Time getLength() const { return m_length; }
 	const Array<TranslationCurve>& getTranslations() const { return m_translations; }
 	const Array<RotationCurve>& getRotations() const { return m_rotations; }
+
+	Flags m_flags = Flags::NONE;
 
 private:
 	void unload() override;

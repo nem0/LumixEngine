@@ -65,6 +65,10 @@
 
 using namespace Lumix;
 
+static Animation::Flags operator | (Animation::Flags a, Animation::Flags b) {
+	return Animation::Flags(u32(a) | u32(b));
+}
+
 namespace {
 
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
@@ -1860,6 +1864,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			blob << "create_impostor = " << (create_impostor ? "true" : "false")
 				 << "\nbake_vertex_ao = " << (bake_vertex_ao ? "true" : "false")
 				 << "\nbake_impostor_normals = " << (bake_impostor_normals ? "true" : "false")
+				 << "\nroot_motion_flags = " << i32(root_motion_flags)
 				 << "\nuse_mikktspace = " << (use_mikktspace ? "true" : "false")
 				 << "\nforce_skin = " << (force_skin ? "true" : "false")
 				 << "\nphysics = \"" << toString(physics) << "\""
@@ -1909,6 +1914,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void deserialize(lua_State* L, const Path& path) {
 			LuaWrapper::DebugGuard guard(L);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "root_motion_flags", (i32*)&root_motion_flags);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &use_mikktspace);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &force_skin);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &scale);
@@ -1982,6 +1988,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		u32 lod_count = 1;
 		float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
 		float lods_distances[4] = { 10'000, 0, 0, 0 };
+		Animation::Flags root_motion_flags = Animation::Flags::NONE;
 		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 		Array<FBXImporter::ImportConfig::Clip> clips;
@@ -2291,6 +2298,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				ImGui::EndTable();
 			}
+
+			ImGuiEx::Label("Root rotation");
+			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
+			ImGuiEx::Label("XZ root translation");
+			saveUndo(ImGui::CheckboxFlags("##rmxz", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::XZ_ROOT_TRANSLATION));
+			ImGuiEx::Label("Y root translation");
+			saveUndo(ImGui::CheckboxFlags("##rmy", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::Y_ROOT_TRANSLATION));
+
 			if (ImGui::Button(ICON_FA_PLUS " Add clip")) {
 				m_meta.clips.emplace();
 				saveUndo(true);
@@ -2584,6 +2599,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		cfg.clips = meta.clips;
+		cfg.animation_flags = meta.root_motion_flags;
 		m_fbx_importer.setSource(filepath, false, meta.force_skin);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {

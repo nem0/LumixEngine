@@ -30,6 +30,8 @@ struct World;
 
 enum class AnimationModuleVersion
 {
+	USE_ROOT_MOTION,
+
 	LATEST
 };
 
@@ -40,15 +42,19 @@ static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType
 static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 
 
-struct AnimationModuleImpl final : AnimationModule
-{
+struct AnimationModuleImpl final : AnimationModule {
 	friend struct AnimationSystemImpl;
 	
-	struct Animator
-	{
+	struct Animator {
+		enum Flags : u32 {
+			NONE = 0,
+			USE_ROOT_MOTION = 1 << 0
+		};
+
 		EntityRef entity;
 		anim::Controller* resource = nullptr;
 		u32 default_set = 0;
+		Flags flags = Flags::NONE;
 		anim::RuntimeContext* ctx = nullptr;
 		LocalRigidTransform root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 
@@ -345,6 +351,7 @@ struct AnimationModuleImpl final : AnimationModule
 		{
 			serializer.write(animator.default_set);
 			serializer.write(animator.entity);
+			serializer.write(animator.flags);
 			serializer.writeString(animator.resource ? animator.resource->getPath() : Path());
 		}
 	}
@@ -392,6 +399,9 @@ struct AnimationModuleImpl final : AnimationModule
 			Animator animator;
 			serializer.read(animator.default_set);
 			serializer.read(animator.entity);
+			if (version > (i32)AnimationModuleVersion::USE_ROOT_MOTION) {
+				serializer.read(animator.flags);
+			}
 			animator.entity = entity_map.get(animator.entity);
 
 			const char* tmp = serializer.readString();
@@ -402,6 +412,16 @@ struct AnimationModuleImpl final : AnimationModule
 		}
 	}
 
+	void setAnimatorUseRootMotion(EntityRef entity, bool value) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		if (value) animator.flags = Animator::Flags(animator.flags | Animator::USE_ROOT_MOTION);
+		else animator.flags = Animator::Flags(animator.flags & ~Animator::USE_ROOT_MOTION);
+	}
+
+	bool getAnimatorUseRootMotion(EntityRef entity) override {
+		const Animator& animator = m_animators[m_animator_map[entity]];
+		return animator.flags & Animator::USE_ROOT_MOTION;
+	}
 
 	void setAnimatorSource(EntityRef entity, const Path& path) override
 	{
@@ -628,7 +648,7 @@ struct AnimationModuleImpl final : AnimationModule
 
 		animator.ctx->model = model;
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
-		animator.ctx->root_bone_hash = BoneNameHash(animator.resource->m_root_motion_bone);
+		animator.ctx->root_bone_hash = animator.resource->m_root_motion_bone.empty() ? BoneNameHash() : BoneNameHash(animator.resource->m_root_motion_bone);
 		animator.resource->update(*animator.ctx, animator.root_motion);
 
 		model->getRelativePose(*pose);
@@ -643,6 +663,13 @@ struct AnimationModuleImpl final : AnimationModule
 		pose->computeAbsolute(*model);
 
 		m_render_module->unlockPose(entity, true);
+
+		if (animator.flags & Animator::USE_ROOT_MOTION) {
+			Transform tr = m_world.getTransform(animator.entity);
+			tr.pos += tr.rot.rotate(animator.root_motion.pos);
+			tr.rot = animator.root_motion.rot * tr.rot;
+			m_world.setTransform(animator.entity, tr);
+		}
 	}
 
 	static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
@@ -910,6 +937,7 @@ void AnimationModule::reflect(Engine& engine) {
 			.LUMIX_FUNC_EX(AnimationModule::setAnimatorIK, "setIK")
 			.LUMIX_PROP(AnimatorSource, "Source").resourceAttribute(anim::Controller::TYPE)
 			.LUMIX_PROP(AnimatorDefaultSet, "Default set")
+			.LUMIX_PROP(AnimatorUseRootMotion, "Use root motion")
 		.LUMIX_CMP(Animable, "animable", "Animation / Animable")
 			.LUMIX_PROP(Animation, "Animation").resourceAttribute(Animation::TYPE)
 	;

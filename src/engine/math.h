@@ -231,6 +231,7 @@ struct LUMIX_ENGINE_API Quat
 
 	void fromEuler(const Vec3& euler);
 	Vec3 toEuler() const;
+	float toYaw() const;
 	void set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 	void conjugate();
 	Quat conjugated() const;

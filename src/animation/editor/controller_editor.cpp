@@ -120,6 +120,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			m_viewer.m_world->createComponent(animator_type, *m_viewer.m_mesh);
 			auto* anim_module = (AnimationModule*)m_viewer.m_world->getModule("animation");
 			anim_module->setAnimatorSource(*m_viewer.m_mesh, path);
+			anim_module->setAnimatorUseRootMotion(*m_viewer.m_mesh, true);
 
 			char fbx_path[MAX_PATH];
 			copyString(fbx_path, path);
@@ -395,6 +396,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		void properties_ui(ConditionNode& node) {
 			if (conditionInput("Condition", m_controller.m_inputs, node.m_condition_str, node.m_condition)) pushUndo();
+
+			float node_blend_length = node.m_blend_length.seconds();
+			ImGuiEx::Label("Blend length");
+			if (ImGui::DragFloat("##bl", &node_blend_length)) {
+				node.m_blend_length = Time::fromSeconds(node_blend_length);
+				saveUndo(true);
+			}
 		}
 
 		void properties_ui(Blend1DNode& node) {
@@ -970,6 +978,17 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			else {
 				m_was_preview_ready = false;
 			}
+			bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
+			
+			ImGuiEx::Label("Show mesh"); 
+			if (ImGui::Checkbox("##sm", &show_mesh)) {
+				render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
+			}
+			ImGuiEx::Label("Show skeleton"); 
+			ImGui::Checkbox("##ss", &m_show_skeleton);
+			if (m_show_skeleton) m_viewer.drawSkeleton();
+			ImGuiEx::Label("Focus mesh"); 
+			ImGui::Checkbox("##fm", &m_viewer.m_focus_mesh);
 			ImGuiEx::Label("Playback speed"); 
 			ImGui::DragFloat("##spd", &m_playback_speed, 0.1f, 0, FLT_MAX);
 			if (ImGui::Button("Apply")) {
@@ -980,7 +999,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ctrl->clear();
 				ctrl->deserialize(tmp);
 			}
-			anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
+			if (m_playback_speed == 0) {
+				ImGui::SameLine();
+				if (ImGui::Button("Step")) anim_module->updateAnimator(*m_viewer.m_mesh, 1 / 30.f);
+			}
+			else {
+				anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
+			}
 			
 			ImGui::TableNextColumn();
 			m_viewer.gui();
@@ -1584,6 +1609,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		Path m_path;
 		bool m_was_preview_ready = false;
 		float m_playback_speed = 1.f;
+		bool m_show_skeleton = true;
 		ControllerDebugMapping m_controller_debug_mapping;
 	};
 

@@ -46,6 +46,7 @@ struct FBXImporter {
 		u8 autolod_mask = 0;
 		float bounding_scale = 1.f;
 		Span<const Clip> clips;
+		u32 animation_flags = 0;
 
 	};
 

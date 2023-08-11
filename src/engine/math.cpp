@@ -637,6 +637,16 @@ Vec3 Quat::toEuler() const
 }
 
 
+float Quat::toYaw() const {
+	float check = 2.0f * (w * x - y * z);
+
+	if (check < -0.999999f) return 0.f;
+	if (check > 0.999999f) return 0.f;
+
+	return atan2f(2.f * (x * z + w * y), 1.0f - 2.0f * (x * x + y * y));
+}
+
+
 void Quat::conjugate()
 {
 	w = -w;

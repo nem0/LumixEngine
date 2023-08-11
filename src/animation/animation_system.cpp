@@ -16,13 +16,6 @@ struct Animation;
 struct Engine;
 struct World;
 
-enum class AnimationSceneVersion
-{
-	SHARED_CONTROLLER,
-
-	LATEST
-};
-
 template <typename T>
 struct AnimResourceManager final : ResourceManager
 {

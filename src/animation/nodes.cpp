@@ -10,34 +10,67 @@
 
 namespace Lumix::anim {
 
+// TODO do not compute root motion stuff every frame, cache it in Animation on first use
 
 
 static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* anim, Time time, int translation_idx, int rotation_idx) {
 	LocalRigidTransform root_motion;
+	root_motion.pos = Vec3::ZERO;
+	root_motion.rot = Quat::IDENTITY;
+	if ((anim->m_flags & Animation::ANY_ROOT_MOTION) == 0) return root_motion;
+
 	if (translation_idx >= 0) {
 		root_motion.pos = anim->getTranslation(time, translation_idx);
+		if ((anim->m_flags & Animation::XZ_ROOT_TRANSLATION) == 0) root_motion.pos.x = root_motion.pos.z = 0;
+		if ((anim->m_flags & Animation::Y_ROOT_TRANSLATION) == 0) root_motion.pos.y = 0;
 	}
-	else {
-		root_motion.pos = Vec3::ZERO;
-	}
-	if (rotation_idx >= 0) {
+
+	if (rotation_idx >= 0 && anim->m_flags & Animation::ROOT_ROTATION) {
 		root_motion.rot = anim->getRotation(time, rotation_idx);
-	}
-	else {
-		root_motion.rot = Quat::IDENTITY;
+		root_motion.rot.x = root_motion.rot.z = 0;
+		root_motion.rot = normalize(root_motion.rot);
 	}
 	return root_motion;
 }
 
+// root motion is applied to entity's transform 
+// we remove root motion from pose so it's not applied twice
+static void rootMotionPose(const RuntimeContext& ctx, Animation* anim, Pose& pose, Time time) {
+
+	if (ctx.root_bone_hash.getHashValue() == 0) return;
+	if ((anim->m_flags & Animation::ANY_ROOT_MOTION) == 0) return; 
+
+	auto iter = ctx.model->getBoneIndex(ctx.root_bone_hash);
+	if (!iter.isValid()) return;
+
+	const i32 bone_index = iter.value();
+
+	const i32 translation_idx = anim->getTranslationCurveIndex(ctx.root_bone_hash);
+	const i32 rotation_idx = anim->getRotationCurveIndex(ctx.root_bone_hash);
+
+	LocalRigidTransform root_motion = getRootMotion(anim, time, translation_idx, rotation_idx);
+	LocalRigidTransform rm0 = getRootMotion(anim, Time(0), translation_idx, rotation_idx);
+
+	LocalRigidTransform tmp = {pose.positions[bone_index], pose.rotations[bone_index]};
+	tmp = rm0 * root_motion.inverted() * tmp;
+
+	pose.positions[bone_index] = tmp.pos;
+	pose.rotations[bone_index] = tmp.rot;
+}
+
+
 static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionSimple(const Animation* anim, Time t0, Time t1, int translation_idx, int rotation_idx) {
-	LocalRigidTransform root_motion;
+	ASSERT(t0 <= t1);
 
 	const LocalRigidTransform old_tr = getRootMotion(anim, t0, translation_idx, rotation_idx);
 	const Quat old_rot_inv = old_tr.rot.conjugated();
-	ASSERT(t0 <= t1);
+
 	const LocalRigidTransform new_tr = getRootMotion(anim, t1, translation_idx, rotation_idx);
-	root_motion.rot = old_rot_inv * new_tr.rot;
+	
+	LocalRigidTransform root_motion;
+	root_motion.rot = new_tr.rot * old_rot_inv;
 	root_motion.pos = old_rot_inv.rotate(new_tr.pos - old_tr.pos);
+
 	return root_motion;
 }
 
@@ -215,6 +248,8 @@ static void getPose(const RuntimeContext& ctx, float rel_time, float weight, u32
 
 	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
 	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
+
+	rootMotionPose(ctx, anim, pose, anim_time);
 }
 
 static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
@@ -227,6 +262,8 @@ static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot
 
 	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
 	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
+
+	rootMotionPose(ctx, anim, pose, anim_time);	
 }
 
 void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
@@ -305,11 +342,20 @@ void ConditionNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 	
 	const bool is_true = m_condition.eval(ctx);
 	if (data.is_true != is_true) {
-		data.t = Time(0);
-		data.is_true = is_true;
-		ctx.data.write(data);
-		(is_true ? m_false_node : m_true_node)->update(ctx, root_motion);
-		(is_true ? m_true_node : m_false_node)->enter(ctx);
+		if (m_blend_length.raw() == 0) {
+			(data.is_true ? m_true_node : m_false_node)->skip(ctx);
+			data.is_true = is_true;
+			ctx.data.write(data);
+			(data.is_true ? m_true_node : m_false_node)->enter(ctx);
+			//(data.is_true ? m_true_node : m_false_node)->update(ctx, root_motion);
+		}
+		else {
+			data.t = Time(0);
+			data.is_true = is_true;
+			ctx.data.write(data);
+			(is_true ? m_false_node : m_true_node)->update(ctx, root_motion);
+			(is_true ? m_true_node : m_false_node)->enter(ctx);
+		}
 		return;
 	}
 
