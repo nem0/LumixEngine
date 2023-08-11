@@ -237,13 +237,13 @@ int stringLength(const char* str)
 }
 
 bool endsWithInsensitive(StringView str, StringView suffix) {
-	if (str.size() > suffix.size()) return false;
+	if (str.size() < suffix.size()) return false;
 	str.begin = str.end - suffix.size();
 	return equalIStrings(str, suffix);
 }
 
 bool endsWith(StringView str, StringView suffix) {
-	if (str.size() > suffix.size()) return false;
+	if (str.size() < suffix.size()) return false;
 	str.begin = str.end - suffix.size();
 	return equalStrings(str, suffix);
 }
