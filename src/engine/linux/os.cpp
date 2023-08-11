@@ -435,8 +435,9 @@ void logInfo() {
 }
 
 
-void getDropFile(const Event& event, int idx, Span<char> out) {
+bool getDropFile(const Event& event, int idx, Span<char> out) {
 	ASSERT(false); // not supported, processEvents does not generate the drop event
+	return false;
 }
 
 
@@ -1154,7 +1155,7 @@ u64 getLastModified(const char* path) {
 
 
 bool makePath(const char* path) {
-	char tmp[LUMIX_MAX_PATH];
+	char tmp[MAX_PATH];
 	const char* cin = path;
 	char* cout = tmp;
 
