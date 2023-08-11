@@ -1050,6 +1050,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 		}
 
+		bool isControllerConnected() const {
+			for (const InputSystem::Device* device : m_app.getEngine().getInputSystem().getDevices()) {
+				if (device->type == InputSystem::Device::CONTROLLER) return true;
+			}
+			return false;
+		}
+
 		void debuggerUI(World& world, EntityRef entity) {
 			processControllerMapping(world, entity);
 
@@ -1073,7 +1080,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (ImGui::DragFloat("##i", &val)) {
 							module->setAnimatorInput(entity, idx, val);
 						}
-						if (ImGui::BeginPopupContextItem()) {
+						if (isControllerConnected() && ImGui::BeginPopupContextItem()) {
 							if (m_controller_debug_mapping.axis_x == idx) {
 								if (ImGui::Selectable("Unmap controller X axis")) m_controller_debug_mapping.axis_x = -1;
 							}

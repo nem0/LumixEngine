@@ -157,13 +157,11 @@ struct InputSystemImpl final : InputSystem
 		m_events.push(event);
 	}
 
-
 	Span<const Event> getEvents() const override { return m_events; }
 
-	int getDevicesCount() const override { return m_devices.size(); }
-	Device* getDevice(int index) override { return m_devices[index]; }
+	Span<Device*> getDevices() override { return m_devices; }
+	
 	void registerLuaAPI();
-
 
 	Engine& m_engine;
 	IAllocator& m_allocator;

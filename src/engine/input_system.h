@@ -80,8 +80,7 @@ struct LUMIX_ENGINE_API InputSystem {
 
 	virtual void addDevice(Device* device) = 0;
 	virtual void removeDevice(Device* device) = 0;
-	virtual int getDevicesCount() const = 0;
-	virtual Device* getDevice(int index) = 0;
+	virtual Span<Device*> getDevices() = 0;
 };
 
 } // namespace Lumix
