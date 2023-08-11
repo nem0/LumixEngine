@@ -26,7 +26,7 @@ extern "C" {
 
 // some winapi calls can fail but we don't have any known way to "fix" the issue
 // some of these calls are not fatal (e.g. if we fail to move a window), so we just assert -> DEBUG_CHECK
-#define DEBUG_CHECK(R) ASSERT(R)
+#define DEBUG_CHECK(R) if (!(R)) ASSERT(false)
 // some may end up corrupting user data (e.g. not having enought space for path string and using such shorter path), so we better abort
 #define FATAL_CHECK(R) do { if (!(R)) abort(); } while(false)
 
