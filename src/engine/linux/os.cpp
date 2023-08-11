@@ -970,7 +970,10 @@ void memRelease(void* ptr, size_t size) {
 
 struct FileIterator {};
 
-FileIterator* createFileIterator(const char* path, IAllocator& allocator) {
+FileIterator* createFileIterator(StringView _path, IAllocator& allocator) {
+	char path[MAX_PATH];
+	copyString(path, _path);
+
 	return (FileIterator*)opendir(path);
 }
 
@@ -1104,49 +1107,70 @@ void copyToClipboard(const char* text) {
 }
 
 
-ExecuteOpenResult shellExecuteOpen(const char* path, const char* args, const char* working_dir) {
-	ASSERT(!args); // not supported 
-	ASSERT(!working_dir);
-	return system(path) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
+ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir) {
+	ASSERT(args.empty()); // not supported 
+	ASSERT(working_dir.empty());
+	char tmp[MAX_PATH];
+	copyString(tmp, path);
+	return system(tmp) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
 }
 
 
-ExecuteOpenResult openExplorer(const char* path) {
+ExecuteOpenResult openExplorer(StringView _path) {
+	char path[MAX_PATH];
+	copyString(path, _path);
+	
 	StaticString<1024> tmp("xdg-open ", path);
 	return system(tmp) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
 }
 
 
-bool deleteFile(const char* path) {
-	return unlink(path) == 0;
+bool deleteFile(StringView path) {
+	char tmp[MAX_PATH];
+	copyString(tmp, path);
+	return unlink(tmp) == 0;
 }
 
 
-bool moveFile(const char* from, const char* to) {
+bool moveFile(StringView _from, StringView _to) {
+	char from[MAX_PATH];
+	copyString(from, _from);
+	char to[MAX_PATH];
+	copyString(to, _to);
+	
 	return rename(from, to) == 0;
 }
 
 
-size_t getFileSize(const char* path) {
+size_t getFileSize(StringView path) {
+	char path_tmp[MAX_PATH];
+	copyString(path_tmp, path);
 	struct stat tmp;
-	stat(path, &tmp);
+	stat(path_tmp, &tmp);
 	return tmp.st_size;
 }
 
 
-bool fileExists(const char* path) {
+bool fileExists(StringView _path) {
+	char path[MAX_PATH];
+	copyString(path, _path);
 	struct stat tmp;
 	return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) != S_IFDIR));
 }
 
 
-bool dirExists(const char* path) {
+bool dirExists(StringView _path) {
+	char path[MAX_PATH];
+	copyString(path, _path);
 	struct stat tmp;
 	return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) == S_IFDIR));
 }
 
 
-u64 getLastModified(const char* path) {
+u64 getLastModified(StringView _path) {
+	char path[MAX_PATH];
+	copyString(path, _path);
+
 	struct stat tmp;
 	Lumix::u64 ret = 0;
 	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::u64(tmp.st_mtim.tv_nsec / 1000000);
@@ -1187,10 +1211,15 @@ void grabMouse(WindowHandle window) {
 }
 
 
-bool copyFile(const char* from, const char* to) {
-	const int source = open(from, O_RDONLY, 0);
+bool copyFile(StringView from, StringView to) {
+	char tmp[MAX_PATH];
+	copyString(tmp, from);
+
+	const int source = open(tmp, O_RDONLY, 0);
 	if (source < 0) return false;
-	const int dest = open(to, O_WRONLY | O_CREAT, 0644);
+	
+	copyString(tmp, to);
+	const int dest = open(tmp, O_WRONLY | O_CREAT, 0644);
 	if (dest < 1) {
 		close(source);
 		return false;
