@@ -1997,6 +1997,7 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 		return bone;
 	}
 
+	DataView getBoneLinkProperty() const override { return bone_link_property; }
 
 	const AnimationCurve* getCurve(int idx) const override {
 		assert(idx >= 0 && idx < 3);
