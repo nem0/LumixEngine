@@ -10,102 +10,23 @@
 
 namespace Lumix::anim {
 
-// TODO do not compute root motion stuff every frame, cache it in Animation on first use
-
-
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* anim, Time time, int translation_idx, int rotation_idx) {
-	LocalRigidTransform root_motion;
-	root_motion.pos = Vec3::ZERO;
-	root_motion.rot = Quat::IDENTITY;
-	if ((anim->m_flags & Animation::ANY_ROOT_MOTION) == 0) return root_motion;
-
-	if (translation_idx >= 0) {
-		root_motion.pos = anim->getTranslation(time, translation_idx);
-		if ((anim->m_flags & Animation::XZ_ROOT_TRANSLATION) == 0) root_motion.pos.x = root_motion.pos.z = 0;
-		if ((anim->m_flags & Animation::Y_ROOT_TRANSLATION) == 0) root_motion.pos.y = 0;
-	}
-
-	if (rotation_idx >= 0 && anim->m_flags & Animation::ROOT_ROTATION) {
-		root_motion.rot = anim->getRotation(time, rotation_idx);
-		root_motion.rot.x = root_motion.rot.z = 0;
-		root_motion.rot = normalize(root_motion.rot);
-	}
-	return root_motion;
-}
-
-// root motion is applied to entity's transform 
-// we remove root motion from pose so it's not applied twice
-static void rootMotionPose(const RuntimeContext& ctx, Animation* anim, Pose& pose, Time time) {
-
-	if (ctx.root_bone_hash.getHashValue() == 0) return;
-	if ((anim->m_flags & Animation::ANY_ROOT_MOTION) == 0) return; 
-
-	auto iter = ctx.model->getBoneIndex(ctx.root_bone_hash);
-	if (!iter.isValid()) return;
-
-	const i32 bone_index = iter.value();
-
-	const i32 translation_idx = anim->getTranslationCurveIndex(ctx.root_bone_hash);
-	const i32 rotation_idx = anim->getRotationCurveIndex(ctx.root_bone_hash);
-
-	LocalRigidTransform root_motion = getRootMotion(anim, time, translation_idx, rotation_idx);
-	LocalRigidTransform rm0 = getRootMotion(anim, Time(0), translation_idx, rotation_idx);
-
-	LocalRigidTransform tmp = {pose.positions[bone_index], pose.rotations[bone_index]};
-	tmp = rm0 * root_motion.inverted() * tmp;
-
-	pose.positions[bone_index] = tmp.pos;
-	pose.rotations[bone_index] = tmp.rot;
-}
-
-
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionSimple(const Animation* anim, Time t0, Time t1, int translation_idx, int rotation_idx) {
+static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionEx(const Animation* anim, Time t0, Time t1) {
 	ASSERT(t0 <= t1);
-
-	const LocalRigidTransform old_tr = getRootMotion(anim, t0, translation_idx, rotation_idx);
-	const Quat old_rot_inv = old_tr.rot.conjugated();
-
-	const LocalRigidTransform new_tr = getRootMotion(anim, t1, translation_idx, rotation_idx);
-	
-	LocalRigidTransform root_motion;
-	root_motion.rot = new_tr.rot * old_rot_inv;
-	root_motion.pos = old_rot_inv.rotate(new_tr.pos - old_tr.pos);
-
-	return root_motion;
+	LocalRigidTransform old_tr = anim->getRootMotion(t0).inverted();
+	LocalRigidTransform new_tr = anim->getRootMotion(t1);
+	return old_tr * new_tr;
 }
 
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* anim, Time t0, Time t1, int translation_idx, int rotation_idx) {
-	if (t0 <= t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
-
-	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), translation_idx, rotation_idx);
-	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time(0), t1, translation_idx, rotation_idx);
-	
-	LocalRigidTransform root_motion;
-	root_motion.rot = tr_1.rot * tr_0.rot;
-	root_motion.pos = tr_0.pos + tr_0.rot.rotate(tr_1.pos);
-	return root_motion;
-}
-
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext& ctx, u32 slot, Time t0_abs, Time t1_abs) {
-	Animation* anim = ctx.animations[slot];
-	if (!anim) return { {0, 0, 0}, {0, 0, 0, 1} };
-
-	// TODO getBoneIndex is O(n)
-	const int translation_idx = anim->getTranslationCurveIndex(ctx.root_bone_hash);
-	const int rotation_idx = anim->getRotationCurveIndex(ctx.root_bone_hash);
-
+static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext& ctx, const Animation* anim, Time t0_abs, Time t1_abs) {
 	const Time t0 = t0_abs % anim->getLength();
 	const Time t1 = t1_abs % anim->getLength();
-
-	if (t0 <= t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
-
-	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), translation_idx, rotation_idx);
-	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time(0), t1, translation_idx, rotation_idx);
 	
-	LocalRigidTransform root_motion;
-	root_motion.rot = tr_1.rot * tr_0.rot;
-	root_motion.pos = tr_0.pos + tr_0.rot.rotate(tr_1.pos);
-	return root_motion;
+	if (t0 <= t1) return getRootMotionEx(anim, t0, t1);
+	
+	const LocalRigidTransform tr_0 = getRootMotionEx(anim, t0, anim->getLength());
+	const LocalRigidTransform tr_1 = getRootMotionEx(anim, Time(0), t1);
+	
+	return tr_0 * tr_1;
 }
 
 RuntimeContext::RuntimeContext(Controller& controller, IAllocator& allocator)
@@ -194,7 +115,7 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		const Time len = anim_a->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
-		root_motion = getRootMotion(ctx, pair.a->slot, t0, t);
+		root_motion = getRootMotion(ctx, ctx.animations[pair.a->slot], t0, t);
 	}
 	else {
 		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
@@ -203,7 +124,7 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		const Time len = anim_b->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
-		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
+		const LocalRigidTransform tr1 = getRootMotion(ctx, ctx.animations[pair.b->slot], t0, t);
 		root_motion = root_motion.interpolate(tr1, pair.t);
 	}
 
@@ -247,9 +168,15 @@ static void getPose(const RuntimeContext& ctx, float rel_time, float weight, u32
 	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
 
 	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
-	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
 
-	rootMotionPose(ctx, anim, pose, anim_time);
+	Animation::SampleContext sample_ctx;
+	sample_ctx.pose = &pose;
+	sample_ctx.time = anim_time;
+	sample_ctx.model = ctx.model;
+	sample_ctx.weight = weight;
+	sample_ctx.mask = mask;
+	anim->setRootMotionBone(ctx.root_bone_hash);
+	anim->getRelativePose(sample_ctx);
 }
 
 static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
@@ -260,10 +187,14 @@ static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot
 
 	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
 
-	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
-	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
-
-	rootMotionPose(ctx, anim, pose, anim_time);	
+	Animation::SampleContext sample_ctx;
+	sample_ctx.pose = &pose;
+	sample_ctx.time = anim_time;
+	sample_ctx.model = ctx.model;
+	sample_ctx.weight = weight;
+	sample_ctx.mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
+	anim->setRootMotionBone(ctx.root_bone_hash);
+	anim->getRelativePose(sample_ctx);
 }
 
 void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
@@ -483,8 +414,6 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 
 	Animation* anim = ctx.animations[m_slot];
 	if (anim && anim->isReady()) {
-		// TODO getBoneIndex is O(n)
-		
 		if ((m_flags & LOOPED) == 0) {
 			const u32 len = anim->getLength().raw();
 			t = Time(minimum(t.raw(), len));
@@ -492,13 +421,7 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 		}
 
 		emitEvents(prev_t, t, anim->getLength(), ctx);
-		const int translation_idx = anim->getTranslationCurveIndex(ctx.root_bone_hash);
-		const int rotation_idx = anim->getRotationCurveIndex(ctx.root_bone_hash);
-		if (rotation_idx >= 0 || translation_idx >= 0) {
-			const Time t1 = t % anim->getLength();
-			const Time t0 = prev_t % anim->getLength();
-			root_motion = getRootMotion(anim, t0, t1, translation_idx, rotation_idx);
-		}
+		root_motion = getRootMotion(ctx, anim, prev_t, t);
 	}
 	else {
 		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};

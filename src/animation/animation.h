@@ -49,6 +49,7 @@ struct BoneMask
 
 
 struct Animation final : Resource {
+	friend struct AnimationSampler;
 	static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
 	static const ResourceType TYPE;
 
@@ -70,7 +71,8 @@ struct Animation final : Resource {
 		XZ_ROOT_TRANSLATION = 1 << 1,
 		ROOT_ROTATION = 1 << 2,
 
-		ANY_ROOT_MOTION = Y_ROOT_TRANSLATION | XZ_ROOT_TRANSLATION | ROOT_ROTATION
+		ANY_ROOT_MOTION = Y_ROOT_TRANSLATION | XZ_ROOT_TRANSLATION | ROOT_ROTATION,
+		ANY_ROOT_TRANSLATION = Y_ROOT_TRANSLATION | XZ_ROOT_TRANSLATION
 	};
 
 	struct Header {
@@ -94,17 +96,24 @@ struct Animation final : Resource {
 		const Quat* rot;
 	};
 
+	struct SampleContext {
+		Pose* pose;
+		const Model* model;
+		Time time;
+		float weight = 1;
+		const BoneMask* mask = nullptr;
+	};
+
 	Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	ResourceType getType() const override { return TYPE; }
 	Vec3 getTranslation(Time time, u32 curve_idx) const;
 	Quat getRotation(Time time, u32 curve_idx) const;
-	int getTranslationCurveIndex(BoneNameHash name_hash) const;
-	int getRotationCurveIndex(BoneNameHash name_hash) const;
-	void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
-	void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
+	void getRelativePose(const SampleContext& ctx);
 	Time getLength() const { return m_length; }
 	const Array<TranslationCurve>& getTranslations() const { return m_translations; }
 	const Array<RotationCurve>& getRotations() const { return m_rotations; }
+	struct LocalRigidTransform getRootMotion(Time t) const;
+	void setRootMotionBone(BoneNameHash bone_name);
 
 	Flags m_flags = Flags::NONE;
 
@@ -116,6 +125,16 @@ private:
 	Time m_length;
 	Array<TranslationCurve> m_translations;
 	Array<RotationCurve> m_rotations;
+	
+	struct RootMotion {
+		RootMotion(IAllocator&);
+		Array<Vec3> pose_translations;
+		Array<Quat> pose_rotations;
+		Array<Vec3> translations;
+		Array<Quat> rotations;
+		BoneNameHash bone;
+	} m_root_motion;
+
 	Array<u8> m_mem;
 	u32 m_frame_count = 0;
 

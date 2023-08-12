@@ -507,7 +507,11 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!pose) return;
 
 		model->getRelativePose(*pose);
-		animable.animation->getRelativePose(animable.time, *pose, *model, nullptr);
+		Animation::SampleContext ctx;
+		ctx.pose = pose;
+		ctx.model = model;
+		ctx.time = animable.time;
+		animable.animation->getRelativePose(ctx);
 		pose->computeAbsolute(*model);
 
 		Time t = animable.time + Time::fromSeconds(time_delta);

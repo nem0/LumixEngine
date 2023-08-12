@@ -21,13 +21,41 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 	, m_mem(m_allocator)
 	, m_translations(m_allocator)
 	, m_rotations(m_allocator)
+	, m_root_motion(m_allocator)
 {
 }
 
 
 struct AnimationSampler {
+
+	static LUMIX_FORCE_INLINE LocalRigidTransform maskRootMotion(Animation::Flags flags, const LocalRigidTransform& transform) {
+		LocalRigidTransform root_motion;
+		root_motion.pos = Vec3::ZERO;
+		root_motion.rot = Quat::IDENTITY;
+	
+		if (flags & Animation::Y_ROOT_TRANSLATION) root_motion.pos.y = transform.pos.y;
+		if (flags & Animation::XZ_ROOT_TRANSLATION) {
+			root_motion.pos.x = transform.pos.x;
+			root_motion.pos.z = transform.pos.z;
+		}
+	
+		if (flags & Animation::ROOT_ROTATION) {
+			root_motion.rot.y = transform.rot.y;
+			root_motion.rot.w = transform.rot.w;
+			root_motion.rot = normalize(root_motion.rot);
+		}
+
+		return root_motion;
+	}
+
 	template <bool use_mask, bool use_weight>
-	static void getRelativePose(const Animation& anim, Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) {
+	static void getRelativePose(Animation& anim, const Animation::SampleContext& ctx) {
+		Pose& pose = *ctx.pose;
+		const Model& model = *ctx.model;
+		const Time time = ctx.time;
+		const BoneMask* mask = ctx.mask;
+		const float weight = ctx.weight;
+
 		ASSERT(!pose.is_absolute);
 		ASSERT(model.isReady());
 
@@ -46,6 +74,7 @@ struct AnimationSampler {
 			for (const Animation::TranslationCurve& curve : anim.m_translations) {
 				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
+
 				if constexpr(use_mask) {
 					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
 				}
@@ -137,21 +166,114 @@ struct AnimationSampler {
 	}
 }; // AnimationSampler
 
-void Animation::getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const {
-	if (mask) {
-		if (weight < 0.9999f) {
-			AnimationSampler::getRelativePose<true, true>(*this, time, pose, model, weight, mask);
+Animation::RootMotion::RootMotion(IAllocator& allocator)
+	: translations(allocator)
+	, rotations(allocator)
+	, pose_translations(allocator)
+	, pose_rotations(allocator)
+{}
+
+void Animation::setRootMotionBone(BoneNameHash bone_name) {
+	if (m_root_motion.bone == bone_name) return;
+	if ((m_flags & ANY_ROOT_MOTION) == 0) return;
+
+	ASSERT(m_root_motion.bone.getHashValue() == 0);
+	m_root_motion.bone = bone_name;
+
+	i32 translation_idx = -1;
+	for (i32 i = 0, c = m_translations.size(); i < c; ++i) {
+		if (m_translations[i].name == bone_name) {
+			translation_idx = i;
+			break;
+		}
+	}
+
+	i32 rotation_idx = -1;
+	for (i32 i = 0, c = m_rotations.size(); i < c; ++i) {
+		if (m_rotations[i].name == bone_name) {
+			rotation_idx = i;
+			break;
+		}
+	}
+	
+	m_root_motion.pose_translations.resize(m_frame_count);
+	m_root_motion.pose_rotations.resize(m_frame_count);
+
+	if (rotation_idx >= 0 && (m_flags & Animation::ROOT_ROTATION)) {
+		m_root_motion.rotations.resize(m_frame_count);
+	}
+
+	if (translation_idx >= 0 && (m_flags & Animation::ANY_ROOT_TRANSLATION)) {
+		m_root_motion.translations.resize(m_frame_count);
+	}
+
+	for (u32 i = 0; i < m_frame_count; ++i) {
+		LocalRigidTransform tmp = {Vec3(0), Quat::IDENTITY};
+		Time t = m_length * (i / float(m_frame_count - 1));
+		if (translation_idx >= 0) tmp.pos = getTranslation(t, translation_idx);
+		if (rotation_idx >= 0) tmp.rot = getRotation(t, rotation_idx);
+		LocalRigidTransform rm = AnimationSampler::maskRootMotion(m_flags, tmp);
+		if (!m_root_motion.translations.empty()) m_root_motion.translations[i] = rm.pos;
+		if (!m_root_motion.rotations.empty()) m_root_motion.rotations[i] = rm.rot;
+
+		LocalRigidTransform rm0;
+		rm0.pos = m_root_motion.translations.empty() ? Vec3(0) : m_root_motion.translations[0];
+		rm0.rot = m_root_motion.rotations.empty() ? Quat::IDENTITY : m_root_motion.rotations[0];
+
+		tmp = rm0 * rm.inverted() * tmp;
+
+		m_root_motion.pose_translations[i] = tmp.pos;
+		m_root_motion.pose_rotations[i] = tmp.rot;
+	}
+
+	m_translations[translation_idx].count = m_frame_count;
+	m_translations[translation_idx].times = nullptr;
+	m_translations[translation_idx].pos = m_root_motion.pose_translations.begin();
+	m_rotations[rotation_idx].count = m_frame_count;
+	m_rotations[rotation_idx].times = nullptr;
+	m_rotations[rotation_idx].rot = m_root_motion.pose_rotations.begin();
+}
+
+LocalRigidTransform Animation::getRootMotion(Time time) const {
+	LocalRigidTransform tr = {Vec3(0), Quat::IDENTITY};
+	
+	if (time < m_length) {
+		const u64 anim_t_highres = ((u64)time.raw() << 16) / (m_length.raw());
+		const u64 frame_48_16 = (m_frame_count - 1) * anim_t_highres;
+		ASSERT((frame_48_16 & 0xffFF00000000) == 0);
+		const u32 frame_idx = u32(frame_48_16 >> 16);
+		const float frame_t = (frame_48_16 & 0xffFF) / float(0xffFF);
+
+		if (!m_root_motion.rotations.empty()) {
+			tr.rot = nlerp(m_root_motion.rotations[frame_idx], m_root_motion.rotations[frame_idx + 1], frame_t);
+		}
+		if (!m_root_motion.translations.empty()) {
+			tr.pos = lerp(m_root_motion.translations[frame_idx], m_root_motion.translations[frame_idx + 1], frame_t);
+		}
+		return tr;
+	}
+	
+	if (!m_root_motion.rotations.empty()) tr.rot = m_root_motion.rotations[m_frame_count - 1];
+	if (!m_root_motion.translations.empty()) tr.pos = m_root_motion.translations[m_frame_count - 1];
+	return tr;
+}
+
+
+void Animation::getRelativePose(const SampleContext& ctx) {
+	if (ctx.mask) {
+		if (ctx.weight < 0.9999f) {
+			AnimationSampler::getRelativePose<true, true>(*this, ctx);
 		}
 		else {
-			AnimationSampler::getRelativePose<true, false>(*this, time, pose, model, weight, mask);
+			AnimationSampler::getRelativePose<true, false>(*this, ctx);
 		}
 	}
 	else {
-		if (weight < 0.9999f) {
-			AnimationSampler::getRelativePose<false, true>(*this, time, pose, model, weight, mask);
+		if (ctx.weight < 0.9999f) {
+			AnimationSampler::getRelativePose<false, true>(*this, ctx);
 		}
 		else {
-			AnimationSampler::getRelativePose<false, false>(*this, time, pose, model, weight, mask);
+			AnimationSampler::getRelativePose<false, false>(*this, ctx);
 		}
 	}
 }
@@ -185,20 +307,6 @@ Vec3 Animation::getTranslation(Time time, u32 curve_idx) const
 	return curve.pos[curve.count - 1];
 }
 
-int Animation::getTranslationCurveIndex(BoneNameHash name_hash) const {
-	for (int i = 0, c = m_translations.size(); i < c; ++i) {
-		if (m_translations[i].name == name_hash) return i;
-	}
-	return -1;
-}
-
-int Animation::getRotationCurveIndex(BoneNameHash name_hash) const {
-	for (int i = 0, c = m_rotations.size(); i < c; ++i) {
-		if (m_rotations[i].name == name_hash) return i;
-	}
-	return -1;
-}
-
 Quat Animation::getRotation(Time time, u32 curve_idx) const
 {
 	const RotationCurve& curve = m_rotations[curve_idx];
@@ -226,15 +334,6 @@ Quat Animation::getRotation(Time time, u32 curve_idx) const
 	}
 
 	return curve.rot[curve.count - 1];
-}
-
-void Animation::getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const {
-	if(mask) {
-		AnimationSampler::getRelativePose<true, false>(*this, time, pose, model, 1, mask);
-	}
-	else {
-		AnimationSampler::getRelativePose<false, false>(*this, time, pose, model, 1, mask);
-	}
 }
 
 bool Animation::load(Span<const u8> mem) {
