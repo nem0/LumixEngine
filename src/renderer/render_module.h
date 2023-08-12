@@ -319,6 +319,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addDebugLine(const DVec3& from, const DVec3& to, Color color) = 0; 
 	virtual DebugLine* addDebugLines(int count) = 0;
 	virtual void addDebugCross(const DVec3& center, float size, Color color) = 0;
+	virtual void addDebugBone(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, Color color) = 0;
 	virtual void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, Color color) = 0;
 	virtual void addDebugCube(const DVec3& from, const DVec3& max, Color color) = 0;
 	virtual void addDebugCubeSolid(const DVec3& from, const DVec3& max, Color color) = 0;

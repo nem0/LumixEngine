@@ -58,7 +58,15 @@ WorldViewer::WorldViewer(StudioApp& app)
 	m_pipeline->setWorld(m_world);
 }
 
-void WorldViewer::drawSkeleton() {
+void WorldViewer::drawMeshTransform() {
+	auto* render_module = (RenderModule*)m_world->getModule("renderer");
+	Transform tr = m_world->getTransform(*m_mesh);
+	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(1, 0, 0)), Color::RED);
+	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 1, 0)), Color::GREEN);
+	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 0, 1)), Color::BLUE);
+}
+
+void WorldViewer::drawSkeleton(BoneNameHash selected_bone) {
 	auto* render_module = (RenderModule*)m_world->getModule("renderer");
 	Pose* pose = render_module->lockPose(*m_mesh);
 	Model* model = render_module->getModelInstanceModel(*m_mesh);
@@ -66,20 +74,24 @@ void WorldViewer::drawSkeleton() {
 		Transform tr = m_world->getTransform(*m_mesh);
 		ASSERT(pose->is_absolute);
 		for (u32 i = 0, c = model->getBoneCount(); i < c; ++i) {
-			const i32 parent_idx = model->getBone(i).parent_idx;
+			const Model::Bone& bone = model->getBone(i);
+			const i32 parent_idx = bone.parent_idx;
 			if (parent_idx < 0) continue;
 
-			
+			Color color = Color::BLUE;
+			if (selected_bone == BoneNameHash(bone.name.c_str())) {
+				color = Color::RED;
+			}
+
 			Vec3 bone_dir = pose->positions[i] - pose->positions[parent_idx];
 			const float bone_len = length(bone_dir);
-			const Quat r = Quat::vec3ToVec3(pose->rotations[i].rotate(Vec3(1, 0, 0)), normalize(bone_dir));
-			//line(pose->positions[i], pose->positions[parent_idx]);
+			const Quat r = pose->rotations[parent_idx];
 
-			Vec3 up = r.rotate(Vec3(0, 0.1f * bone_len, 0));
-			Vec3 right = r.rotate(Vec3(0, 0, 0.1f * bone_len));
+			Vec3 up = r.rotate(Vec3(0, 0, 0.06f * bone_len));
+			Vec3 right = r.rotate(Vec3(0.12f * bone_len, 0, 0));
 
-			DVec3 a = tr.transform(pose->positions[i] - bone_dir * 0.5f);
-			render_module->addDebugCube(a, tr.rot.rotate(bone_dir * 0.5f), tr.rot.rotate(up), tr.rot.rotate(right), Color::RED);
+			DVec3 a = tr.transform(pose->positions[parent_idx]);
+			render_module->addDebugBone(a, tr.rot.rotate(bone_dir), tr.rot.rotate(up), tr.rot.rotate(right), color);
 		}
 		render_module->unlockPose(*m_mesh, false);
 	}
@@ -108,11 +120,6 @@ void WorldViewer::resetCamera(const Model& model) {
 void WorldViewer::gui() {
 	auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
 	ASSERT(render_module);
-
-	Transform tr = m_world->getTransform(*m_mesh);
-	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(1, 0, 0)), Color::RED);
-	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 1, 0)), Color::GREEN);
-	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 0, 1)), Color::BLUE);
 
 	ImVec2 image_size = ImGui::GetContentRegionAvail();
 	image_size.y = maximum(200.f, image_size.y);

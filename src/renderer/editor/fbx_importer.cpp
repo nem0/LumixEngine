@@ -342,6 +342,18 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& module)
 		if (!anim_layer || !anim_layer->getCurveNode(0)) {
 			m_animations.pop();
 		}
+
+		bool data_found = false;
+		for (int k = 0; anim_layer->getCurveNode(k); ++k) {
+			const ofbx::AnimationCurveNode* node = anim_layer->getCurveNode(k);
+			if (node->getBoneLinkProperty() == "Lcl Translation"
+				|| node->getBoneLinkProperty() == "Lcl Rotation")
+			{
+				data_found = true;
+				break;
+			}
+		}
+		if (!data_found) m_animations.pop();
 	}
 
 	if (m_animations.size() == 1) {

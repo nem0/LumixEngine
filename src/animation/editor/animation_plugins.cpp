@@ -95,18 +95,35 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				for (const Animation::TranslationCurve& curve : translations) {
 					auto iter = m_model->getBoneIndex(curve.name);
 					if (!iter.isValid()) continue;
+
 					const Model::Bone& bone = m_model->getBone(iter.value());
-					if (ImGui::TreeNode(bone.name.c_str())) {
+					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
+					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+					bool open = ImGui::TreeNodeEx(bone.name.c_str(), flags);
+					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+						m_selected_bone = curve.name;
+					}
+					if (open) {
+						ImGui::Columns(4);
 						for (u32 i = 0; i < curve.count; ++i) {
 							const Vec3 p = curve.pos[i];
 							if (curve.times) {
 								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
-								ImGui::Text("%.2f s: %f %f %f", t, p.x, p.y, p.z);
+								ImGui::Text("%.2f s", t);
 							}
 							else {
-								ImGui::Text("frame %d s: %f %f %f", i, p.x, p.y, p.z);
+								ImGui::Text("frame %d", i);
 							}
+							ImGui::NextColumn();
+							ImGui::Text("%f", p.x);
+							ImGui::NextColumn();
+							ImGui::Text("%f", p.y);
+							ImGui::NextColumn();
+							ImGui::Text("%f", p.z);
+							ImGui::NextColumn();
+
 						}
+						ImGui::Columns();
 						ImGui::TreePop();
 					}
 				}
@@ -117,18 +134,35 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				for (const Animation::RotationCurve& curve : rotations) {
 					auto iter = m_model->getBoneIndex(curve.name);
 					if (!iter.isValid()) continue;
+
 					const Model::Bone& bone = m_model->getBone(iter.value());
-					if (ImGui::TreeNode(bone.name.c_str())) {
+					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
+					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+
+					bool open = ImGui::TreeNodeEx(bone.name.c_str(), flags);
+					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+						m_selected_bone = curve.name;
+					}
+					if (open) {
+						ImGui::Columns(4);
 						for (u32 i = 0; i < curve.count; ++i) {
-							const Quat r = curve.rot[i];
+							const Vec3 r = radiansToDegrees(curve.rot[i].toEuler());
 							if (curve.times) {
 								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
-								ImGui::Text("%.2f s: %f %f %f %f", t, r.x, r.y, r.z, r.w);
+								ImGui::Text("%.2f s", t);
 							}
 							else {
-								ImGui::Text("frame %d s: %f %f %f %f", i, r.x, r.y, r.z, r.w);
+								ImGui::Text("frame %d", i);
 							}
+							ImGui::NextColumn();
+							ImGui::Text("%f", r.x);
+							ImGui::NextColumn();
+							ImGui::Text("%f", r.y);
+							ImGui::NextColumn();
+							ImGui::Text("%f", r.z);
+							ImGui::NextColumn();
 						}
+						ImGui::Columns();
 						ImGui::TreePop();
 					}
 				}
@@ -169,7 +203,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			
 			ImGuiEx::Label("Show skeleton");
 			ImGui::Checkbox("##ss", &m_show_skeleton);
-			if (m_show_skeleton) m_viewer.drawSkeleton();
+			if (m_show_skeleton) m_viewer.drawSkeleton(m_selected_bone);
 			
 			ImGuiEx::Label("Playback speed");
 			ImGui::DragFloat("##spd", &m_playback_speed, 0.01f, 0, FLT_MAX);
@@ -202,6 +236,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		bool m_play = true;
 		float m_playback_speed = 1.f;
 		WorldViewer m_viewer;
+		BoneNameHash m_selected_bone;
 	};
 	
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)

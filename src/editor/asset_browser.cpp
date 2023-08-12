@@ -967,8 +967,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300))) {
 			static FilePathHash selected_path_hash;
-			if (popup_opened) ImGui::SetKeyboardFocusHere();
-			if (resourceList(path, selected_path_hash, type, true, true)) {
+			if (resourceList(path, selected_path_hash, type, true, true, popup_opened, -1)) {
 				ImGui::EndPopup();
 				ImGui::PopID();
 				return true;
@@ -1037,9 +1036,9 @@ struct AssetBrowserImpl : AssetBrowser {
 		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
-	bool resourceList(Path& path, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit) override {
+	bool resourceList(Path& path, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit, bool focus, float width) override {
 		static char filter[128] = "";
-		ImGuiEx::filter("Filter", filter, sizeof(filter), 200);
+		ImGuiEx::filter("Filter", filter, sizeof(filter), width, focus);
 		
 		ImGui::BeginChild("Resources", ImVec2(0, 200), false, ImGuiWindowFlags_HorizontalScrollbar);
 		AssetCompiler& compiler = m_app.getAssetCompiler();

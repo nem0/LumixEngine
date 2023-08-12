@@ -34,7 +34,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual void openInExternalEditor(struct StringView path) const = 0;
 	virtual void locate(const Resource& resource) = 0;
 	virtual void locate(const Path& resource) = 0;
-	virtual bool resourceList(Path& path, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false) = 0;
+	virtual bool resourceList(Path& path, FilePathHash& selected_idx, ResourceType type, bool can_create_new, bool enter_submit = false, bool focus = false, float width = 200) = 0;
 	virtual void tile(const Path& path, bool selected) = 0;
 	virtual void saveResource(const Path& path, Span<const u8> data) = 0;
 	virtual void saveResource(Resource& resource, Span<const u8> data) = 0;

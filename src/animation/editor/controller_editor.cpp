@@ -796,19 +796,21 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
 						Node* dropped_node = *(Node**)payload->Data;
 						ASSERT(dropped_node->m_parent);
-						OutputMemoryStream blob(m_app.getAllocator());
-						dropped_node->serialize(blob);
 						Node* new_node = createChild(node, dropped_node->type(), m_controller.m_allocator);
-						InputMemoryStream iblob(blob);
-						new_node->deserialize(iblob, m_controller, (u32)ControllerVersion::LATEST);
-						copyChildData(*dropped_node, *new_node);
-						if (m_current_node == dropped_node) m_current_node = nullptr;
-						deleteNode(*dropped_node);
-						ImGui::TreePop();
-						ImGui::PopID();
-						if (!is_selectable) ImGui::PopStyleColor();
-						pushUndo();
-						return;
+						if (new_node) {
+							OutputMemoryStream blob(m_app.getAllocator());
+							dropped_node->serialize(blob);
+							InputMemoryStream iblob(blob);
+							new_node->deserialize(iblob, m_controller, (u32)ControllerVersion::LATEST);
+							copyChildData(*dropped_node, *new_node);
+							if (m_current_node == dropped_node) m_current_node = nullptr;
+							deleteNode(*dropped_node);
+							ImGui::TreePop();
+							ImGui::PopID();
+							if (!is_selectable) ImGui::PopStyleColor();
+							pushUndo();
+							return;
+						}
 					}
 				}
 			}
@@ -953,7 +955,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void previewUI() { 
-			if (!ImGui::CollapsingHeader("Preview") || !ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
+			bool open = m_preview_on_right || ImGui::CollapsingHeader("Preview", nullptr, ImGuiTreeNodeFlags_AllowOverlap);
+			if (!m_preview_on_right) ImGui::SameLine(0, 25);
+			if (ImGuiEx::IconButton(m_preview_on_right ? ICON_FA_ARROW_LEFT : ICON_FA_ARROW_RIGHT, m_preview_on_right ? "Move to left" : "Move to right")) m_preview_on_right = !m_preview_on_right;
+			if (!open) return;
+
+			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
+
 			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
@@ -986,7 +994,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 			ImGuiEx::Label("Show skeleton"); 
 			ImGui::Checkbox("##ss", &m_show_skeleton);
-			if (m_show_skeleton) m_viewer.drawSkeleton();
+			if (m_show_skeleton) m_viewer.drawSkeleton(BoneNameHash());
+			m_viewer.drawMeshTransform();
 			ImGuiEx::Label("Focus mesh"); 
 			ImGui::Checkbox("##fm", &m_viewer.m_focus_mesh);
 			ImGuiEx::Label("Playback speed"); 
@@ -998,6 +1007,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				InputMemoryStream tmp(blob);
 				ctrl->clear();
 				ctrl->deserialize(tmp);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset")) {
+				m_viewer.m_world->setTransform(*m_viewer.m_mesh, DVec3(0), Quat::IDENTITY, Vec3(1));
 			}
 			if (m_playback_speed == 0) {
 				ImGui::SameLine();
@@ -1531,6 +1544,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::Unindent();
 			}
 
+			bool begin_table = false;
+			if (m_preview_on_right) {
+				begin_table = ImGui::BeginTable("tbl", 2, ImGuiTableFlags_Resizable);
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+			}
+
 			if (m_controller.m_root) hierarchy_ui(*m_controller.m_root);
 
 			if (m_current_node && ImGui::CollapsingHeader("Selected node")) {
@@ -1581,7 +1601,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 
 			debuggerUI();
+			if (m_preview_on_right) ImGui::TableNextColumn();
 			previewUI();
+			if (begin_table) ImGui::EndTable();
 		}
 
 		const Path& getPath() override { return m_path; }
@@ -1615,6 +1637,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		Model* m_model = nullptr;
 		Path m_path;
 		bool m_was_preview_ready = false;
+		bool m_preview_on_right = false;
 		float m_playback_speed = 1.f;
 		bool m_show_skeleton = true;
 		ControllerDebugMapping m_controller_debug_mapping;

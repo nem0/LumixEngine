@@ -2315,6 +2315,23 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
+	void addDebugBone(const DVec3& pos,
+		const Vec3& dir,
+		const Vec3& up,
+		const Vec3& right,
+		Color color) override
+	{
+		addDebugLine(pos + up + right, pos + up - right, color);
+		addDebugLine(pos + up + right, pos - up + right, color);
+		addDebugLine(pos - up - right, pos + up - right, color);
+		addDebugLine(pos - up - right, pos - up + right, color);
+
+		addDebugLine(pos + up + right, pos + dir, color);
+		addDebugLine(pos + up - right, pos + dir, color);
+		addDebugLine(pos - up + right, pos + dir, color);
+		addDebugLine(pos - up - right, pos + dir, color);
+	}
+
 	void addDebugCube(const DVec3& pos,
 		const Vec3& dir,
 		const Vec3& up,
