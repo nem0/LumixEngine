@@ -81,7 +81,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				render_module->setModelInstancePath(*m_viewer.m_mesh, m_model ? m_model->getPath() : Path());
 			}
 
-			if (!m_model->isReady()) return;
+			if (!m_model || !m_model->isReady()) return;
 
 			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
 			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
