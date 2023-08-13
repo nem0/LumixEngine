@@ -502,6 +502,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			createTile(fi, path.c_str());
 		}
 	}
+	
+	Span<const Path> getSelectedResources() override {
+		return m_selected_resources;
+	}
 
 	void fileColumn() {
 		ImGui::BeginChild("main_col");
@@ -512,27 +516,37 @@ struct AssetBrowserImpl : AssetBrowser {
 		int tile_count = m_file_infos.size();
 		int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
 	
-		auto callbacks = [this](FileInfo& tile, int idx) {
+		auto callbacks = [this](FileInfo& tile, int idx, bool is_selected) {
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.c_str());
 			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 			{
-				ImGuiEx::TextUnformatted(tile.filepath);
-				ImGui::SetDragDropPayload("path", tile.filepath.c_str(), tile.filepath.length() + 1, ImGuiCond_Once);
-				ImGui::EndDragDropSource();
+				if (m_selected_resources.size() > 1 && is_selected) {
+					ImGui::Text("%d files", m_selected_resources.size());
+					ImGui::SetDragDropPayload("asset_browser_selection", nullptr, 0, ImGuiCond_Once);
+					ImGui::EndDragDropSource();
+				}
+				else {
+					ImGuiEx::TextUnformatted(tile.filepath);
+					ImGui::SetDragDropPayload("path", tile.filepath.c_str(), tile.filepath.length() + 1, ImGuiCond_Once);
+					ImGui::EndDragDropSource();
+				}
 			}
-			else if (ImGui::IsItemHovered())
-			{
+			else if (ImGui::IsItemHovered()){
 				if (ImGui::IsMouseDoubleClicked(0)) {
-					Path path(tile.filepath);
-					openEditor(path);
+					openEditor(tile.filepath);
 				}
 				else if (ImGui::IsMouseReleased(0)) {
-					const bool additive = os::isKeyDown(os::Keycode::CTRL);
-					selectResource(Path(tile.filepath), additive);
+					if (os::isKeyDown(os::Keycode::SHIFT) && !m_selected_resources.empty()) {
+						selectRange(m_selected_resources.back(), tile.filepath);
+					}
+					else {
+						const bool additive = os::isKeyDown(os::Keycode::CTRL);
+						selectResource(tile.filepath, additive);
+					}
 				}
 				else if(ImGui::IsMouseReleased(1)) {
 					if (m_selected_resources.indexOf(tile.filepath) < 0) m_selected_resources.clear();
-					if (m_selected_resources.empty()) selectResource(Path(tile.filepath), false);
+					if (m_selected_resources.empty()) selectResource(tile.filepath, false);
 					ImGui::OpenPopup("item_ctx");
 				}
 			}
@@ -557,7 +571,7 @@ struct AssetBrowserImpl : AssetBrowser {
 						FileInfo& tile = m_file_infos[idx];
 						bool selected = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
 						thumbnail(tile, m_thumbnail_size * TILE_SIZE, selected);
-						callbacks(tile, idx);
+						callbacks(tile, idx, selected);
 					}
 				}
 				else
@@ -565,7 +579,7 @@ struct AssetBrowserImpl : AssetBrowser {
 					FileInfo& tile = m_file_infos[j];
 					bool b = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
 					ImGui::Selectable(tile.filepath.c_str(), b);
-					callbacks(tile, j);
+					callbacks(tile, j, b);
 				}
 			}
 		}
@@ -878,6 +892,25 @@ struct AssetBrowserImpl : AssetBrowser {
 		memcpy(&key, ext.begin, ext.size());
 		auto iter = m_plugin_map.find(key);
 		if (iter.isValid()) iter.value()->openEditor(path);
+	}
+
+	void selectRange(const Path& from, const Path& to) {
+		m_selected_resources.clear();
+		for (u32 i = 0, c = m_file_infos.size(); i < c; ++i) {
+			if (m_file_infos[i].filepath == from) {
+				for (u32 j = i, cj = m_file_infos.size(); j < cj; ++j) {
+					m_selected_resources.push(m_file_infos[j].filepath);
+					if (m_file_infos[j].filepath == to) return;
+				}
+			}
+			
+			if (m_file_infos[i].filepath == to) {
+				for (u32 j = i, cj = m_file_infos.size(); j < cj; ++j) {
+					m_selected_resources.push(m_file_infos[j].filepath);
+					if (m_file_infos[j].filepath == from) return;
+				}
+			}
+		}
 	}
 
 	void selectResource(const Path& path, bool additive) {

@@ -66,6 +66,13 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		}
 
 		void windowGUI() override {
+			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Go to parent")) {
+					m_app.getAssetBrowser().openEditor(Path(Path::getResource(m_resource->getPath())));
+				}
+				ImGui::EndMenuBar();
+			}
+
 			if (m_resource->isEmpty()) {
 				ImGui::TextUnformatted("Loading...");
 				return;

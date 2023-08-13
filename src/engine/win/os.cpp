@@ -816,11 +816,8 @@ Point getMouseScreenPos()
 	POINT p;
 	static POINT last_p = {};
 	const BOOL b = GetCursorPos(&p);
-	// under some unknown (permission denied...) rare circumstances GetCursorPos fails, we returns last known position
-	if (!b) {
-		ASSERT(false);
-		p = last_p;
-	}
+	// GetCursorPos fails after computer wakes up and the app is running, we return last known position
+	if (!b) p = last_p;
 	last_p = p;
 	return {p.x, p.y};
 }

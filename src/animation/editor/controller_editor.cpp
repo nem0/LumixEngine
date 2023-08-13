@@ -965,6 +965,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
+			
 			debuggerUI(*m_viewer.m_world, *m_viewer.m_mesh);
 
 			ImGui::Separator();
@@ -1377,7 +1378,26 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 
 			if (ImGui::BeginDragDropTarget()) {
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("path")) {
+				auto* payload = ImGui::AcceptDragDropPayload(nullptr);
+				if (payload && payload->IsDataType("asset_browser_selection")) {
+					Span<const Path> selection = m_app.getAssetBrowser().getSelectedResources();
+					bool any = false;
+					for (const Path& path : selection) {
+						StringView subres = Path::getSubresource(path);
+						if (Path::hasExtension(subres, "ani")) {
+							Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
+							ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
+							entry.animation = res_manager.load<Animation>(Path(path));
+							entry.set = 0;
+							entry.slot = m_controller.m_animation_slots.size();
+	
+							m_controller.m_animation_slots.emplace(Path::getBasename(path), m_controller.m_allocator);
+							any = true;	
+						}
+					}
+					if (any) pushUndo();
+				}
+				else if (payload && payload->IsDataType("path")) {
 					const char* path = (const char*)payload->Data;
 					StringView subres = Path::getSubresource(path);
 					if (Path::hasExtension(subres, "ani")) {
@@ -1529,6 +1549,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
 				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo")) undo();
 				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo")) redo();
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
 				ImGui::EndMenuBar();
 			}
 
@@ -1551,57 +1572,62 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::TableNextColumn();
 			}
 
-			if (m_controller.m_root) hierarchy_ui(*m_controller.m_root);
+			if (!m_preview_on_right || ImGui::BeginChild("leftc")) {
+				if (m_controller.m_root) hierarchy_ui(*m_controller.m_root);
 
-			if (m_current_node && ImGui::CollapsingHeader("Selected node")) {
-				ui_dispatch(*m_current_node);
-			}
-
-			if (ImGui::CollapsingHeader("Controller")) {
-				ImGuiEx::Label("Root motion bone");
-				saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
-				bool xz_root_motion = m_controller.m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
-				ImGuiEx::Label("XZ root motion");
-				if (ImGui::Checkbox("##xzrm", &xz_root_motion)) {
-					m_controller.m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
-					saveUndo(true);
+				if (m_current_node && ImGui::CollapsingHeader("Selected node")) {
+					ui_dispatch(*m_current_node);
 				}
 
-				if (ImGui::BeginTabBar("ctb")) {
-					if (ImGui::BeginTabItem("Inputs")) {
-						inputsGUI();
+				if (ImGui::CollapsingHeader("Controller")) {
+					ImGuiEx::Label("Root motion bone");
+					saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
+					bool xz_root_motion = m_controller.m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
+					ImGuiEx::Label("XZ root motion");
+					if (ImGui::Checkbox("##xzrm", &xz_root_motion)) {
+						m_controller.m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
+						saveUndo(true);
+					}
+
+					if (ImGui::BeginTabBar("ctb")) {
+						if (ImGui::BeginTabItem("Inputs")) {
+							inputsGUI();
+							ImGui::EndTabItem();
+						}
+
+						if (ImGui::BeginTabItem("Bone masks")) {
+							boneMasksGUI();
+							ImGui::EndTabItem();
+						}
+
+						if (ImGui::BeginTabItem("IK")) {
+							IKGUI();
+							ImGui::EndTabItem();
+						}
+
+						ImGui::EndTabBar();
+					}
+				}
+
+				if (ImGui::CollapsingHeader("Animations") && ImGui::BeginTabBar("tb")) {
+					if (ImGui::BeginTabItem("Slots")) {
+						slotsGUI();
 						ImGui::EndTabItem();
 					}
 
-					if (ImGui::BeginTabItem("Bone masks")) {
-						boneMasksGUI();
+					if (ImGui::BeginTabItem("Sets")) {
+						setsGUI();
 						ImGui::EndTabItem();
 					}
-
-					if (ImGui::BeginTabItem("IK")) {
-						IKGUI();
-						ImGui::EndTabItem();
-					}
-
 					ImGui::EndTabBar();
 				}
+
+				debuggerUI();
 			}
-
-			if (ImGui::CollapsingHeader("Animations") && ImGui::BeginTabBar("tb")) {
-				if (ImGui::BeginTabItem("Slots")) {
-					slotsGUI();
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Sets")) {
-					setsGUI();
-					ImGui::EndTabItem();
-				}
-				ImGui::EndTabBar();
+			if (m_preview_on_right) {
+				ImGui::EndChild();
+				ImGui::TableNextColumn();
 			}
-
-			debuggerUI();
-			if (m_preview_on_right) ImGui::TableNextColumn();
 			previewUI();
 			if (begin_table) ImGui::EndTable();
 		}

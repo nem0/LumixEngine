@@ -2299,17 +2299,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::EndTable();
 			}
 
+			if (ImGui::Button(ICON_FA_PLUS " Add clip")) {
+				m_meta.clips.emplace();
+				saveUndo(true);
+			}
+
 			ImGuiEx::Label("Root rotation");
 			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
 			ImGuiEx::Label("XZ root translation");
 			saveUndo(ImGui::CheckboxFlags("##rmxz", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::XZ_ROOT_TRANSLATION));
 			ImGuiEx::Label("Y root translation");
 			saveUndo(ImGui::CheckboxFlags("##rmy", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::Y_ROOT_TRANSLATION));
-
-			if (ImGui::Button(ICON_FA_PLUS " Add clip")) {
-				m_meta.clips.emplace();
-				saveUndo(true);
-			}
 		}
 
 		void infoGUI() {
