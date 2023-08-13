@@ -616,13 +616,6 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::EndMenu();
 			}
 
-			if (ImGui::MenuItem("Select all")) {
-				m_selected_resources.clear();
-				m_selected_resources.reserve(m_file_infos.size());
-				for (const FileInfo& fi : m_file_infos) {
-					selectResource(Path(fi.filepath), true);
-				}
-			}
 			if (ImGui::MenuItem("Recreate tiles")) {
 				recreateTiles();
 			}

@@ -1520,7 +1520,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PushID(&input);
 				if(ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
 					inputs.removeInput(int(&input - inputs.inputs));
-					// TODO update input references in nodes
 					pushUndo();
 				}
 				ImGui::SameLine();

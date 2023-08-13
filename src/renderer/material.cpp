@@ -173,7 +173,7 @@ void Material::serialize(OutputMemoryStream& blob) {
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
 			StringView texture_path = m_textures[i]->getPath();
 			if (startsWith(texture_path, mat_dir)) {
-				shader_path.removePrefix(mat_dir.size());
+				texture_path.removePrefix(mat_dir.size());
 				blob << "texture \"" << texture_path << "\"\n";
 			}
 			else {

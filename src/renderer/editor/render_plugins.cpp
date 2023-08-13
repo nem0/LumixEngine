@@ -2465,6 +2465,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			if (ImGui::Checkbox("Wireframe", &m_wireframe)) enableWireframe(*m_resource, m_wireframe);
 			ImGui::SameLine();
+			ImGui::Checkbox("Show skeleton", &m_show_skeleton);
+			ImGui::SameLine();
 			if (ImGui::Button("Save preview")) {
 				m_resource->incRefCount();
 				m_plugin.renderTile(m_resource, &m_viewer.m_viewport);
@@ -2487,6 +2489,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 
 			m_viewer.gui();
+			if (m_show_skeleton) m_viewer.drawSkeleton(BoneNameHash());
 		}
 	
 		const Path& getPath() override { return m_resource->getPath(); }
@@ -2502,6 +2505,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		bool m_init = false;
 		i32 m_preview_lod = 0;
 		bool m_has_meshes = true;
+		bool m_show_skeleton = true;
 		FileSystem::AsyncHandle m_fbx_async_handle = FileSystem::AsyncHandle::invalid();
 	};
 
