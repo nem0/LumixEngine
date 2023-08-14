@@ -252,7 +252,7 @@ const char* findInsensitive(StringView haystack, StringView needle) {
 	ASSERT(!needle.empty());
 	if (needle.size() > haystack.size()) return nullptr;
 
-	const char* search_end = haystack.end - needle.size();
+	const char* search_end = haystack.end - needle.size() + 1;
 	const char needle0 = makeLowercase(needle[0]);
 
 	const char* c = haystack.begin;
