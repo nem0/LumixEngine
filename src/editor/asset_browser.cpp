@@ -643,32 +643,38 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 			}
 		};
+
 		if (ImGui::BeginPopup("item_ctx")) {
-			if (m_selected_resources.size() > 1) {
-				ImGui::Text("%d files selected", m_selected_resources.size());
+			if (m_selected_resources.empty()) {
+				ImGui::CloseCurrentPopup();
 			}
 			else {
-				ImGuiEx::TextUnformatted(Path::getBasename(m_selected_resources[0]));
-				ImGui::Separator();
-				if (ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
-					openInExternalEditor(m_selected_resources[0]);
+				if (m_selected_resources.size() > 1) {
+					ImGui::Text("%d files selected", m_selected_resources.size());
 				}
-				if (ImGui::BeginMenu("Rename")) {
-					ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
-					if (ImGui::Button("Rename", ImVec2(100, 0))) {
-						PathInfo fi(m_selected_resources[0]);
-						const Path new_path(fi.dir, tmp, ".", fi.extension);
-						if (!fs.moveFile(m_selected_resources[0], new_path)) {
-							logError("Failed to rename ", m_selected_resources[0], " to ", new_path);
-						}
-						ImGui::CloseCurrentPopup();
+				else {
+					ImGuiEx::TextUnformatted(Path::getBasename(m_selected_resources[0]));
+					ImGui::Separator();
+					if (ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
+						openInExternalEditor(m_selected_resources[0]);
 					}
-					ImGui::EndMenu();
+					if (ImGui::BeginMenu("Rename")) {
+						ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
+						if (ImGui::Button("Rename", ImVec2(100, 0))) {
+							PathInfo fi(m_selected_resources[0]);
+							const Path new_path(fi.dir, tmp, ".", fi.extension);
+							if (!fs.moveFile(m_selected_resources[0], new_path)) {
+								logError("Failed to rename ", m_selected_resources[0], " to ", new_path);
+							}
+							ImGui::CloseCurrentPopup();
+						}
+						ImGui::EndMenu();
+					}
 				}
+				open_delete_popup = ImGui::MenuItem("Delete");
+				ImGui::Separator();
+				common_popup();
 			}
-			open_delete_popup = ImGui::MenuItem("Delete");
-			ImGui::Separator();
-			common_popup();
 			ImGui::EndPopup();
 		}
 		else if (ImGui::BeginPopupContextWindow("context")) {

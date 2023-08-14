@@ -924,7 +924,6 @@ FileIterator* createFileIterator(StringView path, IAllocator& allocator)
 	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(wtmp, &iter->ffd);
-	DEBUG_CHECK(iter->handle);
 	iter->is_valid = iter->handle != INVALID_HANDLE_VALUE;
 	return iter;
 }
@@ -932,7 +931,9 @@ FileIterator* createFileIterator(StringView path, IAllocator& allocator)
 
 void destroyFileIterator(FileIterator* iterator)
 {
-	DEBUG_CHECK(FindClose(iterator->handle));
+	if (iterator->is_valid) {
+		DEBUG_CHECK(FindClose(iterator->handle));
+	}
 	LUMIX_DELETE(*iterator->allocator, iterator);
 }
 
