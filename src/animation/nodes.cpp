@@ -6,7 +6,7 @@
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "engine/crt.h"
-
+#include "engine/stack_array.h"
 
 namespace Lumix::anim {
 
@@ -64,16 +64,314 @@ void RuntimeContext::setInput(u32 input_idx, bool value) {
 	memcpy(&inputs[offset], &value, sizeof(value));
 }
 
-Blend1DNode::Blend1DNode(Node* parent, IAllocator& allocator)
-	: Node(parent, allocator) 
-	, m_children(allocator)
-{}
-
 static float getInputValue(const RuntimeContext& ctx, u32 idx) {
 	const InputDecl::Input& input = ctx.controller.m_inputs.inputs[idx];
 	ASSERT(input.type == InputDecl::FLOAT);
 	return *(float*)&ctx.inputs[input.offset];
 }
+
+struct Blend2DActiveTrio {
+	const Blend2DNode::Child* a;
+	const Blend2DNode::Child* b;
+	const Blend2DNode::Child* c;
+	float ta, tb, tc;
+};
+
+bool getBarycentric(const Vec2& p, const Vec2& a, const Vec2& b, const Vec2& c, Vec2& uv) {
+  const Vec2 ab = b - a, ac = c - a, ap = p - a;
+
+  float d00 = dot(ab, ab);
+  float d01 = dot(ab, ac);
+  float d11 = dot(ac, ac);
+  float d20 = dot(ap, ab);
+  float d21 = dot(ap, ac);
+  float denom = d00 * d11 - d01 * d01;
+
+  uv.x = (d11 * d20 - d01 * d21) / denom;
+  uv.y = (d00 * d21 - d01 * d20) / denom;  
+  return uv.x >= 0.f && uv.y >= 0.f && uv.x + uv.y <= 1.f;
+}
+
+static Blend2DActiveTrio getActiveTrio(const Blend2DNode& node, Vec2 input_val) {
+	const Blend2DNode::Child* children = node.m_children.begin();
+	Vec2 uv;
+	for (const Blend2DNode::Triangle& t : node.m_triangles) {
+		if (!getBarycentric(input_val, children[t.a].value, children[t.b].value, children[t.c].value, uv)) continue;
+		
+		Blend2DActiveTrio res;
+		res.a = &node.m_children[t.a];
+		res.b = &node.m_children[t.b];
+		res.c = &node.m_children[t.c];
+		res.ta = 1 - uv.x - uv.y;
+		res.tb = uv.x;
+		res.tc = uv.y;
+		return res;
+	}
+
+	Blend2DActiveTrio res;
+	res.a = node.m_children.begin();
+	res.b = node.m_children.begin();
+	res.c = node.m_children.begin();
+	res.ta = 1;
+	res.tb = res.tc = 0;
+	return res;
+}
+
+Blend2DNode::Blend2DNode(Node* parent, IAllocator& allocator)
+	: Node(parent, allocator) 
+	, m_children(allocator)
+	, m_triangles(allocator)
+{}
+
+void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+	float relt = ctx.input_runtime.read<float>();
+	const float relt0 = relt;
+	
+	if (m_children.size() > 2) {
+		Vec2 input_val;
+		input_val.x = getInputValue(ctx, m_x_input_index);
+		input_val.y = getInputValue(ctx, m_y_input_index);
+		const Blend2DActiveTrio trio = getActiveTrio(*this, input_val);
+		const Animation* anim_a = ctx.animations[trio.a->slot];
+		const Animation* anim_b = ctx.animations[trio.b->slot];
+		const Animation* anim_c = ctx.animations[trio.c->slot];
+		if (!anim_a || !anim_b || !anim_c || !anim_a->isReady() || !anim_b->isReady() || !anim_c->isReady()) {
+			ctx.data.write(relt);
+			return;
+		}
+	
+		const Time wlen = anim_a->getLength() * trio.ta + anim_b->getLength() * trio.tb + anim_c->getLength() * trio.tc;
+		relt += ctx.time_delta / wlen;
+		relt = fmodf(relt, 1);
+		
+		{
+			const Time len = anim_a->getLength();
+			const Time t0 = len * relt0;
+			const Time t = len * relt;
+			root_motion = getRootMotion(ctx, anim_a, t0, t);
+		}
+	
+		if (trio.tb > 0) {
+			const Time len = anim_b->getLength();
+			const Time t0 = len * relt0;
+			const Time t = len * relt;
+			const LocalRigidTransform tr1 = getRootMotion(ctx, anim_b, t0, t);
+			root_motion = root_motion.interpolate(tr1, trio.tb / (trio.ta + trio.tb));
+		}
+	
+		if (trio.tc > 0) {
+			const Time len = anim_c->getLength();
+			const Time t0 = len * relt0;
+			const Time t = len * relt;
+			const LocalRigidTransform tr1 = getRootMotion(ctx, anim_c, t0, t);
+			root_motion = root_motion.interpolate(tr1, trio.tc);
+		}
+	}
+
+	ctx.data.write(relt);
+}
+
+Time Blend2DNode::length(const RuntimeContext& ctx) const {
+	if (m_children.size() < 3) return Time(1);
+
+	Vec2 input_val;
+	input_val.x = getInputValue(ctx, m_x_input_index);
+	input_val.y = getInputValue(ctx, m_y_input_index);
+	const Blend2DActiveTrio trio = getActiveTrio(*this, input_val);
+
+	Animation* anim_a = ctx.animations[trio.a->slot];
+	Animation* anim_b = ctx.animations[trio.b->slot];
+	Animation* anim_c = ctx.animations[trio.c->slot];
+	if (!anim_a || !anim_a->isReady()) return Time::fromSeconds(1);
+	if (!anim_b || !anim_b->isReady()) return Time::fromSeconds(1);
+	if (!anim_c || !anim_c->isReady()) return Time::fromSeconds(1);
+	
+	return anim_a->getLength() * trio.ta + anim_b->getLength() * trio.tb + anim_c->getLength() * trio.tc;
+}
+
+void Blend2DNode::enter(RuntimeContext& ctx) const {
+	const float t = 0.f;
+	ctx.data.write(t);
+}
+
+void Blend2DNode::skip(RuntimeContext& ctx) const {
+	ctx.input_runtime.skip(sizeof(float));
+}
+
+static void getPose(const RuntimeContext& ctx, float rel_time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
+	Animation* anim = ctx.animations[slot];
+	if (!anim) return;
+	if (!ctx.model->isReady()) return;
+	if (!anim->isReady()) return;
+
+	Time time = anim->getLength() * rel_time;
+	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
+
+	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
+
+	Animation::SampleContext sample_ctx;
+	sample_ctx.pose = &pose;
+	sample_ctx.time = anim_time;
+	sample_ctx.model = ctx.model;
+	sample_ctx.weight = weight;
+	sample_ctx.mask = mask;
+	anim->setRootMotionBone(ctx.root_bone_hash);
+	anim->getRelativePose(sample_ctx);
+}
+
+static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
+	Animation* anim = ctx.animations[slot];
+	if (!anim) return;
+	if (!ctx.model->isReady()) return;
+	if (!anim->isReady()) return;
+
+	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
+
+	Animation::SampleContext sample_ctx;
+	sample_ctx.pose = &pose;
+	sample_ctx.time = anim_time;
+	sample_ctx.model = ctx.model;
+	sample_ctx.weight = weight;
+	sample_ctx.mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
+	anim->setRootMotionBone(ctx.root_bone_hash);
+	anim->getRelativePose(sample_ctx);
+}
+
+void Blend2DNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
+	const float t = ctx.input_runtime.read<float>();
+
+	if (m_children.empty()) return;
+	if (m_children.size() < 3) {
+		anim::getPose(ctx, t, weight, m_children[0].slot, pose, mask, true);
+		return;
+	}
+
+	Vec2 input_val;
+	input_val.x = getInputValue(ctx, m_x_input_index);
+	input_val.y = getInputValue(ctx, m_y_input_index);
+	const Blend2DActiveTrio trio = getActiveTrio(*this, input_val);
+	
+	anim::getPose(ctx, t, weight, trio.a->slot, pose, mask, true);
+	if (trio.tb > 0) anim::getPose(ctx, t, weight * trio.tb, trio.b->slot, pose, mask, true);
+	if (trio.tc > 0) anim::getPose(ctx, t, weight * trio.tc, trio.c->slot, pose, mask, true);
+}
+
+static Vec2 computeCircumcircleCenter(Vec2 a, Vec2 b, Vec2 c) {
+	Vec2 dab = b - a;
+	Vec2 dac = c - a;
+	Vec2 o = (dac * squaredLength(dab) - dab * squaredLength(dac)).ortho() / ((dab.x * dac.y - dab.y * dac.x) * 2.f);
+	return o + a;
+}
+
+// delaunay triangulation
+void Blend2DNode::dataChanged(IAllocator& allocator) {
+	m_triangles.clear();
+	if (m_children.size() < 3) return;
+
+	struct Edge {
+		u32 a, b;
+		bool valid = true;
+		bool operator ==(const Edge& rhs) {
+			return a == rhs.a && b == rhs.b || a == rhs.b && b == rhs.a;
+		}
+	};
+
+	StackArray<Edge, 8> edges(allocator);
+
+	auto pushTriangle = [&](u32 a, u32 b, u32 c){
+		Triangle& t = m_triangles.emplace();
+		t.a = a;
+		t.b = b;
+		t.c = c;
+		t.circumcircle_center = computeCircumcircleCenter(m_children[a].value, m_children[b].value, m_children[c].value);
+	};
+
+	Vec2 min = Vec2(FLT_MAX);
+	Vec2 max = Vec2(-FLT_MAX);
+	for (const Child& i : m_children) {
+		min = minimum(min, i.value);
+		max = maximum(max, i.value);
+	}
+	
+	{
+		// bounding triangle
+		Vec2 d = max - min;
+		float dmax = maximum(d.x, d.y);
+		Vec2 mid = (max + min) * 0.5f;
+		m_children.emplace().value = Vec2(mid.x - 20 * dmax, mid.y - dmax);
+		m_children.emplace().value = Vec2(mid.x, mid.y + 20 * dmax);
+		m_children.emplace().value = Vec2(mid.x + 20 * dmax, mid.y - dmax);
+		pushTriangle(m_children.size() - 1, m_children.size() - 2, 0);
+		pushTriangle(m_children.size() - 2, m_children.size() - 3, 0);
+		pushTriangle(m_children.size() - 3, m_children.size() - 1, 0);
+	}
+
+	for (u32 ch = 1, c = m_children.size() - 3; ch < c; ++ch) {
+		Vec2 p = m_children[ch].value;
+		edges.clear();
+
+		for (i32 ti = m_triangles.size() - 1; ti >= 0; --ti) {
+			const Triangle& t = m_triangles[ti];
+			Vec2 center = t.circumcircle_center;
+			if (squaredLength(p - center) > squaredLength(m_children[t.a].value - center)) continue;
+
+			edges.push({t.a, t.b});
+			edges.push({t.b, t.c});
+			edges.push({t.c, t.a});
+
+			m_triangles.swapAndPop(ti);
+		}
+
+		for (i32 i = edges.size() - 1; i > 0; --i) {
+			for (i32 j = i - 1; j >= 0; --j) {
+				if (edges[i] == edges[j]) {
+					edges[i].valid = false;
+					edges[j].valid = false;
+				}
+			}
+		}
+
+		edges.eraseItems([](const Edge& e){ return !e.valid; });
+
+		for (Edge& e : edges) {
+			pushTriangle(e.a, e.b, ch);
+		}
+	}
+
+	// pop bounding triangle's vertices and remove related triangles
+	m_children.pop();
+	m_children.pop();
+	m_children.pop();
+
+	m_triangles.eraseItems([&](const Triangle& t){
+		const u32 s = (u32)m_children.size();
+		return t.a >= s || t.b >= s || t.c >= s;
+	});
+}
+
+Time Blend2DNode::time(const RuntimeContext& ctx) const {
+	return length(ctx) * ctx.input_runtime.getAs<float>();
+}
+
+void Blend2DNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+	stream.write(m_x_input_index);
+	stream.write(m_y_input_index);
+	stream.writeArray(m_children);
+}
+
+void Blend2DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
+	stream.read(m_x_input_index);
+	stream.read(m_y_input_index);
+	stream.readArray(&m_children);
+	dataChanged(ctrl.m_allocator);
+}
+
+Blend1DNode::Blend1DNode(Node* parent, IAllocator& allocator)
+	: Node(parent, allocator) 
+	, m_children(allocator)
+{}
 
 struct Blend1DActivePair {
 	const Blend1DNode::Child* a;
@@ -156,45 +454,6 @@ void Blend1DNode::enter(RuntimeContext& ctx) const {
 
 void Blend1DNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(float));
-}
-
-static void getPose(const RuntimeContext& ctx, float rel_time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
-	Animation* anim = ctx.animations[slot];
-	if (!anim) return;
-	if (!ctx.model->isReady()) return;
-	if (!anim->isReady()) return;
-
-	Time time = anim->getLength() * rel_time;
-	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
-
-	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
-
-	Animation::SampleContext sample_ctx;
-	sample_ctx.pose = &pose;
-	sample_ctx.time = anim_time;
-	sample_ctx.model = ctx.model;
-	sample_ctx.weight = weight;
-	sample_ctx.mask = mask;
-	anim->setRootMotionBone(ctx.root_bone_hash);
-	anim->getRelativePose(sample_ctx);
-}
-
-static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
-	Animation* anim = ctx.animations[slot];
-	if (!anim) return;
-	if (!ctx.model->isReady()) return;
-	if (!anim->isReady()) return;
-
-	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
-
-	Animation::SampleContext sample_ctx;
-	sample_ctx.pose = &pose;
-	sample_ctx.time = anim_time;
-	sample_ctx.model = ctx.model;
-	sample_ctx.weight = weight;
-	sample_ctx.mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
-	anim->setRootMotionBone(ctx.root_bone_hash);
-	anim->getRelativePose(sample_ctx);
 }
 
 void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
@@ -879,6 +1138,7 @@ Node* Node::create(Node* parent, Type type, IAllocator& allocator) {
 		case Node::ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(parent, allocator);
 		case Node::GROUP: return LUMIX_NEW(allocator, GroupNode)(parent, allocator);
 		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, allocator);
+		case Node::BLEND2D: return LUMIX_NEW(allocator, Blend2DNode)(parent, allocator);
 		case Node::LAYERS: return LUMIX_NEW(allocator, LayersNode)(parent, allocator);
 		case Node::CONDITION: return LUMIX_NEW(allocator, ConditionNode)(parent, allocator);
 		case Node::SELECT: return LUMIX_NEW(allocator, SelectNode)(parent, allocator);

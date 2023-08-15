@@ -34,7 +34,7 @@ static bool editInput(const char* label, u32* input_index, const Controller& con
 		return false;
 	}
 	const InputDecl::Input& current_input = controller.m_inputs.inputs[*input_index];
-	if (ImGui::BeginCombo("##input", current_input.name)) {
+	if (ImGui::BeginCombo(StaticString<64>("##input", label), current_input.name)) {
 		for (const InputDecl::Input& input : controller.m_inputs.inputs) {
 			if (input.type == InputDecl::EMPTY) continue;
 			if (ImGui::Selectable(input.name)) {
@@ -150,6 +150,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(nullptr, allocator); break;
 				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(nullptr, allocator); break;
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(nullptr, allocator); break;
+				case Node::BLEND2D: node = LUMIX_NEW(allocator, Blend2DNode)(nullptr, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(nullptr, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(nullptr, allocator); break;
 				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(nullptr, allocator); break;
@@ -168,6 +169,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+				case Node::BLEND2D: node = LUMIX_NEW(allocator, Blend2DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
 				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
@@ -187,6 +189,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+				case Node::BLEND2D: node = LUMIX_NEW(allocator, Blend2DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
 				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
@@ -210,6 +213,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				switch(node.m_parent->type()) {
 					case Node::NONE:
 					case Node::BLEND1D:
+					case Node::BLEND2D:
 					case Node::ANIMATION: ASSERT(false); break;
 					case Node::LAYERS: 
 						((LayersNode*)node.m_parent)->m_layers.eraseItems([&node](LayersNode::Layer& c){ return c.node == &node; });
@@ -235,6 +239,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		Node* createChild(Node& parent, Node::Type type, IAllocator& allocator) {
 			switch(parent.type()) {
 				case Node::BLEND1D:
+				case Node::BLEND2D:
 				case Node::NONE:
 				case Node::ANIMATION: ASSERT(false); return nullptr;
 				case Node::GROUP: return createChild((GroupNode&)parent, type, allocator);
@@ -252,6 +257,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+				case Node::BLEND2D: node = LUMIX_NEW(allocator, Blend2DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
 				case Node::LAYERS: node = LUMIX_NEW(allocator, LayersNode)(&parent, allocator); break;
 				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
@@ -272,6 +278,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 				case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 				case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
+				case Node::BLEND2D: node = LUMIX_NEW(allocator, Blend2DNode)(&parent, allocator); break;
 				case Node::CONDITION: node = LUMIX_NEW(allocator, ConditionNode)(&parent, allocator); break;
 				case Node::SELECT: node = LUMIX_NEW(allocator, SelectNode)(&parent, allocator); break;
 				case Node::LAYERS: ASSERT(false); return nullptr;
@@ -402,6 +409,124 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (ImGui::DragFloat("##bl", &node_blend_length)) {
 				node.m_blend_length = Time::fromSeconds(node_blend_length);
 				saveUndo(true);
+			}
+		}
+
+		void properties_ui(Blend2DNode& node) {
+			auto saveUndoInternal = [&](bool changed){
+				saveUndo(changed);
+				if (changed) node.dataChanged(m_allocator);
+			};
+
+			saveUndoInternal(editInput("X input", &node.m_x_input_index, m_controller));
+			saveUndoInternal(editInput("Y input", &node.m_y_input_index, m_controller));
+
+			if (ImGui::BeginTable("b2dt", 3, ImGuiTableFlags_Resizable)) {
+				for (Blend2DNode::Child& child : node.m_children) {
+					ImGui::PushID(&child);
+					ImGui::TableNextRow(ImGuiTableFlags_RowBg);
+
+					if (m_hovered_blend2d_child == i32(&child - node.m_children.begin())) {
+						ImU32 row_bg_color = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_TabHovered]);
+						ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
+					}
+					else {
+						ImU32 row_bg_color = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_TableRowBg]);
+						ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
+					}
+
+					ImGui::TableNextColumn();
+					if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
+						node.m_children.erase(u32(&child - node.m_children.begin()));
+						ImGui::TableNextColumn();
+						ImGui::TableNextColumn();
+						ImGui::PopID();
+						saveUndoInternal(true);
+						continue;
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(-1);
+					saveUndoInternal(ImGui::DragFloat("##xval", &child.value.x));
+		
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					saveUndoInternal(ImGui::DragFloat("##yval", &child.value.y));
+
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					saveUndoInternal(inputSlot("##anim", &child.slot));
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add")) {
+				node.m_children.emplace();
+				if(node.m_children.size() > 1) {
+					node.m_children.back().value = node.m_children[node.m_children.size() - 2].value;
+				}
+				saveUndo(true);
+			}
+
+			{
+				float w = maximum(ImGui::GetContentRegionAvail().x, 100.f);
+				ImGui::InvisibleButton("tmp", ImVec2(w, w));
+				ImDrawList* dl = ImGui::GetWindowDrawList();
+				ImVec2 p = ImGui::GetItemRectMin() + ImVec2(4, 4);
+				ImVec2 s = ImGui::GetItemRectSize() - ImVec2(8, 8);
+				Vec2 min(FLT_MAX), max(-FLT_MAX);
+				for (const Blend2DNode::Child& c : node.m_children) {
+					min = minimum(min, c.value);
+					max = maximum(max, c.value);
+				}
+				swap(min.y, max.y);
+				Vec2 inv_range = Vec2(s) / (max - min);
+
+				const ImGuiStyle& style = ImGui::GetStyle();
+				ImU32 lines_color = ImGui::GetColorU32(style.Colors[ImGuiCol_PlotLines]);
+				ImU32 hovered_color = ImGui::GetColorU32(style.Colors[ImGuiCol_PlotLinesHovered]);
+				ImU32 fill_color = ImGui::GetColorU32(style.Colors[ImGuiCol_FrameBgActive]);
+				ImU32 bg_color = ImGui::GetColorU32(style.Colors[ImGuiCol_FrameBg]);
+
+				dl->AddRectFilled(p, p + s, bg_color);
+
+				for (const Blend2DNode::Triangle& t : node.m_triangles) {
+					dl->AddTriangleFilled(p + (node.m_children[t.a].value - min) * inv_range
+						, p + (node.m_children[t.c].value - min) * inv_range
+						, p + (node.m_children[t.b].value - min) * inv_range
+						, fill_color);
+				}
+
+				auto old_flags = dl->Flags;
+				dl->Flags = dl->Flags & ~ImDrawListFlags_AntiAliasedLines;
+				for (const Blend2DNode::Triangle& t : node.m_triangles) {
+					dl->AddTriangle(p + (node.m_children[t.a].value - min) * inv_range
+						, p + (node.m_children[t.c].value - min) * inv_range
+						, p + (node.m_children[t.b].value - min) * inv_range
+						, lines_color);
+				}
+				i32 hovered = -1;
+				for (const Blend2DNode::Child& ch : node.m_children) {
+					ImVec2 p0 = p + (ch.value - min) * inv_range - ImVec2(4, 4);
+					ImVec2 p1 = p0 + ImVec2(8, 8);
+					if (ImGui::IsMouseHoveringRect(p0, p1)) {
+						if (ImGui::BeginTooltip()) {
+							ImGui::TextUnformatted(m_controller.m_animation_slots[ch.slot].c_str());
+							ImGui::Text("%s = %f", m_controller.m_inputs.inputs[node.m_x_input_index].name.data, ch.value.x);
+							ImGui::Text("%s = %f", m_controller.m_inputs.inputs[node.m_y_input_index].name.data, ch.value.y);
+							ImGui::EndTooltip();
+							hovered = i32(&ch - node.m_children.begin());
+						}
+						dl->AddRect(p0, p1, hovered_color);
+					}
+					else {
+						dl->AddRect(p0, p1, lines_color);
+					}
+				}
+				m_hovered_blend2d_child = hovered;
+				dl->Flags = old_flags;
 			}
 		}
 
@@ -605,6 +730,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				case Node::ANIMATION: properties_ui((AnimationNode&)node); break;
 				case Node::GROUP: properties_ui((GroupNode&)node); break;
 				case Node::BLEND1D: properties_ui((Blend1DNode&)node); break;
+				case Node::BLEND2D: properties_ui((Blend2DNode&)node); break;
 				case Node::CONDITION: properties_ui((ConditionNode&)node); break;
 				case Node::SELECT: properties_ui((SelectNode&)node); break;
 				case Node::LAYERS: break;
@@ -660,6 +786,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			switch (type) {
 				case Node::Type::ANIMATION: return "Animation";
 				case Node::Type::BLEND1D: return "Blend 1D";
+				case Node::Type::BLEND2D: return "Blend 2D";
 				case Node::Type::GROUP: return "Group";
 				case Node::Type::LAYERS: return "Layers";
 				case Node::Type::CONDITION: return "Condition";
@@ -673,7 +800,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		static bool isContainer(const Node& node) {
 			switch (node.type()) {
 				case Node::Type::ANIMATION: 
-				case Node::Type::BLEND1D: return false;
+				case Node::Type::BLEND1D:
+				case Node::Type::BLEND2D: return false;
 				case Node::Type::CONDITION:
 				case Node::Type::GROUP:
 				case Node::Type::SELECT:
@@ -707,6 +835,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			switch (src.m_parent->type()) {
 				case Node::NONE:
 				case Node::ANIMATION:
+				case Node::BLEND2D:
 				case Node::BLEND1D: ASSERT(false); break;
 				case Node::CONDITION: break;
 				case Node::LAYERS: {
@@ -829,11 +958,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					case Node::Type::NONE: break;
 					case Node::Type::ANIMATION: break;
 					case Node::Type::BLEND1D: break;
+					case Node::Type::BLEND2D: break;
 					case Node::Type::LAYERS: {
 						LayersNode& layers = (LayersNode&)node;
 						if (ImGui::BeginMenu("Create layer")) {
 							if (ImGui::MenuItem("Animation")) createChild(layers, Node::ANIMATION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Blend1D")) createChild(layers, Node::BLEND1D, m_controller.m_allocator);
+							if (ImGui::MenuItem("Blend2D")) createChild(layers, Node::BLEND2D, m_controller.m_allocator);
 							if (ImGui::MenuItem("Condition")) createChild(layers, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(layers, Node::GROUP, m_controller.m_allocator);
 							if (ImGui::MenuItem("Select")) createChild(layers, Node::SELECT, m_controller.m_allocator);
@@ -846,6 +977,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if ((!cond.m_true_node || !cond.m_false_node) && ImGui::BeginMenu("Create child")) {
 							if (ImGui::MenuItem("Animation")) createChild(cond, Node::ANIMATION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Blend1D")) createChild(cond, Node::BLEND1D, m_controller.m_allocator);
+							if (ImGui::MenuItem("Blend2D")) createChild(cond, Node::BLEND2D, m_controller.m_allocator);
 							if (ImGui::MenuItem("Condition")) createChild(cond, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(cond, Node::GROUP, m_controller.m_allocator);
 							if (ImGui::MenuItem("Select")) createChild(cond, Node::SELECT, m_controller.m_allocator);
@@ -858,6 +990,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (ImGui::BeginMenu("Create child")) {
 							if (ImGui::MenuItem("Animation")) createChild(select, Node::ANIMATION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Blend1D")) createChild(select, Node::BLEND1D, m_controller.m_allocator);
+							if (ImGui::MenuItem("Blend2D")) createChild(select, Node::BLEND2D, m_controller.m_allocator);
 							if (ImGui::MenuItem("Condition")) createChild(select, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(select, Node::GROUP, m_controller.m_allocator);
 							if (ImGui::MenuItem("Select")) createChild(select, Node::SELECT, m_controller.m_allocator);
@@ -869,7 +1002,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (ImGui::BeginMenu("Create child")) {
 							GroupNode& group = (GroupNode&)node;
 							if (ImGui::MenuItem("Animation")) createChild(group, Node::ANIMATION, m_controller.m_allocator);
-							if (ImGui::MenuItem("Blend1D")) createChild(group, Node::BLEND1D, m_controller.m_allocator);
+							if (ImGui::MenuItem("Blend2D")) createChild(group, Node::BLEND2D, m_controller.m_allocator);
 							if (ImGui::MenuItem("Condition")) createChild(group, Node::CONDITION, m_controller.m_allocator);
 							if (ImGui::MenuItem("Group")) createChild(group, Node::GROUP, m_controller.m_allocator);
 							if (ImGui::MenuItem("Layers")) createChild(group, Node::LAYERS, m_controller.m_allocator);
@@ -892,6 +1025,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						case Node::Type::NONE:
 						case Node::Type::ANIMATION:
 						case Node::Type::BLEND1D:
+						case Node::Type::BLEND2D:
 							break;
 						case Node::Type::SELECT: pasted = createChild((SelectNode&)node, m_copy_buffer.node_type, m_controller.m_allocator); break;
 						case Node::Type::GROUP: pasted = createChild((GroupNode&)node, m_copy_buffer.node_type, m_controller.m_allocator); break;
@@ -920,6 +1054,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				switch (node.type()) {
 					case Node::Type::NONE:
 					case Node::Type::BLEND1D:
+					case Node::Type::BLEND2D:
 					case Node::Type::ANIMATION: break;
 					case Node::Type::GROUP: {
 						GroupNode& group = (GroupNode&)node;
@@ -1557,6 +1692,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::Indent();
 				if (ImGui::Selectable("Animation")) createRoot(Node::ANIMATION, m_controller.m_allocator);
 				if (ImGui::Selectable("Blend1D")) createRoot(Node::BLEND1D, m_controller.m_allocator);
+				if (ImGui::Selectable("Blend2D")) createRoot(Node::BLEND2D, m_controller.m_allocator);
 				if (ImGui::Selectable("Condition")) createRoot(Node::CONDITION, m_controller.m_allocator);
 				if (ImGui::Selectable("Group")) createRoot(Node::GROUP, m_controller.m_allocator);
 				if (ImGui::Selectable("Layers")) createRoot(Node::LAYERS, m_controller.m_allocator);
@@ -1581,12 +1717,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (ImGui::CollapsingHeader("Controller")) {
 					ImGuiEx::Label("Root motion bone");
 					saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
-					bool xz_root_motion = m_controller.m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
-					ImGuiEx::Label("XZ root motion");
-					if (ImGui::Checkbox("##xzrm", &xz_root_motion)) {
-						m_controller.m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
-						saveUndo(true);
-					}
 
 					if (ImGui::BeginTabBar("ctb")) {
 						if (ImGui::BeginTabItem("Inputs")) {
@@ -1665,6 +1795,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		bool m_preview_on_right = false;
 		float m_playback_speed = 1.f;
 		bool m_show_skeleton = true;
+		i32 m_hovered_blend2d_child = -1;
 		ControllerDebugMapping m_controller_debug_mapping;
 	};
 

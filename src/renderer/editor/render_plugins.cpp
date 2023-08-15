@@ -2368,6 +2368,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				
 				const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
 				for (i32 i = 0; i < m_resource->getMeshCount(); ++i) {
+					ImGui::PushID(i);
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					const Mesh& mesh = m_resource->getMesh(i);
@@ -2381,6 +2382,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
 						m_app.getAssetBrowser().openEditor(mesh.material->getPath());
 					}
+					ImGui::PopID();
 				}
 				ImGui::EndTable();
 			}

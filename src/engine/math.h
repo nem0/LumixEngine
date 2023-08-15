@@ -91,6 +91,7 @@ struct LUMIX_ENGINE_API Vec2 {
 	Vec2 operator -(const Vec2& v) const;
 	Vec2 operator -(float f) const;
 	Vec2 operator -() const;
+	Vec2 ortho() const { return {y, -x}; }
 
 	float x, y;
 

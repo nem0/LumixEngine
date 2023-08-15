@@ -2,6 +2,7 @@
 
 #include "animation/animation.h"
 #include "engine/array.h"
+#include "engine/math.h"
 #include "engine/stream.h"
 
 
@@ -43,7 +44,8 @@ struct Node {
 		LAYERS,
 		CONDITION,
 		NONE,
-		SELECT
+		SELECT,
+		BLEND2D
 	};
 
 	Node(Node* parent, IAllocator& allocator) 
@@ -124,6 +126,37 @@ struct AnimationNode final : Node {
 
 	u32 m_slot;
 	u32 m_flags = LOOPED;
+};
+
+struct Blend2DNode final : Node {
+	Blend2DNode(Node* parent, IAllocator& allocator);
+	Type type() const override { return BLEND2D; }
+	
+	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void enter(RuntimeContext& ctx) const override;
+	void skip(RuntimeContext& ctx) const override;
+	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
+	
+	void dataChanged(IAllocator& tmp_allocator);
+
+	struct Child {
+		Vec2 value = Vec2(0);
+		u32 slot = 0;
+	};
+
+	struct Triangle {
+		u32 a, b, c;
+		Vec2 circumcircle_center;
+	};
+
+	Array<Child> m_children;
+	Array<Triangle> m_triangles;
+	u32 m_x_input_index = 0;
+	u32 m_y_input_index = 0;
 };
 
 struct Blend1DNode final : Node {

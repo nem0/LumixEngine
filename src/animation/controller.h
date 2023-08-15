@@ -55,7 +55,7 @@ struct Controller final : Resource {
 	Array<BoneMask> m_bone_masks;
 	InputDecl m_inputs;
 	enum class Flags : u32 {
-		XZ_ROOT_MOTION = 1 << 0
+		UNUSED_FLAG = 1 << 0
 	};
 	FlagSet<Flags, u32> m_flags;
 	struct IK {
