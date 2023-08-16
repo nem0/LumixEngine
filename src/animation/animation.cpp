@@ -67,7 +67,8 @@ struct AnimationSampler {
 		if (frame_idx < anim.m_frame_count - 1) {
 			const float frame_t = frame - frame_idx;
 		
-			for (const Animation::TranslationCurve& curve : anim.m_translations) {
+			for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
+				const Animation::TranslationTrack& curve = anim.m_translations[i];
 				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
 
@@ -75,7 +76,7 @@ struct AnimationSampler {
 					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
 				}
 
-				Vec3 anim_pos = lerp(curve.pos[frame_idx], curve.pos[frame_idx + 1], frame_t);
+				Vec3 anim_pos = lerp(anim.getTranslation(frame_idx, i), anim.getTranslation(frame_idx + 1, i), frame_t);
 
 				const int model_bone_index = iter.value();
 				if constexpr (use_weight) {
@@ -106,7 +107,8 @@ struct AnimationSampler {
 			}
 		}
 		else {
-			for (const Animation::TranslationCurve& curve : anim.m_translations) {
+			for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
+				const Animation::TranslationTrack& curve = anim.m_translations[i];
 				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
 				if (!iter.isValid()) continue;
 				if constexpr(use_mask) {
@@ -115,10 +117,10 @@ struct AnimationSampler {
 
 				const int model_bone_index = iter.value();
 				if constexpr (use_weight) {
-					pos[model_bone_index] = lerp(pos[model_bone_index], curve.pos[anim.m_frame_count - 1], weight);
+					pos[model_bone_index] = lerp(pos[model_bone_index], anim.getTranslation(anim.m_frame_count - 1, i), weight);
 				}
 				else {
-					pos[model_bone_index] = curve.pos[anim.m_frame_count - 1];
+					pos[model_bone_index] = anim.getTranslation(anim.m_frame_count - 1, i);
 				}
 			}
 
@@ -185,7 +187,7 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 
 	for (u32 f = 0; f < m_frame_count; ++f) {
 		LocalRigidTransform tmp = {Vec3(0), Quat::IDENTITY};
-		if (translation_idx >= 0) tmp.pos = m_translations[translation_idx].pos[f];
+		if (translation_idx >= 0) tmp.pos = getTranslation(f, translation_idx);
 		if (rotation_idx >= 0) tmp.rot = getRotation(f, rotation_idx);
 		LocalRigidTransform rm = AnimationSampler::maskRootMotion(m_flags, tmp);
 		if (!m_root_motion.translations.empty()) m_root_motion.translations[f] = rm.pos;
@@ -201,8 +203,8 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 		m_root_motion.pose_rotations[f] = tmp.rot;
 	}
 
-	m_translations[translation_idx].pos = m_root_motion.pose_translations.begin();
 	// TODO
+	// m_translations[translation_idx].pos = m_root_motion.pose_translations.begin();
 	//m_rotations[rotation_idx].rot = m_root_motion.pose_rotations.begin();
 }
 
@@ -248,21 +250,50 @@ void Animation::getRelativePose(const SampleContext& ctx) {
 }
 
 Vec3 Animation::getTranslation(Time time, u32 curve_idx) const {
-	const TranslationCurve& curve = m_translations[curve_idx];
 	float frame = time.toFrame(m_fps);
 	const u32 frame_idx = u32(frame);
 	
 	if (frame_idx < m_frame_count - 1) {
 		const float frame_t = frame - frame_idx;
-		return lerp(curve.pos[frame_idx], curve.pos[frame_idx + 1], frame_t);
+		return lerp(getTranslation(frame_idx, curve_idx), getTranslation(frame_idx + 1, curve_idx), frame_t);
 	}
 
-	return curve.pos[m_frame_count - 1];
+	return getTranslation(m_frame_count - 1, curve_idx);
 }
 
-float Animation::unpackRotationChannel(u64 val, float min, float range, u32 bitsize) const {
+float Animation::unpackChannel(u64 val, float min, float range, u32 bitsize) {
 	if (bitsize == 0) return min;
 	return float(min + range * double(val & ((1 << bitsize) - 1)) / ((1 << bitsize) - 1));
+}
+
+Vec3 Animation::getTranslation(u32 frame, u32 curve_idx) const {
+	const TranslationTrack& track = m_translations[curve_idx];
+	if (track.type == Animation::TrackType::CONSTANT) return track.min;
+	const u32 offset = m_translations_frame_size_bits * frame + track.offset_bits;
+
+	u64 tmp;
+	i32 rem = track.bitsizes_sum - (64 - (offset % 64));
+	if (rem <= 0) {
+		u64 buf;
+		memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
+		u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
+		tmp = buf >> offset0;
+	}
+	else {
+		u64 buf[2];
+		memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
+		tmp = buf[0];
+		tmp <<= rem;
+		tmp |= buf[1] >> (64 - rem);
+	}
+
+	Vec3 res;
+	res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
+	tmp >>= track.bitsizes[0];
+	res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
+	tmp >>= track.bitsizes[1];
+	res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
+	return res;
 }
 
 Quat Animation::getRotation(u32 frame, u32 curve_idx) const {
@@ -286,14 +317,44 @@ Quat Animation::getRotation(u32 frame, u32 curve_idx) const {
 		tmp |= buf[1] >> (64 - rem);
 	}
 
+	bool is_negative = tmp & 1;
+	tmp >>= 1;
+
 	Quat res;
-	res.x = unpackRotationChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
-	tmp >>= track.bitsizes[0];
-	res.y = unpackRotationChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
-	tmp >>= track.bitsizes[1];
-	res.z = unpackRotationChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
-	tmp >>= track.bitsizes[2];
-	res.w = unpackRotationChannel(tmp, track.min.w, track.range.w, track.bitsizes[3]);
+	if (track.skipped_channel != 0) {
+		res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
+		tmp >>= track.bitsizes[0];
+	}
+	if (track.skipped_channel != 1) {
+		res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
+		tmp >>= track.bitsizes[1];
+	}
+	if (track.skipped_channel != 2) {
+		res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
+		tmp >>= track.bitsizes[2];
+	}
+	if (track.skipped_channel != 3) {
+		res.w = unpackChannel(tmp, track.min.w, track.range.w, track.bitsizes[3]);
+	}
+	switch (track.skipped_channel) {
+		case 0: 
+			res.x = sqrtf(maximum(0.f, 1 - (res.y * res.y + res.z * res.z + res.w * res.w)));
+			res.x *= is_negative ? -1 : 1; 
+			break;
+		case 1:
+			res.y = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.z * res.z + res.w * res.w)));
+			res.y *= is_negative ? -1 : 1; 
+			break;
+		case 2:
+			res.z = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.w * res.w)));
+			res.z *= is_negative ? -1 : 1; 
+			break;
+		case 3:
+			res.w = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.z * res.z)));
+			res.w *= is_negative ? -1 : 1; 
+			break;
+		
+	}
 	return res;
 }
 
@@ -343,14 +404,28 @@ bool Animation::load(Span<const u8> mem) {
 
 	m_translations.resize(translations_count);
 
+	m_translations_frame_size_bits = 0;
 	InputMemoryStream blob(&m_mem[0], size);
 	for (int i = 0; i < m_translations.size(); ++i) {
-		TranslationCurve& curve = m_translations[i];
+		TranslationTrack& curve = m_translations[i];
 		curve.name = blob.read<BoneNameHash>();
-		const Animation::TrackType type = blob.read<Animation::TrackType>();
-		curve.pos = (const Vec3*)blob.skip(m_frame_count * sizeof(Vec3));
+		blob.read(curve.type);
+		
+		if (curve.type == Animation::TrackType::CONSTANT) {
+			blob.read(curve.min);
+		}
+		else {
+			blob.read(curve.min);
+			blob.read(curve.range);
+			blob.read(curve.bitsizes);
+			blob.read(curve.bitsizes_sum);
+			blob.read(curve.offset_bits);
+			m_translations_frame_size_bits += curve.bitsizes_sum;
+		}
 	}
 	
+	m_translation_stream = (const u8*)blob.skip((m_translations_frame_size_bits * m_frame_count + 7) / 8);
+
 	const u32 rotations_count = blob.read<u32>();
 	m_rotations.resize(rotations_count);
 
@@ -369,6 +444,7 @@ bool Animation::load(Span<const u8> mem) {
 			blob.read(curve.bitsizes);
 			blob.read(curve.bitsizes_sum);
 			blob.read(curve.offset_bits);
+			blob.read(curve.skipped_channel);
 			m_rotations_frame_size_bits += curve.bitsizes_sum;
 		}
 	}

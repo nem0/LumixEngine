@@ -96,35 +96,42 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			ImGui::TableNextColumn();
 
 			const Array<Animation::RotationTrack>& rotations = m_resource->getRotations();
-			const Array<Animation::TranslationCurve>& translations = m_resource->getTranslations();
+			const Array<Animation::TranslationTrack>& translations = m_resource->getTranslations();
 
 			if (!translations.empty() && ImGui::TreeNode("Translations")) {
-				for (const Animation::TranslationCurve& curve : translations) {
+				for (const Animation::TranslationTrack& curve : translations) {
+					u32 curve_idx = u32(&curve - translations.begin());
 					auto iter = m_model->getBoneIndex(curve.name);
 					if (!iter.isValid()) continue;
 
 					const Model::Bone& bone = m_model->getBone(iter.value());
 					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-					bool open = ImGui::TreeNodeEx(bone.name.c_str(), flags);
+					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), m_resource->getTranslations()[curve_idx].bitsizes_sum);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
 						m_selected_bone = curve.name;
 					}
 					if (open) {
-						ImGui::Columns(4);
-						for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
-							const Vec3 p = curve.pos[i];
-							ImGui::Text("%d:", i);
-							ImGui::NextColumn();
-							ImGui::Text("%f", p.x);
-							ImGui::NextColumn();
-							ImGui::Text("%f", p.y);
-							ImGui::NextColumn();
-							ImGui::Text("%f", p.z);
-							ImGui::NextColumn();
-
+						if (m_resource->getTranslations()[curve_idx].type == Animation::TrackType::CONSTANT) {
+							Vec3 p = m_resource->getTranslations()[curve_idx].min;
+							ImGui::Text("%f, %f, %f", p.x, p.y, p.z);
 						}
-						ImGui::Columns();
+						else {
+							ImGui::Columns(4);
+							for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
+								const Vec3 p = m_resource->getTranslation(i, curve_idx);
+								ImGui::Text("%d:", i);
+								ImGui::NextColumn();
+								ImGui::Text("%f", p.x);
+								ImGui::NextColumn();
+								ImGui::Text("%f", p.y);
+								ImGui::NextColumn();
+								ImGui::Text("%f", p.z);
+								ImGui::NextColumn();
+
+							}
+							ImGui::Columns();
+						}
 						ImGui::TreePop();
 					}
 				}

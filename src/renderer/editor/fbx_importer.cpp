@@ -1455,10 +1455,17 @@ struct BitWriter {
 	u8* ptr;
 };
 
+struct TranslationTrack {
+	Vec3 min, max;
+	u8 bitsizes[4];
+	bool is_const;
+};
+
 struct RotationTrack {
 	Quat min, max;
 	u8 bitsizes[4];
 	bool is_const;
+	u8 skipped_channel;
 };
 
 u64 pack(float v, float min, float range, u32 bitsize) {
@@ -1468,19 +1475,48 @@ u64 pack(float v, float min, float range, u32 bitsize) {
 
 u64 pack(const Quat& r, const RotationTrack& track) {
 	u64 res = 0;
-	res |= pack(r.w, track.min.w, track.max.w - track.min.w, track.bitsizes[3]);
-	res <<= track.bitsizes[2];
+	if (track.skipped_channel != 3) {
+		res |= pack(r.w, track.min.w, track.max.w - track.min.w, track.bitsizes[3]);
+	}
+	
+	if (track.skipped_channel != 2) {
+		res <<= track.bitsizes[2];
+		res |= pack(r.z, track.min.z, track.max.z - track.min.z, track.bitsizes[2]);
+	}
 
-	res |= pack(r.z, track.min.z, track.max.z - track.min.z, track.bitsizes[2]);
-	res <<= track.bitsizes[1];
+	if (track.skipped_channel != 1) {
+		res <<= track.bitsizes[1];
+		res |= pack(r.y, track.min.y, track.max.y - track.min.y, track.bitsizes[1]);
+	}
 
-	res |= pack(r.y, track.min.y, track.max.y - track.min.y, track.bitsizes[1]);
-	res <<= track.bitsizes[0];
-
-	res |= pack(r.x, track.min.x, track.max.x - track.min.x, track.bitsizes[0]);
+	if (track.skipped_channel != 0) {
+		res <<= track.bitsizes[0];
+		res |= pack(r.x, track.min.x, track.max.x - track.min.x, track.bitsizes[0]);
+	}
 	return res;
 }
 
+u64 pack(const Vec3& p, const TranslationTrack& track) {
+	u64 res = 0;
+	res |= pack(p.z, track.min.z, track.max.z - track.min.z, track.bitsizes[2]);
+	res <<= track.bitsizes[1];
+
+	res |= pack(p.y, track.min.y, track.max.y - track.min.y, track.bitsizes[1]);
+	res <<= track.bitsizes[0];
+
+	res |= pack(p.x, track.min.x, track.max.x - track.min.x, track.bitsizes[0]);
+	return res;
+}
+
+bool isConstTranslationTrack(const Array<FBXImporter::Key>& keys) {
+	ASSERT(!keys.empty());
+	for (const FBXImporter::Key& k : keys) {
+		if (fabsf(k.pos.x - keys[0].pos.x) > 0.00001f) return false;
+		if (fabsf(k.pos.y - keys[0].pos.y) > 0.00001f) return false;
+		if (fabsf(k.pos.z - keys[0].pos.z) > 0.00001f) return false;
+	}
+	return true;
+}
 bool isConstRotationTrack(const Array<FBXImporter::Key>& keys) {
 	ASSERT(!keys.empty());
 	for (const FBXImporter::Key& k : keys) {
@@ -1521,7 +1557,9 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 			continue;
 		}
 
+		Array<TranslationTrack> translation_tracks(m_allocator);
 		Array<RotationTrack> rotation_tracks(m_allocator);
+		translation_tracks.resize(m_bones.size());
 		rotation_tracks.resize(m_bones.size());
 
 		auto write_animation = [&](StringView name, u32 from_frame, u32 frames_count) {
@@ -1553,42 +1591,100 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 				for (Key& k : keys) k.pos *= parent_scale;
 			}
 
-			u32 translation_curves_count = 0;
-			u64 toffset = out_file.size();
-			write(translation_curves_count);
-			for (const ofbx::Object*& bone : m_bones) {
-				Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
-				if (keys.empty()) continue;
-				const u32 idx = u32(&bone - m_bones.begin());
+			{
+				u32 total_bits = 0;
+				u32 translation_curves_count = 0;
+				u64 toffset = out_file.size();
+				u32 offset_bits = 0;
+				write(translation_curves_count);
+				for (const ofbx::Object*& bone : m_bones) {
+					Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
+					if (keys.empty()) continue;
 
-				ofbx::Object* parent = bone->getParent();
-				Vec3 bind_pos;
-				if (!parent) {
-					bind_pos = m_bind_pose[idx].getTranslation();
-				}
-				else {
-					const int parent_idx = m_bones.indexOf(parent);
-					if (m_bind_pose.empty()) {
-						// TODO should not we evalLocal here like in rotation ~50lines below?
-						bind_pos = toLumixVec3(bone->getLocalTranslation());
+					const u32 bone_idx = u32(&bone - m_bones.begin());
+
+					ofbx::Object* parent = bone->getParent();
+					Vec3 bind_pos;
+					if (!parent) {
+						bind_pos = m_bind_pose[bone_idx].getTranslation();
 					}
 					else {
-						bind_pos = (m_bind_pose[parent_idx].inverted() * m_bind_pose[idx]).getTranslation();
+						const int parent_idx = m_bones.indexOf(parent);
+						if (m_bind_pose.empty()) {
+							// TODO should not we evalLocal here like in rotation ~50lines below?
+							bind_pos = toLumixVec3(bone->getLocalTranslation());
+						}
+						else {
+							bind_pos = (m_bind_pose[parent_idx].inverted() * m_bind_pose[bone_idx]).getTranslation();
+						}
+					}
+
+					if (isBindPosePositionTrack(keys.size(), keys, bind_pos)) continue;
+			
+					const BoneNameHash name_hash(bone->name);
+					write(name_hash);
+
+					if (isConstTranslationTrack(keys)) {
+						translation_tracks[bone_idx].is_const = true;
+						write(Animation::TrackType::CONSTANT);
+						write(keys[0].pos * cfg.mesh_scale * m_fbx_scale);
+					}
+					else {
+						translation_tracks[bone_idx].is_const = false;
+						write(Animation::TrackType::SAMPLED);
+				
+						Vec3 min(FLT_MAX), max(-FLT_MAX);
+						for (const Key& k : keys) {
+							const Vec3 p = fixOrientation(k.pos * cfg.mesh_scale * m_fbx_scale);
+							min = minimum(p, min);
+							max = maximum(p, max);
+						}
+						u8 bitsizes[] = {
+							(u8)log2(u32((max.x - min.x) / 0.0001f)),
+							(u8)log2(u32((max.y - min.y) / 0.0001f)),
+							(u8)log2(u32((max.z - min.z) / 0.0001f))
+						};
+
+						write(min);
+						write(max.x - min.x);
+						write(max.y - min.y);
+						write(max.z - min.z);
+						write(bitsizes);
+						const u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2]);
+						write(bitsize);
+						write(offset_bits);
+						offset_bits += bitsize;
+				
+						memcpy(translation_tracks[bone_idx].bitsizes, bitsizes, sizeof(bitsizes));
+						translation_tracks[bone_idx].max = max;
+						translation_tracks[bone_idx].min = min;
+						total_bits += bitsize * keys.size();
+					}				
+
+					++translation_curves_count;
+				}
+
+				BitWriter bit_writer(out_file, total_bits);
+
+				for (u32 i = 0; i < frames_count; ++i) {
+					for (const ofbx::Object*& bone : m_bones) {
+						const u32 bone_idx = u32(&bone - m_bones.begin());
+						Array<Key>& keys = all_keys[bone_idx];
+						const TranslationTrack& track = translation_tracks[bone_idx];
+
+						if (!keys.empty() && !track.is_const) {
+							const Key& k = keys[i];
+							Vec3 p = fixOrientation(k.pos * cfg.mesh_scale * m_fbx_scale);
+							const u64 packed = pack(p, track);
+							const u32 bitsize = (track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2]);
+							ASSERT(bitsize <= 64);
+							bit_writer.write(packed, bitsize);
+						}
 					}
 				}
 
-				if (isBindPosePositionTrack(keys.size(), keys, bind_pos)) continue;
-			
-				const BoneNameHash name_hash(bone->name);
-				write(name_hash);
-				// TODO animation stats
-				// TODO track types
-				// TODO quantization
-				write(Animation::TrackType::SAMPLED);
-				for (const Key& k : keys) write(fixOrientation(k.pos * cfg.mesh_scale * m_fbx_scale));
-				++translation_curves_count;
+				memcpy(out_file.getMutableData() + toffset, &translation_curves_count, sizeof(translation_curves_count));
 			}
-			memcpy(out_file.getMutableData() + toffset, &translation_curves_count, sizeof(translation_curves_count));
 
 			u32 rotation_curves_count = 0;
 			u64 roffset = out_file.size();
@@ -1642,10 +1738,10 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 						min.w = minimum(min.w, r.w); max.w = maximum(max.w, r.w);
 					}
 					u8 bitsizes[] = {
-						(u8)log2(u32((max.x - min.x) / 0.0001f)),
-						(u8)log2(u32((max.y - min.y) / 0.0001f)),
-						(u8)log2(u32((max.z - min.z) / 0.0001f)),
-						(u8)log2(u32((max.w - min.w) / 0.0001f))
+						(u8)log2(u32((max.x - min.x) / 0.00005f)),
+						(u8)log2(u32((max.y - min.y) / 0.00005f)),
+						(u8)log2(u32((max.z - min.z) / 0.00005f)),
+						(u8)log2(u32((max.w - min.w) / 0.00005f))
 					};
 
 					write(min);
@@ -1654,14 +1750,23 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 					write(max.z - min.z);
 					write(max.w - min.w);
 					write(bitsizes);
-					const u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2] + bitsizes[3]);
+					u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2] + bitsizes[3]);
+					u8 skipped_channel = 0;
+					for (u32 i = 1; i < 4; ++i) {
+						if (bitsizes[i] > bitsizes[skipped_channel]) skipped_channel = i;
+					}
+					bitsize -= bitsizes[skipped_channel];
+					if (bitsize) ++bitsize; // sign bit
 					write(bitsize);
 					write(offset_bits);
+					write(skipped_channel);
+
 					offset_bits += bitsize;
 				
 					memcpy(rotation_tracks[bone_idx].bitsizes, bitsizes, sizeof(bitsizes));
 					rotation_tracks[bone_idx].max = max;
 					rotation_tracks[bone_idx].min = min;
+					rotation_tracks[bone_idx].skipped_channel = skipped_channel;
 					total_bits += bitsize * keys.size();
 				}
 				++rotation_curves_count;
@@ -1679,9 +1784,13 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 					if (!keys.empty() && !track.is_const) {
 						const Key& k = keys[i];
 						Quat q = fixOrientation(k.rot);
-						const u64 packed = pack(q, track);
-						const u32 bitsize = (track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + track.bitsizes[3]);
+						u32 bitsize = (track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + track.bitsizes[3]);
+						bitsize -= track.bitsizes[track.skipped_channel];
+						if (bitsize) ++bitsize; // sign bit
 						ASSERT(bitsize <= 64);
+						u64 packed = pack(q, track);
+						packed <<= 1;
+						packed |= (&q.x)[track.skipped_channel] < 0 ? 1 : 0;
 						bit_writer.write(packed, bitsize);
 					}
 				}

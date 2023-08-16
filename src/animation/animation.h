@@ -83,9 +83,13 @@ struct Animation final : Resource {
 		Version version;
 	};
 
-	struct TranslationCurve {
+	struct TranslationTrack {
 		BoneNameHash name;
-		const Vec3* pos;
+		Vec3 min, range;
+		u8 bitsizes[3] = {};
+		u8 bitsizes_sum = 0;
+		u32 offset_bits = 0;
+		TrackType type;
 	};
 
 	struct RotationTrack {
@@ -95,6 +99,7 @@ struct Animation final : Resource {
 		u8 bitsizes_sum = 0;
 		u32 offset_bits = 0;
 		TrackType type;
+		u8 skipped_channel = 0xff;
 	};
 
 	struct SampleContext {
@@ -107,12 +112,13 @@ struct Animation final : Resource {
 
 	Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	ResourceType getType() const override { return TYPE; }
+	Vec3 getTranslation(u32 frame, u32 curve_idx) const;
 	Vec3 getTranslation(Time time, u32 curve_idx) const;
 	Quat getRotation(Time time, u32 curve_idx) const;
 	Quat getRotation(u32 frame, u32 curve_idx) const;
 	void getRelativePose(const SampleContext& ctx);
 	Time getLength() const { return Time::fromSeconds((m_frame_count - 1) / m_fps); }
-	const Array<TranslationCurve>& getTranslations() const { return m_translations; }
+	const Array<TranslationTrack>& getTranslations() const { return m_translations; }
 	const Array<RotationTrack>& getRotations() const { return m_rotations; }
 	struct LocalRigidTransform getRootMotion(Time t) const;
 	void setRootMotionBone(BoneNameHash bone_name);
@@ -123,10 +129,10 @@ struct Animation final : Resource {
 private:
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	float unpackRotationChannel(u64 val, float min, float max, u32 bitsize) const;
+	static float unpackChannel(u64 val, float min, float max, u32 bitsize);
 
 	TagAllocator m_allocator;
-	Array<TranslationCurve> m_translations;
+	Array<TranslationTrack> m_translations;
 	Array<RotationTrack> m_rotations;
 	
 	struct RootMotion {
@@ -140,7 +146,9 @@ private:
 
 	Array<u8> m_mem;
 	const u8* m_rotation_stream;
+	const u8* m_translation_stream;
 	u32 m_rotations_frame_size_bits;
+	u32 m_translations_frame_size_bits;
 	u32 m_frame_count = 0;
 	float m_fps = 30;
 
