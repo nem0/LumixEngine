@@ -1283,7 +1283,7 @@ static void convert(const ofbx::Matrix& mtx, Vec3& pos, Quat& rot)
 }
 
 template <typename T>
-static void fillTimes(const ofbx::AnimationCurve* curve, Array<T>& out, i64 from_time, i64 to_time){
+static void fillTimes(const ofbx::AnimationCurve* curve, Array<T>& out, u32 from_frame, u32 frames_count){
 	if(!curve) return;
 	ASSERT(out.size() >= 2);
 
@@ -1329,53 +1329,6 @@ static float evalCurve(i64 time, const ofbx::AnimationCurve& curve) {
 	return 0.f;
 };
 
-// parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
-// it in writeSkeleton() and use `parent_scale` in this function
-static void compressPositions(float parent_scale, Array<FBXImporter::Key>& out)
-{
-	if (out.empty()) return;
-
-	const float ERROR = 0; 
-	Vec3 dir = out[1].pos - out[0].pos;
-	dir *= float(1 / ofbx::fbxTimeToSeconds(out[1].time - out[0].time));
-	u32 prev = 0;
-	for (u32 i = 2; i < (u32)out.size(); ++i) {
-		const Vec3 estimate = out[prev].pos + dir * (float)ofbx::fbxTimeToSeconds(out[i].time - out[prev].time);
-		const Vec3 diff = estimate - out[i].pos;
-		if (fabs(diff.x) > ERROR || fabs(diff.y) > ERROR || fabs(diff.z) > ERROR)  {
-			prev = i - 1;
-			dir = out[i].pos - out[i - 1].pos;
-			dir *= float(1 / ofbx::fbxTimeToSeconds(out[i].time - out[i - 1].time));
-		}
-		else {
-			out[i - 1].flags |= 1;
-		}
-	}
-	for (u32 i = 0; i < (u32)out.size(); ++i) {
-		out[i].pos *= parent_scale;
-	}
-}
-
-static void compressRotations(Array<FBXImporter::Key>& out)
-{
-	if (out.empty()) return;
-
-	const float ERROR = 0; 
-	u32 prev = 0;
-	for (u32 i = 2; i < (u32)out.size(); ++i) {
-		const float t = float(ofbx::fbxTimeToSeconds(out[prev + 1].time - out[prev].time) / ofbx::fbxTimeToSeconds(out[i].time - out[prev].time));
-		const Quat estimate = nlerp(out[prev].rot, out[i].rot, t);
-		if (fabs(estimate.x - out[prev + 1].rot.x) > ERROR || fabs(estimate.y - out[prev + 1].rot.y) > ERROR ||
-			fabs(estimate.z - out[prev + 1].rot.z) > ERROR) 
-		{
-			prev = i - 1;
-		}
-		else {
-			out[i - 1].flags |= 2;
-		}
-	}
-}
-
 static float getScaleX(const ofbx::Matrix& mtx)
 {
 	Vec3 v(float(mtx.m[0]), float(mtx.m[4]), float(mtx.m[8]));
@@ -1383,24 +1336,16 @@ static float getScaleX(const ofbx::Matrix& mtx)
 	return length(v);
 }
 
-static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Array<FBXImporter::Key>& keys, i64 from_time, i64 to_time) {
+static i64 frameToFBXTime(u32 frame, float fps) {
+	return ofbx::secondsToFbxTime(frame / fps);
+}
+
+static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Array<FBXImporter::Key>& keys, u32 from_frame, u32 frame_count, float fps) {
 	const ofbx::AnimationCurveNode* translation_node = layer.getCurveNode(bone, "Lcl Translation");
 	const ofbx::AnimationCurveNode* rotation_node = layer.getCurveNode(bone, "Lcl Rotation");
 	if (!translation_node && !rotation_node) return;
 
-	keys.emplace().time = 0;
-	keys.emplace().time = to_time - from_time;
-	if (translation_node) {
-		fillTimes(translation_node->getCurve(0), keys, from_time, to_time);
-		fillTimes(translation_node->getCurve(1), keys, from_time, to_time);
-		fillTimes(translation_node->getCurve(2), keys, from_time, to_time);
-	}
-
-	if (rotation_node) {
-		fillTimes(rotation_node->getCurve(0), keys, from_time, to_time);
-		fillTimes(rotation_node->getCurve(1), keys, from_time, to_time);
-		fillTimes(rotation_node->getCurve(2), keys, from_time, to_time);
-	}
+	keys.resize(frame_count);
 	
 	auto fill_rot = [&](u32 idx, const ofbx::AnimationCurve* curve) {
 		if (!curve) {
@@ -1411,8 +1356,9 @@ static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Ar
 			return;
 		}
 
-		for (FBXImporter::Key& k : keys) {
-			(&k.rot.x)[idx] = evalCurve(k.time + from_time, *curve);
+		for (u32 f = 0; f < (u32)keys.size(); ++f) {
+			FBXImporter::Key& k = keys[f];
+			(&k.rot.x)[idx] = evalCurve(frameToFBXTime(from_frame + f, fps), *curve);
 		}
 	};
 	
@@ -1425,8 +1371,9 @@ static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Ar
 			return;
 		}
 
-		for (FBXImporter::Key& k : keys) {
-			(&k.pos.x)[idx] = evalCurve(k.time + from_time, *curve);
+		for (u32 f = 0; f < (u32)keys.size(); ++f) {
+			FBXImporter::Key& k = keys[f];
+			(&k.pos.x)[idx] = evalCurve(frameToFBXTime(from_frame + f, fps), *curve);
 		}
 	};
 	
@@ -1445,46 +1392,6 @@ static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Ar
 
 }
 
-static bool shouldSample(u32 keyframe_count, float anim_len, float fps, u32 data_size) {
-	const u32 sampled_frame_count = u32(anim_len * fps);
-	const u32 sampled_size = sampled_frame_count * data_size;
-	const u32 time_size = sizeof(u16);
-	const u32 keyframed_size = keyframe_count * (data_size + time_size);
-
-	// * 4 / 3 -> prefer sampled even when a bit bigger, since sampled tracks are faster
-	return sampled_size < keyframed_size * 4 / 3; 
-}
-
-static LocalRigidTransform sample(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, float t) {
-	const ofbx::AnimationCurveNode* translation_node = layer.getCurveNode(bone, "Lcl Translation");
-	const ofbx::AnimationCurveNode* rotation_node = layer.getCurveNode(bone, "Lcl Rotation");
-
-	LocalRigidTransform res;
-	res.pos = toLumixVec3(bone.getLocalTranslation());
-	if (translation_node) {
-		const ofbx::AnimationCurve* x_curve = translation_node->getCurve(0);
-		const ofbx::AnimationCurve* y_curve = translation_node->getCurve(1);
-		const ofbx::AnimationCurve* z_curve = translation_node->getCurve(2);
-		if (x_curve) res.pos.x = evalCurve(ofbx::secondsToFbxTime(t), *x_curve);
-		if (y_curve) res.pos.y = evalCurve(ofbx::secondsToFbxTime(t), *y_curve);
-		if (z_curve) res.pos.z = evalCurve(ofbx::secondsToFbxTime(t), *z_curve);
-	}
-
-	Vec3 euler_angles;
-	euler_angles = toLumixVec3(bone.getLocalRotation());
-	if (rotation_node) {
-		const ofbx::AnimationCurve* x_curve = rotation_node->getCurve(0);
-		const ofbx::AnimationCurve* y_curve = rotation_node->getCurve(1);
-		const ofbx::AnimationCurve* z_curve = rotation_node->getCurve(2);
-		if (x_curve) euler_angles.x = evalCurve(ofbx::secondsToFbxTime(t), *x_curve);
-		if (y_curve) euler_angles.y = evalCurve(ofbx::secondsToFbxTime(t), *y_curve);
-		if (z_curve) euler_angles.z = evalCurve(ofbx::secondsToFbxTime(t), *z_curve);
-	}
-	
-	const ofbx::Matrix mtx = bone.evalLocal({res.pos.x, res.pos.y, res.pos.z}, {euler_angles.x, euler_angles.y, euler_angles.z});
-	convert(mtx, res.pos, res.rot);
-	return res;
-}
 /*
 static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& keys, const Quat& bind_rot, float error) {
 	if (count != 2) return false;
@@ -1499,14 +1406,92 @@ static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& ke
 }
 */
 static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const Vec3& bind_pos) {
-	if (count != 2) return false;
-	const float ERROR = 0;
+	const float ERROR = 0.00001f;
 	for (const FBXImporter::Key& key : keys) {
-		if (key.flags & 1) continue;
 		const Vec3 d = key.pos - bind_pos;
-		if (d.x > ERROR || d.y > ERROR || d.z > ERROR) return false;
+		if (fabsf(d.x) > ERROR || fabsf(d.y) > ERROR || fabsf(d.z) > ERROR) return false;
 	}
 	return true;
+}
+
+namespace {
+
+struct BitWriter {
+	BitWriter(OutputMemoryStream& blob, u32 total_bits)
+		: blob(blob)
+	{
+		const u64 offset = blob.size();
+		blob.resize(blob.size() + (total_bits + 7) / 8);
+		ptr = blob.getMutableData() + offset;
+		memset(ptr, 0, (total_bits + 7) / 8);
+	}
+
+	static u32 quantize(float v, float min, float max, u32 bitsize) {
+		return u32(double(v - min) / (max - min) * (1 << bitsize) + 0.5f);
+	}
+
+	void write(float v, float min, float max, u32 bitsize) {
+		ASSERT(bitsize < 32);
+		write(quantize(v, min, max, bitsize), bitsize);
+	}
+
+	void write(u64 v, u32 bitsize) {
+		while (bitsize > 0) {
+			u32 to_write_size_bits = minimum(64 - (cursor % 64), bitsize);
+			u64 to_write_bits = u64(v >> (bitsize - to_write_size_bits));
+			u64 tmp;
+			memcpy(&tmp, &ptr[cursor / 64 * 8], sizeof(tmp));
+			tmp |= to_write_bits << (64 - to_write_size_bits - (cursor % 64));
+			memcpy(&ptr[cursor / 64 * 8], &tmp, sizeof(tmp));
+
+			bitsize -= to_write_size_bits;
+			cursor += to_write_size_bits;
+			v = v & ((u64(1) << bitsize) - 1);
+		}
+	};
+
+	OutputMemoryStream& blob;
+	u32 cursor = 0;
+	u8* ptr;
+};
+
+struct RotationTrack {
+	Quat min, max;
+	u8 bitsizes[4];
+	bool is_const;
+};
+
+u64 pack(float v, float min, float range, u32 bitsize) {
+	double normalized = double(v - min) / range;
+	return u64(normalized * double((1 << bitsize) - 1) + 0.5f);
+}
+
+u64 pack(const Quat& r, const RotationTrack& track) {
+	u64 res = 0;
+	res |= pack(r.w, track.min.w, track.max.w - track.min.w, track.bitsizes[3]);
+	res <<= track.bitsizes[2];
+
+	res |= pack(r.z, track.min.z, track.max.z - track.min.z, track.bitsizes[2]);
+	res <<= track.bitsizes[1];
+
+	res |= pack(r.y, track.min.y, track.max.y - track.min.y, track.bitsizes[1]);
+	res <<= track.bitsizes[0];
+
+	res |= pack(r.x, track.min.x, track.max.x - track.min.x, track.bitsizes[0]);
+	return res;
+}
+
+bool isConstRotationTrack(const Array<FBXImporter::Key>& keys) {
+	ASSERT(!keys.empty());
+	for (const FBXImporter::Key& k : keys) {
+		if (fabsf(k.rot.x - keys[0].rot.x) > 0.00001f) return false;
+		if (fabsf(k.rot.y - keys[0].rot.y) > 0.00001f) return false;
+		if (fabsf(k.rot.z - keys[0].rot.z) > 0.00001f) return false;
+		if (fabsf(k.rot.w - keys[0].rot.w) > 0.00001f) return false;
+	}
+	return true;
+}
+
 }
 
 void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
@@ -1536,61 +1521,52 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 			continue;
 		}
 
-		auto write_animation = [&](StringView name, u32 from_frame, u32 to_frame) {
+		Array<RotationTrack> rotation_tracks(m_allocator);
+		rotation_tracks.resize(m_bones.size());
+
+		auto write_animation = [&](StringView name, u32 from_frame, u32 frames_count) {
 			out_file.clear();
-			const double anim_len = double(to_frame - from_frame) / fps;
 			Animation::Header header;
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = Animation::Version::LAST;
-			header.length = Time::fromSeconds((float)anim_len);
-			header.frame_count = to_frame - from_frame;
 			write(header);
+			write(fps);
+			write(frames_count);
 			write(cfg.animation_flags);
 
-			const i64 from_fbx_time = ofbx::secondsToFbxTime((double)from_frame / fps);
-			const i64 to_fbx_time = ofbx::secondsToFbxTime((double)to_frame / fps);
-
 			Array<Array<Key>> all_keys(m_allocator);
-			auto fbx_to_anim_time = [anim_len](i64 fbx_time){
-				const double t = clamp(ofbx::fbxTimeToSeconds(fbx_time) / anim_len, 0.0, 1.0);
-				return u16(t * 0xffFF);
-			};
 
 			all_keys.reserve(m_bones.size());
 			for (const ofbx::Object* bone : m_bones) {
 				Array<Key>& keys = all_keys.emplace(m_allocator);
-				fill(*bone, *layer, keys, from_fbx_time, to_fbx_time);
+				fill(*bone, *layer, keys, from_frame, frames_count, fps);
 			}
 
 			for (const ofbx::Object*& bone : m_bones) {
-				Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
 				ofbx::Object* parent = bone->getParent();
-				const float parent_scale = parent ? (float)getScaleX(parent->getGlobalTransform()) : 1;
-				// TODO skip curves which do not change anything
-				compressRotations(keys);
-				compressPositions(parent_scale, keys);
+				if (!parent) continue;
+
+				// parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
+				// it in writeSkeleton() and use `parent_scale` in this function
+				const float parent_scale = (float)getScaleX(parent->getGlobalTransform());
+				Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
+				for (Key& k : keys) k.pos *= parent_scale;
 			}
 
-			const u64 stream_translations_count_pos = out_file.size();
 			u32 translation_curves_count = 0;
+			u64 toffset = out_file.size();
 			write(translation_curves_count);
 			for (const ofbx::Object*& bone : m_bones) {
 				Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
-				u32 count = 0;
-				for (Key& key : keys) {
-					if ((key.flags & 1) == 0) ++count;
-				}
-				if (count == 0) continue;
+				if (keys.empty()) continue;
 				const u32 idx = u32(&bone - m_bones.begin());
 
 				ofbx::Object* parent = bone->getParent();
 				Vec3 bind_pos;
-				if (!parent)
-				{
+				if (!parent) {
 					bind_pos = m_bind_pose[idx].getTranslation();
 				}
-				else
-				{
+				else {
 					const int parent_idx = m_bones.indexOf(parent);
 					if (m_bind_pose.empty()) {
 						// TODO should not we evalLocal here like in rotation ~50lines below?
@@ -1601,38 +1577,28 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 					}
 				}
 
-				if (isBindPosePositionTrack(count, keys, bind_pos)) continue;
+				if (isBindPosePositionTrack(keys.size(), keys, bind_pos)) continue;
 			
 				const BoneNameHash name_hash(bone->name);
 				write(name_hash);
-				write(Animation::CurveType::KEYFRAMED);
-				write(count);
-
-				for (Key& key : keys) {
-					if ((key.flags & 1) == 0) {
-						write(fbx_to_anim_time(key.time));
-					}
-				}
-				for (Key& key : keys) {
-					if ((key.flags & 1) == 0) {
-						write(fixOrientation(key.pos * cfg.mesh_scale * m_fbx_scale));
-					}
-				}
+				// TODO animation stats
+				// TODO track types
+				// TODO quantization
+				write(Animation::TrackType::SAMPLED);
+				for (const Key& k : keys) write(fixOrientation(k.pos * cfg.mesh_scale * m_fbx_scale));
 				++translation_curves_count;
 			}
-			memcpy(out_file.getMutableData() + stream_translations_count_pos, &translation_curves_count, sizeof(translation_curves_count));
+			memcpy(out_file.getMutableData() + toffset, &translation_curves_count, sizeof(translation_curves_count));
 
-			const u64 stream_rotations_count_pos = out_file.size();
 			u32 rotation_curves_count = 0;
+			u64 roffset = out_file.size();
 			write(rotation_curves_count);
 
+			u32 total_bits = 0;
+			u32 offset_bits = 0;
 			for (const ofbx::Object*& bone : m_bones) {
 				Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
-				u32 count = 0;
-				for (Key& key : keys) {
-					if ((key.flags & 2) == 0) ++count;
-				}
-				if (count == 0) continue;
+				if (keys.empty()) continue;
 			
 				Quat bind_rot;
 				const u32 bone_idx = u32(&bone - m_bones.begin());
@@ -1652,47 +1618,84 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 						bind_rot = (m_bind_pose[parent_idx].inverted() * m_bind_pose[bone_idx]).getRotation();
 					}
 				}
+
 				//if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
 
 				const BoneNameHash name_hash(bone->name);
 				write(name_hash);
-				if (shouldSample(count, float(anim_len), fps, sizeof(Quat))) {
-					write(Animation::CurveType::SAMPLED);
-					count = u32(anim_len * fps + 0.5f);
-					write(count);
-					for (u32 i = 0; i < count; ++i) {
-						const float t = float(anim_len * ((float)i / (count - 1)));
-						write(fixOrientation(sample(*bone, *layer, t + from_frame / fps).rot));
-					}
+
+				if (isConstRotationTrack(keys)) {
+					rotation_tracks[bone_idx].is_const = true;
+					write(Animation::TrackType::CONSTANT);
+					write(keys[0].rot);
 				}
 				else {
-					write(Animation::CurveType::KEYFRAMED);
-					write(count);
-					for (Key& key : keys) {
-						if ((key.flags & 2) == 0) {
-							write(fbx_to_anim_time(key.time));
-						}
+					rotation_tracks[bone_idx].is_const = false;
+					write(Animation::TrackType::SAMPLED);
+				
+					Quat min(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX), max(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+					for (const Key& k : keys) {
+						const Quat r = fixOrientation(k.rot);
+						min.x = minimum(min.x, r.x); max.x = maximum(max.x, r.x);
+						min.y = minimum(min.y, r.y); max.y = maximum(max.y, r.y);
+						min.z = minimum(min.z, r.z); max.z = maximum(max.z, r.z);
+						min.w = minimum(min.w, r.w); max.w = maximum(max.w, r.w);
 					}
-					for (Key& key : keys) {
-						if ((key.flags & 2) == 0) {
-							write(fixOrientation(key.rot));
-						}
-					}
+					u8 bitsizes[] = {
+						(u8)log2(u32((max.x - min.x) / 0.0001f)),
+						(u8)log2(u32((max.y - min.y) / 0.0001f)),
+						(u8)log2(u32((max.z - min.z) / 0.0001f)),
+						(u8)log2(u32((max.w - min.w) / 0.0001f))
+					};
+
+					write(min);
+					write(max.x - min.x);
+					write(max.y - min.y);
+					write(max.z - min.z);
+					write(max.w - min.w);
+					write(bitsizes);
+					const u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2] + bitsizes[3]);
+					write(bitsize);
+					write(offset_bits);
+					offset_bits += bitsize;
+				
+					memcpy(rotation_tracks[bone_idx].bitsizes, bitsizes, sizeof(bitsizes));
+					rotation_tracks[bone_idx].max = max;
+					rotation_tracks[bone_idx].min = min;
+					total_bits += bitsize * keys.size();
 				}
 				++rotation_curves_count;
 			}
+			memcpy(out_file.getMutableData() + roffset, &rotation_curves_count, sizeof(rotation_curves_count));
 
-			memcpy(out_file.getMutableData() + stream_rotations_count_pos, &rotation_curves_count, sizeof(rotation_curves_count));
+			BitWriter bit_writer(out_file, total_bits);
+
+			for (u32 i = 0; i < frames_count; ++i) {
+				for (const ofbx::Object*& bone : m_bones) {
+					const u32 bone_idx = u32(&bone - m_bones.begin());
+					Array<Key>& keys = all_keys[bone_idx];
+					const RotationTrack& track = rotation_tracks[bone_idx];
+
+					if (!keys.empty() && !track.is_const) {
+						const Key& k = keys[i];
+						Quat q = fixOrientation(k.rot);
+						const u64 packed = pack(q, track);
+						const u32 bitsize = (track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + track.bitsizes[3]);
+						ASSERT(bitsize <= 64);
+						bit_writer.write(packed, bitsize);
+					}
+				}
+			}
 
 			Path anim_path(name, ".ani:", src);
 			m_compiler.writeCompiledResource(anim_path, Span(out_file.data(), (i32)out_file.size()));
 		};
 		if (cfg.clips.length() == 0) {
-			write_animation(anim.name, 0, u32(full_len * fps + 0.5f));
+			write_animation(anim.name, 0, u32(full_len * fps + 0.5f) + 1);
 		}
 		else {
 			for (const ImportConfig::Clip& clip : cfg.clips) {
-				write_animation(clip.name, clip.from_frame, clip.to_frame);
+				write_animation(clip.name, clip.from_frame, clip.to_frame - clip.from_frame + 1);
 			}
 		}
 	}

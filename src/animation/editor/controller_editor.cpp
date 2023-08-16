@@ -48,6 +48,43 @@ static bool editInput(const char* label, u32* input_index, const Controller& con
 }
 
 struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+	struct SnapIKEventType : EventType {
+		SnapIKEventType() {
+			type = RuntimeHash("snap_ik");
+			label = "Set input";
+			size = sizeof(u32) + sizeof(float);
+		}
+
+		bool onGUI(u8* data, const Controller& controller) const override {
+			bool changed = editInput("Input", (u32*)data, controller);
+			if (changed) {
+				memset(data + sizeof(u32), 0, sizeof(float));
+			}
+			const u32 input_index = *(u32*)data;
+			auto& inputs = controller.m_inputs;
+			if (inputs.inputs_count == 0) return changed;
+			ImGuiEx::Label("Value");
+			switch (inputs.inputs[input_index].type) {
+				case InputDecl::BOOL: {
+					bool b = *(u32*)(data + sizeof(u32)) != 0;
+					if (ImGui::Checkbox("##v", &b)) {
+						changed = true;
+						*(u32*)(data + sizeof(u32)) = b;
+					}
+					break;
+				}
+				case InputDecl::FLOAT:
+					changed = ImGui::DragFloat("##v", (float*)(data + sizeof(u32))) || changed;
+					break;
+				case InputDecl::U32:
+					changed = ImGui::DragInt("##v", (i32*)(data + sizeof(u32))) || changed;
+					break;
+				default: ASSERT(false); break;
+			}
+			return changed;
+		}
+	};
+
 	struct SetInputEventType : EventType {
 		SetInputEventType() {
 			type = RuntimeHash("set_input");
@@ -1265,6 +1302,22 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				}
 				ImGui::PopID();
 			}
+
+			if (m_controller.m_ik_count > 0) {
+				for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
+					if (ImGui::TreeNode((const void*)(uintptr)i, "IK chain %d", i)) {
+						ImGui::Checkbox("Enabled", &m_ik_debug[i].enabled);
+						if (m_ik_debug[i].enabled) ImGui::DragFloat3("Target", &m_ik_debug[i].target.x);
+						ImGui::TreePop();
+					}
+					module->setAnimatorIK(entity, i, m_ik_debug[i].enabled ? 1.f : 0.f, m_ik_debug[i].target);
+					if (m_ik_debug[i].enabled) {
+						auto* render_module = (RenderModule*)world.getModule("renderer");
+						Transform tr = world.getTransform(entity);
+						render_module->addDebugCross(tr.transform(m_ik_debug[i].target), 0.25f, Color::RED);
+					}
+				}
+			}
 		}
 
 		void saveAs(const Path& path) {
@@ -1402,6 +1455,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (ik.bones_count > 1) {
 							ImGui::SameLine();
 							if (ImGui::Button("Pop")) {
+								memmove(&ik.bones[0], &ik.bones[1], sizeof(ik.bones[0]) * ik.bones_count - 1);
 								--ik.bones_count;
 								pushUndo();
 							}
@@ -1781,6 +1835,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			i32 axis_y = -1;
 		};
 
+		struct IKDebug {
+			bool enabled = false;
+			Vec3 target = Vec3(0); 
+		};
+
 		WorldViewer m_viewer;
 		IAllocator& m_allocator;
 		StudioApp& m_app;
@@ -1797,6 +1856,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		bool m_show_skeleton = true;
 		i32 m_hovered_blend2d_child = -1;
 		ControllerDebugMapping m_controller_debug_mapping;
+		IKDebug m_ik_debug[4];
 	};
 
 	ControllerEditorImpl(StudioApp& app)

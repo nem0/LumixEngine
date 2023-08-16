@@ -95,7 +95,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 
-			const Array<Animation::RotationCurve>& rotations = m_resource->getRotations();
+			const Array<Animation::RotationTrack>& rotations = m_resource->getRotations();
 			const Array<Animation::TranslationCurve>& translations = m_resource->getTranslations();
 
 			if (!translations.empty() && ImGui::TreeNode("Translations")) {
@@ -112,15 +112,9 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					}
 					if (open) {
 						ImGui::Columns(4);
-						for (u32 i = 0; i < curve.count; ++i) {
+						for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
 							const Vec3 p = curve.pos[i];
-							if (curve.times) {
-								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
-								ImGui::Text("%.2f s", t);
-							}
-							else {
-								ImGui::Text("frame %d", i);
-							}
+							ImGui::Text("%d:", i);
 							ImGui::NextColumn();
 							ImGui::Text("%f", p.x);
 							ImGui::NextColumn();
@@ -138,7 +132,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			}
 
 			if (!rotations.empty() && ImGui::TreeNode("Rotations")) {
-				for (const Animation::RotationCurve& curve : rotations) {
+				for (const Animation::RotationTrack& curve : rotations) {
+					u32 curve_idx = u32(&curve - rotations.begin());
 					auto iter = m_model->getBoneIndex(curve.name);
 					if (!iter.isValid()) continue;
 
@@ -146,21 +141,15 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 
-					bool open = ImGui::TreeNodeEx(bone.name.c_str(), flags);
+					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), m_resource->getRotations()[curve_idx].bitsizes_sum);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
 						m_selected_bone = curve.name;
 					}
 					if (open) {
 						ImGui::Columns(4);
-						for (u32 i = 0; i < curve.count; ++i) {
-							const Vec3 r = radiansToDegrees(curve.rot[i].toEuler());
-							if (curve.times) {
-								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
-								ImGui::Text("%.2f s", t);
-							}
-							else {
-								ImGui::Text("frame %d", i);
-							}
+						for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
+							const Vec3 r = radiansToDegrees(m_resource->getRotation(i, curve_idx).toEuler());
+							ImGui::Text("%d:", i);
 							ImGui::NextColumn();
 							ImGui::Text("%f", r.x);
 							ImGui::NextColumn();

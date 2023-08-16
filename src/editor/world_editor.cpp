@@ -555,12 +555,9 @@ static void save(ComponentUID cmp, OutputMemoryStream& out) {
 static void load(ComponentUID cmp, InputMemoryStream& blob)
 {
 	struct : IAllocator {
-		void* allocate(size_t size) override { ASSERT(false); return nullptr; }
+		void* allocate(size_t size, size_t align) override { ASSERT(false); return nullptr; }
 		void deallocate(void* ptr) override { ASSERT(!ptr); }
-		void* reallocate(void* ptr, size_t new_size, size_t old_size) override { ASSERT(false); return nullptr; }
-		void* allocate_aligned(size_t size, size_t align) override { ASSERT(false); return nullptr; }
-		void deallocate_aligned(void* ptr) override { ASSERT(!ptr); }
-		void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override { ASSERT(false); return nullptr; }
+		void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override { ASSERT(false); return nullptr; }
 
 	} alloc;
 	HashMap<EntityPtr, u32> map(alloc);

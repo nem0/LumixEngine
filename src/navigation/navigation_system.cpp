@@ -38,9 +38,9 @@ struct NavigationSystem final : ISystem {
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	static void detourFree(void* ptr) { s_instance->m_allocator.deallocate(ptr); }
-	static void* detourAlloc(size_t size, dtAllocHint hint) { return s_instance->m_allocator.allocate(size); }
+	static void* detourAlloc(size_t size, dtAllocHint hint) { return s_instance->m_allocator.allocate(size, 8); }
 	static void recastFree(void* ptr) { s_instance->m_allocator.deallocate(ptr); }
-	static void* recastAlloc(size_t size, rcAllocHint hint) { return s_instance->m_allocator.allocate(size); }
+	static void* recastAlloc(size_t size, rcAllocHint hint) { return s_instance->m_allocator.allocate(size, 8); }
 
 	const char* getName() const override { return "navigation"; }
 	void createModules(World& world) override;

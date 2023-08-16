@@ -113,7 +113,7 @@ void String::operator=(StringView rhs) {
 		m_small[rhs.size()] = '\0';
 	}
 	else {
-		m_big = (char*)m_allocator.allocate(rhs.size() + 1);
+		m_big = (char*)m_allocator.allocate(rhs.size() + 1, 1);
 		memcpy(m_big, rhs.begin, rhs.size());
 		m_big[rhs.size()] = '\0';
 	}
@@ -139,7 +139,7 @@ void String::resize(u32 size) {
 			m_small[size] = '\0';
 		}
 		else {
-			char* tmp = (char*)m_allocator.allocate(size + 1);
+			char* tmp = (char*)m_allocator.allocate(size + 1, 1);
 			memcpy(tmp, m_small, m_size + 1);
 			tmp[size] = '\0';
 			m_big = tmp;
@@ -153,7 +153,7 @@ void String::resize(u32 size) {
 			m_allocator.deallocate(tmp);
 		}
 		else {
-			m_big = (char*)m_allocator.reallocate(m_big, size + 1, m_size + 1);
+			m_big = (char*)m_allocator.reallocate(m_big, size + 1, m_size + 1, 1);
 			m_big[size] = '\0';
 		}
 	}

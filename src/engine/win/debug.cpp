@@ -262,7 +262,7 @@ static const u32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
 static const u32 FREED_MEMORY_PATTERN = 0xDD;
 static const u32 ALLOCATION_GUARD = 0xFDFDFDFD;
 
-void* GuardAllocator::allocate_aligned(size_t size, size_t align) {
+void* GuardAllocator::allocate(size_t size, size_t align) {
 	const size_t pages = 1 + ((size + 4095) >> 12);
 	void* mem = VirtualAlloc(nullptr, pages * 4096, MEM_RESERVE, PAGE_READWRITE);
 	VirtualAlloc(mem, (pages - 1) * 4096, MEM_COMMIT, PAGE_READWRITE);
@@ -273,7 +273,7 @@ void* GuardAllocator::allocate_aligned(size_t size, size_t align) {
 	return (void*)(uintptr_t(ptr + (pages - 1) * 4096 - size) & ~size_t(align - 1));
 }
 
-void GuardAllocator::deallocate_aligned(void* ptr) {
+void GuardAllocator::deallocate(void* ptr) {
 	VirtualFree((void*)((uintptr_t)ptr & ~(size_t)4095), 0, MEM_RELEASE);
 }
 
@@ -409,25 +409,7 @@ u8* Allocator::getSystemFromUser(void* user_ptr)
 	return (u8*)user_ptr - diff;
 }
 
-
-void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size)
-{
-	if (user_ptr == nullptr) return allocate(new_size);
-	if (new_size == 0) return nullptr;
-
-	void* new_data = allocate(new_size);
-	if (!new_data) return nullptr;
-
-	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
-
-	deallocate(user_ptr);
-
-	return new_data;
-}
-
-
-void* Allocator::allocate_aligned(size_t size, size_t align)
+void* Allocator::allocate(size_t size, size_t align)
 {
 	void* system_ptr;
 	AllocationInfo* info;
@@ -436,7 +418,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	size_t system_size = getNeededMemory(size, align);
 
 	m_mutex.enter();
-	system_ptr = m_source.allocate_aligned(system_size, align);
+	system_ptr = m_source.allocate(system_size, align);
 	user_ptr = getUserFromSystem(system_ptr, align);
 	info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
 
@@ -470,7 +452,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 }
 
 
-void Allocator::deallocate_aligned(void* user_ptr)
+void Allocator::deallocate(void* user_ptr)
 {
 	if (user_ptr)
 	{
@@ -502,102 +484,25 @@ void Allocator::deallocate_aligned(void* user_ptr)
 
 		info->~AllocationInfo();
 
-		m_source.deallocate_aligned((void*)system_ptr);
+		m_source.deallocate((void*)system_ptr);
 	}
 }
 
 
-void* Allocator::reallocate_aligned(void* user_ptr, size_t new_size, size_t old_size, size_t align)
+void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size, size_t align)
 {
-	if (user_ptr == nullptr) return allocate_aligned(new_size, align);
+	if (user_ptr == nullptr) return allocate(new_size, align);
 	if (new_size == 0) return nullptr;
 
-	void* new_data = allocate_aligned(new_size, align);
+	void* new_data = allocate(new_size, align);
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
 	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
 
-	deallocate_aligned(user_ptr);
+	deallocate(user_ptr);
 
 	return new_data;
-}
-
-
-void* Allocator::allocate(size_t size)
-{
-	void* system_ptr;
-	AllocationInfo* info;
-	size_t system_size = getNeededMemory(size);
-	{
-		MutexGuard lock(m_mutex);
-		system_ptr = m_source.allocate(system_size);
-		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
-
-		info->previous = m_root->previous;
-		m_root->previous->next = info;
-
-		info->next = m_root;
-		m_root->previous = info;
-
-		m_root = info;
-
-		m_total_size += size;
-	} // because of the lock
-
-	void* user_ptr = getUserFromSystem(system_ptr, 0);
-	info->stack_leaf = m_stack_tree.record();
-	info->size = size;
-	info->align = 0;
-	info->tag = TagAllocator::active_allocator;
-	if (m_is_fill_enabled)
-	{
-		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
-	}
-
-	if (m_are_guards_enabled)
-	{
-		*(u32*)system_ptr = ALLOCATION_GUARD;
-		*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
-	}
-
-	return user_ptr;
-}
-
-void Allocator::deallocate(void* user_ptr)
-{
-	if (user_ptr)
-	{
-		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-		void* system_ptr = getSystemFromUser(user_ptr);
-		if (m_is_fill_enabled)
-		{
-			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
-		}
-
-		if (m_are_guards_enabled)
-		{
-			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
-			size_t system_size = getNeededMemory(info->size);
-			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
-		}
-
-		{
-			MutexGuard lock(m_mutex);
-			if (info == m_root)
-			{
-				m_root = info->next;
-			}
-			info->previous->next = info->next;
-			info->next->previous = info->previous;
-
-			m_total_size -= info->size;
-		} // because of the lock
-
-		info->~AllocationInfo();
-
-		m_source.deallocate((void*)system_ptr);
-	}
 }
 
 } // namespace Debug

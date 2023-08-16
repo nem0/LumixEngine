@@ -96,7 +96,7 @@ template <typename T> struct Array {
 		ASSERT(&m_allocator == &rhs.m_allocator);
 		if (this != &rhs) {
 			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate_aligned(m_data);
+			m_allocator.deallocate(m_data);
 			m_data = rhs.m_data;
 			m_capacity = rhs.m_capacity;
 			m_size = rhs.m_size;
@@ -109,7 +109,7 @@ template <typename T> struct Array {
 	~Array() {
 		if (!m_data) return;
 		callDestructors(m_data, m_data + m_size);
-		m_allocator.deallocate_aligned(m_data);
+		m_allocator.deallocate(m_data);
 	}
 
 	template <typename F> int find(F predicate) const {
@@ -241,10 +241,10 @@ template <typename T> struct Array {
 			if (m_size == m_capacity) {
 				u32 new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
 				T* old_data = m_data;
-				m_data = (T*)m_allocator.allocate_aligned(new_capacity * sizeof(T), alignof(T));
+				m_data = (T*)m_allocator.allocate(new_capacity * sizeof(T), alignof(T));
 				moveRange(m_data, old_data, idx);
 				moveRange(m_data + idx + 1, old_data + idx, m_size - idx);
-				m_allocator.deallocate_aligned(old_data);
+				m_allocator.deallocate(old_data);
 				m_capacity = new_capacity;
 			} else {
 				moveRange(m_data + idx + 1, m_data + idx, m_size - idx);
@@ -293,9 +293,9 @@ template <typename T> struct Array {
 
 	void reserve(u32 capacity) {
 		if (capacity > m_capacity) {
-			T* new_data = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), alignof(T));
+			T* new_data = (T*)m_allocator.allocate(capacity * sizeof(T), alignof(T));
 			moveRange(new_data, m_data, m_size);
-			m_allocator.deallocate_aligned(m_data);
+			m_allocator.deallocate(m_data);
 			m_data = new_data;
 			m_capacity = capacity;
 		}

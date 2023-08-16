@@ -657,7 +657,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				size_t sum = 0;
 				for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
 					if (m_resource_filter[0] != '\0' && findInsensitive(iter.value()->getPath(), m_resource_filter) == nullptr) continue;
-					if (m_resource_size_filter > iter.value()->size() / 1000) continue;
+					if (m_resource_size_filter > iter.value()->getFileSize() / 1024) continue;
 				
 					ImGui::TableNextColumn();
 					ImGui::PushID(iter.value());
@@ -668,8 +668,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					ImGui::SameLine();
 					ImGuiEx::TextUnformatted(iter.value()->getPath());
 					ImGui::TableNextColumn();
-					ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
-					sum += iter.value()->size();
+					ImGui::Text("%.3fKB", iter.value()->getFileSize() / 1024.0f);
+					sum += iter.value()->getFileSize();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(toString(iter.value()->getState()));
 					ImGui::TableNextColumn();

@@ -210,7 +210,7 @@ ParticleSystem::~ParticleSystem()
 	setResource(nullptr);
 	for (Emitter& emitter : m_emitters) {
 		for (const Channel& c : emitter.channels) {
-			m_allocator.deallocate_aligned(c.data);
+			m_allocator.deallocate(c.data);
 		}
 	}
 }
@@ -228,7 +228,7 @@ void ParticleSystem::onResourceChanged(Resource::State old_state, Resource::Stat
 	if (new_state == Resource::State::READY) {
 		for (Emitter& emitter : m_emitters) {
 			for (Channel& c : emitter.channels) {
-				m_allocator.deallocate_aligned(c.data);
+				m_allocator.deallocate(c.data);
 			}
 		}
 		m_emitters.clear();
@@ -241,7 +241,7 @@ void ParticleSystem::onResourceChanged(Resource::State old_state, Resource::Stat
 		emitter.particles_count = 0;
 		emitter.capacity = 0;
 		for (Channel& c : emitter.channels) {
-			m_allocator.deallocate_aligned(c.data);
+			m_allocator.deallocate(c.data);
 			c.data = nullptr;
 		}
 	}
@@ -300,7 +300,7 @@ void ParticleSystem::ensureCapacity(Emitter& emitter, u32 num_new_particles) {
 		new_capacity = (new_capacity + 3) & ~u32(3);
 		for (u32 i = 0; i < channels_count; ++i)
 		{
-			emitter.channels[i].data = (float*)m_allocator.reallocate_aligned(emitter.channels[i].data, new_capacity * sizeof(float), emitter.capacity * sizeof(float), 16);
+			emitter.channels[i].data = (float*)m_allocator.reallocate(emitter.channels[i].data, new_capacity * sizeof(float), emitter.capacity * sizeof(float), 16);
 		}
 		emitter.capacity = new_capacity;
 	}

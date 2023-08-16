@@ -59,7 +59,7 @@ struct LUMIX_ENGINE_API Resource {
 	bool isFailure() const { return State::FAILURE == m_current_state; }
 	u32 getRefCount() const { return m_ref_count; }
 	ObserverCallback& getObserverCb() { return m_cb; }
-	u64 size() const { return m_size; }
+	u64 getFileSize() const { return m_file_size; }
 	const Path& getPath() const { return m_path; }
 	struct ResourceManager& getResourceManager() { return m_resource_manager; }
 	u32 decRefCount();
@@ -103,7 +103,7 @@ protected:
 	void operator=(const Resource&) = delete;
 
 	ObserverCallback m_cb;
-	u64 m_size;
+	u64 m_file_size;
 	Path m_path;
 	u32 m_ref_count;
 	u16 m_failed_dep_count;

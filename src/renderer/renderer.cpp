@@ -558,7 +558,7 @@ struct RendererImpl final : Renderer
 		MemRef ret;
 		ret.size = size;
 		ret.own = true;
-		ret.data = m_allocator.allocate(size);
+		ret.data = m_allocator.allocate(size, 8);
 		return ret;
 	}
 

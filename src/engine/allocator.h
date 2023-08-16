@@ -3,7 +3,7 @@
 
 #include "engine/lumix.h"
 
-#define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate_aligned(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
+#define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
 #define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 
 namespace Lumix { struct NewPlaceholder {}; }
@@ -18,19 +18,15 @@ struct LUMIX_ENGINE_API IAllocator {
 	virtual bool isTagAllocator() const { return false; }
 	virtual IAllocator* getParent() const { return nullptr; }
 
-	virtual void* allocate(size_t size) = 0;
+	virtual void* allocate(size_t size, size_t align) = 0;
 	virtual void deallocate(void* ptr) = 0;
-	virtual void* reallocate(void* ptr, size_t new_size, size_t old_size) = 0;
-
-	virtual void* allocate_aligned(size_t size, size_t align) = 0;
-	virtual void deallocate_aligned(void* ptr) = 0;
-	virtual void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) = 0;
+	virtual void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) = 0;
 
 	template <typename T> void deleteObject(T* ptr) {
 		if (ptr)
 		{
 			ptr->~T();
-			deallocate_aligned(ptr);
+			deallocate(ptr);
 		}
 	}
 };

@@ -17,7 +17,7 @@ struct StackArray : Array<T> {
 	
 	~StackArray() {
 		this->clear();
-		if (this->m_data) this->m_allocator.deallocate_aligned(this->m_data);
+		if (this->m_data) this->m_allocator.deallocate(this->m_data);
 		this->m_data = nullptr;
 		this->m_capacity = 0;
 	}
