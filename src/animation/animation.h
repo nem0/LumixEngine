@@ -57,7 +57,8 @@ struct Animation final : Resource {
 
 	enum class TrackType : u8 {
 		CONSTANT,
-		SAMPLED
+		SAMPLED,
+		ROOT_MOTION_ROOT
 	};
 
 	enum class Version : u32 {

@@ -203,9 +203,8 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 		m_root_motion.pose_rotations[f] = tmp.rot;
 	}
 
-	// TODO
-	// m_translations[translation_idx].pos = m_root_motion.pose_translations.begin();
-	//m_rotations[rotation_idx].rot = m_root_motion.pose_rotations.begin();
+	m_translations[translation_idx].type = Animation::TrackType::ROOT_MOTION_ROOT;
+	m_rotations[rotation_idx].type = Animation::TrackType::ROOT_MOTION_ROOT;
 }
 
 LocalRigidTransform Animation::getRootMotion(Time time) const {
@@ -268,94 +267,109 @@ float Animation::unpackChannel(u64 val, float min, float range, u32 bitsize) {
 
 Vec3 Animation::getTranslation(u32 frame, u32 curve_idx) const {
 	const TranslationTrack& track = m_translations[curve_idx];
-	if (track.type == Animation::TrackType::CONSTANT) return track.min;
-	const u32 offset = m_translations_frame_size_bits * frame + track.offset_bits;
 
-	u64 tmp;
-	i32 rem = track.bitsizes_sum - (64 - (offset % 64));
-	if (rem <= 0) {
-		u64 buf;
-		memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
-		u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
-		tmp = buf >> offset0;
-	}
-	else {
-		u64 buf[2];
-		memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
-		tmp = buf[0];
-		tmp <<= rem;
-		tmp |= buf[1] >> (64 - rem);
-	}
+	switch (track.type) {
+		case Animation::TrackType::CONSTANT: return track.min;
+		case Animation::TrackType::ROOT_MOTION_ROOT: return m_root_motion.pose_translations[frame];
+		case Animation::TrackType::SAMPLED: {
+			const u32 offset = m_translations_frame_size_bits * frame + track.offset_bits;
 
-	Vec3 res;
-	res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
-	tmp >>= track.bitsizes[0];
-	res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
-	tmp >>= track.bitsizes[1];
-	res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
-	return res;
+			u64 tmp;
+			i32 rem = track.bitsizes_sum - (64 - (offset % 64));
+			if (rem <= 0) {
+				u64 buf;
+				memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
+				u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
+				tmp = buf >> offset0;
+			}
+			else {
+				u64 buf[2];
+				memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
+				tmp = buf[0];
+				tmp <<= rem;
+				tmp |= buf[1] >> (64 - rem);
+			}
+
+			Vec3 res;
+			res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
+			tmp >>= track.bitsizes[0];
+			res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
+			tmp >>= track.bitsizes[1];
+			res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
+			return res;
+		}
+	}
+	ASSERT(false);
+	return {};
 }
 
 Quat Animation::getRotation(u32 frame, u32 curve_idx) const {
 	const RotationTrack& track = m_rotations[curve_idx];
-	if (track.type == Animation::TrackType::CONSTANT) return track.min;
-	const u32 offset = m_rotations_frame_size_bits * frame + track.offset_bits;
+	switch (track.type) {
+		case Animation::TrackType::CONSTANT: return track.min;
+		case Animation::TrackType::ROOT_MOTION_ROOT: return m_root_motion.pose_rotations[frame];
+		case Animation::TrackType::SAMPLED: {
+			const u32 offset = m_rotations_frame_size_bits * frame + track.offset_bits;
 
-	u64 tmp;
-	i32 rem = track.bitsizes_sum - (64 - (offset % 64));
-	if (rem <= 0) {
-		u64 buf;
-		memcpy(&buf, m_rotation_stream + offset / 64 * 8, sizeof(buf));
-		u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
-		tmp = buf >> offset0;
-	}
-	else {
-		u64 buf[2];
-		memcpy(&buf, m_rotation_stream + offset / 64 * 8, sizeof(buf));
-		tmp = buf[0];
-		tmp <<= rem;
-		tmp |= buf[1] >> (64 - rem);
-	}
+			u64 tmp;
+			i32 rem = track.bitsizes_sum - (64 - (offset % 64));
+			if (rem <= 0) {
+				u64 buf;
+				memcpy(&buf, m_rotation_stream + offset / 64 * 8, sizeof(buf));
+				u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
+				tmp = buf >> offset0;
+			}
+			else {
+				u64 buf[2];
+				memcpy(&buf, m_rotation_stream + offset / 64 * 8, sizeof(buf));
+				tmp = buf[0];
+				tmp <<= rem;
+				tmp |= buf[1] >> (64 - rem);
+			}
 
-	bool is_negative = tmp & 1;
-	tmp >>= 1;
+			bool is_negative = tmp & 1;
+			tmp >>= 1;
 
-	Quat res;
-	if (track.skipped_channel != 0) {
-		res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
-		tmp >>= track.bitsizes[0];
-	}
-	if (track.skipped_channel != 1) {
-		res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
-		tmp >>= track.bitsizes[1];
-	}
-	if (track.skipped_channel != 2) {
-		res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
-		tmp >>= track.bitsizes[2];
-	}
-	if (track.skipped_channel != 3) {
-		res.w = unpackChannel(tmp, track.min.w, track.range.w, track.bitsizes[3]);
-	}
-	switch (track.skipped_channel) {
-		case 0: 
-			res.x = sqrtf(maximum(0.f, 1 - (res.y * res.y + res.z * res.z + res.w * res.w)));
-			res.x *= is_negative ? -1 : 1; 
-			break;
-		case 1:
-			res.y = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.z * res.z + res.w * res.w)));
-			res.y *= is_negative ? -1 : 1; 
-			break;
-		case 2:
-			res.z = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.w * res.w)));
-			res.z *= is_negative ? -1 : 1; 
-			break;
-		case 3:
-			res.w = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.z * res.z)));
-			res.w *= is_negative ? -1 : 1; 
-			break;
+			Quat res;
+			if (track.skipped_channel != 0) {
+				res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
+				tmp >>= track.bitsizes[0];
+			}
+			if (track.skipped_channel != 1) {
+				res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
+				tmp >>= track.bitsizes[1];
+			}
+			if (track.skipped_channel != 2) {
+				res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
+				tmp >>= track.bitsizes[2];
+			}
+			if (track.skipped_channel != 3) {
+				res.w = unpackChannel(tmp, track.min.w, track.range.w, track.bitsizes[3]);
+			}
+			switch (track.skipped_channel) {
+				case 0: 
+					res.x = sqrtf(maximum(0.f, 1 - (res.y * res.y + res.z * res.z + res.w * res.w)));
+					res.x *= is_negative ? -1 : 1; 
+					break;
+				case 1:
+					res.y = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.z * res.z + res.w * res.w)));
+					res.y *= is_negative ? -1 : 1; 
+					break;
+				case 2:
+					res.z = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.w * res.w)));
+					res.z *= is_negative ? -1 : 1; 
+					break;
+				case 3:
+					res.w = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.z * res.z)));
+					res.w *= is_negative ? -1 : 1; 
+					break;
 		
+			}
+			return res;
+		}
 	}
-	return res;
+	ASSERT(false);
+	return {};
 }
 
 Quat Animation::getRotation(Time time, u32 curve_idx) const {
