@@ -265,9 +265,9 @@ u8* Allocator::getSystemFromUser(void* user_ptr) {
 }
 
 
-void* Allocator::allocate_aligned(size_t size, size_t align) {
+void* Allocator::allocate(size_t size, size_t align) {
 #ifndef LUMIX_DEBUG
-	return m_source.allocate_aligned(size, align);
+	return m_source.allocate(size, align);
 #else
 	void* system_ptr;
 	AllocationInfo* info;
@@ -276,7 +276,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align) {
 	size_t system_size = getNeededMemory(size, align);
 	{
 		MutexGuard lock(m_mutex);
-		system_ptr = m_source.allocate(system_size);
+		system_ptr = m_source.allocate(system_size, align);
 		user_ptr = getUserFromSystem(system_ptr, align);
 		info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
 
@@ -308,9 +308,9 @@ void* Allocator::allocate_aligned(size_t size, size_t align) {
 }
 
 
-void Allocator::deallocate_aligned(void* user_ptr) {
+void Allocator::deallocate(void* user_ptr) {
 #ifndef LUMIX_DEBUG
-	m_source.deallocate_aligned(user_ptr);
+	m_source.deallocate(user_ptr);
 #else
 	if (user_ptr) {
 		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
@@ -338,26 +338,26 @@ void Allocator::deallocate_aligned(void* user_ptr) {
 
 		info->~AllocationInfo();
 
-		m_source.deallocate_aligned((void*)system_ptr);
+		m_source.deallocate((void*)system_ptr);
 	}
 #endif
 }
 
 
-void* Allocator::reallocate_aligned(void* user_ptr, size_t new_size, size_t old_size, size_t align) {
+void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size, size_t align) {
 #ifndef LUMIX_DEBUG
-	return m_source.reallocate_aligned(user_ptr, new_size, old_size, align);
+	return m_source.reallocate(user_ptr, new_size, old_size, align);
 #else
-	if (user_ptr == nullptr) return allocate_aligned(new_size, align);
+	if (user_ptr == nullptr) return allocate(new_size, align);
 	if (new_size == 0) return nullptr;
 
-	void* new_data = allocate_aligned(new_size, align);
+	void* new_data = allocate(new_size, align);
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
 	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
 
-	deallocate_aligned(user_ptr);
+	deallocate(user_ptr);
 
 	return new_data;
 #endif

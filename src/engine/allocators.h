@@ -1,6 +1,7 @@
 #pragma once
 
 #include "allocator.h"
+#include "crt.h"
 #include "sync.h"
 
 namespace Lumix {
