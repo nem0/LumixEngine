@@ -48,8 +48,8 @@ void Pose::resize(int count)
 	this->count = count;
 	if (count)
 	{
-		positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * count));
-		rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * count));
+		positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * count, alignof(Vec3)));
+		rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * count, alignof(Quat)));
 	}
 	else
 	{

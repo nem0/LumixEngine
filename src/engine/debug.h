@@ -46,15 +46,11 @@ private:
 
 #ifdef _WIN32
 struct LUMIX_ENGINE_API GuardAllocator final : IAllocator {
-	void* allocate(size_t size) override { ASSERT(false); return nullptr; }
-	void deallocate(void* ptr) override { ASSERT(false); }
-	void* reallocate(void* ptr, size_t new_size, size_t old_size) override { ASSERT(false); return nullptr; }
-
-	void* allocate_aligned(size_t size, size_t align) override;
-	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override { 
+	void* allocate(size_t size, size_t align) override;
+	void deallocate(void* ptr) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override { 
 		ASSERT(!ptr);
-		return allocate_aligned(new_size, align); 
+		return allocate(new_size, align); 
 	}
 };
 #endif
@@ -75,12 +71,9 @@ struct LUMIX_ENGINE_API Allocator final : IAllocator {
 
 	bool isDebug() const override { return true; }
 
-	void* allocate(size_t size) override;
+	void* allocate(size_t size, size_t align) override;
 	void deallocate(void* ptr) override;
-	void* reallocate(void* ptr, size_t new_size, size_t old_size) override;
-	void* allocate_aligned(size_t size, size_t align) override;
-	void deallocate_aligned(void* ptr) override;
-	void* reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) override;
+	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 	size_t getTotalSize() const { return m_total_size; }
 	void checkGuards();
 	void checkLeaks();

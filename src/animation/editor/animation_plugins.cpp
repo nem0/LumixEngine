@@ -20,6 +20,7 @@
 #include "controller_editor.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
+#include "renderer/editor/model_meta.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/model.h"
@@ -39,12 +40,15 @@ static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("envi
 
 namespace {
 	
+
 struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
-	struct EditorWindow : AssetEditorWindow {
+	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
+			, SimpleUndoRedo(app.getAllocator())
 			, m_app(app)
 			, m_viewer(app)
+			, m_parent_meta(app.getAllocator())
 		{
 			m_resource = app.getEngine().getResourceManager().load<Animation>(path);
 
@@ -58,6 +62,9 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
 			anim_module->setAnimation(*m_viewer.m_mesh, path);
+
+			m_parent_meta.load(m_model->getPath(), m_app);
+			pushUndo(NO_MERGE_UNDO);
 		}
 
 		~EditorWindow() {
@@ -65,8 +72,37 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			if (m_model) m_model->decRefCount();
 		}
 
+		void deserialize(InputMemoryStream& blob) override { m_parent_meta.deserialize(blob, Path("undo/redo")); }
+		void serialize(OutputMemoryStream& blob) override { m_parent_meta.serialize(blob); }
+
+		void saveUndo(bool changed) {
+			if (!changed) return;
+
+			pushUndo(ImGui::GetItemID());
+			m_dirty = true;
+		}
+		
+		bool onAction(const Action& action) override { 
+			const CommonActions& actions = m_app.getCommonActions();
+			if (&action == &actions.save) save();
+			else if (&action == &actions.undo) undo();
+			else if (&action == &actions.redo) redo();
+			else return false;
+			return true;
+		}
+
+		void save() {
+			OutputMemoryStream blob(m_app.getAllocator());
+			m_parent_meta.serialize(blob);
+			m_app.getAssetCompiler().updateMeta(Path(Path::getResource(m_resource->getPath())), blob);
+		}
+
 		void windowGUI() override {
 			if (ImGui::BeginMenuBar()) {
+				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
+				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
+				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Go to parent")) {
 					m_app.getAssetBrowser().openEditor(Path(Path::getResource(m_resource->getPath())));
 				}
@@ -95,50 +131,82 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 
-			const Array<Animation::RotationCurve>& rotations = m_resource->getRotations();
-			const Array<Animation::TranslationCurve>& translations = m_resource->getTranslations();
+			const Array<Animation::RotationTrack>& rotations = m_resource->getRotations();
+			const Array<Animation::ConstRotationTrack>& const_rotations = m_resource->getConstRotations();
+			const Array<Animation::TranslationTrack>& translations = m_resource->getTranslations();
+
+			ImGuiEx::Label("Root rotation");
+			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_parent_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
+			ImGuiEx::Label("XZ root translation");
+			saveUndo(ImGui::CheckboxFlags("##rmxz", (i32*)&m_parent_meta.root_motion_flags, (i32)Animation::Flags::XZ_ROOT_TRANSLATION));
+			ImGuiEx::Label("Y root translation");
+			saveUndo(ImGui::CheckboxFlags("##rmy", (i32*)&m_parent_meta.root_motion_flags, (i32)Animation::Flags::Y_ROOT_TRANSLATION));
+			ImGuiEx::Label("Animation translation error");
+			saveUndo(ImGui::DragFloat("##aert", &m_parent_meta.anim_translation_error, 0.01f));
+			ImGuiEx::Label("Animation rotation error");
+			saveUndo(ImGui::DragFloat("##aerr", &m_parent_meta.anim_rotation_error, 0.01f));
+
+			ImGuiEx::Label("Frames");
+			ImGui::Text("%d", m_resource->getFramesCount());
+			ImGuiEx::Label("Translation frame size");
+			ImGui::Text("%d", m_resource->getTranslationFrameSizeBits());
+			ImGuiEx::Label("Rotation frame size");
+			ImGui::Text("%d", m_resource->getRotationFrameSizeBits());
+
+			u32 const_translation_tracks_count = 0;
+			for (const Animation::TranslationTrack& curve : translations) {
+				if (curve.type == Animation::TrackType::CONSTANT) ++const_translation_tracks_count;
+			}
+			ImGuiEx::Label("Translation tracks (constant / animated)");
+			ImGui::Text("%d / %d", const_translation_tracks_count, translations.size() - const_translation_tracks_count);
+
+			ImGuiEx::Label("Rotation tracks (constant / animated)");
+			ImGui::Text("%d / %d", const_rotations.size(), rotations.size());
 
 			if (!translations.empty() && ImGui::TreeNode("Translations")) {
-				for (const Animation::TranslationCurve& curve : translations) {
+				for (const Animation::TranslationTrack& curve : translations) {
+					u32 curve_idx = u32(&curve - translations.begin());
 					auto iter = m_model->getBoneIndex(curve.name);
 					if (!iter.isValid()) continue;
 
 					const Model::Bone& bone = m_model->getBone(iter.value());
 					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-					bool open = ImGui::TreeNodeEx(bone.name.c_str(), flags);
+					u32 bits = curve.bitsizes[0] + curve.bitsizes[1] + curve.bitsizes[2];
+					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), bits);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
 						m_selected_bone = curve.name;
 					}
 					if (open) {
-						ImGui::Columns(4);
-						for (u32 i = 0; i < curve.count; ++i) {
-							const Vec3 p = curve.pos[i];
-							if (curve.times) {
-								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
-								ImGui::Text("%.2f s", t);
-							}
-							else {
-								ImGui::Text("frame %d", i);
-							}
-							ImGui::NextColumn();
-							ImGui::Text("%f", p.x);
-							ImGui::NextColumn();
-							ImGui::Text("%f", p.y);
-							ImGui::NextColumn();
-							ImGui::Text("%f", p.z);
-							ImGui::NextColumn();
-
+						if (curve.type == Animation::TrackType::CONSTANT) {
+							Vec3 p = curve.min;
+							ImGui::Text("%f, %f, %f", p.x, p.y, p.z);
 						}
-						ImGui::Columns();
+						else {
+							ImGui::Columns(4);
+							for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
+								const Vec3 p = m_resource->getTranslation(i, curve_idx);
+								ImGui::Text("%d:", i);
+								ImGui::NextColumn();
+								ImGui::Text("%f", p.x);
+								ImGui::NextColumn();
+								ImGui::Text("%f", p.y);
+								ImGui::NextColumn();
+								ImGui::Text("%f", p.z);
+								ImGui::NextColumn();
+
+							}
+							ImGui::Columns();
+						}
 						ImGui::TreePop();
 					}
 				}
 				ImGui::TreePop();
 			}
 
-			if (!rotations.empty() && ImGui::TreeNode("Rotations")) {
-				for (const Animation::RotationCurve& curve : rotations) {
+			if ((!rotations.empty() || !const_rotations.empty()) && ImGui::TreeNode("Rotations")) {
+				for (const Animation::RotationTrack& curve : rotations) {
+					u32 curve_idx = u32(&curve - rotations.begin());
 					auto iter = m_model->getBoneIndex(curve.name);
 					if (!iter.isValid()) continue;
 
@@ -146,21 +214,16 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 
-					bool open = ImGui::TreeNodeEx(bone.name.c_str(), flags);
+					u32 bits = curve.bitsizes[0] + curve.bitsizes[1] + curve.bitsizes[2] + 1;
+					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), bits);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
 						m_selected_bone = curve.name;
 					}
 					if (open) {
 						ImGui::Columns(4);
-						for (u32 i = 0; i < curve.count; ++i) {
-							const Vec3 r = radiansToDegrees(curve.rot[i].toEuler());
-							if (curve.times) {
-								const float t = curve.times[i] / float(0xffff) * m_resource->getLength().seconds();
-								ImGui::Text("%.2f s", t);
-							}
-							else {
-								ImGui::Text("frame %d", i);
-							}
+						for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
+							const Vec3 r = radiansToDegrees(m_resource->getRotation(i, curve).toEuler());
+							ImGui::Text("%d:", i);
 							ImGui::NextColumn();
 							ImGui::Text("%f", r.x);
 							ImGui::NextColumn();
@@ -170,6 +233,24 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 							ImGui::NextColumn();
 						}
 						ImGui::Columns();
+						ImGui::TreePop();
+					}
+				}
+				for (const Animation::ConstRotationTrack& curve : const_rotations) {
+					auto iter = m_model->getBoneIndex(curve.name);
+					if (!iter.isValid()) continue;
+
+					const Model::Bone& bone = m_model->getBone(iter.value());
+					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
+					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+
+					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (constant)", bone.name.c_str());
+					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+						m_selected_bone = curve.name;
+					}
+					if (open) {
+						Vec3 e = curve.value.toEuler();
+						ImGui::Text("%f; %f; %f", e.x, e.y, e.z);
 						ImGui::TreePop();
 					}
 				}
@@ -243,6 +324,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		bool m_play = true;
 		float m_playback_speed = 1.f;
 		WorldViewer m_viewer;
+		ModelMeta m_parent_meta;
 		BoneNameHash m_selected_bone;
 	};
 	

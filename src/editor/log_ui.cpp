@@ -205,23 +205,20 @@ void LogUI::onGUI()
 					}
 				}
 
-				if (len > 0)
-				{
-					char* mem = (char*)m_allocator.allocate(len);
+				if (len > 0) {
+					OutputMemoryStream mem(m_allocator);
+					mem.resize(len);
 					mem[0] = '\0';
-					const Span<char> memspan(mem, len);
-					for (int i = 0; i < m_messages.size(); ++i)
-					{
+					const Span<char> memspan((char*)mem.getMutableData(), len);
+					for (int i = 0; i < m_messages.size(); ++i) {
 						const char* msg = m_messages[i].text.c_str();
-						if (m_filter[0] == '\0' || findInsensitive(msg, m_filter))
-						{
+						if (m_filter[0] == '\0' || findInsensitive(msg, m_filter)) {
 							catString(memspan, msg);
 							catString(memspan, "\n");
 						}
 					}
 
-					os::copyToClipboard(mem);
-					m_allocator.deallocate(mem);
+					os::copyToClipboard((const char*)mem.data());
 				}
 			}
 			if (ImGui::Selectable("Clear"))

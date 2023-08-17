@@ -38,6 +38,7 @@
 #include "engine/world.h"
 #include "fbx_importer.h"
 #include "game_view.h"
+#include "model_meta.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/draw_stream.h"
@@ -1857,143 +1858,6 @@ static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 
 }
 
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
-	struct Meta {
-		Meta(IAllocator& allocator) : clips(allocator) {}
-
-		void serialize(OutputMemoryStream& blob) {
-			blob << "create_impostor = " << (create_impostor ? "true" : "false")
-				 << "\nbake_vertex_ao = " << (bake_vertex_ao ? "true" : "false")
-				 << "\nbake_impostor_normals = " << (bake_impostor_normals ? "true" : "false")
-				 << "\nroot_motion_flags = " << i32(root_motion_flags)
-				 << "\nuse_mikktspace = " << (use_mikktspace ? "true" : "false")
-				 << "\nforce_skin = " << (force_skin ? "true" : "false")
-				 << "\nphysics = \"" << toString(physics) << "\""
-				 << "\nscale = " << scale
-				 << "\nlod_count = " << lod_count
-				 << "\nculling_scale = " << culling_scale
-				 << "\nsplit = " << (split ? "true" : "false")
-				 << "\nimport_vertex_colors = " << (import_vertex_colors ? "true" : "false")
-				 << "\nvertex_color_is_ao = " << (vertex_color_is_ao ? "true" : "false");
-
-			if (!clips.empty()) {
-				blob << "\nclips = {";
-				for (const FBXImporter::ImportConfig::Clip& clip : clips) {
-					blob << "\n\n{";
-					blob << "\n\n\nname = \"" << clip.name << "\",";
-					blob << "\n\n\nfrom_frame = " << clip.from_frame << ",";
-					blob << "\n\n\nto_frame = " << clip.to_frame;
-					blob << "\n\n},";
-				}
-				blob << "\n}";
-			}
-
-			if (autolod_mask & 1) blob << "\nautolod0 = " << autolod_coefs[0];
-			if (autolod_mask & 2) blob << "\nautolod1 = " << autolod_coefs[1];
-			if (autolod_mask & 4) blob << "\nautolod2 = " << autolod_coefs[2];
-			if (autolod_mask & 4) blob << "\nautolod3 = " << autolod_coefs[3];
-
-			for (u32 i = 0; i < lengthOf(lods_distances); ++i) {
-				if (lods_distances[i] > 0) {
-					blob << "\nlod" << i << "_distance" << " = " << lods_distances[i];
-				}
-			}
-		}
-
-		bool deserialize(InputMemoryStream& blob, const Path& path) {
-			ASSERT(blob.getPosition() == 0);
-			lua_State* L = luaL_newstate();
-			if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path.c_str(), 0)) {
-				return false;
-			}
-		
-			deserialize(L, path);
-
-			lua_close(L);
-			return true;	
-		}
-
-		void deserialize(lua_State* L, const Path& path) {
-			LuaWrapper::DebugGuard guard(L);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "root_motion_flags", (i32*)&root_motion_flags);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &use_mikktspace);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &force_skin);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &scale);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &culling_scale);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &split);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &bake_impostor_normals);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &bake_vertex_ao);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &create_impostor);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &import_vertex_colors);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &vertex_color_is_ao);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &lod_count);
-			
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &autolod_coefs[0])) autolod_mask |= 1;
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &autolod_coefs[1])) autolod_mask |= 2;
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &autolod_coefs[2])) autolod_mask |= 4;
-			if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod3", &autolod_coefs[3])) autolod_mask |= 8;
-
-			clips.clear();
-			if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "clips") == LUA_TTABLE) {
-				const size_t count = lua_objlen(L, -1);
-				for (int i = 0; i < count; ++i) {
-					lua_rawgeti(L, -1, i + 1);
-					if (lua_istable(L, -1)) {
-						FBXImporter::ImportConfig::Clip& clip = clips.emplace();
-						char name[128];
-						if (!LuaWrapper::checkStringField(L, -1, "name", Span(name)) 
-							|| !LuaWrapper::checkField(L, -1, "from_frame", &clip.from_frame)
-							|| !LuaWrapper::checkField(L, -1, "to_frame", &clip.to_frame))
-						{
-							logError(path, ": clip ", i, " is invalid");
-							clips.pop();
-							continue;
-						}
-						clip.name = name;
-					}
-					lua_pop(L, 1);
-				}
-			}
-			lua_pop(L, 1);
-
-			char tmp[64];
-			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
-				if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
-				else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
-				else physics = FBXImporter::ImportConfig::Physics::NONE;
-			}
-
-			for (u32 i = 0; i < lengthOf(lods_distances); ++i) {
-				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &lods_distances[i]);
-			}
-		}
-
-		void load(const Path& path, StudioApp& app) {
-			if (lua_State* L = app.getAssetCompiler().getMeta(path)) {
-				deserialize(L, path);
-				lua_close(L);
-			}
-		}
-
-		float scale = 1.f;
-		float culling_scale = 1.f;
-		bool split = false;
-		bool create_impostor = false;
-		bool bake_impostor_normals = false;
-		bool bake_vertex_ao = false;
-		bool use_mikktspace = false;
-		bool force_skin = false;
-		bool import_vertex_colors = false;
-		bool vertex_color_is_ao = false;
-		u8 autolod_mask = 0;
-		u32 lod_count = 1;
-		float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
-		float lods_distances[4] = { 10'000, 0, 0, 0 };
-		Animation::Flags root_motion_flags = Animation::Flags::NONE;
-		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
-		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
-		Array<FBXImporter::ImportConfig::Clip> clips;
-	};
-
 	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		EditorWindow(const Path& path, ModelPlugin& plugin, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
@@ -2104,7 +1968,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					saveUndo(true);
 				}
 				ImGuiEx::Label("Physics");
-				if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
+				if (ImGui::BeginCombo("##phys", ModelMeta::toString(m_meta.physics))) {
 					if (ImGui::Selectable("None")) {
 						m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
 						saveUndo(true);
@@ -2310,6 +2174,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			saveUndo(ImGui::CheckboxFlags("##rmxz", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::XZ_ROOT_TRANSLATION));
 			ImGuiEx::Label("Y root translation");
 			saveUndo(ImGui::CheckboxFlags("##rmy", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::Y_ROOT_TRANSLATION));
+			ImGuiEx::Label("Animation translation error");
+			saveUndo(ImGui::DragFloat("##aert", &m_meta.anim_translation_error, 0.01f));
+			ImGuiEx::Label("Animation rotation error");
+			saveUndo(ImGui::DragFloat("##aerr", &m_meta.anim_rotation_error, 0.01f));
 		}
 
 		void infoGUI() {
@@ -2502,7 +2370,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		Model* m_resource;
 		WorldViewer m_viewer;
 		Renderer* m_renderer;
-		Meta m_meta;
+		ModelMeta m_meta;
 		bool m_wireframe = false;
 		bool m_init = false;
 		i32 m_preview_lod = 0;
@@ -2543,9 +2411,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void addSubresources(AssetCompiler& compiler, const Path& _path) override {
 		compiler.addResource(Model::TYPE, _path);
 
-		Meta meta(m_app.getAllocator());
+		ModelMeta meta(m_app.getAllocator());
 		meta.load(_path, m_app);
-		jobs::runLambda([this, _path, meta = static_cast<Meta&&>(meta)]() {
+		jobs::runLambda([this, _path, meta = static_cast<ModelMeta&&>(meta)]() {
 			FBXImporter importer(m_app);
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 
@@ -2590,7 +2458,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		ASSERT(Path::hasExtension(src, "fbx"));
 		Path filepath = Path(Path::getResource(src));
 		FBXImporter::ImportConfig cfg;
-		Meta meta(m_app.getAllocator()); 
+		ModelMeta meta(m_app.getAllocator()); 
 		meta.load(Path(filepath), m_app);
 		cfg.autolod_mask = meta.autolod_mask;
 		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
@@ -2606,6 +2474,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.create_impostor = meta.create_impostor;
 		cfg.clips = meta.clips;
 		cfg.animation_flags = meta.root_motion_flags;
+		cfg.anim_rotation_error = meta.anim_rotation_error;
+		cfg.anim_translation_error = meta.anim_translation_error;
 		m_fbx_importer.setSource(filepath, false, meta.force_skin);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
@@ -2770,16 +2640,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			memset(gb0.begin(), 0xff, gb0.byte_size());
 			memset(gb1.begin(), 0xff, gb1.byte_size());
 		}
-	}
-
-	static const char* toString(FBXImporter::ImportConfig::Physics value) {
-		switch (value) {
-			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
-			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
-			case FBXImporter::ImportConfig::Physics::NONE: return "None";
-		}
-		ASSERT(false);
-		return "none";
 	}
 
 	const char* getLabel() const override { return "Model"; }

@@ -47,6 +47,8 @@ struct FBXImporter {
 		float bounding_scale = 1.f;
 		Span<const Clip> clips;
 		u32 animation_flags = 0;
+		float anim_translation_error = 1.f;
+		float anim_rotation_error = 1.f;
 
 	};
 
@@ -61,8 +63,6 @@ struct FBXImporter {
 	struct Key {
 		Vec3 pos;
 		Quat rot;
-		i64 time;
-		u8 flags = 0;
 	};
 
 	struct Skin {

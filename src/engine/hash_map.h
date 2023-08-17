@@ -465,8 +465,8 @@ private:
 		ASSERT(is_pow_2);
 		m_size = 0;
 		m_mask = capacity - 1;
-		m_keys = (Slot*)m_allocator.allocate(sizeof(Slot) * (capacity + 1));
-		m_values = (Value*)m_allocator.allocate(sizeof(Value) * capacity);
+		m_keys = (Slot*)m_allocator.allocate(sizeof(Slot) * (capacity + 1), alignof(Slot));
+		m_values = (Value*)m_allocator.allocate(sizeof(Value) * capacity, alignof(Value));
 		m_capacity = capacity;
 		if (all_invalid) {
 			for(u32 i = 0; i < capacity; ++i) {

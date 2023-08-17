@@ -24,6 +24,7 @@ namespace Lumix
 			callDestructors(m_keys, m_size);
 			callDestructors(m_values, m_size);
 			m_allocator.deallocate(m_keys);
+			m_allocator.deallocate(m_values);
 		}
 
 
@@ -174,14 +175,16 @@ namespace Lumix
 		{
 			if (m_capacity >= new_capacity) return;
 				
-			u8* new_data = (u8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
+			Key* new_keys = (Key*)m_allocator.allocate(new_capacity * sizeof(Key), alignof(Key));
+			Value* new_values = (Value*)m_allocator.allocate(new_capacity * sizeof(Value), alignof(Value));
 				
-			moveObjects((Key*)new_data, m_keys, m_size);
-			moveObjects((Value*)(new_data + sizeof(Key) * new_capacity), m_values, m_size);
+			moveObjects(new_keys, m_keys, m_size);
+			moveObjects(new_values, m_values, m_size);
 
 			m_allocator.deallocate(m_keys);
-			m_keys = (Key*)new_data;
-			m_values = (Value*)(new_data + sizeof(Key) * new_capacity);
+			m_allocator.deallocate(m_values);
+			m_keys = new_keys;
+			m_values = new_values;
 
 			m_capacity = new_capacity;
 		}

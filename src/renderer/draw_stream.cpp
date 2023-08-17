@@ -895,7 +895,7 @@ void DrawStream::run() {
 				}
 				case Instruction::FREE_ALIGNED_MEMORY: {
 					READ(DeleteMemoryData, data);
-					data.allocator->deallocate_aligned(data.ptr);
+					data.allocator->deallocate(data.ptr);
 					break;
 				}
 				case Instruction::CREATE_BIND_GROUP: {

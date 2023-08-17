@@ -3008,14 +3008,14 @@ struct PipelineImpl final : Pipeline
 			(m_viewport.h + 63) / 64,
 			16);
 		const u32 clusters_count = size.x * size.y * size.z;
-		Cluster* clusters = (Cluster*)frame_allocator.allocate(sizeof(Cluster) * clusters_count);
+		Cluster* clusters = (Cluster*)frame_allocator.allocate(sizeof(Cluster) * clusters_count, alignof(Cluster));
 		memset(clusters, 0, sizeof(Cluster) * clusters_count);
 
 		const DVec3 cam_pos = cp.pos;
 		const World& world = m_module->getWorld();
 		CullResult* light_entities = m_module->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
 		const u32 lights_count = light_entities ? light_entities->count() : 0;
-		ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count);
+		ClusterLight* lights = (ClusterLight*)frame_allocator.allocate(sizeof(ClusterLight) * lights_count, alignof(ClusterLight));
 
 		AtlasSorter atlas_sorter;
 		if (light_entities) {
@@ -3093,8 +3093,8 @@ struct PipelineImpl final : Pipeline
 			const Span<const ReflectionProbe> module_refl_probes = m_module->getReflectionProbes();
 			const Span<const EnvironmentProbe> module_env_probes = m_module->getEnvironmentProbes();
 	
-			ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * module_env_probes.length());
-			ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * module_refl_probes.length());
+			ClusterEnvProbe* env_probes = (ClusterEnvProbe*)frame_allocator.allocate(sizeof(ClusterEnvProbe) * module_env_probes.length(), alignof(ClusterEnvProbe));
+			ClusterReflProbe* refl_probes = (ClusterReflProbe*)frame_allocator.allocate(sizeof(ClusterReflProbe) * module_refl_probes.length(), alignof(ClusterReflProbe));
 	
 			const ShiftedFrustum& frustum = cp.frustum;
 			Vec4 xplanes[65];
@@ -3287,7 +3287,7 @@ struct PipelineImpl final : Pipeline
 				offset += cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
 		
-			i32* map = (i32*)frame_allocator.allocate(offset * sizeof(i32));
+			i32* map = (i32*)frame_allocator.allocate(offset * sizeof(i32), alignof(i32));
 	
 			for_each_light_pair([&](Cluster& cluster, i32 light_idx){
 				map[cluster.offset] = light_idx;

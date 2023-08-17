@@ -1587,24 +1587,6 @@ namespace Lumix
 			return script.m_properties.size();
 		}
 
-
-		static void* luaAllocator(void* ud, void* ptr, size_t osize, size_t nsize)
-		{
-			auto& allocator = *static_cast<IAllocator*>(ud);
-			if (nsize == 0)
-			{
-				allocator.deallocate(ptr);
-				return nullptr;
-			}
-			if (ptr == nullptr) return allocator.allocate(nsize);
-
-			void* new_mem = allocator.allocate(nsize);
-			memcpy(new_mem, ptr, minimum(osize, nsize));
-			allocator.deallocate(ptr);
-			return new_mem;
-		}
-
-
 		void disableScript(ScriptEnvironment& inst)
 		{
 			if (!inst.m_state) return;

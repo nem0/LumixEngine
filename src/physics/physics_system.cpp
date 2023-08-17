@@ -54,14 +54,14 @@ namespace Lumix
 		{}
 
 		void* allocate(size_t size, const char*, const char*, int) override {
-			void* ret = source.allocate_aligned(size, 16);
+			void* ret = source.allocate(size, 16);
 			// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
 			// from " << filename << "(" << line << ")";
 			//ASSERT(ret);
 			return ret;
 		}
 		
-		void deallocate(void* ptr) override { source.deallocate_aligned(ptr); }
+		void deallocate(void* ptr) override { source.deallocate(ptr); }
 
 		IAllocator& source;
 	};

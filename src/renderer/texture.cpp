@@ -164,7 +164,9 @@ bool Texture::saveTGA(IOutputStream* file,
 
 	if (!file->write(&header, sizeof(header))) return false;
 
-	u8* data = (u8*)allocator.allocate(width * height * 4);
+	OutputMemoryStream blob(allocator);
+	blob.resize(width * height * 4);
+	u8* data = blob.getMutableData();
 	for (long y = 0; y < header.height; y++)
 	{
 		long write_index = y * header.width * 4;
@@ -179,7 +181,6 @@ bool Texture::saveTGA(IOutputStream* file,
 	}
 
 	bool res = file->write(data, width * height * 4);
-	allocator.deallocate(data);
 	return res;
 }
 

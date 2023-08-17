@@ -169,11 +169,11 @@ struct EngineImpl final : Engine {
 		}
 		if (!ptr) {
 			ASSERT(osize == 0);
-			return engine->m_lua_allocator.allocate(nsize);
+			return engine->m_lua_allocator.allocate(nsize, 8);
 		}
 
 		ASSERT(osize > 0);
-		return engine->m_lua_allocator.reallocate(ptr, nsize, osize);
+		return engine->m_lua_allocator.reallocate(ptr, nsize, osize, 8);
 	}
 
 	static void logToDebugOutput(LogLevel level, const char* message)

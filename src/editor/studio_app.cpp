@@ -289,7 +289,7 @@ struct StudioAppImpl final : StudioApp
 	
 	static void* imguiAlloc(size_t size, void* user_data) {
 		StudioAppImpl* app = (StudioAppImpl*)user_data;
-		return app->m_imgui_allocator.allocate(size);
+		return app->m_imgui_allocator.allocate(size, 8);
 	}
 
 

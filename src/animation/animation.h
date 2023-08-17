@@ -3,6 +3,7 @@
 #include "engine/allocators.h"
 #include "engine/hash.h"
 #include "engine/hash_map.h"
+#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/string.h"
 
@@ -22,6 +23,7 @@ struct Time {
 		return Time{u32(time * ONE_SECOND)};
 	}
 	float seconds() const { return float(value / double(ONE_SECOND)); }
+	float toFrame(float fps) const { return float(value / double(ONE_SECOND) * fps); }
 	Time operator*(float t) const { return Time{u32(value * t)}; }
 	float operator/(const Time& rhs) const { return float(double(value) / double(rhs.value)); }
 	Time operator+(const Time& rhs) const { return Time{value + rhs.value}; }
@@ -53,14 +55,16 @@ struct Animation final : Resource {
 	static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
 	static const ResourceType TYPE;
 
-	enum class CurveType : u8 {
-		KEYFRAMED,
-		SAMPLED
+	enum class TrackType : u8 {
+		CONSTANT,
+		SAMPLED,
+		ROOT_MOTION_ROOT
 	};
 
 	enum class Version : u32 {
 		FIRST = 3,
 		FLAGS,
+		COMPRESSION,
 
 		LAST
 	};
@@ -78,22 +82,29 @@ struct Animation final : Resource {
 	struct Header {
 		u32 magic;
 		Version version;
-		Time length;
-		u32 frame_count;
 	};
 
-	struct TranslationCurve {
+	struct TranslationTrack {
 		BoneNameHash name;
-		u32 count;
-		const u16* times;
-		const Vec3* pos;
+		Vec3 min;
+		Vec3 to_range; //  * to_normalized * (max - min)
+		u16 offset_bits = 0;
+		u8 bitsizes[3] = {};
+		TrackType type;
 	};
 
-	struct RotationCurve {
+	struct ConstRotationTrack {
 		BoneNameHash name;
-		u32 count;
-		const u16* times;
-		const Quat* rot;
+		Quat value;
+	};
+
+	struct RotationTrack {
+		BoneNameHash name;
+		Vec3 min;
+		Vec3 to_range; //  * to_normalized * (max - min)
+		u16 offset_bits;
+		u8 bitsizes[3];
+		u8 skipped_channel;
 	};
 
 	struct SampleContext {
@@ -106,15 +117,19 @@ struct Animation final : Resource {
 
 	Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	ResourceType getType() const override { return TYPE; }
+	Vec3 getTranslation(u32 frame, u32 curve_idx) const;
 	Vec3 getTranslation(Time time, u32 curve_idx) const;
-	Quat getRotation(Time time, u32 curve_idx) const;
 	void getRelativePose(const SampleContext& ctx);
-	Time getLength() const { return m_length; }
-	const Array<TranslationCurve>& getTranslations() const { return m_translations; }
-	const Array<RotationCurve>& getRotations() const { return m_rotations; }
+	Time getLength() const { return Time::fromSeconds(m_frame_count / m_fps); }
+	const Array<TranslationTrack>& getTranslations() const { return m_translations; }
+	Quat getRotation(u32 sample, const RotationTrack& curve_idx) const;
+	const Array<RotationTrack>& getRotations() const { return m_rotations; }
+	const Array<ConstRotationTrack>& getConstRotations() const { return m_const_rotations; }
 	struct LocalRigidTransform getRootMotion(Time t) const;
 	void setRootMotionBone(BoneNameHash bone_name);
-
+	u32 getFramesCount() const { return m_frame_count; }
+	u32 getRotationFrameSizeBits() const { return m_rotations_frame_size_bits; }
+	u32 getTranslationFrameSizeBits() const { return m_translations_frame_size_bits; }
 	Flags m_flags = Flags::NONE;
 
 private:
@@ -122,9 +137,9 @@ private:
 	bool load(Span<const u8> mem) override;
 
 	TagAllocator m_allocator;
-	Time m_length;
-	Array<TranslationCurve> m_translations;
-	Array<RotationCurve> m_rotations;
+	Array<TranslationTrack> m_translations;
+	Array<RotationTrack> m_rotations;
+	Array<ConstRotationTrack> m_const_rotations;
 	
 	struct RootMotion {
 		RootMotion(IAllocator&);
@@ -133,10 +148,16 @@ private:
 		Array<Vec3> translations;
 		Array<Quat> rotations;
 		BoneNameHash bone;
+		i32 rotation_track_idx = -1;
 	} m_root_motion;
 
 	Array<u8> m_mem;
+	const u8* m_rotation_stream;
+	const u8* m_translation_stream;
+	u32 m_rotations_frame_size_bits;
+	u32 m_translations_frame_size_bits;
 	u32 m_frame_count = 0;
+	float m_fps = 30;
 
 	friend struct AnimationSampler;
 };

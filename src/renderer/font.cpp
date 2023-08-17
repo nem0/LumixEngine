@@ -105,7 +105,7 @@ bool FontManager::build()
 	memory_rec.user = &m_allocator;
 	memory_rec.alloc = [](FT_Memory memory, long size) -> void* { 
 		IAllocator* alloc = (IAllocator*)memory->user;
-		return alloc->allocate(size);
+		return alloc->allocate(size, 8);
 	};
 	memory_rec.free = [](FT_Memory memory, void* block) -> void { 
 		IAllocator* alloc = (IAllocator*)memory->user;
@@ -113,7 +113,7 @@ bool FontManager::build()
 	};
 	memory_rec.realloc = [](FT_Memory memory, long cur_size, long new_size, void* block) -> void* {
 		IAllocator* alloc = (IAllocator*)memory->user;
-		return alloc->reallocate(block, new_size, cur_size);
+		return alloc->reallocate(block, new_size, cur_size, 8);
 	};
 
 	FT_Library ft_library;

@@ -31,7 +31,7 @@ OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& blob, IAllocato
 {
 	if (blob.m_capacity > 0)
 	{
-		m_data = (u8*)allocator.allocate(blob.m_capacity);
+		m_data = (u8*)allocator.allocate(blob.m_capacity, 1);
 		memcpy(m_data, blob.m_data, blob.m_capacity);
 		m_capacity = blob.m_capacity;
 	}
@@ -49,7 +49,7 @@ OutputMemoryStream::OutputMemoryStream(const InputMemoryStream& blob, IAllocator
 {
 	if (blob.size() > 0)
 	{
-		m_data = (u8*)allocator.allocate(blob.size());
+		m_data = (u8*)allocator.allocate(blob.size(), 1);
 		memcpy(m_data, blob.getData(), blob.size());
 		m_capacity = blob.size();
 	}
@@ -146,7 +146,7 @@ OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& rhs)
 	m_size = rhs.m_size;
 	if (rhs.m_capacity > 0)
 	{
-		m_data = (u8*)m_allocator->allocate(rhs.m_capacity);
+		m_data = (u8*)m_allocator->allocate(rhs.m_capacity, 1);
 		memcpy(m_data, rhs.m_data, rhs.m_capacity);
 		m_capacity = rhs.m_capacity;
 	}
@@ -167,7 +167,7 @@ void OutputMemoryStream::operator =(const OutputMemoryStream& rhs)
 	m_size = rhs.m_size;
 	if (rhs.m_capacity > 0)
 	{
-		m_data = (u8*)m_allocator->allocate(rhs.m_capacity);
+		m_data = (u8*)m_allocator->allocate(rhs.m_capacity, 1);
 		memcpy(m_data, rhs.m_data, rhs.m_capacity);
 		m_capacity = rhs.m_capacity;
 	}
@@ -323,7 +323,7 @@ void OutputMemoryStream::reserve(u64 size)
 	if (size <= m_capacity) return;
 
 	ASSERT(m_allocator);
-	u8* tmp = (u8*)m_allocator->allocate(size);
+	u8* tmp = (u8*)m_allocator->allocate(size, 1);
 	memcpy(tmp, m_data, m_capacity);
 	m_allocator->deallocate(m_data);
 	m_data = tmp;
@@ -345,7 +345,7 @@ void OutputMemoryStream::resize(u64 size)
 	if (size <= m_capacity) return;
 
 	ASSERT(m_allocator);
-	u8* tmp = (u8*)m_allocator->allocate(size);
+	u8* tmp = (u8*)m_allocator->allocate(size, 1);
 	memcpy(tmp, m_data, m_capacity);
 	m_allocator->deallocate(m_data);
 	m_data = tmp;

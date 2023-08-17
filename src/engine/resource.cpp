@@ -21,13 +21,13 @@ ResourceType::ResourceType(const char* type_name)
 
 
 Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
-	: m_ref_count()
+	: m_ref_count(0)
 	, m_empty_dep_count(1)
 	, m_failed_dep_count(0)
 	, m_current_state(State::EMPTY)
 	, m_desired_state(State::EMPTY)
 	, m_path(path)
-	, m_size()
+	, m_file_size(0)
 	, m_cb(allocator)
 	, m_resource_manager(resource_manager)
 	, m_async_op(FileSystem::AsyncHandle::invalid())
@@ -118,9 +118,9 @@ void Resource::fileLoaded(Span<const u8> blob, bool success) {
 	}
 
 	const CompiledResourceHeader* header = (const CompiledResourceHeader*)blob.begin();
+	m_file_size = blob.length();
 	if (startsWith(getPath(), ".lumix/asset_tiles/")) {
 		if (!load(blob)) ++m_failed_dep_count;
-		m_size = blob.length();
 	}
 	else if (blob.length() < sizeof(*header)) {
 		logError("Invalid resource file, please delete .lumix directory");
@@ -141,14 +141,11 @@ void Resource::fileLoaded(Span<const u8> blob, bool success) {
 		if (res != header->decompressed_size || !load(tmp)) {
 			++m_failed_dep_count;
 		}
-		m_size = header->decompressed_size;
 	}
 	else {
-		
 		if (!load(blob.fromLeft(sizeof(*header)))) {
 			++m_failed_dep_count;
 		}
-		m_size = header->decompressed_size;
 	} 
 
 	ASSERT(m_empty_dep_count > 0);
@@ -171,7 +168,7 @@ void Resource::doUnload()
 	unload();
 	ASSERT(m_empty_dep_count <= 1);
 
-	m_size = 0;
+	m_file_size = 0;
 	m_empty_dep_count = 1;
 	m_failed_dep_count = 0;
 	checkState();

@@ -78,19 +78,6 @@ namespace Lumix
 		*(u32*)ptr = page->header.first_free;
 		page->header.first_free = u32(ptr - page->data);
 	}
-
-	static void* reallocSmall(DefaultAllocator& allocator, void* mem, size_t n) {
-		DefaultAllocator::Page* p = getPage(mem);
-		if (n <= SMALL_ALLOC_MAX_SIZE) {
-			const u32 bin = sizeToBin(n);
-			if (sizeToBin(p->header.item_size) == bin) return mem;
-		}
-		
-		void* new_mem = allocator.allocate(n);
-		memcpy(new_mem, mem, minimum((size_t)p->header.item_size, n));
-		allocator.deallocate(mem);
-		return new_mem;
-	}
 	
 	static void* reallocSmallAligned(DefaultAllocator& allocator, void* mem, size_t n, size_t align) {
 		DefaultAllocator::Page* p = getPage(mem);
@@ -99,9 +86,9 @@ namespace Lumix
 			if (sizeToBin(p->header.item_size) == bin) return mem;
 		}
 		
-		void* new_mem = allocator.allocate_aligned(n, align);
+		void* new_mem = allocator.allocate(n, align);
 		memcpy(new_mem, mem, minimum((size_t)p->header.item_size, n));
-		allocator.deallocate_aligned(mem);
+		allocator.deallocate(mem);
 		return new_mem;
 	}
 
@@ -158,35 +145,8 @@ namespace Lumix
 		os::memRelease(m_small_allocations, PAGE_SIZE * MAX_PAGE_COUNT);
 	}
 
-	void* DefaultAllocator::allocate(size_t n)
-	{
-		if (n <= SMALL_ALLOC_MAX_SIZE) {
-			return allocSmall(*this, n);
-		}
-		return malloc(n);
-	}
-
-
-	void DefaultAllocator::deallocate(void* p)
-	{
-		if (isSmallAlloc(*this, p)) {
-			freeSmall(*this, p);
-			return;
-		}
-		free(p);
-	}
-
-
-	void* DefaultAllocator::reallocate(void* ptr, size_t new_size, size_t old_size)
-	{
-		if (isSmallAlloc(*this, ptr)) {
-			return reallocSmall(*this, ptr, new_size);
-		}
-		return realloc(ptr, new_size);
-	}
-
 #ifdef _WIN32
-	void* DefaultAllocator::allocate_aligned(size_t size, size_t align)
+	void* DefaultAllocator::allocate(size_t size, size_t align)
 	{
 		if (size <= SMALL_ALLOC_MAX_SIZE && align <= size) {
 			return allocSmall(*this, size);
@@ -195,7 +155,7 @@ namespace Lumix
 	}
 
 
-	void DefaultAllocator::deallocate_aligned(void* ptr)
+	void DefaultAllocator::deallocate(void* ptr)
 	{
 		if (isSmallAlloc(*this, ptr)) {
 			freeSmall(*this, ptr);
@@ -205,7 +165,7 @@ namespace Lumix
 	}
 
 
-	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align)
+	void* DefaultAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align)
 	{
 		if (isSmallAlloc(*this, ptr)) {
 			return reallocSmallAligned(*this, ptr, new_size, align);
@@ -213,7 +173,7 @@ namespace Lumix
 		return _aligned_realloc(ptr, new_size, align);
 	}
 #else
-	void* DefaultAllocator::allocate_aligned(size_t size, size_t align)
+	void* DefaultAllocator::allocate(size_t size, size_t align)
 	{
 		if (size <= SMALL_ALLOC_MAX_SIZE && align <= size) {
 			return allocSmall(*this, size);
@@ -222,7 +182,7 @@ namespace Lumix
 	}
 
 
-	void DefaultAllocator::deallocate_aligned(void* ptr)
+	void DefaultAllocator::deallocate(void* ptr)
 	{
 		if (isSmallAlloc(*this, ptr)) {
 			freeSmall(*this, ptr);
@@ -232,7 +192,7 @@ namespace Lumix
 	}
 
 
-	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align)
+	void* DefaultAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align)
 	{
 		if (isSmallAlloc(*this, ptr)) {
 			return reallocSmallAligned(*this, ptr, new_size, align);
@@ -262,51 +222,28 @@ BaseProxyAllocator::BaseProxyAllocator(IAllocator& source)
 BaseProxyAllocator::~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
 
 
-void* BaseProxyAllocator::allocate_aligned(size_t size, size_t align)
+void* BaseProxyAllocator::allocate(size_t size, size_t align)
 {
 	atomicIncrement(&m_allocation_count);
-	return m_source.allocate_aligned(size, align);
+	return m_source.allocate(size, align);
 }
 
-
-void BaseProxyAllocator::deallocate_aligned(void* ptr)
-{
-	if(ptr)
-	{
-		atomicDecrement(&m_allocation_count);
-		m_source.deallocate_aligned(ptr);
-	}
-}
-
-
-void* BaseProxyAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align)
-{
-	if (!ptr) atomicIncrement(&m_allocation_count);
-	if (new_size == 0) atomicDecrement(&m_allocation_count);
-	return m_source.reallocate_aligned(ptr, new_size, old_size, align);
-}
-
-
-void* BaseProxyAllocator::allocate(size_t size)
-{
-	atomicIncrement(&m_allocation_count);
-	return m_source.allocate(size);
-}
 
 void BaseProxyAllocator::deallocate(void* ptr)
 {
-	if (ptr)
+	if(ptr)
 	{
 		atomicDecrement(&m_allocation_count);
 		m_source.deallocate(ptr);
 	}
 }
 
-void* BaseProxyAllocator::reallocate(void* ptr, size_t new_size, size_t old_size)
+
+void* BaseProxyAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align)
 {
 	if (!ptr) atomicIncrement(&m_allocation_count);
 	if (new_size == 0) atomicDecrement(&m_allocation_count);
-	return m_source.reallocate(ptr, new_size, old_size);
+	return m_source.reallocate(ptr, new_size, old_size, align);
 }
 
 LinearAllocator::LinearAllocator(u32 reserved) {
@@ -331,7 +268,7 @@ static u32 roundUp(u32 val, u32 align) {
 	return (val + align - 1) & ~(align - 1);
 }
 
-void* LinearAllocator::allocate_aligned(size_t size, size_t align) {
+void* LinearAllocator::allocate(size_t size, size_t align) {
 	ASSERT(size < 0xffFFffFF);
 	u32 start;
 	for (;;) {
@@ -356,34 +293,9 @@ void* LinearAllocator::allocate_aligned(size_t size, size_t align) {
 
 volatile i64 LinearAllocator::g_total_commited_bytes = 0;
 
-void LinearAllocator::deallocate_aligned(void* ptr) { /*everything should be "deallocated" with reset()*/ }
-void* LinearAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) { 
-	if (!ptr) return allocate_aligned(new_size, align);
-	// realloc not supported
-	ASSERT(false); 
-	return nullptr;
-}
-
-void* LinearAllocator::allocate(size_t size) {
-	ASSERT(size < 0xffFFffFF);
-	const u32 start = atomicAdd(&m_end, (u32)size);
-
-	if (start + size <= m_commited_bytes) return m_mem + start;
-
-	MutexGuard guard(m_mutex);
-	if (start + size <= m_commited_bytes) return m_mem + start;
-
-	const u32 commited = roundUp(start + (u32)size, 4096);
-	ASSERT(commited < m_reserved);
-	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
-	m_commited_bytes = commited;
-
-	return m_mem + start;
-}
-
 void LinearAllocator::deallocate(void* ptr) { /*everything should be "deallocated" with reset()*/ }
-void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
-	if (!ptr) return allocate(new_size);
+void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) { 
+	if (!ptr) return allocate(new_size, align);
 	// realloc not supported
 	ASSERT(false); 
 	return nullptr;
@@ -400,32 +312,18 @@ TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
 
 thread_local TagAllocator* TagAllocator::active_allocator = nullptr;
 
-void* TagAllocator::allocate(size_t size) {
+void* TagAllocator::allocate(size_t size, size_t align) {
 	active_allocator = this;
-	return m_effective_allocator->allocate(size);
+	return m_effective_allocator->allocate(size, align);
 }
 
 void TagAllocator::deallocate(void* ptr) {
 	m_effective_allocator->deallocate(ptr);
 }
 
-void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size) {
+void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) {
 	active_allocator = this;
-	return m_effective_allocator->reallocate(ptr, new_size, old_size);
-}
-
-void* TagAllocator::allocate_aligned(size_t size, size_t align) {
-	active_allocator = this;
-	return m_effective_allocator->allocate_aligned(size, align);
-}
-
-void TagAllocator::deallocate_aligned(void* ptr) {
-	m_effective_allocator->deallocate_aligned(ptr);
-}
-
-void* TagAllocator::reallocate_aligned(void* ptr, size_t new_size, size_t old_size, size_t align) {
-	active_allocator = this;
-	return m_effective_allocator->reallocate_aligned(ptr, new_size, old_size, align);
+	return m_effective_allocator->reallocate(ptr, new_size, old_size, align);
 }
 
 IAllocator& getGlobalAllocator() {
