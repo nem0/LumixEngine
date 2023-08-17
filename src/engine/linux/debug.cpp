@@ -265,26 +265,6 @@ u8* Allocator::getSystemFromUser(void* user_ptr) {
 }
 
 
-void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size) {
-#ifndef LUMIX_DEBUG
-	return m_source.reallocate(user_ptr, new_size, old_size);
-#else
-	if (user_ptr == nullptr) return allocate(new_size);
-	if (new_size == 0) return nullptr;
-
-	void* new_data = allocate(new_size);
-	if (!new_data) return nullptr;
-
-	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
-
-	deallocate(user_ptr);
-
-	return new_data;
-#endif
-}
-
-
 void* Allocator::allocate_aligned(size_t size, size_t align) {
 #ifndef LUMIX_DEBUG
 	return m_source.allocate_aligned(size, align);
@@ -358,7 +338,7 @@ void Allocator::deallocate_aligned(void* user_ptr) {
 
 		info->~AllocationInfo();
 
-		m_source.deallocate((void*)system_ptr);
+		m_source.deallocate_aligned((void*)system_ptr);
 	}
 #endif
 }
@@ -380,82 +360,6 @@ void* Allocator::reallocate_aligned(void* user_ptr, size_t new_size, size_t old_
 	deallocate_aligned(user_ptr);
 
 	return new_data;
-#endif
-}
-
-
-void* Allocator::allocate(size_t size) {
-#ifndef LUMIX_DEBUG
-	return m_source.allocate(size);
-#else
-	void* system_ptr;
-	AllocationInfo* info;
-	size_t system_size = getNeededMemory(size);
-	{
-		MutexGuard lock(m_mutex);
-		system_ptr = m_source.allocate(system_size);
-		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
-
-		info->previous = m_root->previous;
-		m_root->previous->next = info;
-
-		info->next = m_root;
-		m_root->previous = info;
-
-		m_root = info;
-
-		m_total_size += size;
-	} // because of the MutexGuard
-
-	void* user_ptr = getUserFromSystem(system_ptr, 0);
-	info->stack_leaf = m_stack_tree.record();
-	info->size = size;
-	info->align = 0;
-	if (m_is_fill_enabled) {
-		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
-	}
-
-	if (m_are_guards_enabled) {
-		*(u32*)system_ptr = ALLOCATION_GUARD;
-		*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
-	}
-
-	return user_ptr;
-#endif
-}
-
-void Allocator::deallocate(void* user_ptr) {
-#ifndef LUMIX_DEBUG
-	m_source.deallocate(user_ptr);
-#else
-	if (user_ptr) {
-		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-		void* system_ptr = getSystemFromUser(user_ptr);
-		if (m_is_fill_enabled) {
-			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
-		}
-
-		if (m_are_guards_enabled) {
-			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
-			size_t system_size = getNeededMemory(info->size);
-			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
-		}
-
-		{
-			MutexGuard lock(m_mutex);
-			if (info == m_root) {
-				m_root = info->next;
-			}
-			info->previous->next = info->next;
-			info->next->previous = info->previous;
-
-			m_total_size -= info->size;
-		} // because of the MutexGuard
-
-		info->~AllocationInfo();
-
-		m_source.deallocate((void*)system_ptr);
-	}
 #endif
 }
 
