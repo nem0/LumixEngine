@@ -57,14 +57,11 @@ struct Animation final : Resource {
 
 	enum class TrackType : u8 {
 		CONSTANT,
-		SAMPLED,
-		ROOT_MOTION_ROOT
+		ANIMATED
 	};
 
 	enum class Version : u32 {
-		FIRST = 3,
-		FLAGS,
-		COMPRESSION,
+		COMPRESSION = 6,
 
 		LAST
 	};
@@ -84,13 +81,17 @@ struct Animation final : Resource {
 		Version version;
 	};
 
+	struct ConstTranslationTrack {
+		BoneNameHash name;
+		Vec3 value;
+	};
+
 	struct TranslationTrack {
 		BoneNameHash name;
 		Vec3 min;
 		Vec3 to_range; //  * to_normalized * (max - min)
 		u16 offset_bits = 0;
 		u8 bitsizes[3] = {};
-		TrackType type;
 	};
 
 	struct ConstRotationTrack {
@@ -117,12 +118,14 @@ struct Animation final : Resource {
 
 	Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	ResourceType getType() const override { return TYPE; }
-	Vec3 getTranslation(u32 frame, u32 curve_idx) const;
-	Vec3 getTranslation(Time time, u32 curve_idx) const;
 	void getRelativePose(const SampleContext& ctx);
 	Time getLength() const { return Time::fromSeconds(m_frame_count / m_fps); }
+
+	Vec3 getTranslation(u32 frame, const TranslationTrack& track) const;
+	Quat getRotation(u32 sample, const RotationTrack& track) const;
+	
 	const Array<TranslationTrack>& getTranslations() const { return m_translations; }
-	Quat getRotation(u32 sample, const RotationTrack& curve_idx) const;
+	const Array<ConstTranslationTrack>& getConstTranslations() const { return m_const_translations; }
 	const Array<RotationTrack>& getRotations() const { return m_rotations; }
 	const Array<ConstRotationTrack>& getConstRotations() const { return m_const_rotations; }
 	struct LocalRigidTransform getRootMotion(Time t) const;
@@ -138,6 +141,7 @@ private:
 
 	TagAllocator m_allocator;
 	Array<TranslationTrack> m_translations;
+	Array<ConstTranslationTrack> m_const_translations;
 	Array<RotationTrack> m_rotations;
 	Array<ConstRotationTrack> m_const_rotations;
 	
@@ -149,6 +153,7 @@ private:
 		Array<Quat> rotations;
 		BoneNameHash bone;
 		i32 rotation_track_idx = -1;
+		i32 translation_track_idx = -1;
 	} m_root_motion;
 
 	Array<u8> m_mem;

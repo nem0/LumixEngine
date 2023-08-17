@@ -20,6 +20,7 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 	, m_allocator(allocator, m_path.c_str())
 	, m_mem(m_allocator)
 	, m_translations(m_allocator)
+	, m_const_translations(m_allocator)
 	, m_rotations(m_allocator)
 	, m_const_rotations(m_allocator)
 	, m_root_motion(m_allocator)
@@ -67,16 +68,34 @@ struct AnimationSampler {
 		const u32 sample_idx = u32(sample);
 		const float t = sample - sample_idx;
 		
-		for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
-			const Animation::TranslationTrack& curve = anim.m_translations[i];
-			Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
+		for (u32 i = 0, c = anim.m_const_translations.size(); i < c; ++i) {
+			const Animation::ConstTranslationTrack& track = anim.m_const_translations[i];
+			Model::BoneMap::ConstIterator iter = model.getBoneIndex(track.name);
 			if (!iter.isValid()) continue;
 
 			if constexpr(use_mask) {
-				if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				if (mask->bones.find(track.name) == mask->bones.end()) continue;
 			}
 
-			Vec3 anim_pos = lerp(anim.getTranslation(sample_idx, i), anim.getTranslation(sample_idx + 1, i), t);
+			const int model_bone_index = iter.value();
+			if constexpr (use_weight) {
+				pos[model_bone_index] = lerp(pos[model_bone_index], track.value, weight);
+			}
+			else {
+				pos[model_bone_index] = track.value;
+			}
+		}
+
+		for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
+			const Animation::TranslationTrack& track = anim.m_translations[i];
+			Model::BoneMap::ConstIterator iter = model.getBoneIndex(track.name);
+			if (!iter.isValid()) continue;
+
+			if constexpr(use_mask) {
+				if (mask->bones.find(track.name) == mask->bones.end()) continue;
+			}
+
+			Vec3 anim_pos = lerp(anim.getTranslation(sample_idx, track), anim.getTranslation(sample_idx + 1, track), t);
 
 			const int model_bone_index = iter.value();
 			if constexpr (use_weight) {
@@ -168,7 +187,7 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 
 	for (u32 f = 0; f < m_frame_count + 1; ++f) {
 		LocalRigidTransform tmp = {Vec3(0), Quat::IDENTITY};
-		if (translation_idx >= 0) tmp.pos = getTranslation(f, translation_idx);
+		if (translation_idx >= 0) tmp.pos = getTranslation(f, m_translations[translation_idx]);
 		if (rotation_idx >= 0) tmp.rot = getRotation(f, m_rotations[rotation_idx]);
 		LocalRigidTransform rm = AnimationSampler::maskRootMotion(m_flags, tmp);
 		if (!m_root_motion.translations.empty()) m_root_motion.translations[f] = rm.pos;
@@ -185,7 +204,7 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 	}
 
 	m_root_motion.rotation_track_idx = rotation_idx;
-	m_translations[translation_idx].type = Animation::TrackType::ROOT_MOTION_ROOT;
+	m_root_motion.translation_track_idx = translation_idx;
 }
 
 LocalRigidTransform Animation::getRootMotion(Time time) const {
@@ -229,47 +248,28 @@ void Animation::getRelativePose(const SampleContext& ctx) {
 	}
 }
 
-Vec3 Animation::getTranslation(Time time, u32 curve_idx) const {
-	float frame = time.toFrame(m_fps);
-	const u32 frame_idx = u32(frame);
-	
-	if (frame_idx < m_frame_count) {
-		const float frame_t = frame - frame_idx;
-		return lerp(getTranslation(frame_idx, curve_idx), getTranslation(frame_idx + 1, curve_idx), frame_t);
-	}
-
-	return getTranslation(m_frame_count, curve_idx);
-}
-
 static float unpackChannel(u64 val, float min, float to_float_range, u32 bitsize) {
 	if (bitsize == 0) return min;
 	const u64 mask = (u64(1) << bitsize) - 1;
 	return float(min + to_float_range * double(val & mask));
 }
 
-Vec3 Animation::getTranslation(u32 frame, u32 curve_idx) const {
-	const TranslationTrack& track = m_translations[curve_idx];
-	switch (track.type) {
-		case Animation::TrackType::CONSTANT: return track.min;
-		case Animation::TrackType::ROOT_MOTION_ROOT: return m_root_motion.pose_translations[frame];
-		case Animation::TrackType::SAMPLED: {
-			const u32 offset = m_translations_frame_size_bits * frame + track.offset_bits;
+Vec3 Animation::getTranslation(u32 frame, const TranslationTrack& track) const {
+	ASSERT(&track >= m_translations.begin() && &track < m_translations.end());
+	if (u32(&track - m_translations.begin()) == m_root_motion.translation_track_idx) return m_root_motion.pose_translations[frame];
+	const u32 offset = m_translations_frame_size_bits * frame + track.offset_bits;
 
-			u64 tmp;
-			memcpy(&tmp, &m_translation_stream[offset / 8], sizeof(tmp));
-			tmp >>= offset & 7;
+	u64 tmp;
+	memcpy(&tmp, &m_translation_stream[offset / 8], sizeof(tmp));
+	tmp >>= offset & 7;
 
-			Vec3 res;
-			res.x = unpackChannel(tmp, track.min.x, track.to_range.x, track.bitsizes[0]);
-			tmp >>= track.bitsizes[0];
-			res.y = unpackChannel(tmp, track.min.y, track.to_range.y, track.bitsizes[1]);
-			tmp >>= track.bitsizes[1];
-			res.z = unpackChannel(tmp, track.min.z, track.to_range.z, track.bitsizes[2]);
-			return res;
-		}
-	}
-	ASSERT(false);
-	return {};
+	Vec3 res;
+	res.x = unpackChannel(tmp, track.min.x, track.to_range.x, track.bitsizes[0]);
+	tmp >>= track.bitsizes[0];
+	res.y = unpackChannel(tmp, track.min.y, track.to_range.y, track.bitsizes[1]);
+	tmp >>= track.bitsizes[1];
+	res.z = unpackChannel(tmp, track.min.z, track.to_range.z, track.bitsizes[2]);
+	return res;
 }
 
 Quat Animation::getRotation(u32 frame, const RotationTrack& track) const {
@@ -321,7 +321,7 @@ bool Animation::load(Span<const u8> mem) {
 	}
 
 	if (header.version <= Version::COMPRESSION) {
-		logError(getPath(), ": version not supported. Please delete '.lumix' directory and try again");
+		logError(getPath(), ": version too old. Please delete '.lumix' directory and try again");
 		return false;
 	}
 
@@ -335,21 +335,21 @@ bool Animation::load(Span<const u8> mem) {
 	m_mem.resize(size + 8/*padding for unpacker*/);
 	file.read(&m_mem[0], size);
 
-	m_translations.resize(translations_count);
-
 	m_translations_frame_size_bits = 0;
 	InputMemoryStream blob(&m_mem[0], size);
-	for (int i = 0; i < m_translations.size(); ++i) {
-		TranslationTrack& track = m_translations[i];
-		track.name = blob.read<BoneNameHash>();
-		blob.read(track.type);
+	for (u32 i = 0; i < translations_count; ++i) {
+		auto name = blob.read<BoneNameHash>();
+		auto type = blob.read<Animation::TrackType>();
 		
-		if (track.type == Animation::TrackType::CONSTANT) {
-			blob.read(track.min);
+		if (type == Animation::TrackType::CONSTANT) {
+			ConstTranslationTrack& track = m_const_translations.emplace();
+			track.name = name;
+			blob.read(track.value);
 		}
 		else {
+			TranslationTrack& track = m_translations.emplace();
+			track.name = name;
 			blob.read(track.min);
-			Vec3 range;
 			blob.read(track.to_range);
 			blob.read(track.bitsizes);
 			blob.read(track.offset_bits);

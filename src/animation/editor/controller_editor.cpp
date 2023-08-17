@@ -507,7 +507,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				saveUndo(true);
 			}
 
-			{
+			if (!node.m_triangles.empty()) {
 				float w = maximum(ImGui::GetContentRegionAvail().x, 100.f);
 				ImGui::InvisibleButton("tmp", ImVec2(w, w));
 				ImDrawList* dl = ImGui::GetWindowDrawList();

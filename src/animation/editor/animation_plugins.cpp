@@ -95,6 +95,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			OutputMemoryStream blob(m_app.getAllocator());
 			m_parent_meta.serialize(blob);
 			m_app.getAssetCompiler().updateMeta(Path(Path::getResource(m_resource->getPath())), blob);
+			m_dirty = false;
 		}
 
 		void windowGUI() override {
@@ -134,6 +135,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			const Array<Animation::RotationTrack>& rotations = m_resource->getRotations();
 			const Array<Animation::ConstRotationTrack>& const_rotations = m_resource->getConstRotations();
 			const Array<Animation::TranslationTrack>& translations = m_resource->getTranslations();
+			const Array<Animation::ConstTranslationTrack>& const_translations = m_resource->getConstTranslations();
 
 			ImGuiEx::Label("Root rotation");
 			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_parent_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
@@ -153,53 +155,55 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			ImGuiEx::Label("Rotation frame size");
 			ImGui::Text("%d", m_resource->getRotationFrameSizeBits());
 
-			u32 const_translation_tracks_count = 0;
-			for (const Animation::TranslationTrack& curve : translations) {
-				if (curve.type == Animation::TrackType::CONSTANT) ++const_translation_tracks_count;
-			}
 			ImGuiEx::Label("Translation tracks (constant / animated)");
-			ImGui::Text("%d / %d", const_translation_tracks_count, translations.size() - const_translation_tracks_count);
+			ImGui::Text("%d / %d", const_translations.size(), translations.size());
 
 			ImGuiEx::Label("Rotation tracks (constant / animated)");
 			ImGui::Text("%d / %d", const_rotations.size(), rotations.size());
 
 			if (!translations.empty() && ImGui::TreeNode("Translations")) {
-				for (const Animation::TranslationTrack& curve : translations) {
-					u32 curve_idx = u32(&curve - translations.begin());
-					auto iter = m_model->getBoneIndex(curve.name);
+				for (const Animation::TranslationTrack& track : translations) {
+					auto iter = m_model->getBoneIndex(track.name);
 					if (!iter.isValid()) continue;
 
 					const Model::Bone& bone = m_model->getBone(iter.value());
-					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
+					ImGuiTreeNodeFlags flags = m_selected_bone == track.name ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-					u32 bits = curve.bitsizes[0] + curve.bitsizes[1] + curve.bitsizes[2];
+					u32 bits = track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2];
 					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), bits);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-						m_selected_bone = curve.name;
+						m_selected_bone = track.name;
 					}
 					if (open) {
-						if (curve.type == Animation::TrackType::CONSTANT) {
-							Vec3 p = curve.min;
-							ImGui::Text("%f, %f, %f", p.x, p.y, p.z);
-						}
-						else {
-							ImGui::Columns(4);
-							for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
-								const Vec3 p = m_resource->getTranslation(i, curve_idx);
-								ImGui::Text("%d:", i);
-								ImGui::NextColumn();
-								ImGui::Text("%f", p.x);
-								ImGui::NextColumn();
-								ImGui::Text("%f", p.y);
-								ImGui::NextColumn();
-								ImGui::Text("%f", p.z);
-								ImGui::NextColumn();
+						ImGui::Columns(4);
+						for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
+							const Vec3 p = m_resource->getTranslation(i, track);
+							ImGui::Text("%d:", i);
+							ImGui::NextColumn();
+							ImGui::Text("%f", p.x);
+							ImGui::NextColumn();
+							ImGui::Text("%f", p.y);
+							ImGui::NextColumn();
+							ImGui::Text("%f", p.z);
+							ImGui::NextColumn();
 
-							}
-							ImGui::Columns();
 						}
+						ImGui::Columns();
 						ImGui::TreePop();
 					}
+				}
+				for (const Animation::ConstTranslationTrack& track : const_translations) {
+					auto iter = m_model->getBoneIndex(track.name);
+					if (!iter.isValid()) continue;
+
+					const Model::Bone& bone = m_model->getBone(iter.value());
+					ImGuiTreeNodeFlags flags = m_selected_bone == track.name ? ImGuiTreeNodeFlags_Selected : 0;
+					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (constant)", bone.name.c_str());
+					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+						m_selected_bone = track.name;
+					}
+					if (open) ImGui::Text("%f; %f; %f", track.value.x, track.value.y, track.value.z);
 				}
 				ImGui::TreePop();
 			}

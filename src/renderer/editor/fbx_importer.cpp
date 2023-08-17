@@ -1610,7 +1610,7 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 					}
 					else {
 						translation_tracks[bone_idx].is_const = false;
-						write(Animation::TrackType::SAMPLED);
+						write(Animation::TrackType::ANIMATED);
 
 						write(min);
 						write((max.x - min.x) / ((1 << bitsizes[0]) - 1));
@@ -1711,7 +1711,7 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 				}
 				else {
 					rotation_tracks[bone_idx].is_const = false;
-					write(Animation::TrackType::SAMPLED);
+					write(Animation::TrackType::ANIMATED);
 
 					u8 skipped_channel = 0;
 					for (u32 i = 1; i < 4; ++i) {
