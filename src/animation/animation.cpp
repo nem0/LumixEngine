@@ -21,6 +21,7 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 	, m_mem(m_allocator)
 	, m_translations(m_allocator)
 	, m_rotations(m_allocator)
+	, m_const_rotations(m_allocator)
 	, m_root_motion(m_allocator)
 {
 }
@@ -62,83 +63,63 @@ struct AnimationSampler {
 		Vec3* pos = pose.positions;
 		Quat* rot = pose.rotations;
 
-		float frame = time.toFrame(anim.m_fps);
-		const u32 frame_idx = u32(frame);
-		if (frame_idx < anim.m_frame_count - 1) {
-			const float frame_t = frame - frame_idx;
+		float sample = clamp(time.toFrame(anim.m_fps), 0.f, anim.m_frame_count - 0.00001f);
+		const u32 sample_idx = u32(sample);
+		const float t = sample - sample_idx;
 		
-			for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
-				const Animation::TranslationTrack& curve = anim.m_translations[i];
-				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
-				if (!iter.isValid()) continue;
+		for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
+			const Animation::TranslationTrack& curve = anim.m_translations[i];
+			Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
+			if (!iter.isValid()) continue;
 
-				if constexpr(use_mask) {
-					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
-				}
-
-				Vec3 anim_pos = lerp(anim.getTranslation(frame_idx, i), anim.getTranslation(frame_idx + 1, i), frame_t);
-
-				const int model_bone_index = iter.value();
-				if constexpr (use_weight) {
-					pos[model_bone_index] = lerp(pos[model_bone_index], anim_pos, weight);
-				}
-				else {
-					pos[model_bone_index] = anim_pos;
-				}
+			if constexpr(use_mask) {
+				if (mask->bones.find(curve.name) == mask->bones.end()) continue;
 			}
 
-			for (u32 i = 0, c = anim.m_rotations.size(); i < c; ++i) {
-				const Animation::RotationTrack& curve = anim.m_rotations[i];
-				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
-				if (!iter.isValid()) continue;
-				if constexpr(use_mask) {
-					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
-				}
+			Vec3 anim_pos = lerp(anim.getTranslation(sample_idx, i), anim.getTranslation(sample_idx + 1, i), t);
 
-				Quat anim_rot = nlerp(anim.getRotation(frame_idx, i), anim.getRotation(frame_idx + 1, i), frame_t);
-
-				const int model_bone_index = iter.value();
-				if constexpr (use_weight) {
-					rot[model_bone_index] = nlerp(rot[model_bone_index], anim_rot, weight);
-				}
-				else {
-					rot[model_bone_index] = anim_rot;
-				}
+			const int model_bone_index = iter.value();
+			if constexpr (use_weight) {
+				pos[model_bone_index] = lerp(pos[model_bone_index], anim_pos, weight);
+			}
+			else {
+				pos[model_bone_index] = anim_pos;
 			}
 		}
-		else {
-			for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
-				const Animation::TranslationTrack& curve = anim.m_translations[i];
-				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
-				if (!iter.isValid()) continue;
-				if constexpr(use_mask) {
-					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
-				}
 
-				const int model_bone_index = iter.value();
-				if constexpr (use_weight) {
-					pos[model_bone_index] = lerp(pos[model_bone_index], anim.getTranslation(anim.m_frame_count - 1, i), weight);
-				}
-				else {
-					pos[model_bone_index] = anim.getTranslation(anim.m_frame_count - 1, i);
-				}
+		for (u32 i = 0, c = anim.m_const_rotations.size(); i < c; ++i) {
+			const Animation::ConstRotationTrack& curve = anim.m_const_rotations[i];
+			Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
+			if (!iter.isValid()) continue;
+			if constexpr(use_mask) {
+				if (mask->bones.find(curve.name) == mask->bones.end()) continue;
 			}
 
-			for (u32 i = 0, c = anim.m_rotations.size(); i < c; ++i) {
-				const Animation::RotationTrack& curve = anim.m_rotations[i];
-				Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
-				if (!iter.isValid()) continue;
-				if constexpr(use_mask) {
-					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
-				}
+			const int model_bone_index = iter.value();
+			if constexpr (use_weight) {
+				rot[model_bone_index] = nlerp(rot[model_bone_index], curve.value, weight);
+			}
+			else {
+				rot[model_bone_index] = curve.value;
+			}
+		}
 
-				const int model_bone_index = iter.value();
-				if constexpr (use_weight) {
-					rot[model_bone_index] = nlerp(rot[model_bone_index], anim.getRotation(anim.m_frame_count - 1, i), weight);
-				}
-				else {
-					rot[model_bone_index] = anim.getRotation(anim.m_frame_count - 1, i);
-				}
+		for (u32 i = 0, c = anim.m_rotations.size(); i < c; ++i) {
+			const Animation::RotationTrack& curve = anim.m_rotations[i];
+			Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
+			if (!iter.isValid()) continue;
+			if constexpr(use_mask) {
+				if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+			}
+
+			Quat anim_rot = nlerp(anim.getRotation(sample_idx, curve), anim.getRotation(sample_idx + 1, curve), t);
+
+			const int model_bone_index = iter.value();
+			if constexpr (use_weight) {
+				rot[model_bone_index] = nlerp(rot[model_bone_index], anim_rot, weight);
+			}
+			else {
+				rot[model_bone_index] = anim_rot;
 			}
 		}
 	}
@@ -174,21 +155,21 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 		}
 	}
 	
-	m_root_motion.pose_translations.resize(m_frame_count);
-	m_root_motion.pose_rotations.resize(m_frame_count);
+	m_root_motion.pose_translations.resize(m_frame_count + 1);
+	m_root_motion.pose_rotations.resize(m_frame_count + 1);
 
 	if (rotation_idx >= 0 && (m_flags & Animation::ROOT_ROTATION)) {
-		m_root_motion.rotations.resize(m_frame_count);
+		m_root_motion.rotations.resize(m_frame_count + 1);
 	}
 
 	if (translation_idx >= 0 && (m_flags & Animation::ANY_ROOT_TRANSLATION)) {
-		m_root_motion.translations.resize(m_frame_count);
+		m_root_motion.translations.resize(m_frame_count + 1);
 	}
 
-	for (u32 f = 0; f < m_frame_count; ++f) {
+	for (u32 f = 0; f < m_frame_count + 1; ++f) {
 		LocalRigidTransform tmp = {Vec3(0), Quat::IDENTITY};
 		if (translation_idx >= 0) tmp.pos = getTranslation(f, translation_idx);
-		if (rotation_idx >= 0) tmp.rot = getRotation(f, rotation_idx);
+		if (rotation_idx >= 0) tmp.rot = getRotation(f, m_rotations[rotation_idx]);
 		LocalRigidTransform rm = AnimationSampler::maskRootMotion(m_flags, tmp);
 		if (!m_root_motion.translations.empty()) m_root_motion.translations[f] = rm.pos;
 		if (!m_root_motion.rotations.empty()) m_root_motion.rotations[f] = rm.rot;
@@ -203,15 +184,15 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 		m_root_motion.pose_rotations[f] = tmp.rot;
 	}
 
+	m_root_motion.rotation_track_idx = rotation_idx;
 	m_translations[translation_idx].type = Animation::TrackType::ROOT_MOTION_ROOT;
-	m_rotations[rotation_idx].type = Animation::TrackType::ROOT_MOTION_ROOT;
 }
 
 LocalRigidTransform Animation::getRootMotion(Time time) const {
 	LocalRigidTransform tr = {Vec3(0), Quat::IDENTITY};
 	float frame = time.toFrame(m_fps);
 	const u32 frame_idx = u32(frame);
-	if (frame_idx < m_frame_count - 1) {
+	if (frame_idx < m_frame_count) {
 		const float frame_t = frame - frame_idx;
 
 		if (!m_root_motion.rotations.empty()) {
@@ -252,22 +233,22 @@ Vec3 Animation::getTranslation(Time time, u32 curve_idx) const {
 	float frame = time.toFrame(m_fps);
 	const u32 frame_idx = u32(frame);
 	
-	if (frame_idx < m_frame_count - 1) {
+	if (frame_idx < m_frame_count) {
 		const float frame_t = frame - frame_idx;
 		return lerp(getTranslation(frame_idx, curve_idx), getTranslation(frame_idx + 1, curve_idx), frame_t);
 	}
 
-	return getTranslation(m_frame_count - 1, curve_idx);
+	return getTranslation(m_frame_count, curve_idx);
 }
 
-float Animation::unpackChannel(u64 val, float min, float range, u32 bitsize) {
+static float unpackChannel(u64 val, float min, float to_float_range, u32 bitsize) {
 	if (bitsize == 0) return min;
-	return float(min + range * double(val & ((1 << bitsize) - 1)) / ((1 << bitsize) - 1));
+	const u64 mask = (u64(1) << bitsize) - 1;
+	return float(min + to_float_range * double(val & mask));
 }
 
 Vec3 Animation::getTranslation(u32 frame, u32 curve_idx) const {
 	const TranslationTrack& track = m_translations[curve_idx];
-
 	switch (track.type) {
 		case Animation::TrackType::CONSTANT: return track.min;
 		case Animation::TrackType::ROOT_MOTION_ROOT: return m_root_motion.pose_translations[frame];
@@ -275,27 +256,15 @@ Vec3 Animation::getTranslation(u32 frame, u32 curve_idx) const {
 			const u32 offset = m_translations_frame_size_bits * frame + track.offset_bits;
 
 			u64 tmp;
-			i32 rem = track.bitsizes_sum - (64 - (offset % 64));
-			if (rem <= 0) {
-				u64 buf;
-				memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
-				u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
-				tmp = buf >> offset0;
-			}
-			else {
-				u64 buf[2];
-				memcpy(&buf, m_translation_stream + offset / 64 * 8, sizeof(buf));
-				tmp = buf[0];
-				tmp <<= rem;
-				tmp |= buf[1] >> (64 - rem);
-			}
+			memcpy(&tmp, &m_translation_stream[offset / 8], sizeof(tmp));
+			tmp >>= offset & 7;
 
 			Vec3 res;
-			res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
+			res.x = unpackChannel(tmp, track.min.x, track.to_range.x, track.bitsizes[0]);
 			tmp >>= track.bitsizes[0];
-			res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
+			res.y = unpackChannel(tmp, track.min.y, track.to_range.y, track.bitsizes[1]);
 			tmp >>= track.bitsizes[1];
-			res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
+			res.z = unpackChannel(tmp, track.min.z, track.to_range.z, track.bitsizes[2]);
 			return res;
 		}
 	}
@@ -303,90 +272,40 @@ Vec3 Animation::getTranslation(u32 frame, u32 curve_idx) const {
 	return {};
 }
 
-Quat Animation::getRotation(u32 frame, u32 curve_idx) const {
-	const RotationTrack& track = m_rotations[curve_idx];
-	switch (track.type) {
-		case Animation::TrackType::CONSTANT: return track.min;
-		case Animation::TrackType::ROOT_MOTION_ROOT: return m_root_motion.pose_rotations[frame];
-		case Animation::TrackType::SAMPLED: {
-			const u32 offset = m_rotations_frame_size_bits * frame + track.offset_bits;
+Quat Animation::getRotation(u32 frame, const RotationTrack& track) const {
+	ASSERT(&track >= m_rotations.begin() && &track < m_rotations.end());
+	if (&track - m_rotations.begin() == m_root_motion.rotation_track_idx) return m_root_motion.pose_rotations[frame];
+	const u32 offset = m_rotations_frame_size_bits * frame + track.offset_bits;
 
-			u64 tmp;
-			i32 rem = track.bitsizes_sum - (64 - (offset % 64));
-			if (rem <= 0) {
-				u64 buf;
-				memcpy(&buf, m_rotation_stream + offset / 64 * 8, sizeof(buf));
-				u32 offset0 = (64 - (offset % 64) - track.bitsizes_sum);
-				tmp = buf >> offset0;
-			}
-			else {
-				u64 buf[2];
-				memcpy(&buf, m_rotation_stream + offset / 64 * 8, sizeof(buf));
-				tmp = buf[0];
-				tmp <<= rem;
-				tmp |= buf[1] >> (64 - rem);
-			}
+	u64 packed;
+	memcpy(&packed, &m_rotation_stream[offset / 8], sizeof(packed));
+	packed >>= offset & 7;
 
-			bool is_negative = tmp & 1;
-			tmp >>= 1;
+	bool is_negative = packed & 1;
+	packed >>= 1;
+	Vec3 v3;
 
-			Quat res;
-			if (track.skipped_channel != 0) {
-				res.x = unpackChannel(tmp, track.min.x, track.range.x, track.bitsizes[0]);
-				tmp >>= track.bitsizes[0];
-			}
-			if (track.skipped_channel != 1) {
-				res.y = unpackChannel(tmp, track.min.y, track.range.y, track.bitsizes[1]);
-				tmp >>= track.bitsizes[1];
-			}
-			if (track.skipped_channel != 2) {
-				res.z = unpackChannel(tmp, track.min.z, track.range.z, track.bitsizes[2]);
-				tmp >>= track.bitsizes[2];
-			}
-			if (track.skipped_channel != 3) {
-				res.w = unpackChannel(tmp, track.min.w, track.range.w, track.bitsizes[3]);
-			}
-			switch (track.skipped_channel) {
-				case 0: 
-					res.x = sqrtf(maximum(0.f, 1 - (res.y * res.y + res.z * res.z + res.w * res.w)));
-					res.x *= is_negative ? -1 : 1; 
-					break;
-				case 1:
-					res.y = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.z * res.z + res.w * res.w)));
-					res.y *= is_negative ? -1 : 1; 
-					break;
-				case 2:
-					res.z = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.w * res.w)));
-					res.z *= is_negative ? -1 : 1; 
-					break;
-				case 3:
-					res.w = sqrtf(maximum(0.f, 1 - (res.x * res.x + res.y * res.y + res.z * res.z)));
-					res.w *= is_negative ? -1 : 1; 
-					break;
-		
-			}
-			return res;
-		}
+	v3.x = unpackChannel(packed, track.min.x, track.to_range.x, track.bitsizes[0]);
+	packed >>= track.bitsizes[0];
+	v3.y = unpackChannel(packed, track.min.y, track.to_range.y, track.bitsizes[1]);
+	packed >>= track.bitsizes[1];
+	v3.z = unpackChannel(packed, track.min.z, track.to_range.z, track.bitsizes[2]);
+	float skipped = sqrtf(maximum(0.f, 1 - dot(v3, v3))) * (is_negative ? -1 : 1);
+
+	switch (track.skipped_channel) {
+		case 0: return Quat(skipped, v3.x, v3.y, v3.z);
+		case 1: return Quat(v3.x, skipped, v3.y, v3.z);
+		case 2: return Quat(v3.x, v3.y, skipped, v3.z);
+		case 3: return Quat(v3.x, v3.y, v3.z, skipped);
 	}
 	ASSERT(false);
 	return {};
-}
-
-Quat Animation::getRotation(Time time, u32 curve_idx) const {
-	float frame = time.toFrame(m_fps);
-	const u32 frame_idx = u32(frame);
-	
-	if (frame_idx < m_frame_count - 1) {
-		const float frame_t = frame - frame_idx;
-		return nlerp(getRotation(frame_idx, curve_idx), getRotation(frame_idx + 1, curve_idx), frame_t);
-	}
-
-	return getRotation(m_frame_count - 1, curve_idx);
 }
 
 bool Animation::load(Span<const u8> mem) {
 	m_translations.clear();
 	m_rotations.clear();
+	m_const_rotations.clear();
 	m_mem.clear();
 	Header header;
 	InputMemoryStream file(mem);
@@ -421,45 +340,46 @@ bool Animation::load(Span<const u8> mem) {
 	m_translations_frame_size_bits = 0;
 	InputMemoryStream blob(&m_mem[0], size);
 	for (int i = 0; i < m_translations.size(); ++i) {
-		TranslationTrack& curve = m_translations[i];
-		curve.name = blob.read<BoneNameHash>();
-		blob.read(curve.type);
+		TranslationTrack& track = m_translations[i];
+		track.name = blob.read<BoneNameHash>();
+		blob.read(track.type);
 		
-		if (curve.type == Animation::TrackType::CONSTANT) {
-			blob.read(curve.min);
+		if (track.type == Animation::TrackType::CONSTANT) {
+			blob.read(track.min);
 		}
 		else {
-			blob.read(curve.min);
-			blob.read(curve.range);
-			blob.read(curve.bitsizes);
-			blob.read(curve.bitsizes_sum);
-			blob.read(curve.offset_bits);
-			m_translations_frame_size_bits += curve.bitsizes_sum;
+			blob.read(track.min);
+			Vec3 range;
+			blob.read(track.to_range);
+			blob.read(track.bitsizes);
+			blob.read(track.offset_bits);
+			m_translations_frame_size_bits += track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2];
 		}
 	}
 	
-	m_translation_stream = (const u8*)blob.skip((m_translations_frame_size_bits * m_frame_count + 7) / 8);
+	m_translation_stream = (const u8*)blob.skip((m_translations_frame_size_bits * (m_frame_count + 1) + 7) / 8);
 
 	const u32 rotations_count = blob.read<u32>();
-	m_rotations.resize(rotations_count);
 
 	m_rotations_frame_size_bits = 0;
-	for (int i = 0; i < m_rotations.size(); ++i) {
-		RotationTrack& curve = m_rotations[i];
-		curve.name = blob.read<BoneNameHash>();
-		blob.read(curve.type);
-		
-		if (curve.type == Animation::TrackType::CONSTANT) {
-			blob.read(curve.min);
+	for (u32 i = 0; i < rotations_count; ++i) {
+		auto bone_name_hash = blob.read<BoneNameHash>();
+		auto type = blob.read<Animation::TrackType>();
+
+		if (type == Animation::TrackType::CONSTANT) {
+			ConstRotationTrack& track = m_const_rotations.emplace();
+			track.name = bone_name_hash;
+			blob.read(track.value);
 		}
 		else {
-			blob.read(curve.min);
-			blob.read(curve.range);
-			blob.read(curve.bitsizes);
-			blob.read(curve.bitsizes_sum);
-			blob.read(curve.offset_bits);
-			blob.read(curve.skipped_channel);
-			m_rotations_frame_size_bits += curve.bitsizes_sum;
+			RotationTrack& track = m_rotations.emplace();
+			track.name = bone_name_hash;
+			blob.read(track.min);
+			blob.read(track.to_range);
+			blob.read(track.bitsizes);
+			blob.read(track.offset_bits);
+			blob.read(track.skipped_channel);
+			m_rotations_frame_size_bits += track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + 1/*sign bit*/;
 		}
 	}
 

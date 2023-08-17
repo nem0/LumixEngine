@@ -1114,7 +1114,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void locate(const Path& path) override {
 		m_is_open = true;
 		m_filter[0] = '\0';
-		StringView new_dir = Path::getDir(path);
+		StringView new_dir = Path::getDir(Path::getResource(path));
 		if (!Path::isSame(new_dir, m_dir)) {
 			changeDir(new_dir.empty() ? StringView(".") : new_dir, true);
 		}
