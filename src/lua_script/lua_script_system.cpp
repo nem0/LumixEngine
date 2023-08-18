@@ -804,6 +804,32 @@ namespace Lumix
 			}
 		}
 
+		bool execute(EntityRef entity, i32 scr_index, StringView code) override {
+			const ScriptInstance& script = m_scripts[entity]->m_scripts[scr_index]; 
+
+			lua_State* state = script.m_state;
+			if (!state) return false;
+
+			bool errors = luaL_loadbuffer(state, code.begin, code.size(), nullptr) != 0;
+			if (errors) {
+				logError(lua_tostring(state, -1));
+				lua_pop(state, 1);
+				return false;
+			}
+
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
+			lua_setfenv(script.m_state, -2);
+
+			errors = lua_pcall(state, 0, 0, 0) != 0;
+
+			if (errors) {
+				logError(script.m_script->getPath(), ": ", lua_tostring(state, -1));
+				lua_pop(state, 1);
+				return false;
+			}
+			return true;
+		}
 
 		lua_State* getState(EntityRef entity, int scr_index) override
 		{

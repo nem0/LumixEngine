@@ -68,6 +68,7 @@ struct LuaScriptModule : IModule
 	virtual IFunctionCall* beginFunctionCallInlineScript(EntityRef entity, const char* function) = 0;
 	virtual void endFunctionCall() = 0;
 	virtual int getScriptCount(EntityRef entity) = 0;
+	virtual bool execute(EntityRef entity, i32 scr_index, StringView code) = 0;
 	virtual lua_State* getState(EntityRef entity, int scr_index) = 0;
 	virtual void insertScript(EntityRef entity, int idx) = 0;
 	virtual int addScript(EntityRef entity, int scr_index) = 0;

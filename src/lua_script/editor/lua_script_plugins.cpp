@@ -303,17 +303,30 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		if (!open) return;
 		if (ImGui::Begin(ICON_FA_SCROLL "Lua console##lua_console", &open))
 		{
-			if (ImGui::Button("Execute"))
-			{
-				lua_State* L = app.getEngine().getState();
+			if (ImGui::Button("Execute")) {
+				lua_State* L;
+				if (run_on_entity) {
+					WorldEditor& editor = app.getWorldEditor();
+					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					if (selected.size() == 1) {
+						World& world = *editor.getWorld();
+						LuaScriptModule* module = (LuaScriptModule*)world.getModule("lua_script");
+						if (world.hasComponent(selected[0], LUA_SCRIPT_TYPE) && module->getScriptCount(selected[0]) > 0) {
+							module->execute(selected[0], 0, StringView(buf));
+						}
+					}
+				}
+				else {
+					L = app.getEngine().getState();
 				
-				bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != 0;
-				errors = errors || lua_pcall(L, 0, 0, 0) != 0;
+					bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != 0;
+					errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 
-				if (errors)
-				{
-					logError(lua_tostring(L, -1));
-					lua_pop(L, 1);
+					if (errors)
+					{
+						logError(lua_tostring(L, -1));
+						lua_pop(L, 1);
+					}
 				}
 			}
 			ImGui::SameLine();
@@ -350,6 +363,8 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 					}
 				}
 			}
+			ImGui::SameLine();
+			ImGui::Checkbox("Run on entity", &run_on_entity);
 			if(insert_value) ImGui::SetKeyboardFocusHere();
 			ImGui::InputTextMultiline("##repl",
 				buf,
@@ -396,6 +411,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	Array<String> autocomplete;
 	bool open;
 	bool open_autocomplete = false;
+	bool run_on_entity = false;
 	int autocomplete_selected = 1;
 	const char* insert_value = nullptr;
 	char buf[10 * 1024];
