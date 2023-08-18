@@ -1,4 +1,6 @@
 create_impostor = false
+anim_translation_error = 1.000000
+anim_rotation_error = 1.000000
 bake_vertex_ao = false
 bake_impostor_normals = false
 root_motion_flags = 2

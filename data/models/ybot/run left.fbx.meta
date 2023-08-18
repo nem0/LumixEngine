@@ -1,0 +1,16 @@
+create_impostor = false
+anim_translation_error = 1.000000
+anim_rotation_error = 1.000000
+bake_vertex_ao = false
+bake_impostor_normals = false
+root_motion_flags = 2
+use_mikktspace = false
+force_skin = false
+physics = "None"
+scale = 1.000000
+lod_count = 1
+culling_scale = 1.000000
+split = false
+import_vertex_colors = false
+vertex_color_is_ao = false
+lod0_distance = 10000.000000
