@@ -953,6 +953,10 @@ GroupNode::~GroupNode() {
 
 void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	if (m_children.empty()) {
+		ctx.data.write(data);
+		return;
+	}
 	
 	if (data.from != data.to) {
 		data.t += ctx.time_delta;
@@ -1068,6 +1072,7 @@ void GroupNode::skip(RuntimeContext& ctx) const {
 	
 void GroupNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
 	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	if (m_children.empty()) return;
 
 	m_children[data.from].node->getPose(ctx, weight, pose, mask);
 	if(data.from != data.to) {

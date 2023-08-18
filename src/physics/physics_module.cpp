@@ -2293,6 +2293,11 @@ struct PhysicsModuleImpl final : PhysicsModule
 		ctrl.custom_gravity_acceleration = value;
 	}
 
+	float getGravitySpeed(EntityRef entity) const override {
+		const Controller& ctrl = m_controllers[entity];
+		return ctrl.gravity_speed;
+	}
+
 	bool isControllerCollisionDown(EntityRef entity) const override
 	{
 		const Controller& ctrl = m_controllers[entity];
@@ -3962,6 +3967,7 @@ void PhysicsModule::reflect() {
 		.LUMIX_CMP(Controller, "physical_controller", "Physics / Controller")
 			.LUMIX_FUNC_EX(PhysicsModule::moveController, "move")
 			.LUMIX_FUNC_EX(PhysicsModule::isControllerCollisionDown, "isCollisionDown")
+			.LUMIX_FUNC_EX(PhysicsModule::getGravitySpeed, "getGravitySpeed")
 			.LUMIX_PROP(ControllerRadius, "Radius")
 			.LUMIX_PROP(ControllerHeight, "Height")
 			.LUMIX_ENUM_PROP(ControllerLayer, "Layer").attribute<LayerEnum>()

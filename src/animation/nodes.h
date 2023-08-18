@@ -124,7 +124,7 @@ struct AnimationNode final : Node {
 		LOOPED = 1 << 0
 	};
 
-	u32 m_slot;
+	u32 m_slot = 0;
 	u32 m_flags = LOOPED;
 };
 

@@ -185,6 +185,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule
 	virtual float getActorSpeed(EntityRef entity) = 0;
 	virtual void putToSleep(EntityRef entity) = 0;
 
+	virtual float getGravitySpeed(EntityRef entity) const = 0;
 	virtual bool isControllerCollisionDown(EntityRef entity) const = 0;
 	virtual void moveController(EntityRef entity, const Vec3& v) = 0;
 	virtual u32 getControllerLayer(EntityRef entity) = 0;
