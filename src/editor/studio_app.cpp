@@ -2029,7 +2029,7 @@ struct StudioAppImpl final : StudioApp
 		copyString(cfg.Name, path);
 		cfg.FontDataOwnedByAtlas = false;
 		auto font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg);
-		if(merge_icons) {
+		if (merge_icons) {
 			ImFontConfig config;
 			copyString(config.Name, "editor/fonts/fa-regular-400.ttf");
 			config.MergeMode = true;
@@ -2166,6 +2166,7 @@ struct StudioAppImpl final : StudioApp
 
 			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
 			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_settings.m_font_size * font_scale, true);
+			m_monospace_font = addFontFromFile("editor/fonts/sourcecodepro-regular.ttf", (float)m_settings.m_font_size * font_scale, false);
 
 			OutputMemoryStream data(m_allocator);
 			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
@@ -2192,6 +2193,7 @@ struct StudioAppImpl final : StudioApp
 					"The program will eventually crash!"
 				);
 			}
+			if (!m_monospace_font) logError("Failed to load monospace font");
 
 			{
 				PROFILE_BLOCK("build atlas");
@@ -3320,6 +3322,7 @@ struct StudioAppImpl final : StudioApp
 	
 	ImFont* getBigIconFont() override { return m_big_icon_font; }
 	ImFont* getBoldFont() override { return m_bold_font; }
+	ImFont* getMonospaceFont() override { return m_monospace_font; }
 
 	struct WindowToDestroy {
 		os::WindowHandle window;
@@ -3422,6 +3425,7 @@ struct StudioAppImpl final : StudioApp
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
 	ImFont* m_bold_font;
+	ImFont* m_monospace_font;
 	ImGuiID m_dockspace_id = 0;
 
 	struct WatchedPlugin {

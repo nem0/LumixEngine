@@ -134,6 +134,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getBoldFont() = 0;
 	virtual ImFont* getBigIconFont() = 0;
+	virtual ImFont* getMonospaceFont() = 0;
 	
 	virtual struct CommonActions& getCommonActions() = 0;
 

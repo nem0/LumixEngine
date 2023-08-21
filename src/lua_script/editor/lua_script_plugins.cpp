@@ -75,9 +75,11 @@ struct EditorWindow : AssetEditorWindow {
 
 		if (m_buffer.length() == 0) m_buffer = m_resource->getSourceCode();
 
+		ImGui::PushFont(m_app.getMonospaceFont());
 		if (inputStringMultiline("##code", &m_buffer, ImGui::GetContentRegionAvail())) {
 			m_dirty = true;
 		}
+		ImGui::PopFont();
 	}
 	
 	const Path& getPath() override { return m_resource->getPath(); }
@@ -366,6 +368,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 			ImGui::SameLine();
 			ImGui::Checkbox("Run on entity", &run_on_entity);
 			if(insert_value) ImGui::SetKeyboardFocusHere();
+			ImGui::PushFont(app.getMonospaceFont());
 			ImGui::InputTextMultiline("##repl",
 				buf,
 				lengthOf(buf),
@@ -373,6 +376,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 				ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion,
 				autocompleteCallback,
 				this);
+			ImGui::PopFont();
 
 			if (open_autocomplete)
 			{
