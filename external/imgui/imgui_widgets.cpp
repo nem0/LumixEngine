@@ -1712,13 +1712,30 @@ bool ImGui::BeginCombo(const char* label, const char* preview_value, ImGuiComboF
     const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
     const float value_x2 = ImMax(bb.Min.x, bb.Max.x - arrow_size);
     RenderNavHighlight(bb, id);
-    if (!(flags & ImGuiComboFlags_NoPreview))
+    if (!(flags & ImGuiComboFlags_NoPreview)) {
+	    int vert_start_idx = window->DrawList->VtxBuffer.Size;
         window->DrawList->AddRectFilled(bb.Min, ImVec2(value_x2, bb.Max.y), frame_col, style.FrameRounding, (flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
+	    int vert_end_idx = window->DrawList->VtxBuffer.Size;
+		ImVec4 fc4 = ColorConvertU32ToFloat4(frame_col);
+		fc4.x *= gradient_scale;
+		fc4.y *= gradient_scale;
+		fc4.z *= gradient_scale;
+		ImU32 bot_col = ColorConvertFloat4ToU32(fc4);
+		ShadeVertsLinearColorGradientKeepAlpha(window->DrawList, vert_start_idx, vert_end_idx, bb.Min, ImVec2(bb.Min.x, bb.Max.y), frame_col, bot_col);
+	}
     if (!(flags & ImGuiComboFlags_NoArrowButton))
     {
         ImU32 bg_col = GetColorU32((popup_open || hovered) ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
         ImU32 text_col = GetColorU32(ImGuiCol_Text);
+	    int vert_start_idx = window->DrawList->VtxBuffer.Size;
         window->DrawList->AddRectFilled(ImVec2(value_x2, bb.Min.y), bb.Max, bg_col, style.FrameRounding, (w <= arrow_size) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
+	    int vert_end_idx = window->DrawList->VtxBuffer.Size;
+		ImVec4 fc4 = ColorConvertU32ToFloat4(frame_col);
+		fc4.x *= gradient_scale;
+		fc4.y *= gradient_scale;
+		fc4.z *= gradient_scale;
+		ImU32 bot_col = ColorConvertFloat4ToU32(fc4);
+		ShadeVertsLinearColorGradientKeepAlpha(window->DrawList, vert_start_idx, vert_end_idx, bb.Min, ImVec2(bb.Min.x, bb.Max.y), frame_col, bot_col);
         if (value_x2 + arrow_size - style.FramePadding.x <= bb.Max.x)
             RenderArrow(window->DrawList, ImVec2(value_x2 + style.FramePadding.y, bb.Min.y + style.FramePadding.y), text_col, ImGuiDir_Down, 1.0f);
     }
