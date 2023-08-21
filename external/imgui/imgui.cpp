@@ -1063,6 +1063,9 @@ static void             SetPlatformImeDataFn_DefaultImpl(ImGuiViewport* viewport
 
 namespace ImGui
 {
+
+static float gradient_scale = 0.7f;
+
 // Navigation
 static void             NavUpdate();
 static void             NavUpdateWindowing();
@@ -3487,7 +3490,16 @@ void ImGui::RenderFrame(ImVec2 p_min, ImVec2 p_max, ImU32 fill_col, bool border,
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
+    int vert_start_idx = window->DrawList->VtxBuffer.Size;
     window->DrawList->AddRectFilled(p_min, p_max, fill_col, rounding);
+    int vert_end_idx = window->DrawList->VtxBuffer.Size;
+	ImVec4 fc4 = ColorConvertU32ToFloat4(fill_col);
+	fc4.x *= gradient_scale;
+	fc4.y *= gradient_scale;
+	fc4.z *= gradient_scale;
+	ImU32 bot_col = ColorConvertFloat4ToU32(fc4);
+    ShadeVertsLinearColorGradientKeepAlpha(window->DrawList, vert_start_idx, vert_end_idx, p_min, ImVec2(p_min.x, p_max.y), fill_col, bot_col);
+
     const float border_size = g.Style.FrameBorderSize;
     if (border && border_size > 0.0f)
     {

@@ -8657,11 +8657,21 @@ void ImGui::TabItemBackground(ImDrawList* draw_list, const ImRect& bb, ImGuiTabI
     const float rounding = ImMax(0.0f, ImMin((flags & ImGuiTabItemFlags_Button) ? g.Style.FrameRounding : g.Style.TabRounding, width * 0.5f - 1.0f));
     const float y1 = bb.Min.y + 1.0f;
     const float y2 = bb.Max.y + ((flags & ImGuiTabItemFlags_Preview) ? 0.0f : -1.0f);
-    draw_list->PathLineTo(ImVec2(bb.Min.x, y2));
+    
+    int vert_start_idx = draw_list->VtxBuffer.Size;
+	draw_list->PathLineTo(ImVec2(bb.Min.x, y2));
     draw_list->PathArcToFast(ImVec2(bb.Min.x + rounding, y1 + rounding), rounding, 6, 9);
     draw_list->PathArcToFast(ImVec2(bb.Max.x - rounding, y1 + rounding), rounding, 9, 12);
     draw_list->PathLineTo(ImVec2(bb.Max.x, y2));
     draw_list->PathFillConvex(col);
+    int vert_end_idx = draw_list->VtxBuffer.Size;
+	ImVec4 fc4 = ColorConvertU32ToFloat4(col);
+	fc4.x *= gradient_scale;
+	fc4.y *= gradient_scale;
+	fc4.z *= gradient_scale;
+	ImU32 bot_col = ColorConvertFloat4ToU32(fc4);
+    ShadeVertsLinearColorGradientKeepAlpha(draw_list, vert_start_idx, vert_end_idx, bb.Min, ImVec2(bb.Min.x, bb.Max.y), col, bot_col);
+
     if (g.Style.TabBorderSize > 0.0f)
     {
         draw_list->PathLineTo(ImVec2(bb.Min.x + 0.5f, y2));
