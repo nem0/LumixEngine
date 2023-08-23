@@ -943,10 +943,8 @@ int getDPI() {
 		if (db) {
 			XrmValue value;
 			char* type;
-			if (XrmGetResource(db, "Xft.dpi", "Xft.Dpi", &type, &value)) {
-				if (type && strcmp(type, "String") == 0) {
-					dpi = atof(value.addr);
-				}
+			if (XrmGetResource(db, "Xft.dpi", "String", &type, &value) && value.addr) {
+				dpi = atof(value.addr);
 			}
 			XrmDestroyDatabase(db);
 		}
