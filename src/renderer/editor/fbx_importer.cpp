@@ -1424,8 +1424,8 @@ struct BitWriter {
 
 struct TranslationTrack {
 	Vec3 min, max;
-	u8 bitsizes[4];
-	bool is_const;
+	u8 bitsizes[4] = {};
+	bool is_const = false;
 };
 
 struct RotationTrack {

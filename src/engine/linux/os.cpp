@@ -867,6 +867,11 @@ bool isMaximized(WindowHandle win) {
 	return maximized;
 }
 
+ void restore(WindowHandle win) {
+	// TODO
+	ASSERT(false);
+ }
+
 void restore(WindowHandle win, WindowState state) {
 	XEvent event = {ClientMessage};
 	event.xclient.window = (Window)win;
@@ -900,6 +905,11 @@ WindowState setFullscreen(WindowHandle win) {
 	Window root = RootWindowOfScreen(attrs.screen);
 	XSendEvent(G.display, root, False, SubstructureNotifyMask | SubstructureRedirectMask, &event);
 	return {};
+}
+
+void minimizeWindow(WindowHandle win) {
+	// TODO
+	ASSERT(false);
 }
 
 void maximizeWindow(WindowHandle win) {

@@ -1580,24 +1580,30 @@ struct StudioAppImpl final : StudioApp
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
 			const float spacing = ImGui::GetStyle().ItemSpacing.x;
-			ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_WINDOW_CLOSE).x - 2 * spacing);
-			ImVec2 cp = ImGui::GetCursorPos();
-			if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+			#ifdef _WIN32
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_WINDOW_CLOSE).x - 2 * spacing);
+				ImVec2 cp = ImGui::GetCursorPos();
+				if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
 
-			if (os::isMaximized(m_engine->getWindowHandle())) {
-				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_RESTORE).x + spacing;
-				ImGui::SetCursorPos(cp);
-				if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
-			}
-			else {
-				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MAXIMIZE).x + spacing;
-				ImGui::SetCursorPos(cp);
-				if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
-			}
+				if (os::isMaximized(m_engine->getWindowHandle())) {
+					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_RESTORE).x + spacing;
+					ImGui::SetCursorPos(cp);
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+				}
+				else {
+					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MAXIMIZE).x + spacing;
+					ImGui::SetCursorPos(cp);
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+				}
 
-			cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MINIMIZE).x + spacing;
-			ImGui::SetCursorPos(cp);
-			if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MINIMIZE).x + spacing;
+				ImGui::SetCursorPos(cp);
+				if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+			#else
+				// we don't have custom titlebar on linux
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - spacing);
+				ImVec2 cp = ImGui::GetCursorPos();
+			#endif
 
 			StaticString<200> stats;
 			if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
