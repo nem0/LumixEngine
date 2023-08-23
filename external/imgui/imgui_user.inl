@@ -379,7 +379,7 @@ namespace ImGuiEx {
 		g_node_editor.draw_list->ChannelsSetCurrent(0);
 		ImVec2 np = *g_node_editor.node_pos;
 		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
-		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(draw_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Border), 4.0f, 0, style.FrameBorderSize);
+		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(draw_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_TableBorderStrong), 4.0f, 0, style.FrameBorderSize);
 
 		if (g_node_editor.titlebar_height > 0) {
 			ImVec2 titlebar_size = size;

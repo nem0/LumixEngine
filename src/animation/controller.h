@@ -1,6 +1,5 @@
 #pragma once
 
-#include "condition.h"
 #include "engine/flag_set.h"
 #include "engine/hash.h"
 #include "engine/resource.h"
@@ -18,10 +17,7 @@ struct Node;
 struct RuntimeContext;
 
 enum class ControllerVersion : u32 {
-	EVENTS,
-	TRANSITIONS,
-	HASH64,
-	NO_ROOT,
+	FIRST_SUPPORTED = 4,
 
 	LATEST
 };
@@ -48,12 +44,24 @@ struct Controller final : Resource {
 		Animation* animation;
 	};
 
+	struct Input {
+		enum Type {
+			FLOAT,
+			BOOL,
+			I32
+		};
+
+		Type type;
+		StaticString<32> name;
+	};
+
 	IAllocator& m_allocator;
-	Node* m_root = nullptr;
+	struct TreeNode* m_root = nullptr;
 	Array<AnimationEntry> m_animation_entries;
 	Array<String> m_animation_slots;
 	Array<BoneMask> m_bone_masks;
-	InputDecl m_inputs;
+	Array<Input> m_inputs;
+	u32 m_id_generator = 0;
 	enum class Flags : u32 {
 		UNUSED_FLAG = 1 << 0
 	};
@@ -66,9 +74,9 @@ struct Controller final : Resource {
 	} m_ik[4];
 	u32 m_ik_count = 0;
 	StaticString<64> m_root_motion_bone;
+	bool m_compiled = false;
 
 private:
-	void processEvents(RuntimeContext& ctx) const;
 	void unload() override;
 	bool load(Span<const u8> mem) override;
 };

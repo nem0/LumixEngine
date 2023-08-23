@@ -146,70 +146,54 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	int getAnimatorInputIndex(EntityRef entity, const char* name) const override
+	i32 getAnimatorInputIndex(EntityRef entity, const char* name) const override
 	{
 		const Animator& animator = m_animators[m_animator_map[entity]];
-		anim::InputDecl& decl = animator.resource->m_inputs;
-		for (u32 i = 0; i < lengthOf(decl.inputs); ++i) {
-			if (decl.inputs[i].type != anim::InputDecl::EMPTY && equalStrings(decl.inputs[i].name, name)) return i;
+		for (anim::Controller::Input& input : animator.resource->m_inputs) {
+			if (input.name ==  name) return i32(&input - animator.resource->m_inputs.begin());
 		}
 		return -1;
 	}
 
 
-	void setAnimatorFloatInput(EntityRef entity, u32 input_idx, float value)
-	{
+	void setAnimatorFloatInput(EntityRef entity, u32 input_idx, float value) {
 		auto iter = m_animator_map.find(entity);
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		if (input_idx >= decl.inputs_count) return;
-		if (!animator.ctx) return;
-
-		if (decl.inputs[input_idx].type == anim::InputDecl::FLOAT) {
-			memcpy(&animator.ctx->inputs[decl.inputs[input_idx].offset], &value, sizeof(value));
+		if (animator.resource->m_inputs[input_idx].type == anim::Controller::Input::FLOAT) {
+			animator.ctx->inputs[input_idx].f = value;
 		}
 		else {
-			logWarning("Trying to set float to ", decl.inputs[input_idx].name);
+			logWarning("Trying to set float to ", animator.resource->m_inputs[input_idx].name);
 		}
 	}
 
 
-	void setAnimatorU32Input(EntityRef entity, u32 input_idx, u32 value)
-	{
+	void setAnimatorI32Input(EntityRef entity, u32 input_idx, i32 value) {
 		auto iter = m_animator_map.find(entity);
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		if (input_idx >= decl.inputs_count) return;
-		if (!animator.ctx) return;
-
-		if (decl.inputs[input_idx].type == anim::InputDecl::U32) {
-			*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
+		if (animator.resource->m_inputs[input_idx].type == anim::Controller::Input::I32) {
+			animator.ctx->inputs[input_idx].i32 = value;
 		}
 		else {
-			logWarning("Trying to set int to ", decl.inputs[input_idx].name);
+			logWarning("Trying to set i32 to ", animator.resource->m_inputs[input_idx].name);
 		}
 	}
 
 
-	void setAnimatorBoolInput(EntityRef entity, u32 input_idx, bool value)
-	{
+	void setAnimatorBoolInput(EntityRef entity, u32 input_idx, bool value) {
 		auto iter = m_animator_map.find(entity);
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		if (input_idx >= decl.inputs_count) return;
-		if (!animator.ctx) return;
-
-		if (decl.inputs[input_idx].type == anim::InputDecl::BOOL) {
-			*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
+		if (animator.resource->m_inputs[input_idx].type == anim::Controller::Input::BOOL) {
+			animator.ctx->inputs[input_idx].b = value;
 		}
 		else {
-			logWarning("Trying to set bool to ", decl.inputs[input_idx].name);
+			logWarning("Trying to set bool to ", animator.resource->m_inputs[input_idx].name);
 		}
 	}
 
@@ -539,66 +523,61 @@ struct AnimationModuleImpl final : AnimationModule {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return;
 
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		if (input_idx >= decl.inputs_count) return;
-		if (decl.inputs[input_idx].type != anim::InputDecl::FLOAT) return;
+		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Controller::Input::FLOAT) return;
 
-		*(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
+		animator.ctx->inputs[input_idx].f = value;
 	}
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return;
 
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		if (input_idx >= decl.inputs_count) return;
-		if (decl.inputs[input_idx].type != anim::InputDecl::BOOL) return;
+		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Controller::Input::BOOL) return;
 
-		*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
+		animator.ctx->inputs[input_idx].b = value;
 	}
 
 	float getAnimatorFloatInput(EntityRef entity, u32 input_idx) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return 0;
 
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::FLOAT);
+		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Controller::Input::FLOAT);
 
-		return *(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
+		return animator.ctx->inputs[input_idx].f;
 	}
 
 	bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return 0;
 
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::BOOL);
+		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Controller::Input::BOOL);
 
-		return *(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
+		return animator.ctx->inputs[input_idx].b;
 	}
 
-	u32 getAnimatorU32Input(EntityRef entity, u32 input_idx) override {
+	i32 getAnimatorI32Input(EntityRef entity, u32 input_idx) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return 0;
 
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::U32);
+		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Controller::Input::I32);
 
-		return *(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
+		return animator.ctx->inputs[input_idx].i32;
+
 	}
 
-	void setAnimatorInput(EntityRef entity, u32 input_idx, u32 value) override {
+	void setAnimatorInput(EntityRef entity, u32 input_idx, i32 value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return;
 
-		const anim::InputDecl& decl = animator.resource->m_inputs;
-		if (input_idx >= decl.inputs_count) return;
-		if (decl.inputs[input_idx].type != anim::InputDecl::U32) return;
+		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Controller::Input::I32) return;
 
-		*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
+		animator.ctx->inputs[input_idx].i32 = value;
 	}
 
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
@@ -934,7 +913,7 @@ void AnimationModule::reflect(Engine& engine) {
 			.LUMIX_PROP(PropertyAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
 			.prop<&AnimationModule::isPropertyAnimatorEnabled, &AnimationModule::enablePropertyAnimator>("Enabled")
 		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
-			.function<(void (AnimationModule::*)(EntityRef, u32, u32))&AnimationModule::setAnimatorInput>("setU32Input", "AnimationModule::setAnimatorInput")
+			.function<(void (AnimationModule::*)(EntityRef, u32, i32))&AnimationModule::setAnimatorInput>("setU32Input", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")
 			.LUMIX_FUNC_EX(AnimationModule::getAnimatorInputIndex, "getInputIndex")

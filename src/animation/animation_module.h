@@ -33,12 +33,12 @@ struct AnimationModule : IModule {
 	virtual void updateAnimable(EntityRef entity, float time_delta) = 0;
 	virtual void updateAnimator(EntityRef entity, float time_delta) = 0;
 	virtual Animable& getAnimable(EntityRef entity) = 0;
-	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, u32 value) = 0;
+	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, i32 value) = 0;
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, float value) = 0;
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) = 0;
 	virtual float getAnimatorFloatInput(EntityRef entity, u32 input_idx) = 0;
 	virtual bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) = 0;
-	virtual u32 getAnimatorU32Input(EntityRef entity, u32 input_idx) = 0;
+	virtual i32 getAnimatorI32Input(EntityRef entity, u32 input_idx) = 0;
 	virtual struct LocalRigidTransform getAnimatorRootMotion(EntityRef entity) = 0;
 	virtual void setAnimatorUseRootMotion(EntityRef entity, bool value) = 0;
 	virtual bool getAnimatorUseRootMotion(EntityRef entity) = 0;
