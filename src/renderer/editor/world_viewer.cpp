@@ -128,7 +128,7 @@ void WorldViewer::gui() {
 	m_viewport.w = (int)image_size.x;
 	m_viewport.h = (int)image_size.y;
 	Viewport vp = m_viewport;
-	if (m_focus_mesh) {
+	if (m_follow_mesh) {
 		vp.pos += m_world->getPosition(*m_mesh);
 	}
 	m_pipeline->setViewport(vp);

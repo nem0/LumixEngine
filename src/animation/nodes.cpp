@@ -1,5 +1,4 @@
 #include "animation.h"
-#include "condition.h"
 #include "controller.h"
 #include "engine/log.h"
 #include "nodes.h"
@@ -9,6 +8,8 @@
 #include "engine/stack_array.h"
 
 namespace Lumix::anim {
+
+static constexpr u32 OUTPUT_FLAG = 1 << 31;
 
 static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionEx(const Animation* anim, Time t0, Time t1) {
 	ASSERT(t0 <= t1);
@@ -39,35 +40,20 @@ RuntimeContext::RuntimeContext(Controller& controller, IAllocator& allocator)
 {
 }
 
-static u32 getInputByteOffset(Controller& controller, u32 input_idx) {
-	u32 offset = 0;
-	for (u32 i = 0; i < input_idx; ++i) {
-		switch (controller.m_inputs.inputs[i].type) {
-			case InputDecl::FLOAT: offset += sizeof(float); break;
-			case InputDecl::BOOL: offset += sizeof(bool); break;
-			case InputDecl::U32: offset += sizeof(u32); break;
-			case InputDecl::EMPTY: break;
-		}
-	}
-	return offset;
-}
-
 void RuntimeContext::setInput(u32 input_idx, float value) {
-	ASSERT(controller.m_inputs.inputs[input_idx].type == InputDecl::FLOAT);
-	const u32 offset = getInputByteOffset(controller, input_idx);
-	memcpy(&inputs[offset], &value, sizeof(value));
+	ASSERT(controller.m_inputs[input_idx].type == Controller::Input::FLOAT);
+	inputs[input_idx].f = value;
 }
 
 void RuntimeContext::setInput(u32 input_idx, bool value) {
-	ASSERT(controller.m_inputs.inputs[input_idx].type == InputDecl::BOOL);
-	const u32 offset = getInputByteOffset(controller, input_idx);
-	memcpy(&inputs[offset], &value, sizeof(value));
+	ASSERT(controller.m_inputs[input_idx].type == Controller::Input::BOOL);
+	inputs[input_idx].b = value;
 }
 
 static float getInputValue(const RuntimeContext& ctx, u32 idx) {
-	const InputDecl::Input& input = ctx.controller.m_inputs.inputs[idx];
-	ASSERT(input.type == InputDecl::FLOAT);
-	return *(float*)&ctx.inputs[input.offset];
+	const Controller::Input& input = ctx.controller.m_inputs[idx];
+	ASSERT(input.type == Controller::Input::FLOAT);
+	return ctx.inputs[idx].f;
 }
 
 struct Blend2DActiveTrio {
@@ -117,11 +103,136 @@ static Blend2DActiveTrio getActiveTrio(const Blend2DNode& node, Vec2 input_val) 
 	return res;
 }
 
-Blend2DNode::Blend2DNode(Node* parent, IAllocator& allocator)
-	: Node(parent, allocator) 
+Blend2DNode::Blend2DNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: Node(parent, controller, allocator) 
 	, m_children(allocator)
 	, m_triangles(allocator)
+	, m_name("blend2d", allocator)
 {}
+
+bool Blend2DNode::onGUI() {
+	outputSlot();
+	ImGui::TextUnformatted(m_name.c_str());
+	return false;
+}
+
+bool Blend2DNode::propertiesGUI() {
+	ImGuiEx::Label("Name");
+	bool res = inputString("##name", &m_name);
+	res = editInput("X input", &m_x_input_index, m_controller) || res;
+	res = editInput("Y input", &m_y_input_index, m_controller) || res;
+	
+	if (ImGui::BeginTable("b2dt", 3, ImGuiTableFlags_Resizable)) {
+		for (Blend2DNode::Child& child : m_children) {
+			ImGui::PushID(&child);
+			ImGui::TableNextRow(ImGuiTableFlags_RowBg);
+
+			if (m_hovered_blend2d_child == i32(&child - m_children.begin())) {
+				ImU32 row_bg_color = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_TabHovered]);
+				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
+			}
+			else {
+				ImU32 row_bg_color = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_TableRowBg]);
+				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
+			}
+
+			ImGui::TableNextColumn();
+			if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
+				m_children.erase(u32(&child - m_children.begin()));
+				ImGui::TableNextColumn();
+				ImGui::TableNextColumn();
+				ImGui::PopID();
+				res = true;
+				continue;
+			}
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(-1);
+			res = ImGui::DragFloat("##xval", &child.value.x) || res;
+		
+			ImGui::TableNextColumn();
+			ImGui::SetNextItemWidth(-1);
+			res = ImGui::DragFloat("##yval", &child.value.y) || res;
+
+			ImGui::TableNextColumn();
+			ImGui::SetNextItemWidth(-1);
+			res = anim::inputSlot(m_controller, "##anim", &child.slot) || res;
+
+			ImGui::PopID();
+		}
+
+		ImGui::EndTable();
+	}
+
+	if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add")) {
+		m_children.emplace();
+		if(m_children.size() > 1) {
+			m_children.back().value = m_children[m_children.size() - 2].value;
+		}
+		res = true;
+	}
+
+	
+	if (!m_triangles.empty()) {
+		float w = maximum(ImGui::GetContentRegionAvail().x, 100.f);
+		ImGui::InvisibleButton("tmp", ImVec2(w, w));
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		ImVec2 p = ImGui::GetItemRectMin() + ImVec2(4, 4);
+		ImVec2 s = ImGui::GetItemRectSize() - ImVec2(8, 8);
+		Vec2 min(FLT_MAX), max(-FLT_MAX);
+		for (const Blend2DNode::Child& c : m_children) {
+			min = minimum(min, c.value);
+			max = maximum(max, c.value);
+		}
+		swap(min.y, max.y);
+		Vec2 inv_range = Vec2(s) / (max - min);
+
+		const ImGuiStyle& style = ImGui::GetStyle();
+		ImU32 lines_color = ImGui::GetColorU32(style.Colors[ImGuiCol_PlotLines]);
+		ImU32 hovered_color = ImGui::GetColorU32(style.Colors[ImGuiCol_PlotLinesHovered]);
+		ImU32 fill_color = ImGui::GetColorU32(style.Colors[ImGuiCol_FrameBgActive]);
+		ImU32 bg_color = ImGui::GetColorU32(style.Colors[ImGuiCol_FrameBg]);
+
+		dl->AddRectFilled(p, p + s, bg_color);
+
+		for (const Blend2DNode::Triangle& t : m_triangles) {
+			dl->AddTriangleFilled(p + (m_children[t.a].value - min) * inv_range
+				, p + (m_children[t.c].value - min) * inv_range
+				, p + (m_children[t.b].value - min) * inv_range
+				, fill_color);
+		}
+
+		auto old_flags = dl->Flags;
+		dl->Flags = dl->Flags & ~ImDrawListFlags_AntiAliasedLines;
+		for (const Blend2DNode::Triangle& t : m_triangles) {
+			dl->AddTriangle(p + (m_children[t.a].value - min) * inv_range
+				, p + (m_children[t.c].value - min) * inv_range
+				, p + (m_children[t.b].value - min) * inv_range
+				, lines_color);
+		}
+		i32 hovered = -1;
+		for (const Blend2DNode::Child& ch : m_children) {
+			ImVec2 p0 = p + (ch.value - min) * inv_range - ImVec2(4, 4);
+			ImVec2 p1 = p0 + ImVec2(8, 8);
+			if (ImGui::IsMouseHoveringRect(p0, p1)) {
+				if (ImGui::BeginTooltip()) {
+					ImGui::TextUnformatted(m_controller.m_animation_slots[ch.slot].c_str());
+					ImGui::Text("%s = %f", m_controller.m_inputs[m_x_input_index].name.data, ch.value.x);
+					ImGui::Text("%s = %f", m_controller.m_inputs[m_y_input_index].name.data, ch.value.y);
+					ImGui::EndTooltip();
+					hovered = i32(&ch - m_children.begin());
+				}
+				dl->AddRect(p0, p1, hovered_color);
+			}
+			else {
+				dl->AddRect(p0, p1, lines_color);
+			}
+		}
+		m_hovered_blend2d_child = hovered;
+		dl->Flags = old_flags;
+	}
+
+	return res;
+}
 
 void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	float relt = ctx.input_runtime.read<float>();
@@ -189,7 +300,7 @@ Time Blend2DNode::length(const RuntimeContext& ctx) const {
 	return anim_a->getLength() * trio.ta + anim_b->getLength() * trio.tb + anim_c->getLength() * trio.tc;
 }
 
-void Blend2DNode::enter(RuntimeContext& ctx) const {
+void Blend2DNode::enter(RuntimeContext& ctx) {
 	const float t = 0.f;
 	ctx.data.write(t);
 }
@@ -355,6 +466,7 @@ Time Blend2DNode::time(const RuntimeContext& ctx) const {
 
 void Blend2DNode::serialize(OutputMemoryStream& stream) const {
 	Node::serialize(stream);
+	stream.write(m_name);
 	stream.write(m_x_input_index);
 	stream.write(m_y_input_index);
 	stream.writeArray(m_children);
@@ -362,15 +474,17 @@ void Blend2DNode::serialize(OutputMemoryStream& stream) const {
 
 void Blend2DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
 	Node::deserialize(stream, ctrl, version);
+	stream.read(m_name);
 	stream.read(m_x_input_index);
 	stream.read(m_y_input_index);
 	stream.readArray(&m_children);
 	dataChanged(ctrl.m_allocator);
 }
 
-Blend1DNode::Blend1DNode(Node* parent, IAllocator& allocator)
-	: Node(parent, allocator) 
+Blend1DNode::Blend1DNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: Node(parent, controller, allocator) 
 	, m_children(allocator)
+	, m_name("blend1d", allocator)
 {}
 
 struct Blend1DActivePair {
@@ -395,6 +509,62 @@ static Blend1DActivePair getActivePair(const Blend1DNode& node, float input_val)
 		}
 	}
 	return { &children[0], nullptr, 0 };
+}
+
+bool Blend1DNode::propertiesGUI() {
+	ImGuiEx::Label("Name");
+	bool res = inputString("##name", &m_name);
+	const Controller::Input& current_input = m_controller.m_inputs[m_input_index];
+	ImGuiEx::Label("Input");
+	if (ImGui::BeginCombo("##input", current_input.name)) {
+		bool selected = false;
+		for (const Controller::Input& input : m_controller.m_inputs) {
+			if (ImGui::Selectable(input.name.empty() ? "##tmp" : input.name)) {
+				selected = true;
+				m_input_index = u32(&input - m_controller.m_inputs.begin());
+			}
+		}
+		ImGui::EndCombo();
+		res = true;
+	}
+
+	if (ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) {
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		ImGui::Text("Value");
+		ImGui::TableNextColumn();
+		ImGui::Text("Slot");
+
+		for (Blend1DNode::Child& child : m_children) {
+			ImGui::TableNextColumn();
+			ImGui::PushID(&child);
+		
+			ImGui::SetNextItemWidth(-1);
+			res = ImGui::InputFloat("##val", &child.value) || res;
+		
+			ImGui::TableNextColumn();
+			ImGui::SetNextItemWidth(-1);
+			res = anim::inputSlot(m_controller, "##anim", &child.slot) || res;
+
+			ImGui::PopID();
+		}
+		ImGui::EndTable();
+	}
+
+	if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
+		m_children.emplace();
+		if(m_children.size() > 1) {
+			m_children.back().value = m_children[m_children.size() - 2].value;
+		}
+		res = true;
+	}
+	return res;
+}
+
+bool Blend1DNode::onGUI() {
+	outputSlot();
+	ImGuiEx::TextUnformatted(m_name.c_str());
+	return false;
 }
 
 void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
@@ -447,7 +617,7 @@ Time Blend1DNode::time(const RuntimeContext& ctx) const {
 	return length(ctx) * ctx.input_runtime.getAs<float>();
 }
 
-void Blend1DNode::enter(RuntimeContext& ctx) const {
+void Blend1DNode::enter(RuntimeContext& ctx) {
 	const float t = 0.f;
 	ctx.data.write(t);
 }
@@ -476,6 +646,7 @@ void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mas
 
 void Blend1DNode::serialize(OutputMemoryStream& stream) const {
 	Node::serialize(stream);
+	stream.write(m_name);
 	stream.write(m_input_index);
 	stream.write((u32)m_children.size());
 	stream.write(m_children.begin(), m_children.byte_size());
@@ -483,6 +654,7 @@ void Blend1DNode::serialize(OutputMemoryStream& stream) const {
 
 void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
 	Node::deserialize(stream, ctrl, version);
+	stream.read(m_name);
 	stream.read(m_input_index);
 	u32 count;
 	stream.read(count);
@@ -490,181 +662,40 @@ void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 v
 	stream.read(m_children.begin(), m_children.byte_size());
 }
 
-ConditionNode::ConditionNode(Node* parent, IAllocator& allocator)
-	: Node(parent, allocator)
-	, m_condition(allocator)
-	, m_condition_str(allocator)
-	, m_allocator(allocator)
-{
+bool AnimationNode::compile() {
+	return m_slot < (u32)m_controller.m_animation_slots.size();
 }
 
-ConditionNode::~ConditionNode() {
-	LUMIX_DELETE(m_allocator, m_true_node);
-	LUMIX_DELETE(m_allocator, m_false_node);
-}
-
-void ConditionNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
-	if (!m_true_node || !m_false_node) return;
-
-	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	
-	const bool is_transitioning = data.t < m_blend_length;
-	if (is_transitioning) {
-		data.t += ctx.time_delta;
-		
-		const bool transition_finished = data.t >= m_blend_length;
-		if (transition_finished) {
-			// TODO remaining root motion from skipped node
-			(data.is_true ? m_false_node : m_true_node)->skip(ctx);
-			ctx.data.write(data);
-			(data.is_true ? m_true_node : m_false_node)->update(ctx, root_motion);
-			return;
-		}
-		
-		ctx.data.write(data);
-
-		(data.is_true ? m_false_node : m_true_node)->update(ctx, root_motion);
-		LocalRigidTransform tmp;
-		(data.is_true ? m_true_node : m_false_node)->update(ctx, tmp);
-		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
-		return;
+bool AnimationNode::propertiesGUI() {
+	ImGuiEx::Label("Slot");
+	bool res = Lumix::anim::inputSlot(m_controller, "##slot", &m_slot);
+	ImGuiEx::Label("Looping");
+	bool loop = m_flags && LOOPED;
+	if (ImGui::Checkbox("##loop", &loop)) {
+		if (loop) m_flags = m_flags | LOOPED;
+		else m_flags = m_flags & ~LOOPED;
+		res = true;
 	}
-	
-	const bool is_true = m_condition.eval(ctx);
-	if (data.is_true != is_true) {
-		if (m_blend_length.raw() == 0) {
-			(data.is_true ? m_true_node : m_false_node)->skip(ctx);
-			data.is_true = is_true;
-			ctx.data.write(data);
-			(data.is_true ? m_true_node : m_false_node)->enter(ctx);
-			//(data.is_true ? m_true_node : m_false_node)->update(ctx, root_motion);
-		}
-		else {
-			data.t = Time(0);
-			data.is_true = is_true;
-			ctx.data.write(data);
-			(is_true ? m_false_node : m_true_node)->update(ctx, root_motion);
-			(is_true ? m_true_node : m_false_node)->enter(ctx);
-		}
-		return;
-	}
-
-	ctx.data.write(data);
-	(data.is_true ? m_true_node : m_false_node)->update(ctx, root_motion);
+	return res;
 }
 
-void ConditionNode::enter(RuntimeContext& ctx) const {
-	if (!m_true_node || !m_false_node) return;
-
-	RuntimeData rdata;
-	rdata.t = m_blend_length;
-	rdata.is_true = m_condition.eval(ctx);
-	ctx.data.write(rdata);
-	(rdata.is_true ? m_true_node : m_false_node)->enter(ctx);
-}
-
-void ConditionNode::skip(RuntimeContext& ctx) const {
-	if (!m_true_node || !m_false_node) return;
-
-	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	Node* running_child = data.is_true ? m_true_node : m_false_node;
-	running_child->skip(ctx);
-}
-
-void ConditionNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
-	if (!m_true_node || !m_false_node) return;
-
-	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	const bool is_transitioning = data.t < m_blend_length;
-	if (is_transitioning) {
-		(data.is_true ? m_false_node : m_true_node)->getPose(ctx, weight, pose, mask);
-		const float t = clamp(data.t / m_blend_length, 0.f, 1.f);
-		(data.is_true ? m_true_node : m_false_node)->getPose(ctx, weight * t, pose, mask);
+bool AnimationNode::onGUI() {
+	outputSlot();
+	if (m_slot < (u32)m_controller.m_animation_slots.size()) {
+		ImGui::TextUnformatted(ICON_FA_PLAY);
+		ImGui::SameLine();
+		ImGui::TextUnformatted(m_controller.m_animation_slots[m_slot].c_str());
 	}
 	else {
-		(data.is_true ? m_true_node : m_false_node)->getPose(ctx, weight, pose, mask);
+		ImGui::TextUnformatted(ICON_FA_PLAY " Animation");
 	}
+	return false;
 }
 
-void ConditionNode::serialize(OutputMemoryStream& stream) const {
-	Node::serialize(stream);
-
-	stream.write(m_condition_str);
-	stream.write(m_blend_length);
-
-	stream.write(m_true_node != nullptr);
-	if (m_true_node) {
-		stream.write(m_true_node->type());
-		m_true_node->serialize(stream);
-	}
-	stream.write(m_false_node != nullptr);
-	if (m_false_node) {
-		stream.write(m_false_node->type());
-		m_false_node->serialize(stream);
-	}
-}
-
-void ConditionNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
-	Node::deserialize(stream, ctrl, version);
-
-	stream.read(m_condition_str);
-	m_condition.compile(m_condition_str.c_str(), ctrl.m_inputs);
-	stream.read(m_blend_length);
-
-	if (stream.read<bool>()) {
-		Node::Type type;
-		stream.read(type);
-		m_true_node = Node::create(this, type, m_allocator);
-		m_true_node->deserialize(stream, ctrl, version);
-	}
-
-	if (stream.read<bool>()) {
-		Node::Type type;
-		stream.read(type);
-		m_false_node = Node::create(this, type, m_allocator);
-		m_false_node->deserialize(stream, ctrl, version);
-	}
-}
-
-Time ConditionNode::length(const RuntimeContext& ctx) const {
-	return Time::fromSeconds(1);
-}
-
-Time ConditionNode::time(const RuntimeContext& ctx) const {
-	return Time::fromSeconds(0);
-}
-
-AnimationNode::AnimationNode(Node* parent, IAllocator& allocator) 
-	: Node(parent, allocator) 
+AnimationNode::AnimationNode(Node* parent, Controller& controller, IAllocator& allocator) 
+	: Node(parent, controller, allocator) 
 {}
 
-void Node::emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeContext& ctx) const {
-	// TODO add emitEvents to all nodes (where applicable)
-	if (m_events.empty()) return;
-
-	InputMemoryStream blob(m_events);
-	const Time t0 = old_time % loop_length;
-	const Time t1 = new_time % loop_length;
-
-	const u16 from = u16(0xffFF * (u64)t0.raw() / loop_length.raw());
-	const u16 to = u16(0xffFF * (u64)t1.raw() / loop_length.raw());
-
-	if (t1.raw() >= t0.raw()) {
-		while(blob.getPosition() < blob.size()) {
-			const u32 type = blob.read<u32>();
-			const u16 size = blob.read<u16>();
-			const u16 rel_time = blob.read<u16>();
-			if (rel_time >= from && rel_time < to) {
-				ctx.events.write((u8*)blob.getData() + blob.getPosition() - 2 * sizeof(u32), size + 2 * sizeof(u32));
-			}
-			blob.skip(size);
-		}
-	}
-	else {
-		emitEvents(t0, loop_length, Time::fromSeconds(loop_length.seconds() + 1), ctx);
-		emitEvents(Time(0), t1, loop_length, ctx);
-	}
-}
 
 void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	Time t = ctx.input_runtime.read<Time>();
@@ -679,7 +710,6 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 			prev_t = Time(minimum(prev_t.raw(), len));
 		}
 
-		emitEvents(prev_t, t, anim->getLength(), ctx);
 		root_motion = getRootMotion(ctx, anim, prev_t, t);
 	}
 	else {
@@ -698,7 +728,7 @@ Time AnimationNode::time(const RuntimeContext& ctx) const {
 	return ctx.input_runtime.getAs<Time>();
 }
 
-void AnimationNode::enter(RuntimeContext& ctx) const {
+void AnimationNode::enter(RuntimeContext& ctx) {
 	Time t = Time(0); 
 	ctx.data.write(t);	
 }
@@ -729,8 +759,8 @@ LayersNode::Layer::Layer(IAllocator& allocator)
 {
 }
 
-LayersNode::LayersNode(Node* parent, IAllocator& allocator) 
-	: Node(parent, allocator)
+LayersNode::LayersNode(Node* parent, Controller& controller, IAllocator& allocator) 
+	: Node(parent, controller, allocator)
 	, m_layers(allocator)
 	, m_allocator(allocator)
 {
@@ -760,7 +790,7 @@ Time LayersNode::time(const RuntimeContext& ctx) const {
 	return Time(0);
 }
 
-void LayersNode::enter(RuntimeContext& ctx) const {
+void LayersNode::enter(RuntimeContext& ctx) {
 	for (const Layer& layer : m_layers) {
 		layer.node->enter(ctx);
 	}
@@ -798,36 +828,145 @@ void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ve
 		stream.read(layer.mask);
 		Node::Type type;
 		stream.read(type);
-		layer.node = Node::create(this, type, m_allocator);
+		layer.node = Node::create(this, type, m_controller, m_allocator);
 		layer.node->deserialize(stream, ctrl, version);
 	}
 }
 
-SelectNode::SelectNode(Node* parent, IAllocator& allocator)
-	: Node(parent, allocator)
-	, m_allocator(allocator)
-	, m_children(allocator)
+OutputNode::OutputNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: Node(parent, controller, allocator)
 {}
 
-SelectNode::~SelectNode() {
-	for (Child& c : m_children) {
-		LUMIX_DELETE(m_allocator, c.node);
+bool OutputNode::onGUI() {
+	inputSlot();
+	ImGuiEx::TextUnformatted(ICON_FA_SIGN_OUT_ALT " Output");
+	return false;
+}
+
+void OutputNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const { if (input) input->update(ctx, root_motion); }
+
+bool OutputNode::compile() {
+	input = getInput(0);
+	if (!input) return false;
+	return input->compile();
+}
+
+void OutputNode::enter(RuntimeContext& ctx) { if (input) input->enter(ctx); }
+void OutputNode::skip(RuntimeContext& ctx) const { if (input) input->skip(ctx); }
+void OutputNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const { if (input) input->getPose(ctx, weight, pose, mask); }
+void OutputNode::serialize(OutputMemoryStream& stream) const { Node::serialize(stream); }
+void OutputNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) { Node::deserialize(stream, ctrl, version); }
+Time OutputNode::length(const RuntimeContext& ctx) const { return  input ? input->length(ctx) : Time(1); }
+Time OutputNode::time(const RuntimeContext& ctx) const { return  input ? input->time(ctx) : Time(0); }
+
+
+TreeNode::TreeNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: Node(parent, controller, allocator)
+	, m_name("new tree", allocator)
+{
+	LUMIX_NEW(m_allocator, OutputNode)(this, controller, m_allocator);
+}
+
+void TreeNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const { m_nodes[0]->update(ctx, root_motion); }
+void TreeNode::enter(RuntimeContext& ctx) { m_nodes[0]->enter(ctx); }
+void TreeNode::skip(RuntimeContext& ctx) const { m_nodes[0]->skip(ctx); }
+void TreeNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const { m_nodes[0]->getPose(ctx, weight, pose, mask); }
+void TreeNode::serialize(OutputMemoryStream& stream) const { Node::serialize(stream); stream.write(m_name); }
+bool TreeNode::compile() { return m_nodes[0]->compile(); }
+
+bool TreeNode::propertiesGUI() {
+	ImGuiEx::Label("Name");
+	return inputString("##name", &m_name);
+}
+
+bool TreeNode::onGUI() {
+	outputSlot();
+	ImGui::TextUnformatted(ICON_FA_TREE);
+	ImGui::SameLine();
+	ImGui::TextUnformatted(m_name.c_str());
+	return false;
+}
+
+void TreeNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	LUMIX_DELETE(m_allocator, m_nodes[0]);
+	m_nodes.clear();
+	Node::deserialize(stream, ctrl, version);
+	stream.read(m_name);
+}
+
+Time TreeNode::length(const RuntimeContext& ctx) const { return  m_nodes[0]->length(ctx); }
+Time TreeNode::time(const RuntimeContext& ctx) const { return  m_nodes[0]->time(ctx); }
+
+bool SelectNode::propertiesGUI() { 
+	bool res = editInput("Input", &m_input_index, m_controller);
+	float node_blend_length = m_blend_length.seconds();
+	ImGuiEx::Label("Blend length");
+	if (ImGui::DragFloat("##bl", &node_blend_length)) {
+		m_blend_length = Time::fromSeconds(node_blend_length);
+		res = true;
 	}
+	return res;
+}
+
+bool SelectNode::onGUI() {
+	ImGuiEx::NodeTitle("Select");
+	outputSlot();
+	bool res = false;
+	for (u32 i = 0; i < (u32)m_max_values.size(); ++i) {
+		float& f = m_max_values[i];
+		inputSlot();
+		ImGui::PushID(&f);
+		if (ImGuiEx::IconButton(ICON_FA_TIMES_CIRCLE, "Remove")) {
+			m_max_values.erase(i);
+			for (i32 j = m_parent->m_links.size() - 1; j >= 0; --j) {
+				NodeEditorLink& link = m_parent->m_links[j];
+				if (link.getToNode() == m_id) {
+					if (link.getToPin() == i) {
+						m_parent->m_links.swapAndPop(j);
+					}
+					else if (link.getToPin() > i) {
+						link.to = link.getToNode() | ((link.getToPin() - 1) << 16);
+					}
+				}
+			}
+			--i;
+			ImGui::PopID();
+			res = true;
+			continue;
+		}
+
+		ImGui::SameLine();
+		res = ImGui::DragFloat("##f", &f) || res;
+		ImGui::PopID();
+	}
+	if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add")) {
+		m_max_values.push(m_max_values.back() + 1);
+		return true;
+	}
+	return res;
+}
+
+SelectNode::SelectNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: Node(parent, controller, allocator)
+	, m_max_values(allocator)
+	, m_inputs(allocator)
+{
+	m_max_values.push(0);
+	m_max_values.push(1);
 }
 
 u32 SelectNode::getChildIndex(float input_val) const {
-	ASSERT(m_children.size() > 0);
-	for (u32 i = 0, c = m_children.size(); i < c; ++i) {
-		const Child& child = m_children[i];
-		if (input_val <= child.max_value) {
+	ASSERT(m_max_values.size() > 0);
+	for (u32 i = 0, c = m_max_values.size(); i < c; ++i) {
+		if (input_val <= m_max_values[i]) {
 			return i;
 		}
 	}
-	return m_children.size() - 1;
+	return m_max_values.size() - 1;
 }
 
 void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
-	if (m_children.empty()) return;
+	if (m_max_values.empty()) return;
 
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	
@@ -839,19 +978,19 @@ void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 
 		if (m_blend_length < data.t) {
 			// TODO root motion in data.from
-			m_children[data.from].node->skip(ctx);
+			m_inputs[data.from]->skip(ctx);
 			data.from = data.to;
 			data.t = Time(0);
 			ctx.data.write(data);
-			m_children[data.to].node->update(ctx, root_motion);
+			m_inputs[data.to]->update(ctx, root_motion);
 			return;
 		}
 
 		ctx.data.write(data);
 
-		m_children[data.from].node->update(ctx, root_motion);
+		m_inputs[data.from]->update(ctx, root_motion);
 		LocalRigidTransform tmp;
-		m_children[data.to].node->update(ctx, tmp);
+		m_inputs[data.to]->update(ctx, tmp);
 		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
 		return;
 	}
@@ -860,48 +999,60 @@ void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 		data.to = child_idx;
 		data.t = Time(0);
 		ctx.data.write(data);
-		m_children[data.from].node->update(ctx, root_motion);
-		m_children[data.to].node->enter(ctx);
+		m_inputs[data.from]->update(ctx, root_motion);
+		m_inputs[data.to]->enter(ctx);
 		return;
 	}
 
 	data.t += ctx.time_delta;
 	ctx.data.write(data);
-	m_children[data.from].node->update(ctx, root_motion);
+	m_inputs[data.from]->update(ctx, root_motion);
 }
 
-void SelectNode::enter(RuntimeContext& ctx) const {
-	if (m_children.empty()) return;
+bool SelectNode::compile() {
+	m_inputs.resize(m_max_values.size());
+	for (u32 i = 0; i < (u32)m_inputs.size(); ++i) {
+		Node* n = getInput(i);
+		if (!n) return false;
+		m_inputs[i] = n;
+		if (!n->compile()) return false;
+	}
+	if (m_controller.m_inputs[m_input_index].type != Controller::Input::FLOAT) return false;
+	return true;
+}
+
+void SelectNode::enter(RuntimeContext& ctx) {
+	if (m_inputs.empty()) return;
 
 	RuntimeData runtime_data = { 0, 0, Time(0) };
 	const float input_val = getInputValue(ctx, m_input_index);
 	runtime_data.from = getChildIndex(input_val);
 	runtime_data.to = runtime_data.from;
 	ctx.data.write(runtime_data);
-	if (runtime_data.from < (u32)m_children.size()) {
-		m_children[runtime_data.from].node->enter(ctx);
+	if (runtime_data.from < (u32)m_inputs.size()) {
+		m_inputs[runtime_data.from]->enter(ctx);
 	}
 }
 
 void SelectNode::skip(RuntimeContext& ctx) const {
-	if (m_children.empty()) return;
+	if (m_inputs.empty()) return;
 
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	m_children[data.from].node->skip(ctx);
+	m_inputs[data.from]->skip(ctx);
 	if (data.from != data.to) {
-		m_children[data.to].node->skip(ctx);
+		m_inputs[data.to]->skip(ctx);
 	}
 }
 
 void SelectNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
-	if (m_children.empty()) return;
+	if (m_inputs.empty()) return;
 
 	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 
-	m_children[data.from].node->getPose(ctx, weight, pose, mask);
+	m_inputs[data.from]->getPose(ctx, weight, pose, mask);
 	if(data.from != data.to) {
 		const float t = clamp(data.t.seconds() / m_blend_length.seconds(), 0.f, 1.f);
-		m_children[data.to].node->getPose(ctx, weight * t, pose, mask);
+		m_inputs[data.to]->getPose(ctx, weight * t, pose, mask);
 	}
 }
 
@@ -913,245 +1064,150 @@ void SelectNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ve
 	Node::deserialize(stream, ctrl, version);
 	stream.read(m_blend_length);
 	stream.read(m_input_index);
-	u32 size;
-	stream.read(size);
-	m_children.reserve(size);
-	for (u32 i = 0; i < size; ++i) {
-		Child& child = m_children.emplace();
-		stream.read(child.max_value);
-		Node::Type type;
-		stream.read(type);
-		child.node = Node::create(this, type, m_allocator);
-		child.node->deserialize(stream, ctrl, version);
-	}
+	stream.readArray(&m_max_values);
 }
 
 void SelectNode::serialize(OutputMemoryStream& stream) const {
 	Node::serialize(stream);
 	stream.write(m_blend_length);
 	stream.write(m_input_index);
-	stream.write((u32)m_children.size());
-	for (const Child& child : m_children) {
-		stream.write(child.max_value);
-		stream.write(child.node->type());
-		child.node->serialize(stream);
-	}
-}
-
-GroupNode::GroupNode(Node* parent, IAllocator& allocator)
-	: Node(parent, allocator)
-	, m_allocator(allocator)
-	, m_children(allocator)
-	, m_transitions(allocator)
-{}
-
-GroupNode::~GroupNode() {
-	for (Child& c : m_children) {
-		LUMIX_DELETE(m_allocator, c.node);
-	}
-}
-
-void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
-	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	if (m_children.empty()) {
-		ctx.data.write(data);
-		return;
-	}
-	
-	if (data.from != data.to) {
-		data.t += ctx.time_delta;
-
-		if (data.blend_length < data.t) {
-			// TODO root motion in data.from
-			m_children[data.from].node->skip(ctx);
-			data.from = data.to;
-			data.t = Time(0);
-			ctx.data.write(data);
-			m_children[data.to].node->update(ctx, root_motion);
-			return;
-		}
-
-		ctx.data.write(data);
-
-		m_children[data.from].node->update(ctx, root_motion);
-		LocalRigidTransform tmp;
-		m_children[data.to].node->update(ctx, tmp);
-		root_motion = root_motion.interpolate(tmp, data.t.seconds() / data.blend_length.seconds());
-		return;
-	}
-
-	const bool is_current_matching = m_children[data.from].condition.eval(ctx);
-	const bool is_selectable = m_children[data.from].flags & Child::SELECTABLE;
-
-	if (!is_current_matching || !is_selectable) {
-		bool waiting_for_exit_time = false;
-		bool can_go_anywhere = false;
-		for (const Transition& transition : m_transitions) {
-			if (transition.to == data.to) continue;
-			if (transition.from != data.from && transition.from != 0xffFFffFF) continue;
-			if (transition.to != 0xffFFffFF && !m_children[transition.to].condition.eval(ctx)) continue;
-			
-			if (transition.exit_time >= 0) {
-				waiting_for_exit_time = true;
-				const Time len = m_children[data.from].node->length(ctx);
-				const Time beg = m_children[data.from].node->time(ctx);
-				const Time end = beg + ctx.time_delta;
-				const Time loop_start = beg - beg % len;
-				const Time t = loop_start + Time::fromSeconds(transition.exit_time * len.seconds());
-				if (t < beg || t >= end) continue;
-			}
-
-			if (transition.to == 0xffFFffFF) {
-				waiting_for_exit_time = false;
-				can_go_anywhere = true;
-				break;
-			}
-
-			data.to = transition.to;
-			data.blend_length = transition.blend_length;
-			data.t = Time(0);
-			ctx.data.write(data);
-			m_children[data.from].node->update(ctx, root_motion);
-			m_children[data.to].node->enter(ctx);
-			return;
-		}
-		
-		if ((!is_current_matching || can_go_anywhere) && !waiting_for_exit_time) {
-			for (u32 i = 0, c = m_children.size(); i < c; ++i) {
-				const Child& child = m_children[i];
-				if (i == data.from) continue;
-				if ((child.flags & Child::SELECTABLE) == 0) continue;
-				if (!child.condition.eval(ctx)) continue;
-
-				data.to = i;
-				data.blend_length = m_blend_length;
-				data.t = Time(0);
-				ctx.data.write(data);
-				m_children[data.from].node->update(ctx, root_motion);
-				m_children[data.to].node->enter(ctx);
-				return;
-			}
-		}
-	}
-
-	data.t += ctx.time_delta;
-	ctx.data.write(data);
-	m_children[data.from].node->update(ctx, root_motion);
-}
-	
-Time GroupNode::length(const RuntimeContext& ctx) const {
-	return Time::fromSeconds(1);
-}
-
-Time GroupNode::time(const RuntimeContext& ctx) const {
-	return Time(0);
-}
-
-void GroupNode::enter(RuntimeContext& ctx) const {
-	RuntimeData runtime_data = { 0, 0, Time(0) };
-	for (u32 i = 0, c = m_children.size(); i < c; ++i) {
-		const Child& child = m_children[i];
-		
-		if ((child.flags & Child::SELECTABLE) && child.condition.eval(ctx)) {
-			runtime_data =  { i, i, Time(0) };
-			break;
-		}
-	}
-	ctx.data.write(runtime_data);
-	if(runtime_data.from < (u32)m_children.size())
-		m_children[runtime_data.from].node->enter(ctx);
-}
-
-void GroupNode::skip(RuntimeContext& ctx) const { 
-	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	m_children[data.from].node->skip(ctx);
-	if (data.from != data.to) {
-		m_children[data.to].node->skip(ctx);
-	}
-}
-	
-void GroupNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
-	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
-	if (m_children.empty()) return;
-
-	m_children[data.from].node->getPose(ctx, weight, pose, mask);
-	if(data.from != data.to) {
-		const float t = clamp(data.t.seconds() / data.blend_length.seconds(), 0.f, 1.f);
-		m_children[data.to].node->getPose(ctx, weight * t, pose, mask);
-	}
-}
-
-void GroupNode::serialize(OutputMemoryStream& stream) const {
-	Node::serialize(stream);
-	stream.write(m_blend_length);
-	stream.write((u32)m_children.size());
-	for (const Child& child : m_children) {
-		stream.write(child.node->type());
-		stream.write(child.flags);
-		stream.writeString(child.condition_str);
-		child.node->serialize(stream);
-	}
-	
-	stream.write((u32)m_transitions.size());
-	stream.write(m_transitions.begin(), m_transitions.byte_size());
-}
-
-void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
-	Node::deserialize(stream, ctrl, version);
-	stream.read(m_blend_length);
-	u32 size;
-	stream.read(size);
-	m_children.reserve(size);
-	for (u32 i = 0; i < size; ++i) {
-		Node::Type type;
-		stream.read(type);
-		m_children.emplace(m_allocator);
-		if (version > (u32)ControllerVersion::TRANSITIONS) {
-			stream.read(m_children[i].flags);
-		}
-		const char* tmp = stream.readString();
-		m_children[i].condition_str = tmp;
-		m_children[i].condition.compile(tmp, ctrl.m_inputs);
-		m_children[i].node = Node::create(this, type, m_allocator);
-		m_children[i].node->deserialize(stream, ctrl, version);
-	}
-
-	if (version > (u32)ControllerVersion::TRANSITIONS) {
-		stream.read(size);
-		m_transitions.resize(size);
-		stream.read(m_transitions.begin(), m_transitions.byte_size());
-	}
+	stream.writeArray(m_max_values);
 }
 
 void Node::serialize(OutputMemoryStream& stream) const {
-	stream.writeString(m_name);
-	stream.write((u32)m_events.size());
-	stream.write(m_events.data(), m_events.size());
-}
-
-void Node::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
-	m_name = stream.readString();
-	if (version > (u32)ControllerVersion::EVENTS) {
-		const u32 size = stream.read<u32>();
-		m_events.resize(size);
-		stream.read(m_events.getMutableData(), size);
+	stream.write(m_id);
+	stream.write(m_pos);
+	stream.writeArray(m_links);
+	stream.write(m_nodes.size());
+	for (Node* node : m_nodes) {
+		stream.write(node->type());
+		node->serialize(stream);
 	}
 }
 
-Node* Node::create(Node* parent, Type type, IAllocator& allocator) {
+void Node::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	stream.read(m_id);
+	stream.read(m_pos);
+	stream.readArray(&m_links);
+	u32 count;
+	stream.read(count);
+	m_nodes.reserve(count);
+	for (u32 i = 0; i < count; ++i) {
+		Node::Type type;
+		stream.read(type);
+		Node* child = Node::create(this, type, m_controller, m_allocator);
+		child->deserialize(stream, ctrl, version);
+	}
+}
+
+void Node::inputSlot(ImGuiEx::PinShape shape) {
+	ImGuiEx::Pin(m_id | (u32(m_input_counter) << 16), true, shape);
+	++m_input_counter;
+}
+
+Node* Node::getInput(u32 idx) const {
+	if (!m_parent) return nullptr;
+	for (const NodeEditorLink& link : m_parent->m_links) {
+		if (link.getToNode() == m_id && link.getToPin() == idx) {
+			for (Node* n : m_parent->m_nodes) {
+				if (link.getFromNode() == n->m_id) return n;
+			}
+		}
+	}
+	return nullptr;
+}
+
+void Node::outputSlot(ImGuiEx::PinShape shape) {
+	ImGuiEx::Pin(m_id | (u32(m_output_counter) << 16) | OUTPUT_FLAG, false, shape);
+	++m_output_counter;
+}
+
+bool Node::nodeGUI() {
+	m_input_counter = 0;
+	m_output_counter = 0;
+	const ImVec2 old_pos = m_pos;
+	ImGuiEx::BeginNode(m_id, m_pos, &m_selected);
+	bool res = onGUI();
+	if (m_error.length() > 0) {
+		ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xff, 0, 0, 0xff));
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 4);
+	}
+	else if (!m_reachable) {
+		ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetColorU32(ImGuiCol_TableBorderLight));
+	}
+	ImGuiEx::EndNode();
+	if (m_error.length() > 0) {
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const ImVec2 p = ImGui::GetItemRectMax() - ImGui::GetStyle().FramePadding;
+		dl->AddText(p, IM_COL32(0xff, 0, 0, 0xff), ICON_FA_EXCLAMATION_TRIANGLE);
+			
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m_error.c_str());
+	}
+	else if (!m_reachable) {
+		ImGui::PopStyleColor();
+	}
+	return res;
+}
+
+
+Node* Node::create(Node* parent, Type type, Controller& controller, IAllocator& allocator) {
 	switch (type) {
-		case Node::ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(parent, allocator);
-		case Node::GROUP: return LUMIX_NEW(allocator, GroupNode)(parent, allocator);
-		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, allocator);
-		case Node::BLEND2D: return LUMIX_NEW(allocator, Blend2DNode)(parent, allocator);
-		case Node::LAYERS: return LUMIX_NEW(allocator, LayersNode)(parent, allocator);
-		case Node::CONDITION: return LUMIX_NEW(allocator, ConditionNode)(parent, allocator);
-		case Node::SELECT: return LUMIX_NEW(allocator, SelectNode)(parent, allocator);
+		case Node::ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(parent, controller, allocator);
+		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, controller, allocator);
+		case Node::BLEND2D: return LUMIX_NEW(allocator, Blend2DNode)(parent, controller, allocator);
+		case Node::LAYERS: return LUMIX_NEW(allocator, LayersNode)(parent, controller, allocator);
+		case Node::SELECT: return LUMIX_NEW(allocator, SelectNode)(parent, controller, allocator);
+		case Node::TREE: return LUMIX_NEW(allocator, TreeNode)(parent, controller, allocator);
+		case Node::OUTPUT: return LUMIX_NEW(allocator, OutputNode)(parent, controller, allocator);
 		case Node::NONE: ASSERT(false); return nullptr;
 	}
 	ASSERT(false);
 	return nullptr;
 }
 
+bool editInput(const char* label, u32* input_index, const Controller& controller) {
+	ASSERT(input_index);
+	bool changed = false;
+	ImGuiEx::Label(label);
+	if (controller.m_inputs.empty()) {
+		ImGui::Text("No inputs");
+		return false;
+	}
+	const Controller::Input& current_input = controller.m_inputs[*input_index];
+	if (ImGui::BeginCombo(StaticString<64>("##input", label), current_input.name)) {
+		for (const Controller::Input& input : controller.m_inputs) {
+			if (ImGui::Selectable(input.name)) {
+				changed = true;
+				*input_index = u32(&input - controller.m_inputs.begin());
+			}
+		}
+		ImGui::EndCombo();
+	}
+	return changed;
+}
+
+bool inputSlot(const Controller& controller, const char* str_id, u32* slot) {
+	bool changed = false;
+	const char* preview = *slot < (u32)controller.m_animation_slots.size() ? controller.m_animation_slots[*slot].c_str() : "N/A";
+	if (ImGui::BeginCombo(str_id, preview, 0)) {
+		static char filter[64] = "";
+		ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
+		bool selected = false;
+		for (u32 i = 0, c = controller.m_animation_slots.size(); i < c; ++i) {
+			const char* name = controller.m_animation_slots[i].c_str();
+			if ((!filter[0] || findInsensitive(name, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
+				*slot = i;
+				changed = true;
+				filter[0] = '\0';
+				ImGui::CloseCurrentPopup();
+				break;
+			}
+		}
+		ImGui::EndCombo();
+	}
+	return changed;
+}
 
 } // namespace Lumix::anim
