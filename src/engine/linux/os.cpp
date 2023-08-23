@@ -1183,6 +1183,7 @@ u64 getLastModified(StringView _path) {
 
 	struct stat tmp;
 	Lumix::u64 ret = 0;
+	if (stat(path, &tmp) != 0) return 0;
 	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::u64(tmp.st_mtim.tv_nsec / 1000000);
 	return ret;
 }
