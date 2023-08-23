@@ -2083,7 +2083,7 @@ struct StudioAppImpl final : StudioApp
 			ImGuiViewport* parent = ImGui::FindViewportByID(vp->ParentViewportId);
 			args.parent = parent ? parent->PlatformHandle : os::INVALID_WINDOW;
 			args.name = "child";
-			args.hit_test_callback = &StudioAppImpl::childHitTestCallback;
+			//args.hit_test_callback = &StudioAppImpl::childHitTestCallback;
 			vp->PlatformHandle = os::createWindow(args);
 			that->m_windows.push(vp->PlatformHandle);
 

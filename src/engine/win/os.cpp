@@ -84,6 +84,7 @@ static struct {
 		HCURSOR arrow;
 		HCURSOR text_input;
 	} cursors;
+	CursorType current_cursor = CursorType::DEFAULT;
 } G;
 
 
@@ -523,9 +524,13 @@ bool getEvent(Event& event) {
 	return true;
 }
 
+struct WindowData {
+	InitWindowArgs init_args;
+};
 
-void destroyWindow(WindowHandle window)
-{
+void destroyWindow(WindowHandle window) {
+	WindowData* data = (WindowData*)GetWindowLongPtrW((HWND)window, GWLP_USERDATA);
+	if (data) LUMIX_DELETE(getGlobalAllocator(), data);
 	DestroyWindow((HWND)window);
 }
 
@@ -561,8 +566,25 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
 			Event e;
 			e.window = hWnd;
-			switch (Msg)
-			{
+			WindowData* win = (WindowData*)GetWindowLongPtrW(hWnd, GWLP_USERDATA);
+			switch (Msg) {
+				case WM_SETCURSOR: 
+					if (LOWORD(lParam) == HTCLIENT) {
+						setCursor(G.current_cursor);
+						return 1;
+					}
+					break;
+				case WM_EXITSIZEMOVE:
+					e.type = Event::Type::MOUSE_BUTTON;
+					e.mouse_button.down = false;
+					e.mouse_button.button = MouseButton::LEFT;
+					G.event_queue.pushBack(e);
+					break;
+				case WM_NCCREATE: {
+					void* userdata = ((CREATESTRUCTW*)lParam)->lpCreateParams;
+					SetWindowLongPtrW(hWnd, GWLP_USERDATA, LONG_PTR(userdata));
+					break;
+				}
 				case WM_MOVE:
 					e.type = Event::Type::WINDOW_MOVE;
 					e.win_move.x = (i16)LOWORD(lParam);
@@ -600,11 +622,81 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					G.event_queue.pushBack(e);
 					updateGrabbedMouse();
 					break;
+				case WM_NCPAINT:
+				case WM_NCACTIVATE:
+					if (win->init_args.flags & InitWindowArgs::NO_DECORATION) return TRUE;
+					break;
+				case WM_NCCALCSIZE:
+					if (wParam == TRUE && win->init_args.flags & InitWindowArgs::NO_DECORATION) {
+						NCCALCSIZE_PARAMS& params = *(NCCALCSIZE_PARAMS*)lParam;
+						if (!isMaximized(hWnd)) return 0;
+
+						auto monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONULL);
+						if (!monitor) return 0;
+
+						MONITORINFO monitor_info{};
+						monitor_info.cbSize = sizeof(monitor_info);
+						if (!GetMonitorInfoW(monitor, &monitor_info)) return 0;
+
+						params.rgrc[0] = monitor_info.rcWork;
+						return 0;
+					}
+					break;
+				case WM_NCHITTEST: {
+					if (win->init_args.flags & InitWindowArgs::NO_DECORATION) {
+						// https://github.dev/melak47/BorderlessWindow/blob/master/BorderlessWindow/src/BorderlessWindow.cpp
+						const POINT border{
+							GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER),
+							GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER)
+						};
+						RECT window_rect;
+						if (!GetWindowRect(hWnd, &window_rect)) return HTNOWHERE;
+
+						const POINT cp = {LOWORD(lParam), HIWORD(lParam)};
+
+						if (win->init_args.hit_test_callback) {
+							switch (win->init_args.hit_test_callback(win->init_args.user_data, hWnd, {cp.x, cp.y})) {
+								case HitTestResult::CAPTION: if (cp.y < (window_rect.top + border.y)) break; return HTCAPTION;
+								case HitTestResult::CLIENT: return HTCLIENT;
+								case HitTestResult::NONE: break;
+							}
+						}
+
+						enum {
+							CLIENT = 0b0000,
+							LEFT = 0b0001,
+							RIGHT = 0b0010,
+							TOP = 0b0100,
+							BOTTOM = 0b1000,
+						};
+
+						const auto result =
+							LEFT * (cp.x < (window_rect.left + border.x)) |
+							RIGHT * (cp.x >= (window_rect.right - border.x)) |
+							TOP * (cp.y < (window_rect.top + border.y)) |
+							BOTTOM * (cp.y >= (window_rect.bottom - border.y));
+
+						switch (result) {
+							case LEFT: return HTLEFT;
+							case RIGHT: return HTRIGHT;
+							case TOP: return HTTOP;
+							case BOTTOM: return HTBOTTOM;
+							case TOP | LEFT: return HTTOPLEFT;
+							case TOP | RIGHT: return HTTOPRIGHT;
+							case BOTTOM | LEFT: return HTBOTTOMLEFT;
+							case BOTTOM | RIGHT: return HTBOTTOMRIGHT;
+							case CLIENT: return HTCLIENT;
+							default: return HTNOWHERE;
+						}
+					}
+					break;
+				}
+
 			}
 			return DefWindowProc(hWnd, Msg, wParam, lParam);
 		};
 
-		wc.style = 0;
+		wc.style = CS_HREDRAW | CS_VREDRAW;
 		wc.lpfnWndProc = WndProc;
 		wc.cbClsExtra = 0;
 		wc.cbWndExtra = 0;
@@ -621,8 +713,12 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	HWND parent_window = (HWND)args.parent;
 
 	WCharStr<MAX_PATH> wname(args.name);
-	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION ? WS_POPUP : WS_OVERLAPPEDWINDOW ;
+	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION 
+		? (args.hit_test_callback ? WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX : WS_POPUP)
+		: WS_OVERLAPPEDWINDOW;
 	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
+	WindowData* window_data = LUMIX_NEW(getGlobalAllocator(), WindowData);
+	window_data->init_args = args;
 	const HWND hwnd = CreateWindowEx(
 		ext_style,
 		cls_name,
@@ -630,12 +726,12 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		style,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
+		800,
+		600,
 		parent_window,
 		NULL,
 		wndcls.hInstance,
-		NULL);
+		window_data);
 
 	FATAL_CHECK(hwnd);
 
@@ -725,6 +821,7 @@ void init() {
 }
 
 void setCursor(CursorType type) {
+	G.current_cursor = type;
 	switch (type) {
 		case CursorType::DEFAULT: SetCursor(G.cursors.arrow); break;
 		case CursorType::LOAD: SetCursor(G.cursors.load); break;
@@ -856,9 +953,18 @@ WindowState setFullscreen(WindowHandle win) {
 	return res;
 }
 
+void restore(WindowHandle win) {
+	DEBUG_CHECK(ShowWindow((HWND)win, SW_RESTORE));
+}
+
 void maximizeWindow(WindowHandle win)
 {
 	DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMAXIMIZED));
+}
+
+void minimizeWindow(WindowHandle win)
+{
+	DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMINIMIZED));
 }
 
 
