@@ -87,8 +87,14 @@ struct Event {
     };
 };
 
+enum class HitTestResult : u32 {
+	CAPTION,
+	CLIENT,
+	NONE
+};
 
 struct InitWindowArgs {
+	using HitTestCallback = HitTestResult (*)(void*, os::WindowHandle, Point);
 	enum Flags {
 		NO_DECORATION = 1 << 0,
 		NO_TASKBAR_ICON = 1 << 1
@@ -97,6 +103,8 @@ struct InitWindowArgs {
 	bool handle_file_drops = false;
 	u32 flags = 0;
 	WindowHandle parent = INVALID_WINDOW;
+	HitTestCallback hit_test_callback = nullptr;
+	void* user_data = nullptr;
 };
 
 
@@ -214,8 +222,10 @@ LUMIX_ENGINE_API Rect getWindowClientRect(WindowHandle win);
 LUMIX_ENGINE_API void setWindowScreenRect(WindowHandle win, const Rect& rect);
 LUMIX_ENGINE_API void setWindowTitle(WindowHandle win, const char* title);
 LUMIX_ENGINE_API void maximizeWindow(WindowHandle win);
+LUMIX_ENGINE_API void minimizeWindow(WindowHandle win);
 LUMIX_ENGINE_API WindowState setFullscreen(WindowHandle win);
 LUMIX_ENGINE_API void restore(WindowHandle win, WindowState state);
+LUMIX_ENGINE_API void restore(WindowHandle win);
 LUMIX_ENGINE_API bool isMaximized(WindowHandle win);
 LUMIX_ENGINE_API bool isMinimized(WindowHandle win);
 LUMIX_ENGINE_API WindowHandle getFocused();

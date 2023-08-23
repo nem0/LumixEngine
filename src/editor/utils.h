@@ -173,6 +173,7 @@ struct NodeEditor : SimpleUndoRedo {
 
 	virtual void onCanvasClicked(ImVec2 pos, i32 hovered_link) = 0;
 	virtual void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) = 0;
+	virtual void onNodeDoubleClicked(NodeEditorNode& node) {}
 	virtual void onContextMenu(ImVec2 pos) = 0;
 
 	void splitLink(const NodeEditorNode* node, Array<NodeEditorLink>& links, u32 link_idx);

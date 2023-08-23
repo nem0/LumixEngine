@@ -45,6 +45,7 @@ namespace ImGuiEx {
 		ImRect rect_selection = ImRect(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX); // only Min is persistent
 		bool clicked_node_selected = false;
 		ImGuiID clicked_node = 0;
+		ImVec2 window_size;
 	} g_node_editor;
 
 	ImVec2 GetNodeEditorOffset() {
@@ -62,6 +63,8 @@ namespace ImGuiEx {
 		g_node_editor.canvas_offset = offset;
 		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
 		
+		g_node_editor.window_size = ImGui::GetWindowSize();
+
 		ImGuiStorage* storage = GetStateStorage();
 		g_node_editor.new_link_from = storage->GetInt(GetID("node-new-link_from"), 0);
 		g_node_editor.new_link_from_input = storage->GetBool(GetID("node-new-link_from-input"), false);
@@ -335,7 +338,8 @@ namespace ImGuiEx {
 			g_node_editor.clicked_node = g_node_editor.last_node_id;
 		}
 
-		if (is_hovered && IsMouseReleased(0) && !g_node_editor.new_link_from && !g_node_editor.is_pin_hovered) {
+		if (is_hovered && IsMouseReleased(0) && !g_node_editor.new_link_from && !g_node_editor.is_pin_hovered)
+		{
 			if (g_node_editor.is_node_selected) {
 				if (GetIO().KeyShift) {
 					*g_node_editor.is_node_selected = !*g_node_editor.is_node_selected;
@@ -346,7 +350,9 @@ namespace ImGuiEx {
 			}
 		}
 
-		if (!is_hovered && IsMouseReleased(0) && !g_node_editor.is_pin_hovered && !GetIO().KeyShift && GetMouseDragDelta().x == 0 && GetMouseDragDelta().y == 0) {
+		const ImVec2 editor_pos = g_node_editor.node_editor_pos - *g_node_editor.canvas_offset;
+		bool is_editor_hovered = ImGui::IsMouseHoveringRect(editor_pos, editor_pos + g_node_editor.window_size);
+		if (!is_hovered && is_editor_hovered && IsMouseReleased(0) && !g_node_editor.is_pin_hovered && !GetIO().KeyShift && GetMouseDragDelta().x == 0 && GetMouseDragDelta().y == 0) {
 			if (g_node_editor.is_node_selected) {
 				*g_node_editor.is_node_selected = false;
 			}
@@ -1071,7 +1077,7 @@ namespace ImGuiEx {
 		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		PushStyleColor(ImGuiCol_Button, GetStyle().Colors[ImGuiCol_WindowBg]);
 		bool res = SmallButton(icon);
-		if (IsItemHovered()) {
+		if (tooltip && IsItemHovered()) {
 			SetTooltip("%s", tooltip);
 		}
 		PopStyleColor();

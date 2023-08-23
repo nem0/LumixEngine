@@ -69,10 +69,7 @@ struct EngineImpl final : Engine {
 		registerLogCallback<&EngineImpl::logToFile>(this);
 		registerLogCallback<logToDebugOutput>();
 
-		os::InitWindowArgs init_win_args;
-		init_win_args.handle_file_drops = init_data.handle_file_drops;
-		init_win_args.name = init_data.window_title;
-		m_window_handle = os::createWindow(init_win_args);
+		m_window_handle = os::createWindow(init_data.init_window_args);
 		if (m_window_handle == os::INVALID_WINDOW) {
 			logError("Failed to create main window.");
 		}

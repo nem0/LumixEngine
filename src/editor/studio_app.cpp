@@ -302,6 +302,26 @@ struct StudioAppImpl final : StudioApp
 		m_entity_selection_changed = true;
 	}
 
+	static os::HitTestResult childHitTestCallback(void* user_data, os::WindowHandle window, os::Point mp) {
+		#if 1
+			// let imgui handle size of secondary windows
+			// otherwise it has issues with docking
+			return os::HitTestResult::CLIENT;
+		#else
+			StudioAppImpl* studio = (StudioAppImpl*)user_data;
+			if (mp.y < os::getWindowScreenRect(window).top + 20) return os::HitTestResult::CAPTION;
+			if (ImGui::IsAnyItemHovered()) return os::HitTestResult::CLIENT;
+			return os::HitTestResult::NONE;
+		#endif
+	}
+
+	static os::HitTestResult hitTestCallback(void* user_data, os::WindowHandle window, os::Point mp) {
+		StudioAppImpl* studio = (StudioAppImpl*)user_data;
+		if (studio->m_is_caption_hovered) return os::HitTestResult::CAPTION;
+		if (ImGui::IsAnyItemHovered()) return os::HitTestResult::CLIENT;
+		return os::HitTestResult::NONE;
+	}
+
 	void onInit()
 	{
 		PROFILE_FUNCTION();
@@ -326,9 +346,12 @@ struct StudioAppImpl final : StudioApp
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
 		Engine::InitArgs init_data = {};
-		init_data.handle_file_drops = true;
-		init_data.window_title = "Lumix Studio";
+		init_data.init_window_args.handle_file_drops = true;
+		init_data.init_window_args.name = "Lumix Studio";
 		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
+		init_data.init_window_args.user_data = this;
+		init_data.init_window_args.hit_test_callback = &StudioAppImpl::hitTestCallback;
+		init_data.init_window_args.flags = os::InitWindowArgs::NO_DECORATION;
 		const char* plugins[] = {
 			#define LUMIX_PLUGINS_STRINGS
 				#include "engine/plugins.inl"
@@ -684,13 +707,17 @@ struct StudioAppImpl final : StudioApp
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
 		if (!m_cursor_captured) {
-			switch (imgui_cursor) {
-				case ImGuiMouseCursor_Arrow: os::setCursor(os::CursorType::DEFAULT); break;
-				case ImGuiMouseCursor_ResizeNS: os::setCursor(os::CursorType::SIZE_NS); break;
-				case ImGuiMouseCursor_ResizeEW: os::setCursor(os::CursorType::SIZE_WE); break;
-				case ImGuiMouseCursor_ResizeNWSE: os::setCursor(os::CursorType::SIZE_NWSE); break;
-				case ImGuiMouseCursor_TextInput: os::setCursor(os::CursorType::TEXT_INPUT); break;
-				default: os::setCursor(os::CursorType::DEFAULT); break;
+			static ImGuiMouseCursor last_cursor = ImGuiMouseCursor_COUNT;
+			if (imgui_cursor != last_cursor) {
+				switch (imgui_cursor) {
+					case ImGuiMouseCursor_Arrow: os::setCursor(os::CursorType::DEFAULT); break;
+					case ImGuiMouseCursor_ResizeNS: os::setCursor(os::CursorType::SIZE_NS); break;
+					case ImGuiMouseCursor_ResizeEW: os::setCursor(os::CursorType::SIZE_WE); break;
+					case ImGuiMouseCursor_ResizeNWSE: os::setCursor(os::CursorType::SIZE_NWSE); break;
+					case ImGuiMouseCursor_TextInput: os::setCursor(os::CursorType::TEXT_INPUT); break;
+					default: os::setCursor(os::CursorType::DEFAULT); break;
+				}
+				last_cursor = imgui_cursor;
 			}
 		}
 		ImGui::PushFont(m_font);
@@ -703,43 +730,13 @@ struct StudioAppImpl final : StudioApp
 	void guiEndFrame()
 	{
 		PROFILE_FUNCTION();
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-									ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-									ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
-									ImGuiWindowFlags_NoDocking;
-		const os::Rect main_win_rect = os::getWindowClientRect(m_main_window);
-		const bool has_viewports = ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable;
-		const os::Point p = has_viewports ? os::toScreen(m_main_window, main_win_rect.left, main_win_rect.top) : os::Point{0, 0};
 		if (m_is_welcome_screen_open) {
-			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
-				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
-				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
-			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-				ImGui::Begin("MainDockspace", nullptr, flags);
-				ImGui::PopStyleVar();
-				m_dockspace_id = ImGui::GetID("MyDockspace");
-				ImGui::DockSpace(m_dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
-				ImGui::End();
-				showWelcomeScreen();
-			}
+			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			showWelcomeScreen();
 		}
 		else {
-			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
-				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
-			}
-			else {
-				// we keep processing imgui to remember active dock nodes
-				ImGui::SetNextWindowSize(ImVec2(100, 100));
-			}
-			ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-			ImGui::Begin("MainDockspace", nullptr, flags);
-			ImGui::PopStyleVar();
 			mainMenu();
-			m_dockspace_id = ImGui::GetID("MyDockspace");
-			ImGui::DockSpace(m_dockspace_id, ImVec2(0, 0));
-			ImGui::End();
-			
+			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 			m_asset_compiler->onGUI();
 			onEntityListGUI();
 			onSaveAsDialogGUI();
@@ -1562,8 +1559,13 @@ struct StudioAppImpl final : StudioApp
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 4));
-		if (ImGui::BeginMainMenuBar())
-		{
+		
+		if (ImGui::BeginMainMenuBar()) {
+			const ImVec2 menu_min = ImGui::GetCursorPos();
+			ImGui::SetNextItemAllowOverlap();
+			ImGui::InvisibleButton("titlebardrag", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()));
+			m_is_caption_hovered = ImGui::IsItemHovered();
+			ImGui::SetCursorPos(menu_min);
 			fileMenu();
 			editMenu();
 			entityMenu();
@@ -1577,32 +1579,51 @@ struct StudioAppImpl final : StudioApp
 			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
+			const float spacing = ImGui::GetStyle().ItemSpacing.x;
+			ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_WINDOW_CLOSE).x - 2 * spacing);
+			ImVec2 cp = ImGui::GetCursorPos();
+			if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+
+			if (os::isMaximized(m_engine->getWindowHandle())) {
+				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_RESTORE).x + spacing;
+				ImGui::SetCursorPos(cp);
+				if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+			}
+			else {
+				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MAXIMIZE).x + spacing;
+				ImGui::SetCursorPos(cp);
+				if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+			}
+
+			cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MINIMIZE).x + spacing;
+			ImGui::SetCursorPos(cp);
+			if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+
 			StaticString<200> stats;
 			if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
 			stats.append("FPS: ", u32(m_fps + 0.5f));
 			if (!isFocused()) stats.append(" - inactive window");
-			auto stats_size = ImGui::CalcTextSize(stats);
-			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+			const ImVec2 stats_size = ImGui::CalcTextSize(stats);
+			cp.x -= stats_size.x + spacing;
+			ImGui::SetCursorPos(cp);
 			ImGuiEx::TextUnformatted(stats);
 
-			if (m_log_ui->getUnreadErrorCount() == 1)
-			{
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+			if (m_log_ui->getUnreadErrorCount() == 1) {
 				auto error_stats_size = ImGui::CalcTextSize(ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
+				cp.x -= error_stats_size.x + spacing;
+				ImGui::SetCursorPos(cp);
 				ImGui::TextColored(ImVec4(1, 0, 0, 1), ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
 			}
 			else if (m_log_ui->getUnreadErrorCount() > 1)
 			{
 				StaticString<50> error_stats(ICON_FA_EXCLAMATION_TRIANGLE, m_log_ui->getUnreadErrorCount(), " errors | ");
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 				auto error_stats_size = ImGui::CalcTextSize(error_stats);
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
+				cp.x -= error_stats_size.x + spacing;
+				ImGui::SetCursorPos(cp);
 				ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
 			}
 			ImGui::EndMainMenuBar();
 		}
-		ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2));
 	}
 
 	void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
@@ -2062,6 +2083,7 @@ struct StudioAppImpl final : StudioApp
 			ImGuiViewport* parent = ImGui::FindViewportByID(vp->ParentViewportId);
 			args.parent = parent ? parent->PlatformHandle : os::INVALID_WINDOW;
 			args.name = "child";
+			args.hit_test_callback = &StudioAppImpl::childHitTestCallback;
 			vp->PlatformHandle = os::createWindow(args);
 			that->m_windows.push(vp->PlatformHandle);
 
@@ -2294,7 +2316,7 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::saveAs>(
 			NO_ICON "Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::exit>(
-			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, Action::Modifiers::CTRL);
+			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT);
 		addAction<&StudioAppImpl::copy>(
 			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::paste>(
@@ -3367,6 +3389,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_load = false;
 	bool m_confirm_new = false;
 	bool m_confirm_destroy_partition = false;
+	bool m_is_caption_hovered = false;
 	
 	World::PartitionHandle m_partition_to_destroy;
 	StaticString<MAX_PATH> m_world_to_load;

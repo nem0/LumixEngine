@@ -150,7 +150,7 @@ struct Runner final
 
 	void onInit() {
 		Engine::InitArgs init_data;
-		init_data.window_title = "On the hunt";
+		init_data.init_window_args.name = "Lumix App";
 
 		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);

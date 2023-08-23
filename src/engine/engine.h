@@ -2,6 +2,7 @@
 
 #include "engine/lumix.h"
 #include "engine/allocator.h"
+#include "engine/os.h"
 
 struct lua_State;
 
@@ -22,9 +23,8 @@ struct LUMIX_ENGINE_API Engine {
 	struct InitArgs {
 		const char* working_dir = nullptr;
 		Span<const char*> plugins;
-		bool handle_file_drops = false;
-		const char* window_title = "Lumix App";
-		UniquePtr<struct FileSystem> file_system; 
+		UniquePtr<struct FileSystem> file_system;
+		os::InitWindowArgs init_window_args;
 	};
 
 	using LuaResourceHandle = u32;

@@ -626,7 +626,10 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 		if (node->nodeGUI()) {
 			pushUndo(node->m_id);
 		}
-		if (ImGui::IsMouseDragging(0) && ImGui::IsItemHovered()) m_dragged_node = node->m_id;
+		if (ImGui::IsItemHovered()) {
+			if (ImGui::IsMouseDragging(0)) m_dragged_node = node->m_id;
+			else if (ImGui::IsMouseDoubleClicked(0)) onNodeDoubleClicked(*node);
+		}
 		if (old_pos.x != node->m_pos.x || old_pos.y != node->m_pos.y) {
 			moved = node->m_id;
 			++moved_count;

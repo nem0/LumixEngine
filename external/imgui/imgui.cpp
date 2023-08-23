@@ -16798,7 +16798,15 @@ static void ImGui::DockNodeUpdateTabBar(ImGuiDockNode* node, ImGuiWindow* host_w
         node->LastFrameFocused = g.FrameCount;
     ImU32 title_bar_col = GetColorU32(host_window->Collapsed ? ImGuiCol_TitleBgCollapsed : is_focused ? ImGuiCol_TitleBgActive : ImGuiCol_TitleBg);
     ImDrawFlags rounding_flags = CalcRoundingFlagsForRectInRect(title_bar_rect, host_window->Rect(), g.Style.DockingSeparatorSize);
-    host_window->DrawList->AddRectFilled(title_bar_rect.Min, title_bar_rect.Max, title_bar_col, host_window->WindowRounding, rounding_flags);
+	int vert_start_idx = host_window->DrawList->VtxBuffer.Size;
+	host_window->DrawList->AddRectFilled(title_bar_rect.Min, title_bar_rect.Max, title_bar_col, host_window->WindowRounding, rounding_flags);
+	int vert_end_idx = host_window->DrawList->VtxBuffer.Size;
+	ImVec4 fc4 = ColorConvertU32ToFloat4(title_bar_col);
+	fc4.x *= gradient_scale;
+	fc4.y *= gradient_scale;
+	fc4.z *= gradient_scale;
+	ImU32 bot_col = ColorConvertFloat4ToU32(fc4);
+    ShadeVertsLinearColorGradientKeepAlpha(host_window->DrawList, vert_start_idx, vert_end_idx, title_bar_rect.Min, ImVec2(title_bar_rect.Min.x, title_bar_rect.Max.y), title_bar_col, bot_col);
 
     // Docking/Collapse button
     if (has_window_menu_button)
