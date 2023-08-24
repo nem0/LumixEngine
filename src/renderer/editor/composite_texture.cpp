@@ -3155,9 +3155,9 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 	void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) override {}
 	
 	void onContextMenu(ImVec2 pos) override {
-		ImGuiEx::filter("Filter", m_node_filter, sizeof(m_node_filter), 150, ImGui::IsWindowAppearing());
+		m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing());
 		
-		if (m_node_filter[0]) {
+		if (m_node_filter.isActive()) {
 			struct : INodeTypeVisitor {
 				bool beginCategory(const char* _category) override {
 					category = _category;
@@ -3169,7 +3169,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 				INodeTypeVisitor& visitType(const char* _label, CompositeTexture::NodeType type, char shortcut) override {
 					StaticString<128> label(category, _label);
 					if (shortcut) label.append(" (LMB + ", shortcut, ")");
-					if (!node && findInsensitive(label, win->m_node_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
+					if (!node && win->m_node_filter.pass(label) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label))) {
 						node = win->m_resource.addNode(type);
 						ImGui::CloseCurrentPopup();
 					}
@@ -3386,7 +3386,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 	FileSystem::AsyncHandle m_loading_handle = FileSystem::AsyncHandle::invalid();
 	bool m_show_preview = true;
 	bool m_dirty = false;
-	char m_node_filter[64] = "";
+	TextFilter m_node_filter;
 };
 
 UniquePtr<CompositeTextureEditor> CompositeTextureEditor::open(const Path& path, StudioApp& app, IAllocator& allocator) {

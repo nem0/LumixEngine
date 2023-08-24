@@ -738,4 +738,48 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	m_canvas.end();
 }
 
+bool TextFilter::pass(StringView text) const {
+	for (u32 i = 0; i < count; ++i) {
+		if (*subfilters[i].begin == '-') {
+			if (findInsensitive(text, StringView(subfilters[i].begin + 1, subfilters[i].end))) return false;
+		}
+		else {
+			if (!findInsensitive(text, subfilters[i])) return false;
+		}
+	}
+	return true;
+}
+
+void TextFilter::build() {
+	count = 0;
+	StringView tmp;
+	tmp.begin = filter;
+	tmp.end = filter;
+	for (;;) {
+		if (*tmp.end == ' ' || *tmp.end == '\0') {
+			if (tmp.size() > 0) {
+				if (tmp.size() > 1 || *tmp.begin != '-') {
+					subfilters[count] = tmp;
+					++count;
+					if (count == lengthOf(subfilters)) break;
+				}
+			}
+			if (*tmp.end == '\0') break;
+			tmp.begin = tmp.end + 1;
+			tmp.end = tmp.begin;
+		}
+		else {
+			++tmp.end;
+		}
+	}
+}
+
+bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus) {
+	if (ImGuiEx::filter(hint, filter, sizeof(filter), width, set_keyboard_focus)) {
+		build();
+		return true;
+	}
+	return false;
+}
+
 } // namespace Lumix

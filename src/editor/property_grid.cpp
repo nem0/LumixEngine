@@ -31,8 +31,6 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
-	m_component_filter[0] = '\0';
-
 	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "", false);
 	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
 	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
@@ -846,20 +844,18 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 }
 
 
-static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, EntityPtr parent, WorldEditor& editor)
+static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const TextFilter& filter, EntityPtr parent, WorldEditor& editor)
 {
 	if (!node) return;
 
-	if (filter[0])
-	{
+	if (filter.isActive()) {
 		if (!node->plugin) showAddComponentNode(node->child, filter, parent, editor);
-		else if (findInsensitive(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, parent, editor);
+		else if (filter.pass(node->plugin->getLabel())) node->plugin->onGUI(false, true, parent, editor);
 		showAddComponentNode(node->next, filter, parent, editor);
 		return;
 	}
 
-	if (node->plugin)
-	{
+	if (node->plugin) {
 		node->plugin->onGUI(false, false, parent, editor);
 		showAddComponentNode(node->next, filter, parent, editor);
 		return;
@@ -901,7 +897,7 @@ void PropertyGrid::onGUI()
 		if (ImGui::Button(ICON_FA_PLUS "Add component")) ImGui::OpenPopup("AddComponentPopup");
 
 		if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
-			ImGuiEx::filter("Filter", m_component_filter, sizeof(m_component_filter), 200, ImGui::IsWindowAppearing());
+			m_component_filter.gui("Filter", 200, ImGui::IsWindowAppearing());
 			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
 			ImGui::EndPopup();
 		}

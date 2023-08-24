@@ -623,11 +623,11 @@ struct AssetBrowserImpl : AssetBrowser {
 				recreateTiles();
 			}
 			ImGui::Separator();
-			static char filter[64] = "";
-			ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
+			static TextFilter filter;
+			filter.gui("Filter", -1, ImGui::IsWindowAppearing());
 			for (IPlugin* plugin : m_plugins) {
 				if (!plugin->canCreateResource()) continue;
-				if (filter[0] && !findInsensitive(plugin->getLabel(), filter)) continue;
+				if (!filter.pass(plugin->getLabel())) continue;
 				if (ImGui::BeginMenu(plugin->getLabel())) {
 					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 					ImGui::SameLine();
@@ -1100,8 +1100,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	bool resourceList(Path& path, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit, bool focus, float width) override {
-		static char filter[128] = "";
-		ImGuiEx::filter("Filter", filter, sizeof(filter), width, focus);
+		static TextFilter filter;
+		filter.gui("Filter", width, focus);
 		
 		ImGui::BeginChild("Resources", ImVec2(0, 200), false, ImGuiWindowFlags_HorizontalScrollbar);
 		AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -1110,7 +1110,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		Path selected_path;
 		for (const auto& res : resources) {
 			if(res.type != type) continue;
-			if (filter[0] != '\0' && !findInsensitive(res.path, filter)) continue;
+			if (!filter.pass(res.path)) continue;
 
 			const bool selected = selected_path_hash == res.path.getHash();
 			if(selected) selected_path = res.path;

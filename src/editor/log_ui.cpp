@@ -170,7 +170,7 @@ void LogUI::onGUI()
 		ImGui::SameLine();
 		ImGui::Checkbox("Autoscroll", &m_autoscroll);
 
-		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter));
+		m_filter.gui("Filter");
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
@@ -179,8 +179,7 @@ void LogUI::onGUI()
 			{
 				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
 				const char* msg = m_messages[i].text.c_str();
-				if (m_filter[0] == '\0' || findInsensitive(msg, m_filter))
-				{
+				if (m_filter.pass(msg)) {
 					ImGui::TextUnformatted(msg);
 				}
 			}
@@ -198,8 +197,7 @@ void LogUI::onGUI()
 				for (int i = 0; i < m_messages.size(); ++i)
 				{
 					const char* msg = m_messages[i].text.c_str();
-					if (m_filter[0] == '\0' || findInsensitive(msg, m_filter))
-					{
+					if (m_filter.pass(msg)) {
 						len += stringLength(msg);
 						len += sizeof("\n");
 					}
@@ -212,7 +210,7 @@ void LogUI::onGUI()
 					const Span<char> memspan((char*)mem.getMutableData(), len);
 					for (int i = 0; i < m_messages.size(); ++i) {
 						const char* msg = m_messages[i].text.c_str();
-						if (m_filter[0] == '\0' || findInsensitive(msg, m_filter)) {
+						if (m_filter.pass(msg)) {
 							catString(memspan, msg);
 							catString(memspan, "\n");
 						}

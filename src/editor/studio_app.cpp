@@ -328,7 +328,6 @@ struct StudioAppImpl final : StudioApp
 
 		os::Timer init_timer;
 		m_add_cmp_root.label[0] = '\0';
-		m_open_filter[0] = '\0';
 
 		char saved_data_dir[MAX_PATH] = {};
 		os::InputFile cfg_file;
@@ -1295,20 +1294,18 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, EntityPtr parent, WorldEditor& editor)
+	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const TextFilter& filter, EntityPtr parent, WorldEditor& editor)
 	{
 		if (!node) return;
 
-		if (filter[0])
-		{
+		if (filter.isActive()) {
 			if (!node->plugin) showAddComponentNode(node->child, filter, parent, editor);
-			else if (findInsensitive(node->plugin->getLabel(), filter)) node->plugin->onGUI(true, true, parent, editor);
+			else if (filter.pass(node->plugin->getLabel())) node->plugin->onGUI(true, true, parent, editor);
 			showAddComponentNode(node->next, filter, parent, editor);
 			return;
 		}
 
-		if (node->plugin)
-		{
+		if (node->plugin) {
 			node->plugin->onGUI(true, false, parent, editor);
 			showAddComponentNode(node->next, filter, parent, editor);
 			return;
@@ -1317,8 +1314,7 @@ struct StudioAppImpl final : StudioApp
 		const char* last = reverseFind(node->label, '/');
 		last = last ? last + 1 : node->label;
 		if (last[0] == ' ') ++last;
-		if (ImGui::BeginMenu(last))
-		{
+		if (ImGui::BeginMenu(last)) {
 			showAddComponentNode(node->child, filter, parent, editor);
 			ImGui::EndMenu();
 		}
@@ -1340,7 +1336,7 @@ struct StudioAppImpl final : StudioApp
 			m_editor->endCommandGroup();
 		}
 
-		ImGuiEx::filter("Filter", m_component_filter, sizeof(m_component_filter), 150);
+		m_component_filter.gui("Filter", 150);
 		
 		showAddComponentNode(m_add_cmp_root.child, m_component_filter, parent, *m_editor);
 	}
@@ -1425,10 +1421,10 @@ struct StudioAppImpl final : StudioApp
 		const Array<World::Partition>& partitions = m_editor->getWorld()->getPartitions();
 		auto open_ui = [&](const char* label, bool additive){
 			if (ImGui::BeginMenu(label)) {
-				ImGuiEx::filter("Filter", m_open_filter, sizeof(m_open_filter), 150);
+				m_open_filter.gui("Filter", 150);
 	
 				for (auto& univ : m_worlds) {
-					if ((m_open_filter[0] == '\0' || findInsensitive(univ, m_open_filter)) && ImGui::MenuItem(univ)) {
+					if (m_open_filter.pass(univ) && ImGui::MenuItem(univ)) {
 						if (!additive && m_editor->isWorldChanged()) {
 							m_world_to_load = univ;
 							m_confirm_load = true;
@@ -1959,31 +1955,22 @@ struct StudioAppImpl final : StudioApp
 	{
 		PROFILE_FUNCTION();
 		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
-		static char filter[64] = "";
+		static TextFilter filter;
 		if (!m_is_entity_list_open) return;
 		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
 		{
 			World* world = m_editor->getWorld();
-			ImGuiEx::filter("Filter", filter, sizeof(filter));
+			filter.gui("Filter");
 			
 			if (ImGui::BeginChild("entities")) {
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				
-				if (filter[0] == '\0') {
-					EntityFolders& folders = m_editor->getEntityFolders();
-					Array<EntityRef> selection_chain(m_allocator);
-					if (m_entity_selection_changed && !m_editor->getSelectedEntities().empty()) {
-						getSelectionChain(selection_chain, m_editor->getSelectedEntities()[0]);
-						m_entity_selection_changed = false;
-					}
-					for (const World::Partition& p : world->getPartitions()) {
-						folderUI(folders.getRoot(p.handle), folders, 0, selection_chain, p.name, p.handle);
-					}
-				} else {
+				if (filter.isActive()) {
 					for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
 						char buffer[1024];
 						getEntityListDisplayName(*this, *world, Span(buffer), e);
-						if (!findInsensitive(buffer, filter)) continue;
+						if (!filter.pass(buffer)) continue;
+
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
 						bool selected = entities.indexOf(e_ref) >= 0;
@@ -1996,6 +1983,16 @@ struct StudioAppImpl final : StudioApp
 							ImGui::EndDragDropSource();
 						}
 						ImGui::PopID();
+					}
+				} else {
+					EntityFolders& folders = m_editor->getEntityFolders();
+					Array<EntityRef> selection_chain(m_allocator);
+					if (m_entity_selection_changed && !m_editor->getSelectedEntities().empty()) {
+						getSelectionChain(selection_chain, m_editor->getSelectedEntities()[0]);
+						m_entity_selection_changed = false;
+					}
+					for (const World::Partition& p : world->getPartitions()) {
+						folderUI(folders.getRoot(p.handle), folders, 0, selection_chain, p.name, p.handle);
 					}
 				}
 				ImGui::PopItemWidth();
@@ -3413,8 +3410,8 @@ struct StudioAppImpl final : StudioApp
 	float m_fov = degreesToRadians(60);
 	RenderInterface* m_render_interface = nullptr;
 	Array<os::Event> m_events;
-	char m_open_filter[64];
-	char m_component_filter[32];
+	TextFilter m_open_filter;
+	TextFilter m_component_filter;
 	
 	float m_fps = 0;
 	os::Timer m_fps_timer;
