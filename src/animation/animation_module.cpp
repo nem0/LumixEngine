@@ -28,8 +28,7 @@ struct Animation;
 struct Engine;
 struct World;
 
-enum class AnimationModuleVersion
-{
+enum class AnimationModuleVersion {
 	USE_ROOT_MOTION,
 
 	LATEST
@@ -130,13 +129,6 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	const OutputMemoryStream* getEventStream(EntityRef entity) const override {
-		auto iter = m_animator_map.find(entity);
-		const Animator& animator = m_animators[iter.value()];
-		return animator.ctx ? &animator.ctx->events : nullptr;
-	}
-
-
 	void setAnimatorIK(EntityRef entity, u32 index, float weight, const Vec3& target) override {
 		auto iter = m_animator_map.find(entity);
 		Animator& animator = m_animators[iter.value()];
@@ -161,7 +153,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		if (animator.resource->m_inputs[input_idx].type == anim::Controller::Input::FLOAT) {
+		if (animator.resource->m_inputs[input_idx].type == anim::Value::FLOAT) {
 			animator.ctx->inputs[input_idx].f = value;
 		}
 		else {
@@ -175,8 +167,8 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		if (animator.resource->m_inputs[input_idx].type == anim::Controller::Input::I32) {
-			animator.ctx->inputs[input_idx].i32 = value;
+		if (animator.resource->m_inputs[input_idx].type == anim::Value::I32) {
+			animator.ctx->inputs[input_idx].s32 = value;
 		}
 		else {
 			logWarning("Trying to set i32 to ", animator.resource->m_inputs[input_idx].name);
@@ -189,7 +181,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		if (animator.resource->m_inputs[input_idx].type == anim::Controller::Input::BOOL) {
+		if (animator.resource->m_inputs[input_idx].type == anim::Value::BOOL) {
 			animator.ctx->inputs[input_idx].b = value;
 		}
 		else {
@@ -524,7 +516,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return;
 
 		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
-		if (animator.resource->m_inputs[input_idx].type != anim::Controller::Input::FLOAT) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Value::FLOAT) return;
 
 		animator.ctx->inputs[input_idx].f = value;
 	}
@@ -534,7 +526,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return;
 
 		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
-		if (animator.resource->m_inputs[input_idx].type != anim::Controller::Input::BOOL) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Value::BOOL) return;
 
 		animator.ctx->inputs[input_idx].b = value;
 	}
@@ -544,7 +536,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return 0;
 
 		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
-		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Controller::Input::FLOAT);
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::FLOAT);
 
 		return animator.ctx->inputs[input_idx].f;
 	}
@@ -554,7 +546,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return 0;
 
 		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
-		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Controller::Input::BOOL);
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::BOOL);
 
 		return animator.ctx->inputs[input_idx].b;
 	}
@@ -564,9 +556,9 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return 0;
 
 		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
-		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Controller::Input::I32);
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::I32);
 
-		return animator.ctx->inputs[input_idx].i32;
+		return animator.ctx->inputs[input_idx].s32;
 
 	}
 
@@ -575,9 +567,9 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return;
 
 		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
-		if (animator.resource->m_inputs[input_idx].type != anim::Controller::Input::I32) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Value::I32) return;
 
-		animator.ctx->inputs[input_idx].i32 = value;
+		animator.ctx->inputs[input_idx].s32 = value;
 	}
 
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
@@ -631,11 +623,11 @@ struct AnimationModuleImpl final : AnimationModule {
 
 		animator.ctx->model = model;
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
-		animator.ctx->root_bone_hash = animator.resource->m_root_motion_bone.empty() ? BoneNameHash() : BoneNameHash(animator.resource->m_root_motion_bone);
+		animator.ctx->root_bone_hash = animator.resource->m_root_motion_bone;
 		animator.resource->update(*animator.ctx, animator.root_motion);
 
 		model->getRelativePose(*pose);
-		animator.resource->getPose(*animator.ctx, *pose);
+		evalBlendStack(*animator.ctx, *pose);
 		
 		for (Animator::IK& ik : animator.inverse_kinematics) {
 			if (ik.weight == 0) break;
@@ -668,12 +660,15 @@ struct AnimationModuleImpl final : AnimationModule {
 
 	static void updateIK(anim::Controller::IK& res_ik, Animator::IK& ik, Pose& pose, Model& model)
 	{
-		u32 indices[anim::Controller::IK::MAX_BONES_COUNT];
-		LocalRigidTransform transforms[anim::Controller::IK::MAX_BONES_COUNT];
-		Vec3 old_pos[anim::Controller::IK::MAX_BONES_COUNT];
-		float len[anim::Controller::IK::MAX_BONES_COUNT - 1];
+		enum { MAX_BONES_COUNT = 32 };
+		u32 indices[MAX_BONES_COUNT];
+		LocalRigidTransform transforms[MAX_BONES_COUNT];
+		Vec3 old_pos[MAX_BONES_COUNT];
+		float len[MAX_BONES_COUNT - 1];
 		float len_sum = 0;
-		for (int i = 0; i < res_ik.bones_count; ++i) {
+		const i32 bones_count = res_ik.bones.size();
+		ASSERT(bones_count <= MAX_BONES_COUNT);
+		for (i32 i = 0; i < bones_count; ++i) {
 			auto iter = model.getBoneIndex(res_ik.bones[i]);
 			if (!iter.isValid()) return;
 
@@ -692,7 +687,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		}
 
 		LocalRigidTransform parent_tr = roots_parent;
-		for (int i = 0; i < res_ik.bones_count; ++i) {
+		for (i32 i = 0; i < bones_count; ++i) {
 			LocalRigidTransform tr{pose.positions[indices[i]], pose.rotations[indices[i]]};
 			transforms[i] = parent_tr * tr;
 			old_pos[i] = transforms[i].pos;
@@ -710,22 +705,22 @@ struct AnimationModuleImpl final : AnimationModule {
 			target = transforms[0].pos + to_target * len_sum;
 		}
 
-		for (int iteration = 0; iteration < res_ik.max_iterations; ++iteration) {
-			transforms[res_ik.bones_count - 1].pos = target;
+		for (u32 iteration = 0; iteration < res_ik.max_iterations; ++iteration) {
+			transforms[bones_count - 1].pos = target;
 			
-			for (int i = res_ik.bones_count - 1; i > 1; --i) {
+			for (i32 i = bones_count - 1; i > 1; --i) {
 				Vec3 dir = normalize((transforms[i - 1].pos - transforms[i].pos));
 				transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
 			}
 
-			for (int i = 1; i < res_ik.bones_count; ++i) {
+			for (i32 i = 1; i < bones_count; ++i) {
 				Vec3 dir = normalize((transforms[i].pos - transforms[i - 1].pos));
 				transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
 			}
 		}
 
 		// compute rotations from new positions
-		for (int i = res_ik.bones_count - 2; i >= 0; --i) {
+		for (i32 i = bones_count - 2; i >= 0; --i) {
 			Vec3 old_d = old_pos[i + 1] - old_pos[i];
 			Vec3 new_d = transforms[i + 1].pos - transforms[i].pos;
 
@@ -734,15 +729,15 @@ struct AnimationModuleImpl final : AnimationModule {
 		}
 
 		// convert from object space to bone space
-		LocalRigidTransform ik_out[anim::Controller::IK::MAX_BONES_COUNT];
-		for (int i = res_ik.bones_count - 1; i > 0; --i) {
+		LocalRigidTransform ik_out[MAX_BONES_COUNT];
+		for (i32 i = bones_count - 1; i > 0; --i) {
 			transforms[i] = transforms[i - 1].inverted() * transforms[i];
 			ik_out[i].pos = transforms[i].pos;
 		}
-		for (int i = res_ik.bones_count - 2; i > 0; --i) {
+		for (i32 i = bones_count - 2; i > 0; --i) {
 			ik_out[i].rot = transforms[i].rot;
 		}
-		ik_out[res_ik.bones_count - 1].rot = pose.rotations[indices[res_ik.bones_count - 1]];
+		ik_out[bones_count - 1].rot = pose.rotations[indices[bones_count - 1]];
 
 		if (first_bone.parent_idx >= 0) {
 			ik_out[0].rot = roots_parent.rot.conjugated() * transforms[0].rot;
@@ -753,7 +748,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		ik_out[0].pos = pose.positions[indices[0]];
 
 		const float w = ik.weight;
-		for (u32 i = 0; i < res_ik.bones_count; ++i) {
+		for (i32 i = 0; i < bones_count; ++i) {
 			const u32 idx = indices[i];
 			pose.positions[idx] = lerp(pose.positions[idx], ik_out[i].pos, w);
 			pose.rotations[idx] = nlerp(pose.rotations[idx], ik_out[i].rot, w);

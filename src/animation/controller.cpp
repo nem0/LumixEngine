@@ -4,6 +4,7 @@
 #include "engine/hash.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
+#include "engine/stack_array.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 
@@ -15,22 +16,15 @@ const ResourceType Controller::TYPE = ResourceType("anim_controller");
 Controller::Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator) 
 	: Resource(path, resource_manager, allocator)
 	, m_allocator(allocator)
-	, m_animation_slots(allocator)
 	, m_animation_entries(allocator)
 	, m_inputs(allocator)
+	, m_ik(allocator)
 	, m_bone_masks(allocator)
-{
-	m_root = LUMIX_NEW(m_allocator, TreeNode)(nullptr, *this, m_allocator);
-	m_root->m_name = "Root";
-}
+{}
 
 Controller::~Controller() {
 	LUMIX_DELETE(m_allocator, m_root);
 	ASSERT(isEmpty());
-}
-
-void Controller::clear() {
-	unload();
 }
 
 void Controller::unload() {
@@ -38,7 +32,6 @@ void Controller::unload() {
 		if (entry.animation) entry.animation->decRefCount();
 	}
 	m_animation_entries.clear();
-	m_animation_slots.clear();
 	m_bone_masks.clear();
 	m_inputs.clear();
 	LUMIX_DELETE(m_allocator, m_root);
@@ -55,11 +48,13 @@ void Controller::destroyRuntime(RuntimeContext& ctx) {
 }
 
 RuntimeContext* Controller::createRuntime(u32 anim_set) {
-	if (!m_compiled) return nullptr;
 	RuntimeContext* ctx = LUMIX_NEW(m_allocator, RuntimeContext)(*this, m_allocator);
 	ctx->inputs.resize(m_inputs.size());
 	memset(ctx->inputs.begin(), 0, ctx->inputs.byte_size());
-	ctx->animations.resize(m_animation_slots.size());
+	for (u32 i = 0; i < (u32)m_inputs.size(); ++i) {
+		ctx->inputs[i].type = m_inputs[i].type;
+	}
+	ctx->animations.resize(m_animation_slots_count);
 	memset(ctx->animations.begin(), 0, ctx->animations.byte_size());
 	for (AnimationEntry& anim : m_animation_entries) {
 		if (anim.set == anim_set) {
@@ -71,27 +66,18 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 }
 
 void Controller::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
-	if (!m_compiled) return;
 	ASSERT(&ctx.controller == this);
 	// TODO better allocation strategy
 	const Span<u8> mem = ctx.data.releaseOwnership();
 	ctx.data.reserve(mem.length());
-	ctx.events.clear();
+	ctx.blendstack.clear();
 	ctx.input_runtime.set(mem.begin(), mem.length());
 	if (m_root) m_root->update(ctx, root_motion);
 
 	m_allocator.deallocate(mem.begin());
 }
 
-void Controller::getPose(RuntimeContext& ctx, Pose& pose) {
-	if (!m_compiled) return;
-	ASSERT(&ctx.controller == this);
-	ctx.input_runtime.set(ctx.data.data(), ctx.data.size());
-	if (m_root) m_root->getPose(ctx, 1.f, pose, 0xffFFffFF);
-}
-
 struct Header {
-
 	u32 magic = MAGIC;
 	ControllerVersion version = ControllerVersion::LATEST;
 
@@ -101,22 +87,22 @@ struct Header {
 void Controller::serialize(OutputMemoryStream& stream) {
 	Header header;
 	stream.write(header);
-	stream.write(m_flags);
-	stream.write(m_id_generator);
 	stream.write(m_root_motion_bone);
 	stream.writeArray(m_inputs);
-	stream.write((u32)m_animation_slots.size());
-	for (const String& slot : m_animation_slots) {
-		stream.writeString(slot);
-	}
+	stream.write(m_animation_slots_count);
 	stream.write((u32)m_animation_entries.size());
 	for (const AnimationEntry& entry : m_animation_entries) {
 		stream.write(entry.slot);
 		stream.write(entry.set);
 		stream.writeString(entry.animation ? entry.animation->getPath() : Path());
 	}
-	stream.write(m_ik);
-	stream.write(m_ik_count);
+	stream.write(m_ik.size());
+	for (const IK& ik : m_ik) {
+		stream.write(ik.max_iterations);
+		stream.writeArray(ik.bones);
+	}
+
+	stream.write(m_root->type());
 	m_root->serialize(stream);
 }
 
@@ -133,22 +119,9 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		return false;
 	}
 
-	if (header.version <= ControllerVersion::FIRST_SUPPORTED) {
-		logError("Version of animation controller ", getPath(), " is too old and not supported");
-		return false;
-	}
-
-	stream.read(m_flags);
-	stream.read(m_id_generator);
 	stream.read(m_root_motion_bone);
 	stream.readArray(&m_inputs);
-	const u32 slots_count = stream.read<u32>();
-	m_animation_slots.reserve(slots_count);
-	for (u32 i = 0; i < slots_count; ++i) {
-		String& slot = m_animation_slots.emplace(m_allocator);
-		const char* tmp = stream.readString();
-		slot = tmp;
-	}
+	stream.read(m_animation_slots_count);
 
 	const u32 entries_count = stream.read<u32>();
 	m_animation_entries.reserve(entries_count);
@@ -160,20 +133,57 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
 	}
 
-	stream.read(m_ik);
-	stream.read(m_ik_count);
-	m_root = LUMIX_NEW(m_allocator, TreeNode)(nullptr, *this, m_allocator);
-	m_root->m_name = "Root";
+	u32 ik_count = stream.read<u32>();
+	m_ik.reserve(ik_count);
+	for (u32 i = 0; i < ik_count; ++i) {
+		IK& ik = m_ik.emplace(m_allocator);
+		stream.read(ik.max_iterations);
+		stream.readArray(&ik.bones);
+	}
+
+	NodeType type;
+	stream.read(type);
+	m_root = (PoseNode*)Node::create(type, *this);
 	m_root->deserialize(stream, *this, (u32)header.version);
-	if (m_root->compile()) {
-		m_compiled = true;
-	}
-	else {
-		logError("Failed to compile ", m_path);
-		m_compiled = false;
-	}
 	return true;
 }
 
+static void getPose(const anim::RuntimeContext& ctx, Time time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
+	Animation* anim = ctx.animations[slot];
+	ASSERT(anim);
+	ASSERT(ctx.model->isReady());
+	ASSERT(anim->isReady());
+
+	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
+
+	Animation::SampleContext sample_ctx;
+	sample_ctx.pose = &pose;
+	sample_ctx.time = anim_time;
+	sample_ctx.model = ctx.model;
+	sample_ctx.weight = weight;
+	sample_ctx.mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
+	anim->setRootMotionBone(ctx.root_bone_hash);
+	anim->getRelativePose(sample_ctx);
+}
+
+void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose) {
+	InputMemoryStream bs(ctx.blendstack);
+
+	for (;;) {
+		anim::BlendStackInstructions instr;
+		bs.read(instr);
+		switch (instr) {
+			case anim::BlendStackInstructions::END: return;
+			case anim::BlendStackInstructions::SAMPLE: {
+				u32 slot = bs.read<u32>();
+				float weight = bs.read<float>();
+				Time time = bs.read<Time>();
+				bool looped = bs.read<bool>();
+				getPose(ctx, time, weight, slot, pose, 0, looped);
+				break;
+			}
+		}
+	}
+}
 
 } // ns Lumix::Anim
