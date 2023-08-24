@@ -1292,7 +1292,7 @@ void SceneView::searchUI() {
 		}
 		ImGui::SameLine();
 		if(m_search_request) m_search_selected = 0;
-		if (ImGuiEx::filter(ICON_FA_SEARCH " Search", m_search_buf, sizeof(m_search_buf), -1, m_search_request)) {
+		if (m_filter.gui(ICON_FA_SEARCH " Search", -1, m_search_request)) {
 			m_search_selected = 0;
 		}
 		bool scroll = false;
@@ -1307,7 +1307,7 @@ void SceneView::searchUI() {
 				scroll =  true;
 			}
 		}
-		if (m_search_buf[0]) {
+		if (m_filter.isActive()) {
 			if (ImGui::BeginChild("##list")) {
 				auto insert = [&](const Path& path){
 					const RayCastModelHit hit = castRay(0.5f, 0.5f);
@@ -1329,7 +1329,7 @@ void SceneView::searchUI() {
 					u32 idx = 0;
 					for (const auto& res : resources) {
 						if (res.type != Model::TYPE) continue;
-						if (!findInsensitive(res.path, m_search_buf)) continue;
+						if (!m_filter.pass(res.path)) continue;
 
 						const bool selected = idx == m_search_selected;
 						if (m_search_preview) {
@@ -1360,7 +1360,7 @@ void SceneView::searchUI() {
 					ImGui::TextUnformatted("Actions:");
 					const auto& actions = m_app.getActions();
 					for (Action* act : actions) {
-						if (!findInsensitive(act->label_long, m_search_buf)) continue;
+						if (!m_filter.pass(act->label_long)) continue;
 						char buf[20] = " (";
 						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
 						if (buf[2]) {

@@ -220,8 +220,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		m_current_frame = -1;
 		m_is_open = false;
 		m_is_paused = true;
-		m_filter[0] = 0;
-		m_resource_filter[0] = 0;
 
 		m_toggle_ui.init("Profiler", "Toggle profiler UI", "profiler", "", false);
 		m_toggle_ui.func.bind<&ProfilerUIImpl::toggleUI>(this);
@@ -339,7 +337,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		
 		for (Counter& counter : m_counters) {
 			const char* name = counter.name;
-			if (m_filter[0] && findInsensitive(name, m_filter) == nullptr) continue;
+			if (!m_filter.pass(name)) continue;
 			if (!ImGui::TreeNode(name)) continue;
 
 			const float top = ImGui::GetCursorScreenPos().y;
@@ -622,7 +620,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	void onGUIResources() {
-		ImGuiEx::filter("Filter", m_resource_filter, sizeof(m_resource_filter));
+		m_resource_filter.gui("Filter");
 	
 		ImGuiEx::Label("Filter size (KB)");
 		ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
@@ -656,7 +654,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 				size_t sum = 0;
 				for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
-					if (m_resource_filter[0] != '\0' && findInsensitive(iter.value()->getPath(), m_resource_filter) == nullptr) continue;
+					if (!m_resource_filter.pass(iter.value()->getPath())) continue;
 					if (m_resource_size_filter > iter.value()->getFileSize() / 1024) continue;
 				
 					ImGui::TableNextColumn();
@@ -709,14 +707,14 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	void gui(const AllocationTag& tag) {
-		if (m_filter[0]) {
+		if (m_filter.isActive()) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
 
-			if (findInsensitive(tag.m_tag, m_filter) == nullptr) return;
+			if (!m_filter.pass(tag.m_tag)) return;
 		}
 		if (ImGui::TreeNode(&tag, "%s - %.2f MB", tag.m_tag.c_str(), tag.m_size / 1024.f / 1024.f)) {
 			for (const AllocationTag& child : tag.m_child_tags) gui(child);
-			if (tag.m_child_tags.empty() || m_filter[0] || ImGui::TreeNode("allocs", "Allocations - %.1f MB", tag.m_exclusive_size / 1024.f / 1024.f)) {
+			if (tag.m_child_tags.empty() || m_filter.isActive() || ImGui::TreeNode("allocs", "Allocations - %.1f MB", tag.m_exclusive_size / 1024.f / 1024.f)) {
 				ImGui::Columns(3);
 				ImGuiListClipper clipper;
 				clipper.Begin(tag.m_allocations.size());
@@ -748,7 +746,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					}
 				}
 				ImGui::Columns();
-				if (!tag.m_child_tags.empty() && !m_filter[0]) ImGui::TreePop();
+				if (!tag.m_child_tags.empty() && !m_filter.isActive()) ImGui::TreePop();
 			}
 			ImGui::TreePop();
 		}
@@ -766,7 +764,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		ImGui::SameLine();
 
 		size_t total = 0;
-		ImGuiEx::filter("Filter", m_filter, sizeof(m_filter), 150, false);
+		m_filter.gui("Filter", 150, false);
 		for (AllocationTag& tag : m_allocation_tags) {
 			total += tag.m_size;
 			gui(tag);
@@ -854,13 +852,9 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			ImGui::EndPopup();
 		}
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(150);
-		ImGui::InputTextWithHint("##filter", "filter", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
+		m_filter.gui("Filter", 150, false);
 		ImGui::SameLine();
-		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-			m_filter[0] = '\0';
-		}
-		if (m_filter[0]) {
+		if (m_filter.isActive()) {
 			ImGui::SameLine();
 			ImGui::Text("%f ms (%d calls) / ", (float)m_filtered_time, m_filtered_count);
 		}
@@ -1007,7 +1001,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					const float block_y = y;
 					const float w = ImGui::CalcTextSize(name).x;
 
-					const bool is_filtered = m_filter[0] && !findInsensitive(name, m_filter);
+					const bool is_filtered = !m_filter.pass(name);
 					const u32 alpha = is_filtered ? 0x2000'0000 : 0xff00'0000;
 					if (m_hovered_link.link == block.link && m_hovered_link.frame > m_frame_idx - 2) color = 0xff0000ff;
 					color = alpha | (color & 0x00ffffff);
@@ -1021,7 +1015,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					bool is_hovered = false;
 					if (ImGui::IsMouseHoveringRect(ra, rb)) {
 						if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-							copyString(m_filter, name);
+							copyString(m_filter.filter, name);
+							m_filter.build();
 						}
 						is_hovered = true;
 						m_hovered_block.id = block_id;
@@ -1040,7 +1035,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 						dl->AddText(ImVec2(x_start + 2, block_y), 0x00000000 | alpha, name);
 					}
 					const float t = 1000 * float((to - from) / double(freq));
-					if (!is_filtered && m_filter[0]) {
+					if (!is_filtered && m_filter.isActive()) {
 						m_filtered_time += t;
 						++m_filtered_count;
 					}
@@ -1177,7 +1172,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			});
 
 			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && m_hovered_block.frame < m_frame_idx - 2) {
-				m_filter[0] = '\0';
+				m_filter.clear();
 			}
 
 			auto draw_cswitch = [&](float x, const profiler::ContextSwitchRecord& r, ThreadRecord& tr, bool is_enter) {
@@ -1441,10 +1436,10 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	bool m_is_paused;
 	u64 m_end;
 	u64 m_range = DEFAULT_RANGE;
-	char m_filter[100];
+	TextFilter m_filter;
 	double m_filtered_time = 0;
 	u32 m_filtered_count = 0;
-	char m_resource_filter[100];
+	TextFilter m_resource_filter;
 	u64 m_resource_size_filter = 0;
 	Engine& m_engine;
 	HashMap<u32, ThreadRecord> m_threads;

@@ -76,7 +76,7 @@ private:
 	bool m_search_preview = false;
 	bool m_search_actions = true;
 	bool m_search_models = true;
-	char m_search_buf[128] = "";
+	TextFilter m_filter;
 	i32 m_search_selected = 0;
 	int m_screen_x;
 	int m_screen_y;

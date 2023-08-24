@@ -5,6 +5,7 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/string.h"
+#include "editor/utils.h"
 
 
 struct lua_State;
@@ -16,7 +17,7 @@ namespace Lumix {
 struct LUMIX_EDITOR_API Settings {
 	// gui - not saved
 	bool m_is_open;
-	char m_filter[100];
+	TextFilter m_filter;
 
 	enum Storage {
 		GLOBAL, // shortcuts, ...

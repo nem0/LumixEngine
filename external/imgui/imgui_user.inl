@@ -1297,7 +1297,7 @@ namespace ImGuiEx {
 		SameLine();
 		SetNextItemWidth(width);
 		if (set_keyboard_focus) SetKeyboardFocusHere();
-		changed = InputTextWithHint("##filter", label, buf, buf_size, ImGuiInputTextFlags_AutoSelectAll);
+		changed = InputTextWithHint("##filter", label, buf, buf_size, ImGuiInputTextFlags_AutoSelectAll) || changed;
 		return changed;
 	}
 

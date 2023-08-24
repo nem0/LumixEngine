@@ -296,13 +296,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void onContextMenu(ImVec2 pos) override {
-			ImGuiEx::filter("Filter", m_node_filter, sizeof(m_node_filter), 150, ImGui::IsWindowAppearing());
+			m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing());
 			Node* n = nullptr;
 			
-			if (m_node_filter[0]) {
+			if (m_node_filter.isActive()) {
 				struct : INodeTypeVisitor {
 					INodeTypeVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
-						if (!n && findInsensitive(label, win->m_node_filter) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(label))) {
+						if (!n && win->m_node_filter.pass(label) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(label))) {
 							n = creator.create(*win);
 							ImGui::CloseCurrentPopup();
 						}
@@ -982,7 +982,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		bool m_show_skeleton = true;
 		ControllerDebugMapping m_controller_debug_mapping;
 		IKDebug m_ik_debug[4];
-		char m_node_filter[64] = "";
+		TextFilter m_node_filter;
 	};
 
 	ControllerEditorImpl(StudioApp& app)

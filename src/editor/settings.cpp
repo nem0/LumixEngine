@@ -323,7 +323,6 @@ Settings::Settings(StudioApp& app)
 		catString(m_app_data_path, "studio.ini");
 	}
 
-	m_filter[0] = 0;
 	m_window.x = m_window.y = 0;
 	m_window.w = m_window.h = -1;
 
@@ -680,13 +679,12 @@ void Settings::writeCustom(lua_State* L, IOutputStream& file) {
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	ImGuiEx::filter("Filter", m_filter, sizeof(m_filter));
+	m_filter.gui("Filter");
 
 	for (int i = 0; i < actions.size(); ++i)
 	{
 		Action& a = *actions[i];
-		if (m_filter[0] == 0 || findInsensitive(a.label_long, m_filter))
-		{
+		if (m_filter.pass(a.label_long)) {
 			ImGui::PushID(&a);
 			ImGuiEx::Label(a.label_long);
 			if (shortcutInput(a, &a == m_edit_action)) {

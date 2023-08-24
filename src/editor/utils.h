@@ -166,6 +166,18 @@ private:
 	String m_full_path;
 };
 
+struct TextFilter {
+	bool isActive() const { return count != 0; }
+	void clear() { count = 0; filter[0] = 0; }
+	bool pass(StringView text) const;
+	void build();
+	bool gui(const char* label, float width = -1, bool set_keyboard_focus = false);
+
+	char filter[128] = "";
+	StringView subfilters[8];
+	u32 count = 0;
+};
+
 struct NodeEditor : SimpleUndoRedo {
 	enum { OUTPUT_FLAG = 1 << 31 };
 

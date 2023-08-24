@@ -38,7 +38,7 @@ private:
 	EntityPtr m_deferred_select;
 	
 	bool m_is_open = false;
-	char m_component_filter[32];
+	TextFilter m_component_filter;
 	Action m_toggle_ui;
 };
 

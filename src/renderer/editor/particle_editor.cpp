@@ -3049,12 +3049,12 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 
 	void onContextMenu(ImVec2 pos) override {
 		Node* n = nullptr;
-		ImGuiEx::filter("Filter", m_node_filter, sizeof(m_node_filter), 150, ImGui::IsWindowAppearing());
-		if (m_node_filter[0]) {
+		m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing());
+		if (m_node_filter.isActive()) {
 			struct : ICategoryVisitor {
 				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
 					if (n) return *this;
-					if (findInsensitive(label, editor->m_node_filter)) {
+					if (editor->m_node_filter.pass(label)) {
 						if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::MenuItem(label)) {
 							n = creator.create(*editor->m_active_emitter);
 							ImGui::CloseCurrentPopup();
@@ -3098,7 +3098,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 		}
 
 		if (n) {
-			m_node_filter[0] = '\0';
+			m_node_filter.clear();
 			n->m_pos = pos;
 				
 			if (m_half_link_start) {
@@ -3617,7 +3617,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	ParticleEmitterEditorResource* m_active_emitter = nullptr;
 	bool m_autoapply = false;
 	ImGuiEx::Canvas m_canvas;
-	char m_node_filter[64] = "";
+	TextFilter m_node_filter;
 };
 
 

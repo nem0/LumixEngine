@@ -36,15 +36,15 @@ bool editSlot(const Controller& controller, const char* str_id, u32* slot) {
 	bool changed = false;
 	const char* preview = *slot < (u32)controller.m_animation_slots.size() ? controller.m_animation_slots[*slot].c_str() : "N/A";
 	if (ImGui::BeginCombo(str_id, preview, 0)) {
-		static char filter[64] = "";
-		ImGuiEx::filter("Filter", filter, sizeof(filter), -1, ImGui::IsWindowAppearing());
+		static TextFilter filter;
+		filter.gui("Filter", -1, ImGui::IsWindowAppearing());
 		bool selected = false;
 		for (u32 i = 0, c = controller.m_animation_slots.size(); i < c; ++i) {
 			const char* name = controller.m_animation_slots[i].c_str();
-			if ((!filter[0] || findInsensitive(name, filter)) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
+			if (filter.pass(name) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
 				*slot = i;
 				changed = true;
-				filter[0] = '\0';
+				filter.clear();
 				ImGui::CloseCurrentPopup();
 				break;
 			}
