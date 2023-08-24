@@ -231,11 +231,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void addTile(const Path& path) {
 		if (!m_show_subresources && contains(path, ':')) return;
-		if (m_subfilter_count != 0) {
-			for (u32 i = 0; i < m_subfilter_count; ++i) {
-				if (!findInsensitive(path, m_subfilters[i])) return;
-			}
-		}
+		if (!m_filter.pass(path)) return;
 
 		FileInfo tile;
 		StaticString<MAX_PATH> filename;
@@ -284,7 +280,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 		const RuntimeHash dir_hash(equalStrings(".", m_dir) ? "" : m_dir.c_str());
 		auto& resources = compiler.lockResources();
-		if (m_subfilter_count > 0) {
+		if (m_filter.isActive()) {
 			for (const AssetCompiler::ResourceItem& res : resources) {
 				if (m_dir != "." && !startsWithInsensitive(Path::getResource(res.path), m_dir)) continue;
 				addTile(res.path);
@@ -788,36 +784,8 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
 
-			ImGui::SetNextItemWidth(150);
-			if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll)) {
-				m_subfilter_count = 0;
-				if (m_filter[0]) {
-					StringView tmp;
-					tmp.begin = m_filter;
-					tmp.end = m_filter;
-					m_create_tile_cooldown = 0.2f;
-					for (;;) {
-						if (*tmp.end == ' ' || *tmp.end == '\0') {
-							if (tmp.size() > 0) {
-								m_subfilters[m_subfilter_count] = tmp;
-								++m_subfilter_count;
-								if (m_subfilter_count == lengthOf(m_subfilters)) break;
-							}
-							if (*tmp.end == '\0') break;
-							tmp.begin = tmp.end + 1;
-							tmp.end = tmp.begin;
-						}
-						else {
-							++tmp.end;
-						}
-					}
-				}
-				changeDir(m_dir, false);
-			}
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear search")) {
-				m_filter[0] = '\0';
-				m_subfilter_count = 0;
+			if (m_filter.gui(ICON_FA_SEARCH " Search", 150)) {
+				m_create_tile_cooldown = 0.2f;
 				changeDir(m_dir, false);
 			}
 
@@ -1144,8 +1112,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void locate(const Path& path) override {
 		m_is_open = true;
-		m_filter[0] = '\0';
-		m_subfilter_count = 0;
+		m_filter.clear();
 		StringView new_dir = Path::getDir(Path::getResource(path));
 		if (!Path::isSame(new_dir, m_dir)) {
 			changeDir(new_dir.empty() ? StringView(".") : new_dir, true);
@@ -1221,10 +1188,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	Array<IPlugin*> m_plugins;
 	HashMap<u64, IPlugin*> m_plugin_map;
 	Array<Path> m_selected_resources;
-	char m_filter[128] = "";
+	TextFilter m_filter;
 	float m_create_tile_cooldown = 0.f;
-	StringView m_subfilters[8];
-	u32 m_subfilter_count = 0;
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	bool m_has_focus = false;

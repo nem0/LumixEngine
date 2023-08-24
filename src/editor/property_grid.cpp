@@ -378,21 +378,14 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		World& world = *m_editor.getWorld();
 		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300)))
 		{
-			static char entity_filter[32] = {};
-			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
-			ImGui::SetNextItemWidth(-w);
-			if (recently_opened_popup) ImGui::SetKeyboardFocusHere();
-			ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter), ImGuiInputTextFlags_AutoSelectAll);
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-				entity_filter[0] = '\0';
-			}
+			static TextFilter entity_filter;
+			entity_filter.gui("Filter", -1, ImGui::IsWindowAppearing());
 			
 			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
 				for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity((EntityRef)i))
 				{
 					getEntityListDisplayName(m_app, world, Span(buf), i);
-					bool show = entity_filter[0] == '\0' || findInsensitive(buf, entity_filter);
+					bool show = entity_filter.pass(buf);
 					if (show && ImGui::Selectable(buf))
 					{
 						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, i);
