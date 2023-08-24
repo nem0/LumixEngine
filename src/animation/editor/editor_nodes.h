@@ -166,7 +166,7 @@ struct Blend2DNode final : PoseNode {
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 	anim::Node* compile(anim::Controller& controller) override;
 
-	void dataChanged(IAllocator& tmp_allocator);
+	void dataChanged();
 
 	using Child = anim::Blend2DNode::Child;
 	using Triangle = anim::Blend2DNode::Triangle;

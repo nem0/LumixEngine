@@ -21,11 +21,12 @@ struct ModelMeta {
 	}
 
 
-	ModelMeta(IAllocator& allocator) : clips(allocator) {}
+	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
 
 	void serialize(OutputMemoryStream& blob) {
 		blob << "create_impostor = " << (create_impostor ? "true" : "false")
 				<< "\nanim_translation_error = " << anim_translation_error
+				<< "\nroot_motion_bone = \"" << root_motion_bone << "\""
 				<< "\nanim_rotation_error = " << anim_rotation_error
 				<< "\nbake_vertex_ao = " << (bake_vertex_ao ? "true" : "false")
 				<< "\nbake_impostor_normals = " << (bake_impostor_normals ? "true" : "false")
@@ -122,7 +123,8 @@ struct ModelMeta {
 		}
 		lua_pop(L, 1);
 
-		char tmp[64];
+		char tmp[256];
+		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "root_motion_bone", Span(tmp))) root_motion_bone = tmp;
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
 			if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
 			else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
@@ -161,6 +163,7 @@ struct ModelMeta {
 	FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 	FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 	Array<FBXImporter::ImportConfig::Clip> clips;
+	String root_motion_bone;
 };
 
 }

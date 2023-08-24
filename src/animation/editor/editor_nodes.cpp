@@ -212,6 +212,7 @@ bool Blend2DNode::propertiesGUI() {
 		dl->Flags = old_flags;
 	}
 
+	if (res) dataChanged();
 	return res;
 }
 
@@ -223,7 +224,7 @@ static Vec2 computeCircumcircleCenter(Vec2 a, Vec2 b, Vec2 c) {
 }
 
 // delaunay triangulation
-void Blend2DNode::dataChanged(IAllocator& allocator) {
+void Blend2DNode::dataChanged() {
 	m_triangles.clear();
 	if (m_children.size() < 3) return;
 
@@ -235,7 +236,7 @@ void Blend2DNode::dataChanged(IAllocator& allocator) {
 		}
 	};
 
-	StackArray<Edge, 8> edges(allocator);
+	StackArray<Edge, 8> edges(m_allocator);
 
 	auto pushTriangle = [&](u32 a, u32 b, u32 c){
 		Triangle& t = m_triangles.emplace();
@@ -318,7 +319,7 @@ void Blend2DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 v
 	Node::deserialize(stream, ctrl, version);
 	stream.read(m_name);
 	stream.readArray(&m_children);
-	dataChanged(ctrl.m_allocator);
+	dataChanged();
 }
 
 Blend1DNode::Blend1DNode(Node* parent, Controller& controller, IAllocator& allocator)

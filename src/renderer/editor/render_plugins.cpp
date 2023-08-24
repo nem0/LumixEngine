@@ -2170,6 +2170,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(true);
 			}
 
+			ImGuiEx::Label("Root motion bone");
+			saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
 			ImGuiEx::Label("Root rotation");
 			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
 			ImGuiEx::Label("XZ root translation");
