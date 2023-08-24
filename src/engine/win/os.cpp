@@ -10,6 +10,7 @@
 #define UNICODE
 #pragma warning(push)
 #pragma warning(disable : 4091)
+#include <windowsx.h>
 #include <Shobjidl_core.h>
 #include <shlobj_core.h>
 #include <Psapi.h>
@@ -652,7 +653,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 						RECT window_rect;
 						if (!GetWindowRect(hWnd, &window_rect)) return HTNOWHERE;
 
-						const POINT cp = {LOWORD(lParam), HIWORD(lParam)};
+						const POINT cp = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
 						if (win->init_args.hit_test_callback) {
 							switch (win->init_args.hit_test_callback(win->init_args.user_data, hWnd, {cp.x, cp.y})) {
