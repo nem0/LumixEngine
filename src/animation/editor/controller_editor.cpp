@@ -17,6 +17,7 @@
 #include "engine/os.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "renderer/editor/model_meta.h"
 #include "renderer/editor/world_viewer.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -61,7 +62,7 @@ void Controller::serialize(OutputMemoryStream& stream) {
 	Header header;
 	stream.write(header);
 	stream.write(m_id_generator);
-	stream.write(m_root_motion_bone);
+	stream.writeString(m_skeleton);
 	stream.writeArray(m_inputs);
 	stream.write((u32)m_animation_slots.size());
 	for (const String& slot : m_animation_slots) {
@@ -84,6 +85,7 @@ void Controller::serialize(OutputMemoryStream& stream) {
 bool Controller::compile(StudioApp& app, OutputMemoryStream& blob) {
 	ResourceManager* rm = app.getEngine().getResourceManager().get(anim::Controller::TYPE);
 	anim::Controller controller(m_path, *rm, m_allocator);
+	controller.m_root_motion_bone = m_root_motion_bone;
 	controller.m_animation_slots_count = m_animation_slots.size();
 	
 	controller.m_inputs.resize(m_inputs.size());
@@ -115,7 +117,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	if (header.version <= ControllerVersion::FIRST_SUPPORTED) return false;
 
 	stream.read(m_id_generator);
-	stream.read(m_root_motion_bone);
+	m_skeleton = stream.readString();
 	stream.readArray(&m_inputs);
 	const u32 slots_count = stream.read<u32>();
 	m_animation_slots.reserve(slots_count);
@@ -249,14 +251,21 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			char fbx_path[MAX_PATH];
 			copyString(fbx_path, path);
 			Path::replaceExtension(fbx_path, "fbx");
-			if (fs.fileExists(fbx_path)) {
-				auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
-				render_module->setModelInstancePath(*m_viewer.m_mesh, Path(fbx_path));
+			if (m_controller.m_skeleton.isEmpty()) {
+				if (fs.fileExists(fbx_path)) {
+					auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
+					render_module->setModelInstancePath(*m_viewer.m_mesh, Path(fbx_path));
+				}
 			}
+			else {
+				auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
+				render_module->setModelInstancePath(*m_viewer.m_mesh, m_controller.m_skeleton);
+			}
+			onSkeletonChanged();
 		}
 
 		~EditorWindow() {
-			if (m_model) m_model->decRefCount();
+			if (m_skeleton) m_skeleton->decRefCount();
 		}
 
 		void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
@@ -353,51 +362,57 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void previewUI() { 
-			debuggerUI(*m_viewer.m_world, *m_viewer.m_mesh);
-
-			ImGui::Separator();
-			auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
 			auto* anim_module = (AnimationModule*)m_viewer.m_world->getModule("animation");
-			Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
-			ImGuiEx::Label("Preview model");
-			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
-				render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
-				anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.m_path);
-			}
-			Model* model = render_module->getModelInstanceModel(*m_viewer.m_mesh);
-			if (model && model->isReady()) {
-				if (!m_was_preview_ready) {
-					m_viewer.resetCamera(*model);
+			if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
+				debuggerUI(*m_viewer.m_world, *m_viewer.m_mesh);
+
+				ImGui::Separator();
+				auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
+				Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
+				ImGuiEx::Label("Preview model");
+				if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
+					render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
+					anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.m_path);
 				}
-				m_was_preview_ready = true;
-			}
-			else {
-				m_was_preview_ready = false;
-			}
-			bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
+				Model* model = render_module->getModelInstanceModel(*m_viewer.m_mesh);
+				if (model && model->isReady()) {
+					if (!m_was_preview_ready) {
+						m_viewer.resetCamera(*model);
+					}
+					m_was_preview_ready = true;
+				}
+				else {
+					m_was_preview_ready = false;
+				}
+				bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
 			
-			ImGuiEx::Label("Show mesh"); 
-			if (ImGui::Checkbox("##sm", &show_mesh)) {
-				render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
-			}
-			ImGuiEx::Label("Show skeleton"); 
-			ImGui::Checkbox("##ss", &m_show_skeleton);
-			if (m_show_skeleton) m_viewer.drawSkeleton(BoneNameHash());
-			m_viewer.drawMeshTransform();
-			ImGuiEx::Label("Follow mesh"); 
-			ImGui::Checkbox("##fm", &m_viewer.m_follow_mesh);
-			ImGuiEx::Label("Playback speed"); 
-			ImGui::DragFloat("##spd", &m_playback_speed, 0.1f, 0, FLT_MAX);
-			if (ImGui::Button("Reset")) {
-				m_viewer.m_world->setTransform(*m_viewer.m_mesh, DVec3(0), Quat::IDENTITY, Vec3(1));
-			}
-			if (m_playback_speed == 0) {
-				ImGui::SameLine();
-				if (ImGui::Button("Step")) anim_module->updateAnimator(*m_viewer.m_mesh, 1 / 30.f);
+				ImGuiEx::Label("Show mesh"); 
+				if (ImGui::Checkbox("##sm", &show_mesh)) {
+					render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
+				}
+				ImGuiEx::Label("Show skeleton"); 
+				ImGui::Checkbox("##ss", &m_show_skeleton);
+				if (m_show_skeleton) m_viewer.drawSkeleton(BoneNameHash());
+				m_viewer.drawMeshTransform();
+				ImGuiEx::Label("Follow mesh"); 
+				ImGui::Checkbox("##fm", &m_viewer.m_follow_mesh);
+				ImGuiEx::Label("Playback speed"); 
+				ImGui::DragFloat("##spd", &m_playback_speed, 0.1f, 0, FLT_MAX);
+				if (ImGui::Button("Reset")) {
+					m_viewer.m_world->setTransform(*m_viewer.m_mesh, DVec3(0), Quat::IDENTITY, Vec3(1));
+				}
+				if (m_playback_speed == 0) {
+					ImGui::SameLine();
+					if (ImGui::Button("Step")) anim_module->updateAnimator(*m_viewer.m_mesh, 1 / 30.f);
+				}
+				else {
+					anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
+				}
 			}
 			else {
 				anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
 			}
+			m_viewer.gui();
 		}
 
 		void debuggerUI() {
@@ -554,86 +569,76 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void IKGUI() {
-			Path model_path = m_model ? m_model->getPath() : Path();
-			ImGuiEx::Label("Model");
-			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
-				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
-			}
-			if(m_model) {
-				for (u32 i = 0; i < (u32)m_controller.m_ik.size(); ++i) {
-					ImGui::PushID(i);
-					if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
-						m_controller.m_ik.swapAndPop(i);
-						ImGui::PopID();
-						continue;
-					}
+			for (u32 i = 0; i < (u32)m_controller.m_ik.size(); ++i) {
+				ImGui::PushID(i);
+				if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
+					m_controller.m_ik.swapAndPop(i);
 					ImGui::PopID();
-					ImGui::SameLine();
+					continue;
+				}
+				ImGui::PopID();
+				ImGui::SameLine();
 
-					Controller::IK& ik = m_controller.m_ik[i];
-					if (ImGui::TreeNode(&ik, "Chain %d", i)) {
-						ASSERT(!ik.bones.empty());
-						const u32 bones_count = m_model->getBoneCount();
-						auto leaf_iter = m_model->getBoneIndex(ik.bones.back());
-						ImGuiEx::Label("Leaf");
-						if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
-							bool selected = false;
-							for (u32 j = 0; j < bones_count; ++j) {
-								const char* bone_name = m_model->getBone(j).name.c_str();
-								if (ImGui::Selectable(bone_name)) {
-									ik.bones.clear();
-									ik.bones.push(BoneNameHash(bone_name));
-									selected = true;
-								}
-							}
-							ImGui::EndCombo();
-							saveUndo(selected);
-						}
-						for (i32 j = ik.bones.size() - 2; j >= 0; --j) {
-							auto iter = m_model->getBoneIndex(ik.bones[j]);
-							if (iter.isValid()) {
-								ImGuiEx::TextUnformatted(m_model->getBone(iter.value()).name);
-							}
-							else {
-								ImGui::Text("Unknown bone");
+				Controller::IK& ik = m_controller.m_ik[i];
+				if (ImGui::TreeNode(&ik, "Chain %d", i)) {
+					ASSERT(!ik.bones.empty());
+					const u32 bones_count = m_skeleton->getBoneCount();
+					auto leaf_iter = m_skeleton->getBoneIndex(ik.bones.back());
+					ImGuiEx::Label("Leaf");
+					if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_skeleton->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
+						bool selected = false;
+						for (u32 j = 0; j < bones_count; ++j) {
+							const char* bone_name = m_skeleton->getBone(j).name.c_str();
+							if (ImGui::Selectable(bone_name)) {
+								ik.bones.clear();
+								ik.bones.push(BoneNameHash(bone_name));
+								selected = true;
 							}
 						}
-
-						auto iter = m_model->getBoneIndex(ik.bones[0]);
+						ImGui::EndCombo();
+						saveUndo(selected);
+					}
+					for (i32 j = ik.bones.size() - 2; j >= 0; --j) {
+						auto iter = m_skeleton->getBoneIndex(ik.bones[j]);
 						if (iter.isValid()) {
-							const int parent_idx = m_model->getBone(iter.value()).parent_idx;
-							if (parent_idx >= 0) {
-								const char* bone_name = m_model->getBone(parent_idx).name.c_str();
-								const StaticString<64> add_label("Add ", bone_name);
-								if (ImGui::Button(add_label)) {
-									ik.bones.insert(0, BoneNameHash(bone_name));
-									saveUndo(true);
-								}
-							}
+							ImGuiEx::TextUnformatted(m_skeleton->getBone(iter.value()).name);
 						}
 						else {
-							ImGui::Text("Unknown bone.");
+							ImGui::Text("Unknown bone");
 						}
-						if (ik.bones.size() > 1) {
-							ImGui::SameLine();
-							if (ImGui::Button("Pop")) {
-								ik.bones.erase(0);
+					}
+
+					auto iter = m_skeleton->getBoneIndex(ik.bones[0]);
+					if (iter.isValid()) {
+						const int parent_idx = m_skeleton->getBone(iter.value()).parent_idx;
+						if (parent_idx >= 0) {
+							const char* bone_name = m_skeleton->getBone(parent_idx).name.c_str();
+							const StaticString<64> add_label("Add ", bone_name);
+							if (ImGui::Button(add_label)) {
+								ik.bones.insert(0, BoneNameHash(bone_name));
 								saveUndo(true);
 							}
-						} 
-
-						ImGui::TreePop();
+						}
 					}
-				}
+					else {
+						ImGui::Text("Unknown bone.");
+					}
+					if (ik.bones.size() > 1) {
+						ImGui::SameLine();
+						if (ImGui::Button("Pop")) {
+							ik.bones.erase(0);
+							saveUndo(true);
+						}
+					} 
 
-				if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
-					Controller::IK& ik = m_controller.m_ik.emplace(m_allocator);
-					ik.bones.push(BoneNameHash());
-					saveUndo(true);
+					ImGui::TreePop();
 				}
 			}
-			else {
-				ImGui::Text("Please select a model.");
+
+			if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
+				Controller::IK& ik = m_controller.m_ik.emplace(m_allocator);
+				ik.bones.push(BoneNameHash());
+				saveUndo(true);
 			}
 		}
 
@@ -648,17 +653,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void boneMasksGUI() {
-			Path model_path = m_model ? m_model->getPath() : Path();
-			ImGuiEx::Label("Model");
-			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
-				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
-			}
-
-			if (!m_model) {
-				ImGui::Text("Please select a model.");
-				return;
-			}
-
 			for (BoneMask& mask : m_controller.m_bone_masks) {
 				ImGui::PushID(&mask);
 				if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
@@ -674,8 +668,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				
 				ImGuiEx::Label("Name");
 				saveUndo(inputString("##name", &mask.name));
-				for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
-					const char* bone_name = m_model->getBone(i).name.c_str();
+				for (u32 i = 0, c = m_skeleton->getBoneCount(); i < c; ++i) {
+					const char* bone_name = m_skeleton->getBone(i).name.c_str();
 					const BoneNameHash bone_name_hash(bone_name);
 					const bool is_masked = mask.bones.find(bone_name_hash).isValid();
 					bool b = is_masked;
@@ -887,6 +881,14 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 		}
 
+		void onSkeletonChanged() {
+			if (m_skeleton) m_skeleton->decRefCount();
+			m_skeleton = nullptr;
+			if (!m_controller.m_skeleton.isEmpty()) {
+				m_skeleton = m_app.getEngine().getResourceManager().load<Model>(m_controller.m_skeleton);
+			}
+		}
+
 		void windowGUI() override {
 			const CommonActions& actions = m_app.getCommonActions();
 
@@ -898,7 +900,14 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::EndMenuBar();
 			}
 
-			if (ImGui::BeginTabBar("ctb")) {
+			if (m_controller.m_skeleton.isEmpty()) {
+				ImGuiEx::Label("Skeleton");
+				if(m_app.getAssetBrowser().resourceInput("skel", m_controller.m_skeleton, Model::TYPE)) {
+					onSkeletonChanged();
+					saveUndo(true);
+				}
+			}
+			else if (ImGui::BeginTabBar("ctb")) {
 				if (ImGui::BeginTabItem("Tree")) {
 					if (ImGui::BeginTable("tt", 3, ImGuiTableFlags_Resizable)) {
 						ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
@@ -915,8 +924,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 							}
 						}
 						if (ImGui::CollapsingHeader("Controller")) {
-							ImGuiEx::Label("Root motion bone");
-							saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
+							ImGuiEx::Label("Skeleton");
+							if (m_app.getAssetBrowser().resourceInput("skel", m_controller.m_skeleton, Model::TYPE)) {
+								onSkeletonChanged();
+								saveUndo(true);
+							}
 						}
 						if (ImGui::CollapsingHeader("Inputs")) inputsGUI();
 						if (ImGui::CollapsingHeader("Slots")) slotsGUI();
@@ -929,8 +941,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (m_current_node) nodeEditorGUI(m_current_node->m_nodes, m_current_node->m_links);
 						
 						ImGui::TableNextColumn();
-						if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) previewUI();
-						m_viewer.gui();
+						previewUI();
 						ImGui::EndTable();
 					}
 					ImGui::EndTabItem();
@@ -964,7 +975,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		ControllerEditorImpl& m_plugin;
 		Controller m_controller;
 		Node* m_current_node = nullptr;
-		Model* m_model = nullptr;
+		Model* m_skeleton = nullptr;
 		Path m_path;
 		bool m_was_preview_ready = false;
 		float m_playback_speed = 1.f;
@@ -1011,6 +1022,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		
 		Controller ctrl(src, m_allocator);
 		if (!ctrl.deserialize(input)) return false;
+
+		ModelMeta model_meta(m_allocator);
+		if (lua_State* L = m_app.getAssetCompiler().getMeta(ctrl.m_skeleton)) {
+			model_meta.deserialize(L, ctrl.m_skeleton);
+			lua_close(L);
+		}
+		ctrl.m_root_motion_bone = BoneNameHash(model_meta.root_motion_bone.c_str());
 		if (!ctrl.compile(m_app, output)) return false;
 		
 		return m_app.getAssetCompiler().writeCompiledResource(src, Span(output.data(), (i32)output.size()));
