@@ -1,7 +1,9 @@
 #include <imgui/imgui.h>
 
 #include "animation/animation_module.h"
+#include "animation/controller.h"
 #include "controller_editor.h"
+#include "editor_nodes.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -18,12 +20,133 @@
 #include "renderer/editor/world_viewer.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
-#include "../animation.h"
-#include "../controller.h"
-#include "../nodes.h"
 
 
-namespace Lumix::anim {
+namespace Lumix::anim_editor {
+
+
+Controller::Controller(const Path& path, IAllocator& allocator) 
+	: m_allocator(allocator)
+	, m_animation_slots(allocator)
+	, m_animation_entries(allocator)
+	, m_inputs(allocator)
+	, m_ik(allocator)
+	, m_bone_masks(allocator)
+	, m_path(path)
+{
+	m_root = LUMIX_NEW(m_allocator, TreeNode)(nullptr, *this, m_allocator);
+	m_root->m_name = "Root";
+}
+
+Controller::~Controller() { LUMIX_DELETE(m_allocator, m_root); }
+
+void Controller::clear() {
+	m_animation_entries.clear();
+	m_animation_slots.clear();
+	m_bone_masks.clear();
+	m_inputs.clear();
+	LUMIX_DELETE(m_allocator, m_root);
+	m_root = nullptr;
+}
+
+struct Header {
+
+	u32 magic = MAGIC;
+	ControllerVersion version = ControllerVersion::LATEST;
+
+	static constexpr u32 MAGIC = '_LAC';
+};
+
+void Controller::serialize(OutputMemoryStream& stream) {
+	Header header;
+	stream.write(header);
+	stream.write(m_id_generator);
+	stream.write(m_root_motion_bone);
+	stream.writeArray(m_inputs);
+	stream.write((u32)m_animation_slots.size());
+	for (const String& slot : m_animation_slots) {
+		stream.writeString(slot);
+	}
+	stream.write((u32)m_animation_entries.size());
+	for (const AnimationEntry& entry : m_animation_entries) {
+		stream.write(entry.slot);
+		stream.write(entry.set);
+		stream.writeString(entry.animation);
+	}
+	stream.write(m_ik.size());
+	for (const IK& ik : m_ik) {
+		stream.write(ik.max_iterations);
+		stream.writeArray(ik.bones);
+	}
+	m_root->serialize(stream);
+}
+
+bool Controller::compile(StudioApp& app, OutputMemoryStream& blob) {
+	ResourceManager* rm = app.getEngine().getResourceManager().get(anim::Controller::TYPE);
+	anim::Controller controller(m_path, *rm, m_allocator);
+	controller.m_animation_slots_count = m_animation_slots.size();
+	
+	controller.m_inputs.resize(m_inputs.size());
+	for (u32 i = 0; i < (u32)m_inputs.size(); ++i) {
+		controller.m_inputs[i].name = m_inputs[i].name;
+		controller.m_inputs[i].type = m_inputs[i].type;
+	}
+
+	controller.m_animation_entries.resize(m_animation_entries.size());
+	for (u32 i = 0; i < (u32)m_animation_entries.size(); ++i) {
+		controller.m_animation_entries[i].set = m_animation_entries[i].set;
+		controller.m_animation_entries[i].slot = m_animation_entries[i].slot;
+		const Path& path = m_animation_entries[i].animation;
+		controller.m_animation_entries[i].animation = path.isEmpty() ? nullptr : rm->getOwner().load<Animation>(path);
+	}
+
+	controller.m_root = (anim::PoseNode*)m_root->compile(controller);
+	if (!controller.m_root) return false;
+	controller.serialize(blob);
+	return true;
+}
+
+bool Controller::deserialize(InputMemoryStream& stream) {
+	Header header;
+	stream.read(header);
+
+	if (header.magic != Header::MAGIC) return false;
+	if (header.version > ControllerVersion::LATEST) return false;
+	if (header.version <= ControllerVersion::FIRST_SUPPORTED) return false;
+
+	stream.read(m_id_generator);
+	stream.read(m_root_motion_bone);
+	stream.readArray(&m_inputs);
+	const u32 slots_count = stream.read<u32>();
+	m_animation_slots.reserve(slots_count);
+	for (u32 i = 0; i < slots_count; ++i) {
+		String& slot = m_animation_slots.emplace(m_allocator);
+		slot = stream.readString();
+	}
+
+	const u32 entries_count = stream.read<u32>();
+	m_animation_entries.reserve(entries_count);
+	for (u32 i = 0; i < entries_count; ++i) {
+		AnimationEntry& entry = m_animation_entries.emplace();
+		stream.read(entry.slot);
+		stream.read(entry.set);
+		entry.animation = stream.readString();
+	}
+
+	u32 ik_count = stream.read<u32>();
+	m_ik.reserve(ik_count);
+	for (u32 i = 0; i < ik_count; ++i) {
+		IK& ik = m_ik.emplace(m_allocator);
+		stream.read(ik.max_iterations);
+		stream.readArray(&ik.bones);
+	}
+
+	m_root = LUMIX_NEW(m_allocator, TreeNode)(nullptr, *this, m_allocator);
+	m_root->m_name = "Root";
+	m_root->deserialize(stream, *this, (u32)header.version);
+	OutputMemoryStream blob(m_allocator);
+	return true;
+}
 
 struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow, NodeEditor {
@@ -36,12 +159,12 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			virtual void endCategory() {}
 			virtual INodeTypeVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut = 0) = 0;
 
-			INodeTypeVisitor& visitType(Node::Type type, const char* label, char shortcut = 0) {
+			INodeTypeVisitor& visitType(anim::NodeType type, const char* label, char shortcut = 0) {
 				struct : INodeCreator {
 					Node* create(EditorWindow& editor) const override {
 						return Node::create(editor.m_current_node, type, editor.m_controller, editor.m_controller.m_allocator);
 					}
-					Node::Type type;
+					anim::NodeType type;
 				} creator;
 				creator.type = type;
 				return visitType(label, creator, shortcut);
@@ -52,7 +175,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (visitor.beginCategory("Animations")) {
 				struct : INodeTypeVisitor::INodeCreator {
 					Node* create(EditorWindow& editor) const override {
-						Node* n = Node::create(editor.m_current_node, Node::ANIMATION, editor.m_controller, editor.m_controller.m_allocator);
+						Node* n = Node::create(editor.m_current_node, anim::NodeType::ANIMATION, editor.m_controller, editor.m_controller.m_allocator);
 						((AnimationNode*)n)->m_slot = slot;
 						return n;
 					}
@@ -65,11 +188,29 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				visitor.endCategory();
 			}
 			visitor
-				.visitType(Node::BLEND1D, "Blend 1D", '1')
-				.visitType(Node::BLEND2D, "Blend 2D", '2')
-				.visitType(Node::LAYERS, "Layers", 'L')
-				.visitType(Node::SELECT, "Select", 'S')
-				.visitType(Node::TREE, "Tree", 'T');
+				.visitType(anim::NodeType::BLEND1D, "Blend 1D", '1')
+				.visitType(anim::NodeType::BLEND2D, "Blend 2D", '2');
+			
+			if (visitor.beginCategory("Inputs")) {
+				struct : INodeTypeVisitor::INodeCreator {
+					Node* create(EditorWindow& editor) const override {
+						Node* n = Node::create(editor.m_current_node, anim::NodeType::INPUT, editor.m_controller, editor.m_controller.m_allocator);
+						((InputNode*)n)->m_input_index = input_index;
+						return n;
+					}
+					u32 input_index;
+				} creator;
+				for (Controller::Input& input : m_controller.m_inputs) {
+					creator.input_index = u32(&input - m_controller.m_inputs.begin());
+					visitor.visitType(input.name, creator);
+				}
+				visitor.endCategory();
+			}
+
+			visitor
+				.visitType(anim::NodeType::LAYERS, "Layers", 'L')
+				.visitType(anim::NodeType::SELECT, "Select", 'S')
+				.visitType(anim::NodeType::TREE, "Tree", 'T');
 		}
 	
 		EditorWindow(const Path& path, ControllerEditorImpl& plugin, StudioApp& app, IAllocator& allocator)
@@ -78,14 +219,12 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			, m_allocator(allocator)
 			, m_app(app)
 			, m_plugin(plugin)
-			, m_copy_buffer(allocator)
-			, m_controller(path, *app.getEngine().getResourceManager().get(Controller::TYPE), allocator)
+			, m_controller(path, allocator)
 			, m_viewer(app)
 		{
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			OutputMemoryStream data(m_allocator);
 			if (fs.getContentSync(Path(path), data)) {
-				ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
 				InputMemoryStream str(data);
 				if (m_controller.deserialize(str)) {
 					m_current_node = m_controller.m_root;
@@ -214,12 +353,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void previewUI() { 
-			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
-
-			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-			
 			debuggerUI(*m_viewer.m_world, *m_viewer.m_mesh);
 
 			ImGui::Separator();
@@ -229,7 +362,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			ImGuiEx::Label("Preview model");
 			if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
 				render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
-				anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.getPath());
+				anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.m_path);
 			}
 			Model* model = render_module->getModelInstanceModel(*m_viewer.m_mesh);
 			if (model && model->isReady()) {
@@ -255,15 +388,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			ImGui::Checkbox("##fm", &m_viewer.m_follow_mesh);
 			ImGuiEx::Label("Playback speed"); 
 			ImGui::DragFloat("##spd", &m_playback_speed, 0.1f, 0, FLT_MAX);
-			if (ImGui::Button("Apply")) {
-				anim::Controller* ctrl = anim_module->getAnimatorController(*m_viewer.m_mesh);
-				OutputMemoryStream blob(m_allocator);
-				m_controller.serialize(blob);
-				InputMemoryStream tmp(blob);
-				ctrl->clear();
-				ctrl->deserialize(tmp);
-			}
-			ImGui::SameLine();
 			if (ImGui::Button("Reset")) {
 				m_viewer.m_world->setTransform(*m_viewer.m_mesh, DVec3(0), Quat::IDENTITY, Vec3(1));
 			}
@@ -274,10 +398,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			else {
 				anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
 			}
-			
-			ImGui::TableNextColumn();
-			m_viewer.gui();
-			ImGui::EndTable();
 		}
 
 		void debuggerUI() {
@@ -328,17 +448,17 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			const ComponentType animator_type = reflection::getComponentType("animator");
 			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
-			Controller* ctrl = module->getAnimatorController(entity);
+			anim::Controller* ctrl = module->getAnimatorController(entity);
 			if (!ctrl) {
 				ImGui::TextUnformatted("Selected entity does not have resource assigned in animator component");
 				return;
 			}
 			
-			for (const Controller::Input& input : ctrl->m_inputs) {
+			for (const anim::Controller::Input& input : ctrl->m_inputs) {
 				ImGui::PushID(&input);
 				const u32 idx = u32(&input - ctrl->m_inputs.begin());
 				switch (input.type) {
-					case Controller::Input::Type::FLOAT: {
+					case anim::Value::FLOAT: {
 						float val = module->getAnimatorFloatInput(entity, idx);
 		
 						ImGuiEx::Label(input.name);
@@ -362,7 +482,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						}
 						break;
 					}
-					case Controller::Input::BOOL: {
+					case anim::Value::BOOL: {
 						bool val = module->getAnimatorBoolInput(entity, idx);
 						ImGuiEx::Label(input.name);
 						if (ImGui::Checkbox("##i", &val)) {
@@ -370,7 +490,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						}
 						break;
 					}
-					case Controller::Input::I32: {
+					case anim::Value::I32: {
 						i32 val = module->getAnimatorI32Input(entity, idx);
 						ImGuiEx::Label(input.name);
 						if (ImGui::DragInt("##i", (int*)&val, 1, 0, 0x7ffFFff)) {
@@ -382,21 +502,23 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PopID();
 			}
 
-			if (m_controller.m_ik_count > 0) {
-				for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
-					if (ImGui::TreeNode((const void*)(uintptr)i, "IK chain %d", i)) {
-						ImGui::Checkbox("Enabled", &m_ik_debug[i].enabled);
-						if (m_ik_debug[i].enabled) ImGui::DragFloat3("Target", &m_ik_debug[i].target.x);
-						ImGui::TreePop();
-					}
-					module->setAnimatorIK(entity, i, m_ik_debug[i].enabled ? 1.f : 0.f, m_ik_debug[i].target);
-					if (m_ik_debug[i].enabled) {
-						auto* render_module = (RenderModule*)world.getModule("renderer");
-						Transform tr = world.getTransform(entity);
-						render_module->addDebugCross(tr.transform(m_ik_debug[i].target), 0.25f, Color::RED);
-					}
+#if 0
+			for (Controller::IK& ik : m_controller.m_ik) {
+				const u32 i = u32(&ik - m_controller.m_ik.begin());
+				if (ImGui::TreeNode(&ik, "IK chain %d", i)) {
+					ImGui::Checkbox("Enabled", &m_ik_debug[i].enabled);
+					if (m_ik_debug[i].enabled) ImGui::DragFloat3("Target", &m_ik_debug[i].target.x);
+					ImGui::TreePop();
+				}
+				module->setAnimatorIK(entity, i, m_ik_debug[i].enabled ? 1.f : 0.f, m_ik_debug[i].target);
+				if (m_ik_debug[i].enabled) {
+					auto* render_module = (RenderModule*)world.getModule("renderer");
+					Transform tr = world.getTransform(entity);
+					render_module->addDebugCross(tr.transform(m_ik_debug[i].target), 0.25f, Color::RED);
 				}
 			}
+
+#endif
 		}
 
 		void deleteSelectedNodes() {
@@ -438,42 +560,36 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
 			}
 			if(m_model) {
-				for (u32 i = 0; i < m_controller.m_ik_count; ++i) {
+				for (u32 i = 0; i < (u32)m_controller.m_ik.size(); ++i) {
 					ImGui::PushID(i);
 					if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
-						if (i < m_controller.m_ik_count - 1) {
-							memmove(&m_controller.m_ik[i]
-								, &m_controller.m_ik[i + 1]
-								, sizeof(m_controller.m_ik[i + 1]) * (m_controller.m_ik_count - 1 - i)
-							);
-						}
-						--m_controller.m_ik_count;
+						m_controller.m_ik.swapAndPop(i);
 						ImGui::PopID();
 						continue;
 					}
 					ImGui::PopID();
 					ImGui::SameLine();
 
-					if (ImGui::TreeNode((const void*)(uintptr)i, "Chain %d", i)) {
-						Controller::IK& ik = m_controller.m_ik[i];
-						ASSERT(ik.bones_count > 0);
+					Controller::IK& ik = m_controller.m_ik[i];
+					if (ImGui::TreeNode(&ik, "Chain %d", i)) {
+						ASSERT(!ik.bones.empty());
 						const u32 bones_count = m_model->getBoneCount();
-						auto leaf_iter = m_model->getBoneIndex(ik.bones[ik.bones_count - 1]);
+						auto leaf_iter = m_model->getBoneIndex(ik.bones.back());
 						ImGuiEx::Label("Leaf");
 						if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
 							bool selected = false;
 							for (u32 j = 0; j < bones_count; ++j) {
 								const char* bone_name = m_model->getBone(j).name.c_str();
 								if (ImGui::Selectable(bone_name)) {
-									ik.bones_count = 1;
-									ik.bones[0] = BoneNameHash(bone_name);
+									ik.bones.clear();
+									ik.bones.push(BoneNameHash(bone_name));
 									selected = true;
 								}
 							}
 							ImGui::EndCombo();
 							saveUndo(selected);
 						}
-						for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
+						for (i32 j = ik.bones.size() - 2; j >= 0; --j) {
 							auto iter = m_model->getBoneIndex(ik.bones[j]);
 							if (iter.isValid()) {
 								ImGuiEx::TextUnformatted(m_model->getBone(iter.value()).name);
@@ -485,31 +601,23 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 						auto iter = m_model->getBoneIndex(ik.bones[0]);
 						if (iter.isValid()) {
-							if (ik.bones_count < lengthOf(ik.bones)) {
-								const int parent_idx = m_model->getBone(iter.value()).parent_idx;
-								if (parent_idx >= 0) {
-									const char* bone_name = m_model->getBone(parent_idx).name.c_str();
-									const StaticString<64> add_label("Add ", bone_name);
-									if (ImGui::Button(add_label)) {
-										memmove(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
-										ik.bones[0] = BoneNameHash(bone_name);
-										++ik.bones_count;
-										saveUndo(true);
-									}
+							const int parent_idx = m_model->getBone(iter.value()).parent_idx;
+							if (parent_idx >= 0) {
+								const char* bone_name = m_model->getBone(parent_idx).name.c_str();
+								const StaticString<64> add_label("Add ", bone_name);
+								if (ImGui::Button(add_label)) {
+									ik.bones.insert(0, BoneNameHash(bone_name));
+									saveUndo(true);
 								}
-							}
-							else {
-								ImGui::Text("IK is full");
 							}
 						}
 						else {
 							ImGui::Text("Unknown bone.");
 						}
-						if (ik.bones_count > 1) {
+						if (ik.bones.size() > 1) {
 							ImGui::SameLine();
 							if (ImGui::Button("Pop")) {
-								memmove(&ik.bones[0], &ik.bones[1], sizeof(ik.bones[0]) * ik.bones_count - 1);
-								--ik.bones_count;
+								ik.bones.erase(0);
 								saveUndo(true);
 							}
 						} 
@@ -518,10 +626,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					}
 				}
 
-				if (m_controller.m_ik_count < (u32)lengthOf(m_controller.m_ik) && ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
-					m_controller.m_ik[m_controller.m_ik_count].bones_count = 1;
-					m_controller.m_ik[m_controller.m_ik_count].bones[0] = BoneNameHash();
-					++m_controller.m_ik_count;
+				if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
+					Controller::IK& ik = m_controller.m_ik.emplace(m_allocator);
+					ik.bones.push(BoneNameHash());
 					saveUndo(true);
 				}
 			}
@@ -563,10 +670,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PopID();
 
 				ImGui::SameLine();
-				if (!ImGui::TreeNodeEx(&mask, 0, "%s", mask.name.data)) continue;
+				if (!ImGui::TreeNodeEx(&mask, 0, "%s", mask.name.c_str())) continue;
 				
 				ImGuiEx::Label("Name");
-				saveUndo(ImGui::InputText("##name", mask.name.data, sizeof(mask.name.data)));
+				saveUndo(inputString("##name", &mask.name));
 				for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
 					const char* bone_name = m_model->getBone(i).name.c_str();
 					const BoneNameHash bone_name_hash(bone_name);
@@ -629,7 +736,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (Path::hasExtension(subres, "ani")) {
 							Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
 							ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
-							entry.animation = res_manager.load<Animation>(Path(path));
+							entry.animation = path;
 							entry.set = 0;
 							entry.slot = m_controller.m_animation_slots.size();
 	
@@ -645,7 +752,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					if (Path::hasExtension(subres, "ani")) {
 						Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
 						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
-						entry.animation = res_manager.load<Animation>(Path(path));
+						entry.animation = path;
 						entry.set = 0;
 						entry.slot = m_controller.m_animation_slots.size();
 
@@ -690,14 +797,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						}
 						ImGui::SameLine();
 						ImGui::SetNextItemWidth(-1);
-						saveUndo(inputSlot(m_controller, "##slot", &entry.slot));
+						saveUndo(editSlot(m_controller, "##slot", &entry.slot));
 						ImGui::NextColumn();
 						ImGui::PushItemWidth(-1);
-						Path path = entry.animation ? entry.animation->getPath() : Path();
-						if (m_app.getAssetBrowser().resourceInput("anim", path, Animation::TYPE)) {
-							if (entry.animation) entry.animation->decRefCount();
-							ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
-							entry.animation = res_manager.load<Animation>(path);
+						if (m_app.getAssetBrowser().resourceInput("anim", entry.animation, Animation::TYPE)) {
 							saveUndo(true);
 						}
 						ImGui::PopItemWidth();
@@ -750,7 +853,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				saveUndo(ImGui::InputText("##name", input.name.data, sizeof(input.name.data)));
 				ImGui::NextColumn();
 				ImGui::SetNextItemWidth(-1);
-				if (ImGui::Combo("##type", (int*)&input.type, "float\0u32\0bool")) {
+				if (ImGui::Combo("##type", (int*)&input.type, "float\0i32\0bool")) {
 					saveUndo(true);
 				}
 				ImGui::NextColumn();
@@ -773,7 +876,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			
 			const char* name = "N/A";
 			switch (node->type()) {
-				case Node::TREE: name = ((TreeNode*)node)->m_name.c_str(); break;
+			case anim::NodeType::TREE: name = ((TreeNode*)node)->m_name.c_str(); break;
 				default: ASSERT(false);
 			};
 			if (m_current_node == node) {
@@ -797,52 +900,44 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			if (ImGui::BeginTabBar("ctb")) {
 				if (ImGui::BeginTabItem("Tree")) {
-					ImGui::Columns(2);
-					breadcrumbs(m_current_node);
-					if (m_current_node) nodeEditorGUI(m_current_node->m_nodes, m_current_node->m_links);
-					ImGui::NextColumn();
-					if (m_current_node) {
-						for (Node* n : m_current_node->m_nodes) {
-							if (n->m_selected) {
-								n->propertiesGUI();
-								break;
+					if (ImGui::BeginTable("tt", 3, ImGuiTableFlags_Resizable)) {
+						ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						bool any_selected = false;
+						if (m_current_node) {
+							for (Node* n : m_current_node->m_nodes) {
+								if (n->m_selected) {
+									n->propertiesGUI();
+									any_selected = true;
+									break;
+								}
 							}
 						}
+						if (ImGui::CollapsingHeader("Controller")) {
+							ImGuiEx::Label("Root motion bone");
+							saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
+						}
+						if (ImGui::CollapsingHeader("Inputs")) inputsGUI();
+						if (ImGui::CollapsingHeader("Slots")) slotsGUI();
+						if (ImGui::CollapsingHeader("Sets")) setsGUI();
+						if (ImGui::CollapsingHeader("Bone masks")) boneMasksGUI();
+						if (ImGui::CollapsingHeader("IK")) IKGUI();
+
+						ImGui::TableNextColumn();
+						breadcrumbs(m_current_node);
+						if (m_current_node) nodeEditorGUI(m_current_node->m_nodes, m_current_node->m_links);
+						
+						ImGui::TableNextColumn();
+						if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) previewUI();
+						m_viewer.gui();
+						ImGui::EndTable();
 					}
-					ImGui::Columns();
 					ImGui::EndTabItem();
 				}
-				if (ImGui::BeginTabItem("Controller")) {
-					ImGuiEx::Label("Root motion bone");
-					saveUndo(ImGui::InputText("##rmb", m_controller.m_root_motion_bone.data, sizeof(m_controller.m_root_motion_bone.data)));
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("Inputs")) {
-					inputsGUI();
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("Bone masks")) {
-					boneMasksGUI();
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("IK")) {
-					IKGUI();
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("Slots")) {
-					slotsGUI();
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("Sets")) {
-					setsGUI();
-					ImGui::EndTabItem();
-				}
+				
 				if (ImGui::BeginTabItem("Debugger")) {
 					debuggerUI();
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("Preview")) {
-					previewUI();
 					ImGui::EndTabItem();
 				}
 				ImGui::EndTabBar();
@@ -852,12 +947,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		const Path& getPath() override { return m_path; }
 		const char* getName() const override { return "Animation Editor"; }
-
-		struct CopyBuffer {
-			CopyBuffer(IAllocator& allocator) : data(allocator) {}
-			OutputMemoryStream data;
-			Node::Type node_type;
-		} m_copy_buffer;
 
 		struct ControllerDebugMapping {
 			i32 axis_x = -1;
@@ -903,7 +992,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 	void createResource(OutputMemoryStream& blob) override {
 		ResourceManager* rm = m_app.getEngine().getResourceManager().get(anim::Controller::TYPE);
-		anim::Controller controller(Path("new controller"), *rm, m_app.getAllocator());
+		anim_editor::Controller controller(Path("new controller"), m_app.getAllocator());
 		controller.serialize(blob);
 	}
 
@@ -912,9 +1001,23 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		InputMemoryStream input(src_data);
+		OutputMemoryStream output(m_app.getAllocator());
+		
+		Controller ctrl(src, m_allocator);
+		if (!ctrl.deserialize(input)) return false;
+		if (!ctrl.compile(m_app, output)) return false;
+		
+		return m_app.getAssetCompiler().writeCompiledResource(src, Span(output.data(), (i32)output.size()));
+	}
+
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "act"; }
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Animation Controller"; }
 
 	TagAllocator m_allocator;

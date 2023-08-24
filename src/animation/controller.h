@@ -1,5 +1,6 @@
 #pragma once
 
+#include "animation.h"
 #include "engine/flag_set.h"
 #include "engine/hash.h"
 #include "engine/resource.h"
@@ -13,14 +14,58 @@ struct Pose;
 
 namespace anim {
 
-struct Node;
-struct RuntimeContext;
+struct Value {
+	enum Type : u32 {
+		FLOAT,
+		I32,
+		BOOL
+	};
+	Type type;
+	union {
+		float f;
+		bool b;
+		i32 s32;
+	};
+
+	Value() : f(0), type(FLOAT) {}
+	Value(float f) : f(f), type(FLOAT) {}
+	Value(bool b) : b(b), type(BOOL) {}
+	Value(i32 i) : s32(i), type(I32) {}
+	float toFloat() const { ASSERT(type == FLOAT); return f; }
+	i32 toI32() const { ASSERT(type == I32); return s32; }
+};
+
+struct RuntimeContext {
+	RuntimeContext(struct Controller& controller, IAllocator& allocator);
+
+	void setInput(u32 input_idx, float value);
+	void setInput(u32 input_idx, bool value);
+
+	Controller& controller;
+	Array<Value> inputs;
+	Array<Animation*> animations;
+	OutputMemoryStream data;
+	OutputMemoryStream blendstack;
+
+	float weight = 1;
+	BoneNameHash root_bone_hash;
+	Time time_delta;
+	Model* model = nullptr;
+	InputMemoryStream input_runtime;
+};
+
+enum BlendStackInstructions : u8 {
+	END,
+	SAMPLE,
+};
 
 enum class ControllerVersion : u32 {
-	FIRST_SUPPORTED = 4,
+	FIRST,
 
 	LATEST
 };
+
+void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose);
 
 struct Controller final : Resource {
 	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
@@ -32,8 +77,6 @@ struct Controller final : Resource {
 	RuntimeContext* createRuntime(u32 anim_set);
 	void destroyRuntime(RuntimeContext& ctx);
 	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const;
-	void getPose(RuntimeContext& ctx, struct Pose& pose);
-	void clear();
 
 	ResourceType getType() const override { return TYPE; }
 	static const ResourceType TYPE;
@@ -41,40 +84,28 @@ struct Controller final : Resource {
 	struct AnimationEntry {
 		u32 set;
 		u32 slot;
-		Animation* animation;
+		Animation* animation = nullptr;
 	};
 
 	struct Input {
-		enum Type {
-			FLOAT,
-			BOOL,
-			I32
-		};
-
-		Type type;
+		Value::Type type;
 		StaticString<32> name;
 	};
 
+	struct IK {
+		IK(IAllocator& allocator) : bones(allocator) {}
+		u32 max_iterations = 5;
+		Array<BoneNameHash> bones;
+	};
+
 	IAllocator& m_allocator;
-	struct TreeNode* m_root = nullptr;
+	struct PoseNode* m_root = nullptr;
 	Array<AnimationEntry> m_animation_entries;
-	Array<String> m_animation_slots;
 	Array<BoneMask> m_bone_masks;
 	Array<Input> m_inputs;
-	u32 m_id_generator = 0;
-	enum class Flags : u32 {
-		UNUSED_FLAG = 1 << 0
-	};
-	FlagSet<Flags, u32> m_flags;
-	struct IK {
-		enum { MAX_BONES_COUNT = 8 };
-		u16 max_iterations = 5;
-		u16 bones_count = 4;
-		BoneNameHash bones[MAX_BONES_COUNT];
-	} m_ik[4];
-	u32 m_ik_count = 0;
-	StaticString<64> m_root_motion_bone;
-	bool m_compiled = false;
+	Array<IK> m_ik;
+	u32 m_animation_slots_count = 0;
+	BoneNameHash m_root_motion_bone;
 
 private:
 	void unload() override;

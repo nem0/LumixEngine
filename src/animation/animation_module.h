@@ -22,7 +22,6 @@ struct AnimationModule : IModule {
 	static UniquePtr<AnimationModule> create(Engine& engine, ISystem& system, World& world, struct IAllocator& allocator);
 	static void reflect(Engine& engine);
 
-	virtual const struct OutputMemoryStream* getEventStream(EntityRef e) const = 0;
 	virtual struct Path getPropertyAnimation(EntityRef entity) = 0;
 	virtual void setPropertyAnimation(EntityRef entity, const Path& path) = 0;
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;

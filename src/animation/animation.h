@@ -30,6 +30,7 @@ struct Time {
 	Time operator-(const Time& rhs) const { return Time{value - rhs.value}; }
 	void operator+=(const Time& rhs) { value += rhs.value; }
 	bool operator<(const Time& rhs) const { return value < rhs.value; }
+	bool operator>(const Time& rhs) const { return value > rhs.value; }
 	bool operator<=(const Time& rhs) const { return value <= rhs.value; }
 	bool operator>=(const Time& rhs) const { return value >= rhs.value; }
 	Time operator%(const Time& rhs) const { return Time{value % rhs.value}; }
@@ -43,9 +44,9 @@ private:
 
 struct BoneMask
 {
-	BoneMask(IAllocator& allocator) : bones(allocator) {}
+	BoneMask(IAllocator& allocator) : bones(allocator), name(allocator) {}
 	BoneMask(BoneMask&& rhs) = default;
-	StaticString<32> name;
+	String name;
 	HashMap<BoneNameHash, u8> bones;
 };
 

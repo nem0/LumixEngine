@@ -642,7 +642,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 
 		m_app.getPropertyGrid().addPlugin(m_animable_plugin);
 
-		m_anim_editor = anim::ControllerEditor::create(m_app);
+		m_anim_editor = anim_editor::ControllerEditor::create(m_app);
 	}
 
 	bool showGizmo(WorldView&, ComponentUID) override { return false; }
@@ -662,7 +662,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 	AnimablePropertyGridPlugin m_animable_plugin;
 	AnimationAssetBrowserPlugin m_animation_plugin;
 	PropertyAnimationPlugin m_prop_anim_plugin;
-	UniquePtr<anim::ControllerEditor> m_anim_editor;
+	UniquePtr<anim_editor::ControllerEditor> m_anim_editor;
 };
 
 
