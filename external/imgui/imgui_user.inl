@@ -63,7 +63,7 @@ namespace ImGuiEx {
 		g_node_editor.canvas_offset = offset;
 		BeginChild(title, ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
 		
-		g_node_editor.window_size = ImGui::GetWindowSize();
+		g_node_editor.window_size = GetWindowSize();
 
 		ImGuiStorage* storage = GetStateStorage();
 		g_node_editor.new_link_from = storage->GetInt(GetID("node-new-link_from"), 0);
@@ -74,8 +74,8 @@ namespace ImGuiEx {
 		g_node_editor.clicked_node = storage->GetInt(GetID("clicked-node"), 0);
 		g_node_editor.dragged_node = storage->GetInt(GetID("dragged-node"), 0);
 		if (IsMouseReleased(0)) g_node_editor.dragged_node = 0;
-		if (ImGui::IsMouseReleased(0)) g_node_editor.clicked_node_selected = false;
-		g_node_editor.rect_selection.Max = ImGui::GetMousePos();
+		if (IsMouseReleased(0)) g_node_editor.clicked_node_selected = false;
+		g_node_editor.rect_selection.Max = GetMousePos();
 		const ImVec2 max = ImMax(g_node_editor.rect_selection.Max, g_node_editor.rect_selection.Min);
 		const ImVec2 min = ImMin(g_node_editor.rect_selection.Max, g_node_editor.rect_selection.Min);
 		g_node_editor.rect_selection = ImRect(min, max);
@@ -258,7 +258,7 @@ namespace ImGuiEx {
 
 	void NodeTitle(const char* text, ImU32 color) {
 		BeginNodeTitleBar(color);
-		ImGui::TextUnformatted(text);
+		TextUnformatted(text);
 		EndNodeTitleBar();
 	}
 
@@ -351,7 +351,7 @@ namespace ImGuiEx {
 		}
 
 		const ImVec2 editor_pos = g_node_editor.node_editor_pos - *g_node_editor.canvas_offset;
-		bool is_editor_hovered = ImGui::IsMouseHoveringRect(editor_pos, editor_pos + g_node_editor.window_size);
+		bool is_editor_hovered = IsMouseHoveringRect(editor_pos, editor_pos + g_node_editor.window_size);
 		if (!is_hovered && is_editor_hovered && IsMouseReleased(0) && !g_node_editor.is_pin_hovered && !GetIO().KeyShift && GetMouseDragDelta().x == 0 && GetMouseDragDelta().y == 0) {
 			if (g_node_editor.is_node_selected) {
 				*g_node_editor.is_node_selected = false;
@@ -376,15 +376,16 @@ namespace ImGuiEx {
 			}
 		}
 
+		float rounding = GetStyle().FrameRounding;
 		g_node_editor.draw_list->ChannelsSetCurrent(0);
 		ImVec2 np = *g_node_editor.node_pos;
-		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), 4.0f);
-		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(draw_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_TableBorderStrong), 4.0f, 0, style.FrameBorderSize);
+		g_node_editor.draw_list->AddRectFilled(np, np + size, ImColor(style.Colors[ImGuiCol_WindowBg]), rounding);
+		g_node_editor.draw_list->AddRect(np, np + size, GetColorU32(draw_selected ? ImGuiCol_ButtonActive : is_hovered ? ImGuiCol_ButtonHovered : ImGuiCol_TableBorderStrong), rounding, 0, style.FrameBorderSize);
 
 		if (g_node_editor.titlebar_height > 0) {
 			ImVec2 titlebar_size = size;
 			titlebar_size.y = g_node_editor.titlebar_height;
-			g_node_editor.draw_list->AddRectFilled(np, np + titlebar_size, g_node_editor.titlebar_color, 4.0f, ImDrawFlags_RoundCornersTop);
+			g_node_editor.draw_list->AddRectFilled(np, np + titlebar_size, g_node_editor.titlebar_color, rounding, ImDrawFlags_RoundCornersTop);
 		}
 
 		PopID();
@@ -1072,17 +1073,17 @@ namespace ImGuiEx {
 
 
 	bool IconButton(const char* icon, const char* tooltip, bool enabled) {
-		if (!enabled) ImGui::BeginDisabled();
-		ImGui::AlignTextToFramePadding();
+		if (!enabled) BeginDisabled();
+		AlignTextToFramePadding();
 		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		PushStyleColor(ImGuiCol_Button, GetStyle().Colors[ImGuiCol_WindowBg]);
+		PushStyleColor(ImGuiCol_Button, 0);
 		bool res = SmallButton(icon);
 		if (tooltip && IsItemHovered()) {
 			SetTooltip("%s", tooltip);
 		}
 		PopStyleColor();
 		PopStyleVar();
-		if (!enabled) ImGui::EndDisabled();
+		if (!enabled) EndDisabled();
 		return res;
 	}
 	
@@ -1261,7 +1262,7 @@ namespace ImGuiEx {
 				EndPopup();
 			}
 
-			if (hovered && IsMouseClicked(0) && ImGui::GetIO().KeyAlt) {
+			if (hovered && IsMouseClicked(0) && GetIO().KeyAlt) {
 				for (int j = i; j < *count - 1; ++j) {
 					keys[j] = keys[j + 1];
 					values[j * 4 + 0] = values[j * 4 + 4];
@@ -1290,14 +1291,32 @@ namespace ImGuiEx {
 	bool filter(const char* label, char* buf, int buf_size, float width, bool set_keyboard_focus) {
 		ASSERT(buf_size > 0);
 		bool changed = false;
-		if (IconButton(ICON_FA_TIMES, "Clear")) {
+		SetNextItemWidth(width);
+		BeginGroup();
+		float w = CalcItemWidth();
+		SetNextItemWidth(width - CalcTextSize(ICON_FA_TIMES).x - 1);
+		SetNextItemAllowOverlap();
+		if (set_keyboard_focus) SetKeyboardFocusHere();
+		changed = InputTextWithHint("##filter", label, buf, buf_size, ImGuiInputTextFlags_AutoSelectAll) || changed;
+
+		ImVec2 min = GetItemRectMin();
+		ImVec2 max = GetItemRectMax();
+		SetCursorScreenPos(ImVec2(max.x - GetStyle().FrameRounding, min.y));
+
+		AlignTextToFramePadding();
+
+		ImGuiContext& g = *GImGui;
+		ImVec4 backup_color = g.Style.Colors[ImGuiCol_Button];
+		g.Style.Colors[ImGuiCol_Button] = g.Style.Colors[ImGuiCol_FrameBg];
+		float backup_padding = g.Style.FramePadding.x;
+		g.Style.FramePadding.x = 2;
+		if (Button(ICON_FA_TIMES)) {
 			buf[0] = '\0';
 			changed = true;
 		}
-		SameLine();
-		SetNextItemWidth(width);
-		if (set_keyboard_focus) SetKeyboardFocusHere();
-		changed = InputTextWithHint("##filter", label, buf, buf_size, ImGuiInputTextFlags_AutoSelectAll) || changed;
+		g.Style.FramePadding.x = backup_padding;
+		g.Style.Colors[ImGuiCol_Button] = backup_color;
+		EndGroup();
 		return changed;
 	}
 

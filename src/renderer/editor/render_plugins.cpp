@@ -1933,15 +1933,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace));
 				ImGuiEx::Label("Force skinned");
 				saveUndo(ImGui::Checkbox("##frcskn", &m_meta.force_skin));
-				ImGuiEx::Label("Scale");
-				saveUndo(ImGui::InputFloat("##scale", &m_meta.scale));
-				ImGuiEx::Label("Culling scale");
-				ImGui::Text("(?)");
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("%s", "Use this for animated meshes if they are culled when still visible.");
-				}
-				ImGui::SameLine();
-				saveUndo(ImGui::InputFloat("##cull_scale", &m_meta.culling_scale));
 				ImGuiEx::Label("Split");
 				saveUndo(ImGui::Checkbox("##split", &m_meta.split));
 				ImGuiEx::Label("Create impostor mesh");
@@ -1949,7 +1940,92 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				if (m_meta.create_impostor) {
 					ImGuiEx::Label("Bake impostor normals");
 					saveUndo(ImGui::Checkbox("##impnrm", &m_meta.bake_impostor_normals));
+					ImGui::TextDisabled("(?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "To use impostors, check `Create impostor mesh` and press this button. "
+						"When the mesh changes, you need to regenerate the impostor texture by pressing this button again.");
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Create impostor texture")) {
+						FBXImporter importer(m_app);
+						importer.init();
+						IAllocator& allocator = m_app.getAllocator();
+						Array<u32> gb0(allocator); 
+						Array<u32> gb1(allocator);
+						Array<u16> gbdepth(allocator);
+						Array<u32> shadow(allocator); 
+						IVec2 tile_size;
+						importer.createImpostorTextures(m_resource, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
+						postprocessImpostor(gb0, gb1, shadow, tile_size, allocator);
+						const PathInfo fi(m_resource->getPath());
+						Path img_path(fi.dir, fi.basename, "_impostor0.tga");
+						ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
+				
+						os::OutputFile file;
+						FileSystem& fs = m_app.getEngine().getFileSystem();
+						if (fs.open(img_path, file)) {
+							Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+							file.close();
+						}
+						else {
+							logError("Failed to open ", img_path);
+						}
+
+						img_path = Path(fi.dir, fi.basename, "_impostor1.tga");
+						if (fs.open(img_path, file)) {
+							Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+							file.close();
+						}
+						else {
+							logError("Failed to open ", img_path);
+						}
+
+						img_path = Path(fi.dir, fi.basename, "_impostor_depth.raw");
+						if (fs.open(img_path, file)) {
+							RawTextureHeader header;
+							header.width = tile_size.x * 9;
+							header.height = tile_size.y * 9;
+							header.depth = 1;
+							header.channel_type = RawTextureHeader::ChannelType::U16;
+							header.channels_count = 1;
+							bool res = file.write(header);
+							if (gpu::isOriginBottomLeft()) {
+								res = file.write(gbdepth.begin(), gbdepth.byte_size()) && res;
+							} else {
+								Array<u16> flipped_depth(m_app.getAllocator());
+								flipped_depth.resize(gbdepth.size());
+								for (u32 j = 0; j < header.height; ++j) {
+									for (u32 i = 0; i < header.width; ++i) {
+										flipped_depth[i + j * header.width] = gbdepth[i + (header.height - j - 1) * header.width];
+									}
+								}
+								res = file.write(flipped_depth.begin(), flipped_depth.byte_size()) && res;
+							}
+							if (!res) logError("Failed to write ", img_path);
+							file.close();
+						}
+						else {
+							logError("Failed to open ", img_path);
+						}
+
+						img_path = Path(fi.dir, fi.basename, "_impostor2.tga");
+						if (fs.open(img_path, file)) {
+							Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+							file.close();
+						}
+						else {
+							logError("Failed to open ", img_path);
+						}
+					}
 				}
+				ImGuiEx::Label("Scale");
+				saveUndo(ImGui::InputFloat("##scale", &m_meta.scale));
+				ImGuiEx::Label("Culling scale (?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("%s", "Use this for animated meshes if they are culled when still visible.");
+				}
+				ImGui::SameLine();
+				saveUndo(ImGui::InputFloat("##cull_scale", &m_meta.culling_scale));
 				ImGuiEx::Label("Vertex colors");
 				i32 vertex_colors_mode = m_meta.import_vertex_colors ? (m_meta.vertex_color_is_ao ? 2 : 1) : 0;
 				if (ImGui::Combo("##vercol", &vertex_colors_mode, "Do not import\0Import\0Import as AO")) {
@@ -1986,6 +2062,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGui::EndCombo();
 				}
 
+				ImGuiEx::Label("Root motion bone");
+				saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
+
+				ImGui::SeparatorText("LODs");
 				ImGuiEx::Label("LOD count");
 				if (ImGui::SliderInt("##lodcount", (i32*)&m_meta.lod_count, 1, 4)) {
 					m_meta.lods_distances[1] = maximum(m_meta.lods_distances[0] + 0.01f, m_meta.lods_distances[1]);
@@ -1994,7 +2074,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					saveUndo(true);
 				}
 
-				ImGui::NewLine();
 				if (ImGui::BeginTable("lods", 4, ImGuiTableFlags_BordersOuter)) {
 					ImGui::TableSetupColumn("LOD", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
 					ImGui::TableSetupColumn("Distance");
@@ -2049,139 +2128,55 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 					ImGui::EndTable();
 				}
-
-				if (ImGui::Button("Create impostor texture")) {
-					FBXImporter importer(m_app);
-					importer.init();
-					IAllocator& allocator = m_app.getAllocator();
-					Array<u32> gb0(allocator); 
-					Array<u32> gb1(allocator);
-					Array<u16> gbdepth(allocator);
-					Array<u32> shadow(allocator); 
-					IVec2 tile_size;
-					importer.createImpostorTextures(m_resource, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
-					postprocessImpostor(gb0, gb1, shadow, tile_size, allocator);
-					const PathInfo fi(m_resource->getPath());
-					Path img_path(fi.dir, fi.basename, "_impostor0.tga");
-					ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
-				
-					os::OutputFile file;
-					FileSystem& fs = m_app.getEngine().getFileSystem();
-					if (fs.open(img_path, file)) {
-						Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-						file.close();
-					}
-					else {
-						logError("Failed to open ", img_path);
-					}
-
-					img_path = Path(fi.dir, fi.basename, "_impostor1.tga");
-					if (fs.open(img_path, file)) {
-						Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-						file.close();
-					}
-					else {
-						logError("Failed to open ", img_path);
-					}
-
-					img_path = Path(fi.dir, fi.basename, "_impostor_depth.raw");
-					if (fs.open(img_path, file)) {
-						RawTextureHeader header;
-						header.width = tile_size.x * 9;
-						header.height = tile_size.y * 9;
-						header.depth = 1;
-						header.channel_type = RawTextureHeader::ChannelType::U16;
-						header.channels_count = 1;
-						bool res = file.write(header);
-						if (gpu::isOriginBottomLeft()) {
-							res = file.write(gbdepth.begin(), gbdepth.byte_size()) && res;
-						} else {
-							Array<u16> flipped_depth(m_app.getAllocator());
-							flipped_depth.resize(gbdepth.size());
-							for (u32 j = 0; j < header.height; ++j) {
-								for (u32 i = 0; i < header.width; ++i) {
-									flipped_depth[i + j * header.width] = gbdepth[i + (header.height - j - 1) * header.width];
-								}
-							}
-							res = file.write(flipped_depth.begin(), flipped_depth.byte_size()) && res;
-						}
-						if (!res) logError("Failed to write ", img_path);
-						file.close();
-					}
-					else {
-						logError("Failed to open ", img_path);
-					}
-
-					img_path = Path(fi.dir, fi.basename, "_impostor2.tga");
-					if (fs.open(img_path, file)) {
-						Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-						file.close();
-					}
-					else {
-						logError("Failed to open ", img_path);
-					}
-				}
-				ImGui::SameLine();
-				ImGui::TextDisabled("(?)");
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("%s", "To use impostors, check `Create impostor mesh` and press this button. "
-					"When the mesh changes, you need to regenerate the impostor texture by pressing this button again.");
-				}
-
-				ImGui::NewLine();
 			}
 			else {
 				ImGui::TextUnformatted("No mesh data");
 			}
 
-			if (ImGui::BeginTable("clips", 4, ImGuiTableFlags_BordersOuter)) {
-				ImGui::TableSetupColumn("Name");
-				ImGui::TableSetupColumn("Start frame");
-				ImGui::TableSetupColumn("End frame");
-				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
-				ImGui::TableHeadersRow();
-
-				for (FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
-					ImGui::TableNextColumn();
-					ImGui::PushID(&clip);
-					ImGui::SetNextItemWidth(-1);
-					saveUndo(ImGui::InputText("##name", clip.name.data, sizeof(clip.name.data)));
-					ImGui::TableNextColumn();
-					ImGui::SetNextItemWidth(-1);
-					saveUndo(ImGui::InputInt("##from", (i32*)&clip.from_frame));
-					ImGui::TableNextColumn();
-					ImGui::SetNextItemWidth(-1);
-					saveUndo(ImGui::InputInt("##to", (i32*)&clip.to_frame));
-					ImGui::TableNextColumn();
-					if (ImGuiEx::IconButton(ICON_FA_TRASH, "Delete")) {
-						m_meta.clips.erase(u32(&clip - m_meta.clips.begin()));
-						saveUndo(true);
-						ImGui::PopID();
-						break;
-					}
-					ImGui::PopID();
+			if (m_meta.clips.empty()) {
+				if (ImGui::Button(ICON_FA_PLUS " Add subclip")) {
+					m_meta.clips.emplace();
+					saveUndo(true);
 				}
-
-				ImGui::EndTable();
 			}
+			else {
+				if (ImGui::BeginTable("clips", 4, ImGuiTableFlags_BordersOuter)) {
+					ImGui::TableSetupColumn("Name");
+					ImGui::TableSetupColumn("Start frame");
+					ImGui::TableSetupColumn("End frame");
+					ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+					ImGui::TableHeadersRow();
 
-			if (ImGui::Button(ICON_FA_PLUS " Add clip")) {
-				m_meta.clips.emplace();
-				saveUndo(true);
+					for (FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+						ImGui::TableNextColumn();
+						ImGui::PushID(&clip);
+						ImGui::SetNextItemWidth(-1);
+						saveUndo(ImGui::InputText("##name", clip.name.data, sizeof(clip.name.data)));
+						ImGui::TableNextColumn();
+						ImGui::SetNextItemWidth(-1);
+						saveUndo(ImGui::InputInt("##from", (i32*)&clip.from_frame));
+						ImGui::TableNextColumn();
+						ImGui::SetNextItemWidth(-1);
+						saveUndo(ImGui::InputInt("##to", (i32*)&clip.to_frame));
+						ImGui::TableNextColumn();
+						if (ImGuiEx::IconButton(ICON_FA_TRASH, "Delete")) {
+							m_meta.clips.erase(u32(&clip - m_meta.clips.begin()));
+							saveUndo(true);
+							ImGui::PopID();
+							break;
+						}
+						ImGui::PopID();
+					}
+
+					ImGui::TableNextColumn();
+					if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, " Add subclip")) {
+						m_meta.clips.emplace();
+						saveUndo(true);
+					}
+
+					ImGui::EndTable();
+				}
 			}
-
-			ImGuiEx::Label("Root motion bone");
-			saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
-			ImGuiEx::Label("Root rotation");
-			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
-			ImGuiEx::Label("XZ root translation");
-			saveUndo(ImGui::CheckboxFlags("##rmxz", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::XZ_ROOT_TRANSLATION));
-			ImGuiEx::Label("Y root translation");
-			saveUndo(ImGui::CheckboxFlags("##rmy", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::Y_ROOT_TRANSLATION));
-			ImGuiEx::Label("Animation translation error");
-			saveUndo(ImGui::DragFloat("##aert", &m_meta.anim_translation_error, 0.01f));
-			ImGuiEx::Label("Animation rotation error");
-			saveUndo(ImGui::DragFloat("##aerr", &m_meta.anim_rotation_error, 0.01f));
 		}
 
 		void infoGUI() {
@@ -2195,7 +2190,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ImGuiEx::Label("Bounding radius (from center)");
 			ImGui::Text("%f", m_resource->getCenterBoundingRadius());
 
-			if (m_resource->getMeshCount() > 0 && ImGui::CollapsingHeader("LODs")) {
+			if (m_resource->getMeshCount() > 0) {
+				ImGui::SeparatorText("LODs");
 				const LODMeshIndices* lods = m_resource->getLODIndices();
 				float* distances = m_resource->getLODDistances();
 				if (lods[0].to >= 0 && !m_resource->isFailure() && ImGui::BeginTable("lodtbl", 4, ImGuiTableFlags_Resizable)) {
@@ -2230,36 +2226,38 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 					ImGui::EndTable();
 				}
-			}
 
-			if (m_resource->getMeshCount() > 0 && ImGui::CollapsingHeader("Meshes") && ImGui::BeginTable("mshtbl", 3, ImGuiTableFlags_Resizable)) {
-				ImGui::TableSetupColumn("Name");
-				ImGui::TableSetupColumn("Triangles");
-				ImGui::TableSetupColumn("Material");
-				ImGui::TableHeadersRow();
+				ImGui::SeparatorText("Meshes");
+				if (ImGui::BeginTable("mshtbl", 3, ImGuiTableFlags_Resizable)) {
+					ImGui::TableSetupColumn("Name");
+					ImGui::TableSetupColumn("Triangles");
+					ImGui::TableSetupColumn("Material");
+					ImGui::TableHeadersRow();
 				
-				const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
-				for (i32 i = 0; i < m_resource->getMeshCount(); ++i) {
-					ImGui::PushID(i);
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					const Mesh& mesh = m_resource->getMesh(i);
-					ImGuiEx::TextUnformatted(mesh.name);
-					ImGui::TableNextColumn();
-					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2)) / 3);
-					ImGui::TableNextColumn();
-					const float w = ImGui::GetContentRegionAvail().x - go_to_w;
-					ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
-					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-						m_app.getAssetBrowser().openEditor(mesh.material->getPath());
+					const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
+					for (i32 i = 0; i < m_resource->getMeshCount(); ++i) {
+						ImGui::PushID(i);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						const Mesh& mesh = m_resource->getMesh(i);
+						ImGuiEx::TextUnformatted(mesh.name);
+						ImGui::TableNextColumn();
+						ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2)) / 3);
+						ImGui::TableNextColumn();
+						const float w = ImGui::GetContentRegionAvail().x - go_to_w;
+						ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
+						ImGui::SameLine();
+						if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+							m_app.getAssetBrowser().openEditor(mesh.material->getPath());
+						}
+						ImGui::PopID();
 					}
-					ImGui::PopID();
+					ImGui::EndTable();
 				}
-				ImGui::EndTable();
 			}
 
-			if (m_resource->isReady() && m_resource->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
+			if (m_resource->isReady() && m_resource->getBoneCount() > 0) {
+				ImGui::SeparatorText("Bones");
 				ImGuiEx::Label("Count");
 				ImGui::Text("%d", m_resource->getBoneCount());
 				if (ImGui::BeginTable("bnstbl", 4, ImGuiTableFlags_Resizable)) {
@@ -2311,8 +2309,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ImGui::TableNextColumn();
 
 			importGUI();
-			ImGui::Separator();
-			infoGUI();
+			if (ImGui::CollapsingHeader("Info")) infoGUI();
 
 			ImGui::TableNextColumn();
 			previewGUI();
