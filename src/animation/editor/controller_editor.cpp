@@ -317,23 +317,43 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void onContextMenu(ImVec2 pos) override {
-			m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing());
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+			if (ImGui::IsWindowAppearing()) m_node_filter_selection = 0;
+			if (m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing())) m_node_filter_selection = 0;
 			Node* n = nullptr;
-			
 			if (m_node_filter.isActive()) {
 				struct : INodeTypeVisitor {
 					INodeTypeVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
-						if (!n && win->m_node_filter.pass(label) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(label))) {
+						if (n || !win->m_node_filter.pass(label)) return *this;
+						bool selected = win->m_node_filter_selection == index;
+						if (selected && scroll) ImGui::SetScrollHereY();
+						if (ImGui::Selectable(label, selected) || insert_enter && selected) {
 							n = creator.create(*win);
 							ImGui::CloseCurrentPopup();
 						}
+						++index;
 						return *this;
 					}
+					bool insert_enter;
+					bool scroll = false;
+					u32 index = 0;
 					EditorWindow* win;
 					Node* n = nullptr;
 				} visitor;
+				visitor.insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+				if (ImGui::IsItemFocused()) {
+					if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+						--m_node_filter_selection;
+						visitor.scroll =  true;
+					}
+					if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+						++m_node_filter_selection;
+						visitor.scroll =  true;
+					}
+				}			
 				visitor.win = this;
 				visitNodeTypes(visitor);
+				if (visitor.index) m_node_filter_selection = (m_node_filter_selection + visitor.index) % visitor.index;
 
 				if (visitor.n) {
 					visitor.n->m_pos = pos;
@@ -1064,6 +1084,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		ControllerDebugMapping m_controller_debug_mapping;
 		IKDebug m_ik_debug[4];
 		TextFilter m_node_filter;
+		u32 m_node_filter_selection = 0;
 	};
 
 	ControllerEditorImpl(StudioApp& app)

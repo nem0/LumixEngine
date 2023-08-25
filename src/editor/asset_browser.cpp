@@ -712,6 +712,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		ImGui::EndChild();
+		if (ImGui::IsItemHovered() && ImGui::GetIO().KeyCtrl) {
+			m_thumbnail_size = clamp(m_thumbnail_size + ImGui::GetIO().MouseWheel * 0.1f, 0.3f, 3.f);
+		}
+
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 				const EntityRef e = *(EntityRef*)payload->Data;

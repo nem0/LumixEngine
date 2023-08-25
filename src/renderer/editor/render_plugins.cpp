@@ -1469,8 +1469,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		ltc.serialize(blob);
 	}
 
-	struct TextureTileJob
-	{
+	struct TextureTileJob {
 		TextureTileJob(StudioApp& app, FileSystem& filesystem, IAllocator& allocator) 
 			: m_allocator(allocator) 
 			, m_filesystem(filesystem)
@@ -1488,6 +1487,18 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				logError("Failed to load ", m_in_path);
 				return;
 			}
+
+			auto applyTint = [&](){
+				if (m_tint != Color::WHITE) {
+					Color tint = m_tint;
+					u32* ptr = (u32*)resized_data.getMutableData();
+					for (u32 i = 0,c = (u32)resized_data.size() / 4; i < c; ++i) {
+						Color col(ptr[i]);
+						col *= tint;
+						ptr[i] = col.abgr();
+					}
+				}
+			};
 
 			int image_comp;
 			int w, h;
@@ -1514,6 +1525,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					0,
 					4);
 
+				applyTint();
+
 				if (!saveAsLBC(m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
@@ -1538,6 +1551,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					4);
 				stbi_image_free(data);
 
+				applyTint();
+
 				if (!saveAsLBC(m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
@@ -1557,6 +1572,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		Path m_in_path; 
 		Path m_out_path;
 		TextureTileJob* m_next = nullptr;
+		Color m_tint = Color::WHITE;
 	};
 
 	void update() override {
@@ -1570,11 +1586,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		jobs::runEx(job, &TextureTileJob::execute, nullptr, jobs::getWorkersCount() - 1);
 	}
 
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
-		if (type != Texture::TYPE) return false;
+	bool createTile(const char* in_path, const char* out_path, Color tint) {
 		if (!Path::hasExtension(in_path, "raw")) {
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			TextureTileJob* job = LUMIX_NEW(m_allocator, TextureTileJob)(m_app, fs, m_allocator);
+			job->m_tint = tint;
 			job->m_in_path = in_path;
 			job->m_out_path = out_path;
 			if (m_jobs_head) m_jobs_head->m_next = job;
@@ -1585,6 +1601,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			return true;
 		}
 		return false;
+	}
+
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
+		if (type != Texture::TYPE) return false;
+		return createTile(in_path, out_path, Color::WHITE);
 	}
 
 	bool compileComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const TextureMeta& meta, StringView src_path) {
@@ -2889,7 +2910,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (material->getTextureCount() == 0) {
 			return;
 		}
-		m_texture_plugin->createTile(in_path.c_str(), out_path.c_str(), Texture::TYPE);
+		if (material->getUniformCount() > 0 && material->getUniform(0).name_hash == RuntimeHash("Material color")) {
+			const Vec4 v = *(Vec4*)material->getUniform(0).vec4;
+			Color tint(u8(v.x * 255), u8(v.y * 255), u8(v.z * 255), u8(v.w * 255));
+			m_texture_plugin->createTile(in_path.c_str(), out_path.c_str(), tint);
+		}
+		else {
+			m_texture_plugin->createTile(in_path.c_str(), out_path.c_str(), Color::WHITE);
+		}
 	}
 
 
@@ -2914,7 +2942,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_tile.world->createComponent(ANIMABLE_TYPE, mesh_entity);
 			AnimationModule* anim_module = (AnimationModule*)m_tile.world->getModule(ANIMABLE_TYPE);
 			anim_module->setAnimation(mesh_entity, animation->getPath());
-			if (anim_module) anim_module->updateAnimable(mesh_entity, 0);
+			if (anim_module) anim_module->updateAnimable(mesh_entity, animation->getLength().seconds() * 0.5f);
 		}
 
 		Matrix mtx;
