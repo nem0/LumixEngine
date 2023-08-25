@@ -20,26 +20,39 @@ struct ModelMeta {
 		return "none";
 	}
 
-
 	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
 
 	void serialize(OutputMemoryStream& blob) {
-		blob << "create_impostor = " << (create_impostor ? "true" : "false")
-				<< "\nanim_translation_error = " << anim_translation_error
-				<< "\nroot_motion_bone = \"" << root_motion_bone << "\""
-				<< "\nanim_rotation_error = " << anim_rotation_error
-				<< "\nbake_vertex_ao = " << (bake_vertex_ao ? "true" : "false")
-				<< "\nbake_impostor_normals = " << (bake_impostor_normals ? "true" : "false")
-				<< "\nroot_motion_flags = " << i32(root_motion_flags)
-				<< "\nuse_mikktspace = " << (use_mikktspace ? "true" : "false")
-				<< "\nforce_skin = " << (force_skin ? "true" : "false")
-				<< "\nphysics = \"" << toString(physics) << "\""
-				<< "\nscale = " << scale
-				<< "\nlod_count = " << lod_count
-				<< "\nculling_scale = " << culling_scale
-				<< "\nsplit = " << (split ? "true" : "false")
-				<< "\nimport_vertex_colors = " << (import_vertex_colors ? "true" : "false")
-				<< "\nvertex_color_is_ao = " << (vertex_color_is_ao ? "true" : "false");
+		if(physics != FBXImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
+		blob << "\nlod_count = " << lod_count;
+
+		#define WRITE_BOOL(id, default_value) \
+			if ((id) != (default_value)) { \
+				blob << "\n" << ##id << (id ? " = true" : " = false"); \
+			}
+
+		#define WRITE_VALUE(id, default_value) \
+			if ((id) != (default_value)) { blob << "\n" << ##id << id; }
+		
+		WRITE_BOOL(create_impostor, false);
+		WRITE_BOOL(use_mikktspace, false);
+		WRITE_BOOL(force_skin, false);
+		WRITE_BOOL(bake_vertex_ao, false);
+		WRITE_BOOL(bake_impostor_normals, false);
+		WRITE_BOOL(split, false);
+		WRITE_BOOL(import_vertex_colors, false);
+		WRITE_BOOL(vertex_color_is_ao, false);
+		WRITE_VALUE(anim_translation_error, 1.f);
+		WRITE_VALUE(anim_rotation_error, 1.f);
+		WRITE_VALUE(scale, 1.f);
+		WRITE_VALUE(culling_scale, 1.f);
+		WRITE_VALUE(root_motion_flags, Animation::Flags::NONE);
+
+		#undef WRITE_BOOL
+		#undef WRITE_VALUE
+
+		if (root_motion_bone.length() > 0) blob << "\nroot_motion_bone = \"" << root_motion_bone << "\"";
+		if (!skeleton.isEmpty()) blob << "\nskeleton = \"" << skeleton << "\"";
 
 		if (!clips.empty()) {
 			blob << "\nclips = {";
@@ -123,8 +136,9 @@ struct ModelMeta {
 		}
 		lua_pop(L, 1);
 
-		char tmp[256];
+		char tmp[MAX_PATH];
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "root_motion_bone", Span(tmp))) root_motion_bone = tmp;
+		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton", Span(tmp))) skeleton = tmp;
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
 			if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
 			else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
@@ -164,6 +178,7 @@ struct ModelMeta {
 	FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 	Array<FBXImporter::ImportConfig::Clip> clips;
 	String root_motion_bone;
+	Path skeleton;
 };
 
 }

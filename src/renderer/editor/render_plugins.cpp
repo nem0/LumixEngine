@@ -2062,8 +2062,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGui::EndCombo();
 				}
 
-				ImGuiEx::Label("Root motion bone");
-				saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
+				ImGuiEx::Label("Skeleton");
+				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE));
+				if (m_meta.skeleton.isEmpty()) {
+					ImGuiEx::Label("Root motion bone");
+					saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
+				}
 
 				ImGui::SeparatorText("LODs");
 				ImGuiEx::Label("LOD count");
@@ -2131,6 +2135,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 			else {
 				ImGui::TextUnformatted("No mesh data");
+				ImGuiEx::Label("Skeleton");
+				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE));
 			}
 
 			if (m_meta.clips.empty()) {
