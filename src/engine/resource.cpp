@@ -17,6 +17,7 @@ ResourceType::ResourceType(const char* type_name)
 {
 	ASSERT(type_name[0] == 0 || (type_name[0] >= 'a' && type_name[0] <= 'z'));
 	type = RuntimeHash(type_name);
+	str = type_name;
 }
 
 
