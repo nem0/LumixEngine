@@ -4,6 +4,7 @@
 #endif
 
 #include "animation/animation.h"
+#include "animation/animation_module.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
@@ -2137,6 +2138,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::TextUnformatted("No mesh data");
 				ImGuiEx::Label("Skeleton");
 				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE));
+				ImGuiEx::Label("Root rotation");
+				saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
+				ImGuiEx::Label("XZ root translation");
+				saveUndo(ImGui::CheckboxFlags("##rmxz", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::XZ_ROOT_TRANSLATION));
+				ImGuiEx::Label("Y root translation");
+				saveUndo(ImGui::CheckboxFlags("##rmy", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::Y_ROOT_TRANSLATION));
+				ImGuiEx::Label("Animation translation error");
+				saveUndo(ImGui::DragFloat("##aert", &m_meta.anim_translation_error, 0.01f));
+				ImGuiEx::Label("Animation rotation error");
+				saveUndo(ImGui::DragFloat("##aerr", &m_meta.anim_rotation_error, 0.01f));
 			}
 
 			if (m_meta.clips.empty()) {
@@ -2346,7 +2357,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ImGui::SameLine();
 			if (ImGui::Button("Save preview")) {
 				m_resource->incRefCount();
-				m_plugin.renderTile(m_resource, &m_viewer.m_viewport);
+				m_plugin.renderTile(m_resource, nullptr, &m_viewer.m_viewport);
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Reset camera")) m_viewer.resetCamera(*m_resource);
@@ -2657,17 +2668,36 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		Engine& engine = m_app.getEngine();
 		ResourceManagerHub& resource_manager = engine.getResourceManager();
 
-		Resource* resource;
 		if (Path::hasExtension(path, "fab")) {
-			resource = resource_manager.load<PrefabResource>(path);
+			TileData::PrefabJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::PrefabJob);
+			job->prefab = resource_manager.load<PrefabResource>(path);
+			m_tile.queue.push(job);
 		}
 		else if (Path::hasExtension(path, "mat")) {
-			resource = resource_manager.load<Material>(path);
+			TileData::MaterialJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::MaterialJob);
+			job->material = resource_manager.load<Material>(path);
+			m_tile.queue.push(job);
+		}
+		else if (Path::hasExtension(Path::getSubresource(path), "ani")) {
+			TileData::AnimationJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::AnimationJob);
+			ModelMeta model_meta(m_app.getAllocator());
+			Path src_path(Path::getResource(path));
+			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
+				model_meta.deserialize(L, src_path);
+				job->model = resource_manager.load<Model>(model_meta.skeleton);
+				lua_close(L);
+			}
+			else {
+				job->model = resource_manager.load<Model>(Path(Path::getResource(path)));
+			}
+			job->animation = resource_manager.load<Animation>(path);
+			m_tile.queue.push(job);
 		}
 		else {
-			resource = resource_manager.load<Model>(path);
+			TileData::ModelJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::ModelJob);
+			job->model = resource_manager.load<Model>(path);
+			m_tile.queue.push(job);
 		}
-		m_tile.queue.push(resource);
 	}
 
 
@@ -2706,7 +2736,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				destroyEntityRecursive(*m_tile.world, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
-				const Path path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".lbc");
+				const Path path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.out_path_hash, ".lbc");
 
 				if (!gpu::isOriginBottomLeft()) {
 					u32* p = (u32*)m_tile.data.getMutableData();
@@ -2721,7 +2751,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				m_renderer->getEndFrameDrawStream().destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
-				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
+				m_app.getAssetBrowser().reloadTile(m_tile.out_path_hash);
 			}
 			return;
 		}
@@ -2729,31 +2759,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (m_tile.entity.isValid()) return;
 		if (m_tile.queue.empty()) return;
 
-		Resource* resource = m_tile.queue.front();
-		if (resource->isFailure()) {
-			if (resource->getType() == Model::TYPE) {
-				const Path out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".lbc");
-				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
-			}
+		TileData::Job* job = m_tile.queue.front();
+		if (job->prepare()) {
 			popTileQueue();
-			resource->decRefCount();
-			return;
-		}
-		if (!resource->isReady()) return;
-
-		popTileQueue();
-
-		if (resource->getType() == Model::TYPE) {
-			renderTile((Model*)resource, nullptr);
-		}
-		else if (resource->getType() == Material::TYPE) {
-			renderTile((Material*)resource);
-		}
-		else if (resource->getType() == PrefabResource::TYPE) {
-			renderTile((PrefabResource*)resource);
-		}
-		else {
-			ASSERT(false);
+			job->execute(*this);
+			LUMIX_DELETE(m_app.getAllocator(), job);
 		}
 	}
 
@@ -2766,8 +2776,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (!engine.instantiatePrefab(*m_tile.world, *prefab, DVec3(0), Quat::IDENTITY, Vec3(1), entity_map)) return;
 		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
 
-		m_tile.path_hash = prefab->getPath().getHash();
-		prefab->decRefCount();
+		m_tile.out_path_hash = prefab->getPath().getHash();
 		m_tile.entity = entity_map.m_map[0];
 		m_tile.waiting = true;
 	}
@@ -2886,15 +2895,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			return;
 		}
 		m_texture_plugin->createTile(in_path.c_str(), out_path.c_str(), Texture::TYPE);
-		material->decRefCount();
 	}
 
-	void renderTile(Model* model, const Viewport* in_viewport)
+
+	void renderTile(Model* model, Animation* animation, const Viewport* in_viewport)
 	{
 		if (!m_tile.world) createTileWorld();
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
 		if (!render_module || model->getMeshCount() == 0) {
-			model->decRefCount();
 			return;
 		}
 
@@ -2905,6 +2913,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		render_module->setModelInstanceLOD(mesh_entity, 0);
 		const AABB aabb = model->getAABB();
 		const float radius = model->getCenterBoundingRadius();
+
+		if (animation) {
+			ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
+			m_tile.world->createComponent(ANIMABLE_TYPE, mesh_entity);
+			AnimationModule* anim_module = (AnimationModule*)m_tile.world->getModule(ANIMABLE_TYPE);
+			anim_module->setAnimation(mesh_entity, animation->getPath());
+			if (anim_module) anim_module->updateAnimable(mesh_entity, 0);
+		}
 
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
@@ -2931,7 +2947,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_tile.pipeline->render(false);
 		if (!m_tile.pipeline->getOutput()) {
 			logError("Could not create ", model->getPath(), " thumbnail");
-			model->decRefCount();
 			m_tile.frame_countdown = -1;
 			return;
 		}
@@ -2955,13 +2970,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		stream.destroy(tile_tmp);
 		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
-		m_tile.path_hash = model->getPath().getHash();
-		model->decRefCount();
+		m_tile.out_path_hash = animation ? animation->getPath().getHash() : model->getPath().getHash();
 	}
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override {
-		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
+		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE && type != Animation::TYPE) return false;
 
 		Path path(in_path);
 		if (!m_tile.queue.full()) {
@@ -2980,14 +2994,53 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			, queue()
 		{}
 
+		struct Job {
+			virtual ~Job() {}
+			virtual bool prepare() = 0;
+			virtual void execute(ModelPlugin& plugin) = 0;
+		};
+
+		struct AnimationJob : TileData::Job {
+			Model* model = nullptr;
+			Animation* animation = nullptr;
+			bool prepare() override { return !animation->isEmpty() && !model->isEmpty(); }
+			void execute(ModelPlugin& plugin) override {
+				plugin.renderTile(model, animation, nullptr);
+			}
+		};
+
+		struct MaterialJob : TileData::Job {
+			Material* material = nullptr;
+			bool prepare() override { return !material->isEmpty(); }
+			void execute(ModelPlugin& plugin) override {
+				plugin.renderTile(material);
+			}
+		};
+
+		struct PrefabJob : TileData::Job {
+			PrefabResource* prefab = nullptr;
+			bool prepare() override { return !prefab->isEmpty(); }
+			void execute(ModelPlugin& plugin) override {
+				plugin.renderTile(prefab);
+			}
+		};
+
+		struct ModelJob : TileData::Job {
+			Model* model = nullptr;
+			bool prepare() override { return !model->isEmpty(); }
+			void execute(ModelPlugin& plugin) override {
+				plugin.renderTile(model, nullptr, nullptr);
+			}
+		};
+
 		World* world = nullptr;
 		UniquePtr<Pipeline> pipeline;
 		EntityPtr entity = INVALID_ENTITY;
 		int frame_countdown = -1;
-		FilePathHash path_hash;
+		FilePathHash out_path_hash;
 		OutputMemoryStream data;
 		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
-		Queue<Resource*, 8> queue;
+		Queue<Job*, 8> queue;
 		Array<Path> paths;
 		bool waiting = false;
 	} m_tile;

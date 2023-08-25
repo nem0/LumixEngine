@@ -55,8 +55,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			Engine& engine = m_app.getEngine();
 
 			m_model = m_app.getEngine().getResourceManager().load<Model>(Path(Path::getResource(path)));
-			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
-			render_module->setModelInstancePath((EntityRef)m_viewer.m_mesh, m_model->getPath());
 
 			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
 
@@ -64,6 +62,14 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			anim_module->setAnimation(*m_viewer.m_mesh, path);
 
 			m_parent_meta.load(m_model->getPath(), m_app);
+
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+			if (m_parent_meta.skeleton.isEmpty()) {
+				render_module->setModelInstancePath(*m_viewer.m_mesh, m_model->getPath());
+			}
+			else {
+				render_module->setModelInstancePath(*m_viewer.m_mesh, m_parent_meta.skeleton);
+			}
 			pushUndo(NO_MERGE_UNDO);
 		}
 
@@ -137,6 +143,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			const Array<Animation::TranslationTrack>& translations = m_resource->getTranslations();
 			const Array<Animation::ConstTranslationTrack>& const_translations = m_resource->getConstTranslations();
 
+			ImGuiEx::Label("Skeleton");
+			saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE));
 			ImGuiEx::Label("Root rotation");
 			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_parent_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
 			ImGuiEx::Label("XZ root translation");
