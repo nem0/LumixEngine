@@ -278,13 +278,22 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		void previewGUI() {
 			ASSERT(m_model->isReady());
 
+			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			if (ImGuiEx::IconButton(ICON_FA_STEP_BACKWARD, "Step back", !m_play)) {
+				anim_module->updateAnimable(*m_viewer.m_mesh, -1 / 30.f);
+			}
+			ImGui::SameLine();
 			if (m_play) {
 				if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
 			}
 			else {
 				if (ImGuiEx::IconButton(ICON_FA_PLAY, "Play")) m_play = true;
 			}
-			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_STEP_FORWARD, "Step", !m_play)) {
+				anim_module->updateAnimable(*m_viewer.m_mesh, 1 / 30.f);
+			}
+
 			Animable& animable = anim_module->getAnimable(*m_viewer.m_mesh);
 			float t = animable.time.seconds();
 			ImGui::SameLine();
@@ -306,15 +315,10 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			if (m_show_skeleton) m_viewer.drawSkeleton(m_selected_bone);
 			
 			ImGuiEx::Label("Playback speed");
-			ImGui::DragFloat("##spd", &m_playback_speed, 0.01f, 0, FLT_MAX);
+			ImGui::DragFloat("##spd", &m_playback_speed, 0.01f, -FLT_MAX, FLT_MAX);
 
-			if (m_play && m_playback_speed > 0) {
+			if (m_play) {
 				anim_module->updateAnimable(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
-			}
-			else {
-				if (ImGui::Button("Step")) {
-					anim_module->updateAnimable(*m_viewer.m_mesh, 1 / 30.f);
-				}
 			}
 
 			if (!m_init) {
