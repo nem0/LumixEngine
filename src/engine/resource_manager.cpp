@@ -172,13 +172,18 @@ ResourceManager* ResourceManagerHub::get(ResourceType type)
 	return iter.value();
 }
 
-void ResourceManagerHub::LoadHook::continueLoad(Resource& resource)
+void ResourceManagerHub::LoadHook::continueLoad(Resource& resource, bool success)
 {
 	ASSERT(resource.isEmpty());
 	resource.decRefCount(); // release from hook
 	resource.m_hooked = false;
-	resource.m_desired_state = Resource::State::EMPTY;
-	resource.doLoad();
+	if (success) {
+		resource.m_desired_state = Resource::State::EMPTY;
+		resource.doLoad();
+	}
+	else {
+		resource.m_current_state = Resource::State::FAILURE;
+	}
 }
 
 void ResourceManagerHub::setLoadHook(LoadHook* hook)

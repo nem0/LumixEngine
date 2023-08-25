@@ -50,7 +50,7 @@ struct LUMIX_ENGINE_API ResourceManagerHub {
 		enum class Action { IMMEDIATE, DEFERRED };
 		virtual ~LoadHook() {}
 		virtual Action onBeforeLoad(Resource& res) = 0;
-		void continueLoad(Resource& res);
+		void continueLoad(Resource& res, bool success);
 	};
 
 	explicit ResourceManagerHub(IAllocator& allocator);
