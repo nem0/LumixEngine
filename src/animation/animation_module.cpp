@@ -490,10 +490,18 @@ struct AnimationModuleImpl final : AnimationModule {
 		animable.animation->getRelativePose(ctx);
 		pose->computeAbsolute(*model);
 
-		Time t = animable.time + Time::fromSeconds(time_delta);
-		const Time l = animable.animation->getLength();
-		t = t % l;
-		animable.time = t;
+		if (time_delta > 0) {
+			Time t = animable.time + Time::fromSeconds(time_delta);
+			const Time l = animable.animation->getLength();
+			t = t % l;
+			animable.time = t;
+		} else {
+			const Time l = animable.animation->getLength();
+			Time dt = Time::fromSeconds(-time_delta) % l;
+			Time t = animable.time + l - dt;
+			t = t % l;
+			animable.time = t;
+		}
 
 		m_render_module->unlockPose(entity, true);
 	}

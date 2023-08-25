@@ -27,7 +27,7 @@ struct Time {
 	Time operator*(float t) const { return Time{u32(value * t)}; }
 	float operator/(const Time& rhs) const { return float(double(value) / double(rhs.value)); }
 	Time operator+(const Time& rhs) const { return Time{value + rhs.value}; }
-	Time operator-(const Time& rhs) const { return Time{value - rhs.value}; }
+	Time operator-(const Time& rhs) const { ASSERT(value >= rhs.value); return Time{value - rhs.value}; }
 	void operator+=(const Time& rhs) { value += rhs.value; }
 	bool operator<(const Time& rhs) const { return value < rhs.value; }
 	bool operator>(const Time& rhs) const { return value > rhs.value; }

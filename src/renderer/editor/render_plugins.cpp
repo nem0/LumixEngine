@@ -2687,7 +2687,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				job->model = resource_manager.load<Model>(Path(Path::getResource(path)));
 			}
 			job->animation = resource_manager.load<Animation>(path);
-			m_tile.queue.push(job);
+			if (job->model) {
+				m_tile.queue.push(job);
+			}
+			else {
+				LUMIX_DELETE(m_app.getAllocator(), job);
+			}
 		}
 		else {
 			TileData::ModelJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::ModelJob)(path);
