@@ -146,9 +146,9 @@ template <class T> inline constexpr bool is_enum_v = __is_enum(T);
 template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator | (T a, T b) { return T(u64(a) | u64(b)); }
 template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator & (T a, T b) { return T(u64(a) & u64(b)); }
 template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator ^ (T a, T b) { return T(u64(a) ^ u64(b)); }
-template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator |= (T a, T b) { return T(u64(a) | u64(b)); }
-template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator &= (T a, T b) { return T(u64(a) & u64(b)); }
-template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator ^= (T a, T b) { return T(u64(a) ^ u64(b)); }
+template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr void operator |= (T& a, T b) { a = T(u64(a) | u64(b)); }
+template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr void operator &= (T& a, T b) { a = T(u64(a) & u64(b)); }
+template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr void operator ^= (T& a, T b) { a = T(u64(a) ^ u64(b)); }
 template <typename T, typename EnableIf<is_enum_v<T>, int>::Type = 0> constexpr T operator ~ (T a) { return T(~u64(a)); }
 template <typename E> bool isFlagSet(E flags, E flag) { return ((u64)flags & (u64)flag); }
 template <typename E> void setFlag(E& flags, E flag, bool set) {
