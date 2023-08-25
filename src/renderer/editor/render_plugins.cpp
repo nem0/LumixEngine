@@ -2662,24 +2662,20 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	const char* getLabel() const override { return "Model"; }
 
-	void pushTileQueue(const Path& path)
-	{
-		ASSERT(!m_tile.queue.full());
+	void pushTileQueue(const Path& path) {
 		Engine& engine = m_app.getEngine();
 		ResourceManagerHub& resource_manager = engine.getResourceManager();
 
 		if (Path::hasExtension(path, "fab")) {
-			TileData::PrefabJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::PrefabJob);
-			job->prefab = resource_manager.load<PrefabResource>(path);
+			TileData::PrefabJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::PrefabJob)(path);
 			m_tile.queue.push(job);
 		}
 		else if (Path::hasExtension(path, "mat")) {
-			TileData::MaterialJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::MaterialJob);
-			job->material = resource_manager.load<Material>(path);
+			TileData::MaterialJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::MaterialJob)(path);
 			m_tile.queue.push(job);
 		}
 		else if (Path::hasExtension(Path::getSubresource(path), "ani")) {
-			TileData::AnimationJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::AnimationJob);
+			TileData::AnimationJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::AnimationJob)(path);
 			ModelMeta model_meta(m_app.getAllocator());
 			Path src_path(Path::getResource(path));
 			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
@@ -2694,21 +2690,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_tile.queue.push(job);
 		}
 		else {
-			TileData::ModelJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::ModelJob);
-			job->model = resource_manager.load<Model>(path);
+			TileData::ModelJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::ModelJob)(path);
 			m_tile.queue.push(job);
 		}
-	}
-
-
-	void popTileQueue()
-	{
-		m_tile.queue.pop();
-		if (m_tile.paths.empty()) return;
-
-		Path path = m_tile.paths.back();
-		m_tile.paths.pop();
-		pushTileQueue(path);
 	}
 	
 	static void destroyEntityRecursive(World& world, EntityPtr entity)
@@ -2730,9 +2714,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				m_tile.waiting = false;
 			}
 		}
-		if (m_tile.frame_countdown >= 0) {
-			--m_tile.frame_countdown;
-			if (m_tile.frame_countdown == -1) {
+		if (m_tile.wait_for_readback) {
+			if (m_tile.readback_done) {
+				m_tile.wait_for_readback = false;
 				destroyEntityRecursive(*m_tile.world, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
@@ -2759,11 +2743,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (m_tile.entity.isValid()) return;
 		if (m_tile.queue.empty()) return;
 
-		TileData::Job* job = m_tile.queue.front();
-		if (job->prepare()) {
-			popTileQueue();
-			job->execute(*this);
-			LUMIX_DELETE(m_app.getAllocator(), job);
+		for (u32 i = 0; i < 8; ++i) {
+			if (i >= (u32)m_tile.queue.size()) break;
+
+			TileData::Job* job = m_tile.queue[i];
+			if (job->prepare(*this) && !m_tile.wait_for_readback) {
+				m_tile.queue.erase(i);
+				job->execute(*this);
+				LUMIX_DELETE(m_app.getAllocator(), job);
+				break;
+			}
 		}
 	}
 
@@ -2841,8 +2830,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			, gpu::TextureFormat::RGBA8
 			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
 		stream.destroy(tile_tmp);
-
-		m_tile.frame_countdown = 3;
+		m_tile.readback_done = false;
+		m_tile.wait_for_readback = true;
+		stream.pushLambda([&](){ m_tile.readback_done = true; });
 	}
 
 	void downscale(DrawStream& stream, gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) {
@@ -2947,7 +2937,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_tile.pipeline->render(false);
 		if (!m_tile.pipeline->getOutput()) {
 			logError("Could not create ", model->getPath(), " thumbnail");
-			m_tile.frame_countdown = -1;
+			m_tile.wait_for_readback = false;
 			return;
 		}
 
@@ -2969,7 +2959,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		
 		stream.destroy(tile_tmp);
 		m_tile.entity = mesh_entity;
-		m_tile.frame_countdown = 2;
+		m_tile.wait_for_readback = true;
+		m_tile.readback_done = false;
+		stream.pushLambda([&](){ m_tile.readback_done = true; });
 		m_tile.out_path_hash = animation ? animation->getPath().getHash() : model->getPath().getHash();
 	}
 
@@ -2978,77 +2970,93 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE && type != Animation::TYPE) return false;
 
 		Path path(in_path);
-		if (!m_tile.queue.full()) {
-			pushTileQueue(path);
-			return true;
-		}
-
-		m_tile.paths.push(path);
+		pushTileQueue(path);
 		return true;
 	}
 
 	struct TileData {
 		TileData(IAllocator& allocator)
 			: data(allocator)
-			, paths(allocator)
-			, queue()
+			, queue(allocator)
 		{}
 
 		struct Job {
 			virtual ~Job() {}
-			virtual bool prepare() = 0;
+			virtual bool prepare(ModelPlugin& plugin) = 0;
 			virtual void execute(ModelPlugin& plugin) = 0;
 		};
 
 		struct AnimationJob : TileData::Job {
-			Model* model = nullptr;
-			Animation* animation = nullptr;
-			
-			~AnimationJob() { model->decRefCount(); animation->decRefCount(); }
-			bool prepare() override { return !animation->isEmpty() && !model->isEmpty(); }
+			AnimationJob(const Path& path) : path(path) {}
+			~AnimationJob() {
+				if (model) model->decRefCount();
+				if (animation) animation->decRefCount();
+			}
+			bool prepare(ModelPlugin& plugin) override { return !animation->isEmpty() && !model->isEmpty(); }
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, animation, nullptr);
 			}
+
+			Path path;
+			Model* model = nullptr;
+			Animation* animation = nullptr;
 		};
 
 		struct MaterialJob : TileData::Job {
-			Material* material = nullptr;
-
+			MaterialJob(const Path& path) : path(path) {};
 			~MaterialJob() { material->decRefCount(); }
-			bool prepare() override { return !material->isEmpty(); }
+			
+			bool prepare(ModelPlugin& plugin) override {
+				if (!material) material = plugin.m_app.getEngine().getResourceManager().load<Material>(path);
+				return !material->isEmpty();
+			}
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(material);
 			}
+
+			Path path;
+			Material* material = nullptr;
 		};
 
 		struct PrefabJob : TileData::Job {
-			PrefabResource* prefab = nullptr;
-
+			PrefabJob(const Path& path) : path(path) {};
 			~PrefabJob() { prefab->decRefCount(); }
-			bool prepare() override { return !prefab->isEmpty(); }
+			bool prepare(ModelPlugin& plugin) override {
+				if (!prefab) prefab = plugin.m_app.getEngine().getResourceManager().load<PrefabResource>(path);
+				return !prefab->isEmpty();
+			}
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(prefab);
 			}
+
+			Path path;
+			PrefabResource* prefab = nullptr;
 		};
 
 		struct ModelJob : TileData::Job {
-			Model* model = nullptr;
+			ModelJob(const Path& path) : path(path) {};
 			~ModelJob() { model->decRefCount(); }
-			bool prepare() override { return !model->isEmpty(); }
+			bool prepare(ModelPlugin& plugin) override {
+				if (!model) model = plugin.m_app.getEngine().getResourceManager().load<Model>(path);
+				return !model->isEmpty();
+			}
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, nullptr, nullptr);
 			}
+
+			Path path;
+			Model* model = nullptr;
 		};
 
 		World* world = nullptr;
 		UniquePtr<Pipeline> pipeline;
 		EntityPtr entity = INVALID_ENTITY;
-		int frame_countdown = -1;
+		bool wait_for_readback = false;
+		bool readback_done = false;
 		FilePathHash out_path_hash;
 		OutputMemoryStream data;
 		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
-		Queue<Job*, 8> queue;
-		Array<Path> paths;
+		Array<Job*> queue;
 		bool waiting = false;
 	} m_tile;
 	
