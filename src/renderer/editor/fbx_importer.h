@@ -49,7 +49,6 @@ struct FBXImporter {
 		u32 animation_flags = 0;
 		float anim_translation_error = 1.f;
 		float anim_rotation_error = 1.f;
-
 	};
 
 	enum class Orientation {

@@ -373,8 +373,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	
 		tile.create_called = true;
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
+		const ResourceType type = compiler.getResourceType(tile.filepath);
 		for (IPlugin* plugin : m_plugins) {
-			ResourceType type = compiler.getResourceType(tile.filepath);
 			if (plugin->createTile(tile.filepath.c_str(), out_path, type)) break;
 		}
 	}
@@ -389,7 +389,12 @@ struct AssetBrowserImpl : AssetBrowser {
 	static TileState getState(const FileInfo& info, FileSystem& fs) {
 		const u64 file_path_hash = info.filepath.getHash().getHashValue();
 		const Path path(".lumix/asset_tiles/", file_path_hash, ".lbc");
-		if (!fs.fileExists(info.filepath)) return TileState::DELETED;
+		if (!fs.fileExists(info.filepath)) {
+			StringView master = Path::getResource(info.filepath);
+			if (master.begin == info.filepath.c_str()) {
+				return TileState::DELETED;
+			}
+		}
 		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
 
 		const Path compiled_path(".lumix/resources/", file_path_hash, ".res");
@@ -498,6 +503,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void recreateTiles() {
 		for (FileInfo& fi : m_file_infos) {
 			const Path path(".lumix/asset_tiles/", fi.filepath.getHash().getHashValue(), ".res");
+			fi.create_called = false;
 			createTile(fi, path.c_str());
 		}
 	}
@@ -987,7 +993,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				openEditor(path);
 			}
 			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
+			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear")) {
 				path = Path();
 				ImGui::PopStyleVar();
 				ImGui::PopID();
