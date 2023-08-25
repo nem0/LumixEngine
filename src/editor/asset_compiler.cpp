@@ -71,20 +71,14 @@ struct AssetCompilerImpl : AssetCompiler {
 	struct CompileJob {
 		u32 generation;
 		Path path;
+		bool compiled = false;
 	};
 
-	struct LoadHook : ResourceManagerHub::LoadHook
-	{
+	struct LoadHook : ResourceManagerHub::LoadHook {
 		LoadHook(AssetCompilerImpl& compiler) : compiler(compiler) {}
-
-		Action onBeforeLoad(Resource& res) override
-		{
-			return compiler.onBeforeLoad(res);
-		}
-
+		Action onBeforeLoad(Resource& res) override { return compiler.onBeforeLoad(res); }
 		AssetCompilerImpl& compiler;
 	};
-
 
 	AssetCompilerImpl(StudioApp& app) 
 		: m_app(app)
@@ -668,10 +662,11 @@ struct AssetCompilerImpl : AssetCompiler {
 				if (!endsWithInsensitive(ri.path, job.path)) continue;;
 				
 				Resource* r = getResource(ri.path);
-				if (r && (r->isReady() || r->isFailure())) r->getResourceManager().reload(*r);
-				else if (r && r->isHooked()) m_load_hook.continueLoad(*r);
-
-				if (r) m_resource_compiled.invoke(*r);
+				if (r) {
+					if (r->isReady() || r->isFailure()) r->getResourceManager().reload(*r);
+					else if (r->isHooked()) m_load_hook.continueLoad(*r, job.compiled);
+					m_resource_compiled.invoke(*r);
+				}
 			}
 
 			// compile all dependents
@@ -826,7 +821,7 @@ int AssetCompilerTask::task()
 {
 	while (!m_finished) {
 		m_compiler.m_semaphore.wait();
-		const AssetCompilerImpl::CompileJob p = [&]{
+		AssetCompilerImpl::CompileJob p = [&]{
 			MutexGuard lock(m_compiler.m_to_compile_mutex);
 			AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
 			if (p.path.isEmpty()) return p;
@@ -846,8 +841,8 @@ int AssetCompilerTask::task()
 		if (!p.path.isEmpty()) {
 			PROFILE_BLOCK("compile asset");
 			profiler::pushString(p.path.c_str());
-			const bool compiled = m_compiler.compile(p.path);
-			if (!compiled) logError("Failed to compile resource ", p.path);
+			p.compiled = m_compiler.compile(p.path);
+			if (!p.compiled) logError("Failed to compile resource ", p.path);
 			MutexGuard lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(p);
 		}
