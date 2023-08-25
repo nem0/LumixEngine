@@ -611,7 +611,6 @@ SceneView::SceneView(StudioApp& app)
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
-	m_show_stats = false;
 
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
 	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);
@@ -1100,18 +1099,15 @@ void SceneView::onToolbar()
 
 	ImGui::SameLine();
 	const ImVec4 bg_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
+	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
+	
 	bool open_camera_transform = false;
-	if(ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_CAMERA, bg_color, "Camera transform")) {
+	if(ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_CAMERA, bg_color, "Camera details")) {
 		open_camera_transform = true;
 	}
 
 	ImGui::PushItemWidth(50);
-	ImGui::SameLine();
 	float offset = (toolbar_height - ImGui::GetTextLineHeightWithSpacing()) / 2;
-	pos = ImGui::GetCursorPos();
-	pos.y += offset;
-	ImGui::SetCursorPos(pos);
-	ImGui::DragFloat("##camera_speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
 	
 	Action* mode_action;
 	if (m_app.getGizmoConfig().isTranslateMode())
@@ -1124,8 +1120,14 @@ void SceneView::onToolbar()
 	}
 	
 	ImGui::SameLine();
+	const ImVec4 measure_icon_color = m_is_measure_active ? col_active : ImGui::GetStyle().Colors[ImGuiCol_Text];
+	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_RULER_VERTICAL, measure_icon_color, "Measure")) {
+		m_is_measure_active = !m_is_measure_active;
+	}
+
+	ImGui::SameLine();
 	pos = ImGui::GetCursorPos();
-	pos.y -= offset;
+	//pos.y -= offset;
 	ImGui::SetCursorPos(pos);
 	ImGui::TextUnformatted(mode_action->font_icon);
 
@@ -1141,44 +1143,24 @@ void SceneView::onToolbar()
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
 	ImGui::SameLine();
-	Viewport vp = m_view->getViewport();
-	if (ImGui::Checkbox("Ortho", &vp.is_ortho)) {
-		m_view->setViewport(vp);
-	}
-	if (vp.is_ortho) {
-		ImGui::SameLine();
-		if (ImGui::DragFloat("Ortho size", &vp.ortho_size)) {
-			m_view->setViewport(vp);
-		}
-	}
-
-	ImGui::SameLine(0);
-	ImGui::Checkbox("Stats", &m_show_stats);
-
-	ImGui::SameLine(0);
 	m_pipeline->callLuaFunction("onGUI");
-
-	ImGui::SameLine(0);
-	ImGui::Checkbox("Measure", &m_is_measure_active);
-
-	if (m_is_measure_active) {
-		ImGui::SameLine(0, 20);
-		const double d = length(m_measure_to - m_measure_from);
-		ImGui::Text(" | Measured distance: %f", d);
-	}
 
 	ImGui::PopItemWidth();
 	ImGuiEx::EndToolbar();
 
-	if (open_camera_transform) ImGui::OpenPopup("Camera transform");
+	if (open_camera_transform) ImGui::OpenPopup("Camera details");
 
-	if (ImGui::BeginPopup("Camera transform")) {
+	if (ImGui::BeginPopup("Camera details")) {
+		ImGui::DragFloat("Speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+		Viewport vp = m_view->getViewport();
+		if (ImGui::Checkbox("Ortho", &vp.is_ortho)) m_view->setViewport(vp);
+		if (vp.is_ortho && ImGui::DragFloat("Ortho size", &vp.ortho_size)) {
+			m_view->setViewport(vp);
+		}
 		if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
 			m_view->setViewport(vp);
 		}
-		Vec3 angles = vp.rot.toEuler();
-		if (ImGuiEx::InputRotation("Rotation", &angles.x)) {
-			vp.rot.fromEuler(angles);
+		if (inputRotation("Rotation", &vp.rot)) {
 			m_view->setViewport(vp);
 		}
 		ImGui::Selectable(ICON_FA_TIMES " Close");
@@ -1255,27 +1237,6 @@ void SceneView::onBeforeSettingsSaved() {
 	settings.setValue(Settings::GLOBAL, "quicksearch_preview", m_search_preview);
 }
 
-void SceneView::statsUI(float x, float y) {
-	if (!m_show_stats) return;
-
-	ImVec2 view_pos(x, y);
-	view_pos.x += ImGui::GetStyle().FramePadding.x;
-	view_pos.y += ImGui::GetStyle().FramePadding.y;
-	ImGui::SetNextWindowPos(view_pos);
-	auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
-	col.w = 0.3f;
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
-	if (ImGui::Begin("###stats_overlay",
-			nullptr,
-			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
-	{
-		ImGui::LabelText("Resolution", "%dx%d", m_width, m_height);
-	}
-	ImGui::End();
-	ImGui::PopStyleColor();
-}
-
 void SceneView::searchUI() {
 	if (m_search_request) ImGui::OpenPopup("Search");
 
@@ -1296,7 +1257,7 @@ void SceneView::searchUI() {
 			m_search_selected = 0;
 		}
 		bool scroll = false;
-		const bool insert_enter= ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+		const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
 		if (ImGui::IsItemFocused()) {
 			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_search_selected > 0) {
 				--m_search_selected;
@@ -1398,6 +1359,7 @@ void SceneView::onGUI()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
+		ImGui::PopStyleVar();
 		is_open = true;
 		ImGui::Dummy(ImVec2(2, 2));
 		onToolbar();
@@ -1443,6 +1405,7 @@ void SceneView::onGUI()
 		}
 	}
 	else {
+		ImGui::PopStyleVar();
 		m_view->inputFrame();
 		m_view->m_draw_vertices.clear();
 		m_view->m_draw_cmds.clear();
@@ -1454,11 +1417,27 @@ void SceneView::onGUI()
 
 
 	ImGui::End();
-	ImGui::PopStyleVar();
 
 	searchUI();
 
-	if (is_open) statsUI(view_pos.x, view_pos.y);
+	if (is_open && m_is_measure_active) {
+		view_pos.x += ImGui::GetStyle().FramePadding.x;
+		view_pos.y += ImGui::GetStyle().FramePadding.y;
+		ImGui::SetNextWindowPos(view_pos);
+		auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+		col.w = 0.3f;
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
+		if (ImGui::Begin("###stats_overlay",
+				nullptr,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+		{
+			const double d = length(m_measure_to - m_measure_from);
+			ImGui::Text("Measured distance: %f", d);
+		}
+		ImGui::End();
+		ImGui::PopStyleColor();
+	}
 }
 
 

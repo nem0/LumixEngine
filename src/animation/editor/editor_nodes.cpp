@@ -74,10 +74,10 @@ Blend2DNode::Blend2DNode(Node* parent, Controller& controller, IAllocator& alloc
 
 bool Blend2DNode::onGUI() {
 	ImGuiEx::NodeTitle(m_name.c_str());
-	inputSlot();
+	inputSlot(ImGuiEx::PinShape::SQUARE);
 	outputSlot();
 	ImGui::TextUnformatted("X input");
-	inputSlot();
+	inputSlot(ImGuiEx::PinShape::SQUARE);
 	ImGui::TextUnformatted("Y input");
 	return false;
 }

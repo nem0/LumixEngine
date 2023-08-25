@@ -237,6 +237,15 @@ bool inputString(const char* str_id, const char* label, String* value) {
 	return ImGui::InputText(str_id, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);
 }
 
+bool inputRotation(const char* label, Quat* value) {
+	Vec3 euler = value->toEuler();
+	if (ImGuiEx::InputRotation(label, &euler.x)) {
+		value->fromEuler(euler);
+		return true;
+	}
+	return false;
+}
+
 SimpleUndoRedo::SimpleUndoRedo(IAllocator& allocator)
 	: m_stack(allocator)
 	, m_allocator(allocator)

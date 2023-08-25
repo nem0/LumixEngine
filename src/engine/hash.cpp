@@ -20,6 +20,9 @@ RuntimeHash::RuntimeHash(const void* data, u32 len) {
 
 RuntimeHash::RuntimeHash(const char* str) {
 	hash = XXH3_64bits(str, strlen(str));
+#ifdef LUMIX_DEBUG
+	debug_str = str;
+#endif
 }
 
 RuntimeHash RuntimeHash::fromU64(u64 hash) { 

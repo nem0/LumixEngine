@@ -44,7 +44,6 @@ private:
 	void handleDrop(const char* path, float x, float y);
 	void onToolbar();
 	void handleEvents();
-	void statsUI(float x, float y);
 	void toggleSearch() { m_search_request = true; }
 	void searchUI();
 	void onSettingsLoaded() override;
@@ -71,7 +70,6 @@ private:
 	Action m_copy_view_action;
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
-	bool m_show_stats = false;
 	bool m_search_request = false;
 	bool m_search_preview = false;
 	bool m_search_actions = true;

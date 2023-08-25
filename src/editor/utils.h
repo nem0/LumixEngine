@@ -73,6 +73,7 @@ inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b;
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API [[nodiscard]] bool menuItem(const Action& a, bool enabled);
 LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity);
+LUMIX_EDITOR_API bool inputRotation(const char* label, struct Quat* value);
 LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 LUMIX_EDITOR_API bool inputString(const char* str_id, const char* label, String* value);
 LUMIX_EDITOR_API bool inputStringMultiline(const char* label, String* value, const ImVec2& size = ImVec2(0, 0));

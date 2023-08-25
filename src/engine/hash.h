@@ -19,6 +19,9 @@ struct LUMIX_ENGINE_API RuntimeHash {
 	u64 getHashValue() const { return hash; }
 private:
 	u64 hash = 0;
+#ifdef LUMIX_DEBUG
+	const char* debug_str = nullptr;
+#endif
 };
 
 // same as RuntimeHash, but only 32 bits
