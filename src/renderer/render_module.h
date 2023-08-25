@@ -3,7 +3,6 @@
 
 #include "engine/array.h"
 #include "engine/lumix.h"
-#include "engine/flag_set.h"
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
@@ -96,9 +95,9 @@ struct CurveDecal {
 	Vec2 bezier_p2;
 };
 
-struct Environment
-{
+struct Environment {
 	enum Flags : u32 {
+		NONE = 0,
 		CAST_SHADOWS = 1 << 0
 	};
 
@@ -107,13 +106,12 @@ struct Environment
 	float indirect_intensity;
 	EntityRef entity;
 	Vec4 cascades;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 };
 
-
-struct PointLight
-{
+struct PointLight {
 	enum Flags : u32 {
+		NONE = 0,
 		CAST_SHADOWS = 1 << 0,
 		DYNAMIC = 1 << 1
 	};
@@ -124,18 +122,18 @@ struct PointLight
 	float fov;
 	float attenuation_param;
 	float range;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 	u64 guid;
 };
 
-struct ReflectionProbe
-{
+struct ReflectionProbe {
 	enum Flags {
+		NONE = 0,
 		ENABLED = 1 << 2,
 	};
 
 	u64 guid;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 	u32 size = 128;
 	Vec3 half_extents = Vec3(100, 100, 100);
 	u32 texture_id = 0xffFFffFF;
@@ -144,23 +142,22 @@ struct ReflectionProbe
 	LoadJob* load_job = nullptr;
 };
 
-struct EnvironmentProbe
-{
+struct EnvironmentProbe {
 	enum Flags {
+		NONE = 0,
 		ENABLED = 1 << 2,
 	};
 
 	Vec3 inner_range;
 	Vec3 outer_range;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 	Vec3 sh_coefs[9];
 };
 
-
 struct ModelInstance
 {
-	enum Flags : u8
-	{
+	enum Flags : u8 {
+		NONE = 0,
 		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
 		ENABLED = 1 << 1,
 		VALID = 1 << 2,
@@ -173,7 +170,7 @@ struct ModelInstance
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	float lod = 4;
-	FlagSet<Flags, u8> flags;
+	Flags flags = Flags::NONE;
 	u16 mesh_count;
 };
 

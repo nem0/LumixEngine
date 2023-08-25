@@ -3,7 +3,6 @@
 #include "engine/allocator.h"
 #include "engine/array.h"
 #include "engine/delegate_list.h"
-#include "engine/flag_set.h"
 #include "engine/hash_map.h"
 #include "engine/metaprogramming.h"
 #include "engine/log.h"
@@ -19,22 +18,22 @@ namespace Lumix {
 
 struct AsyncItem {
 	enum class Flags : u32 {
+		NONE = 0,
 		FAILED = 1 << 0,
 		CANCELED = 1 << 1,
 	};
 
 	AsyncItem(IAllocator& allocator) : data(allocator) {}
 	
-	bool isFailed() const { return flags.isSet(Flags::FAILED); }
-	bool isCanceled() const { return flags.isSet(Flags::CANCELED); }
+	bool isFailed() const { return isFlagSet(flags, Flags::FAILED); }
+	bool isCanceled() const { return isFlagSet(flags, Flags::CANCELED); }
 
 	FileSystem::ContentCallback callback;
 	OutputMemoryStream data;
 	Path path;
 	u32 id = 0;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 };
-
 
 struct FileSystemImpl;
 
@@ -140,14 +139,14 @@ struct FileSystemImpl : FileSystem {
 		MutexGuard lock(m_mutex);
 		for (AsyncItem& item : m_queue) {
 			if (item.id == async.value) {
-				item.flags.set(AsyncItem::Flags::CANCELED);
+				item.flags |= AsyncItem::Flags::CANCELED;
 				--m_work_counter;
 				return;
 			}
 		}
 		for (AsyncItem& item : m_finished) {
 			if (item.id == async.value) {
-				item.flags.set(AsyncItem::Flags::CANCELED);
+				item.flags |= AsyncItem::Flags::CANCELED;
 				return;
 			}
 		}
@@ -280,7 +279,7 @@ int FSTask::task()
 				m_fs.m_finished.emplace(static_cast<AsyncItem&&>(m_fs.m_queue[0]));
 				m_fs.m_finished.back().data = static_cast<OutputMemoryStream&&>(data);
 				if(!success) {
-					m_fs.m_finished.back().flags.set(AsyncItem::Flags::FAILED);
+					m_fs.m_finished.back().flags |= AsyncItem::Flags::FAILED;
 				}
 			}
 			m_fs.m_queue.erase(0);

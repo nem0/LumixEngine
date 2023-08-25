@@ -3,7 +3,6 @@
 
 #include "engine/allocators.h"
 #include "engine/array.h"
-#include "engine/flag_set.h"
 #include "engine/geometry.h"
 #include "engine/hash.h"
 #include "engine/hash_map.h"
@@ -75,7 +74,10 @@ struct LUMIX_RENDERER_API Mesh {
 		LAST_TYPE
 	};
 
-	enum Flags : u8 { INDICES_16_BIT = 1 << 0 };
+	enum Flags : u8 {
+		NONE = 0,
+		INDICES_16_BIT = 1 << 0
+	};
 
 	Mesh(Material* mat,
 		const gpu::VertexDecl& vertex_decl,
@@ -90,13 +92,13 @@ struct LUMIX_RENDERER_API Mesh {
 	void operator=(Mesh&&) = delete;
 
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
-	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
+	bool areIndices16() const { return flags & Flags::INDICES_16_BIT; }
 
 	Type type;
 	OutputMemoryStream indices;
 	Array<Vec3> vertices;
 	Array<Skin> skin;
-	FlagSet<Flags, u8> flags;
+	Flags flags = Flags::NONE;
 	u32 sort_key;
 	u8 layer;
 	String name;
@@ -112,7 +114,6 @@ struct LUMIX_RENDERER_API Mesh {
 	gpu::DataType index_type;
 	int indices_count;
 };
-
 
 struct LODMeshIndices
 {

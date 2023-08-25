@@ -64,18 +64,16 @@ struct AnimationModuleImpl final : AnimationModule {
 	};
 
 
-	struct PropertyAnimator
-	{
-		struct Key
-		{
+	struct PropertyAnimator {
+		struct Key {
 			int frame0;
 			int frame1;
 			float value0;
 			float value1;
 		};
 
-		enum Flags
-		{
+		enum Flags {
+			NONE = 0,
 			LOOPED = 1 << 0,
 			DISABLED = 1 << 1
 		};
@@ -85,7 +83,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		PropertyAnimation* animation;
 		Array<Key> keys;
 
-		FlagSet<Flags, u32> flags;
+		Flags flags = Flags::NONE;
 		float time;
 	};
 
@@ -422,14 +420,14 @@ struct AnimationModuleImpl final : AnimationModule {
 
 	bool isPropertyAnimatorEnabled(EntityRef entity) override
 	{
-		return !m_property_animators[entity].flags.isSet(PropertyAnimator::DISABLED);
+		return !isFlagSet(m_property_animators[entity].flags, PropertyAnimator::DISABLED);
 	}
 
 
 	void enablePropertyAnimator(EntityRef entity, bool enabled) override
 	{
 		PropertyAnimator& animator = m_property_animators[entity];
-		animator.flags.set(PropertyAnimator::DISABLED, !enabled);
+		setFlag(animator.flags, PropertyAnimator::DISABLED, !enabled);
 		animator.time = 0;
 		if (!enabled)
 		{
@@ -802,7 +800,7 @@ struct AnimationModuleImpl final : AnimationModule {
 			if (!animation || !animation->isReady()) continue;
 			if (animation->curves.empty()) continue;
 			if (animation->curves[0].frames.empty()) continue;
-			if (animator.flags.isSet(PropertyAnimator::DISABLED)) continue;
+			if (animator.flags & PropertyAnimator::DISABLED) continue;
 
 			animator.time += time_delta;
 			
