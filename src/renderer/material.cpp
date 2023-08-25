@@ -51,12 +51,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 }
 
 
-Material::~Material()
-{
-	ASSERT(isEmpty());
-}
-
-
 const char* Material::getCustomFlagName(int index)
 {
 	return s_custom_flags.flags[index];

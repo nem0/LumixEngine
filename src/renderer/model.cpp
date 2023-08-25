@@ -117,11 +117,6 @@ Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& rend
 }
 
 
-Model::~Model()
-{
-	ASSERT(isEmpty());
-}
-
 static Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
 {
 	Matrix m = matrices[s.indices[0]] * s.weights.x + matrices[s.indices[1]] * s.weights.y +

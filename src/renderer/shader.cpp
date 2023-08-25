@@ -50,11 +50,6 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 }
 
 
-Shader::~Shader()
-{
-	ASSERT(isEmpty());
-}
-
 bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }

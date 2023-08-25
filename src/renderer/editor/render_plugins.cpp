@@ -3003,6 +3003,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		struct AnimationJob : TileData::Job {
 			Model* model = nullptr;
 			Animation* animation = nullptr;
+			
+			~AnimationJob() { model->decRefCount(); animation->decRefCount(); }
 			bool prepare() override { return !animation->isEmpty() && !model->isEmpty(); }
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, animation, nullptr);
@@ -3011,6 +3013,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		struct MaterialJob : TileData::Job {
 			Material* material = nullptr;
+
+			~MaterialJob() { material->decRefCount(); }
 			bool prepare() override { return !material->isEmpty(); }
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(material);
@@ -3019,6 +3023,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		struct PrefabJob : TileData::Job {
 			PrefabResource* prefab = nullptr;
+
+			~PrefabJob() { prefab->decRefCount(); }
 			bool prepare() override { return !prefab->isEmpty(); }
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(prefab);
@@ -3027,6 +3033,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		struct ModelJob : TileData::Job {
 			Model* model = nullptr;
+			~ModelJob() { model->decRefCount(); }
 			bool prepare() override { return !model->isEmpty(); }
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, nullptr, nullptr);

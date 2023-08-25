@@ -95,7 +95,6 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 	};
 
 	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
-	~Shader();
 
 	ResourceType getType() const override { return TYPE; }
 	bool hasDefine(u8 define) const;
