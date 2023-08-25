@@ -42,12 +42,6 @@ Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& 
 }
 
 
-Texture::~Texture()
-{
-	ASSERT(isEmpty());
-}
-
-
 bool Texture::getFlag(Flags flag)
 {
 	return flags & u32(flag);

@@ -82,7 +82,6 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 	};
 
 	Texture(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
-	~Texture();
 
 	ResourceType getType() const override { return TYPE; }
 

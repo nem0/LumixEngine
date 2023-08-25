@@ -57,7 +57,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	static const ResourceType TYPE;
 
 	Material(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
-	~Material();
 
 	ResourceType getType() const override { return TYPE; }
 	Renderer& getRenderer() { return m_renderer; }
