@@ -2,7 +2,6 @@
 #include "engine/allocator.h"
 #include "engine/associative_array.h"
 #include "engine/crt.h"
-#include "engine/flag_set.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/os.h"
@@ -112,18 +111,18 @@ struct GUIImage {
 		if (sprite) sprite->decRefCount();
 	}
 
-	enum Flags : u32
-	{
+	enum Flags : u32 {
+		NONE = 0,
 		IS_ENABLED = 1 << 1
 	};
 	Sprite* sprite = nullptr;
 	u32 color = 0xffffFFFF;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 };
-
 
 struct GUIRect {
 	enum Flags : u32 {
+		NONE = 0,
 		IS_VALID = 1 << 0,
 		IS_ENABLED = 1 << 1,
 		IS_CLIP = 1 << 2
@@ -135,7 +134,7 @@ struct GUIRect {
 	};
 
 	EntityRef entity;
-	FlagSet<Flags, u32> flags;
+	Flags flags = Flags::NONE;
 	Anchor top;
 	Anchor right = { 0, 1 };
 	Anchor bottom = { 0, 1 };
@@ -146,7 +145,6 @@ struct GUIRect {
 	GUIInputField* input_field = nullptr;
 	gpu::TextureHandle* render_target = nullptr;
 };
-
 
 struct GUIModuleImpl final : GUIModule {
 	enum class Version : i32 {
@@ -195,15 +193,15 @@ struct GUIModuleImpl final : GUIModule {
 
 	void renderRect(GUIRect& rect, Draw2D& draw, const Rect& parent_rect, bool is_main)
 	{
-		if (!rect.flags.isSet(GUIRect::IS_VALID)) return;
-		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
+		if (!isFlagSet(rect.flags, GUIRect::IS_VALID)) return;
+		if (!isFlagSet(rect.flags, GUIRect::IS_ENABLED)) return;
 
 		float l = parent_rect.x + rect.left.points + parent_rect.w * rect.left.relative;
 		float r = parent_rect.x + rect.right.points + parent_rect.w * rect.right.relative;
 		float t = parent_rect.y + rect.top.points + parent_rect.h * rect.top.relative;
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
-		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.pushClipRect({ l, t }, { r, b });
+		if (rect.flags & GUIRect::IS_CLIP) draw.pushClipRect({ l, t }, { r, b });
 
 		auto button_iter = m_buttons.find(rect.entity);
 		const Color* img_color = rect.image ? (Color*)&rect.image->color : nullptr;
@@ -220,7 +218,7 @@ struct GUIModuleImpl final : GUIModule {
 			}
 		}
 
-		if (rect.image && rect.image->flags.isSet(GUIImage::IS_ENABLED))
+		if (rect.image && isFlagSet(rect.image->flags, GUIImage::IS_ENABLED))
 		{
 			const Color color = *img_color;
 			if (rect.image->sprite && rect.image->sprite->getTexture())
@@ -309,7 +307,7 @@ struct GUIModuleImpl final : GUIModule {
 				renderRect(*iter.value(), draw, { l, t, r - l, b - t }, is_main);
 			}
 		}
-		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.popClipRect();
+		if (rect.flags & GUIRect::IS_CLIP) draw.popClipRect();
 	}
 
 	IVec2 getCursorPosition() override { return m_cursor_pos; }
@@ -366,8 +364,8 @@ struct GUIModuleImpl final : GUIModule {
 		m_buttons[entity].hovered_cursor = cursor;
 	}
 
-	void enableImage(EntityRef entity, bool enable) override { m_rects[entity]->image->flags.set(GUIImage::IS_ENABLED, enable); }
-	bool isImageEnabled(EntityRef entity) override { return m_rects[entity]->image->flags.isSet(GUIImage::IS_ENABLED); }
+	void enableImage(EntityRef entity, bool enable) override { setFlag(m_rects[entity]->image->flags, GUIImage::IS_ENABLED, enable); }
+	bool isImageEnabled(EntityRef entity) override { return m_rects[entity]->image->flags & GUIImage::IS_ENABLED; }
 
 
 	Vec4 getImageColorRGBA(EntityRef entity) override
@@ -436,14 +434,14 @@ struct GUIModuleImpl final : GUIModule {
 	{
 		auto iter = m_rects.find(entity);
 		if (!iter.isValid()) return false;
-		return iter.value()->flags.isSet(GUIRect::IS_VALID);
+		return iter.value()->flags & GUIRect::IS_VALID;
 	}
 
 
 	EntityPtr getRectAt(const GUIRect& rect, const Vec2& pos, const Rect& parent_rect, EntityPtr limit) const
 	{
-		if (!rect.flags.isSet(GUIRect::IS_VALID)) return INVALID_ENTITY;
-		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return INVALID_ENTITY;
+		if (!isFlagSet(rect.flags, GUIRect::IS_VALID)) return INVALID_ENTITY;
+		if (!isFlagSet(rect.flags, GUIRect::IS_ENABLED)) return INVALID_ENTITY;
 		if (rect.entity.index == limit.index) return INVALID_ENTITY;
 
 		Rect r;
@@ -525,10 +523,10 @@ struct GUIModuleImpl final : GUIModule {
 		return { l, t, r - l, b - t };
 	}
 
-	void setRectClip(EntityRef entity, bool enable) override { m_rects[entity]->flags.set(GUIRect::IS_CLIP, enable); }
-	bool getRectClip(EntityRef entity) override { return m_rects[entity]->flags.isSet(GUIRect::IS_CLIP); }
-	void enableRect(EntityRef entity, bool enable) override { return m_rects[entity]->flags.set(GUIRect::IS_ENABLED, enable); }
-	bool isRectEnabled(EntityRef entity) override { return m_rects[entity]->flags.isSet(GUIRect::IS_ENABLED); }
+	void setRectClip(EntityRef entity, bool enable) override { setFlag(m_rects[entity]->flags, GUIRect::IS_CLIP, enable); }
+	bool getRectClip(EntityRef entity) override { return m_rects[entity]->flags & GUIRect::IS_CLIP; }
+	void enableRect(EntityRef entity, bool enable) override { return setFlag(m_rects[entity]->flags, GUIRect::IS_ENABLED, enable); }
+	bool isRectEnabled(EntityRef entity) override { return m_rects[entity]->flags & GUIRect::IS_ENABLED; }
 	float getRectLeftPoints(EntityRef entity) override { return m_rects[entity]->left.points; }
 	void setRectLeftPoints(EntityRef entity, float value) override { m_rects[entity]->left.points = value; }
 	float getRectLeftRelative(EntityRef entity) override { return m_rects[entity]->left.relative; }
@@ -631,7 +629,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	~GUIModuleImpl() {
 		for (GUIRect* rect : m_rects) {
-			if (rect->flags.isSet(GUIRect::IS_VALID)) {
+			if (rect->flags & GUIRect::IS_VALID) {
 				LUMIX_DELETE(m_allocator, rect->input_field);
 				LUMIX_DELETE(m_allocator, rect->image);
 				LUMIX_DELETE(m_allocator, rect->text);
@@ -659,7 +657,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	void handleMouseAxisEvent(const Rect& parent_rect, GUIRect& rect, const Vec2& mouse_pos, const Vec2& prev_mouse_pos)
 	{
-		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
+		if (!isFlagSet(rect.flags, GUIRect::IS_ENABLED)) return;
 
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
 
@@ -694,7 +692,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	bool handleMouseButtonEvent(const Rect& parent_rect, const GUIRect& rect, const InputSystem::Event& event)
 	{
-		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return false;
+		if (!isFlagSet(rect.flags, GUIRect::IS_ENABLED)) return false;
 		const bool is_up = !event.data.button.down;
 
 		Vec2 pos(event.data.button.x, event.data.button.y);
@@ -901,8 +899,7 @@ struct GUIModuleImpl final : GUIModule {
 		rect->bottom = {0, 1};
 		rect->left = {0, 0};
 		rect->entity = entity;
-		rect->flags.set(GUIRect::IS_VALID);
-		rect->flags.set(GUIRect::IS_ENABLED);
+		rect->flags |= GUIRect::IS_VALID | GUIRect::IS_ENABLED;
 		m_world.onComponentCreated(entity, GUI_RECT_TYPE, this);
 	}
 
@@ -984,7 +981,7 @@ struct GUIModuleImpl final : GUIModule {
 		}
 		GUIRect& rect = *iter.value();
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
-		rect.image->flags.set(GUIImage::IS_ENABLED);
+		rect.image->flags |= GUIImage::IS_ENABLED;
 
 		m_world.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
@@ -993,7 +990,7 @@ struct GUIModuleImpl final : GUIModule {
 	void destroyRect(EntityRef entity)
 	{
 		GUIRect* rect = m_rects[entity];
-		rect->flags.set(GUIRect::IS_VALID, false);
+		rect->flags &= ~GUIRect::IS_VALID;
 		if (!rect->image && !rect->text && !rect->input_field && !rect->render_target)
 		{
 			LUMIX_DELETE(m_allocator, rect);
@@ -1038,7 +1035,7 @@ struct GUIModuleImpl final : GUIModule {
 		if (rect.text) return;
 		if (rect.input_field) return;
 		if (rect.render_target) return;
-		if (rect.flags.isSet(GUIRect::IS_VALID)) return;
+		if (rect.flags & GUIRect::IS_VALID) return;
 			
 		const EntityRef e = rect.entity;
 		LUMIX_DELETE(m_allocator, &rect);
@@ -1138,14 +1135,13 @@ struct GUIModuleImpl final : GUIModule {
 			}
 			GUIRect* rect = iter.value();
 			rect->entity = entity;
-			rect->flags.clear();
-			rect->flags.set(flags);
+			rect->flags = flags;
 
 			serializer.read(rect->top);
 			serializer.read(rect->right);
 			serializer.read(rect->bottom);
 			serializer.read(rect->left);
-			if (rect->flags.isSet(GUIRect::IS_VALID)) {
+			if (rect->flags & GUIRect::IS_VALID) {
 				m_world.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
 

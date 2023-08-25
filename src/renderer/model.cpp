@@ -191,7 +191,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 		const bool is_mesh_skinned = !mesh.skin.empty() && is_skinned;
 		const u16* indices16 = (const u16*)mesh.indices.data();
 		const u32* indices32 = (const u32*)mesh.indices.data();
-		const bool is16 = mesh.flags.isSet(Mesh::Flags::INDICES_16_BIT);
+		const bool is16 = mesh.flags & Mesh::Flags::INDICES_16_BIT;
 		const int index_size = is16 ? 2 : 4;
 		const Vec3* vertices = mesh.vertices.begin();
 		
@@ -505,7 +505,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		mesh.indices_count = indices_count;
 		file.read(mesh.indices.getMutableData(), mesh.indices.size());
 
-		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
+		if (index_size == 2) mesh.flags |= Mesh::Flags::INDICES_16_BIT;
 		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
 		mesh.index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
 		mesh.index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;

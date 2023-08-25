@@ -204,7 +204,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		for (ModelInstance& i : m_model_instances)
 		{
-			if (i.flags.isSet(ModelInstance::VALID) && i.model) {
+			if ((i.flags & ModelInstance::VALID) && i.model) {
 				i.model->decRefCount();
 				if (i.custom_material) i.custom_material->decRefCount();
 				i.custom_material = nullptr;
@@ -511,7 +511,7 @@ struct RenderModuleImpl final : RenderModule {
 		if (parent.isValid() && parent.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[parent.index];
-			mi.flags.set(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
+			mi.flags |= ModelInstance::IS_BONE_ATTACHMENT_PARENT;
 		}
 		updateRelativeMatrix(ba);
 	}
@@ -611,7 +611,7 @@ struct RenderModuleImpl final : RenderModule {
 		serializer.write((i32)m_model_instances.size());
 		for (const ModelInstance& r : m_model_instances) {
 			serializer.write(r.flags);
-			if(r.flags.isSet(ModelInstance::VALID)) {
+			if(r.flags & ModelInstance::VALID) {
 				serializer.write(u32(r.model ? offsets[r.model] : 0xffFFffFF));
 				serializer.writeString(r.custom_material ? r.custom_material->getPath().c_str() : "");
 			}
@@ -952,16 +952,15 @@ struct RenderModuleImpl final : RenderModule {
 		serializer.read(size);
 		m_model_instances.reserve(nextPow2(size + m_model_instances.size()));
 		for (u32 i = 0; i < size; ++i) {
-			FlagSet<ModelInstance::Flags, u8> flags;
+			ModelInstance::Flags flags;
 			serializer.read(flags);
 
-			if(flags.isSet(ModelInstance::VALID)) {
+			if(flags & ModelInstance::VALID) {
 				const EntityRef e = entity_map.get(EntityRef{(i32)i});
 
 				while (e.index >= m_model_instances.size()) {
 					auto& r = m_model_instances.emplace();
-					r.flags.clear();
-					r.flags.set(ModelInstance::VALID, false);
+					r.flags = ModelInstance::NONE;
 					r.model = nullptr;
 					r.pose = nullptr;
 				}
@@ -998,16 +997,15 @@ struct RenderModuleImpl final : RenderModule {
 		serializer.read(size);
 		m_model_instances.reserve(nextPow2(size + m_model_instances.size()));
 		for (u32 i = 0; i < size; ++i) {
-			FlagSet<ModelInstance::Flags, u8> flags;
+			ModelInstance::Flags flags;
 			serializer.read(flags);
 
-			if(flags.isSet(ModelInstance::VALID)) {
+			if(flags & ModelInstance::VALID) {
 				const EntityRef e = entity_map.get(EntityRef{(i32)i});
 
 				while (e.index >= m_model_instances.size()) {
 					ModelInstance& r = m_model_instances.emplace();
-					r.flags.clear();
-					r.flags.set(ModelInstance::VALID, false);
+					r.flags = ModelInstance::NONE;
 					r.model = nullptr;
 					r.pose = nullptr;
 				}
@@ -1158,7 +1156,7 @@ struct RenderModuleImpl final : RenderModule {
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[bone_attachment.parent_entity.index];
-			mi.flags.unset(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
+			mi.flags &= ~ModelInstance::IS_BONE_ATTACHMENT_PARENT;
 		}
 		m_bone_attachments.erase(entity);
 		m_world.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
@@ -1282,8 +1280,7 @@ struct RenderModuleImpl final : RenderModule {
 		auto& model_instance = m_model_instances[entity.index];
 		LUMIX_DELETE(m_allocator, model_instance.pose);
 		model_instance.pose = nullptr;
-		model_instance.flags.clear();
-		model_instance.flags.set(ModelInstance::VALID, false);
+		model_instance.flags = ModelInstance::NONE;
 		if (model_instance.custom_material) model_instance.custom_material->decRefCount();
 		model_instance.custom_material = nullptr;
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
@@ -1390,11 +1387,11 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	bool getEnvironmentCastShadows(EntityRef entity) override {
-		return m_environments[entity].flags.isSet(Environment::CAST_SHADOWS);
+		return m_environments[entity].flags & Environment::CAST_SHADOWS;
 	}
 	
 	void setEnvironmentCastShadows(EntityRef entity, bool enable) override {
-		m_environments[entity].flags.set(Environment::CAST_SHADOWS, enable);
+		setFlag(m_environments[entity].flags, Environment::CAST_SHADOWS, enable);
 	}
 
 	Environment& getEnvironment(EntityRef entity) override
@@ -1876,11 +1873,10 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	Pose* lockPose(EntityRef entity) override { return m_model_instances[entity.index].pose; }
-	void unlockPose(EntityRef entity, bool changed) override
-	{
+	void unlockPose(EntityRef entity, bool changed) override {
 		if (!changed) return;
 		if (entity.index < m_model_instances.size()
-			&& (m_model_instances[entity.index].flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) == 0)
+			&& (m_model_instances[entity.index].flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) == 0)
 		{
 			return;
 		}
@@ -1902,14 +1898,14 @@ struct RenderModuleImpl final : RenderModule {
 	bool isModelInstanceEnabled(EntityRef entity) override
 	{
 		ModelInstance& model_instance = m_model_instances[entity.index];
-		return model_instance.flags.isSet(ModelInstance::ENABLED);
+		return model_instance.flags & ModelInstance::ENABLED;
 	}
 
 
 	void enableModelInstance(EntityRef entity, bool enable) override
 	{
 		ModelInstance& model_instance = m_model_instances[entity.index];
-		model_instance.flags.set(ModelInstance::ENABLED, enable);
+		model_instance.flags |= ModelInstance::ENABLED;
 		if (enable)
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
@@ -2123,7 +2119,7 @@ struct RenderModuleImpl final : RenderModule {
 	{
 		for(int i = entity.index + 1; i < m_model_instances.size(); ++i)
 		{
-			if (m_model_instances[i].flags.isSet(ModelInstance::VALID)) return EntityPtr{i};
+			if (m_model_instances[i].flags & ModelInstance::VALID) return EntityPtr{i};
 		}
 		return INVALID_ENTITY;
 	}
@@ -2641,8 +2637,7 @@ struct RenderModuleImpl final : RenderModule {
 		const World& world = getWorld();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
-			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
-			if (!r.flags.isSet(ModelInstance::VALID)) continue;
+			if ((r.flags & (ModelInstance::ENABLED | ModelInstance::VALID)) == 0) continue;
 			if (!r.model) continue;
 
 			const EntityRef entity{i};
@@ -2725,19 +2720,19 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	bool getPointLightCastShadows(EntityRef entity) override {
-		return m_point_lights[entity].flags.isSet(PointLight::CAST_SHADOWS);
+		return m_point_lights[entity].flags & PointLight::CAST_SHADOWS;
 	}
 
 	void setPointLightCastShadows(EntityRef entity, bool value) override {
-		m_point_lights[entity].flags.set(PointLight::CAST_SHADOWS, value);
+		setFlag(m_point_lights[entity].flags, PointLight::CAST_SHADOWS, value);
 	}
 
 	bool getPointLightDynamic(EntityRef entity) override {
-		return m_point_lights[entity].flags.isSet(PointLight::DYNAMIC);
+		return m_point_lights[entity].flags & PointLight::DYNAMIC;
 	}
 
 	void setPointLightDynamic(EntityRef entity, bool value) override {
-		m_point_lights[entity].flags.set(PointLight::DYNAMIC, value);
+		setFlag(m_point_lights[entity].flags, PointLight::DYNAMIC, value);
 	}
 
 	void setLightRange(EntityRef entity, float value) override
@@ -2763,11 +2758,11 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	void enableReflectionProbe(EntityRef entity, bool enable) override {
-		m_reflection_probes[entity].flags.set(ReflectionProbe::ENABLED, enable);
+		setFlag(m_reflection_probes[entity].flags, ReflectionProbe::ENABLED, enable);
 	}
 
 	bool isReflectionProbeEnabled(EntityRef entity) override {
-		return m_reflection_probes[entity].flags.isSet(ReflectionProbe::ENABLED);
+		return m_reflection_probes[entity].flags & ReflectionProbe::ENABLED;
 	}
 	
 	Span<const ReflectionProbe> getReflectionProbes() override {
@@ -2807,13 +2802,13 @@ struct RenderModuleImpl final : RenderModule {
 	
 	void enableEnvironmentProbe(EntityRef entity, bool enable) override
 	{
-		m_environment_probes[entity].flags.set(EnvironmentProbe::ENABLED, enable);
+		setFlag(m_environment_probes[entity].flags, EnvironmentProbe::ENABLED, enable);
 	}
 
 
 	bool isEnvironmentProbeEnabled(EntityRef entity) override
 	{
-		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::ENABLED);
+		return m_environment_probes[entity].flags & EnvironmentProbe::ENABLED;
 	}
 
 
@@ -2838,7 +2833,7 @@ struct RenderModuleImpl final : RenderModule {
 		const Vec3& scale = m_world.getScale(entity);
 		const DVec3 pos = m_world.getPosition(entity);
 		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
-		if(r.flags.isSet(ModelInstance::ENABLED)) {
+		if(r.flags & ModelInstance::ENABLED) {
 			const RenderableTypes type = getRenderableType(*model, r.custom_material);
 			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
@@ -2851,7 +2846,7 @@ struct RenderModuleImpl final : RenderModule {
 		r.mesh_count = r.model->getMeshCount();
 		r.meshes = r.mesh_count > 0 ? &r.model->getMesh(0) : nullptr;
 
-		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) {
+		if (r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
 			for (auto& attachment : m_bone_attachments) {
 				if (attachment.parent_entity == entity) {
 					updateBoneAttachment(attachment);
@@ -2872,7 +2867,7 @@ struct RenderModuleImpl final : RenderModule {
 	{
 		for (int i = 0, c = m_model_instances.size(); i < c; ++i)
 		{
-			if (m_model_instances[i].flags.isSet(ModelInstance::VALID) && m_model_instances[i].model == model)
+			if ((m_model_instances[i].flags & ModelInstance::VALID) && m_model_instances[i].model == model)
 			{
 				modelUnloaded(model, {i});
 			}
@@ -3009,7 +3004,7 @@ struct RenderModuleImpl final : RenderModule {
 	void setModel(EntityRef entity, Model* model)
 	{
 		auto& model_instance = m_model_instances[entity.index];
-		ASSERT(model_instance.flags.isSet(ModelInstance::VALID));
+		ASSERT(model_instance.flags & ModelInstance::VALID);
 		Model* old_model = model_instance.model;
 		bool no_change = model == old_model && old_model;
 		if (no_change)
@@ -3048,7 +3043,7 @@ struct RenderModuleImpl final : RenderModule {
 	void createEnvironment(EntityRef entity)
 	{
 		Environment light;
-		light.flags.set(Environment::CAST_SHADOWS);
+		light.flags = Environment::CAST_SHADOWS;
 		light.entity = entity;
 		light.light_color = Vec3(1, 1, 1);
 		light.direct_intensity = 1;
@@ -3069,7 +3064,7 @@ struct RenderModuleImpl final : RenderModule {
 		light.color = Vec3(1, 1, 1);
 		light.intensity = 1;
 		light.fov = degreesToRadians(360);
-		light.flags.clear();
+		light.flags = PointLight::Flags::NONE;
 		light.attenuation_param = 2;
 		light.range = 10;
 		light.guid = randGUID();
@@ -3129,7 +3124,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		probe.outer_range = Vec3(9001.f);
 		probe.inner_range = Vec3(4500.f);
-		probe.flags.set(EnvironmentProbe::ENABLED);
+		probe.flags |= EnvironmentProbe::ENABLED;
 		memset(probe.sh_coefs, 0, sizeof(probe.sh_coefs));
 		probe.sh_coefs[0] = Vec3(0.5f, 0.5f, 0.5f);
 
@@ -3155,7 +3150,7 @@ struct RenderModuleImpl final : RenderModule {
 	{
 		ReflectionProbe& probe = m_reflection_probes.insert(entity);
 		probe.guid = randGUID();
-		probe.flags.set(ReflectionProbe::ENABLED);
+		probe.flags |= ReflectionProbe::ENABLED;
 
 		m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 	}
@@ -3187,8 +3182,7 @@ struct RenderModuleImpl final : RenderModule {
 		while(entity.index >= m_model_instances.size())
 		{
 			auto& r = m_model_instances.emplace();
-			r.flags.clear();
-			r.flags.set(ModelInstance::VALID, false);
+			r.flags = ModelInstance::NONE;
 			r.model = nullptr;
 			r.pose = nullptr;
 		}
@@ -3196,9 +3190,7 @@ struct RenderModuleImpl final : RenderModule {
 		r.model = nullptr;
 		r.meshes = nullptr;
 		r.pose = nullptr;
-		r.flags.clear();
-		r.flags.set(ModelInstance::VALID);
-		r.flags.set(ModelInstance::ENABLED);
+		r.flags = ModelInstance::VALID | ModelInstance::ENABLED;
 		r.mesh_count = 0;
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}

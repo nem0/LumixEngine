@@ -356,33 +356,6 @@ inline StateFlags getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, 
 {
 	return StateFlags(((u64)write_mask << 23) | ((u64)func << 31) | ((u64)ref << 35) | ((u64)mask << 43) | ((u64)sfail << 51) | ((u64)dpfail << 55) | ((u64)dppass << 59));
 }
-	
-constexpr MemoryBarrierType operator ~(MemoryBarrierType a) { return MemoryBarrierType(~(u64)a); }
-constexpr MemoryBarrierType operator | (MemoryBarrierType a, MemoryBarrierType b) { return MemoryBarrierType((u64)a | (u64)b); }
-constexpr MemoryBarrierType operator & (MemoryBarrierType a, MemoryBarrierType b) { return MemoryBarrierType((u64)a & (u64)b); }
-
-constexpr StateFlags operator ~(StateFlags a) { return StateFlags(~(u64)a); }
-constexpr StateFlags operator | (StateFlags a, StateFlags b) { return StateFlags((u64)a | (u64)b); }
-constexpr StateFlags operator & (StateFlags a, StateFlags b) { return StateFlags((u64)a & (u64)b); }
-
-constexpr ClearFlags operator | (ClearFlags a, ClearFlags b) { return ClearFlags((u32)a | (u32)b); }
-constexpr ClearFlags operator & (ClearFlags a, ClearFlags b) { return ClearFlags((u32)a & (u32)b); }
-
-constexpr FramebufferFlags operator | (FramebufferFlags a, FramebufferFlags b) { return FramebufferFlags((u32)a | (u32)b); }
-constexpr FramebufferFlags operator & (FramebufferFlags a, FramebufferFlags b) { return FramebufferFlags((u32)a & (u32)b); }
-
-constexpr TextureFlags operator ~(TextureFlags a) { return TextureFlags(~(u32)a); }
-constexpr TextureFlags operator | (TextureFlags a, TextureFlags b) { return TextureFlags((u32)a | (u32)b); }
-constexpr TextureFlags operator & (TextureFlags a, TextureFlags b) { return TextureFlags((u32)a & (u32)b); }
-
-constexpr BufferFlags operator | (BufferFlags a, BufferFlags b) { return BufferFlags((u32)a | (u32)b); }
-constexpr BufferFlags operator & (BufferFlags a, BufferFlags b) { return BufferFlags((u32)a & (u32)b); }
-
-constexpr BindShaderBufferFlags operator & (BindShaderBufferFlags a, BindShaderBufferFlags b) { return BindShaderBufferFlags((u32)a & (u32)b); }
-
-constexpr InitFlags operator ~(InitFlags a) { return InitFlags(~(u32)a); }
-constexpr InitFlags operator | (InitFlags a, InitFlags b) { return InitFlags((u32)a | (u32)b); }
-constexpr InitFlags operator & (InitFlags a, InitFlags b) { return InitFlags((u32)a & (u32)b); }
 
 } // namespace gpu
 

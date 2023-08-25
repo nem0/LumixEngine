@@ -2233,7 +2233,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						int tri_count = 0;
 						for (i32 j = lods[i].from; j <= lods[i].to; ++j) {
 							i32 indices_count = (i32)m_resource->getMesh(j).indices.size() >> 1;
-							if (!m_resource->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
+							if (!isFlagSet(m_resource->getMesh(j).flags, Mesh::Flags::INDICES_16_BIT)) {
 								indices_count >>= 1;
 							}
 							tri_count += indices_count / 3;
@@ -3652,7 +3652,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
 				const ReflectionProbe& probe = module->getReflectionProbe(e);
-				if (probe.flags.isSet(ReflectionProbe::ENABLED)) {
+				if (probe.flags & ReflectionProbe::ENABLED) {
 					const Path path("universes/probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
 					ImGuiEx::TextUnformatted(path);

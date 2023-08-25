@@ -4,7 +4,6 @@
 #include "engine/associative_array.h"
 #include "engine/hash.h"
 #include "engine/engine.h"
-#include "engine/flag_set.h"
 #include "engine/allocator.h"
 #include "engine/input_system.h"
 #include "engine/metaprogramming.h"
@@ -320,6 +319,7 @@ namespace Lumix
 		struct ScriptInstance : ScriptEnvironment
 		{
 			enum Flags : u32 {
+				NONE = 0,
 				ENABLED = 1 << 0,
 				LOADED = 1 << 1,
 				MOVED_FROM = 1 << 2
@@ -359,7 +359,7 @@ namespace Lumix
 				lua_setfield(m_state, -2, "this"); // [env]
 				lua_pop(m_state, 1); // []
 
-				m_flags.set(ENABLED);
+				m_flags = Flags(m_flags | ENABLED);
 			}
 
 			ScriptInstance(const ScriptInstance&) = delete;
@@ -370,17 +370,15 @@ namespace Lumix
 				, m_script(rhs.m_script)
 				, m_flags(rhs.m_flags)
 			{
-				ASSERT(!rhs.m_flags.isSet(MOVED_FROM));
 				m_environment = rhs.m_environment;
 				m_thread_ref = rhs.m_thread_ref;
 				m_state = rhs.m_state;
 				rhs.m_script = nullptr;
-				rhs.m_flags.set(MOVED_FROM);
+				rhs.m_flags = Flags(rhs.m_flags | MOVED_FROM);
 			}
 
 			void operator =(ScriptInstance&& rhs) 
 			{
-				ASSERT(!rhs.m_flags.isSet(MOVED_FROM));
 				m_properties = rhs.m_properties.move();
 				m_environment = rhs.m_environment;
 				m_thread_ref = rhs.m_thread_ref;
@@ -389,11 +387,11 @@ namespace Lumix
 				m_state = rhs.m_state;
 				m_flags = rhs.m_flags;
 				rhs.m_script = nullptr;
-				rhs.m_flags.set(MOVED_FROM);
+				rhs.m_flags = Flags(rhs.m_flags | MOVED_FROM);
 			}
 
 			~ScriptInstance() {
-				if (!m_flags.isSet(MOVED_FROM)) {
+				if (!(m_flags & MOVED_FROM)) {
 					if (m_script) {
 						m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
 						m_script->decRefCount();
@@ -427,7 +425,7 @@ namespace Lumix
 			ScriptComponent* m_cmp;
 			LuaScript* m_script = nullptr;
 			Array<Property> m_properties;
-			FlagSet<Flags, u32> m_flags;
+			Flags m_flags = Flags::NONE;
 		};
 
 		struct InlineScriptComponent : ScriptEnvironment {
@@ -1667,7 +1665,7 @@ namespace Lumix
 		}
 
 		void startScript(EntityRef entity, ScriptInstance& instance, bool is_reload) {
-			if (!instance.m_flags.isSet(ScriptInstance::ENABLED)) return;
+			if (!(instance.m_flags & ScriptInstance::ENABLED)) return;
 			
 			if (is_reload) disableScript(instance);
 			startScriptInternal(entity, instance, is_reload);
@@ -2074,7 +2072,7 @@ namespace Lumix
 					auto& instance = scr->m_scripts[j];
 					if (!instance.m_script) continue;
 					if (!instance.m_script->isReady()) continue;
-					if (!instance.m_flags.isSet(ScriptInstance::ENABLED)) continue;
+					if (!(instance.m_flags & ScriptInstance::ENABLED)) continue;
 
 					startScript(instance.m_cmp->m_entity, instance, false);
 				}
@@ -2331,9 +2329,9 @@ namespace Lumix
 		void enableScript(EntityRef entity, int scr_index, bool enable) override
 		{
 			ScriptInstance& inst = m_scripts[entity]->m_scripts[scr_index];
-			if (inst.m_flags.isSet(ScriptInstance::ENABLED) == enable) return;
+			if (isFlagSet(inst.m_flags, ScriptInstance::ENABLED) == enable) return;
 
-			inst.m_flags.set(ScriptInstance::ENABLED, enable);
+			setFlag(inst.m_flags, ScriptInstance::ENABLED, enable);
 
 			setEnableProperty(entity, scr_index, inst, enable);
 
@@ -2350,7 +2348,7 @@ namespace Lumix
 
 		bool isScriptEnabled(EntityRef entity, int scr_index) override
 		{
-			return m_scripts[entity]->m_scripts[scr_index].m_flags.isSet(ScriptInstance::ENABLED);
+			return m_scripts[entity]->m_scripts[scr_index].m_flags & ScriptInstance::ENABLED;
 		}
 
 
@@ -2415,7 +2413,7 @@ namespace Lumix
 	void LuaScriptModuleImpl::ScriptInstance::onScriptLoaded(LuaScriptModuleImpl& module, struct ScriptComponent& cmp, int scr_index) {
 		LuaWrapper::DebugGuard guard(m_state);
 		
-		bool is_reload = m_flags.isSet(LOADED);
+		bool is_reload = m_flags & LOADED;
 		
 		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
 		ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
@@ -2444,9 +2442,9 @@ namespace Lumix
 
 		cmp.detectProperties(*this);
 					
-		bool enabled = m_flags.isSet(ScriptInstance::ENABLED);
+		bool enabled = m_flags & ScriptInstance::ENABLED;
 		module.setEnableProperty(cmp.m_entity, scr_index, *this, enabled);
-		m_flags.set(LOADED);
+		m_flags = Flags(m_flags | LOADED);
 
 		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
 		lua_getfield(m_state, -1, "awake"); // [env, awake]

@@ -2234,7 +2234,7 @@ struct PipelineImpl final : Pipeline
 		for (auto iter = furs.begin(); iter.isValid(); ++iter) {
 			const EntityRef e = iter.key();
 			if (e.index >= (i32)mi.length()) continue;
-			if (!mi[e.index].flags.isSet(ModelInstance::VALID)) continue;
+			if ((mi[e.index].flags & ModelInstance::VALID) == 0) continue;
 			if (!iter.value().enabled) continue;
 
 			const Model* model = mi[e.index].model;
@@ -3032,7 +3032,7 @@ struct PipelineImpl final : Pipeline
 				light.attenuation_param = pl.attenuation_param;
 
 				auto iter = m_shadow_atlas.map.find(e);
-				if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
+				if (pl.flags & PointLight::CAST_SHADOWS) {
 					light.atlas_idx = iter.isValid() ? iter.value() : -1;
 					atlas_sorter.push(i, computeShadowPriority(light.radius, light_pos, cam_pos), e);
 				}
@@ -3069,7 +3069,7 @@ struct PipelineImpl final : Pipeline
 				light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
 				bakeShadow(pl, light.atlas_idx);
 			}
-			else if (pl.flags.isSet(PointLight::DYNAMIC)) {
+			else if (pl.flags & PointLight::DYNAMIC) {
 				bakeShadow(pl, light.atlas_idx);
 			}
 			shadow_atlas_matrices[light.atlas_idx] = getShadowMatrix(pl, light.atlas_idx);
@@ -3136,7 +3136,7 @@ struct PipelineImpl final : Pipeline
 			const Span<EntityRef> refl_probe_entities = m_module->getReflectionProbesEntities();
 			for (u32 i = 0, c = module_refl_probes.length(); i < c; ++i) {
 				const ReflectionProbe& refl_probe = module_refl_probes[i];
-				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
+				if (!isFlagSet(refl_probe.flags, ReflectionProbe::ENABLED)) continue;
 				const EntityRef e = refl_probe_entities[i];
 				ClusterReflProbe& probe =  refl_probes[i];
 				probe.pos = Vec3(world.getPosition(e) - cam_pos);
@@ -3158,7 +3158,7 @@ struct PipelineImpl final : Pipeline
 			const Span<EntityRef> env_probe_entities = m_module->getEnvironmentProbesEntities();
 			for (u32 probe_idx = 0, c = module_env_probes.length(); probe_idx < c; ++probe_idx) {
 				const EnvironmentProbe& env_probe = module_env_probes[probe_idx];
-				if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
+				if (!isFlagSet(env_probe.flags, EnvironmentProbe::ENABLED)) continue;
 	
 				const EntityRef e = env_probe_entities[probe_idx];
 				ClusterEnvProbe& probe =  env_probes[probe_idx];

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "animation.h"
-#include "engine/flag_set.h"
 #include "engine/hash.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
