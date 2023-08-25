@@ -660,7 +660,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				else {
 					ImGuiEx::TextUnformatted(Path::getBasename(m_selected_resources[0]));
 					ImGui::Separator();
-					if (ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
+					if (*Path::getSubresource(m_selected_resources[0]).end == 0 && ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 						openInExternalEditor(m_selected_resources[0]);
 					}
 					if (ImGui::BeginMenu("Rename")) {
