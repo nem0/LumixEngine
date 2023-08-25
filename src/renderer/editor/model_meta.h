@@ -32,7 +32,7 @@ struct ModelMeta {
 			}
 
 		#define WRITE_VALUE(id, default_value) \
-			if ((id) != (default_value)) { blob << "\n" << ##id << id; }
+			if ((id) != (default_value)) { blob << "\n" << #id << " = " << id; }
 		
 		WRITE_BOOL(create_impostor, false);
 		WRITE_BOOL(use_mikktspace, false);
