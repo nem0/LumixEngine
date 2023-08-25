@@ -219,6 +219,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			: AssetEditorWindow(app)
 			, NodeEditor(allocator)
 			, m_allocator(allocator)
+			, m_to_fix_skeleton(allocator)
 			, m_app(app)
 			, m_plugin(plugin)
 			, m_controller(path, allocator)
@@ -226,9 +227,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		{
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			OutputMemoryStream data(m_allocator);
+			ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
 			if (fs.getContentSync(Path(path), data)) {
 				InputMemoryStream str(data);
 				if (m_controller.deserialize(str)) {
+					checkSkeleton();
 					m_current_node = m_controller.m_root;
 					m_path = path;
 					pushUndo(NO_MERGE_UNDO);
@@ -266,6 +269,24 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		~EditorWindow() {
 			if (m_skeleton) m_skeleton->decRefCount();
+		}
+
+		void checkSkeleton() {
+			for (const Controller::AnimationEntry& a : m_controller.m_animation_entries) {
+				if (a.animation.isEmpty()) continue;
+
+				ModelMeta model_meta(m_allocator);
+				if (lua_State* L = m_app.getAssetCompiler().getMeta(Path(Path::getResource(a.animation)))) {
+					model_meta.deserialize(L, a.animation);
+					if (model_meta.skeleton != m_controller.m_skeleton) {
+						m_to_fix_skeleton.push(a.animation);
+					}
+					lua_close(L);
+				}
+				else {
+					m_to_fix_skeleton.push(a.animation);
+				}
+			}
 		}
 
 		void onCanvasClicked(ImVec2 pos, i32 hovered_link) override {
@@ -887,10 +908,69 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (!m_controller.m_skeleton.isEmpty()) {
 				m_skeleton = m_app.getEngine().getResourceManager().load<Model>(m_controller.m_skeleton);
 			}
+			checkSkeleton();
+		}
+
+		void fixSkeleton(const Path& anim_path) {
+			ModelMeta model_meta(m_allocator);
+			Path src_path(Path::getResource(anim_path));
+			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
+				model_meta.deserialize(L, src_path);
+				lua_close(L);
+
+				model_meta.skeleton = m_controller.m_skeleton;
+				OutputMemoryStream blob(m_allocator);
+				model_meta.serialize(blob);
+				m_app.getAssetCompiler().updateMeta(src_path, blob);
+			}
+			else {
+				ModelMeta new_meta(m_allocator);
+				new_meta.skeleton = m_controller.m_skeleton;
+
+				OutputMemoryStream blob(m_allocator);
+				new_meta.serialize(blob);
+				m_app.getAssetCompiler().updateMeta(src_path, blob);
+			}
 		}
 
 		void windowGUI() override {
 			const CommonActions& actions = m_app.getCommonActions();
+
+			if (!m_to_fix_skeleton.empty()) {
+				ImGui::OpenPopup(ICON_FA_EXCLAMATION_TRIANGLE " Fix skeleton");
+			}
+
+			if (ImGui::BeginPopupModal(ICON_FA_EXCLAMATION_TRIANGLE " Fix skeleton")) {
+				if (m_to_fix_skeleton.empty()) ImGui::CloseCurrentPopup();
+				for (i32 i = m_to_fix_skeleton.size() - 1; i >= 0; --i) {
+					ImGui::PushID(i);
+					if (ImGui::Button("Fix")) {
+						fixSkeleton(m_to_fix_skeleton[i]);
+						m_to_fix_skeleton.erase(i);
+					}
+					else {
+						ImGui::SameLine();
+						if (ImGui::Button("Ignore")) {
+							m_to_fix_skeleton.erase(i);
+						}
+						else {
+							ImGui::SameLine();
+							ImGui::TextUnformatted(m_to_fix_skeleton[i].c_str());
+						}
+					}
+					ImGui::PopID();
+				}
+				if (ImGui::Button("Fix all")) {
+					for (const Path& p : m_to_fix_skeleton) fixSkeleton(p);
+					m_to_fix_skeleton.clear();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Ignore all")) {
+					m_to_fix_skeleton.clear();
+				}
+
+				ImGui::EndPopup();
+			}
 
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
@@ -971,6 +1051,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		WorldViewer m_viewer;
 		IAllocator& m_allocator;
+		Array<Path> m_to_fix_skeleton;
 		StudioApp& m_app;
 		ControllerEditorImpl& m_plugin;
 		Controller m_controller;
