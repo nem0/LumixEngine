@@ -875,7 +875,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PopID();
 			}
 			ImGui::Columns();
-			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add input")) {
+			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE "##addinput", "Add input")) {
 				m_controller.m_inputs.emplace();
 				saveUndo(true);
 			}
