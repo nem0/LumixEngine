@@ -101,11 +101,9 @@ struct FBXImporter {
 		char shader[20];
 	};
 
-	struct ImportMesh {
-		ImportMesh(IAllocator& allocator)
-			: vertex_data(allocator)
-			, indices(allocator)
-			, geom_indices(allocator)
+	struct SourceMesh {
+		SourceMesh(IAllocator& allocator)
+			: geom_indices(allocator)
 			, geom_vertex_data(allocator)
 			, computed_tangents(allocator)
 			, computed_normals(allocator)
@@ -113,14 +111,22 @@ struct FBXImporter {
 		{
 		}
 
+		const ofbx::Mesh* fbx = nullptr;
 		Array<u32> geom_indices;
 		OutputMemoryStream geom_vertex_data;
 		Array<ofbx::Vec3> computed_tangents;
 		Array<ofbx::Vec3> computed_normals;
 		Array<float> computed_ao;
 		u32 unique_vertex_count;
+	};
 
-		const ofbx::Mesh* fbx = nullptr;
+	struct ImportMesh {
+		ImportMesh(IAllocator& allocator)
+			: vertex_data(allocator)
+			, indices(allocator)
+		{
+		}
+
 		const ofbx::Material* fbx_mat = nullptr;
 		bool is_skinned = false;
 		int bone_idx = -1;
@@ -130,6 +136,7 @@ struct FBXImporter {
 		OutputMemoryStream vertex_data;
 		Array<u32> indices;
 		Local<Array<u32>> autolod_indices[4];
+		SourceMesh* source_mesh;
 		AABB aabb;
 		float origin_radius_squared;
 		float center_radius_squared;
@@ -168,11 +175,11 @@ private:
 	void gatherMaterials(StringView fbx_filename, StringView src_dir);
 
 	void sortBones(bool force_skinned);
-	void gatherBones(const ofbx::IScene& scene, bool force_skinned);
-	void gatherAnimations(const ofbx::IScene& scene);
+	void gatherBones(bool force_skinned);
+	void gatherAnimations();
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg, const Path& path);
-	void gatherMeshes(ofbx::IScene* scene);
+	void gatherMeshes();
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
@@ -201,6 +208,7 @@ private:
 	struct AssetCompiler& m_compiler;
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
+	Array<UniquePtr<SourceMesh>> m_source_meshes;
 	HashMap<const ofbx::Material*, String> m_material_name_map;
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;
