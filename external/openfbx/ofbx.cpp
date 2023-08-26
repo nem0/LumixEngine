@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 #include <inttypes.h>
 
 
@@ -18,7 +19,6 @@
 
 namespace ofbx
 {
-
 
 struct Allocator {
 	struct Page {
@@ -60,12 +60,27 @@ struct Allocator {
 		return res;
 	}
 
-	// store temporary data, can be reused
+
+	// store temporary data, can be reused, not threadsafe
 	std::vector<float> tmp;
 	std::vector<int> int_tmp;
 	std::vector<Vec3> vec3_tmp;
 	std::vector<double> double_tmp;
 	std::vector<Vec3> vec3_tmp2;
+	
+	struct MTAllocator {
+		MTAllocator(Allocator* backing) : backing(backing) {}
+		template <typename T, typename... Args> T* allocate(Args&&... args) {
+			std::lock_guard<std::mutex> guard(mutex);
+			return backing->allocate<T, Args...>(static_cast<Args&&>(args)...);
+		}
+
+		std::mutex mutex;
+		Allocator* backing;
+	};
+
+	Allocator() : mt_allocator(this) {}
+	MTAllocator mt_allocator;
 };
 
 
@@ -1089,7 +1104,6 @@ struct Scene;
 
 struct GeometryData {
 	struct NewVertex {
-		~NewVertex() { delete next; }
 		int index = -1;
 		NewVertex* next = nullptr;
 	};
@@ -2220,7 +2234,7 @@ static void triangulate(
 	}
 }
 
-static void add(GeometryImpl::NewVertex& vtx, int index)
+static void add(GeometryImpl::NewVertex& vtx, int index, Allocator::MTAllocator& allocator)
 {
 	if (vtx.index == -1)
 	{
@@ -2228,11 +2242,11 @@ static void add(GeometryImpl::NewVertex& vtx, int index)
 	}
 	else if (vtx.next)
 	{
-		add(*vtx.next, index);
+		add(*vtx.next, index, allocator);
 	}
 	else
 	{
-		vtx.next = new GeometryImpl::NewVertex;
+		vtx.next = allocator.allocate<GeometryImpl::NewVertex>();
 		vtx.next->index = index;
 	}
 }
@@ -2242,7 +2256,8 @@ static void buildGeometryVertexData(
 	const std::vector<Vec3>& vertices,
 	const std::vector<int>& original_indices,
 	std::vector<int>& to_old_indices,
-	bool triangulationEnabled)
+	bool triangulationEnabled,
+	Allocator::MTAllocator& allocator)
 {
 	if (triangulationEnabled) {
 		triangulate(original_indices, &geom->to_old_vertices, &to_old_indices);
@@ -2269,7 +2284,7 @@ static void buildGeometryVertexData(
 	for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
 	{
 		int old = to_old_vertices[i];
-		add(geom->to_new_vertices[old], i);
+		add(geom->to_new_vertices[old], i, allocator);
 	}
 }
 
@@ -2567,7 +2582,7 @@ static OptionalError<Object*> parseGeometryNormals(
 	return {nullptr};
 }
 
-struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, bool triangulate, Allocator& allocator)
+struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, bool triangulate, Allocator::MTAllocator& allocator)
 {
 	MeshImpl* mesh = allocator.allocate<MeshImpl>(scene, element);
 
@@ -2589,7 +2604,7 @@ struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& eleme
 	if (!parseDoubleVecData(*vertices_element->first_property, &vertices, &tmp.f)) return Error("Failed to parse vertices");
 	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
 
-	buildGeometryVertexData(&mesh->geometry_data, vertices, original_indices, to_old_indices, triangulate);
+	buildGeometryVertexData(&mesh->geometry_data, vertices, original_indices, to_old_indices, triangulate, allocator);
 	
 	OptionalError<Object*> materialParsingError = parseGeometryMaterials(&mesh->geometry_data, element, original_indices);
 	if (materialParsingError.isError()) return materialParsingError;
@@ -3246,7 +3261,7 @@ static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Elem
 	return curve;
 }
 
-static OptionalError<Object*> parseGeometry(const Element& element, bool triangulate, GeometryImpl* geom)
+static OptionalError<Object*> parseGeometry(const Element& element, bool triangulate, GeometryImpl* geom, Allocator::MTAllocator& allocator)
 {
 	assert(element.first_property);
 
@@ -3266,7 +3281,7 @@ static OptionalError<Object*> parseGeometry(const Element& element, bool triangu
 	if (!parseDoubleVecData(*vertices_element->first_property, &vertices, &tmp.f)) return Error("Failed to parse vertices");
 	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
 
-	buildGeometryVertexData(geom, vertices, original_indices, to_old_indices, triangulate);
+	buildGeometryVertexData(geom, vertices, original_indices, to_old_indices, triangulate, allocator);
 
 	OptionalError<Object*> materialParsingError = parseGeometryMaterials(geom, element, original_indices);
 	if (materialParsingError.isError()) return materialParsingError;
@@ -3553,6 +3568,7 @@ struct ParseGeometryJob {
 	GeometryImpl* geom;
 	u64 id;
 	bool is_error;
+	Allocator::MTAllocator* allocator;
 };
 
 void sync_job_processor(JobFunction fn, void*, void* data, u32 size, u32 count) {
@@ -3622,7 +3638,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(scene, *iter.second.element);
 				scene.m_geometries.push_back(geom);
-				ParseGeometryJob job {iter.second.element, triangulate, geom, iter.first, false};
+				ParseGeometryJob job {iter.second.element, triangulate, geom, iter.first, false, &allocator.mt_allocator};
 				parse_geom_jobs.push_back(job);
 				continue;
 			}
@@ -3702,7 +3718,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			{
 				if (class_prop->getValue() == "Mesh" && !ignore_meshes)
 				{
-					obj = parseMesh(scene, *iter.second.element, triangulate, allocator);
+					obj = parseMesh(scene, *iter.second.element, triangulate, allocator.mt_allocator);
 					if (!obj.isError()) {
 						Mesh* mesh = (Mesh*)obj.getValue();
 						scene.m_meshes.push_back(mesh);
@@ -3741,7 +3757,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 	if (!parse_geom_jobs.empty()) {
 		(*job_processor)([](void* ptr){
 			ParseGeometryJob* job = (ParseGeometryJob*)ptr;
-			job->is_error = parseGeometry(*job->element, job->triangulate, job->geom).isError();
+			job->is_error = parseGeometry(*job->element, job->triangulate, job->geom, *job->allocator).isError();
 		}, job_user_ptr, &parse_geom_jobs[0], (u32)sizeof(parse_geom_jobs[0]), (u32)parse_geom_jobs.size());
 	}
 
