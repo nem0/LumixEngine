@@ -174,13 +174,14 @@ bool FBXImporter::findTexture(StringView src_dir, StringView ext, FBXImporter::I
 void FBXImporter::gatherMaterials(StringView fbx_filename, StringView src_dir)
 {
 	PROFILE_FUNCTION();
-	for (ImportMesh& mesh : m_meshes)
-	{
+	for (ImportMesh& mesh : m_meshes) {
 		const ofbx::Material* fbx_mat = mesh.fbx_mat;
 		if (!fbx_mat) continue;
 
-		ImportMaterial& mat = m_materials.emplace();
-		mat.fbx = fbx_mat;
+		if (m_materials.find([&](const ImportMaterial& m){ return m.fbx == mesh.fbx_mat; }) < 0) {
+			ImportMaterial& mat = m_materials.emplace();
+			mat.fbx = fbx_mat;
+		}
 	}
 
 	Array<String> names(m_allocator);
@@ -214,10 +215,12 @@ void FBXImporter::gatherMaterials(StringView fbx_filename, StringView src_dir)
 		if (m_filesystem.fileExists(mat_src)) material.import = false;
 	}
 
+	// we don't support dds, but try it as last option, so user can get error message with filepath
+	const char* exts[] = { "png", "jpg", "jpeg", "tga", "bmp", "dds" };
 	for (ImportMaterial& mat : m_materials) {
 		if (!mat.import) continue;
 
-		auto gatherTexture = [this, &mat, src_dir, fbx_filename](ofbx::Texture::TextureType type) {
+		auto gatherTexture = [&](ofbx::Texture::TextureType type) {
 			const ofbx::Texture* texture = mat.fbx->getTexture(type);
 			if (!texture) return;
 
@@ -230,10 +233,14 @@ void FBXImporter::gatherMaterials(StringView fbx_filename, StringView src_dir)
 			tex.is_valid = m_filesystem.fileExists(tex.src);
 
 			StringView tex_ext = Path::getExtension(tex.path);
-			if (!tex.is_valid && !findTexture(src_dir, tex_ext, tex)) {
-				const char* exts[] = { "dds", "png", "jpg", "jpeg", "tga", "bmp" };
-				for (const char* ext : exts) {
-					if (findTexture(src_dir, ext, tex)) break;
+			if (!tex.is_valid && (equalStrings(tex_ext, "dds") || !findTexture(src_dir, tex_ext, tex))) {
+				for (const char*& ext : exts) {
+					if (findTexture(src_dir, ext, tex)) {
+						// we assume all texture have the same extension,
+						// so we move it to the beginning, so it's checked first
+						swap(ext, exts[0]);
+						break;
+					}
 				}
 			}
 
