@@ -28,7 +28,7 @@ struct ModelMeta {
 
 		#define WRITE_BOOL(id, default_value) \
 			if ((id) != (default_value)) { \
-				blob << "\n" << ##id << (id ? " = true" : " = false"); \
+				blob << "\n" << #id << (id ? " = true" : " = false"); \
 			}
 
 		#define WRITE_VALUE(id, default_value) \
