@@ -72,7 +72,7 @@ struct FBXImporter {
 
 	struct ImportAnimation {
 		const ofbx::AnimationStack* fbx = nullptr;
-		const ofbx::IScene* module = nullptr;
+		const ofbx::IScene* scene = nullptr;
 		StringView name;
 		bool import = true;
 	};
@@ -159,7 +159,7 @@ struct FBXImporter {
 	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
 
 	static void getImportMeshName(const ImportMesh& mesh, char (&name)[256]);
-	ofbx::IScene* getOFBXScene() { return module; }
+	ofbx::IScene* getOFBXScene() { return m_scene; }
 
 private:
 	void createAutoLODs(const ImportConfig& cfg, ImportMesh& import_mesh);
@@ -168,11 +168,11 @@ private:
 	void gatherMaterials(StringView fbx_filename, StringView src_dir);
 
 	void sortBones(bool force_skinned);
-	void gatherBones(const ofbx::IScene& module, bool force_skinned);
-	void gatherAnimations(const ofbx::IScene& module);
+	void gatherBones(const ofbx::IScene& scene, bool force_skinned);
+	void gatherAnimations(const ofbx::IScene& scene);
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg, const Path& path);
-	void gatherMeshes(ofbx::IScene* module);
+	void gatherMeshes(ofbx::IScene* scene);
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
@@ -205,7 +205,7 @@ private:
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;
 	Array<Matrix> m_bind_pose;
-	ofbx::IScene* module;
+	ofbx::IScene* m_scene;
 	OutputMemoryStream out_file;
 	float m_time_scale = 1.0f;
 	bool cancel_mesh_transforms = false;
