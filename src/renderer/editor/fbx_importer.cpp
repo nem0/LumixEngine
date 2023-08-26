@@ -937,7 +937,7 @@ bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool for
 	if (m_scene) {
 		PROFILE_BLOCK("clear previous data");
 		m_scene->destroy();
-		m_scene = nullptr;	
+		m_scene = nullptr;
 		m_meshes.clear();
 		m_materials.clear();
 		m_material_name_map.clear();

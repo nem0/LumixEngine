@@ -1897,8 +1897,9 @@ struct Scene : IScene
 
 
 	~Scene() override {
-		for(auto ptr : m_all_objects)
+		for(Object* ptr : m_all_objects) {
 			ptr->~Object();
+		}
 	}
 
 
@@ -3144,7 +3145,6 @@ template <typename T> static bool parseBinaryArrayLinked(const Property& propert
 	if (sizeof(T) % elem_size != 0) return false;
 
 	const Property* p = &property;
-	int i = 0;
 	while (p) {
 		T tmp;
 		for (u32 i = 0; i < sizeof(T) / elem_size; ++i) {
@@ -3781,6 +3781,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 					node->bone_link_property = con.to_property;
 				}
 				break;
+			default: break;
 		}
 
 		switch (parent->getType())
@@ -3804,6 +3805,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 						mesh->geometry = (GeometryImpl*)child;
 						break;
 					case Object::Type::MATERIAL: mesh->materials.push_back((Material*)child); break;
+					default: break;
 				}
 				break;
 			}
@@ -3937,6 +3939,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 				}
 				break;
 			}
+			default: break;
 		}
 	}
 
@@ -3964,6 +3967,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 						return false;
 					}
 					break;
+				default: break;
 			}
 		}
 	}
