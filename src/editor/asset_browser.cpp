@@ -799,6 +799,9 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_create_tile_cooldown = 0.2f;
 				changeDir(m_dir, false);
 			}
+			if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter) && !m_file_infos.empty()) {
+				openEditor(m_file_infos[0].filepath);
+			}
 
 			ImGui::SameLine();
 			breadcrumbs();

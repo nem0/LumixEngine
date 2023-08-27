@@ -406,6 +406,11 @@ struct AnimationModuleImpl final : AnimationModule {
 			animator.ctx = animator.resource->createRuntime(animator.default_set);
 		}
 	}
+	
+	anim::RuntimeContext* getAnimatorRuntimeContext(EntityRef entity) override {
+		const Animator& animator = m_animators[m_animator_map[entity]];
+		return animator.ctx;
+	}
 
 	anim::Controller* getAnimatorController(EntityRef entity) override {
 		const Animator& animator = m_animators[m_animator_map[entity]];
@@ -609,6 +614,28 @@ struct AnimationModuleImpl final : AnimationModule {
 	{
 		Animator& animator = m_animators[m_animator_map[entity]];
 		return animator.default_set;
+	}
+
+	OutputMemoryStream& beginBlendstackUpdate(EntityRef entity) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		updateAnimator(animator, 0);
+		animator.ctx->blendstack.clear();
+		return animator.ctx->blendstack;
+	}
+
+	void endBlendstackUpdate(EntityRef entity) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+
+		Model* model = m_render_module->getModelInstanceModel(entity);
+		if (!model || !model->isReady()) return;
+
+		Pose* pose = m_render_module->lockPose(entity);
+		if (!pose) return;
+	
+		model->getRelativePose(*pose);
+		evalBlendStack(*animator.ctx, *pose);
+		pose->computeAbsolute(*model);
+		m_render_module->unlockPose(entity, true);
 	}
 
 	void updateAnimator(Animator& animator, float time_delta)

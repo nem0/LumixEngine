@@ -1,5 +1,6 @@
 #include <imgui/imgui.h>
 
+#include "animation/animation_module.h"
 #include "engine/plugin.h"
 #include "engine/resource_manager.h"
 #include "editor/studio_app.h"
@@ -58,6 +59,20 @@ WorldViewer::WorldViewer(StudioApp& app)
 	m_pipeline->setWorld(m_world);
 }
 
+void WorldViewer::setModelPath(const Path& path) {
+	RenderModule* module = (RenderModule*)m_world->getModule("renderer");
+	module->setModelInstancePath(*m_mesh, path);
+}
+
+void WorldViewer::setAnimatorPath(const Path& path) {
+	AnimationModule* module = (AnimationModule*)m_world->getModule("animation");
+	ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
+	if (!m_world->hasComponent(*m_mesh, ANIMATOR_TYPE)) {
+		m_world->createComponent(ANIMATOR_TYPE, *m_mesh);
+	}
+	module->setAnimatorSource(*m_mesh, path);
+}
+
 void WorldViewer::drawMeshTransform() {
 	auto* render_module = (RenderModule*)m_world->getModule("renderer");
 	Transform tr = m_world->getTransform(*m_mesh);
@@ -102,6 +117,12 @@ WorldViewer::~WorldViewer() {
 	Engine& engine = m_app.getEngine();
 	engine.destroyWorld(*m_world);
 	m_pipeline.reset();
+}
+
+void WorldViewer::resetCamera() {
+	RenderModule* module = (RenderModule*)m_world->getModule("renderer");
+	Model* model = module->getModelInstanceModel(*m_mesh);
+	if (model && model->isReady()) resetCamera(*model);
 }
 
 void WorldViewer::resetCamera(const Model& model) {
