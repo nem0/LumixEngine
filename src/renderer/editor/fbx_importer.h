@@ -149,12 +149,12 @@ struct FBXImporter {
 	~FBXImporter();
 	void init();
 	bool setSource(const Path& filename, bool ignore_geometry, bool force_skinned);
-	void writeMaterials(const Path& src, const ImportConfig& cfg);
-	void writeAnimations(const Path& src, const ImportConfig& cfg);
-	void writeSubmodels(const Path& src, const ImportConfig& cfg);
-	void writePrefab(const Path& src, const ImportConfig& cfg);
-	void writeModel(const Path& src, const ImportConfig& cfg);
-	void writePhysics(const Path& src, const ImportConfig& cfg);
+	bool writeMaterials(const Path& src, const ImportConfig& cfg);
+	bool writeAnimations(const Path& src, const ImportConfig& cfg);
+	bool writeSubmodels(const Path& src, const ImportConfig& cfg);
+	bool writePrefab(const Path& src, const ImportConfig& cfg);
+	bool writeModel(const Path& src, const ImportConfig& cfg);
+	bool writePhysics(const Path& src, const ImportConfig& cfg);
 	bool createImpostorTextures(struct Model* model
 		, Array<u32>& gb0_rgba
 		, Array<u32>& gb1_rgba
