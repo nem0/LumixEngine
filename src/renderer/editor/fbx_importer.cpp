@@ -369,8 +369,7 @@ void FBXImporter::gatherAnimations()
 		bool data_found = false;
 		for (int k = 0; anim_layer->getCurveNode(k); ++k) {
 			const ofbx::AnimationCurveNode* node = anim_layer->getCurveNode(k);
-			if (node->getBoneLinkProperty() == "Lcl Translation"
-				|| node->getBoneLinkProperty() == "Lcl Rotation")
+			if (node->getBoneLinkProperty() == "Lcl Translation" || node->getBoneLinkProperty() == "Lcl Rotation")
 			{
 				data_found = true;
 				break;
@@ -893,8 +892,8 @@ void FBXImporter::gatherMeshes()
 			mesh.lod = detectMeshLOD(mesh);
 		}
 		// compute submesh_vertex_count so we can preallocate ImportMesh::indices and vertex_data later
-		if (mat_count > 1) {
-			const i32* mat_indices = fbx_mesh->getMaterialIndices();
+		const i32* mat_indices = fbx_mesh->getMaterialIndices();
+		if (mat_count > 1 && mat_indices) {
 			for (u32 i = 0, vc = fbx_mesh->getVertexCount(); i < vc; ++i) {
 				i32 idx = meshes_offset + mat_indices[i / 3];
 				++m_meshes[idx].submesh_vertex_count;
@@ -1922,7 +1921,14 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 	{
 		float sum = 0;
 		for (float w : s.weights) sum += w;
-		for (float& w : s.weights) w /= sum;
+		if (sum == 0) {
+			s.weights[0] = 1;
+			s.weights[1] = s.weights[2] = s.weights[3] = 0;
+			s.joints[0] = s.joints[1] = s.joints[2] = s.joints[3] = 0;
+		}
+		else {
+			for (float& w : s.weights) w /= sum;
+		}
 	}
 }
 

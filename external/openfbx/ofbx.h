@@ -217,7 +217,7 @@ struct Object
 	Object* resolveObjectLink(int idx) const;
 	Object* resolveObjectLink(Type type, const char* property, int idx) const;
 	Object* resolveObjectLinkReverse(Type type) const;
-	Object* getParent() const;
+	Object* getParent() const { return parent; }
 
 	RotationOrder getRotationOrder() const;
 	Vec3 getRotationOffset() const;
@@ -242,11 +242,14 @@ struct Object
 	}
 
 	u64 id;
+	u32 depth = 0xffFFffFF;
+	Object* parent = nullptr;
 	char name[128];
 	const IElement& element;
 	const Object* node_attribute;
 
 protected:
+	friend struct Scene;
 	bool is_node;
 	const Scene& scene;
 };

@@ -1916,6 +1916,8 @@ struct Scene : IScene
 		}
 	}
 
+	bool finalize();
+	Object* findParent(Object& child) const;
 
 	Element* m_root_element = nullptr;
 	Root* m_root = nullptr;
@@ -4191,15 +4193,14 @@ Object* Object::resolveObjectLink(Object::Type type, const char* property, int i
 }
 
 
-Object* Object::getParent() const
-{
+Object* Scene::findParent(Object& child) const {
 	Object* parent = nullptr;
-	for (auto& connection : scene.m_connections)
+	for (auto& connection : m_connections)
 	{
-		if (connection.from_object == id)
+		if (connection.from_object == child.id)
 		{
-			Object* obj = scene.m_object_map.find(connection.to_object)->second.object;
-			if (obj && obj->is_node && obj != this && connection.type == Scene::Connection::OBJECT_OBJECT) {
+			Object* obj = m_object_map.find(connection.to_object)->second.object;
+			if (obj && obj->is_node && obj != &child && connection.type == Scene::Connection::OBJECT_OBJECT) {
 				assert(parent == nullptr);
 				parent = obj;
 			}
@@ -4208,6 +4209,44 @@ Object* Object::getParent() const
 	return parent;
 }
 
+
+bool Scene::finalize() {
+	for (Object* object : m_all_objects) {
+		object->parent = findParent(*object);
+	}
+	for (Object* object : m_all_objects) {
+		if (object->depth != 0xffFFffFF) continue;
+		if (object->parent == object) {
+			Error::s_message = "Cyclic node hierarchy";
+			return false;
+		}
+		if (!object->parent) {
+			object->depth = 0;
+			continue;
+		}
+
+		object->depth = 0;
+		
+		Object* parent = object->parent;
+		while (parent) {
+			if (parent == object) {
+				Error::s_message = "Cyclic node hierarchy";
+				return false;
+			}
+			++object->depth;
+			parent = parent->parent;
+		}
+
+		Object* p = object->parent;
+		Object* child = object;
+		while (p) {
+			p->depth = child->depth - 1;
+			child = p;
+			p = p->parent;
+		}
+	}
+	return true;
+}
 
 IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor, void* job_user_ptr)
 {
@@ -4245,6 +4284,7 @@ IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor, vo
 	if (!parseTakes(*scene.get())) return nullptr;
 	if (!parseObjects(*root.getValue(), *scene.get(), flags, scene->m_allocator, job_processor, job_user_ptr)) return nullptr;
 	parseGlobalSettings(*root.getValue(), scene.get());
+	if (!scene->finalize()) return nullptr;
 
 	return scene.release();
 }
