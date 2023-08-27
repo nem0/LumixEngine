@@ -66,7 +66,7 @@ void WorldViewer::drawMeshTransform() {
 	render_module->addDebugLine(tr.pos, tr.pos + tr.rot.rotate(Vec3(0, 0, 1)), Color::BLUE);
 }
 
-void WorldViewer::drawSkeleton(BoneNameHash selected_bone) {
+void WorldViewer::drawSkeleton(i32 selected_bone) {
 	auto* render_module = (RenderModule*)m_world->getModule("renderer");
 	Pose* pose = render_module->lockPose(*m_mesh);
 	Model* model = render_module->getModelInstanceModel(*m_mesh);
@@ -79,7 +79,7 @@ void WorldViewer::drawSkeleton(BoneNameHash selected_bone) {
 			if (parent_idx < 0) continue;
 
 			Color color = Color::BLUE;
-			if (selected_bone == BoneNameHash(bone.name.c_str())) {
+			if (selected_bone == i) {
 				color = Color::RED;
 			}
 

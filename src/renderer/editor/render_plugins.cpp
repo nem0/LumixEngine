@@ -2398,7 +2398,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 
 			m_viewer.gui();
-			if (m_show_skeleton) m_viewer.drawSkeleton(BoneNameHash());
+			if (m_show_skeleton) m_viewer.drawSkeleton(-1);
 		}
 	
 		const Path& getPath() override { return m_resource->getPath(); }
@@ -2515,6 +2515,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.animation_flags = meta.root_motion_flags;
 		cfg.anim_rotation_error = meta.anim_rotation_error;
 		cfg.anim_translation_error = meta.anim_translation_error;
+		cfg.skeleton = meta.skeleton;
+		cfg.root_motion_bone = BoneNameHash(meta.root_motion_bone.c_str());
 		if (!m_fbx_importer.setSource(filepath, false, meta.force_skin)) return false;
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {

@@ -1,15 +1,6 @@
-create_impostor = false
-bake_vertex_ao = false
-bake_impostor_normals = false
-use_mikktspace = false
-force_skin = false
-physics = "None"
-scale = 1.000000
+
 lod_count = 1
-culling_scale = 1.000000
-split = false
-import_vertex_colors = false
-vertex_color_is_ao = false
+root_motion_bone = "mixamorig:Hips"
 lod0_distance = 5000.000000
 lod1_distance = 10000.009766
 lod2_distance = 10000.019531

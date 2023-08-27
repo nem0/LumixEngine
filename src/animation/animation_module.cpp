@@ -629,7 +629,6 @@ struct AnimationModuleImpl final : AnimationModule {
 
 		animator.ctx->model = model;
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
-		animator.ctx->root_bone_hash = animator.resource->m_root_motion_bone;
 		animator.resource->update(*animator.ctx, animator.root_motion);
 
 		model->getRelativePose(*pose);

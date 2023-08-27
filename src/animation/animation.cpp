@@ -2,6 +2,7 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/profiler.h"
+#include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/math.h"
 #include "renderer/model.h"
@@ -53,6 +54,7 @@ struct AnimationSampler {
 	template <bool use_mask, bool use_weight>
 	static void getRelativePose(Animation& anim, const Animation::SampleContext& ctx) {
 		Pose& pose = *ctx.pose;
+		if (anim.m_max_accessed_bone_index >= pose.count) return; // can happen if skeletons do not match
 		const Model& model = *ctx.model;
 		const Time time = ctx.time;
 		const BoneMask* mask = ctx.mask;
@@ -70,75 +72,68 @@ struct AnimationSampler {
 		
 		for (u32 i = 0, c = anim.m_const_translations.size(); i < c; ++i) {
 			const Animation::ConstTranslationTrack& track = anim.m_const_translations[i];
-			Model::BoneMap::ConstIterator iter = model.getBoneIndex(track.name);
-			if (!iter.isValid()) continue;
 
 			if constexpr(use_mask) {
-				if (mask->bones.find(track.name) == mask->bones.end()) continue;
+				ASSERT(false);
+				//if (mask->bones.find(track.) == mask->bones.end()) continue;
 			}
 
-			const int model_bone_index = iter.value();
 			if constexpr (use_weight) {
-				pos[model_bone_index] = lerp(pos[model_bone_index], track.value, weight);
+				pos[track.bone_index] = lerp(pos[track.bone_index], track.value, weight);
 			}
 			else {
-				pos[model_bone_index] = track.value;
+				pos[track.bone_index] = track.value;
 			}
 		}
 
 		for (u32 i = 0, c = anim.m_translations.size(); i < c; ++i) {
 			const Animation::TranslationTrack& track = anim.m_translations[i];
-			Model::BoneMap::ConstIterator iter = model.getBoneIndex(track.name);
-			if (!iter.isValid()) continue;
 
 			if constexpr(use_mask) {
-				if (mask->bones.find(track.name) == mask->bones.end()) continue;
+				ASSERT(false);
+				//if (mask->bones.find(track.) == mask->bones.end()) continue;
 			}
 
 			Vec3 anim_pos = lerp(anim.getTranslation(sample_idx, track), anim.getTranslation(sample_idx + 1, track), t);
 
-			const int model_bone_index = iter.value();
 			if constexpr (use_weight) {
-				pos[model_bone_index] = lerp(pos[model_bone_index], anim_pos, weight);
+				pos[track.bone_index] = lerp(pos[track.bone_index], anim_pos, weight);
 			}
 			else {
-				pos[model_bone_index] = anim_pos;
+				pos[track.bone_index] = anim_pos;
 			}
 		}
 
 		for (u32 i = 0, c = anim.m_const_rotations.size(); i < c; ++i) {
-			const Animation::ConstRotationTrack& curve = anim.m_const_rotations[i];
-			Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
+			const Animation::ConstRotationTrack& track = anim.m_const_rotations[i];
+
 			if constexpr(use_mask) {
-				if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				ASSERT(false);
+				//if (mask->bones.find(track.) == mask->bones.end()) continue;
 			}
 
-			const int model_bone_index = iter.value();
 			if constexpr (use_weight) {
-				rot[model_bone_index] = nlerp(rot[model_bone_index], curve.value, weight);
+				rot[track.bone_index] = nlerp(rot[track.bone_index], track.value, weight);
 			}
 			else {
-				rot[model_bone_index] = curve.value;
+				rot[track.bone_index] = track.value;
 			}
 		}
 
 		for (u32 i = 0, c = anim.m_rotations.size(); i < c; ++i) {
-			const Animation::RotationTrack& curve = anim.m_rotations[i];
-			Model::BoneMap::ConstIterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
+			const Animation::RotationTrack& track = anim.m_rotations[i];
 			if constexpr(use_mask) {
-				if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				ASSERT(false);
+				//if (mask->bones.find(track.) == mask->bones.end()) continue;
 			}
 
-			Quat anim_rot = nlerp(anim.getRotation(sample_idx, curve), anim.getRotation(sample_idx + 1, curve), t);
+			Quat anim_rot = nlerp(anim.getRotation(sample_idx, track), anim.getRotation(sample_idx + 1, track), t);
 
-			const int model_bone_index = iter.value();
 			if constexpr (use_weight) {
-				rot[model_bone_index] = nlerp(rot[model_bone_index], anim_rot, weight);
+				rot[track.bone_index] = nlerp(rot[track.bone_index], anim_rot, weight);
 			}
 			else {
-				rot[model_bone_index] = anim_rot;
+				rot[track.bone_index] = anim_rot;
 			}
 		}
 	}
@@ -155,12 +150,14 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 	if (m_root_motion.bone == bone_name) return;
 	if ((m_flags & ANY_ROOT_MOTION) == 0) return;
 
-	ASSERT(m_root_motion.bone.getHashValue() == 0);
+	m_root_motion.translations.clear();
+	m_root_motion.rotations.clear();
+
 	m_root_motion.bone = bone_name;
 
 	i32 translation_idx = -1;
 	for (i32 i = 0, c = m_translations.size(); i < c; ++i) {
-		if (m_translations[i].name == bone_name) {
+		if (m_translations[i].bone_name == bone_name) {
 			translation_idx = i;
 			break;
 		}
@@ -168,7 +165,7 @@ void Animation::setRootMotionBone(BoneNameHash bone_name) {
 
 	i32 rotation_idx = -1;
 	for (i32 i = 0, c = m_rotations.size(); i < c; ++i) {
-		if (m_rotations[i].name == bone_name) {
+		if (m_rotations[i].bone_name == bone_name) {
 			rotation_idx = i;
 			break;
 		}
@@ -302,6 +299,37 @@ Quat Animation::getRotation(u32 frame, const RotationTrack& track) const {
 	return {};
 }
 
+void Animation::onBeforeReady() {
+	// TODO bake this
+	ASSERT(m_skeleton);
+	m_max_accessed_bone_index = 0;
+	for (ConstRotationTrack& t : m_const_rotations) {
+		auto iter = m_skeleton->getBoneIndex(t.bone_name);
+		ASSERT(iter.isValid());
+		t.bone_index = iter.isValid() ? iter.value() : 0;
+		m_max_accessed_bone_index = maximum(m_max_accessed_bone_index, t.bone_index);
+	}
+	for (ConstTranslationTrack& t : m_const_translations) {
+		auto iter = m_skeleton->getBoneIndex(t.bone_name);
+		ASSERT(iter.isValid());
+		t.bone_index = iter.isValid() ? iter.value() : 0;
+		m_max_accessed_bone_index = maximum(m_max_accessed_bone_index, t.bone_index);
+	}
+	for (TranslationTrack& t : m_translations) {
+		auto iter = m_skeleton->getBoneIndex(t.bone_name);
+		ASSERT(iter.isValid());
+		t.bone_index = iter.isValid() ? iter.value() : 0;
+		m_max_accessed_bone_index = maximum(m_max_accessed_bone_index, t.bone_index);
+	}
+	for (RotationTrack& t : m_rotations) {
+		auto iter = m_skeleton->getBoneIndex(t.bone_name);
+		ASSERT(iter.isValid());
+		t.bone_index = iter.isValid() ? iter.value() : 0;
+		m_max_accessed_bone_index = maximum(m_max_accessed_bone_index, t.bone_index);
+	}
+	setRootMotionBone(m_skeleton->getRootMotionBone());
+}
+
 bool Animation::load(Span<const u8> mem) {
 	m_translations.clear();
 	m_rotations.clear();
@@ -325,6 +353,17 @@ bool Animation::load(Span<const u8> mem) {
 		return false;
 	}
 
+	if (header.version > Version::SKELETON) {
+		Path path(file.readString());
+		m_skeleton = m_resource_manager.getOwner().load<Model>(path);
+		if (m_skeleton) addDependency(*m_skeleton);
+	}
+
+	if (!m_skeleton) {
+		logError(getPath(), ": missing skeleton.");
+		return false;
+	}
+
 	file.read(m_fps);
 	file.read(m_frame_count);
 	file.read(m_flags);
@@ -343,12 +382,12 @@ bool Animation::load(Span<const u8> mem) {
 		
 		if (type == Animation::TrackType::CONSTANT) {
 			ConstTranslationTrack& track = m_const_translations.emplace();
-			track.name = name;
+			track.bone_name = name;
 			blob.read(track.value);
 		}
 		else {
 			TranslationTrack& track = m_translations.emplace();
-			track.name = name;
+			track.bone_name = name;
 			blob.read(track.min);
 			blob.read(track.to_range);
 			blob.read(track.bitsizes);
@@ -368,12 +407,12 @@ bool Animation::load(Span<const u8> mem) {
 
 		if (type == Animation::TrackType::CONSTANT) {
 			ConstRotationTrack& track = m_const_rotations.emplace();
-			track.name = bone_name_hash;
+			track.bone_name = bone_name_hash;
 			blob.read(track.value);
 		}
 		else {
 			RotationTrack& track = m_rotations.emplace();
-			track.name = bone_name_hash;
+			track.bone_name = bone_name_hash;
 			blob.read(track.min);
 			blob.read(track.to_range);
 			blob.read(track.bitsizes);
@@ -391,10 +430,16 @@ bool Animation::load(Span<const u8> mem) {
 
 void Animation::unload()
 {
+	m_root_motion = RootMotion(m_allocator);
 	m_translations.clear();
 	m_rotations.clear();
 	m_mem.clear();
 	m_frame_count = 0;
+	if (m_skeleton) {
+		removeDependency(*m_skeleton);
+		m_skeleton->decRefCount();
+		m_skeleton = nullptr;
+	}
 }
 
 

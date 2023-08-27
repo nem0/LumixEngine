@@ -86,7 +86,6 @@ struct Header {
 void Controller::serialize(OutputMemoryStream& stream) {
 	Header header;
 	stream.write(header);
-	stream.write(m_root_motion_bone);
 	stream.writeArray(m_inputs);
 	stream.write(m_animation_slots_count);
 	stream.write((u32)m_animation_entries.size());
@@ -118,7 +117,6 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		return false;
 	}
 
-	stream.read(m_root_motion_bone);
 	stream.readArray(&m_inputs);
 	stream.read(m_animation_slots_count);
 
@@ -161,7 +159,6 @@ static void getPose(const anim::RuntimeContext& ctx, Time time, float weight, u3
 	sample_ctx.model = ctx.model;
 	sample_ctx.weight = weight;
 	sample_ctx.mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
-	anim->setRootMotionBone(ctx.root_bone_hash);
 	anim->getRelativePose(sample_ctx);
 }
 

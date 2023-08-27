@@ -127,8 +127,13 @@ void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32
 	stream.read(m_flags);
 }
 
+SelectNode::~SelectNode() {
+	LUMIX_DELETE(m_allocator, m_value);
+}
+
 SelectNode::SelectNode(IAllocator& allocator)
 	: m_children(allocator)
+	, m_allocator(allocator)
 {}
 
 void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
@@ -279,9 +284,15 @@ static Blend2DActiveTrio getActiveTrio(const Blend2DNode& node, Vec2 input_val) 
 	return res;
 }
 
+Blend2DNode::~Blend2DNode() {
+	LUMIX_DELETE(m_allocator, m_x_value);
+	LUMIX_DELETE(m_allocator, m_y_value);
+}
+
 Blend2DNode::Blend2DNode(IAllocator& allocator)
 	: m_children(allocator)
 	, m_triangles(allocator)
+	, m_allocator(allocator)
 {}
 
 void Blend2DNode::serialize(OutputMemoryStream& stream) const {
@@ -423,8 +434,13 @@ static Blend1DActivePair getActivePair(const Blend1DNode& node, float input_val)
 	return { &children[0], nullptr, 0 };
 }
 
+Blend1DNode::~Blend1DNode() {
+	LUMIX_DELETE(m_allocator, m_value);
+}
+
 Blend1DNode::Blend1DNode(IAllocator& allocator)
 	: m_children(allocator)
+	, m_allocator(allocator)
 {}
 
 void Blend1DNode::serialize(OutputMemoryStream& stream) const {

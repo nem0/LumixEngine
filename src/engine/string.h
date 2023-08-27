@@ -22,7 +22,7 @@ struct StringView {
 	StringView(const char* begin, const char* end) : begin(begin), end(end) {}
 	template <int N> StringView(const StaticString<N>& str);
 
-	u32 size() const { ASSERT(end); return u32(end - begin); }
+	u32 size() const { return u32(end - begin); }
 	char operator[](u32 idx) { ASSERT(!end || begin + idx < end); return begin[idx]; }
 	char back() const { ASSERT(end && begin != end); return *(end - 1); }
 	void removeSuffix(u32 count) { ASSERT(count <= size()); end -= count; }

@@ -60,6 +60,7 @@ struct InputNode : ValueNode {
 
 struct Blend1DNode final : PoseNode {
 	Blend1DNode(IAllocator& allocator);
+	~Blend1DNode();
 	NodeType type() const override { return anim::NodeType::BLEND1D; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
@@ -74,6 +75,7 @@ struct Blend1DNode final : PoseNode {
 		u32 slot = 0;
 	};
 
+	IAllocator& m_allocator;
 	Array<Child> m_children;
 	ValueNode* m_value;
 };
@@ -81,6 +83,7 @@ struct Blend1DNode final : PoseNode {
 
 struct Blend2DNode final : PoseNode {
 	Blend2DNode(IAllocator& allocator);
+	~Blend2DNode();
 	NodeType type() const override { return anim::NodeType::BLEND2D; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
@@ -100,6 +103,7 @@ struct Blend2DNode final : PoseNode {
 		Vec2 circumcircle_center;
 	};
 
+	IAllocator& m_allocator;
 	Array<Triangle> m_triangles;
 	Array<Child> m_children;
 	ValueNode* m_x_value;
@@ -114,6 +118,7 @@ struct SelectNode final : PoseNode {
 	};
 
 	SelectNode(IAllocator& allocator);
+	~SelectNode();
 	NodeType type() const override { return anim::NodeType::SELECT; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
@@ -123,6 +128,7 @@ struct SelectNode final : PoseNode {
 	Time length(const RuntimeContext& ctx) const override;
 	Time time(const RuntimeContext& ctx) const override;
 
+	IAllocator& m_allocator;
 	Array<PoseNode*> m_children;
 	ValueNode* m_value;
 	Time m_blend_length;
