@@ -7,10 +7,12 @@
 
 struct lua_State;
 
-namespace Lumix
-{
+namespace Lumix {
 
-namespace anim { struct Controller; }
+namespace anim {
+	struct Controller;
+	struct RuntimeContext;
+}
 
 struct Animable {
 	Time time;
@@ -48,8 +50,11 @@ struct AnimationModule : IModule {
 	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
 	virtual anim::Controller* getAnimatorController(EntityRef entity) = 0;
+	virtual anim::RuntimeContext* getAnimatorRuntimeContext(EntityRef entity) = 0;
 	virtual void setAnimatorIK(EntityRef entity, u32 index, float weight, const struct Vec3& target) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
+	virtual OutputMemoryStream& beginBlendstackUpdate(EntityRef entity) = 0;
+	virtual void endBlendstackUpdate(EntityRef entity) = 0;
 };
 
 

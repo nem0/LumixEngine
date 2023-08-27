@@ -219,6 +219,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			, NodeEditor(allocator)
 			, m_allocator(allocator)
 			, m_to_fix_skeleton(allocator)
+			, m_recording(app, allocator)
 			, m_app(app)
 			, m_plugin(plugin)
 			, m_controller(path, allocator)
@@ -408,12 +409,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 				ImGui::Separator();
 				auto* render_module = (RenderModule*)m_viewer.m_world->getModule("renderer");
-				Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
-				ImGuiEx::Label("Preview model");
-				if (m_app.getAssetBrowser().resourceInput("model", model_path, Model::TYPE)) {
-					render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
-					anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.m_path);
-				}
 				Model* model = render_module->getModelInstanceModel(*m_viewer.m_mesh);
 				if (model && model->isReady()) {
 					if (!m_was_preview_ready) {
@@ -424,28 +419,31 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				else {
 					m_was_preview_ready = false;
 				}
-				bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
-			
-				ImGuiEx::Label("Show mesh"); 
-				if (ImGui::Checkbox("##sm", &show_mesh)) {
-					render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
-				}
-				ImGuiEx::Label("Show skeleton"); 
-				ImGui::Checkbox("##ss", &m_show_skeleton);
-				if (m_show_skeleton) m_viewer.drawSkeleton(-1);
-				m_viewer.drawMeshTransform();
-				ImGuiEx::Label("Follow mesh"); 
-				ImGui::Checkbox("##fm", &m_viewer.m_follow_mesh);
-				ImGuiEx::Label("Playback speed"); 
-				ImGui::DragFloat("##spd", &m_playback_speed, 0.1f, 0, FLT_MAX);
-				if (ImGui::Button("Reset")) {
+				if (ImGuiEx::IconButton(ICON_FA_SYNC_ALT, "Reset")) {
 					m_viewer.m_world->setTransform(*m_viewer.m_mesh, DVec3(0), Quat::IDENTITY, Vec3(1));
 				}
-				if (m_playback_speed == 0) {
-					ImGui::SameLine();
-					if (ImGui::Button("Step")) anim_module->updateAnimator(*m_viewer.m_mesh, 1 / 30.f);
+				ImGui::SameLine();
+				if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
+				if (ImGui::BeginPopup("Settings")) {
+					Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
+					if (m_app.getAssetBrowser().resourceInput("Preview model", model_path, Model::TYPE)) {
+						render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
+						anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.m_path);
+					}
+					bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
+					if (ImGui::Checkbox("Show mesh", &show_mesh)) {
+						render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
+					}
+					ImGui::Checkbox("Show skeleton", &m_show_skeleton);
+					if (m_show_skeleton) m_viewer.drawSkeleton(-1);
+					m_viewer.drawMeshTransform();
+					ImGui::Checkbox("Follow mesh", &m_viewer.m_follow_mesh);
+					ImGui::DragFloat("Playback speed", &m_playback_speed, 0.1f, 0, FLT_MAX);
+					ImGui::EndPopup();
 				}
-				else {
+				ImGui::SameLine();
+				recordButton(*m_viewer.m_world, *m_viewer.m_mesh);
+				if (m_playback_speed > 0) {
 					anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
 				}
 			}
@@ -470,6 +468,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 
 			debuggerUI(world, entity);
+			recordButton(world, entity);
 		}
 
 		void processControllerMapping(World& world, EntityRef entity) {
@@ -496,6 +495,50 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (device->type == InputSystem::Device::CONTROLLER) return true;
 			}
 			return false;
+		}
+
+		void recordButton(World& world, EntityRef entity) {
+			if (ImGuiEx::IconButton(m_recording.is_recording ? ICON_FA_STOP : ICON_FA_BULLSEYE, m_recording.is_recording ? "Stop recording" : "Start recording")) {
+				m_recording.is_recording = !m_recording.is_recording;
+				if (m_recording.is_recording) {
+					m_recording.buffer.clear();
+					m_recording.frames_offsets.clear();
+					m_recording.frames_offsets.push(0);
+					m_recording.view_frame = -1;
+					const Path model_path = ((RenderModule*)world.getModule("renderer"))->getModelInstancePath(entity);
+					const Path ctrl_path = ((AnimationModule*)world.getModule("animation"))->getAnimatorSource(entity);
+					m_recording.viewer.setModelPath(model_path);
+					m_recording.viewer.setAnimatorPath(ctrl_path);
+					m_recording.viewer.resetCamera();
+				}
+			}
+
+			const ComponentType animator_type = reflection::getComponentType("animator");
+			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
+			if (m_recording.is_recording) {
+				const anim::RuntimeContext* ctx = module->getAnimatorRuntimeContext(entity);
+				m_recording.buffer.write(ctx->blendstack.data(), ctx->blendstack.size());
+				m_recording.frames_offsets.push(u32(m_recording.buffer.size()));
+			}
+		}
+
+		void replayUI() {
+			if (m_recording.is_recording) ImGui::TextUnformatted("Recording...");
+			else if(m_recording.frames_offsets.size() <= 1) ImGui::TextUnformatted("Nothing is recorded");
+			else if (m_recording.frames_offsets.size() > 1) {
+				ImGui::SetNextItemWidth(-1);
+				if (ImGui::SliderInt("##frame", &m_recording.view_frame, 0, m_recording.frames_offsets.size() - 2)) {
+					AnimationModule* replay_module = (AnimationModule*)m_recording.viewer.m_world->getModule("animation");
+					u32 from = m_recording.frames_offsets[m_recording.view_frame];
+					u32 to = m_recording.frames_offsets[m_recording.view_frame + 1];
+					OutputMemoryStream& blendstack = replay_module->beginBlendstackUpdate(*m_recording.viewer.m_mesh);
+					blendstack.clear();
+					blendstack.write(m_recording.buffer.data() + from, to - from);
+					replay_module->endBlendstackUpdate(*m_recording.viewer.m_mesh);
+				}
+
+				m_recording.viewer.gui();
+			}
 		}
 
 		void debuggerUI(World& world, EntityRef entity) {
@@ -572,7 +615,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					render_module->addDebugCross(tr.transform(m_ik_debug[i].target), 0.25f, Color::RED);
 				}
 			}
-
 #endif
 		}
 
@@ -1050,6 +1092,11 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					debuggerUI();
 					ImGui::EndTabItem();
 				}
+
+				if (ImGui::BeginTabItem("Replay")) {
+					replayUI();
+					ImGui::EndTabItem();
+				}
 				ImGui::EndTabBar();
 			}
 
@@ -1084,6 +1131,18 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		IKDebug m_ik_debug[4];
 		TextFilter m_node_filter;
 		u32 m_node_filter_selection = 0;
+		struct Record {
+			Record(StudioApp& app, IAllocator& allocator) 
+				: buffer(allocator)
+				, frames_offsets(allocator)
+				, viewer(app)
+			{}
+			bool is_recording = false;
+			OutputMemoryStream buffer;
+			Array<u32> frames_offsets;
+			i32 view_frame = -1;
+			WorldViewer viewer;
+		} m_recording;
 	};
 
 	ControllerEditorImpl(StudioApp& app)

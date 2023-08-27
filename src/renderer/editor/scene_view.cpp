@@ -612,14 +612,14 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
+	#define NO_ICON "     "	
+	
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
 	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);
 	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, false);
 	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, false);
-	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
+	m_search_action.init(NO_ICON "Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
 	m_search_action.func.bind<&SceneView::toggleSearch>(this);
-
-	#define NO_ICON "     "	
 
 	m_top_view_action.init(NO_ICON "Top", "Set top camera view", "viewTop", "", true);
 	m_top_view_action.func.bind<&SceneView::setTopView>(this);
