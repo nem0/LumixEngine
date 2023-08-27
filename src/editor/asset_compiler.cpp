@@ -214,7 +214,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		return m_on_list_changed;
 	}
 
-	DelegateList<void(Resource&)>& resourceCompiled() override {
+	DelegateList<void(Resource&, bool)>& resourceCompiled() override {
 		return m_resource_compiled;
 	}
 
@@ -665,7 +665,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				if (r) {
 					if (r->isReady() || r->isFailure()) r->getResourceManager().reload(*r);
 					else if (r->isHooked()) m_load_hook.continueLoad(*r, job.compiled);
-					m_resource_compiled.invoke(*r);
+					m_resource_compiled.invoke(*r, job.compiled);
 				}
 			}
 
@@ -807,7 +807,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	HashMap<FilePathHash, ResourceItem> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 	DelegateList<void(const Path&)> m_on_list_changed;
-	DelegateList<void(Resource&)> m_resource_compiled;
+	DelegateList<void(Resource&, bool)> m_resource_compiled;
 	bool m_init_finished = false;
 	Array<Resource*> m_on_init_load;
 
