@@ -92,8 +92,10 @@ void LogUI::showNotifications()
 	if (m_notifications.empty()) return;
 
 	const ImGuiViewport* vp = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos({vp->Pos.x + 10, vp->Pos.y + 30});
-	ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
+	float w = maximum(vp->Size.x * 0.25f, 300.f);
+	float h = maximum(vp->Size.y * 0.15f, 100.f);
+	ImGui::SetNextWindowPos({vp->Pos.x + vp->Size.x - 30 - w, vp->Pos.y + vp->Size.y - 30 - h});
+	ImGui::SetNextWindowSize(ImVec2(w, h));
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
 							 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
@@ -101,15 +103,23 @@ void LogUI::showNotifications()
 
 	m_are_notifications_hovered = ImGui::IsWindowHovered();
 
-	if (ImGui::Button("Close")) m_notifications.clear();
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextColored(ImColor(255, 0, 0, 255), ICON_FA_EXCLAMATION_TRIANGLE);
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Close")) m_notifications.clear();
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_SQUARE_ALT, "View log")) m_focus_request = true;
 
-	if (m_move_notifications_to_front) ImGuiEx::BringToFront();
-	m_move_notifications_to_front = false;
-	for (int i = 0; i < m_notifications.size(); ++i)
-	{
-		if (i > 0) ImGui::Separator();
-		ImGuiEx::TextUnformatted(m_notifications[i].message);
+	if (ImGui::BeginChild("scrollarea", ImVec2(0, 0), false, ImGuiWindowFlags_NoBackground)) {
+		if (m_move_notifications_to_front) ImGuiEx::BringToFront();
+		m_move_notifications_to_front = false;
+		for (int i = 0; i < m_notifications.size(); ++i)
+		{
+			if (i > 0) ImGui::Separator();
+			ImGuiEx::TextUnformatted(m_notifications[i].message);
+		}
 	}
+	ImGui::EndChild();
 
 end:
 	ImGui::End();
@@ -147,6 +157,11 @@ void LogUI::onGUI()
 	MutexGuard lock(m_guard);
 	showNotifications();
 
+	if (m_focus_request) {
+		ImGui::SetNextWindowFocus();
+		m_is_open = true;
+		m_focus_request = false;
+	}
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COMMENT_ALT "Log##log", &m_is_open)) {
 		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");

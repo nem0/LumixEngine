@@ -69,6 +69,7 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		bool m_autoscroll = true;
 		Mutex m_guard;
 		bool m_is_open = false;
+		bool m_focus_request = false;
 		Action m_toggle_ui;
 		TextFilter m_filter;
 };

@@ -2518,16 +2518,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.skeleton = meta.skeleton;
 		cfg.root_motion_bone = BoneNameHash(meta.root_motion_bone.c_str());
 		if (!m_fbx_importer.setSource(filepath, false, meta.force_skin)) return false;
-		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
+		if (m_fbx_importer.getBoneCount() == 0 && m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
 					logError("No meshes with materials found in ", src);
 				}
 				else {
-					logError("No meshes or animations found in ", src);
+					if (m_fbx_importer.getBoneCount() == 0) {
+						logError("No meshes or animations found in ", src);
+					}
 				}
 			}
-			return false;
 		}
 
 		bool any_written = false;
@@ -2909,11 +2910,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 
 	void renderTile(Material* material) {
+		if (material->getTextureCount() == 0) return;
+		Texture* texture = material->getTexture(0);
+		if (!texture) return;
+
 		const Path& in_path = material->getTexture(0)->getPath();
 		const Path out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".lbc");
-		if (material->getTextureCount() == 0) {
-			return;
-		}
 		if (material->getUniformCount() > 0 && material->getUniform(0).name_hash == RuntimeHash("Material color")) {
 			const Vec4 v = *(Vec4*)material->getUniform(0).vec4;
 			Color tint(u8(v.x * 255), u8(v.y * 255), u8(v.z * 255), u8(v.w * 255));
