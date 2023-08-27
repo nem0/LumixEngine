@@ -810,7 +810,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::SetKeyboardFocusHere();
 				m_request_focus_search = false;
 			}
-			if (m_filter.gui(ICON_FA_SEARCH " Search", 150)) {
+			if (m_filter.gui(ICON_FA_SEARCH " Search", 300)) {
 				m_create_tile_cooldown = 0.2f;
 				changeDir(m_dir, false);
 			}

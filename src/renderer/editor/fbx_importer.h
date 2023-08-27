@@ -166,6 +166,7 @@ struct FBXImporter {
 		, IVec2& size
 		, bool bake_normals);
 
+	u32 getBoneCount() const { return (u32)m_bones.size(); }
 	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
 

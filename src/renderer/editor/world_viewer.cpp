@@ -126,6 +126,7 @@ void WorldViewer::resetCamera() {
 }
 
 void WorldViewer::resetCamera(const Model& model) {
+	if (model.getMeshCount() == 0) return;
 	const AABB aabb = model.getAABB();
 	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 	m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * length(aabb.max - aabb.min);
