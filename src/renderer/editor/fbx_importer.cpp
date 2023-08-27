@@ -30,7 +30,6 @@
 #include "renderer/shader.h"
 #include "renderer/voxels.h"
 
-
 namespace Lumix {
 
 
@@ -1261,9 +1260,10 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 }
 
 
-void FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION()
+	u32 written_count = 0;
 	StringView dir = Path::getDir(src);
 	for (const ImportMaterial& material : m_materials) {
 		if (!material.import) continue;
@@ -1318,11 +1318,13 @@ void FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 				<< ",1})\n";
 		}
 
+		++written_count;
 		if (!f.write(out_file.data(), out_file.size())) {
 			logError("Failed to write ", mat_src);
 		}
 		f.close();
 	}
+	return written_count > 0;
 }
 
 static void convert(const ofbx::Matrix& mtx, Vec3& pos, Quat& rot)
@@ -1547,9 +1549,10 @@ bool clampBitsizes(Span<u8> values) {
 
 }
 
-void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
+	u32 written_count = 0;
 	for (const FBXImporter::ImportAnimation& anim : m_animations) { 
 		ASSERT(anim.import);
 
@@ -1822,6 +1825,7 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 				}
 			}
 
+			++written_count;
 			Path anim_path(name, ".ani:", src);
 			m_compiler.writeCompiledResource(anim_path, Span(out_file.data(), (i32)out_file.size()));
 		};
@@ -1834,6 +1838,7 @@ void FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 			}
 		}
 	}
+	return written_count > 0;
 }
 
 int FBXImporter::getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) const
@@ -2409,10 +2414,10 @@ void FBXImporter::writeModelHeader()
 }
 
 
-void FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 {
-	if (m_meshes.empty()) return;
-	if (cfg.physics == ImportConfig::Physics::NONE) return;
+	if (m_meshes.empty()) return false;
+	if (cfg.physics == ImportConfig::Physics::NONE) return false;
 
 	out_file.clear();
 
@@ -2423,11 +2428,10 @@ void FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 	header.m_convex = (u32)to_convex;
 	out_file.write(&header, sizeof(header));
 
-
 	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
 	if (!ps) {
 		logError(src, ": no physics system found while trying to cook physics data");
-		return;
+		return false;
 	}
 	Array<Vec3> verts(m_allocator);
 
@@ -2451,7 +2455,7 @@ void FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 	if (to_convex) {
 		if (!ps->cookConvex(verts, out_file)) {
 			logError("Failed to cook ", src);
-			return;
+			return false;
 		}
 	} else {
 		Array<u32> indices(m_allocator);
@@ -2473,16 +2477,17 @@ void FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 
 		if (!ps->cookTriMesh(verts, indices, out_file)) {
 			logError("Failed to cook ", src);
-			return;
+			return false;
 		}
 	}
 
 	Path phy_path(".phy:", src);
 	m_compiler.writeCompiledResource(phy_path, Span(out_file.data(), (i32)out_file.size()));
+	return true;
 }
 
 
-void FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 {
 	// TODO this is not threadsafe, since it can load/unload assets, access lua state, ...
 	Engine& engine = m_app.getEngine();
@@ -2493,7 +2498,7 @@ void FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 	Path tmp(file_info.dir, "/", file_info.basename, ".fab");
 	if (!m_filesystem.open(tmp, file)) {
 		logError("Could not create ", tmp);
-		return;
+		return false;
 	}
 
 	OutputMemoryStream blob(m_allocator);
@@ -2526,12 +2531,15 @@ void FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 
 	if (!file.write(blob.data(), blob.size())) {
 		logError("Could not write ", tmp);
+		file.close();
+		return false;
 	}
 	file.close();
+	return true;
 }
 
 
-void FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg, src);
@@ -2564,10 +2572,11 @@ void FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
 
 		m_compiler.writeCompiledResource(path, Span(out_file.data(), (i32)out_file.size()));
 	}
+	return !m_meshes.empty();
 }
 
 
-void FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg, src);
@@ -2576,7 +2585,7 @@ void FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 	for (const ImportMesh& m : m_meshes) {
 		if (m.import) import_any_mesh = true;
 	}
-	if (!import_any_mesh && m_animations.empty()) return;
+	if (!import_any_mesh && m_animations.empty()) return false;
 
 	out_file.clear();
 	writeModelHeader();
@@ -2586,6 +2595,7 @@ void FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 	writeLODs(cfg);
 
 	m_compiler.writeCompiledResource(Path(src), Span(out_file.data(), (i32)out_file.size()));
+	return true;
 }
 
 
