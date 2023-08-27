@@ -82,13 +82,22 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
 		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, false);
 
+		m_focus_search.init("     Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL, true);
+		m_focus_search.func.bind<&AssetBrowserImpl::focusSearch>(this);
+
 		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", false);
 		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
 
+		m_app.addAction(&m_focus_search);
 		m_app.addAction(&m_back_action);
 		m_app.addAction(&m_forward_action);
 		m_app.addWindowAction(&m_toggle_ui);
+	}
+
+	void focusSearch() {
+		m_request_focus_search = true;
+		m_is_open = true;
 	}
 
 	void onBasePathChanged() {
@@ -118,6 +127,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	~AssetBrowserImpl() override {
+		m_app.removeAction(&m_focus_search);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
@@ -789,12 +799,17 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_dir.isEmpty()) changeDir(".", true);
 
 		if(m_is_open) {
+			if (m_request_focus_search) ImGui::SetNextWindowFocus();
 			if (!ImGui::Begin("Assets", &m_is_open)) {
 				ImGui::End();
 				return;
 			}
 			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
 
+			if (m_request_focus_search) {
+				ImGui::SetKeyboardFocusHere();
+				m_request_focus_search = false;
+			}
 			if (m_filter.gui(ICON_FA_SEARCH " Search", 150)) {
 				m_create_tile_cooldown = 0.2f;
 				changeDir(m_dir, false);
@@ -1208,7 +1223,9 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_subresources;
 	bool m_has_focus = false;
 	bool m_request_delete = false;
+	bool m_request_focus_search = false;
 	float m_thumbnail_size = 1.f;
+	Action m_focus_search;
 	Action m_toggle_ui;
 	Action m_back_action;
 	Action m_forward_action;

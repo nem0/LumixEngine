@@ -148,29 +148,30 @@ void LogUI::onGUI()
 	showNotifications();
 
 	if (!m_is_open) return;
-	if (ImGui::Begin(ICON_FA_COMMENT_ALT "Log##log", &m_is_open))
-	{
-		const char* labels[] = {"Info", "Warning", "Error"};
-		for (u32 i = 0; i < lengthOf(labels); ++i)
-		{
-			char label[40];
-			fillLabel(Span(label), labels[i], m_new_message_count[i]);
-			if (i > 0) ImGui::SameLine();
-			bool b = m_level_filter & (1 << i);
-			if (ImGui::Checkbox(label, &b))
+	if (ImGui::Begin(ICON_FA_COMMENT_ALT "Log##log", &m_is_open)) {
+		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
+		if (ImGui::BeginPopup("Settings")) {
+			const char* labels[] = {"Info", "Warning", "Error"};
+			for (u32 i = 0; i < lengthOf(labels); ++i)
 			{
-				if (b)
-					m_level_filter |= 1 << i;
-				else
-					m_level_filter &= ~(1 << i);
-				m_new_message_count[i] = 0;
+				char label[40];
+				fillLabel(Span(label), labels[i], m_new_message_count[i]);
+				bool b = m_level_filter & (1 << i);
+				if (ImGui::Checkbox(label, &b))
+				{
+					if (b)
+						m_level_filter |= 1 << i;
+					else
+						m_level_filter &= ~(1 << i);
+					m_new_message_count[i] = 0;
+				}
 			}
+			ImGui::Checkbox("Autoscroll", &m_autoscroll);
+			ImGui::EndPopup();
 		}
 
 		ImGui::SameLine();
-		ImGui::Checkbox("Autoscroll", &m_autoscroll);
-
-		m_filter.gui("Filter");
+		m_filter.gui(ICON_FA_SEARCH " Filter");
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
