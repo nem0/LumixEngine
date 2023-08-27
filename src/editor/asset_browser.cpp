@@ -140,7 +140,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.getAssetCompiler().resourceCompiled().bind<&AssetBrowserImpl::onResourceCompiled>(this);
 	}
 
-	void onResourceCompiled(Resource& resource) {
+	void onResourceCompiled(Resource& resource, bool success) {
+		if (!success) return;
 		StringView dir = Path::getDir(resource.getPath());
 		if (!Path::isSame(dir, m_dir)) return;
 		

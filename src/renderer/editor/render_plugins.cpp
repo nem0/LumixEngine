@@ -1186,7 +1186,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		clearTextureView();
 	}
 
-	void onResourceCompiled(Resource& res) { if (m_texture == &res) clearTextureView(); }
+	void onResourceCompiled(Resource& res, bool success) { if (m_texture == &res) clearTextureView(); }
 
 	void saveUndo(bool changed) {
 		if (!changed) return;
@@ -2515,7 +2515,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.animation_flags = meta.root_motion_flags;
 		cfg.anim_rotation_error = meta.anim_rotation_error;
 		cfg.anim_translation_error = meta.anim_translation_error;
-		m_fbx_importer.setSource(filepath, false, meta.force_skin);
+		if (!m_fbx_importer.setSource(filepath, false, meta.force_skin)) return false;
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
@@ -2525,19 +2525,21 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					logError("No meshes or animations found in ", src);
 				}
 			}
+			return false;
 		}
 
+		bool any_written = false;
 		if (meta.split) {
 			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-			m_fbx_importer.writeSubmodels(filepath, cfg);
-			m_fbx_importer.writePrefab(filepath, cfg);
+			any_written = m_fbx_importer.writeSubmodels(filepath, cfg) || any_written;
+			any_written = m_fbx_importer.writePrefab(filepath, cfg) || any_written;
 		}
 		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
-		m_fbx_importer.writeModel(src, cfg);
-		m_fbx_importer.writeMaterials(filepath, cfg);
-		m_fbx_importer.writeAnimations(filepath, cfg);
-		m_fbx_importer.writePhysics(filepath, cfg);
-		return true;
+		any_written = m_fbx_importer.writeModel(src, cfg) || any_written;
+		any_written = m_fbx_importer.writeMaterials(filepath, cfg) || any_written;
+		any_written = m_fbx_importer.writeAnimations(filepath, cfg) || any_written;
+		any_written = m_fbx_importer.writePhysics(filepath, cfg) || any_written;
+		return any_written;
 	}
 
 
