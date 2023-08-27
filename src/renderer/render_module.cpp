@@ -1905,7 +1905,7 @@ struct RenderModuleImpl final : RenderModule {
 	void enableModelInstance(EntityRef entity, bool enable) override
 	{
 		ModelInstance& model_instance = m_model_instances[entity.index];
-		model_instance.flags |= ModelInstance::ENABLED;
+		setFlag(model_instance.flags, ModelInstance::ENABLED, enable);
 		if (enable)
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;

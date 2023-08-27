@@ -54,20 +54,22 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			Engine& engine = m_app.getEngine();
 
-			m_model = m_app.getEngine().getResourceManager().load<Model>(Path(Path::getResource(path)));
 
 			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
 
 			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
 			anim_module->setAnimation(*m_viewer.m_mesh, path);
 
-			m_parent_meta.load(m_model->getPath(), m_app);
+			Path parent_path(Path::getResource(path));
+			m_parent_meta.load(parent_path, m_app);
 
 			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
 			if (m_parent_meta.skeleton.isEmpty()) {
-				render_module->setModelInstancePath(*m_viewer.m_mesh, m_model->getPath());
+				m_model = m_app.getEngine().getResourceManager().load<Model>(parent_path);
+				render_module->setModelInstancePath(*m_viewer.m_mesh, parent_path);
 			}
 			else {
+				m_model = m_app.getEngine().getResourceManager().load<Model>(m_parent_meta.skeleton);
 				render_module->setModelInstancePath(*m_viewer.m_mesh, m_parent_meta.skeleton);
 			}
 			pushUndo(NO_MERGE_UNDO);
@@ -126,16 +128,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE));
 				return;
 			}
-
-			Path model_path = m_model ? m_model->getPath() : Path();
-			if (m_app.getAssetBrowser().resourceInput("Model", model_path, ResourceType("model"))) {
-				if (m_model) m_model->decRefCount();
-				m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
-				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
-				render_module->setModelInstancePath(*m_viewer.m_mesh, m_model ? m_model->getPath() : Path());
-			}
-
-			if (!m_model || !m_model->isReady()) return;
 
 			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
 			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
@@ -210,7 +202,10 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
 						m_selected_bone = track.bone_index;
 					}
-					if (open) ImGui::Text("%f; %f; %f", track.value.x, track.value.y, track.value.z);
+					if (open) {
+						ImGui::Text("%f; %f; %f", track.value.x, track.value.y, track.value.z);
+						ImGui::TreePop();
+					}
 				}
 				ImGui::TreePop();
 			}
@@ -270,9 +265,29 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		}
 		
 		void previewGUI() {
-			ASSERT(m_model->isReady());
-
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
 			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
+			ImGui::SameLine();
+			if (ImGui::BeginPopup("Settings")) {
+				Path model_path = m_model ? m_model->getPath() : Path();
+				if (m_app.getAssetBrowser().resourceInput("Preview model", model_path, ResourceType("model"))) {
+					if (m_model) m_model->decRefCount();
+					m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
+					render_module->setModelInstancePath(*m_viewer.m_mesh, m_model ? m_model->getPath() : Path());
+				}
+
+				bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
+				if (ImGui::Checkbox("Show mesh", &show_mesh)) {
+					render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
+				}
+			
+				ImGui::Checkbox("Show skeleton", &m_show_skeleton);
+			
+				ImGui::DragFloat("Playback speed", &m_playback_speed, 0.01f, -FLT_MAX, FLT_MAX);
+				ImGui::EndPopup();
+			}
+
 			if (ImGuiEx::IconButton(ICON_FA_STEP_BACKWARD, "Step back", !m_play)) {
 				anim_module->updateAnimable(*m_viewer.m_mesh, -1 / 30.f);
 			}
@@ -297,20 +312,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				anim_module->updateAnimable(*m_viewer.m_mesh, 0);
 			}
 
-			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
-			bool show_mesh = render_module->isModelInstanceEnabled(*m_viewer.m_mesh);
-			ImGuiEx::Label("Show mesh");
-			if (ImGui::Checkbox("##sm", &show_mesh)) {
-				render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
-			}
-			
-			ImGuiEx::Label("Show skeleton");
-			ImGui::Checkbox("##ss", &m_show_skeleton);
 			if (m_show_skeleton) m_viewer.drawSkeleton(m_selected_bone);
-			
-			ImGuiEx::Label("Playback speed");
-			ImGui::DragFloat("##spd", &m_playback_speed, 0.01f, -FLT_MAX, FLT_MAX);
-
 			if (m_play) {
 				anim_module->updateAnimable(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
 			}

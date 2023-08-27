@@ -475,7 +475,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_module->getModelInstanceModel(entity);
-		if (!model->isReady()) return;
+		if (!model || !model->isReady()) return;
 
 		Pose* pose = m_render_module->lockPose(entity);
 		if (!pose) return;
