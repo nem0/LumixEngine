@@ -121,7 +121,11 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				return;
 			}
 
-			if (!m_resource->isReady()) return;
+			if (!m_resource->isReady()) {
+				ImGuiEx::Label("Skeleton");
+				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE));
+				return;
+			}
 
 			Path model_path = m_model ? m_model->getPath() : Path();
 			if (m_app.getAssetBrowser().resourceInput("Model", model_path, ResourceType("model"))) {
@@ -171,16 +175,14 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			if (!translations.empty() && ImGui::TreeNode("Translations")) {
 				for (const Animation::TranslationTrack& track : translations) {
-					auto iter = m_model->getBoneIndex(track.name);
-					if (!iter.isValid()) continue;
 
-					const Model::Bone& bone = m_model->getBone(iter.value());
-					ImGuiTreeNodeFlags flags = m_selected_bone == track.name ? ImGuiTreeNodeFlags_Selected : 0;
+					const Model::Bone& bone = m_model->getBone(track.bone_index);
+					ImGuiTreeNodeFlags flags = m_selected_bone == track.bone_index ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 					u32 bits = track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2];
 					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), bits);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-						m_selected_bone = track.name;
+						m_selected_bone = track.bone_index;
 					}
 					if (open) {
 						ImGui::Columns(4);
@@ -201,15 +203,12 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 					}
 				}
 				for (const Animation::ConstTranslationTrack& track : const_translations) {
-					auto iter = m_model->getBoneIndex(track.name);
-					if (!iter.isValid()) continue;
-
-					const Model::Bone& bone = m_model->getBone(iter.value());
-					ImGuiTreeNodeFlags flags = m_selected_bone == track.name ? ImGuiTreeNodeFlags_Selected : 0;
+					const Model::Bone& bone = m_model->getBone(track.bone_index);
+					ImGuiTreeNodeFlags flags = m_selected_bone == track.bone_index ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (constant)", bone.name.c_str());
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-						m_selected_bone = track.name;
+						m_selected_bone = track.bone_index;
 					}
 					if (open) ImGui::Text("%f; %f; %f", track.value.x, track.value.y, track.value.z);
 				}
@@ -217,24 +216,22 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			}
 
 			if ((!rotations.empty() || !const_rotations.empty()) && ImGui::TreeNode("Rotations")) {
-				for (const Animation::RotationTrack& curve : rotations) {
-					u32 curve_idx = u32(&curve - rotations.begin());
-					auto iter = m_model->getBoneIndex(curve.name);
-					if (!iter.isValid()) continue;
+				for (const Animation::RotationTrack& track : rotations) {
+					u32 track_idx = u32(&track - rotations.begin());
 
-					const Model::Bone& bone = m_model->getBone(iter.value());
-					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
+					const Model::Bone& bone = m_model->getBone(track.bone_index);
+					ImGuiTreeNodeFlags flags = m_selected_bone == track.bone_index ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 
-					u32 bits = curve.bitsizes[0] + curve.bitsizes[1] + curve.bitsizes[2] + 1;
+					u32 bits = track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + 1;
 					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (%d bits)", bone.name.c_str(), bits);
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-						m_selected_bone = curve.name;
+						m_selected_bone = track.bone_index;
 					}
 					if (open) {
 						ImGui::Columns(4);
 						for (u32 i = 0; i < m_resource->getFramesCount(); ++i) {
-							const Vec3 r = radiansToDegrees(m_resource->getRotation(i, curve).toEuler());
+							const Vec3 r = radiansToDegrees(m_resource->getRotation(i, track).toEuler());
 							ImGui::Text("%d:", i);
 							ImGui::NextColumn();
 							ImGui::Text("%f", r.x);
@@ -248,20 +245,17 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 						ImGui::TreePop();
 					}
 				}
-				for (const Animation::ConstRotationTrack& curve : const_rotations) {
-					auto iter = m_model->getBoneIndex(curve.name);
-					if (!iter.isValid()) continue;
-
-					const Model::Bone& bone = m_model->getBone(iter.value());
-					ImGuiTreeNodeFlags flags = m_selected_bone == curve.name ? ImGuiTreeNodeFlags_Selected : 0;
+				for (const Animation::ConstRotationTrack& track : const_rotations) {
+					const Model::Bone& bone = m_model->getBone(track.bone_index);
+					ImGuiTreeNodeFlags flags = m_selected_bone == track.bone_index ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 
 					bool open = ImGui::TreeNodeEx(&bone, flags, "%s (constant)", bone.name.c_str());
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-						m_selected_bone = curve.name;
+						m_selected_bone = track.bone_index;
 					}
 					if (open) {
-						Vec3 e = curve.value.toEuler();
+						Vec3 e = track.value.toEuler();
 						ImGui::Text("%f; %f; %f", e.x, e.y, e.z);
 						ImGui::TreePop();
 					}
@@ -341,7 +335,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		float m_playback_speed = 1.f;
 		WorldViewer m_viewer;
 		ModelMeta m_parent_meta;
-		BoneNameHash m_selected_bone;
+		i32 m_selected_bone = -1;
 	};
 	
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)

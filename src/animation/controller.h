@@ -47,7 +47,6 @@ struct RuntimeContext {
 	OutputMemoryStream blendstack;
 
 	float weight = 1;
-	BoneNameHash root_bone_hash;
 	Time time_delta;
 	Model* model = nullptr;
 	InputMemoryStream input_runtime;
@@ -104,7 +103,6 @@ struct Controller final : Resource {
 	Array<Input> m_inputs;
 	Array<IK> m_ik;
 	u32 m_animation_slots_count = 0;
-	BoneNameHash m_root_motion_bone;
 
 private:
 	void unload() override;

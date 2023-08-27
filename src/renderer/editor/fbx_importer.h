@@ -6,6 +6,7 @@
 #include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/os.h"
+#include "engine/path.h"
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "openfbx/ofbx.h"
@@ -49,6 +50,8 @@ struct FBXImporter {
 		u32 animation_flags = 0;
 		float anim_translation_error = 1.f;
 		float anim_rotation_error = 1.f;
+		Path skeleton;
+		BoneNameHash root_motion_bone;
 	};
 
 	enum class Orientation {

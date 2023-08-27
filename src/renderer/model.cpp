@@ -593,6 +593,10 @@ bool Model::load(Span<const u8> mem)
 		return false;
 	}
 
+	if (header.version > (u32)FileVersion::ROOT_MOTION_BONE) {
+		file.read(m_root_motion_bone);
+	}
+
 	if (parseMeshes(file, (FileVersion)header.version)
 		&& parseBones(file)
 		&& parseLODs(file))

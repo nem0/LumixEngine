@@ -49,7 +49,6 @@ struct Controller final {
 	Array<String> m_animation_slots;
 	Array<BoneMask> m_bone_masks;
 	Array<Input> m_inputs;
-	BoneNameHash m_root_motion_bone;
 	u32 m_id_generator = 0;
 	Path m_skeleton;
 	Array<IK> m_ik;

@@ -63,6 +63,7 @@ struct Animation final : Resource {
 
 	enum class Version : u32 {
 		COMPRESSION = 6,
+		SKELETON,
 
 		LAST
 	};
@@ -83,12 +84,14 @@ struct Animation final : Resource {
 	};
 
 	struct ConstTranslationTrack {
-		BoneNameHash name;
+		BoneNameHash bone_name;
+		u16 bone_index;
 		Vec3 value;
 	};
 
 	struct TranslationTrack {
-		BoneNameHash name;
+		BoneNameHash bone_name;
+		u16 bone_index;
 		Vec3 min;
 		Vec3 to_range; //  * to_normalized * (max - min)
 		u16 offset_bits = 0;
@@ -96,12 +99,14 @@ struct Animation final : Resource {
 	};
 
 	struct ConstRotationTrack {
-		BoneNameHash name;
+		BoneNameHash bone_name;
+		u16 bone_index;
 		Quat value;
 	};
 
 	struct RotationTrack {
-		BoneNameHash name;
+		BoneNameHash bone_name;
+		u16 bone_index;
 		Vec3 min;
 		Vec3 to_range; //  * to_normalized * (max - min)
 		u16 offset_bits;
@@ -139,6 +144,7 @@ struct Animation final : Resource {
 private:
 	void unload() override;
 	bool load(Span<const u8> mem) override;
+	void onBeforeReady() override;
 
 	TagAllocator m_allocator;
 	Array<TranslationTrack> m_translations;
@@ -164,6 +170,8 @@ private:
 	u32 m_translations_frame_size_bits;
 	u32 m_frame_count = 0;
 	float m_fps = 30;
+	Model* m_skeleton = nullptr;
+	u32 m_max_accessed_bone_index = 0;
 
 	friend struct AnimationSampler;
 };

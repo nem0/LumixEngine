@@ -153,7 +153,7 @@ bool Blend2DNode::propertiesGUI() {
 	}
 
 	
-	if (!m_triangles.empty()) {
+	if (!res && !m_triangles.empty()) {
 		float w = maximum(ImGui::GetContentRegionAvail().x, 100.f);
 		ImGui::InvisibleButton("tmp", ImVec2(w, w));
 		ImDrawList* dl = ImGui::GetWindowDrawList();

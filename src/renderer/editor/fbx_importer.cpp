@@ -1588,6 +1588,7 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = Animation::Version::LAST;
 			write(header);
+			out_file.writeString(cfg.skeleton.c_str());
 			write(fps);
 			write(samples_count - 1);
 			write(cfg.animation_flags);
@@ -2550,6 +2551,7 @@ bool FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
 
 		out_file.clear();
 		writeModelHeader();
+		write(cfg.root_motion_bone);
 		writeMeshes(src, i, cfg);
 		writeGeometry(i, cfg);
 		if (m_meshes[i].is_skinned) {
@@ -2589,6 +2591,7 @@ bool FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 
 	out_file.clear();
 	writeModelHeader();
+	write(cfg.root_motion_bone);
 	writeMeshes(src, -1, cfg);
 	writeGeometry(cfg);
 	writeSkeleton(cfg);

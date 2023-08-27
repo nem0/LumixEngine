@@ -85,7 +85,6 @@ void Controller::serialize(OutputMemoryStream& stream) {
 bool Controller::compile(StudioApp& app, OutputMemoryStream& blob) {
 	ResourceManager* rm = app.getEngine().getResourceManager().get(anim::Controller::TYPE);
 	anim::Controller controller(m_path, *rm, m_allocator);
-	controller.m_root_motion_bone = m_root_motion_bone;
 	controller.m_animation_slots_count = m_animation_slots.size();
 	
 	controller.m_inputs.resize(m_inputs.size());
@@ -433,7 +432,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				}
 				ImGuiEx::Label("Show skeleton"); 
 				ImGui::Checkbox("##ss", &m_show_skeleton);
-				if (m_show_skeleton) m_viewer.drawSkeleton(BoneNameHash());
+				if (m_show_skeleton) m_viewer.drawSkeleton(-1);
 				m_viewer.drawMeshTransform();
 				ImGuiEx::Label("Follow mesh"); 
 				ImGui::Checkbox("##fm", &m_viewer.m_follow_mesh);
@@ -1130,7 +1129,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			model_meta.deserialize(L, ctrl.m_skeleton);
 			lua_close(L);
 		}
-		ctrl.m_root_motion_bone = BoneNameHash(model_meta.root_motion_bone.c_str());
 		if (!ctrl.compile(m_app, output)) return false;
 		
 		return m_app.getAssetCompiler().writeCompiledResource(src, Span(output.data(), (i32)output.size()));

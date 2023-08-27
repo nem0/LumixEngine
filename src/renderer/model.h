@@ -137,6 +137,8 @@ public:
 
 	enum class FileVersion : u32
 	{
+		ROOT_MOTION_BONE,
+
 		LATEST // keep this last
 	};
 
@@ -193,6 +195,7 @@ public:
 	float* getLODDistances() { return m_lod_distances; }
 	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }
 	Vec3 evalVertexPose(const Pose& pose, u32 mesh, u32 index) const;
+	BoneNameHash getRootMotionBone() const { return m_root_motion_bone; }
 
 public:
 	static constexpr u32 MAX_LOD_COUNT = 4;
@@ -220,6 +223,7 @@ private:
 	float m_center_bounding_radius = 0;
 	BoneMap m_bone_map;
 	AABB m_aabb;
+	BoneNameHash m_root_motion_bone;
 	int m_first_nonroot_bone_index;
 };
 
