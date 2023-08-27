@@ -366,14 +366,14 @@ void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 	if (trio.tb > 0) {
 		ctx.blendstack.write(BlendStackInstructions::SAMPLE);
 		ctx.blendstack.write(trio.b);
-		ctx.blendstack.write(ctx.weight * trio.tb);
+		ctx.blendstack.write(ctx.weight * (trio.tb / (trio.ta + trio.tb)));
 		ctx.blendstack.write(toTime(*anim_b, relt));
 		ctx.blendstack.write(true);
 	}
 	if (trio.tc > 0) {
 		ctx.blendstack.write(BlendStackInstructions::SAMPLE);
 		ctx.blendstack.write(trio.c);
-		ctx.blendstack.write(ctx.weight * trio.tc);
+		ctx.blendstack.write(ctx.weight * (trio.tc / (trio.ta + trio.tb + trio.tc)));
 		ctx.blendstack.write(toTime(*anim_c, relt));
 		ctx.blendstack.write(true);
 	}

@@ -435,7 +435,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						render_module->enableModelInstance(*m_viewer.m_mesh, show_mesh);
 					}
 					ImGui::Checkbox("Show skeleton", &m_show_skeleton);
-					if (m_show_skeleton) m_viewer.drawSkeleton(-1);
 					m_viewer.drawMeshTransform();
 					ImGui::Checkbox("Follow mesh", &m_viewer.m_follow_mesh);
 					ImGui::DragFloat("Playback speed", &m_playback_speed, 0.1f, 0, FLT_MAX);
@@ -450,6 +449,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			else {
 				anim_module->updateAnimator(*m_viewer.m_mesh, m_app.getEngine().getLastTimeDelta() * m_playback_speed);
 			}
+			if (m_show_skeleton) m_viewer.drawSkeleton(-1);
 			m_viewer.gui();
 		}
 
@@ -511,6 +511,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					m_recording.viewer.setAnimatorPath(ctrl_path);
 					m_recording.viewer.resetCamera();
 				}
+				else {
+					m_recording.focus_request = true;
+				}
 			}
 
 			const ComponentType animator_type = reflection::getComponentType("animator");
@@ -522,22 +525,61 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 		}
 
+		void printReplayBlendstack() {
+			if (m_recording.view_frame < 0) return;
+			if (m_recording.view_frame >= m_recording.frames_offsets.size() - 1) return;
+			const u32 from = m_recording.frames_offsets[m_recording.view_frame];
+			const u32 to = m_recording.frames_offsets[m_recording.view_frame + 1];
+			InputMemoryStream blob(m_recording.buffer.data() + from, to - from);
+			for (;;) {
+				anim::BlendStackInstructions instr;
+				blob.read(instr);
+				switch (instr) {
+					case anim::BlendStackInstructions::END: return;
+					case anim::BlendStackInstructions::SAMPLE: {
+						u32 slot = blob.read<u32>();
+						float weight = blob.read<float>();
+						Time time = blob.read<Time>();
+						bool looped = blob.read<bool>();
+						ImGui::Text("slot = %d, weight = %f, time = %f", slot, weight, time.seconds());
+						break;
+					}
+				}
+			}		
+		}
+
 		void replayUI() {
-			if (m_recording.is_recording) ImGui::TextUnformatted("Recording...");
+			if (m_recording.is_recording) {
+				if (ImGuiEx::IconButton(ICON_FA_STOP, "Stop recording")) m_recording.is_recording = false;
+			}
 			else if(m_recording.frames_offsets.size() <= 1) ImGui::TextUnformatted("Nothing is recorded");
 			else if (m_recording.frames_offsets.size() > 1) {
-				ImGui::SetNextItemWidth(-1);
-				if (ImGui::SliderInt("##frame", &m_recording.view_frame, 0, m_recording.frames_offsets.size() - 2)) {
-					AnimationModule* replay_module = (AnimationModule*)m_recording.viewer.m_world->getModule("animation");
-					u32 from = m_recording.frames_offsets[m_recording.view_frame];
-					u32 to = m_recording.frames_offsets[m_recording.view_frame + 1];
-					OutputMemoryStream& blendstack = replay_module->beginBlendstackUpdate(*m_recording.viewer.m_mesh);
-					blendstack.clear();
-					blendstack.write(m_recording.buffer.data() + from, to - from);
-					replay_module->endBlendstackUpdate(*m_recording.viewer.m_mesh);
+				if (ImGui::BeginTable("rptb", 2, ImGuiTableFlags_Resizable)) {
+					ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
+					ImGui::TableNextColumn();
+					printReplayBlendstack();
+					ImGui::TableNextColumn();
+					if (ImGuiEx::IconButton(ICON_FA_STEP_BACKWARD, "Step back", m_recording.view_frame > 0)) {
+						--m_recording.view_frame;
+					}
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_STEP_FORWARD, "Step forward", m_recording.view_frame < m_recording.frames_offsets.size() - 2)) {
+						++m_recording.view_frame;
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::SliderInt("##frame", &m_recording.view_frame, 0, m_recording.frames_offsets.size() - 2)) {
+						AnimationModule* replay_module = (AnimationModule*)m_recording.viewer.m_world->getModule("animation");
+						u32 from = m_recording.frames_offsets[m_recording.view_frame];
+						u32 to = m_recording.frames_offsets[m_recording.view_frame + 1];
+						OutputMemoryStream& blendstack = replay_module->beginBlendstackUpdate(*m_recording.viewer.m_mesh);
+						blendstack.clear();
+						blendstack.write(m_recording.buffer.data() + from, to - from);
+						replay_module->endBlendstackUpdate(*m_recording.viewer.m_mesh);
+					}
+					m_recording.viewer.gui();
+					ImGui::EndTable();
 				}
-
-				m_recording.viewer.gui();
 			}
 		}
 
@@ -1093,7 +1135,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					ImGui::EndTabItem();
 				}
 
-				if (ImGui::BeginTabItem("Replay")) {
+				if (ImGui::BeginTabItem("Replay", nullptr, m_recording.focus_request ? ImGuiTabItemFlags_SetSelected : 0)) {
+					m_recording.focus_request = false;
 					replayUI();
 					ImGui::EndTabItem();
 				}
@@ -1142,6 +1185,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			Array<u32> frames_offsets;
 			i32 view_frame = -1;
 			WorldViewer viewer;
+			bool focus_request = false;
 		} m_recording;
 	};
 
