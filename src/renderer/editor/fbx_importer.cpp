@@ -734,7 +734,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 		}
 
 		const int vertex_size = getVertexSize(mesh, import_mesh.is_skinned, cfg);
-		import_mesh.vertex_data.reserve(import_mesh.source_mesh->unique_vertex_count * vertex_size);
+		import_mesh.vertex_data.reserve(import_mesh.submesh_vertex_count * vertex_size);
+		import_mesh.indices.reserve(import_mesh.submesh_vertex_count);
 
 		Array<Skin> skinning(m_allocator);
 		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
@@ -755,47 +756,46 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 		memset(intramat_idx.begin(), 0xff, intramat_idx.byte_size());
 
 		u32 written_idx = 0;
-		for (int i = 0; i < vertex_count; ++i) {
-			if (geom_materials && geom_materials[i / 3] != material_idx) continue;
-			if (intramat_idx[import_mesh.source_mesh->geom_indices[i]] != 0xffFFffFF) continue;
+		for (u32 tri_idx = 0; tri_idx < u32(vertex_count / 3); ++tri_idx) {
+			if (geom_materials && geom_materials[tri_idx] != material_idx) continue;
 
-			intramat_idx[import_mesh.source_mesh->geom_indices[i]] = written_idx;
-			++written_idx;
+			for (u32 vidx = 0; vidx < 3; ++vidx) {
+				const i32 i = tri_idx * 3 + vidx;
+				if (intramat_idx[import_mesh.source_mesh->geom_indices[i]] != 0xffFFffFF) continue;
 
-			ofbx::Vec3 cp = vertices[i];
-			// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
-			Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * m_fbx_scale;
-			pos = fixOrientation(pos);
-			import_mesh.vertex_data.write(pos);
+				intramat_idx[import_mesh.source_mesh->geom_indices[i]] = written_idx;
+				++written_idx;
 
-			float sq_len = squaredLength(pos);
-			origin_radius_squared = maximum(origin_radius_squared, sq_len);
+				ofbx::Vec3 cp = vertices[i];
+				// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
+				Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * m_fbx_scale;
+				pos = fixOrientation(pos);
+				import_mesh.vertex_data.write(pos);
 
-			aabb.min.x = minimum(aabb.min.x, pos.x);
-			aabb.min.y = minimum(aabb.min.y, pos.y);
-			aabb.min.z = minimum(aabb.min.z, pos.z);
-			aabb.max.x = maximum(aabb.max.x, pos.x);
-			aabb.max.y = maximum(aabb.max.y, pos.y);
-			aabb.max.z = maximum(aabb.max.z, pos.z);
+				float sq_len = squaredLength(pos);
+				origin_radius_squared = maximum(origin_radius_squared, sq_len);
 
-			if (normals) writePackedVec3(normals[i], transform_matrix, &import_mesh.vertex_data);
-			if (uvs) writeUV(uvs[i], &import_mesh.vertex_data);
-			if (cfg.bake_vertex_ao) {
-				const float ao = import_mesh.source_mesh->computed_ao[i];
-				u32 ao8 = u8(clamp(ao * 255.f, 0.f, 255.f) + 0.5f);
-				u32 ao32 = ao8 | ao8 << 8 | ao8 << 16 | ao8 << 24;
-				import_mesh.vertex_data.write(ao32);
-			}
-			if (colors) {
-				if (cfg.vertex_color_is_ao) {
-					const u8 ao[4] = { u8(colors[i].x * 255.f + 0.5f) };
-					import_mesh.vertex_data.write(ao);
-				} else {
-					writeColor(colors[i], &import_mesh.vertex_data);
+				aabb.addPoint(pos);
+
+				if (normals) writePackedVec3(normals[i], transform_matrix, &import_mesh.vertex_data);
+				if (uvs) writeUV(uvs[i], &import_mesh.vertex_data);
+				if (cfg.bake_vertex_ao) {
+					const float ao = import_mesh.source_mesh->computed_ao[i];
+					u32 ao8 = u8(clamp(ao * 255.f, 0.f, 255.f) + 0.5f);
+					u32 ao32 = ao8 | ao8 << 8 | ao8 << 16 | ao8 << 24;
+					import_mesh.vertex_data.write(ao32);
 				}
+				if (colors) {
+					if (cfg.vertex_color_is_ao) {
+						const u8 ao[4] = { u8(colors[i].x * 255.f + 0.5f) };
+						import_mesh.vertex_data.write(ao);
+					} else {
+						writeColor(colors[i], &import_mesh.vertex_data);
+					}
+				}
+				if (tangents) writePackedVec3(tangents[i], transform_matrix, &import_mesh.vertex_data);
+				if (import_mesh.is_skinned) writeSkin(skinning[i], &import_mesh.vertex_data);
 			}
-			if (tangents) writePackedVec3(tangents[i], transform_matrix, &import_mesh.vertex_data);
-			if (import_mesh.is_skinned) writeSkin(skinning[i], &import_mesh.vertex_data);
 		}
 
 		for (int i = 0; i < vertex_count; ++i) {
@@ -875,6 +875,7 @@ void FBXImporter::gatherMeshes()
 		UniquePtr<SourceMesh> src_mesh = UniquePtr<SourceMesh>::create(m_allocator, m_allocator);
 		src_mesh->fbx = fbx_mesh;
 		const int mat_count = fbx_mesh->getMaterialCount();
+		const i32 meshes_offset = m_meshes.size();
 		for (int j = 0; j < mat_count; ++j) {
 			ImportMesh& mesh = m_meshes.emplace(m_allocator);
 			mesh.is_skinned = false;
@@ -891,6 +892,17 @@ void FBXImporter::gatherMeshes()
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
 			mesh.lod = detectMeshLOD(mesh);
+		}
+		// compute submesh_vertex_count so we can preallocate ImportMesh::indices and vertex_data later
+		if (mat_count > 1) {
+			const i32* mat_indices = fbx_mesh->getMaterialIndices();
+			for (u32 i = 0, vc = fbx_mesh->getVertexCount(); i < vc; ++i) {
+				i32 idx = meshes_offset + mat_indices[i / 3];
+				++m_meshes[idx].submesh_vertex_count;
+			}
+		}
+		else if (mat_count == 1) {
+			m_meshes[meshes_offset].submesh_vertex_count = fbx_mesh->getVertexCount();
 		}
 		m_source_meshes.push(src_mesh.move());
 	}
