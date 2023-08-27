@@ -133,6 +133,7 @@ struct FBXImporter {
 		bool import = true;
 		u32 lod = 0;
 		int submesh = -1;
+		u32 submesh_vertex_count = 0; // how many of fbx vertices have this->fbx_mat
 		OutputMemoryStream vertex_data;
 		Array<u32> indices;
 		Local<Array<u32>> autolod_indices[4];
