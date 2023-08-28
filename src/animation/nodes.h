@@ -6,6 +6,8 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 
+// Runtime part of animation nodes
+// For editor part of animation nodes see editor_nodes.h
 
 namespace Lumix {
 
@@ -25,7 +27,21 @@ enum class NodeType : u32 {
 	BLEND2D,
 	TREE,
 	OUTPUT,
-	INPUT
+	INPUT,
+	SWITCH,
+	CMP_EQ,
+	CMP_NEQ,
+	CMP_LT,
+	CMP_GT,
+	CMP_LTE,
+	CMP_GTE,
+	MUL,
+	DIV,
+	ADD,
+	SUB,
+	CONSTANT,
+	AND,
+	OR
 };
 
 struct Node {
@@ -36,6 +52,9 @@ struct Node {
 	virtual void serialize(OutputMemoryStream& stream) const = 0;
 	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) = 0;
 };
+
+void serializeNode(OutputMemoryStream& blob, const Node& node);
+Node* deserializeNode(InputMemoryStream& blob, Controller& ctrl, u32 version);
 
 struct PoseNode : Node {
 	virtual void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const = 0;
@@ -49,13 +68,64 @@ struct ValueNode : Node {
 	virtual Value eval(const RuntimeContext& ctx) const = 0;
 };
 
-struct InputNode : ValueNode {
+struct InputNode final : ValueNode {
 	NodeType type() const override { return anim::NodeType::INPUT; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 	Value eval(const RuntimeContext& ctx) const override;
 
 	u32 m_input_index;
+};
+
+struct ConstNode final : ValueNode {
+	NodeType type() const override { return anim::NodeType::CONSTANT; }
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Value eval(const RuntimeContext& ctx) const override;
+
+	Value m_value;
+};
+
+template <NodeType T>
+struct MathNode final : ValueNode {
+	NodeType type() const override { return T; }
+
+	void serialize(OutputMemoryStream& stream) const override {
+		serializeNode(stream, *m_input0);
+		serializeNode(stream, *m_input1);
+	}
+
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override {
+		m_input0 = (ValueNode*)deserializeNode(stream, ctrl, version);
+		m_input1 = (ValueNode*)deserializeNode(stream, ctrl, version);
+	}
+
+	Value eval(const RuntimeContext& ctx) const override {
+		Value v0 = m_input0->eval(ctx);
+		Value v1 = m_input1->eval(ctx);
+		// TODO other types
+		if constexpr (T == NodeType::CMP_GT) return v0.f > v1.f;
+		else if constexpr (T == NodeType::CMP_GTE) return v0.f >= v1.f;
+		else if constexpr (T == NodeType::CMP_LT) return v0.f < v1.f;
+		else if constexpr (T == NodeType::CMP_LTE) return v0.f <= v1.f;
+		else if constexpr (T == NodeType::CMP_NEQ) return v0.f != v1.f;
+		else if constexpr (T == NodeType::CMP_EQ) return v0.f == v1.f;
+		
+		else if constexpr (T == NodeType::AND) return v0.b && v1.b;
+		else if constexpr (T == NodeType::OR) return v0.b || v1.b;
+
+		else if constexpr (T == NodeType::MUL) return v0.f * v1.f;
+		else if constexpr (T == NodeType::DIV) return v0.f / v1.f;
+		else if constexpr (T == NodeType::ADD) return v0.f + v1.f;
+		else if constexpr (T == NodeType::SUB) return v0.f - v1.f;
+		else {
+			ASSERT(false);
+			return 0;
+		}
+	}
+
+	ValueNode* m_input0 = nullptr;
+	ValueNode* m_input1 = nullptr;
 };
 
 struct Blend1DNode final : PoseNode {
@@ -77,7 +147,7 @@ struct Blend1DNode final : PoseNode {
 
 	IAllocator& m_allocator;
 	Array<Child> m_children;
-	ValueNode* m_value;
+	ValueNode* m_value = nullptr;
 };
 
 
@@ -106,8 +176,8 @@ struct Blend2DNode final : PoseNode {
 	IAllocator& m_allocator;
 	Array<Triangle> m_triangles;
 	Array<Child> m_children;
-	ValueNode* m_x_value;
-	ValueNode* m_y_value;
+	ValueNode* m_x_value = nullptr;
+	ValueNode* m_y_value = nullptr;
 };
 
 struct SelectNode final : PoseNode {
@@ -130,7 +200,32 @@ struct SelectNode final : PoseNode {
 
 	IAllocator& m_allocator;
 	Array<PoseNode*> m_children;
-	ValueNode* m_value;
+	ValueNode* m_value = nullptr;
+	Time m_blend_length;
+};
+
+struct SwitchNode final : PoseNode {
+	struct RuntimeData {
+		bool current;
+		bool switching;
+		Time t;
+	};
+
+	SwitchNode(IAllocator& allocator);
+	~SwitchNode();
+	NodeType type() const override { return anim::NodeType::SWITCH; }
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void enter(RuntimeContext& ctx) override;
+	void skip(RuntimeContext& ctx) const override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
+
+	IAllocator& m_allocator;
+	PoseNode* m_true_node = nullptr;
+	PoseNode* m_false_node = nullptr;
+	ValueNode* m_value = nullptr;
 	Time m_blend_length;
 };
 

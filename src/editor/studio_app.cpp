@@ -731,21 +731,21 @@ struct StudioAppImpl final : StudioApp
 		PROFILE_FUNCTION();
 		if (m_is_welcome_screen_open) {
 			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
-			showWelcomeScreen();
+			guiWelcomeScreen();
 		}
 		else {
 			mainMenu();
 			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 			m_asset_compiler->onGUI();
-			onEntityListGUI();
-			onSaveAsDialogGUI();
+			guiEntityList();
+			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
 				GUIPlugin* win = m_gui_plugins[i];
 				win->onGUI();
 			}
 
 			m_settings.onGUI();
-			onExportDataGUI();
+			guiExportData();
 		}
 		ImGui::PopFont();
 		ImGui::Render();
@@ -932,20 +932,42 @@ struct StudioAppImpl final : StudioApp
 		m_editor->loadWorld(blob, name, additive);
 	}
 
-	void showWelcomeScreen()
+	void guiWelcomeScreen()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->WorkPos);
 		ImGui::SetNextWindowSize(viewport->WorkSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
-		if (ImGui::Begin("Welcome", nullptr, flags))
-		{
+		if (ImGui::Begin("Welcome", nullptr, flags)) {
+			const float spacing = ImGui::GetStyle().ItemSpacing.x;
+			#ifdef _WIN32
+				ImVec2 cp = ImGui::GetCursorPos();
+				cp.x += ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_WINDOW_CLOSE).x - 2 * spacing;
+				ImGui::SetCursorPos(cp);
+				if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+
+				if (os::isMaximized(m_engine->getWindowHandle())) {
+					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_RESTORE).x + spacing;
+					ImGui::SetCursorPos(cp);
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+				}
+				else {
+					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MAXIMIZE).x + spacing;
+					ImGui::SetCursorPos(cp);
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+				}
+
+				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MINIMIZE).x + spacing;
+				ImGui::SetCursorPos(cp);
+				if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+			#endif
+
 			ImGui::Text("Welcome to Lumix Studio");
 
 			ImVec2 half_size = ImGui::GetContentRegionAvail();
 			half_size.x = half_size.x * 0.5f - ImGui::GetStyle().FramePadding.x;
-			half_size.y *= 0.75f;
+			half_size.y *= 0.99f;
 			auto right_pos = ImGui::GetCursorPos();
 			right_pos.x += half_size.x + ImGui::GetStyle().FramePadding.x;
 			if (ImGui::BeginChild("left", half_size, true))
@@ -1040,7 +1062,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void onSaveAsDialogGUI() {
+	void guiSaveAsDialog() {
 		if (m_save_as_request) {
 			ImGui::OpenPopup("Save World As");
 			m_save_as_request = false;
@@ -1953,8 +1975,7 @@ struct StudioAppImpl final : StudioApp
 		ImGui::PopID();
 	}
 
-	void onEntityListGUI()
-	{
+	void guiEntityList() {
 		PROFILE_FUNCTION();
 		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 		static TextFilter filter;
@@ -1962,7 +1983,7 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
 		{
 			World* world = m_editor->getWorld();
-			filter.gui("Filter");
+			filter.gui(ICON_FA_SEARCH "Filter");
 			
 			if (ImGui::BeginChild("entities")) {
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
@@ -3131,7 +3152,7 @@ struct StudioAppImpl final : StudioApp
 	void showExportGameDialog() { m_is_export_game_dialog_open = true; }
 
 
-	void onExportDataGUI() {
+	void guiExportData() {
 		if (!m_is_export_game_dialog_open) {
 			m_export_msg_timer = -1;
 			return;

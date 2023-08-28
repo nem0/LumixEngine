@@ -109,7 +109,7 @@ private:
 struct NodeEditorLink {
 	u32 from;
 	u32 to;
-	u32 color = 0xffFFffFF;
+	u32 color = ImGui::GetColorU32(ImGuiCol_Text);
 
 	u16 getToNode() const { return to & 0xffFF; }
 	u16 getFromNode() const { return from & 0xffFF; }

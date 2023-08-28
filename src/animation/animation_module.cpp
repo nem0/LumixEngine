@@ -160,20 +160,6 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void setAnimatorI32Input(EntityRef entity, u32 input_idx, i32 value) {
-		auto iter = m_animator_map.find(entity);
-		if (!iter.isValid()) return;
-
-		Animator& animator = m_animators[iter.value()];
-		if (animator.resource->m_inputs[input_idx].type == anim::Value::I32) {
-			animator.ctx->inputs[input_idx].s32 = value;
-		}
-		else {
-			logWarning("Trying to set i32 to ", animator.resource->m_inputs[input_idx].name);
-		}
-	}
-
-
 	void setAnimatorBoolInput(EntityRef entity, u32 input_idx, bool value) {
 		auto iter = m_animator_map.find(entity);
 		if (!iter.isValid()) return;
@@ -562,27 +548,6 @@ struct AnimationModuleImpl final : AnimationModule {
 		return animator.ctx->inputs[input_idx].b;
 	}
 
-	i32 getAnimatorI32Input(EntityRef entity, u32 input_idx) override {
-		Animator& animator = m_animators[m_animator_map[entity]];
-		if (!animator.ctx) return 0;
-
-		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
-		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::I32);
-
-		return animator.ctx->inputs[input_idx].s32;
-
-	}
-
-	void setAnimatorInput(EntityRef entity, u32 input_idx, i32 value) override {
-		Animator& animator = m_animators[m_animator_map[entity]];
-		if (!animator.ctx) return;
-
-		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
-		if (animator.resource->m_inputs[input_idx].type != anim::Value::I32) return;
-
-		animator.ctx->inputs[input_idx].s32 = value;
-	}
-
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
 	{
 		auto iter = m_animator_map.find(entity);
@@ -940,7 +905,6 @@ void AnimationModule::reflect(Engine& engine) {
 			.LUMIX_PROP(PropertyAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
 			.prop<&AnimationModule::isPropertyAnimatorEnabled, &AnimationModule::enablePropertyAnimator>("Enabled")
 		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
-			.function<(void (AnimationModule::*)(EntityRef, u32, i32))&AnimationModule::setAnimatorInput>("setU32Input", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")
 			.LUMIX_FUNC_EX(AnimationModule::getAnimatorInputIndex, "getInputIndex")

@@ -189,9 +189,27 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				visitor.endCategory();
 			}
 			visitor
-				.visitType(anim::NodeType::BLEND1D, "Blend 1D", '1')
-				.visitType(anim::NodeType::BLEND2D, "Blend 2D", '2');
+				.visitType(anim::NodeType::BLEND1D, "Blend 1D", 0)
+				.visitType(anim::NodeType::BLEND2D, "Blend 2D", '2')
+				.visitType(anim::NodeType::CONSTANT, "Constant", '1');
 			
+			if (visitor.beginCategory("Math")) {
+				visitor
+					.visitType(anim::NodeType::ADD, "Add")
+					.visitType(anim::NodeType::AND, "And")
+					.visitType(anim::NodeType::DIV, "Divide")
+					.visitType(anim::NodeType::CMP_EQ, "Equal")
+					.visitType(anim::NodeType::CMP_GT, "Greater than")
+					.visitType(anim::NodeType::CMP_GTE, "Greater than or equal")
+					.visitType(anim::NodeType::CMP_LT, "Less than")
+					.visitType(anim::NodeType::CMP_LTE, "Less than or equal")
+					.visitType(anim::NodeType::MUL, "Multiply")
+					.visitType(anim::NodeType::CMP_NEQ, "Not equal")
+					.visitType(anim::NodeType::OR, "Or")
+					.visitType(anim::NodeType::SUB, "Subtract");
+				visitor.endCategory();
+			}
+
 			if (visitor.beginCategory("Inputs")) {
 				struct : INodeTypeVisitor::INodeCreator {
 					Node* create(EditorWindow& editor) const override {
@@ -211,6 +229,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			visitor
 				.visitType(anim::NodeType::LAYERS, "Layers", 'L')
 				.visitType(anim::NodeType::SELECT, "Select", 'S')
+				.visitType(anim::NodeType::SWITCH, "Switch", 'W')
 				.visitType(anim::NodeType::TREE, "Tree", 'T');
 		}
 	
@@ -323,10 +342,20 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			Node* n = nullptr;
 			if (m_node_filter.isActive()) {
 				struct : INodeTypeVisitor {
-					INodeTypeVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
-						if (n || !win->m_node_filter.pass(label)) return *this;
+					bool beginCategory(const char* _category) override {
+						category = _category;
+						category.append(" / ");
+						return true;
+					}
+					void endCategory() override { category = ""; }
+
+					INodeTypeVisitor& visitType(const char* _label, const INodeCreator& creator, char shortcut) override {
+						if (n || !win->m_node_filter.pass(_label)) return *this;
 						bool selected = win->m_node_filter_selection == index;
 						if (selected && scroll) ImGui::SetScrollHereY();
+						
+						StaticString<128> label(category, _label);
+						if (shortcut) label.append(" (LMB + ", shortcut, ")");
 						if (ImGui::Selectable(label, selected) || insert_enter && selected) {
 							n = creator.create(*win);
 							ImGui::CloseCurrentPopup();
@@ -338,6 +367,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					bool scroll = false;
 					u32 index = 0;
 					EditorWindow* win;
+					StaticString<64> category;
 					Node* n = nullptr;
 				} visitor;
 				visitor.insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
@@ -364,7 +394,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				struct : INodeTypeVisitor {
 					bool beginCategory(const char* category) { return ImGui::BeginMenu(category); }
 					void endCategory() { ImGui::EndMenu(); }
-					INodeTypeVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {
+					INodeTypeVisitor& visitType(const char* _label, const INodeCreator& creator, char shortcut) override {
+						StaticString<128> label(_label);
+						if (shortcut) label.append(" (LMB + ", shortcut, ")");
 						if (!n && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(label))) {
 							n = creator.create(*win);
 							ImGui::CloseCurrentPopup();
@@ -626,14 +658,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						bool val = module->getAnimatorBoolInput(entity, idx);
 						ImGuiEx::Label(input.name);
 						if (ImGui::Checkbox("##i", &val)) {
-							module->setAnimatorInput(entity, idx, val);
-						}
-						break;
-					}
-					case anim::Value::I32: {
-						i32 val = module->getAnimatorI32Input(entity, idx);
-						ImGuiEx::Label(input.name);
-						if (ImGui::DragInt("##i", (int*)&val, 1, 0, 0x7ffFFff)) {
 							module->setAnimatorInput(entity, idx, val);
 						}
 						break;
@@ -971,7 +995,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				saveUndo(ImGui::InputText("##name", input.name.data, sizeof(input.name.data)));
 				ImGui::NextColumn();
 				ImGui::SetNextItemWidth(-1);
-				if (ImGui::Combo("##type", (int*)&input.type, "float\0i32\0bool")) {
+				if (ImGui::Combo("##type", (int*)&input.type, "number\0bool")) {
 					saveUndo(true);
 				}
 				ImGui::NextColumn();
