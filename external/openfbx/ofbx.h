@@ -56,35 +56,34 @@ constexpr LoadFlags& operator|=(LoadFlags& lhs, LoadFlags rhs)
 	return lhs = lhs | rhs;
 }
 
-struct Vec2
-{
-	double x, y;
-};
+struct DVec2 { double x, y; };
+struct DVec3 { double x, y, z; };
+struct DVec4 { double x, y, z, w; };
+struct DMatrix { double m[16]; /* last 4 are translation */ };
+struct DQuat{ double x, y, z, w; };
 
+struct FVec2 { float x, y; };
+struct FVec3 { float x, y, z; };
+struct FVec4 { float x, y, z, w; };
+struct FMatrix { float m[16]; };
+struct FQuat{ float x, y, z, w; };
 
-struct Vec3
-{
-	double x, y, z;
-};
-
-
-struct Vec4
-{
-	double x, y, z, w;
-};
-
-
-struct Matrix
-{
-	double m[16]; // last 4 are translation
-};
-
-
-struct Quat
-{
-	double x, y, z, w;
-};
-
+#define OFBX_SINGLE_PRECISION
+#ifdef OFBX_SINGLE_PRECISION
+	// use floats for vertices, normals, uvs, ...
+	using Vec2 = FVec2;
+	using Vec3 = FVec3;
+	using Vec4 = FVec4;
+	using Matrix = FMatrix;
+	using Quat = FQuat;
+#else
+	// use doubles for vertices, normals, uvs, ...
+	using Vec2 = DVec2;
+	using Vec3 = DVec3;
+	using Vec4 = DVec4;
+	using Matrix = DMatrix;
+	using Quat = DQuat;
+#endif
 
 struct Color
 {
@@ -220,19 +219,19 @@ struct Object
 	Object* getParent() const { return parent; }
 
 	RotationOrder getRotationOrder() const;
-	Vec3 getRotationOffset() const;
-	Vec3 getRotationPivot() const;
-	Vec3 getPostRotation() const;
-	Vec3 getScalingOffset() const;
-	Vec3 getScalingPivot() const;
-	Vec3 getPreRotation() const;
-	Vec3 getLocalTranslation() const;
-	Vec3 getLocalRotation() const;
-	Vec3 getLocalScaling() const;
-	Matrix getGlobalTransform() const;
-	Matrix getLocalTransform() const;
-	Matrix evalLocal(const Vec3& translation, const Vec3& rotation) const;
-	Matrix evalLocal(const Vec3& translation, const Vec3& rotation, const Vec3& scaling) const;
+	DVec3 getRotationOffset() const;
+	DVec3 getRotationPivot() const;
+	DVec3 getPostRotation() const;
+	DVec3 getScalingOffset() const;
+	DVec3 getScalingPivot() const;
+	DVec3 getPreRotation() const;
+	DVec3 getLocalTranslation() const;
+	DVec3 getLocalRotation() const;
+	DVec3 getLocalScaling() const;
+	DMatrix getGlobalTransform() const;
+	DMatrix getLocalTransform() const;
+	DMatrix evalLocal(const DVec3& translation, const DVec3& rotation) const;
+	DMatrix evalLocal(const DVec3& translation, const DVec3& rotation, const DVec3& scaling) const;
 	bool isNode() const { return is_node; }
 
 
@@ -259,7 +258,7 @@ struct Pose : Object {
 	static const Type s_type = Type::POSE;
 	Pose(const Scene& _scene, const IElement& _element);
 
-	virtual Matrix getMatrix() const = 0;
+	virtual DMatrix getMatrix() const = 0;
 	virtual const Object* getNode() const = 0;
 };
 
@@ -401,8 +400,8 @@ struct Camera : Object
 	virtual double getFocalLength() const = 0;
 	virtual double getFocusDistance() const = 0;
 
-	virtual Vec3 getBackgroundColor() const = 0;
-	virtual Vec3 getInterestPosition() const = 0;
+	virtual DVec3 getBackgroundColor() const = 0;
+	virtual DVec3 getInterestPosition() const = 0;
 };
 
 struct Material : Object
@@ -440,8 +439,8 @@ struct Cluster : Object
 	virtual int getIndicesCount() const = 0;
 	virtual const double* getWeights() const = 0;
 	virtual int getWeightsCount() const = 0;
-	virtual Matrix getTransformMatrix() const = 0;
-	virtual Matrix getTransformLinkMatrix() const = 0;
+	virtual DMatrix getTransformMatrix() const = 0;
+	virtual DMatrix getTransformLinkMatrix() const = 0;
 	virtual const Object* getLink() const = 0;
 };
 
@@ -534,7 +533,7 @@ struct Mesh : Object
 
 	virtual const Pose* getPose() const = 0;
 	virtual const Geometry* getGeometry() const = 0;
-	virtual Matrix getGeometricMatrix() const = 0;
+	virtual DMatrix getGeometricMatrix() const = 0;
 	virtual const Material* getMaterial(int idx) const = 0;
 	virtual int getMaterialCount() const = 0;
 
@@ -597,7 +596,7 @@ struct AnimationCurveNode : Object
 
 	virtual DataView getBoneLinkProperty() const = 0;
 	virtual const AnimationCurve* getCurve(int idx) const = 0; 
-	virtual Vec3 getNodeLocalTransform(double time) const = 0;
+	virtual DVec3 getNodeLocalTransform(double time) const = 0;
 	virtual const Object* getBone() const = 0;
 };
 

@@ -20,6 +20,15 @@
 namespace ofbx
 {
 
+struct Temporaries {
+	std::vector<double> d;
+	std::vector<float> f;
+	std::vector<int> i;
+	std::vector<Vec2> v2;
+	std::vector<Vec3> v3;
+	std::vector<Vec4> v4;
+};
+
 struct Allocator {
 	struct Page {
 		struct {
@@ -62,11 +71,18 @@ struct Allocator {
 
 
 	// store temporary data, can be reused, not threadsafe
-	std::vector<float> tmp;
-	std::vector<int> int_tmp;
-	std::vector<Vec3> vec3_tmp;
+	std::vector<float> float_tmp;
 	std::vector<double> double_tmp;
-	std::vector<Vec3> vec3_tmp2;
+	std::vector<int> int_tmp;
+	std::vector<FVec3> fvec3_tmp;
+	std::vector<FVec3> fvec3_tmp2;
+	std::vector<DVec3> dvec3_tmp;
+	std::vector<DVec3> dvec3_tmp2;
+
+	std::vector<Vec3>& vec3_tmp;
+	std::vector<Vec3>& vec3_tmp2;
+
+	Temporaries temporaries;
 	
 	struct MTAllocator {
 		MTAllocator(Allocator* backing) : backing(backing) {}
@@ -79,18 +95,20 @@ struct Allocator {
 		Allocator* backing;
 	};
 
-	Allocator() : mt_allocator(this) {}
+	Allocator() 
+		: mt_allocator(this)
+		#ifdef OFBX_SINGLE_PRECISION
+			, vec3_tmp(fvec3_tmp)
+			, vec3_tmp2(fvec3_tmp2)
+		#else
+			, vec3_tmp(dvec3_tmp)
+			, vec3_tmp2(dvec3_tmp2)
+		#endif
+	{}
 	MTAllocator mt_allocator;
 };
 
 
-struct Temporaries {
-	std::vector<float> f;
-	std::vector<int> i;
-	std::vector<Vec2> v2;
-	std::vector<Vec3> v3;
-	std::vector<Vec4> v4;
-};
 
 
 struct Video
@@ -185,7 +203,7 @@ struct Cursor
 };
 
 
-static void setTranslation(const Vec3& t, Matrix* mtx)
+static void setTranslation(const DVec3& t, DMatrix* mtx)
 {
 	mtx->m[12] = t.x;
 	mtx->m[13] = t.y;
@@ -193,15 +211,15 @@ static void setTranslation(const Vec3& t, Matrix* mtx)
 }
 
 
-static Vec3 operator-(const Vec3& v)
+static DVec3 operator-(const DVec3& v)
 {
 	return {-v.x, -v.y, -v.z};
 }
 
 
-static Matrix operator*(const Matrix& lhs, const Matrix& rhs)
+static DMatrix operator*(const DMatrix& lhs, const DMatrix& rhs)
 {
-	Matrix res;
+	DMatrix res;
 	for (int j = 0; j < 4; ++j)
 	{
 		for (int i = 0; i < 4; ++i)
@@ -218,15 +236,15 @@ static Matrix operator*(const Matrix& lhs, const Matrix& rhs)
 }
 
 
-static Matrix makeIdentity()
+static DMatrix makeIdentity()
 {
 	return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 }
 
 
-static Matrix rotationX(double angle)
+static DMatrix rotationX(double angle)
 {
-	Matrix m = makeIdentity();
+	DMatrix m = makeIdentity();
 	double c = cos(angle);
 	double s = sin(angle);
 
@@ -238,9 +256,9 @@ static Matrix rotationX(double angle)
 }
 
 
-static Matrix rotationY(double angle)
+static DMatrix rotationY(double angle)
 {
-	Matrix m = makeIdentity();
+	DMatrix m = makeIdentity();
 	double c = cos(angle);
 	double s = sin(angle);
 
@@ -252,9 +270,9 @@ static Matrix rotationY(double angle)
 }
 
 
-static Matrix rotationZ(double angle)
+static DMatrix rotationZ(double angle)
 {
-	Matrix m = makeIdentity();
+	DMatrix m = makeIdentity();
 	double c = cos(angle);
 	double s = sin(angle);
 
@@ -266,12 +284,12 @@ static Matrix rotationZ(double angle)
 }
 
 
-static Matrix getRotationMatrix(const Vec3& euler, RotationOrder order)
+static DMatrix getRotationMatrix(const DVec3& euler, RotationOrder order)
 {
 	const double TO_RAD = 3.1415926535897932384626433832795028 / 180.0;
-	Matrix rx = rotationX(euler.x * TO_RAD);
-	Matrix ry = rotationY(euler.y * TO_RAD);
-	Matrix rz = rotationZ(euler.z * TO_RAD);
+	DMatrix rx = rotationX(euler.x * TO_RAD);
+	DMatrix ry = rotationY(euler.y * TO_RAD);
+	DMatrix rz = rotationZ(euler.z * TO_RAD);
 	switch (order)
 	{
 		default:
@@ -298,13 +316,18 @@ i64 secondsToFbxTime(double value)
 }
 
 
-static Vec3 operator*(const Vec3& v, float f)
+static DVec3 operator*(const DVec3& v, float f)
 {
 	return {v.x * f, v.y * f, v.z * f};
 }
 
 
-static Vec3 operator+(const Vec3& a, const Vec3& b)
+static DVec3 operator+(const DVec3& a, const DVec3& b)
+{
+	return {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+static FVec3 operator+(const FVec3& a, const FVec3& b)
 {
 	return {a.x + b.x, a.y + b.y, a.z + b.z};
 }
@@ -540,7 +563,7 @@ static int resolveEnumProperty(const Object& object, const char* name, int defau
 }
 
 
-static Vec3 resolveVec3Property(const Object& object, const char* name, const Vec3& default_value)
+static DVec3 resolveVec3Property(const Object& object, const char* name, const DVec3& default_value)
 {
 	bool is_p60;
 	Element* element = (Element*)resolveProperty(object, name, &is_p60);
@@ -1165,17 +1188,17 @@ struct MeshImpl : Mesh
 	}
 
 
-	Matrix getGeometricMatrix() const override
+	DMatrix getGeometricMatrix() const override
 	{
-		Vec3 translation = resolveVec3Property(*this, "GeometricTranslation", {0, 0, 0});
-		Vec3 rotation = resolveVec3Property(*this, "GeometricRotation", {0, 0, 0});
-		Vec3 scale = resolveVec3Property(*this, "GeometricScaling", {1, 1, 1});
+		DVec3 translation = resolveVec3Property(*this, "GeometricTranslation", {0, 0, 0});
+		DVec3 rotation = resolveVec3Property(*this, "GeometricRotation", {0, 0, 0});
+		DVec3 scale = resolveVec3Property(*this, "GeometricScaling", {1, 1, 1});
 
-		Matrix scale_mtx = makeIdentity();
+		DMatrix scale_mtx = makeIdentity();
 		scale_mtx.m[0] = (float)scale.x;
 		scale_mtx.m[5] = (float)scale.y;
 		scale_mtx.m[10] = (float)scale.z;
-		Matrix mtx = getRotationMatrix(rotation, RotationOrder::EULER_XYZ);
+		DMatrix mtx = getRotationMatrix(rotation, RotationOrder::EULER_XYZ);
 		setTranslation(translation, &mtx);
 
 		return scale_mtx * mtx;
@@ -1355,8 +1378,8 @@ struct ClusterImpl : Cluster
 	int getIndicesCount() const override { return (int)indices.size(); }
 	const double* getWeights() const override { return &weights[0]; }
 	int getWeightsCount() const override { return (int)weights.size(); }
-	Matrix getTransformMatrix() const override { return transform_matrix; }
-	Matrix getTransformLinkMatrix() const override { return transform_link_matrix; }
+	DMatrix getTransformMatrix() const override { return transform_matrix; }
+	DMatrix getTransformLinkMatrix() const override { return transform_link_matrix; }
 	Object* getLink() const override { return link; }
 
 	bool postprocess(Allocator& allocator)
@@ -1412,8 +1435,8 @@ struct ClusterImpl : Cluster
 	Skin* skin = nullptr;
 	std::vector<int> indices;
 	std::vector<double> weights;
-	Matrix transform_matrix;
-	Matrix transform_link_matrix;
+	DMatrix transform_matrix;
+	DMatrix transform_link_matrix;
 	Type getType() const override { return Type::CLUSTER; }
 };
 
@@ -1598,12 +1621,12 @@ struct PoseImpl : Pose
 	bool postprocess(Scene& scene);
 
 
-	Matrix getMatrix() const override { return matrix; }
+	DMatrix getMatrix() const override { return matrix; }
 	const Object* getNode() const override { return node; }
 
 	Type getType() const override { return Type::POSE; }
 
-	Matrix matrix;
+	DMatrix matrix;
 	Object* node = nullptr;
 	u64 node_id;
 };
@@ -1735,8 +1758,8 @@ struct CameraImpl : public Camera
 	double focalLength = 50.0;
 	double focusDistance = 50.0;
 	
-	Vec3 backgroundColor = {0, 0, 0};
-	Vec3 interestPosition = {0, 0, 0};
+	DVec3 backgroundColor = {0, 0, 0};
+	DVec3 interestPosition = {0, 0, 0};
 
 	double fieldOfView = 60.0;
 
@@ -1759,8 +1782,8 @@ struct CameraImpl : public Camera
 	double getFocalLength() const override { return focalLength; }
 	double getFocusDistance() const override { return focusDistance; }
 
-	Vec3 getBackgroundColor() const override { return backgroundColor; }
-	Vec3 getInterestPosition() const override { return interestPosition; }
+	DVec3 getBackgroundColor() const override { return backgroundColor; }
+	DVec3 getInterestPosition() const override { return interestPosition; }
 
 	void CalculateFOV()
 	{
@@ -2022,7 +2045,7 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 	}
 
 
-	Vec3 getNodeLocalTransform(double time) const override
+	DVec3 getNodeLocalTransform(double time) const override
 	{
 		i64 fbx_time = secondsToFbxTime(time);
 
@@ -2153,37 +2176,58 @@ void parseVideo(Scene& scene, const Element& element, Allocator& allocator)
 	scene.m_videos.push_back(video);
 }
 
-template <typename T> static bool parseDoubleVecData(Property& property, std::vector<T>* out_vec, std::vector<float>* tmp)
-{
+template <typename T> static void parseTextArray(const Property& property, std::vector<T>* out);
+template <typename T> static bool parseBinaryArrayLinked(const Property& property, std::vector<T>* out);
+
+template <typename T> static bool parseVecData(Property& property, std::vector<T>* out_vec, Temporaries* tmp) {
+	using TElemType = decltype((*out_vec)[0].x);
 	assert(out_vec);
-	if (!property.value.is_binary)
-	{
+	if (!property.value.is_binary) {
 		parseTextArray(property, out_vec);
 		return true;
 	}
 
-	if (property.type == 'D' || property.type == 'F')
-	{
+	if (property.type == 'D' || property.type == 'F') {
 		return parseBinaryArrayLinked(property, out_vec);
 	}
 
-	if (property.type == 'd')
-	{
+	if (property.type == 'f') {
+		if (sizeof((*out_vec)[0].x) == sizeof(float)) {
+			return parseBinaryArray(property, out_vec);
+		}
+		if (sizeof((*out_vec)[0].x) == sizeof(double)) {
+			tmp->f.clear();
+			if (!parseBinaryArray(property, &tmp->f)) return false;
+			int elem_count = sizeof((*out_vec)[0]) / sizeof((*out_vec)[0].x);
+			out_vec->resize(tmp->f.size() / elem_count);
+			TElemType* out = &(*out_vec)[0].x;
+			for (int i = 0, c = (int)tmp->f.size(); i < c; ++i) {
+				out[i] = static_cast<TElemType>(tmp->f[i]);
+			}
+			return true;
+		}
+		return false;
+	}
+
+	if (property.type != 'd') return false;
+	
+	if (sizeof((*out_vec)[0].x) == sizeof(double)) {
 		return parseBinaryArray(property, out_vec);
 	}
 
-	assert(property.type == 'f');
-	assert(sizeof((*out_vec)[0].x) == sizeof(double));
-	tmp->clear();
-	if (!parseBinaryArray(property, tmp)) return false;
-	int elem_count = sizeof((*out_vec)[0]) / sizeof((*out_vec)[0].x);
-	out_vec->resize(tmp->size() / elem_count);
-	double* out = &(*out_vec)[0].x;
-	for (int i = 0, c = (int)tmp->size(); i < c; ++i)
-	{
-		out[i] = (*tmp)[i];
+	if (sizeof((*out_vec)[0].x) == sizeof(float)) {
+		tmp->d.clear();
+		if (!parseBinaryArray(property, &tmp->d)) return false;
+		int elem_count = sizeof((*out_vec)[0]) / sizeof((*out_vec)[0].x);
+		out_vec->resize(tmp->d.size() / elem_count);
+		auto* out = &(*out_vec)[0].x;
+		for (int i = 0, c = (int)tmp->d.size(); i < c; ++i) {
+			out[i] = static_cast<TElemType>(tmp->d[i]);
+		}
+		return true;
 	}
-	return true;
+
+	return false;
 }
 
 static int decodeIndex(int idx)
@@ -2363,7 +2407,7 @@ static bool parseVertexData(const Element& element,
 	std::vector<T>* out,
 	std::vector<int>* out_indices,
 	GeometryImpl::VertexDataMapping* mapping,
-	std::vector<float>* tmp)
+	Temporaries* tmp)
 {
 	assert(out);
 	assert(mapping);
@@ -2408,7 +2452,7 @@ static bool parseVertexData(const Element& element,
 			return false;
 		}
 	}
-	return parseDoubleVecData(*data_element->first_property, out, tmp);
+	return parseVecData(*data_element->first_property, out, tmp);
 }
 
 template <typename T>
@@ -2499,7 +2543,7 @@ static OptionalError<Object*> parseGeometryUVs(
 			tmp->v2.clear();
 			tmp->i.clear();
 			GeometryImpl::VertexDataMapping mapping;
-			if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &tmp->v2, &tmp->i, &mapping, &tmp->f))
+			if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &tmp->v2, &tmp->i, &mapping, tmp))
 				return Error("Invalid UVs");
 			if (!tmp->v2.empty() && (tmp->i.empty() || tmp->i[0] != -1))
 			{
@@ -2533,12 +2577,12 @@ static OptionalError<Object*> parseGeometryTangents(
 		GeometryImpl::VertexDataMapping mapping;
 		if (findChild(*layer_tangent_element, "Tangents"))
 		{
-			if (!parseVertexData(*layer_tangent_element, "Tangents", "TangentsIndex", &tmp->v3, &tmp->i, &mapping, &tmp->f))
+			if (!parseVertexData(*layer_tangent_element, "Tangents", "TangentsIndex", &tmp->v3, &tmp->i, &mapping, tmp))
 				return Error("Invalid tangets");
 		}
 		else
 		{
-			if (!parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", &tmp->v3, &tmp->i, &mapping, &tmp->f))
+			if (!parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", &tmp->v3, &tmp->i, &mapping, tmp))
 				return Error("Invalid tangets");
 		}
 		if (!tmp->v3.empty())
@@ -2561,7 +2605,7 @@ static OptionalError<Object*> parseGeometryColors(
 	if (layer_color_element)
 	{
 		GeometryImpl::VertexDataMapping mapping;
-		if (!parseVertexData(*layer_color_element, "Colors", "ColorIndex", &tmp->v4, &tmp->i, &mapping, &tmp->f))
+		if (!parseVertexData(*layer_color_element, "Colors", "ColorIndex", &tmp->v4, &tmp->i, &mapping, tmp))
 			return Error("Invalid colors");
 		if (!tmp->v4.empty())
 		{
@@ -2583,7 +2627,7 @@ static OptionalError<Object*> parseGeometryNormals(
 	if (layer_normal_element)
 	{
 		GeometryImpl::VertexDataMapping mapping;
-		if (!parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", &tmp->v3, &tmp->i, &mapping, &tmp->f))
+		if (!parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", &tmp->v3, &tmp->i, &mapping, tmp))
 			return Error("Invalid normals");
 		if (!tmp->v3.empty())
 		{
@@ -2613,7 +2657,7 @@ struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& eleme
 	std::vector<int> original_indices;
 	std::vector<int> to_old_indices;
 	Temporaries tmp;
-	if (!parseDoubleVecData(*vertices_element->first_property, &vertices, &tmp.f)) return Error("Failed to parse vertices");
+	if (!parseVecData(*vertices_element->first_property, &vertices, &tmp)) return Error("Failed to parse vertices");
 	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
 
 	buildGeometryVertexData(&mesh->geometry_data, vertices, original_indices, to_old_indices, triangulate, allocator);
@@ -2825,7 +2869,7 @@ struct OptionalError<Object*> parsePose(Scene& scene, const Element& element, Al
 		const Element* node = findChild(*pose_node, "Node");
 		const Element* matrix = findChild(*pose_node, "Matrix");
 
-		if (matrix->first_property) {
+		if (matrix && matrix->first_property) {
 			if (!matrix->first_property->getValues(&pose->matrix.m[0], sizeof(pose->matrix))) {
 				return Error("Failed to parse pose");
 			}
@@ -3102,26 +3146,52 @@ const char* fromString(const char* str, const char* end, double* val, int count)
 	return (const char*)iter;
 }
 
+const char* fromString(const char* str, const char* end, float* val, int count)
+{
+	const char* iter = str;
+	for (int i = 0; i < count; ++i)
+	{
+		*val = (float)atof(iter);
+		++val;
+		while (iter < end && *iter != ',') ++iter;
+		if (iter < end) ++iter; // skip ','
 
-template <> const char* fromString<Vec2>(const char* str, const char* end, Vec2* val)
+		if (iter == end) return iter;
+	}
+	return (const char*)iter;
+}
+
+template <> const char* fromString<DVec2>(const char* str, const char* end, DVec2* val)
 {
 	return fromString(str, end, &val->x, 2);
 }
 
+template <> const char* fromString<FVec2>(const char* str, const char* end, FVec2* val)
+{
+	return fromString(str, end, &val->x, 2);
+}
 
-template <> const char* fromString<Vec3>(const char* str, const char* end, Vec3* val)
+template <> const char* fromString<FVec3>(const char* str, const char* end, FVec3* val)
 {
 	return fromString(str, end, &val->x, 3);
 }
 
+template <> const char* fromString<DVec3>(const char* str, const char* end, DVec3* val)
+{
+	return fromString(str, end, &val->x, 3);
+}
 
-template <> const char* fromString<Vec4>(const char* str, const char* end, Vec4* val)
+template <> const char* fromString<DVec4>(const char* str, const char* end, DVec4* val)
 {
 	return fromString(str, end, &val->x, 4);
 }
 
+template <> const char* fromString<FVec4>(const char* str, const char* end, FVec4* val)
+{
+	return fromString(str, end, &val->x, 4);
+}
 
-template <> const char* fromString<Matrix>(const char* str, const char* end, Matrix* val)
+template <> const char* fromString<DMatrix>(const char* str, const char* end, DMatrix* val)
 {
 	return fromString(str, end, &val->m[0], 16);
 }
@@ -3290,7 +3360,7 @@ static OptionalError<Object*> parseGeometry(const Element& element, bool triangu
 	std::vector<int> original_indices;
 	std::vector<int> to_old_indices;
 	Temporaries tmp;
-	if (!parseDoubleVecData(*vertices_element->first_property, &vertices, &tmp.f)) return Error("Failed to parse vertices");
+	if (!parseVecData(*vertices_element->first_property, &vertices, &tmp)) return Error("Failed to parse vertices");
 	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
 
 	buildGeometryVertexData(geom, vertices, original_indices, to_old_indices, triangulate, allocator);
@@ -3328,13 +3398,13 @@ bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator)
 	}
 
 	allocator.vec3_tmp.clear(); // old vertices
-	allocator.vec3_tmp2.clear(); // old normals
+	allocator.dvec3_tmp2.clear(); // old normals
 	allocator.int_tmp.clear(); // old indices
-	if (!parseDoubleVecData(*vertices_element->first_property, &allocator.vec3_tmp, &allocator.tmp)) return true;
-	if (normals_element && !parseDoubleVecData(*normals_element->first_property, &allocator.vec3_tmp2, &allocator.tmp)) return true;
+	if (!parseVecData(*vertices_element->first_property, &allocator.vec3_tmp, &allocator.temporaries)) return true;
+	if (normals_element && !parseVecData(*normals_element->first_property, &allocator.dvec3_tmp2, &allocator.temporaries)) return true;
 	if (!parseBinaryArray(*indexes_element->first_property, &allocator.int_tmp)) return true;
 
-	if (allocator.vec3_tmp.size() != allocator.int_tmp.size() || allocator.vec3_tmp2.size() != allocator.int_tmp.size()) return false;
+	if (allocator.vec3_tmp.size() != allocator.int_tmp.size() || allocator.dvec3_tmp2.size() != allocator.int_tmp.size()) return false;
 
 	vertices = geom->vertices;
 	normals = geom->normals;
@@ -4011,76 +4081,76 @@ RotationOrder Object::getRotationOrder() const
 }
 
 
-Vec3 Object::getRotationOffset() const
+DVec3 Object::getRotationOffset() const
 {
 	return resolveVec3Property(*this, "RotationOffset", {0, 0, 0});
 }
 
 
-Vec3 Object::getRotationPivot() const
+DVec3 Object::getRotationPivot() const
 {
 	return resolveVec3Property(*this, "RotationPivot", {0, 0, 0});
 }
 
 
-Vec3 Object::getPostRotation() const
+DVec3 Object::getPostRotation() const
 {
 	return resolveVec3Property(*this, "PostRotation", {0, 0, 0});
 }
 
 
-Vec3 Object::getScalingOffset() const
+DVec3 Object::getScalingOffset() const
 {
 	return resolveVec3Property(*this, "ScalingOffset", {0, 0, 0});
 }
 
 
-Vec3 Object::getScalingPivot() const
+DVec3 Object::getScalingPivot() const
 {
 	return resolveVec3Property(*this, "ScalingPivot", {0, 0, 0});
 }
 
 
-Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation) const
+DMatrix Object::evalLocal(const DVec3& translation, const DVec3& rotation) const
 {
 	return evalLocal(translation, rotation, getLocalScaling());
 }
 
 
-Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation, const Vec3& scaling) const
+DMatrix Object::evalLocal(const DVec3& translation, const DVec3& rotation, const DVec3& scaling) const
 {
-	Vec3 rotation_pivot = getRotationPivot();
-	Vec3 scaling_pivot = getScalingPivot();
+	DVec3 rotation_pivot = getRotationPivot();
+	DVec3 scaling_pivot = getScalingPivot();
 	RotationOrder rotation_order = getRotationOrder();
 
-	Matrix s = makeIdentity();
+	DMatrix s = makeIdentity();
 	s.m[0] = scaling.x;
 	s.m[5] = scaling.y;
 	s.m[10] = scaling.z;
 
-	Matrix t = makeIdentity();
+	DMatrix t = makeIdentity();
 	setTranslation(translation, &t);
 
-	Matrix r = getRotationMatrix(rotation, rotation_order);
-	Matrix r_pre = getRotationMatrix(getPreRotation(), RotationOrder::EULER_XYZ);
-	Matrix r_post_inv = getRotationMatrix(-getPostRotation(), RotationOrder::EULER_ZYX);
+	DMatrix r = getRotationMatrix(rotation, rotation_order);
+	DMatrix r_pre = getRotationMatrix(getPreRotation(), RotationOrder::EULER_XYZ);
+	DMatrix r_post_inv = getRotationMatrix(-getPostRotation(), RotationOrder::EULER_ZYX);
 
-	Matrix r_off = makeIdentity();
+	DMatrix r_off = makeIdentity();
 	setTranslation(getRotationOffset(), &r_off);
 
-	Matrix r_p = makeIdentity();
+	DMatrix r_p = makeIdentity();
 	setTranslation(rotation_pivot, &r_p);
 
-	Matrix r_p_inv = makeIdentity();
+	DMatrix r_p_inv = makeIdentity();
 	setTranslation(-rotation_pivot, &r_p_inv);
 
-	Matrix s_off = makeIdentity();
+	DMatrix s_off = makeIdentity();
 	setTranslation(getScalingOffset(), &s_off);
 
-	Matrix s_p = makeIdentity();
+	DMatrix s_p = makeIdentity();
 	setTranslation(scaling_pivot, &s_p);
 
-	Matrix s_p_inv = makeIdentity();
+	DMatrix s_p_inv = makeIdentity();
 	setTranslation(-scaling_pivot, &s_p_inv);
 
 	// http://help.autodesk.com/view/FBX/2017/ENU/?guid=__files_GUID_10CDD63C_79C1_4F2D_BB28_AD2BE65A02ED_htm
@@ -4088,31 +4158,31 @@ Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation, const Ve
 }
 
 
-Vec3 Object::getLocalTranslation() const
+DVec3 Object::getLocalTranslation() const
 {
 	return resolveVec3Property(*this, "Lcl Translation", {0, 0, 0});
 }
 
 
-Vec3 Object::getPreRotation() const
+DVec3 Object::getPreRotation() const
 {
 	return resolveVec3Property(*this, "PreRotation", {0, 0, 0});
 }
 
 
-Vec3 Object::getLocalRotation() const
+DVec3 Object::getLocalRotation() const
 {
 	return resolveVec3Property(*this, "Lcl Rotation", {0, 0, 0});
 }
 
 
-Vec3 Object::getLocalScaling() const
+DVec3 Object::getLocalScaling() const
 {
 	return resolveVec3Property(*this, "Lcl Scaling", {1, 1, 1});
 }
 
 
-Matrix Object::getGlobalTransform() const
+DMatrix Object::getGlobalTransform() const
 {
 	const Object* parent = getParent();
 	if (!parent) return evalLocal(getLocalTranslation(), getLocalRotation());
@@ -4121,7 +4191,7 @@ Matrix Object::getGlobalTransform() const
 }
 
 
-Matrix Object::getLocalTransform() const
+DMatrix Object::getLocalTransform() const
 {
 	return evalLocal(getLocalTranslation(), getLocalRotation(), getLocalScaling());
 }
