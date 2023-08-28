@@ -1004,7 +1004,13 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					const bool is_filtered = !m_filter.pass(name);
 					const u32 alpha = is_filtered ? 0x2000'0000 : 0xff00'0000;
 					if (m_hovered_link.link == block.link && m_hovered_link.frame > m_frame_idx - 2) color = 0xff0000ff;
-					color = alpha | (color & 0x00ffffff);
+					if (is_filtered) {
+						ImColor tmp_c(color);
+						tmp_c.Value.x *= 0.5f;
+						tmp_c.Value.y *= 0.5f;
+						tmp_c.Value.z *= 0.5f;
+						color = tmp_c;
+					}
 					const u32 hovered_color = ImGui::GetColorU32(ImGuiCol_ButtonActive);
 					u32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
 					border_color = alpha | (border_color & 0x00ffffff);
