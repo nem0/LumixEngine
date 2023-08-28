@@ -98,10 +98,10 @@ namespace ImGuiEx {
 			PopID();
 			ImDrawList* dl = g_node_editor.draw_list;
 			if (g_node_editor.new_link_from_input) {
-				dl->AddBezierCubic(from, from - ImVec2(20, 0), mp + ImVec2(20, 0), mp, GetColorU32(ImGuiCol_Tab), 3.f);
+				dl->AddBezierCubic(from, from - ImVec2(20, 0), mp + ImVec2(20, 0), mp, GetColorU32(ImGuiCol_Text), 3.f);
 			}
 			else {
-				dl->AddBezierCubic(from, from + ImVec2(20, 0), mp - ImVec2(20, 0), mp, GetColorU32(ImGuiCol_Tab), 3.f);
+				dl->AddBezierCubic(from, from + ImVec2(20, 0), mp - ImVec2(20, 0), mp, GetColorU32(ImGuiCol_Text), 3.f);
 			}
 		}
 		
@@ -171,7 +171,7 @@ namespace ImGuiEx {
 		const ImVec2 half_extents(NODE_PIN_RADIUS + 4, NODE_PIN_RADIUS + 4);
 		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
 		const bool hovered = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-		const ImU32 color = GetColorU32(hovered ? ImGuiCol_TabHovered : ImGuiCol_Tab);
+		const ImU32 color = GetColorU32(hovered ? ImGuiCol_ResizeGripHovered : ImGuiCol_ResizeGrip);
 		switch(shape) {
 			case PinShape::TRIANGLE:
 				g_node_editor.draw_list->AddTriangleFilled(center - ImVec2(NODE_PIN_RADIUS, -NODE_PIN_RADIUS)
@@ -225,7 +225,7 @@ namespace ImGuiEx {
 	}
 	
 	void NodeLink(ImGuiID from_id, ImGuiID to_id) {
-		NodeLinkEx(from_id, to_id, GetColorU32(ImGuiCol_Tab), GetColorU32(ImGuiCol_TabActive));
+		NodeLinkEx(from_id, to_id, GetColorU32(ImGuiCol_Text), GetColorU32(ImGuiCol_HeaderHovered));
 	}
 
 	void NodeLinkEx(ImGuiID from_id, ImGuiID to_id, ImU32 color, ImU32 active_color) {
@@ -263,11 +263,11 @@ namespace ImGuiEx {
 	}
 
 	void NodeTitle(const char* text) {
-		NodeTitle(text, ImColor(GetStyle().Colors[ImGuiCol_Tab]));
+		NodeTitle(text, ImColor(GetStyle().Colors[ImGuiCol_Header]));
 	}
 
 	void BeginNodeTitleBar() {
-		BeginNodeTitleBar(ImColor(GetStyle().Colors[ImGuiCol_Tab]));
+		BeginNodeTitleBar(ImColor(GetStyle().Colors[ImGuiCol_Header]));
 	}
 
 	void BeginNodeTitleBar(ImU32 color) {

@@ -36,12 +36,28 @@ bool editSlot(const Controller& controller, const char* str_id, u32* slot) {
 	bool changed = false;
 	const char* preview = *slot < (u32)controller.m_animation_slots.size() ? controller.m_animation_slots[*slot].c_str() : "N/A";
 	if (ImGui::BeginCombo(str_id, preview, 0)) {
+		ImGuiStorage* storage = ImGui::GetStateStorage();
+		i32 selected = storage->GetInt(ImGui::GetID("selected-index"), -1);
 		static TextFilter filter;
 		filter.gui("Filter", -1, ImGui::IsWindowAppearing());
-		bool selected = false;
+		bool scroll = false;
+		if (ImGui::IsItemActive()) {
+			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+				--selected;
+				scroll =  true;
+			}
+			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+				++selected;
+				scroll =  true;
+			}
+		}
+		selected = clamp(selected, -1, controller.m_animation_slots.size() - 1);
+		bool is_enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter);
 		for (u32 i = 0, c = controller.m_animation_slots.size(); i < c; ++i) {
 			const char* name = controller.m_animation_slots[i].c_str();
-			if (filter.pass(name) && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::Selectable(name))) {
+			const bool is_selected = selected == i;
+			if (filter.pass(name) && ((is_enter_pressed && is_selected) || ImGui::Selectable(name, is_selected))) {
+				if (scroll && is_selected) ImGui::SetScrollHereY();
 				*slot = i;
 				changed = true;
 				filter.clear();
@@ -49,6 +65,7 @@ bool editSlot(const Controller& controller, const char* str_id, u32* slot) {
 				break;
 			}
 		}
+		storage->SetInt(ImGui::GetID("selected-index"), selected);
 		ImGui::EndCombo();
 	}
 	return changed;
@@ -348,6 +365,7 @@ bool Blend1DNode::propertiesGUI() {
 		
 			ImGui::TableNextColumn();
 			ImGui::SetNextItemWidth(-1);
+			static i32 selected = -1;
 			res = editSlot(m_controller, "##anim", &child.slot) || res;
 
 			ImGui::PopID();
@@ -408,6 +426,7 @@ anim::Node* AnimationNode::compile(anim::Controller& controller) {
 
 bool AnimationNode::propertiesGUI() {
 	ImGuiEx::Label("Slot");
+	static i32 selected = -1;
 	bool res = editSlot(m_controller, "##slot", &m_slot);
 	ImGuiEx::Label("Looping");
 	bool loop = m_flags && Flags::LOOPED;
@@ -529,6 +548,96 @@ void InputNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ver
 	Node::deserialize(stream, ctrl, version);
 	stream.read(m_input_index);
 }
+
+bool ConstNode::onGUI() {
+	outputSlot(ImGuiEx::PinShape::SQUARE);
+	// TODO other types
+	return ImGui::InputFloat("Value", &m_value.f);
+}
+
+anim::Node* ConstNode::compile(anim::Controller& controller) {
+	anim::ConstNode* node = LUMIX_NEW(controller.m_allocator, anim::ConstNode);
+	node->m_value = m_value;
+	return node;
+}
+
+ConstNode::ConstNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: ValueNode(parent, controller, allocator)
+{}
+
+void ConstNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+	stream.write(m_value);
+}
+
+void ConstNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
+	stream.read(m_value);
+}
+
+bool MathNode::onGUI() {
+	switch (m_type) {
+		case anim::NodeType::AND: ImGuiEx::NodeTitle("A and B"); break;
+		case anim::NodeType::OR: ImGuiEx::NodeTitle("A or B"); break;
+		case anim::NodeType::CMP_EQ: ImGuiEx::NodeTitle("A = B"); break;
+		case anim::NodeType::CMP_NEQ: ImGuiEx::NodeTitle("A != B"); break;
+		case anim::NodeType::CMP_GT: ImGuiEx::NodeTitle("A > B"); break;
+		case anim::NodeType::CMP_GTE: ImGuiEx::NodeTitle("A >= B"); break;
+		case anim::NodeType::CMP_LT: ImGuiEx::NodeTitle("A < B"); break;
+		case anim::NodeType::CMP_LTE: ImGuiEx::NodeTitle("A <= B"); break;
+		case anim::NodeType::ADD: ImGuiEx::NodeTitle("A + B"); break;
+		case anim::NodeType::DIV: ImGuiEx::NodeTitle("A / B"); break;
+		case anim::NodeType::MUL: ImGuiEx::NodeTitle("A * B"); break;
+		case anim::NodeType::SUB: ImGuiEx::NodeTitle("A - B"); break;
+		default: ASSERT(false); break;
+	}
+	
+	outputSlot(ImGuiEx::PinShape::SQUARE);
+	inputSlot(ImGuiEx::PinShape::SQUARE);
+	ImGui::TextUnformatted("A");
+	inputSlot(ImGuiEx::PinShape::SQUARE);
+	ImGui::TextUnformatted("B");
+	return false;
+}
+
+template <typename T>
+anim::Node* compileMathNode(MathNode& n, anim::Controller& controller) {
+	UniquePtr<T> node = UniquePtr<T>::create(controller.m_allocator);
+	ValueNode* i0 = castToValueNode(n.getInput(0));
+	ValueNode* i1 = castToValueNode(n.getInput(1));
+	if (!i0 || !i1) return nullptr;
+	node->m_input0 = (anim::ValueNode*)i0->compile(controller);
+	node->m_input1 = (anim::ValueNode*)i1->compile(controller);
+	if (!node->m_input0 || !node->m_input1) return nullptr;
+	return node.detach();
+}
+
+anim::Node* MathNode::compile(anim::Controller& controller) {
+	#define N(T) case anim::NodeType::T: return compileMathNode<anim::MathNode<anim::NodeType::T>>(*this, controller)
+	switch (m_type) {
+		N(CMP_GT);
+		N(CMP_GTE);
+		N(CMP_LT);
+		N(CMP_LTE);
+		N(CMP_EQ);
+		N(CMP_NEQ);
+		
+		N(AND);
+		N(OR);
+
+		N(ADD);
+		N(DIV);
+		N(MUL);
+		N(SUB);
+
+		default: ASSERT(false); return nullptr;
+	}
+}
+
+MathNode::MathNode(Node* parent, Controller& controller, anim::NodeType type, IAllocator& allocator)
+	: ValueNode(parent, controller, allocator)
+	, m_type(type)
+{}
 
 OutputNode::OutputNode(Node* parent, Controller& controller, IAllocator& allocator)
 	: PoseNode(parent, controller, allocator)
@@ -669,6 +778,55 @@ void SelectNode::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_options_count);
 }
 
+
+bool SwitchNode::onGUI() {
+	ImGuiEx::NodeTitle("Switch");
+	outputSlot();
+	inputSlot(); ImGui::TextUnformatted("Condition");
+	
+	inputSlot(); ImGui::TextUnformatted("True");
+	inputSlot(); ImGui::TextUnformatted("False");
+
+	return false;
+}
+
+SwitchNode::SwitchNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: PoseNode(parent, controller, allocator)
+{}
+
+anim::Node* SwitchNode::compile(anim::Controller& controller) {
+	ValueNode* value_node = castToValueNode(getInput(0));
+	// TODO make sure value_node returns bool
+	if (!value_node) return nullptr;
+
+	UniquePtr<anim::SwitchNode> node = UniquePtr<anim::SwitchNode>::create(controller.m_allocator, controller.m_allocator);
+	node->m_blend_length = m_blend_length;
+	node->m_value = (anim::ValueNode*)value_node->compile(controller);
+	if (!node->m_value) return nullptr;
+
+	PoseNode* truenode = castToPoseNode(getInput(1));
+	if (!truenode) return nullptr;
+	node->m_true_node = (anim::PoseNode*)truenode->compile(controller);
+	if (!node->m_true_node) return nullptr;
+
+	PoseNode* falsenode = castToPoseNode(getInput(2));
+	if (!falsenode) return nullptr;
+	node->m_false_node = (anim::PoseNode*)falsenode->compile(controller);
+	if (!node->m_false_node) return nullptr;
+
+	return node.detach();
+}
+
+void SwitchNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
+	stream.read(m_blend_length);
+}
+
+void SwitchNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+	stream.write(m_blend_length);
+}
+
 void Node::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_id);
 	stream.write(m_pos);
@@ -757,6 +915,20 @@ Node* Node::create(Node* parent, Type type, Controller& controller, IAllocator& 
 		case anim::NodeType::TREE: return LUMIX_NEW(allocator, TreeNode)(parent, controller, allocator);
 		case anim::NodeType::OUTPUT: return LUMIX_NEW(allocator, OutputNode)(parent, controller, allocator);
 		case anim::NodeType::INPUT: return LUMIX_NEW(allocator, InputNode)(parent, controller, allocator);
+		case anim::NodeType::CONSTANT: return LUMIX_NEW(allocator, ConstNode)(parent, controller, allocator);
+		case anim::NodeType::SWITCH: return LUMIX_NEW(allocator, SwitchNode)(parent, controller, allocator);
+		case anim::NodeType::CMP_EQ: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_EQ, allocator);
+		case anim::NodeType::CMP_NEQ: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_NEQ, allocator);
+		case anim::NodeType::CMP_GT: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_GT, allocator);
+		case anim::NodeType::CMP_GTE: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_GTE, allocator);
+		case anim::NodeType::CMP_LT: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_LT, allocator);
+		case anim::NodeType::CMP_LTE: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_LTE, allocator);
+		case anim::NodeType::AND: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::AND, allocator);
+		case anim::NodeType::OR: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::OR, allocator);
+		case anim::NodeType::ADD: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::ADD, allocator);
+		case anim::NodeType::DIV: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::DIV, allocator);
+		case anim::NodeType::MUL: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::MUL, allocator);
+		case anim::NodeType::SUB: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::SUB, allocator);
 		case anim::NodeType::NONE: ASSERT(false); return nullptr;
 	}
 	ASSERT(false);

@@ -74,6 +74,20 @@ struct ValueNode : Node {
 	bool isValueNode() const override { return true; }
 };
 
+struct ConstNode : ValueNode {
+	ConstNode(Node* parent, Controller& controller, IAllocator& allocator);
+
+	Type type() const override { return anim::NodeType::CONSTANT; }
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	bool hasInputPins() const override { return false; }
+	bool hasOutputPins() const override { return true; }
+	anim::Node* compile(anim::Controller& controller) override;
+	bool onGUI() override;
+
+	anim::Value m_value;
+};
+
 struct InputNode : ValueNode {
 	InputNode(Node* parent, Controller& controller, IAllocator& allocator);
 
@@ -132,6 +146,34 @@ struct SelectNode final : PoseNode {
 	anim::Node* compile(anim::Controller& controller) override;
 
 	u32 m_options_count = 2;
+	Time m_blend_length = Time::fromSeconds(0.3f);
+};
+
+struct MathNode final : ValueNode {
+	MathNode(Node* parent, Controller& controller, anim::NodeType type, IAllocator& allocator);
+
+	Type type() const override { return m_type; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	bool onGUI() override;
+	
+	anim::Node* compile(anim::Controller& controller) override;
+
+	const anim::NodeType m_type;
+};
+
+struct SwitchNode final : PoseNode {
+	SwitchNode(Node* parent, Controller& controller, IAllocator& allocator);
+
+	Type type() const override { return anim::NodeType::SWITCH; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	bool onGUI() override;
+	
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	anim::Node* compile(anim::Controller& controller) override;
+
 	Time m_blend_length = Time::fromSeconds(0.3f);
 };
 

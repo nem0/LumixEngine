@@ -16,22 +16,20 @@ namespace anim {
 struct Value {
 	enum Type : u32 {
 		FLOAT,
-		I32,
 		BOOL
 	};
 	Type type;
 	union {
 		float f;
 		bool b;
-		i32 s32;
 	};
 
 	Value() : f(0), type(FLOAT) {}
 	Value(float f) : f(f), type(FLOAT) {}
 	Value(bool b) : b(b), type(BOOL) {}
-	Value(i32 i) : s32(i), type(I32) {}
 	float toFloat() const { ASSERT(type == FLOAT); return f; }
-	i32 toI32() const { ASSERT(type == I32); return s32; }
+	i32 toI32() const { ASSERT(type == FLOAT); return i32(f + 0.5f); }
+	bool toBool() const { ASSERT(type == BOOL); return b; }
 };
 
 struct RuntimeContext {
