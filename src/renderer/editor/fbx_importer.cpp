@@ -95,10 +95,10 @@ const FBXImporter::ImportMesh* FBXImporter::getAnyMeshFromBone(const ofbx::Objec
 }
 
 
-static ofbx::Matrix makeOFBXIdentity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
+static ofbx::DMatrix makeOFBXIdentity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 
 
-static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const ofbx::Object* node)
+static ofbx::DMatrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const ofbx::Object* node)
 {
 	if (!mesh) return node->getGlobalTransform();
 	if (!mesh->source_mesh->fbx) return makeOFBXIdentity();
@@ -384,10 +384,11 @@ void FBXImporter::gatherAnimations()
 }
 
 
-static Vec3 toLumixVec3(const ofbx::Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
+static Vec3 toLumixVec3(const ofbx::DVec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
+static Vec3 toLumixVec3(const ofbx::FVec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
 
 
-static Matrix toLumix(const ofbx::Matrix& mtx)
+static Matrix toLumix(const ofbx::DMatrix& mtx)
 {
 	Matrix res;
 
@@ -418,7 +419,17 @@ static u32 packF4u(const Vec3& vec)
 }
 
 
-void FBXImporter::writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const
+void FBXImporter::writePackedVec3(const ofbx::DVec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const
+{
+	Vec3 v = toLumixVec3(vec);
+	v = normalize((mtx * Vec4(v, 0)).xyz());
+	v = fixOrientation(v);
+
+	u32 packed = packF4u(v);
+	blob->write(packed);
+}
+
+void FBXImporter::writePackedVec3(const ofbx::FVec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const
 {
 	Vec3 v = toLumixVec3(vec);
 	v = normalize((mtx * Vec4(v, 0)).xyz());
@@ -680,7 +691,10 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			}
 		}
 
-		src_mesh.unique_vertex_count = (u32)meshopt_generateVertexRemapMulti(src_mesh.geom_indices.begin(), nullptr, vertex_count, vertex_count, streams, stream_count);
+		{
+			PROFILE_BLOCK("meshopt remap");
+			src_mesh.unique_vertex_count = (u32)meshopt_generateVertexRemapMulti(src_mesh.geom_indices.begin(), nullptr, vertex_count, vertex_count, streams, stream_count);
+		}
 		
 		if (!normals) {
 			computeNormals(src_mesh.computed_normals, vertices, vertex_count, src_mesh.geom_indices.begin(), m_allocator);
@@ -1326,7 +1340,7 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 	return written_count > 0;
 }
 
-static void convert(const ofbx::Matrix& mtx, Vec3& pos, Quat& rot)
+static void convert(const ofbx::DMatrix& mtx, Vec3& pos, Quat& rot)
 {
 	Matrix m = toLumix(mtx);
 	m.normalizeScale();
@@ -1356,7 +1370,7 @@ static float evalCurve(i64 time, const ofbx::AnimationCurve& curve) {
 	return 0.f;
 };
 
-static float getScaleX(const ofbx::Matrix& mtx)
+static float getScaleX(const ofbx::DMatrix& mtx)
 {
 	Vec3 v(float(mtx.m[0]), float(mtx.m[4]), float(mtx.m[8]));
 
@@ -1376,7 +1390,7 @@ static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Ar
 	
 	auto fill_rot = [&](u32 idx, const ofbx::AnimationCurve* curve) {
 		if (!curve) {
-			const ofbx::Vec3 lcl_rot = bone.getLocalRotation();
+			const ofbx::DVec3 lcl_rot = bone.getLocalRotation();
 			for (FBXImporter::Key& k : keys) {
 				(&k.rot.x)[idx] = float((&lcl_rot.x)[idx]);
 			}
@@ -1391,7 +1405,7 @@ static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Ar
 	
 	auto fill_pos = [&](u32 idx, const ofbx::AnimationCurve* curve) {
 		if (!curve) {
-			const ofbx::Vec3 lcl_pos = bone.getLocalTranslation();
+			const ofbx::DVec3 lcl_pos = bone.getLocalTranslation();
 			for (FBXImporter::Key& k : keys) {
 				(&k.pos.x)[idx] = float((&lcl_pos.x)[idx]);
 			}
@@ -1413,7 +1427,7 @@ static void fill(const ofbx::Object& bone, const ofbx::AnimationLayer& layer, Ar
 	fill_pos(2, translation_node ? translation_node->getCurve(2) : nullptr);
 
 	for (FBXImporter::Key& key : keys) {
-		const ofbx::Matrix mtx = bone.evalLocal({key.pos.x, key.pos.y, key.pos.z}, {key.rot.x, key.rot.y, key.rot.z});
+		const ofbx::DMatrix mtx = bone.evalLocal({key.pos.x, key.pos.y, key.pos.z}, {key.rot.x, key.rot.y, key.rot.z});
 		convert(mtx, key.pos, key.rot);
 	}
 }
@@ -2375,7 +2389,7 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 	for (UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
 		const ofbx::Mesh* mesh = src_mesh->fbx;
 		const i32 vertex_count = mesh->getVertexCount();
-		const ofbx::Vec3* vertices = (ofbx::Vec3*)mesh->getVertices();
+		const ofbx::DVec3* vertices = (ofbx::DVec3*)mesh->getVertices();
 		
 		for (i32 i = 0; i < vertex_count; ++i) {
 			aabb.addPoint(toLumixVec3(vertices[i]));
@@ -2387,7 +2401,7 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 	for (UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
 		const ofbx::Mesh* mesh = src_mesh->fbx;
 		const i32 vertex_count = mesh->getVertexCount();
-		const ofbx::Vec3* vertices = (ofbx::Vec3*)mesh->getVertices();
+		const ofbx::DVec3* vertices = (ofbx::DVec3*)mesh->getVertices();
 		
 		for (i32 i = 0; i < vertex_count; i += 3) {
 			voxels.raster(toLumixVec3(vertices[i]), toLumixVec3(vertices[i + 1]), toLumixVec3(vertices[i + 2]));
@@ -2399,7 +2413,7 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 	for (UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
 		const ofbx::Mesh* mesh = src_mesh->fbx;
 		const i32 vertex_count = mesh->getVertexCount();
-		const ofbx::Vec3* vertices = (ofbx::Vec3*)mesh->getVertices();
+		const ofbx::DVec3* vertices = (ofbx::DVec3*)mesh->getVertices();
 
 		src_mesh->computed_ao.reserve(vertex_count);
 		for (i32 i = 0; i < vertex_count; ++i) {

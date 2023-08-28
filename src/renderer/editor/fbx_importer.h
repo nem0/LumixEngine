@@ -182,7 +182,8 @@ private:
 	void sortBones(bool force_skinned);
 	void gatherBones(bool force_skinned);
 	void gatherAnimations();
-	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
+	void writePackedVec3(const ofbx::FVec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
+	void writePackedVec3(const ofbx::DVec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg, const Path& path);
 	void gatherMeshes();
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
