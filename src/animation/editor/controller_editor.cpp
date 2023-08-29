@@ -209,6 +209,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					.visitType(anim::NodeType::SUB, "Subtract");
 				visitor.endCategory();
 			}
+			
+			visitor.visitType(anim::NodeType::IK, "Inverse kinematics", 0);
 
 			if (visitor.beginCategory("Inputs")) {
 				struct : INodeTypeVisitor::INodeCreator {
@@ -228,6 +230,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			visitor
 				.visitType(anim::NodeType::LAYERS, "Layers", 'L')
+				.visitType(anim::NodeType::PLAYRATE, "Play rate", 0)
 				.visitType(anim::NodeType::SELECT, "Select", 'S')
 				.visitType(anim::NodeType::SWITCH, "Switch", 'W')
 				.visitType(anim::NodeType::TREE, "Tree", 'T');
@@ -238,6 +241,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			, NodeEditor(allocator)
 			, m_allocator(allocator)
 			, m_to_fix_skeleton(allocator)
+			, m_visualize_position_inputs(allocator)
 			, m_recording(app, allocator)
 			, m_app(app)
 			, m_plugin(plugin)
@@ -503,6 +507,21 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			recordButton(world, entity);
 		}
 
+		void processPositionVisualizations(World& world, EntityRef& entity) {
+			if (m_visualize_position_inputs.empty()) return;
+
+			Transform entity_transform = world.getTransform(entity);
+			const ComponentType animator_type = reflection::getComponentType("animator");
+			AnimationModule* anim_module = (AnimationModule*)world.getModule(animator_type);
+			RenderModule* render_module = (RenderModule*)world.getModule("renderer");
+			
+			for (u32 input_idx : m_visualize_position_inputs) {
+				const Vec3 val = anim_module->getAnimatorVec3Input(entity, input_idx);
+				DVec3 p = entity_transform.transform(val);
+				render_module->addDebugCubeSolid(p - DVec3(0.05f), p + DVec3(0.05f), Color::BLUE);
+			}
+		}
+
 		void processControllerMapping(World& world, EntityRef entity) {
 			if (m_controller_debug_mapping.axis_x < 0 && m_controller_debug_mapping.axis_y < 0) return;
 
@@ -568,6 +587,16 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				blob.read(instr);
 				switch (instr) {
 					case anim::BlendStackInstructions::END: return;
+					case anim::BlendStackInstructions::IK: {
+						ImGui::TextUnformatted("IK");
+						float alpha = blob.read<float>();
+						ImGui::Text("Alpha: %f", alpha);
+						Vec3 pos = blob.read<Vec3>();
+						ImGui::Text("Position: %f %f %F", pos.x, pos.y, pos.z);
+						blob.read<u32>(); // leaf
+						blob.read<u32>(); // bone count
+						break;
+					}
 					case anim::BlendStackInstructions::SAMPLE: {
 						u32 slot = blob.read<u32>();
 						float weight = blob.read<float>();
@@ -617,6 +646,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		void debuggerUI(World& world, EntityRef entity) {
 			processControllerMapping(world, entity);
+			processPositionVisualizations(world, entity);
 
 			const ComponentType animator_type = reflection::getComponentType("animator");
 			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
@@ -630,7 +660,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::PushID(&input);
 				const u32 idx = u32(&input - ctrl->m_inputs.begin());
 				switch (input.type) {
-					case anim::Value::FLOAT: {
+					case anim::Value::NUMBER: {
 						float val = module->getAnimatorFloatInput(entity, idx);
 		
 						ImGuiEx::Label(input.name);
@@ -659,6 +689,23 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						ImGuiEx::Label(input.name);
 						if (ImGui::Checkbox("##i", &val)) {
 							module->setAnimatorInput(entity, idx, val);
+						}
+						break;
+					}
+					case anim::Value::VEC3: {
+						Vec3 val = module->getAnimatorVec3Input(entity, idx);
+						ImGuiEx::Label(input.name);
+						if (ImGui::DragFloat3("##i", &val.x)) {
+							module->setAnimatorInput(entity, idx, val);
+						}
+						if (ImGui::BeginPopupContextItem("##i")) {
+							if (m_visualize_position_inputs.indexOf(idx) >= 0) {
+								if (ImGui::Selectable("Disable visualization")) m_visualize_position_inputs.eraseItem(idx);
+							}
+							else {
+								if (ImGui::Selectable("Visualize")) m_visualize_position_inputs.push(idx);
+							}
+							ImGui::EndPopup();
 						}
 						break;
 					}
@@ -995,7 +1042,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				saveUndo(ImGui::InputText("##name", input.name.data, sizeof(input.name.data)));
 				ImGui::NextColumn();
 				ImGui::SetNextItemWidth(-1);
-				if (ImGui::Combo("##type", (int*)&input.type, "number\0bool")) {
+				if (ImGui::Combo("##type", (int*)&input.type, "number\0bool\0vector 3\0")) {
 					saveUndo(true);
 				}
 				ImGui::NextColumn();
@@ -1124,7 +1171,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (m_current_node) {
 							for (Node* n : m_current_node->m_nodes) {
 								if (n->m_selected) {
-									n->propertiesGUI();
+									n->propertiesGUI(*m_skeleton);
 									any_selected = true;
 									break;
 								}
@@ -1177,11 +1224,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			i32 axis_y = -1;
 		};
 
-		struct IKDebug {
-			bool enabled = false;
-			Vec3 target = Vec3(0); 
-		};
-
 		WorldViewer m_viewer;
 		IAllocator& m_allocator;
 		Array<Path> m_to_fix_skeleton;
@@ -1195,7 +1237,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		float m_playback_speed = 1.f;
 		bool m_show_skeleton = true;
 		ControllerDebugMapping m_controller_debug_mapping;
-		IKDebug m_ik_debug[4];
+		Array<u32> m_visualize_position_inputs;
 		TextFilter m_node_filter;
 		u32 m_node_filter_selection = 0;
 		struct Record {

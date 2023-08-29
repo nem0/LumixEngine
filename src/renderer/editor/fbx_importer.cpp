@@ -364,6 +364,7 @@ void FBXImporter::gatherAnimations()
 		const ofbx::AnimationLayer* anim_layer = anim.fbx->getLayer(0);
 		if (!anim_layer || !anim_layer->getCurveNode(0)) {
 			m_animations.pop();
+			continue;
 		}
 
 		bool data_found = false;

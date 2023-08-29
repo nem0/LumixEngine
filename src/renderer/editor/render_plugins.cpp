@@ -1957,6 +1957,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::Checkbox("##frcskn", &m_meta.force_skin));
 				ImGuiEx::Label("Split");
 				saveUndo(ImGui::Checkbox("##split", &m_meta.split));
+				ImGuiEx::Label("Ignore animations");
+				saveUndo(ImGui::Checkbox("##ignoreanim", &m_meta.ignore_animations));
 				ImGuiEx::Label("Create impostor mesh");
 				saveUndo(ImGui::Checkbox("##creimp", &m_meta.create_impostor));
 				if (m_meta.create_impostor) {
@@ -2476,17 +2478,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				compiler.addResource(physics_geom, tmp);
 			}
 
-			if (meta.clips.empty()) {
-				const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
-				for (const FBXImporter::ImportAnimation& anim : animations) {
-					Path tmp(anim.name, ".ani:", path);
-					compiler.addResource(ResourceType("animation"), tmp);
+			if (!meta.ignore_animations) {
+				if (meta.clips.empty()) {
+					const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
+					for (const FBXImporter::ImportAnimation& anim : animations) {
+						Path tmp(anim.name, ".ani:", path);
+						compiler.addResource(ResourceType("animation"), tmp);
+					}
 				}
-			}
-			else {
-				for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
-					Path tmp(clip.name, ".ani:", Path(path));
-					compiler.addResource(ResourceType("animation"), tmp);
+				else {
+					for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
+						Path tmp(clip.name, ".ani:", Path(path));
+						compiler.addResource(ResourceType("animation"), tmp);
+					}
 				}
 			}
 
@@ -2540,7 +2544,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		any_written = m_fbx_importer.writeModel(src, cfg) || any_written;
 		any_written = m_fbx_importer.writeMaterials(filepath, cfg) || any_written;
-		any_written = m_fbx_importer.writeAnimations(filepath, cfg) || any_written;
+		if (!meta.ignore_animations) {
+			any_written = m_fbx_importer.writeAnimations(filepath, cfg) || any_written;
+		}
 		any_written = m_fbx_importer.writePhysics(filepath, cfg) || any_written;
 		return any_written;
 	}
