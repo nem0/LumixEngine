@@ -35,8 +35,10 @@ struct AnimationModule : IModule {
 	virtual void updateAnimator(EntityRef entity, float time_delta) = 0;
 	virtual Animable& getAnimable(EntityRef entity) = 0;
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, float value) = 0;
+	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, Vec3 value) = 0;
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) = 0;
 	virtual float getAnimatorFloatInput(EntityRef entity, u32 input_idx) = 0;
+	virtual Vec3 getAnimatorVec3Input(EntityRef entity, u32 input_idx) = 0;
 	virtual bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) = 0;
 	virtual struct LocalRigidTransform getAnimatorRootMotion(EntityRef entity) = 0;
 	virtual void setAnimatorUseRootMotion(EntityRef entity, bool value) = 0;
@@ -49,7 +51,6 @@ struct AnimationModule : IModule {
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
 	virtual anim::Controller* getAnimatorController(EntityRef entity) = 0;
 	virtual anim::RuntimeContext* getAnimatorRuntimeContext(EntityRef entity) = 0;
-	virtual void setAnimatorIK(EntityRef entity, u32 index, float weight, const struct Vec3& target) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
 	virtual OutputMemoryStream& beginBlendstackUpdate(EntityRef entity) = 0;
 	virtual void endBlendstackUpdate(EntityRef entity) = 0;

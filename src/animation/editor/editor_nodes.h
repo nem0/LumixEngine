@@ -40,7 +40,7 @@ struct Node : NodeEditorNode {
 	virtual void serialize(OutputMemoryStream& stream) const;
 	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version);
 	virtual bool onGUI() { return false; }
-	virtual bool propertiesGUI() { return false; }
+	virtual bool propertiesGUI(Model& skeleton) { return false; }
 	virtual anim::Node* compile(anim::Controller& controller) = 0;
 	virtual bool isValueNode() const { return false; }
 	virtual bool isPoseNode() const { return false; }
@@ -72,6 +72,7 @@ struct PoseNode : Node {
 struct ValueNode : Node {
 	ValueNode(Node* parent, Controller& controller, IAllocator& allocator) : Node(parent, controller, allocator) {}
 	bool isValueNode() const override { return true; }
+	virtual anim::Value::Type getReturnType() = 0;
 };
 
 struct ConstNode : ValueNode {
@@ -83,6 +84,7 @@ struct ConstNode : ValueNode {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 	anim::Node* compile(anim::Controller& controller) override;
+	anim::Value::Type getReturnType() override { return m_value.type; }
 	bool onGUI() override;
 
 	anim::Value m_value;
@@ -97,10 +99,41 @@ struct InputNode : ValueNode {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 	anim::Node* compile(anim::Controller& controller) override;
+	anim::Value::Type getReturnType() override;
 	bool onGUI() override;
-	bool propertiesGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
 
 	u32 m_input_index = 0;
+};
+
+struct PlayRateNode final : PoseNode {
+	PlayRateNode(Node* parent, Controller& controller, IAllocator& allocator);
+
+	Type type() const override { return anim::NodeType::PLAYRATE; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	bool onGUI() override;
+	
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	anim::Node* compile(anim::Controller& controller) override;
+};
+
+struct IKNode final : PoseNode {
+	IKNode(Node* parent, Controller& controller, IAllocator& allocator);
+
+	Type type() const override { return anim::NodeType::IK; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+	bool onGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
+	
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	anim::Node* compile(anim::Controller& controller) override;
+
+	i32 m_leaf_bone = 0;
+	u32 m_bones_count = 0;
 };
 
 struct OutputNode final : PoseNode {
@@ -123,7 +156,7 @@ struct TreeNode final : PoseNode {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return false; }
 	bool onGUI() override;
-	bool propertiesGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
 	anim::Node* compile(anim::Controller& controller) override;
 
 	void serialize(OutputMemoryStream& stream) const override;
@@ -139,7 +172,7 @@ struct SelectNode final : PoseNode {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 	bool onGUI() override;
-	bool propertiesGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
 	
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
@@ -156,8 +189,8 @@ struct MathNode final : ValueNode {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 	bool onGUI() override;
-	
 	anim::Node* compile(anim::Controller& controller) override;
+	anim::Value::Type getReturnType() override;
 
 	const anim::NodeType m_type;
 };
@@ -184,7 +217,7 @@ struct AnimationNode final : PoseNode {
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 	bool onGUI() override;
-	bool propertiesGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
 	anim::Node* compile(anim::Controller& controller) override;
 
 	void serialize(OutputMemoryStream& stream) const override;
@@ -202,7 +235,7 @@ struct Blend2DNode final : PoseNode {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 	bool onGUI() override;
-	bool propertiesGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
 	
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
@@ -225,7 +258,7 @@ struct Blend1DNode final : PoseNode {
 	bool hasInputPins() const override { return true; }
 	bool hasOutputPins() const override { return true; }
 	bool onGUI() override;
-	bool propertiesGUI() override;
+	bool propertiesGUI(Model& skeleton) override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 	anim::Node* compile(anim::Controller& controller) override;

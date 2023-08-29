@@ -18,7 +18,6 @@ Controller::Controller(const Path& path, ResourceManager& resource_manager, IAll
 	, m_allocator(allocator)
 	, m_animation_entries(allocator)
 	, m_inputs(allocator)
-	, m_ik(allocator)
 	, m_bone_masks(allocator)
 {}
 
@@ -94,11 +93,6 @@ void Controller::serialize(OutputMemoryStream& stream) {
 		stream.write(entry.set);
 		stream.writeString(entry.animation ? entry.animation->getPath() : Path());
 	}
-	stream.write(m_ik.size());
-	for (const IK& ik : m_ik) {
-		stream.write(ik.max_iterations);
-		stream.writeArray(ik.bones);
-	}
 
 	stream.write(m_root->type());
 	m_root->serialize(stream);
@@ -130,14 +124,6 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
 	}
 
-	u32 ik_count = stream.read<u32>();
-	m_ik.reserve(ik_count);
-	for (u32 i = 0; i < ik_count; ++i) {
-		IK& ik = m_ik.emplace(m_allocator);
-		stream.read(ik.max_iterations);
-		stream.readArray(&ik.bones);
-	}
-
 	NodeType type;
 	stream.read(type);
 	m_root = (PoseNode*)Node::create(type, *this);
@@ -162,6 +148,113 @@ static void getPose(const anim::RuntimeContext& ctx, Time time, float weight, u3
 	anim->getRelativePose(sample_ctx);
 }
 
+static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
+{
+	const Model::Bone& bone = model.getBone(bone_index);
+	LocalRigidTransform bone_transform{pose.positions[bone_index], pose.rotations[bone_index]};
+	if (bone.parent_idx < 0)
+	{
+		return bone_transform;
+	}
+	return getAbsolutePosition(pose, model, bone.parent_idx) * bone_transform;
+}
+
+void evalIK(float alpha, Vec3 target, u32 leaf_bone, u32 bones_count, Model& model, Pose& pose) {
+	if (alpha < 0.001f) return;
+	
+	// TODO user defined
+	const u32 max_iterations = 5;
+	enum { MAX_BONES_COUNT = 32 };
+	ASSERT(bones_count <= MAX_BONES_COUNT);
+
+	u32 indices[MAX_BONES_COUNT];
+	LocalRigidTransform transforms[MAX_BONES_COUNT];
+	Vec3 old_pos[MAX_BONES_COUNT];
+	float len[MAX_BONES_COUNT - 1];
+	float len_sum = 0;
+	indices[bones_count - 1] = leaf_bone;
+	for (u32 i = 1; i < bones_count; ++i) {
+		indices[bones_count - 1 - i] = model.getBoneParent(indices[bones_count - i]);
+	}
+
+	// convert from bone space to object space
+	const Model::Bone& first_bone = model.getBone(indices[0]);
+	LocalRigidTransform roots_parent;
+	if (first_bone.parent_idx >= 0) {
+		roots_parent = getAbsolutePosition(pose, model, first_bone.parent_idx);
+	}
+	else {
+		roots_parent.pos = Vec3::ZERO;
+		roots_parent.rot = Quat::IDENTITY;
+	}
+
+	LocalRigidTransform parent_tr = roots_parent;
+	for (u32 i = 0; i < bones_count; ++i) {
+		LocalRigidTransform tr{pose.positions[indices[i]], pose.rotations[indices[i]]};
+		transforms[i] = parent_tr * tr;
+		old_pos[i] = transforms[i].pos;
+		if (i > 0) {
+			len[i - 1] = length(transforms[i].pos - transforms[i - 1].pos);
+			len_sum += len[i - 1];
+		}
+		parent_tr = transforms[i];
+	}
+
+	Vec3 to_target = target - transforms[0].pos;
+	if (len_sum * len_sum < squaredLength(to_target)) {
+		to_target = normalize(to_target);
+		target = transforms[0].pos + to_target * len_sum;
+	}
+
+	for (u32 iteration = 0; iteration < max_iterations; ++iteration) {
+		transforms[bones_count - 1].pos = target;
+			
+		for (i32 i = bones_count - 1; i > 1; --i) {
+			Vec3 dir = normalize((transforms[i - 1].pos - transforms[i].pos));
+			transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
+		}
+
+		for (u32 i = 1; i < bones_count; ++i) {
+			Vec3 dir = normalize((transforms[i].pos - transforms[i - 1].pos));
+			transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
+		}
+	}
+
+	// compute rotations from new positions
+	for (i32 i = bones_count - 2; i >= 0; --i) {
+		Vec3 old_d = old_pos[i + 1] - old_pos[i];
+		Vec3 new_d = transforms[i + 1].pos - transforms[i].pos;
+
+		Quat rel_rot = Quat::vec3ToVec3(old_d, new_d);
+		transforms[i].rot = rel_rot * transforms[i].rot;
+	}
+
+	// convert from object space to bone space
+	LocalRigidTransform ik_out[MAX_BONES_COUNT];
+	for (i32 i = bones_count - 1; i > 0; --i) {
+		transforms[i] = transforms[i - 1].inverted() * transforms[i];
+		ik_out[i].pos = transforms[i].pos;
+	}
+	for (i32 i = bones_count - 2; i > 0; --i) {
+		ik_out[i].rot = transforms[i].rot;
+	}
+	ik_out[bones_count - 1].rot = pose.rotations[indices[bones_count - 1]];
+
+	if (first_bone.parent_idx >= 0) {
+		ik_out[0].rot = roots_parent.rot.conjugated() * transforms[0].rot;
+	}
+	else {
+		ik_out[0].rot = transforms[0].rot;
+	}
+	ik_out[0].pos = pose.positions[indices[0]];
+
+	for (u32 i = 0; i < bones_count; ++i) {
+		const u32 idx = indices[i];
+		pose.positions[idx] = lerp(pose.positions[idx], ik_out[i].pos, alpha);
+		pose.rotations[idx] = nlerp(pose.rotations[idx], ik_out[i].rot, alpha);
+	}
+}
+
 void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose) {
 	InputMemoryStream bs(ctx.blendstack);
 
@@ -170,6 +263,14 @@ void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose) {
 		bs.read(instr);
 		switch (instr) {
 			case anim::BlendStackInstructions::END: return;
+			case anim::BlendStackInstructions::IK: {
+				float alpha = bs.read<float>();
+				Vec3 pos = bs.read<Vec3>();
+				u32 leaf_bone = bs.read<u32>();
+				u32 bone_count = bs.read<u32>();
+				evalIK(alpha * ctx.weight, pos, leaf_bone, bone_count, *ctx.model, pose);
+				break;
+			}
 			case anim::BlendStackInstructions::SAMPLE: {
 				u32 slot = bs.read<u32>();
 				float weight = bs.read<float>();

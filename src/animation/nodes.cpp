@@ -46,7 +46,7 @@ RuntimeContext::RuntimeContext(Controller& controller, IAllocator& allocator)
 }
 
 void RuntimeContext::setInput(u32 input_idx, float value) {
-	ASSERT(controller.m_inputs[input_idx].type == Value::FLOAT);
+	ASSERT(controller.m_inputs[input_idx].type == Value::NUMBER);
 	inputs[input_idx].f = value;
 }
 
@@ -62,6 +62,7 @@ Node* Node::create(NodeType type, Controller& controller) {
 		case NodeType::BLEND2D: return LUMIX_NEW(controller.m_allocator, Blend2DNode)(controller.m_allocator);
 		case NodeType::SELECT: return LUMIX_NEW(controller.m_allocator, SelectNode)(controller.m_allocator);
 		case NodeType::INPUT: return LUMIX_NEW(controller.m_allocator, InputNode);
+		case NodeType::PLAYRATE: return LUMIX_NEW(controller.m_allocator, PlayRateNode)(controller.m_allocator);
 		case NodeType::CONSTANT: return LUMIX_NEW(controller.m_allocator, ConstNode);
 		case NodeType::ANIMATION: return LUMIX_NEW(controller.m_allocator, AnimationNode);
 		case NodeType::SWITCH: return LUMIX_NEW(controller.m_allocator, SwitchNode)(controller.m_allocator);
@@ -77,6 +78,7 @@ Node* Node::create(NodeType type, Controller& controller) {
 		case NodeType::DIV: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::DIV>);
 		case NodeType::ADD: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::ADD>);
 		case NodeType::SUB: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::SUB>);
+		case NodeType::IK: return LUMIX_NEW(controller.m_allocator, IKNode)(controller.m_allocator);
 		case NodeType::OUTPUT:
 		case NodeType::NONE:
 		case NodeType::TREE: return nullptr; // editor only node
@@ -241,7 +243,6 @@ Time SelectNode::length(const RuntimeContext& ctx) const {	return Time::fromSeco
 
 Time SelectNode::time(const RuntimeContext& ctx) const { return Time(0); }
 
-
 SwitchNode::~SwitchNode() {
 	LUMIX_DELETE(m_allocator, m_value);
 	LUMIX_DELETE(m_allocator, m_true_node);
@@ -335,6 +336,59 @@ void SwitchNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ve
 Time SwitchNode::length(const RuntimeContext& ctx) const {	return Time::fromSeconds(1); }
 
 Time SwitchNode::time(const RuntimeContext& ctx) const { return Time(0); }
+
+
+IKNode::~IKNode() {
+	LUMIX_DELETE(m_allocator, m_alpha);
+	LUMIX_DELETE(m_allocator, m_input);
+}
+
+IKNode::IKNode(IAllocator& allocator)
+	: m_allocator(allocator)
+{}
+
+void IKNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+	m_input->update(ctx, root_motion);
+	float alpha = m_alpha->eval(ctx).toFloat();
+	if (alpha > 0) {
+		alpha = minimum(1.f, alpha);
+		Vec3 effector_position = m_effector_position->eval(ctx).toVec3();
+		ctx.blendstack.write(BlendStackInstructions::IK);
+		ctx.blendstack.write(alpha);
+		ctx.blendstack.write(effector_position);
+		ctx.blendstack.write(m_leaf_bone);
+		ctx.blendstack.write(m_bones_count);
+	}
+}
+
+void IKNode::enter(RuntimeContext& ctx) {
+	m_input->enter(ctx);
+}
+
+void IKNode::skip(RuntimeContext& ctx) const {
+	m_input->skip(ctx);
+}
+
+void IKNode::serialize(OutputMemoryStream& stream) const {
+	stream.write(m_bones_count);
+	stream.write(m_leaf_bone);
+	serializeNode(stream, *m_alpha);
+	serializeNode(stream, *m_effector_position);
+	serializeNode(stream, *m_input);
+}
+
+void IKNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	stream.read(m_bones_count);
+	stream.read(m_leaf_bone);
+	m_alpha = (ValueNode*)deserializeNode(stream, ctrl, version);
+	m_effector_position = (ValueNode*)deserializeNode(stream, ctrl, version);
+	m_input = (PoseNode*)deserializeNode(stream, ctrl, version);
+}
+
+Time IKNode::length(const RuntimeContext& ctx) const {	return m_input->length(ctx); }
+
+Time IKNode::time(const RuntimeContext& ctx) const { return m_input->time(ctx); }
+
 
 void InputNode::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_input_index);
@@ -645,6 +699,48 @@ void Blend1DNode::enter(RuntimeContext& ctx) {
 
 void Blend1DNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(float));
+}
+
+PlayRateNode::~PlayRateNode() {
+	LUMIX_DELETE(m_allocator, m_node);
+	LUMIX_DELETE(m_allocator, m_value);
+}
+
+PlayRateNode::PlayRateNode(IAllocator& allocator)
+	: m_allocator(allocator)
+{}
+
+void PlayRateNode::serialize(OutputMemoryStream& stream) const {
+	serializeNode(stream, *m_value);
+	serializeNode(stream, *m_node);
+}
+
+void PlayRateNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	m_value = (ValueNode*)deserializeNode(stream, ctrl, version);
+	m_node = (PoseNode*)deserializeNode(stream, ctrl, version);
+}
+
+void PlayRateNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+	float td = ctx.time_delta.seconds();
+	ctx.time_delta = ctx.time_delta * maximum(0.f, m_value->eval(ctx).toFloat());
+	m_node->update(ctx, root_motion);
+	ctx.time_delta = Time::fromSeconds(td);
+}
+
+Time PlayRateNode::length(const RuntimeContext& ctx) const {
+	return m_node->length(ctx);
+}
+
+Time PlayRateNode::time(const RuntimeContext& ctx) const {
+	return m_node->time(ctx);
+}
+
+void PlayRateNode::enter(RuntimeContext& ctx) {
+	m_node->enter(ctx);
+}
+
+void PlayRateNode::skip(RuntimeContext& ctx) const {
+	m_node->skip(ctx);
 }
 
 } // namespace Lumix::anim

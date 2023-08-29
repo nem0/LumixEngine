@@ -42,6 +42,7 @@ struct ModelMeta {
 		WRITE_BOOL(split, false);
 		WRITE_BOOL(import_vertex_colors, false);
 		WRITE_BOOL(vertex_color_is_ao, false);
+		WRITE_BOOL(ignore_animations, false);
 		WRITE_VALUE(anim_translation_error, 1.f);
 		WRITE_VALUE(anim_rotation_error, 1.f);
 		WRITE_VALUE(scale, 1.f);
@@ -105,6 +106,7 @@ struct ModelMeta {
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &bake_vertex_ao);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &create_impostor);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &import_vertex_colors);
+		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "ignore_animations", &ignore_animations);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &vertex_color_is_ao);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &lod_count);
 			
@@ -167,6 +169,7 @@ struct ModelMeta {
 	bool force_skin = false;
 	bool import_vertex_colors = false;
 	bool vertex_color_is_ao = false;
+	bool ignore_animations = false;
 	u8 autolod_mask = 0;
 	u32 lod_count = 1;
 	float anim_rotation_error = 1.f;

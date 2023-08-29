@@ -41,7 +41,9 @@ enum class NodeType : u32 {
 	SUB,
 	CONSTANT,
 	AND,
-	OR
+	OR,
+	PLAYRATE,
+	IK
 };
 
 struct Node {
@@ -126,6 +128,23 @@ struct MathNode final : ValueNode {
 
 	ValueNode* m_input0 = nullptr;
 	ValueNode* m_input1 = nullptr;
+};
+
+struct PlayRateNode final : PoseNode {
+	PlayRateNode(IAllocator& allocator);
+	~PlayRateNode();
+	NodeType type() const override { return anim::NodeType::PLAYRATE; }
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void enter(RuntimeContext& ctx) override;
+	void skip(RuntimeContext& ctx) const override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
+
+	IAllocator& m_allocator;
+	ValueNode* m_value = nullptr;
+	PoseNode* m_node = nullptr;
 };
 
 struct Blend1DNode final : PoseNode {
@@ -227,6 +246,26 @@ struct SwitchNode final : PoseNode {
 	PoseNode* m_false_node = nullptr;
 	ValueNode* m_value = nullptr;
 	Time m_blend_length;
+};
+
+struct IKNode final : PoseNode {
+	IKNode(IAllocator& allocator);
+	~IKNode();
+	NodeType type() const override { return anim::NodeType::IK; }
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void enter(RuntimeContext& ctx) override;
+	void skip(RuntimeContext& ctx) const override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
+
+	IAllocator& m_allocator;
+	ValueNode* m_alpha = nullptr;
+	ValueNode* m_effector_position = nullptr;
+	PoseNode* m_input = nullptr;
+	u32 m_leaf_bone;
+	u32 m_bones_count;
 };
 
 struct AnimationNode final : PoseNode {

@@ -56,11 +56,6 @@ struct AnimationModuleImpl final : AnimationModule {
 		Flags flags = Flags::NONE;
 		anim::RuntimeContext* ctx = nullptr;
 		LocalRigidTransform root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
-
-		struct IK {
-			float weight = 0;
-			Vec3 target;
-		} inverse_kinematics[4];
 	};
 
 
@@ -126,18 +121,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		}
 	}
 
-
-	void setAnimatorIK(EntityRef entity, u32 index, float weight, const Vec3& target) override {
-		auto iter = m_animator_map.find(entity);
-		Animator& animator = m_animators[iter.value()];
-		Animator::IK& ik = animator.inverse_kinematics[index];
-		ik.weight = clamp(weight, 0.f, 1.f);
-		ik.target = target;
-	}
-
-
-	i32 getAnimatorInputIndex(EntityRef entity, const char* name) const override
-	{
+	i32 getAnimatorInputIndex(EntityRef entity, const char* name) const override {
 		const Animator& animator = m_animators[m_animator_map[entity]];
 		for (anim::Controller::Input& input : animator.resource->m_inputs) {
 			if (input.name ==  name) return i32(&input - animator.resource->m_inputs.begin());
@@ -151,7 +135,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		if (animator.resource->m_inputs[input_idx].type == anim::Value::FLOAT) {
+		if (animator.resource->m_inputs[input_idx].type == anim::Value::NUMBER) {
 			animator.ctx->inputs[input_idx].f = value;
 		}
 		else {
@@ -513,9 +497,19 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return;
 
 		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
-		if (animator.resource->m_inputs[input_idx].type != anim::Value::FLOAT) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Value::NUMBER) return;
 
 		animator.ctx->inputs[input_idx].f = value;
+	}
+
+	void setAnimatorInput(EntityRef entity, u32 input_idx, Vec3 value) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return;
+
+		if (input_idx >= (u32)animator.resource->m_inputs.size()) return;
+		if (animator.resource->m_inputs[input_idx].type != anim::Value::VEC3) return;
+
+		animator.ctx->inputs[input_idx].v3 = value;
 	}
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) override {
@@ -533,7 +527,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		if (!animator.ctx) return 0;
 
 		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
-		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::FLOAT);
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::NUMBER);
 
 		return animator.ctx->inputs[input_idx].f;
 	}
@@ -546,6 +540,16 @@ struct AnimationModuleImpl final : AnimationModule {
 		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::BOOL);
 
 		return animator.ctx->inputs[input_idx].b;
+	}
+
+	Vec3 getAnimatorVec3Input(EntityRef entity, u32 input_idx) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return Vec3(0);
+
+		ASSERT(input_idx < (u32)animator.resource->m_inputs.size());
+		ASSERT(animator.resource->m_inputs[input_idx].type == anim::Value::VEC3);
+
+		return animator.ctx->inputs[input_idx].v3;
 	}
 
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
@@ -626,12 +630,6 @@ struct AnimationModuleImpl final : AnimationModule {
 		model->getRelativePose(*pose);
 		evalBlendStack(*animator.ctx, *pose);
 		
-		for (Animator::IK& ik : animator.inverse_kinematics) {
-			if (ik.weight == 0) break;
-			const u32 idx = u32(&ik - animator.inverse_kinematics);
-			updateIK(animator.resource->m_ik[idx], ik, *pose, *model);
-		}
-
 		pose->computeAbsolute(*model);
 
 		m_render_module->unlockPose(entity, true);
@@ -643,115 +641,6 @@ struct AnimationModuleImpl final : AnimationModule {
 			m_world.setTransform(animator.entity, tr);
 		}
 	}
-
-	static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
-	{
-		const Model::Bone& bone = model.getBone(bone_index);
-		LocalRigidTransform bone_transform{pose.positions[bone_index], pose.rotations[bone_index]};
-		if (bone.parent_idx < 0)
-		{
-			return bone_transform;
-		}
-		return getAbsolutePosition(pose, model, bone.parent_idx) * bone_transform;
-	}
-
-	static void updateIK(anim::Controller::IK& res_ik, Animator::IK& ik, Pose& pose, Model& model)
-	{
-		enum { MAX_BONES_COUNT = 32 };
-		u32 indices[MAX_BONES_COUNT];
-		LocalRigidTransform transforms[MAX_BONES_COUNT];
-		Vec3 old_pos[MAX_BONES_COUNT];
-		float len[MAX_BONES_COUNT - 1];
-		float len_sum = 0;
-		const i32 bones_count = res_ik.bones.size();
-		ASSERT(bones_count <= MAX_BONES_COUNT);
-		for (i32 i = 0; i < bones_count; ++i) {
-			auto iter = model.getBoneIndex(res_ik.bones[i]);
-			if (!iter.isValid()) return;
-
-			indices[i] = iter.value();
-		}
-
-		// convert from bone space to object space
-		const Model::Bone& first_bone = model.getBone(indices[0]);
-		LocalRigidTransform roots_parent;
-		if (first_bone.parent_idx >= 0) {
-			roots_parent = getAbsolutePosition(pose, model, first_bone.parent_idx);
-		}
-		else {
-			roots_parent.pos = Vec3::ZERO;
-			roots_parent.rot = Quat::IDENTITY;
-		}
-
-		LocalRigidTransform parent_tr = roots_parent;
-		for (i32 i = 0; i < bones_count; ++i) {
-			LocalRigidTransform tr{pose.positions[indices[i]], pose.rotations[indices[i]]};
-			transforms[i] = parent_tr * tr;
-			old_pos[i] = transforms[i].pos;
-			if (i > 0) {
-				len[i - 1] = length(transforms[i].pos - transforms[i - 1].pos);
-				len_sum += len[i - 1];
-			}
-			parent_tr = transforms[i];
-		}
-
-		Vec3 target = ik.target;
-		Vec3 to_target = target - transforms[0].pos;
-		if (len_sum * len_sum < squaredLength(to_target)) {
-			to_target = normalize(to_target);
-			target = transforms[0].pos + to_target * len_sum;
-		}
-
-		for (u32 iteration = 0; iteration < res_ik.max_iterations; ++iteration) {
-			transforms[bones_count - 1].pos = target;
-			
-			for (i32 i = bones_count - 1; i > 1; --i) {
-				Vec3 dir = normalize((transforms[i - 1].pos - transforms[i].pos));
-				transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
-			}
-
-			for (i32 i = 1; i < bones_count; ++i) {
-				Vec3 dir = normalize((transforms[i].pos - transforms[i - 1].pos));
-				transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
-			}
-		}
-
-		// compute rotations from new positions
-		for (i32 i = bones_count - 2; i >= 0; --i) {
-			Vec3 old_d = old_pos[i + 1] - old_pos[i];
-			Vec3 new_d = transforms[i + 1].pos - transforms[i].pos;
-
-			Quat rel_rot = Quat::vec3ToVec3(old_d, new_d);
-			transforms[i].rot = rel_rot * transforms[i].rot;
-		}
-
-		// convert from object space to bone space
-		LocalRigidTransform ik_out[MAX_BONES_COUNT];
-		for (i32 i = bones_count - 1; i > 0; --i) {
-			transforms[i] = transforms[i - 1].inverted() * transforms[i];
-			ik_out[i].pos = transforms[i].pos;
-		}
-		for (i32 i = bones_count - 2; i > 0; --i) {
-			ik_out[i].rot = transforms[i].rot;
-		}
-		ik_out[bones_count - 1].rot = pose.rotations[indices[bones_count - 1]];
-
-		if (first_bone.parent_idx >= 0) {
-			ik_out[0].rot = roots_parent.rot.conjugated() * transforms[0].rot;
-		}
-		else {
-			ik_out[0].rot = transforms[0].rot;
-		}
-		ik_out[0].pos = pose.positions[indices[0]];
-
-		const float w = ik.weight;
-		for (i32 i = 0; i < bones_count; ++i) {
-			const u32 idx = indices[i];
-			pose.positions[idx] = lerp(pose.positions[idx], ik_out[i].pos, w);
-			pose.rotations[idx] = nlerp(pose.rotations[idx], ik_out[i].rot, w);
-		}
-	}
-
 
 	void applyPropertyAnimator(EntityRef entity, PropertyAnimator& animator)
 	{
@@ -908,7 +797,6 @@ void AnimationModule::reflect(Engine& engine) {
 			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")
 			.LUMIX_FUNC_EX(AnimationModule::getAnimatorInputIndex, "getInputIndex")
-			.LUMIX_FUNC_EX(AnimationModule::setAnimatorIK, "setIK")
 			.LUMIX_PROP(AnimatorSource, "Source").resourceAttribute(anim::Controller::TYPE)
 			.LUMIX_PROP(AnimatorDefaultSet, "Default set")
 			.LUMIX_PROP(AnimatorUseRootMotion, "Use root motion")

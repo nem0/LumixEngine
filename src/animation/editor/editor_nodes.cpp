@@ -108,6 +108,9 @@ anim::Node* Blend2DNode::compile(anim::Controller& controller) {
 	ValueNode* x = castToValueNode(getInput(0));
 	ValueNode* y = castToValueNode(getInput(1));
 	if (!x || !y) return nullptr;
+	if (x->getReturnType() != anim::Value::NUMBER) return nullptr;
+	if (y->getReturnType() != anim::Value::NUMBER) return nullptr;
+
 	node->m_x_value = (anim::ValueNode*)x->compile(controller);
 	node->m_y_value = (anim::ValueNode*)y->compile(controller);
 	if (!node->m_x_value) return nullptr;
@@ -116,7 +119,7 @@ anim::Node* Blend2DNode::compile(anim::Controller& controller) {
 	return node.detach();
 }
 
-bool Blend2DNode::propertiesGUI() {
+bool Blend2DNode::propertiesGUI(Model& skeleton) {
 	ImGuiEx::Label("Name");
 	bool res = inputString("##name", &m_name);
 	
@@ -345,7 +348,7 @@ Blend1DNode::Blend1DNode(Node* parent, Controller& controller, IAllocator& alloc
 	, m_name("blend1d", allocator)
 {}
 
-bool Blend1DNode::propertiesGUI() {
+bool Blend1DNode::propertiesGUI(Model& skeleton) {
 	ImGuiEx::Label("Name");
 	bool res = inputString("##name", &m_name);
 
@@ -395,6 +398,8 @@ anim::Node* Blend1DNode::compile(anim::Controller& controller) {
 	m_children.copyTo(node->m_children);
 	ValueNode* val = castToValueNode(getInput(0));
 	if (!val) return nullptr;
+	if (val->getReturnType() != anim::Value::NUMBER) return nullptr;
+
 	node->m_value = (anim::ValueNode*)val->compile(controller);
 	if (!node->m_value) return nullptr;
 
@@ -424,7 +429,7 @@ anim::Node* AnimationNode::compile(anim::Controller& controller) {
 	return node;
 }
 
-bool AnimationNode::propertiesGUI() {
+bool AnimationNode::propertiesGUI(Model& skeleton) {
 	ImGuiEx::Label("Slot");
 	static i32 selected = -1;
 	bool res = editSlot(m_controller, "##slot", &m_slot);
@@ -524,7 +529,7 @@ bool InputNode::onGUI() {
 	return false;
 }
 
-bool InputNode::propertiesGUI() {
+bool InputNode::propertiesGUI(Model& skeleton) {
 	return editInput("Input", &m_input_index, m_controller);
 }
 
@@ -533,6 +538,11 @@ anim::Node* InputNode::compile(anim::Controller& controller) {
 	anim::InputNode* node = LUMIX_NEW(controller.m_allocator, anim::InputNode);
 	node->m_input_index = m_input_index;
 	return node;
+}
+
+anim::Value::Type InputNode::getReturnType() {
+	if (m_input_index >= (u32)m_controller.m_inputs.size()) return anim::Value::NUMBER;
+	return m_controller.m_inputs[m_input_index].type;
 }
 
 InputNode::InputNode(Node* parent, Controller& controller, IAllocator& allocator)
@@ -634,10 +644,150 @@ anim::Node* MathNode::compile(anim::Controller& controller) {
 	}
 }
 
+anim::Value::Type MathNode::getReturnType() {
+	ValueNode* input0 = castToValueNode(getInput(0));
+	if (!input0) return anim::Value::NUMBER;
+	return input0->getReturnType();
+}
+
 MathNode::MathNode(Node* parent, Controller& controller, anim::NodeType type, IAllocator& allocator)
 	: ValueNode(parent, controller, allocator)
 	, m_type(type)
 {}
+
+IKNode::IKNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: PoseNode(parent, controller, allocator)
+{}
+
+bool IKNode::onGUI() {
+	outputSlot();
+	inputSlot(ImGuiEx::PinShape::SQUARE);
+	ImGui::TextUnformatted("Alpha");
+	inputSlot(ImGuiEx::PinShape::SQUARE);
+	ImGui::TextUnformatted("Effector position");
+	inputSlot();
+	ImGui::TextUnformatted("Input");
+	return false;
+}
+
+anim::Node* IKNode::compile(anim::Controller& controller) {
+	if (m_bones_count == 0) return nullptr;
+
+	UniquePtr<anim::IKNode> node = UniquePtr<anim::IKNode>::create(controller.m_allocator, controller.m_allocator);
+	node->m_bones_count = m_bones_count;
+	node->m_leaf_bone = m_leaf_bone;
+	
+	ValueNode* alpha = castToValueNode(getInput(0));
+	if (!alpha) return nullptr;
+	if (alpha->getReturnType() != anim::Value::NUMBER) return nullptr;
+	node->m_alpha = (anim::ValueNode*)alpha->compile(controller);
+	if (!node->m_alpha) return nullptr;
+
+	ValueNode* effector = castToValueNode(getInput(1));
+	if (!effector) return nullptr;
+	if (effector->getReturnType() != anim::Value::VEC3) return nullptr;
+	node->m_effector_position = (anim::ValueNode*)effector->compile(controller);
+	if (!node->m_effector_position) return nullptr;
+
+	PoseNode* input = castToPoseNode(getInput(2));
+	if (!input) return nullptr;
+	node->m_input = (anim::PoseNode*)input->compile(controller);
+	if (!node->m_input) return nullptr;
+
+	return node.detach();
+}
+
+void IKNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+	stream.write(m_leaf_bone);
+	stream.write(m_bones_count);
+}
+
+void IKNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
+	stream.read(m_leaf_bone);
+	stream.read(m_bones_count);
+}
+
+bool IKNode::propertiesGUI(Model& skeleton) {
+	ImGuiEx::Label("Leaf");
+	bool changed = false;
+	if (ImGui::BeginCombo("##leaf", skeleton.getBoneName(m_leaf_bone))) {
+		for (u32 j = 0, cj = skeleton.getBoneCount(); j < cj; ++j) {
+			const char* bone_name = skeleton.getBoneName(j);
+			if (ImGui::Selectable(bone_name)) {
+				m_leaf_bone = j;
+				m_bones_count = 1;
+				changed = true;
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	i32 iter = skeleton.getBoneParent(m_leaf_bone);
+	for (u32 i = 0; i < m_bones_count - 1; ++i) {
+		if (iter == -1) {
+			break;
+		}
+		ImGuiEx::TextUnformatted(skeleton.getBoneName(iter));
+		iter = skeleton.getBoneParent(iter);
+	}
+
+	if (iter >= 0) {
+		i32 parent = skeleton.getBoneParent(iter);
+		if (parent >= 0) {
+			const char* bone_name = skeleton.getBoneName(parent);
+			const StaticString<64> add_label("Add ", bone_name);
+			if (ImGui::Button(add_label)) {
+				++m_bones_count;
+				changed = true;
+			}
+		}
+	}
+
+	if (m_bones_count > 1) {
+		ImGui::SameLine();
+		if (ImGui::Button("Pop")) {
+			--m_bones_count;
+			changed = true;
+		}
+	} 
+	return changed;
+}
+
+PlayRateNode::PlayRateNode(Node* parent, Controller& controller, IAllocator& allocator)
+	: PoseNode(parent, controller, allocator)
+{}
+
+bool PlayRateNode::onGUI() {
+	outputSlot();
+	inputSlot(ImGuiEx::PinShape::SQUARE);
+	ImGuiEx::TextUnformatted("Play rate multiplier");
+	inputSlot();
+	ImGuiEx::TextUnformatted("Input");
+	return false;
+}
+
+anim::Node* PlayRateNode::compile(anim::Controller& controller) {
+	UniquePtr<anim::PlayRateNode> node = UniquePtr<anim::PlayRateNode>::create(controller.m_allocator, controller.m_allocator);
+	
+	ValueNode* value = castToValueNode(getInput(0));
+	if (!value) return nullptr;
+	if (value->getReturnType() != anim::Value::NUMBER) return nullptr;
+	node->m_value = (anim::ValueNode*)value->compile(controller);
+	if (!node->m_value) return nullptr;
+
+	Node* pose = getInput(1);
+	if (!pose) return nullptr;
+	if (!pose->isPoseNode()) return nullptr;
+	node->m_node = (anim::PoseNode*)pose->compile(controller);
+	if (!node->m_node) return nullptr;
+
+	return node.detach();
+}
+
+void PlayRateNode::serialize(OutputMemoryStream& stream) const { Node::serialize(stream); }
+void PlayRateNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) { Node::deserialize(stream, ctrl, version); }
 
 OutputNode::OutputNode(Node* parent, Controller& controller, IAllocator& allocator)
 	: PoseNode(parent, controller, allocator)
@@ -671,7 +821,7 @@ anim::Node* TreeNode::compile(anim::Controller& controller) {
 	return m_nodes[0]->compile(controller);
 }
 
-bool TreeNode::propertiesGUI() {
+bool TreeNode::propertiesGUI(Model& skeleton) {
 	ImGuiEx::Label("Name");
 	return inputString("##name", &m_name);
 }
@@ -693,7 +843,7 @@ void TreeNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 vers
 
 void TreeNode::serialize(OutputMemoryStream& stream) const { Node::serialize(stream); stream.write(m_name); }
 
-bool SelectNode::propertiesGUI() { 
+bool SelectNode::propertiesGUI(Model& skeleton) { 
 	float node_blend_length = m_blend_length.seconds();
 	ImGuiEx::Label("Blend length");
 	if (ImGui::DragFloat("##bl", &node_blend_length)) {
@@ -706,7 +856,7 @@ bool SelectNode::propertiesGUI() {
 bool SelectNode::onGUI() {
 	ImGuiEx::NodeTitle("Select");
 	outputSlot();
-	inputSlot(); ImGui::TextUnformatted("Value");
+	inputSlot(ImGuiEx::PinShape::SQUARE); ImGui::TextUnformatted("Value");
 	
 	bool changed = false;
 	for (u32 i = 0; i < m_options_count; ++i) {
@@ -747,8 +897,8 @@ SelectNode::SelectNode(Node* parent, Controller& controller, IAllocator& allocat
 anim::Node* SelectNode::compile(anim::Controller& controller) {
 	if (m_options_count == 0) return nullptr;
 	ValueNode* value_node = castToValueNode(getInput(0));
-	// TODO make sure value_node returns i32
 	if (!value_node) return nullptr;
+	if (value_node->getReturnType() != anim::Value::NUMBER) return nullptr;
 
 	UniquePtr<anim::SelectNode> node = UniquePtr<anim::SelectNode>::create(controller.m_allocator, controller.m_allocator);
 	node->m_blend_length = m_blend_length;
@@ -781,7 +931,7 @@ void SelectNode::serialize(OutputMemoryStream& stream) const {
 
 bool SwitchNode::onGUI() {
 	ImGuiEx::NodeTitle("Switch");
-	outputSlot();
+	outputSlot(ImGuiEx::PinShape::SQUARE);
 	inputSlot(); ImGui::TextUnformatted("Condition");
 	
 	inputSlot(); ImGui::TextUnformatted("True");
@@ -796,8 +946,8 @@ SwitchNode::SwitchNode(Node* parent, Controller& controller, IAllocator& allocat
 
 anim::Node* SwitchNode::compile(anim::Controller& controller) {
 	ValueNode* value_node = castToValueNode(getInput(0));
-	// TODO make sure value_node returns bool
 	if (!value_node) return nullptr;
+	if (value_node->getReturnType() != anim::Value::BOOL) return nullptr;
 
 	UniquePtr<anim::SwitchNode> node = UniquePtr<anim::SwitchNode>::create(controller.m_allocator, controller.m_allocator);
 	node->m_blend_length = m_blend_length;
@@ -915,6 +1065,7 @@ Node* Node::create(Node* parent, Type type, Controller& controller, IAllocator& 
 		case anim::NodeType::TREE: return LUMIX_NEW(allocator, TreeNode)(parent, controller, allocator);
 		case anim::NodeType::OUTPUT: return LUMIX_NEW(allocator, OutputNode)(parent, controller, allocator);
 		case anim::NodeType::INPUT: return LUMIX_NEW(allocator, InputNode)(parent, controller, allocator);
+		case anim::NodeType::PLAYRATE: return LUMIX_NEW(allocator, PlayRateNode)(parent, controller, allocator);
 		case anim::NodeType::CONSTANT: return LUMIX_NEW(allocator, ConstNode)(parent, controller, allocator);
 		case anim::NodeType::SWITCH: return LUMIX_NEW(allocator, SwitchNode)(parent, controller, allocator);
 		case anim::NodeType::CMP_EQ: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::CMP_EQ, allocator);
@@ -929,6 +1080,7 @@ Node* Node::create(Node* parent, Type type, Controller& controller, IAllocator& 
 		case anim::NodeType::DIV: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::DIV, allocator);
 		case anim::NodeType::MUL: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::MUL, allocator);
 		case anim::NodeType::SUB: return LUMIX_NEW(allocator, MathNode)(parent, controller, anim::NodeType::SUB, allocator);
+		case anim::NodeType::IK: return LUMIX_NEW(allocator, IKNode)(parent, controller, allocator);
 		case anim::NodeType::NONE: ASSERT(false); return nullptr;
 	}
 	ASSERT(false);

@@ -15,21 +15,25 @@ namespace anim {
 
 struct Value {
 	enum Type : u32 {
-		FLOAT,
-		BOOL
+		NUMBER,
+		BOOL,
+		VEC3
 	};
 	Type type;
 	union {
 		float f;
 		bool b;
+		Vec3 v3;
 	};
 
-	Value() : f(0), type(FLOAT) {}
-	Value(float f) : f(f), type(FLOAT) {}
+	Value() : f(0), type(NUMBER) {}
+	Value(float f) : f(f), type(NUMBER) {}
 	Value(bool b) : b(b), type(BOOL) {}
-	float toFloat() const { ASSERT(type == FLOAT); return f; }
-	i32 toI32() const { ASSERT(type == FLOAT); return i32(f + 0.5f); }
+	Value(Vec3 v3) : v3(v3), type(VEC3) {}
+	float toFloat() const { ASSERT(type == NUMBER); return f; }
+	i32 toI32() const { ASSERT(type == NUMBER); return i32(f + 0.5f); }
 	bool toBool() const { ASSERT(type == BOOL); return b; }
+	Vec3 toVec3() const { ASSERT(type == VEC3); return v3; }
 };
 
 struct RuntimeContext {
@@ -53,6 +57,7 @@ struct RuntimeContext {
 enum BlendStackInstructions : u8 {
 	END,
 	SAMPLE,
+	IK
 };
 
 enum class ControllerVersion : u32 {
@@ -88,18 +93,11 @@ struct Controller final : Resource {
 		StaticString<32> name;
 	};
 
-	struct IK {
-		IK(IAllocator& allocator) : bones(allocator) {}
-		u32 max_iterations = 5;
-		Array<BoneNameHash> bones;
-	};
-
 	IAllocator& m_allocator;
 	struct PoseNode* m_root = nullptr;
 	Array<AnimationEntry> m_animation_entries;
 	Array<BoneMask> m_bone_masks;
 	Array<Input> m_inputs;
-	Array<IK> m_ik;
 	u32 m_animation_slots_count = 0;
 
 private:
