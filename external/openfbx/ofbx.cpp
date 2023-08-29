@@ -1,5 +1,5 @@
 #include "ofbx.h"
-#include "miniz.h"
+#include "libdeflate.h"
 #include <cassert>
 #include <math.h>
 #include <ctype.h>
@@ -589,19 +589,11 @@ static bool isLong(const Property* prop)
 
 static bool decompress(const u8* in, size_t in_size, u8* out, size_t out_size)
 {
-	mz_stream stream = {};
-	mz_inflateInit(&stream);
-
-	stream.avail_in = (int)in_size;
-	stream.next_in = in;
-	stream.avail_out = (int)out_size;
-	stream.next_out = out;
-
-	int status = mz_inflate(&stream, Z_SYNC_FLUSH);
-
-	if (status != Z_STREAM_END) return false;
-
-	return mz_inflateEnd(&stream) == Z_OK;
+	auto dec = libdeflate_alloc_decompressor();
+	size_t dummy;
+	bool res = libdeflate_deflate_decompress(dec, in + 2, in_size - 2, out, out_size, &dummy) == LIBDEFLATE_SUCCESS;
+	libdeflate_free_decompressor(dec);
+	return res;
 }
 
 

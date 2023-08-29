@@ -522,6 +522,7 @@ static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
 
 
 static void computeTangentsSimple(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec2* uvs) {
+	PROFILE_FUNCTION();
 	out.resize(vertex_count);
 	memset(out.begin(), 0, out.byte_size());
 	for (int i = 0; i < vertex_count; i += 3) {
@@ -553,6 +554,7 @@ static void computeTangentsSimple(Array<ofbx::Vec3>& out, i32 vertex_count, cons
 }
 
 static void computeNormals(Array<ofbx::Vec3>& out, const ofbx::Vec3* vertices, i32 vertex_count, const u32* remap, IAllocator& allocator) {
+	PROFILE_FUNCTION();
 	out.resize(vertex_count);
 	Array<u32> count(allocator);
 	Array<Vec3> normals(allocator);
@@ -593,6 +595,7 @@ static void computeNormals(Array<ofbx::Vec3>& out, const ofbx::Vec3* vertices, i
 
 static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs, const Path& path)
 {
+	PROFILE_FUNCTION();
 	out.resize(vertex_count);
 
 	struct {
@@ -663,7 +666,7 @@ static bool doesFlipHandness(const Matrix& mtx) {
 void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 {
 	jobs::forEach(m_source_meshes.size(), 1, [&](i32 mesh_idx, i32){
-		PROFILE_BLOCK("FBXImporter postprocessMeshes")
+		PROFILE_BLOCK("FBXImporter postprocessMeshes #1")
 		SourceMesh& src_mesh = *m_source_meshes[mesh_idx].get();
 		const ofbx::Mesh* mesh = src_mesh.fbx;
 		const int vertex_count = mesh->getVertexCount();
