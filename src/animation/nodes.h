@@ -136,7 +136,7 @@ struct PlayRateNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::PLAYRATE; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;
@@ -254,7 +254,7 @@ struct IKNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::IK; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;
