@@ -59,7 +59,7 @@ void serializeNode(OutputMemoryStream& blob, const Node& node);
 Node* deserializeNode(InputMemoryStream& blob, Controller& ctrl, u32 version);
 
 struct PoseNode : Node {
-	virtual void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const = 0;
+	virtual void update(RuntimeContext& ctx) const = 0;
 	virtual void enter(RuntimeContext& ctx) = 0;
 	virtual void skip(RuntimeContext& ctx) const = 0;
 	virtual Time length(const RuntimeContext& ctx) const = 0;
@@ -153,7 +153,7 @@ struct Blend1DNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::BLEND1D; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;
@@ -176,7 +176,7 @@ struct Blend2DNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::BLEND2D; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;
@@ -211,7 +211,7 @@ struct SelectNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::SELECT; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;
@@ -235,7 +235,7 @@ struct SwitchNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::SWITCH; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;
@@ -272,7 +272,7 @@ struct AnimationNode final : PoseNode {
 	NodeType type() const override { return anim::NodeType::ANIMATION; }
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const override;
+	void update(RuntimeContext& ctx) const override;
 	void enter(RuntimeContext& ctx) override;
 	void skip(RuntimeContext& ctx) const override;
 	Time length(const RuntimeContext& ctx) const override;

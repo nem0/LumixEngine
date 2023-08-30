@@ -110,6 +110,18 @@ StableHash getPropertyHash(ComponentType cmp_type, const char* property_name) {
 	return hasher.end64();
 }
 
+bool componentTypeExists(const char* id) {
+	Context& ctx = getContext();
+	const RuntimeHash name_hash(id);
+	for (u32 i = 0, c = ctx.components_count; i < c; ++i) {
+		if (ctx.component_bases[i].name_hash == name_hash) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
 ComponentType getComponentType(const char* name)
 {
 	Context& ctx = getContext();

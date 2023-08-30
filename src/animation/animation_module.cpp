@@ -625,7 +625,8 @@ struct AnimationModuleImpl final : AnimationModule {
 
 		animator.ctx->model = model;
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
-		animator.resource->update(*animator.ctx, animator.root_motion);
+		animator.resource->update(*animator.ctx);
+		animator.root_motion = animator.ctx->root_motion;
 
 		model->getRelativePose(*pose);
 		evalBlendStack(*animator.ctx, *pose);

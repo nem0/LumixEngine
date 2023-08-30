@@ -67,6 +67,7 @@ LUMIX_ENGINE_API Span<const RegisteredComponent> getComponents();
 
 LUMIX_ENGINE_API const PropertyBase* getPropertyFromHash(StableHash hash);
 LUMIX_ENGINE_API StableHash getPropertyHash(ComponentType cmp, const char* property_name);
+LUMIX_ENGINE_API bool componentTypeExists(const char* id);
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
 
