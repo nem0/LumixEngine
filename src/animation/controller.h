@@ -52,6 +52,7 @@ struct RuntimeContext {
 	Time time_delta;
 	Model* model = nullptr;
 	InputMemoryStream input_runtime;
+	LocalRigidTransform root_motion;
 };
 
 enum BlendStackInstructions : u8 {
@@ -77,7 +78,7 @@ struct Controller final : Resource {
 
 	RuntimeContext* createRuntime(u32 anim_set);
 	void destroyRuntime(RuntimeContext& ctx);
-	void update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const;
+	void update(RuntimeContext& ctx) const;
 
 	ResourceType getType() const override { return TYPE; }
 	static const ResourceType TYPE;

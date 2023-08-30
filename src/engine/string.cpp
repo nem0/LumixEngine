@@ -222,6 +222,10 @@ bool equalStrings(StringView lhs, StringView rhs) {
 	return strncmp(lhs.begin, rhs.begin, lhs.size()) == 0;
 }
 
+bool equalStrings(const char* lhs, const char* rhs) {
+	return strcmp(lhs, rhs) == 0;
+}
+
 bool equalIStrings(StringView lhs, StringView rhs) {
 	if (lhs.size() != rhs.size()) return false;
 

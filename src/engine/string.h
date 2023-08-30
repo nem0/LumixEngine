@@ -57,6 +57,7 @@ inline const char* fromCString(StringView input, EntityPtr& value) { return from
 LUMIX_ENGINE_API char* copyString(Span<char> output, StringView source);
 LUMIX_ENGINE_API char* catString(Span<char> output, StringView source);
 LUMIX_ENGINE_API bool makeLowercase(Span<char> output, StringView source);
+LUMIX_ENGINE_API bool equalStrings(const char* lhs, const char* rhs);
 LUMIX_ENGINE_API bool equalStrings(StringView lhs, StringView rhs);
 LUMIX_ENGINE_API bool equalIStrings(StringView lhs, StringView rhs);
 LUMIX_ENGINE_API int compareString(StringView lhs, StringView rhs);

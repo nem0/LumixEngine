@@ -87,7 +87,7 @@ Node* Node::create(NodeType type, Controller& controller) {
 	return nullptr;
 }
 
-void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+void AnimationNode::update(RuntimeContext& ctx) const {
 	Time t = ctx.input_runtime.read<Time>();
 	Time prev_t = t;
 	t += ctx.time_delta;
@@ -100,10 +100,10 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 			prev_t = Time(minimum(prev_t.raw(), len));
 		}
 
-		root_motion = getRootMotion(ctx, anim, prev_t, t);
+		ctx.root_motion = getRootMotion(ctx, anim, prev_t, t);
 	}
 	else {
-		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
+		ctx.root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 	}
 	ctx.data.write(t);
 
@@ -152,7 +152,7 @@ SelectNode::SelectNode(IAllocator& allocator)
 	, m_allocator(allocator)
 {}
 
-void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+void SelectNode::update(RuntimeContext& ctx) const {
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	
 	i32 child_idx = m_value->eval(ctx).toI32();
@@ -167,22 +167,22 @@ void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 			data.from = data.to;
 			data.t = Time(0);
 			ctx.data.write(data);
-			m_children[data.to]->update(ctx, root_motion);
+			m_children[data.to]->update(ctx);
 			return;
 		}
 
 		ctx.data.write(data);
 
-		m_children[data.from]->update(ctx, root_motion);
+		m_children[data.from]->update(ctx);
 		
 		const float t = clamp(data.t.seconds() / m_blend_length.seconds(), 0.f, 1.f);
 		const float old_w = ctx.weight;
 		ctx.weight *= t;
-		LocalRigidTransform tmp;
-		m_children[data.to]->update(ctx, tmp);
+		LocalRigidTransform tmp = ctx.root_motion;
+		m_children[data.to]->update(ctx);
 		ctx.weight = old_w;
 
-		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
+		ctx.root_motion = tmp.interpolate(ctx.root_motion, data.t.seconds() / m_blend_length.seconds());
 		return;
 	}
 
@@ -190,14 +190,14 @@ void SelectNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 		data.to = child_idx;
 		data.t = Time(0);
 		ctx.data.write(data);
-		m_children[data.from]->update(ctx, root_motion);
+		m_children[data.from]->update(ctx);
 		m_children[data.to]->enter(ctx);
 		return;
 	}
 
 	data.t += ctx.time_delta;
 	ctx.data.write(data);
-	m_children[data.from]->update(ctx, root_motion);
+	m_children[data.from]->update(ctx);
 }
 
 void SelectNode::enter(RuntimeContext& ctx) {
@@ -253,7 +253,7 @@ SwitchNode::SwitchNode(IAllocator& allocator)
 	: m_allocator(allocator)
 {}
 
-void SwitchNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+void SwitchNode::update(RuntimeContext& ctx) const {
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	
 	bool condition = m_value->eval(ctx).toBool();
@@ -267,22 +267,22 @@ void SwitchNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 			data.switching = false;
 			data.t = Time(0);
 			ctx.data.write(data);
-			(data.current ? m_true_node : m_false_node)->update(ctx, root_motion);
+			(data.current ? m_true_node : m_false_node)->update(ctx);
 			return;
 		}
 
 		ctx.data.write(data);
 
-		(data.current ? m_false_node : m_true_node)->update(ctx, root_motion);
+		(data.current ? m_false_node : m_true_node)->update(ctx);
 		
 		const float t = clamp(data.t.seconds() / m_blend_length.seconds(), 0.f, 1.f);
 		const float old_w = ctx.weight;
 		ctx.weight *= t;
-		LocalRigidTransform tmp;
-		(data.current ? m_true_node : m_false_node)->update(ctx, tmp);
+		LocalRigidTransform tmp = ctx.root_motion;
+		(data.current ? m_true_node : m_false_node)->update(ctx);
 		ctx.weight = old_w;
 
-		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
+		ctx.root_motion = tmp.interpolate(ctx.root_motion, data.t.seconds() / m_blend_length.seconds());
 		return;
 	}
 
@@ -291,14 +291,14 @@ void SwitchNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 		data.current = condition;
 		data.t = Time(0);
 		ctx.data.write(data);
-		(data.current ? m_false_node : m_true_node)->update(ctx, root_motion);
+		(data.current ? m_false_node : m_true_node)->update(ctx);
 		(data.current ? m_true_node : m_false_node)->enter(ctx);
 		return;
 	}
 
 	data.t += ctx.time_delta;
 	ctx.data.write(data);
-	(data.current ? m_true_node : m_false_node)->update(ctx, root_motion);
+	(data.current ? m_true_node : m_false_node)->update(ctx);
 }
 
 void SwitchNode::enter(RuntimeContext& ctx) {
@@ -488,7 +488,7 @@ static Time toTime(const Animation& anim, float relt) {
 	return anim.getLength() * relt;
 }
 
-void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+void Blend2DNode::update(RuntimeContext& ctx) const {
 	float relt = ctx.input_runtime.read<float>();
 	const float relt0 = relt;
 	
@@ -512,7 +512,7 @@ void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		const Time len = anim_a->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
-		root_motion = getRootMotion(ctx, anim_a, t0, t);
+		ctx.root_motion = getRootMotion(ctx, anim_a, t0, t);
 	}
 	
 	if (trio.tb > 0) {
@@ -520,7 +520,7 @@ void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
 		const LocalRigidTransform tr1 = getRootMotion(ctx, anim_b, t0, t);
-		root_motion = root_motion.interpolate(tr1, trio.tb / (trio.ta + trio.tb));
+		ctx.root_motion = ctx.root_motion.interpolate(tr1, trio.tb / (trio.ta + trio.tb));
 	}
 	
 	if (trio.tc > 0) {
@@ -528,7 +528,7 @@ void Blend2DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
 		const LocalRigidTransform tr1 = getRootMotion(ctx, anim_c, t0, t);
-		root_motion = root_motion.interpolate(tr1, trio.tc);
+		ctx.root_motion = ctx.root_motion.interpolate(tr1, trio.tc);
 	}
 
 	ctx.data.write(relt);
@@ -628,7 +628,7 @@ void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 v
 	m_value = (ValueNode*)deserializeNode(stream, ctrl, version);
 }
 
-void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+void Blend1DNode::update(RuntimeContext& ctx) const {
 	float relt = ctx.input_runtime.read<float>();
 	const float relt0 = relt;
 	
@@ -644,17 +644,17 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		const Time len = anim_a->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
-		root_motion = getRootMotion(ctx, ctx.animations[pair.a->slot], t0, t);
+		ctx.root_motion = getRootMotion(ctx, ctx.animations[pair.a->slot], t0, t);
 	}
 	else {
-		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
+		ctx.root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 	}
 	if (anim_b && anim_b->isReady()) {
 		const Time len = anim_b->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
 		const LocalRigidTransform tr1 = getRootMotion(ctx, ctx.animations[pair.b->slot], t0, t);
-		root_motion = root_motion.interpolate(tr1, pair.t);
+		ctx.root_motion = ctx.root_motion.interpolate(tr1, pair.t);
 	}
 
 	ctx.data.write(relt);
