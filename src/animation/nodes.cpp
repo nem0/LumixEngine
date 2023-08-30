@@ -347,8 +347,8 @@ IKNode::IKNode(IAllocator& allocator)
 	: m_allocator(allocator)
 {}
 
-void IKNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
-	m_input->update(ctx, root_motion);
+void IKNode::update(RuntimeContext& ctx) const {
+	m_input->update(ctx);
 	float alpha = m_alpha->eval(ctx).toFloat();
 	if (alpha > 0) {
 		alpha = minimum(1.f, alpha);
@@ -720,10 +720,10 @@ void PlayRateNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 
 	m_node = (PoseNode*)deserializeNode(stream, ctrl, version);
 }
 
-void PlayRateNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
+void PlayRateNode::update(RuntimeContext& ctx) const {
 	float td = ctx.time_delta.seconds();
 	ctx.time_delta = ctx.time_delta * maximum(0.f, m_value->eval(ctx).toFloat());
-	m_node->update(ctx, root_motion);
+	m_node->update(ctx);
 	ctx.time_delta = Time::fromSeconds(td);
 }
 
