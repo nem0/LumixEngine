@@ -668,7 +668,6 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
-			, m_buffer(allocator)
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<PipelineResource>(path);
@@ -679,8 +678,9 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 		}
 
 		void save() {
-			Span<const u8> data((const u8*)m_buffer.c_str(), m_buffer.length());
-			m_app.getAssetBrowser().saveResource(*m_resource, data);
+			OutputMemoryStream blob(m_app.getAllocator());
+			m_editor->serializeText(blob);
+			m_app.getAssetBrowser().saveResource(m_resource->getPath(), blob);
 			m_dirty = false;
 		}
 	
@@ -703,12 +703,13 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 				return;
 			}
 
-			if (m_buffer.length() == 0) m_buffer = m_resource->content;
+			if (!m_editor) {
+				m_editor = createLuaCodeEditor(m_app);
+				m_editor->setText(m_resource->content);
+			}
 
 			ImGui::PushFont(m_app.getMonospaceFont());
-			if (inputStringMultiline("##code", &m_buffer, ImGui::GetContentRegionAvail())) {
-				m_dirty = true;
-			}
+			if (m_editor->gui("codeeditor")) m_dirty = true;
 			ImGui::PopFont();
 		}
 	
@@ -717,7 +718,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 
 		StudioApp& m_app;
 		PipelineResource* m_resource;
-		String m_buffer;
+		UniquePtr<CodeEditor> m_editor;
 	};
 	
 	explicit PipelinePlugin(StudioApp& app)
@@ -3119,19 +3120,22 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
-			, m_buffer(app.getAllocator())
 			, m_app(app)
 			, m_path(path)
 		{
+			m_editor = createLuaCodeEditor(m_app);
+			
 			OutputMemoryStream blob(app.getAllocator());
 			if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
-				m_buffer = StringView((const char*)blob.data(), (u32)blob.size());
+				StringView v((const char*)blob.data(), (u32)blob.size());
+				m_editor->setText(v);
 			}
 		}
 
 		void save() {
-			Span<const u8> data((const u8*)m_buffer.c_str(), m_buffer.length());
-			m_app.getAssetBrowser().saveResource(m_path, data);
+			OutputMemoryStream blob(m_app.getAllocator());
+			m_editor->serializeText(blob);
+			m_app.getAssetBrowser().saveResource(m_path, blob);
 			m_dirty = false;
 		}
 	
@@ -3149,10 +3153,9 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::EndMenuBar();
 			}
 
+
 			ImGui::PushFont(m_app.getMonospaceFont());
-			if (inputStringMultiline("##code", &m_buffer, ImGui::GetContentRegionAvail())) {
-				m_dirty = true;
-			}
+			if (m_editor->gui("codeeditor")) m_dirty = true;
 			ImGui::PopFont();
 		}
 	
@@ -3160,7 +3163,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		const char* getName() const override { return "shader editor"; }
 
 		StudioApp& m_app;
-		String m_buffer;
+		UniquePtr<CodeEditor> m_editor;
 		Path m_path;
 	};
 
