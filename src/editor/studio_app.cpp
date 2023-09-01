@@ -134,6 +134,7 @@ struct StudioAppImpl final : StudioApp
 		m_imgui_key_map[(int)os::Keycode::ESCAPE] = ImGuiKey_Escape;
 		m_imgui_key_map[(int)os::Keycode::A] = ImGuiKey_A;
 		m_imgui_key_map[(int)os::Keycode::C] = ImGuiKey_C;
+		m_imgui_key_map[(int)os::Keycode::D] = ImGuiKey_D;
 		m_imgui_key_map[(int)os::Keycode::V] = ImGuiKey_V;
 		m_imgui_key_map[(int)os::Keycode::X] = ImGuiKey_X;
 		m_imgui_key_map[(int)os::Keycode::Y] = ImGuiKey_Y;

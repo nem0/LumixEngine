@@ -172,15 +172,31 @@ String& String::add(StringView value) {
 	return *this;
 }
 
+void String::eraseRange(u32 position, u32 length) {
+	ASSERT(position + length <= m_size);
+	if (position + length > m_size) return;
+
+	if (isSmall() == isSmall(m_size - length)) {
+		memmove(getMutableData() + position, getMutableData() + position + length, m_size - position - length);
+		m_size -= length;
+		getMutableData()[m_size] = '\0';
+		return;
+	}
+
+	ASSERT(!isSmall());
+
+	char* big = m_big;
+	memcpy(m_small, big, position);
+	memcpy(m_small + position, big + position + length, m_size - position - length);
+	m_allocator.deallocate(big);
+	m_size -= length; 
+	m_small[m_size] = '\0';
+
+}
 
 void String::eraseAt(u32 position)
 {
-	ASSERT(position < m_size);
-	if (position >= m_size) return;
-	
-	memmove(getMutableData() + position, getMutableData() + position + 1, m_size - position - 1);
-	--m_size;
-	getMutableData()[m_size] = '\0';
+	eraseRange(position, 1);
 }
 
 

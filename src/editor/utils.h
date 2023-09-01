@@ -200,4 +200,16 @@ struct NodeEditor : SimpleUndoRedo {
 	u32 m_dragged_node = 0xFFffFFff;
 };
 
+struct CodeEditor {
+	using Tokenizer = bool (*)(const char* str, u32& token_len, u8& token_type, u8 prev_token_type);
+
+	virtual ~CodeEditor() {}
+	virtual void setText(StringView& text) = 0;
+	virtual void setTokenColors(Span<const u32> colors) = 0; // keep colors alive while CodeEditor uses them
+	virtual void setTokenizer(Tokenizer tokenizer) = 0; // user needs to keep the language alive while CodeEditor uses it
+	virtual void gui(const char* str_id, const ImVec2& size = ImVec2(0, 0)) = 0;
+};
+
+UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
+
 } // namespace Lumix

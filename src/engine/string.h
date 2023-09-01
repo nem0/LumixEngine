@@ -141,11 +141,13 @@ struct LUMIX_ENGINE_API String {
 	void append(T... args) { int tmp[] = { 0, (add(args), 0)... }; }
 	void insert(u32 position, const char* value);
 	void eraseAt(u32 position);
+	void eraseRange(u32 position, u32 length);
 
 	IAllocator& m_allocator;
 private:
 	String& add(StringView value);
-	bool isSmall() const { return m_size < sizeof(m_small); }
+	static bool isSmall(u32 size) { return size < sizeof(m_small); }
+	bool isSmall() const { return isSmall(m_size); }
 
 	u32 m_size;
 	union {
