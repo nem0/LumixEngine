@@ -11,12 +11,638 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/world.h"
 
 
 namespace Lumix
 {
 
+// TODO undo/redo
+// TODO utf8
+// TODO clipping selection 
+// TODO selection should render inclugin "end of line char" in certain cases
+// TODO scrollbar
+struct CodeEditorImpl final : CodeEditor {
+	struct TextPoint {
+		TextPoint() {}
+		TextPoint(i32 col, i32 line) : col(col), line(line) {}
+		i32 col = 0;
+		i32 line = 0;
+		bool operator !=(const TextPoint& rhs) const { return col != rhs.col || line != rhs.line; }
+		bool operator ==(const TextPoint& rhs) const { return col == rhs.col && line == rhs.line; }
+		bool operator < (const TextPoint& rhs) const { return line < rhs.line || line == rhs.line && col < rhs.col; }
+		bool operator > (const TextPoint& rhs) const { return line > rhs.line || line == rhs.line && col > rhs.col; }
+	};
+
+	struct Cursor : TextPoint {
+		Cursor() {}
+		Cursor(i32 col, i32 line) : TextPoint(col, line), sel(col, line) {}
+
+		void operator =(const TextPoint& rhs) { col = rhs.col; line = rhs.line; }
+		TextPoint sel;
+
+		bool hasSelection() const { return *this != sel; }
+		void cancelSelection() { sel = *this; }
+	};
+
+	struct Token {
+		u32 from;
+		u32 len;
+		u8 type;
+	};
+
+	struct Line {
+		Line(IAllocator& allocator) : value(allocator), tokens(allocator) {}
+		Line(const String& str, IAllocator& allocator) : value(str, allocator), tokens(allocator) {}
+		Line(StringView sv, IAllocator& allocator) : value(sv, allocator), tokens(allocator) {}
+		void operator =(const String& rhs) { value = rhs; tokens.clear(); }
+		void operator =(String&& rhs) { value = static_cast<String&&>(rhs); }
+		u32 length() const { return value.length(); }
+		String value;
+		Array<Token> tokens;
+	};
+
+	CodeEditorImpl(StudioApp& app)
+		: m_app(app)
+		, m_allocator(app.getAllocator(), "code_editor")
+		, m_lines(m_allocator)
+		, m_cursors(m_allocator)
+	{
+		m_cursors.emplace(Cursor{0, 0});
+	}
+
+	void setText(StringView& text) override {
+		m_cursors.clear();
+		m_cursors.emplace(Cursor{0, 0});
+		m_lines.clear();
+		StringView line;
+		line.begin = line.end = text.begin;
+		do {
+			while (line.end != text.end && *line.end != '\n') ++line.end;
+			StringView next_line = {line.end, line.end};
+			if (line.end != text.end) {
+				next_line.end = next_line.begin = line.end + 1;
+				--line.end;
+			}
+			m_lines.emplace(line, m_allocator);
+			line = next_line;
+		} while (line.end != text.end);
+
+		m_first_untokenized_line = 0;
+
+		{
+			PROFILE_BLOCK("tokenize");
+			while (m_first_untokenized_line < m_lines.size()) {
+				tokenizeLine();
+			}
+		}
+	}
+
+	void cursorMoved(Cursor& cursor) {
+		cursor.line = clamp(cursor.line, 0, m_lines.size() - 1);
+		cursor.col = clamp(cursor.col, 0, m_lines[cursor.line].length());
+		if (!ImGui::GetIO().KeyShift) {
+			cursor.sel.col = cursor.col;
+			cursor.sel.line = cursor.line;
+		}
+		m_blink_timer = 0;
+	}
+
+	void moveCursorLeft(Cursor& cursor, bool word) {
+		if (word) cursor = getLeftWord(cursor);
+		else cursor = getLeft(cursor);
+		cursorMoved(cursor);
+		if (&cursor == &m_cursors[0]) ensureCursorVisible(cursor);
+	}
+
+	void moveCursorRight(Cursor& cursor, bool word) {
+		if (word) cursor = getRightWord(cursor);
+		else cursor = getRight(cursor);
+		cursorMoved(cursor);
+		if (&cursor == &m_cursors[0]) ensureCursorVisible(cursor);
+	}
+
+	void ensureCursorVisible(Cursor& cursor) {
+		if (cursor.line < m_first_visible_line) {
+			m_scroll_y -= (m_first_visible_line - cursor.line) * ImGui::GetTextLineHeight(); 
+		}
+
+		if (cursor.line > m_last_visible_line - 1) {
+			m_scroll_y += (cursor.line - m_last_visible_line + 1) * ImGui::GetTextLineHeight(); 
+		}
+	}
+
+	void moveCursorUp(Cursor& cursor, u32 line_count = 1) {
+		cursor.line = maximum(0, cursor.line - line_count);
+		cursorMoved(cursor);
+		if (&cursor == &m_cursors[0]) ensureCursorVisible(cursor);
+	}
+
+	void moveCursorDown(Cursor& cursor, u32 line_count = 1) {
+		cursor.line = minimum(m_lines.size() - 1, cursor.line + line_count);
+		cursorMoved(cursor);
+		if (&cursor == &m_cursors[0]) ensureCursorVisible(cursor);
+	}
+
+	void moveCursorPageUp(u32 lines_count, float line_height) {
+		m_cursors.resize(1);
+		i32 old_line = m_cursors[0].line;
+		m_cursors[0].line -= lines_count;
+		m_scroll_y += (m_cursors[0].line - old_line) * line_height;
+		cursorMoved(m_cursors[0]);
+	}
+
+	void moveCursorPageDown(u32 lines_count, float line_height) {
+		m_cursors.resize(1);
+		i32 old_line = m_cursors[0].line;
+		m_cursors[0].line += lines_count;
+		m_scroll_y += (m_cursors[0].line - old_line) * line_height;
+		cursorMoved(m_cursors[0]);
+	}
+
+	void moveCursorBegin(Cursor& cursor, bool doc) {
+		if (doc) cursor.line = 0;
+		cursor.col = 0;
+		cursorMoved(cursor);
+		if (&cursor == &m_cursors[0]) ensureCursorVisible(cursor);
+	}
+
+	void moveCursorEnd(Cursor& cursor, bool doc) {
+		if (doc) cursor.line = m_lines.size() - 1;
+		cursor.col = m_lines[cursor.line].length();
+		cursorMoved(cursor);
+		if (&cursor == &m_cursors[0]) ensureCursorVisible(cursor);
+	}
+
+	void invalidateTokens(i32 line) {
+		m_first_untokenized_line = minimum(line, m_first_untokenized_line);
+	}
+
+	void insertNewLine() {
+		deleteSelections();
+
+		for (Cursor& cursor : m_cursors) {
+			StringView v = m_lines[cursor.line].value;
+			StringView rv = v; rv.removePrefix(cursor.col);
+			StringView lv = v; lv.removeSuffix(v.size() - cursor.col);
+
+			String r(rv, m_allocator);
+			String l(lv, m_allocator);
+			m_lines[cursor.line] = static_cast<String&&>(l);
+			m_lines.emplaceAt(cursor.line + 1, static_cast<String&&>(r), m_allocator);
+
+			i32 line = cursor.line;
+			i32 col = cursor.col;
+			
+			invalidateTokens(cursor.line);
+
+			for (Cursor& c: m_cursors) {
+				if (c.line > line) ++c.line;
+				else if (c.line == line && c.col >= col) {
+					++c.line;
+					c.col = c.col - col;
+				}
+			}
+		}
+
+		// we did not adjust sel.line and sel.col while moving cursors, so fix it
+		for (Cursor& cursor : m_cursors) {
+			cursor.cancelSelection();
+		}
+	}
+
+	void deleteSelections() {
+		for (Cursor& cursor : m_cursors) {
+			deleteSelection(cursor);
+		}
+	}
+
+	void insertCharacter(u32 character) {
+		if (character < 0x20 && character != 0x09) return;
+		if (character > 0x7f) return;
+		
+		deleteSelections();
+		for (Cursor& cursor : m_cursors) {
+			char tmp[2] = { (char)character, 0 };
+			m_lines[cursor.line].value.insert(cursor.col, tmp);
+			invalidateTokens(cursor.line);
+			++cursor.col;
+			cursorMoved(cursor);
+			cursor.cancelSelection();
+		}
+	}
+
+	static bool isWordChar(char c) {
+		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
+	}
+
+	void selectWord(Cursor& cursor) {
+		const char* line = m_lines[cursor.line].value.c_str();
+		if (!isWordChar(line[cursor.col])) {
+			if (cursor.col > 0) cursor.sel.col = cursor.col - 1;
+			return;
+		}
+
+		while (isWordChar(line[cursor.sel.col]) && cursor.sel.col > 0) --cursor.sel.col;
+		if (!isWordChar(line[cursor.sel.col])) ++cursor.sel.col;
+		while (isWordChar(line[cursor.col])) ++cursor.col;
+	}
+
+	Cursor& getBottomCursor() {
+		Cursor* bottom = &m_cursors[0];
+		for (Cursor& cursor : m_cursors) {
+			if (bottom->line < cursor.line || bottom->line == cursor.line && bottom->col < cursor.col) {
+				bottom = &cursor;
+			}
+		}
+		return *bottom;
+	}
+
+	void addNextOccurence() {
+		Cursor& cursor = getBottomCursor();
+		if (cursor.hasSelection()) {
+			StringView sel_view;
+			sel_view.begin = m_lines[cursor.line].value.c_str() + cursor.sel.col;
+			sel_view.end = sel_view.begin - cursor.sel.col + cursor.col;
+
+			i32 line = cursor.line;
+			while (line < m_lines.size()) {
+				StringView line_str = m_lines[line].value;
+				if (line == cursor.line) line_str.removePrefix(cursor.col);
+				if (const char* found = findInsensitive(line_str, sel_view)) {
+					Cursor& new_cursor = m_cursors.emplace();
+					new_cursor.line = line;
+					new_cursor.sel.line = line;
+					new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
+					new_cursor.col = new_cursor.sel.col + sel_view.size();
+					ensureCursorVisible(new_cursor);
+					return;
+				}
+				++line;
+			}
+		}
+		else {
+			selectWord(cursor);
+		}
+	}
+
+	void removeCursorAt(i32 col, i32 line) {
+		for (i32 i = m_cursors.size() - 1; i >= 0; --i) {
+			Cursor& cursor = m_cursors[i];
+			if (line < cursor.sel.line) continue;
+			if (line > cursor.line) continue;
+			if (line == cursor.line && col < cursor.sel.col) continue;
+			if (line == cursor.line && col > cursor.col) continue;
+
+			m_cursors.erase(i);
+		}
+	}
+
+	void mergeWithNextLine(i32 line) {
+		invalidateTokens(line);
+		for (Cursor& cursor : m_cursors) {
+			if (cursor.line > line + 1) {
+				--cursor.line;
+				--cursor.sel.line;
+			}
+			else if (cursor.line == line + 1) {
+				--cursor.line;
+				--cursor.sel.line;
+				cursor.col += m_lines[line].length();
+				cursor.sel.col += m_lines[line].length();
+			}
+		}
+		m_lines[line].value.append(m_lines[line + 1].value);
+		m_lines.erase(line + 1);
+	}
+
+	void deleteSelection(Cursor& cursor) {
+		if (!cursor.hasSelection()) return;
+		
+		TextPoint from = cursor.sel;
+		TextPoint to = cursor;
+		if (from > to) swap(from, to);
+
+		invalidateTokens(from.line);
+		if (from.line == to.line) {
+			m_lines[from.line].value.eraseRange(from.col, to.col - from.col);
+		}
+		else {
+			m_lines[from.line].value.resize(from.col);
+			m_lines[to.line].value.eraseRange(0, to.col);
+			if (to.line - from.line - 1 > 0) m_lines.eraseRange(from.line + 1, to.line - from.line - 1);
+			mergeWithNextLine(from.line);
+		}
+
+		for (Cursor& cursor : m_cursors) {
+			if (cursor < from) continue;
+
+			if (cursor.sel.line > to.line) cursor.sel.line -= to.line - from.line;
+			else if (cursor.sel.line == to.line) cursor.col -= to.col;
+			
+			if (cursor.line > to.line) cursor.line -= to.line - from.line;
+			else if (cursor.line == to.line) cursor.col -= to.col;
+		}
+
+		cursor.line = cursor.sel.line = from.line;
+		cursor.col = cursor.sel.col = from.col;
+	}
+
+	char getChar(TextPoint p) const {
+		const String& s = m_lines[p.line].value;
+		if (p.col == s.length()) return '\n';
+		return s[p.col];
+	}
+
+	[[nodiscard]] TextPoint getLeftWord(TextPoint point) {
+		TextPoint p = getLeft(point);
+		bool is_word = isWordChar(getChar(p));
+		p = getLeft(p);
+		
+		while (isWordChar(getChar(p)) == is_word) {
+			p = getLeft(p);
+			if (p.line == 0 && p.col == 0) return p;
+		}
+		return getRight(p);
+	}
+
+	[[nodiscard]] TextPoint getRightWord(TextPoint point) {
+		TextPoint p = getRight(point);
+		bool is_word = isWordChar(getChar(p));
+		p = getRight(p);
+		
+		while (isWordChar(getChar(p)) == is_word) {
+			p = getRight(p);
+			if (p.line == m_lines.size() - 1 && p.col == m_lines.back().length()) return p;
+		}
+		return p;
+	}
+
+	[[nodiscard]] TextPoint getLeft(TextPoint point) {
+		TextPoint p = point;
+		--p.col;
+		if (p.col >= 0) return p;
+
+		--p.line;
+		if (p.line < 0) {
+			p.line = 0;
+			p.col = 0;
+		}
+		else {
+			p.col = m_lines[p.line].length();
+		}
+		return p;
+	}
+
+	[[nodiscard]] TextPoint getRight(TextPoint point) {
+		TextPoint p = point;
+		++p.col;
+		if (p.col <= (i32)m_lines[p.line].length()) return p;
+		if (p.line == m_lines.size() - 1) return p;
+		++p.line;
+		p.col = 0;
+		return p;
+	}
+
+	void selectToLeft(Cursor& c) {
+		if (c.sel < c) c.sel = getLeft(c.sel);
+		else c = getLeft(c);
+	}
+
+	void selectToRight(Cursor& c, bool word) {
+		if (word) {
+			if (c.sel > c) c.sel = getRightWord(c.sel);
+			else c = getRightWord(c);
+		}
+		else {
+			if (c.sel > c) c.sel = getRight(c.sel);
+			else c = getRight(c);
+		}
+	}
+
+	void del(bool word) {
+		for (Cursor& cursor : m_cursors) {
+			if (!cursor.hasSelection()) selectToRight(cursor, word);
+			deleteSelection(cursor);
+		}
+	}
+
+	void backspace() {
+		for (Cursor& cursor : m_cursors) {
+			if (!cursor.hasSelection()) selectToLeft(cursor);
+			deleteSelection(cursor);
+		}
+	}
+
+	void gui(const char* str_id, const ImVec2& size) override {
+		PROFILE_FUNCTION();
+		if (!ImGui::BeginChild(str_id, size)) ImGui::EndChild();
+		
+		ImGuiIO& io = ImGui::GetIO();
+		const ImGuiStyle& style = ImGui::GetStyle();
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		ImVec2 min = ImGui::GetCursorScreenPos();
+		ImVec2 content_size = ImGui::GetContentRegionAvail();
+		const float line_height = ImGui::GetTextLineHeight();
+		const u32 line_num_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+		const u32 code_color = ImGui::GetColorU32(ImGuiCol_Text);
+		const u32 selection_color = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
+		const float char_width = ImGui::CalcTextSize("x").x;
+		const float line_num_width = u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x;
+
+		ImGui::InvisibleButton("codeeditor", ImVec2(content_size));
+		const bool handle_input = ImGui::IsItemFocused();
+		dl->AddRectFilled(min, min + ImVec2(line_num_width, content_size.y), ImGui::GetColorU32(ImGuiCol_Border));
+
+		min.x += style.FramePadding.x;
+		min.y -= m_scroll_y;
+		ImVec2 text_area_pos = min + ImVec2(line_num_width + style.FramePadding.x, 0);
+
+		auto screenToLine = [&](float screen_y) { return clamp(i32((screen_y - text_area_pos.y) / line_height), 0, m_lines.size() - 1); };
+		auto screenToCol = [&](float screen_x, i32 line) {
+			const char* line_str = m_lines[line].value.c_str();
+			const char* c = line_str;
+			const float text_area_x = screen_x - text_area_pos.x;
+			while (*c) {
+				// TODO optimize this
+				if (ImGui::CalcTextSize(line_str, c).x > text_area_x) return i32(c - line_str);
+				++c;
+			}
+			return (i32)m_lines[line].length();
+		};
+
+		auto textToScreenPos = [&](i32 col, i32 line){
+			float y = line * line_height;
+			const char* line_str = m_lines[line].value.c_str();
+			float x = ImGui::CalcTextSize(line_str, line_str + col).x;
+			return text_area_pos + ImVec2(x, y);
+		};
+
+		// selection
+		for (Cursor& c : m_cursors) {
+			if (!c.hasSelection()) continue;
+
+			TextPoint from = c.sel;
+			TextPoint to = c;
+			if (from > to) {
+				swap(from, to);
+			}
+
+			{
+				const ImVec2 line_pos = textToScreenPos(from.col, from.line);
+				const ImVec2 line_max = textToScreenPos(from.line == to.line ? to.col : m_lines[from.line].length(), from.line) + ImVec2(0, line_height);
+				dl->AddRectFilled(line_pos, line_max, selection_color);
+			}
+
+			for (i32 i = from.line + 1; i < to.line; ++i) {
+				ImVec2 line_pos = textToScreenPos(0, i);
+				ImVec2 line_max = textToScreenPos(m_lines[i].length(), i) + ImVec2(0, line_height);
+				dl->AddRectFilled(line_pos, line_max, selection_color);
+			}
+
+			if (to.line > from.line) {
+				ImVec2 line_pos = textToScreenPos(0, to.line);
+				ImVec2 line_max = textToScreenPos(to.col, to.line) + ImVec2(0, line_height);
+				dl->AddRectFilled(line_pos, line_max, selection_color);
+			}
+		}
+
+		// text
+		m_first_visible_line = i32(m_scroll_y / line_height);
+		float visible_lines = content_size.y / line_height;
+		m_first_visible_line = clamp(m_first_visible_line, 0, m_lines.size() - 1);
+		m_last_visible_line = minimum(m_first_visible_line + i32(visible_lines), m_lines.size() - 1);
+		
+		{
+			PROFILE_BLOCK("tokenize");
+			while (m_first_untokenized_line < minimum(m_last_visible_line, m_lines.size() - 1)) tokenizeLine();
+		}
+
+		u32 visible_tokens = 0;
+		for (int j = m_first_visible_line; j <= m_last_visible_line; ++j) {
+			float line_offset_y = j * line_height;
+			ImVec2 line_pos = min + ImVec2(0, line_offset_y);
+			StaticString<16> line_num_str(j + 1);
+			dl->AddText(line_pos, line_num_color, line_num_str);
+			const char* str = m_lines[j].value.c_str();
+			ImVec2 p = text_area_pos + ImVec2(0, line_offset_y);
+			for (const Token& t : m_lines[j].tokens) {
+				dl->AddText(p, m_token_colors[t.type], str + t.from, str + t.from + t.len);
+				p.x += ImGui::CalcTextSize(str + t.from, str + t.from + t.len).x;
+				++visible_tokens;
+			}
+		}
+		profiler::pushInt("Num tokens", visible_tokens);
+
+		// cursors
+		m_blink_timer += io.DeltaTime;
+		m_blink_timer = fmodf(m_blink_timer, 1.f);
+		bool draw_cursors = m_blink_timer < 0.6f;
+		for (Cursor& c : m_cursors) {
+			ImVec2 cursor_pos = textToScreenPos(c.col, c.line);
+			if (draw_cursors) dl->AddRectFilled(cursor_pos, cursor_pos + ImVec2(1, line_height), code_color);
+			if (handle_input) {
+				if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) moveCursorLeft(c, io.KeyCtrl);
+				if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) moveCursorRight(c, io.KeyCtrl);
+				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) moveCursorUp(c);
+				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) moveCursorDown(c);
+				if (ImGui::IsKeyPressed(ImGuiKey_End)) moveCursorEnd(c, io.KeyCtrl);
+				if (ImGui::IsKeyPressed(ImGuiKey_Home)) moveCursorBegin(c, io.KeyCtrl);
+			}
+		}
+		if (handle_input) {
+			if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
+			if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
+			if (ImGui::IsKeyPressed(ImGuiKey_Enter)) insertNewLine();
+			if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace();
+			if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
+		
+			// mouse input
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+				const i32 line = screenToLine(io.MousePos.y);
+				const i32 col = screenToCol(io.MousePos.x, line);
+				removeCursorAt(col, line);
+				Cursor& cursor = io.KeyAlt ? m_cursors.emplace() : (m_cursors.resize(1), m_cursors.back());
+				cursor.line = line;
+				cursor.col = col;
+				cursorMoved(cursor);
+			}
+
+			m_scroll_y -= io.MouseWheel * line_height * 5;
+			m_scroll_y = maximum(0.f, m_scroll_y);
+
+			// text input
+			if (io.KeyCtrl && !io.KeyAlt) {
+				if (ImGui::IsKeyPressed(ImGuiKey_D)) addNextOccurence();
+			}
+		
+			const bool ignore_char_inputs = (io.KeyCtrl && !io.KeyAlt);
+			if (!ignore_char_inputs && io.InputQueueCharacters.Size > 0) {
+				for (int n = 0; n < io.InputQueueCharacters.Size; n++) {
+					u32 c = (u32)io.InputQueueCharacters[n];
+					insertCharacter(c);
+				}
+
+				io.InputQueueCharacters.resize(0);
+			}
+		}
+
+		ImGui::EndChild();
+	}
+
+	void setTokenizer(Tokenizer tokenizer) override {
+		m_tokenizer = tokenizer;
+	}
+
+	void setTokenColors(Span<const u32> colors) override {
+		m_token_colors = colors;
+	}
+
+	void tokenizeLine() {
+		if (m_first_untokenized_line >= m_lines.size()) return;
+
+		Line& line = m_lines[m_first_untokenized_line];
+		line.tokens.clear();
+
+		const char* start = line.value.c_str();
+		const char* c = start;
+		
+		u8 prev_token_type = 0xff;
+		if (m_first_untokenized_line > 0 && !m_lines[m_first_untokenized_line - 1].tokens.empty()) {
+			prev_token_type = m_lines[m_first_untokenized_line - 1].tokens.back().type;
+		}
+
+		bool more_tokens = true;
+		while (more_tokens) {
+			Token& token = line.tokens.emplace();
+			token.from = u32(c - start);
+			more_tokens = m_tokenizer(c, token.len, token.type, prev_token_type);
+			c += token.len;
+			prev_token_type = token.type;
+		}
+
+		++m_first_untokenized_line;
+	}
+
+	i32 m_first_untokenized_line = 0;
+	TagAllocator m_allocator; 
+	float m_blink_timer = 0;
+	StudioApp& m_app;
+	Array<Line> m_lines;
+	float m_scroll_y = 0;
+	Array<Cursor> m_cursors;
+	i32 m_first_visible_line = 0;
+	i32 m_last_visible_line = 0;
+	Tokenizer m_tokenizer = nullptr;
+	Span<const u32> m_token_colors;
+};
+
+UniquePtr<CodeEditor> createCodeEditor(StudioApp& app) {
+	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
+	return editor.move();
+}
 
 ResourceLocator::ResourceLocator(StringView path) {
 	full = path;

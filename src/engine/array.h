@@ -147,6 +147,23 @@ template <typename T> struct Array {
 		}
 	}
 
+	void eraseRange(u32 from, u32 count) {
+		ASSERT(from + count <= m_size);
+		ASSERT(count > 0);
+
+		if constexpr (__is_trivially_copyable(T)) {
+			memcpy(m_data + from, m_data + from + count, (m_size - from - count) * sizeof(T));
+		}
+		else {
+			for (u32 i = from; i < m_size - count; ++i) {
+				m_data[i].~T();	
+				new (NewPlaceholder(), m_data + i) T(static_cast<T&&>(m_data[i + count]));
+			}
+			m_data[m_size - 1].~T();
+		}
+		m_size -= count;
+	}
+
 	void swapAndPopItem(const T& item) {
 		for (u32 i = 0; i < m_size; ++i) {
 			if (m_data[i] == item) {
