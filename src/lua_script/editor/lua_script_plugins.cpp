@@ -50,213 +50,22 @@ struct EditorWindow : AssetEditorWindow {
 		}
 	}
 
-	static inline const u32 token_colors[] = {
-		IM_COL32(0xFF, 0x00, 0xFF, 0xff),
-		IM_COL32(0xe1, 0xe1, 0xe1, 0xff),
-		IM_COL32(0xf7, 0xc9, 0x5c, 0xff),
-		IM_COL32(0xFF, 0xA9, 0x4D, 0xff),
-		IM_COL32(0xFF, 0xA9, 0x4D, 0xff),
-		IM_COL32(0xE5, 0x8A, 0xC9, 0xff),
-		IM_COL32(0x93, 0xDD, 0xFA, 0xff),
-		IM_COL32(0x67, 0x6b, 0x6f, 0xff),
-		IM_COL32(0x67, 0x6b, 0x6f, 0xff)
-	};
-
-	enum class TokenType : u8 {
-		EMPTY,
-		IDENTIFIER,
-		NUMBER,
-		STRING,
-		STRING_MULTI,
-		KEYWORD,
-		OPERATOR,
-		COMMENT,
-		COMMENT_MULTI
-	};
-	
-	static bool isWordChar(char c) {
-		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
-	}
-
-	static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
-		static const char* keywords[] = {
-			"if",
-			"then",
-			"else",
-			"elseif",
-			"end",
-			"do",
-			"function",
-			"repeat",
-			"until",
-			"while",
-			"for",
-			"break",
-			"return",
-			"local",
-			"in",
-			"not",
-			"and",
-			"or",
-			"goto",
-			"self",
-			"true",
-			"false",
-			"nil"
-		};
-
-		const char* c = str;
-		if (!*c) {
-			token_type = prev_token_type == (u8)TokenType::COMMENT_MULTI ? (u8)TokenType::COMMENT_MULTI : (u8)TokenType::EMPTY;
-			token_len = 0;
-			return false;
-		}
-
-		if (prev_token_type == (u8)TokenType::COMMENT_MULTI) {
-			token_type = (u8)TokenType::COMMENT;
-			while (*c) {
-				if (c[0] == ']' && c[1] == ']') {
-					c += 2;
-					token_len = u32(c - str);
-					return *c;
-				}
-				++c;
-			}
-			
-			token_type = (u8)TokenType::COMMENT_MULTI;
-			token_len = u32(c - str);
-			return *c;
-		}
-
-		if (prev_token_type == (u8)TokenType::STRING_MULTI) {
-			token_type = (u8)TokenType::STRING;
-			while (*c) {
-				if (c[0] == ']' && c[1] == ']') {
-					c += 2;
-					token_len = u32(c - str);
-					return *c;
-				}
-				++c;
-			}
-			
-			token_type = (u8)TokenType::STRING_MULTI;
-			token_len = u32(c - str);
-			return *c;
-		}
-
-		if (*c == '[' && c[1] == '[') {
-			while (*c) {
-				if (c[0] == ']' && c[1] == ']') {
-					c += 2;
-					token_type = (u8)TokenType::STRING;
-					token_len = u32(c - str);
-					return *c;
-				}
-				++c;
-			}
-
-			token_type = (u8)TokenType::STRING_MULTI;
-			token_len = u32(c - str);
-			return false;
-		}
-
-		if (*c == '-' && c[1] == '-') {
-			if (c[2] == '[' && c[3] == '[') {
-				while (*c) {
-					if (c[0] == ']' && c[1] == ']') {
-						c += 2;
-						token_type = (u8)TokenType::COMMENT;
-						token_len = u32(c - str);
-						return *c;
-					}
-					++c;
-				}
-			
-				token_type = (u8)TokenType::COMMENT_MULTI;
-				token_len = u32(c - str);
-				return *c;
-			}
-			else {
-				token_type = (u8)TokenType::COMMENT;
-				while (*c) ++c;
-				token_len = u32(c - str);
-				return *c;
-			}
-		}
-
-		if (*c == '"') {
-			token_type = (u8)TokenType::STRING;
-			++c;
-			while (*c && *c != '"') ++c;
-			if (*c == '"') ++c;
-			token_len = u32(c - str);
-			return *c;
-		}
-
-		if (*c == '\'') {
-			token_type = (u8)TokenType::STRING;
-			++c;
-			while (*c && *c != '\'') ++c;
-			if (*c == '\'') ++c;
-			token_len = u32(c - str);
-			return *c;
-		}
-
-		const char operators[] = "*/+-%.<>;=(),:[]{}&|^";
-		for (char op : operators) {
-			if (*c == op) {
-				token_type = (u8)TokenType::OPERATOR;
-				token_len = 1;
-				return *c;
-			}
-		}
-		
-		if (*c >= '0' && *c <= '9') {
-			token_type = (u8)TokenType::NUMBER;
-			while (*c >= '0' && *c <= '9') ++c;
-			token_len = u32(c - str);
-			return *c;
-		}
-
-		if (*c >= 'a' && *c <= 'z' || *c >= 'A' && *c <= 'Z' || *c == '_') {
-			token_type = (u8)TokenType::IDENTIFIER;
-			while (isWordChar(*c)) ++c;
-			token_len = u32(c - str);
-			StringView token_view(str, str + token_len);
-			for (const char* kw : keywords) {
-				if (equalStrings(kw, token_view)) {
-					token_type = (u8)TokenType::KEYWORD;
-					break;
-				}
-			}
-			return *c;
-		}
-
-		token_type = (u8)TokenType::IDENTIFIER;
-		token_len = 1;
-		++c;
-		return *c;
-	}
-
 	void onFileLoaded(Span<const u8> data, bool success) {
 		m_file_async_handle = FileSystem::AsyncHandle::invalid();
 		if (success) {
 			StringView v;
 			v.begin = (const char*)data.begin();
 			v.end = (const char*)data.end();
-			m_code_editor = createCodeEditor(m_app);
-			m_code_editor->setTokenizer(&EditorWindow::tokenize);
-			m_code_editor->setTokenColors(token_colors);
+			m_code_editor = createLuaCodeEditor(m_app);
 			m_code_editor->setText(v);
 		}
 	}
 
 	void save() {
-		ASSERT(false);
-		// TODO
-		//Span<const u8> data((const u8*)m_buffer.c_str(), m_buffer.length());
-		//m_app.getAssetBrowser().saveResource(*m_resource, data);
-		//m_dirty = false;
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_code_editor->serializeText(blob);
+		m_app.getAssetBrowser().saveResource(m_path, blob);
+		m_dirty = false;
 	}
 	
 	bool onAction(const Action& action) override { 
@@ -280,7 +89,7 @@ struct EditorWindow : AssetEditorWindow {
 
 		if (m_code_editor) {
 			ImGui::PushFont(m_app.getMonospaceFont());
-			m_code_editor->gui("test");
+			if (m_code_editor->gui("codeeditor")) m_dirty = true;
 			ImGui::PopFont();
 		}
 	}

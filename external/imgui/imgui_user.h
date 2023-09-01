@@ -11,6 +11,8 @@ namespace ImGuiEx
 
 IMGUI_API ImVec2 GetOsImePosRequest();
 IMGUI_API void ResetActiveID();
+IMGUI_API void SetActiveID(ImGuiID id);
+IMGUI_API void ItemAdd(const ImVec2& min, const ImVec2& max, ImGuiID id);
 
 IMGUI_API void BringToFront();
 

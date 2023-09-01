@@ -15,8 +15,199 @@
 #include "engine/world.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
+
+namespace LuaTokens {
+
+static inline const u32 token_colors[] = {
+	IM_COL32(0xFF, 0x00, 0xFF, 0xff),
+	IM_COL32(0xe1, 0xe1, 0xe1, 0xff),
+	IM_COL32(0xf7, 0xc9, 0x5c, 0xff),
+	IM_COL32(0xFF, 0xA9, 0x4D, 0xff),
+	IM_COL32(0xFF, 0xA9, 0x4D, 0xff),
+	IM_COL32(0xE5, 0x8A, 0xC9, 0xff),
+	IM_COL32(0x93, 0xDD, 0xFA, 0xff),
+	IM_COL32(0x67, 0x6b, 0x6f, 0xff),
+	IM_COL32(0x67, 0x6b, 0x6f, 0xff)
+};
+
+enum class TokenType : u8 {
+	EMPTY,
+	IDENTIFIER,
+	NUMBER,
+	STRING,
+	STRING_MULTI,
+	KEYWORD,
+	OPERATOR,
+	COMMENT,
+	COMMENT_MULTI
+};
+	
+static bool isWordChar(char c) {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
+}
+
+static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
+	static const char* keywords[] = {
+		"if",
+		"then",
+		"else",
+		"elseif",
+		"end",
+		"do",
+		"function",
+		"repeat",
+		"until",
+		"while",
+		"for",
+		"break",
+		"return",
+		"local",
+		"in",
+		"not",
+		"and",
+		"or",
+		"goto",
+		"self",
+		"true",
+		"false",
+		"nil"
+	};
+
+	const char* c = str;
+	if (!*c) {
+		token_type = prev_token_type == (u8)TokenType::COMMENT_MULTI ? (u8)TokenType::COMMENT_MULTI : (u8)TokenType::EMPTY;
+		token_len = 0;
+		return false;
+	}
+
+	if (prev_token_type == (u8)TokenType::COMMENT_MULTI) {
+		token_type = (u8)TokenType::COMMENT;
+		while (*c) {
+			if (c[0] == ']' && c[1] == ']') {
+				c += 2;
+				token_len = u32(c - str);
+				return *c;
+			}
+			++c;
+		}
+			
+		token_type = (u8)TokenType::COMMENT_MULTI;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if (prev_token_type == (u8)TokenType::STRING_MULTI) {
+		token_type = (u8)TokenType::STRING;
+		while (*c) {
+			if (c[0] == ']' && c[1] == ']') {
+				c += 2;
+				token_len = u32(c - str);
+				return *c;
+			}
+			++c;
+		}
+			
+		token_type = (u8)TokenType::STRING_MULTI;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if (*c == '[' && c[1] == '[') {
+		while (*c) {
+			if (c[0] == ']' && c[1] == ']') {
+				c += 2;
+				token_type = (u8)TokenType::STRING;
+				token_len = u32(c - str);
+				return *c;
+			}
+			++c;
+		}
+
+		token_type = (u8)TokenType::STRING_MULTI;
+		token_len = u32(c - str);
+		return false;
+	}
+
+	if (*c == '-' && c[1] == '-') {
+		if (c[2] == '[' && c[3] == '[') {
+			while (*c) {
+				if (c[0] == ']' && c[1] == ']') {
+					c += 2;
+					token_type = (u8)TokenType::COMMENT;
+					token_len = u32(c - str);
+					return *c;
+				}
+				++c;
+			}
+			
+			token_type = (u8)TokenType::COMMENT_MULTI;
+			token_len = u32(c - str);
+			return *c;
+		}
+		else {
+			token_type = (u8)TokenType::COMMENT;
+			while (*c) ++c;
+			token_len = u32(c - str);
+			return *c;
+		}
+	}
+
+	if (*c == '"') {
+		token_type = (u8)TokenType::STRING;
+		++c;
+		while (*c && *c != '"') ++c;
+		if (*c == '"') ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if (*c == '\'') {
+		token_type = (u8)TokenType::STRING;
+		++c;
+		while (*c && *c != '\'') ++c;
+		if (*c == '\'') ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	const char operators[] = "*/+-%.<>;=(),:[]{}&|^";
+	for (char op : operators) {
+		if (*c == op) {
+			token_type = (u8)TokenType::OPERATOR;
+			token_len = 1;
+			return *c;
+		}
+	}
+		
+	if (*c >= '0' && *c <= '9') {
+		token_type = (u8)TokenType::NUMBER;
+		while (*c >= '0' && *c <= '9') ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if (*c >= 'a' && *c <= 'z' || *c >= 'A' && *c <= 'Z' || *c == '_') {
+		token_type = (u8)TokenType::IDENTIFIER;
+		while (isWordChar(*c)) ++c;
+		token_len = u32(c - str);
+		StringView token_view(str, str + token_len);
+		for (const char* kw : keywords) {
+			if (equalStrings(kw, token_view)) {
+				token_type = (u8)TokenType::KEYWORD;
+				break;
+			}
+		}
+		return *c;
+	}
+
+	token_type = (u8)TokenType::IDENTIFIER;
+	token_len = 1;
+	++c;
+	return *c;
+}
+
+}
 
 // TODO undo/redo
 // TODO utf8
@@ -72,7 +263,17 @@ struct CodeEditorImpl final : CodeEditor {
 		m_cursors.emplace(Cursor{0, 0});
 	}
 
-	void setText(StringView& text) override {
+	void serializeText(OutputMemoryStream& blob) override {
+		u32 size = 0;
+		for (const Line& line : m_lines) size += line.value.length() + 1/*end of line char*/;
+		blob.reserve(size);
+		for (const Line& line : m_lines) {
+			blob.write(line.value.c_str(), line.value.length());
+			blob.write('\n');
+		}
+	}
+
+	void setText(StringView text) override {
 		m_cursors.clear();
 		m_cursors.emplace(Cursor{0, 0});
 		m_lines.clear();
@@ -83,7 +284,6 @@ struct CodeEditorImpl final : CodeEditor {
 			StringView next_line = {line.end, line.end};
 			if (line.end != text.end) {
 				next_line.end = next_line.begin = line.end + 1;
-				--line.end;
 			}
 			m_lines.emplace(line, m_allocator);
 			line = next_line;
@@ -231,6 +431,7 @@ struct CodeEditorImpl final : CodeEditor {
 			cursorMoved(cursor);
 			cursor.cancelSelection();
 		}
+		++m_version;
 	}
 
 	static bool isWordChar(char c) {
@@ -299,24 +500,6 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
-	void mergeWithNextLine(i32 line) {
-		invalidateTokens(line);
-		for (Cursor& cursor : m_cursors) {
-			if (cursor.line > line + 1) {
-				--cursor.line;
-				--cursor.sel.line;
-			}
-			else if (cursor.line == line + 1) {
-				--cursor.line;
-				--cursor.sel.line;
-				cursor.col += m_lines[line].length();
-				cursor.sel.col += m_lines[line].length();
-			}
-		}
-		m_lines[line].value.append(m_lines[line + 1].value);
-		m_lines.erase(line + 1);
-	}
-
 	void deleteSelection(Cursor& cursor) {
 		if (!cursor.hasSelection()) return;
 		
@@ -332,7 +515,22 @@ struct CodeEditorImpl final : CodeEditor {
 			m_lines[from.line].value.resize(from.col);
 			m_lines[to.line].value.eraseRange(0, to.col);
 			if (to.line - from.line - 1 > 0) m_lines.eraseRange(from.line + 1, to.line - from.line - 1);
-			mergeWithNextLine(from.line);
+			
+			i32 line = from.line;
+			for (Cursor& cursor : m_cursors) {
+				if (cursor.line > line + 1) {
+					--cursor.line;
+					--cursor.sel.line;
+				}
+				else if (cursor.line == line + 1) {
+					--cursor.line;
+					--cursor.sel.line;
+					cursor.col += m_lines[line].length();
+					cursor.sel.col += m_lines[line].length();
+				}
+			}
+			m_lines[line].value.append(m_lines[line + 1].value);
+			m_lines.erase(line + 1);
 		}
 
 		for (Cursor& cursor : m_cursors) {
@@ -347,6 +545,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 		cursor.line = cursor.sel.line = from.line;
 		cursor.col = cursor.sel.col = from.col;
+		++m_version;
 	}
 
 	char getChar(TextPoint p) const {
@@ -435,10 +634,14 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
-	void gui(const char* str_id, const ImVec2& size) override {
+	bool gui(const char* str_id, const ImVec2& size) override {
 		PROFILE_FUNCTION();
-		if (!ImGui::BeginChild(str_id, size)) ImGui::EndChild();
+		if (!ImGui::BeginChild(str_id, size)) {
+			ImGui::EndChild();
+			return false;
+		}
 		
+		u32 version = m_version;
 		ImGuiIO& io = ImGui::GetIO();
 		const ImGuiStyle& style = ImGui::GetStyle();
 		ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -451,8 +654,13 @@ struct CodeEditorImpl final : CodeEditor {
 		const float char_width = ImGui::CalcTextSize("x").x;
 		const float line_num_width = u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x;
 
-		ImGui::InvisibleButton("codeeditor", ImVec2(content_size));
-		const bool handle_input = ImGui::IsItemFocused();
+		ImGuiID id = ImGui::GetID("codeditor");
+		ImGuiEx::ItemAdd(min, min + content_size, id);
+		const bool clicked = ImGui::IsItemHovered() && ImGui::IsItemClicked();
+		if (clicked) ImGuiEx::SetActiveID(id);
+		if (io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
+
+		const bool handle_input = ImGui::IsItemActive();
 		dl->AddRectFilled(min, min + ImVec2(line_num_width, content_size.y), ImGui::GetColorU32(ImGuiCol_Border));
 
 		min.x += style.FramePadding.x;
@@ -590,6 +798,7 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 
 		ImGui::EndChild();
+		return version != m_version;
 	}
 
 	void setTokenizer(Tokenizer tokenizer) override {
@@ -637,10 +846,18 @@ struct CodeEditorImpl final : CodeEditor {
 	i32 m_last_visible_line = 0;
 	Tokenizer m_tokenizer = nullptr;
 	Span<const u32> m_token_colors;
+	u32 m_version = 0;
 };
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app) {
 	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
+	return editor.move();
+}
+
+UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app) {
+	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
+	editor->setTokenColors(LuaTokens::token_colors);
+	editor->setTokenizer(&LuaTokens::tokenize);
 	return editor.move();
 }
 

@@ -169,7 +169,7 @@ namespace ImGuiEx {
 			return ImVec2(g_node_editor.node_pos->x + g_node_editor.node_w + 2 * GetStyle().WindowPadding.x, screen_pos.y + GetTextLineHeightWithSpacing() * 0.5f);
 		}();
 		const ImVec2 half_extents(NODE_PIN_RADIUS + 4, NODE_PIN_RADIUS + 4);
-		ItemAdd(ImRect(center - half_extents, center + half_extents), id);
+		ImGui::ItemAdd(ImRect(center - half_extents, center + half_extents), id);
 		const bool hovered = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 		const ImU32 color = GetColorU32(hovered ? ImGuiCol_ResizeGripHovered : ImGuiCol_ResizeGrip);
 		switch(shape) {
@@ -328,7 +328,7 @@ namespace ImGuiEx {
 		GetStateStorage()->SetFloat(GetID("node-width"), size.x - style.WindowPadding.x * 2);
 
 		const ImGuiID dragger_id = GetID("##_node_dragger");
-		ItemAdd(rect, dragger_id);
+		ImGui::ItemAdd(rect, dragger_id);
 		const bool is_hovered = IsItemHovered();
 		g_node_editor.is_node_hovered = is_hovered || g_node_editor.is_node_hovered;
 		
@@ -459,14 +459,6 @@ namespace ImGuiEx {
 		return GetCurrentContext()->PlatformImeData.InputPos;
 	}
 
-
-	void ResetActiveID()
-	{
-		SetActiveID(0, nullptr);
-	}
-
-
-
 	static inline bool IsWindowContentHoverableEx(ImGuiWindow* window, ImGuiHoveredFlags flags)
 	{
 		// An active popup disable hovering on other windows (apart from its own children)
@@ -533,6 +525,16 @@ namespace ImGuiEx {
 		}
 
 	}
+
+	void ItemAdd(const ImVec2& min, const ImVec2& max, ImGuiID id) {
+		ImRect bb;
+		bb.Min = min;
+		bb.Max = max;
+		ImGui::ItemAdd(bb, id);
+	}
+	
+	void ResetActiveID() { ImGui::SetActiveID(0, nullptr); }
+	void SetActiveID(ImGuiID id) { ImGui::SetActiveID(id, ImGui::GetCurrentWindow()); }
 
 	void BringToFront()
 	{
@@ -718,7 +720,7 @@ namespace ImGuiEx {
 		}
 
 		const ImGuiID dragger_id = GetID("##_node_dragger");
-		ItemAdd(inner_bb, dragger_id);
+		ImGui::ItemAdd(inner_bb, dragger_id);
 
 		if (GetIO().MouseWheel != 0 && IsItemHovered())
 		{
@@ -1035,7 +1037,7 @@ namespace ImGuiEx {
 		ImVec2 end_pos = screen_pos + ImVec2(w, h);
 		ImRect total_bb(screen_pos, end_pos);
 		ItemSize(total_bb);
-		if (!ItemAdd(total_bb, 0)) return;
+		if (!ImGui::ItemAdd(total_bb, 0)) return;
 		win->DrawList->AddRectFilled(screen_pos, end_pos, color);
 	}
 
@@ -1140,7 +1142,7 @@ namespace ImGuiEx {
 		textRect.Max.y += window->DC.CurrLineTextBaseOffset;
 
 		ItemSize(textRect);
-		if (ItemAdd(textRect, window->GetID(label)))
+		if (ImGui::ItemAdd(textRect, window->GetID(label)))
 		{
 			RenderTextEllipsis(GetWindowDrawList(), textRect.Min, textRect.Max, textRect.Max.x,
 				textRect.Max.x, label, nullptr, &textSize);
