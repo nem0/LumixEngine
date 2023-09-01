@@ -530,6 +530,7 @@ namespace ImGuiEx {
 		ImRect bb;
 		bb.Min = min;
 		bb.Max = max;
+		ItemSize(bb, ImGui::GetStyle().FramePadding.y);
 		ImGui::ItemAdd(bb, id);
 	}
 	

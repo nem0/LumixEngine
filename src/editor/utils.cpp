@@ -658,7 +658,7 @@ struct CodeEditorImpl final : CodeEditor {
 		ImGuiEx::ItemAdd(min, min + content_size, id);
 		const bool clicked = ImGui::IsItemHovered() && ImGui::IsItemClicked();
 		if (clicked) ImGuiEx::SetActiveID(id);
-		if (io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
+		if (ImGui::IsItemActive() && io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
 
 		const bool handle_input = ImGui::IsItemActive();
 		dl->AddRectFilled(min, min + ImVec2(line_num_width, content_size.y), ImGui::GetColorU32(ImGuiCol_Border));
@@ -776,6 +776,11 @@ struct CodeEditorImpl final : CodeEditor {
 				cursor.line = line;
 				cursor.col = col;
 				cursorMoved(cursor);
+			}
+
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && m_cursors.size() == 1) {
+				m_cursors[0].sel.line = screenToLine(io.MousePos.y);
+				m_cursors[0].sel.col = screenToCol(io.MousePos.x, m_cursors[0].sel.line);
 			}
 
 			m_scroll_y -= io.MouseWheel * line_height * 5;
