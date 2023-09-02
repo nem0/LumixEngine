@@ -140,6 +140,7 @@ struct LUMIX_ENGINE_API String {
 	template <typename... T> 
 	void append(T... args) { int tmp[] = { 0, (add(args), 0)... }; }
 	void insert(u32 position, const char* value);
+	void insert(u32 position, StringView value);
 	void eraseAt(u32 position);
 	void eraseRange(u32 position, u32 length);
 

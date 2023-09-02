@@ -199,6 +199,18 @@ void String::eraseAt(u32 position)
 	eraseRange(position, 1);
 }
 
+void String::insert(u32 position, StringView value)
+{
+	ASSERT(value.end <= c_str() || value.begin >= c_str() + m_size);
+	
+	const int old_size = m_size;
+	const int len = value.size();
+	resize(old_size + len);
+
+	char* tmp = getMutableData();
+	memmove(tmp + position + len, tmp + position, old_size - position);
+	memcpy(tmp + position, value.begin, len);
+}
 
 void String::insert(u32 position, const char* value)
 {
