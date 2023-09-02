@@ -1066,22 +1066,6 @@ namespace ImGuiEx {
 	}
 
 
-	void VSplitter(const char* str_id, ImVec2* size)
-	{
-		ImVec2 screen_pos = GetCursorScreenPos();
-		InvisibleButton(str_id, ImVec2(3, -1));
-		ImVec2 end_pos = screen_pos + GetItemRectSize();
-		ImGuiWindow* win = GetCurrentWindow();
-		ImVec4* colors = GetStyle().Colors;
-		ImU32 color = GetColorU32(IsItemActive() || IsItemHovered() ? colors[ImGuiCol_ButtonActive] : colors[ImGuiCol_Button]);
-		win->DrawList->AddRectFilled(screen_pos, end_pos, color);
-		if (IsItemActive())
-		{
-			size->x = ImMax(1.0f, GetIO().MouseDelta.x + size->x);
-		}
-	}
-
-
 	bool IconButton(const char* icon, const char* tooltip, bool enabled) {
 		if (!enabled) BeginDisabled();
 		AlignTextToFramePadding();
@@ -1298,7 +1282,7 @@ namespace ImGuiEx {
 		PushStyleColor(ImGuiCol_Text, GetStyle().Colors[ImGuiCol_TextDisabled]);
 	}
 
-	bool filter(const char* label, char* buf, int buf_size, float width, bool set_keyboard_focus) {
+	bool Filter(const char* label, char* buf, int buf_size, float width, bool set_keyboard_focus) {
 		ASSERT(buf_size > 0);
 		bool changed = false;
 		SetNextItemWidth(width);

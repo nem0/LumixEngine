@@ -44,7 +44,6 @@ IMGUI_API int CurveEditor(const char* label
 	, int* hovered_point = nullptr);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
 IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
-IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
 IMGUI_API bool MenuItemEx(const char* label, const char* icon, const char* shortcut = nullptr, bool selected = false, bool enabled = true);
 IMGUI_API bool BeginMenuEx(const char* label, const char* icon, bool enabled = true);
@@ -76,7 +75,7 @@ IMGUI_API bool IconButton(const char* icon, const char* tooltip, bool enabled = 
 IMGUI_API bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values);
 IMGUI_API void PushReadOnly();
 IMGUI_API void PopReadOnly();
-IMGUI_API bool filter(const char* hint, char* buf, int buf_size, float width = -1, bool set_keyboard_focus = false);
+IMGUI_API bool Filter(const char* hint, char* buf, int buf_size, float width = -1, bool set_keyboard_focus = false);
 IMGUI_API void TextUnformatted(Lumix::StringView str);
 
 struct IMGUI_API Canvas {
