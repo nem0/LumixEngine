@@ -612,29 +612,25 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
-	#define NO_ICON "     "	
-	
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
 	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);
 	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, false);
 	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, false);
-	m_search_action.init(ICON_FA_SEARCH "Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
+	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
 	m_search_action.func.bind<&SceneView::toggleSearch>(this);
 
-	m_top_view_action.init(NO_ICON "Top", "Set top camera view", "viewTop", "", true);
+	m_top_view_action.init("Top", "Set top camera view", "viewTop", "", true);
 	m_top_view_action.func.bind<&SceneView::setTopView>(this);
-	m_side_view_action.init(NO_ICON "Side", "Set side camera view", "viewSide", "", true);
+	m_side_view_action.init("Side", "Set side camera view", "viewSide", "", true);
 	m_side_view_action.func.bind<&SceneView::setSideView>(this);
-	m_front_view_action.init(NO_ICON "Front", "Set front camera view", "viewFront", "", true);
+	m_front_view_action.init("Front", "Set front camera view", "viewFront", "", true);
 	m_front_view_action.func.bind<&SceneView::setFrontView>(this);
-	m_toggle_projection_action.init(NO_ICON "Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", true);
+	m_toggle_projection_action.init("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", true);
 	m_toggle_projection_action.func.bind<&SceneView::toggleProjection>(this);
-	m_look_at_selected_action.init(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected", "", true);
+	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "", true);
 	m_look_at_selected_action.func.bind<&SceneView::lookAtSelected>(this);
-	m_copy_view_action.init(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform", "", true);
+	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "", true);
 	m_copy_view_action.func.bind<&SceneView::copyViewTransform>(this);
-
-	#undef NO_ICON
 
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_toggle_gizmo_step_action);

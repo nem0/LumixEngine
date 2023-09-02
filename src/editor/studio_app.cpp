@@ -69,9 +69,6 @@ struct TarHeader {
 };
 
 
-#define NO_ICON "     "
-
-
 struct StudioAppImpl final : StudioApp
 {
 	StudioAppImpl()
@@ -1374,7 +1371,7 @@ struct StudioAppImpl final : StudioApp
 
 		const auto& selected_entities = m_editor->getSelectedEntities();
 		bool is_any_entity_selected = !selected_entities.empty();
-		if (ImGui::BeginMenu(ICON_FA_PLUS_SQUARE "Create"))
+		if (ImGuiEx::BeginMenuEx("Create", ICON_FA_PLUS_SQUARE))
 		{
 			onCreateEntityWithComponentGUI(INVALID_ENTITY);
 			ImGui::EndMenu();
@@ -1427,7 +1424,7 @@ struct StudioAppImpl final : StudioApp
 		menuItem("setScaleGizmoMode", true);
 		menuItem("setLocalCoordSystem", true);
 		menuItem("setGlobalCoordSystem", true);
-		if (ImGui::BeginMenu(ICON_FA_CAMERA "View", true))
+		if (ImGuiEx::BeginMenuEx("View", ICON_FA_CAMERA, true))
 		{
 			menuItem("toggleProjection", true);
 			menuItem("viewTop", true);
@@ -1463,13 +1460,13 @@ struct StudioAppImpl final : StudioApp
 				ImGui::EndMenu();
 			}
 		};
-		open_ui(NO_ICON "Open", false);
+		open_ui("Open", false);
 		const bool can_load_additive = partitions.size() != 1 || partitions[0].name[0] != '\0';
 		if (can_load_additive) {
-			open_ui(NO_ICON "Open additive", true);
+			open_ui("Open additive", true);
 		}
 		else {
-			if (ImGui::BeginMenu(NO_ICON "Open additive")) {
+			if (ImGui::BeginMenu("Open additive")) {
 				ImGui::TextUnformatted("Please save current partition first");
 				ImGui::EndMenu();
 			}
@@ -2314,16 +2311,16 @@ struct StudioAppImpl final : StudioApp
 
 	void addActions()
 	{
-		m_common_actions.save.init(ICON_FA_SAVE "Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
+		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
 		m_common_actions.save.func.bind<&StudioAppImpl::save>(this);
 		addAction(&m_common_actions.save);
-		m_common_actions.undo.init(ICON_FA_UNDO "Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
+		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
 		m_common_actions.undo.func.bind<&StudioAppImpl::undo>(this);
 		addAction(&m_common_actions.undo);
-		m_common_actions.redo.init(ICON_FA_REDO "Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
+		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
 		m_common_actions.redo.func.bind<&StudioAppImpl::redo>(this);
 		addAction(&m_common_actions.redo);
-		m_common_actions.del.init(ICON_FA_MINUS_SQUARE "Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, true);
+		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, true);
 		m_common_actions.del.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
 		addAction(&m_common_actions.del);
 
@@ -2342,46 +2339,41 @@ struct StudioAppImpl final : StudioApp
 		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", false);
 		addAction(&m_common_actions.cam_down);
 
-		addAction<&StudioAppImpl::newWorld>(ICON_FA_PLUS "New", "New world", "newWorld", ICON_FA_PLUS);
-		addAction<&StudioAppImpl::saveAs>(
-			NO_ICON "Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
-		addAction<&StudioAppImpl::exit>(
-			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT);
-		addAction<&StudioAppImpl::copy>(
-			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::paste>(
-			ICON_FA_PASTE "Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::duplicate>(
-			ICON_FA_CLONE "Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS_ALT "Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
+		addAction<&StudioAppImpl::newWorld>("New", "New world", "newWorld", ICON_FA_PLUS);
+		addAction<&StudioAppImpl::saveAs>("Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
+		addAction<&StudioAppImpl::exit>("Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT);
+		addAction<&StudioAppImpl::copy>("Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
+		addAction<&StudioAppImpl::paste>("Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, Action::Modifiers::CTRL);
+		addAction<&StudioAppImpl::duplicate>("Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, Action::Modifiers::CTRL);
+		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
 			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_UNDO "Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
+		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
 			.is_selected.bind<&Gizmo::Config::isRotateMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setScaleGizmoMode>(ICON_FA_EXPAND_ALT "Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
+		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
 			.is_selected.bind<&Gizmo::Config::isScaleMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setLocalCoordSystem>(ICON_FA_HOME "Local", "Set local transform system", "setLocalCoordSystem", ICON_FA_HOME)
+		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "Set local transform system", "setLocalCoordSystem", ICON_FA_HOME)
 			.is_selected.bind<&Gizmo::Config::isLocalCoordSystem>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setGlobalCoordSystem>(ICON_FA_GLOBE "Global", "Set global transform system", "setGlobalCoordSystem", ICON_FA_GLOBE)
+		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "Set global transform system", "setGlobalCoordSystem", ICON_FA_GLOBE)
 			.is_selected.bind<&Gizmo::Config::isGlobalCoordSystem>(&getGizmoConfig());
 
-		addAction<&StudioAppImpl::addEntity>(ICON_FA_PLUS_SQUARE "Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE);
+		addAction<&StudioAppImpl::addEntity>("Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE);
 		
-		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
-		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
+		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
+		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
 
-		addAction<&StudioAppImpl::nextFrame>(ICON_FA_STEP_FORWARD "Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD);
-		addAction<&StudioAppImpl::pauseGame>(ICON_FA_PAUSE "Pause", "Pause game mode", "pauseGameMode", ICON_FA_PAUSE)
+		addAction<&StudioAppImpl::nextFrame>("Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD);
+		addAction<&StudioAppImpl::pauseGame>("Pause", "Pause game mode", "pauseGameMode", ICON_FA_PAUSE)
 			.is_selected.bind<&Engine::isPaused>(m_engine.get());
-		addAction<&StudioAppImpl::toggleGameMode>(ICON_FA_PLAY "Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
+		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
 			.is_selected.bind<&WorldEditor::isGameMode>(m_editor.get());
-		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
+		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
-		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::toggleEntityList>(ICON_FA_STREAM "Hierarchy", "Toggle hierarchy", "entityList", ICON_FA_STREAM)
+		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
+		addAction<&StudioAppImpl::toggleEntityList>("Hierarchy", "Toggle hierarchy", "entityList", ICON_FA_STREAM)
 			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
-		addAction<&StudioAppImpl::toggleSettings>(ICON_FA_COG "Settings", "Toggle settings UI", "settings", ICON_FA_COG)
+		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings", ICON_FA_COG)
 			.is_selected.bind<&StudioAppImpl::areSettingsOpen>(this);
-		addAction<&StudioAppImpl::showExportGameDialog>(ICON_FA_FILE_EXPORT "Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT);
+		addAction<&StudioAppImpl::showExportGameDialog>("Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT);
 	}
 
 

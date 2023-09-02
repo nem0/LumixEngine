@@ -1029,7 +1029,14 @@ namespace ImGuiEx {
 
 		return opened;
 	}
+	
+	bool BeginMenuEx(const char* label, const char* icon, bool enabled) {
+		return ImGui::BeginMenuEx(label, icon, enabled);
+	}
 
+	bool MenuItemEx(const char* label, const char* icon, const char* shortcut, bool selected, bool enabled) {
+		return ImGui::MenuItemEx(label, icon, shortcut, selected, enabled);
+	}
 
 	void Rect(float w, float h, ImU32 color)
 	{

@@ -409,7 +409,7 @@ struct CodeEditorImpl final : CodeEditor {
 			if (endsWith(line, "\r")) line.removeSuffix(1);
 			m_lines.emplace(line, m_allocator);
 		}
-
+		if (m_lines.empty()) m_lines.emplace("", m_allocator);
 		m_first_untokenized_line = 0;
 
 		{
@@ -1198,7 +1198,7 @@ void getShortcut(const Action& action, Span<char> buf) {
 bool menuItem(const Action& a, bool enabled) {
 	char buf[20];
 	getShortcut(a, Span(buf));
-	return ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled);
+	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, a.is_selected.invoke(), enabled);
 }
 
 void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity)

@@ -360,7 +360,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		m_toggle_ui.func.bind<&PhysicsUIPlugin::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&PhysicsUIPlugin::isOpen>(this);
 		
-		m_simulate_selected.init("     Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "", (os::Keycode)'L', Action::Modifiers::CTRL, true);
+		m_simulate_selected.init("Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "", (os::Keycode)'L', Action::Modifiers::CTRL, true);
 		m_simulate_selected.func.bind<&PhysicsUIPlugin::toggleSimulateSelected>(this);
 		m_simulate_selected.is_selected.bind<&PhysicsUIPlugin::isSimulatingSelected>(this);
 		
