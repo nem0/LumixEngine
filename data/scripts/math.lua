@@ -18,3 +18,11 @@ function makeQuatFromPitch(pitch)
     local cpitch = math.cos(pitch * 0.5)
     return {-spitch, 0, 0, cpitch}
 end
+
+function yawToDir(yaw)
+	return {math.sin(yaw), 0, math.cos(yaw)}
+end
+
+function mulVec3Num(v, f)
+	return {v[1] * f, v[2] * f, v[3] * f}
+end
