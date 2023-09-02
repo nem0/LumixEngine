@@ -77,7 +77,10 @@ template <typename T> struct Array {
 	}
 
 	void copyTo(Array<T>& dst) const {
-		if (m_size == 0) return;
+		if (m_size == 0) {
+			dst.clear();
+			return;
+		}
 		if constexpr (__is_trivially_copyable(T)) {
 			dst.resize(m_size);
 			memcpy(dst.begin(), begin(), sizeof(T) * m_size);

@@ -209,11 +209,11 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 
 }
 
-// TODO copy/paste
 // TODO utf8
 // TODO clipping selection 
 // TODO selection should render inclugin "end of line char" in certain cases
 // TODO scrollbar
+// TODO mouse click - left/right half of character
 struct CodeEditorImpl final : CodeEditor {
 	struct TextPoint {
 		TextPoint() {}
@@ -256,12 +256,14 @@ struct CodeEditorImpl final : CodeEditor {
 
 	struct UndoRecord {
 		enum Type {
+			BEGIN_GROUP,
+			END_GROUP,
 			REMOVE,
 			INSERT,
 			NEW_LINE
 		};
 
-		UndoRecord(IAllocator& allocator) : old_value(allocator) {}
+		UndoRecord(IAllocator& allocator) : text(allocator), cursors(allocator) {}
 
 		Type type;
 		union {
@@ -269,11 +271,18 @@ struct CodeEditorImpl final : CodeEditor {
 			TextPoint from;
 		};
 		TextPoint to;
-		u32 character;
-		OutputMemoryStream old_value;
+		OutputMemoryStream text;
+		Array<Cursor> cursors;
 
 		void execute(CodeEditorImpl& editor, bool is_redo) {
 			switch(type) {
+				case BEGIN_GROUP:
+					if (!is_redo) editor.m_cursors.copyTo(cursors);
+					break;
+				case END_GROUP:
+					if (is_redo) cursors.copyTo(editor.m_cursors);
+					else editor.m_cursors.copyTo(cursors);
+					break;
 				case NEW_LINE: {
 					StringView v = editor.m_lines[point.line].value;
 					StringView rv = v; rv.removePrefix(point.col);
@@ -288,26 +297,17 @@ struct CodeEditorImpl final : CodeEditor {
 					break;
 				}
 				case INSERT: {
-					char tmp[2] = { (char)character, 0 };
-					editor.m_lines[point.line].value.insert(point.col, tmp);
+					StringView sv;
+					sv.begin = (const char*)text.data();
+					sv.end = sv.begin + text.size();
+					to = editor.rawInsertText(from, sv);
 					editor.invalidateTokens(point.line);
 					break;
 				}
 				case REMOVE: {
-					if (!is_redo) editor.serializeText(from, to, old_value);
+					if (!is_redo) editor.serializeText(from, to, text);
 					editor.invalidateTokens(from.line);
-
-					if (from.line == to.line) {
-						editor.m_lines[from.line].value.eraseRange(from.col, to.col - from.col);
-					}
-					else {
-						editor.m_lines[from.line].value.resize(from.col);
-						editor.m_lines[to.line].value.eraseRange(0, to.col);
-						if (to.line - from.line - 1 > 0) editor.m_lines.eraseRange(from.line + 1, to.line - from.line - 1);
-			
-						editor.m_lines[from.line].value.append(editor.m_lines[from.line + 1].value);
-						editor.m_lines.erase(from.line + 1);
-					}
+					editor.rawEraseRange(from ,to);
 					break;
 				}
 			}
@@ -315,36 +315,33 @@ struct CodeEditorImpl final : CodeEditor {
 
 		void undo(CodeEditorImpl& editor) {
 			switch(type) {
+				case BEGIN_GROUP:
+					cursors.copyTo(editor.m_cursors);
+					editor.ensurePointVisible(editor.m_cursors[0]);
+					break;
+				case END_GROUP:
+					break;
 				case NEW_LINE: {
 					editor.m_lines[point.line].value.insert(point.col, editor.m_lines[point.line + 1].value.c_str());
 					editor.m_lines.erase(point.line + 1);
-					editor.m_cursors[0] = point;
-					editor.m_cursors[0].sel = point;
 					editor.invalidateTokens(point.line);
-					editor.ensurePointVisible(editor.m_cursors[0]);
 					break;
 				}
 				case INSERT:
 					editor.m_cursors.resize(1);
-					editor.m_cursors[0] = point;
-					editor.m_cursors[0].sel = point;
-					editor.m_lines[point.line].value.eraseAt(point.col);
+					editor.rawEraseRange(from, to);
 					editor.invalidateTokens(point.line);
-					editor.ensurePointVisible(editor.m_cursors[0]);
 					break;
 				case REMOVE: {
-					editor.m_cursors.resize(1);
-					editor.m_cursors[0] = from;
-					editor.m_cursors[0].sel = to;
 					StringView sv;
-					sv.begin = (const char*)old_value.data();
-					sv.end = (const char*)old_value.data() + old_value.size();
+					sv.begin = (const char*)text.data();
+					sv.end = (const char*)text.data() + text.size();
 					editor.rawInsertText(from, sv);
 					editor.invalidateTokens(from.line);
-					editor.ensurePointVisible(editor.m_cursors[0]);
 					break;
 				}
 			}
+			cursors.copyTo(editor.m_cursors);
 		}
 	};
 
@@ -501,6 +498,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void insertNewLine() {
+		beginUndoGroup();
 		deleteSelections();
 
 		for (Cursor& cursor : m_cursors) {
@@ -524,12 +522,15 @@ struct CodeEditorImpl final : CodeEditor {
 		for (Cursor& cursor : m_cursors) {
 			cursor.cancelSelection();
 		}
+		endUndoGroup();
 	}
 
 	void deleteSelections() {
+		beginUndoGroup();
 		for (Cursor& cursor : m_cursors) {
 			deleteSelection(cursor);
 		}
+		endUndoGroup();
 	}
 
 	struct Lines {
@@ -571,7 +572,21 @@ struct CodeEditorImpl final : CodeEditor {
 		StringView str;
 	};
 
-	void rawInsertText(TextPoint p, StringView value) {
+	void rawEraseRange(TextPoint from, TextPoint to) {
+		if (from.line == to.line) {
+			m_lines[from.line].value.eraseRange(from.col, to.col - from.col);
+		}
+		else {
+			m_lines[from.line].value.resize(from.col);
+			m_lines[to.line].value.eraseRange(0, to.col);
+			if (to.line - from.line - 1 > 0) m_lines.eraseRange(from.line + 1, to.line - from.line - 1);
+			
+			m_lines[from.line].value.append(m_lines[from.line + 1].value);
+			m_lines.erase(from.line + 1);
+		}
+	}
+
+	TextPoint rawInsertText(TextPoint p, StringView value) {
 		for (StringView line : Lines(value)) {
 			if (endsWith(line, "\n")) {
 				line.removeSuffix(1);
@@ -594,27 +609,72 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 			else {
 				m_lines[p.line].value.insert(p.col, line);
+				p.col += line.size();
 			}
 		}
+		return p;
 	}
 
-	void insertCharacter(u32 character) {
+	void indent(TextPoint from, TextPoint to) {
+		beginUndoGroup();
+		if (from > to) swap(from, to);
+		if (to.col == 0 && to.line != from.line) --to.line;
+
+		for (i32 i = from.line; i <= to.line; ++i) {
+			UndoRecord& r = pushUndo();
+			r.type = UndoRecord::INSERT;
+			r.text.write('\t');
+			r.from = TextPoint(0, i);
+			r.execute(*this, false);
+		}
+		endUndoGroup();
+	}
+
+	void unindent(TextPoint from, TextPoint to) {
+		beginUndoGroup();
+		if (from > to) swap(from, to);
+		if (to.col == 0 && to.line != from.line) --to.line;
+		
+		for (i32 i = from.line; i <= to.line; ++i) {
+			if (m_lines[i].value.length() == 0) continue;
+			if (m_lines[i].value[0] != '\t') continue;
+			
+			UndoRecord& r = pushUndo();
+			r.type = UndoRecord::REMOVE;
+			r.from = TextPoint(0, i);
+			r.to = TextPoint(1, i);
+			r.execute(*this, false);
+		}
+		endUndoGroup();
+	}
+
+	void insertCharacter(u32 character, bool shift) {
 		if (character < 0x20 && character != 0x09) return;
 		if (character > 0x7f) return;
 		
-		deleteSelections();
+		beginUndoGroup();
 		for (Cursor& cursor : m_cursors) {
-			char tmp[2] = { (char)character, 0 };
-
-			UndoRecord& r = pushUndo();
-			r.type = UndoRecord::INSERT;
-			r.character = character;
-			r.point = cursor;
-			r.execute(*this, false);
-			++cursor.col;
-			cursorMoved(cursor);
-			cursor.cancelSelection();
+			if (character == '\t' && (cursor.line != cursor.sel.line || shift)) {
+				i32 from_end = m_lines[cursor.line].value.length() - cursor.col;
+				i32 from_end_sel = m_lines[cursor.line].value.length() - cursor.sel.col;
+				if (shift) unindent(cursor, cursor.sel);
+				else indent(cursor, cursor.sel);
+				cursor.col = m_lines[cursor.line].value.length() - from_end;
+				cursor.sel.col = m_lines[cursor.line].value.length() - from_end_sel;
+			}
+			else {
+				deleteSelection(cursor);
+				UndoRecord& r = pushUndo();
+				r.type = UndoRecord::INSERT;
+				r.text.write((char)character);
+				r.from = cursor;
+				r.execute(*this, false);
+				++cursor.col;
+				cursorMoved(cursor);
+				cursor.cancelSelection();
+			}
 		}
+		endUndoGroup();
 		++m_version;
 	}
 
@@ -787,17 +847,55 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void del(bool word) {
+		beginUndoGroup();
 		for (Cursor& cursor : m_cursors) {
 			if (!cursor.hasSelection()) selectToRight(cursor, word);
 			deleteSelection(cursor);
 		}
+		endUndoGroup();
 	}
 
 	void backspace() {
+		beginUndoGroup();
 		for (Cursor& cursor : m_cursors) {
 			if (!cursor.hasSelection()) selectToLeft(cursor);
 			deleteSelection(cursor);
 		}
+		endUndoGroup();
+	}
+
+	void pasteFromClipboard() {
+		ImGuiIO& io = ImGui::GetIO();
+		if (!io.GetClipboardTextFn) return;
+
+		const char* text = io.GetClipboardTextFn(io.ClipboardUserData);
+		u32 len = stringLength(text);
+		StringView sv = text;
+
+		beginUndoGroup();
+		for (Cursor& cursor : m_cursors) {
+			UndoRecord& r = pushUndo();
+			r.type = UndoRecord::INSERT;
+			r.from = cursor;
+			r.text.write(text, len);
+			r.execute(*this, false);
+		}
+		endUndoGroup();
+		ensurePointVisible(m_cursors[0]);
+	}
+
+	void copyToClipboard() {
+		if (m_cursors.size() != 1) return;
+		ImGuiIO& io = ImGui::GetIO();
+		if (!io.SetClipboardTextFn) return;
+
+		TextPoint from = m_cursors[0];
+		TextPoint to = m_cursors[0].sel;
+		if (from > to) swap(from, to);
+		OutputMemoryStream blob(m_allocator);
+		serializeText(from, to, blob);
+		blob.write('\0');
+		io.SetClipboardTextFn(io.ClipboardUserData, (const char*)blob.data());
 	}
 
 	bool gui(const char* str_id, const ImVec2& size) override {
@@ -929,6 +1027,9 @@ struct CodeEditorImpl final : CodeEditor {
 			else if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace();
 			else if (ImGui::IsKeyPressed(ImGuiKey_Z) && io.KeyCtrl) io.KeyShift ? redo() : undo();
+			else if (ImGui::IsKeyPressed(ImGuiKey_C) && io.KeyCtrl) copyToClipboard();
+			else if (ImGui::IsKeyPressed(ImGuiKey_X) && io.KeyCtrl) { copyToClipboard(); deleteSelections(); }
+			else if (ImGui::IsKeyPressed(ImGuiKey_V) && io.KeyCtrl) pasteFromClipboard();
 			else if (ImGui::IsKeyPressed(ImGuiKey_Enter)) insertNewLine();
 			else if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
 			else if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
@@ -946,7 +1047,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && m_cursors.size() == 1) {
 				m_cursors[0].line = screenToLine(io.MousePos.y);
-				m_cursors[0].col = screenToCol(io.MousePos.x, m_cursors[0].sel.line);
+				m_cursors[0].col = screenToCol(io.MousePos.x, m_cursors[0].line);
 			}
 
 			m_scroll_y -= io.MouseWheel * line_height * 5;
@@ -961,7 +1062,7 @@ struct CodeEditorImpl final : CodeEditor {
 			if (!ignore_char_inputs && io.InputQueueCharacters.Size > 0) {
 				for (int n = 0; n < io.InputQueueCharacters.Size; n++) {
 					u32 character = (u32)io.InputQueueCharacters[n];
-					insertCharacter(character);
+					insertCharacter(character, io.KeyShift);
 				}
 
 				io.InputQueueCharacters.resize(0);
@@ -1006,6 +1107,18 @@ struct CodeEditorImpl final : CodeEditor {
 		++m_first_untokenized_line;
 	}
 
+	void beginUndoGroup() {
+		UndoRecord& r =  pushUndo();
+		r.type = UndoRecord::BEGIN_GROUP;
+		r.execute(*this, false);
+	}
+
+	void endUndoGroup() {
+		UndoRecord& r =  pushUndo();
+		r.type = UndoRecord::END_GROUP;
+		r.execute(*this, false);
+	}
+
 	UndoRecord& pushUndo() {
 		while (m_undo_stack.size() > m_undo_stack_idx + 1) m_undo_stack.pop();
 
@@ -1015,16 +1128,32 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void undo() {
 		if (m_undo_stack_idx < 0) return;
-
-		m_undo_stack[m_undo_stack_idx].undo(*this);
-		--m_undo_stack_idx;
+		
+		u32 depth = 0;
+		do {
+			switch (m_undo_stack[m_undo_stack_idx].type) {
+				case UndoRecord::BEGIN_GROUP: --depth; break;
+				case UndoRecord::END_GROUP: ++depth; break;
+				default: break;
+			}
+			m_undo_stack[m_undo_stack_idx].undo(*this);
+			--m_undo_stack_idx;
+		} while (depth != 0);
 	}
 
 	void redo() {
 		if (m_undo_stack_idx + 1 >= m_undo_stack.size()) return;
 
-		m_undo_stack[m_undo_stack_idx + 1].execute(*this, true);
-		++m_undo_stack_idx;
+		u32 depth = 0;
+		do {
+			++m_undo_stack_idx;
+			m_undo_stack[m_undo_stack_idx].execute(*this, true);
+			switch (m_undo_stack[m_undo_stack_idx].type) {
+				case UndoRecord::BEGIN_GROUP: ++depth; break;
+				case UndoRecord::END_GROUP: --depth; break;
+				default: break;
+			}
+		} while(depth != 0);
 	}
 
 	i32 m_first_untokenized_line = 0;
