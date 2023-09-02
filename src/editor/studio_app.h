@@ -132,6 +132,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual u32 getDockspaceID() const = 0;
 
 	virtual Span<const os::Event> getEvents() const = 0;
+	virtual ImFont* getDefaultFont() = 0;
 	virtual ImFont* getBoldFont() = 0;
 	virtual ImFont* getBigIconFont() = 0;
 	virtual ImFont* getMonospaceFont() = 0;

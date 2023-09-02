@@ -1,4 +1,5 @@
 #include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 
 #include "utils.h"
 #include "editor/render_interface.h"
@@ -209,6 +210,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 
 }
 
+// TODO horizontal scroll
 // TODO utf8
 // TODO clipping selection 
 // TODO selection should render inclugin "end of line char" in certain cases
@@ -441,12 +443,18 @@ struct CodeEditorImpl final : CodeEditor {
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
-	void ensurePointVisible(TextPoint& cursor) {
+	void ensurePointVisible(TextPoint& cursor, bool center = false) {
+		if (center) {
+			m_scroll_y = (cursor.line - (m_last_visible_line - m_first_visible_line) / 2) * ImGui::GetTextLineHeight();	
+			m_scroll_y = maximum(m_scroll_y, 0.f);
+			return;
+		}
+
 		if (cursor.line < m_first_visible_line) {
 			m_scroll_y -= (m_first_visible_line - cursor.line) * ImGui::GetTextLineHeight(); 
 		}
 
-		if (cursor.line > m_last_visible_line - 1) {
+		if (cursor.line > m_last_visible_line - 1 && m_last_visible_line < m_lines.size() - 1) {
 			m_scroll_y += (cursor.line - m_last_visible_line + 1) * ImGui::GetTextLineHeight(); 
 		}
 	}
@@ -682,16 +690,24 @@ struct CodeEditorImpl final : CodeEditor {
 		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
 	}
 
-	void selectWord(Cursor& cursor) {
+	Cursor getWord(TextPoint& point) const {
+		Cursor cursor;
+		cursor = point;
+		cursor.sel = point;
 		const char* line = m_lines[cursor.line].value.c_str();
 		if (!isWordChar(line[cursor.col])) {
 			if (cursor.col > 0) cursor.sel.col = cursor.col - 1;
-			return;
+			return cursor;
 		}
 
 		while (isWordChar(line[cursor.sel.col]) && cursor.sel.col > 0) --cursor.sel.col;
 		if (!isWordChar(line[cursor.sel.col])) ++cursor.sel.col;
 		while (isWordChar(line[cursor.col])) ++cursor.col;
+		return cursor;
+	}
+
+	void selectWord(Cursor& cursor) {
+		cursor = getWord(cursor);
 	}
 
 	Cursor& getBottomCursor() {
@@ -898,9 +914,81 @@ struct CodeEditorImpl final : CodeEditor {
 		io.SetClipboardTextFn(io.ClipboardUserData, (const char*)blob.data());
 	}
 
-	bool gui(const char* str_id, const ImVec2& size) override {
+	void selectAll() {
+		m_cursors.resize(1);
+		m_cursors[0] = TextPoint(0, 0);
+		m_cursors[0].sel = TextPoint(m_lines.back().length(), m_lines.size() - 1);
+	}
+
+	void find(TextPoint from) {
+		StringView sel_view = m_search_text;
+		if (sel_view.size() == 0) return;
+
+		i32 line = from.line;
+		while (line < m_lines.size()) {
+			StringView line_str = m_lines[line].value;
+			if (line == from.line) line_str.removePrefix(from.col);
+			if (const char* found = findInsensitive(line_str, sel_view)) {
+				m_cursors.resize(1);
+				Cursor& new_cursor = m_cursors[0];
+				new_cursor.line = line;
+				new_cursor.sel.line = line;
+				new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
+				new_cursor.col = new_cursor.sel.col + sel_view.size();
+				ensurePointVisible(new_cursor, true);
+				return;
+			}
+			++line;
+		}
+	}
+
+	void guiSearch(const ImVec2& text_area_pos, const ImVec2& text_area_size, ImFont* font) {
+		if (!m_search_visible) {
+			if (ImGui::IsKeyPressed(ImGuiKey_F3) && m_search_text[0]) {
+				find(m_cursors[0]);
+			}
+			return;
+		}
+
+		if (font) ImGui::PushFont(font);
+		ImVec2 p = text_area_pos;
+		p.x += text_area_size.x - 350;
+		p.x = maximum(p.x, text_area_pos.x);
+		ImGui::SetCursorScreenPos(p);
+		float w = text_area_pos.x + text_area_size.x - p.x;
+		float h = ImGui::GetTextLineHeightWithSpacing();
+	//	ImGuiEx::Rect(w, h, ImGui::GetColorU32(ImGuiCol_FrameBg));
+		ImGui::SetCursorScreenPos(p);
+		ImGui::SetNextItemWidth(-1);
+		if (m_focus_search) ImGui::SetKeyboardFocusHere();
+		m_focus_search = false;
+		ImGuiInputTextFlags flags = ImGuiInputTextFlags_AutoSelectAll;
+		if (ImGui::InputTextWithHint("##findtext", ICON_FA_SEARCH " Find Text", m_search_text, sizeof(m_search_text), flags)) {
+			find(m_search_from);
+		}
+		if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_F3)) {
+			find(m_cursors[0]);
+		}
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+			m_focus_editor = true;
+			m_search_visible = false;
+		}
+		if (font) ImGui::PopFont();
+	}
+
+	void copy(Span<char> out, const Cursor& cursor) const {
+		ASSERT(cursor.line == cursor.sel.line);
+		
+		StringView sv;
+		sv.begin = m_lines[cursor.line].value.c_str() + cursor.sel.col;
+		sv.end = m_lines[cursor.line].value.c_str() + cursor.col;
+		if (sv.begin > sv.end) swap(sv.begin, sv.end);
+		copyString(out, sv);
+	}
+
+	bool gui(const char* str_id, const ImVec2& size, ImFont* ui_font) override {
 		PROFILE_FUNCTION();
-		if (!ImGui::BeginChild(str_id, size)) {
+		if (!ImGui::BeginChild(str_id, size, false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
 			ImGui::EndChild();
 			return false;
 		}
@@ -918,14 +1006,25 @@ struct CodeEditorImpl final : CodeEditor {
 		const float char_width = ImGui::CalcTextSize("x").x;
 		const float line_num_width = u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x;
 
+		guiSearch(min, content_size, ui_font);
+
 		ImGuiID id = ImGui::GetID("codeditor");
-		ImGuiEx::ItemAdd(min, min + content_size, id);
-		const bool clicked = ImGui::IsItemHovered() && ImGui::IsItemClicked();
-		if (clicked) ImGuiEx::SetActiveID(id);
+		ImRect bb = { min, min + content_size };
+		ImGui::ItemSize(bb);
+		ImGui::ItemAdd(bb, id);
+		if (m_focus_editor) {
+			ImGuiEx::SetActiveID(id);
+			m_focus_editor = false;
+		}
+		const bool hovered = ImGui::ItemHoverable(bb, id, 0);
+		const bool clicked = hovered && ImGui::IsItemClicked();
+		if (clicked && !ImGui::IsItemActive()) ImGuiEx::SetActiveID(id);
+		if (ImGui::IsItemActive() && !io.MouseDown[0]) ImGui::SetItemAllowOverlap(); // because of search gui
 		if (ImGui::IsItemActive() && io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
+		if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
 
 		const bool handle_input = ImGui::IsItemActive();
-		dl->AddRectFilled(min, min + ImVec2(line_num_width, content_size.y), ImGui::GetColorU32(ImGuiCol_Border));
+		//dl->AddRectFilled(min, min + ImVec2(line_num_width, content_size.y), ImGui::GetColorU32(ImGuiCol_Border));
 
 		min.x += style.FramePadding.x;
 		min.y -= m_scroll_y;
@@ -1023,19 +1122,33 @@ struct CodeEditorImpl final : CodeEditor {
 				else if (ImGui::IsKeyPressed(ImGuiKey_End)) moveCursorEnd(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_Home)) moveCursorBegin(c, io.KeyCtrl);
 			}
+	        const ImGuiInputFlags f_repeat = ImGuiInputFlags_Repeat;
+			
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace();
-			else if (ImGui::IsKeyPressed(ImGuiKey_Z) && io.KeyCtrl) io.KeyShift ? redo() : undo();
-			else if (ImGui::IsKeyPressed(ImGuiKey_C) && io.KeyCtrl) copyToClipboard();
-			else if (ImGui::IsKeyPressed(ImGuiKey_X) && io.KeyCtrl) { copyToClipboard(); deleteSelections(); }
-			else if (ImGui::IsKeyPressed(ImGuiKey_V) && io.KeyCtrl) pasteFromClipboard();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_Z, id, f_repeat)) undo();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiMod_Shift | ImGuiKey_Z, id, f_repeat)) redo();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_C, id)) copyToClipboard();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_X, id)) { copyToClipboard(); deleteSelections(); }
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_V, id, f_repeat)) pasteFromClipboard();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_A, id)) selectAll();
 			else if (ImGui::IsKeyPressed(ImGuiKey_Enter)) insertNewLine();
 			else if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
 			else if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_F, id)) {
+				m_search_visible = true;
+				m_focus_search = true;
+				m_search_from = m_cursors[0];
+				if (m_cursors[0].hasSelection()) copy(Span(m_search_text), m_cursors[0]);
+				else copy(Span(m_search_text), getWord(m_cursors[0]));
+			}
 			
 			// mouse input
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+				selectWord(m_cursors[0]);
+			}
+			else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
 				const i32 line = screenToLine(io.MousePos.y);
 				const i32 col = screenToCol(io.MousePos.x, line);
 				removeCursorAt(col, line);
@@ -1170,6 +1283,12 @@ struct CodeEditorImpl final : CodeEditor {
 	u32 m_version = 0;
 	Array<UndoRecord> m_undo_stack;
 	i32 m_undo_stack_idx = -1;
+	
+	bool m_focus_search = false;
+	bool m_search_visible = false;
+	bool m_focus_editor = false;
+	char m_search_text[64] = "";
+	TextPoint m_search_from;
 };
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app) {

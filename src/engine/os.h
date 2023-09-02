@@ -425,6 +425,7 @@ enum class Keycode : u8 {
 	C = 'C',
 	D = 'D',
 	E = 'E',
+	F = 'F',
 	K = 'K',
 	S = 'S',
 	V = 'V',

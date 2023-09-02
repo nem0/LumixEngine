@@ -208,7 +208,7 @@ struct CodeEditor {
 	virtual void serializeText(OutputMemoryStream& blob) = 0;
 	virtual void setTokenColors(Span<const u32> colors) = 0; // keep colors alive while CodeEditor uses them
 	virtual void setTokenizer(Tokenizer tokenizer) = 0; // user needs to keep the language alive while CodeEditor uses it
-	virtual bool gui(const char* str_id, const ImVec2& size = ImVec2(0, 0)) = 0;
+	virtual bool gui(const char* str_id, const ImVec2& size = ImVec2(0, 0), ImFont* ui_font = nullptr) = 0;
 };
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);

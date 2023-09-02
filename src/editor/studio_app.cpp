@@ -127,11 +127,13 @@ struct StudioAppImpl final : StudioApp
 		m_imgui_key_map[(int)os::Keycode::END] = ImGuiKey_End;
 		m_imgui_key_map[(int)os::Keycode::DEL] = ImGuiKey_Delete;
 		m_imgui_key_map[(int)os::Keycode::BACKSPACE] = ImGuiKey_Backspace;
+		m_imgui_key_map[(int)os::Keycode::F3] = ImGuiKey_F3;
 		m_imgui_key_map[(int)os::Keycode::RETURN] = ImGuiKey_Enter;
 		m_imgui_key_map[(int)os::Keycode::ESCAPE] = ImGuiKey_Escape;
 		m_imgui_key_map[(int)os::Keycode::A] = ImGuiKey_A;
 		m_imgui_key_map[(int)os::Keycode::C] = ImGuiKey_C;
 		m_imgui_key_map[(int)os::Keycode::D] = ImGuiKey_D;
+		m_imgui_key_map[(int)os::Keycode::F] = ImGuiKey_F;
 		m_imgui_key_map[(int)os::Keycode::V] = ImGuiKey_V;
 		m_imgui_key_map[(int)os::Keycode::X] = ImGuiKey_X;
 		m_imgui_key_map[(int)os::Keycode::Y] = ImGuiKey_Y;
@@ -3328,7 +3330,7 @@ struct StudioAppImpl final : StudioApp
 
 	
 	void checkShortcuts() {
-		if (ImGui::IsAnyItemActive()) return;
+		if (ImGui::GetIO().WantCaptureKeyboard) return;
 
 		GUIPlugin* window = getFocusedWindow();
 		u8 pressed_modifiers = 0;
@@ -3364,6 +3366,7 @@ struct StudioAppImpl final : StudioApp
 		return m_imgui_key_map[keycode];
 	}
 	
+	ImFont* getDefaultFont() override { return m_font; }
 	ImFont* getBigIconFont() override { return m_big_icon_font; }
 	ImFont* getBoldFont() override { return m_bold_font; }
 	ImFont* getMonospaceFont() override { return m_monospace_font; }
