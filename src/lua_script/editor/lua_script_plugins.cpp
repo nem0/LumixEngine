@@ -89,7 +89,7 @@ struct EditorWindow : AssetEditorWindow {
 
 		if (m_code_editor) {
 			ImGui::PushFont(m_app.getMonospaceFont());
-			if (m_code_editor->gui("codeeditor")) m_dirty = true;
+			if (m_code_editor->gui("codeeditor", ImVec2(0, 0), m_app.getDefaultFont())) m_dirty = true;
 			ImGui::PopFont();
 		}
 	}
