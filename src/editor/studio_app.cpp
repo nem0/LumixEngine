@@ -234,7 +234,9 @@ struct StudioAppImpl final : StudioApp
 	void onIdle() {
 		update();
 
-		if (m_settings.m_sleep_when_inactive && !isFocused()) {
+		if (!isFocused()) ++m_frames_since_focused;
+
+		if (m_settings.m_sleep_when_inactive && m_frames_since_focused > 10) {
 			const float frame_time = m_inactive_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
@@ -1629,7 +1631,7 @@ struct StudioAppImpl final : StudioApp
 			StaticString<200> stats;
 			if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
 			stats.append("FPS: ", u32(m_fps + 0.5f));
-			if (!isFocused()) stats.append(" - inactive window");
+			if (m_frames_since_focused > 10) stats.append(" - inactive window");
 			const ImVec2 stats_size = ImGui::CalcTextSize(stats);
 			cp.x -= stats_size.x + spacing;
 			ImGui::SetCursorPos(cp);
@@ -3387,6 +3389,7 @@ struct StudioAppImpl final : StudioApp
 	UniquePtr<WorldEditor> m_editor;
 	ImGuiKey m_imgui_key_map[255];
 	Array<os::WindowHandle> m_windows;
+	u32 m_frames_since_focused = 0;
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	os::WindowHandle m_main_window;
 	os::WindowState m_fullscreen_restore_state;
