@@ -235,6 +235,7 @@ struct StudioAppImpl final : StudioApp
 		update();
 
 		if (!isFocused()) ++m_frames_since_focused;
+		else m_frames_since_focused = 0;
 
 		if (m_settings.m_sleep_when_inactive && m_frames_since_focused > 10) {
 			const float frame_time = m_inactive_fps_timer.tick();
