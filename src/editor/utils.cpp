@@ -737,7 +737,7 @@ struct CodeEditorImpl final : CodeEditor {
 					new_cursor.sel.line = line;
 					new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
 					new_cursor.col = new_cursor.sel.col + sel_view.size();
-					ensurePointVisible(new_cursor);
+					ensurePointVisible(new_cursor, true);
 					return;
 				}
 				++line;
@@ -957,21 +957,21 @@ struct CodeEditorImpl final : CodeEditor {
 		ImGui::SetCursorScreenPos(p);
 		float w = text_area_pos.x + text_area_size.x - p.x;
 		float h = ImGui::GetTextLineHeightWithSpacing();
-	//	ImGuiEx::Rect(w, h, ImGui::GetColorU32(ImGuiCol_FrameBg));
 		ImGui::SetCursorScreenPos(p);
 		ImGui::SetNextItemWidth(-1);
 		if (m_focus_search) ImGui::SetKeyboardFocusHere();
 		m_focus_search = false;
 		ImGuiInputTextFlags flags = ImGuiInputTextFlags_AutoSelectAll;
-		if (ImGui::InputTextWithHint("##findtext", ICON_FA_SEARCH " Find Text", m_search_text, sizeof(m_search_text), flags)) {
+		// InputTextWithHint clears the text on escape, se we don't let it
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+			m_focus_editor = true;
+			m_search_visible = false;
+		}
+		else if (ImGui::InputTextWithHint("##findtext", ICON_FA_SEARCH " Find Text", m_search_text, sizeof(m_search_text), flags)) {
 			find(m_search_from);
 		}
 		if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_F3)) {
 			find(m_cursors[0]);
-		}
-		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-			m_focus_editor = true;
-			m_search_visible = false;
 		}
 		if (font) ImGui::PopFont();
 	}
@@ -2069,7 +2069,7 @@ void TextFilter::build() {
 }
 
 bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus) {
-	if (ImGuiEx::filter(hint, filter, sizeof(filter), width, set_keyboard_focus)) {
+	if (ImGuiEx::Filter(hint, filter, sizeof(filter), width, set_keyboard_focus)) {
 		build();
 		return true;
 	}
