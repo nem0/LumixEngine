@@ -46,6 +46,8 @@ IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_fir
 IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
+IMGUI_API bool MenuItemEx(const char* label, const char* icon, const char* shortcut = nullptr, bool selected = false, bool enabled = true);
+IMGUI_API bool BeginMenuEx(const char* label, const char* icon, bool enabled = true);
 
 IMGUI_API void BeginNodeEditor(const char* title, ImVec2* offset);
 IMGUI_API void EndNodeEditor();

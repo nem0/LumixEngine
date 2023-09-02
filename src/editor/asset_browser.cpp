@@ -82,7 +82,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
 		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, false);
 
-		m_focus_search.init("     Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL, true);
+		m_focus_search.init("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL, true);
 		m_focus_search.func.bind<&AssetBrowserImpl::focusSearch>(this);
 
 		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", false);
