@@ -1,0 +1,4 @@
+
+lod_count = 1
+skeleton = "models/ybot/ybot.fbx"
+lod0_distance = 10000.000000
