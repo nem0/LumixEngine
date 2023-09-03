@@ -31,7 +31,6 @@ Controller::Controller(const Path& path, IAllocator& allocator)
 	, m_animation_slots(allocator)
 	, m_animation_entries(allocator)
 	, m_inputs(allocator)
-	, m_ik(allocator)
 	, m_bone_masks(allocator)
 	, m_path(path)
 {
@@ -73,11 +72,6 @@ void Controller::serialize(OutputMemoryStream& stream) {
 		stream.write(entry.slot);
 		stream.write(entry.set);
 		stream.writeString(entry.animation);
-	}
-	stream.write(m_ik.size());
-	for (const IK& ik : m_ik) {
-		stream.write(ik.max_iterations);
-		stream.writeArray(ik.bones);
 	}
 	m_root->serialize(stream);
 }
@@ -132,14 +126,6 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(entry.slot);
 		stream.read(entry.set);
 		entry.animation = stream.readString();
-	}
-
-	u32 ik_count = stream.read<u32>();
-	m_ik.reserve(ik_count);
-	for (u32 i = 0; i < ik_count; ++i) {
-		IK& ik = m_ik.emplace(m_allocator);
-		stream.read(ik.max_iterations);
-		stream.readArray(&ik.bones);
 	}
 
 	m_root = LUMIX_NEW(m_allocator, TreeNode)(nullptr, *this, m_allocator);
@@ -763,80 +749,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			m_dirty = true;
 		}
 
-		void IKGUI() {
-			for (u32 i = 0; i < (u32)m_controller.m_ik.size(); ++i) {
-				ImGui::PushID(i);
-				if (ImGui::Button(ICON_FA_TIMES_CIRCLE)) {
-					m_controller.m_ik.swapAndPop(i);
-					ImGui::PopID();
-					continue;
-				}
-				ImGui::PopID();
-				ImGui::SameLine();
-
-				Controller::IK& ik = m_controller.m_ik[i];
-				if (ImGui::TreeNode(&ik, "Chain %d", i)) {
-					ASSERT(!ik.bones.empty());
-					const u32 bones_count = m_skeleton->getBoneCount();
-					auto leaf_iter = m_skeleton->getBoneIndex(ik.bones.back());
-					ImGuiEx::Label("Leaf");
-					if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_skeleton->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
-						bool selected = false;
-						for (u32 j = 0; j < bones_count; ++j) {
-							const char* bone_name = m_skeleton->getBone(j).name.c_str();
-							if (ImGui::Selectable(bone_name)) {
-								ik.bones.clear();
-								ik.bones.push(BoneNameHash(bone_name));
-								selected = true;
-							}
-						}
-						ImGui::EndCombo();
-						saveUndo(selected);
-					}
-					for (i32 j = ik.bones.size() - 2; j >= 0; --j) {
-						auto iter = m_skeleton->getBoneIndex(ik.bones[j]);
-						if (iter.isValid()) {
-							ImGuiEx::TextUnformatted(m_skeleton->getBone(iter.value()).name);
-						}
-						else {
-							ImGui::Text("Unknown bone");
-						}
-					}
-
-					auto iter = m_skeleton->getBoneIndex(ik.bones[0]);
-					if (iter.isValid()) {
-						const int parent_idx = m_skeleton->getBone(iter.value()).parent_idx;
-						if (parent_idx >= 0) {
-							const char* bone_name = m_skeleton->getBone(parent_idx).name.c_str();
-							const StaticString<64> add_label("Add ", bone_name);
-							if (ImGui::Button(add_label)) {
-								ik.bones.insert(0, BoneNameHash(bone_name));
-								saveUndo(true);
-							}
-						}
-					}
-					else {
-						ImGui::Text("Unknown bone.");
-					}
-					if (ik.bones.size() > 1) {
-						ImGui::SameLine();
-						if (ImGui::Button("Pop")) {
-							ik.bones.erase(0);
-							saveUndo(true);
-						}
-					} 
-
-					ImGui::TreePop();
-				}
-			}
-
-			if (ImGui::Button(ICON_FA_PLUS_CIRCLE)) {
-				Controller::IK& ik = m_controller.m_ik.emplace(m_allocator);
-				ik.bones.push(BoneNameHash());
-				saveUndo(true);
-			}
-		}
-
 		void removeSlot(u32 idx) {
 			m_controller.m_animation_slots.erase(idx);
 			for (Controller::AnimationEntry& e : m_controller.m_animation_entries) {
@@ -1187,8 +1099,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						if (ImGui::CollapsingHeader("Inputs")) inputsGUI();
 						if (ImGui::CollapsingHeader("Slots")) slotsGUI();
 						if (ImGui::CollapsingHeader("Sets")) setsGUI();
-						if (ImGui::CollapsingHeader("Bone masks")) boneMasksGUI();
-						if (ImGui::CollapsingHeader("IK")) IKGUI();
+						// TODO
+						//if (ImGui::CollapsingHeader("Bone masks")) boneMasksGUI();
 
 						ImGui::TableNextColumn();
 						breadcrumbs(m_current_node);

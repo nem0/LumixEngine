@@ -36,12 +36,6 @@ struct Controller final {
 		StaticString<32> name;
 	};
 
-	struct IK {
-		IK(IAllocator& allocator) : bones(allocator) {}
-		u32 max_iterations = 5;
-		Array<BoneNameHash> bones;
-	};
-
 	Path m_path;
 	IAllocator& m_allocator;
 	struct TreeNode* m_root = nullptr;
@@ -51,7 +45,6 @@ struct Controller final {
 	Array<Input> m_inputs;
 	u32 m_id_generator = 0;
 	Path m_skeleton;
-	Array<IK> m_ik;
 	bool m_compiled = false;
 };
 
