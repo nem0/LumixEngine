@@ -503,7 +503,7 @@ void LayersNode::serialize(OutputMemoryStream& stream) const {
 
 anim::Node* LayersNode::compile(anim::Controller& controller) {
 	ASSERT(false);
-	return false;
+	return nullptr;
 }
 
 void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
@@ -801,8 +801,8 @@ bool OutputNode::onGUI() {
 
 anim::Node* OutputNode::compile(anim::Controller& controller) {
 	Node* n = getInput(0);
-	if (!n) return false;
-	if (!n->isPoseNode()) return false;
+	if (!n) return nullptr;
+	if (!n->isPoseNode()) return nullptr;
 	return n->compile(controller);
 }
 
@@ -817,7 +817,7 @@ TreeNode::TreeNode(Node* parent, Controller& controller, IAllocator& allocator)
 }
 
 anim::Node* TreeNode::compile(anim::Controller& controller) {
-	if (m_nodes.empty() || m_nodes[0]->type() != anim::NodeType::OUTPUT) return false;
+	if (m_nodes.empty() || m_nodes[0]->type() != anim::NodeType::OUTPUT) return nullptr;
 	return m_nodes[0]->compile(controller);
 }
 

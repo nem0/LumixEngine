@@ -10,6 +10,7 @@
 #include <vector>
 #include <mutex>
 #include <inttypes.h>
+#include <string.h>
 
 
 #if __cplusplus >= 202002L
