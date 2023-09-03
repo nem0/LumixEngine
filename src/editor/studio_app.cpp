@@ -3328,16 +3328,14 @@ struct StudioAppImpl final : StudioApp
 
 	Span<const os::Event> getEvents() const override { return m_events; }
 
-	
 	void checkShortcuts() {
-		if (ImGui::GetIO().WantCaptureKeyboard) return;
-
-		GUIPlugin* window = getFocusedWindow();
 		u8 pressed_modifiers = 0;
 		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
 		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
 		if (os::isKeyDown(os::Keycode::ALT)) pressed_modifiers |= Action::Modifiers::ALT;
-
+		GUIPlugin* window = getFocusedWindow();
+		
+		ImGuiIO& io = ImGui::GetIO();
 		for (Action*& a : m_actions) {
 			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers == 0)) continue;
 			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;
@@ -3345,6 +3343,8 @@ struct StudioAppImpl final : StudioApp
 			
 			if (window && window->onAction(*a))
 				return;
+
+			if (io.WantCaptureKeyboard) return;
 
 			if (a->func.isValid()) {
 				a->func.invoke();
