@@ -1699,20 +1699,14 @@ namespace Lumix
 			}
 			lua_pop(instance.m_state, 1);
 
-			if (!is_reload)
-			{
+			if (!is_reload) {
 				lua_getfield(instance.m_state, -1, "start");
-				if (lua_type(instance.m_state, -1) != LUA_TFUNCTION)
-				{
+				if (lua_type(instance.m_state, -1) != LUA_TFUNCTION) {
 					lua_pop(instance.m_state, 2);
 					return;
 				}
 
-				if (lua_pcall(instance.m_state, 0, 0, 0) != 0)
-				{
-					logError(lua_tostring(instance.m_state, -1));
-					lua_pop(instance.m_state, 1);
-				}
+				LuaWrapper::pcall(instance.m_state, 0, 0);
 			}
 			lua_pop(instance.m_state, 1);
 		}

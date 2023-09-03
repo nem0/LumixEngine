@@ -210,6 +210,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 
 }
 
+// TODO working shortcuts, at least Ctrl-S, Ctrl-O
 // TODO horizontal scroll
 // TODO utf8
 // TODO clipping selection 
@@ -697,6 +698,8 @@ struct CodeEditorImpl final : CodeEditor {
 		const char* line = m_lines[cursor.line].value.c_str();
 		if (!isWordChar(line[cursor.col])) {
 			if (cursor.col > 0) cursor.sel.col = cursor.col - 1;
+			while (isWordChar(line[cursor.sel.col]) && cursor.sel.col > 0) --cursor.sel.col;
+			if (!isWordChar(line[cursor.sel.col]) && cursor.sel.col < cursor.col) ++cursor.sel.col;
 			return cursor;
 		}
 

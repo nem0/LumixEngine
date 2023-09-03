@@ -245,6 +245,13 @@ LUMIX_ENGINE_API void unloadLibrary(void* handle);
 LUMIX_ENGINE_API void* getLibrarySymbol(void* handle, const char* name);
 LUMIX_ENGINE_API float getTimeSinceProcessStart();
 
+LUMIX_ENGINE_API bool initNetwork();
+LUMIX_ENGINE_API void shutdownNetwork();
+LUMIX_ENGINE_API struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator);
+LUMIX_ENGINE_API NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator);
+LUMIX_ENGINE_API bool read(NetworkStream& stream, void* mem, u32 size);
+LUMIX_ENGINE_API bool write(NetworkStream& stream, const void* data, u32 size);
+LUMIX_ENGINE_API void close(NetworkStream& stream);
 
 struct LUMIX_ENGINE_API Timer {
 	Timer();

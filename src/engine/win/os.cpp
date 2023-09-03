@@ -1513,5 +1513,97 @@ u64 Timer::getRawTimestamp()
 	return tick.QuadPart;
 }
 
+static bool g_network_initialized = false;
+bool initNetwork() {
+	if (g_network_initialized) return true;
+	WORD sockVer;
+	WSADATA wsaData;
+	sockVer = 2 | (2 << 8);
+	g_network_initialized = WSAStartup(sockVer, &wsaData) == 0;
+	return g_network_initialized;
+}
+
+void shutdownNetwork() {
+	if (g_network_initialized) WSACleanup();
+	g_network_initialized = false;
+}
+
+struct NetworkStream {
+	IAllocator* allocator;
+	SOCKET socket;
+};
+
+struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) {
+	SOCKET listen_socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (listen_socket == INVALID_SOCKET) return nullptr;
+
+	SOCKADDR_IN sin = {};
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+	sin.sin_addr.s_addr = ::inet_addr(ip);
+
+	int retVal = ::bind(listen_socket, (LPSOCKADDR)&sin, sizeof(sin));
+	if (retVal == SOCKET_ERROR) return nullptr;
+			
+	i32 res = ::listen(listen_socket, 10);
+			
+	SOCKET socket = ::accept(listen_socket, nullptr, nullptr);
+	closesocket(listen_socket);
+	if (socket == INVALID_SOCKET) return nullptr;
+
+	auto* stream = LUMIX_NEW(allocator, NetworkStream);
+	stream->socket = socket;
+	stream->allocator = &allocator;
+	return stream;
+}
+
+NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) {
+	SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (socket == INVALID_SOCKET) return nullptr;
+
+	SOCKADDR_IN sin = {};
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+	sin.sin_addr.s_addr = ::inet_addr(ip);
+
+	if (::connect(socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) return nullptr;
+
+	auto* stream = LUMIX_NEW(allocator, NetworkStream);
+	stream->socket = socket;
+	stream->allocator = &allocator;
+	return stream;
+}
+
+bool read(NetworkStream& stream, void* mem, u32 size) {
+	i32 to_receive = size;
+	char* ptr = (char*)mem;
+
+	do {
+		i32 received = ::recv(stream.socket, ptr, to_receive, 0);
+		ptr += received;
+		to_receive -= received;
+		if (received == SOCKET_ERROR) {
+			i32 err = WSAGetLastError();
+			if (err == WSAEWOULDBLOCK) {
+				ptr -= received;
+				to_receive += received;
+			} else {
+				return false;
+			}
+		}
+	} while (to_receive > 0);
+	return true;
+}
+
+bool write(NetworkStream& stream, const void* data, u32 size) {
+	i32 send = ::send(stream.socket, (const char*)data, size, 0);
+	return send == size;
+}
+
+void close(NetworkStream& stream) {
+	closesocket(stream.socket);
+	stream.allocator->deallocate(&stream);
+}
+
 
 } // namespace Lumix::OS
