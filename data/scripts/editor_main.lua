@@ -1,3 +1,4 @@
+
 local debugger_started = false
 local debug_stream = nil
 local DEBUG_HEADER_MAGIC = "LumixLuaDebuggerHeader";
@@ -12,35 +13,38 @@ function closeDebugConnection(is_error)
 	end
 end
 
-_G.LumixDebugCallback = function()
-	debug_stream = LumixAPI.networkConnect("127.0.0.1", 56789)
-	if debug_stream then 
-		local header = LumixAPI.networkRead(debug_stream, 22) -- 22 = LumixLuaDebuggerHeader
-		if header ~= DEBUG_HEADER_MAGIC then
-			LumixAPI.logError("Lua debug client - invalid header" .. tostring(header))
-			closeDebugConnection()
-			return
-		end
-		LumixAPI.networkWrite(debug_stream, DEBUG_HEADER_MAGIC, 22)
-		while debug_stream do
-			local msg_type = recv()
-			if msg_type == "end" then
+-- disabled by default, since networkConnect's timeout is annoying
+if false then
+	_G.LumixDebugCallback = function()
+		debug_stream = LumixAPI.networkConnect("127.0.0.1", 56789)
+		if debug_stream then 
+			local header = LumixAPI.networkRead(debug_stream, 22) -- 22 = LumixLuaDebuggerHeader
+			if header ~= DEBUG_HEADER_MAGIC then
+				LumixAPI.logError("Lua debug client - invalid header" .. tostring(header))
 				closeDebugConnection()
 				return
 			end
-			if msg_type == "execute" then
-				local cmd = recv()
-				local func, err = load(cmd)
-				if func then
-					local res = func()
-					send(res)
-				else
-					LumixAPI.logError("Lua debugger client - execute failed: " .. err)
+			LumixAPI.networkWrite(debug_stream, DEBUG_HEADER_MAGIC, 22)
+			while debug_stream do
+				local msg_type = recv()
+				if msg_type == "end" then
+					closeDebugConnection()
+					return
+				end
+				if msg_type == "execute" then
+					local cmd = recv()
+					local func, err = load(cmd)
+					if func then
+						local res = func()
+						send(res)
+					else
+						LumixAPI.logError("Lua debugger client - execute failed: " .. err)
+						closeDebugConnection(true)
+					end
+				else 
+					LumixAPI.logError("Lua debug client: Unknown type " .. tostring(msg_type))
 					closeDebugConnection(true)
 				end
-			else 
-				LumixAPI.logError("Lua debug client: Unknown type " .. tostring(msg_type))
-				closeDebugConnection(true)
 			end
 		end
 	end
