@@ -1230,23 +1230,23 @@ bool copyFile(StringView from, StringView to) {
 	copyString(tmp, to);
 	const int dest = open(tmp, O_WRONLY | O_CREAT, 0644);
 	if (dest < 1) {
-		close(source);
+		::close(source);
 		return false;
 	}
 
 	char buf[BUFSIZ];
 	size_t size;
-	while ((size = read(source, buf, BUFSIZ)) > 0) {
-		const ssize_t res = write(dest, buf, size); //-V512
+	while ((size = ::read(source, buf, BUFSIZ)) > 0) {
+		const ssize_t res = ::write(dest, buf, size); //-V512
 		if (res == -1) {
-			close(source);
-			close(dest);
+			::close(source);
+			::close(dest);
 			return false;
 		}
 	}
 
-	close(source);
-	close(dest);
+	::close(source);
+	::close(dest);
 	return true;
 }
 
@@ -1334,6 +1334,19 @@ u64 Timer::getRawTimestamp() {
 	clock_gettime(CLOCK_REALTIME, &tick);
 	return u64(tick.tv_sec) * 1000000000 + u64(tick.tv_nsec);
 }
+
+// network not implemented on linux
+bool initNetwork() {
+	ASSERT(false); 
+	return false;
+}
+
+void shutdownNetwork() {}
+struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
+NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
+bool read(NetworkStream& stream, void* mem, u32 size) { ASSERT(false); return false; }
+bool write(NetworkStream& stream, const void* data, u32 size) { ASSERT(false); return false; }
+void close(NetworkStream& stream) {}
 
 
 } // namespace Lumix::os
