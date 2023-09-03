@@ -18,6 +18,7 @@
 #pragma warning(pop)
 #pragma warning(disable : 4996)
 
+#pragma comment(lib, "Ws2_32.lib")
 
 //Request high performace profiles from mobile chipsets
 extern "C" {
