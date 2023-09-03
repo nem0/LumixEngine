@@ -484,6 +484,58 @@ static void LUA_startGame(Engine* engine, World* world)
 	if(engine && world) engine->startGame(*world);
 }
 
+static void LUA_networkClose(os::NetworkStream* stream) {
+	return os::close(*stream);
+}
+
+static int LUA_networkListen(lua_State* L) {
+	const char* ip = LuaWrapper::checkArg<const char*>(L, 1);
+	u16 port = LuaWrapper::checkArg<u16>(L, 2);
+	os::NetworkStream* stream = os::listen(ip, port, getGlobalAllocator());
+	if (!stream) return 0;
+	lua_pushlightuserdata(L, stream);
+	return 1;
+}
+
+static int LUA_networkConnect(lua_State* L) {
+	const char* ip = LuaWrapper::checkArg<const char*>(L, 1);
+	u16 port = LuaWrapper::checkArg<u16>(L, 2);
+	os::NetworkStream* stream = os::connect(ip, port, getGlobalAllocator());
+	if (!stream) return 0;
+	lua_pushlightuserdata(L, stream);
+	return 1;
+}
+
+static bool LUA_networkWrite(os::NetworkStream* stream, const char* data, u32 size) {
+	return os::write(*stream, data, size);
+}
+
+static int LUA_networkRead(lua_State* L) {
+	char tmp[4096];
+	os::NetworkStream* stream = LuaWrapper::checkArg<os::NetworkStream*>(L, 1);
+	u32 size = LuaWrapper::checkArg<u32>(L, 2);
+	if (size > sizeof(tmp)) return luaL_error(L, "size too big, max %d allowed", sizeof(tmp));
+	if (!os::read(*stream, tmp, size)) return 0;
+	lua_pushlstring(L, tmp, size);
+	return 1;
+}
+
+static int LUA_packU32(lua_State* L) {
+	u32 val = LuaWrapper::checkArg<u32>(L, 1);
+	lua_pushlstring(L, (const char*)&val, sizeof(val));
+	return 1;
+}
+
+static int LUA_unpackU32(lua_State* L) {
+	size_t size;
+	const char* lstr = lua_tolstring(L, 1, &size);
+	u32 val;
+	if (sizeof(val) != size) return luaL_error(L, "Invalid argument");
+	
+	memcpy(&val, lstr, sizeof(val));
+	lua_pushnumber(L, val);
+	return 1;
+}
 
 static bool LUA_createComponent(World* world, i32 entity, const char* type)
 {
@@ -705,6 +757,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		LuaWrapper::createSystemFunction(L, "LumixAPI", #name, \
 			&LuaWrapper::wrap<LUA_##name>); \
 
+	REGISTER_FUNCTION(networkClose);
+	REGISTER_FUNCTION(networkWrite);
 	REGISTER_FUNCTION(createComponent);
 	REGISTER_FUNCTION(hasComponent);
 	REGISTER_FUNCTION(createEntity);
@@ -732,18 +786,15 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
 
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkRead", &LUA_networkRead);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "packU32", &LUA_packU32);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "unpackU32", &LUA_unpackU32);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkConnect", &LUA_networkConnect);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkListen", &LUA_networkListen);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadWorld", LUA_loadWorld);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "hasFilesystemWork", LUA_hasFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
-
-	#undef REGISTER_FUNCTION
-
-	#define REGISTER_FUNCTION(F) \
-		do { \
-			auto f = &LuaWrapper::wrapMethod<&World::F>; \
-			LuaWrapper::createSystemFunction(L, "LumixAPI", #F, f); \
-		} while(false)
 
 	#undef REGISTER_FUNCTION
 

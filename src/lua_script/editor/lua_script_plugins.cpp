@@ -15,6 +15,7 @@
 #include "engine/file_system.h"
 #include "engine/hash.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
@@ -142,6 +143,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		m_toggle_ui.is_selected.bind<&ConsolePlugin::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);
 		buf[0] = '\0';
+		runEditorLua();
 	}
 
 	~ConsolePlugin() {
@@ -190,33 +192,10 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		}
 	}
 
-	/*static const int LUA_CALL_EVENT_SIZE = 32;
-
-	void systemAdded(GUIPlugin& plugin) override
-	{
-		if (!equalStrings(plugin.getName(), "animation_editor")) return;
-
-		auto& anim_editor = (AnimEditor::IAnimationEditor&)plugin;
-		auto& event_type = anim_editor.createEventType("lua_call");
-		event_type.size = LUA_CALL_EVENT_SIZE;
-		event_type.label = "Lua call";
-		event_type.editor.bind<ConsolePlugin, &ConsolePlugin::onLuaCallEventGUI>(this);
-	}
-
-
-	void onLuaCallEventGUI(u8* data, AnimEditor::Component& component) const
-	{
-		LuaScriptModule* plugin = (LuaScriptModule*)app.getWorldEditor().getWorld()->getModule(LUA_SCRIPT_TYPE);
-		ImGui::InputText("Function", (char*)data, LUA_CALL_EVENT_SIZE);
-	}
-	*/
-
 	const char* getName() const override { return "script_console"; }
-
 
 	bool isOpen() const { return open; }
 	void toggleOpen() { open = !open; }
-
 
 	void autocompleteSubstep(lua_State* L, const char* str, ImGuiInputTextCallbackData *data)
 	{
@@ -312,11 +291,11 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		return 0;
 	}
 
-
 	void onGUI() override
 	{
 		if (!open) return;
-		if (ImGui::Begin(ICON_FA_SCROLL "Lua console##lua_console", &open))
+		tickEditorLua();
+		if (ImGui::Begin("Lua console##lua_console", &open))
 		{
 			if (ImGui::Button("Execute")) {
 				lua_State* L;
@@ -422,6 +401,47 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		ImGui::End();
 	}
 
+	
+	void runEditorLua() {
+		OutputMemoryStream blob(app.getAllocator());
+		const char* path = "scripts/editor_main.lua";
+		Engine& engine = app.getEngine();
+		if (!engine.getFileSystem().getContentSync(Path(path), blob)) return;
+
+		StringView sv;
+		sv.begin = (const char*)blob.data();
+		sv.end = sv.begin + blob.size();
+		if (LuaWrapper::execute(engine.getState(), sv, path, 1)) {
+			if (lua_isthread(engine.getState(), -1)) {
+				m_editor_lua_state_ref = luaL_ref(engine.getState(), LUA_REGISTRYINDEX);
+			}
+		}
+	}
+
+	void tickEditorLua() {
+		if (m_editor_lua_state_ref == -1) return;
+
+		Engine& engine = app.getEngine();
+		lua_State* L = engine.getState();
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
+		lua_State* coroutine = lua_tothread(L, -1);
+		i32 res = lua_resume(coroutine, 0);
+		if (res == LUA_OK) {
+			luaL_unref(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
+			m_editor_lua_state_ref = -1;
+		}
+		else if (res != LUA_YIELD) {
+			const char* error_msg2 = lua_tostring(coroutine, -1);
+			logError("editor main: ", error_msg2);
+			LuaWrapper::traceback(coroutine);
+			const char* error_msg = lua_tostring(coroutine, -1);
+			logError("editor main: ", error_msg);
+			luaL_unref(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
+			m_editor_lua_state_ref = -1;
+		}
+		lua_pop(L, 1);
+	}
 
 	StudioApp& app;
 	Action m_toggle_ui;
@@ -432,6 +452,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	int autocomplete_selected = 1;
 	const char* insert_value = nullptr;
 	char buf[10 * 1024];
+	i32 m_editor_lua_state_ref = -1;
 };
 
 

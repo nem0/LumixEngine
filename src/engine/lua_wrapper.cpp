@@ -25,9 +25,18 @@ namespace Lumix::LuaWrapper {
 	}
 #endif
 
-int traceback (lua_State *L) {
+int traceback(lua_State *L) {
 	if (!lua_isstring(L, 1)) return 1;
 	
+	lua_getfield(L, LUA_GLOBALSINDEX, "LumixDebugCallback");
+	if (lua_isfunction(L, -1)) {
+		if (lua_pcall(L, 0, 0, 0) != 0) {
+			logError(lua_tostring(L, -1));
+			return 1;
+		}
+	}
+	else lua_pop(L, 1);
+
 	lua_getfield(L, LUA_GLOBALSINDEX, "debug");
 	if (!lua_istable(L, -1)) {
 		lua_pop(L, 1);
