@@ -224,10 +224,7 @@ UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
 UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
 
 
-#define IMGUI_CENTER_TO_STR_HELPER(x) #x
-#define IMGUI_CENTER_TO_STR(x) IMGUI_CENTER_TO_STR_HELPER(x)
-
-template <typename F> void alignGUI(float align, F& f) {
+template <typename F> void alignGUI(float align, const F& f) {
 	const ImVec2 container_size = ImGui::GetContentRegionAvail();
 	const ImVec2 cp = ImGui::GetCursorScreenPos();
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -237,7 +234,7 @@ template <typename F> void alignGUI(float align, F& f) {
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse |
 							   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
 							   ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoDocking;
-	const char* id = "imgui_measure" IMGUI_CENTER_TO_STR(__COUNTER__);
+	const char* id = "imgui_lumix_measure__";
 	ImGui::Begin(id, nullptr, flags);
 	ImGuiEx::SetSkipItems(false);
 	ImGui::BeginGroup();
@@ -251,8 +248,8 @@ template <typename F> void alignGUI(float align, F& f) {
 	f();
 }
 
-template <typename F> void alignGUIRight(F& f) { alignGUI(1, f); }
-template <typename F> void alignGUICenter(F& f) { alignGUI(0.5f, f); }
+template <typename F> void alignGUIRight(const F& f) { alignGUI(1, f); }
+template <typename F> void alignGUICenter(const F& f) { alignGUI(0.5f, f); }
 
 
 } // namespace Lumix
