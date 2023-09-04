@@ -138,7 +138,7 @@ struct IElementProperty
 		ARRAY_LONG = 'l',
 		ARRAY_FLOAT = 'f',
 		BINARY = 'R',
-		VOID = ' '
+		NONE = ' '
 	};
 	virtual ~IElementProperty() {}
 	virtual Type getType() const = 0;
@@ -489,26 +489,64 @@ struct NodeAttribute : Object
 };
 
 
-struct Geometry : Object
-{
+struct Vec2Attributes {
+	const Vec2* values = nullptr;
+	const int* indices = nullptr;
+	int count = 0;
+
+	Vec2 get(int i) const { return indices ? values[indices[i]] : values[i]; }
+};
+
+struct Vec3Attributes {
+	const Vec3* values = nullptr;
+	const int* indices = nullptr;
+	int count = 0;
+
+	Vec3 get(int i) const { return indices ? values[indices[i]] : values[i]; }
+};
+
+struct Vec4Attributes {
+	const Vec4* values = nullptr;
+	const int* indices = nullptr;
+	int count = 0;
+
+	Vec4 get(int i) const { return indices ? values[indices[i]] : values[i]; }
+};
+
+// subset of polygons with same material
+struct GeometryPartition {
+	struct Polygon {
+		const int from_vertex; // index into VecNAttributes::indices
+		const int vertex_count;
+	};
+	const Polygon* polygons;
+	const int polygon_count;
+	const int max_polygon_triangles; // max triangles in single polygon, can be used for preallocation
+	const int triangles_count; // number of triangles after polygon triangulation, can be used for preallocation
+};
+
+struct GeometryData {
+	virtual ~GeometryData() {}
+	
+	virtual Vec3Attributes getPositions() const = 0;
+	virtual Vec3Attributes getNormals() const = 0;
+	virtual Vec2Attributes getUVs(int index = 0) const = 0;
+	virtual Vec4Attributes getColors() const = 0;
+	virtual Vec3Attributes getTangents() const = 0;
+	virtual int getPartitionCount() const = 0;
+	virtual GeometryPartition getPartition(int partition_index) const = 0;
+};
+
+
+struct Geometry : Object {
 	static const Type s_type = Type::GEOMETRY;
 	static const int s_uvs_max = 4;
 
 	Geometry(const Scene& _scene, const IElement& _element);
 
-	virtual const Vec3* getVertices() const = 0;
-	virtual int getVertexCount() const = 0;
-
-	virtual const int* getFaceIndices() const = 0;
-	virtual int getIndexCount() const = 0;
-
-	virtual const Vec3* getNormals() const = 0;
-	virtual const Vec2* getUVs(int index = 0) const = 0;
-	virtual const Vec4* getColors() const = 0;
-	virtual const Vec3* getTangents() const = 0;
+	virtual const GeometryData& getGeometryData() const = 0;
 	virtual const Skin* getSkin() const = 0;
 	virtual const BlendShape* getBlendShape() const = 0;
-	virtual const int* getMaterials() const = 0;
 };
 
 
@@ -525,8 +563,7 @@ struct Shape : Object
 };
 
 
-struct Mesh : Object
-{
+struct Mesh : Object {
 	static const Type s_type = Type::MESH;
 
 	Mesh(const Scene& _scene, const IElement& _element);
@@ -536,21 +573,8 @@ struct Mesh : Object
 	virtual DMatrix getGeometricMatrix() const = 0;
 	virtual const Material* getMaterial(int idx) const = 0;
 	virtual int getMaterialCount() const = 0;
-
-	// use following functions to access vertex data instead of using getGeometry,
-	// since old formats do not have Geometry nodes
-	virtual const Vec3* getVertices() const = 0;
-	virtual int getVertexCount() const = 0;
-
-	virtual const int* getFaceIndices() const = 0;
-	virtual int getIndexCount() const = 0;
-
-	virtual const Vec3* getNormals() const = 0;
-	virtual const Vec2* getUVs(int index = 0) const = 0;
-	virtual const Vec4* getColors() const = 0;
-	virtual const Vec3* getTangents() const = 0;
-	virtual const int* getMaterialIndices() const = 0;
-
+	// this will use data from `Geometry` if available and from `Mesh` otherwise
+	virtual const GeometryData& getGeometryData() const = 0;
 	virtual const Skin* getSkin() const = 0;
 	virtual const BlendShape* getBlendShape() const = 0;
 };
