@@ -2965,6 +2965,7 @@ struct PipelineImpl final : Pipeline
 
 	void fillClusters(DrawStream& stream, const CameraParams& cp) {
 		PROFILE_FUNCTION();
+		ASSERT(cp.pos.x == cp.pos.x);
 		struct ClusterLight {
 			Vec3 pos;
 			float radius;

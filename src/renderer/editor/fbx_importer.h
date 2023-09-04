@@ -106,21 +106,12 @@ struct FBXImporter {
 
 	struct SourceMesh {
 		SourceMesh(IAllocator& allocator)
-			: geom_indices(allocator)
-			, geom_vertex_data(allocator)
-			, computed_tangents(allocator)
-			, computed_normals(allocator)
-			, computed_ao(allocator)
+			: computed_ao(allocator)
 		{
 		}
 
 		const ofbx::Mesh* fbx = nullptr;
-		Array<u32> geom_indices;
-		OutputMemoryStream geom_vertex_data;
-		Array<ofbx::Vec3> computed_tangents;
-		Array<ofbx::Vec3> computed_normals;
 		Array<float> computed_ao;
-		u32 unique_vertex_count;
 	};
 
 	struct ImportMesh {
@@ -136,7 +127,6 @@ struct FBXImporter {
 		bool import = true;
 		u32 lod = 0;
 		int submesh = -1;
-		u32 submesh_vertex_count = 0; // how many of fbx vertices have this->fbx_mat
 		OutputMemoryStream vertex_data;
 		Array<u32> indices;
 		Local<Array<u32>> autolod_indices[4];
@@ -182,8 +172,8 @@ private:
 	void sortBones(bool force_skinned);
 	void gatherBones(bool force_skinned);
 	void gatherAnimations();
-	void writePackedVec3(const ofbx::FVec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
-	void writePackedVec3(const ofbx::DVec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
+	u8* writePackedVec3(u8* dst, const u8* src, const Matrix& mtx) const;
+	u8* writeUVs(u8* dst, const u8* src) const;
 	void postprocessMeshes(const ImportConfig& cfg, const Path& path);
 	void gatherMeshes();
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
