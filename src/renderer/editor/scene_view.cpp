@@ -1344,6 +1344,7 @@ void SceneView::searchUI() {
 
 void SceneView::onGUI()
 {
+	m_has_focus = false;
 	PROFILE_FUNCTION();
 	m_pipeline->setWorld(m_editor.getWorld());
 
@@ -1354,6 +1355,8 @@ void SceneView::onGUI()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
+		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
+		
 		ImGui::PopStyleVar();
 		is_open = true;
 		ImGui::Dummy(ImVec2(2, 2));

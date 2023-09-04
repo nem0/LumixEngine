@@ -49,6 +49,8 @@ private:
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
 	void toggleProjection();
+	bool hasFocus() const override { return m_has_focus; }
+
 
 private:
 	StudioApp& m_app;
@@ -63,6 +65,7 @@ private:
 	Action m_toggle_projection_action;
 	Action m_look_at_selected_action;
 	Action m_copy_view_action;
+	bool m_has_focus = false;
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
 	bool m_search_request = false;
