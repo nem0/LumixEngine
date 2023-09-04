@@ -59,13 +59,12 @@ GameView::GameView(StudioApp& app)
 
 
 void GameView::init() {
-	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", true);
+	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", Action::IMGUI_PRIORITY);
 	m_toggle_ui.func.bind<&GameView::onToggleOpen>(this);
 	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
 	m_app.addWindowAction(&m_toggle_ui);
 
-	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "", true);
-	m_fullscreen_action.func.bind<&GameView::toggleFullscreen>(this);
+	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "", Action::IMGUI_PRIORITY);
 	m_app.addAction(&m_fullscreen_action);
 
 	Engine& engine = m_app.getEngine();
@@ -91,6 +90,12 @@ GameView::~GameView()
 	if (gui) {
 		gui->setInterface(nullptr);
 	}
+}
+
+bool GameView::onAction(const Action& action) {
+	if (&action == &m_fullscreen_action) toggleFullscreen();
+	else return false;
+	return true;
 }
 
 void GameView::setCursor(os::CursorType type)

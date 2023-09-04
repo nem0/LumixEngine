@@ -23,7 +23,7 @@ VoxelizerUI::VoxelizerUI(StudioApp& app)
 	, m_debug_triangles(app.getAllocator())
 	, m_module(app.getAllocator())
 {
-	m_toggle_ui.init("Voxelizer editor", "Toggle voxelizer editor", "voxelizer_editor", "", true);
+	m_toggle_ui.init("Voxelizer editor", "Toggle voxelizer editor", "voxelizer_editor", "", false);
 	m_toggle_ui.func.bind<&VoxelizerUI::toggleOpen>(this);
 	m_toggle_ui.is_selected.bind<&VoxelizerUI::isOpen>(this);
 	m_app.addWindowAction(&m_toggle_ui);

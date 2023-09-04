@@ -490,7 +490,15 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void moveCursorBegin(Cursor& cursor, bool doc) {
 		if (doc) cursor.line = 0;
-		cursor.col = 0;
+		if (cursor.col == 0) {
+			const String& line = m_lines[cursor.line].value;
+			while (cursor.col < (i32)line.length() && !isWordChar(line[cursor.col])) {
+				++cursor.col;
+			}
+		}
+		else {
+			cursor.col = 0;
+		}
 		cursorMoved(cursor);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
@@ -1022,8 +1030,11 @@ struct CodeEditorImpl final : CodeEditor {
 		const bool hovered = ImGui::ItemHoverable(bb, id, 0);
 		const bool clicked = hovered && ImGui::IsItemClicked();
 		if (clicked && !ImGui::IsItemActive()) ImGuiEx::SetActiveID(id);
-		if (ImGui::IsItemActive() && !io.MouseDown[0]) ImGui::SetItemAllowOverlap(); // because of search gui
-		if (ImGui::IsItemActive() && io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
+		if (ImGui::IsItemActive()) {
+			if (!io.MouseDown[0]) ImGui::SetItemAllowOverlap(); // because of search gui
+			if (io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
+			ImGui::SetShortcutRouting(ImGuiKey_Tab, id);
+		}
 		if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
 
 		const bool handle_input = ImGui::IsItemActive();
@@ -1350,12 +1361,12 @@ Action::Action() {
 	shortcut = os::Keycode::INVALID;
 }
 
-void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global) {
+void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type) {
 	this->label_long = label_long;
 	this->label_short = label_short;
 	this->font_icon = font_icon;
 	this->name = name;
-	this->is_global = is_global;
+	this->type = type;
 	shortcut = os::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
@@ -1367,13 +1378,13 @@ void Action::init(const char* label_short,
 	const char* font_icon,
 	os::Keycode shortcut,
 	Modifiers modifiers,
-	bool is_global)
+	Type type)
 {
 	this->label_long = label_long;
 	this->label_short = label_short;
 	this->name = name;
 	this->font_icon = font_icon;
-	this->is_global = is_global;
+	this->type = type;
 	this->shortcut = shortcut;
 	this->modifiers = modifiers;
 	is_selected.bind<falseConst>();
@@ -2077,6 +2088,24 @@ bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus) {
 		return true;
 	}
 	return false;
+}
+
+void openCenterStrip(const char* str_id) {
+	ImGui::OpenPopup(str_id);
+}
+
+bool beginCenterStrip(const char* str_id, u32 lines) {
+	const ImGuiViewport* vp = ImGui::GetMainViewport();
+	const ImGuiStyle& style = ImGui::GetStyle();
+	ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowSize(ImVec2(vp->Size.x - style.FramePadding.x * 2, ImGui::GetTextLineHeight() * lines));
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+							 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
+	return ImGui::BeginPopupModal(str_id, nullptr, flags);
+}
+
+void endCenterStrip() {
+	ImGui::EndPopup();
 }
 
 } // namespace Lumix

@@ -35,6 +35,7 @@ struct SceneView : StudioApp::GUIPlugin
 	void init();
 
 private:
+	bool onAction(const Action& action) override;
 	void manipulate();
 	void renderSelection();
 	void renderGizmos();
@@ -44,16 +45,10 @@ private:
 	void handleDrop(const char* path, float x, float y);
 	void onToolbar();
 	void handleEvents();
-	void toggleSearch() { m_search_request = true; }
 	void searchUI();
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
-	void setTopView();
-	void setSideView();
-	void setFrontView();
 	void toggleProjection();
-	void lookAtSelected();
-	void copyViewTransform();
 
 private:
 	StudioApp& m_app;

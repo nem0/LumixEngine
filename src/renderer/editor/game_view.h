@@ -45,6 +45,7 @@ public:
 	bool m_is_open;
 
 private:
+	bool onAction(const Action& action) override;
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
 	void toggleFullscreen();

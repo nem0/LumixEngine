@@ -13,6 +13,7 @@ IMGUI_API ImVec2 GetOsImePosRequest();
 IMGUI_API void ResetActiveID();
 IMGUI_API void SetActiveID(ImGuiID id);
 IMGUI_API void ItemAdd(const ImVec2& min, const ImVec2& max, ImGuiID id);
+IMGUI_API void SetSkipItems(bool skip);
 
 IMGUI_API void BringToFront();
 
@@ -77,6 +78,7 @@ IMGUI_API void PushReadOnly();
 IMGUI_API void PopReadOnly();
 IMGUI_API bool Filter(const char* hint, char* buf, int buf_size, float width = -1, bool set_keyboard_focus = false);
 IMGUI_API void TextUnformatted(Lumix::StringView str);
+IMGUI_API void TextCentered(Lumix::StringView str);
 
 struct IMGUI_API Canvas {
 	~Canvas();

@@ -29,7 +29,7 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 		m_new_message_count[i] = 0;
 	}
 
-	m_toggle_ui.init("Log", "Toggle Log UI", "log", "", false);
+	m_toggle_ui.init("Log", "Toggle Log UI", "log", "", Action::IMGUI_PRIORITY);
 	m_toggle_ui.func.bind<&LogUI::toggleUI>(this);
 	m_toggle_ui.is_selected.bind<&LogUI::isOpen>(this);
 
@@ -103,13 +103,14 @@ void LogUI::showNotifications()
 
 	m_are_notifications_hovered = ImGui::IsWindowHovered();
 
+	ImGui::PushFont(m_app.getBigIconFont());
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextColored(ImColor(255, 0, 0, 255), ICON_FA_EXCLAMATION_TRIANGLE);
 	ImGui::SameLine();
-	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Close")) m_notifications.clear();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, nullptr)) m_notifications.clear();
 	ImGui::SameLine();
-	if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_SQUARE_ALT, "View log")) m_focus_request = true;
-
+	if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_SQUARE_ALT, nullptr)) m_focus_request = true;
+	ImGui::PopFont();
 	if (ImGui::BeginChild("scrollarea", ImVec2(0, 0), false, ImGuiWindowFlags_NoBackground)) {
 		if (m_move_notifications_to_front) ImGuiEx::BringToFront();
 		m_move_notifications_to_front = false;

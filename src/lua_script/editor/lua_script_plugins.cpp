@@ -138,7 +138,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		, open(false)
 		, autocomplete(_app.getAllocator())
 	{
-		m_toggle_ui.init("Script Console", "Toggle script console", "script_console", "", true);
+		m_toggle_ui.init("Script Console", "Toggle script console", "script_console", "", Action::IMGUI_PRIORITY);
 		m_toggle_ui.func.bind<&ConsolePlugin::toggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&ConsolePlugin::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);

@@ -235,7 +235,7 @@ public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
 	{
-		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "", true);
+		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "", Action::IMGUI_PRIORITY);
 		m_toggle_ui.func.bind<&GUIEditor::onToggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);

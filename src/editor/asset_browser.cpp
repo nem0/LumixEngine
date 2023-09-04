@@ -79,13 +79,13 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		onBasePathChanged();
 
-		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
-		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, false);
+		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, Action::IMGUI_PRIORITY);
+		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, Action::IMGUI_PRIORITY);
 
-		m_focus_search.init("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL, true);
+		m_focus_search.init("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL, Action::GLOBAL);
 		m_focus_search.func.bind<&AssetBrowserImpl::focusSearch>(this);
 
-		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", false);
+		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", Action::IMGUI_PRIORITY);
 		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
 
@@ -699,27 +699,32 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		if (open_delete_popup || m_request_delete) {
-			ImGui::OpenPopup("Delete file");
+			openCenterStrip("Delete file");
 			m_request_delete = false;
 		}
 
-		if (ImGui::BeginPopupModal("Delete file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		if (beginCenterStrip("Delete file", 7)) {
+			ImGui::NewLine();
 			if (m_selected_resources.size() > 1) {
-				ImGui::Text("%d files will be deleted.", m_selected_resources.size());
+				StaticString<128> txt(m_selected_resources.size(), " files will be deleted.");
+				ImGuiEx::TextCentered(txt);
 			}
 			else {
-				ImGui::TextUnformatted(m_selected_resources[0].c_str());
+				ImGuiEx::TextCentered(m_selected_resources[0].c_str());
 			}
-			ImGui::Text("Are you sure? This can not be undone.");
-			if (ImGui::Button("Yes, delete", ImVec2(100, 0))) {
-				deleteSelectedFiles();
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine(ImGui::GetWindowWidth() - 100 - ImGui::GetStyle().WindowPadding.x);
-			if (ImGui::Button("Cancel", ImVec2(100, 0))) {
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
+			ImGuiEx::TextCentered("Are you sure? This can not be undone.");
+			ImGui::NewLine();
+			alignGUICenter([&](){
+				if (ImGui::Button("Delete", ImVec2(100, 0))) {
+					deleteSelectedFiles();
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel", ImVec2(100, 0))) {
+					ImGui::CloseCurrentPopup();
+				}
+			});
+			endCenterStrip();
 		}
 
 		ImGui::EndChild();

@@ -52,6 +52,15 @@ namespace ImGuiEx {
 		return *g_node_editor.canvas_offset;
 	}
 
+	void TextCentered(Lumix::StringView str) {
+		const float text_w = ImGui::CalcTextSize(str.begin, str.end).x;
+		const float area_w = ImGui::GetContentRegionAvail().x;
+		float x = ImGui::GetCursorPosX();
+		x += (area_w - text_w) * 0.5f;
+		ImGui::SetCursorPosX(x);
+		ImGui::TextUnformatted(str.begin, str.end);
+	}
+
 	void TextUnformatted(Lumix::StringView str) {
 		ImGui::TextUnformatted(str.begin, str.end);
 	}
@@ -523,7 +532,10 @@ namespace ImGuiEx {
 				e.MousePos.PosY = (e.MousePos.PosY - origin.y) / scale;
 			}
 		}
+	}
 
+	void SetSkipItems(bool skip) {
+		ImGui::GetCurrentWindow()->SkipItems = false;
 	}
 
 	void ItemAdd(const ImVec2& min, const ImVec2& max, ImGuiID id) {

@@ -738,6 +738,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		else {
 			mainMenu();
+
 			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 			m_asset_compiler->onGUI();
 			guiEntityList();
@@ -943,27 +944,19 @@ struct StudioAppImpl final : StudioApp
 		ImGui::SetNextWindowSize(viewport->WorkSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags)) {
-			const float spacing = ImGui::GetStyle().ItemSpacing.x;
 			#ifdef _WIN32
-				ImVec2 cp = ImGui::GetCursorPos();
-				cp.x += ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_WINDOW_CLOSE).x - 2 * spacing;
-				ImGui::SetCursorPos(cp);
-				if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
-
-				if (os::isMaximized(m_engine->getWindowHandle())) {
-					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_RESTORE).x + spacing;
-					ImGui::SetCursorPos(cp);
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
-				}
-				else {
-					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MAXIMIZE).x + spacing;
-					ImGui::SetCursorPos(cp);
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
-				}
-
-				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MINIMIZE).x + spacing;
-				ImGui::SetCursorPos(cp);
-				if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+				alignGUIRight([&](){
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+					ImGui::SameLine();
+					if (os::isMaximized(m_engine->getWindowHandle())) {
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+					}
+					else {
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+					}
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+				});
 			#endif
 
 			ImGui::Text("Welcome to Lumix Studio");
@@ -1285,7 +1278,7 @@ struct StudioAppImpl final : StudioApp
 	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
 	{
 		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, true);
+		a->init(label_short, label_long, name, font_icon, Action::IMGUI_PRIORITY);
 		a->func.bind<Func>(this);
 		addAction(a);
 		m_owned_actions.push(a);
@@ -1302,7 +1295,7 @@ struct StudioAppImpl final : StudioApp
 		Action::Modifiers modifiers)
 	{
 		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, true);
+		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, Action::IMGUI_PRIORITY);
 		a->func.bind<Func>(this);
 		m_owned_actions.push(a);
 		addAction(a);
@@ -1515,19 +1508,22 @@ struct StudioAppImpl final : StudioApp
 	void mainMenu()
 	{
 		if (m_confirm_exit) {
-			ImGui::OpenPopup("Confirm##confirm_exit");
+			openCenterStrip("Confirm##confirm_exit");
 			m_confirm_exit = false;
 		}
-		if (ImGui::BeginPopupModal("Confirm##confirm_exit")) {
-			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
-			if (ImGui::Button("Continue"))
-			{
-				m_finished = true;
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
+		if (beginCenterStrip("Confirm##confirm_exit", 6)) {
+			ImGui::NewLine();
+			ImGuiEx::TextCentered("All unsaved changes will be lost, do you want to continue?");
+			ImGui::NewLine();
+			alignGUICenter([&](){
+				if (ImGui::Button("Continue")) {
+					m_finished = true;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			});
+			endCenterStrip();
 		}
 
 		if (m_confirm_destroy_partition) {
@@ -1546,38 +1542,42 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		if (m_confirm_new) {
-			ImGui::OpenPopup("Confirm##confirm_new");
+			openCenterStrip("Confirm##confirm_new");
 			m_confirm_new = false;
 		}
-		if (ImGui::BeginPopupModal("Confirm##confirm_new")) {
-			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
-			if (ImGui::Button("Continue"))
-			{
-				m_editor->newWorld();
-				initDefaultWorld();
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
+		if (beginCenterStrip("Confirm##confirm_new", 6)) {
+			ImGui::NewLine();
+			ImGuiEx::TextCentered("All unsaved changes will be lost, do you want to continue?");
+			ImGui::NewLine();
+			alignGUICenter([&](){
+				if (ImGui::Button("Continue")) {
+					m_editor->newWorld();
+					initDefaultWorld();
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			});
+			endCenterStrip();
 		}
 
-		if (m_confirm_load)
-		{
-			ImGui::OpenPopup("Confirm");
+		if (m_confirm_load) {
+			openCenterStrip("Confirm");
 			m_confirm_load = false;
 		}
-		if (ImGui::BeginPopupModal("Confirm"))
-		{
-			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
-			if (ImGui::Button("Continue"))
-			{
-				loadWorld(m_world_to_load, false);
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
+		if (beginCenterStrip("Confirm", 6)) {
+			ImGui::NewLine();
+			ImGuiEx::TextCentered("All unsaved changes will be lost, do you want to continue?");
+			ImGui::NewLine();
+			alignGUICenter([&](){
+				if (ImGui::Button("Continue")) {
+					loadWorld(m_world_to_load, false);
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			});
+			endCenterStrip();
 		}
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
@@ -1602,55 +1602,40 @@ struct StudioAppImpl final : StudioApp
 			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
 			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
-			const float spacing = ImGui::GetStyle().ItemSpacing.x;
+			// we don't have custom titlebar on linux
 			#ifdef _WIN32
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_WINDOW_CLOSE).x - 2 * spacing);
-				ImVec2 cp = ImGui::GetCursorPos();
-				if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+				alignGUIRight([&](){
+					StaticString<200> stats;
+					if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
+					stats.append("FPS: ", u32(m_fps + 0.5f));
+					if (m_frames_since_focused > 10) stats.append(" - inactive window");
+					ImGuiEx::TextUnformatted(stats);
 
-				if (os::isMaximized(m_engine->getWindowHandle())) {
-					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_RESTORE).x + spacing;
-					ImGui::SetCursorPos(cp);
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
-				}
-				else {
-					cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MAXIMIZE).x + spacing;
-					ImGui::SetCursorPos(cp);
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
-				}
+					if (m_log_ui->getUnreadErrorCount() == 1) {
+						ImGui::SameLine();
+						ImGui::TextColored(ImVec4(1, 0, 0, 1), ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
+					}
+					else if (m_log_ui->getUnreadErrorCount() > 1)
+					{
+						StaticString<50> error_stats(ICON_FA_EXCLAMATION_TRIANGLE, m_log_ui->getUnreadErrorCount(), " errors | ");
+						ImGui::SameLine();
+						ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
+					}
 
-				cp.x -= ImGui::CalcTextSize(ICON_FA_WINDOW_MINIMIZE).x + spacing;
-				ImGui::SetCursorPos(cp);
-				if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
-			#else
-				// we don't have custom titlebar on linux
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - spacing);
-				ImVec2 cp = ImGui::GetCursorPos();
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+					ImGui::SameLine();
+					if (os::isMaximized(m_engine->getWindowHandle())) {
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+					}
+					else {
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+					}
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+				});
 			#endif
 
-			StaticString<200> stats;
-			if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
-			stats.append("FPS: ", u32(m_fps + 0.5f));
-			if (m_frames_since_focused > 10) stats.append(" - inactive window");
-			const ImVec2 stats_size = ImGui::CalcTextSize(stats);
-			cp.x -= stats_size.x + spacing;
-			ImGui::SetCursorPos(cp);
-			ImGuiEx::TextUnformatted(stats);
-
-			if (m_log_ui->getUnreadErrorCount() == 1) {
-				auto error_stats_size = ImGui::CalcTextSize(ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
-				cp.x -= error_stats_size.x + spacing;
-				ImGui::SetCursorPos(cp);
-				ImGui::TextColored(ImVec4(1, 0, 0, 1), ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
-			}
-			else if (m_log_ui->getUnreadErrorCount() > 1)
-			{
-				StaticString<50> error_stats(ICON_FA_EXCLAMATION_TRIANGLE, m_log_ui->getUnreadErrorCount(), " errors | ");
-				auto error_stats_size = ImGui::CalcTextSize(error_stats);
-				cp.x -= error_stats_size.x + spacing;
-				ImGui::SetCursorPos(cp);
-				ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
-			}
 			ImGui::EndMainMenuBar();
 		}
 	}
@@ -2313,32 +2298,32 @@ struct StudioAppImpl final : StudioApp
 
 	void addActions()
 	{
-		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, true);
+		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, Action::GLOBAL);
 		m_common_actions.save.func.bind<&StudioAppImpl::save>(this);
 		addAction(&m_common_actions.save);
-		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, true);
+		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 		m_common_actions.undo.func.bind<&StudioAppImpl::undo>(this);
 		addAction(&m_common_actions.undo);
-		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, true);
+		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
 		m_common_actions.redo.func.bind<&StudioAppImpl::redo>(this);
 		addAction(&m_common_actions.redo);
-		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, true);
+		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
 		m_common_actions.del.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
 		addAction(&m_common_actions.del);
 
-		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
+		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_orbit);
-		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "", false);
+		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_forward);
-		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "", false);
+		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_backward);
-		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "", false);
+		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_left);
-		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "", false);
+		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_right);
-		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "", false);
+		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_up);
-		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", false);
+		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_down);
 
 		addAction<&StudioAppImpl::newWorld>("New", "New world", "newWorld", ICON_FA_PLUS);
@@ -3337,14 +3322,14 @@ struct StudioAppImpl final : StudioApp
 		
 		ImGuiIO& io = ImGui::GetIO();
 		for (Action*& a : m_actions) {
-			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers == 0)) continue;
+			if (a->type == Action::LOCAL) continue;
+			if (a->type == Action::IMGUI_PRIORITY && io.WantCaptureKeyboard) continue;
+			if (a->shortcut == os::Keycode::INVALID && a->modifiers == 0) continue;
 			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;
 			if (a->modifiers != pressed_modifiers) continue;
 			
 			if (window && window->onAction(*a))
 				return;
-
-			if (io.WantCaptureKeyboard) return;
 
 			if (a->func.isValid()) {
 				a->func.invoke();

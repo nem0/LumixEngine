@@ -31,7 +31,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
-	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "", false);
+	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "", Action::IMGUI_PRIORITY);
 	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
 	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
 	

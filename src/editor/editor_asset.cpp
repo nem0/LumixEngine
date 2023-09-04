@@ -44,17 +44,22 @@ void AssetEditorWindow::onGUI() {
 	}
 	if (!open) {
 		if (m_dirty) {
-			ImGui::OpenPopup("Confirm##cvse");
+			openCenterStrip("Confirm##cvse");
 		}
 		else {
 			m_app.getAssetBrowser().closeWindow(*this);
 		}
 	}
 
-	if (ImGui::BeginPopupModal("Confirm##cvse", nullptr, ImGuiWindowFlags_NoSavedSettings)) {
-		ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
-		if (ImGui::Selectable("Yes")) m_app.getAssetBrowser().closeWindow(*this);
-		ImGui::Selectable("No");
+	if (beginCenterStrip("Confirm##cvse", 6)) {
+		ImGui::NewLine();		
+		ImGuiEx::TextCentered("Are you sure? All changes will be lost.");
+		ImGui::NewLine();
+		alignGUICenter([&]{
+			if (ImGui::Button("Close")) m_app.getAssetBrowser().closeWindow(*this);
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+		});
 		ImGui::EndPopup();
 	}
 	ImGui::End();

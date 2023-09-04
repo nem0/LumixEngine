@@ -992,7 +992,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "material editor")
 	{
-		m_wireframe_action.init("Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL, true);
+		m_wireframe_action.init("Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 		m_wireframe_action.func.bind<&MaterialPlugin::toggleWireframe>(this);
 
 		app.getAssetCompiler().registerExtension("mat", Material::TYPE);
@@ -5095,7 +5095,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		PROFILE_FUNCTION();
-		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", false);
+		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", Action::GLOBAL);
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
 
 		if (renderDocOption()) {

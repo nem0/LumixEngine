@@ -23,8 +23,14 @@ struct LUMIX_EDITOR_API ResourceLocator {
 };
 
 
-struct LUMIX_EDITOR_API Action
-{
+struct LUMIX_EDITOR_API Action {
+	// what should `StudioAppImpl::checkShortcuts` do
+	enum Type : u8 {
+		LOCAL, // ignore, must manually check isActive()
+		IMGUI_PRIORITY, // check only when imgui does not want input
+		GLOBAL // check even when imgui wants input
+	};
+
 	enum Modifiers : u8 {
 		NONE = 0,
 
@@ -34,21 +40,21 @@ struct LUMIX_EDITOR_API Action
 	};
 
 	Action();
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers, bool is_global);
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global);
+	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers, Type type);
+	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type);
 	bool toolbarButton(struct ImFont* font);
 	bool isActive() const;
 	bool shortcutText(Span<char> out) const;
 
 	static bool falseConst() { return false; }
 
+	Type type = Type::LOCAL;
 	Modifiers modifiers = Modifiers::NONE;
 	os::Keycode shortcut;
 	StaticString<32> name;
 	StaticString<32> label_short;
 	StaticString<64> label_long;
 	StaticString<5> font_icon;
-	bool is_global;
 	Delegate<void ()> func;
 	Delegate<bool ()> is_selected;
 };
@@ -77,6 +83,9 @@ LUMIX_EDITOR_API bool inputRotation(const char* label, struct Quat* value);
 LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 LUMIX_EDITOR_API bool inputString(const char* str_id, const char* label, String* value);
 LUMIX_EDITOR_API bool inputStringMultiline(const char* label, String* value, const ImVec2& size = ImVec2(0, 0));
+LUMIX_EDITOR_API void openCenterStrip(const char* str_id);
+LUMIX_EDITOR_API bool beginCenterStrip(const char* str_id, u32 lines = 5);
+LUMIX_EDITOR_API void endCenterStrip();
 
 struct SimpleUndoRedo {
 	enum { NO_MERGE_UNDO = 0xffFFffFF };
@@ -213,5 +222,37 @@ struct CodeEditor {
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
 UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
+
+
+#define IMGUI_CENTER_TO_STR_HELPER(x) #x
+#define IMGUI_CENTER_TO_STR(x) IMGUI_CENTER_TO_STR_HELPER(x)
+
+template <typename F> void alignGUI(float align, F& f) {
+	const ImVec2 container_size = ImGui::GetContentRegionAvail();
+	const ImVec2 cp = ImGui::GetCursorScreenPos();
+	ImGuiStyle& style = ImGui::GetStyle();
+	float alpha_backup = style.DisabledAlpha;
+	style.DisabledAlpha = 0;
+	ImGui::BeginDisabled();
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse |
+							   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+							   ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoDocking;
+	const char* id = "imgui_measure" IMGUI_CENTER_TO_STR(__COUNTER__);
+	ImGui::Begin(id, nullptr, flags);
+	ImGuiEx::SetSkipItems(false);
+	ImGui::BeginGroup();
+	f();
+	ImGui::EndGroup();
+	const ImVec2 size = ImGui::GetItemRectSize();
+	ImGui::End();
+	ImGui::EndDisabled();
+	style.DisabledAlpha = alpha_backup;
+	ImGui::SetCursorScreenPos(ImVec2(cp.x + (container_size.x - size.x) * align, cp.y));
+	f();
+}
+
+template <typename F> void alignGUIRight(F& f) { alignGUI(1, f); }
+template <typename F> void alignGUICenter(F& f) { alignGUI(0.5f, f); }
+
 
 } // namespace Lumix

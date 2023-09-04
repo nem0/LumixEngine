@@ -612,25 +612,18 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
-	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
-	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);
-	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, false);
-	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, false);
-	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, true);
-	m_search_action.func.bind<&SceneView::toggleSearch>(this);
+	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", Action::LOCAL);
+	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", Action::LOCAL);
+	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
+	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
+	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 
-	m_top_view_action.init("Top", "Set top camera view", "viewTop", "", true);
-	m_top_view_action.func.bind<&SceneView::setTopView>(this);
-	m_side_view_action.init("Side", "Set side camera view", "viewSide", "", true);
-	m_side_view_action.func.bind<&SceneView::setSideView>(this);
-	m_front_view_action.init("Front", "Set front camera view", "viewFront", "", true);
-	m_front_view_action.func.bind<&SceneView::setFrontView>(this);
-	m_toggle_projection_action.init("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", true);
-	m_toggle_projection_action.func.bind<&SceneView::toggleProjection>(this);
-	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "", true);
-	m_look_at_selected_action.func.bind<&SceneView::lookAtSelected>(this);
-	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "", true);
-	m_copy_view_action.func.bind<&SceneView::copyViewTransform>(this);
+	m_top_view_action.init("Top", "Set top camera view", "viewTop", "", Action::IMGUI_PRIORITY);
+	m_side_view_action.init("Side", "Set side camera view", "viewSide", "", Action::IMGUI_PRIORITY);
+	m_front_view_action.init("Front", "Set front camera view", "viewFront", "", Action::IMGUI_PRIORITY);
+	m_toggle_projection_action.init("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", Action::IMGUI_PRIORITY);
+	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "", Action::IMGUI_PRIORITY);
+	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "", Action::IMGUI_PRIORITY);
 
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_toggle_gizmo_step_action);
@@ -647,12 +640,6 @@ SceneView::SceneView(StudioApp& app)
 	const ResourceType pipeline_type("pipeline");
 	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
 }
-
-void SceneView::setTopView() { m_view->setTopView(); }
-void SceneView::setSideView() { m_view->setSideView(); }
-void SceneView::setFrontView() { m_view->setFrontView(); }
-void SceneView::lookAtSelected() { m_view->lookAtSelected(); }
-void SceneView::copyViewTransform() { m_view->copyTransform(); }
 
 void SceneView::toggleProjection() {
 	Viewport vp = m_view->getViewport(); 
@@ -693,6 +680,20 @@ SceneView::~SceneView()
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
 	m_debug_shape_shader->decRefCount();
+}
+
+bool SceneView::onAction(const Action& action) {
+	if (&action == &m_search_action) m_search_request = true;
+	else if (&action == &m_set_pivot_action) m_view->setCustomPivot();
+	else if (&action == &m_reset_pivot_action) m_view->resetPivot();
+	else if (&action == &m_top_view_action) m_view->setTopView();
+	else if (&action == &m_side_view_action) m_view->setSideView();
+	else if (&action == &m_front_view_action) m_view->setFrontView();
+	else if (&action == &m_toggle_projection_action) toggleProjection();
+	else if (&action == &m_look_at_selected_action) m_view->lookAtSelected();
+	else if (&action == &m_copy_view_action) m_view->copyTransform();
+	else return false;
+	return true;
 }
 
 void SceneView::manipulate() {
@@ -767,8 +768,6 @@ void SceneView::update(float time_delta)
 {
 	PROFILE_FUNCTION();
 	m_pipeline->setWorld(m_editor.getWorld());
-	if (m_set_pivot_action.isActive()) m_view->setCustomPivot();
-	if (m_reset_pivot_action.isActive()) m_view->resetPivot();
 	ImGuiIO& io = ImGui::GetIO();
 	if (!io.KeyShift) {
 		m_view->setSnapMode(false, false);
