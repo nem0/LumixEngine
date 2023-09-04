@@ -77,7 +77,15 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 
 	const char* c = str;
 	if (!*c) {
-		token_type = prev_token_type == (u8)TokenType::COMMENT_MULTI ? (u8)TokenType::COMMENT_MULTI : (u8)TokenType::EMPTY;
+		switch (prev_token_type) {
+			case (u8)TokenType::COMMENT_MULTI:
+			case (u8)TokenType::STRING_MULTI:
+				token_type = prev_token_type;
+				break;
+			default:
+				token_type = (u8)TokenType::EMPTY;
+				break;
+		}
 		token_len = 0;
 		return false;
 	}
@@ -1023,13 +1031,10 @@ struct CodeEditorImpl final : CodeEditor {
 		ImRect bb = { min, min + content_size };
 		ImGui::ItemSize(bb);
 		ImGui::ItemAdd(bb, id);
-		if (m_focus_editor) {
-			ImGuiEx::SetActiveID(id);
-			m_focus_editor = false;
-		}
 		const bool hovered = ImGui::ItemHoverable(bb, id, 0);
 		const bool clicked = hovered && ImGui::IsItemClicked();
-		if (clicked && !ImGui::IsItemActive()) {
+		if (m_focus_editor || clicked && !ImGui::IsItemActive()) {
+			m_focus_editor = false;
 	        ImGuiWindow* window =  ImGui::GetCurrentWindow();
 			ImGui::SetActiveID(id, window);
 			ImGui::SetFocusID(id, window);
@@ -1159,7 +1164,7 @@ struct CodeEditorImpl final : CodeEditor {
 				m_search_visible = true;
 				m_focus_search = true;
 				m_search_from = m_cursors[0];
-				if (m_cursors[0].hasSelection()) copy(Span(m_search_text), m_cursors[0]);
+				if (m_cursors[0].hasSelection() && m_cursors[0].line == m_cursors[0].sel.line) copy(Span(m_search_text), m_cursors[0]);
 				else copy(Span(m_search_text), getWord(m_cursors[0]));
 			}
 			

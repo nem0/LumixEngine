@@ -2938,7 +2938,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	{
 		if (!m_tile.world) createTileWorld();
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
-		if (!render_module || model->getMeshCount() == 0) {
+		if (!render_module || !model->isReady() || model->getMeshCount() == 0) {
 			return;
 		}
 
