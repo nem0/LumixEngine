@@ -1029,7 +1029,12 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 		const bool hovered = ImGui::ItemHoverable(bb, id, 0);
 		const bool clicked = hovered && ImGui::IsItemClicked();
-		if (clicked && !ImGui::IsItemActive()) ImGuiEx::SetActiveID(id);
+		if (clicked && !ImGui::IsItemActive()) {
+	        ImGuiWindow* window =  ImGui::GetCurrentWindow();
+			ImGui::SetActiveID(id, window);
+			ImGui::SetFocusID(id, window);
+			ImGui::FocusWindow(window);
+		}
 		if (ImGui::IsItemActive()) {
 			if (!io.MouseDown[0]) ImGui::SetItemAllowOverlap(); // because of search gui
 			if (io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
