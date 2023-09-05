@@ -3134,7 +3134,7 @@ static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Elem
 	return curve;
 }
 
-static OptionalError<Object*> parseGeometry(const Element& element, bool triangulate, GeometryImpl& geom, Allocator::MTAllocator& allocator)
+static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, Allocator::MTAllocator& allocator)
 {
 	PROFILE_FUNCTION();
 	assert(element.first_property);
@@ -3423,15 +3423,6 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 	}
 }
 
-struct ParseGeometryJob {
-	const Element* element;
-	bool triangulate;
-	GeometryImpl* geom;
-	u64 id;
-	bool is_error;
-	Allocator::MTAllocator* allocator;
-};
-
 void sync_job_processor(JobFunction fn, void*, void* data, u32 size, u32 count) {
 	u8* ptr = (u8*)data;
 	for(u32 i = 0; i < count; ++i) {
@@ -3485,7 +3476,6 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		object = object->sibling;
 	}
 
-	std::vector<ParseGeometryJob> parse_geom_jobs;
 	for (auto iter : scene.m_object_map)
 	{
 		OptionalError<Object*> obj = nullptr;
@@ -3499,12 +3489,11 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			if (last_prop && last_prop->value == "Mesh")
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(scene, *iter.second.element);
+				parseGeometry(*iter.second.element, *geom, allocator.mt_allocator);
+				obj = geom;
 				scene.m_geometries.push_back(geom);
-				ParseGeometryJob job {iter.second.element, triangulate, geom, iter.first, false, &allocator.mt_allocator};
-				parse_geom_jobs.push_back(job);
-				continue;
 			}
-			if (last_prop && last_prop->value == "Shape")
+			else if (last_prop && last_prop->value == "Shape")
 			{
 				obj = allocator.allocate<ShapeImpl>(scene, *iter.second.element);
 			}
@@ -3613,22 +3602,6 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		{
 			scene.m_all_objects.push_back(obj.getValue());
 			obj.getValue()->id = iter.first;
-		}
-	}
-
-	if (!parse_geom_jobs.empty()) {
-		(*job_processor)([](void* ptr){
-			ParseGeometryJob* job = (ParseGeometryJob*)ptr;
-			job->is_error = parseGeometry(*job->element, job->triangulate, *job->geom, *job->allocator).isError();
-		}, job_user_ptr, &parse_geom_jobs[0], (u32)sizeof(parse_geom_jobs[0]), (u32)parse_geom_jobs.size());
-	}
-
-	for (const ParseGeometryJob& job : parse_geom_jobs) {
-		if (job.is_error) return false;
-		scene.m_object_map[job.id].object = job.geom;
-		if (job.geom) {
-			scene.m_all_objects.push_back(job.geom);
-			job.geom->id = job.id;
 		}
 	}
 
