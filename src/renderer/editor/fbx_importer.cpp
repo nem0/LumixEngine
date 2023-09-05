@@ -32,7 +32,6 @@
 
 namespace Lumix {
 
-
 static bool hasTangents(const ofbx::Mesh& mesh) {
 	const ofbx::GeometryData& geom = mesh.getGeometryData();
 	if (geom.getTangents().values) return true;
@@ -57,13 +56,12 @@ static void getMaterialName(const ofbx::Material* material, char (&out)[128])
 	makeLowercase(Span(out), out);
 }
 
-
 void FBXImporter::getImportMeshName(const ImportMesh& mesh, char (&out)[256])
 {
-	const char* name = mesh.source_mesh->fbx->name;
+	const char* name = mesh.fbx->name;
 	const ofbx::Material* material = mesh.fbx_mat;
 
-	if (name[0] == '\0' && mesh.source_mesh->fbx->getParent()) name = mesh.source_mesh->fbx->getParent()->name;
+	if (name[0] == '\0' && mesh.fbx->getParent()) name = mesh.fbx->getParent()->name;
 	if (name[0] == '\0' && material) name = material->name;
 	copyString(out, name);
 	if(mesh.submesh >= 0) {
@@ -79,7 +77,7 @@ const FBXImporter::ImportMesh* FBXImporter::getAnyMeshFromBone(const ofbx::Objec
 {
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		const ofbx::Mesh* mesh = m_meshes[i].source_mesh->fbx;
+		const ofbx::Mesh* mesh = m_meshes[i].fbx;
 		if (m_meshes[i].bone_idx == bone_idx) {
 			return &m_meshes[i];
 		}
@@ -102,9 +100,9 @@ static ofbx::DMatrix makeOFBXIdentity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 
 static ofbx::DMatrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const ofbx::Object* node)
 {
 	if (!mesh) return node->getGlobalTransform();
-	if (!mesh->source_mesh->fbx) return makeOFBXIdentity();
+	if (!mesh->fbx) return makeOFBXIdentity();
 
-	auto* skin = mesh->source_mesh->fbx->getSkin();
+	auto* skin = mesh->fbx->getSkin();
 	if (!skin) return node->getGlobalTransform();
 
 	for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
@@ -298,7 +296,7 @@ void FBXImporter::sortBones(bool force_skinned) {
 
 	if (force_skinned) {
 		for (ImportMesh& m : m_meshes) {
-			m.bone_idx = m_bones.indexOf(m.source_mesh->fbx);
+			m.bone_idx = m_bones.indexOf(m.fbx);
 			m.is_skinned = true;
 		}
 	}
@@ -308,8 +306,8 @@ void FBXImporter::sortBones(bool force_skinned) {
 void FBXImporter::gatherBones(bool force_skinned)
 {
 	PROFILE_FUNCTION();
-	for (const UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
-		const ofbx::Skin* skin = src_mesh->fbx->getSkin();
+	for (const ImportMesh& mesh : m_meshes) {
+		const ofbx::Skin* skin = mesh.fbx->getSkin();
 		if (skin) {
 			for (int i = 0; i < skin->getClusterCount(); ++i) {
 				const ofbx::Cluster* cluster = skin->getCluster(i);
@@ -318,7 +316,7 @@ void FBXImporter::gatherBones(bool force_skinned)
 		}
 
 		if (force_skinned) {
-			insertHierarchy(m_bones, src_mesh->fbx);
+			insertHierarchy(m_bones, mesh.fbx);
 		}
 	}
 
@@ -399,9 +397,26 @@ static Matrix toLumix(const ofbx::DMatrix& mtx)
 	return res;
 }
 
+static u32 packColor(const ofbx::Vec4& vec) {
+	const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+	const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+	const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+	const i8 ww = i8(clamp((vec.w * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
 
-static u32 packF4u(const Vec3& vec)
-{
+	union {
+		u32 ui32;
+		i8 arr[4];
+	} un;
+
+	un.arr[0] = xx;
+	un.arr[1] = yy;
+	un.arr[2] = zz;
+	un.arr[3] = ww;
+
+	return un.ui32;
+}
+
+static u32 packF4u(const Vec3& vec) {
 	const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
 	const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
 	const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
@@ -420,69 +435,40 @@ static u32 packF4u(const Vec3& vec)
 	return un.ui32;
 }
 
-u8* FBXImporter::writeUVs(u8* dst, const u8* src) const {
-	ofbx::Vec2 uv;
-	memcpy(&uv, src, sizeof(uv));
-	Vec2 res = { uv.x, 1 - uv.y };
-	memcpy(dst, &res, sizeof(res));
-	return dst + sizeof(res);
+static Vec3 unpackF4u(u32 packed) {
+	union {
+		u32 ui32;
+		i8 arr[4];
+	} un;
+
+	un.ui32 = packed;
+	Vec3 res;
+	res.x = un.arr[0];
+	res.y = un.arr[1];
+	res.z = un.arr[2];
+	return ((res + Vec3(128.f)) / 255) * 2.f - 0.5f;
 }
 
-u8* FBXImporter::writePackedVec3(u8* dst, const u8* src, const Matrix& mtx) const
-{
-	ofbx::Vec3 vec;
-	memcpy(&vec, src, sizeof(vec));
-	Vec3 v = toLumixVec3(vec);
-	v = normalize((mtx * Vec4(v, 0)).xyz());
-	v = fixOrientation(v);
-
-	u32 packed = packF4u(v);
-	memcpy(dst, &packed, sizeof(packed));
-	return dst + sizeof(packed);
-}
-
-
-static void writeUV(const ofbx::Vec2& uv, OutputMemoryStream* blob)
-{
-	Vec2 tex_cooords = {(float)uv.x, 1 - (float)uv.y};
-	blob->write(tex_cooords);
-}
-
-static Vec2 packUV(const ofbx::Vec2& uv)
-{
-	return {(float)uv.x, 1 - (float)uv.y};
-}
-
-static u8* writeColor(u8* dst, const ofbx::Vec4& color)
-{
-	u8 rgba[4];
-	rgba[0] = u8(color.x * 255);
-	rgba[1] = u8(color.y * 255);
-	rgba[2] = u8(color.z * 255);
-	rgba[3] = u8(color.w * 255);
-	memcpy(dst, &rgba, sizeof(rgba));
-	return dst + sizeof(rgba);
-}
-
-
-static void writeSkin(const FBXImporter::Skin& skin, OutputMemoryStream* blob)
-{
-	blob->write(skin.joints);
-	blob->write(skin.weights);
-	float sum = skin.weights[0] + skin.weights[1] + skin.weights[2] + skin.weights[3];
-	ASSERT(sum > 0.99f && sum < 1.01f);
-}
-
-
-static int getMaterialIndex(const ofbx::Mesh& mesh, const ofbx::Material& material)
-{
-	for (int i = 0, c = mesh.getMaterialCount(); i < c; ++i)
-	{
-		if (mesh.getMaterial(i) == &material) return i;
+LUMIX_FORCE_INLINE static Vec3 fixOrientation(const Vec3& v, FBXImporter::Orientation orientation) {
+	switch (orientation) {
+		case FBXImporter::Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
+		case FBXImporter::Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
+		case FBXImporter::Orientation::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+		case FBXImporter::Orientation::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+		case FBXImporter::Orientation::X_UP: return Vec3(-v.y, v.x, v.z);
 	}
-	return -1;
+	ASSERT(false);
+	return Vec3(v.x, v.y, v.z);
 }
 
+
+LUMIX_FORCE_INLINE static u32 getPackedVec3(ofbx::Vec3 vec, const Matrix& mtx, FBXImporter::Orientation orientation) {
+	Vec3 v = toLumixVec3(vec);
+	v = normalize(mtx.transformVector(v));
+	// TODO put firOrientation in mtx
+	v = fixOrientation(v, orientation);
+	return packF4u(v);
+}
 
 static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, bool bottom, Matrix& transform, Vec3& center)
 {
@@ -516,48 +502,31 @@ static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, bool bott
 }
 
 
-static ofbx::Vec3 operator-(const ofbx::Vec3& a, const ofbx::Vec3& b)
-{
-	return {a.x - b.x, a.y - b.y, a.z - b.z};
-}
 
-
-static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
-{
-	return {a.x - b.x, a.y - b.y};
-}
-
-
-static void computeTangentsSimple(FBXImporter::ImportMesh& mesh
-	, OutputMemoryStream& unindexed_triangles
-	, int normal_offset
-	, int uv_offset
-	, int tangent_offset
-	, int vertex_size)
-{
+static void computeTangentsSimple(FBXImporter::ImportMesh& mesh, OutputMemoryStream& unindexed_triangles, const FBXImporter::VertexLayout& layout) {
 	PROFILE_FUNCTION();
-	const int vertex_count = int(unindexed_triangles.size() / vertex_size / 3);
+	const u32 vertex_size = layout.size;
+	const int vertex_count = int(unindexed_triangles.size() / vertex_size);
 
 	const u8* positions = unindexed_triangles.data();
-	const u8* normals = unindexed_triangles.data() + normal_offset;
-	const u8* uvs = unindexed_triangles.data() + uv_offset;
-	u8* tangents = unindexed_triangles.getMutableData() + tangent_offset;
+	const u8* uvs = unindexed_triangles.data() + layout.uv_offset;
+	u8* tangents = unindexed_triangles.getMutableData() + layout.tangent_offset;
 
 	for (int i = 0; i < vertex_count; i += 3) {
-		ofbx::Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
-		ofbx::Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
-		ofbx::Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
-		ofbx::Vec2 uv0; memcpy(&uv0, uvs + i * vertex_size, sizeof(uv0));
-		ofbx::Vec2 uv1; memcpy(&uv1, uvs + (i + 1) * vertex_size, sizeof(uv1));
-		ofbx::Vec2 uv2; memcpy(&uv2, uvs + (i + 2) * vertex_size, sizeof(uv2));
+		Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
+		Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
+		Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
+		Vec2 uv0; memcpy(&uv0, uvs + i * vertex_size, sizeof(uv0));
+		Vec2 uv1; memcpy(&uv1, uvs + (i + 1) * vertex_size, sizeof(uv1));
+		Vec2 uv2; memcpy(&uv2, uvs + (i + 2) * vertex_size, sizeof(uv2));
 
-		const ofbx::Vec3 dv10 = v1 - v0;
-		const ofbx::Vec3 dv20 = v2 - v0;
-		const ofbx::Vec2 duv10 = uv1 - uv0;
-		const ofbx::Vec2 duv20 = uv2 - uv0;
+		const Vec3 dv10 = v1 - v0;
+		const Vec3 dv20 = v2 - v0;
+		const Vec2 duv10 = uv1 - uv0;
+		const Vec2 duv20 = uv2 - uv0;
 
 		const float dir = duv20.x * duv10.y - duv20.y * duv10.x < 0 ? -1.f : 1.f;
-		ofbx::Vec3 tangent; 
+		Vec3 tangent; 
 		tangent.x = (dv20.x * duv10.y - dv10.x * duv20.y) * dir;
 		tangent.y = (dv20.y * duv10.y - dv10.y * duv20.y) * dir;
 		tangent.z = (dv20.z * duv10.y - dv10.z * duv20.y) * dir;
@@ -566,43 +535,37 @@ static void computeTangentsSimple(FBXImporter::ImportMesh& mesh
 		tangent.y *= l;
 		tangent.z *= l;
 		
-		memcpy(tangents + i * vertex_size, &tangent, sizeof(tangent));
-		memcpy(tangents + (i + 1) * vertex_size, &tangent, sizeof(tangent));
-		memcpy(tangents + (i + 2) * vertex_size, &tangent, sizeof(tangent));
+		u32 tangent_packed = packF4u(tangent);
+
+		memcpy(tangents + i * vertex_size, &tangent_packed, sizeof(tangent_packed));
+		memcpy(tangents + (i + 1) * vertex_size, &tangent_packed, sizeof(tangent_packed));
+		memcpy(tangents + (i + 2) * vertex_size, &tangent_packed, sizeof(tangent_packed));
 	}
 }
 
 // flat shading
-static void computeNormals(OutputMemoryStream& unindexed_triangles, int normals_offset, int vertex_size) {
+static void computeNormals(OutputMemoryStream& unindexed_triangles, const FBXImporter::VertexLayout& layout) {
 	PROFILE_FUNCTION();
+	const u32 vertex_size = layout.size;
 	const int vertex_count = int(unindexed_triangles.size() / vertex_size);
 
-	auto toLumix = [](const ofbx::Vec3& a) { return Vec3{(float)a.x, (float)a.y, (float)a.z}; };
-	auto fromLumix = [](const Vec3& a) { return ofbx::Vec3{ a.x, a.y, a.z}; };
-
 	const u8* positions = unindexed_triangles.getMutableData();
-	u8* normals = unindexed_triangles.getMutableData() + normals_offset;
+	u8* normals = unindexed_triangles.getMutableData() + layout.normal_offset;
 
 	for (int i = 0; i < vertex_count; i += 3) {
-		ofbx::Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
-		ofbx::Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
-		ofbx::Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
-		ofbx::Vec3 n = fromLumix(normalize(cross(toLumix(v1) - toLumix(v0), toLumix(v2) - toLumix(v0))));
+		Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
+		Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
+		Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
+		Vec3 n = normalize(cross(v1 - v0, v2 - v0));
+		u32 npacked = packF4u(n);
 
-		memcpy(normals + i * vertex_size, &n, sizeof(n));
-		memcpy(normals + (i + 1) * vertex_size, &n, sizeof(n));
-		memcpy(normals + (i + 2) * vertex_size, &n, sizeof(n));
+		memcpy(normals + i * vertex_size, &npacked, sizeof(npacked));
+		memcpy(normals + (i + 1) * vertex_size, &npacked, sizeof(npacked));
+		memcpy(normals + (i + 2) * vertex_size, &npacked, sizeof(npacked));
 	}
 }
 
-static void computeTangents(FBXImporter::ImportMesh& mesh
-	, OutputMemoryStream& unindexed_triangles
-	, int normal_offset
-	, int uv_offset
-	, int tangent_offset
-	, int vertex_size 
-	, const Path& path)
-{
+static void computeTangents(FBXImporter::ImportMesh& mesh, OutputMemoryStream& unindexed_triangles, const FBXImporter::VertexLayout& layout, const Path& path) {
 	PROFILE_FUNCTION();
 
 	struct {
@@ -615,12 +578,12 @@ static void computeTangents(FBXImporter::ImportMesh& mesh
 		u8* tangents;
 	} data;
 	data.out = &unindexed_triangles;
-	data.num_triangles = int(unindexed_triangles.size() / vertex_size / 3);
-	data.vertex_size = vertex_size;
+	data.num_triangles = int(unindexed_triangles.size() / layout.size / 3);
+	data.vertex_size = layout.size;
 	data.positions = unindexed_triangles.data();
-	data.normals = unindexed_triangles.data() + normal_offset;
-	data.tangents = unindexed_triangles.getMutableData() + tangent_offset;
-	data.uvs = unindexed_triangles.data() + uv_offset;
+	data.normals = unindexed_triangles.data() + layout.normal_offset;
+	data.tangents = unindexed_triangles.getMutableData() + layout.tangent_offset;
+	data.uvs = unindexed_triangles.data() + layout.uv_offset;
 
 	SMikkTSpaceInterface iface = {};
 	iface.m_getNumFaces = [](const SMikkTSpaceContext * pContext) -> int {
@@ -631,37 +594,39 @@ static void computeTangents(FBXImporter::ImportMesh& mesh
 	iface.m_getPosition = [](const SMikkTSpaceContext * pContext, float fvPosOut[], const int iFace, const int iVert) { 
 		auto* ptr = (decltype(data)*)pContext->m_pUserData;
 		const u8* data = ptr->positions + ptr->vertex_size * (iFace * 3 + iVert);
-		ofbx::Vec3 p;
+		Vec3 p;
 		memcpy(&p, data, sizeof(p));
-		fvPosOut[0] = (float)p.x;
-		fvPosOut[1] = (float)p.y;
-		fvPosOut[2] = (float)p.z;
+		fvPosOut[0] = p.x;
+		fvPosOut[1] = p.y;
+		fvPosOut[2] = p.z;
 	};
 	iface.m_getNormal = [](const SMikkTSpaceContext * pContext, float fvNormOut[], const int iFace, const int iVert) { 
 		auto* ptr = (decltype(data)*)pContext->m_pUserData;
 		const u8* data = ptr->normals + ptr->vertex_size * (iFace * 3 + iVert);
-		ofbx::Vec3 p;
-		memcpy(&p, data, sizeof(p));
-		fvNormOut[0] = (float)p.x;
-		fvNormOut[1] = (float)p.y;
-		fvNormOut[2] = (float)p.z;
+		u32 packed;
+		memcpy(&packed, data, sizeof(packed));
+		const Vec3 normal = unpackF4u(packed);
+		fvNormOut[0] = normal.x;
+		fvNormOut[1] = normal.y;
+		fvNormOut[2] = normal.z;
 	};
 	iface.m_getTexCoord = [](const SMikkTSpaceContext * pContext, float fvTexcOut[], const int iFace, const int iVert) { 
 		auto* ptr = (decltype(data)*)pContext->m_pUserData;
 		const u8* data = ptr->uvs + ptr->vertex_size * (iFace * 3 + iVert);
-		ofbx::Vec2 p;
+		Vec2 p;
 		memcpy(&p, data, sizeof(p));
-		fvTexcOut[0] = (float)p.x;
-		fvTexcOut[1] = (float)p.y;
+		fvTexcOut[0] = p.x;
+		fvTexcOut[1] = p.y;
 	};
 	iface.m_setTSpaceBasic  = [](const SMikkTSpaceContext * pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert) {
 		auto* ptr = (decltype(data)*)pContext->m_pUserData;
 		u8* data = ptr->tangents + ptr->vertex_size * (iFace * 3 + iVert);
-		ofbx::Vec3 t;
+		Vec3 t;
 		t.x = fvTangent[0];
 		t.y = fvTangent[1];
 		t.z = fvTangent[2];
-		memcpy(data, &t, sizeof(t));
+		u32 packed = packF4u(t);
+		memcpy(data, &packed, sizeof(packed));
 	};
 
 	SMikkTSpaceContext ctx;
@@ -680,179 +645,202 @@ static bool doesFlipHandness(const Matrix& mtx) {
 	return z.z < 0;
 }
 
-LUMIX_FORCE_INLINE static u32 triangulate(const ofbx::GeometryData& geom, const ofbx::GeometryPartition::Polygon& polygon, Array<int>& tri_indices) {
-	if (polygon.vertex_count == 3) {
-		tri_indices[0] = polygon.from_vertex;
-		tri_indices[1] = polygon.from_vertex + 1;
-		tri_indices[2] = polygon.from_vertex + 2;
-		return 3;
-	}
-	else if (polygon.vertex_count == 4) {
-		tri_indices[0] = polygon.from_vertex + 0;
-		tri_indices[1] = polygon.from_vertex + 1;
-		tri_indices[2] = polygon.from_vertex + 2;
-
-		tri_indices[3] = polygon.from_vertex + 0;
-		tri_indices[4] = polygon.from_vertex + 2;
-		tri_indices[5] = polygon.from_vertex + 3;
-		return 6;
-	}
-	
-	tri_indices.reserve((polygon.vertex_count - 2) * 3);
-	for (i32 tri = 0; tri < polygon.vertex_count - 2; ++tri) {
-		tri_indices[tri * 3 + 0] = polygon.from_vertex;
-		tri_indices[tri * 3 + 0] = polygon.from_vertex + 1 + tri;
-		tri_indices[tri * 3 + 0] = polygon.from_vertex + 2 + tri;
-	}
-	return 0;
-}
-
-void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
+void FBXImporter::triangulate(OutputMemoryStream& unindexed_triangles
+	, ImportMesh& mesh
+	, const ofbx::GeometryPartition& partition
+	, u32 vertex_size
+	, const Array<FBXImporter::Skin>& skinning
+	, const ImportConfig& cfg
+	, const Matrix& matrix
+	, Array<i32>& tri_indices)
 {
-	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
-		PROFILE_BLOCK("FBXImporter postprocessMeshes #1")
-		ImportMesh& import_mesh = m_meshes[mesh_idx];
-		const ofbx::Mesh* mesh = import_mesh.source_mesh->fbx;
-		const ofbx::GeometryData& geom = mesh->getGeometryData();
+	PROFILE_FUNCTION();
+	const ofbx::GeometryData& geom = mesh.fbx->getGeometryData();
+	ofbx::Vec3Attributes positions = geom.getPositions();
+	ofbx::Vec3Attributes normals = geom.getNormals();
+	ofbx::Vec3Attributes tangents = geom.getTangents();
+	ofbx::Vec4Attributes colors = cfg.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
+	ofbx::Vec2Attributes uvs = geom.getUVs();
+	const bool compute_tangents = !tangents.values && uvs.values;
 
-		ofbx::GeometryPartition partition = geom.getPartition(import_mesh.submesh == -1 ? 0 : import_mesh.submesh);
-		if (partition.polygon_count == 0) {
-			import_mesh.import = false;
-			return;
-		}
-		
-		profiler::pushInt("Triangle count", partition.triangles_count);
-		ofbx::Vec3Attributes positions = geom.getPositions();
-		ofbx::Vec3Attributes normals = geom.getNormals();
-		ofbx::Vec3Attributes tangents = geom.getTangents();
-		ofbx::Vec4Attributes colors = cfg.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
-		ofbx::Vec2Attributes uvs = geom.getUVs();
-
-		AABB aabb = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
-		float origin_radius_squared = 0;
-
-		Matrix transform_matrix = Matrix::IDENTITY;
-		Matrix geometry_matrix = toLumix(mesh->getGeometricMatrix());
-		transform_matrix = toLumix(mesh->getGlobalTransform()) * geometry_matrix;
-		if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
-		if (cfg.origin != ImportConfig::Origin::SOURCE) {
-			const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
-			// TODO
-			//centerMesh(vertices, vertex_count, bottom, transform_matrix, import_mesh.origin);
-		}
-		import_mesh.transform_matrix = transform_matrix.inverted();
-
-		const bool compute_tangents = !tangents.values && uvs.values;
-		const int packed_vertex_size = getVertexSize(*mesh, import_mesh.is_skinned, cfg);
-		int unpacked_vertex_size = sizeof(ofbx::Vec3); // position
-		const int unpacked_normal_offset = unpacked_vertex_size;
-		unpacked_vertex_size += sizeof(ofbx::Vec3); // normals
-		
-		const int unpacked_uv_offset = unpacked_vertex_size;
-		if (uvs.values) unpacked_vertex_size += sizeof(ofbx::Vec2);
-		
-		const int unpacked_colors_offset = unpacked_vertex_size;
-		if (colors.values) unpacked_vertex_size += sizeof(ofbx::Vec4);
-
-		const int unpacked_tangent_offset = unpacked_vertex_size;
-		if (tangents.values) unpacked_vertex_size += sizeof(ofbx::Vec3);
-		else if (compute_tangents) unpacked_vertex_size += sizeof(ofbx::Vec3);
-
-		const int unpacked_skin_offset = unpacked_vertex_size;
-		if (import_mesh.is_skinned) unpacked_vertex_size += sizeof(Vec4) + 4 * sizeof(u16);
-
-		Array<Skin> skinning(m_allocator);
-		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
-
-		OutputMemoryStream unindexed_triangles(m_allocator);
-		Array<i32> tri_indices(m_allocator);
-		tri_indices.resize(partition.max_polygon_triangles * 3);
-		unindexed_triangles.reserve(unpacked_vertex_size * 3 * partition.triangles_count);
-		for (i32 polygon_idx = 0; polygon_idx < partition.polygon_count; ++polygon_idx) {
-			u32 tri_count = triangulate(geom, partition.polygons[polygon_idx], tri_indices);
-			for (u32 i = 0; i < tri_count; ++i) {
-				unindexed_triangles.write(positions.get(tri_indices[i]));
-				if (normals.values) unindexed_triangles.write(normals.get(tri_indices[i]));
-				else unindexed_triangles.write(ofbx::Vec3{0, 0, 0});
-				if (uvs.values) unindexed_triangles.write(uvs.get(tri_indices[i]));
-				if (colors.values) unindexed_triangles.write(colors.get(tri_indices[i]));
-				if (tangents.values) unindexed_triangles.write(tangents.get(tri_indices[i]));
-				else if (compute_tangents) unindexed_triangles.write(Vec3(0));
-				if (import_mesh.is_skinned) {
-					unindexed_triangles.write(skinning[tri_indices[i]].joints);
-					unindexed_triangles.write(skinning[tri_indices[i]].weights);
+	tri_indices.resize(partition.max_polygon_triangles * 3);
+	unindexed_triangles.clear();
+	unindexed_triangles.resize(vertex_size * 3 * partition.triangles_count);
+	u8* dst = unindexed_triangles.getMutableData();
+	// convert to interleaved vertex data of unindexed triangles
+	//	tri[0].v[0].pos, tri[0].v[0].normal, ... tri[0].v[2].tangent, tri[1].v[0].pos, ...
+	auto write = [&](const auto& v){
+		memcpy(dst, &v, sizeof(v));
+		dst += sizeof(v);
+	};
+	
+	for (i32 polygon_idx = 0; polygon_idx < partition.polygon_count; ++polygon_idx) {
+		const ofbx::GeometryPartition::Polygon& polygon = partition.polygons[polygon_idx];
+		u32 tri_count = ofbx::triangulate(geom, polygon, tri_indices.begin());
+		for (u32 i = 0; i < tri_count; ++i) {
+			ofbx::Vec3 cp = positions.get(tri_indices[i]);
+			Vec3 pos = matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * m_fbx_scale;
+			pos = fixOrientation(pos);
+			write(pos);
+	
+			if (normals.values) write(getPackedVec3(normals.get(tri_indices[i]), matrix, m_orientation));
+			else write(u32(0));
+			if (uvs.values) {
+				ofbx::Vec2 uv = uvs.get(tri_indices[i]);
+				write(Vec2(uv.x, 1 - uv.y));
+			}
+			if (cfg.bake_vertex_ao) unindexed_triangles.write(u32(0));
+			if (colors.values && cfg.import_vertex_colors) {
+				ofbx::Vec4 color = colors.get(tri_indices[i]);
+				if (cfg.vertex_color_is_ao) {
+					const u8 ao[4] = { u8(color.x * 255.f + 0.5f) };
+					memcpy(dst, ao, sizeof(ao));
+					dst += sizeof(ao);
+				} else {
+					write(packColor(color));
+				}
+			}
+			if (tangents.values) write(getPackedVec3(tangents.get(tri_indices[i]), matrix, m_orientation));
+			else if (compute_tangents) write(u32(0));
+			if (mesh.is_skinned) {
+				if (positions.indices) {
+					write(skinning[positions.indices[tri_indices[i]]].joints);
+					write(skinning[positions.indices[tri_indices[i]]].weights);
+				}
+				else {
+					write(skinning[tri_indices[i]].joints);
+					write(skinning[tri_indices[i]].weights);
 				}
 			}
 		}
+	}
+	
+}
 
-		if (!normals.values) computeNormals(unindexed_triangles, unpacked_normal_offset, unpacked_vertex_size);
+void FBXImporter::remap(const OutputMemoryStream& unindexed_triangles, ImportMesh& mesh, u32 vertex_size, const ImportConfig& cfg) const {
+	PROFILE_FUNCTION();
+	const u32 vertex_count = u32(unindexed_triangles.size() / vertex_size);
+	mesh.indices.resize(vertex_count);
 
-		if (compute_tangents) {
-			if (cfg.mikktspace_tangents) {
-				computeTangents(import_mesh, unindexed_triangles, unpacked_normal_offset, unpacked_uv_offset, unpacked_tangent_offset, unpacked_vertex_size, path);
+	u32 unique_vertex_count = (u32)meshopt_generateVertexRemap(mesh.indices.begin(), nullptr, vertex_count, unindexed_triangles.data(), vertex_count, vertex_size);
+
+	mesh.vertex_data.resize(unique_vertex_count * vertex_size);
+
+	for (u32 i = 0; i < vertex_count; ++i) {
+		const u8* src = unindexed_triangles.data() + i * vertex_size;
+		u8* dst = mesh.vertex_data.getMutableData() + mesh.indices[i] * vertex_size;
+		memcpy(dst, src, vertex_size);
+	}
+}
+
+static void computeBoundingShapes(FBXImporter::ImportMesh& mesh, u32 vertex_size) {
+	PROFILE_FUNCTION();
+	AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
+	float max_squared_dist = 0;
+	const u32 vertex_count = u32(mesh.vertex_data.size() / vertex_size);
+	const u8* positions = mesh.vertex_data.data();
+	for (u32 i = 0; i < vertex_count; ++i) {
+		Vec3 p;
+		memcpy(&p, positions, sizeof(p));
+		positions += vertex_size;
+		aabb.addPoint(p);
+		float d = squaredLength(p);
+		max_squared_dist = maximum(d, max_squared_dist);
+	}
+
+	mesh.aabb = aabb;
+	mesh.origin_radius_squared = max_squared_dist;
+	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+	float max_center_dist_squared = 0;
+	positions = mesh.vertex_data.data();
+	for (u32 i = 0; i < vertex_count; ++i) {
+		Vec3 p;
+		memcpy(&p, positions, sizeof(p));
+		positions += vertex_size;
+		float d = squaredLength(p - center);
+		max_center_dist_squared = maximum(d, max_center_dist_squared);
+	}
+	mesh.center_radius_squared = max_center_dist_squared;
+}
+
+// convert from ofbx to runtime vertex data, compute missing info (normals, tangents, ao, ...)
+void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
+{
+	volatile i32 mesh_idx_getter = 0;
+	jobs::runOnWorkers([&](){
+		Array<Skin> skinning(m_allocator);
+		OutputMemoryStream unindexed_triangles(m_allocator);
+		Array<i32> tri_indices_tmp(m_allocator);
+
+		for (;;) {
+			i32 mesh_idx = atomicIncrement(&mesh_idx_getter) - 1;
+			if (mesh_idx >= m_meshes.size()) break;
+			
+			ImportMesh& import_mesh = m_meshes[mesh_idx];
+			const ofbx::Mesh* mesh = import_mesh.fbx;
+			const ofbx::GeometryData& geom = mesh->getGeometryData();
+
+			ofbx::GeometryPartition partition = geom.getPartition(import_mesh.submesh == -1 ? 0 : import_mesh.submesh);
+			if (partition.polygon_count == 0) {
+				import_mesh.import = false;
+				continue;
 			}
-			else {
-				computeTangentsSimple(import_mesh, unindexed_triangles, unpacked_normal_offset, unpacked_uv_offset, unpacked_tangent_offset, unpacked_vertex_size);
+		
+			PROFILE_BLOCK("FBX convert vertex data")
+			profiler::pushInt("Triangle count", partition.triangles_count);
+
+			Matrix transform_matrix = Matrix::IDENTITY;
+			Matrix geometry_matrix = toLumix(mesh->getGeometricMatrix());
+			transform_matrix = toLumix(mesh->getGlobalTransform()) * geometry_matrix;
+			if (cfg.origin != ImportConfig::Origin::SOURCE) {
+				const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
+				// TODO
+				//centerMesh(vertices, vertex_count, bottom, transform_matrix, import_mesh.origin);
 			}
-		}
-
-		// TODO
-		//if (cfg.bake_vertex_ao) bakeVertexAO(cfg);
-
-		{
-			PROFILE_BLOCK("meshopt remap");
-			const u32 vertex_count = u32(unindexed_triangles.size() / unpacked_vertex_size);
-			Array<u32> remap(m_allocator);
-			remap.resize(vertex_count);
-			u32 unique_vertex_count = (u32)meshopt_generateVertexRemap(remap.begin(), nullptr, vertex_count, unindexed_triangles.data(), vertex_count, unpacked_vertex_size);
-			import_mesh.indices.resize(vertex_count);
-			meshopt_remapIndexBuffer(import_mesh.indices.begin(), nullptr, vertex_count, remap.begin());
-
-			import_mesh.vertex_data.resize(unique_vertex_count * packed_vertex_size);
-
+			import_mesh.transform_matrix = transform_matrix.inverted();
 			const bool flip_handness = doesFlipHandness(transform_matrix);
 			if (flip_handness) {
 				logError("Mesh ", mesh->name, " in ", path, " flips handness. This is not supported and the mesh will not display correctly.");
 			}
 
-			for (u32 i = 0; i < vertex_count; ++i) {
-				if (remap[i] != ~0u) {
-					const u8* src = unindexed_triangles.data() + i * unpacked_vertex_size;
-					u8* dst = import_mesh.vertex_data.getMutableData() + remap[i] * packed_vertex_size;
+			ofbx::Vec3Attributes normals = geom.getNormals();
+			ofbx::Vec3Attributes tangents = geom.getTangents();
+			ofbx::Vec4Attributes colors = cfg.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
+			ofbx::Vec2Attributes uvs = geom.getUVs();
 
-					ofbx::Vec3 cp;
-					memcpy(&cp, src, sizeof(cp));
-					Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * m_fbx_scale;
-					pos = fixOrientation(pos);
-					memcpy(dst, &pos, sizeof(pos));
-					dst += sizeof(pos);
+			VertexLayout vertex_layout;
 
-					float sq_len = squaredLength(pos);
-					origin_radius_squared = maximum(origin_radius_squared, sq_len);
-					aabb.addPoint(pos);
+			const bool compute_tangents = !tangents.values && uvs.values;
+			const int packed_vertex_size = getVertexSize(*mesh, import_mesh.is_skinned, cfg);
+		
+			vertex_layout.size = sizeof(Vec3); // position
+			vertex_layout.normal_offset = vertex_layout.size;
+			vertex_layout.size += sizeof(u32); // normals
+			vertex_layout.uv_offset = vertex_layout.size;
+			if (uvs.values) vertex_layout.size += sizeof(Vec2);
+			if (cfg.bake_vertex_ao) vertex_layout.size += sizeof(u32);
+			if (colors.values && cfg.import_vertex_colors) vertex_layout.size += sizeof(u32);
+			vertex_layout.tangent_offset = vertex_layout.size;
+			if (tangents.values || compute_tangents) vertex_layout.size += sizeof(u32);
+			if (import_mesh.is_skinned) vertex_layout.size += sizeof(Vec4) + 4 * sizeof(u16);
 
-					if (normals.values) dst = writePackedVec3(dst, src + unpacked_normal_offset, transform_matrix);
-					if (uvs.values) dst = writeUVs(dst, src + unpacked_normal_offset);
-					// TODO check model with vertex colors
-					if (colors.values) {
-						ofbx::Vec4 color;
-						memcpy(&color, src + unpacked_colors_offset, sizeof(color));
-						if (cfg.vertex_color_is_ao) {
-							const u8 ao[4] = { u8(color.x * 255.f + 0.5f) };
-							memcpy(dst, ao, sizeof(ao));
-							dst += sizeof(ao);
-						} else {
-							dst = writeColor(dst, color);
-						}
-					}
-					if (tangents.values) dst = writePackedVec3(dst, src + unpacked_tangent_offset, transform_matrix);
-					else if (compute_tangents) dst = writePackedVec3(dst, src + unpacked_tangent_offset, transform_matrix);
-					if (import_mesh.is_skinned) {
-						memcpy(dst, src + unpacked_skin_offset, sizeof(Vec4) + sizeof(u16) * 4);
-						dst += sizeof(Vec4) + sizeof(u16) * 4;
-					}
+			if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
+
+			triangulate(unindexed_triangles, import_mesh, partition, vertex_layout.size, skinning, cfg, transform_matrix, tri_indices_tmp);
+
+			if (!normals.values) computeNormals(unindexed_triangles, vertex_layout);
+
+			if (compute_tangents) {
+				if (cfg.mikktspace_tangents) {
+					computeTangents(import_mesh, unindexed_triangles, vertex_layout, path);
+				}
+				else {
+					computeTangentsSimple(import_mesh, unindexed_triangles, vertex_layout);
 				}
 			}
+
+			remap(unindexed_triangles, import_mesh, vertex_layout.size, cfg);
+			computeBoundingShapes(import_mesh, vertex_layout.size);
 
 			// TODO autolods are not correct
 			for (u32 i = 0; i < cfg.lod_count; ++i) {
@@ -872,28 +860,24 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 					);
 				import_mesh.autolod_indices[i]->resize((u32)lod_index_count);
 			}
-
-			import_mesh.aabb = aabb;
-			import_mesh.origin_radius_squared = origin_radius_squared;
-			import_mesh.center_radius_squared = 0;
-			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-
-			const u8* mem = import_mesh.vertex_data.data();
-			for (u32 i = 0; i < unique_vertex_count; ++i) {
-				Vec3 p;
-				memcpy(&p, mem, sizeof(p));
-				import_mesh.center_radius_squared = maximum(import_mesh.center_radius_squared, squaredLength(p - center));
-				mem += packed_vertex_size;
-			}
 		}
 	});
+
+	// TODO check this
+	if (cfg.bake_vertex_ao) bakeVertexAO(cfg);
+
+	u32 mesh_data_size = 0;
+	for (const ImportMesh& m : m_meshes) {
+		mesh_data_size += u32(m.vertex_data.size() + m.indices.byte_size());
+	}
+	m_out_file.reserve(128 * 1024 + mesh_data_size);
 
 }
 
 
 static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 {
-	const char* node_name = mesh.source_mesh->fbx->name;
+	const char* node_name = mesh.fbx->name;
 	const char* lod_str = findInsensitive(node_name, "_LOD");
 	if (!lod_str)
 	{
@@ -918,8 +902,6 @@ void FBXImporter::gatherMeshes()
 	int c = m_scene->getMeshCount();
 	for (int mesh_idx = 0; mesh_idx < c; ++mesh_idx) {
 		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)m_scene->getMesh(mesh_idx);
-		UniquePtr<SourceMesh> src_mesh = UniquePtr<SourceMesh>::create(m_allocator, m_allocator);
-		src_mesh->fbx = fbx_mesh;
 		const int mat_count = fbx_mesh->getMaterialCount();
 		const i32 meshes_offset = m_meshes.size();
 		for (int j = 0; j < mat_count; ++j) {
@@ -934,12 +916,11 @@ void FBXImporter::gatherMeshes()
 					}
 				}
 			}
-			mesh.source_mesh = src_mesh.get();
+			mesh.fbx = fbx_mesh;
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
 			mesh.lod = detectMeshLOD(mesh);
 		}
-		m_source_meshes.push(src_mesh.move());
 	}
 }
 
@@ -957,11 +938,10 @@ FBXImporter::FBXImporter(StudioApp& app)
 	, m_scene(nullptr)
 	, m_materials(m_allocator)
 	, m_meshes(m_allocator)
-	, m_source_meshes(m_allocator)
 	, m_animations(m_allocator)
 	, m_bones(m_allocator)
 	, m_bind_pose(m_allocator)
-	, out_file(m_allocator)
+	, m_out_file(m_allocator)
 	, m_filesystem(app.getEngine().getFileSystem())
 	, m_app(app)
 	, m_material_name_map(m_allocator)
@@ -983,14 +963,12 @@ void FBXImporter::init() {
 
 bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool force_skinned)
 {
-	out_file.reserve(1024 * 1024);
 	PROFILE_FUNCTION();
 	if (m_scene) {
 		PROFILE_BLOCK("clear previous data");
 		m_scene->destroy();
 		m_scene = nullptr;
 		m_meshes.clear();
-		m_source_meshes.clear();
 		m_materials.clear();
 		m_material_name_map.clear();
 		m_animations.clear();
@@ -1037,11 +1015,11 @@ bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool for
 		for (const ImportMesh& m : m_meshes) any_skinned = any_skinned || m.is_skinned;
 		gatherBones(force_skinned || any_skinned);
 	}
-
+	
 	return true;
 }
 
-void FBXImporter::writeString(const char* str) { out_file.write(str, stringLength(str)); }
+void FBXImporter::writeString(const char* str) { m_out_file.write(str, stringLength(str)); }
 	
 static Vec3 impostorToWorld(Vec2 uv) {
 	uv = uv * 2 - 1;
@@ -1314,7 +1292,7 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 			logError("Failed to create ", mat_src);
 			continue;
 		}
-		out_file.clear();
+		m_out_file.clear();
 
 		writeString("shader \"/pipelines/standard.shd\"\n");
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
@@ -1348,14 +1326,14 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 		
 		if (!material.textures[0].fbx) {
 			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
-			out_file << "uniform(\"Material color\", {" << powf(diffuse_color.r, 2.2f) 
+			m_out_file << "uniform(\"Material color\", {" << powf(diffuse_color.r, 2.2f) 
 				<< "," << powf(diffuse_color.g, 2.2f)
 				<< "," << powf(diffuse_color.b, 2.2f)
 				<< ",1})\n";
 		}
 
 		++written_count;
-		if (!f.write(out_file.data(), out_file.size())) {
+		if (!f.write(m_out_file.data(), m_out_file.size())) {
 			logError("Failed to write ", mat_src);
 		}
 		f.close();
@@ -1619,12 +1597,12 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 		rotation_tracks.resize(m_bones.size());
 
 		auto write_animation = [&](StringView name, u32 from_sample, u32 samples_count) {
-			out_file.clear();
+			m_out_file.clear();
 			Animation::Header header;
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = Animation::Version::LAST;
 			write(header);
-			out_file.writeString(cfg.skeleton.c_str());
+			m_out_file.writeString(cfg.skeleton.c_str());
 			write(fps);
 			write(samples_count - 1);
 			write(cfg.animation_flags);
@@ -1651,7 +1629,7 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 			{
 				u32 total_bits = 0;
 				u32 translation_curves_count = 0;
-				u64 toffset = out_file.size();
+				u64 toffset = m_out_file.size();
 				u16 offset_bits = 0;
 				write(translation_curves_count);
 				for (const ofbx::Object*& bone : m_bones) {
@@ -1720,7 +1698,7 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 					++translation_curves_count;
 				}
 
-				BitWriter bit_writer(out_file, total_bits);
+				BitWriter bit_writer(m_out_file, total_bits);
 
 				for (u32 i = 0; i < samples_count; ++i) {
 					for (const ofbx::Object*& bone : m_bones) {
@@ -1739,11 +1717,11 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 					}
 				}
 
-				memcpy(out_file.getMutableData() + toffset, &translation_curves_count, sizeof(translation_curves_count));
+				memcpy(m_out_file.getMutableData() + toffset, &translation_curves_count, sizeof(translation_curves_count));
 			}
 
 			u32 rotation_curves_count = 0;
-			u64 roffset = out_file.size();
+			u64 roffset = m_out_file.size();
 			write(rotation_curves_count);
 
 			u32 total_bits = 0;
@@ -1837,9 +1815,9 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 				}
 				++rotation_curves_count;
 			}
-			memcpy(out_file.getMutableData() + roffset, &rotation_curves_count, sizeof(rotation_curves_count));
+			memcpy(m_out_file.getMutableData() + roffset, &rotation_curves_count, sizeof(rotation_curves_count));
 
-			BitWriter bit_writer(out_file, total_bits);
+			BitWriter bit_writer(m_out_file, total_bits);
 
 			for (u32 i = 0; i < samples_count; ++i) {
 				for (const ofbx::Object*& bone : m_bones) {
@@ -1864,7 +1842,7 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 
 			++written_count;
 			Path anim_path(name, ".ani:", src);
-			m_compiler.writeCompiledResource(anim_path, Span(out_file.data(), (i32)out_file.size()));
+			m_compiler.writeCompiledResource(anim_path, Span(m_out_file.data(), (i32)m_out_file.size()));
 		};
 		if (cfg.clips.length() == 0) {
 			write_animation(anim.name, 0, u32(full_len * fps + 0.5f) + 1);
@@ -1901,18 +1879,15 @@ int FBXImporter::getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const Im
 }
 
 
-void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_mesh) const
-{
-	const ofbx::Mesh* mesh = import_mesh.source_mesh->fbx;
+void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_mesh) const {
+	const ofbx::Mesh* mesh = import_mesh.fbx;
 	const ofbx::Skin* fbx_skin = mesh->getSkin();
 	const ofbx::GeometryData& geom = mesh->getGeometryData();
-	skinning.resize(geom.getPositions().count);
+	skinning.resize(geom.getPositions().values_count);
 	memset(&skinning[0], 0, skinning.size() * sizeof(skinning[0]));
-// TODO
-#if 0
+
 	if (!fbx_skin) {
 		ASSERT(import_mesh.bone_idx >= 0);
-		''skinning.resize(geom.getIndexCount());
 		for (Skin& skin : skinning) {
 			skin.count = 1;
 			skin.weights[0] = 1;
@@ -1921,36 +1896,31 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 		}
 		return;
 	}
-#endif
-	for (int i = 0, c = fbx_skin->getClusterCount(); i < c; ++i)
-	{
+
+	for (int i = 0, c = fbx_skin->getClusterCount(); i < c; ++i) {
 		const ofbx::Cluster* cluster = fbx_skin->getCluster(i);
 		if (cluster->getIndicesCount() == 0) continue;
+
 		int joint = m_bones.indexOf(cluster->getLink());
 		ASSERT(joint >= 0);
 		const int* cp_indices = cluster->getIndices();
 		const double* weights = cluster->getWeights();
-		for (int j = 0; j < cluster->getIndicesCount(); ++j)
-		{
+		for (int j = 0; j < cluster->getIndicesCount(); ++j) {
 			int idx = cp_indices[j];
 			float weight = (float)weights[j];
 			Skin& s = skinning[idx];
-			if (s.count < 4)
-			{
+			if (s.count < 4) {
 				s.weights[s.count] = weight;
 				s.joints[s.count] = joint;
 				++s.count;
 			}
-			else
-			{
+			else {
 				int min = 0;
-				for (int m = 1; m < 4; ++m)
-				{
+				for (int m = 1; m < 4; ++m) {
 					if (s.weights[m] < s.weights[min]) min = m;
 				}
 
-				if (s.weights[min] < weight)
-				{
+				if (s.weights[min] < weight) {
 					s.weights[min] = weight;
 					s.joints[min] = joint;
 				}
@@ -1958,8 +1928,7 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 		}
 	}
 
-	for (Skin& s : skinning)
-	{
+	for (Skin& s : skinning) {
 		float sum = 0;
 		for (float w : s.weights) sum += w;
 		if (sum == 0) {
@@ -1972,7 +1941,6 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 		}
 	}
 }
-
 
 Vec3 FBXImporter::fixOrientation(const Vec3& v) const
 {
@@ -2036,6 +2004,7 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 
 void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 {
+	PROFILE_FUNCTION();
 	float origin_radius_squared = 0;
 	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
@@ -2076,16 +2045,15 @@ static bool hasAutoLOD(const FBXImporter::ImportConfig& cfg, u32 idx) {
 	return cfg.autolod_mask & (1 << idx);
 }
 
-void FBXImporter::writeGeometry(const ImportConfig& cfg)
-{
+void FBXImporter::writeGeometry(const ImportConfig& cfg) {
+	PROFILE_FUNCTION();
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 	float origin_radius_squared = 0;
 	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
 
 	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
-		for (const ImportMesh& import_mesh : m_meshes)
-		{
+		for (const ImportMesh& import_mesh : m_meshes) {
 			if (!import_mesh.import) continue;
 
 			const bool are_indices_16_bit = areIndices16Bit(import_mesh, cfg);
@@ -2093,10 +2061,8 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 			center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
 			aabb.merge(import_mesh.aabb);
 			
-			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) {
-
-				if (are_indices_16_bit)
-				{
+			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) { 
+				if (are_indices_16_bit) {
 					const i32 index_size = sizeof(u16);
 					write(index_size);
 					write(import_mesh.indices.size());
@@ -2107,8 +2073,7 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 						write(index);
 					}
 				}
-				else
-				{
+				else {
 					int index_size = sizeof(import_mesh.indices[0]);
 					write(index_size);
 					write(import_mesh.indices.size());
@@ -2128,8 +2093,7 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 						write(index);
 					}
 				}
-				else
-				{
+				else {
 					i32 index_size = sizeof(lod_indices[0]);
 					write(index_size);
 					write(lod_indices.size());
@@ -2167,17 +2131,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 	}
 
 	if (m_meshes.empty()) {
-#if 0
-		Matrix transform_matrix = Matrix::IDENTITY;
-		Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
-		transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
-		if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
-		if (cfg.origin != ImportConfig::Origin::SOURCE) {
-			const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
-			centerMesh(vertices, vertex_count, bottom, transform_matrix, import_mesh.origin);
-		}
-		import_mesh.transform_matrix = transform_matrix.inverted();
-#endif
 		for (const ofbx::Object* bone : m_bones) {
 			const Matrix mtx = toLumix(bone->getGlobalTransform());
 			const Vec3 p = mtx.getTranslation() * cfg.mesh_scale * m_fbx_scale;
@@ -2219,6 +2172,7 @@ void FBXImporter::writeImpostorMesh(StringView dir, StringView model_name)
 
 
 void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig& cfg) {
+	PROFILE_FUNCTION();
 	const PathInfo src_info(src);
 	i32 mesh_count = 0;
 	if (mesh_idx >= 0) {
@@ -2238,7 +2192,7 @@ void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig&
 	
 	auto writeMesh = [&](const ImportMesh& import_mesh ) {
 			
-		const ofbx::Mesh& mesh = *import_mesh.source_mesh->fbx;
+		const ofbx::Mesh& mesh = *import_mesh.fbx;
 		const ofbx::GeometryData& geom = mesh.getGeometryData();
 
 		i32 attribute_count = getAttributeCount(import_mesh, cfg);
@@ -2395,10 +2349,10 @@ void FBXImporter::writeLODs(const ImportConfig& cfg)
 int FBXImporter::getAttributeCount(const ImportMesh& mesh, const ImportConfig& cfg) const
 {
 	int count = 2; // position & normals
-	if (mesh.source_mesh->fbx->getGeometryData().getUVs().values) ++count;
+	if (mesh.fbx->getGeometryData().getUVs().values) ++count;
 	if (cfg.bake_vertex_ao) ++count;
-	if (mesh.source_mesh->fbx->getGeometryData().getColors().values && cfg.import_vertex_colors) ++count;
-	if (hasTangents(*mesh.source_mesh->fbx)) ++count;
+	if (mesh.fbx->getGeometryData().getColors().values && cfg.import_vertex_colors) ++count;
+	if (hasTangents(*mesh.fbx)) ++count;
 	if (mesh.is_skinned) count += 2;
 	return count;
 }
@@ -2406,60 +2360,65 @@ int FBXImporter::getAttributeCount(const ImportMesh& mesh, const ImportConfig& c
 
 bool FBXImporter::areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cfg) const
 {
-	int vertex_size = getVertexSize(*mesh.source_mesh->fbx, mesh.is_skinned, cfg);
+	int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
 	return !(mesh.import && mesh.vertex_data.size() / vertex_size > (1 << 16));
 }
 
 void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
-#if 0
 	PROFILE_FUNCTION();
 
 	AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
-	for (UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
-		const ofbx::Mesh* mesh = src_mesh->fbx;
-		const ofbx::GeometryData& geom = mesh->getGeometryData();
-		const i32 vertex_count = geom.getVertexCount();
-		const ofbx::DVec3* vertices = (ofbx::DVec3*)geom.getVertices();
-		
+	for (ImportMesh& mesh : m_meshes) {
+		const u8* positions = mesh.vertex_data.data();
+		const i32 vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
+		const i32 vertex_count = i32(mesh.vertex_data.size() / vertex_size);
 		for (i32 i = 0; i < vertex_count; ++i) {
-			aabb.addPoint(toLumixVec3(vertices[i]));
+			Vec3 p;
+			memcpy(&p, positions + i * vertex_size, sizeof(p));
+			aabb.addPoint(p);
 		}
 	}
 
 	Voxels voxels(m_allocator);
 	voxels.beginRaster(aabb, 64);
-	for (UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
-		const ofbx::Mesh* mesh = src_mesh->fbx;
-		const ofbx::GeometryData& geom = mesh->getGeometryData();
+	for (ImportMesh& mesh : m_meshes) {
+		const u8* positions = mesh.vertex_data.data();
+		const i32 vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
+		const i32 count = mesh.indices.size();
+		const u32* indices = mesh.indices.data();
 
-		const i32 vertex_count = geom.getVertexCount();
-		const ofbx::DVec3* vertices = (ofbx::DVec3*)geom.getVertices();
-		
-		for (i32 i = 0; i < vertex_count; i += 3) {
-			voxels.raster(toLumixVec3(vertices[i]), toLumixVec3(vertices[i + 1]), toLumixVec3(vertices[i + 2]));
+		for (i32 i = 0; i < count; i += 3) {
+			Vec3 p[3];
+			memcpy(&p[0], positions + indices[i + 0] * vertex_size, sizeof(p[0]));
+			memcpy(&p[1], positions + indices[i + 1] * vertex_size, sizeof(p[1]));
+			memcpy(&p[2], positions + indices[i + 2] * vertex_size, sizeof(p[2]));
+			voxels.raster(p[0], p[1], p[2]);
 		}
 	}
 	voxels.computeAO(32);
 	voxels.blurAO();
 
-	for (UniquePtr<SourceMesh>& src_mesh : m_source_meshes) {
-		const ofbx::Mesh* mesh = src_mesh->fbx;
-		const ofbx::GeometryData& geom = mesh->getGeometryData();
-		const i32 vertex_count = geom.getVertexCount();
-		const ofbx::DVec3* vertices = (ofbx::DVec3*)geom.getVertices();
+	for (ImportMesh& mesh : m_meshes) {
+		const u8* positions = mesh.vertex_data.data();
+		
+		i32 ao_offset = sizeof(Vec3) /*positions*/ + sizeof(u32) /*packed normal*/;
+		if (mesh.fbx->getGeometryData().getUVs().values) ao_offset += sizeof(Vec2);
+		u8* AOs = mesh.vertex_data.getMutableData() + ao_offset;
+		const i32 vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
+		const i32 vertex_count = i32(mesh.vertex_data.size() / vertex_size);
 
-		src_mesh->computed_ao.reserve(vertex_count);
 		for (i32 i = 0; i < vertex_count; ++i) {
-			Vec3 p = toLumixVec3(vertices[i]);
+			Vec3 p;
+			memcpy(&p, positions + i * vertex_size, sizeof(p));
 			float ao;
 			bool res = voxels.sampleAO(p, &ao);
 			ASSERT(res);
-			src_mesh->computed_ao.push(ao);
+			if (res) {
+				u8 ao8 = u8(ao * 255 + 0.5f);
+				memcpy(AOs + i * vertex_size, &ao8, sizeof(ao8));
+			}
 		}
 	}
-#endif
-	// TODO
-	ASSERT(false);
 }
 
 void FBXImporter::writeModelHeader()
@@ -2476,14 +2435,14 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 	if (m_meshes.empty()) return false;
 	if (cfg.physics == ImportConfig::Physics::NONE) return false;
 
-	out_file.clear();
+	m_out_file.clear();
 
 	PhysicsGeometry::Header header;
 	header.m_magic = PhysicsGeometry::HEADER_MAGIC;
 	header.m_version = (u32)PhysicsGeometry::Versions::LAST;
 	const bool to_convex = cfg.physics == ImportConfig::Physics::CONVEX;
 	header.m_convex = (u32)to_convex;
-	out_file.write(&header, sizeof(header));
+	m_out_file.write(&header, sizeof(header));
 
 	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
 	if (!ps) {
@@ -2494,12 +2453,12 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 
 	i32 total_vertex_count = 0;
 	for (auto& mesh : m_meshes)	{
-		total_vertex_count += (i32)(mesh.vertex_data.size() / getVertexSize(*mesh.source_mesh->fbx, mesh.is_skinned, cfg));
+		total_vertex_count += (i32)(mesh.vertex_data.size() / getVertexSize(*mesh.fbx, mesh.is_skinned, cfg));
 	}
 	verts.reserve(total_vertex_count);
 
 	for (auto& mesh : m_meshes) {
-		int vertex_size = getVertexSize(*mesh.source_mesh->fbx, mesh.is_skinned, cfg);
+		int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
 		int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
 
 		const u8* src = mesh.vertex_data.data();
@@ -2510,7 +2469,7 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 	}
 
 	if (to_convex) {
-		if (!ps->cookConvex(verts, out_file)) {
+		if (!ps->cookConvex(verts, m_out_file)) {
 			logError("Failed to cook ", src);
 			return false;
 		}
@@ -2527,19 +2486,19 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 				u32 index = mesh.indices[j] + offset;
 				indices.push(index);
 			}
-			int vertex_size = getVertexSize(*mesh.source_mesh->fbx, mesh.is_skinned, cfg);
+			int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
 			int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
 			offset += vertex_count;
 		}
 
-		if (!ps->cookTriMesh(verts, indices, out_file)) {
+		if (!ps->cookTriMesh(verts, indices, m_out_file)) {
 			logError("Failed to cook ", src);
 			return false;
 		}
 	}
 
 	Path phy_path(".phy:", src);
-	m_compiler.writeCompiledResource(phy_path, Span(out_file.data(), (i32)out_file.size()));
+	m_compiler.writeCompiledResource(phy_path, Span(m_out_file.data(), (i32)m_out_file.size()));
 	return true;
 }
 
@@ -2605,7 +2564,7 @@ bool FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
 		char name[256];
 		getImportMeshName(m_meshes[i], name);
 
-		out_file.clear();
+		m_out_file.clear();
 		writeModelHeader();
 		write(cfg.root_motion_bone);
 		writeMeshes(src, i, cfg);
@@ -2628,7 +2587,7 @@ bool FBXImporter::writeSubmodels(const Path& src, const ImportConfig& cfg)
 
 		Path path(name, ".fbx:", src);
 
-		m_compiler.writeCompiledResource(path, Span(out_file.data(), (i32)out_file.size()));
+		m_compiler.writeCompiledResource(path, Span(m_out_file.data(), (i32)m_out_file.size()));
 	}
 	return !m_meshes.empty();
 }
@@ -2645,7 +2604,7 @@ bool FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 	}
 	if (!import_any_mesh && m_animations.empty()) return false;
 
-	out_file.clear();
+	m_out_file.clear();
 	writeModelHeader();
 	write(cfg.root_motion_bone);
 	writeMeshes(src, -1, cfg);
@@ -2653,7 +2612,7 @@ bool FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 	writeSkeleton(cfg);
 	writeLODs(cfg);
 
-	m_compiler.writeCompiledResource(Path(src), Span(out_file.data(), (i32)out_file.size()));
+	m_compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), (i32)m_out_file.size()));
 	return true;
 }
 

@@ -14,6 +14,13 @@
 namespace Lumix {
 
 struct FBXImporter {
+	struct VertexLayout {
+		u32 size;
+		u32 normal_offset;
+		u32 uv_offset;
+		u32 tangent_offset;
+	};
+
 	struct ImportConfig {
 		struct Clip {
 			StaticString<64> name;
@@ -104,16 +111,6 @@ struct FBXImporter {
 		char shader[20];
 	};
 
-	struct SourceMesh {
-		SourceMesh(IAllocator& allocator)
-			: computed_ao(allocator)
-		{
-		}
-
-		const ofbx::Mesh* fbx = nullptr;
-		Array<float> computed_ao;
-	};
-
 	struct ImportMesh {
 		ImportMesh(IAllocator& allocator)
 			: vertex_data(allocator)
@@ -121,6 +118,7 @@ struct FBXImporter {
 		{
 		}
 
+		const ofbx::Mesh* fbx = nullptr;
 		const ofbx::Material* fbx_mat = nullptr;
 		bool is_skinned = false;
 		int bone_idx = -1;
@@ -130,7 +128,6 @@ struct FBXImporter {
 		OutputMemoryStream vertex_data;
 		Array<u32> indices;
 		Local<Array<u32>> autolod_indices[4];
-		SourceMesh* source_mesh;
 		AABB aabb;
 		float origin_radius_squared;
 		float center_radius_squared;
@@ -172,14 +169,12 @@ private:
 	void sortBones(bool force_skinned);
 	void gatherBones(bool force_skinned);
 	void gatherAnimations();
-	u8* writePackedVec3(u8* dst, const u8* src, const Matrix& mtx) const;
-	u8* writeUVs(u8* dst, const u8* src) const;
 	void postprocessMeshes(const ImportConfig& cfg, const Path& path);
 	void gatherMeshes();
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
-	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
-	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
+	template <typename T> void write(const T& obj) { m_out_file.write(&obj, sizeof(obj)); }
+	void write(const void* ptr, size_t size) { m_out_file.write(ptr, size); }
 	void writeString(const char* str);
 	int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
@@ -196,7 +191,16 @@ private:
 	bool areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cfg) const;
 	void writeModelHeader();
 	void bakeVertexAO(const ImportConfig& cfg);
-	
+	void remap(const OutputMemoryStream& unindexed_triangles, ImportMesh& mesh, u32 vertex_size, const ImportConfig& cfg) const;
+	void triangulate(OutputMemoryStream& unindexed_triangles
+		, ImportMesh& mesh
+		, const ofbx::GeometryPartition& partition
+		, u32 vertex_size
+		, const Array<FBXImporter::Skin>& skinning
+		, const ImportConfig& cfg
+		, const Matrix& matrix
+		, Array<i32>& tri_indices);
+
 	IAllocator& m_allocator;
 	struct FileSystem& m_filesystem;
 	StudioApp& m_app;
@@ -204,15 +208,13 @@ private:
 	struct AssetCompiler& m_compiler;
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
-	Array<UniquePtr<SourceMesh>> m_source_meshes;
 	HashMap<const ofbx::Material*, String> m_material_name_map;
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;
 	Array<Matrix> m_bind_pose;
 	ofbx::IScene* m_scene;
-	OutputMemoryStream out_file;
+	OutputMemoryStream m_out_file;
 	float m_time_scale = 1.0f;
-	bool cancel_mesh_transforms = false;
 	float m_fbx_scale = 1.f;
 	Orientation m_orientation = Orientation::Y_UP;
 };
