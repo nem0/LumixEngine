@@ -815,7 +815,14 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::SetKeyboardFocusHere();
 				m_request_focus_search = false;
 			}
-			if (m_filter.gui(ICON_FA_SEARCH " Search", 300)) {
+
+			StaticString<64> hint(ICON_FA_SEARCH " Search");
+			char search_shortcut[32];
+			if (m_focus_search.shortcutText(search_shortcut)) {
+				hint.append(" (", search_shortcut, ")");
+			}
+			
+			if (m_filter.gui(hint, 300)) {
 				m_create_tile_cooldown = 0.2f;
 				changeDir(m_dir, false);
 			}
