@@ -3126,6 +3126,7 @@ struct StudioAppImpl final : StudioApp
 				out_info.offset = ~0UL;
 			}
 		}
+		exportDataScan("scripts/", infos);
 		exportDataScan("pipelines/", infos);
 		exportDataScan("universes/", infos);
 		exportFile("lumix.prj", infos);
