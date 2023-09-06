@@ -28,7 +28,8 @@ using JobProcessor = void (*)(JobFunction, void*, void*, u32, u32);
 // Ignoring certain nodes will only stop them from being processed not tokenised (i.e. they will still be in the tree)
 enum class LoadFlags : u16
 {
-	TRIANGULATE = 1 << 0,
+	NONE = 0,
+	UNUSED = 1 << 0, // can be reused
 	IGNORE_GEOMETRY = 1 << 1,
 	IGNORE_BLEND_SHAPES = 1 << 2,
 	IGNORE_CAMERAS = 1 << 3,

@@ -982,7 +982,7 @@ bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool for
 		if (!m_filesystem.getContentSync(Path(filename), data)) return false;
 	}
 	
-	const ofbx::LoadFlags flags = ignore_geometry ? ofbx::LoadFlags::IGNORE_GEOMETRY : ofbx::LoadFlags::TRIANGULATE;
+	const ofbx::LoadFlags flags = ignore_geometry ? ofbx::LoadFlags::IGNORE_GEOMETRY : ofbx::LoadFlags::NONE;
 	{
 		PROFILE_BLOCK("ofbx::load");
 		m_scene = ofbx::load(data.data(), (i32)data.size(), static_cast<u16>(flags), &ofbx_job_processor, nullptr);
