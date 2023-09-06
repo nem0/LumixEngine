@@ -1199,8 +1199,11 @@ struct GeometryDataImpl : GeometryData {
 	}
 
 	template <typename T>
-	void postprocess(T& attr) {
-		if (!attr.values.empty() && attr.mapping == VertexDataMapping::BY_VERTEX && !attr.indices.empty()) {
+	bool postprocess(T& attr) {
+		if (attr.values.empty()) return true;
+		if (attr.mapping == VertexDataMapping::BY_VERTEX && !attr.indices.empty()) {
+			if (positions.indices.empty()) return false; // not supported
+
 			std::vector<int> remapped;
 			attr.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
 			remapped.resize(positions.indices.size());
@@ -1209,15 +1212,28 @@ struct GeometryDataImpl : GeometryData {
 			}
 			attr.indices = remapped;
 		}
+		else if (attr.mapping == VertexDataMapping::BY_POLYGON) {
+			if (!attr.indices.empty()) return false; // not supported
+			if (partitions.size() != 1) return false; // not supported
+			if (partitions[0].polygons.size() != attr.values.size()) return false; // invalid
+
+			std::vector<int> remapped;
+			attr.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
+			remapped.resize(positions.indices.size());
+
+			for (i32 i = 0, c = (i32)partitions[0].polygons.size(); i < c; ++i) {
+				GeometryPartition::Polygon& polygon = partitions[0].polygons[i];
+				for (i32 j = polygon.from_vertex; j < polygon.from_vertex + polygon.vertex_count; ++j) {
+					remapped[j] = i;
+				}
+			}
+			attr.indices = remapped;
+		}
+		return true;
 	}
 
 	bool postprocess() {
 		PROFILE_FUNCTION();
-		postprocess(normals);
-		postprocess(tangents);
-		for (Vec2AttributesImpl& uv : uvs) postprocess(uv);
-		postprocess(colors);
-
 		if (materials.empty()) {
 			GeometryPartitionImpl& partition = partitions.emplace_back();
 			int polygon_count = 0;
@@ -1275,6 +1291,12 @@ struct GeometryDataImpl : GeometryData {
 				}
 			}
 		}
+
+		postprocess(normals);
+		postprocess(tangents);
+		for (Vec2AttributesImpl& uv : uvs) postprocess(uv);
+		postprocess(colors);
+
 		return true;
 	}
 };
@@ -3393,7 +3415,7 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 
 		#define get_property(name, field, type, getter) if(node->first_property->value == name) \
 		{ \
-			IElementProperty* prop = node->getProperty(is_p60 ? 3 : 4); \
+			IElementProperty* prop = node->getProperty(scene->version <= 6100 ? 3 : 4); \
 			if (prop) \
 			{ \
 				DataView value = prop->getValue(); \
@@ -3403,7 +3425,7 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 
 		#define get_time_property(name, field, type, getter) if(node->first_property->value == name) \
 		{ \
-			IElementProperty* prop = node->getProperty(is_p60 ? 3 : 4); \
+			IElementProperty* prop = node->getProperty(scene->version <= 6100 ? 3 : 4); \
 			if (prop) \
 			{ \
 				DataView value = prop->getValue(); \
@@ -4114,11 +4136,11 @@ IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor, vo
 	std::unique_ptr<Scene> scene(new Scene());
 	scene->m_data.resize(size);
 	memcpy(&scene->m_data[0], data, size);
-	u32 version;
 
 	const bool is_binary = size >= 18 && strncmp((const char*)data, "Kaydara FBX Binary", 18) == 0;
 	OptionalError<Element*> root(nullptr);
 	if (is_binary) {
+		u32 version;
 		root = tokenize(&scene->m_data[0], size, version, scene->m_allocator);
 		scene->version = version;
 		if (version < 6100)
@@ -4135,6 +4157,13 @@ IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor, vo
 	else {
 		root = tokenizeText(&scene->m_data[0], size, scene->m_allocator);
 		if (root.isError()) return nullptr;
+		const ofbx::Element* header = findChild(*root.getValue(), "FBXHeaderExtension");
+		if (header) {
+			const ofbx::Element* version_elem = findChild(*header, "FBXVersion");
+			if (version_elem->first_property) {
+				scene->version = version_elem->first_property->getValue().toU32();
+			}
+		}
 	}
 
 	scene->m_root_element = root.getValue();
