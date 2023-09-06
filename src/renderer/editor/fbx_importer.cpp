@@ -1900,6 +1900,7 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 	for (int i = 0, c = fbx_skin->getClusterCount(); i < c; ++i) {
 		const ofbx::Cluster* cluster = fbx_skin->getCluster(i);
 		if (cluster->getIndicesCount() == 0) continue;
+		if (!cluster->getLink()) continue;
 
 		int joint = m_bones.indexOf(cluster->getLink());
 		ASSERT(joint >= 0);
