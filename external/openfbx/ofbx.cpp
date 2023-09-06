@@ -441,10 +441,28 @@ bool DataView::operator==(const char* rhs) const
 
 
 struct Property;
-template <typename T> static bool parseArrayRaw(const Property& property, T* out, int max_size);
-template <typename T> static bool parseArray(const Property& property, std::vector<T>* out);
+struct Element;
+
+template <typename T> static bool parseMemory(const Property& property, T* out, int max_size_bytes);
+template <typename T> static bool parseVecData(Property& property, std::vector<T>* out_vec);
+template <typename T> static bool parseVertexData(const Element& element, const char* name, const char* index_name, T& out, std::vector<struct ParseDataJob>& jobs);
 static bool parseDouble(Property& property, double* out);
 
+struct ParseDataJob {
+	using F = bool (*)(Property*, void*);
+	Property* property = nullptr;
+	void* data = nullptr;
+	bool error = false;
+	F f;
+};
+
+template <typename T> [[nodiscard]] bool pushJob(std::vector<ParseDataJob>& jobs, Property& prop, std::vector<T>& data) {
+	ParseDataJob& job = jobs.emplace_back();
+	job.property = &prop;
+	job.data = (void*)&data;
+	job.f = [](Property* prop, void* data){ return parseVecData(*prop, (std::vector<T>*)data); };
+	return true;
+}
 
 struct Property : IElementProperty
 {
@@ -463,22 +481,21 @@ struct Property : IElementProperty
 		return count;
 	}
 
-	bool getValues(double* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
+	bool getValues(double* values, int max_size) const override { return parseMemory(*this, values, max_size); }
 
-	bool getValues(float* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
+	bool getValues(float* values, int max_size) const override { return parseMemory(*this, values, max_size); }
 
-	bool getValues(u64* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
+	bool getValues(u64* values, int max_size) const override { return parseMemory(*this, values, max_size); }
 
-	bool getValues(i64* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
+	bool getValues(i64* values, int max_size) const override { return parseMemory(*this, values, max_size); }
 
-	bool getValues(int* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
+	bool getValues(int* values, int max_size) const override { return parseMemory(*this, values, max_size); }
 
 	int count = 0;
 	u8 type = INTEGER;
 	DataView value;
 	Property* next = nullptr;
 };
-
 
 struct Element : IElement
 {
@@ -577,7 +594,6 @@ static bool isLong(const Property* prop)
 
 static bool decompress(const u8* in, size_t in_size, u8* out, size_t out_size)
 {
-	PROFILE_FUNCTION();
 	auto dec = libdeflate_alloc_decompressor();
 	size_t dummy;
 	bool res = libdeflate_deflate_decompress(dec, in + 2, in_size - 2, out, out_size, &dummy) == LIBDEFLATE_SUCCESS;
@@ -1472,13 +1488,13 @@ struct ClusterImpl : Cluster
 		const Element* indexes = findChild((const Element&)element, "Indexes");
 		if (indexes && indexes->first_property)
 		{
-			if (!parseArray(*indexes->first_property, &indices)) return false;
+			if (!parseVecData(*indexes->first_property, &indices)) return false;
 		}
 
 		const Element* weights_el = findChild((const Element&)element, "Weights");
 		if (weights_el && weights_el->first_property)
 		{
-			if (!parseArray(*weights_el->first_property, &weights)) return false;
+			if (!parseVecData(*weights_el->first_property, &weights)) return false;
 		}
 
 		return true;
@@ -1612,7 +1628,7 @@ struct BlendShapeChannelImpl : BlendShapeChannel
 		const Element* full_weights_el = findChild((const Element&)element, "FullWeights");
 		if (full_weights_el && full_weights_el->first_property)
 		{
-			if (!parseArray(*full_weights_el->first_property, &fullWeights)) return false;
+			if (!parseVecData(*full_weights_el->first_property, &fullWeights)) return false;
 		}
 
 		for (int i = 0; i < (int)shapes.size(); i++)
@@ -2228,60 +2244,6 @@ void parseVideo(Scene& scene, const Element& element, Allocator& allocator)
 	scene.m_videos.push_back(video);
 }
 
-template <typename T> static void parseTextArray(const Property& property, std::vector<T>* out);
-template <typename T> static bool parseBinaryArrayLinked(const Property& property, std::vector<T>* out);
-
-template <typename T> static bool parseVecData(Property& property, std::vector<T>* out_vec) {
-	using TElemType = decltype((*out_vec)[0].x);
-	assert(out_vec);
-	if (!property.value.is_binary) {
-		parseTextArray(property, out_vec);
-		return true;
-	}
-
-	if (property.type == 'D' || property.type == 'F') {
-		return parseBinaryArrayLinked(property, out_vec);
-	}
-
-	if (property.type == 'f') {
-		if constexpr (sizeof((*out_vec)[0].x) == sizeof(float)) {
-			return parseArray(property, out_vec);
-		}
-		if constexpr (sizeof((*out_vec)[0].x) == sizeof(double)) {
-			std::vector<float> tmp;
-			if (!parseArray(property, tmp)) return false;
-			int elem_count = sizeof((*out_vec)[0]) / sizeof((*out_vec)[0].x);
-			out_vec->resize(tmp.size() / elem_count);
-			TElemType* out = &(*out_vec)[0].x;
-			for (int i = 0, c = (int)tmp.size(); i < c; ++i) {
-				out[i] = static_cast<TElemType>(tmp[i]);
-			}
-			return true;
-		}
-		return false;
-	}
-
-	if (property.type != 'd') return false;
-	
-	if constexpr (sizeof((*out_vec)[0].x) == sizeof(double)) {
-		return parseArray(property, out_vec);
-	}
-
-	if constexpr (sizeof((*out_vec)[0].x) == sizeof(float)) {
-		std::vector<double> tmp;
-		if (!parseArray(property, &tmp)) return false;
-		int elem_count = sizeof((*out_vec)[0]) / sizeof((*out_vec)[0].x);
-		out_vec->resize(tmp.size() / elem_count);
-		auto* out = &(*out_vec)[0].x;
-		for (int i = 0, c = (int)tmp.size(); i < c; ++i) {
-			out[i] = static_cast<TElemType>(tmp[i]);
-		}
-		return true;
-	}
-
-	return false;
-}
-
 static int decodeIndex(int idx)
 {
 	return (idx < 0) ? (-idx - 1) : idx;
@@ -2353,7 +2315,7 @@ static int getTriCountFromPoly(const std::vector<int>& indices, int* idx)
 	return count;
 }
 
-static bool parseGeometryMaterials(GeometryDataImpl& geom, const Element& element)
+static bool parseGeometryMaterials(GeometryDataImpl& geom, const Element& element, std::vector<ParseDataJob> &jobs)
 {
 	const Element* layer_material_element = findChild(element, "LayerElementMaterial");
 	if (!layer_material_element) return true;
@@ -2369,7 +2331,7 @@ static bool parseGeometryMaterials(GeometryDataImpl& geom, const Element& elemen
 		const Element* indices_element = findChild(*layer_material_element, "Materials");
 		if (!indices_element || !indices_element->first_property) return false;
 
-		return parseArray(*indices_element->first_property, &geom.materials);
+		return pushJob(jobs, *indices_element->first_property, geom.materials);
 	}
 	else
 	{
@@ -2378,43 +2340,13 @@ static bool parseGeometryMaterials(GeometryDataImpl& geom, const Element& elemen
 	return true;
 }
 
-template <typename T> static bool parseVertexData(const Element& element, const char* name, const char* index_name, T& out) {
-	const Element* data_element = findChild(element, name);
-	if (!data_element || !data_element->first_property) return false;
-
-	const Element* mapping_element = findChild(element, "MappingInformationType");
-	const Element* reference_element = findChild(element, "ReferenceInformationType");
-	if (mapping_element && mapping_element->first_property) {
-		if (mapping_element->first_property->value == "ByPolygonVertex") {
-			out.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
-		} else if (mapping_element->first_property->value == "ByPolygon") {
-			out.mapping = VertexDataMapping::BY_POLYGON;
-		} else if (mapping_element->first_property->value == "ByVertice" || mapping_element->first_property->value == "ByVertex") {
-			out.mapping = VertexDataMapping::BY_VERTEX;
-		} else {
-			return false;
-		}
-	}
-	if (reference_element && reference_element->first_property) {
-		if (reference_element->first_property->value == "IndexToDirect") {
-			const Element* indices_element = findChild(element, index_name);
-			if (indices_element && indices_element->first_property) {
-				if (!parseArray(*indices_element->first_property, &out.indices)) return false;
-			}
-		} else if (reference_element->first_property->value != "Direct") {
-			return false;
-		}
-	}
-	return parseVecData(*data_element->first_property, &out.values);
-}
-
-static bool parseGeometryUVs(GeometryDataImpl& geom, const Element& element) {
+static bool parseGeometryUVs(GeometryDataImpl& geom, const Element& element, std::vector<ParseDataJob> &jobs) {
 	const Element* layer_uv_element = findChild(element, "LayerElementUV");
 	while (layer_uv_element) {
 		const int uv_index = layer_uv_element->first_property ? layer_uv_element->first_property->getValue().toInt() : 0;
 		if (uv_index >= 0 && uv_index < Geometry::s_uvs_max) {
 			Vec2AttributesImpl& uvs = geom.uvs[uv_index];
-			if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", uvs)) return false;
+			if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", uvs, jobs)) return false;
 		}
 
 		do {
@@ -2424,31 +2356,31 @@ static bool parseGeometryUVs(GeometryDataImpl& geom, const Element& element) {
 	return true;
 }
 
-static bool parseGeometryTangents(GeometryDataImpl& geom, const Element& element) {
+static bool parseGeometryTangents(GeometryDataImpl& geom, const Element& element, std::vector<ParseDataJob> &jobs) {
 	const Element* layer_tangent_element = findChild(element, "LayerElementTangents");
 	if (!layer_tangent_element) layer_tangent_element = findChild(element, "LayerElementTangent");
 	if (!layer_tangent_element) return true;
 
 	if (findChild(*layer_tangent_element, "Tangents")) {
-		return parseVertexData(*layer_tangent_element, "Tangents", "TangentsIndex", geom.tangents);
+		return parseVertexData(*layer_tangent_element, "Tangents", "TangentsIndex", geom.tangents, jobs);
 	}
 
-	return parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", geom.tangents);
+	return parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", geom.tangents, jobs);
 }
 
-static bool parseGeometryColors(GeometryDataImpl& geom, const Element& element) {
+static bool parseGeometryColors(GeometryDataImpl& geom, const Element& element, std::vector<ParseDataJob> &jobs) {
 	const Element* layer_color_element = findChild(element, "LayerElementColor");
 	if (!layer_color_element) return true;
-	return parseVertexData(*layer_color_element, "Colors", "ColorIndex", geom.colors);
+	return parseVertexData(*layer_color_element, "Colors", "ColorIndex", geom.colors, jobs);
 }
 
-static bool parseGeometryNormals(GeometryDataImpl& geom, const Element& element) {
+static bool parseGeometryNormals(GeometryDataImpl& geom, const Element& element, std::vector<ParseDataJob> &jobs) {
 	const Element* layer_normal_element = findChild(element, "LayerElementNormal");
 	if (!layer_normal_element) return true;
-	return parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", geom.normals);
+	return parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", geom.normals, jobs);
 }
 
-struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, bool triangulate, Allocator::MTAllocator& allocator) {
+struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, std::vector<ParseDataJob> &jobs, Allocator::MTAllocator& allocator) {
 	MeshImpl* mesh = allocator.allocate<MeshImpl>(scene, element);
 
 	if (!element.first_property) return Error("Invalid mesh");
@@ -2459,14 +2391,14 @@ struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& eleme
 	const Element* polys_element = findChild(element, "PolygonVertexIndex");
 	if (!polys_element || !polys_element->first_property) return Error("Indices missing");
 
-	if (!parseVecData(*vertices_element->first_property, &mesh->geometry_data.positions.values)) return Error("Failed to parse vertices");
-	if (!parseArray(*polys_element->first_property, &mesh->geometry_data.positions.indices)) return Error("Failed to parse indices");
+	if (!pushJob(jobs, *vertices_element->first_property, mesh->geometry_data.positions.values)) return Error("Invalid vertices");
+	if (!pushJob(jobs, *polys_element->first_property, mesh->geometry_data.positions.indices)) return Error("Invalid vertices");
 
-	if (!parseGeometryMaterials(mesh->geometry_data, element)) return Error("Invalid materials");
-	if (!parseGeometryUVs(mesh->geometry_data, element)) return Error("Invalid vertex attributes");
-	if (!parseGeometryTangents(mesh->geometry_data, element)) return Error("Invalid vertex attributes");
-	if (!parseGeometryColors(mesh->geometry_data, element)) return Error("Invalid vertex attributes");
-	if (!parseGeometryNormals(mesh->geometry_data, element)) return Error("Invalid vertex attributes");
+	if (!parseGeometryMaterials(mesh->geometry_data, element, jobs)) return Error("Invalid materials");
+	if (!parseGeometryUVs(mesh->geometry_data, element, jobs)) return Error("Invalid vertex attributes");
+	if (!parseGeometryTangents(mesh->geometry_data, element, jobs)) return Error("Invalid vertex attributes");
+	if (!parseGeometryColors(mesh->geometry_data, element, jobs)) return Error("Invalid vertex attributes");
+	if (!parseGeometryNormals(mesh->geometry_data, element, jobs)) return Error("Invalid vertex attributes");
 
 	return mesh;
 }
@@ -2792,85 +2724,6 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 	return material;
 }
 
-
-template <typename T> static bool parseTextArrayRaw(const Property& property, T* out, int max_size);
-
-template <typename T> static bool parseArrayRawLinked(const Property& property, T* out, int max_size) {
-	assert(property.value.is_binary);
-	int elem_size = 1;
-	switch (property.type)
-	{
-		case 'L': elem_size = 8; break;
-		case 'D': elem_size = 8; break;
-		case 'F': elem_size = 4; break;
-		case 'I': elem_size = 4; break;
-		default: return false;
-	}
-
-	if (elem_size != sizeof(out[0])) return false;
-
-	const Property* p = &property;
-	int i = 0;
-	while (p) {
-		if (i * sizeof(out[0]) == max_size) return false;
-		if (p->type != property.type) return false;
-
-		memcpy(&out[i], p->value.begin, sizeof(out[i]));
-		++i;
-		p = p->next;
-	}
-
-	return true;
-}
-
-template <typename T> static bool parseArrayRaw(const Property& property, T* out, int max_size)
-{
-	if (property.value.is_binary)
-	{
-		assert(out);
-
-		int elem_size = 1;
-		switch (property.type)
-		{
-			case 'l': elem_size = 8; break;
-			case 'd': elem_size = 8; break;
-			case 'f': elem_size = 4; break;
-			case 'i': elem_size = 4; break;
-			case 'I':
-			case 'F':
-			case 'D':
-			case 'L':
-				return parseArrayRawLinked(property, out, max_size);
-			default: return false;
-		}
-
-		const u8* data = property.value.begin + sizeof(u32) * 3;
-		if (data > property.value.end) return false;
-
-		u32 count = property.getCount();
-		u32 enc = *(const u32*)(property.value.begin + 4);
-		u32 len = *(const u32*)(property.value.begin + 8);
-
-		if (enc == 0)
-		{
-			if ((int)len > max_size) return false;
-			if (data + len > property.value.end) return false;
-			memcpy(out, data, len);
-			return true;
-		}
-		else if (enc == 1)
-		{
-			if (int(elem_size * count) > max_size) return false;
-			return decompress(data, len, (u8*)out, elem_size * count);
-		}
-
-		return false;
-	}
-
-	return parseTextArrayRaw(property, out, max_size);
-}
-
-
 template <typename T> const char* fromString(const char* str, const char* end, T* val);
 template <> const char* fromString<int>(const char* str, const char* end, int* val)
 {
@@ -2988,6 +2841,122 @@ template <> const char* fromString<DMatrix>(const char* str, const char* end, DM
 }
 
 
+template <typename T> static bool parseMemoryText(const Property& property, T* out, int max_size_bytes) {
+	const u8* iter = property.value.begin;
+	int max_count = max_size_bytes / sizeof(T);
+	int count = 0;
+	while (iter < property.value.end) {
+		if (count >= max_count) return false;
+		T val;
+		iter = (const u8*)fromString<T>((const char*)iter, (const char*)property.value.end, &val);
+		out[count] = val;
+		++count;
+	}
+	return true;
+}
+
+template <typename T> static bool parseMemoryLinked(const Property& property, T* out, int max_size_bytes) {
+	assert(out);
+	assert(property.value.is_binary);
+
+	int elem_size = 1;
+	switch (property.type) {
+		case 'L': elem_size = 8; break;
+		case 'D': elem_size = 8; break;
+		case 'F': elem_size = 4; break;
+		case 'I': elem_size = 4; break;
+		default: return false;
+	}
+
+	if (sizeof(T) % elem_size != 0) return false;
+
+	const Property* p = &property;
+	int count = 0;
+	int max_count = max_size_bytes / sizeof(T);
+	while (p) {
+		T tmp;
+		if (count == max_count) return false;
+		for (u32 i = 0; i < sizeof(T) / elem_size; ++i) {
+			if (!p) return false;
+			if (p->type != property.type) return false;
+
+			memcpy((u8*)&tmp + elem_size * i, p->value.begin, elem_size);
+			p = p->next;
+		}
+		out[count] = tmp;
+		++count;
+	}
+
+	return true;
+}
+
+template <typename T> struct TElemType;
+template <> struct TElemType<float> { using Type = float; };
+template <> struct TElemType<double> { using Type = double; };
+template <> struct TElemType<int> { using Type = int; };
+template <> struct TElemType<i64> { using Type = i64; };
+template <> struct TElemType<u64> { using Type = u64; };
+template <> struct TElemType<DVec2> { using Type = double; };
+template <> struct TElemType<DVec3> { using Type = double; };
+template <> struct TElemType<DVec4> { using Type = double; };
+template <> struct TElemType<FVec2> { using Type = float; };
+template <> struct TElemType<FVec3> { using Type = float; };
+template <> struct TElemType<FVec4> { using Type = float; };
+
+template <typename T> bool typeMatch(u8 type);
+template <> bool typeMatch<int>(u8 type) { return type == Property::INTEGER || type == Property::ARRAY_INT; }
+template <> bool typeMatch<float>(u8 type) { return type == Property::FLOAT || type == Property::ARRAY_FLOAT; }
+template <> bool typeMatch<double>(u8 type) { return type == Property::DOUBLE || type == Property::ARRAY_DOUBLE; }
+template <> bool typeMatch<u64>(u8 type) { return type == Property::LONG || type == Property::ARRAY_LONG; }
+template <> bool typeMatch<i64>(u8 type) { return type == Property::LONG || type == Property::ARRAY_LONG; }
+
+template <typename T>
+static bool parseMemory(const Property& property, T* out, int max_size_bytes) {
+	assert(out);
+	const u32 count = property.getCount();
+	if (count == 0) return true;
+
+	if (!property.value.is_binary) return parseMemoryText(property, out, max_size_bytes);
+
+	if (!typeMatch<typename TElemType<T>::Type>(property.type))
+		return false;
+	int elem_size = 1;
+	switch (property.type) {
+		case 'l': elem_size = 8; break;
+		case 'd': elem_size = 8; break;
+		case 'f': elem_size = 4; break;
+		case 'i': elem_size = 4; break;
+		case 'L':
+		case 'D':
+		case 'F':
+		case 'I':
+			return parseMemoryLinked(property, out, max_size_bytes); 
+		default: return false;
+	}
+	if (count * elem_size != max_size_bytes) return false;
+	if (sizeof(T) % elem_size != 0) return false;
+
+	const u8* data = property.value.begin + sizeof(u32) * 3;
+	if (data > property.value.end) return false;
+
+	u32 enc = *(const u32*)(property.value.begin + 4);
+	u32 len = *(const u32*)(property.value.begin + 8);
+
+	if (enc == 0) {
+		ASSERT(len == elem_size * count);
+		if ((int)len > max_size_bytes) return false;
+		if (data + len > property.value.end) return false;
+		memcpy(out, data, len);
+		return true;
+	}
+	else if (enc == 1) {
+		if (int(elem_size * count) > max_size_bytes) return false;
+		return decompress(data, len, (u8*)out, elem_size * count);
+	}
+
+	return false;
+}
+
 template <typename T> static void parseTextArray(const Property& property, std::vector<T>* out)
 {
 	out->clear();
@@ -2998,21 +2967,6 @@ template <typename T> static void parseTextArray(const Property& property, std::
 		iter = (const u8*)fromString<T>((const char*)iter, (const char*)property.value.end, &val);
 		out->push_back(val);
 	}
-}
-
-
-template <typename T> static bool parseTextArrayRaw(const Property& property, T* out_raw, int max_size)
-{
-	const u8* iter = property.value.begin;
-
-	T* out = out_raw;
-	while (iter < property.value.end)
-	{
-		iter = (const u8*)fromString<T>((const char*)iter, (const char*)property.value.end, out);
-		++out;
-		if (out - out_raw == max_size / sizeof(T)) return true;
-	}
-	return out - out_raw == max_size / sizeof(T);
 }
 
 template <typename T> static bool parseBinaryArrayLinked(const Property& property, std::vector<T>* out)
@@ -3048,36 +3002,101 @@ template <typename T> static bool parseBinaryArrayLinked(const Property& propert
 	return true;
 }
 
-template <typename T> static bool parseArray(const Property& property, std::vector<T>* out)
-{
+template <typename T> static bool parseArray(const Property& property, std::vector<T>* out) {
 	assert(out);
-	if (property.value.is_binary)
-	{
-		int elem_size = 1;
-		switch (property.type)
-		{
-			case 'd': elem_size = 8; break;
-			case 'f': elem_size = 4; break;
-			case 'i': elem_size = 4; break;
-			case 'L':
-			case 'D':
-			case 'F':
-			case 'I':
-				return parseBinaryArrayLinked(property, out); 
-			default: return false;
-		}
-		u32 count = property.getCount();
-		int elem_count = sizeof(T) / elem_size;
-		out->resize(count / elem_count);
-
-		if (count == 0) return true;
-		return parseArrayRaw(property, &(*out)[0], int(sizeof((*out)[0]) * out->size()));
-	}
-	else
-	{
+	if (!property.value.is_binary) {
 		parseTextArray(property, out);
 		return true;
 	}
+
+	if (!typeMatch<typename TElemType<T>::Type>(property.type)) return false;
+
+	int elem_size = 1;
+	switch (property.type)
+	{
+		case 'l': elem_size = 8; break;
+		case 'd': elem_size = 8; break;
+		case 'f': elem_size = 4; break;
+		case 'i': elem_size = 4; break;
+		case 'L':
+		case 'D':
+		case 'F':
+		case 'I':
+			return parseBinaryArrayLinked(property, out); 
+		default: return false;
+	}
+	u32 count = property.getCount();
+	out->resize(count * elem_size / sizeof(T));
+	if (count == 0) return true;
+
+	return parseMemory(property, out->data(), int(sizeof((*out)[0]) * out->size()));
+}
+
+template <typename T> static bool parseVecData(Property& property, std::vector<T>* out_vec) {
+	using ElemType = typename TElemType<T>::Type;
+	assert(out_vec);
+	if (!property.value.is_binary) {
+		parseTextArray(property, out_vec);
+		return true;
+	}
+
+	if (typeMatch<ElemType>(property.type)) return parseArray(property, out_vec);
+
+	if (property.type == 'f' || property.type == 'F') {
+		std::vector<float> tmp;
+		if (!parseArray(property, &tmp)) return false;
+		int elem_count = sizeof((*out_vec)[0]) / sizeof(ElemType);
+		out_vec->resize(tmp.size() / elem_count);
+		ElemType* out = (ElemType*)out_vec->data();
+		for (int i = 0, c = (int)tmp.size(); i < c; ++i) {
+			out[i] = static_cast<ElemType>(tmp[i]);
+		}
+		return true;
+	}
+
+	if (property.type == 'd' || property.type == 'D') {
+		std::vector<double> tmp;
+		if (!parseArray(property, &tmp)) return false;
+		int elem_count = sizeof((*out_vec)[0]) / sizeof(ElemType);
+		out_vec->resize(tmp.size() / elem_count);
+		auto* out = (ElemType*)out_vec->data();
+		for (int i = 0, c = (int)tmp.size(); i < c; ++i) {
+			out[i] = static_cast<ElemType>(tmp[i]);
+		}
+		return true;
+	}
+
+	return false;
+}
+
+template <typename T> static bool parseVertexData(const Element& element, const char* name, const char* index_name, T& out, std::vector<ParseDataJob>& jobs) {
+	const Element* data_element = findChild(element, name);
+	if (!data_element || !data_element->first_property) return false;
+
+	const Element* mapping_element = findChild(element, "MappingInformationType");
+	const Element* reference_element = findChild(element, "ReferenceInformationType");
+	if (mapping_element && mapping_element->first_property) {
+		if (mapping_element->first_property->value == "ByPolygonVertex") {
+			out.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
+		} else if (mapping_element->first_property->value == "ByPolygon") {
+			out.mapping = VertexDataMapping::BY_POLYGON;
+		} else if (mapping_element->first_property->value == "ByVertice" || mapping_element->first_property->value == "ByVertex") {
+			out.mapping = VertexDataMapping::BY_VERTEX;
+		} else {
+			return false;
+		}
+	}
+	if (reference_element && reference_element->first_property) {
+		if (reference_element->first_property->value == "IndexToDirect") {
+			const Element* indices_element = findChild(element, index_name);
+			if (indices_element && indices_element->first_property) {
+				if (!pushJob(jobs, *indices_element->first_property, out.indices)) return false;
+			}
+		} else if (reference_element->first_property->value != "Direct") {
+			return false;
+		}
+	}
+	return pushJob(jobs, *data_element->first_property, out.values);
 }
 
 static bool parseDouble(Property& property, double* out)
@@ -3134,7 +3153,7 @@ static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Elem
 	return curve;
 }
 
-static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, Allocator::MTAllocator& allocator)
+static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, std::vector<ParseDataJob> &jobs, Allocator::MTAllocator& allocator)
 {
 	PROFILE_FUNCTION();
 	assert(element.first_property);
@@ -3148,14 +3167,14 @@ static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl
 	const Element* polys_element = findChild(element, "PolygonVertexIndex");
 	if (!polys_element || !polys_element->first_property) return Error("Indices missing");
 
-	if (!parseVecData(*vertices_element->first_property, &geom.positions.values)) return Error("Failed to parse vertices");
-	if (!parseArray(*polys_element->first_property, &geom.positions.indices)) return Error("Failed to parse indices");
+	if (!pushJob(jobs, *vertices_element->first_property, geom.positions.values)) return Error("Invalid vertices");
+	if (!pushJob(jobs, *polys_element->first_property, geom.positions.indices)) return Error("Invalid vertices");
 
-	if (!parseGeometryMaterials(geom, element)) return Error("Invalid materials");
-	if (!parseGeometryUVs(geom, element)) return Error("Invalid vertex attributes");
-	if (!parseGeometryTangents(geom, element)) return Error("Invalid vertex attributes");
-	if (!parseGeometryColors(geom, element)) return Error("Invalid vertex attributes");
-	if (!parseGeometryNormals(geom, element)) return Error("Invalid vertex attributes");
+	if (!parseGeometryMaterials(geom, element, jobs)) return Error("Invalid materials");
+	if (!parseGeometryUVs(geom, element, jobs)) return Error("Invalid vertex attributes");
+	if (!parseGeometryTangents(geom, element, jobs)) return Error("Invalid vertex attributes");
+	if (!parseGeometryColors(geom, element, jobs)) return Error("Invalid vertex attributes");
+	if (!parseGeometryNormals(geom, element, jobs)) return Error("Invalid vertex attributes");
 
 	return &geom;
 }
@@ -3181,7 +3200,7 @@ bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator)
 	allocator.int_tmp.clear(); // old indices
 	if (!parseVecData(*vertices_element->first_property, &allocator.vec3_tmp, &allocator.temporaries)) return true;
 	if (normals_element && !parseVecData(*normals_element->first_property, &allocator.dvec3_tmp2, &allocator.temporaries)) return true;
-	if (!parseArray(*indexes_element->first_property, &allocator.int_tmp)) return true;
+	if (!parseVecData(*indexes_element->first_property, &allocator.int_tmp)) return true;
 
 	if (allocator.vec3_tmp.size() != allocator.int_tmp.size() || allocator.dvec3_tmp2.size() != allocator.int_tmp.size()) return false;
 
@@ -3435,7 +3454,6 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 {
 	PROFILE_FUNCTION();
 	if (!job_processor) job_processor = &sync_job_processor;
-	const bool triangulate = (flags & (u16)LoadFlags::TRIANGULATE) != 0;
 
 	const bool ignore_geometry = (flags & (u16)LoadFlags::IGNORE_GEOMETRY) != 0;
 	const bool ignore_blend_shapes = (flags & (u16)LoadFlags::IGNORE_BLEND_SHAPES) != 0;
@@ -3476,6 +3494,8 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		object = object->sibling;
 	}
 
+	std::vector<ParseDataJob> jobs;
+
 	for (auto iter : scene.m_object_map)
 	{
 		OptionalError<Object*> obj = nullptr;
@@ -3489,7 +3509,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			if (last_prop && last_prop->value == "Mesh")
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(scene, *iter.second.element);
-				parseGeometry(*iter.second.element, *geom, allocator.mt_allocator);
+				parseGeometry(*iter.second.element, *geom, jobs, allocator.mt_allocator);
 				obj = geom;
 				scene.m_geometries.push_back(geom);
 			}
@@ -3569,7 +3589,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			{
 				if (class_prop->getValue() == "Mesh" && !ignore_meshes)
 				{
-					obj = parseMesh(scene, *iter.second.element, triangulate, allocator.mt_allocator);
+					obj = parseMesh(scene, *iter.second.element, jobs, allocator.mt_allocator);
 					if (!obj.isError()) {
 						Mesh* mesh = (Mesh*)obj.getValue();
 						scene.m_meshes.push_back(mesh);
@@ -3603,6 +3623,13 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			scene.m_all_objects.push_back(obj.getValue());
 			obj.getValue()->id = iter.first;
 		}
+	}
+
+	if (!jobs.empty()) {
+		(*job_processor)([](void* ptr){
+			ParseDataJob* job = (ParseDataJob*)ptr;
+			job->error = job->f(job->property, job->data);
+		}, job_user_ptr, &jobs[0], (u32)sizeof(jobs[0]), (u32)jobs.size());
 	}
 
 	PROFILE_BLOCK("connections");
