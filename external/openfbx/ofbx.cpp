@@ -30,6 +30,12 @@ static int codeIndex(int idx, bool last)
 	return last ? (-idx - 1) : idx;
 }
 
+template <typename T>
+static T& emplace_back(std::vector<T>& vec) {
+	vec.emplace_back();
+	return vec.back();
+}
+
 struct Allocator {
 	struct Page {
 		struct {
@@ -432,7 +438,7 @@ struct ParseDataJob {
 };
 
 template <typename T> [[nodiscard]] bool pushJob(std::vector<ParseDataJob>& jobs, Property& prop, std::vector<T>& data) {
-	ParseDataJob& job = jobs.emplace_back();
+	ParseDataJob& job = emplace_back(jobs);
 	job.property = &prop;
 	job.data = (void*)&data;
 	job.f = [](Property* prop, void* data){ return parseVecData(*prop, (std::vector<T>*)data); };
@@ -1207,7 +1213,7 @@ struct GeometryDataImpl : GeometryData {
 
 	bool postprocess() {
 		if (materials.empty()) {
-			GeometryPartitionImpl& partition = partitions.emplace_back();
+			GeometryPartitionImpl& partition = emplace_back(partitions);
 			int polygon_count = 0;
 			for (int i : positions.indices) {
 				if (i < 0) ++polygon_count;
