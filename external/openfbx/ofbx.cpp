@@ -22,6 +22,16 @@ using namespace Lumix;
 namespace ofbx
 {
 
+static int decodeIndex(int idx)
+{
+	return (idx < 0) ? (-idx - 1) : idx;
+}
+
+static int codeIndex(int idx, bool last)
+{
+	return last ? (-idx - 1) : idx;
+}
+
 struct Allocator {
 	struct Page {
 		struct {
@@ -2282,77 +2292,6 @@ void parseVideo(Scene& scene, const Element& element, Allocator& allocator)
 	video.filename = filename_element->first_property->value;
 	video.media = element.first_property->next->value;
 	scene.m_videos.push_back(video);
-}
-
-static int decodeIndex(int idx)
-{
-	return (idx < 0) ? (-idx - 1) : idx;
-}
-
-
-static int codeIndex(int idx, bool last)
-{
-	return last ? (-idx - 1) : idx;
-}
-
-static void triangulate(
-	const std::vector<int>& old_indices,
-	std::vector<int>* to_old_vertices,
-	std::vector<int>* to_old_indices)
-{
-	assert(to_old_vertices);
-	assert(to_old_indices);
-
-	auto getIdx = [&old_indices](int i) -> int {
-		int idx = old_indices[i];
-		return decodeIndex(idx);
-	};
-
-	int in_polygon_idx = 0;
-	for (int i = 0; i < (int)old_indices.size(); ++i)
-	{
-		int idx = getIdx(i);
-		if (in_polygon_idx <= 2) //-V1051
-		{
-			to_old_vertices->push_back(idx);
-			to_old_indices->push_back(i);
-		}
-		else
-		{
-			to_old_vertices->push_back(old_indices[i - in_polygon_idx]);
-			to_old_indices->push_back(i - in_polygon_idx);
-			to_old_vertices->push_back(old_indices[i - 1]);
-			to_old_indices->push_back(i - 1);
-			to_old_vertices->push_back(idx);
-			to_old_indices->push_back(i);
-		}
-		++in_polygon_idx;
-		if (old_indices[i] < 0)
-		{
-			if (in_polygon_idx <= 2) {
-				// invalid polygon, let's pop it
-				to_old_vertices->pop_back();
-				to_old_indices->pop_back();
-				if (in_polygon_idx == 2) {
-					to_old_vertices->pop_back();
-					to_old_indices->pop_back();
-				}
-			}
-			in_polygon_idx = 0;
-		}
-	}
-}
-
-static int getTriCountFromPoly(const std::vector<int>& indices, int* idx)
-{
-	int count = 1;
-	while (indices[*idx + 1 + count] >= 0)
-	{
-		++count;
-	}
-
-	*idx = *idx + 2 + count;
-	return count;
 }
 
 static bool parseGeometryMaterials(GeometryDataImpl& geom, const Element& element, std::vector<ParseDataJob> &jobs)
