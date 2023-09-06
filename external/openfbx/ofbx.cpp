@@ -2007,7 +2007,6 @@ struct Scene : IScene
 	}
 
 	bool finalize();
-	Object* findParent(Object& child) const;
 
 	Element* m_root_element = nullptr;
 	Root* m_root = nullptr;
@@ -4056,27 +4055,16 @@ Object* Object::resolveObjectLink(Object::Type type, const char* property, int i
 }
 
 
-Object* Scene::findParent(Object& child) const {
-	Object* parent = nullptr;
-	for (auto& connection : m_connections)
-	{
-		if (connection.from_object == child.id)
-		{
-			Object* obj = m_object_map.find(connection.to_object)->second.object;
-			if (obj && obj->is_node && obj != &child && connection.type == Scene::Connection::OBJECT_OBJECT) {
-				assert(parent == nullptr);
-				parent = obj;
-			}
-		}
-	}
-	return parent;
-}
-
-
 bool Scene::finalize() {
 	PROFILE_FUNCTION();
-	for (Object* object : m_all_objects) {
-		object->parent = findParent(*object);
+	for (const Connection& connection : m_connections) {
+		if (connection.type != Connection::OBJECT_OBJECT) continue;
+		Object* to_obj = m_object_map.find(connection.to_object)->second.object;
+		Object* from_obj = m_object_map.find(connection.from_object)->second.object;
+		if (!from_obj) continue;
+		if (!to_obj) continue;
+		if (!to_obj->is_node) continue;
+		from_obj->parent = to_obj;
 	}
 	PROFILE_BLOCK("cyclic check");
 	for (Object* object : m_all_objects) {
