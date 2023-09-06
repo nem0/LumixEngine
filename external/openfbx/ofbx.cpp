@@ -1,4 +1,3 @@
-#include "engine/profiler.h"
 #include "ofbx.h"
 #include "libdeflate.h"
 #include <cassert>
@@ -12,7 +11,6 @@
 #include <mutex>
 #include <inttypes.h>
 #include <string.h>
-using namespace Lumix;
 
 #if __cplusplus >= 202002L
 #include <bit> // for std::bit_cast (C++20 and later)
@@ -71,39 +69,6 @@ struct Allocator {
 		p->header.offset += sizeof(T);
 		return res;
 	}
-
-
-	// store temporary data, can be reused, not threadsafe
-	std::vector<FVec3> fvec3_tmp;
-	std::vector<FVec3> fvec3_tmp2;
-	std::vector<DVec3> dvec3_tmp;
-	std::vector<DVec3> dvec3_tmp2;
-
-	std::vector<Vec3>& vec3_tmp;
-	std::vector<Vec3>& vec3_tmp2;
-
-	struct MTAllocator {
-		MTAllocator(Allocator* backing) : backing(backing) {}
-		template <typename T, typename... Args> T* allocate(Args&&... args) {
-			std::lock_guard<std::mutex> guard(mutex);
-			return backing->allocate<T, Args...>(static_cast<Args&&>(args)...);
-		}
-
-		std::mutex mutex;
-		Allocator* backing;
-	};
-
-	Allocator() 
-		: mt_allocator(this)
-		#ifdef OFBX_SINGLE_PRECISION
-			, vec3_tmp(fvec3_tmp)
-			, vec3_tmp2(fvec3_tmp2)
-		#else
-			, vec3_tmp(dvec3_tmp)
-			, vec3_tmp2(dvec3_tmp2)
-		#endif
-	{}
-	MTAllocator mt_allocator;
 };
 
 
@@ -1057,9 +1022,7 @@ static OptionalError<Element*> tokenizeText(const u8* data, size_t size, Allocat
 }
 
 
-static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& version, Allocator& allocator)
-{
-	PROFILE_FUNCTION();
+static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& version, Allocator& allocator) {
 	if (size < sizeof(Header)) return Error("Invalid header");
 
 	Cursor cursor;
@@ -1217,7 +1180,7 @@ struct GeometryDataImpl : GeometryData {
 			std::vector<int> remapped;
 			attr.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
 			remapped.resize(positions.indices.size());
-			for (i32 i = 0; i < remapped.size(); ++i) {
+			for (int i = 0; i < remapped.size(); ++i) {
 				remapped[i] = attr.indices[decodeIndex(positions.indices[i])];
 			}
 			attr.indices = remapped;
@@ -1231,9 +1194,9 @@ struct GeometryDataImpl : GeometryData {
 			attr.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
 			remapped.resize(positions.indices.size());
 
-			for (i32 i = 0, c = (i32)partitions[0].polygons.size(); i < c; ++i) {
+			for (int i = 0, c = (int)partitions[0].polygons.size(); i < c; ++i) {
 				GeometryPartition::Polygon& polygon = partitions[0].polygons[i];
-				for (i32 j = polygon.from_vertex; j < polygon.from_vertex + polygon.vertex_count; ++j) {
+				for (int j = polygon.from_vertex; j < polygon.from_vertex + polygon.vertex_count; ++j) {
 					remapped[j] = i;
 				}
 			}
@@ -1243,7 +1206,6 @@ struct GeometryDataImpl : GeometryData {
 	}
 
 	bool postprocess() {
-		PROFILE_FUNCTION();
 		if (materials.empty()) {
 			GeometryPartitionImpl& partition = partitions.emplace_back();
 			int polygon_count = 0;
@@ -1492,7 +1454,7 @@ struct ShapeImpl : Shape {
 		: Shape(_scene, _element)
 	{}
 
-	bool postprocess(GeometryImpl* geom, Allocator& allocator);
+	bool postprocess(GeometryImpl& geom, Allocator& allocator);
 
 	Type getType() const override { return Type::SHAPE; }
 	int getVertexCount() const override { return (int)vertices.size(); }
@@ -1524,9 +1486,7 @@ struct ClusterImpl : Cluster
 	DMatrix getTransformLinkMatrix() const override { return transform_link_matrix; }
 	Object* getLink() const override { return link; }
 
-	bool postprocess()
-	{
-		PROFILE_FUNCTION();
+	bool postprocess() {
 		assert(skin);
 
 		GeometryDataImpl* geom = static_cast<GeometryDataImpl*>(static_cast<GeometryImpl*>(skin->resolveObjectLinkReverse(Object::Type::GEOMETRY)));
@@ -1662,9 +1622,7 @@ struct BlendShapeChannelImpl : BlendShapeChannel
 
 	Type getType() const override { return Type::BLEND_SHAPE_CHANNEL; }
 
-	bool postprocess(Allocator& allocator)
-	{
-		PROFILE_FUNCTION();
+	bool postprocess(Allocator& allocator) {
 		assert(blendShape);
 
 		GeometryImpl* geom = (GeometryImpl*)blendShape->resolveObjectLinkReverse(Object::Type::GEOMETRY);
@@ -1685,7 +1643,7 @@ struct BlendShapeChannelImpl : BlendShapeChannel
 		for (int i = 0; i < (int)shapes.size(); i++)
 		{
 			auto shape = (ShapeImpl*)shapes[i];
-			if (!shape->postprocess(geom, allocator)) return false;
+			if (!shape->postprocess(*geom, allocator)) return false;
 		}
 
 		return true;
@@ -2113,9 +2071,7 @@ DataView TextureImpl::getEmbeddedData() const {
 }
 
 
-bool PoseImpl::postprocess(Scene& scene)
-{
-	PROFILE_FUNCTION();
+bool PoseImpl::postprocess(Scene& scene) {
 	node = scene.m_object_map[node_id].object;
 	if (node && node->getType() == Object::Type::MESH) {
 		static_cast<MeshImpl*>(node)->pose = this;
@@ -2359,7 +2315,7 @@ static bool parseGeometryNormals(GeometryDataImpl& geom, const Element& element,
 	return parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", geom.normals, jobs);
 }
 
-struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, std::vector<ParseDataJob> &jobs, Allocator::MTAllocator& allocator) {
+struct OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, std::vector<ParseDataJob> &jobs, Allocator& allocator) {
 	MeshImpl* mesh = allocator.allocate<MeshImpl>(scene, element);
 
 	if (!element.first_property) return Error("Invalid mesh");
@@ -2922,7 +2878,6 @@ static bool parseMemory(const Property& property, T* out, int max_size_bytes) {
 	u32 len = *(const u32*)(property.value.begin + 8);
 
 	if (enc == 0) {
-		ASSERT(len == elem_size * count);
 		if ((int)len > max_size_bytes) return false;
 		if (data + len > property.value.end) return false;
 		memcpy(out, data, len);
@@ -3132,9 +3087,7 @@ static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Elem
 	return curve;
 }
 
-static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, std::vector<ParseDataJob> &jobs, Allocator::MTAllocator& allocator)
-{
-	PROFILE_FUNCTION();
+static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, std::vector<ParseDataJob> &jobs, Allocator& allocator) {
 	assert(element.first_property);
 
 	const Element* vertices_element = findChild(element, "Vertices");
@@ -3159,10 +3112,7 @@ static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl
 }
 
 
-bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator) {
-	PROFILE_FUNCTION();
-	assert(geom);
-
+bool ShapeImpl::postprocess(GeometryImpl& geom, Allocator& allocator) {
 	const Element* vertices_element = findChild((const Element&)element, "Vertices");
 	const Element* normals_element = findChild((const Element&)element, "Normals");
 	const Element* indexes_element = findChild((const Element&)element, "Indexes");
@@ -3402,9 +3352,7 @@ void sync_job_processor(JobFunction fn, void*, void* data, u32 size, u32 count) 
 	}
 }
 
-static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator& allocator, JobProcessor job_processor, void* job_user_ptr)
-{
-	PROFILE_FUNCTION();
+static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator& allocator, JobProcessor job_processor, void* job_user_ptr) {
 	if (!job_processor) job_processor = &sync_job_processor;
 
 	const bool ignore_geometry = (flags & (u16)LoadFlags::IGNORE_GEOMETRY) != 0;
@@ -3461,7 +3409,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			if (last_prop && last_prop->value == "Mesh")
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(scene, *iter.second.element);
-				parseGeometry(*iter.second.element, *geom, jobs, allocator.mt_allocator);
+				parseGeometry(*iter.second.element, *geom, jobs, allocator);
 				obj = geom;
 				scene.m_geometries.push_back(geom);
 			}
@@ -3541,7 +3489,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			{
 				if (class_prop->getValue() == "Mesh" && !ignore_meshes)
 				{
-					obj = parseMesh(scene, *iter.second.element, jobs, allocator.mt_allocator);
+					obj = parseMesh(scene, *iter.second.element, jobs, allocator);
 					if (!obj.isError()) {
 						Mesh* mesh = (Mesh*)obj.getValue();
 						scene.m_meshes.push_back(mesh);
@@ -3591,7 +3539,6 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		}
 	}
 
-	PROFILE_BLOCK("connections");
 	for (const Scene::Connection& con : scene.m_connections)
 	{
 		if (con.type == Scene::Connection::PROPERTY_PROPERTY) continue;
@@ -4025,7 +3972,6 @@ Object* Object::resolveObjectLink(Object::Type type, const char* property, int i
 
 
 bool Scene::finalize() {
-	PROFILE_FUNCTION();
 	for (const Connection& connection : m_connections) {
 		if (connection.type != Connection::OBJECT_OBJECT) continue;
 		Object* to_obj = m_object_map.find(connection.to_object)->second.object;
@@ -4035,7 +3981,7 @@ bool Scene::finalize() {
 		if (!to_obj->is_node) continue;
 		from_obj->parent = to_obj;
 	}
-	PROFILE_BLOCK("cyclic check");
+
 	for (Object* object : m_all_objects) {
 		if (object->depth != 0xffFFffFF) continue;
 		if (object->parent == object) {
