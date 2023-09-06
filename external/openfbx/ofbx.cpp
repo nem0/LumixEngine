@@ -1175,7 +1175,7 @@ struct GeometryDataImpl : GeometryData {
 	template <typename T, typename S>
 	T patchAttributes(const S& attr) const {
 		T res = attr;
-		if (!attr.values.empty() && attr.indices.empty() && attr.mapping == VertexDataMapping::BY_VERTEX) {
+		if (!attr.values.empty() && attr.mapping == VertexDataMapping::BY_VERTEX && attr.indices.empty()) {
 			res.indices = positions.indices.data();
 		}
 		return res;
@@ -1198,8 +1198,26 @@ struct GeometryDataImpl : GeometryData {
 		};
 	}
 
+	template <typename T>
+	void postprocess(T& attr) {
+		if (!attr.values.empty() && attr.mapping == VertexDataMapping::BY_VERTEX && !attr.indices.empty()) {
+			std::vector<int> remapped;
+			attr.mapping = VertexDataMapping::BY_POLYGON_VERTEX;
+			remapped.resize(positions.indices.size());
+			for (i32 i = 0; i < remapped.size(); ++i) {
+				remapped[i] = attr.indices[decodeIndex(positions.indices[i])];
+			}
+			attr.indices = remapped;
+		}
+	}
+
 	bool postprocess() {
 		PROFILE_FUNCTION();
+		postprocess(normals);
+		postprocess(tangents);
+		for (Vec2AttributesImpl& uv : uvs) postprocess(uv);
+		postprocess(colors);
+
 		if (materials.empty()) {
 			GeometryPartitionImpl& partition = partitions.emplace_back();
 			int polygon_count = 0;
@@ -1214,12 +1232,14 @@ struct GeometryDataImpl : GeometryData {
 			for (int i = 0, c = (int)positions.indices.size(); i < c; ++i) {
 				if (indices[i] < 0) {
 					int vertex_count = i - polygon_start + 1;
-					partition.polygons.push_back({polygon_start, vertex_count});
+					if (vertex_count > 2) {
+						partition.polygons.push_back({polygon_start, vertex_count});
+						indices[i] = -indices[i] - 1;
+						int triangles = vertex_count - 2;
+						total_triangles += triangles;
+						if (triangles > max_polygon_triangles) max_polygon_triangles = triangles;
+					}
 					polygon_start = i + 1;
-					indices[i] = -indices[i] - 1;
-					int triangles = vertex_count - 2;
-					total_triangles += triangles;
-					if (triangles > max_polygon_triangles) max_polygon_triangles = triangles;
 				}
 			}
 			partition.max_polygon_triangles = max_polygon_triangles;
@@ -1431,24 +1451,23 @@ Shape::Shape(const Scene& _scene, const IElement& _element)
 }
 
 
-struct ShapeImpl : Shape
-{
+struct ShapeImpl : Shape {
 	std::vector<Vec3> vertices;
 	std::vector<Vec3> normals;
+	std::vector<int> indices;
 
 	ShapeImpl(const Scene& _scene, const IElement& _element)
 		: Shape(_scene, _element)
-	{
-	}
-
+	{}
 
 	bool postprocess(GeometryImpl* geom, Allocator& allocator);
 
-
 	Type getType() const override { return Type::SHAPE; }
 	int getVertexCount() const override { return (int)vertices.size(); }
+	int getIndexCount() const override { return (int)indices.size(); }
 	const Vec3* getVertices() const override { return &vertices[0]; }
 	const Vec3* getNormals() const override { return normals.empty() ? nullptr : &normals[0]; }
+	const int* getIndices() const override { return indices.empty() ? nullptr : &indices[0]; }
 };
 
 
@@ -3179,10 +3198,8 @@ static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl
 }
 
 
-bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator)
-{
+bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator) {
 	PROFILE_FUNCTION();
-#if 0
 	assert(geom);
 
 	const Element* vertices_element = findChild((const Element&)element, "Vertices");
@@ -3194,35 +3211,10 @@ bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator)
 		return false;
 	}
 
-	allocator.vec3_tmp.clear(); // old vertices
-	allocator.dvec3_tmp2.clear(); // old normals
-	allocator.int_tmp.clear(); // old indices
-	if (!parseVecData(*vertices_element->first_property, &allocator.vec3_tmp, &allocator.temporaries)) return true;
-	if (normals_element && !parseVecData(*normals_element->first_property, &allocator.dvec3_tmp2, &allocator.temporaries)) return true;
-	if (!parseVecData(*indexes_element->first_property, &allocator.int_tmp)) return true;
+	if (!parseVecData(*vertices_element->first_property, &vertices)) return false;
+	if (normals_element && !parseVecData(*normals_element->first_property, &normals)) return false;
+	if (!parseVecData(*indexes_element->first_property, &indices)) return false;
 
-	if (allocator.vec3_tmp.size() != allocator.int_tmp.size() || allocator.dvec3_tmp2.size() != allocator.int_tmp.size()) return false;
-
-	vertices = geom->vertices;
-	normals = geom->normals;
-
-	Vec3* vr = &allocator.vec3_tmp[0];
-	Vec3* nr = normals_element ? &allocator.vec3_tmp2[0] : nullptr;
-	int* ir = &allocator.int_tmp[0];
-	for (int i = 0, c = (int)allocator.int_tmp.size(); i < c; ++i)
-	{
-		int old_idx = ir[i];
-		GeometryImpl::NewVertex* n = &geom->to_new_vertices[old_idx];
-		if (n->index == -1) continue; // skip vertices which aren't indexed.
-		while (n)
-		{
-			vertices[n->index] = vertices[n->index] + vr[i];
-			if (normals_element) normals[n->index] = normals[n->index] + nr[i];
-			n = n->next;
-		}
-	}
-#endif
-	// TODO
 	return true;
 }
 
@@ -3627,8 +3619,15 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 	if (!jobs.empty()) {
 		(*job_processor)([](void* ptr){
 			ParseDataJob* job = (ParseDataJob*)ptr;
-			job->error = job->f(job->property, job->data);
+			job->error = !job->f(job->property, job->data);
 		}, job_user_ptr, &jobs[0], (u32)sizeof(jobs[0]), (u32)jobs.size());
+
+		for (const ParseDataJob& job : jobs) {
+			if (job.error) {
+				Error::s_message = "Failed to parse data";
+				return false;
+			}
+		}
 	}
 
 	PROFILE_BLOCK("connections");
@@ -3821,29 +3820,22 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		}
 	}
 
+
 	if (!ignore_geometry) {
+		struct PostprocessJob {
+			Object* obj;
+			bool error = false;
+		};
+		std::vector<PostprocessJob> postprocess_jobs;
 		for (auto iter : scene.m_object_map)
 		{
 			Object* obj = iter.second.object;
 			if (!obj) continue;
 			switch (obj->getType()) {
 				case Object::Type::CLUSTER:
-					if (!((ClusterImpl*)iter.second.object)->postprocess()) {
-						Error::s_message = "Failed to postprocess cluster";
-						return false;
-					}
-					break;
 				case Object::Type::GEOMETRY:
-					if (!((GeometryImpl*)iter.second.object)->postprocess()) {
-						Error::s_message = "Failed to postprocess geometry";
-						return false;
-					}
-					break;
 				case Object::Type::MESH:
-					if (!((MeshImpl*)iter.second.object)->geometry_data.postprocess()) {
-						Error::s_message = "Failed to postprocess geometry";
-						return false;
-					}
+					postprocess_jobs.push_back({obj});
 					break;
 				case Object::Type::BLEND_SHAPE_CHANNEL:
 					if (!((BlendShapeChannelImpl*)iter.second.object)->postprocess(scene.m_allocator)) {
@@ -3858,6 +3850,22 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 					}
 					break;
 				default: break;
+			}
+		}
+
+		if (!postprocess_jobs.empty()) {
+			(*job_processor)([](void* ptr){
+				PostprocessJob* job = (PostprocessJob*)ptr;
+				switch (job->obj->getType()) {
+					case Object::Type::CLUSTER: job->error = !((ClusterImpl*)job->obj)->postprocess(); break;
+					case Object::Type::GEOMETRY: job->error = !((GeometryImpl*)job->obj)->postprocess(); break;
+					case Object::Type::MESH: job->error = !((MeshImpl*)job->obj)->geometry_data.postprocess(); break;
+					default: break;
+				}
+			}, job_user_ptr, &postprocess_jobs[0], (u32)sizeof(postprocess_jobs[0]), (u32)postprocess_jobs.size());
+			for (const PostprocessJob& job : postprocess_jobs) if (job.error) {
+				Error::s_message = "Failed to postprocess object";
+				return false;
 			}
 		}
 	}

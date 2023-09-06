@@ -561,6 +561,9 @@ struct Shape : Object
 	virtual const Vec3* getVertices() const = 0;
 	virtual int getVertexCount() const = 0;
 
+	virtual const int* getIndices() const = 0;
+	virtual int getIndexCount() const = 0;
+
 	virtual const Vec3* getNormals() const = 0;
 };
 
@@ -751,6 +754,7 @@ i64 secondsToFbxTime(double value);
 
 // TODO nonconvex
 inline u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& polygon, int* tri_indices) {
+	if (polygon.vertex_count < 3) return 0;
 	if (polygon.vertex_count == 3) {
 		tri_indices[0] = polygon.from_vertex;
 		tri_indices[1] = polygon.from_vertex + 1;
