@@ -87,7 +87,7 @@ bool PropertyAnimation::load(Span<const u8> mem) {
 	lua_State* L = luaL_newstate(); // TODO reuse
 	auto fn = &LuaWrapper::wrapMethodClosure<&PropertyAnimation::LUA_curve>;
 	lua_pushlightuserdata(L, this);
-	lua_pushcclosure(L, fn, 1);
+	lua_pushcclosure(L, fn, "curve", 1);
 	lua_setglobal(L, "curve");
 
 	return LuaWrapper::execute(L, StringView((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);

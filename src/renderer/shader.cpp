@@ -247,8 +247,7 @@ static void source(lua_State* L, gpu::ShaderType shader_type)
 	stage.type = shader_type;
 
 	lua_Debug ar;
-	lua_getstack(L, 1, &ar);
-	lua_getinfo(L, "nSl", &ar);
+	lua_getinfo(L, 1, "nSl", &ar);
 	const int line = ar.currentline;
 	ASSERT(line >= 0);
 
@@ -270,8 +269,7 @@ static int common(lua_State* L)
 	Shader* shader = getShader(L);
 
 	lua_Debug ar;
-	lua_getstack(L, 1, &ar);
-	lua_getinfo(L, "nSl", &ar);
+	lua_getinfo(L, 1, "nSl", &ar);
 	const int line = ar.currentline;
 	ASSERT(line >= 0);
 
@@ -357,38 +355,38 @@ int include(lua_State* L)
 bool Shader::load(Span<const u8> mem) {
 	lua_State* root_state = m_renderer.getEngine().getState();
 	lua_State* L = lua_newthread(root_state);
-	const int state_ref = luaL_ref(root_state, LUA_REGISTRYINDEX);
-
+	const int state_ref = LuaWrapper::luaL_ref(root_state, LUA_REGISTRYINDEX);
+	
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
-	lua_pushcfunction(L, LuaAPI::common);
+	lua_pushcfunction(L, LuaAPI::common, "common");
 	lua_setfield(L, LUA_GLOBALSINDEX, "common");
-	lua_pushcfunction(L, LuaAPI::vertex_shader);
+	lua_pushcfunction(L, LuaAPI::vertex_shader, "vertex_shader");
 	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
-	lua_pushcfunction(L, LuaAPI::fragment_shader);
+	lua_pushcfunction(L, LuaAPI::fragment_shader, "fragment_shader");
 	lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
-	lua_pushcfunction(L, LuaAPI::compute_shader);
+	lua_pushcfunction(L, LuaAPI::compute_shader, "compute_shader");
 	lua_setfield(L, LUA_GLOBALSINDEX, "compute_shader");
-	lua_pushcfunction(L, LuaAPI::geometry_shader);
+	lua_pushcfunction(L, LuaAPI::geometry_shader, "geometry_shader");
 	lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
-	lua_pushcfunction(L, LuaAPI::include);
+	lua_pushcfunction(L, LuaAPI::include, "include");
 	lua_setfield(L, LUA_GLOBALSINDEX, "include");
-	lua_pushcfunction(L, LuaAPI::import);
+	lua_pushcfunction(L, LuaAPI::import, "import");
 	lua_setfield(L, LUA_GLOBALSINDEX, "import");
-	lua_pushcfunction(L, LuaAPI::texture_slot);
+	lua_pushcfunction(L, LuaAPI::texture_slot, "texture_slot");
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
-	lua_pushcfunction(L, LuaAPI::define);
+	lua_pushcfunction(L, LuaAPI::define, "define");
 	lua_setfield(L, LUA_GLOBALSINDEX, "define");
-	lua_pushcfunction(L, LuaAPI::uniform);
+	lua_pushcfunction(L, LuaAPI::uniform, "uniform");
 	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
 
 	StringView content((const char*)mem.begin(), (u32)mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
-		luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
+		LuaWrapper::luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
 		return false;
 	}
 
-	luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
+	LuaWrapper::luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
 	return true;
 }
 

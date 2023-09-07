@@ -2696,7 +2696,7 @@ struct StudioAppImpl final : StudioApp
 	void runScript(const char* src, const char* script_name) override
 	{
 		lua_State* L = m_engine->getState();
-		bool errors = luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
+		bool errors = LuaWrapper::luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 		if (errors)
 		{

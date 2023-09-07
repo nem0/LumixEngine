@@ -715,7 +715,7 @@ MaterialManager::MaterialManager(Renderer& renderer, IAllocator& allocator)
 	m_state = luaL_newstate();
 
 	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcfunction(m_state, LuaAPI::func); \
+		lua_pushcfunction(m_state, LuaAPI::func, #func); \
 		lua_setfield(m_state, LUA_GLOBALSINDEX, #func); 
 	
 	DEFINE_LUA_FUNC(alpha_ref);
@@ -731,10 +731,10 @@ MaterialManager::MaterialManager(Renderer& renderer, IAllocator& allocator)
 	DEFINE_LUA_FUNC(shader);
 	DEFINE_LUA_FUNC(texture);
 
-	lua_pushcfunction(m_state, &Material::uniform);
+	lua_pushcfunction(m_state, &Material::uniform, "uniform");
 	lua_setfield(m_state, LUA_GLOBALSINDEX, "uniform"); 
 
-	lua_pushcfunction(m_state, &Material::int_uniform);
+	lua_pushcfunction(m_state, &Material::int_uniform, "int_uniform");
 	lua_setfield(m_state, LUA_GLOBALSINDEX, "int_uniform"); 
 
 	#undef DEFINE_LUA_FUNC

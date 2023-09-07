@@ -192,14 +192,15 @@ namespace Lumix
 				lua_setfield(L, -2, "__index"); // [LumixAPI, obj]
 			}
 			lua_pushlightuserdata(L, f);				// [LumixAPI, obj, f]
-			lua_pushcclosure(L, luaMethodClosure, 1); // [LumixAPI, obj, closure]
 
 			if (f->name) {
+				lua_pushcclosure(L, luaMethodClosure, f->name, 1); // [LumixAPI, obj, closure]
 				lua_setfield(L, -2, f->name);
 			} else {
 				const char* fn_name = f->decl_code + strlen(f->decl_code);
 				while (*fn_name != ':' && fn_name != f->decl_code) --fn_name;
 				if (*fn_name == ':') ++fn_name;
+				lua_pushcclosure(L, luaMethodClosure, fn_name, 1); // [LumixAPI, obj, closure]
 				lua_setfield(L, -2, fn_name);
 			}
 			lua_pop(L, 1);
@@ -333,11 +334,11 @@ namespace Lumix
 				Engine& engine = module.m_system.m_engine;
 				lua_State* L = engine.getState();
 				m_state = lua_newthread(L);
-				m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
+				m_thread_ref = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX); // []
 				lua_newtable(m_state); // [env]
 				// reference environment
 				lua_pushvalue(m_state, -1); // [env, env]
-				m_environment = luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
+				m_environment = LuaWrapper::luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
 
 				// environment's metatable & __index
 				lua_pushvalue(m_state, -1); // [env, env]
@@ -414,8 +415,8 @@ namespace Lumix
 
 					Engine& engine = m_cmp->m_module.m_system.m_engine;
 					lua_State* L = engine.getState();
-					luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
-					luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
+					LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
+					LuaWrapper::luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
 				}
 			}
 
@@ -437,11 +438,11 @@ namespace Lumix
 				Engine& engine = module.m_system.m_engine;
 				lua_State* L = engine.getState();
 				m_state = lua_newthread(L);
-				m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
+				m_thread_ref = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX); // []
 				lua_newtable(m_state);						   // [env]
 				// reference environment
 				lua_pushvalue(m_state, -1);							  // [env, env]
-				m_environment = luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
+				m_environment = LuaWrapper::luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
 
 				// environment's metatable & __index
 				lua_pushvalue(m_state, -1);				  // [env, env]
@@ -483,15 +484,15 @@ namespace Lumix
 
 				Engine& engine = m_module.m_system.m_engine;
 				lua_State* L = engine.getState();
-				luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
-				luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
+				LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
+				LuaWrapper::luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
 			}
 
 			void runSource() {
 				lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
 				ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
 
-				bool errors = luaL_loadbuffer(m_state, m_source.c_str(), m_source.length(), "inline script") != 0; // [env, func]
+				bool errors = LuaWrapper::luaL_loadbuffer(m_state, m_source.c_str(), m_source.length(), "inline script") != 0; // [env, func]
 
 				if (errors) {
 					logError("Inline script, entity ", m_entity.index ,": ", lua_tostring(m_state, -1));
@@ -808,7 +809,7 @@ namespace Lumix
 			lua_State* state = script.m_state;
 			if (!state) return false;
 
-			bool errors = luaL_loadbuffer(state, code.begin, code.size(), nullptr) != 0;
+			bool errors = LuaWrapper::luaL_loadbuffer(state, code.begin, code.size(), nullptr) != 0;
 			if (errors) {
 				logError(lua_tostring(state, -1));
 				lua_pop(state, 1);
@@ -1067,7 +1068,7 @@ namespace Lumix
 				LuaWrapper::push(L, entity_index);
 				LuaWrapper::push(L, cmp_type);
 				LuaWrapper::push(L, idx);
-				lua_pushcclosure(L, getter, 5); // {}, mt, getter
+				lua_pushcclosure(L, getter, "getter", 5); // {}, mt, getter
 				lua_setfield(L, -2, "__index"); // {}, mt
 
 				lua_pushlightuserdata(L, (void*)prop);
@@ -1075,7 +1076,7 @@ namespace Lumix
 				LuaWrapper::push(L, entity_index);
 				LuaWrapper::push(L, cmp_type);
 				LuaWrapper::push(L, idx);
-				lua_pushcclosure(L, setter, 5); // {}, mt, getter
+				lua_pushcclosure(L, setter, "setter", 5); // {}, mt, getter
 				lua_setfield(L, -2, "__newindex"); // {}, mt
 
 				lua_setmetatable(L, -2); // {}
@@ -1087,7 +1088,7 @@ namespace Lumix
 			lua_pushlightuserdata(L, (void*)cmp.module); // {}, mt, &prop, module
 			LuaWrapper::push(L, cmp.entity.index); // {}, mt, &prop, module, entity.index
 			LuaWrapper::push(L, cmp.type); // {}, mt, &prop, module, entity.index, cmp_type
-			lua_pushcclosure(L, getter, 4); // {}, mt, getter
+			lua_pushcclosure(L, getter, "getter", 4); // {}, mt, getter
 			lua_setfield(L, -2, "__index"); // {}, mt
 			lua_setmetatable(L, -2); // {}
 		}
@@ -1277,7 +1278,7 @@ namespace Lumix
 			for (auto* f : cmp->functions) {
 				if (equalStrings(v.prop_name, f->name)) {
 					lua_pushlightuserdata(L, (void*)f);
-					lua_pushcclosure(L, luaCmpMethodClosure, 1);
+					lua_pushcclosure(L, luaCmpMethodClosure, f->name, 1);
 					return 1;
 				}
 			}
@@ -1338,7 +1339,7 @@ namespace Lumix
 				lua_pushvalue(L, -1); // [ module, module ]
 				lua_setfield(L, -2, "__index"); // [ module ]
 
-				lua_pushcfunction(L, lua_new_module); // [ module, fn_new_module ]
+				lua_pushcfunction(L, lua_new_module, "new"); // [ module, fn_new_module ]
 				lua_setfield(L, -2, "new"); // [ module ]
 
 				for (const reflection::FunctionBase* f :  module->functions) {
@@ -1347,7 +1348,7 @@ namespace Lumix
 					ASSERT(*c == ':');
 					c += 2;
 					lua_pushlightuserdata(L, (void*)f); // [module, f]
-					lua_pushcclosure(L, luaModuleMethodClosure, 1); // [module, fn]
+					lua_pushcclosure(L, luaModuleMethodClosure, c, 1); // [module, fn]
 					lua_setfield(L, -2, c); // [module]
 				}
 				lua_pop(L, 1); // []
@@ -1365,17 +1366,17 @@ namespace Lumix
 				lua_setfield(L, -2, cmp_name); // [ cmp, Lumix ]
 				lua_pop(L, 1); // [ cmp ]
 
-				lua_pushcfunction(L, lua_new_cmp); // [ cmp, fn_new_cmp ]
+				lua_pushcfunction(L, lua_new_cmp, "new"); // [ cmp, fn_new_cmp ]
 				lua_setfield(L, -2, "new"); // [ cmp ]
 
 				LuaWrapper::setField(L, -1, "cmp_type", cmp_type.index);
 
 				LuaWrapper::push(L, cmp_type); // [ cmp, cmp_type ]
-				lua_pushcclosure(L, lua_prop_getter, 1); // [ cmp, fn_prop_getter ]
+				lua_pushcclosure(L, lua_prop_getter, "getter", 1); // [ cmp, fn_prop_getter ]
 				lua_setfield(L, -2, "__index"); // [ cmp ]
 				
 				LuaWrapper::push(L, cmp_type); // [ cmp, cmp_type ]
-				lua_pushcclosure(L, lua_prop_setter, 1); // [ cmp, fn_prop_setter ]
+				lua_pushcclosure(L, lua_prop_setter, "setter", 1); // [ cmp, fn_prop_setter ]
 				lua_setfield(L, -2, "__newindex"); // [ cmp ]
 
 				lua_pop(L, 1);
@@ -1404,7 +1405,7 @@ namespace Lumix
 			timer.time = time;
 			timer.state = L;
 			lua_pushvalue(L, 3);
-			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
+			timer.func = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
 			lua_pop(L, 1);
 			LuaWrapper::push(L, timer.func);
 			return 1;
@@ -1544,7 +1545,7 @@ namespace Lumix
 			if (prop.type == Property::STRING) tmp.append("\"", value, "\"");
 			else tmp.append(value);
 
-			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
+			bool errors = LuaWrapper::luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
 			if (errors)
 			{
 				logError(script.m_script->getPath(), ": ", lua_tostring(state, -1));
@@ -1618,7 +1619,7 @@ namespace Lumix
 			{
 				if (m_timers[i].state == inst.m_state)
 				{
-					luaL_unref(m_timers[i].state, LUA_REGISTRYINDEX, m_timers[i].func);
+					LuaWrapper::luaL_unref(m_timers[i].state, LUA_REGISTRYINDEX, m_timers[i].func);
 					m_timers.swapAndPop(i);
 					--i;
 				}
@@ -2113,7 +2114,7 @@ namespace Lumix
 			for (u32 i = timers_to_remove_count - 1; i != 0xffFFffFF; --i)
 			{
 				auto& timer = m_timers[timers_to_remove[i]];
-				luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
+				LuaWrapper::luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
 				m_timers.swapAndPop(timers_to_remove[i]);
 			}
 		}
@@ -2412,7 +2413,7 @@ namespace Lumix
 		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
 		ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
 
-		bool errors = luaL_loadbuffer(m_state,
+		bool errors = LuaWrapper::luaL_loadbuffer(m_state,
 			m_script->getSourceCode().begin,
 			m_script->getSourceCode().size(),
 			m_script->getPath().c_str()) != 0; // [env, func]

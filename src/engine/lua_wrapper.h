@@ -4,8 +4,8 @@
 #include "engine/math.h"
 #include "engine/metaprogramming.h"
 #include "engine/path.h"
-#include <lua.hpp>
-#include <lauxlib.h>
+#include <lua.h>
+#include <lualib.h>
 
 namespace Lumix {
 
@@ -53,6 +53,9 @@ LUMIX_ENGINE_API int traceback (lua_State *L);
 LUMIX_ENGINE_API bool pcall(lua_State* L, int nargs, int nres);
 LUMIX_ENGINE_API bool execute(lua_State* L, StringView content, const char* name, int nresults);
 LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k);
+LUMIX_ENGINE_API void luaL_unref(lua_State* L, int t, int ref);
+LUMIX_ENGINE_API int luaL_ref(lua_State* L, int idx);
+LUMIX_ENGINE_API int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name);
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {
@@ -533,13 +536,13 @@ inline void push(lua_State* L, u8 value)
 {
 	lua_pushinteger(L, value);
 }
-inline void push(lua_State* L, unsigned int value)
+inline void push(lua_State* L, u32 value)
 {
 	lua_pushinteger(L, value);
 }
 inline void push(lua_State* L, u64 value)
 {
-	lua_pushinteger(L, value);
+	lua_pushnumber(L, double(value));
 }
 template <> inline void push(lua_State* L, void* value)
 {
@@ -822,7 +825,7 @@ template <auto t> int wrapMethodClosure(lua_State* L)
 	int index = lua_upvalueindex(1);
 	if (!isType<C>(L, index)) {
 		ASSERT(false);
-		return luaL_error(L, "Invalid Lua closure");
+		luaL_error(L, "Invalid Lua closure");
 	}
 	auto* inst = checkArg<C*>(L, index);
 	return details::Caller<indices>::callMethod(inst, t, L);

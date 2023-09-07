@@ -18,7 +18,8 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "engine/world.h"
-#include <lua.hpp>
+#include <lua.h>
+#include <lualib.h>
 
 namespace Lumix
 {

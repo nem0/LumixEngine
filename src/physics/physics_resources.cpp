@@ -180,7 +180,7 @@ PhysicsMaterialManager::PhysicsMaterialManager(PhysicsSystem& system, IAllocator
 {
 	state = luaL_newstate();
 	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcfunction(state, LuaAPI::func); \
+		lua_pushcfunction(state, LuaAPI::func, #func); \
 		lua_setfield(state, LUA_GLOBALSINDEX, #func); 
 	
 	DEFINE_LUA_FUNC(static_friction);
