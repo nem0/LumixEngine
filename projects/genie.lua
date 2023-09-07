@@ -283,16 +283,20 @@ end
 function useLua()
 	configuration { "vs20*" }
 		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/win64_vs2017") }
-
-	configuration { "linux" }
-		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/linux64_gmake") }
-
-	configuration {}
 		links "Luau.VM"
 		links "Luau.Compiler"
 		links "Luau.CodeGen"
 		links "Luau.Ast"
 		links "Luau.Config"
+
+	configuration { "linux" }
+		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/linux64_gmake") }
+		links "luauvm"
+		links "luaucompiler"
+		links "luaucodegen"
+		links "luauast"
+
+	configuration {}
 	
 	includedirs { path.join(ROOT_DIR, "./external/luau/include") }
 end
