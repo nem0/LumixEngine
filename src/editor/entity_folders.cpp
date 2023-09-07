@@ -25,14 +25,19 @@ EntityFolders::~EntityFolders() {
 	m_world.entityDestroyed().unbind<&EntityFolders::onEntityDestroyed>(this);
 }
 
-EntityFolders::FolderHandle EntityFolders::getRoot(World::PartitionHandle partition) const {
+EntityFolders::FolderHandle EntityFolders::getRoot(World::PartitionHandle partition) {
 	for (const Folder& f : m_folders) {
 		if (f.parent != INVALID_FOLDER) continue;
 		ASSERT(f.next == INVALID_FOLDER);
 		ASSERT(f.prev == INVALID_FOLDER);
 		if (f.partition == partition) return f.id;
 	}
-	return INVALID_FOLDER;
+	// partition created at runtime, create folder for it
+	Folder& f = m_folders.emplace();
+	f.id = randGUID();
+	f.partition = partition;
+	copyString(f.name, "runtime folder");
+	return f.id;
 }
 
 EntityFolders::FolderHandle EntityFolders::generateUniqueID() {
