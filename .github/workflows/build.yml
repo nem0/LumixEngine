@@ -104,8 +104,12 @@ jobs:
               mkdir -p ../external/physx/lib/linux64_gmake/release
               mkdir -p ../external/recast/lib/linux64_gmake/release
               git clone --depth=1 https://github.com/nem0/lumixengine_linux_3rdparty_bin.git
+              git clone --depth=1 https://github.com/nem0/luau.git
+              pushd 3rdparty/luau/
+              make config=release luau
+              popd
               cp lumixengine_linux_3rdparty_bin/freetype/* ../external/freetype/lib/linux64_gmake/release
-              cp lumixengine_linux_3rdparty_bin/luau/* ../external/luau/lib/linux64_gmake
+              cp luau/build/release/*.a ../external/luau/lib/linux64_gmake
               cp lumixengine_linux_3rdparty_bin/physx/* ../external/physx/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/recast/* ../external/recast/lib/linux64_gmake/release
           - name: build
