@@ -457,7 +457,7 @@ static int LUA_networkRead(lua_State* L) {
 	char tmp[4096];
 	os::NetworkStream* stream = LuaWrapper::checkArg<os::NetworkStream*>(L, 1);
 	u32 size = LuaWrapper::checkArg<u32>(L, 2);
-	if (size > sizeof(tmp)) luaL_error(L, "size too big, max %d allowed", sizeof(tmp));
+	if (size > sizeof(tmp)) luaL_error(L, "size too big, max %d allowed", (int)sizeof(tmp));
 	if (!os::read(*stream, tmp, size)) return 0;
 	lua_pushlstring(L, tmp, size);
 	return 1;
@@ -753,7 +753,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 		luaL_argerror(L, 3, "Unknown prefab.");
 	}
 	if (!prefab->isReady()) {
-		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath());
+		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
 	}
 	EntityMap entity_map(engine->getAllocator());
 	if (engine->instantiatePrefab(*world, *prefab, position, {0, 0, 0, 1}, {1, 1, 1}, entity_map)) {
