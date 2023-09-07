@@ -28,7 +28,7 @@ Who is using it?
 
 3rd party libraries
 
-* [LuaJIT](https://github.com/LuaJIT/LuaJIT/)
+* [Luau](https://github.com/Roblox/luau)
 * [rgbcx](https://github.com/richgel999/bc7enc/blob/master/rgbcx.h)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
