@@ -34,7 +34,7 @@ struct LUMIX_EDITOR_API EntityFolders final {
 	~EntityFolders();
 
 	void ignoreNewEntities(bool ignore) { m_ignore_new_entities = ignore; }
-	FolderHandle getRoot(World::PartitionHandle partition) const;
+	FolderHandle getRoot(World::PartitionHandle partition);
 	Folder& getFolder(FolderHandle folder_handle);
 	const Folder& getFolder(FolderHandle folder_handle) const;
 	void moveToFolder(EntityRef e, FolderHandle folder);

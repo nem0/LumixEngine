@@ -602,6 +602,18 @@ static void LUA_logError(const char* text) { logError(text); }
 static void LUA_logInfo(const char* text) { logInfo(text); }
 static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
 
+static void LUA_setActivePartition(World* world, u16 partition) {
+	world->setActivePartition(World::PartitionHandle(partition));
+}
+
+static u16 LUA_createPartition(World* world, const char* name) {
+	return (u16)world->createPartition(name);
+}
+
+static u16 LUA_getActivePartition(World* world) {
+	return (u16)world->getActivePartition();
+}
+
 static int LUA_loadWorld(lua_State* L)
 {
 	Engine* engine = getEngineUpvalue(L);
@@ -616,17 +628,6 @@ static int LUA_loadWorld(lua_State* L)
 				logError("Failed to open world ", path);
 			} else {
 				InputMemoryStream blob(mem);
-				#pragma pack(1)
-					struct Header {
-						u32 magic;
-						int version;
-						u32 hash;
-						u32 engine_hash;
-					};
-				#pragma pack()
-				Header header;
-				blob.read(&header, sizeof(header));
-
 				EntityMap entity_map(engine->getAllocator());
 				WorldVersion editor_version;
 				if (!world->deserialize(blob, entity_map, editor_version)) {
@@ -786,6 +787,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(destroyEntity);
 	REGISTER_FUNCTION(destroyWorld);
 	REGISTER_FUNCTION(findByName);
+	REGISTER_FUNCTION(getActivePartition);
+	REGISTER_FUNCTION(setActivePartition);
+	REGISTER_FUNCTION(createPartition);
 	REGISTER_FUNCTION(getEntityName);
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);
@@ -991,6 +995,15 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			setmetatable(u, self)
 			self.__index = self
 			return u
+		end
+		function Lumix.World:setActivePartition(partition)
+			LumixAPI.setActivePartition(self.value, partition)
+		end
+		function Lumix.World:getActivePartition()
+			return LumixAPI.getActivePartition(self.value)
+		end
+		function Lumix.World:createPartition(name)
+			return LumixAPI.createPartition(self.value, name)
 		end
 		function Lumix.World:createEntity()
 			local e = LumixAPI.createEntity(self.value)
