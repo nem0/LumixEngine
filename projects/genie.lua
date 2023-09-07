@@ -282,11 +282,15 @@ end
 
 function useLua()
 	configuration { "vs20*" }
-		linkLib "lua51"
+		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/win64_vs2017") }
+		links "Luau.VM"
+		links "Luau.Compiler"
+		links "Luau.CodeGen"
+		links "Luau.Ast"
+		links "Luau.Config"
 	
 	configuration {}
-	linkLib "luajit"
-	includedirs { path.join(ROOT_DIR, "./external/luajit/include") }
+	includedirs { path.join(ROOT_DIR, "./external/luau/include") }
 end
 
 function libType()
@@ -514,17 +518,15 @@ project "engine"
 		defines { "LZ4_DLL_EXPORT" }
 	end
 	
-	includedirs { "../external/luajit/include", "../external/freetype/include" }
+	includedirs { "../external/luau/include", "../external/freetype/include" }
 
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 	
-	configuration { "vs20*" }
-		linkLib "lua51"
+	useLua()
 	
 	configuration {}
 	
-	linkLib "luajit"
 	if _OPTIONS["dynamic-plugins"] then
 		linkLib "freetype"
 	end
@@ -789,7 +791,6 @@ if build_app then
 				linkLib "basisu"
 			end
 			linkLib "freetype"
-			linkLib "luajit"
 			linkLib "recast"
 			
 			configuration { "vs*" }
@@ -805,7 +806,7 @@ if build_app then
 			end
 		end
 		
-		linkLib "luajit"
+		useLua()
 		linkLib "recast"
 		files { "../src/app/main.cpp" }
 
@@ -962,7 +963,7 @@ if build_studio then
 				linkLib "basisu"
 			end
 			linkLib "freetype"
-			linkLib "luajit"
+			useLua()
 			linkLib "recast"
 			
 			if has_plugin("renderer") then

@@ -10,7 +10,8 @@
 #include "reflection.h"
 #include "string.h"
 #include "world.h"
-#include <lua.hpp>
+#include <lua.h>
+#include <luacode.h>
 
 namespace Lumix {
 
@@ -378,70 +379,12 @@ int SameLine(lua_State* L)
 
 void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 {
-	lua_pushcfunction(L, f);
+	lua_pushcfunction(L, f, name);
 	lua_setfield(L, -2, name);
 }
 
 } // namespace LuaImGui
 
-
-static int LUA_packageLoader(lua_State* L)
-{
-	const char* module = LuaWrapper::toType<const char*>(L, 1);
-	Path tmp(module);
-	lua_getglobal(L, "LumixAPI");
-	lua_getfield(L, -1, "engine");
-	lua_remove(L, -2);
-	auto* engine = (Engine*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	auto& fs = engine->getFileSystem();
-	OutputMemoryStream buf(engine->getAllocator());
-	bool loaded = true;
-	if (!fs.getContentSync(tmp, buf)) {
-		tmp.append(".lua");
-		if (!fs.getContentSync(tmp, buf)) {
-			loaded = false;
-			logError("Failed to open file ", tmp);
-			StaticString<MAX_PATH + 40> msg("Failed to open file ");
-			msg.append(tmp);
-			lua_pushstring(L, msg);
-		}
-	}
-	if (loaded && luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp.c_str()) != 0) {
-		logError("Failed to load package ", tmp, ": ", lua_tostring(L, -1));
-	}
-	return 1;
-}
-
-
-static void installLuaPackageLoader(lua_State* L)
-{
-	lua_getglobal(L, "package");
-	if (lua_type(L, -1) != LUA_TTABLE) {
-		logError("Lua \"package\" is not a table");
-		return;
-	}
-	lua_getfield(L, -1, "searchers");
-	if (lua_type(L, -1) != LUA_TTABLE) {
-		lua_pop(L, 1);
-		lua_getfield(L, -1, "loaders");
-		if (lua_type(L, -1) != LUA_TTABLE) {
-			logError("Lua \"package.searchers\"/\"package.loaders\" is not a table");
-			return;
-		}
-	}
-	int numLoaders = 0;
-	lua_pushnil(L);
-	while (lua_next(L, -2) != 0) {
-		lua_pop(L, 1);
-		numLoaders++;
-	}
-
-	lua_pushinteger(L, numLoaders + 1);
-	lua_pushcfunction(L, LUA_packageLoader);
-	lua_rawset(L, -3);
-	lua_pop(L, 2);
-}
 
 static Engine* getEngineUpvalue(lua_State* L) {
 	const int index = lua_upvalueindex(1);
@@ -514,7 +457,7 @@ static int LUA_networkRead(lua_State* L) {
 	char tmp[4096];
 	os::NetworkStream* stream = LuaWrapper::checkArg<os::NetworkStream*>(L, 1);
 	u32 size = LuaWrapper::checkArg<u32>(L, 2);
-	if (size > sizeof(tmp)) return luaL_error(L, "size too big, max %d allowed", sizeof(tmp));
+	if (size > sizeof(tmp)) luaL_error(L, "size too big, max %d allowed", sizeof(tmp));
 	if (!os::read(*stream, tmp, size)) return 0;
 	lua_pushlstring(L, tmp, size);
 	return 1;
@@ -530,7 +473,7 @@ static int LUA_unpackU32(lua_State* L) {
 	size_t size;
 	const char* lstr = lua_tolstring(L, 1, &size);
 	u32 val;
-	if (sizeof(val) != size) return luaL_error(L, "Invalid argument");
+	if (sizeof(val) != size) luaL_error(L, "Invalid argument");
 	
 	memcpy(&val, lstr, sizeof(val));
 	lua_pushnumber(L, val);
@@ -666,7 +609,7 @@ static int LUA_loadWorld(lua_State* L)
 	auto* name = LuaWrapper::checkArg<const char*>(L, 2);
 	if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
 	struct Callback {
-		~Callback() { luaL_unref(L, LUA_REGISTRYINDEX, lua_func); }
+		~Callback() { LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, lua_func); }
 
 		void invoke(Span<const u8> mem, bool success) {
 			if (!success) {
@@ -717,9 +660,82 @@ static int LUA_loadWorld(lua_State* L)
 	const Path path("universes/", name, ".unv");
 	inst->path = path;
 	inst->L = L;
-	inst->lua_func = luaL_ref(L, LUA_REGISTRYINDEX);
+	inst->lua_func = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
 	fs.getContent(inst->path, makeDelegate<&Callback::invoke>(inst));
 	return 0;
+}
+
+static int finishrequire(lua_State* L)
+{
+    if (lua_isstring(L, -1))
+        lua_error(L);
+
+    return 1;
+}
+
+static int LUA_require(lua_State* L) {
+    const char* name = luaL_checkstring(L, 1);
+
+    luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
+
+    // return the module from the cache
+    lua_getfield(L, -1, name);
+    if (!lua_isnil(L, -1))
+    {
+        // L stack: _MODULES result
+        return finishrequire(L);
+    }
+
+    lua_pop(L, 1);
+
+	Engine* engine = LuaWrapper::toType<Engine*>(L, lua_upvalueindex(1));
+	StaticString<MAX_PATH> path(name, ".lua");
+	OutputMemoryStream blob(engine->getAllocator());
+	if (!engine->getFileSystem().getContentSync(Path(path), blob)) {
+		luaL_argerrorL(L, 1, "error loading module");
+	}
+
+    // module needs to run in a new thread, isolated from the rest
+    // note: we create ML on main thread so that it doesn't inherit environment of L
+    lua_State* GL = lua_mainthread(L);
+    lua_State* ML = lua_newthread(GL);
+    lua_xmove(GL, L, 1);
+
+    // new thread needs to have the globals sandboxed
+    luaL_sandboxthread(ML);
+
+    // now we can compile & run module on the new thread
+	size_t bytecode_size;
+	char* bytecode = luau_compile((const char*)blob.data(), blob.size(), nullptr, &bytecode_size);
+    if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
+    {
+        int status = lua_resume(ML, L, 0);
+
+        if (status == 0)
+        {
+            if (lua_gettop(ML) == 0)
+                lua_pushstring(ML, "module must return a value");
+            else if (!lua_istable(ML, -1) && !lua_isfunction(ML, -1))
+                lua_pushstring(ML, "module must return a table or function");
+        }
+        else if (status == LUA_YIELD)
+        {
+            lua_pushstring(ML, "module can not yield");
+        }
+        else if (!lua_isstring(ML, -1))
+        {
+            lua_pushstring(ML, "unknown error while running module");
+        }
+    }
+	free(bytecode);
+
+    // there's now a return value on top of ML; L stack: _MODULES ML
+    lua_xmove(ML, L, 1);
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -4, name);
+
+    // L stack: _MODULES ML result
+    return finishrequire(L);
 }
 
 static int LUA_instantiatePrefab(lua_State* L) {
@@ -751,6 +767,10 @@ static int LUA_instantiatePrefab(lua_State* L) {
 
 void registerEngineAPI(lua_State* L, Engine* engine)
 {
+	lua_pushlightuserdata(L, engine);
+	lua_pushcclosure(L, &LUA_require, "require", 1);
+	lua_setglobal(L, "require");
+
 	LuaWrapper::createSystemVariable(L, "LumixAPI", "engine", engine);
 
 	#define REGISTER_FUNCTION(name) \
@@ -1008,8 +1028,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	if (!LuaWrapper::execute(L, entity_src, __FILE__ "(" TO_STR(__LINE__) ")", 0)) {
 		logError("Failed to init entity api");
 	}
-
-	installLuaPackageLoader(L);
 }
 
 

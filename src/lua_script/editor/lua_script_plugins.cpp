@@ -24,7 +24,7 @@
 #include "engine/world.h"
 #include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
-#include <lua.hpp>
+#include <lua.h>
 
 
 using namespace Lumix;
@@ -143,7 +143,6 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		m_toggle_ui.is_selected.bind<&ConsolePlugin::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);
 		buf[0] = '\0';
-		runEditorLua();
 	}
 
 	~ConsolePlugin() {
@@ -294,7 +293,6 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	void onGUI() override
 	{
 		if (!open) return;
-		tickEditorLua();
 		if (ImGui::Begin("Lua console##lua_console", &open))
 		{
 			if (ImGui::Button("Execute")) {
@@ -313,7 +311,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 				else {
 					L = app.getEngine().getState();
 				
-					bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != 0;
+					bool errors = LuaWrapper::luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != 0;
 					errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 
 					if (errors)
@@ -342,7 +340,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 						}
 						file.close();
 						lua_State* L = app.getEngine().getState();
-						bool errors = luaL_loadbuffer(L, &data[0], data.size(), tmp) != 0;
+						bool errors = LuaWrapper::luaL_loadbuffer(L, &data[0], data.size(), tmp) != 0;
 						errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 
 						if (errors)
@@ -401,48 +399,6 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		ImGui::End();
 	}
 
-	
-	void runEditorLua() {
-		OutputMemoryStream blob(app.getAllocator());
-		const char* path = "scripts/editor_main.lua";
-		Engine& engine = app.getEngine();
-		if (!engine.getFileSystem().getContentSync(Path(path), blob)) return;
-
-		StringView sv;
-		sv.begin = (const char*)blob.data();
-		sv.end = sv.begin + blob.size();
-		if (LuaWrapper::execute(engine.getState(), sv, path, 1)) {
-			if (lua_isthread(engine.getState(), -1)) {
-				m_editor_lua_state_ref = luaL_ref(engine.getState(), LUA_REGISTRYINDEX);
-			}
-		}
-	}
-
-	void tickEditorLua() {
-		if (m_editor_lua_state_ref == -1) return;
-
-		Engine& engine = app.getEngine();
-		lua_State* L = engine.getState();
-		LuaWrapper::DebugGuard guard(L);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
-		lua_State* coroutine = lua_tothread(L, -1);
-		i32 res = lua_resume(coroutine, 0);
-		if (res == LUA_OK) {
-			luaL_unref(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
-			m_editor_lua_state_ref = -1;
-		}
-		else if (res != LUA_YIELD) {
-			const char* error_msg2 = lua_tostring(coroutine, -1);
-			logError("editor main: ", error_msg2);
-			LuaWrapper::traceback(coroutine);
-			const char* error_msg = lua_tostring(coroutine, -1);
-			logError("editor main: ", error_msg);
-			luaL_unref(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
-			m_editor_lua_state_ref = -1;
-		}
-		lua_pop(L, 1);
-	}
-
 	StudioApp& app;
 	Action m_toggle_ui;
 	Array<String> autocomplete;
@@ -452,7 +408,6 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	int autocomplete_selected = 1;
 	const char* insert_value = nullptr;
 	char buf[10 * 1024];
-	i32 m_editor_lua_state_ref = -1;
 };
 
 

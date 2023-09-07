@@ -111,7 +111,7 @@ bool Sprite::load(Span<const u8> mem) {
 	lua_State* L = luaL_newstate();
 
 	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcfunction(L, LuaSpriteAPI::func); \
+		lua_pushcfunction(L, LuaSpriteAPI::func, #func); \
 		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
 	
 	DEFINE_LUA_FUNC(type);

@@ -833,8 +833,8 @@ struct PipelineImpl final : Pipeline
 	{
 		if (m_lua_state)
 		{
-			luaL_unref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX, m_lua_thread_ref);
-			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+			LuaWrapper::luaL_unref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX, m_lua_thread_ref);
+			LuaWrapper::luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 			m_lua_state = nullptr;
 		}
 	}
@@ -844,7 +844,7 @@ struct PipelineImpl final : Pipeline
 		if (m_define == "") return;
 		StaticString<256> tmp(m_define, " = true");
 
-		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), m_resource->getPath().c_str()) != 0;
+		bool errors = LuaWrapper::luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
 			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
@@ -879,7 +879,7 @@ struct PipelineImpl final : Pipeline
 
 		StaticString<1024> tmp("function ", handler.name, "() executeCustomCommand(\"", handler.name, "\") end");
 
-		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), "exposeCustomCommandToLua") != 0;
+		bool errors = LuaWrapper::luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), "exposeCustomCommandToLua") != 0;
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_setfenv(m_lua_state, -2);
 		errors = errors || lua_pcall(m_lua_state, 0, 0, 0) != 0;
@@ -898,11 +898,11 @@ struct PipelineImpl final : Pipeline
 		cleanup();
 
 		m_lua_state = lua_newthread(m_renderer.getEngine().getState());
-		m_lua_thread_ref = luaL_ref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX);
+		m_lua_thread_ref = LuaWrapper::luaL_ref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX);
 
 		lua_newtable(m_lua_state);
 		lua_pushvalue(m_lua_state, -1);
-		m_lua_env = luaL_ref(m_lua_state, LUA_REGISTRYINDEX);
+		m_lua_env = LuaWrapper::luaL_ref(m_lua_state, LUA_REGISTRYINDEX);
 		lua_pushvalue(m_lua_state, -1);
 		lua_setmetatable(m_lua_state, -2);
 		lua_pushvalue(m_lua_state, LUA_GLOBALSINDEX);
@@ -923,11 +923,11 @@ struct PipelineImpl final : Pipeline
 		}
 
 		setDefine();
-
+	
 		const char* content = m_resource->content.c_str();
 		const int content_size = m_resource->content.length();
 		bool errors =
-			luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
+			LuaWrapper::luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
 			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
@@ -944,7 +944,7 @@ struct PipelineImpl final : Pipeline
 			lua_pop(m_lua_state, 1);
 			return;
 		}
-
+		
 		m_viewport.w = m_viewport.h = 800;
 		if (m_module) callInitModule();
 	}
@@ -3829,7 +3829,7 @@ struct PipelineImpl final : Pipeline
 
 		auto registerCFunction = [L, this](const char* name, lua_CFunction function) {
 			lua_pushlightuserdata(L, this);
-			lua_pushcclosure(L, function, 1);
+			lua_pushcclosure(L, function, name, 1);
 			lua_setfield(L, -3, name);
 		};
 
@@ -3914,7 +3914,7 @@ struct PipelineImpl final : Pipeline
 					lua_getfield(L, -1, "Draw2D");	 \
 				}									 \
 				lua_pushlightuserdata(L, &m_draw2d); \
-				lua_pushcclosure(L, f, 1);			 \
+				lua_pushcclosure(L, f, #fn_name, 1); \
 				lua_setfield(L, -2, #fn_name);		 \
 				lua_pop(L, 1);						 \
 			} while(false)							 \

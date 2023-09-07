@@ -1,4 +1,4 @@
-require "scripts/math"
+local math = require "scripts/math"
  
 local forward = 0
 local backward = 0
@@ -77,7 +77,7 @@ end
 
 function onControllerHit(obj)
     local a = obj.rigid_actor
-	local force = mulVec3Num(yawToDir(yaw), 50)
+	local force = math.mulVec3Num(math.yawToDir(yaw), 50)
     a:applyForce(force)
 end
 
@@ -127,8 +127,8 @@ function update(td)
     this.animator:setBoolInput(crouched_input_idx, crouched)
     this.animator:setBoolInput(falling_input_idx, gravity_speed < -4)
     this.animator:setBoolInput(aiming_input_idx, aiming)
-	local yaw_rot = makeQuatFromYaw(yaw)
-    local pitch_rot = makeQuatFromPitch(pitch)
+	local yaw_rot = math.makeQuatFromYaw(yaw)
+    local pitch_rot = math.makeQuatFromPitch(pitch)
     this.rotation = yaw_rot
-    camera_pivot.rotation = mulquat(yaw_rot, pitch_rot)
+    camera_pivot.rotation = math.mulquat(yaw_rot, pitch_rot)
 end

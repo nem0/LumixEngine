@@ -21,6 +21,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "lz4/lz4.h"
+#include <luacode.h>
 
 // use this if you want to be able to use cached resources without having the original
 // #define CACHE_MASTER
@@ -398,7 +399,11 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (fs.getContentSync(Path(".lumix/resources/_list.txt"), content)) {
 			lua_State* L = luaL_newstate();
 			[&](){
-				if (luaL_loadbuffer(L, (const char*)content.data(), content.size(), "lumix_asset_list") != 0) {
+				size_t bytecodeSize = 0;
+				char* bytecode = luau_compile((const char*)content.data(), content.size(), NULL, &bytecodeSize);
+				int res = luau_load(L, "lumix_asset_list", bytecode, bytecodeSize, 0);
+				free(bytecode);
+				if (res != 0) {
 					logError(list_path, ": ", lua_tostring(L, -1));
 					return;
 				}

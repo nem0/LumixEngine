@@ -3209,45 +3209,32 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			return 0;
 		};
 
-		lua_pushcclosure(L, reg_dep, 0);
+		lua_pushcclosure(L, reg_dep, "include", 0);
 		lua_setfield(L, LUA_GLOBALSINDEX, "include");
-		lua_pushcclosure(L, reg_dep, 0);
+		lua_pushcclosure(L, reg_dep, "import", 0);
 		lua_setfield(L, LUA_GLOBALSINDEX, "import");
 
 		static const char* preface = 
 			"local new_g = setmetatable({include = include, import = import}, {__index = function() return function() end end })\n"
 			"setfenv(1, new_g)\n";
 
-		auto reader = [](lua_State* L, void* data, size_t* size) -> const char* {
-			Context* ctx = (Context*)data;
-			++ctx->idx;
-			switch(ctx->idx) {
-				case 1: 
-					*size = stringLength(preface);
-					return preface;
-				case 2: 
-					*size = ctx->content_len;
-					return (const char*)ctx->content;
-				default:
-					*size = 0;
-					return nullptr;
-			}
-		};
-
-		if (lua_load(L, reader, &ctx, path.c_str()) != 0) {
+		OutputMemoryStream tmp(m_app.getAllocator());
+		tmp.write(preface, stringLength(preface));
+		tmp.write(content.data(), content.size());
+		
+		if (LuaWrapper::luaL_loadbuffer(L, (const char*)tmp.data(), tmp.size(), path.c_str()) != 0) {
 			logError(path, ": ", lua_tostring(L, -1));
 			lua_pop(L, 2);
 			lua_close(L);
 			return;
 		}
 
-		if (lua_pcall(L, 0, 0, -2) != 0) {
+		if (lua_pcall(L, 0, 0, 0) != 0) {
 			logError(lua_tostring(L, -1));
 			lua_pop(L, 2);
 			lua_close(L);
 			return;
 		}
-		lua_pop(L, 1);
 		lua_close(L);
 	}
 

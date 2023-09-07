@@ -1,6 +1,7 @@
 #include "lua_wrapper.h"
 #include "log.h"
 #include "string.h"
+#include <luacode.h>
 
 namespace Lumix::LuaWrapper {
 
@@ -59,7 +60,7 @@ int traceback(lua_State *L) {
 
 bool pcall(lua_State* L, int nargs, int nres)
 {
-	lua_pushcfunction(L, traceback);
+	lua_pushcfunction(L, traceback, "traceback");
 	lua_insert(L, -2 - nargs);
 	if (lua_pcall(L, nargs, nres, -2 - nargs) != 0) {
 		logError(lua_tostring(L, -1));
@@ -76,8 +77,13 @@ bool execute(lua_State* L
 	, const char* name
 	, int nresults)
 {
-	lua_pushcfunction(L, traceback);
-	if (luaL_loadbuffer(L, content.begin, content.size(), name) != 0) {
+	lua_pushcfunction(L, traceback, "traceback");
+	
+	size_t bytecodeSize = 0;
+	char* bytecode = luau_compile((const char*)content.begin, content.size(), NULL, &bytecodeSize);
+	int res = luau_load(L, name, bytecode, bytecodeSize, 0);
+	free(bytecode);
+	if (res != 0) {
 		logError(name, ": ", lua_tostring(L, -1));
 		lua_pop(L, 2);
 		return false;
@@ -145,6 +151,25 @@ void pushEntity(lua_State* L, EntityPtr value, World* world) {
 	ASSERT(!error);
 }
 
+int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name) {
+	size_t bytecode_size;
+	char* bytecode = luau_compile(buff, size, nullptr, &bytecode_size);
+	if (!bytecode) return 1;
+	int res = luau_load(L, name ? name : "N/A", bytecode, bytecode_size, 0);
+	free(bytecode);
+	return res;
+}
+
+void luaL_unref(lua_State* L, int t, int ref) {
+	lua_unref(L, ref);
+}
+
+int luaL_ref(lua_State* L, int idx) {
+	int r = lua_ref(L, -1);
+    lua_pop(L, 1);
+    return r;
+}
+
 int getField(lua_State* L, int idx, const char* k) {
 	lua_getfield(L, idx, k);
 	return lua_type(L, -1);
@@ -202,7 +227,7 @@ void createSystemFunction(lua_State* L, const char* system, const char* var_name
 		lua_setglobal(L, system);
 		lua_getglobal(L, system);
 	}
-	lua_pushcfunction(L, fn);
+	lua_pushcfunction(L, fn, var_name);
 	lua_setfield(L, -2, var_name);
 	lua_pop(L, 1);
 }
@@ -216,7 +241,7 @@ void createSystemClosure(lua_State* L, const char* system, void* system_ptr, con
 		lua_getglobal(L, system);
 	}
 	lua_pushlightuserdata(L, system_ptr);
-	lua_pushcclosure(L, fn, 1);
+	lua_pushcclosure(L, fn, var_name, 1);
 	lua_setfield(L, -2, var_name);
 	lua_pop(L, 1);
 }
