@@ -4,12 +4,12 @@ local right = 0
 local yaw = 0
 local sprint = 0
 
-function onInputEvent(event)
-    if event.type == LumixAPI.INPUT_EVENT_AXIS and event.device.type == LumixAPI.INPUT_DEVICE_MOUSE then
+function onInputEvent(event : InputEvent)
+    if event.type == "axis" and event.device.type == "mouse" then
         yaw = yaw + event.x * -0.003
     end
-    if event.type == LumixAPI.INPUT_EVENT_BUTTON then
-		if event.device.type == LumixAPI.INPUT_DEVICE_KEYBOARD then
+    if event.type == "button" then
+		if event.device.type == "keyboard" then
 			if event.key_id == string.byte("W") then
                 if event.down then
                     forward = 1

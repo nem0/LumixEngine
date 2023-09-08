@@ -42,13 +42,13 @@ function update(dt)
     this.rotation = mulQuat(yaw_quat, pitch_quat)
 end
 
-function onInputEvent(event)
-	if event.type == LumixAPI.INPUT_EVENT_BUTTON then
-        if event.device.type == LumixAPI.INPUT_DEVICE_MOUSE and event.key_id > 0 then
+function onInputEvent(event : InputEvent)
+	if event.type == "button" then
+        if event.device.type == "mouse" and event.key_id > 0 then
             rmb_down = event.down
-            Gui.enableCursor(not event.down)
+            --Gui.enableCursor(not event.down)
 
-        elseif event.device.type == LumixAPI.INPUT_DEVICE_KEYBOARD then
+        elseif event.device.type == "keyboard" then
 			if event.key_id == string.byte("W") then
                 if event.down then
                     forward = 1
@@ -64,8 +64,8 @@ function onInputEvent(event)
                 end
 			end
 		end		
-	elseif event.type == LumixAPI.INPUT_EVENT_AXIS then
-		if event.device.type == LumixAPI.INPUT_DEVICE_MOUSE and rmb_down then
+	elseif event.type == "axis" then
+		if event.device.type == "mouse" and rmb_down then
 			dyaw = dyaw + event.x * -0.1;
 			dpitch = dpitch + event.y * -0.1;
 		end
