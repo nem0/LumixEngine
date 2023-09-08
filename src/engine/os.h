@@ -100,6 +100,7 @@ struct InitWindowArgs {
 		NO_TASKBAR_ICON = 1 << 1
 	};
 	const char* name = ""; 
+	const char* icon = nullptr;
 	bool handle_file_drops = false;
 	u32 flags = 0;
 	WindowHandle parent = INVALID_WINDOW;

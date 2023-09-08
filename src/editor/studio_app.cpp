@@ -360,6 +360,7 @@ struct StudioAppImpl final : StudioApp
 			#undef LUMIX_PLUGINS_STRINGS
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
+		init_data.init_window_args.icon = "editor/logo.ico";
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		m_main_window = m_engine->getWindowHandle();
 		m_windows.push(m_main_window);
@@ -400,8 +401,14 @@ struct StudioAppImpl final : StudioApp
 		#ifdef _WIN32
 			logInfo(os::getTimeSinceProcessStart(), " s since process started");
 		#endif
+
+		loadLogo();
 	}
 
+	void loadLogo() {
+		if (!m_render_interface) return;
+		m_logo = m_render_interface->loadTexture(Path("editor/logo.png"));
+	}
 
 	~StudioAppImpl()
 	{
@@ -1581,9 +1588,13 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 4));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 8));
 		
 		if (ImGui::BeginMainMenuBar()) {
+			if(m_render_interface && m_render_interface->isValid(m_logo)) {
+				ImGui::Image(*(void**)m_logo, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
+			}
+			
 			const ImVec2 menu_min = ImGui::GetCursorPos();
 			ImGui::SetNextItemAllowOverlap();
 			ImGui::InvisibleButton("titlebardrag", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()));
@@ -3406,6 +3417,7 @@ struct StudioAppImpl final : StudioApp
 	World::PartitionHandle m_partition_to_destroy;
 	StaticString<MAX_PATH> m_world_to_load;
 	
+	ImTextureID m_logo = nullptr;
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;

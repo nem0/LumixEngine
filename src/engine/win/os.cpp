@@ -698,12 +698,15 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 			return DefWindowProc(hWnd, Msg, wParam, lParam);
 		};
 
+		HICON hIcon = args.icon ? (HICON)LoadImageA(NULL, args.icon, IMAGE_ICON, 32, 32, LR_LOADFROMFILE) : NULL;
+		if (!hIcon) hIcon = LoadIcon(NULL, IDI_APPLICATION);
+
 		wc.style = CS_HREDRAW | CS_VREDRAW;
 		wc.lpfnWndProc = WndProc;
 		wc.cbClsExtra = 0;
 		wc.cbWndExtra = 0;
 		wc.hInstance = GetModuleHandle(NULL);
-		wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+		wc.hIcon = (HICON)hIcon;
 		wc.hCursor = NULL;
 		wc.hbrBackground = NULL;
 		wc.lpszClassName = cls_name;
