@@ -130,5 +130,5 @@ function update(td)
 	local yaw_rot = math.makeQuatFromYaw(yaw)
     local pitch_rot = math.makeQuatFromPitch(pitch)
     this.rotation = yaw_rot
-    camera_pivot.rotation = math.mulquat(yaw_rot, pitch_rot)
+    camera_pivot.rotation = math.mulQuat(yaw_rot, pitch_rot)
 end

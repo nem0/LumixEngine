@@ -8,7 +8,9 @@
 declare ImGui: {
     Begin : (string) -> boolean,
     End : () -> (),
-    Text : (string) -> ()
+    Text : (string) -> (),
+    Button : (string) -> boolean,
+    SameLine : () -> ()
 }
 
 declare class World
@@ -39,6 +41,8 @@ end
 
 declare class Entity 
     world : World
+    name : string
+    parent : Entity?
     animator : Animator
     gui_rect : GUIRect
     navmesh_agent : NavmeshAgent
@@ -46,13 +50,17 @@ declare class Entity
     rotation : any
     position : any
     scale : any
+    hasComponent : (Entity, any) -> boolean
+    getComponent : (Entity, any) -> any
+    destroy : (Entity) -> ()
+    createComponent : (Entity, any) -> any
 end
-
 
 declare this:Entity
 
 declare Editor: {
     ENTITY_PROPERTY : number,
+    BOOLEAN_PROPERTY : number,
     setPropertyType : (any, string, number) -> ()
 }
 
