@@ -1343,13 +1343,19 @@ namespace Lumix
 				lua_setfield(L, -2, "new"); // [ module ]
 
 				for (const reflection::FunctionBase* f :  module->functions) {
-					const char* c = f->decl_code;
-					while (*c != ':' && *c) ++c;
-					ASSERT(*c == ':');
-					c += 2;
 					lua_pushlightuserdata(L, (void*)f); // [module, f]
-					lua_pushcclosure(L, luaModuleMethodClosure, c, 1); // [module, fn]
-					lua_setfield(L, -2, c); // [module]
+					if (f->name) {
+						lua_pushcclosure(L, luaModuleMethodClosure, f->name, 1);
+						lua_setfield(L, -2, f->name); // [module]
+					}
+					else {
+						const char* c = f->decl_code;
+						while (*c != ':' && *c) ++c;
+						ASSERT(*c == ':');
+						c += 2;
+						lua_pushcclosure(L, luaModuleMethodClosure, c, 1);
+						lua_setfield(L, -2, c); // [module]
+					}
 				}
 				lua_pop(L, 1); // []
 

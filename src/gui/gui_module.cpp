@@ -468,8 +468,6 @@ struct GUIModuleImpl final : GUIModule {
 		return intersect ? rect.entity : INVALID_ENTITY;
 	}
 	
-	void enableCursor(bool enable) { m_system.enableCursor(enable); }
-
 	EntityPtr getRectAt(const Vec2& pos) const override { return getRectAtEx(pos, m_canvas_size, INVALID_ENTITY); }
 
 	bool isOver(const Vec2& pos, EntityRef e) override {
@@ -1232,6 +1230,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	World& getWorld() override { return m_world; }
 	ISystem& getSystem() const override { return m_system; }
+	GUISystem* getSystemPtr() const { return &m_system; }
 
 	IAllocator& m_allocator;
 	World& m_world;
@@ -1317,7 +1316,7 @@ void GUIModule::reflect() {
 		.LUMIX_EVENT(GUIModule::mousedButtonUnhandled)
 		.LUMIX_FUNC(GUIModule::getRectAt)
 		.LUMIX_FUNC(GUIModule::isOver)
-		.LUMIX_FUNC(GUIModuleImpl::enableCursor)
+		.function<&GUIModuleImpl::getSystemPtr>("getSystem", "GUIModule::getSystem")
 		.LUMIX_CMP(RenderTarget, "gui_render_target", "GUI / Render taget")
 		.LUMIX_CMP(Text, "gui_text", "GUI / Text")
 			.icon(ICON_FA_FONT)

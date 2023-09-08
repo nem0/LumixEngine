@@ -501,7 +501,7 @@ UniquePtr<AudioModule> AudioModule::createInstance(AudioSystem& system,
 void AudioModule::reflect(Engine& engine) {
 	LUMIX_MODULE(AudioModuleImpl, "audio")
 		.LUMIX_FUNC(AudioModule::setMasterVolume)
-		.function<(SoundHandle (AudioModule::*)(EntityRef, const Path&, bool))&AudioModule::play>("AudioModule::play", "AudioModule::play")
+		.function<(SoundHandle (AudioModule::*)(EntityRef, const Path&, bool))&AudioModule::play>("play", "AudioModule::play")
 		.LUMIX_FUNC(AudioModule::stop)
 		.LUMIX_FUNC(AudioModule::isEnd)
 		.LUMIX_FUNC(AudioModule::setFrequency)
