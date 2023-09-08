@@ -911,7 +911,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					ImGui::Columns();
 					if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add animation")) {
 						Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
-						entry.animation = nullptr;
+						entry.animation = Path();
 						entry.set = set_idx;
 						entry.slot = 0;
 						saveUndo(true);

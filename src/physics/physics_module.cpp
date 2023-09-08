@@ -457,6 +457,12 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 		m_joints.clear();
 
+		// we have to reset mesh of rigid actor before calling m_actors.clear
+		// because ~RigidActor accesses m_actors, which might already contain invalid values in m_actors.clear()
+		for (RigidActor& a : m_actors) {
+			a.setMesh(nullptr);
+		}
+
 		m_actors.clear();
 		m_dynamic_actors.clear();
 

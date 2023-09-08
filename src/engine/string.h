@@ -17,7 +17,7 @@ LUMIX_ENGINE_API int stringLength(const char* str);
 
 struct StringView {
 	StringView() {}
-	StringView(const char* str) : begin(str), end(str + stringLength(str)) {}
+	StringView(const char* str) : begin(str), end(str ? str + stringLength(str) : 0) {}
 	StringView(const char* str, u32 len) : begin(str), end(str + len) {}
 	StringView(const char* begin, const char* end) : begin(begin), end(end) {}
 	template <int N> StringView(const StaticString<N>& str);

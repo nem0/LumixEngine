@@ -644,8 +644,23 @@ anim::Node* MathNode::compile(anim::Controller& controller) {
 	}
 }
 
+static bool isCompare(anim::NodeType type) {
+	switch (type) {
+		case anim::NodeType::CMP_EQ:
+		case anim::NodeType::CMP_GT:
+		case anim::NodeType::CMP_GTE:
+		case anim::NodeType::CMP_LT:
+		case anim::NodeType::CMP_LTE:
+		case anim::NodeType::CMP_NEQ:
+			return true;
+		default:
+			return false;
+	}
+}
+
 anim::Value::Type MathNode::getReturnType() {
 	ValueNode* input0 = castToValueNode(getInput(0));
+	if (isCompare(m_type)) return anim::Value::BOOL;
 	if (!input0) return anim::Value::NUMBER;
 	return input0->getReturnType();
 }
