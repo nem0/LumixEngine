@@ -17,20 +17,20 @@ local aiming = false
 camera_pivot = -1
 Editor.setPropertyType(this, "camera_pivot", Editor.ENTITY_PROPERTY)
 
-function onInputEvent(event)
-    if event.type == LumixAPI.INPUT_EVENT_AXIS and event.device.type == LumixAPI.INPUT_DEVICE_MOUSE then
+function onInputEvent(event : InputEvent)
+    if event.type == "axis" and event.device.type == "mouse" then
         yaw = yaw + event.x * -0.01
         pitch = pitch + event.y * -0.01
     end
-    if event.type == LumixAPI.INPUT_EVENT_BUTTON then
-		if event.device.type == LumixAPI.INPUT_DEVICE_MOUSE then
+    if event.type == "button" then
+		if event.device.type == "mouse" then
             if event.down and event.key_id == 1 then
                 aiming = true
             else 
                 aiming = false
             end
         end
-        if event.device.type == LumixAPI.INPUT_DEVICE_KEYBOARD then
+        if event.device.type == "keyboard" then
 			if event.key_id == string.byte("W") then
                 if event.down then
                     forward = 1
