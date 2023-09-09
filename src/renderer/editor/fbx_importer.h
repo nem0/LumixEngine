@@ -131,7 +131,6 @@ struct FBXImporter {
 		AABB aabb;
 		float origin_radius_squared;
 		float center_radius_squared;
-		Matrix transform_matrix = Matrix::IDENTITY;
 		Vec3 origin = Vec3(0);
 	};
 
@@ -176,6 +175,7 @@ private:
 	template <typename T> void write(const T& obj) { m_out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { m_out_file.write(ptr, size); }
 	void writeString(const char* str);
+	void centerMesh(ImportMesh& mesh, bool bottom, const ImportConfig& cfg, const Matrix& matrix) const;
 	int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixOrientation(const Vec3& v) const;

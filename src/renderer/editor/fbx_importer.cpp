@@ -465,21 +465,24 @@ LUMIX_FORCE_INLINE static Vec3 fixOrientation(const Vec3& v, FBXImporter::Orient
 LUMIX_FORCE_INLINE static u32 getPackedVec3(ofbx::Vec3 vec, const Matrix& mtx, FBXImporter::Orientation orientation) {
 	Vec3 v = toLumixVec3(vec);
 	v = normalize(mtx.transformVector(v));
-	// TODO put firOrientation in mtx
+	// TODO put fixOrientation in mtx
 	v = fixOrientation(v, orientation);
 	return packF4u(v);
 }
 
-static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, bool bottom, Matrix& transform, Vec3& center)
-{
-	if (vertices_count <= 0) return;
+void FBXImporter::centerMesh(ImportMesh& mesh, bool bottom, const ImportConfig& cfg, const Matrix& mtx) const {
+	const int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
+	const u32 vertex_count = u32(mesh.vertex_data.size() / vertex_size);
+	if (vertex_count <= 0) return;
 
-	ofbx::Vec3 min = vertices[0];
-	ofbx::Vec3 max = vertices[0];
+	u8* ptr = mesh.vertex_data.getMutableData();
+	
+	Vec3 min(FLT_MAX);
+	Vec3 max(-FLT_MAX);
 
-	for (int i = 1; i < vertices_count; ++i)
-	{
-		ofbx::Vec3 v = vertices[i];
+	for (u32 i = 0; i < vertex_count; ++i) {
+		Vec3 v;
+		memcpy(&v, ptr + vertex_size * i, sizeof(v));
 			
 		min.x = minimum(min.x, v.x);
 		min.y = minimum(min.y, v.y);
@@ -490,18 +493,21 @@ static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, bool bott
 		max.z = maximum(max.z, v.z);
 	}
 
+	Vec3 center;
 	center.x = float(min.x + max.x) * 0.5f;
 	center.y = float(min.y + max.y) * 0.5f;
 	center.z = float(min.z + max.z) * 0.5f;
+	mesh.origin = center;
 		
 	if (bottom) center.y = (float)min.y;
-
-	const Vec3 p = transform.getTranslation();
-	transform.setTranslation(-center);
-	center += p;
+	
+	for (u32 i = 0; i < vertex_count; ++i) {
+		Vec3 v;
+		memcpy(&v, ptr + vertex_size * i, sizeof(v));
+		v -= center;
+		memcpy(ptr + vertex_size * i, &v, sizeof(v));
+	}
 }
-
-
 
 static void computeTangentsSimple(FBXImporter::ImportMesh& mesh, OutputMemoryStream& unindexed_triangles, const FBXImporter::VertexLayout& layout) {
 	PROFILE_FUNCTION();
@@ -792,12 +798,6 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			Matrix transform_matrix = Matrix::IDENTITY;
 			Matrix geometry_matrix = toLumix(mesh->getGeometricMatrix());
 			transform_matrix = toLumix(mesh->getGlobalTransform()) * geometry_matrix;
-			if (cfg.origin != ImportConfig::Origin::SOURCE) {
-				const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
-				// TODO
-				//centerMesh(vertices, vertex_count, bottom, transform_matrix, import_mesh.origin);
-			}
-			import_mesh.transform_matrix = transform_matrix.inverted();
 			const bool flip_handness = doesFlipHandness(transform_matrix);
 			if (flip_handness) {
 				logError("Mesh ", mesh->name, " in ", path, " flips handness. This is not supported and the mesh will not display correctly.");
@@ -840,6 +840,12 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			}
 
 			remap(unindexed_triangles, import_mesh, vertex_layout.size, cfg);
+			
+			if (cfg.origin != ImportConfig::Origin::SOURCE) {
+				const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
+				centerMesh(import_mesh, bottom, cfg, transform_matrix);
+			}
+
 			computeBoundingShapes(import_mesh, vertex_layout.size);
 
 			// TODO autolods are not correct
@@ -2524,7 +2530,7 @@ bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 
 	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 	for(int i  = 0; i < m_meshes.size(); ++i) {
-		const EntityRef e = world.createEntity(DVec3(fixOrientation(m_meshes[i].origin) * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
+		const EntityRef e = world.createEntity(DVec3(m_meshes[i].origin), Quat::IDENTITY);
 		world.createComponent(MODEL_INSTANCE_TYPE, e);
 		world.setParent(root, e);
 		char mesh_name[256];
