@@ -1775,6 +1775,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
 					m_current_dir.append("/", subdir.c_str());
 					fillSubitems();
+					break;
 				}
 			}
 		}
@@ -1839,6 +1840,7 @@ bool FileSelector::gui(bool show_breadcrumbs, const char* accepted_extension) {
 				m_current_dir.append("/", subdir.c_str());
 				fillSubitems();
 				changed = true;
+				break;
 			}
 		}
 		
