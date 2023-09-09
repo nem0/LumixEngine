@@ -1664,7 +1664,7 @@ void NavigationModule::reflect() {
 			.LUMIX_FUNC_EX(NavigationModule::debugDrawNavmesh, "drawNavmesh")
 			.LUMIX_FUNC_EX(NavigationModule::debugDrawCompactHeightfield, "drawCompactHeightfield")
 			.LUMIX_FUNC_EX(NavigationModule::debugDrawHeightfield, "drawHeightfield")
-			.LUMIX_FUNC(generateNavmesh)
+			.LUMIX_FUNC_EX(NavigationModule::generateNavmesh, "generateNavmesh")
 			.var_prop<&NavigationModule::getZone, &NavmeshZone::extents>("Extents")
 			.var_prop<&NavigationModule::getZone, &NavmeshZone::agent_height>("Agent height")
 			.var_prop<&NavigationModule::getZone, &NavmeshZone::agent_radius>("Agent radius")
