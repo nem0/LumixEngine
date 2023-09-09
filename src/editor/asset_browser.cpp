@@ -171,7 +171,6 @@ struct AssetBrowserImpl : AssetBrowser {
 					m_file_infos.erase(i);
 					return;
 				case TileState::OUTDATED:
-					logInfo("Thumbnail for ", info.filepath, " is outdated");
 				case TileState::NOT_CREATED:
 					ri->unloadTexture(info.tex);
 					info.create_called = false;
@@ -384,7 +383,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_create_tile_cooldown > 0) return;
 		if (tile.create_called) return;
 	
-		logInfo("Creating thumbnail for ", tile.filepath);
 		tile.create_called = true;
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
 		const ResourceType type = compiler.getResourceType(tile.filepath);
