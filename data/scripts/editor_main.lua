@@ -1,11 +1,57 @@
 local tpl = [[
 declare ImGui: {
+    AlignTextToFramePadding : () -> (),
     Begin : (string) -> boolean,
-    End : () -> (),
-    Text : (string) -> (),
+    BeginChildFrame : (string, number, number) -> boolean,
+    BeginPopup : (string) -> boolean,
     Button : (string) -> boolean,
+    CalcTextSize : (string) -> (number, number),
+    Checkbox : (string, boolean) -> (boolean, boolean),
+    CollapsingHeader : (string) -> boolean,
+    Columns : (number) -> (),
+    DragFloat : (string, number) -> (boolean, number),
+    DragInt : (string, number) -> (boolean, number),
+    Dummy : (number, number) -> (),
+    End : () -> (),
+    EndChildFrame : () -> (),
+    EndCombo : () -> (),
+    EndPopup : () -> (),
+    GetColumnWidth : (number) -> number,
+    GetDisplayWidth : () -> number,
+    GetDisplayHeight : () -> number,
+    GetWindowWidth : () -> (),
+    GetWindowHeight : () -> (),
+    GetWindowPos : () -> any,
+    Indent : (number) -> (),
+    InputTextMultiline : (string, string) -> (boolean, string),
+    IsItemHovered : () -> boolean,
+    IsMouseClicked : (number) -> boolean,
+    IsMouseDown : (number) -> boolean,
+    LabelText : (string, string) -> (),
+    NewLine : () -> (),
+    NextColumn : () -> (),
+    OpenPopup : (string) -> (),
+    PopItemWidth : () -> (),
+    PopID : () -> (),
+    PopStyleColor : (number) -> (),
+    PopStyleVar : (number) -> (),
+    PopItemWidth : () -> (),
+    PushItemWidth : (number) -> (),
+    PushID : (number) -> (),
+    PushStyleColor : (number, any) -> (),
+    PushStyleVar : (number, number, number) -> () | (number, number) -> () ,
+    Rect : (number, number, number) -> (),
     SameLine : () -> (),
-    InputTextMultiline : (string, string) -> (boolean, string)
+    Selectable : (string, boolean) -> boolean | (string) -> boolean,
+    Separator : () -> (),
+    SetCursorScreenPos : (number, number) -> (),
+    SetNextWindowPos : (number, number) -> (),
+    SetNextWindowPosCenter : () -> (),
+    SetNextWindowSize : (number, number) -> (),
+    SetStyleColor : (number, any) -> (),
+    SliderFloat : (string, number, number, number) -> (boolean, number),
+    Text : (string) -> (),
+    Unindent : (number) -> (),
 }
 
 declare class World
@@ -67,6 +113,8 @@ declare LumixReflection: {
     getFunction : (ComponentBase, number) -> FunctionBase,
     getFunctionName : (FunctionBase) -> string,
     getFunctionArgCount : (FunctionBase) -> number,
+    getFunctionArgType : (FunctionBase, number) -> string,
+    getFunctionReturnType : (FunctionBase) -> string,
     getPropertyType : (PropertyBase) -> number,
     getPropertyName : (PropertyBase) -> string
 }
@@ -99,7 +147,7 @@ type ButtonInputEvent = {
 export type InputEvent = ButtonInputEvent | AxisInputEvent
 
 ]]
-if true then
+if false then
     function typeToString(type : number) : string
         if type < 3 then return "number" end
         if type == 3 then return "Entity" end
@@ -112,6 +160,13 @@ if true then
     function toLuaIdentifier(v : string)
         local s = string.gsub(v, "[^a-zA-Z0-9]", "_")
         return string.lower(s)
+    end
+
+    function toLuaType(ctype : string)
+        if ctype == "float" then return "number" end
+        if ctype == "bool" then return "boolean" end
+        if ctype == "void" then return "()" end
+        return "any"
     end
 
     function refl()
@@ -128,7 +183,7 @@ if true then
                 local prop = LumixReflection.getProperty(cmp, j - 1)
                 local prop_name = LumixReflection.getPropertyName(prop)
                 local prop_type = LumixReflection.getPropertyType(prop)
-                if prop_name:match("3.*") then continue end
+                if prop_name:match("[0-9].*") then continue end
                 out = out .. "\t" .. toLuaIdentifier(prop_name) .. ": " .. typeToString(prop_type) .. "\n"
             end
             local num_funcs = LumixReflection.getNumFunctions(cmp)
@@ -136,11 +191,12 @@ if true then
                 local func = LumixReflection.getFunction(cmp, j - 1)
                 local func_name = LumixReflection.getFunctionName(func)
                 local arg_count = LumixReflection.getFunctionArgCount(func)
+                local ret_type = LumixReflection.getFunctionReturnType(func)
                 out = out .. `\t{func_name} : ({name}`
                 for i = 2, arg_count do
-                    out = out .. ", any"
+                    out = out .. ", " .. toLuaType(LumixReflection.getFunctionArgType(func, i - 1))
                 end
-                out = out .. ") -> any\n"
+                out = out .. `) -> {toLuaType(ret_type)}\n`
             end
             out = out .. "end\n\n"
         end

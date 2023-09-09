@@ -59,16 +59,13 @@ int DragInt(lua_State* L)
 }
 
 
-int PushStyleColor(lua_State* L)
-{
-	int var = LuaWrapper::checkArg<int>(L, 1);
+void PushStyleColor(i32 var, const Vec4& color) {
 	ImVec4 v;
-	v.x = LuaWrapper::checkArg<float>(L, 2);
-	v.y = LuaWrapper::checkArg<float>(L, 3);
-	v.z = LuaWrapper::checkArg<float>(L, 4);
-	v.w = LuaWrapper::checkArg<float>(L, 5);
+	v.x = color.x;
+	v.y = color.y;
+	v.z = color.z;
+	v.w = color.w;
 	ImGui::PushStyleColor(var, v);
-	return 0;
 }
 
 
@@ -91,25 +88,17 @@ int PushStyleVar(lua_State* L)
 }
 
 
-int PushID(lua_State* L)
-{
-	int id = LuaWrapper::checkArg<int>(L, 1);
-	ImGui::PushID(id);
-	return 0;
-}
+void PushID(i32 id) { ImGui::PushID(id); }
 
 
-int SetStyleColor(lua_State* L)
-{
-	auto& style = ImGui::GetStyle();
-	int index = LuaWrapper::checkArg<int>(L, 1);
-	ImVec4 color;
-	color.x = LuaWrapper::checkArg<float>(L, 2);
-	color.y = LuaWrapper::checkArg<float>(L, 3);
-	color.z = LuaWrapper::checkArg<float>(L, 4);
-	color.w = LuaWrapper::checkArg<float>(L, 5);
-	style.Colors[index] = color;
-	return 0;
+void SetStyleColor(int color_index, const Vec4& color) {
+	ImGuiStyle& style = ImGui::GetStyle();
+	ImVec4 v;
+	v.x = color.x;
+	v.y = color.y;
+	v.z = color.z;
+	v.w = color.w;
+	style.Colors[color_index] = v;
 }
 
 
@@ -134,12 +123,8 @@ int Text(lua_State* L)
 }
 
 
-int LabelText(lua_State* L)
-{
-	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
-	auto* text = LuaWrapper::checkArg<const char*>(L, 2);
+void LabelText(const char* label, const char* text) {
 	ImGui::LabelText(label, "%s", text);
-	return 0;
 }
 
 
@@ -188,11 +173,9 @@ int Checkbox(lua_State* L)
 }
 
 
-int GetWindowPos(lua_State* L)
-{
+Vec2 GetWindowPos() {
 	ImVec2 pos = ImGui::GetWindowPos();
-	LuaWrapper::push(L, Vec2(pos.x, pos.y));
-	return 1;
+	return Vec2(pos.x, pos.y);
 }
 
 
@@ -202,13 +185,6 @@ int SetNextWindowPos(lua_State* L)
 	pos.x = LuaWrapper::checkArg<float>(L, 1);
 	pos.y = LuaWrapper::checkArg<float>(L, 2);
 	ImGui::SetNextWindowPos(pos);
-	return 0;
-}
-
-
-int AlignTextToFramePadding(lua_State* L)
-{
-	ImGui::AlignTextToFramePadding();
 	return 0;
 }
 
@@ -233,13 +209,6 @@ int SetCursorScreenPos(lua_State* L)
 	pos.x = LuaWrapper::checkArg<float>(L, 1);
 	pos.y = LuaWrapper::checkArg<float>(L, 2);
 	ImGui::SetCursorScreenPos(pos);
-	return 0;
-}
-
-
-int Separator(lua_State* L)
-{
-	ImGui::Separator();
 	return 0;
 }
 
@@ -289,11 +258,7 @@ int SetNextWindowSize(float w, float h)
 }
 
 
-int OpenPopup(lua_State* L) {
-	auto* str_id = LuaWrapper::checkArg<const char*>(L, 1);
-	ImGui::OpenPopup(str_id);
-	return 0;
-}
+void OpenPopup(const char* str_id) { ImGui::OpenPopup(str_id); }
 
 int Begin(lua_State* L)
 {
@@ -332,37 +297,8 @@ int BeginPopup(lua_State* L)
 	return 1;
 }
 
-
-int GetDisplayWidth(lua_State* L)
-{
-	float w = ImGui::GetIO().DisplaySize.x;
-	LuaWrapper::push(L, w);
-	return 1;
-}
-
-
-int GetDisplayHeight(lua_State* L)
-{
-	float w = ImGui::GetIO().DisplaySize.y;
-	LuaWrapper::push(L, w);
-	return 1;
-}
-
-
-int GetWindowWidth(lua_State* L)
-{
-	float w = ImGui::GetWindowWidth();
-	LuaWrapper::push(L, w);
-	return 1;
-}
-
-
-int GetWindowHeight(lua_State* L)
-{
-	float w = ImGui::GetWindowHeight();
-	LuaWrapper::push(L, w);
-	return 1;
-}
+float GetDisplayWidth() { return ImGui::GetIO().DisplaySize.x; }
+float GetDisplayHeight() { return ImGui::GetIO().DisplaySize.y; }
 
 
 int SameLine(lua_State* L)
@@ -534,6 +470,33 @@ static const char* LUA_getFunctionName(reflection::FunctionBase* fnc) {
 
 static u32 LUA_getFunctionArgCount(reflection::FunctionBase* fnc) {
 	return fnc->getArgCount();
+}
+
+static i32 LUA_getFunctionReturnType(lua_State* L) {
+	auto* fnc = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
+	StringView name = fnc->getReturnTypeName();
+	lua_pushlstring(L, name.begin, name.size());
+	return 1;
+}
+
+static const char* LUA_getFunctionArgType(reflection::FunctionBase* fnc, u32 arg_idx) {
+	const reflection::TypeDescriptor type = fnc->getArgType(arg_idx);
+	switch (type.type) {
+		case reflection::Variant::VOID: return "void";
+		case reflection::Variant::PTR: return "void*";
+		case reflection::Variant::BOOL: return "bool";
+		case reflection::Variant::I32: return "i32";
+		case reflection::Variant::U32: return "u32";
+		case reflection::Variant::FLOAT: return "float";
+		case reflection::Variant::CSTR: return "const char*";
+		case reflection::Variant::ENTITY: return "EntityPtr";
+		case reflection::Variant::VEC2: return "Vec2";
+		case reflection::Variant::VEC3: return "Vec3";
+		case reflection::Variant::DVEC3: return "DVec3";
+		case reflection::Variant::COLOR: return "Color";
+	}
+	ASSERT(false);
+	return "";
 }
 
 static const char* LUA_getPropertyName(reflection::PropertyBase* prop) {
@@ -908,6 +871,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunction", &LuaWrapper::wrap<LUA_getFunction>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionName", &LuaWrapper::wrap<LUA_getFunctionName>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgCount", &LuaWrapper::wrap<LUA_getFunctionArgCount>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionReturnType", &LUA_getFunctionReturnType);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgType", &LuaWrapper::wrap<LUA_getFunctionArgType>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyType", &LuaWrapper::wrap<LUA_getPropertyType>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyName", &LuaWrapper::wrap<LUA_getPropertyName>);
 	
@@ -946,7 +911,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_ItemSpacing", ImGuiStyleVar_ItemSpacing);
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_ItemInnerSpacing", ImGuiStyleVar_ItemInnerSpacing);
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_WindowPadding", ImGuiStyleVar_WindowPadding);
-	LuaImGui::registerCFunction(L, "AlignTextToFramePadding", &LuaImGui::AlignTextToFramePadding);
+	LuaImGui::registerCFunction(L, "AlignTextToFramePadding", &LuaWrapper::wrap<ImGui::AlignTextToFramePadding>);
 	LuaImGui::registerCFunction(L, "Begin", &LuaImGui::Begin);
 	LuaImGui::registerCFunction(L, "BeginChildFrame", &LuaImGui::BeginChildFrame);
 	LuaImGui::registerCFunction(L, "BeginPopup", LuaImGui::BeginPopup);
@@ -963,11 +928,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "EndCombo", &LuaWrapper::wrap<&ImGui::EndCombo>);
 	LuaImGui::registerCFunction(L, "EndPopup", &LuaWrapper::wrap<&ImGui::EndPopup>);
 	LuaImGui::registerCFunction(L, "GetColumnWidth", &LuaWrapper::wrap<&ImGui::GetColumnWidth>);
-	LuaImGui::registerCFunction(L, "GetDisplayWidth", &LuaImGui::GetDisplayWidth);
-	LuaImGui::registerCFunction(L, "GetDisplayHeight", &LuaImGui::GetDisplayHeight);
-	LuaImGui::registerCFunction(L, "GetWindowWidth", &LuaImGui::GetWindowWidth);
-	LuaImGui::registerCFunction(L, "GetWindowHeight", &LuaImGui::GetWindowHeight);
-	LuaImGui::registerCFunction(L, "GetWindowPos", &LuaImGui::GetWindowPos);
+	LuaImGui::registerCFunction(L, "GetDisplayWidth", &LuaWrapper::wrap<LuaImGui::GetDisplayWidth>);
+	LuaImGui::registerCFunction(L, "GetDisplayHeight", &LuaWrapper::wrap<LuaImGui::GetDisplayHeight>);
+	LuaImGui::registerCFunction(L, "GetWindowWidth", &LuaWrapper::wrap<ImGui::GetWindowWidth>);
+	LuaImGui::registerCFunction(L, "GetWindowHeight", &LuaWrapper::wrap<ImGui::GetWindowHeight>);
+	LuaImGui::registerCFunction(L, "GetWindowPos", &LuaWrapper::wrap<LuaImGui::GetWindowPos>);
 	LuaImGui::registerCFunction(L, "Indent", &LuaWrapper::wrap<&ImGui::Indent>);
 	LuaImGui::registerCFunction(L, "InputTextMultiline", &LuaImGui::InputTextMultiline);
 	LuaImGui::registerCFunction(L, "IsItemHovered", &LuaWrapper::wrap<&LuaImGui::IsItemHovered>);
@@ -975,28 +940,28 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "IsMouseDown", &LuaWrapper::wrap<&LuaImGui::IsMouseDown>);
 	LuaImGui::registerCFunction(L, "NewLine", &LuaWrapper::wrap<&ImGui::NewLine>);
 	LuaImGui::registerCFunction(L, "NextColumn", &LuaWrapper::wrap<&ImGui::NextColumn>);
-	LuaImGui::registerCFunction(L, "OpenPopup", &LuaImGui::OpenPopup);
+	LuaImGui::registerCFunction(L, "OpenPopup", &LuaWrapper::wrap<LuaImGui::OpenPopup>);
 	LuaImGui::registerCFunction(L, "PopItemWidth", &LuaWrapper::wrap<&ImGui::PopItemWidth>);
 	LuaImGui::registerCFunction(L, "PopID", &LuaWrapper::wrap<&ImGui::PopID>);
 	LuaImGui::registerCFunction(L, "PopStyleColor", &LuaWrapper::wrap<&ImGui::PopStyleColor>);
 	LuaImGui::registerCFunction(L, "PopStyleVar", &LuaWrapper::wrap<&ImGui::PopStyleVar>);
 	LuaImGui::registerCFunction(L, "PushItemWidth", &LuaWrapper::wrap<&ImGui::PushItemWidth>);
-	LuaImGui::registerCFunction(L, "PushID", &LuaImGui::PushID);
-	LuaImGui::registerCFunction(L, "PushStyleColor", &LuaImGui::PushStyleColor);
+	LuaImGui::registerCFunction(L, "PushID", &LuaWrapper::wrap<LuaImGui::PushID>);
+	LuaImGui::registerCFunction(L, "PushStyleColor", &LuaWrapper::wrap<LuaImGui::PushStyleColor>);
 	LuaImGui::registerCFunction(L, "PushStyleVar", &LuaImGui::PushStyleVar);
 	LuaImGui::registerCFunction(L, "Rect", &LuaWrapper::wrap<&LuaImGui::Rect>);
 	LuaImGui::registerCFunction(L, "SameLine", &LuaImGui::SameLine);
 	LuaImGui::registerCFunction(L, "Selectable", &LuaImGui::Selectable);
-	LuaImGui::registerCFunction(L, "Separator", &LuaImGui::Separator);
+	LuaImGui::registerCFunction(L, "Separator", &LuaWrapper::wrap<ImGui::Separator>);
 	LuaImGui::registerCFunction(L, "SetCursorScreenPos", &LuaImGui::SetCursorScreenPos);
 	LuaImGui::registerCFunction(L, "SetNextWindowPos", &LuaImGui::SetNextWindowPos);
 	LuaImGui::registerCFunction(L, "SetNextWindowPosCenter", &LuaImGui::SetNextWindowPosCenter);
 	LuaImGui::registerCFunction(L, "SetNextWindowSize", &LuaWrapper::wrap<&LuaImGui::SetNextWindowSize>);
-	LuaImGui::registerCFunction(L, "SetStyleColor", &LuaImGui::SetStyleColor);
+	LuaImGui::registerCFunction(L, "SetStyleColor", &LuaWrapper::wrap<LuaImGui::SetStyleColor>);
 	LuaImGui::registerCFunction(L, "SliderFloat", &LuaImGui::SliderFloat);
 	LuaImGui::registerCFunction(L, "Text", &LuaImGui::Text);
 	LuaImGui::registerCFunction(L, "Unindent", &LuaWrapper::wrap<&ImGui::Unindent>);
-	LuaImGui::registerCFunction(L, "LabelText", &LuaImGui::LabelText);
+	LuaImGui::registerCFunction(L, "LabelText", &LuaWrapper::wrap<LuaImGui::LabelText>);
 
 	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_DEVICE_KEYBOARD", InputSystem::Device::KEYBOARD);
 	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_DEVICE_MOUSE", InputSystem::Device::MOUSE);

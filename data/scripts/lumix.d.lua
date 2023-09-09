@@ -1,10 +1,56 @@
 declare ImGui: {
+    AlignTextToFramePadding : () -> (),
     Begin : (string) -> boolean,
-    End : () -> (),
-    Text : (string) -> (),
+    BeginChildFrame : (string, number, number) -> boolean,
+    BeginPopup : (string) -> boolean,
     Button : (string) -> boolean,
+    CalcTextSize : (string) -> (number, number),
+    Checkbox : (string, boolean) -> (boolean, boolean),
+    CollapsingHeader : (string) -> boolean,
+    Columns : (number) -> (),
+    DragFloat : (string, number) -> (boolean, number),
+    DragInt : (string, number) -> (boolean, number),
+    Dummy : (number, number) -> (),
+    End : () -> (),
+    EndChildFrame : () -> (),
+    EndCombo : () -> (),
+    EndPopup : () -> (),
+    GetColumnWidth : (number) -> number,
+    GetDisplayWidth : () -> number,
+    GetDisplayHeight : () -> number,
+    GetWindowWidth : () -> (),
+    GetWindowHeight : () -> (),
+    GetWindowPos : () -> any,
+    Indent : (number) -> (),
+    InputTextMultiline : (string, string) -> (boolean, string),
+    IsItemHovered : () -> boolean,
+    IsMouseClicked : (number) -> boolean,
+    IsMouseDown : (number) -> boolean,
+    LabelText : (string, string) -> (),
+    NewLine : () -> (),
+    NextColumn : () -> (),
+    OpenPopup : (string) -> (),
+    PopItemWidth : () -> (),
+    PopID : () -> (),
+    PopStyleColor : (number) -> (),
+    PopStyleVar : (number) -> (),
+    PopItemWidth : () -> (),
+    PushItemWidth : (number) -> (),
+    PushID : (number) -> (),
+    PushStyleColor : (number, any) -> (),
+    PushStyleVar : (number, number, number) -> () | (number, number) -> () ,
+    Rect : (number, number, number) -> (),
     SameLine : () -> (),
-    InputTextMultiline : (string, string) -> (boolean, string)
+    Selectable : (string, boolean) -> boolean | (string) -> boolean,
+    Separator : () -> (),
+    SetCursorScreenPos : (number, number) -> (),
+    SetNextWindowPos : (number, number) -> (),
+    SetNextWindowPosCenter : () -> (),
+    SetNextWindowSize : (number, number) -> (),
+    SetStyleColor : (number, any) -> (),
+    SliderFloat : (string, number, number, number) -> (boolean, number),
+    Text : (string) -> (),
+    Unindent : (number) -> (),
 }
 
 declare class World
@@ -47,8 +93,8 @@ declare class terrain
 	tesselation: number
 	grid_resolution: number
 	grass: any
-	getTerrainNormalAt : (terrain, any, any) -> any
-	getTerrainHeightAt : (terrain, any, any) -> any
+	getTerrainNormalAt : (terrain, number, number) -> any
+	getTerrainHeightAt : (terrain, number, number) -> number
 end
 
 declare class camera
@@ -69,8 +115,6 @@ declare class curve_decal
 	material: string
 	half_extents: number
 	uv_scale: any
-	bezier_p0: any
-	bezier_p2: any
 end
 
 declare class point_light
@@ -141,12 +185,12 @@ declare class rigid_actor
 	sphere_geometry: any
 	mesh: string
 	material: string
-	putToSleep : (rigid_actor) -> any
-	getSpeed : (rigid_actor) -> any
+	putToSleep : (rigid_actor) -> ()
+	getSpeed : (rigid_actor) -> number
 	getVelocity : (rigid_actor) -> any
-	applyForce : (rigid_actor, any) -> any
-	applyImpulse : (rigid_actor, any) -> any
-	addForceAtPos : (rigid_actor, any, any) -> any
+	applyForce : (rigid_actor, any) -> ()
+	applyImpulse : (rigid_actor, any) -> ()
+	addForceAtPos : (rigid_actor, any, any) -> ()
 end
 
 declare class physical_heightfield
@@ -163,9 +207,9 @@ declare class physical_controller
 	use_root_motion: boolean
 	use_custom_gravity: boolean
 	custom_gravity_acceleration: number
-	move : (physical_controller, any) -> any
-	isCollisionDown : (physical_controller) -> any
-	getGravitySpeed : (physical_controller) -> any
+	move : (physical_controller, any) -> ()
+	isCollisionDown : (physical_controller) -> boolean
+	getGravitySpeed : (physical_controller) -> number
 end
 
 declare class js_script
@@ -237,8 +281,6 @@ declare class d6_joint
 	x_motion: number
 	y_motion: number
 	z_motion: number
-	swing_1: number
-	swing_2: number
 	twist: number
 	linear_limit: number
 	swing_limit: any
@@ -258,9 +300,9 @@ declare class vehicle
 	chassis: string
 	chassis_layer: number
 	wheels_layer: number
-	setAccel : (vehicle, any) -> any
-	setSteer : (vehicle, any) -> any
-	setBrake : (vehicle, any) -> any
+	setAccel : (vehicle, number) -> ()
+	setSteer : (vehicle, number) -> ()
+	setBrake : (vehicle, number) -> ()
 end
 
 declare class wheel
@@ -281,10 +323,10 @@ declare class navmesh_agent
 	height: number
 	move_entity: boolean
 	speed: number
-	setActive : (navmesh_agent, any) -> any
-	navigate : (navmesh_agent, any, any, any) -> any
-	cancelNavigation : (navmesh_agent) -> any
-	drawPath : (navmesh_agent) -> any
+	setActive : (navmesh_agent, boolean) -> ()
+	navigate : (navmesh_agent, any, number, number) -> boolean
+	cancelNavigation : (navmesh_agent) -> ()
+	drawPath : (navmesh_agent) -> ()
 end
 
 declare class navmesh_zone
@@ -297,11 +339,11 @@ declare class navmesh_zone
 	max_climb: number
 	autoload: boolean
 	detailed: boolean
-	load : (navmesh_zone) -> any
-	drawContours : (navmesh_zone) -> any
-	drawNavmesh : (navmesh_zone, any, any, any, any) -> any
-	drawCompactHeightfield : (navmesh_zone) -> any
-	drawHeightfield : (navmesh_zone) -> any
+	load : (navmesh_zone) -> boolean
+	drawContours : (navmesh_zone) -> ()
+	drawNavmesh : (navmesh_zone, any, boolean, boolean, boolean) -> ()
+	drawCompactHeightfield : (navmesh_zone) -> ()
+	drawHeightfield : (navmesh_zone) -> ()
 	generateNavmesh : (navmesh_zone) -> any
 end
 
@@ -325,8 +367,8 @@ declare class animator
 	source: string
 	default_set: number
 	use_root_motion: boolean
-	setFloatInput : (animator, any, any) -> any
-	setBoolInput : (animator, any, any) -> any
+	setFloatInput : (animator, any, number) -> ()
+	setBoolInput : (animator, any, boolean) -> ()
 	getInputIndex : (animator, any) -> any
 end
 
@@ -345,8 +387,8 @@ end
 
 declare class ambient_sound
 	sound: string
-	pause : (ambient_sound) -> any
-	resume : (ambient_sound) -> any
+	pause : (ambient_sound) -> ()
+	resume : (ambient_sound) -> ()
 end
 
 declare class echo_zone
@@ -457,6 +499,8 @@ declare LumixReflection: {
     getFunction : (ComponentBase, number) -> FunctionBase,
     getFunctionName : (FunctionBase) -> string,
     getFunctionArgCount : (FunctionBase) -> number,
+    getFunctionArgType : (FunctionBase, number) -> string,
+    getFunctionReturnType : (FunctionBase) -> string,
     getPropertyType : (PropertyBase) -> number,
     getPropertyName : (PropertyBase) -> string
 }
@@ -487,4 +531,3 @@ type ButtonInputEvent = {
 }
 
 export type InputEvent = ButtonInputEvent | AxisInputEvent
-
