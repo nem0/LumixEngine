@@ -1199,7 +1199,7 @@ struct StudioAppImpl final : StudioApp
 	void unparent()
 	{
 		const auto& entities = m_editor->getSelectedEntities();
-		ASSERT(entities.size() == 1);
+		if (entities.size() != 1) return;
 		m_editor->makeParent(INVALID_ENTITY, entities[0]);
 	}
 
@@ -2702,7 +2702,6 @@ struct StudioAppImpl final : StudioApp
 	void addPlugin(MousePlugin& plugin) override { m_mouse_plugins.push(&plugin); }
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
-
 
 	void runScript(const char* src, const char* script_name) override
 	{

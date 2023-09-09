@@ -19,7 +19,7 @@ namespace LuaImGui {
 
 int InputTextMultiline(lua_State* L)
 {
-	char buf[4096];
+	char buf[4 * 4096];
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
 	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
 	copyString(buf, value);
@@ -453,6 +453,93 @@ static bool LUA_networkWrite(os::NetworkStream* stream, const char* data, u32 si
 	return os::write(*stream, data, size);
 }
 
+static reflection::ComponentBase* LUA_getComponent(u32 index) {
+	return reflection::getComponents()[index].cmp;
+}
+
+static const char* LUA_getComponentName(reflection::ComponentBase* cmp) {
+	return cmp->name;
+}
+
+static i32 LUA_getNumProperties(reflection::ComponentBase* cmp) {
+	return cmp->props.size();
+}
+
+static i32 LUA_getNumFunctions(reflection::ComponentBase* cmp) {
+	return cmp->functions.size();
+}
+
+static i32 LUA_getPropertyType(reflection::PropertyBase* property) {
+	enum class PropertyType {
+		FLOAT,
+		I32,
+		U32,
+		ENTITY,
+		VEC2,
+		VEC3,
+		IVEC3,
+		VEC4,
+		PATH,
+		BOOL,
+		STRING,
+		ARRAY,
+		BLOB,
+		DYNAMIC
+	};
+	
+	struct : reflection::IPropertyVisitor {
+		void visit(const reflection::Property<float>& prop) override { type = PropertyType::FLOAT; }
+		void visit(const reflection::Property<int>& prop) override { type = PropertyType::I32; }
+		void visit(const reflection::Property<u32>& prop) override { type = PropertyType::U32; }
+		void visit(const reflection::Property<EntityPtr>& prop) override { type = PropertyType::ENTITY; }
+		void visit(const reflection::Property<Vec2>& prop) override { type = PropertyType::VEC2; }
+		void visit(const reflection::Property<Vec3>& prop) override { type = PropertyType::VEC3; }
+		void visit(const reflection::Property<IVec3>& prop) override { type = PropertyType::IVEC3; }
+		void visit(const reflection::Property<Vec4>& prop) override { type = PropertyType::VEC4; }
+		void visit(const reflection::Property<Path>& prop) override { type = PropertyType::PATH; }
+		void visit(const reflection::Property<bool>& prop) override { type = PropertyType::BOOL; }
+		void visit(const reflection::Property<const char*>& prop) override { type = PropertyType::STRING; }
+		void visit(const struct reflection::ArrayProperty& prop) override { type = PropertyType::ARRAY; }
+		void visit(const struct reflection::BlobProperty& prop) override { type = PropertyType::BLOB; }
+		void visit(const reflection::DynamicProperties& prop) override { type = PropertyType::DYNAMIC; }
+		PropertyType type;
+	} visitor;
+	property->visit(visitor);
+	return (i32)visitor.type;
+}
+
+static i32 LUA_getNumComponents() {
+	return reflection::getComponents().length();
+}
+
+static const char* LUA_getComponentLabel(reflection::ComponentBase* cmp) {
+	return cmp->label;
+}
+
+static const char* LUA_getComponentIcon(reflection::ComponentBase* cmp) {
+	return cmp->icon;
+}
+
+static reflection::PropertyBase* LUA_getProperty(reflection::ComponentBase* cmp, u32 index) {
+	return cmp->props[index];
+}
+
+static reflection::FunctionBase* LUA_getFunction(reflection::ComponentBase* cmp, u32 index) {
+	return cmp->functions[index];
+}
+
+static const char* LUA_getFunctionName(reflection::FunctionBase* fnc) {
+	return fnc->name;
+}
+
+static u32 LUA_getFunctionArgCount(reflection::FunctionBase* fnc) {
+	return fnc->getArgCount();
+}
+
+static const char* LUA_getPropertyName(reflection::PropertyBase* prop) {
+	return prop->name;
+}
+
 static int LUA_networkRead(lua_State* L) {
 	char tmp[4096];
 	os::NetworkStream* stream = LuaWrapper::checkArg<os::NetworkStream*>(L, 1);
@@ -810,6 +897,20 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
 
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponent", &LuaWrapper::wrap<LUA_getComponent>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumComponents", &LuaWrapper::wrap<LUA_getNumComponents>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumProperties", &LuaWrapper::wrap<LUA_getNumProperties>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumFunctions", &LuaWrapper::wrap<LUA_getNumFunctions>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentName", &LuaWrapper::wrap<LUA_getComponentName>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentLabel", &LuaWrapper::wrap<LUA_getComponentLabel>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentIcon", &LuaWrapper::wrap<LUA_getComponentIcon>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getProperty", &LuaWrapper::wrap<LUA_getProperty>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunction", &LuaWrapper::wrap<LUA_getFunction>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionName", &LuaWrapper::wrap<LUA_getFunctionName>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgCount", &LuaWrapper::wrap<LUA_getFunctionArgCount>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyType", &LuaWrapper::wrap<LUA_getPropertyType>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyName", &LuaWrapper::wrap<LUA_getPropertyName>);
+	
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkRead", &LUA_networkRead);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "packU32", &LUA_packU32);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "unpackU32", &LUA_unpackU32);
