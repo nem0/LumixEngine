@@ -22,7 +22,7 @@ struct ModelMeta {
 
 	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
 
-	void serialize(OutputMemoryStream& blob) {
+	void serialize(OutputMemoryStream& blob, const Path& path) {
 		if(physics != FBXImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
 		blob << "\nlod_count = " << lod_count;
 
@@ -53,7 +53,16 @@ struct ModelMeta {
 		#undef WRITE_VALUE
 
 		if (root_motion_bone.length() > 0) blob << "\nroot_motion_bone = \"" << root_motion_bone << "\"";
-		if (!skeleton.isEmpty()) blob << "\nskeleton = \"" << skeleton << "\"";
+		if (!skeleton.isEmpty()) {
+			StringView dir = Path::getDir(Path::getResource(path));
+			if (!dir.empty() && startsWith(skeleton, dir)) {
+				blob << "\nskeleton_rel = \"" << skeleton.c_str() + dir.size();
+			}
+			else {
+				blob << "\nskeleton = \"" << skeleton;
+			}
+			blob << "\"";
+		}
 
 		if (!clips.empty()) {
 			blob << "\nclips = {";
@@ -141,6 +150,10 @@ struct ModelMeta {
 		char tmp[MAX_PATH];
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "root_motion_bone", Span(tmp))) root_motion_bone = tmp;
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton", Span(tmp))) skeleton = tmp;
+		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton_rel", Span(tmp))) {
+			StringView dir = Path::getDir(Path::getResource(path));
+			skeleton = Path(dir, "/", tmp);
+		}
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
 			if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
 			else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;

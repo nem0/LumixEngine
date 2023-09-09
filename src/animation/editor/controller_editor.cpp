@@ -1006,7 +1006,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 				model_meta.skeleton = m_controller.m_skeleton;
 				OutputMemoryStream blob(m_allocator);
-				model_meta.serialize(blob);
+				model_meta.serialize(blob, src_path);
 				m_app.getAssetCompiler().updateMeta(src_path, blob);
 			}
 			else {
@@ -1014,7 +1014,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				new_meta.skeleton = m_controller.m_skeleton;
 
 				OutputMemoryStream blob(m_allocator);
-				new_meta.serialize(blob);
+				new_meta.serialize(blob, src_path);
 				m_app.getAssetCompiler().updateMeta(src_path, blob);
 			}
 		}

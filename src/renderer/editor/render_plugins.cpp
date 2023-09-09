@@ -1923,7 +1923,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void deserialize(InputMemoryStream& blob) override { m_meta.deserialize(blob, Path("undo/redo")); }
-		void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob); }
+		void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob, Path()); }
 
 		void saveUndo(bool changed) {
 			if (!changed) return;
@@ -1934,7 +1934,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			m_meta.serialize(blob);
+			m_meta.serialize(blob, m_resource->getPath());
 			m_app.getAssetCompiler().updateMeta(m_resource->getPath(), blob);
 			m_dirty = false;
 		}
