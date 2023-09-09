@@ -2699,6 +2699,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		Engine& engine = m_app.getEngine();
 		ResourceManagerHub& resource_manager = engine.getResourceManager();
 
+		for (TileData::Job* job : m_tile.queue) {
+			if (job->isFor(path)) {
+				return;
+			}
+		}
+
 		if (Path::hasExtension(path, "fab")) {
 			TileData::PrefabJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::PrefabJob)(path);
 			m_tile.queue.push(job);
@@ -3030,6 +3036,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			virtual ~Job() {}
 			virtual bool prepare(ModelPlugin& plugin) = 0;
 			virtual void execute(ModelPlugin& plugin) = 0;
+			virtual bool isFor(const Path& path) const = 0;
 		};
 
 		struct AnimationJob : TileData::Job {
@@ -3042,6 +3049,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, animation, nullptr);
 			}
+			
+			bool isFor(const Path& _path) const { return path == _path; }
 
 			Path path;
 			Model* model = nullptr;
@@ -3059,6 +3068,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(material);
 			}
+			
+			bool isFor(const Path& _path) const { return path == _path; }
 
 			Path path;
 			Material* material = nullptr;
@@ -3075,6 +3086,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				plugin.renderTile(prefab);
 			}
 
+			bool isFor(const Path& _path) const { return path == _path; }
+
 			Path path;
 			PrefabResource* prefab = nullptr;
 		};
@@ -3089,6 +3102,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, nullptr, nullptr);
 			}
+			bool isFor(const Path& _path) const { return path == _path; }
 
 			Path path;
 			Model* model = nullptr;

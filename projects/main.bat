@@ -196,6 +196,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist market (
 		git.exe clone https://github.com/nem0/lumixengine_market.git market
+		pushd market
+		git remote add origin2 git@github.com:nem0/lumixengine_market.git
+		popd
 	) else (
 		cd market
 		git pull
