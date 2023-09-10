@@ -293,7 +293,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 	void runEditorMainLua() {
 		OutputMemoryStream blob(app.getAllocator());
-		const char* path = "scripts/editor_main.lua";
+		const char* path = "editor/scripts/main.lua";
 		Engine& engine = app.getEngine();
 		if (!engine.getFileSystem().getContentSync(Path(path), blob)) return;
 
