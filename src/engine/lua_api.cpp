@@ -724,6 +724,25 @@ static int finishrequire(lua_State* L)
     return 1;
 }
 
+static int LUA_loadstring(lua_State* L) {
+	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
+	size_t bytecode_size;
+	char* bytecode = luau_compile(src, stringLength(src), nullptr, &bytecode_size);
+	if (bytecode_size == 0) {
+		lua_pushnil(L);
+		lua_pushstring(L, bytecode);
+		return 2;
+	}
+	int res = luau_load(L, "loadstring", bytecode, bytecode_size, 0);
+	free(bytecode);
+	if (res != 0) {
+		lua_pushnil(L);
+		lua_insert(L, -2);
+		return 2;
+	}
+	return 1;
+}
+
 static int LUA_require(lua_State* L) {
     const char* name = luaL_checkstring(L, 1);
 
@@ -821,6 +840,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	lua_pushlightuserdata(L, engine);
 	lua_pushcclosure(L, &LUA_require, "require", 1);
 	lua_setglobal(L, "require");
+
+	lua_pushcfunction(L, &LUA_loadstring, "loadstring");
+	lua_setglobal(L, "loadstring");
 
 	LuaWrapper::createSystemVariable(L, "LumixAPI", "engine", engine);
 
