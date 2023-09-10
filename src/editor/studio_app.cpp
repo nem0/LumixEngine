@@ -1595,6 +1595,7 @@ struct StudioAppImpl final : StudioApp
 				ImGui::Image(*(void**)m_logo, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
 			}
 			
+			ImGui::PopStyleVar(2);
 			const ImVec2 menu_min = ImGui::GetCursorPos();
 			ImGui::SetNextItemAllowOverlap();
 			ImGui::InvisibleButton("titlebardrag", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()));
@@ -1605,7 +1606,6 @@ struct StudioAppImpl final : StudioApp
 			entityMenu();
 			toolsMenu();
 			viewMenu();
-			ImGui::PopStyleVar(2);
 
 			float w = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x) * 0.5f - 30 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeightWithSpacing()));
