@@ -2739,6 +2739,9 @@ struct StudioAppImpl final : StudioApp
 		m_editor->addComponent(Span(&e, 1), cmp_type);
 	}
 
+	i32 getSelectedEntitiesCount() const { return m_editor->getSelectedEntities().size(); }
+	EntityRef getSelectedEntity(u32 idx) const { return m_editor->getSelectedEntities()[idx]; }
+
 	void exitGameMode() { m_deferred_game_mode_exit = true; }
 
 
@@ -2867,7 +2870,7 @@ struct StudioAppImpl final : StudioApp
 	};
 
 
-	static int createEntityEx(lua_State* L)
+	static int LUA_createEntityEx(lua_State* L)
 	{
 		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
 		LuaWrapper::checkTableArg(L, 2);
@@ -2937,8 +2940,31 @@ struct StudioAppImpl final : StudioApp
 		return 1;
 	}
 
+	static int LUA_getSelectedEntity(lua_State* L) {
+		LuaWrapper::DebugGuard guard(L, 1);
+		i32 entity_idx = LuaWrapper::checkArg<i32>(L, 1);
+		int upvalue_index = lua_upvalueindex(1);
+		if (!LuaWrapper::isType<StudioAppImpl*>(L, upvalue_index)) {
+			ASSERT(false);
+			luaL_error(L, "Invalid Lua closure");
+		}
+		StudioAppImpl* inst = LuaWrapper::checkArg<StudioAppImpl*>(L, upvalue_index);
+		EntityRef entity = inst->m_editor->getSelectedEntities()[entity_idx];
 
-	static int getResources(lua_State* L)
+		lua_getglobal(L, "Lumix");
+		lua_getfield(L, -1, "Entity");
+		lua_remove(L, -2);
+		lua_getfield(L, -1, "new");
+		lua_pushvalue(L, -2); // [Lumix.Entity, Entity.new, Lumix.Entity]
+		lua_remove(L, -3); // [Entity.new, Lumix.Entity]
+		World* world = inst->m_editor->getWorld();
+		LuaWrapper::push(L, world); // [Entity.new, Lumix.Entity, world]
+		LuaWrapper::push(L, entity.index); // [Entity.new, Lumix.Entity, world, entity_index]
+		const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
+		return 1;
+	}
+
+	static int LUA_getResources(lua_State* L)
 	{
 		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
 		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2982,11 +3008,13 @@ struct StudioAppImpl final : StudioApp
 		REGISTER_FUNCTION(newWorld);
 		REGISTER_FUNCTION(exitWithCode);
 		REGISTER_FUNCTION(exitGameMode);
+		REGISTER_FUNCTION(getSelectedEntitiesCount);
 
 #undef REGISTER_FUNCTION
 
-		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &getResources);
-		LuaWrapper::createSystemFunction(L, "Editor", "createEntityEx", &createEntityEx);
+		LuaWrapper::createSystemClosure(L, "Editor", this, "getSelectedEntity", &LUA_getSelectedEntity);
+		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
+		LuaWrapper::createSystemFunction(L, "Editor", "createEntityEx", &LUA_createEntityEx);
 	}
 
 	void checkScriptCommandLine() {

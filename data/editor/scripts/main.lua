@@ -1,7 +1,7 @@
 local tpl = [[
 declare ImGui: {
     AlignTextToFramePadding : () -> (),
-    Begin : (string) -> boolean,
+    Begin : (string, boolean?) -> (boolean, boolean?),
     BeginChildFrame : (string, number, number) -> boolean,
     BeginPopup : (string) -> boolean,
     Button : (string) -> boolean,
@@ -23,7 +23,7 @@ declare ImGui: {
     GetWindowHeight : () -> (),
     GetWindowPos : () -> any,
     Indent : (number) -> (),
-    InputTextMultiline : (string, string) -> (boolean, string),
+    InputTextMultiline : (string, string) -> (boolean, string?),
     IsItemHovered : () -> boolean,
     IsMouseClicked : (number) -> boolean,
     IsMouseDown : (number) -> boolean,
@@ -83,7 +83,9 @@ declare this:Entity
 declare Editor: {
     ENTITY_PROPERTY : number,
     BOOLEAN_PROPERTY : number,
-    setPropertyType : (any, string, number) -> ()
+    setPropertyType : (any, string, number) -> (),
+	getSelectedEntitiesCount : () -> number,
+	getSelectedEntity : (number) -> Entity
 }
 
 declare LumixAPI: {

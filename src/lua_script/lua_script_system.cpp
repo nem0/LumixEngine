@@ -1468,9 +1468,10 @@ public:
 	}
 
 
-	int getEnvironment(EntityRef entity, int scr_index) override
-	{
-		return m_scripts[entity]->m_scripts[scr_index].m_environment;
+	int getEnvironment(EntityRef entity, int scr_index) override {
+		const Array<ScriptInstance>& scripts = m_scripts[entity]->m_scripts;
+		if (scr_index >= scripts.size()) return -1;
+		return scripts[scr_index].m_environment;
 	}
 
 

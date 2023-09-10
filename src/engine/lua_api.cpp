@@ -25,15 +25,11 @@ int InputTextMultiline(lua_State* L)
 	copyString(buf, value);
 	bool changed = ImGui::InputTextMultiline(name, buf, sizeof(buf), ImVec2(-1, -1));
 	lua_pushboolean(L, changed);
-	if (changed)
-	{
+	if (changed) {
 		lua_pushstring(L, buf);
+		return 2;
 	}
-	else
-	{
-		lua_pushvalue(L, 2);
-	}
-	return 2;
+	return 1;
 }
 
 
@@ -264,13 +260,19 @@ int Begin(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
 	ImGuiWindowFlags flags = 0;
-	if (lua_gettop(L) > 1)
-	{
-		flags = LuaWrapper::checkArg<int>(L, 2);
+	bool open = true;
+	bool has_open = false;
+	if (lua_gettop(L) > 1) {
+		open = LuaWrapper::checkArg<bool>(L, 2);
+		has_open = true;
 	}
-	bool res = ImGui::Begin(label, nullptr, flags);
+	if (lua_gettop(L) > 2) {
+		flags = LuaWrapper::checkArg<int>(L, 3);
+	}
+	bool res = ImGui::Begin(label, has_open ? &open : nullptr, flags);
 	lua_pushboolean(L, res);
-	return 1;
+	if (has_open) lua_pushboolean(L, open);
+	return has_open ? 2 : 1;
 }
 
 
