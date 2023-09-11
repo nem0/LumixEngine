@@ -104,6 +104,7 @@ plugin.gui = function()
             if ImGui.IsKeyPressed(ImGui.Key_DownArrow, true) then autocomplete_selected_idx += 1 end
             if autocomplete_selected_idx < -1 then autocomplete_selected_idx = 0 end
             if autocomplete_selected_idx >= #suggestions then autocomplete_selected_idx = #suggestions - 1 end
+            if ImGui.IsKeyPressed(ImGui.Key_Escape, false) then ImGui.CloseCurrentPopup() end
             if ImGui.IsKeyPressed(ImGui.Key_Enter, false) then
                 ImGui.CloseCurrentPopup()
                 local k = suggestions[autocomplete_selected_idx + 1]

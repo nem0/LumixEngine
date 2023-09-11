@@ -60,6 +60,7 @@ declare ImGui: {
 
 	Key_DownArrow : number,
 	Key_Enter : number,
+	Key_Escape : number,
 	Key_UpArrow : number
 }
 

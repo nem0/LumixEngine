@@ -949,6 +949,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_WindowPadding", ImGuiStyleVar_WindowPadding);
 	LuaWrapper::createSystemVariable(L, "ImGui", "Key_DownArrow", ImGuiKey_DownArrow);
 	LuaWrapper::createSystemVariable(L, "ImGui", "Key_Enter", ImGuiKey_Enter);
+	LuaWrapper::createSystemVariable(L, "ImGui", "Key_Escape", ImGuiKey_Escape);
 	LuaWrapper::createSystemVariable(L, "ImGui", "Key_UpArrow", ImGuiKey_UpArrow);
 	LuaImGui::registerCFunction(L, "AlignTextToFramePadding", &LuaWrapper::wrap<ImGui::AlignTextToFramePadding>);
 	LuaImGui::registerCFunction(L, "Begin", &LuaImGui::Begin);
