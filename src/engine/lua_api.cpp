@@ -17,8 +17,42 @@ namespace Lumix {
 
 namespace LuaImGui {
 
-int InputTextMultiline(lua_State* L)
-{
+int GetOsImePosRequest(lua_State* L) {
+	ImVec2 p = ImGuiEx::GetOsImePosRequest();
+	lua_pushnumber(L, p.x);
+	lua_pushnumber(L, p.y);
+	return 2;
+}
+
+int InputTextMultilineWithCallback(lua_State* L) {
+	char buf[4 * 4096];
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
+	copyString(buf, value);
+	auto callback = [](ImGuiInputTextCallbackData* data) -> int {
+		lua_State* L = (lua_State*)data->UserData;
+		lua_pushlstring(L, data->Buf, data->BufTextLen);
+		lua_pushnumber(L, data->CursorPos);
+		lua_pushboolean(L, data->EventFlag == ImGuiInputTextFlags_CallbackCompletion);
+		LuaWrapper::pcall(L, 3, 1);
+		if (lua_isstring(L, -1)) {
+			const char* str = lua_tostring(L, -1);
+			data->InsertChars(data->CursorPos, str);
+		}
+		lua_pop(L, 1);
+		return 0;
+	};
+
+	bool changed = ImGui::InputTextMultiline(name, buf, sizeof(buf), ImVec2(-1, -1), ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackAlways, callback, L);
+	lua_pushboolean(L, changed);
+	if (changed) {
+		lua_pushstring(L, buf);
+		return 2;
+	}
+	return 1;
+}
+
+int InputTextMultiline(lua_State* L) {
 	char buf[4 * 4096];
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
 	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
@@ -209,34 +243,12 @@ int SetCursorScreenPos(lua_State* L)
 }
 
 
-void Rect(float w, float h, u32 color)
-{
-	ImGuiEx::Rect(w, h, color);
-}
-
-
-void Dummy(float w, float h)
-{
-	ImGui::Dummy({w, h});
-}
-
-
-bool IsItemHovered()
-{
-	return ImGui::IsItemHovered();
-}
-
-
-bool IsMouseDown(int button)
-{
-	return ImGui::IsMouseDown(button);
-}
-
-
-bool IsMouseClicked(int button)
-{
-	return ImGui::IsMouseClicked(button);
-}
+void Rect(float w, float h, u32 color) { ImGuiEx::Rect(w, h, color); }
+void Dummy(float w, float h) { ImGui::Dummy({w, h}); }
+bool IsItemHovered() { return ImGui::IsItemHovered(); }
+bool IsMouseDown(int button) { return ImGui::IsMouseDown(button); }
+bool IsMouseClicked(int button) { return ImGui::IsMouseClicked(button); }
+bool IsKeyPressed(int key, bool repeat) { return ImGui::IsKeyPressed((ImGuiKey)key, repeat); }
 
 
 int SetNextWindowPosCenter(lua_State* L)
@@ -935,6 +947,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_ItemSpacing", ImGuiStyleVar_ItemSpacing);
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_ItemInnerSpacing", ImGuiStyleVar_ItemInnerSpacing);
 	LuaWrapper::createSystemVariable(L, "ImGui", "StyleVar_WindowPadding", ImGuiStyleVar_WindowPadding);
+	LuaWrapper::createSystemVariable(L, "ImGui", "Key_DownArrow", ImGuiKey_DownArrow);
+	LuaWrapper::createSystemVariable(L, "ImGui", "Key_Enter", ImGuiKey_Enter);
+	LuaWrapper::createSystemVariable(L, "ImGui", "Key_UpArrow", ImGuiKey_UpArrow);
 	LuaImGui::registerCFunction(L, "AlignTextToFramePadding", &LuaWrapper::wrap<ImGui::AlignTextToFramePadding>);
 	LuaImGui::registerCFunction(L, "Begin", &LuaImGui::Begin);
 	LuaImGui::registerCFunction(L, "BeginChildFrame", &LuaImGui::BeginChildFrame);
@@ -942,6 +957,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "Button", &LuaImGui::Button);
 	LuaImGui::registerCFunction(L, "CalcTextSize", &LuaImGui::CalcTextSize);
 	LuaImGui::registerCFunction(L, "Checkbox", &LuaImGui::Checkbox);
+	LuaImGui::registerCFunction(L, "CloseCurrentPopup", &LuaWrapper::wrap<ImGui::CloseCurrentPopup>);
 	LuaImGui::registerCFunction(L, "CollapsingHeader", &LuaImGui::CollapsingHeader);
 	LuaImGui::registerCFunction(L, "Columns", &LuaWrapper::wrap<&ImGui::Columns>);
 	LuaImGui::registerCFunction(L, "DragFloat", &LuaImGui::DragFloat);
@@ -958,8 +974,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "GetWindowHeight", &LuaWrapper::wrap<ImGui::GetWindowHeight>);
 	LuaImGui::registerCFunction(L, "GetWindowPos", &LuaWrapper::wrap<LuaImGui::GetWindowPos>);
 	LuaImGui::registerCFunction(L, "Indent", &LuaWrapper::wrap<&ImGui::Indent>);
+	LuaImGui::registerCFunction(L, "GetOsImePosRequest", &LuaImGui::GetOsImePosRequest);
+	LuaImGui::registerCFunction(L, "InputTextMultilineWithCallback", &LuaImGui::InputTextMultilineWithCallback);
 	LuaImGui::registerCFunction(L, "InputTextMultiline", &LuaImGui::InputTextMultiline);
 	LuaImGui::registerCFunction(L, "IsItemHovered", &LuaWrapper::wrap<&LuaImGui::IsItemHovered>);
+	LuaImGui::registerCFunction(L, "IsKeyPressed", &LuaWrapper::wrap<&LuaImGui::IsKeyPressed>);
 	LuaImGui::registerCFunction(L, "IsMouseClicked", &LuaWrapper::wrap<&LuaImGui::IsMouseClicked>);
 	LuaImGui::registerCFunction(L, "IsMouseDown", &LuaWrapper::wrap<&LuaImGui::IsMouseDown>);
 	LuaImGui::registerCFunction(L, "NewLine", &LuaWrapper::wrap<&ImGui::NewLine>);
@@ -978,6 +997,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "Selectable", &LuaImGui::Selectable);
 	LuaImGui::registerCFunction(L, "Separator", &LuaWrapper::wrap<ImGui::Separator>);
 	LuaImGui::registerCFunction(L, "SetCursorScreenPos", &LuaImGui::SetCursorScreenPos);
+	LuaImGui::registerCFunction(L, "SetKeyboardFocusHere", &LuaWrapper::wrap<&ImGui::SetKeyboardFocusHere>);
 	LuaImGui::registerCFunction(L, "SetNextWindowPos", &LuaImGui::SetNextWindowPos);
 	LuaImGui::registerCFunction(L, "SetNextWindowPosCenter", &LuaImGui::SetNextWindowPosCenter);
 	LuaImGui::registerCFunction(L, "SetNextWindowSize", &LuaWrapper::wrap<&LuaImGui::SetNextWindowSize>);

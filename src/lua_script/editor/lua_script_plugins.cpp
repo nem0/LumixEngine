@@ -35,6 +35,201 @@ static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_s
 
 namespace {
 
+struct StudioLuaPlugin : StudioApp::GUIPlugin {
+	static void create(StudioApp& app, StringView content, const Path& path) {
+		lua_State* L = app.getEngine().getState();
+		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return;
+
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			return;
+		}
+
+		if (lua_getfield(L, -1, "name") != LUA_TSTRING) {
+			logError(path, ": missing `name` or `name` is not a string");
+			return;
+		}
+		const char* name = LuaWrapper::toType<const char*>(L, -1);
+
+
+		StudioLuaPlugin* plugin = LUMIX_NEW(app.getAllocator(), StudioLuaPlugin)(app, name);
+		lua_pop(L, 1);
+		
+		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
+			char tmp[64];
+			convertToLuaName(name, tmp);
+			plugin->m_action.init(name, name, tmp, "", Action::IMGUI_PRIORITY);
+			plugin->m_action.func.bind<&StudioLuaPlugin::runWindowAction>(plugin);
+			app.addWindowAction(&plugin->m_action);
+		}
+		lua_pop(L, 1);
+		
+		plugin->m_plugin_ref = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+		app.addPlugin(*plugin);
+
+	} 
+	
+	static void convertToLuaName(const char* src, Span<char> out) {
+		const u32 max_size = out.length();
+		ASSERT(max_size > 0);
+		char* dest = out.begin();
+		while (*src && dest - out.begin() < max_size - 1) {
+			if (isLetter(*src)) {
+				*dest = isUpperCase(*src) ? *src - 'A' + 'a' : *src;
+				++dest;
+			}
+			else if (isNumeric(*src)) {
+				*dest = *src;
+				++dest;
+			}
+			else {
+				*dest = '_';
+				++dest;
+			}
+			++src;
+		}
+		*dest = 0;
+	}
+
+	StudioLuaPlugin(StudioApp& app, const char* name)
+		: m_app(app)
+		, m_name(name, app.getAllocator())
+	{}
+
+	void runWindowAction() {
+		lua_State* L = m_app.getEngine().getState();
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
+		lua_getfield(L, -1, "windowMenuAction");
+		LuaWrapper::pcall(L, 0, 0);
+		lua_pop(L, 1);
+	}
+
+	bool onAction(const Action& action) {
+		if (&action == &m_action) {
+			runWindowAction();
+			return true;
+		}
+		return false;
+	}
+
+
+	void onGUI() override {
+		lua_State* L = m_app.getEngine().getState();
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
+		lua_getfield(L, -1, "gui");
+		LuaWrapper::pcall(L, 0, 0);
+		lua_pop(L, 1);
+	}
+
+	void onSettingsLoaded() {
+		lua_State* L = m_app.getEngine().getState();
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
+		if (lua_getfield(L, -1, "settings") == LUA_TNIL) {
+			lua_pop(L, 2);
+			return;
+		}
+		if (!lua_istable(L, -1)) {
+			logError(m_name, ": settings must be a table");
+			lua_pop(L, 1);
+			return;
+		}
+
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0) {
+			if (!lua_isstring(L, -2)) {
+				logError(m_name, ": settings must be a table with string keys");
+				lua_pop(L, 3);
+				return;
+			} 
+			const char* setting_name = lua_tostring(L, -2);
+			switch (lua_type(L, -1)) {
+				case LUA_TBOOLEAN: {
+					bool val = lua_toboolean(L, -1);
+					val = m_app.getSettings().getValue(Settings::LOCAL, setting_name, val);
+					lua_pushboolean(L, val);
+					lua_setfield(L, -4, setting_name);
+					break;
+				}
+				case LUA_TNUMBER: {
+					float val = (float)lua_tonumber(L, -1);
+					val = m_app.getSettings().getValue(Settings::LOCAL, setting_name, val);
+					lua_pushnumber(L, val);
+					lua_setfield(L, -4, setting_name);
+					break;
+				}
+				case LUA_TSTRING: {
+					const char* val = lua_tostring(L, -1);
+					val = m_app.getSettings().getStringValue(Settings::LOCAL, setting_name, val);
+					lua_pushstring(L, val);
+					lua_setfield(L, -4, setting_name);
+					break;
+				}
+				default: break;
+			}
+			lua_pop(L, 1);
+		}
+
+		lua_pop(L, 2);
+	}
+	
+	void onBeforeSettingsSaved() {
+		lua_State* L = m_app.getEngine().getState();
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
+		if (lua_getfield(L, -1, "settings") == LUA_TNIL) {
+			lua_pop(L, 2);
+			return;
+		}
+		if (!lua_istable(L, -1)) {
+			logError(m_name, ": settings must be a table");
+			lua_pop(L, 1);
+			return;
+		}
+
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0) {
+			if (!lua_isstring(L, -2)) {
+				logError(m_name, ": settings must be a table with string keys");
+				lua_pop(L, 3);
+				return;
+			} 
+			const char* setting_name = lua_tostring(L, -2);
+			switch (lua_type(L, -1)) {
+				case LUA_TBOOLEAN: {
+					bool val = lua_toboolean(L, -1);
+					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					break;
+				}
+				case LUA_TNUMBER: {
+					float val = (float)lua_tonumber(L, -1);
+					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					break;
+				}
+				case LUA_TSTRING: {
+					const char* val = lua_tostring(L, -1);
+					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					break;
+				}
+				default:
+					logError(m_name, "settings: ", setting_name, " has unsupported type");
+					break;
+			}
+			lua_pop(L, 1);
+		}
+
+		lua_pop(L, 2);
+	}
+
+	const char* getName() const override { return m_name.c_str(); }
+
+	StudioApp& m_app;
+	Action m_action;
+	String m_name;
+	i32 m_plugin_ref;
+};
 
 struct EditorWindow : AssetEditorWindow {
 	EditorWindow(const Path& path, StudioApp& app)
@@ -130,329 +325,6 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	StudioApp& m_app;
 };
 
-
-struct ConsolePlugin final : StudioApp::GUIPlugin
-{
-	explicit ConsolePlugin(StudioApp& _app)
-		: app(_app)
-		, open(false)
-		, autocomplete(_app.getAllocator())
-	{
-		m_toggle_ui.init("Script Console", "Toggle script console", "script_console", "", Action::IMGUI_PRIORITY);
-		m_toggle_ui.func.bind<&ConsolePlugin::toggleOpen>(this);
-		m_toggle_ui.is_selected.bind<&ConsolePlugin::isOpen>(this);
-		app.addWindowAction(&m_toggle_ui);
-		buf[0] = '\0';
-		runEditorMainLua();
-	}
-
-	~ConsolePlugin() {
-		app.removeAction(&m_toggle_ui);
-	}
-
-	void onSettingsLoaded() override {
-		Settings& settings = app.getSettings();
-		open = settings.getValue(Settings::GLOBAL, "is_script_console_open", false);
-		if (!buf[0]) {
-			StringView dir = Path::getDir(settings.getAppDataPath());
-			const StaticString<MAX_PATH> path(dir, "/lua_console_content.lua");
-			os::InputFile file;
-			if (file.open(path)) {
-				const u64 size = file.size();
-				if (size + 1 <= sizeof(buf)) {
-					if (!file.read(buf, size)) {
-						logError("Failed to read ", path);
-						buf[0] = '\0';
-					}
-					else {
-						buf[size] = '\0';
-					}
-				}
-				file.close();
-			}
-		}
-	}
-
-	void onBeforeSettingsSaved() override {
-		Settings& settings = app.getSettings();
-		settings.setValue(Settings::GLOBAL, "is_script_console_open", open);
-		if (buf[0]) {
-			StringView dir = Path::getDir(settings.getAppDataPath());
-			const StaticString<MAX_PATH> path(dir, "/lua_console_content.lua");
-			os::OutputFile file;
-			if (!file.open(path)) {
-				logError("Failed to save ", path);
-			}
-			else {
-				if (!file.write(buf, stringLength(buf))) {
-					logError("Failed to write ", path);
-				}
-				file.close();
-			}
-		}
-	}
-
-	const char* getName() const override { return "script_console"; }
-
-	bool isOpen() const { return open; }
-	void toggleOpen() { open = !open; }
-
-	void autocompleteSubstep(lua_State* L, const char* str, ImGuiInputTextCallbackData *data)
-	{
-		char item[128];
-		const char* next = str;
-		char* c = item;
-		while (*next != '.' && *next != '\0')
-		{
-			*c = *next;
-			++next;
-			++c;
-		}
-		*c = '\0';
-
-		if (!lua_istable(L, -1)) return;
-
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			const char* name = lua_tostring(L, -2);
-			if (startsWith(name, item))
-			{
-				if (*next == '.' && next[1] == '\0')
-				{
-					autocompleteSubstep(L, "", data);
-				}
-				else if (*next == '\0')
-				{
-					autocomplete.push(String(name, app.getAllocator()));
-				}
-				else
-				{
-					autocompleteSubstep(L, next + 1, data);
-				}
-			}
-			lua_pop(L, 1);
-		}
-	}
-
-
-	static bool isWordChar(char c)
-	{
-		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
-	}
-
-
-	static int autocompleteCallback(ImGuiInputTextCallbackData *data)
-	{
-		auto* that = (ConsolePlugin*)data->UserData;
-		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
-		{
-			lua_State* L = that->app.getEngine().getState();
-
-			int start_word = data->CursorPos;
-			char c = data->Buf[start_word - 1];
-			while (start_word > 0 && (isWordChar(c) || c == '.'))
-			{
-				--start_word;
-				c = data->Buf[start_word - 1];
-			}
-			char tmp[128];
-			copyString(Span(tmp), StringView(data->Buf + start_word, data->CursorPos - start_word));
-
-			that->autocomplete.clear();
-			lua_pushvalue(L, LUA_GLOBALSINDEX);
-			that->autocompleteSubstep(L, tmp, data);
-			lua_pop(L, 1);
-			if (!that->autocomplete.empty())
-			{
-				that->open_autocomplete = true;
-				qsort(&that->autocomplete[0],
-					that->autocomplete.size(),
-					sizeof(that->autocomplete[0]),
-					[](const void* a, const void* b) {
-					const String* a_str = (const String*)a;
-					const String* b_str = (const String*)b;
-					return compareString(*a_str, *b_str);
-				});
-			}
-		}
-		else if (that->insert_value)
-		{
-			int start_word = data->CursorPos;
-			char c = data->Buf[start_word - 1];
-			while (start_word > 0 && (isWordChar(c)))
-			{
-				--start_word;
-				c = data->Buf[start_word - 1];
-			}
-			data->InsertChars(data->CursorPos, that->insert_value + data->CursorPos - start_word);
-			that->insert_value = nullptr;
-		}
-		return 0;
-	}
-
-	void runEditorMainLua() {
-		OutputMemoryStream blob(app.getAllocator());
-		const char* path = "editor/scripts/main.lua";
-		Engine& engine = app.getEngine();
-		if (!engine.getFileSystem().getContentSync(Path(path), blob)) return;
-
-		StringView sv;
-		sv.begin = (const char*)blob.data();
-		sv.end = sv.begin + blob.size();
-		if (LuaWrapper::execute(engine.getState(), sv, path, 1)) {
-			if (lua_isthread(engine.getState(), -1)) {
-				m_editor_lua_state_ref = LuaWrapper::luaL_ref(engine.getState(), LUA_REGISTRYINDEX);
-			}
-		}
-	}
-
-	void tickEditorLua() {
-		if (m_editor_lua_state_ref == -1) return;
-
-		Engine& engine = app.getEngine();
-		lua_State* L = engine.getState();
-		LuaWrapper::DebugGuard guard(L);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
-		lua_State* coroutine = lua_tothread(L, -1);
-		i32 res = lua_resume(coroutine, nullptr, 0);
-		if (res == LUA_OK) {
-			LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
-			m_editor_lua_state_ref = -1;
-		}
-		else if (res != LUA_YIELD) {
-			LuaWrapper::traceback(coroutine);
-			const char* error_msg = lua_tostring(coroutine, -1);
-			logError("editor main: ", error_msg);
-			LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, m_editor_lua_state_ref);
-			m_editor_lua_state_ref = -1;
-		}
-		lua_pop(L, 1);
-	}
-
-	void onGUI() override
-	{
-		tickEditorLua();
-		if (!open) return;
-		if (ImGui::Begin("Lua console##lua_console", &open))
-		{
-			if (ImGui::Button("Execute")) {
-				lua_State* L;
-				if (run_on_entity) {
-					WorldEditor& editor = app.getWorldEditor();
-					const Array<EntityRef>& selected = editor.getSelectedEntities();
-					if (selected.size() == 1) {
-						World& world = *editor.getWorld();
-						LuaScriptModule* module = (LuaScriptModule*)world.getModule("lua_script");
-						if (world.hasComponent(selected[0], LUA_SCRIPT_TYPE) && module->getScriptCount(selected[0]) > 0) {
-							module->execute(selected[0], 0, StringView(buf));
-						}
-					}
-				}
-				else {
-					L = app.getEngine().getState();
-				
-					bool errors = LuaWrapper::luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != 0;
-					errors = errors || lua_pcall(L, 0, 0, 0) != 0;
-
-					if (errors)
-					{
-						logError(lua_tostring(L, -1));
-						lua_pop(L, 1);
-					}
-				}
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Execute file"))
-			{
-				char tmp[MAX_PATH] = {};
-				if (os::getOpenFilename(Span(tmp), "Scripts\0*.lua\0", nullptr))
-				{
-					os::InputFile file;
-					IAllocator& allocator = app.getAllocator();
-					if (file.open(tmp))
-					{
-						size_t size = file.size();
-						Array<char> data(allocator);
-						data.resize((int)size);
-						if (!file.read(&data[0], size)) {
-							logError("Could not read ", tmp);
-							data.clear();
-						}
-						file.close();
-						lua_State* L = app.getEngine().getState();
-						bool errors = LuaWrapper::luaL_loadbuffer(L, &data[0], data.size(), tmp) != 0;
-						errors = errors || lua_pcall(L, 0, 0, 0) != 0;
-
-						if (errors)
-						{
-							logError(lua_tostring(L, -1));
-							lua_pop(L, 1);
-						}
-					}
-					else
-					{
-						logError("Failed to open file ", tmp);
-					}
-				}
-			}
-			ImGui::SameLine();
-			ImGui::Checkbox("Run on entity", &run_on_entity);
-			if(insert_value) ImGui::SetKeyboardFocusHere();
-			ImGui::PushFont(app.getMonospaceFont());
-			ImGui::InputTextMultiline("##repl",
-				buf,
-				lengthOf(buf),
-				ImVec2(-1, -1),
-				ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion,
-				autocompleteCallback,
-				this);
-			ImGui::PopFont();
-
-			if (open_autocomplete)
-			{
-				ImGui::OpenPopup("autocomplete");
-				ImGui::SetNextWindowPos(ImGuiEx::GetOsImePosRequest());
-			}
-			open_autocomplete = false;
-			if (ImGui::BeginPopup("autocomplete"))
-			{
-				if (autocomplete.size() == 1)
-				{
-					insert_value = autocomplete[0].c_str();
-				}
-				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) ++autocomplete_selected;
-				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) --autocomplete_selected;
-				if (ImGui::IsKeyPressed(ImGuiKey_Enter)) insert_value = autocomplete[autocomplete_selected].c_str();
-				if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-				autocomplete_selected = clamp(autocomplete_selected, 0, autocomplete.size() - 1);
-				for (int i = 0, c = autocomplete.size(); i < c; ++i)
-				{
-					const char* value = autocomplete[i].c_str();
-					if (ImGui::Selectable(value, autocomplete_selected == i))
-					{
-						insert_value = value;
-					}
-				}
-				ImGui::EndPopup();
-			}
-		}
-		ImGui::End();
-	}
-
-	StudioApp& app;
-	Action m_toggle_ui;
-	Array<String> autocomplete;
-	bool open;
-	bool open_autocomplete = false;
-	bool run_on_entity = false;
-	int autocomplete_selected = 1;
-	const char* insert_value = nullptr;
-	char buf[10 * 1024];
-	i32 m_editor_lua_state_ref = -1;
-};
-
-
 struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 {
 	explicit AddComponentPlugin(StudioApp& app)
@@ -460,7 +332,6 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		, file_selector("lua", app)
 	{
 	}
-
 
 	void onGUI(bool create_entity, bool, EntityPtr parent, WorldEditor& editor) override
 	{
@@ -552,8 +423,29 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_asset_plugin(app)
-		, m_console_plugin(app)
 	{
+		initPlugins();
+	}
+
+	void initPlugins() {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		os::FileIterator* iter = fs.createFileIterator("editor/scripts/plugins");
+		os::FileInfo info;
+		while (os::getNextFile(iter, &info)) {
+			info.is_directory = info.is_directory;
+			if (info.is_directory) continue;
+			if (!Path::hasExtension(info.filename, "lua")) continue;
+
+			OutputMemoryStream blob(m_app.getAllocator());
+			const Path path("editor/scripts/plugins/", info.filename);
+			if (!fs.getContentSync(path, blob)) continue;
+
+			StringView content;
+			content.begin = (const char*)blob.data();
+			content.end = content.begin + blob.size();
+			StudioLuaPlugin::create(m_app, content, path);
+		}
+		os::destroyFileIterator(iter);
 	}
 
 	const char* getName() const override { return "lua_script"; }
@@ -566,7 +458,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* exts[] = { "lua" };
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(exts));
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(exts));
-		m_app.addPlugin(m_console_plugin);
 		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 	}
 
@@ -574,7 +465,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		m_app.getAssetCompiler().removePlugin(m_asset_plugin);
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
-		m_app.removePlugin(m_console_plugin);
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 	}
 
@@ -598,7 +488,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	
 	StudioApp& m_app;
 	AssetPlugin m_asset_plugin;
-	ConsolePlugin m_console_plugin;
 	PropertyGridPlugin m_property_grid_plugin;
 };
 

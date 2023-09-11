@@ -7,6 +7,7 @@ declare ImGui: {
     Button : (string) -> boolean,
     CalcTextSize : (string) -> (number, number),
     Checkbox : (string, boolean) -> (boolean, boolean),
+    CloseCurrentPopup : () -> (),
     CollapsingHeader : (string) -> boolean,
     Columns : (number) -> (),
     DragFloat : (string, number) -> (boolean, number),
@@ -19,12 +20,15 @@ declare ImGui: {
     GetColumnWidth : (number) -> number,
     GetDisplayWidth : () -> number,
     GetDisplayHeight : () -> number,
+    GetOsImePosRequest : () -> (number, number),
     GetWindowWidth : () -> (),
     GetWindowHeight : () -> (),
     GetWindowPos : () -> any,
     Indent : (number) -> (),
     InputTextMultiline : (string, string) -> (boolean, string?),
+    InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
     IsItemHovered : () -> boolean,
+    IsKeyPressed : (number, boolean) -> boolean,
     IsMouseClicked : (number) -> boolean,
     IsMouseDown : (number) -> boolean,
     LabelText : (string, string) -> (),
@@ -45,6 +49,7 @@ declare ImGui: {
     Selectable : (string, boolean) -> boolean | (string) -> boolean,
     Separator : () -> (),
     SetCursorScreenPos : (number, number) -> (),
+    SetKeyboardFocusHere : (number) -> (),
     SetNextWindowPos : (number, number) -> (),
     SetNextWindowPosCenter : () -> (),
     SetNextWindowSize : (number, number) -> (),
@@ -52,6 +57,10 @@ declare ImGui: {
     SliderFloat : (string, number, number, number) -> (boolean, number),
     Text : (string) -> (),
     Unindent : (number) -> (),
+
+	Key_DownArrow : number,
+	Key_Enter : number,
+	Key_UpArrow : number
 }
 
 declare class World
@@ -149,7 +158,6 @@ type ButtonInputEvent = {
 export type InputEvent = ButtonInputEvent | AxisInputEvent
 
 ]]
-if false then
     function typeToString(type : number) : string
         if type < 3 then return "number" end
         if type == 3 then return "Entity" end
@@ -206,16 +214,16 @@ if false then
         return string.format(tpl, out, entity_src)
     end
 
-    local type_defs = refl()
+local type_defs = refl()
 
-    return coroutine.create(function()
-        while true do
+if false then
+    return {
+        name = "Lua type defs",
+        gui = function()
             if ImGui.Begin("Lua type definitions") then
                 ImGui.InputTextMultiline("Types", type_defs)
             end
             ImGui.End()
-            coroutine.yield()    
         end
-    end)
+    }
 end
-
