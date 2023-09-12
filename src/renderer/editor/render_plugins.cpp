@@ -2519,6 +2519,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.anim_rotation_error = meta.anim_rotation_error;
 		cfg.anim_translation_error = meta.anim_translation_error;
 		cfg.skeleton = meta.skeleton;
+		if (cfg.skeleton.isEmpty()) cfg.skeleton = src;
 		cfg.root_motion_bone = BoneNameHash(meta.root_motion_bone.c_str());
 		FBXImporter importer(m_app);
 		if (!importer.setSource(filepath, false, meta.force_skin)) return false;

@@ -84,7 +84,6 @@ struct FBXImporter {
 		const ofbx::AnimationStack* fbx = nullptr;
 		const ofbx::IScene* scene = nullptr;
 		StringView name;
-		bool import = true;
 	};
 
 	struct ImportTexture {

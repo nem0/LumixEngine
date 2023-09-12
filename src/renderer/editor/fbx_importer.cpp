@@ -335,6 +335,13 @@ void FBXImporter::gatherBones(bool force_skinned)
 	sortBones(force_skinned);
 }
 
+static bool isConstCurve(const ofbx::AnimationCurve* curve) {
+	if (!curve) return true;
+	if (curve->getKeyCount() <= 1) return true;
+	const float* values = curve->getKeyValue();
+	if (curve->getKeyCount() == 2 && fabsf(values[1] - values[0]) < 1e-6) return true;
+	return false;
+}
 
 void FBXImporter::gatherAnimations()
 {
@@ -344,7 +351,6 @@ void FBXImporter::gatherAnimations()
 		ImportAnimation& anim = m_animations.emplace();
 		anim.scene = m_scene;
 		anim.fbx = (const ofbx::AnimationStack*)m_scene->getAnimationStack(i);
-		anim.import = true;
 		const ofbx::TakeInfo* take_info = m_scene->getTakeInfo(anim.fbx->name);
 		if (take_info) {
 			if (take_info->name.begin != take_info->name.end) {
@@ -369,10 +375,11 @@ void FBXImporter::gatherAnimations()
 		bool data_found = false;
 		for (int k = 0; anim_layer->getCurveNode(k); ++k) {
 			const ofbx::AnimationCurveNode* node = anim_layer->getCurveNode(k);
-			if (node->getBoneLinkProperty() == "Lcl Translation" || node->getBoneLinkProperty() == "Lcl Rotation")
-			{
-				data_found = true;
-				break;
+			if (node->getBoneLinkProperty() == "Lcl Translation" || node->getBoneLinkProperty() == "Lcl Rotation") {
+				if (!isConstCurve(node->getCurve(0)) || !isConstCurve(node->getCurve(1)) || !isConstCurve(node->getCurve(2))) {
+					data_found = true;
+					break;
+				}
 			}
 		}
 		if (!data_found) m_animations.pop();
@@ -1574,8 +1581,6 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 	PROFILE_FUNCTION();
 	u32 written_count = 0;
 	for (const FBXImporter::ImportAnimation& anim : m_animations) { 
-		ASSERT(anim.import);
-
 		const ofbx::AnimationStack* stack = anim.fbx;
 		const ofbx::AnimationLayer* layer = stack->getLayer(0);
 		ASSERT(anim.scene == m_scene);
