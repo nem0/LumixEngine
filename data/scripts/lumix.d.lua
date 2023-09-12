@@ -7,7 +7,7 @@ declare ImGui: {
     CalcTextSize : (string) -> (number, number),
     Checkbox : (string, boolean) -> (boolean, boolean),
     CloseCurrentPopup : () -> (),
-	CollapsingHeader : (string) -> boolean,
+    CollapsingHeader : (string) -> boolean,
     Columns : (number) -> (),
     DragFloat : (string, number) -> (boolean, number),
     DragInt : (string, number) -> (boolean, number),
@@ -19,15 +19,15 @@ declare ImGui: {
     GetColumnWidth : (number) -> number,
     GetDisplayWidth : () -> number,
     GetDisplayHeight : () -> number,
-	GetOsImePosRequest : () -> (number, number),
+    GetOsImePosRequest : () -> (number, number),
     GetWindowWidth : () -> (),
     GetWindowHeight : () -> (),
     GetWindowPos : () -> any,
     Indent : (number) -> (),
     InputTextMultiline : (string, string) -> (boolean, string?),
     InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
-	IsItemHovered : () -> boolean,
-	IsKeyPressed : (number, boolean) -> boolean,
+    IsItemHovered : () -> boolean,
+    IsKeyPressed : (number, boolean) -> boolean,
     IsMouseClicked : (number) -> boolean,
     IsMouseDown : (number) -> boolean,
     LabelText : (string, string) -> (),
@@ -49,7 +49,7 @@ declare ImGui: {
     Separator : () -> (),
     SetCursorScreenPos : (number, number) -> (),
     SetKeyboardFocusHere : (number) -> (),
-	SetNextWindowPos : (number, number) -> (),
+    SetNextWindowPos : (number, number) -> (),
     SetNextWindowPosCenter : () -> (),
     SetNextWindowSize : (number, number) -> (),
     SetStyleColor : (number, any) -> (),
@@ -70,10 +70,59 @@ declare class World
     load : (World, string, any) -> ()
 end
 
-declare class spline
+declare class GUISystem
+	enableCursor : (GUISystem) -> ()
 end
 
-declare class gui_rect
+declare class Model
+	getBoneCount : (Model) -> number
+	getBoneName : (Model) -> string
+	getBoneParent : (Model) -> number
+end
+
+declare class core_module
+end
+
+declare class navigation_module
+end
+
+declare class animation_module
+end
+
+declare class gui_module
+	getRectAt : (gui_module) -> any
+	isOver : (gui_module, any) -> boolean
+	getSystem : (gui_module) -> any
+end
+
+declare class lua_script_module
+end
+
+declare class audio_module
+	setMasterVolume : (audio_module) -> ()
+	play : (audio_module, any, boolean) -> number
+	stop : (audio_module) -> ()
+	isEnd : (audio_module) -> boolean
+	setFrequency : (audio_module, number) -> ()
+	setVolume : (audio_module, number) -> ()
+	setEcho : (audio_module, number, number, number, number) -> ()
+end
+
+declare class renderer_module
+	addDebugCross : (renderer_module, number, any) -> ()
+	addDebugLine : (renderer_module, any, any) -> ()
+	addDebugTriangle : (renderer_module, any, any, any) -> ()
+	setActiveCamera : (renderer_module) -> ()
+end
+
+declare class physics_module
+	raycast : (physics_module, any, any) -> any
+end
+
+declare class spline_component
+end
+
+declare class gui_rect_component
 	enabled: boolean
 	clip_content: boolean
 	top_points: number
@@ -86,28 +135,28 @@ declare class gui_rect
 	left_relative: number
 end
 
-declare class gui_canvas
+declare class gui_canvas_component
 	orient_to_camera: boolean
 	virtual_size: any
 end
 
-declare class particle_emitter
+declare class particle_emitter_component
 	autodestroy: boolean
 	source: string
 end
 
-declare class terrain
+declare class terrain_component
 	material: string
 	xz_scale: number
 	height_scale: number
 	tesselation: number
 	grid_resolution: number
 	grass: any
-	getTerrainNormalAt : (terrain, number, number) -> any
-	getTerrainHeightAt : (terrain, number, number) -> number
+	getTerrainNormalAt : (terrain_component, number, number) -> any
+	getTerrainHeightAt : (terrain_component, number, number) -> number
 end
 
-declare class camera
+declare class camera_component
 	fov: number
 	near: number
 	far: number
@@ -115,19 +164,19 @@ declare class camera
 	orthographic_size: number
 end
 
-declare class decal
+declare class decal_component
 	material: string
 	half_extents: any
 	uv_scale: any
 end
 
-declare class curve_decal
+declare class curve_decal_component
 	material: string
 	half_extents: number
 	uv_scale: any
 end
 
-declare class point_light
+declare class point_light_component
 	cast_shadows: boolean
 	dynamic: boolean
 	intensity: number
@@ -137,7 +186,7 @@ declare class point_light
 	range: number
 end
 
-declare class environment
+declare class environment_component
 	color: any
 	intensity: number
 	indirect_intensity: number
@@ -145,49 +194,49 @@ declare class environment
 	cast_shadows: boolean
 end
 
-declare class instanced_model
+declare class instanced_model_component
 	model: string
 	blob: any
 end
 
-declare class model_instance
+declare class model_instance_component
 	enabled: boolean
 	material: string
 	source: string
-	getModel : (model_instance) -> any
+	getModel : (model_instance_component) -> any
 end
 
-declare class environment_probe
+declare class environment_probe_component
 	enabled: boolean
 	inner_range: any
 	outer_range: any
 end
 
-declare class reflection_probe
+declare class reflection_probe_component
 	enabled: boolean
 	size: number
 	half_extents: any
 end
 
-declare class fur
+declare class fur_component
 	layers: number
 	scale: number
 	gravity: number
 	enabled: boolean
 end
 
-declare class procedural_geom
+declare class procedural_geom_component
 	material: string
 end
 
-declare class bone_attachment
+declare class bone_attachment_component
 	parent: Entity
 	relative_position: any
 	relative_rotation: any
 	bone: number
 end
 
-declare class rigid_actor
+declare class rigid_actor_component
 	layer: number
 	dynamic: number
 	trigger: boolean
@@ -195,48 +244,44 @@ declare class rigid_actor
 	sphere_geometry: any
 	mesh: string
 	material: string
-	putToSleep : (rigid_actor) -> ()
-	getSpeed : (rigid_actor) -> number
-	getVelocity : (rigid_actor) -> any
-	applyForce : (rigid_actor, any) -> ()
-	applyImpulse : (rigid_actor, any) -> ()
-	addForceAtPos : (rigid_actor, any, any) -> ()
+	putToSleep : (rigid_actor_component) -> ()
+	getSpeed : (rigid_actor_component) -> number
+	getVelocity : (rigid_actor_component) -> any
+	applyForce : (rigid_actor_component, any) -> ()
+	applyImpulse : (rigid_actor_component, any) -> ()
+	addForceAtPos : (rigid_actor_component, any, any) -> ()
 end
 
-declare class physical_heightfield
+declare class physical_heightfield_component
 	layer: number
 	heightmap: string
 	y_scale: number
 	xz_scale: number
 end
 
-declare class physical_controller
+declare class physical_controller_component
 	radius: number
 	height: number
 	layer: number
 	use_root_motion: boolean
 	use_custom_gravity: boolean
 	custom_gravity_acceleration: number
-	move : (physical_controller, any) -> ()
-	isCollisionDown : (physical_controller) -> boolean
-	getGravitySpeed : (physical_controller) -> number
+	move : (physical_controller_component, any) -> ()
+	isCollisionDown : (physical_controller_component) -> boolean
+	getGravitySpeed : (physical_controller_component) -> number
 end
 
-declare class js_script
+declare class lua_script_component
 	scripts: any
 end
 
-declare class lua_script
-	scripts: any
-end
-
-declare class gui_image
+declare class gui_image_component
 	enabled: boolean
 	color: any
 	sprite: string
 end
 
-declare class gui_text
+declare class gui_text_component
 	text: string
 	font: string
 	font_size: number
@@ -245,19 +290,19 @@ declare class gui_text
 	color: any
 end
 
-declare class gui_button
+declare class gui_button_component
 	hovered_color: any
 	cursor: number
 end
 
-declare class gui_render_target
+declare class gui_render_target_component
 end
 
-declare class animable
+declare class animable_component
 	animation: string
 end
 
-declare class distance_joint
+declare class distance_joint_component
 	connected_body: Entity
 	axis_position: any
 	damping: number
@@ -266,7 +311,7 @@ declare class distance_joint
 	limits: any
 end
 
-declare class hinge_joint
+declare class hinge_joint_component
 	connected_body: Entity
 	axis_position: any
 	axis_direction: any
@@ -276,7 +321,7 @@ declare class hinge_joint
 	limit: any
 end
 
-declare class spherical_joint
+declare class spherical_joint_component
 	connected_body: Entity
 	axis_position: any
 	axis_direction: any
@@ -284,7 +329,7 @@ declare class spherical_joint
 	limit: any
 end
 
-declare class d6_joint
+declare class d6_joint_component
 	connected_body: Entity
 	axis_position: any
 	axis_direction: any
@@ -300,7 +345,7 @@ declare class d6_joint
 	restitution: number
 end
 
-declare class vehicle
+declare class vehicle_component
 	speed: number
 	current_gear: number
 	rpm: number
@@ -310,12 +355,12 @@ declare class vehicle
 	chassis: string
 	chassis_layer: number
 	wheels_layer: number
-	setAccel : (vehicle, number) -> ()
-	setSteer : (vehicle, number) -> ()
-	setBrake : (vehicle, number) -> ()
+	setAccel : (vehicle_component, number) -> ()
+	setSteer : (vehicle_component, number) -> ()
+	setBrake : (vehicle_component, number) -> ()
 end
 
-declare class wheel
+declare class wheel_component
 	radius: number
 	width: number
 	mass: number
@@ -328,18 +373,18 @@ declare class wheel
 	rpm: number
 end
 
-declare class navmesh_agent
+declare class navmesh_agent_component
 	radius: number
 	height: number
 	move_entity: boolean
 	speed: number
-	setActive : (navmesh_agent, boolean) -> ()
-	navigate : (navmesh_agent, any, number, number) -> boolean
-	cancelNavigation : (navmesh_agent) -> ()
-	drawPath : (navmesh_agent) -> ()
+	setActive : (navmesh_agent_component, boolean) -> ()
+	navigate : (navmesh_agent_component, any, number, number) -> boolean
+	cancelNavigation : (navmesh_agent_component) -> ()
+	drawPath : (navmesh_agent_component) -> ()
 end
 
-declare class navmesh_zone
+declare class navmesh_zone_component
 	extents: any
 	agent_height: number
 	agent_radius: number
@@ -349,64 +394,60 @@ declare class navmesh_zone
 	max_climb: number
 	autoload: boolean
 	detailed: boolean
-	load : (navmesh_zone) -> boolean
-	drawContours : (navmesh_zone) -> ()
-	drawNavmesh : (navmesh_zone, any, boolean, boolean, boolean) -> ()
-	drawCompactHeightfield : (navmesh_zone) -> ()
-	drawHeightfield : (navmesh_zone) -> ()
-	generateNavmesh : (navmesh_zone) -> any
+	load : (navmesh_zone_component) -> boolean
+	drawContours : (navmesh_zone_component) -> ()
+	drawNavmesh : (navmesh_zone_component, any, boolean, boolean, boolean) -> ()
+	drawCompactHeightfield : (navmesh_zone_component) -> ()
+	drawHeightfield : (navmesh_zone_component) -> ()
+	generateNavmesh : (navmesh_zone_component) -> any
 end
 
-declare class script
-	script: string
-end
-
-declare class lua_script_inline
+declare class lua_script_inline_component
 	code: string
 end
 
-declare class gui_input_field
+declare class gui_input_field_component
 end
 
-declare class property_animator
+declare class property_animator_component
 	animation: string
 	enabled: boolean
 end
 
-declare class animator
+declare class animator_component
 	source: string
 	default_set: number
 	use_root_motion: boolean
-	setFloatInput : (animator, any, number) -> ()
-	setBoolInput : (animator, any, boolean) -> ()
-	getInputIndex : (animator, any) -> any
+	setFloatInput : (animator_component, number, number) -> ()
+	setBoolInput : (animator_component, number, boolean) -> ()
+	getInputIndex : (animator_component, any) -> number
 end
 
-declare class physical_instanced_cube
+declare class physical_instanced_cube_component
 	half_extents: any
 	layer: number
 end
 
-declare class physical_instanced_mesh
+declare class physical_instanced_mesh_component
 	mesh: string
 	layer: number
 end
 
-declare class audio_listener
+declare class audio_listener_component
 end
 
-declare class ambient_sound
+declare class ambient_sound_component
 	sound: string
-	pause : (ambient_sound) -> ()
-	resume : (ambient_sound) -> ()
+	pause : (ambient_sound_component) -> ()
+	resume : (ambient_sound_component) -> ()
 end
 
-declare class echo_zone
+declare class echo_zone_component
 	radius: number
 	delay__ms_: number
 end
 
-declare class chorus_zone
+declare class chorus_zone_component
 	radius: number
 	delay__ms_: number
 end
@@ -424,52 +465,50 @@ declare class Entity
     getComponent : (Entity, any) -> any
     destroy : (Entity) -> ()
     createComponent : (Entity, any) -> any
-	spline: spline
-	gui_rect: gui_rect
-	gui_canvas: gui_canvas
-	particle_emitter: particle_emitter
-	terrain: terrain
-	camera: camera
-	decal: decal
-	curve_decal: curve_decal
-	point_light: point_light
-	environment: environment
-	instanced_model: instanced_model
-	model_instance: model_instance
-	environment_probe: environment_probe
-	reflection_probe: reflection_probe
-	fur: fur
-	procedural_geom: procedural_geom
-	bone_attachment: bone_attachment
-	rigid_actor: rigid_actor
-	physical_heightfield: physical_heightfield
-	physical_controller: physical_controller
-	js_script: js_script
-	lua_script: lua_script
-	gui_image: gui_image
-	gui_text: gui_text
-	gui_button: gui_button
-	gui_render_target: gui_render_target
-	animable: animable
-	distance_joint: distance_joint
-	hinge_joint: hinge_joint
-	spherical_joint: spherical_joint
-	d6_joint: d6_joint
-	vehicle: vehicle
-	wheel: wheel
-	navmesh_agent: navmesh_agent
-	navmesh_zone: navmesh_zone
-	script: script
-	lua_script_inline: lua_script_inline
-	gui_input_field: gui_input_field
-	property_animator: property_animator
-	animator: animator
-	physical_instanced_cube: physical_instanced_cube
-	physical_instanced_mesh: physical_instanced_mesh
-	audio_listener: audio_listener
-	ambient_sound: ambient_sound
-	echo_zone: echo_zone
-	chorus_zone: chorus_zone
+	spline: spline_component
+	gui_rect: gui_rect_component
+	gui_canvas: gui_canvas_component
+	particle_emitter: particle_emitter_component
+	terrain: terrain_component
+	camera: camera_component
+	decal: decal_component
+	curve_decal: curve_decal_component
+	point_light: point_light_component
+	environment: environment_component
+	instanced_model: instanced_model_component
+	model_instance: model_instance_component
+	environment_probe: environment_probe_component
+	reflection_probe: reflection_probe_component
+	fur: fur_component
+	procedural_geom: procedural_geom_component
+	bone_attachment: bone_attachment_component
+	rigid_actor: rigid_actor_component
+	physical_heightfield: physical_heightfield_component
+	physical_controller: physical_controller_component
+	lua_script: lua_script_component
+	gui_image: gui_image_component
+	gui_text: gui_text_component
+	gui_button: gui_button_component
+	gui_render_target: gui_render_target_component
+	animable: animable_component
+	distance_joint: distance_joint_component
+	hinge_joint: hinge_joint_component
+	spherical_joint: spherical_joint_component
+	d6_joint: d6_joint_component
+	vehicle: vehicle_component
+	wheel: wheel_component
+	navmesh_agent: navmesh_agent_component
+	navmesh_zone: navmesh_zone_component
+	lua_script_inline: lua_script_inline_component
+	gui_input_field: gui_input_field_component
+	property_animator: property_animator_component
+	animator: animator_component
+	physical_instanced_cube: physical_instanced_cube_component
+	physical_instanced_mesh: physical_instanced_mesh_component
+	audio_listener: audio_listener_component
+	ambient_sound: ambient_sound_component
+	echo_zone: echo_zone_component
+	chorus_zone: chorus_zone_component
 
 end
 
@@ -501,22 +540,33 @@ end
 declare class FunctionBase
 end
 
+declare class ModuleReflection
+end
+
 declare LumixReflection: {
     getComponent : (number) -> ComponentBase,
     getComponentName : (ComponentBase) -> string,
     getNumComponents : () -> number,
     getNumProperties : (ComponentBase) -> number,
-    getNumFunctions : (ComponentBase) -> number,
+    getNumComponentFunctions : (ComponentBase) -> number,
     getProperty : (ComponentBase, number) -> PropertyBase,
-    getFunction : (ComponentBase, number) -> FunctionBase,
+    getComponentFunction : (ComponentBase, number) -> FunctionBase,
     getFunctionName : (FunctionBase) -> string,
     getFunctionArgCount : (FunctionBase) -> number,
     getFunctionArgType : (FunctionBase, number) -> string,
     getFunctionReturnType : (FunctionBase) -> string,
     getPropertyType : (PropertyBase) -> number,
-    getPropertyName : (PropertyBase) -> string
+    getPropertyName : (PropertyBase) -> string,
+	getFirstModule  : () -> ModuleReflection,
+	getNextModule  : (ModuleReflection) -> ModuleReflection?,
+	getNumModuleFunctions : (ModuleReflection) -> number,
+	getModuleFunction : (ModuleReflection, number) -> FunctionBase,
+    getModuleName : (ModuleReflection) -> string,
+    getNumFunctions : () -> number,
+    getFunction : (number) -> FunctionBase,
+    getThisTypeName : (FunctionBase) -> string,
+    getReturnTypeName : (FunctionBase) -> string,
 }
-
 
 type InputDevice = {
     type : "mouse" | "keyboard",
@@ -543,3 +593,4 @@ type ButtonInputEvent = {
 }
 
 export type InputEvent = ButtonInputEvent | AxisInputEvent
+

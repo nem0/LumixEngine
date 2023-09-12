@@ -25,6 +25,14 @@ static Context& getContext() {
 	return ctx;
 }
 
+const char* declCodeToName(const char* decl_code) {
+	const char* c = decl_code;
+	while (*c) ++c;
+	while (*c != ':' && c > decl_code) --c;
+	if (*c == ':') ++c;
+	return c;
+}
+
 Array<FunctionBase*>& allFunctions() {
 	static Array<FunctionBase*> fncs(getGlobalAllocator());
 	return fncs;

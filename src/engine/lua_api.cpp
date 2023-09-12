@@ -415,8 +415,49 @@ static i32 LUA_getNumProperties(reflection::ComponentBase* cmp) {
 	return cmp->props.size();
 }
 
-static i32 LUA_getNumFunctions(reflection::ComponentBase* cmp) {
+static i32 LUA_getNumComponentFunctions(reflection::ComponentBase* cmp) {
 	return cmp->functions.size();
+}
+
+static i32 LUA_getNumFunctions() {
+	return reflection::allFunctions().size();
+}
+
+static reflection::FunctionBase* LUA_getFunction(i32 idx) {
+	return reflection::allFunctions()[idx];
+}
+
+static i32 LUA_getNextModule(lua_State* L) {
+	reflection::Module* module = LuaWrapper::checkArg<reflection::Module*>(L, 1);
+	if (module->next) lua_pushlightuserdata(L, module->next);
+	else lua_pushnil(L);
+	return 1;
+}
+
+i32 LUA_getThisTypeName(lua_State* L) {
+	reflection::FunctionBase* fn = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
+	StringView sv = fn->getThisTypeName();
+	lua_pushlstring(L, sv.begin, sv.size());
+	return 1;
+}
+
+i32 LUA_getReturnTypeName(lua_State* L) {
+	reflection::FunctionBase* fn = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
+	StringView sv = fn->getReturnTypeName();
+	lua_pushlstring(L, sv.begin, sv.size());
+	return 1;
+}
+
+static i32 LUA_getNumModuleFunctions(reflection::Module* module) {
+	return module->functions.size();
+}
+
+static reflection::FunctionBase* LUA_getModuleFunction(reflection::Module* module, i32 idx) {
+	return module->functions[idx];
+}
+
+static const char* LUA_getModuleName(reflection::Module* module) {
+	return module->name;
 }
 
 static i32 LUA_getPropertyType(reflection::PropertyBase* property) {
@@ -474,7 +515,7 @@ static reflection::PropertyBase* LUA_getProperty(reflection::ComponentBase* cmp,
 	return cmp->props[index];
 }
 
-static reflection::FunctionBase* LUA_getFunction(reflection::ComponentBase* cmp, u32 index) {
+static reflection::FunctionBase* LUA_getComponentFunction(reflection::ComponentBase* cmp, u32 index) {
 	return cmp->functions[index];
 }
 
@@ -899,18 +940,29 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponent", &LuaWrapper::wrap<LUA_getComponent>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumComponents", &LuaWrapper::wrap<LUA_getNumComponents>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumProperties", &LuaWrapper::wrap<LUA_getNumProperties>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumFunctions", &LuaWrapper::wrap<LUA_getNumFunctions>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumComponentFunctions", &LuaWrapper::wrap<LUA_getNumComponentFunctions>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentName", &LuaWrapper::wrap<LUA_getComponentName>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentLabel", &LuaWrapper::wrap<LUA_getComponentLabel>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentIcon", &LuaWrapper::wrap<LUA_getComponentIcon>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getProperty", &LuaWrapper::wrap<LUA_getProperty>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunction", &LuaWrapper::wrap<LUA_getFunction>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentFunction", &LuaWrapper::wrap<LUA_getComponentFunction>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionName", &LuaWrapper::wrap<LUA_getFunctionName>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgCount", &LuaWrapper::wrap<LUA_getFunctionArgCount>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionReturnType", &LUA_getFunctionReturnType);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgType", &LuaWrapper::wrap<LUA_getFunctionArgType>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyType", &LuaWrapper::wrap<LUA_getPropertyType>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyName", &LuaWrapper::wrap<LUA_getPropertyName>);
+	
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFirstModule", &LuaWrapper::wrap<reflection::getFirstModule>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNextModule", &LUA_getNextModule);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getThisTypeName", &LUA_getThisTypeName);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getReturnTypeName", &LUA_getReturnTypeName);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumModuleFunctions", &LuaWrapper::wrap<LUA_getNumModuleFunctions>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getModuleFunction", &LuaWrapper::wrap<LUA_getModuleFunction>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getModuleName", &LuaWrapper::wrap<LUA_getModuleName>);
+	
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumFunctions", &LuaWrapper::wrap<LUA_getNumFunctions>);
+	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunction", &LuaWrapper::wrap<LUA_getFunction>);
 	
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkRead", &LUA_networkRead);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "packU32", &LUA_packU32);

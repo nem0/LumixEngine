@@ -50,7 +50,6 @@ GameView::GameView(StudioApp& app)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
-	, m_show_stats(false)
 {
 	Engine& engine = app.getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
@@ -199,28 +198,6 @@ void GameView::setFullscreen(bool fullscreen)
 	m_is_fullscreen = fullscreen;
 }
 
-
-void GameView::onStatsGUI(const ImVec2& view_pos)
-{
-	if (!m_show_stats || !m_is_open) return;
-	
-	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
-	ImVec2 v = view_pos;
-	v.x += ImGui::GetStyle().FramePadding.x;
-	v.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
-	ImGui::SetNextWindowPos(v);
-	auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
-	col.w = 0.3f;
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-	if (ImGui::Begin("###stats_overlay", nullptr, flags)) {
-		ImGui::LabelText("Resolution", "%dx%d", (int)m_size.x, (int)m_size.y);
-	}
-	ImGui::End();
-	ImGui::PopStyleColor();
-}
-
-
 void GameView::forceViewport(bool enable, int w, int h)
 {
 	m_forced_viewport.enabled = enable;
@@ -249,9 +226,6 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		ImGui::SameLine();
 		if (ImGui::Button("Fullscreen")) setFullscreen(true);
 	}
-	ImGui::SameLine();
-	ImGui::Checkbox("Stats", &m_show_stats);
-	ImGui::SameLine();
 	m_pipeline->callLuaFunction("onGUI");
 }
 
@@ -327,6 +301,8 @@ void GameView::onGUI()
 			m_pipeline->setViewport(vp);
 			m_pipeline->render(false);
 			const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
+			
+			controlsGUI(editor);
 
 			if (texture_handle) {
 				if (gpu::isOriginBottomLeft()) {
@@ -345,7 +321,6 @@ void GameView::onGUI()
 			m_size = ImGui::GetItemRectSize();
 
 			processInputEvents();
-			controlsGUI(editor);
 		}
 
 	}
@@ -356,7 +331,6 @@ void GameView::onGUI()
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();
-	if (is_game_view_visible) onStatsGUI(view_pos);
 }
 
 

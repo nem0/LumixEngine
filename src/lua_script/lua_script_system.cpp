@@ -215,17 +215,8 @@ static void createClasses(lua_State* L) {
 			lua_setfield(L, -2, "__index"); // [LumixAPI, obj]
 		}
 		lua_pushlightuserdata(L, f);				// [LumixAPI, obj, f]
-
-		if (f->name) {
-			lua_pushcclosure(L, luaMethodClosure, f->name, 1); // [LumixAPI, obj, closure]
-			lua_setfield(L, -2, f->name);
-		} else {
-			const char* fn_name = f->decl_code + strlen(f->decl_code);
-			while (*fn_name != ':' && fn_name != f->decl_code) --fn_name;
-			if (*fn_name == ':') ++fn_name;
-			lua_pushcclosure(L, luaMethodClosure, fn_name, 1); // [LumixAPI, obj, closure]
-			lua_setfield(L, -2, fn_name);
-		}
+		lua_pushcclosure(L, luaMethodClosure, f->name, 1); // [LumixAPI, obj, closure]
+		lua_setfield(L, -2, f->name);
 		lua_pop(L, 1);
 	}
 	lua_pop(L, 1);

@@ -115,22 +115,33 @@ end
 declare class FunctionBase
 end
 
+declare class ModuleReflection
+end
+
 declare LumixReflection: {
     getComponent : (number) -> ComponentBase,
     getComponentName : (ComponentBase) -> string,
     getNumComponents : () -> number,
     getNumProperties : (ComponentBase) -> number,
-    getNumFunctions : (ComponentBase) -> number,
+    getNumComponentFunctions : (ComponentBase) -> number,
     getProperty : (ComponentBase, number) -> PropertyBase,
-    getFunction : (ComponentBase, number) -> FunctionBase,
+    getComponentFunction : (ComponentBase, number) -> FunctionBase,
     getFunctionName : (FunctionBase) -> string,
     getFunctionArgCount : (FunctionBase) -> number,
     getFunctionArgType : (FunctionBase, number) -> string,
     getFunctionReturnType : (FunctionBase) -> string,
     getPropertyType : (PropertyBase) -> number,
-    getPropertyName : (PropertyBase) -> string
+    getPropertyName : (PropertyBase) -> string,
+	getFirstModule  : () -> ModuleReflection,
+	getNextModule  : (ModuleReflection) -> ModuleReflection?,
+	getNumModuleFunctions : (ModuleReflection) -> number,
+	getModuleFunction : (ModuleReflection, number) -> FunctionBase,
+    getModuleName : (ModuleReflection) -> string,
+    getNumFunctions : () -> number,
+    getFunction : (number) -> FunctionBase,
+    getThisTypeName : (FunctionBase) -> string,
+    getReturnTypeName : (FunctionBase) -> string,
 }
-
 
 type InputDevice = {
     type : "mouse" | "keyboard",
@@ -174,22 +185,79 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
     end
 
     function toLuaType(ctype : string)
+        LumixAPI.logError(ctype)
+        if ctype == "int" then return "number" end
+        if ctype == "char const *" then return "string" end
+        if ctype == "i32" then return "number" end
+        if ctype == "u32" then return "number" end
         if ctype == "float" then return "number" end
         if ctype == "bool" then return "boolean" end
         if ctype == "void" then return "()" end
         return "any"
     end
 
+    function writeFuncDecl(code : string, self_type : string, func : FunctionBase)
+        local func_name = LumixReflection.getFunctionName(func)
+        local arg_count = LumixReflection.getFunctionArgCount(func)
+        local ret_type = LumixReflection.getFunctionReturnType(func)
+        code = code .. `\t{func_name} : ({self_type}`
+        for i = 2, arg_count do
+            code = code .. ", " .. toLuaType(LumixReflection.getFunctionArgType(func, i - 1))
+        end
+        code = code .. `) -> {toLuaType(ret_type)}\n`
+        return code
+    end
+
+    function toLuaTypeName(name : string)
+        local t = name:match(".*::(%w*)")
+        if t:len() == 0 then return name end
+        return t
+    end
+
     function refl()
-        local num_cmp = LumixReflection.getNumComponents()
         local out = ""
+        local num_funcs = LumixReflection.getNumFunctions()
+        local objs = {}
+        for i = 1, num_funcs do
+            local fn = LumixReflection.getFunction(i - 1)
+            local this_type_name = toLuaTypeName(LumixReflection.getThisTypeName(fn)) 
+            if objs[this_type_name] == nil then
+                objs[this_type_name] = {}
+            end
+            table.insert(objs[this_type_name], fn)
+            --local func_name = LumixReflection.getFunctionName(fn)
+            --out = out .. `--{this_type_name} :: {func_name}\n`
+        end
+
+        for k, t in pairs(objs) do
+            out = out .. `declare class {k}\n`
+            for _, fn in ipairs(t) do
+                out = writeFuncDecl(out, k, fn)
+            end
+            out = out .. `end\n\n`
+        end
+
+        local module = LumixReflection.getFirstModule()
+        while module ~= nil do
+            local module_name = LumixReflection.getModuleName(module)
+            out = out .. `declare class {module_name}_module\n`
+            local num_fn = LumixReflection.getNumModuleFunctions(module)
+            for i = 1, num_fn do
+                local fn = LumixReflection.getModuleFunction(module, i - 1)
+                out = writeFuncDecl(out, module_name .. "_module", fn)
+            end
+            out = out .. "end\n\n"
+            module = LumixReflection.getNextModule(module)
+        end
+
+        local num_cmp = LumixReflection.getNumComponents()
         local entity_src = ""
         for i = 1, num_cmp do
             local cmp = LumixReflection.getComponent(i - 1)
             local name = LumixReflection.getComponentName(cmp)
             local num_props = LumixReflection.getNumProperties(cmp)
-            out = out .. "declare class " .. name .. "\n"
-            entity_src = entity_src .. `\t{name}: {name}\n`
+            out = out .. `declare class {name}_component\n`
+            entity_src = entity_src .. `\t{name}: {name}_component\n`
             for j = 1, num_props do
                 local prop = LumixReflection.getProperty(cmp, j - 1)
                 local prop_name = LumixReflection.getPropertyName(prop)
@@ -197,17 +265,10 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
                 if prop_name:match("[0-9].*") then continue end
                 out = out .. "\t" .. toLuaIdentifier(prop_name) .. ": " .. typeToString(prop_type) .. "\n"
             end
-            local num_funcs = LumixReflection.getNumFunctions(cmp)
-            for j = 1, num_funcs do
-                local func = LumixReflection.getFunction(cmp, j - 1)
-                local func_name = LumixReflection.getFunctionName(func)
-                local arg_count = LumixReflection.getFunctionArgCount(func)
-                local ret_type = LumixReflection.getFunctionReturnType(func)
-                out = out .. `\t{func_name} : ({name}`
-                for i = 2, arg_count do
-                    out = out .. ", " .. toLuaType(LumixReflection.getFunctionArgType(func, i - 1))
-                end
-                out = out .. `) -> {toLuaType(ret_type)}\n`
+            local num_cmp_funcs = LumixReflection.getNumComponentFunctions(cmp)
+            for j = 1, num_cmp_funcs do
+                local func = LumixReflection.getComponentFunction(cmp, j - 1)
+                out = writeFuncDecl(out, name .. "_component", func)
             end
             out = out .. "end\n\n"
         end
@@ -217,12 +278,12 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
 
 local type_defs = refl()
 
-if false then
+if true then
     return {
         name = "Lua type defs",
         gui = function()
             if ImGui.Begin("Lua type definitions") then
-                ImGui.InputTextMultiline("Types", type_defs)
+                ImGui.InputTextMultiline("##code", type_defs)
             end
             ImGui.End()
         end

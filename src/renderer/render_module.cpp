@@ -3342,10 +3342,10 @@ void RenderModule::reflect() {
 	};
 
 	LUMIX_MODULE(RenderModuleImpl, "renderer")
-		.LUMIX_FUNC(RenderModule::addDebugCross)
-		.LUMIX_FUNC(RenderModule::addDebugLine)
-		.LUMIX_FUNC(RenderModule::addDebugTriangle)
-		.LUMIX_FUNC(RenderModule::setActiveCamera)
+		.LUMIX_FUNC(addDebugCross)
+		.LUMIX_FUNC(addDebugLine)
+		.LUMIX_FUNC(addDebugTriangle)
+		.LUMIX_FUNC(setActiveCamera)
 		.LUMIX_CMP(ProceduralGeometry, "procedural_geom", "Render / Procedural geometry")
 			.LUMIX_PROP(ProceduralGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
 		.LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment")

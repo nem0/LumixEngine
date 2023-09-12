@@ -52,7 +52,6 @@ private:
 	void processInputEvents();
 	void onFullscreenGUI(WorldEditor& editor);
 	void setFullscreen(bool fullscreen);
-	void onStatsGUI(const ImVec2& view_pos);
 	void controlsGUI(WorldEditor& editor);
 
 private:
@@ -65,7 +64,6 @@ private:
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;
-	bool m_show_stats;
 	bool m_was_game_mode = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct

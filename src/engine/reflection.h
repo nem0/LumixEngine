@@ -70,6 +70,7 @@ LUMIX_ENGINE_API StableHash getPropertyHash(ComponentType cmp, const char* prope
 LUMIX_ENGINE_API bool componentTypeExists(const char* id);
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
+LUMIX_ENGINE_API const char* declCodeToName(const char* decl_code);
 
 struct ResourceAttribute : IAttribute
 {
@@ -568,7 +569,7 @@ auto& function(F func, const char* decl_code, const char* name)
 	allFunctions().push(&ret);
 	ret.function = func;
 	ret.decl_code = decl_code;
-	ret.name = name;
+	ret.name = name && name[0] ? name : declCodeToName(decl_code);
 	return ret;
 }
 
@@ -827,7 +828,7 @@ struct LUMIX_ENGINE_API builder {
 	builder& function(const char* name, const char* decl_code) {
 		auto* f = LUMIX_NEW(allocator, Function<decltype(F)>);
 		f->function = F;
-		f->name = name;
+		f->name = name && name[0] ? name : declCodeToName(decl_code);
 		f->decl_code = decl_code;
 		if (module->cmps.empty()) {
 			module->functions.push(f);
