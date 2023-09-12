@@ -1156,7 +1156,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		function Lumix.World:new(_world)
 			local u = { value = _world }
 			setmetatable(u, self)
-			self.__index = self
 			return u
 		end
 		function Lumix.World:setActivePartition(partition)
@@ -1171,6 +1170,15 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		function Lumix.World:createEntity()
 			local e = LumixAPI.createEntity(self.value)
 			return Lumix.Entity:new(self.value, e)
+		end
+		function Lumix.World.__index(table, key)
+			if Lumix.World[key] ~= nil then
+				return Lumix.World[key]
+			else
+				if Lumix[key] == nil then return nil end
+				local module = LumixAPI.getModule(table.value, key)	
+				return Lumix[key]:new(module)
+			end
 		end
 		function Lumix.World:getModule(name)
 			local module = LumixAPI.getModule(self.value, name)	

@@ -1314,7 +1314,7 @@ void GUIModule::reflect() {
 		.LUMIX_EVENT(GUIModule::rectHoveredOut)
 		.LUMIX_EVENT(GUIModule::rectMouseDown)
 		.LUMIX_EVENT(GUIModule::mousedButtonUnhandled)
-		.LUMIX_FUNC(getRectAt)
+		.LUMIX_FUNC_EX(GUIModule::getRectAt, "getRectAt")
 		.LUMIX_FUNC(isOver)
 		.function<&GUIModuleImpl::getSystemPtr>("getSystem", "GUIModule::getSystem")
 		.LUMIX_CMP(RenderTarget, "gui_render_target", "GUI / Render taget")

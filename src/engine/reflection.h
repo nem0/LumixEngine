@@ -12,7 +12,7 @@
 
 #define LUMIX_MODULE(Class, Label) using ReflModule = Class; reflection::build_module(Label)
 #define LUMIX_FUNC_EX(F, Name) function<&ReflModule::F>(Name, #F)
-#define LUMIX_FUNC(F) function<&F>(#F, #F)
+#define LUMIX_FUNC(F) function<&ReflModule::F>(#F, #F)
 #define LUMIX_EVENT(F) event<&F>(#F)
 #define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflModule::create##Cmp, &ReflModule::destroy##Cmp>(Name, Label)
 #define LUMIX_PROP(Property, Label) prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)

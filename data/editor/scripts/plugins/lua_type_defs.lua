@@ -69,6 +69,8 @@ declare class World
     setActivePartition : (World, number) -> ()
     createPartition : (World, string) -> number
     load : (World, string, any) -> ()
+    getModule : (string) -> any
+%s
 end
 
 %s
@@ -170,6 +172,8 @@ type ButtonInputEvent = {
 export type InputEvent = ButtonInputEvent | AxisInputEvent
 
 ]]
+    local objs = {}
+
     function typeToString(type : number) : string
         if type < 3 then return "number" end
         if type == 3 then return "Entity" end
@@ -184,24 +188,13 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
         return string.lower(s)
     end
 
-    function toLuaType(ctype : string)
-        LumixAPI.logError(ctype)
-        if ctype == "int" then return "number" end
-        if ctype == "char const *" then return "string" end
-        if ctype == "i32" then return "number" end
-        if ctype == "u32" then return "number" end
-        if ctype == "float" then return "number" end
-        if ctype == "bool" then return "boolean" end
-        if ctype == "void" then return "()" end
-        return "any"
-    end
-
-    function writeFuncDecl(code : string, self_type : string, func : FunctionBase)
+    function writeFuncDecl(code : string, self_type : string, func : FunctionBase, is_global_fn : boolean)
         local func_name = LumixReflection.getFunctionName(func)
         local arg_count = LumixReflection.getFunctionArgCount(func)
         local ret_type = LumixReflection.getFunctionReturnType(func)
         code = code .. `\t{func_name} : ({self_type}`
-        for i = 2, arg_count do
+        local from_arg = if is_global_fn then 1 else 2
+        for i = from_arg, arg_count do
             code = code .. ", " .. toLuaType(LumixReflection.getFunctionArgType(func, i - 1))
         end
         code = code .. `) -> {toLuaType(ret_type)}\n`
@@ -210,14 +203,26 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
 
     function toLuaTypeName(name : string)
         local t = name:match(".*::(%w*)")
-        if t:len() == 0 then return name end
+        if t == nil or t:len() == 0 then return name end
         return t
+    end
+
+    function toLuaType(ctype : string)
+        if ctype == "int" then return "number" end
+        if ctype == "char const *" then return "string" end
+        if ctype == "i32" then return "number" end
+        if ctype == "u32" then return "number" end
+        if ctype == "float" then return "number" end
+        if ctype == "bool" then return "boolean" end
+        if ctype == "void" then return "()" end
+        local tmp = toLuaTypeName(ctype)
+        if objs[tmp] ~= nil then return tmp end
+        return "any"
     end
 
     function refl()
         local out = ""
         local num_funcs = LumixReflection.getNumFunctions()
-        local objs = {}
         for i = 1, num_funcs do
             local fn = LumixReflection.getFunction(i - 1)
             local this_type_name = toLuaTypeName(LumixReflection.getThisTypeName(fn)) 
@@ -225,18 +230,17 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
                 objs[this_type_name] = {}
             end
             table.insert(objs[this_type_name], fn)
-            --local func_name = LumixReflection.getFunctionName(fn)
-            --out = out .. `--{this_type_name} :: {func_name}\n`
         end
 
         for k, t in pairs(objs) do
             out = out .. `declare class {k}\n`
             for _, fn in ipairs(t) do
-                out = writeFuncDecl(out, k, fn)
+                out = writeFuncDecl(out, k, fn, true)
             end
             out = out .. `end\n\n`
         end
 
+        local world_src = ""
         local module = LumixReflection.getFirstModule()
         while module ~= nil do
             local module_name = LumixReflection.getModuleName(module)
@@ -244,9 +248,10 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
             local num_fn = LumixReflection.getNumModuleFunctions(module)
             for i = 1, num_fn do
                 local fn = LumixReflection.getModuleFunction(module, i - 1)
-                out = writeFuncDecl(out, module_name .. "_module", fn)
+                out = writeFuncDecl(out, module_name .. "_module", fn, false)
             end
             out = out .. "end\n\n"
+            world_src = world_src .. `\t{module_name} : {module_name}_module\n`
             module = LumixReflection.getNextModule(module)
         end
 
@@ -268,12 +273,12 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
             local num_cmp_funcs = LumixReflection.getNumComponentFunctions(cmp)
             for j = 1, num_cmp_funcs do
                 local func = LumixReflection.getComponentFunction(cmp, j - 1)
-                out = writeFuncDecl(out, name .. "_component", func)
+                out = writeFuncDecl(out, name .. "_component", func, false)
             end
             out = out .. "end\n\n"
         end
 
-        return string.format(tpl, out, entity_src)
+        return string.format(tpl, world_src, out, entity_src)
     end
 
 local type_defs = refl()

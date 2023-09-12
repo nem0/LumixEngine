@@ -68,16 +68,26 @@ declare class World
     setActivePartition : (World, number) -> ()
     createPartition : (World, string) -> number
     load : (World, string, any) -> ()
+    getModule : (string) -> any
+	core : core_module
+	navigation : navigation_module
+	animation : animation_module
+	gui : gui_module
+	lua_script : lua_script_module
+	audio : audio_module
+	renderer : renderer_module
+	physics : physics_module
+
 end
 
 declare class GUISystem
-	enableCursor : (GUISystem) -> ()
+	enableCursor : (GUISystem, boolean) -> ()
 end
 
 declare class Model
 	getBoneCount : (Model) -> number
-	getBoneName : (Model) -> string
-	getBoneParent : (Model) -> number
+	getBoneName : (Model, number) -> string
+	getBoneParent : (Model, number) -> number
 end
 
 declare class core_module
@@ -92,7 +102,7 @@ end
 declare class gui_module
 	getRectAt : (gui_module) -> any
 	isOver : (gui_module, any) -> boolean
-	getSystem : (gui_module) -> any
+	getSystem : (gui_module) -> GUISystem
 end
 
 declare class lua_script_module
@@ -203,7 +213,7 @@ declare class model_instance_component
 	enabled: boolean
 	material: string
 	source: string
-	getModel : (model_instance_component) -> any
+	getModel : (model_instance_component) -> Model
 end
 
 declare class environment_probe_component
