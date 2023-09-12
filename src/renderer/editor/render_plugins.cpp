@@ -2424,7 +2424,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 		, m_tile(app.getAllocator())
-		, m_fbx_importer(app)
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 	}
@@ -2447,7 +2446,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void init() {
 		Engine& engine = m_app.getEngine();
 		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		m_fbx_importer.init();
 	}
 
 	void addSubresources(AssetCompiler& compiler, const Path& _path) override {
@@ -2522,14 +2520,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.anim_translation_error = meta.anim_translation_error;
 		cfg.skeleton = meta.skeleton;
 		cfg.root_motion_bone = BoneNameHash(meta.root_motion_bone.c_str());
-		if (!m_fbx_importer.setSource(filepath, false, meta.force_skin)) return false;
-		if (m_fbx_importer.getBoneCount() == 0 && m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
-			if (m_fbx_importer.getOFBXScene()) {
-				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+		FBXImporter importer(m_app);
+		if (!importer.setSource(filepath, false, meta.force_skin)) return false;
+		if (importer.getBoneCount() == 0 && importer.getMeshes().empty() && importer.getAnimations().empty()) {
+			if (importer.getOFBXScene()) {
+				if (importer.getOFBXScene()->getMeshCount() > 0) {
 					logError("No meshes with materials found in ", src);
 				}
 				else {
-					if (m_fbx_importer.getBoneCount() == 0) {
+					if (importer.getBoneCount() == 0) {
 						logError("No meshes or animations found in ", src);
 					}
 				}
@@ -2539,16 +2538,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		bool any_written = false;
 		if (meta.split) {
 			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-			any_written = m_fbx_importer.writeSubmodels(filepath, cfg) || any_written;
-			any_written = m_fbx_importer.writePrefab(filepath, cfg) || any_written;
+			any_written = importer.writeSubmodels(filepath, cfg) || any_written;
+			any_written = importer.writePrefab(filepath, cfg) || any_written;
 		}
 		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
-		any_written = m_fbx_importer.writeModel(src, cfg) || any_written;
-		any_written = m_fbx_importer.writeMaterials(filepath, cfg) || any_written;
+		any_written = importer.writeModel(src, cfg) || any_written;
+		any_written = importer.writeMaterials(filepath, cfg) || any_written;
 		if (!meta.ignore_animations) {
-			any_written = m_fbx_importer.writeAnimations(filepath, cfg) || any_written;
+			any_written = importer.writeAnimations(filepath, cfg) || any_written;
 		}
-		any_written = m_fbx_importer.writePhysics(filepath, cfg) || any_written;
+		any_written = importer.writePhysics(filepath, cfg) || any_written;
 		return any_written;
 	}
 
@@ -3124,7 +3123,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
 	TexturePlugin* m_texture_plugin;
-	FBXImporter m_fbx_importer;
 	jobs::Signal m_subres_signal;
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
 };
@@ -5076,6 +5074,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_terrain_plugin(app)
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
+		, m_fbx_importer(app)
 		, m_procedural_geom_plugin(app)
 	{}
 
@@ -5096,6 +5095,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		PROFILE_FUNCTION();
+		m_fbx_importer.init();
 		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", Action::GLOBAL);
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
 
@@ -5379,6 +5379,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
+	FBXImporter m_fbx_importer; // only for preloading impostor shadow shader // TODO do this in a better way
 	Action m_renderdoc_capture_action;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;

@@ -45,20 +45,6 @@ struct HashFunc<Path>
 };
 
 
-struct AssetCompilerTask : Thread
-{
-	AssetCompilerTask(AssetCompilerImpl& compiler, IAllocator& allocator) 
-		: Thread(allocator) 
-		 , m_compiler(compiler)
-	{}
-
-	int task() override;
-
-	AssetCompilerImpl& m_compiler;
-	volatile bool m_finished = false;
-};
-
-
 void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const Path& path)
 {
 	const ResourceType type = compiler.getResourceType(path);
@@ -86,10 +72,8 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_load_hook(*this)
 		, m_allocator(app.getAllocator(), "asset compiler")
 		, m_plugins(m_allocator)
-		, m_task(*this, m_allocator)
 		, m_to_compile(m_allocator)
 		, m_compiled(m_allocator)
-		, m_semaphore(0, 0x7fFFffFF)
 		, m_registered_extensions(m_allocator)
 		, m_resources(m_allocator)
 		, m_generations(m_allocator)
@@ -105,7 +89,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		const char* base_path = fs.getBasePath();
 		m_watcher = FileSystemWatcher::create(base_path, m_allocator);
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
-		m_task.create("Asset compiler", true);
 		Path path(base_path, ".lumix/resources");
 		if (!os::dirExists(path)) {
 			if (!os::makePath(path.c_str())) logError("Could not create ", path);
@@ -193,10 +176,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 
 		ASSERT(m_plugins.empty());
-		m_task.m_finished = true;
-		m_to_compile.emplace();
-		m_semaphore.signal();
-		m_task.destroy();
 		ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
 	}
@@ -234,6 +213,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool writeCompiledResource(const Path& path, Span<const u8> data) override {
 		PROFILE_FUNCTION();
+		jobs::enter(&m_lz4_mutex);
 		constexpr u32 COMPRESSION_SIZE_LIMIT = 4096;
 		OutputMemoryStream compressed(m_allocator);
 		i32 compressed_size = 0;
@@ -250,6 +230,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 			compressed.resize(compressed_size);
 		}
+		jobs::exit(&m_lz4_mutex);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const Path out_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
@@ -583,7 +564,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void pushToCompileQueue(const Path& path) {
-		MutexGuard lock(m_to_compile_mutex);
 		auto iter = m_generations.find(path);
 		if (!iter.isValid()) {
 			iter = m_generations.insert(path, 0);
@@ -599,7 +579,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		m_to_compile.push(job);
 		++m_compile_batch_count;
 		++m_batch_remaining_count;
-		m_semaphore.signal();
 	}
 
 	CompileJob popCompiledResource()
@@ -632,12 +611,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (ImGui::Begin("Resource compilation", nullptr, flags)) {
 			ImGui::TextUnformatted("Compiling resources...");
 			ImGui::ProgressBar(((float)m_compile_batch_count - m_batch_remaining_count) / m_compile_batch_count);
-			Path path;
-			{
-				MutexGuard lock(m_to_compile_mutex);
-				path = m_res_in_progress;
-			}
-			ImGui::TextWrapped("%s", path.c_str());
+			ImGui::TextWrapped("%s", m_res_in_progress.c_str());
 		}
 		ImGui::End();
 		ImGui::PopStyleVar();
@@ -652,24 +626,44 @@ struct AssetCompilerImpl : AssetCompiler {
 		return nullptr;
 	}
 
-	void update() override
-	{
+	void runOneJob() {
+		if (m_to_compile.empty()) return;
+
+		AssetCompilerImpl::CompileJob p = m_to_compile.back();
+		m_to_compile.pop();
+		auto iter = m_generations.find(p.path);
+		const bool is_most_recent = p.generation == iter.value();
+		if (!is_most_recent) {
+			--m_batch_remaining_count;
+			return;
+		}
+
+		m_res_in_progress = p.path.c_str();
+
+		jobs::runLambda([p, this]() mutable {
+			PROFILE_BLOCK("compile asset");
+			profiler::pushString(p.path.c_str());
+			p.compiled = compile(p.path);
+			if (!p.compiled) logError("Failed to compile resource ", p.path);
+			MutexGuard lock(m_compiled_mutex);
+			m_compiled.push(p);
+		}, nullptr);
+	}
+
+	void update() override {
 		for(;;) {
+			runOneJob();
 			CompileJob job = popCompiledResource();
 			if (job.path.isEmpty()) break;
 
-			// this can take some time, mutex is probably not the best option
-
-			const u32 generation = [&](){
-				MutexGuard lock(m_to_compile_mutex);
-				return m_generations[job.path];
-			}();
+			const u32 generation = m_generations[job.path];
 			if (job.generation != generation) continue;
 
+			// this can take some time, mutex is probably not the best option
 			MutexGuard lock(m_compiled_mutex);
 			// reload/continue loading resource and its subresources
 			for (const ResourceItem& ri : m_resources) {
-				if (!endsWithInsensitive(ri.path, job.path)) continue;;
+				if (!endsWithInsensitive(ri.path, job.path)) continue;
 				
 				Resource* r = getResource(ri.path);
 				if (r) {
@@ -797,8 +791,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	TagAllocator m_allocator;
-	Semaphore m_semaphore;
-	Mutex m_to_compile_mutex;
 	Mutex m_compiled_mutex;
 	Mutex m_changed_mutex;
 	Mutex m_plugin_mutex;
@@ -812,7 +804,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	StudioApp& m_app;
 	LoadHook m_load_hook;
 	HashMap<RuntimeHash, IPlugin*> m_plugins;
-	AssetCompilerTask m_task;
 	UniquePtr<FileSystemWatcher> m_watcher;
 	HashMap<FilePathHash, ResourceItem> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
@@ -821,45 +812,12 @@ struct AssetCompilerImpl : AssetCompiler {
 	bool m_init_finished = false;
 	Array<Resource*> m_on_init_load;
 	u8* m_lz4_state = nullptr;
+	jobs::Mutex m_lz4_mutex;
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;
 	Path m_res_in_progress;
 };
-
-
-int AssetCompilerTask::task()
-{
-	while (!m_finished) {
-		m_compiler.m_semaphore.wait();
-		AssetCompilerImpl::CompileJob p = [&]{
-			MutexGuard lock(m_compiler.m_to_compile_mutex);
-			AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
-			if (p.path.isEmpty()) return p;
-
-			auto iter = m_compiler.m_generations.find(p.path);
-			const bool is_most_recent = p.generation == iter.value();
-			if (is_most_recent) {
-				m_compiler.m_res_in_progress = p.path.c_str();
-			}
-			else {
-				p.path = Path();
-				--m_compiler.m_batch_remaining_count;
-			}
-			m_compiler.m_to_compile.pop();
-			return p;
-		}();
-		if (!p.path.isEmpty()) {
-			PROFILE_BLOCK("compile asset");
-			profiler::pushString(p.path.c_str());
-			p.compiled = m_compiler.compile(p.path);
-			if (!p.compiled) logError("Failed to compile resource ", p.path);
-			MutexGuard lock(m_compiler.m_compiled_mutex);
-			m_compiler.m_compiled.push(p);
-		}
-	}
-	return 0;
-}
 
 
 UniquePtr<AssetCompiler> AssetCompiler::create(StudioApp& app) {
