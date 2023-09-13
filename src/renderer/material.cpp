@@ -602,7 +602,7 @@ int shader(lua_State* L)
 			material->setShader(fullpath);
 		}
 		else {
-			material->setShader(Path(path));
+			material->setShader(Path(path + 1));
 		}
 	}
 	return 0;
@@ -622,12 +622,15 @@ int texture(lua_State* L) {
 			const int idx = material->getTextureCount();
 			
 			Path texture_path;
-			if (path[0] != '/' && path[0] != '\\' && path[0] != '\0') {
+			if (path[0] == '\0') {
+				texture_path = path;
+			}
+			else if (path[0] != '/' && path[0] != '\\') {
 				texture_path = material_dir;
 				texture_path.append(path);
 			}
 			else {
-				texture_path = path;
+				texture_path = path + 1;
 			}
 
 			material->setTexturePath(idx, texture_path);
@@ -652,11 +655,14 @@ int texture(lua_State* L) {
 	const int idx = material->getTextureCount();
 	
 	Path texture_path;
-	if (path[0] != '/' && path[0] != '\\' && path[0] != '\0') {
+	if (path[0] == '\0') {
+		texture_path = path;
+	}
+	else if (path[0] != '/' && path[0] != '\\') {
 		texture_path.append(material_dir, path);
 	}
 	else {
-		texture_path = path;
+		texture_path = path + 1;
 	}
 
 	material->setTexturePath(idx, texture_path);
