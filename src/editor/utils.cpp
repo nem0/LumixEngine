@@ -2110,7 +2110,7 @@ bool beginCenterStrip(const char* str_id, u32 lines) {
 	const ImGuiViewport* vp = ImGui::GetMainViewport();
 	const ImGuiStyle& style = ImGui::GetStyle();
 	ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-	ImGui::SetNextWindowSize(ImVec2(vp->Size.x - style.FramePadding.x * 2, ImGui::GetTextLineHeight() * lines));
+	ImGui::SetNextWindowSize(ImVec2(vp->Size.x - style.FramePadding.x * 2, ImGui::GetTextLineHeightWithSpacing() * lines));
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
 							 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
 	return ImGui::BeginPopupModal(str_id, nullptr, flags);
