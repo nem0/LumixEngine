@@ -1067,27 +1067,35 @@ struct StudioAppImpl final : StudioApp
 
 	void guiSaveAsDialog() {
 		if (m_save_as_request) {
-			ImGui::OpenPopup("Save World As");
+			openCenterStrip("Save World As");
 			m_save_as_request = false;
 		}
-		ImGui::SetNextWindowSizeConstraints(ImVec2(300, 150), ImVec2(9000, 9000));
-		if (ImGui::BeginPopupModal("Save World As")) {
+		if (beginCenterStrip("Save World As", 6)) {
+			ImGui::NewLine();
 			static char name[64] = "";
-			ImGuiEx::Label("Name");
-			ImGui::InputText("##name", name, lengthOf(name));
-			if (ImGui::Button(ICON_FA_SAVE "Save")) {
-				ASSERT(!m_editor->isGameMode());
-				World* world = m_editor->getWorld();
-				World::PartitionHandle active_partition_handle = world->getActivePartition();
-				World::Partition& active_partition = world->getPartition(active_partition_handle);
-				copyString(active_partition.name, name);
-				m_editor->savePartition(active_partition_handle);
-				scanWorlds();
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_TIMES "Cancel")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
+			alignGUICenter([&](){
+				ImGui::TextUnformatted("Save world as");
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(250);
+				ImGui::InputText("##name", name, sizeof(name));
+			});
+			ImGui::NewLine();
+			
+			alignGUICenter([&](){
+				if (ImGui::Button(ICON_FA_SAVE "Save")) {
+					ASSERT(!m_editor->isGameMode());
+					World* world = m_editor->getWorld();
+					World::PartitionHandle active_partition_handle = world->getActivePartition();
+					World::Partition& active_partition = world->getPartition(active_partition_handle);
+					copyString(active_partition.name, name);
+					m_editor->savePartition(active_partition_handle);
+					scanWorlds();
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button(ICON_FA_TIMES "Cancel")) ImGui::CloseCurrentPopup();
+			});
+			endCenterStrip();
 		}
 	}
 
