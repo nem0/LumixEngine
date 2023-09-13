@@ -21,10 +21,6 @@ local render_grass = true
 local render_impostors = true
 local render_terrain = true
 
-function iff(cond, a, b) 
-	if cond then return a else return b end
-end
-
 local shadowmap_1x1 = createRenderbufferDesc { size = {1, 1}, format = "depth32", debug_name = "shadowmap" }
 local shadowmap_desc = createRenderbufferDesc { size = { 4096, 1024 }, format = "depth32", debug_name = "shadowmap" }
 local selection_mask_desc = createRenderbufferDesc { format = "depth32", debug_name = "selection_depthbuffer" }
@@ -37,8 +33,8 @@ local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name 
 local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true }
 local icon_ds_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "icon_ds" }
 local water_color_copy_desc = createRenderbufferDesc { format = "r11g11b10f", debug_name = "hdr_copy" }
-local hdr_rb_desc = createRenderbufferDesc { format = iff(PROBE ~= nil, "rgba32f", "rgba16f"), debug_name = "hdr" }
-local tonemap_rb_desc = createRenderbufferDesc { format = iff(PREVIEW ~= nil, "rgba8", "srgba"), debug_name = "tonemap" }
+local hdr_rb_desc = createRenderbufferDesc { format = if PROBE ~= nil then "rgba32f" else "rgba16f", debug_name = "hdr" }
+local tonemap_rb_desc = createRenderbufferDesc { format = if PREVIEW ~= nil then "rgba8" else "srgba", debug_name = "tonemap" }
 local preview_rb_desc = createRenderbufferDesc { format = "rgba16f", debug_name = "preview_rb" }
 local preview_ds_desc = createRenderbufferDesc { format = "depth32", debug_name = "gbuffer_ds" }
 
@@ -130,7 +126,7 @@ local shadow_grass_state = createRenderState {
 	stencil_zpass = STENCIL_REPLACE,
 }
 
-function waterPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
+local function waterPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 
 	local color_copy = createRenderbuffer(water_color_copy_desc)
 
@@ -158,7 +154,7 @@ function waterPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 	endBlock()
 end
 
-function transparentPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
+local function transparentPass(view_params, entities, colorbuffer, dsbuffer, shadowmap)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("transparent_pass")
@@ -169,7 +165,7 @@ function transparentPass(view_params, entities, colorbuffer, dsbuffer, shadowmap
 	endBlock()
 end
 
-function geomPass(view_params, entities)
+local function geomPass(view_params, entities)
 	beginBlock("geom_pass")
 		local gbuffer0 = createRenderbuffer(gbuffer0_desc)
 		local gbuffer1 = createRenderbuffer(gbuffer1_desc)
@@ -209,7 +205,7 @@ function geomPass(view_params, entities)
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
 end
 
-function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+local function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local hdr_rb = createRenderbuffer(hdr_rb_desc)
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
@@ -234,7 +230,7 @@ function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, sha
 	return hdr_rb
 end
 
-function debugClusters(gb_depth, output)
+local function debugClusters(gb_depth, output)
 	setRenderTargets(output)
 	drawArray(0, 3, debug_clusters_shader
 		, { gb_depth }
@@ -242,7 +238,7 @@ function debugClusters(gb_depth, output)
 end
 
 
-function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
+local function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 	setRenderTargets(output)
 
 	drawcallUniforms( 
@@ -259,7 +255,7 @@ function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 	)
 end
 
-function blur(buffer, w, h, rb_desc) 
+blur = function(buffer, w, h, rb_desc) 
 	beginBlock("blur")
 	local blur_buf = createRenderbuffer(rb_desc)
 	setRenderTargets(blur_buf)
@@ -280,7 +276,7 @@ function blur(buffer, w, h, rb_desc)
 	setRenderTargets()
 end
 
-function shadowPass()
+local function shadowPass()
 	if not environmentCastShadows() then
 		local rb = createRenderbuffer(shadowmap_1x1)
 		setRenderTargetsDS(rb)
@@ -321,7 +317,7 @@ function shadowPass()
 	end
 end
 
-function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+local function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local prev = hdr_buffer
 	if _G["postprocesses"] ~= nil then
 		for _, value in pairs(_G["postprocesses"]) do
@@ -331,7 +327,7 @@ function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 	return prev
 end
 
-function tonemap(hdr_buffer)
+local function tonemap(hdr_buffer)
 	if PROBE ~= nil then
 		return hdr_buffer
 	end
@@ -347,7 +343,7 @@ function tonemap(hdr_buffer)
 	return rb
 end
 
-function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
+local function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	if debug_shadowmap then
 		debugRenderbuffer(shadowmap, output, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
@@ -377,8 +373,7 @@ function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	end
 end
 
-
-function renderSelectionOutline(output)
+local function renderSelectionOutline(output)
 	local selection_mask = createRenderbuffer(selection_mask_desc)
 	setRenderTargetsDS(selection_mask)
 	clear(CLEAR_DEPTH, 0, 0, 0, 0, 0)
@@ -391,7 +386,7 @@ function renderSelectionOutline(output)
 	)
 end
 
-function main_shadowmap()
+main_shadowmap = function()
 	beginBlock("bake_shadow")
 
 	local depthbuf = createRenderbuffer(baked_shadowmap_desc)
@@ -409,7 +404,7 @@ function main_shadowmap()
 	endBlock()
 end
 
-function render_preview()
+local function render_preview()
 	local shadowmap = shadowPass()
 
 	local view_params = getCameraParams()
@@ -434,7 +429,7 @@ function render_preview()
 	setOutput(output)
 end
 
-function TAA(res, gbuffer_depth)
+local function TAA(res, gbuffer_depth)
 	PIXEL_JITTER = taa_enabled
 	if taa_enabled then
 		beginBlock("taa")
@@ -475,7 +470,7 @@ function TAA(res, gbuffer_depth)
 	end
 end
 
-function main()
+main = function()
 	if PREVIEW then
 		render_preview()
 		return
@@ -573,7 +568,7 @@ function main()
 	setOutput(res)
 end
 
-function onGUI()
+onGUI = function()
 	if GAME_VIEW then
 		return
 	end
@@ -583,22 +578,21 @@ function onGUI()
 	end
 
 	if ImGui.BeginPopup("debug_popup") then
-		changed, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
-		changed, debug_shadow_atlas = ImGui.Checkbox("Shadow atlas", debug_shadow_atlas)
-		changed, debug_albedo = ImGui.Checkbox("Albedo", debug_albedo)
-		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
-		changed, debug_roughness = ImGui.Checkbox("Roughness", debug_roughness)
-		changed, debug_metallic = ImGui.Checkbox("Metallic", debug_metallic)
-		changed, debug_ao = ImGui.Checkbox("AO", debug_ao)
-		changed, debug_shadow_buf = ImGui.Checkbox("GBuffer shadow", debug_shadow_buf)
-		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
-		changed, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
-		changed, render_grass = ImGui.Checkbox("Grass", render_grass)
-		changed, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
-		changed, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
-		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
-		local lod_mul = Renderer.getLODMultiplier()
-		changed, lod_mul = ImGui.DragFloat("LOD multiplier", lod_mul)
+		_, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
+		_, debug_shadow_atlas = ImGui.Checkbox("Shadow atlas", debug_shadow_atlas)
+		_, debug_albedo = ImGui.Checkbox("Albedo", debug_albedo)
+		_, debug_normal = ImGui.Checkbox("Normal", debug_normal)
+		_, debug_roughness = ImGui.Checkbox("Roughness", debug_roughness)
+		_, debug_metallic = ImGui.Checkbox("Metallic", debug_metallic)
+		_, debug_ao = ImGui.Checkbox("AO", debug_ao)
+		_, debug_shadow_buf = ImGui.Checkbox("GBuffer shadow", debug_shadow_buf)
+		_, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
+		_, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
+		_, render_grass = ImGui.Checkbox("Grass", render_grass)
+		_, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
+		_, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
+		_, enable_icons = ImGui.Checkbox("Icons", enable_icons)
+		local changed, lod_mul = ImGui.DragFloat("LOD multiplier", Renderer.getLODMultiplier())
 		if changed then
 			Renderer.setLODMultiplier(lod_mul)
 		end
