@@ -162,6 +162,7 @@ struct FormatDesc {
 			case GL_R11F_G11F_B10F : return get(TextureFormat::R11G11B10F);
 			case GL_RGBA32F : return get(TextureFormat::RGBA32F);
 			case GL_RG32F : return get(TextureFormat::RG32F);
+			case GL_RG16 : return get(TextureFormat::RG16);
 			case GL_RGB32F : return get(TextureFormat::RGB32F);
 			
 			case GL_DEPTH_COMPONENT32 : return get(TextureFormat::D32);
@@ -177,6 +178,7 @@ struct FormatDesc {
 			case TextureFormat::BC4: return {			true,		false,	8,	GL_COMPRESSED_RED_RGTC1,			GL_ZERO};
 			case TextureFormat::BC5: return {			true,		false,	16, GL_COMPRESSED_RG_RGTC2,				GL_ZERO};
 			case TextureFormat::R16: return {			false,		false,	2,	GL_R16,								GL_ZERO, GL_RED, GL_UNSIGNED_SHORT};
+			case TextureFormat::RG16: return {			false,		false,  4,	GL_RG16,							GL_ZERO, GL_RG, GL_UNSIGNED_SHORT};
 			case TextureFormat::R8: return {			false,		false,	1,	GL_R8,								GL_ZERO, GL_RED, GL_UNSIGNED_BYTE};
 			case TextureFormat::RG8: return {			false,		false,	2,	GL_RG8,								GL_ZERO, GL_RG, GL_UNSIGNED_BYTE};
 			case TextureFormat::BGRA8: return {			false,		false,	4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE};

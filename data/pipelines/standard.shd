@@ -14,7 +14,7 @@ surface_shader [[
 		data.albedo.rgb *= v_color.rgb;
 	#endif
 
-	#ifdef _HAS_ATTR7
+	#ifdef HAS_AMBIENT_OCCLUSION_ATTRIBUTE
 		data.ao = v_ao;
 	#else
 		data.ao = 1;

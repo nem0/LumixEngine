@@ -104,6 +104,7 @@ struct LUMIX_RENDERER_API Mesh {
 	String name;
 	Material* material;
 	gpu::VertexDecl vertex_decl;
+	gpu::VertexDecl dyn_vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
 	Renderer& renderer;
 	float lod = 0;

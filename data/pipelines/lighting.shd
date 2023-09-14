@@ -18,15 +18,16 @@ fragment_shader [[
 	layout (binding=0) uniform sampler2D u_gbuffer0;
 	layout (binding=1) uniform sampler2D u_gbuffer1;
 	layout (binding=2) uniform sampler2D u_gbuffer2;
-	layout (binding=3) uniform sampler2D u_gbuffer_depth;
-	layout (binding=4) uniform sampler2D u_shadowmap;
-	layout (binding=5) uniform sampler2D u_shadow_atlas;
-	layout (binding=6) uniform samplerCubeArray u_reflection_probes;
+	layout (binding=3) uniform sampler2D u_gbuffer3;
+	layout (binding=4) uniform sampler2D u_gbuffer_depth;
+	layout (binding=5) uniform sampler2D u_shadowmap;
+	layout (binding=6) uniform sampler2D u_shadow_atlas;
+	layout (binding=7) uniform samplerCubeArray u_reflection_probes;
 
 	void main()
 	{
 		float ndc_depth;
-		Surface surface = unpackSurface(v_uv, u_gbuffer0, u_gbuffer1, u_gbuffer2, u_gbuffer_depth, ndc_depth);
+		Surface surface = unpackSurface(v_uv, u_gbuffer0, u_gbuffer1, u_gbuffer2, u_gbuffer3, u_gbuffer_depth, ndc_depth);
 		Cluster cluster = getCluster(ndc_depth);
 
 		o_color.rgb = computeLighting(cluster

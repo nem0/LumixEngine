@@ -13,12 +13,6 @@ compute_shader [[
 		float u_current_frame_weight;
 	};
 
-	vec2 reproject(vec2 uv, float depth) {
-		vec4 v = (Global.reprojection * vec4(uv * 2 - 1, depth, 1));
-		vec2 res = (v.xy / v.w) * 0.5 + 0.5;
-		return res;
-	}
-
 	void main()
 	{
 		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
@@ -27,7 +21,7 @@ compute_shader [[
 		vec2 uv = (vec2(ij) + 0.5) / u_size.xy;
 		float depth = texture(u_depthbuf, uv).x;
 		
-		vec2 uv_prev = reproject(uv, depth);
+		vec2 uv_prev = cameraReproject(uv, depth);
 
 		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {
 			float current = imageLoad(u_current, ij).x;

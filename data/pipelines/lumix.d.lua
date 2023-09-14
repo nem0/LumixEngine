@@ -56,7 +56,7 @@ declare function renderTerrains(cp: CameraParams, rs: RenderState, define : stri
 declare function renderTransparent() : ()
 declare function renderUI() : ()
 declare function setOutput(rb : RenderBuffer) : ()
-declare function setRenderTargets(rt: {RenderBuffer}?) : ()
+declare function setRenderTargets(...: RenderBuffer) : ()
 declare function setRenderTargetsDS(...: RenderBuffer) : ()
 declare function setRenderTargetsReadonlyDS(...: RenderBuffer) : ()
 declare function viewport(x : number, y : number, w : number, h : number) : ()

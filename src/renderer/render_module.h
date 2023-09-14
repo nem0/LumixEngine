@@ -154,13 +154,13 @@ struct EnvironmentProbe {
 	Vec3 sh_coefs[9];
 };
 
-struct ModelInstance
-{
+struct ModelInstance {
 	enum Flags : u8 {
 		NONE = 0,
 		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
 		ENABLED = 1 << 1,
 		VALID = 1 << 2,
+		MOVED = 1 << 3,
 	};
 
 	Model* model;
@@ -170,6 +170,7 @@ struct ModelInstance
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	float lod = 4;
+	Transform prev_frame_transform;
 	Flags flags = Flags::NONE;
 	u16 mesh_count;
 };

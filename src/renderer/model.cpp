@@ -44,12 +44,16 @@ Mesh::Mesh(Material* mat,
 	, vertices(allocator)
 	, skin(allocator)
 	, vertex_decl(vertex_decl)
+	, dyn_vertex_decl(vertex_decl)
 	, renderer(renderer)
 	, vb_stride(vb_stride)
 	, vertex_buffer_handle(gpu::INVALID_BUFFER)
 	, index_buffer_handle(gpu::INVALID_BUFFER)
 	, index_type(gpu::DataType::U32)
 {
+	dyn_vertex_decl.addAttribute(7, 48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+	dyn_vertex_decl.addAttribute(8, 64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+	dyn_vertex_decl.addAttribute(9, 80, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
@@ -73,6 +77,7 @@ Mesh::Mesh(Mesh&& rhs)
 	, name(rhs.name)
 	, material(rhs.material)
 	, vertex_decl(rhs.vertex_decl)
+	, dyn_vertex_decl(rhs.dyn_vertex_decl)
 	, lod(rhs.lod)
 	, renderer(rhs.renderer)
 {

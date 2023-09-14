@@ -1,4 +1,5 @@
 local lighting_shader = preloadShader("pipelines/lighting.shd")
+local field_debug_shader = preloadShader("pipelines/field_debug.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
@@ -12,6 +13,7 @@ local debug_metallic = false
 local debug_ao = false
 local debug_shadow_buf = false
 local debug_albedo = false
+local debug_motion_vectors = false
 local debug_clusters = false
 local debug_shadow_atlas = false
 local enable_icons = true
@@ -27,6 +29,7 @@ local selection_mask_desc = createRenderbufferDesc { format = "depth32", debug_n
 local gbuffer0_desc = createRenderbufferDesc { format = "srgba", debug_name = "gbuffer0" }
 local gbuffer1_desc = createRenderbufferDesc { compute_write = true, format = "rgba16", debug_name = "gbuffer1" }
 local gbuffer2_desc = createRenderbufferDesc { compute_write = true, format = "rgba8", debug_name = "gbuffer2" }
+local gbuffer3_desc = createRenderbufferDesc { compute_write = true, format = "rg32f", debug_name = "gbuffer3" }
 local dsbuffer_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "gbuffer_ds" }
 local baked_shadowmap_desc = createRenderbufferDesc { format = "depth32", debug_name = "shadowmap_depth" }
 local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true }
@@ -170,9 +173,10 @@ local function geomPass(view_params, entities)
 		local gbuffer0 = createRenderbuffer(gbuffer0_desc)
 		local gbuffer1 = createRenderbuffer(gbuffer1_desc)
 		local gbuffer2 = createRenderbuffer(gbuffer2_desc)
+		local gbuffer3 = createRenderbuffer(gbuffer3_desc)
 		local dsbuffer = createRenderbuffer(dsbuffer_desc)
 	
-		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
+		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, gbuffer3, dsbuffer)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
 		pass(view_params)
 		if render_terrain then
@@ -194,7 +198,7 @@ local function geomPass(view_params, entities)
 	endBlock()
 
 	beginBlock("decals")
-		setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
+		setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, gbuffer3, dsbuffer)
 		bindTextures({
 			dsbuffer,
 		}, 1)
@@ -202,10 +206,10 @@ local function geomPass(view_params, entities)
 		renderBucket(entities.terrain_decal)
 	endBlock()
 	
-	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
+	return gbuffer0, gbuffer1, gbuffer2, gbuffer3, dsbuffer
 end
 
-local function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+local function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	local hdr_rb = createRenderbuffer(hdr_rb_desc)
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
@@ -218,6 +222,7 @@ local function lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_dept
 			gbuffer0,
 			gbuffer1,
 			gbuffer2,
+			gbuffer3,
 			gbuffer_depth,
 			shadowmap,
 			SHADOW_ATLAS,
@@ -237,6 +242,16 @@ local function debugClusters(gb_depth, output)
 		, { depth_test = false });
 end
 
+
+local function debugField(rb, output)
+	setRenderTargets(output)
+	drawcallUniforms(0, 0, 1, 1) 
+
+	drawArray(0, 3, field_debug_shader
+		, { rb }
+		, empty_state
+	)
+end
 
 local function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 	setRenderTargets(output)
@@ -317,11 +332,11 @@ local function shadowPass()
 	end
 end
 
-local function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+local function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap) : RenderBuffer
 	local prev = hdr_buffer
 	if _G["postprocesses"] ~= nil then
 		for _, value in pairs(_G["postprocesses"]) do
-			prev = value(getfenv(1), phase, prev, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+			prev = value(getfenv(1), phase, prev, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 		end
 	end
 	return prev
@@ -343,7 +358,7 @@ local function tonemap(hdr_buffer)
 	return rb
 end
 
-local function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
+local function debugPass(output, gb0, gb1, gb2, gb3, gb_depth, shadowmap)
 	if debug_shadowmap then
 		debugRenderbuffer(shadowmap, output, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
@@ -352,6 +367,9 @@ local function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	end
 	if debug_albedo then
 		debugRenderbuffer(gb0, output, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
+	end
+	if debug_motion_vectors then
+		debugField(gb3, output)
 	end
 	if debug_roughness then
 		debugRenderbuffer(gb0, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
@@ -429,7 +447,7 @@ local function render_preview()
 	setOutput(output)
 end
 
-local function TAA(res, gbuffer_depth)
+local function TAA(res, gbuffer3, gbuffer_depth)
 	PIXEL_JITTER = taa_enabled
 	if taa_enabled then
 		beginBlock("taa")
@@ -444,7 +462,7 @@ local function TAA(res, gbuffer_depth)
 		setRenderTargets()
 
 		drawcallUniforms(viewport_w, viewport_h, 0, 0) 
-		bindTextures({taa_history, gbuffer_depth, res}, 0)
+		bindTextures({taa_history, gbuffer_depth, res, gbuffer3}, 0)
 		bindImageTexture(taa_tmp, 3)
 		dispatch(taa_shader, (viewport_w + 15) / 16, (viewport_h + 15) / 16, 1)
 
@@ -487,32 +505,32 @@ main = function()
 	)
 
 	local shadowmap = shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(view_params, entities)
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth = geomPass(view_params, entities)
 
-	postprocess("pre_lightpass", nil, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	postprocess("pre_lightpass", nil, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 
-	local hdr_buffer = lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	local hdr_buffer = lightPass(view_params, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	
 	custom_tonemap = false
 	local res = hdr_buffer
-	res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	
 	waterPass(view_params, entities, res, gbuffer_depth, shadowmap)
 	transparentPass(view_params, entities, res, gbuffer_depth, shadowmap)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 
-	res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 
 	if PROBE == nil then
 		if custom_tonemap == true then
-			res = postprocess("tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+			res = postprocess("tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 		else
 			res = tonemap(res)
 		end
 	end
 
 	if PROBE == nil then
-		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	end
 
 
@@ -524,7 +542,7 @@ main = function()
 		end
 	end
 
-	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
 		icon_ds = createRenderbuffer(icon_ds_desc)
@@ -546,7 +564,7 @@ main = function()
 		end
 	end
 
-	TAA(res, gbuffer_depth)
+	TAA(res, gbuffer3, gbuffer_depth)
 
 	render2D()
 
@@ -585,6 +603,7 @@ onGUI = function()
 		_, debug_roughness = ImGui.Checkbox("Roughness", debug_roughness)
 		_, debug_metallic = ImGui.Checkbox("Metallic", debug_metallic)
 		_, debug_ao = ImGui.Checkbox("AO", debug_ao)
+		_, debug_motion_vectors = ImGui.Checkbox("Motion vectors", debug_motion_vectors)
 		_, debug_shadow_buf = ImGui.Checkbox("GBuffer shadow", debug_shadow_buf)
 		_, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		_, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)

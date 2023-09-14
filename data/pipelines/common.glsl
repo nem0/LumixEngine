@@ -77,6 +77,7 @@ struct Surface {
 	vec3 N;
 	vec3 V;
 	vec3 wpos;
+	vec2 motion;
 };
 
 struct SMSlice {
@@ -95,6 +96,7 @@ layout (std140, binding = 0) uniform GlobalState {
 	mat4 view;
 	mat4 inv_view;
 	mat4 view_projection;
+	mat4 view_projection_no_jitter;
 	mat4 inv_view_projection;
 	mat4 reprojection;
 	vec4 camera_world_pos;
@@ -102,6 +104,8 @@ layout (std140, binding = 0) uniform GlobalState {
 	vec4 light_color;
 	ivec2 framebuffer_size;
 	vec2 pixel_jitter;
+	vec2 prev_pixel_jitter;
+	vec2 padding_;
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
@@ -585,16 +589,24 @@ float rand(vec3 seed)
 	return fract(sin(dot_product) * 43758.5453);
 }
 
-void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2) {
+vec2 cameraReproject(vec2 uv, float depth) {
+	vec4 v = (Global.reprojection * vec4(uv * 2 - 1, depth, 1));
+	vec2 res = (v.xy / v.w) * 0.5 + 0.5;
+	return res;
+}
+
+void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2, out vec4 gbuffer3) {
 	gbuffer0 = vec4(surface.albedo.rgb, surface.roughness);
 	gbuffer1 = vec4(surface.N * 0.5 + 0.5, surface.ao);
 	gbuffer2 = vec4(packEmission(surface.emission), surface.translucency, surface.metallic, surface.shadow);
+	gbuffer3 = vec4(surface.motion, 0, 0);
 }
 
-Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D gbuffer2, sampler2D gbuffer_depth, out float ndc_depth) {
+Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D gbuffer2, sampler2D gbuffer3, sampler2D gbuffer_depth, out float ndc_depth) {
 	vec4 gb0 = texture(gbuffer0, uv);
 	vec4 gb1 = texture(gbuffer1, uv);
 	vec4 gb2 = texture(gbuffer2, uv);
+	vec4 gb3 = texture(gbuffer3, uv);
 
 	Surface surface;
 	surface.albedo = gb0.rgb;
@@ -607,6 +619,7 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	surface.translucency = gb2.y;
 	surface.ao = gb1.w;
 	surface.shadow = gb2.w;
+	surface.motion = gb3.xy;
 	return surface;
 }
 

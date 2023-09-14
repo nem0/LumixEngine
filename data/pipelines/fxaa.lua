@@ -1,4 +1,4 @@
-function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	if not enabled then return ldr_buffer end
 	if transparent_phase ~= "post_tonemap" then return ldr_buffer end
 	env.fxaa_rb_desc = env.fxaa_rb_desc or env.createRenderbufferDesc { rel_size = {1, 1}, format = "srgba", debug_name = "fxaa" }

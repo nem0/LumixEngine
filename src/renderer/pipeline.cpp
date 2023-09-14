@@ -269,6 +269,7 @@ struct GlobalState
 	Matrix camera_view;
 	Matrix camera_inv_view;
 	Matrix camera_view_projection;
+	Matrix camera_view_projection_no_jitter;
 	Matrix camera_inv_view_projection;
 	Matrix camera_reprojection;
 	Vec4 cam_world_pos;
@@ -276,6 +277,8 @@ struct GlobalState
 	Vec4 light_color;
 	IVec2 framebuffer_size;
 	Vec2 pixel_jitter;
+	Vec2 prev_pixel_jitter;
+	Vec2 padding_;
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
@@ -1189,14 +1192,17 @@ struct PipelineImpl final : Pipeline
 
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjectionWithJitter();
+		const Matrix projection_no_jitter = m_viewport.getProjectionNoJitter();
 		GlobalState global_state;
 		global_state.pixel_jitter = m_viewport.pixel_offset;
+		global_state.prev_pixel_jitter = m_prev_viewport.pixel_offset;
 		global_state.camera_projection = projection;
-		global_state.camera_projection_no_jitter = m_viewport.getProjectionNoJitter();
+		global_state.camera_projection_no_jitter = projection_no_jitter;
 		global_state.camera_inv_projection = projection.inverted();
 		global_state.camera_view = view;
 		global_state.camera_inv_view = view.fastInverted();
 		global_state.camera_view_projection = projection * view;
+		global_state.camera_view_projection_no_jitter = projection_no_jitter * view;
 		global_state.camera_inv_view_projection = global_state.camera_view_projection.inverted();
 		global_state.time = m_timer.getTimeSinceStart();
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
@@ -1448,6 +1454,7 @@ struct PipelineImpl final : Pipeline
 			{"rgba32f", gpu::TextureFormat::RGBA32F},
 			{"r16f", gpu::TextureFormat::R16F},
 			{"r16", gpu::TextureFormat::R16},
+			{"rg16", gpu::TextureFormat::RG16},
 			{"r8", gpu::TextureFormat::R8},
 			{"r32f", gpu::TextureFormat::R32F},
 			{"rg32f", gpu::TextureFormat::RG32F},
@@ -1459,7 +1466,7 @@ struct PipelineImpl final : Pipeline
 		{
 			if (equalStrings(i.name, name)) return i.value;
 		}
-		logError("Uknown texture format ", name);
+		logError("Unknown texture format ", name);
 		return gpu::TextureFormat::RGBA8;
 	}
 
@@ -2606,13 +2613,14 @@ struct PipelineImpl final : Pipeline
 
 		const World& world = m_module->getWorld();
 		const ShiftedFrustum frustum = view.cp.frustum;
-		const ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
+		ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
 		const Transform* LUMIX_RESTRICT transforms = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
 		u64 instance_key_mask;
 		u32 define_mask;
 		u32 autoinstanced_define_mask;
+		u32 dynamic_define_mask;
 		u32 skinned_define_mask;
 		u32 fur_define_mask;
 		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
@@ -2630,6 +2638,7 @@ struct PipelineImpl final : Pipeline
 				stream = &view.buckets[bucket].stream;
 				define_mask = view.buckets[bucket].define_mask;
 				autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
+				dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
 				skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
 				fur_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("FUR"));
 				const bool sort_depth = view.buckets[bucket].sort == Bucket::DEPTH;
@@ -2720,22 +2729,21 @@ struct PipelineImpl final : Pipeline
 					}
 					else {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
 						const Mesh& mesh = mi->meshes[mesh_idx];
 						const float mesh_lod = mesh.lod;
-						int start_i = i;
-						const u64 key = sort_keys[i] & instance_key_mask;
-						while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
-							++i;
-						}
-						const u32 count = u32(i - start_i);
-						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 3));
-						u8* instance_data = slice.ptr;
-						for (int j = start_i; j < start_i + (i32)count; ++j) {
-							const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+						const Material* material = mesh.material;
+						Shader* shader = material->getShader();
+						const gpu::StateFlags state = material->m_render_states | render_state;
+
+						if (mi->flags & ModelInstance::MOVED) {
+							const Renderer::TransientSlice slice = m_renderer.allocTransient((sizeof(Vec4) * 6));
+							u8* instance_data = slice.ptr;
+							const EntityRef e = { i32(renderables[i] & 0xFFffFFff) };
 							const Transform& tr = transforms[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							const float lod_d = model_instances[e.index].lod - mesh_lod;
+							
 							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
 							instance_data += sizeof(tr.rot);
 							memcpy(instance_data, &lpos, sizeof(lpos));
@@ -2744,28 +2752,71 @@ struct PipelineImpl final : Pipeline
 							instance_data += sizeof(lod_d);
 							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 							instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
-						}
 
-						const Material* material = mesh.material;
-						Shader* shader = material->getShader();
-						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
+							const Transform prev_tr = mi->prev_frame_transform;
+							const Vec3 prev_lpos = Vec3(prev_tr.pos - camera_pos);
+
+							memcpy(instance_data, &prev_tr.rot, sizeof(prev_tr.rot));
+							instance_data += sizeof(prev_tr.rot);
+							memcpy(instance_data, &prev_lpos, sizeof(prev_lpos));
+							instance_data += sizeof(prev_lpos);
+							memcpy(instance_data, &lod_d, sizeof(lod_d));
+							instance_data += sizeof(lod_d);
+							memcpy(instance_data, &prev_tr.scale, sizeof(prev_tr.scale));
+							instance_data += sizeof(prev_tr.scale) + sizeof(float)/*padding*/;
+
+							const u32 defines = dynamic_define_mask | material->getDefineMask();
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.dyn_vertex_decl, defines);
 						
-						stream->useProgram(program);
-						stream->bind(0, material->m_bind_group);
-						stream->bindIndexBuffer(mesh.index_buffer_handle);
-						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
-						stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-						--i;
+							stream->useProgram(program);
+							stream->bind(0, material->m_bind_group);
+							stream->bindIndexBuffer(mesh.index_buffer_handle);
+							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 96);
+							stream->drawIndexedInstanced(mesh.indices_count, 1, mesh.index_type);
+						}
+						else {
+							int start_i = i;
+							const u64 key = sort_keys[i] & instance_key_mask;
+							while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
+								++i;
+							}
+							const u32 count = u32(i - start_i);
+							const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 3));
+							u8* instance_data = slice.ptr;
+							for (int j = start_i; j < start_i + (i32)count; ++j) {
+								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+								const Transform& tr = transforms[e.index];
+								const Vec3 lpos = Vec3(tr.pos - camera_pos);
+								const float lod_d = model_instances[e.index].lod - mesh_lod;
+								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+								instance_data += sizeof(tr.rot);
+								memcpy(instance_data, &lpos, sizeof(lpos));
+								instance_data += sizeof(lpos);
+								memcpy(instance_data, &lod_d, sizeof(lod_d));
+								instance_data += sizeof(lod_d);
+								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+								instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
+							}
+
+							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
+						
+							stream->useProgram(program);
+							stream->bind(0, material->m_bind_group);
+							stream->bindIndexBuffer(mesh.index_buffer_handle);
+							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
+							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
+							--i;
+						}
 					}
 					break;
 				}
 				case RenderableTypes::FUR:
 				case RenderableTypes::SKINNED: {
 					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+					ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
 					const Transform& tr = transforms[entity.index];
 					const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
 					const Mesh& mesh = mi->meshes[mesh_idx];
@@ -2784,6 +2835,7 @@ struct PipelineImpl final : Pipeline
 						float layers;
 						float padding;
 						Matrix model_mtx;
+						Matrix prev_model_mtx;
 					};
 
 					const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
@@ -2791,6 +2843,10 @@ struct PipelineImpl final : Pipeline
 					prefix->model_mtx = Matrix(rel_pos, tr.rot);
 					prefix->model_mtx.multiply3x3(tr.scale);
 
+					const Vec3 prev_rel_pos = Vec3(mi->prev_frame_transform.pos - camera_pos);
+					prefix->prev_model_mtx = Matrix(prev_rel_pos, mi->prev_frame_transform.rot);
+					prefix->prev_model_mtx.multiply3x3(mi->prev_frame_transform.scale);
+							
 					u32 layers = 1;
 					if (type == RenderableTypes::FUR) {
 						FurComponent& fur = m_module->getFur(entity);
@@ -3520,7 +3576,11 @@ struct PipelineImpl final : Pipeline
 									const u32 bucket = bucket_map[mesh.layer];
 									ASSERT(!mi.custom_material);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
-									if (bucket < 0xff) {
+									if (mi.flags & ModelInstance::MOVED && !is_shadow) {
+										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
+										inserter.push(key, subrenderable);
+									}
+									else if (bucket < 0xff) {
 										instancer.add(mesh.sort_key, subrenderable);
 									} else if (bucket < 0xffFF) {
 										const DVec3 pos = transforms[e.index].pos;
