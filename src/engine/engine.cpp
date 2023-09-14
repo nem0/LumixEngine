@@ -322,6 +322,13 @@ struct EngineImpl final : Engine {
 
 	void update(World& world) override
 	{
+		{
+			PROFILE_BLOCK("end frame");
+			for (UniquePtr<IModule>& module : world.getModules()) {
+				module->endFrame();
+			}
+		}
+
 		PROFILE_FUNCTION();
 		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
 		profiler::pushCounter(lua_mem_counter, float(double(m_lua_allocated) / 1024.0));

@@ -58,6 +58,7 @@ function procedural_geom_shader(args)
 				layout(location = 0) out vec4 o_gbuffer0;
 				layout(location = 1) out vec4 o_gbuffer1;
 				layout(location = 2) out vec4 o_gbuffer2;
+				layout(location = 3) out vec4 o_gbuffer3;
 			#else
 				layout(location = 0) out vec4 o_color;
 			#endif
@@ -76,7 +77,7 @@ function procedural_geom_shader(args)
 		#elif defined DEFERRED || defined GRASS
 			void main() {
 				Surface data = getSurface();
-				packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
+				packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2, o_gbuffer2);
 			}
 		#else 
 			void main() {

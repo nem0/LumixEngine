@@ -113,6 +113,7 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_gbuffer0;
 		layout(location = 1) out vec4 o_gbuffer1;
 		layout(location = 2) out vec4 o_gbuffer2;
+		layout(location = 3) out vec4 o_gbuffer3;
 	#elif !defined DEPTH
 		layout(location = 0) out vec4 o_color;
 	#endif
@@ -173,7 +174,7 @@ fragment_shader [[
 		void main()
 		{
 			Surface data = getSurface();
-			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
+			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2, o_gbuffer3);
 			#ifdef HAS_DEPTHMAP
 				float depth = texture(t_depth, v_uv).x;
 				float linear_z = toLinearDepth(Pass.inv_projection, gl_FragCoord.z);

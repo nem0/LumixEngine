@@ -519,6 +519,16 @@ struct RenderModuleImpl final : RenderModule {
 	void startGame() override { m_is_game_running = true; }
 	void stopGame() override { m_is_game_running = false; }
 
+	void endFrame() override {
+		for (EntityRef e : m_moved_instances) {
+			if (!m_world.hasEntity(e)) continue;
+
+			m_model_instances[e.index].flags &= ~ModelInstance::MOVED;
+			m_model_instances[e.index].prev_frame_transform = m_world.getTransform(e);
+		}
+		m_moved_instances.clear();
+	}
+
 	void update(float dt) override {
 		PROFILE_FUNCTION();
 
@@ -1459,7 +1469,10 @@ struct RenderModuleImpl final : RenderModule {
 		if (m_culling_system->isAdded(entity)) {
 			if (m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
 				const Transform& tr = m_world.getTransform(entity);
-				const Model* model = m_model_instances[entity.index].model;
+				ModelInstance& mi = m_model_instances[entity.index];
+				m_moved_instances.push(entity);
+				mi.flags |= ModelInstance::MOVED;
+				const Model* model = mi.model;
 				ASSERT(model);
 				const float bounding_radius = model->getOriginBoundingRadius();
 				m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
@@ -3004,6 +3017,8 @@ struct RenderModuleImpl final : RenderModule {
 	void setModel(EntityRef entity, Model* model)
 	{
 		auto& model_instance = m_model_instances[entity.index];
+		model_instance.prev_frame_transform = m_world.getTransform(entity);
+
 		ASSERT(model_instance.flags & ModelInstance::VALID);
 		Model* old_model = model_instance.model;
 		bool no_change = model == old_model && old_model;
@@ -3229,6 +3244,7 @@ struct RenderModuleImpl final : RenderModule {
 	HashMap<EntityRef, Decal> m_decals;
 	HashMap<EntityRef, CurveDecal> m_curve_decals;
 	Array<ModelInstance> m_model_instances;
+	Array<EntityRef> m_moved_instances;
 	HashMap<EntityRef, InstancedModel> m_instanced_models;
 	HashMap<EntityRef, Environment> m_environments;
 	HashMap<EntityRef, Camera> m_cameras;
@@ -3438,6 +3454,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_allocator(allocator, "renderer module")
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
+	, m_moved_instances(m_allocator)
 	, m_instanced_models(m_allocator)
 	, m_cameras(m_allocator)
 	, m_terrains(m_allocator)

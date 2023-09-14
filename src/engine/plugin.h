@@ -47,6 +47,7 @@ struct LUMIX_ENGINE_API IModule
 	virtual ISystem& getSystem() const = 0;
 	virtual void update(float time_delta) = 0;
 	virtual void lateUpdate(float time_delta) {}
+	virtual void endFrame() {}
 	virtual struct World& getWorld() = 0;
 	virtual void startGame() {}
 	virtual void stopGame() {}

@@ -3,7 +3,7 @@ lumamount = 0.1
 noise = -1
 Editor.setPropertyType(this, "noise", Editor.RESOURCE_PROPERTY, "texture")
 
-function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	if not enabled then return ldr_buffer end
 	if transparent_phase ~= "post_tonemap" then return ldr_buffer end
 	if noise == -1 then return ldr_buffer end

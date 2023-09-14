@@ -4,7 +4,7 @@ stride = 4
 current_frame_weight = 0.1
 local sss_history = -1
 
-function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer3, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if phase ~= "pre_lightpass" then return hdr_buffer end
 
