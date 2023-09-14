@@ -32,7 +32,7 @@ declare function clear(flags : number, r : number, g : number, b : number, a : n
 declare function createRenderbuffer(desc : RenderBufferDescHandle) : RenderBuffer
 declare function createRenderbufferDesc(desc : RenderBufferDesc) : RenderBufferDescHandle
 declare function createRenderState(state : any) : RenderState
-declare function cull(cp : CameraParams, ... : any) : ()
+declare function cull(cp : CameraParams, ... : any) : any
 declare function dispatch(shader : Shader, x : number, y : number, z : number) : ()
 declare function drawArray(indices_offset : number, indices_count : number, shader : Shader, textures : {RenderBuffer}, rs : any, define : string?) : ()
 declare function drawcallUniforms(...: number) : ()
@@ -81,3 +81,4 @@ declare CLEAR_COLOR : number
 declare viewport_w : number
 declare viewport_h : number
 declare Renderer : any
+declare enabled : boolean

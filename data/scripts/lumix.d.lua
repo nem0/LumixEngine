@@ -2,6 +2,7 @@ declare ImGui: {
     AlignTextToFramePadding : () -> (),
     Begin : (string, boolean?) -> (boolean, boolean?),
     BeginChildFrame : (string, number, number) -> boolean,
+    BeginMenu : (string, boolean) -> boolean,
     BeginPopup : (string) -> boolean,
     Button : (string) -> boolean,
     CalcTextSize : (string) -> (number, number),
@@ -15,6 +16,7 @@ declare ImGui: {
     End : () -> (),
     EndChildFrame : () -> (),
     EndCombo : () -> (),
+    EndMenu : () -> (),
     EndPopup : () -> (),
     GetColumnWidth : (number) -> number,
     GetDisplayWidth : () -> number,
@@ -526,9 +528,11 @@ end
 declare this:Entity
 
 declare Editor: {
+	RESOURCE_PROPERTY : number,
+	COLOR_PROPERTY : number,
     ENTITY_PROPERTY : number,
     BOOLEAN_PROPERTY : number,
-    setPropertyType : (any, string, number) -> (),
+    setPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
 	getSelectedEntity : (number) -> Entity
 }
@@ -537,8 +541,10 @@ declare LumixAPI: {
     INPUT_KEYCODE_SHIFT: number,
     INPUT_KEYCODE_LEFT : number,
     INPUT_KEYCODE_RIGHT : number,
+	engine : any,
     logError : (string) -> (),
     logInfo : (string) -> (),
+	loadResource : (any, path:string, restype:string) -> any
 }
 
 declare class ComponentBase

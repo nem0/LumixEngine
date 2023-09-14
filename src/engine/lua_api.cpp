@@ -1006,6 +1006,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "AlignTextToFramePadding", &LuaWrapper::wrap<ImGui::AlignTextToFramePadding>);
 	LuaImGui::registerCFunction(L, "Begin", &LuaImGui::Begin);
 	LuaImGui::registerCFunction(L, "BeginChildFrame", &LuaImGui::BeginChildFrame);
+	LuaImGui::registerCFunction(L, "BeginMenu", &LuaWrapper::wrap<ImGui::BeginMenu>);
 	LuaImGui::registerCFunction(L, "BeginPopup", LuaImGui::BeginPopup);
 	LuaImGui::registerCFunction(L, "Button", &LuaImGui::Button);
 	LuaImGui::registerCFunction(L, "CalcTextSize", &LuaImGui::CalcTextSize);
@@ -1019,6 +1020,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "End", &LuaWrapper::wrap<&ImGui::End>);
 	LuaImGui::registerCFunction(L, "EndChildFrame", &LuaWrapper::wrap<&ImGui::EndChildFrame>);
 	LuaImGui::registerCFunction(L, "EndCombo", &LuaWrapper::wrap<&ImGui::EndCombo>);
+	LuaImGui::registerCFunction(L, "EndMenu", &LuaWrapper::wrap<&ImGui::EndMenu>);
 	LuaImGui::registerCFunction(L, "EndPopup", &LuaWrapper::wrap<&ImGui::EndPopup>);
 	LuaImGui::registerCFunction(L, "GetColumnWidth", &LuaWrapper::wrap<&ImGui::GetColumnWidth>);
 	LuaImGui::registerCFunction(L, "GetDisplayWidth", &LuaWrapper::wrap<LuaImGui::GetDisplayWidth>);
