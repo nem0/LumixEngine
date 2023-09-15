@@ -1272,6 +1272,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		if (&actions.save == &action) save();
 		else if (&actions.undo == &action) m_composite_editor ? m_composite_editor->doUndo() : undo();
 		else if (&actions.redo == &action) m_composite_editor ? m_composite_editor->doRedo() : redo();
+		else if (&actions.del == &action && m_composite_editor) m_composite_editor->deleteSelectedNodes();
 		else return false;
 		return true;
 	}

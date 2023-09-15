@@ -3224,7 +3224,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 		pushUndo(NO_MERGE_UNDO);
 	}
 
-	void deleteSelectedNodes() {
+	void deleteSelectedNodes() override {
 		if (m_is_any_item_active) return;
 		m_resource.deleteSelectedNodes();
 		pushUndo(NO_MERGE_UNDO);

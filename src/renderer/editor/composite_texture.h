@@ -142,6 +142,7 @@ struct CompositeTextureEditor {
 	virtual bool isDirty() const = 0;
 	virtual void doUndo() = 0;
 	virtual void doRedo() = 0;
+	virtual void deleteSelectedNodes() = 0;
 	
 	static UniquePtr<CompositeTextureEditor> open(const Path& path, StudioApp& app, IAllocator& allocator);
 };
