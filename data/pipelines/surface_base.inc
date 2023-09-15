@@ -75,16 +75,6 @@ function surface_shader_ex(args)
 			} Model;
 		#endif
 
-		#if defined _HAS_ATTR7 && defined AUTOINSTANCED
-			#define HAS_VERTEX_COLOR
-		#endif
-		#if defined _HAS_ATTR10 && defined DYNAMIC
-			#define HAS_VERTEX_COLOR
-		#endif
-		#if defined _HAS_ATTR6 && defined GRASS
-			#define HAS_VERTEX_COLOR
-		#endif
-
 		#if !defined GRASS && !defined PARTICLES
 			#define HAS_LOD
 		#endif
@@ -107,47 +97,53 @@ function surface_shader_ex(args)
 			};
 		#else
 			layout(location = 0) in vec3 a_position;
-			#ifdef _HAS_ATTR1
-				layout(location = 1) in vec2 a_uv;
+			#ifdef UV0_ATTR
+				layout(location = UV0_ATTR) in vec2 a_uv;
 			#else
 				const vec2 a_uv = vec2(0);
 			#endif
-			layout(location = 2) in vec3 a_normal;
-			#ifdef _HAS_ATTR3
-				layout(location = 3) in vec3 a_tangent;
+
+			layout(location = NORMAL_ATTR) in vec3 a_normal;
+
+			#ifdef TANGENT_ATTR
+				layout(location = TANGENT_ATTR) in vec3 a_tangent;
 			#else 
 				const vec3 a_tangent = vec3(0, 1, 0);
 			#endif
+
+			#ifdef INDICES_ATTR
+				layout(location = INDICES_ATTR) in ivec4 a_indices;
+				layout(location = WEIGHTS_ATTR) in vec4 a_weights;
+			#endif
+
 			#if defined SKINNED
-				layout(location = 4) in ivec4 a_indices;
-				layout(location = 5) in vec4 a_weights;
 			#elif defined INSTANCED
-				layout(location = 4) in vec4 i_rot_lod;
-				layout(location = 5) in vec4 i_pos_scale;
+				layout(location = INSTANCE0_ATTR) in vec4 i_rot_lod;
+				layout(location = INSTANCE1_ATTR) in vec4 i_pos_scale;
 			#elif defined AUTOINSTANCED
-				layout(location = 4) in vec4 i_rot;
-				layout(location = 5) in vec4 i_pos_lod;
-				layout(location = 6) in vec4 i_scale;
-				#ifdef HAS_VERTEX_COLOR
-					layout(location = 7) in vec4 a_color;
+				layout(location = INSTANCE0_ATTR) in vec4 i_rot;
+				layout(location = INSTANCE1_ATTR) in vec4 i_pos_lod;
+				layout(location = INSTANCE2_ATTR) in vec4 i_scale;
+				#ifdef COLOR0_ATTR
+					layout(location = COLOR0_ATTR) in vec4 a_color;
 					layout(location = 5) out vec4 v_color;
 				#endif
 			#elif defined DYNAMIC
-				layout(location = 4) in vec4 i_rot;
-				layout(location = 5) in vec4 i_pos_lod;
-				layout(location = 6) in vec4 i_scale;
-				layout(location = 7) in vec4 i_prev_rot;
-				layout(location = 8) in vec4 i_prev_pos_lod;
-				layout(location = 9) in vec4 i_prev_scale;
-				#ifdef HAS_VERTEX_COLOR
-					layout(location = 10) in vec4 a_color;
+				layout(location = INSTANCE0_ATTR) in vec4 i_rot;
+				layout(location = INSTANCE1_ATTR) in vec4 i_pos_lod;
+				layout(location = INSTANCE2_ATTR) in vec4 i_scale;
+				layout(location = INSTANCE3_ATTR) in vec4 i_prev_rot;
+				layout(location = INSTANCE4_ATTR) in vec4 i_prev_pos_lod;
+				layout(location = INSTANCE5_ATTR) in vec4 i_prev_scale;
+				#ifdef COLOR0_ATTR
+					layout(location = COLOR0_ATTR) in vec4 a_color;
 					layout(location = 5) out vec4 v_color;
 				#endif
 			#elif defined GRASS
-				layout(location = 4) in vec4 i_pos_scale;
-				layout(location = 5) in vec4 i_rot;
-				#ifdef HAS_VERTEX_COLOR
-					layout(location = 6) in vec4 a_color;
+				layout(location = INSTANCE0_ATTR) in vec4 i_pos_scale;
+				layout(location = INSTANCE1_ATTR) in vec4 i_rot;
+				#ifdef COLOR0_ATTR
+					layout(location = COLOR0_ATTR) in vec4 a_color;
 					layout(location = 5) out vec4 v_color;
 				#endif
 				layout(location = 7) out float v_pos_y;
@@ -208,7 +204,7 @@ function surface_shader_ex(args)
 						v_lod = i_pos_lod.w;
 					#endif
 					v_wpos = vec4(i_pos_lod.xyz + rotateByQuat(i_rot, p), 1);
-					#ifdef HAS_VERTEX_COLOR
+					#ifdef COLOR0_ATTR
 						v_color = a_color;
 					#endif
 				#elif defined DYNAMIC
@@ -219,7 +215,7 @@ function surface_shader_ex(args)
 					#endif
 					v_wpos = vec4(i_pos_lod.xyz + rotateByQuat(i_rot, a_position * i_scale.xyz), 1);
 					v_prev_wpos = vec4(i_prev_pos_lod.xyz + rotateByQuat(i_prev_rot, a_position * i_prev_scale.xyz), 1);
-					#ifdef HAS_VERTEX_COLOR
+					#ifdef COLOR0_ATTR
 						v_color = a_color;
 					#endif
 				#elif defined GRASS
@@ -231,7 +227,7 @@ function surface_shader_ex(args)
 					#ifdef GRASS
 						v_wpos.xyz += Grass.u_grass_origin;
 					#endif
-					#ifdef HAS_VERTEX_COLOR
+					#ifdef COLOR0_ATTR
 						v_color = a_color;
 					#endif
 				#elif defined SKINNED
@@ -299,7 +295,7 @@ function surface_shader_ex(args)
 			#ifdef HAS_LOD
 				layout(location = 4) in float v_lod;
 			#endif
-			#ifdef HAS_VERTEX_COLOR
+			#ifdef COLOR0_ATTR
 				layout(location = 5) in vec4 v_color;
 			#endif
 			#ifdef HAS_AMBIENT_OCCLUSION_ATTRIBUTE
@@ -340,8 +336,7 @@ function surface_shader_ex(args)
 					prev_pos_projected /= prev_pos_projected.w;
 					data.motion = (prev_pos_projected.xy * 0.5 + 0.5 - (p.xy / p.w * 0.5 + 0.5)) * 0.5 + 0.5;
 				#else
-					vec4 pos_projected = Global.reprojection * p;
-					data.motion = (pos_projected.xy / pos_projected.w * 0.5 + 0.5 - (p.xy / p.w * 0.5 + 0.5)) * 0.5 + 0.5;
+					data.motion = computeStaticObjectMotionVector(v_wpos.xyz);
 				#endif
 				data.V = normalize(-data.wpos);
 			#endif

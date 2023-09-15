@@ -133,9 +133,8 @@ struct FrameData {
 	struct ShaderToCompile {
 		Shader* shader;
 		gpu::VertexDecl decl;
-		u32 defines;
 		gpu::ProgramHandle program;
-		gpu::StateFlags state;
+		ShaderKey key;
 	};
 
 	TransientBuffer<16> transient_buffer;
@@ -383,6 +382,7 @@ struct RendererImpl final : Renderer
 		, m_plugins(m_allocator)
 		, m_free_sort_keys(m_allocator)
 		, m_sort_key_to_mesh_map(m_allocator)
+		, m_semantic_defines(m_allocator)
 	{
 		RenderModule::reflect();
 
@@ -432,6 +432,49 @@ struct RendererImpl final : Renderer
 			gpu::shutdown();
 		}, &signal, 1);
 		jobs::wait(&signal);
+	}
+
+	static void add(String& res, const char* a, u32 b) {
+		char tmp[32];
+		toCString(b, Span(tmp));
+		res.append(a, tmp, "\n");
+	}
+
+	const char* getSemanticDefines(Span<const AttributeSemantic> attributes) override {
+		RuntimeHash hash(attributes.begin(), sizeof(attributes[0]) * attributes.length());
+		auto iter = m_semantic_defines.find(hash);
+		if (!iter.isValid()) {
+			String s(m_allocator);
+			u32 first_empty = attributes.length();
+			for (u32 i = 0; i < attributes.length(); ++i) {
+				switch (attributes[i]) {
+					case AttributeSemantic::COUNT: ASSERT(false); break;
+					case AttributeSemantic::NONE: first_empty = minimum(first_empty, i); break;
+					case AttributeSemantic::POSITION: break;
+					
+					case AttributeSemantic::NORMAL: add(s, "#define NORMAL_ATTR ", i); break;
+					case AttributeSemantic::TANGENT: add(s, "#define TANGENT_ATTR ", i); break;
+					case AttributeSemantic::BITANGENT: add(s, "#define BITANGENT_ATTR ", i); break;
+					case AttributeSemantic::COLOR0: add(s, "#define COLOR0_ATTR ", i); break;
+					case AttributeSemantic::COLOR1: add(s, "#define COLOR1_ATTR ", i); break;
+					case AttributeSemantic::INDICES: add(s, "#define INDICES_ATTR ", i); break;
+					case AttributeSemantic::WEIGHTS: add(s, "#define WEIGHTS_ATTR ", i); break;
+					case AttributeSemantic::TEXCOORD0: add(s, "#define UV0_ATTR ", i); break;
+					case AttributeSemantic::TEXCOORD1: add(s, "#define UV1_ATTR ", i); break;
+					case AttributeSemantic::AO: add(s, "#define AO_ATTR ", i); break;
+				}
+			}
+
+			add(s, "#define INSTANCE0_ATTR ", first_empty + 0);
+			add(s, "#define INSTANCE1_ATTR ", first_empty + 1);
+			add(s, "#define INSTANCE2_ATTR ", first_empty + 2);
+			add(s, "#define INSTANCE3_ATTR ", first_empty + 3);
+			add(s, "#define INSTANCE4_ATTR ", first_empty + 4);
+			add(s, "#define INSTANCE5_ATTR ", first_empty + 5);
+
+			iter = m_semantic_defines.insert(hash, static_cast<String&&>(s));
+		}
+		return iter.value().c_str();
 	}
 
 	static bool shouldLoadRenderdoc() {
@@ -761,18 +804,18 @@ struct RendererImpl final : Renderer
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 
-	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines) override {
+	gpu::ProgramHandle queueShaderCompile(Shader& shader, const ShaderKey& key, gpu::VertexDecl decl) override {
 		ASSERT(shader.isReady());
 		jobs::MutexGuard lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
-			if (i.shader == &shader && decl.hash == i.decl.hash && defines == i.defines && i.state == state) {
+			if (i.shader == &shader && key == i.key) {
 				return i.program;
 			}
 		}
 		gpu::ProgramHandle program = gpu::allocProgramHandle();
-		shader.compile(program, state, decl, defines, m_cpu_frame->begin_frame_draw_stream);
-		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, state});
+		shader.compile(program, key, decl, m_cpu_frame->begin_frame_draw_stream);
+		m_cpu_frame->to_compile_shaders.push({&shader, decl, program, key});
 		return program;
 	}
 
@@ -926,11 +969,7 @@ struct RendererImpl final : Renderer
 		}
 
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
-			Shader::ShaderKey key;
-			key.defines = i.defines;
-			key.decl_hash = i.decl.hash;
-			key.state = i.state;
-			i.shader->m_programs.push({key, i.program});
+			i.shader->m_programs.push({i.key, i.program});
 		}
 		m_cpu_frame->to_compile_shaders.clear();
 
@@ -972,7 +1011,7 @@ struct RendererImpl final : Renderer
 	u32 m_frame_number = 0;
 	float m_lod_multiplier = 1;
 	jobs::Signal m_init_signal;
-
+	HashMap<RuntimeHash, String> m_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];

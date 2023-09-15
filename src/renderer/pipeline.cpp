@@ -755,28 +755,28 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
 		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
 
-		m_base_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		m_base_vertex_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		m_base_vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+		m_base_vertex_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
-		m_base_line_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		m_base_line_vertex_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		m_base_line_vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+		m_base_line_vertex_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
-		m_decal_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		m_decal_decl.addAttribute(1, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(2, 12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(3, 28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(4, 40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+		m_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-		m_curve_decal_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		m_curve_decal_decl.addAttribute(1, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(2, 12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(3, 28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(4, 40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(5, 48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+		m_curve_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-		m_2D_decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
-		m_2D_decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
-		m_2D_decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		m_2D_decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
+		m_2D_decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
+		m_2D_decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 	}
 
 	~PipelineImpl()
@@ -1287,7 +1287,7 @@ struct PipelineImpl final : Pipeline
 			};
 			const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
-			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0);
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0, "");
 			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
 			const Renderer::TransientSlice ub = m_renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
@@ -1321,7 +1321,7 @@ struct PipelineImpl final : Pipeline
 			};
 			const Array<DebugLine>& lines = m_module->getDebugLines();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0);
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0, "");
 			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
 			const Renderer::TransientSlice ub = m_renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
@@ -1372,7 +1372,7 @@ struct PipelineImpl final : Pipeline
 		gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 		state = state | gpu::StateFlags::SCISSOR_TEST;
 		if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
-		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, m_2D_decl, 0);
+		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, m_2D_decl, 0, "");
 		const Renderer::TransientSlice ub = m_renderer.allocUniform(&matrix, sizeof(matrix));
 
 		stream.pushDebugGroup("draw2d");
@@ -1645,7 +1645,7 @@ struct PipelineImpl final : Pipeline
 				const Vec3 scale = terrain->getScale();
 				const Vec2 hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				const gpu::ProgramHandle program = shader->getProgram(render_state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask());
+				const gpu::ProgramHandle program = shader->getProgram(render_state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask(), "");
 				const Material* material = terrain->m_material;
 				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
@@ -1751,7 +1751,11 @@ struct PipelineImpl final : Pipeline
 		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
 		gpu::StateFlags render_state = state_handle.valid ? m_render_states[state_handle.value] : gpu::StateFlags::NONE;
 
-		m_renderer.pushJob("grass", [this, cp, define_mask, render_state](DrawStream& stream){
+		gpu::VertexDecl grass_instance_decl(gpu::PrimitiveType::NONE);
+		grass_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		grass_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+
+		m_renderer.pushJob("grass", [this, cp, define_mask, render_state, grass_instance_decl](DrawStream& stream){
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			const World& world = m_module->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
@@ -1773,6 +1777,8 @@ struct PipelineImpl final : Pipeline
 
 					const i32 to_mesh = type.m_grass_model->getLODIndices()[0].to;
 					const HashMap<u64, Terrain::GrassQuad>& quads = type.m_quads;
+					if (quads.empty()) continue;
+
 					for (i32 i = 0; i <= to_mesh; ++i) {
 						const Mesh& mesh = type.m_grass_model->getMesh(i);
 
@@ -1782,7 +1788,8 @@ struct PipelineImpl final : Pipeline
 						const Material* material = mesh.material;
 						gpu::StateFlags state = render_state | material->m_render_states;
 
-						stream.useProgram(shader->getProgram(state, mesh.vertex_decl, define_mask | material->getDefineMask()));
+						gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, grass_instance_decl, define_mask | material->getDefineMask(), mesh.semantics_defines);
+						stream.useProgram(program);
 						stream.bind(0, material->m_bind_group);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
 						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
@@ -2115,7 +2122,7 @@ struct PipelineImpl final : Pipeline
 	
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.bindTextures(textures_handles.begin(), 0, textures_handles.size());
-		const gpu::ProgramHandle program = shader->getProgram(rs, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask);
+		const gpu::ProgramHandle program = shader->getProgram(rs, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask, "");
 		stream.useProgram(program);
 		stream.bindIndexBuffer(gpu::INVALID_BUFFER);
 		stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2282,7 +2289,7 @@ struct PipelineImpl final : Pipeline
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			const gpu::StateFlags state = pg.material->m_render_states | render_state;
-			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, pg.vertex_decl, bucket.define_mask | pg.material->getDefineMask());
+			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, pg.vertex_decl, bucket.define_mask | pg.material->getDefineMask(), "");
 
 			const u32 stride = pg.vertex_decl.getStride();
 			
@@ -2485,7 +2492,7 @@ struct PipelineImpl final : Pipeline
 				Shader* shader = mesh.material->getShader();
 				const Material* material = mesh.material;
 				const gpu::StateFlags state = material->m_render_states | bucket.state;
-				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask(), mesh.semantics_defines);
 
 				bucket.stream.useProgram(program);
 				bucket.stream.bind(0, material->m_bind_group);
@@ -2628,6 +2635,19 @@ struct PipelineImpl final : Pipeline
 		DrawStream* stream = nullptr;
 		gpu::StateFlags render_state;
 
+		gpu::VertexDecl dyn_instance_decl(gpu::PrimitiveType::NONE);
+		dyn_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(80, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+
+		gpu::VertexDecl instanced_decl(gpu::PrimitiveType::NONE);
+		instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		instanced_decl.addAttribute(32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+
 		for (u32 i = 0; i < keys_count; ++i) {
 			const EntityRef entity = {int(renderables[i] & 0xFFffFFff)};
 			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
@@ -2658,7 +2678,7 @@ struct PipelineImpl final : Pipeline
 					const Vec3 lpos = Vec3(tr.pos - camera_pos);
 					const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 					const gpu::StateFlags state = material->m_render_states | render_state;
-					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask());
+					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask(), "");
 					const Renderer::TransientSlice slice = emitter.slice;
 					const Matrix mtx(lpos, tr.rot);
 
@@ -2696,7 +2716,7 @@ struct PipelineImpl final : Pipeline
 						const Material* material =  mi->custom_material;
 
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, autoinstanced_define_mask | material->getDefineMask());
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, autoinstanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
 						stream->useProgram(program);
 						stream->bind(0, material->m_bind_group);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
@@ -2718,7 +2738,7 @@ struct PipelineImpl final : Pipeline
 						Shader* shader = material->getShader();
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
 						
 						stream->useProgram(program);
 						stream->bind(0, material->m_bind_group);
@@ -2737,6 +2757,7 @@ struct PipelineImpl final : Pipeline
 						const gpu::StateFlags state = material->m_render_states | render_state;
 
 						if (mi->flags & ModelInstance::MOVED) {
+							// we could merge drawcalls here, same as we do for transparent meshes in next `else`
 							const Renderer::TransientSlice slice = m_renderer.allocTransient((sizeof(Vec4) * 6));
 							u8* instance_data = slice.ptr;
 							const EntityRef e = { i32(renderables[i] & 0xFFffFFff) };
@@ -2766,7 +2787,7 @@ struct PipelineImpl final : Pipeline
 							instance_data += sizeof(prev_tr.scale) + sizeof(float)/*padding*/;
 
 							const u32 defines = dynamic_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.dyn_vertex_decl, defines);
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
 						
 							stream->useProgram(program);
 							stream->bind(0, material->m_bind_group);
@@ -2800,7 +2821,7 @@ struct PipelineImpl final : Pipeline
 							}
 
 							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
 						
 							stream->useProgram(program);
 							stream->bind(0, material->m_bind_group);
@@ -2866,7 +2887,7 @@ struct PipelineImpl final : Pipeline
 					const Material* material = mesh.material;
 					stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 					const gpu::StateFlags state = material->m_render_states | render_state;
-					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines);
+					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines, mesh.semantics_defines);
 					stream->useProgram(program);
 					stream->bind(0, material->m_bind_group);
 					stream->bindIndexBuffer(mesh.index_buffer_handle);
@@ -2918,7 +2939,7 @@ struct PipelineImpl final : Pipeline
 					state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 					if (nonintersecting_count) {
-						stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask()));
+						stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
 						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
 						stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 					}
@@ -2927,7 +2948,7 @@ struct PipelineImpl final : Pipeline
 						state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 						state = state & ~gpu::StateFlags::CULL_BACK;
 						state = state | gpu::StateFlags::CULL_FRONT;
-						stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask()));
+						stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
 						const u32 offs = slice.offset + sizeof(float) * 12 * nonintersecting_count;
 						stream->bindVertexBuffer(1, slice.buffer, offs, 48);
 						stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
@@ -2980,7 +3001,7 @@ struct PipelineImpl final : Pipeline
 					state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 					if (nonintersecting_count) {
-						stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask()));
+						stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
 						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 64);
 						stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 					}
@@ -2989,7 +3010,7 @@ struct PipelineImpl final : Pipeline
 						state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 						state = state & ~gpu::StateFlags::CULL_BACK;
 						state = state | gpu::StateFlags::CULL_FRONT;
-						stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask()));
+						stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
 						const u32 offs = slice.offset + sizeof(float) * 16 * nonintersecting_count;
 						stream->bindVertexBuffer(1, slice.buffer, offs, 64);
 						stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
@@ -3577,6 +3598,9 @@ struct PipelineImpl final : Pipeline
 									ASSERT(!mi.custom_material);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
 									if (mi.flags & ModelInstance::MOVED && !is_shadow) {
+										// moved and unmoved meshes can't be drawn in single drawcall as they need different instance data
+										// but autoinstancer groups all instances of a mesh in single drawcall
+										// so we don't autoinstance moved meshes, only unmoved
 										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
 										inserter.push(key, subrenderable);
 									}

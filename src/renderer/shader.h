@@ -19,6 +19,13 @@ struct DrawStream;
 struct Renderer;
 struct Texture;
 
+struct ShaderKey {
+	bool operator==(const ShaderKey& rhs) const;
+	gpu::StateFlags state;
+	u32 defines;
+	u32 decl_hash; // this does not need to match gpu::VertexDecl::hash
+	const char* semantic_defines;
+};
 
 struct LUMIX_RENDERER_API Shader final : Resource {
 	struct TextureSlot
@@ -100,17 +107,11 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 	bool hasDefine(u8 define) const;
 	
 	gpu::ProgramHandle getProgram(u32 defines);
-	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines);
-	void compile(gpu::ProgramHandle program, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines, DrawStream& stream);
+	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines, const char* attr_defines);
+	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, const gpu::VertexDecl& decl2, u32 defines, const char* attr_defines);
+	void compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::VertexDecl decl, DrawStream& stream);
 	static void toUniformVarName(Span<char> out, const char* in);
 	static void toTextureVarName(Span<char> out, const char* in);
-
-	struct ShaderKey {
-		bool operator==(const ShaderKey& rhs) const;
-		gpu::StateFlags state;
-		u32 defines;
-		u32 decl_hash;
-	};
 
 	TagAllocator m_allocator;
 	Renderer& m_renderer;
@@ -135,7 +136,7 @@ private:
 };
 
 template<>
-struct HashFunc<Shader::ShaderKey> {
+struct HashFunc<ShaderKey> {
 	static u32 mix(u32 a, u32 b) {
 		b *= 0x5bd1e995;
 		b ^= b >> 24;
@@ -143,7 +144,7 @@ struct HashFunc<Shader::ShaderKey> {
 		return a * 0x5bd1e995;
 	}
 
-	static u32 get(const Shader::ShaderKey& key) {
+	static u32 get(const ShaderKey& key) {
 		return mix(HashFunc<u64>::get(((u64*)&key)[0]), HashFunc<u64>::get(((u64*)&key)[1]));
 	}
 };

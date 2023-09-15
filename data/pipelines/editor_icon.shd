@@ -12,13 +12,13 @@ vertex_shader [[
 		mat4 u_model;
 	};
 	layout(location = 0) in vec3 a_position;
-	#ifdef _HAS_ATTR1
-		layout(location = 1) in vec2 a_uv;
+	#ifdef UV0_ATTR
+		layout(location = UV0_ATTR) in vec2 a_uv;
 	#else
 		const vec2 a_uv = vec2(0, 0);
 	#endif
-	#ifdef _HAS_ATTR2
-		layout(location = 2) in vec3 a_normal;
+	#ifdef NORMAL_ATTR
+		layout(location = NORMAL_ATTR) in vec3 a_normal;
 	#else
 		const vec3 a_normal = vec3(0, 1, 0);
 	#endif

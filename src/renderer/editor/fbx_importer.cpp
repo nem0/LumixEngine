@@ -1156,7 +1156,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 					Shader* shader = mesh.material->getShader();
 					const Material* material = mesh.material;
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
-					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask());
+					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask(), mesh.semantics_defines);
 
 					stream.bind(0, material->m_bind_group);
 					stream.useProgram(program);
@@ -2163,11 +2163,11 @@ void FBXImporter::writeImpostorMesh(StringView dir, StringView model_name)
 	const i32 attribute_count = 2;
 	write(attribute_count);
 
-	write(Mesh::AttributeSemantic::POSITION);
+	write(AttributeSemantic::POSITION);
 	write(gpu::AttributeType::FLOAT);
 	write((u8)3);
 
-	write(Mesh::AttributeSemantic::TEXCOORD0);
+	write(AttributeSemantic::TEXCOORD0);
 	write(gpu::AttributeType::FLOAT);
 	write((u8)2);
 
@@ -2210,46 +2210,46 @@ void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig&
 		i32 attribute_count = getAttributeCount(import_mesh, cfg);
 		write(attribute_count);
 
-		write(Mesh::AttributeSemantic::POSITION);
+		write(AttributeSemantic::POSITION);
 		write(gpu::AttributeType::FLOAT);
 		write((u8)3);
-		write(Mesh::AttributeSemantic::NORMAL);
+		write(AttributeSemantic::NORMAL);
 		write(gpu::AttributeType::I8);
 		write((u8)4);
 
 		if (geom.getUVs().values) {
-			write(Mesh::AttributeSemantic::TEXCOORD0);
+			write(AttributeSemantic::TEXCOORD0);
 			write(gpu::AttributeType::FLOAT);
 			write((u8)2);
 		}
 		if (cfg.bake_vertex_ao) {
-			write(Mesh::AttributeSemantic::AO);
+			write(AttributeSemantic::AO);
 			write(gpu::AttributeType::U8);
 			write((u8)4); // 1+3 because of padding
 		}
 		if (geom.getColors().values && cfg.import_vertex_colors) {
 			if (cfg.vertex_color_is_ao) {
-				write(Mesh::AttributeSemantic::AO);
+				write(AttributeSemantic::AO);
 				write(gpu::AttributeType::U8);
 				write((u8)4); // 1+3 because of padding
 			}
 			else {
-				write(Mesh::AttributeSemantic::COLOR0);
+				write(AttributeSemantic::COLOR0);
 				write(gpu::AttributeType::U8);
 				write((u8)4);
 			}
 		}
 		if (hasTangents(mesh)) {
-			write(Mesh::AttributeSemantic::TANGENT);
+			write(AttributeSemantic::TANGENT);
 			write(gpu::AttributeType::I8);
 			write((u8)4);
 		}
 
 		if (import_mesh.is_skinned) {
-			write(Mesh::AttributeSemantic::INDICES);
+			write(AttributeSemantic::INDICES);
 			write(gpu::AttributeType::I16);
 			write((u8)4);
-			write(Mesh::AttributeSemantic::WEIGHTS);
+			write(AttributeSemantic::WEIGHTS);
 			write(gpu::AttributeType::FLOAT);
 			write((u8)4);
 		}

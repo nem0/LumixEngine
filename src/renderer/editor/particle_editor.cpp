@@ -616,30 +616,28 @@ struct ParticleEmitterEditorResource {
 	}
 	
 	void fillVertexDecl(gpu::VertexDecl& decl, Array<String>* attribute_names, IAllocator& allocator) const {
-		u32 idx = 0;
 		u32 offset = 0;
 		for (const ParticleEmitterEditorResource::Output& o : m_outputs) {
 			switch(o.type) {
 				case ValueType::FLOAT: {
 					if (attribute_names) attribute_names->emplace(o.name, allocator);
-					decl.addAttribute(idx, offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(float);
 					break;
 				}
 				case ValueType::VEC3: {
 					if (attribute_names) attribute_names->emplace(o.name, allocator);
-					decl.addAttribute(idx, offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					decl.addAttribute(offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec3);
 					break;
 				}
 				case ValueType::VEC4: {
 					if (attribute_names) attribute_names->emplace(o.name, allocator);
-					decl.addAttribute(idx, offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					decl.addAttribute(offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec4);
 					break;
 				}
 			}
-			++idx;
 		}
 	}
 

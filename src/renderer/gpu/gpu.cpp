@@ -38,7 +38,7 @@ VertexDecl::VertexDecl(PrimitiveType pt) {
 	hash = RuntimeHash32(attributes, sizeof(Attribute) * attributes_count).getHashValue() ^ static_cast<u8>(primitive_type);
 }
 
-void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags)
+void VertexDecl::addAttribute(u8 byte_offset, u8 components_num, AttributeType type, u8 flags)
 {
 	if(attributes_count >= lengthOf(attributes)) {
 		ASSERT(false);
@@ -47,7 +47,6 @@ void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, Attribu
 
 	Attribute& attr = attributes[attributes_count];
 	attr.components_count = components_num;
-	attr.idx = idx;
 	attr.flags = flags;
 	attr.type = type;
 	attr.byte_offset = byte_offset;

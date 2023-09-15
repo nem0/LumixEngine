@@ -589,6 +589,12 @@ float rand(vec3 seed)
 	return fract(sin(dot_product) * 43758.5453);
 }
 
+vec2 computeStaticObjectMotionVector(vec3 wpos) {
+	vec4 p = Global.view_projection_no_jitter * vec4(wpos, 1);
+	vec4 pos_projected = Global.reprojection * p;
+	return (pos_projected.xy / pos_projected.w * 0.5 + 0.5 - (p.xy / p.w * 0.5 + 0.5)) * 0.5 + 0.5;
+}
+
 vec2 cameraReproject(vec2 uv, float depth) {
 	vec4 v = (Global.reprojection * vec4(uv * 2 - 1, depth, 1));
 	vec2 res = (v.xy / v.w) * 0.5 + 0.5;

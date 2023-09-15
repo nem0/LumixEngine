@@ -499,14 +499,14 @@ static void setVAO(const VertexDecl& decl) {
 		const bool normalized = attr.flags & Attribute::NORMALIZED;
 		if (attr.flags & Attribute::AS_INT) {
 			ASSERT(!normalized);
-			glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset);
+			glVertexAttribIFormat(i, attr.components_count, gl_attr_type, attr.byte_offset);
 		}
 		else {
-			glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset);
+			glVertexAttribFormat(i, attr.components_count, gl_attr_type, normalized, attr.byte_offset);
 		}
-		glEnableVertexAttribArray(attr.idx);
-		mask |= 1 << attr.idx;
-		glVertexAttribBinding(attr.idx, instanced ? 1 : 0);
+		glEnableVertexAttribArray(i);
+		mask |= 1 << i;
+		glVertexAttribBinding(i, instanced ? 1 : 0);
 	}
 
 	for (u32 i = 0; i < 16; ++i) {
@@ -1356,7 +1356,7 @@ void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl,
 		}
 		++src_idx;
 		for (u32 j = 0; j < decl.attributes_count; ++j) {
-			combined_srcs[src_idx] = attr_defines[decl.attributes[j].idx];
+			combined_srcs[src_idx] = attr_defines[j];
 			++src_idx;
 		}
 		const GLuint shd = glCreateShader(shader_type);
