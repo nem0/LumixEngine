@@ -814,11 +814,12 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			return true;
 		}
 
-		void saveUndo(bool changed) {
+		bool saveUndo(bool changed) {
 			if (changed) {
 				m_dirty = true;
 				pushUndo(ImGui::GetItemID());
 			}
+			return changed;
 		}
 
 		void windowGUI() override {
@@ -916,30 +917,32 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 					ImGui::PushID(&shader_uniform);
 					ImGuiEx::Label(shader_uniform.name);
+					bool uniform_changed = false;
 					switch (shader_uniform.type) {
 						case Shader::Uniform::FLOAT:
-							saveUndo(ImGui::DragFloat("##f", &uniform->float_value));
+							uniform_changed = saveUndo(ImGui::DragFloat("##f", &uniform->float_value));
 							break;
 						case Shader::Uniform::NORMALIZED_FLOAT:
-							saveUndo(ImGui::DragFloat("##nf", &uniform->float_value, 0.01f, 0.f, 1.f));
+							uniform_changed = saveUndo(ImGui::DragFloat("##nf", &uniform->float_value, 0.01f, 0.f, 1.f));
 							break;
 						case Shader::Uniform::INT:
-							saveUndo(ImGui::DragInt("##i", &uniform->int_value));
+							uniform_changed = saveUndo(ImGui::DragInt("##i", &uniform->int_value));
 							break;
 						case Shader::Uniform::VEC3:
-							saveUndo(ImGui::DragFloat3("##v3", uniform->vec3));
+							uniform_changed = saveUndo(ImGui::DragFloat3("##v3", uniform->vec3));
 							break;
 						case Shader::Uniform::VEC4:
-							saveUndo(ImGui::DragFloat4("##v4", uniform->vec4));
+							uniform_changed = saveUndo(ImGui::DragFloat4("##v4", uniform->vec4));
 							break;
 						case Shader::Uniform::VEC2:
-							saveUndo(ImGui::DragFloat2("##v2", uniform->vec2));
+							uniform_changed = saveUndo(ImGui::DragFloat2("##v2", uniform->vec2));
 							break;
 						case Shader::Uniform::COLOR:
-							saveUndo(ImGui::ColorEdit4("##c", uniform->vec4));
+							uniform_changed = saveUndo(ImGui::ColorEdit4("##c", uniform->vec4));
 							break;
 						default: ASSERT(false); break;
 					}
+					if (uniform_changed) m_resource->updateRenderData(false);
 					ImGui::PopID();
 				}
 			}
