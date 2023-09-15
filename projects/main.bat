@@ -76,6 +76,9 @@ goto :plugins
 	pushd ..\plugins
 	if not exist dx (
 		git.exe clone https://github.com/nem0/lumixengine_dx.git dx
+		pushd dx
+		git remote add origin2 git@github.com:nem0/lumixengine_dx.git
+		popd
 	) else (
 		cd dx
 		git pull
@@ -88,6 +91,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist gltf_import (
 		git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
+		pushd gltf_import
+		git remote add origin2 git@github.com:nem0/lumixengine_gltf.git
+		popd
 	) else (
 		cd gltf_import
 		git pull
@@ -100,6 +106,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist rml (
 		git.exe clone https://github.com/nem0/lumixengine_rml.git rml
+		pushd rml
+		git remote add origin2 git@github.com:nem0/lumixengine_rml.git
+		popd
 	) else (
 		cd rml
 		git pull
@@ -112,6 +121,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist net (
 		git.exe clone https://github.com/nem0/lumixengine_net.git net
+		pushd net
+		git remote add origin2 git@github.com:nem0/lumixengine_net.git
+		popd
 	) else (
 		cd net
 		git pull
@@ -124,6 +136,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist js (
 		git.exe clone https://github.com/nem0/lumixengine_js.git js
+		pushd js
+		git remote add origin2 git@github.com:nem0/lumixengine_js.git
+		popd
 	) else (
 		cd js
 		git pull
@@ -136,6 +151,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist csharp (
 		git.exe clone https://github.com/nem0/lumixengine_csharp.git csharp
+		pushd csharp
+		git remote add origin2 git@github.com:nem0/lumixengine_csharp.git
+		popd
 	) else (
 		cd csharp
 		git pull
@@ -148,6 +166,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist visualscript (
 		git.exe clone https://github.com/nem0/lumixengine_visualscript.git visualscript
+		pushd visualscript
+		git remote add origin2 git@github.com:nem0/lumixengine_visualscript.git
+		popd
 	) else (
 		cd visualscript
 		git pull
@@ -160,6 +181,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist shader_editor (
 		git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+		pushd shader_editor
+		git remote add origin2 git@github.com:nem0/lumixengine_shader_editor.git
+		popd
 	) else (
 		cd shader_editor
 		git pull
@@ -172,6 +196,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist maps (
 		git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+		pushd maps
+		git remote add origin2 git@github.com:nem0/lumixengine_maps.git
+		popd
 	) else (
 		cd maps
 		git pull
@@ -184,6 +211,9 @@ exit /B 0
 	pushd ..\plugins
 	if not exist procedural_geom (
 		git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+		pushd procedural_geom
+		git remote add origin2 git@github.com:nem0/lumixengine_procedural_geom.git
+		popd
 	) else (
 		cd procedural_geom
 		git pull
