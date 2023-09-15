@@ -44,24 +44,22 @@ Mesh::Mesh(Material* mat,
 	, vertices(allocator)
 	, skin(allocator)
 	, vertex_decl(vertex_decl)
-	, dyn_vertex_decl(vertex_decl)
 	, renderer(renderer)
 	, vb_stride(vb_stride)
 	, vertex_buffer_handle(gpu::INVALID_BUFFER)
 	, index_buffer_handle(gpu::INVALID_BUFFER)
 	, index_type(gpu::DataType::U32)
 {
-	dyn_vertex_decl.addAttribute(7, 48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-	dyn_vertex_decl.addAttribute(8, 64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-	dyn_vertex_decl.addAttribute(9, 80, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
-	if(semantics) {
+	if (semantics) {
 		for(u32 i = 0; i < vertex_decl.attributes_count; ++i) {
 			attributes_semantic[i] = semantics[i];
 		}
 	}
+	
+	semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic));
 
 	sort_key = renderer.allocSortKey(this);
 }
@@ -77,7 +75,6 @@ Mesh::Mesh(Mesh&& rhs)
 	, name(rhs.name)
 	, material(rhs.material)
 	, vertex_decl(rhs.vertex_decl)
-	, dyn_vertex_decl(rhs.dyn_vertex_decl)
 	, lod(rhs.lod)
 	, renderer(rhs.renderer)
 {
@@ -88,9 +85,9 @@ Mesh::~Mesh() {
 	renderer.freeSortKey(sort_key);
 }
 
-static bool hasAttribute(Mesh& mesh, Mesh::AttributeSemantic attribute)
+static bool hasAttribute(Mesh& mesh, AttributeSemantic attribute)
 {
-	for(const Mesh::AttributeSemantic& attr : mesh.attributes_semantic) {
+	for(const AttributeSemantic& attr : mesh.attributes_semantic) {
 		if(attr == attribute) return true;
 	}
 	return false;
@@ -290,22 +287,7 @@ void Model::getPose(Pose& pose)
 }
 
 
-static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
-	switch (semantic) {
-		case Mesh::AttributeSemantic::POSITION: return 0;
-		case Mesh::AttributeSemantic::TEXCOORD0: return 1;
-		case Mesh::AttributeSemantic::NORMAL: return 2;
-		case Mesh::AttributeSemantic::TANGENT: return 3;
-		case Mesh::AttributeSemantic::INDICES: return 4;
-		case Mesh::AttributeSemantic::WEIGHTS: return 5;
-		case Mesh::AttributeSemantic::COLOR0: return 6;
-		case Mesh::AttributeSemantic::AO: return 7;
-		default: ASSERT(false); return 0;
-	}
-}
-
-
-static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics, u32& vb_stride)
+static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, AttributeSemantic* semantics, u32& vb_stride)
 {
 	u32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
@@ -320,30 +302,28 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Me
 		file.read(type);
 		file.read(cmp_count);
 
-		const u8 idx = getIndexBySemantic(semantics[i]);
-
 		switch(semantics[i]) {
-			case Mesh::AttributeSemantic::WEIGHTS:
-			case Mesh::AttributeSemantic::POSITION:
-			case Mesh::AttributeSemantic::TEXCOORD0:
-				vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
+			case AttributeSemantic::WEIGHTS:
+			case AttributeSemantic::POSITION:
+			case AttributeSemantic::TEXCOORD0:
+				vertex_decl->addAttribute(offset, cmp_count, type, 0);
 				break;
-			case Mesh::AttributeSemantic::AO:
-			case Mesh::AttributeSemantic::COLOR0:
-				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);
+			case AttributeSemantic::AO:
+			case AttributeSemantic::COLOR0:
+				vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
 				break;
-			case Mesh::AttributeSemantic::NORMAL:
-			case Mesh::AttributeSemantic::TANGENT:
+			case AttributeSemantic::NORMAL:
+			case AttributeSemantic::TANGENT:
 				if (type == gpu::AttributeType::FLOAT) {
-					vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
+					vertex_decl->addAttribute(offset, cmp_count, type, 0);
 				}
 				else {
-					vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);
+					vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
 				}
 				break;
-			case Mesh::AttributeSemantic::INDICES:
+			case AttributeSemantic::INDICES:
 				is_skinned = true;
-				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::AS_INT);
+				vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::AS_INT);
 				break;
 			default: ASSERT(false); break;
 		}
@@ -351,12 +331,6 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Me
 		offset += gpu::getSize(type) * cmp_count;
 	}
 	vb_stride = offset;
-
-	if (!is_skinned) {
-		vertex_decl->addAttribute(4, 0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		vertex_decl->addAttribute(5, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		vertex_decl->addAttribute(6, 32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-	}
 
 	return true;
 }
@@ -454,7 +428,7 @@ int Model::getBoneIdx(const char* name)
 }
 
 
-static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
+static int getAttributeOffset(Mesh& mesh, AttributeSemantic attr)
 {
 	for (u32 i = 0; i < lengthOf(mesh.attributes_semantic); ++i) {
 		if(mesh.attributes_semantic[i] == attr) {
@@ -475,8 +449,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	for (int i = 0; i < object_count; ++i)
 	{
 		gpu::VertexDecl vertex_decl(gpu::PrimitiveType::TRIANGLES);
-		Mesh::AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
-		for(auto& sem : semantics) sem = Mesh::AttributeSemantic::NONE;
+		AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
+		for(auto& sem : semantics) sem = AttributeSemantic::NONE;
 		u32 vb_stride;
 		if (!parseVertexDecl(file, &vertex_decl, semantics, vb_stride)) return false;
 
@@ -525,10 +499,10 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		Renderer::MemRef vertices_mem = m_renderer.allocate(data_size);
 		file.read(vertices_mem.data, data_size);
 
-		int position_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::POSITION);
-		int weights_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::WEIGHTS);
-		int bone_indices_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::INDICES);
-		bool keep_skin = hasAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS) && hasAttribute(mesh, Mesh::AttributeSemantic::INDICES);
+		int position_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::POSITION);
+		int weights_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::WEIGHTS);
+		int bone_indices_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::INDICES);
+		bool keep_skin = hasAttribute(mesh, AttributeSemantic::WEIGHTS) && hasAttribute(mesh, AttributeSemantic::INDICES);
 
 		int vertex_size = mesh.vb_stride;
 		int mesh_vertex_count = data_size / vertex_size;

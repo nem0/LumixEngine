@@ -13,6 +13,8 @@
 
 namespace Lumix {
 
+enum class AttributeSemantic : u8;
+
 struct RenderPlugin {
 	virtual void renderUI(struct Pipeline& pipeline) {}
 	virtual void renderOpaque(Pipeline& pipeline) {}
@@ -67,6 +69,8 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual u32 getMaxSortKey() const = 0;
 	virtual const Mesh** getSortKeyToMeshMap() const = 0;
 	
+	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes) = 0;
+
 	virtual struct FontManager& getFontManager() = 0;
 	virtual struct ResourceManager& getTextureManager() = 0;
 	
@@ -81,7 +85,7 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) = 0;
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
 
-	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, gpu::StateFlags state, gpu::VertexDecl decl, u32 defines) = 0;
+	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, const struct ShaderKey& key, gpu::VertexDecl decl) = 0;
 	virtual DrawStream& getDrawStream() = 0;
 	virtual DrawStream& getEndFrameDrawStream() = 0;
 

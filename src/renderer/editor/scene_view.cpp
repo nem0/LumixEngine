@@ -834,7 +834,7 @@ void SceneView::renderIcons() {
 				const Material* material = mesh.material;
 				stream.bind(0, material->m_bind_group);
 				const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask());
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
 				
 				stream.useProgram(program);
 				stream.bindIndexBuffer(mesh.index_buffer_handle);
@@ -910,7 +910,7 @@ void SceneView::renderSelection()
 				}
 		
 				const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask);
+				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				stream.bind(0, material->m_bind_group);
 				stream.useProgram(program);
@@ -938,16 +938,16 @@ void SceneView::renderGizmos()
 		const Renderer::TransientSlice ub = renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
 		gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
-		lines_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		lines_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		lines_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+		lines_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
 		gpu::VertexDecl tris_decl(gpu::PrimitiveType::TRIANGLES);
-		tris_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		tris_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		tris_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+		tris_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
 		const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-		gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0);
-		gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0);
+		gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0, "");
+		gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0, "");
 	
 		u32 offset = 0;
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);

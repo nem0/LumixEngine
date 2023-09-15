@@ -3470,7 +3470,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void update() override
 	{
 		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
-			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0);
+			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0, "");
 		}
 
 		if (m_done_counter != m_probe_counter) {
@@ -4852,9 +4852,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				const char* srcs[] = {vs, fs};
 				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
 				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-				decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				const gpu::StateFlags state = gpu::StateFlags::SCISSOR_TEST | blend_state;
 				stream.createProgram(program, state, decl, srcs, types, 2, nullptr, 0, "imgui shader");
@@ -4985,7 +4985,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 		}
 
 		file << R"#(
-			shader "pipelines/terrain.shd"
+			shader "/pipelines/terrain.shd"
 			texture ")#";
 		file << info.basename;
 		file << R"#(.raw"

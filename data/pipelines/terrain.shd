@@ -62,6 +62,7 @@ vertex_shader [[
 	#ifndef DEPTH
 		layout (location = 0) out vec2 v_uv;
 	 	layout (location = 1) out float v_dist2;
+		layout (location = 2) out vec3 v_wpos;
 	#endif
 
 	void main() {
@@ -89,7 +90,11 @@ vertex_shader [[
 			float h = texture(u_hm, hm_uv).x * u_terrain_scale.y;
 		#endif
 
-		vec4 p = Pass.view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		vec3 wpos = u_position.xyz + v + vec3(0, h, 0);		
+		#ifndef DEPTH
+			v_wpos = wpos;
+		#endif
+		vec4 p = Pass.view * vec4(wpos, 1);
 		#ifndef DEPTH
  			v_dist2 = dot(p.xyz, p.xyz);
 		#endif
@@ -111,6 +116,7 @@ fragment_shader [[
 	#ifndef DEPTH
 		layout (location = 0) in vec2 v_uv;
 		layout (location = 1) in float v_dist2;
+		layout (location = 2) in vec3 v_wpos;
 
 		float rgbSum(vec4 v) { return dot(v, vec4(1, 1, 1, 0)); }
 
@@ -231,6 +237,11 @@ fragment_shader [[
 				surface.albedo *= saturate(0.5 + texture(t_noise, v_uv * 10, -2).r * texture(t_noise, v_uv*29, -2).r * 0.5);
 				surface.alpha = 1;
 			}
+
+			#ifndef DEPTH
+				surface.motion = computeStaticObjectMotionVector(v_wpos);
+			#endif
+
 			surface.wpos = vec3(0);
 			surface.roughness = u_roughness;
 			surface.metallic  = u_metallic;

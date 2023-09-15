@@ -25,6 +25,23 @@ struct Pose;
 struct Renderer;
 template <typename T> struct Delegate;
 
+enum class AttributeSemantic : u8 {
+	POSITION,
+	NORMAL,
+	TANGENT,
+	BITANGENT,
+	COLOR0,
+	COLOR1,
+	INDICES,
+	WEIGHTS,
+	TEXCOORD0,
+	TEXCOORD1,
+	AO,
+
+	COUNT,
+
+	NONE = 0xff
+};
 
 struct LUMIX_RENDERER_API RayCastModelHit {
 	bool is_hit;
@@ -40,28 +57,6 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 
 
 struct LUMIX_RENDERER_API Mesh {
-	enum class AttributeSemantic : u8 {
-		POSITION,
-		NORMAL,
-		TANGENT,
-		BITANGENT,
-		COLOR0,
-		COLOR1,
-		INDICES,
-		WEIGHTS,
-		TEXCOORD0,
-		TEXCOORD1,
-		AO,
-
-		INSTANCE0,
-		INSTANCE1,
-		INSTANCE2,
-
-		COUNT,
-
-		NONE = 0xff
-	};
-
 	struct Skin {
 		Vec4 weights;
 		i16 indices[4];
@@ -104,8 +99,8 @@ struct LUMIX_RENDERER_API Mesh {
 	String name;
 	Material* material;
 	gpu::VertexDecl vertex_decl;
-	gpu::VertexDecl dyn_vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
+	const char* semantics_defines = "";
 	Renderer& renderer;
 	float lod = 0;
 

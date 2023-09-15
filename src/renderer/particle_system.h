@@ -27,6 +27,7 @@ struct ParticleSystemResource final : Resource {
 		MULTIEMITTER,
 		EMIT,
 		FLAGS,
+		NEW_VERTEX_DECL,
 
 		LAST
 	};

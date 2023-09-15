@@ -199,7 +199,6 @@ struct Attribute {
 		AS_INT = 1 << 1,
 		INSTANCED = 1 << 2
 	};
-	u8 idx;
 	u8 components_count;
 	u8 byte_offset;
 	AttributeType type;
@@ -211,7 +210,7 @@ struct VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
 	VertexDecl(PrimitiveType pt);
-	void addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags);
+	void addAttribute(u8 byte_offset, u8 components_num, AttributeType type, u8 flags);
 	u32 getStride() const;
 	void computeHash();
 	void setPrimitiveType(PrimitiveType type);

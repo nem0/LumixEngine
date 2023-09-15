@@ -54,16 +54,11 @@ bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }
 
-bool Shader::ShaderKey::operator==(const ShaderKey& rhs) const {
+bool ShaderKey::operator==(const ShaderKey& rhs) const {
 	return memcmp(this, &rhs, sizeof(rhs)) == 0;
 }
 
-void Shader::compile(gpu::ProgramHandle program
-	, gpu::StateFlags state
-	, gpu::VertexDecl decl
-	, u32 defines
-	, DrawStream& stream
-) {
+void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::VertexDecl decl, DrawStream& stream) {
 	PROFILE_BLOCK("compile_shader");
 
 	const char* codes[64];
@@ -73,44 +68,74 @@ void Shader::compile(gpu::ProgramHandle program
 		codes[i] = &m_sources.stages[i].code[0];
 		types[i] = m_sources.stages[i].type;
 	}
-	const char* prefixes[35];
+	const char* prefixes[36];
 	StaticString<128> defines_code[32];
 	int defines_count = 0;
-	if (defines != 0) {
-		for(int i = 0; i < sizeof(defines) * 8; ++i) {
-			if((defines & (1 << i)) == 0) continue;
+	prefixes[0] = key.semantic_defines ? key.semantic_defines : "";
+	if (key.defines != 0) {
+		for(int i = 0; i < sizeof(key.defines) * 8; ++i) {
+			if((key.defines & (1 << i)) == 0) continue;
 			defines_code[defines_count].append("#define ", m_renderer.getShaderDefine(i), "\n");
-			prefixes[defines_count] = defines_code[defines_count];
+			prefixes[defines_count + 1] = defines_code[defines_count];
 			++defines_count;
 		}
 	}
-	prefixes[defines_count] = m_sources.common.length() == 0 ? "" : m_sources.common.c_str();
+	prefixes[defines_count + 1] = m_sources.common.length() == 0 ? "" : m_sources.common.c_str();
 
-	stream.createProgram(program, state, decl, codes, types, m_sources.stages.size(), prefixes, 1 + defines_count, m_sources.path.c_str());
+	stream.createProgram(program, key.state, decl, codes, types, m_sources.stages.size(), prefixes, 2 + defines_count, m_sources.path.c_str());
 }
 
-gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines) {
+gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines, const char* semantic_defines) {
 	ShaderKey key;
 	key.decl_hash = decl.hash;
 	key.defines = defines;
 	key.state = state;
+	key.semantic_defines = semantic_defines;
 	for (const ProgramPair& p : m_programs) {
 		if (p.key == key) return p.program;
 	}
-	return m_renderer.queueShaderCompile(*this, state, decl, defines);
+	return m_renderer.queueShaderCompile(*this, key, decl);
+}
+
+static gpu::VertexDecl merge(const gpu::VertexDecl& a, const gpu::VertexDecl& b) {
+	gpu::VertexDecl res = a;
+	for (u32 i = 0; i < b.attributes_count; ++i) {
+		res.attributes[res.attributes_count] = b.attributes[i];
+		++res.attributes_count;
+	}
+	res.computeHash();
+	return res;
+}
+
+gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, const gpu::VertexDecl& decl2, u32 defines, const char* semantic_defines) {
+	ShaderKey key;
+	key.decl_hash = decl.hash ^ decl2.hash;
+	key.defines = defines;
+	key.state = state;
+	key.semantic_defines = semantic_defines;
+
+	for (const ProgramPair& p : m_programs) {
+		if (p.key == key) return p.program;
+	}
+	
+	gpu::VertexDecl merged_decl = merge(decl, decl2);
+
+	return m_renderer.queueShaderCompile(*this, key, merged_decl);
 }
 
 gpu::ProgramHandle Shader::getProgram(u32 defines) {
 	ASSERT(m_sources.stages.empty() || m_sources.stages[0].type == gpu::ShaderType::COMPUTE);
 	const gpu::VertexDecl dummy_decl(gpu::PrimitiveType::NONE);
 	ShaderKey key;
+	static const char* no_def = "";
 	key.decl_hash = dummy_decl.hash;
 	key.defines = defines;
 	key.state = gpu::StateFlags::NONE;
+	key.semantic_defines = no_def;
 	for (const ProgramPair& p : m_programs) {
 		if (p.key == key) return p.program;
 	}
-	return m_renderer.queueShaderCompile(*this, gpu::StateFlags::NONE, dummy_decl, defines);
+	return m_renderer.queueShaderCompile(*this, key, dummy_decl);
 }
 
 static Shader* getShader(lua_State* L)

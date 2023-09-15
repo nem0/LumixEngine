@@ -140,14 +140,27 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 	for (u32 i = 0; i < emitter_count; ++i) {
 		Emitter& emitter = m_emitters.emplace(*this);
 		if (header.version > Version::VERTEX_DECL) {
-			blob.read(emitter.vertex_decl);
+			if (header.version > Version::NEW_VERTEX_DECL) {
+				blob.read(emitter.vertex_decl);
+			}
+			else {
+				blob.read(emitter.vertex_decl.attributes_count);
+				blob.skip(3);
+				blob.read(emitter.vertex_decl.hash);
+				for (u32 j = 0; j < gpu::VertexDecl::MAX_ATTRIBUTES; ++j) {
+					blob.skip(1);
+					blob.read(emitter.vertex_decl.attributes[j]);
+				}
+				blob.read(emitter.vertex_decl.primitive_type);
+				blob.skip(3);
+			}
 		}
 		else {
-			emitter.vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
-			emitter.vertex_decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
-			emitter.vertex_decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
-			emitter.vertex_decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// rot
-			emitter.vertex_decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// frame
+			emitter.vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
+			emitter.vertex_decl.addAttribute(12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
+			emitter.vertex_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
+			emitter.vertex_decl.addAttribute(32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// rot
+			emitter.vertex_decl.addAttribute(36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// frame
 		}
 
 		emitter.setMaterial(Path(blob.readString()));
