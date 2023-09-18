@@ -186,6 +186,7 @@ struct LUMIX_ENGINE_API Vec4 {
 	Vec2 xy() const;
 	Vec3 xyz() const;
 	Vec2 yz() const;
+	Vec2 yw() const;
 	Vec3 rgb() const;
 
 	float& operator[](u32 i);

@@ -38,8 +38,8 @@ define "SSR"
 
 vertex_shader [[
 	layout(location = 0) in vec3 a_position;
-	#ifdef _HAS_ATTR1 
-		layout(location = 1) in vec2 a_uv;
+	#ifdef UV0_ATTR
+		layout(location = UV0_ATTR) in vec2 a_uv;
 	#else
 		const vec2 a_uv = vec2(0, 0);
 	#endif
@@ -58,12 +58,12 @@ vertex_shader [[
 			mat4 u_model;
 		};
 	#endif
-	layout (location = 0) out vec2 v_uv;
-	layout (location = 1) out vec3 v_normal;
-	layout (location = 2) out vec3 v_tangent;
-	layout (location = 3) out vec4 v_wpos;
+	out vec2 v_uv;
+	out vec3 v_normal;
+	out vec3 v_tangent;
+	out vec4 v_wpos;
 	#ifdef _HAS_ATTR2 
-		layout (location = 4) out vec2 v_masks;
+		out vec2 v_masks;
 	#endif
 	
 	void main() {
@@ -108,12 +108,12 @@ fragment_shader [[
 	layout (binding=8) uniform samplerCubeArray u_reflection_probes;
 	layout (binding=9) uniform sampler2D u_bg;
 	
-	layout (location = 0) in vec2 v_uv;
-	layout (location = 1) in vec3 v_normal;
-	layout (location = 2) in vec3 v_tangent;
-	layout (location = 3) in vec4 v_wpos;
+	in vec2 v_uv;
+	in vec3 v_normal;
+	in vec3 v_tangent;
+	in vec4 v_wpos;
 	#ifdef _HAS_ATTR2 
-		layout (location = 4) in vec2 v_masks;
+		in vec2 v_masks;
 	#endif
 
 	layout(location = 0) out vec4 o_color;
@@ -234,11 +234,11 @@ fragment_shader [[
 		vec3 wnormal0;
 		wnormal0.xz = (texture(u_normalmap, tc0).xy + texture(u_normalmap, tc1 * 2.7).xy) - 0.5;
 		wnormal0.xz = wnormal0.xz * 2 - 1;
+		wnormal0.y = sqrt(saturate(1 - dot(wnormal0.xz, wnormal0.xz))); 
+		
 		vec3 wnormal1;
 		wnormal1.xz = (texture(u_normalmap, vec2(0.5, 0.5) - tc1).xy + texture(u_normalmap, (vec2(0.5, 0.5) - tc1) * 2.3).xy) - 0.5;
 		wnormal1.xz = wnormal1.xz * 2 - 1;
-		
-		wnormal0.y = sqrt(saturate(1 - dot(wnormal0.xz, wnormal0.xz))); 
 		wnormal1.y = sqrt(saturate(1 - dot(wnormal1.xz, wnormal1.xz))); 
 
 		float noise = texture(u_noise, uv * 0.05).x;
@@ -317,7 +317,7 @@ fragment_shader [[
 			vec4 clutter = texture(u_clutter, v_uv + wnormal.xz * 0.3 + vec2(noise * 0.03, 0));
 			o_color.rgb = mix(o_color.rgb, clutter.rgb, saturate(clutter.a * v_masks.g * t));
 		#endif
-
+		
 		o_color.a = 1;
 	}
 ]]

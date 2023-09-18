@@ -245,6 +245,7 @@ Vec2 Vec4::xz() const { return Vec2(x, z); }
 Vec2 Vec4::xy() const { return Vec2(x, y); }
 Vec3 Vec4::xyz() const { return Vec3(x, y, z); }
 Vec2 Vec4::yz() const { return Vec2(y, z); }
+Vec2 Vec4::yw() const { return Vec2(y, w); }
 Vec3 Vec4::rgb() const { return Vec3(x, y, z); }
 
 float& Vec4::operator[](u32 i) {

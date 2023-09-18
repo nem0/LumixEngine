@@ -35,13 +35,13 @@ enum class CompositeTexture::NodeType : u32 {
 	MULTIPLY,
 	MIX,
 	GRADIENT,
-	RANDOM_PIXELS,
+	VALUE_NOISE,
 	CONSTANT,
 	RESIZE,
 	CIRCLE,
 	CELLULAR_NOISE,
 	SPLAT,
-	SIMPLEX,
+	GRADIENT_NOISE,
 	WAVE_NOISE,
 	CURVE,
 	SET_ALPHA,
@@ -92,6 +92,7 @@ void CompositeTexture::Image::init(u32 _w, u32 _h, u32 _channels) {
 	channels = _channels;
 	pixels.resize(w * h * channels);
 }
+
 
 Vec4 CompositeTexture::Image::sample(i32 x, i32 y) {
 	x = clamp(x, 0, w - 1);
@@ -634,7 +635,7 @@ struct PixelProcessorNode final : CompositeTexture::Node {
 struct RandomPixelsNode final : CompositeTexture::Node {
 	RandomPixelsNode(IAllocator& allocator) : Node(allocator) {}
 
-	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::RANDOM_PIXELS; }
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::VALUE_NOISE; }
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
@@ -996,38 +997,89 @@ struct WaveNoiseNode final : CompositeTexture::Node {
 	float offset = 0;
 };
 
-struct SimplexNode final : CompositeTexture::Node {
-	SimplexNode(IAllocator& allocator) : Node(allocator) {}
+struct GradientNoiseNode final : CompositeTexture::Node {
+	GradientNoiseNode(IAllocator& allocator) : Node(allocator) {}
 
-	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::SIMPLEX; }
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::GRADIENT_NOISE; }
 
 	bool hasInputPins() const override { return false; }
 	bool hasOutputPins() const override { return true; }
 
-	static Vec2 hash2(Vec2 p) { return hash(p) * 2 - Vec2(1); }
+	// https://github.com/tuxalin/procedural-tileable-shaders/blob/master/gradientNoise.glsl
+	static Vec4 yyww(const Vec4& v) { return {v.y, v.y, v.w, v.w}; }
+	static Vec4 xzxz(const Vec4& v) { return {v.x, v.z, v.x, v.z}; }
+	static Vec4 xyxy(Vec2 v) { return {v.x, v.y, v.x, v.y}; }
+	static Vec4 mod(const Vec4& a, const Vec4& b) {
+		return {
+			fmodf(a.x, b.x),
+			fmodf(a.y, b.y),
+			fmodf(a.z, b.z),
+			fmodf(a.w, b.w)
+		};
+	}
+	
+	struct UVec4 {
+		UVec4(u32 x, u32 y, u32 z, u32 w) : x(x), y(y), z(z), w(w) {}
+		UVec4(const Vec4& rhs) : x((u32)rhs.x), y((u32)rhs.y), z((u32)rhs.z), w((u32)rhs.w) {}
+		u32 x, y, z, w;
+		UVec4 operator^(const UVec4& rhs) const { return {x ^ rhs.x, y ^ rhs.y, z ^ rhs.z, w ^ rhs.w}; }
+		UVec4 operator<<(u32 v) const { return {x << v, y << v, z << v, w << v}; }
+		UVec4 operator+(u32 v) const { return {x + v, y + v, z + v, w + v}; }
+		UVec4 operator^(u32 v) const { return {x ^ v, y ^ v, z ^ v, w ^ v}; }
+		UVec4 operator*(u32 v) const { return {x * v, y * v, z * v, w * v}; }
+		UVec4 operator*(const UVec4& rhs) const { return {x * rhs.x, y * rhs.y, z * rhs.z, w * rhs.w}; }
+		UVec4 operator+(const UVec4& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w}; }
 
-	static float step(float edge, float x) {
-		return x < edge ? 0.f : 1.f;
+		UVec4 xzxz() const { return { x, z, x, z }; }
+		UVec4 yyww() const { return { y, y, w, w }; }
+
+		Vec4 asVec4() const { return { (float)x, (float)y, (float)z, (float)w }; }
+	};
+
+	static UVec4 ihash1D(UVec4 q) {
+		// hash by Hugo Elias, Integer Hash - I, 2017
+		q = q * 747796405u + 2891336453u;
+		q = (q << 13u) ^ q;
+		return q * (q * q * 15731u + 789221u) + 1376312589u;
 	}
 
-	// https://www.shadertoy.com/view/Msf3WH
-	float noise(Vec2 p) {
-		static const float K1 = (sqrtf(3) - 1) / 2;
-		static const float K2 = (3 - sqrtf(3)) / 6;
-	
-		Vec2 i = floor(p + (p.x + p.y) * K1);
-		Vec2 a = p - i + (i.x + i.y) * K2;
-		float m = step(a.y, a.x);
-		Vec2 o = Vec2(m, 1.f - m);
-		Vec2 b = a - o + K2;
-		Vec2 c = a - 1.f + 2.f * K2;
-		Vec3 h = maximum(Vec3(0.5f) - Vec3(dot(a, a), dot(b, b), dot(c, c)), Vec3(0.f));
-		Vec3 n = h * h * h * h * Vec3(dot(a, hash2(i)), dot(b, hash2(i + o)), dot(c, hash2(i + 1.f)));
-		return dot(n, Vec3(70.f)) * 0.5f + 0.5f;
+	static void multiHash2D(Vec4 cell, Vec4& hashX, Vec4& hashY) {
+		UVec4 i = UVec4(cell);
+		UVec4 hash0 = ihash1D(ihash1D(i.xzxz()) + i.yyww());
+		UVec4 hash1 = ihash1D(hash0 ^ 1933247u);
+		hashX = hash0.asVec4() * (1.0 / float(0xffFFffFF));
+		hashY = hash1.asVec4() * (1.0 / float(0xffFFffFF));
+	}
+
+	static void smultiHash2D(Vec4 cell, Vec4& hashX, Vec4& hashY)
+	{
+		multiHash2D(cell, hashX, hashY);
+		hashX = hashX * Vec4(2.f) - Vec4(1.f); 
+		hashY = hashY * Vec4(2.f) - Vec4(1.f);
+	}
+
+	static Vec2 noiseInterpolate(Vec2 x) { 
+		Vec2 x2 = x * x;
+		return x2 * x * (x * (x * 6.0 - 15.0) + 10.0); 
+	}
+
+	float gradientNoise(Vec2 pos, Vec2 scale) {
+		pos = pos * scale;
+		Vec4 i = xyxy(floor(pos)) + Vec4(0, 0, 1, 1);
+		Vec4 f = (xyxy(pos) - xyxy(i.xy())) - Vec4(0, 0, 1, 1);
+		i = mod(i, xyxy(scale));
+
+		Vec4 hashX, hashY;
+		smultiHash2D(i, hashX, hashY);
+
+		Vec4 gradients = hashX * xzxz(f) + hashY * yyww(f);
+		Vec2 u = noiseInterpolate(f.xy());
+		Vec2 g = lerp(gradients.xz(), gradients.yw(), u.x);
+		return (1.4142135623730950f * lerp(g.x, g.y, u.y)) * 0.5f + 0.5f;
 	}
 
 	bool gui() override {
-		nodeTitle("Simplex");
+		nodeTitle("Gradient noise");
 		outputSlot();
 		bool res = ImGui::DragFloat("Scale", &scale, 0.01f, FLT_MIN, FLT_MAX);
 		res = ImGui::DragInt("Width", (i32*)&w, 1, 1, 999999) || res;
@@ -1039,10 +1091,10 @@ struct SimplexNode final : CompositeTexture::Node {
 		CompositeTexture::Image& out = m_outputs.emplace(w, h, 1, m_allocator); 
 
 		for (u32 j = 0; j < h; ++j) {
-			const float v = j / float(h - 1);
+			const float v = j / float(h);
 			for (u32 i = 0; i < w; ++i) {
-				float u = i / float(w - 1);
-				float d = noise(Vec2(u, v) * scale);
+				float u = i / float(w);
+				float d = gradientNoise(Vec2(u, v), Vec2(scale));
 				out.pixels[i + j * w] = d;
 			}
 		}
@@ -1926,8 +1978,8 @@ struct NormalmapNode final : CompositeTexture::Node {
 		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, 2, m_allocator);
 		for (i32 j = 0; j < (i32)out.h; ++j) {
 			for (i32 i = 0; i < (i32)out.w; ++i) {
-				const float dx = clamp((in.sample(i + 1, j) - in.sample(i - 1, j)).x * intensity, -1.f, 1.f);
-				const float dy = clamp((in.sample(i, j + 1) - in.sample(i, j - 1)).x * intensity, -1.f, 1.f);
+				const float dx = clamp((in.sampleWrap(i + 1, j) - in.sampleWrap(i - 1, j)).x * intensity, -1.f, 1.f);
+				const float dy = clamp((in.sampleWrap(i, j + 1) - in.sampleWrap(i, j - 1)).x * intensity, -1.f, 1.f);
 				
 				out.setPixel(i, j, Vec4(dx * 0.5f + 0.5f, dy * 0.5f + 0.5f, 0, 0));
 			}
@@ -2730,7 +2782,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode)(allocator); break;
 		case CompositeTexture::NodeType::SPLAT: node = LUMIX_NEW(allocator, SplatNode)(allocator); break;
 		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode)(allocator); break;
-		case CompositeTexture::NodeType::SIMPLEX: node = LUMIX_NEW(allocator, SimplexNode)(allocator); break;
+		case CompositeTexture::NodeType::GRADIENT_NOISE: node = LUMIX_NEW(allocator, GradientNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
 		case CompositeTexture::NodeType::NORMALMAP: node = LUMIX_NEW(allocator, NormalmapNode)(allocator); break;
@@ -2747,7 +2799,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode)(allocator); break;
 		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode)(allocator); break;
 		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode)(allocator); break;
-		case CompositeTexture::NodeType::RANDOM_PIXELS: node = LUMIX_NEW(allocator, RandomPixelsNode)(allocator); break;
+		case CompositeTexture::NodeType::VALUE_NOISE: node = LUMIX_NEW(allocator, RandomPixelsNode)(allocator); break;
 		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode)(allocator); break;
 		case CompositeTexture::NodeType::GRADIENT_MAP: node = LUMIX_NEW(allocator, GradientMapNode)(allocator); break;
 		case CompositeTexture::NodeType::CIRCULAR_SPLATTER: node = LUMIX_NEW(allocator, CircularSplatterNode)(allocator); break;
@@ -3096,8 +3148,8 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 		if (visitor.beginCategory("Noise")) {
 			visitor
 				.visitType("Cell noise", CompositeTexture::NodeType::CELLULAR_NOISE)
-				.visitType("Random pixels", CompositeTexture::NodeType::RANDOM_PIXELS)
-				.visitType("Simplex", CompositeTexture::NodeType::SIMPLEX)
+				.visitType("Gradient noise", CompositeTexture::NodeType::GRADIENT_NOISE)
+				.visitType("Value noise", CompositeTexture::NodeType::VALUE_NOISE)
 				.visitType("Wave noise", CompositeTexture::NodeType::WAVE_NOISE)
 				.endCategory();
 		}
