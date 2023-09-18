@@ -224,28 +224,30 @@ fragment_shader [[
 		return texture(u_bg, screen_pos.xy * 0.5 + 0.5);
 	}
 	
+	float getHeight(vec2 uv) {
+		return 
+				(cos(texture(u_normalmap, uv).x * 2 * M_PI + Global.time * 5) 
+				+ sin(texture(u_normalmap, -uv.yx * 2 + 0.1).x * M_PI - Global.time * 3)) * 0.5 + 0.5
+;
+	}
+
 	// TODO try less texture fetches
-	vec3 getSurfaceNormal(vec2 uv, float normal_strength)
+	vec3 getSurfaceNormal(vec2 uv, float normal_strength, out float h00)
 	{
-		float noise_t = texture(u_noise, 1 - uv * 0.1).x;
-		vec2 tc0 = uv * u_uv_scale + u_flow_dir * Global.time;
-		vec2 tc1 = uv * u_uv_scale + u_flow_dir * (Global.time + noise_t * 0.1);
+		vec2 d = vec2(0.01, 0);
+		uv *= u_uv_scale;
+		uv += u_flow_dir * Global.time;
+		// TODO optimize
+		h00 = getHeight(uv - d.xy) * normal_strength;
+		float h10 = getHeight(uv + d.xy) * normal_strength;
+		float h01 = getHeight(uv - d.yx) * normal_strength;
+		float h11 = getHeight(uv + d.yx) * normal_strength;
 
-		vec3 wnormal0;
-		wnormal0.xz = (texture(u_normalmap, tc0).xy + texture(u_normalmap, tc1 * 2.7).xy) - 0.5;
-		wnormal0.xz = wnormal0.xz * 2 - 1;
-		wnormal0.y = sqrt(saturate(1 - dot(wnormal0.xz, wnormal0.xz))); 
-		
-		vec3 wnormal1;
-		wnormal1.xz = (texture(u_normalmap, vec2(0.5, 0.5) - tc1).xy + texture(u_normalmap, (vec2(0.5, 0.5) - tc1) * 2.3).xy) - 0.5;
-		wnormal1.xz = wnormal1.xz * 2 - 1;
-		wnormal1.y = sqrt(saturate(1 - dot(wnormal1.xz, wnormal1.xz))); 
-
-		float noise = texture(u_noise, uv * 0.05).x;
-		float t = fract(Global.time + noise * 2);
-		vec3 wnormal = mix(wnormal0, wnormal1, abs( 0.5 - t ) / 0.5);
-
-		return normalize(mix(vec3(0, 1, 0), wnormal, normal_strength));
+		vec3 N;
+		N.x = h00 - h10;
+		N.z = h00 - h10;
+		N.y = sqrt(saturate(1 - dot(N.xz, N.xz))); 
+		return N;
 	}
 
 	void main()
@@ -253,16 +255,6 @@ fragment_shader [[
 		vec3 V = normalize(-v_wpos.xyz);
 		vec3 L = Global.light_dir.xyz;
 		
-		float shadow = 1; //getShadow(u_shadowmap, data.wpos, data.N);
-		
-		/////////
-		const float WAVE_HEIGHT = 0.0;
-		const float WAVE_FREQUENCY = 3;
-
-		const float FOAM_DEPTH = 0.2;
-		const float FOAM_TEXTURE_SCALE = 5;
-		const float FOAM_WIDTH = 1;
-	
 		mat3 tbn = mat3(
 			normalize(v_tangent),
 			normalize(v_normal),
@@ -274,13 +266,16 @@ fragment_shader [[
 			//normal_strength *= 1 - v_masks.g;
 		#endif
 
-		vec3 wnormal = getSurfaceNormal(v_uv, normal_strength);
+		float h;
+		vec3 wnormal = getSurfaceNormal(v_uv, normal_strength, h);
 		wnormal = normalize(tbn * wnormal);
+
+		//float shadow = getShadow(u_shadowmap, v_wpos.xyz, wnormal);
 
 		float dist = length(v_wpos.xyz);
 		vec3 view = normalize(-v_wpos.xyz);
 		vec3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, v_wpos.xyz) * u_reflection_multiplier;
-		float water_depth = getWaterDepth(v_wpos.xyz, view, wnormal);
+		float water_depth = getWaterDepth(v_wpos.xyz, view, wnormal)- saturate(h * 0.4);
 
 		vec3 halfvec = normalize(view + Global.light_dir.xyz);
 		float spec_strength = pow(saturate(dot(halfvec, wnormal)), u_specular_power);
@@ -294,7 +289,7 @@ fragment_shader [[
 		vec3 water_color = pow(u_water_color.rgb, vec3(2.2)); // TODO do not do this in shader
 		vec3 transmittance = saturate(exp(-water_depth * u_water_scattering * (vec3(1) - water_color)));
 
-		float t = saturate(water_depth * 5); // no hard edge
+		float t = saturate(water_depth * 2); // no hard edge
 
 		float refraction_distortion = u_refraction_distortion;
 
@@ -305,7 +300,7 @@ fragment_shader [[
 		vec3 reflection = refl_color + spec_color;
 
 		o_color.rgb = mix(refraction, reflection, fresnel);
-		o_color.rgb = mix(refraction, o_color.rgb, t);
+		//o_color.rgb = mix(refraction, o_color.rgb, t);
 		
 		float noise = texture(u_noise, 1 - v_uv * 0.1 + u_flow_dir * Global.time * 0.3).x;
 		#if defined HAS_FOAM && defined _HAS_ATTR2
