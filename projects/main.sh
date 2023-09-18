@@ -41,13 +41,6 @@ build_recast()
     popd
 }
 
-build_luau()
-{
-    pushd 3rdparty/luau/
-    make config=release luau
-    popd
-}
-
 build_physx()
 {
     pushd 3rdparty/physx/physx
@@ -73,7 +66,6 @@ build_3rdparty()
 {
     case "$1" in
         "freetype" ) build_freetype;;
-        "luau" ) build_luau;;
         "physx" ) build_physx;;
         "recast" ) build_recast;;
     esac
@@ -83,12 +75,6 @@ deploy_freetype()
 {
     mkdir -p ../external/freetype/lib/linux64_gmake/release
     cp 3rdparty/freetype/objs/libfreetype.a ../external/freetype/lib/linux64_gmake/release/libfreetype.a
-}
-
-deploy_luau()
-{
-    mkdir -p ../external/luau/lib/linux64_gmake
-    cp 3rdparty/luau/build/release/*.a ../external/luau/lib/linux64_gmake
 }
 
 deploy_recast()
@@ -107,7 +93,6 @@ deploy_3rdparty()
 {
     case "$1" in
         "freetype" ) deploy_freetype;;
-        "luau" ) deploy_luau;;
         "physx" ) deploy_physx;;
         "recast" ) deploy_recast;;
     esac
@@ -139,12 +124,10 @@ init_3rdparty()
     download_project "recast" "https://github.com/nem0/recastnavigation.git"
 
     build_3rdparty "freetype"
-    build_3rdparty "luau"
     build_3rdparty "physx"
     build_3rdparty "recast"
 
     deploy_3rdparty "freetype"
-    deploy_3rdparty "luau"
     deploy_3rdparty "physx"
     deploy_3rdparty "recast"
 
@@ -178,7 +161,7 @@ thirdparty_menu()
         do
             case "$REPLY" in
                 1 ) project_menu "freetype" "https://github.com/nem0/freetype2.git"; break;;
-                2 ) project_menu "luau" "https://github.com/nem0/luau.git"; break;;
+                2 ) download_project "luau" "https://github.com/nem0/luau.git"; break;;
                 3 ) project_menu "physx" "https://github.com/nem0/PhysX.git"; break;;
                 4 ) project_menu "recast" "https://github.com/nem0/recastnavigation.git"; break;;
                 5 ) init_3rdparty; break;;

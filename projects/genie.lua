@@ -158,7 +158,7 @@ newoption {
 	description = "Add Luau project to solution. Do not use the prebuilt library."
 }
 
-if _OPTIONS["force-build-lua"] then
+if _OPTIONS["force-build-luau"] then
 	force_build_luau = true
 end
 
@@ -292,15 +292,12 @@ end
 
 function useLua()
 	configuration { "vs20*" }
-		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/win64_vs2017") }
+		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/win") }
 		links "Luau"
 
 	configuration { "linux" }
-		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/linux64_gmake") }
-		links "luauvm"
-		links "luaucompiler"
-		links "luaucodegen"
-		links "luauast"
+		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/linux") }
+		links "Luau"
 
 	configuration {}
 	
@@ -427,7 +424,6 @@ solution "LumixEngine"
 	configuration { "linux" }
 		buildoptions {
 			"-m64",
-			"-fno-exceptions",
 			"-fPIC",
 			"-no-canonical-prefixes",
 			"-Wa,--noexecstack",
@@ -1009,35 +1005,43 @@ if build_studio then
 		defaultConfigurations()
 end
 
-if force_build_luau then
-	project "Luau"
-		kind "SharedLib"
-		files { "3rdparty/luau/Ast/src/**.cpp"
-			, "3rdparty/luau/Ast/src/**.h"
-			, "3rdparty/luau/CodeGen/src/**.cpp"
-			, "3rdparty/luau/CodeGen/src/**.h"
-			, "3rdparty/luau/Compiler/src/**.cpp"
-			, "3rdparty/luau/Compiler/src/**.h"
-			, "3rdparty/luau/VM/src/**.cpp"
-			, "3rdparty/luau/VM/src/**.h"
-		}
 
-		includedirs { "3rdparty/luau/Ast/include/"
-			, "3rdparty/luau/CodeGen/include/"
-			, "3rdparty/luau/Common/include/"
-			, "3rdparty/luau/Compiler/include/"
-			, "3rdparty/luau/VM/include/"
-			, "3rdparty/luau/VM/src/"
-		}
-
-		removeflags { "NoExceptions" }
-		flags { "OptimizeSize", "ReleaseRuntime" }
-
-		configuration { "windows" }
-			targetdir "../external/luau/lib/win64_vs2017"
-			defines { 
-				"_CRT_SECURE_NO_WARNINGS",
-				"LUA_API=__declspec(dllexport)",
-				"LUACODE_API=__declspec(dllexport)"
+if force_build_luau == true then
+	if os.isdir("3rdparty/luau") then
+		project "Luau"
+			kind "SharedLib"
+			files { "3rdparty/luau/Ast/src/**.cpp"
+				, "3rdparty/luau/Ast/src/**.h"
+				, "3rdparty/luau/CodeGen/src/**.cpp"
+				, "3rdparty/luau/CodeGen/src/**.h"
+				, "3rdparty/luau/Compiler/src/**.cpp"
+				, "3rdparty/luau/Compiler/src/**.h"
+				, "3rdparty/luau/VM/src/**.cpp"
+				, "3rdparty/luau/VM/src/**.h"
 			}
+
+			includedirs { "3rdparty/luau/Ast/include/"
+				, "3rdparty/luau/CodeGen/include/"
+				, "3rdparty/luau/Common/include/"
+				, "3rdparty/luau/Compiler/include/"
+				, "3rdparty/luau/VM/include/"
+				, "3rdparty/luau/VM/src/"
+			}
+
+			removeflags { "NoExceptions" }
+			flags { "OptimizeSize", "ReleaseRuntime" }
+
+			configuration { "linux"}
+				targetdir "../external/luau/lib/linux"
+
+			configuration { "windows" }
+				targetdir "../external/luau/lib/win"
+				defines { 
+					"_CRT_SECURE_NO_WARNINGS",
+					"LUA_API=__declspec(dllexport)",
+					"LUACODE_API=__declspec(dllexport)"
+				}
+	else	
+		printf("--force-build-luau used but Luau source code not found")
+	end
 end
