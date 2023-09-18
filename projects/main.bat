@@ -257,7 +257,7 @@ exit /B 0
 	echo  2. Download, build and deploy all
 	echo  3. Recast navigation
 	echo  4. PhysX
-	echo  5. LuaJIT
+	echo  5. Download Luau
 	echo  6. FreeType2
 	echo  7. Basis Universal
 	echo ===============================
@@ -267,7 +267,7 @@ exit /B 0
 	if %errorlevel%==2 call :all_3rdparty
 	if %errorlevel%==3 call :recast
 	if %errorlevel%==4 call :physx
-	if %errorlevel%==5 call :luajit
+	if %errorlevel%==5 call :download_luau
 	if %errorlevel%==6 call :freetype
 	if %errorlevel%==7 call :basisu
 goto :third_party
@@ -275,71 +275,29 @@ goto :third_party
 :all_3rdparty
 	call :download_physx
 	call :download_recast
-	call :download_luajit
 	call :download_freetype
 	call :download_basisu
 	
 	call :build_physx
 	call :build_recast
-	call :build_luajit
 	call :build_freetype
 	call :build_basisu
 	
 	call :deploy_physx
 	call :deploy_recast
-	call :deploy_luajit
 	call :deploy_freetype
 	call :deploy_basisu
 	pause
 
 exit /B 0
 
-:luajit
-	cls
-	echo LuaJIT
-	echo ===============================
-	echo  1. Go back
-	echo  2. Download
-	if exist "3rdparty\luajit\" (
-		echo  3. Build
-		echo  4. Deploy
-	)
-	echo ===============================
-	choice /C 1234 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :download_luajit
-	if %errorlevel%==3 call :build_luajit
-	if %errorlevel%==4 call :deploy_luajit
-	pause
-goto :luajit
-
-:deploy_luajit
-	del /Q ..\external\luajit\lib\win64_vs2017\release\*
-	del /Q ..\external\luajit\include\*
-	copy 3rdparty\luajit\src\lua51.lib ..\external\luajit\lib\win64_vs2017\release\
-	copy 3rdparty\luajit\src\luajit.lib ..\external\luajit\lib\win64_vs2017\release\
-	copy 3rdparty\luajit\src\lauxlib.h ..\external\luajit\include
-	copy 3rdparty\luajit\src\lua.h ..\external\luajit\include
-	copy 3rdparty\luajit\src\lua.hpp ..\external\luajit\include
-	copy 3rdparty\luajit\src\luaconf.h ..\external\luajit\include
-	copy 3rdparty\luajit\src\luajit.h ..\external\luajit\include
-	copy 3rdparty\luajit\src\lualib.h ..\external\luajit\include
-exit /B 0
-
-:build_luajit
-	pushd 3rdparty\luajit\src
-	call msvcbuild.bat static
-	popd
-exit /B 0
-
-:download_luajit
+:download_luau
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
-	if not exist luajit (
-		git.exe clone https://github.com/nem0/LuaJIT.git luajit
+	if not exist luau (
+		git.exe clone https://github.com/nem0/Luau.git luau
 	) else (
-		cd luajit
+		cd luau
 		git pull
 		cd ..
 	)

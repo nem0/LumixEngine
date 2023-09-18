@@ -28,6 +28,7 @@ local plugins = {}
 local base_plugins = {}
 local plugin_creators = {}
 local embed_resources = false
+local force_build_luau = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
@@ -151,6 +152,15 @@ newoption {
 	trigger = "no-studio",
 	description = "Do not build Studio."
 }
+
+newoption {
+	trigger = "force-build-luau",
+	description = "Add Luau project to solution. Do not use the prebuilt library."
+}
+
+if _OPTIONS["force-build-lua"] then
+	force_build_luau = true
+end
 
 if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
@@ -283,11 +293,7 @@ end
 function useLua()
 	configuration { "vs20*" }
 		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/win64_vs2017") }
-		links "Luau.VM"
-		links "Luau.Compiler"
-		links "Luau.CodeGen"
-		links "Luau.Ast"
-		links "Luau.Config"
+		links "Luau"
 
 	configuration { "linux" }
 		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/linux64_gmake") }
@@ -988,6 +994,10 @@ if build_studio then
 			callback()
 		end
 		
+		configuration { "windows" }
+			files { "../external/luau/lib/win64_vs2017/Luau.dll" }
+			copy { "../external/luau/lib/win64_vs2017/Luau.dll" }
+
 		configuration { "linux" }
 			links {"gtk-3", "gobject-2.0"}
 
@@ -997,4 +1007,37 @@ if build_studio then
 		
 		useLua()
 		defaultConfigurations()
+end
+
+if force_build_luau then
+	project "Luau"
+		kind "SharedLib"
+		files { "3rdparty/luau/Ast/src/**.cpp"
+			, "3rdparty/luau/Ast/src/**.h"
+			, "3rdparty/luau/CodeGen/src/**.cpp"
+			, "3rdparty/luau/CodeGen/src/**.h"
+			, "3rdparty/luau/Compiler/src/**.cpp"
+			, "3rdparty/luau/Compiler/src/**.h"
+			, "3rdparty/luau/VM/src/**.cpp"
+			, "3rdparty/luau/VM/src/**.h"
+		}
+
+		includedirs { "3rdparty/luau/Ast/include/"
+			, "3rdparty/luau/CodeGen/include/"
+			, "3rdparty/luau/Common/include/"
+			, "3rdparty/luau/Compiler/include/"
+			, "3rdparty/luau/VM/include/"
+			, "3rdparty/luau/VM/src/"
+		}
+
+		removeflags { "NoExceptions" }
+		flags { "OptimizeSize", "ReleaseRuntime" }
+
+		configuration { "windows" }
+			targetdir "../external/luau/lib/win64_vs2017"
+			defines { 
+				"_CRT_SECURE_NO_WARNINGS",
+				"LUA_API=__declspec(dllexport)",
+				"LUACODE_API=__declspec(dllexport)"
+			}
 end
