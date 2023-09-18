@@ -289,7 +289,7 @@ fragment_shader [[
 		vec3 water_color = pow(u_water_color.rgb, vec3(2.2)); // TODO do not do this in shader
 		vec3 transmittance = saturate(exp(-water_depth * u_water_scattering * (vec3(1) - water_color)));
 
-		float t = saturate(water_depth * 2); // no hard edge
+		float t = saturate(water_depth * 5); // no hard edge
 
 		float refraction_distortion = u_refraction_distortion;
 
@@ -300,7 +300,7 @@ fragment_shader [[
 		vec3 reflection = refl_color + spec_color;
 
 		o_color.rgb = mix(refraction, reflection, fresnel);
-		//o_color.rgb = mix(refraction, o_color.rgb, t);
+		o_color.rgb = mix(refraction, o_color.rgb, t);
 		
 		float noise = texture(u_noise, 1 - v_uv * 0.1 + u_flow_dir * Global.time * 0.3).x;
 		#if defined HAS_FOAM && defined _HAS_ATTR2
