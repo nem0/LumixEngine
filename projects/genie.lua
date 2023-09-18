@@ -991,8 +991,8 @@ if build_studio then
 		end
 		
 		configuration { "windows" }
-			files { "../external/luau/lib/win64_vs2017/Luau.dll" }
-			copy { "../external/luau/lib/win64_vs2017/Luau.dll" }
+			files { "../external/luau/lib/win/Luau.dll" }
+			copy { "../external/luau/lib/win/Luau.dll" }
 
 		configuration { "linux" }
 			links {"gtk-3", "gobject-2.0"}
