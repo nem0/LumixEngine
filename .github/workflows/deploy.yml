@@ -15,7 +15,6 @@ jobs:
                 mkdir plugins
                 mkdir projects\3rdparty
                 mkdir projects\itch_io
-                mkdir external\physx\lib\vs2017\win64\release_static
                 
             - name: fetch procedural geometry plugin
               working-directory: plugins
@@ -47,33 +46,10 @@ jobs:
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
             
-            - name: create physx solution
-              working-directory: projects\3rdparty\PhysX\physx
-              run: |
-                ./generate_projects.bat lumix_vc17win64_static
-            
-            - name: build physx
-              working-directory: projects\3rdparty\PhysX\physx
-              shell: cmd
-              run: |
-                "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" compiler\vc17win64\PhysXSDK.sln /p:Configuration=Release /p:Platform=x64
-                
-            - name: deploy physx
-              working-directory: projects
-              run: |
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCharacterKinematic_static_64.lib ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXExtensions_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXFoundation_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-                copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
-            
             - name: make dx11 project
               working-directory: projects
               run: |
-                ./genie.exe --with-app --static-physx vs2022
+                ./genie.exe --force-build-physx --with-app vs2022
                 
             - name: get butler
               working-directory: projects
@@ -106,7 +82,7 @@ jobs:
             - name: make gl project with plugins
               working-directory: projects
               run: |
-                ./genie.exe --static-physx --nodx --with-app vs2022
+                ./genie.exe --force-build-physx --nodx --with-app vs2022
                 
             - name: build gl engine
               working-directory: projects

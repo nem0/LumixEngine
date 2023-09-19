@@ -29,6 +29,7 @@ local base_plugins = {}
 local plugin_creators = {}
 local embed_resources = false
 local force_build_luau = false
+local force_build_physx = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
@@ -71,11 +72,6 @@ newoption {
 newoption {
 	trigger = "dynamic-plugins",
 	description = "Plugins are dynamic libraries."
-}
-
-newoption {
-	trigger = "static-physx",
-	description = "Linked physx static lib."
 }
 
 newoption {
@@ -158,8 +154,17 @@ newoption {
 	description = "Add Luau project to solution. Do not use the prebuilt library."
 }
 
+newoption {
+	trigger = "force-build-physx",
+	description = "Add PhysX project to solution. Do not use the prebuilt library."
+}
+
 if _OPTIONS["force-build-luau"] then
 	force_build_luau = true
+end
+
+if _OPTIONS["force-build-physx"] then
+	force_build_physx = true
 end
 
 if _OPTIONS["plugins"] then
@@ -314,40 +319,10 @@ end
 
 function linkPhysX()
 	if has_plugin("physics") then
-		if _OPTIONS["static-physx"] then
-			configuration { "x64", "vs20*" }
-				links { 
-					"PhysXCharacterKinematic_static_64",
-					"PhysXCommon_static_64",
-					"PhysXCooking_static_64",
-					"PhysXExtensions_static_64",
-					"PhysXFoundation_static_64",
-					"PhysXPvdSDK_static_64",
-					"PhysXVehicle_static_64",
-					"PhysX_static_64"
-				}
-			configuration { "linux" }
-				libdirs {"../external/physx/lib/linux64_gmake/release"}
-				links { 
-					"PhysX_static_64",
-					"PhysXCharacterKinematic_static_64",
-					"PhysXCommon_static_64",
-					"PhysXCooking_static_64",
-					"PhysXExtensions_static_64",
-					"PhysXFoundation_static_64",
-					"PhysXPvdSDK_static_64",
-					--"PhysXTask_static_64",
-					"PhysXVehicle_static_64",
-					--"SceneQuery_static_64",
-					--"SimulationController_static_64"
-				}
-
-			configuration {}
-				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release_static"}
-				defines {
-					"PX_PHYSX_CHARACTER_STATIC_LIB",
-					"PX_PHYSX_STATIC_LIB"
-				}
+		if force_build_physx then
+			configuration { "vs20*" }
+				links { "PhysX" }
+				defines { "PX_PHYSX_STATIC_LIB", "PX_PHYSX_CHARACTER_STATIC_LIB" }
 		else 
 			configuration { "x64", "vs20*" }
 				links { 
@@ -368,7 +343,7 @@ function linkPhysX()
 					"SimulationController_static_64"
 				}
 			configuration { "linux" }
-				libdirs {"../external/physx/lib/linux64_gmake/release"}	
+				libdirs {"../external/physx/lib/linux"}	
 				links { 
 					"PhysX_static_64",
 					"PhysXCharacterKinematic_static_64",
@@ -383,13 +358,8 @@ function linkPhysX()
 					--"SimulationController_static_64"
 				}
 
-			configuration { "Debug" }
-				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
-
-			configuration { "RelWithDebInfo" }
-				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
-
 			configuration {}
+				libdirs {"../external/physx/lib/win"}
 				defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
 		end
 	end
@@ -547,22 +517,22 @@ if has_plugin("physics") then
 	project "physics"
 		libType()
 
-		if _OPTIONS["static-physx"] then
+		if force_build_physx then
 			defines { "LUMIX_STATIC_PHYSX" }
+		else
+			configuration { "vs*" }
+				files { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+				files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+				files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+				files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+				copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+				copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+				copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+				copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+			configuration {}
 		end
 
 		files { "../src/physics/**.h", "../src/physics/**.cpp" }
-
-		configuration { "vs*" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-		configuration {}
 
 		includedirs { "../external/physx/include/" }
 		defines { "BUILDING_PHYSICS" }
@@ -1005,6 +975,25 @@ if build_studio then
 		defaultConfigurations()
 end
 
+if force_build_physx == true then
+	if os.isdir("3rdparty/physx") then	
+		project "PhysX"
+			kind "StaticLib"
+			files { "3rdparty/physx/physx/source/**.cpp", "3rdparty/physx/physx/include/**.h", "3rdparty/physx/pxshared/**.h" }
+			removefiles { "**/unix/*", "3rdparty/physx/**/linux/*" }
+			includedirs { "3rdparty/physx/physx/include"
+				, "3rdparty/physx/pxshared/include"
+				, "3rdparty/physx/physx/source/**"
+			}
+			defines { "NDEBUG", "PX_PHYSX_STATIC_LIB", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "PX_COOKING" }
+			flags { "OptimizeSize", "ReleaseRuntime" }
+
+			configuration { "windows" }
+				targetdir "../external/physx/lib/win"
+	else
+		printf("--force-build-physx used but PhysX source code not found")
+	end
+end
 
 if force_build_luau == true then
 	if os.isdir("3rdparty/luau") then
