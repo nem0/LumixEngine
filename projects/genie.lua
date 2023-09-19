@@ -29,6 +29,7 @@ local base_plugins = {}
 local plugin_creators = {}
 local embed_resources = false
 local force_build_luau = false
+local force_build_luau_dynamic = false
 local force_build_physx = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
@@ -155,12 +156,23 @@ newoption {
 }
 
 newoption {
+	trigger = "force-build-luau-dynamic",
+	description = "Add Luau project to solution. Do not use the prebuilt library. Build luau as dynamic library"
+}
+
+newoption {
 	trigger = "force-build-physx",
 	description = "Add PhysX project to solution. Do not use the prebuilt library."
 }
 
 if _OPTIONS["force-build-luau"] then
 	force_build_luau = true
+	force_build_luau_dynamic = false
+end
+
+if _OPTIONS["force-build-luau-dynamic"] then
+	force_build_luau = true
+	force_build_luau_dynamic = true
 end
 
 if _OPTIONS["force-build-physx"] then
@@ -960,9 +972,11 @@ if build_studio then
 			callback()
 		end
 		
-		configuration { "windows" }
-			files { "../external/luau/lib/win/Luau.dll" }
-			copy { "../external/luau/lib/win/Luau.dll" }
+		if not force_build_luau or force_build_luau_dynamic then
+			configuration { "windows" }
+				files { "../external/luau/lib/win/Luau.dll" }
+				copy { "../external/luau/lib/win/Luau.dll" }
+		end
 
 		configuration { "linux" }
 			links {"gtk-3", "gobject-2.0"}
@@ -998,7 +1012,7 @@ end
 if force_build_luau == true then
 	if os.isdir("3rdparty/luau") then
 		project "Luau"
-			if os.get() == "windows" then
+			if force_build_luau_dynamic == true then
 				kind "SharedLib"
 			else
 				kind "StaticLib"
