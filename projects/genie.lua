@@ -998,7 +998,11 @@ end
 if force_build_luau == true then
 	if os.isdir("3rdparty/luau") then
 		project "Luau"
-			kind "SharedLib"
+			if os.get() == "windows" then
+				kind "SharedLib"
+			else
+				kind "StaticLib"
+			end
 			files { "3rdparty/luau/Ast/src/**.cpp"
 				, "3rdparty/luau/Ast/src/**.h"
 				, "3rdparty/luau/CodeGen/src/**.cpp"
