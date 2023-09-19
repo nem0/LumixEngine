@@ -1,7 +1,7 @@
 return {
 	enabled = false,
 	intensity = 1.0,
-	sky = LumixAPI.loadResource(LumixAPI.engine, "textures/Yokohama2/cube.ltc", "texture"), -- TODO set from UI
+	sky = nil,
 
 	gui = function(self)
 		_, self.enabled = ImGui.Checkbox("Enabled", self.enabled)
@@ -10,7 +10,7 @@ return {
 
 	postprocess = function(self, env, hdr_buffer, gbuffer, shadowmap) : ()
 		if not self.enabled then return end
-		if self.sky == -1 then return end
+		self.sky = self.sky or LumixAPI.loadResource(LumixAPI.engine, "textures/Yokohama2/cube.ltc", "texture"), -- TODO set from UI
 		env.beginBlock("sky")
 		if env.cubemap_sky_shader == nil then
 			env.cubemap_sky_shader = env.preloadShader("pipelines/cubemap_sky.shd")
