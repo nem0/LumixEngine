@@ -141,7 +141,7 @@ void Material::deserialize(InputMemoryStream& blob) {
 
 void Material::serialize(OutputMemoryStream& blob) {
 	StringView mat_dir = Path::getDir(getPath());
-	StringView shader_path = m_shader->getPath();
+	StringView shader_path = m_shader ? m_shader->getPath() : StringView("");
 	if (startsWith(shader_path, mat_dir)) {
 		shader_path.removePrefix(mat_dir.size());
 		blob << "shader \"" << shader_path << "\"\n";
@@ -197,26 +197,28 @@ void Material::serialize(OutputMemoryStream& blob) {
 		blob << " }";
 	};
 
-	for (const Shader::Uniform& su : m_shader->m_uniforms) {
-		for (const Uniform& mu : m_uniforms) {
-			if(mu.name_hash == su.name_hash) {
-				if (su.type == Shader::Uniform::INT) {
-					blob << "int_uniform(\"" << su.name << "\", " << mu.int_value << ")\n";
-				}
-				else {
-					blob << "uniform(\"" << su.name << "\", ";
-					switch(su.type) {
-						case Shader::Uniform::INT: blob << mu.int_value; break;
-						case Shader::Uniform::NORMALIZED_FLOAT: blob << mu.float_value; break;
-						case Shader::Uniform::FLOAT: blob << mu.float_value; break;
-						case Shader::Uniform::COLOR: 
-						case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
-						case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
-						case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
+	if (m_shader) {
+		for (const Shader::Uniform& su : m_shader->m_uniforms) {
+			for (const Uniform& mu : m_uniforms) {
+				if(mu.name_hash == su.name_hash) {
+					if (su.type == Shader::Uniform::INT) {
+						blob << "int_uniform(\"" << su.name << "\", " << mu.int_value << ")\n";
 					}
-					blob << ")\n";
+					else {
+						blob << "uniform(\"" << su.name << "\", ";
+						switch(su.type) {
+							case Shader::Uniform::INT: blob << mu.int_value; break;
+							case Shader::Uniform::NORMALIZED_FLOAT: blob << mu.float_value; break;
+							case Shader::Uniform::FLOAT: blob << mu.float_value; break;
+							case Shader::Uniform::COLOR: 
+							case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
+							case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
+							case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
+						}
+						blob << ")\n";
+					}
+					break;
 				}
-				break;
 			}
 		}
 	}

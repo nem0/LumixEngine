@@ -45,11 +45,16 @@ jobs:
               working-directory: projects\3rdparty
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
+
+            - name: download Luau
+              working-directory: projects\3rdparty
+              run: |
+                git.exe clone --depth=1 https://github.com/nem0/luau.git 3rdparty/luau
             
             - name: make dx11 project
               working-directory: projects
               run: |
-                ./genie.exe --force-build-physx --with-app vs2022
+                ./genie.exe --force-build-physx --force-build-luau --with-app vs2022
                 
             - name: get butler
               working-directory: projects
@@ -82,7 +87,7 @@ jobs:
             - name: make gl project with plugins
               working-directory: projects
               run: |
-                ./genie.exe --force-build-physx --nodx --with-app vs2022
+                ./genie.exe --force-build-physx --force-build-luau --nodx --with-app vs2022
                 
             - name: build gl engine
               working-directory: projects
