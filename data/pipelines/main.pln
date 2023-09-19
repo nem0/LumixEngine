@@ -9,7 +9,7 @@ local fxaa =  require "pipelines/fxaa"
 
 local lighting_shader = preloadShader("pipelines/lighting.shd")
 local field_debug_shader = preloadShader("pipelines/field_debug.shd")
-local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
+textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")

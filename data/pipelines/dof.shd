@@ -10,13 +10,54 @@ vertex_shader [[
 
 
 fragment_shader [[
-	layout (binding=0) uniform sampler2D u_source;
+	layout (binding=0) uniform sampler2D u_texture;
+	layout (binding=1) uniform sampler2D u_depth;
+
+	layout(std140, binding = 4) uniform Drawcall {
+		float u_distance;
+		float u_range;
+		float u_max_blur_size;
+		float u_sharp_range;
+	};
+
+	const float GOLDEN_ANGLE = 2.39996323; 
+	const float RAD_SCALE = 0.5; 
+
+	float getBlurSize(float depth, float focus_point) {
+		float d = depth - focus_point;
+		d = abs(d) < u_sharp_range ? 0 : d - u_sharp_range;
+		float coc = clamp(d / u_range, -1.0, 1.0);
+		return abs(coc) * u_max_blur_size;
+	}
+
+	// https://blog.voxagon.se/2018/05/04/bokeh-depth-of-field-in-single-pass.html
+	vec3 depthOfField(vec2 tex_coord, float focus_point) {
+		float center_depth = toLinearDepth(Global.inv_projection, texture(u_depth, tex_coord).r);
+		float center_size = getBlurSize(center_depth, focus_point);
+		vec3 color = texture(u_texture, tex_coord).rgb;
+		float tot = 1.0;
+		float radius = RAD_SCALE;
+		vec2 view_size_rcp = 1.0 / Global.framebuffer_size;
+		for (float ang = 0.0; radius < u_max_blur_size; ang += GOLDEN_ANGLE) {
+			vec2 tc = tex_coord + vec2(cos(ang), sin(ang)) * view_size_rcp * radius;
+			vec3 sample_color = texture(u_texture, tc).rgb;
+			float sample_depth = toLinearDepth(Global.inv_projection, texture(u_depth, tc).r);
+			float sample_size = getBlurSize(sample_depth, focus_point);
+			if (sample_depth > center_depth)
+				sample_size = clamp(sample_size, 0.0, center_size * 2.0);
+			float m = smoothstep(radius - 0.5, radius + 0.5, sample_size);
+			color += mix(color / tot, sample_color, m);
+			tot += 1.0;
+			radius += RAD_SCALE / radius;
+		}
+		return color /= tot;
+	}
 
 	layout(location=0) in vec2 v_uv;
 	layout(location=0) out vec4 o_color;
 
 	void main() {
-		o_color.rgb = texture(u_source, v_uv).rgb;
+		o_color.rgb = depthOfField(v_uv, u_distance);
 		o_color.w = 1;
 	}
 ]]
