@@ -862,14 +862,13 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			
 				import_mesh.autolod_indices[i].create(m_allocator);
 				import_mesh.autolod_indices[i]->resize(import_mesh.indices.size());
-				const size_t lod_index_count = meshopt_simplify(import_mesh.autolod_indices[i]->begin()
+				const size_t lod_index_count = meshopt_simplifySloppy(import_mesh.autolod_indices[i]->begin()
 					, import_mesh.indices.begin()
 					, import_mesh.indices.size()
 					, (const float*)import_mesh.vertex_data.data()
 					, u32(import_mesh.vertex_data.size() / packed_vertex_size)
 					, packed_vertex_size
 					, size_t(import_mesh.indices.size() * cfg.autolod_coefs[i])
-					, 9001.f // TODO
 					);
 				import_mesh.autolod_indices[i]->resize((u32)lod_index_count);
 			}
