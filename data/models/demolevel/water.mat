@@ -1,0 +1,18 @@
+shader "/pipelines/water.shd"
+backface_culling(true)
+layer "water"
+defines {}
+texture "/textures/water_h.ltc"
+texture "/textures/common/blue_noise.tga"
+texture ""
+uniform("UV scale", 1.000000)
+uniform("Specular power", 512.000000)
+uniform("R0", 0.040000)
+uniform("Normal strength", 0.290000)
+uniform("Reflection multiplier", 2.000000)
+uniform("Specular multiplier", 8.000000)
+uniform("Flow dir", { 0.060000, 0.040000 })
+uniform("Water color", { 0.000000, 0.866359, 0.854382, 0.000000 })
+uniform("Ground tint", { 0.000000, 0.640553, 0.507719, 0.000000 })
+uniform("Water scattering", 8.000000)
+uniform("Refraction distortion", 0.400000)
