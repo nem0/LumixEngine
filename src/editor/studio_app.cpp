@@ -1493,7 +1493,6 @@ struct StudioAppImpl final : StudioApp
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		menuItem("search", true);
 		menuItem("focus_asset_search", true);
 		menuItem("snapDown", is_any_entity_selected);
 		menuItem("autosnapDown", true);
