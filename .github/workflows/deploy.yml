@@ -49,7 +49,7 @@ jobs:
             - name: download Luau
               working-directory: projects\3rdparty
               run: |
-                git.exe clone --depth=1 https://github.com/nem0/luau.git 3rdparty/luau
+                git.exe clone --depth=1 https://github.com/nem0/luau.git luau
             
             - name: make dx11 project
               working-directory: projects
