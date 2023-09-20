@@ -1,4 +1,4 @@
-// dear imgui, v1.89.9 WIP
+// dear imgui, v1.90 WIP
 // (internal structures/api)
 
 // You may use this file to debug, understand or extend Dear ImGui features but we don't provide any guarantee of forward compatibility.
@@ -23,6 +23,7 @@ Index of this file:
 // [SECTION] Inputs support
 // [SECTION] Clipper support
 // [SECTION] Navigation support
+// [SECTION] Typing-select support
 // [SECTION] Columns support
 // [SECTION] Multi-select support
 // [SECTION] Docking support
@@ -157,6 +158,8 @@ struct ImGuiTableInstanceData;      // Storage for one instance of a same table
 struct ImGuiTableTempData;          // Temporary storage for one table (one per table in the stack), shared between tables.
 struct ImGuiTableSettings;          // Storage for a table .ini settings
 struct ImGuiTableColumnsSettings;   // Storage for a column .ini settings
+struct ImGuiTypingSelectState;      // Storage for GetTypingSelectRequest()
+struct ImGuiTypingSelectRequest;    // Storage for GetTypingSelectRequest() (aimed to be public)
 struct ImGuiWindow;                 // Storage for one window
 struct ImGuiWindowTempData;         // Temporary storage for one window (that's the data which in theory we could ditch at the end of the frame, in practice we currently keep it for each window)
 struct ImGuiWindowSettings;         // Storage for a window .ini settings (we keep one of those even if the actual window wasn't instanced during this session)
@@ -183,6 +186,7 @@ typedef int ImGuiScrollFlags;           // -> enum ImGuiScrollFlags_        // F
 typedef int ImGuiSeparatorFlags;        // -> enum ImGuiSeparatorFlags_     // Flags: for SeparatorEx()
 typedef int ImGuiTextFlags;             // -> enum ImGuiTextFlags_          // Flags: for TextEx()
 typedef int ImGuiTooltipFlags;          // -> enum ImGuiTooltipFlags_       // Flags: for BeginTooltipEx()
+typedef int ImGuiTypingSelectFlags;     // -> enum ImGuiTypingSelectFlags_  // Flags: for GetTypingSelectRequest()
 
 typedef void (*ImGuiErrorLogCallback)(void* user_data, const char* fmt, ...);
 
@@ -315,6 +319,18 @@ namespace ImStb
 #endif
 #endif // #ifndef IM_DEBUG_BREAK
 
+// Format specifiers, printing 64-bit hasn't been decently standardized...
+// In a real application you should be using PRId64 and PRIu64 from <inttypes.h> (non-windows) and on Windows define them yourself.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define IM_PRId64   "I64d"
+#define IM_PRIu64   "I64u"
+#define IM_PRIX64   "I64X"
+#else
+#define IM_PRId64   "lld"
+#define IM_PRIu64   "llu"
+#define IM_PRIX64   "llX"
+#endif
+
 //-----------------------------------------------------------------------------
 // [SECTION] Generic helpers
 // Note that the ImXXX helpers functions are lower-level than ImGui functions.
@@ -358,18 +374,18 @@ static inline bool      ImIsPowerOfTwo(ImU64 v)         { return v != 0 && (v & 
 static inline int       ImUpperPowerOfTwo(int v)        { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
 
 // Helpers: String
-IMGUI_API int           ImStricmp(const char* str1, const char* str2);
-IMGUI_API int           ImStrnicmp(const char* str1, const char* str2, size_t count);
-IMGUI_API void          ImStrncpy(char* dst, const char* src, size_t count);
-IMGUI_API char*         ImStrdup(const char* str);
-IMGUI_API char*         ImStrdupcpy(char* dst, size_t* p_dst_size, const char* str);
-IMGUI_API const char*   ImStrchrRange(const char* str_begin, const char* str_end, char c);
-IMGUI_API int           ImStrlenW(const ImWchar* str);
+IMGUI_API int           ImStricmp(const char* str1, const char* str2);                      // Case insensitive compare.
+IMGUI_API int           ImStrnicmp(const char* str1, const char* str2, size_t count);       // Case insensitive compare to a certain count.
+IMGUI_API void          ImStrncpy(char* dst, const char* src, size_t count);                // Copy to a certain count and always zero terminate (strncpy doesn't).
+IMGUI_API char*         ImStrdup(const char* str);                                          // Duplicate a string.
+IMGUI_API char*         ImStrdupcpy(char* dst, size_t* p_dst_size, const char* str);        // Copy in provided buffer, recreate buffer if needed.
+IMGUI_API const char*   ImStrchrRange(const char* str_begin, const char* str_end, char c);  // Find first occurrence of 'c' in string range.
 IMGUI_API const char*   ImStreolRange(const char* str, const char* str_end);                // End end-of-line
-IMGUI_API const ImWchar*ImStrbolW(const ImWchar* buf_mid_line, const ImWchar* buf_begin);   // Find beginning-of-line
-IMGUI_API const char*   ImStristr(const char* haystack, const char* haystack_end, const char* needle, const char* needle_end);
-IMGUI_API void          ImStrTrimBlanks(char* str);
-IMGUI_API const char*   ImStrSkipBlank(const char* str);
+IMGUI_API const char*   ImStristr(const char* haystack, const char* haystack_end, const char* needle, const char* needle_end);  // Find a substring in a string range.
+IMGUI_API void          ImStrTrimBlanks(char* str);                                         // Remove leading and trailing blanks from a buffer.
+IMGUI_API const char*   ImStrSkipBlank(const char* str);                                    // Find first non-blank character.
+IMGUI_API int           ImStrlenW(const ImWchar* str);                                      // Computer string length (ImWchar string)
+IMGUI_API const ImWchar*ImStrbolW(const ImWchar* buf_mid_line, const ImWchar* buf_begin);   // Find beginning-of-line (ImWchar string)
 IM_MSVC_RUNTIME_CHECKS_OFF
 static inline char      ImToUpper(char c)               { return (c >= 'a' && c <= 'z') ? c &= ~32 : c; }
 static inline bool      ImCharIsBlankA(char c)          { return c == ' ' || c == '\t'; }
@@ -396,6 +412,7 @@ IMGUI_API int           ImTextStrFromUtf8(ImWchar* out_buf, int out_buf_size, co
 IMGUI_API int           ImTextCountCharsFromUtf8(const char* in_text, const char* in_text_end);                                 // return number of UTF-8 code-points (NOT bytes count)
 IMGUI_API int           ImTextCountUtf8BytesFromChar(const char* in_text, const char* in_text_end);                             // return number of bytes to express one char in UTF-8
 IMGUI_API int           ImTextCountUtf8BytesFromStr(const ImWchar* in_text, const ImWchar* in_text_end);                        // return number of bytes to express string in UTF-8
+IMGUI_API const char*   ImTextFindPreviousUtf8Codepoint(const char* in_text_start, const char* in_text_curr);                   // return previous UTF-8 code-point.
 
 // Helpers: File System
 #ifdef IMGUI_DISABLE_FILE_FUNCTIONS
@@ -815,6 +832,7 @@ enum ImGuiItemFlags_
 
     // Controlled by widget code
     ImGuiItemFlags_Inputable                = 1 << 10, // false     // [WIP] Auto-activate input mode when tab focused. Currently only used and supported by a few items before it becomes a generic feature.
+    ImGuiItemFlags_HasSelectionUserData     = 1 << 11, // false     // Set by SetNextItemSelectionUserData()
 };
 
 // Status flags for an already submitted item
@@ -895,7 +913,7 @@ enum ImGuiComboFlagsPrivate_
 enum ImGuiSliderFlagsPrivate_
 {
     ImGuiSliderFlags_Vertical               = 1 << 20,  // Should this slider be orientated vertically?
-    ImGuiSliderFlags_ReadOnly               = 1 << 21,
+    ImGuiSliderFlags_ReadOnly               = 1 << 21,  // Consider using g.NextItemData.ItemFlags |= ImGuiItemFlags_ReadOnly instead.
 };
 
 // Extend ImGuiSelectableFlags_
@@ -1187,6 +1205,10 @@ struct ImGuiNextWindowData
     inline void ClearFlags()    { Flags = ImGuiNextWindowDataFlags_None; }
 };
 
+// Multi-Selection item index or identifier when using SetNextItemSelectionUserData()/BeginMultiSelect()
+// (Most users are likely to use this store an item INDEX but this may be used to store a POINTER as well.)
+typedef ImS64 ImGuiSelectionUserData;
+
 enum ImGuiNextItemDataFlags_
 {
     ImGuiNextItemDataFlags_None     = 0,
@@ -1197,13 +1219,14 @@ enum ImGuiNextItemDataFlags_
 struct ImGuiNextItemData
 {
     ImGuiNextItemDataFlags      Flags;
-    ImGuiItemFlags              ItemFlags;      // Currently only tested/used for ImGuiItemFlags_AllowOverlap.
-    float                       Width;          // Set by SetNextItemWidth()
-    ImGuiID                     FocusScopeId;   // Set by SetNextItemMultiSelectData() (!= 0 signify value has been set, so it's an alternate version of HasSelectionData, we don't use Flags for this because they are cleared too early. This is mostly used for debugging)
+    ImGuiItemFlags              ItemFlags;          // Currently only tested/used for ImGuiItemFlags_AllowOverlap.
+    // Non-flags members are NOT cleared by ItemAdd() meaning they are still valid during NavProcessItem()
+    float                       Width;              // Set by SetNextItemWidth()
+    ImGuiSelectionUserData      SelectionUserData;  // Set by SetNextItemSelectionUserData() (note that NULL/0 is a valid value, we use -1 == ImGuiSelectionUserData_Invalid to mark invalid values)
     ImGuiCond                   OpenCond;
-    bool                        OpenVal;        // Set by SetNextItemOpen()
+    bool                        OpenVal;            // Set by SetNextItemOpen()
 
-    ImGuiNextItemData()         { memset(this, 0, sizeof(*this)); }
+    ImGuiNextItemData()         { memset(this, 0, sizeof(*this)); SelectionUserData = -1; }
     inline void ClearFlags()    { Flags = ImGuiNextItemDataFlags_None; ItemFlags = ImGuiItemFlags_None; } // Also cleared manually by ItemAdd()!
 };
 
@@ -1544,12 +1567,50 @@ struct ImGuiNavItemData
     ImGuiID             FocusScopeId;   // Init,Move    // Best candidate focus scope ID
     ImRect              RectRel;        // Init,Move    // Best candidate bounding box in window relative space
     ImGuiItemFlags      InFlags;        // ????,Move    // Best candidate item flags
+    ImGuiSelectionUserData SelectionUserData;//I+Mov    // Best candidate SetNextItemSelectionData() value.
     float               DistBox;        //      Move    // Best candidate box distance to current NavId
     float               DistCenter;     //      Move    // Best candidate center distance to current NavId
     float               DistAxial;      //      Move    // Best candidate axial distance to current NavId
 
     ImGuiNavItemData()  { Clear(); }
-    void Clear()        { Window = NULL; ID = FocusScopeId = 0; InFlags = 0; DistBox = DistCenter = DistAxial = FLT_MAX; }
+    void Clear()        { Window = NULL; ID = FocusScopeId = 0; InFlags = 0; SelectionUserData = -1; DistBox = DistCenter = DistAxial = FLT_MAX; }
+};
+
+//-----------------------------------------------------------------------------
+// [SECTION] Typing-select support
+//-----------------------------------------------------------------------------
+
+// Flags for GetTypingSelectRequest()
+enum ImGuiTypingSelectFlags_
+{
+    ImGuiTypingSelectFlags_None                 = 0,
+    ImGuiTypingSelectFlags_AllowBackspace       = 1 << 0,   // Backspace to delete character inputs. If using: ensure GetTypingSelectRequest() is not called more than once per frame (filter by e.g. focus state)
+    ImGuiTypingSelectFlags_AllowSingleCharMode  = 1 << 1,   // Allow "single char" search mode which is activated when pressing the same character multiple times.
+};
+
+// Returned by GetTypingSelectRequest(), designed to eventually be public.
+struct IMGUI_API ImGuiTypingSelectRequest
+{
+    ImGuiTypingSelectFlags  Flags;              // Flags passed to GetTypingSelectRequest()
+    int                     SearchBufferLen;
+    const char*             SearchBuffer;       // Search buffer contents (use full string. unless SingleCharMode is set, in which case use SingleCharSize).
+    bool                    SelectRequest;      // Set when buffer was modified this frame, requesting a selection.
+    bool                    SingleCharMode;     // Notify when buffer contains same character repeated, to implement special mode. In this situation it preferred to not display any on-screen search indication.
+    ImS8                    SingleCharSize;     // Length in bytes of first letter codepoint (1 for ascii, 2-4 for UTF-8). If (SearchBufferLen==RepeatCharSize) only 1 letter has been input.
+};
+
+// Storage for GetTypingSelectRequest()
+struct IMGUI_API ImGuiTypingSelectState
+{
+    ImGuiTypingSelectRequest Request;           // User-facing data
+    char            SearchBuffer[64];           // Search buffer: no need to make dynamic as this search is very transient.
+    ImGuiID         FocusScope;
+    int             LastRequestFrame = 0;
+    float           LastRequestTime = 0.0f;
+    bool            SingleCharModeLock = false; // After a certain single char repeat count we lock into SingleCharMode. Two benefits: 1) buffer never fill, 2) we can provide an immediate SingleChar mode without timer elapsing.
+
+    ImGuiTypingSelectState() { memset(this, 0, sizeof(*this)); }
+    void            Clear()  { SearchBuffer[0] = 0; SingleCharModeLock = false; } // We preserve remaining data for easier debugging
 };
 
 //-----------------------------------------------------------------------------
@@ -1612,6 +1673,9 @@ struct ImGuiOldColumns
 // [SECTION] Multi-select support
 //-----------------------------------------------------------------------------
 
+// We always assume that -1 is an invalid value (which works for indices and pointers)
+#define ImGuiSelectionUserData_Invalid        ((ImGuiSelectionUserData)-1)
+
 #ifdef IMGUI_HAS_MULTI_SELECT
 // <this is filled in 'range_select' branch>
 #endif // #ifdef IMGUI_HAS_MULTI_SELECT
@@ -1629,25 +1693,28 @@ struct ImGuiOldColumns
 enum ImGuiDockNodeFlagsPrivate_
 {
     // [Internal]
-    ImGuiDockNodeFlags_DockSpace                = 1 << 10,  // Local, Saved  // A dockspace is a node that occupy space within an existing user window. Otherwise the node is floating and create its own window.
-    ImGuiDockNodeFlags_CentralNode              = 1 << 11,  // Local, Saved  // The central node has 2 main properties: stay visible when empty, only use "remaining" spaces from its neighbor.
-    ImGuiDockNodeFlags_NoTabBar                 = 1 << 12,  // Local, Saved  // Tab bar is completely unavailable. No triangle in the corner to enable it back.
-    ImGuiDockNodeFlags_HiddenTabBar             = 1 << 13,  // Local, Saved  // Tab bar is hidden, with a triangle in the corner to show it again (NB: actual tab-bar instance may be destroyed as this is only used for single-window tab bar)
-    ImGuiDockNodeFlags_NoWindowMenuButton       = 1 << 14,  // Local, Saved  // Disable window/docking menu (that one that appears instead of the collapse button)
-    ImGuiDockNodeFlags_NoCloseButton            = 1 << 15,  // Local, Saved  //
-    ImGuiDockNodeFlags_NoDocking                = 1 << 16,  // Local, Saved  // Disable any form of docking in this dockspace or individual node. (On a whole dockspace, this pretty much defeat the purpose of using a dockspace at all). Note: when turned on, existing docked nodes will be preserved.
-    ImGuiDockNodeFlags_NoDockingSplitMe         = 1 << 17,  // [EXPERIMENTAL] Prevent another window/node from splitting this node.
-    ImGuiDockNodeFlags_NoDockingSplitOther      = 1 << 18,  // [EXPERIMENTAL] Prevent this node from splitting another window/node.
-    ImGuiDockNodeFlags_NoDockingOverMe          = 1 << 19,  // [EXPERIMENTAL] Prevent another window/node to be docked over this node.
-    ImGuiDockNodeFlags_NoDockingOverOther       = 1 << 20,  // [EXPERIMENTAL] Prevent this node to be docked over another window or non-empty node.
-    ImGuiDockNodeFlags_NoDockingOverEmpty       = 1 << 21,  // [EXPERIMENTAL] Prevent this node to be docked over an empty node (e.g. DockSpace with no other windows)
-    ImGuiDockNodeFlags_NoResizeX                = 1 << 22,  // [EXPERIMENTAL]
-    ImGuiDockNodeFlags_NoResizeY                = 1 << 23,  // [EXPERIMENTAL]
+    ImGuiDockNodeFlags_DockSpace                = 1 << 10,  // Saved // A dockspace is a node that occupy space within an existing user window. Otherwise the node is floating and create its own window.
+    ImGuiDockNodeFlags_CentralNode              = 1 << 11,  // Saved // The central node has 2 main properties: stay visible when empty, only use "remaining" spaces from its neighbor.
+    ImGuiDockNodeFlags_NoTabBar                 = 1 << 12,  // Saved // Tab bar is completely unavailable. No triangle in the corner to enable it back.
+    ImGuiDockNodeFlags_HiddenTabBar             = 1 << 13,  // Saved // Tab bar is hidden, with a triangle in the corner to show it again (NB: actual tab-bar instance may be destroyed as this is only used for single-window tab bar)
+    ImGuiDockNodeFlags_NoWindowMenuButton       = 1 << 14,  // Saved // Disable window/docking menu (that one that appears instead of the collapse button)
+    ImGuiDockNodeFlags_NoCloseButton            = 1 << 15,  // Saved // Disable close button
+    ImGuiDockNodeFlags_NoResizeX                = 1 << 16,  //       //
+    ImGuiDockNodeFlags_NoResizeY                = 1 << 17,  //       //
+    // Disable docking/undocking actions in this dockspace or individual node (existing docked nodes will be preserved)
+    // Those are not exposed in public because the desirable sharing/inheriting/copy-flag-on-split behaviors are quite difficult to design and understand.
+    // The two public flags ImGuiDockNodeFlags_NoDockingOverCentralNode/ImGuiDockNodeFlags_NoDockingSplit don't have those issues.
+    ImGuiDockNodeFlags_NoDockingSplitOther      = 1 << 19,  //       // Disable this node from splitting other windows/nodes.
+    ImGuiDockNodeFlags_NoDockingOverMe          = 1 << 20,  //       // Disable other windows/nodes from being docked over this node.
+    ImGuiDockNodeFlags_NoDockingOverOther       = 1 << 21,  //       // Disable this node from being docked over another window or non-empty node.
+    ImGuiDockNodeFlags_NoDockingOverEmpty       = 1 << 22,  //       // Disable this node from being docked over an empty node (e.g. DockSpace with no other windows)
+    ImGuiDockNodeFlags_NoDocking                = ImGuiDockNodeFlags_NoDockingOverMe | ImGuiDockNodeFlags_NoDockingOverOther | ImGuiDockNodeFlags_NoDockingOverEmpty | ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoDockingSplitOther,
+    // Masks
     ImGuiDockNodeFlags_SharedFlagsInheritMask_  = ~0,
     ImGuiDockNodeFlags_NoResizeFlagsMask_       = ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoResizeX | ImGuiDockNodeFlags_NoResizeY,
-    ImGuiDockNodeFlags_LocalFlagsMask_          = ImGuiDockNodeFlags_NoSplit | ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton | ImGuiDockNodeFlags_NoDocking,
-    ImGuiDockNodeFlags_LocalFlagsTransferMask_  = ImGuiDockNodeFlags_LocalFlagsMask_ & ~ImGuiDockNodeFlags_DockSpace,  // When splitting those flags are moved to the inheriting child, never duplicated
-    ImGuiDockNodeFlags_SavedFlagsMask_          = ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton | ImGuiDockNodeFlags_NoDocking
+    // When splitting, those local flags are moved to the inheriting child, never duplicated
+    ImGuiDockNodeFlags_LocalFlagsTransferMask_  = ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton,
+    ImGuiDockNodeFlags_SavedFlagsMask_          = ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton,
 };
 
 // Store the source authority (dock node vs window) of a field
@@ -1862,6 +1929,7 @@ enum ImGuiLocKey : int
     ImGuiLocKey_WindowingPopup,
     ImGuiLocKey_WindowingUntitled,
     ImGuiLocKey_DockingHideTabBar,
+    ImGuiLocKey_DockingHoldShiftToDock,
     ImGuiLocKey_COUNT
 };
 
@@ -1891,6 +1959,7 @@ enum ImGuiDebugLogFlags_
     ImGuiDebugLogFlags_EventViewport    = 1 << 8,
     ImGuiDebugLogFlags_EventMask_       = ImGuiDebugLogFlags_EventActiveId | ImGuiDebugLogFlags_EventFocus | ImGuiDebugLogFlags_EventPopup | ImGuiDebugLogFlags_EventNav | ImGuiDebugLogFlags_EventClipper | ImGuiDebugLogFlags_EventSelection | ImGuiDebugLogFlags_EventIO | ImGuiDebugLogFlags_EventDocking | ImGuiDebugLogFlags_EventViewport,
     ImGuiDebugLogFlags_OutputToTTY      = 1 << 10,  // Also send output to TTY
+    ImGuiDebugLogFlags_OutputToTestEngine = 1 << 11,// Also send output to Test Engine
 };
 
 struct ImGuiMetricsConfig
@@ -2053,14 +2122,14 @@ struct ImGuiContext
     ImGuiNextWindowData     NextWindowData;                     // Storage for SetNextWindow** functions
 
     // Shared stacks
-    ImVector<ImGuiColorMod> ColorStack;                         // Stack for PushStyleColor()/PopStyleColor() - inherited by Begin()
-    ImVector<ImGuiStyleMod> StyleVarStack;                      // Stack for PushStyleVar()/PopStyleVar() - inherited by Begin()
-    ImVector<ImFont*>       FontStack;                          // Stack for PushFont()/PopFont() - inherited by Begin()
-    ImVector<ImGuiID>       FocusScopeStack;                    // Stack for PushFocusScope()/PopFocusScope() - inherited by BeginChild(), pushed into by Begin()
-    ImVector<ImGuiItemFlags>ItemFlagsStack;                     // Stack for PushItemFlag()/PopItemFlag() - inherited by Begin()
-    ImVector<ImGuiGroupData>GroupStack;                         // Stack for BeginGroup()/EndGroup() - not inherited by Begin()
-    ImVector<ImGuiPopupData>OpenPopupStack;                     // Which popups are open (persistent)
-    ImVector<ImGuiPopupData>BeginPopupStack;                    // Which level of BeginPopup() we are in (reset every frame)
+    ImVector<ImGuiColorMod>     ColorStack;                     // Stack for PushStyleColor()/PopStyleColor() - inherited by Begin()
+    ImVector<ImGuiStyleMod>     StyleVarStack;                  // Stack for PushStyleVar()/PopStyleVar() - inherited by Begin()
+    ImVector<ImFont*>           FontStack;                      // Stack for PushFont()/PopFont() - inherited by Begin()
+    ImVector<ImGuiID>           FocusScopeStack;                // Stack for PushFocusScope()/PopFocusScope() - inherited by BeginChild(), pushed into by Begin()
+    ImVector<ImGuiItemFlags>    ItemFlagsStack;                 // Stack for PushItemFlag()/PopItemFlag() - inherited by Begin()
+    ImVector<ImGuiGroupData>    GroupStack;                     // Stack for BeginGroup()/EndGroup() - not inherited by Begin()
+    ImVector<ImGuiPopupData>    OpenPopupStack;                 // Which popups are open (persistent)
+    ImVector<ImGuiPopupData>    BeginPopupStack;                // Which level of BeginPopup() we are in (reset every frame)
     ImVector<ImGuiNavTreeNodeData> NavTreeNodeStack;            // Stack for TreeNode() when a NavLeft requested is emitted.
 
     int                     BeginMenuCount;
@@ -2092,6 +2161,7 @@ struct ImGuiContext
     ImGuiActivateFlags      NavNextActivateFlags;
     ImGuiInputSource        NavInputSource;                     // Keyboard or Gamepad mode? THIS CAN ONLY BE ImGuiInputSource_Keyboard or ImGuiInputSource_Mouse
     ImGuiNavLayer           NavLayer;                           // Layer we are navigating on. For now the system is hard-coded for 0=main contents and 1=menu/title bar, may expose layers later.
+    ImGuiSelectionUserData  NavLastValidSelectionUserData;      // Last valid data passed to SetNextItemSelectionUser(), or -1. For current window. Not reset when focusing an item that doesn't have selection data.
     bool                    NavIdIsAlive;                       // Nav widget has been seen this frame ~~ NavRectRel is valid
     bool                    NavMousePosDirty;                   // When set we will update mouse position if (io.ConfigFlags & ImGuiConfigFlags_NavEnableSetMousePos) if set (NB: this not enabled by default)
     bool                    NavDisableHighlight;                // When user starts using mouse, we hide gamepad/keyboard highlight (NB: but they are still available, which is why NavDisableHighlight isn't always != NavDisableMouseHover)
@@ -2208,9 +2278,11 @@ struct ImGuiContext
     float                   ScrollbarClickDeltaToGrabCenter;    // Distance between mouse and center of grab box, normalized in parent space. Use storage?
     float                   DisabledAlphaBackup;                // Backup for style.Alpha for BeginDisabled()
     short                   DisabledStackSize;
+    short                   LockMarkEdited;
     short                   TooltipOverrideCount;
     ImVector<char>          ClipboardHandlerData;               // If no custom clipboard handler is defined
     ImVector<ImGuiID>       MenusIdSubmittedThisFrame;          // A list of menu IDs that were rendered at least once
+    ImGuiTypingSelectState  TypingSelectState;                  // State for GetTypingSelectRequest()
 
     // Platform support
     ImGuiPlatformImeData    PlatformImeData;                    // Data updated by current frame
@@ -2352,6 +2424,7 @@ struct ImGuiContext
         NavJustMovedToKeyMods = ImGuiMod_None;
         NavInputSource = ImGuiInputSource_Keyboard;
         NavLayer = ImGuiNavLayer_Main;
+        NavLastValidSelectionUserData = ImGuiSelectionUserData_Invalid;
         NavIdIsAlive = false;
         NavMousePosDirty = false;
         NavDisableHighlight = true;
@@ -2416,6 +2489,7 @@ struct ImGuiContext
         ScrollbarClickDeltaToGrabCenter = 0.0f;
         DisabledAlphaBackup = 0.0f;
         DisabledStackSize = 0;
+        LockMarkEdited = 0;
         TooltipOverrideCount = 0;
 
         PlatformImeData.InputPos = ImVec2(0.0f, 0.0f);
@@ -2675,7 +2749,6 @@ enum ImGuiTabItemFlagsPrivate_
     ImGuiTabItemFlags_NoCloseButton             = 1 << 20,  // Track whether p_open was set or not (we'll need this info on the next frame to recompute ContentWidth during layout)
     ImGuiTabItemFlags_Button                    = 1 << 21,  // Used by TabItemButton, change the tab item behavior to mimic a button
     ImGuiTabItemFlags_Unsorted                  = 1 << 22,  // [Docking] Trailing tabs with the _Unsorted flag will be sorted based on the DockOrder of their Window.
-    ImGuiTabItemFlags_Preview                   = 1 << 23,  // [Docking] Display tab shape for docking preview (height is adjusted slightly to compensate for the yet missing tab bar)
 };
 
 // Storage for one active tab item (sizeof() 48 bytes)
@@ -2720,6 +2793,8 @@ struct IMGUI_API ImGuiTabBar
     float               ScrollingSpeed;
     float               ScrollingRectMinX;
     float               ScrollingRectMaxX;
+    float               SeparatorMinX;
+    float               SeparatorMaxX;
     ImGuiID             ReorderRequestTabId;
     ImS16               ReorderRequestOffset;
     ImS8                BeginCount;
@@ -2854,6 +2929,7 @@ struct IMGUI_API ImGuiTable
     float                       RowPosY1;
     float                       RowPosY2;
     float                       RowMinHeight;               // Height submitted to TableNextRow()
+    float                       RowCellPaddingY;            // Top and bottom padding. Reloaded during row change.
     float                       RowTextBaseline;
     float                       RowIndentOffsetX;
     ImGuiTableRowFlags          RowFlags : 16;              // Current row flags, see ImGuiTableRowFlags_
@@ -2867,9 +2943,8 @@ struct IMGUI_API ImGuiTable
     float                       HostIndentX;
     float                       MinColumnWidth;
     float                       OuterPaddingX;
-    float                       CellPaddingX;               // Padding from each borders
-    float                       CellPaddingY;
-    float                       CellSpacingX1;              // Spacing between non-bordered cells
+    float                       CellPaddingX;               // Padding from each borders. Locked in BeginTable()/Layout.
+    float                       CellSpacingX1;              // Spacing between non-bordered cells. Locked in BeginTable()/Layout.
     float                       CellSpacingX2;
     float                       InnerWidth;                 // User value passed to BeginTable(), see comments at the top of BeginTable() for details.
     float                       ColumnsGivenWidth;          // Sum of current column width
@@ -3190,6 +3265,7 @@ namespace ImGui
     IMGUI_API void          NavMoveRequestApplyResult();
     IMGUI_API void          NavMoveRequestTryWrapping(ImGuiWindow* window, ImGuiNavMoveFlags move_flags);
     IMGUI_API void          NavClearPreferredPosForAxis(ImGuiAxis axis);
+    IMGUI_API void          NavRestoreHighlightAfterMove();
     IMGUI_API void          NavUpdateCurrentWindowIsScrollPushableX();
     IMGUI_API void          SetNavWindow(ImGuiWindow* window);
     IMGUI_API void          SetNavID(ImGuiID id, ImGuiNavLayer nav_layer, ImGuiID focus_scope_id, const ImRect& rect_rel);
@@ -3230,6 +3306,7 @@ namespace ImGui
     IMGUI_API float         GetNavTweakPressedAmount(ImGuiAxis axis);
     IMGUI_API int           CalcTypematicRepeatAmount(float t0, float t1, float repeat_delay, float repeat_rate);
     IMGUI_API void          GetTypematicRepeatRate(ImGuiInputFlags flags, float* repeat_delay, float* repeat_rate);
+    IMGUI_API void          TeleportMousePos(const ImVec2& pos);
     IMGUI_API void          SetActiveIdUsingAllKeyboardKeys();
     inline bool             IsActiveIdUsingNavDir(ImGuiDir dir)                         { ImGuiContext& g = *GImGui; return (g.ActiveIdUsingNavDirMask & (1 << dir)) != 0; }
 
@@ -3353,6 +3430,12 @@ namespace ImGui
     IMGUI_API bool          IsDragDropPayloadBeingAccepted();
     IMGUI_API void          RenderDragDropTargetRect(const ImRect& bb);
 
+    // Typing-Select API
+    IMGUI_API ImGuiTypingSelectRequest* GetTypingSelectRequest(ImGuiTypingSelectFlags flags = ImGuiTypingSelectFlags_None);
+    IMGUI_API int           TypingSelectFindMatch(ImGuiTypingSelectRequest* req, int items_count, const char* (*get_item_name_func)(void*, int), void* user_data, int nav_item_idx);
+    IMGUI_API int           TypingSelectFindNextSingleCharMatch(ImGuiTypingSelectRequest* req, int items_count, const char* (*get_item_name_func)(void*, int), void* user_data, int nav_item_idx);
+    IMGUI_API int           TypingSelectFindBestLeadingMatch(ImGuiTypingSelectRequest* req, int items_count, const char* (*get_item_name_func)(void*, int), void* user_data);
+
     // Internal Columns API (this is not exposed because we will encourage transitioning to the Tables API)
     IMGUI_API void          SetWindowClipRectBeforeSetChannel(ImGuiWindow* window, const ImRect& clip_rect);
     IMGUI_API void          BeginColumns(const char* str_id, int count, ImGuiOldColumnFlags flags = 0); // setup number of columns. use an identifier to distinguish multiple column sets. close with EndColumns().
@@ -3422,7 +3505,7 @@ namespace ImGui
 
     // Tab Bars
     inline    ImGuiTabBar*  GetCurrentTabBar() { ImGuiContext& g = *GImGui; return g.CurrentTabBar; }
-    IMGUI_API bool          BeginTabBarEx(ImGuiTabBar* tab_bar, const ImRect& bb, ImGuiTabBarFlags flags, ImGuiDockNode* dock_node);
+    IMGUI_API bool          BeginTabBarEx(ImGuiTabBar* tab_bar, const ImRect& bb, ImGuiTabBarFlags flags);
     IMGUI_API ImGuiTabItem* TabBarFindTabByID(ImGuiTabBar* tab_bar, ImGuiID tab_id);
     IMGUI_API ImGuiTabItem* TabBarFindTabByOrder(ImGuiTabBar* tab_bar, int order);
     IMGUI_API ImGuiTabItem* TabBarFindMostRecentlySelectedTabForActiveWindow(ImGuiTabBar* tab_bar);
@@ -3496,6 +3579,7 @@ namespace ImGui
     IMGUI_API void          TreePushOverrideID(ImGuiID id);
     IMGUI_API void          TreeNodeSetOpen(ImGuiID id, bool open);
     IMGUI_API bool          TreeNodeUpdateNextOpen(ImGuiID id, ImGuiTreeNodeFlags flags);   // Return open state. Consume previous SetNextItemOpen() data, if any. May return true when logging.
+    IMGUI_API void          SetNextItemSelectionUserData(ImGuiSelectionUserData selection_user_data);
 
     // Template functions are instantiated in imgui_widgets.cpp for a finite number of types.
     // To use them externally (for custom widget) you may need an "extern template" statement in your code in order to link to existing instances and silence Clang warnings (see #2036).
@@ -3568,6 +3652,7 @@ namespace ImGui
     IMGUI_API void          DebugNodeTable(ImGuiTable* table);
     IMGUI_API void          DebugNodeTableSettings(ImGuiTableSettings* settings);
     IMGUI_API void          DebugNodeInputTextState(ImGuiInputTextState* state);
+    IMGUI_API void          DebugNodeTypingSelectState(ImGuiTypingSelectState* state);
     IMGUI_API void          DebugNodeWindow(ImGuiWindow* window, const char* label);
     IMGUI_API void          DebugNodeWindowSettings(ImGuiWindowSettings* settings);
     IMGUI_API void          DebugNodeWindowsList(ImVector<ImGuiWindow*>* windows, const char* label);
@@ -3610,6 +3695,7 @@ struct ImFontBuilderIO
 #ifdef IMGUI_ENABLE_STB_TRUETYPE
 IMGUI_API const ImFontBuilderIO* ImFontAtlasGetBuilderForStbTruetype();
 #endif
+IMGUI_API void      ImFontAtlasUpdateConfigDataPointers(ImFontAtlas* atlas);
 IMGUI_API void      ImFontAtlasBuildInit(ImFontAtlas* atlas);
 IMGUI_API void      ImFontAtlasBuildSetupFont(ImFontAtlas* atlas, ImFont* font, ImFontConfig* font_config, float ascent, float descent);
 IMGUI_API void      ImFontAtlasBuildPackCustomRects(ImFontAtlas* atlas, void* stbrp_context_opaque);
