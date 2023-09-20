@@ -95,6 +95,10 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		: m_app(app)
 		, m_name(name, app.getAllocator())
 	{}
+	
+	~StudioLuaPlugin() {
+		m_app.removeAction(&m_action);
+	}
 
 	void runWindowAction() {
 		lua_State* L = m_app.getEngine().getState();

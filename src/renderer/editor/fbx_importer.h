@@ -47,6 +47,7 @@ struct FBXImporter {
 		bool import_vertex_colors = true;
 		bool vertex_color_is_ao = false;
 		bool bake_vertex_ao = false;
+		float min_bake_vertex_ao = 0.f;
 		Physics physics = Physics::NONE;
 		u32 lod_count = 1;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
@@ -129,7 +130,6 @@ struct FBXImporter {
 		Local<Array<u32>> autolod_indices[4];
 		AABB aabb;
 		float origin_radius_squared;
-		float center_radius_squared;
 		Vec3 origin = Vec3(0);
 	};
 
@@ -179,7 +179,7 @@ private:
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
-	void writeImpostorVertices(const AABB& aabb);
+	void writeImpostorVertices(float center_y, Vec2 bounding_cylinder);
 	void writeGeometry(const ImportConfig& cfg);
 	void writeGeometry(int mesh_idx, const ImportConfig& cfg);
 	void writeImpostorMesh(StringView dir, StringView model_name);

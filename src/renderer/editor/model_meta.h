@@ -43,6 +43,7 @@ struct ModelMeta {
 		WRITE_BOOL(import_vertex_colors, false);
 		WRITE_BOOL(vertex_color_is_ao, false);
 		WRITE_BOOL(ignore_animations, false);
+		WRITE_VALUE(min_bake_vertex_ao, 0.f);
 		WRITE_VALUE(anim_translation_error, 1.f);
 		WRITE_VALUE(anim_rotation_error, 1.f);
 		WRITE_VALUE(scale, 1.f);
@@ -113,6 +114,7 @@ struct ModelMeta {
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &split);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &bake_impostor_normals);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &bake_vertex_ao);
+		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "min_bake_vertex_ao", &min_bake_vertex_ao);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &create_impostor);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &import_vertex_colors);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "ignore_animations", &ignore_animations);
@@ -185,6 +187,7 @@ struct ModelMeta {
 	bool ignore_animations = false;
 	u8 autolod_mask = 0;
 	u32 lod_count = 1;
+	float min_bake_vertex_ao = 0.f;
 	float anim_rotation_error = 1.f;
 	float anim_translation_error = 1.f;
 	float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };

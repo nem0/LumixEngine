@@ -1957,6 +1957,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (m_has_meshes) {
 				ImGuiEx::Label("Bake vertex AO");
 				saveUndo(ImGui::Checkbox("##vrtxao", &m_meta.bake_vertex_ao));
+				if (m_meta.bake_vertex_ao) {
+					ImGuiEx::Label("Min bake vertex AO");
+					saveUndo(ImGui::DragFloat("##minvrtxao", &m_meta.min_bake_vertex_ao, 0.01f, 0, 1));
+				}
 				ImGuiEx::Label("Mikktspace tangents");
 				saveUndo(ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace));
 				ImGuiEx::Label("Force skinned");
@@ -2514,6 +2518,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
 		cfg.bake_vertex_ao = meta.bake_vertex_ao;
+		cfg.min_bake_vertex_ao = meta.min_bake_vertex_ao;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
 		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
 		cfg.lod_count = meta.lod_count;

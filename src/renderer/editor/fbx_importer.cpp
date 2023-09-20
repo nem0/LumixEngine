@@ -39,7 +39,6 @@ static bool hasTangents(const ofbx::Mesh& mesh) {
 	return false;
 }
 
-
 static void getMaterialName(const ofbx::Material* material, char (&out)[128])
 {
 	copyString(out, material ? material->name : "default");
@@ -702,7 +701,7 @@ void FBXImporter::triangulate(OutputMemoryStream& unindexed_triangles
 				ofbx::Vec2 uv = uvs.get(tri_indices[i]);
 				write(Vec2(uv.x, 1 - uv.y));
 			}
-			if (cfg.bake_vertex_ao) unindexed_triangles.write(u32(0));
+			if (cfg.bake_vertex_ao) write(u32(0));
 			if (colors.values && cfg.import_vertex_colors) {
 				ofbx::Vec4 color = colors.get(tri_indices[i]);
 				if (cfg.vertex_color_is_ao) {
@@ -763,17 +762,6 @@ static void computeBoundingShapes(FBXImporter::ImportMesh& mesh, u32 vertex_size
 
 	mesh.aabb = aabb;
 	mesh.origin_radius_squared = max_squared_dist;
-	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-	float max_center_dist_squared = 0;
-	positions = mesh.vertex_data.data();
-	for (u32 i = 0; i < vertex_count; ++i) {
-		Vec3 p;
-		memcpy(&p, positions, sizeof(p));
-		positions += vertex_size;
-		float d = squaredLength(p - center);
-		max_center_dist_squared = maximum(d, max_center_dist_squared);
-	}
-	mesh.center_radius_squared = max_center_dist_squared;
 }
 
 // convert from ofbx to runtime vertex data, compute missing info (normals, tangents, ao, ...)
@@ -1048,37 +1036,32 @@ static Vec3 impostorToWorld(Vec2 uv) {
 static constexpr u32 IMPOSTOR_TILE_SIZE = 512;
 static constexpr u32 IMPOSTOR_COLS = 9;
 
-static void getBBProjection(const AABB& aabb, Vec2& out_min, Vec2& out_max) {
-	const float radius = length(aabb.max - aabb.min) * 0.5f;
-	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
-
-	Matrix proj;
-	proj.setOrtho(-1, 1, -1, 1, 0, radius * 2, true);
-	Vec2 min(FLT_MAX, FLT_MAX), max(-FLT_MAX, -FLT_MAX);
-	for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
-		for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
-			const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
-			Matrix view;
-			view.lookAt(center + v, center, Vec3(0, 1, 0));
-			const Matrix vp = proj * view;
-			for (u32 k = 0; k < 8; ++k) {
-				const Vec3 p = {
-					k & 1 ? aabb.min.x : aabb.max.x,
-					k & 2 ? aabb.min.y : aabb.max.y,
-					k & 4 ? aabb.min.z : aabb.max.z
-				};
-				const Vec4 proj_p = vp * Vec4(p, 1);
-				min.x = minimum(min.x, proj_p.x / proj_p.w);
-				min.y = minimum(min.y, proj_p.y / proj_p.w);
-				max.x = maximum(max.x, proj_p.x / proj_p.w);
-				max.y = maximum(max.y, proj_p.y / proj_p.w);
-			}
+static Vec2 computeBoundingCylinder(const Model& model, Vec3 center) {
+	center.x = 0;
+	center.z = 0;
+	i32 mesh_count = model.getMeshCount();
+	Vec2 bcylinder(0);
+	for (i32 mesh_idx = 0; mesh_idx < mesh_count; ++mesh_idx) {
+		const Mesh& mesh = model.getMesh(mesh_idx);
+		if (mesh.lod != 0) continue;
+		i32 vertex_count = mesh.vertices.size();
+		for (i32 i = 0; i < vertex_count; ++i) {
+			const Vec3 p = mesh.vertices[i] - center;
+			bcylinder.x = maximum(bcylinder.x, p.x * p.x + p.z * p.z);
+			bcylinder.y = maximum(bcylinder.y, fabsf(p.y));
 		}
 	}
-	out_min = min;
-	out_max = max;
+
+	bcylinder.x = sqrtf(bcylinder.x);
+	return bcylinder;
 }
 
+static Vec2 computeImpostorHalfExtents(Vec2 bounding_cylinder) {
+	return {
+		bounding_cylinder.x,
+		sqrtf(bounding_cylinder.x * bounding_cylinder.x + bounding_cylinder.y * bounding_cylinder.y)
+	};
+}
 
 bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u16>& gb_depth, Array<u32>& shadow_data, IVec2& tile_size, bool bake_normals)
 {
@@ -1091,20 +1074,22 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 
 	const u32 capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
+	Array<u32> depth_tmp(m_allocator);
 
 	renderer->pushJob("create impostor textures", [&](DrawStream& stream) {
-		const AABB aabb = model->getAABB();
+		const AABB& aabb = model->getAABB();
+		Vec3 center = (aabb.max + aabb.min) * 0.5f;
+		center.x = center.z = 0;
 		const float radius = model->getCenterBoundingRadius();
+
+		const Vec2 bounding_cylinder = computeBoundingCylinder(*model, center);
+		Vec2 min, max;
+		const Vec2 half_extents = computeImpostorHalfExtents(bounding_cylinder);
+		min = -half_extents;
+		max = half_extents;
 
 		gpu::TextureHandle gbs[] = {gpu::allocTextureHandle(), gpu::allocTextureHandle(), gpu::allocTextureHandle()};
 
-		const Vec3 center = Vec3(0, (aabb.min + aabb.max).y * 0.5f, 0);
-		Vec2 min, max;
-		getBBProjection(aabb, min, max);
-		if (max.x > radius && min.y < -radius && max.y > radius && min.y < radius) {
-			max = Vec2(radius);
-			min = Vec2(-radius);
-		}
 		const Vec2 padding = Vec2(1.f) / Vec2(IMPOSTOR_TILE_SIZE) * (max - min);
 		min += -padding;
 		max += padding;
@@ -1225,18 +1210,15 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		stream.readTexture(staging, 0, Span((u8*)shadow_data.begin(), shadow_data.byte_size()));
 		stream.destroy(staging);
 
-		{
-			gpu::TextureHandle staging_depth = gpu::allocTextureHandle();
-			stream.createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
-			stream.copy(staging_depth, gbs[2], 0, 0);
-			Array<u32> tmp(m_allocator);
-			tmp.resize(gb_depth.size());
-			stream.readTexture(staging_depth, 0, Span((u8*)tmp.begin(), tmp.byte_size()));
-			for (i32 i = 0; i < tmp.size(); ++i) {
-				gb_depth[i] = u16(0xffFF - (tmp[i] >> 16));
-			}
-			stream.destroy(staging_depth);
+		gpu::TextureHandle staging_depth = gpu::allocTextureHandle();
+		stream.createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
+		stream.copy(staging_depth, gbs[2], 0, 0);
+		depth_tmp.resize(gb_depth.size());
+		stream.readTexture(staging_depth, 0, Span((u8*)depth_tmp.begin(), depth_tmp.byte_size()));
+		for (i32 i = 0; i < depth_tmp.size(); ++i) {
+			gb_depth[i] = u16(0xffFF - (depth_tmp[i] >> 16));
 		}
+		stream.destroy(staging_depth);
 
 		stream.destroy(shadow);
 		stream.destroy(gbs[0]);
@@ -1982,26 +1964,24 @@ Quat FBXImporter::fixOrientation(const Quat& v) const
 	return Quat(v.x, v.y, v.z, v.w);
 }
 
-void FBXImporter::writeImpostorVertices(const AABB& aabb)
+void FBXImporter::writeImpostorVertices(float center_y, Vec2 bounding_cylinder)
 {
-	#pragma pack(1)
-		struct Vertex
-		{
-			Vec3 pos;
-			Vec2 uv;
-		};
-	#pragma pack()
-
-	const Vec3 center = Vec3(0, (aabb.max + aabb.min).y * 0.5f, 0);
+	struct Vertex
+	{
+		Vec3 pos;
+		Vec2 uv;
+	};
 
 	Vec2 min, max;
-	getBBProjection(aabb, min, max);
+	const Vec2 half_extents = computeImpostorHalfExtents(bounding_cylinder);
+	min = -half_extents;
+	max = half_extents;
 
 	const Vertex vertices[] = {
-		{{center.x + min.x, center.y + min.y, center.z}, {0, 0}},
-		{{center.x + min.x, center.y + max.y, center.z}, {0, 1}},
-		{{center.x + max.x, center.y + max.y, center.z}, {1, 1}},
-		{{center.x + max.x, center.y + min.y, center.z}, {1, 0}}
+		{{ min.x, center_y + min.y, 0}, {0, 0}},
+		{{ min.x, center_y + max.y, 0}, {0, 1}},
+		{{ max.x, center_y + max.y, 0}, {1, 1}},
+		{{ max.x, center_y + min.y, 0}, {1, 0}}
 	};
 
 	const u32 vertex_data_size = sizeof(vertices);
@@ -2016,8 +1996,6 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	float origin_radius_squared = 0;
-	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
 	const ImportMesh& import_mesh = m_meshes[mesh_idx];
 	
@@ -2041,14 +2019,25 @@ void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 		write(import_mesh.indices.size());
 		write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 	}
-	origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
-	center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
+	
+	const Vec3 center = (import_mesh.aabb.max + import_mesh.aabb.min) * 0.5f;
+	float max_center_dist_squared = 0;
+	const u8* positions = import_mesh.vertex_data.data();
+	const i32 vertex_size = getVertexSize(*import_mesh.fbx, import_mesh.is_skinned, cfg);
+	const u32 vertex_count = u32(import_mesh.vertex_data.size() / vertex_size);
+	for (u32 i = 0; i < vertex_count; ++i) {
+		Vec3 p;
+		memcpy(&p, positions, sizeof(p));
+		positions += vertex_size;
+		float d = squaredLength(p - center);
+		max_center_dist_squared = maximum(d, max_center_dist_squared);
+	}
 
 	write((i32)import_mesh.vertex_data.size());
 	write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
 
-	write(sqrtf(origin_radius_squared));
-	write(sqrtf(center_radius_squared));
+	write(sqrtf(import_mesh.origin_radius_squared));
+	write(sqrtf(max_center_dist_squared));
 	write(import_mesh.aabb);
 }
 
@@ -2063,14 +2052,45 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
 
+	Vec2 bounding_cylinder = Vec2(0);
+	for (const ImportMesh& import_mesh : m_meshes) {
+		if (!import_mesh.import) continue;
+		if (import_mesh.lod != 0) continue;
+
+		origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
+		aabb.merge(import_mesh.aabb);
+	}
+	
+	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
+	const Vec3 center_xz0(0, center.y, 0);
+	for (const ImportMesh& import_mesh : m_meshes) {
+		if (!import_mesh.import) continue;
+		if (import_mesh.lod != 0) continue;
+
+		const u8* positions = import_mesh.vertex_data.data();
+		const i32 vertex_size = getVertexSize(*import_mesh.fbx, import_mesh.is_skinned, cfg);
+		const u32 vertex_count = u32(import_mesh.vertex_data.size() / vertex_size);
+		for (u32 i = 0; i < vertex_count; ++i) {
+			Vec3 p;
+			memcpy(&p, positions, sizeof(p));
+			positions += vertex_size;
+			float d = squaredLength(p - center);
+			center_radius_squared = maximum(d, center_radius_squared);
+			
+			p -= center_xz0;
+			float xz_squared = p.x * p.x + p.z * p.z;
+			bounding_cylinder.x = maximum(bounding_cylinder.x, xz_squared);
+			bounding_cylinder.y = maximum(bounding_cylinder.y, fabsf(p.y));
+		}
+
+		bounding_cylinder.x = sqrtf(bounding_cylinder.x);
+	}
+
 	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {
 			if (!import_mesh.import) continue;
 
 			const bool are_indices_16_bit = areIndices16Bit(import_mesh, cfg);
-			origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
-			center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
-			aabb.merge(import_mesh.aabb);
 			
 			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) { 
 				if (are_indices_16_bit) {
@@ -2133,13 +2153,8 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 			}
 		}
 	}
-	if (cfg.create_impostor) {
-		writeImpostorVertices(aabb);
-		const float r = maximum(squaredLength(aabb.max), squaredLength(aabb.min));
-		origin_radius_squared = maximum(origin_radius_squared, r);
-		center_radius_squared = maximum(center_radius_squared, squaredLength(aabb.max - aabb.min) * 0.5f);
 
-	}
+	if (cfg.create_impostor) writeImpostorVertices((aabb.max.y + aabb.min.y) * 0.5f, bounding_cylinder);
 
 	if (m_meshes.empty()) {
 		for (const ofbx::Object* bone : m_bones) {
@@ -2425,7 +2440,7 @@ void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
 			bool res = voxels.sampleAO(p, &ao);
 			ASSERT(res);
 			if (res) {
-				u8 ao8 = u8(ao * 255 + 0.5f);
+				u8 ao8 = u8(clamp((ao + cfg.min_bake_vertex_ao) * 255, 0.f, 255.f) + 0.5f);
 				memcpy(AOs + i * vertex_size, &ao8, sizeof(ao8));
 			}
 		}
