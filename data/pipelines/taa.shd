@@ -76,9 +76,11 @@ compute_shader [[
 		if (any(greaterThanEqual(ij, ivec2(u_size.xy)))) return;
 
 		vec2 uv = (vec2(ij) + 0.5) / u_size.xy;
-		float depth = textureLod(u_depthbuf, uv, 0).x;
 		vec2 motionvec = textureLod(u_motion_vectors, uv, 0).xy * 2 - 1;
-		
+		#ifndef _ORIGIN_BOTTOM_LEFT
+			motionvec.y *= -1;
+		#endif
+
 		vec2 uv_prev = uv + motionvec;
 
 		vec4 current = textureLod(u_current, uv /*- Global.pixel_jitter*/, 0);
