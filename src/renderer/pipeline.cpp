@@ -1156,13 +1156,9 @@ struct PipelineImpl final : Pipeline
 	static Matrix computeReprojection(const Viewport& current, const Viewport& prev) {
 		Matrix translation = Matrix::IDENTITY;
 		translation.setTranslation(Vec3(current.pos - prev.pos));
-		if (gpu::isOriginBottomLeft()) {
-			return prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted();
-		}
+		return prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted();
+	}
 
-		Matrix flip = Matrix::IDENTITY;
-		flip.columns[1].y = -1;
-		return flip * prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted() * flip;
 	}
 
 	bool render(bool only_2d) override
