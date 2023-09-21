@@ -264,15 +264,19 @@ struct GlobalState
 	};
 	SMSlice sm_slices[4];
 	Matrix camera_projection;
+	Matrix camera_prev_projection;
 	Matrix camera_projection_no_jitter;
+	Matrix camera_prev_projection_no_jitter;
 	Matrix camera_inv_projection;
 	Matrix camera_view;
 	Matrix camera_inv_view;
 	Matrix camera_view_projection;
 	Matrix camera_view_projection_no_jitter;
+	Matrix camera_prev_view_projection_no_jitter;
 	Matrix camera_inv_view_projection;
 	Matrix camera_reprojection;
 	Vec4 cam_world_pos;
+	Vec4 to_prev_frame_camera_translation;
 	Vec4 light_direction;
 	Vec4 light_color;
 	IVec2 framebuffer_size;
@@ -1159,8 +1163,6 @@ struct PipelineImpl final : Pipeline
 		return prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted();
 	}
 
-	}
-
 	bool render(bool only_2d) override
 	{
 		PROFILE_FUNCTION();
@@ -1187,18 +1189,24 @@ struct PipelineImpl final : Pipeline
 		}
 
 		const Matrix view = m_viewport.getViewRotation();
+		const Matrix prev_view = m_prev_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjectionWithJitter();
+		const Matrix prev_projection = m_prev_viewport.getProjectionWithJitter();
 		const Matrix projection_no_jitter = m_viewport.getProjectionNoJitter();
+		const Matrix prev_projection_no_jitter = m_prev_viewport.getProjectionNoJitter();
 		GlobalState global_state;
 		global_state.pixel_jitter = m_viewport.pixel_offset;
 		global_state.prev_pixel_jitter = m_prev_viewport.pixel_offset;
 		global_state.camera_projection = projection;
+		global_state.camera_prev_projection = prev_projection;
 		global_state.camera_projection_no_jitter = projection_no_jitter;
+		global_state.camera_prev_projection_no_jitter = prev_projection_no_jitter;
 		global_state.camera_inv_projection = projection.inverted();
 		global_state.camera_view = view;
 		global_state.camera_inv_view = view.fastInverted();
 		global_state.camera_view_projection = projection * view;
 		global_state.camera_view_projection_no_jitter = projection_no_jitter * view;
+		global_state.camera_prev_view_projection_no_jitter = prev_projection_no_jitter * prev_view;
 		global_state.camera_inv_view_projection = global_state.camera_view_projection.inverted();
 		global_state.time = m_timer.getTimeSinceStart();
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
@@ -1207,6 +1215,7 @@ struct PipelineImpl final : Pipeline
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
+		global_state.to_prev_frame_camera_translation = Vec4(Vec3(m_viewport.pos - m_prev_viewport.pos), 1);
 		m_prev_viewport = m_viewport;
 		m_indirect_buffer_offset = 0;
 

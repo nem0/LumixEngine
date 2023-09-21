@@ -126,13 +126,8 @@ fragment_shader [[
 
         float k0 = 1 / H0.w, k1 = 1 / H1.w;
 
-        vec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * Global.framebuffer_size;
-        vec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * Global.framebuffer_size;
-
-        #ifndef _ORIGIN_BOTTOM_LEFT
-            P0.y = Global.framebuffer_size.y - P0.y;
-            P1.y = Global.framebuffer_size.y - P1.y;
-        #endif
+        vec2 P0 = toScreenUV(H0.xy * k0 * 0.5 + 0.5) * Global.framebuffer_size;
+        vec2 P1 = toScreenUV(H1.xy * k1 * 0.5 + 0.5) * Global.framebuffer_size;
 
         vec2 delta = P1 - P0;
         bool permute = abs(delta.x) < abs(delta.y);
@@ -207,10 +202,7 @@ fragment_shader [[
 	{
 		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
-		#ifndef _ORIGIN_BOTTOM_LEFT
-			screen_pos.y *= -1;
-		#endif
-		float depth = texture(u_depthbuffer, screen_pos.xy * 0.5 + 0.5).x;
+		float depth = texture(u_depthbuffer, toScreenUV(screen_pos.xy * 0.5 + 0.5)).x;
 		return toLinearDepth(depth) - toLinearDepth(screen_pos.z);
 	}
 	
@@ -218,10 +210,7 @@ fragment_shader [[
 	{
 		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
-		#ifndef _ORIGIN_BOTTOM_LEFT
-			screen_pos.y *= -1;
-		#endif
-		return texture(u_bg, screen_pos.xy * 0.5 + 0.5);
+		return texture(u_bg, toScreenUV(screen_pos.xy * 0.5 + 0.5));
 	}
 	
 	float getHeight(vec2 uv) {

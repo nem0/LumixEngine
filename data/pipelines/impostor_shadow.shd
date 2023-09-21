@@ -52,14 +52,6 @@ compute_shader [[
 		return res;
 	}
 
-	vec2 dxuv(vec2 uv) {
-		#ifdef ORIGIN_BOTTOM_LEFT
-			return uv;
-		#else
-			return vec2(uv.x, 1 - uv.y);
-		#endif
-	}
-
 	float getShadow(vec2 tile_uv, float depth, vec3 v_shadow) {
 		v_shadow = normalize(v_shadow);
 		if (depth == 0) return 1;
@@ -75,7 +67,7 @@ compute_shader [[
 		vec4 p = to_sm * vec4(tile_uv * 2 - 1, depth, 1);
 		p.xyz /= p.w;
 		p.xy = p.xy * 0.5 + 0.5;
-		float shadow_depth = texture(u_depth, dxuv((p.xy + shadow_tile.xy) / float(u_size))).r;
+		float shadow_depth = texture(u_depth, toScreenUV((p.xy + shadow_tile.xy) / float(u_size))).r;
 		res += shadow_depth * 0.99 < p.z ? 1 : 0;
 
 		return res;

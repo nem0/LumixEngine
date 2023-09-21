@@ -27,11 +27,7 @@ fragment_shader [[
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
 	void main() {
-		#ifdef ORIGIN_BOTTOM_LEFT
-			vec4 t = textureLod(u_texture, v_uv, 0);
-		#else
-			vec4 t = textureLod(u_texture, vec2(v_uv.x, 1-v_uv.y), 0);
-		#endif
+		vec4 t = textureLod(u_texture, toScreenUV(v_uv), 0);
 		o_color.r = dot(t, u_r_mask) + u_offsets.r;
 		o_color.g = dot(t, u_g_mask) + u_offsets.g;
 		o_color.b = dot(t, u_b_mask) + u_offsets.b;
