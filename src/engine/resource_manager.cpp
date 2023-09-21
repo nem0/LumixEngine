@@ -153,6 +153,11 @@ void ResourceManagerHub::init(FileSystem& fs)
 	m_file_system = &fs;
 }
 
+bool ResourceManagerHub::loadRaw(const Path& included_from, const Path& path, OutputMemoryStream& data) {
+	if (m_load_hook) m_load_hook->loadRaw(included_from, path);
+	return m_file_system->getContentSync(path, data);
+}
+
 Resource* ResourceManagerHub::load(ResourceType type, const Path& path)
 {
 	ResourceManager* manager = get(type);
