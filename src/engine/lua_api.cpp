@@ -1196,9 +1196,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			local ent = self:createEntity()
 			for k, v in pairs(desc) do
 				if k == "position" then
-					e.position = v
+					ent.position = v
 				elseif k == "rotation" then
-					e.position = v
+					ent.position = v
 				else
 					local c = ent:createComponent(k)
 					for k2, v2 in pairs(v) do
