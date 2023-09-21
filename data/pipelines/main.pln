@@ -610,10 +610,6 @@ main = function()
 end
 
 onGUI = function()
-	if GAME_VIEW then
-		return
-	end
-
 	if ImGui.Button("Pipeline") then
 		ImGui.OpenPopup("debug_popup")
 	end

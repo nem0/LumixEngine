@@ -226,6 +226,7 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		ImGui::SameLine();
 		if (ImGui::Button("Fullscreen")) setFullscreen(true);
 	}
+	ImGui::SameLine();
 	m_pipeline->callLuaFunction("onGUI");
 }
 
