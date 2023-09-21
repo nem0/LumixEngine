@@ -34,6 +34,10 @@
 #include "terrain.h"
 #include "texture.h"
 
+#ifdef LUMIX_FSR2
+	#include "../plugins/dx/src/fsr2.h"
+#endif
+
 namespace Lumix
 {
 
@@ -3912,6 +3916,38 @@ struct PipelineImpl final : Pipeline
 		stream.freeMemory(mem.data, m_renderer.getAllocator());
 	}
 
+	#ifdef LUMIX_FSR2
+		void fsr2Dispatch(PipelineTexture color, PipelineTexture depth, PipelineTexture motion_vectors, PipelineTexture output) {
+			DrawStream& stream = m_renderer.getDrawStream();	
+			gpu::FSR2DispatchParams params;
+			params.jitter_x = m_viewport.pixel_offset.x;
+			params.jitter_y = m_viewport.pixel_offset.y;
+			params.time_delta = m_renderer.getEngine().getLastTimeDelta() * 1000;
+			params.render_width = m_viewport.w;
+			params.render_height = m_viewport.h;
+			params.near_plane = m_viewport.near;
+			params.fov = m_viewport.fov;
+			params.color = toHandle(color);
+			params.depth = toHandle(depth);
+			params.motion_vectors = toHandle(motion_vectors);
+			params.output = toHandle(output);
+			beginBlock("FSR2");
+			stream.pushLambda([this, params](){
+				IVec2 s(m_viewport.w, m_viewport.h);
+				if (m_fsr2 && m_fsr2_size != s) {
+					gpu::fsr2Shutdown(*m_fsr2);
+					m_fsr2 = nullptr;
+				}
+				if (!m_fsr2) {
+					m_fsr2 = gpu::fsr2Init(m_viewport.w, m_viewport.h, m_allocator);
+					m_fsr2_size = s;
+				}
+				gpu::fsr2Dispatch(*m_fsr2, params);
+			});
+			endBlock();
+		}
+	#endif
+
 	void registerLuaAPI(lua_State* L)
 	{
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -3951,6 +3987,9 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
+		#ifdef LUMIX_FSR2
+			REGISTER_FUNCTION(fsr2Dispatch);
+		#endif		
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
 		REGISTER_FUNCTION(keepRenderbufferAlive);
@@ -4084,6 +4123,10 @@ struct PipelineImpl final : Pipeline
 		Buffer refl_probes;
 	} m_cluster_buffers;
 	Viewport m_shadow_camera_viewports[4];
+	#ifdef LUMIX_FSR2
+		Lumix::gpu::FSR2Context* m_fsr2 = nullptr;
+		IVec2 m_fsr2_size = IVec2(0);
+	#endif
 };
 
 

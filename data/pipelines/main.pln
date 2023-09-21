@@ -31,6 +31,7 @@ local taa_history = -1
 local render_grass = true
 local render_impostors = true
 local render_terrain = true
+local fsr2_enable = false
 
 type GBuffer = {
 	A : RenderBuffer,
@@ -463,8 +464,8 @@ local function render_preview()
 end
 
 local function TAA(res, gbuffer)
-	PIXEL_JITTER = taa_enabled
 	if taa_enabled then
+		PIXEL_JITTER = true
 		beginBlock("taa")
 		if taa_history == -1 then
 			taa_history = createRenderbuffer(taa_history_desc)
@@ -504,6 +505,7 @@ local function TAA(res, gbuffer)
 end
 
 main = function()
+	PIXEL_JITTER = false
 	if PREVIEW then
 		render_preview()
 		return
@@ -526,14 +528,21 @@ main = function()
 	sss:postprocess(getfenv(1), nil, gbuffer, shadowmap)
 
 	local hdr_buffer = lightPass(view_params, gbuffer, shadowmap)
-	
-	local res = hdr_buffer
 	cubemap_sky:postprocess(getfenv(1), hdr_buffer, gbuffer, shadowmap)
 	atmo:postprocess(getfenv(1), hdr_buffer, gbuffer, shadowmap)
 	
+	local res 
+	if fsr2Dispatch and fsr2_enable then
+		PIXEL_JITTER = true
+		res = createRenderbuffer(taa_desc)	
+		fsr2Dispatch(hdr_buffer, gbuffer.DS, gbuffer.D, res)
+	else
+		res = hdr_buffer
+	end
+
 	waterPass(view_params, entities, res, gbuffer, shadowmap)
 	transparentPass(view_params, entities, res, gbuffer, shadowmap)
-	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer.DS)
+	setRenderTargetsReadonlyDS(res, gbuffer.DS)
 
 	res = dof:postprocess(getfenv(1), res, gbuffer, shadowmap)
 	bloom:postprocess(getfenv(1), res, gbuffer, shadowmap)
@@ -576,7 +585,9 @@ main = function()
 		end
 	end
 
-	TAA(res, gbuffer)
+	if not fsr2_enable then
+		TAA(res, gbuffer)
+	end
 
 	render2D()
 
@@ -650,6 +661,9 @@ onGUI = function()
 		_, debug_shadow_buf = ImGui.Checkbox("GBuffer shadow", debug_shadow_buf)
 		_, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		_, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
+		if fsr2Dispatch then
+			_, fsr2_enable = ImGui.Checkbox("FSR2", fsr2_enable)
+		end
 		_, render_grass = ImGui.Checkbox("Grass", render_grass)
 		_, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
 		_, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
