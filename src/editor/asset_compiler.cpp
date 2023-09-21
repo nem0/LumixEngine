@@ -64,6 +64,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	struct LoadHook : ResourceManagerHub::LoadHook {
 		LoadHook(AssetCompilerImpl& compiler) : compiler(compiler) {}
 		Action onBeforeLoad(Resource& res) override { return compiler.onBeforeLoad(res); }
+		void loadRaw(const Path& requester, const Path& path) override { compiler.registerDependency(requester, path); }
 		AssetCompilerImpl& compiler;
 	};
 

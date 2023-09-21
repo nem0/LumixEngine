@@ -339,7 +339,9 @@ int import(lua_State* L)
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 
 	OutputMemoryStream content(shader->m_allocator);
-	if (!fs.getContentSync(Path(path), content)) {
+	ResourceManagerHub& rm = shader->getResourceManager().getOwner();
+	
+	if (!rm.loadRaw(shader->getPath(), Path(path), content)) {
 		logError("Failed to open/read import ", path, " imported from ", shader->getPath());
 		return 0;
 	}
@@ -358,9 +360,10 @@ int include(lua_State* L)
 	Shader* shader = getShader(L);
 
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
+	ResourceManagerHub& rm = shader->getResourceManager().getOwner();
 
 	OutputMemoryStream content(shader->m_allocator);
-	if (!fs.getContentSync(Path(path), content)) {
+	if (!rm.loadRaw(shader->getPath(), Path(path), content)) {
 		logError("Failed to open/read include ", path, " included from ", shader->getPath());
 		return 0;
 	}
