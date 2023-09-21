@@ -34,6 +34,11 @@ struct SceneView : StudioApp::GUIPlugin
 	const char* getName() const override { return "scene_view"; }
 	void init();
 
+	DVec3 getViewportPosition();
+	void setViewportPosition(const DVec3& pos);
+	Quat getViewportRotation();
+	void setViewportRotation(const Quat& rot);
+
 private:
 	bool onAction(const Action& action) override;
 	void manipulate();
@@ -50,7 +55,6 @@ private:
 	void onBeforeSettingsSaved() override;
 	void toggleProjection();
 	bool hasFocus() const override { return m_has_focus; }
-
 
 private:
 	StudioApp& m_app;

@@ -101,7 +101,8 @@ declare Editor: {
     BOOLEAN_PROPERTY : number,
     setPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
-	getSelectedEntity : (number) -> Entity
+	getSelectedEntity : (number) -> Entity,
+    scene_view : SceneView
 }
 
 declare LumixAPI: {

@@ -82,6 +82,11 @@ declare class World
 
 end
 
+declare class SceneView
+	getViewportPosition : (SceneView) -> any
+	setViewportPosition : (SceneView, any) -> ()
+end
+
 declare class GUISystem
 	enableCursor : (GUISystem, boolean) -> ()
 end
@@ -528,13 +533,14 @@ end
 declare this:Entity
 
 declare Editor: {
-	RESOURCE_PROPERTY : number,
-	COLOR_PROPERTY : number,
+    RESOURCE_PROPERTY : number,
+    COLOR_PROPERTY : number,
     ENTITY_PROPERTY : number,
     BOOLEAN_PROPERTY : number,
     setPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
-	getSelectedEntity : (number) -> Entity
+	getSelectedEntity : (number) -> Entity,
+    scene_view : SceneView
 }
 
 declare LumixAPI: {

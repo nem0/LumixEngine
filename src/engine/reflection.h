@@ -338,7 +338,8 @@ struct Variant {
 		VEC2,
 		VEC3,
 		DVEC3,
-		COLOR
+		COLOR,
+		QUAT
 	} type;
 	union {
 		bool b;
@@ -352,6 +353,7 @@ struct Variant {
 		DVec3 dv3;
 		void* ptr;
 		Color color;
+		Quat quat;
 	};
 
 	void operator =(bool v) { b = v; type = BOOL; }
@@ -365,6 +367,7 @@ struct Variant {
 	void operator =(const DVec3& v) { dv3 = v; type = DVEC3; }
 	void operator =(void* v) { ptr = v; type = PTR; }
 	void operator =(Color c) { color = c; type = COLOR; }
+	void operator =(const Quat& q) { quat = q; type = QUAT; }
 };
 
 struct TypeDescriptor {
@@ -389,6 +392,7 @@ inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
 inline Variant::Type _getVariantType(VariantTag<Path>) { return Variant::CSTR; }
 inline Variant::Type _getVariantType(VariantTag<Color>) { return Variant::COLOR; }
 inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
+inline Variant::Type _getVariantType(VariantTag<Quat>) { return Variant::QUAT; }
 template <typename T> inline Variant::Type getVariantType() { return _getVariantType(VariantTag<RemoveCVR<T>>{}); }
 
 template <typename T> TypeDescriptor toTypeDescriptor() {
@@ -424,6 +428,7 @@ inline u32 fromVariant(int i, Span<Variant> args, VariantTag<u32>) { return args
 inline Color fromVariant(int i, Span<Variant> args, VariantTag<Color>) { return args[i].color; }
 inline Vec2 fromVariant(int i, Span<Variant> args, VariantTag<Vec2>) { return args[i].v2; }
 inline Vec3 fromVariant(int i, Span<Variant> args, VariantTag<Vec3>) { return args[i].v3; }
+inline Quat fromVariant(int i, Span<Variant> args, VariantTag<Quat>) { return args[i].quat; }
 inline DVec3 fromVariant(int i, Span<Variant> args, VariantTag<DVec3>) { return args[i].dv3; }
 inline EntityPtr fromVariant(int i, Span<Variant> args, VariantTag<EntityPtr>) { return args[i].e; }
 inline EntityRef fromVariant(int i, Span<Variant> args, VariantTag<EntityRef>) { return (EntityRef)args[i].e; }
