@@ -49,6 +49,7 @@ struct LUMIX_ENGINE_API ResourceManagerHub {
 	struct LUMIX_ENGINE_API LoadHook {
 		enum class Action { IMMEDIATE, DEFERRED };
 		virtual ~LoadHook() {}
+		virtual void loadRaw(const Path& requester, const Path& path) = 0;
 		virtual Action onBeforeLoad(Resource& res) = 0;
 		void continueLoad(Resource& res, bool success);
 	};
@@ -70,6 +71,9 @@ struct LUMIX_ENGINE_API ResourceManagerHub {
 	}
 
 	Resource* load(ResourceType type, const Path& path);
+	// use `loadRaw` to load nonresource files, synchronous
+	// files loaded this way are tracked as dependencies 
+	bool loadRaw(const Path& included_from, const Path& path, OutputMemoryStream& data);
 
 	void setLoadHook(LoadHook* hook);
 	bool isHooked() const { return m_load_hook; }
