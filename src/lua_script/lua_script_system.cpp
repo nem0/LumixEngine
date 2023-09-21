@@ -84,6 +84,7 @@ static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, ref
 		case reflection::Variant::COLOR:
 		case reflection::Variant::VEC3: val = LuaWrapper::checkArg<Vec3>(L, idx); break;
 		case reflection::Variant::DVEC3: val = LuaWrapper::checkArg<DVec3>(L, idx); break;
+		case reflection::Variant::QUAT: val = LuaWrapper::checkArg<Quat>(L, idx); break;
 		case reflection::Variant::CSTR: val = LuaWrapper::checkArg<const char*>(L, idx); break;
 		case reflection::Variant::PTR: {
 			void* ptr;
@@ -110,6 +111,7 @@ static int push(lua_State* L, const reflection::Variant& v, StringView type_name
 		case reflection::Variant::COLOR:
 		case reflection::Variant::VEC3: LuaWrapper::push(L, v.v3); return 1;
 		case reflection::Variant::DVEC3: LuaWrapper::push(L, v.dv3); return 1;
+		case reflection::Variant::QUAT: LuaWrapper::push(L, v.quat); return 1;
 		case reflection::Variant::PTR: pushObject(L, v.ptr, type_name); return 1;
 	}
 	ASSERT(false);

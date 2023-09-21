@@ -27,6 +27,9 @@ function execute()
     else 
         if run_on_entity then
             local selected_count = Editor.getSelectedEntitiesCount()
+            if selected_count == 0 then
+                LumixAPI.logError("No entities selected")
+            end
             for i = 1, selected_count do
                 local entity = Editor.getSelectedEntity(i - 1)
                 if entity.lua_script == nil then continue end

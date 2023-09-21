@@ -14,11 +14,13 @@
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
+#include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/world.h"
@@ -603,6 +605,33 @@ struct WorldViewImpl final : WorldView {
 	Array<DrawCmd> m_draw_cmds;
 };
 
+DVec3 SceneView::getViewportPosition() {
+	return m_view->getViewport().pos;
+}
+
+void SceneView::setViewportPosition(const DVec3& pos) {
+	Viewport vp = m_view->getViewport();
+	vp.pos = pos;
+	m_view->setViewport(vp);
+}
+
+Quat SceneView::getViewportRotation() {
+	return m_view->getViewport().rot;
+}
+
+void SceneView::setViewportRotation(const Quat& rot) {
+	Viewport vp = m_view->getViewport();
+	vp.rot = rot;
+	m_view->setViewport(vp);
+}
+
+static volatile bool once = [](){
+	LUMIX_GLOBAL_FUNC(SceneView::getViewportRotation);
+	LUMIX_GLOBAL_FUNC(SceneView::setViewportRotation);
+	LUMIX_GLOBAL_FUNC(SceneView::getViewportPosition);
+	LUMIX_GLOBAL_FUNC(SceneView::setViewportPosition);
+	return true;
+}();
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
@@ -639,6 +668,7 @@ SceneView::SceneView(StudioApp& app)
 
 	const ResourceType pipeline_type("pipeline");
 	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
+
 }
 
 void SceneView::toggleProjection() {
@@ -661,6 +691,12 @@ void SceneView::init() {
 
 	ResourceManagerHub& rm = engine.getResourceManager();
 	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
+
+	lua_State* L = m_app.getEngine().getState();
+	lua_getglobal(L, "Editor");
+	LuaWrapper::pushObject(L, this, "SceneView");
+	lua_setfield(L, -2, "scene_view");
+	lua_pop(L, 1);
 }
 
 
