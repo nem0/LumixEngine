@@ -661,7 +661,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			if (job.generation != generation) continue;
 
 			// this can take some time, mutex is probably not the best option
-			MutexGuard lock(m_compiled_mutex);
+			jobs::MutexGuard lock(m_resources_mutex);
 			// reload/continue loading resource and its subresources
 			for (const ResourceItem& ri : m_resources) {
 				if (!endsWithInsensitive(ri.path, job.path)) continue;
