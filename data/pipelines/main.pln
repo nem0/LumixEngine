@@ -478,7 +478,7 @@ local function TAA(res, gbuffer)
 		setRenderTargets()
 
 		drawcallUniforms(viewport_w, viewport_h, 0, 0) 
-		bindTextures({taa_history, gbuffer.DS, res, gbuffer.D}, 0)
+		bindTextures({taa_history, res, gbuffer.D}, 0)
 		bindImageTexture(taa_tmp, 3)
 		dispatch(taa_shader, (viewport_w + 15) / 16, (viewport_h + 15) / 16, 1)
 

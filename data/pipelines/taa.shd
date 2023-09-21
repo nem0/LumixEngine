@@ -7,9 +7,8 @@ compute_shader [[
 
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 	layout (binding = 0) uniform sampler2D u_history;
-	layout (binding = 1) uniform sampler2D u_depthbuf;
-	layout (binding = 2) uniform sampler2D u_current;
-	layout (binding = 3) uniform sampler2D u_motion_vectors;
+	layout (binding = 1) uniform sampler2D u_current;
+	layout (binding = 2) uniform sampler2D u_motion_vectors;
     layout (rgba8, binding = 3) uniform image2D u_output;
 
 	// https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
