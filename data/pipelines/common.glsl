@@ -91,15 +91,19 @@ struct SMSlice {
 layout (std140, binding = 0) uniform GlobalState {
 	SMSlice sm_slices[4];
 	mat4 projection;
+	mat4 prev_projection;
 	mat4 projection_no_jitter;
+	mat4 prev_projection_no_jitter;
 	mat4 inv_projection;
 	mat4 view;
 	mat4 inv_view;
 	mat4 view_projection;
 	mat4 view_projection_no_jitter;
+	mat4 prev_view_projection_no_jitter;
 	mat4 inv_view_projection;
 	mat4 reprojection;
 	vec4 camera_world_pos;
+	vec4 to_prev_frame_camera_translation;
 	vec4 light_dir;
 	vec4 light_color;
 	ivec2 framebuffer_size;
@@ -185,13 +189,17 @@ vec3 ACESFilm(vec3 x)
 	}
 #endif
 
+vec2 toScreenUV(vec2 uv) {
+	#ifdef _ORIGIN_BOTTOM_LEFT
+		return uv;
+	#else
+		return vec2(uv.x, 1 - uv.y);
+	#endif
+}
+
 vec4 fullscreenQuad(int vertexID, out vec2 uv) {
 	uv = vec2((vertexID & 1) * 2, vertexID & 2);
-	#ifdef _ORIGIN_BOTTOM_LEFT
-		return vec4(uv * 2 - 1, 0, 1);
-	#else
-		return vec4(uv.x * 2 - 1, -uv.y * 2 + 1, 0, 1);
-	#endif
+	return vec4(toScreenUV(uv) * 2 - 1, 0, 1);
 }
 
 float packEmission(float emission)
@@ -263,11 +271,7 @@ vec2 raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
 vec3 getWorldNormal(vec2 frag_coord)
 {
 	float z = 1;
-	#ifdef _ORIGIN_BOTTOM_LEFT
-		vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
-	#else
-		vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
-	#endif
+	vec4 posProj = vec4(toScreenUV(frag_coord) * 2 - 1, z, 1.0);
 	vec4 wpos = Global.inv_view_projection * posProj;
 	wpos /= wpos.w;
 	vec3 view = (Global.inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
@@ -278,11 +282,7 @@ vec3 getWorldNormal(vec2 frag_coord)
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord, out float ndc_depth)
 {
 	float z = texture(depth_buffer, tex_coord).r;
-	#ifdef _ORIGIN_BOTTOM_LEFT
-		vec4 pos_proj = vec4(tex_coord * 2 - 1, z, 1.0);
-	#else 
-		vec4 pos_proj = vec4(vec2(tex_coord.x, 1-tex_coord.y) * 2 - 1, z, 1.0);
-	#endif
+	vec4 pos_proj = vec4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
 	vec4 view_pos = inv_view_proj * pos_proj;
 	ndc_depth = z;
 	return view_pos.xyz / view_pos.w;
@@ -291,11 +291,7 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord,
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 {
 	float z = texture(depth_buffer, tex_coord).r;
-	#ifdef _ORIGIN_BOTTOM_LEFT
-		vec4 pos_proj = vec4(tex_coord * 2 - 1, z, 1.0);
-	#else 
-		vec4 pos_proj = vec4(vec2(tex_coord.x, 1-tex_coord.y) * 2 - 1, z, 1.0);
-	#endif
+	vec4 pos_proj = vec4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
 	vec4 view_pos = inv_view_proj * pos_proj;
 	return view_pos.xyz / view_pos.w;
 }
@@ -591,16 +587,16 @@ float rand(vec3 seed)
 
 vec2 computeStaticObjectMotionVector(vec3 wpos) {
 	vec4 p = Global.view_projection_no_jitter * vec4(wpos, 1);
-	vec4 pos_projected = Global.reprojection * p;
+	vec4 pos_projected = Global.prev_view_projection_no_jitter * vec4(wpos + Global.to_prev_frame_camera_translation.xyz, 1);
 	vec2 r = (pos_projected.xy / pos_projected.w * 0.5 + 0.5 - (p.xy / p.w * 0.5 + 0.5));	
 	r =  r * 0.5 + 0.5;
 	return r;
 }
 
 vec2 cameraReproject(vec2 uv, float depth) {
-	vec4 v = (Global.reprojection * vec4(uv * 2 - 1, depth, 1));
+	vec4 v = (Global.reprojection * vec4(toScreenUV(uv) * 2 - 1, depth, 1));
 	vec2 res = (v.xy / v.w) * 0.5 + 0.5;
-	return res;
+	return toScreenUV(res);
 }
 
 void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2, out vec4 gbuffer3) {

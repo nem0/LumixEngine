@@ -21,13 +21,8 @@ compute_shader [[
 
         float k0 = 1 / H0.w, k1 = 1 / H1.w;
 
-        vec2 P0 = (H0.xy * k0 * 0.5 + 0.5) * u_size;
-        vec2 P1 = (H1.xy * k1 * 0.5 + 0.5) * u_size;
-
-        #ifndef _ORIGIN_BOTTOM_LEFT
-            P0.y = u_size.y - P0.y;
-            P1.y = u_size.y - P1.y;
-        #endif
+        vec2 P0 = toScreenUV(H0.xy * k0 * 0.5 + 0.5) * u_size;
+        vec2 P1 = toScreenUV(H1.xy * k1 * 0.5 + 0.5) * u_size;
 
         vec2 delta = P1 - P0;
         bool permute = abs(delta.x) < abs(delta.y);
@@ -49,8 +44,8 @@ compute_shader [[
 
         uint max_steps = uint(min(abs(P1.x - P0.x), u_max_steps)) >> 2;
         for (uint j = 0; j < 4; ++j) {
-            P += dP * jitter / stride;
-            k += dk * jitter / stride;
+            P += dP * jitter;
+            k += dk * jitter;
             for (uint i = 0; i < max_steps; ++i) {
                 float rayZFar = 1 / k;
 
@@ -70,6 +65,8 @@ compute_shader [[
                 P += dP;
                 k += dk;
             }
+                P -= dP;
+                k -= dk;
             dP *= 2;
             dk *= 2;
         }
@@ -83,6 +80,6 @@ compute_shader [[
         vec4 o = Global.view * vec4(p, 1);
         vec3 d = mat3(Global.view) * Global.light_dir.xyz;
         float rr = random(vec2(gl_GlobalInvocationID.xy) + 0.1 * Global.time);
-        raycast(o.xyz, d.xyz, u_stride, rr * u_stride, ivec2(gl_GlobalInvocationID.xy));
+        raycast(o.xyz, d.xyz, u_stride, rr, ivec2(gl_GlobalInvocationID.xy));
 	}
 ]]
