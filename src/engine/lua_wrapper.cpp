@@ -151,6 +151,31 @@ void pushEntity(lua_State* L, EntityPtr value, World* world) {
 	ASSERT(!error);
 }
 
+void pushObject(lua_State* L, void* obj, StringView type_name) {
+	ASSERT(!type_name.empty());
+	LuaWrapper::DebugGuard guard(L, 1);
+	lua_getglobal(L, "LumixAPI");
+	char tmp[64];
+	copyString(Span(tmp), type_name);
+
+	if (LuaWrapper::getField(L, -1, tmp) != LUA_TTABLE) {
+		lua_pop(L, 2);
+		lua_newtable(L);
+		lua_pushlightuserdata(L, obj);
+		lua_setfield(L, -2, "_value");
+		ASSERT(false);
+		return;
+	}
+
+	lua_newtable(L); // [LumixAPI, class, obj]
+	lua_pushlightuserdata(L, obj); // [LumixAPI, class, obj, obj_ptr]
+	lua_setfield(L, -2, "_value"); // [LumixAPI, class, obj]
+	lua_pushvalue(L, -2); // [LumixAPI, class, obj, class]
+	lua_setmetatable(L, -2); // [LumixAPI, class, obj]
+	lua_remove(L, -2); // [LumixAPI, obj]
+	lua_remove(L, -2); // [obj]
+}
+
 int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name) {
 	size_t bytecode_size;
 	char* bytecode = luau_compile(buff, size, nullptr, &bytecode_size);

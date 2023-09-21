@@ -56,6 +56,7 @@ LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k);
 LUMIX_ENGINE_API void luaL_unref(lua_State* L, int t, int ref);
 LUMIX_ENGINE_API int luaL_ref(lua_State* L, int idx);
 LUMIX_ENGINE_API int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name);
+LUMIX_ENGINE_API void pushObject(lua_State* L, void* obj, StringView type_name);
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {

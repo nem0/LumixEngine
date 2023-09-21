@@ -44,33 +44,76 @@ static const char* toString(InputSystem::Event::Type type) {
 	return "N/A";
 }
 
+static void convertPropertyToLuaName(const char* src, Span<char> out) {
+	const u32 max_size = out.length();
+	ASSERT(max_size > 0);
+	char* dest = out.begin();
+	while (*src && dest - out.begin() < max_size - 1) {
+		if (isLetter(*src)) {
+			*dest = isUpperCase(*src) ? *src - 'A' + 'a' : *src;
+			++dest;
+		}
+		else if (isNumeric(*src)) {
+			*dest = *src;
+			++dest;
+		}
+		else {
+			*dest = '_';
+			++dest;
+		}
+		++src;
+	}
+	*dest = 0;
+}
+
+struct ArrayItemSetVisitor : reflection::IPropertyVisitor {
+	void visit(const reflection::Property<float>& prop) override { set(prop); }
+	void visit(const reflection::Property<int>& prop) override { set(prop); }
+	void visit(const reflection::Property<u32>& prop) override { set(prop); }
+	void visit(const reflection::Property<EntityPtr>& prop) override { set(prop); }
+	void visit(const reflection::Property<Vec2>& prop) override { set(prop); }
+	void visit(const reflection::Property<Vec3>& prop) override { set(prop); }
+	void visit(const reflection::Property<IVec3>& prop) override { set(prop); }
+	void visit(const reflection::Property<Vec4>& prop) override { set(prop); }
+	void visit(const reflection::Property<Path>& prop) override { set(prop); }
+	void visit(const reflection::Property<bool>& prop) override { set(prop); }
+	void visit(const reflection::Property<const char*>& prop) override { set(prop); }
+	void visit(const reflection::ArrayProperty& prop) override { ASSERT(false); }
+	void visit(const reflection::BlobProperty& prop) override { ASSERT(false); }
+	void visit(const reflection::DynamicProperties& prop) override { ASSERT(false); }
+
+	template <typename T>
+	void set(const reflection::Property<T>& prop) {
+		char tmp[50];
+		convertPropertyToLuaName(prop.name, Span(tmp));
+		i32 type = lua_getfield(L, -1, tmp);
+		if (type == LUA_TNIL) {
+			lua_pop(L, 1);
+			return;
+		}
+		if (!LuaWrapper::isType<T>(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "%s has incorrect type", tmp);
+		}
+
+		T val = LuaWrapper::toType<T>(L, -1);
+		lua_pop(L, 1);
+		prop.set(cmp, idx, val);
+	}
+
+	ComponentUID cmp;
+	const char* prop_name;
+	u32 idx;
+	lua_State* L;
+};
 
 static void pushObject(lua_State* L, void* obj, StringView type_name) {
 	ASSERT(!type_name.empty());
-	LuaWrapper::DebugGuard guard(L, 1);
-	lua_getglobal(L, "LumixAPI");
-	char tmp[64];
 	const char* c = type_name.end - 1;
 	while (*c != ':' && c != type_name.begin) --c;
 	if (*c == ':') ++c;
-	copyString(Span(tmp), StringView(c, u32(type_name.end - c - 2)));
 
-	if (LuaWrapper::getField(L, -1, tmp) != LUA_TTABLE) {
-		lua_pop(L, 2);
-		lua_newtable(L);
-		lua_pushlightuserdata(L, obj);
-		lua_setfield(L, -2, "_value");
-		ASSERT(false);
-		return;
-	}
-
-	lua_newtable(L); // [LumixAPI, class, obj]
-	lua_pushlightuserdata(L, obj); // [LumixAPI, class, obj, obj_ptr]
-	lua_setfield(L, -2, "_value"); // [LumixAPI, class, obj]
-	lua_pushvalue(L, -2); // [LumixAPI, class, obj, class]
-	lua_setmetatable(L, -2); // [LumixAPI, class, obj]
-	lua_remove(L, -2); // [LumixAPI, obj]
-	lua_remove(L, -2); // [obj]
+	LuaWrapper::pushObject(L, obj, StringView(c, u32(type_name.end - c - 2)));
 }
 
 static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, reflection::Variant& val) {
@@ -1011,28 +1054,6 @@ public:
 		return 1;
 	}
 		
-	static void convertPropertyToLuaName(const char* src, Span<char> out) {
-		const u32 max_size = out.length();
-		ASSERT(max_size > 0);
-		char* dest = out.begin();
-		while (*src && dest - out.begin() < max_size - 1) {
-			if (isLetter(*src)) {
-				*dest = isUpperCase(*src) ? *src - 'A' + 'a' : *src;
-				++dest;
-			}
-			else if (isNumeric(*src)) {
-				*dest = *src;
-				++dest;
-			}
-			else {
-				*dest = '_';
-				++dest;
-			}
-			++src;
-		}
-		*dest = 0;
-	}
-
 	static bool isSameProperty(const char* name, const char* lua_name) {
 		char tmp[50];
 		convertPropertyToLuaName(name, Span(tmp));
@@ -1226,7 +1247,31 @@ public:
 			prop.set(cmp, idx, val);
 		}
 
-		void visit(const reflection::ArrayProperty& prop) override {}
+		void set(const reflection::ArrayProperty& prop, u32 idx) {
+			ArrayItemSetVisitor visitor;
+			visitor.idx = idx;
+			visitor.cmp = cmp;
+			visitor.prop_name = prop.name;
+			visitor.L = L;
+			
+			prop.visitChildren(visitor);
+		}
+
+		void visit(const reflection::ArrayProperty& prop) override {
+			if (!isSameProperty(prop.name, prop_name)) return;
+			LuaWrapper::checkTableArg(L, 3);
+
+			lua_pushnil(L);
+			while (prop.getCount(cmp) > 0) prop.removeItem(cmp, 0);
+			u32 idx = 0;
+			while (lua_next(L, 3)) {
+				prop.addItem(cmp, idx);
+				set(prop, idx);
+				++idx;
+				lua_pop(L, 1);
+			}
+		}
+
 		void visit(const reflection::BlobProperty& prop) override {}
 
 		ComponentUID cmp;
