@@ -108,7 +108,7 @@ struct Runner final
 		lua_module->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
-	bool loadWorld(const char* path, const char* world_name) {
+	bool loadWorld(const char* path) {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) return false;
