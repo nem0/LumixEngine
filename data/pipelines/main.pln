@@ -31,7 +31,6 @@ local taa_history = -1
 local render_grass = true
 local render_impostors = true
 local render_terrain = true
-local fsr2_enable = false
 
 type GBuffer = {
 	A : RenderBuffer,
@@ -62,8 +61,9 @@ local shadowmap_1x1 = createRenderbufferDesc { size = {1, 1}, format = "depth32"
 local shadowmap_desc = createRenderbufferDesc { size = { 4096, 1024 }, format = "depth32", debug_name = "shadowmap" }
 local selection_mask_desc = createRenderbufferDesc { format = "depth32", debug_name = "selection_depthbuffer" }
 local baked_shadowmap_desc = createRenderbufferDesc { format = "depth32", debug_name = "shadowmap_depth" }
-local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true, display_size = true }
-local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true, display_size = true }
+local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_history", compute_write = true, display_size = true }
+local taa_tmp_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true, display_size = true }
+local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true, display_size = true }
 local icon_ds_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "icon_ds" }
 local water_color_copy_desc = createRenderbufferDesc { format = "r11g11b10f", debug_name = "hdr_copy" }
 local hdr_rb_desc = createRenderbufferDesc { format = if PROBE ~= nil then "rgba32f" else "rgba16f", debug_name = "hdr" }
@@ -465,9 +465,9 @@ local function render_preview()
 	setOutput(output)
 end
 
-local function TAA(res, gbuffer)
+local function TAA(hdr_buffer : RenderBuffer, velocity : RenderBuffer, depth : RenderBuffer, output : RenderBuffer)
+	enablePixelJitter(taa_enabled);
 	if taa_enabled then
-		PIXEL_JITTER = true
 		beginBlock("taa")
 		if taa_history == -1 then
 			taa_history = createRenderbuffer(taa_history_desc)
@@ -475,16 +475,16 @@ local function TAA(res, gbuffer)
 			clear(CLEAR_ALL, 1, 1, 1, 1, 0)
 		end
 
-		local taa_tmp = createRenderbuffer(taa_desc)
-
 		setRenderTargets()
 
+		local taa_tmp = createRenderbuffer(taa_tmp_desc)
+
 		drawcallUniforms(display_w, display_h, 0, 0) 
-		bindTextures({taa_history, res, gbuffer.D}, 0)
+		bindTextures({taa_history, hdr_buffer, velocity}, 0)
 		bindImageTexture(taa_tmp, 3)
 		dispatch(taa_shader, (display_w + 15) / 16, (display_h + 15) / 16, 1)
 
-		setRenderTargets(res)
+		setRenderTargets(output)
 		drawcallUniforms( 
 			0, 0, 1, 1, 
 			1, 0, 0, 0, 
@@ -494,20 +494,18 @@ local function TAA(res, gbuffer)
 			0, 0, 0, 0
 		)
 
-		-- TODO get rid of this step
+		-- TODO textured_quad_shader does unnecessary computations
 		drawArray(0, 3, textured_quad_shader
 			, { taa_tmp }
 			, empty_state)
 
 		taa_history = taa_tmp
-
 		keepRenderbufferAlive(taa_history)
 		endBlock()
 	end
 end
 
 main = function()
-	PIXEL_JITTER = false
 	if PREVIEW then
 		render_preview()
 		return
@@ -533,12 +531,14 @@ main = function()
 	cubemap_sky:postprocess(getfenv(1), hdr_buffer, gbuffer, shadowmap)
 	atmo:postprocess(getfenv(1), hdr_buffer, gbuffer, shadowmap)
 	
-	local res 
-	if fsr2Dispatch and fsr2_enable then
-		PIXEL_JITTER = true
-		res = createRenderbuffer(taa_desc)	
-		fsr2Dispatch(hdr_buffer, gbuffer.DS, gbuffer.D, res)
+	local res 	
+	if taa_enabled then
+		res = createRenderbuffer(taa_desc)
+		if not renderAA(hdr_buffer, gbuffer.D, gbuffer.DS, res) then
+			TAA(hdr_buffer, gbuffer.D, gbuffer.DS, res)
+		end
 	else
+		enablePixelJitter(false)
 		res = hdr_buffer
 	end
 
@@ -585,10 +585,6 @@ main = function()
 			}, 1)
 			renderIcons()
 		end
-	end
-
-	if not fsr2_enable then
-		TAA(res, gbuffer)
 	end
 
 	render2D()
@@ -659,9 +655,6 @@ onGUI = function()
 		_, debug_shadow_buf = ImGui.Checkbox("GBuffer shadow", debug_shadow_buf)
 		_, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		_, taa_enabled = ImGui.Checkbox("TAA", taa_enabled)
-		if fsr2Dispatch then
-			_, fsr2_enable = ImGui.Checkbox("FSR2", fsr2_enable)
-		end
 		_, render_grass = ImGui.Checkbox("Grass", render_grass)
 		_, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
 		_, render_terrain = ImGui.Checkbox("Terrain", render_terrain)

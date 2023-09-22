@@ -328,6 +328,7 @@ void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u3
 	
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
 void generateMipmaps(TextureHandle texture);
+void setDebugName(TextureHandle texture, const char* debug_name);
 	
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
 void update(BufferHandle buffer, const void* data, size_t size);

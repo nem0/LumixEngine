@@ -28,7 +28,6 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
-
 namespace Lumix {
 
 

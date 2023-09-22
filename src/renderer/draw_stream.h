@@ -63,6 +63,7 @@ struct DrawStream {
 	
 	void readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf);
 	void generateMipmaps(gpu::TextureHandle texture);
+	void setDebugName(gpu::TextureHandle texture, const char* debug_name);
 	
 	void update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size);
 	void update(gpu::BufferHandle buffer, const void* data, size_t size);

@@ -34,10 +34,6 @@
 #include "terrain.h"
 #include "texture.h"
 
-#ifdef LUMIX_FSR2
-	#include "../plugins/dx/src/fsr2.h"
-#endif
-
 namespace Lumix
 {
 
@@ -790,6 +786,10 @@ struct PipelineImpl final : Pipeline
 
 	~PipelineImpl()
 	{
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->pipelineDestroyed(*this);
+		}
+
 		DrawStream& stream = m_renderer.getEndFrameDrawStream();
 		for (gpu::TextureHandle t : m_textures) stream.destroy(t);
 		for (gpu::BufferHandle b : m_buffers) stream.destroy(b);
@@ -1192,11 +1192,9 @@ struct PipelineImpl final : Pipeline
 		m_renderer.waitCanSetup();
 		clearBuffers();
 
-		bool pixel_jitter = false;
-		LuaWrapper::getOptionalField(m_lua_state, -1, "PIXEL_JITTER", &pixel_jitter);
 		m_viewport.pixel_offset = Vec2(0);
 
-		if (pixel_jitter) {
+		if (m_is_pixel_jitter_enabled) {
 			m_viewport.pixel_offset.x = (halton(m_renderer.frameNumber() % 8 + 1, 2) * 2 - 1) / m_viewport.w;
 			m_viewport.pixel_offset.y = (halton(m_renderer.frameNumber() % 8 + 1, 3) * 2 - 1) / m_viewport.h;
 		}
@@ -1537,7 +1535,8 @@ struct PipelineImpl final : Pipeline
 		for (Renderbuffer& rb : m_renderbuffers) {
 			if (!rb.handle) {
 				rb.frame_counter = 0;
-				rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+				StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
+				rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), name);
 				rb.flags = desc.flags;
 				rb.format = desc.format;
 				rb.size = size;
@@ -1552,6 +1551,8 @@ struct PipelineImpl final : Pipeline
 			}
 			rb.frame_counter = 0;
 			res.renderbuffer = u32(&rb - m_renderbuffers.begin());
+			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
+			m_renderer.getDrawStream().setDebugName(rb.handle, name);
 			return res;
 		}
 
@@ -2210,6 +2211,18 @@ struct PipelineImpl final : Pipeline
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderTransparent(*this);
 		}
+	}
+
+	bool renderAA(PipelineTexture color, PipelineTexture velocity, PipelineTexture depth, PipelineTexture output) {
+		PROFILE_FUNCTION();
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			if (plugin->renderAA(*this, toHandle(color), toHandle(velocity), toHandle(depth), toHandle(output))) return true;
+		}
+		return false;
+	}
+
+	void enablePixelJitter(bool enable) override {
+		m_is_pixel_jitter_enabled = enable;
 	}
 
 	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
@@ -3429,14 +3442,14 @@ struct PipelineImpl final : Pipeline
 
 	CameraParamsHandle getShadowCameraParams(i32 slice) { return (CameraParamsHandle)CameraParamsEnum::SHADOW0 + slice; }
 	
-	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb) {
+	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb, IVec2 viewport_size) {
 		gpu::FramebufferFlags flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;
 		if (readonly_ds) {
 			flags = flags | gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.setFramebuffer(renderbuffers.begin(), renderbuffers.length(), ds, flags);
-		stream.viewport(0, 0, m_viewport.w, m_viewport.h);
+		stream.viewport(0, 0, viewport_size.x, viewport_size.y);
 	}
 
 	static int setRenderTargets(lua_State* L, bool has_ds, bool readonly_ds) {
@@ -3450,9 +3463,14 @@ struct PipelineImpl final : Pipeline
 			return 0;
 		}
 
+		IVec2 size;
+		size.x = pipeline->m_viewport.w;
+		size.y = pipeline->m_viewport.h;
+
 		for(u32 i = 0; i < rb_count; ++i) {
 			const i32 rb_idx = pipeline->toRenderbufferIdx(L, i + 1);
 			rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
+			size = pipeline->m_renderbuffers[rb_idx].size;
 		}
 
 		gpu::TextureHandle ds = gpu::INVALID_TEXTURE;
@@ -3461,7 +3479,7 @@ struct PipelineImpl final : Pipeline
 			ds = pipeline->m_renderbuffers[ds_idx].handle;
 		}
 
-		pipeline->setRenderTargets(Span(rbs, rb_count), ds, readonly_ds, true);
+		pipeline->setRenderTargets(Span(rbs, rb_count), ds, readonly_ds, true, size);
 		return 0;
 	}
 
@@ -3942,38 +3960,6 @@ struct PipelineImpl final : Pipeline
 	float getRenderToDisplayRatio() const { return m_render_to_display_scale; }
 	void setRenderToDisplayRatio(float scale) { m_render_to_display_scale = scale; }
 
-	#ifdef LUMIX_FSR2
-		void fsr2Dispatch(PipelineTexture color, PipelineTexture depth, PipelineTexture motion_vectors, PipelineTexture output) {
-			DrawStream& stream = m_renderer.getDrawStream();
-			gpu::FSR2DispatchParams params;
-			params.jitter_x = m_viewport.pixel_offset.x;
-			params.jitter_y = m_viewport.pixel_offset.y;
-			params.time_delta = m_renderer.getEngine().getLastTimeDelta() * 1000;
-			params.render_width = m_viewport.w;
-			params.render_height = m_viewport.h;
-			params.near_plane = m_viewport.near;
-			params.fov = m_viewport.fov;
-			params.color = toHandle(color);
-			params.depth = toHandle(depth);
-			params.motion_vectors = toHandle(motion_vectors);
-			params.output = toHandle(output);
-			beginBlock("FSR2");
-			stream.pushLambda([this, params](){
-				IVec2 s(m_display_size.x, m_display_size.y);
-				if (m_fsr2 && m_fsr2_size != s) {
-					gpu::fsr2Shutdown(*m_fsr2);
-					m_fsr2 = nullptr;
-				}
-				if (!m_fsr2) {
-					m_fsr2 = gpu::fsr2Init(m_display_size.x, m_display_size.y, m_allocator);
-					m_fsr2_size = s;
-				}
-				gpu::fsr2Dispatch(*m_fsr2, params);
-			});
-			endBlock();
-		}
-	#endif
-
 	void registerLuaAPI(lua_State* L)
 	{
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -4010,12 +3996,10 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(createTexture3D);
 		REGISTER_FUNCTION(dispatch);
 		REGISTER_FUNCTION(drawArray);
+		REGISTER_FUNCTION(enablePixelJitter);
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
-		#ifdef LUMIX_FSR2
-			REGISTER_FUNCTION(fsr2Dispatch);
-		#endif		
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
 		REGISTER_FUNCTION(getRenderToDisplayRatio);
@@ -4030,6 +4014,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderOpaque);
 		REGISTER_FUNCTION(renderTransparent);
+		REGISTER_FUNCTION(renderAA);
 		REGISTER_FUNCTION(renderUI);
 		REGISTER_FUNCTION(saveRenderbuffer);
 		REGISTER_FUNCTION(setOutput);
@@ -4098,6 +4083,8 @@ struct PipelineImpl final : Pipeline
 	}
 	
 	void setIndirectLightMultiplier(float value) override { m_indirect_light_multiplier = value; }
+	
+	IVec2 getDisplaySize() const override { return m_display_size; }
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -4113,6 +4100,7 @@ struct PipelineImpl final : Pipeline
 	Array<UniquePtr<View>> m_views;
 	jobs::Signal m_buckets_ready;
 	Viewport m_viewport;
+	bool m_is_pixel_jitter_enabled = false;
 	Viewport m_prev_viewport;
 	IVec2 m_display_size;
 	float m_render_to_display_scale = 1;
@@ -4153,10 +4141,6 @@ struct PipelineImpl final : Pipeline
 		Buffer refl_probes;
 	} m_cluster_buffers;
 	Viewport m_shadow_camera_viewports[4];
-	#ifdef LUMIX_FSR2
-		Lumix::gpu::FSR2Context* m_fsr2 = nullptr;
-		IVec2 m_fsr2_size = IVec2(0);
-	#endif
 };
 
 
