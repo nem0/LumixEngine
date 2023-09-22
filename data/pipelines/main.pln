@@ -63,7 +63,7 @@ local selection_mask_desc = createRenderbufferDesc { format = "depth32", debug_n
 local baked_shadowmap_desc = createRenderbufferDesc { format = "depth32", debug_name = "shadowmap_depth" }
 local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_history", compute_write = true, display_size = true }
 local taa_tmp_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true, display_size = true }
-local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true, display_size = true }
+local taa_desc = createRenderbufferDesc { format = if PROBE ~= nil then "rgba32f" else "rgba16", debug_name = "taa", compute_write = true, display_size = true }
 local icon_ds_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "icon_ds" }
 local water_color_copy_desc = createRenderbufferDesc { format = "r11g11b10f", debug_name = "hdr_copy" }
 local hdr_rb_desc = createRenderbufferDesc { format = if PROBE ~= nil then "rgba32f" else "rgba16f", debug_name = "hdr" }
