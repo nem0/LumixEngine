@@ -96,7 +96,7 @@ fragment_shader [[
 	
     void main() {
         vec2 uv = toScreenUV(v_uv);
-		vec4 t = textureLod(u_texture, uv, 0) * 2 - 1;
+		vec4 t = textureLod(u_texture, uv, 0);
         float tt = arrow(gl_FragCoord.xy, (t.xy) * 10000);
         
         o_color = vec4(t.rg * 100, 1 - tt, 1);

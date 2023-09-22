@@ -331,7 +331,7 @@ function surface_shader_ex(args)
 				vec4 p = Global.view_projection_no_jitter * v_wpos;
 				#if defined DYNAMIC || defined SKINNED
 					vec2 prev_pos_projected = v_prev_ndcpos_no_jitter.xy / v_prev_ndcpos_no_jitter.w;
-					data.motion = (prev_pos_projected.xy * 0.5 + 0.5 - (p.xy / p.w * 0.5 + 0.5)) * 0.5 + 0.5;
+					data.motion = prev_pos_projected.xy - p.xy / p.w;
 				#else
 					data.motion = computeStaticObjectMotionVector(v_wpos.xyz);
 				#endif

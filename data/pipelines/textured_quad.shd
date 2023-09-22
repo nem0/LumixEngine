@@ -16,7 +16,6 @@ vertex_shader [[
 	void main() {
 		vec4 pos = fullscreenQuad(gl_VertexID, v_uv);
 		pos.xy = pos.xy * u_offset_scale.zw + u_offset_scale.xy;
-		pos.y = -pos.y;
 		gl_Position = pos;
 	}
 ]]
@@ -27,7 +26,7 @@ fragment_shader [[
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
 	void main() {
-		vec4 t = textureLod(u_texture, toScreenUV(v_uv), 0);
+		vec4 t = textureLod(u_texture, v_uv, 0);
 		o_color.r = dot(t, u_r_mask) + u_offsets.r;
 		o_color.g = dot(t, u_g_mask) + u_offsets.g;
 		o_color.b = dot(t, u_b_mask) + u_offsets.b;
