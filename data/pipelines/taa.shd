@@ -75,7 +75,12 @@ compute_shader [[
 		if (any(greaterThanEqual(ij, ivec2(u_size.xy)))) return;
 
 		vec2 uv = (vec2(ij) + 0.5) / u_size.xy;
-		vec2 motionvec = toScreenUV(textureLod(u_motion_vectors, uv, 0).xy) * 2 - 1;
+		vec2 motionvec = textureLod(u_motion_vectors, uv, 0).xy;
+		#ifdef _ORIGIN_BOTTOM_LEFT
+			motionvec *= vec2(0.5);
+		#else
+			motionvec *= vec2(0.5, -0.5);
+		#endif
 
 		vec2 uv_prev = uv + motionvec;
 

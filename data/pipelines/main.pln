@@ -44,7 +44,7 @@ type GBuffer = {
 local gbuffer_A_desc = createRenderbufferDesc { format = "srgba", debug_name = "gbuffer.A" }
 local gbuffer_B_desc = createRenderbufferDesc { compute_write = true, format = "rgba16", debug_name = "gbuffer.B" }
 local gbuffer_C_desc = createRenderbufferDesc { compute_write = true, format = "rgba8", debug_name = "gbuffer.C" }
-local gbuffer_D_desc = createRenderbufferDesc { compute_write = true, format = "rg16", debug_name = "gbuffer.D" }
+local gbuffer_D_desc = createRenderbufferDesc { compute_write = true, format = "rg16f", debug_name = "gbuffer.D" }
 local gbuffer_DS_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "gbuffer_ds" }
 
 local function createGBuffer() : GBuffer 
@@ -201,7 +201,9 @@ end
 local function geomPass(view_params : CameraParams, entities) : GBuffer
 	beginBlock("geom_pass")
 		local gbuffer = createGBuffer()
-	
+		setRenderTargets(gbuffer.D)
+		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
+
 		setRenderTargetsDS(gbuffer.A, gbuffer.B, gbuffer.C, gbuffer.D, gbuffer.DS)
 		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
 		pass(view_params)
