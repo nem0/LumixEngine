@@ -222,7 +222,7 @@ struct CodeEditor {
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
 UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
-
+UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app);
 
 template <typename F> void alignGUI(float align, const F& f) {
 	const ImVec2 container_size = ImGui::GetContentRegionAvail();

@@ -3139,58 +3139,62 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
 };
 
+struct CodeEditorWindow : AssetEditorWindow {
+	CodeEditorWindow(const Path& path, StudioApp& app)
+		: AssetEditorWindow(app)
+		, m_app(app)
+		, m_path(path)
+	{
+		if (Path::hasExtension(path, "glsl")) {
+			m_editor = createGLSLCodeEditor(m_app);
+		}
+		else {
+			m_editor = createLuaCodeEditor(m_app);
+		}
+			
+		OutputMemoryStream blob(app.getAllocator());
+		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
+			StringView v((const char*)blob.data(), (u32)blob.size());
+			m_editor->setText(v);
+		}
+	}
+
+	void save() {
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_editor->serializeText(blob);
+		m_app.getAssetBrowser().saveResource(m_path, blob);
+		m_dirty = false;
+	}
+	
+	bool onAction(const Action& action) override { 
+		if (&action == &m_app.getCommonActions().save) save();
+		else return false;
+		return true;
+	}
+
+	void windowGUI() override {
+		if (ImGui::BeginMenuBar()) {
+			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
+			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
+			ImGui::EndMenuBar();
+		}
+
+
+		ImGui::PushFont(m_app.getMonospaceFont());
+		if (m_editor->gui("codeeditor")) m_dirty = true;
+		ImGui::PopFont();
+	}
+	
+	const Path& getPath() override { return m_path; }
+	const char* getName() const override { return "shader editor"; }
+
+	StudioApp& m_app;
+	UniquePtr<CodeEditor> m_editor;
+	Path m_path;
+};
 
 struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
-	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app)
-			: AssetEditorWindow(app)
-			, m_app(app)
-			, m_path(path)
-		{
-			m_editor = createLuaCodeEditor(m_app);
-			
-			OutputMemoryStream blob(app.getAllocator());
-			if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
-				StringView v((const char*)blob.data(), (u32)blob.size());
-				m_editor->setText(v);
-			}
-		}
-
-		void save() {
-			OutputMemoryStream blob(m_app.getAllocator());
-			m_editor->serializeText(blob);
-			m_app.getAssetBrowser().saveResource(m_path, blob);
-			m_dirty = false;
-		}
-	
-		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getCommonActions().save) save();
-			else return false;
-			return true;
-		}
-
-		void windowGUI() override {
-			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
-				ImGui::EndMenuBar();
-			}
-
-
-			ImGui::PushFont(m_app.getMonospaceFont());
-			if (m_editor->gui("codeeditor")) m_dirty = true;
-			ImGui::PopFont();
-		}
-	
-		const Path& getPath() override { return m_path; }
-		const char* getName() const override { return "shader editor"; }
-
-		StudioApp& m_app;
-		UniquePtr<CodeEditor> m_editor;
-		Path m_path;
-	};
-
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -3268,12 +3272,37 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 	
 	void openEditor(const Path& path) override {
-		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(m_app.getAllocator(), path, m_app);
+		UniquePtr<CodeEditorWindow> win = UniquePtr<CodeEditorWindow>::create(m_app.getAllocator(), path, m_app);
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Shader"; }
+
+	StudioApp& m_app;
+};
+
+static ResourceType SHADER_INCLUDE_TYPE("shader_include");
+
+struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+	explicit ShaderIncludePlugin(StudioApp& app)
+		: m_app(app)
+	{
+		app.getAssetCompiler().registerExtension("inc", SHADER_INCLUDE_TYPE);
+		app.getAssetCompiler().registerExtension("glsl", SHADER_INCLUDE_TYPE);
+	}
+
+	void addSubresources(AssetCompiler& compiler, const Path& path) override {
+		compiler.addResource(SHADER_INCLUDE_TYPE, path);
+	}
+	
+	void openEditor(const Path& path) override {
+		UniquePtr<CodeEditorWindow> win = UniquePtr<CodeEditorWindow>::create(m_app.getAllocator(), path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
+
+	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	const char* getLabel() const override { return "Shader include"; }
 
 	StudioApp& m_app;
 };
@@ -5077,6 +5106,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_material_plugin(app)
 		, m_particle_emitter_property_plugin(app)
 		, m_shader_plugin(app)
+		, m_shader_include_plugin(app)
 		, m_model_properties_plugin(app)
 		, m_texture_plugin(app)
 		, m_game_view(app)
@@ -5125,6 +5155,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* shader_exts[] = {"shd"};
 		asset_compiler.addPlugin(m_shader_plugin, Span(shader_exts));
 
+		const char* inc_exts[] = {"inc", "glsl"};
+		asset_compiler.addPlugin(m_shader_include_plugin, Span(inc_exts));
+
 		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc"};
 		asset_compiler.addPlugin(m_texture_plugin, Span(texture_exts));
 
@@ -5146,6 +5179,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(m_material_plugin, Span(material_exts));
 		asset_browser.addPlugin(m_font_plugin, Span(fonts_exts));
 		asset_browser.addPlugin(m_shader_plugin, Span(shader_exts));
+		asset_browser.addPlugin(m_shader_include_plugin, Span(inc_exts));
 		asset_browser.addPlugin(m_texture_plugin, Span(texture_exts));
 		asset_browser.addPlugin(m_pipeline_plugin, Span(pipeline_exts));
 
@@ -5365,11 +5399,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(m_font_plugin);
 		asset_browser.removePlugin(m_texture_plugin);
 		asset_browser.removePlugin(m_shader_plugin);
+		asset_browser.removePlugin(m_shader_include_plugin);
 		asset_browser.removePlugin(m_pipeline_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 		asset_compiler.removePlugin(m_font_plugin);
 		asset_compiler.removePlugin(m_shader_plugin);
+		asset_compiler.removePlugin(m_shader_include_plugin);
 		asset_compiler.removePlugin(m_texture_plugin);
 		asset_compiler.removePlugin(m_model_plugin);
 		asset_compiler.removePlugin(m_material_plugin);
@@ -5399,6 +5435,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	ParticleSystemPropertyPlugin m_particle_emitter_property_plugin;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
+	ShaderIncludePlugin m_shader_include_plugin;
 	ShaderPlugin m_shader_plugin;
 	ModelPropertiesPlugin m_model_properties_plugin;
 	TexturePlugin m_texture_plugin;
