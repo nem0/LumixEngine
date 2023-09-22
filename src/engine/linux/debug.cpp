@@ -29,7 +29,7 @@ void debugBreak() {
 }
 
 
-int StackTree::s_instances = 0;
+AtomicI32 StackTree::s_instances = 0;
 
 
 struct StackNode {

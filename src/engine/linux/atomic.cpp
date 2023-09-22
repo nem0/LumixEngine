@@ -4,51 +4,34 @@
 namespace Lumix
 {
 
-i32 atomicIncrement(i32 volatile* value)
-{
-	return __sync_fetch_and_add(value, 1) + 1;
+
+void AtomicI32::operator =(i32 v) { __atomic_store_n(&value, v, __ATOMIC_RELEASE); }
+AtomicI32::operator i32() const { return __atomic_load_n(&value, __ATOMIC_ACQUIRE); }
+
+i32 AtomicI32::inc() { return __atomic_fetch_add(&value, 1, __ATOMIC_ACQ_REL); }
+i32 AtomicI32::dec() { return __atomic_fetch_sub(&value, 1, __ATOMIC_ACQ_REL); }
+i32 AtomicI32::add(i32 v) { return __atomic_fetch_add(&value, v, __ATOMIC_ACQ_REL); }
+i32 AtomicI32::subtract(i32 v) { return __atomic_fetch_sub(&value, v, __ATOMIC_ACQ_REL); }
+
+bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
+	return __sync_bool_compare_and_swap(&value, exchange, comperand);
 }
 
-i64 atomicIncrement(i64 volatile* value)
-{
-	return __sync_fetch_and_add(value, 1) + 1;
+void AtomicI64::operator =(i64 v) { __atomic_store_n(&value, v, __ATOMIC_RELEASE); }
+AtomicI64::operator i64() const { return __atomic_load_n(&value, __ATOMIC_ACQUIRE); }
+
+i64 AtomicI64::inc() { return __atomic_fetch_add(&value, 1, __ATOMIC_ACQ_REL); }
+i64 AtomicI64::dec() { return __atomic_fetch_sub(&value, 1, __ATOMIC_ACQ_REL); }
+i64 AtomicI64::add(i64 v) { return __atomic_fetch_add(&value, v, __ATOMIC_ACQ_REL); }
+i64 AtomicI64::subtract(i64 v) { return __atomic_fetch_sub(&value, v, __ATOMIC_ACQ_REL); }
+
+bool AtomicI64::compareExchange(i64 exchange, i64 comperand) { 
+	return __sync_bool_compare_and_swap(&value, exchange, comperand);
 }
 
-i32 atomicDecrement(i32 volatile* value)
-{
-	return __sync_fetch_and_sub(value, 1) - 1;
+bool compareExchangePtr(volatile void** value, void* exchange, void* comperand) {
+	return __sync_bool_compare_and_swap(value, exchange, comperand);
 }
-
-i32 atomicAdd(i32 volatile* addend, i32 value)
-{
-	return __sync_fetch_and_add(addend, value);
-}
-
-i32 atomicSubtract(i32 volatile* addend, i32 value)
-{
-	return __sync_fetch_and_sub(addend, value);
-}
-
-i64 atomicAdd(i64 volatile* addend, i64 value)
-{
-	return __sync_fetch_and_add(addend, value);
-}
-
-i64 atomicSubtract(i64 volatile* addend, i64 value)
-{
-	return __sync_fetch_and_sub(addend, value);
-}
-
-bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand)
-{
-	return __sync_bool_compare_and_swap(dest, comperand, exchange);
-}
-
-bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64 comperand)
-{
-	return __sync_bool_compare_and_swap(dest, comperand, exchange);
-}
-
 
 LUMIX_ENGINE_API void memoryBarrier()
 {
