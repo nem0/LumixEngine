@@ -36,6 +36,7 @@ declare function cull(cp : CameraParams, ... : any) : any
 declare function dispatch(shader : Shader, x : number, y : number, z : number) : ()
 declare function drawArray(indices_offset : number, indices_count : number, shader : Shader, textures : {RenderBuffer}, rs : any, define : string?) : ()
 declare function drawcallUniforms(...: number) : ()
+declare function enablePixelJitter(enable : boolean) : ()
 declare function endBlock() : ()
 declare function environmentCastShadows() : boolean
 declare function getCameraParams() : CameraParams
@@ -45,6 +46,7 @@ declare function keepRenderbufferAlive(rb : RenderBuffer) : ()
 declare function pass(cp : CameraParams) : ()
 declare function preloadShader(path: string) : Shader
 declare function render2D() : ()
+declare function renderAA(color : RenderBuffer, velocity : RenderBuffer, depth : RenderBuffer, output : RenderBuffer) : boolean
 declare function renderBucket(bucket : Bucket) : ()
 declare function renderDebugShapes() : ()
 declare function renderGizmos() : ()
@@ -82,6 +84,8 @@ declare CLEAR_DEPTH : number
 declare CLEAR_COLOR : number
 declare viewport_w : number
 declare viewport_h : number
+declare display_w : number
+declare display_h : number
 declare Renderer : any
 declare enabled : boolean
 declare fsr2Dispatch : any

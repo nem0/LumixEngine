@@ -16,9 +16,14 @@ namespace Lumix {
 enum class AttributeSemantic : u8;
 
 struct RenderPlugin {
+	virtual ~RenderPlugin() {}
+	// all `RenderPlugin` functions are called during execution of every `Pipeline`
 	virtual void renderUI(struct Pipeline& pipeline) {}
 	virtual void renderOpaque(Pipeline& pipeline) {}
 	virtual void renderTransparent(Pipeline& pipeline) {}
+	// returns true if AA run and builtin TAA should not run
+	virtual bool renderAA(Pipeline& pipeline, gpu::TextureHandle color, gpu::TextureHandle velocity, gpu::TextureHandle depth, gpu::TextureHandle output) { return false; }
+	virtual void pipelineDestroyed(Pipeline& pipeline) {}
 };
 
 struct DrawStream;

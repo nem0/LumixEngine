@@ -67,7 +67,8 @@ enum class DrawStream::Instruction : u8 {
 	SUBSTREAM,
 	BEGIN_PROFILE_BLOCK,
 	END_PROFILE_BLOCK,
-	USER_ALLOC
+	USER_ALLOC,
+	SET_TEXTURE_DEBUG_NAME
 };
 
 namespace {
@@ -361,6 +362,15 @@ void DrawStream::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 dept
 	ASSERT(h < 64*1024);
 	WRITE_CONST(Instruction::CREATE_TEXTURE);
 	WRITE(desc);
+	WRITE(len);
+	WRITE_ARRAY(debug_name, len);
+}
+
+void DrawStream::setDebugName(gpu::TextureHandle texture, const char* debug_name) {
+	const u32 len = stringLength(debug_name) + 1;
+	u8* data = alloc(sizeof(Instruction) + sizeof(texture) + len + sizeof(len));
+	WRITE_CONST(Instruction::SET_TEXTURE_DEBUG_NAME);
+	WRITE(texture);
 	WRITE(len);
 	WRITE_ARRAY(debug_name, len);
 }
@@ -835,6 +845,14 @@ void DrawStream::run() {
 					gpu::scissor(vec.x, vec.y, vec.z, vec.w);
 					break;
 				}
+				case Instruction::SET_TEXTURE_DEBUG_NAME: {
+					READ(gpu::TextureHandle, texture);
+					READ(u32, len);
+					const char* debug_name = (const char*)ptr;
+					ptr += len;
+					gpu::setDebugName(texture, debug_name);
+					break;
+				}
 				case Instruction::CREATE_TEXTURE: {
 					READ(CreateTextureData, data);
 					READ(u32, len);
@@ -961,9 +979,6 @@ void DrawStream::run() {
 					gpu::viewport(vec.x, vec.y, vec.z, vec.w);
 					break;
 				}
-				default:
-					ASSERT(false);
-					goto next_page;
 			}
 		}
 		next_page:
