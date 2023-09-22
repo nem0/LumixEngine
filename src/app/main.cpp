@@ -142,7 +142,7 @@ struct Runner final
 		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
 
 		InputMemoryStream tmp(data);
-		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, Span(m_startup_world));
+		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, Path(m_startup_world));
 		if (DeserializeProjectResult::SUCCESS != res) {
 			logError("Failed to deserialize project file");
 		}
@@ -173,8 +173,7 @@ struct Runner final
 
 		loadProject();
 
-		const Path unv_path("universes/", m_startup_world, ".unv");
-		if (!loadWorld(unv_path.c_str(), m_startup_world)) {
+		if (!loadWorld(m_startup_world.c_str())) {
 			initDemoScene();
 		}
 		os::showCursor(false);
@@ -259,7 +258,7 @@ struct Runner final
 	Renderer* m_renderer = nullptr;
 	World* m_world = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
-	char m_startup_world[96] = "main";
+	Path m_startup_world;
 
 	Viewport m_viewport;
 	bool m_finished = false;
