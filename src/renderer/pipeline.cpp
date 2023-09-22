@@ -2462,7 +2462,7 @@ struct PipelineImpl final : Pipeline
 			lod_indices.w = maximum(lod_indices.z, m->getLODIndices()[3].to);
 			const u32 instance_count = im.instances.size();
 			
-			const u32 indirect_offset = atomicAdd(&m_indirect_buffer_offset, m->getMeshCount());
+			const u32 indirect_offset = m_indirect_buffer_offset.add(m->getMeshCount());
 
 			ub_values.camera_offset = Vec4(Vec3(origin.pos - view.cp.pos), 1);
 			ub_values.lod_distances = lod_distances;
@@ -3508,7 +3508,7 @@ struct PipelineImpl final : Pipeline
 		const float global_lod_multiplier = m_renderer.getLODMultiplier();
 		const float global_lod_multiplier_rcp = 1 / global_lod_multiplier;
 		const float time_delta = m_renderer.getEngine().getLastTimeDelta();
-		volatile i32 worker_idx = 0;
+		AtomicI32 worker_idx = 0;
 
 		u32 bucket_map[255];
 		for (u32 i = 0; i < 255; ++i) {
@@ -3529,7 +3529,7 @@ struct PipelineImpl final : Pipeline
 			const DVec3 lod_ref_point = m_viewport.pos;
 			Sorter::Inserter inserter(view.sorter);
 
-			const i32 instancer_idx = atomicIncrement(&worker_idx) - 1;
+			const i32 instancer_idx = worker_idx.inc();
 			AutoInstancer& instancer = view.instancers[instancer_idx];
 			instancer.init(m_renderer.getMaxSortKey() + 1);
 
@@ -3757,14 +3757,14 @@ struct PipelineImpl final : Pipeline
 			memset(m_histogram, 0, sizeof(m_histogram));
 			m_sorted = true;
 
-			volatile i32 counter = 0;
+			AtomicI32 counter = 0;
 			auto work = [&](){
 				PROFILE_BLOCK("compute histogram");
 				u32 histogram[SIZE];
 				bool sorted = true;
 				memset(histogram, 0, sizeof(histogram));
 
-				i32 begin = atomicAdd(&counter, STEP);
+				i32 begin = counter.add(STEP);
 
 				while (begin < size) {
 					const i32 end = minimum(size, begin + STEP);
@@ -3778,7 +3778,7 @@ struct PipelineImpl final : Pipeline
 						sorted &= prev_key <= key;
 						prev_key = key;
 					}
-					begin = atomicAdd(&counter, STEP);
+					begin = counter.add(STEP);
 				}
 
 				jobs::MutexGuard lock(m_cs);
@@ -4116,7 +4116,7 @@ struct PipelineImpl final : Pipeline
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
-	volatile i32 m_indirect_buffer_offset;
+	AtomicI32 m_indirect_buffer_offset = 0;
 	gpu::BufferHandle m_instanced_meshes_buffer;
 	gpu::BufferHandle m_indirect_buffer;
 	gpu::VertexDecl m_base_vertex_decl;

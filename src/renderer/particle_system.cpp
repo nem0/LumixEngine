@@ -342,7 +342,7 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 		++emitter.emit_index;
 		m_constants[1] += time_step;
 	}
-	m_last_update_stats.emitted += count;
+	m_last_update_stats.emitted.add(count);
 	m_constants[1] = c1;
 }
 
@@ -1089,7 +1089,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 	OutputPagedStream emit_stream(page_allocator);
 	jobs::Mutex emit_mutex;
 
-	volatile i32 counter = 0;
+	AtomicI32 counter = 0;
 	auto update = [&](){
 		PROFILE_BLOCK("update particles");
 		
@@ -1101,7 +1101,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 
 		u32 processed = 0;
 		for (;;) {
-			ctx.from = atomicAdd(&counter, 1024);
+			ctx.from = counter.add(1024);
 			if (ctx.from >= (i32)emitter.particles_count) return;
 
 			processChunk(ctx);
@@ -1110,7 +1110,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 		profiler::pushInt("Total count", processed);
 	};
 	
-	m_last_update_stats.processed += emitter.particles_count;
+	m_last_update_stats.processed.add(emitter.particles_count);
 	if (emitter.particles_count <= 4096) update();
 	else jobs::runOnWorkers(update);
 
@@ -1148,7 +1148,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 			}
 		}
 		
-		m_last_update_stats.killed += total_killed;
+		m_last_update_stats.killed.add(total_killed);
 		emitter.particles_count -= total_killed;
 		profiler::pushInt("kill count", total_killed);
 		page_allocator.deallocate(kill_counter, true);
@@ -1231,7 +1231,7 @@ u32 ParticleSystem::Emitter::getParticlesDataSizeBytes() const {
 void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_allocator) const {
 	if (particles_count == 0) return;
 
-	volatile i32 counter = 0;
+	AtomicI32 counter = 0;
 	auto fill = [&](){
 		PROFILE_BLOCK("fill particle gpu data");
 
@@ -1240,7 +1240,7 @@ void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_
 		ctx.output_memory = data;
 
 		for (;;) {
-			ctx.from = atomicAdd(&counter, 1024);
+			ctx.from = counter.add(1024);
 			if (ctx.from >= (i32)particles_count) return;
 			
 			system.processChunk(ctx);

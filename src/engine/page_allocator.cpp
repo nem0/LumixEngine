@@ -43,7 +43,7 @@ void PageAllocator::unlock()
 
 void* PageAllocator::allocate(bool lock)
 {
-	atomicIncrement(&allocated_count);
+	allocated_count.inc();
 
 	void* p;
 	if (free_pages.pop(p)) return p;
@@ -65,7 +65,7 @@ void* PageAllocator::allocate(bool lock)
 
 void PageAllocator::deallocate(void* mem, bool lock)
 {
-	atomicDecrement(&allocated_count);
+	allocated_count.dec();
 	free_pages.push(mem, lock ? &mutex : nullptr);
 }
 

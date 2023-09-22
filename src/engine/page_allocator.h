@@ -28,7 +28,7 @@ public:
 	void unlock();
 		
 private:
-	volatile i32 allocated_count = 0;
+	AtomicI32 allocated_count = 0;
 	u32 reserved_count = 0;
 	RingBuffer<void*, 512> free_pages;
 	Mutex mutex;
@@ -47,10 +47,11 @@ struct PagedListIterator
 		for (;;) {
 			volatile T* tmp = value;
 			if(!tmp) return nullptr;
-			if (compareAndExchange64((volatile i64*)&value, (i64)tmp->header.next, (i64)tmp)) return (T*)tmp;
+			if (compareExchangePtr((volatile void**)&value, (void*)tmp->header.next, (void*)tmp)) return (T*)tmp;
 		}
 	}
 
+private:
 	volatile T* value;
 };
 

@@ -6,6 +6,7 @@
 	#include <evntcons.h>
 #endif
 
+#include "engine/atomic.h"
 #include "engine/array.h"
 #include "engine/crt.h"
 #include "engine/hash_map.h"
@@ -182,7 +183,7 @@ static struct Instance
 	u64 paused_time = 0;
 	u64 last_frame_duration = 0;
 	u64 last_frame_time = 0;
-	volatile i32 fiber_wait_id = 0;
+	AtomicI32 fiber_wait_id = 0;
 	TraceTask trace_task;
 	ThreadContext global_context;
 } g_instance;
@@ -363,18 +364,18 @@ void blockColor(u8 r, u8 g, u8 b)
 	write(*ctx, EventType::BLOCK_COLOR, color);
 }
 
-static volatile i32 last_block_id = 0;
-
 static void continueBlock(i32 block_id) {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	ctx->open_blocks.push(block_id);
 	write(*ctx, EventType::CONTINUE_BLOCK, block_id);
 }
 
+static AtomicI32 last_block_id = 0;
+
 void beginBlock(const char* name)
 {
 	BlockRecord r;
-	r.id = atomicIncrement(&last_block_id);
+	r.id = last_block_id.inc();
 	r.name = name;
 	ThreadContext* ctx = g_instance.getThreadContext();
 	ctx->open_blocks.push(r.id);
@@ -402,8 +403,8 @@ void endGPUBlock(u64 timestamp)
 
 i64 createNewLinkID()
 {
-	static i64 counter = 0;
-	return atomicIncrement(&counter);
+	AtomicI64 counter = 0;
+	return counter.inc();
 }
 
 
@@ -447,7 +448,7 @@ void signalTriggered(i32 job_system_signal) {
 FiberSwitchData beginFiberWait(i32 job_system_signal, bool is_mutex)
 {
 	FiberWaitRecord r;
-	r.id = atomicIncrement(&g_instance.fiber_wait_id);
+	r.id = g_instance.fiber_wait_id.inc();
 	r.job_system_signal = job_system_signal;
 	r.is_mutex = is_mutex;
 

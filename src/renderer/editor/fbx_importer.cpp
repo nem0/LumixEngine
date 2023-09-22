@@ -767,14 +767,14 @@ static void computeBoundingShapes(FBXImporter::ImportMesh& mesh, u32 vertex_size
 // convert from ofbx to runtime vertex data, compute missing info (normals, tangents, ao, ...)
 void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 {
-	volatile i32 mesh_idx_getter = 0;
+	AtomicI32 mesh_idx_getter = 0;
 	jobs::runOnWorkers([&](){
 		Array<Skin> skinning(m_allocator);
 		OutputMemoryStream unindexed_triangles(m_allocator);
 		Array<i32> tri_indices_tmp(m_allocator);
 
 		for (;;) {
-			i32 mesh_idx = atomicIncrement(&mesh_idx_getter) - 1;
+			i32 mesh_idx = mesh_idx_getter.inc();
 			if (mesh_idx >= m_meshes.size()) break;
 			
 			ImportMesh& import_mesh = m_meshes[mesh_idx];

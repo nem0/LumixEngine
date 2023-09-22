@@ -2,6 +2,7 @@
 
 
 #include "engine/allocator.h"
+#include "engine/atomic.h"
 #include "engine/lumix.h"
 #include "engine/sync.h"
 
@@ -41,7 +42,7 @@ private:
 
 private:
 	StackNode* m_root;
-	static i32 s_instances;
+	static AtomicI32 s_instances;
 };
 
 #ifdef _WIN32

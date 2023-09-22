@@ -1313,16 +1313,16 @@ struct NavigationModuleImpl final : NavigationModule
 
 		void pushJob() {
 			jobs::runLambda([this](){
-				const i32 i = atomicIncrement(&counter) - 1;
+				const i32 i = counter.inc();
 				if (i >= total) {
 					return;
 				}
 
 				if (!module->generateTile(*zone, zone_entity, i % zone->m_num_tiles_x, i / zone->m_num_tiles_x, false, mutex)) {
-					atomicIncrement(&fail_counter);
+					fail_counter.inc();
 				}
 				else {
-					atomicIncrement(&done_counter);
+					done_counter.inc();
 				}
 
 				pushJob();
@@ -1337,9 +1337,9 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 
 		i32 total;
-		volatile i32 counter = 0;
-		volatile i32 fail_counter = 0;
-		volatile i32 done_counter = 0;
+		AtomicI32 counter = 0;
+		AtomicI32 fail_counter = 0;
+		AtomicI32 done_counter = 0;
 		Mutex mutex;
 		RecastZone* zone;
 		EntityRef zone_entity;

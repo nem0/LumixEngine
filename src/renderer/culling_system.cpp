@@ -319,7 +319,7 @@ struct CullingSystemImpl final : CullingSystem
 	{
 		if (m_cells.empty()) return nullptr;
 
-		volatile i32 cell_idx = 0;
+		AtomicI32 cell_idx = 0;
 		PagedList<CullResult> list(m_page_allocator);
 
 		jobs::runOnWorkers([&](){
@@ -329,7 +329,7 @@ struct CullingSystemImpl final : CullingSystem
 			CullResult* result = nullptr;
 			u32 total_count = 0;
 			for(;;) {
-				const i32 idx = atomicIncrement(&cell_idx) - 1;
+				const i32 idx = cell_idx.inc();
 				if (idx >= m_cells.size()) return;
 
 				CellPage& cell = *m_cells[idx];

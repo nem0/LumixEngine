@@ -32,7 +32,7 @@ struct RingBuffer {
 				return false;
 			}
 			else if (seq == pos + 1) {
-				if (compareAndExchange(&rd, pos + 1, pos)) break;
+				if (rd.compareExchange(pos + 1, pos)) break;
 			}
 			else {
 				pos = rd;
@@ -58,7 +58,7 @@ struct RingBuffer {
 			}
 			else if (seq == pos) {
 				// we can try to push
-				if (compareAndExchange(&wr, pos + 1, pos)) break;
+				if (wr.compareExchange(pos + 1, pos)) break;
 			}
 			else {
 				// somebody pushed before us, try again
@@ -77,8 +77,8 @@ struct RingBuffer {
 	}
 
 	Item objects[CAPACITY];
-	volatile i32 rd = 0;
-	volatile i32 wr = 0;
+	AtomicI32 rd = 0;
+	AtomicI32 wr = 0;
 	Array<T> m_fallback;
 };
 

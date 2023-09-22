@@ -5,17 +5,41 @@
 namespace Lumix
 {
 
-LUMIX_ENGINE_API i64 atomicIncrement(i64 volatile* value);
-LUMIX_ENGINE_API i32 atomicIncrement(i32 volatile* value);
-// returns the resulting value
-LUMIX_ENGINE_API i32 atomicDecrement(i32 volatile* value);
-// returns the initial value
-LUMIX_ENGINE_API i32 atomicAdd(i32 volatile* addend, i32 value);
-LUMIX_ENGINE_API i64 atomicAdd(i64 volatile* addend, i64 value);
-LUMIX_ENGINE_API i32 atomicSubtract(i32 volatile* addend, i32 value);
-LUMIX_ENGINE_API i64 atomicSubtract(i64 volatile* addend, i64 value);
-LUMIX_ENGINE_API bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand);
-LUMIX_ENGINE_API bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64 comperand);
+LUMIX_ENGINE_API struct AtomicI32 {
+	AtomicI32(i32 v) : value(v) {}
+	
+	void operator =(i32 v);
+	operator i32() const;
+	
+	// returns initial value of the variable
+	i32 inc();
+	i32 dec();
+	i32 add(i32 v);
+	i32 subtract(i32 v);
+
+	bool compareExchange(i32 exchange, i32 comperand);
+private:
+	volatile i32 value;
+};
+
+LUMIX_ENGINE_API struct AtomicI64 {
+	AtomicI64(i64 v) : value(v) {}
+	
+	void operator =(i64 v);
+	operator i64() const;
+	
+	// returns initial value of the variable
+	i64 inc();
+	i64 dec();
+	i64 add(i64 v);
+	i64 subtract(i64 v);
+
+	bool compareExchange(i64 exchange, i64 comperand);
+private:
+	volatile i64 value;
+};
+
+LUMIX_ENGINE_API bool compareExchangePtr(volatile void** value, void* exchange, void* comperand);
 LUMIX_ENGINE_API void memoryBarrier();
 
 } // namespace Lumix

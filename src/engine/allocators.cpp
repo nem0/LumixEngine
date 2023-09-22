@@ -215,8 +215,8 @@ namespace Lumix
 	
 BaseProxyAllocator::BaseProxyAllocator(IAllocator& source)
 	: m_source(source)
+	, m_allocation_count(0)
 {
-	m_allocation_count = 0;
 }
 
 BaseProxyAllocator::~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
@@ -224,7 +224,7 @@ BaseProxyAllocator::~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
 
 void* BaseProxyAllocator::allocate(size_t size, size_t align)
 {
-	atomicIncrement(&m_allocation_count);
+	m_allocation_count.inc();
 	return m_source.allocate(size, align);
 }
 
@@ -233,7 +233,7 @@ void BaseProxyAllocator::deallocate(void* ptr)
 {
 	if(ptr)
 	{
-		atomicDecrement(&m_allocation_count);
+		m_allocation_count.dec();
 		m_source.deallocate(ptr);
 	}
 }
@@ -241,14 +241,13 @@ void BaseProxyAllocator::deallocate(void* ptr)
 
 void* BaseProxyAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align)
 {
-	if (!ptr) atomicIncrement(&m_allocation_count);
-	if (new_size == 0) atomicDecrement(&m_allocation_count);
+	if (!ptr) m_allocation_count.inc();
+	if (new_size == 0) m_allocation_count.dec();
 	return m_source.reallocate(ptr, new_size, old_size, align);
 }
 
-LinearAllocator::LinearAllocator(u32 reserved) {
-	m_end = 0;
-	m_commited_bytes = 0;
+LinearAllocator::LinearAllocator(u32 reserved)
+{
 	m_reserved = reserved;
 	m_mem = (u8*)os::memReserve(reserved);
 }
@@ -256,7 +255,7 @@ LinearAllocator::LinearAllocator(u32 reserved) {
 LinearAllocator::~LinearAllocator() {
 	ASSERT(m_end == 0);
 	os::memRelease(m_mem, m_reserved);
-	atomicSubtract(&g_total_commited_bytes, m_commited_bytes);
+	g_total_commited_bytes.subtract(m_commited_bytes);
 }
 
 void LinearAllocator::reset() {
@@ -274,7 +273,7 @@ void* LinearAllocator::allocate(size_t size, size_t align) {
 	for (;;) {
 		const u32 end = m_end;
 		start = roundUp(end, (u32)align);
-		if (compareAndExchange(&m_end, u32(start + size), end)) break;
+		if (m_end.compareExchange(u32(start + size), end)) break;
 	}
 
 	if (start + size <= m_commited_bytes) return m_mem + start;
@@ -285,13 +284,13 @@ void* LinearAllocator::allocate(size_t size, size_t align) {
 	const u32 commited = roundUp(start + (u32)size, 4096);
 	ASSERT(commited < m_reserved);
 	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
-	atomicAdd(&g_total_commited_bytes, commited - m_commited_bytes);
+	g_total_commited_bytes.add(commited - m_commited_bytes);
 	m_commited_bytes = commited;
 
 	return m_mem + start;
 }
 
-volatile i64 LinearAllocator::g_total_commited_bytes = 0;
+AtomicI64 LinearAllocator::g_total_commited_bytes = 0;
 
 void LinearAllocator::deallocate(void* ptr) { /*everything should be "deallocated" with reset()*/ }
 void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) { 

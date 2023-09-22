@@ -4,51 +4,34 @@
 namespace Lumix
 {
 
-i64 atomicIncrement(i64 volatile* value)
-{
-	return _InterlockedIncrement64((volatile long long*)value);
+void AtomicI32::operator =(i32 v) { _InterlockedExchange((volatile long*)&value, v); }
+AtomicI32::operator i32() const { return _InterlockedExchangeAdd((volatile long*)&value, 0); }
+
+i32 AtomicI32::inc() { return _InterlockedExchangeAdd((volatile long*)&value, 1); }
+i32 AtomicI32::dec() { return _InterlockedExchangeAdd((volatile long*)&value, -1); }
+i32 AtomicI32::add(i32 v) { return _InterlockedExchangeAdd((volatile long*)&value, v); }
+i32 AtomicI32::subtract(i32 v) { return _InterlockedExchangeAdd((volatile long*)&value, -v); }
+
+bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
+	return _InterlockedCompareExchange((volatile long*)&value, exchange, comperand) == comperand;
 }
 
-i32 atomicIncrement(i32 volatile* value)
-{
-	return _InterlockedIncrement((volatile long*)value);
+void AtomicI64::operator =(i64 v) { _InterlockedExchange64((volatile long long*)&value, v); }
+AtomicI64::operator i64() const { return _InterlockedExchangeAdd64((volatile long long*)&value, 0); }
+
+i64 AtomicI64::inc() { return _InterlockedExchangeAdd64((volatile long long*)&value, 1); }
+i64 AtomicI64::dec() { return _InterlockedExchangeAdd64((volatile long long*)&value, -1); }
+i64 AtomicI64::add(i64 v) { return _InterlockedExchangeAdd64((volatile long long*)&value, v); }
+i64 AtomicI64::subtract(i64 v) { return _InterlockedExchangeAdd64((volatile long long*)&value, -v); }
+
+bool AtomicI64::compareExchange(i64 exchange, i64 comperand) { 
+	return _InterlockedCompareExchange64((volatile long long*)&value, exchange, comperand) == comperand;
 }
 
-i32 atomicDecrement(i32 volatile* value)
-{
-	return _InterlockedDecrement((volatile long*)value);
+bool compareExchangePtr(volatile void** value, void* exchange, void* comperand) {
+	static_assert(sizeof(comperand) == sizeof(long long));
+	return _InterlockedCompareExchange64((volatile long long*)value, (long long)exchange, (long long)comperand) == (long long)comperand;
 }
-
-i32 atomicAdd(i32 volatile* addend, i32 value)
-{
-	return _InterlockedExchangeAdd((volatile long*)addend, value);
-}
-
-i32 atomicSubtract(i32 volatile* addend, i32 value)
-{
-	return _InterlockedExchangeAdd((volatile long*)addend, -value);
-}
-
-i64 atomicAdd(i64 volatile* addend, i64 value)
-{
-	return _InterlockedExchangeAdd64((volatile long long*)addend, value);
-}
-
-i64 atomicSubtract(i64 volatile* addend, i64 value)
-{
-	return _InterlockedExchangeAdd64((volatile long long*)addend, -value);
-}
-
-bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand)
-{
-	return _InterlockedCompareExchange((volatile long*)dest, exchange, comperand) == comperand;
-}
-
-bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64 comperand)
-{
-	return _InterlockedCompareExchange64(dest, exchange, comperand) == comperand;
-}
-
 
 LUMIX_ENGINE_API void memoryBarrier()
 {

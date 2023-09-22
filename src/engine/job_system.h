@@ -1,8 +1,6 @@
 #pragma once
 #include "lumix.h"
-#ifndef _WIN32
-	#include "atomic.h"
-#endif
+#include "atomic.h"
 
 namespace Lumix {
 
@@ -64,7 +62,7 @@ struct Signal {
 	~Signal() { ASSERT(!waitor); ASSERT(!counter); }
 
 	struct Waitor* waitor = nullptr;
-	volatile i32 counter = 0;
+	AtomicI32 counter = 0;
 	i32 generation; // identify different red-green pairs on the same signal, used by profiler
 };
 
@@ -95,11 +93,11 @@ void forEach(i32 count, i32 step, const F& f)
 		return;
 	}
 
-	volatile i32 offset = 0;
+	AtomicI32 offset = 0;
 
 	jobs::runOnWorkers([&](){
 		for(;;) {
-			const i32 idx = atomicAdd(&offset, step);
+			const i32 idx = offset.add(step);
 			if (idx >= count) break;
 			i32 to = idx + step;
 			to = to > count ? count : to;

@@ -536,7 +536,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		StackArray<EntityRef, 16> to_delete(m_allocator);
 		jobs::Mutex mutex;
-		volatile ParticleSystem::Stats stats = {};
+		ParticleSystem::Stats stats = {};
 		jobs::forEach(m_particle_emitters.capacity(), 1, [&](i32 idx, i32){
 			ParticleSystem* ps = m_particle_emitters.getFromIndex(idx);
 			if (!ps) return;
@@ -547,9 +547,9 @@ struct RenderModuleImpl final : RenderModule {
 				jobs::exit(&mutex);
 			}
 
-			atomicAdd(&stats.emitted, ps->m_last_update_stats.emitted);
-			atomicAdd(&stats.killed, ps->m_last_update_stats.killed);
-			atomicAdd(&stats.processed, ps->m_last_update_stats.processed);
+			stats.emitted.add(ps->m_last_update_stats.emitted);
+			stats.killed.add(ps->m_last_update_stats.killed);
+			stats.processed.add(ps->m_last_update_stats.processed);
 		});
 
 		static u32 emitted_particles_stat = profiler::createCounter("Emitted particles", 0);

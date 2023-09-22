@@ -1,6 +1,7 @@
 #pragma once
 
 #include "allocator.h"
+#include "atomic.h"
 #include "crt.h"
 #include "sync.h"
 
@@ -58,7 +59,7 @@ struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 
 private:
 	IAllocator& m_source;
-	volatile i32 m_allocation_count;
+	AtomicI32 m_allocation_count;
 };
 
 // allocations in a row one after another, deallocate everything at once
@@ -76,13 +77,13 @@ struct LUMIX_ENGINE_API LinearAllocator : IAllocator {
 	static size_t getTotalCommitedBytes() { return g_total_commited_bytes; }
 
 private:
-	u32 m_commited_bytes;
+	u32 m_commited_bytes = 0;
 	u32 m_reserved;
-	volatile i32 m_end;
+	AtomicI32 m_end = 0;
 	u8* m_mem;
 	Mutex m_mutex;
 
-	static volatile i64 g_total_commited_bytes;
+	static AtomicI64 g_total_commited_bytes;
 };
 
 // one allocation from local memory backing (m_mem), use fallback allocator otherwise

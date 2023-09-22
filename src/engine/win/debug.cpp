@@ -58,7 +58,7 @@ void debugBreak()
 }
 
 
-int StackTree::s_instances = 0;
+AtomicI32 StackTree::s_instances = 0;
 
 
 struct StackNode
@@ -79,7 +79,7 @@ struct StackNode
 StackTree::StackTree()
 {
 	m_root = nullptr;
-	if (atomicIncrement(&s_instances) == 1)
+	if (s_instances.inc() == 0)
 	{
 		HANDLE process = GetCurrentProcess();
 		SymInitialize(process, nullptr, TRUE);
@@ -90,7 +90,7 @@ StackTree::StackTree()
 StackTree::~StackTree()
 {
 	LUMIX_DELETE(getGlobalAllocator(), m_root);
-	if (atomicDecrement(&s_instances) == 0)
+	if (s_instances.dec() == 1)
 	{
 		HANDLE process = GetCurrentProcess();
 		SymCleanup(process);

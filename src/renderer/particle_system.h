@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/array.h"
+#include "engine/atomic.h"
 #include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
@@ -147,9 +148,9 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	};
 
 	struct Stats {
-		i32 emitted = 0;
-		i32 killed = 0;
-		i32 processed = 0;
+		AtomicI32 emitted = 0;
+		AtomicI32 killed = 0;
+		AtomicI32 processed = 0;
 	};
 
 	struct Emitter {

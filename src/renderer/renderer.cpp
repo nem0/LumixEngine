@@ -51,7 +51,7 @@ struct TransientBuffer {
 	Renderer::TransientSlice alloc(u32 size) {
 		Renderer::TransientSlice slice;
 		size = (size + (ALIGN - 1)) & ~(ALIGN - 1);
-		slice.offset = atomicAdd(&m_offset, size);
+		slice.offset = m_offset.add(size);
 		slice.size = size;
 		if (slice.offset + size <= m_size) {
 			slice.buffer = m_buffer;
@@ -111,7 +111,7 @@ struct TransientBuffer {
 	}
 
 	gpu::BufferHandle m_buffer = gpu::INVALID_BUFFER;
-	i32 m_offset = 0;
+	AtomicI32 m_offset = 0;
 	u32 m_size = 0;
 	u8* m_ptr = nullptr;
 	jobs::Mutex m_mutex;

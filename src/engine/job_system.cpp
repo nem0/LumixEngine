@@ -78,7 +78,7 @@ struct System {
 
 static Local<System> g_system;
 
-static volatile i32 g_generation = 0;
+static AtomicI32 g_generation = 0;
 static thread_local WorkerTask* g_worker = nullptr;
 
 #ifndef _WIN32
@@ -166,9 +166,9 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 			signal->counter = 0;
 		}
 		else {
-			--signal->counter;
-			ASSERT(signal->counter >= 0);
-			if (signal->counter > 0) return false;
+			i32 counter = signal->counter.dec();
+			ASSERT(counter > 0);
+			if (counter > 1) return false;
 		}
 
 		waitor = signal->waitor;
@@ -223,9 +223,9 @@ void enableBackupWorker(bool enable)
 LUMIX_FORCE_INLINE static bool setRedEx(Signal* signal) {
 	ASSERT(signal);
 	ASSERT(signal->counter <= 1);
-	bool res = compareAndExchange(&signal->counter, 1, 0);
+	bool res = signal->counter.compareExchange(1, 0);
 	if (res) {
-		signal->generation = atomicIncrement(&g_generation);
+		signal->generation = g_generation.inc();
 	}
 	return res;
 }
@@ -260,9 +260,8 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 
 	if (on_finished) {
 		Lumix::MutexGuard guard(g_system->m_sync);
-		++on_finished->counter;
-		if (on_finished->counter == 1) {
-			on_finished->generation = atomicIncrement(&g_generation);
+		if (on_finished->counter.inc() == 0) {
+			on_finished->generation = g_generation.inc();
 		}
 	}
 
