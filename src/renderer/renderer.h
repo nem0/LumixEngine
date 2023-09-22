@@ -24,6 +24,7 @@ struct RenderPlugin {
 	// returns true if AA run and builtin TAA should not run
 	virtual bool renderAA(Pipeline& pipeline, gpu::TextureHandle color, gpu::TextureHandle velocity, gpu::TextureHandle depth, gpu::TextureHandle output) { return false; }
 	virtual void pipelineDestroyed(Pipeline& pipeline) {}
+	virtual void frame(struct Renderer& renderer) {}
 };
 
 struct DrawStream;

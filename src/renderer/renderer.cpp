@@ -984,7 +984,11 @@ struct RendererImpl final : Renderer
 		m_cpu_frame = m_frames[(getFrameIndex(m_cpu_frame) + 1) % lengthOf(m_frames)].get();
 		++m_frame_number;
 		m_cpu_frame->frame_number = m_frame_number;
-		
+
+		for (RenderPlugin* plugin : m_plugins) {
+			plugin->frame(*this);
+		}
+
 		jobs::runLambda([this](){
 			render();
 		}, &m_last_render, 1);

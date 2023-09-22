@@ -531,6 +531,10 @@ main = function()
 	cubemap_sky:postprocess(getfenv(1), hdr_buffer, gbuffer, shadowmap)
 	atmo:postprocess(getfenv(1), hdr_buffer, gbuffer, shadowmap)
 	
+
+	waterPass(view_params, entities, hdr_buffer, gbuffer, shadowmap)
+	transparentPass(view_params, entities, hdr_buffer, gbuffer, shadowmap)
+
 	local res 	
 	if taa_enabled then
 		res = createRenderbuffer(taa_desc)
@@ -541,10 +545,6 @@ main = function()
 		enablePixelJitter(false)
 		res = hdr_buffer
 	end
-
-	waterPass(view_params, entities, res, gbuffer, shadowmap)
-	transparentPass(view_params, entities, res, gbuffer, shadowmap)
-	setRenderTargetsReadonlyDS(res, gbuffer.DS)
 
 	res = dof:postprocess(getfenv(1), res, gbuffer, shadowmap)
 	bloom:postprocess(getfenv(1), res, gbuffer, shadowmap)
