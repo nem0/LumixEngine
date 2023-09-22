@@ -1242,6 +1242,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 			case gpu::TextureFormat::R8: return "R8";
 			case gpu::TextureFormat::RGB32F: return "RGB32F";
 			case gpu::TextureFormat::RG32F: return "RG32F";
+			case gpu::TextureFormat::RG16F: return "RG16F";
 			case gpu::TextureFormat::RG8: return "RG8";
 			case gpu::TextureFormat::D24S8: return "D24S8";
 			case gpu::TextureFormat::D32: return "D32";
