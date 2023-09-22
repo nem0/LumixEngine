@@ -1416,7 +1416,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	template <typename T>
-	void forEachWorld(T& f) {
+	void forEachWorld(const T& f) {
 		const HashMap<FilePathHash, AssetCompiler::ResourceItem>& resources = m_asset_compiler->lockResources();
 		ResourceType WORLD_TYPE("world");
 		for (const AssetCompiler::ResourceItem& ri : resources) {
