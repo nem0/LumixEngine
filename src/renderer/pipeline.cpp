@@ -391,7 +391,8 @@ struct PipelineImpl final : Pipeline
 	struct RenderbufferDesc {
 		enum Type {
 			FIXED,
-			RELATIVE
+			RELATIVE,
+			DISPLAY_SIZE
 		};
 		Type type = FIXED;
 		IVec2 fixed_size;
@@ -985,6 +986,10 @@ struct PipelineImpl final : Pipeline
 	void setViewport(const Viewport& viewport) override 
 	{
 		m_viewport = viewport;
+		m_display_size.x = m_viewport.w;
+		m_display_size.y = m_viewport.h;
+		m_viewport.w = i32(m_viewport.w / m_render_to_display_scale);
+		m_viewport.h = i32(m_viewport.h / m_render_to_display_scale);
 		if (m_first_set_viewport) {
 			m_prev_viewport = viewport;
 			m_first_set_viewport = false;
@@ -1112,6 +1117,8 @@ struct PipelineImpl final : Pipeline
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
+		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
+		LuaWrapper::setField(m_lua_state, -1, "display_h", m_display_size.y);
 		lua_getfield(m_lua_state, -1, "main_shadowmap");
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
 			lua_pop(m_lua_state, 2);
@@ -1139,6 +1146,8 @@ struct PipelineImpl final : Pipeline
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
+		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
+		LuaWrapper::setField(m_lua_state, -1, "display_h", m_display_size.y);
 		lua_pop(m_lua_state, 1);
 		return true;
 	}
@@ -1259,6 +1268,8 @@ struct PipelineImpl final : Pipeline
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
+		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
+		LuaWrapper::setField(m_lua_state, -1, "display_h", m_display_size.y);
 		lua_getfield(m_lua_state, -1, "main");
 		bool has_main = true;
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
@@ -1517,7 +1528,12 @@ struct PipelineImpl final : Pipeline
 		res.type = PipelineTexture::RENDERBUFFER;
 
 		const RenderbufferDesc& desc = m_renderbuffer_descs[desc_handle];
-		const IVec2 size = desc.type == RenderbufferDesc::FIXED ? desc.fixed_size : IVec2(i32(desc.rel_size.x * m_viewport.w), i32(desc.rel_size.y * m_viewport.h));
+		IVec2 size;
+		switch (desc.type) {
+			case RenderbufferDesc::FIXED: size = desc.fixed_size; break;
+			case RenderbufferDesc::RELATIVE: size = IVec2(i32(desc.rel_size.x * m_viewport.w), i32(desc.rel_size.y * m_viewport.h)); break;
+			case RenderbufferDesc::DISPLAY_SIZE: size = m_display_size; break;
+		}
 		for (Renderbuffer& rb : m_renderbuffers) {
 			if (!rb.handle) {
 				rb.frame_counter = 0;
@@ -1561,10 +1577,16 @@ struct PipelineImpl final : Pipeline
 		bool compute_write = false;
 		RenderbufferDesc::Type type = RenderbufferDesc::FIXED;
 		if (!LuaWrapper::getOptionalField(L, 1, "size", &fixed_size)) {
-			if (!LuaWrapper::getOptionalField(L, 1, "rel_size", &rel_size)) {
-				rel_size = Vec2(1, 1);
-			}
 			type = RenderbufferDesc::RELATIVE;
+			if (!LuaWrapper::getOptionalField(L, 1, "rel_size", &rel_size)) {
+				bool display_size = false;
+				if (LuaWrapper::getOptionalField(L, 1, "display_size", &display_size) && display_size) {
+					type = RenderbufferDesc::DISPLAY_SIZE;
+				}
+				else {
+					rel_size = Vec2(1, 1);
+				}
+			}
 		}
 		else {
 			type = RenderbufferDesc::FIXED;
@@ -3917,9 +3939,12 @@ struct PipelineImpl final : Pipeline
 		stream.freeMemory(mem.data, m_renderer.getAllocator());
 	}
 
+	float getRenderToDisplayRatio() const { return m_render_to_display_scale; }
+	void setRenderToDisplayRatio(float scale) { m_render_to_display_scale = scale; }
+
 	#ifdef LUMIX_FSR2
 		void fsr2Dispatch(PipelineTexture color, PipelineTexture depth, PipelineTexture motion_vectors, PipelineTexture output) {
-			DrawStream& stream = m_renderer.getDrawStream();	
+			DrawStream& stream = m_renderer.getDrawStream();
 			gpu::FSR2DispatchParams params;
 			params.jitter_x = m_viewport.pixel_offset.x;
 			params.jitter_y = m_viewport.pixel_offset.y;
@@ -3934,13 +3959,13 @@ struct PipelineImpl final : Pipeline
 			params.output = toHandle(output);
 			beginBlock("FSR2");
 			stream.pushLambda([this, params](){
-				IVec2 s(m_viewport.w, m_viewport.h);
+				IVec2 s(m_display_size.x, m_display_size.y);
 				if (m_fsr2 && m_fsr2_size != s) {
 					gpu::fsr2Shutdown(*m_fsr2);
 					m_fsr2 = nullptr;
 				}
 				if (!m_fsr2) {
-					m_fsr2 = gpu::fsr2Init(m_viewport.w, m_viewport.h, m_allocator);
+					m_fsr2 = gpu::fsr2Init(m_display_size.x, m_display_size.y, m_allocator);
 					m_fsr2_size = s;
 				}
 				gpu::fsr2Dispatch(*m_fsr2, params);
@@ -3993,6 +4018,7 @@ struct PipelineImpl final : Pipeline
 		#endif		
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
+		REGISTER_FUNCTION(getRenderToDisplayRatio);
 		REGISTER_FUNCTION(keepRenderbufferAlive);
 		REGISTER_FUNCTION(pass);
 		REGISTER_FUNCTION(preloadShader);
@@ -4007,6 +4033,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderUI);
 		REGISTER_FUNCTION(saveRenderbuffer);
 		REGISTER_FUNCTION(setOutput);
+		REGISTER_FUNCTION(setRenderToDisplayRatio);
 		REGISTER_FUNCTION(viewport);
 
 		lua_pushinteger(L, -2); lua_setfield(L, -2, "SHADOW_ATLAS");
@@ -4087,6 +4114,8 @@ struct PipelineImpl final : Pipeline
 	jobs::Signal m_buckets_ready;
 	Viewport m_viewport;
 	Viewport m_prev_viewport;
+	IVec2 m_display_size;
+	float m_render_to_display_scale = 1;
 	float m_indirect_light_multiplier = 1;
 	bool m_first_set_viewport = true;
 	int m_output;

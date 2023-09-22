@@ -39,6 +39,7 @@ declare function drawcallUniforms(...: number) : ()
 declare function endBlock() : ()
 declare function environmentCastShadows() : boolean
 declare function getCameraParams() : CameraParams
+declare function getRenderToDisplayRatio() : number
 declare function getShadowCameraParams(slice : number) : CameraParams
 declare function keepRenderbufferAlive(rb : RenderBuffer) : ()
 declare function pass(cp : CameraParams) : ()
@@ -59,6 +60,7 @@ declare function setOutput(rb : RenderBuffer) : ()
 declare function setRenderTargets(...: RenderBuffer) : ()
 declare function setRenderTargetsDS(...: RenderBuffer) : ()
 declare function setRenderTargetsReadonlyDS(...: RenderBuffer) : ()
+declare function setRenderToDisplayRatio(ratio: number) : ()
 declare function viewport(x : number, y : number, w : number, h : number) : ()
 
     
@@ -82,3 +84,4 @@ declare viewport_w : number
 declare viewport_h : number
 declare Renderer : any
 declare enabled : boolean
+declare fsr2Dispatch : any

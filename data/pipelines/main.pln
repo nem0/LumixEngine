@@ -62,8 +62,8 @@ local shadowmap_1x1 = createRenderbufferDesc { size = {1, 1}, format = "depth32"
 local shadowmap_desc = createRenderbufferDesc { size = { 4096, 1024 }, format = "depth32", debug_name = "shadowmap" }
 local selection_mask_desc = createRenderbufferDesc { format = "depth32", debug_name = "selection_depthbuffer" }
 local baked_shadowmap_desc = createRenderbufferDesc { format = "depth32", debug_name = "shadowmap_depth" }
-local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true }
-local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true }
+local taa_history_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa", compute_write = true, display_size = true }
+local taa_desc = createRenderbufferDesc { format = "rgba16", debug_name = "taa_tmp", compute_write = true, display_size = true }
 local icon_ds_desc = createRenderbufferDesc { format = "depth24stencil8", debug_name = "icon_ds" }
 local water_color_copy_desc = createRenderbufferDesc { format = "r11g11b10f", debug_name = "hdr_copy" }
 local hdr_rb_desc = createRenderbufferDesc { format = if PROBE ~= nil then "rgba32f" else "rgba16f", debug_name = "hdr" }
@@ -479,10 +479,10 @@ local function TAA(res, gbuffer)
 
 		setRenderTargets()
 
-		drawcallUniforms(viewport_w, viewport_h, 0, 0) 
+		drawcallUniforms(display_w, display_h, 0, 0) 
 		bindTextures({taa_history, res, gbuffer.D}, 0)
 		bindImageTexture(taa_tmp, 3)
-		dispatch(taa_shader, (viewport_w + 15) / 16, (viewport_h + 15) / 16, 1)
+		dispatch(taa_shader, (display_w + 15) / 16, (display_h + 15) / 16, 1)
 
 		setRenderTargets(res)
 		drawcallUniforms( 
@@ -666,7 +666,14 @@ onGUI = function()
 		_, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
 		_, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
 		_, enable_icons = ImGui.Checkbox("Icons", enable_icons)
-		local changed, lod_mul = ImGui.DragFloat("LOD multiplier", Renderer.getLODMultiplier())
+		local changed, upsample = ImGui.DragFloat("Downsample", getRenderToDisplayRatio())
+		if changed then
+			if upsample < 1 then upsample = 1 end
+			setRenderToDisplayRatio(upsample)
+		end
+
+		local lod_mul
+		changed, lod_mul = ImGui.DragFloat("LOD multiplier", Renderer.getLODMultiplier())
 		if changed then
 			Renderer.setLODMultiplier(lod_mul)
 		end
