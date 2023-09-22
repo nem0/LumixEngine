@@ -1218,6 +1218,13 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	}
 }
 
+void setDebugName(gpu::TextureHandle texture, const char* debug_name) {
+	glObjectLabel(GL_TEXTURE, texture->gl_handle, stringLength(debug_name), debug_name);
+	#ifdef LUMIX_DEBUG
+		handle->name = debug_name;
+	#endif
+}
+
 void generateMipmaps(TextureHandle texture)
 {
 	GPU_PROFILE();
