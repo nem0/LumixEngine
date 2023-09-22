@@ -3393,11 +3393,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count) {
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		Path path(base_path, "universes");
-		if (!os::makePath(path.c_str()) && !os::dirExists(path)) {
-			logError("Failed to create ", path);
-		}
-		path.append("/probes_tmp/");
+		Path path(base_path, "probes_tmp/");
 		if (!os::makePath(path.c_str()) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
@@ -3555,11 +3551,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-			Path dir_path(base_path, "universes/");
-			if (!os::dirExists(dir_path) && !os::makePath(dir_path.c_str())) {
-				logError("Failed to create ", dir_path);
-			}
-			dir_path.append("/probes/");
+			Path dir_path(base_path, "probes/");
 			if (!os::dirExists(dir_path) && !os::makePath(dir_path.c_str())) {
 				logError("Failed to create ", dir_path);
 			}
@@ -3574,8 +3566,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const u64 guid = job.reflection_probe.guid;
 
-					const Path tmp_path(base_path, "/universes/probes_tmp/", guid, ".lbc");
-					const Path path(base_path, "/universes/probes/", guid, ".lbc");
+					const Path tmp_path(base_path, "/probes_tmp/", guid, ".lbc");
+					const Path path(base_path, "/probes/", guid, ".lbc");
 					if (!os::fileExists(tmp_path)) {
 						if (module) module->reloadReflectionProbes();
 						return;
@@ -3736,7 +3728,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			else {
 				const ReflectionProbe& probe = module->getReflectionProbe(e);
 				if (probe.flags & ReflectionProbe::ENABLED) {
-					const Path path("universes/probes/", probe.guid, ".lbc");
+					const Path path("probes/", probe.guid, ".lbc");
 					ImGuiEx::Label("Path");
 					ImGuiEx::TextUnformatted(path);
 					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().openEditor(path);

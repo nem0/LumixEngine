@@ -114,7 +114,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		if(module->isNavmeshReady(entities[0])) {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
-				const Path dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
+				const Path dir(m_app.getEngine().getFileSystem().getBasePath(), "/navzones/");
 				if (!os::makePath(dir.c_str()) && !os::dirExists(dir)) {
 					logError("Could not create ", dir);
 				}

@@ -2067,28 +2067,30 @@ bool FileSelector::gui(const char* label, bool* open, const char* extension, boo
 	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		res = gui(true, extension);
 	
-		if (m_save) {
-			if (ImGui::Button(ICON_FA_SAVE " Save")) {
-				if (!Path::hasExtension(m_full_path, m_accepted_extension)) {
-					m_full_path.append(".", m_accepted_extension.c_str());
-				}
-				if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
-					ImGui::OpenPopup("warn_overwrite");
-				}
-				else {
-					res = true;
-				}
-			}
-		}
-		else {
-			if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open")) {
-				if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
-					res = true;
+		alignGUICenter([&](){
+			if (m_save) {
+				if (ImGui::Button(ICON_FA_SAVE " Save")) {
+					if (!Path::hasExtension(m_full_path, m_accepted_extension)) {
+						m_full_path.append(".", m_accepted_extension.c_str());
+					}
+					if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
+						ImGui::OpenPopup("warn_overwrite");
+					}
+					else {
+						res = true;
+					}
 				}
 			}
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
+			else {
+				if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open")) {
+					if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
+						res = true;
+					}
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
+		});
 	
 		if (ImGui::BeginPopup("warn_overwrite")) {
 			ImGui::TextUnformatted("File already exists, are you sure you want to overwrite it?");

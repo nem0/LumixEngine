@@ -1966,28 +1966,26 @@ public:
 
 	void save() {
 		ASSERT(m_world->getPartitions().size() == 1);
-		const char* basename = m_world->getPartitions()[0].name;
-		ASSERT(basename[0]);
+		const char* path = m_world->getPartitions()[0].name;
+		ASSERT(path[0]);
 		saveProject();
 
-		logInfo("Saving world ", basename, "...");
+		logInfo("Saving world ", path, "...");
 		
-		StaticString<MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
-		if (!os::makePath(path)) logError("Could not create directory universes/");
-		path.append("/", basename, ".unv");
-		StaticString<MAX_PATH> bkp_path(path, ".bak");
-		if (os::fileExists(path)) {
-			if (!os::copyFile(path, bkp_path)) {
+		FileSystem& fs = m_engine.getFileSystem();
+		Path bkp_path(path, ".bak");
+		if (fs.fileExists(path)) {
+			if (!fs.copyFile(path, bkp_path)) {
 				logError("Could not copy ", path, " to ", bkp_path);
 			}
 		}
 		os::OutputFile file;
-		if (file.open(path)) {
+		if (fs.open(path, file)) {
 			save(file, false);
 			file.close();
 		}
 		else {
-			logError("Failed to save world ", basename);
+			logError("Failed to save world ", path);
 		}
 		
 		m_is_world_changed = false;
@@ -2467,7 +2465,7 @@ public:
 	void saveProject() {
 		FileSystem& fs = m_engine.getFileSystem();
 		OutputMemoryStream blob(m_allocator);
-		m_engine.serializeProject(blob, "main");
+		m_engine.serializeProject(blob, Path("main.unv"));
 
 		if (!fs.saveContentSync(Path("lumix.prj"), blob)) {
 			logError("Failed to save lumix.prj");
@@ -2482,9 +2480,9 @@ public:
 		}
 		
 		InputMemoryStream stream(data);
-		char dummy[1];
+		Path dummy;
 		
-		const DeserializeProjectResult res = m_engine.deserializeProject(stream, Span(dummy));
+		const DeserializeProjectResult res = m_engine.deserializeProject(stream, dummy);
 		switch (res) {
 			case DeserializeProjectResult::SUCCESS: break;
 			case DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED: logError("Project file: Plugin deserialization failed"); break;

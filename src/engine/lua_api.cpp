@@ -724,7 +724,7 @@ static int LUA_loadWorld(lua_State* L)
 {
 	Engine* engine = getEngineUpvalue(L);
 	auto* world = LuaWrapper::checkArg<World*>(L, 1);
-	auto* name = LuaWrapper::checkArg<const char*>(L, 2);
+	auto* path = LuaWrapper::checkArg<const char*>(L, 2);
 	if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
 	struct Callback {
 		~Callback() { LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, lua_func); }
@@ -764,8 +764,7 @@ static int LUA_loadWorld(lua_State* L)
 	Callback* inst = LUMIX_NEW(engine->getAllocator(), Callback);
 	inst->engine = engine;
 	inst->world = world;
-	const Path path("universes/", name, ".unv");
-	inst->path = path;
+	inst->path = Path(path);
 	inst->L = L;
 	inst->lua_func = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
 	fs.getContent(inst->path, makeDelegate<&Callback::invoke>(inst));

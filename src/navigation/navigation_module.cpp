@@ -682,7 +682,7 @@ struct NavigationModuleImpl final : NavigationModule
 
 		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
-		const Path path("universes/navzones/", zone.zone.guid, ".nav");
+		const Path path("navzones/", zone.zone.guid, ".nav");
 		FileSystem& fs = m_engine.getFileSystem();
 		return fs.getContent(path, makeDelegate<&LoadCallback::fileLoaded>(lcb)).isValid();
 	}
@@ -694,7 +694,7 @@ struct NavigationModuleImpl final : NavigationModule
 		FileSystem& fs = m_engine.getFileSystem();
 		
 		os::OutputFile file;
-		const Path path("universes/navzones/", zone.zone.guid, ".nav");
+		const Path path("navzones/", zone.zone.guid, ".nav");
 		if (!fs.open(path, file)) return false;
 
 		bool success = file.write(zone.m_num_tiles_x);

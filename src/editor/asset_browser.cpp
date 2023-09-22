@@ -47,6 +47,27 @@ bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path
 	return false;
 }
 
+static ResourceType WORLD_TYPE("world");
+
+struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+	explicit WorldAssetPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		app.getAssetCompiler().registerExtension("unv", WORLD_TYPE);
+	}
+
+	void addSubresources(AssetCompiler& compiler, const Path& path) override {
+		compiler.addResource(WORLD_TYPE, path);
+	}
+	
+	void openEditor(const Path& path) override { m_app.tryLoadWorld(path, false); }
+
+	bool compile(const Path& src) override { return true; }
+	const char* getLabel() const override { return "World"; }
+
+	StudioApp& m_app;
+};
+
 struct AssetBrowserImpl : AssetBrowser {
 	struct FileInfo {
 		StaticString<MAX_PATH> clamped_filename;
@@ -74,6 +95,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_immediate_tiles(m_allocator)
 		, m_subdirs(m_allocator)
 		, m_windows(m_allocator)
+		, m_world_asset_plugin(app)
 	{
 		PROFILE_FUNCTION();
 
@@ -93,6 +115,9 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.addAction(&m_back_action);
 		m_app.addAction(&m_forward_action);
 		m_app.addWindowAction(&m_toggle_ui);
+		const char* world_exts[] = { "unv" };
+		addPlugin(m_world_asset_plugin, Span(world_exts));
+		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
 	}
 
 	void focusSearch() {
@@ -1242,6 +1267,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	Action m_toggle_ui;
 	Action m_back_action;
 	Action m_forward_action;
+	WorldAssetPlugin m_world_asset_plugin;
 };
 
 UniquePtr<AssetBrowser> AssetBrowser::create(StudioApp& app) {

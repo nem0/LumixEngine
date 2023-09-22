@@ -829,7 +829,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		const Path path("universes/probes/", probe.guid, ".lbc");
+		const Path path("probes/", probe.guid, ".lbc");
 		if (probe.texture_id == 0xffFFffFF) {
 			logError("There's not enough space for ", path);
 			return;
@@ -845,7 +845,7 @@ struct RenderModuleImpl final : RenderModule {
 		u32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count + m_environment_probes.size());
-		const Path probe_dir("universes/probes/");
+		const Path probe_dir("probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);

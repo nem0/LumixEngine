@@ -96,6 +96,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual struct Settings& getSettings() = 0;
 	virtual struct RenderInterface* getRenderInterface() = 0;
 	virtual void setRenderInterface(RenderInterface* ifc) = 0;
+	virtual void tryLoadWorld(const struct Path& path, bool additive) = 0;
 
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void addPlugin(MousePlugin& plugin) = 0;
@@ -119,7 +120,6 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	
-	virtual void scanWorlds() = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual void snapDown() = 0;

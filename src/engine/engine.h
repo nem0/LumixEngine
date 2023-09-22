@@ -55,8 +55,8 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void stopGame(World& world) = 0;
 
 	virtual void update(World& world) = 0;
-	[[nodiscard]] virtual DeserializeProjectResult deserializeProject(struct InputMemoryStream& serializer, Span<char> startup_world) = 0;
-	virtual void serializeProject(struct OutputMemoryStream& serializer, const char* startup_world) const = 0;
+	[[nodiscard]] virtual DeserializeProjectResult deserializeProject(struct InputMemoryStream& serializer, Path& startup_world) = 0;
+	virtual void serializeProject(struct OutputMemoryStream& serializer, const Path& startup_world) const = 0;
 	virtual float getLastTimeDelta() const = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;

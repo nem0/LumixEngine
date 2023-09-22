@@ -5,7 +5,7 @@ function onInputEvent(event : InputEvent)
 			local old_partition = this.world:getActivePartition()
 			local demo = this.world:createPartition("demo")
 			this.world:setActivePartition(demo)
-			this.world:load("demo", function() 
+			this.world:load("universes/demo.unv", function() 
 				--this.world:destroyPartition(old_partition)
 			end)
 

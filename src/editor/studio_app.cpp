@@ -89,7 +89,6 @@ struct StudioAppImpl final : StudioApp
 		, m_component_labels(m_allocator)
 		, m_component_icons(m_allocator)
 		, m_exit_code(0)
-		, m_worlds(m_allocator)
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
@@ -377,7 +376,6 @@ struct StudioAppImpl final : StudioApp
 		m_asset_compiler = AssetCompiler::create(*this);
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		m_editor->entitySelectionChanged().bind<&StudioAppImpl::onEntitySelectionChanged>(this);
-		scanWorlds();
 		loadUserPlugins();
 		addActions();
 
@@ -919,28 +917,29 @@ struct StudioAppImpl final : StudioApp
 		m_editor->endCommandGroup();
 	}
 
-	void loadWorld(const char* name, bool additive) {
-		const char* base_path = m_engine->getFileSystem().getBasePath();
-		os::InputFile file;
-		const Path path(base_path, "universes/", name, ".unv");
+	void tryLoadWorld(const Path& path, bool additive) override {
+		if (!additive && m_editor->isWorldChanged()) {
+			m_world_to_load = path;
+			m_confirm_load = true;
+		}
+		else {
+			loadWorld(path, additive);
+		}
+	}
 
-		if (!file.open(path.c_str())) {
-			logError("Failed to open ", path);
+
+	void loadWorld(const Path& path, bool additive) {
+		FileSystem& fs = m_engine->getFileSystem();
+		OutputMemoryStream data(m_allocator);
+
+		if (!fs.getContentSync(path, data)) {
+			logError("Failed to read ", path);
 			m_editor->newWorld();
 			return;
 		}
 
-		OutputMemoryStream data(m_allocator);
-		data.resize(file.size());
-		if (!file.read(data.getMutableData(), data.size())) {
-			logError("Failed to read ", path);
-			file.close();
-			return;
-		}
-		file.close();
-
-		InputMemoryStream blob(data);
-		m_editor->loadWorld(blob, name, additive);
+		InputMemoryStream blob(data); 
+		m_editor->loadWorld(blob, path.c_str(), additive);
 	}
 
 	void guiWelcomeScreen()
@@ -988,7 +987,6 @@ struct StudioAppImpl final : StudioApp
 						m_engine->getFileSystem().setBasePath(dir);
 						extractBundled();
 						m_editor->loadProject();
-						scanWorlds();
 						m_asset_compiler->onBasePathChanged();
 						m_engine->getResourceManager().reloadAll();
 					}
@@ -1000,17 +998,12 @@ struct StudioAppImpl final : StudioApp
 				}
 				ImGui::Text("Open world:");
 				ImGui::Indent();
-				if(m_worlds.empty()) {
-					ImGui::Text("No worlds found");
-				}
-				for (auto& univ : m_worlds)
-				{
-					if (ImGui::MenuItem(univ))
-					{
-						loadWorld(univ, false);
+				forEachWorld([&](const Path& path){
+					if (ImGui::MenuItem(path.c_str())) {
+						loadWorld(path, false);
 						m_is_welcome_screen_open = false;
 					}
-				}
+				});
 				ImGui::Unindent();
 			}
 			ImGui::EndChild();
@@ -1066,36 +1059,13 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	void guiSaveAsDialog() {
-		if (m_save_as_request) {
-			openCenterStrip("Save World As");
-			m_save_as_request = false;
-		}
-		if (beginCenterStrip("Save World As", 6)) {
-			ImGui::NewLine();
-			static char name[64] = "";
-			alignGUICenter([&](){
-				ImGui::TextUnformatted("Save world as");
-				ImGui::SameLine();
-				ImGui::SetNextItemWidth(250);
-				ImGui::InputText("##name", name, sizeof(name));
-			});
-			ImGui::NewLine();
-			
-			alignGUICenter([&](){
-				if (ImGui::Button(ICON_FA_SAVE "Save")) {
-					ASSERT(!m_editor->isGameMode());
-					World* world = m_editor->getWorld();
-					World::PartitionHandle active_partition_handle = world->getActivePartition();
-					World::Partition& active_partition = world->getPartition(active_partition_handle);
-					copyString(active_partition.name, name);
-					m_editor->savePartition(active_partition_handle);
-					scanWorlds();
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::SameLine();
-				if (ImGui::Button(ICON_FA_TIMES "Cancel")) ImGui::CloseCurrentPopup();
-			});
-			endCenterStrip();
+		if (m_file_selector.gui("Save world as", &m_show_save_world_ui, "unv", true)) {
+			ASSERT(!m_editor->isGameMode());
+			World* world = m_editor->getWorld();
+			World::PartitionHandle active_partition_handle = world->getActivePartition();
+			World::Partition& active_partition = world->getPartition(active_partition_handle);
+			copyString(active_partition.name, m_file_selector.getPath());
+			m_editor->savePartition(active_partition_handle);
 		}
 	}
 
@@ -1106,7 +1076,7 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		m_save_as_request = true;
+		m_show_save_world_ui = true;
 	}
 
 	void exit() {
@@ -1445,6 +1415,17 @@ struct StudioAppImpl final : StudioApp
 		ImGui::EndMenu();
 	}
 
+	template <typename T>
+	void forEachWorld(T& f) {
+		const HashMap<FilePathHash, AssetCompiler::ResourceItem>& resources = m_asset_compiler->lockResources();
+		ResourceType WORLD_TYPE("world");
+		for (const AssetCompiler::ResourceItem& ri : resources) {
+			if (ri.type != WORLD_TYPE) continue;
+			f(ri.path);
+		}
+		m_asset_compiler->unlockResources();
+	}
+
 
 	void fileMenu()
 	{
@@ -1456,17 +1437,11 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::BeginMenu(label)) {
 				m_open_filter.gui("Filter", 150);
 	
-				for (auto& univ : m_worlds) {
-					if (m_open_filter.pass(univ) && ImGui::MenuItem(univ)) {
-						if (!additive && m_editor->isWorldChanged()) {
-							m_world_to_load = univ;
-							m_confirm_load = true;
-						}
-						else {
-							loadWorld(univ, additive);
-						}
+				forEachWorld([&](const Path& path){
+					if (m_open_filter.pass(path.c_str()) && ImGui::MenuItem(path.c_str())) {
+						tryLoadWorld(path, additive);
 					}
-				}
+				});
 				ImGui::EndMenu();
 			}
 		};
@@ -2568,7 +2543,7 @@ struct StudioAppImpl final : StudioApp
 			if (!parser.next()) break;
 
 			parser.getCurrent(path, lengthOf(path));
-			loadWorld(path, false);
+			loadWorld(Path(path), false);
 			m_is_welcome_screen_open = false;
 			break;
 		}
@@ -3204,12 +3179,18 @@ struct StudioAppImpl final : StudioApp
 			}
 
 			ImGuiEx::Label("Startup world");
-			if (m_worlds.size() > 0 && m_export.startup_world[0] == '\0') m_export.startup_world = m_worlds[0].data;
-			if (ImGui::BeginCombo("##startunv", m_export.startup_world)) {
-				for (const auto& unv : m_worlds) {
-					if (ImGui::Selectable(unv)) m_export.startup_world = unv.data;
-				}
+			if (ImGui::BeginCombo("##startunv", m_export.startup_world.c_str())) {
+				forEachWorld([&](const Path& path){
+					if (ImGui::Selectable(path.c_str())) m_export.startup_world = path;
+				});
 				ImGui::EndCombo();
+			}
+			if (m_export.startup_world.isEmpty()) {
+				forEachWorld([&](const Path& path){
+					if (m_export.startup_world.isEmpty()) {
+						m_export.startup_world = path;
+					}
+				});
 			}
 
 			if (m_export_msg_timer > 0) {
@@ -3336,25 +3317,6 @@ struct StudioAppImpl final : StudioApp
 		return true;
 	}
 
-
-	void scanWorlds() override {
-		PROFILE_FUNCTION();
-		m_worlds.clear();
-		auto* iter = m_engine->getFileSystem().createFileIterator("universes");
-		os::FileInfo info;
-		while (os::getNextFile(iter, &info))
-		{
-			if (info.filename[0] == '.') continue;
-			if (info.is_directory) continue;
-			if (startsWith(info.filename, "__")) continue;
-			if (!Path::hasExtension(info.filename, "unv")) continue;
-
-			m_worlds.emplace(Path::getBasename(info.filename));
-		}
-		os::destroyFileIterator(iter);
-	}
-
-
 	Span<const os::Event> getEvents() const override { return m_events; }
 
 	void checkShortcuts() {
@@ -3432,13 +3394,12 @@ struct StudioAppImpl final : StudioApp
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 
-	Array<StaticString<MAX_PATH>> m_worlds;
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, StaticString<5>> m_component_icons;
 	Gizmo::Config m_gizmo_config;
 
-	bool m_save_as_request = false;
+	bool m_show_save_world_ui = false;
 	bool m_cursor_captured = false;
 	bool m_confirm_exit = false;
 	bool m_confirm_load = false;
@@ -3447,7 +3408,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_is_caption_hovered = false;
 	
 	World::PartitionHandle m_partition_to_destroy;
-	StaticString<MAX_PATH> m_world_to_load;
+	Path m_world_to_load;
 	
 	ImTextureID m_logo = nullptr;
 	UniquePtr<AssetBrowser> m_asset_browser;
@@ -3480,7 +3441,7 @@ struct StudioAppImpl final : StudioApp
 		Mode mode = Mode::ALL_FILES;
 
 		bool pack = false;
-		StaticString<96> startup_world;
+		Path startup_world;
 		StaticString<MAX_PATH> dest_dir;
 	};
 
