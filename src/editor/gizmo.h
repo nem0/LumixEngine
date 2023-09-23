@@ -42,6 +42,7 @@ struct LUMIX_EDITOR_API Config {
 	bool isGlobalCoordSystem() const { return coord_system == GLOBAL; }
 	bool isAutosnapDown() const { return autosnap; }
 	void setAutosnapDown(bool value) { autosnap = value; }
+	float getStep(Mode m) const { return steps[m]; }
 	float getStep() const { return steps[mode]; }
 	void setStep(float step) { steps[mode] = step; }
 	void enableStep(bool enable) { is_step = enable; }

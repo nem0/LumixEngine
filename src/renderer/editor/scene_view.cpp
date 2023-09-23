@@ -653,6 +653,11 @@ SceneView::SceneView(StudioApp& app)
 	m_toggle_projection_action.init("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", Action::IMGUI_PRIORITY);
 	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "", Action::IMGUI_PRIORITY);
 	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "", Action::IMGUI_PRIORITY);
+	m_rotate_entity_90_action.init("Rotate 90 degrees", "Rotate selected entities by 90 degrees", "rotate90deg", "", os::Keycode::R, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
+	m_move_entity_E_action.init("Move entity east", "MoveEselected entity east", "moveEntityE", "", os::Keycode::RIGHT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_move_entity_N_action.init("Move entity north", "Move selected entity north", "moveEntityN", "", os::Keycode::UP, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_move_entity_S_action.init("Move entity south", "Move Selected entity south", "moveEntityS", "", os::Keycode::DOWN, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_move_entity_W_action.init("Move entity west", "Move Welected entity west", "moveEntityW", "", os::Keycode::LEFT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_toggle_gizmo_step_action);
@@ -664,6 +669,11 @@ SceneView::SceneView(StudioApp& app)
 	m_app.addAction(&m_front_view_action);
 	m_app.addAction(&m_look_at_selected_action);
 	m_app.addAction(&m_copy_view_action);
+	m_app.addAction(&m_rotate_entity_90_action);
+	m_app.addAction(&m_move_entity_E_action);
+	m_app.addAction(&m_move_entity_N_action);
+	m_app.addAction(&m_move_entity_S_action);
+	m_app.addAction(&m_move_entity_W_action);
 	m_app.addAction(&m_toggle_projection_action);
 
 	const ResourceType pipeline_type("pipeline");
@@ -712,10 +722,65 @@ SceneView::~SceneView()
 	m_app.removeAction(&m_front_view_action);
 	m_app.removeAction(&m_look_at_selected_action);
 	m_app.removeAction(&m_copy_view_action);
+	m_app.removeAction(&m_rotate_entity_90_action);
+	m_app.removeAction(&m_move_entity_E_action);
+	m_app.removeAction(&m_move_entity_N_action);
+	m_app.removeAction(&m_move_entity_S_action);
+	m_app.removeAction(&m_move_entity_W_action);
 	m_app.removeAction(&m_toggle_projection_action);
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
 	m_debug_shape_shader->decRefCount();
+}
+
+void SceneView::rotate90Degrees() {
+	const Array<EntityRef>& selected_entities = m_app.getWorldEditor().getSelectedEntities();
+	WorldEditor& editor = m_app.getWorldEditor();
+	World& world = *editor.getWorld();
+	editor.beginCommandGroup("rot90deg");
+	for (EntityRef e : selected_entities) {
+		Quat rot = world.getRotation(e);
+		float yaw = rot.toEuler().y;
+		yaw += PI * 0.5f; // next turn
+		yaw += 2 * PI; // make yaw positive if it were negative
+		yaw += PI * 0.25f; // for correct "rounding"
+		yaw -= fmodf(yaw, PI * 0.5f); // round
+		rot.fromEuler({0, yaw, 0});
+		editor.setEntitiesRotations(&e, &rot, 1);
+	}
+	editor.endCommandGroup();
+}
+
+void SceneView::moveEntity(Vec2 v) {
+	const Array<EntityRef>& selected_entities = m_app.getWorldEditor().getSelectedEntities();
+	Vec3 V = m_view->m_viewport.rot * Vec3(0, 0, -1);  
+	if (fabsf(V.x) > fabsf(V.z)) {
+		V = {signum(V.x), 0, 0};
+	}
+	else {
+		V = {0, 0, signum(V.z)};
+	}
+
+	float step = m_app.getGizmoConfig().getStep(Gizmo::Config::TRANSLATE);
+	if (step <= 0) step = 1;
+	V *= step;
+
+	Vec3 S(V.z, 0, -V.x);
+
+	WorldEditor& editor = m_app.getWorldEditor();
+	World& world = *editor.getWorld();
+	editor.beginCommandGroup("rot90deg");
+	for (EntityRef e : selected_entities) {
+		DVec3 pos = world.getPosition(e);
+		pos += V * v.y + S * v.x;
+		// round position to multiple of step
+		pos += Vec3(step * 0.5f);
+		pos.x = floor(pos.x / step) * step;
+		pos.y = floor(pos.y / step) * step;
+		pos.z = floor(pos.z / step) * step;
+		editor.setEntitiesPositions(&e, &pos, 1);
+	}
+	editor.endCommandGroup();
 }
 
 bool SceneView::onAction(const Action& action) {
@@ -728,6 +793,11 @@ bool SceneView::onAction(const Action& action) {
 	else if (&action == &m_toggle_projection_action) toggleProjection();
 	else if (&action == &m_look_at_selected_action) m_view->lookAtSelected();
 	else if (&action == &m_copy_view_action) m_view->copyTransform();
+	else if (&action == &m_rotate_entity_90_action) rotate90Degrees();
+	else if (&action == &m_move_entity_E_action) moveEntity(Vec2(-1, 0));
+	else if (&action == &m_move_entity_N_action) moveEntity(Vec2(0, 1));
+	else if (&action == &m_move_entity_S_action) moveEntity(Vec2(0, -1));
+	else if (&action == &m_move_entity_W_action) moveEntity(Vec2(1, 0));
 	else return false;
 	return true;
 }

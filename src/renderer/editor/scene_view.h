@@ -55,6 +55,8 @@ private:
 	void onBeforeSettingsSaved() override;
 	void toggleProjection();
 	bool hasFocus() const override { return m_has_focus; }
+	void rotate90Degrees();
+	void moveEntity(Vec2 v);
 
 private:
 	StudioApp& m_app;
@@ -69,6 +71,11 @@ private:
 	Action m_toggle_projection_action;
 	Action m_look_at_selected_action;
 	Action m_copy_view_action;
+	Action m_rotate_entity_90_action;
+	Action m_move_entity_N_action;
+	Action m_move_entity_S_action;
+	Action m_move_entity_E_action;
+	Action m_move_entity_W_action;
 	bool m_has_focus = false;
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
