@@ -66,6 +66,7 @@
 
 
 using namespace Lumix;
+	static AtomicI32 xx = 0;
 
 static Animation::Flags operator | (Animation::Flags a, Animation::Flags b) {
 	return Animation::Flags(u32(a) | u32(b));
@@ -2687,7 +2688,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (meta.split) {
 			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH;
 			any_written = importer.writeSubmodels(filepath, cfg) || any_written;
+			// writePrefab is not threadsafe, run on "main thread"
+			jobs::moveJobToWorker(0);
 			any_written = importer.writePrefab(filepath, cfg) || any_written;
+			jobs::yield();
 		}
 		cfg.origin = meta.origin;
 		any_written = importer.writeModel(src, cfg) || any_written;
@@ -2697,7 +2701,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		any_written = importer.writePhysics(filepath, cfg) || any_written;
 		if (meta.create_prefab_with_physics) {
+			jobs::moveJobToWorker(0);
 			importer.writePhysicsPrefab(filepath, cfg);
+			jobs::yield();
 		}
 		return any_written;
 	}

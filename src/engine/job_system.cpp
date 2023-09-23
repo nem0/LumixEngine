@@ -379,7 +379,7 @@ bool init(u8 workers_count, IAllocator& allocator)
 
 	int count = maximum(1, int(workers_count));
 	for (int i = 0; i < count; ++i) {
-		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
+		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i);
 		if (task->create("Worker", false)) {
 			task->m_is_enabled = true;
 			g_system->m_workers.push(task);
@@ -498,5 +498,46 @@ void exit(Mutex* mutex) {
 void wait(Signal* handle) {
 	waitEx(handle, false);
 }
+
+u32 getWorkerIndex() {
+	return getWorker()->m_worker_index;
+}
+
+void moveJobToWorker(u8 worker_index) {
+	g_system->m_sync.enter();
+	FiberDecl* this_fiber = getWorker()->m_current_fiber;
+	WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
+	worker->m_work_queue.push(this_fiber, &g_system->m_job_queue_sync);
+	wake();
+	FiberDecl* new_fiber = g_system->m_free_fibers.back();
+	g_system->m_free_fibers.pop();
+	if (!Fiber::isValid(new_fiber->fiber)) {
+		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
+	}
+	getWorker()->m_current_fiber = new_fiber;
+	this_fiber->current_job.worker_index = worker_index;
+	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
+	getWorker()->m_current_fiber = this_fiber;
+	ASSERT(getWorker()->m_worker_index == worker_index);
+	g_system->m_sync.exit();
+}
+
+void yield() {
+	g_system->m_sync.enter();
+	FiberDecl* this_fiber = getWorker()->m_current_fiber;
+	g_system->m_work_queue.push(this_fiber, &g_system->m_job_queue_sync);
+
+	wake();
+	FiberDecl* new_fiber = g_system->m_free_fibers.back();
+	g_system->m_free_fibers.pop();
+	if (!Fiber::isValid(new_fiber->fiber)) {
+		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
+	}
+	this_fiber->current_job.worker_index = ANY_WORKER;
+	getWorker()->m_current_fiber = new_fiber;
+	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
+	g_system->m_sync.exit();
+}
+
 
 } // namespace Lumix::jobs

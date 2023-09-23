@@ -2586,7 +2586,6 @@ bool FBXImporter::writePhysicsPrefab(const Path& src, const ImportConfig& cfg) {
 
 bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 {
-	// TODO this is not threadsafe, since it can load/unload assets, access lua state, ...
 	Engine& engine = m_app.getEngine();
 	World& world = engine.createWorld(false);
 
@@ -2625,7 +2624,6 @@ bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 
 	world.serialize(blob, WorldSerializeFlags::NONE);
 	engine.destroyWorld(world);
-
 	if (!file.write(blob.data(), blob.size())) {
 		logError("Could not write ", tmp);
 		file.close();

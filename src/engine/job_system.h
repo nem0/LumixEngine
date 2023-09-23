@@ -19,6 +19,10 @@ LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API u8 getWorkersCount();
 
 LUMIX_ENGINE_API void enableBackupWorker(bool enable);
+// yield current job and push it to worker queue
+LUMIX_ENGINE_API void moveJobToWorker(u8 worker_index);
+// yield current job, push it to global queue
+LUMIX_ENGINE_API void yield();
 
 LUMIX_ENGINE_API void enter(Mutex* mutex);
 LUMIX_ENGINE_API void exit(Mutex* mutex);
