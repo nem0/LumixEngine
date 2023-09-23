@@ -2063,7 +2063,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::InputFloat("##cull_scale", &m_meta.culling_scale));
 				
 				ImGuiEx::Label("Origin");
-				if (ImGui::BeginCombo("##origin", ModelMeta::toString(m_meta.origin))) {
+				if (ImGui::BeginCombo("##origin", ModelMeta::toUIString(m_meta.origin))) {
 					if (ImGui::Selectable("Keep")) {
 						m_meta.origin = FBXImporter::ImportConfig::Origin::SOURCE;
 						saveUndo(true);
@@ -2099,7 +2099,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					saveUndo(true);
 				}
 				ImGuiEx::Label("Physics");
-				if (ImGui::BeginCombo("##phys", ModelMeta::toString(m_meta.physics))) {
+				if (ImGui::BeginCombo("##phys", ModelMeta::toUIString(m_meta.physics))) {
 					if (ImGui::Selectable("None")) {
 						m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
 						saveUndo(true);

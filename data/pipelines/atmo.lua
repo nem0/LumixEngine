@@ -13,8 +13,8 @@ return {
 	sunlight_strength = 10,
 	cloud_param0 = 1,
 	cloud_param1 = 1,
-	cloud_param2 = 1,
-	cloud_param3 = 1,
+	cloud_param2 = 0.63,
+	cloud_param3 = 3,
 	enable_clouds = false,
 	enable_fog = false,
 	enable_godrays = false,
@@ -23,7 +23,13 @@ return {
 	enabled = true,
 
 	gui = function(self)
-		_, self.enabled = ImGui.Checkbox("Enabled", self.enabled)
+		for k, v in pairs(self) do
+			if typeof(v) == "number" then
+				_, self[k] = ImGui.DragFloat(k, v)
+			elseif typeof(v) == "boolean" then
+				_, self[k] = ImGui.Checkbox(k, v)
+			end
+		end
 	end,
 
 	setDrawcallUniforms = function(self, env, x, y, z)
