@@ -2723,8 +2723,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
 
 		Matrix mtx;
-		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_tile.world->createEntity({10, 10, 10}, mtx.getRotation());
+		mtx.lookAt({0, 0, 0}, {-10, -10, -10}, {0, 1, 0});
+		const EntityRef light_entity = m_tile.world->createEntity({0, 0, 0}, mtx.getRotation());
 		m_tile.world->createComponent(ENVIRONMENT_TYPE, light_entity);
 		render_module->getEnvironment(light_entity).direct_intensity = 5;
 		render_module->getEnvironment(light_entity).indirect_intensity = 1;
@@ -2975,7 +2975,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void renderPrefabSecondStage() {
 		if (!m_tile.world) createTileWorld();
 		AABB aabb({0, 0, 0}, {0, 0, 0});
-		float radius = 1;
 		World& world = *m_tile.world;
 		for (EntityPtr e = world.getFirstEntity(); e.isValid(); e = world.getNextEntity((EntityRef)e)) {
 			EntityRef ent = (EntityRef)e;
@@ -2992,13 +2991,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					for (const DVec3& p : points) {
 						aabb.addPoint(Vec3(p));
 					}
-					radius = maximum(radius, model->getCenterBoundingRadius());
 				}
 			}
 		}
 
-		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * length(aabb.max - aabb.min) / SQRT2;
+		const float radius = length(aabb.max - aabb.min) * 0.50001f;
+		const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+		const Vec3 eye = center + Vec3(1, 1, 1) * length(aabb.max - aabb.min) / SQRT2;
 		Matrix mtx;
 		mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 		Viewport viewport;
