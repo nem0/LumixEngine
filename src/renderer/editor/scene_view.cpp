@@ -1150,6 +1150,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 			m_editor.beginCommandGroup("insert_mesh");
 			EntityRef entity = m_editor.addEntity();
+			m_editor.selectEntities(Span(&entity, 1), false);
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
 			m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
@@ -1166,7 +1167,11 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			while (fs.hasWork()) fs.processCallbacks();
 		}
 		if (prefab->isReady()) {
-			m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, Vec3(1));
+			EntityPtr eptr = m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, Vec3(1));
+			if (eptr.isValid()) {
+				EntityRef e = *eptr;
+				m_editor.selectEntities(Span(&e, 1), false);
+			}
 		}
 		else {
 			ASSERT(prefab->isFailure());
