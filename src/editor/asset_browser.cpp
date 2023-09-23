@@ -60,7 +60,7 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		compiler.addResource(WORLD_TYPE, path);
 	}
 	
-	void openEditor(const Path& path) override { m_app.tryLoadWorld(path, false); }
+	void openEditor(const Path& path) override { m_app.tryLoadWorld(path, ImGui::GetIO().KeyCtrl); }
 
 	bool compile(const Path& src) override { return true; }
 	const char* getLabel() const override { return "World"; }

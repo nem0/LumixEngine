@@ -20,10 +20,21 @@ struct ModelMeta {
 		return "none";
 	}
 
+	static const char* toString(FBXImporter::ImportConfig::Origin value) {
+		switch (value) {
+			case FBXImporter::ImportConfig::Origin::SOURCE: return "Keep";
+			case FBXImporter::ImportConfig::Origin::BOTTOM: return "Bottom";
+			case FBXImporter::ImportConfig::Origin::CENTER: return "Center";
+		}
+		ASSERT(false);
+		return "none";
+	}
+
 	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
 
 	void serialize(OutputMemoryStream& blob, const Path& path) {
-		if(physics != FBXImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
+		if (physics != FBXImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
+		if (origin != FBXImporter::ImportConfig::Origin::SOURCE) blob << "\norigin = \"" << toString(origin) << "\"";
 		blob << "\nlod_count = " << lod_count;
 
 		#define WRITE_BOOL(id, default_value) \
@@ -160,6 +171,12 @@ struct ModelMeta {
 			if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
 			else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
 			else physics = FBXImporter::ImportConfig::Physics::NONE;
+		}
+
+		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "origin", Span(tmp))) {
+			if (equalIStrings(tmp, "center")) origin = FBXImporter::ImportConfig::Origin::CENTER;
+			else if (equalIStrings(tmp, "bottom")) origin = FBXImporter::ImportConfig::Origin::BOTTOM;
+			else origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		}
 
 		for (u32 i = 0; i < lengthOf(lods_distances); ++i) {

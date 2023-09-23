@@ -2061,6 +2061,24 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 				ImGui::SameLine();
 				saveUndo(ImGui::InputFloat("##cull_scale", &m_meta.culling_scale));
+				
+				ImGuiEx::Label("Origin");
+				if (ImGui::BeginCombo("##origin", ModelMeta::toString(m_meta.origin))) {
+					if (ImGui::Selectable("Keep")) {
+						m_meta.origin = FBXImporter::ImportConfig::Origin::SOURCE;
+						saveUndo(true);
+					}
+					if (ImGui::Selectable("Center")) {
+						m_meta.origin = FBXImporter::ImportConfig::Origin::CENTER;
+						saveUndo(true);
+					}
+					if (ImGui::Selectable("Bottom")) {
+						m_meta.origin = FBXImporter::ImportConfig::Origin::BOTTOM;
+						saveUndo(true);
+					}
+					ImGui::EndCombo();
+				}
+
 				ImGuiEx::Label("Vertex colors");
 				i32 vertex_colors_mode = m_meta.import_vertex_colors ? (m_meta.vertex_color_is_ao ? 2 : 1) : 0;
 				if (ImGui::Combo("##vercol", &vertex_colors_mode, "Do not import\0Import\0Import as AO")) {
@@ -2518,6 +2536,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.mesh_scale = meta.scale;
 		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
+		cfg.origin = meta.origin;
 		cfg.bake_vertex_ao = meta.bake_vertex_ao;
 		cfg.min_bake_vertex_ao = meta.min_bake_vertex_ao;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
@@ -2553,7 +2572,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			any_written = importer.writeSubmodels(filepath, cfg) || any_written;
 			any_written = importer.writePrefab(filepath, cfg) || any_written;
 		}
-		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
+		cfg.origin = meta.origin;
 		any_written = importer.writeModel(src, cfg) || any_written;
 		any_written = importer.writeMaterials(filepath, cfg) || any_written;
 		if (!meta.ignore_animations) {
