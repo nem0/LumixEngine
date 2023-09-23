@@ -1888,6 +1888,113 @@ static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 
 	stream.destroy(staging);
 }
 
+struct ModelMultiEditor {
+	struct Asset {
+		Asset(IAllocator& allocator) : meta(allocator) {}
+
+		ModelMeta meta;
+		Path path;
+	};
+
+	ModelMultiEditor(StudioApp& app, Span<const Path> paths)
+		: m_app(app)
+		, m_assets(app.getAllocator())
+	{
+		m_assets.reserve(paths.length());
+		for (const Path& p : paths) {
+			Asset& asset = m_assets.emplace(m_app.getAllocator());
+			asset.path = p;
+			asset.meta.load(p, m_app);
+		}
+	}
+
+	void gui() {
+		if (!m_open) return;
+		
+		if (ImGui::Begin("Model multieditor", &m_open)) {
+			if (ImGui::Button("Save all")) {
+				for (Asset& asset : m_assets) {
+					OutputMemoryStream blob(m_app.getAllocator());
+					asset.meta.serialize(blob, asset.path);
+					m_app.getAssetCompiler().updateMeta(asset.path, blob);
+				}
+			}
+
+			if (ImGui::BeginTable("##tbl", 5, ImGuiTableFlags_Resizable)) {
+			    ImGui::TableSetupColumn("Path");
+				ImGui::TableSetupColumn("Skeleton");
+				ImGui::TableSetupColumn("Physics");
+				ImGui::TableSetupColumn("Write prefab");
+				ImGui::TableSetupColumn("Save");
+				ImGui::TableHeadersRow();				
+
+				for (Asset& asset : m_assets) {
+					ImGui::PushID(&asset);
+					ImGui::TableNextRow();
+
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(asset.path.c_str());
+
+					ImGui::TableNextColumn();
+					m_app.getAssetBrowser().resourceInput("##ske", asset.meta.skeleton, Model::TYPE);
+
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::BeginCombo("##phys", ModelMeta::toUIString(asset.meta.physics))) {
+						if (ImGui::Selectable("None")) asset.meta.physics = FBXImporter::ImportConfig::Physics::NONE;
+						if (ImGui::Selectable("Convex")) asset.meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
+						if (ImGui::Selectable("Triangle mesh")) asset.meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+						ImGui::EndCombo();
+					}
+
+					ImGui::TableNextColumn();
+					if (asset.meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+						ImGui::Checkbox("##cpwf", &asset.meta.create_prefab_with_physics);
+					}
+
+					ImGui::TableNextColumn();
+					if (ImGui::Button(ICON_FA_SAVE)) {
+						OutputMemoryStream blob(m_app.getAllocator());
+						asset.meta.serialize(blob, asset.path);
+						m_app.getAssetCompiler().updateMeta(asset.path, blob);
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::TableNextColumn();
+				if (ImGui::Button("Make same")) {
+					for (i32 i = 1; i < m_assets.size(); ++i) {
+						m_assets[i].meta.skeleton = m_assets[0].meta.skeleton;
+					}			
+				}
+				ImGui::TableNextColumn();
+				if (ImGui::Button("Make same##ms2")) {
+					for (i32 i = 1; i < m_assets.size(); ++i) {
+						m_assets[i].meta.physics = m_assets[0].meta.physics;
+					}			
+				}
+				ImGui::TableNextColumn();
+				if (ImGui::Button("Make same##ms3")) {
+					for (i32 i = 1; i < m_assets.size(); ++i) {
+						m_assets[i].meta.create_prefab_with_physics = m_assets[0].meta.create_prefab_with_physics;
+					}			
+				}
+
+				ImGui::TableNextColumn();
+
+				ImGui::EndTable();
+			}
+		}
+		ImGui::End();
+	}
+
+	StudioApp& m_app;
+	Array<Asset> m_assets;
+	bool m_open = true;
+};
+
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		EditorWindow(const Path& path, ModelPlugin& plugin, StudioApp& app, IAllocator& allocator)
@@ -2476,6 +2583,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
+	bool canMultiEdit() override { return true; }
+	void openMultiEditor(Span<const Path> paths) override {
+		m_multi_editor = UniquePtr<ModelMultiEditor>::create(m_app.getAllocator(), m_app, paths);
+	}
+
 	void init() {
 		Engine& engine = m_app.getEngine();
 		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
@@ -2790,6 +2902,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	void update() override
 	{
+		if (m_multi_editor) m_multi_editor->gui();
 		if (m_tile.waiting) {
 			if (!m_app.getEngine().getFileSystem().hasWork()) {
 				renderPrefabSecondStage();
@@ -3164,6 +3277,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	TexturePlugin* m_texture_plugin;
 	jobs::Signal m_subres_signal;
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
+	UniquePtr<ModelMultiEditor> m_multi_editor;
 };
 
 struct CodeEditorWindow : AssetEditorWindow {

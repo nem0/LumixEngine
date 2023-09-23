@@ -13,6 +13,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 
 	struct LUMIX_EDITOR_API IPlugin {
 		virtual bool canCreateResource() const { return false; }
+		virtual bool canMultiEdit() { return false; }
 		virtual void createResource(struct OutputMemoryStream& content) {}
 		virtual const char* getDefaultExtension() const { return ""; }
 
@@ -20,6 +21,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual bool createTile(const char* in_path, const char* out_path, struct ResourceType type);
 		virtual void update() {}
 		virtual void openEditor(const struct Path& path) {}
+		virtual void openMultiEditor(Span<const Path> paths) {}
 	};
 
 	static UniquePtr<AssetBrowser> create(struct StudioApp& app);

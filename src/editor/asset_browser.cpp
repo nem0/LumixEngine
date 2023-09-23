@@ -549,6 +549,40 @@ struct AssetBrowserImpl : AssetBrowser {
 		return m_selected_resources;
 	}
 
+	IPlugin* getPluginFor(const Path& path) {
+		StringView ext = Path::getExtension(Path::getSubresource(path));
+		u64 key = 0;
+		ASSERT(ext.size() <= sizeof(key));
+		memcpy(&key, ext.begin, ext.size());
+		auto iter = m_plugin_map.find(key);
+		return iter.isValid() ? iter.value() : nullptr;
+	}
+
+	bool canMultiEdit() {
+		if (m_selected_resources.size() < 2) return false;
+
+		const AssetCompiler& compiler = m_app.getAssetCompiler();
+		const ResourceType type = compiler.getResourceType(m_selected_resources[0]);
+
+		IPlugin* plugin = getPluginFor(m_selected_resources[0]);
+		if (!plugin) return false;
+		if (!plugin->canMultiEdit()) return false;
+
+		for (const Path& path : m_selected_resources) {
+			const ResourceType other_type = compiler.getResourceType(path);
+			if (other_type != type) return false;
+		}
+		return true;
+	}
+
+	void openMultiEdit() {
+		ASSERT(m_selected_resources.size() > 1);
+		IPlugin* plugin = getPluginFor(m_selected_resources[0]);
+		ASSERT(plugin);
+		ASSERT(plugin->canMultiEdit());
+		plugin->openMultiEditor(m_selected_resources);
+	}
+
 	void fileColumn() {
 		ImGui::BeginChild("main_col");
 
@@ -657,6 +691,8 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				ImGui::EndMenu();
 			}
+
+			if (canMultiEdit() && ImGui::MenuItem("Multiedit")) openMultiEdit();
 
 			if (ImGui::MenuItem("Recreate tiles")) {
 				recreateTiles();
@@ -951,12 +987,8 @@ struct AssetBrowserImpl : AssetBrowser {
 			return;
 		}
 
-		StringView ext = Path::getExtension(Path::getSubresource(path));
-		u64 key = 0;
-		ASSERT(ext.size() <= sizeof(key));
-		memcpy(&key, ext.begin, ext.size());
-		auto iter = m_plugin_map.find(key);
-		if (iter.isValid()) iter.value()->openEditor(path);
+		IPlugin* plugin = getPluginFor(path);
+		if (plugin) plugin->openEditor(path);
 	}
 
 	void selectRange(const Path& from, const Path& to) {
