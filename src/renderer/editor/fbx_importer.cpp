@@ -476,12 +476,34 @@ LUMIX_FORCE_INLINE static u32 getPackedVec3(ofbx::Vec3 vec, const Matrix& mtx, F
 	return packF4u(v);
 }
 
-void FBXImporter::centerMesh(ImportMesh& mesh, bool bottom, const ImportConfig& cfg, const Matrix& mtx) const {
+static int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const FBXImporter::ImportConfig& cfg)
+{
+	static const int POSITION_SIZE = sizeof(float) * 3;
+	static const int NORMAL_SIZE = sizeof(u8) * 4;
+	static const int TANGENT_SIZE = sizeof(u8) * 4;
+	static const int UV_SIZE = sizeof(float) * 2;
+	static const int COLOR_SIZE = sizeof(u8) * 4;
+	static const int AO_SIZE = sizeof(u8) * 4;
+	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
+	int size = POSITION_SIZE + NORMAL_SIZE;
+
+	const ofbx::GeometryData& geom = mesh.getGeometryData();
+
+	if (geom.getUVs().values) size += UV_SIZE;
+	if (cfg.bake_vertex_ao) size += AO_SIZE;
+	if (geom.getColors().values && cfg.import_vertex_colors) size += cfg.vertex_color_is_ao ? AO_SIZE : COLOR_SIZE;
+	if (hasTangents(mesh)) size += TANGENT_SIZE;
+	if (is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
+
+	return size;
+}
+
+static AABB computeMeshAABB(const FBXImporter::ImportMesh& mesh, const FBXImporter::ImportConfig& cfg) {
 	const int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
 	const u32 vertex_count = u32(mesh.vertex_data.size() / vertex_size);
-	if (vertex_count <= 0) return;
+	if (vertex_count <= 0) return { Vec3(0), Vec3(0) };
 
-	u8* ptr = mesh.vertex_data.getMutableData();
+	const u8* ptr = mesh.vertex_data.data();
 	
 	Vec3 min(FLT_MAX);
 	Vec3 max(-FLT_MAX);
@@ -489,28 +511,26 @@ void FBXImporter::centerMesh(ImportMesh& mesh, bool bottom, const ImportConfig& 
 	for (u32 i = 0; i < vertex_count; ++i) {
 		Vec3 v;
 		memcpy(&v, ptr + vertex_size * i, sizeof(v));
-			
-		min.x = minimum(min.x, v.x);
-		min.y = minimum(min.y, v.y);
-		min.z = minimum(min.z, v.z);
-			
-		max.x = maximum(max.x, v.x);
-		max.y = maximum(max.y, v.y);
-		max.z = maximum(max.z, v.z);
+
+		min = minimum(min, v);
+		max = maximum(max, v);
 	}
 
-	Vec3 center;
-	center.x = float(min.x + max.x) * 0.5f;
-	center.y = float(min.y + max.y) * 0.5f;
-	center.z = float(min.z + max.z) * 0.5f;
-	mesh.origin = center;
-		
-	if (bottom) center.y = (float)min.y;
+	return { min, max };
+}
+
+static void offsetMesh(FBXImporter::ImportMesh& mesh, const FBXImporter::ImportConfig& cfg, const Vec3& offset) {
+	const int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
+	const u32 vertex_count = u32(mesh.vertex_data.size() / vertex_size);
+	if (vertex_count <= 0) return;
+
+	u8* ptr = mesh.vertex_data.getMutableData();
+	mesh.origin = offset;
 	
 	for (u32 i = 0; i < vertex_count; ++i) {
 		Vec3 v;
 		memcpy(&v, ptr + vertex_size * i, sizeof(v));
-		v -= center;
+		v -= offset;
 		memcpy(ptr + vertex_size * i, &v, sizeof(v));
 	}
 }
@@ -835,31 +855,49 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			}
 
 			remap(unindexed_triangles, import_mesh, vertex_layout.size, cfg);
-			
-			if (cfg.origin != ImportConfig::Origin::SOURCE) {
-				const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
-				centerMesh(import_mesh, bottom, cfg, transform_matrix);
-			}
 
+			if (cfg.origin == ImportConfig::Origin::CENTER_EACH_MESH) {
+				const AABB aabb = computeMeshAABB(import_mesh, cfg);
+				Vec3 offset = (aabb.max + aabb.min) * 0.5f;
+				offsetMesh(import_mesh, cfg, offset);
+			}
+	
 			computeBoundingShapes(import_mesh, vertex_layout.size);
+		}
+	});
 
-			// TODO autolods are not correct
-			for (u32 i = 0; i < cfg.lod_count; ++i) {
-				if ((cfg.autolod_mask & (1 << i)) == 0) continue;
-				if (import_mesh.lod != 0) continue;
+	AABB merged_aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
+	for (const ImportMesh& m : m_meshes) {
+		merged_aabb.merge(m.aabb);
+	}
+
+	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
+		ImportMesh& import_mesh = m_meshes[mesh_idx];
+		const i32 vertex_size = getVertexSize(*import_mesh.fbx, import_mesh.is_skinned, cfg);
+
+		if (cfg.origin != ImportConfig::Origin::SOURCE && cfg.origin != ImportConfig::Origin::CENTER_EACH_MESH) {
+			const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
+			Vec3 offset = (merged_aabb.max + merged_aabb.min) * 0.5f;
+			if (bottom) offset.y = merged_aabb.min.y;
+			offsetMesh(import_mesh, cfg, offset);
+			computeBoundingShapes(import_mesh, vertex_size);
+		}
+
+		for (u32 i = 0; i < cfg.lod_count; ++i) {
+			if ((cfg.autolod_mask & (1 << i)) == 0) continue;
+			if (import_mesh.lod != 0) continue;
 			
-				import_mesh.autolod_indices[i].create(m_allocator);
-				import_mesh.autolod_indices[i]->resize(import_mesh.indices.size());
-				const size_t lod_index_count = meshopt_simplifySloppy(import_mesh.autolod_indices[i]->begin()
-					, import_mesh.indices.begin()
-					, import_mesh.indices.size()
-					, (const float*)import_mesh.vertex_data.data()
-					, u32(import_mesh.vertex_data.size() / packed_vertex_size)
-					, packed_vertex_size
-					, size_t(import_mesh.indices.size() * cfg.autolod_coefs[i])
-					);
-				import_mesh.autolod_indices[i]->resize((u32)lod_index_count);
-			}
+			import_mesh.autolod_indices[i].create(m_allocator);
+			import_mesh.autolod_indices[i]->resize(import_mesh.indices.size());
+			const size_t lod_index_count = meshopt_simplifySloppy(import_mesh.autolod_indices[i]->begin()
+				, import_mesh.indices.begin()
+				, import_mesh.indices.size()
+				, (const float*)import_mesh.vertex_data.data()
+				, u32(import_mesh.vertex_data.size() / vertex_size)
+				, vertex_size
+				, size_t(import_mesh.indices.size() * cfg.autolod_coefs[i])
+				);
+			import_mesh.autolod_indices[i]->resize((u32)lod_index_count);
 		}
 	});
 
@@ -1846,28 +1884,6 @@ bool FBXImporter::writeAnimations(const Path& src, const ImportConfig& cfg)
 		}
 	}
 	return written_count > 0;
-}
-
-int FBXImporter::getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) const
-{
-	static const int POSITION_SIZE = sizeof(float) * 3;
-	static const int NORMAL_SIZE = sizeof(u8) * 4;
-	static const int TANGENT_SIZE = sizeof(u8) * 4;
-	static const int UV_SIZE = sizeof(float) * 2;
-	static const int COLOR_SIZE = sizeof(u8) * 4;
-	static const int AO_SIZE = sizeof(u8) * 4;
-	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
-	int size = POSITION_SIZE + NORMAL_SIZE;
-
-	const ofbx::GeometryData& geom = mesh.getGeometryData();
-
-	if (geom.getUVs().values) size += UV_SIZE;
-	if (cfg.bake_vertex_ao) size += AO_SIZE;
-	if (geom.getColors().values && cfg.import_vertex_colors) size += cfg.vertex_color_is_ao ? AO_SIZE : COLOR_SIZE;
-	if (hasTangents(mesh)) size += TANGENT_SIZE;
-	if (is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
-
-	return size;
 }
 
 

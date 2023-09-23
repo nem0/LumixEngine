@@ -2568,7 +2568,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		bool any_written = false;
 		if (meta.split) {
-			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH;
 			any_written = importer.writeSubmodels(filepath, cfg) || any_written;
 			any_written = importer.writePrefab(filepath, cfg) || any_written;
 		}

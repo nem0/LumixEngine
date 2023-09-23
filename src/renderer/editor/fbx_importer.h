@@ -29,9 +29,11 @@ struct FBXImporter {
 		};
 
 		enum class Origin : i32 {
-			SOURCE,
-			CENTER,
-			BOTTOM
+			SOURCE, // keep vertex data as is
+			CENTER, // center all meshes as a group
+			BOTTOM, // same as center, but don't change Y coordinate
+			
+			CENTER_EACH_MESH // center each mesh in fbx separately, when exporting each mesh as a subresources
 		};
 
 		enum class Physics {
@@ -174,8 +176,6 @@ private:
 	template <typename T> void write(const T& obj) { m_out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { m_out_file.write(ptr, size); }
 	void writeString(const char* str);
-	void centerMesh(ImportMesh& mesh, bool bottom, const ImportConfig& cfg, const Matrix& matrix) const;
-	int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;

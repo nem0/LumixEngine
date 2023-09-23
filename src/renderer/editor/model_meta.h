@@ -25,6 +25,10 @@ struct ModelMeta {
 			case FBXImporter::ImportConfig::Origin::SOURCE: return "Keep";
 			case FBXImporter::ImportConfig::Origin::BOTTOM: return "Bottom";
 			case FBXImporter::ImportConfig::Origin::CENTER: return "Center";
+		
+			case FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH:
+				ASSERT(false); // this should not be exposed in UI / meta files so there should be no reason to convert to string
+				return "Center each mesh";
 		}
 		ASSERT(false);
 		return "none";
