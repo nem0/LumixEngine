@@ -20,6 +20,7 @@
 #include "meshoptimizer/meshoptimizer.h"
 #include "mikktspace/mikktspace.h"
 #include "physics/physics_resources.h"
+#include "physics/physics_module.h"
 #include "physics/physics_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/material.h"
@@ -2544,6 +2545,44 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 	return true;
 }
 
+
+bool FBXImporter::writePhysicsPrefab(const Path& src, const ImportConfig& cfg) {
+	// TODO handle split meshes
+	Engine& engine = m_app.getEngine();
+	World& world = engine.createWorld(false);
+
+	os::OutputFile file;
+	PathInfo file_info(src);
+	Path tmp(file_info.dir, "/", file_info.basename, ".fab");
+	if (!m_filesystem.open(tmp, file)) {
+		logError("Could not create ", tmp);
+		return false;
+	}
+
+	OutputMemoryStream blob(m_allocator);
+	
+	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+	const EntityRef e = world.createEntity(DVec3(0), Quat::IDENTITY);
+	world.createComponent(MODEL_INSTANCE_TYPE, e);
+	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+	rmodule->setModelInstancePath(e, src);
+
+	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
+	world.createComponent(RIGID_ACTOR_TYPE, e);
+	pmodule->setMeshGeomPath(e, Path(".phy:", src));
+
+	world.serialize(blob, WorldSerializeFlags::NONE);
+	engine.destroyWorld(world);
+
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Could not write ", tmp);
+		file.close();
+		return false;
+	}
+	file.close();
+	return true;
+}
 
 bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 {

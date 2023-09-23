@@ -2115,6 +2115,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGui::EndCombo();
 				}
 
+				if (m_meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+					ImGuiEx::Label("Create prefab with physics");
+					ImGui::Checkbox("##cpwf", &m_meta.create_prefab_with_physics);
+				}
+
 				ImGuiEx::Label("Skeleton");
 				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE));
 				if (m_meta.skeleton.isEmpty()) {
@@ -2579,6 +2584,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			any_written = importer.writeAnimations(filepath, cfg) || any_written;
 		}
 		any_written = importer.writePhysics(filepath, cfg) || any_written;
+		if (meta.create_prefab_with_physics) {
+			importer.writePhysicsPrefab(filepath, cfg);
+		}
 		return any_written;
 	}
 

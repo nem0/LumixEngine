@@ -143,6 +143,7 @@ struct FBXImporter {
 	bool writeAnimations(const Path& src, const ImportConfig& cfg);
 	bool writeSubmodels(const Path& src, const ImportConfig& cfg);
 	bool writePrefab(const Path& src, const ImportConfig& cfg);
+	bool writePhysicsPrefab(const Path& src, const ImportConfig& cfg);
 	bool writeModel(const Path& src, const ImportConfig& cfg);
 	bool writePhysics(const Path& src, const ImportConfig& cfg);
 	bool createImpostorTextures(struct Model* model

@@ -12,6 +12,27 @@ namespace Lumix {
 struct ModelMeta {
 	static const char* toString(FBXImporter::ImportConfig::Physics value) {
 		switch (value) {
+			case FBXImporter::ImportConfig::Physics::TRIMESH: return "trimesh";
+			case FBXImporter::ImportConfig::Physics::CONVEX: return "convex";
+			case FBXImporter::ImportConfig::Physics::NONE: return "none";
+		}
+		ASSERT(false);
+		return "none";
+	}
+
+	static const char* toString(FBXImporter::ImportConfig::Origin value) {
+		switch (value) {
+			case FBXImporter::ImportConfig::Origin::SOURCE: return "source";
+			case FBXImporter::ImportConfig::Origin::BOTTOM: return "bottom";
+			case FBXImporter::ImportConfig::Origin::CENTER: return "center";
+			case FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH: return "center_each_mesh";
+		}
+		ASSERT(false);
+		return "none";
+	}
+
+	static const char* toUIString(FBXImporter::ImportConfig::Physics value) {
+		switch (value) {
 			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
 			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
 			case FBXImporter::ImportConfig::Physics::NONE: return "None";
@@ -20,7 +41,7 @@ struct ModelMeta {
 		return "none";
 	}
 
-	static const char* toString(FBXImporter::ImportConfig::Origin value) {
+	static const char* toUIString(FBXImporter::ImportConfig::Origin value) {
 		switch (value) {
 			case FBXImporter::ImportConfig::Origin::SOURCE: return "Keep";
 			case FBXImporter::ImportConfig::Origin::BOTTOM: return "Bottom";
@@ -49,6 +70,7 @@ struct ModelMeta {
 		#define WRITE_VALUE(id, default_value) \
 			if ((id) != (default_value)) { blob << "\n" << #id << " = " << id; }
 		
+		WRITE_BOOL(create_prefab_with_physics, false);
 		WRITE_BOOL(create_impostor, false);
 		WRITE_BOOL(use_mikktspace, false);
 		WRITE_BOOL(force_skin, false);
@@ -135,6 +157,7 @@ struct ModelMeta {
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "ignore_animations", &ignore_animations);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &vertex_color_is_ao);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &lod_count);
+		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_prefab_with_physics", &create_prefab_with_physics);
 			
 		if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &autolod_coefs[0])) autolod_mask |= 1;
 		if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &autolod_coefs[1])) autolod_mask |= 2;
@@ -181,6 +204,7 @@ struct ModelMeta {
 			if (equalIStrings(tmp, "center")) origin = FBXImporter::ImportConfig::Origin::CENTER;
 			else if (equalIStrings(tmp, "bottom")) origin = FBXImporter::ImportConfig::Origin::BOTTOM;
 			else origin = FBXImporter::ImportConfig::Origin::SOURCE;
+			ASSERT(origin != FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH);
 		}
 
 		for (u32 i = 0; i < lengthOf(lods_distances); ++i) {
@@ -206,6 +230,7 @@ struct ModelMeta {
 	bool import_vertex_colors = false;
 	bool vertex_color_is_ao = false;
 	bool ignore_animations = false;
+	bool create_prefab_with_physics = false;
 	u8 autolod_mask = 0;
 	u32 lod_count = 1;
 	float min_bake_vertex_ao = 0.f;
