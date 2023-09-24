@@ -25,7 +25,7 @@ int GetOsImePosRequest(lua_State* L) {
 }
 
 int InputTextMultilineWithCallback(lua_State* L) {
-	char buf[4 * 4096];
+	char buf[8 * 4096];
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
 	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
 	copyString(buf, value);
@@ -53,7 +53,7 @@ int InputTextMultilineWithCallback(lua_State* L) {
 }
 
 int InputTextMultiline(lua_State* L) {
-	char buf[4 * 4096];
+	char buf[8 * 4096];
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
 	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
 	copyString(buf, value);
