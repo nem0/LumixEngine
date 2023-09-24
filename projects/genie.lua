@@ -31,6 +31,7 @@ local embed_resources = false
 local force_build_luau = false
 local force_build_luau_dynamic = false
 local force_build_physx = false
+local force_build_jolt = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
@@ -165,6 +166,11 @@ newoption {
 	description = "Add PhysX project to solution. Do not use the prebuilt library."
 }
 
+newoption {
+	trigger = "force-build-jolt",
+	description = "Add Jolt project to solution. Do not use the prebuilt library."
+}
+
 if _OPTIONS["force-build-luau"] then
 	force_build_luau = true
 	force_build_luau_dynamic = false
@@ -177,6 +183,10 @@ end
 
 if _OPTIONS["force-build-physx"] then
 	force_build_physx = true
+end
+
+if _OPTIONS["force-build-jolt"] then
+	force_build_jolt = true
 end
 
 if _OPTIONS["plugins"] then
@@ -202,6 +212,7 @@ end
 if not _OPTIONS["no-physics"] then
 	table.insert(plugins, "physics")
 	table.insert(base_plugins, "physics")
+	table.insert(base_plugins, "jolt_physics")
 end
 
 if _OPTIONS["no-renderer"] == nil then
@@ -526,6 +537,15 @@ project "engine"
 	defaultConfigurations()
 
 if has_plugin("physics") then
+	project "jolt_physics"
+		libType()
+		files { "../src/jolt_physics/**.h", "../src/jolt_physics/**.cpp" }
+		includedirs { "../external/jolt/include/" }
+		links { "engine", "editor", "renderer" }
+		useLua()
+		defaultConfigurations()
+		links { "Jolt" }
+	
 	project "physics"
 		libType()
 
@@ -988,6 +1008,19 @@ if build_studio then
 		useLua()
 		defaultConfigurations()
 end
+
+if force_build_jolt == true then
+	if os.isdir("3rdparty/jolt") then
+		project "Jolt"
+			kind "StaticLib"
+			files { "3rdparty/jolt/jolt/**.cpp", "3rdparty/jolt/jolt/**.h" }
+			includedirs { "3rdparty/jolt/" }
+			flags { "OptimizeSize", "ReleaseRuntime" }
+	else
+		printf("--force-build-jolt used but Jolt source code not found")
+	end
+end
+
 
 if force_build_physx == true then
 	if os.isdir("3rdparty/physx") then	
