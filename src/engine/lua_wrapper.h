@@ -353,6 +353,14 @@ template <> inline const char* typeToString<int>()
 {
 	return "number|integer";
 }
+template <> inline const char* typeToString<Vec3>()
+{
+	return "Vec3";
+}
+template <> inline const char* typeToString<DVec3>()
+{
+	return "DVec3";
+}
 template <> inline const char* typeToString<u16>()
 {
 	return "number|u16";
