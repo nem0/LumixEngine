@@ -83,8 +83,10 @@ declare class World
 end
 
 declare class SceneView
-	getViewportPosition : (SceneView) -> any
-	setViewportPosition : (SceneView, any) -> ()
+	getViewportRotation : (SceneView) -> any --[[struct Lumix::Quat]]
+	setViewportRotation : (SceneView, any --[[Quat]]) -> ()
+	getViewportPosition : (SceneView) -> any --[[struct Lumix::DVec3]]
+	setViewportPosition : (SceneView, any --[[DVec3]]) -> ()
 end
 
 declare class GUISystem
@@ -107,8 +109,8 @@ declare class animation_module
 end
 
 declare class gui_module
-	getRectAt : (gui_module) -> any
-	isOver : (gui_module, any) -> boolean
+	getRectAt : (gui_module, any --[[Vec2]]) -> any --[[struct Lumix::EntityPtr]]
+	isOver : (gui_module, any --[[Vec2]], any --[[EntityPtr]]) -> boolean
 	getSystem : (gui_module) -> GUISystem
 end
 
@@ -116,24 +118,24 @@ declare class lua_script_module
 end
 
 declare class audio_module
-	setMasterVolume : (audio_module) -> ()
-	play : (audio_module, any, boolean) -> number
-	stop : (audio_module) -> ()
-	isEnd : (audio_module) -> boolean
-	setFrequency : (audio_module, number) -> ()
-	setVolume : (audio_module, number) -> ()
-	setEcho : (audio_module, number, number, number, number) -> ()
+	setMasterVolume : (audio_module, number) -> ()
+	play : (audio_module, any --[[EntityPtr]], any --[[const char*]], boolean) -> number
+	stop : (audio_module, number) -> ()
+	isEnd : (audio_module, number) -> boolean
+	setFrequency : (audio_module, number, number) -> ()
+	setVolume : (audio_module, number, number) -> ()
+	setEcho : (audio_module, number, number, number, number, number) -> ()
 end
 
 declare class renderer_module
-	addDebugCross : (renderer_module, number, any) -> ()
-	addDebugLine : (renderer_module, any, any) -> ()
-	addDebugTriangle : (renderer_module, any, any, any) -> ()
-	setActiveCamera : (renderer_module) -> ()
+	addDebugCross : (renderer_module, any --[[DVec3]], number, any --[[Color]]) -> ()
+	addDebugLine : (renderer_module, any --[[DVec3]], any --[[DVec3]], any --[[Color]]) -> ()
+	addDebugTriangle : (renderer_module, any --[[DVec3]], any --[[DVec3]], any --[[DVec3]], any --[[Color]]) -> ()
+	setActiveCamera : (renderer_module, any --[[EntityPtr]]) -> ()
 end
 
 declare class physics_module
-	raycast : (physics_module, any, any) -> any
+	raycast : (physics_module, any --[[Vec3]], any --[[Vec3]], any --[[EntityPtr]]) -> any --[[struct Lumix::EntityPtr]]
 end
 
 declare class spline_component
@@ -169,7 +171,7 @@ declare class terrain_component
 	tesselation: number
 	grid_resolution: number
 	grass: any
-	getTerrainNormalAt : (terrain_component, number, number) -> any
+	getTerrainNormalAt : (terrain_component, number, number) -> any --[[struct Lumix::Vec3]]
 	getTerrainHeightAt : (terrain_component, number, number) -> number
 end
 
@@ -259,14 +261,15 @@ declare class rigid_actor_component
 	trigger: boolean
 	box_geometry: any
 	sphere_geometry: any
+	ccd: boolean
 	mesh: string
 	material: string
 	putToSleep : (rigid_actor_component) -> ()
 	getSpeed : (rigid_actor_component) -> number
-	getVelocity : (rigid_actor_component) -> any
-	applyForce : (rigid_actor_component, any) -> ()
-	applyImpulse : (rigid_actor_component, any) -> ()
-	addForceAtPos : (rigid_actor_component, any, any) -> ()
+	getVelocity : (rigid_actor_component) -> any --[[struct Lumix::Vec3]]
+	applyForce : (rigid_actor_component, any --[[Vec3]]) -> ()
+	applyImpulse : (rigid_actor_component, any --[[Vec3]]) -> ()
+	addForceAtPos : (rigid_actor_component, any --[[Vec3]], any --[[Vec3]]) -> ()
 end
 
 declare class physical_heightfield_component
@@ -283,7 +286,7 @@ declare class physical_controller_component
 	use_root_motion: boolean
 	use_custom_gravity: boolean
 	custom_gravity_acceleration: number
-	move : (physical_controller_component, any) -> ()
+	move : (physical_controller_component, any --[[Vec3]]) -> ()
 	isCollisionDown : (physical_controller_component) -> boolean
 	getGravitySpeed : (physical_controller_component) -> number
 end
@@ -396,7 +399,7 @@ declare class navmesh_agent_component
 	move_entity: boolean
 	speed: number
 	setActive : (navmesh_agent_component, boolean) -> ()
-	navigate : (navmesh_agent_component, any, number, number) -> boolean
+	navigate : (navmesh_agent_component, any --[[DVec3]], number, number) -> boolean
 	cancelNavigation : (navmesh_agent_component) -> ()
 	drawPath : (navmesh_agent_component) -> ()
 end
@@ -413,10 +416,10 @@ declare class navmesh_zone_component
 	detailed: boolean
 	load : (navmesh_zone_component) -> boolean
 	drawContours : (navmesh_zone_component) -> ()
-	drawNavmesh : (navmesh_zone_component, any, boolean, boolean, boolean) -> ()
+	drawNavmesh : (navmesh_zone_component, any --[[DVec3]], boolean, boolean, boolean) -> ()
 	drawCompactHeightfield : (navmesh_zone_component) -> ()
 	drawHeightfield : (navmesh_zone_component) -> ()
-	generateNavmesh : (navmesh_zone_component) -> any
+	generateNavmesh : (navmesh_zone_component) -> any --[[struct Lumix::NavmeshBuildJob *]]
 end
 
 declare class lua_script_inline_component
@@ -437,7 +440,7 @@ declare class animator_component
 	use_root_motion: boolean
 	setFloatInput : (animator_component, number, number) -> ()
 	setBoolInput : (animator_component, number, boolean) -> ()
-	getInputIndex : (animator_component, any) -> number
+	getInputIndex : (animator_component, any --[[const char*]]) -> number
 end
 
 declare class physical_instanced_cube_component

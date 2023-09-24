@@ -87,7 +87,7 @@ struct PrefabSystemImpl final : PrefabSystem
 
 			system.doInstantiatePrefabs(prefab, transforms, entities);
 			if (output) {
-				*output = entities[0];
+				*output = entities.empty() ? INVALID_ENTITY : entities[0];
 				output = nullptr;
 			}
 

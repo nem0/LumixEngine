@@ -195,12 +195,12 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
         return string.lower(s)
     end
 
-    function writeFuncDecl(code : string, self_type : string, func : FunctionBase, is_global_fn : boolean)
+    function writeFuncDecl(code : string, self_type : string, func : FunctionBase, is_component_fn : boolean)
         local func_name = LumixReflection.getFunctionName(func)
         local arg_count = LumixReflection.getFunctionArgCount(func)
         local ret_type = LumixReflection.getFunctionReturnType(func)
         code = code .. `\t{func_name} : ({self_type}`
-        local from_arg = if is_global_fn then 1 else 2
+        local from_arg = if is_component_fn then 2 else 1
         for i = from_arg, arg_count do
             code = code .. ", " .. toLuaType(LumixReflection.getFunctionArgType(func, i - 1))
         end
@@ -216,6 +216,7 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
 
     function toLuaType(ctype : string)
         if ctype == "int" then return "number" end
+        if ctype == "const char *" then return "string" end
         if ctype == "char const *" then return "string" end
         if ctype == "i32" then return "number" end
         if ctype == "u32" then return "number" end
@@ -224,7 +225,7 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
         if ctype == "void" then return "()" end
         local tmp = toLuaTypeName(ctype)
         if objs[tmp] ~= nil then return tmp end
-        return "any"
+        return `any --[[{ctype}]]`
     end
 
     function refl()
@@ -242,7 +243,7 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
         for k, t in pairs(objs) do
             out = out .. `declare class {k}\n`
             for _, fn in ipairs(t) do
-                out = writeFuncDecl(out, k, fn, true)
+                out = writeFuncDecl(out, k, fn, false)
             end
             out = out .. `end\n\n`
         end
@@ -280,7 +281,7 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
             local num_cmp_funcs = LumixReflection.getNumComponentFunctions(cmp)
             for j = 1, num_cmp_funcs do
                 local func = LumixReflection.getComponentFunction(cmp, j - 1)
-                out = writeFuncDecl(out, name .. "_component", func, false)
+                out = writeFuncDecl(out, name .. "_component", func, true)
             end
             out = out .. "end\n\n"
         end
