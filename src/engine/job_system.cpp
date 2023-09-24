@@ -499,10 +499,6 @@ void wait(Signal* handle) {
 	waitEx(handle, false);
 }
 
-u32 getWorkerIndex() {
-	return getWorker()->m_worker_index;
-}
-
 void moveJobToWorker(u8 worker_index) {
 	g_system->m_sync.enter();
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;

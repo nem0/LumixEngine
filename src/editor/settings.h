@@ -43,6 +43,7 @@ struct LUMIX_EDITOR_API Settings {
 	bool m_is_crash_reporting_enabled;
 	bool m_force_no_crash_report;
 	bool m_sleep_when_inactive;
+	bool m_focus_game_view_on_game_mode_start;
 	Vec2 m_mouse_sensitivity;
 	float m_mouse_sensitivity_y;
 	int m_font_size = 13;

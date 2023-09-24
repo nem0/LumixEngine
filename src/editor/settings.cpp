@@ -305,6 +305,7 @@ Settings::Settings(StudioApp& app)
 	, m_is_properties_open(false)
 	, m_is_crash_reporting_enabled(true)
 	, m_sleep_when_inactive(true)
+	, m_focus_game_view_on_game_mode_start(false)
 	, m_force_no_crash_report(false)
 	, m_mouse_sensitivity(80.0f, 80.0f)
 	, m_font_size(13)
@@ -412,6 +413,7 @@ bool Settings::load()
 	m_is_properties_open = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	m_sleep_when_inactive = getBoolean(L, "sleep_when_inactive", true);
+	m_focus_game_view_on_game_mode_start = getBoolean(L, "focus_game_view_on_game_mode_start", false);
 	if (!shouldSleepWhenInactive()) m_sleep_when_inactive = false;
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_app.getGizmoConfig().scale = getFloat(L, "gizmo_scale", 1.f);
@@ -610,6 +612,7 @@ bool Settings::save()
 	writeBool("properties_opened", m_is_properties_open);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	writeBool("sleep_when_inactive", m_sleep_when_inactive);
+	writeBool("focus_game_view_on_game_mode_start", m_focus_game_view_on_game_mode_start);
 	file << "gizmo_scale = " << m_app.getGizmoConfig().scale << "\n";
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
@@ -1310,6 +1313,7 @@ void Settings::onGUI()
 						enableCrashReporting(m_is_crash_reporting_enabled);
 					}
 				}
+				ImGui::Checkbox("Focus game view on game start", &m_focus_game_view_on_game_mode_start);
 				ImGui::Checkbox("Sleep when inactive", &m_sleep_when_inactive);
 				ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 1.f, 0.1f, 500.0f);
 				float fov = radiansToDegrees(m_app.getFOV());

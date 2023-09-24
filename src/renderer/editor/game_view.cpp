@@ -238,7 +238,7 @@ void GameView::onGUI()
 	m_pipeline->setWorld(editor.getWorld());
 
 	const bool is_game_mode = m_app.getWorldEditor().isGameMode();
-	if (is_game_mode && !m_was_game_mode) {
+	if (is_game_mode && !m_was_game_mode && m_app.getSettings().m_focus_game_view_on_game_mode_start) {
 		ImGui::SetNextWindowFocus();
 		m_is_open = true;
 	}
