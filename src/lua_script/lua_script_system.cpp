@@ -392,12 +392,12 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 			LuaScriptModuleImpl& module = cmp.m_module;
 			Engine& engine = module.m_system.m_engine;
 			lua_State* L = engine.getState();
+			LuaWrapper::DebugGuard guard(L);
 			m_state = lua_newthread(L);
-			m_thread_ref = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX); // []
+			m_thread_ref = LuaWrapper::createRef(L);
+			lua_pop(L, 1); // []
 			lua_newtable(m_state); // [env]
-			// reference environment
-			lua_pushvalue(m_state, -1); // [env, env]
-			m_environment = LuaWrapper::luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
+			m_environment = LuaWrapper::createRef(m_state); // [env]
 
 			// environment's metatable & __index
 			lua_pushvalue(m_state, -1); // [env, env]
@@ -474,8 +474,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 
 				Engine& engine = m_cmp->m_module.m_system.m_engine;
 				lua_State* L = engine.getState();
-				LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
-				LuaWrapper::luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
+				LuaWrapper::releaseRef(L, m_thread_ref);
+				LuaWrapper::releaseRef(m_state, m_environment);
 			}
 		}
 
@@ -497,11 +497,11 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 			Engine& engine = module.m_system.m_engine;
 			lua_State* L = engine.getState();
 			m_state = lua_newthread(L);
-			m_thread_ref = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX); // []
+			m_thread_ref = LuaWrapper::createRef(L);
+			lua_pop(L, 1); // []
 			lua_newtable(m_state);						   // [env]
 			// reference environment
-			lua_pushvalue(m_state, -1);							  // [env, env]
-			m_environment = LuaWrapper::luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
+			m_environment = LuaWrapper::createRef(m_state); // [env]
 
 			// environment's metatable & __index
 			lua_pushvalue(m_state, -1);				  // [env, env]
@@ -543,8 +543,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 
 			Engine& engine = m_module.m_system.m_engine;
 			lua_State* L = engine.getState();
-			LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
-			LuaWrapper::luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
+			LuaWrapper::releaseRef(L, m_thread_ref);
+			LuaWrapper::releaseRef(m_state, m_environment);
 		}
 
 		void runSource() {
@@ -1472,7 +1472,7 @@ public:
 		timer.time = time;
 		timer.state = L;
 		lua_pushvalue(L, 3);
-		timer.func = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+		timer.func = LuaWrapper::createRef(L);
 		lua_pop(L, 1);
 		LuaWrapper::push(L, timer.func);
 		return 1;
@@ -1687,7 +1687,7 @@ public:
 		{
 			if (m_timers[i].state == inst.m_state)
 			{
-				LuaWrapper::luaL_unref(m_timers[i].state, LUA_REGISTRYINDEX, m_timers[i].func);
+				LuaWrapper::releaseRef(m_timers[i].state, m_timers[i].func);
 				m_timers.swapAndPop(i);
 				--i;
 			}
@@ -2182,7 +2182,7 @@ public:
 		for (u32 i = timers_to_remove_count - 1; i != 0xffFFffFF; --i)
 		{
 			auto& timer = m_timers[timers_to_remove[i]];
-			LuaWrapper::luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
+			LuaWrapper::releaseRef(timer.state, timer.func);
 			m_timers.swapAndPop(timers_to_remove[i]);
 		}
 	}

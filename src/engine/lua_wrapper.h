@@ -49,12 +49,31 @@ struct Optional {
 	bool valid = false;
 };
 
+using RefHandle = i32;
+
 LUMIX_ENGINE_API int traceback (lua_State *L);
 LUMIX_ENGINE_API bool pcall(lua_State* L, int nargs, int nres);
 LUMIX_ENGINE_API bool execute(lua_State* L, StringView content, const char* name, int nresults);
 LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k);
-LUMIX_ENGINE_API void luaL_unref(lua_State* L, int t, int ref);
-LUMIX_ENGINE_API int luaL_ref(lua_State* L, int idx);
+
+// create reference to a value on top of stack, so it's not garbage collected and can be easily pushed to stack. Similar to luaL_ref
+LUMIX_ENGINE_API RefHandle createRef(lua_State* L);
+// release the reference, so it can be GCed
+LUMIX_ENGINE_API void releaseRef(lua_State* L, RefHandle ref);
+// push the reference on top of stack
+LUMIX_ENGINE_API void pushRef(lua_State* L, RefHandle ref);
+
+// get closure objects passed to `createSystemClosure`
+template <typename T>
+T* getClosureObject(lua_State* L) {
+	int upvalue_index = lua_upvalueindex(1);
+	if (!lua_islightuserdata(L, upvalue_index)) {
+		ASSERT(false);
+		luaL_error(L, "Invalid Lua closure");
+	}
+	return (T*)lua_tolightuserdata(L, upvalue_index);
+}
+
 LUMIX_ENGINE_API int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name);
 LUMIX_ENGINE_API void pushObject(lua_State* L, void* obj, StringView type_name);
 
@@ -832,11 +851,11 @@ template <auto t> int wrapMethodClosure(lua_State* L)
 	using C = typename ClassOf<decltype(t)>::Type;
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
-	if (!isType<C>(L, index)) {
+	if (!lua_islightuserdata(L, index)) {
 		ASSERT(false);
 		luaL_error(L, "Invalid Lua closure");
 	}
-	auto* inst = checkArg<C*>(L, index);
+	auto* inst = (C*)lua_tolightuserdata(L, index);
 	return details::Caller<indices>::callMethod(inst, t, L);
 }
 

@@ -845,8 +845,8 @@ struct PipelineImpl final : Pipeline
 	{
 		if (m_lua_state)
 		{
-			LuaWrapper::luaL_unref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX, m_lua_thread_ref);
-			LuaWrapper::luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+			LuaWrapper::releaseRef(m_renderer.getEngine().getState(), m_lua_thread_ref);
+			LuaWrapper::releaseRef(m_lua_state, m_lua_env);
 			m_lua_state = nullptr;
 		}
 	}
@@ -909,13 +909,15 @@ struct PipelineImpl final : Pipeline
 
 		cleanup();
 
-		m_lua_state = lua_newthread(m_renderer.getEngine().getState());
-		m_lua_thread_ref = LuaWrapper::luaL_ref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX);
+		lua_State* L = m_renderer.getEngine().getState();
+		m_lua_state = lua_newthread(L);
+		m_lua_thread_ref = LuaWrapper::createRef(L);
+		lua_pop(L, 1);
 
 		lua_newtable(m_lua_state);
 		lua_pushvalue(m_lua_state, -1);
-		m_lua_env = LuaWrapper::luaL_ref(m_lua_state, LUA_REGISTRYINDEX);
-		lua_pushvalue(m_lua_state, -1);
+		m_lua_env = LuaWrapper::createRef(m_lua_state);
+
 		lua_setmetatable(m_lua_state, -2);
 		lua_pushvalue(m_lua_state, LUA_GLOBALSINDEX);
 		lua_setfield(m_lua_state, -2, "__index");
@@ -1987,16 +1989,8 @@ struct PipelineImpl final : Pipeline
 		return res;
 	}
 
-	static PipelineImpl* getClosureThis(lua_State* L) {
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		return LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);	
-	}
-
 	static int drawcallUniforms(lua_State* L) {
-		PipelineImpl* pipeline = getClosureThis(L);
+		PipelineImpl* pipeline = LuaWrapper::getClosureObject<PipelineImpl>(L);
 		const int len = lua_gettop(L);
 
 		const Renderer::TransientSlice ub = pipeline->m_renderer.allocUniform(sizeof(float) * len);
@@ -2567,7 +2561,7 @@ struct PipelineImpl final : Pipeline
 	static int cull(lua_State* L) {
 		PROFILE_FUNCTION();
 		
-		PipelineImpl* pipeline = getClosureThis(L);
+		PipelineImpl* pipeline = LuaWrapper::getClosureObject<PipelineImpl>(L);
 		const CameraParamsHandle cp_handle = LuaWrapper::checkArg<CameraParamsHandle>(L, 1);
 		const CameraParams cp = pipeline->resolveCameraParams(cp_handle);
 		const i32 bucket_count = lua_gettop(L) - 1;
@@ -3454,7 +3448,7 @@ struct PipelineImpl final : Pipeline
 
 	static int setRenderTargets(lua_State* L, bool has_ds, bool readonly_ds) {
 		PROFILE_FUNCTION();
-		PipelineImpl* pipeline = getClosureThis(L);
+		PipelineImpl* pipeline = LuaWrapper::getClosureObject<PipelineImpl>(L);
 
 		const u32 rb_count = lua_gettop(L) - (has_ds ? 1 : 0);
 		gpu::TextureHandle rbs[16];

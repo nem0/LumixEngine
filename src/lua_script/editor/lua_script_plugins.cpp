@@ -44,7 +44,7 @@ Editor.addAction {
 		for i = 1, 10 do
 			Editor.createEntityEx {
 				position = { 3 * i, 0, 0 },
-				model_instance = { source = "models/shapes/cube.fbx" }
+				model_instance = { Source = "models/shapes/cube.fbx" }
 			}
 		end
 	end
@@ -66,12 +66,7 @@ static int LUA_addAction(lua_State* L) {
 	};
 
 	LuaWrapper::DebugGuard guard(L);
-	int upvalue_index = lua_upvalueindex(1);
-	if (!LuaWrapper::isType<StudioApp*>(L, upvalue_index)) {
-		ASSERT(false);
-		luaL_error(L, "Invalid Lua closure");
-	}
-	StudioApp* app = LuaWrapper::checkArg<StudioApp*>(L, upvalue_index);
+	StudioApp* app = LuaWrapper::getClosureObject<StudioApp>(L);
 	LuaWrapper::checkTableArg(L, 1);
 	char name[64];
 	char label[128];
@@ -82,9 +77,10 @@ static int LUA_addAction(lua_State* L) {
 	LuaAction* action = LUMIX_NEW(app->getAllocator(), LuaAction);
 
 	lua_pushthread(L);
-	action->ref_thread = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+	action->ref_thread = LuaWrapper::createRef(L);
 	lua_pushvalue(L, 1);
-	action->ref_action = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+	action->ref_action = LuaWrapper::createRef(L);
+	lua_pop(L, 2);
 	action->action.init(label, label, name, "", Action::Type::IMGUI_PRIORITY);
 	action->action.func.bind<&LuaAction::run>(action);
 	action->L = L;
@@ -95,6 +91,7 @@ static int LUA_addAction(lua_State* L) {
 struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	static void create(StudioApp& app, StringView content, const Path& path) {
 		lua_State* L = app.getEngine().getState();
+		LuaWrapper::DebugGuard guard(L);
 		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return;
 
 		if (lua_isnil(L, -1)) {
@@ -121,7 +118,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		}
 		lua_pop(L, 1);
 		
-		plugin->m_plugin_ref = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+		plugin->m_plugin_ref = LuaWrapper::createRef(L);
+		lua_pop(L, 1);
 		app.addPlugin(*plugin);
 
 	} 
