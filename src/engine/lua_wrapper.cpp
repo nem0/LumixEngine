@@ -185,15 +185,9 @@ int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* nam
 	return res;
 }
 
-void luaL_unref(lua_State* L, int t, int ref) {
-	lua_unref(L, ref);
-}
-
-int luaL_ref(lua_State* L, int idx) {
-	int r = lua_ref(L, -1);
-    lua_pop(L, 1);
-    return r;
-}
+void releaseRef(lua_State* L, RefHandle ref) { lua_unref(L, ref); }
+RefHandle createRef(lua_State* L) { return lua_ref(L, -1); }
+void pushRef(lua_State* L, RefHandle ref) { lua_rawgeti(L, LUA_REGISTRYINDEX, ref); }
 
 int getField(lua_State* L, int idx, const char* k) {
 	lua_getfield(L, idx, k);

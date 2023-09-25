@@ -383,7 +383,8 @@ int include(lua_State* L)
 bool Shader::load(Span<const u8> mem) {
 	lua_State* root_state = m_renderer.getEngine().getState();
 	lua_State* L = lua_newthread(root_state);
-	const int state_ref = LuaWrapper::luaL_ref(root_state, LUA_REGISTRYINDEX);
+	const int state_ref = LuaWrapper::createRef(root_state);
+	lua_pop(root_state, 1);
 	
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -410,11 +411,11 @@ bool Shader::load(Span<const u8> mem) {
 
 	StringView content((const char*)mem.begin(), (u32)mem.length());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
-		LuaWrapper::luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
+		LuaWrapper::releaseRef(root_state, state_ref);
 		return false;
 	}
 
-	LuaWrapper::luaL_unref(root_state, LUA_REGISTRYINDEX, state_ref);
+	LuaWrapper::releaseRef(root_state, state_ref);
 	return true;
 }
 

@@ -336,37 +336,24 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 } // namespace LuaImGui
 
 
-static Engine* getEngineUpvalue(lua_State* L) {
-	const int index = lua_upvalueindex(1);
-	if (!LuaWrapper::isType<Engine>(L, index)) {
-		logError("Invalid Lua closure");
-		ASSERT(false);
-		return 0;
-	}
-	return LuaWrapper::checkArg<Engine*>(L, index);
-}
-
-static int LUA_pause(lua_State* L) 
-{
+static int LUA_pause(lua_State* L) {
 	bool pause = LuaWrapper::checkArg<bool>(L, 1);
-	Engine* engine = getEngineUpvalue(L);
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	engine->pause(pause);
 	return 0;
 }
 
 
-static int LUA_hasFilesystemWork(lua_State* L)
-{
-	Engine* engine = getEngineUpvalue(L);
+static int LUA_hasFilesystemWork(lua_State* L) {
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	bool res = engine->getFileSystem().hasWork();
 	lua_pushboolean(L, res);
 	return 1;
 }
 
 
-static int LUA_processFilesystemWork(lua_State* L)
-{
-	Engine* engine = getEngineUpvalue(L);
+static int LUA_processFilesystemWork(lua_State* L) {
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	engine->getFileSystem().processCallbacks();
 	return 0;
 }
@@ -722,12 +709,12 @@ static u16 LUA_getActivePartition(World* world) {
 
 static int LUA_loadWorld(lua_State* L)
 {
-	Engine* engine = getEngineUpvalue(L);
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	auto* world = LuaWrapper::checkArg<World*>(L, 1);
 	auto* path = LuaWrapper::checkArg<const char*>(L, 2);
 	if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
 	struct Callback {
-		~Callback() { LuaWrapper::luaL_unref(L, LUA_REGISTRYINDEX, lua_func); }
+		~Callback() { LuaWrapper::releaseRef(L, lua_func); }
 
 		void invoke(Span<const u8> mem, bool success) {
 			if (!success) {
@@ -739,7 +726,7 @@ static int LUA_loadWorld(lua_State* L)
 				if (!world->deserialize(blob, entity_map, editor_version)) {
 					logError("Failed to deserialize world ", path);
 				} else {
-					lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func);
+					LuaWrapper::pushRef(L, lua_func);
 					if (lua_type(L, -1) != LUA_TFUNCTION) {
 						ASSERT(false);
 					}
@@ -757,7 +744,7 @@ static int LUA_loadWorld(lua_State* L)
 		World* world;
 		Path path;
 		lua_State* L;
-		int lua_func;
+		LuaWrapper::RefHandle lua_func;
 	};
 
 	FileSystem& fs = engine->getFileSystem();
@@ -766,7 +753,9 @@ static int LUA_loadWorld(lua_State* L)
 	inst->world = world;
 	inst->path = Path(path);
 	inst->L = L;
-	inst->lua_func = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushvalue(L, 3);
+	inst->lua_func = LuaWrapper::createRef(L);
+	lua_pop(L, 1);
 	fs.getContent(inst->path, makeDelegate<&Callback::invoke>(inst));
 	return 0;
 }
@@ -813,7 +802,7 @@ static int LUA_require(lua_State* L) {
 
     lua_pop(L, 1);
 
-	Engine* engine = LuaWrapper::toType<Engine*>(L, lua_upvalueindex(1));
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	StaticString<MAX_PATH> path(name, ".lua");
 	OutputMemoryStream blob(engine->getAllocator());
 	if (!engine->getFileSystem().getContentSync(Path(path), blob)) {
@@ -864,7 +853,7 @@ static int LUA_require(lua_State* L) {
 }
 
 static int LUA_instantiatePrefab(lua_State* L) {
-	Engine* engine = getEngineUpvalue(L);
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	LuaWrapper::checkTableArg(L, 1);
 	if (LuaWrapper::getField(L, 1, "value") != LUA_TLIGHTUSERDATA) {
 		LuaWrapper::argError(L, 1, "world");

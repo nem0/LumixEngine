@@ -2914,15 +2914,8 @@ struct StudioAppImpl final : StudioApp
 		m_show_all_actions_request = false;
 	}
 
-	static int LUA_createEntityEx(lua_State* L)
-	{
-		int upvalue_index = lua_upvalueindex(1);
-		if (!LuaWrapper::isType<StudioAppImpl*>(L, upvalue_index)) {
-			ASSERT(false);
-			luaL_error(L, "Invalid Lua closure");
-		}
-		StudioAppImpl* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, upvalue_index);
-		
+	static int LUA_createEntityEx(lua_State* L) {
+		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
 		LuaWrapper::checkTableArg(L, 1);
 
 		WorldEditor& editor = *studio->m_editor;
@@ -2993,12 +2986,8 @@ struct StudioAppImpl final : StudioApp
 	static int LUA_getSelectedEntity(lua_State* L) {
 		LuaWrapper::DebugGuard guard(L, 1);
 		i32 entity_idx = LuaWrapper::checkArg<i32>(L, 1);
-		int upvalue_index = lua_upvalueindex(1);
-		if (!LuaWrapper::isType<StudioAppImpl*>(L, upvalue_index)) {
-			ASSERT(false);
-			luaL_error(L, "Invalid Lua closure");
-		}
-		StudioAppImpl* inst = LuaWrapper::checkArg<StudioAppImpl*>(L, upvalue_index);
+		
+		StudioAppImpl* inst = LuaWrapper::getClosureObject<StudioAppImpl>(L);
 		EntityRef entity = inst->m_editor->getSelectedEntities()[entity_idx];
 
 		lua_getglobal(L, "Lumix");
