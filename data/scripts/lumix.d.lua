@@ -535,6 +535,12 @@ end
 
 declare this:Entity
 
+type ActionDesc = {
+    name : string,
+    label : string,
+    run : () -> ()
+}
+
 declare Editor: {
     RESOURCE_PROPERTY : number,
     COLOR_PROPERTY : number,
@@ -543,6 +549,8 @@ declare Editor: {
     setPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
 	getSelectedEntity : (number) -> Entity,
+	addAction : (ActionDesc) -> (),
+	createEntityEx : (any) -> Entity,
     scene_view : SceneView
 }
 

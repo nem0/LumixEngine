@@ -53,7 +53,10 @@
 	<Type Name="Lumix::String">
 		<DisplayString Condition="m_size &gt;= sizeof(m_small)">{m_big,na}</DisplayString>
 		<DisplayString Condition="m_size &lt; sizeof(m_small)">{m_small,na}</DisplayString>
+	</Type>
 
+	<Type Name="Lumix::StaticString&lt;*&gt;">
+		<DisplayString>{data,na}</DisplayString>
 	</Type>
 
 	<Type Name="Lumix::Span&lt;*&gt;">

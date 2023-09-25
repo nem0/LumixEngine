@@ -35,6 +35,63 @@ static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_s
 
 namespace {
 
+/*
+-- example lua usage
+Editor.addAction {
+	name ="spawn_10_cubes",
+	label = "Spawn 10 cubes",
+	run = function()
+		for i = 1, 10 do
+			Editor.createEntityEx {
+				position = { 3 * i, 0, 0 },
+				model_instance = { source = "models/shapes/cube.fbx" }
+			}
+		end
+	end
+}
+*/ 
+static int LUA_addAction(lua_State* L) {
+	struct LuaAction {
+		void run() {
+			LuaWrapper::DebugGuard guard(L);
+			lua_rawgeti(L, LUA_REGISTRYINDEX, ref_action);
+			lua_getfield(L, -1, "run");
+			LuaWrapper::pcall(L, 0, 0);
+			lua_pop(L, 1);
+		}
+		Action action;
+		lua_State* L;
+		int ref_thread;
+		int ref_action;
+	};
+
+	LuaWrapper::DebugGuard guard(L);
+	int upvalue_index = lua_upvalueindex(1);
+	if (!LuaWrapper::isType<StudioApp*>(L, upvalue_index)) {
+		ASSERT(false);
+		luaL_error(L, "Invalid Lua closure");
+	}
+	StudioApp* app = LuaWrapper::checkArg<StudioApp*>(L, upvalue_index);
+	LuaWrapper::checkTableArg(L, 1);
+	char name[64];
+	char label[128];
+	if (!LuaWrapper::checkStringField(L, 1, "name", Span(name))) luaL_argerror(L, 1, "missing name");
+	if (!LuaWrapper::checkStringField(L, 1, "label", Span(label))) luaL_argerror(L, 1, "missing label");
+
+	// TODO leak
+	LuaAction* action = LUMIX_NEW(app->getAllocator(), LuaAction);
+
+	lua_pushthread(L);
+	action->ref_thread = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushvalue(L, 1);
+	action->ref_action = LuaWrapper::luaL_ref(L, LUA_REGISTRYINDEX);
+	action->action.init(label, label, name, "", Action::Type::IMGUI_PRIORITY);
+	action->action.func.bind<&LuaAction::run>(action);
+	action->L = L;
+	app->addAction(&action->action);
+	return 0;
+}
+
 struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	static void create(StudioApp& app, StringView content, const Path& path) {
 		lua_State* L = app.getEngine().getState();
@@ -422,12 +479,13 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin
 	}
 };
 
-struct StudioAppPlugin : StudioApp::IPlugin
-{
+struct StudioAppPlugin : StudioApp::IPlugin {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_asset_plugin(app)
 	{
+		lua_State* L = app.getEngine().getState();
+		LuaWrapper::createSystemClosure(L, "Editor", &app, "addAction", &LUA_addAction);
 		initPlugins();
 	}
 

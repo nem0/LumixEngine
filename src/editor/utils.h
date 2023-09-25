@@ -48,12 +48,12 @@ struct LUMIX_EDITOR_API Action {
 
 	static bool falseConst() { return false; }
 
-	Type type = Type::LOCAL;
-	Modifiers modifiers = Modifiers::NONE;
-	os::Keycode shortcut;
 	StaticString<32> name;
 	StaticString<32> label_short;
 	StaticString<64> label_long;
+	Type type = Type::LOCAL;
+	Modifiers modifiers = Modifiers::NONE;
+	os::Keycode shortcut;
 	StaticString<5> font_icon;
 	Delegate<void ()> func;
 	Delegate<bool ()> is_selected;

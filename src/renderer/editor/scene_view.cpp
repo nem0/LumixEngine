@@ -645,7 +645,7 @@ SceneView::SceneView(StudioApp& app)
 	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", Action::LOCAL);
 	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
 	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
-	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_insert_model_action.init("Insert model", "Insert model or prefab", "insert_model", ICON_FA_SEARCH, (os::Keycode)'P', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 
 	m_top_view_action.init("Top", "Set top camera view", "viewTop", "", Action::IMGUI_PRIORITY);
 	m_side_view_action.init("Side", "Set side camera view", "viewSide", "", Action::IMGUI_PRIORITY);
@@ -654,14 +654,14 @@ SceneView::SceneView(StudioApp& app)
 	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "", Action::IMGUI_PRIORITY);
 	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "", Action::IMGUI_PRIORITY);
 	m_rotate_entity_90_action.init("Rotate 90 degrees", "Rotate selected entities by 90 degrees", "rotate90deg", "", os::Keycode::R, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
-	m_move_entity_E_action.init("Move entity east", "MoveEselected entity east", "moveEntityE", "", os::Keycode::RIGHT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_move_entity_E_action.init("Move entity east", "Move selected entity east", "moveEntityE", "", os::Keycode::RIGHT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 	m_move_entity_N_action.init("Move entity north", "Move selected entity north", "moveEntityN", "", os::Keycode::UP, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-	m_move_entity_S_action.init("Move entity south", "Move Selected entity south", "moveEntityS", "", os::Keycode::DOWN, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-	m_move_entity_W_action.init("Move entity west", "Move Welected entity west", "moveEntityW", "", os::Keycode::LEFT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_move_entity_S_action.init("Move entity south", "Move selected entity south", "moveEntityS", "", os::Keycode::DOWN, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_move_entity_W_action.init("Move entity west", "Move selected entity west", "moveEntityW", "", os::Keycode::LEFT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_toggle_gizmo_step_action);
-	m_app.addAction(&m_search_action);
+	m_app.addAction(&m_insert_model_action);
 	m_app.addAction(&m_set_pivot_action);
 	m_app.addAction(&m_reset_pivot_action);
 	m_app.addAction(&m_top_view_action);
@@ -714,7 +714,7 @@ SceneView::~SceneView()
 {
 	m_app.removeAction(&m_copy_move_action);
 	m_app.removeAction(&m_toggle_gizmo_step_action);
-	m_app.removeAction(&m_search_action);
+	m_app.removeAction(&m_insert_model_action);
 	m_app.removeAction(&m_set_pivot_action);
 	m_app.removeAction(&m_reset_pivot_action);
 	m_app.removeAction(&m_top_view_action);
@@ -784,7 +784,7 @@ void SceneView::moveEntity(Vec2 v) {
 }
 
 bool SceneView::onAction(const Action& action) {
-	if (&action == &m_search_action) m_search_request = true;
+	if (&action == &m_insert_model_action) m_insert_model_request = true;
 	else if (&action == &m_set_pivot_action) m_view->setCustomPivot();
 	else if (&action == &m_reset_pivot_action) m_view->resetPivot();
 	else if (&action == &m_top_view_action) m_view->setTopView();
@@ -1331,35 +1331,29 @@ void SceneView::handleEvents() {
 
 void SceneView::onSettingsLoaded() {
 	Settings& settings = m_app.getSettings();
-	m_search_actions = settings.getValue(Settings::GLOBAL, "quicksearch_actions", true);
-	m_search_models = settings.getValue(Settings::GLOBAL, "quicksearch_models", true);
 	m_search_preview = settings.getValue(Settings::GLOBAL, "quicksearch_preview", false);
 }
 
 void SceneView::onBeforeSettingsSaved() {
 	Settings& settings = m_app.getSettings();
-	settings.setValue(Settings::GLOBAL, "quicksearch_actions", m_search_actions);
-	settings.setValue(Settings::GLOBAL, "quicksearch_models", m_search_models);
 	settings.setValue(Settings::GLOBAL, "quicksearch_preview", m_search_preview);
 }
 
-void SceneView::searchUI() {
-	if (m_search_request) ImGui::OpenPopup("Search");
+void SceneView::insertModelUI() {
+	if (m_insert_model_request) ImGui::OpenPopup("Insert model");
 
-	if (ImGuiEx::BeginResizablePopup("Search", ImVec2(300, 200))) {
+	if (ImGuiEx::BeginResizablePopup("Insert model", ImVec2(300, 200))) {
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 		ImGui::AlignTextToFramePadding();
 		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("settings_popup");
 		if (ImGui::BeginPopup("settings_popup")) {
 			ImGui::Checkbox("Preview", &m_search_preview);
-			ImGui::Checkbox("Actions", &m_search_actions);
-			ImGui::Checkbox("Models", &m_search_models);
 			ImGui::EndPopup();
 		}
 		ImGui::SameLine();
-		if(m_search_request) m_search_selected = 0;
-		if (m_filter.gui(ICON_FA_SEARCH " Search", -1, m_search_request)) {
+		if(m_insert_model_request) m_search_selected = 0;
+		if (m_filter.gui(ICON_FA_SEARCH " Search", -1, m_insert_model_request)) {
 			m_search_selected = 0;
 		}
 		bool scroll = false;
@@ -1392,57 +1386,33 @@ void SceneView::searchUI() {
 				};
 				AssetBrowser& ab = m_app.getAssetBrowser();
 				const auto& resources = m_app.getAssetCompiler().lockResources();
-				if (m_search_models) {
-					u32 idx = 0;
-					for (const auto& res : resources) {
-						if (res.type != Model::TYPE) continue;
-						if (!m_filter.pass(res.path)) continue;
+				u32 idx = 0;
+				for (const auto& res : resources) {
+					if (res.type != Model::TYPE) continue;
+					if (!m_filter.pass(res.path)) continue;
 
-						const bool selected = idx == m_search_selected;
-						if (m_search_preview) {
-							ImGui::SameLine();
-							if (idx == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
-							ab.tile(res.path, selected);
-							if (ImGui::IsItemClicked() || (insert_enter && selected)) {
-								insert(res.path);
-								break;
-							}
-						}
-						else {
-							if (ImGui::Selectable(res.path.c_str(), selected) || (insert_enter && selected)) {
-								insert(res.path);
-								break;
-							}
-						}
-						if (selected && scroll) {
-							ImGui::SetScrollHereY();
-						}
-						++idx;
-					}
-					m_search_selected = idx > 0 ? minimum(m_search_selected, idx - 1) : 0;
-					if (m_search_actions) ImGui::Separator();
-				}
-
-				if (m_search_actions) {
-					ImGui::TextUnformatted("Actions:");
-					const auto& actions = m_app.getActions();
-					for (Action* act : actions) {
-						if (!m_filter.pass(act->label_long)) continue;
-						char buf[20] = " (";
-						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
-						if (buf[2]) {
-							catString(buf, ")");
-						}
-						else { 
-							buf[0] = '\0';
-						}
-						if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf))) {
-							ImGui::CloseCurrentPopup();
-							act->func.invoke();
+					const bool selected = idx == m_search_selected;
+					if (m_search_preview) {
+						ImGui::SameLine();
+						if (idx == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
+						ab.tile(res.path, selected);
+						if (ImGui::IsItemClicked() || (insert_enter && selected)) {
+							insert(res.path);
 							break;
 						}
 					}
+					else {
+						if (ImGui::Selectable(res.path.c_str(), selected) || (insert_enter && selected)) {
+							insert(res.path);
+							break;
+						}
+					}
+					if (selected && scroll) {
+						ImGui::SetScrollHereY();
+					}
+					++idx;
 				}
+				m_search_selected = idx > 0 ? minimum(m_search_selected, idx - 1) : 0;
 
 				m_app.getAssetCompiler().unlockResources();
 			}
@@ -1450,7 +1420,7 @@ void SceneView::searchUI() {
 		}
 		ImGui::EndPopup();
 	}
-	m_search_request = false;
+	m_insert_model_request = false;
 }
 
 void SceneView::onGUI()
@@ -1527,7 +1497,7 @@ void SceneView::onGUI()
 
 	ImGui::End();
 
-	searchUI();
+	insertModelUI();
 
 	if (is_open && m_is_measure_active) {
 		view_pos.x += ImGui::GetStyle().FramePadding.x;
