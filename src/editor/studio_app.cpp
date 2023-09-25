@@ -410,6 +410,7 @@ struct StudioAppImpl final : StudioApp
 
 	~StudioAppImpl()
 	{
+		removeAction(&m_show_all_actions_action);
 		removePlugin(*m_asset_browser.get());
 		removePlugin(*m_log_ui.get());
 		removePlugin(*m_property_grid.get());
@@ -746,6 +747,7 @@ struct StudioAppImpl final : StudioApp
 
 			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 			m_asset_compiler->onGUI();
+			guiAllActions();
 			guiEntityList();
 			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
@@ -2287,6 +2289,8 @@ struct StudioAppImpl final : StudioApp
 
 	CommonActions& getCommonActions() override { return m_common_actions; }
 
+	void showAllActionsGUI() { m_show_all_actions_request = true; }
+
 	void addActions()
 	{
 		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, Action::GLOBAL);
@@ -2316,6 +2320,10 @@ struct StudioAppImpl final : StudioApp
 		addAction(&m_common_actions.cam_up);
 		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_down);
+
+		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::Type::IMGUI_PRIORITY);
+		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
+		addAction(&m_show_all_actions_action);
 
 		addAction<&StudioAppImpl::newWorld>("New", "New world", "newWorld", ICON_FA_PLUS);
 		addAction<&StudioAppImpl::saveAs>("Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
@@ -2817,7 +2825,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), Path(str));
 		}
 
 
@@ -2849,18 +2857,80 @@ struct StudioAppImpl final : StudioApp
 		WorldEditor* editor;
 	};
 
+	void guiAllActions() {
+		if (m_show_all_actions_request) ImGui::OpenPopup("Action palette");
+
+		if (ImGuiEx::BeginResizablePopup("Action palette", ImVec2(300, 200))) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+
+			if(m_show_all_actions_request) m_all_actions_selected = 0;
+			if (m_all_actions_filter.gui(ICON_FA_SEARCH " Search", -1, m_show_all_actions_request)) {
+				m_all_actions_selected = 0;
+			}
+			bool scroll = false;
+			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+			if (ImGui::IsItemFocused()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_all_actions_selected > 0) {
+					--m_all_actions_selected;
+					scroll =  true;
+				}
+				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+					++m_all_actions_selected;
+					scroll =  true;
+				}
+			}
+			if (m_all_actions_filter.isActive()) {
+				if (ImGui::BeginChild("##list")) {
+					u32 idx = 0;
+					for (Action* act : m_actions) {
+						if (!m_all_actions_filter.pass(act->label_long)) continue;
+
+						char buf[20] = " (";
+						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
+						if (buf[2]) {
+							catString(buf, ")");
+						}
+						else { 
+							buf[0] = '\0';
+						}
+						bool selected = idx == m_all_actions_selected;
+						if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf), selected) || (selected && insert_enter)) {
+							ImGui::CloseCurrentPopup();
+							GUIPlugin* window = getFocusedWindow();
+							if (!window || !window->onAction(*act)) {
+								if (act->func.isValid()) {
+									act->func.invoke();
+								}
+							}
+							break;
+						}
+						++idx;
+					}
+				}
+				ImGui::EndChild();
+			}
+			ImGui::EndPopup();
+		}
+		m_show_all_actions_request = false;
+	}
 
 	static int LUA_createEntityEx(lua_State* L)
 	{
-		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
-		LuaWrapper::checkTableArg(L, 2);
+		int upvalue_index = lua_upvalueindex(1);
+		if (!LuaWrapper::isType<StudioAppImpl*>(L, upvalue_index)) {
+			ASSERT(false);
+			luaL_error(L, "Invalid Lua closure");
+		}
+		StudioAppImpl* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, upvalue_index);
+		
+		LuaWrapper::checkTableArg(L, 1);
 
 		WorldEditor& editor = *studio->m_editor;
 		editor.beginCommandGroup("createEntityEx");
 		EntityRef e = editor.addEntity();
 		editor.selectEntities(Span(&e, 1), false);
 
-		lua_pushvalue(L, 2);
+		lua_pushvalue(L, 1);
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0)
 		{
@@ -2916,7 +2986,7 @@ struct StudioAppImpl final : StudioApp
 		lua_pop(L, 1);
 
 		editor.endCommandGroup();
-		LuaWrapper::push(L, e);
+		LuaWrapper::pushEntity(L, e, editor.getWorld());
 		return 1;
 	}
 
@@ -2994,7 +3064,7 @@ struct StudioAppImpl final : StudioApp
 
 		LuaWrapper::createSystemClosure(L, "Editor", this, "getSelectedEntity", &LUA_getSelectedEntity);
 		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
-		LuaWrapper::createSystemFunction(L, "Editor", "createEntityEx", &LUA_createEntityEx);
+		LuaWrapper::createSystemClosure(L, "Editor", this, "createEntityEx", &LUA_createEntityEx);
 	}
 
 	void checkScriptCommandLine() {
@@ -3388,6 +3458,7 @@ struct StudioAppImpl final : StudioApp
 	Array<Action*> m_window_actions;
 
 	CommonActions m_common_actions;
+	Action m_show_all_actions_action;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
@@ -3476,6 +3547,10 @@ struct StudioAppImpl final : StudioApp
 		int iteration = 0;
 		bool reload_request = false;
 	} m_watched_plugin;
+
+	bool m_show_all_actions_request = false;
+	i32 m_all_actions_selected = 0;
+	TextFilter m_all_actions_filter;
 };
 
 static Local<StudioAppImpl> g_studio;

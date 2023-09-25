@@ -50,7 +50,7 @@ private:
 	void handleDrop(const char* path, float x, float y);
 	void onToolbar();
 	void handleEvents();
-	void searchUI();
+	void insertModelUI();
 	void onSettingsLoaded() override;
 	void onBeforeSettingsSaved() override;
 	void toggleProjection();
@@ -60,7 +60,7 @@ private:
 
 private:
 	StudioApp& m_app;
-	Action m_search_action;
+	Action m_insert_model_action;
 	Action m_set_pivot_action;
 	Action m_toggle_gizmo_step_action;
 	Action m_copy_move_action;
@@ -79,10 +79,8 @@ private:
 	bool m_has_focus = false;
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
-	bool m_search_request = false;
+	bool m_insert_model_request = false;
 	bool m_search_preview = false;
-	bool m_search_actions = true;
-	bool m_search_models = true;
 	TextFilter m_filter;
 	i32 m_search_selected = 0;
 	int m_screen_x;
