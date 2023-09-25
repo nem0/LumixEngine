@@ -89,6 +89,7 @@ enum class PhysicsModuleVersion
 	INSTANCED_CUBE,
 	INSTANCED_MESH,
 	MATERIAL,
+	CCD,
 
 	LATEST,
 };
@@ -345,6 +346,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			, next_with_mesh(rhs.next_with_mesh)
 			, dynamic_type(rhs.dynamic_type)
 			, is_trigger(rhs.is_trigger)
+			, ccd(rhs.ccd)
 		{
 			rhs.mesh = nullptr;
 			rhs.material = nullptr;
@@ -375,6 +377,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		EntityPtr next_with_mesh = INVALID_ENTITY;
 		DynamicType dynamic_type = DynamicType::STATIC;
 		bool is_trigger = false;
+		bool ccd = false;
 	};
 
 
@@ -2853,6 +2856,20 @@ struct PhysicsModuleImpl final : PhysicsModule
 		return getGeometryCount(actor, PxGeometryType::eBOX);
 	}
 
+	bool getRigidActorCCD(EntityRef e) {
+		RigidActor& actor = m_actors[e];
+		return actor.ccd;
+	}
+
+	void setRigidActorCCD(EntityRef e, bool enable) {
+		RigidActor& actor = m_actors[e];
+		actor.ccd = enable;
+		if (actor.physx_actor) {
+			PxRigidBody* body = actor.physx_actor->is<PxRigidBody>();
+			if (body) body->setRigidBodyFlag(PxRigidBodyFlag::eENABLE_CCD, enable);
+		}
+	}
+
 	Path getMeshGeomPath(EntityRef entity) override {
 		RigidActor& actor = m_actors[entity];
 		return actor.mesh ? actor.mesh->getPath() : Path();
@@ -3032,6 +3049,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		serializer.write(actor.entity);
 		serializer.write(actor.dynamic_type);
 		serializer.write(actor.is_trigger);
+		serializer.write(actor.ccd);
 		serializer.write(actor.layer);
 		serializer.writeString(actor.material ? actor.material->getPath() : Path());
 		auto* px_actor = actor.physx_actor;
@@ -3221,6 +3239,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			serializer.read(actor.dynamic_type);
 			serializer.read(actor.is_trigger);
 			if (actor.dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(entity);
+			if (version > (i32)PhysicsModuleVersion::CCD) serializer.read(actor.ccd);
 			actor.layer = 0;
 			serializer.read(actor.layer);
 			
@@ -3690,7 +3709,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		if (!(filterData0.word0 & filterData1.word1) || !(filterData1.word0 & filterData0.word1)) {
 			return PxFilterFlag::eSUPPRESS;
 		}
-		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eNOTIFY_CONTACT_POINTS;
+		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eNOTIFY_CONTACT_POINTS | PxPairFlag::eDETECT_CCD_CONTACT;
 		return PxFilterFlag::eDEFAULT;
 	}
 
@@ -3854,6 +3873,7 @@ UniquePtr<PhysicsModule> PhysicsModule::create(PhysicsSystem& system, World& wor
 
 	sceneDesc.filterShader = impl->filterShader;
 	sceneDesc.simulationEventCallback = &impl->m_contact_callback;
+	sceneDesc.flags |= PxSceneFlag::eENABLE_CCD;
 
 	impl->m_scene = system.getPhysics()->createScene(sceneDesc);
 	if (!impl->m_scene)
@@ -4000,6 +4020,7 @@ void PhysicsModule::reflect() {
 				.LUMIX_PROP(SphereGeomRadius, "Radius").minAttribute(0)
 				.LUMIX_PROP(SphereGeomOffsetPosition, "Position offset")
 			.end_array()
+			.LUMIX_PROP(RigidActorCCD, "CCD")
 			.LUMIX_PROP(MeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
 			.LUMIX_PROP(RigidActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
 		.LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle")
@@ -4099,6 +4120,8 @@ void PhysicsModuleImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 		actor->userData = (void*)(intptr_t)entity.index;
 		module.updateFilterData(actor, layer);
 		setIsTrigger(is_trigger);
+		PxRigidBody* rigid_body = actor->is<PxRigidBody>();
+		if (rigid_body) rigid_body->setRigidBodyFlag(PxRigidBodyFlag::eENABLE_CCD, ccd);
 	}
 }
 
