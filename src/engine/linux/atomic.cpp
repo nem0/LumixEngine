@@ -14,7 +14,7 @@ i32 AtomicI32::add(i32 v) { return __atomic_fetch_add(&value, v, __ATOMIC_ACQ_RE
 i32 AtomicI32::subtract(i32 v) { return __atomic_fetch_sub(&value, v, __ATOMIC_ACQ_REL); }
 
 bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
-	return __sync_bool_compare_and_swap(&value, exchange, comperand);
+	return __sync_bool_compare_and_swap(&value, comperand, exchange);
 }
 
 void AtomicI64::operator =(i64 v) { __atomic_store_n(&value, v, __ATOMIC_RELEASE); }
@@ -26,11 +26,11 @@ i64 AtomicI64::add(i64 v) { return __atomic_fetch_add(&value, v, __ATOMIC_ACQ_RE
 i64 AtomicI64::subtract(i64 v) { return __atomic_fetch_sub(&value, v, __ATOMIC_ACQ_REL); }
 
 bool AtomicI64::compareExchange(i64 exchange, i64 comperand) { 
-	return __sync_bool_compare_and_swap(&value, exchange, comperand);
+	return __sync_bool_compare_and_swap(&value, comperand, exchange);
 }
 
 bool compareExchangePtr(volatile void** value, void* exchange, void* comperand) {
-	return __sync_bool_compare_and_swap(value, exchange, comperand);
+	return __sync_bool_compare_and_swap(value, comperand, exchange);
 }
 
 LUMIX_ENGINE_API void memoryBarrier()
