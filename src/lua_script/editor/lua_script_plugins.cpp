@@ -164,7 +164,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		lua_pop(L, 1);
 	}
 
-	bool onAction(const Action& action) {
+	bool onAction(const Action& action) override {
 		if (&action == &m_action) {
 			runWindowAction();
 			return true;
@@ -182,7 +182,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		lua_pop(L, 1);
 	}
 
-	void onSettingsLoaded() {
+	void onSettingsLoaded() override {
 		lua_State* L = m_app.getEngine().getState();
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
@@ -234,7 +234,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		lua_pop(L, 2);
 	}
 	
-	void onBeforeSettingsSaved() {
+	void onBeforeSettingsSaved() override {
 		lua_State* L = m_app.getEngine().getState();
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
