@@ -1,9 +1,16 @@
+#define LUMIX_NO_CUSTOM_CRT
+
 #include "jolt_physics/jolt_module.h"
 #include "jolt_physics/jolt_system.h"
 #include "engine/allocators.h"
 #include "engine/engine.h"
 #include "engine/profiler.h"
 #include "engine/world.h"
+
+#include <Jolt/Jolt.h>
+
+#include <Jolt/RegisterTypes.h>
+#include <Jolt/Core/Factory.h>
 
 namespace Lumix {
 
@@ -13,6 +20,9 @@ struct JoltSystemImpl final : JoltSystem {
 		, m_allocator(engine.getAllocator(), "jolt")
 	{
 		JoltModule::reflect();
+		JPH::RegisterDefaultAllocator();
+		JPH::Factory::sInstance = new JPH::Factory();
+		JPH::RegisterTypes();
 	}
 
 	void createModules(World& world) {

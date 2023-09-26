@@ -1012,6 +1012,7 @@ end
 if force_build_jolt == true then
 	if os.isdir("3rdparty/jolt") then
 		project "Jolt"
+			targetdir "../external/jolt/lib/win"
 			kind "StaticLib"
 			files { "3rdparty/jolt/jolt/**.cpp", "3rdparty/jolt/jolt/**.h" }
 			includedirs { "3rdparty/jolt/" }
