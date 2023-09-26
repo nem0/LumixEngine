@@ -31,6 +31,7 @@ local embed_resources = false
 local force_build_luau = false
 local force_build_luau_dynamic = false
 local force_build_physx = false
+local force_build_physx_dynamic = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
@@ -165,6 +166,11 @@ newoption {
 	description = "Add PhysX project to solution. Do not use the prebuilt library."
 }
 
+newoption {
+	trigger = "force-build-physx-dynamic",
+	description = "Add PhysX project to solution. Do not use the prebuilt library. Build physx as dynamic library"
+}
+
 if _OPTIONS["force-build-luau"] then
 	force_build_luau = true
 	force_build_luau_dynamic = false
@@ -177,6 +183,10 @@ end
 
 if _OPTIONS["force-build-physx"] then
 	force_build_physx = true
+end
+
+if _OPTIONS["force-build-physx-dynamic"] then
+	force_build_physx_dynamic = true
 end
 
 if _OPTIONS["plugins"] then
@@ -331,10 +341,24 @@ end
 
 function linkPhysX()
 	if has_plugin("physics") then
-		if force_build_physx then
+		if force_build_physx or force_build_physx_dynamic then
 			configuration { "vs20*" }
 				links { "PhysX" }
-				defines { "PX_PHYSX_STATIC_LIB", "PX_PHYSX_CHARACTER_STATIC_LIB" }
+				includedirs { "../external/physx/include/foundation" }
+				defines { "NDEBUG" }
+				if not force_build_physx_dynamic then
+					defines { "PX_PHYSX_STATIC_LIB" }
+				end
+
+				if build_studio then
+					project "studio"
+						links("PhysX")
+				end
+
+				if build_app then
+					project "app"
+						links {"PhysX"}
+				end
 		else 
 			configuration { "x64", "vs20*" }
 				links { 
@@ -372,7 +396,6 @@ function linkPhysX()
 
 			configuration {}
 				libdirs {"../external/physx/lib/win"}
-				defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
 		end
 	end
 end
@@ -550,9 +573,9 @@ if has_plugin("physics") then
 		defines { "BUILDING_PHYSICS" }
 		links { "engine", "editor", "renderer" }
 		useLua()
-		linkPhysX()
-
 		defaultConfigurations()
+		
+		linkPhysX()
 end
 
 
@@ -989,25 +1012,83 @@ if build_studio then
 		defaultConfigurations()
 end
 
-if force_build_physx == true then
-	if os.isdir("3rdparty/physx") then	
-		project "PhysX"
+if force_build_physx or force_build_physx_dynamic then
+	function physXStaticLib(project_name, dir)
+		project(project_name)
 			kind "StaticLib"
-			files { "3rdparty/physx/physx/source/**.cpp", "3rdparty/physx/physx/include/**.h", "3rdparty/physx/pxshared/**.h" }
+			defines { "PX_PHYSX_STATIC_LIB" }
+			files { "3rdparty/physx/physx/source/" .. dir .. "/**.cpp", "3rdparty/physx/physx/source/" .. dir .. "/**.h", "3rdparty/physx/pxshared/**.h" }
 			removefiles { "**/unix/*", "3rdparty/physx/**/linux/*" }
 			includedirs { "3rdparty/physx/physx/include"
 				, "3rdparty/physx/pxshared/include"
 				, "3rdparty/physx/physx/source/**"
 			}
-			defines { "NDEBUG", "PX_PHYSX_STATIC_LIB", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "PX_COOKING" }
-			flags { "OptimizeSize", "ReleaseRuntime" }
+			defines { "NDEBUG", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "_ITERATOR_DEBUG_LEVEL=0" }
+			flags { "OptimizeSize", "ReleaseRuntime" }	
+
+			configuration { "Debug" }
+				defines { "LUMIX_DEBUG" }
 
 			configuration { "windows" }
 				targetdir "../external/physx/lib/win"
+	end
+
+	if os.isdir("3rdparty/physx") then	
+		physXStaticLib("PhysXPVD", "pvd")
+		physXStaticLib("PhysXVehicle", "physxvehicle")
+		physXStaticLib("PhysXCharacterKinematic", "physxcharacterkinematic")
+		physXStaticLib("PhysXExtensions", "physxextensions")
+		project "PhysX"
+			if force_build_physx_dynamic then
+				kind "SharedLib"
+				defines { "PX_PHYSX_COMMON_EXPORTS", "PX_PHYSX_FOUNDATION_EXPORTS", "PX_PHYSX_COOKING_EXPORTS", "PX_PHYSX_LOADER_EXPORTS", "PX_PHYSX_CORE_EXPORTS" }
+			else
+				kind "StaticLib"
+				defines { "PX_PHYSX_STATIC_LIB" }
+			end
+			links { "PhysXExtensions" }
+			files { "3rdparty/physx/physx/source/**.cpp", "3rdparty/physx/physx/include/**.h", "3rdparty/physx/pxshared/**.h" }
+			removefiles { "3rdparty/physx/physx/source/pvd/**.cpp", "3rdparty/physx/physx/include/pvd/**.h" }
+			removefiles { "3rdparty/physx/physx/source/physxvehicle/**.cpp", "3rdparty/physx/physx/include/physxvehicle/**.h" }
+			removefiles { "3rdparty/physx/physx/source/physxcharacterkinematic/**.cpp", "3rdparty/physx/physx/include/physxcharacterkinematic/**.h" }
+			removefiles { "3rdparty/physx/physx/source/physxextensions/**.cpp", "3rdparty/physx/physx/include/physxextensions/**.h" }
+			removefiles { "**/unix/*", "3rdparty/physx/**/linux/*" }
+			includedirs { "3rdparty/physx/physx/include"
+				, "3rdparty/physx/pxshared/include"
+				, "3rdparty/physx/physx/source/**"
+			}
+			defines { "NDEBUG", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "_ITERATOR_DEBUG_LEVEL=0" }
+			flags { "OptimizeSize", "ReleaseRuntime" }	
+
+			configuration { "Debug" }
+				defines { "LUMIX_DEBUG" }
+
+			configuration { "windows" }
+				targetdir "../external/physx/lib/win"
+
+			if build_studio then
+				project "studio"
+					if force_build_physx_dynamic then
+						configuration { "vs*" }
+							files { "../external/physx/lib/win/PhysX.dll" }
+							copy { "../external/physx/lib/win/PhysX.dll" }
+						configuration {}
+					end
+					
+					links { "PhysX", "PhysXPVD", "PhysXVehicle", "PhysXCharacterKinematic", "PhysXExtensions" }
+					libdirs "../external/physx/lib/win"
+			end
+
+			if build_app then
+				project "app"
+					links { "PhysX", "PhysXPVD", "PhysXVehicle", "PhysXCharacterKinematic", "PhysXExtensions" }
+					libdirs "../external/physx/lib/win"
+			end
 	else
 		printf("--force-build-physx used but PhysX source code not found")
 	end
 end
+
 
 if force_build_luau == true then
 	if os.isdir("3rdparty/luau") then

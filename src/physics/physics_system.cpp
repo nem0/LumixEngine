@@ -1,5 +1,6 @@
 #include "physics/physics_system.h"
 
+#include <cooking/PxCooking.h>
 #include <foundation/PxAllocatorCallback.h>
 #include <foundation/PxErrorCallback.h>
 #include <foundation/PxIO.h>
@@ -11,7 +12,6 @@
 #include <PxPhysicsVersion.h>
 #include <vehicle/PxVehicleSDK.h>
 
-#include "cooking/PxCooking.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -142,9 +142,6 @@ namespace Lumix
 			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(), false, m_pvd);
 			ASSERT(m_physics);
 
-			physx::PxTolerancesScale scale;
-			m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
-
 			if (!PxInitVehicleSDK(*m_physics)) {
 				ASSERT(false);
 			}
@@ -158,7 +155,6 @@ namespace Lumix
 			m_material_manager.destroy();
 			m_geometry_manager.destroy();
 			physx::PxCloseVehicleSDK();
-			m_cooking->release();
 			m_physics->release();
 			if (m_pvd) {
 				m_pvd->disconnect();
@@ -189,7 +185,6 @@ namespace Lumix
 		}
 
 		physx::PxPhysics* getPhysics() override { return m_physics; }
-		physx::PxCooking* getCooking() override { return m_cooking; }
 		CollisionLayers& getCollisionLayers() override { return m_layers; }
 
 		bool connect2VisualDebugger()
@@ -210,28 +205,30 @@ namespace Lumix
 
 		bool cookTriMesh(Span<const Vec3> verts, Span<const u32> indices, IOutputStream& blob) override {
 
-			physx::PxTriangleMeshDesc meshDesc;
-			meshDesc.points.count = verts.length();
-			meshDesc.points.stride = sizeof(physx::PxVec3);
-			meshDesc.points.data = verts.begin();
+			physx::PxTriangleMeshDesc mesh_desc;
+			mesh_desc.points.count = verts.length();
+			mesh_desc.points.stride = sizeof(physx::PxVec3);
+			mesh_desc.points.data = verts.begin();
 
-			meshDesc.triangles.count = indices.length() / 3;
-			meshDesc.triangles.stride = 3 * sizeof(physx::PxU32);
-			meshDesc.triangles.data = indices.begin();
+			mesh_desc.triangles.count = indices.length() / 3;
+			mesh_desc.triangles.stride = 3 * sizeof(physx::PxU32);
+			mesh_desc.triangles.data = indices.begin();
 
 			OutputStream writeBuffer(blob);
-			return m_cooking->cookTriangleMesh(meshDesc, writeBuffer);
+			physx::PxCookingParams params{physx::PxTolerancesScale()};
+			return PxCookTriangleMesh(params, mesh_desc, writeBuffer);
 		}
 
 		bool cookConvex(Span<const Vec3> verts, IOutputStream& blob) override {
-			physx::PxConvexMeshDesc meshDesc;
-			meshDesc.points.count = verts.length();
-			meshDesc.points.stride = sizeof(Vec3);
-			meshDesc.points.data = verts.begin();
-			meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
+			physx::PxConvexMeshDesc mesh_desc;
+			mesh_desc.points.count = verts.length();
+			mesh_desc.points.stride = sizeof(Vec3);
+			mesh_desc.points.data = verts.begin();
+			mesh_desc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
 
 			OutputStream writeBuffer(blob);
-			return m_cooking->cookConvexMesh(meshDesc, writeBuffer);
+			physx::PxCookingParams params{physx::PxTolerancesScale()};
+			return PxCookConvexMesh(params, mesh_desc, writeBuffer);
 		}
 
 		int getCollisionsLayersCount() const override { return m_layers.count; }
@@ -259,7 +256,6 @@ namespace Lumix
 		physx::PxControllerManager* m_controller_manager;
 		PhysxAllocator m_physx_allocator;
 		CustomErrorCallback m_error_callback;
-		physx::PxCooking* m_cooking;
 		PhysicsGeometryManager m_geometry_manager;
 		PhysicsMaterialManager m_material_manager;
 		Engine& m_engine;

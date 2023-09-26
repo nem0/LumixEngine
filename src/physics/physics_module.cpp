@@ -17,7 +17,6 @@
 #include <geometry/PxHeightField.h>
 #include <geometry/PxHeightFieldDesc.h>
 #include <geometry/PxHeightFieldSample.h>
-#include <PxBatchQuery.h>
 #include <PxMaterial.h>
 #include <PxRigidActor.h>
 #include <PxRigidStatic.h>
@@ -90,6 +89,7 @@ enum class PhysicsModuleVersion
 	INSTANCED_MESH,
 	MATERIAL,
 	CCD,
+	PHYSX5,
 
 	LATEST,
 };
@@ -383,7 +383,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem& system, IAllocator& allocator);
 
-
+#if 0
 	PxBatchQuery* createVehicleBatchQuery(u8* mem)
 	{
 		const PxU32 maxNumQueriesInBatch = 64;
@@ -404,10 +404,11 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 		return m_scene->createBatchQuery(desc);
 	}
-
+#endif
 
 	PxVehicleDrivableSurfaceToTireFrictionPairs* createFrictionPairs() const
 	{
+#if 0
 		PxVehicleDrivableSurfaceType surfaceTypes[1];
 		surfaceTypes[0].mType = 0;
 
@@ -419,6 +420,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 		surfaceTirePairs->setup(1, 1, surfaceMaterials, surfaceTypes);
 		surfaceTirePairs->setTypePairFriction(0, 0, 5.0f);
 		return surfaceTirePairs;
+#endif
+		return nullptr;
 	}
 
 	int getVersion() const override { return (int)PhysicsModuleVersion::LATEST; }
@@ -471,7 +474,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 		m_terrains.clear();
 
-		m_vehicle_batch_query->release();
 		m_vehicle_frictions->release();
 		m_controller_manager->release();
 		m_default_material->release();
@@ -734,8 +736,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 			PxShape* shape;
 			for (int i = 0; i < shape_count; ++i) {
 				veh->actor->getShapes(&shape, 1, i);
-				if (shape->getGeometryType() == physx::PxGeometryType::eCONVEXMESH ||
-					shape->getGeometryType() == physx::PxGeometryType::eTRIANGLEMESH)
+				if (shape->getGeometry().getType() == physx::PxGeometryType::eCONVEXMESH ||
+					shape->getGeometry().getType() == physx::PxGeometryType::eTRIANGLEMESH)
 				{
 					veh->actor->detachShape(*shape);
 					break;
@@ -855,13 +857,13 @@ struct PhysicsModuleImpl final : PhysicsModule
 		const u8* src_data,
 		int bytes_per_pixel) override
 	{
+		// TODO check if this works
 		PROFILE_FUNCTION();
 		Heightfield& terrain = m_terrains[entity];
 
 		PxShape* shape;
 		terrain.m_actor->getShapes(&shape, 1);
-		PxHeightFieldGeometry geom;
-		shape->getHeightFieldGeometry(geom);
+		const PxHeightFieldGeometry& geom = static_cast<const PxHeightFieldGeometry&>(shape->getGeometry());
 
 		Array<PxHeightFieldSample> heights(m_allocator);
 
@@ -1512,7 +1514,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
 		DVec3 position = m_world.getPosition(entity);
-		cDesc.position.set(position.x, position.y, position.z);
+		cDesc.position = PxVec3d(position.x, position.y, position.z);
 		Controller& c = m_controllers.insert(entity);
 		c.controller = m_controller_manager->createController(cDesc);
 		c.controller->getActor()->userData = (void*)(uintptr)entity.index;
@@ -1786,6 +1788,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 	void updateVehicles(float time_delta) {
+#if 0
 		PxVehicleWheels* vehicles[16];
 
 		u32 valid_count = 0;
@@ -1808,6 +1811,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			PxVehicleSuspensionRaycasts(m_vehicle_batch_query, valid_count, vehicles, valid_count * 4, m_vehicle_results);
 			PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, valid_count, vehicles, nullptr);
 		}
+#endif
 	}
 
 	void lateUpdate(float time_delta) override {
@@ -1995,6 +1999,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 	PxRigidDynamic* createVehicleActor(const RigidTransform& transform, Span<const EntityRef> wheels_entities, Vehicle& vehicle) {
+#if 0
 		PxPhysics& physics = *m_system->getPhysics();
 		PxCooking& cooking = *m_system->getCooking();
 
@@ -2041,6 +2046,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 		actor->setCMassLocalPose(PxTransform(toPhysx(vehicle.center_of_mass), PxQuat(PxIdentity)));
 
 		return actor;
+#endif
+		return nullptr;
 	}
 
 
@@ -2081,7 +2088,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	static PxConvexMesh* createConvexMesh(const PxVec3* verts, const PxU32 numVerts, PxPhysics& physics, PxCooking& cooking)
+	static PxConvexMesh* createConvexMesh(const PxVec3* verts, const PxU32 numVerts, PxPhysics& physics)
 	{
 		PxConvexMeshDesc convexDesc;
 		convexDesc.points.count = numVerts;
@@ -2091,7 +2098,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 		PxConvexMesh* convexMesh = NULL;
 		PxDefaultMemoryOutputStream buf;
-		if (cooking.cookConvexMesh(convexDesc, buf))
+		physx::PxCookingParams cooking_params{PxTolerancesScale()};
+		if (PxCookConvexMesh(cooking_params, convexDesc, buf))
 		{
 			PxDefaultMemoryInputData id(buf.getData(), buf.getSize());
 			convexMesh = physics.createConvexMesh(id);
@@ -2101,7 +2109,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	static PxConvexMesh* createWheelMesh(const PxF32 width, const PxF32 radius, PxPhysics& physics, PxCooking& cooking)
+	static PxConvexMesh* createWheelMesh(const PxF32 width, const PxF32 radius, PxPhysics& physics)
 	{
 		PxVec3 points[2 * 16];
 		for (PxU32 i = 0; i < 16; i++)
@@ -2114,7 +2122,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			points[2 * i + 1] = PxVec3(+width / 2.0f, y, z);
 		}
 
-		return createConvexMesh(points, 32, physics, cooking);
+		return createConvexMesh(points, 32, physics);
 	}
 
 	void getWheels(EntityRef car, Span<EntityPtr> wheels) {
@@ -2262,9 +2270,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			PxCapsuleGeometry capsule;
-			bool is_capsule = shapes->getCapsuleGeometry(capsule);
-			ASSERT(is_capsule);
+			PxCapsuleGeometry capsule = static_cast<const PxCapsuleGeometry&>(shapes->getGeometry());
 			capsule.radius = value;
 			shapes->setGeometry(capsule);
 		}
@@ -2282,9 +2288,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			PxCapsuleGeometry capsule;
-			bool is_capsule = shapes->getCapsuleGeometry(capsule);
-			ASSERT(is_capsule);
+			PxCapsuleGeometry capsule = static_cast<const PxCapsuleGeometry&>(shapes->getGeometry());
 			capsule.halfHeight = value * 0.5f;
 			shapes->setGeometry(capsule);
 		}
@@ -2380,8 +2384,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 
 
-		PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit) override
-		{
+		PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override {
 			return PxQueryHitType::eBLOCK;
 		}
 
@@ -2527,7 +2530,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			return;
 		}
 
-		{ // PROFILE_BLOCK scope
+		{
 			PROFILE_BLOCK("physX");
 			PxHeightFieldDesc hfDesc;
 			hfDesc.format = PxHeightFieldFormat::eS16_TM;
@@ -2536,8 +2539,12 @@ struct PhysicsModuleImpl final : PhysicsModule
 			hfDesc.samples.data = &heights[0];
 			hfDesc.samples.stride = sizeof(PxHeightFieldSample);
 
-			PxHeightField* heightfield = m_system->getCooking()->createHeightField(
-				hfDesc, m_system->getPhysics()->getPhysicsInsertionCallback());
+			// TODO check if this works
+			PxDefaultMemoryOutputStream buf;
+			PxCookHeightField(hfDesc, buf);
+			PxDefaultMemoryInputData stream(buf.getData(), buf.getSize());
+			
+			physx::PxHeightField* heightfield = m_system->getPhysics()->createHeightField(stream);
 			float height_scale = terrain.m_heightmap->format == gpu::TextureFormat::R16 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			PxHeightFieldGeometry hfGeom(heightfield,
 				PxMeshGeometryFlags(),
@@ -2738,7 +2745,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	Vec3 getBoxGeomHalfExtents(EntityRef entity, int index) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eBOX);
-		PxBoxGeometry box = shape->getGeometry().box();
+		const PxBoxGeometry& box = static_cast<const PxBoxGeometry&>(shape->getGeometry());
 		return fromPhysx(box.halfExtents);
 	}
 
@@ -2751,7 +2758,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		for (int i = 0; i < shape_count; ++i)
 		{
 			actor->getShapes(&shape, 1, i);
-			if (shape->getGeometryType() == type)
+			if (shape->getGeometry().getType() == type)
 			{
 				if (shape->userData == (void*)(intptr_t)index)
 				{
@@ -2767,7 +2774,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void setBoxGeomHalfExtents(EntityRef entity, int index, const Vec3& size) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eBOX);
-		PxBoxGeometry box = shape->getGeometry().box();
+		PxBoxGeometry box = static_cast<const PxBoxGeometry&>(shape->getGeometry());
 		box.halfExtents = toPhysx(size);
 		shape->setGeometry(box);
 	}
@@ -2844,7 +2851,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		for (int i = 0; i < shape_count; ++i)
 		{
 			actor->getShapes(&shape, 1, i);
-			if (shape->getGeometryType() == type) ++count;
+			if (shape->getGeometry().getType() == type) ++count;
 		}
 		return count;
 	}
@@ -2936,7 +2943,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	float getSphereGeomRadius(EntityRef entity, int index) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eSPHERE);
-		PxSphereGeometry geom = shape->getGeometry().sphere();
+		const PxSphereGeometry& geom = static_cast<const PxSphereGeometry&>(shape->getGeometry());
 		return geom.radius;
 	}
 
@@ -2944,7 +2951,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void setSphereGeomRadius(EntityRef entity, int index, float radius) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eSPHERE);
-		PxSphereGeometry geom = shape->getGeometry().sphere();
+		PxSphereGeometry geom = static_cast<const PxSphereGeometry&>(shape->getGeometry());
 		geom.radius = radius;
 		shape->setGeometry(geom);
 	}
@@ -3004,36 +3011,32 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void duplicateShape(PxShape* shape, PxRigidActor* actor, physx::PxMaterial* material)
 	{
 		PxShape* new_shape;
-		switch (shape->getGeometryType())
+		switch (shape->getGeometry().getType())
 		{
 			case PxGeometryType::eBOX:
 			{
-				PxBoxGeometry geom;
-				shape->getBoxGeometry(geom);
+				const PxBoxGeometry& geom = static_cast<const PxBoxGeometry&>(shape->getGeometry());
 				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
 			case PxGeometryType::eSPHERE:
 			{
-				PxSphereGeometry geom;
-				shape->getSphereGeometry(geom);
+				const PxSphereGeometry& geom = static_cast<const PxSphereGeometry&>(shape->getGeometry());
 				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
 			case PxGeometryType::eCONVEXMESH:
 			{
-				PxConvexMeshGeometry geom;
-				shape->getConvexMeshGeometry(geom);
+				const PxConvexMeshGeometry& geom = static_cast<const PxConvexMeshGeometry&>(shape->getGeometry());
 				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
 			case PxGeometryType::eTRIANGLEMESH:
 			{
-				PxTriangleMeshGeometry geom;
-				shape->getTriangleMeshGeometry(geom);
+				const PxTriangleMeshGeometry& geom = static_cast<const PxTriangleMeshGeometry&>(shape->getGeometry());
 				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *material);
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
@@ -3060,7 +3063,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		for (int i = 0; i < shape_count; ++i)
 		{
 			px_actor->getShapes(&shape, 1, i);
-			int type = shape->getGeometryType();
+			int type = shape->getGeometry().getType();
 			serializer.write(type);
 			serializer.write((int)(intptr_t)shape->userData);
 			RigidTransform tr = fromPhysx(shape->getLocalPose());
@@ -3068,16 +3071,14 @@ struct PhysicsModuleImpl final : PhysicsModule
 			switch (type)
 			{
 				case PxGeometryType::eBOX: {
-					PxBoxGeometry geom;
-					shape->getBoxGeometry(geom);
+					const PxBoxGeometry& geom = static_cast<const PxBoxGeometry&>(shape->getGeometry());
 					serializer.write(geom.halfExtents.x);
 					serializer.write(geom.halfExtents.y);
 					serializer.write(geom.halfExtents.z);
 					break;
 				}
 				case PxGeometryType::eSPHERE: {
-					PxSphereGeometry geom;
-					shape->getSphereGeometry(geom);
+					const PxSphereGeometry& geom = static_cast<const PxSphereGeometry&>(shape->getGeometry());
 					serializer.write(geom.radius);
 					break;
 				}
@@ -3268,8 +3269,15 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 			int geoms_count = serializer.read<int>();
 			for (int i = 0; i < geoms_count; ++i) {
-				int type = serializer.read<int>();
-				int index = serializer.read<int>();
+				int type = serializer.read<int>(); // physx enum values
+				if (version > (i32)PhysicsModuleVersion::PHYSX5) {
+					switch (type) {
+						case 4: type = PxGeometryType::eCONVEXMESH; break;
+						case 5: type = PxGeometryType::eTRIANGLEMESH; break;
+					}
+				}
+
+				const int index = serializer.read<int>();
 				PxTransform tr = toPhysx(serializer.read<RigidTransform>());
 				PxShape* shape = nullptr;
 				switch (type) {
@@ -3288,10 +3296,12 @@ struct PhysicsModuleImpl final : PhysicsModule
 						serializer.read(geom.radius);
 						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, material ? *material->material : *m_default_material);
 						shape->setLocalPose(tr);
+						shape->setContactOffset(0);
 						break;
 					}
 					case PxGeometryType::eCONVEXMESH:
-					case PxGeometryType::eTRIANGLEMESH: break;
+					case PxGeometryType::eTRIANGLEMESH:
+						break;
 					default: ASSERT(false); break;
 				}
 				if (shape) {
@@ -3340,7 +3350,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			cDesc.height = c.height;
 			cDesc.radius = c.radius;
 			DVec3 position = m_world.getPosition(entity);
-			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
+			cDesc.position = PxVec3d(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.controller = m_controller_manager->createController(cDesc);
 			c.controller->getActor()->userData = (void*)(intptr_t)entity.index;
 			c.entity = entity;
@@ -3749,8 +3759,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			return PxQueryHitType::eBLOCK;
 		}
 
-		PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit) override
-		{
+		PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override {
 			return PxQueryHitType::eNONE;
 		}
 
@@ -3810,9 +3819,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 	HashMap<EntityRef, InstancedCube> m_instanced_cubes;
 	HashMap<EntityRef, InstancedMesh> m_instanced_meshes;
 	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
-	PxBatchQuery* m_vehicle_batch_query;
-	u8 m_vehicle_query_mem[sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64];
-	PxRaycastQueryResult* m_vehicle_results;
 	u64 m_physics_cmps_mask;
 
 	Array<EntityRef> m_dynamic_actors;
@@ -3843,7 +3849,6 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 	, m_script_module(nullptr)
 	, m_debug_visualization_flags(0)
 	, m_update_in_progress(nullptr)
-	, m_vehicle_batch_query(nullptr)
 	, m_system(&system)
 	, m_hit_report(*this)
 	, m_layers(m_system->getCollisionLayers())
@@ -3887,7 +3892,6 @@ UniquePtr<PhysicsModule> PhysicsModule::create(PhysicsSystem& system, World& wor
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor = PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
-	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(impl->m_vehicle_query_mem);
 	return UniquePtr<PhysicsModuleImpl>(impl, &allocator);
 }
 
@@ -4022,7 +4026,7 @@ void PhysicsModule::reflect() {
 			.end_array()
 			.LUMIX_PROP(RigidActorCCD, "CCD")
 			.LUMIX_PROP(MeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
-			.LUMIX_PROP(RigidActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
+			.LUMIX_PROP(RigidActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)		
 		.LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle")
 			.icon(ICON_FA_CAR_ALT)
 			.LUMIX_FUNC_EX(PhysicsModule::setVehicleAccel, "setAccel")
@@ -4093,6 +4097,7 @@ void PhysicsModuleImpl::RigidActor::onStateChanged(Resource::State, Resource::St
 		const PxGeometry* geom = mesh->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
 		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, material ? *material->material : *module.m_default_material);
 		(void)shape;
+		shape->setContactOffset(0);
 		module.updateFilterData(physx_actor, layer);
 	}
 }
@@ -4133,8 +4138,8 @@ void PhysicsModuleImpl::RigidActor::setMesh(PhysicsGeometry* new_value)
 		PxShape* shape;
 		for (int i = 0; i < shape_count; ++i) {
 			physx_actor->getShapes(&shape, 1, i);
-			if (shape->getGeometryType() == physx::PxGeometryType::eCONVEXMESH ||
-				shape->getGeometryType() == physx::PxGeometryType::eTRIANGLEMESH)
+			if (shape->getGeometry().getType() == physx::PxGeometryType::eCONVEXMESH ||
+				shape->getGeometry().getType() == physx::PxGeometryType::eTRIANGLEMESH)
 			{
 				physx_actor->detachShape(*shape);
 				break;

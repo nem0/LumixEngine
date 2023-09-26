@@ -17,9 +17,6 @@ struct LUMIX_ENGINE_API ResourceType {
 	bool operator <(const ResourceType& rhs) const { return rhs.type.getHashValue() < type.getHashValue(); }
 	bool isValid() const { return type.getHashValue() != 0; }
 	RuntimeHash type;
-#ifdef LUMIX_DEBUG
-	const char* str = nullptr;
-#endif
 };
 const ResourceType INVALID_RESOURCE_TYPE("");
 

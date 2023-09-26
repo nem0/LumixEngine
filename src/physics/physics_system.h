@@ -5,7 +5,6 @@
 
 namespace physx {
 	class PxControllerManager;
-	class PxCooking;
 	class PxPhysics;
 } // namespace physx
 
@@ -24,7 +23,6 @@ struct PhysicsSystem : ISystem {
 	const char* getName() const override { return "physics"; }
 	
 	virtual physx::PxPhysics* getPhysics() = 0;
-	virtual physx::PxCooking* getCooking() = 0;
 	virtual CollisionLayers& getCollisionLayers() = 0;
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;
