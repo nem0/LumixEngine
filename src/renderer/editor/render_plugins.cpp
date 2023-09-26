@@ -729,7 +729,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Pipeline"; }
 
-	void openEditor(const struct Path& path) {
+	void openEditor(const struct Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
 		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app, m_app.getAllocator());
 		m_app.getAssetBrowser().addWindow(win.move());
@@ -1435,7 +1435,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 
 	const char* getName() const override { return "texture editor"; }
 
-	const Path& getPath() { return m_texture->getPath(); }
+	const Path& getPath() override { return m_texture->getPath(); }
 
 	IAllocator& m_allocator;
 	StudioApp& m_app;
@@ -3206,7 +3206,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				plugin.renderTile(model, animation, nullptr);
 			}
 			
-			bool isFor(const Path& _path) const { return path == _path; }
+			bool isFor(const Path& _path) const override { return path == _path; }
 
 			Path path;
 			Model* model = nullptr;
@@ -3225,7 +3225,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				plugin.renderTile(material);
 			}
 			
-			bool isFor(const Path& _path) const { return path == _path; }
+			bool isFor(const Path& _path) const override { return path == _path; }
 
 			Path path;
 			Material* material = nullptr;
@@ -3242,7 +3242,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				plugin.renderTile(prefab);
 			}
 
-			bool isFor(const Path& _path) const { return path == _path; }
+			bool isFor(const Path& _path) const override { return path == _path; }
 
 			Path path;
 			PrefabResource* prefab = nullptr;
@@ -3258,7 +3258,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			void execute(ModelPlugin& plugin) override {
 				plugin.renderTile(model, nullptr, nullptr);
 			}
-			bool isFor(const Path& _path) const { return path == _path; }
+			bool isFor(const Path& _path) const override { return path == _path; }
 
 			Path path;
 			Model* model = nullptr;

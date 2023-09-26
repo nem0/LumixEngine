@@ -122,7 +122,7 @@ struct MathNode final : ValueNode {
 		else if constexpr (T == NodeType::SUB) return v0.f - v1.f;
 		else {
 			ASSERT(false);
-			return 0;
+			return false;
 		}
 	}
 

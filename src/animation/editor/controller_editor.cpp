@@ -382,8 +382,8 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			}
 			else {
 				struct : INodeTypeVisitor {
-					bool beginCategory(const char* category) { return ImGui::BeginMenu(category); }
-					void endCategory() { ImGui::EndMenu(); }
+					bool beginCategory(const char* category) override { return ImGui::BeginMenu(category); }
+					void endCategory() override { ImGui::EndMenu(); }
 					INodeTypeVisitor& visitType(const char* _label, const INodeCreator& creator, char shortcut) override {
 						StaticString<128> label(_label);
 						if (shortcut) label.append(" (LMB + ", shortcut, ")");

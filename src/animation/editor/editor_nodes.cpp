@@ -434,7 +434,7 @@ bool AnimationNode::propertiesGUI(Model& skeleton) {
 	static i32 selected = -1;
 	bool res = editSlot(m_controller, "##slot", &m_slot);
 	ImGuiEx::Label("Looping");
-	bool loop = m_flags && Flags::LOOPED;
+	bool loop = m_flags & Flags::LOOPED;
 	if (ImGui::Checkbox("##loop", &loop)) {
 		if (loop) m_flags = m_flags | Flags::LOOPED;
 		else m_flags = m_flags & ~Flags::LOOPED;
