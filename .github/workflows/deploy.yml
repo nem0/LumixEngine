@@ -54,7 +54,7 @@ jobs:
             - name: make dx11 project
               working-directory: projects
               run: |
-                ./genie.exe --force-build-physx --force-build-luau --with-app vs2022
+                ./bin/windows/genie.exe --force-build-physx --force-build-luau --with-app vs2022
                 
             - name: get butler
               working-directory: projects
@@ -87,7 +87,7 @@ jobs:
             - name: make gl project with plugins
               working-directory: projects
               run: |
-                ./genie.exe --force-build-physx --force-build-luau --nodx --with-app vs2022
+                ./bin/windows/genie.exe --force-build-physx --force-build-luau --nodx --with-app vs2022
                 
             - name: build gl engine
               working-directory: projects

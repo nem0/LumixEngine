@@ -499,7 +499,7 @@ exit /B 0
 
 :create_project
 	echo Creating project...
-	,\bin\windows\genie.exe --with-app vs2022 
+	.\bin\windows\genie.exe --with-app vs2022 
 	pause
 exit /B 0
 
