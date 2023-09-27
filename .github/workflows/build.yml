@@ -14,7 +14,7 @@ jobs:
                 pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
                 popd
-                ./genie.exe vs2022
+                ./bin/windows/genie.exe vs2022
             - name: build dx11 engine
               working-directory: projects
               shell: cmd
@@ -25,7 +25,7 @@ jobs:
               run: |
                 pushd ..\plugins
                 popd
-                ./genie.exe --dx12 vs2022
+                ./bin/windows/genie.exe --dx12 vs2022
             - name: build dx12 engine
               working-directory: projects
               shell: cmd
@@ -70,7 +70,7 @@ jobs:
             - name: make gl project with plugins
               working-directory: projects
               run: |
-                ./genie.exe --nodx --with-app vs2022
+                ./bin/windows/genie.exe --nodx --with-app vs2022
             - name: build gl engine with plugins
               working-directory: projects
               shell: cmd
@@ -107,6 +107,6 @@ jobs:
           - name: build
             run: |
               cd projects
-              ./genie --force-build-luau gmake
+              ./bin/linux/genie --force-build-luau gmake
               cd tmp/gmake
               make -j
