@@ -14,6 +14,7 @@ data/studio.ini
 .lumixuser
 *.unv.bak
 projects/3rdparty
+!projects/bin/
 plugins/
 src/engine/plugins.inl
 data/.shader_cache_dx11
