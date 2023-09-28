@@ -5,10 +5,14 @@ local right = 0
 local yaw = 0
 local sprint = 0
 local jump = 0
+local pitch = 0
+camera_pivot = -1
+Editor.setPropertyType(this, "camera_pivot", Editor.ENTITY_PROPERTY)
 
 function onInputEvent(event : InputEvent)
     if event.type == "axis" and event.device.type == "mouse" then
         yaw = yaw + event.x * -0.003
+		pitch = math.max(-math.pi / 2, math.min(math.pi / 2, pitch + event.y * -0.003))
     end
     if event.type == "button" then
 		if event.device.type == "keyboard" then
@@ -64,6 +68,15 @@ function onControllerHit(obj)
     a:applyForce(dir)
 end
 
+function multiplyQuaternions(q1, q2)
+    return {
+        q1[4]*q2[1] + q1[1]*q2[4] + q1[2]*q2[3] - q1[3]*q2[2],
+        q1[4]*q2[2] - q1[1]*q2[3] + q1[2]*q2[4] + q1[3]*q2[1],
+        q1[4]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[4],
+        q1[4]*q2[4] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3]
+    }
+end
+
 function update(td)
 
     local speed = 3 
@@ -97,7 +110,11 @@ function update(td)
     end
 
     local a2 = yaw * 0.5
+    local a3 = pitch * 0.5
     this.rotation = {0, math.sin(a2), 0, math.cos(a2) }
+	local yaw_quat = {0, math.sin(yaw * 0.5), 0, math.cos(yaw * 0.5)}
+    local pitch_quat = {math.sin(pitch * 0.5), 0, 0, math.cos(pitch * 0.5)}
+    camera_pivot.rotation = multiplyQuaternions(yaw_quat, pitch_quat)
     local dir_x = math.sin(yaw) * disp_z + math.cos(yaw) * disp_x  
     local dir_z = math.cos(yaw) * disp_z - math.sin(yaw) * disp_x  
     this.physical_controller:move({dir_x, disp_y, dir_z})  
