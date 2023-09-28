@@ -213,6 +213,17 @@ struct CodeEditor {
 	using Tokenizer = bool (*)(const char* str, u32& token_len, u8& token_type, u8 prev_token_type);
 
 	virtual ~CodeEditor() {}
+	
+	virtual u32 getCursorLine(u32 cursor_index = 0) = 0;
+	virtual u32 getCursorColumn(u32 cursor_index = 0) = 0;
+	virtual void setSelection(u32 from_line, u32 from_col, u32 to_line, u32 to_col, bool ensure_visibility) = 0;
+	virtual bool canHandleInput() = 0;
+	virtual void underlineToken(u32 line, u32 col) = 0;
+	virtual void insertText(const char* text) = 0;
+	virtual u32 getNumCursors() = 0;
+	virtual ImVec2 getCursorScreenPosition(u32 cursor_index = 0) = 0;
+	virtual void focus() = 0;
+	
 	virtual void setText(StringView text) = 0;
 	virtual void serializeText(OutputMemoryStream& blob) = 0;
 	virtual void setTokenColors(Span<const u32> colors) = 0; // keep colors alive while CodeEditor uses them

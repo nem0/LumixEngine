@@ -427,15 +427,21 @@ struct CodeEditorImpl final : CodeEditor {
 
 		void operator =(const TextPoint& rhs) { col = rhs.col; line = rhs.line; }
 		TextPoint sel;
+		u32 virtual_x;
 
 		bool hasSelection() const { return *this != sel; }
 		void cancelSelection() { sel = *this; }
 	};
 
 	struct Token {
+		enum Flags {
+			NONE = 0,
+			UNDERLINE = 1 << 0
+		};
 		u32 from;
 		u32 len;
 		u8 type;
+		Flags flags = NONE;
 	};
 
 	struct Line {
@@ -592,6 +598,31 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
+	ImVec2 toScreenPosition(u32 line, u32 col) {
+		ImVec2 v = m_text_area_screen_pos;
+		float y = line * ImGui::GetTextLineHeight();
+		const char* line_str = m_lines[line].value.c_str();
+		float x = ImGui::CalcTextSize(line_str, line_str + col).x;
+		return m_text_area_screen_pos + ImVec2(x, y);
+	}
+
+	ImVec2 getCursorScreenPosition(u32 cursor_index) override {
+		const Cursor& cursor =  m_cursors[cursor_index];
+		return toScreenPosition(cursor.line, cursor.col);
+	}
+
+	u32 getCursorLine(u32 cursor_index) override { return m_cursors[cursor_index].line; };
+	u32 getCursorColumn(u32 cursor_index) override { return m_cursors[cursor_index].col; };
+
+	void setSelection(u32 from_line, u32 from_col, u32 to_line, u32 to_col, bool ensure_visibility) override {
+		m_cursors.resize(1);
+		m_cursors[0].line = from_line;
+		m_cursors[0].col = from_col;
+		m_cursors[0].sel.line = to_line;
+		m_cursors[0].sel.col = to_col;
+		if (ensure_visibility) ensurePointVisible(m_cursors[0], true);
+	}
+
 	void setText(StringView text) override {
 		m_cursors.clear();
 		m_cursors.emplace(Cursor{0, 0});
@@ -612,27 +643,33 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
-	void cursorMoved(Cursor& cursor) {
+	u32 computeCursorX(const Cursor& cursor) {
+		const char* str = m_lines[cursor.line].value.c_str();
+		return (u32)ImGui::CalcTextSize(str, str + cursor.col).x;
+	}
+
+	void cursorMoved(Cursor& cursor, bool update_virtual) {
 		cursor.line = clamp(cursor.line, 0, m_lines.size() - 1);
 		cursor.col = clamp(cursor.col, 0, m_lines[cursor.line].length());
 		if (!ImGui::GetIO().KeyShift) {
 			cursor.sel.col = cursor.col;
 			cursor.sel.line = cursor.line;
 		}
+		if (update_virtual) cursor.virtual_x = computeCursorX(cursor);
 		m_blink_timer = 0;
 	}
 
 	void moveCursorLeft(Cursor& cursor, bool word) {
 		if (word) cursor = getLeftWord(cursor);
 		else cursor = getLeft(cursor);
-		cursorMoved(cursor);
+		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
 	void moveCursorRight(Cursor& cursor, bool word) {
 		if (word) cursor = getRightWord(cursor);
 		else cursor = getRight(cursor);
-		cursorMoved(cursor);
+		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
@@ -653,14 +690,39 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void moveCursorUp(Cursor& cursor, u32 line_count = 1) {
+		const char* line_str = m_lines[cursor.line].value.c_str();
 		cursor.line = maximum(0, cursor.line - line_count);
-		cursorMoved(cursor);
+
+		u32 num_chars_in_line = m_lines[cursor.line].length();
+		line_str = m_lines[cursor.line].value.c_str();
+		for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
+			float x = ImGui::CalcTextSize(line_str, line_str + cursor.col).x;
+			if (x >= cursor.virtual_x) {
+				break;
+			}
+		}
+
+		cursorMoved(cursor, false);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
 	void moveCursorDown(Cursor& cursor, u32 line_count = 1) {
+		const char* line_str = m_lines[cursor.line].value.c_str();
+		float old_x = ImGui::CalcTextSize(line_str, line_str + cursor.col).x;
+		
+		ImVec2 cursor_pos = toScreenPosition(cursor.line, cursor.col);
 		cursor.line = minimum(m_lines.size() - 1, cursor.line + line_count);
-		cursorMoved(cursor);
+
+		u32 num_chars_in_line = m_lines[cursor.line].length();
+		line_str = m_lines[cursor.line].value.c_str();
+		for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
+			float x = ImGui::CalcTextSize(line_str, line_str + cursor.col).x;
+			if (x >= cursor.virtual_x) {
+				break;
+			}
+		}
+
+		cursorMoved(cursor, false);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
@@ -669,7 +731,7 @@ struct CodeEditorImpl final : CodeEditor {
 		i32 old_line = m_cursors[0].line;
 		m_cursors[0].line -= lines_count;
 		m_scroll_y += (m_cursors[0].line - old_line) * line_height;
-		cursorMoved(m_cursors[0]);
+		cursorMoved(m_cursors[0], false);
 	}
 
 	void moveCursorPageDown(u32 lines_count, float line_height) {
@@ -677,7 +739,7 @@ struct CodeEditorImpl final : CodeEditor {
 		i32 old_line = m_cursors[0].line;
 		m_cursors[0].line += lines_count;
 		m_scroll_y += (m_cursors[0].line - old_line) * line_height;
-		cursorMoved(m_cursors[0]);
+		cursorMoved(m_cursors[0], false);
 	}
 
 	void moveCursorBegin(Cursor& cursor, bool doc) {
@@ -691,14 +753,14 @@ struct CodeEditorImpl final : CodeEditor {
 		else {
 			cursor.col = 0;
 		}
-		cursorMoved(cursor);
+		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
 	void moveCursorEnd(Cursor& cursor, bool doc) {
 		if (doc) cursor.line = m_lines.size() - 1;
 		cursor.col = m_lines[cursor.line].length();
-		cursorMoved(cursor);
+		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
@@ -879,7 +941,7 @@ struct CodeEditorImpl final : CodeEditor {
 				r.from = cursor;
 				r.execute(*this, false);
 				++cursor.col;
-				cursorMoved(cursor);
+				cursorMoved(cursor, true);
 				cursor.cancelSelection();
 			}
 		}
@@ -963,7 +1025,7 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
-	void deleteSelection(Cursor& cursor) {
+	void deleteSelection(Cursor& cursor, bool ensure_visibility = true) {
 		if (!cursor.hasSelection()) return;
 		
 		TextPoint from = cursor.sel;
@@ -989,7 +1051,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 		cursor.line = cursor.sel.line = from.line;
 		cursor.col = cursor.sel.col = from.col;
-		ensurePointVisible(cursor);
+		if (ensure_visibility) ensurePointVisible(cursor);
 		++m_version;
 	}
 
@@ -1088,18 +1150,7 @@ struct CodeEditorImpl final : CodeEditor {
 		if (!io.GetClipboardTextFn) return;
 
 		const char* text = io.GetClipboardTextFn(io.ClipboardUserData);
-		u32 len = stringLength(text);
-		StringView sv = text;
-
-		beginUndoGroup();
-		for (Cursor& cursor : m_cursors) {
-			UndoRecord& r = pushUndo();
-			r.type = UndoRecord::INSERT;
-			r.from = cursor;
-			r.text.write(text, len);
-			r.execute(*this, false);
-		}
-		endUndoGroup();
+		insertText(text);
 		ensurePointVisible(m_cursors[0]);
 	}
 
@@ -1178,6 +1229,8 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 		if (font) ImGui::PopFont();
 	}
+	
+	void focus() override { m_focus_editor = true; }
 
 	void copy(Span<char> out, const Cursor& cursor) const {
 		ASSERT(cursor.line == cursor.sel.line);
@@ -1189,8 +1242,67 @@ struct CodeEditorImpl final : CodeEditor {
 		copyString(out, sv);
 	}
 
+	u32 getNumCursors() override { return m_cursors.size(); }
+
+	void insertText(const char* text) override {
+		u32 len = stringLength(text);
+
+		beginUndoGroup();
+		for (Cursor& cursor : m_cursors) {
+			deleteSelection(cursor, false);
+		}
+		
+		u32 new_lines = 0;
+		u32 last_line_i = 0;
+		for (u32 i = 0; i < len; ++i) { 
+			if (text[i] == '\n') {
+				++new_lines;
+				last_line_i = i + 1;
+			}
+		}
+		
+		for (Cursor& cursor : m_cursors) {
+			UndoRecord& r = pushUndo();
+			r.type = UndoRecord::INSERT;
+			r.from = cursor;
+			r.text.write(text, len);
+			r.execute(*this, false);
+
+			i32 line = cursor.line;
+			i32 col = cursor.col;
+			for (Cursor& c: m_cursors) {
+				if (c.line > line) {
+					c.line += new_lines;
+				}
+				else if (c.line == line && c.col >= col) {
+					c.line += new_lines;
+					if (new_lines > 0) c.col = len - last_line_i;
+					else c.col += len - last_line_i;
+				}
+				c.sel = c;
+			}
+
+		}
+		endUndoGroup();
+	}
+
+	void underlineToken(u32 line_index, u32 col) override {
+		Line& line = m_lines[line_index];
+		for (Token& token : line.tokens) {
+			if (token.from <= col && token.from + token.len > col) {
+				token.flags = token.flags | Token::UNDERLINE;
+				break;
+			}
+		}
+	}
+
+	bool canHandleInput() override {
+		return m_handle_input;
+	}
+
 	bool gui(const char* str_id, const ImVec2& size, ImFont* ui_font) override {
 		PROFILE_FUNCTION();
+		m_handle_input = false;
 		if (!ImGui::BeginChild(str_id, size, false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
 			ImGui::EndChild();
 			return false;
@@ -1231,13 +1343,13 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 		if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
 
-		const bool handle_input = ImGui::IsItemActive();
+		m_handle_input = ImGui::IsItemActive();
 		//dl->AddRectFilled(min, min + ImVec2(line_num_width, content_size.y), ImGui::GetColorU32(ImGuiCol_Border));
 
 		min.x += style.FramePadding.x;
 		min.y -= m_scroll_y;
 		ImVec2 text_area_pos = min + ImVec2(line_num_width + style.FramePadding.x, 0);
-
+		m_text_area_screen_pos = text_area_pos;
 		auto screenToLine = [&](float screen_y) { return clamp(i32((screen_y - text_area_pos.y) / line_height), 0, m_lines.size() - 1); };
 		auto screenToCol = [&](float screen_x, i32 line) {
 			const char* line_str = m_lines[line].value.c_str();
@@ -1308,7 +1420,11 @@ struct CodeEditorImpl final : CodeEditor {
 			ImVec2 p = text_area_pos + ImVec2(0, line_offset_y);
 			for (const Token& t : m_lines[j].tokens) {
 				dl->AddText(p, m_token_colors[t.type], str + t.from, str + t.from + t.len);
+				ImVec2 start_p = p;
 				p.x += ImGui::CalcTextSize(str + t.from, str + t.from + t.len).x;
+				if (t.flags & Token::UNDERLINE) {
+					dl->AddLine(start_p + ImVec2(0, line_height), p + ImVec2(0, line_height), IM_COL32(0xff, 0x50, 0x50, 0xff)); 
+				}
 				++visible_tokens;
 			}
 		}
@@ -1318,7 +1434,7 @@ struct CodeEditorImpl final : CodeEditor {
 		m_blink_timer += io.DeltaTime;
 		m_blink_timer = fmodf(m_blink_timer, 1.f);
 		bool draw_cursors = m_blink_timer < 0.6f;
-		if (handle_input) {
+		if (m_handle_input) {
 			for (i32 i = 0; i < m_cursors.size(); ++i) {
 				Cursor& c = m_cursors[i];
 				ImVec2 cursor_pos = textToScreenPos(c.col, c.line);
@@ -1363,7 +1479,7 @@ struct CodeEditorImpl final : CodeEditor {
 				Cursor& cursor = io.KeyAlt ? m_cursors.emplace() : (m_cursors.resize(1), m_cursors.back());
 				cursor.line = line;
 				cursor.col = col;
-				cursorMoved(cursor);
+				cursorMoved(cursor, true);
 			}
 
 			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && m_cursors.size() == 1) {
@@ -1491,7 +1607,9 @@ struct CodeEditorImpl final : CodeEditor {
 	u32 m_version = 0;
 	Array<UndoRecord> m_undo_stack;
 	i32 m_undo_stack_idx = -1;
+	ImVec2 m_text_area_screen_pos;
 	
+	bool m_handle_input = false;
 	bool m_focus_search = false;
 	bool m_search_visible = false;
 	bool m_focus_editor = false;

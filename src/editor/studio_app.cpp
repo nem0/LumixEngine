@@ -127,6 +127,7 @@ struct StudioAppImpl final : StudioApp
 		m_imgui_key_map[(int)os::Keycode::DEL] = ImGuiKey_Delete;
 		m_imgui_key_map[(int)os::Keycode::BACKSPACE] = ImGuiKey_Backspace;
 		m_imgui_key_map[(int)os::Keycode::F3] = ImGuiKey_F3;
+		m_imgui_key_map[(int)os::Keycode::F11] = ImGuiKey_F11;
 		m_imgui_key_map[(int)os::Keycode::RETURN] = ImGuiKey_Enter;
 		m_imgui_key_map[(int)os::Keycode::ESCAPE] = ImGuiKey_Escape;
 		m_imgui_key_map[(int)os::Keycode::A] = ImGuiKey_A;
