@@ -111,6 +111,7 @@ declare Editor: {
     addAction : (ActionDesc) -> (),
     createEntityEx : (any) -> Entity,
     scene_view : SceneView,
+    asset_browser : AssetBrowser
 }
 
 declare LumixAPI: {

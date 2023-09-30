@@ -13,6 +13,7 @@
 #include "engine/engine.h"
 #include "engine/hash.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
@@ -68,6 +69,12 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	StudioApp& m_app;
 };
 
+static volatile bool once = [](){
+	LUMIX_GLOBAL_FUNC(AssetBrowser::openEditor);
+	return true;
+}();
+
+
 struct AssetBrowserImpl : AssetBrowser {
 	struct FileInfo {
 		StaticString<MAX_PATH> clamped_filename;
@@ -118,6 +125,12 @@ struct AssetBrowserImpl : AssetBrowser {
 		const char* world_exts[] = { "unv" };
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
+
+		lua_State* L = m_app.getEngine().getState();
+		lua_getglobal(L, "Editor");
+		LuaWrapper::pushObject(L, this, "AssetBrowser");
+		lua_setfield(L, -2, "asset_browser");
+		lua_pop(L, 1);
 	}
 
 	void focusSearch() {

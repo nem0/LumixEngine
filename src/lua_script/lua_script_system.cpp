@@ -2648,11 +2648,12 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 		.LUMIX_CMP(InlineScriptComponent, "lua_script_inline", "Lua Script / Inline") 
 			.LUMIX_PROP(InlineScriptCode, "Code").multilineAttribute()
 		.LUMIX_CMP(ScriptComponent, "lua_script", "Lua Script / File") 
-		.begin_array<&LuaScriptModule::getScriptCount, &LuaScriptModule::addScript, &LuaScriptModule::removeScript>("scripts")
-			.prop<&LuaScriptModule::isScriptEnabled, &LuaScriptModule::enableScript>("Enabled")
-			.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
-			.property<LuaProperties>()
-		.end_array();
+			.LUMIX_FUNC_EX(LuaScriptModule::getScriptPath, "getScriptPath")
+			.begin_array<&LuaScriptModule::getScriptCount, &LuaScriptModule::addScript, &LuaScriptModule::removeScript>("scripts")
+				.prop<&LuaScriptModule::isScriptEnabled, &LuaScriptModule::enableScript>("Enabled")
+				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
+				.property<LuaProperties>()
+			.end_array();
 }
 
 void LuaScriptSystemImpl::initBegin() {

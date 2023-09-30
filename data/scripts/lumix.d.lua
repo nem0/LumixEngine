@@ -82,15 +82,19 @@ declare class World
 
 end
 
+declare class GUISystem
+	enableCursor : (GUISystem, boolean) -> ()
+end
+
+declare class AssetBrowser
+	openEditor : (AssetBrowser, any --[[const char*]]) -> ()
+end
+
 declare class SceneView
 	getViewportRotation : (SceneView) -> any --[[struct Lumix::Quat]]
 	setViewportRotation : (SceneView, any --[[Quat]]) -> ()
 	getViewportPosition : (SceneView) -> any --[[struct Lumix::DVec3]]
 	setViewportPosition : (SceneView, any --[[DVec3]]) -> ()
-end
-
-declare class GUISystem
-	enableCursor : (GUISystem, boolean) -> ()
 end
 
 declare class Model
@@ -135,7 +139,8 @@ declare class renderer_module
 end
 
 declare class physics_module
-	raycast : (physics_module, any --[[Vec3]], any --[[Vec3]], any --[[EntityPtr]]) -> any --[[struct Lumix::EntityPtr]]
+	raycast : (physics_module, any --[[Vec3]], any --[[Vec3]], number, any --[[EntityPtr]]) -> any --[[struct Lumix::EntityPtr]]
+	setGravity : (physics_module, any --[[Vec3]]) -> ()
 end
 
 declare class spline_component
@@ -293,6 +298,7 @@ end
 
 declare class lua_script_component
 	scripts: any
+	getScriptPath : (lua_script_component, number) -> any --[[struct Lumix::Path]]
 end
 
 declare class gui_image_component
@@ -549,9 +555,10 @@ declare Editor: {
     setPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
 	getSelectedEntity : (number) -> Entity,
-	addAction : (ActionDesc) -> (),
-	createEntityEx : (any) -> Entity,
-    scene_view : SceneView
+    addAction : (ActionDesc) -> (),
+    createEntityEx : (any) -> Entity,
+    scene_view : SceneView,
+	asset_browser : AssetBrowser
 }
 
 declare LumixAPI: {

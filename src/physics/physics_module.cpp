@@ -2348,11 +2348,13 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	void moveController(EntityRef entity, const Vec3& v) override { m_controllers[entity].frame_change += v; }
 
+	void setGravity(const Vec3& gravity) override {
+		m_scene->setGravity(toPhysx(gravity));
+	}
 
-	EntityPtr raycast(const Vec3& origin, const Vec3& dir, EntityPtr ignore_entity) override
-	{
+	EntityPtr raycast(const Vec3& origin, const Vec3& dir, float distance, EntityPtr ignore_entity) override {
 		RaycastHit hit;
-		if (raycastEx(origin, dir, FLT_MAX, hit, ignore_entity, -1)) return hit.entity;
+		if (raycastEx(origin, dir, distance, hit, ignore_entity, -1)) return hit.entity;
 		return INVALID_ENTITY;
 	}
 
@@ -3947,6 +3949,7 @@ void PhysicsModule::reflect() {
 
 	LUMIX_MODULE(PhysicsModuleImpl, "physics")
 		.LUMIX_FUNC(raycast)
+		.LUMIX_FUNC(setGravity)
 		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
 			.LUMIX_PROP(JointConnectedBody, "Connected body")
 			.LUMIX_PROP(JointAxisPosition, "Axis position")

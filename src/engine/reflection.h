@@ -360,6 +360,7 @@ struct Variant {
 	void operator =(i32 v) { i = v; type = I32; }
 	void operator =(u32 v) { u = v; type = U32; }
 	void operator =(float v) { f = v; type = FLOAT; }
+	void operator =(const Path& v) { s = v.c_str(); type = CSTR; }
 	void operator =(const char* v) { s = v; type = CSTR; }
 	void operator =(EntityPtr v) { e = v; type = ENTITY; }
 	void operator =(Vec2 v) { v2 = v; type = VEC2; }
