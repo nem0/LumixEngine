@@ -1027,6 +1027,18 @@ if force_build_luau == true then
 				, "3rdparty/luau/VM/src/**.h"
 			}
 
+			if not force_build_luau_dynamic then
+				files { "3rdparty/luau/Analysis/src/**.cpp"
+					, "3rdparty/luau/Analysis/src/**.h"
+					, "3rdparty/luau/Config/src/**.cpp"
+					, "3rdparty/luau/Config/src/**.h"
+				}
+
+				includedirs { "3rdparty/luau/Analysis/include/" 
+					, "3rdparty/luau/Config/include/"
+				}
+			end
+
 			includedirs { "3rdparty/luau/Ast/include/"
 				, "3rdparty/luau/CodeGen/include/"
 				, "3rdparty/luau/Common/include/"
@@ -1035,7 +1047,7 @@ if force_build_luau == true then
 				, "3rdparty/luau/VM/src/"
 			}
 
-			removeflags { "NoExceptions" }
+			removeflags { "NoExceptions", "NoRTTI" }
 			flags { "OptimizeSize", "ReleaseRuntime" }
 
 			configuration { "linux"}
@@ -1048,6 +1060,10 @@ if force_build_luau == true then
 					"LUA_API=__declspec(dllexport)",
 					"LUACODE_API=__declspec(dllexport)"
 				}
+		if not force_build_luau_dynamic then
+			solution "LumixEngine"
+				defines { "LUMIX_LUAU_ANALYSIS" }
+		end
 	else	
 		printf("--force-build-luau used but Luau source code not found")
 	end

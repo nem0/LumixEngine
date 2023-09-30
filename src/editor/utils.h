@@ -217,12 +217,15 @@ struct CodeEditor {
 	virtual u32 getCursorLine(u32 cursor_index = 0) = 0;
 	virtual u32 getCursorColumn(u32 cursor_index = 0) = 0;
 	virtual void setSelection(u32 from_line, u32 from_col, u32 to_line, u32 to_col, bool ensure_visibility) = 0;
+	virtual void selectWord() = 0;
 	virtual bool canHandleInput() = 0;
-	virtual void underlineToken(u32 line, u32 col) = 0;
+	virtual void underlineTokens(u32 line, u32 col_from, u32 col_to, const char* msg) = 0;
 	virtual void insertText(const char* text) = 0;
 	virtual u32 getNumCursors() = 0;
 	virtual ImVec2 getCursorScreenPosition(u32 cursor_index = 0) = 0;
 	virtual void focus() = 0;
+	// get part of word left of cursor, usable for example for autocomplete
+	virtual StringView getPrefix() = 0;
 	
 	virtual void setText(StringView text) = 0;
 	virtual void serializeText(OutputMemoryStream& blob) = 0;

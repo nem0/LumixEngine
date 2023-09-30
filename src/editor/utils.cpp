@@ -444,6 +444,14 @@ struct CodeEditorImpl final : CodeEditor {
 		Flags flags = NONE;
 	};
 
+	struct Underline {
+		Underline(IAllocator& allocator) : msg(allocator) {}
+		u32 line;
+		u32 col_from;
+		u32 col_to;
+		String msg;
+	};
+
 	struct Line {
 		Line(IAllocator& allocator) : value(allocator), tokens(allocator) {}
 		Line(const String& str, IAllocator& allocator) : value(str, allocator), tokens(allocator) {}
@@ -476,6 +484,7 @@ struct CodeEditorImpl final : CodeEditor {
 		Array<Cursor> cursors;
 
 		void execute(CodeEditorImpl& editor, bool is_redo) {
+			++editor.m_version;
 			switch(type) {
 				case BEGIN_GROUP:
 					if (!is_redo) editor.m_cursors.copyTo(cursors);
@@ -515,6 +524,7 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 
 		void undo(CodeEditorImpl& editor) {
+			++editor.m_version;
 			switch(type) {
 				case BEGIN_GROUP:
 					cursors.copyTo(editor.m_cursors);
@@ -550,6 +560,7 @@ struct CodeEditorImpl final : CodeEditor {
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "code_editor")
 		, m_lines(m_allocator)
+		, m_underlines(m_allocator)
 		, m_cursors(m_allocator)
 		, m_undo_stack(m_allocator)
 	{
@@ -658,7 +669,7 @@ struct CodeEditorImpl final : CodeEditor {
 		if (update_virtual) cursor.virtual_x = computeCursorX(cursor);
 		m_blink_timer = 0;
 	}
-
+	
 	void moveCursorLeft(Cursor& cursor, bool word) {
 		if (word) cursor = getLeftWord(cursor);
 		else cursor = getLeft(cursor);
@@ -766,6 +777,9 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void invalidateTokens(i32 line) {
 		m_first_untokenized_line = minimum(line, m_first_untokenized_line);
+		m_underlines.eraseItems([&](const Underline& u){
+			return u.line >= (u32)line;
+		});
 	}
 
 	void insertNewLine() {
@@ -946,7 +960,6 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 		}
 		endUndoGroup();
-		++m_version;
 	}
 
 	static bool isWordChar(char c) {
@@ -969,6 +982,11 @@ struct CodeEditorImpl final : CodeEditor {
 		if (!isWordChar(line[cursor.sel.col])) ++cursor.sel.col;
 		while (isWordChar(line[cursor.col])) ++cursor.col;
 		return cursor;
+	}
+	
+	void selectWord() override {
+		ASSERT(m_cursors.size() == 1);
+		selectWord(m_cursors[0]);
 	}
 
 	void selectWord(Cursor& cursor) {
@@ -1054,7 +1072,6 @@ struct CodeEditorImpl final : CodeEditor {
 		cursor.line = cursor.sel.line = from.line;
 		cursor.col = cursor.sel.col = from.col;
 		if (ensure_visibility) ensurePointVisible(cursor);
-		++m_version;
 	}
 
 	char getChar(TextPoint p) const {
@@ -1063,7 +1080,18 @@ struct CodeEditorImpl final : CodeEditor {
 		return s[p.col];
 	}
 
-	[[nodiscard]] TextPoint getLeftWord(TextPoint point) {
+	StringView getPrefix() override {
+		ASSERT(m_cursors.size() == 1);
+		if (m_cursors[0].col == 0) return {};
+		TextPoint left = getLeftWord(m_cursors[0]);
+		const char* line_str = m_lines[m_cursors[0].line].value.c_str();
+		StringView res;
+		res.begin = line_str + left.col;
+		res.end = line_str + m_cursors[0].col;
+		return res;
+	}
+
+	TextPoint getLeftWord(TextPoint point) {
 		TextPoint p = getLeft(point);
 		bool is_word = isWordChar(getChar(p));
 		p = getLeft(p);
@@ -1075,7 +1103,7 @@ struct CodeEditorImpl final : CodeEditor {
 		return getRight(p);
 	}
 
-	[[nodiscard]] TextPoint getRightWord(TextPoint point) {
+	TextPoint getRightWord(TextPoint point) {
 		TextPoint p = getRight(point);
 		bool is_word = isWordChar(getChar(p));
 		p = getRight(p);
@@ -1087,7 +1115,7 @@ struct CodeEditorImpl final : CodeEditor {
 		return p;
 	}
 
-	[[nodiscard]] TextPoint getLeft(TextPoint point) {
+	TextPoint getLeft(TextPoint point) {
 		TextPoint p = point;
 		--p.col;
 		if (p.col >= 0) return p;
@@ -1103,7 +1131,7 @@ struct CodeEditorImpl final : CodeEditor {
 		return p;
 	}
 
-	[[nodiscard]] TextPoint getRight(TextPoint point) {
+	TextPoint getRight(TextPoint point) {
 		TextPoint p = point;
 		++p.col;
 		if (p.col <= (i32)m_lines[p.line].length()) return p;
@@ -1113,9 +1141,15 @@ struct CodeEditorImpl final : CodeEditor {
 		return p;
 	}
 
-	void selectToLeft(Cursor& c) {
-		if (c.sel < c) c.sel = getLeft(c.sel);
-		else c = getLeft(c);
+	void selectToLeft(Cursor& c, bool word) {
+		if (word) {
+			if (c.sel < c) c.sel = getLeftWord(c.sel);
+			else c = getLeftWord(c);
+		}
+		else {
+			if (c.sel < c) c.sel = getLeft(c.sel);
+			else c = getLeft(c);
+		}
 	}
 
 	void selectToRight(Cursor& c, bool word) {
@@ -1138,10 +1172,10 @@ struct CodeEditorImpl final : CodeEditor {
 		endUndoGroup();
 	}
 
-	void backspace() {
+	void backspace(bool word) {
 		beginUndoGroup();
 		for (Cursor& cursor : m_cursors) {
-			if (!cursor.hasSelection()) selectToLeft(cursor);
+			if (!cursor.hasSelection()) selectToLeft(cursor, word);
 			deleteSelection(cursor);
 		}
 		endUndoGroup();
@@ -1288,18 +1322,27 @@ struct CodeEditorImpl final : CodeEditor {
 		endUndoGroup();
 	}
 
-	void underlineToken(u32 line_index, u32 col) override {
-		Line& line = m_lines[line_index];
-		for (Token& token : line.tokens) {
-			if (token.from <= col && token.from + token.len > col) {
-				token.flags = token.flags | Token::UNDERLINE;
-				break;
-			}
-		}
+	void underlineTokens(u32 line_index, u32 col_from, u32 col_to, const char* msg) override {
+		Underline& underline = m_underlines.emplace(m_allocator);
+		underline.line = line_index;
+		underline.col_from = col_from;
+		underline.col_to = col_to;
+		underline.msg = msg;
+		m_first_untokenized_line = minimum(m_first_untokenized_line, line_index);
 	}
 
 	bool canHandleInput() override {
 		return m_handle_input;
+	}
+
+	const Underline* getUnderline(u32 line, const Token& token) {
+		for (const Underline& underline : m_underlines) {
+			if (underline.line != line) continue;
+			if (underline.col_to <= token.from) continue;
+			if (underline.col_from >= token.from + token.len) continue;
+			return &underline;
+		}
+		return nullptr;
 	}
 
 	bool gui(const char* str_id, const ImVec2& size, ImFont* ui_font) override {
@@ -1424,7 +1467,12 @@ struct CodeEditorImpl final : CodeEditor {
 				dl->AddText(p, m_token_colors[t.type], str + t.from, str + t.from + t.len);
 				ImVec2 start_p = p;
 				p.x += ImGui::CalcTextSize(str + t.from, str + t.from + t.len).x;
+
 				if (t.flags & Token::UNDERLINE) {
+					if (m_handle_input && ImGui::IsMouseHoveringRect(start_p, p + ImVec2(0, line_height))) {
+						const Underline* underline = getUnderline(j, t);
+						ImGui::SetTooltip(underline->msg.c_str());
+					}
 					dl->AddLine(start_p + ImVec2(0, line_height), p + ImVec2(0, line_height), IM_COL32(0xff, 0x50, 0x50, 0xff)); 
 				}
 				++visible_tokens;
@@ -1452,7 +1500,7 @@ struct CodeEditorImpl final : CodeEditor {
 			
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
-			else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace();
+			else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace(io.KeyCtrl);
 			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_Z, id, f_repeat)) undo();
 			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiMod_Shift | ImGuiKey_Z, id, f_repeat)) redo();
 			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_C, id)) copyToClipboard();
@@ -1541,7 +1589,15 @@ struct CodeEditorImpl final : CodeEditor {
 			more_tokens = m_tokenizer(c, token.len, token.type, prev_token_type);
 			c += token.len;
 			prev_token_type = token.type;
+
+			for (const Underline& underline : m_underlines) {
+				if (underline.line != m_first_untokenized_line) continue;
+				if (underline.col_to <= token.from) continue;
+				if (underline.col_from >= token.from + token.len) continue;
+				token.flags = token.flags | Token::UNDERLINE;
+			}
 		}
+
 
 		++m_first_untokenized_line;
 	}
@@ -1600,6 +1656,7 @@ struct CodeEditorImpl final : CodeEditor {
 	float m_blink_timer = 0;
 	StudioApp& m_app;
 	Array<Line> m_lines;
+	Array<Underline> m_underlines;
 	float m_scroll_y = 0;
 	Array<Cursor> m_cursors;
 	i32 m_first_visible_line = 0;
