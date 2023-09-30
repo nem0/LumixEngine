@@ -1060,9 +1060,13 @@ if force_build_luau == true then
 					"LUA_API=__declspec(dllexport)",
 					"LUACODE_API=__declspec(dllexport)"
 				}
+			configuration {}
+
 		if not force_build_luau_dynamic then
 			solution "LumixEngine"
+				configuration { "vs20*" }
 				defines { "LUMIX_LUAU_ANALYSIS" }
+				configuration {}
 		end
 	else	
 		printf("--force-build-luau used but Luau source code not found")
