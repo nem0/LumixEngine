@@ -535,7 +535,7 @@ struct EditorWindow : AssetEditorWindow {
 					if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && ImGui::GetIO().KeyCtrl && m_code_editor->getNumCursors() == 1) {
 						m_autocomplete_list.clear();
 						StringView prefix = m_code_editor->getPrefix();
-						if (equalStrings(prefix, ".")) prefix = {};
+						if (equalStrings(prefix, ".") || equalStrings(prefix, ":")) prefix = {};
 						m_analysis.autocomplete(m_path.c_str(), m_code_editor->getCursorLine(), m_code_editor->getCursorColumn(), [&](const char* v){
 							if (!startsWith(v, prefix)) return;
 							String tmp(v, m_app.getAllocator());
