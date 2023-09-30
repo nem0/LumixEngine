@@ -973,6 +973,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void selectWord(Cursor& cursor) {
 		cursor = getWord(cursor);
+		cursor.virtual_x = computeCursorX(cursor);
 	}
 
 	Cursor& getBottomCursor() {
@@ -1002,6 +1003,7 @@ struct CodeEditorImpl final : CodeEditor {
 					new_cursor.sel.line = line;
 					new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
 					new_cursor.col = new_cursor.sel.col + sel_view.size();
+					new_cursor.virtual_x = computeCursorX(new_cursor);
 					ensurePointVisible(new_cursor, true);
 					return;
 				}

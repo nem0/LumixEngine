@@ -1,3 +1,5 @@
+local lmath = require "scripts/math"
+
 local forward = 0
 local backward = 0
 local left = 0
@@ -114,7 +116,7 @@ function update(td)
     this.rotation = {0, math.sin(a2), 0, math.cos(a2) }
 	local yaw_quat = {0, math.sin(yaw * 0.5), 0, math.cos(yaw * 0.5)}
     local pitch_quat = {math.sin(pitch * 0.5), 0, 0, math.cos(pitch * 0.5)}
-    camera_pivot.rotation = multiplyQuaternions(yaw_quat, pitch_quat)
+    camera_pivot.rotation = lmath.mulQuat(yaw_quat, pitch_quat)
     local dir_x = math.sin(yaw) * disp_z + math.cos(yaw) * disp_x  
     local dir_z = math.cos(yaw) * disp_z - math.sin(yaw) * disp_x  
     this.physical_controller:move({dir_x, disp_y, dir_z})  
