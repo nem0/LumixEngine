@@ -1471,7 +1471,7 @@ struct CodeEditorImpl final : CodeEditor {
 				if (t.flags & Token::UNDERLINE) {
 					if (m_handle_input && ImGui::IsMouseHoveringRect(start_p, p + ImVec2(0, line_height))) {
 						const Underline* underline = getUnderline(j, t);
-						ImGui::SetTooltip(underline->msg.c_str());
+						ImGui::SetTooltip("%s", underline->msg.c_str());
 					}
 					dl->AddLine(start_p + ImVec2(0, line_height), p + ImVec2(0, line_height), IM_COL32(0xff, 0x50, 0x50, 0xff)); 
 				}
