@@ -2392,6 +2392,21 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PhysicsModuleImpl* module;
 	};
 
+	EntityPtr sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, EntityPtr ignored, i32 layer) override {
+		PxSweepBuffer hit; 
+		physx::PxSphereGeometry sphere(radius);
+		physx::PxTransform transform(toPhysx(pos), physx::PxIdentity);
+		Filter filter;
+		filter.entity = ignored;
+		filter.layer = layer;
+		filter.module = this;
+		PxQueryFilterData filter_data;
+		filter_data.flags = PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC | PxQueryFlag::ePREFILTER;
+		if (!m_scene->sweep(sphere, transform, toPhysx(dir), distance, hit, physx::PxHitFlag::eDEFAULT, filter_data, &filter)) return INVALID_ENTITY;
+		if (!hit.hasBlock) return INVALID_ENTITY;
+		const EntityRef hit_entity = {(int)(intptr_t)hit.block.actor->userData};
+		return hit_entity;	
+	}
 
 	bool raycastEx(const Vec3& origin,
 		const Vec3& dir,
@@ -3949,6 +3964,7 @@ void PhysicsModule::reflect() {
 
 	LUMIX_MODULE(PhysicsModuleImpl, "physics")
 		.LUMIX_FUNC(raycast)
+		.LUMIX_FUNC(sweepSphere)
 		.LUMIX_FUNC(setGravity)
 		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
 			.LUMIX_PROP(JointConnectedBody, "Connected body")

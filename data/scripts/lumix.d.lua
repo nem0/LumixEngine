@@ -140,6 +140,7 @@ end
 
 declare class physics_module
 	raycast : (physics_module, any --[[Vec3]], any --[[Vec3]], number, any --[[EntityPtr]]) -> any --[[struct Lumix::EntityPtr]]
+	sweepSphere : (physics_module, any --[[DVec3]], number, any --[[Vec3]], number, any --[[EntityPtr]], number) -> any --[[struct Lumix::EntityPtr]]
 	setGravity : (physics_module, any --[[Vec3]]) -> ()
 end
 
@@ -558,7 +559,7 @@ declare Editor: {
     addAction : (ActionDesc) -> (),
     createEntityEx : (any) -> Entity,
     scene_view : SceneView,
-	asset_browser : AssetBrowser
+    asset_browser : AssetBrowser
 }
 
 declare LumixAPI: {
