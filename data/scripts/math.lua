@@ -1,4 +1,8 @@
 return {
+dot = function(a, b)
+	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+end,
+
 mulQuat = function(a, b)
 	return {
         a[4] * b[1] + b[4] * a[1] + a[2] * b[3] - b[2] * a[3],
@@ -30,6 +34,10 @@ end,
 
 addVec3 = function(a, b)
     return {a[1] + b[1], a[2] + b[2], a[3] + b[3]}
+end,
+
+subVec3 = function(a, b)
+    return {a[1] - b[1], a[2] - b[2], a[3] - b[3]}
 end,
 
 mulVec3 = function(a, f)
