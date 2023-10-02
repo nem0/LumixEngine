@@ -949,12 +949,16 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 			else {
 				deleteSelection(cursor);
+				const i32 col = cursor.col;
 				UndoRecord& r = pushUndo();
 				r.type = UndoRecord::INSERT;
 				r.text.write((char)character);
 				r.from = cursor;
 				r.execute(*this, false);
-				++cursor.col;
+				for (Cursor& c2 : m_cursors) {
+					if (c2.line == cursor.line && c2.col >= col) ++c2.col;
+					if (c2.sel.line == cursor.line && c2.sel.col >= col) ++c2.sel.col;
+				}
 				cursorMoved(cursor, true);
 				cursor.cancelSelection();
 			}
@@ -1063,10 +1067,10 @@ struct CodeEditorImpl final : CodeEditor {
 			if (cursor < from) continue;
 
 			if (cursor.sel.line > to.line) cursor.sel.line -= to.line - from.line;
-			else if (cursor.sel.line == to.line) cursor.col -= to.col;
+			else if (cursor.sel.line == to.line) cursor.sel.col -= to.col - from.col;
 			
 			if (cursor.line > to.line) cursor.line -= to.line - from.line;
-			else if (cursor.line == to.line) cursor.col -= to.col;
+			else if (cursor.line == to.line) cursor.col -= to.col - from.col;
 		}
 
 		cursor.line = cursor.sel.line = from.line;
