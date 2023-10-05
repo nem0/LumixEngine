@@ -265,6 +265,22 @@ int SetNextWindowSize(float w, float h)
 	return 0;
 }
 
+void PlotLines(lua_State* L, const char* str_id) {
+	LuaWrapper::checkTableArg(L, 2);
+	Vec2 size = LuaWrapper::checkArg<Vec2>(L, 3);
+	const i32 num_values = lua_objlen(L, 2);
+	auto getter = [](void* data, i32 idx) -> float {
+		lua_State* L = (lua_State*)data;
+		int t = lua_rawgeti(L, 2, idx + 1);
+		float res = FLT_MAX;
+		if (t == LUA_TNUMBER) {
+			res = (float)lua_tonumber(L, -1);
+		}
+		lua_pop(L, 1);
+		return res;
+	};
+	ImGui::PlotLines(str_id, getter, L, num_values, 0, nullptr, FLT_MAX, FLT_MAX, size);
+}
 
 void OpenPopup(const char* str_id) { ImGui::OpenPopup(str_id); }
 
@@ -1064,6 +1080,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "NewLine", &LuaWrapper::wrap<&ImGui::NewLine>);
 	LuaImGui::registerCFunction(L, "NextColumn", &LuaWrapper::wrap<&ImGui::NextColumn>);
 	LuaImGui::registerCFunction(L, "OpenPopup", &LuaWrapper::wrap<LuaImGui::OpenPopup>);
+	LuaImGui::registerCFunction(L, "PlotLines", &LuaWrapper::wrap<&LuaImGui::PlotLines>);
 	LuaImGui::registerCFunction(L, "PopItemWidth", &LuaWrapper::wrap<&ImGui::PopItemWidth>);
 	LuaImGui::registerCFunction(L, "PopID", &LuaWrapper::wrap<&ImGui::PopID>);
 	LuaImGui::registerCFunction(L, "PopStyleColor", &LuaWrapper::wrap<&ImGui::PopStyleColor>);

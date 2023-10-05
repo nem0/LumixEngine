@@ -42,6 +42,7 @@ declare ImGui: {
     NewLine : () -> (),
     NextColumn : () -> (),
     OpenPopup : (string) -> (),
+    PlotLines : (string, {number}, Vec2) -> (),
     PopItemWidth : () -> (),
     PopID : () -> (),
     PopStyleColor : (number) -> (),

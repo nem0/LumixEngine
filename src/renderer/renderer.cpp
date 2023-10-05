@@ -392,9 +392,7 @@ struct RendererImpl final : Renderer
 		m_shader_defines.reserve(32);
 
 		gpu::preinit(m_allocator, shouldLoadRenderdoc());
-		m_frames[0].create(*this, m_allocator, m_engine.getPageAllocator());
-		m_frames[1].create(*this, m_allocator, m_engine.getPageAllocator());
-		m_frames[2].create(*this, m_allocator, m_engine.getPageAllocator());
+		for (Local<FrameData>& f : m_frames) f.create(*this, m_allocator, m_engine.getPageAllocator());
 	}
 
 	float getLODMultiplier() const override { return m_lod_multiplier; }
