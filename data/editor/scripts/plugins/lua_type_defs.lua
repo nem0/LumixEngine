@@ -360,7 +360,7 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
 
 local type_defs = refl()
 
-if true then
+if false then
     return {
         name = "Lua type defs",
         gui = function()
