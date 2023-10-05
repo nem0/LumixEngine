@@ -28,6 +28,7 @@ local plugins = {}
 local base_plugins = {}
 local plugin_creators = {}
 local embed_resources = false
+local force_build_recast = false
 local force_build_luau = false
 local force_build_luau_dynamic = false
 local force_build_physx = false
@@ -156,6 +157,11 @@ newoption {
 }
 
 newoption {
+	trigger = "force-build-recast",
+	description = "Add Recast to solution. Do not use the prebuilt library."
+}
+
+newoption {
 	trigger = "force-build-luau-dynamic",
 	description = "Add Luau project to solution. Do not use the prebuilt library. Build luau as dynamic library"
 }
@@ -168,6 +174,10 @@ newoption {
 if _OPTIONS["force-build-luau"] then
 	force_build_luau = true
 	force_build_luau_dynamic = false
+end
+
+if _OPTIONS["force-build-recast"] then
+	force_build_recast = true
 end
 
 if _OPTIONS["force-build-luau-dynamic"] then
@@ -688,10 +698,20 @@ if has_plugin("navigation") then
 			"../external/recast/src/DetourProximityGrid.cpp",
 		}
 
+		if force_build_recast then
+			files { "3rdparty/recast/Recast/Source/**.cpp"
+				, "3rdparty/recast/Recast/Include/**.h"
+				,"3rdparty/recast/Detour/Source/**.cpp"
+				, "3rdparty/recast/Detour/Include/**.h"
+			}
+			includedirs { "3rdparty/recast/Recast/Include" }
+		else		
+			linkLib "recast"
+		end
+
 		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
 		includedirs { "../src", "../src/navigation", "../external/recast/include" }
 		links { "engine", "renderer" }
-		linkLib "recast"
 		
 		if build_studio then
 			links { "editor" }
@@ -783,7 +803,9 @@ if build_app then
 				linkLib "basisu"
 			end
 			linkLib "freetype"
-			linkLib "recast"
+			if not force_build_recast then
+				linkLib "recast"
+			end
 			
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
@@ -799,7 +821,9 @@ if build_app then
 		end
 		
 		useLua()
-		linkLib "recast"
+		if not force_build_recast then
+			linkLib "recast"
+		end
 		files { "../src/app/main.cpp" }
 
 		configuration { "windows" }
@@ -956,7 +980,9 @@ if build_studio then
 			end
 			linkLib "freetype"
 			useLua()
-			linkLib "recast"
+			if not force_build_recast then
+				linkLib "recast"
+			end
 			
 			if has_plugin("renderer") then
 				linkOpenGL()
