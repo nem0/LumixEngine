@@ -821,13 +821,12 @@ struct PipelineImpl final : Pipeline
 		clearBuffers();
 	}
 
-	void callInitModule()
-	{
+	void callInitModule() {
 		PROFILE_FUNCTION();
+		LuaWrapper::DebugGuard guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_getfield(m_lua_state, -1, "initModule");
-		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION)
-		{
+		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION) {
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != 0)
 			{
@@ -835,10 +834,7 @@ struct PipelineImpl final : Pipeline
 				lua_pop(m_lua_state, 1);
 			}
 		}
-		else
-		{
-			lua_pop(m_lua_state, 1);
-		}
+		lua_pop(m_lua_state, 2);
 	}
 	
 	void cleanup()
@@ -910,7 +906,9 @@ struct PipelineImpl final : Pipeline
 		cleanup();
 
 		lua_State* L = m_renderer.getEngine().getState();
+		LuaWrapper::DebugGuard guard(L);
 		m_lua_state = lua_newthread(L);
+		LuaWrapper::DebugGuard guard2(m_lua_state);
 		m_lua_thread_ref = LuaWrapper::createRef(L);
 		lua_pop(L, 1);
 
@@ -922,11 +920,6 @@ struct PipelineImpl final : Pipeline
 		lua_pushvalue(m_lua_state, LUA_GLOBALSINDEX);
 		lua_setfield(m_lua_state, -2, "__index");
 
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_pushstring(m_lua_state, m_renderer.getEngine().getFileSystem().getBasePath());
-		lua_setfield(m_lua_state, -2, "LUA_PATH");
-
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_pushlightuserdata(m_lua_state, this);
 		lua_setfield(m_lua_state, -2, "this");
 
@@ -961,6 +954,7 @@ struct PipelineImpl final : Pipeline
 		
 		m_viewport.w = m_viewport.h = 800;
 		if (m_module) callInitModule();
+		lua_pop(m_lua_state, 1);
 	}
 
 	void clearBuffers() {
@@ -1265,7 +1259,7 @@ struct PipelineImpl final : Pipeline
 		if (!only_2d) fillClusters(stream, resolveCameraParams((CameraParamsHandle)CameraParamsEnum::MAIN));
 
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		LuaWrapper::pushRef(m_lua_state, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
 		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
