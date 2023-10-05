@@ -39,9 +39,10 @@ void EntityMap::set(EntityRef src, EntityRef dst) {
 	m_map[src.index] = dst;
 }
 
-
-World::~World() = default;
-
+World::~World() {
+	// release modules first, since they can access world
+	m_modules.clear();
+}
 
 World::World(Engine& engine)
 	: m_allocator(engine.getAllocator(), "world")

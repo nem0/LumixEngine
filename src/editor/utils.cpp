@@ -436,7 +436,7 @@ struct CodeEditorImpl final : CodeEditor {
 	struct Token {
 		enum Flags {
 			NONE = 0,
-			UNDERLINE = 1 << 0
+			UNDERLINE = 1 << 0,
 		};
 		u32 from;
 		u32 len;
@@ -469,7 +469,8 @@ struct CodeEditorImpl final : CodeEditor {
 			END_GROUP,
 			REMOVE,
 			INSERT,
-			NEW_LINE
+			NEW_LINE,
+			MOVE_LINE
 		};
 
 		UndoRecord(IAllocator& allocator) : text(allocator), cursors(allocator) {}
@@ -486,6 +487,21 @@ struct CodeEditorImpl final : CodeEditor {
 		void execute(CodeEditorImpl& editor, bool is_redo) {
 			++editor.m_version;
 			switch(type) {
+				case MOVE_LINE: {
+					if (from.line < to.line) {
+						for (i32 line = from.line; line < to.line; ++line) {
+							swap(editor.m_lines[line], editor.m_lines[line + 1]);
+						}
+					}
+					else {
+						for (i32 line = from.line; line > to.line; --line) {
+							swap(editor.m_lines[line], editor.m_lines[line - 1]);
+						}
+					}
+					editor.invalidateTokens(from.line);
+					editor.invalidateTokens(to.line);
+					break;
+				}
 				case BEGIN_GROUP:
 					if (!is_redo) editor.m_cursors.copyTo(cursors);
 					break;
@@ -526,6 +542,21 @@ struct CodeEditorImpl final : CodeEditor {
 		void undo(CodeEditorImpl& editor) {
 			++editor.m_version;
 			switch(type) {
+				case MOVE_LINE: {
+					if (to.line < from.line) {
+						for (i32 line = to.line; line < from.line; ++line) {
+							swap(editor.m_lines[line], editor.m_lines[line + 1]);
+						}
+					}
+					else {
+						for (i32 line = to.line; line > from.line; --line) {
+							swap(editor.m_lines[line], editor.m_lines[line - 1]);
+						}
+					}
+					editor.invalidateTokens(from.line);
+					editor.invalidateTokens(to.line);
+					break;
+				}
 				case BEGIN_GROUP:
 					cursors.copyTo(editor.m_cursors);
 					editor.ensurePointVisible(editor.m_cursors[0]);
@@ -659,6 +690,23 @@ struct CodeEditorImpl final : CodeEditor {
 		return (u32)ImGui::CalcTextSize(str, str + cursor.col).x;
 	}
 
+	Token getToken(TextPoint p) {
+		const Line& line = m_lines[p.line];
+		for (Token token : line.tokens) {
+			if (p.col >= (i32)token.from && p.col < i32(token.from + token.len)) return token;
+		}
+		return {};
+	}
+
+	StringView toStringView(const Token& token, u32 line) {
+		const char* str = m_lines[line].value.c_str();
+		StringView res;
+		res.begin = str + token.from;
+		res.end = res.begin + token.len;
+		return res;
+	}
+
+
 	void cursorMoved(Cursor& cursor, bool update_virtual) {
 		cursor.line = clamp(cursor.line, 0, m_lines.size() - 1);
 		cursor.col = clamp(cursor.col, 0, m_lines[cursor.line].length());
@@ -668,6 +716,8 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 		if (update_virtual) cursor.virtual_x = computeCursorX(cursor);
 		m_blink_timer = 0;
+		m_time_since_cursor_moved = 0;
+		m_highlighted_str = {};
 	}
 	
 	void moveCursorLeft(Cursor& cursor, bool word) {
@@ -686,7 +736,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void ensurePointVisible(TextPoint& cursor, bool center = false) {
 		if (center) {
-			m_scroll_y = (cursor.line - (m_last_visible_line - m_first_visible_line) / 2) * ImGui::GetTextLineHeight();	
+			m_scroll_y += (cursor.line - (m_first_visible_line + m_max_visible_lines / 2)) * ImGui::GetTextLineHeight();	
 			m_scroll_y = maximum(m_scroll_y, 0.f);
 			return;
 		}
@@ -698,6 +748,47 @@ struct CodeEditorImpl final : CodeEditor {
 		if (cursor.line > m_last_visible_line - 1 && m_last_visible_line < m_lines.size() - 1) {
 			m_scroll_y += (cursor.line - m_last_visible_line + 1) * ImGui::GetTextLineHeight(); 
 		}
+	}
+
+	void moveLinesUp() {
+		TextPoint from = m_cursors[0];
+		TextPoint to = m_cursors[0].sel;
+		if (from > to) swap(from, to);
+		if (to.col == 0 && to.line > from.line) --to.line;
+		if (from.line == 0) return;
+
+		beginUndoGroup();
+		m_cursors.resize(1);
+		UndoRecord& r = pushUndo();
+		r.type = UndoRecord::MOVE_LINE;
+		r.from = from;
+		r.to = to;
+		--r.from.line;
+		r.execute(*this, false);
+		--m_cursors[0].line;
+		--m_cursors[0].sel.line;
+		endUndoGroup();
+	}
+
+	void moveLinesDown() {
+		m_cursors.resize(1);
+		TextPoint from = m_cursors[0];
+		TextPoint to = m_cursors[0].sel;
+		if (from > to) swap(from, to);
+		if (to.col == 0 && to.line > from.line) --to.line;
+		if (to.line == m_lines.size() - 1) return;
+
+		beginUndoGroup();
+		m_cursors.resize(1);
+		UndoRecord& r = pushUndo();
+		r.type = UndoRecord::MOVE_LINE;
+		r.from = to;
+		r.to = from;
+		++r.from.line;
+		r.execute(*this, false);
+		++m_cursors[0].line;
+		++m_cursors[0].sel.line;
+		endUndoGroup();
 	}
 
 	void moveCursorUp(Cursor& cursor, u32 line_count = 1) {
@@ -755,15 +846,13 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void moveCursorBegin(Cursor& cursor, bool doc) {
 		if (doc) cursor.line = 0;
-		if (cursor.col == 0) {
-			const String& line = m_lines[cursor.line].value;
-			while (cursor.col < (i32)line.length() && !isWordChar(line[cursor.col])) {
-				++cursor.col;
-			}
+		const i32 prev_col = cursor.col;
+		const String& line = m_lines[cursor.line].value;
+		cursor.col = 0;
+		while (cursor.col < (i32)line.length() && !isWordChar(line[cursor.col])) {
+			++cursor.col;
 		}
-		else {
-			cursor.col = 0;
-		}
+		if (cursor.col >= prev_col && prev_col != 0) cursor.col = 0;
 		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
@@ -1026,7 +1115,7 @@ struct CodeEditorImpl final : CodeEditor {
 					new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
 					new_cursor.col = new_cursor.sel.col + sel_view.size();
 					new_cursor.virtual_x = computeCursorX(new_cursor);
-					ensurePointVisible(new_cursor, true);
+					ensurePointVisible(new_cursor);
 					return;
 				}
 				++line;
@@ -1097,25 +1186,30 @@ struct CodeEditorImpl final : CodeEditor {
 
 	TextPoint getLeftWord(TextPoint point) {
 		TextPoint p = getLeft(point);
-		bool is_word = isWordChar(getChar(p));
-		p = getLeft(p);
-		
-		while (isWordChar(getChar(p)) == is_word) {
+		if (p.col == 0) return p;
+		const bool is_word = isWordChar(getChar(p));
+		for (;;) {
 			p = getLeft(p);
-			if (p.line == 0 && p.col == 0) return p;
+			char c = getChar(p);
+			if (isWordChar(c) != is_word) {
+				p = getRight(p);
+				return p;
+			}
+			if (p.col == 0) return p;
 		}
-		return getRight(p);
+		return p;
 	}
 
 	TextPoint getRightWord(TextPoint point) {
-		TextPoint p = getRight(point);
-		bool is_word = isWordChar(getChar(p));
-		p = getRight(p);
-		
-		while (isWordChar(getChar(p)) == is_word) {
+		TextPoint p = point;
+		const bool is_word = isWordChar(getChar(p));
+		char c;
+		do {
 			p = getRight(p);
+			c = getChar(p);
+			if (c == '\n') return p;
 			if (p.line == m_lines.size() - 1 && p.col == m_lines.back().length()) return p;
-		}
+		} while (isWordChar(c) == is_word);
 		return p;
 	}
 
@@ -1450,9 +1544,9 @@ struct CodeEditorImpl final : CodeEditor {
 
 		// text
 		m_first_visible_line = i32(m_scroll_y / line_height);
-		float visible_lines = content_size.y / line_height;
+		m_max_visible_lines = i32(content_size.y / line_height);
 		m_first_visible_line = clamp(m_first_visible_line, 0, m_lines.size() - 1);
-		m_last_visible_line = minimum(m_first_visible_line + i32(visible_lines), m_lines.size() - 1);
+		m_last_visible_line = minimum(m_first_visible_line + i32(m_max_visible_lines), m_lines.size() - 1);
 		
 		{
 			PROFILE_BLOCK("tokenize");
@@ -1468,9 +1562,15 @@ struct CodeEditorImpl final : CodeEditor {
 			const char* str = m_lines[j].value.c_str();
 			ImVec2 p = text_area_pos + ImVec2(0, line_offset_y);
 			for (const Token& t : m_lines[j].tokens) {
-				dl->AddText(p, m_token_colors[t.type], str + t.from, str + t.from + t.len);
+
 				ImVec2 start_p = p;
 				p.x += ImGui::CalcTextSize(str + t.from, str + t.from + t.len).x;
+
+				if (equalStrings(toStringView(t, j), m_highlighted_str)) {
+					dl->AddRectFilled(start_p, p + ImVec2(0, line_height), IM_COL32(0x50, 0x50, 0x50, 0x7f));
+				}
+
+				dl->AddText(start_p, m_token_colors[t.type], str + t.from, str + t.from + t.len);
 
 				if (t.flags & Token::UNDERLINE) {
 					if (m_handle_input && ImGui::IsMouseHoveringRect(start_p, p + ImVec2(0, line_height))) {
@@ -1485,6 +1585,19 @@ struct CodeEditorImpl final : CodeEditor {
 		profiler::pushInt("Num tokens", visible_tokens);
 
 		// cursors
+		float prev_since_cursor_moved = m_time_since_cursor_moved;
+		m_time_since_cursor_moved += io.DeltaTime;
+		if (m_time_since_cursor_moved > 0.5f && prev_since_cursor_moved <= 0.5f) {
+			m_highlighted_str = toStringView(getToken(m_cursors[0]), m_cursors[0].line);
+			bool empty = true;
+			for (const char* c = m_highlighted_str.begin; c != m_highlighted_str.end; ++c) {
+				if (isWordChar(*c)) {
+					empty = false;
+					break;
+				}
+			}
+			if (empty) m_highlighted_str = {};
+		}
 		m_blink_timer += io.DeltaTime;
 		m_blink_timer = fmodf(m_blink_timer, 1.f);
 		bool draw_cursors = m_blink_timer < 0.6f;
@@ -1495,8 +1608,8 @@ struct CodeEditorImpl final : CodeEditor {
 				if (draw_cursors) dl->AddRectFilled(cursor_pos, cursor_pos + ImVec2(1, line_height), code_color);
 				if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) moveCursorLeft(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) moveCursorRight(c, io.KeyCtrl);
-				else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) moveCursorUp(c);
-				else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) moveCursorDown(c);
+				else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) io.KeyAlt ? moveLinesUp() :  moveCursorUp(c);
+				else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) io.KeyAlt ? moveLinesDown() : moveCursorDown(c);
 				else if (ImGui::IsKeyPressed(ImGuiKey_End)) moveCursorEnd(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_Home)) moveCursorBegin(c, io.KeyCtrl);
 			}
@@ -1658,6 +1771,8 @@ struct CodeEditorImpl final : CodeEditor {
 	i32 m_first_untokenized_line = 0;
 	TagAllocator m_allocator; 
 	float m_blink_timer = 0;
+	float m_time_since_cursor_moved = 0;
+	StringView m_highlighted_str;
 	StudioApp& m_app;
 	Array<Line> m_lines;
 	Array<Underline> m_underlines;
@@ -1665,6 +1780,7 @@ struct CodeEditorImpl final : CodeEditor {
 	Array<Cursor> m_cursors;
 	i32 m_first_visible_line = 0;
 	i32 m_last_visible_line = 0;
+	i32 m_max_visible_lines = 0;
 	Tokenizer m_tokenizer = nullptr;
 	Span<const u32> m_token_colors;
 	u32 m_version = 0;

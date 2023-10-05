@@ -1,3 +1,8 @@
+export type Vec2 = {number}
+export type Vec3 = {number}
+export type Color = {number}
+export type Quat = {number}
+export type DVec3 = {number}
 declare ImGui: {
     AlignTextToFramePadding : () -> (),
     Begin : (string, boolean?) -> (boolean, boolean?),
@@ -82,19 +87,31 @@ declare class World
 
 end
 
+declare class RaycastHit
+	position : Vec3
+	normal : Vec3
+	entity : Entity
+end
+
+declare class SweepHit
+	position : Vec3
+	normal : Vec3
+	entity : Entity
+end
+
 declare class GUISystem
 	enableCursor : (GUISystem, boolean) -> ()
 end
 
 declare class AssetBrowser
-	openEditor : (AssetBrowser, any --[[const char*]]) -> ()
+	openEditor : (AssetBrowser, string) -> ()
 end
 
 declare class SceneView
-	getViewportRotation : (SceneView) -> any --[[struct Lumix::Quat]]
-	setViewportRotation : (SceneView, any --[[Quat]]) -> ()
-	getViewportPosition : (SceneView) -> any --[[struct Lumix::DVec3]]
-	setViewportPosition : (SceneView, any --[[DVec3]]) -> ()
+	getViewportRotation : (SceneView) -> Quat
+	setViewportRotation : (SceneView, Quat) -> ()
+	getViewportPosition : (SceneView) -> DVec3
+	setViewportPosition : (SceneView, DVec3) -> ()
 end
 
 declare class Model
@@ -113,9 +130,9 @@ declare class animation_module
 end
 
 declare class gui_module
-	getRectAt : (gui_module, any --[[Vec2]]) -> any --[[struct Lumix::EntityPtr]]
-	isOver : (gui_module, any --[[Vec2]], any --[[EntityPtr]]) -> boolean
-	getSystem : (gui_module) -> GUISystem
+	getRectAt : (gui_module, Vec2) -> Entity?
+	isOver : (gui_module, Vec2, Entity?) -> boolean
+	getSystem : (gui_module) -> any --[[GUISystem *]]
 end
 
 declare class lua_script_module
@@ -123,7 +140,7 @@ end
 
 declare class audio_module
 	setMasterVolume : (audio_module, number) -> ()
-	play : (audio_module, any --[[EntityPtr]], any --[[const char*]], boolean) -> number
+	play : (audio_module, Entity?, string, boolean) -> number
 	stop : (audio_module, number) -> ()
 	isEnd : (audio_module, number) -> boolean
 	setFrequency : (audio_module, number, number) -> ()
@@ -132,16 +149,17 @@ declare class audio_module
 end
 
 declare class renderer_module
-	addDebugCross : (renderer_module, any --[[DVec3]], number, any --[[Color]]) -> ()
-	addDebugLine : (renderer_module, any --[[DVec3]], any --[[DVec3]], any --[[Color]]) -> ()
-	addDebugTriangle : (renderer_module, any --[[DVec3]], any --[[DVec3]], any --[[DVec3]], any --[[Color]]) -> ()
-	setActiveCamera : (renderer_module, any --[[EntityPtr]]) -> ()
+	addDebugCross : (renderer_module, DVec3, number, Color) -> ()
+	addDebugLine : (renderer_module, DVec3, DVec3, Color) -> ()
+	addDebugTriangle : (renderer_module, DVec3, DVec3, DVec3, Color) -> ()
+	setActiveCamera : (renderer_module, Entity?) -> ()
 end
 
 declare class physics_module
-	raycast : (physics_module, any --[[Vec3]], any --[[Vec3]], number, any --[[EntityPtr]]) -> any --[[struct Lumix::EntityPtr]]
-	sweepSphere : (physics_module, any --[[DVec3]], number, any --[[Vec3]], number, any --[[EntityPtr]], number) -> any --[[struct Lumix::EntityPtr]]
-	setGravity : (physics_module, any --[[Vec3]]) -> ()
+	raycast : (physics_module, Vec3, Vec3, number, Entity?) -> Entity?
+	raycastEx : (physics_module, Vec3, Vec3, number, any --[[void*]], Entity?, number) -> boolean
+	sweepSphere : (physics_module, DVec3, number, Vec3, number, any --[[void*]], Entity?, number) -> boolean
+	setGravity : (physics_module, Vec3) -> ()
 end
 
 declare class spline_component
@@ -177,7 +195,7 @@ declare class terrain_component
 	tesselation: number
 	grid_resolution: number
 	grass: any
-	getTerrainNormalAt : (terrain_component, number, number) -> any --[[struct Lumix::Vec3]]
+	getTerrainNormalAt : (terrain_component, number, number) -> Vec3
 	getTerrainHeightAt : (terrain_component, number, number) -> number
 end
 
@@ -191,7 +209,7 @@ end
 
 declare class decal_component
 	material: string
-	half_extents: any
+	half_extents: Vec3
 	uv_scale: any
 end
 
@@ -207,12 +225,12 @@ declare class point_light_component
 	intensity: number
 	fov: number
 	attenuation: number
-	color: any
+	color: Vec3
 	range: number
 end
 
 declare class environment_component
-	color: any
+	color: Vec3
 	intensity: number
 	indirect_intensity: number
 	shadow_cascades: any
@@ -228,19 +246,19 @@ declare class model_instance_component
 	enabled: boolean
 	material: string
 	source: string
-	getModel : (model_instance_component) -> Model
+	getModel : (model_instance_component) -> any --[[Model *]]
 end
 
 declare class environment_probe_component
 	enabled: boolean
-	inner_range: any
-	outer_range: any
+	inner_range: Vec3
+	outer_range: Vec3
 end
 
 declare class reflection_probe_component
 	enabled: boolean
 	size: number
-	half_extents: any
+	half_extents: Vec3
 end
 
 declare class fur_component
@@ -256,8 +274,8 @@ end
 
 declare class bone_attachment_component
 	parent: Entity
-	relative_position: any
-	relative_rotation: any
+	relative_position: Vec3
+	relative_rotation: Vec3
 	bone: number
 end
 
@@ -272,10 +290,10 @@ declare class rigid_actor_component
 	material: string
 	putToSleep : (rigid_actor_component) -> ()
 	getSpeed : (rigid_actor_component) -> number
-	getVelocity : (rigid_actor_component) -> any --[[struct Lumix::Vec3]]
-	applyForce : (rigid_actor_component, any --[[Vec3]]) -> ()
-	applyImpulse : (rigid_actor_component, any --[[Vec3]]) -> ()
-	addForceAtPos : (rigid_actor_component, any --[[Vec3]], any --[[Vec3]]) -> ()
+	getVelocity : (rigid_actor_component) -> Vec3
+	applyForce : (rigid_actor_component, Vec3) -> ()
+	applyImpulse : (rigid_actor_component, Vec3) -> ()
+	addForceAtPos : (rigid_actor_component, Vec3, Vec3) -> ()
 end
 
 declare class physical_heightfield_component
@@ -292,14 +310,14 @@ declare class physical_controller_component
 	use_root_motion: boolean
 	use_custom_gravity: boolean
 	custom_gravity_acceleration: number
-	move : (physical_controller_component, any --[[Vec3]]) -> ()
+	move : (physical_controller_component, Vec3) -> ()
 	isCollisionDown : (physical_controller_component) -> boolean
 	getGravitySpeed : (physical_controller_component) -> number
 end
 
 declare class lua_script_component
 	scripts: any
-	getScriptPath : (lua_script_component, number) -> any --[[struct Lumix::Path]]
+	getScriptPath : (lua_script_component, number) -> string
 end
 
 declare class gui_image_component
@@ -331,7 +349,7 @@ end
 
 declare class distance_joint_component
 	connected_body: Entity
-	axis_position: any
+	axis_position: Vec3
 	damping: number
 	stiffness: number
 	tolerance: number
@@ -340,8 +358,8 @@ end
 
 declare class hinge_joint_component
 	connected_body: Entity
-	axis_position: any
-	axis_direction: any
+	axis_position: Vec3
+	axis_direction: Vec3
 	damping: number
 	stiffness: number
 	use_limit: boolean
@@ -350,16 +368,16 @@ end
 
 declare class spherical_joint_component
 	connected_body: Entity
-	axis_position: any
-	axis_direction: any
+	axis_position: Vec3
+	axis_direction: Vec3
 	use_limit: boolean
 	limit: any
 end
 
 declare class d6_joint_component
 	connected_body: Entity
-	axis_position: any
-	axis_direction: any
+	axis_position: Vec3
+	axis_direction: Vec3
 	x_motion: number
 	y_motion: number
 	z_motion: number
@@ -377,7 +395,7 @@ declare class vehicle_component
 	current_gear: number
 	rpm: number
 	mass: number
-	center_of_mass: any
+	center_of_mass: Vec3
 	moi_multiplier: number
 	chassis: string
 	chassis_layer: number
@@ -406,13 +424,13 @@ declare class navmesh_agent_component
 	move_entity: boolean
 	speed: number
 	setActive : (navmesh_agent_component, boolean) -> ()
-	navigate : (navmesh_agent_component, any --[[DVec3]], number, number) -> boolean
+	navigate : (navmesh_agent_component, DVec3, number, number) -> boolean
 	cancelNavigation : (navmesh_agent_component) -> ()
 	drawPath : (navmesh_agent_component) -> ()
 end
 
 declare class navmesh_zone_component
-	extents: any
+	extents: Vec3
 	agent_height: number
 	agent_radius: number
 	cell_size: number
@@ -423,10 +441,10 @@ declare class navmesh_zone_component
 	detailed: boolean
 	load : (navmesh_zone_component) -> boolean
 	drawContours : (navmesh_zone_component) -> ()
-	drawNavmesh : (navmesh_zone_component, any --[[DVec3]], boolean, boolean, boolean) -> ()
+	drawNavmesh : (navmesh_zone_component, DVec3, boolean, boolean, boolean) -> ()
 	drawCompactHeightfield : (navmesh_zone_component) -> ()
 	drawHeightfield : (navmesh_zone_component) -> ()
-	generateNavmesh : (navmesh_zone_component) -> any --[[struct Lumix::NavmeshBuildJob *]]
+	generateNavmesh : (navmesh_zone_component) -> any --[[NavmeshBuildJob *]]
 end
 
 declare class lua_script_inline_component
@@ -447,11 +465,11 @@ declare class animator_component
 	use_root_motion: boolean
 	setFloatInput : (animator_component, number, number) -> ()
 	setBoolInput : (animator_component, number, boolean) -> ()
-	getInputIndex : (animator_component, any --[[const char*]]) -> number
+	getInputIndex : (animator_component, string) -> number
 end
 
 declare class physical_instanced_cube_component
-	half_extents: any
+	half_extents: Vec3
 	layer: number
 end
 
@@ -486,8 +504,8 @@ declare class Entity
     name : string
     parent : Entity?
     rotation : any
-    position : any
-    scale : any
+    position : Vec3
+    scale : Vec3
     hasComponent : (Entity, any) -> boolean
     getComponent : (Entity, any) -> any
     destroy : (Entity) -> ()
@@ -563,6 +581,9 @@ declare Editor: {
 }
 
 declare LumixAPI: {
+	RaycastHit : { create : () -> RaycastHit, destroy : (RaycastHit) -> () },
+	SweepHit : { create : () -> SweepHit, destroy : (SweepHit) -> () },
+
     INPUT_KEYCODE_SHIFT: number,
     INPUT_KEYCODE_LEFT : number,
     INPUT_KEYCODE_RIGHT : number,
@@ -579,6 +600,12 @@ declare class PropertyBase
 end
 
 declare class FunctionBase
+end
+
+declare class StructVarBase
+end
+
+declare class StructBase
 end
 
 declare class ModuleReflection
@@ -607,6 +634,13 @@ declare LumixReflection: {
     getFunction : (number) -> FunctionBase,
     getThisTypeName : (FunctionBase) -> string,
     getReturnTypeName : (FunctionBase) -> string,
+    getNumStructs : () -> number,
+    getStruct : (number) -> StructBase,
+    getStructName : (StructBase) -> string,
+	getNumStructMembers : (StructBase) -> number,
+	getStructMember : (StructBase, number) -> StructVarBase,
+	getStructMemberName : (StructVarBase) -> string,
+	getStructMemberType : (StructVarBase) -> number
 }
 
 type InputDevice = {

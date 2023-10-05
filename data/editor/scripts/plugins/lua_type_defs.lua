@@ -1,4 +1,9 @@
 local tpl = [[
+export type Vec2 = {number}
+export type Vec3 = {number}
+export type Color = {number}
+export type Quat = {number}
+export type DVec3 = {number}
 declare ImGui: {
     AlignTextToFramePadding : () -> (),
     Begin : (string, boolean?) -> (boolean, boolean?),
@@ -82,8 +87,8 @@ declare class Entity
     name : string
     parent : Entity?
     rotation : any
-    position : any
-    scale : any
+    position : Vec3
+    scale : Vec3
     hasComponent : (Entity, any) -> boolean
     getComponent : (Entity, any) -> any
     destroy : (Entity) -> ()
@@ -115,6 +120,7 @@ declare Editor: {
 }
 
 declare LumixAPI: {
+%s
     INPUT_KEYCODE_SHIFT: number,
     INPUT_KEYCODE_LEFT : number,
     INPUT_KEYCODE_RIGHT : number,
@@ -131,6 +137,12 @@ declare class PropertyBase
 end
 
 declare class FunctionBase
+end
+
+declare class StructVarBase
+end
+
+declare class StructBase
 end
 
 declare class ModuleReflection
@@ -159,6 +171,13 @@ declare LumixReflection: {
     getFunction : (number) -> FunctionBase,
     getThisTypeName : (FunctionBase) -> string,
     getReturnTypeName : (FunctionBase) -> string,
+    getNumStructs : () -> number,
+    getStruct : (number) -> StructBase,
+    getStructName : (StructBase) -> string,
+	getNumStructMembers : (StructBase) -> number,
+	getStructMember : (StructBase, number) -> StructVarBase,
+	getStructMemberName : (StructVarBase) -> string,
+	getStructMemberType : (StructVarBase) -> number
 }
 
 type InputDevice = {
@@ -193,6 +212,7 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
     function typeToString(type : number) : string
         if type < 3 then return "number" end
         if type == 3 then return "Entity" end
+        if type == 5 then return "Vec3" end
         if type == 8 then return "string" end
         if type == 9 then return "boolean" end
         if type == 10 then return "string" end
@@ -224,9 +244,21 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
     end
 
     function toLuaType(ctype : string)
+        if string.match(ctype, "^struct Lumix::") then
+            ctype = string.sub(ctype, 15)
+        end
         if ctype == "int" then return "number" end
         if ctype == "const char *" then return "string" end
+        if ctype == "const char*" then return "string" end
         if ctype == "char const *" then return "string" end
+        if ctype == "Vec3" then return "Vec3" end
+        if ctype == "Quat" then return "Quat" end
+        if ctype == "Vec2" then return "Vec2" end
+        if ctype == "Color" then return "Color" end
+        if ctype == "DVec3" then return "DVec3" end
+        if ctype == "EntityPtr" then return "Entity?" end
+        if ctype == "EntityRef" then return "Entity" end
+        if ctype == "Path" then return "string" end
         if ctype == "i32" then return "number" end
         if ctype == "u32" then return "number" end
         if ctype == "float" then return "number" end
@@ -237,8 +269,36 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
         return `any --[[{ctype}]]`
     end
 
+    function memberTypeToString(type : number) : string
+        if type == 2 then return "boolean" end
+        if type == 3 then return "number" end
+        if type == 4 then return "number" end
+        if type == 5 then return "number" end
+        if type == 6 then return "string" end
+        if type == 7 then return "Entity" end
+        if type == 9 then return "Vec3" end
+        return "any"
+    end
+
     function refl()
         local out = ""
+        local lumixAPI_src = ""
+        local num_structs = LumixReflection.getNumStructs()
+        for i = 0, num_structs - 1 do
+            local struct = LumixReflection.getStruct(i)
+            local name = LumixReflection.getStructName(struct)
+            out = out .. `declare class {name}\n`
+            local num_members = LumixReflection.getNumStructMembers(struct)
+            lumixAPI_src = lumixAPI_src .. `\t{name} : \{ create : () -> {name}, destroy : ({name}) -> () \},\n`
+            for j = 0, num_members - 1 do
+                local member = LumixReflection.getStructMember(struct, j)
+                local member_name = LumixReflection.getStructMemberName(member)
+                local type = LumixReflection.getStructMemberType(member)
+                out = out .. `\t{member_name} : {memberTypeToString(type)}\n`
+            end
+            out = out .. `end\n\n`
+        end
+
         local num_funcs = LumixReflection.getNumFunctions()
         for i = 1, num_funcs do
             local fn = LumixReflection.getFunction(i - 1)
@@ -295,12 +355,12 @@ export type InputEvent = ButtonInputEvent | AxisInputEvent
             out = out .. "end\n\n"
         end
 
-        return string.format(tpl, world_src, out, entity_src)
+        return string.format(tpl, world_src, out, entity_src, lumixAPI_src)
     end
 
 local type_defs = refl()
 
-if false then
+if true then
     return {
         name = "Lua type defs",
         gui = function()

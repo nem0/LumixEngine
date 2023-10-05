@@ -591,7 +591,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	void visit(const reflection::ArrayProperty& prop) override
 	{
 		ImGui::Unindent();
-		bool is_root_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap);
+		bool is_root_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_DefaultOpen);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");

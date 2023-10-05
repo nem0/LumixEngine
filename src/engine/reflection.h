@@ -326,7 +326,7 @@ StringView getTypeName()
 
 struct Variant {
 	Variant() { type = I32; i = 0; }
-	enum Type {
+	enum Type : u32 {
 		VOID,
 		PTR,
 		BOOL,
@@ -380,6 +380,7 @@ struct TypeDescriptor {
 template <typename T> struct VariantTag {};
 
 template <typename T> inline Variant::Type _getVariantType(VariantTag<T*>) { return Variant::PTR; }
+template <typename T> inline Variant::Type _getVariantType(VariantTag<T>) { return Variant::PTR; }
 inline Variant::Type _getVariantType(VariantTag<void>) { return Variant::VOID; }
 inline Variant::Type _getVariantType(VariantTag<bool>) { return Variant::BOOL; }
 inline Variant::Type _getVariantType(VariantTag<i32>) { return Variant::I32; }
@@ -435,6 +436,7 @@ inline EntityPtr fromVariant(int i, Span<Variant> args, VariantTag<EntityPtr>) {
 inline EntityRef fromVariant(int i, Span<Variant> args, VariantTag<EntityRef>) { return (EntityRef)args[i].e; }
 inline void* fromVariant(int i, Span<Variant> args, VariantTag<void*>) { return args[i].ptr; }
 template <typename T> inline T* fromVariant(int i, Span<Variant> args, VariantTag<T*>) { return (T*)args[i].ptr; }
+template <typename T> inline T& fromVariant(int i, Span<Variant> args, VariantTag<T>) { return *(T*)args[i].ptr; }
 
 template <typename... Args>
 struct VariantCaller {
@@ -566,7 +568,75 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 	}
 };
 
+
+struct StructVarBase {
+	virtual ~StructVarBase() {}
+	virtual bool set(void* obj, Span<const u8> mem) = 0;
+	virtual bool get(const void* obj, Span<u8> mem) = 0;
+
+	template <typename T> T get(void* obj) {
+		T res;
+		get(obj, Span((u8*)&res, sizeof(res)));
+		return res;
+	}
+
+	template <typename T> void set(void* obj, T val) {
+		set(obj, Span((const u8*)&val, sizeof(val)));
+	}
+
+	virtual TypeDescriptor getType() const = 0;
+
+	const char* name;
+};
+
+template <auto Getter>
+struct StructVar : StructVarBase {
+	using T = typename ResultOf<decltype(Getter)>::Type;
+	using C = typename ClassOf<decltype(Getter)>::Type;
+
+	TypeDescriptor getType() const override {
+		return toTypeDescriptor<T>();
+	}
+
+	bool set(void* obj, Span<const u8> mem) override {
+		C* inst = (C*)obj;
+		auto& v = inst->*Getter;
+		if (sizeof(v) != mem.length()) return false;
+		memcpy(&v, mem.begin(), sizeof(v));
+		return true;
+	}
+
+	bool get(const void* obj, Span<u8> mem) override {
+		C* inst = (C*)obj;
+		auto& v = inst->*Getter;
+		if (sizeof(v) != mem.length()) return false;
+		memcpy(mem.begin(), &v, sizeof(v));
+		return true;
+	}
+};
+
+struct StructBase {
+	StructBase() : allocator(getGlobalAllocator()), members(getGlobalAllocator()) {}
+
+	virtual ~StructBase() {}
+	virtual void* createInstance(IAllocator& allocator) = 0;
+	virtual void destroyInstance(void* obj, IAllocator& allocator) = 0;
+
+	template <auto Getter> 
+	StructBase& member(const char* name) {
+		StructVar<Getter>* member = LUMIX_NEW(allocator, StructVar<Getter>);
+		member->name = name;
+		members.push(member);
+		return *this;
+	}
+
+	IAllocator& allocator;
+	const char* name;
+	Array<StructVarBase*> members;
+};
+
 LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
+LUMIX_ENGINE_API Array<StructBase*>& allStructs();
 
 template <typename F>
 auto& function(F func, const char* decl_code, const char* name)
@@ -576,6 +646,18 @@ auto& function(F func, const char* decl_code, const char* name)
 	ret.function = func;
 	ret.decl_code = decl_code;
 	ret.name = name && name[0] ? name : declCodeToName(decl_code);
+	return ret;
+}
+
+template <typename S>
+auto& structure(const char* name)
+{
+	static struct : StructBase {
+		void* createInstance(IAllocator& allocator) override { return LUMIX_NEW(allocator, S); }
+		void destroyInstance(void* obj, IAllocator& allocator) override { LUMIX_DELETE(allocator, (S*)obj); }
+	} ret;
+	ret.name = name;
+	allStructs().push(&ret);
 	return ret;
 }
 

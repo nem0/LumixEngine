@@ -124,7 +124,16 @@ static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, ref
 		case reflection::Variant::FLOAT: val = LuaWrapper::checkArg<float>(L, idx); break;
 		case reflection::Variant::ENTITY: val = LuaWrapper::checkArg<EntityPtr>(L, idx); break;
 		case reflection::Variant::VEC2: val = LuaWrapper::checkArg<Vec2>(L, idx); break;
-		case reflection::Variant::COLOR:
+		case reflection::Variant::COLOR: {
+			if (LuaWrapper::isType<Vec4>(L, idx)) {
+				Vec4 c = LuaWrapper::toType<Vec4>(L, idx);
+				val = Color(u8(c.r * 255), u8(c.g * 255), u8(c.b * 255), u8(c.a * 255));
+				break;
+			}
+			Vec3 c = LuaWrapper::checkArg<Vec3>(L, idx);
+			val = Color(u8(c.r * 255), u8(c.g * 255), u8(c.b * 255), 0xff);
+			break;
+		}
 		case reflection::Variant::VEC3: val = LuaWrapper::checkArg<Vec3>(L, idx); break;
 		case reflection::Variant::DVEC3: val = LuaWrapper::checkArg<DVec3>(L, idx); break;
 		case reflection::Variant::QUAT: val = LuaWrapper::checkArg<Quat>(L, idx); break;
@@ -241,9 +250,129 @@ static int luaCmpMethodClosure(lua_State* L) {
 	return push(L, res, f->getReturnTypeName());
 }
 
+static int lua_struct_var_setter(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1); // self
+	const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+	int type = lua_getfield(L, 1, "_value");
+	if (type != LUA_TLIGHTUSERDATA) luaL_argerror(L, 1, "invalid object");
+	void* inst = lua_tolightuserdata(L, -1);
+	lua_pop(L, 1);
+	reflection::StructBase* s = LuaWrapper::toType<reflection::StructBase*>(L, lua_upvalueindex(1));
+
+	for (reflection::StructVarBase* var : s->members) {
+		if (equalStrings(var->name, prop_name)) {
+			reflection::TypeDescriptor td = var->getType();
+			switch (td.type) {
+				case reflection::Variant::DVEC3: {
+					const DVec3& v = LuaWrapper::checkArg<DVec3>(L, 2);
+					var->set(inst, v);
+					return 0;
+				}
+				case reflection::Variant::VEC3: {
+					const Vec3& v = LuaWrapper::checkArg<Vec3>(L, 2);
+					var->set(inst, v);
+					return 0;
+				}
+				case reflection::Variant::FLOAT: {
+					const float v = LuaWrapper::checkArg<float>(L, 2);
+					var->set(inst, v);
+					return 0;
+				}
+				default:
+					ASSERT(false);
+					// TODO
+					return 0;
+			}
+		}
+	}
+	return 0;
+}
+
+static int lua_struct_var_getter(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1); // self
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		int type = lua_getfield(L, 1, "_value");
+		if (type != LUA_TLIGHTUSERDATA) luaL_argerror(L, 1, "invalid object");
+		void* inst = lua_tolightuserdata(L, -1);
+		lua_pop(L, 1);
+		reflection::StructBase* s = LuaWrapper::toType<reflection::StructBase*>(L, lua_upvalueindex(1));
+
+		for (reflection::StructVarBase* var : s->members) {
+			if (equalStrings(var->name, prop_name)) {
+				reflection::TypeDescriptor td = var->getType();
+				switch (td.type) {
+					case reflection::Variant::DVEC3: {
+						LuaWrapper::push(L, var->get<DVec3>(inst));
+						return 1;
+					}
+					case reflection::Variant::VEC3: {
+						LuaWrapper::push(L, var->get<Vec3>(inst));
+						return 1;
+					}
+					case reflection::Variant::FLOAT: {
+						LuaWrapper::push(L, var->get<float>(inst));
+						return 1;
+					}
+					default:
+						ASSERT(false);
+						// TODO
+						return 0;
+				}
+			}
+		}
+		return 0;
+	}
+
+
 static void createClasses(lua_State* L) {
 	LuaWrapper::DebugGuard guard(L);
 	lua_getglobal(L, "LumixAPI");
+	for (auto* s : reflection::allStructs()) {
+		if (LuaWrapper::getField(L, -1, s->name) != LUA_TTABLE) { // [LumixAPI, obj|nil ]
+			lua_pop(L, 1);						// [LumixAPI]
+			lua_newtable(L);					// [LumixAPI, obj]
+			lua_pushvalue(L, -1);				// [LumixAPI, obj, obj]
+			lua_setfield(L, -3, s->name); // [LumixAPI, obj]
+			
+			lua_pushlightuserdata(L, s); // [LumixAPI, obj, refl::struct]
+			lua_pushcclosure(L, lua_struct_var_getter, "struct_var_getter", 1); // [LumixAPI, obj, var_getter]
+			lua_setfield(L, -2, "__index"); // [LumixAPI, obj]
+
+			lua_pushlightuserdata(L, s); // [LumixAPI, obj, refl::struct]
+			lua_pushcclosure(L, lua_struct_var_setter, "struct_var_setter", 1); // [LumixAPI, obj, var_setter]
+			lua_setfield(L, -2, "__newindex"); // [LumixAPI, obj]
+			
+			lua_pushvalue(L, -1); // [LumixAPI, obj, obj]
+			auto creator = [](lua_State* L) -> int {
+				auto* s = LuaWrapper::getClosureObject<reflection::StructBase>(L);
+				void* obj = s->createInstance(getGlobalAllocator());
+				LuaWrapper::pushObject(L, obj, s->name);
+				return 1;
+			};
+
+			auto destroyer = [](lua_State* L) -> int {
+				auto* s = LuaWrapper::getClosureObject<reflection::StructBase>(L);
+				LuaWrapper::checkTableArg(L, 1);
+				void* obj;
+				if (!LuaWrapper::checkField(L, 1, "_value", &obj)) {
+					luaL_argerror(L, 1, "expected object");
+				}
+				s->destroyInstance(obj, getGlobalAllocator());
+				return 0;
+			};
+
+			lua_pushlightuserdata(L, s); // [LumixAPI, obj, obj, refl::struct]
+			lua_pushcclosure(L, creator, "create", 1); // [LumixAPI, obj, obj, closure]
+			lua_setfield(L, -2, "create"); // [LumixAPI, obj, obj]
+
+			lua_pushlightuserdata(L, s); // [LumixAPI, obj, obj, refl::struct]
+			lua_pushcclosure(L, destroyer, "destroy", 1); // [LumixAPI, obj, obj, closure]
+			lua_setfield(L, -2, "destroy"); // [LumixAPI, obj, obj]
+			lua_pop(L, 1); // [LumixAPI, obj ]
+		}
+		lua_pop(L, 1);
+	}
+
 	for (auto* f : reflection::allFunctions()) {
 		char tmp_obj_type_name[128];
 		copyString(Span(tmp_obj_type_name), f->getThisTypeName());

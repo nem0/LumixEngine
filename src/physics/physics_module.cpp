@@ -2392,7 +2392,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PhysicsModuleImpl* module;
 	};
 
-	EntityPtr sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, EntityPtr ignored, i32 layer) override {
+	bool sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) override {
 		PxSweepBuffer hit; 
 		physx::PxSphereGeometry sphere(radius);
 		physx::PxTransform transform(toPhysx(pos), physx::PxIdentity);
@@ -2403,9 +2403,11 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxQueryFilterData filter_data;
 		filter_data.flags = PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC | PxQueryFlag::ePREFILTER;
 		if (!m_scene->sweep(sphere, transform, toPhysx(dir), distance, hit, physx::PxHitFlag::eDEFAULT, filter_data, &filter)) return INVALID_ENTITY;
-		if (!hit.hasBlock) return INVALID_ENTITY;
-		const EntityRef hit_entity = {(int)(intptr_t)hit.block.actor->userData};
-		return hit_entity;	
+		if (!hit.hasBlock) return false;
+		result.entity = EntityPtr{(int)(intptr_t)hit.block.actor->userData};
+		result.position = fromPhysx(hit.block.position);
+		result.normal = fromPhysx(hit.block.normal);
+		return true;	
 	}
 
 	bool raycastEx(const Vec3& origin,
@@ -3961,9 +3963,20 @@ void PhysicsModule::reflect() {
 			return "N/A";
 		}
 	};
+	
+	reflection::structure<RaycastHit>("RaycastHit")
+		.member<&RaycastHit::position>("position")
+		.member<&RaycastHit::normal>("normal")
+		.member<&RaycastHit::entity>("entity");
+
+	reflection::structure<SweepHit>("SweepHit")
+		.member<&SweepHit::position>("position")
+		.member<&SweepHit::normal>("normal")
+		.member<&SweepHit::entity>("entity");
 
 	LUMIX_MODULE(PhysicsModuleImpl, "physics")
 		.LUMIX_FUNC(raycast)
+		.LUMIX_FUNC(raycastEx)
 		.LUMIX_FUNC(sweepSphere)
 		.LUMIX_FUNC(setGravity)
 		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
