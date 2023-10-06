@@ -2027,8 +2027,9 @@ struct RenderModuleImpl final : RenderModule {
 		RayCastModelHit hit = module->castRay(origin, dir, INVALID_ENTITY);
 		LuaWrapper::push(L, hit.is_hit);
 		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
+		LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
 
-		return 2;
+		return 3;
 	}
 
 

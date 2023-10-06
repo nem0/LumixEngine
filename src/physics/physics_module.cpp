@@ -2407,6 +2407,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		result.entity = EntityPtr{(int)(intptr_t)hit.block.actor->userData};
 		result.position = fromPhysx(hit.block.position);
 		result.normal = fromPhysx(hit.block.normal);
+		result.distance = hit.block.distance;
 		return true;	
 	}
 
@@ -3972,6 +3973,7 @@ void PhysicsModule::reflect() {
 	reflection::structure<SweepHit>("SweepHit")
 		.member<&SweepHit::position>("position")
 		.member<&SweepHit::normal>("normal")
+		.member<&SweepHit::distance>("distance")
 		.member<&SweepHit::entity>("entity");
 
 	LUMIX_MODULE(PhysicsModuleImpl, "physics")

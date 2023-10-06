@@ -98,6 +98,7 @@ declare class SweepHit
 	position : Vec3
 	normal : Vec3
 	entity : Entity
+	distance : number
 end
 
 declare class GUISystem

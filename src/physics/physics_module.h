@@ -50,6 +50,7 @@ struct SweepHit {
 	Vec3 position;
 	Vec3 normal;
 	EntityPtr entity;
+	float distance;
 };
 
 struct LUMIX_PHYSICS_API PhysicsModule : IModule

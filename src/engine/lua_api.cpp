@@ -7,6 +7,7 @@
 #include "lua_wrapper.h"
 #include "plugin.h"
 #include "prefab.h"
+#include "profiler.h"
 #include "reflection.h"
 #include "string.h"
 #include "world.h"
@@ -1005,6 +1006,10 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberName", &LuaWrapper::wrap<LUA_getStructMemberName>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberType", &LuaWrapper::wrap<LUA_getStructMemberType>);
 	
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "endProfilerBlock", LuaWrapper::wrap<&profiler::beginBlock>);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "createProfilerCounter", LuaWrapper::wrap<&profiler::createCounter>);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "pushProfilerCounter", LuaWrapper::wrap<&profiler::pushCounter>);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkRead", &LUA_networkRead);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "packU32", &LUA_packU32);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "unpackU32", &LUA_unpackU32);
@@ -1158,6 +1163,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				end
 			end
 		end
+
+		Lumix.Entity.__eq = function(a, b)
+			return a._entity == b._entity and a._world == b._world
+		end
+
 		Lumix.Entity.__newindex = function(table, key, value)
 			if key == "position" then
 				LumixAPI.setEntityPosition(table._world, table._entity, value)
