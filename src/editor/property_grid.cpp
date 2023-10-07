@@ -780,6 +780,22 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEdi
 						editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
 					}
 				}
+				
+				ImGuiEx::Label("Local rotation");
+				const Vec3 old_euler = tr.rot.toEuler();
+				Vec3 euler = old_euler;
+				if (ImGuiEx::InputRotation("##lcl_rot", &euler.x)) {
+					Array<Quat> rots(m_app.getAllocator());
+					for (EntityRef entity : entities) {
+						Vec3 tmp = world.getLocalTransform(entity).rot.toEuler();
+			
+						if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
+						if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
+						if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
+						rots.emplace().fromEuler(tmp);
+					}
+					editor.setEntitiesLocalRotation(&entities[0], &rots[0], entities.size());
+				}
 			}
 		}
 	}

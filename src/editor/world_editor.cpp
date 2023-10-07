@@ -754,10 +754,83 @@ private:
 	Array<Quat> m_old_rotations;
 };
 
+struct LocalRotateEntityCommand final : IEditorCommand {
+	explicit LocalRotateEntityCommand(WorldEditor& editor)
+		: m_new_rotations(editor.getAllocator())
+		, m_old_rotations(editor.getAllocator())
+		, m_entities(editor.getAllocator())
+		, m_editor(editor)
+	{}
 
-struct LocalMoveEntityCommand final : IEditorCommand
-{
-public:
+	LocalRotateEntityCommand(WorldEditor& editor,
+		const EntityRef* entities,
+		const Quat* new_rotations,
+		int count,
+		IAllocator& allocator)
+		: m_new_rotations(allocator)
+		, m_old_rotations(allocator)
+		, m_entities(allocator)
+		, m_editor(editor)
+	{
+		ASSERT(count > 0);
+		World* world = m_editor.getWorld();
+		m_entities.reserve(count);
+		m_new_rotations.reserve(count);
+		m_old_rotations.reserve(count);
+		for (int i = count - 1; i >= 0; --i)
+		{
+			m_entities.push(entities[i]);
+			m_new_rotations.push(new_rotations[i]);
+			m_old_rotations.push(world->getLocalTransform(entities[i]).rot);
+		}
+	}
+
+	bool execute() override {
+		World* world = m_editor.getWorld();
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				world->setLocalRotation(entity, m_new_rotations[i]);
+			}
+		}
+		return true;
+	}
+
+	void undo() override {
+		World* world = m_editor.getWorld();
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				world->setLocalRotation(entity, m_old_rotations[i]);
+			}
+		}
+	}
+
+	const char* getType() override { return "local_rotate_entity"; }
+
+	bool merge(IEditorCommand& command) override {
+		ASSERT(command.getType() == getType());
+		LocalRotateEntityCommand& my_command = static_cast<LocalRotateEntityCommand&>(command);
+		if (my_command.m_entities.size() != m_entities.size()) return false;
+
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i] != my_command.m_entities[i]) {
+				return false;
+			}
+		}
+		
+		my_command.m_new_rotations = m_new_rotations.move();
+		return true;
+	}
+
+private:
+	WorldEditor& m_editor;
+	Array<EntityPtr> m_entities;
+	Array<Quat> m_new_rotations;
+	Array<Quat> m_old_rotations;
+};
+
+struct LocalMoveEntityCommand final : IEditorCommand {
 	explicit LocalMoveEntityCommand(WorldEditor& editor)
 		: m_new_positions(editor.getAllocator())
 		, m_old_positions(editor.getAllocator())
@@ -786,7 +859,7 @@ public:
 		{
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
-			m_old_positions.push(world->getPosition(entities[i]));
+			m_old_positions.push(world->getLocalTransform(entities[i]).pos);
 		}
 	}
 
@@ -2120,7 +2193,16 @@ public:
 		UniquePtr<IEditorCommand> command = UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, &poss[0], &rots[0], count, m_allocator);
 		executeCommand(command.move());
 	}
+	
+	void setEntitiesLocalRotation(const EntityRef* entities, const Quat* local_rotations, u32 count) override
+	{
+		ASSERT(entities);
+		if (count <= 0) return;
 
+		World* world = getWorld();
+		UniquePtr<IEditorCommand> command = UniquePtr<LocalRotateEntityCommand>::create(m_allocator, *this, entities, local_rotations, count, m_allocator);
+		executeCommand(command.move());
+	}
 
 	void setEntitiesLocalCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) override
 	{
@@ -2135,8 +2217,7 @@ public:
 			poss.push(world->getLocalTransform(entities[i]).pos);
 			(&poss[i].x)[(int)coord] = value;
 		}
-		UniquePtr<IEditorCommand> command =
-			UniquePtr<LocalMoveEntityCommand>::create(m_allocator, *this, entities, &poss[0], count, m_allocator);
+		UniquePtr<IEditorCommand> command = UniquePtr<LocalMoveEntityCommand>::create(m_allocator, *this, entities, &poss[0], count, m_allocator);
 		executeCommand(command.move());
 	}
 
