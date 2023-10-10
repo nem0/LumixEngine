@@ -72,7 +72,6 @@ private:
 		int width;
 		int height;
 	} m_forced_viewport;
-	int m_captured_mouse_x, m_captured_mouse_y;
 	Action m_toggle_ui;
 	Action m_fullscreen_action;
 };

@@ -1367,7 +1367,6 @@ struct StudioAppImpl final : StudioApp
 			if (selected) {
 				char filename[MAX_PATH];
 				Path::normalize(m_file_selector.getPath(), filename);
-				const char* base_path = m_engine->getFileSystem().getBasePath();
 				EntityRef entity = selected_entities[0];
 				m_editor->getPrefabSystem().savePrefab(entity, Path(filename));
 				ImGui::CloseCurrentPopup();
@@ -1845,7 +1844,6 @@ struct StudioAppImpl final : StudioApp
 				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_FOLDER, folder->name);
 			}
 		}
-		const ImGuiID node_id = ImGui::GetItemID();
 		
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
@@ -3001,7 +2999,7 @@ struct StudioAppImpl final : StudioApp
 		LuaWrapper::push(L, world); // [Entity.new, Lumix.Entity, world]
 		LuaWrapper::push(L, entity.index); // [Entity.new, Lumix.Entity, world, entity_index]
 		const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
-		return 1;
+		return error ? 0 : 1;
 	}
 
 	static int LUA_getResources(lua_State* L)

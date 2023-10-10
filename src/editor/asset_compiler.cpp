@@ -746,8 +746,6 @@ struct AssetCompilerImpl : AssetCompiler {
 				}
 			}
 			else {
-				StringView ext = Path::getExtension(path_obj);
-
 				auto dep_iter = m_dependencies.find(path_obj);
 				if (dep_iter.isValid()) {
 					for (const Path& p : dep_iter.value()) {

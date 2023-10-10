@@ -1299,7 +1299,6 @@ namespace ImGuiEx {
 		bool changed = false;
 		SetNextItemWidth(width);
 		BeginGroup();
-		float w = CalcItemWidth();
 		SetNextItemWidth(width - CalcTextSize(ICON_FA_TIMES).x - 1);
 		SetNextItemAllowOverlap();
 		if (set_keyboard_focus) SetKeyboardFocusHere();

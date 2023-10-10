@@ -55,22 +55,16 @@
 #include "renderer/texture.h"
 #include "renderer/terrain.h"
 #include "scene_view.h"
-#include "stb/stb_image.h"
-#include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
 #include "world_viewer.h"
 
 #define RGBCX_IMPLEMENTATION
 #include <rgbcx/rgbcx.h>
-#include <stb/stb_image_resize.h>
+#include "stb/stb_image.h"
+#include <stb/stb_image_resize2.h>
 
 
 using namespace Lumix;
-	static AtomicI32 xx = 0;
-
-static Animation::Flags operator | (Animation::Flags a, Animation::Flags b) {
-	return Animation::Flags(u32(a) | u32(b));
-}
 
 namespace {
 
@@ -220,12 +214,12 @@ static void computeMip(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32 dst_w
 		downsampleNormal(src, dst, w, h, dst_w, dst_h);
 	}
 	else if (is_srgb) {
-		i32 res = stbir_resize_uint8_srgb(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4, 3, STBIR_ALPHA_CHANNEL_NONE);
-		ASSERT(res == 1);
+		u8* res = stbir_resize_uint8_srgb(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, STBIR_RGBA);
+		ASSERT(res);
 	}
 	else {
-		i32 res = stbir_resize_uint8(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, 4);
-		ASSERT(res == 1);
+		u8* res = stbir_resize_uint8_linear(src.begin(), w, h, 0, dst.begin(), dst_w, dst_h, 0, STBIR_RGBA);
+		ASSERT(res);
 	}
 }
 
@@ -1523,7 +1517,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				const CompositeTexture::Image& layer0 = res.layers[0];
 				if (layer0.channels != 4) return;
 
-				stbir_resize_uint8(layer0.asU8().data(),
+				stbir_resize_uint8_linear(layer0.asU8().data(),
 					layer0.w,
 					layer0.h,
 					0,
@@ -1531,7 +1525,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					AssetBrowser::TILE_SIZE,
 					AssetBrowser::TILE_SIZE,
 					0,
-					4);
+					STBIR_RGBA);
 
 				applyTint();
 
@@ -1548,7 +1542,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					return;
 				}
 
-				stbir_resize_uint8(data,
+				stbir_resize_uint8_linear(data,
 					w,
 					h,
 					0,
@@ -1556,7 +1550,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					AssetBrowser::TILE_SIZE,
 					AssetBrowser::TILE_SIZE,
 					0,
-					4);
+					STBIR_RGBA);
 				stbi_image_free(data);
 
 				applyTint();

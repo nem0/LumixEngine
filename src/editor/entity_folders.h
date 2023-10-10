@@ -58,7 +58,6 @@ private:
 	void unlink(Folder& folder);
 	FolderHandle generateUniqueID();
 
-	IAllocator& m_allocator;
 	World& m_world;
 	Array<Entity> m_entities;
 	Array<Folder> m_folders;

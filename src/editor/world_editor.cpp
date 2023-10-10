@@ -2199,7 +2199,6 @@ public:
 		ASSERT(entities);
 		if (count <= 0) return;
 
-		World* world = getWorld();
 		UniquePtr<IEditorCommand> command = UniquePtr<LocalRotateEntityCommand>::create(m_allocator, *this, entities, local_rotations, count, m_allocator);
 		executeCommand(command.move());
 	}

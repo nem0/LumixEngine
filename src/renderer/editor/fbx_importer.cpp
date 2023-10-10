@@ -827,7 +827,6 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			VertexLayout vertex_layout;
 
 			const bool compute_tangents = !tangents.values && uvs.values;
-			const int packed_vertex_size = getVertexSize(*mesh, import_mesh.is_skinned, cfg);
 		
 			vertex_layout.size = sizeof(Vec3); // position
 			vertex_layout.normal_offset = vertex_layout.size;
@@ -942,7 +941,6 @@ void FBXImporter::gatherMeshes()
 	for (int mesh_idx = 0; mesh_idx < c; ++mesh_idx) {
 		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)m_scene->getMesh(mesh_idx);
 		const int mat_count = fbx_mesh->getMaterialCount();
-		const i32 meshes_offset = m_meshes.size();
 		for (int j = 0; j < mat_count; ++j) {
 			ImportMesh& mesh = m_meshes.emplace(m_allocator);
 			mesh.is_skinned = false;

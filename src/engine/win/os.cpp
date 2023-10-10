@@ -1550,6 +1550,7 @@ struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) {
 	if (retVal == SOCKET_ERROR) return nullptr;
 			
 	i32 res = ::listen(listen_socket, 10);
+	if (res != 0) return nullptr;
 			
 	SOCKET socket = ::accept(listen_socket, nullptr, nullptr);
 	closesocket(listen_socket);

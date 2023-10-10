@@ -249,7 +249,6 @@ Span<u8> OutputPagedStream::reserve(u32 size) {
 }
 
 bool OutputPagedStream::write(const void* data, u64 size) {
-	const u8* src = (const u8*)data;
 	while (size > 0) {
 		Span<u8> dst = reserve((u32)size);
 		memcpy(dst.begin(), data, dst.length());

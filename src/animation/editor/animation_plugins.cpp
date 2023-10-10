@@ -52,9 +52,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		{
 			m_resource = app.getEngine().getResourceManager().load<Animation>(path);
 
-			Engine& engine = m_app.getEngine();
-
-
 			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
 
 			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
@@ -212,8 +209,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			if ((!rotations.empty() || !const_rotations.empty()) && ImGui::TreeNode("Rotations")) {
 				for (const Animation::RotationTrack& track : rotations) {
-					u32 track_idx = u32(&track - rotations.begin());
-
 					const Model::Bone& bone = m_model->getBone(track.bone_index);
 					ImGuiTreeNodeFlags flags = m_selected_bone == track.bone_index ? ImGuiTreeNodeFlags_Selected : 0;
 					flags |= ImGuiTreeNodeFlags_OpenOnArrow;

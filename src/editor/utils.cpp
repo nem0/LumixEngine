@@ -45,7 +45,7 @@ enum class TokenType : u8 {
 };
 	
 static bool isWordChar(char c) {
-	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 }
 
 static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
@@ -196,7 +196,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		return *c;
 	}
 
-	if (*c >= 'a' && *c <= 'z' || *c >= 'A' && *c <= 'Z' || *c == '_') {
+	if ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '_') {
 		token_type = (u8)TokenType::IDENTIFIER;
 		while (isWordChar(*c)) ++c;
 		token_len = u32(c - str);
@@ -246,7 +246,7 @@ enum class TokenType : u8 {
 };
 	
 static bool isWordChar(char c) {
-	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 }
 
 static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
@@ -381,7 +381,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		return *c;
 	}
 
-	if (*c >= 'a' && *c <= 'z' || *c >= 'A' && *c <= 'Z' || *c == '_') {
+	if ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '_') {
 		token_type = (u8)TokenType::IDENTIFIER;
 		while (isWordChar(*c)) ++c;
 		token_len = u32(c - str);
@@ -417,8 +417,8 @@ struct CodeEditorImpl final : CodeEditor {
 		i32 line = 0;
 		bool operator !=(const TextPoint& rhs) const { return col != rhs.col || line != rhs.line; }
 		bool operator ==(const TextPoint& rhs) const { return col == rhs.col && line == rhs.line; }
-		bool operator < (const TextPoint& rhs) const { return line < rhs.line || line == rhs.line && col < rhs.col; }
-		bool operator > (const TextPoint& rhs) const { return line > rhs.line || line == rhs.line && col > rhs.col; }
+		bool operator < (const TextPoint& rhs) const { return line < rhs.line || (line == rhs.line && col < rhs.col); }
+		bool operator > (const TextPoint& rhs) const { return line > rhs.line || (line == rhs.line && col > rhs.col); }
 	};
 
 	struct Cursor : TextPoint {
@@ -641,7 +641,6 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	ImVec2 toScreenPosition(u32 line, u32 col) {
-		ImVec2 v = m_text_area_screen_pos;
 		float y = line * ImGui::GetTextLineHeight();
 		const char* line_str = m_lines[line].value.c_str();
 		float x = ImGui::CalcTextSize(line_str, line_str + col).x;
@@ -810,9 +809,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void moveCursorDown(Cursor& cursor, u32 line_count = 1) {
 		const char* line_str = m_lines[cursor.line].value.c_str();
-		float old_x = ImGui::CalcTextSize(line_str, line_str + cursor.col).x;
 		
-		ImVec2 cursor_pos = toScreenPosition(cursor.line, cursor.col);
 		cursor.line = minimum(m_lines.size() - 1, cursor.line + line_count);
 
 		u32 num_chars_in_line = m_lines[cursor.line].length();
@@ -1056,7 +1053,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	static bool isWordChar(char c) {
-		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 	}
 
 	Cursor getWord(TextPoint& point) const {
@@ -1090,7 +1087,7 @@ struct CodeEditorImpl final : CodeEditor {
 	Cursor& getBottomCursor() {
 		Cursor* bottom = &m_cursors[0];
 		for (Cursor& cursor : m_cursors) {
-			if (bottom->line < cursor.line || bottom->line == cursor.line && bottom->col < cursor.col) {
+			if (bottom->line < cursor.line || (bottom->line == cursor.line && bottom->col < cursor.col)) {
 				bottom = &cursor;
 			}
 		}
@@ -1151,7 +1148,6 @@ struct CodeEditorImpl final : CodeEditor {
 		r.to = to;
 		r.execute(*this, false);
 
-		i32 line = from.line;
 		for (Cursor& cursor : m_cursors) {
 			if (cursor < from) continue;
 
@@ -1343,9 +1339,6 @@ struct CodeEditorImpl final : CodeEditor {
 		p.x += text_area_size.x - 350;
 		p.x = maximum(p.x, text_area_pos.x);
 		ImGui::SetCursorScreenPos(p);
-		float w = text_area_pos.x + text_area_size.x - p.x;
-		float h = ImGui::GetTextLineHeightWithSpacing();
-		ImGui::SetCursorScreenPos(p);
 		ImGui::SetNextItemWidth(-1);
 		if (m_focus_search) ImGui::SetKeyboardFocusHere();
 		m_focus_search = false;
@@ -1358,7 +1351,7 @@ struct CodeEditorImpl final : CodeEditor {
 		else if (ImGui::InputTextWithHint("##findtext", ICON_FA_SEARCH " Find Text", m_search_text, sizeof(m_search_text), flags)) {
 			find(m_search_from);
 		}
-		if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_F3)) {
+		if ((ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) || ImGui::IsKeyPressed(ImGuiKey_F3)) {
 			find(m_cursors[0]);
 		}
 		if (font) ImGui::PopFont();
@@ -1472,7 +1465,7 @@ struct CodeEditorImpl final : CodeEditor {
 		ImGui::ItemAdd(bb, id);
 		const bool hovered = ImGui::ItemHoverable(bb, id, 0);
 		const bool clicked = hovered && ImGui::IsItemClicked();
-		if (m_focus_editor || clicked && !ImGui::IsItemActive()) {
+		if (m_focus_editor || (clicked && !ImGui::IsItemActive())) {
 			m_focus_editor = false;
 	        ImGuiWindow* window =  ImGui::GetCurrentWindow();
 			ImGui::SetActiveID(id, window);

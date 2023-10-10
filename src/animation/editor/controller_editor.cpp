@@ -236,8 +236,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		{
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			OutputMemoryStream data(m_allocator);
-			ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
-			if (fs.getContentSync(Path(path), data)) {
+			if (fs.getContentSync(path, data)) {
 				InputMemoryStream str(data);
 				if (m_controller.deserialize(str)) {
 					checkSkeleton();
@@ -329,7 +328,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 			if (ImGui::IsWindowAppearing()) m_node_filter_selection = 0;
 			if (m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing())) m_node_filter_selection = 0;
-			Node* n = nullptr;
 			if (m_node_filter.isActive()) {
 				struct : INodeTypeVisitor {
 					bool beginCategory(const char* _category) override {
@@ -346,7 +344,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						
 						StaticString<128> label(category, _label);
 						if (shortcut) label.append(" (LMB + ", shortcut, ")");
-						if (ImGui::Selectable(label, selected) || insert_enter && selected) {
+						if (ImGui::Selectable(label, selected) || (insert_enter && selected)) {
 							n = creator.create(*win);
 							ImGui::CloseCurrentPopup();
 						}
@@ -588,7 +586,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						float weight = blob.read<float>();
 						Time time = blob.read<Time>();
 						bool looped = blob.read<bool>();
-						ImGui::Text("slot = %d, weight = %f, time = %f", slot, weight, time.seconds());
+						ImGui::Text("slot = %d, weight = %f, time = %f, looped = %s", slot, weight, time.seconds(), looped ? "true" : "false");
 						break;
 					}
 				}
@@ -836,7 +834,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						StringView subres = Path::getSubresource(path);
 						if (Path::hasExtension(subres, "ani")) {
 							Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
-							ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
 							entry.animation = path;
 							entry.set = 0;
 							entry.slot = m_controller.m_animation_slots.size();
@@ -852,7 +849,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					StringView subres = Path::getSubresource(path);
 					if (Path::hasExtension(subres, "ani")) {
 						Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
-						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
 						entry.animation = path;
 						entry.set = 0;
 						entry.slot = m_controller.m_animation_slots.size();
@@ -1020,8 +1016,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void windowGUI() override {
-			const CommonActions& actions = m_app.getCommonActions();
-
 			if (!m_to_fix_skeleton.empty()) {
 				ImGui::OpenPopup(ICON_FA_EXCLAMATION_TRIANGLE " Fix skeleton");
 			}
@@ -1184,7 +1178,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 	}
 
 	void createResource(OutputMemoryStream& blob) override {
-		ResourceManager* rm = m_app.getEngine().getResourceManager().get(anim::Controller::TYPE);
 		anim_editor::Controller controller(Path("new controller"), m_app.getAllocator());
 		controller.serialize(blob);
 	}

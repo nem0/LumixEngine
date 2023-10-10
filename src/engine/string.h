@@ -138,7 +138,7 @@ struct LUMIX_ENGINE_API String {
 	u32 length() const { return m_size; }
 	const char* c_str() const { return isSmall() ? m_small : m_big; }
 	template <typename... T> 
-	void append(T... args) { int tmp[] = { 0, (add(args), 0)... }; }
+	void append(T... args) { int tmp[] = { 0, (add(args), 0)... }; (void)tmp; }
 	void insert(u32 position, const char* value);
 	void insert(u32 position, StringView value);
 	void eraseAt(u32 position);

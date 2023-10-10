@@ -57,7 +57,7 @@ struct AnimationSampler {
 		if (anim.m_max_accessed_bone_index >= pose.count) return; // can happen if skeletons do not match
 		const Model& model = *ctx.model;
 		const Time time = ctx.time;
-		const BoneMask* mask = ctx.mask;
+		//const BoneMask* mask = ctx.mask;
 		const float weight = ctx.weight;
 
 		ASSERT(!pose.is_absolute);

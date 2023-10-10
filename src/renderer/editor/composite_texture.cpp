@@ -16,7 +16,7 @@
 #include "renderer/renderer.h"
 #include "stb/stb_image.h"
 #include <math.h>
-#include <stb/stb_image_resize.h>
+#include <stb/stb_image_resize2.h>
 
 namespace Lumix {
 
@@ -886,9 +886,7 @@ struct ResizeNode final : CompositeTexture::Node {
 		const u32 h = type == Type::PIXELS ? size.y : u32(in.h * scale.y * 0.01f + 0.5f);
 		CompositeTexture::Image& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
 		
-		const i32 res = stbir_resize_float(in.pixels.data(), in.w, in.h, 0, out.pixels.data(), w, h, 0, out.channels);
-		if (res != 1) return error("Failed to resize image");
-		return true;
+		return nullptr != stbir_resize_float_linear(in.pixels.data(), in.w, in.h, 0, out.pixels.data(), w, h, 0, (stbir_pixel_layout)out.channels);
 	}	
 
 	bool gui() override {
@@ -3374,7 +3372,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 				Renderer* renderer = (Renderer*)m_resource.m_app.getEngine().getSystemManager().getSystem("renderer");
 				if (renderer) {
 					const CompositeTexture::Image& pd = preview_node->m_outputs[0];
-					gpu::TextureFormat format;
+					gpu::TextureFormat format = gpu::TextureFormat::RGBA32F;
 					switch (pd.channels) {
 						case 1: format = gpu::TextureFormat::R32F; break;
 						case 2: format = gpu::TextureFormat::RG32F; break;

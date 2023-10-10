@@ -8,7 +8,6 @@ EntityFolders::EntityFolders(World& world, IAllocator& allocator)
 	: m_entities(allocator)
 	, m_world(world) 
 	, m_folders(allocator)
-	, m_allocator(allocator)
 {
 	ASSERT(!world.getFirstEntity().isValid());
 	world.entityDestroyed().bind<&EntityFolders::onEntityDestroyed>(this);

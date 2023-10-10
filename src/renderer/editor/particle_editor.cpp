@@ -218,7 +218,6 @@ struct Node : NodeEditorNode {
 	bool nodeGUI() override {
 		m_input_counter = 0;
 		m_output_counter = 0;
-		const ImVec2 old_pos = m_pos;
 		ImGuiEx::BeginNode(m_id, m_pos, &m_selected);
 		bool res = onGUI();
 		if (m_error.length() > 0) {
@@ -3379,7 +3378,6 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 
 		for (u32 emitter_idx = 0, c = system->getEmitters().size(); emitter_idx < c; ++emitter_idx) {
 			ASSERT(c == m_resource.m_emitters.size());
-			const ParticleSystem::Emitter& emitter = system->getEmitters()[emitter_idx];
 			const UniquePtr<ParticleEmitterEditorResource>& editor_emitter = m_resource.m_emitters[emitter_idx];
 			OutputMemoryStream instructions(m_allocator);
 			instructions.resize(editor_emitter->m_update.size() + editor_emitter->m_emit.size() + editor_emitter->m_output.size());

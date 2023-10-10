@@ -269,7 +269,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 	void timeline(float from_x, float to_x, float top, float bottom, u64 start_t) {
 		const float view_length_us = (float)1'000'000 * float(m_range / double(profiler::frequency()));
-		const float timeline_height = ImGui::GetTextLineHeightWithSpacing();
 		const ImColor border_color(ImGui::GetStyle().Colors[ImGuiCol_FrameBg]);
 		
 		ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1348,7 +1347,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		}
 		ImGui::EndChild();
 
-		ImDrawList* dl = ImGui::GetWindowDrawList();
 		timeline(from_x, to_x, timeline_y, before_gpu_y, timeline_start_t);
 	}
 

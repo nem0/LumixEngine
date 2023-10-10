@@ -336,7 +336,6 @@ int import(lua_State* L)
 {
 	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 	Shader* shader = getShader(L);
-	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 
 	OutputMemoryStream content(shader->m_allocator);
 	ResourceManagerHub& rm = shader->getResourceManager().getOwner();
@@ -359,7 +358,6 @@ int include(lua_State* L)
 
 	Shader* shader = getShader(L);
 
-	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 	ResourceManagerHub& rm = shader->getResourceManager().getOwner();
 
 	OutputMemoryStream content(shader->m_allocator);

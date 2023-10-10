@@ -6,4 +6,4 @@
 #pragma warning(disable : 4312)
 #endif
 #include "stb/stb_image.h"
-#include "stb/stb_image_resize.h"
+#include "stb/stb_image_resize2.h"

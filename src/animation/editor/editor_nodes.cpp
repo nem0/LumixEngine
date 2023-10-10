@@ -252,7 +252,7 @@ void Blend2DNode::dataChanged() {
 		u32 a, b;
 		bool valid = true;
 		bool operator ==(const Edge& rhs) {
-			return a == rhs.a && b == rhs.b || a == rhs.b && b == rhs.a;
+			return (a == rhs.a && b == rhs.b) || (a == rhs.b && b == rhs.a);
 		}
 	};
 
@@ -368,7 +368,6 @@ bool Blend1DNode::propertiesGUI(Model& skeleton) {
 		
 			ImGui::TableNextColumn();
 			ImGui::SetNextItemWidth(-1);
-			static i32 selected = -1;
 			res = editSlot(m_controller, "##anim", &child.slot) || res;
 
 			ImGui::PopID();
@@ -431,7 +430,6 @@ anim::Node* AnimationNode::compile(anim::Controller& controller) {
 
 bool AnimationNode::propertiesGUI(Model& skeleton) {
 	ImGuiEx::Label("Slot");
-	static i32 selected = -1;
 	bool res = editSlot(m_controller, "##slot", &m_slot);
 	ImGuiEx::Label("Looping");
 	bool loop = m_flags & Flags::LOOPED;
