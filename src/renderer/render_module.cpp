@@ -244,20 +244,18 @@ struct RenderModuleImpl final : RenderModule {
 	ISystem& getSystem() const override { return m_renderer; }
 
 
-	void getRay(EntityRef camera_entity,
-		const Vec2& screen_pos,
-		DVec3& origin,
-		Vec3& dir) override
+	Ray getCameraRay(EntityRef camera_entity, const Vec2& screen_pos) override
 	{
+		Ray out;
 		Camera& camera = m_cameras[camera_entity];
-		origin = m_world.getPosition(camera_entity);
+		out.origin = m_world.getPosition(camera_entity);
 
 		float width = camera.screen_width;
 		float height = camera.screen_height;
 		if (width <= 0 || height <= 0)
 		{
-			dir = m_world.getRotation(camera_entity).rotate(Vec3(0, 0, 1));
-			return;
+			out.dir = m_world.getRotation(camera_entity).rotate(Vec3(0, 0, 1));
+			return out;
 		}
 
 		float nx = 2 * (screen_pos.x / width) - 1;
@@ -268,7 +266,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		if (camera.is_ortho) {
 			const float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-			origin += view.rot * Vec3(1, 0, 0) * nx * camera.ortho_size * ratio
+			out.origin += view.rot * Vec3(1, 0, 0) * nx * camera.ortho_size * ratio
 				+ view.rot * Vec3(0, 1, 0) * ny * camera.ortho_size;
 		}
 
@@ -278,8 +276,9 @@ struct RenderModuleImpl final : RenderModule {
 		Vec4 p1 = inv_projection * Vec4(nx, ny, 1, 1);
 		p0 *= 1 / p0.w;
 		p1 *= 1 / p1.w;
-		dir = normalize((p1 - p0).xyz());
-		dir = view.rot * dir;
+		out.dir = normalize((p1 - p0).xyz());
+		out.dir = view.rot * out.dir;
+		return out;
 	}
 
 	void setActiveCamera(EntityRef camera) override { m_active_camera = camera; }
@@ -2008,7 +2007,12 @@ struct RenderModuleImpl final : RenderModule {
 
 	static int LUA_castCameraRay(lua_State* L)
 	{
-		auto* module = LuaWrapper::checkArg<RenderModuleImpl*>(L, 1);
+		LuaWrapper::checkTableArg(L, 1);
+		if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError(L, 1, "module");
+		}
+		RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
+		lua_pop(L, 1);
 		EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 		float x, y;
 		if (lua_gettop(L) > 3) {
@@ -2020,11 +2024,9 @@ struct RenderModuleImpl final : RenderModule {
 			y = module->getCameraScreenHeight(camera_entity) * 0.5f;
 		}
 
-		DVec3 origin;
-		Vec3 dir;
-		module->getRay(camera_entity, {x, y}, origin, dir);
+		const Ray ray = module->getCameraRay(camera_entity, {x, y});
 
-		RayCastModelHit hit = module->castRay(origin, dir, INVALID_ENTITY);
+		RayCastModelHit hit = module->castRay(ray.origin, ray.dir, INVALID_ENTITY);
 		LuaWrapper::push(L, hit.is_hit);
 		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
 		LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());

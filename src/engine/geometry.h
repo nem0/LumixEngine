@@ -8,6 +8,11 @@ namespace Lumix {
 struct AABB;
 struct Matrix;
 
+struct LUMIX_ENGINE_API Ray {
+	DVec3 origin;
+	Vec3 dir;
+};
+
 struct LUMIX_ENGINE_API Sphere {
 	Sphere();
 	Sphere(float x, float y, float z, float _radius);
