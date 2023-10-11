@@ -948,7 +948,7 @@ struct PipelineImpl final : Pipeline
 		if (errors)
 		{
 			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 1);
+			lua_pop(m_lua_state, 2);
 			return;
 		}
 		

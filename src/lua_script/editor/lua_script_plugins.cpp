@@ -323,6 +323,25 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		return false;
 	}
 
+	bool exportData(const char* dest_dir) override
+	{
+		#ifndef LUMIX_STATIC_LUAU
+			char exe_path[MAX_PATH];
+			os::getExecutablePath(Span(exe_path));
+			char exe_dir[MAX_PATH];
+
+			copyString(Span(exe_dir), Path::getDir(exe_path));
+			StaticString<MAX_PATH> tmp(exe_dir, "Luau.dll");
+			if (!os::fileExists(tmp)) return false;
+			StaticString<MAX_PATH> dest(dest_dir, "Luau.dll");
+			if (!os::copyFile(tmp, dest))
+			{
+				logError("Failed to copy ", tmp, " to ", dest);
+				return false;
+			}
+		#endif
+		return true; 
+	}
 
 	void onGUI() override {
 		lua_State* L = m_app.getEngine().getState();

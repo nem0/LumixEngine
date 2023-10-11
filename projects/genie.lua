@@ -747,6 +747,10 @@ if has_plugin("lua_script") then
 	project "lua_script"
 		libType()
 
+		if force_build_luau and not force_build_luau_dynamic then
+			defines { "LUMIX_STATIC_LUAU" }
+		end
+
 		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 		includedirs { "../src", "../src/lua_script" }
 		defines { "BUILDING_LUA_SCRIPT" }
