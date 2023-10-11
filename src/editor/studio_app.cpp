@@ -1672,7 +1672,7 @@ struct StudioAppImpl final : StudioApp
 				m_editor->setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
 				m_renaming_entity = INVALID_ENTITY;
 			}
-			if (ImGui::IsItemDeactivated()) {
+			if (ImGui::IsItemDeactivated() && m_renaming_entity.isValid()) {
 				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
 					m_editor->setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
 				}
