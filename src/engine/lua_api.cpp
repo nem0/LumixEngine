@@ -848,9 +848,9 @@ static int LUA_require(lua_State* L) {
     lua_pop(L, 1);
 
 	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
-	StaticString<MAX_PATH> path(name, ".lua");
+	Path path(name, ".lua");
 	OutputMemoryStream blob(engine->getAllocator());
-	if (!engine->getFileSystem().getContentSync(Path(path), blob)) {
+	if (!engine->getFileSystem().getContentSync(path, blob)) {
 		luaL_argerrorL(L, 1, "error loading module");
 	}
 

@@ -142,7 +142,7 @@ struct Runner final
 		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
 
 		InputMemoryStream tmp(data);
-		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, Path(m_startup_world));
+		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, m_startup_world);
 		if (DeserializeProjectResult::SUCCESS != res) {
 			logError("Failed to deserialize project file");
 		}

@@ -3105,6 +3105,9 @@ struct StudioAppImpl final : StudioApp
 		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/resources");
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
+		exportDataScan("pipelines/", infos);
+		exportDataScan("universes/", infos);
+		exportFile("lumix.prj", infos);
 		while (os::getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
@@ -3122,10 +3125,6 @@ struct StudioAppImpl final : StudioApp
 		}
 		
 		os::destroyFileIterator(iter);
-
-		exportDataScan("pipelines/", infos);
-		exportDataScan("universes/", infos);
-		exportFile("lumix.prj", infos);
 	}
 
 
@@ -3189,6 +3188,10 @@ struct StudioAppImpl final : StudioApp
 	void exportDataScanResources(AssociativeArray<FilePathHash, ExportFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
+		exportDataScan("scripts/", infos);
+		exportDataScan("pipelines/", infos);
+		exportDataScan("universes/", infos);
+		exportFile("lumix.prj", infos);
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
@@ -3202,10 +3205,6 @@ struct StudioAppImpl final : StudioApp
 				out_info.offset = ~0UL;
 			}
 		}
-		exportDataScan("scripts/", infos);
-		exportDataScan("pipelines/", infos);
-		exportDataScan("universes/", infos);
-		exportFile("lumix.prj", infos);
 	}
 
 
