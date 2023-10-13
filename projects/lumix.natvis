@@ -71,6 +71,10 @@
 		</Expand>
 	</Type>
 
+	<Type Name="Lumix::StringView">
+		<DisplayString>{begin,[end - begin]}</DisplayString>
+	</Type>
+
 	<Type Name="Lumix::HashMap&lt;*,*&gt;">
 		<DisplayString>{{ size={m_size} }}</DisplayString>
 		<Expand>
