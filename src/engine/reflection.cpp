@@ -7,13 +7,22 @@
 #include "engine/string.h"
 #include "engine/world.h"
 
-namespace Lumix
-{
+namespace Lumix::reflection {
+
+namespace detail {
+
+StringView normalizeTypeName(StringView type_name) {
+	StringView res = type_name;
+	if (startsWith(res, "struct ")) res.removePrefix(7);
+	if (startsWith(res, "Lumix::")) res.removePrefix(7);
+	while (res.size() > 0 && res[0] == ' ') res.removePrefix(1);
+	while (res.size() > 0 && res.back() == ' ') res.removeSuffix(1);
+	return res;
+}
+
+} // namespace detail
 
 
-namespace reflection
-{
-	
 struct Context {
 	Module* first_module = nullptr; 
 	RegisteredComponent component_bases[ComponentType::MAX_TYPES_COUNT];
@@ -298,7 +307,4 @@ void ArrayProperty::visitChildren(struct IPropertyVisitor& visitor) const {
 	}
 }
 
-} // namespace Reflection
-
-
-} // namespace Lumix
+} // namespace Lumix::reflection

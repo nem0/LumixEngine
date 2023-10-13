@@ -9,6 +9,8 @@ template <typename T> struct IsSame<T, T> { static constexpr bool Value = true; 
 template <typename T> struct RemoveReference { using Type = T; };
 template <typename T> struct RemoveReference<T&> { using Type = T; };
 template <typename T> struct RemoveReference<T&&> { using Type = T; };
+template <typename T> struct RemovePointerHelper { using Type = T; };
+template <typename T> struct RemovePointerHelper<T*> { using Type = T; };
 template <typename T> struct RemoveConst { using Type = T; };
 template <typename T> struct RemoveConst<const T> { using Type = T; };
 template <typename T> struct RemoveConst<const T&> { using Type = T; };
@@ -16,6 +18,7 @@ template <typename T> struct RemoveVolatile { using Type = T; };
 template <typename T> struct RemoveVolatile<volatile T> { using Type = T; };
 template <typename T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::Type>::Type;
 template <typename T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
+template <typename T> using RemovePointer = typename RemovePointerHelper<T>::Type;
 
 template <int... T> struct Indices {};
 

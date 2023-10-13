@@ -12,6 +12,7 @@ namespace Lumix {
 struct World;
 struct CameraParams;
 struct PipelineTexture;
+template <typename T> struct Array;
 
 namespace LuaWrapper {
 

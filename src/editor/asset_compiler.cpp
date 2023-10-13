@@ -551,12 +551,12 @@ struct AssetCompilerImpl : AssetCompiler {
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
-			if (!getPlugin(res.getPath())) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 			if (!m_init_finished) {
 				res.incRefCount();
 				m_on_init_load.push(&res);
 				return ResourceManagerHub::LoadHook::Action::DEFERRED;
 			}
+			if (!getPlugin(res.getPath())) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 			pushToCompileQueue(Path(filepath));
 			return ResourceManagerHub::LoadHook::Action::DEFERRED;

@@ -20,6 +20,7 @@
 #include "engine/world.h"
 #include "gui/gui_module.h"
 #include "gui/sprite.h"
+#include "lua_script/lua_script.h"
 #include "renderer/draw2d.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
@@ -244,7 +245,7 @@ public:
 	void init() {
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
+		LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/gui_editor.lua"));
 		m_pipeline = Pipeline::create(renderer, pres, "");
 	}
 

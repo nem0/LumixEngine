@@ -24,6 +24,7 @@
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/world.h"
+#include "lua_script/lua_script.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
@@ -122,10 +123,8 @@ struct WorldViewImpl final : WorldView {
 	{
 		if (m_snap_mode != SnapMode::VERTEX) return;
 
-		DVec3 origin;
-		Vec3 dir;
-		m_viewport.getRay(m_mouse_pos, origin, dir);
-		const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
+		const Ray ray = m_viewport.getRay(m_mouse_pos);
+		const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
 		if (!hit.is_hit) return;
 
 		const DVec3 snap_pos = getClosestVertex(hit);
@@ -183,15 +182,13 @@ struct WorldViewImpl final : WorldView {
 			}
 			else
 			{
-				DVec3 origin;
-				Vec3 dir;
-				m_viewport.getRay(m_mouse_pos, origin, dir);
-				const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
+				const Ray ray = m_viewport.getRay(m_mouse_pos);
+				const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
 
 				const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
 				if (m_snap_mode != SnapMode::NONE && !selected_entities.empty() && hit.is_hit)
 				{
-					DVec3 snap_pos = origin + dir * hit.t;
+					DVec3 snap_pos = ray.origin + ray.dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
 					const Quat rot = m_editor.getWorld()->getRotation(selected_entities[0]);
 					const Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
@@ -200,7 +197,7 @@ struct WorldViewImpl final : WorldView {
 				}
 				else
 				{
-					auto icon_hit = m_icons->raycast(origin, dir);
+					auto icon_hit = m_icons->raycast(ray.origin, ray.dir);
 					if (icon_hit.entity != INVALID_ENTITY) {
 						if(icon_hit.entity.isValid()) {
 							EntityRef e = (EntityRef)icon_hit.entity;
@@ -239,10 +236,8 @@ struct WorldViewImpl final : WorldView {
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
 		if (selected_entities.empty()) return;
 
-		DVec3 origin;
-		Vec3 dir;		
-		m_viewport.getRay(m_mouse_pos, origin, dir);
-		const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
+		const Ray ray = m_viewport.getRay(m_mouse_pos);
+		const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
 		if (!hit.is_hit || hit.entity != selected_entities[0]) return;
 
 		const DVec3 snap_pos = getClosestVertex(hit);
@@ -351,10 +346,8 @@ struct WorldViewImpl final : WorldView {
 		}
 		else if (button == os::MouseButton::LEFT)
 		{
-			DVec3 origin;
-			Vec3 dir;
-			m_viewport.getRay({(float)x, (float)y}, origin, dir);
-			const RayCastModelHit hit = m_module->castRay(origin, dir, INVALID_ENTITY);
+			const Ray ray = m_viewport.getRay({(float)x, (float)y});
+			const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
 			if (Gizmo::isActive()) return;
 
 			if (m_scene_view.m_is_measure_active) {
@@ -537,13 +530,11 @@ struct WorldViewImpl final : WorldView {
 		RayHit res;
 		const Vec2 center{float(cam_x), float(cam_y)};
 
-		DVec3 origin;
-		Vec3 dir;
-		m_viewport.getRay(center, origin, dir);
-		const RayCastModelHit hit = m_module->castRay(origin, dir, ignore);
+		const Ray ray = m_viewport.getRay(center);
+		const RayCastModelHit hit = m_module->castRay(ray, ignore);
 		DVec3 pos;
 		if (hit.is_hit) {
-			res.pos = origin + dir * hit.t;
+			res.pos = ray.origin + ray.dir * hit.t;
 			res.t = hit.t;
 			res.entity = hit.entity;
 			res.is_hit = true;
@@ -675,10 +666,6 @@ SceneView::SceneView(StudioApp& app)
 	m_app.addAction(&m_move_entity_S_action);
 	m_app.addAction(&m_move_entity_W_action);
 	m_app.addAction(&m_toggle_projection_action);
-
-	const ResourceType pipeline_type("pipeline");
-	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
-
 }
 
 void SceneView::toggleProjection() {
@@ -693,7 +680,7 @@ void SceneView::init() {
 
 	Engine& engine = m_app.getEngine();
 	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
 	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW");
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
@@ -1098,10 +1085,8 @@ RayCastModelHit SceneView::castRay(float x, float y)
 	ASSERT(module);
 	
 	const Viewport& vp = m_view->getViewport();
-	DVec3 origin;
-	Vec3 dir;
-	vp.getRay({x * vp.w, y * vp.h}, origin, dir);
-	return module->castRay(origin, dir, INVALID_ENTITY);
+	const Ray ray = vp.getRay({x * vp.w, y * vp.h});
+	return module->castRay(ray, INVALID_ENTITY);
 }
 
 

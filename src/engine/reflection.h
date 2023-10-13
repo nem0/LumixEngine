@@ -307,6 +307,8 @@ struct GetTypeNameHelper
 	}
 };
 
+LUMIX_ENGINE_API StringView normalizeTypeName(StringView type_name);
+
 } // namespace detail
 
 
@@ -321,7 +323,7 @@ const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
 template <typename T>
 StringView getTypeName()
 {
-	return detail::GetTypeNameHelper<T>::GetTypeName();
+	return detail::normalizeTypeName(detail::GetTypeNameHelper<T>::GetTypeName());
 }
 
 struct Variant {
@@ -372,9 +374,14 @@ struct Variant {
 };
 
 struct TypeDescriptor {
+	using Copier = void* (*)(const void* src, IAllocator& allocator);
 	Variant::Type type;
+	StringView type_name;
 	bool is_const;
 	bool is_reference;
+	bool is_pointer;
+	u32 size;
+	Copier create_copy;
 };
 
 template <typename T> struct VariantTag {};
@@ -399,9 +406,23 @@ template <typename T> inline Variant::Type getVariantType() { return _getVariant
 
 template <typename T> TypeDescriptor toTypeDescriptor() {
 	TypeDescriptor td;
+	td.create_copy = [](const void* src, IAllocator& allocator) -> void* {
+		if constexpr (__is_constructible(T)) {
+			return LUMIX_NEW(allocator, RemoveCVR<T>)(*(RemoveCVR<T>*)src);
+		}
+		return nullptr;
+	};
+	td.type_name = getTypeName<RemoveCVR<RemovePointer<T>>>();
 	td.type = getVariantType<T>();
 	td.is_const = !IsSame<T, typename RemoveConst<T>::Type>::Value;
 	td.is_reference = !IsSame<T, typename RemoveReference<T>::Type>::Value;
+	td.is_pointer = !IsSame<T, RemovePointer<T>>::Value;
+	if constexpr (IsSame<T, void>::Value) {
+		td.size = 0;
+	}
+	else {
+		td.size = sizeof(T);
+	}
 	return td;
 }
 
@@ -411,10 +432,9 @@ struct FunctionBase
 
 	virtual u32 getArgCount() const = 0;
 	virtual TypeDescriptor getReturnType() const = 0;
-	virtual StringView getReturnTypeName() const = 0;
-	virtual StringView getThisTypeName() const = 0;
+	virtual TypeDescriptor getThisType() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
-	virtual Variant invoke(void* obj, Span<Variant> args) const = 0;
+	virtual void invoke(void* obj, Span<u8> ret_mem, Span<Variant> args) const = 0;
 	virtual bool isConstMethod() = 0;
 
 	const char* decl_code;
@@ -441,18 +461,16 @@ template <typename T> inline T& fromVariant(int i, Span<Variant> args, VariantTa
 template <typename... Args>
 struct VariantCaller {
 	template <typename C, typename F, int... I>
-	static Variant call(C* inst, F f, Span<Variant> args, Indices<I...>& indices) {
+	static void call(C* inst, F f, Span<u8> ret_mem, Span<Variant> args, Indices<I...>& indices) {
 		using R = typename ResultOf<F>::Type;
 		if constexpr (IsSame<R, void>::Value) {
-			Variant v;
-			v.type = Variant::VOID;
 			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
-			return v;
 		}
 		else {
-			Variant v;
-			v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
-			return v;
+			auto v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+			if (ret_mem.length() == sizeof(v)) {
+				memcpy(ret_mem.m_begin, &v, sizeof(v));
+			}
 		}
 	}
 };
@@ -522,8 +540,7 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 
 	u32 getArgCount() const override { return sizeof...(Args); }
 	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	StringView getReturnTypeName() const override { return getTypeName<R>(); }
-	StringView getThisTypeName() const override { return getTypeName<C>(); }
+	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
 	bool isConstMethod() override { return false; }
 	
 	TypeDescriptor getArgType(int i) const override
@@ -535,9 +552,9 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 		return expand[i];
 	}
 	
-	Variant invoke(void* obj, Span<Variant> args) const override {
+	void invoke(void* obj, Span<u8> ret_mem, Span<Variant> args) const override {
 		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		return VariantCaller<Args...>::call((C*)obj, function, args, indices);
+		VariantCaller<Args...>::call((C*)obj, function, ret_mem, args, indices);
 	}
 };
 
@@ -549,8 +566,7 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 
 	u32 getArgCount() const override { return sizeof...(Args); }
 	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	StringView getReturnTypeName() const override { return getTypeName<R>(); }
-	StringView getThisTypeName() const override { return getTypeName<C>(); }
+	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
 	bool isConstMethod() override { return true; }
 	
 	TypeDescriptor getArgType(int i) const override
@@ -562,9 +578,9 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 		return expand[i];
 	}
 
-	Variant invoke(void* obj, Span<Variant> args) const override {
+	void invoke(void* obj, Span<u8> ret_mem, Span<Variant> args) const override {
 		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		return VariantCaller<Args...>::call((const C*)obj, function, args, indices);
+		VariantCaller<Args...>::call((const C*)obj, function, ret_mem, args, indices);
 	}
 };
 

@@ -26,6 +26,7 @@ public:
 
 private:
 	TagAllocator m_allocator;
+	Array<LuaScript*> m_dependencies;
 	String m_source_code;
 };
 

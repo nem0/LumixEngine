@@ -475,7 +475,7 @@ void Terrain::setHeight(int x, int z, float h)
 }
 
 
-RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
+RayCastModelHit Terrain::castRay(const Ray& ray)
 {
 	RayCastModelHit hit;
 	hit.is_hit = false;
@@ -485,8 +485,8 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	const World& world = m_module.getWorld();
 	const Quat rot = world.getRotation(m_entity);
 	const DVec3 pos = world.getPosition(m_entity);
-	const Vec3 rel_dir = rot.rotate(dir);
-	const Vec3 terrain_to_ray = Vec3(origin - pos);
+	const Vec3 rel_dir = rot.rotate(ray.dir);
+	const Vec3 terrain_to_ray = Vec3(ray.origin - pos);
 	const Vec3 rel_origin = rot.conjugated().rotate(terrain_to_ray);
 
 	Vec3 start;
@@ -514,15 +514,15 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 		Vec3 p3(x, getHeight(x, z + m_scale.x), z + m_scale.x);
 		if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, &t)) {
 			hit.is_hit = true;
-			hit.origin = origin;
-			hit.dir = dir;
+			hit.origin = ray.origin;
+			hit.dir = ray.dir;
 			hit.t = t;
 			return hit;
 		}
 		if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, &t)) {
 			hit.is_hit = true;
-			hit.origin = origin;
-			hit.dir = dir;
+			hit.origin = ray.origin;
+			hit.dir = ray.dir;
 			hit.t = t;
 			return hit;
 		}

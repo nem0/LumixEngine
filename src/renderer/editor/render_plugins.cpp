@@ -39,6 +39,7 @@
 #include "engine/world.h"
 #include "fbx_importer.h"
 #include "game_view.h"
+#include "lua_script/lua_script.h"
 #include "model_meta.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
@@ -654,80 +655,6 @@ struct FontPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Font"; }
-
-	StudioApp& m_app;
-};
-
-
-struct PipelinePlugin final : AssetCompiler::IPlugin, AssetBrowser::IPlugin {
-	struct EditorWindow : AssetEditorWindow {
-		EditorWindow(const Path& path, StudioApp& app, IAllocator& allocator)
-			: AssetEditorWindow(app)
-			, m_app(app)
-		{
-			m_resource = app.getEngine().getResourceManager().load<PipelineResource>(path);
-		}
-
-		~EditorWindow() {
-			m_resource->decRefCount();
-		}
-
-		void save() {
-			OutputMemoryStream blob(m_app.getAllocator());
-			m_editor->serializeText(blob);
-			m_app.getAssetBrowser().saveResource(m_resource->getPath(), blob);
-			m_dirty = false;
-		}
-	
-		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getCommonActions().save) save();
-			else return false;
-			return true;
-		}
-
-		void windowGUI() override {
-			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
-				ImGui::EndMenuBar();
-			}
-
-			if (m_resource->isEmpty()) {
-				ImGui::TextUnformatted("Loading...");
-				return;
-			}
-
-			if (!m_editor) {
-				m_editor = createLuaCodeEditor(m_app);
-				m_editor->setText(m_resource->content);
-			}
-
-			ImGui::PushFont(m_app.getMonospaceFont());
-			if (m_editor->gui("codeeditor")) m_dirty = true;
-			ImGui::PopFont();
-		}
-	
-		const Path& getPath() override { return m_resource->getPath(); }
-		const char* getName() const override { return "pipeline editor"; }
-
-		StudioApp& m_app;
-		PipelineResource* m_resource;
-		UniquePtr<CodeEditor> m_editor;
-	};
-	
-	explicit PipelinePlugin(StudioApp& app)
-		: m_app(app)
-	{}
-
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
-	const char* getLabel() const override { return "Pipeline"; }
-
-	void openEditor(const struct Path& path) override {
-		IAllocator& allocator = m_app.getAllocator();
-		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app, m_app.getAllocator());
-		m_app.getAssetBrowser().addWindow(win.move());
-	}
 
 	StudioApp& m_app;
 };
@@ -2707,7 +2634,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	{
 		Engine& engine = m_app.getEngine();
 		m_tile.world = &engine.createWorld(false);
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
 		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
 
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
@@ -3525,7 +3452,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		SystemManager& system_manager = engine.getSystemManager();
 		Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
 		ResourceManagerHub& rm = engine.getResourceManager();
-		PipelineResource* pres = rm.load<PipelineResource>(Path("pipelines/main.pln"));
+		LuaScript* pres = rm.load<LuaScript>(Path("pipelines/main.lua"));
 		m_pipeline = Pipeline::create(*renderer, pres, "PROBE");
 		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
 	}
@@ -4110,10 +4037,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (!cmp.im->model || !cmp.im->model->isReady()) return false;
 
 		WorldEditor& editor = m_app.getWorldEditor();
-		DVec3 ray_origin;
-		Vec3 ray_dir;
-		editor.getView().getViewport().getRay(Vec2((float)x, (float)y), ray_origin, ray_dir);
-		const RayCastModelHit hit = m_brush != Brush::TERRAIN ? cmp.module->castRay(ray_origin, ray_dir, INVALID_ENTITY) : cmp.module->castRayTerrain(ray_origin, ray_dir);
+		const Ray ray = editor.getView().getViewport().getRay(Vec2((float)x, (float)y));
+		const RayCastModelHit hit = m_brush != Brush::TERRAIN ? cmp.module->castRay(ray, INVALID_ENTITY) : cmp.module->castRayTerrain(ray);
 		if (!hit.is_hit) return false;
 
 		const DVec3 hit_pos = hit.origin + hit.t * hit.dir;
@@ -4231,10 +4156,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (!cmp.im) return false;
 		if (!cmp.im->model || !cmp.im->model->isReady()) return false;
 
-		DVec3 ray_origin;
-		Vec3 ray_dir;
-		view.getViewport().getRay(Vec2((float)x, (float)y), ray_origin, ray_dir);
-		RayCastModelHit hit = cmp.module->castRayInstancedModels(ray_origin, ray_dir, [](const RayCastModelHit&){ return true; });
+		const Ray ray = view.getViewport().getRay(Vec2((float)x, (float)y));
+		RayCastModelHit hit = cmp.module->castRayInstancedModels(ray, [](const RayCastModelHit&){ return true; });
 		if (hit.is_hit && hit.entity == cmp.entity) {
 			m_selected = cmp.module->getInstancedModels()[cmp.entity].instances[hit.subindex];
 			return true;
@@ -4389,10 +4312,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 				if (ImGui::GetIO().KeyShift) {
 					const Vec2 mp = editor.getView().getMousePos();
-					DVec3 ray_origin;
-					Vec3 ray_dir;
-					editor.getView().getViewport().getRay(mp, ray_origin, ray_dir);
-					const RayCastModelHit hit = render_module->castRayTerrain(ray_origin, ray_dir);
+					const Ray ray = editor.getView().getViewport().getRay(mp);
+					const RayCastModelHit hit = render_module->castRayTerrain(ray);
 					if (hit.is_hit) {
 						drawCircle(*render_module, hit.origin + hit.t * hit.dir, m_brush_radius, 0xff880000);
 					}
@@ -4485,10 +4406,8 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		RenderModule* module = (RenderModule*)world.getModule("renderer");
 		if (!world.hasComponent(entity, PROCEDURAL_GEOM_TYPE)) return false;
 
-		DVec3 origin;
-		Vec3 dir;
-		view.getViewport().getRay({(float)x, (float)y}, origin, dir);
-		const RayCastModelHit hit = module->castRay(origin, dir, [entity](const RayCastModelHit& hit) {
+		const Ray ray = view.getViewport().getRay({(float)x, (float)y});
+		const RayCastModelHit hit = module->castRay(ray, [entity](const RayCastModelHit& hit) {
 			return hit.entity == entity;
 		});
 		if (!hit.is_hit) return false;
@@ -4510,10 +4429,8 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		World& world = *editor.getWorld();
 	
 		RenderModule* module = static_cast<RenderModule*>(world.getModule("renderer"));
-		DVec3 origin;
-		Vec3 dir;
-		view.getViewport().getRay(mp, origin, dir);
-		const RayCastModelHit hit = module->castRay(origin, dir, [entity](const RayCastModelHit& hit){
+		const Ray ray = view.getViewport().getRay(mp);
+		const RayCastModelHit hit = module->castRay(ray, [entity](const RayCastModelHit& hit){
 			return hit.entity == entity;
 		});
 
@@ -4824,10 +4741,10 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	WorldView::RayHit castRay(World& world, const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
+	WorldView::RayHit castRay(World& world, const Ray& ray, EntityPtr ignored) override
 	{
 		RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
-		const RayCastModelHit hit = module->castRay(origin, dir, ignored);
+		const RayCastModelHit hit = module->castRay(ray, ignored);
 
 		return {hit.is_hit, hit.t, hit.entity, hit.origin + hit.dir * hit.t};
 	}
@@ -5233,7 +5150,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
-		, m_pipeline_plugin(app)
 		, m_font_plugin(app)
 		, m_material_plugin(app)
 		, m_particle_emitter_property_plugin(app)
@@ -5293,9 +5209,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc"};
 		asset_compiler.addPlugin(m_texture_plugin, Span(texture_exts));
 
-		const char* pipeline_exts[] = {"pln"};
-		asset_compiler.addPlugin(m_pipeline_plugin, Span(pipeline_exts));
-
 		const char* material_exts[] = {"mat"};
 		asset_compiler.addPlugin(m_material_plugin, Span(material_exts));
 
@@ -5313,7 +5226,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(m_shader_plugin, Span(shader_exts));
 		asset_browser.addPlugin(m_shader_include_plugin, Span(inc_exts));
 		asset_browser.addPlugin(m_texture_plugin, Span(texture_exts));
-		asset_browser.addPlugin(m_pipeline_plugin, Span(pipeline_exts));
 
 		m_app.addPlugin(m_scene_view);
 		m_app.addPlugin(m_game_view);
@@ -5532,7 +5444,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(m_texture_plugin);
 		asset_browser.removePlugin(m_shader_plugin);
 		asset_browser.removePlugin(m_shader_include_plugin);
-		asset_browser.removePlugin(m_pipeline_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 		asset_compiler.removePlugin(m_font_plugin);
@@ -5541,7 +5452,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.removePlugin(m_texture_plugin);
 		asset_compiler.removePlugin(m_model_plugin);
 		asset_compiler.removePlugin(m_material_plugin);
-		asset_compiler.removePlugin(m_pipeline_plugin);
 
 		m_app.removePlugin(m_scene_view);
 		m_app.removePlugin(m_game_view);
@@ -5565,7 +5475,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
 	ParticleSystemPropertyPlugin m_particle_emitter_property_plugin;
-	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
 	ShaderIncludePlugin m_shader_include_plugin;
 	ShaderPlugin m_shader_plugin;

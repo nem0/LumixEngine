@@ -165,6 +165,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	~AssetBrowserImpl() override {
+		removePlugin(m_world_asset_plugin);
+		m_app.getAssetCompiler().removePlugin(m_world_asset_plugin);
 		m_app.removeAction(&m_focus_search);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);

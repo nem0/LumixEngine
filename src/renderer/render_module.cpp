@@ -2026,7 +2026,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		const Ray ray = module->getCameraRay(camera_entity, {x, y});
 
-		RayCastModelHit hit = module->castRay(ray.origin, ray.dir, INVALID_ENTITY);
+		RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
 		LuaWrapper::push(L, hit.is_hit);
 		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
 		LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
@@ -2518,12 +2518,12 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	RayCastModelHit castRayTerrain(const DVec3& origin, const Vec3& dir) override
+	RayCastModelHit castRayTerrain(const Ray& ray) override
 	{
 		RayCastModelHit hit;
 		hit.is_hit = false;
 		for (Terrain* terrain : m_terrains) {
-			hit = terrain->castRay(origin, dir);
+			hit = terrain->castRay(ray);
 			hit.component_type = TERRAIN_TYPE;
 			hit.entity = terrain->getEntity();
 			if (hit.is_hit) break;
@@ -2531,13 +2531,13 @@ struct RenderModuleImpl final : RenderModule {
 		return hit;
 	}
 
-	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override {
-		return castRay(origin, dir, [&](const RayCastModelHit& hit) -> bool {
+	RayCastModelHit castRay(const Ray& ray, EntityPtr ignored_model_instance) override {
+		return castRay(ray, [&](const RayCastModelHit& hit) -> bool {
 			return hit.entity != ignored_model_instance || !ignored_model_instance.isValid();
 		});
 	}
 	
-	RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const RayCastModelHit::Filter& filter) override {
+	RayCastModelHit castRayInstancedModels(const Ray& ray, const RayCastModelHit::Filter& filter) override {
 		RayCastModelHit hit;
 		hit.is_hit = false;
 		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
@@ -2556,12 +2556,12 @@ struct RenderModuleImpl final : RenderModule {
 				return res;
 			};
 			for (const InstancedModel::InstanceData& id : im.instances) {
-				Vec3 rel_pos = Vec3(ray_origin - tr.pos) - id.pos;
+				Vec3 rel_pos = Vec3(ray.origin - tr.pos) - id.pos;
 				const float radius = model_radius * id.scale;
 				float intersection_t;
-				if (getRaySphereIntersection(rel_pos, ray_dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
+				if (getRaySphereIntersection(rel_pos, ray.dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
 					const Quat rot = getInstanceQuat(id.rot_quat);
-					const Vec3 rel_dir = rot.conjugated().rotate(ray_dir);
+					const Vec3 rel_dir = rot.conjugated().rotate(ray.dir);
 					rel_pos = rot.conjugated().rotate(rel_pos / id.scale);
 					RayCastModelHit new_hit = im.model->castRay(rel_pos, rel_dir, nullptr, e, &filter);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * id.scale < hit.t)) {
@@ -2578,7 +2578,7 @@ struct RenderModuleImpl final : RenderModule {
 		return hit;
 	}
 	
-	RayCastModelHit castRayProceduralGeometry(const DVec3& origin, const Vec3& dir, const RayCastModelHit::Filter& filter) {
+	RayCastModelHit castRayProceduralGeometry(const Ray& ray, const RayCastModelHit::Filter& filter) {
 		RayCastModelHit hit;
 		hit.is_hit = false;
 		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
@@ -2593,8 +2593,8 @@ struct RenderModuleImpl final : RenderModule {
 
 			const DVec3& pos = m_world.getPosition(iter.key());
 			const Quat rot = m_world.getRotation(iter.key()).conjugated();
-			const Vec3 rd = rot.rotate(dir);
-			Vec3 ro = Vec3(origin - pos);
+			const Vec3 rd = rot.rotate(ray.dir);
+			Vec3 ro = Vec3(ray.origin - pos);
 
 			Vec3 dummy;
 			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
@@ -2637,17 +2637,16 @@ struct RenderModuleImpl final : RenderModule {
 				}
 			}
 		}
-		hit.origin = origin;
-		hit.dir = dir;
+		hit.origin = ray.origin;
+		hit.dir = ray.dir;
 		return hit;
 	}
 
 
-	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) override {
+	RayCastModelHit castRay(const Ray& ray, const Delegate<bool (const RayCastModelHit&)> filter) override {
 		PROFILE_FUNCTION();
-		ASSERT(length(dir) > 0.99f && length(dir) < 1.01f);
 		
-		RayCastModelHit hit = castRayInstancedModels(origin, dir, filter);
+		RayCastModelHit hit = castRayInstancedModels(ray, filter);
 		double cur_dist = hit.is_hit ? hit.t : DBL_MAX;
 
 		const World& world = getWorld();
@@ -2659,12 +2658,12 @@ struct RenderModuleImpl final : RenderModule {
 			const EntityRef entity{i};
 			const Transform& tr = world.getTransform(entity);
 			float radius = r.model->getOriginBoundingRadius();
-			const double dist = length(tr.pos - origin);
+			const double dist = length(tr.pos - ray.origin);
 			if (dist - radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z) > cur_dist) continue;
 			
 			const Transform& inv_tr = tr.inverted();
-			const Vec3 ray_origin_model_space = Vec3(inv_tr.transform(origin));
-			const Vec3 ray_dir_model_space = normalize(inv_tr.transformVector(dir));
+			const Vec3 ray_origin_model_space = Vec3(inv_tr.transform(ray.origin));
+			const Vec3 ray_dir_model_space = normalize(inv_tr.transformVector(ray.dir));
 
 			float intersection_t;
 			if (getRaySphereIntersection(ray_origin_model_space, ray_dir_model_space, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
@@ -2675,13 +2674,13 @@ struct RenderModuleImpl final : RenderModule {
 					if (new_hit.is_hit) {
 						const Vec3 hit_pos_model_space = Vec3(new_hit.origin + new_hit.dir * new_hit.t);
 						const DVec3 new_hit_pos = tr.transform(hit_pos_model_space);
-						const float new_t = (float)length(origin - new_hit_pos);
+						const float new_t = (float)length(ray.origin - new_hit_pos);
 						if (!hit.is_hit || new_t < hit.t) {
 							new_hit.entity = entity;
 							new_hit.component_type = MODEL_INSTANCE_TYPE;
 							hit = new_hit;
-							hit.origin = origin;
-							hit.dir = dir;
+							hit.origin = ray.origin;
+							hit.dir = ray.dir;
 							hit.t = new_t;
 							hit.is_hit = true;
 							cur_dist = hit.t;
@@ -2691,14 +2690,14 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		const RayCastModelHit pg_hit = castRayProceduralGeometry(origin, dir, filter);
+		const RayCastModelHit pg_hit = castRayProceduralGeometry(ray, filter);
 		if (pg_hit.is_hit && (pg_hit.t < hit.t || !hit.is_hit)) {
 			hit = pg_hit;
 			hit.component_type = PROCEDURAL_GEOM_TYPE;
 		}
 
 		for (auto* terrain : m_terrains) {
-			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
+			RayCastModelHit terrain_hit = terrain->castRay(ray);
 			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t)) {
 				terrain_hit.component_type = TERRAIN_TYPE;
 				terrain_hit.entity = terrain->getEntity();
@@ -2707,8 +2706,8 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		hit.origin = origin;
-		hit.dir = dir;
+		hit.origin = ray.origin;
+		hit.dir = ray.dir;
 		return hit;
 	}
 	
@@ -3360,10 +3359,20 @@ void RenderModule::reflect() {
 		}
 	};
 
+	reflection::structure<Ray>("Ray")
+		.member<&Ray::origin>("origin")
+		.member<&Ray::dir>("dir");
+
+	reflection::structure<RayCastModelHit>("RayCastModelHit")
+		.member<&RayCastModelHit::is_hit>("is_hit")
+		.member<&RayCastModelHit::t>("t")
+		.member<&RayCastModelHit::entity>("entity");
+
 	LUMIX_MODULE(RenderModuleImpl, "renderer")
 		.LUMIX_FUNC(addDebugCross)
 		.LUMIX_FUNC(addDebugLine)
 		.LUMIX_FUNC(addDebugTriangle)
+		.function<(RayCastModelHit (RenderModuleImpl::*)(const Ray&, EntityPtr))&RenderModuleImpl::castRay>("castRay", "RenderModuleImpl::castRay")
 		.LUMIX_FUNC(setActiveCamera)
 		.LUMIX_CMP(ProceduralGeometry, "procedural_geom", "Render / Procedural geometry")
 			.LUMIX_PROP(ProceduralGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
@@ -3391,6 +3400,7 @@ void RenderModule::reflect() {
 			.LUMIX_PROP(ParticleSystemPath, "Source").resourceAttribute(ParticleSystemResource::TYPE)
 		.LUMIX_CMP(Camera, "camera", "Render / Camera")
 			.icon(ICON_FA_CAMERA)
+			.function<&RenderModule::getCameraRay>("getRay", "getCameraRay")
 			.var_prop<&RenderModule::getCamera, &Camera::fov>("FOV").radiansAttribute()
 			.var_prop<&RenderModule::getCamera, &Camera::near>("Near").minAttribute(0)
 			.var_prop<&RenderModule::getCamera, &Camera::far>("Far").minAttribute(0)

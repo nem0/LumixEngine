@@ -280,6 +280,7 @@ enum class RenderModuleVersion : i32 {
 	LATEST
 };
 
+
 struct LUMIX_RENDERER_API RenderModule : IModule
 {
 	static UniquePtr<RenderModule> createInstance(Renderer& renderer,
@@ -289,10 +290,10 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	static void registerLuaAPI(lua_State* L, Renderer& renderer);
 	static void reflect();
 
-	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
-	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
-	virtual RayCastModelHit castRayTerrain(const DVec3& origin, const Vec3& dir) = 0;
-	virtual RayCastModelHit castRayInstancedModels(const DVec3& ray_origin, const Vec3& ray_dir, const Delegate<bool (const RayCastModelHit&)>& filter) = 0;
+	virtual RayCastModelHit castRay(const Ray& ray, const Delegate<bool (const RayCastModelHit&)> filter) = 0;
+	virtual RayCastModelHit castRay(const Ray& ray, EntityPtr ignore) = 0;
+	virtual RayCastModelHit castRayTerrain(const Ray& ray) = 0;
+	virtual RayCastModelHit castRayInstancedModels(const Ray& ray, const Delegate<bool (const RayCastModelHit&)>& filter) = 0;
 	virtual struct Ray getCameraRay(EntityRef entity, const Vec2& screen_pos) = 0;
 
 	virtual void setActiveCamera(EntityRef camera) = 0;

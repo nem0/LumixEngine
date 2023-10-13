@@ -19,6 +19,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stack_array.h"
 #include "engine/world.h"
+#include "lua_script/lua_script.h"
 #include "culling_system.h"
 #include "draw2d.h"
 #include "draw_stream.h"
@@ -356,29 +357,7 @@ struct ShadowAtlas {
 	EntityPtr inv_map[64];
 };
 
-
 static const float SHADOW_CAM_FAR = 500.0f;
-
-
-ResourceType PipelineResource::TYPE("pipeline");
-
-
-void PipelineResource::unload()
-{
-	content.resize(0);
-}
-
-
-bool PipelineResource::load(Span<const u8> mem) {
-	content = StringView((const char*)mem.begin(), mem.length());
-	return true;
-}
-
-
-PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, Renderer&, IAllocator& allocator)
-	: Resource(path, owner, allocator)
-	, content(allocator) 
-{}
 
 
 struct PipelineImpl final : Pipeline
@@ -689,7 +668,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, LuaScript* resource, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
 		, m_resource(resource)
@@ -931,10 +910,8 @@ struct PipelineImpl final : Pipeline
 
 		setDefine();
 	
-		const char* content = m_resource->content.c_str();
-		const int content_size = m_resource->content.length();
-		bool errors =
-			LuaWrapper::luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
+		StringView content = m_resource->getSourceCode();
+		bool errors = LuaWrapper::luaL_loadbuffer(m_lua_state, content.begin, content.size(), m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
 			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
@@ -3075,6 +3052,7 @@ struct PipelineImpl final : Pipeline
 
 	void fillClusters(DrawStream& stream, const CameraParams& cp) {
 		PROFILE_FUNCTION();
+		ASSERT(cp.frustum.xs[0] == cp.frustum.xs[0]);
 		ASSERT(cp.pos.x == cp.pos.x);
 		struct ClusterLight {
 			Vec3 pos;
@@ -4076,7 +4054,7 @@ struct PipelineImpl final : Pipeline
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	PipelineResource* m_resource;
+	LuaScript* m_resource;
 	lua_State* m_lua_state;
 	int m_lua_thread_ref;
 	int m_lua_env;
@@ -4132,7 +4110,7 @@ struct PipelineImpl final : Pipeline
 };
 
 
-UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, PipelineResource* resource, const char* define)
+UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, LuaScript* resource, const char* define)
 {
 	return UniquePtr<PipelineImpl>::create(renderer.getAllocator(), renderer, resource, define, renderer.getAllocator());
 }

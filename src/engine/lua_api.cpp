@@ -468,14 +468,14 @@ static i32 LUA_getNextModule(lua_State* L) {
 
 i32 LUA_getThisTypeName(lua_State* L) {
 	reflection::FunctionBase* fn = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
-	StringView sv = fn->getThisTypeName();
+	StringView sv = fn->getThisType().type_name;
 	lua_pushlstring(L, sv.begin, sv.size());
 	return 1;
 }
 
 i32 LUA_getReturnTypeName(lua_State* L) {
 	reflection::FunctionBase* fn = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
-	StringView sv = fn->getReturnTypeName();
+	StringView sv = fn->getReturnType().type_name;
 	lua_pushlstring(L, sv.begin, sv.size());
 	return 1;
 }
@@ -561,7 +561,7 @@ static u32 LUA_getFunctionArgCount(reflection::FunctionBase* fnc) {
 
 static i32 LUA_getFunctionReturnType(lua_State* L) {
 	auto* fnc = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
-	StringView name = fnc->getReturnTypeName();
+	StringView name = fnc->getReturnType().type_name;
 	lua_pushlstring(L, name.begin, name.size());
 	return 1;
 }
@@ -805,14 +805,6 @@ static int LUA_loadWorld(lua_State* L)
 	return 0;
 }
 
-static int finishrequire(lua_State* L)
-{
-    if (lua_isstring(L, -1))
-        lua_error(L);
-
-    return 1;
-}
-
 static int LUA_loadstring(lua_State* L) {
 	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
 	size_t bytecode_size;
@@ -830,71 +822,6 @@ static int LUA_loadstring(lua_State* L) {
 		return 2;
 	}
 	return 1;
-}
-
-static int LUA_require(lua_State* L) {
-    const char* name = luaL_checkstring(L, 1);
-
-    luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
-
-    // return the module from the cache
-    lua_getfield(L, -1, name);
-    if (!lua_isnil(L, -1))
-    {
-        // L stack: _MODULES result
-        return finishrequire(L);
-    }
-
-    lua_pop(L, 1);
-
-	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
-	Path path(name, ".lua");
-	OutputMemoryStream blob(engine->getAllocator());
-	if (!engine->getFileSystem().getContentSync(path, blob)) {
-		luaL_argerrorL(L, 1, "error loading module");
-	}
-
-    // module needs to run in a new thread, isolated from the rest
-    // note: we create ML on main thread so that it doesn't inherit environment of L
-    lua_State* GL = lua_mainthread(L);
-    lua_State* ML = lua_newthread(GL);
-    lua_xmove(GL, L, 1);
-
-    // new thread needs to have the globals sandboxed
-    luaL_sandboxthread(ML);
-
-    // now we can compile & run module on the new thread
-	size_t bytecode_size;
-	char* bytecode = luau_compile((const char*)blob.data(), blob.size(), nullptr, &bytecode_size);
-    if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
-    {
-        int status = lua_resume(ML, L, 0);
-
-        if (status == 0)
-        {
-            if (lua_gettop(ML) == 0)
-                lua_pushstring(ML, "module must return a value");
-            else if (!lua_istable(ML, -1) && !lua_isfunction(ML, -1))
-                lua_pushstring(ML, "module must return a table or function");
-        }
-        else if (status == LUA_YIELD)
-        {
-            lua_pushstring(ML, "module can not yield");
-        }
-        else if (!lua_isstring(ML, -1))
-        {
-            lua_pushstring(ML, "unknown error while running module");
-        }
-    }
-	free(bytecode);
-
-    // there's now a return value on top of ML; L stack: _MODULES ML
-    lua_xmove(ML, L, 1);
-    lua_pushvalue(L, -1);
-    lua_setfield(L, -4, name);
-
-    // L stack: _MODULES ML result
-    return finishrequire(L);
 }
 
 static int LUA_instantiatePrefab(lua_State* L) {
@@ -927,8 +854,6 @@ static int LUA_instantiatePrefab(lua_State* L) {
 void registerEngineAPI(lua_State* L, Engine* engine)
 {
 	lua_pushlightuserdata(L, engine);
-	lua_pushcclosure(L, &LUA_require, "require", 1);
-	lua_setglobal(L, "require");
 
 	lua_pushcfunction(L, &LUA_loadstring, "loadstring");
 	lua_setglobal(L, "loadstring");

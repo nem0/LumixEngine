@@ -15,6 +15,7 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "gui/gui_system.h"
+#include "lua_script/lua_script.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -68,7 +69,7 @@ void GameView::init() {
 
 	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
-	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
 	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW");
 
 	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));

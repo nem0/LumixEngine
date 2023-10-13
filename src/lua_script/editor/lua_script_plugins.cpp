@@ -649,6 +649,60 @@ struct EditorWindow : AssetEditorWindow {
 	#endif
 };
 
+static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies) {
+	lua_State* L = luaL_newstate();
+
+	auto reg_dep = [](lua_State* L) -> int {
+		lua_getglobal(L, "__deps");
+		Lumix::Array<Path>* deps = (Lumix::Array<Path>*)lua_tolightuserdata(L, -1);
+		lua_pop(L, 1);
+		const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+		Path lua_path(path, ".lua");
+		deps->push(lua_path);
+		return 0;
+	};
+
+	auto index_fn = [](lua_State* L) -> int {
+		lua_insert(L, 1);
+		return 1;
+	};
+
+	auto call_fn = [](lua_State* L) -> int {
+		lua_insert(L, 1);
+		return 1;
+	};
+
+	lua_pushcclosure(L, reg_dep, "require", 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "require");
+
+	lua_pushlightuserdata(L, &dependencies);
+	lua_setfield(L, LUA_GLOBALSINDEX, "__deps");
+		
+	lua_newtable(L); // metatable
+	lua_pushcfunction(L, index_fn, "__index"); // metatable, fn
+	lua_setfield(L, -2, "__index"); // metatable
+		
+	lua_pushcfunction(L, call_fn, "__call"); // metatable, fn
+	lua_setfield(L, -2, "__call"); // metatable
+
+	lua_newtable(L); // metatable, new_g
+	lua_getglobal(L, "require"); // metatable, new_g, require
+	lua_setfield(L, -2, "require"); // metatable, new_g
+		
+	lua_insert(L, -2); // new_g, meta
+	lua_setmetatable(L, -2); //new_g
+		
+	bool errors = LuaWrapper::luaL_loadbuffer(L, (const char*)src.m_begin, src.length(), "gather_requires"); // new_g, fn
+	if (errors) {
+		lua_close(L);
+		return false;
+	}
+	lua_insert(L, -2); // fn, new_g
+	lua_setfenv(L, -2);
+	const bool res = LuaWrapper::pcall(L, 0, 0);
+	lua_close(L);
+	return res;
+}
 
 struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit AssetPlugin(LuauAnalysis& analysis, StudioApp& app)
@@ -664,7 +718,23 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+		
+		Array<Path> deps(m_app.getAllocator());
+		if (!gatherRequires(src_data, deps)) return false;
+
+		OutputMemoryStream out(m_app.getAllocator());
+		out.write(deps.size());
+		for (const Path& dep : deps) {
+			out.writeString(dep.c_str());
+		}
+		out.write(src_data.data(), src_data.size());
+		return m_app.getAssetCompiler().writeCompiledResource(src, out);
+	}
+
 	const char* getLabel() const override { return "Lua script"; }
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "lua"; }

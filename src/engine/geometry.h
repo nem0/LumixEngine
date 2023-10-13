@@ -182,7 +182,7 @@ struct LUMIX_ENGINE_API Viewport {
 	ShiftedFrustum getFrustum() const;
 	ShiftedFrustum getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_max_px) const;
 	Vec2 worldToScreenPixels(const DVec3& world) const;
-	void getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const;
+	Ray getRay(const Vec2& screen_pos) const;
 
 	bool is_ortho;
 	float fov;

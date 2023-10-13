@@ -41,8 +41,8 @@ declare ImGui: {
     NewLine : () -> (),
     NextColumn : () -> (),
     OpenPopup : (string) -> (),
-	PlotLines : (string, {number}, Vec2) -> (),    
-	PopItemWidth : () -> (),
+    PlotLines : (string, {number}, Vec2) -> (),
+    PopItemWidth : () -> (),
     PopID : () -> (),
     PopStyleColor : (number) -> (),
     PopStyleVar : (number) -> (),
@@ -97,8 +97,19 @@ end
 declare class SweepHit
 	position : Vec3
 	normal : Vec3
-	entity : Entity
 	distance : number
+	entity : Entity
+end
+
+declare class Ray
+	origin : any
+	dir : Vec3
+end
+
+declare class RayCastModelHit
+	is_hit : boolean
+	t : number
+	entity : Entity
 end
 
 declare class GUISystem
@@ -118,7 +129,7 @@ end
 
 declare class Model
 	getBoneCount : (Model) -> number
-	getBoneName : (Model, number) -> string
+	getBoneName : (Model, number) -> any --[[char]]
 	getBoneParent : (Model, number) -> number
 end
 
@@ -134,7 +145,7 @@ end
 declare class gui_module
 	getRectAt : (gui_module, Vec2) -> Entity?
 	isOver : (gui_module, Vec2, Entity?) -> boolean
-	getSystem : (gui_module) -> any --[[GUISystem *]]
+	getSystem : (gui_module) -> GUISystem
 end
 
 declare class lua_script_module
@@ -154,6 +165,7 @@ declare class renderer_module
 	addDebugCross : (renderer_module, DVec3, number, Color) -> ()
 	addDebugLine : (renderer_module, DVec3, DVec3, Color) -> ()
 	addDebugTriangle : (renderer_module, DVec3, DVec3, DVec3, Color) -> ()
+	castRay : (renderer_module, any --[[void*]], Entity?) -> any --[[RayCastModelHit]]
 	setActiveCamera : (renderer_module, Entity?) -> ()
 end
 
@@ -207,6 +219,7 @@ declare class camera_component
 	far: number
 	orthographic: boolean
 	orthographic_size: number
+	getRay : (camera_component, Vec2) -> any --[[Ray]]
 end
 
 declare class decal_component
@@ -248,7 +261,7 @@ declare class model_instance_component
 	enabled: boolean
 	material: string
 	source: string
-	getModel : (model_instance_component) -> any --[[Model *]]
+	getModel : (model_instance_component) -> Model
 end
 
 declare class environment_probe_component
@@ -446,7 +459,7 @@ declare class navmesh_zone_component
 	drawNavmesh : (navmesh_zone_component, DVec3, boolean, boolean, boolean) -> ()
 	drawCompactHeightfield : (navmesh_zone_component) -> ()
 	drawHeightfield : (navmesh_zone_component) -> ()
-	generateNavmesh : (navmesh_zone_component) -> any --[[NavmeshBuildJob *]]
+	generateNavmesh : (navmesh_zone_component) -> any --[[NavmeshBuildJob]]
 end
 
 declare class lua_script_inline_component
@@ -585,6 +598,8 @@ declare Editor: {
 declare LumixAPI: {
 	RaycastHit : { create : () -> RaycastHit, destroy : (RaycastHit) -> () },
 	SweepHit : { create : () -> SweepHit, destroy : (SweepHit) -> () },
+	Ray : { create : () -> Ray, destroy : (Ray) -> () },
+	RayCastModelHit : { create : () -> RayCastModelHit, destroy : (RayCastModelHit) -> () },
 
     INPUT_KEYCODE_SHIFT: number,
     INPUT_KEYCODE_LEFT : number,

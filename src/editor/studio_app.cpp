@@ -1194,12 +1194,12 @@ struct StudioAppImpl final : StudioApp
 
 		for (EntityRef entity : selected) {
 			const DVec3 origin = world->getPosition(entity);
-			auto hit = getRenderInterface()->castRay(*world, origin, Vec3(0, -1, 0), entity);
+			auto hit = getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, -1, 0)}, entity);
 			if (hit.is_hit) {
 				new_positions.push(origin + Vec3(0, -hit.t, 0));
 			}
 			else {
-				hit = getRenderInterface()->castRay(*world, origin, Vec3(0, 1, 0), entity);
+				hit = getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, 1, 0)}, entity);
 				if (hit.is_hit) {
 					new_positions.push(origin + Vec3(0, hit.t, 0));
 				}
@@ -3105,8 +3105,6 @@ struct StudioAppImpl final : StudioApp
 		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/resources");
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
-		exportDataScan("pipelines/", infos);
-		exportDataScan("universes/", infos);
 		exportFile("lumix.prj", infos);
 		while (os::getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
@@ -3123,6 +3121,8 @@ struct StudioAppImpl final : StudioApp
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
 		}
+		exportDataScan("pipelines/", infos);
+		exportDataScan("universes/", infos);
 		
 		os::destroyFileIterator(iter);
 	}
@@ -3188,9 +3188,6 @@ struct StudioAppImpl final : StudioApp
 	void exportDataScanResources(AssociativeArray<FilePathHash, ExportFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
-		exportDataScan("scripts/", infos);
-		exportDataScan("pipelines/", infos);
-		exportDataScan("universes/", infos);
 		exportFile("lumix.prj", infos);
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
@@ -3198,13 +3195,17 @@ struct StudioAppImpl final : StudioApp
 				const FilePathHash hash = res->getPath().getHash();
 				const Path baked_path(".lumix/resources/", hash, ".res");
 
-				auto& out_info = infos.emplace(hash);
-				copyString(Span(out_info.path), baked_path);
-				out_info.hash = hash;
-				out_info.size = os::getFileSize(baked_path);
-				out_info.offset = ~0UL;
+				if (infos.find(hash) < 0) {
+					auto& out_info = infos.emplace(hash);
+					copyString(Span(out_info.path), baked_path);
+					out_info.hash = hash;
+					out_info.size = os::getFileSize(baked_path);
+					out_info.offset = ~0UL;
+				}
 			}
 		}
+		exportDataScan("pipelines/", infos);
+		exportDataScan("universes/", infos);
 	}
 
 

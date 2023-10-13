@@ -368,7 +368,6 @@ struct RendererImpl final : Renderer
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "renderer")
 		, m_texture_manager("textures", *this, m_allocator)
-		, m_pipeline_manager("pipelines", *this, m_allocator)
 		, m_model_manager("models", *this, m_allocator)
 		, m_particle_emitter_manager("particle emitters", *this, m_allocator)
 		, m_material_manager(*this, m_allocator)
@@ -404,7 +403,6 @@ struct RendererImpl final : Renderer
 	~RendererImpl()
 	{
 		m_particle_emitter_manager.destroy();
-		m_pipeline_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
@@ -557,7 +555,6 @@ struct RendererImpl final : Renderer
 		stream.update(mb.buffer, &default_mat, sizeof(default_mat));
 
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		m_pipeline_manager.create(PipelineResource::TYPE, manager);
 		m_texture_manager.create(Texture::TYPE, manager);
 		m_model_manager.create(Model::TYPE, manager);
 		m_material_manager.create(Material::TYPE, manager);
@@ -1003,7 +1000,6 @@ struct RendererImpl final : Renderer
 	MaterialManager m_material_manager;
 	RenderResourceManager<Model> m_model_manager;
 	RenderResourceManager<ParticleSystemResource> m_particle_emitter_manager;
-	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 	Array<u32> m_free_sort_keys;

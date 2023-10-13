@@ -34,15 +34,13 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		World* world = m_app.getWorldEditor().getWorld();
 		const EntityRef e = *getSplineEntity();
 		const Transform tr = world->getTransform(e);
-		DVec3 origin;
-		Vec3 dir;
 		const Viewport& vp = view.getViewport();
-		vp.getRay(Vec2((float)x, (float)y), origin, dir);
+		const Ray ray = vp.getRay(Vec2((float)x, (float)y));
 		
 		for (const Vec3& point : spline->points) {
 			const DVec3 p = tr.pos + point;
 			float t;
-			const bool hovered = getRaySphereIntersection(Vec3(0), dir, Vec3(p - vp.pos), 0.1f, t);
+			const bool hovered = getRaySphereIntersection(Vec3(0), ray.dir, Vec3(p - vp.pos), 0.1f, t);
 			if (hovered) return true;
 		}
 
@@ -59,10 +57,8 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 	}
 
 	void onMouseUp(WorldView& view, int x, int y, os::MouseButton button) override {
-		DVec3 origin;
-		Vec3 dir;
 		const Viewport& vp = view.getViewport();
-		vp.getRay(Vec2((float)x, (float)y), origin, dir);
+		const Ray ray = vp.getRay(Vec2((float)x, (float)y));
 
 		const EntityRef e = *getSplineEntity();
 		World* world = m_app.getWorldEditor().getWorld();
@@ -73,7 +69,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 			for (const Vec3& point : spline->points) {
 				const DVec3 p = tr.pos + point;
 				float t;
-				const bool hovered = getRaySphereIntersection(Vec3(0), dir, Vec3(p - vp.pos), 0.1f, t);
+				const bool hovered = getRaySphereIntersection(Vec3(0), ray.dir, Vec3(p - vp.pos), 0.1f, t);
 				if (hovered) {
 					m_selected = i32(&point - spline->points.begin());
 					return;
@@ -213,13 +209,11 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		const Transform& tr = world.getTransform(e);
 		const DVec3 cam_pos = view.getViewport().pos;
 		const Vec3 offset = Vec3(tr.pos - cam_pos);
-		DVec3 origin;
-		Vec3 dir;
-		view.getViewport().getRay(view.getMousePos(), origin, dir);
+		const Ray ray = view.getViewport().getRay(view.getMousePos());
 		for (i32 i = 0; i < spline.points.size(); ++i) {
 			const DVec3 p = tr.pos + spline.points[i];
 			float t;
-			const bool hovered = getRaySphereIntersection(Vec3(0), dir, Vec3(p - cam_pos), 0.1f, t);
+			const bool hovered = getRaySphereIntersection(Vec3(0), ray.dir, Vec3(p - cam_pos), 0.1f, t);
 			addCircle(view, p, 0.1f, tr.rot.rotate(Vec3(0, 1, 0)), hovered ? Color::RED : Color::GREEN);
 		}
 

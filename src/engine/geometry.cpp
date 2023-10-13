@@ -709,13 +709,14 @@ Matrix Viewport::getViewRotation() const
 }
 
 
-void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
+Ray Viewport::getRay(const Vec2& screen_pos) const
 {
-	origin = pos;
+	Ray ray;
+	ray.origin = pos;
 
 	if (w <= 0 || h <= 0) {
-		dir = rot.rotate(Vec3(0, 0, 1));
-		return;
+		ray.dir = rot.rotate(Vec3(0, 0, 1));
+		return ray;
 	}
 
 	const float nx = 2 * (screen_pos.x / w) - 1;
@@ -727,19 +728,20 @@ void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
 		const Vec3 x = rot * Vec3(1, 0, 0);
 		const Vec3 y = rot * Vec3(0, 1, 0);
 		float ratio = h > 0 ? w / (float)h : 1;
-		origin += x * nx * ortho_size * ratio
+		ray.origin += x * nx * ortho_size * ratio
 			+ y * ny * ortho_size;
 	}
 
-	const Matrix view_matrix = getView(origin);
+	const Matrix view_matrix = getView(ray.origin);
 	const Matrix inverted = (projection_matrix * view_matrix).inverted();
 
 	Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
 	Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
 	p0 *= 1 / p0.w;
 	p1 *= 1 / p1.w;
-	dir = normalize((p1 - p0).xyz());
-	if (is_ortho) dir *= -1.f;
+	ray.dir = normalize((p1 - p0).xyz());
+	if (is_ortho) ray.dir *= -1.f;
+	return ray;
 }
 
 

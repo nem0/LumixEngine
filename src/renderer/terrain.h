@@ -99,7 +99,7 @@ struct Terrain {
 	void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 	void setMaterial(Material* material);
 
-	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
+	RayCastModelHit castRay(const Ray& ray);
 	void serialize(OutputMemoryStream& serializer);
 	void deserialize(EntityRef entity, InputMemoryStream& serializer, World& world, RenderModule& module, i32 version);
 

@@ -71,7 +71,6 @@ bool pcall(lua_State* L, int nargs, int nres)
 	return true;
 }
 
-
 bool execute(lua_State* L
 	, StringView content
 	, const char* name

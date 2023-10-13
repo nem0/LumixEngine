@@ -152,14 +152,12 @@ Axis collide(const ScaleGizmo& gizmo, const WorldView& view, const Gizmo::Config
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
 	const Vec3 pos(gizmo.pos - vp.pos);
-	DVec3 origin;
-	Vec3 dir;
 	const Vec2 mp = view.getMousePos();
-	vp.getRay(mp, origin, dir);
-	const Vec3 rel_origin = Vec3(origin - vp.pos);
-	const float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.x);
-	const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.y);
-	const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.z);
+	const Ray ray = vp.getRay(mp);
+	const Vec3 rel_origin = Vec3(ray.origin - vp.pos);
+	const float x_dist = getLineSegmentDistance(rel_origin, ray.dir, pos, pos + gizmo.x);
+	const float y_dist = getLineSegmentDistance(rel_origin, ray.dir, pos, pos + gizmo.y);
+	const float z_dist = getLineSegmentDistance(rel_origin, ray.dir, pos, pos + gizmo.z);
 
 	float influenced_dist = scale * INFLUENCE_DISTANCE;
 
@@ -173,33 +171,31 @@ Axis collide(const RotationGizmo& gizmo, const WorldView& view, const Gizmo::Con
 	const Vec3 pos(gizmo.pos - vp.pos);
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
-	DVec3 origin;
-	Vec3 dir;
 	const Viewport viewport = view.getViewport();
 	const Vec2 mp = view.getMousePos();
-	viewport.getRay(mp, origin, dir);
-	const Vec3 rel_origin(origin - vp.pos);
+	const Ray ray = viewport.getRay(mp);
+	const Vec3 rel_origin(ray.origin - vp.pos);
 
 	float t;
 	float mint = FLT_MAX;
 	float d = FLT_MAX;
 	Axis axis = Axis::NONE;
-	if (getRayPlaneIntersecion(rel_origin, dir, pos, normalize(gizmo.x), t) && t > 0) {
-		const Vec3 p = rel_origin + dir * t;
+	if (getRayPlaneIntersecion(rel_origin, ray.dir, pos, normalize(gizmo.x), t) && t > 0) {
+		const Vec3 p = rel_origin + ray.dir * t;
 		mint = t;
 		d = length(p - pos);
 		axis = Axis::X;
 	}
 
-	if (getRayPlaneIntersecion(rel_origin, dir, pos, normalize(gizmo.y), t) && t < mint && t > 0) {
-		const Vec3 p = rel_origin + dir * t;
+	if (getRayPlaneIntersecion(rel_origin, ray.dir, pos, normalize(gizmo.y), t) && t < mint && t > 0) {
+		const Vec3 p = rel_origin + ray.dir * t;
 		d = length(p - pos);
 		mint = t;
 		axis = Axis::Y;
 	}
 
-	if (getRayPlaneIntersecion(rel_origin, dir, pos, normalize(gizmo.z), t) && t < mint && t > 0) {
-		const Vec3 p = rel_origin + dir * t;
+	if (getRayPlaneIntersecion(rel_origin, ray.dir, pos, normalize(gizmo.z), t) && t < mint && t > 0) {
+		const Vec3 p = rel_origin + ray.dir * t;
 		d = length(p - pos);
 		axis = Axis::Z;
 	}
@@ -209,27 +205,25 @@ Axis collide(const RotationGizmo& gizmo, const WorldView& view, const Gizmo::Con
 }
 
 Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const WorldView& view, const Gizmo::Config& cfg) {
-	DVec3 origin;
-	Vec3 dir;
 	const Viewport viewport = view.getViewport();
 	const Vec2 mp = view.getMousePos();
-	viewport.getRay(mp, origin, dir);
+	const Ray ray = viewport.getRay(mp);
 
-	const Vec3 rel_origin(origin - viewport.pos);
+	const Vec3 rel_origin(ray.origin - viewport.pos);
 	float t, tmin = FLT_MAX;
 	const Vec3 pos(gizmo.pos - viewport.pos);
-	bool hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + gizmo.x * 0.5f, pos + gizmo.y * 0.5f, &t);
+	bool hit = getRayTriangleIntersection(rel_origin, ray.dir, pos, pos + gizmo.x * 0.5f, pos + gizmo.y * 0.5f, &t);
 	Axis transform_axis = Axis::NONE;
 	if (hit) {
 		tmin = t;
 		transform_axis = Axis::XY;
 	}
-	hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + gizmo.y * 0.5f, pos + gizmo.z * 0.5f, &t);
+	hit = getRayTriangleIntersection(rel_origin, ray.dir, pos, pos + gizmo.y * 0.5f, pos + gizmo.z * 0.5f, &t);
 	if (hit && t < tmin) {
 		tmin = t;
 		transform_axis = Axis::YZ;
 	}
-	hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + gizmo.x * 0.5f, pos + gizmo.z * 0.5f, &t);
+	hit = getRayTriangleIntersection(rel_origin, ray.dir, pos, pos + gizmo.x * 0.5f, pos + gizmo.z * 0.5f, &t);
 	if (hit && t < tmin) transform_axis = Axis::XZ;
 
 	if (transform_axis != Axis::NONE) return transform_axis;
@@ -239,9 +233,9 @@ Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const WorldView
 	const Vec3 x = is_global ? gizmo.x : tr.rot.rotate(Vec3(scale, 0, 0));
 	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
 	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
-	const float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + x);
-	const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + y);
-	const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + z);
+	const float x_dist = getLineSegmentDistance(rel_origin, ray.dir, pos, pos + x);
+	const float y_dist = getLineSegmentDistance(rel_origin, ray.dir, pos, pos + y);
+	const float z_dist = getLineSegmentDistance(rel_origin, ray.dir, pos, pos + z);
 
 	const float influenced_dist = length(gizmo.x) * INFLUENCE_DISTANCE;
 	if (x_dist < y_dist && x_dist < z_dist && x_dist < influenced_dist) return Axis::X;
@@ -252,10 +246,8 @@ Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const WorldView
 template <typename Gizmo>
 DVec3 getMousePlaneIntersection(const WorldView& view, const Gizmo& gizmo, Axis transform_axis) {
 	const Viewport& vp = view.getViewport();
-	DVec3 origin;
-	Vec3 dir;
 	const Vec2 mouse_pos = view.getMousePos();
-	vp.getRay(mouse_pos, origin, dir);
+	const Ray ray = vp.getRay(mouse_pos);
 	bool is_two_axed = transform_axis == Axis::XZ || transform_axis == Axis::XY || transform_axis == Axis::YZ;
 	if (is_two_axed) {
 		Vec3 plane_normal;
@@ -266,11 +258,11 @@ DVec3 getMousePlaneIntersection(const WorldView& view, const Gizmo& gizmo, Axis 
 			default: ASSERT(false); break;
 		}
 		float t;
-		const Vec3 rel_origin = Vec3(origin - gizmo.pos);
-		if (getRayPlaneIntersecion(rel_origin, dir, Vec3(0), plane_normal, t)) {
-			return origin + dir * t;
+		const Vec3 rel_origin = Vec3(ray.origin - gizmo.pos);
+		if (getRayPlaneIntersecion(rel_origin, ray.dir, Vec3(0), plane_normal, t)) {
+			return ray.origin + ray.dir * t;
 		}
-		return origin;
+		return ray.origin;
 	}
 
 	Vec3 axis;
@@ -280,8 +272,8 @@ DVec3 getMousePlaneIntersection(const WorldView& view, const Gizmo& gizmo, Axis 
 		case Axis::Z: axis = normalize(gizmo.z); break;
 		default: ASSERT(false); return DVec3(0);
 	}
-	const Vec3 normal = cross(cross(dir, axis), dir);
-	const float d = dot(Vec3(origin - gizmo.pos), normal) / dot(axis, normal);
+	const Vec3 normal = cross(cross(ray.dir, axis), ray.dir);
+	const float d = dot(Vec3(ray.origin - gizmo.pos), normal) / dot(axis, normal);
 	return gizmo.pos + axis * d;
 }
 
@@ -725,16 +717,14 @@ bool box(u64 id, WorldView& view, Transform& tr, Vec3& half_extents, const Confi
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, tr.pos, cfg.scale) * 0.1f;
 
-	DVec3 origin;
-	Vec3 dir;
 	const Vec2 mp = view.getMousePos();
-	vp.getRay(mp, origin, dir);
+	const Ray ray = vp.getRay(mp);
 	
-	const Vec3 pos = Vec3(origin - tr.pos);
+	const Vec3 pos = Vec3(ray.origin - tr.pos);
 	const Vec3 center = Vec3(tr.pos - vp.pos);
 	auto cube = [&](u32 color, Vec3 p, float& prev_t){
 		float t;
-		if (getRaySphereIntersection(pos, dir, p, scale * 1.414f, t) && (prev_t < 0 || t < prev_t)) {
+		if (getRaySphereIntersection(pos, ray.dir, p, scale * 1.414f, t) && (prev_t < 0 || t < prev_t)) {
 			renderCube(view, SELECTED_COLOR, center + p, scale, xn, yn, zn);
 			WorldView::Vertex* line = view.render(true, 2);
 			line[0].pos = center;

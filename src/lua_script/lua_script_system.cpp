@@ -18,6 +18,7 @@
 #include "engine/world.h"
 #include "gui/gui_module.h"
 #include "lua_script/lua_script.h"
+#include <luacode.h>
 
 
 namespace Lumix {
@@ -107,15 +108,6 @@ struct ArrayItemSetVisitor : reflection::IPropertyVisitor {
 	lua_State* L;
 };
 
-static void pushObject(lua_State* L, void* obj, StringView type_name) {
-	ASSERT(!type_name.empty());
-	const char* c = type_name.end - 1;
-	while (*c != ':' && c != type_name.begin) --c;
-	if (*c == ':') ++c;
-
-	LuaWrapper::pushObject(L, obj, StringView(c, u32(type_name.end - c - 2)));
-}
-
 static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, reflection::Variant& val) {
 	switch(type) {
 		case reflection::Variant::BOOL: val = LuaWrapper::checkArg<bool>(L, idx); break;
@@ -150,24 +142,57 @@ static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, ref
 	}	
 }
 
-static int push(lua_State* L, const reflection::Variant& v, StringView type_name) {
-	switch (v.type) {
+static bool isPath(const reflection::TypeDescriptor& type) {
+	if (type.type != reflection::Variant::CSTR) return false;
+	return equalStrings(type.type_name, "Path");
+}
+
+static int push(lua_State* L, Span<u8> val, const reflection::TypeDescriptor& type, World* world) {
+	#define RET(T) do { \
+		T v; \
+		ASSERT(sizeof(v) == val.length()); \
+		memcpy(&v, val.m_begin, sizeof(v)); \
+		LuaWrapper::push(L, v); \
+		return 1; \
+	} while(false) \
+	
+	switch (type.type) {
+		default:	
 		case reflection::Variant::ENTITY: ASSERT(false); return 0;
 		case reflection::Variant::VOID: return 0;
-		case reflection::Variant::BOOL: LuaWrapper::push(L, v.b); return 1;
-		case reflection::Variant::U32: LuaWrapper::push(L, v.u); return 1;
-		case reflection::Variant::I32: LuaWrapper::push(L, v.i); return 1;
-		case reflection::Variant::FLOAT: LuaWrapper::push(L, v.f); return 1;
-		case reflection::Variant::CSTR: LuaWrapper::push(L, v.s); return 1;
-		case reflection::Variant::VEC2: LuaWrapper::push(L, v.v2); return 1;
+		case reflection::Variant::BOOL: RET(bool);
+		case reflection::Variant::U32: RET(u32);
+		case reflection::Variant::I32: RET(i32);
+		case reflection::Variant::VEC2: RET(Vec2);
 		case reflection::Variant::COLOR:
-		case reflection::Variant::VEC3: LuaWrapper::push(L, v.v3); return 1;
-		case reflection::Variant::DVEC3: LuaWrapper::push(L, v.dv3); return 1;
-		case reflection::Variant::QUAT: LuaWrapper::push(L, v.quat); return 1;
-		case reflection::Variant::PTR: pushObject(L, v.ptr, type_name); return 1;
+		case reflection::Variant::VEC3: RET(Vec3);
+		case reflection::Variant::DVEC3: RET(DVec3);
+		case reflection::Variant::QUAT: RET(Quat);
+		case reflection::Variant::PTR: {
+			if (type.is_pointer) {
+				void* ptr;
+				ASSERT(sizeof(ptr) == val.length());
+				memcpy(&ptr, val.m_begin, sizeof(ptr));
+				LuaWrapper::pushObject(L, ptr, type.type_name);
+				return 1;
+			}
+			
+			void* inst = type.create_copy(val.m_begin, getGlobalAllocator());
+			LuaWrapper::pushObject(L, inst, type.type_name);
+			return 1;
+		}
+		case reflection::Variant::FLOAT: RET(float);
+		case reflection::Variant::CSTR: {
+			if (isPath(type)) {
+				LuaWrapper::push(L, (const char*)val.m_begin);
+				return 1;
+			}
+			RET(const char*);
+		}
 	}
 	ASSERT(false);
 	return 0;
+	#undef RET
 }
 
 static int luaMethodClosure(lua_State* L) {
@@ -189,8 +214,12 @@ static int luaMethodClosure(lua_State* L) {
 		toVariant(type, L, i + 2, args[i]);
 	}
 
-	const reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
-	return push(L, res, f->getReturnTypeName());
+	u8 res_mem[128];
+	reflection::TypeDescriptor ret_type = f->getReturnType();
+	ASSERT(ret_type.size <= sizeof(res_mem));
+	Span<u8> res(res_mem, ret_type.size);
+	f->invoke(obj, res, Span(args, f->getArgCount()));
+	return push(L, res, f->getReturnType(), nullptr);
 }
 
 static int luaModuleMethodClosure(lua_State* L) {
@@ -208,12 +237,14 @@ static int luaModuleMethodClosure(lua_State* L) {
 		reflection::Variant::Type type = f->getArgType(i).type;
 		toVariant(type, L, i + 2, args[i]);
 	}
-	const reflection::Variant res = f->invoke(module, Span(args, f->getArgCount()));
-	if (res.type == reflection::Variant::ENTITY) {
-		LuaWrapper::pushEntity(L, res.e, &module->getWorld());
-		return 1;
-	}
-	return push(L, res, f->getReturnTypeName());
+
+	u8 res_mem[128];
+	reflection::TypeDescriptor ret_type = f->getReturnType();
+	ASSERT(ret_type.size <= sizeof(res_mem));
+	Span<u8> res(res_mem, ret_type.size);
+	
+	f->invoke(module, res, Span(args, f->getArgCount()));
+	return push(L, res, f->getReturnType(), &module->getWorld());
 }
 
 static int luaCmpMethodClosure(lua_State* L) {
@@ -242,12 +273,14 @@ static int luaCmpMethodClosure(lua_State* L) {
 		reflection::Variant::Type type = f->getArgType(i).type;
 		toVariant(type, L, i + 1, args[i]);
 	}
-	const reflection::Variant res = f->invoke(module, Span(args, f->getArgCount()));
-	if (res.type == reflection::Variant::ENTITY) {
-		LuaWrapper::pushEntity(L, res.e, &module->getWorld());
-		return 1;
-	}
-	return push(L, res, f->getReturnTypeName());
+
+	u8 res_mem[sizeof(Path)];
+	reflection::TypeDescriptor ret_type = f->getReturnType();
+	ASSERT(ret_type.size <= sizeof(res_mem));
+	Span<u8> res(res_mem, ret_type.size);
+	
+	f->invoke(module, res, Span(args, f->getArgCount()));
+	return push(L, res, f->getReturnType(), &module->getWorld());
 }
 
 static int lua_struct_var_setter(lua_State* L) {
@@ -305,12 +338,20 @@ static int lua_struct_var_getter(lua_State* L) {
 						LuaWrapper::push(L, var->get<DVec3>(inst));
 						return 1;
 					}
+					case reflection::Variant::BOOL: {
+						LuaWrapper::push(L, var->get<bool>(inst));
+						return 1;
+					}
 					case reflection::Variant::VEC3: {
 						LuaWrapper::push(L, var->get<Vec3>(inst));
 						return 1;
 					}
 					case reflection::Variant::FLOAT: {
 						LuaWrapper::push(L, var->get<float>(inst));
+						return 1;
+					}
+					case reflection::Variant::ENTITY: {
+						LuaWrapper::push(L, var->get<EntityPtr>(inst).index);
 						return 1;
 					}
 					default:
@@ -374,12 +415,8 @@ static void createClasses(lua_State* L) {
 	}
 
 	for (auto* f : reflection::allFunctions()) {
-		char tmp_obj_type_name[128];
-		copyString(Span(tmp_obj_type_name), f->getThisTypeName());
-		const char* c = tmp_obj_type_name + strlen(tmp_obj_type_name);
-		while (*c != ':' && c != tmp_obj_type_name) --c;
-		if (*c == ':') ++c;
-		const char* obj_type_name = c;
+		char obj_type_name[128];
+		copyString(Span(obj_type_name), f->getThisType().type_name);
 		if (LuaWrapper::getField(L, -1, obj_type_name) != LUA_TTABLE) { // [LumixAPI, obj|nil ]
 			lua_pop(L, 1);						// [LumixAPI]
 			lua_newtable(L);					// [LumixAPI, obj]
@@ -1534,18 +1571,9 @@ public:
 
 			for (const reflection::FunctionBase* f :  module->functions) {
 				lua_pushlightuserdata(L, (void*)f); // [module, f]
-				if (f->name) {
-					lua_pushcclosure(L, luaModuleMethodClosure, f->name, 1);
-					lua_setfield(L, -2, f->name); // [module]
-				}
-				else {
-					const char* c = f->decl_code;
-					while (*c != ':' && *c) ++c;
-					ASSERT(*c == ':');
-					c += 2;
-					lua_pushcclosure(L, luaModuleMethodClosure, c, 1);
-					lua_setfield(L, -2, c); // [module]
-				}
+				ASSERT(f->name);
+				lua_pushcclosure(L, luaModuleMethodClosure, f->name, 1);
+				lua_setfield(L, -2, f->name); // [module]
 			}
 			lua_pop(L, 1); // []
 
@@ -2765,12 +2793,90 @@ struct LuaProperties : reflection::DynamicProperties {
 	}
 };
 
+static int finishrequire(lua_State* L)
+{
+    if (lua_isstring(L, -1))
+        lua_error(L);
+
+    return 1;
+}
+
+static int LUA_require(lua_State* L) {
+    const char* name = luaL_checkstring(L, 1);
+
+    luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
+
+    // return the module from the cache
+    lua_getfield(L, -1, name);
+    if (!lua_isnil(L, -1))
+    {
+        // L stack: _MODULES result
+        return finishrequire(L);
+    }
+
+    lua_pop(L, 1);
+
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
+	Path path(name, ".lua");
+	LuaScript* dep = engine->getResourceManager().load<LuaScript>(path);
+	if (!dep->isReady()) {
+		ASSERT(false); // require-d modules should be registered as dependencies, so it should be impossible to get here
+		luaL_argerrorL(L, 1, "error loading module");
+	}
+
+    // module needs to run in a new thread, isolated from the rest
+    // note: we create ML on main thread so that it doesn't inherit environment of L
+    lua_State* GL = lua_mainthread(L);
+    lua_State* ML = lua_newthread(GL);
+    lua_xmove(GL, L, 1);
+
+    // new thread needs to have the globals sandboxed
+    luaL_sandboxthread(ML);
+
+    // now we can compile & run module on the new thread
+	size_t bytecode_size;
+	char* bytecode = luau_compile((const char*)dep->getSourceCode().begin, dep->getSourceCode().size(), nullptr, &bytecode_size);
+    if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
+    {
+        int status = lua_resume(ML, L, 0);
+
+        if (status == 0)
+        {
+            if (lua_gettop(ML) == 0)
+                lua_pushstring(ML, "module must return a value");
+            else if (!lua_istable(ML, -1) && !lua_isfunction(ML, -1))
+                lua_pushstring(ML, "module must return a table or function");
+        }
+        else if (status == LUA_YIELD)
+        {
+            lua_pushstring(ML, "module can not yield");
+        }
+        else if (!lua_isstring(ML, -1))
+        {
+            lua_pushstring(ML, "unknown error while running module");
+        }
+    }
+	free(bytecode);
+
+    // there's now a return value on top of ML; L stack: _MODULES ML
+    lua_xmove(ML, L, 1);
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -4, name);
+
+    // L stack: _MODULES ML result
+    return finishrequire(L);
+}
 
 LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	: m_engine(engine)
 	, m_allocator(engine.getAllocator(), "lua system")
 	, m_script_manager(m_allocator)
 {
+	lua_State* L = engine.getState();
+	lua_pushlightuserdata(L, &engine);
+	lua_pushcclosure(L, &LUA_require, "require", 1);
+	lua_setglobal(L, "require");
+
 	m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
 	LUMIX_MODULE(LuaScriptModuleImpl, "lua_script")

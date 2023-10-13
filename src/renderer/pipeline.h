@@ -44,18 +44,6 @@ namespace UniformBuffer {
 	};
 }
 
-struct LUMIX_RENDERER_API PipelineResource : Resource {
-	static ResourceType TYPE;
-
-	PipelineResource(const Path& path, ResourceManager& owner, Renderer& renderer, IAllocator& allocator);
-
-	void unload() override;
-	bool load(Span<const u8> mem) override;
-	ResourceType getType() const override { return TYPE; }
-
-	String content;
-};
-
 
 struct LUMIX_RENDERER_API Pipeline {
 	struct CustomCommandHandler {
@@ -64,7 +52,7 @@ struct LUMIX_RENDERER_API Pipeline {
 		RuntimeHash hash;
 	};
 
-	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineResource* resource, const char* define);
+	static UniquePtr<Pipeline> create(Renderer& renderer, struct LuaScript* resource, const char* define);
 	
 	virtual ~Pipeline() {}
 

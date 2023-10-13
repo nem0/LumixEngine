@@ -18,6 +18,7 @@
 #include "engine/thread.h"
 #include "engine/world.h"
 #include "gui/gui_system.h"
+#include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -79,7 +80,7 @@ struct Runner final
 		m_viewport.rot = Quat::IDENTITY;
 
 		m_renderer = static_cast<Renderer*>(m_engine->getSystemManager().getSystem("renderer"));
-		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		LuaScript* pres = m_engine->getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
 		m_pipeline = Pipeline::create(*m_renderer, pres, "APP");
 
 		while (m_engine->getFileSystem().hasWork()) {
