@@ -737,6 +737,8 @@ struct IScene
 	virtual DataView getEmbeddedData(int index) const = 0;
 	virtual DataView getEmbeddedFilename(int index) const = 0;
 	virtual bool isEmbeddedBase64(int index) const = 0;
+	// data are encoded in returned property and all ->next properties
+	virtual const IElementProperty* getEmbeddedBase64Data(int index) const = 0;
 
 	// Scene Misc
 	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;

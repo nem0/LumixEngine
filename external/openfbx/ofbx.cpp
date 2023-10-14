@@ -80,6 +80,7 @@ struct Allocator {
 
 struct Video
 {
+	IElementProperty* base64_property = nullptr;
 	DataView filename;
 	DataView content;
 	DataView media;
@@ -1957,6 +1958,10 @@ struct Scene : IScene
 		return m_videos[index].is_base_64;
 	}
 
+	const IElementProperty* getEmbeddedBase64Data(int index) const override {
+		return m_videos[index].base64_property;
+	}
+
 	DataView getEmbeddedFilename(int index) const override {
 		return m_videos[index].filename;
 	}
@@ -2256,16 +2261,6 @@ void parseVideo(Scene& scene, const Element& element, Allocator& allocator)
 	if (!content_element->first_property) return;
 	const Property* content_property = content_element->first_property;
 	if (content_element->first_property->getType() != IElementProperty::BINARY) {
-		/*
-			if this happens in text format: 
-			Content: ,
-				"iVBORw0KGgoA...
-			this is not a proper solution, but keep doing this until it become an issue
-		*/
-		if (content_element->first_property->getType() != IElementProperty::NONE) return;
-		if (!content_element->first_property->next) return;
-		if (content_element->first_property->next->getType() != IElementProperty::STRING) return;
-		content_property = content_element->first_property->next;
 		is_base64 = true;
 	}
 
@@ -2276,7 +2271,8 @@ void parseVideo(Scene& scene, const Element& element, Allocator& allocator)
 
 	Video video;
 	video.is_base_64 = is_base64;
-	video.content = content_property->value;
+	video.base64_property = is_base64 ? content_element->first_property->next : nullptr;
+	video.content = is_base64 ? DataView{} : content_element->first_property->value;
 	video.filename = filename_element->first_property->value;
 	video.media = element.first_property->next->value;
 	scene.m_videos.push_back(video);

@@ -142,14 +142,15 @@ void decodeBase64(const void* data, const u32 len, OutputMemoryStream& str)
 	unsigned char* p = (unsigned char*)data;
 	int pad = len > 0 && (len % 4 || p[len - 1] == '=');
 	const u32 L = ((len + 3) / 4 - pad) * 4;
-	str.resize(L / 4 * 3 + pad);
+	const u32 offset = (u32)str.size();
+	str.resize(L / 4 * 3 + pad + offset);
 
 	for (u32 i = 0, j = 0; i < L; i += 4)
 	{
 		int n = B64index[p[i]] << 18 | B64index[p[i + 1]] << 12 | B64index[p[i + 2]] << 6 | B64index[p[i + 3]];
-		str[j++] = n >> 16;
-		str[j++] = n >> 8 & 0xFF;
-		str[j++] = n & 0xFF;
+		str[offset + j++] = n >> 16;
+		str[offset + j++] = n >> 8 & 0xFF;
+		str[offset + j++] = n & 0xFF;
 	}
 	if (pad)
 	{
@@ -174,7 +175,7 @@ static void extractEmbedded(const ofbx::IScene& m_scene, StringView src_dir, IAl
 		const PathInfo pi(filename);
 		const StaticString<MAX_PATH> fullpath(src_dir, pi.basename, ".", pi.extension);
 
-		if (os::fileExists(fullpath)) return;
+		if (os::fileExists(fullpath)) continue;
 
 		os::OutputFile file;
 		if (!file.open(fullpath)) {
@@ -184,10 +185,21 @@ static void extractEmbedded(const ofbx::IScene& m_scene, StringView src_dir, IAl
 
 		if (m_scene.isEmbeddedBase64(i)) {
 			OutputMemoryStream tmp(allocator);
-			decodeBase64(embedded.begin, u32(embedded.end - embedded.begin), tmp);
-			if (!file.write(tmp.data(), tmp.size())) {
-				logError("Failed to write ", fullpath);
+			const ofbx::IElementProperty* prop = m_scene.getEmbeddedBase64Data(i);
+			if (prop) {
+				if (prop->getNext()) {
+					for (const auto* j = prop; j; j = j->getNext()) {
+						decodeBase64(j->getValue().begin, u32(j->getValue().end - j->getValue().begin), tmp);
+					}
+				}
+				else {
+					decodeBase64(prop->getValue().begin, u32(prop->getValue().end - prop->getValue().begin), tmp);
+				}
+				if (!file.write(tmp.data(), tmp.size())) {
+					logError("Failed to write ", fullpath);
+				}
 			}
+			else logError("Invalid data ", fullpath);
 		}
 		else {
 			if (!file.write(embedded.begin + 4, embedded.end - embedded.begin - 4)) {
