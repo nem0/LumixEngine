@@ -64,6 +64,12 @@ void FBXImporter::getImportMeshName(const ImportMesh& mesh, char (&out)[256])
 	if (name[0] == '\0' && mesh.fbx->getParent()) name = mesh.fbx->getParent()->name;
 	if (name[0] == '\0' && material) name = material->name;
 	copyString(out, name);
+	for (char& c : out) {
+		if (c == 0) break;
+		// we use ':' as a separator between subresource:resource, so we can't have 
+		// use it in mesh name
+		if (c == ':') c = '_'; 
+	}
 	if(mesh.submesh >= 0) {
 		catString(out, "_");
 		char tmp[32];
