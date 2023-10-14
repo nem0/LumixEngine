@@ -178,6 +178,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 
 	void serialize(OutputMemoryStream& blob) const;
 	void deserialize(InputMemoryStream& blob, bool has_autodestroy, bool emit_rate_removed, ResourceManagerHub& manager);
+	void applyTransform(const Transform& new_tr);
 	bool update(float dt, PageAllocator& page_allocator);
 	ParticleSystemResource* getResource() const { return m_resource; }
 	void setResource(ParticleSystemResource* res);
@@ -198,7 +199,7 @@ private:
 
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
-	void update(float dt, u32 emitter_idx, const Transform& delta_transform, PageAllocator& page_allocator);
+	void update(float dt, u32 emitter_idx, PageAllocator& page_allocator);
 	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
 	void run(RunningContext& ctx);

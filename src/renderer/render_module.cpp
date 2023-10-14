@@ -1493,6 +1493,9 @@ struct RenderModuleImpl final : RenderModule {
 				m_culling_system->setPosition(entity, pos);
 			}
 		}
+		else if (m_world.hasComponent(entity, PARTICLE_EMITTER_TYPE)) {
+			m_particle_emitters[entity].applyTransform(m_world.getTransform(entity));
+		}
 
 		bool was_updating = m_is_updating_attachments;
 		m_is_updating_attachments = true;

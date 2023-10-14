@@ -1060,7 +1060,35 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 	}
 }
 
-void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr, PageAllocator& page_allocator) {
+void ParticleSystem::applyTransform(const Transform& new_tr) {
+	PROFILE_FUNCTION();
+	if (m_total_time == 0) {
+		m_prev_frame_transform = new_tr;
+	}
+	const Transform delta_tr = new_tr.inverted() * m_prev_frame_transform;
+	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
+		Emitter& emitter = m_emitters[emitter_idx];
+		if ((u32)m_resource->getFlags() & (u32)ParticleSystemResource::Flags::WORLD_SPACE) {
+			jobs::forEach(emitter.particles_count, 4096, [&](u32 from, u32 to){
+				PROFILE_BLOCK("to world space");
+				// TODO make sure first 3 channels are position
+				float* LUMIX_RESTRICT x = emitter.channels[0].data;
+				float* LUMIX_RESTRICT y = emitter.channels[1].data;
+				float* LUMIX_RESTRICT z = emitter.channels[2].data;
+				for (u32 i = from; i < to; ++i) {
+					Vec3 p{x[i], y[i], z[i]};
+					p = Vec3(delta_tr.transform(p));
+					x[i] = p.x;
+					y[i] = p.y;
+					z[i] = p.z;
+				}
+			});
+		}
+	}
+	m_prev_frame_transform = new_tr;
+}
+
+void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_allocator) {
 	PROFILE_FUNCTION();
 
 	Emitter& emitter = m_emitters[emitter_idx];
@@ -1168,23 +1196,6 @@ void ParticleSystem::update(float dt, u32 emitter_idx, const Transform& delta_tr
 		profiler::pushInt("count", dst_emitter.resource_emitter.init_emit_count);
 		emit(emitter_idx, Span(outputs, outputs_count), dst_emitter.resource_emitter.init_emit_count, 0);
 	}
-
-	if ((u32)m_resource->getFlags() & (u32)ParticleSystemResource::Flags::WORLD_SPACE) {
-		jobs::forEach(emitter.particles_count, 4096, [&](u32 from, u32 to){
-			PROFILE_BLOCK("to world space");
-			// TODO make sure first 3 channels are position
-			float* LUMIX_RESTRICT x = emitter.channels[0].data;
-			float* LUMIX_RESTRICT y = emitter.channels[1].data;
-			float* LUMIX_RESTRICT z = emitter.channels[2].data;
-			for (u32 i = from; i < to; ++i) {
-				Vec3 p{x[i], y[i], z[i]};
-				p = Vec3(delta_tr.transform(p));
-				x[i] = p.x;
-				y[i] = p.y;
-				z[i] = p.z;
-			}
-		});
-	}
 }
 
 bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
@@ -1197,7 +1208,6 @@ bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 	m_constants[1] = m_total_time;
 	
 	if (m_total_time == 0) {
-		m_prev_frame_transform = m_world.getTransform(*m_entity);
 		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 			const ParticleSystemResource::Emitter& emitter = m_resource->getEmitters()[emitter_idx];
 			if (emitter.emit_inputs_count == 0) {
@@ -1208,17 +1218,14 @@ bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 
 	m_total_time += dt;
 
-	const Transform world_tr = m_world.getTransform(*m_entity);
-	const Transform delta_tr = world_tr.inverted() * m_prev_frame_transform;
 	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
-		update(dt, emitter_idx, delta_tr, page_allocator);
+		update(dt, emitter_idx, page_allocator);
 	}
 
 	u32 c = 0;
 	for (const Emitter& emitter : m_emitters) {
 		c += emitter.particles_count;
 	}
-	m_prev_frame_transform = world_tr;
 	return c == 0 && m_autodestroy;
 }
 
