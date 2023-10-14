@@ -736,6 +736,7 @@ struct IScene
 	virtual int getEmbeddedDataCount() const = 0;
 	virtual DataView getEmbeddedData(int index) const = 0;
 	virtual DataView getEmbeddedFilename(int index) const = 0;
+	virtual bool isEmbeddedBase64(int index) const = 0;
 
 	// Scene Misc
 	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
