@@ -2532,30 +2532,68 @@ void FBXImporter::writeModelHeader()
 	write(header);
 }
 
-
-bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes)
 {
 	if (m_meshes.empty()) return false;
 	if (cfg.physics == ImportConfig::Physics::NONE) return false;
 
-	m_out_file.clear();
+	Array<Vec3> verts(m_allocator);
+	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
+	if (!ps) {
+		logError(src, ": no physics system found while trying to cook physics data");
+		return false;
+	}
 
 	PhysicsGeometry::Header header;
 	header.m_magic = PhysicsGeometry::HEADER_MAGIC;
 	header.m_version = (u32)PhysicsGeometry::Versions::LAST;
 	const bool to_convex = cfg.physics == ImportConfig::Physics::CONVEX;
 	header.m_convex = (u32)to_convex;
+
+	if (split_meshes) {
+		for (const ImportMesh& mesh : m_meshes) {
+			m_out_file.clear();
+			m_out_file.write(&header, sizeof(header));
+
+			verts.clear();
+			int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
+			int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
+
+			const u8* vd = mesh.vertex_data.data();
+
+			for (int i = 0; i < vertex_count; ++i) {
+				verts.push(*(Vec3*)(vd + i * vertex_size));
+			}
+
+			if (to_convex) {
+				if (!ps->cookConvex(verts, m_out_file)) {
+					logError("Failed to cook ", src);
+					return false;
+				}
+			}
+			else {
+				if (!ps->cookTriMesh(verts, mesh.indices, m_out_file)) {
+					logError("Failed to cook ", src);
+					return false;
+				}
+			}
+
+			char mesh_name[256];
+			getImportMeshName(mesh, mesh_name);
+			Path phy_path(mesh_name, ".phy:", src);
+			if (!m_compiler.writeCompiledResource(phy_path, Span(m_out_file.data(), (i32)m_out_file.size()))) {
+				logError("Failed to write ", phy_path);
+				return false;
+			}
+		}
+		return true;
+	}
+
+	m_out_file.clear();
 	m_out_file.write(&header, sizeof(header));
 
-	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
-	if (!ps) {
-		logError(src, ": no physics system found while trying to cook physics data");
-		return false;
-	}
-	Array<Vec3> verts(m_allocator);
-
 	i32 total_vertex_count = 0;
-	for (auto& mesh : m_meshes)	{
+	for (const ImportMesh& mesh : m_meshes)	{
 		total_vertex_count += (i32)(mesh.vertex_data.size() / getVertexSize(*mesh.fbx, mesh.is_skinned, cfg));
 	}
 	verts.reserve(total_vertex_count);
@@ -2601,50 +2639,10 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg)
 	}
 
 	Path phy_path(".phy:", src);
-	m_compiler.writeCompiledResource(phy_path, Span(m_out_file.data(), (i32)m_out_file.size()));
-	return true;
+	return m_compiler.writeCompiledResource(phy_path, Span(m_out_file.data(), (i32)m_out_file.size()));
 }
 
-
-bool FBXImporter::writePhysicsPrefab(const Path& src, const ImportConfig& cfg) {
-	// TODO handle split meshes
-	Engine& engine = m_app.getEngine();
-	World& world = engine.createWorld(false);
-
-	os::OutputFile file;
-	PathInfo file_info(src);
-	Path tmp(file_info.dir, "/", file_info.basename, ".fab");
-	if (!m_filesystem.open(tmp, file)) {
-		logError("Could not create ", tmp);
-		return false;
-	}
-
-	OutputMemoryStream blob(m_allocator);
-	
-	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
-	const EntityRef e = world.createEntity(DVec3(0), Quat::IDENTITY);
-	world.createComponent(MODEL_INSTANCE_TYPE, e);
-	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
-	rmodule->setModelInstancePath(e, src);
-
-	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
-	world.createComponent(RIGID_ACTOR_TYPE, e);
-	pmodule->setMeshGeomPath(e, Path(".phy:", src));
-
-	world.serialize(blob, WorldSerializeFlags::NONE);
-	engine.destroyWorld(world);
-
-	if (!file.write(blob.data(), blob.size())) {
-		logError("Could not write ", tmp);
-		file.close();
-		return false;
-	}
-	file.close();
-	return true;
-}
-
-bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes)
 {
 	Engine& engine = m_app.getEngine();
 	World& world = engine.createWorld(false);
@@ -2658,28 +2656,45 @@ bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg)
 	}
 
 	OutputMemoryStream blob(m_allocator);
+	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+	const bool with_physics = cfg.physics != ImportConfig::Physics::NONE;
+	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
 	
 	const EntityRef root = world.createEntity({0, 0, 0}, Quat::IDENTITY);
+	if (!split_meshes) {
+		world.createComponent(MODEL_INSTANCE_TYPE, root);
+		rmodule->setModelInstancePath(root, src);
 
-	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	for(int i  = 0; i < m_meshes.size(); ++i) {
-		const EntityRef e = world.createEntity(DVec3(m_meshes[i].origin), Quat::IDENTITY);
-		world.createComponent(MODEL_INSTANCE_TYPE, e);
-		world.setParent(root, e);
-		char mesh_name[256];
-		getImportMeshName(m_meshes[i], mesh_name);
-		Path mesh_path(mesh_name, ".fbx:", src);
-		RenderModule* m_scene = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
-		m_scene->setModelInstancePath(e, mesh_path);
+		ASSERT(with_physics);
+		world.createComponent(RIGID_ACTOR_TYPE, root);
+		pmodule->setMeshGeomPath(root, Path(".phy:", src));
 	}
+	else {
+		for(int i  = 0; i < m_meshes.size(); ++i) {
+			const EntityRef e = world.createEntity(DVec3(m_meshes[i].origin), Quat::IDENTITY);
+			world.createComponent(MODEL_INSTANCE_TYPE, e);
+			world.setParent(root, e);
+			char mesh_name[256];
+			getImportMeshName(m_meshes[i], mesh_name);
+			Path mesh_path(mesh_name, ".fbx:", src);
+			rmodule->setModelInstancePath(e, mesh_path);
+	
+			if (with_physics) {
+				world.createComponent(RIGID_ACTOR_TYPE, e);
+				pmodule->setMeshGeomPath(e, Path(mesh_name, ".phy:", src));
+			}
+		}
 
-	static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
-	for (i32 i = 0, c = m_scene->getLightCount(); i < c; ++i) {
-		const ofbx::Light* light = m_scene->getLight(i);
-		const Matrix mtx = toLumix(light->getGlobalTransform());
-		const EntityRef e = world.createEntity(DVec3(mtx.getTranslation() * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
-		world.createComponent(POINT_LIGHT_TYPE, e);
-		world.setParent(root, e);
+		static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
+		for (i32 i = 0, c = m_scene->getLightCount(); i < c; ++i) {
+			const ofbx::Light* light = m_scene->getLight(i);
+			const Matrix mtx = toLumix(light->getGlobalTransform());
+			const EntityRef e = world.createEntity(DVec3(mtx.getTranslation() * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
+			world.createComponent(POINT_LIGHT_TYPE, e);
+			world.setParent(root, e);
+		}
 	}
 
 	world.serialize(blob, WorldSerializeFlags::NONE);

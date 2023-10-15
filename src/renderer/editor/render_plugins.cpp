@@ -2535,10 +2535,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					importer.getImportMeshName(meshes[i], mesh_name);
 					Path tmp(mesh_name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
+					if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+						ResourceType physics_geom("physics_geometry");
+						compiler.addResource(physics_geom, Path(mesh_name, ".phy:", path));
+					}
 				}
 			}
 
-			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE && !meta.split) {
 				Path tmp(".phy:", path);
 				ResourceType physics_geom("physics_geometry");
 				compiler.addResource(physics_geom, tmp);
@@ -2609,10 +2613,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (meta.split) {
 			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH;
 			any_written = importer.writeSubmodels(filepath, cfg) || any_written;
-			// writePrefab is not threadsafe, run on "main thread"
-			jobs::moveJobToWorker(0);
-			any_written = importer.writePrefab(filepath, cfg) || any_written;
-			jobs::yield();
+			any_written = importer.writePhysics(filepath, cfg, true) || any_written;
 		}
 		cfg.origin = meta.origin;
 		any_written = importer.writeModel(src, cfg) || any_written;
@@ -2620,10 +2621,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (!meta.ignore_animations) {
 			any_written = importer.writeAnimations(filepath, cfg) || any_written;
 		}
-		any_written = importer.writePhysics(filepath, cfg) || any_written;
-		if (meta.create_prefab_with_physics) {
+		if (!meta.split) {
+			any_written = importer.writePhysics(filepath, cfg, false) || any_written;
+		}
+		if (meta.split || meta.create_prefab_with_physics) {
 			jobs::moveJobToWorker(0);
-			importer.writePhysicsPrefab(filepath, cfg);
+			any_written = importer.writePrefab(filepath, cfg, meta.split) || any_written;
 			jobs::yield();
 		}
 		return any_written;
