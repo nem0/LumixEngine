@@ -2408,11 +2408,7 @@ public:
 
 		lua_pushvalue(L, -3); // [lua_event, environment, func, lua_event]
 			
-		if (lua_pcall(L, 1, 0, 0) != 0)// [lua_event, environment]
-		{
-			logError(lua_tostring(L, -1));
-			lua_pop(L, 1); // []
-		}
+		LuaWrapper::pcall(L, 1, 0); // [lua_event, environment]
 		lua_pop(L, 2); // []
 	}
 

@@ -649,7 +649,7 @@ struct EditorWindow : AssetEditorWindow {
 	#endif
 };
 
-static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies) {
+static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies, const Path& path) {
 	lua_State* L = luaL_newstate();
 
 	auto reg_dep = [](lua_State* L) -> int {
@@ -692,8 +692,10 @@ static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies)
 	lua_insert(L, -2); // new_g, meta
 	lua_setmetatable(L, -2); //new_g
 		
-	bool errors = LuaWrapper::luaL_loadbuffer(L, (const char*)src.m_begin, src.length(), "gather_requires"); // new_g, fn
+	bool errors = LuaWrapper::luaL_loadbuffer(L, (const char*)src.m_begin, src.length(), path.c_str()); // new_g, fn
 	if (errors) {
+		const char* msg = lua_tostring(L, -1);
+		logError(msg);
 		lua_close(L);
 		return false;
 	}
@@ -724,7 +726,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (!fs.getContentSync(src, src_data)) return false;
 		
 		Array<Path> deps(m_app.getAllocator());
-		if (!gatherRequires(src_data, deps)) return false;
+		if (!gatherRequires(src_data, deps, src)) return false;
 
 		OutputMemoryStream out(m_app.getAllocator());
 		out.write(deps.size());
