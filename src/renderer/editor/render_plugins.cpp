@@ -2919,9 +2919,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 		}
 
-		const float radius = length(aabb.max - aabb.min) * 0.50001f;
+		const float radius = maximum(1e-5f, length(aabb.max - aabb.min) * 0.50001f);
 		const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		const Vec3 eye = center + Vec3(1, 1, 1) * length(aabb.max - aabb.min) / SQRT2;
+		const Vec3 eye = center + Vec3(1, 1, 1) * maximum(1e-5f, length(aabb.max - aabb.min)) / SQRT2;
 		Matrix mtx;
 		mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 		Viewport viewport;

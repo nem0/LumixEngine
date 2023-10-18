@@ -1185,7 +1185,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		static TextFilter filter;
 		filter.gui("Filter", width, focus);
 		
-		float h = ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeightWithSpacing() * 2;
+		float h = maximum(200.f, ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeightWithSpacing() * 2);
 
 		ImGui::BeginChild("Resources", ImVec2(0, h), false, ImGuiWindowFlags_HorizontalScrollbar);
 		AssetCompiler& compiler = m_app.getAssetCompiler();
