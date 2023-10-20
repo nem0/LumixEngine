@@ -7,6 +7,7 @@ local cubemap_sky = require "pipelines/cubemap_sky"
 local film_grain =  require "pipelines/film_grain"
 local fxaa =  require "pipelines/fxaa"
 
+local grid_shader = preloadShader("pipelines/grid.shd")
 local lighting_shader = preloadShader("pipelines/lighting.shd")
 local field_debug_shader = preloadShader("pipelines/field_debug.shd")
 textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
@@ -31,6 +32,7 @@ local taa_history = -1
 local render_grass = true
 local render_impostors = true
 local render_terrain = true
+local enable_grid = true
 
 type GBuffer = {
 	A : RenderBuffer,
@@ -319,6 +321,12 @@ blur = function(buffer: RenderBuffer, w : number, h : number, rb_desc : RenderBu
 	setRenderTargets()
 end
 
+local function grid()
+	if enable_grid then
+		drawArray(0, 4, grid_shader, {}, transparent_state);
+	end
+end
+
 local function shadowPass() : RenderBuffer
 	if not environmentCastShadows() then
 		local rb = createRenderbuffer(shadowmap_1x1)
@@ -572,6 +580,8 @@ main = function()
 	if SCENE_VIEW ~= nil then
 		local icon_ds = createRenderbuffer(icon_ds_desc)
 		pass(view_params)
+			setRenderTargetsDS(res, gbuffer.DS)
+			grid()
 			setRenderTargetsDS(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 			renderGizmos()
@@ -659,6 +669,7 @@ onGUI = function()
 		_, render_impostors = ImGui.Checkbox("Impostors", render_impostors)
 		_, render_terrain = ImGui.Checkbox("Terrain", render_terrain)
 		_, enable_icons = ImGui.Checkbox("Icons", enable_icons)
+		_, enable_grid = ImGui.Checkbox("Grid", enable_grid)
 		local changed, upsample = ImGui.DragFloat("Downsample", getRenderToDisplayRatio())
 		if changed then
 			if upsample < 1 then upsample = 1 end
