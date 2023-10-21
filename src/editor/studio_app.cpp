@@ -685,7 +685,7 @@ struct StudioAppImpl final : StudioApp
 	const Array<Action*>& getActions() override { return m_actions; }
 
 
-	void guiBeginFrame() const
+	void guiBeginFrame()
 	{
 		PROFILE_FUNCTION();
 
@@ -702,7 +702,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		io.DeltaTime = m_engine->getLastTimeDelta();
 
-		if (!m_cursor_captured) {
+		if (!m_cursor_clipped) {
 			const os::Point cp = os::getMouseScreenPos();
 			if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 				io.AddMousePosEvent((float)cp.x, (float)cp.y);
@@ -715,7 +715,7 @@ struct StudioAppImpl final : StudioApp
 
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
-		if (!m_cursor_captured) {
+		if (!m_cursor_clipped) {
 			static ImGuiMouseCursor last_cursor = ImGuiMouseCursor_COUNT;
 			if (imgui_cursor != last_cursor) {
 				switch (imgui_cursor) {
@@ -730,6 +730,8 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 		ImGui::PushFont(m_font);
+
+		if (os::getFocused() != m_main_window && m_cursor_clipped) unclipMouseCursor();
 	}
 
 	u32 getDockspaceID() const override {
@@ -1111,7 +1113,17 @@ struct StudioAppImpl final : StudioApp
 
 	Gizmo::Config& getGizmoConfig() override { return m_gizmo_config; }
 	
-	void setCursorCaptured(bool captured) override { m_cursor_captured = captured; }
+	void clipMouseCursor() override { m_cursor_clipped = true; }
+	void unclipMouseCursor() override {
+		os::clipCursor(os::INVALID_WINDOW, {});
+		m_cursor_clipped = false;
+	}
+	bool isMouseCursorClipped() const override {return m_cursor_clipped; }
+
+	void setMouseClipRect(os::WindowHandle win, const os::Rect &screen_rect) override {
+		if (!m_cursor_clipped) return;
+		os::clipCursor(win, screen_rect);
+	}
 
 	void addEntity() {
 		const EntityRef e = m_editor->addEntity();
@@ -3459,7 +3471,7 @@ struct StudioAppImpl final : StudioApp
 	Gizmo::Config m_gizmo_config;
 
 	bool m_show_save_world_ui = false;
-	bool m_cursor_captured = false;
+	bool m_cursor_clipped = false;
 	bool m_confirm_exit = false;
 	bool m_confirm_load = false;
 	bool m_confirm_new = false;

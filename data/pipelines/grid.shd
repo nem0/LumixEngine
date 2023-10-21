@@ -25,6 +25,7 @@ fragment_shader [[
 
 	 // https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
 	 // https://gist.github.com/bgolus/d49651f52b1dcf82f70421ba922ed064
+	 // grid by Ben Golus
 	 float PristineGrid(vec2 uv, vec2 lineWidth) {
         vec4 uvDDXY = vec4(dFdx(uv), dFdy(uv));
         vec2 uvDeriv = vec2(length(uvDDXY.xz), length(uvDDXY.yw));

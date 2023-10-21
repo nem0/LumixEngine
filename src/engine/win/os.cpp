@@ -71,7 +71,6 @@ struct EventQueue {
 };
 
 static struct {
-	WindowHandle grabbed_window = INVALID_WINDOW;
 	EventQueue event_queue;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
@@ -549,17 +548,6 @@ Point toScreen(WindowHandle win, int x, int y)
 	return res;
 }
 
-void updateGrabbedMouse() {
-	if (G.grabbed_window == INVALID_WINDOW) {
-		DEBUG_CHECK(ClipCursor(NULL));
-		return;
-	}
-
-	RECT rect;
-	DEBUG_CHECK(GetWindowRect((HWND)G.grabbed_window, &rect));
-	DEBUG_CHECK(ClipCursor(&rect));
-}
-
 WindowHandle createWindow(const InitWindowArgs& args) {
 	PROFILE_FUNCTION();
 	WCharStr<MAX_PATH> cls_name("lunex_window");
@@ -592,25 +580,20 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					e.win_move.x = (i16)LOWORD(lParam);
 					e.win_move.y = (i16)HIWORD(lParam);
 					G.event_queue.pushBack(e);
-					updateGrabbedMouse();
 					return 0;
 				case WM_SIZE:
 					e.type = Event::Type::WINDOW_SIZE;
 					e.win_size.w = LOWORD(lParam);
 					e.win_size.h = HIWORD(lParam);
 					G.event_queue.pushBack(e);
-					updateGrabbedMouse();
 					return 0;
 				case WM_CLOSE:
 					e.type = Event::Type::WINDOW_CLOSE;
 					G.event_queue.pushBack(e);
-					if (hWnd == G.grabbed_window) G.grabbed_window = INVALID_WINDOW;
-					updateGrabbedMouse();
 					return 0;
 				case WM_ACTIVATE:
 					if (wParam == WA_INACTIVE) {
 						showCursor(true);
-						grabMouse(INVALID_WINDOW);
 						G.key_states[(u32)os::Keycode::SHIFT] = false;
 						G.key_states[(u32)os::Keycode::CTRL] = false;
 						G.key_states[(u32)os::Keycode::ALT] = false;
@@ -622,7 +605,6 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					e.type = Event::Type::FOCUS;
 					e.focus.gained = wParam != WA_INACTIVE;
 					G.event_queue.pushBack(e);
-					updateGrabbedMouse();
 					break;
 				case WM_NCPAINT:
 				case WM_NCACTIVATE:
@@ -1361,9 +1343,16 @@ bool makePath(const char* path)
 	return error_code == ERROR_SUCCESS || error_code == ERROR_ALREADY_EXISTS;
 }
 
-void grabMouse(WindowHandle win) {
-	G.grabbed_window = win;
-	updateGrabbedMouse();
+void clipCursor(WindowHandle win, const Rect& rect) {
+	if (win == INVALID_WINDOW) ClipCursor(NULL);
+	else {
+		RECT wrect;
+		wrect.left = rect.left;
+		wrect.top = rect.top;
+		wrect.bottom = rect.top + rect.height;
+		wrect.right = rect.left + rect.width;
+		ClipCursor(&wrect);
+	}
 }
 
 

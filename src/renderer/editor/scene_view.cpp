@@ -1060,20 +1060,18 @@ void SceneView::renderGizmos()
 }
 
 
-void SceneView::captureMouse(bool capture)
-{
-	if(m_is_mouse_captured == capture) return;
+void SceneView::captureMouse(bool capture) {
+	if (m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
-	m_app.setCursorCaptured(capture);
-	os::showCursor(!m_is_mouse_captured);
+	os::showCursor(!capture);
 	if (capture) {
-		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
+		m_app.clipMouseCursor();
 		const os::Point p = os::getMouseScreenPos();
 		m_captured_mouse_x = p.x;
 		m_captured_mouse_y = p.y;
 	}
 	else {
-		os::grabMouse(os::INVALID_WINDOW);
+		m_app.unclipMouseCursor();
 		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 	}
 }
@@ -1260,7 +1258,7 @@ void SceneView::onToolbar()
 }
 
 void SceneView::handleEvents() {
-	const bool handle_input = m_is_mouse_captured || (ImGui::IsItemHovered() && os::getFocused() == ImGui::GetWindowViewport()->PlatformHandle);
+	const bool handle_input = m_is_mouse_captured || ImGui::IsItemHovered();
 	for (const os::Event event : m_app.getEvents()) {
 		switch (event.type) {
 			case os::Event::Type::KEY: {
@@ -1410,6 +1408,8 @@ void SceneView::insertModelUI() {
 
 void SceneView::onGUI()
 {
+	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
+
 	m_has_focus = false;
 	PROFILE_FUNCTION();
 	m_pipeline->setWorld(m_editor.getWorld());
@@ -1420,6 +1420,7 @@ void SceneView::onGUI()
 	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImVec2 view_size;
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
 		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
 		
@@ -1427,10 +1428,10 @@ void SceneView::onGUI()
 		is_open = true;
 		ImGui::Dummy(ImVec2(2, 2));
 		onToolbar();
-		const ImVec2 size = ImGui::GetContentRegionAvail();
+		view_size = ImGui::GetContentRegionAvail();
 		Viewport vp = m_view->getViewport();
-		vp.w = (int)size.x;
-		vp.h = (int)size.y;
+		vp.w = (int)view_size.x;
+		vp.h = (int)view_size.y;
 		m_view->setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
@@ -1439,27 +1440,27 @@ void SceneView::onGUI()
 		m_view->inputFrame();
 
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
-		if (size.x > 0 && size.y > 0) {
+		if (view_size.x > 0 && view_size.y > 0) {
 			const ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
 			m_screen_y = int(cursor_pos.y);
-			m_width = int(size.x);
-			m_height = int(size.y);
+			m_width = int(view_size.x);
+			m_height = int(view_size.y);
 			view_pos = ImGui::GetCursorScreenPos();
 			
 			if (texture_handle) {
 				void* t = texture_handle;
 				if (gpu::isOriginBottomLeft()) {
-					ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
+					ImGui::Image(t, view_size, ImVec2(0, 1), ImVec2(1, 0));
 				} 
 				else {
-					ImGui::Image(t, size);
+					ImGui::Image(t, view_size);
 				}
 			}
 
 			if (ImGui::BeginDragDropTarget()) {
 				if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
-					const ImVec2 drop_pos = (ImGui::GetMousePos() - view_pos) / size;
+					const ImVec2 drop_pos = (ImGui::GetMousePos() - view_pos) / view_size;
 					handleDrop((const char*)payload->Data, drop_pos.x, drop_pos.y);
 				}
 				ImGui::EndDragDropTarget();
@@ -1475,12 +1476,16 @@ void SceneView::onGUI()
 		m_view->m_draw_cmds.clear();
 	}
 
-	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {
-		captureMouse(false);
-	}
-
-
 	ImGui::End();
+
+	if (m_is_mouse_captured && is_open) {
+		os::Rect rect;
+		rect.left = (i32)view_pos.x;
+		rect.top = (i32)view_pos.y;
+		rect.width = (i32)view_size.x;
+		rect.height = (i32)view_size.y;
+		m_app.setMouseClipRect(ImGui::GetWindowViewport()->PlatformHandle, rect);
+	}
 
 	insertModelUI();
 

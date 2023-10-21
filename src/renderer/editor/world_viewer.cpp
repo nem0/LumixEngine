@@ -157,19 +157,28 @@ void WorldViewer::gui() {
 	m_pipeline->setViewport(vp);
 	m_pipeline->render(false);
 	gpu::TextureHandle preview = m_pipeline->getOutput();
+	const ImVec2 view_pos = ImGui::GetCursorScreenPos();
 	if (gpu::isOriginBottomLeft()) {
 		ImGui::Image(preview, image_size);
 	}
 	else {
 		ImGui::Image(preview, image_size, ImVec2(0, 1), ImVec2(1, 0));
 	}
-		
+	
+	if (m_is_mouse_captured) {
+		os::Rect rect;
+		rect.left = (i32)view_pos.x;
+		rect.top = (i32)view_pos.y;
+		rect.width = (i32)image_size.x;
+		rect.height = (i32)image_size.y;
+		m_app.setMouseClipRect(ImGui::GetWindowViewport()->PlatformHandle, rect);
+	}
+
 	const bool mouse_down = ImGui::IsMouseDown(ImGuiMouseButton_Right);
-	if (m_is_mouse_captured && !mouse_down) {
+	if (m_is_mouse_captured && (!mouse_down || !m_app.isMouseCursorClipped())) {
 		m_is_mouse_captured = false;
-		m_app.setCursorCaptured(false);
+		m_app.unclipMouseCursor();
 		os::showCursor(true);
-		os::grabMouse(os::INVALID_WINDOW);
 		os::setMouseScreenPos(m_captured_mouse_pos.x, m_captured_mouse_pos.y);
 	}
 
@@ -183,9 +192,8 @@ void WorldViewer::gui() {
 
 		if (!m_is_mouse_captured) {
 			m_is_mouse_captured = true;
-			m_app.setCursorCaptured(true);
+			m_app.clipMouseCursor();
 			os::showCursor(false);
-			os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
 			m_captured_mouse_pos = os::getMouseScreenPos();
 		}
 

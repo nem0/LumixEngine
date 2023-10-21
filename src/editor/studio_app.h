@@ -25,8 +25,10 @@ struct Action;
 struct ComponentUID;
 namespace Gizmo { struct Config; }
 namespace os {
+	using WindowHandle = void*;
 	enum class MouseButton;
 	struct Event;
+	struct Rect;
 }
 
 struct LUMIX_EDITOR_API StudioApp {
@@ -126,10 +128,17 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual float getFOV() const = 0;
 	virtual void setFOV(float fov_radians) = 0;
 	virtual Gizmo::Config& getGizmoConfig() = 0;
-	virtual void setCursorCaptured(bool captured) = 0;
 	virtual void saveSettings() = 0;
 	virtual int getImGuiKey(int keycode) const = 0;
 	virtual u32 getDockspaceID() const = 0;
+
+	// clip mouse cursor = keep it in specified rectangle
+	// cursor is automatically unclipped when app is inactive
+	virtual void clipMouseCursor() = 0;
+	// some platforms can't clip to `screen_rect` so they ignore it and use just `win`'s client rectangle
+	virtual void setMouseClipRect(os::WindowHandle win, const os::Rect &screen_rect) = 0;
+	virtual void unclipMouseCursor() = 0;
+	virtual bool isMouseCursorClipped() const = 0;
 
 	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getDefaultFont() = 0;

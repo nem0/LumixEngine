@@ -51,8 +51,8 @@ enum class MouseButton : i32 {
 	MAX = 16
 };
 
-struct Point { int x, y; };
-struct Rect { int left, top, width, height; };
+struct Point { i32 x, y; };
+struct Rect { i32 left, top, width, height; };
 
 using WindowHandle = void*;
 constexpr WindowHandle INVALID_WINDOW = nullptr;
@@ -203,7 +203,9 @@ LUMIX_ENGINE_API u64 getLastModified(StringView file);
 LUMIX_ENGINE_API [[nodiscard]] bool makePath(const char* path);
 
 LUMIX_ENGINE_API void setCursor(CursorType type);
-LUMIX_ENGINE_API void grabMouse(WindowHandle win);
+// clip mouse cursor to `rect`, on platforms, where this is not possible, clip to `win`
+// pass INVALID_WINDOW to disable clipping
+LUMIX_ENGINE_API void clipCursor(WindowHandle win, const Rect& rect);
 
 LUMIX_ENGINE_API [[nodiscard]] bool getDropFile(const Event& event, int idx, Span<char> out);
 LUMIX_ENGINE_API int getDropFileCount(const Event& event);

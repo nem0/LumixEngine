@@ -112,14 +112,13 @@ void GameView::enableIngameCursor(bool enable)
 }
 
 
-void GameView::captureMouse(bool capture)
-{
+void GameView::captureMouse(bool capture) {
 	if (m_is_mouse_captured == capture) return;
 
-	m_app.setCursorCaptured(capture);
 	m_is_mouse_captured = capture;
 	os::showCursor(!capture || m_is_ingame_cursor);
-	if (!capture) os::grabMouse(os::INVALID_WINDOW);
+	if (capture) m_app.clipMouseCursor();
+	else m_app.unclipMouseCursor();
 }
 
 void GameView::onSettingsLoaded() {
@@ -245,7 +244,7 @@ void GameView::onGUI()
 	}
 	m_was_game_mode = is_game_mode;
 
-	if (m_is_mouse_captured && (ImGui::IsKeyDown(ImGuiKey_Escape) || !editor.isGameMode())) {
+	if (m_is_mouse_captured && (ImGui::IsKeyDown(ImGuiKey_Escape) || !editor.isGameMode() || !m_app.isMouseCursorClipped())) {
 		captureMouse(false);
 	}
 
@@ -267,15 +266,13 @@ void GameView::onGUI()
 
 	if (!m_pipeline->isReady()) captureMouse(false);
 
-	ImVec2 view_pos;
 	ImVec2 view_size;
 	bool is_game_view_visible = false;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
 		is_game_view_visible = true;
-		view_pos = ImGui::GetCursorScreenPos();
 
-		const ImVec2 content_min = view_pos;
+		const ImVec2 content_min = ImGui::GetCursorScreenPos();
 		view_size = ImGui::GetContentRegionAvail();
 		view_size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
 		ImVec2 content_max(content_min.x + view_size.x, content_min.y + view_size.y);
@@ -306,6 +303,7 @@ void GameView::onGUI()
 			
 			controlsGUI(editor);
 
+			const ImVec2 view_pos = ImGui::GetCursorScreenPos();
 			if (texture_handle) {
 				if (gpu::isOriginBottomLeft()) {
 					ImGui::Image(texture_handle, view_size, ImVec2(0, 1), ImVec2(1, 0));
@@ -317,6 +315,15 @@ void GameView::onGUI()
 			else {
 				ImGuiEx::Rect(view_size.x, view_size.y, 0xffFF00FF);
 			}
+			if (m_is_mouse_captured) {
+				os::Rect rect;
+				rect.left = (i32)view_pos.x;
+				rect.top = (i32)view_pos.y;
+				rect.width = (i32)view_size.x;
+				rect.height = (i32)view_size.y;
+				m_app.setMouseClipRect(ImGui::GetWindowViewport()->PlatformHandle, rect);
+			}
+
 			const bool is_hovered = ImGui::IsItemHovered();
 			if (is_hovered && ImGui::IsMouseReleased(0) && editor.isGameMode()) captureMouse(true);
 			m_pos = ImGui::GetItemRectMin();
@@ -327,10 +334,8 @@ void GameView::onGUI()
 
 	}
 
-	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
-	if (m_is_mouse_captured && is_game_view_visible) {
-		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
-	}
+	if (m_is_mouse_captured && !is_game_view_visible) captureMouse(false);
+
 	ImGui::End();
 	ImGui::PopStyleVar();
 }
