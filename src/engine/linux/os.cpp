@@ -1209,7 +1209,7 @@ bool makePath(const char* path) {
 }
 
 
-void clipCursor(WindowHandle win, const Rect& rect) {
+void clipCursor(WindowHandle window, const Rect& rect) {
 	if (window == INVALID_WINDOW) {
 		XUngrabPointer(G.display, CurrentTime);
 	}
