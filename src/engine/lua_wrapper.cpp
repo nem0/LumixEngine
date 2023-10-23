@@ -31,7 +31,8 @@ int traceback(lua_State *L) {
 	
 	lua_getfield(L, LUA_GLOBALSINDEX, "LumixDebugCallback");
 	if (lua_isfunction(L, -1)) {
-		if (lua_pcall(L, 0, 0, 0) != 0) {
+		lua_pushvalue(L, 1);
+		if (lua_pcall(L, 1, 0, 0) != 0) {
 			logError(lua_tostring(L, -1));
 			return 1;
 		}

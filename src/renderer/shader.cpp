@@ -272,7 +272,7 @@ static void source(lua_State* L, gpu::ShaderType shader_type)
 	stage.type = shader_type;
 
 	lua_Debug ar;
-	lua_getinfo(L, 1, "nSl", &ar);
+	lua_getinfo(L, 1, "nsl", &ar);
 	const int line = ar.currentline;
 	ASSERT(line >= 0);
 
@@ -294,7 +294,7 @@ static int common(lua_State* L)
 	Shader* shader = getShader(L);
 
 	lua_Debug ar;
-	lua_getinfo(L, 1, "nSl", &ar);
+	lua_getinfo(L, 1, "nsl", &ar);
 	const int line = ar.currentline;
 	ASSERT(line >= 0);
 

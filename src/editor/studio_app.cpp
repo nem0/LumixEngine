@@ -810,12 +810,163 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void update() {
-		PROFILE_FUNCTION();
-		profiler::blockColor(0x7f, 0x7f, 0x7f);
-		
-		updateGizmoOffset();
+	static int LUA_debugCallback(lua_State* L) {
+		const char* error_msg = lua_tostring(L, 1);
+		if (lua_getglobal(L, "Editor") != LUA_TTABLE) {
+			lua_pop(L, 1);
+			return 0;
+		}
+		if (lua_getfield(L, -1, "editor") != LUA_TLIGHTUSERDATA) {
+			lua_pop(L, 2);
+			return 0;
+		}
+		StudioAppImpl* app = (StudioAppImpl*)lua_tolightuserdata(L, -1);
+		lua_pop(L, 2);
+		if (app->m_lua_debug_enabled) app->luaDebugLoop(L, error_msg);
+		return 0;
+	}
 
+	void luaImGuiTable(const char* prefix, lua_State* L) {
+		lua_pushnil(L);
+		while (lua_next(L, -2)) {
+			const char* name = lua_tostring(L, -2);
+			if (!lua_isfunction(L, -1) && !equalStrings(name, "__index")) {
+				if (lua_istable(L, -1)) {
+					luaImGuiTable(StaticString<128>(prefix, name, "."), L);
+				}
+				else {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::Text("%s%s", prefix, name);
+					ImGui::TableNextColumn();
+					switch (lua_type(L, -1)) {
+						case LUA_TLIGHTUSERDATA:
+							ImGui::TextUnformatted("light user data");
+							break;
+						case LUA_TBOOLEAN: {
+							const bool b = lua_toboolean(L, -1) != 0;
+							ImGui::TextUnformatted(b ? "true" : "false");
+							break;
+						}
+						case LUA_TNUMBER: {
+							const double val = lua_tonumber(L, -1);
+							ImGui::Text("%f", val);
+							break;
+						}
+						case LUA_TSTRING: 
+							ImGui::TextUnformatted(lua_tostring(L, -1));
+							break;
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+	}
+
+	// asserts once if called between ImGui::Begin/End, can be safely skipped
+	void luaDebugLoop(lua_State* L, const char* error_msg) {
+		// end normal loop
+		ImGui::PopFont();
+		ImGui::Render();
+		ImGui::UpdatePlatformWindows();
+		for (auto* plugin : m_gui_plugins) plugin->guiEndFrame();
+
+		// debug loop
+		// we have special loop for debug, because we don't want world or lua state to change while we debug
+		bool finished = false;
+		while (!finished) {
+			os::Event e;
+			while (os::getEvent(e)) {
+				// pass events to imgui
+				onEvent(e);
+				m_events.clear();
+			}
+
+			processDeferredWindowDestroy();
+			guiBeginFrame();
+
+			const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+
+			static int selected_stack_level = -1;
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);			
+			if (ImGui::Begin("REPL")) {
+				LuaWrapper::DebugGuard guard(L);
+				static char repl[4096] = "";
+				ImGui::SetNextItemWidth(-1);
+				ImGui::InputTextMultiline("##repl", repl, sizeof(repl));
+				if (ImGui::Button("Run")) {
+					const bool errors = LuaWrapper::luaL_loadbuffer(L, repl, strlen(repl), "REPL");
+					if (!errors) {
+						if (selected_stack_level >= 0) {
+							lua_Debug ar;
+							if (0 != lua_getinfo(L, selected_stack_level + 1, "f", &ar)) {
+								lua_getfenv(L, -1);
+								lua_setfenv(L, -3);
+								lua_pop(L, 1);
+							}
+						}
+						if (::lua_pcall(L, 0, 0, 0) != 0) {
+							const char* msg = lua_tostring(L, -1); 
+							ASSERT(false); // TODO
+						}
+					}
+				}
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Callstack")) {
+				LuaWrapper::DebugGuard guard(L);
+				lua_Debug ar;
+				for (u32 stack_level = 1/*skip traceback fn*/; ;++stack_level) {
+					if (0 == lua_getinfo(L, stack_level + 1, "nsl", &ar)) break;
+					const bool selected = selected_stack_level == stack_level;
+					const StaticString<MAX_PATH + 128> label(ar.source, ": ", ar.name, " Line ", ar.currentline);
+					if (ImGui::Selectable(label, selected)) selected_stack_level = stack_level;
+				}
+			}
+			ImGui::End();
+			
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Locals") && selected_stack_level >= 0) {
+				if (ImGui::BeginTable("locals", 2, ImGuiTableFlags_Resizable)) {
+					lua_Debug ar;
+					if (0 != lua_getinfo(L, selected_stack_level + 1, "nslf", &ar)) {
+						lua_getfenv(L, -1);
+
+						luaImGuiTable("", L);
+
+						lua_pop(L, 2);
+					}
+					ImGui::EndTable();
+				}
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Lua debugger")) {
+				ImGui::TextUnformatted(error_msg);
+				ImGui::Checkbox("Enable debugger", &m_lua_debug_enabled);
+				ImGui::SameLine();
+				if (ImGui::Button("Resume")) finished = true;
+			}
+			ImGui::End();
+		
+			ImGui::PopFont();
+			ImGui::Render();
+			ImGui::UpdatePlatformWindows();
+
+			for (auto* plugin : m_gui_plugins) {
+				plugin->guiEndFrame();
+			}
+		}
+
+		// restart normal loop
+		guiBeginFrame();
+	}
+
+	void processDeferredWindowDestroy() {
 		for (i32 i = m_deferred_destroy_windows.size() - 1; i >= 0; --i) {
 			--m_deferred_destroy_windows[i].counter;
 			if (m_deferred_destroy_windows[i].counter == 0) {
@@ -823,6 +974,14 @@ struct StudioAppImpl final : StudioApp
 				m_deferred_destroy_windows.swapAndPop(i);
 			}
 		}
+	}
+
+	void update() {
+		PROFILE_FUNCTION();
+		profiler::blockColor(0x7f, 0x7f, 0x7f);
+		
+		updateGizmoOffset();
+		processDeferredWindowDestroy();
 
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
@@ -3042,6 +3201,9 @@ struct StudioAppImpl final : StudioApp
 		lua_State* L = m_engine->getState();
 
 		LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
+		
+		lua_pushcfunction(L, &LUA_debugCallback, "LumixDebugCallback");
+		lua_setglobal(L, "LumixDebugCallback");
 
 #define REGISTER_FUNCTION(F)                                                                                    \
 	do                                                                                                          \
@@ -3532,6 +3694,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_set_rename_focus = false;
 	char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
 	bool m_is_f2_pressed = false;
+	bool m_lua_debug_enabled = true;
 	
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
