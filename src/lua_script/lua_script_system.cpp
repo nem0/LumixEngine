@@ -45,28 +45,6 @@ static const char* toString(InputSystem::Event::Type type) {
 	return "N/A";
 }
 
-static void convertPropertyToLuaName(const char* src, Span<char> out) {
-	const u32 max_size = out.length();
-	ASSERT(max_size > 0);
-	char* dest = out.begin();
-	while (*src && dest - out.begin() < max_size - 1) {
-		if (isLetter(*src)) {
-			*dest = isUpperCase(*src) ? *src - 'A' + 'a' : *src;
-			++dest;
-		}
-		else if (isNumeric(*src)) {
-			*dest = *src;
-			++dest;
-		}
-		else {
-			*dest = '_';
-			++dest;
-		}
-		++src;
-	}
-	*dest = 0;
-}
-
 struct ArrayItemSetVisitor : reflection::IPropertyVisitor {
 	void visit(const reflection::Property<float>& prop) override { set(prop); }
 	void visit(const reflection::Property<int>& prop) override { set(prop); }
@@ -86,7 +64,7 @@ struct ArrayItemSetVisitor : reflection::IPropertyVisitor {
 	template <typename T>
 	void set(const reflection::Property<T>& prop) {
 		char tmp[50];
-		convertPropertyToLuaName(prop.name, Span(tmp));
+		LuaWrapper::convertPropertyToLuaName(prop.name, Span(tmp));
 		i32 type = lua_getfield(L, -1, tmp);
 		if (type == LUA_TNIL) {
 			lua_pop(L, 1);
@@ -1222,7 +1200,7 @@ public:
 		
 	static bool isSameProperty(const char* name, const char* lua_name) {
 		char tmp[50];
-		convertPropertyToLuaName(name, Span(tmp));
+		LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
 		return equalStrings(tmp, lua_name);
 	}
 
@@ -1360,7 +1338,7 @@ public:
 	{
 		bool isSameProperty(const char* name, const char* lua_name) {
 			char tmp[50];
-			convertPropertyToLuaName(name, Span(tmp));
+			LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
 			if (equalStrings(tmp, lua_name)) {
 				found = true;
 				return true;

@@ -2910,11 +2910,16 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	struct SetPropertyVisitor : reflection::IPropertyVisitor
-	{
+	struct SetPropertyVisitor : reflection::IPropertyVisitor {
+		static bool isSameProperty(const char* name, const char* lua_name) {
+			char tmp[128];
+			LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
+			return equalStrings(tmp, lua_name);
+		}
+
 		void visit(const reflection::Property<int>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
 			if(reflection::getAttribute(prop, reflection::IAttribute::ENUM)) {
@@ -2927,7 +2932,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<u32>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
 			const u32 val = (u32)lua_tointeger(L, -1);
@@ -2936,7 +2941,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<float>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
 			float val = (float)lua_tonumber(L, -1);
@@ -2945,7 +2950,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<Vec2>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
 
 			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
@@ -2954,7 +2959,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<Vec3>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
 
 			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
@@ -2963,7 +2968,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<IVec3>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
 
 			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
@@ -2972,7 +2977,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<Vec4>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
 
 			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
@@ -2981,7 +2986,7 @@ struct StudioAppImpl final : StudioApp
 		
 		void visit(const reflection::Property<const char*>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
@@ -2991,7 +2996,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<Path>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
@@ -3001,7 +3006,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<bool>& prop) override
 		{
-			if (!equalStrings(property_name, prop.name)) return;
+			if (!isSameProperty(prop.name, property_name)) return;
 			if (!lua_isboolean(L, -1)) return;
 
 			bool val = lua_toboolean(L, -1) != 0;

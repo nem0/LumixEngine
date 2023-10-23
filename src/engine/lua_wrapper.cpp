@@ -58,6 +58,27 @@ int traceback(lua_State *L) {
 	return 1;
 }
 
+void convertPropertyToLuaName(const char* src, Span<char> out) {
+	const u32 max_size = out.length();
+	ASSERT(max_size > 0);
+	char* dest = out.begin();
+	while (*src && dest - out.begin() < max_size - 1) {
+		if (isLetter(*src)) {
+			*dest = isUpperCase(*src) ? *src - 'A' + 'a' : *src;
+			++dest;
+		}
+		else if (isNumeric(*src)) {
+			*dest = *src;
+			++dest;
+		}
+		else {
+			*dest = '_';
+			++dest;
+		}
+		++src;
+	}
+	*dest = 0;
+}
 
 bool pcall(lua_State* L, int nargs, int nres)
 {
