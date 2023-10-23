@@ -199,12 +199,14 @@ struct Runner final
 	}
 
 	void captureMouse(bool capture) {
+		m_mouse_captured = capture;
 		if (m_focused) {
-			os::grabMouse(m_engine->getWindowHandle());
+			os::Rect r = os::getWindowScreenRect(m_engine->getWindowHandle());
+			os::clipCursor(m_engine->getWindowHandle(), r);
 			os::showCursor(false);
 		}
 		else {
-			os::grabMouse(os::INVALID_WINDOW);
+			os::clipCursor(os::INVALID_WINDOW, {});
 			os::showCursor(true);
 		}
 	}
@@ -237,6 +239,11 @@ struct Runner final
 	}
 
 	void onIdle() {
+		if (m_mouse_captured) {
+			os::Rect r = os::getWindowScreenRect(m_engine->getWindowHandle());
+			os::clipCursor(m_engine->getWindowHandle(), r);
+		}
+
 		m_engine->update(*m_world);
 
 		EntityPtr camera = m_pipeline->getModule()->getActiveCamera();
@@ -264,6 +271,7 @@ struct Runner final
 	Viewport m_viewport;
 	bool m_finished = false;
 	bool m_focused = true;
+	bool m_mouse_captured = false;
 	GUIInterface m_gui_interface;
 };
 
