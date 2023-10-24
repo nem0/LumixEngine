@@ -3089,6 +3089,11 @@ struct StudioAppImpl final : StudioApp
 		m_show_all_actions_request = false;
 	}
 
+	static void LUA_makeParent(lua_State* L, EntityPtr parent, EntityRef child) {
+		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
+		studio->m_editor->makeParent(parent, child);
+	}
+
 	static int LUA_createEntityEx(lua_State* L) {
 		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
 		LuaWrapper::checkTableArg(L, 1);
@@ -3232,6 +3237,7 @@ struct StudioAppImpl final : StudioApp
 		LuaWrapper::createSystemClosure(L, "Editor", this, "getSelectedEntity", &LUA_getSelectedEntity);
 		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
 		LuaWrapper::createSystemClosure(L, "Editor", this, "createEntityEx", &LUA_createEntityEx);
+		LuaWrapper::createSystemClosure(L, "Editor", this, "makeParent", &LuaWrapper::wrap<LUA_makeParent>);
 	}
 
 	void checkScriptCommandLine() {
