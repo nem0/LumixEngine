@@ -240,6 +240,17 @@ public:
 		m_toggle_ui.func.bind<&GUIEditor::onToggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);
+
+		m_hcenter_action.init("Center horizontally", "GUI editor - center horizontally", "guied_hcenter", "", Action::IMGUI_PRIORITY);
+		m_vcenter_action.init("Center vertically", "GUI editor - center vertically", "guied_vcenter", "", Action::IMGUI_PRIORITY);
+		m_hexpand_action.init("Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", "", Action::IMGUI_PRIORITY);
+		m_vexpand_action.init("Expand vertically", "GUI editor - expand vertically", "guied_vexpand", "", Action::IMGUI_PRIORITY);
+		m_make_rel_action.init("Make relative", "GUI editor - make relative", "guied_makerel", "", Action::IMGUI_PRIORITY);
+		m_app.addAction(&m_hcenter_action);
+		m_app.addAction(&m_vcenter_action);
+		m_app.addAction(&m_hexpand_action);
+		m_app.addAction(&m_vexpand_action);
+		m_app.addAction(&m_make_rel_action);
 	}
 
 	void init() {
@@ -252,6 +263,11 @@ public:
 
 	~GUIEditor() {
 		m_app.removeAction(&m_toggle_ui);
+		m_app.removeAction(&m_hcenter_action);
+		m_app.removeAction(&m_vcenter_action);
+		m_app.removeAction(&m_hexpand_action);
+		m_app.removeAction(&m_vexpand_action);
+		m_app.removeAction(&m_make_rel_action);
 	}
 
 
@@ -261,6 +277,22 @@ private:
 		RESIZE,
 		MOVE
 	};
+
+	bool onAction(const Action& action) override { 
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (editor.getSelectedEntities().size() != 1) return false;
+
+		const EntityRef e = editor.getSelectedEntities()[0];
+
+		if (&action == &m_hcenter_action) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
+		else if (&action == &m_vcenter_action) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
+		else if (&action == &m_hexpand_action) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
+		else if (&action == &m_vexpand_action) expand(e, (u8)EdgeMask::VERTICAL, editor);
+		else if (&action == &m_make_rel_action) makeRelative(e, m_canvas_size, (u8)EdgeMask::ALL, editor);
+		else return false;
+		return true;
+	}
+	bool hasFocus() const override { return m_has_focus; }
 
 	void onSettingsLoaded() override {
 		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_gui_editor_open", false);
@@ -409,15 +441,18 @@ private:
 
 	void onGUI() override
 	{
+		m_has_focus = false;
 		if (!m_is_window_open) return;
 		if (ImGui::Begin("GUIEditor", &m_is_window_open))
 		{
+			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 			WorldEditor& editor = m_app.getWorldEditor();
 			ImVec2 mouse_canvas_pos = ImGui::GetMousePos();
 			mouse_canvas_pos.x -= ImGui::GetCursorScreenPos().x;
 			mouse_canvas_pos.y -= ImGui::GetCursorScreenPos().y;
 			
-			ImVec2 size = ImGui::GetContentRegionAvail();
+			const ImVec2 size = ImGui::GetContentRegionAvail();
+			m_canvas_size = size;
 			if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
 				ImGui::End();
 				return;
@@ -894,10 +929,18 @@ private:
 	Action m_toggle_ui;
 	UniquePtr<Pipeline> m_pipeline;
 	bool m_is_window_open = false;
+	bool m_has_focus = false;
 	gpu::TextureHandle m_texture_handle;
 	MouseMode m_mouse_mode = MouseMode::NONE;
 	Vec2 m_bottom_right_start_transform;
 	Vec2 m_top_left_start_move;
+	Vec2 m_canvas_size;
+
+	Action m_hcenter_action;
+	Action m_vcenter_action;
+	Action m_hexpand_action;
+	Action m_vexpand_action;
+	Action m_make_rel_action;
 };
 
 
