@@ -1,10 +1,11 @@
 #pragma once
 
+#include "foundation/array.h"
+#include "foundation/math.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
+
 #include "animation/animation.h"
-#include "engine/array.h"
-#include "engine/math.h"
-#include "engine/stream.h"
-#include "engine/string.h"
 
 // Runtime part of animation nodes
 // For editor part of animation nodes see editor_nodes.h

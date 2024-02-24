@@ -1,10 +1,12 @@
+
+#include "foundation/profiler.h"
+
 #include "animation_module.h"
 
 #include "animation/animation.h"
 #include "animation/property_animation.h"
 #include "animation/controller.h"
 #include "engine/engine.h"
-#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 

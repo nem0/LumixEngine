@@ -1,9 +1,10 @@
+#include "foundation/allocator.h"
+#include "foundation/log.h"
+#include "foundation/stream.h"
+
 #include "animation/property_animation.h"
-#include "engine/allocator.h"
-#include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
-#include "engine/stream.h"
 
 
 namespace Lumix {

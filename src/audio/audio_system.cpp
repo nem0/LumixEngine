@@ -1,10 +1,11 @@
+#include "foundation/profiler.h"
+
 #include "audio_system.h"
 #include "audio_device.h"
 #include "audio_module.h"
 #include "clip.h"
 #include "engine/engine.h"
 #include "engine/plugin.h"
-#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 

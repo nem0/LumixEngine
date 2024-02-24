@@ -1,5 +1,5 @@
-#include "engine/crt.h"
-#include "engine/hash.h"
+#include "foundation/crt.h"
+#include "foundation/hash.h"
 #include "prefab.h"
 
 namespace Lumix

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/os.h"
+
+#include "foundation/os.h"
 
 namespace Lumix {
 

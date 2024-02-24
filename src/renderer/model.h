@@ -1,15 +1,17 @@
 #pragma once
 
+#include "engine/lumix.h"
 
-#include "engine/allocators.h"
-#include "engine/array.h"
-#include "engine/geometry.h"
-#include "engine/hash.h"
-#include "engine/hash_map.h"
-#include "engine/math.h"
+#include "foundation/allocators.h"
+#include "foundation/array.h"
+#include "foundation/geometry.h"
+#include "foundation/hash.h"
+#include "foundation/hash_map.h"
+#include "foundation/math.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
+
 #include "engine/resource.h"
-#include "engine/stream.h"
-#include "engine/string.h"
 #include "gpu/gpu.h"
 
 

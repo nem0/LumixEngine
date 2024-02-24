@@ -1,10 +1,11 @@
 #pragma once
 
+#include "engine/lumix.h"
 
-#include "engine/delegate_list.h"
-#include "engine/file_system.h"
-#include "engine/hash.h"
-#include "engine/path.h"
+#include "foundation/delegate_list.h"
+#include "foundation/file_system.h"
+#include "foundation/hash.h"
+#include "foundation/path.h"
 
 
 namespace Lumix {

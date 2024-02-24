@@ -1,14 +1,14 @@
 #pragma once
 
 
-#include "engine/array.h"
-#include "engine/geometry.h"
-#include "engine/hash_map.h"
-#include "engine/math.h"
-#include "engine/os.h"
-#include "engine/path.h"
-#include "engine/stream.h"
-#include "engine/string.h"
+#include "foundation/array.h"
+#include "foundation/geometry.h"
+#include "foundation/hash_map.h"
+#include "foundation/math.h"
+#include "foundation/os.h"
+#include "foundation/path.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
 #include "openfbx/ofbx.h"
 
 namespace Lumix {

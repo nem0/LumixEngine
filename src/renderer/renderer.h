@@ -1,14 +1,16 @@
 #pragma once
 
-#include "engine/allocator.h"
 #include "engine/lumix.h"
+
+#include "foundation/allocator.h"
+
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
 
 #ifndef _WIN32
+	#include "foundation/profiler.h"
 	#include "draw_stream.h"
 	#include "engine/engine.h"
-	#include "engine/profiler.h"
 #endif
 
 namespace Lumix {

@@ -1,8 +1,9 @@
 #pragma once
 
+#include "engine/lumix.h"
 
-#include "engine/hash_map.h"
-#include "engine/math.h"
+#include "foundation/hash_map.h"
+#include "foundation/math.h"
 
 
 namespace Lumix

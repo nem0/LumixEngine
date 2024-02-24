@@ -1,5 +1,8 @@
 #include <imgui/imgui.h>
 
+#include "foundation/profiler.h"
+#include "foundation/stream.h"
+
 #include "audio_device.h"
 #include "audio_module.h"
 #include "audio_system.h"
@@ -12,9 +15,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
-#include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/stream.h"
 #include "engine/world.h"
 
 

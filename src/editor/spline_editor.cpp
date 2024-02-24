@@ -1,3 +1,6 @@
+#include "foundation/geometry.h"
+#include "foundation/string.h"
+
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
 #include "editor/property_grid.h"
@@ -6,9 +9,7 @@
 #include "editor/world_editor.h"
 #include "engine/core.h"
 #include "engine/engine.h"
-#include "engine/geometry.h"
 #include "engine/resource_manager.h"
-#include "engine/string.h"
 #include "engine/world.h"
 #include <math.h>
 #include <imgui/imgui.h>

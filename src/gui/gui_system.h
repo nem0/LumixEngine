@@ -2,7 +2,7 @@
 
 
 #include "engine/plugin.h"
-#include "engine/os.h"
+#include "foundation/os.h"
 
 
 namespace Lumix

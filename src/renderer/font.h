@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "engine/allocators.h"
-#include "engine/hash_map.h"
-#include "engine/math.h"
+#include "foundation/allocators.h"
+#include "foundation/hash_map.h"
+#include "foundation/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/stream.h"
+#include "foundation/stream.h"
 
 
 namespace Lumix

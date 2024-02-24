@@ -1,5 +1,10 @@
 #include <imgui/imgui.h>
 
+#include "foundation/hash_map.h"
+#include "foundation/log.h"
+#include "foundation/os.h"
+#include "foundation/profiler.h"
+
 #include "animation/animation.h"
 #include "animation/animation_module.h"
 #include "animation/controller.h"
@@ -12,10 +17,6 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "engine/hash_map.h"
-#include "engine/log.h"
-#include "engine/os.h"
-#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "controller_editor.h"
 #include "engine/reflection.h"

@@ -1,7 +1,11 @@
 #pragma once
 
-#include "engine/array.h"
-#include "engine/hash_map.h"
+#include "engine/lumix.h"
+
+#include "foundation/array.h"
+#include "foundation/hash_map.h"
+
+#include "engine/engine.h"
 #include "engine/plugin.h"
 
 namespace Lumix {

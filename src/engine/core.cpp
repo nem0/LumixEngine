@@ -1,8 +1,8 @@
 #include "core.h"
 #include "engine.h"
-#include "hash_map.h"
+#include "foundation/hash_map.h"
 #include "reflection.h"
-#include "stream.h"
+#include "foundation/stream.h"
 #include "world.h"
 
 namespace Lumix {

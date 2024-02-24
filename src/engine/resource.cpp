@@ -1,11 +1,14 @@
-#include "engine/resource.h"
-#include "engine/hash.h"
-#include "engine/log.h"
 #include "engine/lumix.h"
-#include "engine/path.h"
+
+#include "foundation/hash.h"
+#include "foundation/log.h"
+#include "foundation/path.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
+
+#include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/stream.h"
-#include "engine/string.h"
+
 #include "lz4/lz4.h"
 
 

@@ -1,10 +1,11 @@
 #include <imgui/imgui.h>
 
+#include "foundation/delegate_list.h"
+#include "foundation/log.h"
+#include "foundation/os.h"
+
 #include "log_ui.h"
 #include "editor/settings.h"
-#include "engine/delegate_list.h"
-#include "engine/log.h"
-#include "engine/os.h"
 
 
 namespace Lumix

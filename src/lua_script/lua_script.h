@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "engine/allocators.h"
+#include "foundation/allocators.h"
 #include "engine/resource.h"
-#include "engine/string.h"
+#include "foundation/string.h"
 
 
 namespace Lumix

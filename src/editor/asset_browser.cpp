@@ -1,5 +1,13 @@
 #include <imgui/imgui.h>
 
+#include "foundation/crt.h"
+#include "foundation/hash.h"
+#include "foundation/log.h"
+#include "foundation/os.h"
+#include "foundation/path.h"
+#include "foundation/profiler.h"
+#include "foundation/string.h"
+
 #include "asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -9,18 +17,11 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
-#include "engine/crt.h"
 #include "engine/engine.h"
-#include "engine/hash.h"
-#include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/os.h"
-#include "engine/path.h"
-#include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/string.h"
 #include "engine/world.h"
 #include "utils.h"
 

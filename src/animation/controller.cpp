@@ -1,10 +1,10 @@
+#include "foundation/hash.h"
+#include "foundation/log.h"
+#include "foundation/stack_array.h"
 #include "animation.h"
 #include "controller.h"
 #include "nodes.h"
-#include "engine/hash.h"
-#include "engine/log.h"
 #include "engine/resource_manager.h"
-#include "engine/stack_array.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 
