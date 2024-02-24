@@ -37,12 +37,12 @@ struct LUMIX_FOUNDATION_API TagAllocator final : IAllocator {
 	IAllocator* getParent() const override { return m_direct_parent; }
 	bool isTagAllocator() const override { return true; }
 
+	static TagAllocator* getActiveAllocator();
+
 	IAllocator* m_direct_parent;
 	// skip TagAllocator parents when actually allocating
 	IAllocator* m_effective_allocator;
 	const char* m_tag;
-
-	static thread_local TagAllocator* active_allocator;
 };
 
 // detects memory leaks, just by counting number of allocations - very fast
@@ -74,7 +74,7 @@ struct LUMIX_FOUNDATION_API LinearAllocator : IAllocator {
 	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 
 	u32 getCommitedBytes() const { return m_commited_bytes; }
-	static size_t getTotalCommitedBytes() { return g_total_commited_bytes; }
+	static inline size_t getTotalCommitedBytes() { return g_total_commited_bytes; }
 
 private:
 	u32 m_commited_bytes = 0;
@@ -83,7 +83,7 @@ private:
 	u8* m_mem;
 	Mutex m_mutex;
 
-	static AtomicI64 g_total_commited_bytes;
+	static inline AtomicI64 g_total_commited_bytes = 0;
 };
 
 // one allocation from local memory backing (m_mem), use fallback allocator otherwise

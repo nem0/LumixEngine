@@ -1,3 +1,5 @@
+#include "engine/lumix.h"
+
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/utils.h"
@@ -7,7 +9,7 @@ namespace Lumix {
 // use this if you want an editor-only asset to be visible in asset browser
 // editor only assets do not inherit from Resource, e.g. particle system function
 // it can also be used as a base for normal asset plugin
-struct EditorAssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+struct LUMIX_EDITOR_API EditorAssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	EditorAssetPlugin(const char* name, const char* ext, ResourceType type, StudioApp& app, IAllocator& allocator);
 	~EditorAssetPlugin();
 
@@ -23,7 +25,7 @@ protected:
 };
 
 // common funcitonality for asset editor windows
-struct AssetEditorWindow : StudioApp::GUIPlugin {
+struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
 	AssetEditorWindow(StudioApp& app) : m_app(app) {}
 
 	virtual void windowGUI() = 0;

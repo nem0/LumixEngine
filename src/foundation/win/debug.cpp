@@ -433,7 +433,7 @@ void* Allocator::allocate(size_t size, size_t align)
 	m_total_size += size;
 	m_mutex.exit();
 
-	info->tag = TagAllocator::active_allocator;
+	info->tag = TagAllocator::getActiveAllocator();
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;

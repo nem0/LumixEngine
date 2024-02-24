@@ -1,6 +1,7 @@
-#include "lua_wrapper.h"
 #include "foundation/log.h"
-#include "string.h"
+#include "foundation/string.h"
+
+#include "lua_wrapper.h"
 #include <luacode.h>
 
 namespace Lumix::LuaWrapper {

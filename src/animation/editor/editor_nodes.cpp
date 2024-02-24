@@ -197,23 +197,26 @@ bool Blend2DNode::propertiesGUI(Model& skeleton) {
 		dl->AddRectFilled(p, p + s, bg_color);
 
 		for (const Blend2DNode::Triangle& t : m_triangles) {
-			dl->AddTriangleFilled(p + (m_children[t.a].value - min) * inv_range
-				, p + (m_children[t.c].value - min) * inv_range
-				, p + (m_children[t.b].value - min) * inv_range
-				, fill_color);
+			Vec2 p1 = (m_children[t.a].value - min) * inv_range;
+			Vec2 p2 = (m_children[t.c].value - min) * inv_range;
+			Vec2 p3 = (m_children[t.b].value - min) * inv_range;
+			dl->AddTriangleFilled(p + ImVec2(p1.x, p1.y), p + ImVec2(p2.x, p2.y), p + ImVec2(p3.x, p3.y), fill_color);
 		}
 
 		auto old_flags = dl->Flags;
 		dl->Flags = dl->Flags & ~ImDrawListFlags_AntiAliasedLines;
 		for (const Blend2DNode::Triangle& t : m_triangles) {
-			dl->AddTriangle(p + (m_children[t.a].value - min) * inv_range
-				, p + (m_children[t.c].value - min) * inv_range
-				, p + (m_children[t.b].value - min) * inv_range
-				, lines_color);
+
+			Vec2 p1 = (m_children[t.a].value - min) * inv_range;
+			Vec2 p2 = (m_children[t.c].value - min) * inv_range;
+			Vec2 p3 = (m_children[t.b].value - min) * inv_range;
+
+			dl->AddTriangle(p + ImVec2(p1.x, p1.y), p + ImVec2(p2.x, p2.y), p + ImVec2(p3.x, p3.y), lines_color);
 		}
 		i32 hovered = -1;
 		for (const Blend2DNode::Child& ch : m_children) {
-			ImVec2 p0 = p + (ch.value - min) * inv_range - ImVec2(4, 4);
+			Vec2 tmp = (ch.value - min) * inv_range;
+			ImVec2 p0 = p + ImVec2(tmp.x, tmp.y) - ImVec2(4, 4);
 			ImVec2 p1 = p0 + ImVec2(8, 8);
 			if (ImGui::IsMouseHoveringRect(p0, p1)) {
 				if (ImGui::BeginTooltip()) {

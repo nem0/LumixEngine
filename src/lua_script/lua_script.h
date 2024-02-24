@@ -22,7 +22,7 @@ public:
 	bool load(Span<const u8> mem) override;
 	StringView getSourceCode() const { return m_source_code; }
 
-	static const ResourceType TYPE;
+	static inline const ResourceType TYPE = ResourceType("lua_script");
 
 private:
 	TagAllocator m_allocator;

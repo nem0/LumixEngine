@@ -290,8 +290,6 @@ void* LinearAllocator::allocate(size_t size, size_t align) {
 	return m_mem + start;
 }
 
-AtomicI64 LinearAllocator::g_total_commited_bytes = 0;
-
 void LinearAllocator::deallocate(void* ptr) { /*everything should be "deallocated" with reset()*/ }
 void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) { 
 	if (!ptr) return allocate(new_size, align);
@@ -309,7 +307,7 @@ TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
 	}
 }
 
-thread_local TagAllocator* TagAllocator::active_allocator = nullptr;
+thread_local TagAllocator* active_allocator = nullptr;
 
 void* TagAllocator::allocate(size_t size, size_t align) {
 	active_allocator = this;
@@ -323,6 +321,10 @@ void TagAllocator::deallocate(void* ptr) {
 void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) {
 	active_allocator = this;
 	return m_effective_allocator->reallocate(ptr, new_size, old_size, align);
+}
+
+TagAllocator* TagAllocator::getActiveAllocator() {
+	return active_allocator;
 }
 
 IAllocator& getGlobalAllocator() {

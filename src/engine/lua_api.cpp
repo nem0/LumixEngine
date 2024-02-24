@@ -1,18 +1,24 @@
 #include <imgui/imgui.h>
+
+#include "engine/lumix.h"
+
 #include "foundation/delegate.h"
-#include "engine.h"
 #include "foundation/file_system.h"
-#include "input_system.h"
 #include "foundation/log.h"
+#include "foundation/profiler.h"
+#include "foundation/math.h"
+#include "foundation/string.h"
+
+#include "engine.h"
+#include "input_system.h"
 #include "lua_wrapper.h"
 #include "plugin.h"
 #include "prefab.h"
-#include "foundation/profiler.h"
 #include "reflection.h"
-#include "string.h"
 #include "world.h"
 #include <lua.h>
 #include <luacode.h>
+
 
 namespace Lumix {
 

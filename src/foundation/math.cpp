@@ -21,6 +21,8 @@ const Vec4 Vec4::ZERO = Vec4(0);
 
 const Transform Transform::IDENTITY = Transform({0, 0, 0}, {0, 0, 0, 1}, {1, 1, 1});
 
+const Quat Quat::IDENTITY = Quat(0, 0, 0, 1);
+
 	
 Vec2::Vec2(const IVec2& rhs)
 	: x(float(rhs.x))
@@ -555,9 +557,6 @@ void IVec4::operator += (const IVec4& rhs) {
 	z += rhs.z;
 	w += rhs.w;
 }
-
-
-const Quat Quat::IDENTITY = { 0, 0, 0, 1 };
 
 
 Quat::Quat(const Vec3& axis, float angle)
