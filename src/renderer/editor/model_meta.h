@@ -1,9 +1,9 @@
 #pragma once
 
-#include "engine/allocator.h"
+#include "foundation/allocator.h"
 #include "engine/lua_wrapper.h"
-#include "engine/stream.h"
-#include "engine/string.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
 #include "fbx_importer.h"
 
 

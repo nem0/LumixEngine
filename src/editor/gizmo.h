@@ -1,9 +1,10 @@
 #pragma once
 
-
-#include "engine/array.h"
 #include "engine/lumix.h"
-#include "engine/math.h"
+
+#include "foundation/array.h"
+#include "foundation/math.h"
+
 
 
 namespace Lumix

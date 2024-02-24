@@ -1,13 +1,14 @@
 #pragma once
 
-
 #include "engine/lumix.h"
-#include "engine/array.h"
-#include "engine/atomic.h"
-#include "engine/math.h"
+
+#include "foundation/array.h"
+#include "foundation/atomic.h"
+#include "foundation/math.h"
+#include "foundation/stream.h"
+
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/stream.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/renderer.h"
 

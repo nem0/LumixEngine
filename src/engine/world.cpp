@@ -1,12 +1,12 @@
 #include "world.h"
 #include "engine/engine.h"
-#include "engine/hash.h"
-#include "engine/log.h"
-#include "engine/math.h"
+#include "foundation/hash.h"
+#include "foundation/log.h"
+#include "foundation/math.h"
 #include "engine/plugin.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
-#include "engine/string.h"
+#include "foundation/string.h"
 
 
 namespace Lumix

@@ -1,14 +1,15 @@
-#include "engine/array.h"
-#include "engine/debug.h"
-#include "engine/delegate_list.h"
+#include "foundation/array.h"
+#include "foundation/debug.h"
+#include "foundation/delegate_list.h"
+#include "foundation/log.h"
+#include "foundation/os.h"
+#include "foundation/path.h"
+#include "foundation/profiler.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
+
 #include "engine/engine.h"
 #include "engine/plugin.h"
-#include "engine/log.h"
-#include "engine/os.h"
-#include "engine/path.h"
-#include "engine/profiler.h"
-#include "engine/stream.h"
-#include "engine/string.h"
 
 namespace Lumix
 {

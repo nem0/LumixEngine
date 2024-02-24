@@ -1,9 +1,11 @@
+#include "engine/lumix.h"
+
+#include "foundation/math.h"
+#include "foundation/profiler.h"
+
 #include "navigation_module.h"
 #include "animation/animation_module.h"
 #include "engine/engine.h"
-#include "engine/lumix.h"
-#include "engine/math.h"
-#include "engine/profiler.h"
 #include "engine/world.h"
 #include "navigation/navigation_module.h"
 #include "renderer/material.h"

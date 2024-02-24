@@ -1,21 +1,25 @@
-#include "navigation_module.h"
-#include "engine/array.h"
-#include "engine/atomic.h"
-#include "engine/crt.h"
-#include "engine/engine.h"
-#include "engine/job_system.h"
-#include "engine/log.h"
 #include "engine/lumix.h"
-#include "engine/os.h"
-#include "engine/profiler.h"
+
+#include "navigation_module.h"
+
+#include "foundation/array.h"
+#include "foundation/atomic.h"
+#include "foundation/crt.h"
+#include "foundation/job_system.h"
+#include "foundation/log.h"
+#include "foundation/os.h"
+#include "foundation/profiler.h"
+#include "foundation/sync.h"
+
+#include "engine/engine.h"
 #include "engine/reflection.h"
-#include "engine/sync.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
+
 #include <DetourAlloc.h>
 #include <DetourCrowd.h>
 #include <DetourNavMesh.h>

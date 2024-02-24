@@ -1,5 +1,5 @@
 #include "lua_wrapper.h"
-#include "log.h"
+#include "foundation/log.h"
 #include "string.h"
 #include <luacode.h>
 

@@ -1,7 +1,7 @@
 #pragma once
 
-
 #include "engine/lumix.h"
+
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 

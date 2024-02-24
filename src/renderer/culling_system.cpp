@@ -1,16 +1,18 @@
-#include "culling_system.h"
-#include "engine/array.h"
-#include "engine/crt.h"
-#include "engine/geometry.h"
-#include "engine/hash_map.h"
-#include "engine/allocator.h"
-#include "engine/atomic.h"
-#include "engine/job_system.h"
 #include "engine/lumix.h"
-#include "engine/math.h"
-#include "engine/page_allocator.h"
-#include "engine/profiler.h"
-#include "engine/simd.h"
+
+#include "foundation/array.h"
+#include "foundation/crt.h"
+#include "foundation/geometry.h"
+#include "foundation/hash_map.h"
+#include "foundation/allocator.h"
+#include "foundation/atomic.h"
+#include "foundation/job_system.h"
+#include "foundation/math.h"
+#include "foundation/page_allocator.h"
+#include "foundation/profiler.h"
+#include "foundation/simd.h"
+
+#include "culling_system.h"
 
 
 namespace Lumix

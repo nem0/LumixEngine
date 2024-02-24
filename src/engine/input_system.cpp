@@ -1,12 +1,12 @@
 #include "engine/input_system.h"
-#include "engine/os.h"
+#include "foundation/os.h"
 #include "engine/controller_device.h"
-#include "engine/delegate.h"
-#include "engine/delegate_list.h"
+#include "foundation/delegate.h"
+#include "foundation/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
-#include "engine/profiler.h"
-#include "engine/math.h"
+#include "foundation/profiler.h"
+#include "foundation/math.h"
 
 
 namespace Lumix

@@ -489,6 +489,24 @@ solution "LumixEngine"
 		defines {"STATIC_PLUGINS"}
 	end
 
+project "foundation"
+	libType()
+
+	files { "../src/foundation/**.h",
+			"../src/foundation/**.c",
+			"../src/foundation/**.cpp",
+			"../src/foundation/**.inl",
+			"genie.lua",
+			"../external/wyhash/**.*"
+	}
+
+
+	defines { "BUILDING_ENGINE" }
+	
+	configuration {}
+
+	defaultConfigurations()
+
 project "engine"
 	libType()
 
@@ -502,7 +520,7 @@ project "engine"
 			"../external/imgui/**.inl",
 			"../external/lz4/**.c",
 			"../external/lz4/**.h",
-			"../external/wyhash/**.*"
+--			"../external/wyhash/**.*"
 	}
 	excludes { 
 		"../external/imgui/imgui_demo.cpp",
@@ -515,12 +533,13 @@ project "engine"
 
 
 	defines { "BUILDING_ENGINE" }
+	links { "foundation" }
 	
 	if _OPTIONS["dynamic-plugins"] then
 		defines { "LZ4_DLL_EXPORT" }
 	end
 	
-	includedirs { "../external/luau/include", "../external/freetype/include" }
+	includedirs { "../src", "../external/luau/include", "../external/freetype/include" }
 
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
@@ -558,7 +577,7 @@ if has_plugin("physics") then
 
 		includedirs { "../external/physx/include/" }
 		defines { "BUILDING_PHYSICS" }
-		links { "engine", "editor", "renderer" }
+		links { "foundation", "engine", "editor", "renderer" }
 		useLua()
 		linkPhysX()
 
@@ -606,7 +625,7 @@ if has_plugin("renderer") then
 		includedirs { "../src", "../external/freetype/include", "../external/" }
 		
 		defines { "BUILDING_RENDERER" }
-		links { "engine" }
+		links { "foundation", "engine" }
 
 		if build_studio then
 			links { "editor" }
@@ -634,7 +653,7 @@ if has_plugin("animation") then
 		files { "../src/animation/**.h", "../src/animation/**.cpp" }
 		includedirs { "../src" }
 		defines { "BUILDING_ANIMATION" }
-		links { "engine", "renderer" }
+		links { "foundation", "engine", "renderer" }
 
 		if build_studio then
 			links { "editor" }
@@ -671,7 +690,7 @@ if has_plugin("audio") then
 		}
 		includedirs { "../src", "../src/audio" }
 		defines { "BUILDING_AUDIO" }
-		links { "engine" }
+		links { "foundation", "engine" }
 
 		if build_studio then
 			links { "editor" }
@@ -711,7 +730,7 @@ if has_plugin("navigation") then
 
 		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
 		includedirs { "../src", "../src/navigation", "../external/recast/include" }
-		links { "engine", "renderer" }
+		links { "foundation", "engine", "renderer" }
 		
 		if build_studio then
 			links { "editor" }
@@ -727,7 +746,7 @@ if has_plugin("gui") then
 
 		files { "../src/gui/**.h", "../src/gui/**.cpp" }
 		includedirs { "../src", "../src/gui" }
-		links { "engine", "renderer" }
+		links { "foundation", "engine", "renderer" }
 		
 		defines { "BUILDING_GUI" }
 		
@@ -754,7 +773,7 @@ if has_plugin("lua_script") then
 		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 		includedirs { "../src", "../src/lua_script" }
 		defines { "BUILDING_LUA_SCRIPT" }
-		links { "engine", "renderer" }
+		links { "foundation", "engine", "renderer" }
 
 		if build_studio then
 			links { "editor" }
@@ -802,7 +821,7 @@ if build_app then
 			end
 			if build_studio then links {"editor"} end
 
-			links { "engine" }
+			links { "foundation", "engine" }
 			if use_basisu then
 				linkLib "basisu"
 			end
@@ -904,7 +923,7 @@ if build_studio then
 			"../src/editor/**.cpp"
 		}
 		defines { "BUILDING_EDITOR" }
-		links { "engine" }
+		links { "foundation", "engine" }
 		includedirs {
 			"../src",
 			"../src/editor",

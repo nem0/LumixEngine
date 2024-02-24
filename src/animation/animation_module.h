@@ -1,8 +1,10 @@
 #pragma once
 
-#include "animation/animation.h"
-#include "engine/allocator.h"
 #include "engine/lumix.h"
+
+#include "foundation/allocator.h"
+
+#include "animation/animation.h"
 #include "engine/plugin.h"
 
 struct lua_State;

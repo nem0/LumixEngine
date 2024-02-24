@@ -1,7 +1,7 @@
 #pragma once
 
+#include "foundation/array.h"
 
-#include "engine/array.h"
 #include "engine/resource.h"
 
 

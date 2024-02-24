@@ -1,12 +1,13 @@
 #pragma once
 
+#include "foundation/array.h"
+#include "foundation/math.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
+
 #include "animation/animation.h"
 #include "animation/nodes.h"
 #include "controller_editor.h"
-#include "engine/array.h"
-#include "engine/math.h"
-#include "engine/stream.h"
-#include "engine/string.h"
 #include "editor/utils.h"
 
 

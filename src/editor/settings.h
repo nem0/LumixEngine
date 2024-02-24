@@ -1,10 +1,11 @@
 #pragma once
 
-
 #include "engine/lumix.h"
-#include "engine/math.h"
-#include "engine/os.h"
-#include "engine/string.h"
+
+#include "foundation/math.h"
+#include "foundation/os.h"
+#include "foundation/string.h"
+
 #include "editor/utils.h"
 
 

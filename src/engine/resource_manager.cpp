@@ -1,5 +1,7 @@
-#include "engine/log.h"
 #include "engine/lumix.h"
+
+#include "foundation/log.h"
+
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 

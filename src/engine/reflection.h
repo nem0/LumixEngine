@@ -1,12 +1,14 @@
 #pragma once
 
-
 #include "engine/lumix.h"
-#include "engine/delegate_list.h"
-#include "engine/hash.h"
-#include "engine/metaprogramming.h"
+
+#include "foundation/foundation.h"
+#include "foundation/delegate_list.h"
+#include "foundation/hash.h"
+#include "foundation/metaprogramming.h"
+#include "foundation/string.h"
+
 #include "engine/resource.h"
-#include "engine/string.h"
 #include "engine/world.h"
 
 

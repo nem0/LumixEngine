@@ -1,10 +1,11 @@
 #pragma once
 
-
-#include "engine/allocator.h"
 #include "engine/lumix.h"
+
+#include "foundation/allocator.h"
+#include "foundation/math.h"
+
 #include "engine/plugin.h"
-#include "engine/math.h"
 
 
 #ifdef STATIC_PLUGINS

@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "engine/allocators.h"
+#include "foundation/allocators.h"
 #include "engine/resource.h"
-#include "engine/stream.h"
+#include "foundation/stream.h"
 #include "gpu/gpu.h"
 
 

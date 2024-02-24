@@ -1,5 +1,5 @@
-#include "engine/os.h"
-#include "engine/win/simple_win.h"
+#include "foundation/os.h"
+#include "foundation/win/simple_win.h"
 #include "editor/studio_app.h"
 
 int main(int argc, char* argv[])

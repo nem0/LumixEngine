@@ -1,8 +1,9 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/allocator.h"
-#include "engine/os.h"
+
+#include "foundation/allocator.h"
+#include "foundation/os.h"
 
 struct lua_State;
 

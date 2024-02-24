@@ -1,7 +1,7 @@
-#include "engine/log.h"
-#include "engine/file_system.h"
+#include "foundation/log.h"
+#include "foundation/file_system.h"
 #include "engine/resource_manager.h"
-#include "engine/stream.h"
+#include "foundation/stream.h"
 #include "lua_script.h"
 
 namespace Lumix {

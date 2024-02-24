@@ -1,6 +1,20 @@
 #include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
 #include <imgui/imgui_freetype.h>
+#include <imgui/imgui_internal.h>
+
+#include "foundation/allocators.h"
+#include "foundation/associative_array.h"
+#include "foundation/atomic.h"
+#include "foundation/command_line_parser.h"
+#include "foundation/debug.h"
+#include "foundation/file_system.h"
+#include "foundation/geometry.h"
+#include "foundation/hash.h"
+#include "foundation/job_system.h"
+#include "foundation/log.h"
+#include "foundation/os.h"
+#include "foundation/path.h"
+#include "foundation/profiler.h"
 
 #include "audio/audio_module.h"
 #include "editor/asset_browser.h"
@@ -12,22 +26,9 @@
 #include "editor/render_interface.h"
 #include "editor/spline_editor.h"
 #include "editor/world_editor.h"
-#include "engine/allocators.h"
-#include "engine/associative_array.h"
-#include "engine/atomic.h"
-#include "engine/command_line_parser.h"
-#include "engine/debug.h"
 #include "engine/engine.h"
-#include "engine/file_system.h"
-#include "engine/geometry.h"
-#include "engine/hash.h"
 #include "engine/input_system.h"
-#include "engine/job_system.h"
-#include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/os.h"
-#include "engine/path.h"
-#include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -39,7 +40,7 @@
 #include "utils.h"
 
 #ifdef _WIN32
-	#include "engine/win/simple_win.h"
+	#include "foundation/win/simple_win.h"
 #endif
 
 namespace Lumix

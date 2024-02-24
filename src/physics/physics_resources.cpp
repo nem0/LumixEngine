@@ -5,13 +5,13 @@
 #include <PxPhysics.h>
 
 #include "physics_resources.h"
-#include "engine/log.h"
+#include "foundation/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/profiler.h"
+#include "foundation/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/stream.h"
-#include "engine/string.h"
-#include "engine/math.h"
+#include "foundation/stream.h"
+#include "foundation/string.h"
+#include "foundation/math.h"
 #include "physics/physics_system.h"
 
 

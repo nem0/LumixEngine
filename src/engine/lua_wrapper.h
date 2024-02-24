@@ -1,9 +1,11 @@
 #pragma once
 
+#include "engine/lumix.h"
 
-#include "engine/math.h"
-#include "engine/metaprogramming.h"
-#include "engine/path.h"
+#include "foundation/math.h"
+#include "foundation/metaprogramming.h"
+#include "foundation/path.h"
+
 #include <lua.h>
 #include <lualib.h>
 

@@ -1,6 +1,7 @@
+#include "foundation/string.h"
+#include "foundation/stream.h"
+
 #include "entity_folders.h"
-#include "engine/string.h"
-#include "engine/stream.h"
 
 namespace Lumix {
 

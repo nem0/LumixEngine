@@ -1,11 +1,11 @@
 #pragma once
 
-
-#include "engine/allocators.h"
-#include "engine/array.h"
-#include "engine/delegate_list.h"
 #include "engine/lumix.h"
-#include "engine/math.h"
+
+#include "foundation/allocators.h"
+#include "foundation/array.h"
+#include "foundation/delegate_list.h"
+#include "foundation/math.h"
 
 
 namespace Lumix {

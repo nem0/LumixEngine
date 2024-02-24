@@ -1,13 +1,13 @@
 #pragma once
 
+#include "foundation/allocators.h"
+#include "foundation/array.h"
+#include "foundation/log.h"
+#include "foundation/sync.h"
+#include "foundation/string.h"
 
 #include "editor/studio_app.h"
 #include "editor/utils.h"
-#include "engine/allocators.h"
-#include "engine/array.h"
-#include "engine/log.h"
-#include "engine/sync.h"
-#include "engine/string.h"
 
 
 namespace Lumix

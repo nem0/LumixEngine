@@ -1,20 +1,21 @@
 #include <imgui/imgui.h>
 
+#include "foundation/crt.h"
+#include "foundation/math.h"
+#include "foundation/stream.h"
+#include "foundation/math.h"
+
 #include "property_grid.h"
 #include "asset_browser.h"
 #include "editor/prefab_system.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
-#include "engine/crt.h"
 #include "engine/plugin.h"
-#include "engine/math.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
-#include "engine/stream.h"
 #include "engine/world.h"
-#include "engine/math.h"
 #include "utils.h"
 
 

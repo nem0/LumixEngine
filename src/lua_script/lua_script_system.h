@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "engine/hash.h"
-#include "engine/path.h"
+#include "foundation/hash.h"
+#include "foundation/path.h"
 #include "engine/plugin.h"
 #include "engine/resource.h"
-#include "engine/string.h"
+#include "foundation/string.h"
 
 
 struct lua_State;
