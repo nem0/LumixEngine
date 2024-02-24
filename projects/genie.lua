@@ -293,7 +293,7 @@ function defaultConfigurations()
 		links { "pthread" }
 
 	configuration { "vs20*"}
-		buildoptions { "/wd4503"}
+		buildoptions { "/wd4503 /wd4251"}
 		
 	configuration {}
 		files {
@@ -501,7 +501,7 @@ project "foundation"
 	}
 
 
-	defines { "BUILDING_ENGINE" }
+	defines { "BUILDING_FOUNDATION" }
 	
 	configuration {}
 
@@ -625,7 +625,7 @@ if has_plugin("renderer") then
 		includedirs { "../src", "../external/freetype/include", "../external/" }
 		
 		defines { "BUILDING_RENDERER" }
-		links { "foundation", "engine" }
+		links { "foundation", "engine", "lua_script" }
 
 		if build_studio then
 			links { "editor" }
@@ -746,7 +746,7 @@ if has_plugin("gui") then
 
 		files { "../src/gui/**.h", "../src/gui/**.cpp" }
 		includedirs { "../src", "../src/gui" }
-		links { "foundation", "engine", "renderer" }
+		links { "foundation", "engine", "renderer", "lua_script" }
 		
 		defines { "BUILDING_GUI" }
 		
@@ -773,7 +773,7 @@ if has_plugin("lua_script") then
 		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 		includedirs { "../src", "../src/lua_script" }
 		defines { "BUILDING_LUA_SCRIPT" }
-		links { "foundation", "engine", "renderer" }
+		links { "foundation", "engine" }
 
 		if build_studio then
 			links { "editor" }
@@ -821,7 +821,7 @@ if build_app then
 			end
 			if build_studio then links {"editor"} end
 
-			links { "foundation", "engine" }
+			links { "foundation", "engine", "lua_script" }
 			if use_basisu then
 				linkLib "basisu"
 			end
@@ -835,7 +835,7 @@ if build_app then
 
 			configuration {}
 		else
-			links { "editor", "engine" }
+			links { "editor", "foundation", "engine" }
 		end
 		if build_studio then
 			if use_basisu then
@@ -997,7 +997,7 @@ if build_studio then
 			
 			configuration {}
 
-			links { "editor", "engine" }
+			links { "editor", "foundation", "engine" }
 			if use_basisu then
 				linkLib "basisu"
 			end
@@ -1014,7 +1014,7 @@ if build_studio then
 				linkPhysX()
 			end
 		else
-			links { "renderer", "editor", "engine" }
+			links { "renderer", "editor", "foundation", "engine" }
 		end
 
 		for _, callback in ipairs(build_studio_callbacks) do

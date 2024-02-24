@@ -8,7 +8,7 @@
 
 namespace Lumix {
 
-LUMIX_RENDERER_API struct WorldViewer {
+struct LUMIX_RENDERER_API WorldViewer {
 	WorldViewer(struct StudioApp& app);
 	~WorldViewer();
 

@@ -89,7 +89,7 @@ LUMIX_EDITOR_API void openCenterStrip(const char* str_id);
 LUMIX_EDITOR_API bool beginCenterStrip(const char* str_id, u32 lines = 5);
 LUMIX_EDITOR_API void endCenterStrip();
 
-struct SimpleUndoRedo {
+struct LUMIX_EDITOR_API SimpleUndoRedo {
 	enum { NO_MERGE_UNDO = 0xffFFffFF };
 	struct Undo {
 		Undo(IAllocator& allocator) : blob(allocator) {}
@@ -155,7 +155,7 @@ private:
 	char m_new_folder_name[MAX_PATH] = "";
 };
 
-struct FileSelector {
+struct LUMIX_EDITOR_API FileSelector {
 	FileSelector(StudioApp& app);
 	FileSelector(const char* ext, StudioApp& app);
 	// popup
@@ -178,7 +178,7 @@ private:
 	String m_full_path;
 };
 
-struct TextFilter {
+struct LUMIX_EDITOR_API TextFilter {
 	bool isActive() const { return count != 0; }
 	void clear() { count = 0; filter[0] = 0; }
 	bool pass(StringView text) const;
@@ -190,7 +190,7 @@ struct TextFilter {
 	u32 count = 0;
 };
 
-struct NodeEditor : SimpleUndoRedo {
+struct LUMIX_EDITOR_API NodeEditor : SimpleUndoRedo {
 	enum { OUTPUT_FLAG = 1 << 31 };
 
 	NodeEditor(IAllocator& allocator);
@@ -236,9 +236,9 @@ struct CodeEditor {
 	virtual bool gui(const char* str_id, const ImVec2& size = ImVec2(0, 0), ImFont* ui_font = nullptr) = 0;
 };
 
-UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
-UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
-UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app);
+LUMIX_EDITOR_API UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
+LUMIX_EDITOR_API UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
+LUMIX_EDITOR_API UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app);
 
 template <typename F> void alignGUI(float align, const F& f) {
 	const ImVec2 container_size = ImGui::GetContentRegionAvail();

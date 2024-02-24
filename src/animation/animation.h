@@ -54,7 +54,7 @@ struct BoneMask
 struct Animation final : Resource {
 	friend struct AnimationSampler;
 	static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
-	static const ResourceType TYPE;
+	static inline const ResourceType TYPE = ResourceType("animation");
 
 	enum class TrackType : u8 {
 		CONSTANT,

@@ -12,10 +12,6 @@
 namespace Lumix
 {
 
-
-const ResourceType Animation::TYPE("animation");
-
-
 Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_allocator(allocator, m_path.c_str())

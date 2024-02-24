@@ -5,7 +5,7 @@
 namespace Lumix
 {
 
-LUMIX_FOUNDATION_API struct AtomicI32 {
+struct LUMIX_FOUNDATION_API AtomicI32 {
 	AtomicI32(i32 v) : value(v) {}
 	
 	void operator =(i32 v);
@@ -22,7 +22,7 @@ private:
 	volatile i32 value;
 };
 
-LUMIX_FOUNDATION_API struct AtomicI64 {
+struct LUMIX_FOUNDATION_API AtomicI64 {
 	AtomicI64(i64 v) : value(v) {}
 	
 	void operator =(i64 v);

@@ -166,13 +166,11 @@ struct Color {
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_FOUNDATION_API
-#elif defined BUILDING_ENGINE
+#elif defined BUILDING_FOUNDATION
 	#define LUMIX_FOUNDATION_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_FOUNDATION_API LUMIX_LIBRARY_IMPORT
 #endif
-
-namespace os { void abort(); }
 
 #ifdef _MSC_VER
 	#pragma warning(error : 4101)

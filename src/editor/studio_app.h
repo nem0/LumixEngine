@@ -51,7 +51,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual const char* getName() const = 0;
 	};
 
-	struct GUIPlugin {
+	struct LUMIX_EDITOR_API GUIPlugin {
 		virtual ~GUIPlugin() {}
 		virtual void onGUI() = 0;
 		virtual bool hasFocus() const { return false; }
