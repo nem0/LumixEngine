@@ -1,9 +1,9 @@
 #pragma once
 
-#include "foundation/array.h"
-#include "foundation/geometry.h"
-#include "foundation/math.h"
-#include "foundation/stream.h"
+#include "core/array.h"
+#include "core/geometry.h"
+#include "core/math.h"
+#include "core/stream.h"
 
 namespace Lumix {
 

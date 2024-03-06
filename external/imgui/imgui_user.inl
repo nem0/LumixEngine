@@ -1,5 +1,5 @@
-#include "foundation/math.h"
-#include "foundation/string.h"
+#include "core/math.h"
+#include "core/string.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <math.h>

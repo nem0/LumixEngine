@@ -2,8 +2,8 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/allocator.h"
-#include "foundation/os.h"
+#include "core/allocator.h"
+#include "core/os.h"
 
 struct lua_State;
 

@@ -2,8 +2,8 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/array.h"
-#include "foundation/math.h"
+#include "core/array.h"
+#include "core/math.h"
 
 
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "foundation/allocators.h"
-#include "foundation/array.h"
-#include "foundation/log.h"
-#include "foundation/sync.h"
-#include "foundation/string.h"
+#include "core/allocators.h"
+#include "core/array.h"
+#include "core/log.h"
+#include "core/sync.h"
+#include "core/string.h"
 
 #include "editor/studio_app.h"
 #include "editor/utils.h"

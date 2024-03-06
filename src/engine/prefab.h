@@ -1,8 +1,8 @@
 #pragma once
 
-#include "foundation/hash.h"
+#include "core/hash.h"
 #include "engine/resource.h"
-#include "foundation/stream.h"
+#include "core/stream.h"
 
 namespace Lumix {
 

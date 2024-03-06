@@ -2,14 +2,14 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/allocators.h"
-#include "foundation/array.h"
-#include "foundation/geometry.h"
-#include "foundation/hash.h"
-#include "foundation/hash_map.h"
-#include "foundation/math.h"
-#include "foundation/stream.h"
-#include "foundation/string.h"
+#include "core/allocators.h"
+#include "core/array.h"
+#include "core/geometry.h"
+#include "core/hash.h"
+#include "core/hash_map.h"
+#include "core/math.h"
+#include "core/stream.h"
+#include "core/string.h"
 
 #include "engine/resource.h"
 #include "gpu/gpu.h"

@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "foundation/array.h"
-#include "foundation/math.h"
+#include "core/array.h"
+#include "core/math.h"
 #include "editor/studio_app.h"
-#include "foundation/file_system.h"
-#include "foundation/path.h"
+#include "engine/file_system.h"
+#include "core/path.h"
 #include "engine/world.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"

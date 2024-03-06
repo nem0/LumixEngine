@@ -1,9 +1,9 @@
 #include "sprite.h"
-#include "foundation/log.h"
+#include "core/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/resource_manager.h"
-#include "foundation/stream.h"
-#include "foundation/string.h"
+#include "core/stream.h"
+#include "core/string.h"
 #include "renderer/texture.h"
 
 

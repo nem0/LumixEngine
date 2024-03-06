@@ -1,10 +1,10 @@
 #include "engine/lumix.h"
 
-#include "foundation/hash.h"
-#include "foundation/log.h"
-#include "foundation/path.h"
-#include "foundation/stream.h"
-#include "foundation/string.h"
+#include "core/hash.h"
+#include "core/log.h"
+#include "core/path.h"
+#include "core/stream.h"
+#include "core/string.h"
 
 #include "engine/resource.h"
 #include "engine/resource_manager.h"

@@ -2,8 +2,8 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/allocator.h"
-#include "foundation/math.h"
+#include "core/allocator.h"
+#include "core/math.h"
 
 #include "engine/plugin.h"
 

@@ -1,4 +1,4 @@
-#include "foundation/profiler.h"
+#include "core/profiler.h"
 
 #include "audio_system.h"
 #include "audio_device.h"

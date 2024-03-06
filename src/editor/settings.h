@@ -2,9 +2,9 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/math.h"
-#include "foundation/os.h"
-#include "foundation/string.h"
+#include "core/math.h"
+#include "core/os.h"
+#include "core/string.h"
 
 #include "editor/utils.h"
 

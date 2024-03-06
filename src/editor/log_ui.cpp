@@ -1,8 +1,8 @@
 #include <imgui/imgui.h>
 
-#include "foundation/delegate_list.h"
-#include "foundation/log.h"
-#include "foundation/os.h"
+#include "core/delegate_list.h"
+#include "core/log.h"
+#include "core/os.h"
 
 #include "log_ui.h"
 #include "editor/settings.h"

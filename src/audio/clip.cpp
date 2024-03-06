@@ -1,10 +1,10 @@
 #include "engine/lumix.h"
 
-#include "foundation/allocator.h"
-#include "foundation/crt.h"
-#include "foundation/profiler.h"
-#include "foundation/string.h"
-#include "foundation/stream.h"
+#include "core/allocator.h"
+#include "core/crt.h"
+#include "core/profiler.h"
+#include "core/string.h"
+#include "core/stream.h"
 
 #include "clip.h"
 #include "engine/resource.h"

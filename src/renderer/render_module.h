@@ -2,11 +2,12 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/array.h"
-#include "foundation/geometry.h"
-#include "foundation/hash_map.h"
-#include "foundation/math.h"
-#include "foundation/stream.h"
+#include "core/color.h"
+#include "core/array.h"
+#include "core/geometry.h"
+#include "core/hash_map.h"
+#include "core/math.h"
+#include "core/stream.h"
 
 #include "engine/plugin.h"
 #include "gpu/gpu.h"

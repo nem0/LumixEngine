@@ -1,6 +1,6 @@
 #pragma once
 
-#include "foundation/array.h"
+#include "core/array.h"
 
 #include "engine/resource.h"
 

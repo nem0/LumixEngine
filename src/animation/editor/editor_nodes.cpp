@@ -1,6 +1,6 @@
-#include "foundation/log.h"
-#include "foundation/crt.h"
-#include "foundation/stack_array.h"
+#include "core/log.h"
+#include "core/crt.h"
+#include "core/stack_array.h"
 
 #include "animation/animation.h"
 #include "animation/controller.h"

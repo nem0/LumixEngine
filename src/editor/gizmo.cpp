@@ -1,8 +1,8 @@
-#include "foundation/crt.h"
-#include "foundation/geometry.h"
-#include "foundation/math.h"
-#include "foundation/os.h"
-#include "foundation/string.h"
+#include "core/crt.h"
+#include "core/geometry.h"
+#include "core/math.h"
+#include "core/os.h"
+#include "core/string.h"
 
 #include "editor/gizmo.h"
 #include "engine/world.h"

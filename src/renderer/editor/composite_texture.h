@@ -1,9 +1,9 @@
 #pragma once
 
-#include "foundation/allocators.h"
-#include "foundation/array.h"
-#include "foundation/math.h"
-#include "foundation/path.h"
+#include "core/allocators.h"
+#include "core/array.h"
+#include "core/math.h"
+#include "core/path.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "renderer/gpu/gpu.h"

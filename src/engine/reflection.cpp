@@ -1,10 +1,10 @@
 #include "engine/reflection.h"
-#include "foundation/allocator.h"
-#include "foundation/allocators.h"
-#include "foundation/hash.h"
-#include "foundation/log.h"
-#include "foundation/stream.h"
-#include "foundation/string.h"
+#include "core/allocator.h"
+#include "core/allocators.h"
+#include "core/hash.h"
+#include "core/log.h"
+#include "core/stream.h"
+#include "core/string.h"
 #include "engine/world.h"
 
 namespace Lumix::reflection {

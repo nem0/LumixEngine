@@ -2,19 +2,19 @@
 #include <imgui/imgui_freetype.h>
 #include <imgui/imgui_internal.h>
 
-#include "foundation/allocators.h"
-#include "foundation/associative_array.h"
-#include "foundation/atomic.h"
-#include "foundation/command_line_parser.h"
-#include "foundation/debug.h"
-#include "foundation/file_system.h"
-#include "foundation/geometry.h"
-#include "foundation/hash.h"
-#include "foundation/job_system.h"
-#include "foundation/log.h"
-#include "foundation/os.h"
-#include "foundation/path.h"
-#include "foundation/profiler.h"
+#include "core/allocators.h"
+#include "core/associative_array.h"
+#include "core/atomic.h"
+#include "core/command_line_parser.h"
+#include "core/debug.h"
+#include "engine/file_system.h"
+#include "core/geometry.h"
+#include "core/hash.h"
+#include "core/job_system.h"
+#include "core/log.h"
+#include "core/os.h"
+#include "core/path.h"
+#include "core/profiler.h"
 
 #include "audio/audio_module.h"
 #include "editor/asset_browser.h"
@@ -40,7 +40,7 @@
 #include "utils.h"
 
 #ifdef _WIN32
-	#include "foundation/win/simple_win.h"
+	#include "core/win/simple_win.h"
 #endif
 
 namespace Lumix

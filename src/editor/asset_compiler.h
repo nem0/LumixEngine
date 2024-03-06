@@ -2,8 +2,8 @@
 
 struct lua_State;
 
-#include "foundation/hash.h"
-#include "foundation/hash_map.h"
+#include "core/hash.h"
+#include "core/hash_map.h"
 #include "engine/resource.h"
 
 namespace Lumix {

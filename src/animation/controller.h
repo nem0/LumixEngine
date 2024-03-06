@@ -1,7 +1,7 @@
 #pragma once
 
-#include "foundation/hash.h"
-#include "foundation/stream.h"
+#include "core/hash.h"
+#include "core/stream.h"
 #include "animation.h"
 #include "engine/resource.h"
 

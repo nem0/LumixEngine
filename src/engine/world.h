@@ -2,10 +2,10 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/allocators.h"
-#include "foundation/array.h"
-#include "foundation/delegate_list.h"
-#include "foundation/math.h"
+#include "core/allocators.h"
+#include "core/array.h"
+#include "core/delegate_list.h"
+#include "core/math.h"
 
 
 namespace Lumix {

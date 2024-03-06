@@ -1,7 +1,7 @@
 #include "engine/lumix.h"
 
-#include "foundation/math.h"
-#include "foundation/profiler.h"
+#include "core/math.h"
+#include "core/profiler.h"
 
 #include "navigation_module.h"
 #include "animation/animation_module.h"

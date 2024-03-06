@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "foundation/array.h"
-#include "foundation/hash_map.h"
-#include "foundation/math.h"
-#include "foundation/geometry.h"
+#include "core/array.h"
+#include "core/hash_map.h"
+#include "core/math.h"
+#include "core/geometry.h"
 #include "engine/resource.h"
-#include "foundation/stream.h"
+#include "core/stream.h"
 #include "gpu/gpu.h"
 
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/span.h"
 
 #include "engine/lumix.h"
 

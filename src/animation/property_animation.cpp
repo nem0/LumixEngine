@@ -1,6 +1,6 @@
-#include "foundation/allocator.h"
-#include "foundation/log.h"
-#include "foundation/stream.h"
+#include "core/allocator.h"
+#include "core/log.h"
+#include "core/stream.h"
 
 #include "animation/property_animation.h"
 #include "engine/lua_wrapper.h"

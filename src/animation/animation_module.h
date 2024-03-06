@@ -2,7 +2,7 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/allocator.h"
+#include "core/allocator.h"
 
 #include "animation/animation.h"
 #include "engine/plugin.h"

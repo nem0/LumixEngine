@@ -2,10 +2,10 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/delegate_list.h"
-#include "foundation/file_system.h"
-#include "foundation/hash.h"
-#include "foundation/path.h"
+#include "core/delegate_list.h"
+#include "engine/file_system.h"
+#include "core/hash.h"
+#include "core/path.h"
 
 
 namespace Lumix {
