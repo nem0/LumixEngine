@@ -1,5 +1,4 @@
 #include "lua_script_system.h"
-#include "animation/animation_module.h"
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/hash.h"
@@ -909,7 +908,6 @@ public:
 		, m_property_names(system.m_allocator)
 		, m_is_game_running(false)
 		, m_is_api_registered(false)
-		, m_animation_module(nullptr)
 	{
 		m_function_call.is_in_progress = false;
 			
@@ -1959,7 +1957,6 @@ public:
 
 	void startGame() override
 	{
-		m_animation_module = (AnimationModule*)m_world.getModule("animation");
 		m_is_game_running = true;
 		m_gui_module = (GUIModule*)m_world.getModule("gui");
 		if (m_gui_module)
@@ -1987,7 +1984,6 @@ public:
 		m_updates.clear();
 		m_input_handlers.clear();
 		m_timers.clear();
-		m_animation_module = nullptr;
 	}
 
 	void createInlineScriptComponent(EntityRef entity) {
@@ -2571,7 +2567,6 @@ public:
 	bool m_is_api_registered = false;
 	bool m_is_game_running = false;
 	GUIModule* m_gui_module = nullptr;
-	AnimationModule* m_animation_module;
 };
 
 void LuaScriptModuleImpl::ScriptInstance::onScriptUnloaded(LuaScriptModuleImpl& module, struct ScriptComponent& cmp, int scr_index) {

@@ -8,11 +8,7 @@
 
 namespace Lumix
 {
-
-
-struct Engine;
-
-
+	
 namespace Fiber
 {
 
