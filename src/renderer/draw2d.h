@@ -1,7 +1,8 @@
 #pragma once
 
-#include "foundation/array.h"
-#include "foundation/math.h"
+#include "core/color.h"
+#include "core/array.h"
+#include "core/math.h"
 #include "renderer/gpu/gpu.h"
 
 

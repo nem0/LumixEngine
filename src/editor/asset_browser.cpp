@@ -1,12 +1,12 @@
 #include <imgui/imgui.h>
 
-#include "foundation/crt.h"
-#include "foundation/hash.h"
-#include "foundation/log.h"
-#include "foundation/os.h"
-#include "foundation/path.h"
-#include "foundation/profiler.h"
-#include "foundation/string.h"
+#include "core/crt.h"
+#include "core/hash.h"
+#include "core/log.h"
+#include "core/os.h"
+#include "core/path.h"
+#include "core/profiler.h"
+#include "core/string.h"
 
 #include "asset_browser.h"
 #include "editor/asset_compiler.h"

@@ -2,10 +2,10 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/array.h"
-#include "foundation/atomic.h"
-#include "foundation/math.h"
-#include "foundation/stream.h"
+#include "core/array.h"
+#include "core/atomic.h"
+#include "core/math.h"
+#include "core/stream.h"
 
 #include "engine/resource.h"
 #include "engine/resource_manager.h"

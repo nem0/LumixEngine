@@ -1,12 +1,12 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
-#include "foundation/file_system.h"
-#include "foundation/log.h"
-#include "foundation/math.h"
-#include "foundation/os.h"
-#include "foundation/path.h"
-#include "foundation/profiler.h"
+#include "engine/file_system.h"
+#include "core/log.h"
+#include "core/math.h"
+#include "core/os.h"
+#include "core/path.h"
+#include "core/profiler.h"
 
 #include "utils.h"
 #include "editor/render_interface.h"

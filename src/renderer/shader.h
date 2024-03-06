@@ -1,10 +1,10 @@
 #pragma once
-#include "foundation/allocators.h"
-#include "foundation/array.h"
-#include "foundation/hash.h"
-#include "foundation/hash_map.h"
+#include "core/allocators.h"
+#include "core/array.h"
+#include "core/hash.h"
+#include "core/hash_map.h"
 #include "engine/resource.h"
-#include "foundation/string.h"
+#include "core/string.h"
 #include "gpu/gpu.h"
 
 

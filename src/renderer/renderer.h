@@ -2,13 +2,13 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/allocator.h"
+#include "core/allocator.h"
 
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
 
 #ifndef _WIN32
-	#include "foundation/profiler.h"
+	#include "core/profiler.h"
 	#include "draw_stream.h"
 	#include "engine/engine.h"
 #endif

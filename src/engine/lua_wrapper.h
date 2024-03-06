@@ -2,9 +2,9 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/math.h"
-#include "foundation/metaprogramming.h"
-#include "foundation/path.h"
+#include "core/math.h"
+#include "core/metaprogramming.h"
+#include "core/path.h"
 
 #include <lua.h>
 #include <lualib.h>

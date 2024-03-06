@@ -2,9 +2,11 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/delegate.h"
-#include "foundation/string.h"
-#include "foundation/stream.h"
+#include "core/span.h"
+
+#include "core/delegate.h"
+#include "core/string.h"
+#include "core/stream.h"
 
 #include <imgui/imgui.h>
 

@@ -1,11 +1,11 @@
-#include "foundation/allocator.h"
-#include "foundation/crt.h"
-#include "foundation/delegate.h"
-#include "foundation/profiler.h"
-#include "foundation/string.h"
-#include "foundation/thread.h"
+#include "core/allocator.h"
+#include "core/crt.h"
+#include "core/delegate.h"
+#include "core/profiler.h"
+#include "core/string.h"
+#include "core/thread.h"
 
-#include "foundation/win/simple_win.h"
+#include "core/win/simple_win.h"
 #include "file_system_watcher.h"
 
 

@@ -2,9 +2,10 @@
 
 #include "engine/lumix.h"
 
+#include "core/color.h"
 #include "editor/entity_folders.h"
-#include "foundation/hash_map.h"
-#include "foundation/math.h"
+#include "core/hash_map.h"
+#include "core/math.h"
 
 #include "engine/world.h"
 

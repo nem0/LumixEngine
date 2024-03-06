@@ -1,11 +1,11 @@
 #define NOGDI 
 #include <dsound.h>
 
-#include "foundation/allocator.h"
-#include "foundation/crt.h"
-#include "foundation/log.h"
-#include "foundation/math.h"
-#include "foundation/profiler.h"
+#include "core/allocator.h"
+#include "core/crt.h"
+#include "core/log.h"
+#include "core/math.h"
+#include "core/profiler.h"
 
 #include "audio_device.h"
 #include "engine/engine.h"

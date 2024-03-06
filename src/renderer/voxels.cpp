@@ -1,4 +1,4 @@
-#include "foundation/profiler.h"
+#include "core/profiler.h"
 #include "renderer/model.h"
 #include "voxels.h"
 

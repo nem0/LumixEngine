@@ -2,8 +2,8 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/hash_map.h"
-#include "foundation/math.h"
+#include "core/hash_map.h"
+#include "core/math.h"
 
 
 namespace Lumix

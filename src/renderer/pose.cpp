@@ -1,7 +1,7 @@
 #include "renderer/pose.h"
-#include "foundation/math.h"
-#include "foundation/profiler.h"
-#include "foundation/math.h"
+#include "core/math.h"
+#include "core/profiler.h"
+#include "core/math.h"
 #include "renderer/model.h"
 
 

@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "foundation/delegate.h"
-#include "foundation/hash.h"
+#include "core/delegate.h"
+#include "core/hash.h"
 #include "engine/resource.h"
-#include "foundation/string.h"
+#include "core/string.h"
 #include "renderer/gpu/gpu.h"
 
 

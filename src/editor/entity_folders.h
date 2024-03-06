@@ -1,8 +1,8 @@
 #pragma once
 
-#include "foundation/array.h"
-#include "foundation/hash.h"
-#include "foundation/hash_map.h"
+#include "core/array.h"
+#include "core/hash.h"
+#include "core/hash_map.h"
 
 #include "engine/world.h"
 

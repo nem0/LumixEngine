@@ -1,7 +1,7 @@
 #include <imgui/imgui.h>
 
-#include "foundation/profiler.h"
-#include "foundation/stream.h"
+#include "core/profiler.h"
+#include "core/stream.h"
 
 #include "audio_device.h"
 #include "audio_module.h"

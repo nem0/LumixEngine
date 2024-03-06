@@ -1,8 +1,8 @@
 #pragma once
 
 #include "engine/engine.h"
-#include "foundation/geometry.h"
-#include "foundation/os.h"
+#include "core/geometry.h"
+#include "core/os.h"
 #include "engine/world.h"
 #include "renderer/pipeline.h"
 

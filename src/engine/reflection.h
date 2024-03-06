@@ -2,11 +2,12 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/foundation.h"
-#include "foundation/delegate_list.h"
-#include "foundation/hash.h"
-#include "foundation/metaprogramming.h"
-#include "foundation/string.h"
+#include "core/core.h"
+#include "core/color.h"
+#include "core/delegate_list.h"
+#include "core/hash.h"
+#include "core/metaprogramming.h"
+#include "core/string.h"
 
 #include "engine/resource.h"
 #include "engine/world.h"

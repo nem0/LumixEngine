@@ -1,11 +1,11 @@
 #include <imgui/imgui.h>
 
-#include "foundation/command_line_parser.h"
-#include "foundation/debug.h"
-#include "foundation/file_system.h"
-#include "foundation/geometry.h"
-#include "foundation/log.h"
-#include "foundation/os.h"
+#include "core/command_line_parser.h"
+#include "core/debug.h"
+#include "engine/file_system.h"
+#include "core/geometry.h"
+#include "core/log.h"
+#include "core/os.h"
 
 #include "settings.h"
 #include "engine/engine.h"

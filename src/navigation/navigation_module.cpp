@@ -2,14 +2,14 @@
 
 #include "navigation_module.h"
 
-#include "foundation/array.h"
-#include "foundation/atomic.h"
-#include "foundation/crt.h"
-#include "foundation/job_system.h"
-#include "foundation/log.h"
-#include "foundation/os.h"
-#include "foundation/profiler.h"
-#include "foundation/sync.h"
+#include "core/array.h"
+#include "core/atomic.h"
+#include "core/crt.h"
+#include "core/job_system.h"
+#include "core/log.h"
+#include "core/os.h"
+#include "core/profiler.h"
+#include "core/sync.h"
 
 #include "engine/engine.h"
 #include "engine/reflection.h"

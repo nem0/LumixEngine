@@ -2,7 +2,7 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/hash.h"
+#include "core/hash.h"
 
 
 namespace Lumix {

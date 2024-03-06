@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "foundation/array.h"
-#include "foundation/hash.h"
+#include "core/array.h"
+#include "core/hash.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "foundation/math.h"
+#include "core/math.h"
 #include "gpu/gpu.h"
 
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "foundation/allocators.h"
-#include "foundation/hash.h"
-#include "foundation/hash_map.h"
-#include "foundation/math.h"
-#include "foundation/string.h"
+#include "core/allocators.h"
+#include "core/hash.h"
+#include "core/hash_map.h"
+#include "core/math.h"
+#include "core/string.h"
 #include "engine/resource.h"
 
 namespace Lumix

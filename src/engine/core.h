@@ -2,8 +2,8 @@
 
 #include "engine/lumix.h"
 
-#include "foundation/array.h"
-#include "foundation/hash_map.h"
+#include "core/array.h"
+#include "core/hash_map.h"
 
 #include "engine/engine.h"
 #include "engine/plugin.h"

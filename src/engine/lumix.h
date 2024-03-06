@@ -1,9 +1,9 @@
 #pragma once
 
-#include "foundation/foundation.h"
-#include "foundation/hash.h"
-#include "foundation/hash_map.h"
-#include "foundation/string.h"
+#include "core/core.h"
+#include "core/hash.h"
+#include "core/hash_map.h"
+#include "core/string.h"
 
 namespace Lumix {
 

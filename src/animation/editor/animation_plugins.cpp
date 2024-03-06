@@ -1,9 +1,9 @@
 #include <imgui/imgui.h>
 
-#include "foundation/hash_map.h"
-#include "foundation/log.h"
-#include "foundation/os.h"
-#include "foundation/profiler.h"
+#include "core/hash_map.h"
+#include "core/log.h"
+#include "core/os.h"
+#include "core/profiler.h"
 
 #include "animation/animation.h"
 #include "animation/animation_module.h"

@@ -1,5 +1,5 @@
 
-#include "foundation/profiler.h"
+#include "core/profiler.h"
 
 #include "animation_module.h"
 

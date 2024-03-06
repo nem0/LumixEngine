@@ -1,6 +1,6 @@
 #include "engine/controller_device.h"
-#include "foundation/allocator.h"
-#include "foundation/win/simple_win.h"
+#include "core/allocator.h"
+#include "core/win/simple_win.h"
 
 namespace Lumix
 {

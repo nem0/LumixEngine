@@ -1,5 +1,5 @@
-#include "foundation/string.h"
-#include "foundation/stream.h"
+#include "core/string.h"
+#include "core/stream.h"
 
 #include "entity_folders.h"
 
