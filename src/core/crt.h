@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core.h"
+#include "core/core.h"
 
 #if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT) && !defined __clang__
 	#define _INC_FLOAT // if float.h is imported after this file, MCW_EM is redefined

@@ -58,7 +58,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
 			anim_module->setAnimation(*m_viewer.m_mesh, path);
 
-			Path parent_path(Path::getResource(path));
+			Path parent_path(ResourcePath::getResource(path));
 			m_parent_meta.load(parent_path, m_app);
 
 			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
@@ -100,7 +100,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
 			m_parent_meta.serialize(blob, m_resource->getPath());
-			m_app.getAssetCompiler().updateMeta(Path(Path::getResource(m_resource->getPath())), blob);
+			m_app.getAssetCompiler().updateMeta(Path(ResourcePath::getResource(m_resource->getPath())), blob);
 			m_dirty = false;
 		}
 
@@ -111,7 +111,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
 				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Go to parent")) {
-					m_app.getAssetBrowser().openEditor(Path(Path::getResource(m_resource->getPath())));
+					m_app.getAssetBrowser().openEditor(Path(ResourcePath::getResource(m_resource->getPath())));
 				}
 				ImGui::EndMenuBar();
 			}

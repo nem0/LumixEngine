@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core.h"
+#include "core/core.h"
 #include "stream.h"
 #include "core/string.h"
 #ifdef __linux__

@@ -9,6 +9,8 @@ struct lua_State;
 
 namespace Lumix {
 
+struct Path;
+
 namespace os { using WindowHandle = void*; }
 
 enum class DeserializeProjectResult {

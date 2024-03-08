@@ -257,7 +257,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	static RuntimeHash dirHash(const Path& path) {
-		StringView dir = Path::getDir(Path::getResource(path));
+		StringView dir = Path::getDir(ResourcePath::getResource(path));
 		if (!dir.empty() && (dir.back() == '\\' || dir.back() == '/')) dir.removeSuffix(1);
 		return RuntimeHash(dir.begin, dir.size());
 	}
@@ -276,7 +276,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	ResourceType getResourceType(StringView path) const override
 	{
-		StringView subres = Path::getSubresource(path);
+		StringView subres = ResourcePath::getSubresource(path);
 		StringView ext = Path::getExtension(subres);
 
 		alignas(u32) char tmp[6] = {};
@@ -409,7 +409,7 @@ struct AssetCompilerImpl : AssetCompiler {
 							}
 						#else
 							if (type.isValid()) {
-								if (fs.fileExists(Path::getResource(p))) {
+								if (fs.fileExists(ResourcePath::getResource(p))) {
 									m_resources.insert(p.getHash(), {p, type, dirHash(p)});
 								}
 								else {
@@ -462,7 +462,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	{
 		m_init_finished = true;
 		for (Resource* res : m_on_init_load) {
-			StringView filepath = Path::getResource(res->getPath());
+			StringView filepath = ResourcePath::getResource(res->getPath());
 			pushToCompileQueue(Path(filepath));
 			res->decRefCount();
 		}
@@ -535,7 +535,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 	
 	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res) {
-		StringView filepath = Path::getResource(res.getPath());
+		StringView filepath = ResourcePath::getResource(res.getPath());
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;

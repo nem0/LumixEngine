@@ -288,7 +288,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		FileInfo tile;
 		StaticString<MAX_PATH> filename;
-		StringView subres = Path::getSubresource(path);
+		StringView subres = ResourcePath::getSubresource(path);
 		if (*subres.end) {
 			filename.append(subres, ":", Path::getBasename(path));
 		}
@@ -335,7 +335,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto& resources = compiler.lockResources();
 		if (m_filter.isActive()) {
 			for (const AssetCompiler::ResourceItem& res : resources) {
-				if (m_dir != "." && !startsWithInsensitive(Path::getResource(res.path), m_dir)) continue;
+				if (m_dir != "." && !startsWithInsensitive(ResourcePath::getResource(res.path), m_dir)) continue;
 				addTile(res.path);
 			}
 		}
@@ -443,7 +443,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		const u64 file_path_hash = info.filepath.getHash().getHashValue();
 		const Path path(".lumix/asset_tiles/", file_path_hash, ".lbc");
 		if (!fs.fileExists(info.filepath)) {
-			StringView master = Path::getResource(info.filepath);
+			StringView master = ResourcePath::getResource(info.filepath);
 			if (master.begin == info.filepath.c_str()) {
 				return TileState::DELETED;
 			}
@@ -566,7 +566,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	IPlugin* getPluginFor(const Path& path) {
-		StringView ext = Path::getExtension(Path::getSubresource(path));
+		StringView ext = Path::getExtension(ResourcePath::getSubresource(path));
 		u64 key = 0;
 		ASSERT(ext.size() <= sizeof(key));
 		memcpy(&key, ext.begin, ext.size());
@@ -749,7 +749,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				else {
 					ImGuiEx::TextUnformatted(Path::getBasename(m_selected_resources[0]));
 					ImGui::Separator();
-					if (*Path::getSubresource(m_selected_resources[0]).end == 0 && ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
+					if (*ResourcePath::getSubresource(m_selected_resources[0]).end == 0 && ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 						openInExternalEditor(m_selected_resources[0]);
 					}
 					if (ImGui::BeginMenu("Rename")) {
@@ -846,7 +846,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void refreshLabels() {
 		for (FileInfo& tile : m_file_infos) {
 			StaticString<MAX_PATH> filename;
-			StringView subres = Path::getSubresource(tile.filepath);
+			StringView subres = ResourcePath::getSubresource(tile.filepath);
 			if (*subres.end) {
 				filename.append(subres, ":", Path::getBasename(tile.filepath));
 			} else {
@@ -1083,7 +1083,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
 				const char* dropped_path = (const char*)payload->Data;
-				StringView subres = Path::getSubresource(dropped_path);
+				StringView subres = ResourcePath::getSubresource(dropped_path);
 				StringView ext = Path::getExtension(subres);
 				const AssetCompiler& compiler = m_app.getAssetCompiler();
 				if (compiler.acceptExtension(ext, type)) {
@@ -1160,7 +1160,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			fi.filepath = path;
 
 			StaticString<MAX_PATH> filename;
-			StringView subres = Path::getSubresource(path);
+			StringView subres = ResourcePath::getSubresource(path);
 			if (*subres.end) {
 				filename.append(subres, ":", Path::getBasename(path));
 			}
@@ -1230,7 +1230,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void locate(const Path& path) override {
 		m_is_open = true;
 		m_filter.clear();
-		StringView new_dir = Path::getDir(Path::getResource(path));
+		StringView new_dir = Path::getDir(ResourcePath::getResource(path));
 		if (!Path::isSame(new_dir, m_dir)) {
 			changeDir(new_dir.empty() ? StringView(".") : new_dir, true);
 		}

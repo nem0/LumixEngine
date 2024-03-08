@@ -285,7 +285,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (a.animation.isEmpty()) continue;
 
 				ModelMeta model_meta(m_allocator);
-				if (lua_State* L = m_app.getAssetCompiler().getMeta(Path(Path::getResource(a.animation)))) {
+				if (lua_State* L = m_app.getAssetCompiler().getMeta(Path(ResourcePath::getResource(a.animation)))) {
 					model_meta.deserialize(L, a.animation);
 					if (model_meta.skeleton != m_controller.m_skeleton) {
 						m_to_fix_skeleton.push(a.animation);
@@ -832,7 +832,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 					Span<const Path> selection = m_app.getAssetBrowser().getSelectedResources();
 					bool any = false;
 					for (const Path& path : selection) {
-						StringView subres = Path::getSubresource(path);
+						StringView subres = ResourcePath::getSubresource(path);
 						if (Path::hasExtension(subres, "ani")) {
 							Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
 							entry.animation = path;
@@ -847,7 +847,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				}
 				else if (payload && payload->IsDataType("path")) {
 					const char* path = (const char*)payload->Data;
-					StringView subres = Path::getSubresource(path);
+					StringView subres = ResourcePath::getSubresource(path);
 					if (Path::hasExtension(subres, "ani")) {
 						Controller::AnimationEntry& entry = m_controller.m_animation_entries.emplace();
 						entry.animation = path;
@@ -996,7 +996,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		void fixSkeleton(const Path& anim_path) {
 			ModelMeta model_meta(m_allocator);
-			Path src_path(Path::getResource(anim_path));
+			Path src_path(ResourcePath::getResource(anim_path));
 			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
 				model_meta.deserialize(L, src_path);
 				lua_close(L);
