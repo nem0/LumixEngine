@@ -2571,7 +2571,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool compile(const Path& src) override {
 		ASSERT(Path::hasExtension(src, "fbx"));
-		Path filepath = Path(Path::getResource(src));
+		Path filepath = Path(ResourcePath::getResource(src));
 		FBXImporter::ImportConfig cfg;
 		ModelMeta meta(m_app.getAllocator()); 
 		meta.load(Path(filepath), m_app);
@@ -2795,17 +2795,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			TileData::MaterialJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::MaterialJob)(path);
 			m_tile.queue.push(job);
 		}
-		else if (Path::hasExtension(Path::getSubresource(path), "ani")) {
+		else if (Path::hasExtension(ResourcePath::getSubresource(path), "ani")) {
 			TileData::AnimationJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::AnimationJob)(path);
 			ModelMeta model_meta(m_app.getAllocator());
-			Path src_path(Path::getResource(path));
+			Path src_path(ResourcePath::getResource(path));
 			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
 				model_meta.deserialize(L, src_path);
 				job->model = resource_manager.load<Model>(model_meta.skeleton);
 				lua_close(L);
 			}
 			else {
-				job->model = resource_manager.load<Model>(Path(Path::getResource(path)));
+				job->model = resource_manager.load<Model>(Path(ResourcePath::getResource(path)));
 			}
 			job->animation = resource_manager.load<Animation>(path);
 			if (job->model) {

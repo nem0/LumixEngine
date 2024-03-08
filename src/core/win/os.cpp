@@ -4,7 +4,6 @@
 #include "core/log.h"
 #include "core/core.h"
 #include "core/os.h"
-#include "core/path.h"
 #include "core/profiler.h"
 #include "core/string.h"
 #define UNICODE
@@ -1092,9 +1091,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 
 	bool res = GetSaveFileName(&ofn) != FALSE;
 
-	char tmp[MAX_PATH];
-	fromWChar(Span(tmp), wtmp);
-	if (res) Path::normalize(tmp, out);
+	if (res) fromWChar(out, wtmp);
 	return res;
 }
 
@@ -1144,9 +1141,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 
 	const bool res = GetOpenFileName(&ofn) != FALSE;
 	if (res) {
-		char tmp[MAX_PATH];
-		fromWChar(Span(tmp), wout);
-		Path::normalize(tmp, out);
+		fromWChar(out, wout);
 	}
 	else {
 		auto err = CommDlgExtendedError();

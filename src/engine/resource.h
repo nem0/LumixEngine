@@ -3,19 +3,24 @@
 #include "engine/lumix.h"
 
 #include "core/delegate_list.h"
-#include "engine/file_system.h"
 #include "core/hash.h"
 #include "core/path.h"
+#include "engine/file_system.h"
 
 
 namespace Lumix {
 
+struct LUMIX_ENGINE_API ResourcePath {
+	static StringView getSubresource(StringView str);
+	static StringView getResource(StringView str);
+};
+
 struct LUMIX_ENGINE_API ResourceType {
 	ResourceType() {}
 	explicit ResourceType(const char* type_name);
-	bool operator !=(const ResourceType& rhs) const { return rhs.type != type; }
-	bool operator ==(const ResourceType& rhs) const { return rhs.type == type; }
-	bool operator <(const ResourceType& rhs) const { return rhs.type.getHashValue() < type.getHashValue(); }
+	bool operator!=(const ResourceType& rhs) const { return rhs.type != type; }
+	bool operator==(const ResourceType& rhs) const { return rhs.type == type; }
+	bool operator<(const ResourceType& rhs) const { return rhs.type.getHashValue() < type.getHashValue(); }
 	bool isValid() const { return type.getHashValue() != 0; }
 	RuntimeHash type;
 #ifdef LUMIX_DEBUG
@@ -31,9 +36,7 @@ template <> struct HashFunc<ResourceType> {
 #pragma pack(1)
 struct CompiledResourceHeader {
 	static constexpr u32 MAGIC = 'LRES';
-	enum Flags {
-		COMPRESSED = 1 << 0
-	};
+	enum Flags { COMPRESSED = 1 << 0 };
 	u32 magic = MAGIC;
 	u32 version = 0;
 	u32 flags = 0;
@@ -71,11 +74,9 @@ struct LUMIX_ENGINE_API Resource {
 	bool wantReady() const { return m_desired_state == State::READY; }
 	bool isHooked() const { return m_hooked; }
 
-	template <auto Function, typename C> void onLoaded(C* instance)
-	{
+	template <auto Function, typename C> void onLoaded(C* instance) {
 		m_cb.bind<Function>(instance);
-		if (isReady())
-		{
+		if (isReady()) {
 			(instance->*Function)(State::READY, State::READY, *this);
 		}
 	}

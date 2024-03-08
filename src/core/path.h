@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/core.h"
 #include "core/hash.h"
 #include "core/string.h"
 
@@ -23,8 +24,6 @@ struct LUMIX_CORE_API Path {
 	static StringView getDir(StringView src);
 	static StringView getBasename(StringView src);
 	static StringView getExtension(StringView src);
-	static StringView getSubresource(StringView str);
-	static StringView getResource(StringView str);
 	static bool hasExtension(StringView filename, StringView ext);
 	static bool replaceExtension(char* path, const char* ext);
 	static bool isSame(StringView a, StringView b);

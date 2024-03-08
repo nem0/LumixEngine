@@ -9,14 +9,12 @@
 // some functions can return unexpected results e.g. stringLength returns number of bytes for utf-8, not number of characters
 
 namespace Lumix {
-
 struct IAllocator;
-struct Path;
 template <int SIZE> struct StaticString;
 
 LUMIX_CORE_API int stringLength(const char* str);
 
-struct StringView {
+struct LUMIX_CORE_API StringView {
 	StringView() {}
 	StringView(const char* str) : begin(str), end(str ? str + stringLength(str) : 0) {}
 	StringView(const char* str, u32 len) : begin(str), end(str + len) {}

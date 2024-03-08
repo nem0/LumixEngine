@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core.h"
+#include "core/core.h"
 
 namespace Lumix {
 #pragma pack(1)

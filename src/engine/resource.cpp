@@ -279,5 +279,32 @@ void Resource::onStateChanged(State old_state, State new_state, Resource&)
 	checkState();
 }
 
+StringView ResourcePath::getResource(StringView str) {
+	const char* c = str.begin;
+	if (str.end) {
+		while (c != str.end) {
+			if (*c == ':') return StringView(c + 1, str.end);
+			++c;
+		}
+		return str;
+	}
+	while (*c) {
+		if (*c == ':') return c + 1;
+		++c;
+	}
+	return str;
+}
+
+StringView ResourcePath::getSubresource(StringView str) {
+	StringView ret;
+	ret.begin = str.begin;
+	ret.end = str.begin;
+	if (str.end) {
+		while (ret.end != str.end && *ret.end != ':') ++ret.end;
+	} else {
+		while (*ret.end && *ret.end != ':') ++ret.end;
+	}
+	return ret;
+}
 
 } // namespace Lumix

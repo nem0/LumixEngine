@@ -92,7 +92,7 @@ struct ModelMeta {
 
 		if (root_motion_bone.length() > 0) blob << "\nroot_motion_bone = \"" << root_motion_bone << "\"";
 		if (!skeleton.isEmpty()) {
-			StringView dir = Path::getDir(Path::getResource(path));
+			StringView dir = Path::getDir(ResourcePath::getResource(path));
 			if (!dir.empty() && startsWith(skeleton, dir)) {
 				blob << "\nskeleton_rel = \"" << skeleton.c_str() + dir.size();
 			}
@@ -191,7 +191,7 @@ struct ModelMeta {
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "root_motion_bone", Span(tmp))) root_motion_bone = tmp;
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton", Span(tmp))) skeleton = tmp;
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton_rel", Span(tmp))) {
-			StringView dir = Path::getDir(Path::getResource(path));
+			StringView dir = Path::getDir(ResourcePath::getResource(path));
 			skeleton = Path(dir, "/", tmp);
 		}
 		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
