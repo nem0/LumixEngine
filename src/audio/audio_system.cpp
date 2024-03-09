@@ -1,13 +1,13 @@
-#include "core/profiler.h"
+#include "core/profiler.hpp"
 
-#include "audio_system.h"
-#include "audio_device.h"
-#include "audio_module.h"
-#include "clip.h"
-#include "engine/engine.h"
-#include "engine/plugin.h"
-#include "engine/resource_manager.h"
-#include "engine/world.h"
+#include "audio_system.hpp"
+#include "audio_device.hpp"
+#include "audio_module.hpp"
+#include "clip.hpp"
+#include "engine/engine.hpp"
+#include "engine/plugin.hpp"
+#include "engine/resource_manager.hpp"
+#include "engine/world.hpp"
 
 
 namespace Lumix

@@ -1,22 +1,22 @@
 #include <imgui/imgui.h>
 
-#include "core/crt.h"
-#include "core/math.h"
-#include "core/stream.h"
-#include "core/math.h"
+#include "core/crt.hpp"
+#include "core/math.hpp"
+#include "core/stream.hpp"
+#include "core/math.hpp"
 
-#include "property_grid.h"
-#include "asset_browser.h"
-#include "editor/prefab_system.h"
-#include "editor/settings.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
-#include "engine/plugin.h"
-#include "engine/prefab.h"
-#include "engine/reflection.h"
-#include "engine/resource.h"
-#include "engine/world.h"
-#include "utils.h"
+#include "property_grid.hpp"
+#include "asset_browser.hpp"
+#include "editor/prefab_system.hpp"
+#include "editor/settings.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/world_editor.hpp"
+#include "engine/plugin.hpp"
+#include "engine/prefab.hpp"
+#include "engine/reflection.hpp"
+#include "engine/resource.hpp"
+#include "engine/world.hpp"
+#include "utils.hpp"
 
 
 namespace Lumix

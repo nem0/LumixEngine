@@ -1,9 +1,9 @@
-#include "engine/lumix.h"
+#include "engine/lumix.hpp"
 
-#include "core/log.h"
+#include "core/log.hpp"
 
-#include "engine/resource.h"
-#include "engine/resource_manager.h"
+#include "engine/resource.hpp"
+#include "engine/resource_manager.hpp"
 
 
 namespace Lumix

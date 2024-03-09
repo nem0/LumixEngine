@@ -1,12 +1,12 @@
-#include "core/crt.h"
-#include "core/geometry.h"
-#include "core/math.h"
-#include "core/os.h"
-#include "core/string.h"
+#include "core/crt.hpp"
+#include "core/geometry.hpp"
+#include "core/math.hpp"
+#include "core/os.hpp"
+#include "core/string.hpp"
 
-#include "editor/gizmo.h"
-#include "engine/world.h"
-#include "render_interface.h"
+#include "editor/gizmo.hpp"
+#include "engine/world.hpp"
+#include "render_interface.hpp"
 
 
 namespace Lumix {

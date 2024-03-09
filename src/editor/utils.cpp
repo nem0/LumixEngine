@@ -1,20 +1,20 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
-#include "engine/file_system.h"
-#include "core/log.h"
-#include "core/math.h"
-#include "core/os.h"
-#include "core/path.h"
-#include "core/profiler.h"
+#include "engine/file_system.hpp"
+#include "core/log.hpp"
+#include "core/math.hpp"
+#include "core/os.hpp"
+#include "core/path.hpp"
+#include "core/profiler.hpp"
 
-#include "utils.h"
-#include "editor/render_interface.h"
-#include "editor/settings.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/world.h"
+#include "utils.hpp"
+#include "editor/render_interface.hpp"
+#include "editor/settings.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/world_editor.hpp"
+#include "engine/engine.hpp"
+#include "engine/world.hpp"
 
 
 namespace Lumix {

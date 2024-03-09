@@ -1,11 +1,11 @@
-#include "core/allocator.h"
-#include "core/allocators.h"
-#include "core/atomic.h"
-#include "core/log.h"
-#include "core/core.h"
-#include "core/os.h"
-#include "core/profiler.h"
-#include "core/string.h"
+#include "core/allocator.hpp"
+#include "core/allocators.hpp"
+#include "core/atomic.hpp"
+#include "core/log.hpp"
+#include "core/core.hpp"
+#include "core/os.hpp"
+#include "core/profiler.hpp"
+#include "core/string.hpp"
 #define UNICODE
 #pragma warning(push)
 #pragma warning(disable : 4091)

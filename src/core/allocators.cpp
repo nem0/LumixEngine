@@ -1,8 +1,8 @@
-#include "core/allocators.h"
-#include "core/atomic.h"
-#include "core/crt.h"
-#include "core/math.h"
-#include "core/os.h"
+#include "core/allocators.hpp"
+#include "core/atomic.hpp"
+#include "core/crt.hpp"
+#include "core/math.hpp"
+#include "core/os.hpp"
 #if !defined __linux__ && defined __clang__
 	#include <intrin.h>
 #endif

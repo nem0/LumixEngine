@@ -1,14 +1,14 @@
 
-#include "core/profiler.h"
+#include "core/profiler.hpp"
 
-#include "animation_module.h"
+#include "animation_module.hpp"
 
-#include "animation/animation.h"
-#include "animation/property_animation.h"
-#include "animation/controller.h"
-#include "engine/engine.h"
-#include "engine/resource_manager.h"
-#include "engine/world.h"
+#include "animation/animation.hpp"
+#include "animation/property_animation.hpp"
+#include "animation/controller.hpp"
+#include "engine/engine.hpp"
+#include "engine/resource_manager.hpp"
+#include "engine/world.hpp"
 
 
 namespace Lumix

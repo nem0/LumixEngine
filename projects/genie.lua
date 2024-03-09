@@ -493,6 +493,7 @@ project "core"
 	libType()
 
 	files { "../src/core/**.h",
+	        "../src/core/**.hpp",
 			"../src/core/**.c",
 			"../src/core/**.cpp",
 			"../src/core/**.inl",
@@ -511,6 +512,7 @@ project "engine"
 	libType()
 
 	files { "../src/engine/**.h",
+	        "../src/engine/**.hpp",
 			"../src/engine/**.c",
 			"../src/engine/**.cpp",
 			"../src/engine/**.inl",
@@ -573,7 +575,11 @@ if has_plugin("physics") then
 			configuration {}
 		end
 
-		files { "../src/physics/**.h", "../src/physics/**.cpp" }
+		files { 
+		        "../src/physics/**.h", 
+		        "../src/physics/**.hpp", 
+				"../src/physics/**.cpp" 
+		}
 
 		includedirs { "../external/physx/include/" }
 		defines { "BUILDING_PHYSICS" }
@@ -591,6 +597,7 @@ if has_plugin("renderer") then
 
 		files {
 			"../src/renderer/**.h",
+			"../src/renderer/**.hpp",
 			"../src/renderer/**.cpp",
 			"../src/renderer/**.c",
 		}
@@ -650,7 +657,11 @@ if has_plugin("animation") then
 	project "animation"
 		libType()
 
-		files { "../src/animation/**.h", "../src/animation/**.cpp" }
+		files { 
+		    "../src/animation/**.h", 
+		    "../src/animation/**.hpp", 
+			"../src/animation/**.cpp" 
+		}
 		includedirs { "../src" }
 		defines { "BUILDING_ANIMATION" }
 		links { "core", "engine", "renderer" }
@@ -685,6 +696,7 @@ if has_plugin("audio") then
 
 		files { 
 			"../src/audio/**.h",
+			"../src/audio/**.hpp",
 			"../src/audio/**.cpp",
 			"../external/stb/stb_vorbis.cpp"
 		}
@@ -728,7 +740,12 @@ if has_plugin("navigation") then
 			linkLib "recast"
 		end
 
-		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
+		files { 
+		    "../src/navigation/**.h", 
+		    "../src/navigation/**.hpp", 
+			"../src/navigation/**.cpp", 
+			"../external/recast/src/**.cpp" 
+		}
 		includedirs { "../src", "../src/navigation", "../external/recast/include" }
 		links { "core", "engine", "renderer" }
 		
@@ -744,7 +761,11 @@ if has_plugin("gui") then
 	project "gui"
 		libType()
 
-		files { "../src/gui/**.h", "../src/gui/**.cpp" }
+		files { 
+		    "../src/gui/**.h", 
+		    "../src/gui/**.hpp", 
+			"../src/gui/**.cpp" 
+		}
 		includedirs { "../src", "../src/gui" }
 		links { "core", "engine", "renderer", "lua_script" }
 		
@@ -770,7 +791,11 @@ if has_plugin("lua_script") then
 			defines { "LUMIX_STATIC_LUAU" }
 		end
 
-		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
+		files { 
+			"../src/lua_script/**.h", 
+			"../src/lua_script/**.hpp", 
+			"../src/lua_script/**.cpp" 
+		}
 		includedirs { "../src", "../src/lua_script" }
 		defines { "BUILDING_LUA_SCRIPT" }
 		links { "core", "engine" }
@@ -920,6 +945,7 @@ if build_studio then
 
 		files {
 			"../src/editor/**.h",
+			"../src/editor/**.hpp",
 			"../src/editor/**.cpp"
 		}
 		defines { "BUILDING_EDITOR" }

@@ -1,7 +1,7 @@
-#include "crt.h"
-#include "math.h"
-#include "os.h"
-#include "simd.h"
+#include "crt.hpp"
+#include "math.hpp"
+#include "os.hpp"
+#include "simd.hpp"
 
 namespace Lumix
 {

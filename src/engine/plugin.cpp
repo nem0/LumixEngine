@@ -1,15 +1,15 @@
-#include "core/array.h"
-#include "core/debug.h"
-#include "core/delegate_list.h"
-#include "core/log.h"
-#include "core/os.h"
-#include "core/path.h"
-#include "core/profiler.h"
-#include "core/stream.h"
-#include "core/string.h"
+#include "core/array.hpp"
+#include "core/debug.hpp"
+#include "core/delegate_list.hpp"
+#include "core/log.hpp"
+#include "core/os.hpp"
+#include "core/path.hpp"
+#include "core/profiler.hpp"
+#include "core/stream.hpp"
+#include "core/string.hpp"
 
-#include "engine/engine.h"
-#include "engine/plugin.h"
+#include "engine/engine.hpp"
+#include "engine/plugin.hpp"
 
 namespace Lumix
 {

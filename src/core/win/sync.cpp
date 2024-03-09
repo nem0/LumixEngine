@@ -1,10 +1,10 @@
-#include "core/allocator.h"
-#include "core/crt.h"
-#include "core/sync.h"
-#include "core/atomic.h"
-#include "core/profiler.h"
-#include "core/string.h"
-#include "core/win/simple_win.h"
+#include "core/allocator.hpp"
+#include "core/crt.hpp"
+#include "core/sync.hpp"
+#include "core/atomic.hpp"
+#include "core/profiler.hpp"
+#include "core/string.hpp"
+#include "core/win/simple_win.hpp"
 #include <intrin.h>
 
 

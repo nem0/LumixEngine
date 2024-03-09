@@ -1,11 +1,11 @@
-#include "core/allocators.h"
-#include "core/crt.h"
-#include "core/delegate_list.h"
-#include "core/log.h"
-#include "core/path.h"
-#include "core/stream.h"
-#include "core/string.h"
-#include "core/sync.h"
+#include "core/allocators.hpp"
+#include "core/crt.hpp"
+#include "core/delegate_list.hpp"
+#include "core/log.hpp"
+#include "core/path.hpp"
+#include "core/stream.hpp"
+#include "core/string.hpp"
+#include "core/sync.hpp"
 
 
 namespace Lumix

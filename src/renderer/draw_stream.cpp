@@ -1,10 +1,10 @@
-#include "draw_stream.h"
-#include "core/array.h"
-#include "engine/engine.h"
-#include "core/math.h"
-#include "core/page_allocator.h"
-#include "core/string.h"
-#include "renderer/renderer.h"
+#include "draw_stream.hpp"
+#include "core/array.hpp"
+#include "engine/engine.hpp"
+#include "core/math.hpp"
+#include "core/page_allocator.hpp"
+#include "core/string.hpp"
+#include "renderer/renderer.hpp"
 #ifdef _WIN32
 	#include <intrin.h>
 #endif

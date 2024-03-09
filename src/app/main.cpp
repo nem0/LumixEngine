@@ -1,28 +1,28 @@
 #if 1 // set to 0 to build minimal lunex example
 
-#include "core/allocators.h"
-#include "core/atomic.h"
-#include "core/command_line_parser.h"
-#include "core/debug.h"
-#include "engine/file_system.h"
-#include "core/geometry.h"
-#include "core/job_system.h"
-#include "core/log.h"
-#include "core/os.h"
-#include "core/path.h"
-#include "core/profiler.h"
-#include "core/thread.h"
-#include "engine/engine.h"
-#include "engine/input_system.h"
-#include "engine/reflection.h"
-#include "engine/resource_manager.h"
-#include "engine/world.h"
-#include "gui/gui_system.h"
-#include "lua_script/lua_script.h"
-#include "lua_script/lua_script_system.h"
-#include "renderer/pipeline.h"
-#include "renderer/render_module.h"
-#include "renderer/renderer.h"
+#include "core/allocators.hpp"
+#include "core/atomic.hpp"
+#include "core/command_line_parser.hpp"
+#include "core/debug.hpp"
+#include "engine/file_system.hpp"
+#include "core/geometry.hpp"
+#include "core/job_system.hpp"
+#include "core/log.hpp"
+#include "core/os.hpp"
+#include "core/path.hpp"
+#include "core/profiler.hpp"
+#include "core/thread.hpp"
+#include "engine/engine.hpp"
+#include "engine/input_system.hpp"
+#include "engine/reflection.hpp"
+#include "engine/resource_manager.hpp"
+#include "engine/world.hpp"
+#include "gui/gui_system.hpp"
+#include "lua_script/lua_script.hpp"
+#include "lua_script/lua_script_system.hpp"
+#include "renderer/pipeline.hpp"
+#include "renderer/render_module.hpp"
+#include "renderer/renderer.hpp"
 
 #ifdef __linux__
 	#define STB_IMAGE_IMPLEMENTATION
@@ -309,9 +309,9 @@ int main(int args, char* argv[])
 
 #else
 
-#include "engine/allocators.h"
-#include "engine/os.h"
-#include "renderer/gpu/gpu.h"
+#include "engine/allocators.hpp"
+#include "engine/os.hpp"
+#include "renderer/gpu/gpu.hpp"
 
 using namespace Lumix;
 

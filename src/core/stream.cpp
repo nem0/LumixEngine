@@ -1,9 +1,9 @@
-#include "stream.h"
-#include "core/allocator.h"
-#include "core/crt.h"
-#include "core/math.h"
-#include "core/page_allocator.h"
-#include "core/string.h"
+#include "stream.hpp"
+#include "core/allocator.hpp"
+#include "core/crt.hpp"
+#include "core/math.hpp"
+#include "core/page_allocator.hpp"
+#include "core/string.hpp"
 
 
 namespace Lumix {

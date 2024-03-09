@@ -1,4 +1,4 @@
-#include "core/atomic.h"
+#include "core/atomic.hpp"
 
 
 namespace Lumix

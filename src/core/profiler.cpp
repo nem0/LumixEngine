@@ -6,18 +6,18 @@
 	#include <evntcons.h>
 #endif
 
-#include "core/atomic.h"
-#include "core/array.h"
-#include "core/crt.h"
-#include "core/hash_map.h"
-#include "core/allocators.h"
-#include "core/atomic.h"
-#include "core/math.h"
-#include "core/string.h"
-#include "core/sync.h"
-#include "core/thread.h"
-#include "core/os.h"
-#include "profiler.h"
+#include "core/atomic.hpp"
+#include "core/array.hpp"
+#include "core/crt.hpp"
+#include "core/hash_map.hpp"
+#include "core/allocators.hpp"
+#include "core/atomic.hpp"
+#include "core/math.hpp"
+#include "core/string.hpp"
+#include "core/sync.hpp"
+#include "core/thread.hpp"
+#include "core/os.hpp"
+#include "profiler.hpp"
 
 namespace Lumix
 {

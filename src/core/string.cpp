@@ -1,6 +1,6 @@
-#include "core/string.h"
-#include "core/allocator.h"
-#include "core/crt.h"
+#include "core/string.hpp"
+#include "core/allocator.hpp"
+#include "core/crt.hpp"
 
 
 namespace Lumix

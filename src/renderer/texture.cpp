@@ -2,19 +2,19 @@
 	#define LUMIX_NO_CUSTOM_CRT
 	#include <transcoder/basisu_transcoder.h>
 #endif
-#include "core/crt.h"
-#include "engine/file_system.h"
-#include "core/log.h"
-#include "core/math.h"
-#include "core/path.h"
-#include "core/os.h"
-#include "core/profiler.h"
-#include "engine/resource_manager.h"
-#include "core/stream.h"
-#include "core/string.h"
-#include "renderer/draw_stream.h"
-#include "renderer/renderer.h"
-#include "renderer/texture.h"
+#include "core/crt.hpp"
+#include "engine/file_system.hpp"
+#include "core/log.hpp"
+#include "core/math.hpp"
+#include "core/path.hpp"
+#include "core/os.hpp"
+#include "core/profiler.hpp"
+#include "engine/resource_manager.hpp"
+#include "core/stream.hpp"
+#include "core/string.hpp"
+#include "renderer/draw_stream.hpp"
+#include "renderer/renderer.hpp"
+#include "renderer/texture.hpp"
 #include "stb/stb_image.h"
 
 namespace Lumix

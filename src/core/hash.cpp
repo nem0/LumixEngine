@@ -1,4 +1,4 @@
-#include "core/hash.h"
+#include "core/hash.hpp"
 
 #define XXH_STATIC_LINKING_ONLY
 #define XXH_IMPLEMENTATION

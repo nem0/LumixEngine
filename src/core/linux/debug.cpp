@@ -1,7 +1,7 @@
-#include "core/allocators.h"
-#include "core/debug.h"
-#include "core/atomic.h"
-#include "core/string.h"
+#include "core/allocators.hpp"
+#include "core/debug.hpp"
+#include "core/atomic.hpp"
+#include "core/string.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

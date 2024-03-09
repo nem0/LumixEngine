@@ -1,19 +1,19 @@
 #include <imgui/imgui.h>
 
-#include "core/command_line_parser.h"
-#include "core/debug.h"
-#include "engine/file_system.h"
-#include "core/geometry.h"
-#include "core/log.h"
-#include "core/os.h"
+#include "core/command_line_parser.hpp"
+#include "core/debug.hpp"
+#include "engine/file_system.hpp"
+#include "core/geometry.hpp"
+#include "core/log.hpp"
+#include "core/os.hpp"
 
-#include "settings.h"
-#include "engine/engine.h"
-#include "engine/lua_wrapper.h"
-#include "editor/gizmo.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
-#include "utils.h"
+#include "settings.hpp"
+#include "engine/engine.hpp"
+#include "engine/lua_wrapper.hpp"
+#include "editor/gizmo.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/world_editor.hpp"
+#include "utils.hpp"
 
 
 namespace Lumix

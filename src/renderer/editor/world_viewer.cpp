@@ -1,17 +1,17 @@
 #include <imgui/imgui.h>
 
-#include "animation/animation_module.h"
-#include "engine/plugin.h"
-#include "engine/resource_manager.h"
-#include "editor/studio_app.h"
-#include "editor/settings.h"
-#include "editor/utils.h"
-#include "lua_script/lua_script.h"
-#include "renderer/model.h"
-#include "renderer/pose.h"
-#include "renderer/render_module.h"
-#include "renderer/renderer.h"
-#include "world_viewer.h"
+#include "animation/animation_module.hpp"
+#include "engine/plugin.hpp"
+#include "engine/resource_manager.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/settings.hpp"
+#include "editor/utils.hpp"
+#include "lua_script/lua_script.hpp"
+#include "renderer/model.hpp"
+#include "renderer/pose.hpp"
+#include "renderer/render_module.hpp"
+#include "renderer/renderer.hpp"
+#include "world_viewer.hpp"
 
 namespace Lumix {
 
