@@ -1,18 +1,18 @@
-#include "engine/lumix.h"
+#include "engine/lumix.hpp"
 
-#include "core/array.h"
-#include "core/crt.h"
-#include "core/geometry.h"
-#include "core/hash_map.h"
-#include "core/allocator.h"
-#include "core/atomic.h"
-#include "core/job_system.h"
-#include "core/math.h"
-#include "core/page_allocator.h"
-#include "core/profiler.h"
-#include "core/simd.h"
+#include "core/array.hpp"
+#include "core/crt.hpp"
+#include "core/geometry.hpp"
+#include "core/hash_map.hpp"
+#include "core/allocator.hpp"
+#include "core/atomic.hpp"
+#include "core/job_system.hpp"
+#include "core/math.hpp"
+#include "core/page_allocator.hpp"
+#include "core/profiler.hpp"
+#include "core/simd.hpp"
 
-#include "culling_system.h"
+#include "culling_system.hpp"
 
 
 namespace Lumix

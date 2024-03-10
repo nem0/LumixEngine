@@ -1,12 +1,12 @@
-#include "core/log.h"
-#include "core/crt.h"
-#include "core/stack_array.h"
+#include "core/log.hpp"
+#include "core/crt.hpp"
+#include "core/stack_array.hpp"
 
-#include "animation/animation.h"
-#include "animation/controller.h"
-#include "editor_nodes.h"
-#include "renderer/model.h"
-#include "renderer/pose.h"
+#include "animation/animation.hpp"
+#include "animation/controller.hpp"
+#include "editor_nodes.hpp"
+#include "renderer/model.hpp"
+#include "renderer/pose.hpp"
 
 namespace Lumix::anim_editor {
 

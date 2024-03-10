@@ -7,14 +7,14 @@
 #pragma warning (pop)
 #include <mapi.h>
 
-#include "core/allocators.h"
-#include "core/crt.h"
-#include "core/debug.h"
-#include "core/log.h"
-#include "core/atomic.h"
-#include "core/os.h"
-#include "core/path.h"
-#include "core/string.h"
+#include "core/allocators.hpp"
+#include "core/crt.hpp"
+#include "core/debug.hpp"
+#include "core/log.hpp"
+#include "core/atomic.hpp"
+#include "core/os.hpp"
+#include "core/path.hpp"
+#include "core/string.hpp"
 
 
 #pragma comment(lib, "DbgHelp.lib")

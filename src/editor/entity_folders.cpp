@@ -1,7 +1,7 @@
-#include "core/string.h"
-#include "core/stream.h"
+#include "core/string.hpp"
+#include "core/stream.hpp"
 
-#include "entity_folders.h"
+#include "entity_folders.hpp"
 
 namespace Lumix {
 

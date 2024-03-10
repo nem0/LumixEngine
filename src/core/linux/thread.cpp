@@ -1,9 +1,9 @@
-#include "core/allocator.h"
-#include "core/core.h"
-#include "core/thread.h"
-#include "core/sync.h"
-#include "core/os.h"
-#include "core/profiler.h"
+#include "core/allocator.hpp"
+#include "core/core.hpp"
+#include "core/thread.hpp"
+#include "core/sync.hpp"
+#include "core/os.hpp"
+#include "core/profiler.hpp"
 #include <pthread.h>
 
 

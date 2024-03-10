@@ -1,6 +1,6 @@
-#include "core/profiler.h"
-#include "renderer/model.h"
-#include "voxels.h"
+#include "core/profiler.hpp"
+#include "renderer/model.hpp"
+#include "voxels.hpp"
 
 namespace Lumix {
 

@@ -1,22 +1,22 @@
 #include <imgui/imgui.h>
 
-#include "core/profiler.h"
-#include "core/stream.h"
+#include "core/profiler.hpp"
+#include "core/stream.hpp"
 
-#include "audio_device.h"
-#include "audio_module.h"
-#include "audio_system.h"
-#include "clip.h"
-#include "editor/asset_browser.h"
-#include "editor/asset_compiler.h"
-#include "editor/editor_asset.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/lua_wrapper.h"
-#include "engine/resource_manager.h"
-#include "engine/world.h"
+#include "audio_device.hpp"
+#include "audio_module.hpp"
+#include "audio_system.hpp"
+#include "clip.hpp"
+#include "editor/asset_browser.hpp"
+#include "editor/asset_compiler.hpp"
+#include "editor/editor_asset.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/utils.hpp"
+#include "editor/world_editor.hpp"
+#include "engine/engine.hpp"
+#include "engine/lua_wrapper.hpp"
+#include "engine/resource_manager.hpp"
+#include "engine/world.hpp"
 
 
 using namespace Lumix;

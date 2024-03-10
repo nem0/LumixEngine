@@ -1,9 +1,9 @@
-#include "core/allocator.h"
-#include "core/atomic.h"
-#include "core/crt.h"
-#include "core/log.h"
-#include "core/page_allocator.h"
-#include "core/os.h"
+#include "core/allocator.hpp"
+#include "core/atomic.hpp"
+#include "core/crt.hpp"
+#include "core/log.hpp"
+#include "core/page_allocator.hpp"
+#include "core/os.hpp"
 
 
 namespace Lumix

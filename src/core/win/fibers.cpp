@@ -1,6 +1,6 @@
-#include "core/fibers.h"
-#include "core/profiler.h"
-#include "core/win/simple_win.h"
+#include "core/fibers.hpp"
+#include "core/profiler.hpp"
+#include "core/win/simple_win.hpp"
 
 namespace Lumix
 {

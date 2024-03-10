@@ -1,12 +1,12 @@
-#include "voxelizer_ui.h"
-#include "editor/asset_browser.h"
-#include "editor/settings.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/world.h"
-#include "renderer/model.h"
+#include "voxelizer_ui.hpp"
+#include "editor/asset_browser.hpp"
+#include "editor/settings.hpp"
+#include "editor/world_editor.hpp"
+#include "engine/engine.hpp"
+#include "core/profiler.hpp"
+#include "engine/resource_manager.hpp"
+#include "engine/world.hpp"
+#include "renderer/model.hpp"
 #include <imgui/imgui.h>
 
 

@@ -1,9 +1,9 @@
-#include "core/log.h"
-#include "core/os.h"
-#include "core/stream.h"
-#include "font.h"
-#include "renderer/texture.h"
-#include "renderer/renderer.h"
+#include "core/log.hpp"
+#include "core/os.hpp"
+#include "core/stream.hpp"
+#include "font.hpp"
+#include "renderer/texture.hpp"
+#include "renderer/renderer.hpp"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <stb/stb_rect_pack.h>

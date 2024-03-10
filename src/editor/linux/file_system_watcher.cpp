@@ -1,9 +1,9 @@
-#include "engine/hash_map.h"
-#include "engine/thread.h"
-#include "engine/delegate.h"
-#include "engine/os.h"
-#include "engine/profiler.h"
-#include "engine/string.h"
+#include "engine/hash_map.hpp"
+#include "engine/thread.hpp"
+#include "engine/delegate.hpp"
+#include "engine/os.hpp"
+#include "engine/profiler.hpp"
+#include "engine/string.hpp"
 #include "file_system_watcher.h"
 #include <sys/inotify.h>
 #include <sys/select.h>

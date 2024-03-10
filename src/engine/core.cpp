@@ -1,9 +1,9 @@
-#include "engine/core.h"
-#include "engine.h"
-#include "core/hash_map.h"
-#include "reflection.h"
-#include "core/stream.h"
-#include "world.h"
+#include "engine/core.hpp"
+#include "engine.hpp"
+#include "core/hash_map.hpp"
+#include "reflection.hpp"
+#include "core/stream.hpp"
+#include "world.hpp"
 
 namespace Lumix {
 

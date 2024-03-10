@@ -1,13 +1,13 @@
-#include "engine/lumix.h"
+#include "engine/lumix.hpp"
 
-#include "core/hash.h"
-#include "core/log.h"
-#include "core/path.h"
-#include "core/stream.h"
-#include "core/string.h"
+#include "core/hash.hpp"
+#include "core/log.hpp"
+#include "core/path.hpp"
+#include "core/stream.hpp"
+#include "core/string.hpp"
 
-#include "engine/resource.h"
-#include "engine/resource_manager.h"
+#include "engine/resource.hpp"
+#include "engine/resource_manager.hpp"
 
 #include "lz4/lz4.h"
 

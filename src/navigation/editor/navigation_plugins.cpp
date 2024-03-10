@@ -1,20 +1,20 @@
 #include <DetourCrowd.h>
 #include <imgui/imgui.h>
 
-#include "editor/property_grid.h"
-#include "editor/render_interface.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/file_system.h"
-#include "core/geometry.h"
-#include "core/log.h"
-#include "core/path.h"
-#include "core/os.h"
-#include "core/profiler.h"
-#include "engine/world.h"
-#include "navigation/navigation_module.h"
+#include "editor/property_grid.hpp"
+#include "editor/render_interface.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/utils.hpp"
+#include "editor/world_editor.hpp"
+#include "engine/engine.hpp"
+#include "engine/file_system.hpp"
+#include "core/geometry.hpp"
+#include "core/log.hpp"
+#include "core/path.hpp"
+#include "core/os.hpp"
+#include "core/profiler.hpp"
+#include "engine/world.hpp"
+#include "navigation/navigation_module.hpp"
 
 
 using namespace Lumix;

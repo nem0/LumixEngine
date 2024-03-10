@@ -1,10 +1,10 @@
-#include "core/allocator.h"
-#include "core/log.h"
-#include "core/stream.h"
+#include "core/allocator.hpp"
+#include "core/log.hpp"
+#include "core/stream.hpp"
 
-#include "animation/property_animation.h"
-#include "engine/lua_wrapper.h"
-#include "engine/reflection.h"
+#include "animation/property_animation.hpp"
+#include "engine/lua_wrapper.hpp"
+#include "engine/reflection.hpp"
 
 
 namespace Lumix {

@@ -1,14 +1,14 @@
 #define NOGDI 
 #include <dsound.h>
 
-#include "core/allocator.h"
-#include "core/crt.h"
-#include "core/log.h"
-#include "core/math.h"
-#include "core/profiler.h"
+#include "core/allocator.hpp"
+#include "core/crt.hpp"
+#include "core/log.hpp"
+#include "core/math.hpp"
+#include "core/profiler.hpp"
 
-#include "audio_device.h"
-#include "engine/engine.h"
+#include "audio_device.hpp"
+#include "engine/engine.hpp"
 
 
 namespace Lumix
