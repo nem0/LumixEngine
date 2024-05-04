@@ -53,16 +53,16 @@ namespace ImGuiEx {
 	}
 
 	void TextCentered(Lumix::StringView str) {
-		const float text_w = ImGui::CalcTextSize(str.begin, str.end).x;
+		const float text_w = ImGui::CalcTextSize(str.m_begin, str.m_end).x;
 		const float area_w = ImGui::GetContentRegionAvail().x;
 		float x = ImGui::GetCursorPosX();
 		x += (area_w - text_w) * 0.5f;
 		ImGui::SetCursorPosX(x);
-		ImGui::TextUnformatted(str.begin, str.end);
+		ImGui::TextUnformatted(str.m_begin, str.m_end);
 	}
 
 	void TextUnformatted(Lumix::StringView str) {
-		ImGui::TextUnformatted(str.begin, str.end);
+		ImGui::TextUnformatted(str.m_begin, str.m_end);
 	}
 
 	void BeginNodeEditor(const char* title, ImVec2* offset) {
