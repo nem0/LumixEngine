@@ -1,7 +1,7 @@
-#include "core/log.h"
-#include "core/string.h"
+#include "core/log.hpp"
+#include "core/string.hpp"
 
-#include "lua_wrapper.h"
+#include "lua_wrapper.hpp"
 #include <luacode.h>
 
 namespace Lumix::LuaWrapper {

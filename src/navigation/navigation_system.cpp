@@ -1,15 +1,15 @@
-#include "engine/lumix.h"
+#include "engine/lumix.hpp"
 
-#include "core/math.h"
-#include "core/profiler.h"
+#include "core/math.hpp"
+#include "core/profiler.hpp"
 
-#include "navigation_module.h"
-#include "animation/animation_module.h"
-#include "engine/engine.h"
-#include "engine/world.h"
-#include "navigation/navigation_module.h"
-#include "renderer/material.h"
-#include "renderer/model.h"
+#include "navigation_module.hpp"
+#include "animation/animation_module.hpp"
+#include "engine/engine.hpp"
+#include "engine/world.hpp"
+#include "navigation/navigation_module.hpp"
+#include "renderer/material.hpp"
+#include "renderer/model.hpp"
 #include <DetourAlloc.h>
 #include <RecastAlloc.h>
 

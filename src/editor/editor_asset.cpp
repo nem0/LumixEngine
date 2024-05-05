@@ -1,4 +1,4 @@
-#include "editor_asset.h"
+#include "editor_asset.hpp"
 
 namespace Lumix {
 

@@ -1,6 +1,6 @@
-#include "core/crt.h"
-#include "core/hash.h"
-#include "prefab.h"
+#include "core/crt.hpp"
+#include "core/hash.hpp"
+#include "prefab.hpp"
 
 namespace Lumix
 {

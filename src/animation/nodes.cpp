@@ -1,6 +1,6 @@
-#include "controller.h"
-#include "nodes.h"
-#include "renderer/model.h"
+#include "controller.hpp"
+#include "nodes.hpp"
+#include "renderer/model.hpp"
 
 namespace Lumix::anim {
 

@@ -1,13 +1,13 @@
-#include "engine/lumix.h"
+#include "engine/lumix.hpp"
 
-#include "core/allocator.h"
-#include "core/crt.h"
-#include "core/profiler.h"
-#include "core/string.h"
-#include "core/stream.h"
+#include "core/allocator.hpp"
+#include "core/crt.hpp"
+#include "core/profiler.hpp"
+#include "core/string.hpp"
+#include "core/stream.hpp"
 
-#include "clip.h"
-#include "engine/resource.h"
+#include "clip.hpp"
+#include "engine/resource.hpp"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb/stb_vorbis.cpp"
 

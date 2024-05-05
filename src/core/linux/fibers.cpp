@@ -1,7 +1,7 @@
-#include "core/core.h"
+#include "core/core.hpp"
 
-#include "core/fibers.h"
-#include "core/profiler.h"
+#include "core/fibers.hpp"
+#include "core/profiler.hpp"
 #include <ucontext.h>
 #include <stdlib.h>
 #include <string.h>

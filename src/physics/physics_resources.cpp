@@ -4,15 +4,15 @@
 #include <PxMaterial.h>
 #include <PxPhysics.h>
 
-#include "physics_resources.h"
-#include "core/log.h"
-#include "engine/lua_wrapper.h"
-#include "core/profiler.h"
-#include "engine/resource_manager.h"
-#include "core/stream.h"
-#include "core/string.h"
-#include "core/math.h"
-#include "physics/physics_system.h"
+#include "physics_resources.hpp"
+#include "core/log.hpp"
+#include "engine/lua_wrapper.hpp"
+#include "core/profiler.hpp"
+#include "engine/resource_manager.hpp"
+#include "core/stream.hpp"
+#include "core/string.hpp"
+#include "core/math.hpp"
+#include "physics/physics_system.hpp"
 
 
 namespace Lumix

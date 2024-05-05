@@ -1,12 +1,12 @@
-#include "core/log.h"
-#include "core/math.h"
-#include "core/profiler.h"
-#include "core/stream.h"
-#include "core/math.h"
-#include "animation/animation.h"
-#include "engine/resource_manager.h"
-#include "renderer/model.h"
-#include "renderer/pose.h"
+#include "core/log.hpp"
+#include "core/math.hpp"
+#include "core/profiler.hpp"
+#include "core/stream.hpp"
+#include "core/math.hpp"
+#include "animation/animation.hpp"
+#include "engine/resource_manager.hpp"
+#include "renderer/model.hpp"
+#include "renderer/pose.hpp"
 
 
 namespace Lumix

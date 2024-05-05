@@ -1,4 +1,4 @@
-#include "physics/physics_system.h"
+#include "physics/physics_system.hpp"
 
 #include <foundation/PxAllocatorCallback.h>
 #include <foundation/PxErrorCallback.h>
@@ -12,16 +12,16 @@
 #include <vehicle/PxVehicleSDK.h>
 
 #include "cooking/PxCooking.h"
-#include "engine/engine.h"
-#include "core/log.h"
-#include "engine/lua_wrapper.h"
-#include "core/profiler.h"
-#include "engine/resource_manager.h"
-#include "core/string.h"
-#include "engine/world.h"
-#include "physics/physics_resources.h"
-#include "physics/physics_module.h"
-#include "renderer/texture.h"
+#include "engine/engine.hpp"
+#include "core/log.hpp"
+#include "engine/lua_wrapper.hpp"
+#include "core/profiler.hpp"
+#include "engine/resource_manager.hpp"
+#include "core/string.hpp"
+#include "engine/world.hpp"
+#include "physics/physics_resources.hpp"
+#include "physics/physics_module.hpp"
+#include "renderer/texture.hpp"
 
 
 namespace Lumix

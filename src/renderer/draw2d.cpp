@@ -1,5 +1,5 @@
-#include "draw2d.h"
-#include "font.h"
+#include "draw2d.hpp"
+#include "font.hpp"
 
 
 namespace Lumix {

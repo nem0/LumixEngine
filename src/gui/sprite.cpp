@@ -1,10 +1,10 @@
-#include "sprite.h"
-#include "core/log.h"
-#include "engine/lua_wrapper.h"
-#include "engine/resource_manager.h"
-#include "core/stream.h"
-#include "core/string.h"
-#include "renderer/texture.h"
+#include "sprite.hpp"
+#include "core/log.hpp"
+#include "engine/lua_wrapper.hpp"
+#include "engine/resource_manager.hpp"
+#include "core/stream.hpp"
+#include "core/string.hpp"
+#include "renderer/texture.hpp"
 
 
 namespace Lumix

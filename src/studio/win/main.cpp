@@ -1,6 +1,6 @@
-#include "core/os.h"
-#include "core/win/simple_win.h"
-#include "editor/studio_app.h"
+#include "core/os.hpp"
+#include "core/win/simple_win.hpp"
+#include "editor/studio_app.hpp"
 
 int main(int argc, char* argv[])
 {

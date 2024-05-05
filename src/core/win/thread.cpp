@@ -1,10 +1,10 @@
-#include "core/core.h"
-#include "core/allocator.h"
-#include "core/sync.h"
-#include "core/thread.h"
-#include "core/os.h"
-#include "core/win/simple_win.h"
-#include "core/profiler.h"
+#include "core/core.hpp"
+#include "core/allocator.hpp"
+#include "core/sync.hpp"
+#include "core/thread.hpp"
+#include "core/os.hpp"
+#include "core/win/simple_win.hpp"
+#include "core/profiler.hpp"
 
 
 namespace Lumix

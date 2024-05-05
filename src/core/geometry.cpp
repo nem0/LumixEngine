@@ -1,7 +1,7 @@
-#include "geometry.h"
-#include "core/crt.h"
-#include "core/math.h"
-#include "core/simd.h"
+#include "geometry.hpp"
+#include "core/crt.hpp"
+#include "core/math.hpp"
+#include "core/simd.hpp"
 
 
 namespace Lumix

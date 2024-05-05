@@ -1,11 +1,11 @@
 #include <imgui/imgui.h>
 
-#include "core/delegate_list.h"
-#include "core/log.h"
-#include "core/os.h"
+#include "core/delegate_list.hpp"
+#include "core/log.hpp"
+#include "core/os.hpp"
 
-#include "log_ui.h"
-#include "editor/settings.h"
+#include "log_ui.hpp"
+#include "editor/settings.hpp"
 
 
 namespace Lumix

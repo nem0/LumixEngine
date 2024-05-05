@@ -1,4 +1,4 @@
-#include "core/path.h"
+#include "core/path.hpp"
 
 namespace Lumix {
 

@@ -1,8 +1,8 @@
-#include "renderer/pose.h"
-#include "core/math.h"
-#include "core/profiler.h"
-#include "core/math.h"
-#include "renderer/model.h"
+#include "renderer/pose.hpp"
+#include "core/math.hpp"
+#include "core/profiler.hpp"
+#include "core/math.hpp"
+#include "renderer/model.hpp"
 
 
 namespace Lumix

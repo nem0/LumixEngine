@@ -1,12 +1,12 @@
-#include "core/hash.h"
-#include "core/log.h"
-#include "core/stack_array.h"
-#include "animation.h"
-#include "controller.h"
-#include "nodes.h"
-#include "engine/resource_manager.h"
-#include "renderer/model.h"
-#include "renderer/pose.h"
+#include "core/hash.hpp"
+#include "core/log.hpp"
+#include "core/stack_array.hpp"
+#include "animation.hpp"
+#include "controller.hpp"
+#include "nodes.hpp"
+#include "engine/resource_manager.hpp"
+#include "renderer/model.hpp"
+#include "renderer/pose.hpp"
 
 
 namespace Lumix::anim {

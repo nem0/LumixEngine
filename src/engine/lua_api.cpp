@@ -1,21 +1,21 @@
 #include <imgui/imgui.h>
 
-#include "engine/lumix.h"
+#include "engine/lumix.hpp"
 
-#include "core/delegate.h"
-#include "engine/file_system.h"
-#include "core/log.h"
-#include "core/profiler.h"
-#include "core/math.h"
-#include "core/string.h"
+#include "core/delegate.hpp"
+#include "engine/file_system.hpp"
+#include "core/log.hpp"
+#include "core/profiler.hpp"
+#include "core/math.hpp"
+#include "core/string.hpp"
 
-#include "engine.h"
-#include "input_system.h"
-#include "lua_wrapper.h"
-#include "plugin.h"
-#include "prefab.h"
-#include "reflection.h"
-#include "world.h"
+#include "engine.hpp"
+#include "input_system.hpp"
+#include "lua_wrapper.hpp"
+#include "plugin.hpp"
+#include "prefab.hpp"
+#include "reflection.hpp"
+#include "world.hpp"
 #include <lua.h>
 #include <luacode.h>
 

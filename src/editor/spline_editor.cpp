@@ -1,16 +1,16 @@
-#include "core/geometry.h"
-#include "core/string.h"
+#include "core/geometry.hpp"
+#include "core/string.hpp"
 
-#include "editor/asset_compiler.h"
-#include "editor/gizmo.h"
-#include "editor/property_grid.h"
-#include "editor/spline_editor.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
-#include "engine/core.h"
-#include "engine/engine.h"
-#include "engine/resource_manager.h"
-#include "engine/world.h"
+#include "editor/asset_compiler.hpp"
+#include "editor/gizmo.hpp"
+#include "editor/property_grid.hpp"
+#include "editor/spline_editor.hpp"
+#include "editor/studio_app.hpp"
+#include "editor/world_editor.hpp"
+#include "engine/core.hpp"
+#include "engine/engine.hpp"
+#include "engine/resource_manager.hpp"
+#include "engine/world.hpp"
 #include <math.h>
 #include <imgui/imgui.h>
 
