@@ -1164,6 +1164,7 @@ struct GeometryDataImpl : GeometryData {
 		T res = attr;
 		if (!attr.values.empty() && attr.mapping == VertexDataMapping::BY_VERTEX && attr.indices.empty()) {
 			res.indices = positions.indices.data();
+			res.count = int(positions.indices.size());
 		}
 		return res;
 	}
@@ -2228,7 +2229,7 @@ struct AnimationLayerImpl : AnimationLayer
 	std::map<std::string, ofbx::IElementProperty*, std::less<>> allProperties;
 	mapProperties(element, allProperties);
 */
-void mapProperties(const ofbx::IElement& parent, std::map<std::string, ofbx::IElementProperty*, std::less<>>& propMap)
+void mapProperties(const ofbx::IElement& parent, std::map<std::string, ofbx::IElementProperty*, std::less<std::string>>& propMap)
 {
 	for (const ofbx::IElement* element = parent.getFirstChild(); element; element = element->getSibling())
 	{
@@ -3761,6 +3762,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		struct PostprocessJob {
 			Object* obj;
 			bool error = false;
+			PostprocessJob(Object* o) : obj(o) {}
 		};
 		std::vector<PostprocessJob> postprocess_jobs;
 		for (auto iter : scene.m_object_map)
@@ -4044,7 +4046,7 @@ bool Scene::finalize() {
 	return true;
 }
 
-IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor, void* job_user_ptr)
+IScene* load(const u8* data, usize size, u16 flags, JobProcessor job_processor, void* job_user_ptr)
 {
 	std::unique_ptr<Scene> scene(new Scene());
 	scene->m_data.resize(size);

@@ -21,6 +21,7 @@ static_assert(sizeof(u32) == 4, "u32 is not 4 bytes");
 static_assert(sizeof(u64) == 8, "u64 is not 8 bytes");
 static_assert(sizeof(i64) == 8, "i64 is not 8 bytes");
 
+typedef decltype(sizeof(0)) usize;
 
 using JobFunction = void (*)(void*);
 using JobProcessor = void (*)(JobFunction, void*, void*, u32, u32);
@@ -52,7 +53,7 @@ constexpr LoadFlags operator|(LoadFlags lhs, LoadFlags rhs)
 	return static_cast<LoadFlags>(static_cast<u16>(lhs) | static_cast<u16>(rhs));
 }
 
-constexpr LoadFlags& operator|=(LoadFlags& lhs, LoadFlags rhs)
+inline LoadFlags& operator|=(LoadFlags& lhs, LoadFlags rhs)
 {
 	return lhs = lhs | rhs;
 }
@@ -495,6 +496,9 @@ struct Vec2Attributes {
 	const int* indices = nullptr;
 	int count = 0;
 
+	Vec2Attributes() {}
+	Vec2Attributes(const Vec2* v, const int* i, int c) : values(v), indices(i), count(c) {}
+
 	Vec2 get(int i) const { return indices ? values[indices[i]] : values[i]; }
 };
 
@@ -504,6 +508,9 @@ struct Vec3Attributes {
 	int count = 0;
 	int values_count = 0;
 
+	Vec3Attributes() {}
+	Vec3Attributes(const Vec3* v, const int* i, int c, int vc) : values(v), indices(i), count(c), values_count(vc) {}
+
 	Vec3 get(int i) const { return indices ? values[indices[i]] : values[i]; }
 };
 
@@ -511,6 +518,9 @@ struct Vec4Attributes {
 	const Vec4* values = nullptr;
 	const int* indices = nullptr;
 	int count = 0;
+
+	Vec4Attributes() {}
+	Vec4Attributes(const Vec4* v, const int* i, int c) : values(v), indices(i), count(c) {}
 
 	Vec4 get(int i) const { return indices ? values[indices[i]] : values[i]; }
 };
@@ -750,7 +760,7 @@ protected:
 };
 
 
-IScene* load(const u8* data, int size, u16 flags, JobProcessor job_processor = nullptr, void* job_user_ptr = nullptr);
+IScene* load(const u8* data, usize size, u16 flags, JobProcessor job_processor = nullptr, void* job_user_ptr = nullptr);
 const char* getError();
 double fbxTimeToSeconds(i64 value);
 i64 secondsToFbxTime(double value);
