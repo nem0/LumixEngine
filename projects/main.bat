@@ -354,7 +354,7 @@ exit /B 0
 
 :build_basisu
 	pushd 3rdparty\basisu\lumix\
-		..\..\..\bin\windows\genie.exe vs2022
+		..\..\..\genie.exe vs2022
 	popd
 	%msbuild_cmd% 3rdparty\basisu\lumix\vs2022\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
 exit /B 0
@@ -493,13 +493,13 @@ goto :recast
 exit /B 0
 
 :build_recast
-	.\bin\windows\genie.exe --file=recastnavigation.lua vs2022
+	.\genie.exe --file=recastnavigation.lua vs2022
 	%msbuild_cmd% 3rdparty\recast\_project\RecastDetour.sln /p:Configuration=Release /p:Platform=x64
 exit /B 0
 
 :create_project
 	echo Creating project...
-	.\bin\windows\genie.exe --with-app vs2022 
+	.\genie.exe --with-app vs2022 
 	pause
 exit /B 0
 
@@ -524,7 +524,7 @@ exit /B 0
 
 :create_bundle
 	echo Creating bundle...
-	.\bin\windows\genie.exe --embed-resources --static-physx vs2022
+	.\genie.exe --embed-resources --static-physx vs2022
 	cd ..\data
 	tar -cvf data.tar .
 	move data.tar ../src/studio

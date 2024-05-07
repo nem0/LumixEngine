@@ -35,7 +35,7 @@ download_plugin()
 
 build_recast()
 {
-    ./bin/$"OS"/genie --file=recastnavigation.lua gmake
+    ./genie --file=recastnavigation.lua gmake
     pushd 3rdparty/recast/_project
     make 
     popd
@@ -176,7 +176,7 @@ push_to_itch_io()
     git clean -f -x -d ../data/
     rm -rf itch_io
     mkdir itch_io
-    ./bin/"$OS"/genie gmake
+    ./genie gmake
     cd tmp/gmake 
     make -j config=relwithdebinfo64
     cd ../..
@@ -219,7 +219,7 @@ main_menu()
     select opt in "${options[@]}"
     do
         case "$REPLY" in
-            1 ) ./bin/"$OS"/genie gmake; pause; break;;
+            1 ) ./genie gmake; pause; break;;
             2 ) build relwithdebinfo64; pause; break;;
             3 ) build debug64; pause; break;;
             4 ) thirdparty_menu; break;;
