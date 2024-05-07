@@ -500,6 +500,10 @@ project "core"
 			"../external/wyhash/**.*"
 	}
 
+	configuration { "linux" }
+		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
+	
+	configuration {}
 
 	defines { "BUILDING_CORE" }
 	
