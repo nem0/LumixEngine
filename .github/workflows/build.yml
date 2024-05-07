@@ -107,6 +107,6 @@ jobs:
           - name: build
             run: |
               cd projects
-              ./bin/linux/genie --force-build-luau gmake
+              ./genie --force-build-luau gmake
               cd tmp/gmake
               make -j
