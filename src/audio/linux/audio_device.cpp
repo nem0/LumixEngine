@@ -1,13 +1,13 @@
 #include "audio_device.h"
-#include "engine/array.h"
-#include "engine/log.h"
+#include "core/array.h"
+#include "core/log.h"
 #include "engine/engine.h"
 #include "engine/plugin.h"
-#include "engine/log.h"
-#include "engine/math.h"
-#include "engine/sync.h"
-#include "engine/thread.h"
-#include "engine/os.h"
+#include "core/log.h"
+#include "core/math.h"
+#include "core/sync.h"
+#include "core/thread.h"
+#include "core/os.h"
 #include <alsa/asoundlib.h>
 
 

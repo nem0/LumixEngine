@@ -1,5 +1,5 @@
 #include "editor/studio_app.h"
-#include "engine/os.h"
+#include "core/os.h"
 
 int main(int argc, char* argv[])
 {
