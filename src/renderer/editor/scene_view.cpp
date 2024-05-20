@@ -45,6 +45,7 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
 
 struct WorldViewImpl final : WorldView {
 	enum class MouseMode
@@ -681,6 +682,9 @@ void SceneView::init() {
 	Engine& engine = m_app.getEngine();
 	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
+	
+	m_camera_preview_pipeline = Pipeline::create(*renderer, pres, "PREVIEW");
+
 	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW");
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
@@ -1241,6 +1245,7 @@ void SceneView::onToolbar()
 
 	if (ImGui::BeginPopup("Camera details")) {
 		ImGui::DragFloat("Speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+		ImGui::Checkbox("Camera preview", &m_show_camera_preview);
 		Viewport vp = m_view->getViewport();
 		if (ImGui::Checkbox("Ortho", &vp.is_ortho)) m_view->setViewport(vp);
 		if (vp.is_ortho && ImGui::DragFloat("Ortho size", &vp.ortho_size)) {
@@ -1315,11 +1320,13 @@ void SceneView::handleEvents() {
 void SceneView::onSettingsLoaded() {
 	Settings& settings = m_app.getSettings();
 	m_search_preview = settings.getValue(Settings::GLOBAL, "quicksearch_preview", false);
+	m_show_camera_preview = settings.getValue(Settings::GLOBAL, "show_camera_preview", true);
 }
 
 void SceneView::onBeforeSettingsSaved() {
 	Settings& settings = m_app.getSettings();
 	settings.setValue(Settings::GLOBAL, "quicksearch_preview", m_search_preview);
+	settings.setValue(Settings::GLOBAL, "show_camera_preview", m_show_camera_preview);
 }
 
 void SceneView::insertModelUI() {
@@ -1406,6 +1413,38 @@ void SceneView::insertModelUI() {
 	m_insert_model_request = false;
 }
 
+void SceneView::cameraPreviewGUI(Vec2 size) {
+	if (!m_show_camera_preview) return;
+	if (size.x <= 0) return;
+	if (size.y <= 0) return;
+
+	const Array<EntityRef>& selected = m_editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	World* world = m_editor.getWorld();
+	if (!world->hasComponent(selected[0], CAMERA_TYPE)) return;
+
+	RenderModule* module = (RenderModule*)m_editor.getWorld()->getModule("renderer");
+	Viewport vp = module->getCameraViewport(selected[0]);
+	vp.w = (i32)size.x;
+	vp.h = (i32)size.y;
+
+	m_camera_preview_pipeline->setWorld(m_editor.getWorld());
+	m_camera_preview_pipeline->setViewport(vp);
+	m_camera_preview_pipeline->render(false);
+	const gpu::TextureHandle texture_handle = m_camera_preview_pipeline->getOutput();
+
+	if (!texture_handle) return;
+
+	void* t = texture_handle;
+	if (gpu::isOriginBottomLeft()) {
+		ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
+	} 
+	else {
+		ImGui::Image(t, size);
+	}
+}
+
 void SceneView::onGUI()
 {
 	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
@@ -1467,6 +1506,9 @@ void SceneView::onGUI()
 			}
 
 			handleEvents();
+
+			ImGui::SetCursorScreenPos(view_pos + view_size * 0.66f);
+			cameraPreviewGUI(view_size * Vec2(0.33f) - Vec2(20.f));
 		}
 	}
 	else {

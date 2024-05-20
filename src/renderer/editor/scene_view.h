@@ -40,6 +40,7 @@ struct SceneView : StudioApp::GUIPlugin
 	void setViewportRotation(const Quat& rot);
 
 private:
+	void cameraPreviewGUI(Vec2 size);
 	bool onAction(const Action& action) override;
 	void manipulate();
 	void renderSelection();
@@ -91,8 +92,10 @@ private:
 	int m_captured_mouse_y;
 	float m_camera_speed = 0.1f;
 	UniquePtr<Pipeline> m_pipeline;
+	UniquePtr<Pipeline> m_camera_preview_pipeline;
 	LogUI& m_log_ui;
 	Shader* m_debug_shape_shader;
+	bool m_show_camera_preview = true;
 	
 	WorldEditor& m_editor;
 	struct WorldViewImpl* m_view;
