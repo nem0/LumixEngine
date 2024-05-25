@@ -774,6 +774,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		const u32 reserved_pages = m_app.getEngine().getPageAllocator().getReservedCount() * PageAllocator::PAGE_SIZE;
 		ImGui::Text("Page allocator: %.1f MB", reserved_pages / 1024.f / 1024.f);
 		ImGui::Text("Linear allocators: %.1f MB", LinearAllocator::getTotalCommitedBytes() / 1024.f / 1024.f);
+		ImGui::Text("Profiler contexts: %.1f MB", profiler::getThreadContextMemorySize() / 1024.f / 1024.f);
 		// TODO gpu mem
 	}
 

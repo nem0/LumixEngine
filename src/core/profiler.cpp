@@ -495,6 +495,16 @@ void endBlock()
 }
 
 
+u64 getThreadContextMemorySize() {
+	u64 res = 0;
+	MutexGuard lock(g_instance.mutex);
+	for (ThreadContext* ctx : g_instance.contexts) {
+		MutexGuard lock2(ctx->mutex);
+		res += ctx->buffer.capacity();
+	}
+	return res;
+}
+
 u64 frequency()
 {
 	return g_instance.timer.getFrequency();

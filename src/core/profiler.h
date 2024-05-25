@@ -56,6 +56,7 @@ struct Scope
 
 LUMIX_CORE_API bool contextSwitchesEnabled();
 LUMIX_CORE_API u64 frequency();
+LUMIX_CORE_API u64 getThreadContextMemorySize();
 
 
 struct ContextSwitchRecord
