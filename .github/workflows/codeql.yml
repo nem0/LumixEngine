@@ -50,7 +50,7 @@ jobs:
 
     - name: Create solution
       working-directory: projects
-      run: ./bin/windows/genie.exe vs2019    
+      run: ./genie.exe vs2019    
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, Go, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
