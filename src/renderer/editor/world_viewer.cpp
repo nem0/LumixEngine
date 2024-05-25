@@ -219,15 +219,14 @@ void WorldViewer::gui() {
 		}
 
 		if (delta.x != 0 || delta.y != 0) {
-			const Vec2 mouse_sensitivity = m_app.getSettings().m_mouse_sensitivity;
 			Quat rot = m_viewport.rot;
 
-			float yaw = signum(delta.x) * (powf(fabsf(delta.x / 10000 * mouse_sensitivity.x), 1.2f));
+			float yaw = m_app.getSettings().m_mouse_sensitivity_x.eval(delta.x);
 			Quat yaw_rot(Vec3(0, 1, 0), yaw);
 			rot = normalize(yaw_rot * rot);
 
 			Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-			float pitch = signum(delta.y) * (powf(fabsf(delta.y / 10000 * mouse_sensitivity.y), 1.2f));
+			float pitch = m_app.getSettings().m_mouse_sensitivity_y.eval(delta.y);
 			Quat pitch_rot(pitch_axis, pitch);
 			rot = normalize(pitch_rot * rot);
 

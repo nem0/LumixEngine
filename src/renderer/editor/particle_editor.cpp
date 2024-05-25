@@ -1117,31 +1117,9 @@ struct CurveNode : Node {
 		inputSlot(); 
 		outputSlot();
 
-		if (ImGui::InvisibleButton("curve", ImVec2(150, 30))) {
-			ImGui::OpenPopup("Edit curve");
+		if (ImGuiEx::CurvePreviewButton("curve", keys, values, count, ImVec2(120, 30))) {
 			fit_curve_in_editor = true;
-		}
-		const ImVec2 from = ImGui::GetItemRectMin();
-		const ImVec2 to = ImGui::GetItemRectMax();
-		
-		ImVec2 points_max(-FLT_MAX, -FLT_MAX);
-		ImVec2 points_min(FLT_MAX, FLT_MAX);
-		for (u32 i = 0; i < count; ++i) {
-			ImVec2 point(keys[i], values[i]);
-			points_max = ImMax(points_max, point);
-			points_min = ImMin(points_min, point);
-		}
-
-		ImDrawList* dl = ImGui::GetWindowDrawList();
-		const ImU32 col = ImGui::GetColorU32(ImGuiCol_PlotLinesHovered);
-		auto to_preview = [&](u32 i) -> ImVec2 {
-			return {
-				from.x + (keys[i] - points_min.x) / (points_max.x - points_min.x) * (to.x - from.x),
-				to.y - (values[i] - points_min.y) / (points_max.y - points_min.y) * (to.y - from.y)
-			};
-		};
-		for (u32 i = 1; i < count; ++i) {
-			dl->AddLine(to_preview(i - 1), to_preview(i), col);
+			ImGui::OpenPopup("Edit curve");
 		}
 		
 		bool res = false;

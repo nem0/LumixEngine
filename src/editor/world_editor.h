@@ -59,8 +59,6 @@ struct WorldView {
 	virtual bool isMouseDown(os::MouseButton button) const = 0;
 	virtual bool isMouseClick(os::MouseButton button) const = 0;
 	virtual Vec2 getMousePos() const = 0;
-	virtual void setMouseSensitivity(float x, float y) = 0;
-	virtual Vec2 getMouseSensitivity() = 0;
 	virtual void setCustomPivot() = 0;
 	virtual void resetPivot() = 0;
 	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;

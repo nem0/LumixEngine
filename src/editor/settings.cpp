@@ -294,6 +294,81 @@ static bool shouldSleepWhenInactive()
 	return true;
 }
 
+MouseSensitivity::MouseSensitivity(IAllocator& allocator) : values(allocator)
+{
+	values.push({0, 0.5f});
+	values.push({16, 16.f});
+}
+
+void MouseSensitivity::gui(const char* label) {
+	ImGui::PushID(this);
+	ImGuiEx::Label(label);
+	if (ImGuiEx::CurvePreviewButton("curve", &values.begin()->x, &values.begin()->y, values.size(), ImVec2(130, ImGui::GetTextLineHeight()), sizeof(values[0]))) ImGui::OpenPopup(label);
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_PENCIL_ALT)) ImGui::OpenPopup(label);
+	bool open = true;
+	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	if (ImGui::BeginPopupModal(label, &open)) {
+		i32 new_count;
+		ImU32 flags = ImU32(ImGuiEx::CurveEditorFlags::NO_TANGENTS | ImGuiEx::CurveEditorFlags::SHOW_GRID);
+		if (ImGuiEx::IconButton(ICON_FA_EXPAND, "Fit to view")) flags |= (ImU32)ImGuiEx::CurveEditorFlags::RESET;
+		ImGuiEx::CurveEditor("##curve", &values.begin()->x, values.size(), values.capacity(), ImGui::GetContentRegionAvail(), flags, &new_count);
+		values.resize(new_count);
+		if (new_count == values.capacity()) values.reserve(values.capacity() + 1);
+		ImGui::EndPopup();
+	}
+	
+	ImGui::PopID();
+}
+
+float MouseSensitivity::eval(float value) {
+	float M = signum(value) / 500.f; // so `value` ~ 1 is a reasonable setting
+	value = fabsf(value);
+	if (values.empty()) return M * value;
+	if (value < values[0].x) return M * values[0].y;
+	for (i32 i = 1; i < values.size(); ++i) {
+		if (value < values[i].x) {
+			const float t = (value - values[i - 1].x) / (values[i].x - values[i - 1].x);
+			return M * (values[i - 1].y + t * (values[i].y - values[i - 1].y));
+		}
+	}
+	return M * values.last().y;
+}
+
+void MouseSensitivity::load(const char* name, lua_State* L) {
+	lua_getglobal(L, name);
+	switch (lua_type(L, -1)) {
+		case LUA_TTABLE:
+			values.clear();
+			lua_pushnil(L);
+			while (lua_next(L, -2)) {
+				const float key = (float)lua_tonumber(L, -1);
+				lua_pop(L, 1);
+				if (lua_next(L, -2)) {
+					const float value = (float)lua_tonumber(L, -1);
+					values.push({key, value});
+					lua_pop(L, 1);
+				}
+				else {
+					logError("Error reading mouse sensitivity"); break;
+				}
+			}
+			break;
+		case LUA_TNIL: break;
+		default: logError("Error reading mouse sensitivity"); break;
+	}
+	lua_pop(L, 1);
+}
+
+void MouseSensitivity::save(const char* name, os::OutputFile& file) {
+	file << name << " = {";
+	for (const Vec2& v : values) {
+		file << v.x << ", " << v.y << ", ";
+	}
+	file << "}\n";
+}
+
+
 Settings::Settings(StudioApp& app)
 	: m_app(app)
 	, m_is_open(false)
@@ -308,7 +383,8 @@ Settings::Settings(StudioApp& app)
 	, m_sleep_when_inactive(true)
 	, m_focus_game_view_on_game_mode_start(false)
 	, m_force_no_crash_report(false)
-	, m_mouse_sensitivity(80.0f, 80.0f)
+	, m_mouse_sensitivity_x(app.getAllocator())
+	, m_mouse_sensitivity_y(app.getAllocator())
 	, m_font_size(13)
 	, m_imgui_state(app.getAllocator())
 {
@@ -418,8 +494,8 @@ bool Settings::load()
 	if (!shouldSleepWhenInactive()) m_sleep_when_inactive = false;
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_app.getGizmoConfig().scale = getFloat(L, "gizmo_scale", 1.f);
-	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.f);
-	m_mouse_sensitivity.y = getFloat(L, "mouse_sensitivity_y", 200.f);
+	m_mouse_sensitivity_x.load("mouse_x_sensitivity", L);
+	m_mouse_sensitivity_y.load("mouse_y_sensitivity", L);
 	m_app.setFOV(degreesToRadians(getFloat(L, "fov", 60)));
 	m_font_size = getInteger(L, "font_size", 13);
 
@@ -615,8 +691,8 @@ bool Settings::save()
 	writeBool("sleep_when_inactive", m_sleep_when_inactive);
 	writeBool("focus_game_view_on_game_mode_start", m_focus_game_view_on_game_mode_start);
 	file << "gizmo_scale = " << m_app.getGizmoConfig().scale << "\n";
-	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
-	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
+	m_mouse_sensitivity_x.save("mouse_x_sensitivity", file);
+	m_mouse_sensitivity_y.save("mouse_y_sensitivity", file);
 	file << "font_size = " << m_font_size << "\n";
 
 	saveStyle(file);
@@ -1309,20 +1385,26 @@ void Settings::onGUI()
 				}
 				else
 				{
-					if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+					ImGuiEx::Label("Crash reporting");
+					if (ImGui::Checkbox("##Crash reporting", &m_is_crash_reporting_enabled))
 					{
 						enableCrashReporting(m_is_crash_reporting_enabled);
 					}
 				}
-				ImGui::Checkbox("Focus game view on game start", &m_focus_game_view_on_game_mode_start);
-				ImGui::Checkbox("Sleep when inactive", &m_sleep_when_inactive);
-				ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 1.f, 0.1f, 500.0f);
+				ImGuiEx::Label("Focus game view on game start");
+				ImGui::Checkbox("##focus_gv", &m_focus_game_view_on_game_mode_start);
+				ImGuiEx::Label("Sleep when inactive");
+				ImGui::Checkbox("##sleep_inactive", &m_sleep_when_inactive);
+				m_mouse_sensitivity_x.gui("Mouse sensitivity X");
+				m_mouse_sensitivity_y.gui("Mouse sensitivity Y");
 				float fov = radiansToDegrees(m_app.getFOV());
-				if (ImGui::SliderFloat("FOV", &fov, 0.1f, 180)) {
+				ImGuiEx::Label("FOV");
+				if (ImGui::SliderFloat("##FOV", &fov, 0.1f, 180)) {
 					fov = degreesToRadians(fov);
 					m_app.setFOV(fov);
 				}
-				ImGui::DragFloat("Gizmo scale", &m_app.getGizmoConfig().scale, 0.1f);
+				ImGuiEx::Label("Gizmo scale");
+				ImGui::DragFloat("##Gizmo scale", &m_app.getGizmoConfig().scale, 0.1f);
 				ImGui::EndTabItem();
 			}
 

@@ -4,6 +4,7 @@
 
 #include "core/math.h"
 #include "core/os.h"
+#include "core/stack_array.h"
 #include "core/string.h"
 
 #include "editor/utils.h"
@@ -13,6 +14,16 @@ struct lua_State;
 
 
 namespace Lumix {
+
+struct MouseSensitivity {
+	MouseSensitivity(IAllocator& allocator);
+	void gui(const char* label);
+	float eval(float value);
+	void load(const char* name, lua_State* L);
+	void save(const char* name, os::OutputFile& file);
+
+	StackArray<Vec2, 8> values; 
+};
 
 
 struct LUMIX_EDITOR_API Settings {
@@ -45,8 +56,8 @@ struct LUMIX_EDITOR_API Settings {
 	bool m_force_no_crash_report;
 	bool m_sleep_when_inactive;
 	bool m_focus_game_view_on_game_mode_start;
-	Vec2 m_mouse_sensitivity;
-	float m_mouse_sensitivity_y;
+	MouseSensitivity m_mouse_sensitivity_x;
+	MouseSensitivity m_mouse_sensitivity_y;
 	int m_font_size = 13;
 	String m_imgui_state;
 

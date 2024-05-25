@@ -576,6 +576,38 @@ namespace ImGuiEx {
 		return ImVec2(f * v.x, f * v.y);
 	}
 
+	bool CurvePreviewButton(const char* id, const float* keys, const float* values, int count, const ImVec2& size, int stride_bytes) {
+		if (stride_bytes < sizeof(keys[0])) stride_bytes = sizeof(keys[0]);
+		bool res = false;
+		if (ImGui::InvisibleButton(id, size)) {
+			res = true;
+		}
+		const ImVec2 from = ImGui::GetItemRectMin();
+		const ImVec2 to = ImGui::GetItemRectMax();
+		
+		ImVec2 points_max(-FLT_MAX, -FLT_MAX);
+		ImVec2 points_min(FLT_MAX, FLT_MAX);
+		for (int i = 0; i < count; ++i) {
+			ImVec2 point(*(float*)((char*)keys + stride_bytes * i), *(float*)((char*)values + stride_bytes * i));
+			points_max = ImMax(points_max, point);
+			points_min = ImMin(points_min, point);
+		}
+
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const ImU32 col = ImGui::GetColorU32(ImGuiCol_PlotLinesHovered);
+		auto to_preview = [&](int i) -> ImVec2 {
+			const float k = *(float*)((char*)keys + stride_bytes * i);
+			const float v = *(float*)((char*)values + stride_bytes * i);
+			return {
+				from.x + (k - points_min.x) / (points_max.x - points_min.x) * (to.x - from.x),
+				to.y - (v - points_min.y) / (points_max.y - points_min.y) * (to.y - from.y)
+			};
+		};
+		for (int i = 1; i < count; ++i) {
+			dl->AddLine(to_preview(i - 1), to_preview(i), col);
+		}
+		return res;
+	}
 
 	int CurveEditor(const char* label
 		, float* values
@@ -644,6 +676,10 @@ namespace ImGuiEx {
 		}
 		points_max.y = ImMax(points_max.y, points_min.y + 0.0001f);
 
+		ImVec2 points_range = points_max - points_min;
+		points_min -= points_range * 0.05f; 
+		points_max += points_range * 0.05f; 
+
 		if (flags & (int)CurveEditorFlags::RESET) window->StateStorage.Clear();
 
 		float from_x = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_X, points_min.x);
@@ -684,6 +720,7 @@ namespace ImGuiEx {
 			);
 		};
 
+		const ImU32 color_text = GetColorU32(ImGuiCol_TextDisabled);
 		if (flags & (int)CurveEditorFlags::SHOW_GRID)
 		{
 			int exp;
@@ -706,7 +743,7 @@ namespace ImGuiEx {
 				{
 					ImFormatString(buf, sizeof(buf), " %.2f", x + i * step_x);
 				}
-				window->DrawList->AddText(b, 0x55000000, buf);
+				window->DrawList->AddText(b, color_text, buf);
 			}
 
 			frexp(height / 5, &exp);
@@ -728,7 +765,7 @@ namespace ImGuiEx {
 				{
 					ImFormatString(buf, sizeof(buf), " %.2f", y + i * step_y);
 				}
-				window->DrawList->AddText(a, 0x55000000, buf);
+				window->DrawList->AddText(a, color_text, buf);
 			}
 		}
 
@@ -826,7 +863,7 @@ namespace ImGuiEx {
 				{
 					char tmp[64];
 					ImFormatString(tmp, sizeof(tmp), "%0.2f, %0.2f", p.x, p.y);
-					window->DrawList->AddText({ pos.x, pos.y - GetTextLineHeight() }, 0xff000000, tmp);
+					window->DrawList->AddText({ pos.x, pos.y - GetTextLineHeight() }, color_text, tmp);
 				}
 
 				if (IsItemActive() && IsMouseDragging(0))

@@ -132,17 +132,6 @@ struct WorldViewImpl final : WorldView {
 		addCross(snap_pos, 1, Color::RED);
 	}
 
-	Vec2 getMouseSensitivity() override
-	{
-		return m_mouse_sensitivity;
-	}
-
-	void setMouseSensitivity(float x, float y) override
-	{
-		m_mouse_sensitivity.x = 10000 / x;
-		m_mouse_sensitivity.y = 10000 / y;
-	}
-
 	void rectSelect()
 	{
 		Vec2 min = m_rect_selection_start;
@@ -321,8 +310,8 @@ struct WorldViewImpl final : WorldView {
 			}
 			break;
 			case MouseMode::NAVIGATE: {
-				const float yaw = -signum(relx) * (powf(fabsf((float)relx / m_mouse_sensitivity.x), 1.2f));
-				const float pitch = -signum(rely) * (powf(fabsf((float)rely / m_mouse_sensitivity.y), 1.2f));
+				const float yaw = -m_app.getSettings().m_mouse_sensitivity_x.eval((float)relx);
+				const float pitch = -m_app.getSettings().m_mouse_sensitivity_y.eval((float)rely);
 				rotateCamera(yaw, pitch);
 				break;
 			}
@@ -585,7 +574,6 @@ struct WorldViewImpl final : WorldView {
 	MouseMode m_mouse_mode = MouseMode::NONE;
 	SnapMode m_snap_mode = SnapMode::NONE;
 	Vec2 m_mouse_pos;
-	Vec2 m_mouse_sensitivity{200, 200};
 	bool m_is_mouse_down[(int)os::MouseButton::EXTENDED] = {};
 	bool m_is_mouse_click[(int)os::MouseButton::EXTENDED] = {};
 	StudioApp::MousePlugin* m_mouse_handling_plugin = nullptr;
@@ -873,7 +861,6 @@ void SceneView::update(float time_delta)
 		m_view->setSnapMode(io.KeyShift, io.KeyCtrl);
 	}
 	Settings& settings = m_app.getSettings();
-	m_view->setMouseSensitivity(settings.m_mouse_sensitivity.x, settings.m_mouse_sensitivity.y);
 	m_view->update(time_delta);
 
 	if (m_is_measure_active) {

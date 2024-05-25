@@ -34,6 +34,7 @@ enum class PinShape {
 	SQUARE
 };
 
+IMGUI_API bool CurvePreviewButton(const char* id, const float* keys, const float* values, int count, const ImVec2& size, int stride_bytes = 0);
 IMGUI_API int CurveEditor(const char* label
 	, float* values
 	, int points_count
