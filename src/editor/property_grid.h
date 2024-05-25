@@ -14,7 +14,7 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 	struct IPlugin {
 		virtual ~IPlugin() {}
 		virtual void update() {}
-		virtual void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) = 0;
+		virtual void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) = 0;
 	};
 
 	explicit PropertyGrid(StudioApp& app);
@@ -39,6 +39,7 @@ private:
 	
 	bool m_is_open = false;
 	TextFilter m_component_filter;
+	TextFilter m_property_filter;
 	Action m_toggle_ui;
 };
 

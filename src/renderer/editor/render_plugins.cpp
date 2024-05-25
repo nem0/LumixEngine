@@ -666,7 +666,8 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 {
 	ParticleSystemPropertyPlugin(StudioApp& app) : m_app(app) {}
 
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (cmp_type != PARTICLE_EMITTER_TYPE) return;
 		if (entities.length() != 1) return;
 		
@@ -1746,7 +1747,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	ModelPropertiesPlugin(StudioApp& app) : m_app(app) {}
 	
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (!filter.pass("Material")) return;
+		
 		if (cmp_type != MODEL_INSTANCE_TYPE) return;
 		if (entities.length() != 1) return;
 
@@ -3778,7 +3781,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (entities.length() != 1) return;
 
 		World& world = *editor.getWorld();
@@ -4191,7 +4195,8 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		return -1;
 	}
 
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (cmp_type != INSTANCED_MODEL_TYPE) return;
 		if (entities.length() != 1) return;
 
@@ -4568,7 +4573,8 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		file.close();
 	}
 
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (cmp_type != PROCEDURAL_GEOM_TYPE) return;
 		if (entities.length() != 1) return;
 
@@ -4640,7 +4646,8 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 	{}
 
 
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (cmp_type != TERRAIN_TYPE) return;
 		if (entities.length() != 1) return;
 

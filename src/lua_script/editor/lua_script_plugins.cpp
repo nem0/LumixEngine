@@ -827,7 +827,8 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 
 struct PropertyGridPlugin final : PropertyGrid::IPlugin
 {
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (cmp_type != LUA_SCRIPT_TYPE) return;
 		if (entities.length() != 1) return;
 

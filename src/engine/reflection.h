@@ -229,6 +229,37 @@ struct IPropertyVisitor {
 	virtual void visit(const DynamicProperties& prop) {}
 };
 
+template <typename F> void forEachProperty(ComponentType cmp_type, F& f) {
+	struct Helper final : public IPropertyVisitor {
+		Helper(F& f) : f(f) {}
+		void visit(const Property<float>& prop) override { f(prop, parent);}
+		void visit(const Property<int>& prop) override { f(prop, parent); }
+		void visit(const Property<u32>& prop) override { f(prop, parent); }
+		void visit(const Property<EntityPtr>& prop) override { f(prop, parent); }
+		void visit(const Property<Vec2>& prop) override { f(prop, parent); }
+		void visit(const Property<Vec3>& prop) override { f(prop, parent); }
+		void visit(const Property<IVec3>& prop) override { f(prop, parent); }
+		void visit(const Property<Vec4>& prop) override { f(prop, parent); }
+		void visit(const Property<Path>& prop) override { f(prop, parent); }
+		void visit(const Property<bool>& prop) override { f(prop, parent); }
+		void visit(const Property<const char*>& prop) override { f(prop, parent); }
+		void visit(const struct ArrayProperty& prop) override {
+			f(prop, parent); 
+			parent = &prop;
+			prop.visitChildren(*this);
+			parent = nullptr;
+		}
+		void visit(const struct BlobProperty& prop) override { f(prop, parent); }
+		void visit(const DynamicProperties& prop) { f(prop, parent); }
+		F& f;
+		const ArrayProperty* parent = nullptr;
+	};
+
+	Helper h(f);
+	const ComponentBase* cmp = getComponent(cmp_type);
+	if (cmp) cmp->visit(h);
+}
+
 template <typename T>
 void Property<T>::visit(IPropertyVisitor& visitor) const {
 	visitor.visit(*this);

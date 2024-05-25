@@ -88,7 +88,8 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		ImGui::PopStyleVar();
 	}
 
-	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (filter.isActive()) return;
 		if (entities.length() != 1) return;
 
 		if(cmp_type == NAVMESH_AGENT_TYPE) { 
