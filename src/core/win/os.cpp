@@ -700,7 +700,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 
 	WCharStr<MAX_PATH> wname(args.name);
 	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION 
-		? (args.hit_test_callback ? WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX : WS_POPUP)
+		? (args.hit_test_callback ? WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX : WS_POPUP)
 		: WS_OVERLAPPEDWINDOW;
 	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
 	WindowData* window_data = LUMIX_NEW(getGlobalAllocator(), WindowData);
