@@ -208,7 +208,7 @@ struct Attribute {
 };
 #pragma pack()
 
-struct VertexDecl {
+struct LUMIX_RENDERER_API VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
 	VertexDecl(PrimitiveType pt);

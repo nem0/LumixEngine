@@ -15,7 +15,7 @@ struct lua_State;
 
 namespace Lumix {
 
-struct MouseSensitivity {
+struct LUMIX_EDITOR_API MouseSensitivity {
 	MouseSensitivity(IAllocator& allocator);
 	void gui(const char* label);
 	float eval(float value);

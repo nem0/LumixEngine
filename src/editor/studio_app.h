@@ -42,7 +42,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual bool showGizmo(struct WorldView& view, struct ComponentUID cmp) = 0;
 	};
 
-	struct MousePlugin {
+	struct LUMIX_EDITOR_API MousePlugin {
 		virtual ~MousePlugin() {}
 
 		virtual bool onMouseDown(WorldView& view, int x, int y) { return false; }

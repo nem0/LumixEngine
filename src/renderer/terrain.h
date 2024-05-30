@@ -29,7 +29,7 @@ struct Texture;
 struct World;
 
 
-struct Terrain {
+struct LUMIX_RENDERER_API Terrain {
 	struct GrassQuad {
 		gpu::BufferHandle instances = gpu::INVALID_BUFFER;
 		u32 instances_count = 0;

@@ -8,7 +8,7 @@ namespace gpu { struct VertexDecl; }
 
 template <typename T> struct UniquePtr;
 
-struct ParticleEditor {
+struct LUMIX_RENDERER_API ParticleEditor {
 	virtual ~ParticleEditor() {}
 
 	static UniquePtr<ParticleEditor> create(StudioApp& app);

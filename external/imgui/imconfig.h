@@ -59,7 +59,7 @@ namespace Lumix { struct Vec2; }
 //---- Define constructor and implicit cast operators to convert back<>forth from your math types and ImVec2/ImVec4.
 
 #define IM_VEC2_CLASS_EXTRA                                                         \
-        ImVec2(const Lumix::Vec2& f);                                               \
+        IMGUI_API ImVec2(const Lumix::Vec2& f);                                               \
         IMGUI_API operator Lumix::Vec2() const;                                               \
         ImVec2 operator+(const ImVec2& rhs) { return ImVec2(x+rhs.x, y+rhs.y); }    \
         ImVec2 operator-(const ImVec2& rhs) { return ImVec2(x-rhs.x, y-rhs.y); }    \

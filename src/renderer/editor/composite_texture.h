@@ -10,7 +10,7 @@
 
 namespace Lumix {
 
-struct CompositeTexture {
+struct LUMIX_RENDERER_API CompositeTexture {
 	enum class NodeType : u32;
 	
 	struct Image {

@@ -23,7 +23,7 @@ struct RenderModule;
 struct Texture;
 struct Renderer;
 
-struct TerrainEditor final : StudioApp::MousePlugin {
+struct LUMIX_RENDERER_API TerrainEditor final : StudioApp::MousePlugin {
 	enum class Mode {
 		LAYER,
 		HEIGHT,
