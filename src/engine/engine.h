@@ -47,7 +47,7 @@ struct LUMIX_ENGINE_API Engine {
 	virtual struct ResourceManagerHub& getResourceManager() = 0;
 	virtual struct PageAllocator& getPageAllocator() = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual bool instantiatePrefab(World& world,
+	virtual EntityPtr instantiatePrefab(World& world,
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,
 		const struct Quat& rot,

@@ -201,7 +201,7 @@ struct EngineImpl final : Engine {
 	IAllocator& getAllocator() override { return m_allocator; }
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
-	bool instantiatePrefab(World& world,
+	EntityPtr instantiatePrefab(World& world,
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,
 		const struct Quat& rot,
@@ -213,7 +213,7 @@ struct EngineImpl final : Engine {
 		WorldVersion editor_header_version;
 		if (!world.deserialize(blob, entity_map, editor_header_version)) {
 			logError("Failed to instantiate prefab ", prefab.getPath());
-			return false;
+			return INVALID_ENTITY;
 		}
 
 		ASSERT(!entity_map.m_map.empty());
@@ -221,7 +221,7 @@ struct EngineImpl final : Engine {
 		ASSERT(!world.getParent(root).isValid());
 		ASSERT(!world.getNextSibling(root).isValid());
 		world.setTransform(root, pos, rot, scale);
-		return true;
+		return root;
 	}
 
 	World& createWorld(bool is_main_world) override {
