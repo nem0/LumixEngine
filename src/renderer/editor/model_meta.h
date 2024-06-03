@@ -73,6 +73,7 @@ struct ModelMeta {
 		WRITE_BOOL(create_prefab_with_physics, false);
 		WRITE_BOOL(create_impostor, false);
 		WRITE_BOOL(use_mikktspace, false);
+		WRITE_BOOL(force_recompute_normals, false);
 		WRITE_BOOL(force_skin, false);
 		WRITE_BOOL(bake_vertex_ao, false);
 		WRITE_BOOL(bake_impostor_normals, false);
@@ -143,6 +144,7 @@ struct ModelMeta {
 		LuaWrapper::DebugGuard guard(L);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "root_motion_flags", (i32*)&root_motion_flags);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &use_mikktspace);
+		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_recompute_normals", &force_recompute_normals);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &force_skin);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "anim_rotation_error", &anim_rotation_error);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "anim_translation_error", &anim_translation_error);
@@ -226,6 +228,7 @@ struct ModelMeta {
 	bool bake_impostor_normals = false;
 	bool bake_vertex_ao = false;
 	bool use_mikktspace = false;
+	bool force_recompute_normals = false;
 	bool force_skin = false;
 	bool import_vertex_colors = false;
 	bool vertex_color_is_ao = false;

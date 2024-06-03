@@ -1998,6 +1998,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 				ImGuiEx::Label("Mikktspace tangents");
 				saveUndo(ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace));
+				ImGuiEx::Label("Recompute normals");
+				saveUndo(ImGui::Checkbox("##recomputenormals", &m_meta.force_recompute_normals));
 				ImGuiEx::Label("Force skinned");
 				saveUndo(ImGui::Checkbox("##frcskn", &m_meta.force_skin));
 				ImGuiEx::Label("Split");
@@ -2581,6 +2583,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.autolod_mask = meta.autolod_mask;
 		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
 		cfg.mikktspace_tangents = meta.use_mikktspace;
+		cfg.force_normal_recompute = meta.force_recompute_normals;
 		cfg.mesh_scale = meta.scale;
 		cfg.bounding_scale = meta.culling_scale;
 		cfg.physics = meta.physics;

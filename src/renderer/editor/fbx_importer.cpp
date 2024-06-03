@@ -905,7 +905,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 
 			triangulate(unindexed_triangles, import_mesh, partition, vertex_layout.size, skinning, cfg, transform_matrix, tri_indices_tmp);
 
-			if (!normals.values) computeNormals(unindexed_triangles, vertex_layout);
+			if (!normals.values || cfg.force_normal_recompute) computeNormals(unindexed_triangles, vertex_layout);
 
 			if (compute_tangents) {
 				if (cfg.mikktspace_tangents) {

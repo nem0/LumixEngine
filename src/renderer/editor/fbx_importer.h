@@ -45,6 +45,7 @@ struct FBXImporter {
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
 		bool create_impostor = false;
+		bool force_normal_recompute = false;
 		bool mikktspace_tangents = false;
 		bool import_vertex_colors = true;
 		bool vertex_color_is_ao = false;
