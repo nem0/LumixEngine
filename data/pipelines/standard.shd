@@ -28,15 +28,7 @@ surface_shader [[
 		data.alpha = saturate(data.alpha - v_fur_layer);
 	#endif
 
-	vec3 N = v_normal;
-	vec3 tangent = v_tangent;
-
-	mat3 tbn = mat3(
-		normalize(tangent),
-		normalize(N),
-		normalize(cross(tangent, N))
-	);
-		
+	
 	data.roughness = texture(t_roughness, v_uv).g * u_roughness;
 	#ifdef HAS_METALLICMAP
 		data.metallic = texture(t_metallic, v_uv).b * u_metallic;
@@ -45,7 +37,20 @@ surface_shader [[
 	#endif
 	data.N.xz = texture(t_normal, v_uv).xy * 2 - 1;
 	data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
-	data.N = tbn * data.N;
+
+	#ifdef TANGENT_ATTR
+		vec3 tangent = normalize(v_tangent);
+		vec3 N = normalize(v_normal);
+
+		mat3 tbn = mat3(
+			tangent,
+			N,
+			normalize(cross(tangent, v_normal))
+		);
+		data.N = tbn * data.N;
+	#else
+		data.N = normalize(v_normal);
+	#endif
 	data.emission = u_emission;
 	data.translucency = u_translucency;
 	data.shadow = 1;
