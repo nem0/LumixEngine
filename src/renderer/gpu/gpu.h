@@ -278,11 +278,10 @@ BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
 BindGroupHandle allocBindGroupHandle();
 
-void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
 QueryHandle createQuery(QueryType type);
 
 void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data);
+void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
 void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture, u32 layer);
 void createBindGroup(BindGroupHandle group, Span<const BindGroupEntryDesc> descs);
@@ -291,6 +290,7 @@ void destroy(TextureHandle texture);
 void destroy(BufferHandle buffer);
 void destroy(ProgramHandle program);
 void destroy(BindGroupHandle group);
+void destroy(QueryHandle query);
 	
 void setCurrentWindow(void* window_handle);
 void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle ds, FramebufferFlags flags);
@@ -301,8 +301,6 @@ void clear(ClearFlags flags, const float* color, float depth);
 	
 void startCapture();
 void stopCapture();
-void pushDebugGroup(const char* msg);
-void popDebugGroup();
 
 void useProgram(ProgramHandle program);
 	
@@ -343,9 +341,6 @@ void endQuery(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
 u64 getQueryFrequency();
 bool isQueryReady(QueryHandle query);
-
-void destroy(BufferHandle buffer);
-void destroy(QueryHandle query);
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
