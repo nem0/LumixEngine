@@ -1114,6 +1114,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 	u32* kill_counter = (u32*)page_allocator.allocate(true);
 	const u32 chunks_count = (emitter.particles_count + 1023) / 1024;
 	ASSERT(chunks_count <= PageAllocator::PAGE_SIZE / sizeof(u32));
+	memset(kill_counter, 0, chunks_count * sizeof(u32));
 	OutputPagedStream emit_stream(page_allocator);
 	jobs::Mutex emit_mutex;
 
