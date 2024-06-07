@@ -676,11 +676,12 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 
+		bool open_create_dir_popup = false;
 		bool open_delete_popup = false;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		static char tmp[MAX_PATH] = "";
+		const char* base_path = fs.getBasePath();
 		auto common_popup = [&](){
-			const char* base_path = fs.getBasePath();
 			ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
 			if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
 				ImGui::CloseCurrentPopup();
@@ -694,19 +695,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				const Path dir_full_path(base_path, "/", m_dir);
 				os::openExplorer(dir_full_path);
 			}
-			if (ImGui::BeginMenu("Create directory")) {
-				ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
-				ImGui::SameLine();
-				if (ImGui::Button("Create")) {
-					StaticString<MAX_PATH> path(base_path, "/", m_dir, "/", tmp);
-					if (!os::makePath(path)) {
-						logError("Failed to create ", path);
-					}
-					changeDir(m_dir, false);
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndMenu();
-			}
+			if (ImGui::MenuItem("Create directory")) open_create_dir_popup = true; 
 
 			if (canMultiEdit() && ImGui::MenuItem("Multiedit")) openMultiEdit();
 
@@ -774,6 +763,30 @@ struct AssetBrowserImpl : AssetBrowser {
 		else if (ImGui::BeginPopupContextWindow("context")) {
 			common_popup();
 			ImGui::EndPopup();
+		}
+
+		if (open_create_dir_popup) openCenterStrip("create_dir");
+		if (beginCenterStrip("create_dir")) {
+			ImGui::NewLine();
+			bool input_entered = false;
+			alignGUICenter([&](){
+				if (open_create_dir_popup) ImGui::SetKeyboardFocusHere();
+				input_entered = ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue);
+			});
+			alignGUICenter([&](){
+				if (input_entered || ImGui::Button("Create")) {
+					input_entered = false;
+					StaticString<MAX_PATH> path(base_path, "/", m_dir, "/", tmp);
+					if (!os::makePath(path)) {
+						logError("Failed to create ", path);
+					}
+					changeDir(StaticString<MAX_PATH>(m_dir, "/", tmp), false);
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			});
+			endCenterStrip();
 		}
 
 		if (open_delete_popup || m_request_delete) {
