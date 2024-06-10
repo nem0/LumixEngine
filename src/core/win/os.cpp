@@ -526,6 +526,7 @@ bool getEvent(Event& event) {
 
 struct WindowData {
 	InitWindowArgs init_args;
+	bool is_shown = false;
 };
 
 void destroyWindow(WindowHandle window) {
@@ -710,10 +711,10 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		cls_name,
 		wname,
 		style,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		800,
-		600,
+		args.x,
+		args.y,
+		args.width,
+		args.height,
 		parent_window,
 		NULL,
 		wndcls.hInstance,
@@ -726,8 +727,12 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		DragAcceptFiles(hwnd, TRUE);
 	}
 
-	ShowWindow(hwnd, SW_SHOW);
-	DEBUG_CHECK(UpdateWindow(hwnd));
+
+	if (!args.is_hidden) {
+		window_data->is_shown = true;
+		ShowWindow(hwnd, SW_SHOW);
+		if (args.is_maximized) ShowWindow(hwnd, SW_MAXIMIZE);
+	}
 
 	if (!G.raw_input_registered) {
 		RAWINPUTDEVICE device;
@@ -742,6 +747,17 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	return hwnd;
 }
 
+void hideWindow(WindowHandle wnd) {
+	WindowData* wd = (WindowData*)GetWindowLongPtrW((HWND)wnd, GWLP_USERDATA);
+	wd->is_shown = false;
+	ShowWindow((HWND)wnd, SW_HIDE);
+}
+
+void showWindow(WindowHandle wnd) {
+	WindowData* wd = (WindowData*)GetWindowLongPtrW((HWND)wnd, GWLP_USERDATA);
+	wd->is_shown = true;
+	ShowWindow((HWND)wnd, SW_SHOW);
+}
 
 bool isKeyDown(Keycode keycode) {
 	return G.key_states[(i32)keycode];
@@ -940,17 +956,24 @@ WindowState setFullscreen(WindowHandle win) {
 }
 
 void restore(WindowHandle win) {
-	DEBUG_CHECK(ShowWindow((HWND)win, SW_RESTORE));
+	WindowData* wd = (WindowData*)GetWindowLongPtrW((HWND)win, GWLP_USERDATA);
+	if (wd->is_shown) {
+		DEBUG_CHECK(ShowWindow((HWND)win, SW_RESTORE));
+	}
 }
 
-void maximizeWindow(WindowHandle win)
-{
-	DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMAXIMIZED));
+void maximizeWindow(WindowHandle win) {
+	WindowData* wd = (WindowData*)GetWindowLongPtrW((HWND)win, GWLP_USERDATA);
+	if (wd->is_shown) {
+		DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMAXIMIZED));
+	}
 }
 
-void minimizeWindow(WindowHandle win)
-{
-	DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMINIMIZED));
+void minimizeWindow(WindowHandle win) {
+	WindowData* wd = (WindowData*)GetWindowLongPtrW((HWND)win, GWLP_USERDATA);
+	if (wd->is_shown) {
+		DEBUG_CHECK(ShowWindow((HWND)win, SW_SHOWMINIMIZED));
+	}
 }
 
 

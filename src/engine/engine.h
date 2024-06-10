@@ -27,7 +27,6 @@ struct LUMIX_ENGINE_API Engine {
 		const char* working_dir = nullptr;
 		Span<const char*> plugins;
 		UniquePtr<struct FileSystem> file_system;
-		os::InitWindowArgs init_window_args;
 	};
 
 	using LuaResourceHandle = u32;
@@ -39,7 +38,8 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void init() = 0;
 	virtual struct World& createWorld(bool is_main_world) = 0;
 	virtual void destroyWorld(World& world) = 0;
-	virtual os::WindowHandle getWindowHandle() = 0;
+	virtual void setMainWindow(os::WindowHandle win) = 0;
+	virtual os::WindowHandle getMainWindow() = 0;
 
 	virtual struct FileSystem& getFileSystem() = 0;
 	virtual struct InputSystem& getInputSystem() = 0;

@@ -8,6 +8,7 @@
 
 #include "core/atomic.h"
 #include "core/array.h"
+#include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/hash_map.h"
 #include "core/allocators.h"
@@ -125,38 +126,36 @@ static struct Instance
 	void startTrace()
 	{
 		#ifdef _WIN32
-			static TRACEHANDLE trace_handle;
-			static TraceProps props = {};
-			props.base.Wnode.BufferSize = sizeof(props);
-			props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
-			props.base.Wnode.ClientContext = 1;
-			props.base.Wnode.Guid = SystemTraceControlGuid;
-			props.base.LoggerNameOffset = sizeof(props.base);
-			props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
-			props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
-			strcpy_s(props.name, KERNEL_LOGGER_NAME);
+			if (CommandLineParser::isOn("-profile_cswitch")) {
+				static TRACEHANDLE trace_handle;
+				static TraceProps props = {};
+				props.base.Wnode.BufferSize = sizeof(props);
+				props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+				props.base.Wnode.ClientContext = 1;
+				props.base.Wnode.Guid = SystemTraceControlGuid;
+				props.base.LoggerNameOffset = sizeof(props.base);
+				props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
+				props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+				strcpy_s(props.name, KERNEL_LOGGER_NAME);
 
-			TraceProps tmp = props;
-			ControlTrace(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
-			ULONG res = StartTrace(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
-			switch (res) {
-			case ERROR_ALREADY_EXISTS:
-			case ERROR_ACCESS_DENIED:
-			case ERROR_BAD_LENGTH:
-			default:
-				context_switches_enabled = false;
-				break;
-			case ERROR_SUCCESS:
-				context_switches_enabled = true;
-				break;
+				TraceProps tmp = props;
+				ControlTrace(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
+				ULONG res = StartTrace(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
+				switch (res) {
+					case ERROR_ALREADY_EXISTS:
+					case ERROR_ACCESS_DENIED:
+					case ERROR_BAD_LENGTH:
+					default: context_switches_enabled = false; break;
+					case ERROR_SUCCESS: context_switches_enabled = true; break;
+				}
+
+				static EVENT_TRACE_LOGFILE trace = {};
+				trace.LoggerName = (decltype(trace.LoggerName))KERNEL_LOGGER_NAME;
+				trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
+				trace.EventRecordCallback = TraceTask::callback;
+				trace_task.open_handle = OpenTrace(&trace);
+				trace_task.create("profiler trace", true);
 			}
-
-			static EVENT_TRACE_LOGFILE trace = {};
-			trace.LoggerName = (decltype(trace.LoggerName))KERNEL_LOGGER_NAME;
-			trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
-			trace.EventRecordCallback = TraceTask::callback;
-			trace_task.open_handle = OpenTrace(&trace);
-			trace_task.create("profiler trace", true);
 		#endif
 	}
 

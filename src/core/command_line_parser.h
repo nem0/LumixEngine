@@ -2,15 +2,26 @@
 
 
 #include "core/core.h"
+#include "core/os.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
-struct CommandLineParser
-{
-public:
+struct CommandLineParser {
+	static bool isOn(const char* option) {
+		char tmp[4096];
+		if (!os::getCommandLine(Span(tmp))) return false;
+
+		CommandLineParser parser(tmp);
+		while (parser.next()) {
+			if (parser.currentEquals(option)) return true;
+		}
+
+		return false;
+	}
+
+
 	explicit CommandLineParser(const char* cmd_line)
 		: m_cmd_line(cmd_line)
 		, m_current(nullptr)

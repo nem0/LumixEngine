@@ -783,16 +783,9 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		if (done) return;
 		done = true;
 
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next()) {
-			if (parser.currentEquals("-profile_start")) {
-				m_is_paused = true;
-				onPause();
-				return;
-			}
+		if (CommandLineParser::isOn("-profile_start")) {
+			m_is_paused = true;
+			onPause();
 		}
 	}
 
@@ -845,7 +838,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				ImGui::Separator();
 				#ifdef _WIN32
 					ImGui::Text("Context switch tracing not available.");
-					ImGui::Text("Run the app as an administrator.");
+					ImGui::Text("Run the app as an administrator");
+					ImGui::Text("and use -profile_cswitch command line option");
 				#else
 					ImGui::Text("Context switch tracing not available on this platform.");
 				#endif

@@ -16,8 +16,7 @@
 #include "utils.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
 static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
@@ -25,28 +24,24 @@ static const char SETTINGS_PATH[] = "studio.ini";
 
 
 namespace LuaWrapper {
-	void getOptionalField(lua_State* L, int idx, const char* field_name, ImVec2* out) {
-		if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<Vec2>(L, -1)) {
-			const Vec2 tmp = toType<Vec2>(L, -1);
-			out->x = tmp.x; 
-			out->y = tmp.y; 
-		}
-		lua_pop(L, 1);
+void getOptionalField(lua_State* L, int idx, const char* field_name, ImVec2* out) {
+	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<Vec2>(L, -1)) {
+		const Vec2 tmp = toType<Vec2>(L, -1);
+		out->x = tmp.x;
+		out->y = tmp.y;
 	}
+	lua_pop(L, 1);
+}
 }
 
-static void loadStyle(lua_State* L)
-{
+static void loadStyle(lua_State* L) {
 	lua_getglobal(L, "style");
-	if (lua_type(L, -1) == LUA_TTABLE)
-	{
+	if (lua_type(L, -1) == LUA_TTABLE) {
 		auto& style = ImGui::GetStyle();
-		for (int i = 0; i < ImGuiCol_COUNT; ++i)
-		{
+		for (int i = 0; i < ImGuiCol_COUNT; ++i) {
 			const char* name = ImGui::GetStyleColorName(i);
 			lua_getfield(L, -1, name);
-			if (lua_type(L, -1) == LUA_TTABLE)
-			{
+			if (lua_type(L, -1) == LUA_TTABLE) {
 				lua_rawgeti(L, -1, 1);
 				if (lua_type(L, -1) == LUA_TNUMBER) style.Colors[i].x = (float)lua_tonumber(L, -1);
 				lua_rawgeti(L, -2, 2);
@@ -102,8 +97,8 @@ static void loadStyle(lua_State* L)
 		LOAD_VEC2(DisplayWindowPadding);
 		LOAD_VEC2(DisplaySafeAreaPadding);
 		LOAD_FLOAT(MouseCursorScale);
-		LOAD_BOOL(AntiAliasedLines);           
-		LOAD_BOOL(AntiAliasedFill);            
+		LOAD_BOOL(AntiAliasedLines);
+		LOAD_BOOL(AntiAliasedFill);
 		LOAD_FLOAT(CurveTessellationTol);
 		LOAD_FLOAT(CircleTessellationMaxError);
 		i32 dpi = 96;
@@ -117,9 +112,8 @@ static void loadStyle(lua_State* L)
 	lua_pop(L, 1);
 }
 
-static const char* toString(ImGuiDir dir)
-{
-	switch(dir) {
+static const char* toString(ImGuiDir dir) {
+	switch (dir) {
 		case ImGuiDir_Up: return "up";
 		case ImGuiDir_Down: return "down";
 		case ImGuiDir_Left: return "left";
@@ -129,57 +123,61 @@ static const char* toString(ImGuiDir dir)
 	}
 }
 
-static void saveStyle(os::OutputFile& file)
-{
+static void saveStyle(os::OutputFile& file) {
 	auto& style = ImGui::GetStyle();
 	file << "style = {";
-	for (int i = 0; i < ImGuiCol_COUNT; ++i)
-	{
-		file << "\t" << ImGui::GetStyleColorName(i) << " = {" << style.Colors[i].x
-			<< ", " << style.Colors[i].y
-			<< ", " << style.Colors[i].z
-			<< ", " << style.Colors[i].w << "},\n";
+	for (int i = 0; i < ImGuiCol_COUNT; ++i) {
+		file << "\t" << ImGui::GetStyleColorName(i) << " = {" << style.Colors[i].x << ", " << style.Colors[i].y << ", " << style.Colors[i].z << ", " << style.Colors[i].w << "},\n";
 	}
 
 	file << "\tWindowMenuButtonPosition = \"" << toString(style.WindowMenuButtonPosition) << "\",\n";
 
-	#define SAVE_FLOAT(name) do { file << "\t" #name " = " << style.name << ",\n"; } while(false)
-	#define SAVE_BOOL(name) do { file << "\t" #name " = " << (style.name ? "true" : "false") << ",\n"; } while(false)
-	#define SAVE_VEC2(name) do { file << "\t" #name " = {" << style.name.x << ", " << style.name.y << "},\n"; } while(false)
+	#define SAVE_FLOAT(name)                                 \
+		do {                                                 \
+			file << "\t" #name " = " << style.name << ",\n"; \
+		} while (false)
+	#define SAVE_BOOL(name)                                                       \
+		do {                                                                      \
+			file << "\t" #name " = " << (style.name ? "true" : "false") << ",\n"; \
+		} while (false)
+	#define SAVE_VEC2(name)                                                              \
+		do {                                                                             \
+			file << "\t" #name " = {" << style.name.x << ", " << style.name.y << "},\n"; \
+		} while (false)
 
-    SAVE_FLOAT(Alpha);
-    SAVE_VEC2(WindowPadding);
-    SAVE_FLOAT(WindowRounding);
-    SAVE_FLOAT(WindowBorderSize);
-    SAVE_VEC2(WindowMinSize);
-    SAVE_VEC2(WindowTitleAlign);
-    SAVE_FLOAT(ChildRounding);
-    SAVE_FLOAT(ChildBorderSize);
-    SAVE_FLOAT(PopupRounding);
-    SAVE_FLOAT(PopupBorderSize);
-    SAVE_VEC2(FramePadding);
-    SAVE_FLOAT(FrameRounding);
-    SAVE_FLOAT(FrameBorderSize);
-    SAVE_VEC2(ItemSpacing);
-    SAVE_VEC2(ItemInnerSpacing);
-    SAVE_VEC2(TouchExtraPadding);
-    SAVE_FLOAT(IndentSpacing);
-    SAVE_FLOAT(ColumnsMinSpacing);
-    SAVE_FLOAT(ScrollbarSize);
-    SAVE_FLOAT(ScrollbarRounding);
-    SAVE_FLOAT(GrabMinSize);
-    SAVE_FLOAT(GrabRounding);
-    SAVE_FLOAT(TabRounding);
-    SAVE_FLOAT(TabBorderSize);
-    SAVE_VEC2(ButtonTextAlign);
-    SAVE_VEC2(SelectableTextAlign);
-    SAVE_VEC2(DisplayWindowPadding);
-    SAVE_VEC2(DisplaySafeAreaPadding);
-    SAVE_FLOAT(MouseCursorScale);
-    SAVE_BOOL(AntiAliasedLines);           
-    SAVE_BOOL(AntiAliasedFill);            
-    SAVE_FLOAT(CurveTessellationTol);
-    SAVE_FLOAT(CircleTessellationMaxError);
+	SAVE_FLOAT(Alpha);
+	SAVE_VEC2(WindowPadding);
+	SAVE_FLOAT(WindowRounding);
+	SAVE_FLOAT(WindowBorderSize);
+	SAVE_VEC2(WindowMinSize);
+	SAVE_VEC2(WindowTitleAlign);
+	SAVE_FLOAT(ChildRounding);
+	SAVE_FLOAT(ChildBorderSize);
+	SAVE_FLOAT(PopupRounding);
+	SAVE_FLOAT(PopupBorderSize);
+	SAVE_VEC2(FramePadding);
+	SAVE_FLOAT(FrameRounding);
+	SAVE_FLOAT(FrameBorderSize);
+	SAVE_VEC2(ItemSpacing);
+	SAVE_VEC2(ItemInnerSpacing);
+	SAVE_VEC2(TouchExtraPadding);
+	SAVE_FLOAT(IndentSpacing);
+	SAVE_FLOAT(ColumnsMinSpacing);
+	SAVE_FLOAT(ScrollbarSize);
+	SAVE_FLOAT(ScrollbarRounding);
+	SAVE_FLOAT(GrabMinSize);
+	SAVE_FLOAT(GrabRounding);
+	SAVE_FLOAT(TabRounding);
+	SAVE_FLOAT(TabBorderSize);
+	SAVE_VEC2(ButtonTextAlign);
+	SAVE_VEC2(SelectableTextAlign);
+	SAVE_VEC2(DisplayWindowPadding);
+	SAVE_VEC2(DisplaySafeAreaPadding);
+	SAVE_FLOAT(MouseCursorScale);
+	SAVE_BOOL(AntiAliasedLines);
+	SAVE_BOOL(AntiAliasedFill);
+	SAVE_FLOAT(CurveTessellationTol);
+	SAVE_FLOAT(CircleTessellationMaxError);
 	file << "\tdpi = " << os::getDPI() << "\n";
 
 	#undef SAVE_BOOL
@@ -190,8 +188,7 @@ static void saveStyle(os::OutputFile& file)
 }
 
 
-static bool shortcutInput(Action& action, bool edit)
-{
+static bool shortcutInput(Action& action, bool edit) {
 	char button_label[64];
 	action.shortcutText(Span(button_label));
 
@@ -204,17 +201,10 @@ static bool shortcutInput(Action& action, bool edit)
 		if (os::isKeyDown(os::Keycode::CTRL)) action.modifiers |= Action::Modifiers::CTRL;
 
 		for (int i = 0; i < (int)os::Keycode::MAX; ++i) {
-			const auto kc= (os::Keycode)i;
+			const auto kc = (os::Keycode)i;
 			const bool is_mouse = kc == os::Keycode::LBUTTON || kc == os::Keycode::RBUTTON || kc == os::Keycode::MBUTTON;
-			const bool is_modifier = kc == os::Keycode::SHIFT 
-				|| kc == os::Keycode::LSHIFT 
-				|| kc == os::Keycode::RSHIFT 
-				|| kc == os::Keycode::ALT
-				|| kc == os::Keycode::LALT
-				|| kc == os::Keycode::RALT
-				|| kc == os::Keycode::CTRL 
-				|| kc == os::Keycode::LCTRL 
-				|| kc == os::Keycode::RCTRL;
+			const bool is_modifier = kc == os::Keycode::SHIFT || kc == os::Keycode::LSHIFT || kc == os::Keycode::RSHIFT || kc == os::Keycode::ALT || kc == os::Keycode::LALT ||
+									 kc == os::Keycode::RALT || kc == os::Keycode::CTRL || kc == os::Keycode::LCTRL || kc == os::Keycode::RCTRL;
 			if (os::isKeyDown(kc) && !is_mouse && !is_modifier) {
 				action.shortcut = (os::Keycode)i;
 				break;
@@ -226,17 +216,15 @@ static bool shortcutInput(Action& action, bool edit)
 		action.modifiers = Action::Modifiers::NONE;
 		action.shortcut = os::Keycode::INVALID;
 	}
-	
+
 	return res;
 }
 
 
-static int getIntegerField(lua_State* L, const char* name, int default_value)
-{
+static int getIntegerField(lua_State* L, const char* name, int default_value) {
 	int value = default_value;
 	lua_getfield(L, -1, name);
-	if (lua_type(L, -1) == LUA_TNUMBER)
-	{
+	if (lua_type(L, -1) == LUA_TNUMBER) {
 		value = (int)lua_tointeger(L, -1);
 	}
 	lua_pop(L, 1);
@@ -244,12 +232,10 @@ static int getIntegerField(lua_State* L, const char* name, int default_value)
 }
 
 
-static float getFloat(lua_State* L, const char* name, float default_value)
-{
+static float getFloat(lua_State* L, const char* name, float default_value) {
 	float value = default_value;
 	lua_getglobal(L, name);
-	if (lua_type(L, -1) == LUA_TNUMBER)
-	{
+	if (lua_type(L, -1) == LUA_TNUMBER) {
 		value = (float)lua_tonumber(L, -1);
 	}
 	lua_pop(L, 1);
@@ -257,12 +243,10 @@ static float getFloat(lua_State* L, const char* name, float default_value)
 }
 
 
-static bool getBoolean(lua_State* L, const char* name, bool default_value)
-{
+static bool getBoolean(lua_State* L, const char* name, bool default_value) {
 	bool value = default_value;
 	lua_getglobal(L, name);
-	if (lua_type(L, -1) == LUA_TBOOLEAN)
-	{
+	if (lua_type(L, -1) == LUA_TBOOLEAN) {
 		value = lua_toboolean(L, -1) != 0;
 	}
 	lua_pop(L, 1);
@@ -270,32 +254,22 @@ static bool getBoolean(lua_State* L, const char* name, bool default_value)
 }
 
 
-static int getInteger(lua_State* L, const char* name, int default_value)
-{
+static int getInteger(lua_State* L, const char* name, int default_value) {
 	int value = default_value;
 	lua_getglobal(L, name);
-	if (lua_type(L, -1) == LUA_TNUMBER)
-	{
+	if (lua_type(L, -1) == LUA_TNUMBER) {
 		value = (int)lua_tointeger(L, -1);
 	}
 	lua_pop(L, 1);
 	return value;
 }
 
-static bool shouldSleepWhenInactive()
-{
-	char cmd_line[2048];
-	os::getCommandLine(Span(cmd_line));
-
-	CommandLineParser parser(cmd_line);
-	while (parser.next()) {
-		if (parser.currentEquals("-no_sleep_inactive")) return false;
-	}
-	return true;
+static bool shouldSleepWhenInactive() {
+	return !CommandLineParser::isOn("-no_sleep_inactive");
 }
 
-MouseSensitivity::MouseSensitivity(IAllocator& allocator) : values(allocator)
-{
+MouseSensitivity::MouseSensitivity(IAllocator& allocator)
+	: values(allocator) {
 	values.push({0, 0.5f});
 	values.push({16, 16.f});
 }
@@ -317,7 +291,7 @@ void MouseSensitivity::gui(const char* label) {
 		if (new_count == values.capacity()) values.reserve(values.capacity() + 1);
 		ImGui::EndPopup();
 	}
-	
+
 	ImGui::PopID();
 }
 
@@ -348,9 +322,9 @@ void MouseSensitivity::load(const char* name, lua_State* L) {
 					const float value = (float)lua_tonumber(L, -1);
 					values.push({key, value});
 					lua_pop(L, 1);
-				}
-				else {
-					logError("Error reading mouse sensitivity"); break;
+				} else {
+					logError("Error reading mouse sensitivity");
+					break;
 				}
 			}
 			break;
@@ -417,19 +391,17 @@ Settings::Settings(StudioApp& app)
 }
 
 
-Settings::~Settings()
-{
+Settings::~Settings() {
 	lua_close(m_global_state);
 	lua_close(m_local_state);
 }
 
-bool Settings::load()
-{
+bool Settings::load() {
 	lua_State* L = m_global_state;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const bool has_settings = fs.fileExists(SETTINGS_PATH);
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
-	
+
 	OutputMemoryStream buf(m_app.getAllocator());
 	if (!fs.getContentSync(Path(path), buf)) {
 		logError("Failed to open ", path);
@@ -462,8 +434,7 @@ bool Settings::load()
 	}
 
 	lua_getglobal(L, "window");
-	if (lua_type(L, -1) == LUA_TTABLE)
-	{
+	if (lua_type(L, -1) == LUA_TTABLE) {
 		m_window.x = getIntegerField(L, "x", 0);
 		m_window.y = getIntegerField(L, "y", 0);
 		m_window.w = getIntegerField(L, "w", -1);
@@ -471,16 +442,8 @@ bool Settings::load()
 	}
 	lua_pop(L, 1);
 
-	loadStyle(L);
-
-	lua_getglobal(L, "imgui");
-	if (lua_type(L, -1) == LUA_TSTRING) {
-		m_imgui_state = lua_tostring(L, -1);
-	}
-	lua_pop(L, 1);
-
 	m_is_maximized = getBoolean(L, "maximized", true);
-	
+	m_font_size = getInteger(L, "font_size", 13);
 	m_is_open = getBoolean(L, "settings_opened", false);
 	m_is_asset_browser_open = getBoolean(L, "asset_browser_opened", false);
 	m_is_entity_list_open = getBoolean(L, "entity_list_opened", false);
@@ -491,13 +454,26 @@ bool Settings::load()
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	m_sleep_when_inactive = getBoolean(L, "sleep_when_inactive", true);
 	m_focus_game_view_on_game_mode_start = getBoolean(L, "focus_game_view_on_game_mode_start", false);
+	m_mouse_sensitivity_x.load("mouse_x_sensitivity", L);
+	m_mouse_sensitivity_y.load("mouse_y_sensitivity", L);
+
+	lua_getglobal(L, "imgui");
+	if (lua_type(L, -1) == LUA_TSTRING) {
+		m_imgui_state = lua_tostring(L, -1);
+	}
+	lua_pop(L, 1);
+
+	return true;
+}
+
+bool Settings::postLoad() {
+	lua_State* L = m_global_state;
+	loadStyle(L);
+
 	if (!shouldSleepWhenInactive()) m_sleep_when_inactive = false;
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_app.getGizmoConfig().scale = getFloat(L, "gizmo_scale", 1.f);
-	m_mouse_sensitivity_x.load("mouse_x_sensitivity", L);
-	m_mouse_sensitivity_y.load("mouse_y_sensitivity", L);
 	m_app.setFOV(degreesToRadians(getFloat(L, "fov", 60)));
-	m_font_size = getInteger(L, "font_size", 13);
 
 	auto& actions = m_app.getActions();
 	lua_getglobal(L, "actions");

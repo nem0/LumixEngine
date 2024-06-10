@@ -106,9 +106,13 @@ struct InitWindowArgs {
 	WindowHandle parent = INVALID_WINDOW;
 	HitTestCallback hit_test_callback = nullptr;
 	void* user_data = nullptr;
+	u32 width = 800;
+	u32 height = 600;
+	i32 x = 0;
+	i32 y = 0;
+	bool is_maximized = false;
+	bool is_hidden = false;
 };
-
-
 
 struct Monitor {
 	Rect work_rect;
@@ -218,6 +222,8 @@ LUMIX_CORE_API void showCursor(bool show);
 LUMIX_CORE_API u32 getMonitors(Span<Monitor> monitors);
 LUMIX_CORE_API Point toScreen(WindowHandle win, int x, int y);
 LUMIX_CORE_API WindowHandle createWindow(const InitWindowArgs& args);
+LUMIX_CORE_API void showWindow(WindowHandle wnd);
+LUMIX_CORE_API void hideWindow(WindowHandle wnd);
 LUMIX_CORE_API bool getEvent(Event& event);
 LUMIX_CORE_API void destroyWindow(WindowHandle wnd);
 LUMIX_CORE_API Rect getWindowScreenRect(WindowHandle win);

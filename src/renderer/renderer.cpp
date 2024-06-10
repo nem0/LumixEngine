@@ -390,7 +390,8 @@ struct RendererImpl final : Renderer
 
 		m_shader_defines.reserve(32);
 
-		gpu::preinit(m_allocator, shouldLoadRenderdoc());
+		bool try_load_renderdoc = CommandLineParser::isOn("-renderdoc");
+		gpu::preinit(m_allocator, try_load_renderdoc);
 		for (Local<FrameData>& f : m_frames) f.create(*this, m_allocator, m_engine.getPageAllocator());
 	}
 
@@ -472,18 +473,6 @@ struct RendererImpl final : Renderer
 		return iter.value().c_str();
 	}
 
-	static bool shouldLoadRenderdoc() {
-		char cmd_line[4096];
-		os::getCommandLine(Span(cmd_line));
-		CommandLineParser cmd_line_parser(cmd_line);
-		while (cmd_line_parser.next()) {
-			if (cmd_line_parser.currentEquals("-renderdoc")) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	void initEnd() override {
 		jobs::wait(&m_init_signal);
 	}
@@ -507,7 +496,11 @@ struct RendererImpl final : Renderer
 		jobs::Signal signal;
 		jobs::runLambda([this, flags]() {
 			PROFILE_BLOCK("init_render");
-			void* window_handle = m_engine.getWindowHandle();
+			os::WindowHandle window_handle = m_engine.getMainWindow();
+			if (window_handle == os::INVALID_WINDOW) {
+				logError("Trying to initialize renderer without any window");
+				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
+			}
 			if (!gpu::init(window_handle, flags)) {
 				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
 			}

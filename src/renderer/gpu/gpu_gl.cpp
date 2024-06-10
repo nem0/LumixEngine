@@ -29,6 +29,21 @@ namespace Lumix {
 
 namespace gpu {
 
+#ifdef _WIN32
+	// https://hero.handmade.network/forums/code-discussion/t/2503-%5Bday_235%5D_opengls_pixel_format_takes_a_long_time#12672
+	DWORD WINAPI glSpeedUp(LPVOID param) {
+		PROFILE_FUNCTION();
+		HDC dc = GetDC(NULL);
+		DescribePixelFormat(dc, 0, 0, NULL);
+		ReleaseDC(NULL, dc);
+		return 0;
+	}
+	static bool gl_speedup__ = []() {
+		CreateThread(NULL, 2048, &glSpeedUp, NULL, 0, NULL);	
+		return true;
+	}();
+#endif
+
 #define GPU_GL_IMPORT(prototype, name) static prototype name;
 #define GPU_GL_IMPORT_TYPEDEFS
 

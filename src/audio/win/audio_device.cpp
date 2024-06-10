@@ -2,6 +2,7 @@
 #include <dsound.h>
 
 #include "core/allocator.h"
+#include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/log.h"
 #include "core/math.h"
@@ -120,8 +121,9 @@ struct AudioDeviceImpl final : AudioDevice
 			return false;
 		}
 
-		HWND hwnd = (HWND)engine.getWindowHandle();
-		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
+		os::WindowHandle wnd = engine.getMainWindow();
+		HWND hwnd = (HWND)wnd;
+		const bool result = wnd == os::INVALID_WINDOW ? true : SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer()) {
 			logError("Failed to initialize the primary buffer.");
 			ASSERT(false);
@@ -581,9 +583,14 @@ struct NullAudioDevice final : AudioDevice
 
 UniquePtr<AudioDevice> AudioDevice::create(Engine& engine, IAllocator& allocator)
 {
+	if (CommandLineParser::isOn("-nullaudio")) {
+		logInfo("Using null audio device because it was requested on command line");
+		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
+	}
+
 	UniquePtr<AudioDeviceImpl> device = UniquePtr<AudioDeviceImpl>::create(allocator);
 	if (!device->init(engine)) {
-		logWarning("Using null device");
+		logWarning("Using null audio device");
 		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
 	}
 	return device.move();

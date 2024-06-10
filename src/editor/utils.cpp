@@ -2,6 +2,7 @@
 #include <imgui/imgui_internal.h>
 
 #include "engine/file_system.h"
+#include "core/command_line_parser.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"

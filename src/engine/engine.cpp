@@ -70,11 +70,6 @@ struct EngineImpl final : Engine {
 		registerLogCallback<&EngineImpl::logToFile>(this);
 		registerLogCallback<logToDebugOutput>();
 
-		m_window_handle = os::createWindow(init_data.init_window_args);
-		if (m_window_handle == os::INVALID_WINDOW) {
-			logError("Failed to create main window.");
-		}
-
 		m_is_log_file_open = m_log_file.open("lumix.log");
 		
 		installUnhandledExceptionHandler();
@@ -133,6 +128,10 @@ struct EngineImpl final : Engine {
 				logInfo(plugin_name, " plugin has not been loaded");
 			}
 		}
+	}
+
+	void setMainWindow(os::WindowHandle wnd) override {
+		m_window_handle = wnd;
 	}
 
 	void init() override {
@@ -197,7 +196,7 @@ struct EngineImpl final : Engine {
 		}
 	}
 
-	os::WindowHandle getWindowHandle() override { return m_window_handle; }
+	os::WindowHandle getMainWindow() override { return m_window_handle; }
 	IAllocator& getAllocator() override { return m_allocator; }
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
@@ -488,7 +487,7 @@ private:
 	bool m_is_game_running;
 	bool m_paused;
 	bool m_next_frame;
-	os::WindowHandle m_window_handle;
+	os::WindowHandle m_window_handle = os::INVALID_WINDOW;
 	lua_State* m_state;
 	os::OutputFile m_log_file;
 	bool m_is_log_file_open = false;

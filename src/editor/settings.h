@@ -66,6 +66,7 @@ struct LUMIX_EDITOR_API Settings {
 
 	[[nodiscard]] bool save();
 	bool load();
+	bool postLoad();
 	void onGUI();
 	void setValue(Storage storage, const char* name, bool value) const;
 	void setValue(Storage storage, const char* name, float value) const;

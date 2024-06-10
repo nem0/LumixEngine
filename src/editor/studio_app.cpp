@@ -231,8 +231,17 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+
 	void onIdle() {
 		update();
+
+		if (m_first_update) {
+			// we show window after the first update, so it does not show default (white) background
+			// only to be replace with actual (potentially dark) content
+			os::showWindow(m_main_window);
+			if (m_settings.m_is_maximized) os::maximizeWindow(m_main_window);
+			m_first_update = false;
+		}
 
 		if (!isFocused()) ++m_frames_since_focused;
 		else m_frames_since_focused = 0;
@@ -253,17 +262,6 @@ struct StudioAppImpl final : StudioApp
 		m_is_f2_pressed = false;
 	}
 
-	bool profileStart() {
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next()) {
-			if (parser.currentEquals("-profile_start")) return true;
-		}
-		return false;
-	}
-
 	void run() override {
 		profiler::setThreadName("Main thread");
 		Semaphore semaphore(0, 1);
@@ -273,7 +271,7 @@ struct StudioAppImpl final : StudioApp
 		} data = {this, &semaphore};
 		jobs::runLambda([&data]() {
 			data.that->onInit();
-			if (data.that->profileStart()) {
+			if (CommandLineParser::isOn("-profile_start")) {
 				profiler::pause(true);
 			}
 			while (!data.that->m_finished) {
@@ -349,22 +347,28 @@ struct StudioAppImpl final : StudioApp
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
 		Engine::InitArgs init_data = {};
-		init_data.init_window_args.handle_file_drops = true;
-		init_data.init_window_args.name = "Lumix Studio";
 		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
-		init_data.init_window_args.user_data = this;
-		init_data.init_window_args.hit_test_callback = &StudioAppImpl::hitTestCallback;
-		init_data.init_window_args.flags = os::InitWindowArgs::NO_DECORATION;
 		const char* plugins[] = {
 			#define LUMIX_PLUGINS_STRINGS
 				#include "engine/plugins.inl"
 			#undef LUMIX_PLUGINS_STRINGS
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
-		init_data.init_window_args.icon = "editor/logo.ico";
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
-		m_main_window = m_engine->getWindowHandle();
+		m_settings.load();
+
+		os::InitWindowArgs init_window_args;
+		init_window_args.icon = "editor/logo.ico";
+		init_window_args.user_data = this;
+		init_window_args.hit_test_callback = &StudioAppImpl::hitTestCallback;
+		init_window_args.flags = os::InitWindowArgs::NO_DECORATION;
+		init_window_args.handle_file_drops = true;
+		init_window_args.name = "Lumix Studio";
+		init_window_args.is_hidden = true;
+
+		m_main_window = os::createWindow(init_window_args);
 		m_windows.push(m_main_window);
+		m_engine->setMainWindow(m_main_window);
 		
 		beginInitIMGUI();
 		m_engine->init();
@@ -386,9 +390,8 @@ struct StudioAppImpl final : StudioApp
 		m_profiler_ui = createProfilerUI(*this);
 		m_log_ui.create(*this, m_allocator);
 
-		// TODO refactor so we don't need to call loadSettings twice (once in beginInitIMGUI)
 		initPlugins(); // needs initialized imgui
-		loadSettings(); // needs plugins
+		loadSettings();
 
 		loadWorldFromCommandLine();
 
@@ -396,13 +399,12 @@ struct StudioAppImpl final : StudioApp
 		m_asset_browser->onInitFinished();
 		
 		checkScriptCommandLine();
+		loadLogo();
 
 		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
 		#ifdef _WIN32
 			logInfo(os::getTimeSinceProcessStart(), " s since process started");
 		#endif
-
-		loadLogo();
 	}
 
 	void loadLogo() {
@@ -1117,13 +1119,13 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin("Welcome", nullptr, flags)) {
 			#ifdef _WIN32
 				alignGUIRight([&](){
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
 					ImGui::SameLine();
-					if (os::isMaximized(m_engine->getWindowHandle())) {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+					if (os::isMaximized(m_main_window)) {
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_main_window);
 					}
 					else {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_main_window);
 					}
 					ImGui::SameLine();
 					if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
@@ -1788,13 +1790,13 @@ struct StudioAppImpl final : StudioApp
 					}
 
 					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_engine->getWindowHandle());
+					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
 					ImGui::SameLine();
-					if (os::isMaximized(m_engine->getWindowHandle())) {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_engine->getWindowHandle());
+					if (os::isMaximized(m_main_window)) {
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_main_window);
 					}
 					else {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_engine->getWindowHandle());
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_main_window);
 					}
 					ImGui::SameLine();
 					if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
@@ -2342,7 +2344,6 @@ struct StudioAppImpl final : StudioApp
 		PROFILE_FUNCTION();
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
-		loadSettings(); // needs imgui context
 
 		jobs::runLambda([this](){
 			PROFILE_BLOCK("init imgui");
@@ -2420,19 +2421,10 @@ struct StudioAppImpl final : StudioApp
 	void loadSettings() {
 		PROFILE_FUNCTION();
 		logInfo("Loading settings...");
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
 
-		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (!parser.currentEquals("-no_crash_report")) continue;
+		if (CommandLineParser::isOn("-no_crash_report")) m_settings.m_force_no_crash_report = true;
 
-			m_settings.m_force_no_crash_report = true;
-			break;
-		}
-
-		m_settings.load();
+		m_settings.postLoad();
 		for (auto* i : m_gui_plugins) {
 			i->onSettingsLoaded();
 		}
@@ -3644,6 +3636,7 @@ struct StudioAppImpl final : StudioApp
 	HashMap<ComponentType, StaticString<5>> m_component_icons;
 	Gizmo::Config m_gizmo_config;
 
+	bool m_first_update = true;
 	bool m_show_save_world_ui = false;
 	bool m_cursor_clipped = false;
 	bool m_confirm_exit = false;

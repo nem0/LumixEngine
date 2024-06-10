@@ -63,9 +63,9 @@ struct Runner final
 
 	void onResize() {
 		if (!m_engine.get()) return;
-		if (m_engine->getWindowHandle() == os::INVALID_WINDOW) return;
+		if (m_engine->getMainWindow() == os::INVALID_WINDOW) return;
 
-		const os::Rect r = os::getWindowClientRect(m_engine->getWindowHandle());
+		const os::Rect r = os::getWindowClientRect(m_engine->getMainWindow());
 		m_viewport.w = r.width;
 		m_viewport.h = r.height;
 		m_gui_interface.size = Vec2((float)r.width, (float)r.height);
@@ -125,18 +125,6 @@ struct Runner final
 		return true;
 	}
 
-	static bool isWindowCommandLineOption() {
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-window")) return true;
-		}
-		return false;
-	}
-
 	void loadProject() {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
@@ -151,17 +139,22 @@ struct Runner final
 
 	void onInit() {
 		Engine::InitArgs init_data;
-		init_data.init_window_args.name = "Lumix App";
 
 		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);
 		}
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+
+		os::InitWindowArgs init_window_args;
+		init_window_args.name = "Lumix App";
+		os::WindowHandle wnd = os::createWindow(init_window_args);
+		m_engine->setMainWindow(wnd);
+
 		m_engine->init();
 		
-		if (!isWindowCommandLineOption()) {
-			os::setFullscreen(m_engine->getWindowHandle());
+		if (!CommandLineParser::isOn("-window")) {
+			os::setFullscreen(m_engine->getMainWindow());
 			captureMouse(true);
 		}
 
@@ -201,8 +194,8 @@ struct Runner final
 	void captureMouse(bool capture) {
 		m_mouse_captured = capture;
 		if (m_focused) {
-			os::Rect r = os::getWindowScreenRect(m_engine->getWindowHandle());
-			os::clipCursor(m_engine->getWindowHandle(), r);
+			os::Rect r = os::getWindowScreenRect(m_engine->getMainWindow());
+			os::clipCursor(m_engine->getMainWindow(), r);
 			os::showCursor(false);
 		}
 		else {
@@ -240,8 +233,8 @@ struct Runner final
 
 	void onIdle() {
 		if (m_mouse_captured) {
-			os::Rect r = os::getWindowScreenRect(m_engine->getWindowHandle());
-			os::clipCursor(m_engine->getWindowHandle(), r);
+			os::Rect r = os::getWindowScreenRect(m_engine->getMainWindow());
+			os::clipCursor(m_engine->getMainWindow(), r);
 		}
 
 		m_engine->update(*m_world);

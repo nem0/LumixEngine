@@ -5185,18 +5185,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	const char* getName() const override { return "renderer"; }
 
-	static bool renderDocOption() {
-		char cmd_line[2048];
-		os::getCommandLine(Span(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-renderdoc")) return true;
-		}
-		return false;
-	}
-
 	void init() override
 	{
 		PROFILE_FUNCTION();
@@ -5204,7 +5192,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", Action::GLOBAL);
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
 
-		if (renderDocOption()) {
+		if (CommandLineParser::isOn("-renderdoc")) {
 			m_app.addToolAction(&m_renderdoc_capture_action);
 		}
 

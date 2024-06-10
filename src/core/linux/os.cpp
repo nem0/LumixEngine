@@ -643,7 +643,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		ret.event_mask = ButtonPressMask | ButtonReleaseMask | ExposureMask | KeyPressMask | KeyReleaseMask | PointerMotionMask | StructureNotifyMask;
 		return ret;
 	}();
-	Window win = XCreateWindow(display, args.parent ? (Window)args.parent : root, 0, 0, 800, 600, 0, depth, InputOutput, visual, CWBorderPixel | CWEventMask, &attrs);
+	Window win = XCreateWindow(display, args.parent ? (Window)args.parent : root, args.x, args.y, args.width, args.height, 0, depth, InputOutput, visual, CWBorderPixel | CWEventMask, &attrs);
 	XSetWindowAttributes attr = {};
 	XChangeWindowAttributes(display, win, CWBackPixel, &attr);
 

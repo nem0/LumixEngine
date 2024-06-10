@@ -2,8 +2,6 @@
 
 #include "engine/lumix.h"
 
-#include "core/hash.h"
-
 
 namespace Lumix {
 
