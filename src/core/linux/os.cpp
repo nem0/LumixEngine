@@ -628,6 +628,14 @@ Point toScreen(WindowHandle win, int x, int y) {
 	return p;
 }
 
+void showWindow(WindowHandle wnd) {
+	XMapWindow(G.display, (Window)wnd);
+}
+
+void hideWindow(WindowHandle wnd) {
+	XUnmapWindow(G.display, (Window)wnd);
+}
+
 WindowHandle createWindow(const InitWindowArgs& args) {
 	ASSERT(G.display);
 
@@ -647,7 +655,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	XSetWindowAttributes attr = {};
 	XChangeWindowAttributes(display, win, CWBackPixel, &attr);
 
-	XMapWindow(display, win);
+	if (!args.is_hidden) XMapWindow(display, win);
 	XStoreName(display, win, args.name && args.name[0] ? args.name : "Lumix App");
 
 	G.ic = XCreateIC(G.im, XNInputStyle, 0 | XIMPreeditNothing | XIMStatusNothing, XNClientWindow, win, NULL);
