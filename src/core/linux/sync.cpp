@@ -55,7 +55,7 @@ void Semaphore::signal()
 	ASSERT(res == 0);
 	res = pthread_cond_signal(&m_id.cond);
 	ASSERT(res == 0);
-	++m_id.count;
+	m_id.count = m_id.count + 1;
 	res = pthread_mutex_unlock(&m_id.mutex);
 	ASSERT(res == 0);
 }
@@ -71,7 +71,7 @@ void Semaphore::wait()
 		ASSERT(res == 0);
 	}
 	
-	--m_id.count;
+	m_id.count = m_id.count - 1;
 	
 	res = pthread_mutex_unlock(&m_id.mutex);
 	ASSERT(res == 0);

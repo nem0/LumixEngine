@@ -1,5 +1,5 @@
 #include "core/os.h"
-#include "core/allocators.h"
+#include "core/default_allocator.h"
 #include "core/hash_map.h"
 #include "core/log.h"
 #include "core/core.h"
