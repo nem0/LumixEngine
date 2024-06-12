@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/math.h"
 #include "core/os.h"
 #include "core/stack_array.h"
 #include "editor/utils.h"
