@@ -2,7 +2,7 @@
 #include <imgui/imgui_freetype.h>
 #include <imgui/imgui_internal.h>
 
-#include "core/allocators.h"
+#include "core/default_allocator.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
 #include "core/command_line_parser.h"
@@ -27,6 +27,7 @@
 #include "editor/spline_editor.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/engine_hash_funcs.h"
 #include "engine/input_system.h"
 #include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
@@ -1183,22 +1184,22 @@ struct StudioAppImpl final : StudioApp
 
 				if (ImGui::Button("Wiki"))
 				{
-					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
+					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki", {}, {});
 				}
 
 				if (ImGui::Button("Show major releases"))
 				{
-					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
+					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases", {}, {});
 				}
 
 				if (ImGui::Button("Show latest commits"))
 				{
-					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
+					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master", {}, {});
 				}
 
 				if (ImGui::Button("Show issues"))
 				{
-					os::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
+					os::shellExecuteOpen("https://github.com/nem0/lumixengine/issues", {}, {});
 				}
 			}
 			ImGui::EndChild();
@@ -3399,7 +3400,7 @@ struct StudioAppImpl final : StudioApp
 		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
-			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir)) {
+			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir.data)) {
 				if (os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
 					m_settings.setValue(Settings::LOCAL, "export_dir", m_export.dest_dir);
 				}

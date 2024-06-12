@@ -2,9 +2,9 @@
 
 #include "engine/lumix.h"
 
-#include "core/span.h"
-
+#include "core/array.h"
 #include "core/delegate.h"
+#include "core/span.h"
 #include "core/string.h"
 #include "core/stream.h"
 

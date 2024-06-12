@@ -1,8 +1,9 @@
 #pragma once
 
+#include "core/allocator.h"
+#include "core/crt.h"
 #include "gpu/gpu.h"
 #ifndef _WIN32
-	#include "core/allocator.h"
 	#include <string.h>
 #endif
 

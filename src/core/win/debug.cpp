@@ -7,7 +7,6 @@
 #pragma warning (pop)
 #include <mapi.h>
 
-#include "core/allocators.h"
 #include "core/atomic.h"
 #include "core/crt.h"
 #include "core/debug.h"
@@ -15,6 +14,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/string.h"
+#include "core/tag_allocator.h"
 
 
 #pragma comment(lib, "DbgHelp.lib")

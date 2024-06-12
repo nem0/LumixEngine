@@ -1,8 +1,5 @@
 #pragma once
 
-#include "engine/lumix.h"
-
-#include "renderer/gpu/gpu.h"
 #include "editor/world_editor.h"
 
 using ImTextureID = void*;

@@ -1,13 +1,10 @@
 #include "draw_stream.h"
 #include "core/array.h"
-#include "engine/engine.h"
 #include "core/math.h"
 #include "core/page_allocator.h"
 #include "core/string.h"
+#include "engine/engine.h"
 #include "renderer/renderer.h"
-#ifdef _WIN32
-	#include <intrin.h>
-#endif
 
 namespace Lumix {
 

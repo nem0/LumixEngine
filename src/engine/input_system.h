@@ -1,12 +1,13 @@
 #pragma once
 
+#include "core/span.h"
 #include "engine/lumix.h"
 
-#include "core/os.h"
 
 namespace Lumix {
 
 template <typename T> struct UniquePtr;
+namespace os { struct Event; }
 
 struct LUMIX_ENGINE_API InputSystem {
 	struct Device {

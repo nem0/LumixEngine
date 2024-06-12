@@ -1,3 +1,4 @@
+#include "core/crt.h"
 #include "core/log.h"
 #include "core/string.h"
 

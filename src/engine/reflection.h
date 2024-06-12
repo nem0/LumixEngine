@@ -6,11 +6,12 @@
 #include "core/color.h"
 #include "core/delegate_list.h"
 #include "core/hash.h"
+#include "core/math.h"
 #include "core/metaprogramming.h"
 #include "core/string.h"
 
+#include "engine/component_uid.h"
 #include "engine/resource.h"
-#include "engine/world.h"
 
 
 #define LUMIX_MODULE(Class, Label) using ReflModule = Class; reflection::build_module(Label)
@@ -32,6 +33,8 @@ struct IVec3;
 struct Vec2;
 struct Vec3;
 struct Vec4;
+struct InputMemoryStream;
+struct OutputMemoryStream;
 
 namespace reflection
 {

@@ -421,6 +421,15 @@ enum class LuaModuleVersion : i32
 	LATEST
 };
 
+
+inline void toCString(EntityPtr value, Span<char> output) {
+	toCString(value.index, output);
+}
+
+inline const char* fromCString(StringView input, EntityPtr& value) {
+	return fromCString(input, value.index);
+}
+
 template <typename T> static T fromString(const char* val) {
 	T res;
 	fromCString(val, res);

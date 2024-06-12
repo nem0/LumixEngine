@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/core.h"
+#include "core.h"
 
 #if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT) && !defined __clang__
 	#define _INC_FLOAT // if float.h is imported after this file, MCW_EM is redefined
@@ -57,8 +57,8 @@
 		const void* __cdecl memchr(const void* buf, int val, size_t max_count);
 		int __cdecl memcmp(const void* buf1, const void* buf2, size_t size);
 		void* __cdecl memcpy(void* dst, void const* src, size_t size); __pragma(intrinsic(memcpy))
-		void* __cdecl memmove(void* dst, const void* src, size_t size);
-		void* __cdecl memset(void*  dst, int val, size_t size); __pragma(intrinsic(memmove))
+		void* __cdecl memmove(void* dst, const void* src, size_t size); __pragma(intrinsic(memmove))
+		void* __cdecl memset(void*  dst, int val, size_t size); __pragma(intrinsic(memset))
 		LUMIX_CRT_API float __cdecl powf(float x, float y);
 		double __cdecl pow(double x, double y); __pragma(intrinsic(pow))
 		LUMIX_CRT_API void __cdecl qsort(void* ptr, size_t count, size_t size, int(*cmp)(const void *, const void *));

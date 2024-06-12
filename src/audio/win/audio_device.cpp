@@ -6,7 +6,9 @@
 #include "core/crt.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/profiler.h"
+#include "core/string.h"
 
 #include "audio_device.h"
 #include "engine/engine.h"

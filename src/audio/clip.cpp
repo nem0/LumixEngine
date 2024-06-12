@@ -1,6 +1,5 @@
-#include "engine/lumix.h"
-
 #include "core/allocator.h"
+#include "core/core.h"
 #include "core/crt.h"
 #include "core/profiler.h"
 #include "core/string.h"

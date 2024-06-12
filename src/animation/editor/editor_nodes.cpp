@@ -255,7 +255,7 @@ void Blend2DNode::dataChanged() {
 	struct Edge {
 		u32 a, b;
 		bool valid = true;
-		bool operator ==(const Edge& rhs) {
+		bool operator ==(const Edge& rhs) const {
 			return (a == rhs.a && b == rhs.b) || (a == rhs.b && b == rhs.a);
 		}
 	};

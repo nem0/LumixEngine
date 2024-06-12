@@ -1,7 +1,5 @@
 #pragma once
 
-#include "engine/lumix.h"
-
 #include "core/array.h"
 #include "core/hash_map.h"
 

@@ -1,9 +1,8 @@
 #pragma once
 
 
-#include "core/core.h"
+#include "core.h"
 #include "stream.h"
-#include "core/string.h"
 #ifdef __linux__
 	#include <pthread.h>
 #endif
@@ -11,6 +10,7 @@
 
 namespace Lumix {
 
+struct StringView;
 struct IAllocator;
 
 namespace os {
@@ -194,7 +194,7 @@ LUMIX_CORE_API void getCurrentDirectory(Span<char> path);
 LUMIX_CORE_API [[nodiscard]] bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
 LUMIX_CORE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
 LUMIX_CORE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
-LUMIX_CORE_API ExecuteOpenResult shellExecuteOpen(StringView path, StringView args = {}, StringView working_dir = {});
+LUMIX_CORE_API ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir);
 LUMIX_CORE_API ExecuteOpenResult openExplorer(StringView path);
 LUMIX_CORE_API void copyToClipboard(const char* text);
 

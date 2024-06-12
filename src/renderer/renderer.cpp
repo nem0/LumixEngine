@@ -1,6 +1,6 @@
 #include "renderer.h"
 
-#include "core/allocators.h"
+#include "core/arena_allocator.h"
 #include "core/array.h"
 #include "core/atomic.h"
 #include "core/command_line_parser.h"
@@ -140,7 +140,7 @@ struct FrameData {
 	TransientBuffer<256> uniform_buffer;
 	u32 gpu_frame = 0xffFFffFF;
 
-	LinearAllocator linear_allocator;
+	ArenaAllocator arena_allocator;
 	jobs::Mutex shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
@@ -874,7 +874,7 @@ struct RendererImpl final : Renderer
 		frame.end_frame_draw_stream.run();
 		frame.end_frame_draw_stream.reset();
 
-		frame.linear_allocator.reset();
+		frame.arena_allocator.reset();
 		m_profiler.endQuery();
 
 		jobs::enableBackupWorker(true);
@@ -913,7 +913,7 @@ struct RendererImpl final : Renderer
 		}
 	}
 	
-	LinearAllocator& getCurrentFrameAllocator() override { return m_cpu_frame->linear_allocator; }
+	ArenaAllocator& getCurrentFrameAllocator() override { return m_cpu_frame->arena_allocator; }
 
 	void waitForCommandSetup() override
 	{
@@ -962,7 +962,7 @@ struct RendererImpl final : Renderer
 
 		u32 frame_data_mem = 0;
 		for (const Local<FrameData>& fd : m_frames) {
-			frame_data_mem += fd->linear_allocator.getCommitedBytes();
+			frame_data_mem += fd->arena_allocator.getCommitedBytes();
 		}
 		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
@@ -1036,7 +1036,7 @@ struct RendererImpl final : Renderer
 FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 
 	: renderer(renderer)
 	, to_compile_shaders(allocator)
-	, linear_allocator(1024 * 1024 * 64)
+	, arena_allocator(1024 * 1024 * 64)
 	, draw_stream(renderer)
 	, begin_frame_draw_stream(renderer)
 	, end_frame_draw_stream(renderer)

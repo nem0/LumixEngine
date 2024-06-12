@@ -7,6 +7,7 @@
 #include "editor/spline_editor.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
@@ -195,7 +196,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		m_app.addPlugin((StudioApp::MousePlugin&)*this);
 	}
 
-	bool showGizmo(struct WorldView& view, struct ComponentUID cmp) override {
+	bool showGizmo(WorldView& view, ComponentUID cmp) override {
 		m_hovered_gizmo = false;
 		if (cmp.type != SPLINE_TYPE) return false;
 		

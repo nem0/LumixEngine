@@ -1,10 +1,8 @@
 #pragma once
 
-#include "core/allocators.h"
-#include "core/hash.h"
 #include "core/hash_map.h"
 #include "core/math.h"
-#include "core/string.h"
+#include "core/tag_allocator.h"
 #include "engine/resource.h"
 
 namespace Lumix
@@ -38,7 +36,7 @@ struct Time {
 
 private:
 	u32 value;
-	enum { ONE_SECOND = 1 << 15 };
+	static constexpr u32 ONE_SECOND = 1 << 15;
 };
 
 

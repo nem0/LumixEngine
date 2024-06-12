@@ -3,7 +3,6 @@
 #include "core/crt.h"
 #include "core/hash.h"
 #include "core/log.h"
-#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/string.h"
@@ -1257,7 +1256,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void openInExternalEditor(StringView path) const override {
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH> full_path(base_path, path);
-		const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path);
+		const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path, {}, {});
 		if (res == os::ExecuteOpenResult::NO_ASSOCIATION) {
 			logError(full_path, " is not associated with any app.");
 		}

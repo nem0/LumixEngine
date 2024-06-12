@@ -3,7 +3,7 @@
 #include "engine/lumix.h"
 
 #include "core/allocator.h"
-#include "core/os.h"
+#include "core/span.h"
 
 struct lua_State;
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/core.h"
+#include "core.h"
 
 namespace Lumix {
 template <typename T> struct Span {

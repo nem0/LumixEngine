@@ -1,12 +1,7 @@
 #pragma once
 
-#include "engine/lumix.h"
-
-#include "core/math.h"
 #include "core/os.h"
 #include "core/stack_array.h"
-#include "core/string.h"
-
 #include "editor/utils.h"
 
 
@@ -37,8 +32,7 @@ struct LUMIX_EDITOR_API Settings {
 	};
 
 	// actual settings
-	struct Rect
-	{
+	struct Rect {
 		int x, y;
 		int w, h;
 	};

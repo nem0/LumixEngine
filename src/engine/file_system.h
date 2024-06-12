@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/core.h"
 #include "lumix.h"
 
 namespace Lumix {
 
 template <typename T> struct Delegate;
+template <typename T> struct Span;
 template <typename T> struct UniquePtr;
 
 namespace os {

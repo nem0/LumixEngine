@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/span.h"
 #include "core/allocator.h"
 #include "core/crt.h"
+#include "core/span.h"
 
 namespace Lumix {
 

@@ -5,7 +5,6 @@
 #include "core/profiler.h"
 #include "core/string.h"
 #include "core/win/simple_win.h"
-#include <intrin.h>
 
 
 namespace Lumix

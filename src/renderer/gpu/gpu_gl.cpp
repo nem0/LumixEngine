@@ -1,5 +1,4 @@
 #include "gpu.h"
-#include "core/allocators.h"
 #include "core/array.h"
 #include "core/hash.h"
 #include "core/hash_map.h"
@@ -12,6 +11,7 @@
 #include "core/profiler.h"
 #include "core/stream.h"
 #include "core/string.h"
+#include "core/tag_allocator.h"
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>

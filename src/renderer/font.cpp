@@ -1,5 +1,4 @@
 #include "core/log.h"
-#include "core/os.h"
 #include "core/stream.h"
 #include "font.h"
 #include "renderer/texture.h"

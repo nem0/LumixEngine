@@ -1,14 +1,14 @@
-#include "core/allocators.h"
+#include "core/default_allocator.h"
 #include "core/atomic.h"
 #include "core/crt.h"
 #include "core/math.h"
 #include "core/os.h"
 #if !defined __linux__ && defined __clang__
-	#include <intrin.h>
+#include <intrin.h>
 #endif
 #if !defined _WIN32 || defined __clang__
-	#include <malloc.h>
-	#include <string.h>
+#include <malloc.h>
+#include <string.h>
 #endif
 
 
@@ -34,15 +34,15 @@ namespace Lumix
 	static u32 sizeToBin(size_t n) {
 		ASSERT(n > 0);
 		ASSERT(n <= SMALL_ALLOC_MAX_SIZE);
-		#ifdef _WIN32
-			unsigned long res;
-			return _BitScanReverse(&res, ((unsigned long)n - 1) >> 2) ? res : 0;
-		#else
-			size_t tmp = (n - 1) >> 2;
-			auto res = tmp == 0 ? 0 : 31 - __builtin_clz(tmp);
-			ASSERT(res <= lengthOf(((DefaultAllocator*)nullptr)->m_free_lists));
-			return res;
-		#endif
+#ifdef _WIN32
+		unsigned long res;
+		return _BitScanReverse(&res, ((unsigned long)n - 1) >> 2) ? res : 0;
+#else
+		size_t tmp = (n - 1) >> 2;
+		auto res = tmp == 0 ? 0 : 31 - __builtin_clz(tmp);
+		ASSERT(res <= lengthOf(((DefaultAllocator*)nullptr)->m_free_lists));
+		return res;
+#endif
 	}
 
 	void initPage(u32 item_size, DefaultAllocator::Page* page) {
@@ -65,7 +65,7 @@ namespace Lumix
 	static void freeSmall(DefaultAllocator& allocator, void* mem) {
 		u8* ptr = (u8*)mem;
 		DefaultAllocator::Page* page = getPage(ptr);
-		
+
 		MutexGuard guard(allocator.m_mutex);
 		if (page->header.first_free + page->header.item_size > sizeof(page->data)) {
 			ASSERT(!page->header.next);
@@ -78,14 +78,14 @@ namespace Lumix
 		*(u32*)ptr = page->header.first_free;
 		page->header.first_free = u32(ptr - page->data);
 	}
-	
+
 	static void* reallocSmallAligned(DefaultAllocator& allocator, void* mem, size_t n, size_t align) {
 		DefaultAllocator::Page* p = getPage(mem);
 		if (n <= SMALL_ALLOC_MAX_SIZE) {
 			const u32 bin = sizeToBin(n);
 			if (sizeToBin(p->header.item_size) == bin) return mem;
 		}
-		
+
 		void* new_mem = allocator.allocate(n, align);
 		memcpy(new_mem, mem, minimum((size_t)p->header.item_size, n));
 		allocator.deallocate(mem);
@@ -211,125 +211,5 @@ namespace Lumix
 		return newptr;
 	}
 #endif
-
-	
-BaseProxyAllocator::BaseProxyAllocator(IAllocator& source)
-	: m_source(source)
-	, m_allocation_count(0)
-{
-}
-
-BaseProxyAllocator::~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
-
-
-void* BaseProxyAllocator::allocate(size_t size, size_t align)
-{
-	m_allocation_count.inc();
-	return m_source.allocate(size, align);
-}
-
-
-void BaseProxyAllocator::deallocate(void* ptr)
-{
-	if(ptr)
-	{
-		m_allocation_count.dec();
-		m_source.deallocate(ptr);
-	}
-}
-
-
-void* BaseProxyAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align)
-{
-	if (!ptr) m_allocation_count.inc();
-	if (new_size == 0) m_allocation_count.dec();
-	return m_source.reallocate(ptr, new_size, old_size, align);
-}
-
-LinearAllocator::LinearAllocator(u32 reserved)
-{
-	m_reserved = reserved;
-	m_mem = (u8*)os::memReserve(reserved);
-}
-
-LinearAllocator::~LinearAllocator() {
-	ASSERT(m_end == 0);
-	os::memRelease(m_mem, m_reserved);
-	g_total_commited_bytes.subtract(m_commited_bytes);
-}
-
-void LinearAllocator::reset() {
-	m_end = 0;
-}
-
-static u32 roundUp(u32 val, u32 align) {
-	ASSERT(isPowOfTwo(align));
-	return (val + align - 1) & ~(align - 1);
-}
-
-void* LinearAllocator::allocate(size_t size, size_t align) {
-	ASSERT(size < 0xffFFffFF);
-	u32 start;
-	for (;;) {
-		const u32 end = m_end;
-		start = roundUp(end, (u32)align);
-		if (m_end.compareExchange(u32(start + size), end)) break;
-	}
-
-	if (start + size <= m_commited_bytes) return m_mem + start;
-
-	MutexGuard guard(m_mutex);
-	if (start + size <= m_commited_bytes) return m_mem + start;
-
-	const u32 commited = roundUp(start + (u32)size, 4096);
-	ASSERT(commited < m_reserved);
-	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
-	g_total_commited_bytes.add(commited - m_commited_bytes);
-	m_commited_bytes = commited;
-
-	return m_mem + start;
-}
-
-void LinearAllocator::deallocate(void* ptr) { /*everything should be "deallocated" with reset()*/ }
-void* LinearAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) { 
-	if (!ptr) return allocate(new_size, align);
-	// realloc not supported
-	ASSERT(false); 
-	return nullptr;
-}
-
-TagAllocator::TagAllocator(IAllocator& allocator, const char* tag_name)
-	: m_tag(tag_name)
-{
-	m_effective_allocator = m_direct_parent = &allocator;
-	while (m_effective_allocator->getParent() && m_effective_allocator->isTagAllocator()) {
-		m_effective_allocator = m_effective_allocator->getParent();
-	}
-}
-
-thread_local TagAllocator* active_allocator = nullptr;
-
-void* TagAllocator::allocate(size_t size, size_t align) {
-	active_allocator = this;
-	return m_effective_allocator->allocate(size, align);
-}
-
-void TagAllocator::deallocate(void* ptr) {
-	m_effective_allocator->deallocate(ptr);
-}
-
-void* TagAllocator::reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) {
-	active_allocator = this;
-	return m_effective_allocator->reallocate(ptr, new_size, old_size, align);
-}
-
-TagAllocator* TagAllocator::getActiveAllocator() {
-	return active_allocator;
-}
-
-IAllocator& getGlobalAllocator() {
-	static DefaultAllocator alloc;
-	return alloc;
-}
 
 } // namespace Lumix

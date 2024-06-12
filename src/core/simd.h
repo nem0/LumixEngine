@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/core.h"
+#include "core.h"
 
 
 #if defined _WIN32 && !defined __clang__

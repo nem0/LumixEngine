@@ -1,9 +1,6 @@
 #pragma once
 
 #include "core/core.h"
-#include "core/hash.h"
-#include "core/hash_map.h"
-#include "core/string.h"
 
 namespace Lumix {
 
@@ -47,27 +44,6 @@ struct ComponentType
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
 const EntityPtr INVALID_ENTITY = EntityPtr{-1};
 
-template <> struct HashFunc<ComponentType> {
-	static u32 get(const ComponentType& key) {
-		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
-		return HashFunc<i32>::get(key.index);
-	}
-};
-
-template <> struct HashFunc<EntityRef> {
-	static u32 get(const EntityRef& key) {
-		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
-		return HashFunc<i32>::get(key.index);
-	}
-};
-
-template <> struct HashFunc<EntityPtr> {
-	static u32 get(const EntityPtr& key) {
-		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
-		return HashFunc<i32>::get(key.index);
-	}
-};
-
 inline EntityPtr::operator EntityRef() const {
 	ASSERT(isValid());
 	return {index};
@@ -76,15 +52,6 @@ inline EntityPtr::operator EntityRef() const {
 inline EntityRef EntityPtr::operator*() const {
 	ASSERT(isValid());
 	return {index};
-}
-
-
-inline void toCString(EntityPtr value, Span<char> output) {
-	toCString(value.index, output);
-}
-
-inline const char* fromCString(StringView input, EntityPtr& value) {
-	return fromCString(input, value.index);
 }
 
 #ifdef STATIC_PLUGINS

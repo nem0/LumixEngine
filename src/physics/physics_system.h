@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/span.h"
 #include "engine/plugin.h"
 
 namespace physx {

@@ -2,14 +2,13 @@
 
 #include "engine/lumix.h"
 
-#include "core/allocators.h"
 #include "core/array.h"
 #include "core/geometry.h"
 #include "core/hash.h"
 #include "core/hash_map.h"
 #include "core/math.h"
 #include "core/stream.h"
-#include "core/string.h"
+#include "core/tag_allocator.h"
 
 #include "engine/resource.h"
 #include "gpu/gpu.h"

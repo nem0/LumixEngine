@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/array.h"
-#include "core/hash.h"
 #include "core/hash_map.h"
 
 #include "engine/world.h"

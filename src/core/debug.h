@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/allocator.h"
-#include "core/atomic.h"
-#include "core/core.h"
-#include "core/span.h"
-#include "core/sync.h"
+#include "allocator.h"
+#include "atomic.h"
+#include "core.h"
+#include "span.h"
+#include "sync.h"
 
 
 namespace Lumix

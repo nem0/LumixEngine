@@ -1,7 +1,7 @@
-#include "core/allocators.h"
 #include "core/crt.h"
 #include "core/delegate_list.h"
 #include "core/log.h"
+#include "core/log_callback.h"
 #include "core/path.h"
 #include "core/stream.h"
 #include "core/string.h"
@@ -29,8 +29,9 @@ namespace detail {
 	thread_local Log g_log;
 
 	void addLog(StringView val) { g_log.message << val; }
-	void addLog(u32 val) { g_log.message << val; }
 	void addLog(u64 val) { g_log.message << val; }
+	void addLog(i64 val) { g_log.message << val; }
+	void addLog(u32 val) { g_log.message << val; }
 	void addLog(i32 val) { g_log.message << val; }
 	void addLog(float val) { g_log.message << val; }
 

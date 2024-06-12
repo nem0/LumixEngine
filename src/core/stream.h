@@ -1,10 +1,11 @@
 #pragma once
 
-#include "core/core.h"
+#include "core.h"
 #include "span.h"
-#include "array.h"
 
 namespace Lumix {
+
+template <typename T> struct Array;
 
 struct LUMIX_CORE_API IOutputStream {
 	virtual bool write(const void* buffer, u64 size) = 0;

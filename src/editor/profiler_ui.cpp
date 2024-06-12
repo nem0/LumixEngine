@@ -1,19 +1,19 @@
 #include <imgui/imgui.h>
 
-#include "core/allocators.h"
 #include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/debug.h"
 #include "engine/file_system.h"
+#include "core/arena_allocator.h"
 #include "core/atomic.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
-#include "core/os.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
 #include "core/stack_array.h"
 #include "core/string.h"
+#include "core/tag_allocator.h"
 
 #include "profiler_ui.h"
 #include "editor/asset_browser.h"
@@ -773,7 +773,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		ImGui::Text("Total: %d MB", u32(total / 1024 / 1024));
 		const u32 reserved_pages = m_app.getEngine().getPageAllocator().getReservedCount() * PageAllocator::PAGE_SIZE;
 		ImGui::Text("Page allocator: %.1f MB", reserved_pages / 1024.f / 1024.f);
-		ImGui::Text("Linear allocators: %.1f MB", LinearAllocator::getTotalCommitedBytes() / 1024.f / 1024.f);
+		ImGui::Text("Arena allocators: %.1f MB", ArenaAllocator::getTotalCommitedBytes() / 1024.f / 1024.f);
 		ImGui::Text("Profiler contexts: %.1f MB", profiler::getThreadContextMemorySize() / 1024.f / 1024.f);
 		// TODO gpu mem
 	}

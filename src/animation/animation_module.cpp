@@ -10,9 +10,9 @@
 
 #include "animation/animation.h"
 #include "animation/controller.h"
-#include "animation/events.h"
 #include "animation/property_animation.h"
 #include "engine/engine.h"
+#include "engine/engine_hash_funcs.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"

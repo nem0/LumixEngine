@@ -1,12 +1,15 @@
 #pragma once
 
 
-#include "core/core.h"
-#include "core/os.h"
+#include "core.h"
+#include "span.h"
 
 
 namespace Lumix {
 
+namespace os {
+	LUMIX_CORE_API bool getCommandLine(Span<char> output);
+}
 
 struct CommandLineParser {
 	static bool isOn(const char* option) {

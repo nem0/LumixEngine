@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/lumix.h"
+#include "core/core.h"
 
 
 #ifdef STATIC_PLUGINS

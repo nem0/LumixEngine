@@ -4,7 +4,6 @@
 #include "core/hash.h"
 #include "engine/lua_wrapper.h"
 #include "core/log.h"
-#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "engine/resource_manager.h"

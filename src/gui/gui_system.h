@@ -2,15 +2,12 @@
 
 
 #include "engine/plugin.h"
-#include "core/os.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
+namespace os { enum class CursorType : u32; }
 
 struct Vec2;
-
 
 struct GUISystem : ISystem
 {

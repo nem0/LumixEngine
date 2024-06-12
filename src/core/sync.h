@@ -1,5 +1,5 @@
 #pragma once
-#include "core/core.h"
+#include "core.h"
 #ifdef __linux__
 	#include <pthread.h>
 #endif

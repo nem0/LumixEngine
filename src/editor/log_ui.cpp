@@ -1,8 +1,8 @@
 #include <imgui/imgui.h>
 
 #include "core/delegate_list.h"
-#include "core/log.h"
-#include "core/os.h"
+#include "core/log_callback.h"
+#include "core/math.h"
 
 #include "log_ui.h"
 #include "editor/settings.h"

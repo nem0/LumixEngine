@@ -1,31 +1,28 @@
 #define LUMIX_NO_CUSTOM_CRT
+#include <string.h>
 #ifdef LUMIX_BASIS_UNIVERSAL
 	#include <encoder/basisu_comp.h>
 #endif
 
 #include "engine/lumix.h"
 
-#include "core/allocators.h"
+#include "animation/animation.h"
+#include "animation/animation_module.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
 #include "core/command_line_parser.h"
-#include "engine/file_system.h"
+#include "core/crt.h"
 #include "core/geometry.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
-#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/queue.h"
 #include "core/string.h"
-
-#include "animation/animation.h"
-#include "animation/animation_module.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
-#include "renderer/editor/particle_editor.h"
 #include "editor/editor_asset.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
@@ -33,8 +30,10 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
+#include "engine/file_system.h"
 #include "engine/lua_wrapper.h"
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
@@ -45,6 +44,7 @@
 #include "model_meta.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
+#include "renderer/editor/particle_editor.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"

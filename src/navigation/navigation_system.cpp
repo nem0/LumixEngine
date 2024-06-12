@@ -4,7 +4,6 @@
 #include "core/profiler.h"
 
 #include "navigation_module.h"
-#include "animation/animation_module.h"
 #include "engine/engine.h"
 #include "engine/world.h"
 #include "navigation/navigation_module.h"

@@ -39,7 +39,6 @@
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
-#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "engine/reflection.h"
@@ -265,7 +264,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 				},
 				nullptr);
 		}
-		PxU32 getWorkerCount() const override { return os::getCPUsCount(); }
+		PxU32 getWorkerCount() const override { return jobs::getWorkersCount(); }
 	};
 
 

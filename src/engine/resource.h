@@ -3,7 +3,6 @@
 #include "engine/lumix.h"
 
 #include "core/delegate_list.h"
-#include "core/hash.h"
 #include "core/path.h"
 #include "engine/file_system.h"
 

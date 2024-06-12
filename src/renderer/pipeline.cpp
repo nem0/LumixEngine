@@ -1,6 +1,6 @@
 #include "gpu/gpu.h"
+#include "core/arena_allocator.h"
 #include "core/crt.h"
-#include "core/allocators.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
 #include "engine/engine.h"
@@ -554,7 +554,7 @@ struct PipelineImpl final : Pipeline
 		
 		static_assert(sizeof(Page) == PageAllocator::PAGE_SIZE);
 
-		AutoInstancer(LinearAllocator& allocator, PageAllocator& page_allocator)
+		AutoInstancer(ArenaAllocator& allocator, PageAllocator& page_allocator)
 			: instances(allocator)
 			, page_allocator(page_allocator)
 		{
@@ -639,7 +639,7 @@ struct PipelineImpl final : Pipeline
 	};
 	
 	struct View {
-		View(LinearAllocator& allocator, PageAllocator& page_allocator) 
+		View(ArenaAllocator& allocator, PageAllocator& page_allocator) 
 			: sorter(allocator, page_allocator)
 			, instancers(allocator)
 			, buckets(allocator)
@@ -2539,7 +2539,7 @@ struct PipelineImpl final : Pipeline
 		for (i32 i = 0; i < bucket_count; ++i) LuaWrapper::checkTableArg(L, 2 + i);
 		
 		UniquePtr<View>& view = pipeline->m_views.emplace();
-		LinearAllocator& allocator = pipeline->m_renderer.getCurrentFrameAllocator();
+		ArenaAllocator& allocator = pipeline->m_renderer.getCurrentFrameAllocator();
 		view = UniquePtr<View>::create(allocator, allocator, pipeline->m_renderer.getEngine().getPageAllocator());
 		view->cp = cp;
 		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
@@ -3091,7 +3091,7 @@ struct PipelineImpl final : Pipeline
 			float pad1;
 		};
 
-		LinearAllocator& frame_allocator = m_renderer.getCurrentFrameAllocator();
+		ArenaAllocator& frame_allocator = m_renderer.getCurrentFrameAllocator();
 		const IVec3 size(
 			(m_viewport.w + 63) / 64,
 			(m_viewport.h + 63) / 64,
@@ -3466,7 +3466,7 @@ struct PipelineImpl final : Pipeline
 		PagedListIterator<const CullResult> iterator(view.renderables);
 
 		view.instancers.reserve(jobs::getWorkersCount());
-		LinearAllocator& allocator = m_renderer.getCurrentFrameAllocator();
+		ArenaAllocator& allocator = m_renderer.getCurrentFrameAllocator();
 		for (u8 i = 0; i < jobs::getWorkersCount(); ++i) {
 			view.instancers.emplace(allocator, m_renderer.getEngine().getPageAllocator());
 		}

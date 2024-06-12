@@ -1,6 +1,7 @@
 #include "core/string.h"
 #include "core/stream.h"
 
+#include "engine/engine_hash_funcs.h"
 #include "entity_folders.h"
 
 namespace Lumix {

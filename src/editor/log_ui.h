@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/allocators.h"
 #include "core/array.h"
 #include "core/log.h"
 #include "core/sync.h"
 #include "core/string.h"
+#include "core/tag_allocator.h"
 
 #include "editor/studio_app.h"
 #include "editor/utils.h"

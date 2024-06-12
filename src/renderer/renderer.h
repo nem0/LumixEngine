@@ -3,13 +3,12 @@
 #include "engine/lumix.h"
 
 #include "core/allocator.h"
-
+#include "core/profiler.h"
+#include "draw_stream.h"
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
 
 #ifndef _WIN32
-	#include "core/profiler.h"
-	#include "draw_stream.h"
 	#include "engine/engine.h"
 #endif
 
@@ -56,7 +55,7 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual float getLODMultiplier() const = 0;
 	virtual void setLODMultiplier(float value) = 0;
 	
-	virtual struct LinearAllocator& getCurrentFrameAllocator() = 0;
+	virtual struct ArenaAllocator& getCurrentFrameAllocator() = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual MemRef allocate(u32 size) = 0;
 	virtual MemRef copy(const void* data, u32 size) = 0 ;

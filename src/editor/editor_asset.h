@@ -1,8 +1,5 @@
-#include "engine/lumix.h"
-
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/utils.h"
 
 namespace Lumix {
 
@@ -35,7 +32,7 @@ struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
 	void onGUI() override;
 
 	StudioApp& m_app;
-	ImGuiID m_dock_id = 0;
+	u32 m_dock_id = 0;
 	bool m_focus_request = false;
 	bool m_has_focus = false;
 	bool m_dirty = false;

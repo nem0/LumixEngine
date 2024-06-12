@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "core/allocators.h"
 #include "core/hash_map.h"
 #include "core/math.h"
+#include "core/stream.h"
+#include "core/tag_allocator.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "core/stream.h"
 
 
 namespace Lumix

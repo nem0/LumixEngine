@@ -1,7 +1,7 @@
 #pragma once 
 
 
-#include "core/core.h"
+#include "core.h"
 
 #define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
 #define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
@@ -30,6 +30,9 @@ struct LUMIX_CORE_API IAllocator {
 		}
 	}
 };
+
+// used for stuff that can't access engine's allocator, e.g. global objects constructed before engine such as logger
+LUMIX_CORE_API IAllocator& getGlobalAllocator();
 
 template <typename T>
 struct Local

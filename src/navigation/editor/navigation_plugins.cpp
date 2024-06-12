@@ -6,6 +6,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "core/geometry.h"

@@ -388,7 +388,7 @@ function linkPhysX()
 end
 
 solution "LumixEngine"
-	flags { "Cpp17" }
+	flags { "Cpp20" }
 	if _ACTION == "gmake" or _ACTION == "ninja" then
 		if "linux-gcc" == _OPTIONS["gcc"] then
 			LOCATION = "tmp/gcc"
@@ -468,6 +468,7 @@ solution "LumixEngine"
 
 	configuration { "vs*" }
 		defines { "_HAS_EXCEPTIONS=0" }
+		buildoptions { "/Zc:char8_t-" }
 
 	configuration { "vs*", "RelWithDebInfo" }
 		flags { "NoBufferSecurityCheck" }

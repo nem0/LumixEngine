@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "core/allocators.h"
 #include "engine/resource.h"
 #include "core/string.h"
+#include "core/tag_allocator.h"
 
 
 namespace Lumix

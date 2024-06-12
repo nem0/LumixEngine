@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/core.h"
-#include "core/span.h"
-#include "core/hash.h"
+#include "core.h"
+#include "span.h"
+#include "hash.h"
 
 // all functions here handle bytes independently of the encoding used
 // it means some are valid only for ascii (e.g. makeLowercase)

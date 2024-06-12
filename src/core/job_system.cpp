@@ -1,4 +1,4 @@
-#include "core/allocators.h"
+#include "core/tag_allocator.h"
 #include "core/array.h"
 #include "core/atomic.h"
 #include "core/fibers.h"
@@ -6,10 +6,11 @@
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
+#include "core/profiler.h"
 #include "core/ring_buffer.h"
+#include "core/string.h"
 #include "core/sync.h"
 #include "core/thread.h"
-#include "core/profiler.h"
 #include "job_system.h"
 
 namespace Lumix::jobs {

@@ -11,7 +11,6 @@
 #include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/hash_map.h"
-#include "core/allocators.h"
 #include "core/atomic.h"
 #include "core/math.h"
 #include "core/string.h"

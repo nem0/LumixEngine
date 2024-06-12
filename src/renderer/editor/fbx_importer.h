@@ -5,7 +5,6 @@
 #include "core/geometry.h"
 #include "core/hash_map.h"
 #include "core/math.h"
-#include "core/os.h"
 #include "core/path.h"
 #include "core/stream.h"
 #include "core/string.h"

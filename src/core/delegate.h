@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/core.h"
+#include "core.h"
 
 // base on molecular musings blogpost
 
@@ -81,7 +81,7 @@ public:
 		return m_stub.second(m_stub.first, args...);
 	}
 
-	bool operator==(const Delegate<R(Args...)>& rhs)
+	bool operator==(const Delegate<R(Args...)>& rhs) const
 	{
 		return m_stub.first == rhs.m_stub.first && m_stub.second == rhs.m_stub.second;
 	}

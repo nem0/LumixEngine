@@ -1,9 +1,9 @@
 #if 1 // set to 0 to build minimal lunex example
 
-#include "core/allocators.h"
 #include "core/atomic.h"
 #include "core/command_line_parser.h"
 #include "core/debug.h"
+#include "core/default_allocator.h"
 #include "engine/file_system.h"
 #include "core/geometry.h"
 #include "core/job_system.h"
@@ -302,20 +302,23 @@ int main(int args, char* argv[])
 
 #else
 
-#include "engine/allocators.h"
-#include "engine/os.h"
+#include "core/default_allocator.h"
+#include "core/os.h"
 #include "renderer/gpu/gpu.h"
 
 using namespace Lumix;
 
 int main(int args, char* argv[]) {
-	os::WindowHandle win = os::createWindow({});
-
+	// create window
+	os::WindowHandle win = os::createWindow({ .width = 640, .height = 480 });
+	
+	// init GPU
 	DefaultAllocator allocator;
 	gpu::preinit(allocator, false);
 	gpu::init(win, gpu::InitFlags::NONE);
 	gpu::ProgramHandle shader = gpu::allocProgramHandle();
 
+	// create shader
 	const gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
 	const char* srcs[] = {
 		"void main() { gl_Position = vec4(gl_VertexID & 1, (gl_VertexID >> 1) & 1, 0, 1); }",
@@ -324,8 +327,10 @@ int main(int args, char* argv[]) {
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, srcs, types, 2, nullptr, 0, "shader");
 
+	// main loop
 	bool finished = false;
 	while (!finished) {
+		// process OS events
 		os::Event e;
 		while (os::getEvent(e)) {
 			switch (e.type) {
@@ -335,8 +340,11 @@ int main(int args, char* argv[]) {
 			}
 		}
 
+		// draw
+		os::Rect rect = os::getWindowClientRect(win);
+		gpu::viewport(0, 0, rect.width, rect.height);
 		gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
-		const float clear_col[] = {0, 0, 0, 1};
+		const float clear_col[] = {0.1f, 0.1f, 0.1f, 1};
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
 		gpu::useProgram(shader);
 		gpu::drawArrays(0, 3);
@@ -345,6 +353,7 @@ int main(int args, char* argv[]) {
 		gpu::waitFrame(frame);
 	}
 
+	// shutdown
 	gpu::shutdown();
 
 	os::destroyWindow(win);

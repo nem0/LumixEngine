@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/allocator.h"
-#include "core/core.h"
+#include "allocator.h"
+#include "core.h"
 
 
 namespace Lumix

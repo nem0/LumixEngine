@@ -2,10 +2,10 @@
 
 #include "engine/lumix.h"
 
-#include "core/allocators.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/math.h"
+#include "core/tag_allocator.h"
 
 
 namespace Lumix {
@@ -68,8 +68,8 @@ struct LUMIX_ENGINE_API World {
 	void destroyComponent(EntityRef entity, ComponentType type);
 	void onComponentCreated(EntityRef entity, ComponentType component_type, IModule* module);
 	void onComponentDestroyed(EntityRef entity, ComponentType component_type, IModule* module);
-    u64 getComponentsMask(EntityRef entity) const;
-    bool hasComponent(EntityRef entity, ComponentType component_type) const;
+	u64 getComponentsMask(EntityRef entity) const;
+	bool hasComponent(EntityRef entity, ComponentType component_type) const;
 	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
 	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
@@ -203,29 +203,6 @@ private:
 	
 	// freelist for m_entities/m_transforms
 	int m_first_free_slot;
-};
-
-// contains necessary info to fully (==no other context needed) identify component at runtime
-struct LUMIX_ENGINE_API ComponentUID final {
-	ComponentUID() {
-		module = nullptr;
-		entity = INVALID_ENTITY;
-		type = {-1};
-	}
-
-	ComponentUID(EntityPtr entity, ComponentType type, IModule* module)
-		: entity(entity)
-		, type(type)
-		, module(module) {}
-
-	EntityPtr entity;
-	ComponentType type;
-	IModule* module;
-
-	static const ComponentUID INVALID;
-
-	bool operator==(const ComponentUID& rhs) const { return type == rhs.type && module == rhs.module && entity == rhs.entity; }
-	bool isValid() const { return entity.isValid(); }
 };
 
 // to iterate children with range-based for loop: for (EntityRef child : world->childrenOf(parent))
