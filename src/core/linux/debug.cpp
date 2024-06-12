@@ -1,7 +1,7 @@
 #include "core/debug.h"
+#include "core/default_allocator.h"
 #include "core/atomic.h"
 #include "core/string.h"
-#include "core/tag_allocator.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

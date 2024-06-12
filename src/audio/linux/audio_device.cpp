@@ -5,6 +5,7 @@
 #include "engine/plugin.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/string.h"
 #include "core/sync.h"
 #include "core/thread.h"
 #include "core/os.h"
