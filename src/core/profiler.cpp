@@ -192,73 +192,38 @@ void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 {
 	if (g_instance.paused && timestamp > g_instance.paused_time) return;
 
-	#pragma pack(1)
-		struct {
-			EventHeader header;
-			T value;
-		} v;
-	#pragma pack()
-	v.header.type = type;
-	v.header.size = sizeof(v);
-	v.header.time = timestamp;
-	v.value = value;
+	u8 tmp[sizeof(EventHeader) + sizeof(T)];
+	EventHeader* header = (EventHeader*)tmp;
+	header->type = type;
+	header->size = sizeof(T) + sizeof(EventHeader);
+	header->time = timestamp;
+	memcpy(tmp + sizeof(*header), &value, sizeof(value));
 
 	MutexGuard lock(ctx.mutex);
 	u8* buf = ctx.buffer.getMutableData();
 	const u32 buf_size = (u32)ctx.buffer.size();
 
-	while (sizeof(v) + ctx.end - ctx.begin > buf_size) {
+	while (sizeof(tmp) + ctx.end - ctx.begin > buf_size) {
 		const u8 size = buf[ctx.begin % buf_size];
 		ctx.begin += size;
 	}
 
 	const u32 lend = ctx.end % buf_size;
-	if (buf_size - lend >= sizeof(v)) {
-		memcpy(buf + lend, &v, sizeof(v));
+	if (buf_size - lend >= sizeof(tmp)) {
+		memcpy(buf + lend, tmp, sizeof(tmp));
 	}
 	else {
-		memcpy(buf + lend, &v, buf_size - lend);
-		memcpy(buf, ((u8*)&v) + buf_size - lend, sizeof(v) - (buf_size - lend));
+		memcpy(buf + lend, tmp, buf_size - lend);
+		memcpy(buf, tmp + buf_size - lend, sizeof(tmp) - (buf_size - lend));
 	}
 
-	ctx.end += sizeof(v);
+	ctx.end += sizeof(tmp);
 };
 
 template <typename T>
 void write(ThreadContext& ctx, EventType type, const T& value)
 {
-	if (g_instance.paused) return;
-
-#pragma pack(1)
-	struct {
-		EventHeader header;
-		T value;
-	} v;
-#pragma pack()
-	v.header.type = type;
-	v.header.size = sizeof(v);
-	v.header.time = os::Timer::getRawTimestamp();
-	v.value = value;
-
-	MutexGuard lock(ctx.mutex);
-	u8* buf = ctx.buffer.getMutableData();
-	const u32 buf_size = (u32)ctx.buffer.size();
-
-	while (sizeof(v) + ctx.end - ctx.begin > buf_size) {
-		const u8 size = buf[ctx.begin % buf_size];
-		ctx.begin += size;
-	}
-
-	const u32 lend = ctx.end % buf_size;
-	if (buf_size - lend >= sizeof(v)) {
-		memcpy(buf + lend, &v, sizeof(v));
-	}
-	else {
-		memcpy(buf + lend, &v, buf_size - lend);
-		memcpy(buf, ((u8*)&v) + buf_size - lend, sizeof(v) - (buf_size - lend));
-	}
-
-	ctx.end += sizeof(v);
+	write(ctx, os::Timer::getRawTimestamp(), type, value);
 };
 
 
@@ -596,7 +561,7 @@ static void saveStrings(OutputMemoryStream& blob) {
 	}
 
 	blob.write(map.size());
-	for (auto iter : map) {
+	for (const char* iter : map) {
 		blob.write((u64)(uintptr)iter);
 		blob.write(iter, strlen(iter) + 1);
 	}
