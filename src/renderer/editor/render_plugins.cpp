@@ -626,7 +626,7 @@ static void flipX(Vec4* data, int texture_size)
 	}
 }
 	
-static bool saveAsLBC(const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, IAllocator& allocator) {
+static bool saveAsLBC(FileSystem& fs, const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, IAllocator& allocator) {
 	ASSERT(data);
 	
 	OutputMemoryStream blob(allocator);
@@ -638,7 +638,7 @@ static bool saveAsLBC(const char* path, const u8* data, int w, int h, bool gener
 		return false;
 	}
 	os::OutputFile file;
-	if (!file.open(path)) return false;
+	if (!fs.open(path, file)) return false;
 	(void)file.write("lbc", 3);
 	(void)file.write(u32(0));
 	(void)file.write(blob.data(), blob.size());
@@ -1459,7 +1459,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				applyTint();
 
-				if (!saveAsLBC(m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
 			}
@@ -1485,7 +1485,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				applyTint();
 
-				if (!saveAsLBC(m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
 			}
@@ -2853,7 +2853,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				destroyEntityRecursive(*m_tile.world, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
-				const Path path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.out_path_hash, ".lbc");
+				const Path path(".lumix/asset_tiles/", m_tile.out_path_hash, ".lbc");
 
 				if (!gpu::isOriginBottomLeft()) {
 					u32* p = (u32*)m_tile.data.getMutableData();
@@ -2864,7 +2864,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					}
 				}
 
-				saveAsLBC(path.c_str(), m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
+				saveAsLBC(fs, path.c_str(), m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				m_renderer->getEndFrameDrawStream().destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
