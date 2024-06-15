@@ -128,7 +128,8 @@ declare LumixAPI: {
 	engine : any,
     logError : (string) -> (),
     logInfo : (string) -> (),
-	loadResource : (any, path:string, restype:string) -> any
+	loadResource : (any, path:string, restype:string) -> any,
+	writeFile : (string, string) -> boolean
 }
 
 declare class ComponentBase

@@ -197,6 +197,11 @@ declare class gui_canvas_component
 	virtual_size: any
 end
 
+declare class lua_script_component
+	scripts: any
+	getScriptPath : (lua_script_component, number) -> string
+end
+
 declare class particle_emitter_component
 	autodestroy: boolean
 	source: string
@@ -330,11 +335,6 @@ declare class physical_controller_component
 	getGravitySpeed : (physical_controller_component) -> number
 end
 
-declare class lua_script_component
-	scripts: any
-	getScriptPath : (lua_script_component, number) -> string
-end
-
 declare class gui_image_component
 	enabled: boolean
 	color: any
@@ -360,6 +360,20 @@ end
 
 declare class animable_component
 	animation: string
+end
+
+declare class property_animator_component
+	animation: string
+	enabled: boolean
+end
+
+declare class animator_component
+	source: string
+	default_set: number
+	use_root_motion: boolean
+	setFloatInput : (animator_component, number, number) -> ()
+	setBoolInput : (animator_component, number, boolean) -> ()
+	getInputIndex : (animator_component, string) -> number
 end
 
 declare class distance_joint_component
@@ -469,20 +483,6 @@ end
 declare class gui_input_field_component
 end
 
-declare class property_animator_component
-	animation: string
-	enabled: boolean
-end
-
-declare class animator_component
-	source: string
-	default_set: number
-	use_root_motion: boolean
-	setFloatInput : (animator_component, number, number) -> ()
-	setBoolInput : (animator_component, number, boolean) -> ()
-	getInputIndex : (animator_component, string) -> number
-end
-
 declare class physical_instanced_cube_component
 	half_extents: Vec3
 	layer: number
@@ -528,6 +528,7 @@ declare class Entity
 	spline: spline_component
 	gui_rect: gui_rect_component
 	gui_canvas: gui_canvas_component
+	lua_script: lua_script_component
 	particle_emitter: particle_emitter_component
 	terrain: terrain_component
 	camera: camera_component
@@ -545,12 +546,13 @@ declare class Entity
 	rigid_actor: rigid_actor_component
 	physical_heightfield: physical_heightfield_component
 	physical_controller: physical_controller_component
-	lua_script: lua_script_component
 	gui_image: gui_image_component
 	gui_text: gui_text_component
 	gui_button: gui_button_component
 	gui_render_target: gui_render_target_component
 	animable: animable_component
+	property_animator: property_animator_component
+	animator: animator_component
 	distance_joint: distance_joint_component
 	hinge_joint: hinge_joint_component
 	spherical_joint: spherical_joint_component
@@ -561,8 +563,6 @@ declare class Entity
 	navmesh_zone: navmesh_zone_component
 	lua_script_inline: lua_script_inline_component
 	gui_input_field: gui_input_field_component
-	property_animator: property_animator_component
-	animator: animator_component
 	physical_instanced_cube: physical_instanced_cube_component
 	physical_instanced_mesh: physical_instanced_mesh_component
 	audio_listener: audio_listener_component
@@ -607,7 +607,8 @@ declare LumixAPI: {
 	engine : any,
     logError : (string) -> (),
     logInfo : (string) -> (),
-	loadResource : (any, path:string, restype:string) -> any
+	loadResource : (any, path:string, restype:string) -> any,
+	writeFile : (string, string) -> boolean
 }
 
 declare class ComponentBase

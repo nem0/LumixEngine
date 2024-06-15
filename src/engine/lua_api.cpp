@@ -358,6 +358,27 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 } // namespace LuaImGui
 
 
+static int LUA_writeFile(lua_State* L) {
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
+	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+	if (!LuaWrapper::isType<const char*>(L, 2)) {
+		LuaWrapper::argError<const char*>(L, 2);
+	}
+	size_t len;
+	const char* content = lua_tolstring(L, 2, &len);
+	FileSystem& fs = engine->getFileSystem();
+	os::OutputFile file;
+	if (!fs.open(path, file)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	bool res = file.write(content, len);
+	file.close();
+	lua_pushboolean(L, res);
+	return 1;
+}
+
 static int LUA_pause(lua_State* L) {
 	bool pause = LuaWrapper::checkArg<bool>(L, 1);
 	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
@@ -949,6 +970,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "hasFilesystemWork", LUA_hasFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "writeFile", LUA_writeFile);
 
 	#undef REGISTER_FUNCTION
 
