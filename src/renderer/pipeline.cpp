@@ -2600,12 +2600,14 @@ struct PipelineImpl final : Pipeline
 			if (view_ptr->renderables) {
 				pipeline->createSortKeys(*view_ptr);
 				view_ptr->renderables->free(pipeline->m_renderer.getEngine().getPageAllocator());
-				if (!view_ptr->sorter.keys.empty()) {
-					pipeline->radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
-					pipeline->createCommands(*view_ptr);
-				}
 			}
+			view_ptr->sorter.pack();
 
+			if (!view_ptr->sorter.keys.empty()) {
+				pipeline->radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
+				pipeline->createCommands(*view_ptr);
+			}
+			
 			jobs::setGreen(&view_ptr->ready);
 		});
 
@@ -3705,8 +3707,6 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 		});
-
-		view.sorter.pack();
 	}
 
 	struct Histogram {
