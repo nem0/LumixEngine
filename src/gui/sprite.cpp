@@ -39,7 +39,13 @@ void Sprite::setTexture(const Path& path)
 	if (path.isEmpty()) {
 		m_texture = nullptr;
 	} else {
-		m_texture = (Texture*)getResourceManager().getOwner().load<Texture>(path);
+		if (path.c_str()[0] == '\\' || path.c_str()[0] == '/') {
+			m_texture = (Texture*)getResourceManager().getOwner().load<Texture>(path);
+		} else {
+			StringView dir = Path::getDir(getPath());
+			StaticString<MAX_PATH> tmp(dir, "/", path);
+			m_texture = (Texture*)getResourceManager().getOwner().load<Texture>(Path(tmp));
+		}
 	}
 }
 
@@ -52,7 +58,18 @@ void Sprite::serialize(OutputMemoryStream& out)
 	out << "bottom(" << bottom << ")\n";
 	out << "left(" << left << ")\n";
 	out << "right(" << right << ")\n";
-	out << "texture \"" << (m_texture ? m_texture->getPath() : Path()) << "\"";
+	if (m_texture) {
+		StringView dir = Path::getDir(getPath());
+		if (startsWith(m_texture->getPath(), dir)) {
+			StringView path = m_texture->getPath();
+			path.removePrefix(dir.size());
+			out << "texture \"" << path << "\"";
+		} else {
+			out << "texture \"/" << m_texture->getPath() << "\"";
+		}
+	} else {
+		out << "texture \"\"";
+	}
 }
 
 namespace LuaSpriteAPI {
