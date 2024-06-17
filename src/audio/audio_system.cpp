@@ -50,8 +50,7 @@ struct AudioSystemImpl final : AudioSystem {
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
-	void initBegin() override
-	{
+	void initBegin() override {
 		PROFILE_FUNCTION();
 		m_device = AudioDevice::create(m_engine, m_allocator);
 		m_manager.create(Clip::TYPE, m_engine.getResourceManager());

@@ -206,6 +206,9 @@ ParticleSystem::ParticleSystem(ParticleSystem&& rhs)
 	, m_resource(rhs.m_resource)
 	, m_entity(rhs.m_entity)
 	, m_autodestroy(rhs.m_autodestroy)
+	, m_total_time(rhs.m_total_time)
+	, m_prev_frame_transform(rhs.m_prev_frame_transform)
+	, m_last_update_stats(rhs.m_last_update_stats)
 {
 	memcpy(m_constants, rhs.m_constants, sizeof(m_constants));
 	
