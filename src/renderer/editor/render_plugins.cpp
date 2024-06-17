@@ -1054,7 +1054,7 @@ struct TextureMeta {
 		return true;	
 	}
 
-	void serialize(OutputMemoryStream& blob) {
+	void serialize(OutputMemoryStream& blob, const Path&) {
 		blob << "srgb = " << (srgb ? "true" : "false")
 			<< "\ncompress = " << (compress ? "true" : "false")
 			<< "\nstochastic_mip = " << (stochastic_mipmap ? "true" : "false")
@@ -1129,13 +1129,13 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 			logError("Failed to deserialize texture meta data for undo/redo");
 		}
 	}
-	void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob); }
+	void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob, m_texture->getPath()); }
 
 	void save() {
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 		char buf[1024];
 		OutputMemoryStream blob(buf, sizeof(buf));
-		m_meta.serialize(blob);
+		m_meta.serialize(blob, m_texture->getPath());
 		compiler.updateMeta(m_texture->getPath(), blob);
 		if (m_composite_editor) m_composite_editor->save();
 		m_dirty = false;
@@ -1147,19 +1147,6 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		auto* renderer = (Renderer*)system_manager.getSystem("renderer");
 		renderer->getEndFrameDrawStream().destroy(m_texture_view);
 		m_texture_view = gpu::INVALID_TEXTURE;
-	}
-
-
-	static const char* getCubemapLabel(u32 idx) {
-		switch (idx) {
-			case 0: return "X+";
-			case 1: return "X-";
-			case 2: return "Y+ (top)";
-			case 3: return "Y- (bottom)";
-			case 4: return "Z+";
-			case 5: return "Z-";
-			default: return "Too many faces in cubemap";
-		}
 	}
 
 	static const char* toString(gpu::TextureFormat format) {
@@ -1372,6 +1359,140 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 	TextureMeta m_meta;
 };
 
+template <typename T>
+struct R {
+	const char* label;
+	T value_ptr;
+	ResourceType resource_type;
+};
+
+template <typename T> struct Acceptor;
+
+template <> struct Acceptor<TextureMeta> {
+	template <typename V> static void accept(V visitor) {
+		visitor(R{"Compress", &TextureMeta::compress});
+		visitor(R{"Filter", &TextureMeta::filter});
+		visitor(R{"Is normalmap", &TextureMeta::is_normalmap});
+		visitor(R{"Mips", &TextureMeta::mips});
+		visitor(R{"SRGB", &TextureMeta::srgb});
+		visitor(R{"U Wrap", &TextureMeta::wrap_mode_u});
+		visitor(R{"V Wrap", &TextureMeta::wrap_mode_v});
+		visitor(R{"W Wrap", &TextureMeta::wrap_mode_w});
+	}
+};
+
+template <> struct Acceptor<ModelMeta> {
+	template <typename V> static void accept(V visitor) {
+		visitor(R{"Import vertex colors", &ModelMeta::import_vertex_colors});
+		visitor(R{"Physics", &ModelMeta::physics});
+		visitor(R{"Scale", &ModelMeta::scale});
+		visitor(R{"Skeleton", &ModelMeta::skeleton, Model::TYPE});
+		visitor(R{"Write prefab", &ModelMeta::create_prefab_with_physics});
+	}
+};
+
+template <typename Asset>
+struct MultiEditor {
+	using Meta = decltype(Asset::meta);
+	MultiEditor(StudioApp& app, Span<const Path> paths)
+		: m_app(app)
+		, m_assets(app.getAllocator())
+	{
+		m_assets.reserve(paths.length());
+		for (const Path& p : paths) {
+			Asset& asset = m_assets.emplace(app.getAllocator());
+			asset.path = p;
+			asset.meta.load(p, m_app);
+		}
+	}
+
+	LUMIX_FORCE_INLINE void ui(const char* label, bool* value, auto v) { ImGui::Checkbox(label, value); }
+	LUMIX_FORCE_INLINE void ui(const char* label, float* value, auto v) { ImGui::DragFloat(label, value); }
+	LUMIX_FORCE_INLINE void ui(const char* label, TextureMeta::WrapMode* value, auto v) {
+		ImGui::Combo(label, (int*)value, "Repeat\0Clamp\0");
+	}
+	LUMIX_FORCE_INLINE void ui(const char* label, TextureMeta::Filter* value, auto v) {
+		ImGui::Combo(label, (int*)value, "Linear\0Point\0Anisotropic\0");
+	}
+	LUMIX_FORCE_INLINE void ui(const char* label, FBXImporter::ImportConfig::Physics* value, auto v) {
+		ImGui::Combo(label, (int*)value, "None\0Convex\0Triangle mesh\0");
+	}
+	LUMIX_FORCE_INLINE void ui(const char* label, Path* value, auto v) {
+		m_app.getAssetBrowser().resourceInput(label, *value, v.resource_type);
+	}
+
+	void gui() {
+		if (!m_open) return;
+
+		if (ImGui::Begin("Multieditor", &m_open)) {
+			if (ImGui::Button("Save all")) {
+				OutputMemoryStream blob(m_app.getAllocator());
+				for (Asset& asset : m_assets) {
+					blob.clear();
+					asset.meta.serialize(blob, asset.path);
+					m_app.getAssetCompiler().updateMeta(asset.path, blob);
+				}
+			}
+
+			u32 row_count = 2;
+			Acceptor<Meta>::accept([&](auto) { ++row_count; });
+
+			if (ImGui::BeginTable("##tbl", row_count, ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn("Path");
+				Acceptor<Meta>::accept([](auto v) { ImGui::TableSetupColumn(v.label); });
+				ImGui::TableSetupColumn("Save");
+
+				ImGui::TableHeadersRow();
+
+				for (Asset& asset : m_assets) {
+					ImGui::PushID(&asset);
+					ImGui::TableNextRow();
+
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(asset.path.c_str());
+
+					Acceptor<Meta>::accept([&](auto v) {
+						auto* ptr = &(asset.meta.*v.value_ptr);
+						ImGui::TableNextColumn();
+						StaticString<MAX_PATH> tmp("##", v.label);
+						ui(tmp, ptr, v);
+					});
+
+					ImGui::TableNextColumn();
+					if (ImGui::Button(ICON_FA_SAVE)) {
+						OutputMemoryStream blob(m_app.getAllocator());
+						asset.meta.serialize(blob, asset.path);
+						m_app.getAssetCompiler().updateMeta(asset.path, blob);
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+
+				Acceptor<Meta>::accept([&](auto v) {
+					ImGui::TableNextColumn();
+					StaticString<MAX_PATH> tmp("Make same ##ms_", v.label);
+					if (ImGui::Button(tmp)) {
+						for (i32 i = 1; i < m_assets.size(); ++i) {
+							m_assets[i].meta.*v.value_ptr = m_assets[0].meta.*v.value_ptr;
+						}
+					}
+				});
+
+				ImGui::TableNextColumn();
+
+				ImGui::EndTable();
+			}
+		}
+		ImGui::End();
+	}
+
+	StudioApp& m_app;
+	Array<Asset> m_assets;
+	bool m_open;
+};
+
 struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
@@ -1392,6 +1513,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		UniquePtr<TextureAssetEditorWindow> win = UniquePtr<TextureAssetEditorWindow>::create(m_allocator, path, m_app, m_allocator);
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
+
+	bool canMultiEdit() override { return true; }
+	void openMultiEditor(Span<const Path> paths) override { 
+		m_multi_editor = UniquePtr<MultiEditor<Asset>>::create(m_app.getAllocator(), m_app, paths);
+	}
+
 
 	const char* getDefaultExtension() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
@@ -1508,6 +1635,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	};
 
 	void update() override {
+		if (m_multi_editor) m_multi_editor->gui();
 		if (!m_jobs_tail) return;
 
 		TextureTileJob* job = m_jobs_tail;
@@ -1736,12 +1864,19 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	const char* getLabel() const override { return "Texture"; }
 
+	struct Asset {
+		Asset(IAllocator& allocator) {}
+		Path path;
+		TextureMeta meta;
+	};
+
 	TagAllocator m_allocator;
 	StudioApp& m_app;
 	TextureTileJob* m_jobs_head = nullptr;
 	TextureTileJob* m_jobs_tail = nullptr;
 	TextureMeta m_meta;
 	FilePathHash m_meta_res;
+	UniquePtr<MultiEditor<Asset>> m_multi_editor;
 };
 
 struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
@@ -1814,113 +1949,6 @@ static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 
 	stream.readTexture(staging, 0, data);
 	stream.destroy(staging);
 }
-
-struct ModelMultiEditor {
-	struct Asset {
-		Asset(IAllocator& allocator) : meta(allocator) {}
-
-		ModelMeta meta;
-		Path path;
-	};
-
-	ModelMultiEditor(StudioApp& app, Span<const Path> paths)
-		: m_app(app)
-		, m_assets(app.getAllocator())
-	{
-		m_assets.reserve(paths.length());
-		for (const Path& p : paths) {
-			Asset& asset = m_assets.emplace(m_app.getAllocator());
-			asset.path = p;
-			asset.meta.load(p, m_app);
-		}
-	}
-
-	void gui() {
-		if (!m_open) return;
-		
-		if (ImGui::Begin("Model multieditor", &m_open)) {
-			if (ImGui::Button("Save all")) {
-				for (Asset& asset : m_assets) {
-					OutputMemoryStream blob(m_app.getAllocator());
-					asset.meta.serialize(blob, asset.path);
-					m_app.getAssetCompiler().updateMeta(asset.path, blob);
-				}
-			}
-
-			if (ImGui::BeginTable("##tbl", 5, ImGuiTableFlags_Resizable)) {
-			    ImGui::TableSetupColumn("Path");
-				ImGui::TableSetupColumn("Skeleton");
-				ImGui::TableSetupColumn("Physics");
-				ImGui::TableSetupColumn("Write prefab");
-				ImGui::TableSetupColumn("Save");
-				ImGui::TableHeadersRow();				
-
-				for (Asset& asset : m_assets) {
-					ImGui::PushID(&asset);
-					ImGui::TableNextRow();
-
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(asset.path.c_str());
-
-					ImGui::TableNextColumn();
-					m_app.getAssetBrowser().resourceInput("##ske", asset.meta.skeleton, Model::TYPE);
-
-					ImGui::TableNextColumn();
-					ImGui::SetNextItemWidth(-1);
-					if (ImGui::BeginCombo("##phys", ModelMeta::toUIString(asset.meta.physics))) {
-						if (ImGui::Selectable("None")) asset.meta.physics = FBXImporter::ImportConfig::Physics::NONE;
-						if (ImGui::Selectable("Convex")) asset.meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
-						if (ImGui::Selectable("Triangle mesh")) asset.meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
-						ImGui::EndCombo();
-					}
-
-					ImGui::TableNextColumn();
-					if (asset.meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
-						ImGui::Checkbox("##cpwf", &asset.meta.create_prefab_with_physics);
-					}
-
-					ImGui::TableNextColumn();
-					if (ImGui::Button(ICON_FA_SAVE)) {
-						OutputMemoryStream blob(m_app.getAllocator());
-						asset.meta.serialize(blob, asset.path);
-						m_app.getAssetCompiler().updateMeta(asset.path, blob);
-					}
-					ImGui::PopID();
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-				ImGui::TableNextColumn();
-				if (ImGui::Button("Make same")) {
-					for (i32 i = 1; i < m_assets.size(); ++i) {
-						m_assets[i].meta.skeleton = m_assets[0].meta.skeleton;
-					}			
-				}
-				ImGui::TableNextColumn();
-				if (ImGui::Button("Make same##ms2")) {
-					for (i32 i = 1; i < m_assets.size(); ++i) {
-						m_assets[i].meta.physics = m_assets[0].meta.physics;
-					}			
-				}
-				ImGui::TableNextColumn();
-				if (ImGui::Button("Make same##ms3")) {
-					for (i32 i = 1; i < m_assets.size(); ++i) {
-						m_assets[i].meta.create_prefab_with_physics = m_assets[0].meta.create_prefab_with_physics;
-					}			
-				}
-
-				ImGui::TableNextColumn();
-
-				ImGui::EndTable();
-			}
-		}
-		ImGui::End();
-	}
-
-	StudioApp& m_app;
-	Array<Asset> m_assets;
-	bool m_open = true;
-};
 
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
@@ -2514,7 +2542,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool canMultiEdit() override { return true; }
 	void openMultiEditor(Span<const Path> paths) override {
-		m_multi_editor = UniquePtr<ModelMultiEditor>::create(m_app.getAllocator(), m_app, paths);
+		m_multi_editor = UniquePtr<MultiEditor<Asset>>::create(m_app.getAllocator(), m_app, paths);
 	}
 
 	void init() {
@@ -3208,13 +3236,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		bool waiting = false;
 	} m_tile;
 	
+	struct Asset {
+		Asset(IAllocator& allocator) : meta(allocator) {}
+		Path path;
+		ModelMeta meta;
+	};
 
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
 	TexturePlugin* m_texture_plugin;
 	jobs::Signal m_subres_signal;
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
-	UniquePtr<ModelMultiEditor> m_multi_editor;
+	UniquePtr<MultiEditor<Asset>> m_multi_editor;
 };
 
 struct CodeEditorWindow : AssetEditorWindow {

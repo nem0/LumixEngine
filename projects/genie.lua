@@ -293,6 +293,7 @@ function defaultConfigurations()
 		links { "pthread" }
 
 	configuration { "vs20*"}
+		defines { "_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS" }
 		buildoptions { "/wd4503 /wd4251"}
 		
 	configuration {}

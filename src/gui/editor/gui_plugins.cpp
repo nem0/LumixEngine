@@ -292,6 +292,7 @@ private:
 		else return false;
 		return true;
 	}
+
 	bool hasFocus() const override { return m_has_focus; }
 
 	void onSettingsLoaded() override {
@@ -305,6 +306,46 @@ private:
 	void onToggleOpen() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
 
+	void handleDrop(const char* path, const ImVec2& drop_pos, const ImVec2& canvas_size) {
+		if (!Path::hasExtension(path, "spr")) return;
+
+		WorldEditor& editor = m_app.getWorldEditor();
+		GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
+		EntityPtr entity = module->getRectAtEx(drop_pos, canvas_size, INVALID_ENTITY);
+		if (!entity) return;
+
+		const GUIModule::Rect rect = module->getRectEx(*entity, canvas_size);
+
+		editor.beginCommandGroup("gui_drop_sprite");
+		EntityRef child = editor.addEntity();
+		editor.makeParent(entity, child);
+		editor.selectEntities(Span(&child, 1), false);
+		editor.addComponent(Span(&child, 1), GUI_RECT_TYPE);
+		editor.addComponent(Span(&child, 1), GUI_IMAGE_TYPE);
+		editor.setProperty(GUI_IMAGE_TYPE, "", 0, "Sprite", Span(&child, 1), Path(path));
+		
+		Sprite* sprite = m_app.getEngine().getResourceManager().load<Sprite>(Path(path));
+		Texture* texture = sprite->getTexture();
+		if (sprite->isReady() && texture) {
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Top Relative", Span(&child, 1), 0.f);
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Bottom Relative", Span(&child, 1), 0.f);
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Left Relative", Span(&child, 1), 0.f);
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Right Relative", Span(&child, 1), 0.f);
+
+			float w = (float)texture->width;
+			float h = (float)texture->height;
+			float x = drop_pos.x - rect.x - w / 2;
+			float y = drop_pos.y - rect.y - h / 2;
+
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Top Points", Span(&child, 1), y);
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Bottom Points", Span(&child, 1), y + h);
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Left Points", Span(&child, 1), x);
+			editor.setProperty(GUI_RECT_TYPE, "", 0, "Right Points", Span(&child, 1), x + w);
+		}
+		sprite->decRefCount();
+
+		editor.endCommandGroup();
+	}
 
 	MouseMode drawGizmo(Draw2D& draw, GUIModule& module, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos, Span<const EntityRef> selected_entities)
 	{
@@ -438,6 +479,13 @@ private:
 		editor.endCommandGroup();
 	}
 
+	void menuActionItem(const Action& action, const char* label = nullptr) {
+		char shortcut[64];
+		getShortcut(action, Span(shortcut));
+		if (ImGui::MenuItem(label ? label : action.label_short.data, shortcut)) {
+			onAction(action);
+		}
+	}
 
 	void onGUI() override
 	{
@@ -517,7 +565,15 @@ private:
 						ImGui::Image(m_texture_handle, size);
 					}
 				}
+
+				if (ImGui::BeginDragDropTarget()) {
+					if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
+						handleDrop((const char*)payload->Data, mouse_canvas_pos, m_canvas_size);
+					}
+					ImGui::EndDragDropTarget();
+				}
 			}
+
 
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
@@ -556,8 +612,7 @@ private:
 			if (has_rect && ImGui::BeginPopupContextItem("context"))
 			{
 				EntityRef e = editor.getSelectedEntities()[0];
-				if (ImGui::BeginMenu("Create child"))
-				{
+				if (ImGui::BeginMenu("Create child")) {
 					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE, editor);
 					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE, editor);
 					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE, editor);
@@ -565,30 +620,27 @@ private:
 					if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE, editor);
 					ImGui::EndMenu();
 				}
-				if (ImGui::BeginMenu("Align"))
-				{
+				if (ImGui::BeginMenu("Align")) {
 					if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP, editor);
 					if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT, editor);
 					if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM, editor);
 					if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT, editor);
-					if (ImGui::MenuItem("Center horizontal")) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
-					if (ImGui::MenuItem("Center vertical")) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
+					menuActionItem(m_hcenter_action);
+					menuActionItem(m_vcenter_action);
 					ImGui::EndMenu();
 				}
-				if (ImGui::BeginMenu("Expand"))
-				{
+				if (ImGui::BeginMenu("Expand")) {
 					if (ImGui::MenuItem("All")) expand(e, (u8)EdgeMask::ALL, editor);
 					if (ImGui::MenuItem("Top")) expand(e, (u8)EdgeMask::TOP, editor);
 					if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT, editor);
 					if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM, editor);
 					if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT, editor);
-					if (ImGui::MenuItem("Horizontal")) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
-					if (ImGui::MenuItem("Vertical")) expand(e, (u8)EdgeMask::VERTICAL, editor);
+					menuActionItem(m_hexpand_action, "Horizontal");
+					menuActionItem(m_vexpand_action, "Vertical");
 					ImGui::EndMenu();
 				}
-				if (ImGui::BeginMenu("Make relative"))
-				{
-					if (ImGui::MenuItem("All")) makeRelative(e, toLumix(size), (u8)EdgeMask::ALL, editor);
+				if (ImGui::BeginMenu("Make relative")) {
+					menuActionItem(m_make_rel_action, "All");
 					if (ImGui::MenuItem("Top")) makeRelative(e, toLumix(size), (u8)EdgeMask::TOP, editor);
 					if (ImGui::MenuItem("Right")) makeRelative(e, toLumix(size), (u8)EdgeMask::RIGHT, editor);
 					if (ImGui::MenuItem("Bottom")) makeRelative(e, toLumix(size), (u8)EdgeMask::BOTTOM, editor);
@@ -596,8 +648,7 @@ private:
 					
 					ImGui::EndMenu();
 				}
-				if (ImGui::BeginMenu("Make absolute"))
-				{
+				if (ImGui::BeginMenu("Make absolute")) {
 					if (ImGui::MenuItem("All")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::ALL, editor);
 					if (ImGui::MenuItem("Top")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::TOP, editor);
 					if (ImGui::MenuItem("Right")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::RIGHT, editor);
@@ -617,8 +668,7 @@ private:
 					if (ImGui::MenuItem("Bottom right")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::RIGHT, editor);
 					ImGui::EndMenu();
 				}
-				if (ImGui::BeginMenu("Copy position"))
-				{
+				if (ImGui::BeginMenu("Copy position")) {
 					if (ImGui::MenuItem("All")) copy(e, (u8)EdgeMask::ALL, editor);
 					if (ImGui::MenuItem("Top")) copy(e, (u8)EdgeMask::TOP, editor);
 					if (ImGui::MenuItem("Right")) copy(e, (u8)EdgeMask::RIGHT, editor);

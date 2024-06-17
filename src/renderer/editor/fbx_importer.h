@@ -35,7 +35,7 @@ struct FBXImporter {
 			CENTER_EACH_MESH // center each mesh in fbx separately, when exporting each mesh as a subresources
 		};
 
-		enum class Physics {
+		enum class Physics : i32 {
 			NONE,
 			CONVEX,
 			TRIMESH
