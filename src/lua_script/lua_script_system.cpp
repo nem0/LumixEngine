@@ -2203,6 +2203,9 @@ public:
 				auto iter = m_inline_scripts.insert(entity, InlineScriptComponent(entity, *this, m_system.m_allocator));
 				serializer.read(iter.value().m_source);
 				m_world.onComponentCreated(entity, LUA_SCRIPT_INLINE_TYPE, this);
+				if (m_is_game_running) {
+					startScript(entity, iter.value(), false);
+				}
 			}
 		}
 
