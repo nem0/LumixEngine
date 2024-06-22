@@ -8,7 +8,7 @@ namespace ofbx
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__ANDROID__)
 	typedef long long i64;
 	typedef unsigned long long u64;
 #else
@@ -70,8 +70,7 @@ struct FVec4 { float x, y, z, w; };
 struct FMatrix { float m[16]; };
 struct FQuat{ float x, y, z, w; };
 
-#define OFBX_SINGLE_PRECISION
-#ifdef OFBX_SINGLE_PRECISION
+#ifndef OFBX_DOUBLE_PRECISION
 	// use floats for vertices, normals, uvs, ...
 	using Vec2 = FVec2;
 	using Vec3 = FVec3;
