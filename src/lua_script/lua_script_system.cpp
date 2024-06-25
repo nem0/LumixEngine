@@ -191,7 +191,7 @@ static int luaMethodClosure(lua_State* L) {
 		toVariant(type, L, i + 2, args[i]);
 	}
 
-	u8 res_mem[128];
+	u8 res_mem[sizeof(Path)];
 	reflection::TypeDescriptor ret_type = f->getReturnType();
 	ASSERT(ret_type.size <= sizeof(res_mem));
 	Span<u8> res(res_mem, ret_type.size);
@@ -215,7 +215,7 @@ static int luaModuleMethodClosure(lua_State* L) {
 		toVariant(type, L, i + 2, args[i]);
 	}
 
-	u8 res_mem[128];
+	u8 res_mem[sizeof(Path)];
 	reflection::TypeDescriptor ret_type = f->getReturnType();
 	ASSERT(ret_type.size <= sizeof(res_mem));
 	Span<u8> res(res_mem, ret_type.size);
