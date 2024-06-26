@@ -21,7 +21,7 @@ surface_shader [[
 	#endif
 
 	#ifdef HAS_AMBIENT_OCCLUSION_TEX
-		data.ao *= texture(u_ambient_occlusion, v_uv).r;
+		data.ao *= texture(t_ambient_occlusion, v_uv).r;
 	#endif
 
 	#ifdef FUR 
