@@ -52,8 +52,9 @@ goto :begin
 	echo  B. Visual script
 	echo  C. Procedural geometry
 	echo  D. Marketplace
+	echo  E. LiveCode 
 	echo ===============================
-	choice /C 123456789ABCD /N /M "Your choice:"
+	choice /C 123456789ABCDE /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -68,6 +69,7 @@ goto :begin
 	if %errorlevel%==11 call :visual_script_plugin
 	if %errorlevel%==12 call :procedural_geom_plugin
 	if %errorlevel%==13 call :marketplace_plugin
+	if %errorlevel%==14 call :livecode_plugin
 	call :create_project
 goto :plugins
 
@@ -231,6 +233,21 @@ exit /B 0
 		popd
 	) else (
 		cd market
+		git pull
+	)
+	popd
+exit /B 0
+
+:livecode_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist livecode (
+		git.exe clone https://github.com/nem0/lumixengine_livecode.git livecode
+		pushd livecode
+		git remote add origin2 git@github.com:nem0/lumixengine_livecode.git
+		popd
+	) else (
+		cd livecode
 		git pull
 	)
 	popd
