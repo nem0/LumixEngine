@@ -309,6 +309,7 @@ int main(int args, char* argv[])
 using namespace Lumix;
 
 int main(int args, char* argv[]) {
+	os::init();
 	// create window
 	os::WindowHandle win = os::createWindow({ .width = 640, .height = 480 });
 	
