@@ -135,10 +135,10 @@ StringView Path::getDir(StringView src) {
 	StringView dir = src;
 	dir.removeSuffix(1);
 
-	while (dir.end != dir.begin && *dir.end != '\\' && *dir.end != '/') {
+	while (dir.end > dir.begin && *(dir.end - 1) != '\\' && *(dir.end - 1) != '/') {
 		--dir.end;
 	}
-	if (dir.end != dir.begin) ++dir.end;
+	
 	return dir;
 }
 
