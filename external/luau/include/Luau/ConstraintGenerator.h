@@ -5,15 +5,17 @@
 #include "Luau/Constraint.h"
 #include "Luau/ControlFlow.h"
 #include "Luau/DataFlowGraph.h"
+#include "Luau/InsertionOrderedMap.h"
 #include "Luau/Module.h"
 #include "Luau/ModuleResolver.h"
+#include "Luau/Normalize.h"
 #include "Luau/NotNull.h"
 #include "Luau/Refinement.h"
 #include "Luau/Symbol.h"
-#include "Luau/Type.h"
+#include "Luau/TypeFwd.h"
 #include "Luau/TypeUtils.h"
 #include "Luau/Variant.h"
-#include "Normalize.h"
+#include "Luau/Normalize.h"
 
 #include <memory>
 #include <vector>
@@ -55,7 +57,7 @@ struct InferencePack
     }
 };
 
-struct ConstraintGraphBuilder
+struct ConstraintGenerator
 {
     // A list of all the scopes in the module. This vector holds ownership of the
     // scope pointers; the scopes themselves borrow pointers to other scopes to
@@ -66,8 +68,25 @@ struct ConstraintGraphBuilder
     NotNull<BuiltinTypes> builtinTypes;
     const NotNull<TypeArena> arena;
     // The root scope of the module we're generating constraints for.
-    // This is null when the CGB is initially constructed.
+    // This is null when the CG is initially constructed.
     Scope* rootScope;
+
+    TypeContext typeContext = TypeContext::Default;
+
+    struct InferredBinding
+    {
+        Scope* scope;
+        Location location;
+        TypeIds types;
+    };
+
+    // Some locals have multiple type states.  We wish for Scope::bindings to
+    // map each local name onto the union of every type that the local can have
+    // over its lifetime, so we use this map to accumulate the set of types it
+    // might have.
+    //
+    // See the functions recordInferredBinding and fillInInferredBindings.
+    DenseHashMap<Symbol, InferredBinding> inferredBindings{{}};
 
     // Constraints that go straight to the solver.
     std::vector<ConstraintPtr> constraints;
@@ -99,11 +118,23 @@ struct ConstraintGraphBuilder
     std::function<void(const ModuleName&, const ScopePtr&)> prepareModuleScope;
     std::vector<RequireCycle> requireCycles;
 
+    DenseHashMap<TypeId, TypeIds> localTypes{nullptr};
+
     DcrLogger* logger;
 
-    ConstraintGraphBuilder(ModulePtr module, NotNull<Normalizer> normalizer, NotNull<ModuleResolver> moduleResolver, NotNull<BuiltinTypes> builtinTypes,
+    ConstraintGenerator(ModulePtr module, NotNull<Normalizer> normalizer, NotNull<ModuleResolver> moduleResolver, NotNull<BuiltinTypes> builtinTypes,
         NotNull<InternalErrorReporter> ice, const ScopePtr& globalScope, std::function<void(const ModuleName&, const ScopePtr&)> prepareModuleScope,
         DcrLogger* logger, NotNull<DataFlowGraph> dfg, std::vector<RequireCycle> requireCycles);
+
+    /**
+     * The entry point to the ConstraintGenerator. This will construct a set
+     * of scopes, constraints, and free types that can be solved later.
+     * @param block the root block to generate constraints for.
+     */
+    void visitModuleRoot(AstStatBlock* block);
+
+private:
+    std::vector<std::vector<TypeId>> interiorTypes;
 
     /**
      * Fabricates a new free type belonging to a given scope.
@@ -118,11 +149,25 @@ struct ConstraintGraphBuilder
     TypePackId freshTypePack(const ScopePtr& scope);
 
     /**
+     * Allocate a new TypePack with the given head and tail.
+     *
+     * Avoids allocating 0-length type packs:
+     *
+     * If the head is non-empty, allocate and return a type pack with the given
+     * head and tail.
+     * If the head is empty and tail is non-empty, return *tail.
+     * If both the head and tail are empty, return an empty type pack.
+     */
+    TypePackId addTypePack(std::vector<TypeId> head, std::optional<TypePackId> tail);
+
+    /**
      * Fabricates a scope that is a child of another scope.
      * @param node the lexical node that the scope belongs to.
      * @param parent the parent scope of the new scope. Must not be null.
      */
     ScopePtr childScope(AstNode* node, const ScopePtr& parent);
+
+    std::optional<TypeId> lookup(const ScopePtr& scope, Location location, DefId def, bool prototype = true);
 
     /**
      * Adds a new constraint with no dependencies to a given scope.
@@ -140,14 +185,21 @@ struct ConstraintGraphBuilder
      */
     NotNull<Constraint> addConstraint(const ScopePtr& scope, std::unique_ptr<Constraint> c);
 
-    void applyRefinements(const ScopePtr& scope, Location location, RefinementId refinement);
+    struct RefinementPartition
+    {
+        // Types that we want to intersect against the type of the expression.
+        std::vector<TypeId> discriminantTypes;
 
-    /**
-     * The entry point to the ConstraintGraphBuilder. This will construct a set
-     * of scopes, constraints, and free types that can be solved later.
-     * @param block the root block to generate constraints for.
-     */
-    void visit(AstStatBlock* block);
+        // Sometimes the type we're discriminating against is implicitly nil.
+        bool shouldAppendNilType = false;
+    };
+
+    using RefinementContext = InsertionOrderedMap<DefId, RefinementPartition>;
+    void unionRefinements(const ScopePtr& scope, Location location, const RefinementContext& lhs, const RefinementContext& rhs,
+        RefinementContext& dest, std::vector<ConstraintV>* constraints);
+    void computeRefinement(const ScopePtr& scope, Location location, RefinementId refinement, RefinementContext* refis, bool sense, bool eq,
+        std::vector<ConstraintV>* constraints);
+    void applyRefinements(const ScopePtr& scope, Location location, RefinementId refinement);
 
     ControlFlow visitBlockWithoutChildScope(const ScopePtr& scope, AstStatBlock* block);
 
@@ -171,7 +223,8 @@ struct ConstraintGraphBuilder
     ControlFlow visit(const ScopePtr& scope, AstStatError* error);
 
     InferencePack checkPack(const ScopePtr& scope, AstArray<AstExpr*> exprs, const std::vector<std::optional<TypeId>>& expectedTypes = {});
-    InferencePack checkPack(const ScopePtr& scope, AstExpr* expr, const std::vector<std::optional<TypeId>>& expectedTypes = {});
+    InferencePack checkPack(
+        const ScopePtr& scope, AstExpr* expr, const std::vector<std::optional<TypeId>>& expectedTypes = {}, bool generalize = true);
 
     InferencePack checkPack(const ScopePtr& scope, AstExprCall* call);
 
@@ -181,18 +234,20 @@ struct ConstraintGraphBuilder
      * @param expr the expression to check.
      * @param expectedType the type of the expression that is expected from its
      *      surrounding context.  Used to implement bidirectional type checking.
+     * @param generalize If true, generalize any lambdas that are encountered.
      * @return the type of the expression.
      */
-    Inference check(const ScopePtr& scope, AstExpr* expr, ValueContext context = ValueContext::RValue, std::optional<TypeId> expectedType = {},
-        bool forceSingleton = false);
+    Inference check(
+        const ScopePtr& scope, AstExpr* expr, std::optional<TypeId> expectedType = {}, bool forceSingleton = false, bool generalize = true);
 
     Inference check(const ScopePtr& scope, AstExprConstantString* string, std::optional<TypeId> expectedType, bool forceSingleton);
     Inference check(const ScopePtr& scope, AstExprConstantBool* bool_, std::optional<TypeId> expectedType, bool forceSingleton);
-    Inference check(const ScopePtr& scope, AstExprLocal* local, ValueContext context);
+    Inference check(const ScopePtr& scope, AstExprLocal* local);
     Inference check(const ScopePtr& scope, AstExprGlobal* global);
+    Inference checkIndexName(const ScopePtr& scope, const RefinementKey* key, AstExpr* indexee, const std::string& index, Location indexLocation);
     Inference check(const ScopePtr& scope, AstExprIndexName* indexName);
     Inference check(const ScopePtr& scope, AstExprIndexExpr* indexExpr);
-    Inference check(const ScopePtr& scope, AstExprFunction* func, std::optional<TypeId> expectedType);
+    Inference check(const ScopePtr& scope, AstExprFunction* func, std::optional<TypeId> expectedType, bool generalize);
     Inference check(const ScopePtr& scope, AstExprUnary* unary);
     Inference check(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
     Inference check(const ScopePtr& scope, AstExprIfElse* ifElse, std::optional<TypeId> expectedType);
@@ -201,9 +256,11 @@ struct ConstraintGraphBuilder
     Inference check(const ScopePtr& scope, AstExprTable* expr, std::optional<TypeId> expectedType);
     std::tuple<TypeId, TypeId, RefinementId> checkBinary(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
 
-    std::vector<TypeId> checkLValues(const ScopePtr& scope, AstArray<AstExpr*> exprs);
-
-    TypeId checkLValue(const ScopePtr& scope, AstExpr* expr);
+    void visitLValue(const ScopePtr& scope, AstExpr* expr, TypeId rhsType);
+    void visitLValue(const ScopePtr& scope, AstExprLocal* local, TypeId rhsType);
+    void visitLValue(const ScopePtr& scope, AstExprGlobal* global, TypeId rhsType);
+    void visitLValue(const ScopePtr& scope, AstExprIndexName* indexName, TypeId rhsType);
+    void visitLValue(const ScopePtr& scope, AstExprIndexExpr* indexExpr, TypeId rhsType);
 
     struct FunctionSignature
     {
@@ -286,19 +343,35 @@ struct ConstraintGraphBuilder
     void reportError(Location location, TypeErrorData err);
     void reportCodeTooComplex(Location location);
 
+    // make a union type family of these two types
+    TypeId makeUnion(const ScopePtr& scope, Location location, TypeId lhs, TypeId rhs);
+    // make an intersect type family of these two types
+    TypeId makeIntersect(const ScopePtr& scope, Location location, TypeId lhs, TypeId rhs);
+
     /** Scan the program for global definitions.
      *
-     * ConstraintGraphBuilder needs to differentiate between globals and accesses to undefined symbols. Doing this "for
+     * ConstraintGenerator needs to differentiate between globals and accesses to undefined symbols. Doing this "for
      * real" in a general way is going to be pretty hard, so we are choosing not to tackle that yet. For now, we do an
      * initial scan of the AST and note what globals are defined.
      */
     void prepopulateGlobalScope(const ScopePtr& globalScope, AstStatBlock* program);
+
+    bool recordPropertyAssignment(TypeId ty);
+
+    // Record the fact that a particular local has a particular type in at least
+    // one of its states.
+    void recordInferredBinding(AstLocal* local, TypeId ty);
+
+    void fillInInferredBindings(const ScopePtr& globalScope, AstStatBlock* block);
 
     /** Given a function type annotation, return a vector describing the expected types of the calls to the function
      *  For example, calling a function with annotation ((number) -> string & ((string) -> number))
      *  yields a vector of size 1, with value: [number | string]
      */
     std::vector<std::optional<TypeId>> getExpectedCallTypesForFunctionOverloads(const TypeId fnType);
+
+    TypeId createTypeFamilyInstance(
+        const TypeFamily& family, std::vector<TypeId> typeArguments, std::vector<TypePackId> packArguments, const ScopePtr& scope, Location location);
 };
 
 /** Borrow a vector of pointers from a vector of owning pointers to constraints.

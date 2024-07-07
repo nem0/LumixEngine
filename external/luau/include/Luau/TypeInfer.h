@@ -4,14 +4,14 @@
 #include "Luau/Anyification.h"
 #include "Luau/ControlFlow.h"
 #include "Luau/Error.h"
+#include "Luau/Instantiation.h"
 #include "Luau/Module.h"
 #include "Luau/Predicate.h"
 #include "Luau/Substitution.h"
 #include "Luau/Symbol.h"
 #include "Luau/TxnLog.h"
-#include "Luau/Type.h"
+#include "Luau/TypeFwd.h"
 #include "Luau/TypeCheckLimits.h"
-#include "Luau/TypePack.h"
 #include "Luau/TypeUtils.h"
 #include "Luau/Unifier.h"
 #include "Luau/UnifierSharedState.h"
@@ -55,17 +55,6 @@ struct GenericTypeDefinitions
 struct HashBoolNamePair
 {
     size_t operator()(const std::pair<bool, Name>& pair) const;
-};
-
-struct GlobalTypes
-{
-    GlobalTypes(NotNull<BuiltinTypes> builtinTypes);
-
-    NotNull<BuiltinTypes> builtinTypes; // Global types are based on builtin types
-
-    TypeArena globalTypes;
-    SourceModule globalNames; // names for symbols entered into globalScope
-    ScopePtr globalScope;     // shared by all modules
 };
 
 // All Types are retained via Environment::types.  All TypeIds
@@ -374,6 +363,8 @@ public:
     UnifierSharedState unifierState;
     Normalizer normalizer;
 
+    Instantiation reusableInstantiation;
+
     std::vector<RequireCycle> requireCycles;
 
     // Type inference limits
@@ -389,6 +380,7 @@ public:
     const TypeId stringType;
     const TypeId booleanType;
     const TypeId threadType;
+    const TypeId bufferType;
     const TypeId anyType;
     const TypeId unknownType;
     const TypeId neverType;

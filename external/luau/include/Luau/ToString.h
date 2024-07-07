@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Luau/Common.h"
+#include "Luau/TypeFwd.h"
 
 #include <memory>
 #include <optional>
@@ -19,13 +20,6 @@ class AstExpr;
 
 struct Scope;
 
-struct Type;
-using TypeId = const Type*;
-
-struct TypePackVar;
-using TypePackId = const TypePackVar*;
-
-struct FunctionType;
 struct Constraint;
 
 struct Position;
@@ -39,6 +33,11 @@ struct ToStringNameMap
 
 struct ToStringOptions
 {
+    ToStringOptions(bool exhaustive = false)
+        : exhaustive(exhaustive)
+    {
+    }
+
     bool exhaustive = false;                      // If true, we produce complete output rather than comprehensible output
     bool useLineBreaks = false;                   // If true, we insert new lines to separate long results such as table entries/metatable.
     bool functionTypeArguments = false;           // If true, output function type argument names when they are available
@@ -47,6 +46,7 @@ struct ToStringOptions
     bool hideFunctionSelfArgument = false;        // If true, `self: X` will be omitted from the function signature if the function has self
     size_t maxTableLength = size_t(FInt::LuauTableTypeMaximumStringifierLength); // Only applied to TableTypes
     size_t maxTypeLength = size_t(FInt::LuauTypeMaximumStringifierLength);
+    size_t compositeTypesSingleLineLimit = 5; // The number of type elements permitted on a single line when printing type unions/intersections
     ToStringNameMap nameMap;
     std::shared_ptr<Scope> scope; // If present, module names will be added and types that are not available in scope will be marked as 'invalid'
     std::vector<std::string> namedFunctionOverrideArgNames; // If present, named function argument names will be overridden
@@ -140,5 +140,15 @@ std::string generateName(size_t n);
 
 std::string toString(const Position& position);
 std::string toString(const Location& location, int offset = 0, bool useBegin = true);
+
+std::string toString(const TypeOrPack& tyOrTp, ToStringOptions& opts);
+
+inline std::string toString(const TypeOrPack& tyOrTp)
+{
+    ToStringOptions opts{};
+    return toString(tyOrTp, opts);
+}
+
+std::string dump(const TypeOrPack& tyOrTp);
 
 } // namespace Luau

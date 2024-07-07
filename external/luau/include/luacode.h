@@ -22,6 +22,12 @@ struct lua_CompileOptions
     // 2 - full debug info with local & upvalue names; necessary for debugger
     int debugLevel; // default=1
 
+    // type information is used to guide native code generation decisions
+    // information includes testable types for function arguments, locals, upvalues and some temporaries
+    // 0 - generate for native modules
+    // 1 - generate for all modules
+    int typeInfoLevel; // default=0
+
     // 0 - no code coverage support
     // 1 - statement coverage
     // 2 - statement and expression coverage (verbose)
@@ -36,6 +42,9 @@ struct lua_CompileOptions
 
     // null-terminated array of globals that are mutable; disables the import optimization for fields accessed through these
     const char* const* mutableGlobals;
+
+    // null-terminated array of userdata types that will be included in the type information
+    const char* const* userdataTypes;
 };
 
 // compile source to bytecode; when source compilation fails, the resulting bytecode contains the encoded error. use free() to destroy

@@ -1,12 +1,15 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #pragma once
 
-#include "Luau/Type.h"
 #include "Luau/Unifiable.h"
 #include "Luau/Variant.h"
+#include "Luau/TypeFwd.h"
+#include "Luau/NotNull.h"
+#include "Luau/Common.h"
 
 #include <optional>
 #include <set>
+#include <vector>
 
 namespace Luau
 {
@@ -19,9 +22,6 @@ struct TypePack;
 struct VariadicTypePack;
 struct BlockedTypePack;
 struct TypeFamilyInstanceTypePack;
-
-struct TypePackVar;
-using TypePackId = const TypePackVar*;
 
 struct FreeTypePack
 {
@@ -82,6 +82,8 @@ struct BlockedTypePack
     BlockedTypePack();
     size_t index;
 
+    struct Constraint* owner = nullptr;
+
     static size_t nextIndex;
 };
 
@@ -90,7 +92,7 @@ struct BlockedTypePack
  */
 struct TypeFamilyInstanceTypePack
 {
-    NotNull<TypePackFamily> family;
+    NotNull<const TypePackFamily> family;
 
     std::vector<TypeId> typeArguments;
     std::vector<TypePackId> packArguments;
@@ -230,5 +232,19 @@ bool isVariadic(TypePackId tp, const TxnLog& log);
 bool isVariadicTail(TypePackId tp, const TxnLog& log, bool includeHiddenVariadics = false);
 
 bool containsNever(TypePackId tp);
+
+/*
+ * Use this to change the kind of a particular type pack.
+ *
+ * LUAU_NOINLINE so that the calling frame doesn't have to pay the stack storage for the new variant.
+ */
+template<typename T, typename... Args>
+LUAU_NOINLINE T* emplaceTypePack(TypePackVar* ty, Args&&... args)
+{
+    return &ty->ty.emplace<T>(std::forward<Args>(args)...);
+}
+
+template<>
+LUAU_NOINLINE Unifiable::Bound<TypePackId>* emplaceTypePack<BoundTypePack>(TypePackVar* ty, TypePackId& tyArg);
 
 } // namespace Luau

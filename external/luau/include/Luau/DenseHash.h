@@ -3,6 +3,7 @@
 
 #include "Luau/Common.h"
 
+#include <stddef.h>
 #include <functional>
 #include <utility>
 #include <type_traits>
@@ -119,12 +120,12 @@ public:
         return *this;
     }
 
-    void clear()
+    void clear(size_t thresholdToDestroy = 32)
     {
         if (count == 0)
             return;
 
-        if (capacity > 32)
+        if (capacity > thresholdToDestroy)
         {
             destroy();
         }
@@ -285,9 +286,8 @@ public:
         using value_type = Item;
         using reference = Item&;
         using pointer = Item*;
-        using iterator = pointer;
-        using difference_type = size_t;
-        using iterator_category = std::input_iterator_tag;
+        using difference_type = ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
 
         const_iterator()
             : set(0)
@@ -348,6 +348,12 @@ public:
     class iterator
     {
     public:
+        using value_type = MutableItem;
+        using reference = MutableItem&;
+        using pointer = MutableItem*;
+        using difference_type = ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
+
         iterator()
             : set(0)
             , index(0)
@@ -539,6 +545,25 @@ public:
     {
         return impl.end();
     }
+
+    bool operator==(const DenseHashSet<Key, Hash, Eq>& other) const
+    {
+        if (size() != other.size())
+            return false;
+
+        for (const Key& k : *this)
+        {
+            if (!other.contains(k))
+                return false;
+        }
+
+        return true;
+    }
+
+    bool operator!=(const DenseHashSet<Key, Hash, Eq>& other) const
+    {
+        return !(*this == other);
+    }
 };
 
 // This is a faster alternative of unordered_map, but it does not implement the same interface (i.e. it does not support erasing and has
@@ -558,9 +583,9 @@ public:
     {
     }
 
-    void clear()
+    void clear(size_t thresholdToDestroy = 32)
     {
-        impl.clear();
+        impl.clear(thresholdToDestroy);
     }
 
     // Note: this reference is invalidated by any insert operation (i.e. operator[])

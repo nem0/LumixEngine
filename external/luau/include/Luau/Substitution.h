@@ -2,8 +2,7 @@
 #pragma once
 
 #include "Luau/TypeArena.h"
-#include "Luau/TypePack.h"
-#include "Luau/Type.h"
+#include "Luau/TypeFwd.h"
 #include "Luau/DenseHash.h"
 
 // We provide an implementation of substitution on types,
@@ -86,6 +85,8 @@ struct TarjanNode
 // https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
 struct Tarjan
 {
+    Tarjan();
+
     // Vertices (types and type packs) are indexed, using pre-order traversal.
     DenseHashMap<TypeId, int> typeToIndex{nullptr};
     DenseHashMap<TypePackId, int> packToIndex{nullptr};
@@ -133,7 +134,8 @@ struct Tarjan
     TarjanResult visitRoot(TypeId ty);
     TarjanResult visitRoot(TypePackId ty);
 
-    void clearTarjan();
+    // Used to reuse the object for a new operation
+    void clearTarjan(const TxnLog* log);
 
     // Get/set the dirty bit for an index (grows the vector if needed)
     bool getDirty(int index);
@@ -182,13 +184,21 @@ struct Tarjan
 struct Substitution : Tarjan
 {
 protected:
-    Substitution(const TxnLog* log_, TypeArena* arena)
-        : arena(arena)
-    {
-        log = log_;
-        LUAU_ASSERT(log);
-        LUAU_ASSERT(arena);
-    }
+    Substitution(const TxnLog* log_, TypeArena* arena);
+
+    /*
+     * By default, Substitution assumes that the types produced by clean() are
+     * freshly allocated types that are safe to mutate.
+     *
+     * If your clean() implementation produces a type that is not safe to
+     * mutate, you must call dontTraverseInto on this type (or type pack) to
+     * prevent Substitution from attempting to perform substitutions within the
+     * cleaned type.
+     *
+     * See the test weird_cyclic_instantiation for an example.
+     */
+    void dontTraverseInto(TypeId ty);
+    void dontTraverseInto(TypePackId tp);
 
 public:
     TypeArena* arena;
@@ -197,8 +207,13 @@ public:
     DenseHashSet<TypeId> replacedTypes{nullptr};
     DenseHashSet<TypePackId> replacedTypePacks{nullptr};
 
+    DenseHashSet<TypeId> noTraverseTypes{nullptr};
+    DenseHashSet<TypePackId> noTraverseTypePacks{nullptr};
+
     std::optional<TypeId> substitute(TypeId ty);
     std::optional<TypePackId> substitute(TypePackId tp);
+
+    void resetState(const TxnLog* log, TypeArena* arena);
 
     TypeId replace(TypeId ty);
     TypePackId replace(TypePackId tp);

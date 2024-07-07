@@ -4,8 +4,8 @@
 #include "Luau/Ast.h" // Used for some of the enumerations
 #include "Luau/DenseHash.h"
 #include "Luau/NotNull.h"
-#include "Luau/Type.h"
 #include "Luau/Variant.h"
+#include "Luau/TypeFwd.h"
 
 #include <string>
 #include <memory>
@@ -14,13 +14,15 @@
 namespace Luau
 {
 
+enum class ValueContext;
 struct Scope;
 
-struct Type;
-using TypeId = const Type*;
-
-struct TypePackVar;
-using TypePackId = const TypePackVar*;
+// if resultType is a freeType, assignmentType <: freeType <: resultType bounds
+struct EqualityConstraint
+{
+    TypeId resultType;
+    TypeId assignmentType;
+};
 
 // subType <: superType
 struct SubtypeConstraint
@@ -46,46 +48,16 @@ struct GeneralizationConstraint
 {
     TypeId generalizedType;
     TypeId sourceType;
+
+    std::vector<TypeId> interiorTypes;
 };
 
-// subType ~ inst superType
-struct InstantiationConstraint
-{
-    TypeId subType;
-    TypeId superType;
-};
-
-struct UnaryConstraint
-{
-    AstExprUnary::Op op;
-    TypeId operandType;
-    TypeId resultType;
-};
-
-// let L : leftType
-// let R : rightType
-// in
-//     L op R : resultType
-struct BinaryConstraint
-{
-    AstExprBinary::Op op;
-    TypeId leftType;
-    TypeId rightType;
-    TypeId resultType;
-
-    // When we dispatch this constraint, we update the key at this map to record
-    // the overload that we selected.
-    const AstNode* astFragment;
-    DenseHashMap<const AstNode*, TypeId>* astOriginalCallTypes;
-    DenseHashMap<const AstNode*, TypeId>* astOverloadResolvedTypes;
-};
-
-// iteratee is iterable
-// iterators is the iteration types.
+// variables ~ iterate iterator
+// Unpack the iterator, figure out what types it iterates over, and bind those types to variables.
 struct IterableConstraint
 {
     TypePackId iterator;
-    TypePackId variables;
+    std::vector<TypeId> variables;
 
     const AstNode* nextAstFragment;
     DenseHashMap<const AstNode*, TypeId>* astForInNextTypes;
@@ -121,18 +93,44 @@ struct FunctionCallConstraint
     DenseHashMap<const AstNode*, TypeId>* astOverloadResolvedTypes = nullptr;
 };
 
-// result ~ prim ExpectedType SomeSingletonType MultitonType
+// function_check fn argsPack
 //
-// If ExpectedType is potentially a singleton (an actual singleton or a union
-// that contains a singleton), then result ~ SomeSingletonType
+// If fn is a function type and argsPack is a partially solved
+// pack of arguments to be supplied to the function, propagate the argument
+// types of fn into the types of argsPack. This is used to implement
+// bidirectional inference of lambda arguments.
+struct FunctionCheckConstraint
+{
+    TypeId fn;
+    TypePackId argsPack;
+
+    class AstExprCall* callSite = nullptr;
+    NotNull<DenseHashMap<const AstExpr*, TypeId>> astTypes;
+    NotNull<DenseHashMap<const AstExpr*, TypeId>> astExpectedTypes;
+};
+
+// prim FreeType ExpectedType PrimitiveType
 //
-// else result ~ MultitonType
+// FreeType is bounded below by the singleton type and above by PrimitiveType
+// initially. When this constraint is resolved, it will check that the bounds
+// of the free type are well-formed by subtyping.
+//
+// If they are not well-formed, then FreeType is replaced by its lower bound
+//
+// If they are well-formed and ExpectedType is potentially a singleton (an
+// actual singleton or a union that contains a singleton),
+// then FreeType is replaced by its lower bound
+//
+// else FreeType is replaced by PrimitiveType
 struct PrimitiveTypeConstraint
 {
-    TypeId resultType;
-    TypeId expectedType;
-    TypeId singletonType;
-    TypeId multitonType;
+    TypeId freeType;
+
+    // potentially gets used to force the lower bound?
+    std::optional<TypeId> expectedType;
+
+    // the primitive type to check against
+    TypeId primitiveType;
 };
 
 // result ~ hasProp type "prop_name"
@@ -151,6 +149,16 @@ struct HasPropConstraint
     TypeId resultType;
     TypeId subjectType;
     std::string prop;
+    ValueContext context;
+
+    // We want to track if this `HasPropConstraint` comes from a conditional.
+    // If it does, we're going to change the behavior of property look-up a bit.
+    // In particular, we're going to return `unknownType` for property lookups
+    // on `table` or inexact table types where the property is not present.
+    //
+    // This allows us to refine table types to have additional properties
+    // without reporting errors in typechecking on the property tests.
+    bool inConditional = false;
 
     // HACK: We presently need types like true|false or string|"hello" when
     // deciding whether a particular literal expression should have a singleton
@@ -171,74 +179,61 @@ struct HasPropConstraint
     bool suppressSimplification = false;
 };
 
-// result ~ setProp subjectType ["prop", "prop2", ...] propType
+// resultType ~ hasIndexer subjectType indexType
 //
-// If the subject is a table or table-like thing that already has the named
-// property chain, we unify propType with that existing property type.
+// If the subject type is a table or table-like thing that supports indexing,
+// populate the type result with the result type of such an index operation.
 //
-// If the subject is a free table, we augment it in place.
-//
-// If the subject is an unsealed table, result is an augmented table that
-// includes that new prop.
-struct SetPropConstraint
-{
-    TypeId resultType;
-    TypeId subjectType;
-    std::vector<std::string> path;
-    TypeId propType;
-};
-
-// result ~ setIndexer subjectType indexType propType
-//
-// If the subject is a table or table-like thing that already has an indexer,
-// unify its indexType and propType with those from this constraint.
-//
-// If the table is a free or unsealed table, we augment it with a new indexer.
-struct SetIndexerConstraint
+// If the subject is not indexable, resultType is bound to errorType.
+struct HasIndexerConstraint
 {
     TypeId resultType;
     TypeId subjectType;
     TypeId indexType;
+};
+
+// assignProp lhsType propName rhsType
+//
+// Assign a value of type rhsType into the named property of lhsType.
+
+struct AssignPropConstraint
+{
+    TypeId lhsType;
+    std::string propName;
+    TypeId rhsType;
+
+    /// The canonical write type of the property.  It is _solely_ used to
+    /// populate astTypes during constraint resolution.  Nothing should ever
+    /// block on it.
+    TypeId propType;
+
+    // When we generate constraints, we increment the remaining prop count on
+    // the table if we are able. This flag informs the solver as to whether or
+    // not it should in turn decrement the prop count when this constraint is
+    // dispatched.
+    bool decrementPropCount = false;
+};
+
+struct AssignIndexConstraint
+{
+    TypeId lhsType;
+    TypeId indexType;
+    TypeId rhsType;
+
+    /// The canonical write type of the property.  It is _solely_ used to
+    /// populate astTypes during constraint resolution.  Nothing should ever
+    /// block on it.
     TypeId propType;
 };
 
-// if negation:
-//   result ~ if isSingleton D then ~D else unknown where D = discriminantType
-// if not negation:
-//   result ~ if isSingleton D then D else unknown where D = discriminantType
-struct SingletonOrTopTypeConstraint
-{
-    TypeId resultType;
-    TypeId discriminantType;
-    bool negated;
-};
-
-// resultType ~ unpack sourceTypePack
+// resultTypes ~ unpack sourceTypePack
 //
 // Similar to PackSubtypeConstraint, but with one important difference: If the
 // sourcePack is blocked, this constraint blocks.
 struct UnpackConstraint
 {
-    TypePackId resultPack;
+    std::vector<TypeId> resultPack;
     TypePackId sourcePack;
-};
-
-// resultType ~ refine type mode discriminant
-//
-// Compute type & discriminant (or type | discriminant) as soon as possible (but
-// no sooner), simplify, and bind resultType to that type.
-struct RefineConstraint
-{
-    enum
-    {
-        Intersection,
-        Union
-    } mode;
-
-    TypeId resultType;
-
-    TypeId type;
-    TypeId discriminant;
 };
 
 // ty ~ reduce ty
@@ -257,10 +252,9 @@ struct ReducePackConstraint
     TypePackId tp;
 };
 
-using ConstraintV = Variant<SubtypeConstraint, PackSubtypeConstraint, GeneralizationConstraint, InstantiationConstraint, UnaryConstraint,
-    BinaryConstraint, IterableConstraint, NameConstraint, TypeAliasExpansionConstraint, FunctionCallConstraint, PrimitiveTypeConstraint,
-    HasPropConstraint, SetPropConstraint, SetIndexerConstraint, SingletonOrTopTypeConstraint, UnpackConstraint, RefineConstraint, ReduceConstraint,
-    ReducePackConstraint>;
+using ConstraintV = Variant<SubtypeConstraint, PackSubtypeConstraint, GeneralizationConstraint, IterableConstraint, NameConstraint,
+    TypeAliasExpansionConstraint, FunctionCallConstraint, FunctionCheckConstraint, PrimitiveTypeConstraint, HasPropConstraint, HasIndexerConstraint,
+    AssignPropConstraint, AssignIndexConstraint, UnpackConstraint, ReduceConstraint, ReducePackConstraint, EqualityConstraint>;
 
 struct Constraint
 {
@@ -274,9 +268,13 @@ struct Constraint
     ConstraintV c;
 
     std::vector<NotNull<Constraint>> dependencies;
+
+    DenseHashSet<TypeId> getMaybeMutatedFreeTypes() const;
 };
 
 using ConstraintPtr = std::unique_ptr<Constraint>;
+
+bool isReferenceCountedType(const TypeId typ);
 
 inline Constraint& asMutable(const Constraint& c)
 {

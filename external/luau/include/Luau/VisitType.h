@@ -10,7 +10,7 @@
 
 LUAU_FASTINT(LuauVisitRecursionLimit)
 LUAU_FASTFLAG(LuauBoundLazyTypes2)
-LUAU_FASTFLAG(DebugLuauReadWriteProperties)
+LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution)
 
 namespace Luau
 {
@@ -64,6 +64,9 @@ inline void unsee(DenseHashSet<void*>& seen, const void* tv)
 
 } // namespace visit_detail
 
+// recursion counter is equivalent here, but we'd like a better name to express the intent.
+using TypeFamilyDepthCounter = RecursionCounter;
+
 template<typename S>
 struct GenericTypeVisitor
 {
@@ -72,6 +75,7 @@ struct GenericTypeVisitor
     Set seen;
     bool skipBoundTypes = false;
     int recursionCounter = 0;
+    int typeFamilyDepth = 0;
 
     GenericTypeVisitor() = default;
 
@@ -220,7 +224,26 @@ struct GenericTypeVisitor
                 traverse(btv->boundTo);
         }
         else if (auto ftv = get<FreeType>(ty))
-            visit(ty, *ftv);
+        {
+            if (FFlag::DebugLuauDeferredConstraintResolution)
+            {
+                if (visit(ty, *ftv))
+                {
+                    // TODO: Replace these if statements with assert()s when we
+                    // delete FFlag::DebugLuauDeferredConstraintResolution.
+                    //
+                    // When the old solver is used, these pointers are always
+                    // unused. When the new solver is used, they are never null.
+                    if (ftv->lowerBound)
+                        traverse(ftv->lowerBound);
+
+                    if (ftv->upperBound)
+                        traverse(ftv->upperBound);
+                }
+            }
+            else
+                visit(ty, *ftv);
+        }
         else if (auto gtv = get<GenericType>(ty))
             visit(ty, *gtv);
         else if (auto etv = get<ErrorType>(ty))
@@ -252,12 +275,16 @@ struct GenericTypeVisitor
                 {
                     for (auto& [_name, prop] : ttv->props)
                     {
-                        if (FFlag::DebugLuauReadWriteProperties)
+                        if (FFlag::DebugLuauDeferredConstraintResolution)
                         {
-                            if (auto ty = prop.readType())
+                            if (auto ty = prop.readTy)
                                 traverse(*ty);
 
-                            if (auto ty = prop.writeType())
+                            // In the case that the readType and the writeType
+                            // are the same pointer, just traverse once.
+                            // Traversing each property twice has pretty
+                            // significant performance consequences.
+                            if (auto ty = prop.writeTy; ty && !prop.isShared())
                                 traverse(*ty);
                         }
                         else
@@ -286,12 +313,16 @@ struct GenericTypeVisitor
             {
                 for (const auto& [name, prop] : ctv->props)
                 {
-                    if (FFlag::DebugLuauReadWriteProperties)
+                    if (FFlag::DebugLuauDeferredConstraintResolution)
                     {
-                        if (auto ty = prop.readType())
+                        if (auto ty = prop.readTy)
                             traverse(*ty);
 
-                        if (auto ty = prop.writeType())
+                        // In the case that the readType and the writeType are
+                        // the same pointer, just traverse once. Traversing each
+                        // property twice would have pretty significant
+                        // performance consequences.
+                        if (auto ty = prop.writeTy; ty && !prop.isShared())
                             traverse(*ty);
                     }
                     else
@@ -317,16 +348,38 @@ struct GenericTypeVisitor
         {
             if (visit(ty, *utv))
             {
+                bool unionChanged = false;
                 for (TypeId optTy : utv->options)
+                {
                     traverse(optTy);
+                    if (!get<UnionType>(follow(ty)))
+                    {
+                        unionChanged = true;
+                        break;
+                    }
+                }
+
+                if (unionChanged)
+                    traverse(ty);
             }
         }
         else if (auto itv = get<IntersectionType>(ty))
         {
             if (visit(ty, *itv))
             {
+                bool intersectionChanged = false;
                 for (TypeId partTy : itv->parts)
+                {
                     traverse(partTy);
+                    if (!get<IntersectionType>(follow(ty)))
+                    {
+                        intersectionChanged = true;
+                        break;
+                    }
+                }
+
+                if (intersectionChanged)
+                    traverse(ty);
             }
         }
         else if (auto ltv = get<LazyType>(ty))
@@ -364,6 +417,8 @@ struct GenericTypeVisitor
         }
         else if (auto tfit = get<TypeFamilyInstanceType>(ty))
         {
+            TypeFamilyDepthCounter tfdc{&typeFamilyDepth};
+
             if (visit(ty, *tfit))
             {
                 for (TypeId p : tfit->typeArguments)
@@ -424,6 +479,8 @@ struct GenericTypeVisitor
             visit(tp, *btp);
         else if (auto tfitp = get<TypeFamilyInstanceTypePack>(tp))
         {
+            TypeFamilyDepthCounter tfdc{&typeFamilyDepth};
+
             if (visit(tp, *tfitp))
             {
                 for (TypeId t : tfitp->typeArguments)
