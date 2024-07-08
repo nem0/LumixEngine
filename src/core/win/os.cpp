@@ -1258,12 +1258,23 @@ void copyToClipboard(const char* text)
 }
 
 
-ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir)
+ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir, bool show_console)
 {
 	const WCharStr<MAX_PATH> wpath(path);
 	const WCharStr<MAX_PATH> wargs(args);
 	const WCharStr<MAX_PATH> wdir(working_dir);
-	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, args.empty() ? NULL : wargs.data, working_dir.empty() ? NULL : wdir.data, SW_SHOW);
+	SHELLEXECUTEINFOW exec_info = {};
+	exec_info.cbSize = sizeof(exec_info);
+	exec_info.lpFile = wpath;
+	exec_info.lpParameters = args.empty() ? NULL : wargs.data;
+	exec_info.lpDirectory = working_dir.empty() ? NULL : wdir.data;
+	if (show_console) {
+		exec_info.nShow = SW_SHOW;
+	}
+	else {
+		exec_info.fMask = SEE_MASK_NO_CONSOLE;
+	}
+	const uintptr_t res = (uintptr_t)ShellExecuteEx(&exec_info);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
 	return ExecuteOpenResult::OTHER_ERROR;

@@ -1123,7 +1123,7 @@ void copyToClipboard(const char* text) {
 }
 
 
-ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir) {
+ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir, bool show_console) {
 	ASSERT(args.empty()); // not supported 
 	ASSERT(working_dir.empty());
 	char tmp[MAX_PATH];
