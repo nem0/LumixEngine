@@ -1,5 +1,6 @@
-#include "engine/core.h"
+#include "core.h"
 #include "engine.h"
+#include "engine_hash_funcs.h"
 #include "core/hash_map.h"
 #include "reflection.h"
 #include "core/stream.h"
