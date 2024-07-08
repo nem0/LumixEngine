@@ -239,6 +239,7 @@ struct CodeEditor {
 };
 
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
+LUMIX_EDITOR_API UniquePtr<CodeEditor> createCppCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app);
 

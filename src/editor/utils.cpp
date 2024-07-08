@@ -220,6 +220,196 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 } // namespace LuaTokens
 
 
+namespace CPPTokens {
+
+	static inline const u32 token_colors[] = {
+		IM_COL32(0xFF, 0x00, 0xFF, 0xff),
+		IM_COL32(0xe1, 0xe1, 0xe1, 0xff),
+		IM_COL32(0xf7, 0xc9, 0x5c, 0xff),
+		IM_COL32(0xFF, 0xA9, 0x4D, 0xff),
+		IM_COL32(0xE5, 0x8A, 0xC9, 0xff),
+		IM_COL32(0x93, 0xDD, 0xFA, 0xff),
+		IM_COL32(0x67, 0x6b, 0x6f, 0xff),
+		IM_COL32(0x67, 0x6b, 0x6f, 0xff),
+		IM_COL32(0xFF, 0x6E, 0x59, 0xff)
+	};
+
+	enum class TokenType : u8 {
+		EMPTY,
+		IDENTIFIER,
+		NUMBER,
+		STRING,
+		KEYWORD,
+		OPERATOR,
+		COMMENT,
+		COMMENT_MULTI,
+		PREPROCESSOR
+	};
+
+	static bool isWordChar(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+	}
+
+	static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
+		static const char* keywords[] = {
+			"if",
+			"else",
+			"end",
+			"do",
+			"while",
+			"for",
+			"break",
+			"return",
+			"not",
+			"and",
+			"or",
+			"goto",
+			"true",
+			"false",
+			"float",
+			"double",
+			"void",
+			"static",
+			"const",
+			"char",
+			"int",
+			"struct",
+			"switch",
+			"case",
+			"override",
+			"auto",
+			"bool",
+			"continue",
+			"default",
+			"enum",
+			"inline",
+			"namespace",
+			"nullptr",
+			"sizeof",
+			"template",
+			"this",
+			"typedef",
+			"using",
+			"virtual"
+		};
+
+		const char* c = str;
+		if (!*c) {
+			switch (prev_token_type) {
+			case (u8)TokenType::COMMENT_MULTI:
+				token_type = prev_token_type;
+				break;
+			default:
+				token_type = (u8)TokenType::EMPTY;
+				break;
+			}
+			token_len = 0;
+			return false;
+		}
+
+		if (prev_token_type == (u8)TokenType::COMMENT_MULTI) {
+			token_type = (u8)TokenType::COMMENT;
+			while (*c) {
+				if (c[0] == '*' && c[1] == '/') {
+					c += 2;
+					token_len = u32(c - str);
+					return *c;
+				}
+				++c;
+			}
+
+			token_type = (u8)TokenType::COMMENT_MULTI;
+			token_len = u32(c - str);
+			return *c;
+		}
+
+		if (c[0] == '#') {
+			token_type = (u8)TokenType::PREPROCESSOR;
+			while (*c) ++c;
+
+			token_len = u32(c - str);
+			return false;
+		}
+
+		if (c[0] == '/' && c[1] == '*') {
+			while (*c) {
+				if (c[0] == '*' && c[1] == '/') {
+					c += 2;
+					token_type = (u8)TokenType::COMMENT;
+					token_len = u32(c - str);
+					return *c;
+				}
+				++c;
+			}
+
+			token_type = (u8)TokenType::COMMENT_MULTI;
+			token_len = u32(c - str);
+			return *c;
+		}
+
+		if (*c == '/' && c[1] == '/') {
+			token_type = (u8)TokenType::COMMENT;
+			while (*c) ++c;
+			token_len = u32(c - str);
+			return *c;
+		}
+
+		if (*c == '"') {
+			token_type = (u8)TokenType::STRING;
+			++c;
+			while (*c && *c != '"') ++c;
+			if (*c == '"') ++c;
+			token_len = u32(c - str);
+			return *c;
+		}
+
+		if (*c == '\'') {
+			token_type = (u8)TokenType::STRING;
+			++c;
+			while (*c && *c != '\'') ++c;
+			if (*c == '\'') ++c;
+			token_len = u32(c - str);
+			return *c;
+		}
+
+		const char operators[] = "*/+-%.<>;=(),:[]{}&|^";
+		for (char op : operators) {
+			if (*c == op) {
+				token_type = (u8)TokenType::OPERATOR;
+				token_len = 1;
+				return *c;
+			}
+		}
+
+		if (*c >= '0' && *c <= '9') {
+			token_type = (u8)TokenType::NUMBER;
+			while (*c >= '0' && *c <= '9') ++c;
+			token_len = u32(c - str);
+			return *c;
+		}
+
+		if ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '_') {
+			token_type = (u8)TokenType::IDENTIFIER;
+			while (isWordChar(*c)) ++c;
+			token_len = u32(c - str);
+			StringView token_view(str, str + token_len);
+			for (const char* kw : keywords) {
+				if (equalStrings(kw, token_view)) {
+					token_type = (u8)TokenType::KEYWORD;
+					break;
+				}
+			}
+			return *c;
+		}
+
+		token_type = (u8)TokenType::IDENTIFIER;
+		token_len = 1;
+		++c;
+		return *c;
+	}
+
+} // namespace CPPTokens
+
 namespace GLSLTokens {
 
 static inline const u32 token_colors[] = {
@@ -1799,6 +1989,13 @@ UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app) {
 	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
 	editor->setTokenColors(LuaTokens::token_colors);
 	editor->setTokenizer(&LuaTokens::tokenize);
+	return editor.move();
+}
+
+UniquePtr<CodeEditor> createCppCodeEditor(StudioApp& app) {
+	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
+	editor->setTokenColors(CPPTokens::token_colors);
+	editor->setTokenizer(&CPPTokens::tokenize);
 	return editor.move();
 }
 
