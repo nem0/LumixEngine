@@ -102,9 +102,14 @@ bool execute(lua_State* L
 {
 	lua_pushcfunction(L, traceback, "traceback");
 	
-	size_t bytecodeSize = 0;
-	char* bytecode = luau_compile((const char*)content.begin, content.size(), NULL, &bytecodeSize);
-	int res = luau_load(L, name, bytecode, bytecodeSize, 0);
+	size_t bytecode_size = 0;
+	char* bytecode = luau_compile((const char*)content.begin, content.size(), NULL, &bytecode_size);
+	if (bytecode_size == 0) {
+		logError(name, ": ", bytecode);
+		free(bytecode);
+		return false;
+	}
+	int res = luau_load(L, name, bytecode, bytecode_size, 0);
 	free(bytecode);
 	if (res != 0) {
 		logError(name, ": ", lua_tostring(L, -1));
@@ -202,7 +207,11 @@ void pushObject(lua_State* L, void* obj, StringView type_name) {
 int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name) {
 	size_t bytecode_size;
 	char* bytecode = luau_compile(buff, size, nullptr, &bytecode_size);
-	if (!bytecode) return 1;
+	if (bytecode_size == 0) {
+		lua_pushstring(L, bytecode);
+		free(bytecode);
+		return 1;
+	}
 	int res = luau_load(L, name ? name : "N/A", bytecode, bytecode_size, 0);
 	free(bytecode);
 	return res;

@@ -838,6 +838,7 @@ static int LUA_loadstring(lua_State* L) {
 	if (bytecode_size == 0) {
 		lua_pushnil(L);
 		lua_pushstring(L, bytecode);
+		free(bytecode);
 		return 2;
 	}
 	int res = luau_load(L, "loadstring", bytecode, bytecode_size, 0);

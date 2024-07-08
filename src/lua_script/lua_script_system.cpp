@@ -2817,6 +2817,12 @@ static int LUA_require(lua_State* L) {
     // now we can compile & run module on the new thread
 	size_t bytecode_size;
 	char* bytecode = luau_compile((const char*)dep->getSourceCode().begin, dep->getSourceCode().size(), nullptr, &bytecode_size);
+	if (bytecode_size == 0) {
+		lua_pushstring(L, bytecode);
+		free(bytecode);
+		lua_error(L);
+	}
+
     if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
     {
         int status = lua_resume(ML, L, 0);

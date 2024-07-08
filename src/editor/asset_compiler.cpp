@@ -379,9 +379,14 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (fs.getContentSync(Path(".lumix/resources/_list.txt"), content)) {
 			lua_State* L = luaL_newstate();
 			[&](){
-				size_t bytecodeSize = 0;
-				char* bytecode = luau_compile((const char*)content.data(), content.size(), NULL, &bytecodeSize);
-				int res = luau_load(L, "lumix_asset_list", bytecode, bytecodeSize, 0);
+				size_t bytecode_size = 0;
+				char* bytecode = luau_compile((const char*)content.data(), content.size(), NULL, &bytecode_size);
+				if (bytecode_size == 0) {
+					logError(list_path, ": ", bytecode);
+					free(bytecode);
+					return;
+				}
+				int res = luau_load(L, "lumix_asset_list", bytecode, bytecode_size, 0);
 				free(bytecode);
 				if (res != 0) {
 					logError(list_path, ": ", lua_tostring(L, -1));
