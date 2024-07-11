@@ -1,6 +1,7 @@
 #include "engine/controller_device.h"
 #include "core/allocator.h"
 #include "core/os.h"
+#include "core/profiler.h"
 #include "core/win/simple_win.h"
 
 namespace Lumix
@@ -25,6 +26,7 @@ struct XInputControllerDevice : ControllerDevice
 {
 	void update(float dt) override
 	{
+		PROFILE_FUNCTION();
 		XINPUT_STATE new_state;
 		const XINPUT_STATE& old_state = g_controllers.states[index];
 		g_controllers.get_state(index, &new_state);
@@ -108,9 +110,10 @@ void ControllerDevice::init(InputSystem& input_system)
 	}
 }
 
-
 void ControllerDevice::frame(float dt)
 {
+	// TODO multithread this, since get_state is relatively slow
+	PROFILE_FUNCTION();
 	if (!g_controllers.get_state) return;
 
 	for (int i = 0; i < XUSER_MAX_COUNT; ++i)
@@ -129,6 +132,7 @@ void ControllerDevice::frame(float dt)
 			}
 			else if (!g_controllers.connected[i] && g_controllers.devices[i])
 			{
+				// TODO does device leak here?
 				g_controllers.input->removeDevice(g_controllers.devices[i]);
 				g_controllers.devices[i] = nullptr;
 			}

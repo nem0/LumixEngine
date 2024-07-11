@@ -13,6 +13,8 @@
 #include "core/thread.h"
 #include "core/os.h"
 #include "core/profiler.h"
+#include "core/stack_array.h"
+#include "core/thread.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "core/string.h"
@@ -381,6 +383,8 @@ struct RendererImpl final : Renderer
 		, m_free_sort_keys(m_allocator)
 		, m_sort_key_to_mesh_map(m_allocator)
 		, m_semantic_defines(m_allocator)
+		, m_free_frames(m_allocator)
+		, m_frame_thread(*this)
 	{
 		RenderModule::reflect();
 
@@ -393,6 +397,8 @@ struct RendererImpl final : Renderer
 		bool try_load_renderdoc = CommandLineParser::isOn("-renderdoc");
 		gpu::preinit(m_allocator, try_load_renderdoc);
 		for (Local<FrameData>& f : m_frames) f.create(*this, m_allocator, m_engine.getPageAllocator());
+
+		m_frame_thread.create("frame_thread", true);
 	}
 
 	float getLODMultiplier() const override { return m_lod_multiplier; }
@@ -521,7 +527,9 @@ struct RendererImpl final : Renderer
 		}, &m_init_signal, 1);
 
 		m_cpu_frame = m_frames[0].get();
-		m_gpu_frame = m_frames[0].get();
+		for (u32 i = 1; i < lengthOf(m_frames); ++i) {
+			pushFreeFrame(*m_frames[i].get());
+		}
 
 		MaterialBuffer& mb = m_material_buffer;
 		const u32 MAX_MATERIAL_CONSTS_COUNT = 400;
@@ -829,19 +837,10 @@ struct RendererImpl final : Renderer
 	}
 
 	void render() {
+		PROFILE_FUNCTION();
 		jobs::MutexGuard guard(m_render_mutex);
 
-		FrameData* next_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
-
-		if (next_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(next_frame->gpu_frame)) {
-			next_frame->gpu_frame = 0xFFffFFff;
-			next_frame->transient_buffer.renderDone();
-			next_frame->uniform_buffer.renderDone();
-			jobs::setGreen(&next_frame->can_setup);
-		}
-		
-		FrameData& frame = *m_gpu_frame;
-		profiler::pushInt("GPU Frame", getFrameIndex(m_gpu_frame));
+		FrameData& frame = popGPUQueue();
 		frame.transient_buffer.prepareToRender();
 		frame.uniform_buffer.prepareToRender();
 		
@@ -868,8 +867,11 @@ struct RendererImpl final : Renderer
 		frame.begin_frame_draw_stream.run();
 		frame.begin_frame_draw_stream.reset();
 
-		frame.draw_stream.run();
-		frame.draw_stream.reset();
+		{
+			PROFILE_BLOCK("draw stream");
+			frame.draw_stream.run();
+			frame.draw_stream.reset();
+		}
 
 		frame.end_frame_draw_stream.run();
 		frame.end_frame_draw_stream.reset();
@@ -879,40 +881,27 @@ struct RendererImpl final : Renderer
 
 		jobs::enableBackupWorker(true);
 
-		FrameData* prev_frame = m_frames[(getFrameIndex(m_gpu_frame) + lengthOf(m_frames) - 1) % lengthOf(m_frames)].get();
-		if (prev_frame->gpu_frame != 0xffFFffFF && gpu::frameFinished(prev_frame->gpu_frame)) {
-			prev_frame->gpu_frame = 0xFFffFFff;
-			prev_frame->transient_buffer.renderDone();
-			prev_frame->uniform_buffer.renderDone();
-			jobs::setGreen(&prev_frame->can_setup);
-		}
-		
 		{
 			PROFILE_BLOCK("swap buffers");
 			frame.gpu_frame = gpu::swapBuffers();
 		}
 		
-		if (frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(frame.gpu_frame)) {
+		jobs::enableBackupWorker(false);
+		m_profiler.frame();
+
+		if (gpu::frameFinished(frame.gpu_frame)) {
 			frame.gpu_frame = 0xFFffFFff;
 			frame.transient_buffer.renderDone();
 			frame.uniform_buffer.renderDone();
 			jobs::setGreen(&frame.can_setup);
+			pushFreeFrame(frame);
 		}
-
-		jobs::enableBackupWorker(false);
-		m_profiler.frame();
-
-		m_gpu_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
-
-		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
-			gpu::waitFrame(m_gpu_frame->gpu_frame);
-			m_gpu_frame->gpu_frame = 0xFFffFFff;
-			m_gpu_frame->transient_buffer.renderDone();
-			m_gpu_frame->uniform_buffer.renderDone();
-			jobs::setGreen(&m_gpu_frame->can_setup);
+		else {
+			m_frame_thread.frames.push(&frame);
+			m_frame_thread.semaphore.signal();
 		}
 	}
-	
+
 	ArenaAllocator& getCurrentFrameAllocator() override { return m_cpu_frame->arena_allocator; }
 
 	void waitForCommandSetup() override
@@ -938,6 +927,46 @@ struct RendererImpl final : Renderer
 	}
 
 	u32 frameNumber() const override { return m_cpu_frame->frame_number; }
+
+	void pushFreeFrame(FrameData& frame) {
+		jobs::MutexGuard guard(m_frames_mutex);
+		m_free_frames.push(&frame);
+		jobs::setGreen(&m_has_free_frames);
+	}
+
+	FrameData* popFreeFrame() {
+		jobs::MutexGuard guard(m_frames_mutex);
+		if (m_free_frames.empty()) {
+			jobs::exit(&m_frames_mutex);
+			jobs::wait(&m_has_free_frames);
+			jobs::enter(&m_frames_mutex);
+		}
+		FrameData* frame = m_free_frames.back();
+		m_free_frames.pop();
+		if (m_free_frames.empty()) jobs::setRed(&m_has_free_frames);
+		return frame;
+	}
+
+	FrameData& popGPUQueue() {
+		jobs::MutexGuard guard(m_frames_mutex);
+		FrameData* f = m_gpu_queue;
+		m_gpu_queue = nullptr;
+		jobs::setGreen(&m_gpu_queue_empty);
+		ASSERT(f);
+		return *f;
+	}
+
+	void pushToGPUQueue(FrameData& frame) {
+		jobs::MutexGuard guard(m_frames_mutex);
+		if (m_gpu_queue) {
+			jobs::exit(&m_frames_mutex);
+			jobs::wait(&m_gpu_queue_empty);
+			jobs::enter(&m_frames_mutex);
+			ASSERT(!m_gpu_queue);
+		}
+		m_gpu_queue = &frame;
+		jobs::setRed(&m_gpu_queue_empty);
+	}
 
 	void frame() override
 	{
@@ -968,8 +997,9 @@ struct RendererImpl final : Renderer
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
 
 		jobs::setRed(&m_cpu_frame->can_setup);
+		pushToGPUQueue(*m_cpu_frame);
 
-		m_cpu_frame = m_frames[(getFrameIndex(m_cpu_frame) + 1) % lengthOf(m_frames)].get();
+		m_cpu_frame = popFreeFrame();
 		++m_frame_number;
 		m_cpu_frame->frame_number = m_frame_number;
 
@@ -982,6 +1012,40 @@ struct RendererImpl final : Renderer
 		}, &m_last_render, 1);
 
 	}
+
+	// wait till gpu is done with a frame and reuse it
+	struct FrameThread : Thread {
+		FrameThread(RendererImpl& renderer)
+			: Thread(renderer.m_allocator)
+			, renderer(renderer)
+			, semaphore(0, 3)
+			, frames(renderer.m_allocator)
+		{}
+
+		int task() {
+			for (;;) {
+				semaphore.wait();
+				FrameData* f = frames[0];
+				frames.erase(0);
+				gpu::waitFrame(f->gpu_frame);
+				PROFILE_BLOCK("frame finished");
+				jobs::runLambda([f, this]() {
+					PROFILE_BLOCK("reuse frame");
+					f->gpu_frame = 0xFFffFFff;
+					f->transient_buffer.renderDone();
+					f->uniform_buffer.renderDone();
+					jobs::setGreen(&f->can_setup);
+					renderer.pushFreeFrame(*f);
+					}, nullptr, 1);
+			}
+			return 0;
+		}
+
+		RendererImpl& renderer;
+		Semaphore semaphore;
+		Array<FrameData*> frames;
+
+	};
 
 	Engine& m_engine;
 	TagAllocator m_allocator;
@@ -1004,12 +1068,17 @@ struct RendererImpl final : Renderer
 	HashMap<RuntimeHash, String> m_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
-	Local<FrameData> m_frames[3];
-	FrameData* m_gpu_frame = nullptr;
+	Local<FrameData> m_frames[2];
+	jobs::Signal m_gpu_queue_empty;
+	FrameData* m_gpu_queue = nullptr;
 	FrameData* m_cpu_frame = nullptr;
+	StackArray<FrameData*, 3> m_free_frames;
+	jobs::Mutex m_frames_mutex;
+	jobs::Signal m_has_free_frames;
 	jobs::Signal m_last_render;
 
 	GPUProfiler m_profiler;
+	FrameThread m_frame_thread;
 
 	struct MaterialBuffer {
 		MaterialBuffer(IAllocator& alloc) 
