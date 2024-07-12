@@ -671,6 +671,7 @@ void SceneView::init() {
 	
 	m_camera_preview_pipeline = Pipeline::create(*renderer, pres, "PREVIEW");
 
+	pres->incRefCount();
 	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW");
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
