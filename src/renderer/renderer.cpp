@@ -434,6 +434,10 @@ struct RendererImpl final : Renderer
 			gpu::shutdown();
 		}, &signal, 1);
 		jobs::wait(&signal);
+
+		m_frame_thread.finished = true;
+		m_frame_thread.semaphore.signal();
+		m_frame_thread.destroy();
 	}
 
 	static void add(String& res, const char* a, u32 b) {
@@ -1022,6 +1026,8 @@ struct RendererImpl final : Renderer
 		int task() {
 			for (;;) {
 				semaphore.wait();
+				if (finished) break;
+
 				FrameData* f = frames[0];
 				frames.erase(0);
 				gpu::waitFrame(f->gpu_frame);
@@ -1041,7 +1047,7 @@ struct RendererImpl final : Renderer
 		RendererImpl& renderer;
 		Semaphore semaphore;
 		Array<FrameData*> frames;
-
+		volatile bool finished = false;
 	};
 
 	Engine& m_engine;

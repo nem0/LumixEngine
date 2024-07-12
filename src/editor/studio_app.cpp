@@ -142,6 +142,10 @@ struct StudioAppImpl final : StudioApp
 		m_imgui_key_map[(int)os::Keycode::Z] = ImGuiKey_Z;
 	}
 
+	~StudioAppImpl() {
+		jobs::shutdown();
+	}
+
 	void onEvent(const os::Event& event)
 	{
 		const bool handle_input = isFocused();
@@ -230,6 +234,74 @@ struct StudioAppImpl final : StudioApp
 		while (m_engine->getFileSystem().hasWork()) {
 			m_engine->getFileSystem().processCallbacks();
 		}
+
+		removeAction(&m_show_all_actions_action);
+		removePlugin(*m_asset_browser.get());
+		removePlugin(*m_log_ui.get());
+		removePlugin(*m_property_grid.get());
+		removePlugin(*m_profiler_ui.get());
+
+		m_asset_browser->releaseResources();
+		m_watched_plugin.watcher.reset();
+
+		saveSettings();
+
+		while (m_engine->getFileSystem().hasWork()) {
+			m_engine->getFileSystem().processCallbacks();
+		}
+
+		m_editor->newWorld();
+
+		destroyAddCmpTreeNode(m_add_cmp_root.child);
+
+		for (auto* i : m_plugins) {
+			LUMIX_DELETE(m_allocator, i);
+		}
+		m_plugins.clear();
+
+		for (auto* i : m_gui_plugins) {
+			LUMIX_DELETE(m_allocator, i);
+		}
+		m_gui_plugins.clear();
+
+		PrefabSystem::destroyEditorPlugins(*this);
+		ASSERT(m_mouse_plugins.empty());
+
+		for (auto* i : m_add_cmp_plugins)
+		{
+			LUMIX_DELETE(m_allocator, i);
+		}
+		m_add_cmp_plugins.clear();
+
+		m_profiler_ui.reset();
+		m_asset_browser.reset();
+		m_property_grid.destroy();
+		m_log_ui.destroy();
+		ASSERT(!m_render_interface);
+		m_asset_compiler.reset();
+		m_editor.reset();
+
+		removeAction(&m_common_actions.save);
+		removeAction(&m_common_actions.undo);
+		removeAction(&m_common_actions.redo);
+		removeAction(&m_common_actions.del);
+		removeAction(&m_common_actions.cam_orbit);
+		removeAction(&m_common_actions.cam_forward);
+		removeAction(&m_common_actions.cam_backward);
+		removeAction(&m_common_actions.cam_right);
+		removeAction(&m_common_actions.cam_left);
+		removeAction(&m_common_actions.cam_up);
+		removeAction(&m_common_actions.cam_down);
+
+		for (Action* action : m_owned_actions) {
+			removeAction(action);
+			LUMIX_DELETE(m_allocator, action);
+		}
+		m_owned_actions.clear();
+		ASSERT(m_actions.empty());
+		m_actions.clear();
+
+		m_engine.reset();
 	}
 
 
@@ -412,80 +484,6 @@ struct StudioAppImpl final : StudioApp
 		if (!m_render_interface) return;
 		m_logo = m_render_interface->loadTexture(Path("editor/logo.png"));
 	}
-
-	~StudioAppImpl()
-	{
-		removeAction(&m_show_all_actions_action);
-		removePlugin(*m_asset_browser.get());
-		removePlugin(*m_log_ui.get());
-		removePlugin(*m_property_grid.get());
-		removePlugin(*m_profiler_ui.get());
-
-		m_asset_browser->releaseResources();
-		m_watched_plugin.watcher.reset();
-
-		saveSettings();
-
-		while (m_engine->getFileSystem().hasWork()) {
-			m_engine->getFileSystem().processCallbacks();
-		}
-
-		m_editor->newWorld();
-
-		destroyAddCmpTreeNode(m_add_cmp_root.child);
-
-		for (auto* i : m_plugins) {
-			LUMIX_DELETE(m_allocator, i);
-		}
-		m_plugins.clear();
-
-		for (auto* i : m_gui_plugins) {
-			LUMIX_DELETE(m_allocator, i);
-		}
-		m_gui_plugins.clear();
-
-		PrefabSystem::destroyEditorPlugins(*this);
-		ASSERT(m_mouse_plugins.empty());
-
-		for (auto* i : m_add_cmp_plugins)
-		{
-			LUMIX_DELETE(m_allocator, i);
-		}
-		m_add_cmp_plugins.clear();
-
-		m_profiler_ui.reset();
-		m_asset_browser.reset();
-		m_property_grid.destroy();
-		m_log_ui.destroy();
-		ASSERT(!m_render_interface);
-		m_asset_compiler.reset();
-		m_editor.reset();
-
-		removeAction(&m_common_actions.save);
-		removeAction(&m_common_actions.undo);
-		removeAction(&m_common_actions.redo);
-		removeAction(&m_common_actions.del);
-		removeAction(&m_common_actions.cam_orbit);
-		removeAction(&m_common_actions.cam_forward);
-		removeAction(&m_common_actions.cam_backward);
-		removeAction(&m_common_actions.cam_right);
-		removeAction(&m_common_actions.cam_left);
-		removeAction(&m_common_actions.cam_up);
-		removeAction(&m_common_actions.cam_down);
-
-		for (Action* action : m_owned_actions) {
-			removeAction(action);
-			LUMIX_DELETE(m_allocator, action);
-		}
-		m_owned_actions.clear();
-		ASSERT(m_actions.empty());
-		m_actions.clear();
-
-		m_engine.reset();
-		
-		jobs::shutdown();
-	}
-
 
 	void destroyAddCmpTreeNode(AddCmpTreeNode* node)
 	{
