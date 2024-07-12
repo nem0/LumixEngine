@@ -75,17 +75,31 @@ struct LUMIX_EDITOR_API Settings {
 	const char* getAppDataPath() const { return m_app_data_path; }
 	float getTimeSinceLastSave() const { return m_time_since_last_save.getTimeSinceTick(); }
 
+	void registerVariable(const char* category_name, const char* var_name, Delegate<bool()> getter, Delegate<void(bool)> setter);
+
+	struct Variable {
+		StaticString<32> name;
+		Delegate<bool()> getter;
+		Delegate<void(bool)> setter;
+	};
+
+	struct Category {
+		Category(IAllocator& allocator) : variables(allocator) {}
+		StaticString<32> name;
+		Array<Variable> variables;
+	};
+
 private:
 	static void writeCustom(lua_State* L, struct IOutputStream& file);
 	lua_State* getState(Storage storage) const;
 	bool loadAppData();
-
 	StudioApp& m_app;
 	struct Action* m_edit_action = nullptr;
 	lua_State* m_global_state;
 	lua_State* m_local_state;
 	char m_app_data_path[MAX_PATH];
 	os::Timer m_time_since_last_save;
+	Array<Category> m_categories;
 
 private:
 	void showShortcutSettings();

@@ -91,8 +91,12 @@ private:
 };
 
 template <typename T> struct ToDelegate_T;
-template <typename R, typename C, typename... Args> struct ToDelegate_T<R (C::*)(Args...)> {
-	using Type = Delegate<R (Args...)>;
+template <typename R, typename C, typename... Args> struct ToDelegate_T<R(C::*)(Args...)> {
+	using Type = Delegate<R(Args...)>;
+};
+
+template <typename R, typename... Args> struct ToDelegate_T<R(*)(Args...)> {
+	using Type = Delegate<R(Args...)>;
 };
 
 template <typename T> using ToDelegate = typename ToDelegate_T<T>::Type;
@@ -101,6 +105,13 @@ template <auto M, typename C>
 auto makeDelegate(C* inst) {
 	ToDelegate<decltype(M)> res;
 	res.template bind<M, C>(inst);
+	return res;
+};
+
+template <auto F>
+auto makeDelegate() {
+	ToDelegate<decltype(F)> res;
+	res.template bind<F>();
 	return res;
 };
 

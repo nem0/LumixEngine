@@ -360,6 +360,7 @@ Settings::Settings(StudioApp& app)
 	, m_mouse_sensitivity_y(app.getAllocator())
 	, m_font_size(13)
 	, m_imgui_state(app.getAllocator())
+	, m_categories(app.getAllocator())
 {
 	if (!os::getAppDataDir(Span(m_app_data_path))) {
 		m_app_data_path[0] = 0;
@@ -393,6 +394,16 @@ Settings::Settings(StudioApp& app)
 Settings::~Settings() {
 	lua_close(m_global_state);
 	lua_close(m_local_state);
+}
+
+static StaticString<128> toLuaID(const Settings::Category& cat, const Settings::Variable& var) {
+	StaticString<128> res(cat.name, "_", var.name);
+	for (char* c = res.data; *c; ++c) {
+		if (!(*c >= 'a' && *c <= 'z' || *c >= 'A' && *c <= 'Z' || *c >= '0' && *c <= '9')) {
+			*c = '_';
+		}
+	}
+	return res;
 }
 
 bool Settings::load() {
@@ -496,6 +507,17 @@ bool Settings::postLoad() {
 		}
 	}
 	lua_pop(L, 1);
+
+	for (const Category& cat : m_categories) {
+		for (const Variable& var : cat.variables) {
+			lua_getglobal(L, toLuaID(cat, var));
+			if (lua_type(L, -1) == LUA_TBOOLEAN) {
+				const bool value = lua_toboolean(L, -1) != 0;
+				var.setter.invoke(value);
+			}
+			lua_pop(L, 1);
+		}
+	}
 
 	return loadAppData();
 }
@@ -655,6 +677,13 @@ bool Settings::save()
 		file << name << " = " << (value ? "true\n" : "false\n");
 	};
 
+	for (const Category& cat : m_categories) {
+		for (const Variable& var : cat.variables) {
+			StaticString<128> id = toLuaID(cat, var);
+			writeBool(id, var.getter.invoke());
+		}
+	}
+
 	writeBool("settings_opened", m_is_open);
 	writeBool("asset_browser_opened", m_is_asset_browser_open);
 	writeBool("entity_list_opened", m_is_entity_list_open);
@@ -698,6 +727,20 @@ bool Settings::save()
 	return !file.isError();
 }
 
+void Settings::registerVariable(const char* category_name, const char* var_name, Delegate<bool()> getter, Delegate<void(bool)> setter) {
+	i32 idx = m_categories.find([&](const Category& cat){ return cat.name == category_name; });
+	if (idx < 0) {
+		idx = m_categories.size();
+		Category& cat = m_categories.emplace(m_app.getAllocator());
+		cat.name = category_name;
+	}
+
+	Category& cat = m_categories[idx];
+	Variable& var = cat.variables.emplace();
+	var.name = var_name;
+	var.getter = getter;
+	var.setter = setter;
+}
 
 void Settings::writeCustom(lua_State* L, IOutputStream& file) {
 	file << "custom = {\n";
@@ -1393,6 +1436,23 @@ void Settings::onGUI()
 				showStyleEditor();
 				ImGui::EndTabItem();
 			}
+
+			for (const Category& cat : m_categories) {
+				if (ImGui::BeginTabItem(cat.name)) {
+					for (const Variable& var : cat.variables) {
+						bool val = var.getter.invoke();
+						ImGuiEx::Label(var.name);
+						ImGui::PushID(var.name);
+						if (ImGui::Checkbox("##cb", &val)) {
+							var.setter.invoke(val);
+						}
+						ImGui::PopID();
+					}
+					ImGui::EndTabItem();
+				}
+			}
+
+
 			ImGui::EndTabBar();
 		}	
 	}

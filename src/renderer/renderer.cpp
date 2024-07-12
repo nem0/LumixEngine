@@ -485,16 +485,13 @@ struct RendererImpl final : Renderer
 
 	void initBegin() override {
 		PROFILE_FUNCTION();
-		gpu::InitFlags flags = gpu::InitFlags::VSYNC;
+		gpu::InitFlags flags = gpu::InitFlags::NONE;
 		
 		char cmd_line[4096];
 		os::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
-			if (cmd_line_parser.currentEquals("-no_vsync")) {
-				flags = flags & ~gpu::InitFlags::VSYNC;
-			}
-			else if (cmd_line_parser.currentEquals("-debug_opengl")) {
+			if (cmd_line_parser.currentEquals("-debug_opengl")) {
 				flags = flags | gpu::InitFlags::DEBUG_OUTPUT;
 			}
 		}

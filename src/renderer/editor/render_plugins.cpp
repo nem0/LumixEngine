@@ -5221,6 +5221,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		PROFILE_FUNCTION();
+		m_app.getSettings().registerVariable("Renderer", "VSync", makeDelegate<&gpu::isVSyncEnabled>(), makeDelegate<&gpu::enableVSync>());
 		m_fbx_importer.init();
 		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", Action::GLOBAL);
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);

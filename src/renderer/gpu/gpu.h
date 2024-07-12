@@ -24,7 +24,6 @@ const BindGroupHandle INVALID_BIND_GROUP = nullptr;
 enum class InitFlags : u32 {
 	NONE = 0,
 	DEBUG_OUTPUT = 1 << 0,
-	VSYNC = 1 << 1
 };
 
 enum class FramebufferFlags : u32 {
@@ -262,6 +261,8 @@ bool init(void* window_handle, InitFlags flags);
 void captureRenderDocFrame();
 bool getMemoryStats(MemoryStats& stats);
 u32 swapBuffers();
+void enableVSync(bool enable);
+bool isVSyncEnabled();
 void waitFrame(u32 frame);
 bool frameFinished(u32 frame);
 LUMIX_RENDERER_API bool isOriginBottomLeft();

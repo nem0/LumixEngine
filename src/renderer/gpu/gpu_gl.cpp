@@ -147,6 +147,7 @@ struct GL {
 	u64 texture_allocated_mem = 0;
 	u64 render_target_allocated_mem = 0;
 	float max_anisotropy = 0;
+	bool vsync = true;
 };
 
 Local<GL> gl;
@@ -378,10 +379,22 @@ static bool load_gl_linux(void* wnd){
 }
 #endif
 
+bool isVSyncEnabled() {
+	return gl->vsync;
+}
+
+void enableVSync(bool enable) {
+	gl->vsync = enable;
+}
+
+typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
+
+
 static bool load_gl(void* platform_handle, InitFlags init_flags)
 {
 	#ifdef _WIN32
-		const bool vsync = u32(init_flags & InitFlags::VSYNC);
+		gl->vsync = true;
 		HDC hdc = (HDC)platform_handle;
 		const PIXELFORMATDESCRIPTOR pfd =
 		{
@@ -410,11 +423,10 @@ static bool load_gl(void* platform_handle, InitFlags init_flags)
 		ASSERT(dummy_context);
 		wglMakeCurrent(hdc, dummy_context);
 
-		typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 		typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
 		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)getGLFunc("wglCreateContextAttribsARB");
-		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)getGLFunc("wglSwapIntervalEXT");
-		
+		wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)getGLFunc("wglSwapIntervalEXT");
+
 		#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
 		#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
 		#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
@@ -448,7 +460,7 @@ static bool load_gl(void* platform_handle, InitFlags init_flags)
 		}
 		logVersion();
 		gl->contexts[0].hglrc = hglrc;
-		wglSwapIntervalEXT(vsync ? 1 : 0);
+		wglSwapIntervalEXT(gl->vsync ? 1 : 0);
 		void* gl_dll = os::loadLibrary("opengl32.dll");
 
 		#define GPU_GL_IMPORT(prototype, name) \
@@ -974,6 +986,7 @@ u32 swapBuffers()
 	GPU_PROFILE();
 	checkThread();
 	#ifdef _WIN32
+		wglSwapIntervalEXT(gl->vsync ? 1 : 0);
 		for (WindowContext& ctx : gl->contexts) {
 			if (!ctx.window_handle) continue;
 			if (gl->frame == ctx.last_frame || &ctx == gl->contexts) {
