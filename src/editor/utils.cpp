@@ -2307,6 +2307,7 @@ void FileSelector::fillSubitems() {
 
 
 bool FileSelector::breadcrumb(StringView path) {
+	if (path.size() > 0 && path.back() == '/') path.removeSuffix(1);
 	if (path.empty()) {
 		if (ImGui::Button(".")) {
 			m_current_dir = "";
@@ -2315,8 +2316,6 @@ bool FileSelector::breadcrumb(StringView path) {
 		}
 		return false;
 	}
-
-	if (path.back() == '/') path.removeSuffix(1);
 	
 	StringView dir = Path::getDir(path);
 	StringView basename = Path::getBasename(path);
@@ -2375,6 +2374,7 @@ void DirSelector::fillSubitems() {
 }
 
 bool DirSelector::breadcrumb(StringView path) {
+	if (path.size() > 0 && path.back() == '/') path.removeSuffix(1);
 	if (path.empty()) {
 		if (ImGui::Button(".")) {
 			m_current_dir = "";
@@ -2383,7 +2383,6 @@ bool DirSelector::breadcrumb(StringView path) {
 		}
 		return false;
 	}
-	if (path.back() == '/') path.removeSuffix(1);
 	
 	StringView dir = Path::getDir(path);
 	StringView basename = Path::getBasename(path);
