@@ -187,59 +187,6 @@ struct LuauAnalysis :Luau::FileResolver {
 	};
 #endif
 
-/*
--- example lua usage
-Editor.addAction {
-	name ="spawn_10_cubes",
-	label = "Spawn 10 cubes",
-	run = function()
-		for i = 1, 10 do
-			Editor.createEntityEx {
-				position = { 3 * i, 0, 0 },
-				model_instance = { Source = "models/shapes/cube.fbx" }
-			}
-		end
-	end
-}
-*/ 
-static int LUA_addAction(lua_State* L) {
-	struct LuaAction {
-		void run() {
-			LuaWrapper::DebugGuard guard(L);
-			lua_rawgeti(L, LUA_REGISTRYINDEX, ref_action);
-			lua_getfield(L, -1, "run");
-			LuaWrapper::pcall(L, 0, 0);
-			lua_pop(L, 1);
-		}
-		Action action;
-		lua_State* L;
-		int ref_thread;
-		int ref_action;
-	};
-
-	LuaWrapper::DebugGuard guard(L);
-	StudioApp* app = LuaWrapper::getClosureObject<StudioApp>(L);
-	LuaWrapper::checkTableArg(L, 1);
-	char name[64];
-	char label[128];
-	if (!LuaWrapper::checkStringField(L, 1, "name", Span(name))) luaL_argerror(L, 1, "missing name");
-	if (!LuaWrapper::checkStringField(L, 1, "label", Span(label))) luaL_argerror(L, 1, "missing label");
-
-	// TODO leak
-	LuaAction* action = LUMIX_NEW(app->getAllocator(), LuaAction);
-
-	lua_pushthread(L);
-	action->ref_thread = LuaWrapper::createRef(L);
-	lua_pushvalue(L, 1);
-	action->ref_action = LuaWrapper::createRef(L);
-	lua_pop(L, 2);
-	action->action.init(label, label, name, "", Action::Type::IMGUI_PRIORITY);
-	action->action.func.bind<&LuaAction::run>(action);
-	action->L = L;
-	app->addAction(&action->action);
-	return 0;
-}
-
 struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	static void create(StudioApp& app, StringView content, const Path& path) {
 		lua_State* L = app.getEngine().getState();
@@ -844,15 +791,74 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin
 	}
 };
 
+/*
+-- example lua usage
+Editor.addAction {
+	name ="spawn_10_cubes",
+	label = "Spawn 10 cubes",
+	run = function()
+		for i = 1, 10 do
+			Editor.createEntityEx {
+				position = { 3 * i, 0, 0 },
+				model_instance = { Source = "models/shapes/cube.fbx" }
+			}
+		end
+	end
+}
+*/
+
+struct LuaAction {
+	void run() {
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, ref_action);
+		lua_getfield(L, -1, "run");
+		LuaWrapper::pcall(L, 0, 0);
+		lua_pop(L, 1);
+	}
+	Action action;
+	lua_State* L;
+	int ref_thread;
+	int ref_action;
+};
+
+
+
 struct StudioAppPlugin : StudioApp::IPlugin {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_luau_analysis(app)
 		, m_asset_plugin(m_luau_analysis, app)
+		, m_lua_actions(app.getAllocator())
 	{
 		lua_State* L = app.getEngine().getState();
-		LuaWrapper::createSystemClosure(L, "Editor", &app, "addAction", &LUA_addAction);
+		LuaWrapper::createSystemClosure(L, "Editor", this, "addAction", &LUA_addAction);
 		initPlugins();
+	}
+
+	static int LUA_addAction(lua_State* L) {
+		LuaWrapper::DebugGuard guard(L);
+		StudioAppPlugin* plugin = LuaWrapper::getClosureObject<StudioAppPlugin>(L);
+		StudioApp& app = plugin->m_app;
+		LuaWrapper::checkTableArg(L, 1);
+		char name[64];
+		char label[128];
+		if (!LuaWrapper::checkStringField(L, 1, "name", Span(name))) luaL_argerror(L, 1, "missing name");
+		if (!LuaWrapper::checkStringField(L, 1, "label", Span(label))) luaL_argerror(L, 1, "missing label");
+
+		// TODO leak
+		LuaAction* action = LUMIX_NEW(app.getAllocator(), LuaAction);
+		plugin->m_lua_actions.push(action);
+
+		lua_pushthread(L);
+		action->ref_thread = LuaWrapper::createRef(L);
+		lua_pushvalue(L, 1);
+		action->ref_action = LuaWrapper::createRef(L);
+		lua_pop(L, 2);
+		action->action.init(label, label, name, "", Action::Type::IMGUI_PRIORITY);
+		action->action.func.bind<&LuaAction::run>(action);
+		action->L = L;
+		app.addAction(&action->action);
+		return 0;
 	}
 
 	void initPlugins() {
@@ -894,6 +900,11 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		m_app.getAssetCompiler().removePlugin(m_asset_plugin);
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
+
+		for (LuaAction* action : m_lua_actions) {
+			m_app.removeAction(&action->action);
+			LUMIX_DELETE(m_app.getAllocator(), action);
+		}
 	}
 
 	bool showGizmo(WorldView& view, ComponentUID cmp) override
@@ -918,6 +929,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 	LuauAnalysis m_luau_analysis;
 	AssetPlugin m_asset_plugin;
 	PropertyGridPlugin m_property_grid_plugin;
+	Array<LuaAction*> m_lua_actions;
 };
 
 
