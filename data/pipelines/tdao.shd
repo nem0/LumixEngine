@@ -50,7 +50,7 @@ compute_shader [[
 		}
 		ao *= u_intensity / 16;
 
-		v.w = min(v.w, 1 - ao);
+		v.w = v.w * (1 - ao);
 		imageStore(u_gbuffer1, ivec2(gl_GlobalInvocationID.xy), v);
 	}
 ]]

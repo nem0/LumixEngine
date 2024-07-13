@@ -278,8 +278,6 @@ void FBXImporter::gatherMaterials(StringView fbx_filename, StringView src_dir)
 	// we don't support dds, but try it as last option, so user can get error message with filepath
 	const char* exts[] = { "png", "jpg", "jpeg", "tga", "bmp", "dds" };
 	for (ImportMaterial& mat : m_materials) {
-		if (!mat.import) continue;
-
 		auto gatherTexture = [&](ofbx::Texture::TextureType type) {
 			const ofbx::Texture* texture = mat.fbx->getTexture(type);
 			if (!texture) return;
@@ -1060,9 +1058,12 @@ void FBXImporter::init() {
 	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("pipelines/impostor_shadow.shd"));
 }
 
-bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool force_skinned)
-{
+bool FBXImporter::setSource(const Path& filename, ReadFlags read_flags) {
 	PROFILE_FUNCTION();
+	bool ignore_geometry = isFlagSet(read_flags, ReadFlags::IGNORE_GEOMETRY);
+	bool ignore_materials = isFlagSet(read_flags, ReadFlags::IGNORE_MATERIALS);
+	bool force_skinned = isFlagSet(read_flags, ReadFlags::FORCE_SKINNED);
+
 	if (m_scene) {
 		PROFILE_BLOCK("clear previous data");
 		m_scene->destroy();
@@ -1106,10 +1107,12 @@ bool FBXImporter::setSource(const Path& filename, bool ignore_geometry, bool for
 	gatherMeshes();
 
 	gatherAnimations();
-	if (!ignore_geometry) {
+	if (!ignore_materials) {
 		gatherMaterials(filename, src_dir);
 		m_materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
-		
+	}
+
+	if (!ignore_geometry) {
 		bool any_skinned = false;
 		for (const ImportMesh& m : m_meshes) any_skinned = any_skinned || m.is_skinned;
 		gatherBones(force_skinned || any_skinned);
@@ -1367,13 +1370,13 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 }
 
 
-bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
+bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool force)
 {
 	PROFILE_FUNCTION()
 	u32 written_count = 0;
 	StringView dir = Path::getDir(src);
 	for (const ImportMaterial& material : m_materials) {
-		if (!material.import) continue;
+		if (!material.import && !force) continue;
 
 		const String& mat_name = m_material_name_map[material.fbx];
 
@@ -1415,8 +1418,19 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg)
 
 		writeTexture(material.textures[0], 0);
 		writeTexture(material.textures[1], 1);
-		writeTexture(material.textures[2], 2);
-		
+		if (cfg.use_specular_as_roughness) {
+			writeTexture(material.textures[2], 2);
+		}
+		else {
+			writeString("texture \"\"\n");
+		}
+		if (cfg.use_specular_as_metallic) {
+			writeTexture(material.textures[2], 3);
+		}
+		else {
+			writeString("texture \"\"\n");
+		}
+
 		if (!material.textures[0].fbx) {
 			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
 			m_out_file << "uniform(\"Material color\", {" << powf(diffuse_color.r, 2.2f) 

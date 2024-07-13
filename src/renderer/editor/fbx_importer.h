@@ -49,6 +49,8 @@ struct FBXImporter {
 		bool import_vertex_colors = true;
 		bool vertex_color_is_ao = false;
 		bool bake_vertex_ao = false;
+		bool use_specular_as_roughness = true;
+		bool use_specular_as_metallic = false;
 		float min_bake_vertex_ao = 0.f;
 		Physics physics = Physics::NONE;
 		u32 lod_count = 1;
@@ -135,11 +137,18 @@ struct FBXImporter {
 		Vec3 origin = Vec3(0);
 	};
 
+	enum class ReadFlags : u32 {
+		NONE = 0,
+		FORCE_SKINNED = 1 << 0,
+		IGNORE_GEOMETRY = 1 << 1,
+		IGNORE_MATERIALS = 1 << 2,
+	};
+
 	FBXImporter(struct StudioApp& app);
 	~FBXImporter();
 	void init();
-	bool setSource(const Path& filename, bool ignore_geometry, bool force_skinned);
-	bool writeMaterials(const Path& src, const ImportConfig& cfg);
+	bool setSource(const Path& filename, ReadFlags flags);
+	bool writeMaterials(const Path& src, const ImportConfig& cfg, bool force);
 	bool writeAnimations(const Path& src, const ImportConfig& cfg);
 	bool writeSubmodels(const Path& src, const ImportConfig& cfg);
 	bool writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes);

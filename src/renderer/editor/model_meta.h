@@ -78,6 +78,8 @@ struct ModelMeta {
 		WRITE_BOOL(bake_vertex_ao, false);
 		WRITE_BOOL(bake_impostor_normals, false);
 		WRITE_BOOL(split, false);
+		WRITE_BOOL(use_specular_as_roughness, true);
+		WRITE_BOOL(use_specular_as_metallic, false);
 		WRITE_BOOL(import_vertex_colors, false);
 		WRITE_BOOL(vertex_color_is_ao, false);
 		WRITE_BOOL(ignore_animations, false);
@@ -156,6 +158,8 @@ struct ModelMeta {
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "min_bake_vertex_ao", &min_bake_vertex_ao);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &create_impostor);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &import_vertex_colors);
+		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_specular_as_roughness", &use_specular_as_roughness);
+		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_specular_as_metallic", &use_specular_as_metallic);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "ignore_animations", &ignore_animations);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &vertex_color_is_ao);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &lod_count);
@@ -231,6 +235,8 @@ struct ModelMeta {
 	bool force_recompute_normals = false;
 	bool force_skin = false;
 	bool import_vertex_colors = false;
+	bool use_specular_as_roughness = true;
+	bool use_specular_as_metallic = false;
 	bool vertex_color_is_ao = false;
 	bool ignore_animations = false;
 	bool create_prefab_with_physics = false;

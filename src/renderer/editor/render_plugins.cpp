@@ -1384,6 +1384,8 @@ template <> struct Acceptor<TextureMeta> {
 template <> struct Acceptor<ModelMeta> {
 	template <typename V> static void accept(V visitor) {
 		visitor(R{"Import vertex colors", &ModelMeta::import_vertex_colors});
+		visitor(R{"Use specular as roughness", &ModelMeta::use_specular_as_roughness});
+		visitor(R{"Use specular as metallic", &ModelMeta::use_specular_as_metallic});
 		visitor(R{"Physics", &ModelMeta::physics});
 		visitor(R{"Scale", &ModelMeta::scale});
 		visitor(R{"Skeleton", &ModelMeta::skeleton, Model::TYPE});
@@ -2024,6 +2026,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGuiEx::Label("Min bake vertex AO");
 					saveUndo(ImGui::DragFloat("##minvrtxao", &m_meta.min_bake_vertex_ao, 0.01f, 0, 1));
 				}
+				ImGuiEx::Label("Use specular as roughness");
+				saveUndo(ImGui::Checkbox("##spcrgh", &m_meta.use_specular_as_roughness));
+				ImGuiEx::Label("Use specular as metallic");
+				saveUndo(ImGui::Checkbox("##spcmtl", &m_meta.use_specular_as_metallic));
 				ImGuiEx::Label("Mikktspace tangents");
 				saveUndo(ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace));
 				ImGuiEx::Label("Recompute normals");
@@ -2189,6 +2195,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				if (m_meta.skeleton.isEmpty()) {
 					ImGuiEx::Label("Root motion bone");
 					saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
+				}
+
+				if (ImGui::Button("Reimport materials")) {
+					FBXImporter fbx_importer(m_app);
+					if (fbx_importer.setSource(m_resource->getPath(), FBXImporter::ReadFlags::IGNORE_GEOMETRY)) {
+						FBXImporter::ImportConfig cfg = metaToImportConfig(m_meta, m_resource->getPath());
+						if (!fbx_importer.writeMaterials(m_resource->getPath(), cfg, true)) {
+							logError("Failed to write materials for ", m_resource->getPath());
+						}
+					}
+					else {
+						logError("Failed to load ", m_resource->getPath());
+					}
 				}
 
 				ImGui::SeparatorText("LODs");
@@ -2561,7 +2580,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			const char* path = _path.c_str();
 			if (path[0] == '/') ++path;
-			importer.setSource(Path(path), true, false);
+			importer.setSource(Path(path), FBXImporter::ReadFlags::IGNORE_GEOMETRY);
 
 			if(meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
@@ -2602,12 +2621,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}, &m_subres_signal, 2);			
 	}
 
-	bool compile(const Path& src) override {
-		ASSERT(Path::hasExtension(src, "fbx"));
-		Path filepath = Path(ResourcePath::getResource(src));
+	static FBXImporter::ImportConfig metaToImportConfig(const ModelMeta& meta, const Path& src) {
 		FBXImporter::ImportConfig cfg;
-		ModelMeta meta(m_app.getAllocator()); 
-		meta.load(Path(filepath), m_app);
 		cfg.autolod_mask = meta.autolod_mask;
 		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
 		cfg.mikktspace_tangents = meta.use_mikktspace;
@@ -2619,6 +2634,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.bake_vertex_ao = meta.bake_vertex_ao;
 		cfg.min_bake_vertex_ao = meta.min_bake_vertex_ao;
 		cfg.import_vertex_colors = meta.import_vertex_colors;
+		cfg.use_specular_as_metallic = meta.use_specular_as_metallic;
+		cfg.use_specular_as_roughness = meta.use_specular_as_roughness;
 		cfg.vertex_color_is_ao = meta.vertex_color_is_ao;
 		cfg.lod_count = meta.lod_count;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
@@ -2630,8 +2647,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		cfg.skeleton = meta.skeleton;
 		if (cfg.skeleton.isEmpty()) cfg.skeleton = src;
 		cfg.root_motion_bone = BoneNameHash(meta.root_motion_bone.c_str());
+		return cfg;
+	}
+
+	bool compile(const Path& src) override {
+		ASSERT(Path::hasExtension(src, "fbx"));
+		Path filepath = Path(ResourcePath::getResource(src));
+		ModelMeta meta(m_app.getAllocator()); 
+		meta.load(Path(filepath), m_app);
+		
+		FBXImporter::ImportConfig cfg = metaToImportConfig(meta, src);
 		FBXImporter importer(m_app);
-		if (!importer.setSource(filepath, false, meta.force_skin)) return false;
+		if (!importer.setSource(filepath, meta.force_skin ? FBXImporter::ReadFlags::FORCE_SKINNED : FBXImporter::ReadFlags::NONE)) return false;
 		if (importer.getBoneCount() == 0 && importer.getMeshes().empty() && importer.getAnimations().empty()) {
 			if (importer.getOFBXScene()) {
 				if (importer.getOFBXScene()->getMeshCount() > 0) {
@@ -2653,7 +2680,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		cfg.origin = meta.origin;
 		any_written = importer.writeModel(src, cfg) || any_written;
-		any_written = importer.writeMaterials(filepath, cfg) || any_written;
+		any_written = importer.writeMaterials(filepath, cfg, false) || any_written;
 		if (!meta.ignore_animations) {
 			any_written = importer.writeAnimations(filepath, cfg) || any_written;
 		}
