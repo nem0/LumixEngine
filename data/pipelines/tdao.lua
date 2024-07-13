@@ -43,7 +43,7 @@ return {
 			env.tdao_rb = nil
 			env.tdao_rb_desc = nil 
 		end
-		env.tdao_rb_desc = env.tdao_rb_desc or env.createRenderbufferDesc { size = {w, h}, format = "depth32", debug_name = "tdao", compute_write = true }
+		env.tdao_rb_desc = env.tdao_rb_desc or env.createRenderbufferDesc { size = {w, h}, format = "depth32", debug_name = "tdao" }
 		if env.tdao_rb == nil then
 			env.tdao_rb = env.createRenderbuffer(env.tdao_rb_desc)
 		end

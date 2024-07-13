@@ -32,7 +32,10 @@ compute_shader [[
 		vec2 screen_uv = gl_GlobalInvocationID.xy / vec2(u_width, u_height);
 		vec3 wpos = getViewPosition(u_depth_buffer, Global.inv_view_projection, screen_uv);
 
-		vec2 uv = (wpos.xz + vec2(u_offset0, u_offset2)) / u_range * vec2(1, -1);
+		vec2 uv = (wpos.xz + vec2(u_offset0, u_offset2)) / u_range;
+		#ifdef _ORIGIN_BOTTOM_LEFT
+			uv = uv * vec2(1, -1);
+		#endif
 		if (any(greaterThan(uv, vec2(1, 1)))) return;
 		if (any(lessThan(uv, vec2(-1, -1)))) return;
 		uv = saturate(uv * 0.5 + 0.5);
