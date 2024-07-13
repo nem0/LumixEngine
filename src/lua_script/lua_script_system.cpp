@@ -2854,6 +2854,60 @@ static int LUA_require(lua_State* L) {
     return finishrequire(L);
 }
 
+static int LUA_dofile(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L, 1);
+	const char* name = luaL_checkstring(L, 1);
+
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
+	Path path(name, ".lua");
+	LuaScript* dep = engine->getResourceManager().load<LuaScript>(path);
+	if (!dep->isReady()) {
+		ASSERT(false); // require-d modules should be registered as dependencies, so it should be impossible to get here
+		luaL_argerrorL(L, 1, "error loading module");
+	}
+
+	lua_State* GL = lua_mainthread(L);
+	lua_State* ML = lua_newthread(GL);
+	LuaWrapper::DebugGuard guard2(ML);
+	lua_xmove(GL, L, 1);
+
+	luaL_sandboxthread(ML);
+
+	size_t bytecode_size;
+	char* bytecode = luau_compile((const char*)dep->getSourceCode().begin, dep->getSourceCode().size(), nullptr, &bytecode_size);
+	if (bytecode_size == 0) {
+		lua_pushstring(L, bytecode);
+		free(bytecode);
+		lua_error(L);
+	}
+
+	if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
+	{
+		int status = lua_resume(ML, L, 0);
+
+		if (status == 0)
+		{
+			if (lua_gettop(ML) == 0)
+				lua_pushstring(ML, "module must return a value");
+			else if (!lua_istable(ML, -1) && !lua_isfunction(ML, -1))
+				lua_pushstring(ML, "module must return a table or function");
+		}
+		else if (status == LUA_YIELD)
+		{
+			lua_pushstring(ML, "module can not yield");
+		}
+		else if (!lua_isstring(ML, -1))
+		{
+			lua_pushstring(ML, "unknown error while running module");
+		}
+	}
+	free(bytecode);
+
+	lua_xmove(ML, L, 1);
+	lua_remove(L, -2);
+	return finishrequire(L);
+}
+
 LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	: m_engine(engine)
 	, m_allocator(engine.getAllocator(), "lua system")
@@ -2863,6 +2917,10 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	lua_pushlightuserdata(L, &engine);
 	lua_pushcclosure(L, &LUA_require, "require", 1);
 	lua_setglobal(L, "require");
+
+	lua_pushlightuserdata(L, &engine);
+	lua_pushcclosure(L, &LUA_dofile, "dofile", 1);
+	lua_setglobal(L, "dofile");
 
 	m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 

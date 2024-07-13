@@ -623,6 +623,9 @@ static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies,
 	lua_pushcclosure(L, reg_dep, "require", 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "require");
 
+	lua_pushcclosure(L, reg_dep, "dofile", 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "dofile");
+
 	lua_pushlightuserdata(L, &dependencies);
 	lua_setfield(L, LUA_GLOBALSINDEX, "__deps");
 		
@@ -636,7 +639,9 @@ static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies,
 	lua_newtable(L); // metatable, new_g
 	lua_getglobal(L, "require"); // metatable, new_g, require
 	lua_setfield(L, -2, "require"); // metatable, new_g
-		
+	lua_getglobal(L, "dofile"); // metatable, new_g, require
+	lua_setfield(L, -2, "dofile"); // metatable, new_g
+
 	lua_insert(L, -2); // new_g, meta
 	lua_setmetatable(L, -2); //new_g
 		
