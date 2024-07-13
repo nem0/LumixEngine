@@ -2,6 +2,7 @@ local atmo = require "pipelines/atmo"
 local bloom = require "pipelines/bloom"
 local dof = require "pipelines/dof"
 local ssao = require "pipelines/ssao"
+local tdao = require "pipelines/tdao"
 local sss = require "pipelines/sss"
 local cubemap_sky = require "pipelines/cubemap_sky"
 local film_grain =  require "pipelines/film_grain"
@@ -533,6 +534,7 @@ main = function()
 	local gbuffer = geomPass(view_params, entities)
 
 	ssao:postprocess(getfenv(1), nil, gbuffer, shadowmap)
+	tdao:postprocess(getfenv(1), nil, gbuffer, shadowmap)
 	sss:postprocess(getfenv(1), nil, gbuffer, shadowmap)
 
 	local hdr_buffer = lightPass(view_params, gbuffer, shadowmap)
@@ -575,6 +577,8 @@ main = function()
 			renderIngameGUI()
 		end
 	end
+
+	tdao:debug(getfenv(1), res)
 
 	debugPass(res, gbuffer, shadowmap)
 	if SCENE_VIEW ~= nil then
@@ -646,6 +650,10 @@ onGUI = function()
 		_, fxaa.enabled = ImGui.Checkbox("FXAA", fxaa.enabled)
 		if ImGui.BeginMenu("SSAO", true) then
 			ssao:gui()
+			ImGui.EndMenu()
+		end
+		if ImGui.BeginMenu("TDAO", true) then
+			tdao:gui()
 			ImGui.EndMenu()
 		end
 		if ImGui.BeginMenu("SSS", true) then

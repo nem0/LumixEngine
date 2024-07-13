@@ -1592,14 +1592,52 @@ struct PipelineImpl final : Pipeline
 
 	enum class CameraParamsEnum : CameraParamsHandle {
 		MAIN,
+		CUSTOM,
 		SHADOW0,
 		SHADOW1,
 		SHADOW2,
-		SHADOW3
+		SHADOW3,
 	};
+
+	CameraParams m_custom_camera_params;
+
+	void setOrthoCustomCameraParams(const DVec3 pos
+		, const Quat& rot
+		, u32 w
+		, u32 h
+		, float ortho_size
+		, float z_near
+		, float z_far
+		, bool reversed_z
+	) {
+		m_custom_camera_params.pos = pos;
+		ShiftedFrustum frustum;
+		const float ratio = h > 0 ? w / (float)h : 1;
+		frustum.computeOrtho({ 0, 0, 0 },
+			rot * Vec3(0, 0, 1),
+			rot * Vec3(0, 1, 0),
+			ortho_size * ratio,
+			ortho_size,
+			z_near,
+			z_far);
+		frustum.origin = pos;
+		m_custom_camera_params.frustum = frustum;
+		m_custom_camera_params.lod_multiplier = 1;
+		m_custom_camera_params.is_shadow = false;
+
+		m_custom_camera_params.view = rot.toMatrix().fastInverted();
+		m_custom_camera_params.projection.setOrtho(-ortho_size * ratio,
+			ortho_size * ratio,
+			-ortho_size,
+			ortho_size,
+			z_near,
+			z_far,
+			reversed_z);
+	}
 
 	CameraParams resolveCameraParams(CameraParamsHandle handle) {
 		switch ((CameraParamsEnum)handle) {
+			case CameraParamsEnum::CUSTOM: return m_custom_camera_params;
 			case CameraParamsEnum::MAIN: {
 				CameraParams cp;
 				cp.pos = m_viewport.pos;
@@ -2126,6 +2164,10 @@ struct PipelineImpl final : Pipeline
 		stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		stream.drawArrays(indices_offset, indices_count);
+	}
+
+	DVec3 getCameraPositionFromParams(CameraParamsHandle cp) {
+		return resolveCameraParams(cp).pos;
 	}
 
 	CameraParamsHandle getCameraParams() { return (CameraParamsHandle)CameraParamsEnum::MAIN; }
@@ -3967,6 +4009,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(getCameraParams);
+		REGISTER_FUNCTION(getCameraPositionFromParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
 		REGISTER_FUNCTION(getRenderToDisplayRatio);
 		REGISTER_FUNCTION(keepRenderbufferAlive);
@@ -3983,10 +4026,12 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderAA);
 		REGISTER_FUNCTION(renderUI);
 		REGISTER_FUNCTION(saveRenderbuffer);
+		REGISTER_FUNCTION(setOrthoCustomCameraParams);
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(setRenderToDisplayRatio);
 		REGISTER_FUNCTION(viewport);
 
+		lua_pushinteger(L, (i32)CameraParamsEnum::CUSTOM); lua_setfield(L, -2, "CUSTOM_CAMERA_PARAMS");
 		lua_pushinteger(L, -2); lua_setfield(L, -2, "SHADOW_ATLAS");
 		lua_pushinteger(L, -3); lua_setfield(L, -2, "REFLECTION_PROBES");
 
