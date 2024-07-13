@@ -21,7 +21,7 @@ compute_shader [[
 		float depth = texelFetch(u_depthbuf, ij, 0).x;
 		
 		vec2 uv = (vec2(ij) + 0.5) / u_size.xy;
-		vec2 uv_prev = cameraReproject(uv, depth);
+		vec2 uv_prev = cameraReproject(uv, depth).xy;
 
 		float current = imageLoad(u_sss, ij).x;
 		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {

@@ -32,7 +32,7 @@ compute_shader [[
 		float occlusion = 0;
 		float occlusion_count = 0;
 	
-		float rand = rand(view_pos.xyz + Global.time * 0.1);
+		float rand = rand(view_pos.xyz + fract(Global.time) * 0.001);
 		float random_angle = rand * 6.283285;
 		vec3 rot;
 		float depth_scale = u_radius / view_pos.z * (rand * 2 + 0.1);
@@ -65,10 +65,6 @@ compute_shader [[
 			{
 				occlusion += (angle_a + angle_b) * (0.5 - 0.25 * (dist_a + dist_b));
 				occlusion_count += 1.0;
-			}
-			else
-			{
-				occlusion = 0;
 			}
 		}
 	

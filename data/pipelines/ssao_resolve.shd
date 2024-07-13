@@ -11,6 +11,7 @@ compute_shader [[
 	layout(std140, binding = 4) uniform Data {
 		vec4 u_size;
 		float u_current_frame_weight;
+		float u_disocclusion_strength;
 	};
 
 	void main()
@@ -22,12 +23,21 @@ compute_shader [[
 		float depth = texture(u_depthbuf, uv).x;
 		
 		vec2 uv_prev = cameraReproject(uv, depth);
+		float prev_depth = texture(u_depthbuf, uv_prev).x;
 
 		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {
 			float current = imageLoad(u_current, ij).x;
 			float prev = texture(u_history, uv_prev).x;
+			float disocclusion = abs(prev_depth - depth);
+			disocclusion = saturate(disocclusion * u_disocclusion_strength);
 			vec4 v = vec4(mix(prev, current, u_current_frame_weight));
+			v = mix(v, vec4(1), disocclusion);
 			imageStore(u_current, ij, v);
+		}
+		else {
+			float current = imageLoad(u_current, ij).x;
+			float v = mix(1, current, u_current_frame_weight);
+			imageStore(u_current, ij, vec4(v));
 		}
 	}
 ]]
