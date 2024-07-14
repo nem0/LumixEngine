@@ -387,9 +387,10 @@ void enableVSync(bool enable) {
 	gl->vsync = enable;
 }
 
-typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
-static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
-
+#ifdef _WIN32
+	typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+	static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
+#endif
 
 static bool load_gl(void* platform_handle, InitFlags init_flags)
 {
