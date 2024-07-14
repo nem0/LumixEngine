@@ -7,7 +7,7 @@ template <typename T> struct Span {
 	Span()
 		: m_begin(nullptr)
 		, m_end(nullptr) {}
-	Span(T* begin, u32 len)
+	Span(T* begin, u64 len)
 		: m_begin(begin)
 		, m_end(begin + len) {}
 	Span(T* begin, T* end)
