@@ -198,7 +198,7 @@ struct WorldViewImpl final : WorldView {
 							m_editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
 						}
 					} else {
-						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u32)0), false);
+						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u64)0), false);
 					}
 				}
 			}
@@ -1255,7 +1255,7 @@ void SceneView::handleEvents() {
 			case os::Event::Type::KEY: {
 				if (handle_input) {
 					if (event.key.down && event.key.keycode == os::Keycode::ESCAPE) {
-						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u32)0), false);
+						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u64)0), false);
 					}
 				}
 				break;
