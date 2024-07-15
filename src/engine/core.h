@@ -5,6 +5,7 @@
 
 #include "engine/engine.h"
 #include "engine/plugin.h"
+#include "engine/reflection.h"
 
 namespace Lumix {
 
@@ -15,8 +16,17 @@ struct Spline {
 	Array<Vec3> points;
 };
 
+struct Signal {
+	EntityRef entity;
+	reflection::Module* event_module = nullptr;
+	reflection::EventBase* event = nullptr;
+	reflection::Module* function_module = nullptr;
+	reflection::FunctionBase* function = nullptr;
+};
+
 struct CoreModule : IModule {
 	virtual Spline& getSpline(EntityRef e) = 0;
+	virtual Signal& getSignal(EntityRef e) = 0;
 	virtual const HashMap<EntityRef, Spline>& getSplines() = 0;
 };
 

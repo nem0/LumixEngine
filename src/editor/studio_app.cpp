@@ -24,6 +24,7 @@
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
+#include "editor/signal_editor.h"
 #include "editor/spline_editor.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -2778,6 +2779,7 @@ struct StudioAppImpl final : StudioApp
 			}
 		#endif
 		addPlugin(*createSplineEditor(*this));
+		addPlugin(*createSignalEditor(*this));
 		addPlugin(*m_property_grid.get());
 		addPlugin(*m_log_ui.get());
 		addPlugin(*m_asset_browser.get());

@@ -21,7 +21,7 @@
 #define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflModule::create##Cmp, &ReflModule::destroy##Cmp>(Name, Label)
 #define LUMIX_PROP(Property, Label) prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
 #define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
-#define LUMIX_GLOBAL_FUNC(Func) reflection::function(&Func, #Func, nullptr)
+#define LUMIX_GLOBAL_FUNC(Func) reflection::function<&Func>(#Func, nullptr)
 
 namespace Lumix
 {
@@ -433,53 +433,20 @@ template <typename T> TypeDescriptor toTypeDescriptor() {
 	return td;
 }
 
-struct FunctionBase
-{
+struct FunctionBase {
+	using DummyFnType = void (*)();
+
 	virtual ~FunctionBase() {}
 
 	virtual u32 getArgCount() const = 0;
 	virtual TypeDescriptor getReturnType() const = 0;
 	virtual TypeDescriptor getThisType() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
-	virtual void invoke(void* obj, Span<u8> ret_mem, Span<Variant> args) const = 0;
-	virtual bool isConstMethod() = 0;
+	virtual void invoke(void* obj, Span<u8> ret_mem, Span<const Variant> args) const = 0;
+	virtual DummyFnType getDelegateStub() = 0;
 
 	const char* decl_code;
 	const char* name;
-};
-
-inline bool fromVariant(int i, Span<Variant> args, VariantTag<bool>) { return args[i].b; }
-inline float fromVariant(int i, Span<Variant> args, VariantTag<float>) { return args[i].f; }
-inline const char* fromVariant(int i, Span<Variant> args, VariantTag<const char*>) { return args[i].s; }
-inline Path fromVariant(int i, Span<Variant> args, VariantTag<Path>) { return Path(args[i].s); }
-inline i32 fromVariant(int i, Span<Variant> args, VariantTag<i32>) { return args[i].i; }
-inline u32 fromVariant(int i, Span<Variant> args, VariantTag<u32>) { return args[i].u; }
-inline Color fromVariant(int i, Span<Variant> args, VariantTag<Color>) { return args[i].color; }
-inline Vec2 fromVariant(int i, Span<Variant> args, VariantTag<Vec2>) { return args[i].v2; }
-inline Vec3 fromVariant(int i, Span<Variant> args, VariantTag<Vec3>) { return args[i].v3; }
-inline Quat fromVariant(int i, Span<Variant> args, VariantTag<Quat>) { return args[i].quat; }
-inline DVec3 fromVariant(int i, Span<Variant> args, VariantTag<DVec3>) { return args[i].dv3; }
-inline EntityPtr fromVariant(int i, Span<Variant> args, VariantTag<EntityPtr>) { return args[i].e; }
-inline EntityRef fromVariant(int i, Span<Variant> args, VariantTag<EntityRef>) { return (EntityRef)args[i].e; }
-inline void* fromVariant(int i, Span<Variant> args, VariantTag<void*>) { return args[i].ptr; }
-template <typename T> inline T* fromVariant(int i, Span<Variant> args, VariantTag<T*>) { return (T*)args[i].ptr; }
-template <typename T> inline T& fromVariant(int i, Span<Variant> args, VariantTag<T>) { return *(T*)args[i].ptr; }
-
-template <typename... Args>
-struct VariantCaller {
-	template <typename C, typename F, int... I>
-	static void call(C* inst, F f, Span<u8> ret_mem, Span<Variant> args, Indices<I...>& indices) {
-		using R = typename ResultOf<F>::Type;
-		if constexpr (IsSame<R, void>::Value) {
-			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
-		}
-		else {
-			auto v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
-			if (ret_mem.length() == sizeof(v)) {
-				memcpy(ret_mem.m_begin, &v, sizeof(v));
-			}
-		}
-	}
 };
 
 struct EventBase {
@@ -493,16 +460,136 @@ struct EventBase {
 	virtual StringView getThisTypeName() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void bind(void* object, Callback* callback) const = 0;
+	[[nodiscard]] virtual bool bind(void* object, void* fn_object, FunctionBase* function) const = 0;
 
 	const char* name;
 };
 
+inline bool fromVariant(int i, Span<const Variant> args, VariantTag<bool>) { return args[i].b; }
+inline float fromVariant(int i, Span<const Variant> args, VariantTag<float>) { return args[i].f; }
+inline const char* fromVariant(int i, Span<const Variant> args, VariantTag<const char*>) { return args[i].s; }
+inline Path fromVariant(int i, Span<const Variant> args, VariantTag<Path>) { return Path(args[i].s); }
+inline i32 fromVariant(int i, Span<const Variant> args, VariantTag<i32>) { return args[i].i; }
+inline u32 fromVariant(int i, Span<const Variant> args, VariantTag<u32>) { return args[i].u; }
+inline Color fromVariant(int i, Span<const Variant> args, VariantTag<Color>) { return args[i].color; }
+inline Vec2 fromVariant(int i, Span<const Variant> args, VariantTag<Vec2>) { return args[i].v2; }
+inline Vec3 fromVariant(int i, Span<const Variant> args, VariantTag<Vec3>) { return args[i].v3; }
+inline Quat fromVariant(int i, Span<const Variant> args, VariantTag<Quat>) { return args[i].quat; }
+inline DVec3 fromVariant(int i, Span<const Variant> args, VariantTag<DVec3>) { return args[i].dv3; }
+inline EntityPtr fromVariant(int i, Span<const Variant> args, VariantTag<EntityPtr>) { return args[i].e; }
+inline EntityRef fromVariant(int i, Span<const Variant> args, VariantTag<EntityRef>) { return (EntityRef)args[i].e; }
+inline void* fromVariant(int i, Span<const Variant> args, VariantTag<void*>) { return args[i].ptr; }
+template <typename T> inline T* fromVariant(int i, Span<const Variant> args, VariantTag<T*>) { return (T*)args[i].ptr; }
+template <typename T> inline T& fromVariant(int i, Span<const Variant> args, VariantTag<T>) { return *(T*)args[i].ptr; }
+
 template <typename F> struct Event;
 
-template <typename C, typename... Args>
-struct Event<DelegateList<void (Args...)>& (C::*)()> : EventBase
+template <typename T> struct ArgToTypeDescriptor;
+
+template <typename R, typename C, typename... Args>
+struct ArgToTypeDescriptor<R(C::*)(Args...)>
 {
-	using F = DelegateList<void (Args...)>& (C::*)();
+	static TypeDescriptor get(int i) {
+		TypeDescriptor expand[] = {
+			toTypeDescriptor<Args>()...,
+			Variant::Type::VOID
+		};
+		return expand[i];
+	}
+};
+
+template <typename R, typename C, typename... Args>
+struct ArgToTypeDescriptor<R(C::*)(Args...) const>
+{
+	static TypeDescriptor get(int i) {
+		TypeDescriptor expand[] = {
+			toTypeDescriptor<Args>()...,
+			Variant::Type::VOID
+		};
+		return expand[i];
+	}
+};
+
+template <typename T> struct VariantCaller;
+
+template <typename R, typename C, typename... Args>
+struct VariantCaller<R (C::*)(Args...)> {
+	template <int... I>
+	static void call(C* inst, auto f, Span<u8> ret_mem, Span<const Variant> args, Indices<I...>& indices) {
+		if constexpr (IsSame<R, void>::Value) {
+			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+		}
+		else {
+			auto v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+			if (ret_mem.length() == sizeof(v)) {
+				memcpy(ret_mem.m_begin, &v, sizeof(v));
+			}
+		}
+	}
+};
+
+template <typename R, typename C, typename... Args>
+struct VariantCaller<R (C::*)(Args...) const> {
+	template <int... I>
+	static void call(C* inst, auto f, Span<u8> ret_mem, Span<const Variant> args, Indices<I...>& indices) {
+		if constexpr (IsSame<R, void>::Value) {
+			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+		}
+		else {
+			auto v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+			if (ret_mem.length() == sizeof(v)) {
+				memcpy(ret_mem.m_begin, &v, sizeof(v));
+			}
+		}
+	}
+};
+
+template <typename T, T f> struct DelegateStub;
+
+template <typename R, typename C, auto F, typename... Args>
+struct DelegateStub<R(C::*)(Args...), F> {
+	static R stub(void* obj, Args... args) {
+		C* o = (C*)obj;
+		return (o->*F)(args...);
+	}
+};
+
+template <typename R, typename C, auto F, typename... Args>
+struct DelegateStub<R(C::*)(Args...) const, F> {
+	static R stub(void* obj, Args... args) {
+		C* o = (C*)obj;
+		return (o->*F)(args...);
+	}
+};
+
+template <auto function> 
+struct Function : FunctionBase {
+	using F = decltype(function);
+	using R = ResultOf<F>::Type;
+	using C = ClassOf<F>::Type;
+
+	u32 getArgCount() const override { return ArgsCount<F>::value; }
+	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
+	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
+	
+	TypeDescriptor getArgType(int i) const override {
+		return ArgToTypeDescriptor<F>::get(i);
+	}
+	
+	void invoke(void* obj, Span<u8> ret_mem, Span<const Variant> args) const override {
+		auto indices = typename BuildIndices<-1, ArgsCount<F>::value>::result{};
+		VariantCaller<F>::call((C*)obj, function, ret_mem, args, indices);
+	}
+
+	DummyFnType getDelegateStub() override {
+		return reinterpret_cast<DummyFnType>(&DelegateStub<F, function>::stub);
+	}
+};
+
+template <typename C, typename... Args>
+struct Event<DelegateList<void(Args...)>& (C::*)()> : EventBase
+{
+	using F = DelegateList<void(Args...)>& (C::*)();
 	F function;
 
 	u32 getArgCount() const override { return sizeof...(Args); }
@@ -516,7 +603,7 @@ struct Event<DelegateList<void (Args...)>& (C::*)()> : EventBase
 		};
 		return expand[i];
 	}
-	
+
 	template <typename T>
 	static Variant toVariant(T value) {
 		Variant v;
@@ -524,73 +611,32 @@ struct Event<DelegateList<void (Args...)>& (C::*)()> : EventBase
 		return v;
 	}
 
+	bool bind(void* object, void* fn_object, FunctionBase* fn) const override {
+		C* s = (C*)object;
+		using RawFnType = void (*)(void*, Args...);
+		if (fn->getArgCount() != ArgsCount<void (C::*)(Args...)>::value) return false;
+		for (u32 i = 0; i < fn->getArgCount(); ++i) {
+			if (fn->getArgType(i).type != ArgToTypeDescriptor<void (C::*)(Args...)>::get(i).type) {
+				return false;
+			}
+		}
+
+		(s->*function)().bindRaw(fn_object, reinterpret_cast<RawFnType>(fn->getDelegateStub()));
+		return true;
+	}
+
 	void bind(void* object, Callback* callback) const override {
 		C* s = (C*)object;
-		auto l = [](void* obj, Args... args){
+		auto l = [](void* obj, Args... args) {
 			Callback* cb = (Callback*)obj;
 			Variant a[] = {
 				toVariant(args)...
 			};
 			cb->invoke(Span(a));
-		};
+			};
 		(s->*function)().bindRaw(callback, l);
 	}
 };
-
-template <typename F> struct Function;
-
-template <typename R, typename C, typename... Args>
-struct Function<R (C::*)(Args...)> : FunctionBase
-{
-	using F = R(C::*)(Args...);
-	F function;
-
-	u32 getArgCount() const override { return sizeof...(Args); }
-	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
-	bool isConstMethod() override { return false; }
-	
-	TypeDescriptor getArgType(int i) const override
-	{
-		TypeDescriptor expand[] = {
-			toTypeDescriptor<Args>()...,
-			Variant::Type::VOID
-		};
-		return expand[i];
-	}
-	
-	void invoke(void* obj, Span<u8> ret_mem, Span<Variant> args) const override {
-		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		VariantCaller<Args...>::call((C*)obj, function, ret_mem, args, indices);
-	}
-};
-
-template <typename R, typename C, typename... Args>
-struct Function<R (C::*)(Args...) const> : FunctionBase
-{
-	using F = R(C::*)(Args...) const;
-	F function;
-
-	u32 getArgCount() const override { return sizeof...(Args); }
-	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
-	bool isConstMethod() override { return true; }
-	
-	TypeDescriptor getArgType(int i) const override
-	{
-		TypeDescriptor expand[] = {
-			toTypeDescriptor<Args>()...,
-			Variant::Type::VOID
-		};
-		return expand[i];
-	}
-
-	void invoke(void* obj, Span<u8> ret_mem, Span<Variant> args) const override {
-		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		VariantCaller<Args...>::call((const C*)obj, function, ret_mem, args, indices);
-	}
-};
-
 
 struct StructVarBase {
 	virtual ~StructVarBase() {}
@@ -661,12 +707,11 @@ struct StructBase {
 LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
 LUMIX_ENGINE_API Array<StructBase*>& allStructs();
 
-template <typename F>
-auto& function(F func, const char* decl_code, const char* name)
+template <auto func>
+auto& function(const char* decl_code, const char* name)
 {
-	static Function<F> ret;
+	static Function<func> ret;
 	allFunctions().push(&ret);
-	ret.function = func;
 	ret.decl_code = decl_code;
 	ret.name = name && name[0] ? name : declCodeToName(decl_code);
 	return ret;
@@ -937,8 +982,7 @@ struct LUMIX_ENGINE_API builder {
 
 	template <auto F>
 	builder& function(const char* name, const char* decl_code) {
-		auto* f = LUMIX_NEW(allocator, Function<decltype(F)>);
-		f->function = F;
+		auto* f = LUMIX_NEW(allocator, Function<F>);
 		f->name = name && name[0] ? name : declCodeToName(decl_code);
 		f->decl_code = decl_code;
 		if (module->cmps.empty()) {
