@@ -219,10 +219,38 @@ struct CoreModuleImpl : CoreModule {
 		signal.function = function;
 	}
 
+	void getSplineBlob(EntityRef entity, OutputMemoryStream& value) {
+		const Spline& spline = m_splines[entity];
+		value.writeArray(spline.points);
+	}
+
+	void setSplineBlob(EntityRef entity, InputMemoryStream& value) {
+		Spline& spline = m_splines[entity];
+		value.readArray(&spline.points);
+	}
+
+	void getSignalBlob(EntityRef entity, OutputMemoryStream& value) {
+		const Signal& signal = *m_signals[entity].get();
+		value.write(signal.event_module);
+		value.write(signal.event);
+		value.write(signal.function_module);
+		value.write(signal.function);
+	}
+
+	void setSignalBlob(EntityRef entity, InputMemoryStream& value) {
+		Signal& signal = *m_signals[entity].get();
+		value.read(signal.event_module);
+		value.read(signal.event);
+		value.read(signal.function_module);
+		value.read(signal.function);
+	}
+
 	static void reflect() {
 		LUMIX_MODULE(CoreModuleImpl, "core")
 			.LUMIX_CMP(Spline, "spline", "Core / Spline")
+				.blob_property<&CoreModuleImpl::getSplineBlob, &CoreModuleImpl::setSplineBlob>("Blob")
 			.LUMIX_CMP(Signal, "signal", "Core / Signal")
+				.blob_property<&CoreModuleImpl::getSignalBlob, &CoreModuleImpl::setSignalBlob>("Blob")
 		;
 	}
 
