@@ -91,6 +91,7 @@ struct GUIModule : IModule
 	virtual void setImageSprite(EntityRef entity, const Path& path) = 0;
 
 	virtual GUICanvas& getCanvas(EntityRef entity) = 0;
+	virtual HashMap<EntityRef, GUICanvas>& getCanvases() = 0;
 
 	virtual void setText(EntityRef entity, const char* text) = 0;
 	virtual const char* getText(EntityRef entity) = 0;

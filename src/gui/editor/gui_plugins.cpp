@@ -32,6 +32,7 @@ using namespace Lumix;
 
 namespace {
 
+static const ComponentType GUI_CANVAS_TYPE = reflection::getComponentType("gui_canvas");
 static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_text");
@@ -499,16 +500,50 @@ private:
 			mouse_canvas_pos.x -= ImGui::GetCursorScreenPos().x;
 			mouse_canvas_pos.y -= ImGui::GetCursorScreenPos().y;
 			
+			m_pipeline->setWorld(editor.getWorld());
+
+			GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
+			HashMap<EntityRef, GUICanvas>& canvases = module->getCanvases();
+			if (!m_canvas_entity.isValid() && canvases.size() > 0) {
+				m_canvas_entity = canvases.begin().key();
+			}
+
+			if (canvases.size() > 1) {
+				char entity_name[64] = "N/A";
+				getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), m_canvas_entity);
+				if (ImGui::BeginCombo("Canvas", entity_name)) {
+					for (auto iter = canvases.begin(), end = canvases.end(); iter != end; ++iter) {
+						getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), iter.key());
+						if (ImGui::Selectable(entity_name)) {
+							m_canvas_entity = iter.key();
+						}
+					}
+					ImGui::EndCombo();
+				}
+			}
+
+			if (!m_canvas_entity.isValid()) {
+				if (canvases.empty()) {
+					ImGui::TextUnformatted("No canvases found.");
+					if (ImGui::Button("Create canvas")) {
+						editor.beginCommandGroup("create_gui_canvas");
+						EntityRef e = editor.addEntity();
+						editor.setEntityName(e, "GUI canvas");
+						editor.addComponent(Span(&e, 1), GUI_CANVAS_TYPE);
+						editor.addComponent(Span(&e, 1), GUI_RECT_TYPE);
+						editor.endCommandGroup();
+					}
+				}
+				ImGui::End();
+				return;
+			}
+
 			const ImVec2 size = ImGui::GetContentRegionAvail();
 			m_canvas_size = size;
 			if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
 				ImGui::End();
 				return;
 			}
-
-			m_pipeline->setWorld(editor.getWorld());
-
-			GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
 			module->render(*m_pipeline, { size.x, size.y }, false);
 			
 			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *module, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
@@ -613,6 +648,7 @@ private:
 			{
 				EntityRef e = editor.getSelectedEntities()[0];
 				if (ImGui::BeginMenu("Create child")) {
+					if (ImGui::MenuItem("Button + Image + Text")) createChildren(e, editor, GUI_BUTTON_TYPE, GUI_IMAGE_TYPE, GUI_TEXT_TYPE);
 					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE, editor);
 					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE, editor);
 					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE, editor);
@@ -743,6 +779,22 @@ private:
 		editor.endCommandGroup();
 	}
 
+
+	void createChildren(EntityRef entity, WorldEditor& editor, ComponentType child_type0, ComponentType child_type1, ComponentType child_type2) {
+		editor.beginCommandGroup("create_gui_rect_child");
+		EntityRef child = editor.addEntity();
+		editor.makeParent(entity, child);
+		editor.selectEntities(Span(&child, 1), false);
+		editor.addComponent(Span(&child, 1), GUI_RECT_TYPE);
+		ASSERT(child_type0 != GUI_RECT_TYPE);
+		ASSERT(child_type1 != GUI_RECT_TYPE);
+		ASSERT(child_type2 != GUI_RECT_TYPE);
+		editor.addComponent(Span(&child, 1), child_type0);
+		editor.addComponent(Span(&child, 1), child_type1);
+		editor.addComponent(Span(&child, 1), child_type2);
+		editor.endCommandGroup();
+
+	}
 
 	void createChild(EntityRef entity, ComponentType child_type, WorldEditor& editor)
 	{
@@ -985,6 +1037,7 @@ private:
 	Vec2 m_bottom_right_start_transform;
 	Vec2 m_top_left_start_move;
 	Vec2 m_canvas_size;
+	EntityPtr m_canvas_entity = INVALID_ENTITY;
 
 	Action m_hcenter_action;
 	Action m_vcenter_action;

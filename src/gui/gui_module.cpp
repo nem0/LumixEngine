@@ -402,6 +402,10 @@ struct GUIModuleImpl final : GUIModule {
 		GUIImage* image = m_rects[entity]->image;
 		return image->sprite ? image->sprite->getPath() : Path();
 	}
+	
+	HashMap<EntityRef, GUICanvas>& getCanvases() override {
+		return m_canvas;
+	}
 
 	GUICanvas& getCanvas(EntityRef entity) override {
 		return m_canvas[entity];
