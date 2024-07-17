@@ -1274,9 +1274,10 @@ ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView 
 	else {
 		exec_info.fMask = SEE_MASK_NO_CONSOLE;
 	}
-	const uintptr_t res = (uintptr_t)ShellExecuteEx(&exec_info);
-	if (res > 32) return ExecuteOpenResult::SUCCESS;
-	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
+	BOOL res = ShellExecuteEx(&exec_info);
+	if (res) return ExecuteOpenResult::SUCCESS;
+	DWORD err = GetLastError();
+	if (err == ERROR_NO_ASSOCIATION) return ExecuteOpenResult::NO_ASSOCIATION;
 	return ExecuteOpenResult::OTHER_ERROR;
 }
 
