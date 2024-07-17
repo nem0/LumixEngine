@@ -163,8 +163,8 @@ struct Runner final
 
 		os::InitWindowArgs init_window_args;
 		init_window_args.name = "Lumix App";
-		os::WindowHandle wnd = os::createWindow(init_window_args);
-		m_engine->setMainWindow(wnd);
+		m_window = os::createWindow(init_window_args);
+		m_engine->setMainWindow(m_window);
 
 		m_engine->init();
 		
@@ -196,7 +196,7 @@ struct Runner final
 		onResize();
 		m_engine->startGame(*m_world);
 
-		os::showWindow(wnd);
+		os::showWindow(m_window);
 	}
 
 	void shutdown() {
@@ -213,11 +213,9 @@ struct Runner final
 		if (m_focused) {
 			os::Rect r = os::getWindowScreenRect(m_engine->getMainWindow());
 			os::clipCursor(m_engine->getMainWindow(), r);
-			os::showCursor(false);
 		}
 		else {
 			os::clipCursor(os::INVALID_WINDOW, {});
-			os::showCursor(true);
 		}
 	}
 
@@ -227,7 +225,8 @@ struct Runner final
 			const bool is_key_up = event.type == os::Event::Type::KEY && !event.key.down;
 			if (m_focused || is_mouse_up || is_key_up) {
 				InputSystem& input = m_engine->getInputSystem();
-				input.injectEvent(event, 0, 0);
+				os::Point p = os::toScreen(m_window, 0, 0);
+				input.injectEvent(event, p.x, p.y);
 			}
 		}
 		switch (event.type) {
@@ -277,6 +276,7 @@ struct Runner final
 	World* m_world = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
 	Path m_startup_world;
+	os::WindowHandle m_window = os::INVALID_WINDOW;
 
 	Viewport m_viewport;
 	bool m_finished = false;

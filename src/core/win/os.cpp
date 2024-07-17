@@ -75,6 +75,7 @@ static struct {
 	bool raw_input_registered = false;
 	u16 surrogate = 0;
 	bool key_states[256] = {};
+	bool is_cursor_shown = true;
 	struct {
 		HCURSOR load;
 		HCURSOR size_ns;
@@ -590,8 +591,10 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					e.type = Event::Type::WINDOW_CLOSE;
 					G.event_queue.pushBack(e);
 					return 0;
-				case WM_ACTIVATE:
+				case WM_ACTIVATE: {
+					static bool was_cursor_shown = true;
 					if (wParam == WA_INACTIVE) {
+						was_cursor_shown = G.is_cursor_shown;
 						showCursor(true);
 						G.key_states[(u32)os::Keycode::SHIFT] = false;
 						G.key_states[(u32)os::Keycode::CTRL] = false;
@@ -600,11 +603,15 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 						G.key_states[(u32)os::Keycode::LCTRL] = false;
 						G.key_states[(u32)os::Keycode::LALT] = false;
 					}
+					else {
+						showCursor(was_cursor_shown);
+					}
 
 					e.type = Event::Type::FOCUS;
 					e.focus.gained = wParam != WA_INACTIVE;
 					G.event_queue.pushBack(e);
 					break;
+				}
 				case WM_NCPAINT:
 				case WM_NCACTIVATE:
 					if (win->init_args.flags & InitWindowArgs::NO_DECORATION) return TRUE;
@@ -799,6 +806,7 @@ void getKeyName(Keycode keycode, Span<char> out)
 
 void showCursor(bool show)
 {
+	G.is_cursor_shown = show;
 	if (show) {
 		while(ShowCursor(show) < 0);
 	}
