@@ -325,6 +325,16 @@ struct GUIModuleImpl final : GUIModule {
 		pipeline.render3DUI(canvas.entity, m_draw_2d, canvas.virtual_size, canvas.orient_to_camera);
 	}
 
+	void renderCanvas(Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main, EntityRef canvas_entity) override {
+		m_canvas_size = canvas_size;
+		GUICanvas& canvas = m_canvas[canvas_entity];
+		auto iter = m_rects.find(canvas.entity);
+		if (iter.isValid()) {
+			GUIRect* r = iter.value();
+			renderRect(*r, pipeline.getDraw2D(), { 0, 0, canvas_size.x, canvas_size.y }, is_main);
+		}
+	}
+
 	void render(Pipeline& pipeline, const Vec2& canvas_size, bool is_main) override {
 		m_canvas_size = canvas_size;
 		if (is_main) {
@@ -477,6 +487,17 @@ struct GUIModuleImpl final : GUIModule {
 	bool isOver(const Vec2& pos, EntityRef e) override {
 		const Rect r =  getRect(e);
 		return pos.x >= r.x && pos.y >= r.y && pos.x <= r.x + r.w && pos.y <= r.y + r.h;
+	}
+
+	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit, EntityRef canvas_entity) const override {
+		const GUICanvas& canvas = m_canvas[canvas_entity];
+		auto iter = m_rects.find(canvas.entity);
+		if (iter.isValid()) {
+			const GUIRect* r = iter.value();
+			const EntityPtr e = getRectAt(*r, pos, { 0, 0, canvas_size.x, canvas_size.y }, limit);
+			if (e.isValid()) return e;
+		}
+		return INVALID_ENTITY;
 	}
 
 	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const override

@@ -2152,7 +2152,7 @@ bool menuItem(const Action& a, bool enabled) {
 	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, a.is_selected.invoke(), enabled);
 }
 
-void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity)
+void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity, bool force_display_index)
 {
 	if (!entity.isValid())
 	{
@@ -2192,6 +2192,11 @@ void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, Enti
 	if (name && name[0] != '\0')
 	{
 		copyString(buf, name);
+		if (force_display_index) {
+			catString(buf, " ");
+			buf.removePrefix(stringLength(buf.begin()));
+			toCString(entity.index, buf);
+		}
 	}
 	else
 	{

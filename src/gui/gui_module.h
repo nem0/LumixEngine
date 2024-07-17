@@ -45,12 +45,14 @@ struct GUIModule : IModule
 	static void reflect();
 
 	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
+	virtual void renderCanvas(Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main, EntityRef canvas_entity) = 0;
 	virtual IVec2 getCursorPosition() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
 	virtual Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const = 0;
 	virtual Rect getRect(EntityRef entity) const = 0;
 	virtual EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const = 0;
+	virtual EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit, EntityRef canvas) const = 0;
 	virtual EntityPtr getRectAt(const Vec2& pos) const = 0;
 	virtual bool isOver(const Vec2& pos, EntityRef e) = 0;
 

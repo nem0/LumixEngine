@@ -348,11 +348,8 @@ private:
 		editor.endCommandGroup();
 	}
 
-	MouseMode drawGizmo(Draw2D& draw, GUIModule& module, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos, Span<const EntityRef> selected_entities)
+	MouseMode drawGizmo(Draw2D& draw, GUIModule& module, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos, EntityRef e)
 	{
-		if (selected_entities.length() != 1) return MouseMode::NONE;
-
-		EntityRef e = selected_entities[0];
 		if (!module.hasGUI(e)) return MouseMode::NONE;
 
 		const EntityPtr parent = module.getWorld().getParent(e);
@@ -411,12 +408,6 @@ private:
 			ret = MouseMode::MOVE;
 		}
 		return ret;
-	}
-		
-
-	static Vec2 toLumix(const ImVec2& value)
-	{
-		return { value.x, value.y };
 	}
 
 	struct CopyPositionBufferItem
@@ -488,262 +479,281 @@ private:
 		}
 	}
 
-	void onGUI() override
-	{
+	bool isInCanvas(EntityRef entity, EntityRef canvas) {
+		WorldEditor& editor = m_app.getWorldEditor();
+		World& world = *editor.getWorld();
+		EntityPtr iter = entity;
+		while (iter.isValid()) {
+			if (iter == canvas) return true;
+			iter = world.getParent(*iter);
+		}
+		return false;
+	}
+
+	void onGUI() override {
 		m_has_focus = false;
 		if (!m_is_window_open) return;
-		if (ImGui::Begin("GUIEditor", &m_is_window_open))
+
+		if (!ImGui::Begin("GUIEditor", &m_is_window_open)) {
+			ImGui::End();
+			return;
+		}
+		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+		WorldEditor& editor = m_app.getWorldEditor();
+		ImVec2 mouse_canvas_pos = ImGui::GetMousePos();
+		mouse_canvas_pos.x -= ImGui::GetCursorScreenPos().x;
+		mouse_canvas_pos.y -= ImGui::GetCursorScreenPos().y;
+			
+		m_pipeline->setWorld(editor.getWorld());
+
+		GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
+		HashMap<EntityRef, GUICanvas>& canvases = module->getCanvases();
+		if (!m_canvas_entity.isValid() && canvases.size() > 0) {
+			m_canvas_entity = canvases.begin().key();
+		}
+
+		if (canvases.size() > 1) {
+			char entity_name[64] = "N/A";
+			getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), m_canvas_entity, true);
+			if (ImGui::BeginCombo("Canvas", entity_name)) {
+				for (auto iter : canvases.iterated()) {
+					getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), iter.key(), true);
+					if (ImGui::Selectable(entity_name)) {
+						m_canvas_entity = iter.key();
+					}
+				}
+				ImGui::EndCombo();
+			}
+		}
+
+		if (!m_canvas_entity.isValid()) {
+			if (canvases.empty()) {
+				ImGui::TextUnformatted("No canvases found.");
+				if (ImGui::Button("Create canvas")) {
+					editor.beginCommandGroup("create_gui_canvas");
+					EntityRef e = editor.addEntity();
+					editor.setEntityName(e, "GUI canvas");
+					editor.addComponent(Span(&e, 1), GUI_CANVAS_TYPE);
+					editor.addComponent(Span(&e, 1), GUI_RECT_TYPE);
+					editor.endCommandGroup();
+				}
+			}
+			ImGui::End();
+			return;
+		}
+
+		const ImVec2 size = ImGui::GetContentRegionAvail();
+		m_canvas_size = size;
+		if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
+			ImGui::End();
+			return;
+		}
+
+		module->renderCanvas(*m_pipeline, { size.x, size.y }, false, *m_canvas_entity);
+			
+		if (editor.getSelectedEntities().size() == 1) {
+			EntityRef e = editor.getSelectedEntities()[0];
+			if (isInCanvas(e, *m_canvas_entity)) {
+				MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *module, { size.x, size.y }, mouse_canvas_pos, e);
+				if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
+			}
+		}
+			
+		if (ImGui::IsMouseReleased(0)) m_mouse_mode = MouseMode::NONE;
+			
+		if (editor.getSelectedEntities().size() == 1)
 		{
-			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-			WorldEditor& editor = m_app.getWorldEditor();
-			ImVec2 mouse_canvas_pos = ImGui::GetMousePos();
-			mouse_canvas_pos.x -= ImGui::GetCursorScreenPos().x;
-			mouse_canvas_pos.y -= ImGui::GetCursorScreenPos().y;
-			
-			m_pipeline->setWorld(editor.getWorld());
-
-			GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
-			HashMap<EntityRef, GUICanvas>& canvases = module->getCanvases();
-			if (!m_canvas_entity.isValid() && canvases.size() > 0) {
-				m_canvas_entity = canvases.begin().key();
-			}
-
-			if (canvases.size() > 1) {
-				char entity_name[64] = "N/A";
-				getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), m_canvas_entity);
-				if (ImGui::BeginCombo("Canvas", entity_name)) {
-					for (auto iter = canvases.begin(), end = canvases.end(); iter != end; ++iter) {
-						getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), iter.key());
-						if (ImGui::Selectable(entity_name)) {
-							m_canvas_entity = iter.key();
-						}
-					}
-					ImGui::EndCombo();
-				}
-			}
-
-			if (!m_canvas_entity.isValid()) {
-				if (canvases.empty()) {
-					ImGui::TextUnformatted("No canvases found.");
-					if (ImGui::Button("Create canvas")) {
-						editor.beginCommandGroup("create_gui_canvas");
-						EntityRef e = editor.addEntity();
-						editor.setEntityName(e, "GUI canvas");
-						editor.addComponent(Span(&e, 1), GUI_CANVAS_TYPE);
-						editor.addComponent(Span(&e, 1), GUI_RECT_TYPE);
-						editor.endCommandGroup();
-					}
-				}
-				ImGui::End();
-				return;
-			}
-
-			const ImVec2 size = ImGui::GetContentRegionAvail();
-			m_canvas_size = size;
-			if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
-				ImGui::End();
-				return;
-			}
-			module->render(*m_pipeline, { size.x, size.y }, false);
-			
-			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *module, { size.x, size.y }, mouse_canvas_pos, editor.getSelectedEntities());
-			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
-			if (ImGui::IsMouseReleased(0)) m_mouse_mode = MouseMode::NONE;
-			
-			if (editor.getSelectedEntities().size() == 1)
+			EntityRef e = editor.getSelectedEntities()[0];
+			switch (m_mouse_mode)
 			{
-				EntityRef e = editor.getSelectedEntities()[0];
-				switch (m_mouse_mode)
+				case MouseMode::NONE: break;
+				case MouseMode::RESIZE:
 				{
-					case MouseMode::NONE: break;
-					case MouseMode::RESIZE:
-					{
-						editor.beginCommandGroup("gui_mouse_resize");
-						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-						setRectProperty(e, "Bottom Points", b, editor);
-						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-						setRectProperty(e, "Right Points", r, editor);
-						editor.endCommandGroup();
-					}
-					break;
-					case MouseMode::MOVE:
-					{
-						editor.beginCommandGroup("gui_mouse_move");
-						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-						setRectProperty(e, "Bottom Points", b, editor);
-						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-						setRectProperty(e, "Right Points", r, editor);
-
-						float t = m_top_left_start_move.y + ImGui::GetMouseDragDelta(0).y;
-						setRectProperty(e, "Top Points", t, editor);
-						float l = m_top_left_start_move.x + ImGui::GetMouseDragDelta(0).x;
-						setRectProperty(e, "Left Points", l, editor);
-						editor.endCommandGroup();
-					}
-					break;
+					editor.beginCommandGroup("gui_mouse_resize");
+					float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
+					setRectProperty(e, "Bottom Points", b, editor);
+					float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
+					setRectProperty(e, "Right Points", r, editor);
+					editor.endCommandGroup();
 				}
-			}
+				break;
+				case MouseMode::MOVE:
+				{
+					editor.beginCommandGroup("gui_mouse_move");
+					float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
+					setRectProperty(e, "Bottom Points", b, editor);
+					float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
+					setRectProperty(e, "Right Points", r, editor);
 
-			Viewport vp = {};
-			vp.w = (int)size.x;
-			vp.h = (int)size.y;
-			m_pipeline->setViewport(vp);
+					float t = m_top_left_start_move.y + ImGui::GetMouseDragDelta(0).y;
+					setRectProperty(e, "Top Points", t, editor);
+					float l = m_top_left_start_move.x + ImGui::GetMouseDragDelta(0).x;
+					setRectProperty(e, "Left Points", l, editor);
+					editor.endCommandGroup();
+				}
+				break;
+			}
+		}
+
+		Viewport vp = {};
+		vp.w = (int)size.x;
+		vp.h = (int)size.y;
+		m_pipeline->setViewport(vp);
 			
-			if (m_pipeline->render(true)) {
-				m_texture_handle = m_pipeline->getOutput();
+		if (m_pipeline->render(true)) {
+			m_texture_handle = m_pipeline->getOutput();
 
-				if(m_texture_handle) {
-					if (gpu::isOriginBottomLeft()) {
-						ImGui::Image(m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
-					}
-					else {
-						ImGui::Image(m_texture_handle, size);
-					}
+			if(m_texture_handle) {
+				if (gpu::isOriginBottomLeft()) {
+					ImGui::Image(m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 				}
-
-				if (ImGui::BeginDragDropTarget()) {
-					if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
-						handleDrop((const char*)payload->Data, mouse_canvas_pos, m_canvas_size);
-					}
-					ImGui::EndDragDropTarget();
+				else {
+					ImGui::Image(m_texture_handle, size);
 				}
 			}
 
-
-			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
-			{
-				const Array<EntityRef>& selected = editor.getSelectedEntities();
-				bool parent_selected = false;
-				if (!selected.empty()) {
-					const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
-					if (parent.isValid()) {
-						const GUIModule::Rect rect = module->getRect(*parent);
-						if (mouse_canvas_pos.x >= rect.x 
-							&& mouse_canvas_pos.y >= rect.y 
-							&& mouse_canvas_pos.x <= rect.x + rect.w
-							&& mouse_canvas_pos.y <= rect.y + rect.h)
-						{
-							EntityRef e = *parent;
-							editor.selectEntities(Span(&e, 1), false);
-							parent_selected =  true;
-						}
-					}
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
+					handleDrop((const char*)payload->Data, mouse_canvas_pos, m_canvas_size);
 				}
+				ImGui::EndDragDropTarget();
+			}
+		}
 
-				if (!parent_selected) {
-					EntityPtr e = module->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), INVALID_ENTITY);
-					if (e.isValid()) {
-						EntityRef r = (EntityRef)e;
-						editor.selectEntities(Span(&r, 1), false);
+
+		if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
+		{
+			const Array<EntityRef>& selected = editor.getSelectedEntities();
+			bool parent_selected = false;
+			if (!selected.empty() && isInCanvas(selected[0], *m_canvas_entity)) {
+				const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
+				if (parent.isValid()) {
+					const GUIModule::Rect rect = module->getRect(*parent);
+					if (mouse_canvas_pos.x >= rect.x 
+						&& mouse_canvas_pos.y >= rect.y 
+						&& mouse_canvas_pos.x <= rect.x + rect.w
+						&& mouse_canvas_pos.y <= rect.y + rect.h)
+					{
+						EntityRef e = *parent;
+						editor.selectEntities(Span(&e, 1), false);
+						parent_selected =  true;
 					}
 				}
 			}
 
-			bool has_rect = false;
-			if (editor.getSelectedEntities().size() == 1)
-			{
-				has_rect = editor.getWorld()->hasComponent(editor.getSelectedEntities()[0], GUI_RECT_TYPE);
+			if (!parent_selected) {
+				EntityPtr e = module->getRectAtEx(mouse_canvas_pos, size, INVALID_ENTITY, *m_canvas_entity);
+				if (e.isValid()) {
+					EntityRef r = (EntityRef)e;
+					editor.selectEntities(Span(&r, 1), false);
+				}
 			}
-			if (has_rect && ImGui::BeginPopupContextItem("context"))
-			{
-				EntityRef e = editor.getSelectedEntities()[0];
-				if (ImGui::BeginMenu("Create child")) {
-					if (ImGui::MenuItem("Button + Image + Text")) createChildren(e, editor, GUI_BUTTON_TYPE, GUI_IMAGE_TYPE, GUI_TEXT_TYPE);
-					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE, editor);
-					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE, editor);
-					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE, editor);
-					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE, editor);
-					if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE, editor);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Align")) {
-					if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP, editor);
-					if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT, editor);
-					if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM, editor);
-					if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT, editor);
-					menuActionItem(m_hcenter_action);
-					menuActionItem(m_vcenter_action);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Expand")) {
-					if (ImGui::MenuItem("All")) expand(e, (u8)EdgeMask::ALL, editor);
-					if (ImGui::MenuItem("Top")) expand(e, (u8)EdgeMask::TOP, editor);
-					if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT, editor);
-					if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM, editor);
-					if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT, editor);
-					menuActionItem(m_hexpand_action, "Horizontal");
-					menuActionItem(m_vexpand_action, "Vertical");
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Make relative")) {
-					menuActionItem(m_make_rel_action, "All");
-					if (ImGui::MenuItem("Top")) makeRelative(e, toLumix(size), (u8)EdgeMask::TOP, editor);
-					if (ImGui::MenuItem("Right")) makeRelative(e, toLumix(size), (u8)EdgeMask::RIGHT, editor);
-					if (ImGui::MenuItem("Bottom")) makeRelative(e, toLumix(size), (u8)EdgeMask::BOTTOM, editor);
-					if (ImGui::MenuItem("Left")) makeRelative(e, toLumix(size), (u8)EdgeMask::LEFT, editor);
-					
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Make absolute")) {
-					if (ImGui::MenuItem("All")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::ALL, editor);
-					if (ImGui::MenuItem("Top")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::TOP, editor);
-					if (ImGui::MenuItem("Right")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::RIGHT, editor);
-					if (ImGui::MenuItem("Bottom")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::BOTTOM, editor);
-					if (ImGui::MenuItem("Left")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::LEFT, editor);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Anchor")) {
-					if (ImGui::MenuItem("Center")) anchor(e, (u8)EdgeMask::CENTER_HORIZONTAL |  (u8)EdgeMask::CENTER_VERTICAL, editor);
-					if (ImGui::MenuItem("Left middle")) anchor(e, (u8)EdgeMask::LEFT |  (u8)EdgeMask::CENTER_VERTICAL, editor);
-					if (ImGui::MenuItem("Right middle")) anchor(e, (u8)EdgeMask::RIGHT |  (u8)EdgeMask::CENTER_VERTICAL, editor);
-					if (ImGui::MenuItem("Top center")) anchor(e, (u8)EdgeMask::TOP |  (u8)EdgeMask::CENTER_HORIZONTAL, editor);
-					if (ImGui::MenuItem("Bottom center")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::CENTER_HORIZONTAL, editor);
-					if (ImGui::MenuItem("Top left")) anchor(e, (u8)EdgeMask::TOP |  (u8)EdgeMask::LEFT, editor);
-					if (ImGui::MenuItem("Top right")) anchor(e, (u8)EdgeMask::TOP |  (u8)EdgeMask::RIGHT, editor);
-					if (ImGui::MenuItem("Bottom left")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::LEFT, editor);
-					if (ImGui::MenuItem("Bottom right")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::RIGHT, editor);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Copy position")) {
-					if (ImGui::MenuItem("All")) copy(e, (u8)EdgeMask::ALL, editor);
-					if (ImGui::MenuItem("Top")) copy(e, (u8)EdgeMask::TOP, editor);
-					if (ImGui::MenuItem("Right")) copy(e, (u8)EdgeMask::RIGHT, editor);
-					if (ImGui::MenuItem("Bottom")) copy(e, (u8)EdgeMask::BOTTOM, editor);
-					if (ImGui::MenuItem("Left")) copy(e, (u8)EdgeMask::LEFT, editor);
-					if (ImGui::MenuItem("Horizontal")) copy(e, (u8)EdgeMask::HORIZONTAL, editor);
-					if (ImGui::MenuItem("Vertical")) copy(e, (u8)EdgeMask::VERTICAL, editor);
-					ImGui::EndMenu();
-				}
-				if (ImGui::MenuItem("Paste")) paste(e, editor);
+		}
 
-				if (ImGui::BeginMenu("Layout")) {
-					static int cols = 1;
-					static int row_height = 20;
-					static int row_spacing = 0;
-					static int col_spacing = 0;
-					ImGui::InputInt("Columns", &cols);
-					ImGui::InputInt("Row height", &row_height);
-					ImGui::InputInt("Row spacing", &row_spacing);
-					ImGui::InputInt("Column spacing", &col_spacing);
-					if (editor.getSelectedEntities().empty()) {
-						ImGui::TextUnformatted("Please select an entity");
-					}
-					else {
-						if (ImGui::Button("Do")) {
-							layout(cols, row_height, row_spacing, col_spacing, editor);
-						}
-					}
-					ImGui::EndMenu();
-				}
-
-
-				ImGui::EndPopup();
-			}
+		bool has_rect = false;
+		if (editor.getSelectedEntities().size() == 1) {
+			has_rect = editor.getWorld()->hasComponent(editor.getSelectedEntities()[0], GUI_RECT_TYPE);
+		}
+		
+		if (has_rect && ImGui::BeginPopupContextItem("context")) {
+			entityContextMenu(editor.getSelectedEntities()[0], size);
+			ImGui::EndPopup();
 		}
 
 		ImGui::End();
 	}
 
+	void entityContextMenu(EntityRef e, Vec2 canvas_size) {
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (ImGui::BeginMenu("Create child")) {
+			if (ImGui::MenuItem("Button + Image + Text")) createChildren(e, editor, GUI_BUTTON_TYPE, GUI_IMAGE_TYPE, GUI_TEXT_TYPE);
+			if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE, editor);
+			if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE, editor);
+			if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE, editor);
+			if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE, editor);
+			if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE, editor);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Align")) {
+			if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP, editor);
+			if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT, editor);
+			if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM, editor);
+			if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT, editor);
+			menuActionItem(m_hcenter_action);
+			menuActionItem(m_vcenter_action);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Expand")) {
+			if (ImGui::MenuItem("All")) expand(e, (u8)EdgeMask::ALL, editor);
+			if (ImGui::MenuItem("Top")) expand(e, (u8)EdgeMask::TOP, editor);
+			if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT, editor);
+			if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM, editor);
+			if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT, editor);
+			menuActionItem(m_hexpand_action, "Horizontal");
+			menuActionItem(m_vexpand_action, "Vertical");
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Make relative")) {
+			menuActionItem(m_make_rel_action, "All");
+			if (ImGui::MenuItem("Top")) makeRelative(e, canvas_size, (u8)EdgeMask::TOP, editor);
+			if (ImGui::MenuItem("Right")) makeRelative(e, canvas_size, (u8)EdgeMask::RIGHT, editor);
+			if (ImGui::MenuItem("Bottom")) makeRelative(e, canvas_size, (u8)EdgeMask::BOTTOM, editor);
+			if (ImGui::MenuItem("Left")) makeRelative(e, canvas_size, (u8)EdgeMask::LEFT, editor);
+
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Make absolute")) {
+			if (ImGui::MenuItem("All")) makeAbsolute(e, canvas_size, (u8)EdgeMask::ALL, editor);
+			if (ImGui::MenuItem("Top")) makeAbsolute(e, canvas_size, (u8)EdgeMask::TOP, editor);
+			if (ImGui::MenuItem("Right")) makeAbsolute(e, canvas_size, (u8)EdgeMask::RIGHT, editor);
+			if (ImGui::MenuItem("Bottom")) makeAbsolute(e, canvas_size, (u8)EdgeMask::BOTTOM, editor);
+			if (ImGui::MenuItem("Left")) makeAbsolute(e, canvas_size, (u8)EdgeMask::LEFT, editor);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Anchor")) {
+			if (ImGui::MenuItem("Center")) anchor(e, (u8)EdgeMask::CENTER_HORIZONTAL | (u8)EdgeMask::CENTER_VERTICAL, editor);
+			if (ImGui::MenuItem("Left middle")) anchor(e, (u8)EdgeMask::LEFT | (u8)EdgeMask::CENTER_VERTICAL, editor);
+			if (ImGui::MenuItem("Right middle")) anchor(e, (u8)EdgeMask::RIGHT | (u8)EdgeMask::CENTER_VERTICAL, editor);
+			if (ImGui::MenuItem("Top center")) anchor(e, (u8)EdgeMask::TOP | (u8)EdgeMask::CENTER_HORIZONTAL, editor);
+			if (ImGui::MenuItem("Bottom center")) anchor(e, (u8)EdgeMask::BOTTOM | (u8)EdgeMask::CENTER_HORIZONTAL, editor);
+			if (ImGui::MenuItem("Top left")) anchor(e, (u8)EdgeMask::TOP | (u8)EdgeMask::LEFT, editor);
+			if (ImGui::MenuItem("Top right")) anchor(e, (u8)EdgeMask::TOP | (u8)EdgeMask::RIGHT, editor);
+			if (ImGui::MenuItem("Bottom left")) anchor(e, (u8)EdgeMask::BOTTOM | (u8)EdgeMask::LEFT, editor);
+			if (ImGui::MenuItem("Bottom right")) anchor(e, (u8)EdgeMask::BOTTOM | (u8)EdgeMask::RIGHT, editor);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Copy position")) {
+			if (ImGui::MenuItem("All")) copy(e, (u8)EdgeMask::ALL, editor);
+			if (ImGui::MenuItem("Top")) copy(e, (u8)EdgeMask::TOP, editor);
+			if (ImGui::MenuItem("Right")) copy(e, (u8)EdgeMask::RIGHT, editor);
+			if (ImGui::MenuItem("Bottom")) copy(e, (u8)EdgeMask::BOTTOM, editor);
+			if (ImGui::MenuItem("Left")) copy(e, (u8)EdgeMask::LEFT, editor);
+			if (ImGui::MenuItem("Horizontal")) copy(e, (u8)EdgeMask::HORIZONTAL, editor);
+			if (ImGui::MenuItem("Vertical")) copy(e, (u8)EdgeMask::VERTICAL, editor);
+			ImGui::EndMenu();
+		}
+		if (ImGui::MenuItem("Paste")) paste(e, editor);
+
+		if (ImGui::BeginMenu("Layout")) {
+			static int cols = 1;
+			static int row_height = 20;
+			static int row_spacing = 0;
+			static int col_spacing = 0;
+			ImGui::InputInt("Columns", &cols);
+			ImGui::InputInt("Row height", &row_height);
+			ImGui::InputInt("Row spacing", &row_spacing);
+			ImGui::InputInt("Column spacing", &col_spacing);
+			if (editor.getSelectedEntities().empty()) {
+				ImGui::TextUnformatted("Please select an entity");
+			}
+			else {
+				if (ImGui::Button("Do")) {
+					layout(cols, row_height, row_spacing, col_spacing, editor);
+				}
+			}
+			ImGui::EndMenu();
+		}
+	}
 
 	void layout(u32 cols, u32 row_height, u32 row_spacing, u32 col_spacing, WorldEditor& editor) {
 		const Array<EntityRef>& selected = editor.getSelectedEntities();
