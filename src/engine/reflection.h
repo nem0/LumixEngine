@@ -443,6 +443,7 @@ struct FunctionBase {
 	virtual TypeDescriptor getThisType() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void invoke(void* obj, Span<u8> ret_mem, Span<const Variant> args) const = 0;
+	// we can use this in Delegate::bindRaw, so there's less overhead
 	virtual DummyFnType getDelegateStub() = 0;
 
 	const char* decl_code;
@@ -544,9 +545,10 @@ struct VariantCaller<R (C::*)(Args...) const> {
 	}
 };
 
+// DelegateStub can be used to wrap a method as a simple function compatible with Delegate's stub
 template <typename T, T f> struct DelegateStub;
 
-template <typename R, typename C, auto F, typename... Args>
+template <typename R, typename C, typename... Args, R(C::* F)(Args...)>
 struct DelegateStub<R(C::*)(Args...), F> {
 	static R stub(void* obj, Args... args) {
 		C* o = (C*)obj;
@@ -554,10 +556,10 @@ struct DelegateStub<R(C::*)(Args...), F> {
 	}
 };
 
-template <typename R, typename C, auto F, typename... Args>
+template <typename R, typename C, typename... Args, R(C::* F)(Args...) const>
 struct DelegateStub<R(C::*)(Args...) const, F> {
 	static R stub(void* obj, Args... args) {
-		C* o = (C*)obj;
+		const C* o = (const C*)obj;
 		return (o->*F)(args...);
 	}
 };
