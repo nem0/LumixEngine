@@ -390,7 +390,7 @@ public:
 
 			// TODO undo/redo might keep references do prefab entities, handle that
 			EntityFolders& folders = m_editor.getEntityFolders();
-			for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
+			for (auto iter : m_roots.iterated()) {
 				if (iter.value() != prefab) continue;
 				if (iter.key() == entity) continue;
 
@@ -489,8 +489,8 @@ public:
 
 		u32 res_count = 0;
 		for (PrefabVersion& prefab : m_resources) prefab.instance_count = 0;
-		for (auto iter = m_roots.begin(); iter.isValid(); ++iter) {
-			PrefabVersion& p = m_resources[iter.value()];
+		for (PrefabHandle handle : m_roots) {
+			PrefabVersion& p = m_resources[handle];
 			if (p.instance_count == 0) ++res_count;
 			++p.instance_count;
 		}
@@ -505,7 +505,7 @@ public:
 		}
 
 		serializer.write((u32)m_roots.size());
-		for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
+		for (auto iter : m_roots.iterated()) {
 			serializer.write(iter.key());
 			serializer.write(iter.value());
 		}
@@ -573,7 +573,7 @@ public:
 
 		// clone roots
 		dst.m_roots.reserve(m_roots.size());
-		for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
+		for (auto iter : m_roots.iterated()) {
 			const EntityPtr dst_e = get_mapped(iter.key());
 			if (dst_e.isValid()) {
 				dst.m_roots.insert(*dst_e, iter.value());
@@ -581,8 +581,7 @@ public:
 		}
 
 		// clone resources
-		for (auto iter = dst.m_roots.begin(), end = dst.m_roots.end(); iter != end; ++iter) {
-			const PrefabHandle prefab_handle = iter.value();
+		for (const PrefabHandle prefab_handle : dst.m_roots) {
 			auto res_iter = dst.m_resources.find(prefab_handle);
 			if (res_iter.isValid()) continue;
 

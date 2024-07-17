@@ -1103,7 +1103,7 @@ struct GUIModuleImpl final : GUIModule {
 
 		serializer.write(m_buttons.size());
 		
-		for (auto iter = m_buttons.begin(); iter.isValid(); ++iter)
+		for (auto iter : m_buttons.iterated())
 		{
 			serializer.write(iter.key());
 			const GUIButton& button = iter.value();

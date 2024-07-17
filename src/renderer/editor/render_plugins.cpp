@@ -4736,14 +4736,14 @@ struct RenderInterfaceImpl final : RenderInterface
 	{}
 
 	~RenderInterfaceImpl() {
-		for (auto iter = m_textures.begin(), end = m_textures.end(); iter != end; ++iter) {
-			if (iter.value().loaded) {
-				iter.value().texture->decRefCount();
+		for (const TextureItem& t : m_textures) {
+			if (t.loaded) {
+				t.texture->decRefCount();
 			}
 			else {
-				iter.value().texture->destroy();
+				t.texture->destroy();
 				IAllocator& allocator = m_app.getAllocator();
-				LUMIX_DELETE(allocator, iter.value().texture);
+				LUMIX_DELETE(allocator, t.texture);
 			}
 		} 
 	}

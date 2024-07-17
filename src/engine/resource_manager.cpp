@@ -17,11 +17,8 @@ void ResourceManager::create(ResourceType type, ResourceManagerHub& owner)
 
 void ResourceManager::destroy()
 {
-	for (auto iter = m_resources.begin(), end = m_resources.end(); iter != end; ++iter)
-	{
-		Resource* resource = iter.value();
-		if (!resource->isEmpty())
-		{
+	for (Resource* resource : m_resources) {
+		if (!resource->isEmpty()) {
 			logError("Leaking resource ", resource->getPath(), "\n");
 		}
 		destroyResource(*resource);

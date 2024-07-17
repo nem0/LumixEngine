@@ -197,6 +197,25 @@ public:
 
 	void operator =(HashMap&& rhs) = delete;
 
+	struct Iterated {
+		struct IteratorProxy {
+			Iterator inner;
+
+			bool operator != (const IteratorProxy& rhs) const { return rhs.inner != inner; }
+			Iterator operator*() { return inner; }
+			void operator ++() { ++inner; }
+		};
+
+		IteratorProxy begin() { return {hm.begin()}; }
+		IteratorProxy end() { return {hm.end()}; }
+
+		HashMap& hm;
+	};
+
+	// for easy access to both key and value during iteration
+	// usage: for (auto iter : hashmap.iterated()) logInfo(iter.key(), iter.value())
+	Iterated iterated() { return {*this}; }
+
 	Iterator begin() {
 		for (u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };

@@ -2297,7 +2297,7 @@ struct PipelineImpl final : Pipeline
 		
 		// TODO frustum culling
 		// TODO render correct LOD
-		for (auto iter = furs.begin(); iter.isValid(); ++iter) {
+		for (auto iter : furs.iterated()) {
 			const EntityRef e = iter.key();
 			if (e.index >= (i32)mi.length()) continue;
 			if ((mi[e.index].flags & ModelInstance::VALID) == 0) continue;

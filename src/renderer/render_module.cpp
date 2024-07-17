@@ -211,17 +211,17 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 		
-		for(auto iter = m_model_entity_map.begin(), end = m_model_entity_map.end(); iter != end; ++iter) {
+		for(auto iter : m_model_entity_map.iterated()) {
 			Model* model = iter.key();
 			model->getObserverCb().unbind<&RenderModuleImpl::modelStateChanged>(this);
 		}
 
-		for(auto iter = m_material_decal_map.begin(), end = m_material_decal_map.end(); iter != end; ++iter) {
+		for(auto iter : m_material_decal_map.iterated()) {
 			Material* mat = iter.key();
 			mat->getObserverCb().unbind<&RenderModuleImpl::decalMaterialStateChanged>(this);
 		}
 
-		for(auto iter = m_material_curve_decal_map.begin(), end = m_material_curve_decal_map.end(); iter != end; ++iter) {
+		for(auto iter : m_material_curve_decal_map.iterated()) {
 			Material* mat = iter.key();
 			mat->getObserverCb().unbind<&RenderModuleImpl::curveDecalMaterialStateChanged>(this);
 		}
@@ -606,13 +606,13 @@ struct RenderModuleImpl final : RenderModule {
 	void serializeModelInstances(OutputMemoryStream& serializer) {
 		u32 len = 0;
 		HashMap<Model*, u32> offsets(m_allocator);
-		for (auto iter = m_model_entity_map.begin(); iter.isValid(); ++iter) {
+		for (auto iter : m_model_entity_map.iterated()) {
 			offsets.insert(iter.key(), len);
 			len += iter.key()->getPath().length() + 1;
 		}
 
 		serializer.write(len);
-		for (auto iter = m_model_entity_map.begin(); iter.isValid(); ++iter) {
+		for (auto iter : m_model_entity_map.iterated()) {
 			serializer.writeString(iter.key()->getPath());
 		}
 
@@ -638,7 +638,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	void serializeInstancedModels(OutputMemoryStream& serializer) {
 		serializer.write(m_instanced_models.size());
-		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
+		for (auto iter : m_instanced_models.iterated()) {
 			serializer.write(iter.key());
 			const InstancedModel& im = iter.value();
 			serializer.writeString(im.model ? im.model->getPath() : Path());
@@ -672,7 +672,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	void serializeFurs(OutputMemoryStream& serializer) {
 		serializer.write(m_furs.size());
-		for (auto iter = m_furs.begin(); iter.isValid(); ++iter) {
+		for (auto iter : m_furs.iterated()) {
 			serializer.write(iter.key());
 			serializer.write(iter.value());
 		}
@@ -902,7 +902,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	void serializeProceduralGeometries(OutputMemoryStream& blob) {
 		blob.write(m_procedural_geometries.size());
-		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
+		for (auto iter : m_procedural_geometries.iterated()) {
 			blob.write(iter.key());
 			const ProceduralGeometry& pg = iter.value();
 			blob.writeString(pg.material ? pg.material->getPath() : Path());
@@ -2542,7 +2542,7 @@ struct RenderModuleImpl final : RenderModule {
 	RayCastModelHit castRayInstancedModels(const Ray& ray, const RayCastModelHit::Filter& filter) override {
 		RayCastModelHit hit;
 		hit.is_hit = false;
-		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
+		for (auto iter : m_instanced_models.iterated()) {
 			const EntityRef e = iter.key();
 			const Transform tr = m_world.getTransform(e);
 			const InstancedModel& im = iter.value();
@@ -2583,7 +2583,7 @@ struct RenderModuleImpl final : RenderModule {
 	RayCastModelHit castRayProceduralGeometry(const Ray& ray, const RayCastModelHit::Filter& filter) {
 		RayCastModelHit hit;
 		hit.is_hit = false;
-		for (auto iter = m_procedural_geometries.begin(), end = m_procedural_geometries.end(); iter != end; ++iter) {
+		for (auto iter : m_procedural_geometries.iterated()) {
 			const ProceduralGeometry& pg = iter.value();
 			if (pg.vertex_data.empty()) continue;
 			if (pg.vertex_decl.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;

@@ -189,7 +189,7 @@ void EntityFolders::cloneTo(EntityFolders& dst, World::PartitionHandle partition
 		}
 	}
 
-	for (auto iter = entity_map.begin(), end = entity_map.end(); iter != end; ++iter) {
+	for (auto iter : entity_map.iterated()) {
 		EntityPtr src_e = iter.key();
 		EntityPtr dst_e = iter.value();
 		if (dst.m_entities.size() <= dst_e.index) dst.m_entities.resize(dst_e.index + 1);

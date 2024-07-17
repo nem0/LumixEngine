@@ -1705,7 +1705,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 		if (!vehicles) return;
 
-		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+		for (auto iter : m_vehicles.iterated()) {
 			Vehicle* veh = iter.value().get();
 			if (veh->actor) {
 				const PxTransform car_trans = veh->actor->getGlobalPose();
@@ -1788,18 +1788,17 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxVehicleWheels* vehicles[16];
 
 		u32 valid_count = 0;
-		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
-			Vehicle* veh = iter.value().get();
-			if (veh->drive) {
-				vehicles[valid_count] = veh->drive;
-				PxVehicleDrive4WSmoothAnalogRawInputsAndSetAnalogInputs(pad_smoothing, steer_vs_forward_speed, veh->raw_input, time_delta, false, *veh->drive);
-				++valid_count;
+		for (UniquePtr<Vehicle>& veh : m_vehicles) {
+			if (!veh->drive) continue;
 
-				if (valid_count == lengthOf(vehicles)) {
-					PxVehicleSuspensionRaycasts(m_vehicle_batch_query, valid_count, vehicles, valid_count * 4, m_vehicle_results);
-					PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, valid_count, vehicles, nullptr);
-					valid_count = 0;
-				}
+			vehicles[valid_count] = veh->drive;
+			PxVehicleDrive4WSmoothAnalogRawInputsAndSetAnalogInputs(pad_smoothing, steer_vs_forward_speed, veh->raw_input, time_delta, false, *veh->drive);
+			++valid_count;
+
+			if (valid_count == lengthOf(vehicles)) {
+				PxVehicleSuspensionRaycasts(m_vehicle_batch_query, valid_count, vehicles, valid_count * 4, m_vehicle_results);
+				PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, valid_count, vehicles, nullptr);
+				valid_count = 0;
 			}
 		}
 
@@ -2137,7 +2136,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		RenderModule* rs = (RenderModule*)m_world.getModule(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
-		for (auto iter = m_instanced_cubes.begin(), end = m_instanced_cubes.end(); iter != end; ++iter) {
+		for (auto iter : m_instanced_cubes.iterated()) {
 			if (!m_world.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
 			
 			const InstancedModel& im = rs->getInstancedModels()[iter.key()];
@@ -2168,7 +2167,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		RenderModule* rs = (RenderModule*)m_world.getModule(INSTANCED_MODEL_TYPE);
 		if (!rs) return;
 
-		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
+		for (auto iter : m_instanced_meshes.iterated()) {
 			if (!m_world.hasComponent(iter.key(), INSTANCED_MODEL_TYPE)) continue;
 			
 			const InstancedModel& im = rs->getInstancedModels()[iter.key()];
@@ -2206,7 +2205,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	void initVehicles()
 	{
-		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+		for (auto iter : m_vehicles.iterated()) {
 			rebuildVehicle(iter.key(), *iter.value().get());
 		}
 	}
@@ -3138,14 +3137,14 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 		
 		serializer.write((i32)m_instanced_cubes.size());
-		for (auto iter = m_instanced_cubes.begin(), end = m_instanced_cubes.end(); iter != end; ++iter) {
+		for (auto iter : m_instanced_cubes.iterated()) {
 			serializer.write(iter.key());
 			serializer.write(iter.value().half_extents);
 			serializer.write(iter.value().layer);
 		}
 
 		serializer.write((i32)m_instanced_meshes.size());
-		for (auto iter = m_instanced_meshes.begin(), end = m_instanced_meshes.end(); iter != end; ++iter) {
+		for (auto iter : m_instanced_meshes.iterated()) {
 			serializer.write(iter.key());
 			serializer.writeString(iter.value().resource ? iter.value().resource->getPath() : Path());
 			serializer.write(iter.value().layer);
@@ -3159,7 +3158,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void serializeVehicles(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_vehicles.size());
-		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+		for (auto iter : m_vehicles.iterated()) {
 			serializer.write(iter.key());
 			const UniquePtr<Vehicle>& veh = iter.value();
 			serializer.write(veh->mass);
@@ -3173,7 +3172,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 
 		serializer.write(m_wheels.size());
-		for (auto iter = m_wheels.begin(), end = m_wheels.end(); iter != end; ++iter) {
+		for (auto iter : m_wheels.iterated()) {
 			serializer.write(iter.key());
 			const Wheel& w = iter.value();
 			serializer.write(w);

@@ -43,7 +43,7 @@ struct CoreModuleImpl : CoreModule {
 		}
 
 		serializer.write((u32)m_splines.size());
-		for (auto iter = m_splines.begin(); iter.isValid(); ++iter) {
+		for (auto iter : m_splines.iterated()) {
 			const Spline& spline = iter.value();
 			serializer.write(iter.key());
 			serializer.writeArray(spline.points);
@@ -143,7 +143,7 @@ struct CoreModuleImpl : CoreModule {
 	void startGame() {
 		// connect signals
 		m_signal_dispatchers.clear();
-		for (auto iter = m_signals.begin(), end = m_signals.end(); iter != end; ++iter) {
+		for (auto iter : m_signals.iterated()) {
 			Signal& signal = *iter.value().get();
 			if (!signal.event) continue;
 			if (!signal.function) continue;

@@ -988,7 +988,7 @@ struct NavigationModuleImpl final : NavigationModule
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
 
-		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter) {
+		for (auto iter : m_agents.iterated()) {
 			Agent& agent = iter.value();
 			if (agent.zone.isValid() && agent.agent >= 0) continue;
 
@@ -1493,7 +1493,7 @@ struct NavigationModuleImpl final : NavigationModule
 	{
 		int count = m_zones.size();
 		serializer.write(count);
-		for (auto iter = m_zones.begin(); iter.isValid(); ++iter) {
+		for (auto iter : m_zones.iterated()) {
 			serializer.write(iter.key());
 			const NavmeshZone& zone = iter.value().zone;
 			serializer.write(zone.extents);
@@ -1509,7 +1509,7 @@ struct NavigationModuleImpl final : NavigationModule
 
 		count = m_agents.size();
 		serializer.write(count);
-		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter) {
+		for (auto iter : m_agents.iterated()) {
 			serializer.write(iter.key());
 			serializer.write(iter.value().radius);
 			serializer.write(iter.value().height);

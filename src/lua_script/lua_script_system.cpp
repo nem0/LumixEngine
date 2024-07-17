@@ -2155,7 +2155,7 @@ public:
 	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write(m_inline_scripts.size());
-		for (auto iter = m_inline_scripts.begin(), end = m_inline_scripts.end(); iter != end; ++iter) {
+		for (auto iter : m_inline_scripts.iterated()) {
 			serializer.write(iter.key());
 			serializer.write(iter.value().m_source);
 		}
@@ -2284,7 +2284,7 @@ public:
 			}
 		}
 
-		for (auto iter = m_inline_scripts.begin(), end = m_inline_scripts.end(); iter != end; ++iter) {
+		for (auto iter : m_inline_scripts.iterated()) {
 			startScript(iter.key(), iter.value(), false);
 		}
 

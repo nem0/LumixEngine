@@ -157,7 +157,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 			file << "}\n\n";
 			file << "dependencies = {\n";
-			for (auto iter = m_dependencies.begin(), end = m_dependencies.end(); iter != end; ++iter) {
+			for (auto iter : m_dependencies.iterated()) {
 				file << "\t[\"" << iter.key() << "\"] = {\n";
 				for (const Path& p : iter.value()) {
 					file << "\t\t\"" << p << "\",\n";
@@ -765,7 +765,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		bool removed;
 		do {
 			removed = false;
-			for(auto iter = m_plugins.begin(), end = m_plugins.end(); iter != end; ++iter) {
+			for(auto iter : m_plugins.iterated()) {
 				if (iter.value() == &plugin) {
 					m_plugins.erase(iter);
 					removed = true;

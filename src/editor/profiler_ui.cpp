@@ -653,25 +653,25 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				ImGui::TableHeadersRow();
 
 				size_t sum = 0;
-				for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
-					if (!m_resource_filter.pass(iter.value()->getPath())) continue;
-					if (m_resource_size_filter > iter.value()->getFileSize() / 1024) continue;
+				for (const Resource* res  : resources) {
+					if (!m_resource_filter.pass(res->getPath())) continue;
+					if (m_resource_size_filter > res->getFileSize() / 1024) continue;
 				
 					ImGui::TableNextColumn();
-					ImGui::PushID(iter.value());
+					ImGui::PushID(res);
 					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-						m_app.getAssetBrowser().openEditor(iter.value()->getPath());
+						m_app.getAssetBrowser().openEditor(res->getPath());
 					}
 					ImGui::PopID();
 					ImGui::SameLine();
-					ImGuiEx::TextUnformatted(iter.value()->getPath());
+					ImGuiEx::TextUnformatted(res->getPath());
 					ImGui::TableNextColumn();
-					ImGui::Text("%.3fKB", iter.value()->getFileSize() / 1024.0f);
-					sum += iter.value()->getFileSize();
+					ImGui::Text("%.3fKB", res->getFileSize() / 1024.0f);
+					sum += res->getFileSize();
 					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(toString(iter.value()->getState()));
+					ImGui::TextUnformatted(toString(res->getState()));
 					ImGui::TableNextColumn();
-					ImGui::Text("%u", iter.value()->getRefCount());
+					ImGui::Text("%u", res->getRefCount());
 				}
 
 				ImGui::TableNextColumn();
