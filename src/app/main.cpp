@@ -135,6 +135,20 @@ struct Runner final
 		if (DeserializeProjectResult::SUCCESS != res) {
 			logError("Failed to deserialize project file");
 		}
+
+		char cmd_line[4096];
+		if (os::getCommandLine(cmd_line)) {
+			CommandLineParser parser(cmd_line);
+			while (parser.next()) {
+				if (!parser.currentEquals("-world")) continue;
+				if (!parser.next()) break;
+
+				char src[MAX_PATH];
+				parser.getCurrent(src, lengthOf(src));
+				m_startup_world = src;
+				break;
+			}
+		}
 	}
 
 	void onInit() {
@@ -180,6 +194,8 @@ struct Runner final
 		os::showCursor(false);
 		onResize();
 		m_engine->startGame(*m_world);
+
+		os::showWindow(wnd);
 	}
 
 	void shutdown() {
