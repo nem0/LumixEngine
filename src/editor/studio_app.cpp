@@ -236,6 +236,7 @@ struct StudioAppImpl final : StudioApp
 			m_engine->getFileSystem().processCallbacks();
 		}
 
+		removeAction(&m_start_standalone_app);
 		removeAction(&m_show_all_actions_action);
 		removePlugin(*m_asset_browser.get());
 		removePlugin(*m_log_ui.get());
@@ -2452,6 +2453,27 @@ struct StudioAppImpl final : StudioApp
 
 	CommonActions& getCommonActions() override { return m_common_actions; }
 
+	void startStandaloneApp() {
+		if (m_editor->getWorld()->getPartitions()[0].name[0] == '\0') {
+			logError("Save your scene before running it standalone");
+			return;
+		}
+
+		char studio_exe_path[MAX_PATH];
+		os::getExecutablePath(studio_exe_path);
+		StringView dir = Path::getDir(studio_exe_path);
+		#ifdef _WIN32
+			StaticString<MAX_PATH> exe_path(dir, "app.exe");
+		#else
+			StaticString<MAX_PATH> exe_path(dir, "app");
+		#endif
+		const char* working_dir = m_engine->getFileSystem().getBasePath();
+		StaticString<MAX_PATH + 64> args("-window -world ", m_editor->getWorld()->getPartitions()[0].name);
+		if (os::shellExecuteOpen(exe_path, args, working_dir, false) != os::ExecuteOpenResult::SUCCESS) {
+			logError("Failed to run ", exe_path, " ", args);
+		}
+	}
+
 	void showAllActionsGUI() { m_show_all_actions_request = true; }
 
 	void addActions()
@@ -2487,6 +2509,10 @@ struct StudioAppImpl final : StudioApp
 		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::Type::IMGUI_PRIORITY);
 		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
 		addAction(&m_show_all_actions_action);
+		
+		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "", Action::Type::IMGUI_PRIORITY);
+		m_start_standalone_app.func.bind<&StudioAppImpl::startStandaloneApp>(this);
+		addToolAction(&m_start_standalone_app);
 
 		addAction<&StudioAppImpl::newWorld>("New", "New world", "newWorld", ICON_FA_PLUS);
 		addAction<&StudioAppImpl::saveAs>("Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
@@ -3626,6 +3652,7 @@ struct StudioAppImpl final : StudioApp
 
 	CommonActions m_common_actions;
 	Action m_show_all_actions_action;
+	Action m_start_standalone_app;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
