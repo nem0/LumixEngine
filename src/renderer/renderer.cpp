@@ -506,10 +506,10 @@ struct RendererImpl final : Renderer
 			os::WindowHandle window_handle = m_engine.getMainWindow();
 			if (window_handle == os::INVALID_WINDOW) {
 				logError("Trying to initialize renderer without any window");
-				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
+				os::messageBox("Failed to initialize renderer. More info in log.");
 			}
 			if (!gpu::init(window_handle, flags)) {
-				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
+				os::messageBox("Failed to initialize renderer. More info in log.");
 			}
 
 			gpu::MemoryStats mem_stats;

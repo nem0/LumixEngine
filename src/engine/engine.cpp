@@ -70,7 +70,7 @@ struct EngineImpl final : Engine {
 		registerLogCallback<&EngineImpl::logToFile>(this);
 		registerLogCallback<logToDebugOutput>();
 
-		m_is_log_file_open = m_log_file.open("lumix.log");
+		m_is_log_file_open = m_log_file.open(init_data.log_path);
 		
 		installUnhandledExceptionHandler();
 
