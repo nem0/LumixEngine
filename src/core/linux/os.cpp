@@ -51,6 +51,7 @@ static struct {
 	bool relative_mouse = false;
 	WindowHandle win = INVALID_WINDOW;
 	Cursor arrow_cursor = None;
+	Cursor hand_cursor = None;
 	Cursor size_ns_cursor = None;
 	Cursor size_we_cursor = None;
 	Cursor size_nwse_cursor = None;
@@ -609,7 +610,7 @@ void destroyWindow(WindowHandle window) {
 }
 
 
-Point toScreen(WindowHandle win, int x, int y) {
+Point clientToScreen(WindowHandle win, int x, int y) {
 	XWindowAttributes attrs;
 	Point p;
 	p.x = x;
@@ -699,6 +700,7 @@ void getKeyName(Keycode keycode, Span<char> out) {
 }
 
 static void initCursors() {
+	if (G.hand_cursor == None) G.hand_cursor = XCreateFontCursor(G.display, 60);
 	if (G.arrow_cursor == None) G.arrow_cursor = XCreateFontCursor(G.display, 68);
 	if (G.size_ns_cursor == None) G.size_ns_cursor = XCreateFontCursor(G.display, 116);
 	if (G.size_we_cursor == None) G.size_we_cursor = XCreateFontCursor(G.display, 108);
@@ -723,6 +725,7 @@ void setCursor(CursorType type) {
 	if (!G.is_cursor_visible) return;
 	switch (type) {
 		case CursorType::DEFAULT: XDefineCursor(G.display, (Window)G.win, G.arrow_cursor); break;
+		case CursorType::HAND: XDefineCursor(G.display, (Window)G.win, G.hand_cursor); break;
 		case CursorType::SIZE_NS: XDefineCursor(G.display, (Window)G.win, G.size_ns_cursor); break;
 		case CursorType::SIZE_WE: XDefineCursor(G.display, (Window)G.win, G.size_we_cursor); break;
 		case CursorType::SIZE_NWSE: XDefineCursor(G.display, (Window)G.win, G.size_nwse_cursor); break;
@@ -764,14 +767,12 @@ Rect getWindowScreenRect(WindowHandle win) {
 	return r;
 }
 
-Rect getWindowClientRect(WindowHandle win) {
+Point getWindowClientSize(WindowHandle win) {
 	XWindowAttributes attrs;
 	XGetWindowAttributes(G.display, (Window)win, &attrs);
-	Rect r;
-	r.left = 0;
-	r.top = 0;
-	r.width = attrs.width;
-	r.height = attrs.height;
+	Point r;
+	r.x = attrs.width;
+	r.y = attrs.height;
 	return r;
 }
 

@@ -1327,6 +1327,7 @@ void GUIModule::reflect() {
 				case os::CursorType::SIZE_NWSE: return "Size NWSE";
 				case os::CursorType::SIZE_WE: return "Size WE";
 				case os::CursorType::TEXT_INPUT: return "Text input";
+				case os::CursorType::HAND: return "Hand";
 			}
 			ASSERT(false);
 			return "N/A";

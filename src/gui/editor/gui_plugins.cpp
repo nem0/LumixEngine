@@ -273,6 +273,20 @@ public:
 
 
 private:
+	enum class ResizeSide {
+		NONE = 0,
+
+		N = 1 << 0,
+		E = 1 << 1,
+		S = 1 << 2,
+		W = 1 << 3,
+		
+		NE = N | E,
+		NW = N | W,
+		SE = S | E,
+		SW = S | W
+	};
+
 	enum class MouseMode {
 		NONE,
 		RESIZE,
@@ -389,25 +403,60 @@ private:
 			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color::WHITE : Color{0xff, 0xff, 0xff, 0x77});
 			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), Color::BLACK, 1);
 
-			return is_hovered && ImGui::IsMouseClicked(0);
+			return is_hovered;
 		};
 
-		MouseMode ret = MouseMode::NONE;
-		if (drawHandle(bottom_right, mouse_canvas_pos))
-		{
+		constexpr float RESIZE_EDGE_SIZE = 5;
+		if (mouse_canvas_pos.x < rect.x - RESIZE_EDGE_SIZE) return MouseMode::NONE;
+		if (mouse_canvas_pos.y < rect.y - RESIZE_EDGE_SIZE) return MouseMode::NONE;
+		if (mouse_canvas_pos.x > bottom_right.x + RESIZE_EDGE_SIZE) return MouseMode::NONE;
+		if (mouse_canvas_pos.y > bottom_right.y + RESIZE_EDGE_SIZE) return MouseMode::NONE;
+
+		if (ImGui::IsMouseClicked(0)) {
 			m_bottom_right_start_transform.x = module.getRectRightPoints(e);
 			m_bottom_right_start_transform.y = module.getRectBottomPoints(e);
-			ret = MouseMode::RESIZE;
+			m_top_left_start_transform.y = module.getRectTopPoints(e);
+			m_top_left_start_transform.x = module.getRectLeftPoints(e);
 		}
-		if (drawHandle(mid, mouse_canvas_pos))
-		{
-			m_bottom_right_start_transform.x = module.getRectRightPoints(e);
-			m_bottom_right_start_transform.y = module.getRectBottomPoints(e);
-			m_top_left_start_move.y = module.getRectTopPoints(e);
-			m_top_left_start_move.x = module.getRectLeftPoints(e);
-			ret = MouseMode::MOVE;
+
+		if (m_mouse_mode == MouseMode::NONE) {
+			m_resize_side = ResizeSide::NONE;
+			if (mouse_canvas_pos.x < rect.x + RESIZE_EDGE_SIZE) {
+				m_resize_side = ResizeSide::W;
+			}
+			if (mouse_canvas_pos.x > bottom_right.x - RESIZE_EDGE_SIZE) {
+				m_resize_side |= ResizeSide::E;
+			}
+			if (mouse_canvas_pos.y < rect.y + RESIZE_EDGE_SIZE) {
+				m_resize_side |= ResizeSide::N;
+			}
+			if (mouse_canvas_pos.y > bottom_right.y - RESIZE_EDGE_SIZE) {
+				m_resize_side |= ResizeSide::S;
+			}
+			switch (m_resize_side) {
+				case ResizeSide::W:
+				case ResizeSide::E:
+					ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+					break;
+				case ResizeSide::N:
+				case ResizeSide::S:
+					ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+					break;
+				case ResizeSide::NE:
+				case ResizeSide::SW:
+					ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNESW);
+					break;
+				case ResizeSide::NW:
+				case ResizeSide::SE:
+					ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+					break;
+				default: break;
+			}
+			if (m_resize_side != ResizeSide::NONE && ImGui::IsMouseClicked(0)) return MouseMode::RESIZE;
 		}
-		return ret;
+		if (m_resize_side == ResizeSide::NONE) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		if (ImGui::IsMouseClicked(0)) return MouseMode::MOVE;
+		return MouseMode::NONE;
 	}
 
 	struct CopyPositionBufferItem
@@ -500,13 +549,14 @@ private:
 		}
 		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		WorldEditor& editor = m_app.getWorldEditor();
-		ImVec2 mouse_canvas_pos = ImGui::GetMousePos();
-		mouse_canvas_pos.x -= ImGui::GetCursorScreenPos().x;
-		mouse_canvas_pos.y -= ImGui::GetCursorScreenPos().y;
-			
-		m_pipeline->setWorld(editor.getWorld());
+		World& world = *editor.getWorld();
+		if (m_canvas_entity.isValid() && (!world.hasEntity(*m_canvas_entity) || !world.hasComponent(*m_canvas_entity, GUI_CANVAS_TYPE))) {
+			// new world or entity deleted or component deleted
+			m_canvas_entity = INVALID_ENTITY;
+		}
 
-		GUIModule* module = (GUIModule*)editor.getWorld()->getModule("gui");
+		m_pipeline->setWorld(&world);
+		GUIModule* module = (GUIModule*)world.getModule("gui");
 		HashMap<EntityRef, GUICanvas>& canvases = module->getCanvases();
 		if (!m_canvas_entity.isValid() && canvases.size() > 0) {
 			m_canvas_entity = canvases.begin().key();
@@ -514,16 +564,22 @@ private:
 
 		if (canvases.size() > 1) {
 			char entity_name[64] = "N/A";
-			getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), m_canvas_entity, true);
+			getEntityListDisplayName(m_app, world, Span(entity_name), m_canvas_entity, true);
 			if (ImGui::BeginCombo("Canvas", entity_name)) {
 				for (auto iter : canvases.iterated()) {
-					getEntityListDisplayName(m_app, *editor.getWorld(), Span(entity_name), iter.key(), true);
+					getEntityListDisplayName(m_app, world, Span(entity_name), iter.key(), true);
 					if (ImGui::Selectable(entity_name)) {
 						m_canvas_entity = iter.key();
 					}
 				}
 				ImGui::EndCombo();
 			}
+		}
+
+		switch (m_mouse_mode) {
+			case MouseMode::RESIZE: ImGui::TextUnformatted("Resize"); break;
+			case MouseMode::MOVE: ImGui::TextUnformatted("Move"); break;
+			case MouseMode::NONE: ImGui::TextUnformatted("None"); break;
 		}
 
 		if (!m_canvas_entity.isValid()) {
@@ -541,6 +597,8 @@ private:
 			ImGui::End();
 			return;
 		}
+		
+		const ImVec2 mouse_canvas_pos = ImGui::GetMousePos() - ImGui::GetCursorScreenPos();
 
 		const ImVec2 size = ImGui::GetContentRegionAvail();
 		m_canvas_size = size;
@@ -558,36 +616,42 @@ private:
 				if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
 			}
 		}
-			
-		if (ImGui::IsMouseReleased(0)) m_mouse_mode = MouseMode::NONE;
-			
-		if (editor.getSelectedEntities().size() == 1)
-		{
+
+		if (editor.getSelectedEntities().size() == 1) {
 			EntityRef e = editor.getSelectedEntities()[0];
-			switch (m_mouse_mode)
-			{
+			switch (m_mouse_mode) {
 				case MouseMode::NONE: break;
-				case MouseMode::RESIZE:
-				{
+				case MouseMode::RESIZE: {
 					editor.beginCommandGroup("gui_mouse_resize");
-					float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-					setRectProperty(e, "Bottom Points", b, editor);
-					float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-					setRectProperty(e, "Right Points", r, editor);
+					if (isFlagSet(m_resize_side, ResizeSide::N)) {
+						float b = m_top_left_start_transform.y + ImGui::GetMouseDragDelta(0).y;
+						setRectProperty(e, "Top Points", b, editor);
+					}
+					if (isFlagSet(m_resize_side, ResizeSide::S)) {
+						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
+						setRectProperty(e, "Bottom Points", b, editor);
+					}
+					if (isFlagSet(m_resize_side, ResizeSide::W)) {
+						float b = m_top_left_start_transform.x + ImGui::GetMouseDragDelta(0).x;
+						setRectProperty(e, "Left Points", b, editor);
+					}
+					if (isFlagSet(m_resize_side, ResizeSide::E)) {
+						float b = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
+						setRectProperty(e, "Right Points", b, editor);
+					}
 					editor.endCommandGroup();
 				}
 				break;
-				case MouseMode::MOVE:
-				{
+				case MouseMode::MOVE: {
 					editor.beginCommandGroup("gui_mouse_move");
 					float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
 					setRectProperty(e, "Bottom Points", b, editor);
 					float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
 					setRectProperty(e, "Right Points", r, editor);
 
-					float t = m_top_left_start_move.y + ImGui::GetMouseDragDelta(0).y;
+					float t = m_top_left_start_transform.y + ImGui::GetMouseDragDelta(0).y;
 					setRectProperty(e, "Top Points", t, editor);
-					float l = m_top_left_start_move.x + ImGui::GetMouseDragDelta(0).x;
+					float l = m_top_left_start_transform.x + ImGui::GetMouseDragDelta(0).x;
 					setRectProperty(e, "Left Points", l, editor);
 					editor.endCommandGroup();
 				}
@@ -621,8 +685,7 @@ private:
 		}
 
 
-		if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
-		{
+		if (ImGui::IsMouseReleased(0) && ImGui::IsItemHovered() && ImGui::GetMouseDragDelta().x == 0 && ImGui::GetMouseDragDelta().x == 0) {
 			const Array<EntityRef>& selected = editor.getSelectedEntities();
 			bool parent_selected = false;
 			if (!selected.empty() && isInCanvas(selected[0], *m_canvas_entity)) {
@@ -648,6 +711,10 @@ private:
 					editor.selectEntities(Span(&r, 1), false);
 				}
 			}
+		}
+		
+		if (ImGui::IsMouseReleased(0)) {
+			m_mouse_mode = MouseMode::NONE;
 		}
 
 		bool has_rect = false;
@@ -1044,8 +1111,9 @@ private:
 	bool m_has_focus = false;
 	gpu::TextureHandle m_texture_handle;
 	MouseMode m_mouse_mode = MouseMode::NONE;
+	ResizeSide m_resize_side = ResizeSide::NONE;
 	Vec2 m_bottom_right_start_transform;
-	Vec2 m_top_left_start_move;
+	Vec2 m_top_left_start_transform;
 	Vec2 m_canvas_size;
 	EntityPtr m_canvas_entity = INVALID_ENTITY;
 

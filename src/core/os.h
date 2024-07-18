@@ -30,6 +30,7 @@ enum class CursorType : u32 {
 	SIZE_NWSE,
 	LOAD,
 	TEXT_INPUT,
+	HAND,
 
 	UNDEFINED
 };
@@ -220,14 +221,14 @@ LUMIX_CORE_API void setMouseScreenPos(int x, int y);
 LUMIX_CORE_API void showCursor(bool show);
 
 LUMIX_CORE_API u32 getMonitors(Span<Monitor> monitors);
-LUMIX_CORE_API Point toScreen(WindowHandle win, int x, int y);
+LUMIX_CORE_API Point clientToScreen(WindowHandle win, int x, int y);
 LUMIX_CORE_API WindowHandle createWindow(const InitWindowArgs& args);
 LUMIX_CORE_API void showWindow(WindowHandle wnd);
 LUMIX_CORE_API void hideWindow(WindowHandle wnd);
 LUMIX_CORE_API bool getEvent(Event& event);
 LUMIX_CORE_API void destroyWindow(WindowHandle wnd);
 LUMIX_CORE_API Rect getWindowScreenRect(WindowHandle win);
-LUMIX_CORE_API Rect getWindowClientRect(WindowHandle win);
+LUMIX_CORE_API Point getWindowClientSize(WindowHandle win);
 LUMIX_CORE_API void setWindowScreenRect(WindowHandle win, const Rect& rect);
 LUMIX_CORE_API void setWindowTitle(WindowHandle win, const char* title);
 LUMIX_CORE_API void maximizeWindow(WindowHandle win);

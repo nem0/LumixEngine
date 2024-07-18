@@ -65,10 +65,10 @@ struct Runner final
 		if (!m_engine.get()) return;
 		if (m_engine->getMainWindow() == os::INVALID_WINDOW) return;
 
-		const os::Rect r = os::getWindowClientRect(m_engine->getMainWindow());
-		m_viewport.w = r.width;
-		m_viewport.h = r.height;
-		m_gui_interface.size = Vec2((float)r.width, (float)r.height);
+		const os::Point client_size = os::getWindowClientSize(m_engine->getMainWindow());
+		m_viewport.w = client_size.x;
+		m_viewport.h = client_size.y;
+		m_gui_interface.size = Vec2((float)client_size.x, (float)client_size.y);
 	}
 
 	void initRenderPipeline() {
@@ -225,7 +225,7 @@ struct Runner final
 			const bool is_key_up = event.type == os::Event::Type::KEY && !event.key.down;
 			if (m_focused || is_mouse_up || is_key_up) {
 				InputSystem& input = m_engine->getInputSystem();
-				os::Point p = os::toScreen(m_window, 0, 0);
+				os::Point p = os::clientToScreen(m_window, 0, 0);
 				input.injectEvent(event, p.x, p.y);
 			}
 		}

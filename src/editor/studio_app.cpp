@@ -696,9 +696,9 @@ struct StudioAppImpl final : StudioApp
 		ImGuiIO& io = ImGui::GetIO();
 
 		updateIMGUIMonitors();
-		const os::Rect rect = os::getWindowClientRect(m_main_window);
-		if (rect.width > 0 && rect.height > 0) {
-			io.DisplaySize = ImVec2(float(rect.width), float(rect.height));
+		const os::Point client_size = os::getWindowClientSize(m_main_window);
+		if (client_size.x > 0 && client_size.y > 0) {
+			io.DisplaySize = ImVec2(float(client_size.x), float(client_size.y));
 		}
 		else if(io.DisplaySize.x <= 0) {
 			io.DisplaySize.x = 800;
@@ -728,6 +728,7 @@ struct StudioAppImpl final : StudioApp
 					case ImGuiMouseCursor_ResizeEW: os::setCursor(os::CursorType::SIZE_WE); break;
 					case ImGuiMouseCursor_ResizeNWSE: os::setCursor(os::CursorType::SIZE_NWSE); break;
 					case ImGuiMouseCursor_TextInput: os::setCursor(os::CursorType::TEXT_INPUT); break;
+					case ImGuiMouseCursor_Hand: os::setCursor(os::CursorType::HAND); break;
 					default: os::setCursor(os::CursorType::DEFAULT); break;
 				}
 				last_cursor = imgui_cursor;
@@ -2287,8 +2288,7 @@ struct StudioAppImpl final : StudioApp
 		};
 		pio.Platform_GetWindowPos = [](ImGuiViewport* vp) -> ImVec2 {
 			os::WindowHandle win = (os::WindowHandle)vp->PlatformHandle;
-			const os::Rect r = os::getWindowClientRect(win);
-			const os::Point p = os::toScreen(win, r.left, r.top);
+			const os::Point p = os::clientToScreen(win, 0, 0);
 			return {(float)p.x, (float)p.y};
 
 		};
@@ -2300,8 +2300,8 @@ struct StudioAppImpl final : StudioApp
 			os::setWindowScreenRect(h, r);
 		};
 		pio.Platform_GetWindowSize = [](ImGuiViewport* vp) -> ImVec2 {
-			const os::Rect r = os::getWindowClientRect((os::WindowHandle)vp->PlatformHandle);
-			return {(float)r.width, (float)r.height};
+			const os::Point client_size = os::getWindowClientSize((os::WindowHandle)vp->PlatformHandle);
+			return {(float)client_size.x, (float)client_size.y};
 		};
 		pio.Platform_SetWindowTitle = [](ImGuiViewport* vp, const char* title){
 			os::setWindowTitle((os::WindowHandle)vp->PlatformHandle, title);

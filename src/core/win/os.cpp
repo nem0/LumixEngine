@@ -83,6 +83,7 @@ static struct {
 		HCURSOR size_nwse;
 		HCURSOR arrow;
 		HCURSOR text_input;
+		HCURSOR hand;
 	} cursors;
 	CursorType current_cursor = CursorType::DEFAULT;
 } G;
@@ -536,7 +537,7 @@ void destroyWindow(WindowHandle window) {
 }
 
 
-Point toScreen(WindowHandle win, int x, int y)
+Point clientToScreen(WindowHandle win, int x, int y)
 {
 	POINT p;
 	p.x = x;
@@ -827,6 +828,7 @@ void init() {
 	G.cursors.size_ns = LoadCursor(NULL, IDC_SIZENS);
 	G.cursors.size_we = LoadCursor(NULL, IDC_SIZEWE);
 	G.cursors.size_nwse = LoadCursor(NULL, IDC_SIZENWSE);
+	G.cursors.hand = LoadCursor(NULL, IDC_HAND);
 }
 
 void setCursor(CursorType type) {
@@ -838,6 +840,7 @@ void setCursor(CursorType type) {
 		case CursorType::SIZE_WE: SetCursor(G.cursors.size_we); break;
 		case CursorType::SIZE_NWSE: SetCursor(G.cursors.size_nwse); break;
 		case CursorType::TEXT_INPUT: SetCursor(G.cursors.text_input); break;
+		case CursorType::HAND: SetCursor(G.cursors.hand); break;
 		case CursorType::UNDEFINED: break;
 	}
 }
@@ -856,11 +859,12 @@ Rect getWindowScreenRect(WindowHandle win)
 	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
 }
 
-Rect getWindowClientRect(WindowHandle win)
-{
+Point getWindowClientSize(WindowHandle win) {
 	RECT rect;
 	FATAL_CHECK(GetClientRect((HWND)win, &rect));
-	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
+	ASSERT(rect.left == 0);
+	ASSERT(rect.top == 0);
+	return {rect.right - rect.left, rect.bottom - rect.top};
 }
 
 void setWindowScreenRect(WindowHandle win, const Rect& rect)
