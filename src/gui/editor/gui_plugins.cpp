@@ -454,7 +454,7 @@ private:
 			}
 			if (m_resize_side != ResizeSide::NONE && ImGui::IsMouseClicked(0)) return MouseMode::RESIZE;
 		}
-		if (m_resize_side == ResizeSide::NONE) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		if (m_resize_side == ResizeSide::NONE && module.isOver(mouse_canvas_pos, e)) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 		if (ImGui::IsMouseClicked(0)) return MouseMode::MOVE;
 		return MouseMode::NONE;
 	}
@@ -576,11 +576,8 @@ private:
 			}
 		}
 
-		switch (m_mouse_mode) {
-			case MouseMode::RESIZE: ImGui::TextUnformatted("Resize"); break;
-			case MouseMode::MOVE: ImGui::TextUnformatted("Move"); break;
-			case MouseMode::NONE: ImGui::TextUnformatted("None"); break;
-		}
+
+		ImGui::ColorEdit3("Background", &m_clear_color.x);
 
 		if (!m_canvas_entity.isValid()) {
 			if (canvases.empty()) {
@@ -608,12 +605,12 @@ private:
 		}
 
 		module->renderCanvas(*m_pipeline, { size.x, size.y }, false, *m_canvas_entity);
-			
+
 		if (editor.getSelectedEntities().size() == 1) {
 			EntityRef e = editor.getSelectedEntities()[0];
 			if (isInCanvas(e, *m_canvas_entity)) {
 				MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *module, { size.x, size.y }, mouse_canvas_pos, e);
-				if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
+				if (ImGui::IsWindowHovered() && m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
 			}
 		}
 
@@ -663,7 +660,8 @@ private:
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
 		m_pipeline->setViewport(vp);
-			
+		m_pipeline->setLuaGlobal("GUI_EDITOR_CLEAR_COLOR", m_clear_color);	
+
 		if (m_pipeline->render(true)) {
 			m_texture_handle = m_pipeline->getOutput();
 
@@ -684,13 +682,12 @@ private:
 			}
 		}
 
-
-		if (ImGui::IsMouseReleased(0) && ImGui::IsItemHovered() && ImGui::GetMouseDragDelta().x == 0 && ImGui::GetMouseDragDelta().x == 0) {
+		if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0) && ImGui::IsItemHovered() && ImGui::GetMouseDragDelta().x == 0 && ImGui::GetMouseDragDelta().x == 0) {
 			const Array<EntityRef>& selected = editor.getSelectedEntities();
 			bool parent_selected = false;
 			if (!selected.empty() && isInCanvas(selected[0], *m_canvas_entity)) {
 				const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
-				if (parent.isValid()) {
+				if (module->isOver(mouse_canvas_pos, selected[0]) && parent.isValid()) {
 					const GUIModule::Rect rect = module->getRect(*parent);
 					if (mouse_canvas_pos.x >= rect.x 
 						&& mouse_canvas_pos.y >= rect.y 
@@ -1116,6 +1113,7 @@ private:
 	Vec2 m_top_left_start_transform;
 	Vec2 m_canvas_size;
 	EntityPtr m_canvas_entity = INVALID_ENTITY;
+	Vec3 m_clear_color = Vec3(0);
 
 	Action m_hcenter_action;
 	Action m_vcenter_action;

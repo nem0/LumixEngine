@@ -186,7 +186,7 @@ struct GUIModuleImpl final : GUIModule {
 		Font* font = rect.text->getFont();
 		Vec2 text_size = measureTextA(*font, text, text_end);
 		draw.addLine({ pos.x + text_size.x, pos.y }
-			, { pos.x + text_size.x, pos.y + text_size.y }
+			, { pos.x + text_size.x, pos.y - text_size.y }
 			, *(Color*)&rect.text->color
 			, 1);
 	}
@@ -214,7 +214,6 @@ struct GUIModuleImpl final : GUIModule {
 					m_cursor_set = true;
 				}
 				img_color = (Color*)&button.hovered_color;
-				txt_color = (Color*)&button.hovered_color;
 			}
 		}
 
@@ -790,6 +789,7 @@ struct GUIModuleImpl final : GUIModule {
 	{
 		const GUIRect* rect = getInput(m_focused_entity);
 		if (!rect) return;
+		if (event.data.text.utf8 == '\b') return;
 		char tmp[5] = {};
 		memcpy(tmp, &event.data.text.utf8, sizeof(event.data.text.utf8));
 		rect->text->text.insert(rect->input_field->cursor, tmp);

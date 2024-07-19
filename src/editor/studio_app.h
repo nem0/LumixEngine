@@ -140,6 +140,9 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void setMouseClipRect(os::WindowHandle win, const os::Rect &screen_rect) = 0;
 	virtual void unclipMouseCursor() = 0;
 	virtual bool isMouseCursorClipped() const = 0;
+	// if true, shortcuts are not processed
+	// use case - when there's active game in game view, we don't want delete keypress to delete entities
+	virtual void setCaptureInput(bool capture) = 0;
 
 	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getDefaultFont() = 0;

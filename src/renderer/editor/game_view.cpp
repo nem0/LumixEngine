@@ -115,6 +115,7 @@ void GameView::enableIngameCursor(bool enable)
 void GameView::captureMouse(bool capture) {
 	if (m_is_mouse_captured == capture) return;
 
+	m_app.setCaptureInput(capture);
 	m_is_mouse_captured = capture;
 	os::showCursor(!capture || m_is_ingame_cursor);
 	if (capture) m_app.clipMouseCursor();

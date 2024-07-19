@@ -945,6 +945,14 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
+	void setLuaGlobal(const char* var_name, const Vec3& value) override {
+		LuaWrapper::DebugGuard guard(m_lua_state);
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		LuaWrapper::setField(m_lua_state, -1, var_name, value);
+		lua_pop(m_lua_state, 1);
+
+	}
+
 	void define(const char* define, bool enable) override {
 		LuaWrapper::DebugGuard guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);

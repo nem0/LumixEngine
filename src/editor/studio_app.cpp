@@ -3582,7 +3582,12 @@ struct StudioAppImpl final : StudioApp
 
 	Span<const os::Event> getEvents() const override { return m_events; }
 
+	void setCaptureInput(bool capture) override {
+		m_capture_input = capture;
+	}
+
 	void checkShortcuts() {
+		if (m_capture_input) return;
 		u8 pressed_modifiers = 0;
 		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
 		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
@@ -3672,6 +3677,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_new = false;
 	bool m_confirm_destroy_partition = false;
 	bool m_is_caption_hovered = false;
+	bool m_capture_input = false;
 	
 	World::PartitionHandle m_partition_to_destroy;
 	Path m_world_to_load;
