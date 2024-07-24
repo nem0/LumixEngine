@@ -1120,6 +1120,10 @@ struct StudioAppImpl final : StudioApp
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags)) {
 			#ifdef _WIN32
+				const ImVec2 cp = ImGui::GetCursorPos();
+				ImGui::InvisibleButton("titlebardrag", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()), ImGuiButtonFlags_AllowOverlap);
+				m_is_caption_hovered = ImGui::IsItemHovered();
+				ImGui::SetCursorPos(cp);
 				alignGUIRight([&](){
 					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
 					ImGui::SameLine();
