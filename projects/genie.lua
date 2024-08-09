@@ -1059,6 +1059,7 @@ if force_build_physx == true then
 
 			configuration { "windows" }
 				targetdir "../external/physx/lib/win"
+				buildoptions { "/wd5055"}
 	else
 		printf("--force-build-physx used but PhysX source code not found")
 	end
