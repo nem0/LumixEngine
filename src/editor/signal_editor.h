@@ -5,7 +5,7 @@
 
 namespace Lumix {
 
-struct SignalEditor : PropertyGrid::IPlugin, StudioApp::IPlugin {
+struct SignalEditor : StudioApp::IPlugin, PropertyGrid::IPlugin {
 };
 
 SignalEditor* createSignalEditor(StudioApp& app);
