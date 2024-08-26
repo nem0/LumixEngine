@@ -359,8 +359,8 @@ int main(int args, char* argv[]) {
 		}
 
 		// draw
-		os::Rect rect = os::getWindowClientRect(win);
-		gpu::viewport(0, 0, rect.width, rect.height);
+		os::Point size = os::getWindowClientSize(win);
+		gpu::viewport(0, 0, size.x, size.y);
 		gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 		const float clear_col[] = {0.1f, 0.1f, 0.1f, 1};
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
