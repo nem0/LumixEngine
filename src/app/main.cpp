@@ -319,17 +319,30 @@ int main(int args, char* argv[])
 
 #else
 
+#include "core/debug.h"
 #include "core/default_allocator.h"
+#include "core/log_callback.h"
 #include "core/os.h"
 #include "renderer/gpu/gpu.h"
 
 using namespace Lumix;
 
+static void logToDebugOutput(LogLevel level, const char* message)
+{
+	if (level == LogLevel::ERROR) {
+		debug::debugOutput("Error: ");
+	}
+	debug::debugOutput(message);
+	debug::debugOutput("\n");
+}
+
 int main(int args, char* argv[]) {
+	registerLogCallback<logToDebugOutput>();
+
 	os::init();
 	// create window
 	os::WindowHandle win = os::createWindow({ .width = 640, .height = 480 });
-	
+
 	// init GPU
 	DefaultAllocator allocator;
 	gpu::preinit(allocator, false);
