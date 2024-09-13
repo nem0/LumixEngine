@@ -13,6 +13,7 @@ jobs:
                 mkdir ..\plugins
                 pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+                git.exe checkout bindless
             - name: fetch gltf plugin
               working-directory: plugins
               run: |
@@ -33,14 +34,21 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_market.git market
+                git.exe checkout bindless
             - name: fetch procedural geometry plugin
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+                git.exe checkout bindless
             - name: fetch visual script plugin
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_visualscript.git visual_script
+            - name: fetch livecode plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_livcode.git livecode
+                git.exe checkout bindless
             - name: fetch empty plugin template
               working-directory: plugins
               run: |
