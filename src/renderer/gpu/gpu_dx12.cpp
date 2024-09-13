@@ -30,12 +30,15 @@
 
 #include "renderer/gpu/renderdoc_app.h"
 
-#define USE_PIX
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "WinPixEventRuntime.lib")
-#include "pix3.h"
+
+#ifdef LUMIX_DEBUG
+	#define USE_PIX
+	#pragma comment(lib, "WinPixEventRuntime.lib")
+	#include "pix3.h"
+#endif
 
 namespace Lumix::gpu {
 
@@ -1134,7 +1137,9 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 	cmd_queue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&cmd_list);
 	if (capture_requested) {
 		capture_requested = false;
-		if (PIXIsAttachedForGpuCapture()) PIXEndCapture(FALSE);
+		#ifdef LUMIX_DEBUG
+			if (PIXIsAttachedForGpuCapture()) PIXEndCapture(FALSE);
+		#endif
 	}
 
 
@@ -1830,13 +1835,17 @@ bool init(void* hwnd, InitFlags flags) {
 }
 
 void pushDebugGroup(const char* msg) {
-	WCHAR tmp[128];
-	toWChar(tmp, msg);
-	PIXBeginEvent(d3d->cmd_list, PIX_COLOR(0x55, 0xff, 0x55), tmp);
+	#ifdef LUMIX_DEBUG
+		WCHAR tmp[128];
+		toWChar(tmp, msg);
+		PIXBeginEvent(d3d->cmd_list, PIX_COLOR(0x55, 0xff, 0x55), tmp);
+	#endif
 }
 
 void popDebugGroup() {
-	PIXEndEvent(d3d->cmd_list);
+	#ifdef LUMIX_DEBUG
+		PIXEndEvent(d3d->cmd_list);
+	#endif
 }
 
 void setFramebufferCube(TextureHandle cube, u32 face, u32 mip) {
