@@ -24,7 +24,6 @@ struct BindlessHandle {
 	constexpr BindlessHandle() {}
 	explicit BindlessHandle(u32 value) : value(value) {}
 	u32 value = 0;
-	operator u32() const { return value; }
 };
 
 static constexpr BindlessHandle INVALID_BINDLESS_HANDLE = {};
@@ -33,7 +32,6 @@ struct RWBindlessHandle {
 	constexpr RWBindlessHandle() {}
 	explicit RWBindlessHandle(u32 value) : value(value) {}
 	u32 value = 0;
-	operator u32() const { return value; }
 };
 
 static constexpr RWBindlessHandle INVALID_RW_BINDLESS_HANDLE = {};
