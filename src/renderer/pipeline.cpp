@@ -35,9 +35,6 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
-// TODO must haves:
-	// TODO check if github CI works
-
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
 
@@ -1053,13 +1050,20 @@ struct PipelineImpl final : Pipeline {
 
 		beginBlock("tonemap");
 		const RenderBufferHandle rb = createRenderbuffer({
-			.format = is_preview ? gpu::TextureFormat::RGBA8 : gpu::TextureFormat::SRGBA,
-			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS,
+			.format = gpu::TextureFormat::RGBA8,
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "tonemap"
 		});
-		setRenderTargets(Span(&rb, 1));
-		setUniform(toBindless(input, m_renderer.getDrawStream()));
-		drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
+		DrawStream& stream = m_renderer.getDrawStream();
+		struct {
+			gpu::BindlessHandle input;
+			gpu::RWBindlessHandle output;
+		} ubdata {
+			toBindless(input, stream),
+			toRWBindless(rb, stream)
+		};
+		setUniform(ubdata);
+		dispatch(*m_tonemap_shader, (m_viewport.w + 15) / 16, (m_viewport.h + 15) / 16, 1);
 		endBlock();
 		return rb;
 	}
