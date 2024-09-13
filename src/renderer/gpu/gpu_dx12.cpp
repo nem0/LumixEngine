@@ -32,7 +32,6 @@
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3dcompiler.lib")
 
 #ifdef LUMIX_DEBUG
 	#define USE_PIX
@@ -1736,7 +1735,7 @@ bool init(void* hwnd, InitFlags flags) {
 		if (SUCCEEDED(hr)) {
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-			//info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 			D3D12_INFO_QUEUE_FILTER filter = {};
 
 			D3D12_MESSAGE_CATEGORY catlist[] = {
@@ -1814,22 +1813,6 @@ bool init(void* hwnd, InitFlags flags) {
 		queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_PIPELINE_STATISTICS;
 		if (d3d->device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&d3d->stats_query_heap)) != S_OK) return false;
 	}
-
-	#ifdef LUMIX_DEBUG
-		auto api_DXGIGetDebugInterface1 = (decltype(DXGIGetDebugInterface1)*)GetProcAddress(d3d->dxgi_dll, "DXGIGetDebugInterface1");
-		IDXGIInfoQueue* dxgiInfoQueue = nullptr;
-		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue)))) {
-			// TODO
-			// Set the message severity level to include detailed information
-			//dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
-			//dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-			//dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, TRUE);
-
-			// Optionally, you can also set the message severity level to include info and verbose messages
-			//dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_INFO, TRUE);
-			//dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_MESSAGE, TRUE);
-		}
-	#endif
 
 	return true;
 }
@@ -2154,9 +2137,9 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	desc.Flags = shader_buffer ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
 
-	HRESULT hr = d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, IID_PPV_ARGS(&buffer->resource));
+	HRESULT hr = d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, NULL, IID_PPV_ARGS(&buffer->resource));
 	ASSERT(hr == S_OK);
-	buffer->state = D3D12_RESOURCE_STATE_GENERIC_READ;
+	buffer->state = D3D12_RESOURCE_STATE_COMMON;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 	srv_desc = {};
@@ -2661,8 +2644,6 @@ void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u
 		d3d->cmd_list->IASetVertexBuffers(binding_idx, 1, &vbv);
 	}
 }
-
-
 
 BindlessHandle getBindlessHandle(TextureHandle texture) {
 	return BindlessHandle(texture->heap_id);

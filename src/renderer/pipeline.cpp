@@ -35,10 +35,15 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
+// TODO 3d ui depth test
+// TODO fog
+
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
 
 // TODO nice to have:
+	// TODO render graph
+	// TODO vertex pulling
 	// TODO 200 MB in memory profiler
 	// TODO rewrite shaders to compute
 	// TODO temporal upsample
@@ -1284,7 +1289,10 @@ struct PipelineImpl final : Pipeline {
 
 		beginBlock("light pass");
 		const bool is_probe = m_type == PipelineType::PROBE;
-		const RenderBufferHandle hdr_rb = createRenderbuffer({ .format = is_probe ? gpu::TextureFormat::RGBA32F : gpu::TextureFormat::RGBA16F, .debug_name = "hdr" });
+		const RenderBufferHandle hdr_rb = createRenderbuffer({ 
+			.format = is_probe ? gpu::TextureFormat::RGBA32F : gpu::TextureFormat::RGBA16F, 
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
+			.debug_name = "hdr" });
 
 		setRenderTargets(Span(&hdr_rb, 1));
 		clear(gpu::ClearFlags::ALL, m_clear_color.x, m_clear_color.y, m_clear_color.z, 0, 0);

@@ -13,7 +13,8 @@ compute_shader [[
 		float accum = asfloat(bindless_buffers[u_accum].Load(256 * 4));
 		accum = max(accum, 1e-5);
 		float exposure = u_exposure / (10 * accum);
-		float input_rgb = bindless_textures[u_input][thread_id.xy].rgb;
- 		bindless_rw_textures[u_output][thread_id.xy] = float4(ACESFilm(input_rgb * exposure), 1);
+		float3 input_rgb = bindless_textures[u_input][thread_id.xy].rgb;
+		float3 tonemapped = ACESFilm(input_rgb * exposure);
+ 		bindless_rw_textures[u_output][thread_id.xy] = float4(tonemapped, 1);
 	}
 ]]

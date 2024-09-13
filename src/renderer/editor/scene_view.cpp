@@ -715,9 +715,24 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			pipeline.drawArray(0, 3, *m_selection_outline_shader, 0, gpu::StateFlags::NONE);
 		}
 
+		// grid
+		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS, true);
+		if (m_grid_shader->isReady() && m_show_grid) {
+			pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS);
+			pipeline.drawArray(0, 4, *m_grid_shader, 0, gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA));
+		}
+
+		const RenderBufferHandle icons_ds = pipeline.createRenderbuffer({
+			.format = gpu::TextureFormat::D32,
+			.debug_name = "icons_ds"
+		});
+
+		pipeline.setRenderTargets({}, icons_ds);
+		pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
+
 		// icons
 		if (m_show_icons) {
-			pipeline.setRenderTargets(Span(&input, 1), INVALID_RENDERBUFFER);
+			pipeline.setRenderTargets(Span(&input, 1), icons_ds);
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
 			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
 
@@ -753,23 +768,10 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			});
 		}
 
-		// grid
-		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS, true);
-		if (m_grid_shader->isReady() && m_show_grid) {
-			pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS);
-			pipeline.drawArray(0, 4, *m_grid_shader, 0, gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA));
-		}
-
 		// gizmo
 		auto& vertices = m_scene_view.m_view->m_draw_vertices;
 		if (m_debug_shape_shader->isReady() && !vertices.empty()) {
-			const RenderBufferHandle icon_ds = pipeline.createRenderbuffer({
-				.type = RenderbufferDesc::RELATIVE,
-				.rel_size = {1, 1},
-				.format = gpu::TextureFormat::D32,
-				.debug_name = "icon_ds"
-			});
-			pipeline.setRenderTargets(Span(&input, 1), icon_ds);
+			pipeline.setRenderTargets(Span(&input, 1), icons_ds);
 			pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 
 			renderer.pushJob("gizmos", [&renderer, &vertices, this](DrawStream& stream) {
@@ -880,7 +882,7 @@ void SceneView::init() {
 	renderer->addPlugin(*m_render_plugin.get());
 	m_app.getSettings().registerPtr("show_grid", &m_render_plugin->m_show_grid, "Scene view");
 	
-	m_camera_preview_pipeline = Pipeline::create(*renderer, PipelineType::PREVIEW);
+	m_camera_preview_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 
 	m_pipeline = Pipeline::create(*renderer, PipelineType::SCENE_VIEW);
 
