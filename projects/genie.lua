@@ -766,6 +766,7 @@ if build_app then
 
 		configuration { "windows" }
 			kind "WindowedApp"
+			libdirs { path.join(ROOT_DIR, "./external/pix/bin/x64") }
 
 		configuration { "linux" }
 			links { "GL", "X11", "dl", "rt", "Xi" }
