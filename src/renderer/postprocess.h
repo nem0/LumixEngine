@@ -547,16 +547,18 @@ struct Bloom : public RenderPlugin {
 			float exposure;
 			gpu::BindlessHandle input;
 			gpu::BindlessHandle accum;
+			gpu::RWBindlessHandle output;
 		} ubdata = {
 			camera->bloom_exposure,
 			pipeline.toBindless(input, stream),
-			gpu::getBindlessHandle(m_lum_buf)
+			gpu::getBindlessHandle(m_lum_buf),
+			pipeline.toRWBindless(rb, stream)
 		};
 
 		stream.barrierRead(m_lum_buf);
-		pipeline.setRenderTargets(Span(&rb, 1));
 		pipeline.setUniform(ubdata); 
-		pipeline.drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
+		const Viewport& vp = pipeline.getViewport();
+		pipeline.dispatch(*m_tonemap_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		pipeline.endBlock();
 		output = rb;
 		return true;

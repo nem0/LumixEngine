@@ -1,29 +1,19 @@
 include "pipelines/common.glsl"
 
-vertex_shader [[
-	struct Output {
-		float2 uv : TEXCOORD0;
-		float4 position : SV_POSITION;
-	};
-
-	Output main(uint vertex_id : SV_VertexID) {
-		Output output;
-		output.position = fullscreenQuad(vertex_id, output.uv);
-		return output;
-	}
-]]
-
-fragment_shader [[
+compute_shader [[
 	cbuffer Drawcall : register (b4) {
 		float u_exposure;
 		uint u_input;
 		uint u_accum;
+		uint u_output;
 	};
 
-	float4 main(float2 uv : TEXCOORD0) : SV_TARGET {
+	[numthreads(16, 16, 1)]
+	void main(uint3 thread_id : SV_DispatchThreadID) {
 		float accum = asfloat(bindless_buffers[u_accum].Load(256 * 4));
 		accum = max(accum, 1e-5);
 		float exposure = u_exposure / (10 * accum);
-		return float4(ACESFilm(sampleBindlessLod(LinearSamplerClamp, u_input, uv, 0).rgb * exposure), 1);
+		float input_rgb = bindless_textures[u_input][thread_id.xy].rgb;
+ 		bindless_rw_textures[u_output][thread_id.xy] = float4(ACESFilm(input_rgb * exposure), 1);
 	}
 ]]
