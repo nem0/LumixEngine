@@ -30,6 +30,7 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_js.git js
+                git.exe checkout bindless
             - name: fetch marketplace plugin
               working-directory: plugins
               run: |
