@@ -140,7 +140,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual gpu::RWBindlessHandle toRWBindless(RenderBufferHandle rb_idx, DrawStream& stream) = 0;
 
 	virtual void setUniformRaw(Span<const u8> mem, UniformBuffer::Enum bind_point = UniformBuffer::DRAWCALL) = 0;
-	virtual void renderTexturedQuad(u32 texture_bindless, bool flip_x = false, bool flip_y = false) = 0;
+	virtual void renderTexturedQuad(gpu::BindlessHandle texture, bool flip_x = false, bool flip_y = false) = 0;
 	virtual void viewport(i32 x, i32 y, i32 w, i32 h) = 0;
 	virtual void pass(const CameraParams& cp) const = 0;
 	virtual u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) = 0;

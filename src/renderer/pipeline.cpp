@@ -995,7 +995,7 @@ struct PipelineImpl final : Pipeline {
 		stream.drawArrays(indices_offset, indices_count);
 	}
 
-	void renderTexturedQuad(u32 texture_bindless, bool flip_x, bool flip_y) override {
+	void renderTexturedQuad(gpu::BindlessHandle texture_bindless, bool flip_x, bool flip_y) override {
 		struct {
 			Vec4 offset_scale = Vec4(0, 0, 1, 1);
 			Vec4 r_mask = Vec4(1, 0, 0, 0);
@@ -1003,7 +1003,7 @@ struct PipelineImpl final : Pipeline {
 			Vec4 b_mask = Vec4(0, 0, 1, 0);
 			Vec4 a_mask = Vec4(0, 0, 0, 1);;
 			Vec4 offsets = Vec4(0, 0, 0, 1);
-			u32 texture;
+			gpu::BindlessHandle texture;
 		} udata;
 		udata.texture = texture_bindless;
 		if (flip_x) udata.offset_scale.z = -1;
@@ -1234,22 +1234,10 @@ struct PipelineImpl final : Pipeline {
 			.debug_name = "hdr_copy"
 			});
 
-		struct {
-			Vec4 offset_scale = Vec4(0, 0, 1, 1);
-			Vec4 r_mask = Vec4(1, 0, 0, 0);
-			Vec4 g_mask = Vec4(0, 1, 0, 0);
-			Vec4 b_mask = Vec4(0, 0, 1, 0);
-			Vec4 a_mask = Vec4(0, 0, 0, 1);;
-			Vec4 offsets = Vec4(0, 0, 0, 1);
-			u32 texture;
-		} udata;
 		DrawStream& stream = m_renderer.getDrawStream();
-		udata.texture = toBindless(hdr_rb, stream);
-
 		pass(getMainCamera());
 		setRenderTargets(Span(&color_copy, 1));
-		setUniform(udata);
-		drawArray(0, 3, *m_textured_quad_shader, 0, gpu::StateFlags::NONE);
+		renderTexturedQuad(toBindless(hdr_rb, stream), false, false);
 
 		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, true);
 
@@ -1325,7 +1313,7 @@ struct PipelineImpl final : Pipeline {
 			Vec4 b_mask;
 			Vec4 a_mask;
 			Vec4 offsets;
-			u32 texture;
+			gpu::BindlessHandle texture;
 		} copy_ub = {
 				Vec4(0, 0, 1, 1),
 				r,
@@ -2213,9 +2201,9 @@ struct PipelineImpl final : Pipeline {
 			float padding;
 			Vec4 camera_planes[6];
 			IVec4 indices_count[32];
-			u32 culled_buffer;
-			u32 instanced_data;
-			u32 indirect_buffer;
+			gpu::RWBindlessHandle culled_buffer;
+			gpu::RWBindlessHandle instanced_data;
+			gpu::RWBindlessHandle indirect_buffer;
 		};
 
 		UBValues ub_values;
@@ -2313,9 +2301,9 @@ struct PipelineImpl final : Pipeline {
 			ub_values.indirect_offset = indirect_offset;
 			ub_values.radius = m->getOriginBoundingRadius();
 			ub_values.batch_size = instance_count;
-			ub_values.culled_buffer = gpu::getBindlessHandle(culled_buffer) + 1;
-			ub_values.instanced_data = gpu::getBindlessHandle(im.gpu_data) + 1;
-			ub_values.indirect_buffer = gpu::getBindlessHandle(m_indirect_buffer) + 1;
+			ub_values.culled_buffer = gpu::getRWBindlessHandle(culled_buffer);
+			ub_values.instanced_data = gpu::getRWBindlessHandle(im.gpu_data);
+			ub_values.indirect_buffer = gpu::getRWBindlessHandle(m_indirect_buffer);
 			ASSERT((u32)m->getMeshCount() < lengthOf(ub_values.indices_count)); // TODO
 			for (i32 i = 0; i < m->getMeshCount(); ++i) {
 				const Mesh& mesh = m->getMesh(i);

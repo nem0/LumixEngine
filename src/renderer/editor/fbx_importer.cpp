@@ -1274,9 +1274,9 @@ void FBXImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& 
 			IVec2 tile_size;
 			int size;
 			float radius;
-			u32 depth;
-			u32 normalmap;
-			u32 output;
+			gpu::BindlessHandle depth;
+			gpu::BindlessHandle normalmap;
+			gpu::RWBindlessHandle output;
 		} data;
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {

@@ -3561,7 +3561,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 			m_pipeline->render(false);
 
 			stream.setFramebufferCube(cubemap, i, 0);
-			const u32 side_tex = gpu::getBindlessHandle(m_pipeline->getOutput());
+			const gpu::BindlessHandle side_tex = gpu::getBindlessHandle(m_pipeline->getOutput());
 			m_pipeline->renderTexturedQuad(side_tex, i != 2 && i != 3, i == 2 || i == 3);
 		}
 
@@ -3598,7 +3598,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 						float roughness;
 						u32 face;
 						u32 mip;
-						u32 texture;
+						gpu::BindlessHandle texture;
 					} drawcall = { roughness, face, mip, gpu::getBindlessHandle(cubemap) };
 					m_pipeline->setUniform(drawcall);
 					stream.viewport(0, 0, texture_size >> mip, texture_size >> mip);
