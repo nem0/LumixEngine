@@ -80,6 +80,7 @@ struct GUISystemImpl final : GUISystem
 		}
 
 		RenderBufferHandle renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
+			pipeline.setRenderTargets(Span(&input, 1));
 			if (pipeline.getType() != PipelineType::GAME_VIEW) return input;
 			auto* module = (GUIModule*)pipeline.getModule()->getWorld().getModule("gui");
 			Vec2 size = m_system.m_interface->getSize();
