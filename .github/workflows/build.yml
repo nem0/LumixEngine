@@ -57,7 +57,7 @@ jobs:
               working-directory: projects
               shell: cmd
               run: |
-                "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
+                "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" -v:m tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
     # linux:
     #     runs-on: ubuntu-22.04
     #     steps:
