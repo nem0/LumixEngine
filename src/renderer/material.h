@@ -9,33 +9,14 @@
 #include "gpu/gpu.h"
 
 
-struct lua_State;
-
-
-namespace Lumix
-{
+namespace Lumix {
 
 struct Renderer;
 struct ResourceManagerHub;
 struct Shader;
 struct Texture;
 
-struct MaterialManager : ResourceManager {
-public:
-	MaterialManager(Renderer& renderer, IAllocator& allocator);
-	~MaterialManager() override;
-
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-	lua_State* getState(struct Material& material) const;
-
-private:
-	Renderer& m_renderer; 
-	lua_State* m_state;
-};
-
 struct LUMIX_RENDERER_API Material final : Resource {
-	friend struct MaterialManager;
 	static const int MAX_TEXTURE_COUNT = 16;
 
 	static constexpr u32 MAX_UNIFORMS_FLOATS = 64; 
@@ -93,7 +74,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void setLayer(u8 layer);
 	u32 getSortKey() const { return m_sort_key; }
 
-	static u32 getCustomFlag(const char* flag_name);
+	static u32 getCustomFlag(StringView flag_name);
 	static const char* getCustomFlagName(int index);
 	static int getCustomFlagCount();
 	void updateRenderData(bool on_before_ready);
@@ -101,17 +82,14 @@ struct LUMIX_RENDERER_API Material final : Resource {
 
 	void deserialize(struct InputMemoryStream& blob);
 	void serialize(struct OutputMemoryStream& blob);
+	void bind(struct DrawStream& stream) const;
 
-	gpu::BindGroupHandle m_bind_group = gpu::INVALID_BIND_GROUP;
 	gpu::StateFlags m_render_states;
 
 private:
 	void onBeforeReady() override;
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-
-	static int uniform(lua_State* L);
-	static int int_uniform(lua_State* L);
 
 	Renderer& m_renderer;
 	Shader* m_shader;

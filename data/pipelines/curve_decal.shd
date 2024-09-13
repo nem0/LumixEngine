@@ -8,58 +8,50 @@ texture_slot {
 
 uniform("Material color", "color", {1, 1, 1, 1})
 
-------------------
+common [[
+	struct VSOutput {
+		float3 half_extents : TEXCOORD0;
+		float3 pos : TEXCOORD1;
+		float4 rot : TEXCOORD2;
+		float2 uv_scale : TEXCOORD3;
+		float4 bezier : TEXCOORD4;
+		float4 position : SV_POSITION;
+	};
+]]
 
 vertex_shader [[
-	layout(location = 0) in vec3 a_position;
-	layout(location = 1) in vec3 i_pos;
-	layout(location = 2) in vec4 i_rot;
-	layout(location = 3) in vec3 i_half_extents;
-	layout(location = 4) in vec2 i_uv_scale;
-	layout(location = 5) in vec4 i_bezier;
-	layout(location = 0) out vec3 v_half_extents;
-	layout(location = 1) out vec3 v_pos;
-	layout(location = 2) out vec4 v_rot;
-	layout(location = 3) out vec2 v_uv_scale;
-	layout(location = 4) out vec4 v_bezier;
-	void main()
-	{
-		v_pos = i_pos;
-		v_rot = i_rot;
-		v_half_extents = i_half_extents;
-		vec3 pos = rotateByQuat(i_rot, a_position * i_half_extents);
-		pos += i_pos;
-		v_uv_scale = i_uv_scale;
-		v_bezier = i_bezier;
-		gl_Position = Global.projection * Global.view * vec4(pos, 1);
+	struct Input {
+		float3 position : TEXCOORD0;
+		float3 i_pos : TEXCOORD1;
+		float4 i_rot : TEXCOORD2;
+		float3 i_half_extents : TEXCOORD3;
+		float2 i_uv_scale : TEXCOORD4;
+		float4 i_bezier : TEXCOORD5;
+	};
+	
+	VSOutput main(Input input) {
+		VSOutput output;
+		output.pos = input.i_pos;
+		output.rot = input.i_rot;
+		output.half_extents = input.i_half_extents;
+		float3 pos = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
+		pos += input.i_pos;
+		output.uv_scale = input.i_uv_scale;
+		output.bezier = input.i_bezier;
+		output.position = mul(float4(pos, 1), mul(Global_view, Global_projection));
+		return output;
 	}
 ]]
 
----------------------
-
-
 fragment_shader [[
-	layout(location = 0) out vec4 o_gbuffer0;
-	layout(location = 1) out vec4 o_gbuffer1;
-	layout(location = 2) out vec4 o_gbuffer2;
-	
-	layout(location = 0) in vec3 v_half_extents;
-	layout(location = 1) in vec3 v_pos;
-	layout(location = 2) in vec4 v_rot;
-	layout(location = 3) in vec2 v_uv_scale;
-	layout(location = 4) in vec4 v_bezier;
-	
-	layout (binding=0) uniform sampler2D u_texture;
-	layout (binding=1) uniform sampler2D u_gbuffer_depth;
-
-	float cross2(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
+	float cross2(float2 a, float2 b) { return a.x * b.y - a.y * b.x; }
 
 	// from shadertoy by iq
-	vec2 sdBezier(vec2 pos, vec2 A, vec2 B, vec2 C) {    
-		vec2 a = B - A;
-		vec2 b = A - 2.0*B + C;
-		vec2 c = a * 2.0;
-		vec2 d = A - pos;
+	float2 sdBezier(float2 pos, float2 A, float2 B, float2 C) {    
+		float2 a = B - A;
+		float2 b = A - 2.0*B + C;
+		float2 c = a * 2.0;
+		float2 d = A - pos;
 
 		float kk = 1.0 / dot(b, b);
 		float kx = kk * dot(a, b);
@@ -77,10 +69,10 @@ fragment_shader [[
 
 		if (h >= 0.0) { // 1 root
 			h = sqrt(h);
-			vec2 x = (vec2(h, -h) - q) / 2.0;
-			vec2 uv = sign(x) * pow(abs(x), vec2(1.0 / 3.0));
+			float2 x = (float2(h, -h) - q) / 2.0;
+			float2 uv = sign(x) * pow(abs(x), 1.0 / 3.0);
 			float t = saturate(uv.x + uv.y - kx);
-			vec2 q = d + (c + b * t) * t;
+			float2 q = d + (c + b * t) * t;
 			res = dot(q, q);
 			sgn = cross2(c + 2.0 * b * t, q);
 			res_t = t;
@@ -90,10 +82,10 @@ fragment_shader [[
 			float v = acos(q / (p * z * 2.0)) / 3.0;
 			float m = cos(v);
 			float n = sin(v) * 1.732050808;
-			vec3 t = saturate(vec3(m + m, -n - m, n - m) * z - kx);
-			vec2 qx = d + (c + b * t.x) * t.x;
+			float3 t = saturate(float3(m + m, -n - m, n - m) * z - kx);
+			float2 qx = d + (c + b * t.x) * t.x;
 			float dx = dot(qx, qx), sx = cross2(c + 2.0 * b * t.x, qx);
-			vec2 qy = d + (c + b * t.y) * t.y;
+			float2 qy = d + (c + b * t.y) * t.y;
 			float dy = dot(qy, qy), sy = cross2(c + 2.0 * b * t.y, qy);
 			if (dx < dy) {
 				res = dx;
@@ -106,31 +98,37 @@ fragment_shader [[
 			}
 		}
     
-		return vec2(sqrt(res) * sign(sgn), res_t);
+		return float2(sqrt(res) * sign(sgn), res_t);
 	}
 
-	void main()
-	{
-		vec2 screen_uv = gl_FragCoord.xy / Global.framebuffer_size;
-		vec3 wpos = getViewPosition(u_gbuffer_depth, Global.inv_view_projection, screen_uv);
+	cbuffer Dc : register(b4) {
+		uint u_gbuffer_depth;
+	};
+
+	GBufferOutput main(VSOutput input) {
+		float2 screen_uv = input.position.xy / Global_framebuffer_size;
+		float3 wpos = getViewPosition(u_gbuffer_depth, Global_inv_view_projection, screen_uv);
 		
-		vec4 r = v_rot;
+		float4 r = input.rot;
 		r.w = -r.w;
-		vec3 lpos = rotateByQuat(r, wpos - v_pos);
-		if (any(greaterThan(abs(lpos), v_half_extents))) discard;
+		float3 lpos = rotateByQuat(r, wpos - input.pos);
+		if (any(abs(lpos) > input.half_extents)) discard;
 		
-		vec2 bezier_dist = sdBezier(lpos.xz, v_bezier.xy, vec2(0), v_bezier.zw);
-		if (abs(bezier_dist.x) > 0.5 * v_uv_scale.x) discard;
+		float2 bezier_dist = sdBezier(lpos.xz, input.bezier.xy, 0, input.bezier.zw);
+		if (abs(bezier_dist.x) > 0.5 * input.uv_scale.x) discard;
 		if (abs(bezier_dist.y - 0.5) > 0.499) discard;
-		bezier_dist.x += 0.5 * v_uv_scale.x;
-		bezier_dist.x /= v_uv_scale.x;
-		bezier_dist.y *= v_uv_scale.y;
-		vec4 color = texture(u_texture, bezier_dist.yx);
+		bezier_dist.x += 0.5 * input.uv_scale.x;
+		bezier_dist.x /= input.uv_scale.x;
+		bezier_dist.y *= input.uv_scale.y;
+		float4 color = sampleBindless(LinearSampler, t_texture, bezier_dist.yx);
 		if (color.a < 0.5) discard;
 		color.rgb *= u_material_color.rgb;
 
-		o_gbuffer0 = vec4(color.rgb, 0.9);
-		o_gbuffer1 = vec4(0, 0, 0, 0);
-		o_gbuffer2 = vec4(0, 0, 0, 0);
+		GBufferOutput o;
+		o.gbuffer0 = float4(color.rgb, 0.9);
+		o.gbuffer1 = float4(0, 0, 0, 0);
+		o.gbuffer2 = float4(0, 0, 0, 0);
+		o.gbuffer3 = float4(0, 0, 0, 0);
+		return o;
 	}
 ]]

@@ -1,27 +1,31 @@
 include "pipelines/common.glsl"
 
 vertex_shader [[
-	layout(location=0) out vec2 v_uv;
-	void main() {
-		vec4 pos = fullscreenQuad(gl_VertexID, v_uv);
-		gl_Position = pos;
+	struct Output {
+		float2 uv : TEXCOORD0;
+		float4 position : SV_POSITION;
+	};
+
+	Output main(uint vertex_id : SV_VertexID) {
+		Output output;
+		output.position = fullscreenQuad(vertex_id, output.uv);
+		return output;
 	}
 ]]
 
 
 fragment_shader [[
-	layout (binding=0) uniform sampler2D u_texture;
-	layout (binding=1) uniform sampler2D u_depth;
-
-	layout(std140, binding = 4) uniform Drawcall {
+	cbuffer Drawcall : register(b4) {
 		float u_distance;
 		float u_range;
 		float u_max_blur_size;
 		float u_sharp_range;
+		uint u_texture;
+		uint u_depth;
 	};
 
-	const float GOLDEN_ANGLE = 2.39996323; 
-	const float RAD_SCALE = 0.5; 
+	static const float GOLDEN_ANGLE = 2.39996323; 
+	static const float RAD_SCALE = 0.5; 
 
 	float getBlurSize(float depth, float focus_point) {
 		float d = depth - focus_point;
@@ -31,33 +35,29 @@ fragment_shader [[
 	}
 
 	// https://blog.voxagon.se/2018/05/04/bokeh-depth-of-field-in-single-pass.html
-	vec3 depthOfField(vec2 tex_coord, float focus_point) {
-		float center_depth = toLinearDepth(Global.inv_projection, texture(u_depth, tex_coord).r);
+	float3 depthOfField(float2 tex_coord, float focus_point) {
+		float center_depth = toLinearDepth(Global_inv_projection, sampleBindless(LinearSamplerClamp, u_depth, tex_coord).r);
 		float center_size = getBlurSize(center_depth, focus_point);
-		vec3 color = texture(u_texture, tex_coord).rgb;
+		float3 color = sampleBindless(LinearSamplerClamp, u_texture, tex_coord).rgb;
 		float tot = 1.0;
 		float radius = RAD_SCALE;
-		vec2 view_size_rcp = 1.0 / Global.framebuffer_size;
+		float2 view_size_rcp = 1.0 / Global_framebuffer_size;
 		for (float ang = 0.0; radius < u_max_blur_size; ang += GOLDEN_ANGLE) {
-			vec2 tc = tex_coord + vec2(cos(ang), sin(ang)) * view_size_rcp * radius;
-			vec3 sample_color = texture(u_texture, tc).rgb;
-			float sample_depth = toLinearDepth(Global.inv_projection, texture(u_depth, tc).r);
+			float2 tc = tex_coord + float2(cos(ang), sin(ang)) * view_size_rcp * radius;
+			float3 sample_color = sampleBindless(LinearSamplerClamp, u_texture, tc).rgb;
+			float sample_depth = toLinearDepth(Global_inv_projection, sampleBindless(LinearSamplerClamp, u_depth, tc).r);
 			float sample_size = getBlurSize(sample_depth, focus_point);
 			if (sample_depth > center_depth)
 				sample_size = clamp(sample_size, 0.0, center_size * 2.0);
 			float m = smoothstep(radius - 0.5, radius + 0.5, sample_size);
-			color += mix(color / tot, sample_color, m);
+			color += lerp(color / tot, sample_color, m);
 			tot += 1.0;
 			radius += RAD_SCALE / radius;
 		}
 		return color /= tot;
 	}
 
-	layout(location=0) in vec2 v_uv;
-	layout(location=0) out vec4 o_color;
-
-	void main() {
-		o_color.rgb = depthOfField(v_uv, u_distance);
-		o_color.w = 1;
+	float4 main(float2 uv : TEXCOORD0) : SV_TARGET {
+		return float4(depthOfField(uv, u_distance), 1);
 	}
 ]]

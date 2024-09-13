@@ -273,6 +273,10 @@ struct LUMIX_CORE_API Timer {
 	static u64 getRawTimestamp();
 	static u64 getFrequency();
 
+	static float rawToSeconds(u64 raw) {
+		return (float)(raw / (double)getFrequency());
+	}
+
 	u64 frequency;
 	u64 last_tick;
 	u64 first_tick;

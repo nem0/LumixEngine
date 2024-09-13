@@ -1,13 +1,13 @@
 #include <imgui/imgui.h>
 
+#include "asset_browser.h"
 #include "core/crt.h"
 #include "core/hash.h"
 #include "core/log.h"
+#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/string.h"
-
-#include "asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
 #include "editor/prefab_system.h"
@@ -19,8 +19,8 @@
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
-#include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "engine/resource.h"
 #include "engine/world.h"
 #include "utils.h"
 
@@ -131,6 +131,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		LuaWrapper::pushObject(L, this, "AssetBrowser");
 		lua_setfield(L, -2, "asset_browser");
 		lua_pop(L, 1);
+		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open);
 	}
 
 	void focusSearch() {
@@ -1280,9 +1281,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool isOpen() const { return m_is_open; }
 	void toggleUI() { m_is_open = !m_is_open; }
 	
-	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_asset_browser_open; }
-	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_asset_browser_open  = m_is_open; }
-
 	void addWindow(UniquePtr<AssetEditorWindow>&& window) override {
 		if (!m_windows.empty()) window->m_dock_id = m_windows.last()->m_dock_id;
 		m_app.addPlugin(*window);

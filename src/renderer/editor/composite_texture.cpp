@@ -4,6 +4,7 @@
 #include "engine/file_system.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/stream.h"
 #include "core/string.h"
 #include "editor/asset_browser.h"

@@ -367,6 +367,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		app.addWindowAction(&m_toggle_ui);
 		app.addToolAction(&m_simulate_selected);
 		app.getWorldEditor().worldDestroyed().bind<&PhysicsUIPlugin::onWorldDestroyed>(this);
+		app.getSettings().registerPtr("physics_ui_open", &m_is_window_open);
 	}
 
 	~PhysicsUIPlugin() {
@@ -790,14 +791,6 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 		EntityRef entity = editor.getSelectedEntities()[0];
 		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(entity, editor);
-	}
-
-	void onSettingsLoaded() override {
-		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_physics_ui_open", false);
-	}
-
-	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue(Settings::GLOBAL, "is_physics_ui_open", m_is_window_open);
 	}
 
 	void onGUI() override

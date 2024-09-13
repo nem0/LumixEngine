@@ -2,6 +2,7 @@
 #include "core/associative_array.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/string.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -3234,7 +3235,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 						m_active_emitter->m_links.eraseItems([&](const NodeEditorLink& link){
 							return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 						});
-						LUMIX_DELETE(m_allocator, n)
+						LUMIX_DELETE(m_allocator, n);
 						m_active_emitter->m_nodes.swapAndPop(i);
 					}
 					break;

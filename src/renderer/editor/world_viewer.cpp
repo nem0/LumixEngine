@@ -32,8 +32,7 @@ WorldViewer::WorldViewer(StudioApp& app)
 	m_viewport.rot = Quat::IDENTITY;
 
 	m_world = &engine.createWorld(false);
-	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
-	m_pipeline = Pipeline::create(*renderer, pres, "PREVIEW");
+	m_pipeline = Pipeline::create(*renderer, PipelineType::PREVIEW);
 
 	const EntityRef mesh_entity = m_world->createEntity({0, 0, 0}, {0, 0, 0, 1});
 	auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));

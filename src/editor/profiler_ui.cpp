@@ -1,28 +1,28 @@
 #include <imgui/imgui.h>
 
+#include "core/arena_allocator.h"
+#include "core/atomic.h"
 #include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/debug.h"
-#include "engine/file_system.h"
-#include "core/arena_allocator.h"
-#include "core/atomic.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
 #include "core/stack_array.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
-
-#include "profiler_ui.h"
 #include "editor/asset_browser.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "engine/engine.h"
-#include "engine/resource.h"
+#include "engine/file_system.h"
 #include "engine/resource_manager.h"
+#include "engine/resource.h"
+#include "profiler_ui.h"
 
 
 namespace Lumix {
@@ -227,6 +227,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		m_toggle_ui.is_selected.bind<&ProfilerUIImpl::isOpen>(this);
 
 		m_app.addWindowAction(&m_toggle_ui);
+		m_app.getSettings().registerPtr("profiler_open", &m_is_open);
 	}
 
 	~ProfilerUIImpl() {
@@ -609,8 +610,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	const char* getName() const override { return "profiler"; }
-	void onSettingsLoaded() override { m_is_open = m_app.getSettings().m_is_profiler_open; }
-	void onBeforeSettingsSaved() override { m_app.getSettings().m_is_profiler_open  = m_is_open; }
 	void toggleUI() { m_is_open = !m_is_open; }
 	bool isOpen() { return m_is_open; }
 
@@ -654,6 +653,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 				size_t sum = 0;
 				for (const Resource* res  : resources) {
+					if (res->isEmpty()) continue;
 					if (!m_resource_filter.pass(res->getPath())) continue;
 					if (m_resource_size_filter > res->getFileSize() / 1024) continue;
 				

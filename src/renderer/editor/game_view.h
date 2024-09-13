@@ -46,8 +46,6 @@ public:
 
 private:
 	bool onAction(const Action& action) override;
-	void onSettingsLoaded() override;
-	void onBeforeSettingsSaved() override;
 	void toggleFullscreen();
 	void processInputEvents();
 	void onFullscreenGUI(WorldEditor& editor);
@@ -65,6 +63,7 @@ private:
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;
 	bool m_was_game_mode = false;
+	bool m_focus_on_game_start = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct
 	{

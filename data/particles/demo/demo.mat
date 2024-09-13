@@ -1,7 +1,7 @@
 shader "/pipelines/particles.shd"
-backface_culling(true)
+backface_culling true
 layer "transparent"
-defines {}
+
 texture "demo.png"
-int_uniform("Frames cols", 2)
-int_uniform("Frames rows", 2)
+int_uniform "Frames cols", 2
+int_uniform "Frames rows", 2

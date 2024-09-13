@@ -1,11 +1,7 @@
 include "pipelines/common.glsl"
 
 compute_shader [[
-	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-	layout (binding=0) uniform sampler2D u_depth_buffer;
-	layout (binding=1) uniform sampler2D u_topdown_depthmap;
-	layout (binding=2, rgba16) uniform image2D u_gbuffer1;
-	layout(std140, binding = 4) uniform Drawcall {
+	cbuffer Drawcall : register(b4) {
 		float u_intensity;
 		float u_width;
 		float u_height;
@@ -16,44 +12,40 @@ compute_shader [[
 		float u_half_depth_range;
 		float u_scale;
 		float u_depth_offset;
+		uint u_depth_buffer;
+		uint u_gbufferB;
+		uint u_topdown_depthmap;
 	};
-/*
-	vec3 getViewNormal(vec2 tex_coord)
-	{
-		vec3 wnormal = texture(u_normal_buffer, tex_coord).xyz * 2 - 1;
-		vec4 vnormal = Global.view * vec4(wnormal, 0);
-		return vnormal.xyz;
-	}	
-	*/
-	void main()
-	{
-		if (any(greaterThan(gl_GlobalInvocationID.xy, ivec2(u_width, u_height)))) return;
 
-		vec2 screen_uv = gl_GlobalInvocationID.xy / vec2(u_width, u_height);
-		vec3 wpos = getViewPosition(u_depth_buffer, Global.inv_view_projection, screen_uv);
+	[numthreads(16, 16, 1)]
+	void main(uint3 thread_id : SV_DispatchThreadID) {
+		if (any(thread_id.xy > uint2(u_width, u_height))) return;
 
-		vec2 uv = (wpos.xz + vec2(u_offset0, u_offset2)) / u_range;
+		float2 screen_uv = thread_id.xy / float2(u_width, u_height);
+		float3 wpos = getViewPosition(u_depth_buffer, Global_inv_view_projection, screen_uv);
+
+		float2 uv = (wpos.xz + float2(u_offset0, u_offset2)) / u_range;
 		#ifdef _ORIGIN_BOTTOM_LEFT
-			uv = uv * vec2(1, -1);
+			uv = uv * float2(1, -1);
 		#endif
-		if (any(greaterThan(uv, vec2(1, 1)))) return;
-		if (any(lessThan(uv, vec2(-1, -1)))) return;
+		if (any(uv > 1)) return;
+		if (any(uv < -1)) return;
 		uv = saturate(uv * 0.5 + 0.5);
 
-		vec4 v = imageLoad(u_gbuffer1, ivec2(gl_GlobalInvocationID.xy));
-		float c = random(vec2(gl_GlobalInvocationID.xy)) * 2 - 1;
+		float4 v = bindless_rw_textures[u_gbufferB][thread_id.xy];
+		float c = random(float2(thread_id.xy)) * 2 - 1;
 		float s = sqrt(1 - c * c); 
 		
 		float ao = 0;
-		mat2 rot = mat2(c, s, -s, c) * u_scale;
+		float2x2 rot = mul(u_scale, float2x2(c, s, -s, c));
 		for (int i = 0; i < 16; ++i) {
-			float td_depth = texture(u_topdown_depthmap, uv + rot * POISSON_DISK_16[i]).r;
+			float td_depth = sampleBindlessLod(LinearSamplerClamp, u_topdown_depthmap, uv + mul(POISSON_DISK_16[i], rot), 0).r;
 			td_depth = (td_depth * 2 - 1) * u_half_depth_range;
 			ao += saturate((-(wpos.y + u_offset1) - u_depth_offset + td_depth));
 		}
 		ao *= u_intensity / 16;
 
 		v.w = v.w * (1 - ao);
-		imageStore(u_gbuffer1, ivec2(gl_GlobalInvocationID.xy), v);
+		bindless_rw_textures[u_gbufferB][thread_id.xy] = v;
 	}
 ]]

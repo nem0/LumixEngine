@@ -5,56 +5,60 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
-------------------
+common [[
+	struct VSOutput {
+		float2 uv : TEXCOORD0;
+		float3 wpos : TEXCOORD1;
+		float3 normal : TEXCOORD2;
+		float4 position : SV_POSITION;
+	};
+]]
 
 vertex_shader [[
-	layout(std140, binding = 4) uniform Model {
-		mat4 u_model;
+	#define ATTR(X) TEXCOORD##X
+	cbuffer Model : register(b4) {
+		float4x4 u_model;
 	};
-	layout(location = 0) in vec3 a_position;
-	#ifdef UV0_ATTR
-		layout(location = UV0_ATTR) in vec2 a_uv;
-	#else
-		const vec2 a_uv = vec2(0, 0);
-	#endif
-	#ifdef NORMAL_ATTR
-		layout(location = NORMAL_ATTR) in vec3 a_normal;
-	#else
-		const vec3 a_normal = vec3(0, 1, 0);
-	#endif
-	layout (location = 0) out vec2 v_uv;
-	layout (location = 1) out vec3 v_wpos;
-	layout (location = 2) out vec3 v_normal;
-	
-	void main() {
-		v_uv = a_uv;
-		vec4 p = Global.view * u_model * vec4(a_position,  1);
-		v_wpos = p.xyz;
-		v_normal = a_normal;
-		gl_Position = Global.projection_no_jitter * p;
+	struct Input {
+		float3 position : TEXCOORD0;
+		#ifdef UV0_ATTR
+			float2 uv : ATTR(UV0_ATTR);
+		#endif
+		float3 normal : ATTR(NORMAL_ATTR);
+	};
+
+	VSOutput main(Input input) {
+		VSOutput output;
+		#ifdef UV0_ATTR
+			output.uv = input.uv;
+		#else
+			output.uv = 0;
+		#endif
+		float4 p = mul(float4(input.position, 1), mul(u_model, Global_view));
+		output.wpos = p.xyz;
+		output.normal = input.normal;
+		output.position = mul(p, Global_projection_no_jitter);
+		return output;
 	}
 ]]
 
----------------------
-
 fragment_shader [[
-	layout (binding=0) uniform sampler2D t_albedo;
-	layout (binding=1) uniform sampler2D t_gbuffer_depth;
-	layout (location = 0) in vec2 v_uv;
-	layout (location = 1) in vec3 v_wpos;
-	layout (location = 2) in vec3 v_normal;
-	layout(location = 0) out vec4 o_color;
-
-	void main() {
-		vec2 screen_uv = gl_FragCoord.xy / Global.framebuffer_size;
-		vec3 wpos = getViewPosition(t_gbuffer_depth, Global.inv_view_projection, screen_uv);
-		vec4 albedo = texture(t_albedo, v_uv);
+	cbuffer Drawcall2 : register(b5) {
+		uint u_gbuffer_depth;
+	};
+	
+	float4 main(VSOutput input) : SV_TARGET {
+		float2 screen_uv = input.position.xy / Global_framebuffer_size;
+		float3 wpos = getViewPosition(u_gbuffer_depth, Global_inv_view_projection, screen_uv);
+		float4 albedo = sampleBindless(LinearSampler, t_albedo, input.uv);
 		#ifdef ALPHA_CUTOUT
-			if(albedo.a < 0.5) discard;
+			if (albedo.a < 0.5) discard;
 		#endif
-		float d = dot(Global.light_dir.xyz, v_normal);
+		float d = dot(Global_light_dir.xyz, input.normal);
+		float4 o_color;
 		o_color.rgb = albedo.rgb * saturate(max(0, -d) + 0.25 * max(0, d) + 0.25);
 		o_color.a = 1;
-		if(length(wpos) < length(v_wpos)) o_color.rgb *= 0.25;
+		if(length(wpos) < length(input.wpos)) o_color.rgb *= 0.25;
+		return o_color;
 	}
 ]]

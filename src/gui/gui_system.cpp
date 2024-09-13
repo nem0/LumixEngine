@@ -5,6 +5,8 @@
 #include "core/math.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "engine/engine.h"
+#include "engine/plugin.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -59,18 +61,44 @@ struct GUISystemImpl final : GUISystem
 		return "Unknown";
 	}
 
-
 	explicit GUISystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "gui")
 		, m_interface(nullptr)
 		, m_sprite_manager(m_allocator)
+		, m_render_plugin(*this)
 	{
 		GUIModule::reflect();
 		LUMIX_GLOBAL_FUNC(GUISystem::enableCursor);
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 
+	struct RenderPlugin : Lumix::RenderPlugin {
+		RenderPlugin(GUISystemImpl& system)
+			: m_system(system)
+		{
+		}
+
+		RenderBufferHandle renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
+			if (pipeline.getType() != PipelineType::GAME_VIEW) return input;
+			auto* module = (GUIModule*)pipeline.getModule()->getWorld().getModule("gui");
+			Vec2 size = m_system.m_interface->getSize();
+			module->render(pipeline, size, true);
+			return input;
+		}
+
+		GUISystemImpl& m_system;
+	};
+
+	void initEnd() override {
+		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
+		renderer->addPlugin(m_render_plugin);
+	}
+
+	void shutdownStarted() {
+		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
+		renderer->removePlugin(m_render_plugin);
+	}
 
 	~GUISystemImpl() { m_sprite_manager.destroy(); }
 
@@ -94,23 +122,6 @@ struct GUISystemImpl final : GUISystem
 	void setInterface(Interface* interface) override
 	{
 		m_interface = interface;
-		
-		if (!m_interface) return;
-
-		auto* pipeline = m_interface->getPipeline();
-		pipeline->addCustomCommandHandler("renderIngameGUI")
-			.callback.bind<&GUISystemImpl::pipelineCallback>(this);
-	}
-
-
-	void pipelineCallback()
-	{
-		if (!m_interface) return;
-
-		Pipeline* pipeline = m_interface->getPipeline();
-		auto* module = (GUIModule*)pipeline->getModule()->getWorld().getModule("gui");
-		Vec2 size = m_interface->getSize();
-		module->render(*pipeline, size, true);
 	}
 
 
@@ -130,6 +141,7 @@ struct GUISystemImpl final : GUISystem
 	Engine& m_engine;
 	SpriteManager m_sprite_manager;
 	Interface* m_interface;
+	RenderPlugin m_render_plugin;
 };
 
 

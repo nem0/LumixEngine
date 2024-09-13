@@ -1165,11 +1165,12 @@ static Vec2 computeImpostorHalfExtents(Vec2 bounding_cylinder) {
 	};
 }
 
-bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Array<u32>& gb1_rgba, Array<u16>& gb_depth, Array<u32>& shadow_data, IVec2& tile_size, bool bake_normals)
+void FBXImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& ctx, bool bake_normals)
 {
 	ASSERT(model->isReady());
 	ASSERT(m_impostor_shadow_shader->isReady());
 
+	ctx.path = model->getPath();
 	Engine& engine = m_app.getEngine();
 	Renderer* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	ASSERT(renderer);
@@ -1197,10 +1198,12 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 		max += padding;
 		const Vec2 size = max - min;
 
+		IVec2& tile_size = ctx.tile_size;
 		tile_size = IVec2(int(IMPOSTOR_TILE_SIZE * size.x / size.y), IMPOSTOR_TILE_SIZE);
 		tile_size.x = (tile_size.x + 3) & ~3;
 		tile_size.y = (tile_size.y + 3) & ~3;
 		const IVec2 texture_size = tile_size * IMPOSTOR_COLS;
+		stream.beginProfileBlock("create impostor textures", 0);
 		stream.createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::SRGBA, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
 		stream.createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb1");
 		stream.createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gbd");
@@ -1244,7 +1247,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask(), mesh.semantics_defines);
 
-					stream.bind(0, material->m_bind_group);
+					material->bind(stream);
 					stream.useProgram(program);
 					stream.bindIndexBuffer(mesh.index_buffer_handle);
 					stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
@@ -1256,17 +1259,12 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 
 		stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 
-		gb0_rgba.resize(texture_size.x * texture_size.y);
-		gb1_rgba.resize(gb0_rgba.size());
-		gb_depth.resize(gb0_rgba.size());
-		shadow_data.resize(gb0_rgba.size());
-
 		gpu::TextureHandle shadow = gpu::allocTextureHandle();
 		stream.createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, "impostor_shadow");
 		gpu::ProgramHandle shadow_program = m_impostor_shadow_shader->getProgram(bake_normals ? bake_normals_define : 0);
 		stream.useProgram(shadow_program);
-		stream.bindImageTexture(shadow, 0);
-		stream.bindTextures(&gbs[1], 1, 2);
+		// stream.bindImageTexture(shadow, 0);
+		// stream.bindTextures(&gbs[1], 1, 2);
 		struct {
 			Matrix projection;
 			Matrix proj_to_model;
@@ -1276,6 +1274,9 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			IVec2 tile_size;
 			int size;
 			float radius;
+			u32 depth;
+			u32 normalmap;
+			u32 output;
 		} data;
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
@@ -1285,47 +1286,35 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
 				view.lookAt(center - v * 1.01f * radius, center, up);
 				projection.setOrtho(min.x, max.x, min.y, max.y, 0, 2.02f * radius, true);
-				data.proj_to_model = (projection * view).inverted();
-				data.projection = projection;
-				data.inv_view = view.inverted();
-				data.center = Vec4(center, 1);
-				data.tile = IVec2(i, j);
-				data.tile_size = tile_size;
-				data.size = IMPOSTOR_COLS;
-				data.radius = radius;
+				data = {
+					.projection = projection,
+					.proj_to_model = (projection * view).inverted(),
+					.inv_view = view.inverted(),
+					.center = Vec4(center, 1),
+					.tile = IVec2(i, j),
+					.tile_size = tile_size,
+					.size = IMPOSTOR_COLS,
+					.radius = radius,
+					.depth = gpu::getBindlessHandle(gbs[2]),
+					.normalmap = gpu::getBindlessHandle(gbs[1]),
+					.output = gpu::getRWBindlessHandle(shadow),
+				};
 				const Renderer::TransientSlice ub = renderer->allocUniform(&data, sizeof(data));
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				stream.dispatch((tile_size.x + 15) / 16, (tile_size.y + 15) / 16, 1);
 			}
 		}
 
-		gpu::TextureHandle staging = gpu::allocTextureHandle();
-		const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-		stream.createTexture(staging, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
-		stream.copy(staging, gbs[0], 0, 0);
-		stream.readTexture(staging, 0, Span((u8*)gb0_rgba.begin(), gb0_rgba.byte_size()));
-
-		stream.copy(staging, gbs[1], 0, 0);
-		stream.readTexture(staging, 0, Span((u8*)gb1_rgba.begin(), gb1_rgba.byte_size()));
-
-		stream.copy(staging, shadow, 0, 0);
-		stream.readTexture(staging, 0, Span((u8*)shadow_data.begin(), shadow_data.byte_size()));
-		stream.destroy(staging);
-
-		gpu::TextureHandle staging_depth = gpu::allocTextureHandle();
-		stream.createTexture(staging_depth, texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, flags, "staging_buffer");
-		stream.copy(staging_depth, gbs[2], 0, 0);
-		depth_tmp.resize(gb_depth.size());
-		stream.readTexture(staging_depth, 0, Span((u8*)depth_tmp.begin(), depth_tmp.byte_size()));
-		for (i32 i = 0; i < depth_tmp.size(); ++i) {
-			gb_depth[i] = u16(0xffFF - (depth_tmp[i] >> 16));
-		}
-		stream.destroy(staging_depth);
-
+		ctx.start();
+		stream.readTexture(gbs[0], makeDelegate<&ImpostorTexturesContext::readCallback0>(&ctx));
+		stream.readTexture(gbs[1], makeDelegate<&ImpostorTexturesContext::readCallback1>(&ctx));
+		stream.readTexture(gbs[2], makeDelegate<&ImpostorTexturesContext::readCallback2>(&ctx));
+		stream.readTexture(shadow, makeDelegate<&ImpostorTexturesContext::readCallback3>(&ctx));
 		stream.destroy(shadow);
 		stream.destroy(gbs[0]);
 		stream.destroy(gbs[1]);
 		stream.destroy(gbs[2]);
+		stream.endProfileBlock();
 	});
 
 	renderer->frame();
@@ -1343,7 +1332,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			f << "shader \"/pipelines/impostor.shd\"\n";
 			f << "texture \"" << src_info.basename << "_impostor0.tga\"\n";
-			f << "texture \"\"\n";
+			f << "texture \"" << src_info.basename << "_impostor1.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor2.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor_depth.raw\"\n";
 			f << "defines { \"ALPHA_CUTOUT\" }\n";
@@ -1365,8 +1354,6 @@ bool FBXImporter::createImpostorTextures(Model* model, Array<u32>& gb0_rgba, Arr
 			f.close();
 		}
 	}
-
-	return true;
 }
 
 
@@ -2173,9 +2160,8 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 			bounding_cylinder.x = maximum(bounding_cylinder.x, xz_squared);
 			bounding_cylinder.y = maximum(bounding_cylinder.y, fabsf(p.y));
 		}
-
-		bounding_cylinder.x = sqrtf(bounding_cylinder.x);
 	}
+	bounding_cylinder.x = sqrtf(bounding_cylinder.x);
 
 	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {

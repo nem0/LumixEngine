@@ -25,8 +25,6 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 
 private:
 	void onGUI() override;
-	void onSettingsLoaded() override;
-	void onBeforeSettingsSaved() override;
 	const char* getName() const override { return "property_grid"; }
 	void showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor);
 	void showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const;

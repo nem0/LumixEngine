@@ -3,51 +3,48 @@ include "pipelines/common.glsl"
 ------------------
 
 vertex_shader [[
-	layout(std140, binding = 4) uniform Model {
-		mat4 u_model;
+	struct Output {
+		float4 lpos : TEXCOORD0;
+		float4 position : SV_POSITION;
 	};
-	
-	out vec4 v_lpos; 
 
-	void main() {
-		vec3 local_pos = vec3(gl_VertexID & 1, 0, gl_VertexID >> 1) * 1000 - 500;
+	Output main(uint vertex_id : SV_VertexID) {
+		Output output;
+		float3 local_pos = float3(vertex_id & 1, 0, vertex_id >> 1) * 1000 - 500;
 		local_pos.y = 0;
-		v_lpos = vec4(local_pos, 1);
-		vec4 p = vec4(local_pos - Global.camera_world_pos.xyz,  1);
-		gl_Position = Global.projection_no_jitter * Global.view * p;
+		output.lpos = float4(local_pos, 1);
+		float4 p = float4(local_pos - Global_camera_world_pos.xyz,  1);
+		output.position = mul(p, mul(Global_view, Global_projection_no_jitter));
+		return output;
 	}
 ]]
 
 ---------------------
 
 fragment_shader [[
-	layout(location = 0) out vec4 o_color;
+	// https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
+	// https://gist.github.com/bgolus/d49651f52b1dcf82f70421ba922ed064
+	// grid by Ben Golus
+	float PristineGrid(float2 uv, float2 lineWidth) {
+		float4 uvDDXY = float4(ddx(uv), ddy(uv));
+		float2 uvDeriv = float2(length(uvDDXY.xz), length(uvDDXY.yw));
+		bool2 invertLine = lineWidth < 0.5;
+		float2 targetWidth = lerp(1.0 - lineWidth, lineWidth, invertLine);
+		float2 drawWidth = clamp(targetWidth, uvDeriv, 0.5);
+		float2 lineAA = uvDeriv * 1.5;
+		float2 gridUV = abs(frac(uv) * 2.0 - 1.0);
+		gridUV = lerp(gridUV, 1.0 - gridUV, invertLine);
+		float2 grid2 = smoothstep(drawWidth + lineAA, drawWidth - lineAA, gridUV);
+		grid2 *= saturate(targetWidth / drawWidth);
+		grid2 = lerp(grid2, targetWidth, saturate(uvDeriv * 2.0 - 1.0));
+		grid2 = lerp(1.0 - grid2, grid2, invertLine);
+		return lerp(grid2.x, 1.0, grid2.y);
+	}
 
-	 // https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
-	 // https://gist.github.com/bgolus/d49651f52b1dcf82f70421ba922ed064
-	 // grid by Ben Golus
-	 float PristineGrid(vec2 uv, vec2 lineWidth) {
-        vec4 uvDDXY = vec4(dFdx(uv), dFdy(uv));
-        vec2 uvDeriv = vec2(length(uvDDXY.xz), length(uvDDXY.yw));
-        bvec2 invertLine = lessThan(lineWidth, vec2(0.5));
-        vec2 targetWidth = mix(1.0 - lineWidth, lineWidth, invertLine);
-        vec2 drawWidth = clamp(targetWidth, uvDeriv, vec2(0.5));
-        vec2 lineAA = uvDeriv * 1.5;
-        vec2 gridUV = abs(fract(uv) * 2.0 - 1.0);
-        gridUV = mix(gridUV, 1.0 - gridUV, invertLine);
-        vec2 grid2 = smoothstep(drawWidth + lineAA, drawWidth - lineAA, gridUV);
-        grid2 *= saturate(targetWidth / drawWidth);
-        grid2 = mix(grid2, targetWidth, saturate(uvDeriv * 2.0 - 1.0));
-        grid2 = mix(1.0 - grid2, grid2, invertLine);
-        return mix(grid2.x, 1.0, grid2.y);
-    }
-
-	in vec4 v_lpos;
-
-	void main() {
-		vec2 uv = v_lpos.xz / v_lpos.w;
-		float grid = PristineGrid(uv, vec2(0.005));
+	float4 main(float4 lpos : TEXCOORD0) : SV_TARGET {
+		float2 uv = lpos.xz / lpos.w;
+		float grid = PristineGrid(uv, 0.02);
 		if (grid < 0.0) discard;
-		o_color = vec4(vec3(0.0), grid);
+		return float4(0, 0, 0, grid);
 	}
 ]]

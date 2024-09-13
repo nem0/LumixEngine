@@ -275,7 +275,7 @@ static void source(lua_State* L, gpu::ShaderType shader_type)
 	const int line = ar.currentline;
 	ASSERT(line >= 0);
 
-	const StaticString<32> line_str("#line ", line, "\n");
+	const StaticString<32 + MAX_PATH> line_str("#line ", line, "\"", shader->getPath(), "\"", "\n");
 	const int line_str_len = stringLength(line_str);
 	const int src_len = stringLength(src);
 
@@ -367,7 +367,7 @@ int include(lua_State* L)
 	
 	if (!content.empty()) {
 		content << "\n";
-		shader->m_sources.common.append("#line 0\n", StringView((const char*)content.data(), (u32)content.size()));
+		shader->m_sources.common.append(StringView((const char*)content.data(), (u32)content.size()));
 	}
 
 	return 0;
@@ -412,6 +412,14 @@ bool Shader::load(Span<const u8> mem) {
 		return false;
 	}
 
+	RollingHasher hasher;
+	hasher.begin();
+	for (auto& stage : m_sources.stages) {
+		hasher.update(stage.code.data(), stage.code.size());
+	}
+	hasher.update(m_sources.common.c_str(), m_sources.common.length());
+	m_content_hash = hasher.end();
+
 	LuaWrapper::releaseRef(root_state, state_ref);
 	return true;
 }
@@ -439,13 +447,13 @@ void Shader::unload()
 
 static const char* toString(Shader::Uniform::Type type) {
 	switch(type) {
-		case Shader::Uniform::COLOR: return "vec4";
+		case Shader::Uniform::COLOR: return "float4";
 		case Shader::Uniform::FLOAT: return "float";
 		case Shader::Uniform::NORMALIZED_FLOAT: return "float";
 		case Shader::Uniform::INT: return "int";
-		case Shader::Uniform::VEC2: return "vec2";
-		case Shader::Uniform::VEC3: return "vec4"; // vec4 because of padding
-		case Shader::Uniform::VEC4: return "vec4";
+		case Shader::Uniform::VEC2: return "float2";
+		case Shader::Uniform::VEC3: return "float4"; // vec4 because of padding
+		case Shader::Uniform::VEC4: return "float4";
 	}
 	ASSERT(false);
 	return "unknown_type";
@@ -484,14 +492,20 @@ void Shader::toTextureVarName(Span<char> out, const char* in) {
 }
 
 void Shader::onBeforeReady() {
-	if (m_uniforms.empty()) return;
+	if (m_uniforms.empty() && m_texture_slot_count == 0) return;
 
-	m_sources.common.append("layout (std140, binding = 2) uniform MaterialState {");
+	m_sources.common.append("cbuffer MaterialState : register(b2) {");
 
 	for (const Uniform& u : m_uniforms) {
 		char var_name[64];
 		toUniformVarName(Span(var_name), u.name);
 		m_sources.common.append(toString(u.type), " ", var_name, ";\n");
+	}
+
+	for (u32 i = 0; i < m_texture_slot_count; ++i) {
+		char var_name[64];
+		toTextureVarName(Span(var_name), m_texture_slots[i].name);
+		m_sources.common.append("uint ", var_name, ";\n");
 	}
 
 	m_sources.common.append("};\n");

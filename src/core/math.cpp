@@ -1276,7 +1276,9 @@ float angleDiff(float a, float b) {
 
 // Marsaglia simple rng
 
-RandomGenerator::RandomGenerator(u32 u, u32 v) : u(u), v(v) {}
+RandomGenerator::RandomGenerator(u32 u, u32 v) : u(u), v(v) {
+	ASSERT(u != 0 && v != 0);
+}
 
 u32 RandomGenerator::rand() {
 	u = 36969 * (u & 65535) + (u >> 16);

@@ -1536,7 +1536,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 		for (u32 layer = 0; layer < albedo->depth; ++layer) {
 			gpu::TextureHandle view = gpu::allocTextureHandle();
 			m_layer_views.push(view);
-			stream.createTextureView(view, albedo->handle, layer);
+			stream.createTextureView(view, albedo->handle, layer, 0);
 		}
 	}
 

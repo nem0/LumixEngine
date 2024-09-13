@@ -8,9 +8,6 @@
 #include "gpu/gpu.h"
 
 
-struct lua_State;
-
-
 namespace Lumix
 {
 
@@ -128,6 +125,7 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 	Sources m_sources;
 
 	static const ResourceType TYPE;
+	RuntimeHash32 m_content_hash;
 
 private:
 	void unload() override;

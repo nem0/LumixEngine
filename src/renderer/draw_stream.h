@@ -15,12 +15,10 @@ struct DrawStream {
 	~DrawStream();
 
 	void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char** srcs, const gpu::ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data);
+	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data, const char* debug_name);
 	void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
-	void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture, u32 layer);
-	void createBindGroup(gpu::BindGroupHandle group, Span<const gpu::BindGroupEntryDesc> descriptors);
+	void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture, u32 layer, u32 mip);
 
-	void destroy(gpu::BindGroupHandle group);
 	void destroy(gpu::TextureHandle texture);
 	void destroy(gpu::BufferHandle buffer);
 	void destroy(gpu::ProgramHandle program);
@@ -32,8 +30,7 @@ struct DrawStream {
 	void scissor(u32 x,u32 y,u32 w,u32 h);
 	void clear(gpu::ClearFlags flags, const float* color, float depth);
 	
-	void startCapture();
-	void stopCapture();
+	void captureFrame();
 	void pushDebugGroup(const char* msg);
 	void popDebugGroup();
 	void beginProfileBlock(const char* name, i64 link);
@@ -41,15 +38,12 @@ struct DrawStream {
 
 	void useProgram(gpu::ProgramHandle program);
 	
-	void bind(u32 idx, gpu::BindGroupHandle group);
 	void bindIndexBuffer(gpu::BufferHandle buffer);
 	void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
-	void bindTextures(const gpu::TextureHandle* handles, u32 offset, u32 count);
 	void bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, u32 offset, u32 size);
 	void bindIndirectBuffer(gpu::BufferHandle buffer);
-	void bindShaderBuffer(gpu::BufferHandle buffer, u32 binding_idx, gpu::BindShaderBufferFlags flags);
-	void bindImageTexture(gpu::TextureHandle texture, u32 unit);
-
+	void bindShaderBuffers(Span<gpu::BufferHandle> buffers);
+	
 	void drawArrays(u32 offset, u32 count);
 	void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
 	void drawIndexed(u32 offset, u32 count, gpu::DataType type);
@@ -57,13 +51,18 @@ struct DrawStream {
 	void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
 	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 	
-	void memoryBarrier(gpu::MemoryBarrierType type, gpu::BufferHandle);
+	void barrierRead(gpu::TextureHandle texture);
+	void barrierWrite(gpu::TextureHandle texture);
+	void barrierRead(gpu::BufferHandle buffer);
+	void barrierWrite(gpu::BufferHandle buffer);
+	void memoryBarrier(gpu::BufferHandle buffer);
+	void memoryBarrier(gpu::TextureHandle texture);
 	
+	void copy(gpu::BufferHandle dst, gpu::TextureHandle src);
 	void copy(gpu::TextureHandle dst, gpu::TextureHandle src, u32 dst_x, u32 dst_y);
 	void copy(gpu::BufferHandle dst, gpu::BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
 	
-	void readTexture(gpu::TextureHandle texture, u32 mip, Span<u8> buf);
-	void generateMipmaps(gpu::TextureHandle texture);
+	void readTexture(gpu::TextureHandle texture, gpu::TextureReadCallback callback);
 	void setDebugName(gpu::TextureHandle texture, const char* debug_name);
 	
 	void update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size);
@@ -104,7 +103,6 @@ private:
 	Page* current = nullptr;
 	bool run_called = false;
 	struct Cache {
-		gpu::BindGroupHandle group0;
 		gpu::ProgramHandle program;
 		gpu::BufferHandle index_buffer;
 		struct VertexBuffer {
@@ -112,10 +110,14 @@ private:
 			u32 offset;
 			u32 stride;
 		} vertex_buffers[2];
+		struct UniformBuffer {
+			gpu::BufferHandle buffer;
+			u32 offset;
+			u32 size;
+		} uniform_buffer4;
 	};
 
 	struct CacheEx : Cache {
-		gpu::BindGroupHandle group1;
 		gpu::BufferHandle indirect_buffer;
 		u32 dirty = 0;
 	};

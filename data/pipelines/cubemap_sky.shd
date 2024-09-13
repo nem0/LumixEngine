@@ -1,31 +1,30 @@
 include "pipelines/common.glsl"
 
+common [[
+	struct VSOutput {
+		float2 uv : TEXCOORD0;
+		float4 position : SV_POSITION;
+	};
+
+]]
+
 vertex_shader [[
-	
-	layout (location = 0) out vec2 v_uv;
-	
-	void main()
-	{
-		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
+	VSOutput main(uint vertex_id : SV_VertexID) {
+		VSOutput output;
+		output.position = fullscreenQuad(vertex_id, output.uv);
+		return output;
 	}
 ]]
 
 
 fragment_shader [[
-	layout (location = 0) in vec2 v_uv;
-	layout (location = 0) out vec4 o_color;
-	layout (binding = 0) uniform samplerCube u_sky;
-
-	layout(std140, binding = 4) uniform Data {
+	cbuffer Drawcall : register(b4) {
 		float u_intensity;
-		float u_padding0;
-		float u_padding1;
-		float u_padding2;
+		uint u_sky;
 	};
 
-	float getFogFactorSky(float cam_height, vec3 eye_dir, float fog_density, float fog_bottom, float fog_height) 
-	{
-		if(eye_dir.y == 0) return 1.0;
+	float getFogFactorSky(float cam_height, float3 eye_dir, float fog_density, float fog_bottom, float fog_height) {
+		if (eye_dir.y == 0) return 1.0;
 		float to_top = max(0, (fog_bottom + fog_height) - cam_height);
 
 		float avg_y = (fog_bottom + fog_height + cam_height) * 0.5;
@@ -35,10 +34,8 @@ fragment_shader [[
 		return res;
 	}
 
-	void main()
-	{
-		vec3 eye_dir = getWorldNormal(v_uv);
-		o_color.rgb = texture(u_sky, eye_dir).rgb * u_intensity;
-		o_color.a = 1;
+	float4 main(VSOutput input) : SV_TARGET {
+		float3 eye_dir = getWorldNormal(input.uv);
+		return float4(sampleCubeBindless(LinearSampler, u_sky, eye_dir).rgb * u_intensity, 1);
 	}
 ]]

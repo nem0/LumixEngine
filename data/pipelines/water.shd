@@ -37,99 +37,100 @@ define "SSR"
 ------------------
 
 vertex_shader [[
-	layout(location = 0) in vec3 a_position;
-	#ifdef UV0_ATTR
-		layout(location = UV0_ATTR) in vec2 a_uv;
-	#else
-		const vec2 a_uv = vec2(0, 0);
-	#endif
-	#ifdef _HAS_ATTR2 
-		layout(location = 2) in vec2 a_masks;
-	#endif
-	const vec3 a_normal = vec3(0, 1, 0);
-	const vec3 a_tangent = vec3(1, 0, 0);
+	#define ATTR(X) TEXCOORD##X
 
-	#if defined AUTOINSTANCED
-		layout(location = 4) in vec4 i_rot;
-		layout(location = 5) in vec4 i_pos_lod;
-		layout(location = 6) in vec4 i_scale;
-	#else
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
+	struct Input {
+		float3 position : TEXCOORD0;
+		#ifdef UV0_ATTR
+			float2 uv : ATTR(UV0_ATTR);
+		#endif
+		#ifdef _HAS_ATTR2 
+			//layout(location = 2) in float2 a_masks;
+		#endif
+		#if defined AUTOINSTANCED
+			float4 i_rot : ATTR(INSTANCE0_ATTR);
+			float4 i_pos_lod : ATTR(INSTANCE1_ATTR);
+			float4 i_scale : ATTR(INSTANCE2_ATTR);
+		#endif
+	};
+
+	#ifndef AUTOINSTANCED
+		cbuffer Model : register(b4) {
+			float4x4 u_model;
 		};
 	#endif
-	out vec2 v_uv;
-	out vec3 v_normal;
-	out vec3 v_tangent;
-	out vec4 v_wpos;
-	#ifdef _HAS_ATTR2 
-		out vec2 v_masks;
-	#endif
+
+	struct Output {
+		float2 uv : TEXCOORD0;
+		float3 normal : TEXCOORD1;
+		float3 tangent : TEXCOORD2;
+		float4 wpos : TEXCOORD3;
+		#ifdef _HAS_ATTR2 
+			//float2 masks : TEXCOORD4;
+		#endif
+		float4 position : SV_POSITION;
+	};
 	
-	void main() {
-		v_uv = a_uv;
+	Output main(Input input) {
+		static const float3 normal = float3(0, 1, 0);
+		static const float3 tangent = float3(1, 0, 0);
+
+		Output output;
+		output.uv = input.uv;
 		#if defined AUTOINSTANCED
-			v_normal = rotateByQuat(i_rot, a_normal);
-			v_tangent = rotateByQuat(i_rot, a_tangent);
-			vec3 p = a_position * i_scale.xyz;
-			v_wpos = vec4(i_pos_lod.xyz + rotateByQuat(i_rot, p), 1);
+			output.normal = rotateByQuat(input.i_rot, normal);
+			output.tangent = rotateByQuat(input.i_rot, tangent);
+			float3 p = input.position * input.i_scale.xyz;
+			output.wpos = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
+		#elif defined GRASS
+			#error TODO
 		#else 
-			mat4 model_mtx = u_model;
-			v_normal = mat3(model_mtx) * a_normal;
-			v_tangent = mat3(model_mtx) * a_tangent;
-
-			vec3 p = a_position;
-
-			v_wpos = model_mtx * vec4(p,  1);
+			float4x4 model_mtx = u_model;
+			output.normal = float3x3(model_mtx) * normal;
+			output.tangent = float3x3(model_mtx) * tangent;
+			output.wpos = mul(float4(input.position,  1), model_mtx);
 		#endif
 		
 		#ifdef _HAS_ATTR2 
-			v_masks = a_masks;
+			//output.masks = a_masks;
 		#endif
-		gl_Position = Pass.view_projection * v_wpos;		
+		output.position = mul(output.wpos, Pass_view_projection);
+		return output;
 	}
 ]]
 
 ---------------------
 
 fragment_shader [[
-	layout (binding=0) uniform sampler2D u_normalmap;
-	layout (binding=1) uniform sampler2D u_noise;
-	#ifdef HAS_FOAM
-		layout (binding=2) uniform sampler2D u_foam;
-	#endif
-	#ifdef HAS_CLUTTER
-		layout (binding=3) uniform sampler2D u_clutter;
-	#endif
-
-	layout (binding=4) uniform sampler2D u_shadowmap;
-	layout (binding=5) uniform sampler2D u_depthbuffer;
+	cbuffer Textures : register(b5) {
+		uint u_shadowmap;
+		uint u_depthbuffer;
+		uint u_reflection_probes;
+		uint u_bg;
+	};
 	
-	layout (binding=8) uniform samplerCubeArray u_reflection_probes;
-	layout (binding=9) uniform sampler2D u_bg;
-	
-	in vec2 v_uv;
-	in vec3 v_normal;
-	in vec3 v_tangent;
-	in vec4 v_wpos;
-	#ifdef _HAS_ATTR2 
-		in vec2 v_masks;
-	#endif
+	struct Input {
+		float2 uv : TEXCOORD0;
+		float3 normal : TEXCOORD1;
+		float3 tangent : TEXCOORD2;
+		float4 wpos : TEXCOORD3;
+		#ifdef _HAS_ATTR2 
+			//float2 masks : TEXCOORD4;
+		#endif
+	};
 
-	layout(location = 0) out vec4 o_color;
+	float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
+        float3 csEndPoint = csOrig + abs(csOrig.z * 0.1) * csDir;
 
-	vec2 raycast(vec3 csOrig, vec3 csDir, float stride, float jitter) {
-        vec3 csEndPoint = csOrig + abs(csOrig.z * 0.1) * csDir;
-
-        vec4 H0 = Global.projection * vec4(csOrig, 1);
-        vec4 H1 = Global.projection * vec4(csEndPoint, 1);
+        float4 H0 = mul(float4(csOrig, 1), Global_projection);
+        float4 H1 = mul(float4(csEndPoint, 1), Global_projection);
 
         float k0 = 1 / H0.w, k1 = 1 / H1.w;
 
-        vec2 P0 = toScreenUV(H0.xy * k0 * 0.5 + 0.5) * Global.framebuffer_size;
-        vec2 P1 = toScreenUV(H1.xy * k1 * 0.5 + 0.5) * Global.framebuffer_size;
+        float2 P0 = toScreenUV(H0.xy * k0 * 0.5 + 0.5) * Global_framebuffer_size;
+        float2 P1 = toScreenUV(H1.xy * k1 * 0.5 + 0.5) * Global_framebuffer_size;
 
-        vec2 delta = P1 - P0;
+        float2 delta = P1 - P0;
         bool permute = abs(delta.x) < abs(delta.y);
         if (permute) {
             P0 = P0.yx;
@@ -141,9 +142,9 @@ fragment_shader [[
         float invdx = stepDir / delta.x;
 
         float dk = ((k1 - k0) * invdx) * stride;
-        vec2  dP = (vec2(stepDir, delta.y * invdx)) * stride;
+        float2  dP = (float2(stepDir, delta.y * invdx)) * stride;
 
-        vec2 P = P0;
+        float2 P = P0;
         float k = k0;
         
         uint max_steps = 64 >> 2;
@@ -153,12 +154,12 @@ fragment_shader [[
             for (uint i = 0; i < max_steps; ++i) {
                 float rayZFar = 1 / k;
 
-                vec2 p = permute ? P.yx : P;
-                if (any(lessThan(p, vec2(0)))) break;
-                if (any(greaterThan(p, vec2(Global.framebuffer_size)))) break;
+                float2 p = permute ? P.yx : P;
+                if (any(p < 0.0f.xx)) break;
+                if (any(p > float2(Global_framebuffer_size))) break;
 
-                float depth = texture(u_depthbuffer, p / Global.framebuffer_size).x;
-                depth = toLinearDepth(Global.inv_projection, depth);
+                float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, p / Global_framebuffer_size).x;
+                depth = toLinearDepth(Global_inv_projection, depth);
                 
                 float dif = rayZFar - depth;
                 if (dif > 1e-3) {
@@ -171,84 +172,76 @@ fragment_shader [[
             dP *= 2;
             dk *= 2;
         }
-        return vec2(-1);
+        return -1.0f.xx;
     }
 
-	vec3 getReflectionColor(vec3 view, vec3 normal, float dist, vec3 wpos)
+	float3 getReflectionColor(float3 view, float3 normal, float dist, float3 wpos)
 	{
 		#ifdef SSR
-        	vec4 o = Global.view * vec4(wpos, 1);
-        	vec3 d = mat3(Global.view) * reflect(-view, normal);
-			vec2 hit = raycast(o.xyz, d, 4, random(wpos.xy + Global.time));
+			float4 o = mul(float4(wpos, 1), Global_view);
+			float3 d = mul(reflect(-view, normal), float3x3(Global_view));
+			float2 hit = raycast(o.xyz, d, 4, random(wpos.xy + Global_time));
 			if (hit.x >= 0) {
-				return texture(u_bg, hit.xy / Global.framebuffer_size.xy).rgb;
+				return sampleBindless(LinearSamplerClamp, u_bg, hit.xy / Global_framebuffer_size.xy).rgb;
 			}
 		#endif
 
-		vec3 reflection = reflect(-view, normal);
-		vec4 radiance_rgbm = textureLod(u_reflection_probes, vec4(reflection, 0), min(3, dist * 0.1));
+		float3 reflection = reflect(-view, normal);
+		float4 radiance_rgbm = sampleCubeArrayBindlessLod(LinearSampler, u_reflection_probes, float4(reflection, 0), min(3, dist * 0.1));
 		return radiance_rgbm.rgb * radiance_rgbm.a * 4;
 	}
 
-	float toLinearDepth(float ndc_depth) {
-		vec4 pos_proj = vec4(0, 0, ndc_depth, 1.0);
-	
-		vec4 view_pos = Global.inv_projection * pos_proj;
-	
-		return -view_pos.z / view_pos.w;
-	}
-
-	float getWaterDepth(vec3 wpos, vec3 view, vec3 normal)
+	float getWaterDepth(float3 wpos, float3 view, float3 normal)
 	{
-		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
+		float4 screen_pos = mul(float4(wpos, 1), Global_view_projection);
 		screen_pos /= screen_pos.w;
-		float depth = texture(u_depthbuffer, toScreenUV(screen_pos.xy * 0.5 + 0.5)).x;
-		return toLinearDepth(depth) - toLinearDepth(screen_pos.z);
+		float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, toScreenUV(screen_pos.xy * 0.5 + 0.5)).x;
+		return toLinearDepth(Global_inv_projection, depth) - toLinearDepth(Global_inv_projection, screen_pos.z);
 	}
 	
-	vec4 getRefraction(vec3 wpos)
+	float4 getRefraction(float3 wpos)
 	{
-		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
+		float4 screen_pos = mul(float4(wpos, 1), Global_view_projection);
 		screen_pos /= screen_pos.w;
-		return texture(u_bg, toScreenUV(screen_pos.xy * 0.5 + 0.5));
+		return sampleBindless(LinearSamplerClamp, u_bg, toScreenUV(screen_pos.xy * 0.5 + 0.5));
 	}
 	
-	float getHeight(vec2 uv) {
+	float getHeight(float2 uv) {
 		return 
-				(cos(texture(u_normalmap, uv).x * 2 * M_PI + Global.time * 5) 
-				+ sin(texture(u_normalmap, -uv.yx * 2 + 0.1).x * M_PI - Global.time * 3)) * 0.5 + 0.5
+				(cos(sampleBindless(LinearSampler, t_normal, uv).x * 2 * M_PI + Global_time * 5) 
+				+ sin(sampleBindless(LinearSampler, t_normal, -uv.yx * 2 + 0.1).x * M_PI - Global_time * 3)) * 0.5 + 0.5
 ;
 	}
 
 	// TODO try less texture fetches
-	vec3 getSurfaceNormal(vec2 uv, float normal_strength, out float h00)
+	float3 getSurfaceNormal(float2 uv, float normal_strength, out float h00)
 	{
-		vec2 d = vec2(0.01, 0);
+		float2 d = float2(0.01, 0);
 		uv *= u_uv_scale;
-		uv += u_flow_dir * Global.time;
+		uv += u_flow_dir * Global_time;
 		// TODO optimize
 		h00 = getHeight(uv - d.xy) * normal_strength;
 		float h10 = getHeight(uv + d.xy) * normal_strength;
 		float h01 = getHeight(uv - d.yx) * normal_strength;
 		float h11 = getHeight(uv + d.yx) * normal_strength;
 
-		vec3 N;
+		float3 N;
 		N.x = h00 - h10;
 		N.z = h00 - h10;
 		N.y = sqrt(saturate(1 - dot(N.xz, N.xz))); 
 		return N;
 	}
 
-	void main()
+	float4 main(Input input) : SV_TARGET
 	{
-		vec3 V = normalize(-v_wpos.xyz);
-		vec3 L = Global.light_dir.xyz;
+		float3 V = normalize(-input.wpos.xyz);
+		float3 L = Global_light_dir.xyz;
 		
-		mat3 tbn = mat3(
-			normalize(v_tangent),
-			normalize(v_normal),
-			normalize(cross(v_normal, v_tangent))
-			);
+		float3x3 tbn = float3x3(
+			normalize(input.tangent),
+			normalize(input.normal),
+			normalize(cross(input.normal, input.tangent))
+		);
 
 		float normal_strength = u_normal_strength;
 		#ifdef _HAS_ATTR2 
@@ -256,52 +249,56 @@ fragment_shader [[
 		#endif
 
 		float h;
-		vec3 wnormal = getSurfaceNormal(v_uv, normal_strength, h);
-		wnormal = normalize(tbn * wnormal);
+		float3 wnormal = getSurfaceNormal(input.uv, normal_strength, h);
+		wnormal = normalize(mul(wnormal, tbn));
 
-		//float shadow = getShadow(u_shadowmap, v_wpos.xyz, wnormal);
+		//float shadow = getShadow(u_shadowmap, input.wpos.xyz, wnormal);
 
-		float dist = length(v_wpos.xyz);
-		vec3 view = normalize(-v_wpos.xyz);
-		vec3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, v_wpos.xyz) * u_reflection_multiplier;
-		float water_depth = getWaterDepth(v_wpos.xyz, view, wnormal)- saturate(h * 0.4);
+		float dist = length(input.wpos.xyz);
+		float3 view = normalize(-input.wpos.xyz);
+		float3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, input.wpos.xyz) * u_reflection_multiplier;
+		float water_depth = getWaterDepth(input.wpos.xyz, view, wnormal)- saturate(h * 0.4);
+		
 
-		vec3 halfvec = normalize(view + Global.light_dir.xyz);
+		float3 halfvec = normalize(view + Global_light_dir.xyz);
 		float spec_strength = pow(saturate(dot(halfvec, wnormal)), u_specular_power);
 		
-		vec3 R = reflect(-normalize(view), normalize(wnormal));
-		spec_strength = pow(saturate(dot(R, normalize(Global.light_dir.xyz))), u_specular_power);
+		float3 R = reflect(-normalize(view), normalize(wnormal));
+		spec_strength = pow(saturate(dot(R, normalize(Global_light_dir.xyz))), u_specular_power);
 
-		vec3 spec_color = Global.light_color.rgb * spec_strength * u_specular_multiplier;
+		float3 spec_color = Global_light_color.rgb * spec_strength * u_specular_multiplier;
 		float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
 
-		vec3 water_color = pow(u_water_color.rgb, vec3(2.2)); // TODO do not do this in shader
-		vec3 transmittance = saturate(exp(-water_depth * u_water_scattering * (vec3(1) - water_color)));
+		float3 water_color = pow(u_water_color.rgb, 2.2f.xxx); // TODO do not do this in shader
+		float3 transmittance = saturate(exp(-water_depth * u_water_scattering * (1.0f.xxx - water_color)));
 
 		float t = saturate(water_depth * 5); // no hard edge
 
 		float refraction_distortion = u_refraction_distortion;
 
-		vec3 refraction = getRefraction(v_wpos.xyz + vec3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
-		refraction *= mix(vec3(1), u_ground_tint.rgb, t);
+		float3 refraction = getRefraction(input.wpos.xyz + float3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
+
+		refraction *= lerp(1.0f.xxx, u_ground_tint.rgb, t);
 		refraction *= transmittance;
 
-		vec3 reflection = refl_color + spec_color;
+		float3 reflection = refl_color + spec_color;
 
-		o_color.rgb = mix(refraction, reflection, fresnel);
-		o_color.rgb = mix(refraction, o_color.rgb, t);
+		float4 o_color;
+		o_color.rgb = lerp(refraction, reflection, fresnel);
+		o_color.rgb = lerp(refraction, o_color.rgb, t);
 		
-		float noise = texture(u_noise, 1 - v_uv * 0.1 + u_flow_dir * Global.time * 0.3).x;
-		#if defined HAS_FOAM && defined _HAS_ATTR2
-			vec4 foam = texture(u_foam, v_uv + u_flow_dir * Global.time * 3);
-			o_color.rgb = mix(o_color.rgb, foam.rgb, saturate(v_masks.r - noise) * t);
+		float noise = sampleBindless(LinearSampler, t_noise, 1 - input.uv * 0.1 + u_flow_dir * Global_time * 0.3).x;
+		/*#if defined HAS_FOAM && defined _HAS_ATTR2
+			float4 foam = sampleBindless(LinearSampler, t_foam, input.uv + u_flow_dir * Global_time * 3);
+			o_color.rgb = lerp(o_color.rgb, foam.rgb, saturate(v_masks.r - noise) * t);
 		#endif
 
 		#if defined HAS_CLUTTER && defined _HAS_ATTR2
-			vec4 clutter = texture(u_clutter, v_uv + wnormal.xz * 0.3 + vec2(noise * 0.03, 0));
-			o_color.rgb = mix(o_color.rgb, clutter.rgb, saturate(clutter.a * v_masks.g * t));
-		#endif
+			float4 clutter = sampleBindless(LinearSampler, t_clutter, input.uv + wnormal.xz * 0.3 + float2(noise * 0.03, 0));
+			o_color.rgb = lerp(o_color.rgb, clutter.rgb, saturate(clutter.a * v_masks.g * t));
+		#endif*/
 		
 		o_color.a = 1;
+		return o_color;
 	}
 ]]

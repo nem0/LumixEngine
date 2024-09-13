@@ -61,8 +61,7 @@ struct ProceduralGeometry {
 	u32 getIndexCount() const;
 };
 
-struct Camera
-{
+struct Camera {
 	EntityRef entity;
 	float fov;
 	float near;
@@ -71,6 +70,19 @@ struct Camera
 	float screen_width;
 	float screen_height;
 	bool is_ortho;
+	float film_grain_intensity = 0;
+	
+	bool dof_enabled = false;
+	float dof_distance = 10;
+	float dof_range = 20;
+	float dof_max_blur_size = 10;
+	float dof_sharp_range = 0;
+
+	bool bloom_enabled = false;
+	bool bloom_tonemap_enabled = false;
+	float bloom_accomodation_speed = 1;
+	float bloom_avg_bloom_multiplier = 0.2f;
+	float bloom_exposure = 1;
 };
 
 struct Decal {
@@ -109,6 +121,22 @@ struct Environment {
 	EntityRef entity;
 	Vec4 cascades;
 	Flags flags = Flags::NONE;
+	Texture* cubemap_sky = nullptr;
+	float sky_intensity = 1;
+	Vec3 scatter_rayleigh = {5.802f / 33.1f, 13.558f / 33.1f, 33.1f / 33.1f};
+	Vec3 scatter_mie = {1, 1, 1};
+	Vec3 absorb_mie = {1, 1, 1};
+	Vec3 sunlight_color = {1, 1, 1};
+	Vec3 fog_scattering = {1, 1, 1};
+	float sunlight_strength = 10;
+	float height_distribution_rayleigh = 8000;
+	float height_distribution_mie = 1200;
+	float ground_r = 6378;
+	float atmo_r = 6478;
+	float fog_top = 100;
+	bool fog_enabled = false;
+	bool godrays_enabled = false;
+	bool atmo_enabled = true;
 };
 
 struct PointLight {
@@ -278,6 +306,7 @@ enum class RenderModuleVersion : i32 {
 	TESSELATED_TERRAIN,
 	REMOVED_SPLINE_GEOMETRY,
 	EMIT_RATE_REMOVED,
+	POSTPROCESS,
 
 	LATEST
 };

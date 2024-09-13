@@ -43,17 +43,12 @@ private:
 	void cameraPreviewGUI(Vec2 size);
 	bool onAction(const Action& action) override;
 	void manipulate();
-	void renderSelection();
-	void renderGizmos();
-	void renderIcons();
 	void captureMouse(bool capture);
 	RayCastModelHit castRay(float x, float y);
 	void handleDrop(const char* path, float x, float y);
 	void onToolbar();
 	void handleEvents();
 	void insertModelUI();
-	void onSettingsLoaded() override;
-	void onBeforeSettingsSaved() override;
 	void toggleProjection();
 	bool hasFocus() const override { return m_has_focus; }
 	void rotate90Degrees();
@@ -94,7 +89,6 @@ private:
 	UniquePtr<Pipeline> m_pipeline;
 	UniquePtr<Pipeline> m_camera_preview_pipeline;
 	LogUI& m_log_ui;
-	Shader* m_debug_shape_shader;
 	bool m_show_camera_preview = true;
 	
 	WorldEditor& m_editor;
@@ -104,6 +98,9 @@ private:
 	bool m_is_measure_from_set = false;
 	DVec3 m_measure_to = {0, 0, 0};
 	DVec3 m_measure_from = {0, 0, 0};
+	
+	struct RenderPlugin;
+	UniquePtr<RenderPlugin> m_render_plugin;
 };
 
 

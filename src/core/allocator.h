@@ -4,7 +4,7 @@
 #include "core.h"
 
 #define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
-#define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
+#define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var)
 
 namespace Lumix { struct NewPlaceholder {}; }
 inline void* operator new(size_t, Lumix::NewPlaceholder, void* where) { return where; }

@@ -7,49 +7,57 @@ uniform("Emission", "float", 0)
 uniform("Translucency", "normalized_float", 0)
 
 surface_shader [[
-	vec4 c = texture(t_albedo, v_uv, -1) * u_material_color;
+	#line 11 "standard.shd"
+	// TODO mip offset
+	#ifdef UV0_ATTR
+		float2 uv = input.uv;
+	#else
+		float2 uv = 0;
+	#endif
+
+	float4 c = sampleBindless(LinearSampler, t_albedo, uv/*, -1*/) * u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
 	#ifdef COLOR0_ATTR
-		data.albedo.rgb *= v_color.rgb;
+		data.albedo.rgb *= input.color.rgb;
 	#endif
 
 	#ifdef AO_ATTR
-		data.ao = v_ao;
+		data.ao = input.ao;
 	#else
 		data.ao = 1;
 	#endif
 
 	#ifdef HAS_AMBIENT_OCCLUSION_TEX
-		data.ao *= texture(t_ambient_occlusion, v_uv).r;
+		data.ao *= sampleBindless(LinearSampler, t_ambient_occlusion, uv).r;
 	#endif
 
 	#ifdef FUR 
-		data.alpha = saturate(data.alpha - v_fur_layer);
+		data.alpha = saturate(data.alpha - input.fur_layer);
 	#endif
 
 	
-	data.roughness = texture(t_roughness, v_uv).g * u_roughness;
+	data.roughness = sampleBindless(LinearSampler, t_roughness, uv).g * u_roughness;
 	#ifdef HAS_METALLICMAP
-		data.metallic = texture(t_metallic, v_uv).b * u_metallic;
+		data.metallic = sampleBindless(LinearSampler, t_metallic, uv).b * u_metallic;
 	#else
 		data.metallic = u_metallic;
 	#endif
-	data.N.xz = texture(t_normal, v_uv).xy * 2 - 1;
+	data.N.xz = sampleBindless(LinearSampler, t_normal, uv).xy * 2 - 1;
 	data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 
 	#ifdef TANGENT_ATTR
-		vec3 tangent = normalize(v_tangent);
-		vec3 N = normalize(v_normal);
+		float3 tangent = normalize(input.tangent);
+		float3 N = normalize(input.normal);
 
-		mat3 tbn = mat3(
+		float3x3 tbn = float3x3(
 			tangent,
 			N,
-			normalize(cross(tangent, v_normal))
+			normalize(cross(tangent, input.normal))
 		);
-		data.N = tbn * data.N;
+		data.N = mul(data.N, tbn);
 	#else
-		data.N = normalize(v_normal);
+		data.N = normalize(input.normal);
 	#endif
 	data.emission = u_emission;
 	data.translucency = u_translucency;
@@ -57,6 +65,6 @@ surface_shader [[
 
 	#ifndef ALPHA_CUTOUT
 		float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
-		data.alpha = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
+		data.alpha = lerp(data.alpha, 1, pow(saturate(1 - ndotv), 5));
 	#endif
 ]]

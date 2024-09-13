@@ -1,22 +1,19 @@
 include "pipelines/common.glsl"
 
-
 compute_shader [[
-	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-
-	layout (binding=0) uniform sampler2D u_ssao_buf;
-	layout (binding=1, rgba16) uniform image2D u_gbuffer1;
-	
-	layout(std140, binding = 4) uniform Data {
-		vec4 u_size;
+	cbuffer Data : register(b4) {
+		float2 u_size;
+		uint u_ssao_buf;
+		uint u_gbufferB;
 	};
 
-	void main()
-	{
-		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
-		float ssao = texture(u_ssao_buf, vec2(ij) / u_size.xy).x;
-		vec4 v = imageLoad(u_gbuffer1, ij);
+	[numthreads(16, 16, 1)]
+	void main(uint3 thread_id : SV_DispatchThreadID) {
+		int2 ij = int2(thread_id.xy);
+		float2 uv = float2(ij) / u_size.xy;
+		float ssao = sampleBindlessLod(LinearSamplerClamp, u_ssao_buf, uv, 0).x;
+		float4 v = bindless_rw_textures[u_gbufferB][ij];
 		v.w *= ssao;
-		imageStore(u_gbuffer1, ij, v);
+		bindless_rw_textures[u_gbufferB][ij] = v;
 	}
 ]]

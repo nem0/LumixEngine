@@ -1,37 +1,34 @@
 include "pipelines/common.glsl"
 
 compute_shader [[
-	layout(std140, binding = 4) uniform Data {
-		vec2 u_size;
-		vec2 padding;
+	cbuffer Data : register(b4) {
+		float2 u_size;
 		float u_current_frame_weight;
-    };
+		uint u_sss;
+		uint u_history;
+		uint u_depthbuf;
+		uint u_gbuffer2;
+	};
 
-	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-    layout (binding = 0) uniform sampler2D u_history;
-	layout (binding = 1) uniform sampler2D u_depthbuf;
-    layout (rgba8, binding = 0) uniform image2D u_gbuffer2;
-    layout (r8, binding = 1) uniform image2D u_sss;
+	[numthreads(16, 16, 1)]
+	void main(uint3 thread_id : SV_DispatchThreadID) {
+		uint2 ij = thread_id.xy;
+		if (any(ij >= uint2(u_size.xy))) return;
 
-	void main()
-	{
-		ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
-		if (any(greaterThanEqual(ij, ivec2(u_size.xy)))) return;
-
-		float depth = texelFetch(u_depthbuf, ij, 0).x;
+		float depth = bindless_textures[u_depthbuf][ij].x;
 		
-		vec2 uv = (vec2(ij) + 0.5) / u_size.xy;
-		vec2 uv_prev = cameraReproject(uv, depth).xy;
+		float2 uv = (float2(ij) + 0.5) / u_size.xy;
+		float2 uv_prev = cameraReproject(uv, depth).xy;
 
-		float current = imageLoad(u_sss, ij).x;
-		if (all(lessThan(uv_prev, vec2(1))) && all(greaterThan(uv_prev, vec2(0)))) {
-			float prev = texture(u_history, uv_prev).x;
-			current = mix(prev, current, u_current_frame_weight);
-			imageStore(u_sss, ij, vec4(current));
+		float current = bindless_textures[u_sss][ij].x;
+		if (all(uv_prev < 1) && all(uv_prev > 0)) {
+			float prev = sampleBindlessLod(LinearSamplerClamp, u_history, uv_prev, 0).x;
+			current = lerp(prev, current, u_current_frame_weight);
+			bindless_rw_textures[u_sss][ij] = current;
 		}
 		
-		vec4 gb2v = imageLoad(u_gbuffer2, ij);
+		float4 gb2v = bindless_rw_textures[u_gbuffer2][ij];
 		gb2v.w = min(current, gb2v.w);
-		imageStore(u_gbuffer2, ij, gb2v);
+		bindless_rw_textures[u_gbuffer2][ij] = gb2v;
 	}
 ]]

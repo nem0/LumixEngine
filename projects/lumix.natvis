@@ -12,10 +12,32 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::Path">
-		<DisplayString>{m_data->m_path,na}</DisplayString>
+	<Type Name="Lumix::Local&lt;*&gt;">
+		<SmartPointer Usage="Minimal">obj</SmartPointer>
+		<DisplayString Condition="obj == nullptr">null</DisplayString>
+		<DisplayString Condition="obj != nullptr">{obj}</DisplayString>
+		<Expand>
+			<ExpandedItem>obj</ExpandedItem>
+		</Expand>
 	</Type>
 
+	<Type Name="Lumix::UniquePtr&lt;*&gt;">
+		<SmartPointer Usage="Minimal">m_ptr</SmartPointer>
+		<DisplayString Condition="m_ptr == nullptr">null</DisplayString>
+		<DisplayString Condition="m_ptr != nullptr">{m_ptr}</DisplayString>
+		<Expand>
+			<ExpandedItem>m_ptr</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="Lumix::Path">
+		<DisplayString>{m_path,sb}</DisplayString>
+	</Type>
+
+	<Type Name="Lumix::gpu::Program">
+		<DisplayString>{name,sb}</DisplayString>
+	</Type>
+		
 	<Type Name="Lumix::Vec4">
 		<Expand>
 			<Synthetic Name="x">
@@ -51,8 +73,8 @@
 	</Type>
 
 	<Type Name="Lumix::String">
-		<DisplayString Condition="m_size &gt;= sizeof(m_small)">{m_big,na}</DisplayString>
-		<DisplayString Condition="m_size &lt; sizeof(m_small)">{m_small,na}</DisplayString>
+		<DisplayString Condition="m_size &gt;= sizeof(m_small)">{m_big,sb}</DisplayString>
+		<DisplayString Condition="m_size &lt; sizeof(m_small)">{m_small,sb}</DisplayString>
 	</Type>
 
 	<Type Name="Lumix::StaticString&lt;*&gt;">
@@ -81,11 +103,11 @@
 			<Item Name="[size]" ExcludeView="simple">m_size</Item>
 			<CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
 				<Variable Name="i" InitialValue="0" />
-				<Variable Name="k" InitialValue="m_keys" />
+				<Variable Name="k" InitialValue="m_slots" />
 				<Loop>
 					<Break Condition="i == m_capacity" />
-					<If Condition="m_keys[i].valid">
-						<Item Name="[{*($T1*)m_keys[i].key_mem}]">m_values[i]</Item>
+					<If Condition="m_slots[i].valid">
+						<Item Name="[{*($T1*)m_slots[i].key_mem}]">*($T2*)m_slots[i].value_mem</Item>
 					</If>
 					<Exec>++i</Exec>
 				</Loop>

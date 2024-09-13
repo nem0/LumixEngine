@@ -80,8 +80,7 @@ struct Runner final
 		m_viewport.rot = Quat::IDENTITY;
 
 		m_renderer = static_cast<Renderer*>(m_engine->getSystemManager().getSystem("renderer"));
-		LuaScript* pres = m_engine->getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
-		m_pipeline = Pipeline::create(*m_renderer, pres, "APP");
+		m_pipeline = Pipeline::create(*m_renderer, PipelineType::GAME_VIEW);
 
 		while (m_engine->getFileSystem().hasWork()) {
 			os::sleep(100);
@@ -338,22 +337,39 @@ static void logToDebugOutput(LogLevel level, const char* message)
 
 int main(int args, char* argv[]) {
 	registerLogCallback<logToDebugOutput>();
-
 	os::init();
 	// create window
 	os::WindowHandle win = os::createWindow({ .width = 640, .height = 480 });
 
 	// init GPU
 	DefaultAllocator allocator;
-	gpu::preinit(allocator, false);
+	gpu::preinit(allocator, true);
 	gpu::init(win, gpu::InitFlags::NONE);
 	gpu::ProgramHandle shader = gpu::allocProgramHandle();
+
+	// texture
+	gpu::TextureHandle texture = gpu::allocTextureHandle();
+	gpu::createTexture(texture, 2, 2, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, "checkerboard");
+	u32 texels[] = {
+		0xffFFffFF, 0,
+		0, 0xffFFffFF
+	};
+	gpu::update(texture, 0, 0, 0, 0, 2, 2, gpu::TextureFormat::RGBA8, texels, sizeof(texels));
 
 	// create shader
 	const gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
 	const char* srcs[] = {
-		"void main() { gl_Position = vec4(gl_VertexID & 1, (gl_VertexID >> 1) & 1, 0, 1); }",
-		"layout(location = 0) out vec4 color; void main() { color = vec4(1, 0, 1, 1); }",
+		R"#(
+			out vec2 uv;
+			void main() { uv = 10 * vec2(gl_VertexID & 1, (gl_VertexID >> 1) & 1); gl_Position = vec4(gl_VertexID & 1, (gl_VertexID >> 1) & 1, 0, 1); }
+		)#",
+		R"#(
+			in vec2 uv;
+			layout(location = 0) out vec4 color;
+			void main() {
+				color = sampleBindless(32766, uv);
+			}
+		)#",
 	};
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, srcs, types, 2, nullptr, 0, "shader");
@@ -378,6 +394,7 @@ int main(int args, char* argv[]) {
 		const float clear_col[] = {0.1f, 0.1f, 0.1f, 1};
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
 		gpu::useProgram(shader);
+		gpu::bindTextures(&texture, 0, 1);
 		gpu::drawArrays(0, 3);
 
 		u32 frame = gpu::swapBuffers();
