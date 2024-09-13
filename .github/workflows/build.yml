@@ -12,8 +12,7 @@ jobs:
               run: |
                 mkdir ..\plugins
                 pushd ..\plugins
-                git.exe clone https://github.com/nem0/lumixengine_maps.git maps
-                git.exe checkout bindless
+                git.exe clone -b bindless https://github.com/nem0/lumixengine_maps.git maps
             - name: fetch gltf plugin
               working-directory: plugins
               run: |
@@ -29,18 +28,15 @@ jobs:
             - name: fetch js plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_js.git js
-                git.exe checkout bindless
+                git.exe clone -b bindless https://github.com/nem0/lumixengine_js.git js
             - name: fetch marketplace plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_market.git market
-                git.exe checkout bindless
+                git.exe clone -b bindless https://github.com/nem0/lumixengine_market.git market
             - name: fetch procedural geometry plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
-                git.exe checkout bindless
+                git.exe clone -b bindless https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
             - name: fetch visual script plugin
               working-directory: plugins
               run: |
@@ -48,8 +44,7 @@ jobs:
             - name: fetch livecode plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_livcode.git livecode
-                git.exe checkout bindless
+                git.exe clone -b bindless https://github.com/nem0/lumixengine_livcode.git livecode
             - name: fetch empty plugin template
               working-directory: plugins
               run: |
