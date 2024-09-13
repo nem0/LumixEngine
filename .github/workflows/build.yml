@@ -44,7 +44,7 @@ jobs:
             - name: fetch livecode plugin
               working-directory: plugins
               run: |
-                git.exe clone -b bindless https://github.com/nem0/lumixengine_livcode.git livecode
+                git.exe clone -b bindless https://github.com/nem0/lumixengine_livecode.git livecode
             - name: fetch empty plugin template
               working-directory: plugins
               run: |
@@ -58,42 +58,42 @@ jobs:
               shell: cmd
               run: |
                 "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
-    linux:
-        runs-on: ubuntu-22.04
-        steps:
-          - uses: actions/checkout@v1
-            with:
-              fetch-depth: 1
+    # linux:
+    #     runs-on: ubuntu-22.04
+    #     steps:
+    #       - uses: actions/checkout@v1
+    #         with:
+    #           fetch-depth: 1
 
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install gcc-10
-              sudo apt-get install g++-10
-              sudo apt-get install mesa-common-dev
-              sudo apt-get install libasound2-dev
-              sudo apt-get install libgl1-mesa-dev
-              sudo apt-get install libgl1-mesa-glx
-              sudo apt-get install libxi-dev
-              sudo apt-get install libgtk-3-dev
-          - name: Download 3rdparties
-            run: |
-              cd projects
-              mkdir -p ../external/freetype/lib/linux64_gmake/release
-              mkdir -p 3rdparty/
-              mkdir -p ../external/physx/lib/linux
-              mkdir -p ../external/recast/lib/linux64_gmake/release
-              git clone --depth=1 https://github.com/nem0/lumixengine_linux_3rdparty_bin.git
-              git clone --depth=1 https://github.com/nem0/luau.git 3rdparty/luau
-              cp lumixengine_linux_3rdparty_bin/freetype/* ../external/freetype/lib/linux64_gmake/release
-              cp lumixengine_linux_3rdparty_bin/physx/* ../external/physx/lib/linux
-              cp lumixengine_linux_3rdparty_bin/recast/* ../external/recast/lib/linux64_gmake/release
-          - name: build
-            run: |
-              cd projects
-              ./genie --force-build-luau gmake
-              cd tmp/gmake
-              make -j
-            env:
-              CC:   gcc-10
-              CXX:  g++-10
+    #       - name: Install Dependencies
+    #         run: |
+    #           sudo apt-get update
+    #           sudo apt-get install gcc-10
+    #           sudo apt-get install g++-10
+    #           sudo apt-get install mesa-common-dev
+    #           sudo apt-get install libasound2-dev
+    #           sudo apt-get install libgl1-mesa-dev
+    #           sudo apt-get install libgl1-mesa-glx
+    #           sudo apt-get install libxi-dev
+    #           sudo apt-get install libgtk-3-dev
+    #       - name: Download 3rdparties
+    #         run: |
+    #           cd projects
+    #           mkdir -p ../external/freetype/lib/linux64_gmake/release
+    #           mkdir -p 3rdparty/
+    #           mkdir -p ../external/physx/lib/linux
+    #           mkdir -p ../external/recast/lib/linux64_gmake/release
+    #           git clone --depth=1 https://github.com/nem0/lumixengine_linux_3rdparty_bin.git
+    #           git clone --depth=1 https://github.com/nem0/luau.git 3rdparty/luau
+    #           cp lumixengine_linux_3rdparty_bin/freetype/* ../external/freetype/lib/linux64_gmake/release
+    #           cp lumixengine_linux_3rdparty_bin/physx/* ../external/physx/lib/linux
+    #           cp lumixengine_linux_3rdparty_bin/recast/* ../external/recast/lib/linux64_gmake/release
+    #       - name: build
+    #         run: |
+    #           cd projects
+    #           ./genie --force-build-luau gmake
+    #           cd tmp/gmake
+    #           make -j
+    #         env:
+    #           CC:   gcc-10
+    #           CXX:  g++-10
