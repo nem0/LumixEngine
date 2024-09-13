@@ -2,8 +2,6 @@
 #include <imgui/IconsFontAwesome5.h>
 
 
-struct lua_State;
-
 namespace Lumix { struct StringView; }
 
 namespace ImGuiEx

@@ -48,8 +48,6 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		void onLog(LogLevel level, const char* message);
 		void push(LogLevel level, const char* message);
 		void showNotifications();
-		void onSettingsLoaded() override;
-		void onBeforeSettingsSaved() override;
 		const char* getName() const override { return "log"; }
 		void onGUI() override;
 		void update(float time_delta) override;

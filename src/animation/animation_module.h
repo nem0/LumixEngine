@@ -7,8 +7,6 @@
 #include "animation/animation.h"
 #include "engine/plugin.h"
 
-struct lua_State;
-
 namespace Lumix {
 
 namespace anim {

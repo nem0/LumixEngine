@@ -511,21 +511,6 @@ gpu::TextureFlags Texture::getGPUFlags() const
 	if(flags & (u32)Flags::SRGB) {
 		gpu_flags = gpu_flags | gpu::TextureFlags::SRGB;
 	}
-	if(flags & (u32)Flags::POINT) {
-		gpu_flags = gpu_flags | gpu::TextureFlags::POINT_FILTER;
-	}
-	if(flags & (u32)Flags::ANISOTROPIC) {
-		gpu_flags = gpu_flags | gpu::TextureFlags::ANISOTROPIC_FILTER;
-	}
-	if (flags & (u32)Flags::CLAMP_U) {
-		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_U;
-	}
-	if (flags & (u32)Flags::CLAMP_V) {
-		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_V;
-	}
-	if (flags & (u32)Flags::CLAMP_W) {
-		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_W;
-	}
 	return gpu_flags;
 }
 

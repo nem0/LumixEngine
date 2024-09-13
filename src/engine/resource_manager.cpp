@@ -1,6 +1,7 @@
 #include "engine/lumix.h"
 
 #include "core/log.h"
+#include "core/stream.h"
 
 #include "engine/resource.h"
 #include "engine/resource_manager.h"

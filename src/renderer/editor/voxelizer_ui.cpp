@@ -27,6 +27,7 @@ VoxelizerUI::VoxelizerUI(StudioApp& app)
 	m_toggle_ui.func.bind<&VoxelizerUI::toggleOpen>(this);
 	m_toggle_ui.is_selected.bind<&VoxelizerUI::isOpen>(this);
 	m_app.addWindowAction(&m_toggle_ui);
+	m_app.getSettings().registerPtr(nullptr, "voxelizer_open", &m_is_open);
 }
 
 void VoxelizerUI::visualizeAO() {
@@ -198,14 +199,6 @@ void VoxelizerUI::onWindowGUI() {
 	if (m_debug_draw) draw();
 
 	ImGui::End();
-}
-
-void VoxelizerUI::onSettingsLoaded() {
-	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_voxelizer_ui_open", false);
-}
-
-void VoxelizerUI::onBeforeSettingsSaved() {
-	m_app.getSettings().setValue(Settings::GLOBAL, "is_voxelizer_ui_open", m_is_open);
 }
 
 

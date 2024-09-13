@@ -10,9 +10,6 @@
 #include "engine/world.h"
 
 
-struct lua_State;
-
-
 namespace Lumix
 {
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/delegate.h"
 #include "core/span.h"
 #include "engine/lumix.h"
 
@@ -14,12 +15,28 @@ using BufferHandle = struct Buffer*;
 using ProgramHandle = struct Program*;
 using TextureHandle = struct Texture*;
 using QueryHandle = struct Query*;
-using BindGroupHandle = struct BindGroup*;
 const BufferHandle INVALID_BUFFER = nullptr;
 const ProgramHandle INVALID_PROGRAM = nullptr;
 const TextureHandle INVALID_TEXTURE = nullptr;
 const QueryHandle INVALID_QUERY = nullptr;
-const BindGroupHandle INVALID_BIND_GROUP = nullptr;
+
+struct BindlessHandle {
+	constexpr BindlessHandle() {}
+	explicit BindlessHandle(u32 value) : value(value) {}
+	u32 value = 0;
+	operator u32() const { return value; }
+};
+
+static constexpr BindlessHandle INVALID_BINDLESS_HANDLE = {};
+
+struct RWBindlessHandle {
+	constexpr RWBindlessHandle() {}
+	explicit RWBindlessHandle(u32 value) : value(value) {}
+	u32 value = 0;
+	operator u32() const { return value; }
+};
+
+static constexpr RWBindlessHandle INVALID_RW_BINDLESS_HANDLE = {};
 
 enum class InitFlags : u32 {
 	NONE = 0,
@@ -50,11 +67,6 @@ enum class StateFlags : u64 {
 enum class QueryType : u32 {
 	TIMESTAMP,
 	STATS
-};
-
-enum class MemoryBarrierType : u32 {
-	SSBO = 1 << 0,
-	COMMAND = 1 << 1
 };
 
 enum class PrimitiveType : u8 {
@@ -156,34 +168,22 @@ enum class TextureFormat : u32 {
 	RG16F
 };
 
-enum class BindShaderBufferFlags : u32 {
-	NONE = 0,
-	OUTPUT = 1 << 0,
-};
-
 enum class TextureFlags : u32 {
 	NONE = 0,
-	POINT_FILTER = 1 << 0,
-	CLAMP_U = 1 << 1,
-	CLAMP_V = 1 << 2,
-	CLAMP_W = 1 << 3,
-	ANISOTROPIC_FILTER = 1 << 4,
-	NO_MIPS = 1 << 5,
-	SRGB = 1 << 6,
-	READBACK = 1 << 7,
-	IS_3D = 1 << 8,
-	IS_CUBE = 1 << 9,
-	COMPUTE_WRITE = 1 << 10,
-	RENDER_TARGET = 1 << 11,
+	NO_MIPS = 1 << 1,
+	SRGB = 1 << 2,
+	READBACK = 1 << 3,
+	IS_3D = 1 << 4,
+	IS_CUBE = 1 << 5,
+	COMPUTE_WRITE = 1 << 6,
+	RENDER_TARGET = 1 << 7
 };
 
 enum class BufferFlags : u32 {
 	NONE = 0,
 	IMMUTABLE = 1 << 0,
-	UNIFORM_BUFFER = 1 << 1,
-	SHADER_BUFFER = 1 << 2,
-	COMPUTE_WRITE = 1 << 3,
-	MAPPABLE = 1 << 4,
+	SHADER_BUFFER = 1 << 1,
+	MAPPABLE = 1 << 2
 };
 
 enum class DataType : u32 {
@@ -240,25 +240,10 @@ struct MemoryStats {
 	u64 texture_mem;
 };
 
-struct BindGroupEntryDesc {
-	enum Type { 
-		UNIFORM_BUFFER,
-		TEXTURE
-	};
-	Type type;
-	union {
-		BufferHandle buffer;
-		TextureHandle texture;
-	};
-	u32 bind_point;
-	u32 offset;
-	u32 size;
-};
-
 void preinit(IAllocator& allocator, bool load_renderdoc);
 IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
-void captureRenderDocFrame();
+void captureFrame();
 bool getMemoryStats(MemoryStats& stats);
 u32 swapBuffers();
 void enableVSync(bool enable);
@@ -275,20 +260,24 @@ u32 getBytesPerPixel(TextureFormat format);
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
-BindGroupHandle allocBindGroupHandle();
 
 QueryHandle createQuery(QueryType type);
 
 void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
-void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
+void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data, const char* debug_name);
 void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
-void createTextureView(TextureHandle view, TextureHandle texture, u32 layer);
-void createBindGroup(BindGroupHandle group, Span<const BindGroupEntryDesc> descs);
+void createTextureView(TextureHandle view, TextureHandle texture, u32 layer, u32 mip);
+
+void memoryBarrier(BufferHandle buffer);
+void memoryBarrier(TextureHandle texture);
+void barrierWrite(TextureHandle texture);
+void barrierRead(TextureHandle texture);
+void barrierWrite(BufferHandle buffer);
+void barrierRead(BufferHandle buffer);
 
 void destroy(TextureHandle texture);
 void destroy(BufferHandle buffer);
 void destroy(ProgramHandle program);
-void destroy(BindGroupHandle group);
 void destroy(QueryHandle query);
 	
 void setCurrentWindow(void* window_handle);
@@ -298,19 +287,17 @@ void viewport(u32 x, u32 y, u32 w, u32 h);
 void scissor(u32 x,u32 y,u32 w,u32 h);
 void clear(ClearFlags flags, const float* color, float depth);
 	
-void startCapture();
-void stopCapture();
-
 void useProgram(ProgramHandle program);
-	
-void bind(BindGroupHandle group);
+
+BindlessHandle getBindlessHandle(BufferHandle buffer); // safe to call from any job
+BindlessHandle getBindlessHandle(TextureHandle texture); // safe to call from any job
+RWBindlessHandle getRWBindlessHandle(BufferHandle buffer); // safe to call from any job
+RWBindlessHandle getRWBindlessHandle(TextureHandle texture); // safe to call from any job
 void bindIndexBuffer(BufferHandle buffer);
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
-void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
 void bindIndirectBuffer(BufferHandle buffer);
-void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, BindShaderBufferFlags flags);
-void bindImageTexture(TextureHandle texture, u32 unit);
+void bindShaderBuffers(Span<BufferHandle> buffers);
 
 void drawArrays(u32 offset, u32 count);
 void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
@@ -318,14 +305,13 @@ void drawIndexed(u32 offset, u32 count, DataType type);
 void drawArraysInstanced(u32 indices_count, u32 instances_count);
 void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);
 void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
-	
-void memoryBarrier(MemoryBarrierType type, BufferHandle);
-	
+
 void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
+void copy(BufferHandle dst, TextureHandle src);
 	
-void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
-void generateMipmaps(TextureHandle texture);
+using TextureReadCallback = Delegate<void(Span<const u8>)>;
+void readTexture(TextureHandle texture, TextureReadCallback callback);
 void setDebugName(TextureHandle texture, const char* debug_name);
 	
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);

@@ -55,6 +55,8 @@ GameView::GameView(StudioApp& app)
 	Engine& engine = app.getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
+	m_app.getSettings().registerPtr("game_view_open", &m_is_open);
+	m_app.getSettings().registerPtr("focus_game_view_on_game_mode_start", &m_focus_on_game_start);
 }
 
 
@@ -69,8 +71,7 @@ void GameView::init() {
 
 	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
-	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
-	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW");
+	m_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 
 	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui)
@@ -120,14 +121,6 @@ void GameView::captureMouse(bool capture) {
 	os::showCursor(!capture || m_is_ingame_cursor);
 	if (capture) m_app.clipMouseCursor();
 	else m_app.unclipMouseCursor();
-}
-
-void GameView::onSettingsLoaded() {
-	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_game_view_open", false);
-}
-
-void GameView::onBeforeSettingsSaved() {
-	m_app.getSettings().setValue(Settings::GLOBAL, "is_game_view_open", m_is_open);
 }
 
 void GameView::onFullscreenGUI(WorldEditor& editor)
@@ -227,8 +220,6 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		ImGui::SameLine();
 		if (ImGui::Button("Fullscreen")) setFullscreen(true);
 	}
-	ImGui::SameLine();
-	m_pipeline->callLuaFunction("onGUI");
 }
 
 
@@ -239,7 +230,7 @@ void GameView::onGUI()
 	m_pipeline->setWorld(editor.getWorld());
 
 	const bool is_game_mode = m_app.getWorldEditor().isGameMode();
-	if (is_game_mode && !m_was_game_mode && m_app.getSettings().m_focus_game_view_on_game_mode_start) {
+	if (is_game_mode && !m_was_game_mode && m_focus_on_game_start) {
 		ImGui::SetNextWindowFocus();
 		m_is_open = true;
 	}
@@ -255,7 +246,7 @@ void GameView::onGUI()
 		os::setCursor(m_cursor_type);
 	}
 	
-	if (m_is_fullscreen && m_pipeline->isReady()) {
+	if (m_is_fullscreen) {
 		onFullscreenGUI(editor);
 		return;
 	}
@@ -264,8 +255,6 @@ void GameView::onGUI()
 		captureMouse(false);
 		return;
 	}
-
-	if (!m_pipeline->isReady()) captureMouse(false);
 
 	ImVec2 view_size;
 	bool is_game_view_visible = false;

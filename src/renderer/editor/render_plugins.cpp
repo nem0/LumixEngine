@@ -554,14 +554,14 @@ struct SphericalHarmonics {
 
 	// https://github.com/TheRealMJP/LowResRendering/blob/master/SampleFramework11/v1.01/Graphics/SH.cpp
 	// https://www.gamedev.net/forums/topic/699721-spherical-harmonics-irradiance-from-hdr/
-	void compute(const Array<Vec4>& pixels) {
+	void compute(Span<const Vec4> pixels) {
 		PROFILE_FUNCTION();
 		for (u32 i = 0; i < 9; ++i) {
 			coefs[i] = Vec3(0);
 		}
-		const u32 w = (u32)sqrtf(pixels.size() / 6.f);
+		const u32 w = (u32)sqrtf(pixels.length() / 6.f);
 		const u32 h = w;
-		ASSERT(6 * w * h == pixels.size());
+		ASSERT(6 * w * h == pixels.length());
 
 		float weightSum = 0.0f;
 		for (u32 face = 0; face < 6; ++face) {
@@ -980,36 +980,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 };
 
 struct TextureMeta {
-	enum WrapMode : u32 {
-		REPEAT,
-		CLAMP
-	};
-
-	enum Filter : u32 {
-		LINEAR,
-		POINT,
-		ANISOTROPIC
-	};
-
-	static const char* toString(Filter filter) {
-		switch (filter) {
-			case Filter::POINT: return "point";
-			case Filter::LINEAR: return "linear";
-			case Filter::ANISOTROPIC: return "anisotropic";
-		}
-		ASSERT(false);
-		return "linear";
-	}
-
-	static const char* toString(WrapMode wrap) {
-		switch (wrap) {
-			case WrapMode::CLAMP: return "clamp";
-			case WrapMode::REPEAT: return "repeat";
-		}
-		ASSERT(false);
-		return "repeat";
-	}
-
 	void deserialize(lua_State* L) {
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &srgb);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &compress);
@@ -1018,27 +988,6 @@ struct TextureMeta {
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &is_normalmap);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "invert_green", &invert_normal_y);
 		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &mips);
-		char tmp[32];
-		if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
-			if (equalIStrings(tmp, "point")) {
-				filter = TextureMeta::Filter::POINT;
-			}
-			else if (equalIStrings(tmp, "anisotropic")) {
-				filter = TextureMeta::Filter::ANISOTROPIC;
-			}
-			else {
-				filter = TextureMeta::Filter::LINEAR;
-			}
-		}
-		if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_u", Span(tmp))) {
-			wrap_mode_u = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
-		}
-		if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_v", Span(tmp))) {
-			wrap_mode_v = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
-		}
-		if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
-			wrap_mode_w = equalIStrings(tmp, "repeat") ? TextureMeta::WrapMode::REPEAT : TextureMeta::WrapMode::CLAMP;
-		}
 	}
 
 	bool deserialize(InputMemoryStream& blob, const char* path) {
@@ -1061,11 +1010,7 @@ struct TextureMeta {
 			<< "\nmip_scale_coverage = " << scale_coverage
 			<< "\nmips = " << (mips ? "true" : "false")
 			<< "\nnormalmap = " << (is_normalmap ? "true" : "false")
-			<< "\ninvert_green = " << (invert_normal_y ? "true" : "false")
-			<< "\nwrap_mode_u = \"" << toString(wrap_mode_u) << "\""
-			<< "\nwrap_mode_v = \"" << toString(wrap_mode_v) << "\""
-			<< "\nwrap_mode_w = \"" << toString(wrap_mode_w) << "\""
-			<< "\nfilter = \"" << toString(filter) << "\"";
+			<< "\ninvert_green = " << (invert_normal_y ? "true" : "false");
 	}
 
 	void load(const Path& path, StudioApp& app) {
@@ -1087,10 +1032,6 @@ struct TextureMeta {
 	float scale_coverage = -0.5f;
 	bool stochastic_mipmap = false;
 	bool compress = true;
-	WrapMode wrap_mode_u = WrapMode::REPEAT;
-	WrapMode wrap_mode_v = WrapMode::REPEAT;
-	WrapMode wrap_mode_w = WrapMode::REPEAT;
-	Filter filter = Filter::LINEAR;
 };
 
 struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
@@ -1266,15 +1207,6 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 			saveUndo(ImGui::Checkbox("##nrmmapinvy", &m_meta.invert_normal_y));
 		}
 
-		ImGuiEx::Label("U Wrap mode");
-		saveUndo(ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0"));
-		ImGuiEx::Label("V Wrap mode");
-		saveUndo(ImGui::Combo("##vwrp", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0"));
-		ImGuiEx::Label("W Wrap mode");
-		saveUndo(ImGui::Combo("##wwrp", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0"));
-		ImGuiEx::Label("Filter");
-		saveUndo(ImGui::Combo("##Filter", (int*)&m_meta.filter, "Linear\0Point\0Anisotropic\0"));
-
 		ImGui::TableNextColumn();
 		ImGui::CheckboxFlags("Red", &m_channel_view_mask, 1);
 		ImGui::SameLine();
@@ -1309,7 +1241,8 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 
 			stream.createTextureView(m_texture_view
 				, m_texture->handle
-				, m_texture->is_cubemap ? m_view_layer : m_view_layer % m_texture->depth);
+				, m_texture->is_cubemap ? m_view_layer : m_view_layer % m_texture->depth
+				, 0);
 		}
 		if (m_texture_view) {
 			ImVec2 texture_size((float)m_texture->width, (float)m_texture->height);
@@ -1371,13 +1304,9 @@ template <typename T> struct Acceptor;
 template <> struct Acceptor<TextureMeta> {
 	template <typename V> static void accept(V visitor) {
 		visitor(R{"Compress", &TextureMeta::compress});
-		visitor(R{"Filter", &TextureMeta::filter});
 		visitor(R{"Is normalmap", &TextureMeta::is_normalmap});
 		visitor(R{"Mips", &TextureMeta::mips});
 		visitor(R{"SRGB", &TextureMeta::srgb});
-		visitor(R{"U Wrap", &TextureMeta::wrap_mode_u});
-		visitor(R{"V Wrap", &TextureMeta::wrap_mode_v});
-		visitor(R{"W Wrap", &TextureMeta::wrap_mode_w});
 	}
 };
 
@@ -1410,12 +1339,6 @@ struct MultiEditor {
 
 	LUMIX_FORCE_INLINE void ui(const char* label, bool* value, auto v) { ImGui::Checkbox(label, value); }
 	LUMIX_FORCE_INLINE void ui(const char* label, float* value, auto v) { ImGui::DragFloat(label, value); }
-	LUMIX_FORCE_INLINE void ui(const char* label, TextureMeta::WrapMode* value, auto v) {
-		ImGui::Combo(label, (int*)value, "Repeat\0Clamp\0");
-	}
-	LUMIX_FORCE_INLINE void ui(const char* label, TextureMeta::Filter* value, auto v) {
-		ImGui::Combo(label, (int*)value, "Linear\0Point\0Anisotropic\0");
-	}
 	LUMIX_FORCE_INLINE void ui(const char* label, FBXImporter::ImportConfig::Physics* value, auto v) {
 		ImGui::Combo(label, (int*)value, "None\0Convex\0Triangle mesh\0");
 	}
@@ -1716,11 +1639,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		dst.write("lbc", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-		flags |= meta.wrap_mode_u == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-		flags |= meta.wrap_mode_v == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-		flags |= meta.wrap_mode_w == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-		flags |= meta.filter == TextureMeta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-		flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
 		TextureCompressor::Options options;
 		options.generate_mipmaps = meta.mips;
@@ -1801,11 +1719,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		#else
 			dst.write("lbc", 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode_u == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == TextureMeta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			dst.write(&flags, sizeof(flags));
 
 			TextureCompressor::Input input(w, h, 1, 1, m_allocator);
@@ -1843,11 +1756,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			
 			out.write(ext, 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode_u == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == TextureMeta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == TextureMeta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			flags |= meta.filter == TextureMeta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			out.write(flags);
 			out.write(src_data.data(), src_data.size());
 		}
@@ -1943,14 +1851,234 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	StudioApp& m_app;
 };
 
-static void getTextureImage(DrawStream& stream, gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) {
-	gpu::TextureHandle staging = gpu::allocTextureHandle();
-	const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-	stream.createTexture(staging, w, h, 1, out_format, flags, "staging_buffer");
-	stream.copy(staging, texture, 0, 0);
-	stream.readTexture(staging, 0, data);
-	stream.destroy(staging);
+static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, Array<u32>& shadow, const IVec2& tile_size, IAllocator& allocator) {
+	struct Cell {
+		i16 x, y;
+	};
+	const IVec2 size = tile_size * 9;
+	Array<Cell> cells(allocator);
+	cells.resize(gb0.size());
+	const u32* data = gb0.begin();
+	for (i32 j = 0; j < size.y; ++j) {
+		for (i32 i = 0; i < size.x; ++i) {
+			const u32 idx = i + j * size.x;
+			if (data[idx] & 0xff000000) {
+				cells[i].x = i;
+				cells[i].y = j;
+			}
+			else {
+				cells[i].x = -3 * size.x;
+				cells[i].y = -3 * size.y;
+			}
+		}
+	}
+
+	auto pow2 = [](i32 v){
+		return v * v;
+	};
+
+	for (i32 j = 0; j < size.y; ++j) {
+		for (i32 i = 0; i < size.x; ++i) {
+			const u32 idx = i + j * size.x;
+			if (data[idx] & 0xff000000) {
+				cells[idx].x = i;
+				cells[idx].y = j;
+			}
+			else {
+				if(i > 0) {
+					const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+					const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
+					if(dist_x < dist_0) {
+						cells[idx] = cells[idx - 1];
+					}
+				}					
+				if(j > 0) {
+					const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+					const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
+					if(dist_y < dist_0) {
+						cells[idx] = cells[idx - size.x];
+					}
+				}					
+			}
+		}
+	}
+
+	for (i32 j = size.y - 1; j >= 0; --j) {
+		for (i32 i = size.x - 1; i>= 0; --i) {
+			const u32 idx = i + j * size.x;
+			if (data[idx] & 0xff000000) {
+				cells[idx].x = i;
+				cells[idx].y = j;
+			}
+			else {
+				if(i < size.x - 1) {
+					const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+					const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
+					if(dist_x < dist_0) {
+						cells[idx] = cells[idx + 1];
+					}
+				}					
+				if(j < size.y - 1) {
+					const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+					const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
+					if(dist_y < dist_0) {
+						cells[idx] = cells[idx + size.x];
+					}
+				}					
+			}
+		}
+	}
+
+	Array<u32> tmp(allocator);
+	tmp.resize(gb0.size());
+	if (cells[0].x >= 0) {
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				const u8 alpha = data[idx] >> 24;
+				tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
+				tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
+			}
+		}
+		memcpy(gb0.begin(), tmp.begin(), tmp.byte_size());
+
+		const u32* gb1_data = gb1.begin();
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
+			}
+		}
+		memcpy(gb1.begin(), tmp.begin(), tmp.byte_size());
+
+		const u32* shadow_data = shadow.begin();
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				tmp[idx] = shadow_data[cells[idx].x + cells[idx].y * size.x];
+			}
+		}
+		memcpy(shadow.begin(), tmp.begin(), tmp.byte_size());
+	}
+	else {
+		// nothing was rendered
+		memset(gb0.begin(), 0xff, gb0.byte_size());
+		memset(gb1.begin(), 0xff, gb1.byte_size());
+	}
 }
+
+struct ImpostorTexturesContextImpl final : public ImpostorTexturesContext {
+	ImpostorTexturesContextImpl(StudioApp& app, IAllocator& allocator)
+		: allocator(allocator)
+		, app(app)
+		, gb0_rgba(allocator)
+		, gb1_rgba(allocator)
+		, gb_depth(allocator)
+		, shadow_data(allocator)
+	{}
+
+	void onRead() {
+		--to_read;
+		if (to_read == 0) {
+			postprocessImpostor(gb0_rgba, gb1_rgba, shadow_data, tile_size, allocator);
+			const PathInfo fi(path);
+			Path img_path(fi.dir, fi.basename, "_impostor0.tga");
+			ASSERT(gb0_rgba.size() == tile_size.x * 9 * tile_size.y * 9);
+
+			os::OutputFile file;
+			FileSystem& fs = app.getEngine().getFileSystem();
+			if (fs.open(img_path, file)) {
+				Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0_rgba.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+				file.close();
+			}
+			else {
+				logError("Failed to open ", img_path);
+			}
+
+			img_path = Path(fi.dir, fi.basename, "_impostor1.tga");
+			if (fs.open(img_path, file)) {
+				Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1_rgba.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+				file.close();
+			}
+			else {
+				logError("Failed to open ", img_path);
+			}
+
+			img_path = Path(fi.dir, fi.basename, "_impostor_depth.raw");
+			if (fs.open(img_path, file)) {
+				RawTextureHeader header;
+				header.width = tile_size.x * 9;
+				header.height = tile_size.y * 9;
+				header.depth = 1;
+				header.channel_type = RawTextureHeader::ChannelType::U16;
+				header.channels_count = 1;
+				bool res = file.write(header);
+				if (gpu::isOriginBottomLeft()) {
+					res = file.write(gb_depth.begin(), gb_depth.byte_size()) && res;
+				} else {
+					// TODO flip inplace?
+					Array<u16> flipped_depth(app.getAllocator());
+					flipped_depth.resize(gb_depth.size());
+					for (u32 j = 0; j < header.height; ++j) {
+						for (u32 i = 0; i < header.width; ++i) {
+							flipped_depth[i + j * header.width] = gb_depth[i + (header.height - j - 1) * header.width];
+						}
+					}
+					res = file.write(flipped_depth.begin(), flipped_depth.byte_size()) && res;
+				}
+				if (!res) logError("Failed to write ", img_path);
+				file.close();
+			}
+			else {
+				logError("Failed to open ", img_path);
+			}
+
+			img_path = Path(fi.dir, fi.basename, "_impostor2.tga");
+			if (fs.open(img_path, file)) {
+				Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow_data.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+				file.close();
+			}
+			else {
+				logError("Failed to open ", img_path);
+			}
+		}
+	}
+
+	void start() override {
+		ASSERT(to_read == 0);
+		to_read = 4;
+	}
+
+	void readCallback0(Span<const u8> data) override {
+		gb0_rgba.resize(data.length() / sizeof(u32));
+		memcpy(gb0_rgba.begin(), data.begin(), data.length());
+		onRead();
+	}
+	void readCallback1(Span<const u8> data) override {
+		gb1_rgba.resize(data.length() / sizeof(u32));
+		memcpy(gb1_rgba.begin(), data.begin(), data.length());
+		onRead();
+	}
+	void readCallback2(Span<const u8> data) override {
+		gb_depth.resize(data.length() / sizeof(u16));
+		memcpy(gb_depth.begin(), data.begin(), data.length());
+		onRead();
+	}
+	void readCallback3(Span<const u8> data) override {
+		shadow_data.resize(data.length() / sizeof(u32));
+		memcpy(shadow_data.begin(), data.begin(), data.length());
+		onRead();
+	}
+	
+	IAllocator& allocator;
+	StudioApp& app;
+	u32 to_read = 0;
+	jobs::Signal done_signal; // set to green when we have all data in memory (gb0_rgba...)
+	Array<u32> gb0_rgba;
+	Array<u32> gb1_rgba;
+	Array<u16> gb_depth; // TODO check original, might need to 0xffff - x - it
+	Array<u32> shadow_data;
+};
 
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
@@ -1961,6 +2089,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			, m_plugin(plugin)
 			, m_meta(allocator)
 			, m_viewer(app)
+			, m_impostor_texture_context(app, allocator)
 		{
 			Engine& engine = app.getEngine();
 			m_resource = engine.getResourceManager().load<Model>(path);
@@ -2054,73 +2183,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					if (ImGui::Button("Create impostor texture")) {
 						FBXImporter importer(m_app);
 						importer.init();
-						IAllocator& allocator = m_app.getAllocator();
-						Array<u32> gb0(allocator); 
-						Array<u32> gb1(allocator);
-						Array<u16> gbdepth(allocator);
-						Array<u32> shadow(allocator); 
-						IVec2 tile_size;
-						importer.createImpostorTextures(m_resource, gb0, gb1, gbdepth, shadow, tile_size, m_meta.bake_impostor_normals);
-						postprocessImpostor(gb0, gb1, shadow, tile_size, allocator);
-						const PathInfo fi(m_resource->getPath());
-						Path img_path(fi.dir, fi.basename, "_impostor0.tga");
-						ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
-				
-						os::OutputFile file;
-						FileSystem& fs = m_app.getEngine().getFileSystem();
-						if (fs.open(img_path, file)) {
-							Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-							file.close();
-						}
-						else {
-							logError("Failed to open ", img_path);
-						}
-
-						img_path = Path(fi.dir, fi.basename, "_impostor1.tga");
-						if (fs.open(img_path, file)) {
-							Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-							file.close();
-						}
-						else {
-							logError("Failed to open ", img_path);
-						}
-
-						img_path = Path(fi.dir, fi.basename, "_impostor_depth.raw");
-						if (fs.open(img_path, file)) {
-							RawTextureHeader header;
-							header.width = tile_size.x * 9;
-							header.height = tile_size.y * 9;
-							header.depth = 1;
-							header.channel_type = RawTextureHeader::ChannelType::U16;
-							header.channels_count = 1;
-							bool res = file.write(header);
-							if (gpu::isOriginBottomLeft()) {
-								res = file.write(gbdepth.begin(), gbdepth.byte_size()) && res;
-							} else {
-								Array<u16> flipped_depth(m_app.getAllocator());
-								flipped_depth.resize(gbdepth.size());
-								for (u32 j = 0; j < header.height; ++j) {
-									for (u32 i = 0; i < header.width; ++i) {
-										flipped_depth[i + j * header.width] = gbdepth[i + (header.height - j - 1) * header.width];
-									}
-								}
-								res = file.write(flipped_depth.begin(), flipped_depth.byte_size()) && res;
-							}
-							if (!res) logError("Failed to write ", img_path);
-							file.close();
-						}
-						else {
-							logError("Failed to open ", img_path);
-						}
-
-						img_path = Path(fi.dir, fi.basename, "_impostor2.tga");
-						if (fs.open(img_path, file)) {
-							Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-							file.close();
-						}
-						else {
-							logError("Failed to open ", img_path);
-						}
+						importer.createImpostorTextures(m_resource, m_impostor_texture_context, m_meta.bake_impostor_normals);
 					}
 				}
 				ImGuiEx::Label("Scale");
@@ -2535,6 +2598,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		bool m_has_meshes = true;
 		bool m_show_skeleton = true;
 		FileSystem::AsyncHandle m_fbx_async_handle = FileSystem::AsyncHandle::invalid();
+		ImpostorTexturesContextImpl m_impostor_texture_context;
 	};
 
 	explicit ModelPlugin(StudioApp& app)
@@ -2700,8 +2764,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	{
 		Engine& engine = m_app.getEngine();
 		m_tile.world = &engine.createWorld(false);
-		LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
-		m_tile.pipeline = Pipeline::create(*m_renderer, pres, "PREVIEW");
+		m_tile.pipeline = Pipeline::create(*m_renderer, PipelineType::PREVIEW);
 
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
 		const EntityRef env_probe = m_tile.world->createEntity({0, 0, 0}, Quat::IDENTITY);
@@ -2717,123 +2780,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		render_module->getEnvironment(light_entity).indirect_intensity = 1;
 		
 		m_tile.pipeline->setWorld(m_tile.world);
-	}
-
-
-	static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, Array<u32>& shadow, const IVec2& tile_size, IAllocator& allocator) {
-		struct Cell {
-			i16 x, y;
-		};
-		const IVec2 size = tile_size * 9;
-		Array<Cell> cells(allocator);
-		cells.resize(gb0.size());
-		const u32* data = gb0.begin();
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[i].x = i;
-					cells[i].y = j;
-				}
-				else {
-					cells[i].x = -3 * size.x;
-					cells[i].y = -3 * size.y;
-				}
-			}
-		}
-
-		auto pow2 = [](i32 v){
-			return v * v;
-		};
-
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[idx].x = i;
-					cells[idx].y = j;
-				}
-				else {
-					if(i > 0) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
-						if(dist_x < dist_0) {
-							cells[idx] = cells[idx - 1];
-						}
-					}					
-					if(j > 0) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
-						if(dist_y < dist_0) {
-							cells[idx] = cells[idx - size.x];
-						}
-					}					
-				}
-			}
-		}
-
-		for (i32 j = size.y - 1; j >= 0; --j) {
-			for (i32 i = size.x - 1; i>= 0; --i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[idx].x = i;
-					cells[idx].y = j;
-				}
-				else {
-					if(i < size.x - 1) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
-						if(dist_x < dist_0) {
-							cells[idx] = cells[idx + 1];
-						}
-					}					
-					if(j < size.y - 1) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
-						if(dist_y < dist_0) {
-							cells[idx] = cells[idx + size.x];
-						}
-					}					
-				}
-			}
-		}
-
-		Array<u32> tmp(allocator);
-		tmp.resize(gb0.size());
-		if (cells[0].x >= 0) {
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					const u8 alpha = data[idx] >> 24;
-					tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
-					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
-				}
-			}
-			memcpy(gb0.begin(), tmp.begin(), tmp.byte_size());
-
-			const u32* gb1_data = gb1.begin();
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
-				}
-			}
-			memcpy(gb1.begin(), tmp.begin(), tmp.byte_size());
-
-			const u32* shadow_data = shadow.begin();
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					tmp[idx] = shadow_data[cells[idx].x + cells[idx].y * size.x];
-				}
-			}
-			memcpy(shadow.begin(), tmp.begin(), tmp.byte_size());
-		}
-		else {
-			// nothing was rendered
-			memset(gb0.begin(), 0xff, gb0.byte_size());
-			memset(gb1.begin(), 0xff, gb1.byte_size());
-		}
 	}
 
 	const char* getLabel() const override { return "Model"; }
@@ -2902,6 +2848,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				m_tile.waiting = false;
 			}
 		}
+
 		if (m_tile.wait_for_readback) {
 			if (m_tile.readback_done) {
 				m_tile.wait_for_readback = false;
@@ -3004,43 +2951,39 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		DrawStream& stream = m_renderer->getDrawStream();
 		
 		m_tile.texture = gpu::allocTextureHandle();
-		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
+		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS, "tile_final");
 		gpu::TextureHandle tile_tmp = gpu::allocTextureHandle();
 		stream.createTexture(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_tmp");
 		stream.copy(tile_tmp, m_tile.pipeline->getOutput(), 0, 0);
 		downscale(stream, tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
-
-		getTextureImage(stream
-			, m_tile.texture
-			, AssetBrowser::TILE_SIZE
-			, AssetBrowser::TILE_SIZE
-			, gpu::TextureFormat::RGBA8
-			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
+		stream.readTexture(m_tile.texture, makeDelegate<&TileData::readTextureCallback>(&m_tile));
 		stream.destroy(tile_tmp);
 		m_tile.readback_done = false;
 		m_tile.wait_for_readback = true;
-		stream.pushLambda([&](){ m_tile.readback_done = true; });
 	}
 
 	void downscale(DrawStream& stream, gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) {
 		if (!m_downscale_program) {
 			static const char* downscale_src = R"#(
-				layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-				layout (rgba8, binding = 0) uniform readonly image2D u_src;
-				layout (rgba8, binding = 1) uniform writeonly image2D u_dst;
-				layout(std140, binding = 4) uniform Data {
-					ivec2 u_scale;
+				struct Data {
+					int2 u_scale;
+					uint u_src;
+					uint u_dst;
 				};
-				void main() {
-					vec4 accum = vec4(0);
-					for (int j = 0; j < u_scale.y; ++j) {
-						for (int i = 0; i < u_scale.x; ++i) {
-							vec4 v = imageLoad(u_src, ivec2(gl_GlobalInvocationID.xy) * u_scale + ivec2(i, j));
+
+				ConstantBuffer<Data> cb : register(b4);
+
+				[numthreads(16, 16, 1)]
+				void main(uint3 thread_id : SV_DispatchThreadID) {
+					float4 accum = 0;
+					for (int j = 0; j < cb.u_scale.y; ++j) {
+						for (int i = 0; i < cb.u_scale.x; ++i) {
+							float4 v = bindless_textures[cb.u_src][thread_id.xy * cb.u_scale + int2(i, j)];
 							accum += v;
 						}
 					}
-					accum *= 1.0 / (u_scale.x * u_scale.y);
-					imageStore(u_dst, ivec2(gl_GlobalInvocationID.xy), accum);
+					accum *= 1.0 / (cb.u_scale.x * cb.u_scale.y);
+					bindless_rw_textures[cb.u_dst][thread_id.xy] = accum;
 				}
 			)#";
 
@@ -3055,11 +2998,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		
 		IVec2 src_size((i32)src_w, (i32)src_h);
 		IVec2 dst_size = {(i32)dst_w, (i32)dst_h};
-		const IVec2 scale = src_size / dst_size;
-		const Renderer::TransientSlice ub_slice = m_renderer->allocUniform(&scale, sizeof(scale));
+		const struct {
+			IVec2 scale;
+			gpu::BindlessHandle src;
+			gpu::RWBindlessHandle dst;
+		} ubdata = {
+			.scale = src_size / dst_size,
+			.src = gpu::getBindlessHandle(src),
+			.dst = gpu::getRWBindlessHandle(dst),
+		};
+		const Renderer::TransientSlice ub_slice = m_renderer->allocUniform(&ubdata, sizeof(ubdata));
 		stream.bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
-		stream.bindImageTexture(src, 0);
-		stream.bindImageTexture(dst, 1);
 		stream.useProgram(m_downscale_program);
 		stream.dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
 	}
@@ -3138,25 +3087,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		DrawStream& stream = m_renderer->getDrawStream();
 		m_tile.texture = gpu::allocTextureHandle();
-		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_final");
+		stream.createTexture(m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS, "tile_final");
 		gpu::TextureHandle tile_tmp = gpu::allocTextureHandle();
 		stream.createTexture(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, "tile_tmp");
 		stream.copy(tile_tmp, m_tile.pipeline->getOutput(), 0, 0);
 		downscale(stream, tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
-		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		getTextureImage(stream
-			, m_tile.texture 
-			, AssetBrowser::TILE_SIZE
-			, AssetBrowser::TILE_SIZE
-			, gpu::TextureFormat::RGBA8
-			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
-		
+		stream.readTexture(m_tile.texture, makeDelegate<&TileData::readTextureCallback>(&m_tile));
+
 		stream.destroy(tile_tmp);
 		m_tile.entity = mesh_entity;
 		m_tile.wait_for_readback = true;
 		m_tile.readback_done = false;
-		stream.pushLambda([&](){ m_tile.readback_done = true; });
 		m_tile.out_path_hash = animation ? animation->getPath().getHash() : model->getPath().getHash();
 	}
 
@@ -3174,6 +3116,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			: data(allocator)
 			, queue(allocator)
 		{}
+
+		void readTextureCallback(Span<const u8> mem) {
+			readback_done = true;
+			data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+			ASSERT(mem.length() == data.size());
+			memcpy(data.getMutableData(), mem.begin(), mem.length());
+		}
 
 		struct Job {
 			virtual ~Job() {}
@@ -3445,73 +3394,13 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 };
 
-template <typename F>
-void captureCubemap(StudioApp& app
-	, World& world
-	, Pipeline& pipeline
-	, const u32 texture_size
-	, const DVec3& position
-	, Array<Vec4>& data
-	, F&& f) {
-	memoryBarrier();
-
-	Engine& engine = app.getEngine();
-	SystemManager& system_manager = engine.getSystemManager();
-
-	Viewport viewport;
-	viewport.is_ortho = false;
-	viewport.fov = degreesToRadians(90.f);
-	viewport.near = 0.1f;
-	viewport.far = 10'000;
-	viewport.w = texture_size;
-	viewport.h = texture_size;
-
-	pipeline.setWorld(&world);
-	pipeline.setViewport(viewport);
-
-	Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
-	Vec3 dirs[] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
-	Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
-	Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
-
-	data.resize(6 * texture_size * texture_size);
-
-	const bool ndc_bottom_left = gpu::isOriginBottomLeft();
-	for (int i = 0; i < 6; ++i) {
-		Vec3 side = cross(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
-		Matrix mtx = Matrix::IDENTITY;
-		mtx.setZVector(dirs[i]);
-		mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
-		mtx.setXVector(side);
-		viewport.pos = position;
-		viewport.rot = mtx.getRotation();
-		pipeline.setViewport(viewport);
-		pipeline.render(false);
-
-		const gpu::TextureHandle res = pipeline.getOutput();
-		ASSERT(res);
-		DrawStream& stream = renderer->getDrawStream();
-		getTextureImage(stream
-			, res
-			, texture_size
-			, texture_size
-			, gpu::TextureFormat::RGBA32F
-			, Span((u8*)(data.begin() + (i * texture_size * texture_size)), u32(texture_size * texture_size * sizeof(*data.begin())))
-		);
-	}
-
-	DrawStream& stream = renderer->getDrawStream();
-	stream.pushLambda(f);
-}
-
-struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
-{
-	explicit EnvironmentProbePlugin(StudioApp& app)
+struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
+	explicit EnvironmentProbePlugin(ModelPlugin& model_plugin, StudioApp& app)
 		: m_app(app)
 		, m_probes(app.getAllocator())
+		, m_model_plugin(model_plugin)
 	{
 	}
-
 
 	~EnvironmentProbePlugin()
 	{
@@ -3523,12 +3412,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		SystemManager& system_manager = engine.getSystemManager();
 		Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
 		ResourceManagerHub& rm = engine.getResourceManager();
-		LuaScript* pres = rm.load<LuaScript>(Path("pipelines/main.lua"));
-		m_pipeline = Pipeline::create(*renderer, pres, "PROBE");
+		m_pipeline = Pipeline::create(*renderer, PipelineType::PROBE);
 		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
 	}
 
-	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count) {
+	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 num_src_mips, u32 num_saved_mips) {
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		Path path(base_path, "probes_tmp/");
@@ -3540,18 +3428,20 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		OutputMemoryStream blob(m_app.getAllocator());
 
 		const Vec4* mip_pixels = data;
-		TextureCompressor::Input input(texture_size, texture_size, 1, mips_count, m_app.getAllocator());
-		for (u32 mip = 0; mip < mips_count; ++mip) {
-			const u32 mip_size = texture_size >> mip;
-			for (int face = 0; face < 6; ++face) {
-				TextureCompressor::Input::Image& img = input.add(face, 0, mip);
-				Color* rgbm = (Color*)img.pixels.getMutableData();
-				for (u32 j = 0, c = mip_size * mip_size; j < c; ++j) {
-					const float m = clamp(maximum(mip_pixels[j].x, mip_pixels[j].y, mip_pixels[j].z), 1 / 64.f, 4.f);
-					rgbm[j].r = u8(clamp(mip_pixels[j].x / m * 255 + 0.5f, 0.f, 255.f));
-					rgbm[j].g = u8(clamp(mip_pixels[j].y / m * 255 + 0.5f, 0.f, 255.f));
-					rgbm[j].b = u8(clamp(mip_pixels[j].z / m * 255 + 0.5f, 0.f, 255.f));
-					rgbm[j].a = u8(clamp(255.f * m / 4 + 0.5f, 1.f, 255.f));
+		TextureCompressor::Input input(texture_size, texture_size, 1, num_saved_mips, m_app.getAllocator());
+		for (int face = 0; face < 6; ++face) {
+			for (u32 mip = 0; mip < num_src_mips; ++mip) {
+				const u32 mip_size = texture_size >> mip;
+				if (mip < num_saved_mips) {
+					TextureCompressor::Input::Image& img = input.add(face, 0, mip);
+					Color* rgbm = (Color*)img.pixels.getMutableData();
+					for (u32 j = 0, c = mip_size * mip_size; j < c; ++j) {
+						const float m = clamp(maximum(mip_pixels[j].x, mip_pixels[j].y, mip_pixels[j].z), 1 / 64.f, 4.f);
+						rgbm[j].r = u8(clamp(mip_pixels[j].x / m * 255 + 0.5f, 0.f, 255.f));
+						rgbm[j].g = u8(clamp(mip_pixels[j].y / m * 255 + 0.5f, 0.f, 255.f));
+						rgbm[j].b = u8(clamp(mip_pixels[j].z / m * 255 + 0.5f, 0.f, 255.f));
+						rgbm[j].a = u8(clamp(255.f * m / 4 + 0.5f, 1.f, 255.f));
+					}
 				}
 				mip_pixels += mip_size * mip_size;
 			}
@@ -3630,14 +3520,139 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	};
 
 	void render(ProbeJob& job) {
+		Engine& engine = m_app.getEngine();
+		Renderer& renderer = m_pipeline->getRenderer();
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
-		captureCubemap(m_app, job.world, *m_pipeline, texture_size, job.position, job.data, [&job](){
-			jobs::runLambda([&job]() {
-				job.plugin.processData(job);
-			}, nullptr);
+		Viewport viewport;
+		viewport.is_ortho = false;
+		viewport.fov = degreesToRadians(90.f);
+		viewport.near = 0.1f;
+		viewport.far = 10'000;
+		viewport.w = texture_size;
+		viewport.h = texture_size;
 
-		});
+		m_pipeline->setWorld(&job.world);
+
+		Vec3 dirs[] = { {-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1} };
+		Vec3 ups[] = { {0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0} };
+		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
+
+		DrawStream& stream = renderer.getDrawStream();
+		stream.captureFrame();
+		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
+
+		// capture cubemap
+		gpu::TextureHandle cubemap = gpu::allocTextureHandle();
+		stream.beginProfileBlock("probe job", 0);
+		gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::COMPUTE_WRITE;
+		if (!job.is_reflection) flags |= gpu::TextureFlags::NO_MIPS;
+		stream.createTexture(cubemap, texture_size, texture_size, 1, gpu::TextureFormat::RGBA32F, flags, "probe");
+		for (int i = 0; i < 6; ++i) {
+			Vec3 side = cross(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
+			Matrix mtx = Matrix::IDENTITY;
+			mtx.setZVector(dirs[i]);
+			mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
+			mtx.setXVector(side);
+			viewport.pos = job.position;
+			viewport.rot = mtx.getRotation();
+			
+			m_pipeline->setViewport(viewport);
+			m_pipeline->render(false);
+
+			stream.setFramebufferCube(cubemap, i, 0);
+			const u32 side_tex = gpu::getBindlessHandle(m_pipeline->getOutput());
+			m_pipeline->renderTexturedQuad(side_tex, i != 2 && i != 3, i == 2 || i == 3);
+		}
+
+		if (job.is_reflection) {
+			const u32 num_mips = 1 + log2(texture_size);
+			for (u32 side = 0; side < 6; ++side) {
+				gpu::TextureHandle mip_views[16];
+				for (u32 mip = 0; mip < num_mips; ++mip) {
+					mip_views[mip] = gpu::allocTextureHandle();
+					stream.createTextureView(mip_views[mip], cubemap, side, mip);
+				}
+
+				for (u32 mip = 1; mip < num_mips; ++mip) {
+					const u32 mip_size = texture_size >> mip;
+					m_model_plugin.downscale(stream, mip_views[mip - 1], mip_size << 1, mip_size << 1, mip_views[mip], mip_size, mip_size);
+					stream.memoryBarrier(cubemap);
+				}
+				
+				for (u32 mip = 0; mip < num_mips; ++mip) stream.destroy(mip_views[mip]);
+			}
+			
+			// radiance filter
+			enum { roughness_levels = 5 };
+			stream.useProgram(m_ibl_filter_program);
+			stream.barrierRead(cubemap);
+
+			gpu::TextureHandle filtered = gpu::allocTextureHandle();
+			stream.createTexture(filtered, job.reflection_probe.size, job.reflection_probe.size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::COMPUTE_WRITE, "probe_filtered");
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				const float roughness = float(mip) / (roughness_levels - 1);
+				for (u32 face = 0; face < 6; ++face) {
+					stream.setFramebufferCube(filtered, face, mip);
+					struct {
+						float roughness;
+						u32 face;
+						u32 mip;
+						u32 texture;
+					} drawcall = { roughness, face, mip, gpu::getBindlessHandle(cubemap) };
+					m_pipeline->setUniform(drawcall);
+					stream.viewport(0, 0, texture_size >> mip, texture_size >> mip);
+					stream.drawArrays(0, 4);
+				}
+			}
+
+			struct Callback {
+				void callback(Span<const u8> mem) {
+					const u32 num_mips = 1 + log2(texture_size);
+					plugin->saveCubemap(job->reflection_probe.guid, (const Vec4*)mem.begin(), texture_size, num_mips, roughness_levels);
+					memoryBarrier();
+					job->done = true;
+					LUMIX_DELETE(*allocator, this);
+				}
+				EnvironmentProbePlugin* plugin;
+				IAllocator* allocator;
+				ProbeJob* job;
+				u32 texture_size;
+			};
+
+			Callback* cb = LUMIX_NEW(m_app.getAllocator(), Callback);
+			cb->allocator = &m_app.getAllocator();
+			cb->plugin = this;
+			cb->texture_size = texture_size;
+			cb->job = &job;
+			stream.readTexture(filtered, makeDelegate<&Callback::callback>(cb));
+
+			stream.destroy(filtered);
+		}
+		else {
+			struct Callback {
+				void callback(Span<const u8> mem) {
+					job->sh.compute(Span((Vec4*)mem.begin(), mem.length() / sizeof(Vec4)));
+					memoryBarrier();
+					job->done = true;
+					LUMIX_DELETE(*allocator, this);
+				}
+				EnvironmentProbePlugin* plugin;
+				IAllocator* allocator;
+				ProbeJob* job;
+				u32 texture_size;
+			};
+
+			Callback* cb = LUMIX_NEW(m_app.getAllocator(), Callback);
+			cb->allocator = &m_app.getAllocator();
+			cb->plugin = this;
+			cb->texture_size = texture_size;
+			cb->job = &job;
+			stream.readTexture(cubemap, makeDelegate<&Callback::callback>(cb));
+
+		}
+		stream.destroy(cubemap);
+		stream.endProfileBlock();
 	}
 
 	void update() override
@@ -3729,121 +3744,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		}
 	}
 
-	void radianceFilter(const Vec4* data, u32 size, u64 guid) {
-		PROFILE_FUNCTION();
-		if (!m_ibl_filter_shader->isReady()) {
-			logError(m_ibl_filter_shader->getPath(), "is not ready");
-			return;
-		}
-		SystemManager& system_manager = m_app.getEngine().getSystemManager();
-		Renderer* renderer = (Renderer*)system_manager.getSystem("renderer");
-		enum { roughness_levels = 5 };
-		
-		jobs::Signal signal;
-		jobs::setRed(&signal);
-		Array<u8> tmp(m_app.getAllocator());
-		renderer->pushJob([&](DrawStream& stream){
-			gpu::TextureHandle src = gpu::allocTextureHandle();
-			gpu::TextureHandle dst = gpu::allocTextureHandle();
-			stream.createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
-			for (u32 face = 0; face < 6; ++face) {
-				stream.update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
-			}
-			stream.generateMipmaps(src);
-			stream.createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
-
-			stream.useProgram(m_ibl_filter_program);
-			stream.bindTextures(&src, 0, 1);
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				const float roughness = float(mip) / (roughness_levels - 1);
-				for (u32 face = 0; face < 6; ++face) {
-					stream.setFramebufferCube(dst, face, mip);
-					struct {
-						float roughness;
-						u32 face;
-						u32 mip;
-					} drawcall = {roughness, face, mip};
-					const Renderer::TransientSlice ub = renderer->allocUniform(&drawcall, sizeof(drawcall));
-					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-					stream.viewport(0, 0, size >> mip, size >> mip);
-					stream.drawArrays(0, 4);
-				}
-			}
-
-			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
-
-			gpu::TextureHandle staging = gpu::allocTextureHandle();
-			const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
-			stream.createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
-			
-			u32 data_size = 0;
-			{
-				u32 mip_size = size;
-				for (u32 mip = 0; mip < roughness_levels; ++mip) {
-					data_size += mip_size * mip_size * sizeof(Vec4) * 6;
-					mip_size >>= 1;
-				}
-			}
-
-			tmp.resize(data_size);
-
-			stream.copy(staging, dst, 0, 0);
-			u8* tmp_ptr = tmp.begin();
-			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				const u32 mip_size = size >> mip;
-				stream.readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
-				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
-			}
-
-			stream.destroy(staging);
-			stream.destroy(src);
-			stream.destroy(dst);	
-
-			struct Payload {
-				EnvironmentProbePlugin* plugin;
-				u64 guid;
-				jobs::Signal* signal;
-				Array<u8>* data;
-				u32 texture_size;
-			};
-
-			stream.pushLambda([&](){
-				saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
-				jobs::setGreen(&signal);		
-			});
-		});
-		jobs::wait(&signal); // wait to keep `data` alive until renderer is done with it
-	}
-
-	void processData(ProbeJob& job) {
-		Array<Vec4>& data = job.data;
-		const u32 texture_size = (u32)sqrtf(data.size() / 6.f);
-				
-		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
-		if (!ndc_bottom_left) {
-			for (int i = 0; i < 6; ++i) {
-				Vec4* tmp = &data[i * texture_size * texture_size];
-				if (i == 2 || i == 3) {
-					flipY(tmp, texture_size);
-				}
-				else {
-					flipX(tmp, texture_size);
-				}
-			}
-		}
-
-		if (job.is_reflection) {
-			radianceFilter(data.begin(), texture_size, job.reflection_probe.guid);
-		}
-		else {
-			job.sh.compute(data);
-		}
-
-		memoryBarrier();
-		job.done = true;
-	}
-
-
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
 		if (entities.length() != 1) return;
@@ -3883,6 +3783,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 
 	StudioApp& m_app;
+	ModelPlugin& m_model_plugin;
 	UniquePtr<Pipeline> m_pipeline;
 	Shader* m_ibl_filter_shader = nullptr;
 	gpu::ProgramHandle m_ibl_filter_program = gpu::INVALID_PROGRAM;
@@ -4464,7 +4365,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 		if (pg.vertex_buffer) renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 		const Renderer::MemRef mem = renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
-		pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);	
+		pg.vertex_buffer = renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_vertices");	
 	}
 
 	bool paint(WorldView& view, i32 x, i32 y) {
@@ -4921,7 +4822,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		return iter.value();
 	}
 
-	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program) {
+	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program, Vec2 scale, Vec2 offset) {
 		const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
 		memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
 
@@ -4940,7 +4841,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
 			if (!tex) tex = m_texture;
-			stream.bindTextures(&tex, 0, 1);
+
+			const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(ImGuiUniformBuffer));
+			ImGuiUniformBuffer* uniform_data = (ImGuiUniformBuffer*)ub.ptr;
+			uniform_data->scale = scale;
+			uniform_data->offset = offset;
+			uniform_data->texture_handle = gpu::getBindlessHandle(tex);
+			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 			const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
 
@@ -4962,8 +4869,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		}
 	}
 
-	void guiEndFrame() override
-	{
+	struct ImGuiUniformBuffer {
+		Vec2 scale;
+		Vec2 offset;
+		gpu::BindlessHandle texture_handle;
+	};
+
+	void guiEndFrame() override {
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getSystemManager().getSystem("renderer"));
 
 		DrawStream& stream = renderer->getDrawStream();
@@ -4974,44 +4886,60 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			ImDrawData* draw_data = vp->DrawData;
 			bool new_program = false;
 			gpu::ProgramHandle program = getProgram(vp->PlatformHandle, new_program);
-			const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(Vec4) * 2);
-
 			const u32 w = u32(vp->Size.x);
 			const u32 h = u32(vp->Size.y);
-			const Vec4 canvas_mtx[] = {
-				Vec4(2.f / w, 0, -1 + (float)-draw_data->DisplayPos.x * 2.f / w, 0),
-				Vec4(0, -2.f / h, 1 + (float)draw_data->DisplayPos.y * 2.f / h, 0)
-			};
-			memcpy(ub.ptr, &canvas_mtx, sizeof(canvas_mtx));
+			const Vec2 scale(2.f / w, -2.f / h);
+			const Vec2 offset(-1 + (float)-draw_data->DisplayPos.x * 2.f / w, 1 + (float)draw_data->DisplayPos.y * 2.f / h); 
 
 			if (new_program) {
+				const char* fs =
+					R"#(struct Input {
+							float4 color : TEXCOORD0;
+							float2 uv : TEXCOORD1;
+						};
+
+						cbuffer ImGuiState : register(b4) {
+							float2 c_scale;
+							float2 c_offset;
+							uint c_texture;
+						};
+
+						float4 main(Input input) : SV_Target {
+							float4 tc = sampleBindlessLod(LinearSamplerClamp, c_texture, input.uv, 0);
+							return float4( 
+								pow(abs(tc.rgb)/*to silence warning*/, (1/2.2).xxx) * input.color.rgb,
+								input.color.a * tc.a
+							);
+						})#";
 				const char* vs =
-					R"#(
-					layout(location = 0) in vec2 a_pos;
-					layout(location = 1) in vec2 a_uv;
-					layout(location = 2) in vec4 a_color;
-					layout(location = 0) out vec4 v_color;
-					layout(location = 1) out vec2 v_uv;
-					layout (std140, binding = 4) uniform IMGUIState {
-						mat2x4 u_canvas_mtx;
-					};
-					void main() {
-						v_color = a_color;
-						v_uv = a_uv;
-						vec2 p = vec3(a_pos, 1) * mat2x3(u_canvas_mtx);
-						gl_Position = vec4(p.xy, 0, 1);
-					})#";
-				const char* fs = 
-					R"#(
-					layout(location = 0) in vec4 v_color;
-					layout(location = 1) in vec2 v_uv;
-					layout(location = 0) out vec4 o_color;
-					layout(binding = 0) uniform sampler2D u_texture;
-					void main() {
-						vec4 tc = textureLod(u_texture, v_uv, 0);
-						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
-						o_color.a = v_color.a * tc.a;
-					})#";
+					R"#(cbuffer ImGuiState : register(b4) {
+							float2 c_scale;
+							float2 c_offset;
+							uint c_texture;
+						};
+
+						struct Input {
+							float2 pos : TEXCOORD0;
+							float2 uv : TEXCOORD1;
+							float4 color : TEXCOORD2;
+						};
+
+						struct Output {
+							float4 color : TEXCOORD0;
+							float2 uv : TEXCOORD1;
+							float4 position : SV_POSITION;
+						};
+
+						Output main(Input input) {
+							Output output;
+							output.color = input.color;
+							output.uv = input.uv;
+							float2 p = input.pos * c_scale + c_offset;
+							output.position = float4(p.xy, 0, 1);
+							return output;
+						}
+
+					)#";
 				const char* srcs[] = {vs, fs};
 				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
 				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
@@ -5028,10 +4956,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			stream.viewport(0, 0, w, h);
 			const Vec4 clear_color = Vec4(0.2f, 0.2f, 0.2f, 1.f);
 			stream.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &clear_color.x, 1.0);
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				
 			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
-				encode(draw_data->CmdLists[i], vp, renderer, stream, program);
+				encode(draw_data->CmdLists[i], vp, renderer, stream, program, scale, offset);
 			}
 		}
 		stream.setCurrentWindow(nullptr);
@@ -5235,7 +5162,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_game_view(app)
 		, m_scene_view(app)
 		, m_editor_ui_render_plugin(app)
-		, m_env_probe_plugin(app)
+		, m_env_probe_plugin(m_model_plugin, app)
 		, m_terrain_plugin(app)
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
@@ -5248,7 +5175,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		PROFILE_FUNCTION();
-		m_app.getSettings().registerVariable("Renderer", "VSync", makeDelegate<&gpu::isVSyncEnabled>(), makeDelegate<&gpu::enableVSync>());
+		// TODO
+		//m_app.getSettings().registerVariable("Renderer", "VSync", makeDelegate<&gpu::isVSyncEnabled>(), makeDelegate<&gpu::enableVSync>());
 		m_fbx_importer.init();
 		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", Action::GLOBAL);
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
@@ -5312,7 +5240,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_particle_editor = ParticleEditor::create(m_app);
 	}
 
-	void captureRenderDoc() { gpu::captureRenderDocFrame(); }
+	void captureRenderDoc() {
+		auto* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
+		renderer->getDrawStream().captureFrame();
+	}
 
 	void showEnvironmentProbeGizmo(WorldView& view, ComponentUID cmp) {
 		RenderModule* module = static_cast<RenderModule*>(cmp.module);
@@ -5546,11 +5477,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	TexturePlugin m_texture_plugin;
 	GameView m_game_view;
 	SceneView m_scene_view;
+	ModelPlugin m_model_plugin;
 	EnvironmentProbePlugin m_env_probe_plugin;
 	TerrainPlugin m_terrain_plugin;
 	ProceduralGeomPlugin m_procedural_geom_plugin;
 	InstancedModelPlugin m_instanced_model_plugin;
-	ModelPlugin m_model_plugin;
 };
 
 }

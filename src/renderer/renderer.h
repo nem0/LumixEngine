@@ -15,6 +15,8 @@
 namespace Lumix {
 
 enum class AttributeSemantic : u8;
+struct RenderBufferHandle;
+struct GBuffer;
 
 struct RenderPlugin {
 	virtual ~RenderPlugin() {}
@@ -22,8 +24,18 @@ struct RenderPlugin {
 	virtual void renderUI(struct Pipeline& pipeline) {}
 	virtual void renderOpaque(Pipeline& pipeline) {}
 	virtual void renderTransparent(Pipeline& pipeline) {}
-	// returns true if AA run and builtin TAA should not run
-	virtual bool renderAA(Pipeline& pipeline, gpu::TextureHandle color, gpu::TextureHandle velocity, gpu::TextureHandle depth, gpu::TextureHandle output) { return false; }
+	virtual void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) {}
+	virtual RenderBufferHandle renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
+	virtual RenderBufferHandle renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
+	virtual RenderBufferHandle renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
+	// returns valid buffer if plugin's Antialiasing run and no other AA should run
+	virtual RenderBufferHandle renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
+	// returns true if plugin's tonemap run and builtin tonemap should not run
+	virtual bool tonemap(RenderBufferHandle input, RenderBufferHandle& output, Pipeline& pipeline);
+	
+	virtual void debugUI(Pipeline&) {}
+	virtual bool debugOutput(RenderBufferHandle input, Pipeline& pipeline);
+	
 	virtual void pipelineDestroyed(Pipeline& pipeline) {}
 	virtual void frame(struct Renderer& renderer) {}
 };
@@ -89,7 +101,7 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual TransientSlice allocUniform(u32 size) = 0;
 	virtual TransientSlice allocUniform(const void* data, u32 size) = 0;
 	
-	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) = 0;
+	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
 
 	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, const struct ShaderKey& key, gpu::VertexDecl decl) = 0;
@@ -97,7 +109,6 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual DrawStream& getEndFrameDrawStream() = 0;
 
 	template <typename T> void pushJob(const char* name, const T& func);
-	template <typename T> void pushJob(const T& func) { pushJob(nullptr, func); }
 
 	virtual void beginProfileBlock(const char* name, i64 link, bool stats = false) = 0;
 	virtual void endProfileBlock() = 0;

@@ -1,56 +1,53 @@
 include "pipelines/common.glsl"
 
 compute_shader [[
-	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 	// possible future optimizations https://software.intel.com/content/www/us/en/develop/articles/adaptive-screen-space-ambient-occlusion.html
 	// inspired by https://github.com/tobspr/RenderPipeline/blob/master/rpplugins/ao/shader/ue4ao.kernel.glsl
-	layout (binding=0) uniform sampler2D u_depth_buffer;
-	layout (binding=1) uniform sampler2D u_normal_buffer;
-	layout (binding=2, rgba8) uniform image2D u_output;
-	layout(std140, binding = 4) uniform Drawcall {
+
+	cbuffer UB : register(b4) {
 		float u_radius;
 		float u_intensity;
 		float u_width;
 		float u_height;
+		uint u_normal_buffer;
+		uint u_depth_buffer;
+		uint u_output;
 	};
 
-	vec3 getViewNormal(vec2 tex_coord)
-	{
-		vec3 wnormal = texture(u_normal_buffer, tex_coord).xyz * 2 - 1;
-		vec4 vnormal = Global.view * vec4(wnormal, 0);
+	float3 getViewNormal(float2 tex_coord) {
+		float3 wnormal = sampleBindlessLod(LinearSamplerClamp, u_normal_buffer, tex_coord, 0).xyz * 2 - 1;
+		float4 vnormal = mul(float4(wnormal, 0), Global_view);
 		return vnormal.xyz;
 	}	
 	
-	void main()
-	{
-		if (any(greaterThan(gl_GlobalInvocationID.xy, ivec2(u_width, u_height)))) return;
-
-		vec2 uv = gl_GlobalInvocationID.xy / vec2(u_width, u_height);
-		vec3 view_pos = getViewPosition(u_depth_buffer, Global.inv_projection, uv);
-		vec3 view_normal = getViewNormal(uv);
-	
+	[numthreads(16, 16, 1)]
+	void main(uint3 thread_id : SV_DispatchThreadID) {
+		if (any(thread_id.xy > uint2(u_width, u_height))) return;
+		
+		float2 uv = thread_id.xy / float2(u_width, u_height);
+		float3 view_pos = getViewPosition(u_depth_buffer, Global_inv_projection, uv);
+		float3 view_normal = getViewNormal(uv);
 		float occlusion = 0;
 		float occlusion_count = 0;
 	
-		float rand = rand(view_pos.xyz + fract(Global.time) * 0.001);
+		float rand = random(view_pos.xyz + frac(Global_time) * 0.001);
 		float random_angle = rand * 6.283285;
-		vec3 rot;
+		float3 rot;
 		float depth_scale = u_radius / view_pos.z * (rand * 2 + 0.1);
 		rot.x = sin(random_angle);
 		rot.y = cos(random_angle);
 		rot.z = -rot.x;
 		rot *= depth_scale;
 
-		for (int i = 0; i < 4; ++i)
-		{
-			vec2 poisson = POISSON_DISK_4[i];
-			vec2 s = vec2(dot(poisson, rot.yx), dot(poisson, rot.zy));
+		for (int i = 0; i < 4; ++i) {
+			float2 poisson = POISSON_DISK_4[i];
+			float2 s = float2(dot(poisson, rot.yx), dot(poisson, rot.zy));
 			
-			vec3 vpos_a = getViewPosition(u_depth_buffer, Global.inv_projection, uv + s) - view_pos;
-			vec3 vpos_b = getViewPosition(u_depth_buffer, Global.inv_projection, uv - s) - view_pos;
+			float3 vpos_a = getViewPosition(u_depth_buffer, Global_inv_projection, uv + s) - view_pos;
+			float3 vpos_b = getViewPosition(u_depth_buffer, Global_inv_projection, uv - s) - view_pos;
 
-			vec3 sample_vec_a = normalize(vpos_a);
-			vec3 sample_vec_b = normalize(vpos_b);
+			float3 sample_vec_a = normalize(vpos_a);
+			float3 sample_vec_b = normalize(vpos_b);
 
 			float dist_a = length(vpos_a);
 			float dist_b = length(vpos_b);
@@ -61,8 +58,7 @@ compute_shader [[
 			float angle_a = saturate(dot(sample_vec_a, view_normal));
 			float angle_b = saturate(dot(sample_vec_b, view_normal));
 
-			if (valid_a + valid_b > 1)
-			{
+			if (valid_a + valid_b > 1) {
 				occlusion += (angle_a + angle_b) * (0.5 - 0.25 * (dist_a + dist_b));
 				occlusion_count += 1.0;
 			}
@@ -70,7 +66,7 @@ compute_shader [[
 	
 		occlusion /= max(1.0, occlusion_count);
 		float value = 1 - occlusion * u_intensity;
-	
-		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(value), 1));
+
+		bindless_rw_textures[u_output][thread_id.xy] = value;
 	}
 ]]

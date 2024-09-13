@@ -37,6 +37,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
 	
 	m_app.addWindowAction(&m_toggle_ui);
+	m_app.getSettings().registerPtr("property_grid_open", &m_is_open);
 }
 
 
@@ -925,9 +926,6 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const Te
 	}
 	showAddComponentNode(node->next, filter, parent, editor);
 }
-
-void PropertyGrid::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_properties_open; }
-void PropertyGrid::onBeforeSettingsSaved() { m_app.getSettings().m_is_properties_open  = m_is_open; }
 
 void PropertyGrid::onGUI()
 {

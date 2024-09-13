@@ -14,6 +14,7 @@
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
@@ -31,8 +32,8 @@
 #include "engine/lua_wrapper.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
+#include "lua_script/lua_script.h"
 
 
 using namespace Lumix;
@@ -301,6 +302,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 
 	void onSettingsLoaded() override {
+		// TODO
+		/*
 		lua_State* L = m_app.getEngine().getState();
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
@@ -349,10 +352,11 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 			lua_pop(L, 1);
 		}
 
-		lua_pop(L, 2);
+		lua_pop(L, 2);*/
 	}
 	
 	void onBeforeSettingsSaved() override {
+		/*
 		lua_State* L = m_app.getEngine().getState();
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
@@ -398,6 +402,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		}
 
 		lua_pop(L, 2);
+		*/
+		// TODO
 	}
 
 	const char* getName() const override { return m_name.c_str(); }

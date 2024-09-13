@@ -1,19 +1,19 @@
-#include "renderer/material.h"
-#include "engine/engine.h"
-#include "engine/file_system.h"
 #include "core/hash.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
 #include "core/path.h"
 #include "core/profiler.h"
-#include "engine/resource_manager.h"
 #include "core/stream.h"
+#include "core/tokenizer.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
+#include "engine/resource_manager.h"
+#include "gpu/gpu.h"
 #include "renderer/draw_stream.h"
+#include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "gpu/gpu.h"
 
 namespace Lumix
 {
@@ -68,7 +68,7 @@ void Material::setLayer(u8 layer) {
 	refresh();
 }
 
-u32 Material::getCustomFlag(const char* flag_name)
+u32 Material::getCustomFlag(StringView flag_name)
 {
 	for (u32 i = 0; i < s_custom_flags.count; ++i)
 	{
@@ -122,8 +122,6 @@ void Material::unload()
 	}
 	m_texture_count = 0;
 
-	m_renderer.getEndFrameDrawStream().destroy(m_bind_group);
-	m_bind_group = gpu::INVALID_BIND_GROUP;
 	for (Texture*& tex : m_textures) tex = nullptr;
 	
 	setShader(nullptr);
@@ -149,10 +147,10 @@ void Material::serialize(OutputMemoryStream& blob) {
 	else {
 		blob << "shader \"/" << shader_path << "\"\n";
 	}
-	blob << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
+	blob << "backface_culling " << (isBackfaceCulling() ? "true" : "false") << "\n";
 	blob << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
-	blob << "defines {";
+	blob << "defines [";
 	bool first_define = true;
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
 		if ((m_define_mask & (1 << i)) == 0) continue;
@@ -161,7 +159,7 @@ void Material::serialize(OutputMemoryStream& blob) {
 		first_define = false;
 		blob << "\"" << def << "\"";
 	}
-	blob << "}\n";
+	blob << "]\n";
 
 	for (u32 i = 0; i < m_texture_count; ++i) {
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
@@ -188,7 +186,7 @@ void Material::serialize(OutputMemoryStream& blob) {
 		}
 	}
 	
-	auto writeArray = [&blob](const float* value, u32 num) {
+	auto writeObject = [&blob](const float* value, u32 num) {
 		blob << "{ ";
 		for (u32 i = 0; i < num; ++i) {
 			if (i > 0) blob << ", ";
@@ -202,20 +200,20 @@ void Material::serialize(OutputMemoryStream& blob) {
 			for (const Uniform& mu : m_uniforms) {
 				if(mu.name_hash == su.name_hash) {
 					if (su.type == Shader::Uniform::INT) {
-						blob << "int_uniform(\"" << su.name << "\", " << mu.int_value << ")\n";
+						blob << "int_uniform \"" << su.name << "\", " << mu.int_value << "\n";
 					}
 					else {
-						blob << "uniform(\"" << su.name << "\", ";
+						blob << "uniform \"" << su.name << "\", ";
 						switch(su.type) {
 							case Shader::Uniform::INT: blob << mu.int_value; break;
 							case Shader::Uniform::NORMALIZED_FLOAT: blob << mu.float_value; break;
 							case Shader::Uniform::FLOAT: blob << mu.float_value; break;
 							case Shader::Uniform::COLOR: 
-							case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
-							case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
-							case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
+							case Shader::Uniform::VEC4: writeObject(mu.vec4, 4); break;
+							case Shader::Uniform::VEC3: writeObject(mu.vec4, 3); break;
+							case Shader::Uniform::VEC2: writeObject(mu.vec4, 2); break;
 						}
-						blob << ")\n";
+						blob << "\n";
 					}
 					break;
 				}
@@ -223,49 +221,6 @@ void Material::serialize(OutputMemoryStream& blob) {
 		}
 	}
 }
-
-
-int Material::uniform(lua_State* L) {
-	const char* name = LuaWrapper::checkArg<const char*>(L, 1);
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	Uniform u;
-	u.name_hash = RuntimeHash(name);
-	switch (lua_type(L, 2)) {
-		case LUA_TNUMBER: u.float_value = LuaWrapper::toType<float>(L, 2); break;
-		case LUA_TTABLE: {
-			const size_t len = lua_objlen(L, 2);
-			switch (len) {
-				case 2:	*(Vec2*)u.vec2 = LuaWrapper::toType<Vec2>(L, 2); break;
-				case 3: *(Vec3*)u.vec3 = LuaWrapper::toType<Vec3>(L, 2); break;
-				case 4: *(Vec4*)u.vec4 = LuaWrapper::toType<Vec4>(L, 2); break;
-				default: luaL_error(L, "Uniform %s has unsupported type", name); break;
-			}
-			break;
-		}
-		default: luaL_error(L, "Uniform %s has unsupported type", name); break;
-	}
-	material->m_uniforms.push(u);
-	return 0;
-}
-
-
-int Material::int_uniform(lua_State* L) {
-	const char* name = LuaWrapper::checkArg<const char*>(L, 1);
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	Uniform u;
-	u.name_hash = RuntimeHash(name);
-	switch (lua_type(L, 2)) {
-		case LUA_TNUMBER: u.int_value = LuaWrapper::toType<i32>(L, 2); break;
-		default: luaL_error(L, "Uniform %s has unsupported type", name); break;
-	}
-	material->m_uniforms.push(u);
-	return 0;
-}
-
 
 void Material::setTexturePath(int i, const Path& path)
 {
@@ -320,7 +275,7 @@ void Material::setTexture(u32 i, Texture* texture)
 
 void Material::setShader(const Path& path)
 {
-	Shader* shader = m_resource_manager.getOwner().load<Shader>(path);
+	Shader* shader = path.isEmpty() ? nullptr : m_resource_manager.getOwner().load<Shader>(path);
 	setShader(shader);
 }
 
@@ -367,10 +322,13 @@ void Material::updateRenderData(bool on_before_ready)
 
 	if (m_material_constants) m_renderer.destroyMaterialConstants(m_material_constants);
 
+	// TODO check overflow
 	float cs[Material::MAX_UNIFORMS_FLOATS] = {};
+	u32 textures_offset = 0;
 	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
-		bool found = false;
 		const u32 size = shader_uniform.size();
+		textures_offset = maximum(textures_offset, shader_uniform.offset + size);
+		bool found = false;
 		for (Uniform& uniform : m_uniforms) {
 			if (shader_uniform.name_hash == uniform.name_hash) {
 				memcpy((u8*)cs + shader_uniform.offset, uniform.vec4, size);
@@ -382,25 +340,21 @@ void Material::updateRenderData(bool on_before_ready)
 			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.vec4, size);
 		}
 	}
+	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
+		const gpu::BindlessHandle bindless_handle = m_textures[i] ? gpu::getBindlessHandle(m_textures[i]->handle) : gpu::BindlessHandle();
+		memcpy((u8*)cs + textures_offset + i * sizeof(bindless_handle), &bindless_handle, sizeof(bindless_handle));
+	}
 
 	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
+}
 
-	DrawStream& stream = m_renderer.getDrawStream();
-	if (m_bind_group) stream.destroy(m_bind_group);
-	m_bind_group = gpu::allocBindGroupHandle();
-	
-	gpu::BindGroupEntryDesc descs[MAX_TEXTURE_COUNT + 1];
-	for(u32 i = 0; i < m_texture_count; ++i) {
-		descs[i].texture = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
-		descs[i].type = gpu::BindGroupEntryDesc::TEXTURE;
-		descs[i].bind_point = i;
-	}
-	descs[m_texture_count].type = gpu::BindGroupEntryDesc::UNIFORM_BUFFER;
-	descs[m_texture_count].buffer = m_renderer.getMaterialUniformBuffer();
-	descs[m_texture_count].size = MAX_UNIFORMS_BYTES;
-	descs[m_texture_count].offset = m_material_constants * MAX_UNIFORMS_BYTES;
-	descs[m_texture_count].bind_point = UniformBuffer::MATERIAL;
-	stream.createBindGroup(m_bind_group, Span(descs, m_texture_count + 1));
+
+void Material::bind(DrawStream& stream) const
+{
+	stream.bindUniformBuffer(UniformBuffer::MATERIAL
+	, m_renderer.getMaterialUniformBuffer()
+	, m_material_constants * Material::MAX_UNIFORMS_BYTES
+	, Material::MAX_UNIFORMS_BYTES);
 }
 
 
@@ -462,218 +416,6 @@ bool Material::isBackfaceCulling() const
 	return u64(m_render_states & gpu::StateFlags::CULL_BACK);
 }
 
-
-namespace LuaAPI
-{
-
-
-int layer(lua_State* L)
-{
-	const char* layer_name = LuaWrapper::checkArg<const char*>(L, 1);
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	const u8 layer = material->getRenderer().getLayerIdx(layer_name);
-	material->setLayer(layer);
-	return 0;
-}
-
-
-int roughness(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	logWarning(material->getPath(), ": roughness deprecated");
-	return 0;
-}
-
-
-int alpha_ref(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	logWarning(material->getPath(), ": alpha_ref deprecated");
-	return 0;
-}
-
-
-int backface_culling(lua_State* L)
-{
-	const bool enable = LuaWrapper::checkArg<bool>(L, 1);
-	
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	material->enableBackfaceCulling(enable);
-	return 0;
-}
-
-
-int color(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	logWarning(material->getPath(), ": color deprecated");
-
-	return 0;
-}
-
-
-int custom_flag(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	const char* flag_name = LuaWrapper::checkArg<const char*>(L, 1);
-
-	const u32 flag = material->getCustomFlag(flag_name);
-	material->setCustomFlag(flag);
-
-	return 0;
-}
-
-
-int metallic(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	logWarning(material->getPath(), ": metallic deprecated");
-	return 0;
-}
-
-
-int emission(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	logWarning(material->getPath(), ": emission deprecated");
-	return 0;
-}
-
-
-int translucency(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	logWarning(material->getPath(), ": translucency deprecated");
-	return 0;
-}
-
-
-int defines(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	LuaWrapper::forEachArrayItem<const char*>(L, 1, "array of strings expected", [&](const char* v){
-		material->setDefine(material->getRenderer().getShaderDefineIdx(v), true);
-	});
-	return 0;
-}
-
-
-int shader(lua_State* L)
-{
-	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	if (!path[0]) material->setShader(nullptr);
-	else {
-		char c = path[0];
-		if (c != '\\' && c != '/') {
-			StringView material_dir = Path::getDir(material->getPath());
-			Path fullpath(material_dir, path);
-			material->setShader(fullpath);
-		}
-		else {
-			material->setShader(Path(path + 1));
-		}
-	}
-	return 0;
-}
-
-
-int texture(lua_State* L) {
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	StringView material_dir = Path::getDir(material->getPath());
-
-	if (lua_istable(L, 1)) {
-		lua_getfield(L, 1, "source");
-		if (lua_isstring(L, -1)) {
-			const char* path = lua_tostring(L, -1);
-			const int idx = material->getTextureCount();
-			
-			Path texture_path;
-			if (path[0] == '\0') {
-				texture_path = path;
-			}
-			else if (path[0] != '/' && path[0] != '\\') {
-				texture_path = material_dir;
-				texture_path.append(path);
-			}
-			else {
-				texture_path = path + 1;
-			}
-
-			material->setTexturePath(idx, texture_path);
-		}
-		else {
-			logError(material->getPath(), " texture's source is not a string.");
-			lua_pop(L, 1);
-			return 0;
-		}
-		lua_pop(L, 1);
-		
-
-		Texture* texture = material->getTexture(material->getTextureCount() - 1);
-		bool keep_data = false;
-		LuaWrapper::getOptionalField(L, 1, "keep_data", &keep_data);
-		if (keep_data) texture->addDataReference();
-
-		return 0;
-	}
-	
-	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
-	const int idx = material->getTextureCount();
-	
-	Path texture_path;
-	if (path[0] == '\0') {
-		texture_path = path;
-	}
-	else if (path[0] != '/' && path[0] != '\\') {
-		texture_path.append(material_dir, path);
-	}
-	else {
-		texture_path = path + 1;
-	}
-
-	material->setTexturePath(idx, texture_path);
-	return 0;
-}
-
-
-} // namespace LuaAPI
-
 bool Material::wireframe() const {
 	return u32(m_render_states & gpu::StateFlags::WIREFRAME);
 }
@@ -686,16 +428,96 @@ void Material::setWireframe(bool enable) {
 bool Material::load(Span<const u8> mem) {
 	PROFILE_FUNCTION();
 
-	MaterialManager& mng = static_cast<MaterialManager&>(getResourceManager());
-	lua_State* L = mng.getState(*this);
-	
 	m_uniforms.clear();
 	m_render_states = gpu::StateFlags::CULL_BACK;
 	m_custom_flags = 0;
 
-	StringView content((const char*)mem.begin(), (u32)mem.length());
-	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
-		return false;
+	Tokenizer tokenizer(StringView((const char*)mem.begin(), (u32)mem.length()), getPath().c_str());
+
+	for (;;) {
+		Tokenizer::Token key = tokenizer.tryNextToken();
+		switch (key.type) {
+			case Tokenizer::Token::ERROR: return false;
+			case Tokenizer::Token::EOF: return true;
+			default: break;
+		}
+		
+		StringView value;
+
+		if (key == "shader") {
+			if (!tokenizer.consume(value)) return false;
+			if (startsWith(value, "/") || startsWith(value, "\\")) value.removePrefix(1);
+			setShader(Path(value));
+		}
+		else if (key == "custom_flag") {
+			if (!tokenizer.consume(value)) return false;
+			const u32 flag = getCustomFlag(value);
+			setCustomFlag(flag);
+		}
+		else if (key == "define") {
+			char define_str[32];
+			if (!tokenizer.consume(define_str)) return false;
+			const u8 define_idx = getRenderer().getShaderDefineIdx(define_str);
+			setDefine(define_idx, true);
+		}
+		else if (key == "layer") {
+			char layer_name[64];
+			if (!tokenizer.consume(layer_name)) return false;
+			const u8 layer = getRenderer().getLayerIdx(layer_name);
+			setLayer(layer);
+		}
+		else if (key == "texture") {
+			if (!tokenizer.consume(value)) return false;
+			const i32 idx = getTextureCount();
+			if (value.empty()) {
+				setTexture(idx, nullptr);
+			}
+			else if (value[0] == '/' || value[0] == '\\') {
+				value.removePrefix(1);
+				setTexturePath(idx, Path(value));
+			}
+			else {
+				StringView material_dir = Path::getDir(getPath());
+				Path path(material_dir, value);
+				setTexturePath(idx, path);
+			}
+		}
+		else if (key == "backface_culling") {
+			bool b;
+			if (!tokenizer.consume(b)) return false;
+			enableBackfaceCulling(b);
+		}
+		else if (key == "int_uniform") {
+			StringView name;
+			Uniform u;
+			if (!tokenizer.consume(name, ",", u.int_value)) return false;
+			u.name_hash = RuntimeHash(name.begin, name.size());
+			m_uniforms.push(u);
+		}
+		else if (key == "uniform") {
+			StringView name;
+			if (!tokenizer.consume(name, ",")) return false;
+
+			Uniform u;
+			u.name_hash = RuntimeHash(name.begin, name.size());
+
+			Tokenizer::Token token = tokenizer.nextToken();
+			if (!token) return false;
+
+			if (token.value[0] == '{') {
+				u32 vecsize;
+				if (!tokenizer.consumeVector(u.vec4, vecsize)) return false;
+			}
+			else if (token.type == Tokenizer::Token::NUMBER) {
+				u.float_value = Tokenizer::toFloat(token);
+			}
+			m_uniforms.push(u);
+		}
+		else {
+			logError(getPath(), "(", tokenizer.getLine(), "): Unknown identifier ", key);
+			tokenizer.logErrorPosition(key.value.begin);
+			return false;
+		}
 	}
 
 	if (!m_shader) {
@@ -705,56 +527,5 @@ bool Material::load(Span<const u8> mem) {
 
 	return true;
 }
-
-lua_State* MaterialManager::getState(Material& material) const {
-	lua_pushlightuserdata(m_state, &material);
-	lua_setfield(m_state, LUA_GLOBALSINDEX, "this");
-	return m_state;
-}
-
-MaterialManager::~MaterialManager() {
-	lua_close(m_state);
-}
-
-MaterialManager::MaterialManager(Renderer& renderer, IAllocator& allocator)
-	: ResourceManager(allocator)
-	, m_renderer(renderer)
-{
-	m_state = luaL_newstate();
-
-	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcfunction(m_state, LuaAPI::func, #func); \
-		lua_setfield(m_state, LUA_GLOBALSINDEX, #func); 
-	
-	DEFINE_LUA_FUNC(alpha_ref);
-	DEFINE_LUA_FUNC(backface_culling);
-	DEFINE_LUA_FUNC(color);
-	DEFINE_LUA_FUNC(custom_flag);
-	DEFINE_LUA_FUNC(defines);
-	DEFINE_LUA_FUNC(emission);
-	DEFINE_LUA_FUNC(translucency);
-	DEFINE_LUA_FUNC(layer);
-	DEFINE_LUA_FUNC(metallic);
-	DEFINE_LUA_FUNC(roughness);
-	DEFINE_LUA_FUNC(shader);
-	DEFINE_LUA_FUNC(texture);
-
-	lua_pushcfunction(m_state, &Material::uniform, "uniform");
-	lua_setfield(m_state, LUA_GLOBALSINDEX, "uniform"); 
-
-	lua_pushcfunction(m_state, &Material::int_uniform, "int_uniform");
-	lua_setfield(m_state, LUA_GLOBALSINDEX, "int_uniform"); 
-
-	#undef DEFINE_LUA_FUNC
-
-}
-
-Resource* MaterialManager::createResource(const Path& path) {
-	return LUMIX_NEW(m_allocator, Material)(path, *this, m_renderer, m_allocator);
-}
-
-void MaterialManager::destroyResource(Resource& resource) {
-	LUMIX_DELETE(m_allocator, &resource);
-};
 
 } // namespace Lumix

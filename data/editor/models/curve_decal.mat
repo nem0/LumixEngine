@@ -1,6 +1,6 @@
 shader "/pipelines/editor_icon.shd"
-backface_culling(true)
+backface_culling true
 layer "default"
-defines {}
+
 texture "/editor/models/curve_decal.tga"
 layer "default"

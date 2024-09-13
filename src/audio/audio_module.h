@@ -5,11 +5,7 @@
 #include "engine/plugin.h"
 
 
-struct lua_State;
-
-
-namespace Lumix
-{
+namespace Lumix {
 
 
 struct AudioSystem;

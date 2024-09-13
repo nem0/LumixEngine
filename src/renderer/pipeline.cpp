@@ -1,43 +1,68 @@
-#include "gpu/gpu.h"
 #include "core/arena_allocator.h"
-#include "core/crt.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
-#include "engine/engine.h"
-#include "engine/file_system.h"
+#include "core/crt.h"
 #include "core/geometry.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
 #include "core/math.h"
-#include "core/sync.h"
 #include "core/os.h"
 #include "core/page_allocator.h"
 #include "core/path.h"
 #include "core/profiler.h"
-#include "engine/resource_manager.h"
 #include "core/stack_array.h"
-#include "engine/world.h"
-#include "lua_script/lua_script.h"
+#include "core/sync.h"
 #include "culling_system.h"
-#include "draw2d.h"
 #include "draw_stream.h"
+#include "draw2d.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
+#include "engine/resource_manager.h"
+#include "engine/world.h"
 #include "font.h"
+#include "gpu/gpu.h"
+#include "lua_script/lua_script.h"
 #include "material.h"
 #include "model.h"
 #include "particle_system.h"
 #include "pipeline.h"
 #include "pose.h"
-#include "renderer.h"
 #include "render_module.h"
+#include "renderer.h"
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
+#include <imgui/imgui.h>
 
-namespace Lumix
-{
+// TODO must haves:
+	// TODO check if github CI works
 
+// TODO crashes:
+	// TODO crash when context menu is outside of main window
+
+// TODO nice to have:
+	// TODO 200 MB in memory profiler
+	// TODO rewrite shaders to compute
+	// TODO temporal upsample
+	// TODO temporal SSAO
+	// TODO shader cleanup
+	// TODO get rid of #line
+	// TODO fuzzy search
+	// TODO remove lua from shaders, materials, ...
+	// TODO different type for bindless rw and const, right now it's mixed and works only by chance
+	// TODO static samplers
+	// TODO icons over some debugs, e.g. TDAO 
+	// TODO switch plugins to use new genie stuff like plugin() function
+	// TODO gpu::readTexture with destination memory, so it does not have to allocate it
+	// TODO matrix rename A_to_B
+	// TODO fsr2
+	// TODO "static" srv+urv == "constant" bindless index
+	// TODO bindless terrain
+	// TODO shadow atlas -> bindless?
+	// TODO releaseRenderBuffer -> so they can be reused in the same frame
+
+namespace Lumix {
 
 // sort key:
 // bucket 64-56
@@ -55,207 +80,17 @@ static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
 static constexpr u64 SORT_KEY_MESH_IDX_SHIFT = 40;
 static constexpr u64 SORT_KEY_EMITTER_SHIFT = 40;
 
-struct CameraParams
-{
-	ShiftedFrustum frustum;
-	DVec3 pos;
-	float lod_multiplier;
-	bool is_shadow;
-	Matrix view;
-	Matrix projection;
-};
-
-using CameraParamsHandle = u32;
-
-struct PipelineTexture {
-	enum Type {
-		RENDERBUFFER,
-		RESOURCE,
-		RAW
-	} type;
-
-	union {
-		u32 renderbuffer;
-		gpu::TextureHandle raw;
-		Engine::LuaResourceHandle resource;
-	};
-};
-
-using RenderStateHandle = u32;
-struct RenderState {
-	gpu::StateFlags value;
-};
-
 namespace {
-	struct Indirect {
-		u32 vertex_count;
-		u32 instance_count;
-		u32 first_index;
-		u32 base_vertex;
-		u32 base_instance;
-	};
-}
 
-using LuaBufferHandle = gpu::BufferHandle;
+struct Indirect {
+	u32 vertex_count;
+	u32 instance_count;
+	u32 first_index;
+	u32 base_vertex;
+	u32 base_instance;
+};
 
-namespace LuaWrapper {
-
-	template <> inline PipelineTexture toType(lua_State* L, int idx) {
-		PipelineTexture res;
-		switch (lua_type(L, idx)) {
-			case LUA_TTABLE: {
-				const int type1 = LuaWrapper::getField(L, idx, "lumix_resource");
-				if (type1 != LUA_TSTRING) luaL_error(L, "texture expected");
-				const char* res_type = LuaWrapper::toType<const char*>(L, -1);
-				
-				if (equalStrings(res_type, "renderbuffer")) {
-					lua_pop(L, 1);
-					if (!LuaWrapper::checkField(L, idx, "value", &res.renderbuffer)) luaL_error(L, "texture expected");
-					res.type = PipelineTexture::RENDERBUFFER;
-					return res;
-				}
-				if (equalStrings(res_type, "raw_texture")) {
-					lua_pop(L, 1);
-					if (!LuaWrapper::checkField(L, idx, "value", &res.raw)) luaL_error(L, "texture expected");
-					res.type = PipelineTexture::RAW;
-					return res;
-				}
-
-				luaL_error(L, "texture expected");
-				break;
-			}
-			case LUA_TNUMBER: {
-				res.type = PipelineTexture::RESOURCE;
-				res.resource = LuaWrapper::toType<i32>(L, idx);
-				break;
-			}
-			default:
-				luaL_error(L, "texture expected");
-				break;
-		}
-		return res;
-	}
-
-	template <> inline RenderState toType(lua_State* L, int idx)
-	{
-		gpu::StencilFuncs stencil_func = gpu::StencilFuncs::DISABLE;
-		u8 stencil_write_mask = 0xff;
-		u8 stencil_ref = 0;
-		u8 stencil_mask = 0;
-		gpu::StencilOps stencil_sfail = gpu::StencilOps::KEEP;
-		gpu::StencilOps stencil_zfail = gpu::StencilOps::KEEP;
-		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
-
-		char tmp[64];
-		gpu::StateFlags rs = gpu::StateFlags::DEPTH_WRITE;
-		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
-			if(equalIStrings(tmp, "add")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-			}
-			else if(equalIStrings(tmp, "alpha")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			}
-			else if(equalIStrings(tmp, "multiply")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
-			}
-			else if(equalIStrings(tmp, "dual")) {
-				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-			}
-			else if(equalIStrings(tmp, "")) {
-			}
-			else {
-				luaL_error(L, "Unknown blending mode");
-			}
-		}
-
-		u32 depth_func = 0;
-		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, gpu::StateFlags::WIREFRAME, false);
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, gpu::StateFlags::DEPTH_WRITE, true);
-		if (LuaWrapper::getOptionalField(L, idx, "depth_func", &depth_func)) {
-			rs = rs | gpu::StateFlags(depth_func);
-		}
-		else {
-			LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, gpu::StateFlags::DEPTH_FN_GREATER, true);
-		}
-		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
-		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
-		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
-		LuaWrapper::getOptionalField(L, idx, "stencil_mask", &stencil_mask);
-		LuaWrapper::getOptionalField(L, idx, "stencil_sfail", reinterpret_cast<u8*>(&stencil_sfail));
-		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
-		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
-
-		rs = rs | gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
-
-		return {rs};
-	}
-	
-	template <> inline bool isType<RenderState>(lua_State* L, int index)
-	{
-		return lua_istable(L, index);
-	}
-
-	template <> inline bool isType<PipelineTexture>(lua_State* L, int index)
-	{
-		return lua_istable(L, index) || lua_isnumber(L, index);
-	}
-
-	template <> inline bool isType<Color>(lua_State* L, int index)
-	{
-		return lua_isnumber(L, index) != 0 || lua_istable(L, index);
-	}
-
-	template <> inline Color toType<Color>(lua_State* L, int index)
-	{
-		if (lua_isnumber(L, index)) {
-			return Color((u32)lua_tointeger(L, index));
-		}
-		else if (lua_istable(L, index)) {
-			Color c(0);
-			lua_rawgeti(L, index, 1);
-			c.r = (u8)lua_tointeger(L, -1);
-			lua_pop(L, 1);
-
-			lua_rawgeti(L, index, 2);
-			c.g = (u8)lua_tointeger(L, -1);
-			lua_pop(L, 1);
-
-			lua_rawgeti(L, index, 3);
-			c.b = (u8)lua_tointeger(L, -1);
-			lua_pop(L, 1);
-
-			lua_rawgeti(L, index, 4);
-			c.a = (u8)lua_tointeger(L, -1);
-			lua_pop(L, 1);
-
-			return c;
-	
-		}
-		return Color(0);
-	}
-
-	void push(lua_State* L, const PipelineTexture& tex) {
-		switch (tex.type) {
-			case PipelineTexture::RESOURCE:
-				LuaWrapper::push(L, tex.resource);
-				break;
-			case PipelineTexture::RAW:
-				lua_newtable(L);
-				LuaWrapper::setField(L, -1, "lumix_resource", "raw_texture");
-				LuaWrapper::setField(L, -1, "value", tex.raw);
-				break;
-			case PipelineTexture::RENDERBUFFER:
-				lua_newtable(L);
-				LuaWrapper::setField(L, -1, "lumix_resource", "renderbuffer");
-				LuaWrapper::setField(L, -1, "value", tex.renderbuffer);
-				break;
-		}
-	}
-}
-
-
-struct GlobalState
-{
+struct GlobalState {
 	struct SMSlice {
 		Matrix3x4 world_to_slice;
 		float size;
@@ -290,8 +125,11 @@ struct GlobalState
 	float frame_time_delta;
 	float shadow_cam_depth_range;
 	float shadow_cam_rcp_depth_range;
+	u32 frame_idx;
+	u32 shadowmap_bindless; 
+	u32 shadow_atlas_bindless;
+	u32 reflection_probes_bindless;
 };
-
 
 struct ShadowAtlas {
 	static constexpr u32 SIZE = 2048;
@@ -359,22 +197,17 @@ struct ShadowAtlas {
 
 static const float SHADOW_CAM_FAR = 500.0f;
 
+} // anonymous namespace
 
-struct PipelineImpl final : Pipeline
-{
-	using RenderbufferDescHandle = u32;
-	struct RenderbufferDesc {
-		enum Type {
-			FIXED,
-			RELATIVE,
-			DISPLAY_SIZE
-		};
-		Type type = FIXED;
-		IVec2 fixed_size;
-		Vec2 rel_size;
-		gpu::TextureFormat format;
-		gpu::TextureFlags flags;
-		StaticString<32> debug_name;
+struct PipelineImpl final : Pipeline {
+	struct Bucket {
+		Bucket(Renderer& renderer) : stream(renderer) {}
+		u8 layer;
+		char layer_name[32];
+		BucketDesc::Sort sort = BucketDesc::DEFAULT;
+		u32 define_mask = 0;
+		gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
+		DrawStream stream;
 	};
 
 	struct Renderbuffer {
@@ -385,24 +218,6 @@ struct PipelineImpl final : Pipeline
 		gpu::TextureFlags flags;
 	};
 
-	struct ShaderRef {
-		Lumix::Shader* res;
-		int id;
-	};
-
-	struct Bucket {
-		Bucket(Renderer& renderer) : stream(renderer) {}
-		enum Sort {
-			DEFAULT,
-			DEPTH
-		};
-		u8 layer;
-		char layer_name[32];
-		Sort sort = DEFAULT;
-		u32 define_mask = 0;
-		gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
-		DrawStream stream;
-	};
 
 	struct Sorter {
 		struct alignas(4096) Page {
@@ -668,19 +483,14 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	PipelineImpl(Renderer& renderer, LuaScript* resource, const char* define, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, PipelineType type, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
-		, m_resource(resource)
-		, m_lua_state(nullptr)
-		, m_custom_commands_handlers(m_allocator)
-		, m_define(define)
+		, m_type(type)
 		, m_module(nullptr)
 		, m_draw2d(m_allocator)
 		, m_output(-1)
-		, m_renderbuffer_descs(m_allocator)
 		, m_renderbuffers(m_allocator)
-		, m_shaders(m_allocator)
 		, m_shadow_atlas(m_allocator)
 		, m_textures(m_allocator)
 		, m_buffers(m_allocator)
@@ -691,9 +501,13 @@ struct PipelineImpl final : Pipeline
 		, m_decal_decl(gpu::PrimitiveType::TRIANGLES)
 		, m_curve_decal_decl(gpu::PrimitiveType::TRIANGLES)
 		, m_2D_decl(gpu::PrimitiveType::TRIANGLES)
+		, m_instance_data(m_allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
+		m_tonemap_shader = rm.load<Shader>(Path("pipelines/tonemap.shd"));
+		m_textured_quad_shader = rm.load<Shader>(Path("pipelines/textured_quad.shd"));
+		m_lighting_shader = rm.load<Shader>(Path("pipelines/lighting.shd"));
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.shd"));
@@ -711,7 +525,7 @@ struct PipelineImpl final : Pipeline
 			-1, 1, 1
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
-		m_cube_vb = m_renderer.createBuffer(vb_mem, gpu::BufferFlags::IMMUTABLE);
+		m_cube_vb = m_renderer.createBuffer(vb_mem, gpu::BufferFlags::IMMUTABLE, "cube");
 
 		u16 cube_indices[] = {
 			0, 1, 2,
@@ -729,15 +543,13 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
-		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE);
-
-		m_resource->onLoaded<&PipelineImpl::onStateChanged>(this);
+		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE, "cube_indices");
 
 		const Renderer::MemRef im_mem = { INSTANCED_MESHES_BUFFER_SIZE, nullptr, false };
-		m_instanced_meshes_buffer = m_renderer.createBuffer(im_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
+		m_instanced_meshes_buffer = m_renderer.createBuffer(im_mem, gpu::BufferFlags::SHADER_BUFFER, "instanced_meshes");
 
 		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
-		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
+		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::SHADER_BUFFER, "indirect");
 
 		m_base_vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
 		m_base_vertex_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
@@ -761,10 +573,13 @@ struct PipelineImpl final : Pipeline
 		m_2D_decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
 		m_2D_decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
 		m_2D_decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+
+		if (m_type == PipelineType::PREVIEW) m_clear_color = { 0.2f, 0.2f, 0.2f };
 	}
 
 	~PipelineImpl()
 	{
+		for (void* ptr : m_instance_data) m_allocator.deallocate(ptr);
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->pipelineDestroyed(*this);
 		}
@@ -773,6 +588,9 @@ struct PipelineImpl final : Pipeline
 		for (gpu::TextureHandle t : m_textures) stream.destroy(t);
 		for (gpu::BufferHandle b : m_buffers) stream.destroy(b);
 
+		m_tonemap_shader->decRefCount();
+		m_textured_quad_shader->decRefCount();
+		m_lighting_shader->decRefCount();
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
 		m_instancing_shader->decRefCount();
@@ -780,11 +598,6 @@ struct PipelineImpl final : Pipeline
 		for (const Renderbuffer& rb : m_renderbuffers) {
 			stream.destroy(rb.handle);
 		}
-
-		for(ShaderRef& shader : m_shaders) {
-			shader.res->decRefCount();
-		}
-		if (m_resource) m_resource->decRefCount();
 
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
@@ -800,140 +613,6 @@ struct PipelineImpl final : Pipeline
 		clearBuffers();
 	}
 
-	void callInitModule() {
-		PROFILE_FUNCTION();
-		LuaWrapper::DebugGuard guard(m_lua_state);
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_getfield(m_lua_state, -1, "initModule");
-		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION) {
-			lua_pushlightuserdata(m_lua_state, this);
-			if (lua_pcall(m_lua_state, 1, 0, 0) != 0)
-			{
-				logError(lua_tostring(m_lua_state, -1));
-				lua_pop(m_lua_state, 1);
-			}
-		}
-		lua_pop(m_lua_state, 2);
-	}
-	
-	void cleanup()
-	{
-		if (m_lua_state)
-		{
-			LuaWrapper::releaseRef(m_renderer.getEngine().getState(), m_lua_thread_ref);
-			LuaWrapper::releaseRef(m_lua_state, m_lua_env);
-			m_lua_state = nullptr;
-		}
-	}
-
-	void setDefine()
-	{
-		if (m_define == "") return;
-		StaticString<256> tmp(m_define, " = true");
-
-		bool errors = LuaWrapper::luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), m_resource->getPath().c_str()) != 0;
-		if (errors)
-		{
-			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 1);
-			return;
-		}
-
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_setfenv(m_lua_state, -2);
-		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
-		if (errors)
-		{
-			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 1);
-		}
-	}
-
-	void executeCustomCommand(const char* name)
-	{
-		const RuntimeHash name_hash(name);
-		for (CustomCommandHandler& handler : m_custom_commands_handlers) {
-			if (handler.hash == name_hash) {
-				handler.callback.invoke();
-				break;
-			}
-		}
-	}
-
-	void exposeCustomCommandToLua(const CustomCommandHandler& handler)
-	{
-		if (!m_lua_state) return;
-
-		StaticString<1024> tmp("function ", handler.name, "() executeCustomCommand(\"", handler.name, "\") end");
-
-		bool errors = LuaWrapper::luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), "exposeCustomCommandToLua") != 0;
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_setfenv(m_lua_state, -2);
-		errors = errors || lua_pcall(m_lua_state, 0, 0, 0) != 0;
-
-		if (errors)
-		{
-			logError(lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 1);
-		}
-	}
-	
-	void onStateChanged(Resource::State, Resource::State new_state, Resource&)
-	{
-		if (new_state != Resource::State::READY) return;
-
-		cleanup();
-
-		lua_State* L = m_renderer.getEngine().getState();
-		LuaWrapper::DebugGuard guard(L);
-		m_lua_state = lua_newthread(L);
-		LuaWrapper::DebugGuard guard2(m_lua_state);
-		m_lua_thread_ref = LuaWrapper::createRef(L);
-		lua_pop(L, 1);
-
-		lua_newtable(m_lua_state);
-		lua_pushvalue(m_lua_state, -1);
-		m_lua_env = LuaWrapper::createRef(m_lua_state);
-
-		lua_setmetatable(m_lua_state, -2);
-		lua_pushvalue(m_lua_state, LUA_GLOBALSINDEX);
-		lua_setfield(m_lua_state, -2, "__index");
-
-		lua_pushlightuserdata(m_lua_state, this);
-		lua_setfield(m_lua_state, -2, "this");
-
-		registerLuaAPI(m_lua_state);
-		for (auto& handler : m_custom_commands_handlers)
-		{
-			exposeCustomCommandToLua(handler);
-		}
-
-		setDefine();
-	
-		StringView content = m_resource->getSourceCode();
-		bool errors = LuaWrapper::luaL_loadbuffer(m_lua_state, content.begin, content.size(), m_resource->getPath().c_str()) != 0;
-		if (errors)
-		{
-			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 1);
-			return;
-		}
-
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_setfenv(m_lua_state, -2);
-		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
-		if (errors)
-		{
-			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 2);
-			return;
-		}
-		
-		m_viewport.w = m_viewport.h = 800;
-		if (m_module) callInitModule();
-		lua_pop(m_lua_state, 1);
-	}
-
 	void clearBuffers() {
 		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
@@ -945,24 +624,11 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void setLuaGlobal(const char* var_name, const Vec3& value) override {
-		LuaWrapper::DebugGuard guard(m_lua_state);
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		LuaWrapper::setField(m_lua_state, -1, var_name, value);
-		lua_pop(m_lua_state, 1);
-
-	}
-
-	void define(const char* define, bool enable) override {
-		LuaWrapper::DebugGuard guard(m_lua_state);
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		LuaWrapper::setField(m_lua_state, -1, define, enable);
-		lua_pop(m_lua_state, 1);
-	}
-
-	Viewport getViewport() override {
+	const Viewport& getViewport() override {
 		return m_viewport;
 	}
+
+	void setClearColor(Vec3 color) override { m_clear_color = color; }
 
 	void setViewport(const Viewport& viewport) override 
 	{
@@ -1085,6 +751,7 @@ struct PipelineImpl final : Pipeline
 		const Viewport backup_viewport = m_viewport;
 
 		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
+		m_viewport = {};
 		m_viewport.is_ortho = false;
 		m_viewport.pos = world.getPosition(light.entity);
 		m_viewport.rot = world.getRotation(light.entity);
@@ -1094,42 +761,41 @@ struct PipelineImpl final : Pipeline
 		m_viewport.w = u32(ShadowAtlas::SIZE * uv.z + 0.5f);
 		m_viewport.h = u32(ShadowAtlas::SIZE * uv.w + 0.5f);;
 
-		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
-		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
-		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
-		LuaWrapper::setField(m_lua_state, -1, "display_h", m_display_size.y);
-		lua_getfield(m_lua_state, -1, "main_shadowmap");
-		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
-			lua_pop(m_lua_state, 2);
-			logError(getPath(), ": can not bake shadows because main_shadowmap() is missing");
-			return false;
-		}
-		LuaWrapper::pcall(m_lua_state, 0, 0);
-		lua_pop(m_lua_state, 1);
+		beginBlock("bake_shadow");
+
+		RenderBufferHandle depthbuf = createRenderbuffer({
+			.type = RenderbufferDesc::FIXED,
+			.fixed_size = {m_viewport.w, m_viewport.h},
+			.format = gpu::TextureFormat::D32,
+			.debug_name = "bake_shadow_depth",
+
+		});
+		setRenderTargets({}, depthbuf);
+		clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
+		CameraParams cp = getMainCamera();
+		pass(cp);
+
+		BucketDesc bucket[] = {{ .layer = "default", .define = "DEPTH"}};
+
+		u32 view_idx = cull(cp, bucket);
+		renderBucket(view_idx, 0);
+		renderTerrains(cp, gpu::StateFlags::NONE, "DEPTH");
+		m_output = depthbuf;
+		endBlock();
 
 		const gpu::TextureHandle src = getOutput();
 		m_renderbuffers[m_output].frame_counter = 1;
 		if (!src) {
-			logError(getPath(), ": can not bake shadows because the pipeline has no output");
+			logError("Could not bake shadows because the pipeline had no output");
 			return false;
 		}
 
 		const gpu::TextureHandle dst = m_shadow_atlas.texture;
-		m_renderer.pushJob("bake_shadow_copy", [uv, src, dst](DrawStream& stream){
-			const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
-			const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
-			stream.copy(dst, src, x, y);
-		});
-
+		const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
+		const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
+		m_renderer.getDrawStream().copy(dst, src, x, y);
 		m_viewport = backup_viewport;
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
-		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
-		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
-		LuaWrapper::setField(m_lua_state, -1, "display_h", m_display_size.y);
-		lua_pop(m_lua_state, 1);
+
 		return true;
 	}
 
@@ -1157,11 +823,613 @@ struct PipelineImpl final : Pipeline
 		return prev.getProjectionNoJitter() * prev.getViewRotation() * translation * current.getViewRotation().inverted() * current.getProjectionNoJitter().inverted();
 	}
 
-	bool render(bool only_2d) override
-	{
+	void clear(gpu::ClearFlags flags, float r, float g, float b, float a, float depth) override {
+		const Vec4 color = Vec4(r, g, b, a);
+		DrawStream& stream = m_renderer.getDrawStream();
+		stream.clear(flags, &color.x, depth);
+	}
+
+	RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) override {
+		IVec2 size;
+		switch (desc.type) {
+			case RenderbufferDesc::FIXED: size = desc.fixed_size; break;
+			case RenderbufferDesc::RELATIVE: size = IVec2(i32(desc.rel_size.x * m_viewport.w), i32(desc.rel_size.y * m_viewport.h)); break;
+			case RenderbufferDesc::DISPLAY_SIZE: size = m_display_size; break;
+		}
+		for (Renderbuffer& rb : m_renderbuffers) {
+			if (!rb.handle) {
+				rb.frame_counter = 0;
+				StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
+				rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), name);
+				rb.flags = desc.flags;
+				rb.format = desc.format;
+				rb.size = size;
+				return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
+			}
+			else {
+				if (rb.frame_counter < 2) continue;
+				if (rb.size != size) continue;
+				if (rb.format != desc.format) continue;
+				if (rb.flags != desc.flags) continue;
+			}
+			rb.frame_counter = 0;
+			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
+			m_renderer.getDrawStream().setDebugName(rb.handle, name);
+			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
+		}
+
+		Renderbuffer& rb = m_renderbuffers.emplace();
+		rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+		rb.frame_counter = 0;
+		rb.flags = desc.flags;
+		rb.format = desc.format;
+		rb.size = size;
+		return RenderBufferHandle(m_renderbuffers.size() - 1);
+	}
+
+	void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, bool readonly_ds = false, bool srgb = false) override {
+		DrawStream& stream = m_renderer.getDrawStream();
+		if (ds == INVALID_RENDERBUFFER && renderbuffers.length() == 0) {
+			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+			return;
+		}
+
+		const IVec2 viewport_size = m_renderbuffers[ds == INVALID_RENDERBUFFER ? renderbuffers[0] : ds].size;
+		gpu::FramebufferFlags flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;
+		if (readonly_ds) {
+			flags = flags | gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
+		}
+		gpu::TextureHandle attachments[16];
+		ASSERT(renderbuffers.length() <= lengthOf(attachments));
+		for (u32 i = 0; i < renderbuffers.length(); ++i) {
+			attachments[i] = m_renderbuffers[renderbuffers[i]].handle;
+		}
+		stream.setFramebuffer(attachments, renderbuffers.length(), ds != INVALID_RENDERBUFFER ? m_renderbuffers[ds].handle : gpu::INVALID_TEXTURE, flags);
+		stream.viewport(0, 0, viewport_size.x, viewport_size.y);
+	}
+
+	u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) override {
 		PROFILE_FUNCTION();
 
-		if (!isReady() || m_viewport.w <= 0 || m_viewport.h <= 0) {
+		UniquePtr<View>& view = m_views.emplace();
+		ArenaAllocator& allocator = m_renderer.getCurrentFrameAllocator();
+		view = UniquePtr<View>::create(allocator, allocator, m_renderer.getEngine().getPageAllocator());
+		view->cp = cp;
+		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
+
+		view->buckets.reserve(buckets.length());
+		for (const BucketDesc& desc : buckets) {
+			Bucket& bucket = view->buckets.emplace(m_renderer);
+			bucket.layer = m_renderer.getLayerIdx(desc.layer);
+			copyString(Span(bucket.layer_name), desc.layer);
+
+			bucket.sort = desc.sort;
+			if (desc.define) {
+				bucket.define_mask = 1 << m_renderer.getShaderDefineIdx(desc.define);
+			}
+			bucket.state = desc.state;
+		}
+
+		for (i32 i = 0; i < view->buckets.size(); ++i) {
+			Bucket& bucket = view->buckets[i];
+			view->layer_to_bucket[bucket.layer] = i;
+		}
+
+		if (m_instancing_shader->isReady()) {
+			const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
+			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+				if (iter.value().dirty) {
+					m_module->initInstancedModelGPUData(iter.key());
+				}
+			}
+		}
+
+		View* view_ptr = view.get();
+		jobs::setRed(&view->ready);
+		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
+			setupFur(*view_ptr);
+			setupParticles(*view_ptr);
+			encodeInstancedModels(stream, *view_ptr);
+			encodeProceduralGeometry(*view_ptr);
+
+			view_ptr->renderables = m_module->getRenderables(view_ptr->cp.frustum);
+
+			if (view_ptr->renderables) {
+				createSortKeys(*view_ptr);
+				view_ptr->renderables->free(m_renderer.getEngine().getPageAllocator());
+			}
+			view_ptr->sorter.pack();
+
+			if (!view_ptr->sorter.keys.empty()) {
+				radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
+				createCommands(*view_ptr);
+			}
+
+			jobs::setGreen(&view_ptr->ready);
+			});
+
+		return m_views.size() - 1;
+	}
+
+	void renderBucket(u32 view_idx, u32 bucket_idx) const override {
+		View* view = m_views[view_idx].get();
+		m_renderer.pushJob("render bucket", [view, bucket_idx](DrawStream& stream) {
+			jobs::wait(&view->ready);
+			Bucket& bucket = view->buckets[bucket_idx];
+			stream.merge(bucket.stream);
+		});
+	}
+
+	void pass(const CameraParams& cp) const override {
+		PassState pass_state;
+		pass_state.view = cp.view;
+		pass_state.projection = cp.projection;
+		pass_state.inv_projection = cp.projection.inverted();
+		pass_state.inv_view = cp.view.fastInverted();
+		pass_state.view_projection = cp.projection * cp.view;
+		pass_state.inv_view_projection = pass_state.view_projection.inverted();
+		pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+		pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
+		toPlanes(cp, Span(pass_state.camera_planes));
+		if (cp.is_shadow) {
+			pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
+		}
+
+		const Renderer::TransientSlice ub = m_renderer.allocUniform(&pass_state, sizeof(PassState));
+		DrawStream& stream = m_renderer.getDrawStream();
+		stream.bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
+	}
+
+	void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u32 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) override {
+		PROFILE_FUNCTION();
+		if (!shader.isReady()) return;
+
+		DrawStream& stream = m_renderer.getDrawStream();
+		const gpu::ProgramHandle program = shader.getProgram(state, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask, "");
+		stream.useProgram(program);
+		stream.bindIndexBuffer(gpu::INVALID_BUFFER);
+		stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+		stream.drawArrays(indices_offset, indices_count);
+	}
+
+	void renderTexturedQuad(u32 texture_bindless, bool flip_x, bool flip_y) override {
+		struct {
+			Vec4 offset_scale = Vec4(0, 0, 1, 1);
+			Vec4 r_mask = Vec4(1, 0, 0, 0);
+			Vec4 g_mask = Vec4(0, 1, 0, 0);
+			Vec4 b_mask = Vec4(0, 0, 1, 0);
+			Vec4 a_mask = Vec4(0, 0, 0, 1);;
+			Vec4 offsets = Vec4(0, 0, 0, 1);
+			u32 texture;
+		} udata;
+		udata.texture = texture_bindless;
+		if (flip_x) udata.offset_scale.z = -1;
+		if (flip_y) udata.offset_scale.w = -1;
+		setUniform(udata);
+		drawArray(0, 3, *m_textured_quad_shader, 0, gpu::StateFlags::NONE);
+	}
+
+	void setUniformRaw(Span<const u8> mem, UniformBuffer::Enum bind_point = UniformBuffer::DRAWCALL) override {
+		Renderer::TransientSlice ub = m_renderer.allocUniform(mem.length());
+		memcpy(ub.ptr, mem.begin(), mem.length());
+		m_renderer.getDrawStream().bindUniformBuffer(bind_point, ub.buffer, ub.offset, ub.size);
+	}
+
+	gpu::TextureHandle toTexture(RenderBufferHandle handle) override {
+		return m_renderbuffers[handle].handle;
+	}
+
+	InstanceData getData(u32 idx, u32 size, u32 align) override {
+		auto iter = m_instance_data.find(idx);
+		if (iter.isValid()) return { iter.value(), false };
+
+		void* data = m_allocator.allocate(size, align);
+		m_instance_data.insert(idx, data);
+		return { data, true };
+	}
+
+
+	void dispatch(Shader& shader, u32 x, u32 y, u32 z, const char* define = nullptr) override {
+		if (!shader.isReady()) return;
+
+		gpu::ProgramHandle program = shader.getProgram(define ? 1 << m_renderer.getShaderDefineIdx(define) : 0);
+		if (!program) return;
+
+		DrawStream& stream = m_renderer.getDrawStream();
+		stream.useProgram(program);
+		stream.dispatch(x, y, z);
+	}
+
+	RenderBufferHandle tonemap(GBuffer gbuffer, RenderBufferHandle input) {
+		bool is_preview = m_type == PipelineType::PREVIEW;
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			RenderBufferHandle tonemapped;
+			if (plugin->tonemap(input, tonemapped, *this)) {
+				return tonemapped;
+			}
+		}
+
+		beginBlock("tonemap");
+		const RenderBufferHandle rb = createRenderbuffer({
+			.format = is_preview ? gpu::TextureFormat::RGBA8 : gpu::TextureFormat::SRGBA,
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS,
+			.debug_name = "tonemap"
+		});
+		setRenderTargets(Span(&rb, 1));
+		setUniform(toBindless(input, m_renderer.getDrawStream()));
+		drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
+		endBlock();
+		return rb;
+	}
+
+	CameraParams getShadowCamera(u32 slice) const {
+		const Viewport& vp = m_shadow_camera_viewports[slice];
+		CameraParams cp;
+		cp.pos = vp.pos;
+		cp.frustum = vp.getFrustum();
+		cp.lod_multiplier = m_module->getCameraLODMultiplier(vp.fov, vp.is_ortho);
+		cp.is_shadow = true;
+		cp.view = vp.getView(cp.pos);
+		cp.projection = vp.getProjectionNoJitter();
+		return cp;
+	}
+
+	CameraParams getMainCamera() const {
+		CameraParams cp;
+		cp.pos = m_viewport.pos;
+		cp.frustum = m_viewport.getFrustum();
+		cp.lod_multiplier = m_module->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
+		cp.is_shadow = false;
+		cp.view = m_viewport.getView(cp.pos);
+		cp.projection = m_viewport.getProjectionWithJitter();
+		return cp;
+	}
+
+	RenderBufferHandle shadowPass() {
+		PROFILE_FUNCTION();
+		beginBlock("shadow pass");
+		DrawStream& stream = m_renderer.getDrawStream();
+
+		const BucketDesc buckets[] = {
+			{.layer = "default", .define = "DEPTH" },
+			{.layer = "impostor", .define = "DEPTH", }
+		};
+
+		bool cast_shadows = true;
+		EntityPtr env = m_module->getActiveEnvironment();
+		if (env.isValid()) {
+			cast_shadows = isFlagSet(m_module->getEnvironment(*env).flags, Environment::CAST_SHADOWS);
+		}
+
+		if (!cast_shadows) {
+			const RenderBufferHandle shadowmap_rb = createRenderbuffer({
+				.type = RenderbufferDesc::FIXED,
+				.fixed_size = {1, 1},
+				.format = gpu::TextureFormat::D32,
+				.debug_name = "shadowmap"
+				});
+			setRenderTargets({}, shadowmap_rb);
+			clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
+			stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);
+			return shadowmap_rb;
+		}
+
+		const RenderBufferHandle shadowmap_rb = createRenderbuffer({
+			.type = RenderbufferDesc::FIXED,
+			.fixed_size = {4096, 1024},
+			.format = gpu::TextureFormat::D32,
+			.debug_name = "shadowmap"
+			});
+		setRenderTargets({}, shadowmap_rb);
+		clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
+
+		for (u32 slice = 0; slice < 4; ++slice) {
+			PROFILE_BLOCK("slice");
+			CameraParams view_params = getShadowCamera(slice);
+			stream.viewport(slice * 1024, 0, 1024, 1024);
+			pass(view_params);
+
+			u32 shadow_view = cull(view_params, Span(buckets));
+
+			renderBucket(shadow_view, 0);
+			renderBucket(shadow_view, 1);
+
+			const u32 grass_depth_defines = 1 << m_renderer.getShaderDefineIdx("GRASS") | 1 << m_renderer.getShaderDefineIdx("DEPTH");
+			const gpu::StateFlags shadow_grass_state = gpu::StateFlags::DEPTH_FUNCTION | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
+			renderGrass(view_params, shadow_grass_state, grass_depth_defines);
+			renderTerrains(view_params, gpu::StateFlags::NONE, "DEPTH");
+		}
+		endBlock();
+		stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);
+		return shadowmap_rb;
+	}
+
+	GBuffer geomPass(u32& view_idx) {
+		PROFILE_FUNCTION();
+		GBuffer gbuffer;
+		DrawStream& stream = m_renderer.getDrawStream();
+		beginBlock("geom pass");
+		const gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE;
+		gbuffer.A = createRenderbuffer({ .format = gpu::TextureFormat::SRGBA, .debug_name = "gbufferA" });
+		gbuffer.B = createRenderbuffer({ .format = gpu::TextureFormat::RGBA16, .flags = flags, .debug_name = "gbufferB" });
+		gbuffer.C = createRenderbuffer({ .format = gpu::TextureFormat::RGBA8, .flags = flags, .debug_name = "gbufferC" });
+		gbuffer.D = createRenderbuffer({ .format = gpu::TextureFormat::RG16F, .flags = flags, .debug_name = "gbufferD" });
+		gbuffer.DS = createRenderbuffer({ .format = gpu::TextureFormat::D24S8, .debug_name = "gbufferDS" });
+
+		const CameraParams cp = getMainCamera();
+		pass(cp);
+		const RenderBufferHandle gbuffer_rbs[] = { gbuffer.A, gbuffer.B, gbuffer.C, gbuffer.D };
+		setRenderTargets(Span(gbuffer_rbs), gbuffer.DS);
+		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
+
+		const gpu::StateFlags default_state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION | gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 1, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
+		const BucketDesc buckets[] = {
+			{
+				.layer = "default",
+				.define = "DEFERRED",
+				.state = default_state
+			},
+			{
+				.layer = "water",
+				.sort = BucketDesc::Sort::DEPTH,
+				.state = gpu::StateFlags::DEPTH_FUNCTION
+			},
+			{
+				.layer = "transparent",
+				.sort = BucketDesc::Sort::DEPTH,
+				.state = gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA)
+			},
+			{
+				.layer = "decal",
+				.state = gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA)
+			},
+			{
+				.layer = "impostor",
+				.define = "DEFERRED",
+				.state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION | gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 1, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE)
+			},
+		};
+
+		view_idx = cull(cp, buckets);
+		const gpu::StateFlags terrain_state = gpu::StateFlags::DEPTH_WRITE 
+			| gpu::StateFlags::DEPTH_FUNCTION 
+			| gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 2, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
+		renderTerrains(cp, terrain_state, "DEFERRED");
+		renderBucket(view_idx, 0);
+		renderBucket(view_idx, 4);
+		renderGrass(cp, default_state);
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->renderOpaque(*this);
+		}
+		endBlock();
+
+		beginBlock("decals");
+		setRenderTargets(Span(gbuffer_rbs), gbuffer.DS, true);
+		setUniform(toBindless(gbuffer.DS, stream));
+		renderBucket(view_idx, 3);
+		endBlock();
+
+		return gbuffer;
+	}
+
+	void transparentPass(GBuffer gbuffer, RenderBufferHandle shadowmap, RenderBufferHandle hdr_rb, u32 view_idx) {
+		PROFILE_FUNCTION();
+		beginBlock("water");
+		const RenderBufferHandle color_copy = createRenderbuffer({
+			.type = RenderbufferDesc::RELATIVE,
+			.rel_size = {1, 1},
+			.format = gpu::TextureFormat::R11G11B10F,
+			.debug_name = "hdr_copy"
+			});
+
+		struct {
+			Vec4 offset_scale = Vec4(0, 0, 1, 1);
+			Vec4 r_mask = Vec4(1, 0, 0, 0);
+			Vec4 g_mask = Vec4(0, 1, 0, 0);
+			Vec4 b_mask = Vec4(0, 0, 1, 0);
+			Vec4 a_mask = Vec4(0, 0, 0, 1);;
+			Vec4 offsets = Vec4(0, 0, 0, 1);
+			u32 texture;
+		} udata;
+		DrawStream& stream = m_renderer.getDrawStream();
+		udata.texture = toBindless(hdr_rb, stream);
+
+		pass(getMainCamera());
+		setRenderTargets(Span(&color_copy, 1));
+		setUniform(udata);
+		drawArray(0, 3, *m_textured_quad_shader, 0, gpu::StateFlags::NONE);
+
+		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, true);
+
+		gpu::TextureHandle reflection_probes = m_module->getReflectionProbesTexture();
+		const gpu::BindlessHandle water_textures[] = { 
+			toBindless(shadowmap, stream), 
+			toBindless(gbuffer.DS, stream), 
+			gpu::getBindlessHandle(reflection_probes), 
+			toBindless(color_copy, stream)
+		};
+		setUniform(water_textures, UniformBuffer::DRAWCALL2);
+		renderBucket(view_idx, 1);
+		endBlock();
+
+		// TODO can we marge water + transparent pass?
+		beginBlock("transparent_pass");
+		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, true);
+		const gpu::BindlessHandle transparent_pass_textures[] = { 
+			toBindless(shadowmap, stream), 
+			toBindless(gbuffer.DS, stream), 
+			gpu::getBindlessHandle(reflection_probes), 
+			toBindless(color_copy, stream) };
+		setUniform(transparent_pass_textures, UniformBuffer::DRAWCALL2);
+		pass(getMainCamera());
+		renderBucket(view_idx, 2);
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->renderTransparent(*this);
+		}
+
+		endBlock();
+	}
+
+	RenderBufferHandle lightPass(GBuffer gbuffer, RenderBufferHandle shadowmap) {
+		DrawStream& stream = m_renderer.getDrawStream();
+		// stream.barrierRead(m_shadow_atlas.texture); // TODO do we need this?
+
+		beginBlock("light pass");
+		const bool is_probe = m_type == PipelineType::PROBE;
+		const RenderBufferHandle hdr_rb = createRenderbuffer({ .format = is_probe ? gpu::TextureFormat::RGBA32F : gpu::TextureFormat::RGBA16F, .debug_name = "hdr" });
+
+		setRenderTargets(Span(&hdr_rb, 1));
+		clear(gpu::ClearFlags::ALL, m_clear_color.x, m_clear_color.y, m_clear_color.z, 0, 0);
+
+		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, true);
+		gpu::TextureHandle reflection_probes = m_module->getReflectionProbesTexture();
+		const gpu::BindlessHandle ubdata[] = { toBindless(gbuffer.A, stream)
+			, toBindless(gbuffer.B, stream)
+			, toBindless(gbuffer.C, stream)
+			, toBindless(gbuffer.D, stream)
+			, toBindless(gbuffer.DS, stream)
+			, toBindless(shadowmap, stream)
+			, gpu::getBindlessHandle(m_shadow_atlas.texture)
+			, gpu::getBindlessHandle(reflection_probes)
+		};
+		setUniform(ubdata);
+		gpu::StateFlags stencil_state = gpu::getStencilStateBits(0, gpu::StencilFuncs::NOT_EQUAL, 0, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
+		gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+		drawArray(0, 3, *m_lighting_shader, 0, stencil_state);
+		endBlock();
+		return hdr_rb;
+	}
+
+	void copy(RenderBufferHandle dst, RenderBufferHandle src, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) override {
+		setRenderTargets(Span(&dst, 1), INVALID_RENDERBUFFER);
+		struct {
+			Vec4 offset_scale;
+			Vec4 r_mask;
+			Vec4 g_mask;
+			Vec4 b_mask;
+			Vec4 a_mask;
+			Vec4 offsets;
+			u32 texture;
+		} copy_ub = {
+				Vec4(0, 0, 1, 1),
+				r,
+				g,
+				b,
+				Vec4(0, 0, 0, 1),
+				Vec4(0, 0, 0, 1)
+		};
+		DrawStream& stream = m_renderer.getDrawStream();
+		copy_ub.texture = toBindless(src, stream);
+		setUniform(copy_ub);
+		drawArray(0, 3, *m_textured_quad_shader, 0, gpu::StateFlags::NONE);
+	}
+
+	bool debugOutput(GBuffer gbuffer, RenderBufferHandle result) {
+		if (m_debug_show == DebugShow::ALBEDO) {
+			copy(result, gbuffer.A);
+			return true;
+		}
+		if (m_debug_show == DebugShow::NORMAL) {
+			copy(result, gbuffer.B, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0});
+			return true;
+		}
+		if (m_debug_show == DebugShow::ROUGHNESS) {
+			copy(result, gbuffer.A, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 });
+			return true;
+		}
+		if (m_debug_show == DebugShow::METALLIC) {
+			copy(result, gbuffer.C, { 0, 0, 1, 0 }, { 0, 0, 1, 0 }, { 0, 0, 1, 0 });
+			return true;
+		}
+		if (m_debug_show == DebugShow::AO) {
+			copy(result, gbuffer.B, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1});
+			return true;
+		}
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			if (plugin->debugOutput(result, *this)) return true;
+		}
+
+		return false;
+	}
+
+	gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
+		if (rb_idx == INVALID_RENDERBUFFER) return gpu::INVALID_BINDLESS_HANDLE;
+		stream.barrierRead(m_renderbuffers[rb_idx].handle);
+		return gpu::getBindlessHandle(m_renderbuffers[rb_idx].handle);
+	}
+
+	gpu::RWBindlessHandle toRWBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
+		if (rb_idx == INVALID_RENDERBUFFER) return gpu::INVALID_RW_BINDLESS_HANDLE;
+		stream.barrierWrite(m_renderbuffers[rb_idx].handle);
+		return gpu::getRWBindlessHandle(m_renderbuffers[rb_idx].handle);
+	}
+
+	void render2DOnly() {
+		const RenderBufferHandle rb = createRenderbuffer({
+			.type = RenderbufferDesc::DISPLAY_SIZE,
+			.format = gpu::TextureFormat::SRGBA,
+			.debug_name = "2D only"
+			});
+		setRenderTargets(Span(&rb, 1));
+		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
+		render2D(rb);
+		m_output = rb;
+	}
+
+	void renderMain() {
+		DrawStream& stream = m_renderer.getDrawStream();
+		const RenderBufferHandle shadowmap = shadowPass();
+		u32 view_idx;
+		GBuffer gbuffer = geomPass(view_idx);
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->renderBeforeLightPass(gbuffer, *this);
+		}
+
+		RenderBufferHandle result = lightPass(gbuffer, shadowmap);
+		
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			result = plugin->renderBeforeTransparent(gbuffer, result, *this);
+		}
+		transparentPass(gbuffer, shadowmap, result, view_idx);
+
+		if (m_type == PipelineType::PROBE) {
+			m_output = result;
+			return;
+		}
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			if (plugin->renderAA(gbuffer, result, *this) != INVALID_RENDERBUFFER) break;
+		}
+		
+		render2D(result);
+
+		const bool is_debug_output = debugOutput(gbuffer, result);
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			result = plugin->renderBeforeTonemap(gbuffer, result, *this);
+		}
+		renderDebugShapes();
+		if (!is_debug_output) {
+			result = tonemap(gbuffer, result);
+		}
+
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			result = plugin->renderAfterTonemap(gbuffer, result, *this);
+		}
+
+		m_output = result;
+	}
+
+	bool render(bool only_2d) override {
+		PROFILE_FUNCTION();
+
+		if (m_viewport.w <= 0 || m_viewport.h <= 0) {
 			if (m_module) {
 				m_module->clearDebugLines();
 				m_module->clearDebugTriangles();
@@ -1204,6 +1472,7 @@ struct PipelineImpl final : Pipeline
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
 		global_state.camera_reprojection = computeReprojection(m_viewport, m_prev_viewport);
 		m_timer.tick();
+		global_state.frame_idx = m_renderer.frameNumber();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
@@ -1227,7 +1496,13 @@ struct PipelineImpl final : Pipeline
 			prepareShadowCameras(global_state);
 		}
 
-		beginBlock(m_define);
+		switch (m_type) {
+			case PipelineType::PREVIEW: beginBlock("Preview"); break;
+			case PipelineType::SCENE_VIEW: beginBlock("Scene view"); break;
+			case PipelineType::GAME_VIEW: beginBlock("Game view"); break;
+			case PipelineType::PROBE: beginBlock("Probe"); break;
+			case PipelineType::GUI_EDITOR: beginBlock("GUI editor"); break;
+		}
 
 		DrawStream& stream = m_renderer.getDrawStream();
 		const Renderer::TransientSlice global_state_buffer = m_renderer.allocUniform(&global_state, sizeof(GlobalState));
@@ -1241,29 +1516,12 @@ struct PipelineImpl final : Pipeline
 
 		ASSERT(m_views.empty());
 		
-		if (!only_2d) fillClusters(stream, resolveCameraParams((CameraParamsHandle)CameraParamsEnum::MAIN));
-
-		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
-		LuaWrapper::pushRef(m_lua_state, m_lua_env);
-		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
-		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
-		LuaWrapper::setField(m_lua_state, -1, "display_w", m_display_size.x);
-		LuaWrapper::setField(m_lua_state, -1, "display_h", m_display_size.y);
-		lua_getfield(m_lua_state, -1, "main");
-		bool has_main = true;
-		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
-			lua_pop(m_lua_state, 2);
-			if (m_module) {
-				m_module->clearDebugLines();
-				m_module->clearDebugTriangles();
-			}
-			has_main = false;
+		if (only_2d) {
+			render2DOnly();
 		}
-		if (has_main) {
-			PROFILE_BLOCK("lua pipeline main");
-			profiler::blockColor(0xff, 0x7f, 0x7f);
-			LuaWrapper::pcall(m_lua_state, 0, 0);
-			lua_pop(m_lua_state, 1);
+		else {
+			fillClusters(stream, getMainCamera());
+			renderMain();
 		}
 
 		endBlock();
@@ -1341,16 +1599,17 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 
-	void renderDebugShapes()
-	{
+	void renderDebugShapes() {
+		if (m_type == PipelineType::PREVIEW) return;
 		renderDebugTriangles();
 		renderDebugLines();
 		//renderDebugPoints();
 	}
 
-	void render2D() {
+	void render2D(RenderBufferHandle input) {
 		Matrix matrix;
 		matrix.setOrtho(0, (float)m_viewport.w, (float)m_viewport.h, 0, 0, 1, false);
+		setRenderTargets(Span(&input, 1));
 		renderUIHelper(m_draw2d, false, matrix);
 		m_draw2d.clear(getAtlasSize());
 	}
@@ -1372,11 +1631,15 @@ struct PipelineImpl final : Pipeline
 		state = state | gpu::StateFlags::SCISSOR_TEST;
 		if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
 		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, m_2D_decl, 0, "");
-		const Renderer::TransientSlice ub = m_renderer.allocUniform(&matrix, sizeof(matrix));
 
 		stream.pushDebugGroup("draw2d");
-
-		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+		struct {
+			Matrix mtx;
+			gpu::BindlessHandle texture;
+		} ubdata = {
+			matrix,
+			gpu::BindlessHandle()
+		};
 		u32 elem_offset = 0;
 		stream.useProgram(program);
 		stream.bindIndexBuffer(idx_buffer_mem.buffer);
@@ -1407,7 +1670,8 @@ struct PipelineImpl final : Pipeline
 			if (cmd.texture) texture_id = *cmd.texture;
 			if (!texture_id) texture_id = atlas_texture->handle;
 
-			stream.bindTextures(&texture_id, 0, 1);
+			ubdata.texture = gpu::getBindlessHandle(texture_id);
+			setUniform(ubdata);
 			stream.drawIndexed(idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::DataType::U32);
 
 			elem_offset += cmd.indices_count;
@@ -1419,21 +1683,11 @@ struct PipelineImpl final : Pipeline
 		RenderModule* module = world ? (RenderModule*)world->getModule("renderer") : nullptr;
 		if (m_module == module) return;
 		m_module = module;
-		if (m_lua_state && m_module) callInitModule();
 	}
 	
 	Renderer& getRenderer() const override { return m_renderer; }
 
 	RenderModule* getModule() const override { return m_module; }
-
-	CustomCommandHandler& addCustomCommandHandler(const char* name) override 
-	{
-		auto& handler = m_custom_commands_handlers.emplace();
-		copyString(handler.name, name);
-		handler.hash = RuntimeHash(name);
-		exposeCustomCommandToLua(handler);
-		return handler;
-	}
 
 	static gpu::TextureFormat getFormat(const char* name)
 	{
@@ -1470,145 +1724,12 @@ struct PipelineImpl final : Pipeline
 		return gpu::TextureFormat::RGBA8;
 	}
 
-	i32 toRenderbufferIdx(lua_State* L, int idx) const {
-		LuaWrapper::checkTableArg(L, idx);
-		const int type = LuaWrapper::getField(L, idx, "value");
-		if (type != LUA_TNUMBER) {
-			LuaWrapper::argError(L, idx, "renderbuffer");
-		}
-		const i32 rb = LuaWrapper::toType<i32>(L, -1);
-		lua_pop(L, 1);
-
-		if (rb < 0 || rb >= m_renderbuffers.size()) {
-			luaL_argerror(L, idx, "invalid renderbuffer");
-		}
-
-		return rb;
+	void keepRenderbufferAlive(RenderBufferHandle idx) override {
+		if (idx == INVALID_RENDERBUFFER) return;
+		--m_renderbuffers[idx].frame_counter;
 	}
 
-	void releaseRenderbuffer(lua_State* L) {
-		const i32 rb = toRenderbufferIdx(L, 1);
-
-		if (rb >= 0 && rb < m_renderbuffers.size()) {
-			m_renderbuffers[rb].frame_counter = 2;
-		}
-	}
-
-	void keepRenderbufferAlive(lua_State* L) {
-		const i32 rb = toRenderbufferIdx(L, 1);
-
-		if (rb >= 0 && rb < m_renderbuffers.size()) {
-			--m_renderbuffers[rb].frame_counter;
-		}
-	}
-
-	PipelineTexture createRenderbuffer(RenderbufferDescHandle desc_handle) {
-		PipelineTexture res;
-		res.type = PipelineTexture::RENDERBUFFER;
-
-		const RenderbufferDesc& desc = m_renderbuffer_descs[desc_handle];
-		IVec2 size;
-		switch (desc.type) {
-			case RenderbufferDesc::FIXED: size = desc.fixed_size; break;
-			case RenderbufferDesc::RELATIVE: size = IVec2(i32(desc.rel_size.x * m_viewport.w), i32(desc.rel_size.y * m_viewport.h)); break;
-			case RenderbufferDesc::DISPLAY_SIZE: size = m_display_size; break;
-		}
-		for (Renderbuffer& rb : m_renderbuffers) {
-			if (!rb.handle) {
-				rb.frame_counter = 0;
-				StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
-				rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), name);
-				rb.flags = desc.flags;
-				rb.format = desc.format;
-				rb.size = size;
-				res.renderbuffer = u32(&rb - m_renderbuffers.begin());
-				return res;
-			}
-			else {
-				if (rb.frame_counter < 2) continue;
-				if (rb.size != size) continue;
-				if (rb.format != desc.format) continue;
-				if (rb.flags != desc.flags) continue;
-			}
-			rb.frame_counter = 0;
-			res.renderbuffer = u32(&rb - m_renderbuffers.begin());
-			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
-			m_renderer.getDrawStream().setDebugName(rb.handle, name);
-			return res;
-		}
-
-		Renderbuffer& rb = m_renderbuffers.emplace();
-		rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
-		rb.frame_counter = 0;
-		rb.flags = desc.flags;
-		rb.format = desc.format;
-		rb.size = size;
-		res.renderbuffer = m_renderbuffers.size() - 1;
-		return res;
-	}
-
-	RenderbufferDescHandle createRenderbufferDesc(lua_State* L) {
-		PROFILE_FUNCTION();
-
-		LuaWrapper::checkTableArg(L, 1);
-		IVec2 fixed_size;
-		Vec2 rel_size;
-		char format_str[64];
-		char debug_name[64] = "";
-		bool point_filter = false;
-		bool compute_write = false;
-		RenderbufferDesc::Type type = RenderbufferDesc::FIXED;
-		if (!LuaWrapper::getOptionalField(L, 1, "size", &fixed_size)) {
-			type = RenderbufferDesc::RELATIVE;
-			if (!LuaWrapper::getOptionalField(L, 1, "rel_size", &rel_size)) {
-				bool display_size = false;
-				if (LuaWrapper::getOptionalField(L, 1, "display_size", &display_size) && display_size) {
-					type = RenderbufferDesc::DISPLAY_SIZE;
-				}
-				else {
-					rel_size = Vec2(1, 1);
-				}
-			}
-		}
-		else {
-			type = RenderbufferDesc::FIXED;
-		}
-
-		if (!LuaWrapper::checkStringField(L, 1, "format", Span(format_str))) luaL_argerror(L, 1, "missing format");
-		LuaWrapper::getOptionalStringField(L, 1, "debug_name", Span(debug_name));
-		LuaWrapper::getOptionalField(L, 1, "point_filter", &point_filter);
-		LuaWrapper::getOptionalField(L, 1, "compute_write", &compute_write);
-		gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET 
-			| gpu::TextureFlags::NO_MIPS
-			| gpu::TextureFlags::CLAMP_U
-			| gpu::TextureFlags::CLAMP_V
-			| (compute_write ? gpu::TextureFlags::COMPUTE_WRITE : gpu::TextureFlags::NONE);
-		if (point_filter) flags = flags | gpu::TextureFlags::POINT_FILTER;
-
-		const gpu::TextureFormat format = getFormat(format_str);
-
-		RenderbufferDesc& rb = m_renderbuffer_descs.emplace();
-		rb.fixed_size = fixed_size;
-		rb.rel_size = rel_size;
-		rb.format = format;
-		rb.flags = flags;
-		rb.type = type;
-		rb.debug_name = debug_name;
-
-		return m_renderbuffer_descs.size() - 1;
-	}
-
-	enum class CameraParamsEnum : CameraParamsHandle {
-		MAIN,
-		CUSTOM,
-		SHADOW0,
-		SHADOW1,
-		SHADOW2,
-		SHADOW3,
-	};
-
-	CameraParams m_custom_camera_params;
-
+	// TODO is this needed?
 	void setOrthoCustomCameraParams(const DVec3 pos
 		, const Quat& rot
 		, u32 w
@@ -1643,43 +1764,9 @@ struct PipelineImpl final : Pipeline
 			reversed_z);
 	}
 
-	CameraParams resolveCameraParams(CameraParamsHandle handle) {
-		switch ((CameraParamsEnum)handle) {
-			case CameraParamsEnum::CUSTOM: return m_custom_camera_params;
-			case CameraParamsEnum::MAIN: {
-				CameraParams cp;
-				cp.pos = m_viewport.pos;
-				cp.frustum = m_viewport.getFrustum();
-				cp.lod_multiplier = m_module->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
-				cp.is_shadow = false;
-				cp.view = m_viewport.getView(cp.pos);
-				cp.projection = m_viewport.getProjectionWithJitter();
-				return cp;
-			}
-			case CameraParamsEnum::SHADOW0:
-			case CameraParamsEnum::SHADOW1:
-			case CameraParamsEnum::SHADOW2:
-			case CameraParamsEnum::SHADOW3: {
-				const Viewport& vp = m_shadow_camera_viewports[(u32)handle - (u32)CameraParamsEnum::SHADOW0];
-				CameraParams cp;
-				cp.pos = vp.pos;
-				cp.frustum = vp.getFrustum();
-				cp.lod_multiplier = m_module->getCameraLODMultiplier(vp.fov, vp.is_ortho);
-				cp.is_shadow = true;
-				cp.view = vp.getView(cp.pos);
-				cp.projection = vp.getProjectionNoJitter();
-				return cp;
-			}
-		}
-		return {};
-	}
-
-	void renderTerrains(CameraParamsHandle cp_handle, RenderStateHandle render_state_handle, LuaWrapper::Optional<const char*> define) {
-		const CameraParams cp = resolveCameraParams(cp_handle);
-		const u32 define_mask = define.valid && define.value[0] ? 1 << m_renderer.getShaderDefineIdx(define.value) : 0;
-		const gpu::StateFlags render_state = m_render_states[render_state_handle];
-
-		m_renderer.pushJob("terrain", [this, cp, render_state, define_mask](DrawStream& stream){
+	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {
+		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		m_renderer.pushJob("terrain", [this, cp, state, define_mask](DrawStream& stream){
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			if(terrains.empty()) return;
 
@@ -1697,7 +1784,7 @@ struct PipelineImpl final : Pipeline
 				const Vec3 scale = terrain->getScale();
 				const Vec2 hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				const gpu::ProgramHandle program = shader->getProgram(render_state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask(), "");
+				const gpu::ProgramHandle program = shader->getProgram(state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask(), "");
 				const Material* material = terrain->m_material;
 				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
@@ -1726,7 +1813,7 @@ struct PipelineImpl final : Pipeline
 				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				stream.bind(0, material->m_bind_group);
+				material->bind(stream);
 				for (;;) {
 					// round 
 					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(terrain->m_base_grid_res / 2);
@@ -1775,9 +1862,8 @@ struct PipelineImpl final : Pipeline
 		});
 	}
 	
-	void renderGrass(lua_State* L, CameraParamsHandle cp_handle, LuaWrapper::Optional<RenderStateHandle> state_handle) {
+	void renderGrass(CameraParams cp, gpu::StateFlags state = gpu::StateFlags::NONE, u32 define_mask = 0) {
 		PROFILE_FUNCTION();
-		const CameraParams cp = resolveCameraParams(cp_handle);
 		if (!cp.is_shadow) {
 			for (Terrain* terrain : m_module->getTerrains()) {
 				const Transform tr = m_module->getWorld().getTransform(terrain->m_entity);
@@ -1787,27 +1873,13 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		u32 define_mask = 0;
-		if (lua_istable(L, 2)) {
-			const char* define = "";
-			LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
-			define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-
-			if (LuaWrapper::getField(L, 2, "defines") != LUA_TNIL) {
-				LuaWrapper::forEachArrayItem<const char*>(L, -1, "array of strings expeceted", [&](const char* define){
-					define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
-				});
-			}
-			lua_pop(L, 1);
-		}
 		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
-		gpu::StateFlags render_state = state_handle.valid ? m_render_states[state_handle.value] : gpu::StateFlags::NONE;
 
 		gpu::VertexDecl grass_instance_decl(gpu::PrimitiveType::NONE);
 		grass_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		grass_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-		m_renderer.pushJob("grass", [this, cp, define_mask, render_state, grass_instance_decl](DrawStream& stream){
+		m_renderer.pushJob("grass", [this, cp, define_mask, state, grass_instance_decl](DrawStream& stream){
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			const World& world = m_module->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
@@ -1838,11 +1910,10 @@ struct PipelineImpl final : Pipeline
 						ASSERT(shader->isReady());
 
 						const Material* material = mesh.material;
-						gpu::StateFlags state = render_state | material->m_render_states;
-
-						gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, grass_instance_decl, define_mask | material->getDefineMask(), mesh.semantics_defines);
+ 
+						gpu::ProgramHandle program = shader->getProgram(state | material->m_render_states, mesh.vertex_decl, grass_instance_decl, define_mask | material->getDefineMask(), mesh.semantics_defines);
 						stream.useProgram(program);
-						stream.bind(0, material->m_bind_group);
+						material->bind(stream);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
 						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						
@@ -1863,7 +1934,7 @@ struct PipelineImpl final : Pipeline
 							count_scale *= count_scale;
 
 							const u32 instance_count = u32(quad.instances_count * count_scale);
-							if (instance_count  == 0) {
+							if (instance_count == 0) {
 								++culled_count;
 								continue;
 							}
@@ -1940,163 +2011,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point, bool writable) {
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.bindShaderBuffer(buffer_handle, binding_point, writable ? gpu::BindShaderBufferFlags::OUTPUT : gpu::BindShaderBufferFlags::NONE);
-	}
-	
-	LuaBufferHandle createBuffer(u32 size) {
-		Renderer::MemRef mem;
-		mem.own = false;
-		mem.data = nullptr;
-		mem.size = size;
-		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
-		m_buffers.push(buffer);
-		return buffer;
-	}
-	
-	PipelineTexture createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
-		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = m_renderer.createTexture(width
-			, height
-			, depth
-			, format
-			, gpu::TextureFlags::IS_3D | gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
-			, Renderer::MemRef()
-			, debug_name.get("lua_texture"));
-		m_textures.push(texture);
-
-		PipelineTexture res;
-		res.type = PipelineTexture::RAW;
-		res.raw = texture;
-		return res;
-	}
-	
-	PipelineTexture createTextureArray(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
-		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = m_renderer.createTexture(width
-			, height
-			, depth
-			, format
-			, gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
-			, Renderer::MemRef()
-			, debug_name.get("lua_texture"));
-		m_textures.push(texture);
-
-		PipelineTexture res;
-		res.type = PipelineTexture::RAW;
-		res.raw = texture;
-		return res;
-	}
-
-	PipelineTexture createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
-		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = m_renderer.createTexture(width
-			, height
-			, 1
-			, format
-			, gpu::TextureFlags::CLAMP_U | gpu::TextureFlags::CLAMP_V | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE
-			, Renderer::MemRef()
-			, debug_name.get("lua_texture"));
-		m_textures.push(texture);
-
-		PipelineTexture res;
-		res.type = PipelineTexture::RAW;
-		res.raw = texture;
-		return res;
-	}
-
-	static int drawcallUniforms(lua_State* L) {
-		PipelineImpl* pipeline = LuaWrapper::getClosureObject<PipelineImpl>(L);
-		const int len = lua_gettop(L);
-
-		const Renderer::TransientSlice ub = pipeline->m_renderer.allocUniform(sizeof(float) * len);
-
-		float* values = (float*)ub.ptr;
-		for(int i = 0; i < len; ++i) {
-			values[i] = LuaWrapper::checkArg<float>(L, i + 1);
-		}
-
-		DrawStream& stream = pipeline->m_renderer.getDrawStream();
-		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-		return 0;
-	}
-
-	void dispatch(u32 shader_id, u32 num_groups_x, u32 num_groups_y, u32 num_groups_z, LuaWrapper::Optional<const char*> define) {
-		Shader* shader = nullptr;
-		for (const ShaderRef& s : m_shaders) {
-			if(s.id == shader_id) {
-				shader = s.res;
-				break;
-			}
-		}
-		if (!shader || !shader->isReady()) return;
-
-		u32 defines = 0;
-		if (define.valid) {
-			defines |= 1 << m_renderer.getShaderDefineIdx(define.value);
-		}
-		gpu::ProgramHandle program = shader->getProgram(defines);
-		if (!program) return;
-
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.useProgram(program);
-		stream.dispatch(num_groups_x, num_groups_y, num_groups_z);
-	}
-
-	gpu::TextureHandle toHandle(PipelineTexture tex) const {
-		switch (tex.type) {
-			case PipelineTexture::RENDERBUFFER: return tex.renderbuffer < (u32)m_renderbuffers.size() ? m_renderbuffers[tex.renderbuffer].handle : gpu::INVALID_TEXTURE;
-			case PipelineTexture::RAW: return tex.raw;
-			case PipelineTexture::RESOURCE: {
-				if (tex.resource == -2) return m_shadow_atlas.texture;
-				if (tex.resource == -3) return m_module->getReflectionProbesTexture();
-
-				Resource* res = m_renderer.getEngine().getLuaResource(tex.resource);
-				if (res->getType() != Texture::TYPE) return gpu::INVALID_TEXTURE;
-				return ((Texture*)res)->handle;
-			}
-		}
-		ASSERT(false);
-		return gpu::INVALID_TEXTURE;
-	}
-
-	void bindImageTexture(PipelineTexture texture, u32 unit) {
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.bindImageTexture(toHandle(texture), unit);
-	}
-
-	void bindTextures(lua_State* L, LuaWrapper::Array<PipelineTexture, 16> textures, LuaWrapper::Optional<u32> offset) 	{
-		StackArray<gpu::TextureHandle, 16> textures_handles(m_allocator);
-		for (u32 i = 0; i < textures.size; ++i) {
-			textures_handles.push(toHandle(textures[i]));
-		}
-
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.bindTextures(textures_handles.begin(), offset.get(0), textures_handles.size());
-	};
-	
-	void pass(CameraParamsHandle cp_handle) {
-		const CameraParams cp = resolveCameraParams(cp_handle);
-		PassState pass_state;
-		pass_state.view = cp.view;
-		pass_state.projection = cp.projection;
-		pass_state.inv_projection = cp.projection.inverted();
-		pass_state.inv_view = cp.view.fastInverted();
-		pass_state.view_projection = cp.projection * cp.view;
-		pass_state.inv_view_projection = pass_state.view_projection.inverted();
-		pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-		pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
-		toPlanes(cp, Span(pass_state.camera_planes));
-		if (cp.is_shadow) {
-			pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
-		}
-
-		const Renderer::TransientSlice ub = m_renderer.allocUniform(&pass_state, sizeof(PassState));
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
-	}
-
 	static void toPlanes(const CameraParams& cp, Span<Vec4> planes) {
 		ASSERT(planes.length() >= 6);
 		for (int i = 0; i < 6; ++i) {
@@ -2106,79 +2020,6 @@ struct PipelineImpl final : Pipeline
 			planes[i].w = cp.frustum.ds[i];
 		}
 	}
-
-	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id) {
-		PROFILE_FUNCTION();
-		LuaWrapper::DebugGuard guard(L);
-		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
-		
-		LuaWrapper::Optional<RenderStateHandle> state_handle = LuaWrapper::checkArg<LuaWrapper::Optional<RenderStateHandle>>(L, 5);
-		const gpu::StateFlags rs = state_handle.valid ? m_render_states[state_handle.value] : gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
-
-		Shader* shader = nullptr;
-		for (const ShaderRef& s : m_shaders) {
-			if(s.id == shader_id) {
-				shader = s.res;
-				break;
-			}
-		}
-		if (!shader) {
-			luaL_error(L, "Unknown shader id %d.", shader_id);
-			return;
-		}
-
-		if (shader->isFailure()) {
-			luaL_error(L, "Shader %s failed to load. `drawArrays` has no effect.", shader->getPath().c_str());
-			return;
-		}
-		if (!shader->isReady()) return;
-
-		
-		StackArray<gpu::TextureHandle, 16> textures_handles(m_allocator);
-		u32 define_mask = 0;
-		if(lua_gettop(L) > 3) {
-			const u32 len = (u32)lua_objlen(L, 4);
-
-			for(u32 i = 0; i < len; ++i) {
-				lua_rawgeti(L, 4, i + 1);
-				if (!LuaWrapper::isType<PipelineTexture>(L, -1)) luaL_argerror(L, 4, "expected textures");
-				const PipelineTexture tex = LuaWrapper::toType<PipelineTexture>(L, -1);
-				textures_handles.push(toHandle(tex));
-				lua_pop(L, 1);
-			}
-		
-			if (lua_isstring(L, 6)) {
-				const char* define = lua_tostring(L, 6);
-				define_mask = 1 << m_renderer.getShaderDefineIdx(define);
-			}
-			else if (lua_istable(L, 6)) {
-				lua_pushnil(L);
-				while (lua_next(L, 6) != 0) {
-					if(lua_type(L, -1) != LUA_TSTRING) {
-						luaL_error(L, "%s", "Incorrect define arguments of drawArrays");
-					}
-					const char* define = lua_tostring(L, -1);
-					define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
-					lua_pop(L, 1);
-				}
-			}
-		}
-	
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.bindTextures(textures_handles.begin(), 0, textures_handles.size());
-		const gpu::ProgramHandle program = shader->getProgram(rs, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask, "");
-		stream.useProgram(program);
-		stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-		stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-		stream.drawArrays(indices_offset, indices_count);
-	}
-
-	DVec3 getCameraPositionFromParams(CameraParamsHandle cp) {
-		return resolveCameraParams(cp).pos;
-	}
-
-	CameraParamsHandle getCameraParams() { return (CameraParamsHandle)CameraParamsEnum::MAIN; }
 
 	static void findExtraShadowcasterPlanes(const Vec3& light_forward
 		, const Frustum& camera_frustum
@@ -2205,35 +2046,6 @@ struct PipelineImpl final : Pipeline
 			}
 			prev_side = side;
 		}
-	}
-
-	void renderUI() {
-		PROFILE_FUNCTION();
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			plugin->renderUI(*this);
-		}
-	}
-
-	void renderOpaque() {
-		PROFILE_FUNCTION();
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			plugin->renderOpaque(*this);
-		}
-	}
-
-	void renderTransparent() {
-		PROFILE_FUNCTION();
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			plugin->renderTransparent(*this);
-		}
-	}
-
-	bool renderAA(PipelineTexture color, PipelineTexture velocity, PipelineTexture depth, PipelineTexture output) {
-		PROFILE_FUNCTION();
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			if (plugin->renderAA(*this, toHandle(color), toHandle(velocity), toHandle(depth), toHandle(output))) return true;
-		}
-		return false;
 	}
 
 	void enablePixelJitter(bool enable) override {
@@ -2354,7 +2166,7 @@ struct PipelineImpl final : Pipeline
 			const u32 stride = pg.vertex_decl.getStride();
 			
 			bucket.stream.useProgram(program);
-			bucket.stream.bind(0, pg.material->m_bind_group);
+			pg.material->bind(bucket.stream);
 			bucket.stream.bindIndexBuffer(pg.index_buffer);
 			bucket.stream.bindVertexBuffer(0, pg.vertex_buffer, 0, stride);
 			bucket.stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -2377,6 +2189,7 @@ struct PipelineImpl final : Pipeline
 		const float global_lod_multiplier = m_renderer.getLODMultiplier();
 		const World& world = m_module->getWorld();
 		const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
+		if (ims.empty()) return;
 		
 		struct UBValues {
 			Vec4 camera_offset;
@@ -2388,13 +2201,16 @@ struct PipelineImpl final : Pipeline
 			float padding;
 			Vec4 camera_planes[6];
 			IVec4 indices_count[32];
+			u32 culled_buffer;
+			u32 instanced_data;
+			u32 indirect_buffer;
 		};
 
 		UBValues ub_values;
 		toPlanes(view.cp, Span(ub_values.camera_planes));
 
 		const gpu::BufferHandle culled_buffer = m_instanced_meshes_buffer;
-		stream.bindShaderBuffer(m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
+		//stream.bindShaderBuffer(m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
 		const gpu::ProgramHandle gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
 		const gpu::ProgramHandle indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
 		u32 cull_shader_defines = 1 << m_renderer.getShaderDefineIdx("PASS1");
@@ -2485,26 +2301,38 @@ struct PipelineImpl final : Pipeline
 			ub_values.indirect_offset = indirect_offset;
 			ub_values.radius = m->getOriginBoundingRadius();
 			ub_values.batch_size = instance_count;
+			ub_values.culled_buffer = gpu::getBindlessHandle(culled_buffer) + 1;
+			ub_values.instanced_data = gpu::getBindlessHandle(im.gpu_data) + 1;
+			ub_values.indirect_buffer = gpu::getBindlessHandle(m_indirect_buffer) + 1;
 			ASSERT((u32)m->getMeshCount() < lengthOf(ub_values.indices_count)); // TODO
 			for (i32 i = 0; i < m->getMeshCount(); ++i) {
 				const Mesh& mesh = m->getMesh(i);
 				ub_values.indices_count[i].x = mesh.indices_count;
 			}
 
+			gpu::VertexDecl instanced_decl(gpu::PrimitiveType::NONE);
+			instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+			instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+
 			const Renderer::TransientSlice drawcall_ub = m_renderer.allocUniform(&ub_values, sizeof(ub_values));
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
 
-			stream.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
+			stream.barrierWrite(m_instanced_meshes_buffer);
+			stream.barrierWrite(m_indirect_buffer);
+			stream.barrierWrite(culled_buffer);
+			//stream.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
 			stream.useProgram(init_shader);
 			stream.dispatch(1, 1, 1);
-			stream.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+			stream.memoryBarrier(culled_buffer);
 
 			if (view.cp.is_shadow) {
-				stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
+				stream.barrierRead(im.gpu_data);
+				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
 			}
 			else {
-				stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+				stream.barrierWrite(im.gpu_data);
+				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
 				stream.useProgram(update_lods_shader);
 				for (u32 i = 0; i < cell_count; ++i) {
 					if (!cells[i].visible) {
@@ -2521,15 +2349,16 @@ struct PipelineImpl final : Pipeline
 					stream.dispatch((cells[i].count + 255) / 256, 1, 1);
 				}
 			}
-			stream.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+			stream.memoryBarrier(culled_buffer);
 
 			if (!view.cp.is_shadow) {
-				stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
+				stream.barrierRead(im.gpu_data);
+				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
 			}
 
 			stream.useProgram(indirect_shader);
 			stream.dispatch((m->getMeshCount() + 255) / 256, 1, 1);
-			stream.memoryBarrier(gpu::MemoryBarrierType::SSBO, m_indirect_buffer);
+			stream.memoryBarrier(m_indirect_buffer);
 
 			stream.useProgram(gather_shader);
 			for (u32 i = 0; i < cell_count; ++i) {
@@ -2539,7 +2368,7 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 
-			stream.memoryBarrier(gpu::MemoryBarrierType::SSBO, culled_buffer);
+			stream.memoryBarrier(culled_buffer);
 
 			const u32 instanced_define = 1 << m_renderer.getShaderDefineIdx("INSTANCED");
 			for (i32 i = 0; i < m->getMeshCount(); ++i) {
@@ -2552,10 +2381,10 @@ struct PipelineImpl final : Pipeline
 				Shader* shader = mesh.material->getShader();
 				const Material* material = mesh.material;
 				const gpu::StateFlags state = material->m_render_states | bucket.state;
-				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask(), mesh.semantics_defines);
+				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, instanced_define_mask | mesh.material->getDefineMask(), mesh.semantics_defines);
 
 				bucket.stream.useProgram(program);
-				bucket.stream.bind(0, material->m_bind_group);
+				material->bind(bucket.stream);
 				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
 				bucket.stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 				bucket.stream.bindVertexBuffer(1, m_instanced_meshes_buffer, 48, 32);
@@ -2570,106 +2399,15 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		stream.memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_indirect_buffer);
+		stream.memoryBarrier(m_indirect_buffer);
 			
-		stream.bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-		stream.bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
-		stream.bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);	
+		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
+		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
+		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);	
 
-		stream.memoryBarrier(gpu::MemoryBarrierType::COMMAND, m_indirect_buffer);
+		stream.memoryBarrier(m_indirect_buffer);
 	}
 
-	static int cull(lua_State* L) {
-		PROFILE_FUNCTION();
-		
-		PipelineImpl* pipeline = LuaWrapper::getClosureObject<PipelineImpl>(L);
-		const CameraParamsHandle cp_handle = LuaWrapper::checkArg<CameraParamsHandle>(L, 1);
-		const CameraParams cp = pipeline->resolveCameraParams(cp_handle);
-		const i32 bucket_count = lua_gettop(L) - 1;
-		for (i32 i = 0; i < bucket_count; ++i) LuaWrapper::checkTableArg(L, 2 + i);
-		
-		UniquePtr<View>& view = pipeline->m_views.emplace();
-		ArenaAllocator& allocator = pipeline->m_renderer.getCurrentFrameAllocator();
-		view = UniquePtr<View>::create(allocator, allocator, pipeline->m_renderer.getEngine().getPageAllocator());
-		view->cp = cp;
-		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
-
-		view->buckets.reserve(bucket_count);
-		for (i32 i = 0; i < bucket_count; ++i) {
-			char layer[32];
-			if (!LuaWrapper::checkStringField(L, 2 + i, "layer", Span(layer))) {
-				LuaWrapper::argError(L, 2 + i, "expected table with `layer` key");
-			}
-			if (equalStrings(layer, "view")) {
-				LuaWrapper::argError(L, 2 + i, "layer name `view` is reserved");
-			}
-			Bucket& bucket = view->buckets.emplace(pipeline->m_renderer);
-			bucket.layer = pipeline->m_renderer.getLayerIdx(layer);
-			copyString(Span(bucket.layer_name), layer); 
-			
-			char sort[32];
-			if (LuaWrapper::getOptionalStringField(L, 2 + i, "sort", Span(sort))) {
-				bucket.sort = equalIStrings(sort, "depth") ? Bucket::DEPTH : Bucket::DEFAULT;
-			}
-
-			char define[32];
-			if (LuaWrapper::getOptionalStringField(L, 2 + i, "define", Span(define))) {
-				bucket.define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
-			}
-
-			RenderStateHandle state_handle;
-			if (LuaWrapper::getOptionalField<RenderStateHandle>(L, 2 + i, "state", &state_handle)) {
-				bucket.state = pipeline->m_render_states[state_handle];
-			}
-		}
-
-		for (i32 i = 0; i < view->buckets.size(); ++i) {
-			Bucket& bucket = view->buckets[i];
-			view->layer_to_bucket[bucket.layer] = i;
-		}
-
-		if (pipeline->m_instancing_shader->isReady()) {
-			const HashMap<EntityRef, InstancedModel>& ims = pipeline->m_module->getInstancedModels();
-			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-				if (iter.value().dirty) {
-					pipeline->m_module->initInstancedModelGPUData(iter.key());
-				}
-			}
-		}
-
-		View* view_ptr = view.get();
-		jobs::setRed(&view->ready);
-		pipeline->m_renderer.pushJob("prepare view", [pipeline, view_ptr](DrawStream& stream){
-			pipeline->setupFur(*view_ptr);
-			pipeline->setupParticles(*view_ptr);
-			pipeline->encodeInstancedModels(stream, *view_ptr);
-			pipeline->encodeProceduralGeometry(*view_ptr);
-
-			view_ptr->renderables = pipeline->m_module->getRenderables(view_ptr->cp.frustum);
-			
-			if (view_ptr->renderables) {
-				pipeline->createSortKeys(*view_ptr);
-				view_ptr->renderables->free(pipeline->m_renderer.getEngine().getPageAllocator());
-			}
-			view_ptr->sorter.pack();
-
-			if (!view_ptr->sorter.keys.empty()) {
-				pipeline->radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
-				pipeline->createCommands(*view_ptr);
-			}
-			
-			jobs::setGreen(&view_ptr->ready);
-		});
-
-		lua_newtable(L);
-		const u32 view_id = pipeline->m_views.size() - 1;
-		LuaWrapper::setField(L, -1, "view", view_id);
-		for (u32 i = 0; i < (u32)view->buckets.size(); ++i) {
-			LuaWrapper::setField(L, -1, view->buckets[i].layer_name, (view_id << 16) | i);
-		}
-		return 1;
-	}
-	   
 	void createCommands(View& view)
 	{
 		PROFILE_FUNCTION();
@@ -2723,7 +2461,7 @@ struct PipelineImpl final : Pipeline
 				dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
 				skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
 				fur_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("FUR"));
-				const bool sort_depth = view.buckets[bucket].sort == Bucket::DEPTH;
+				const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
 				instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 				render_state = view.buckets[bucket].state;
 			}
@@ -2746,7 +2484,7 @@ struct PipelineImpl final : Pipeline
 
 					const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
 					stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-					stream->bind(0, material->m_bind_group);
+					material->bind(*stream);
 					stream->useProgram(program);
 					stream->bindIndexBuffer(gpu::INVALID_BUFFER);
 					stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2780,7 +2518,7 @@ struct PipelineImpl final : Pipeline
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, autoinstanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
 						stream->useProgram(program);
-						stream->bind(0, material->m_bind_group);
+						material->bind(*stream);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
@@ -2803,7 +2541,7 @@ struct PipelineImpl final : Pipeline
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
 						
 						stream->useProgram(program);
-						stream->bind(0, material->m_bind_group);
+						material->bind(*stream);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						stream->bindVertexBuffer(1, instances.slice.buffer, instances.slice.offset, 48);
@@ -2852,7 +2590,7 @@ struct PipelineImpl final : Pipeline
 							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
 						
 							stream->useProgram(program);
-							stream->bind(0, material->m_bind_group);
+							material->bind(*stream);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
 							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 96);
@@ -2886,7 +2624,7 @@ struct PipelineImpl final : Pipeline
 							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
 						
 							stream->useProgram(program);
-							stream->bind(0, material->m_bind_group);
+							material->bind(*stream);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
 							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
@@ -2951,7 +2689,7 @@ struct PipelineImpl final : Pipeline
 					const gpu::StateFlags state = material->m_render_states | render_state;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines, mesh.semantics_defines);
 					stream->useProgram(program);
-					stream->bind(0, material->m_bind_group);
+					material->bind(*stream);
 					stream->bindIndexBuffer(mesh.index_buffer_handle);
 					stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 					stream->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -2993,7 +2731,7 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					stream->bind(0, material->m_bind_group);
+					material->bind(*stream);
 					stream->bindIndexBuffer(m_cube_ib);
 					stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
@@ -3055,7 +2793,7 @@ struct PipelineImpl final : Pipeline
 						intersecting ? --end : ++beg;
 					}
 
-					stream->bind(0, material->m_bind_group);
+					material->bind(*stream);
 					stream->bindIndexBuffer(m_cube_ib);
 					stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
@@ -3205,7 +2943,6 @@ struct PipelineImpl final : Pipeline
 			ClusterLight& light = lights[atlas_sorter.lights[i].idx];
 			EntityRef e = atlas_sorter.lights[i].entity;
 			PointLight& pl = m_module->getPointLight(e);
-			// TODO bakeShadow reenters m_lua_state, this is not safe since it's inside another job
 			if (light.atlas_idx == -1) {
 				light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
 				bakeShadow(pl, light.atlas_idx);
@@ -3218,18 +2955,18 @@ struct PipelineImpl final : Pipeline
 		const Renderer::TransientSlice shadow_matrices_ub = m_renderer.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
 
-		m_renderer.pushJob([clusters_count, clusters, lights, lights_count, cam_pos, &world, size, cp, this, &frame_allocator](DrawStream& stream){
-			auto bind = [](auto& buffer, const void* data, u32 size, i32 idx, DrawStream& stream){
+		m_renderer.pushJob("fill clusters", [clusters_count, clusters, lights, lights_count, cam_pos, &world, size, cp, this, &frame_allocator](DrawStream& stream){
+			auto bind = [](auto& buffer, const void* data, u32 size, DrawStream& stream, const char* debug_name){
 				if (!size) return;
 				const u32 capacity = (size + 15) & ~15;
 				if (buffer.capacity < capacity) {
 					if (buffer.buffer) stream.destroy(buffer.buffer);
 					buffer.buffer = gpu::allocBufferHandle();
-					stream.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
+					stream.createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr, debug_name);
 					buffer.capacity = capacity;
 				}
 				stream.update(buffer.buffer, data, size);
-				stream.bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
+				stream.barrierRead(buffer.buffer);
 			};
 			const Span<const ReflectionProbe> module_refl_probes = m_module->getReflectionProbes();
 			const Span<const EnvironmentProbe> module_env_probes = m_module->getEnvironmentProbes();
@@ -3450,16 +3187,22 @@ struct PipelineImpl final : Pipeline
 				cluster.offset -= cluster.lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
 		
-			bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), 11, stream);
-			bind(m_cluster_buffers.maps, map, offset * sizeof(i32), 13, stream);
-			bind(m_cluster_buffers.env_probes, env_probes, module_env_probes.length() * sizeof(env_probes[0]), 14, stream);
-			bind(m_cluster_buffers.refl_probes, refl_probes, module_refl_probes.length() * sizeof(refl_probes[0]), 15, stream);
-			bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, 12, stream);
+			bind(m_cluster_buffers.lights, lights, lights_count * sizeof(lights[0]), stream, "lights");
+			bind(m_cluster_buffers.clusters, clusters, sizeof(clusters[0]) * clusters_count, stream, "clusters");
+			bind(m_cluster_buffers.maps, map, offset * sizeof(i32), stream, "cluster_map");
+			bind(m_cluster_buffers.env_probes, env_probes, module_env_probes.length() * sizeof(env_probes[0]), stream, "env_probes");
+			bind(m_cluster_buffers.refl_probes, refl_probes, module_refl_probes.length() * sizeof(refl_probes[0]), stream, "refl_probes");
+			gpu::BufferHandle sbs[] = {
+				m_cluster_buffers.lights.buffer,
+				m_cluster_buffers.clusters.buffer,
+				m_cluster_buffers.maps.buffer,
+				m_cluster_buffers.env_probes.buffer,
+				m_cluster_buffers.refl_probes.buffer
+			};
+			stream.bindShaderBuffers(sbs);
 		});
 	}
 
-	CameraParamsHandle getShadowCameraParams(i32 slice) { return (CameraParamsHandle)CameraParamsEnum::SHADOW0 + slice; }
-	
 	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb, IVec2 viewport_size) {
 		gpu::FramebufferFlags flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;
 		if (readonly_ds) {
@@ -3468,49 +3211,6 @@ struct PipelineImpl final : Pipeline
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.setFramebuffer(renderbuffers.begin(), renderbuffers.length(), ds, flags);
 		stream.viewport(0, 0, viewport_size.x, viewport_size.y);
-	}
-
-	static int setRenderTargets(lua_State* L, bool has_ds, bool readonly_ds) {
-		PROFILE_FUNCTION();
-		PipelineImpl* pipeline = LuaWrapper::getClosureObject<PipelineImpl>(L);
-
-		const u32 rb_count = lua_gettop(L) - (has_ds ? 1 : 0);
-		gpu::TextureHandle rbs[16];
-		if(rb_count > lengthOf(rbs)) {
-			luaL_error(L, "%s", "Too many render buffers");	
-			return 0;
-		}
-
-		IVec2 size;
-		size.x = pipeline->m_viewport.w;
-		size.y = pipeline->m_viewport.h;
-
-		for(u32 i = 0; i < rb_count; ++i) {
-			const i32 rb_idx = pipeline->toRenderbufferIdx(L, i + 1);
-			rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
-			size = pipeline->m_renderbuffers[rb_idx].size;
-		}
-
-		gpu::TextureHandle ds = gpu::INVALID_TEXTURE;
-		if (has_ds) {
-			const int ds_idx = pipeline->toRenderbufferIdx(L, rb_count + 1);
-			ds = pipeline->m_renderbuffers[ds_idx].handle;
-		}
-
-		pipeline->setRenderTargets(Span(rbs, rb_count), ds, readonly_ds, true, size);
-		return 0;
-	}
-
-	static int setRenderTargets(lua_State* L) { 
-		return setRenderTargets(L, false, false);
-	}
-
-	static int setRenderTargetsReadonlyDS(lua_State* L) { 
-		return setRenderTargets(L, true, true);
-	}
-
-	static int setRenderTargetsDS(lua_State* L) {
-		return setRenderTargets(L, true, false);
 	}
 
 	void createSortKeys(PipelineImpl::View& view) {
@@ -3534,7 +3234,7 @@ struct PipelineImpl final : Pipeline
 			if (bucket_map[i] == 0xff) {
 				bucket_map[i] = 0xffFFffFF;
 			}
-			else if (view.buckets[bucket_map[i]].sort == Bucket::DEPTH) {
+			else if (view.buckets[bucket_map[i]].sort == BucketDesc::DEPTH) {
 				bucket_map[i] |= 0x100;
 			}
 		}
@@ -3868,33 +3568,25 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void clear(u32 flags, float r, float g, float b, float a, float depth) {
-		const Vec4 color = Vec4(r, g, b, a);
-		DrawStream& stream = m_renderer.getDrawStream();
-		stream.clear((gpu::ClearFlags)flags, &color.x, depth);
-	}
-
-	void viewport(int x, int y, int w, int h) {
+	void viewport(int x, int y, int w, int h) override {
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.viewport(x, y, w, h);
 	}
 
-	void beginBlock(const char* name) {
+	PipelineType getType() const override {
+		return m_type;
+	}
+
+	void beginBlock(const char* name) override {
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.beginProfileBlock(name, 0);
 	}
 
-	void endBlock() {
+	void endBlock() override {
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.endProfileBlock();
 	}
 	
-	void setOutput(lua_State* L, PipelineTexture tex) {
-		if (tex.type != PipelineTexture::RENDERBUFFER) LuaWrapper::argError(L, 1, "renderbuffer");
-		
-		m_output = tex.renderbuffer;
-	}
-
 	bool environmentCastShadows() {
 		if (!m_module) return false;
 		const EntityPtr env = m_module->getActiveEnvironment();
@@ -3902,220 +3594,32 @@ struct PipelineImpl final : Pipeline
 		return m_module->getEnvironmentCastShadows((EntityRef)env);
 	}
 
-	RenderStateHandle createRenderState(RenderState state) {
-		for (const gpu::StateFlags& s : m_render_states) {
-			if (s == state.value) return RenderStateHandle(&s - m_render_states.begin());
-		}
-		m_render_states.push(state.value);
-		return m_render_states.size() - 1;
-	}
-
-	int preloadShader(const char* path)
-	{
-		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		ShaderRef s;
-		s.res = rm.load<Shader>(Path(path));
-		s.id = 0;
-		for(ShaderRef& i : m_shaders) {
-			if(i.id >= s.id) {
-				s.id = i.id + 1;
-			}
-		}
-		m_shaders.push(s);
-		return s.id;
-	}
-
-	void callLuaFunction(const char* function) override 
-	{
-		if (!m_lua_state) return;
-
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_getfield(m_lua_state, -1, function);
-		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION)
-		{
-			lua_pop(m_lua_state, 2);
-			return;
-		}
-
-		if (lua_pcall(m_lua_state, 0, 0, 0) != 0)
-		{
-			logWarning(lua_tostring(m_lua_state, -1));
-			lua_pop(m_lua_state, 1);
-		}
-		lua_pop(m_lua_state, 1);
-	}
-
-	void saveRenderbuffer(lua_State* L) { 
-		const i32 render_buffer = toRenderbufferIdx(L, 1);
-		Path path = Path(LuaWrapper::checkArg<const char*>(L, 2));
-		DrawStream& stream = m_renderer.getDrawStream();
-
-		FileSystem* fs = &m_renderer.getEngine().getFileSystem();
-		const Renderer::MemRef mem = m_renderer.allocate(sizeof(u32) * m_viewport.w * m_viewport.h);
-		const gpu::TextureHandle staging = gpu::allocTextureHandle();
-		const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-		stream.createTexture(staging, m_viewport.w, m_viewport.h, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
-		stream.copy(staging, m_renderbuffers[render_buffer].handle, 0, 0);
-		stream.readTexture(staging, 0, Span((u8*)mem.data, mem.size));
-		stream.destroy(staging);
-		const u32 w = m_viewport.w;
-		const u32 h = m_viewport.h;
-		stream.pushLambda([fs, path, w, h, mem, this](){
-			os::OutputFile file;
-			if (fs->open(path, file)) {
-				Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)mem.data, false, path, m_renderer.getAllocator());
-				file.close();
-			}
-			else {
-				logError("Failed to save ", path);
-			}
-		});
-		stream.freeMemory(mem.data, m_renderer.getAllocator());
-	}
-
 	float getRenderToDisplayRatio() const { return m_render_to_display_scale; }
 	void setRenderToDisplayRatio(float scale) { m_render_to_display_scale = scale; }
-
-	void registerLuaAPI(lua_State* L)
-	{
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-
-		auto registerCFunction = [L, this](const char* name, lua_CFunction function) {
-			lua_pushlightuserdata(L, this);
-			lua_pushcclosure(L, function, name, 1);
-			lua_setfield(L, -3, name);
-		};
-
-		auto registerConst = [L](const char* name, u32 value)
-		{
-			lua_pushinteger(L, value);
-			lua_setfield(L, -2, name);
-		};
-
-		#define REGISTER_FUNCTION(name) \
-			do {\
-				auto f = &LuaWrapper::wrapMethodClosure<&PipelineImpl::name>; \
-				registerCFunction(#name, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(beginBlock);
-		REGISTER_FUNCTION(bindImageTexture);
-		REGISTER_FUNCTION(bindShaderBuffer);
-		REGISTER_FUNCTION(bindTextures);
-		REGISTER_FUNCTION(clear);
-		REGISTER_FUNCTION(createBuffer);
-		REGISTER_FUNCTION(createRenderbufferDesc);
-		REGISTER_FUNCTION(createRenderbuffer);
-		REGISTER_FUNCTION(createRenderState);
-		REGISTER_FUNCTION(createTextureArray);
-		REGISTER_FUNCTION(createTexture2D);
-		REGISTER_FUNCTION(createTexture3D);
-		REGISTER_FUNCTION(dispatch);
-		REGISTER_FUNCTION(drawArray);
-		REGISTER_FUNCTION(enablePixelJitter);
-		REGISTER_FUNCTION(endBlock);
-		REGISTER_FUNCTION(environmentCastShadows);
-		REGISTER_FUNCTION(executeCustomCommand);
-		REGISTER_FUNCTION(getCameraParams);
-		REGISTER_FUNCTION(getCameraPositionFromParams);
-		REGISTER_FUNCTION(getShadowCameraParams);
-		REGISTER_FUNCTION(getRenderToDisplayRatio);
-		REGISTER_FUNCTION(keepRenderbufferAlive);
-		REGISTER_FUNCTION(pass);
-		REGISTER_FUNCTION(preloadShader);
-		REGISTER_FUNCTION(releaseRenderbuffer);
-		REGISTER_FUNCTION(render2D);
-		REGISTER_FUNCTION(renderBucket);
-		REGISTER_FUNCTION(renderDebugShapes);
-		REGISTER_FUNCTION(renderGrass);
-		REGISTER_FUNCTION(renderTerrains);
-		REGISTER_FUNCTION(renderOpaque);
-		REGISTER_FUNCTION(renderTransparent);
-		REGISTER_FUNCTION(renderAA);
-		REGISTER_FUNCTION(renderUI);
-		REGISTER_FUNCTION(saveRenderbuffer);
-		REGISTER_FUNCTION(setOrthoCustomCameraParams);
-		REGISTER_FUNCTION(setOutput);
-		REGISTER_FUNCTION(setRenderToDisplayRatio);
-		REGISTER_FUNCTION(viewport);
-
-		lua_pushinteger(L, (i32)CameraParamsEnum::CUSTOM); lua_setfield(L, -2, "CUSTOM_CAMERA_PARAMS");
-		lua_pushinteger(L, -2); lua_setfield(L, -2, "SHADOW_ATLAS");
-		lua_pushinteger(L, -3); lua_setfield(L, -2, "REFLECTION_PROBES");
-
-		registerConst("CLEAR_DEPTH", (u32)gpu::ClearFlags::DEPTH);
-		registerConst("CLEAR_COLOR", (u32)gpu::ClearFlags::COLOR);
-		registerConst("CLEAR_ALL", (u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL);
-
-		registerConst("DEPTH_FN_GREATER", (u32)gpu::StateFlags::DEPTH_FN_GREATER);
-		registerConst("DEPTH_FN_EQUAL", (u32)gpu::StateFlags::DEPTH_FN_EQUAL);
-
-		registerConst("STENCIL_ALWAYS", (u32)gpu::StencilFuncs::ALWAYS);
-		registerConst("STENCIL_EQUAL", (u32)gpu::StencilFuncs::EQUAL);
-		registerConst("STENCIL_NOT_EQUAL", (u32)gpu::StencilFuncs::NOT_EQUAL);
-		registerConst("STENCIL_DISABLE", (u32)gpu::StencilFuncs::DISABLE);
-		registerConst("STENCIL_KEEP", (u32)gpu::StencilOps::KEEP);
-		registerConst("STENCIL_REPLACE", (u32)gpu::StencilOps::REPLACE);
-
-		registerCFunction("cull", PipelineImpl::cull);
-		registerCFunction("drawcallUniforms", PipelineImpl::drawcallUniforms);
-		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
-		registerCFunction("setRenderTargetsDS", PipelineImpl::setRenderTargetsDS);
-		registerCFunction("setRenderTargetsReadonlyDS", PipelineImpl::setRenderTargetsReadonlyDS);
-
-		#define REGISTER_DRAW2D_FUNCTION(fn_name) \
-			do { \
-				auto f = &LuaWrapper::wrapMethodClosure<&Draw2D::fn_name>; \
-				lua_getfield(L, -1, "Draw2D");		 \
-				if (lua_type(L, -1) == LUA_TNIL) {	 \
-					lua_pop(L, 1);					 \
-					lua_newtable(L);				 \
-					lua_setfield(L, -2, "Draw2D");	 \
-					lua_getfield(L, -1, "Draw2D");	 \
-				}									 \
-				lua_pushlightuserdata(L, &m_draw2d); \
-				lua_pushcclosure(L, f, #fn_name, 1); \
-				lua_setfield(L, -2, #fn_name);		 \
-				lua_pop(L, 1);						 \
-			} while(false)							 \
-
-		REGISTER_DRAW2D_FUNCTION(addLine);
-		REGISTER_DRAW2D_FUNCTION(addRect);
-		REGISTER_DRAW2D_FUNCTION(addRectFilled);
-
-		#undef REGISTER_DRAW2D_FUNCTION
-
-		lua_pop(L, 1); // pop env
-
-		#undef REGISTER_FUNCTION
-	}
-
-	bool isReady() const override { return m_resource->isReady(); }
-	const Path& getPath() override { return m_resource->getPath(); }
 
 	void clearDraw2D() override { return m_draw2d.clear(getAtlasSize()); }
 	Draw2D& getDraw2D() override { return m_draw2d; }
 	
 	gpu::TextureHandle getOutput() override { 
-		if (m_output < 0 || m_output >= m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
+		if (m_output >= (u32)m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
 		return m_renderbuffers[m_output].handle;
 	}
 	
 	void setIndirectLightMultiplier(float value) override { m_indirect_light_multiplier = value; }
 	
-	IVec2 getDisplaySize() const override { return m_display_size; }
+	const IVec2& getDisplaySize() const override { return m_display_size; }
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	LuaScript* m_resource;
-	lua_State* m_lua_state;
-	int m_lua_thread_ref;
-	int m_lua_env;
-	StaticString<32> m_define;
+	PipelineType m_type;
+	Vec3 m_clear_color = Vec3(0, 0, 0);
 	Array<gpu::StateFlags> m_render_states;
 	RenderModule* m_module;
 	Draw2D m_draw2d;
-	Shader* m_draw2d_shader;
+	Shader* m_tonemap_shader = nullptr;
+	Shader* m_textured_quad_shader = nullptr;
+	Shader* m_lighting_shader = nullptr;
+	Shader* m_draw2d_shader = nullptr;
 	Array<UniquePtr<View>> m_views;
 	jobs::Signal m_buckets_ready;
 	Viewport m_viewport;
@@ -4125,13 +3629,10 @@ struct PipelineImpl final : Pipeline
 	float m_render_to_display_scale = 1;
 	float m_indirect_light_multiplier = 1;
 	bool m_first_set_viewport = true;
-	int m_output;
+	RenderBufferHandle m_output = INVALID_RENDERBUFFER;
 	Shader* m_debug_shape_shader;
 	Shader* m_instancing_shader;
-	Array<CustomCommandHandler> m_custom_commands_handlers;
-	Array<RenderbufferDesc> m_renderbuffer_descs;
 	Array<Renderbuffer> m_renderbuffers;
-	Array<ShaderRef> m_shaders;
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
@@ -4145,8 +3646,9 @@ struct PipelineImpl final : Pipeline
 	gpu::VertexDecl m_curve_decal_decl;
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;
-	
 	ShadowAtlas m_shadow_atlas;
+	CameraParams m_custom_camera_params;
+	HashMap<u32, void*> m_instance_data;
 
 	struct {
 		struct Buffer {
@@ -4163,10 +3665,11 @@ struct PipelineImpl final : Pipeline
 };
 
 
-UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, LuaScript* resource, const char* define)
+UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, PipelineType type)
 {
-	return UniquePtr<PipelineImpl>::create(renderer.getAllocator(), renderer, resource, define, renderer.getAllocator());
+	return UniquePtr<PipelineImpl>::create(renderer.getAllocator(), renderer, type, renderer.getAllocator());
 }
 
 
 } // namespace Lumix
+

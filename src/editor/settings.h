@@ -1,13 +1,13 @@
 #pragma once
 
+#include "core/array.h"
+#include "core/hash_map.h"
 #include "core/math.h"
 #include "core/os.h"
 #include "core/stack_array.h"
-#include "editor/utils.h"
-
-
-struct lua_State;
-
+#include "core/string.h"
+#include "core/tag_allocator.h"
+#include "engine/lumix.h"
 
 namespace Lumix {
 
@@ -15,96 +15,91 @@ struct LUMIX_EDITOR_API MouseSensitivity {
 	MouseSensitivity(IAllocator& allocator);
 	void gui(const char* label);
 	float eval(float value);
-	void load(const char* name, lua_State* L);
-	void save(const char* name, os::OutputFile& file);
+	void save(const char* name, OutputMemoryStream& blob);
+	bool load(struct Tokenizer& tokenizer);
 
 	StackArray<Vec2, 8> values; 
 };
 
-
+// every setting can be stored in two places - workspace and user
+// workspace settings are stored in the project folder and are shared between all users
+// user settings are stored in the user's home folder and are unique for each user
+// user settings override workspace settings
 struct LUMIX_EDITOR_API Settings {
-	// gui - not saved
-	bool m_is_open;
-	TextFilter m_filter;
-
 	enum Storage {
-		GLOBAL, // shortcuts, ...
-		LOCAL // recently open files, ...
+		WORKSPACE,
+		USER
 	};
 
-	// actual settings
-	struct Rect {
-		int x, y;
-		int w, h;
-	};
+	enum : u32 { INVALID_CATEGORY = 0xFFffFFff };
 
-	Rect m_window;
-	bool m_is_maximized;
+	Settings(struct StudioApp& app);
 
-	bool m_is_asset_browser_open;
-	bool m_is_entity_list_open;
-	bool m_is_entity_template_list_open;
-	bool m_is_log_open;
-	bool m_is_profiler_open;
-	bool m_is_properties_open;
-	bool m_is_crash_reporting_enabled;
-	bool m_force_no_crash_report;
-	bool m_sleep_when_inactive;
-	bool m_focus_game_view_on_game_mode_start;
-	MouseSensitivity m_mouse_sensitivity_x;
-	MouseSensitivity m_mouse_sensitivity_y;
-	int m_font_size = 13;
-	String m_imgui_state;
+	void gui();
+	void load();
+	void save();
 
-	explicit Settings(struct StudioApp& app);
-	~Settings();
+	i32 getI32(const char* var_name, i32 default_value);
+	bool getBool(const char* var_name, bool default_value);
+	void setI32(const char* var_name, i32 value, Storage storage);
+	void setBool(const char* var_name, bool value, Storage storage);
+	// register variable with memory storage not in Settings
+	// if category is null, the variable is not visible in settings UI
+	// otherwise it's grouped in the category
+	void registerPtr(const char* name, bool* value, const char* category = nullptr);
+	void registerPtr(const char* name, String* value, const char* category = nullptr);
+	void registerPtr(const char* name, i32* value, const char* category = nullptr);
+	void registerPtr(const char* name, float* value, const char* category = nullptr, bool is_angle = false);
 
-	[[nodiscard]] bool save();
-	bool load();
-	bool postLoad();
-	void onGUI();
-	void setValue(Storage storage, const char* name, bool value) const;
-	void setValue(Storage storage, const char* name, float value) const;
-	void setValue(Storage storage, const char* name, int value) const;
-	void setValue(Storage storage, const char* name, const char* value) const;
-	float getValue(Storage storage, const char* name, float default_value) const;
-	int getValue(Storage storage, const char* name, int default_value) const;
-	bool getValue(Storage storage, const char* name, bool default_value) const;
-	u32 getValue(Storage storage, const char* name, Span<char> out) const;
-	const char* getStringValue(Storage storage, const char* name, const char* default_value) const;
-	const char* getAppDataPath() const { return m_app_data_path; }
-	float getTimeSinceLastSave() const { return m_time_since_last_save.getTimeSinceTick(); }
-
-	void registerVariable(const char* category_name, const char* var_name, Delegate<bool()> getter, Delegate<void(bool)> setter);
+	float getTimeSinceLastSave() const;
 
 	struct Variable {
-		StaticString<32> name;
-		Delegate<bool()> getter;
-		Delegate<void(bool)> setter;
+		Variable(IAllocator& allocator) : string_value(allocator) {}
+		Storage storage = WORKSPACE;
+		enum Type {
+			BOOL,
+			BOOL_PTR,
+			STRING,
+			STRING_PTR,
+			I32,
+			I32_PTR,
+			FLOAT,
+			FLOAT_PTR,
+		};
+		union {
+			bool bool_value;
+			bool* bool_ptr;
+			String* string_ptr;
+			i32 i32_value;
+			i32* i32_ptr;
+			float float_value;
+			float* float_ptr;
+		};
+		String string_value;
+		Type type;
+		u32 category = INVALID_CATEGORY;
+		bool is_angle = false; // is angle in radians
 	};
 
+	// category is only to group variables in the settings window
 	struct Category {
-		Category(IAllocator& allocator) : variables(allocator) {}
-		StaticString<32> name;
-		Array<Variable> variables;
+		Category(IAllocator& allocator) : name(allocator) {}
+		String name;
 	};
 
-private:
-	static void writeCustom(lua_State* L, struct IOutputStream& file);
-	lua_State* getState(Storage storage) const;
-	bool loadAppData();
 	StudioApp& m_app;
-	struct Action* m_edit_action = nullptr;
-	lua_State* m_global_state;
-	lua_State* m_local_state;
-	char m_app_data_path[MAX_PATH];
-	os::Timer m_time_since_last_save;
+	TagAllocator m_allocator;
 	Array<Category> m_categories;
-
+	HashMap<String, Variable> m_variables;
+	String m_imgui_state;
+	String m_app_data_path;
+	MouseSensitivity m_mouse_sensitivity_x;
+	MouseSensitivity m_mouse_sensitivity_y;
+	bool m_is_open = false;
+	u64 m_last_save_time = 0;
+	struct Action* m_edit_action = nullptr;
 private:
-	void showShortcutSettings();
-	void showStyleEditor() const;
+	void shortcutsGUI();
 };
-
 
 } // namespace Lumix

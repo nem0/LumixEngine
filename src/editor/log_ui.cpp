@@ -3,9 +3,9 @@
 #include "core/delegate_list.h"
 #include "core/log_callback.h"
 #include "core/math.h"
-
-#include "log_ui.h"
+#include "core/os.h"
 #include "editor/settings.h"
+#include "log_ui.h"
 
 
 namespace Lumix
@@ -35,6 +35,7 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	m_toggle_ui.is_selected.bind<&LogUI::isOpen>(this);
 
 	m_app.addWindowAction(&m_toggle_ui);
+	m_app.getSettings().registerPtr("log_open", &m_is_open);
 }
 
 
@@ -150,9 +151,6 @@ int LogUI::getUnreadErrorCount() const
 {
 	return m_new_message_count[(int)LogLevel::ERROR];
 }
-
-void LogUI::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_log_open; }
-void LogUI::onBeforeSettingsSaved() { m_app.getSettings().m_is_log_open  = m_is_open; }
 
 void LogUI::onGUI()
 {

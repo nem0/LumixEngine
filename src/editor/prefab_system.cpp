@@ -388,7 +388,7 @@ public:
 			prefab_res = m_resources[prefab].resource;
 			prefab_res->getResourceManager().reload(*prefab_res);
 
-			// TODO undo/redo might keep references do prefab entities, handle that
+			// TODO undo/redo might keep references to prefab entities, handle that
 			EntityFolders& folders = m_editor.getEntityFolders();
 			for (auto iter : m_roots.iterated()) {
 				if (iter.value() != prefab) continue;

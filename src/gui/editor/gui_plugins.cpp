@@ -252,13 +252,14 @@ public:
 		m_app.addAction(&m_hexpand_action);
 		m_app.addAction(&m_vexpand_action);
 		m_app.addAction(&m_make_rel_action);
+
+		m_app.getSettings().registerPtr("gui_editor_open", &m_is_window_open);
 	}
 
 	void init() {
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/gui_editor.lua"));
-		m_pipeline = Pipeline::create(renderer, pres, "");
+		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
 	}
 
 
@@ -309,15 +310,6 @@ private:
 	}
 
 	bool hasFocus() const override { return m_has_focus; }
-
-	void onSettingsLoaded() override {
-		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_gui_editor_open", false);
-	}
-
-	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue(Settings::GLOBAL, "is_gui_editor_open", m_is_window_open);
-	}
-
 	void onToggleOpen() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
 
@@ -599,7 +591,7 @@ private:
 
 		const ImVec2 size = ImGui::GetContentRegionAvail();
 		m_canvas_size = size;
-		if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
+		if (size.x == 0 || size.y == 0) {
 			ImGui::End();
 			return;
 		}
@@ -660,7 +652,7 @@ private:
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
 		m_pipeline->setViewport(vp);
-		m_pipeline->setLuaGlobal("GUI_EDITOR_CLEAR_COLOR", m_clear_color);	
+		m_pipeline->setClearColor(m_clear_color);	
 
 		if (m_pipeline->render(true)) {
 			m_texture_handle = m_pipeline->getOutput();

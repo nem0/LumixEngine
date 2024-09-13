@@ -1,71 +1,3 @@
-local LOCATION = "tmp/"
-if _ACTION == nil then
-	LOCATION = LOCATION .. "vs2019"
-	binary_api_dir = "vs2017"
-elseif "linux-gcc" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "gcc"
-	binary_api_dir = "gmake"
-elseif "linux-gcc-5" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "gcc"
-	binary_api_dir = "gmake"
-elseif "linux-clang" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "clang"
-	binary_api_dir = "gmake"
-else
-	LOCATION = LOCATION .. _ACTION
-	binary_api_dir = iif(_ACTION == "vs2022" or _ACTION == "vs2019" or _ACTION == "vs2017", "vs2017", "gmake")
-end
-
-local ROOT_DIR = path.getabsolute("../")
-local BINARY_DIR = LOCATION .. "/bin/"
-build_app = false
-local use_basisu = false
-build_studio = true
-local working_dir = nil
-local debug_args = nil
-local release_args = nil
-local plugins = {}
-local base_plugins = {}
-local plugin_creators = {}
-local embed_resources = false
-local force_build_recast = false
-local force_build_luau = false
-local force_build_luau_dynamic = false
-local force_build_physx = false
-build_studio_callbacks = {}
-build_app_callbacks = {}
-
-function linkOpenGL()
-	configuration { "windows" }
-		links { "opengl32" }
-	configuration { "not windows" }
-		links { "GL" }
-	configuration {}
-end
-
-function has_plugin(plugin)
-	for _, v in ipairs(plugins) do
-    if v == plugin then
-      return true
-    end
-  end
-  return false
-end
-
-
-function linkPlugin(plugin_name)
-	table.insert(plugin_creators, plugin_name)
-	if build_studio then
-		project "studio"
-			links(plugin_name)
-	end
-
-	if build_app then
-		project "app"
-			links {plugin_name}
-	end
-end
-
 newoption {
 	trigger = "plugins",
 	description = "Add plugins to project, can be a comma-separated list, e.g. --plugins=pluginA,pluginB"
@@ -157,6 +89,11 @@ newoption {
 }
 
 newoption {
+	trigger = "force-build-freetype",
+	description = "Add FreeType project to solution. Do not use the prebuilt library."
+}
+
+newoption {
 	trigger = "force-build-recast",
 	description = "Add Recast to solution. Do not use the prebuilt library."
 }
@@ -171,57 +108,38 @@ newoption {
 	description = "Add PhysX project to solution. Do not use the prebuilt library."
 }
 
-if _OPTIONS["force-build-luau"] then
-	force_build_luau = true
-	force_build_luau_dynamic = false
-end
+newoption {
+	trigger = "gcc",
+	value = "GCC",
+	description = "Choose GCC flavor",
+	allowed = {
+		{ "linux-gcc", 			"Linux (GCC compiler)" 				},
+		{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
+		{ "linux-clang", 		"Linux (Clang compiler)"			},
+		{ "windows-clang", 		"Windows (Clang compiler)"			},
+	}
+}
 
-if _OPTIONS["force-build-recast"] then
-	force_build_recast = true
-end
+-- process _OPTIONS
+build_studio = not _OPTIONS["no-studio"]
+build_app = _OPTIONS["with-app"] or false
+local embed_resources = _OPTIONS["embed-resources"]
+local working_dir = _OPTIONS["working-dir"]
+local debug_args = _OPTIONS["debug-args"]
+local release_args = _OPTIONS["release-args"]
+local force_build_recast = _OPTIONS["force-build-recast"]
+local force_build_luau = _OPTIONS["force-build-luau"]
+local force_build_freetype = _OPTIONS["force-build-freetype"]
+local force_build_luau_dynamic = _OPTIONS["force-build-luau-dynamic"]
+local force_build_physx = _OPTIONS["force-build-physx"]
+local use_basisu =  _OPTIONS["with-basis-universal"]
+local dynamic_plugins = _OPTIONS["dynamic-plugins"]
 
-if _OPTIONS["force-build-luau-dynamic"] then
-	force_build_luau = true
-	force_build_luau_dynamic = true
-end
-
-if _OPTIONS["force-build-physx"] then
-	force_build_physx = true
-end
+local plugins = {}
+local base_plugins = {}
 
 if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
-end
-
-if _OPTIONS["embed-resources"] then
-	embed_resources = true
-end
-
-if _OPTIONS["working-dir"] then
-	working_dir = _OPTIONS["working-dir"]
-end
-
-if _OPTIONS["debug-args"] then
-	debug_args = _OPTIONS["debug-args"]
-end
-
-if _OPTIONS["release-args"] then
-	release_args = _OPTIONS["release-args"]
-end
-
-if not _OPTIONS["no-physics"] then
-	table.insert(plugins, "physics")
-	table.insert(base_plugins, "physics")
-end
-
-if _OPTIONS["no-renderer"] == nil then
-	table.insert(plugins, "renderer")
-	table.insert(base_plugins, "renderer")
-end
-
-if _OPTIONS["no-audio"] == nil then
-	table.insert(plugins, "audio")
-	table.insert(base_plugins, "audio")
 end
 
 if _OPTIONS["no-lua-script"] == nil then
@@ -229,32 +147,115 @@ if _OPTIONS["no-lua-script"] == nil then
 	table.insert(base_plugins, "lua_script")
 end
 
-if _OPTIONS["no-gui"] == nil then
-	table.insert(plugins, "gui")
-	table.insert(base_plugins, "gui")
+for	_, v in ipairs { "physics", "renderer", "audio", "gui", "animation", "navigation" } do
+	if _OPTIONS["no-" .. v] == nil then
+		table.insert(plugins, v)
+		table.insert(base_plugins, v)
+	end
 end
 
-if _OPTIONS["no-animation"] == nil then
-	table.insert(plugins, "animation")
-	table.insert(base_plugins, "animation")
+local LOCATION = "tmp/"
+if _ACTION == nil then
+	LOCATION = LOCATION .. "vs2019"
+	binary_api_dir = "vs2017"
+elseif "linux-gcc" == _OPTIONS["gcc"] then
+	LOCATION = LOCATION .. "gcc"
+	binary_api_dir = "gmake"
+elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+	LOCATION = LOCATION .. "gcc"
+	binary_api_dir = "gmake"
+elseif "linux-clang" == _OPTIONS["gcc"] then
+	LOCATION = LOCATION .. "clang"
+	binary_api_dir = "gmake"
+else
+	LOCATION = LOCATION .. _ACTION
+	binary_api_dir = iif(_ACTION == "vs2022" or _ACTION == "vs2019" or _ACTION == "vs2017", "vs2017", "gmake")
 end
 
-if _OPTIONS["no-navigation"] == nil then
-	table.insert(plugins, "navigation")
-	table.insert(base_plugins, "navigation")
+if _ACTION == "gmake" or _ACTION == "ninja" then
+	if "linux-gcc" == _OPTIONS["gcc"] then
+		LOCATION = "tmp/gcc"
+
+	elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+		premake.gcc.cc  = "gcc-5"
+		premake.gcc.cxx = "g++-5"
+		premake.gcc.ar  = "ar"
+		LOCATION = "tmp/gcc5"
+		
+	elseif "linux-clang" == _OPTIONS["gcc"] then
+		premake.gcc.cc  = "clang"
+		premake.gcc.cxx = "clang++"
+		premake.gcc.ar  = "ar"
+		LOCATION = LOCATION .. "_clang"
+
+	elseif "windows-clang" == _OPTIONS["gcc"] then
+		premake.gcc.cc  = "clang"
+		premake.gcc.cxx = "clang++"
+		premake.gcc.ar  = "llvm-ar"
+		LOCATION = LOCATION .. "_clang"
+	end
+	BINARY_DIR = LOCATION .. "/bin/"
 end
 
-if _OPTIONS["no-studio"] then
-	build_studio = false
+
+local ROOT_DIR = path.getabsolute("../")
+local BINARY_DIR = LOCATION .. "/bin/"
+local plugin_creators = {}
+build_studio_callbacks = {}
+build_app_callbacks = {}
+
+function linkEditor()
+	if build_studio then
+		links { "editor" }
+	end
 end
 
-
-if _OPTIONS["with-app"] then
-	build_app = true
+function linkOpenGL()
+	configuration { "windows" }
+		links { "opengl32" }
+	configuration { "not windows" }
+		links { "GL" }
+	configuration {}
 end
 
-if _OPTIONS["with-basis-universal"] then
-	use_basisu = true
+function has_plugin(plugin)
+	for _, v in ipairs(plugins) do
+    if v == plugin then
+      return true
+    end
+  end
+  return false
+end
+
+function plugin(plugin_name)
+	if not has_plugin(plugin_name) then return false end
+
+	if build_studio then
+		project "studio"
+			links(plugin_name)
+	end
+
+	if build_app then
+		project "app"
+			links {plugin_name}
+	end
+	project(plugin_name)
+	libType()
+	defaultConfigurations()
+	return true
+end
+
+function linkPlugin(plugin_name)
+	table.insert(plugin_creators, plugin_name)
+	if build_studio then
+		project "studio"
+			links(plugin_name)
+	end
+
+	if build_app then
+		project "app"
+			links {plugin_name}
+	end
 end
 
 function detect_plugins()
@@ -265,17 +266,6 @@ function detect_plugins()
 	end
 end
 detect_plugins()
-
-newoption {
-		trigger = "gcc",
-		value = "GCC",
-		description = "Choose GCC flavor",
-		allowed = {
-			{ "linux-gcc", 			"Linux (GCC compiler)" 				},
-			{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
-			{ "linux-clang", 		"Linux (Clang compiler)"			}
-		}
-	}
 
 function defaultConfigurations()
 	configuration "Debug"
@@ -308,13 +298,17 @@ end
 function linkLib(lib)
 	links {lib}
 
-	for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
-		for platform,target_platform in pairs({win="windows", linux="linux", }) do
-			configuration { "x64", conf, target_platform }
-				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
-				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
+	--if lib == "freetype" then
+		--libdirs { "external/freetype/lib/win" }
+	--else
+		for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
+			for platform,target_platform in pairs({win="windows", linux="linux", }) do
+				configuration { "x64", conf, target_platform }
+					libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
+					libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
+			end
 		end
-	end
+	--end
 	configuration {}
 end
 
@@ -333,7 +327,7 @@ function useLua()
 end
 
 function libType()
-	if not _OPTIONS["dynamic-plugins"] then
+	if not dynamic_plugins then
 		kind "StaticLib"
 	else
 		kind "SharedLib"
@@ -390,29 +384,38 @@ end
 
 solution "LumixEngine"
 	flags { "Cpp20" }
-	if _ACTION == "gmake" or _ACTION == "ninja" then
-		if "linux-gcc" == _OPTIONS["gcc"] then
-			LOCATION = "tmp/gcc"
+	configurations { "Debug", "RelWithDebInfo" }
+	platforms { "x64" }
+	flags { 
+		"UseObjectResponseFile",
+		"UseLDResponseFile",
+		"LinkSupportCircularDependencies",
+		"FatalWarnings", 
+		"NoPCH", 
+		"NoExceptions", 
+		"NoRTTI", 
+		"NoEditAndContinue"
+	}
+	includedirs {"../src", "../external" }
+	location(LOCATION)
+	language "C++"
+	startproject "studio"
 
-		elseif "linux-gcc-5" == _OPTIONS["gcc"] then
-			premake.gcc.cc  = "gcc-5"
-			premake.gcc.cxx = "g++-5"
-			premake.gcc.ar  = "ar"
-			LOCATION = "tmp/gcc5"
-			
-		elseif "linux-clang" == _OPTIONS["gcc"] then
-			premake.gcc.cc  = "clang"
-			premake.gcc.cxx = "clang++"
-			premake.gcc.ar  = "ar"
-			LOCATION = "tmp/clang"
-
-		end
-		BINARY_DIR = LOCATION .. "/bin/"
+	if not dynamic_plugins then
+		defines {"STATIC_PLUGINS"}
 	end
-	
+
 	if not build_studio then
 		removefiles { "../src/**/editor/*" }
 	end
+
+	if "windows-clang" == _OPTIONS["gcc"] then
+		removeflags { "LinkSupportCircularDependencies"}
+		buildoptions { 
+			"-Wno-return-type-c-linkage" -- PxGetFoundation
+		}
+	end
+
 
 	configuration { "linux" }
 		buildoptions {
@@ -448,25 +451,6 @@ solution "LumixEngine"
 			"-fopenmp"
 		}
 
-	configuration {}
-	
-	configurations { "Debug", "RelWithDebInfo" }
-	platforms { "x64" }
-	flags { 
-		"UseObjectResponseFile",
-		"UseLDResponseFile",
-		"LinkSupportCircularDependencies",
-		"FatalWarnings", 
-		"NoPCH", 
-		"NoExceptions", 
-		"NoRTTI", 
-		"NoEditAndContinue"
-	}
-	includedirs {"../src", "../external" }
-	location(LOCATION)
-	language "C++"
-	startproject "studio"
-
 	configuration { "vs*" }
 		defines { "_HAS_EXCEPTIONS=0" }
 		buildoptions { "/Zc:char8_t-" }
@@ -485,14 +469,10 @@ solution "LumixEngine"
 	configuration "not windows"
 		removefiles { "../src/**/win/*"}
 
-	configuration {}
-
-	if not _OPTIONS["dynamic-plugins"] then
-		defines {"STATIC_PLUGINS"}
-	end
-
 project "core"
 	libType()
+	defaultConfigurations()
+	defines { "BUILDING_CORE" }
 
 	files { "../src/core/**.h",
 			"../src/core/**.c",
@@ -504,17 +484,19 @@ project "core"
 
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
-	
-	configuration {}
-
-	defines { "BUILDING_CORE" }
-	
-	configuration {}
-
-	defaultConfigurations()
 
 project "engine"
 	libType()
+	defines { "BUILDING_ENGINE" }
+	links { "core" }
+	defaultConfigurations()
+	useLua()
+	includedirs { "../src", "../external/luau/include", "../external/freetype/include" }
+
+	if dynamic_plugins then
+		linkLib "freetype"
+		defines { "LZ4_DLL_EXPORT" }
+	end
 
 	files { "../src/engine/**.h",
 			"../src/engine/**.c",
@@ -526,9 +508,8 @@ project "engine"
 			"../external/imgui/**.inl",
 			"../external/lz4/**.c",
 			"../external/lz4/**.h",
---			"../external/wyhash/**.*"
 	}
-	excludes { 
+	excludes {
 		"../external/imgui/imgui_demo.cpp",
 		"../external/imgui/imgui.cpp",
 		"../external/imgui/imgui_tables.cpp",
@@ -537,136 +518,167 @@ project "engine"
 		"../external/imgui/imgui_freetype.cpp",
 	}
 
-
-	defines { "BUILDING_ENGINE" }
-	links { "core" }
-	
-	if _OPTIONS["dynamic-plugins"] then
-		defines { "LZ4_DLL_EXPORT" }
-	end
-	
-	includedirs { "../src", "../external/luau/include", "../external/freetype/include" }
-
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
-	
-	useLua()
-	
-	configuration {}
-	
-	if _OPTIONS["dynamic-plugins"] then
-		linkLib "freetype"
+
+if plugin "physics" then
+	if force_build_physx then
+		defines { "LUMIX_STATIC_PHYSX" }
+	else
+		configuration { "vs*" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+		configuration {}
 	end
 
-	defaultConfigurations()
+	files { "../src/physics/**.h", "../src/physics/**.cpp" }
 
-if has_plugin("physics") then
-	project "physics"
-		libType()
-
-		if force_build_physx then
-			defines { "LUMIX_STATIC_PHYSX" }
-		else
-			configuration { "vs*" }
-				files { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-				files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-				files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-				files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-				copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-				copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-				copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-				copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-			configuration {}
-		end
-
-		files { "../src/physics/**.h", "../src/physics/**.cpp" }
-
-		includedirs { "../external/physx/include/" }
-		defines { "BUILDING_PHYSICS" }
-		links { "core", "engine", "editor", "renderer" }
-		useLua()
-		linkPhysX()
-
-		defaultConfigurations()
+	includedirs { "../external/physx/include/" }
+	defines { "BUILDING_PHYSICS" }
+	links { "core", "engine", "renderer" }
+	linkEditor()
+	useLua()
+	linkPhysX()
 end
 
-
-if has_plugin("renderer") then
-	project "renderer"
-		libType()
-
+if plugin "renderer" then
+	files {
+		"../src/renderer/**.h",
+		"../src/renderer/**.cpp",
+		"../src/renderer/**.c",
+	}
+	files { "../data/pipelines/**.*" }
+	excludes { 
+		"../external/meshoptimizer/clusterizer.cpp",
+		"../external/meshoptimizer/overdrawanalyzer.cpp",
+		"../external/meshoptimizer/overdrawoptimizer.cpp",
+		"../external/meshoptimizer/spatialorder.cpp",
+		"../external/meshoptimizer/stripifier.cpp",
+		"../external/meshoptimizer/vcacheanalyzer.cpp",
+		"../external/meshoptimizer/vcacheoptimizer.cpp",
+		"../external/meshoptimizer/vertexcodec.cpp",
+		"../external/meshoptimizer/vertexfilter.cpp",
+		"../external/meshoptimizer/vfetchanalyzer.cpp",
+		"../external/meshoptimizer/vfetchoptimizer.cpp",
+		"../src/renderer/editor/voxelizer_ui.cpp",
+	}
+	
+	if build_studio then
 		files {
-			"../src/renderer/**.h",
-			"../src/renderer/**.cpp",
-			"../src/renderer/**.c",
+			"../external/meshoptimizer/**.*",
+			"../external/mikktspace/**.*",
+			"../external/openfbx/**.*",
 		}
-		files { "../data/pipelines/**.*" }
-		excludes { 
-			"../external/meshoptimizer/clusterizer.cpp",
-			"../external/meshoptimizer/overdrawanalyzer.cpp",
-			"../external/meshoptimizer/overdrawoptimizer.cpp",
-			"../external/meshoptimizer/spatialorder.cpp",
-			"../external/meshoptimizer/stripifier.cpp",
-			"../external/meshoptimizer/vcacheanalyzer.cpp",
-			"../external/meshoptimizer/vcacheoptimizer.cpp",
-			"../external/meshoptimizer/vertexcodec.cpp",
-			"../external/meshoptimizer/vertexfilter.cpp",
-			"../external/meshoptimizer/vfetchanalyzer.cpp",
-			"../external/meshoptimizer/vfetchoptimizer.cpp",
-			"../src/renderer/editor/voxelizer_ui.cpp"
-		}
-		
-		if build_studio then
-			files {
-				"../external/meshoptimizer/**.*",
-				"../external/mikktspace/**.*",
-				"../external/openfbx/**.*",
-			}
-		end
+	end
 
-		if use_basisu then
-			defines { "LUMIX_BASIS_UNIVERSAL" }
-			includedirs { "../external/basisu/include" }
-		end
-		includedirs { "../src", "../external/freetype/include", "../external/" }
-		
-		defines { "BUILDING_RENDERER" }
-		links { "core", "engine", "lua_script" }
+	if use_basisu then
+		defines { "LUMIX_BASIS_UNIVERSAL" }
+		includedirs { "../external/basisu/include" }
+	end
+	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
+	
+	defines { "BUILDING_RENDERER" }
+	links { "core", "engine", "lua_script" }
 
-		if build_studio then
-			links { "editor" }
-			if use_basisu then
-				linkLib "basisu"
-			end
-		end
-		linkLib "freetype"
-		linkOpenGL()
-		configuration { "linux" }
-			links { "GL", "X11", "Xi" }
-		configuration {}
-		useLua()
-		
-		configuration { "windows" }
-			links { "psapi" }
+	linkEditor()
+	if build_studio and use_basisu then
+		linkLib "basisu"
+	end
 
-		defaultConfigurations()
+	linkLib "freetype"
+	linkOpenGL()
+	useLua()
+
+	configuration { "linux" }
+		links { "GL", "X11", "Xi" }
+	
+	configuration { "windows" }
+		links { "psapi" }
 end
 		
-if has_plugin("animation") then
-	project "animation"
-		libType()
+if plugin "animation" then
+	files { "../src/animation/**.h", "../src/animation/**.cpp" }
+	includedirs { "../src" }
+	defines { "BUILDING_ANIMATION" }
+	links { "core", "engine", "renderer" }
+	linkEditor()
+	useLua()
+end
 
-		files { "../src/animation/**.h", "../src/animation/**.cpp" }
-		includedirs { "../src" }
-		defines { "BUILDING_ANIMATION" }
-		links { "core", "engine", "renderer" }
+if plugin "audio" then
+	files { 
+		"../src/audio/**.h",
+		"../src/audio/**.cpp",
+		"../external/stb/stb_vorbis.cpp"
+	}
 
-		if build_studio then
-			links { "editor" }
-		end
-		
-		useLua()
-		defaultConfigurations()
+	includedirs { "../src", "../src/audio" }
+	defines { "BUILDING_AUDIO" }
+	links { "core", "engine" }
+	linkEditor()
+	useLua()
+
+	configuration "windows"
+		links { "dxguid" }
+end
+
+if plugin "navigation" then
+	excludes { 
+		"../external/recast/src/DetourCrowd.cpp",
+		"../external/recast/src/DetourLocalBoundary.cpp",
+		"../external/recast/src/DetourObstacleAvoidance.cpp",
+		"../external/recast/src/DetourPathCorridor.cpp",
+		"../external/recast/src/DetourPathQueue.cpp",
+		"../external/recast/src/DetourProximityGrid.cpp",
+	}
+
+	if force_build_recast then
+		files { "3rdparty/recast/Recast/Source/**.cpp"
+			, "3rdparty/recast/Recast/Include/**.h"
+			,"3rdparty/recast/Detour/Source/**.cpp"
+			, "3rdparty/recast/Detour/Include/**.h"
+		}
+		includedirs { "3rdparty/recast/Recast/Include" }
+	else		
+		linkLib "recast"
+	end
+
+	files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
+	includedirs { "../src", "../src/navigation", "../external/recast/include" }
+	links { "core", "engine", "renderer" }
+	linkEditor()
+	useLua()
+end
+
+if plugin "gui" then
+	files { "../src/gui/**.h", "../src/gui/**.cpp" }
+	includedirs { "../src", "../src/gui" }
+	links { "core", "engine", "renderer", "lua_script" }
+	linkEditor()
+	useLua()
+	defines { "BUILDING_GUI" }
+	
+	configuration { "vs*" }
+		links { "winmm", "psapi" }
+end
+	
+if plugin "lua_script" then
+	if force_build_luau and not force_build_luau_dynamic then
+		defines { "LUMIX_STATIC_LUAU" }
+	end
+
+	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
+	includedirs { "../src", "../src/lua_script" }
+	defines { "BUILDING_LUA_SCRIPT" }
+	links { "core", "engine" }
+	linkEditor()
+	useLua()
 end
 
 if _OPTIONS["with-game"] ~= nil then
@@ -684,110 +696,6 @@ for _, plugin in ipairs(plugins) do
 		end
 	end
 end
-	
-if has_plugin("audio") then
-	project "audio"
-		libType()
-
-		files { 
-			"../src/audio/**.h",
-			"../src/audio/**.cpp",
-			"../external/stb/stb_vorbis.cpp"
-		}
-		includedirs { "../src", "../src/audio" }
-		defines { "BUILDING_AUDIO" }
-		links { "core", "engine" }
-
-		if build_studio then
-			links { "editor" }
-		end
-
-		configuration "windows"
-			links { "dxguid" }
-		configuration {}
-
-		useLua()
-		defaultConfigurations()
-end
-	
-if has_plugin("navigation") then
-	project "navigation"
-		libType()
-
-		excludes { 
-			"../external/recast/src/DetourCrowd.cpp",
-			"../external/recast/src/DetourLocalBoundary.cpp",
-			"../external/recast/src/DetourObstacleAvoidance.cpp",
-			"../external/recast/src/DetourPathCorridor.cpp",
-			"../external/recast/src/DetourPathQueue.cpp",
-			"../external/recast/src/DetourProximityGrid.cpp",
-		}
-
-		if force_build_recast then
-			files { "3rdparty/recast/Recast/Source/**.cpp"
-				, "3rdparty/recast/Recast/Include/**.h"
-				,"3rdparty/recast/Detour/Source/**.cpp"
-				, "3rdparty/recast/Detour/Include/**.h"
-			}
-			includedirs { "3rdparty/recast/Recast/Include" }
-		else		
-			linkLib "recast"
-		end
-
-		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
-		includedirs { "../src", "../src/navigation", "../external/recast/include" }
-		links { "core", "engine", "renderer" }
-		
-		if build_studio then
-			links { "editor" }
-		end
-		
-		useLua()
-		defaultConfigurations()
-end
-
-if has_plugin("gui") then
-	project "gui"
-		libType()
-
-		files { "../src/gui/**.h", "../src/gui/**.cpp" }
-		includedirs { "../src", "../src/gui" }
-		links { "core", "engine", "renderer", "lua_script" }
-		
-		defines { "BUILDING_GUI" }
-		
-		configuration { "vs*" }
-			links { "winmm", "psapi" }
-		configuration {}
-
-		if build_studio then
-			links { "editor" }
-		end
-	
-		useLua()
-		defaultConfigurations()
-end
-	
-if has_plugin("lua_script") then
-	project "lua_script"
-		libType()
-
-		if force_build_luau and not force_build_luau_dynamic then
-			defines { "LUMIX_STATIC_LUAU" }
-		end
-
-		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
-		includedirs { "../src", "../src/lua_script" }
-		defines { "BUILDING_LUA_SCRIPT" }
-		links { "core", "engine" }
-
-		if build_studio then
-			links { "editor" }
-		end
-
-		useLua()
-		defaultConfigurations()
-end
 
 function dbgHelp()
 	configuration { "windows" }
@@ -798,15 +706,20 @@ end
 
 if build_app then
 	project "app"
+		kind "ConsoleApp"
+		useLua()
+		defaultConfigurations()
+		includedirs { "../src", "../src/app" }
+		useLua()
+		files { "../src/app/main.cpp" }
+
 		if working_dir then
 			debugdir ("../../" .. working_dir)
 		else 
 			debugdir "../data"
 		end
-
-		kind "ConsoleApp"
 		
-		if #plugins > 0 and _OPTIONS["dynamic-plugins"] then
+		if #plugins > 0 and dynamic_plugins then
 			local def = ""
 			for idx, plugin in ipairs(plugins) do
 				if idx > 1 then 
@@ -817,17 +730,16 @@ if build_app then
 			defines { "LUMIXENGINE_PLUGINS=" .. def }
 		end
 
-		includedirs { "../src", "../src/app" }
-		if not _OPTIONS["dynamic-plugins"] then	
+		if not dynamic_plugins then	
 			if has_plugin("renderer") then
 				linkOpenGL()
 			end
 			if has_plugin("physics") then
 				linkPhysX()
 			end
-			if build_studio then links {"editor"} end
-
 			links { "core", "engine", "lua_script" }
+			linkEditor()
+
 			if use_basisu then
 				linkLib "basisu"
 			end
@@ -841,27 +753,22 @@ if build_app then
 
 			configuration {}
 		else
-			links { "editor", "core", "engine" }
+			linkEditor()
+			links { "core", "engine" }
 		end
-		if build_studio then
-			if use_basisu then
-				linkLib "basisu"
-			end
+		if build_studio and use_basisu then
+			linkLib "basisu"
 		end
 		
-		useLua()
 		if not force_build_recast then
 			linkLib "recast"
 		end
-		files { "../src/app/main.cpp" }
 
 		configuration { "windows" }
 			kind "WindowedApp"
 
 		configuration { "linux" }
 			links { "GL", "X11", "dl", "rt", "Xi" }
-		
-		configuration {}
 		
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
@@ -870,73 +777,27 @@ if build_app then
 		for _, callback in ipairs(build_app_callbacks) do
 			callback()
 		end
-		
-		useLua()
-		defaultConfigurations()
 end
-
--- write plugins.inl
-for _, plugin in ipairs(base_plugins) do
-	linkPlugin(plugin)
-end
-local file = io.open("../src/engine/plugins.inl", "w")
-io.output(file)
-io.write("// generated by genie.lua\n\n")
-io.write "#ifdef LUMIX_PLUGIN_DECLS\n"
-	for _, plugin in ipairs(plugin_creators) do
-		io.write([[extern "C" ISystem* createPlugin_]] .. plugin .. "(Engine&);\n")
-	end
-io.write "#elif defined LUMIX_EDITOR_PLUGINS_DECLS\n"
-	if not _OPTIONS["dynamic-plugins"] then
-		for _, plugin in ipairs(plugin_creators) do
-			io.write([[extern "C" Lumix::StudioApp::IPlugin* setStudioApp_]] .. plugin .. "(StudioApp&);\n")
-		end
-	end
-io.write "#elif defined LUMIX_EDITOR_PLUGINS\n"
-	if not _OPTIONS["dynamic-plugins"] then
-		for _, plugin in ipairs(plugin_creators) do
-			io.write "{\n"
-			io.write("\tStudioApp::IPlugin* plugin = setStudioApp_" .. plugin .. "(*this);\n")
-			io.write("\tif (plugin) this->addPlugin(*plugin);\n")
-			io.write "}\n"
-		end
-	end
-io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
-	if _OPTIONS["dynamic-plugins"] then
-		for _, plugin in ipairs(plugin_creators) do
-			io.write("\"" .. plugin .. "\", ")
-		end
-	end
-	io.write("nullptr\n")
-io.write "#else\n"
-	if not _OPTIONS["dynamic-plugins"] then
-		for _, plugin in ipairs(plugin_creators) do
-			io.write "{\n"
-			io.write("\tISystem* p = createPlugin_" .. plugin .. "(engine);\n")
-			io.write "\tif (p) engine.getSystemManager().addSystem(p, nullptr);\n"
-			io.write "}\n"
-		end
-	end
-io.write "#endif\n"
-io.close(file)
 
 if build_studio then
 	project "editor"
 		libType()
+		useLua()
+		defaultConfigurations()
+		defines { "BUILDING_EDITOR" }
+		links { "core", "engine" }
 
 		files {
 			"../src/editor/**.h",
 			"../src/editor/**.cpp"
 		}
-		defines { "BUILDING_EDITOR" }
-		links { "core", "engine" }
 		includedirs {
 			"../src",
 			"../src/editor",
 			"../external"
 		}
 		
-		if #plugins > 0 and _OPTIONS["dynamic-plugins"] then
+		if #plugins > 0 and dynamic_plugins then
 			local def = ""
 			for idx, plugin in ipairs(plugins) do
 				if idx > 1 then 
@@ -950,25 +811,31 @@ if build_studio then
 		configuration { "windows" }
 			links { "winmm" }
 
-		configuration {}
-
-		if _OPTIONS["dynamic-plugins"] then	
+		if dynamic_plugins then	
 			configuration {"vs*"}
 				links { "winmm", "imm32", "version" }
 			configuration {}
 		end
-		
-		useLua()
-		defaultConfigurations()
 
 	project "studio"
 		kind "WindowedApp"
+		files { "../src/studio/**.cpp" }
+		dbgHelp()
+		includedirs { "../src" }
+		useLua()
+		defaultConfigurations()
+		links { "editor", "core", "engine", "renderer" }
+
+		if embed_resources then
+			files { "../src/studio/**.rc" }
+		end
 
 		if debug_args then
 			configuration { "Debug" }
 				debugargs { debug_args }
 			configuration {}
 		end
+
 		if release_args then
 			configuration { "RelWithDebInfo" }
 				debugargs { release_args }
@@ -981,17 +848,14 @@ if build_studio then
 			debugdir "../data"
 		end
 
-		files { "../src/studio/**.cpp" }
+		if not dynamic_plugins then	
+			linkLib "freetype"
+			useLua()
+			if use_basisu then linkLib "basisu" end
+			if not force_build_recast then linkLib "recast" end
+			if has_plugin "renderer" then linkOpenGL() end
+			if has_plugin "physics" then linkPhysX() end
 
-		dbgHelp()
-
-		if embed_resources then
-			files { "../src/studio/**.rc" }
-		end
-
-		includedirs { "../src" }
-
-		if not _OPTIONS["dynamic-plugins"] then	
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt", "Xi" }
 				if _ACTION == "gmake" then
@@ -1000,27 +864,11 @@ if build_studio then
 
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
+				libdirs { path.join(ROOT_DIR, "./external/pix/bin/x64") }
+				--files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+				--copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
 			
 			configuration {}
-
-			links { "editor", "core", "engine" }
-			if use_basisu then
-				linkLib "basisu"
-			end
-			linkLib "freetype"
-			useLua()
-			if not force_build_recast then
-				linkLib "recast"
-			end
-			
-			if has_plugin("renderer") then
-				linkOpenGL()
-			end
-			if has_plugin "physics" then
-				linkPhysX()
-			end
-		else
-			links { "renderer", "editor", "core", "engine" }
 		end
 
 		for _, callback in ipairs(build_studio_callbacks) do
@@ -1038,10 +886,6 @@ if build_studio then
 
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
-		configuration {}
-		
-		useLua()
-		defaultConfigurations()
 end
 
 if force_build_physx == true then
@@ -1064,6 +908,70 @@ if force_build_physx == true then
 		printf("--force-build-physx used but PhysX source code not found")
 	end
 end
+
+if force_build_freetype then
+	if os.isdir("3rdparty/freetype") then
+		project "freetype"
+			kind "StaticLib"
+			files { --"3rdparty/freetype/src/**.c", "3rdparty/freetype/include/**.h", 
+			"3rdparty/freetype/src/autofit/autofit.c",
+			"3rdparty/freetype/src/base/ftbase.c",
+			"3rdparty/freetype/src/base/ftbbox.c",
+			"3rdparty/freetype/src/base/ftbdf.c",
+			"3rdparty/freetype/src/base/ftbitmap.c",
+			"3rdparty/freetype/src/base/ftcid.c",
+			"3rdparty/freetype/src/base/ftfstype.c",
+			"3rdparty/freetype/src/base/ftgasp.c",
+			"3rdparty/freetype/src/base/ftglyph.c",
+			"3rdparty/freetype/src/base/ftgxval.c",
+			"3rdparty/freetype/src/base/ftinit.c",
+			"3rdparty/freetype/src/base/ftmm.c",
+			"3rdparty/freetype/src/base/ftotval.c",
+			"3rdparty/freetype/src/base/ftpatent.c",
+			"3rdparty/freetype/src/base/ftpfr.c",
+			"3rdparty/freetype/src/base/ftstroke.c",
+			"3rdparty/freetype/src/base/ftsynth.c",
+			"3rdparty/freetype/src/base/ftsystem.c",
+			"3rdparty/freetype/src/base/fttype1.c",
+			"3rdparty/freetype/src/base/ftwinfnt.c",
+			"3rdparty/freetype/src/bdf/bdf.c",
+			"3rdparty/freetype/src/cache/ftcache.c",
+			"3rdparty/freetype/src/cff/cff.c",
+			"3rdparty/freetype/src/cid/type1cid.c",
+			"3rdparty/freetype/src/gzip/ftgzip.c",
+			"3rdparty/freetype/src/lzw/ftlzw.c",
+			"3rdparty/freetype/src/pcf/pcf.c",
+			"3rdparty/freetype/src/pfr/pfr.c",
+			"3rdparty/freetype/src/psaux/psaux.c",
+			"3rdparty/freetype/src/pshinter/pshinter.c",
+			"3rdparty/freetype/src/psnames/psmodule.c",
+			"3rdparty/freetype/src/raster/raster.c",
+			"3rdparty/freetype/src/sfnt/sfnt.c",
+			"3rdparty/freetype/src/smooth/smooth.c",
+			"3rdparty/freetype/src/truetype/truetype.c",
+			"3rdparty/freetype/src/type1/type1.c",
+			"3rdparty/freetype/src/type42/type42.c",
+			"3rdparty/freetype/src/winfonts/winfnt.c",
+			"3rdparty/freetype/builds/windows/ftdebug.c"
+		}
+			includedirs { "3rdparty/freetype/include" }
+			defines { "NDEBUG", "FT2_BUILD_LIBRARY", "_CRT_SECURE_NO_WARNINGS" }
+			flags { "OptimizeSize", "ReleaseRuntime", "MinimumWarnings" }
+			targetname "freetype"
+			targetprefix ""
+			targetextension ".lib"
+			
+			configuration { "linux" }
+			targetdir "../external/freetype/lib/linux"
+			
+			configuration { "windows" }
+				buildoptions { "/wd4312"}
+				targetdir "../external/freetype/lib/win"
+	else
+		printf("--force-build-freetype used but FreeType source code not found")
+	end
+end
+
 
 if force_build_luau == true then
 	if os.isdir("3rdparty/luau") then
@@ -1128,3 +1036,49 @@ if force_build_luau == true then
 		printf("--force-build-luau used but Luau source code not found")
 	end
 end
+
+for _, plugin in ipairs(base_plugins) do
+	linkPlugin(plugin)
+end
+
+-- write plugins.inl
+local file = io.open("../src/engine/plugins.inl", "w")
+io.output(file)
+io.write("// generated by genie.lua\n\n")
+io.write "#ifdef LUMIX_PLUGIN_DECLS\n"
+	for _, plugin in ipairs(plugin_creators) do
+		io.write([[extern "C" ISystem* createPlugin_]] .. plugin .. "(Engine&);\n")
+	end
+io.write "#elif defined LUMIX_EDITOR_PLUGINS_DECLS\n"
+	if not dynamic_plugins then
+		for _, plugin in ipairs(plugin_creators) do
+			io.write([[extern "C" Lumix::StudioApp::IPlugin* setStudioApp_]] .. plugin .. "(StudioApp&);\n")
+		end
+	end
+io.write "#elif defined LUMIX_EDITOR_PLUGINS\n"
+	if not dynamic_plugins then
+		for _, plugin in ipairs(plugin_creators) do
+			io.write "{\n"
+			io.write("\tStudioApp::IPlugin* plugin = setStudioApp_" .. plugin .. "(*this);\n")
+			io.write("\tif (plugin) this->addPlugin(*plugin);\n")
+			io.write "}\n"
+		end
+	end
+io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
+	if dynamic_plugins then
+		for _, plugin in ipairs(plugin_creators) do
+			io.write("\"" .. plugin .. "\", ")
+		end
+	end
+	io.write("nullptr\n")
+io.write "#else\n"
+	if not dynamic_plugins then
+		for _, plugin in ipairs(plugin_creators) do
+			io.write "{\n"
+			io.write("\tISystem* p = createPlugin_" .. plugin .. "(engine);\n")
+			io.write "\tif (p) engine.getSystemManager().addSystem(p, nullptr);\n"
+			io.write "}\n"
+		end
+	end
+io.write "#endif\n"
+io.close(file)

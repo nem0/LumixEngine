@@ -140,6 +140,10 @@ struct EngineImpl final : Engine {
 
 	~EngineImpl()
 	{
+		for (ISystem* system : m_system_manager->getSystems()) {
+			system->shutdownStarted();
+		}
+
 		m_prefab_resource_manager.destroy();
 		for (Resource* res : m_lua_resources) {
 			res->decRefCount();

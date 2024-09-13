@@ -92,7 +92,7 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 
 				instances.clear();
 				AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
-				RandomGenerator rg(i, j);
+				RandomGenerator rg(i + 13, j + 57);
 
 				for (u32 k = 0; k < 1024; ++k) {
 					const Vec2 pn = Vec2(rg.randFloat(), rg.randFloat());
@@ -134,7 +134,7 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 				quad.last_used_frame = frame;
 				if (!instances.empty()) {
 					const Renderer::MemRef mem = m_renderer.copy(instances.begin(), instances.byte_size());
-					quad.instances = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+					quad.instances = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "grass_instances");
 					quad.instances_count = instances.size();
 				}
 			}

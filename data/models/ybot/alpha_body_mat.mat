@@ -1,15 +1,15 @@
 shader "/pipelines/standard.shd"
-backface_culling(true)
+backface_culling true
 layer "default"
-defines {}
+
 texture ""
 texture ""
 texture ""
 texture ""
 layer "default"
 custom_flag "no_navigation"
-uniform("Material color", { 0.040137, 0.304164, 0.580645, 1.000000 })
-uniform("Roughness", 0.790000)
-uniform("Metallic", 0.000000)
-uniform("Emission", 0.000000)
-uniform("Translucency", 0.000000)
+uniform "Material color", { 0.040137, 0.304164, 0.580645, 1.000000 }
+uniform "Roughness", 0.790000
+uniform "Metallic", 0.000000
+uniform "Emission", 0.000000
+uniform "Translucency", 0.000000

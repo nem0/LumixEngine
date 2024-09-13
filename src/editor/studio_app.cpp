@@ -100,6 +100,7 @@ struct StudioAppImpl final : StudioApp
 		, m_debug_allocator(m_main_allocator)
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
+		, m_export(m_allocator)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -308,20 +309,53 @@ struct StudioAppImpl final : StudioApp
 
 
 	void onIdle() {
-		update();
+		PROFILE_FUNCTION();
+		profiler::blockColor(0x7f, 0x7f, 0x7f);
+
+		updateGizmoOffset();
+		processDeferredWindowDestroy();
+
+		if (m_watched_plugin.reload_request) tryReloadPlugin();
+
+		guiBeginFrame();
+		m_asset_compiler->update();
+		m_editor->update();
+		showGizmos();
+
+		m_engine->update(*m_editor->getWorld());
+
+		++m_fps_frame;
+		if (m_fps_timer.getTimeSinceTick() > 1.0f) {
+			m_fps = m_fps_frame / m_fps_timer.tick();
+			m_fps_frame = 0;
+		}
+
+		if (m_deferred_game_mode_exit) {
+			m_deferred_game_mode_exit = false;
+			m_editor->toggleGameMode();
+		}
+
+		float time_delta = m_engine->getLastTimeDelta();
+		for (auto* plugin : m_gui_plugins) {
+			plugin->update(time_delta);
+		}
+
+		if (m_settings.getTimeSinceLastSave() > 30.f) saveSettings();
+
+		guiEndFrame();
 
 		if (m_first_update) {
 			// we show window after the first update, so it does not show default (white) background
 			// only to be replace with actual (potentially dark) content
 			os::showWindow(m_main_window);
-			if (m_settings.m_is_maximized) os::maximizeWindow(m_main_window);
+			if (m_settings.getBool("is_maximized", false)) os::maximizeWindow(m_main_window);
 			m_first_update = false;
 		}
 
 		if (!isFocused()) ++m_frames_since_focused;
 		else m_frames_since_focused = 0;
 
-		if (m_settings.m_sleep_when_inactive && m_frames_since_focused > 10) {
+		if (m_sleep_when_inactive && m_frames_since_focused > 10) {
 			const float frame_time = m_inactive_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
@@ -430,6 +464,16 @@ struct StudioAppImpl final : StudioApp
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		m_settings.registerPtr("report_crashes", &m_crash_reporting, "General");
+		m_settings.registerPtr("entity_list_open", &m_is_entity_list_open);
+		m_settings.registerPtr("sleep_when_inactive", &m_sleep_when_inactive);
+		m_settings.registerPtr("fileselector_dir", &m_file_selector.m_current_dir);
+		m_settings.registerPtr("font_size", &m_font_size, "General");
+		m_settings.registerPtr("export_pack", &m_export.pack);
+		m_settings.registerPtr("export_dir", &m_export.dest_dir);
+		m_settings.registerPtr("gizmo_scale", &m_gizmo_config.scale, "General");
+		m_settings.registerPtr("fov", &m_fov, "General", true);
+		// we need some stuff (font_size) from settings at this point
 		m_settings.load();
 
 		os::InitWindowArgs init_window_args;
@@ -466,7 +510,7 @@ struct StudioAppImpl final : StudioApp
 		m_log_ui.create(*this, m_allocator);
 
 		initPlugins(); // needs initialized imgui
-		loadSettings();
+		loadSettings(); // we can load settings now, we have everything (i.e. actions, imgui context) available
 
 		loadWorldFromCommandLine();
 
@@ -763,7 +807,7 @@ struct StudioAppImpl final : StudioApp
 				win->onGUI();
 			}
 
-			m_settings.onGUI();
+			m_settings.gui();
 			guiExportData();
 		}
 		ImGui::PopFont();
@@ -980,44 +1024,6 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 	}
-
-	void update() {
-		PROFILE_FUNCTION();
-		profiler::blockColor(0x7f, 0x7f, 0x7f);
-		
-		updateGizmoOffset();
-		processDeferredWindowDestroy();
-
-		if (m_watched_plugin.reload_request) tryReloadPlugin();
-
-		guiBeginFrame();
-		m_asset_compiler->update();
-		m_editor->update();
-		showGizmos();
-		
-		m_engine->update(*m_editor->getWorld());
-
-		++m_fps_frame;
-		if (m_fps_timer.getTimeSinceTick() > 1.0f) {
-			m_fps = m_fps_frame / m_fps_timer.tick();
-			m_fps_frame = 0;
-		}
-
-		if (m_deferred_game_mode_exit) {
-			m_deferred_game_mode_exit = false;
-			m_editor->toggleGameMode();
-		}
-
-		float time_delta = m_engine->getLastTimeDelta();
-		for (auto* plugin : m_gui_plugins) {
-			plugin->update(time_delta);
-		}
-
-		if (m_settings.getTimeSinceLastSave() > 30.f) saveSettings();
-
-		guiEndFrame();
-	}
-
 
 	void extractBundled() {
 		#ifdef _WIN32
@@ -2202,28 +2208,21 @@ struct StudioAppImpl final : StudioApp
 			m_settings.m_imgui_state = data;
 			io.WantSaveIniSettings = false;
 		}
-		m_settings.m_is_entity_list_open = m_is_entity_list_open;
-		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
 
-		m_settings.m_is_maximized = os::isMaximized(m_main_window);
+		m_settings.setBool("is_maximized", os::isMaximized(m_main_window), Settings::WORKSPACE);
 		if (!os::isMinimized(m_main_window)) {
 			os::Rect win_rect = os::getWindowScreenRect(m_main_window);
-			m_settings.m_window.x = win_rect.left;
-			m_settings.m_window.y = win_rect.top;
-			m_settings.m_window.w = win_rect.width;
-			m_settings.m_window.h = win_rect.height;
+			m_settings.setI32("window_x", win_rect.left, Settings::WORKSPACE);
+			m_settings.setI32("window_y", win_rect.top, Settings::WORKSPACE);
+			m_settings.setI32("window_w", win_rect.width, Settings::WORKSPACE);
+			m_settings.setI32("window_h", win_rect.height, Settings::WORKSPACE);
 		}
 
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
 		}
 
-		if (m_settings.save()) {
-			logInfo("Settings saved");
-		}
-		else {
-			logError("Settings failed to save");
-		}
+		m_settings.save();
 	}
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
@@ -2277,7 +2276,7 @@ struct StudioAppImpl final : StudioApp
 		};
 		pio.Platform_DestroyWindow = [](ImGuiViewport* vp){
 			os::WindowHandle w = (os::WindowHandle)vp->PlatformHandle;
-			that->m_deferred_destroy_windows.push({w, 4});
+			that->m_deferred_destroy_windows.push({w, 8});
 			vp->PlatformHandle = nullptr;
 			vp->PlatformUserData = nullptr;
 			that->m_windows.eraseItem(w);
@@ -2370,13 +2369,13 @@ struct StudioAppImpl final : StudioApp
 		
 			ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
-			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_settings.m_font_size * font_scale, true);
-			m_monospace_font = addFontFromFile("editor/fonts/sourcecodepro-regular.ttf", (float)m_settings.m_font_size * font_scale, false);
+			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_font_size * font_scale, true);
+			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_font_size * font_scale, true);
+			m_monospace_font = addFontFromFile("editor/fonts/sourcecodepro-regular.ttf", (float)m_font_size * font_scale, false);
 
 			OutputMemoryStream data(m_allocator);
 			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
-				const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
+				const float size = (float)m_font_size * font_scale * 1.25f;
 				ImFontConfig cfg;
 				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
 				cfg.FontDataOwnedByAtlas = false;
@@ -2427,32 +2426,27 @@ struct StudioAppImpl final : StudioApp
 		PROFILE_FUNCTION();
 		logInfo("Loading settings...");
 
-		if (CommandLineParser::isOn("-no_crash_report")) m_settings.m_force_no_crash_report = true;
+		m_settings.load();
+		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
+		else enableCrashReporting(m_crash_reporting);
 
-		m_settings.postLoad();
 		for (auto* i : m_gui_plugins) {
 			i->onSettingsLoaded();
 		}
 
-		m_is_entity_list_open = m_settings.m_is_entity_list_open;
-
-		if (m_settings.m_is_maximized)
-		{
+		if (m_settings.getBool("is_maximized", false)){
 			os::maximizeWindow(m_main_window);
 		}
-		else if (m_settings.m_window.w > 0)
-		{
+		else {
 			os::Rect r;
-			r.left = m_settings.m_window.x;
-			r.top = m_settings.m_window.y;
-			r.width = m_settings.m_window.w;
-			r.height = m_settings.m_window.h;
-			os::setWindowScreenRect(m_main_window, r);
+			r.width = m_settings.getI32("window_w", -1);
+			if (r.width > 0) {
+				r.left = m_settings.getI32("window_x", -1);
+				r.top = m_settings.getI32("window_y", -1);
+				r.height = m_settings.getI32("window_h", -1);
+				os::setWindowScreenRect(m_main_window, r);
+			}
 		}
-		m_export.dest_dir = "";
-		m_settings.getValue(Settings::LOCAL, "export_dir", Span(m_export.dest_dir.data));
-		m_settings.getValue(Settings::LOCAL, "export_pack", m_export.pack);
-		m_file_selector.m_current_dir = m_settings.getStringValue(Settings::LOCAL, "fileselector_dir", "");
 	}
 
 	CommonActions& getCommonActions() override { return m_common_actions; }
@@ -3430,20 +3424,17 @@ struct StudioAppImpl final : StudioApp
 		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
-			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir.data)) {
-				if (os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
-					m_settings.setValue(Settings::LOCAL, "export_dir", m_export.dest_dir);
+			if (ImGui::Button(m_export.dest_dir.length() == 0 ? "..." : m_export.dest_dir.c_str())) {
+				char tmp[MAX_PATH];
+				if (os::getOpenDirectory(Span(tmp), m_engine->getFileSystem().getBasePath())) {
+					m_export.dest_dir = tmp;
 				}
 			}
 
 			ImGuiEx::Label("Pack data");
-			if (ImGui::Checkbox("##pack", &m_export.pack)) {
-				m_settings.setValue(Settings::LOCAL, "export_pack", m_export.pack);
-			}
+			ImGui::Checkbox("##pack", &m_export.pack);
 			ImGuiEx::Label("Mode");
-			if (ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0")) {
-				m_settings.setValue(Settings::LOCAL, "export_pack", (i32)m_export.mode);
-			}
+			ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0");
 
 			ImGuiEx::Label("Startup world");
 			if (ImGui::BeginCombo("##startunv", m_export.startup_world.c_str())) {
@@ -3475,7 +3466,7 @@ struct StudioAppImpl final : StudioApp
 
 
 	bool exportData() {
-		if (m_export.dest_dir.empty()) return false;
+		if (m_export.dest_dir.length() == 0) return false;
 
 		FileSystem& fs = m_engine->getFileSystem(); 
 		{
@@ -3576,7 +3567,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (GUIPlugin* plugin : m_gui_plugins)	{
-			if (!plugin->exportData(m_export.dest_dir)) {
+			if (!plugin->exportData(m_export.dest_dir.c_str())) {
 				logError("Plugin ", plugin->getName(), " failed to pack data.");
 			}
 		}
@@ -3709,6 +3700,7 @@ struct StudioAppImpl final : StudioApp
 	u32 m_fps_frame = 0;
 
 	struct ExportConfig {
+		ExportConfig(IAllocator& allocator) : dest_dir(allocator) {}
 		enum class Mode : i32 {
 			ALL_FILES,
 			CURRENT_WORLD
@@ -3718,7 +3710,7 @@ struct StudioAppImpl final : StudioApp
 
 		bool pack = false;
 		Path startup_world;
-		StaticString<MAX_PATH> dest_dir;
+		String dest_dir;
 	};
 
 	ExportConfig m_export;
@@ -3757,6 +3749,9 @@ struct StudioAppImpl final : StudioApp
 	bool m_show_all_actions_request = false;
 	i32 m_all_actions_selected = 0;
 	TextFilter m_all_actions_filter;
+	bool m_sleep_when_inactive = true;
+	bool m_crash_reporting = true;
+	i32 m_font_size = 13;
 };
 
 static Local<StudioAppImpl> g_studio;

@@ -1,28 +1,17 @@
 include "pipelines/common.glsl"
 
 compute_shader [[
-	#if defined PASS2 || defined PASS0
-		layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-	#else
-		layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-	#endif
-
-	layout (binding = 0) uniform sampler2D u_image;
-	layout (binding = 1, std430) coherent buffer OutData {
-		uint b_histogram[256];
-		float b_accum;
-	};
-	layout(binding = 4, std140) uniform Data {
-		vec2 u_size;
+	cbuffer Data : register (b4) {
+		float2 u_size;
 		float u_accomodation_speed;
+		uint u_image;
+		uint b_histogram;
 	};
 	
-	shared uint histogram[256];
+	groupshared uint histogram[256];
 
 	uint luminanceToBin(float lum, float min, float inv_range) {
-	  if (lum < 1e-3) {
-		return 0;
-	  }
+	  if (lum < 1e-3) return 0;
 	  float logLum = clamp((log2(lum) - min) * inv_range, 0.0, 1.0);
 	  return uint(logLum * 254.0 + 1.0);
 	}
@@ -33,48 +22,56 @@ compute_shader [[
 		return exp2(t * range + min);
 	}
 
-	void main() {
+	#if defined PASS2 || defined PASS0
+		[numthreads(256, 1, 1)]
+	#else
+		[numthreads(16, 16, 1)]
+	#endif
+	void main(uint3 local_thread_id : SV_GroupThreadID, uint3 thread_id : SV_DispatchThreadID) {
 		const float range = 12.0;
 		const float min = -6;
 		#ifdef PASS0
-			b_histogram[gl_LocalInvocationID.x] = 0;
+			bindless_rw_buffers[b_histogram].Store(local_thread_id.x * 4, 0);
 		#elif !defined PASS2
-			uint idx = gl_LocalInvocationID.x + gl_LocalInvocationID.y * 16;
+			uint idx = local_thread_id.x + local_thread_id.y * 16;
 			histogram[idx] = 0;
 
-			groupMemoryBarrier();
-			barrier();
+			AllMemoryBarrier();
+			GroupMemoryBarrierWithGroupSync();
 
-			if (all(lessThan(gl_GlobalInvocationID.xy, uvec2(u_size + 0.5)))) {
-				float luminance = luminance(texture(u_image, ivec2(gl_GlobalInvocationID.xy) / u_size).rgb);
-				uint bin = luminanceToBin(luminance, min, 1 / range);
-				atomicAdd(histogram[bin], 1);
+			if (all(thread_id.xy < uint2(u_size + 0.5))) {
+				float _luminance = luminance(sampleBindlessLod(LinearSamplerClamp, u_image, int2(thread_id.xy) / u_size, 0).rgb);
+				uint bin = luminanceToBin(_luminance, min, 1 / range);
+				InterlockedAdd(histogram[bin], 1);
 			}
+			AllMemoryBarrier();
+			GroupMemoryBarrierWithGroupSync();
 			
-			groupMemoryBarrier();
-			barrier();
-			
-			atomicAdd(b_histogram[idx], histogram[idx]); 
+			uint dummy;
+			bindless_rw_buffers[b_histogram].InterlockedAdd(idx * 4, histogram[idx], dummy);
 		#else
-			uint idx = gl_LocalInvocationID.x;
-			histogram[idx] = b_histogram[idx] * idx;
+			uint idx = local_thread_id.x;
+			histogram[idx] = bindless_rw_buffers[b_histogram].Load(idx * 4) * idx;
 			
-			groupMemoryBarrier();
-			barrier();
-
+			AllMemoryBarrier();
+			GroupMemoryBarrierWithGroupSync();
 
 			for (uint offset = 256 >> 1; offset > 0; offset >>= 1) {
 				if (idx < offset) {
 					histogram[idx] += histogram[idx + offset];
 				}
-				groupMemoryBarrier();
-				barrier();
+				AllMemoryBarrier();
+				GroupMemoryBarrierWithGroupSync();
 			}
 
 			if (idx == 0) {
-				float avg_bin = histogram[0] / float(u_size.x * u_size.y);
+				uint sum = histogram[0];
+				float avg_bin = sum / float(u_size.x * u_size.y);
 				float avg_lum = binToLuminance(avg_bin, min, range);
-				b_accum += (avg_lum - b_accum) * (1 - exp(-Global.frame_time_delta * u_accomodation_speed));
+				float accumulator = asfloat(bindless_rw_buffers[b_histogram].Load(256 * 4));
+				accumulator += (avg_lum - accumulator) * (1 - exp(-Global_frame_time_delta * u_accomodation_speed));
+
+				bindless_rw_buffers[b_histogram].Store(256 * 4, asuint(accumulator));
 			}
 		#endif
 	}
