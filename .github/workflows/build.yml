@@ -8,8 +8,10 @@ jobs:
               with:
                 fetch-depth: 1
             - name: fetch maps plugin
-              working-directory: plugins
+              working-directory: projects
               run: |
+                mkdir ..\plugins
+                pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
             - name: fetch gltf plugin
               working-directory: plugins
