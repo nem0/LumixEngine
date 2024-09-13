@@ -161,22 +161,28 @@ struct FilmGrain : public RenderPlugin {
 		const RenderBufferHandle ldr_buffer = INVALID_RENDERBUFFER;
 		pipeline.beginBlock("film_grain");
 
-		const RenderBufferHandle res = pipeline.createRenderbuffer({.format = gpu::TextureFormat::RGBA8, .debug_name = "film_grain"});
-		pipeline.setRenderTargets(Span(&res, 1));
+		const RenderBufferHandle res = pipeline.createRenderbuffer({
+			.format = gpu::TextureFormat::RGBA8, 
+			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
+			.debug_name = "film_grain"
+		});
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 		struct {
 			float intensity;
 			float lumamount;
-			u32 source;
-			u32 noise;
+			gpu::BindlessHandle source;
+			gpu::BindlessHandle noise;
+			gpu::RWBindlessHandle output;
 		} ubdata = {
 			camera.film_grain_intensity,
 			0.1f,
 			pipeline.toBindless(input, stream),
-			gpu::getBindlessHandle(m_noise->handle)
+			gpu::getBindlessHandle(m_noise->handle),
+			pipeline.toRWBindless(res, stream)
 		};
+		const Viewport& vp = pipeline.getViewport();
 		pipeline.setUniform(ubdata);
-		pipeline.drawArray(0, 3, *m_shader, 0, gpu::StateFlags::NONE);
+		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		pipeline.endBlock();
 		return res;
