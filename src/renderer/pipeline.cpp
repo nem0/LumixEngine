@@ -35,7 +35,6 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
-// TODO 3d ui depth test
 // TODO fog
 
 // TODO crashes:
