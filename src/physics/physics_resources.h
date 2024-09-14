@@ -19,23 +19,15 @@ namespace Lumix
 
 struct PhysicsSystem;
 
-struct PhysicsMaterialLoadData {
-	float static_friction = 0.5f;
-	float dynamic_friction = 0.5f;
-	float restitution = 0.1f;
-};
-
 struct PhysicsMaterialManager : ResourceManager {
 	PhysicsMaterialManager(PhysicsSystem& system, IAllocator& allocator);
 	~PhysicsMaterialManager();
 
-	lua_State* getState(PhysicsMaterialLoadData& material);
 	Resource* createResource(const Path& path) override;
 	void destroyResource(Resource& resource) override;
 
 	IAllocator& allocator;
 	PhysicsSystem& system;
-	lua_State* state;
 };
 
 struct PhysicsMaterial : Resource {

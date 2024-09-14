@@ -35,6 +35,7 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
+// TODO 3d ui in scene view
 // TODO fog
 // TODO move shader cache in .lumix ?
 
