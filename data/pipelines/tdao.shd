@@ -33,7 +33,7 @@ compute_shader [[
 		uv = saturate(uv * 0.5 + 0.5);
 
 		float4 v = bindless_rw_textures[u_gbufferB][thread_id.xy];
-		float c = random(float2(thread_id.xy)) * 2 - 1;
+		float c = hash(float2(thread_id.xy)) * 2 - 1;
 		float s = sqrt(1 - c * c); 
 		
 		float ao = 0;

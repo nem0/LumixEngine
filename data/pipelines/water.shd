@@ -180,7 +180,7 @@ fragment_shader [[
 		#ifdef SSR
 			float4 o = mul(float4(wpos, 1), Global_view);
 			float3 d = mul(reflect(-view, normal), float3x3(Global_view));
-			float2 hit = raycast(o.xyz, d, 4, random(wpos.xy + Global_time));
+			float2 hit = raycast(o.xyz, d, 4, hash(wpos.xy + Global_time));
 			if (hit.x >= 0) {
 				return sampleBindless(LinearSamplerClamp, u_bg, hit.xy / Global_framebuffer_size.xy).rgb;
 			}

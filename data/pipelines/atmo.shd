@@ -59,28 +59,8 @@ fragment_shader [[
 		return (a/b)*(c/d);
 	}
 
-	float getFogDensity(float y) {
-		return y > u_fog_top ? 0 : 1;
-	}
-
-	void makeAscending(inout float3 a, inout float3 b) {
-		if (a.y > b.y) {
-			float3 tmp = a;
-			a = b;
-			b = tmp;
-		}
-	}
-
-	float opticalDepth(float3 a, float3 b) {
-		makeAscending(a, b); // TODO remove and make sure argument are correct
-
-		if (a.y > u_fog_top) return 0;
-		if (b.y > u_fog_top) {
-			float3 dir = b - a;
-			float3 diry1 = dir / dir.y;
-			b -= diry1 * (b.y - u_fog_top);
-		}
-		return length(a - b);
+	float getFogDensity(float3 pos) {
+		return pos.y > u_fog_top ? 0 : 1;
 	}
 
 	Output main(float2 uv : TEXCOORD0, float4 frag_coord : SV_POSITION) {
@@ -132,7 +112,7 @@ fragment_shader [[
 		if (u_fog_enabled > 0) {
 			const float3 fog_extinction = u_fog_scattering.rgb;
 			float linear_depth = ndc_depth > 0 ? toLinearDepth(Global_inv_projection, ndc_depth) : 1e5;
-			float dist = (linear_depth / dot(eyedir, Pass_view_dir.xyz));
+			float dist = (linear_depth / dot(eyedir, Global_view_dir.xyz));
 			float3 p0 = Global_camera_world_pos.xyz;
 			float3 p1 = Global_camera_world_pos.xyz + eyedir * dist;
 			makeAscending(p0, p1);
@@ -144,29 +124,25 @@ fragment_shader [[
 					p1 -= diry1 * (p1.y - u_fog_top);
 				}
 
-				float opt_depth = opticalDepth(p0, p1);
-				float3 fog_transmittance = exp(-opt_depth * fog_extinction);
+				float3 fog_transmittance = exp(-distanceInFog(p0, p1) * fog_extinction);
 
 				float3 inscatter = 0;
 				{
 					const int STEP_COUNT = u_godarys_enabled > 0 ? 128 : 8;
 					float step_len = length(p1 - p0) / (STEP_COUNT + 1);
-					float offset = random(p0.xyz) * 2 - 1;
+					float offset = hash(p0.xyz) * 2 - 1;
 					for (float f = (0.5 + offset * 0.2) / STEP_COUNT; f < 1; f += 1.0 / (STEP_COUNT + 1)) {
 						float3 p = lerp(p0, p1, f);
-						float od = opticalDepth(p, p + Global_light_dir.xyz * 1e5); // TODO 1e5
-						od += opticalDepth(p, Global_camera_world_pos.xyz);
+						float od = distanceInFog(p, p + Global_light_dir.xyz * 1e5); // TODO 1e5
+						od += distanceInFog(p, Global_camera_world_pos.xyz);
 						float shadow = u_godarys_enabled > 0 ? getShadowSimple(Global_shadowmap, p - Global_camera_world_pos.xyz) : 1;
-						inscatter += getFogDensity(p.y) * step_len * exp(-od * fog_extinction) * shadow;
+						inscatter += getFogDensity(p) * step_len * exp(-od * fog_extinction) * shadow;
 					}
 				}
 
 				const float cos_theta = dot(eyedir, Global_light_dir.xyz);
 
 				output.output1.rgb = fog_transmittance;
-				if (Global_camera_world_pos.y < u_fog_top) {
-					output.output0.rgb *= fog_transmittance;
-				}
 
 				output.output0.rgb += inscatter * u_fog_scattering.rgb * sunlight * miePhase(0.25, -cos_theta);
 			}

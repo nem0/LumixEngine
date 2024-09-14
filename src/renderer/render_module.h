@@ -128,13 +128,13 @@ struct Environment {
 	Vec3 absorb_mie = {1, 1, 1};
 	Vec3 sunlight_color = {1, 1, 1};
 	Vec3 fog_scattering = {1, 1, 1};
+	float fog_density = 1.f;
 	float sunlight_strength = 10;
 	float height_distribution_rayleigh = 8000;
 	float height_distribution_mie = 1200;
 	float ground_r = 6378;
 	float atmo_r = 6478;
 	float fog_top = 100;
-	bool fog_enabled = false;
 	bool godrays_enabled = false;
 	bool atmo_enabled = true;
 };
@@ -307,6 +307,7 @@ enum class RenderModuleVersion : i32 {
 	REMOVED_SPLINE_GEOMETRY,
 	EMIT_RATE_REMOVED,
 	POSTPROCESS,
+	FOG_DENSITY,
 
 	LATEST
 };

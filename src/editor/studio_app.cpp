@@ -1620,7 +1620,9 @@ struct StudioAppImpl final : StudioApp
 				m_open_filter.gui("Filter", 150);
 	
 				forEachWorld([&](const Path& path){
-					if (m_open_filter.pass(path.c_str()) && ImGui::MenuItem(path.c_str())) {
+					StringView basename = Path::getBasename(path);
+					StaticString<MAX_PATH> tmp(basename);
+					if (m_open_filter.pass(path.c_str()) && ImGui::MenuItem(tmp)) {
 						tryLoadWorld(path, additive);
 					}
 				});

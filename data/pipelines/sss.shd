@@ -76,7 +76,7 @@ compute_shader [[
 		float3 p = getViewPosition(u_depth, Global_inv_view_projection, uv);
 		float4 o = mul(float4(p, 1), Global_view);
 		float3 d = mul(Global_light_dir.xyz, (float3x3)Global_view);
-		float rr = random(float2(thread_id.xy) + 0.1 * Global_time);
+		float rr = hash(float2(thread_id.xy) + 0.1 * Global_time);
 		raycast(o.xyz, d.xyz, u_stride, rr, thread_id.xy);
 	}
 ]]
