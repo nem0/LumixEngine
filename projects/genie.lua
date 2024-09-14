@@ -866,8 +866,8 @@ if build_studio then
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
 				libdirs { path.join(ROOT_DIR, "./external/pix/bin/x64") }
-				--files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
-				--copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+				files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+				copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
 			
 			configuration {}
 		end
