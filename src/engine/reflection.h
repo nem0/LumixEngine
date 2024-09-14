@@ -68,13 +68,13 @@ struct RegisteredComponent {
 };
 
 LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
-LUMIX_ENGINE_API const struct PropertyBase* getProperty(ComponentType cmp_type, const char* prop);
+LUMIX_ENGINE_API const struct PropertyBase* getProperty(ComponentType cmp_type, StringView prop);
 LUMIX_ENGINE_API Span<const RegisteredComponent> getComponents();
 
 LUMIX_ENGINE_API const PropertyBase* getPropertyFromHash(StableHash hash);
 LUMIX_ENGINE_API StableHash getPropertyHash(ComponentType cmp, const char* property_name);
 LUMIX_ENGINE_API bool componentTypeExists(const char* id);
-LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
+LUMIX_ENGINE_API ComponentType getComponentType(StringView id);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
 LUMIX_ENGINE_API const char* declCodeToName(const char* decl_code);
 

@@ -36,6 +36,7 @@
 #include <imgui/imgui.h>
 
 // TODO fog
+// TODO move shader cache in .lumix ?
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window

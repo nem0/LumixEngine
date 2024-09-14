@@ -2,8 +2,6 @@
 
 #include "engine/resource.h"
 
-struct lua_State;
-
 namespace Lumix {
 
 namespace reflection { template <typename T> struct Property; }
@@ -33,7 +31,6 @@ struct PropertyAnimation final : Resource {
 	static const ResourceType TYPE;
 
 private:
-	void LUA_curve(lua_State* L);
 	void unload() override;
 	bool load(Span<const u8> mem) override;
 };

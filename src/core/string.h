@@ -44,13 +44,18 @@ LUMIX_CORE_API char* toCString(u64 value, Span<char> output);
 LUMIX_CORE_API char* toCString(u32 value, Span<char> output);
 LUMIX_CORE_API char* toCString(float value, Span<char> output, int after_point);
 LUMIX_CORE_API char* toCString(double value, Span<char> output, int after_point);
-LUMIX_CORE_API const char* fromCStringOctal(StringView input, u32& value);
+
+// conver string from `input` to `value` and returns pointer to the next character after the number
+// does not need to consume the whole input
 LUMIX_CORE_API const char* fromCString(StringView input, i32& value);
 LUMIX_CORE_API const char* fromCString(StringView input, u64& value);
 LUMIX_CORE_API const char* fromCString(StringView input, i64& value);
 LUMIX_CORE_API const char* fromCString(StringView input, u32& value);
 LUMIX_CORE_API const char* fromCString(StringView input, u16& value);
+LUMIX_CORE_API const char* fromCString(StringView input, float& value);
 LUMIX_CORE_API const char* fromCString(StringView input, bool& value);
+LUMIX_CORE_API const char* fromCStringOctal(StringView input, u32& value);
+
 LUMIX_CORE_API char* copyString(Span<char> output, StringView source);
 LUMIX_CORE_API char* catString(Span<char> output, StringView source);
 LUMIX_CORE_API bool makeLowercase(Span<char> output, StringView source);

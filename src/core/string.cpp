@@ -406,6 +406,35 @@ const char* fromCString(StringView input, i64& value) {
 	return res;
 }
 
+const char* fromCString(StringView input, float& value) {
+	if (input.empty()) return nullptr;
+	
+	const char* c = input.begin;
+	if (*c == '-') ++c;
+	
+	if (*c < '0' || *c > '9') return nullptr;
+
+	value = 0;
+	while (c != input.end && *c >= '0' && *c <= '9') {
+		value *= 10;
+		value += *c - '0';
+		++c;
+	}
+	if (c != input.end && *c == '.') {
+		++c;
+		float d = 0.1f;
+		while (c != input.end && *c >= '0' && *c <= '9') {
+			value += d * (*c - '0');
+			d *= 0.1f;
+			++c;
+		}
+	}
+
+	value = input[0] == '-' ? -value : value;
+
+	return c;
+}
+
 const char* fromCString(StringView input, u16& value) {
 	u32 tmp;
 	const char* ret = fromCString(input, tmp);
