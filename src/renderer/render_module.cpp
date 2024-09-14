@@ -628,8 +628,8 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.write(env.atmo_r);
 			serializer.write(env.fog_top);
 			serializer.write(env.atmo_enabled);
-			serializer.write(env.fog_enabled);
 			serializer.write(env.godrays_enabled);
+			serializer.write(env.fog_density);
 		}
 		serializer.write(m_active_global_light_entity);
 	}
@@ -1133,9 +1133,15 @@ struct RenderModuleImpl final : RenderModule {
 				serializer.read(env.atmo_r);
 				serializer.read(env.fog_top);
 				serializer.read(env.atmo_enabled);
-				serializer.read(env.fog_enabled);
+				if (version <= (i32)RenderModuleVersion::FOG_DENSITY) {
+					bool fog_enabled;
+					serializer.read(fog_enabled);
+					env.fog_density = fog_enabled ? 1.f : 0.0f;
+				}
 				serializer.read(env.godrays_enabled);
-
+				if (version > (i32)RenderModuleVersion::FOG_DENSITY) {
+					serializer.read(env.fog_density);
+				}
 			}
 
 			env.entity = entity_map.get(env.entity);
@@ -3528,19 +3534,19 @@ void RenderModule::reflect() {
 			.LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")
 			.LUMIX_PROP(SkyTexturePath, "Sky texture").resourceAttribute(Texture::TYPE)
 			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_enabled>("Atmosphere enabled")
-			.var_prop<&RenderModule::getEnvironment, &Environment::fog_enabled>("Fog enabled")
 			.var_prop<&RenderModule::getEnvironment, &Environment::godrays_enabled>("Godrays enabled")
 			.var_prop<&RenderModule::getEnvironment, &Environment::sky_intensity>("Sky intensity").minAttribute(0)
 			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_rayleigh>("Scatter Rayleigh").colorAttribute()
 			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_mie>("Scatter Mie").colorAttribute()
 			.var_prop<&RenderModule::getEnvironment, &Environment::absorb_mie>("Absorb Mie").colorAttribute()
 			.var_prop<&RenderModule::getEnvironment, &Environment::sunlight_color>("Sunlight color").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::fog_scattering>("Fog scattering").colorAttribute()
 			.var_prop<&RenderModule::getEnvironment, &Environment::sunlight_strength>("Sunlight strength").minAttribute(0)
 			.var_prop<&RenderModule::getEnvironment, &Environment::height_distribution_rayleigh>("Height distribution Rayleigh")
 			.var_prop<&RenderModule::getEnvironment, &Environment::height_distribution_mie>("Height distribution Mie")
 			.var_prop<&RenderModule::getEnvironment, &Environment::ground_r>("Ground radius").minAttribute(0)
 			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_r>("Atmosphere radius").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::fog_density>("Fog density").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::fog_scattering>("Fog scattering").colorAttribute()
 			.var_prop<&RenderModule::getEnvironment, &Environment::fog_top>("Fog top")
 		.LUMIX_CMP(PointLight, "point_light", "Render / Point light")
 			.icon(ICON_FA_LIGHTBULB)

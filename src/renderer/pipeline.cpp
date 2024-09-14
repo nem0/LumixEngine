@@ -35,14 +35,14 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
-// TODO 3d ui in scene view
-// TODO fog
-// TODO move shader cache in .lumix ?
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
 
 // TODO nice to have:
+	// TODO 3d ui in scene view
+	// TODO property groups in property grid
+	// TODO move shader cache in .lumix ?
 	// TODO render graph
 	// TODO vertex pulling
 	// TODO 200 MB in memory profiler
@@ -115,6 +115,8 @@ struct GlobalState {
 	Matrix camera_inv_view_projection;
 	Matrix camera_reprojection;
 	Vec4 cam_world_pos;
+	Vec4 view_dir;
+	Vec4 fog_scattering;
 	Vec4 to_prev_frame_camera_translation;
 	Vec4 light_direction;
 	Vec4 light_color;
@@ -122,6 +124,8 @@ struct GlobalState {
 	Vec2 pixel_jitter;
 	Vec2 prev_pixel_jitter;
 	Vec2 padding_;
+	float fog_enabled;
+	float fog_top;
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
@@ -1477,19 +1481,23 @@ struct PipelineImpl final : Pipeline {
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
+		global_state.view_dir = Vec4(m_viewport.rot * Vec3(0, 0, -1), 0);
 		global_state.to_prev_frame_camera_translation = Vec4(Vec3(m_viewport.pos - m_prev_viewport.pos), 1);
 		m_prev_viewport = m_viewport;
 		m_indirect_buffer_offset = 0;
 
 		if(m_module) {
-			const EntityPtr global_light = m_module->getActiveEnvironment();
-			if(global_light.isValid()) {
-				EntityRef gl = (EntityRef)global_light;
+			const EntityPtr env_entity = m_module->getActiveEnvironment();
+			if(env_entity.isValid()) {
+				EntityRef gl = (EntityRef)env_entity;
 				const Environment& env = m_module->getEnvironment(gl);
 				global_state.light_direction = Vec4(normalize(m_module->getWorld().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
 				global_state.light_color = Vec4(env.light_color, 456);
 				global_state.light_intensity = env.direct_intensity;
 				global_state.light_indirect_intensity = env.indirect_intensity * m_indirect_light_multiplier;
+				global_state.fog_enabled = env.fog_density > 0;
+				global_state.fog_scattering = Vec4(env.fog_scattering * env.fog_density * 0.0001f, 0);
+				global_state.fog_top = env.fog_top;
 			}
 		}
 

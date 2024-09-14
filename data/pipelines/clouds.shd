@@ -269,7 +269,7 @@ fragment_shader [[
 		
 		}
 
-		p += eyedir * random(v_uv) * 100;
+		p += eyedir * hash(v_uv) * 100;
 
 		const uint STEP_COUNT = 40;
 		float step_len = min(1550, cloud_height / STEP_COUNT / abs(eyedir.y));

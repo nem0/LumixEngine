@@ -102,37 +102,41 @@ struct Surface {
 };
 
 cbuffer GlobalState : register(b0) {
-	SMSlice Global_sm_slices[4] : packoffset(c0);
-	float4x4 Global_projection : packoffset(c16);
-	float4x4 Global_prev_projection : packoffset(c20);
-	float4x4 Global_projection_no_jitter : packoffset(c24);
-	float4x4 Global_prev_projection_no_jitter : packoffset(c28);
-	float4x4 Global_inv_projection : packoffset(c32);
-	float4x4 Global_view : packoffset(c36);
-	float4x4 Global_inv_view : packoffset(c40);
-	float4x4 Global_view_projection : packoffset(c44);
-	float4x4 Global_view_projection_no_jitter : packoffset(c48);
-	float4x4 Global_prev_view_projection_no_jitter : packoffset(c52);
-	float4x4 Global_inv_view_projection : packoffset(c56);
-	float4x4 Global_reprojection : packoffset(c60);
-	float4 Global_camera_world_pos : packoffset(c64);
-	float4 Global_to_prev_frame_camera_translation : packoffset(c65);
-	float4 Global_light_dir : packoffset(c66);
-	float4 Global_light_color : packoffset(c67);
-	int2 Global_framebuffer_size : packoffset(c68);
-	float2 Global_pixel_jitter : packoffset(c68.z);
-	float2 Global_prev_pixel_jitter : packoffset(c69);
-	float2 Global_padding_ : packoffset(c69.z);
-	float Global_light_intensity : packoffset(c70);
-	float Global_light_indirect_intensity : packoffset(c70.y);
-	float Global_time : packoffset(c70.z);
-	float Global_frame_time_delta : packoffset(c70.w);
-	float Global_shadow_depth_range : packoffset(c71);
-	float Global_shadow_rcp_depth_range : packoffset(c71.y);
-	uint Global_frame_index : packoffset(c71.z);
-	uint Global_shadowmap : packoffset(c71.w);
-	uint Global_shadow_atlas : packoffset(c72.x);
-	uint Global_reflection_probes : packoffset(c72.y);
+	SMSlice Global_sm_slices[4];
+	float4x4 Global_projection;
+	float4x4 Global_prev_projection;
+	float4x4 Global_projection_no_jitter;
+	float4x4 Global_prev_projection_no_jitter;
+	float4x4 Global_inv_projection;
+	float4x4 Global_view;
+	float4x4 Global_inv_view;
+	float4x4 Global_view_projection;
+	float4x4 Global_view_projection_no_jitter;
+	float4x4 Global_prev_view_projection_no_jitter;
+	float4x4 Global_inv_view_projection;
+	float4x4 Global_reprojection;
+	float4 Global_camera_world_pos;
+	float4 Global_view_dir;
+	float4 Global_fog_scattering;
+	float4 Global_to_prev_frame_camera_translation;
+	float4 Global_light_dir;
+	float4 Global_light_color;
+	int2 Global_framebuffer_size;
+	float2 Global_pixel_jitter;
+	float2 Global_prev_pixel_jitter;
+	float2 Global_padding_;
+	float Global_fog_enabled;
+	float Global_fog_top;
+	float Global_light_intensity;
+	float Global_light_indirect_intensity;
+	float Global_time;
+	float Global_frame_time_delta;
+	float Global_shadow_depth_range;
+	float Global_shadow_rcp_depth_range;
+	uint Global_frame_index;
+	uint Global_shadowmap;
+	uint Global_shadow_atlas;
+	uint Global_reflection_probes;
 };
 
 cbuffer PassState : register(b1) {
@@ -326,12 +330,12 @@ Cluster getCluster(float ndc_depth, float2 frag_coord) {
 
 #endif
 
-float random(float3 seed) {
+float hash(float3 seed) {
 	float dot_product = dot(seed, float3(12.9898,78.233,45.164));
 	return frac(sin(dot_product) * 43758.5453);
 }
 
-float random(float2 st) {
+float hash(float2 st) {
 	return frac(sin(dot(st.xy, float2(12.9898,78.233))) * 43758.5453123);
 }
 
@@ -362,7 +366,7 @@ float getShadow(uint shadowmap, float3 wpos, float3 N, float2 frag_coord) {
 			float3 sc = mul(Global_sm_slices[slice].world_to_slice, pos);
 			
 			if (all(sc.xyz < 0.99) && all(sc.xyz > 0.01)) {
-				float c = random(frag_coord) * 2 - 1;
+				float c = hash(frag_coord) * 2 - 1;
 				float s = sqrt(1 - c * c); 
 				float2x2 rot = float2x2(c, s, -s, c);
 				float2 sm_uv = float2(sc.x * 0.25 + slice * 0.25, sc.y);
@@ -447,7 +451,7 @@ float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, 
 
 					float2 shadow_uv = proj_pos.xy;
 
-					float c = random(frag_coord) * 2 - 1;
+					float c = hash(frag_coord) * 2 - 1;
 					float s = sqrt(1 - c * c); 
 					float2x2 rot = float2x2(c, s, -s, c);
 					float shadow = 0;
@@ -581,9 +585,33 @@ float3 reflProbesLighting(Cluster cluster, Surface surface, uint reflection_prob
 	return (remaining_w > 0.999 ? 0 : res * brdf / (1 - remaining_w)) * surface.ao * Global_light_indirect_intensity;
 }
 
+void makeAscending(inout float3 a, inout float3 b) {
+	if (a.y > b.y) {
+		float3 tmp = a;
+		a = b;
+		b = tmp;
+	}
+}
+
+float distanceInFog(float3 a, float3 b) {
+	makeAscending(a, b); // TODO remove and make sure argument are correct
+
+	if (a.y > Global_fog_top) return 0;
+	if (b.y > Global_fog_top) {
+		float3 dir = b - a;
+		float3 diry1 = dir / dir.y;
+		b -= diry1 * (b.y - Global_fog_top);
+	}
+	return length(a - b);
+}
+
 float3 computeLighting(Cluster cluster, Surface surface, float3 light_direction, float3 light, uint shadowmap, uint shadow_atlas, uint reflection_probes, float2 frag_coord) {
 	float shadow = min(surface.shadow, getShadow(shadowmap, surface.wpos, surface.N, frag_coord));
-	float3 res = computeDirectLight(surface, light_direction, light * shadow);
+
+	float dist = max(0, (Global_fog_top - surface.wpos.y - Global_camera_world_pos.y) * Global_light_dir.y);
+	float3 fog_transmittance = Global_fog_enabled > 0 ? exp(-dist * Global_fog_scattering.rgb * 10) : 1;
+
+	float3 res = computeDirectLight(surface, light_direction, light * shadow * fog_transmittance);
 	res += surface.emission * surface.albedo;
 	res += envProbesLighting(cluster, surface);
 	res += reflProbesLighting(cluster, surface, reflection_probes);
@@ -612,7 +640,6 @@ float D_GGX(float ndoth, float roughness) {
 		return ret < 1e-3;
 	}
 #endif
-
 
 /*
  

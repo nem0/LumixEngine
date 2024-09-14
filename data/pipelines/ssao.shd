@@ -30,7 +30,7 @@ compute_shader [[
 		float occlusion = 0;
 		float occlusion_count = 0;
 	
-		float rand = random(view_pos.xyz + frac(Global_time) * 0.001);
+		float rand = hash(view_pos.xyz + frac(Global_time) * 0.001);
 		float random_angle = rand * 6.283285;
 		float3 rot;
 		float depth_scale = u_radius / view_pos.z * (rand * 2 + 0.1);

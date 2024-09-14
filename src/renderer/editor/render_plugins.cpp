@@ -5082,11 +5082,11 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			texture "albedo_detail.ltc"
 			texture "normal_detail.ltc"
 			texture "splatmap.tga"
-			uniform("Detail distance", 50.000000)
-			uniform("Detail scale", 1.000000)
-			uniform("Noise UV scale", 0.200000)
-			uniform("Detail diffusion", 0.500000)
-			uniform("Detail power", 16.000000)
+			uniform "Detail distance", 50.000000
+			uniform "Detail scale", 1.000000
+			uniform "Noise UV scale", 0.200000
+			uniform "Detail diffusion", 0.500000
+			uniform "Detail power", 16.000000
 		)#";
 
 		file.close();
