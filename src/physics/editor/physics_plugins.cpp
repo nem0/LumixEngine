@@ -849,9 +849,9 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			blob << "static_friction(" << m_resource->material->getStaticFriction() << ")\n";
-			blob << "dynamic_friction(" << m_resource->material->getDynamicFriction() << ")\n";
-			blob << "restitution(" << m_resource->material->getRestitution() << ")\n";
+			blob << "static_friction " << m_resource->material->getStaticFriction() << "\n";
+			blob << "dynamic_friction " << m_resource->material->getDynamicFriction() << "\n";
+			blob << "restitution " << m_resource->material->getRestitution() << "\n";
 
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
