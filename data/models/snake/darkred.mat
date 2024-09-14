@@ -2,4 +2,4 @@ shader "/pipelines/standard.shd"
 texture ""
 texture ""
 texture ""
-color {0.486891,0.091405,0.067428,1}
+uniform "Material color", {0.486891,0.091405,0.067428,1}
