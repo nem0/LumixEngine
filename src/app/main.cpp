@@ -18,8 +18,6 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "gui/gui_system.h"
-#include "lua_script/lua_script.h"
-#include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
@@ -32,7 +30,6 @@
 using namespace Lumix;
 
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
-static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 
 struct GUIInterface : GUISystem::Interface {
 	Pipeline* getPipeline() override { return pipeline; }
@@ -93,7 +90,6 @@ struct Runner final
 	void initDemoScene() {
 		const EntityRef env = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
 		m_world->createComponent(ENVIRONMENT_TYPE, env);
-		m_world->createComponent(LUA_SCRIPT_TYPE, env);
 		
 		RenderModule* render_module = (RenderModule*)m_world->getModule("renderer");
 		Environment& environment = render_module->getEnvironment(env);
@@ -102,10 +98,6 @@ struct Runner final
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_world->setRotation(env, rot);
-		
-		LuaScriptModule* lua_module = (LuaScriptModule*)m_world->getModule("lua_script");
-		lua_module->addScript(env, 0);
-		lua_module->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
 	bool loadWorld(const char* path) {

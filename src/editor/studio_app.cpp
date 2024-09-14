@@ -1079,17 +1079,11 @@ struct StudioAppImpl final : StudioApp
 		EntityRef env = m_editor->addEntity();
 		m_editor->setEntityName(env, "environment");
 		ComponentType env_cmp_type = reflection::getComponentType("environment");
-		ComponentType lua_script_cmp_type = reflection::getComponentType("lua_script");
 		Span<EntityRef> entities(&env, 1);
 		m_editor->addComponent(entities, env_cmp_type);
-		m_editor->addComponent(entities, lua_script_cmp_type);
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
-		const ComponentUID cmp = m_editor->getWorld()->getComponent(env, lua_script_cmp_type);
-		m_editor->addArrayPropertyItem(cmp, "scripts");
-		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/atmo.lua"));
-		m_editor->endCommandGroup();
 	}
 
 	void tryLoadWorld(const Path& path, bool additive) override {
