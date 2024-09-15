@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
-#include "game_view.h"
+#include "core/geometry.h"
+#include "core/profiler.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/settings.h"
@@ -8,12 +9,11 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "core/geometry.h"
 #include "engine/input_system.h"
 #include "engine/lua_wrapper.h"
-#include "core/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "game_view.h"
 #include "gui/gui_system.h"
 #include "lua_script/lua_script.h"
 #include "renderer/gpu/gpu.h"
@@ -220,6 +220,29 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		ImGui::SameLine();
 		if (ImGui::Button("Fullscreen")) setFullscreen(true);
 	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
+	if (ImGui::BeginPopup("Debug")) {
+		auto option = [&](const char* label, Pipeline::DebugShow value) {
+			if (ImGui::RadioButton(label, m_pipeline->m_debug_show == value)) {
+				m_pipeline->m_debug_show = value;
+				m_pipeline->m_debug_show_plugin = nullptr;
+			}
+		};
+		option("No debug", Pipeline::DebugShow::NONE);
+		option("Albedo", Pipeline::DebugShow::ALBEDO);
+		option("Normal", Pipeline::DebugShow::NORMAL);
+		option("Roughness", Pipeline::DebugShow::ROUGHNESS);
+		option("Metallic", Pipeline::DebugShow::METALLIC);
+		option("AO", Pipeline::DebugShow::AO);
+		Renderer& renderer = m_pipeline->getRenderer();
+		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
+			plugin->debugUI(*m_pipeline);
+		}
+		ImGui::EndPopup();
+	}
+
 }
 
 

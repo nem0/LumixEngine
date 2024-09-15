@@ -818,6 +818,11 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 		return input;
 	}
 
+	void debugUI(Pipeline& pipeline) override {
+		ImGui::Checkbox("Grid", &m_show_grid);
+		ImGui::Checkbox("Icons", &m_show_icons);
+	}
+
 	SceneView& m_scene_view;
 	Shader* m_grid_shader;
 	Shader* m_debug_shape_shader;
@@ -1285,7 +1290,10 @@ void SceneView::onToolbar()
 	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
 	if (ImGui::BeginPopup("Debug")) {
 		auto option = [&](const char* label, Pipeline::DebugShow value) {
-			if (ImGui::RadioButton(label, m_pipeline->m_debug_show == value)) m_pipeline->m_debug_show = value;
+			if (ImGui::RadioButton(label, m_pipeline->m_debug_show == value)) {
+				m_pipeline->m_debug_show = value;
+				m_pipeline->m_debug_show_plugin = nullptr;
+			}
 		};
 		option("No debug", Pipeline::DebugShow::NONE);
 		option("Albedo", Pipeline::DebugShow::ALBEDO);
@@ -1297,8 +1305,6 @@ void SceneView::onToolbar()
 		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
 			plugin->debugUI(*m_pipeline);
 		}
-		ImGui::Checkbox("Grid", &m_render_plugin->m_show_grid);
-		ImGui::Checkbox("Icons", &m_render_plugin->m_show_icons);
 		ImGui::EndPopup();
 	}
 
