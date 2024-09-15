@@ -340,20 +340,18 @@ float hash(float2 st) {
 }
 
 float getShadowSimple(uint shadowmap, float3 wpos) {
-	#ifdef LUMIX_FRAGMENT_SHADER
-		float4 pos = float4(wpos, 1);
+	float4 pos = float4(wpos, 1);
 
-		for (int slice = 0; slice < 4; ++slice) {
-			float3 sc = mul(Global_sm_slices[slice].world_to_slice, pos).xyz;
-			if (all(sc.xyz < 0.99) && all(sc.xyz > 0.01)) {
-				float2 sm_uv = float2(sc.x * 0.25 + slice * 0.25, sc.y);
-				float shadow = 0;
-				float receiver = sc.z;
-				float occluder = sampleBindlessLod(LinearSamplerClamp, shadowmap, sm_uv, 0).r;
-				return saturate((receiver - occluder) * 10e3);
-			}
+	for (int slice = 0; slice < 4; ++slice) {
+		float3 sc = mul(Global_sm_slices[slice].world_to_slice, pos).xyz;
+		if (all(sc.xyz < 0.99) && all(sc.xyz > 0.01)) {
+			float2 sm_uv = float2(sc.x * 0.25 + slice * 0.25, sc.y);
+			float shadow = 0;
+			float receiver = sc.z;
+			float occluder = sampleBindlessLod(LinearSamplerClamp, shadowmap, sm_uv, 0).r;
+			return saturate((receiver - occluder) * 10e3);
 		}
-	#endif
+	}
 	return 1;
 }
 

@@ -36,7 +36,6 @@
 #include <imgui/imgui.h>
 
 // TODO TAA with low fps
-// TODO godrays
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
@@ -135,9 +134,9 @@ struct GlobalState {
 	float shadow_cam_depth_range;
 	float shadow_cam_rcp_depth_range;
 	u32 frame_idx;
-	u32 shadowmap_bindless; 
-	u32 shadow_atlas_bindless;
-	u32 reflection_probes_bindless;
+	gpu::BindlessHandle shadowmap_bindless; 
+	gpu::BindlessHandle shadow_atlas_bindless;
+	gpu::BindlessHandle reflection_probes_bindless;
 };
 
 struct ShadowAtlas {
@@ -1392,6 +1391,11 @@ struct PipelineImpl final : Pipeline {
 	void renderMain() {
 		DrawStream& stream = m_renderer.getDrawStream();
 		const RenderBufferHandle shadowmap = shadowPass();
+		
+		m_global_state.shadowmap_bindless = toBindless(shadowmap, stream);
+	 	Renderer::TransientSlice gsb = m_renderer.allocUniform(&m_global_state, sizeof(GlobalState));
+		stream.bindUniformBuffer(UniformBuffer::GLOBAL, gsb.buffer, gsb.offset, sizeof(GlobalState));
+		
 		u32 view_idx;
 		GBuffer gbuffer = geomPass(view_idx);
 
@@ -1462,7 +1466,7 @@ struct PipelineImpl final : Pipeline {
 		const Matrix prev_projection = m_prev_viewport.getProjectionWithJitter();
 		const Matrix projection_no_jitter = m_viewport.getProjectionNoJitter();
 		const Matrix prev_projection_no_jitter = m_prev_viewport.getProjectionNoJitter();
-		GlobalState global_state;
+		GlobalState& global_state = m_global_state;
 		global_state.pixel_jitter = m_viewport.pixel_offset;
 		global_state.prev_pixel_jitter = m_prev_viewport.pixel_offset;
 		global_state.camera_projection = projection;
@@ -1480,6 +1484,8 @@ struct PipelineImpl final : Pipeline {
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
 		global_state.camera_reprojection = computeReprojection(m_viewport, m_prev_viewport);
 		m_timer.tick();
+		global_state.reflection_probes_bindless = gpu::getBindlessHandle(m_module->getReflectionProbesTexture());
+		global_state.shadow_atlas_bindless = m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE;
 		global_state.frame_idx = m_renderer.frameNumber();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
@@ -3673,6 +3679,7 @@ struct PipelineImpl final : Pipeline {
 		Buffer refl_probes;
 	} m_cluster_buffers;
 	Viewport m_shadow_camera_viewports[4];
+	GlobalState m_global_state;
 };
 
 
