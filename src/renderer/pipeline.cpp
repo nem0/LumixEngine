@@ -35,11 +35,14 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
+// TODO TAA with low fps
+// TODO godrays
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
 
 // TODO nice to have:
+	// TODO semaphore in job system to wake workers?
 	// TODO 3d ui in scene view
 	// TODO property groups in property grid
 	// TODO move shader cache in .lumix ?
@@ -53,7 +56,6 @@
 	// TODO get rid of #line
 	// TODO fuzzy search
 	// TODO remove lua from shaders, materials, ...
-	// TODO different type for bindless rw and const, right now it's mixed and works only by chance
 	// TODO static samplers
 	// TODO icons over some debugs, e.g. TDAO 
 	// TODO switch plugins to use new genie stuff like plugin() function
@@ -1123,7 +1125,7 @@ struct PipelineImpl final : Pipeline {
 				.fixed_size = {1, 1},
 				.format = gpu::TextureFormat::D32,
 				.debug_name = "shadowmap"
-				});
+			});
 			setRenderTargets({}, shadowmap_rb);
 			clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 			stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);
@@ -1277,6 +1279,7 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	RenderBufferHandle lightPass(GBuffer gbuffer, RenderBufferHandle shadowmap) {
+		PROFILE_FUNCTION();
 		DrawStream& stream = m_renderer.getDrawStream();
 		// stream.barrierRead(m_shadow_atlas.texture); // TODO do we need this?
 
@@ -1884,11 +1887,10 @@ struct PipelineImpl final : Pipeline {
 
 		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
 
-		gpu::VertexDecl grass_instance_decl(gpu::PrimitiveType::NONE);
-		grass_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		grass_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-
-		m_renderer.pushJob("grass", [this, cp, define_mask, state, grass_instance_decl](DrawStream& stream){
+		m_renderer.pushJob("grass", [this, cp, define_mask, state](DrawStream& stream){
+			gpu::VertexDecl grass_instance_decl(gpu::PrimitiveType::NONE);
+			grass_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+			grass_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			const World& world = m_module->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
