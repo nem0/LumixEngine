@@ -218,6 +218,7 @@ struct DOF : public RenderPlugin {
 		pipeline.beginBlock("dof");
 		RenderBufferHandle dof_rb = pipeline.createRenderbuffer({
 			.format = gpu::TextureFormat::RGBA16F,
+			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "dof"
 		});
 		
@@ -229,18 +230,20 @@ struct DOF : public RenderPlugin {
 			float sharp_range;
 			gpu::BindlessHandle texture;
 			gpu::BindlessHandle depth;
+			gpu::RWBindlessHandle output;
 		}	ub = {
 			camera.dof_distance,
 			camera.dof_range,
 			camera.dof_max_blur_size,
 			camera.dof_sharp_range,
 			pipeline.toBindless(input, stream),
-			pipeline.toBindless(gbuffer.DS, stream)
+			pipeline.toBindless(gbuffer.DS, stream),
+			pipeline.toRWBindless(dof_rb, stream),
 		};
 
+		const Viewport& vp = pipeline.getViewport();
 		pipeline.setUniform(ub);
-		pipeline.setRenderTargets(Span(&dof_rb, 1));
-		pipeline.drawArray(0, 3, *m_shader, 0, gpu::StateFlags::NONE);
+		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		pipeline.setRenderTargets(Span(&input, 1));
 		pipeline.renderTexturedQuad(pipeline.toBindless(dof_rb, stream), false, false);
