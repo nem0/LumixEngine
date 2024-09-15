@@ -35,8 +35,6 @@
 #include "texture.h"
 #include <imgui/imgui.h>
 
-// TODO TAA with low fps
-
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
 
@@ -1416,7 +1414,11 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			if (plugin->renderAA(gbuffer, result, *this) != INVALID_RENDERBUFFER) break;
+			RenderBufferHandle rb = plugin->renderAA(gbuffer, result, *this);
+			if (rb != INVALID_RENDERBUFFER) {
+				result = rb;
+				break;
+			}
 		}
 		
 		render2D(result);
