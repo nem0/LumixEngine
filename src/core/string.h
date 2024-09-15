@@ -32,6 +32,7 @@ struct LUMIX_CORE_API StringView {
 	const char* end = nullptr;
 };
 
+LUMIX_CORE_API char toLower(char c);
 LUMIX_CORE_API const char* findInsensitive(StringView haystack, StringView needle);
 LUMIX_CORE_API void toCStringHex(u8 value, Span<char> output);
 LUMIX_CORE_API void toCStringPretty(i32 value, Span<char> output);

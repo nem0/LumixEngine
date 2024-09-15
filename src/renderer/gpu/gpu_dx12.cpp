@@ -1047,6 +1047,8 @@ struct D3D {
 	u32 dirty_compute_uniform_blocks = 0;
 	u32 dirty_gfx_uniform_blocks = 0;
 	u64 frame_number = 0;
+	u32 debug_groups_depth = 0;
+	StaticString<128> debug_groups_queue[8];
 
 	bool vsync = true;
 	bool vsync_dirty = false;
@@ -1817,6 +1819,10 @@ bool init(void* hwnd, InitFlags flags) {
 
 void pushDebugGroup(const char* msg) {
 	#ifdef LUMIX_DEBUG
+		if (d3d->debug_groups_depth < lengthOf(d3d->debug_groups_queue)) {
+			d3d->debug_groups_queue[d3d->debug_groups_depth] = msg;
+		}
+		++d3d->debug_groups_depth;
 		WCHAR tmp[128];
 		toWChar(tmp, msg);
 		PIXBeginEvent(d3d->cmd_list, PIX_COLOR(0x55, 0xff, 0x55), tmp);
@@ -1825,6 +1831,7 @@ void pushDebugGroup(const char* msg) {
 
 void popDebugGroup() {
 	#ifdef LUMIX_DEBUG
+		--d3d->debug_groups_depth;
 		PIXEndEvent(d3d->cmd_list);
 	#endif
 }

@@ -82,6 +82,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		void* tex = nullptr;
 		bool create_called = false;
 		u64 extension = 0;
+		u32 score = 0;
 	};
 
 	struct ImmediateTile : FileInfo {
@@ -284,9 +285,10 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void addTile(const Path& path) {
 		if (!m_show_subresources && contains(path, ':')) return;
-		if (!m_filter.pass(path)) return;
-
 		FileInfo tile;
+		tile.score = m_filter.passWithScore(path);
+		if (tile.score == 0) return;
+
 		StaticString<MAX_PATH> filename;
 		StringView subres = ResourcePath::getSubresource(path);
 		if (*subres.end) {
@@ -350,11 +352,22 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void sortTiles() {
-		qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
-			FileInfo* m = (FileInfo*)a;
-			FileInfo* n = (FileInfo*)b;
-			return compareString(m->filepath, n->filepath);
-		});
+		if (m_filter.isActive()) {
+			qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
+				const FileInfo* m = (FileInfo*)a;
+				const FileInfo* n = (FileInfo*)b;
+				if (n->score < m->score) return -1;
+				if (n->score > m->score) return 1;
+				return compareString(m->filepath, n->filepath);
+			});
+		}
+		else {
+			qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
+				FileInfo* m = (FileInfo*)a;
+				FileInfo* n = (FileInfo*)b;
+				return compareString(m->filepath, n->filepath);
+			});
+		}
 	}
 
 	void breadcrumbs()
