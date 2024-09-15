@@ -70,8 +70,8 @@ compute_shader [[
 			float4 depth_a = sampleOpticalDepth(Global_light_dir.xyz, up, height_a);
 			float4 depth_c = sampleOpticalDepth(eyedir, up, height_a);
 			
-			float x_rayleigh = (-depth_a.x - depth_b.x + depth_c.x) * extinction_rayleigh;
-			float x_mie = (-depth_a.y - depth_b.y + depth_c.y) * extinction_mie;
+			float3 x_rayleigh = (-depth_a.x - depth_b.x + depth_c.x) * extinction_rayleigh;
+			float3 x_mie = (-depth_a.y - depth_b.y + depth_c.y) * extinction_mie;
 			float3 total_transmittance = exp(x_rayleigh) * exp(x_mie);
 
 			float h = min(0, u_bot - length(p));

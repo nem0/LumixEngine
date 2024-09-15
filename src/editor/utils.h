@@ -184,6 +184,9 @@ struct LUMIX_EDITOR_API TextFilter {
 	bool isActive() const { return count != 0; }
 	void clear() { count = 0; filter[0] = 0; }
 	bool pass(StringView text) const;
+	// if filter is empty, returns 1
+	// returns 0 if does not pass, otherwise returns score
+	u32 passWithScore(StringView text) const;
 	void build();
 	bool gui(const char* label, float width = -1, bool set_keyboard_focus = false);
 

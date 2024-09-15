@@ -6,7 +6,7 @@
 namespace Lumix
 {
 
-static char toLower(char c) {
+char toLower(char c) {
 	if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
 	return c;
 }

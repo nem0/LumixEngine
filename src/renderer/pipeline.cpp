@@ -1048,8 +1048,6 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	RenderBufferHandle tonemap(GBuffer gbuffer, RenderBufferHandle input) {
-		bool is_preview = m_type == PipelineType::PREVIEW;
-
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			RenderBufferHandle tonemapped;
 			if (plugin->tonemap(input, tonemapped, *this)) {

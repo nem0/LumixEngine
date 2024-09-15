@@ -2742,6 +2742,46 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 	m_canvas.end();
 }
 
+// search score
+u32 TextFilter::passWithScore(StringView text) const {
+	if (count == 0) return 1;
+
+	u32 score = (1 << 31) - text.size();
+	for (u32 i = 0; i < count; ++i) {
+		if (*subfilters[i].begin == '-') {
+			if (findInsensitive(text, StringView(subfilters[i].begin + 1, subfilters[i].end))) return 0;
+		}
+		else {
+			const char* found = findInsensitive(text, subfilters[i]);
+			if (!found) return 0;
+			u32 pattern_size = subfilters[i].size();
+
+			auto getSeparatorScore = [](char c) {
+				if (c == '.' || c == '/' || c == '\\') return 8;
+				if (c == '_' || c == '-') return 4;
+				if (c == ' ') return 2;
+				return 0;
+			};
+
+			auto computeScore = [&](const char* found) {
+				const u32 from_start = minimum(4, u32(found - text.begin));
+				score += (4 - from_start) * 4; // the closer to the beginning the better
+				if (found > text.begin) score += getSeparatorScore(found[-1]); // next to "separator" is better
+				if (found + pattern_size < text.end)  score += getSeparatorScore(found[pattern_size]); // next to "separator" is better
+			};
+			computeScore(found);
+
+			for (;;) {
+				found = findInsensitive(StringView(found + pattern_size, text.end), subfilters[i]);
+				if (!found) break;
+
+				computeScore(found);
+			}
+		}
+	}
+	return score;
+}
+
 bool TextFilter::pass(StringView text) const {
 	for (u32 i = 0; i < count; ++i) {
 		if (*subfilters[i].begin == '-') {

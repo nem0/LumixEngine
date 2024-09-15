@@ -828,6 +828,7 @@ struct TDAO : public RenderPlugin {
 
 
 	void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) override {
+		if (pipeline.getType() == PipelineType::PREVIEW) return;
 		PROFILE_FUNCTION();
 		auto* inst_data = pipeline.getData<PipelineInstanceData>();
 
