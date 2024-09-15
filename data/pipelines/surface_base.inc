@@ -1,4 +1,4 @@
-include "pipelines/common.glsl"
+include "pipelines/common.hlsli"
 
 function surface_shader_ex(args)
 	args.vertex_preface = args.vertex_preface or ""

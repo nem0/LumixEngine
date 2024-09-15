@@ -66,6 +66,7 @@ LUMIX_CORE_API bool equalIStrings(StringView lhs, StringView rhs);
 LUMIX_CORE_API int compareString(StringView lhs, StringView rhs);
 LUMIX_CORE_API const char* reverseFind(StringView haystack, char c);
 LUMIX_CORE_API const char* find(StringView str, char needle);
+LUMIX_CORE_API const char* find(StringView str, StringView needle);
 LUMIX_CORE_API bool contains(StringView haystack, char needle);
 LUMIX_CORE_API bool startsWith(StringView str, StringView prefix);
 LUMIX_CORE_API bool startsWithInsensitive(StringView str, StringView prefix);

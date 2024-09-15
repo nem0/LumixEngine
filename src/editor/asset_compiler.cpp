@@ -299,10 +299,10 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void registerExtension(const char* extension, ResourceType type) override
 	{
-		alignas(u32) char tmp[6] = {};
+		alignas(u64) char tmp[9] = {};
 		makeLowercase(Span(tmp), extension);
-		ASSERT(strlen(tmp) < 5);
-		u32 q = *(u32*)tmp;
+		ASSERT(strlen(tmp) < 9);
+		u64 q = *(u64*)tmp;
 		ASSERT(!m_registered_extensions.find(q).isValid());
 
 		m_registered_extensions.insert(q, type);
@@ -808,7 +808,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	HashMap<RuntimeHash, IPlugin*> m_plugins;
 	UniquePtr<FileSystemWatcher> m_watcher;
 	HashMap<FilePathHash, ResourceItem> m_resources;
-	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
+	HashMap<u64, ResourceType> m_registered_extensions;
 	DelegateList<void(const Path&)> m_on_list_changed;
 	DelegateList<void(Resource&, bool)> m_resource_compiled;
 	bool m_init_finished = false;

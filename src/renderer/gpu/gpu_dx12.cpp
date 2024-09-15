@@ -266,8 +266,6 @@ struct Program {
 	OutputMemoryStream cs;
 	D3D12_INPUT_ELEMENT_DESC attributes[16];
 	u32 attribute_count = 0;
-	u32 readonly_binding_flags = 0xffFFffFF;
-	u32 used_srvs_flags = 0xffFFffFF;
 	StateFlags state;
 	D3D12_PRIMITIVE_TOPOLOGY primitive_topology;
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
@@ -336,13 +334,14 @@ struct ShaderCompiler {
 	};
 
 	static void set(ShaderType type, const void* data, u64 size, Program& program) {
+		ASSERT(size > 0);
 		OutputMemoryStream* str;
 		switch(type) {
 			case ShaderType::COMPUTE: str = &program.cs; break;
 			case ShaderType::VERTEX: str = &program.vs; break;
 			case ShaderType::FRAGMENT: str = &program.ps; break;
 			case ShaderType::GEOMETRY: str = &program.gs; break;
-			default: ASSERT(false); return;
+			case ShaderType::SURFACE: ASSERT(false); return;
 		}
 		str->resize(size);
 		memcpy(str->getMutableData(), data, size);
@@ -353,7 +352,6 @@ struct ShaderCompiler {
 		, const char* name
 		, Program& program)
 	{
-		program.used_srvs_flags = 0;
 		program.attribute_count = decl.attributes_count;
 		for (u8 i = 0; i < decl.attributes_count; ++i) {
 			const Attribute& attr = decl.attributes[i];
@@ -367,7 +365,7 @@ struct ShaderCompiler {
 			program.attributes[i].InstanceDataStepRate = instanced ? 1 : 0;
 		}
 
-		auto compile_stage = [&](ShaderType type, OutputMemoryStream& out) -> bool {
+		auto compile_stage = [&](ShaderType type, OutputMemoryStream& out, OutputMemoryStream* secondary = nullptr) -> bool {
 			const char* tmp[128];
 			const u32 c = filter(input, type, tmp);
 			if (c == 0) {
@@ -376,12 +374,11 @@ struct ShaderCompiler {
 			}
 			if (c > (u32)input.prefixes.length() + decl.attributes_count) {
 				const StableHash32 hash = computeHash(tmp, c);
-				if (m_use_cache) {
+				// TODO surface shader cache
+				if (m_use_cache && type != ShaderType::SURFACE) {
 					auto iter = m_cache.find(hash);
 					if (iter.isValid()) {
 						set(type, iter.value().data.data(), iter.value().data.size(), program);
-						program.readonly_binding_flags = iter.value().readonly_bitset;
-						program.used_srvs_flags = iter.value().used_srvs_bitset;
 						return true;
 					}
 				}
@@ -389,10 +386,26 @@ struct ShaderCompiler {
 				String hlsl(m_allocator);
 				for (u32 i = 0; i < c; ++i) hlsl.append(tmp[i]);
 
-				ID3DBlob* blob = ShaderCompiler::compile(hash, hlsl.c_str(), type, name, program.readonly_binding_flags, program.used_srvs_flags);
-				if (!blob) return false;
-				set(type, blob->GetBufferPointer(), blob->GetBufferSize(), program);
-				blob->Release();
+				if (type == ShaderType::SURFACE) {
+					ID3DBlob* blob = compile(hash, hlsl.c_str(), ShaderType::VERTEX, name, "mainVS");
+					if (!blob) return false;
+					set(ShaderType::VERTEX, blob->GetBufferPointer(), blob->GetBufferSize(), program);
+					ASSERT(blob->GetBufferSize() > 0);
+					blob->Release();
+
+					blob = compile(hash, hlsl.c_str(), ShaderType::FRAGMENT, name, "mainPS");
+					if (!blob) return false;
+					set(ShaderType::FRAGMENT, blob->GetBufferPointer(), blob->GetBufferSize(), program);
+					ASSERT(blob->GetBufferSize() > 0);
+					blob->Release();
+				}
+				else {
+					ID3DBlob* blob = compile(hash, hlsl.c_str(), type, name);
+					if (!blob) return false;
+					set(type, blob->GetBufferPointer(), blob->GetBufferSize(), program);
+					ASSERT(blob->GetBufferSize() > 0);
+					blob->Release();
+				}
 				return true;
 			}
 			return false;
@@ -400,6 +413,9 @@ struct ShaderCompiler {
 
 		bool compiled = compile_stage(ShaderType::VERTEX, program.vs);
 		compiled = compiled && compile_stage(ShaderType::FRAGMENT, program.ps);
+		if (program.vs.size() == 0) {
+			compiled = compiled && compile_stage(ShaderType::SURFACE, program.vs, &program.ps);
+		}
 		compiled = compiled && compile_stage(ShaderType::COMPUTE, program.cs);
 		compiled = compiled && compile_stage(ShaderType::GEOMETRY, program.gs);
 		
@@ -475,7 +491,7 @@ struct ShaderCompiler {
 		return hasher.end();
 	}
 
-	ID3DBlob* compile(StableHash32 hash, const char* src, ShaderType type, const char* name, u32 readonly_bitset, u32 used_bitset) {
+	ID3DBlob* compile(StableHash32 hash, const char* src, ShaderType type, const char* name, const char* entry_point = "main") {
 		ID3DBlob* output = NULL;
 		ID3DBlob* errors = NULL;
 		HRESULT hr = D3DCompile(src,
@@ -483,7 +499,7 @@ struct ShaderCompiler {
 			name,
 			NULL,
 			NULL,
-			"main",
+			entry_point,
 			type == ShaderType::VERTEX ? "vs_5_1" : (type == ShaderType::COMPUTE ? "cs_5_1" : "ps_5_1"),
 			D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES | D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 			0,
@@ -502,8 +518,6 @@ struct ShaderCompiler {
 		if (m_use_cache) {
 			CachedShader cached(m_allocator);
 			cached.data.write(output->GetBufferPointer(), output->GetBufferSize());
-			cached.readonly_bitset = readonly_bitset;
-			cached.used_srvs_bitset = used_bitset;
 			m_cache.insert(hash, static_cast<CachedShader&&>(cached));
 		}
 		return output;
@@ -523,8 +537,6 @@ struct ShaderCompiler {
 				success = file.write(&hash, sizeof(hash)) && success;
 				success = file.write(&size, sizeof(size)) && success;
 				success = file.write(s.data.data(), size) && success;
-				success = file.write(&s.readonly_bitset, sizeof(s.readonly_bitset)) && success;
-				success = file.write(&s.used_srvs_bitset, sizeof(s.used_srvs_bitset)) && success;
 			}
 			if (!success) {
 				logError("Could not write ", filename);
@@ -549,8 +561,6 @@ struct ShaderCompiler {
 					CachedShader value(m_allocator);
 					value.data.resize(size);
 					if (!file.read(value.data.getMutableData(), size)) break;
-					if (!file.read(&value.readonly_bitset, sizeof(value.readonly_bitset))) break;
-					if (!file.read(&value.used_srvs_bitset, sizeof(value.used_srvs_bitset))) break;
 					m_cache.insert(hash, value);
 				} else {
 					break;
@@ -566,8 +576,10 @@ struct ShaderCompiler {
 			case ShaderType::GEOMETRY: return "#define LUMIX_GEOMETRY_SHADER\n";
 			case ShaderType::FRAGMENT: return "#define LUMIX_FRAGMENT_SHADER\n";
 			case ShaderType::VERTEX: return "#define LUMIX_VERTEX_SHADER\n";
-			default: ASSERT(false); return "";
+			case ShaderType::SURFACE: return "";
 		}
+		ASSERT(false);
+		return "";
 	}
 
 	static const char* getAttrDefine(u32 idx) {
@@ -593,8 +605,6 @@ struct ShaderCompiler {
 	struct CachedShader {
 		CachedShader(IAllocator& allocator) : data(allocator) {}
 		OutputMemoryStream data;
-		u32 used_srvs_bitset;
-		u32 readonly_bitset;
 	};
 	HashMap<StableHash32, CachedShader> m_cache;
 };

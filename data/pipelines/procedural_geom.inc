@@ -1,6 +1,6 @@
 function procedural_geom_shader(args)
 	args.user_channels = args.user_channels or 3
-	include "pipelines/common.glsl"
+	include "pipelines/common.hlsli"
 	
 	vertex_shader([[
 		layout(location = 0) in vec3 a_position;

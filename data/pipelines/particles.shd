@@ -1,4 +1,4 @@
-include "pipelines/common.glsl"
+include "pipelines/common.hlsli"
 
 uniform("Frames cols", "int")
 uniform("Frames rows", "int")

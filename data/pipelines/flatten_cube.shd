@@ -1,4 +1,4 @@
-include "pipelines/common.glsl"
+include "pipelines/common.hlsli"
 
 common [[
 	layout(std140, binding = 4) uniform Drawcall {

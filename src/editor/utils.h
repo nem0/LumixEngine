@@ -244,7 +244,7 @@ struct CodeEditor {
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createCppCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
-LUMIX_EDITOR_API UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app);
+LUMIX_EDITOR_API UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app);
 
 template <typename F> void alignGUI(float align, const F& f) {
 	const ImVec2 container_size = ImGui::GetContentRegionAvail();

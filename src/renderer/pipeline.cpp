@@ -36,6 +36,7 @@
 #include <imgui/imgui.h>
 
 // TODO crashes:
+	// TODO crash - open texture array
 	// TODO crash when context menu is outside of main window
 
 // TODO nice to have:
@@ -511,12 +512,12 @@ struct PipelineImpl final : Pipeline {
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
-		m_tonemap_shader = rm.load<Shader>(Path("pipelines/tonemap.shd"));
-		m_textured_quad_shader = rm.load<Shader>(Path("pipelines/textured_quad.shd"));
+		m_tonemap_shader = rm.load<Shader>(Path("pipelines/tonemap.hlsl"));
+		m_textured_quad_shader = rm.load<Shader>(Path("pipelines/textured_quad.hlsl"));
 		m_lighting_shader = rm.load<Shader>(Path("pipelines/lighting.shd"));
-		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
-		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
-		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.shd"));
+		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.hlsl"));
+		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.hlsl"));
+		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.hlsl"));
 		
 		m_draw2d.clear({1, 1});
 

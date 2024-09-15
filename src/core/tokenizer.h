@@ -5,6 +5,25 @@
 namespace Lumix {
 
 struct Tokenizer {
+	struct Variant {
+		Variant() : type(NONE) {}
+		enum Type {
+			NONE,
+			NUMBER,
+			STRING,
+			VEC2,
+			VEC3,
+			VEC4
+		};
+
+		Type type;
+		union {
+			float number;
+			StringView string;
+			float vector[4];
+		};
+	};
+
 	struct Token {
 		enum Type {
 			NONE,
@@ -77,6 +96,8 @@ struct Tokenizer {
 		copyString(out, tmp);
 		return true;
 	}
+
+	Variant consumeVariant();
 
 	// if `token` == `value` returns true
 	// otherwise prints error and returns false
