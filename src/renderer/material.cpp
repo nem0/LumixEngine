@@ -207,9 +207,9 @@ void Material::serialize(OutputMemoryStream& blob) {
 							case Shader::Uniform::NORMALIZED_FLOAT: blob << mu.float_value; break;
 							case Shader::Uniform::FLOAT: blob << mu.float_value; break;
 							case Shader::Uniform::COLOR: 
-							case Shader::Uniform::VEC4: writeObject(mu.vec4, 4); break;
-							case Shader::Uniform::VEC3: writeObject(mu.vec4, 3); break;
-							case Shader::Uniform::VEC2: writeObject(mu.vec4, 2); break;
+							case Shader::Uniform::FLOAT4: writeObject(mu.vec4, 4); break;
+							case Shader::Uniform::FLOAT3: writeObject(mu.vec4, 3); break;
+							case Shader::Uniform::FLOAT2: writeObject(mu.vec4, 2); break;
 						}
 						blob << "\n";
 					}

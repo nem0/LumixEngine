@@ -1055,7 +1055,7 @@ static void ofbx_job_processor(ofbx::JobFunction fn, void*, void* data, u32 size
 }
 
 void FBXImporter::init() {
-	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("pipelines/impostor_shadow.shd"));
+	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("pipelines/impostor_shadow.hlsl"));
 }
 
 bool FBXImporter::setSource(const Path& filename, ReadFlags read_flags) {
@@ -1335,11 +1335,11 @@ void FBXImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& 
 			f << "texture \"" << src_info.basename << "_impostor1.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor2.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor_depth.raw\"\n";
-			f << "defines { \"ALPHA_CUTOUT\" }\n";
+			f << "define \"ALPHA_CUTOUT\"\n";
 			f << "layer \"impostor\"\n";
-			f << "backface_culling(false)\n";
-			f << "uniform(\"Center\", { 0, " << center.y << ", 0 })\n";
-			f << "uniform(\"Radius\", " << model->getCenterBoundingRadius() << ")\n";
+			f << "backface_culling false \n";
+			f << "uniform \"Center\", { 0, " << center.y << ", 0 }\n";
+			f << "uniform \"Radius\", " << model->getCenterBoundingRadius() << "\n";
 			f.close();
 		}
 	}
@@ -1378,8 +1378,8 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool 
 		m_out_file.clear();
 
 		writeString("shader \"/pipelines/standard.shd\"\n");
-		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
-		if (material.textures[2].is_valid) writeString("uniform(\"Metallic\", 1.000000)");
+		if (material.alpha_cutout) writeString("define \"ALPHA_CUTOUT\"\n");
+		if (material.textures[2].is_valid) writeString("uniform \"Metallic\", 1.000000");
 
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
@@ -1420,10 +1420,10 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool 
 
 		if (!material.textures[0].fbx) {
 			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
-			m_out_file << "uniform(\"Material color\", {" << powf(diffuse_color.r, 2.2f) 
+			m_out_file << "uniform \"Material color\", {" << powf(diffuse_color.r, 2.2f) 
 				<< "," << powf(diffuse_color.g, 2.2f)
 				<< "," << powf(diffuse_color.b, 2.2f)
-				<< ",1})\n";
+				<< ",1}\n";
 		}
 
 		++written_count;

@@ -218,6 +218,57 @@ bool Tokenizer::consume(float& out) {
 	return false;
 }
 
+Tokenizer::Variant Tokenizer::consumeVariant() {
+	Variant v;
+	Token token = nextToken();
+	if (!token) return v;
+
+	if (token.type == Token::NUMBER) {
+		v.type = Variant::NUMBER;
+		fromCString(token.value, v.number);
+		return v;
+	}
+
+	if (token.type == Token::STRING) {
+		v.type = Variant::STRING;
+		v.string = token.value;
+		return v;
+	}
+
+	if (token.value[0] == '{') {
+		if (!consume(v.vector[0], ",", v.vector[1])) return {};
+		Tokenizer::Token iter = tryNextToken();
+		if (iter == "}") {
+			v.type = Variant::VEC2;
+			return v;
+		}
+		else if (iter != ",") {
+			logError(filename, "(", getLine(), "): expected ',' or '}', got ", iter.value);
+			logErrorPosition(iter.value.begin);
+			return {};
+		}
+		if (!consume(v.vector[2])) return {};
+		
+		iter = tryNextToken();
+		if (iter == "}") {
+			v.type = Variant::VEC3;
+			return v;
+		}
+		else if (iter != ",") {
+			logError(filename, "(", getLine(), "): expected ',' or '}', got ", iter.value);
+			logErrorPosition(iter.value.begin);
+			return {};
+		}
+		if (!consume(v.vector[3], "}")) return {};
+		v.type = Variant::VEC4;
+		return v;
+	}
+
+	logError(filename, "(", getLine(), "): unexpected token ", token.value);
+	logErrorPosition(token.value.begin);
+	return v;
+}
+
 bool Tokenizer::consume(const char* literal) {
 	Token token = nextToken();
 	if (!token) return false;

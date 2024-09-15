@@ -327,6 +327,30 @@ const char* find(StringView haystack, char needle) {
 	return nullptr;
 }
 
+const char* find(StringView haystack, StringView needle) {
+	ASSERT(!needle.empty());
+	if (needle.size() > haystack.size()) return nullptr;
+
+	const char* search_end = haystack.end - needle.size() + 1;
+	const char needle0 = needle[0];
+
+	const char* c = haystack.begin;
+	while (c != search_end) {
+		if (*c == needle0) {
+			const char* n = needle.begin + 1;
+			const char* c2 = c + 1;
+			while (n != needle.end && c2 != haystack.end) {
+				if (*n != *c2) break;
+				++n;
+				++c2;
+			}
+			if (n == needle.end) return c;
+		}
+		++c;
+	}
+	return nullptr;
+}
+
 bool contains(StringView haystack, char needle) {
 	return find(haystack, needle) != nullptr;
 }

@@ -1,4 +1,4 @@
-shader "/pipelines/water.shd"
+shader "/pipelines/water.hlsl"
 backface_culling true
 layer "water"
 

@@ -616,9 +616,9 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 		: m_scene_view(view)
 	{
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
-		m_grid_shader = rm.load<Shader>(Path("pipelines/grid.shd"));
-		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
-		m_selection_outline_shader = rm.load<Shader>(Path("pipelines/selection_outline.shd"));
+		m_grid_shader = rm.load<Shader>(Path("pipelines/grid.hlsl"));
+		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.hlsl"));
+		m_selection_outline_shader = rm.load<Shader>(Path("pipelines/selection_outline.hlsl"));
 	}
 
 	~RenderPlugin() {

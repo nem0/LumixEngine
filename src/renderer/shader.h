@@ -46,9 +46,9 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 			INT,
 			FLOAT,
 			COLOR,
-			VEC2,
-			VEC3,
-			VEC4,
+			FLOAT2,
+			FLOAT3,
+			FLOAT4,
 			NORMALIZED_FLOAT
 		};
 

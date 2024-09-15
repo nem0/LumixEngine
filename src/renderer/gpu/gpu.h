@@ -80,7 +80,8 @@ enum class ShaderType : u32 {
 	VERTEX,
 	FRAGMENT,
 	GEOMETRY,
-	COMPUTE
+	COMPUTE,
+	SURFACE
 };
 
 

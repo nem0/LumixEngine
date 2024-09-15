@@ -6,6 +6,7 @@
 #include "core/log.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/tokenizer.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
 #include "renderer/renderer.h"
@@ -25,9 +26,9 @@ u32 Shader::Uniform::size() const {
 		case NORMALIZED_FLOAT: return 4;
 		case FLOAT: return 4;
 		case COLOR: return 16;
-		case VEC2: return 8;
-		case VEC3: return 16; // pad to vec4
-		case VEC4: return 16;	
+		case FLOAT2: return 8;
+		case FLOAT3: return 16; // pad to vec4
+		case FLOAT4: return 16;	
 	}
 	ASSERT(false);
 	return 0;
@@ -169,9 +170,9 @@ int uniform(lua_State* L)
 		{ "float", Shader::Uniform::FLOAT },
 		{ "color", Shader::Uniform::COLOR },
 		{ "int", Shader::Uniform::INT },
-		{ "vec2", Shader::Uniform::VEC2 },
-		{ "vec3", Shader::Uniform::VEC3 },
-		{ "vec4", Shader::Uniform::VEC4 },
+		{ "vec2", Shader::Uniform::FLOAT2 },
+		{ "vec3", Shader::Uniform::FLOAT3 },
+		{ "vec4", Shader::Uniform::FLOAT4 },
 	};
 
 	bool valid = false;
@@ -318,13 +319,6 @@ int fragment_shader(lua_State* L)
 }
 
 
-int compute_shader(lua_State* L)
-{
-	source(L, gpu::ShaderType::COMPUTE);
-	return 0;
-}
-
-
 int geometry_shader(lua_State* L)
 {
 	source(L, gpu::ShaderType::GEOMETRY);
@@ -376,40 +370,190 @@ int include(lua_State* L)
 
 } // namespace LuaAPI
 
+static StringView getLine(StringView& src) {
+	const char* b = src.begin;
+	while (b < src.end && *b != '\n') ++b;
+	StringView ret(src.begin, b);
+	src.begin = b < src.end ? b + 1 : b;
+	return ret;
+}
+
+static bool assign(Shader::Uniform& u, Tokenizer::Variant v) {
+	switch (u.type) {
+		case Shader::Uniform::NORMALIZED_FLOAT:
+		case Shader::Uniform::FLOAT:
+		case Shader::Uniform::INT:
+			if (v.type != Tokenizer::Variant::NUMBER) return false;
+			u.default_value.float_value = (float)v.number;
+			return true;
+		case Shader::Uniform::FLOAT2:
+			if (v.type != Tokenizer::Variant::VEC2) return false;
+			memcpy(u.default_value.vec2, v.vector, sizeof(u.default_value.vec2));
+			return true;
+		case Shader::Uniform::FLOAT3:
+			if (v.type != Tokenizer::Variant::VEC3) return false;
+			memcpy(u.default_value.vec3, v.vector, sizeof(u.default_value.vec3));
+			return true;
+		case Shader::Uniform::COLOR:
+		case Shader::Uniform::FLOAT4:
+			if (v.type != Tokenizer::Variant::VEC4) return false;
+			memcpy(u.default_value.vec4, v.vector, sizeof(u.default_value.vec4));
+			return true;
+	}
+	ASSERT(false);
+	return false;
+}
 
 bool Shader::load(Span<const u8> mem) {
-	lua_State* root_state = m_renderer.getEngine().getState();
-	lua_State* L = lua_newthread(root_state);
-	const int state_ref = LuaWrapper::createRef(root_state);
-	lua_pop(root_state, 1);
-	
-	lua_pushlightuserdata(L, this);
-	lua_setfield(L, LUA_GLOBALSINDEX, "this");
-	lua_pushcfunction(L, LuaAPI::common, "common");
-	lua_setfield(L, LUA_GLOBALSINDEX, "common");
-	lua_pushcfunction(L, LuaAPI::vertex_shader, "vertex_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
-	lua_pushcfunction(L, LuaAPI::fragment_shader, "fragment_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
-	lua_pushcfunction(L, LuaAPI::compute_shader, "compute_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "compute_shader");
-	lua_pushcfunction(L, LuaAPI::geometry_shader, "geometry_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
-	lua_pushcfunction(L, LuaAPI::include, "include");
-	lua_setfield(L, LUA_GLOBALSINDEX, "include");
-	lua_pushcfunction(L, LuaAPI::import, "import");
-	lua_setfield(L, LUA_GLOBALSINDEX, "import");
-	lua_pushcfunction(L, LuaAPI::texture_slot, "texture_slot");
-	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
-	lua_pushcfunction(L, LuaAPI::define, "define");
-	lua_setfield(L, LUA_GLOBALSINDEX, "define");
-	lua_pushcfunction(L, LuaAPI::uniform, "uniform");
-	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
-
 	StringView content((const char*)mem.begin(), (u32)mem.length());
-	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
+	if (Path::hasExtension(getPath(), "hlsl")) {
+		StringView preprocess = content;
+		bool is_surface = false;
+		for (;;) {
+			StringView line = getLine(preprocess);
+			if (line.begin == preprocess.end) break;
+			if (startsWith(line, "//@")) {
+				line.removePrefix(3);
+				if (startsWith(line, "surface")) {
+					is_surface = true;
+				}
+				else if (startsWith(line, "define \"")) {
+					line.removePrefix(8);
+					line.end = line.begin + 1;
+					while (line.end < preprocess.end && *line.end != '"') ++line.end;
+					
+					char tmp[64];
+					copyString(tmp, line);
+					const u8 def_idx = m_renderer.getShaderDefineIdx(tmp);
+					m_defines.push(def_idx);
+				}
+				else if (startsWith(line, "uniform")) {
+					line.removePrefix(7);
+					Tokenizer t(preprocess, getPath().c_str());
+					t.cursor = line.begin;
+					StringView name;
+					StringView type;
+					if (!t.consume(name, ",", type, ",")) return false;
+
+					Shader::Uniform& u = m_uniforms.emplace();
+					copyString(Span(u.name), name);
+					u.name_hash = RuntimeHash(name.begin, name.size());
+									
+					if (equalStrings(type, "normalized_float")) u.type = Shader::Uniform::FLOAT;
+					else if (equalStrings(type, "float")) u.type = Shader::Uniform::FLOAT;
+					else if (equalStrings(type, "int")) u.type = Shader::Uniform::INT;
+					else if (equalStrings(type, "color")) u.type = Shader::Uniform::COLOR;
+					else if (equalStrings(type, "float2")) u.type = Shader::Uniform::FLOAT2;
+					else if (equalStrings(type, "float3")) u.type = Shader::Uniform::FLOAT3;
+					else if (equalStrings(type, "float4")) u.type = Shader::Uniform::FLOAT4;
+					else {
+						logError(getPath(), "(", getLine(type), "): Unknown uniform type ", type, " in ", getPath());
+						t.logErrorPosition(type.begin);
+						return false;
+					}
+
+					Tokenizer::Variant v = t.consumeVariant();
+					if (v.type == Tokenizer::Variant::NONE) return false;
+					if (!assign(u, v)) {
+						logError(getPath(), "(", getLine(type), "): Uniform ", name, " has incompatible type ", type);
+						t.logErrorPosition(type.begin);
+						return false;
+					}
+
+					if (m_uniforms.size() == 1) {
+						u.offset = 0;
+					}
+					else {
+						const Shader::Uniform& prev = m_uniforms[m_uniforms.size() - 2];
+						u.offset = prev.offset + prev.size();
+						const u32 align = u.size();
+						u.offset += (align - u.offset % align) % align;
+					}
+
+				}
+				else if (startsWith(line, "texture_slot")) {
+					line.removePrefix(12);
+					Tokenizer t(preprocess, getPath().c_str());
+					t.content.end = line.end;
+					t.cursor = line.begin;
+					StringView name;
+					StringView default_texture;
+					if (!t.consume(name, ",", default_texture)) return false;
+					
+					Shader::TextureSlot& slot = m_texture_slots[m_texture_slot_count];
+					++m_texture_slot_count;
+					copyString(slot.name, name);
+					
+					ResourceManagerHub& manager = getResourceManager().getOwner();
+					slot.default_texture = default_texture.empty() ? nullptr : manager.load<Texture>(Path(default_texture));
+					
+					Tokenizer::Token n = t.tryNextToken();
+					if (n && n.value[0] == ',') {
+						StringView def;
+						if (!t.consume(def)) return false;
+						StaticString<64> tmp(def);
+						slot.define_idx = m_renderer.getShaderDefineIdx(tmp);
+					}
+				}
+				else if (startsWith(line, "include \"")) {
+					StringView path;
+					path.begin = line.begin + 9;
+					path.end = path.begin + 1;
+					while (path.end < preprocess.end && *path.end != '"') ++path.end;
+
+					ResourceManagerHub& rm = getResourceManager().getOwner();
+					OutputMemoryStream include_content(m_allocator);
+					if (!rm.loadRaw(getPath(), Path(path), include_content)) {
+						logError("Failed to open/read include ", path, " included from ", getPath());
+						return false;
+					}
+					
+					if (!include_content.empty()) {
+						include_content << "\n";
+						m_sources.common.append(StringView((const char*)include_content.data(), (u32)include_content.size()));
+					}				
+				}
+			}
+		}
+		
+		Shader::Stage& stage = m_sources.stages.emplace(m_allocator);
+		stage.type = is_surface ? gpu::ShaderType::SURFACE : gpu::ShaderType::COMPUTE;
+		stage.code.resize(mem.length() + 1);
+		memcpy(&stage.code[0], mem.begin(), mem.length());
+		stage.code.back() = '\0';
+	}
+	else {
+		lua_State* root_state = m_renderer.getEngine().getState();
+		lua_State* L = lua_newthread(root_state);
+		const int state_ref = LuaWrapper::createRef(root_state);
+		lua_pop(root_state, 1);
+		
+		lua_pushlightuserdata(L, this);
+		lua_setfield(L, LUA_GLOBALSINDEX, "this");
+		lua_pushcfunction(L, LuaAPI::common, "common");
+		lua_setfield(L, LUA_GLOBALSINDEX, "common");
+		lua_pushcfunction(L, LuaAPI::vertex_shader, "vertex_shader");
+		lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
+		lua_pushcfunction(L, LuaAPI::fragment_shader, "fragment_shader");
+		lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
+		lua_pushcfunction(L, LuaAPI::geometry_shader, "geometry_shader");
+		lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
+		lua_pushcfunction(L, LuaAPI::include, "include");
+		lua_setfield(L, LUA_GLOBALSINDEX, "include");
+		lua_pushcfunction(L, LuaAPI::import, "import");
+		lua_setfield(L, LUA_GLOBALSINDEX, "import");
+		lua_pushcfunction(L, LuaAPI::texture_slot, "texture_slot");
+		lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
+		lua_pushcfunction(L, LuaAPI::define, "define");
+		lua_setfield(L, LUA_GLOBALSINDEX, "define");
+		lua_pushcfunction(L, LuaAPI::uniform, "uniform");
+		lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
+
+		if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
+			LuaWrapper::releaseRef(root_state, state_ref);
+			return false;
+		}
 		LuaWrapper::releaseRef(root_state, state_ref);
-		return false;
 	}
 
 	RollingHasher hasher;
@@ -420,7 +564,6 @@ bool Shader::load(Span<const u8> mem) {
 	hasher.update(m_sources.common.c_str(), m_sources.common.length());
 	m_content_hash = hasher.end();
 
-	LuaWrapper::releaseRef(root_state, state_ref);
 	return true;
 }
 
@@ -451,9 +594,9 @@ static const char* toString(Shader::Uniform::Type type) {
 		case Shader::Uniform::FLOAT: return "float";
 		case Shader::Uniform::NORMALIZED_FLOAT: return "float";
 		case Shader::Uniform::INT: return "int";
-		case Shader::Uniform::VEC2: return "float2";
-		case Shader::Uniform::VEC3: return "float4"; // vec4 because of padding
-		case Shader::Uniform::VEC4: return "float4";
+		case Shader::Uniform::FLOAT2: return "float2";
+		case Shader::Uniform::FLOAT3: return "float4"; // float4 because of padding
+		case Shader::Uniform::FLOAT4: return "float4";
 	}
 	ASSERT(false);
 	return "unknown_type";

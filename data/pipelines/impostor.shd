@@ -18,7 +18,7 @@ texture_slot {
 	define = "HAS_DEPTHMAP"
 }
 
-include "pipelines/common.glsl"
+include "pipelines/common.hlsli"
 
 define "ALPHA_CUTOUT"
 uniform("Material color", "color", {1, 1, 1, 1})

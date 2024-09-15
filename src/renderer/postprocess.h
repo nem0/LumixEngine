@@ -36,9 +36,9 @@ struct Atmo : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/atmo.shd"));
-		m_scattering_shader = rm.load<Shader>(Path("pipelines/atmo_scattering.shd"));
-		m_optical_depth_shader = rm.load<Shader>(Path("pipelines/atmo_optical_depth.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/atmo.hlsl"));
+		m_scattering_shader = rm.load<Shader>(Path("pipelines/atmo_scattering.hlsl"));
+		m_optical_depth_shader = rm.load<Shader>(Path("pipelines/atmo_optical_depth.hlsl"));
 	}
 
 	RenderBufferHandle renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle hdr_rb, Pipeline& pipeline) override {
@@ -142,7 +142,7 @@ struct FilmGrain : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/film_grain.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/film_grain.hlsl"));
 		m_noise = rm.load<Texture>(Path("textures/common/blue_noise.tga"));
 	}
 
@@ -201,7 +201,7 @@ struct DOF : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/dof.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/dof.hlsl"));
 	}
 
 	RenderBufferHandle renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
@@ -265,7 +265,7 @@ struct CubemapSky : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/cubemap_sky.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/cubemap_sky.hlsl"));
 	}
 
 	RenderBufferHandle renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
@@ -322,11 +322,11 @@ struct Bloom : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/bloom.shd"));
-		m_tonemap_shader = rm.load<Shader>(Path("pipelines/bloom_tonemap.shd"));
-		m_blur_shader = rm.load<Shader>(Path("pipelines/blur.shd"));
-		m_avg_luminance_shader = rm.load<Shader>(Path("pipelines/avg_luminance.shd"));
-		m_bloom_blur_shader = rm.load<Shader>(Path("pipelines/bloom_blur.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/bloom.hlsl"));
+		m_tonemap_shader = rm.load<Shader>(Path("pipelines/bloom_tonemap.hlsl"));
+		m_blur_shader = rm.load<Shader>(Path("pipelines/blur.hlsl"));
+		m_avg_luminance_shader = rm.load<Shader>(Path("pipelines/avg_luminance.hlsl"));
+		m_bloom_blur_shader = rm.load<Shader>(Path("pipelines/bloom_blur.hlsl"));
 		m_lum_buf = m_renderer.createBuffer({2048}, gpu::BufferFlags::SHADER_BUFFER, "bloom");
 	}
 
@@ -613,8 +613,8 @@ struct SSS : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/sss.shd"));
-		m_shader_blit = rm.load<Shader>(Path("pipelines/sss_blit.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/sss.hlsl"));
+		m_shader_blit = rm.load<Shader>(Path("pipelines/sss_blit.hlsl"));
 	}
 
 	void debugUI(Pipeline& pipeline) override {
@@ -722,8 +722,8 @@ struct SSAO : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/ssao.shd"));
-		m_blit_shader = rm.load<Shader>(Path("pipelines/ssao_blit.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/ssao.hlsl"));
+		m_blit_shader = rm.load<Shader>(Path("pipelines/ssao_blit.hlsl"));
 	}
 
 	void debugUI(Pipeline& pipeline) override {
@@ -802,7 +802,7 @@ struct TDAO : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/tdao.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/tdao.hlsl"));
 	}
 
 	void debugUI(Pipeline& pipeline) override {
@@ -948,7 +948,7 @@ struct TAA : public RenderPlugin {
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-		m_shader = rm.load<Shader>(Path("pipelines/taa.shd"));
+		m_shader = rm.load<Shader>(Path("pipelines/taa.hlsl"));
 	}
 
 	void debugUI(Pipeline& pipeline) override {

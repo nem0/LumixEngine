@@ -1,0 +1,50 @@
+//@include "pipelines/common.hlsli"
+
+cbuffer Drawcall : register(b4) {
+	float u_intensity;
+	float u_width;
+	float u_height;
+	float u_offset0;
+	float u_offset1;
+	float u_offset2;
+	float u_range;
+	float u_half_depth_range;
+	float u_scale;
+	float u_depth_offset;
+	uint u_depth_buffer;
+	uint u_gbufferB;
+	uint u_topdown_depthmap;
+};
+
+[numthreads(16, 16, 1)]
+void main(uint3 thread_id : SV_DispatchThreadID) {
+	if (any(thread_id.xy > uint2(u_width, u_height))) return;
+
+	float2 screen_uv = thread_id.xy / float2(u_width, u_height);
+	float3 wpos = getViewPosition(u_depth_buffer, Global_inv_view_projection, screen_uv);
+
+	float2 uv = (wpos.xz + float2(u_offset0, u_offset2)) / u_range;
+	#ifdef _ORIGIN_BOTTOM_LEFT
+		uv = uv * float2(1, -1);
+	#endif
+	if (any(uv > 1)) return;
+	if (any(uv < -1)) return;
+	uv = saturate(uv * 0.5 + 0.5);
+
+	float4 v = bindless_rw_textures[u_gbufferB][thread_id.xy];
+	float c = hash(float2(thread_id.xy)) * 2 - 1;
+	float s = sqrt(1 - c * c); 
+	
+	float ao = 0;
+	float2x2 rot = mul(u_scale, float2x2(c, s, -s, c));
+	for (int i = 0; i < 16; ++i) {
+		float td_depth = sampleBindlessLod(LinearSamplerClamp, u_topdown_depthmap, uv + mul(POISSON_DISK_16[i], rot), 0).r;
+		td_depth = (td_depth * 2 - 1) * u_half_depth_range;
+		ao += saturate((-(wpos.y + u_offset1) - u_depth_offset + td_depth));
+	}
+	ao *= u_intensity / 16;
+
+	v.w = v.w * (1 - ao);
+	bindless_rw_textures[u_gbufferB][thread_id.xy] = v;
+}
+

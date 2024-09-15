@@ -853,13 +853,13 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						case Shader::Uniform::INT:
 							uniform_changed = saveUndo(ImGui::DragInt("##i", &uniform->int_value));
 							break;
-						case Shader::Uniform::VEC3:
+						case Shader::Uniform::FLOAT3:
 							uniform_changed = saveUndo(ImGui::DragFloat3("##v3", uniform->vec3));
 							break;
-						case Shader::Uniform::VEC4:
+						case Shader::Uniform::FLOAT4:
 							uniform_changed = saveUndo(ImGui::DragFloat4("##v4", uniform->vec4));
 							break;
-						case Shader::Uniform::VEC2:
+						case Shader::Uniform::FLOAT2:
 							uniform_changed = saveUndo(ImGui::DragFloat2("##v2", uniform->vec2));
 							break;
 						case Shader::Uniform::COLOR:
@@ -3232,8 +3232,8 @@ struct CodeEditorWindow : AssetEditorWindow {
 		, m_app(app)
 		, m_path(path)
 	{
-		if (Path::hasExtension(path, "glsl")) {
-			m_editor = createGLSLCodeEditor(m_app);
+		if (Path::hasExtension(path, "hlsl") || Path::hasExtension(path, "hlsli")) {
+			m_editor = createHLSLCodeEditor(m_app);
 		}
 		else {
 			m_editor = createLuaCodeEditor(m_app);
@@ -3286,12 +3286,25 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		: m_app(app)
 	{
 		app.getAssetCompiler().registerExtension("shd", Shader::TYPE);
+		app.getAssetCompiler().registerExtension("hlsl", Shader::TYPE);
+	}
+
+	void findHLSLIncludes(StringView content, const Path& path) {
+		const StringView needle = "//@include \"";
+		for (;;) {
+			const char* inc = find(content, needle);
+			if (!inc) return;
+			
+			StringView dep_path;
+			dep_path.begin = inc + needle.size();
+			dep_path.end = dep_path.begin + 1;
+			while (dep_path.end < content.end && *dep_path.end != '"') ++dep_path.end;
+			m_app.getAssetCompiler().registerDependency(path, Path(dep_path));
+			content.begin = dep_path.end;
+		}
 	}
 
 	void findIncludes(const Path& path) {
-		lua_State* L = luaL_newstate();
-		luaL_openlibs(L);
-
 		os::InputFile file;
 		if (!file.open(path.c_str()[0] == '/' ? path.c_str() + 1 : path.c_str())) return;
 		
@@ -3303,6 +3316,14 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			content.clear();
 		}
 		file.close();
+
+		if (Path::hasExtension(path, "hlsl")) {
+			findHLSLIncludes(StringView((const char*)content.data(), (u32)content.size()), path);
+			return;
+		}
+
+		lua_State* L = luaL_newstate();
+		luaL_openlibs(L);
 
 		struct Context {
 			const Path& path;
@@ -3376,7 +3397,7 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		: m_app(app)
 	{
 		app.getAssetCompiler().registerExtension("inc", SHADER_INCLUDE_TYPE);
-		app.getAssetCompiler().registerExtension("glsl", SHADER_INCLUDE_TYPE);
+		app.getAssetCompiler().registerExtension("hlsli", SHADER_INCLUDE_TYPE);
 	}
 
 	void addSubresources(AssetCompiler& compiler, const Path& path) override {
@@ -5075,7 +5096,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 		}
 
 		file << R"#(
-			shader "/pipelines/terrain.shd"
+			shader "/pipelines/terrain.hlsl"
 			texture ")#";
 		file << info.basename;
 		file << R"#(.raw"
@@ -5192,10 +5213,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 
-		const char* shader_exts[] = {"shd"};
+		const char* shader_exts[] = {"shd", "hlsl"};
 		asset_compiler.addPlugin(m_shader_plugin, Span(shader_exts));
 
-		const char* inc_exts[] = {"inc", "glsl"};
+		const char* inc_exts[] = {"inc", "hlsli"};
 		asset_compiler.addPlugin(m_shader_include_plugin, Span(inc_exts));
 
 		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc"};

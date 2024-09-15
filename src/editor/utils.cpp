@@ -409,7 +409,7 @@ namespace CPPTokens {
 
 } // namespace CPPTokens
 
-namespace GLSLTokens {
+namespace HLSLTokens {
 
 static inline const u32 token_colors[] = {
 	IM_COL32(0xFF, 0x00, 0xFF, 0xff),
@@ -459,21 +459,26 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"not",
 		"and",
 		"or",
-		"goto",
 		"self",
 		"true",
 		"false",
 		"nil",
-		"vec2",
-		"vec3",
-		"vec4",
-		"ivec2",
-		"ivec3",
-		"ivec4",
-		"mat2",
-		"mat3",
-		"mat4",
-		"float"
+		"float2",
+		"float3",
+		"float4",
+		"int2",
+		"int3",
+		"int4",
+		"uint2",
+		"uint3",
+		"uint4",
+		"float2x2",
+		"float3x3",
+		"float4x4",
+		"float",
+		"cbuffer",
+		"register",
+		"numthreads",
 	};
 
 	const char* c = str;
@@ -591,7 +596,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 	return *c;
 }
 
-} // namespace GLSLTokens
+} // namespace
 
 // TODO horizontal scroll
 // TODO utf8
@@ -1998,10 +2003,10 @@ UniquePtr<CodeEditor> createCppCodeEditor(StudioApp& app) {
 	return editor.move();
 }
 
-UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app) {
+UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app) {
 	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
-	editor->setTokenColors(GLSLTokens::token_colors);
-	editor->setTokenizer(&GLSLTokens::tokenize);
+	editor->setTokenColors(HLSLTokens::token_colors);
+	editor->setTokenizer(&HLSLTokens::tokenize);
 	return editor.move();
 }
 
