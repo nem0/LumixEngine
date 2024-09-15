@@ -710,9 +710,16 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			});
 
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
-			pipeline.setUniform(pipeline.toBindless(selection_mask, stream));
-			pipeline.setRenderTargets(Span(&input, 1));
-			pipeline.drawArray(0, 3, *m_selection_outline_shader, 0, gpu::StateFlags::NONE);
+			struct {
+				gpu::BindlessHandle mask;
+				gpu::RWBindlessHandle output;
+			} ub = {
+				pipeline.toBindless(selection_mask, stream),
+				pipeline.toRWBindless(input, stream)
+			};
+			pipeline.setUniform(ub);
+			const Viewport& vp = m_scene_view.m_view->getViewport();
+			pipeline.dispatch(*m_selection_outline_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		}
 
 		// grid
