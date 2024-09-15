@@ -1002,6 +1002,7 @@ struct TAA : public RenderPlugin {
 
 		const RenderBufferHandle taa_output = pipeline.createRenderbuffer({
 			.format = gpu::TextureFormat::RGBA16F,
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "taa_output"	
 		});
 		stream.memoryBarrier(pipeline.toTexture(taa_tmp));
