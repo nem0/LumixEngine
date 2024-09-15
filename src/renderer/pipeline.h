@@ -172,10 +172,13 @@ struct LUMIX_RENDERER_API Pipeline {
 		NORMAL,
 		ROUGHNESS,
 		METALLIC,
-		AO
+		AO,
+
+		PLUGIN
 	};
 
 	DebugShow m_debug_show = DebugShow::NONE;
+	struct RenderPlugin* m_debug_show_plugin = nullptr;
 
 protected:
 	static inline u32 s_data_type_generator = 0;

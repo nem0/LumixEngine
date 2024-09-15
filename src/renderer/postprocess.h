@@ -306,7 +306,6 @@ struct Bloom : public RenderPlugin {
 	Shader* m_bloom_blur_shader = nullptr;
 	gpu::BufferHandle m_lum_buf = gpu::INVALID_BUFFER;
 	RenderBufferHandle m_extracted_rt = INVALID_RENDERBUFFER; // for debug view
-	bool m_show_debug = false;
 
 	Bloom(Renderer& renderer)
 		: m_renderer(renderer)
@@ -332,11 +331,14 @@ struct Bloom : public RenderPlugin {
 	}
 
 	void debugUI(Pipeline& pipeline) override {
-		ImGui::Checkbox("Bloom", &m_show_debug);
+		if (ImGui::RadioButton("Bloom", pipeline.m_debug_show_plugin == this)) {
+			pipeline.m_debug_show_plugin = this;
+			pipeline.m_debug_show = Pipeline::DebugShow::PLUGIN;
+		}
 	}
 
 	bool debugOutput(RenderBufferHandle input, Pipeline& pipeline) override {
-		if (!m_show_debug) return false;
+		if (pipeline.m_debug_show_plugin != this) return false;
 		pipeline.copy(input, m_extracted_rt);
 		pipeline.keepRenderbufferAlive(m_extracted_rt);
 		return true;
@@ -497,7 +499,7 @@ struct Bloom : public RenderPlugin {
 		pipeline.dispatch(*m_shader, ((vp.w >> 1) + 15) / 16, ((vp.h >> 1) + 15) / 16, 1, "EXTRACT");
 		m_extracted_rt = bloom_rb;
 
-		if (m_show_debug) {
+		if (pipeline.m_debug_show_plugin == this) {
 			pipeline.endBlock();
 			return input;
 		}
@@ -597,7 +599,6 @@ struct SSS : public RenderPlugin {
 	float m_stride = 4;
 	float m_current_frame_weight = 0.1f;
 	bool m_is_enabled = false;
-	bool m_show_debug = false;
 
 	struct PipelineInstanceData {
 		RenderBufferHandle history = INVALID_RENDERBUFFER;
@@ -617,15 +618,20 @@ struct SSS : public RenderPlugin {
 	}
 
 	void debugUI(Pipeline& pipeline) override {
+
 		if (!ImGui::BeginMenu("SSS")) return;
 
 		ImGui::Checkbox("Enable", &m_is_enabled);
-		ImGui::Checkbox("Debug", &m_show_debug);
+		
+		if (ImGui::RadioButton("Debug", pipeline.m_debug_show_plugin == this)) {
+			pipeline.m_debug_show_plugin = this;
+			pipeline.m_debug_show = Pipeline::DebugShow::PLUGIN;
+		}
 		ImGui::EndMenu();
 	}
 
 	bool debugOutput(RenderBufferHandle input, Pipeline& pipeline) override {
-		if (!m_show_debug) return false;
+		if (pipeline.m_debug_show_plugin != this) return false;
 		RenderBufferHandle rb = pipeline.getData<PipelineInstanceData>()->history;
 		if (rb != INVALID_RENDERBUFFER) pipeline.copy(input, rb);
 		return true;
@@ -783,7 +789,6 @@ struct TDAO : public RenderPlugin {
 	float m_y_range = 200;
 	float m_intensity = 0.3f;
 	bool m_enabled = true;
-	bool m_show_debug = false;
 	
 	struct PipelineInstanceData {
 		RenderBufferHandle rb = INVALID_RENDERBUFFER;
@@ -803,12 +808,16 @@ struct TDAO : public RenderPlugin {
 	void debugUI(Pipeline& pipeline) override {
 		if (!ImGui::BeginMenu("TDAO")) return;
 		ImGui::Checkbox("Enable", &m_enabled);
-		ImGui::Checkbox("Debug", &m_show_debug);
+		
+		if (ImGui::RadioButton("Debug", pipeline.m_debug_show_plugin == this)) {
+			pipeline.m_debug_show_plugin = this;
+			pipeline.m_debug_show = Pipeline::DebugShow::PLUGIN;
+		}
 		ImGui::EndMenu();
 	}
 
 	bool debugOutput(RenderBufferHandle input, Pipeline& pipeline) override {
-		if (!m_show_debug) return false;
+		if (pipeline.m_debug_show_plugin != this) return false;
 		
 		auto* data = pipeline.getData<PipelineInstanceData>();
 		if (data->rb != INVALID_RENDERBUFFER) {
