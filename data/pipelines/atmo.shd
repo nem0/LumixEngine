@@ -111,10 +111,10 @@ compute_shader [[
 
 				float3 inscatter = 0;
 				{
-					const int STEP_COUNT = u_godarys_enabled > 0 ? 128 : 8;
+					const int STEP_COUNT = u_godarys_enabled > 0 ? 32 : 8;
 					float step_len = length(p1 - p0) / (STEP_COUNT + 1);
-					float offset = hash(p0.xyz) * 2 - 1;
-					for (float f = (0.5 + offset * 0.2) / STEP_COUNT; f < 1; f += 1.0 / (STEP_COUNT + 1)) {
+					float offset = hash((float2)thread_id.xy * 0.05);
+					for (float f = (offset ) / STEP_COUNT; f < 1; f += 1.0 / (STEP_COUNT + 1)) {
 						float3 p = lerp(p0, p1, f);
 						float od = distanceInFog(p, p + Global_light_dir.xyz * 1e5); // TODO 1e5
 						od += distanceInFog(p, Global_camera_world_pos.xyz);
