@@ -52,7 +52,7 @@
 	// TODO shader cleanup
 	// TODO get rid of #line
 	// TODO fuzzy search
-	// TODO remove lua from shaders, materials, ...
+	// TODO remove lua from shaders, meta, ...
 	// TODO static samplers
 	// TODO icons over some debugs, e.g. TDAO 
 	// TODO switch plugins to use new genie stuff like plugin() function
