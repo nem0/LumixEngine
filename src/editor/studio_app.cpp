@@ -490,6 +490,9 @@ struct StudioAppImpl final : StudioApp
 		m_engine->setMainWindow(m_main_window);
 		
 		beginInitIMGUI();
+		// we need to create the asset compiler before plugins, since asset compiler installs a hook for asset loading
+		// and plugins can try to load stuf, e.g. renderer loads postprocess shaders
+		m_asset_compiler = AssetCompiler::create(*this);
 		m_engine->init();
 		jobs::wait(&m_init_imgui_signal);
 		
@@ -498,7 +501,6 @@ struct StudioAppImpl final : StudioApp
 		registerLuaAPI();
 		extractBundled();
 
-		m_asset_compiler = AssetCompiler::create(*this);
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		m_editor->entitySelectionChanged().bind<&StudioAppImpl::onEntitySelectionChanged>(this);
 		loadUserPlugins();
