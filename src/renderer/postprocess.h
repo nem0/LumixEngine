@@ -118,10 +118,10 @@ struct Atmo : public RenderPlugin {
 		stream.memoryBarrier(m_inscatter_precomputed);
 		
 		ub_data.inscatter_precomputed = gpu::getBindlessHandle(m_inscatter_precomputed);
-		pipeline.setRenderTargets(Span(&hdr_rb, 1));
+		ub_data.output = pipeline.toRWBindless(hdr_rb, stream);
 		pipeline.setUniform(ub_data);
-		const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-		pipeline.drawArray(0, 3, *m_shader, 0, state);
+		const Viewport& vp = pipeline.getViewport();
+		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		pipeline.endBlock();
 		return hdr_rb;

@@ -1,25 +1,6 @@
 include "pipelines/common.glsl"
 
-vertex_shader [[
-	struct Output {
-		float2 uv : TEXCOORD;
-		float4 position : SV_POSITION;
-	};
-
-	Output main(uint vertex_id : SV_VertexID) {
-		Output output;
-		output.position = fullscreenQuad(vertex_id, output.uv);
-		return output;
-	}
-]]
-
-
-fragment_shader [[
-	struct Output {
-		float4 output0 : SV_TARGET0; 
-		float4 output1 : SV_TARGET1; 
-	};
-
+compute_shader [[
 	cbuffer Data : register (b4) {
 		float u_bot;
 		float u_top;
@@ -63,12 +44,15 @@ fragment_shader [[
 		return pos.y > u_fog_top ? 0 : 1;
 	}
 
-	Output main(float2 uv : TEXCOORD0, float4 frag_coord : SV_POSITION) {
-		Output output;
-		output.output1 = 1;
-
+	[numthreads(16, 16, 1)]
+	void main(uint3 thread_id : SV_DispatchThreadID) {
+		float4 atmo;
+		float4 scene = 1;
+		atmo.a = 1;
+		
 		float3 sunlight = u_sunlight.rgb * u_sunlight.a;
-		float ndc_depth = sampleBindlessLod(LinearSamplerClamp, u_depth_buffer, uv, 0).r;
+		float ndc_depth = bindless_textures[u_depth_buffer][thread_id.xy].r;
+		float2 uv = thread_id.xy / (float2)Global_framebuffer_size.xy;
 		float3 eyedir = getWorldNormal(uv);
 		const float cos_theta = dot(eyedir, Global_light_dir.xyz);
 
@@ -82,7 +66,7 @@ fragment_shader [[
 
 			float mie_phase = miePhase(0.75, -cos_theta);
 			float rayleigh_phase = rayleighPhase(-cos_theta);
-			output.output0.rgb = 
+			atmo.rgb = 
 				insc.aaa * mie_phase * sunlight * u_scatter_mie.rgb
 				+ insc.rgb * rayleigh_phase * sunlight * u_scatter_rayleigh.rgb
 				;
@@ -101,13 +85,12 @@ fragment_shader [[
 			float4 insc = sampleBindlessLod(LinearSamplerClamp, u_inscatter, v, 0);
 			float p_height = saturate((length(p) - u_bot) / (u_top - u_bot));
 			float2 opt_depth = sampleBindlessLod(LinearSamplerClamp, u_optical_depth, float2(abs(eyedir.y), p_height), 0).xy;
-			output.output0.rgb = 
+			atmo.rgb = 
 				insc.aaa * miePhase(0.75, -cos_theta) * sunlight * u_scatter_mie.rgb
 				+ insc.rgb * rayleighPhase(-cos_theta) * sunlight * u_scatter_rayleigh.rgb
 				+ spot * exp(-opt_depth.x * extinction_rayleigh - opt_depth.y * extinction_mie) 
 				;
 		}
-		output.output0.a = 1;
 
 		if (u_fog_enabled > 0) {
 			const float3 fog_extinction = u_fog_scattering.rgb;
@@ -142,12 +125,11 @@ fragment_shader [[
 
 				const float cos_theta = dot(eyedir, Global_light_dir.xyz);
 
-				output.output1.rgb = fog_transmittance;
-
-				output.output0.rgb += inscatter * u_fog_scattering.rgb * sunlight * miePhase(0.25, -cos_theta);
+				scene.rgb = fog_transmittance;
+				atmo.rgb += inscatter * u_fog_scattering.rgb * sunlight * miePhase(0.25, -cos_theta);
 			}
 		}
 
-		return output;
+		bindless_rw_textures[u_output][thread_id.xy] = atmo + bindless_rw_textures[u_output][thread_id.xy] * scene;
 	}
 ]]

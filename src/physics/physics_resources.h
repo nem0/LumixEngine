@@ -11,8 +11,6 @@ namespace physx
 	class PxTriangleMesh;
 }
 
-struct lua_State;
-
 namespace Lumix
 {
 
