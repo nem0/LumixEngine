@@ -461,9 +461,7 @@ struct PSOCache {
 	{}
 
 	ID3D12PipelineState* getPipelineStateCompute(ID3D12Device* device, ID3D12RootSignature* root_signature, ProgramHandle program) {
-		const RuntimeHash32 hash(&program, sizeof(program));
-		
-		auto iter = cache.find(hash);
+		auto iter = cache.find(program->content_hash);
 		if (iter.isValid()) return iter.value();
 
 		if (program->cs.size() == 0) return nullptr;
@@ -478,7 +476,7 @@ struct PSOCache {
 		ID3D12PipelineState* pso;
 		HRESULT hr = device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pso));
 		ASSERT(hr == S_OK);
-		cache.insert(hash, pso);
+		cache.insert(program->content_hash, pso);
 		return pso;
 	}
 
