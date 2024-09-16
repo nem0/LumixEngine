@@ -67,37 +67,6 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 		u32 size() const;
 	};
 
-	struct Stage {
-		Stage(IAllocator& allocator) : code(allocator) {}
-		Stage(const Stage& rhs)
-			: type(rhs.type)
-			, code(rhs.code.getAllocator())
-		{
-			rhs.code.copyTo(code);
-		}
-
-		gpu::ShaderType type;
-		Array<char> code;
-	};
-
-	struct Sources {
-		Sources(IAllocator& allocator) 
-			: stages(allocator)
-			, common(allocator)
-		{}
-		Sources(const Sources& rhs)
-			: stages(rhs.stages.getAllocator())
-			, common(rhs.common)
-			, path(rhs.path)
-		{
-			rhs.stages.copyTo(stages);
-		}
-
-		Path path;
-		Array<Shader::Stage> stages;
-		String common;
-	};
-
 	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
@@ -122,7 +91,8 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 		gpu::ProgramHandle program;
 	};
 	Array<ProgramPair> m_programs;
-	Sources m_sources;
+	gpu::ShaderType m_type;
+	String m_code;
 
 	static const ResourceType TYPE;
 	RuntimeHash32 m_content_hash;

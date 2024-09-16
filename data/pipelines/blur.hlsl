@@ -6,15 +6,15 @@ cbuffer Drawcall : register(b4) {
 	uint u_input;
 };
 
-struct Output {
+struct VSOutput {
 	float2 tc0 : TEXCOORD0;
 	float4 tc1 : TEXCOORD1;
 	float4 tc2 : TEXCOORD2;
 	float4 position : SV_POSITION;
 };
 
-Output mainVS(uint vertex_id : SV_VertexID) {
-	Output output;
+VSOutput mainVS(uint vertex_id : SV_VertexID) {
+	VSOutput output;
 	float2 uv;
 	output.position = fullscreenQuad(vertex_id, uv);
 	output.tc0 = uv;
@@ -40,13 +40,7 @@ Output mainVS(uint vertex_id : SV_VertexID) {
 	return output;
 }
 
-struct Input {
-	float2 tc0 : TEXCOORD0;
-	float4 tc1 : TEXCOORD1;
-	float4 tc2 : TEXCOORD2;
-};
-
-float4 mainPS(Input input) : SV_Target {
+float4 mainPS(VSOutput input) : SV_Target {
 	float2 uv0 = saturate(input.tc0.xy);
 	float2 uv1 = saturate(input.tc1.xy);
 	float2 uv2 = saturate(input.tc1.zw);

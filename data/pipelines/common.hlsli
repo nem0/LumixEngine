@@ -1,5 +1,3 @@
-#line 2 "common.hlsli"
-
 #define M_PI 3.14159265359
 #define ONE_BY_PI (1 / 3.14159265359)
 
@@ -8,10 +6,6 @@ static const float2 POISSON_DISK_4[4] = {
   float2( 0.94558609, -0.76890725 ),
   float2( -0.094184101, -0.92938870 ),
   float2( 0.34495938, 0.29387760 )
-};
-
-cbuffer ShadowAtlas : register(b3) {
-	float4x4 u_shadow_atlas_matrices[128];
 };
 
 static const float2 POISSON_DISK_16[16] = {
@@ -121,6 +115,7 @@ cbuffer GlobalState : register(b0) {
 	float4 Global_to_prev_frame_camera_translation;
 	float4 Global_light_dir;
 	float4 Global_light_color;
+	uint2 Global_random_uint2;
 	int2 Global_framebuffer_size;
 	float2 Global_pixel_jitter;
 	float2 Global_prev_pixel_jitter;
@@ -150,6 +145,10 @@ cbuffer PassState : register(b1) {
 	float4 Pass_camera_up : packoffset(c25);
 	float4 Pass_camera_planes[6] : packoffset(c26);
 	float4 Pass_shadow_to_camera : packoffset(c32);
+};
+
+cbuffer ShadowAtlas : register(b3) {
+	float4x4 u_shadow_atlas_matrices[128];
 };
 
 float3 rotateByQuat(float4 rot, float3 pos) {
@@ -206,16 +205,14 @@ uint2 textureSize(TextureCube<float4> Tex, uint Level) {
 	return ret;
 }
 
-float3 getWorldNormal(float2 frag_coord) {
-	float z = 1;
-	float4 posProj = float4(toScreenUV(frag_coord) * 2 - 1, z, 1.0);
+// returns view vector, i.e. normalized vector in world-space pointing from camera to pixel
+float3 getViewDirection(float2 screen_uv) {
+	float4 posProj = float4(toScreenUV(screen_uv) * 2 - 1, 1, 1.0);
 	float4 wpos = mul(posProj, Global_inv_view_projection);
-	wpos /= wpos.w;
-	float3 view = (mul(float4(0.0, 0.0, 0.0, 1.0), Global_inv_view)).xyz - wpos.xyz;
-
-	return -normalize(view);
+	return normalize(wpos.xyz);
 }
 
+// get view-space position of pixel at `tex_coord`
 float3 getViewPosition(uint depth_buffer, float4x4 inv_view_proj, float2 tex_coord) {
 	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, tex_coord, 0).r;
 	float4 pos_proj = float4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
@@ -223,6 +220,7 @@ float3 getViewPosition(uint depth_buffer, float4x4 inv_view_proj, float2 tex_coo
 	return view_pos.xyz / view_pos.w;
 }
 
+// get view-space position of pixel at `tex_coord` and its NDC depth
 float3 getViewPosition(uint depth_buffer, float4x4 inv_view_proj, float2 tex_coord, out float ndc_depth) {
 	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, tex_coord, 0).r;
 	float4 pos_proj = float4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
@@ -276,9 +274,10 @@ float2 computeStaticObjectMotionVector(float3 wpos) {
 	return pos_projected.xy / pos_projected.w - p.xy / p.w;	
 }
 
-float4 fullscreenQuad(int vertexID, out float2 uv) {
-	uv = float2((vertexID & 1) * 2, vertexID & 2);
-	return float4(toScreenUV(uv) * 2 - 1, 0, 1);
+// can be used in VS to draw a triangle covering whole screen
+float4 fullscreenQuad(int vertexID, out float2 screen_uv) {
+	screen_uv = float2((vertexID & 1) * 2, vertexID & 2);
+	return float4(toScreenUV(screen_uv) * 2 - 1, 0, 1);
 }
 
 // TODO optimize
@@ -293,8 +292,6 @@ StructuredBuffer<Cluster> b_clusters : register(t1, space0);
 StructuredBuffer<int> b_cluster_map : register(t2);
 StructuredBuffer<EnvProbe> b_env_probes : register(t3);
 StructuredBuffer<ReflectionProbe> b_refl_probes : register(t4);
-
-#ifdef LUMIX_FRAGMENT_SHADER
 
 Cluster getClusterLinearDepth(float linear_depth, float2 frag_coord) {
 	int3 cluster;
@@ -328,8 +325,6 @@ Cluster getCluster(float ndc_depth, float2 frag_coord) {
 	return b_clusters[idx];
 }
 
-#endif
-
 float hash(float3 seed) {
 	float dot_product = dot(seed, float3(12.9898,78.233,45.164));
 	return frac(sin(dot_product) * 43758.5453);
@@ -356,33 +351,31 @@ float getShadowSimple(uint shadowmap, float3 wpos) {
 }
 
 float getShadow(uint shadowmap, float3 wpos, float3 N, float2 frag_coord) {
-	#ifdef LUMIX_FRAGMENT_SHADER
-		float NdL = saturate(dot(N, Global_light_dir.xyz));
-		float4 pos = float4(wpos, 1);
+	float NdL = saturate(dot(N, Global_light_dir.xyz));
+	float4 pos = float4(wpos, 1);
+	
+	for (int slice = 0; slice < 4; ++slice) {
+		float3 sc = mul(Global_sm_slices[slice].world_to_slice, pos);
 		
-		for (int slice = 0; slice < 4; ++slice) {
-			float3 sc = mul(Global_sm_slices[slice].world_to_slice, pos);
+		if (all(sc.xyz < 0.99) && all(sc.xyz > 0.01)) {
+			float c = hash(frag_coord) * 2 - 1;
+			float s = sqrt(1 - c * c); 
+			float2x2 rot = float2x2(c, s, -s, c);
+			float2 sm_uv = float2(sc.x * 0.25 + slice * 0.25, sc.y);
+			float shadow = 0;
+			float receiver = sc.z;
 			
-			if (all(sc.xyz < 0.99) && all(sc.xyz > 0.01)) {
-				float c = hash(frag_coord) * 2 - 1;
-				float s = sqrt(1 - c * c); 
-				float2x2 rot = float2x2(c, s, -s, c);
-				float2 sm_uv = float2(sc.x * 0.25 + slice * 0.25, sc.y);
-				float shadow = 0;
-				float receiver = sc.z;
-				
-				float bias = (0.01 + Global_sm_slices[slice].texel_world / max(NdL, 0.1)) * Global_shadow_rcp_depth_range;
-				for (int j = 0; j < 16; ++j) {
-					float2 pcf_offset = mul(rot, POISSON_DISK_16[j]);
-					float2 uv = sm_uv + pcf_offset * float2(0.25, 1) * Global_sm_slices[slice].rcp_size * 3;
+			float bias = (0.01 + Global_sm_slices[slice].texel_world / max(NdL, 0.1)) * Global_shadow_rcp_depth_range;
+			for (int j = 0; j < 16; ++j) {
+				float2 pcf_offset = mul(rot, POISSON_DISK_16[j]);
+				float2 uv = sm_uv + pcf_offset * float2(0.25, 1) * Global_sm_slices[slice].rcp_size * 3;
 
-					float occluder = sampleBindlessLod(LinearSamplerClamp, shadowmap, uv, 0).r;
-					shadow += receiver > occluder - length(pcf_offset) * bias * 3 ? 1 : 0;
-				}
-				return shadow / 16.0;
+				float occluder = sampleBindlessLod(LinearSamplerClamp, shadowmap, uv, 0).r;
+				shadow += receiver > occluder - length(pcf_offset) * bias * 3 ? 1 : 0;
 			}
+			return shadow / 16.0;
 		}
-	#endif
+	}
 	return 1;
 }
 
@@ -432,56 +425,52 @@ float getShadowAtlasResolution(int idx) {
 }
 
 float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, float2 frag_coord) {
-	#ifdef LUMIX_FRAGMENT_SHADER
-		float3 res = 0;
-		for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
-			Light light = b_lights[b_cluster_map[i]];
-			float3 lpos = surface.wpos.xyz - light.pos_radius.xyz;
-			float dist = length(lpos);
-			float attn = pow(max(0, 1 - dist / light.pos_radius.w), light.color_attn.w);
-			float3 L = -lpos / dist;
-			if (attn > 1e-5) {
-				float3 direct_light = computeDirectLight(surface, L, light.color_attn.rgb);
-				int atlas_idx = light.atlas_idx;
-				if (atlas_idx >= 0) {
-					float4 proj_pos = mul(float4(lpos, 1), u_shadow_atlas_matrices[atlas_idx]);
-					proj_pos /= proj_pos.w;
+	float3 res = 0;
+	for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
+		Light light = b_lights[b_cluster_map[i]];
+		float3 lpos = surface.wpos.xyz - light.pos_radius.xyz;
+		float dist = length(lpos);
+		float attn = pow(max(0, 1 - dist / light.pos_radius.w), light.color_attn.w);
+		float3 L = -lpos / dist;
+		if (attn > 1e-5) {
+			float3 direct_light = computeDirectLight(surface, L, light.color_attn.rgb);
+			int atlas_idx = light.atlas_idx;
+			if (atlas_idx >= 0) {
+				float4 proj_pos = mul(float4(lpos, 1), u_shadow_atlas_matrices[atlas_idx]);
+				proj_pos /= proj_pos.w;
 
-					float2 shadow_uv = proj_pos.xy;
+				float2 shadow_uv = proj_pos.xy;
 
-					float c = hash(frag_coord) * 2 - 1;
-					float s = sqrt(1 - c * c); 
-					float2x2 rot = float2x2(c, s, -s, c);
-					float shadow = 0;
-					float receiver = proj_pos.z;
-					for (int j = 0; j < 16; ++j) {
-						float2 pcf_offset = mul(rot, POISSON_DISK_16[j]);
-						float2 uv = shadow_uv + pcf_offset * float2(0.25, 1) / getShadowAtlasResolution(atlas_idx) * 3;
+				float c = hash(frag_coord) * 2 - 1;
+				float s = sqrt(1 - c * c); 
+				float2x2 rot = float2x2(c, s, -s, c);
+				float shadow = 0;
+				float receiver = proj_pos.z;
+				for (int j = 0; j < 16; ++j) {
+					float2 pcf_offset = mul(rot, POISSON_DISK_16[j]);
+					float2 uv = shadow_uv + pcf_offset * float2(0.25, 1) / getShadowAtlasResolution(atlas_idx) * 3;
 
-						float occluder = sampleBindlessLod(LinearSamplerClamp, shadow_atlas, uv, 0).r;
-						shadow += receiver * 1.02 > occluder ? 1 : 0;
-					}
-					attn *= shadow / 16.0;
+					float occluder = sampleBindlessLod(LinearSamplerClamp, shadow_atlas, uv, 0).r;
+					shadow += receiver * 1.02 > occluder ? 1 : 0;
 				}
-
-				float fov = light.fov;
-				if (fov < M_PI) {
-					// TODO replace rot with dir
-					float3 dir = rotateByQuat(light.rot, float3(0, 0, -1));
-					float3 L = lpos / max(dist, 1e-5);
-					float cosDir = dot(normalize(dir), L);
-					float cosCone = cos(fov * 0.5);
-
-					attn *= cosDir < cosCone ? 0 : (cosDir - cosCone) / (1 - cosCone);
-				}
-
-				res += direct_light * attn;
+				attn *= shadow / 16.0;
 			}
+
+			float fov = light.fov;
+			if (fov < M_PI) {
+				// TODO replace rot with dir
+				float3 dir = rotateByQuat(light.rot, float3(0, 0, -1));
+				float3 L = lpos / max(dist, 1e-5);
+				float cosDir = dot(normalize(dir), L);
+				float cosCone = cos(fov * 0.5);
+
+				attn *= cosDir < cosCone ? 0 : (cosDir - cosCone) / (1 - cosCone);
+			}
+
+			res += direct_light * attn;
 		}
-		return res;
-	#else
-		return 0;
-	#endif
+	}
+	return res;
 }
 
 float3 computeIndirectDiffuse(float3 irradiance, Surface surface) {
@@ -617,8 +606,8 @@ float3 computeLighting(Cluster cluster, Surface surface, float3 light_direction,
 	return res;
 }
 
-float2 cameraReproject(float2 uv, float depth) {
-	float4 v = mul(float4(toScreenUV(uv) * 2 - 1, depth, 1), Global_reprojection);
+float2 cameraReproject(float2 uv, float ndc_depth) {
+	float4 v = mul(float4(toScreenUV(uv) * 2 - 1, ndc_depth, 1), Global_reprojection);
 	float2 res = (v.xy / v.w) * 0.5 + 0.5;
 	return toScreenUV(res);
 }
@@ -630,77 +619,9 @@ float D_GGX(float ndoth, float roughness) {
 	return a2 / (f * f * M_PI);
 }
 
-#ifdef LUMIX_FRAGMENT_SHADER
-	bool ditherLOD(float lod, float2 frag_coord){
-		// interleaved gradient noise by Jorge Jimenez
-		float s = frac(52.9829189 * frac(0.06711056 * frag_coord.x + 0.00583715 * frag_coord.y));
-		float ret = lod < 0.0 ? step(s, lod + 1.0) : step(lod, s);
-		return ret < 1e-3;
-	}
-#endif
-
-/*
- 
-layout (std140, binding = 3) uniform ShadowAtlas {
-	mat4 u_shadow_atlas_matrices[128];
-};
-
-float3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, float2 tex_coord, out float ndc_depth)
-{
-	float z = texture(depth_buffer, tex_coord).r;
-	float4 pos_proj = float4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
-	float4 view_pos = inv_view_proj * pos_proj;
-	ndc_depth = z;
-	return view_pos.xyz / view_pos.w;
+bool ditherLOD(float lod, float2 frag_coord){
+	// interleaved gradient noise by Jorge Jimenez
+	float s = frac(52.9829189 * frac(0.06711056 * frag_coord.x + 0.00583715 * frag_coord.y));
+	float ret = lod < 0.0 ? step(s, lod + 1.0) : step(lod, s);
+	return ret < 1e-3;
 }
-
-float3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, float2 tex_coord)
-{
-	float z = texture(depth_buffer, tex_coord).r;
-	float4 pos_proj = float4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
-	float4 view_pos = inv_view_proj * pos_proj;
-	return view_pos.xyz / view_pos.w;
-}
-
-		
-
-float G_SmithSchlickGGX(float ndotl, float ndotv, float roughness)
-{
-	float r = roughness + 1.0;
-	float k = (r * r) / 8.0;
-	float l = ndotl / (ndotl * (1.0 - k) + k);
-	float v = ndotv / (ndotv * (1.0 - k) + k);
-	return l * v;
-}
-
-float3 env_brdf_approx(float3 F0, float roughness, float NoV) {
-	float4 c0 = float4(-1, -0.0275, -0.572, 0.022);
-	float4 c1 = float4(1, 0.0425, 1.0, -0.04);
-	float4 r = roughness * c0 + c1;
-	float a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
-	float2 AB = float2(-1.04, 1.04) * a004 + r.zw;
-	return F0 * AB.x + AB.y;
-}
-
-float3 computeIndirectDiffuse(float3 irradiance, Surface surface) {
-	float ndotv = abs(dot(surface.N , surface.V)) + 1e-5f;
-	float3 F0 = mix(float3(0.04), surface.albedo, surface.metallic);		
-	float3 F = F_Schlick(ndotv, F0);
-	float3 kd = mix(float3(1.0) - F, float3(0.0), surface.metallic);
-	return surface.albedo * irradiance;
-}
-
-float3 transformByDualQuat(mat2x4 dq, float3 pos) {
-	return pos 
-		+ 2 * cross(dq[0].xyz, cross(dq[0].xyz, pos) + dq[0].w * pos) 
-		+ 2 * (dq[0].w * dq[1].xyz - dq[1].w * dq[0].xyz + cross(dq[0].xyz, dq[1].xyz));
-}
-
-float2 computeStaticObjectMotionVector(float3 wpos) {
-	float4 p = Global.view_projection_no_jitter * float4(wpos, 1);
-	float4 pos_projected = Global.prev_view_projection_no_jitter * float4(wpos + Global.to_prev_frame_camera_translation.xyz, 1);
-	return pos_projected.xy / pos_projected.w - p.xy / p.w;	
-}
-
-
-*/

@@ -19,20 +19,6 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 
-struct Input {
-	float3 half_extents : TEXCOORD0;
-	float3 pos : TEXCOORD1;
-	float4 rot : TEXCOORD2;
-	float2 uv_scale : TEXCOORD3;
-	float4 frag_coord : SV_POSITION;
-};
-
-struct Output {
-	float4 o0 : SV_TARGET0;
-	float4 o1 : SV_TARGET1;
-	float4 o2 : SV_TARGET2;
-};
-
 cbuffer DC : register(b4) {
 	uint u_gbuffer_depth;
 };
@@ -41,6 +27,7 @@ VSOutput mainVS(VSInput input) {
 	VSOutput output;
 	output.pos = input.i_pos;
 	output.rot = input.i_rot;
+	output.rot.w = -output.rot.w;
 	output.half_extents = input.i_half_extents;
 	float3 pos = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
 	pos += input.i_pos;
@@ -49,22 +36,22 @@ VSOutput mainVS(VSInput input) {
 	return output;
 }
 
-Output mainPS(Input input) {
-	float2 screen_uv = input.frag_coord.xy / Global_framebuffer_size;
+GBufferOutput mainPS(VSOutput input) {
+	float2 screen_uv = input.position.xy / Global_framebuffer_size;
 	float3 wpos = getViewPosition(u_gbuffer_depth, Global_inv_view_projection, screen_uv);
 	
-	float4 r = input.rot;
-	r.w = -r.w;
-	float3 lpos = rotateByQuat(r, wpos - input.pos);
+	float3 lpos = rotateByQuat(input.rot, wpos - input.pos);
 	if (any(abs(lpos) > input.half_extents)) discard;
-	
-	float4 color = sampleBindless(LinearSampler, t_texture, (lpos.xz / input.half_extents.xz * 0.5 + 0.5) * input.uv_scale);
+
+	float2 uv = (lpos.xz / input.half_extents.xz * 0.5 + 0.5) * input.uv_scale;	
+	float4 color = sampleBindless(LinearSampler, t_texture, uv);
 	//if (color.a < 0.01) discard;
 	color.rgb *= u_material_color.rgb;
 
-	Output output;
-	output.o0 = float4(color.rgb, color.a);
-	output.o1 = float4(0, 0, 0, 0);
-	output.o2 = float4(0, 0, 0, 0);
+	GBufferOutput output;
+	output.gbuffer0 = float4(color.rgb, color.a);
+	output.gbuffer1 = float4(0, 0, 0, 0);
+	output.gbuffer2 = float4(0, 0, 0, 0);
+	output.gbuffer3 = float4(0, 0, 0, 0);
 	return output;
 }

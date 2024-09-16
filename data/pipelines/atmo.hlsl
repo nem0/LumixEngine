@@ -13,7 +13,7 @@ cbuffer Data : register (b4) {
 	float4 u_fog_scattering;
 	float u_fog_top;
 	float u_fog_enabled;
-	float u_godarys_enabled;
+	float u_godrays_enabled;
 	uint u_output;
 	uint u_optical_depth;
 	uint u_depth_buffer;
@@ -52,10 +52,11 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	float3 sunlight = u_sunlight.rgb * u_sunlight.a;
 	float ndc_depth = bindless_textures[u_depth_buffer][thread_id.xy].r;
 	float2 uv = thread_id.xy / (float2)Global_framebuffer_size.xy;
-	float3 eyedir = getWorldNormal(uv);
+	float3 eyedir = getViewDirection(uv);
 	const float cos_theta = dot(eyedir, Global_light_dir.xyz);
 
 	if (ndc_depth > 0) {
+		// sky is hidden some object
 		float linear_depth = toLinearDepth(Global_inv_projection, ndc_depth);
 		float2 v = float2(
 			saturate(linear_depth / 50e3),
@@ -71,7 +72,8 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 			;
 	}
 	else {
-		float spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
+		// sky is visible
+		float sun_spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
 
 		float2 v = 1;
 		v.y = max(0, eyedir.y);
@@ -87,42 +89,42 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		atmo.rgb = 
 			insc.aaa * miePhase(0.75, -cos_theta) * sunlight * u_scatter_mie.rgb
 			+ insc.rgb * rayleighPhase(-cos_theta) * sunlight * u_scatter_rayleigh.rgb
-			+ spot * exp(-opt_depth.x * extinction_rayleigh - opt_depth.y * extinction_mie) 
+			+ sun_spot * exp(-opt_depth.x * extinction_rayleigh - opt_depth.y * extinction_mie) 
 			;
 	}
 
 	if (u_fog_enabled > 0) {
-		const float3 fog_extinction = u_fog_scattering.rgb;
 		float linear_depth = ndc_depth > 0 ? toLinearDepth(Global_inv_projection, ndc_depth) : 1e5;
 		float dist = (linear_depth / dot(eyedir, Global_view_dir.xyz));
 		float3 p0 = Global_camera_world_pos.xyz;
 		float3 p1 = Global_camera_world_pos.xyz + eyedir * dist;
 		makeAscending(p0, p1);
 
-		if (p0.y < u_fog_top) {
-			if (p1.y > u_fog_top) {
+		const bool is_in_fog = p0.y < u_fog_top;
+		if (is_in_fog) {
+			const bool is_partially_in_fog = p1.y > u_fog_top;
+			if (is_partially_in_fog) {
+				// clip to top of fog
 				float3 dir = p1 - p0;
 				float3 diry1 =  dir / (abs(dir.y) < 1e-5 ? 1e-5 : dir.y);
 				p1 -= diry1 * (p1.y - u_fog_top);
 			}
 
-			float3 fog_transmittance = exp(-distanceInFog(p0, p1) * fog_extinction);
+			float3 fog_transmittance = exp(-distanceInFog(p0, p1) * u_fog_scattering.rgb);
 
 			float3 inscatter = 0;
 			{
-				const int STEP_COUNT = u_godarys_enabled > 0 ? 32 : 8;
+				const int STEP_COUNT = u_godrays_enabled > 0 ? 32 : 8;
 				float step_len = length(p1 - p0) / (STEP_COUNT + 1);
 				float offset = hash((float2)thread_id.xy * 0.05);
 				for (float f = (offset ) / STEP_COUNT; f < 1; f += 1.0 / (STEP_COUNT + 1)) {
 					float3 p = lerp(p0, p1, f);
 					float od = distanceInFog(p, p + Global_light_dir.xyz * 1e5); // TODO 1e5
 					od += distanceInFog(p, Global_camera_world_pos.xyz);
-					float shadow = u_godarys_enabled > 0 ? getShadowSimple(Global_shadowmap, p - Global_camera_world_pos.xyz) : 1;
-					inscatter += getFogDensity(p) * step_len * exp(-od * fog_extinction) * shadow;
+					float shadow = u_godrays_enabled > 0 ? getShadowSimple(Global_shadowmap, p - Global_camera_world_pos.xyz) : 1;
+					inscatter += getFogDensity(p) * step_len * exp(-od * u_fog_scattering.rgb) * shadow;
 				}
 			}
-
-			const float cos_theta = dot(eyedir, Global_light_dir.xyz);
 
 			scene.rgb = fog_transmittance;
 			atmo.rgb += inscatter * u_fog_scattering.rgb * sunlight * miePhase(0.25, -cos_theta);

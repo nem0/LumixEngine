@@ -14,7 +14,7 @@ struct DrawStream {
 	DrawStream(DrawStream&& rhs);
 	~DrawStream();
 
-	void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char** srcs, const gpu::ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
+	void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char* srcs, gpu::ShaderType type, const char** prefixes, u32 prefixes_count, const char* name);
 	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data, const char* debug_name);
 	void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
 	void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture, u32 layer, u32 mip);

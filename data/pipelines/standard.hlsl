@@ -1,13 +1,21 @@
-import "pipelines/surface_base.inc"
+//@surface
+//@include "pipelines/common.hlsli"
+//@include "pipelines/surface_base.hlsli"
 
-uniform("Material color", "color", {1, 1, 1, 1})
-uniform("Roughness", "normalized_float", 1)
-uniform("Metallic", "normalized_float", 0)
-uniform("Emission", "float", 0)
-uniform("Translucency", "normalized_float", 0)
+//@uniform "Material color", "color", {1, 1, 1, 1}
+//@uniform "Roughness", "normalized_float", 1
+//@uniform "Metallic", "normalized_float", 0
+//@uniform "Emission", "float", 0
+//@uniform "Translucency", "normalized_float", 0
 
-surface_shader [[
-	#line 11 "standard.shd"
+//@texture_slot "Albedo", "textures/common/white.tga"
+//@texture_slot "Normal", "textures/common/default_normal.tga"
+//@texture_slot "Roughness", "textures/common/white.tga"
+//@texture_slot "Metallic", "", "HAS_METALLICMAP"
+//@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
+
+Surface getSurface(VSOutput input) {
+	Surface data;
 	// TODO mip offset
 	#ifdef UV0_ATTR
 		float2 uv = input.uv;
@@ -15,17 +23,17 @@ surface_shader [[
 		float2 uv = 0;
 	#endif
 
+	#ifdef AO_ATTR
+		data.ao = input.ao;
+	#else
+		data.ao = 1;
+	#endif
+
 	float4 c = sampleBindless(LinearSampler, t_albedo, uv/*, -1*/) * u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
 	#ifdef COLOR0_ATTR
 		data.albedo.rgb *= input.color.rgb;
-	#endif
-
-	#ifdef AO_ATTR
-		data.ao = input.ao;
-	#else
-		data.ao = 1;
 	#endif
 
 	#ifdef HAS_AMBIENT_OCCLUSION_TEX
@@ -67,4 +75,5 @@ surface_shader [[
 		float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
 		data.alpha = lerp(data.alpha, 1, pow(saturate(1 - ndotv), 5));
 	#endif
-]]
+	return data;
+}

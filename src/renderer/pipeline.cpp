@@ -36,24 +36,20 @@
 #include <imgui/imgui.h>
 
 // TODO crashes:
-	// TODO crash - open texture array
 	// TODO crash when context menu is outside of main window
+	// TODO env probe lighting is off
 
 // TODO nice to have:
 	// TODO semaphore in job system to wake workers?
 	// TODO 3d ui in scene view
 	// TODO property groups in property grid
-	// TODO move shader cache in .lumix ?
 	// TODO render graph
 	// TODO vertex pulling
 	// TODO 200 MB in memory profiler
-	// TODO rewrite shaders to compute
 	// TODO temporal upsample
 	// TODO temporal SSAO
 	// TODO shader cleanup
-	// TODO get rid of #line
-	// TODO fuzzy search
-	// TODO remove lua from shaders, meta, ...
+	// TODO remove meta, ...
 	// TODO static samplers
 	// TODO icons over some debugs, e.g. TDAO 
 	// TODO switch plugins to use new genie stuff like plugin() function
@@ -120,6 +116,7 @@ struct GlobalState {
 	Vec4 to_prev_frame_camera_translation;
 	Vec4 light_direction;
 	Vec4 light_color;
+	IVec2 random_uint2;
 	IVec2 framebuffer_size;
 	Vec2 pixel_jitter;
 	Vec2 prev_pixel_jitter;
@@ -513,8 +510,8 @@ struct PipelineImpl final : Pipeline {
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
 		m_tonemap_shader = rm.load<Shader>(Path("pipelines/tonemap.hlsl"));
-		m_textured_quad_shader = rm.load<Shader>(Path("pipelines/textured_quad.hlsl"));
-		m_lighting_shader = rm.load<Shader>(Path("pipelines/lighting.shd"));
+		m_blit_shader = rm.load<Shader>(Path("pipelines/blit.hlsl"));
+		m_lighting_shader = rm.load<Shader>(Path("pipelines/lighting.hlsl"));
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.hlsl"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.hlsl"));
 		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.hlsl"));
@@ -596,7 +593,7 @@ struct PipelineImpl final : Pipeline {
 		for (gpu::BufferHandle b : m_buffers) stream.destroy(b);
 
 		m_tonemap_shader->decRefCount();
-		m_textured_quad_shader->decRefCount();
+		m_blit_shader->decRefCount();
 		m_lighting_shader->decRefCount();
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
@@ -1000,21 +997,30 @@ struct PipelineImpl final : Pipeline {
 		stream.drawArrays(indices_offset, indices_count);
 	}
 
-	void renderTexturedQuad(gpu::BindlessHandle texture_bindless, bool flip_x, bool flip_y) override {
+	void blit(gpu::BindlessHandle src, gpu::RWBindlessHandle dst, IVec2 size, bool flip_x, bool flip_y) override {
 		struct {
-			Vec4 offset_scale = Vec4(0, 0, 1, 1);
 			Vec4 r_mask = Vec4(1, 0, 0, 0);
 			Vec4 g_mask = Vec4(0, 1, 0, 0);
 			Vec4 b_mask = Vec4(0, 0, 1, 0);
 			Vec4 a_mask = Vec4(0, 0, 0, 1);;
 			Vec4 offsets = Vec4(0, 0, 0, 1);
-			gpu::BindlessHandle texture;
+			IVec2 position = IVec2(0, 0);
+			IVec2 scale = IVec2(1, 1);
+			gpu::BindlessHandle src;
+			gpu::RWBindlessHandle dst;
 		} udata;
-		udata.texture = texture_bindless;
-		if (flip_x) udata.offset_scale.z = -1;
-		if (flip_y) udata.offset_scale.w = -1;
+		udata.src = src;
+		udata.dst= dst;
+		if (flip_x) {
+			udata.position.x = size.x - 1;
+			udata.scale.x = -1;
+		}
+		if (flip_y) {
+			udata.position.y = size.y - 1;
+			udata.scale.y = -1;
+		}
 		setUniform(udata);
-		drawArray(0, 3, *m_textured_quad_shader, 0, gpu::StateFlags::NONE);
+		dispatch(*m_blit_shader, (size.x + 15) / 16, (size.y + 15) / 16, 1);
 	}
 
 	void setUniformRaw(Span<const u8> mem, UniformBuffer::Enum bind_point = UniformBuffer::DRAWCALL) override {
@@ -1234,13 +1240,14 @@ struct PipelineImpl final : Pipeline {
 			.type = RenderbufferDesc::RELATIVE,
 			.rel_size = {1, 1},
 			.format = gpu::TextureFormat::R11G11B10F,
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "hdr_copy"
 			});
 
 		DrawStream& stream = m_renderer.getDrawStream();
 		pass(getMainCamera());
-		setRenderTargets(Span(&color_copy, 1));
-		renderTexturedQuad(toBindless(hdr_rb, stream), false, false);
+		const IVec2 size = {m_viewport.w, m_viewport.h};
+		blit(toBindless(hdr_rb, stream), toRWBindless(color_copy, stream), size, false, false);
 
 		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, true);
 
@@ -1302,55 +1309,58 @@ struct PipelineImpl final : Pipeline {
 		};
 		setUniform(ubdata);
 		gpu::StateFlags stencil_state = gpu::getStencilStateBits(0, gpu::StencilFuncs::NOT_EQUAL, 0, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
-		gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 		drawArray(0, 3, *m_lighting_shader, 0, stencil_state);
 		endBlock();
 		return hdr_rb;
 	}
 
-	void copy(RenderBufferHandle dst, RenderBufferHandle src, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) override {
-		setRenderTargets(Span(&dst, 1), INVALID_RENDERBUFFER);
+	void copy(RenderBufferHandle dst, RenderBufferHandle src, IVec2 size, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) override {
 		struct {
-			Vec4 offset_scale;
 			Vec4 r_mask;
 			Vec4 g_mask;
 			Vec4 b_mask;
 			Vec4 a_mask;
 			Vec4 offsets;
-			gpu::BindlessHandle texture;
+			IVec2 position;
+			IVec2 scale;
+			gpu::BindlessHandle src;
+			gpu::RWBindlessHandle dst;
 		} copy_ub = {
-				Vec4(0, 0, 1, 1),
-				r,
-				g,
-				b,
-				Vec4(0, 0, 0, 1),
-				Vec4(0, 0, 0, 1)
+			r,
+			g,
+			b,
+			Vec4(0, 0, 0, 1),
+			Vec4(0, 0, 0, 1),
+			IVec2(0, 0),
+			IVec2(1, 1)
 		};
 		DrawStream& stream = m_renderer.getDrawStream();
-		copy_ub.texture = toBindless(src, stream);
+		copy_ub.src = toBindless(src, stream);
+		copy_ub.dst = toRWBindless(dst, stream);
 		setUniform(copy_ub);
-		drawArray(0, 3, *m_textured_quad_shader, 0, gpu::StateFlags::NONE);
+		dispatch(*m_blit_shader, (size.x + 15) / 16, (size.y + 15) / 16, 1);
 	}
 
 	bool debugOutput(GBuffer gbuffer, RenderBufferHandle result) {
+		const IVec2 size = {m_viewport.w, m_viewport.h};
 		if (m_debug_show == DebugShow::ALBEDO) {
-			copy(result, gbuffer.A);
+			copy(result, gbuffer.A, size);
 			return true;
 		}
 		if (m_debug_show == DebugShow::NORMAL) {
-			copy(result, gbuffer.B, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0});
+			copy(result, gbuffer.B, size, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0});
 			return true;
 		}
 		if (m_debug_show == DebugShow::ROUGHNESS) {
-			copy(result, gbuffer.A, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 });
+			copy(result, gbuffer.A, size, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 });
 			return true;
 		}
 		if (m_debug_show == DebugShow::METALLIC) {
-			copy(result, gbuffer.C, { 0, 0, 1, 0 }, { 0, 0, 1, 0 }, { 0, 0, 1, 0 });
+			copy(result, gbuffer.C, size, { 0, 0, 1, 0 }, { 0, 0, 1, 0 }, { 0, 0, 1, 0 });
 			return true;
 		}
 		if (m_debug_show == DebugShow::AO) {
-			copy(result, gbuffer.B, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1});
+			copy(result, gbuffer.B, size, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1});
 			return true;
 		}
 
@@ -1488,6 +1498,7 @@ struct PipelineImpl final : Pipeline {
 		global_state.reflection_probes_bindless = gpu::getBindlessHandle(m_module->getReflectionProbesTexture());
 		global_state.shadow_atlas_bindless = m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE;
 		global_state.frame_idx = m_renderer.frameNumber();
+		global_state.random_uint2 = IVec2((i32)rand(), (i32)rand());
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
@@ -3635,7 +3646,7 @@ struct PipelineImpl final : Pipeline {
 	RenderModule* m_module;
 	Draw2D m_draw2d;
 	Shader* m_tonemap_shader = nullptr;
-	Shader* m_textured_quad_shader = nullptr;
+	Shader* m_blit_shader = nullptr;
 	Shader* m_lighting_shader = nullptr;
 	Shader* m_draw2d_shader = nullptr;
 	Array<UniquePtr<View>> m_views;

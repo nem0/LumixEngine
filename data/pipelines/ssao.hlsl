@@ -13,6 +13,7 @@ cbuffer UB : register(b4) {
 	uint u_output;
 };
 
+// get normal in view space
 float3 getViewNormal(float2 tex_coord) {
 	float3 wnormal = sampleBindlessLod(LinearSamplerClamp, u_normal_buffer, tex_coord, 0).xyz * 2 - 1;
 	float4 vnormal = mul(float4(wnormal, 0), Global_view);
@@ -29,18 +30,16 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	float occlusion = 0;
 	float occlusion_count = 0;
 
-	float rand = hash(view_pos.xyz + frac(Global_time) * 0.001);
-	float random_angle = rand * 6.283285;
-	float3 rot;
-	float depth_scale = u_radius / view_pos.z * (rand * 2 + 0.1);
-	rot.x = sin(random_angle);
-	rot.y = cos(random_angle);
-	rot.z = -rot.x;
+
+	float c = hash(view_pos.xyz + frac(Global_time) * 0.001) * 2 - 1;
+	float depth_scale = u_radius / view_pos.z * (c * 2 + 0.1);
+	float s = sqrt(1 - c * c); 
+	float2x2 rot = float2x2(c, s, -s, c); 
 	rot *= depth_scale;
 
 	for (int i = 0; i < 4; ++i) {
 		float2 poisson = POISSON_DISK_4[i];
-		float2 s = float2(dot(poisson, rot.yx), dot(poisson, rot.zy));
+		float2 s = mul(poisson, rot);
 		
 		float3 vpos_a = getViewPosition(u_depth_buffer, Global_inv_projection, uv + s) - view_pos;
 		float3 vpos_b = getViewPosition(u_depth_buffer, Global_inv_projection, uv - s) - view_pos;
