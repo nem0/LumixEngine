@@ -1,11 +1,10 @@
 #pragma once
 
 #include "core/span.h"
-
 #include "engine/lumix.h"
 
-
 struct ImFont;
+struct lua_State;
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
@@ -88,6 +87,8 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void run() = 0;
 	virtual int getExitCode() const = 0;
+	virtual void exitWithCode(int exit_code) = 0;
+	virtual void exitGameMode() = 0;
 	
 	virtual struct PropertyGrid& getPropertyGrid() = 0;
 	virtual struct LogUI& getLogUI() = 0;
@@ -123,7 +124,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	
-	virtual void runScript(const char* src, const char* script_name) = 0;
+	virtual void newWorld() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual void snapDown() = 0;
 	virtual float getFOV() const = 0;
@@ -132,6 +133,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void saveSettings() = 0;
 	virtual int getImGuiKey(int keycode) const = 0;
 	virtual u32 getDockspaceID() const = 0;
+	virtual void luaDebugLoop(lua_State* L, const char* error_msg) = 0;
 
 	// clip mouse cursor = keep it in specified rectangle
 	// cursor is automatically unclipped when app is inactive

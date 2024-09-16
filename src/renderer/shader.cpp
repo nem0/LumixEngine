@@ -2,7 +2,6 @@
 #include "engine/file_system.h"
 #include "engine/engine.h"
 #include "core/hash.h"
-#include "engine/lua_wrapper.h"
 #include "core/log.h"
 #include "core/path.h"
 #include "core/profiler.h"
@@ -119,15 +118,6 @@ gpu::ProgramHandle Shader::getProgram(u32 defines) {
 		if (p.key == key) return p.program;
 	}
 	return m_renderer.queueShaderCompile(*this, key, dummy_decl);
-}
-
-static Shader* getShader(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	ASSERT(lua_type(L, -1) == LUA_TLIGHTUSERDATA);
-	Shader* shader = (Shader*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	return shader;
 }
 
 static StringView getLine(StringView& src) {

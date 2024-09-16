@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "core/allocator.h"
@@ -8,13 +7,9 @@
 #include "core/os.h"
 #include "renderer/gpu/gpu.h"
 
-
 struct ImVec2;
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct Path;
 struct Pipeline;
@@ -22,11 +17,9 @@ struct PlatformData;
 struct RenderModule;
 struct StudioApp;
 
+struct GameView : StudioApp::GUIPlugin {
+	friend struct GUIInterface;
 
-struct GameView : StudioApp::GUIPlugin
-{
-friend struct GUIInterface;
-public:
 	explicit GameView(StudioApp& app);
 	~GameView();
 
@@ -41,7 +34,6 @@ public:
 	void onGUI() override;
 	void init();
 
-public:
 	bool m_is_open;
 
 private:
@@ -52,7 +44,6 @@ private:
 	void setFullscreen(bool fullscreen);
 	void controlsGUI(WorldEditor& editor);
 
-private:
 	UniquePtr<Pipeline> m_pipeline;
 	StudioApp& m_app;
 	float m_time_multiplier;

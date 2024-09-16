@@ -615,9 +615,6 @@ struct RendererImpl final : Renderer {
 		m_shader_manager.create(Shader::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
-
-		RenderModule::registerLuaAPI(m_engine.getState(), *this);
-
 		m_layers.emplace("default");
 	}
 

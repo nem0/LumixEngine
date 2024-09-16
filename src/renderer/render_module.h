@@ -13,9 +13,6 @@
 #include "gpu/gpu.h"
 
 
-struct lua_State;
-
-
 namespace Lumix
 {
 
@@ -319,7 +316,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 		Engine& engine,
 		World& world,
 		IAllocator& allocator);
-	static void registerLuaAPI(lua_State* L, Renderer& renderer);
 	static void reflect();
 
 	virtual RayCastModelHit castRay(const Ray& ray, const Delegate<bool (const RayCastModelHit&)> filter) = 0;

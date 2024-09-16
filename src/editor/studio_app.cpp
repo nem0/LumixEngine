@@ -498,7 +498,6 @@ struct StudioAppImpl final : StudioApp
 		
 		logInfo("Current directory: ", current_dir);
 
-		registerLuaAPI();
 		extractBundled();
 
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
@@ -519,7 +518,6 @@ struct StudioAppImpl final : StudioApp
 		m_asset_compiler->onInitFinished();
 		m_asset_browser->onInitFinished();
 		
-		checkScriptCommandLine();
 		loadLogo();
 
 		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
@@ -861,22 +859,6 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	static int LUA_debugCallback(lua_State* L) {
-		const char* error_msg = lua_tostring(L, 1);
-		if (lua_getglobal(L, "Editor") != LUA_TTABLE) {
-			lua_pop(L, 1);
-			return 0;
-		}
-		if (lua_getfield(L, -1, "editor") != LUA_TLIGHTUSERDATA) {
-			lua_pop(L, 2);
-			return 0;
-		}
-		StudioAppImpl* app = (StudioAppImpl*)lua_tolightuserdata(L, -1);
-		lua_pop(L, 2);
-		if (app->m_lua_debug_enabled) app->luaDebugLoop(L, error_msg);
-		return 0;
-	}
-
 	void luaImGuiTable(const char* prefix, lua_State* L) {
 		lua_pushnil(L);
 		while (lua_next(L, -2)) {
@@ -915,7 +897,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	// asserts once if called between ImGui::Begin/End, can be safely skipped
-	void luaDebugLoop(lua_State* L, const char* error_msg) {
+	void luaDebugLoop(lua_State* L, const char* error_msg) override {
 		// end normal loop
 		ImGui::PopFont();
 		ImGui::Render();
@@ -1263,7 +1245,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void newWorld() {
+	void newWorld() override {
 		if (m_editor->isWorldChanged()) {
 			m_confirm_new = true;
 		}
@@ -1272,7 +1254,6 @@ struct StudioAppImpl final : StudioApp
 			initDefaultWorld();
 		}
 	}
-
 
 	GUIPlugin* getFocusedWindow() {
 		for (GUIPlugin* win : m_gui_plugins) {
@@ -2877,176 +2858,12 @@ struct StudioAppImpl final : StudioApp
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
 
-	void runScript(const char* src, const char* script_name) override
-	{
-		lua_State* L = m_engine->getState();
-		bool errors = LuaWrapper::luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
-		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
-		if (errors)
-		{
-			logError(script_name, ": ", lua_tostring(L, -1));
-			lua_pop(L, 1);
-		}
-	}
+	void exitGameMode() override { m_deferred_game_mode_exit = true; }
 
-
-	void savePrefabAs(const char* path) {
-		auto& selected_entities = m_editor->getSelectedEntities();
-		if (selected_entities.size() != 1) return;
-
-		EntityRef entity = selected_entities[0];
-		m_editor->getPrefabSystem().savePrefab(entity, Path(path)); 
-	}
-
-
-	void destroyEntity(EntityRef e) { m_editor->destroyEntities(&e, 1); }
-
-
-	void selectEntity(EntityRef e) { m_editor->selectEntities(Span(&e, 1), false); }
-
-
-	EntityRef createEntity() { return m_editor->addEntity(); }
-
-	void createComponent(EntityRef e, const char* type)
-	{
-		const ComponentType cmp_type = reflection::getComponentType(type);
-		m_editor->addComponent(Span(&e, 1), cmp_type);
-	}
-
-	i32 getSelectedEntitiesCount() const { return m_editor->getSelectedEntities().size(); }
-	EntityRef getSelectedEntity(u32 idx) const { return m_editor->getSelectedEntities()[idx]; }
-
-	void exitGameMode() { m_deferred_game_mode_exit = true; }
-
-
-	void exitWithCode(int exit_code)
-	{
+	void exitWithCode(int exit_code) override {
 		m_finished = true;
 		m_exit_code = exit_code;
 	}
-
-
-	struct SetPropertyVisitor : reflection::IPropertyVisitor {
-		static bool isSameProperty(const char* name, const char* lua_name) {
-			char tmp[128];
-			LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
-			return equalStrings(tmp, lua_name);
-		}
-
-		void visit(const reflection::Property<int>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isnumber(L, -1)) return;
-
-			if(reflection::getAttribute(prop, reflection::IAttribute::ENUM)) {
-				notSupported(prop);
-			}
-
-			int val = (int)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<u32>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isnumber(L, -1)) return;
-
-			const u32 val = (u32)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<float>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isnumber(L, -1)) return;
-
-			float val = (float)lua_tonumber(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<Vec2>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
-
-			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<Vec3>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
-
-			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<IVec3>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
-
-			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<Vec4>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
-
-			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-		
-		void visit(const reflection::Property<const char*>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isstring(L, -1)) return;
-
-			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
-		}
-
-
-		void visit(const reflection::Property<Path>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isstring(L, -1)) return;
-
-			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), Path(str));
-		}
-
-
-		void visit(const reflection::Property<bool>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isboolean(L, -1)) return;
-
-			bool val = lua_toboolean(L, -1) != 0;
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
-		void visit(const reflection::BlobProperty& prop) override { notSupported(prop); }
-
-		template <typename T>
-		void notSupported(const T& prop)
-		{
-			if (!equalStrings(property_name, prop.name)) return;
-			logError("Property ", prop.name, " has unsupported type");
-		}
-
-
-		lua_State* L;
-		EntityRef entity;
-		ComponentType cmp_type;
-		const char* property_name;
-		WorldEditor* editor;
-	};
 
 	void guiAllActions() {
 		if (m_show_all_actions_request) ImGui::OpenPopup("Action palette");
@@ -3103,181 +2920,6 @@ struct StudioAppImpl final : StudioApp
 			ImGui::EndPopup();
 		}
 		m_show_all_actions_request = false;
-	}
-
-	static void LUA_makeParent(lua_State* L, EntityPtr parent, EntityRef child) {
-		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
-		studio->m_editor->makeParent(parent, child);
-	}
-
-	static int LUA_createEntityEx(lua_State* L) {
-		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
-		LuaWrapper::checkTableArg(L, 1);
-
-		WorldEditor& editor = *studio->m_editor;
-		editor.beginCommandGroup("createEntityEx");
-		EntityRef e = editor.addEntity();
-		editor.selectEntities(Span(&e, 1), false);
-
-		lua_pushvalue(L, 1);
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			const char* parameter_name = LuaWrapper::toType<const char*>(L, -2);
-			if (equalStrings(parameter_name, "name"))
-			{
-				const char* name = LuaWrapper::toType<const char*>(L, -1);
-				editor.setEntityName(e, name);
-			}
-			else if (equalStrings(parameter_name, "position"))
-			{
-				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
-				editor.setEntitiesPositions(&e, &pos, 1);
-			}
-			else if (equalStrings(parameter_name, "rotation"))
-			{
-				const Quat rot = LuaWrapper::toType<Quat>(L, -1);
-				editor.setEntitiesRotations(&e, &rot, 1);
-			}
-			else
-			{
-				ComponentType cmp_type = reflection::getComponentType(parameter_name);
-				editor.addComponent(Span(&e, 1), cmp_type);
-
-				IModule* module = editor.getWorld()->getModule(cmp_type);
-				if (module)
-				{
-					ComponentUID cmp(e, cmp_type, module);
-					const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
-					if (cmp.isValid())
-					{
-						lua_pushvalue(L, -1);
-						lua_pushnil(L);
-						while (lua_next(L, -2) != 0)
-						{
-							const char* property_name = LuaWrapper::toType<const char*>(L, -2);
-							SetPropertyVisitor v;
-							v.property_name = property_name;
-							v.entity = (EntityRef)cmp.entity;
-							v.cmp_type = cmp.type;
-							v.L = L;
-							v.editor = &editor;
-							cmp_des->visit(v);
-
-							lua_pop(L, 1);
-						}
-						lua_pop(L, 1);
-					}
-				}
-			}
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		editor.endCommandGroup();
-		LuaWrapper::pushEntity(L, e, editor.getWorld());
-		return 1;
-	}
-
-	static int LUA_getSelectedEntity(lua_State* L) {
-		LuaWrapper::DebugGuard guard(L, 1);
-		i32 entity_idx = LuaWrapper::checkArg<i32>(L, 1);
-		
-		StudioAppImpl* inst = LuaWrapper::getClosureObject<StudioAppImpl>(L);
-		EntityRef entity = inst->m_editor->getSelectedEntities()[entity_idx];
-
-		lua_getglobal(L, "Lumix");
-		lua_getfield(L, -1, "Entity");
-		lua_remove(L, -2);
-		lua_getfield(L, -1, "new");
-		lua_pushvalue(L, -2); // [Lumix.Entity, Entity.new, Lumix.Entity]
-		lua_remove(L, -3); // [Entity.new, Lumix.Entity]
-		World* world = inst->m_editor->getWorld();
-		LuaWrapper::push(L, world); // [Entity.new, Lumix.Entity, world]
-		LuaWrapper::push(L, entity.index); // [Entity.new, Lumix.Entity, world, entity_index]
-		const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
-		return error ? 0 : 1;
-	}
-
-	static int LUA_getResources(lua_State* L)
-	{
-		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
-		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
-
-		AssetCompiler& compiler = studio->getAssetCompiler();
-		if (!ResourceType(type).isValid()) return 0;
-		const auto& resources = compiler.lockResources();
-
-		lua_createtable(L, resources.size(), 0);
-		int i = 0;
-		for (const AssetCompiler::ResourceItem& res : resources)
-		{
-			LuaWrapper::push(L, res.path.c_str());
-			lua_rawseti(L, -2, i + 1);
-			++i;
-		}
-
-		compiler.unlockResources();
-		return 1;
-	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_engine->getState();
-
-		LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
-		
-		lua_pushcfunction(L, &LUA_debugCallback, "LumixDebugCallback");
-		lua_setglobal(L, "LumixDebugCallback");
-
-#define REGISTER_FUNCTION(F)                                                                                    \
-	do                                                                                                          \
-	{                                                                                                           \
-		auto f = &LuaWrapper::wrapMethodClosure<&StudioAppImpl::F>; \
-		LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);                                              \
-	} while (false)
-
-		REGISTER_FUNCTION(savePrefabAs);
-		REGISTER_FUNCTION(selectEntity);
-		REGISTER_FUNCTION(createEntity);
-		REGISTER_FUNCTION(createComponent);
-		REGISTER_FUNCTION(destroyEntity);
-		REGISTER_FUNCTION(newWorld);
-		REGISTER_FUNCTION(exitWithCode);
-		REGISTER_FUNCTION(exitGameMode);
-		REGISTER_FUNCTION(getSelectedEntitiesCount);
-
-#undef REGISTER_FUNCTION
-
-		LuaWrapper::createSystemClosure(L, "Editor", this, "getSelectedEntity", &LUA_getSelectedEntity);
-		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
-		LuaWrapper::createSystemClosure(L, "Editor", this, "createEntityEx", &LUA_createEntityEx);
-		LuaWrapper::createSystemClosure(L, "Editor", this, "makeParent", &LuaWrapper::wrap<LUA_makeParent>);
-	}
-
-	void checkScriptCommandLine() {
-		char command_line[1024];
-		os::getCommandLine(Span(command_line));
-		CommandLineParser parser(command_line);
-		while (parser.next()) {
-			if (parser.currentEquals("-run_script")) {
-				if (!parser.next()) break;
-
-				char tmp[MAX_PATH];
-				parser.getCurrent(tmp, lengthOf(tmp));
-				OutputMemoryStream content(m_allocator);
-				
-				if (m_engine->getFileSystem().getContentSync(Path(tmp), content)) {
-					content.write('\0');
-					runScript((const char*)content.data(), tmp);
-				}
-				else {
-					logError("Could not read ", tmp);
-				}
-				break;
-			}
-		}
 	}
 
 	static bool includeFileInExport(const char* filename) {
