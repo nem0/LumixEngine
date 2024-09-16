@@ -1,22 +1,27 @@
-#include "lua_script_system.h"
+#include "core/allocator.h"
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/hash.h"
-#include "engine/engine.h"
-#include "core/allocator.h"
-#include "engine/input_system.h"
-#include "core/metaprogramming.h"
-#include "engine/plugin.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
+#include "core/metaprogramming.h"
+#include "core/os.h"
 #include "core/profiler.h"
-#include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "core/stream.h"
 #include "core/string.h"
+#include "engine/engine.h"
+#include "engine/input_system.h"
+#include "engine/lua_wrapper.h"
+#include "engine/plugin.h"
+#include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "gui/gui_module.h"
+#include "lua_script_system.h"
 #include "lua_script/lua_script.h"
+#include "physics/physics_module.h"
+#include "renderer/model.h"
+#include "renderer/render_module.h"
+#include "renderer/renderer.h"
 #include <luacode.h>
 
 
@@ -2936,9 +2941,234 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 			.end_array();
 }
 
+static int LUA_raycast(lua_State* L)
+{
+	auto* module = LuaWrapper::checkArg<PhysicsModule*>(L, 1);
+	Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
+	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
+	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
+	RaycastHit hit;
+	if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
+	{
+		LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
+		LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());
+		LuaWrapper::push(L, hit.position);
+		LuaWrapper::push(L, hit.normal);
+		return 4;
+	}
+	LuaWrapper::push(L, false);
+	return 1;
+}
+
+
+static int LUA_castCameraRay(lua_State* L)
+{
+	LuaWrapper::checkTableArg(L, 1);
+	if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
+		LuaWrapper::argError(L, 1, "module");
+	}
+	RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
+	lua_pop(L, 1);
+	EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
+	float x, y;
+	if (lua_gettop(L) > 3) {
+		x = LuaWrapper::checkArg<float>(L, 3);
+		y = LuaWrapper::checkArg<float>(L, 4);
+	}
+	else {
+		x = module->getCameraScreenWidth(camera_entity) * 0.5f;
+		y = module->getCameraScreenHeight(camera_entity) * 0.5f;
+	}
+
+	const Ray ray = module->getCameraRay(camera_entity, {x, y});
+
+	RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
+	LuaWrapper::push(L, hit.is_hit);
+	LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
+	LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
+
+	return 3;
+}
+
+
+static void registerRendererAPI(lua_State* L, Engine& engine) {
+	auto renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
+	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
+	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
+}
+
+static void registerInputAPI(lua_State* state) {
+	#define REGISTER_KEYCODE(KEYCODE) \
+		LuaWrapper::createSystemVariable(state, "LumixAPI", "INPUT_KEYCODE_" #KEYCODE, (int)os::Keycode::KEYCODE);
+
+		REGISTER_KEYCODE(LBUTTON); 
+		REGISTER_KEYCODE(RBUTTON); 
+		REGISTER_KEYCODE(CANCEL);
+		REGISTER_KEYCODE(MBUTTON);
+		REGISTER_KEYCODE(BACKSPACE);
+		REGISTER_KEYCODE(TAB);
+		REGISTER_KEYCODE(CLEAR);
+		REGISTER_KEYCODE(RETURN);
+		REGISTER_KEYCODE(SHIFT);
+		REGISTER_KEYCODE(CTRL);
+		REGISTER_KEYCODE(ALT);
+		REGISTER_KEYCODE(PAUSE);
+		REGISTER_KEYCODE(CAPITAL);
+		REGISTER_KEYCODE(KANA);
+		REGISTER_KEYCODE(HANGEUL);
+		REGISTER_KEYCODE(HANGUL);
+		REGISTER_KEYCODE(JUNJA);
+		REGISTER_KEYCODE(FINAL);
+		REGISTER_KEYCODE(HANJA);
+		REGISTER_KEYCODE(KANJI);
+		REGISTER_KEYCODE(ESCAPE);
+		REGISTER_KEYCODE(CONVERT);
+		REGISTER_KEYCODE(NONCONVERT);
+		REGISTER_KEYCODE(ACCEPT);
+		REGISTER_KEYCODE(MODECHANGE);
+		REGISTER_KEYCODE(SPACE);
+		REGISTER_KEYCODE(PAGEUP);
+		REGISTER_KEYCODE(PAGEDOWN);
+		REGISTER_KEYCODE(END);
+		REGISTER_KEYCODE(HOME);
+		REGISTER_KEYCODE(LEFT);
+		REGISTER_KEYCODE(UP);
+		REGISTER_KEYCODE(RIGHT);
+		REGISTER_KEYCODE(DOWN);
+		REGISTER_KEYCODE(SELECT);
+		REGISTER_KEYCODE(PRINT);
+		REGISTER_KEYCODE(EXECUTE);
+		REGISTER_KEYCODE(SNAPSHOT);
+		REGISTER_KEYCODE(INSERT);
+		REGISTER_KEYCODE(DEL);
+		REGISTER_KEYCODE(HELP);
+		REGISTER_KEYCODE(LWIN);
+		REGISTER_KEYCODE(RWIN);
+		REGISTER_KEYCODE(APPS);
+		REGISTER_KEYCODE(SLEEP);
+		REGISTER_KEYCODE(NUMPAD0);
+		REGISTER_KEYCODE(NUMPAD1);
+		REGISTER_KEYCODE(NUMPAD2);
+		REGISTER_KEYCODE(NUMPAD3);
+		REGISTER_KEYCODE(NUMPAD4);
+		REGISTER_KEYCODE(NUMPAD5);
+		REGISTER_KEYCODE(NUMPAD6);
+		REGISTER_KEYCODE(NUMPAD7);
+		REGISTER_KEYCODE(NUMPAD8);
+		REGISTER_KEYCODE(NUMPAD9);
+		REGISTER_KEYCODE(MULTIPLY);
+		REGISTER_KEYCODE(ADD);
+		REGISTER_KEYCODE(SEPARATOR);
+		REGISTER_KEYCODE(SUBTRACT);
+		REGISTER_KEYCODE(DECIMAL);
+		REGISTER_KEYCODE(DIVIDE);
+		REGISTER_KEYCODE(F1);
+		REGISTER_KEYCODE(F2);
+		REGISTER_KEYCODE(F3);
+		REGISTER_KEYCODE(F4);
+		REGISTER_KEYCODE(F5);
+		REGISTER_KEYCODE(F6);
+		REGISTER_KEYCODE(F7);
+		REGISTER_KEYCODE(F8);
+		REGISTER_KEYCODE(F9);
+		REGISTER_KEYCODE(F10);
+		REGISTER_KEYCODE(F11);
+		REGISTER_KEYCODE(F12);
+		REGISTER_KEYCODE(F13);
+		REGISTER_KEYCODE(F14);
+		REGISTER_KEYCODE(F15);
+		REGISTER_KEYCODE(F16);
+		REGISTER_KEYCODE(F17);
+		REGISTER_KEYCODE(F18);
+		REGISTER_KEYCODE(F19);
+		REGISTER_KEYCODE(F20);
+		REGISTER_KEYCODE(F21);
+		REGISTER_KEYCODE(F22);
+		REGISTER_KEYCODE(F23);
+		REGISTER_KEYCODE(F24);
+		REGISTER_KEYCODE(NUMLOCK);
+		REGISTER_KEYCODE(SCROLL);
+		REGISTER_KEYCODE(OEM_NEC_EQUAL);
+		REGISTER_KEYCODE(OEM_FJ_JISHO);
+		REGISTER_KEYCODE(OEM_FJ_MASSHOU);
+		REGISTER_KEYCODE(OEM_FJ_TOUROKU);
+		REGISTER_KEYCODE(OEM_FJ_LOYA);
+		REGISTER_KEYCODE(OEM_FJ_ROYA);
+		REGISTER_KEYCODE(LSHIFT);
+		REGISTER_KEYCODE(RSHIFT);
+		REGISTER_KEYCODE(LCTRL);
+		REGISTER_KEYCODE(RCTRL);
+		REGISTER_KEYCODE(LALT);
+		REGISTER_KEYCODE(RALT);
+		REGISTER_KEYCODE(BROWSER_BACK);
+		REGISTER_KEYCODE(BROWSER_FORWARD);
+		REGISTER_KEYCODE(BROWSER_REFRESH);
+		REGISTER_KEYCODE(BROWSER_STOP);
+		REGISTER_KEYCODE(BROWSER_SEARCH);
+		REGISTER_KEYCODE(BROWSER_FAVORITES);
+		REGISTER_KEYCODE(BROWSER_HOME);
+		REGISTER_KEYCODE(VOLUME_MUTE);
+		REGISTER_KEYCODE(VOLUME_DOWN);
+		REGISTER_KEYCODE(VOLUME_UP);
+		REGISTER_KEYCODE(MEDIA_NEXT_TRACK);
+		REGISTER_KEYCODE(MEDIA_PREV_TRACK);
+		REGISTER_KEYCODE(MEDIA_STOP);
+		REGISTER_KEYCODE(MEDIA_PLAY_PAUSE);
+		REGISTER_KEYCODE(LAUNCH_MAIL);
+		REGISTER_KEYCODE(LAUNCH_MEDIA_SELECT);
+		REGISTER_KEYCODE(LAUNCH_APP1);
+		REGISTER_KEYCODE(LAUNCH_APP2);
+		REGISTER_KEYCODE(OEM_1);
+		REGISTER_KEYCODE(OEM_PLUS);
+		REGISTER_KEYCODE(OEM_COMMA);
+		REGISTER_KEYCODE(OEM_MINUS);
+		REGISTER_KEYCODE(OEM_PERIOD);
+		REGISTER_KEYCODE(OEM_2);
+		REGISTER_KEYCODE(OEM_3);
+		REGISTER_KEYCODE(OEM_4);
+		REGISTER_KEYCODE(OEM_5);
+		REGISTER_KEYCODE(OEM_6);
+		REGISTER_KEYCODE(OEM_7);
+		REGISTER_KEYCODE(OEM_8);
+		REGISTER_KEYCODE(OEM_AX);
+		REGISTER_KEYCODE(OEM_102);
+		REGISTER_KEYCODE(ICO_HELP);
+		REGISTER_KEYCODE(ICO_00);
+		REGISTER_KEYCODE(PROCESSKEY);
+		REGISTER_KEYCODE(ICO_CLEAR);
+		REGISTER_KEYCODE(PACKET);
+		REGISTER_KEYCODE(OEM_RESET);
+		REGISTER_KEYCODE(OEM_JUMP);
+		REGISTER_KEYCODE(OEM_PA1);
+		REGISTER_KEYCODE(OEM_PA2);
+		REGISTER_KEYCODE(OEM_PA3);
+		REGISTER_KEYCODE(OEM_WSCTRL);
+		REGISTER_KEYCODE(OEM_CUSEL);
+		REGISTER_KEYCODE(OEM_ATTN);
+		REGISTER_KEYCODE(OEM_FINISH);
+		REGISTER_KEYCODE(OEM_COPY);
+		REGISTER_KEYCODE(OEM_AUTO);
+		REGISTER_KEYCODE(OEM_ENLW);
+		REGISTER_KEYCODE(OEM_BACKTAB);
+		REGISTER_KEYCODE(ATTN);
+		REGISTER_KEYCODE(CRSEL);
+		REGISTER_KEYCODE(EXSEL);
+		REGISTER_KEYCODE(EREOF);
+		REGISTER_KEYCODE(PLAY);
+		REGISTER_KEYCODE(ZOOM);
+		REGISTER_KEYCODE(NONAME);
+		REGISTER_KEYCODE(PA1);
+		REGISTER_KEYCODE(OEM_CLEAR);
+
+	#undef REGISTER_KEYCODE
+}
+
 void LuaScriptSystemImpl::initBegin() {
 	PROFILE_FUNCTION();
 	createClasses(m_engine.getState());
+	registerInputAPI(m_engine.getState());
+	registerRendererAPI(m_engine.getState(), m_engine);
+	LuaWrapper::createSystemFunction(m_engine.getState(), "Physics", "raycast", &LUA_raycast);
 }
 
 LuaScriptSystemImpl::~LuaScriptSystemImpl()

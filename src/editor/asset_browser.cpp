@@ -17,7 +17,6 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource.h"
@@ -126,12 +125,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		const char* world_exts[] = { "unv" };
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
-
-		lua_State* L = m_app.getEngine().getState();
-		lua_getglobal(L, "Editor");
-		LuaWrapper::pushObject(L, this, "AssetBrowser");
-		lua_setfield(L, -2, "asset_browser");
-		lua_pop(L, 1);
 		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open);
 	}
 

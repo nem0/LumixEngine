@@ -584,7 +584,11 @@ if plugin "renderer" then
 	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
 	
 	defines { "BUILDING_RENDERER" }
-	links { "core", "engine", "lua_script" }
+	links { "core", "engine" }
+
+	if _OPTIONS["no-lua-script"] == nil then
+		links { "lua_script" }
+	end
 
 	linkEditor()
 	if build_studio and use_basisu then
@@ -659,7 +663,7 @@ end
 if plugin "gui" then
 	files { "../src/gui/**.h", "../src/gui/**.cpp" }
 	includedirs { "../src", "../src/gui" }
-	links { "core", "engine", "renderer", "lua_script" }
+	links { "core", "engine", "renderer" }
 	linkEditor()
 	useLua()
 	defines { "BUILDING_GUI" }
@@ -737,7 +741,10 @@ if build_app then
 			if has_plugin("physics") then
 				linkPhysX()
 			end
-			links { "core", "engine", "lua_script" }
+			links { "core", "engine" }
+			if _OPTIONS["no-lua-script"] == nil then
+				links { "lua_script" }
+			end
 			linkEditor()
 
 			if use_basisu then

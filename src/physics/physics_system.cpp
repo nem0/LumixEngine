@@ -87,25 +87,6 @@ namespace Lumix
 		PhysicsSystem& m_system;
 	};
 
-	static int LUA_raycast(lua_State* L)
-	{
-		auto* module = LuaWrapper::checkArg<PhysicsModule*>(L, 1);
-		Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
-		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
-		const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
-		RaycastHit hit;
-		if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
-		{
-			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());
-			LuaWrapper::push(L, hit.position);
-			LuaWrapper::push(L, hit.normal);
-			return 4;
-		}
-		LuaWrapper::push(L, false);
-		return 1;
-	}
-
 	struct PhysicsSystemImpl final : PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
@@ -129,7 +110,6 @@ namespace Lumix
 			
 			m_material_manager.create(PhysicsMaterial::TYPE, engine.getResourceManager());
 			m_geometry_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
-			LuaWrapper::createSystemFunction(engine.getState(), "Physics", "raycast", &LUA_raycast);
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
 

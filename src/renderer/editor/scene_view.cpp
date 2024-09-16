@@ -13,7 +13,6 @@
 #include "core/delegate_list.h"
 #include "engine/engine.h"
 #include "core/geometry.h"
-#include "engine/lua_wrapper.h"
 #include "core/path.h"
 #include "core/path.h"
 #include "engine/prefab.h"
@@ -22,7 +21,6 @@
 #include "engine/resource_manager.h"
 #include "core/string.h"
 #include "engine/world.h"
-#include "lua_script/lua_script.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
@@ -897,12 +895,6 @@ void SceneView::init() {
 	m_camera_preview_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 
 	m_pipeline = Pipeline::create(*renderer, PipelineType::SCENE_VIEW);
-
-	lua_State* L = m_app.getEngine().getState();
-	lua_getglobal(L, "Editor");
-	LuaWrapper::pushObject(L, this, "SceneView");
-	lua_setfield(L, -2, "scene_view");
-	lua_pop(L, 1);
 }
 
 

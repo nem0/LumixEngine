@@ -9,7 +9,6 @@
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
 #include "core/math.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
@@ -1532,13 +1531,6 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	Vec3 getPoseBonePosition(EntityRef model_instance, int bone_index)
-	{
-		Pose* pose = m_model_instances[model_instance.index].pose;
-		return pose->positions[bone_index];
-	}
-
-
 	void onEntityDestroyed(EntityRef entity)
 	{
 		for (auto& i : m_bone_attachments)
@@ -2102,53 +2094,9 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	static int LUA_castCameraRay(lua_State* L)
-	{
-		LuaWrapper::checkTableArg(L, 1);
-		if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError(L, 1, "module");
-		}
-		RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
-		lua_pop(L, 1);
-		EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-		float x, y;
-		if (lua_gettop(L) > 3) {
-			x = LuaWrapper::checkArg<float>(L, 3);
-			y = LuaWrapper::checkArg<float>(L, 4);
-		}
-		else {
-			x = module->getCameraScreenWidth(camera_entity) * 0.5f;
-			y = module->getCameraScreenHeight(camera_entity) * 0.5f;
-		}
-
-		const Ray ray = module->getCameraRay(camera_entity, {x, y});
-
-		RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
-		LuaWrapper::push(L, hit.is_hit);
-		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
-		LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
-
-		return 3;
-	}
-
-
 	void setTerrainHeightAt(EntityRef entity, int x, int z, float height)
 	{
 		m_terrains[entity]->setHeight(x, z, height);
-	}
-
-
-	static void LUA_setModelInstancePath(IModule* module, int component, const char* path)
-	{
-		RenderModule* render_module = (RenderModule*)module;
-		render_module->setModelInstancePath({component}, Path(path));
-	}
-
-
-	static int LUA_getModelBoneIndex(Model* model, const char* bone)
-	{
-		if (!model) return 0;
-		return model->getBoneIndex(BoneNameHash(bone)).value();
 	}
 
 
@@ -3644,34 +3592,6 @@ UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,
 	return UniquePtr<RenderModuleImpl>::create(allocator, renderer, engine, world, allocator);
 }
 
-void RenderModule::registerLuaAPI(lua_State* L, Renderer& renderer)
-{
-	#define REGISTER_FUNCTION(F)\
-		do { \
-			auto f = &LuaWrapper::wrapMethod<&RenderModuleImpl::F>; \
-			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(getTerrainMaterial);
-	REGISTER_FUNCTION(getPoseBonePosition);
-
-	#undef REGISTER_FUNCTION
-
-	#define REGISTER_FUNCTION(F)\
-		do { \
-		auto f = &LuaWrapper::wrap<&RenderModuleImpl::LUA_##F>; \
-		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(getModelBoneIndex);
-
-	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderModuleImpl::LUA_castCameraRay);
-
-	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
-	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
-
-	#undef REGISTER_FUNCTION
-}
 
 
 } // namespace Lumix

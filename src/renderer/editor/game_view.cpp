@@ -10,12 +10,10 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
-#include "engine/lua_wrapper.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "game_view.h"
 #include "gui/gui_system.h"
-#include "lua_script/lua_script.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -53,8 +51,6 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 {
 	Engine& engine = app.getEngine();
-	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
-	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 	m_app.getSettings().registerPtr("game_view_open", &m_is_open);
 	m_app.getSettings().registerPtr("focus_game_view_on_game_mode_start", &m_focus_on_game_start);
 }
