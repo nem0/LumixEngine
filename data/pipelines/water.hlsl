@@ -35,13 +35,7 @@ struct VSInput {
 	#endif
 };
 
-#ifndef AUTOINSTANCED
-	cbuffer Model : register(b4) {
-		float4x4 u_model;
-	};
-#endif
-
-struct Output {
+struct VSOutput {
 	float2 uv : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	float3 tangent : TEXCOORD2;
@@ -52,11 +46,17 @@ struct Output {
 	float4 position : SV_POSITION;
 };
 
-Output mainVS(VSInput input) {
+#ifndef AUTOINSTANCED
+	cbuffer Model : register(b4) {
+		float4x4 u_model;
+	};
+#endif
+
+VSOutput mainVS(VSInput input) {
 	static const float3 normal = float3(0, 1, 0);
 	static const float3 tangent = float3(1, 0, 0);
 
-	Output output;
+	VSOutput output;
 	output.uv = input.uv;
 	#if defined AUTOINSTANCED
 		output.normal = rotateByQuat(input.i_rot, normal);
@@ -84,16 +84,6 @@ cbuffer Textures : register(b5) {
 	uint u_depthbuffer;
 	uint u_reflection_probes;
 	uint u_bg;
-};
-
-struct Input {
-	float2 uv : TEXCOORD0;
-	float3 normal : TEXCOORD1;
-	float3 tangent : TEXCOORD2;
-	float4 wpos : TEXCOORD3;
-	#ifdef _HAS_ATTR2 
-		//float2 masks : TEXCOORD4;
-	#endif
 };
 
 float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
@@ -209,7 +199,7 @@ float3 getSurfaceNormal(float2 uv, float normal_strength, out float h00)
 	return N;
 }
 
-float4 mainPS(Input input) : SV_TARGET
+float4 mainPS(VSOutput input) : SV_TARGET
 {
 	float3 V = normalize(-input.wpos.xyz);
 	float3 L = Global_light_dir.xyz;

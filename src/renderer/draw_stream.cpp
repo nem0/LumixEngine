@@ -206,11 +206,7 @@ struct BinderShaderBufferData {
 
 struct CreateProgramData {
 	CreateProgramData(IAllocator& allocator) 
-		: sources(allocator)
-		, prefixes(allocator)
-		, srcs(allocator)
-		, prfxs(allocator)
-		, types(allocator)
+		: source(allocator)
 		, name(allocator)
 		, decl(gpu::PrimitiveType::NONE)
 	{}
@@ -218,11 +214,9 @@ struct CreateProgramData {
 	gpu::ProgramHandle program;
 	gpu::StateFlags state;
 	gpu::VertexDecl decl;
-	Array<String> sources;
-	Array<const char*> srcs;
-	Array<String> prefixes;
-	Array<const char*> prfxs;
-	Array<gpu::ShaderType> types;
+	String source;
+	const char* src;
+	gpu::ShaderType type;
 	String name;
 };
 
@@ -379,12 +373,30 @@ DrawStream& DrawStream::createSubstream() {
 	return *new (NewPlaceholder(), data) DrawStream(renderer);
 }
 
+static const char* getAttrDefine(u32 idx) {
+	switch (idx) {
+		case 0 : return "#define _HAS_ATTR0\n";
+		case 1 : return "#define _HAS_ATTR1\n";
+		case 2 : return "#define _HAS_ATTR2\n";
+		case 3 : return "#define _HAS_ATTR3\n";
+		case 4 : return "#define _HAS_ATTR4\n";
+		case 5 : return "#define _HAS_ATTR5\n";
+		case 6 : return "#define _HAS_ATTR6\n";
+		case 7 : return "#define _HAS_ATTR7\n";
+		case 8 : return "#define _HAS_ATTR8\n";
+		case 9 : return "#define _HAS_ATTR9\n";
+		case 10 : return "#define _HAS_ATTR10\n";
+		case 11 : return "#define _HAS_ATTR11\n";
+		case 12 : return "#define _HAS_ATTR12\n";
+		default: ASSERT(false); return "";
+	}
+}
+
 void DrawStream::createProgram(gpu::ProgramHandle prog
 	, gpu::StateFlags state
 	, const gpu::VertexDecl& decl
-	, const char** srcs
-	, const gpu::ShaderType* types
-	, u32 num
+	, const char* src
+	, gpu::ShaderType type
 	, const char** prefixes
 	, u32 prefixes_count
 	, const char* name
@@ -393,21 +405,39 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	data->program = prog;
 	data->state = state;
 	data->decl = decl;
-	data->sources.reserve(num);
-	data->srcs.resize(num);
-	data->types.resize(num);
-	for (u32 i = 0; i < num; ++i) {
-		data->sources.emplace(srcs[i], gpu::getAllocator());
-		data->srcs[i] = data->sources[i].c_str();
-		data->types[i] = types[i];
+	data->type = type;
+	data->source = String(gpu::getAllocator());
+	for (u32 i = 0; i < decl.attributes_count; ++i) {
+		data->source.append(getAttrDefine(i)); 
 	}
+	data->source = R"#(
+		#define TextureHandle int
+		#define TextureCubeArrayHandle int
 
-	data->prefixes.reserve(prefixes_count);
-	data->prfxs.resize(prefixes_count);
+		Texture2D<float4> bindless_textures[] : register(t0, space1);
+		TextureCubeArray bindless_cube_arrays[] : register(t0, space2);
+		Texture2DArray bindless_2D_arrays[] : register(t0, space3);
+		TextureCube bindless_cubemaps[] : register(t0, space4);
+		ByteAddressBuffer bindless_buffers[] : register(t0, space5);
+		RWTexture2D<float4> bindless_rw_textures[] : register(u0, space0);
+		RWByteAddressBuffer bindless_rw_buffers[] : register(u0, space1);
+
+		SamplerState LinearSamplerClamp : register(s0);
+		SamplerState LinearSampler : register(s1);
+
+		#define sampleCubeBindlessLod(sampler, index, uv, lod) bindless_cubemaps[index].Sample((sampler), (uv), (lod))
+		#define sampleCubeBindless(sampler, index, uv) bindless_cubemaps[index].Sample((sampler), (uv))
+		#define sampleBindless(sampler, index, uv) bindless_textures[index].Sample((sampler), (uv))
+		#define sampleBindlessLod(sampler, index, uv, lod) bindless_textures[index].SampleLevel((sampler), (uv), (lod))
+		#define sampleBindlessOffset(sampler, index, uv, offset) bindless_textures[index].Sample((sampler), (uv), (offset))
+		#define sampleBindlessLodOffset(sampler, index, uv, lod, offset) bindless_textures[index].SampleLevel((sampler), (uv), (lod), (offset))
+		#define sampleCubeArrayBindlessLod(sampler, index, uv, lod) bindless_cube_arrays[index].SampleLevel((sampler), (uv), (lod))
+	)#";
 	for (u32 i = 0; i < prefixes_count; ++i) {
-		data->prefixes.emplace(prefixes[i], gpu::getAllocator());
-		data->prfxs[i] = data->prefixes[i].c_str();
+		data->source.append(prefixes[i], "\n");
 	}
+	data->source.append(src);
+	data->src = data->source.c_str();
 	data->name = name;
 	write(Instruction::CREATE_PROGRAM, data);
 }
@@ -762,11 +792,8 @@ void DrawStream::run() {
 					gpu::createProgram(data->program
 						, data->state
 						, data->decl
-						, data->srcs.begin()
-						, data->types.begin()
-						, data->sources.size()
-						, data->prfxs.begin()
-						, data->prfxs.size()
+						, data->src
+						, data->type
 						, data->name.c_str()
 					);
 					LUMIX_DELETE(gpu::getAllocator(), data);

@@ -1,13 +1,15 @@
-import "pipelines/surface_base.inc"
+//@surface
+//@include "pipelines/common.hlsli"
+//@include "pipelines/surface_base.hlsli"
 
-uniform("Material color", "color", {1, 1, 1, 1})
-uniform("Roughness", "normalized_float", 1)
-uniform("Metallic", "normalized_float", 0)
-uniform("Emission", "float", 0)
-uniform("Translucency", "normalized_float", 0)
+//@uniform "Material color", "color", {1, 1, 1, 1}
+//@uniform "Roughness", "normalized_float", 1
+//@uniform "Metallic", "normalized_float", 0
+//@uniform "Emission", "float", 0
+//@uniform "Translucency", "normalized_float", 0
 
-surface_shader [[
-	#line 11 "world_grid.shd"
+Surface getSurface(VSOutput input) {
+	Surface data;
 	float3 t = fmod(abs(input.wpos.xyz + Global_camera_world_pos.xyz + 0.5), float3(2.0f.xxx));
 	float ff = dot(floor(t), float3(1.0f.xxx));
 	ff = fmod(ff, 2);
@@ -21,4 +23,5 @@ surface_shader [[
 	data.emission = u_emission;
 	data.translucency = u_translucency;
 	data.shadow = 1;
-]]
+	return data;
+}

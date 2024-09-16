@@ -161,31 +161,24 @@ struct FilmGrain : public RenderPlugin {
 		const RenderBufferHandle ldr_buffer = INVALID_RENDERBUFFER;
 		pipeline.beginBlock("film_grain");
 
-		const RenderBufferHandle res = pipeline.createRenderbuffer({
-			.format = gpu::TextureFormat::RGBA8, 
-			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
-			.debug_name = "film_grain"
-		});
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 		struct {
 			float intensity;
 			float lumamount;
-			gpu::BindlessHandle source;
+			gpu::RWBindlessHandle source;
 			gpu::BindlessHandle noise;
-			gpu::RWBindlessHandle output;
 		} ubdata = {
 			camera.film_grain_intensity,
 			0.1f,
-			pipeline.toBindless(input, stream),
+			pipeline.toRWBindless(input, stream),
 			gpu::getBindlessHandle(m_noise->handle),
-			pipeline.toRWBindless(res, stream)
 		};
 		const Viewport& vp = pipeline.getViewport();
 		pipeline.setUniform(ubdata);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		pipeline.endBlock();
-		return res;
+		return input;
 	}
 };
 
@@ -245,8 +238,7 @@ struct DOF : public RenderPlugin {
 		pipeline.setUniform(ub);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
-		pipeline.setRenderTargets(Span(&input, 1));
-		pipeline.renderTexturedQuad(pipeline.toBindless(dof_rb, stream), false, false);
+		pipeline.blit(pipeline.toBindless(dof_rb, stream), pipeline.toRWBindless(input, stream), {(i32)vp.w, (i32)vp.h});
 
 		pipeline.endBlock();
 		return input;
@@ -339,7 +331,8 @@ struct Bloom : public RenderPlugin {
 
 	bool debugOutput(RenderBufferHandle input, Pipeline& pipeline) override {
 		if (pipeline.m_debug_show_plugin != this) return false;
-		pipeline.copy(input, m_extracted_rt);
+		const Viewport& vp = pipeline.getViewport();
+		pipeline.copy(input, m_extracted_rt, {(i32)vp.w, (i32)vp.h});
 		pipeline.keepRenderbufferAlive(m_extracted_rt);
 		return true;
 	}
@@ -633,7 +626,8 @@ struct SSS : public RenderPlugin {
 	bool debugOutput(RenderBufferHandle input, Pipeline& pipeline) override {
 		if (pipeline.m_debug_show_plugin != this) return false;
 		RenderBufferHandle rb = pipeline.getData<PipelineInstanceData>()->history;
-		if (rb != INVALID_RENDERBUFFER) pipeline.copy(input, rb);
+		const Viewport& vp = pipeline.getViewport();
+		if (rb != INVALID_RENDERBUFFER) pipeline.copy(input, rb, {(i32)vp.w, (i32)vp.h});
 		return true;
 	}
 
@@ -821,11 +815,11 @@ struct TDAO : public RenderPlugin {
 		
 		auto* data = pipeline.getData<PipelineInstanceData>();
 		if (data->rb != INVALID_RENDERBUFFER) {
-			pipeline.copy(input, data->rb, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0});
+			const Viewport& vp = pipeline.getViewport();
+			pipeline.copy(input, data->rb, {(i32)vp.w, (i32)vp.h}, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0});
 		}
 		return true;
 	}
-
 
 	void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) override {
 		if (pipeline.getType() == PipelineType::PREVIEW) return;
@@ -891,27 +885,22 @@ struct TDAO : public RenderPlugin {
 			pipeline.renderBucket(view_id, 1);
 		}
 
+		const Viewport& vp = pipeline.getViewport();
 		struct {
-			float u_intensity;
-			float u_width;
-			float u_height;
-			float u_offset0;
-			float u_offset1;
-			float u_offset2;
-			float u_range;
-			float u_half_depth_range;
-			float u_scale;
-			float u_depth_offset;
+			Vec4 offset;
+			Vec2 size;
+			float intensity;
+			float range;
+			float half_depth_range;
+			float scale;
+			float depth_offset;
 			gpu::BindlessHandle u_depth_buffer;
 			gpu::RWBindlessHandle u_gbufferB;
 			gpu::BindlessHandle u_topdown_depthmap;
 		} ubdata = {
+			Vec4(0, 0, 0, 0),
+			Vec2((float)vp.w, (float)vp.h),
 			m_intensity,
-			(float)pipeline.getViewport().w,
-			(float)pipeline.getViewport().h,
-			0,
-			0,
-			0,
 			m_xz_range,
 			m_y_range * 0.5f,
 			0.01f,
@@ -922,7 +911,7 @@ struct TDAO : public RenderPlugin {
 		};
 
 		pipeline.setUniform(ubdata);
-		pipeline.dispatch(*m_shader, (pipeline.getViewport().w + 15) / 16, (pipeline.getViewport().h + 15) / 16, 1);
+		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		
 		pipeline.endBlock();
 	}
@@ -1007,10 +996,10 @@ struct TAA : public RenderPlugin {
 			.debug_name = "taa_output"	
 		});
 		stream.memoryBarrier(pipeline.toTexture(taa_tmp));
-		pipeline.setRenderTargets(Span(&taa_output, 1));
-		gpu::BindlessHandle t = pipeline.toBindless(taa_tmp, stream);
-		// TODO textured_quad_shader does unnecessary computations
-		pipeline.renderTexturedQuad(t, false, false);
+		// TODO blit does unnecessary computations
+		gpu::BindlessHandle src = pipeline.toBindless(taa_tmp, stream);
+		gpu::RWBindlessHandle dst = pipeline.toRWBindless(taa_output, stream);
+		pipeline.blit(src, dst, display_size);
 		
 		data->history_rb = taa_tmp;
 		pipeline.keepRenderbufferAlive(data->history_rb);

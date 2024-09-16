@@ -29,6 +29,6 @@ VSOutput mainVS(uint vertex_id : SV_VertexID) {
 }
 
 float4 mainPS(VSOutput input) : SV_TARGET {
-	float3 eye_dir = getWorldNormal(input.uv);
+	float3 eye_dir = getViewDirection(input.uv);
 	return float4(sampleCubeBindless(LinearSampler, u_sky, eye_dir).rgb * u_intensity, 1);
 }

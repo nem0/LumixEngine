@@ -1330,7 +1330,7 @@ void FBXImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& 
 		else {
 			const AABB& aabb = model->getAABB();
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			f << "shader \"/pipelines/impostor.shd\"\n";
+			f << "shader \"/pipelines/impostor.hlsl\"\n";
 			f << "texture \"" << src_info.basename << "_impostor0.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor1.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor2.tga\"\n";
@@ -1377,7 +1377,7 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool 
 		}
 		m_out_file.clear();
 
-		writeString("shader \"/pipelines/standard.shd\"\n");
+		writeString("shader \"/pipelines/standard.hlsl\"\n");
 		if (material.alpha_cutout) writeString("define \"ALPHA_CUTOUT\"\n");
 		if (material.textures[2].is_valid) writeString("uniform \"Metallic\", 1.000000");
 

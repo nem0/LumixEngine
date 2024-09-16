@@ -970,7 +970,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "mat"; }
-	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/pipelines/standard.shd\""; }
+	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/pipelines/standard.hlsl\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Material"; }
 
@@ -2988,9 +2988,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			)#";
 
 			m_downscale_program = gpu::allocProgramHandle();
-			const gpu::ShaderType type = gpu::ShaderType::COMPUTE;
-			const char* srcs[] = { downscale_src };
-			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::NONE), srcs, &type, 1, nullptr, 0, "downscale");
+			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::NONE), downscale_src, gpu::ShaderType::COMPUTE, nullptr, 0, "downscale");
 		}
 
 		ASSERT(src_w % dst_w == 0);
@@ -3285,7 +3283,6 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("shd", Shader::TYPE);
 		app.getAssetCompiler().registerExtension("hlsl", Shader::TYPE);
 	}
 
@@ -3317,61 +3314,19 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		file.close();
 
-		if (Path::hasExtension(path, "hlsl")) {
-			findHLSLIncludes(StringView((const char*)content.data(), (u32)content.size()), path);
-			return;
+		const StringView needle = "//@include \"";
+		StringView view((const char*)content.data(), (u32)content.size());
+		for (;;) {
+			const char* inc = find(view, needle);
+			if (!inc) return;
+			
+			StringView dep_path;
+			dep_path.begin = inc + needle.size();
+			dep_path.end = dep_path.begin + 1;
+			while (dep_path.end < view.end && *dep_path.end != '"') ++dep_path.end;
+			m_app.getAssetCompiler().registerDependency(path, Path(dep_path));
+			view.begin = dep_path.end;
 		}
-
-		lua_State* L = luaL_newstate();
-		luaL_openlibs(L);
-
-		struct Context {
-			const Path& path;
-			ShaderPlugin* plugin;
-			u8* content;
-			u32 content_len;
-			int idx;
-		} ctx = { path, this, content.getMutableData(), (u32)content.size(), 0 };
-
-		lua_pushlightuserdata(L, &ctx);
-		lua_setfield(L, LUA_GLOBALSINDEX, "this");
-
-		auto reg_dep = [](lua_State* L) -> int {
-			lua_getfield(L, LUA_GLOBALSINDEX, "this");
-			Context* that = LuaWrapper::toType<Context*>(L, -1);
-			lua_pop(L, 1);
-			const char* path = LuaWrapper::checkArg<const char*>(L, 1);
-			that->plugin->m_app.getAssetCompiler().registerDependency(that->path, Path(path));
-			return 0;
-		};
-
-		lua_pushcclosure(L, reg_dep, "include", 0);
-		lua_setfield(L, LUA_GLOBALSINDEX, "include");
-		lua_pushcclosure(L, reg_dep, "import", 0);
-		lua_setfield(L, LUA_GLOBALSINDEX, "import");
-
-		static const char* preface = 
-			"local new_g = setmetatable({include = include, import = import}, {__index = function() return function() end end })\n"
-			"setfenv(1, new_g)\n";
-
-		OutputMemoryStream tmp(m_app.getAllocator());
-		tmp.write(preface, stringLength(preface));
-		tmp.write(content.data(), content.size());
-		
-		if (LuaWrapper::luaL_loadbuffer(L, (const char*)tmp.data(), tmp.size(), path.c_str()) != 0) {
-			logError(path, ": ", lua_tostring(L, -1));
-			lua_pop(L, 2);
-			lua_close(L);
-			return;
-		}
-
-		if (lua_pcall(L, 0, 0, 0) != 0) {
-			logError(lua_tostring(L, -1));
-			lua_pop(L, 2);
-			lua_close(L);
-			return;
-		}
-		lua_close(L);
 	}
 
 	void addSubresources(AssetCompiler& compiler, const Path& path) override {
@@ -3396,7 +3351,6 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit ShaderIncludePlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("inc", SHADER_INCLUDE_TYPE);
 		app.getAssetCompiler().registerExtension("hlsli", SHADER_INCLUDE_TYPE);
 	}
 
@@ -3434,7 +3388,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
 		ResourceManagerHub& rm = engine.getResourceManager();
 		m_pipeline = Pipeline::create(*renderer, PipelineType::PROBE);
-		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
+		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.hlsl"));
 	}
 
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 num_src_mips, u32 num_saved_mips) {
@@ -3581,9 +3535,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 			m_pipeline->setViewport(viewport);
 			m_pipeline->render(false);
 
-			stream.setFramebufferCube(cubemap, i, 0);
+			gpu::TextureHandle view = gpu::allocTextureHandle();
+			stream.createTextureView(view, cubemap, i, 0);
 			const gpu::BindlessHandle side_tex = gpu::getBindlessHandle(m_pipeline->getOutput());
-			m_pipeline->renderTexturedQuad(side_tex, i != 2 && i != 3, i == 2 || i == 3);
+			gpu::RWBindlessHandle dst = gpu::getRWBindlessHandle(view);
+			m_pipeline->blit(side_tex, dst, {(i32)texture_size, (i32)texture_size}, i != 2 && i != 3, i == 2 || i == 3);
+			stream.destroy(view);
 		}
 
 		if (job.is_reflection) {
@@ -4913,10 +4870,11 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			const Vec2 offset(-1 + (float)-draw_data->DisplayPos.x * 2.f / w, 1 + (float)draw_data->DisplayPos.y * 2.f / h); 
 
 			if (new_program) {
-				const char* fs =
-					R"#(struct Input {
-							float4 color : TEXCOORD0;
+				const char* src =
+					R"#(struct VSInput {
+							float2 pos : TEXCOORD0;
 							float2 uv : TEXCOORD1;
+							float4 color : TEXCOORD2;
 						};
 
 						cbuffer ImGuiState : register(b4) {
@@ -4925,34 +4883,14 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 							uint c_texture;
 						};
 
-						float4 main(Input input) : SV_Target {
-							float4 tc = sampleBindlessLod(LinearSamplerClamp, c_texture, input.uv, 0);
-							return float4( 
-								pow(abs(tc.rgb)/*to silence warning*/, (1/2.2).xxx) * input.color.rgb,
-								input.color.a * tc.a
-							);
-						})#";
-				const char* vs =
-					R"#(cbuffer ImGuiState : register(b4) {
-							float2 c_scale;
-							float2 c_offset;
-							uint c_texture;
-						};
-
-						struct Input {
-							float2 pos : TEXCOORD0;
-							float2 uv : TEXCOORD1;
-							float4 color : TEXCOORD2;
-						};
-
-						struct Output {
+						struct VSOutput {
 							float4 color : TEXCOORD0;
 							float2 uv : TEXCOORD1;
 							float4 position : SV_POSITION;
 						};
 
-						Output main(Input input) {
-							Output output;
+						VSOutput mainVS(VSInput input) {
+							VSOutput output;
 							output.color = input.color;
 							output.uv = input.uv;
 							float2 p = input.pos * c_scale + c_offset;
@@ -4960,16 +4898,21 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 							return output;
 						}
 
+						float4 mainPS(VSOutput input) : SV_Target {
+							float4 tc = sampleBindlessLod(LinearSamplerClamp, c_texture, input.uv, 0);
+							return float4( 
+								pow(abs(tc.rgb)/*to silence warning*/, (1/2.2).xxx) * input.color.rgb,
+								input.color.a * tc.a
+							);
+						}
 					)#";
-				const char* srcs[] = {vs, fs};
-				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
 				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 				decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
 				decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
 				decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				const gpu::StateFlags state = gpu::StateFlags::SCISSOR_TEST | blend_state;
-				stream.createProgram(program, state, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+				stream.createProgram(program, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
 			}
 
 			stream.setCurrentWindow(vp->PlatformHandle);
@@ -5213,10 +5156,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 
-		const char* shader_exts[] = {"shd", "hlsl"};
+		const char* shader_exts[] = {"hlsl"};
 		asset_compiler.addPlugin(m_shader_plugin, Span(shader_exts));
 
-		const char* inc_exts[] = {"inc", "hlsli"};
+		const char* inc_exts[] = {"hlsli"};
 		asset_compiler.addPlugin(m_shader_include_plugin, Span(inc_exts));
 
 		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc"};

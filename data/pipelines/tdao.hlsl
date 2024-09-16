@@ -1,12 +1,11 @@
 //@include "pipelines/common.hlsli"
 
+// top-down ambient occlusion
+
 cbuffer Drawcall : register(b4) {
+	float4 u_offset;
+	float2 u_size;
 	float u_intensity;
-	float u_width;
-	float u_height;
-	float u_offset0;
-	float u_offset1;
-	float u_offset2;
 	float u_range;
 	float u_half_depth_range;
 	float u_scale;
@@ -18,12 +17,14 @@ cbuffer Drawcall : register(b4) {
 
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
-	if (any(thread_id.xy > uint2(u_width, u_height))) return;
+	// compute td-space position
+	float2 screen_uv = thread_id.xy / u_size;
+	float3 pos_td = getViewPosition(u_depth_buffer, Global_inv_view_projection, screen_uv);
+	pos_td += u_offset.xyz;
+	pos_td.y += u_depth_offset;
 
-	float2 screen_uv = thread_id.xy / float2(u_width, u_height);
-	float3 wpos = getViewPosition(u_depth_buffer, Global_inv_view_projection, screen_uv);
-
-	float2 uv = (wpos.xz + float2(u_offset0, u_offset2)) / u_range;
+	// compute uv in tdao texture space
+	float2 uv = pos_td.xz / u_range;
 	#ifdef _ORIGIN_BOTTOM_LEFT
 		uv = uv * float2(1, -1);
 	#endif
@@ -31,20 +32,24 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	if (any(uv < -1)) return;
 	uv = saturate(uv * 0.5 + 0.5);
 
-	float4 v = bindless_rw_textures[u_gbufferB][thread_id.xy];
+	// create random rotation matrix
 	float c = hash(float2(thread_id.xy)) * 2 - 1;
 	float s = sqrt(1 - c * c); 
-	
+	float2x2 rot = mul(u_scale, float2x2(c, s, -s, c)); 
+
+	// compute tdao
 	float ao = 0;
-	float2x2 rot = mul(u_scale, float2x2(c, s, -s, c));
 	for (int i = 0; i < 16; ++i) {
-		float td_depth = sampleBindlessLod(LinearSamplerClamp, u_topdown_depthmap, uv + mul(POISSON_DISK_16[i], rot), 0).r;
-		td_depth = (td_depth * 2 - 1) * u_half_depth_range;
-		ao += saturate((-(wpos.y + u_offset1) - u_depth_offset + td_depth));
+		float2 uv_iter = uv + mul(POISSON_DISK_16[i], rot);
+		float td_depth_ndc = sampleBindlessLod(LinearSamplerClamp, u_topdown_depthmap, uv_iter, 0).r;
+		float td_depth = (td_depth_ndc * 2 - 1) * u_half_depth_range;
+		ao += saturate(td_depth - pos_td.y);
 	}
 	ao *= u_intensity / 16;
 
-	v.w = v.w * (1 - ao);
-	bindless_rw_textures[u_gbufferB][thread_id.xy] = v;
+	// add tdao to ao
+	float4 gbufferB_value = bindless_rw_textures[u_gbufferB][thread_id.xy];
+	gbufferB_value.w = gbufferB_value.w * (1 - ao);
+	bindless_rw_textures[u_gbufferB][thread_id.xy] = gbufferB_value;
 }
 
