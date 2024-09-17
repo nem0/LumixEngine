@@ -148,7 +148,7 @@ struct LUMIX_CORE_API Vec3 {
 struct LUMIX_CORE_API DVec3
 {
 	DVec3() {}
-	DVec3(float a);
+	DVec3(double a);
 	DVec3(double x, double y, double z);
 	DVec3(const DVec3& rhs) = default;
 	explicit DVec3(const Vec3& rhs);
