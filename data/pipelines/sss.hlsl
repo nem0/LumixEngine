@@ -49,7 +49,7 @@ void raycast(float3 csOrig, float3 csDir, float stride, float jitter, uint2 ip0)
 			if (any(p > u_size)) break;
 
 			float depth = sampleBindlessLod(LinearSamplerClamp, u_depth, p / u_size, 0).x;
-			depth = toLinearDepth(Global_inv_projection, depth);
+			depth = toLinearDepth(depth);
 			
 			float dif = rayZFar - depth;
 			if (dif < depth * 0.02 && dif > 1e-3) {
@@ -72,7 +72,7 @@ void raycast(float3 csOrig, float3 csDir, float stride, float jitter, uint2 ip0)
 void main(uint3 thread_id : SV_DispatchThreadID) {
 	float2 inv_size = 1 / u_size;
 	float2 uv = float2(thread_id.xy) * inv_size;
-	float3 p = getViewPosition(u_depth, Global_inv_view_projection, uv);
+	float3 p = getPositionWS(u_depth, uv);
 	float4 o = mul(float4(p, 1), Global_view);
 	float3 d = mul(Global_light_dir.xyz, (float3x3)Global_view);
 	float rr = hash(float2(thread_id.xy) + 0.1 * Global_time);

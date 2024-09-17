@@ -38,7 +38,7 @@ VSOutput mainVS(VSInput input) {
 
 GBufferOutput mainPS(VSOutput input) {
 	float2 screen_uv = input.position.xy / Global_framebuffer_size;
-	float3 wpos = getViewPosition(u_gbuffer_depth, Global_inv_view_projection, screen_uv);
+	float3 wpos = getPositionWS(u_gbuffer_depth, screen_uv);
 	
 	float3 lpos = rotateByQuat(input.rot, wpos - input.pos);
 	if (any(abs(lpos) > input.half_extents)) discard;

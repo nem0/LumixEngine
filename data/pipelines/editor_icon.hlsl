@@ -42,7 +42,7 @@ VSOutput mainVS(Input input) {
 
 float4 mainPS(VSOutput input) : SV_TARGET {
 	float2 screen_uv = input.position.xy / Global_framebuffer_size;
-	float3 wpos = getViewPosition(u_gbuffer_depth, Global_inv_view_projection, screen_uv);
+	float3 wpos = getPositionWS(u_gbuffer_depth, screen_uv);
 	float4 albedo = sampleBindless(LinearSampler, t_albedo, input.uv);
 	#ifdef ALPHA_CUTOUT
 		if (albedo.a < 0.5) discard;

@@ -57,7 +57,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 
 	if (ndc_depth > 0) {
 		// sky is hidden some object
-		float linear_depth = toLinearDepth(Global_inv_projection, ndc_depth);
+		float linear_depth = toLinearDepth(ndc_depth);
 		float2 v = float2(
 			saturate(linear_depth / 50e3),
 			max(0, eyedir.y)
@@ -94,7 +94,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	}
 
 	if (u_fog_enabled > 0) {
-		float linear_depth = ndc_depth > 0 ? toLinearDepth(Global_inv_projection, ndc_depth) : 1e5;
+		float linear_depth = ndc_depth > 0 ? toLinearDepth(ndc_depth) : 1e5;
 		float dist = (linear_depth / dot(eyedir, Global_view_dir.xyz));
 		float3 p0 = Global_camera_world_pos.xyz;
 		float3 p1 = Global_camera_world_pos.xyz + eyedir * dist;
