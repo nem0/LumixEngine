@@ -1,3 +1,11 @@
+// global space - topmost space, objects in the engine are placed in this space
+// world space - centered on camera, orientation same as global space, we send position from cpu to gpu in this space (in most cases)
+// view space - centered on camera, orientation matches camera orientation
+// NDC space - normalized device coordinates, z is in [0, 1] range
+// we use reverse z with infinite far plane
+// space is usually specified in the name of the variable by postfix, WS for world space, VS for view space, etc.
+// we use camera centered world space for rendering to avoid floating point precision issues with large world
+
 #define M_PI 3.14159265359
 #define ONE_BY_PI (1 / 3.14159265359)
 
@@ -207,26 +215,26 @@ uint2 textureSize(TextureCube<float4> Tex, uint Level) {
 
 // returns view vector, i.e. normalized vector in world-space pointing from camera to pixel
 float3 getViewDirection(float2 screen_uv) {
-	float4 posProj = float4(toScreenUV(screen_uv) * 2 - 1, 1, 1.0);
-	float4 wpos = mul(posProj, Global_inv_view_projection);
-	return normalize(wpos.xyz);
+	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, 1, 1.0);
+	float4 pos_ws = mul(pos_ndc, Global_inv_view_projection);
+	return normalize(pos_ws.xyz);
 }
 
-// get view-space position of pixel at `tex_coord`
-float3 getViewPosition(uint depth_buffer, float4x4 inv_view_proj, float2 tex_coord) {
-	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, tex_coord, 0).r;
-	float4 pos_proj = float4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
-	float4 view_pos = mul(pos_proj, inv_view_proj);
-	return view_pos.xyz / view_pos.w;
+// get world-space position of pixel at `screen_uv`
+float3 getPositionWS(uint depth_buffer, float2 screen_uv) {
+	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
+	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, z, 1.0);
+	float4 pos_ws = mul(pos_ndc, Global_inv_view_projection);
+	return pos_ws.xyz / pos_ws.w;
 }
 
-// get view-space position of pixel at `tex_coord` and its NDC depth
-float3 getViewPosition(uint depth_buffer, float4x4 inv_view_proj, float2 tex_coord, out float ndc_depth) {
-	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, tex_coord, 0).r;
-	float4 pos_proj = float4(toScreenUV(tex_coord) * 2 - 1, z, 1.0);
-	float4 view_pos = mul(pos_proj, inv_view_proj);
+// get world-space position of pixel at `tex_coord`, also returns its NDC depth
+float3 getPositionWS(uint depth_buffer, float2 screen_uv, out float ndc_depth) {
+	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
+	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, z, 1.0);
+	float4 pos_ws = mul(pos_ndc, Global_inv_view_projection);
 	ndc_depth = z;
-	return view_pos.xyz / view_pos.w;
+	return pos_ws.xyz / pos_ws.w;
 }
 
 Surface unpackSurface(float2 uv, uint gbuffer0, uint gbuffer1, uint gbuffer2, uint gbuffer3, uint gbuffer_depth, out float ndc_depth) {
@@ -241,7 +249,7 @@ Surface unpackSurface(float2 uv, uint gbuffer0, uint gbuffer1, uint gbuffer2, ui
 	surface.roughness = gb0.a;
 	surface.metallic = gb2.z;
 	surface.emission = unpackEmission(gb2.x);
-	surface.wpos = getViewPosition(gbuffer_depth, Global_inv_view_projection, uv, ndc_depth);
+	surface.wpos = getPositionWS(gbuffer_depth, uv, ndc_depth);
 	surface.V = normalize(-surface.wpos);
 	surface.translucency = gb2.y;
 	surface.ao = gb1.w;
@@ -280,11 +288,14 @@ float4 fullscreenQuad(int vertexID, out float2 screen_uv) {
 	return float4(toScreenUV(screen_uv) * 2 - 1, 0, 1);
 }
 
-// TODO optimize
-float toLinearDepth(float4x4 inv_proj, float ndc_depth) {
-	float4 pos_proj = float4(0, 0, ndc_depth, 1.0);
-	float4 view_pos = mul(pos_proj, inv_proj);
-	return -view_pos.z / view_pos.w;
+// converts ndc depth to linear depth, using Global_projection
+// we assume reversed z with infinite far plane
+float toLinearDepth(float ndc_depth) {
+	// float4 pos_proj = float4(0, 0, ndc_depth, 1.0);
+	// float4 view_pos = mul(pos_proj, inv_proj);
+	// return view_pos.z / view_pos.w;
+	// for reversed z with infinite far plane, this is equivalent to:
+	return Global_projection[3].z / ndc_depth;
 }
 
 StructuredBuffer<Light> b_lights : register(t0);
@@ -315,7 +326,7 @@ Cluster getCluster(float ndc_depth, float2 frag_coord) {
 	#endif
 
 	int3 cluster = int3(ifrag_coord.xy / 64.0, 0);
-	float linear_depth = toLinearDepth(Global_inv_projection, ndc_depth);
+	float linear_depth = toLinearDepth(ndc_depth);
 	cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - log(0.1) * 16 / log(10000 / 0.1));
 	cluster.z = min(cluster.z, 15);
 	int2 tiles = int2((Global_framebuffer_size + 63) / 64.0);

@@ -741,16 +741,14 @@ struct SSAO : public RenderPlugin {
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
 		struct {
+			Vec2 rcp_size;
 			float radius = 0.2f;
 			float intensity = 3;
-			float width;
-			float height;
 			gpu::BindlessHandle normal_buffer;
 			gpu::BindlessHandle depth_buffer;
 			gpu::RWBindlessHandle output;
 		} udata = {
-			.width = (float)vp.w,
-			.height = (float)vp.h,
+			.rcp_size = Vec2(1.f / vp.w, 1.f / vp.h),
 			.normal_buffer = pipeline.toBindless(gbuffer.B, stream),
 			.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
 			.output = pipeline.toRWBindless(ssao_rb, stream)
@@ -890,9 +888,9 @@ struct TDAO : public RenderPlugin {
 
 		struct {
 			Vec4 offset;
-			Vec2 size;
+			Vec2 rcp_size;
 			float intensity;
-			float range;
+			float rcp_range;
 			float half_depth_range;
 			float scale;
 			float depth_offset;
@@ -901,9 +899,9 @@ struct TDAO : public RenderPlugin {
 			gpu::BindlessHandle u_topdown_depthmap;
 		} ubdata = {
 			Vec4(Vec3(vp.pos - m_last_camera_pos), 0),
-			Vec2((float)vp.w, (float)vp.h),
+			Vec2(1.f / vp.w, 1.f / vp.h),
 			m_intensity,
-			m_xz_range,
+			1.f / m_xz_range,
 			m_y_range * 0.5f,
 			0.01f,
 			0.02f,

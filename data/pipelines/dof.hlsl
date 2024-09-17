@@ -22,7 +22,7 @@ float getBlurSize(float depth, float focus_point) {
 
 // https://blog.voxagon.se/2018/05/04/bokeh-depth-of-field-in-single-pass.html
 float3 depthOfField(float2 tex_coord, float focus_point) {
-	float center_depth = toLinearDepth(Global_inv_projection, sampleBindlessLod(LinearSamplerClamp, u_depth, tex_coord, 0).r);
+	float center_depth = toLinearDepth(sampleBindlessLod(LinearSamplerClamp, u_depth, tex_coord, 0).r);
 	float center_size = getBlurSize(center_depth, focus_point);
 	float3 color = sampleBindlessLod(LinearSamplerClamp, u_texture, tex_coord, 0).rgb;
 	float tot = 1.0;
@@ -31,7 +31,7 @@ float3 depthOfField(float2 tex_coord, float focus_point) {
 	for (float ang = 0.0; radius < u_max_blur_size; ang += GOLDEN_ANGLE) {
 		float2 tc = tex_coord + float2(cos(ang), sin(ang)) * view_size_rcp * radius;
 		float3 sample_color = sampleBindlessLod(LinearSamplerClamp, u_texture, tc, 0).rgb;
-		float sample_depth = toLinearDepth(Global_inv_projection, sampleBindlessLod(LinearSamplerClamp, u_depth, tc, 0).r);
+		float sample_depth = toLinearDepth(sampleBindlessLod(LinearSamplerClamp, u_depth, tc, 0).r);
 		float sample_size = getBlurSize(sample_depth, focus_point);
 		if (sample_depth > center_depth)
 			sample_size = clamp(sample_size, 0.0, center_size * 2.0);

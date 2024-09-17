@@ -59,9 +59,9 @@ float4 mainPS(VSOutput input) : SV_TARGET {
 	data.translucency = 0;
 
 	float linear_depth = dot(data.wpos.xyz, Pass_view_dir.xyz);
-	Cluster cluster = getClusterLinearDepth(linear_depth, input.frag_coord.xy);
+	Cluster cluster = getClusterLinearDepth(linear_depth, input.position.xy);
 	float4 o_color;
-	o_color.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, Global_shadowmap, Global_shadow_atlas, Global_reflection_probes, input.frag_coord.xy);
+	o_color.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, Global_shadowmap, Global_shadow_atlas, Global_reflection_probes, input.position.xy);
 
 	#if defined ALPHA_CUTOUT
 		if(data.alpha < 0.5) discard;

@@ -126,7 +126,7 @@ float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
 			if (any(p > float2(Global_framebuffer_size))) break;
 
 			float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, p / Global_framebuffer_size).x;
-			depth = toLinearDepth(Global_inv_projection, depth);
+			depth = toLinearDepth(depth);
 			
 			float dif = rayZFar - depth;
 			if (dif > 1e-3) {
@@ -163,7 +163,7 @@ float getWaterDepth(float3 wpos, float3 view, float3 normal)
 	float4 screen_pos = mul(float4(wpos, 1), Global_view_projection);
 	screen_pos /= screen_pos.w;
 	float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, toScreenUV(screen_pos.xy * 0.5 + 0.5)).x;
-	return toLinearDepth(Global_inv_projection, depth) - toLinearDepth(Global_inv_projection, screen_pos.z);
+	return toLinearDepth(depth) - toLinearDepth(screen_pos.z);
 }
 
 float4 getRefraction(float3 wpos)

@@ -224,7 +224,7 @@ Surface getSurface(VSOutput input) {
 		output.gbuffer3 = gb.gbuffer3;
 		#ifdef HAS_DEPTHMAP
 			float depth = sampleBindless(LinearSampler, t_depth, input.uv).x;
-			float linear_z = toLinearDepth(Pass_inv_projection, input.position.z);
+			float linear_z = toLinearDepth(input.position.z);
 			output.depth = 0.1 / (linear_z + (depth - 0.5) * u_radius); // TODO remove hardcoded near plane 0.1
 			output.depth = input.position.z;
 		#endif

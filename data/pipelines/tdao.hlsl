@@ -4,9 +4,9 @@
 
 cbuffer Drawcall : register(b4) {
 	float4 u_offset;
-	float2 u_size;
+	float2 u_rcp_size;
 	float u_intensity;
-	float u_range;
+	float u_rcp_range;
 	float u_half_depth_range;
 	float u_scale;
 	float u_depth_offset;
@@ -18,24 +18,23 @@ cbuffer Drawcall : register(b4) {
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
 	// compute td-space position
-	float2 screen_uv = thread_id.xy / u_size;
-	float3 pos_td = getViewPosition(u_depth_buffer, Global_inv_view_projection, screen_uv);
+	float2 screen_uv = thread_id.xy * u_rcp_size;
+	float3 pos_td = getPositionWS(u_depth_buffer, screen_uv);
 	pos_td += u_offset.xyz;
 	pos_td.y += u_depth_offset;
 
 	// compute uv in tdao texture space
-	float2 uv = pos_td.xz / u_range;
+	float2 uv = pos_td.xz * u_rcp_range;
 	#ifdef _ORIGIN_BOTTOM_LEFT
 		uv = uv * float2(1, -1);
 	#endif
-	if (any(uv > 1)) return;
-	if (any(uv < -1)) return;
+	if (any(abs(uv) > 1)) return;
 	uv = saturate(uv * 0.5 + 0.5);
 
 	// create random rotation matrix
-	float c = hash(float2(thread_id.xy)) * 2 - 1;
-	float s = sqrt(1 - c * c); 
-	float2x2 rot = mul(u_scale, float2x2(c, s, -s, c)); 
+	float c = hash(float2(thread_id.xy) * 0.01) * 2 - 1;
+	float s = sqrt(1 - c * c);
+	float2x2 rot = u_scale * float2x2(c, s, -s, c); 
 
 	// compute tdao
 	float ao = 0;
