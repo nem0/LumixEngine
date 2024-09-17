@@ -346,6 +346,7 @@ struct ShaderCompiler {
 		}
 
 		const StableHash32 hash(src, stringLength(src));
+		program.shader_hash = hash;
 		if (type == ShaderType::SURFACE) {
 			// TODO surface shader cache
 			program.vs = compileStage(hash, src, "vs_5_1", name, "mainVS");
@@ -370,18 +371,7 @@ struct ShaderCompiler {
 				return false;
 			}
 		}
-		
-		RollingStableHasher hasher;
-		hasher.begin();
-		hasher.update(program.attributes, sizeof(program.attributes[0]) * program.attribute_count);
-		hasher.update(&program.state, sizeof(program.state));
-		hasher.update(&program.primitive_topology, sizeof(program.primitive_topology));
-		hasher.update(&program.primitive_topology_type, sizeof(program.primitive_topology_type));
-		if (program.vs) hasher.update(program.vs->GetBufferPointer(), (u32)program.vs->GetBufferSize());
-		if (program.ps) hasher.update(program.ps->GetBufferPointer(), (u32)program.ps->GetBufferSize());
-		if (program.cs) hasher.update(program.cs->GetBufferPointer(), (u32)program.cs->GetBufferSize());
-		program.shader_hash = hasher.end();
-		
+
 		return true;
 	}
 
