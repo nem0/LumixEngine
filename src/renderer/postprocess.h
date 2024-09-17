@@ -783,6 +783,7 @@ struct TDAO : public RenderPlugin {
 	float m_y_range = 200;
 	float m_intensity = 0.3f;
 	bool m_enabled = true;
+	DVec3 m_last_camera_pos = DVec3(DBL_MAX);
 	
 	struct PipelineInstanceData {
 		RenderBufferHandle rb = INVALID_RENDERBUFFER;
@@ -827,6 +828,7 @@ struct TDAO : public RenderPlugin {
 		auto* inst_data = pipeline.getData<PipelineInstanceData>();
 
 		if (!m_enabled) {
+			m_last_camera_pos = DVec3(DBL_MAX);
 			inst_data->rb = INVALID_RENDERBUFFER;
 			return;
 		}
@@ -843,15 +845,16 @@ struct TDAO : public RenderPlugin {
 		pipeline.keepRenderbufferAlive(inst_data->rb);
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
-		// TODO
-		bool camera_moved = true;
+		const Viewport& vp = pipeline.getViewport();
+		const bool camera_moved = fabs(vp.pos.x - m_last_camera_pos.x) > 3 || fabs(vp.pos.y - m_last_camera_pos.y) > 3 || fabs(vp.pos.z - m_last_camera_pos.z) > 3;
 		if (camera_moved) {
+			m_last_camera_pos = vp.pos;
 			pipeline.setRenderTargets({}, inst_data->rb);
 			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
 
 			CameraParams cp;
 			const Quat rot(-0.707106769f, 0, 0, 0.707106769f);
-			cp.pos = pipeline.getViewport().pos;
+			cp.pos = vp.pos;
 			ShiftedFrustum frustum;
 			const float ratio = 1;
 			frustum.computeOrtho({ 0, 0, 0 },
@@ -861,7 +864,7 @@ struct TDAO : public RenderPlugin {
 				m_xz_range,
 				-0.5f * m_y_range,
 				0.5f * m_y_range);
-			frustum.origin = pipeline.getViewport().pos;
+			frustum.origin = vp.pos;
 			cp.frustum = frustum;
 			cp.lod_multiplier = 1;
 			cp.is_shadow = false;
@@ -885,7 +888,6 @@ struct TDAO : public RenderPlugin {
 			pipeline.renderBucket(view_id, 1);
 		}
 
-		const Viewport& vp = pipeline.getViewport();
 		struct {
 			Vec4 offset;
 			Vec2 size;
@@ -898,7 +900,7 @@ struct TDAO : public RenderPlugin {
 			gpu::RWBindlessHandle u_gbufferB;
 			gpu::BindlessHandle u_topdown_depthmap;
 		} ubdata = {
-			Vec4(0, 0, 0, 0),
+			Vec4(Vec3(vp.pos - m_last_camera_pos), 0),
 			Vec2((float)vp.w, (float)vp.h),
 			m_intensity,
 			m_xz_range,
